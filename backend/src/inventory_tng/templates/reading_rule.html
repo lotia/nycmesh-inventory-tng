@@ -17,6 +17,9 @@ reads every name with it again, refused where two would read alike. -#}
     {% endfor %}
     <label><input type="radio" name="reading" value="{{ not_a_unit }}" {% if rule.reading is none %}checked{% endif %} required> Not a unit</label>
   </fieldset>
+  <label><input type="checkbox" name="respell" {% if rule.respell %}checked{% endif %}> Respell it
+    <span class="hint">a name typed with “{{ rule.token }}” is saved with the
+    unit's symbol, joined to its number; otherwise names are saved as typed</span></label>
   <button class="primary">Save</button>
 </form>
 

@@ -321,14 +321,21 @@ change to one reads every name with its number again (`items.reread`),
 refused where two names would then read alike. Administrators see and
 correct them on the Unit readings page, linked from Items.
 
-An item's or a package's form stores each unit after a number by its
-symbol as a name shows it, joined to the number (`units.spell`: `305 m` is
-`305m`, `10 uF` is `10μF`), reading case loosely only as a size in its
-kind's plausible range (`units.KINDS`), and asks which was meant where two
-readings are likely. A unit's words (`units.Unit.words`, such as `feet`)
-are read by search only, never to spell a name. A new unit needs its name
-in words and, if a name spells it otherwise than its symbol, that
-spelling: `units.NAMES` and `units.SHOWN`.
+An item's, a package's or an alias's form saves the name as typed, in
+canonical spelling, and says under it how each unit after a number is
+read (`units.found_in`): by its reading rule, else by the one reading the
+table leaves likely (case read loosely only as a size in its kind's
+plausible range, `units.KINDS`; a bare `G`, `M` or `K` a data rate too,
+`units.BARE_RATES`), never in a product's name (`units.PRODUCTS`). Where
+two readings are likely and nothing settles one, it asks, offering them in
+`units.PROFILE`'s order; the answer, or a correction under "Not right?",
+is kept as a rule as the form saves. A name is respelt only where its rule
+says (`units.spell`). A unit's words (`units.Unit.words`, such as `feet`)
+are read by search only, never in a name. A new unit needs its name in
+words and, if a name spells it otherwise than its symbol, that spelling:
+`units.NAMES` and `units.SHOWN`. The seeding page (Unit readings, then
+Propose) proposes rules from every name, by the words near each unit
+(`reading_rules.EVIDENCE`).
 
 ### Locking a row
 

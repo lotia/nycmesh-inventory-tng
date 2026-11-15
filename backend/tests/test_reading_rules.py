@@ -15,7 +15,7 @@ from structlog.testing import capture_logs
 from inventory_tng import items, names, reading_rules, sign_in, units
 from inventory_tng.admin.items import ITEMS, SEARCHED
 from inventory_tng.admin.listing import folded
-from inventory_tng.admin.reading_rules import READINGS
+from inventory_tng.admin.reading_rules import READINGS, SEED, offered
 from inventory_tng.catalogue import catalogue
 from inventory_tng.models import (
     Category,
@@ -53,7 +53,7 @@ def test_a_rule_reads_a_unit_before_the_table() -> None:
     assert units.respell("Tape 3M", {"3M": units.Rule(None)}) == "Tape 3M"
     assert unit_key("Link 10G", {"10G": GBPS}) == unit_key("Link 10 Gbps")
     (found,) = units.found_in("Link 10G", {"10G": units.Rule(None)})
-    assert (found.key, found.settled, found.asks) == ("10G", None, False)
+    assert (found.key, found.read, found.asks) == ("10G", None, False)
 
 
 def test_names_that_read_alike_are_one(session: Session, radios: Category) -> None:
@@ -149,6 +149,15 @@ def test_a_rule_reading_names_alike_is_refused(
     assert items.read_alike(session, ["10G"], {}) == []
 
 
+def test_a_rule_may_read_what_the_table_finds_unlikely() -> None:
+    """Offered with the likely readings; a token no name holds offers
+    none."""
+    rules = {"10G": units.Rule("Mbit/s")}
+    (found,) = units.found_in("Link 10G", rules)
+    assert [str(r) for r in found.offered] == ["Gbit/s", "g", "Mbit/s"]
+    assert offered("m", units.Rule(None)) == ()
+
+
 def test_a_rule_reads_only_known_readings(session: Session) -> None:
     with breaks(session, reading_rules.NOT_A_READING):
         reading_rules.decide(session, {"10G": units.Rule("Gbps")}, None)
@@ -168,7 +177,7 @@ def test_the_answer_to_a_unit_asked_about_is_kept_as_a_rule(
     assert (rule.reading, rule.decided_by_admin_id is not None) == ("mg", True)
     again = form | {"name": "Brass 5 MG"}
     assert admin_client.post(ITEMS, data=again).status_code == 303
-    named(session, Item, "Brass 5mg")
+    named(session, Item, "Brass 5 MG")
 
 
 def test_the_scan_page_has_the_rules(session: Session) -> None:
@@ -249,3 +258,122 @@ def test_rules_are_for_administrators(make_client: Callable[..., TestClient]) ->
     answer = make_client().get(READINGS)
     assert answer.status_code == 303
     assert answer.headers["location"].startswith(sign_in.SIGN_IN)
+
+
+def test_proposals_read_the_words_near_each_unit() -> None:
+    """Ali, 2026-11-15: 10G near SFP+ or an uplink is a data rate, 305M near
+    a spool a length; a unit the table reads loosely is proposed so; one
+    nothing settles is proposed nothing, to choose; one read as typed, or
+    by a rule, is not listed."""
+    names = [
+        "Uplink SFP+ 10G",
+        "Switch 10G port",
+        "Spool 305M cable",
+        "Tape 3M",
+        "Cap 10MF",
+        "Patch 2 m",
+        "Link 1G",
+        "Port 10G",
+        "Uplink 10G spare",
+    ]
+    proposals = reading_rules.propose(names, {"1G": units.Rule(None)})
+    said = {
+        p.found.key: (p.count, str(p.proposed) if p.proposed else None, p.why)
+        for p in proposals
+    }
+    assert said == {
+        "10G": (4, "Gbit/s", "near port, sfp+, switch, uplink"),
+        "305M": (1, "m", "near cable, spool"),
+        "3M": (1, None, ""),
+        "10MF": (1, "mF", "the one likely reading"),
+    }
+    assert proposals[0].found.key == "10G"
+    # A few of the names, first found.
+    assert proposals[0].names == ["Uplink SFP+ 10G", "Switch 10G port", "Port 10G"]
+
+
+def test_the_seeding_page_proposes_and_accepts_readings(
+    admin_client: TestClient, session: Session, radios: Category
+) -> None:
+    """Accept all, each as chosen; refused while one nothing settles is not
+    chosen; accepted ones become rules, and are proposed no more."""
+    link = new_item(session, radios, "Uplink SFP+ 10G")
+    add(session, ItemPackage(item_id=link.id, name="Spool 305M cable", size=1))
+    items.add_alias(session, link, "Tape 3M")
+    page = text(admin_client.get(SEED))
+    assert "“10G”" in page
+    assert "near sfp+, uplink" in page
+    assert '<option value="">Choose…</option>' in page
+    form = {"reading:10G": "Gbit/s", "reading:305M": "m", "reading:3M": ""}
+    refused = admin_client.post(SEED, data=form)
+    assert refused.status_code == 400
+    assert "Choose how to read each one marked" in text(refused)
+    assert session.scalars(select(ReadingRule)).all() == []
+    with capture_logs() as logs:
+        done = admin_client.post(SEED, data=form | {"reading:3M": "none"})
+    assert done.headers["location"] == f"{SEED}?notice=readings_accepted"
+    rules = {r.token: r.reading for r in session.scalars(select(ReadingRule))}
+    assert rules == {"10G": "Gbit/s", "305M": "m", "3M": None}
+    (line,) = [line for line in logs if line["event"] == "reading rules set"]
+    assert line["by"] == "seed"
+    assert len(line["reading_rule_ids"]) == 3
+    assert "Nothing to settle" in text(admin_client.get(SEED))
+    assert "10Gbit/s" in link.search_text
+
+
+def test_the_seeding_page_reviews_one_by_one(
+    admin_client: TestClient, session: Session, radios: Category
+) -> None:
+    new_item(session, radios, "Uplink SFP+ 10G")
+    new_item(session, radios, "Tape 3M")
+    page = text(admin_client.get(f"{SEED}?one=1"))
+    assert "1 of 2." in page
+    assert "“10G”" in page
+    assert "“3M”" not in page
+    assert f'href="{SEED}?one=1&at=1">Skip</a>' in page
+    skipped = text(admin_client.get(f"{SEED}?one=1&at=1"))
+    assert "2 of 2." in skipped
+    assert "“3M”" in skipped
+    form = {"one": "1", "at": "0", "reading:10G": "Gbit/s"}
+    done = admin_client.post(SEED, data=form)
+    assert done.headers["location"] == (f"{SEED}?one=1&at=0&notice=readings_accepted")
+    assert "“3M”" in text(admin_client.get(done.headers["location"]))
+    # A row settled meanwhile is left as it is.
+    again = admin_client.post(SEED, data=form | {"reading:10G": "g"})
+    assert again.status_code == 303
+    assert rule_of(session, "10G").reading == "Gbit/s"
+
+
+def test_the_seeding_page_names_what_would_read_alike(
+    admin_client: TestClient, session: Session, radios: Category
+) -> None:
+    one = new_item(session, radios, "Link 10G")
+    other = new_item(session, radios, "Link 10 Gbps")
+    refused = admin_client.post(SEED, data={"reading:10G": "Gbit/s"})
+    assert refused.status_code == 409
+    assert f"item {one.id} (Link 10G) and item {other.id} (Link 10 Gbps)" in (
+        text(refused)
+    )
+
+
+def test_a_rule_may_respell_names_typed_with_it(
+    admin_client: TestClient, session: Session, radios: Category
+) -> None:
+    """Set on the rule's page: names typed with it after are saved with the
+    unit's symbol joined to its number; one typed before stays as it is."""
+    before = new_item(session, radios, "Reel 305M")
+    (rule,) = reading_rules.decide(session, {"305M": units.Rule("m")}, None)
+    page = text(admin_client.get(f"{READINGS}/{rule.id}"))
+    assert "Respell it" in page
+    sent = {"reading": "m", "respell": "on", "version": shown(rule)}
+    assert admin_client.post(f"{READINGS}/{rule.id}", data=sent).status_code == 303
+    assert (rule.reading, rule.respell) == ("m", True)
+    assert "Respelt" in text(admin_client.get(READINGS))
+    form = {"name": "Spool 305 M", "category_id": str(radios.id), "unit": "each"}
+    # A different item from the reel, whose name is close.
+    sent = form | {"different": "Spool 305 M"}
+    assert admin_client.post(ITEMS, data=sent).status_code == 303
+    named(session, Item, "Spool 305m")
+    assert before.name == "Reel 305M"
+    page = text(admin_client.get(f"{ITEMS}/{before.id}"))
+    assert "Read as 305m · length.\n  Saved as 305m." in page

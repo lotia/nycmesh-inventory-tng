@@ -410,3 +410,39 @@ page names them by id, to rename one first.
 Rejected: a key in the database from a table of rules, which would need a
 function reading the unit table (0016), and keying rules by the unit alone
 (`M`), which would read `305M` and `100M` alike.
+
+## Amendment: names are saved as typed, and units read by rules (2026-11-15)
+
+A name is saved as typed, in canonical spelling: a reading changes what
+search matches and how names are compared, not the name (Ali, 2026-11-15,
+inventory-tng-c0c.3, option D). This replaces respelling each unit by its
+symbol (2026-11-14, above), which changed names silently: `SFP+ 10G` was
+saved as `SFP+ 10g`, read as grams. A name is respelt only where its
+reading rule says so (`respell`, set on the rule's page).
+
+Three layers decide a reading. A network profile ranks kinds where a unit
+could be several (`units.PROFILE`): data rate first, then length, power
+level and gain, power, voltage, current, frequency, the rest, and mass
+last; and a bare `G`, `M` or `K` after a number may be a data rate (`10G`,
+10 Gbps). A product list is never read as units (`units.PRODUCTS`:
+`Cat6a`, `SFP+`, `5AC`, `Gen2`, `2-in-1` and the like). And reading rules,
+seeded once from every name saved: the seeding page tallies each number
+and unit no rule settles, with the words near it (`10G` near `SFP+` or
+`uplink` is a data rate, `305M` near `spool` a length), proposes a reading
+with that evidence, and an administrator accepts them all, changes any
+first, or reviews them one by one; one nothing settles needs a choice.
+It is run again after an import (inventory-tng-c0c.5).
+
+On the form, under the name: `Read as 10Gbps · data rate. Saved as
+typed.`, with "Not right?" offering the other readings and "Not a unit",
+which, saved with the name, updates the rule. A number and unit nothing
+settles, two readings being likely, is asked once, inline, as the form
+saves (`"3M" is new. Is it a unit?`, with `3Mbps · data rate`, `3m ·
+length` and `Not a unit: keep "3M"`), only kinds this inventory uses
+offered: `24P`, which none reads, is simply no unit. Where one reading
+alone is likely, it is taken, and said, as `4 K` is 4 kbps, kelvins being
+unlikely. A reading is written by its usual printed symbol: data rates as
+`bps`, `Mbps`, `Gbps`, and `m³` (Q15). Corrections are made in three
+places, the seeding page, the form and the rules page, and each reads every
+name with that spelling again. Search still reads a bare `K` as kelvins
+where no rule says otherwise: the profile is the forms'.

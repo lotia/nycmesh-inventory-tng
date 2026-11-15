@@ -216,7 +216,14 @@ NAMES: dict[str, str] = {
     "m3": "cubic {}metres",
     "gal": "US gallons",
 }
-SHOWN: dict[str, str] = {"degC": "°C", "degF": "°F", "Ohm": "\u03a9", "m3": "m\u00b3"}
+# Data rates as printed: bps, Mbps, Gbps (Ali, 2026-11-15, Q15).
+SHOWN: dict[str, str] = {
+    "degC": "°C",
+    "degF": "°F",
+    "Ohm": "\u03a9",
+    "m3": "m\u00b3",
+    "bit/s": "bps",
+}
 
 
 def table() -> dict[str, Any]:
@@ -396,15 +403,65 @@ def respell(text: str, rules: Rules | None = None) -> str:
     return ALONE.sub(alone, AFTER_A_NUMBER.sub(respelt, text))
 
 
-# How a name an administrator types spells its units (docs/decisions/0021,
-# Ali, 2026-11-12, inventory-tng-c0c.3): each unit right after a number
-# by its symbol, joined to the number, read in any case, but only as a
-# size this inventory may hold; where case leaves two such, the form asks.
+# How a name an administrator types is read (docs/decisions/0021, Ali,
+# 2026-11-15, option D, inventory-tng-c0c.3): saved as typed, each unit
+# right after a number read by its reading rule, else by the one likely
+# reading the table leaves, else asked once, the answer kept as a rule.
 
 # The number a unit follows, ending at its last digit: a comma groups
 # thousands, a point is decimal, and a minus counts only where no letter
 # or digit is before it ("-40 dBm", not "Gen2-5 m").
 _NUMBER = re.compile(r"(?:(?<![^\W_])[-\u2212])?[0-9][0-9,]*(?:[.][0-9]+)?\Z")
+
+# A network inventory's profile (Ali, 2026-11-15): where a unit may be of
+# several kinds, the readings are offered in this order of kinds, data
+# rates first and mass last.
+PROFILE = (
+    "data rate",
+    "length",
+    "power level",
+    "gain",
+    "power",
+    "voltage",
+    "current",
+    "frequency",
+    "temperature",
+    "capacitance",
+    "resistance",
+    "volume",
+    "mass",
+)
+# A bare G, M or K after a number may be a data rate: 10G is 10 Gbps.
+BARE_RATES = {"G": "G", "M": "M", "K": "k"}
+# Words in names that are products, never a number and its unit (Ali,
+# 2026-11-15), compared in lower case: Cat6a is no 6 amperes.
+PRODUCTS = frozenset(
+    (
+        "cat5",
+        "cat5e",
+        "cat6",
+        "cat6a",
+        "cat7",
+        "cat8",
+        "sfp",
+        "sfp+",
+        "sfp28",
+        "qsfp",
+        "qsfp+",
+        "qsfp28",
+        "poe",
+        "poe+",
+        "2ac",
+        "5ac",
+        "gen2",
+        "gen3",
+        "2-in-1",
+        "3-in-1",
+        "4-in-1",
+    )
+)
+# A word, as PRODUCTS has them: letters, digits, + and - within.
+_WORD = re.compile(r"[A-Za-z0-9+]+(?:-[A-Za-z0-9+]+)*")
 
 
 def reading_of(symbol: str) -> Reading | None:
@@ -414,8 +471,9 @@ def reading_of(symbol: str) -> Reading | None:
 
 
 def readings(token: str) -> list[tuple[Reading, bool]]:
-    """Every unit `token` spells in any case, each once, and whether it is
-    spelt so as typed, those first: `MF` is megafarads as typed and
+    """Every unit `token` spells in any case, each once, a bare G, M or K
+    as a data rate too (BARE_RATES), and whether it is spelt so as typed:
+    those first, then by PROFILE's kinds. `MF` is megafarads as typed and
     millifarads otherwise."""
     lower = token.lower()
     found: list[tuple[Reading, bool]] = []
@@ -429,7 +487,26 @@ def readings(token: str) -> list[tuple[Reading, bool]]:
             if unit := _TAKES_PREFIX_LOOSE.get(rest.lower()):
                 exact = token.startswith(spelling) and rest in unit.prefixed()
                 found.append((Reading(prefix, unit), exact))
-    return sorted(found, key=lambda pair: not pair[1])
+    if token in BARE_RATES:
+        rate = read(BARE_RATES[token] + "bit/s")
+        assert rate is not None  # Gbit/s, Mbit/s and kbit/s are read.
+        found.append((rate, False))
+    return sorted(found, key=lambda pair: (not pair[1], _rank(pair[0])))
+
+
+def _rank(reading: Reading) -> int:
+    return PROFILE.index(reading.unit.kind)
+
+
+def _product(name: str, at: int) -> bool:
+    """Whether the word the digit at `at` is in, alone or joined to the word
+    before it, is a product's (PRODUCTS): `Cat6a`, `Cat 6a`, `5AC`."""
+    for word in _WORD.finditer(name):
+        if word.start() <= at < word.end():
+            before = re.search(r"([A-Za-z0-9+]+)[ -]?\Z", name[: word.start()])
+            joined = (before[1] if before else "") + word[0]
+            return word[0].lower() in PRODUCTS or joined.lower() in PRODUCTS
+    return False  # pragma: no cover  A digit is always in a word.
 
 
 @dataclass(frozen=True)
@@ -437,17 +514,17 @@ class Found:
     """What may be a unit right after a number in a name: the number as
     typed, the unit as typed (`token`), where the space before it, if any,
     and it are (`start`, `end`), and the readings of it that are plausible
-    sizes (Reading.plausible), the one spelt as typed first. `settled` is
-    the reading to spell it by, if case leaves only one: the one plausible,
-    or the one plausible spelt as typed."""
+    sizes (Reading.plausible), the one spelt as typed first, then by
+    PROFILE. `read` is what it reads as: its rule's reading (None: no
+    unit), else the one plausible, or the one plausible spelt as typed;
+    `rule` its rule, if it has one."""
 
     number: str
     token: str
     start: int
     end: int
     plausible: tuple[Reading, ...]
-    settled: Reading | None
-    # Its reading rule, if it has one, which settled it.
+    read: Reading | None
     rule: Rule | None = None
 
     @property
@@ -457,16 +534,29 @@ class Found:
 
     @property
     def asks(self) -> bool:
-        """Whether case leaves two plausible readings and no rule settles
-        it, so the form asks."""
-        return self.rule is None and self.settled is None and len(self.plausible) > 1
+        """Whether nothing settles it, two readings being likely: no rule,
+        and case or the profile leaving two. A form asks once."""
+        return self.rule is None and self.read is None and len(self.plausible) > 1
+
+    @property
+    def offered(self) -> tuple[Reading, ...]:
+        """What it may be read as: its plausible readings, and its rule's,
+        if that is not among them."""
+        if self.read is None or self.read in self.plausible:
+            return self.plausible
+        return (*self.plausible, self.read)
+
+    def shown(self, reading: Reading) -> str:
+        """`reading` joined to its number, as a name spells it: `10Gbps`."""
+        return self.number + reading.shown
 
 
 def found_in(name: str, rules: Rules | None = None) -> list[Found]:
     """What may be units in `name`, right after a number: each token some
     unit spells, in any case (readings), whether or not one is plausible,
-    and each a reading rule names. Its rule, if any, settles it.
-    `name` is in canonical spelling (models.canonical), so `℃` is `°C`."""
+    and each a reading rule names, but in a product's name (PRODUCTS). Its
+    rule, if any, settles it. `name` is in canonical spelling
+    (models.canonical), so `℃` is `°C`."""
     found = []
     for match in AFTER_A_NUMBER.finditer(name):
         if _marked(name, match.end()):
@@ -474,7 +564,7 @@ def found_in(name: str, rules: Rules | None = None) -> list[Found]:
         number = _number(name, match.end(1))
         rule = (rules or {}).get(rule_key(number, match[2]))
         every = readings(match[2])
-        if not every and rule is None:
+        if rule is None and (not every or _product(name, match.end(1) - 1)):
             continue
         value = float(number.replace(",", "").replace("\u2212", "-"))
         plausible = [(r, exact) for r, exact in every if r.plausible(value)]
@@ -505,35 +595,27 @@ def read_as(name: str, rules: Rules | None = None) -> str:
     the table (found_in), spelt by its symbol (str(Reading)) joined to its
     number, the rest as it is: so names that read alike are spelt alike,
     `10 µF`, `10 uF` and `10μF` all `10uF` (models.KeyedName.unit_key)."""
-    spelt, at = [], 0
-    for found in found_in(name, rules):
-        if found.settled is not None:
-            spelt += [name[at : found.start], str(found.settled)]
-            at = found.end
-    return "".join([*spelt, name[at:]])
+    return _spelt(name, {f: str(f.read) for f in found_in(name, rules) if f.read})
 
 
-def spell(
-    name: str, chosen: Mapping[str, str], rules: Rules | None = None
-) -> tuple[str, list[Found]]:
-    """`name` with each unit right after a number spelt by its symbol as a
-    name shows it (Reading.shown), joined to the number: the one reading
-    case leaves, or the one `chosen` for its token (by str(Reading)), as
-    the form asked. And what is still to be asked. A token with no
-    plausible reading is left as typed: `4 K`, as -269 °C, is no unit."""
-    spelt, asked, at = [], [], 0
-    for found in found_in(name, rules):
-        choice = next(
-            (r for r in found.plausible if str(r) == chosen.get(found.key)), None
-        )
-        reading = found.settled if found.rule is not None else found.settled or choice
-        if reading is None:
-            if found.asks:
-                asked.append(found)
-            continue
-        spelt += [name[at : found.start], reading.shown]
+def spell(name: str, found: list[Found]) -> str:
+    """`name` as it is saved: as typed (Ali, 2026-11-15), but where a
+    reading rule says to respell its unit, by its symbol as a name shows it
+    (Reading.shown), joined to its number."""
+    return _spelt(
+        name,
+        {f: f.read.shown for f in found if f.read and f.rule and f.rule.respell},
+    )
+
+
+def _spelt(name: str, spelt: Mapping[Found, str]) -> str:
+    """`name` with each Found's unit, and the space before it, as `spelt`
+    says."""
+    parts, at = [], 0
+    for found, spelling in spelt.items():
+        parts += [name[at : found.start], spelling]
         at = found.end
-    return "".join([*spelt, name[at:]]), asked
+    return "".join([*parts, name[at:]])
 
 
 def main(path: Path = TABLE) -> None:

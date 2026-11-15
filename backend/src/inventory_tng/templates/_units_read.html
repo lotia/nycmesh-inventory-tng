@@ -1,15 +1,33 @@
-{#- How the units in a name are read (units.found_in, docs/decisions/0021): each said in a hint under its field, and where case leaves two plausible readings, the form asks which was meant. `typed` is the name in the field, `sent` the form sent, holding any answer. -#}
-{% set found = units_read(typed) %}
-{% for each in found if not each.asks %}
-<span class="hint block">{% if each.settled %}{{ each.number }}{{ each.settled.shown }}: {{ each.settled.named }}
-{%- else %}{{ each.number }} {{ each.token }}: not read as a unit, as no size of one is likely{% endif %}</span>
-{% endfor %}
-{% for each in found if each.asks %}
+{#- How the units in a name are read (units.found_in, docs/decisions/0021, Ali, 2026-11-15): a name is saved as typed; under it, each unit's reading, with "Not right?" to correct it, and where nothing settles one, the question, asked once. An answer or a correction is kept as a reading rule as the form saves. `typed` is the name in the field, `sent` the form sent, holding any answer. -#}
+{% for each in units_read(typed) %}
 {% set field = reading_field ~ each.key %}
+{% set chosen = sent.get(field, "") %}
+{% if each.asks %}
 <fieldset>
-  <legend>{{ each.number }} {{ each.token }} is</legend>
-  {% for reading in each.plausible %}
-  <label><input type="radio" name="{{ field }}" value="{{ reading }}" {% if sent.get(field) == reading | string %}checked{% endif %} required> {{ each.number }}{{ reading.shown }}, {{ reading.named }}</label>
+  <legend>“{{ each.key }}” is new. Is it a unit?</legend>
+  {% for reading in each.offered %}
+  <label><input type="radio" name="{{ field }}" value="{{ reading }}" {% if chosen == reading | string %}checked{% endif %} required> {{ each.shown(reading) }} · {{ reading.unit.kind }}</label>
   {% endfor %}
+  <label><input type="radio" name="{{ field }}" value="{{ not_a_unit }}" {% if chosen == not_a_unit %}checked{% endif %} required> Not a unit: keep “{{ each.key }}”</label>
 </fieldset>
+{% elif each.read or each.rule %}
+<div class="hint">
+  {% if each.read %}Read as {{ each.shown(each.read) }} · {{ each.read.unit.kind }}.
+  {% if each.rule and each.rule.respell %}Saved as {{ each.shown(each.read) }}.{% else %}Saved as typed.{% endif %}
+  {%- else %}“{{ each.key }}” is not read as a unit.{% endif %}
+  {% if each.offered or each.read %}
+  <details {% if chosen %}open{% endif %}>
+    <summary>Not right?</summary>
+    <label><input type="radio" name="{{ field }}" value="" {% if not chosen %}checked{% endif %}> As read</label>
+    {% for reading in each.offered if reading != each.read %}
+    <label><input type="radio" name="{{ field }}" value="{{ reading }}" {% if chosen == reading | string %}checked{% endif %}> {{ each.shown(reading) }} · {{ reading.unit.kind }}</label>
+    {% endfor %}
+    {% if each.read %}
+    <label><input type="radio" name="{{ field }}" value="{{ not_a_unit }}" {% if chosen == not_a_unit %}checked{% endif %}> Not a unit: keep “{{ each.key }}”</label>
+    {% endif %}
+    <span>Saved, it reads every name with “{{ each.key }}” so.</span>
+  </details>
+  {% endif %}
+</div>
+{% endif %}
 {% endfor %}

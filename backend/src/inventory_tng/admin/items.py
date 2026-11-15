@@ -4,7 +4,7 @@ change it. A retired item with stock left may still be taken, never
 received (docs/decisions/0003)."""
 
 from collections.abc import Callable, Mapping, Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from decimal import Decimal
 from typing import Annotated, Literal
 
@@ -33,7 +33,12 @@ from inventory_tng.admin.common import (
     undo_retire,
 )
 from inventory_tng.admin.listing import Listing, Searched
-from inventory_tng.admin.reading_rules import READINGS, read_alike_words
+from inventory_tng.admin.reading_rules import (
+    NOT_A_UNIT,
+    READINGS,
+    chosen_rule,
+    read_alike_words,
+)
 from inventory_tng.db import DbSession, exists_where, refusal
 from inventory_tng.ledger import balance
 from inventory_tng.local_time import site_zone
@@ -69,12 +74,13 @@ TAKEN = (
     "manufacturer and part number, or that old code."
 )
 NO_LETTERS = "A name needs at least one letter or number."
-# A field saying which reading of a unit in a name was meant, where case
-# leaves two (units.spell): this, then the number and unit as typed
-# (units.rule_key); its value is str(Reading). The answer is kept as a
-# reading rule (reading_rules.decide).
+# A field saying how a number and its unit in a name are read, asked where
+# nothing settles it, or corrected ("Not right?"): this, then the number
+# and unit as typed (units.rule_key); its value is str(Reading), or
+# NOT_A_UNIT, or blank: as read. Kept as a reading rule
+# (reading_rules.decide), so it is asked once.
 READING = "unit:"
-ASK_UNIT = "Which unit did you mean? Pick one below."
+ASK_UNIT = "Say below whether it is a unit."
 # The form's field holding the name an administrator was shown close names
 # for, and sent again: a different item's, so not asked about again.
 DIFFERENT = "different"
@@ -261,6 +267,7 @@ def _name_field(session: Session, similar: Sequence[items.Close]) -> dict[str, o
         "different": DIFFERENT,
         "units_read": units_read,
         "reading_field": READING,
+        "not_a_unit": NOT_A_UNIT,
     }
 
 
@@ -364,34 +371,37 @@ def _item_page(
 
 @dataclass(frozen=True)
 class Typed:
-    """A name as it will be stored, the units in it still to ask about, and
-    the answers given, to keep as reading rules."""
+    """A name as it will be stored, the units in it still to ask about, the
+    answers and corrections given, to keep as reading rules, and the rules
+    that wrote, once written."""
 
     name: str
     asked: list[units.Found]
     answered: dict[str, units.Rule]
+    decided: list[int] = field(default_factory=list)
 
 
 def _typed_name(session: Session, typed: str, form: Mapping[str, str]) -> Typed:
-    """An item's or a package's name as it will be stored
-    (models.CanonicalName), each unit after a number spelt by its symbol,
-    joined to it, as read, by its reading rule first, or as `form` says it
-    was meant (units.spell), so it is checked and compared so; the units
-    still to ask about; and the answers."""
-    chosen = {
-        key.removeprefix(READING): value
-        for key, value in form.items()
-        if key.startswith(READING)
-    }
+    """An item's or a package's name as it will be stored: as typed, in
+    canonical spelling (models.CanonicalName), each unit respelt only where
+    its reading rule says (units.spell, Ali, 2026-11-15, option D); the
+    units still to ask about; and how `form` says a unit is read, where
+    that is new: an answer, or a correction of what it was read as."""
     name = canonical(typed.strip())
     rules = rules_held(session)
-    spelt, asked = units.spell(name, chosen, rules)
-    answered = {
-        found.key: units.Rule(chosen[found.key])
-        for found in units.found_in(name, rules)
-        if found.asks and chosen.get(found.key) in {str(r) for r in found.plausible}
-    }
-    return Typed(spelt, asked, answered)
+    answered = {}
+    for found in units.found_in(name, rules):
+        rule = chosen_rule(form.get(READING + found.key, ""), found.offered)
+        if rule is None:
+            continue
+        current = None if found.read is None else str(found.read)
+        if found.asks or rule.reading != current:
+            # Corrected, a rule respelling it goes on doing so.
+            kept = found.rule is not None and found.rule.respell and rule.reading
+            answered[found.key] = units.Rule(rule.reading, bool(kept))
+    found = units.found_in(name, {**rules, **answered})
+    asked = [each for each in found if each.asks]
+    return Typed(units.spell(name, found), asked, answered)
 
 
 def _deciding[T](
@@ -402,10 +412,17 @@ def _deciding[T](
 
     def deciding() -> T:
         if typed.answered:
-            reading_rules.decide(session, typed.answered, signed.admin.id)
+            written = reading_rules.decide(session, typed.answered, signed.admin.id)
+            typed.decided[:] = [rule.id for rule in written]
         return change()
 
     return deciding
+
+
+def _decided(typed: Typed, **ids: int) -> None:
+    """Log the reading rules a form wrote, once committed."""
+    if typed.decided:
+        log.info("reading rules set", reading_rule_ids=typed.decided, by="form", **ids)
 
 
 def _name_problem(
@@ -520,6 +537,7 @@ def add_item(
         return _list_page(request, session, signed, problems=problems, values=form)
     session.commit()
     log.info("item added", item_id=item.id)
+    _decided(typed, item_id=item.id)
     return redirect(f"{ITEMS}/{item.id}", notice="added")
 
 
@@ -611,6 +629,7 @@ def save_item(
         )
     session.commit()
     log.info("item saved", item_id=item_id)
+    _decided(typed, item_id=item_id)
     if fields is not None and fields.track_opened != tracked:
         _tracking_changed("item", 1, fields.track_opened, item_id=item_id)
     if renamed is None:
@@ -729,6 +748,7 @@ def add_package(
         if package is not None:
             session.commit()
             log.info("package added", item_package_id=package.id)
+            _decided(typed, item_package_id=package.id)
             return redirect(
                 f"{ITEMS}/{item_id}", notice="package_added", section="packages"
             )
@@ -785,6 +805,7 @@ def save_package(
         if broken is None:
             session.commit()
             log.info("package saved", item_package_id=package_id)
+            _decided(typed, item_package_id=package_id)
             return redirect(
                 f"{ITEMS}/{item_id}", notice="package_saved", section="packages"
             )
@@ -999,6 +1020,7 @@ def add_alias(
         if alias is not None:
             session.commit()
             log.info("alias added", item_id=item_id, item_alias_id=alias.id)
+            _decided(typed, item_alias_id=alias.id)
             return redirect(
                 f"{ITEMS}/{item_id}", notice="alias_added", section="aliases"
             )

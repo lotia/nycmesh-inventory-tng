@@ -91,6 +91,14 @@ def reading_rule(world: World) -> None:
     add(session, rule)
 
 
+def unsettled_unit(world: World) -> None:
+    """An item more whose name has a number and unit no rule settles."""
+    session = world.session
+    spools = world.spools
+    count = session.scalar(select(func.count()).select_from(Item))
+    add(session, Item(name=f"Uplink {count}0G", category_id=spools.cable.category_id))
+
+
 def over_recorded_line(world: World) -> None:
     """A line more recorded with more than was moved (over_recorded.py)."""
     transaction = write(world.session, world.spools.place)
@@ -222,6 +230,7 @@ PAGES: dict[str, tuple[More, *tuple[Path, ...]]] = {
     "/admin/stock/length-checks/{which}": (everything, *(k.path for k in KINDS)),
     "/admin/counts": (everything,),
     "/admin/unit-readings": (reading_rule,),
+    "/admin/unit-readings/seed": (unsettled_unit,),
     "/admin/counts/{location_id:int}": (
         item_in_store,
         lambda w: f"/admin/counts/{w.spools.store.id}",
@@ -253,7 +262,7 @@ EXEMPT = {
     "/admin/devices/{device_id:int}": "one device",
     "/admin/devices/{device_id:int}/revoke": "a confirmation of one row",
     "/admin/admins/{admin_id}": "one administrator",
-    "/admin/unit-readings/{rule_id}": "one reading rule",
+    "/admin/unit-readings/{rule_id:int}": "one reading rule",
     "/admin/admins/{admin_id}/reset": "a confirmation of one row",
 }
 

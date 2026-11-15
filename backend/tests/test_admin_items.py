@@ -30,6 +30,7 @@ from inventory_tng.models import (
     LedgerTransaction,
     Location,
     Movement,
+    ReadingRule,
 )
 
 from helpers.rows import add, history, item_fields, named, shown
@@ -396,8 +397,8 @@ def test_a_package_is_renamed_and_resized_until_it_moves(
     fixed = send(spools.spool, "Spool", "300")
     assert "Its size is fixed" in text(fixed)
     assert send(spools.spool, "Spool 305 m", "305").status_code == 303
-    # Its unit joined to its number, as names are stored (units.spell).
-    assert (spools.spool.name, spools.spool.size) == ("Spool 305m", 305)
+    # Saved as typed (option D, Ali, 2026-11-15).
+    assert (spools.spool.name, spools.spool.size) == ("Spool 305 m", 305)
     # A form shown before another's save is refused, as it was changed.
     stale = admin_client.post(
         f"{page}/packages/{box.id}",
@@ -1025,60 +1026,151 @@ def test_a_too_short_length_refused_as_resized_meanwhile_says_so_beside_it(
     assert "Shorter than a whole one, or blank." in text(refused)
 
 
-def test_a_unit_in_a_name_is_stored_by_its_symbol_and_said_under_it(
+def test_a_name_is_saved_as_typed_and_its_units_said_under_it(
     admin_client: TestClient, session: Session, radios: Category
 ) -> None:
-    """Joined to its number, by its symbol, its case read loosely where one
-    reading only is a likely size (Ali, 2026-11-12, inventory-tng-c0c.3);
-    the form says how each was read, and what was not."""
+    """Option D (Ali, 2026-11-15): saved as typed, in canonical spelling;
+    under the name, how each unit is read, with Not right? to correct it."""
     form = {"category_id": str(radios.id), "unit": "each"}
-    done = admin_client.post(ITEMS, data=form | {"name": "Cable 305 M, 10 \u00b5F"})
+    done = admin_client.post(ITEMS, data=form | {"name": "Cable 305 m, 10 \u00b5F"})
     assert done.status_code == 303
-    item = named(session, Item, "Cable 305m, 10\u03bcF")
+    item = named(session, Item, "Cable 305 m, 10 \u03bcF")
     page = text(admin_client.get(f"{ITEMS}/{item.id}"))
-    assert '<span class="hint block">305m: metres</span>' in page
-    assert '<span class="hint block">10\u03bcF: microfarads</span>' in page
-    hub = new_item(session, radios, "Hub 4 K")
-    page = text(admin_client.get(f"{ITEMS}/{hub.id}"))
-    assert "4 K: not read as a unit, as no size of one is likely" in page
+    assert "Read as 305m · length.\n  Saved as typed." in page
+    assert "Read as 10\u03bcF · capacitance." in page
+    assert "<summary>Not right?</summary>" in page
+    assert 'name="unit:305m" value="none"' in page
+    assert session.scalars(select(ReadingRule)).all() == []
 
 
-def test_case_asks_which_unit_when_both_are_likely(
+def test_a_spelling_nothing_settles_is_asked_once(
     admin_client: TestClient, session: Session, radios: Category
 ) -> None:
-    """5 MG may be megagrams or milligrams: the form asks, saving nothing,
-    and keeps the answer through the question about close names."""
+    """10G may be gigabits a second or grams: the form asks, inline, saving
+    nothing; the answer, kept through the question about close names, is
+    kept as a reading rule, and asked no more."""
     from structlog.testing import capture_logs
 
-    new_item(session, radios, "Weight 5mg brass")
-    form = {"name": "Weight 5 MG", "category_id": str(radios.id), "unit": "each"}
+    new_item(session, radios, "Uplink SFP+ 10G spare")
+    form = {"name": "Uplink SFP+ 10G", "category_id": str(radios.id), "unit": "each"}
     with capture_logs() as logs:
         asked = admin_client.post(ITEMS, data=form)
     assert asked.status_code == 400
     page = text(asked)
-    assert "Which unit did you mean?" in page
-    assert "<legend>5 MG is</legend>" in page
-    assert 'name="unit:5MG" value="Mg"' in page
-    assert "5Mg, megagrams" in page
-    assert "5mg, milligrams" in page
+    assert "Say below whether it is a unit." in page
+    assert "<legend>“10G” is new. Is it a unit?</legend>" in page
+    assert "10Gbps · data rate" in page
+    assert "10g · mass" in page
+    assert "Not a unit: keep “10G”" in page
     (line,) = [line for line in logs if line["event"] == "unit asked about"]
     assert line == {"event": "unit asked about", "item_id": None, "asked": 1} | {
         "log_level": "debug"
     }
     assert session.scalar(select(func.count()).select_from(Item)) == 1
-    answered = form | {"unit:5MG": "mg"}
+    answered = form | {"unit:10G": "Gbit/s"}
     close = admin_client.post(ITEMS, data=answered)
     assert "A different item?" in text(close)
-    assert 'name="unit:5MG" value="mg" checked' in close.text
-    again = answered | {"different": "Weight 5 MG"}
-    assert admin_client.post(ITEMS, data=again).status_code == 303
-    named(session, Item, "Weight 5mg")
+    assert 'name="unit:10G" value="Gbit/s" checked' in close.text
+    assert session.scalars(select(ReadingRule)).all() == []
+    again = answered | {"different": "Uplink SFP+ 10G"}
+    with capture_logs() as logs:
+        assert admin_client.post(ITEMS, data=again).status_code == 303
+    item = named(session, Item, "Uplink SFP+ 10G")
+    (rule,) = session.scalars(select(ReadingRule)).all()
+    assert (rule.token, rule.reading, rule.respell) == ("10G", "Gbit/s", False)
+    assert rule.decided_by_admin_id is not None
+    (line,) = [line for line in logs if line["event"] == "reading rules set"]
+    assert (line["reading_rule_ids"], line["by"]) == ([rule.id], "form")
+    assert line["item_id"] == item.id
+    # The spare, saved before, reads so too.
+    assert "10Gbit/s" in named(session, Item, "Uplink SFP+ 10G spare").search_text
+    switch = form | {"name": "Switch 10 G"}
+    assert admin_client.post(ITEMS, data=switch).status_code == 303
+    page = text(admin_client.get(f"{ITEMS}/{named(session, Item, 'Switch 10 G').id}"))
+    assert "Read as 10Gbps · data rate." in page
+
+
+def test_not_right_corrects_a_reading_for_every_name(
+    admin_client: TestClient, session: Session, radios: Category
+) -> None:
+    """A correction under the name, saved with it, is kept as the rule: a
+    unit the table reads as no unit, then back; a respelling rule goes on
+    respelling."""
+    item = new_item(session, radios, "Tape 25 m")
+    other = new_item(session, radios, "Spare 25 m")
+    form = {
+        "name": "Tape 25 m",
+        "category_id": str(radios.id),
+        "unit": "each",
+        "version": shown(item),
+    }
+    # What it is read as already: no rule.
+    same = admin_client.post(f"{ITEMS}/{item.id}", data=form | {"unit:25m": "m"})
+    assert same.status_code == 303
+    assert session.scalars(select(ReadingRule)).all() == []
+    form["version"] = shown(item)
+    done = admin_client.post(f"{ITEMS}/{item.id}", data=form | {"unit:25m": "none"})
+    assert done.status_code == 303
+    rule = session.scalars(select(ReadingRule)).one()
+    assert (rule.token, rule.reading) == ("25m", None)
+    assert other.unit_key == "spare25m"
+    assert "25m" not in other.search_text.replace("25 m", "")
+    page = text(admin_client.get(f"{ITEMS}/{item.id}"))
+    assert "“25m” is not read as a unit." in page
+    # As read: nothing changes.
+    form["version"] = shown(item)
+    assert admin_client.post(f"{ITEMS}/{item.id}", data=form | {"unit:25m": ""})
+    rule.reading, rule.respell = "m", True
+    session.flush()
+    form["version"] = shown(item)
+    renamed = form | {"name": "Tape 25 m!", "unit:25m": "none"}
+    assert admin_client.post(f"{ITEMS}/{item.id}", data=renamed).status_code == 303
+    assert (rule.reading, rule.respell) == (None, False)
+
+
+def test_a_correction_reading_names_alike_is_refused_naming_them(
+    admin_client: TestClient, session: Session, radios: Category
+) -> None:
+    """On the item's, a package's or an alias's form: nothing kept."""
+    one = new_item(session, radios, "Link 10G")
+    other = new_item(session, radios, "Link 10 Gbps")
+    spare = new_item(session, radios, "Spare")
+    said = (
+        "Read so, these names would read as one: "
+        f"item {one.id} (Link 10G) and item {other.id} (Link 10 Gbps)."
+    )
+    base = f"{ITEMS}/{spare.id}"
+    for path, form, field in (
+        (
+            base,
+            {
+                "name": "Spare 10G",
+                "category_id": str(radios.id),
+                "unit": "each",
+                "version": shown(spare),
+            },
+            "name",
+        ),
+        (f"{base}/packages", {"package_name": "Bag 10G", "size": "1"}, "package_name"),
+        (f"{base}/aliases", {"alias_name": "Extra 10G"}, "alias_name"),
+    ):
+        refused = admin_client.post(path, data=form | {"unit:10G": "Gbit/s"})
+        assert refused.status_code == 400, path
+        assert f'id="{field}-problem">{escape(said)}' in refused.text, path
+    assert session.scalars(select(ReadingRule)).all() == []
+    box = add(session, ItemPackage(item_id=spare.id, name="Box", size=Decimal(1)))
+    renamed = {"package_name": "Box 10G", "size": "1", "package_version": shown(box)}
+    refused = admin_client.post(
+        f"{base}/packages/{box.id}", data=renamed | {"unit:10G": "Gbit/s"}
+    )
+    assert escape(said) in refused.text
 
 
 def test_a_package_name_reads_units_too(
     admin_client: TestClient, session: Session, radios: Category
 ) -> None:
-    """Added or renamed, as an item's name is: asked where case leaves two."""
+    """Added or renamed, as an item's name is: saved as typed, asked where
+    nothing settles it."""
     item = new_item(session, radios, "Brass")
     path = f"{ITEMS}/{item.id}/packages"
     added = admin_client.post(path, data={"package_name": "Bag 5 MG", "size": "2"})
@@ -1087,20 +1179,20 @@ def test_a_package_name_reads_units_too(
     assert 'name="unit:5MG" value="Mg" checked' not in added.text
     chosen = {"package_name": "Bag 5 MG", "size": "2", "unit:5MG": "Mg"}
     assert admin_client.post(path, data=chosen).status_code == 303
-    package = named(session, ItemPackage, "Bag 5Mg")
+    package = named(session, ItemPackage, "Bag 5 MG")
     page = text(admin_client.get(f"{ITEMS}/{item.id}"))
-    assert "5Mg: megagrams" in page
+    assert "Read as 5Mg · mass." in page
     renamed = {"package_name": "Spool 1000 FT", "size": "2"}
     resent = admin_client.post(
         f"{path}/{package.id}", data=renamed | {"package_version": shown(package)}
     )
     assert resent.status_code == 303
-    assert package.name == "Spool 1000ft"
+    assert package.name == "Spool 1000 FT"
     # 5 MG is settled now, by the answer kept as a reading rule.
     asking = {"package_name": "Bag 7 MG", "size": "2", "package_version": "1"}
     refused = admin_client.post(f"{path}/{package.id}", data=asking)
     assert refused.status_code == 400
-    assert "Which unit did you mean?" in text(refused)
+    assert "Say below whether it is a unit." in text(refused)
 
 
 def aliased(session: Session, item: Item, *names: str) -> list[ItemAlias]:
@@ -1203,18 +1295,18 @@ def test_the_items_form_adds_and_removes_aliases(
     item = new_item(session, radios, "Cat6 cable, outdoor")
     path = f"{ITEMS}/{item.id}/aliases"
     with capture_logs() as logs:
-        done = admin_client.post(path, data={"alias_name": "Tough  cable 305 M"})
+        done = admin_client.post(path, data={"alias_name": "Tough  cable 305 m"})
     assert done.headers["location"] == (
         f"{ITEMS}/{item.id}?notice=alias_added&section=aliases#aliases"
     )
-    # Spelt as a name typed on its form is (units.spell).
+    # Saved as typed, as a name typed on its form is (units.spell).
     (alias,) = items.aliases(session, item.id)
-    assert alias.name == "Tough  cable 305m"
+    assert alias.name == "Tough  cable 305 m"
     (line,) = [line for line in logs if line["event"] == "alias added"]
     assert (line["item_id"], line["item_alias_id"]) == (item.id, alias.id)
     assert "Tough" not in str(line)
     page = text(admin_client.get(f"{ITEMS}/{item.id}"))
-    assert "Tough  cable 305m" in page
+    assert "Tough  cable 305 m" in page
     refused = admin_client.post(path, data={"alias_name": "- ?"})
     assert refused.status_code == 400
     assert NO_LETTERS in text(refused)

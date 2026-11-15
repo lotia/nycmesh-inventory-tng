@@ -9,10 +9,10 @@ import { prepared } from "./prepared";
 
 /**
  * A name no other test, or run of this one, has. Its end in letters only,
- * so no part of it is read as a unit after a number ("3f" as farads),
- * which a name would store otherwise (docs/decisions/0021).
+ * so no part of it is read as a unit after a number ("3f" as farads), which
+ * the form would say under it, or ask about (docs/decisions/0021).
  */
-function unique(what: string): string {
+export function unique(what: string): string {
   const id = randomUUID()
     .slice(0, 8)
     .replace(/[0-9]/g, (digit) => "ghijklmnop".charAt(Number(digit)));

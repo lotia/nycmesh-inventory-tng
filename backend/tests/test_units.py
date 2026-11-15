@@ -212,10 +212,7 @@ def test_in_is_no_unit_and_words_never_spell_a_name() -> None:
     for word in ("feet", "volts", "watt", "amps", "inch", "meters"):
         assert read(word) is not None, word
         assert units.readings(word) == [], word
-    assert units.spell("Cable 100 feet, 48 volts", {}) == (
-        "Cable 100 feet, 48 volts",
-        [],
-    )
+    assert units.found_in("Cable 100 feet, 48 volts") == []
 
 
 def test_what_was_found_before_units_were_read_still_is(
@@ -277,55 +274,108 @@ def test_a_unit_ends_where_a_letter_or_digit_of_any_script_does_not_follow() -> 
 
 
 @pytest.mark.parametrize(
-    ("typed", "stored"),
+    ("typed", "shown"),
     [
-        ("Spool 305 m", "Spool 305m"),
-        # Megametres are no likely size: case read loosely (Ali, 2026-11-12).
-        ("Spool 305M", "Spool 305m"),
-        ("Cap 10 uF", "Cap 10\u03bcF"),
-        ("Cap 10 \u039cF", "Cap 10\u03bcF"),
-        ("4.7 kohm", "4.7k\u03a9"),
-        ("Probe 85 deg C", "Probe 85\u00b0C"),
-        ("Probe 85 Cel", "Probe 85\u00b0C"),
-        ("Antenna -100 dBm", "Antenna -100dBm"),
-        ("Box 1,000 ft", "Box 1,000ft"),
-        ("Tank 2 m3", "Tank 2m\u00b3"),
-        ("Radio 100 mhz", "Radio 100MHz"),
-        ("Link 1 Gbps", "Link 1Gbit/s"),
+        ("Spool 305 m", "305m · length"),
+        ("Cap 10 uF", "10\u03bcF · capacitance"),
+        ("Cap 10 \u039cF", "10\u03bcF · capacitance"),
+        ("4.7 kohm", "4.7k\u03a9 · resistance"),
+        ("Probe 85 deg C", "85\u00b0C · temperature"),
+        ("Probe 85 Cel", "85\u00b0C · temperature"),
+        ("Antenna -100 dBm", "-100dBm · power level"),
+        ("Box 1,000 ft", "1,000ft · length"),
+        ("Tank 2 m3", "2m\u00b3 · volume"),
+        ("Radio 100 mhz", "100MHz · frequency"),
+        # Data rates as printed (Q15).
+        ("Link 1 Gbps", "1Gbps · data rate"),
+        ("Link 1Gbit/s", "1Gbps · data rate"),
         # Megafarads are not likely, millifarads are.
-        ("Cap 10MF", "Cap 10mF"),
+        ("Cap 10MF", "10mF · capacitance"),
         # Both likely, but spelt as typed, so not asked.
-        ("Pill 5 mg", "Pill 5mg"),
-        ("Resistor 10 MOhm", "Resistor 10M\u03a9"),
-        # No size of it likely (-269 °C): no unit, left as typed.
-        ("Hub 4 K", "Hub 4 K"),
-        ("LiteBeam 5AC Gen2", "LiteBeam 5AC Gen2"),
-        ("2 g\u00e2teaux", "2 g\u00e2teaux"),
-        ("Patch 2 m, 5 m", "Patch 2m, 5m"),
+        ("Pill 5 mg", "5mg · mass"),
+        ("Resistor 10 MOhm", "10M\u03a9 · resistance"),
+        # No kelvins likely (-269 °C); a bare K is a data rate (option D).
+        ("Hub 4 K", "4kbps · data rate"),
     ],
 )
-def test_a_name_spells_each_unit_by_its_symbol_joined_to_its_number(
-    typed: str, stored: str
-) -> None:
-    """Ali, 2026-11-12 (inventory-tng-c0c.3): the symbol as the SI Brochure
-    writes it, joined to its number; searched alike either way."""
-    assert units.spell(typed, {}) == (stored, [])
-    assert fold(stored).lower() == fold(typed).lower()
+def test_a_name_is_saved_as_typed_and_its_units_read(typed: str, shown: str) -> None:
+    """Ali, 2026-11-15 (option D): a reading changes what search matches,
+    not the name; each said as its symbol joined to its number, and its
+    kind."""
+    (found,) = units.found_in(typed)
+    assert found.read is not None
+    assert f"{found.shown(found.read)} · {found.read.unit.kind}" == shown
+    assert units.spell(typed, [found]) == typed
+    # Searched alike, but a bare K, which search reads as kelvins.
+    if found.token != "K":
+        assert fold(units.read_as(typed)).lower() == fold(typed).lower()
+
+
+def test_a_rule_respelling_a_unit_spells_the_name_by_its_symbol() -> None:
+    """Saved as typed, unless its reading rule says to respell it."""
+    rules = {"305M": units.Rule("m", respell=True), "10G": units.Rule("Gbit/s")}
+    typed = "Spool 305 M, SFP+ 10G"
+    found = units.found_in(typed, rules)
+    assert units.spell(typed, found) == "Spool 305m, SFP+ 10G"
+
+
+@pytest.mark.parametrize(
+    "typed",
+    [
+        "LiteBeam 5AC Gen2",
+        "Cat6a cable",
+        "Cable Cat 6a, outdoor",
+        "Patch Cat5e 2 m",
+        "Adapter 2-in-1",
+        "2 g\u00e2teaux",
+    ],
+)
+def test_a_product_is_never_read_as_a_unit(typed: str) -> None:
+    """Cat6a is no 6 amperes, 5AC nothing (Ali, 2026-11-15, the product
+    list); a unit after it still is."""
+    assert [f.key for f in units.found_in(typed)] == (
+        ["2m"] if typed.endswith("2 m") else []
+    )
+
+
+def test_a_bare_g_m_or_k_may_be_a_data_rate_and_asks() -> None:
+    """10G may be 10 Gbps or 10 grams, 3M 3 Mbps or 3 metres: nothing
+    settles either, so a form asks, data rates first (the profile)."""
+    for typed, offered in (
+        ("SFP+ 10G", ["10Gbps · data rate", "10g · mass"]),
+        ("Tape 3M", ["3Mbps · data rate", "3m · length"]),
+        ("Switch 100 M", ["100Mbps · data rate", "100m · length"]),
+    ):
+        (found,) = units.found_in(typed)
+        assert found.asks, typed
+        said = [f"{found.shown(r)} · {r.unit.kind}" for r in found.offered]
+        assert said == offered
+    assert units.PROFILE[0] == "data rate"
+    assert units.PROFILE[-1] == "mass"
+    assert set(units.PROFILE) == set(KINDS)
 
 
 def test_case_asks_only_between_two_plausible_readings() -> None:
     """5 MG may be megagrams or milligrams, both likely sizes, and neither
-    spelt as typed: asked, by the number and token as typed, which each
-    answers; an answer not among them asks again."""
+    spelt as typed: asked, by the number and token as typed; a rule
+    settles it."""
     typed = "Weights 5 MG, 10 MG"
-    spelt, asked = units.spell(typed, {})
-    assert spelt == typed
-    assert [(each.number, each.token) for each in asked] == [("5", "MG"), ("10", "MG")]
+    asked = [each for each in units.found_in(typed) if each.asks]
+    assert [(each.number, each.token, each.key) for each in asked] == [
+        ("5", "MG", "5MG"),
+        ("10", "MG", "10MG"),
+    ]
     assert [str(r) for r in asked[0].plausible] == ["Mg", "mg"]
     assert [r.named for r in asked[0].plausible] == ["megagrams", "milligrams"]
-    answers = {"5MG": "mg", "10MG": "mg"}
-    assert units.spell(typed, answers) == ("Weights 5mg, 10mg", [])
-    assert units.spell(typed, {"5MG": "kg", "10MG": "kg"})[1] == asked
+    rules = {"5MG": units.Rule("mg"), "10MG": units.Rule(None)}
+    first, second = units.found_in(typed, rules)
+    assert (str(first.read), first.asks) == ("mg", False)
+    assert (second.read, second.asks, second.offered) == (
+        None,
+        False,
+        asked[1].plausible,
+    )
+    assert units.read_as(typed, rules) == "Weights 5mg, 10 MG"
 
 
 def test_every_reading_is_shown_and_named_and_read_back_as_itself() -> None:

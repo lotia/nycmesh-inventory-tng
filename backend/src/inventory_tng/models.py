@@ -361,6 +361,8 @@ def _refold(session: Session, _context: object, _instances: object) -> None:
         )
     ]
     # An alias added or removed is searched as its item's (Item.refold).
+    # And each name new or changed keyed with its units read, by the
+    # reading rules (KeyedName.unit_key).
     rows += [
         session.get_one(Item, row.item_id)
         for row in changed
