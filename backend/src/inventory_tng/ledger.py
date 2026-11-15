@@ -2071,32 +2071,9 @@ def _as_batch(
     if transaction.kind not in SIDES or transaction.volunteer_id is None:
         return None
     lines = list(movements.values())
-    opened = {
-        form.open_package_id
-        for line in lines
-        for form in (line.leaves, line.arrives)
-        if form.open_package_id is not None
-    }
-    keys = dict(
-        session.execute(
-            select(OpenPackage.id, OpenPackage.key).where(OpenPackage.id.in_(opened))
-        ).all()
-        if opened
-        else []
-    )
-    packages = {
-        form.package_id
-        for line in lines
-        for form in (line.leaves, line.arrives)
-        if form.package_id is not None
-    }
-    sizes = dict(
-        session.execute(
-            select(ItemPackage.id, ItemPackage.size).where(ItemPackage.id.in_(packages))
-        ).all()
-        if packages
-        else []
-    )
+    forms = [form for line in lines for form in (line.leaves, line.arrives)]
+    keys = _keys_of(session, {f.open_package_id for f in forms if f.open_package_id})
+    sizes = _sizes(session, {f.package_id for f in forms if f.package_id})
 
     def line_of(line: Entry) -> RecordedLine:
         if transaction.kind == "open":
@@ -2147,6 +2124,26 @@ def _keyed(session: Session, keys: Collection[uuid.UUID]) -> dict[uuid.UUID, int
     return {key: open_id for key, open_id in found}
 
 
+def _keys_of(session: Session, open_ids: Collection[int]) -> dict[int, uuid.UUID]:
+    """These open packages' keys, by id: _keyed the other way."""
+    if not open_ids:
+        return {}
+    found = session.execute(
+        select(OpenPackage.id, OpenPackage.key).where(OpenPackage.id.in_(open_ids))
+    )
+    return {open_id: key for open_id, key in found}
+
+
+def _sizes(session: Session, package_ids: Collection[int]) -> dict[int, Decimal]:
+    """These packages' sizes, by id."""
+    if not package_ids:
+        return {}
+    found = session.execute(
+        select(ItemPackage.id, ItemPackage.size).where(ItemPackage.id.in_(package_ids))
+    )
+    return {package_id: size for package_id, size in found}
+
+
 def _open_packages_named(session: Session, batch: Batch) -> dict[int, int]:
     """The open packages a batch's lines take from, by key, by line number.
     A key with none is left out."""
@@ -2164,17 +2161,13 @@ def _open_packages_named(session: Session, batch: Batch) -> dict[int, int]:
 def _made_by_opening(session: Session, batch: Batch) -> dict[int, list[int]]:
     """The open packages an opening's lines made, under their keys
     (_opening_keys), by line number."""
-    unkeyed = {line.package_id for line in batch.lines if line.open_package_key is None}
-    sizes: dict[int, Decimal] = (
-        dict(
-            session.execute(
-                select(ItemPackage.id, ItemPackage.size).where(
-                    ItemPackage.id.in_(unkeyed)
-                )
-            ).all()
-        )
-        if unkeyed
-        else {}
+    sizes = _sizes(
+        session,
+        {
+            line.package_id
+            for line in batch.lines
+            if line.open_package_key is None and line.package_id is not None
+        },
     )
     keys: dict[int, list[uuid.UUID]] = {}
     for number, line in enumerate(batch.lines):
