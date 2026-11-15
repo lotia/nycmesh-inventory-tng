@@ -10,8 +10,8 @@ for its dry run and `load` before it writes a name; from the command line:
         python -m inventory_tng.unit_readings load - < readings.tsv
 
 `propose` reads names, one a line, and needs no database: it writes the
-file, keeping each correction the file already has, so a later dry run
-updates it. `load` writes a rule for each unit the file reads, by no
+file, keeping each row, correction and respell the file already has, so a
+later dry run updates it. `load` writes a rule for each unit the file reads, by no
 administrator (`decided_by_admin_id` NULL), and leaves alone, saying so,
 any rule an administrator has set otherwise. Proposals are the seeding
 page's (reading_rules.propose); it proposes again what is left after an
@@ -22,6 +22,7 @@ comment lines (#) saying what each column holds (HEADER)."""
 
 import argparse
 import csv
+import io
 import sys
 from collections.abc import Iterable, Sequence
 from contextlib import AbstractContextManager, nullcontext
@@ -44,25 +45,33 @@ COLUMNS = (
     "unit",
     "proposed",
     "correction",
+    "respell",
     "offered",
     "why",
     "names",
     "near",
     "examples",
 )
+# Between a row's examples and words near it.
+JOIN = " | "
+# What the respell column says for yes; empty is no.
+YES = "yes"
+# Why, for a row a later dry run no longer proposes: still loaded.
+NOT_PROPOSED = "not proposed for these names; loaded all the same, or delete the row"
 HEADER = f"""\
 # How each unit typed after a number in the import's names is read.
 # To read one otherwise, write a reading in "correction"; left empty,
 # "proposed" is taken. A unit with neither stops the load until given one.
 # A reading is one of "offered", by its symbol, the part before brackets;
-# {reading_rules.NOT_A_UNIT} is not a unit. A later dry run keeps corrections.
+# {reading_rules.NOT_A_UNIT} is not a unit. A later dry run keeps every row,
+# its correction and respell; one it no longer proposes says so in "why".
 #   unit: as typed after a number, case kept; one rule reads it in every name
+#   respell: {YES} to save names with the reading's symbol (305M as 305m);
+#     left empty, names are saved as typed
 #   why: what the proposal is by; names: how many names need it settled
 #   near: words near it in the names where they settle it, how often
 #   examples: a few of the names that need it settled
 """
-# Between a row's examples and words near it.
-JOIN = " | "
 
 
 def _called(reading: units.Reading) -> str:
@@ -77,6 +86,7 @@ def _row(proposal: reading_rules.Proposal) -> dict[str, str]:
         "unit": found.key,
         "proposed": str(proposal.proposed) if proposal.proposed else "",
         "correction": "",
+        "respell": "",
         "offered": JOIN.join(offered),
         "why": proposal.why or "nothing settles it: choose",
         "names": str(proposal.count),
@@ -86,13 +96,19 @@ def _row(proposal: reading_rules.Proposal) -> dict[str, str]:
 
 
 def read(text: TextIO) -> list[dict[str, str]]:
-    """The rows of a readings file, by COLUMNS, comment lines skipped.
-    ValueError if its columns are not COLUMNS."""
-    lines = (line for line in text if not line.startswith("#"))
-    reader = csv.DictReader(lines, dialect="excel-tab")
-    if tuple(reader.fieldnames or ()) != COLUMNS:
+    """The rows of a readings file, by COLUMNS, comment rows (#) and empty
+    ones skipped, even quoted, as a spreadsheet may save them. ValueError if
+    its columns are not COLUMNS."""
+    rows = (
+        row
+        for row in csv.reader(text, dialect="excel-tab")
+        if any(row) and not row[0].startswith("#")
+    )
+    if tuple(next(rows, ())) != COLUMNS:
         raise ValueError(f"its columns must be: {' '.join(COLUMNS)}")
-    return [{key: row.get(key) or "" for key in COLUMNS} for row in reader]
+    return [
+        dict(zip(COLUMNS, [*row, *[""] * len(COLUMNS)], strict=False)) for row in rows
+    ]
 
 
 def write(text: TextIO, rows: Iterable[dict[str, str]]) -> None:
@@ -104,28 +120,37 @@ def write(text: TextIO, rows: Iterable[dict[str, str]]) -> None:
 
 @dataclass
 class Proposed:
-    """What a dry run wrote: rows, of which corrected, and to choose
-    (neither proposed nor corrected)."""
+    """What a dry run wrote: rows, of which corrected, to choose (neither
+    proposed nor corrected), and no longer proposed (NOT_PROPOSED)."""
 
     rows: int
     corrected: int
     to_choose: int
+    not_proposed: int
 
 
 def propose(names: Iterable[str], path: Path) -> Proposed:
     """The readings file at `path` written for `names`, as the seeding page
     proposes, by no rule (an import's database has none): every row it had
-    kept, its correction with it, a unit no longer found as it was."""
+    kept with its correction and respell, one no longer proposed as it was
+    but said so (NOT_PROPOSED), as loading it still reads names by it.
+    ValueError if the file there is not a readings file, or has a unit twice."""
     kept = {}
     if path.exists():
-        with path.open(encoding="utf-8", newline="") as text:
-            kept = {row["unit"]: row for row in read(text)}
+        with _text(path) as text:
+            earlier = read(text)
+        kept = {row["unit"]: row for row in earlier}
+        if len(kept) < len(earlier):
+            raise ValueError("a unit has more than one row; keep one")
     canonical = [models.canonical(name) for name in names]
-    rows = {**kept}
+    rows = {
+        unit: {**row, "why": NOT_PROPOSED, "names": "0"} for unit, row in kept.items()
+    }
     for proposal in reading_rules.propose(canonical, {}):
         row = _row(proposal)
         if (earlier := kept.get(row["unit"])) is not None:
             row["correction"] = earlier["correction"]
+            row["respell"] = earlier["respell"]
         rows[row["unit"]] = row
     with path.open("w", encoding="utf-8", newline="") as text:
         write(text, rows.values())
@@ -133,12 +158,14 @@ def propose(names: Iterable[str], path: Path) -> Proposed:
         len(rows),
         sum(bool(row["correction"]) for row in rows.values()),
         sum(not (row["proposed"] or row["correction"]) for row in rows.values()),
+        sum(row["why"] == NOT_PROPOSED for row in rows.values()),
     )
     log.info(
         "unit readings proposed",
         units=done.rows,
         corrected=done.corrected,
         to_choose=done.to_choose,
+        not_proposed=done.not_proposed,
     )
     return done
 
@@ -150,7 +177,8 @@ def chosen(rows: Sequence[dict[str, str]]) -> tuple[dict[str, units.Rule], list[
     problems = []
     for row in rows:
         unit = units.rule_key(row["unit"].strip())
-        reading = (row["correction"] or row["proposed"]).strip()
+        reading = row["correction"].strip() or row["proposed"].strip()
+        respell = row["respell"].strip().lower()
         allowed = {str(r) for r in reading_rules.offered(unit, units.Rule(None))}
         if not unit:
             problems.append("a row has no unit")
@@ -158,10 +186,17 @@ def chosen(rows: Sequence[dict[str, str]]) -> tuple[dict[str, units.Rule], list[
             problems.append(f"{unit}: more than one row")
         elif not reading:
             problems.append(f"{unit}: no reading; write one in its correction")
+        elif respell not in {"", YES}:
+            problems.append(f"{unit}: respell is {YES} or empty, not {row['respell']}")
         elif reading == reading_rules.NOT_A_UNIT:
-            rules[unit] = units.Rule(None)
+            if respell:
+                problems.append(
+                    f"{unit}: {reading} is never respelt; empty its respell"
+                )
+            else:
+                rules[unit] = units.Rule(None)
         elif reading in allowed:
-            rules[unit] = units.Rule(reading)
+            rules[unit] = units.Rule(reading, respell == YES)
         else:
             problems.append(
                 f"{unit}: {reading} is not one of its readings: "
@@ -174,11 +209,13 @@ def chosen(rows: Sequence[dict[str, str]]) -> tuple[dict[str, units.Rule], list[
 class Loaded:
     """What load did: rules written (new or changed), those already so,
     and those an administrator set otherwise, left as they are with what
-    the file says."""
+    the file says; and what each rule written over said before, by token
+    (an earlier load's: an administrator's is never written over)."""
 
     written: list[ReadingRule]
     same: int
     kept: list[tuple[ReadingRule, units.Rule]]
+    was: dict[str, units.Rule]
 
 
 def load(session: Session, rules: dict[str, units.Rule]) -> Loaded | list[str]:
@@ -201,6 +238,7 @@ def load(session: Session, rules: dict[str, units.Rule]) -> Loaded | list[str]:
         and row.decided_by_admin_id is not None
         and row.rule != rule
     ]
+    was = {token: row.rule for token, row in held.items()}
     left = {row.token for row, _ in kept}
     loading = {token: rule for token, rule in rules.items() if token not in left}
     written, broken = refusal(
@@ -219,11 +257,12 @@ def load(session: Session, rules: dict[str, units.Rule]) -> Loaded | list[str]:
         reading_rule_ids=[row.id for row in written],
         kept_reading_rule_ids=[row.id for row, _ in kept],
     )
-    return Loaded(written, len(loading) - len(written), kept)
+    return Loaded(written, len(loading) - len(written), kept, was)
 
 
 def _said(rule: units.Rule) -> str:
-    return rule.reading or reading_rules.NOT_A_UNIT
+    said = rule.reading or reading_rules.NOT_A_UNIT
+    return f"{said}, respelt" if rule.respell else said
 
 
 def parse(argv: Sequence[str] | None = None) -> argparse.Namespace:
@@ -254,10 +293,13 @@ def parse(argv: Sequence[str] | None = None) -> argparse.Namespace:
 
 
 def _text(path: Path) -> AbstractContextManager[TextIO]:
-    """The file at `path` to read, or standard input, left open, for -."""
+    """The file at `path` to read, or standard input, left open, for -: as
+    UTF-8 whatever the locale, a byte order mark dropped."""
     if str(path) == "-":
+        if isinstance(sys.stdin, io.TextIOWrapper):
+            sys.stdin.reconfigure(encoding="utf-8-sig")
         return nullcontext(sys.stdin)
-    return path.open(encoding="utf-8", newline="")
+    return path.open(encoding="utf-8-sig", newline="")
 
 
 def main(argv: Sequence[str] | None = None) -> int:
@@ -270,8 +312,12 @@ def main(argv: Sequence[str] | None = None) -> int:
 
 
 def run_propose(args: argparse.Namespace) -> int:
-    with _text(args.names) as text:
-        names = [line.strip() for line in text if line.strip()]
+    try:
+        with _text(args.names) as text:
+            names = [line.strip() for line in text if line.strip()]
+    except ValueError as error:
+        print(f"{args.names}: {error}", file=sys.stderr)
+        return 1
     try:
         done = propose(names, args.file)
     except ValueError as error:
@@ -279,7 +325,7 @@ def run_propose(args: argparse.Namespace) -> int:
         return 1
     print(
         f"Wrote {args.file}: {done.rows} units, {done.corrected} corrected, "
-        f"{done.to_choose} to choose."
+        f"{done.to_choose} to choose, {done.not_proposed} no longer proposed."
     )
     return 0
 
@@ -307,7 +353,9 @@ def run_load(session: Session, args: argparse.Namespace) -> int:
         )
         return 1
     for row in done.written:
-        print(f"{row.token}: {_said(row.rule)}")
+        before = done.was.get(row.token)
+        was = f" (was {_said(before)}, by an earlier load)" if before else ""
+        print(f"{row.token}: {_said(row.rule)}{was}")
     for row, rule in done.kept:
         print(
             f"{row.token}: kept {_said(row.rule)}, set by an administrator; "

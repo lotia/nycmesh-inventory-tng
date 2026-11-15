@@ -499,11 +499,14 @@ operator command, `unit_readings`, writes the dry run's readings to a
 file: one row per unit as typed after a number that the seeding page
 would propose, with the same proposal and evidence (the reading proposed
 and why, the readings offered, how many names need it, the words near it
-where they settle it, a few names), and an empty `correction` column. It
-is tab-separated UTF-8, sorted by unit, with comment lines saying what
-each column holds, so a correction is a one-line diff. The operator
-corrects it once and keeps it: a later dry run keeps every correction and
-row and adds what is new.
+where they settle it, a few names), and empty `correction` and
+`respell` columns (respell `yes` saves names with the reading's symbol,
+as a rule's respell does). It is tab-separated UTF-8, sorted by unit,
+with comment lines saying what each column holds, so a correction is a
+one-line diff. The operator corrects it once and keeps it: a later dry
+run keeps every row with its correction and respell, says in `why` which
+it no longer proposes (still loaded unless deleted), and adds what is
+new.
 
 Loading it is the first source of rules: each unit read by its correction,
 else its proposal, written with no administrator (`decided_by_admin_id`

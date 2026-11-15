@@ -33,10 +33,14 @@ def rows_of(path: Path) -> dict[str, dict[str, str]]:
         return {row["unit"]: row for row in unit_readings.read(text)}
 
 
-def corrected(path: Path, **corrections: str) -> None:
+def corrected(path: Path, respell: str = "", **corrections: str) -> None:
+    """The file at `path` with `corrections` by unit, and `respell` (the
+    units, by spaces) said yes."""
     rows = rows_of(path)
     for unit, reading in corrections.items():
         rows[unit]["correction"] = reading
+    for unit in respell.split():
+        rows[unit]["respell"] = unit_readings.YES
     with path.open("w", encoding="utf-8", newline="") as text:
         unit_readings.write(text, rows.values())
 
@@ -55,7 +59,9 @@ def test_a_dry_run_proposes_as_the_seeding_page_does(tmp_path: Path) -> None:
     path = tmp_path / "readings.tsv"
     with capture_logs() as logs:
         done = unit_readings.propose(NAMES, path)
-    assert done == unit_readings.Proposed(rows=2, corrected=0, to_choose=1)
+    assert done == unit_readings.Proposed(
+        rows=2, corrected=0, to_choose=1, not_proposed=0
+    )
     proposals = reading_rules.propose(NAMES, {})
     keys = ["M", "g"]
     assert sorted(rows_of(path)) == sorted(p.found.key for p in proposals) == keys
@@ -64,6 +70,7 @@ def test_a_dry_run_proposes_as_the_seeding_page_does(tmp_path: Path) -> None:
         "unit": "M",
         "proposed": "m",
         "correction": "",
+        "respell": "",
         "offered": "Mbit/s (data rate) | m (meters) | none (not a unit)",
         "why": "elsewhere near cable, cat6, spool",
         "names": "1",
@@ -76,7 +83,8 @@ def test_a_dry_run_proposes_as_the_seeding_page_does(tmp_path: Path) -> None:
     text = path.read_text(encoding="utf-8")
     assert text.startswith(unit_readings.HEADER)
     (line,) = [line for line in logs if line["event"] == "unit readings proposed"]
-    assert (line["units"], line["corrected"], line["to_choose"]) == (2, 0, 1)
+    said = (line["units"], line["corrected"], line["to_choose"], line["not_proposed"])
+    assert said == (2, 0, 1, 0)
 
 
 def test_the_round_trip_dry_run_correct_dry_run_again_load(
@@ -89,7 +97,9 @@ def test_the_round_trip_dry_run_correct_dry_run_again_load(
     unit_readings.propose(NAMES, path)
     corrected(path, g="Gbit/s", M="none")
     done = unit_readings.propose([*NAMES[2:], "Strip 2M"], path)
-    assert done == unit_readings.Proposed(rows=2, corrected=2, to_choose=0)
+    assert done == unit_readings.Proposed(
+        rows=2, corrected=2, to_choose=0, not_proposed=0
+    )
     rows = rows_of(path)
     assert (rows["g"]["correction"], rows["M"]["correction"]) == ("Gbit/s", "none")
     assert rows["M"]["examples"] == "Strip 2M"
@@ -157,17 +167,80 @@ def test_a_file_with_a_unit_unread_loads_nothing(
     assert session.scalars(select(ReadingRule)).all() == []
 
 
-def test_rows_twice_or_without_a_unit_are_refused() -> None:
+def test_rows_twice_without_a_unit_or_badly_respelt_are_refused() -> None:
     blank = dict.fromkeys(unit_readings.COLUMNS, "")
     rows = [
-        {**blank, "unit": "g", "proposed": "g"},
+        {**blank, "unit": "g", "proposed": "g", "respell": " Yes "},
         {**blank, "unit": "g", "proposed": "g"},
         blank,
+        {**blank, "unit": "M", "proposed": "m", "respell": "no"},
+        {**blank, "unit": "G", "correction": "none", "respell": "yes"},
     ]
     assert unit_readings.chosen(rows) == (
-        {"g": units.Rule("g")},
-        ["g: more than one row", "a row has no unit"],
+        {"g": units.Rule("g", respell=True)},
+        [
+            "g: more than one row",
+            "a row has no unit",
+            "M: respell is yes or empty, not no",
+            "G: none is never respelt; empty its respell",
+        ],
     )
+
+
+def test_a_row_no_longer_proposed_is_kept_and_said(tmp_path: Path) -> None:
+    """A later dry run for other names keeps a row it no longer proposes,
+    with its correction and respell, as loading still reads names by it."""
+    path = tmp_path / "readings.tsv"
+    unit_readings.propose(NAMES, path)
+    corrected(path, respell="M", M="m")
+    done = unit_readings.propose(["Box 10g"], path)
+    assert done == unit_readings.Proposed(
+        rows=2, corrected=1, to_choose=1, not_proposed=1
+    )
+    m = rows_of(path)["M"]
+    assert (m["correction"], m["respell"]) == ("m", "yes")
+    assert (m["why"], m["names"]) == (unit_readings.NOT_PROPOSED, "0")
+
+
+def test_propose_refuses_a_file_with_a_unit_twice(tmp_path: Path) -> None:
+    path = tmp_path / "readings.tsv"
+    unit_readings.propose(NAMES, path)
+    with path.open("a", encoding="utf-8") as text:
+        text.write("g\t\tg\n")
+    with pytest.raises(ValueError, match="more than one row"):
+        unit_readings.propose(NAMES, path)
+
+
+def test_a_respelt_rule_loads_and_a_reload_says_what_it_was(
+    session: Session, tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    path = tmp_path / "readings.tsv"
+    unit_readings.propose(NAMES, path)
+    corrected(path, respell="M", g="Gbit/s")
+    assert run_load(session, path) == 0
+    assert rule_of(session, "M").rule == units.Rule("m", respell=True)
+    assert capsys.readouterr().out.splitlines()[:2] == ["M: m, respelt", "g: Gbit/s"]
+    corrected(path, g="g")
+    assert run_load(session, path) == 0
+    assert capsys.readouterr().out.splitlines() == [
+        "g: g (was Gbit/s, by an earlier load)",
+        "Loaded 1 rules; 1 already so; 0 kept as an administrator set them.",
+    ]
+
+
+def test_a_file_a_spreadsheet_saved_is_read(
+    session: Session, tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """A byte order mark, comment and empty rows quoted, and rows short of
+    their trailing empty cells are read as the file says."""
+    path = tmp_path / "readings.tsv"
+    columns = "\t".join(unit_readings.COLUMNS)
+    path.write_text(
+        f'\ufeff"# a comment"\t\n\t\t\n{columns}\ng\t\tGbit/s\nM\tm\n',
+        encoding="utf-8",
+    )
+    assert run_load(session, path) == 0
+    assert sorted(capsys.readouterr().out.splitlines()[:2]) == ["M: m", "g: Gbit/s"]
 
 
 def test_a_file_not_of_these_columns_is_refused(
@@ -217,7 +290,7 @@ def test_the_commands_run_as_operator_commands(
     monkeypatch.setattr(sys, "stdin", stdin)
     assert unit_readings.main(["propose", "-", "--file", str(path)]) == 0
     assert capsys.readouterr().out.splitlines()[-1] == (
-        f"Wrote {path}: 2 units, 0 corrected, 1 to choose."
+        f"Wrote {path}: 2 units, 0 corrected, 1 to choose, 0 no longer proposed."
     )
     corrected(path, g="Gbit/s")
     stdin = io.TextIOWrapper(io.BytesIO(path.read_bytes()))
@@ -244,3 +317,29 @@ def test_unit_readings_runs_as_a_module(
         runpy.run_module("inventory_tng.unit_readings", run_name="__main__")
     assert done.value.code == 0
     assert "propose" in capsys.readouterr().out
+
+
+def test_names_not_in_utf_8_are_refused(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    names = tmp_path / "names.txt"
+    names.write_bytes("Câble 3M\n".encode("latin-1"))
+    args = unit_readings.parse(["propose", str(names), "--file", str(tmp_path / "r")])
+    assert unit_readings.run_propose(args) == 1
+    assert capsys.readouterr().err.startswith(f"{names}: 'utf-8' codec")
+
+
+def test_names_from_a_standard_input_already_text(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Standard input that is not a file's (a test's, an embedding's) is read
+    as it is."""
+    monkeypatch.setattr(sys, "stdin", io.StringIO("\n".join(NAMES)))
+    path = tmp_path / "readings.tsv"
+    assert (
+        unit_readings.run_propose(
+            unit_readings.parse(["propose", "-", "--file", str(path)])
+        )
+        == 0
+    )
+    assert sorted(rows_of(path)) == ["M", "g"]

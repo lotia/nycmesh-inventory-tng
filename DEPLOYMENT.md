@@ -480,17 +480,21 @@ uv run python -m inventory_tng.unit_readings propose names.txt --file readings.t
 
 Correct it once: in each row, leave `correction` empty to take `proposed`,
 or write one of `offered`, by its symbol, or `none` for no unit. A unit
-proposed nothing must be given one. Keep the file: a later dry run keeps
-its corrections and adds new units. Then load it, before the import
-writes any name:
+proposed nothing must be given one. Write `yes` in `respell` to save names
+with the reading's symbol (`305M` as `305m`); left empty, names are saved
+as typed. Keep the file: a later dry run keeps every row, with its
+correction and respell, and adds new units; a row it no longer proposes
+says so in `why`, and is still loaded unless deleted. Then load it, before
+the import writes any name:
 
 ```sh
 kubectl exec -i deploy/inventory -- python -m inventory_tng.unit_readings \
   load - < readings.tsv
 ```
 
-It writes a rule for each unit, by no administrator, and says what it did.
-A rule an administrator has set otherwise is kept, and said. A file with a
+It writes a rule for each unit, by no administrator, and says what it did,
+with what an earlier load had set. A rule an administrator has set
+otherwise is kept, and said. A file with a
 unit left unread, or that would make two saved names read alike, loads
 nothing. After the import, administrators review what is left on the Unit
 readings page, under Propose.
