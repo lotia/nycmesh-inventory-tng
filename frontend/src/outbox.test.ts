@@ -1484,6 +1484,8 @@ describe("listening", () => {
     window.dispatchEvent(new StorageEvent("storage", { key: STORAGE_KEY }));
     expect(outbox.entries.value).toEqual([old, kept, waiting]);
     expect(outbox.shown()).toEqual([kept, waiting]);
+    outbox.forgetShown([kept.body.key]);
+    expect(outbox.entries.value).toEqual([old, kept, waiting]);
     outbox.forgetShown([old.body.key]);
     expect(outbox.entries.value).toEqual([kept, waiting]);
     stop();
@@ -1529,6 +1531,21 @@ describe("listening", () => {
     window.dispatchEvent(new StorageEvent("storage", { key: STORAGE_KEY }));
     expect(outbox.entries.value).toEqual([saved, refused]);
     expect(outbox.shown()).toEqual([refused]);
+    stop();
+  });
+
+  test("a batch another tab forgot, then queued again, shows here", () => {
+    const saved = entry({ state: "saved", transactionId: 1, queuedAt: 1 });
+    const again = entry({ body: saved.body, queuedAt: 2 });
+    store(saved);
+    const outbox = new Outbox(answering(() => json({}, 500)).api);
+    const stop = outbox.listen();
+    store();
+    window.dispatchEvent(new StorageEvent("storage", { key: STORAGE_KEY }));
+    store(again);
+    window.dispatchEvent(new StorageEvent("storage", { key: STORAGE_KEY }));
+    expect(outbox.entries.value).toEqual([again]);
+    expect(outbox.shown()).toEqual([again]);
     stop();
   });
 

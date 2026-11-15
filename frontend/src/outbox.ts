@@ -480,8 +480,8 @@ export class Outbox {
   private retry: ReturnType<typeof setTimeout> | undefined;
   /** Saved batches another tab let storage forget, as its catalogue showed
    * them: kept in `entries` until this tab's shows them too (forgetShown),
-   * as its page counts them until then. Off the list. By batchId, as one
-   * key may name two (queue). */
+   * as its page counts them until then, or storage holds them again
+   * (show). Off the list. By batchId, as one key may name two (queue). */
   private readonly forgottenElsewhere = new Map<string, Entry>();
 
   constructor(
@@ -493,13 +493,17 @@ export class Outbox {
     this.show(this.read());
   }
 
-  /** `stored`, and the batches forgotten elsewhere, oldest first. */
+  /** `stored`, and the batches forgotten elsewhere, oldest first. One
+   * storage holds again (queued again, here or in another tab) is no
+   * longer forgotten, so it is listed. */
   private show(stored: Entry[]): void {
-    const here = new Set(stored.map((entry) => batchId(entry.body)));
-    const elsewhere = [...this.forgottenElsewhere].flatMap(([id, entry]) =>
-      here.has(id) ? [] : [entry],
+    for (const entry of stored) {
+      this.forgottenElsewhere.delete(batchId(entry.body));
+    }
+    this.entries.value = oldestFirst(
+      [...this.forgottenElsewhere.values()],
+      stored,
     );
-    this.entries.value = oldestFirst(elsewhere, stored);
   }
 
   /** What storage holds, oldest first. */
