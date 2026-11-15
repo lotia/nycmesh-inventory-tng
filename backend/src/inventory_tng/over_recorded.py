@@ -477,6 +477,7 @@ def settled(
             Movement.from_open_package_id,
             Movement.to_open_package_id,
             Movement.quantity,
+            LedgerTransaction.idempotency_key,
             LedgerTransaction.kind,
             LedgerTransaction.from_location_id,
             FROM.name,
@@ -504,6 +505,30 @@ def settled(
         .limit(limit)
         .offset(offset)
     ).all()
+    # An opening corrected, its open package closed: whether Correct wrote
+    # its open end off, or found it closed and skipped it, by the key it
+    # writes under, as no time tells (a close's is the server's clock as it
+    # began, perhaps before Correct's, and waited for its place).
+    off = {
+        _correction_key(each.idempotency_key, check, found=False): check.id
+        for each in found
+        if (check := each.OverRecorded).settled_how == "corrected"
+        and each.kind == "open"
+        and check.arrived_count_id is None
+        and each.closed_at is not None
+    }
+    written_off = (
+        {
+            off[key]
+            for key in session.scalars(
+                select(LedgerTransaction.idempotency_key).where(
+                    LedgerTransaction.idempotency_key.in_(off)
+                )
+            )
+        }
+        if off
+        else set()
+    )
     lines = []
     for (
         row,
@@ -515,6 +540,7 @@ def settled(
         from_open,
         to_open,
         held,
+        _,
         kind,
         from_id,
         from_place,
@@ -545,7 +571,8 @@ def settled(
             why = f"Adjusted at {to_place}"
         elif how == "corrected":
             # The ends Correct wrote (correct()): each it has but one a
-            # count put right, or an opening's open package closed before.
+            # count put right, or an opening's open package closed before
+            # (written_off).
             written = [
                 end
                 for end, there in (
@@ -554,9 +581,7 @@ def settled(
                         arrived,
                         to_id is not None
                         and row.arrived_count_id is None
-                        and not (
-                            kind == "open" and closed_on is not None and closed_on <= at
-                        ),
+                        and (closed_on is None or row.id in written_off),
                     ),
                 )
                 if there
@@ -667,6 +692,18 @@ def mark_checked(
     )
 
 
+def _correction_key(
+    transaction_key: uuid.UUID, row: OverRecorded, *, found: bool
+) -> uuid.UUID:
+    """The key Correct writes an end of a check under: found again where
+    it left, or written off where it arrived; the other end only, after a
+    count put one right, a key of its own."""
+    only = " only" if row.left_count_id or row.arrived_count_id else ""
+    return uuid.uuid5(
+        transaction_key, f"over recorded {row.id} {'found' if found else 'off'}{only}"
+    )
+
+
 def correct(
     session: Session, check_id: int, seen_as: str, admin_id: int
 ) -> list[ledger.Written]:
@@ -704,8 +741,6 @@ def correct(
             over_recorded_id=check_id,
             open_package_id=open_id,
         )
-    # The other end only, after a count put one right.
-    only = " only" if row.left_count_id or row.arrived_count_id else ""
     sides = (
         (
             None if row.left_count_id else transaction.from_location_id,
@@ -724,13 +759,9 @@ def correct(
     for place, found, package_id, open_id in sides:
         if place is None:
             continue
-        key = uuid.uuid5(
-            transaction.idempotency_key,
-            f"over recorded {row.id} {'found' if found else 'off'}{only}",
-        )
         written += ledger.record_adjustment(
             session,
-            key,
+            _correction_key(transaction.idempotency_key, row, found=found),
             admin_id,
             place,
             movement.item_id,

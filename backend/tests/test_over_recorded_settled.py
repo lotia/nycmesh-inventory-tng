@@ -9,7 +9,7 @@ from decimal import Decimal
 
 import pytest
 from fastapi.testclient import TestClient
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from inventory_tng import open_packages, over_recorded
@@ -264,6 +264,44 @@ def test_an_openings_open_package_closed_before_correct_names_the_sealed_end(
     assert (how, why) == ("Corrected", "Sealed spool only")
 
 
+@pytest.mark.parametrize(
+    ("closed_first", "hours", "why"),
+    [
+        # Closed before, timed after: the close's time is the server's
+        # clock as it began, and Correct's when its transaction began.
+        (True, 1, "Sealed spool only"),
+        # Closed after, timed before: begun before Correct, it waited for
+        # the place Correct held.
+        (False, -1, "Two adjustments"),
+    ],
+)
+def test_what_correct_wrote_is_told_by_what_it_wrote_not_when(
+    admin_client: TestClient,
+    session: Session,
+    closed_first: bool,
+    hours: int,
+    why: str,
+) -> None:
+    _, check = opening(session)
+    admin = ada(session)
+    movement = session.get_one(Movement, check.movement_id)
+    open_id = movement.to_open_package_id
+    assert open_id is not None
+    began = session.scalar(select(func.now()))
+    assert began is not None
+    at = began + timedelta(hours=hours)
+    if closed_first:
+        assert open_packages.close(session, open_id, admin, at)
+        session.flush()
+    over_recorded.correct(session, check.id, seen(check), admin)
+    session.flush()
+    if not closed_first:
+        assert open_packages.close(session, open_id, admin, at)
+        session.flush()
+    ((*_, how, shown_why, _),) = settled_rows(admin_client)
+    assert (how, shown_why) == ("Corrected", why)
+
+
 def test_an_openings_ends_counted_name_their_forms(
     admin_client: TestClient, session: Session
 ) -> None:
@@ -431,7 +469,7 @@ def test_one_end_only_counted_names_that_end(
     has one end only, where it arrived."""
     place = Place(session)
     install = write(session, place, kind="install", to_location_id=None)
-    raised(session, install)
+    used = raised(session, install)
     count_at(admin_client, place.store.id, {f"counted_{place.item.id}": "0"})
     spools, check = moved_whole(session)
     movement = session.get_one(Movement, check.movement_id)
@@ -439,13 +477,25 @@ def test_one_end_only_counted_names_that_end(
         admin_client, spools.van.id, {f"opened_{movement.to_open_package_id}": "1"}
     )
     session.expire_all()
-    day = show_day(datetime.now(UTC), site_zone(session))
+    zone = site_zone(session)
+
+    def counted_on(count_id: int | None) -> str:
+        """The day of the count that put an end right, as the row says it."""
+        assert count_id is not None
+        return show_day(session.get_one(LedgerTransaction, count_id).created_at, zone)
+
+    used = session.get_one(OverRecorded, used.id)
+    check = session.get_one(OverRecorded, check.id)
     found = [(row[3], row[4], row[5]) for row in settled_rows(admin_client)]
     assert found == [
         (
             f"{spools.store.name} → {spools.van.name}",
             "Counted",
-            f"{spools.van.name} {day}",
+            f"{spools.van.name} {counted_on(check.arrived_count_id)}",
         ),
-        (f"from {place.store.name}", "Counted", f"{place.store.name} {day}"),
+        (
+            f"from {place.store.name}",
+            "Counted",
+            f"{place.store.name} {counted_on(used.left_count_id)}",
+        ),
     ]
