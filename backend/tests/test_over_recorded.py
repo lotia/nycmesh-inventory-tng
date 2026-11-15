@@ -900,6 +900,37 @@ def test_refused_at_a_place_brought_back_meanwhile_it_names_that_place(
     assert f"Bring back {place.store.name}" in page
 
 
+def test_a_count_refused_at_a_place_brought_back_meanwhile_names_it(
+    admin_client: TestClient,
+    registered_client: TestClient,
+    session: Session,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Confirm count, refused where it arrived: that place, as it refused."""
+    spools = Spools(session)
+    made = moved_whole(registered_client, spools)
+    whole = Form(open_package_id=made.id)
+    spools.write(
+        {
+            "kind": "move",
+            "volunteer_id": spools.place.volunteer.id,
+            "from_location_id": spools.van.id,
+            "to_location_id": spools.store.id,
+        },
+        Entry(spools.cable.id, Decimal(305), whole, whole),
+        Entry(spools.place.item.id, Decimal(1)),
+    )
+    retire(session, spools.van)
+    refused_then(monkeypatch, lambda: locations.restore(session, spools.van))
+    _, response = counted(admin_client, session, "180")
+    assert response.status_code == 409
+    page = " ".join(text(response).split())
+    assert (
+        f"Not changed: {spools.van.name} is retired and holds nothing, so its "
+        "count can't be corrected there." in page
+    )
+
+
 def test_refused_then_settled_meanwhile_it_says_so(
     admin_client: TestClient,
     registered_client: TestClient,

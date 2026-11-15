@@ -156,7 +156,7 @@ def _refusal(
         words = f"Not changed: {rule_words(broken)}"
         return {"shown": each, "words": words, "place": None}
     place = session.get_one(Location, at)
-    # correct() adjusts where it left first, so refused there if it is that.
+    # correct() finds it again where it left, writes it off where it arrived.
     if do != "correct":
         so = "its count can't be corrected there"
     elif at == over_recorded.ends(session, check_id)[0]:

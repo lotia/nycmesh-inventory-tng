@@ -1890,7 +1890,7 @@ def count_open_package(
     this, so what it shows now moves by the difference, and a cut since
     stays as saved. A count of only this package, at its place, so a cut of
     another does not stop it. What it shows then; None if sent before
-    under its key, and so written once, then. RuleBroken
+    under its key, and so written once, then. NotCountable
     (location_countable), as record_count."""
     place = row.location_id
     lock_place(session, place)
