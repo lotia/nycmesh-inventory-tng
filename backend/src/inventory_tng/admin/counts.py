@@ -239,13 +239,13 @@ class Shown(NamedTuple):
 
     def ids(self, session: Session) -> set[int] | None:
         """The items shown, of any at all; None for every one."""
-        if self.only is None and not self.search:
-            return None
-        query = select(Item.id)
+        if not self.search:
+            return None if self.only is None else {self.only.id}
+        query = select(Item.id).where(
+            SEARCHED.matching(self.search, SEARCHED.rules(session))
+        )
         if self.only is not None:
             query = query.where(Item.id == self.only.id)
-        if self.search:
-            query = query.where(SEARCHED.matching(self.search, SEARCHED.rules(session)))
         return set(session.scalars(query))
 
     def query(self) -> str:
