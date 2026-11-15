@@ -15,6 +15,7 @@ import { type Catalogue, type Item, indexOf } from "./cart";
 import { FROM_OPEN, inUnit, nameOf, RESCAN, withRetired } from "./older";
 import {
   type Body,
+  batchId,
   type Draft,
   fromOpen,
   type Note,
@@ -282,9 +283,11 @@ export function changesShown(
  * What `mine` adds to what was recorded, as a batch: each line the
  * volunteer added, or holds more of (differences), by as much, of the same
  * kind, between the same places, by the same volunteer, under a key of its
- * own made from mine's, so put in the cart and recorded again it is the
- * same batch, taken once; none taken from an open package, nor any report.
- * Null if it adds nothing that can go back.
+ * own made from mine's batchId, as one key may name two batches
+ * (Outbox.queue): so put in the cart and recorded again it is the same
+ * batch, taken once, and each of two under one key has its own; none
+ * taken from an open package, nor any report. Null if it adds nothing
+ * that can go back.
  */
 export function differenceOf(recorded: Body, mine: Body): Body | null {
   const lines = differences(recorded, mine).flatMap(
@@ -306,7 +309,7 @@ export function differenceOf(recorded: Body, mine: Body): Body | null {
   const { used_up: _, lengths: __, key, changed_from: ___, ...header } = mine;
   return {
     ...header,
-    key: uuidFrom("difference", key),
+    key: uuidFrom(`difference ${batchId(mine)}`, key),
     lines,
   } satisfies Draft & { key: string };
 }

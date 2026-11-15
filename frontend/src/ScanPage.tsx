@@ -733,7 +733,8 @@ function CartForm({
   // An empty cart takes what a save recorded elsewhere adds, without a
   // tap, as it takes what an older build left (Ali, inventory-tng-0gg,
   // 2026-11-15, 2): the oldest first, each tried once a load, so one the
-  // browser would not keep is not tried for ever, and stays offered.
+  // browser would not keep is not tried for ever, and stays offered. By
+  // batchId, not key: one key may name two batches (Outbox.queue).
   const differencesTried = useRef(new Set<string>());
   const outboxEntries = outbox.entries.value;
   useEffect(() => {
@@ -742,11 +743,12 @@ function CartForm({
     }
     for (const entry of outboxEntries) {
       const { reason } = entry;
+      const id = batchId(entry.body);
       if (
         reason?.code !== "recorded_elsewhere" ||
         reason.recorded === undefined ||
         reason.added === true ||
-        differencesTried.current.has(entry.body.key)
+        differencesTried.current.has(id)
       ) {
         continue;
       }
@@ -754,11 +756,11 @@ function CartForm({
       if (difference === null) {
         continue;
       }
-      differencesTried.current.add(entry.body.key);
+      differencesTried.current.add(id);
       const why = addDifference(entry, difference, true);
       if (why === "cart_not_empty") {
         // Filled in another tab meanwhile: tried again once it is empty.
-        differencesTried.current.delete(entry.body.key);
+        differencesTried.current.delete(id);
       } else if (why !== null) {
         problems.value = [[olderSaid(why, true)]];
       }

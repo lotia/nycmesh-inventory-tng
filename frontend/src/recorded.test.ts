@@ -230,6 +230,14 @@ describe("the difference", () => {
     expect(differenceOf(was, putBack(was, mine))?.key).toBe(difference?.key);
   });
 
+  test("each of two batches under one key has a key of its own (inventory-tng-3iy)", () => {
+    const was = move([boxes(1)]);
+    const first = differenceOf(was, putBack(was, move([boxes(2)])));
+    const second = differenceOf(was, putBack(was, move([boxes(3)])));
+    expect(first?.key).not.toBe(second?.key);
+    expect(second?.key).not.toBe(KEY);
+  });
+
   test("none when it adds nothing that can go back", () => {
     const was = move([metres(5)]);
     expect(

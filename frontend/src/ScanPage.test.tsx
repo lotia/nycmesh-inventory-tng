@@ -3226,6 +3226,69 @@ describe("what an older build left", () => {
     expect(storedCart().lines).toEqual([]);
   });
 
+  test("two saves under one key recorded elsewhere each put their difference in the cart by itself, under a key of its own, recorded once (inventory-tng-3iy)", async () => {
+    const record = vi.spyOn(telemetry, "record");
+    record.mockClear();
+    const move = (lines: object[]) => ({
+      key: KEY,
+      kind: "move",
+      volunteer_id: 1,
+      from_location_id: 10,
+      to_location_id: 12,
+      install_number: null,
+      lines,
+    });
+    const refused = (n: number) => ({
+      queuedAt: AT + n,
+      build: BUILD,
+      waitingFor: null,
+      failures: 0,
+      // Put back from what was recorded, then changed.
+      body: { ...move([boxed(n)]), changed_from: [boxed(1)] },
+      what: `save ${n}`,
+      state: "refused",
+      reason: {
+        code: "recorded_elsewhere",
+        recorded: {
+          by: "elsewhere",
+          transactionId: 1,
+          batch: move([boxed(1)]),
+        },
+      },
+      transactionId: null,
+    });
+    localStorage.setItem(
+      OUTBOX_KEY,
+      JSON.stringify({ build: BUILD, entries: [refused(2), refused(3)] }),
+    );
+    const written = new Map([[KEY, linesOf({ lines: [boxed(1)] })]]);
+    const { api, sent } = ledger(written);
+    open(api);
+    await ready();
+    await vi.waitFor(() => expect(boxes()).toBe("1"));
+    save();
+    await screen.findByText("Recorded (transaction 2).");
+    // Emptied, the cart takes the second's, under another key.
+    await vi.waitFor(() => expect(boxes()).toBe("2"));
+    save();
+    await screen.findByText("Recorded (transaction 3).");
+    const keys = await Promise.all(
+      saves(sent).map(async (request) => (await request.clone().json()).key),
+    );
+    expect(keys).toHaveLength(2);
+    expect(new Set([KEY, ...keys]).size).toBe(3);
+    expect(written.size).toBe(3);
+    // Neither goes in again.
+    await new Promise((settled) => setTimeout(settled, 50));
+    expect(storedCart().lines).toEqual([]);
+    expect(
+      record.mock.calls.filter(([event]) => event.kind === "difference_added"),
+    ).toEqual([
+      [{ kind: "difference_added", how: "automatic" }],
+      [{ kind: "difference_added", how: "automatic" }],
+    ]);
+  });
+
   test("its difference waits on a button while the cart has lines, and goes in by itself once it is empty (Ali, inventory-tng-0gg, 2026-11-15, 2)", async () => {
     const entry = await differing([boxed(1)], "2", fillMove);
     expect(ADD_DIFFERENCE).toBe("Add these to cart");
