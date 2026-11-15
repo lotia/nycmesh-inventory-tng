@@ -27,6 +27,7 @@ from inventory_tng.db import SnapshotSession
 from inventory_tng.devices import DeviceRefusedReply, RegisteredDevice
 from inventory_tng.ledger import takeable
 from inventory_tng.models import (
+    CURRENT_ALIAS,
     Category,
     Item,
     ItemAlias,
@@ -245,7 +246,7 @@ def catalogue(session: Session) -> Catalogue:
     aliases: dict[int, list[str]] = {}
     for item_id, alias in session.execute(
         select(ItemAlias.item_id, ItemAlias.name)
-        .where(ItemAlias.retired_at.is_(None))
+        .where(CURRENT_ALIAS)
         .order_by(ItemAlias.id)
     ):
         aliases.setdefault(item_id, []).append(alias)

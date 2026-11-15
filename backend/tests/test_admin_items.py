@@ -21,6 +21,7 @@ from inventory_tng.admin.listing import PER_PAGE
 from inventory_tng.db import RuleBroken, attempt
 from inventory_tng.local_time import DEFAULT_ZONE
 from inventory_tng.models import (
+    CURRENT_ALIAS,
     Category,
     Item,
     ItemAlias,
@@ -1105,6 +1106,16 @@ def aliased(session: Session, item: Item, *names: str) -> list[ItemAlias]:
     return [items.add_alias(session, item, name) for name in names]
 
 
+def current_aliases(session: Session, item: Item) -> list[str]:
+    """The names of `item`'s current aliases, oldest first."""
+    return [each.name for each in items.aliases(session, item.id)]
+
+
+def rename(session: Session, item: Item, name: str) -> items.Renamed | None:
+    """`item` renamed `name`, the rest of it as it is."""
+    return items.save(session, item, item_fields(item, name=name), seen=None)
+
+
 def test_an_alias_is_searched_and_its_removal_frees_it(
     admin_client: TestClient, session: Session, radios: Category
 ) -> None:
@@ -1129,7 +1140,7 @@ def test_an_alias_is_searched_and_its_removal_frees_it(
     assert found == ["Cat6 cable, outdoor"]
     items.remove_alias(session, tough, NOW)
     assert item.search_text.split()[3:] == ["Cap", "10", "mF", "Cap", "10uF"]
-    assert [each.name for each in items.aliases(session, item.id)] == ["Cap 10 μF"]
+    assert current_aliases(session, item) == ["Cap 10 μF"]
     # Free again: another item may be named so, and this one given it again.
     new_item(session, radios, "Tough cable")
     assert attempt(session, lambda: items.add_alias(session, item, "toughcable")) == (
@@ -1157,8 +1168,7 @@ def test_names_and_aliases_are_one_namespace(
 
     new = items.Fields.new(name="lbe-gen2", category_id=radios.id)
     assert broken(lambda: items.add(session, new)) == items.NAME_IS_ALIAS
-    renamed = item_fields(other, name="LBE gen 2")
-    save = partial(items.save, session, other, renamed, seen=None)
+    save = partial(rename, session, other, "LBE gen 2")
     assert broken(save) == items.NAME_IS_ALIAS
     for name, rule in (
         ("Nano beam", items.ALIAS_IS_NAME),  # A retired item's name.
@@ -1269,7 +1279,7 @@ def test_a_clash_with_an_alias_names_the_item(
                 "name": "LBE gen2",
                 "category_id": str(radios.id),
                 "unit": "each",
-                "version": str(rocket.edit_version),
+                "version": shown(rocket),
             },
             "name",
             (
@@ -1294,7 +1304,7 @@ def test_an_alias_added_or_removed_refuses_no_save_of_the_item(
         "name": "NanoBeam M5",
         "category_id": str(radios.id),
         "unit": "each",
-        "version": str(item.edit_version),
+        "version": shown(item),
     }
     path = f"{ITEMS}/{item.id}/aliases"
     assert admin_client.post(path, data={"alias_name": "NBE"}).status_code == 303
@@ -1340,13 +1350,9 @@ def test_a_retired_items_page_refuses_alias_changes(
     ):
         assert refused.status_code == 409
         assert "Bring it back first" in text(refused)
-    assert [each.name for each in items.aliases(session, item.id)] == ["NBE"]
+    assert current_aliases(session, item) == ["NBE"]
     missing = admin_client.post(f"{ITEMS}/0/aliases", data={"alias_name": "X"})
     assert missing.status_code == 404
-
-
-def current_aliases(session: Session, item: Item) -> list[str]:
-    return [each.name for each in items.aliases(session, item.id)]
 
 
 def test_a_rename_keeps_the_old_name_as_an_alias(
@@ -1362,7 +1368,7 @@ def test_a_rename_keeps_the_old_name_as_an_alias(
 
     def save(name: str) -> Response:
         session.refresh(item)
-        sent = form | {"name": name, "version": str(item.edit_version)}
+        sent = form | {"name": name, "version": shown(item)}
         return admin_client.post(f"{ITEMS}/{item.id}", data=sent)
 
     with capture_logs() as logs:
@@ -1416,7 +1422,7 @@ def test_renaming_to_its_own_alias_swaps_them(
         "name": "tough cable PRO",
         "category_id": str(radios.id),
         "unit": "each",
-        "version": str(item.edit_version),
+        "version": shown(item),
     }
     with capture_logs() as logs:
         done = admin_client.post(f"{ITEMS}/{item.id}", data=form)
@@ -1433,9 +1439,9 @@ def test_renaming_to_its_own_alias_swaps_them(
     assert {line["by"] for line in said.values()} == {"swap"}
     assert "Tough" not in str(said)
     # And back: a swap again.
-    assert items.save(
-        session, item, item_fields(item, name="Tough-Cable"), seen=None
-    ) == items.Renamed(kept=items.aliases(session, item.id)[0], swapped=kept)
+    assert rename(session, item, "Tough-Cable") == items.Renamed(
+        kept=items.aliases(session, item.id)[0], swapped=kept
+    )
     assert item.name == "Tough-Cable"
     assert current_aliases(session, item) == ["tough cable PRO"]
     assert item.search_text.split() == ["Tough-Cable", "tough", "cable", "PRO"]
@@ -1456,7 +1462,7 @@ def test_a_rename_refused_keeps_its_aliases(
             "unit": "each",
             "old_code": "NYCM-9",
             "different": name,
-            "version": str(item.edit_version),
+            "version": shown(item),
         }
         refused = admin_client.post(f"{ITEMS}/{item.id}", data=form)
         assert refused.status_code == 400, name
@@ -1483,12 +1489,7 @@ def test_an_old_name_is_always_free_as_an_alias(
     items.remove_alias(session, gone, NOW)
     retire(session, new_item(session, radios, "Old NanoBeam"))
     for name in ("NanoBeam M5", "NanoBeam", "NanoBeam M5", "NBE", "NanoBeam"):
-        done, broken = attempt(
-            session,
-            lambda name=name: items.save(
-                session, item, item_fields(item, name=name), seen=None
-            ),
-        )
+        done, broken = attempt(session, partial(rename, session, item, name))
         assert broken is None, name
         assert done is not None
         assert done.kept.item_id == item.id
@@ -1496,9 +1497,7 @@ def test_an_old_name_is_always_free_as_an_alias(
     names = set(session.scalars(select(Item.name_key)))
     keys = [
         alias.name_key
-        for alias in session.scalars(
-            select(ItemAlias).where(ItemAlias.retired_at.is_(None))
-        )
+        for alias in session.scalars(select(ItemAlias).where(CURRENT_ALIAS))
     ]
     assert len(keys) == len(set(keys))
     assert not names & set(keys)

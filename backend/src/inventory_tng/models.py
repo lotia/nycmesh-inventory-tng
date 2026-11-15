@@ -47,6 +47,7 @@ from sqlalchemy import (
     Index,
     LargeBinary,
     Numeric,
+    Select,
     SmallInteger,
     SQLColumnExpression,
     Text,
@@ -330,15 +331,27 @@ class Searchable:
 # change such as a receipt's to on_order stays only that (db.flush_writes).
 @event.listens_for(Session, "before_flush", insert=True)
 def _refold(session: Session, _context: object, _instances: object) -> None:
-    for row in (*session.new, *session.dirty):
-        if isinstance(row, Searchable) and (
+    changed = (*session.new, *session.dirty)
+    rows: list[Searchable] = [
+        row
+        for row in changed
+        if isinstance(row, Searchable)
+        and (
             row in session.new
             or any(
                 inspect(row).attrs[field].history.has_changes()
                 for field in row.SEARCHED
             )
-        ):
-            row.refold()
+        )
+    ]
+    # An alias added or removed is searched as its item's (Item.refold).
+    rows += [
+        session.get_one(Item, row.item_id)
+        for row in changed
+        if isinstance(row, ItemAlias)
+    ]
+    for row in dict.fromkeys(rows):
+        row.refold()
 
 
 def fuzzy(column: SQLColumnExpression[str], search: str) -> ColumnElement[bool]:
@@ -479,16 +492,23 @@ class Item(KeyedName, Searchable, Versioned, Base):
     def refold(self) -> None:
         super().refold()
         self.name_folded = fold(self.name or "")
-        # Its current aliases too, each folded alone, as written so far:
-        # items.add_alias and remove_alias write the alias, then refold.
+        # Its current aliases too, each folded alone, as the session holds
+        # them: refolded as a flush begins (_refold), one added or retired
+        # is not yet written, and a new one's id will put it last.
         session = object_session(self)
         if self.id is not None and session is not None:
-            aliases = session.scalars(
-                select(ItemAlias.name)
-                .where(ItemAlias.item_id == self.id, ItemAlias.retired_at.is_(None))
-                .order_by(ItemAlias.id)
+            written = session.scalars(current_aliases(self.id))
+            adding = (
+                row
+                for row in session.new
+                if isinstance(row, ItemAlias) and row.item_id == self.id
             )
-            self.search_text = " ".join([self.search_text, *map(held, aliases)])
+            names = [
+                held(alias.name)
+                for alias in (*written, *adding)
+                if alias.retired_at is None
+            ]
+            self.search_text = " ".join([self.search_text, *names])
 
 
 class ItemPackage(KeyedName, Searchable, Versioned, Base):
@@ -559,6 +579,17 @@ class ItemAlias(KeyedName, Base):
     def _named(self, name: str) -> None:
         super()._named(name)
         self.name_folded = fold(name)
+
+
+# Whether an alias is current: not removed.
+CURRENT_ALIAS = ItemAlias.retired_at.is_(None)
+
+
+def current_aliases(item_id: int) -> Select[ItemAlias]:
+    """An item's current aliases, oldest first, as its search_text holds
+    them."""
+    query = select(ItemAlias).where(ItemAlias.item_id == item_id, CURRENT_ALIAS)
+    return query.order_by(ItemAlias.id)
 
 
 class OpenPackage(Base):

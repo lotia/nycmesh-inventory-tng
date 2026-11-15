@@ -137,7 +137,9 @@ def _change_or_note[T](
 
     def asking() -> T:
         done = change()
-        if asked is not None:
+        # Renamed to its own alias, it was found by that name already.
+        swapped = isinstance(done, items.Renamed) and done.swapped is not None
+        if asked is not None and not swapped:
             session.flush()
             # An add returns its item; a save is of item_id's.
             made = done.id if isinstance(done, Item) else item_id or 0
@@ -515,12 +517,8 @@ def save_item(
     if fields is not None:
         seen = form_version(form.get("version", ""))
         # Its own name, or a respelling of it, asks nothing: it is the same;
-        # nor one of its aliases, which it was found by already.
-        same = (
-            name_key(fields.name) == found.name_key
-            or items.own_alias(session, item_id, fields.name) is not None
-            or _confirmed(form, fields)
-        )
+        # nor one of its aliases (_change_or_note).
+        same = name_key(fields.name) == found.name_key or _confirmed(form, fields)
         asked = None if same else []
         renamed, broken = _change_or_note(
             session,
@@ -859,9 +857,9 @@ def package_settings(
 
 
 def _alias_problem(session: Session, item: Item, name: str, broken: str | None) -> str:
-    """Words for an alias refused as an item's name or another alias
-    (`broken`), naming that item, or what is wrong with the name itself."""
-    other = items.alias_taken_by(session, name)
+    """Words for an alias refused (`broken`, logged) as an item's name or
+    another alias, naming that item, or what is wrong with the name itself."""
+    whose, other = items.alias_taken_by(session, name) or ("name", None)
     log.debug(
         "alias refused",
         rule=broken,
@@ -871,7 +869,6 @@ def _alias_problem(session: Session, item: Item, name: str, broken: str | None) 
     # Its holder changed since, as the refusal let go of the lock: rare.
     if other is None:
         return TAKEN
-    whose = "name" if broken == items.ALIAS_IS_NAME else "alias"
     if other.id == item.id:
         return f"That is its {whose} already."
     retired = " It is retired." if other.retired_at is not None else ""

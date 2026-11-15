@@ -22,9 +22,11 @@ from collections.abc import Collection
 from dataclasses import asdict, dataclass
 from datetime import UTC, datetime
 from decimal import Decimal
+from typing import Any
 
 from sqlalchemy import (
     ColumnElement,
+    Select,
     SQLColumnExpression,
     and_,
     func,
@@ -47,6 +49,7 @@ from inventory_tng.db import (
     require_current,
 )
 from inventory_tng.models import (
+    CURRENT_ALIAS,
     Category,
     Item,
     ItemAlias,
@@ -54,6 +57,7 @@ from inventory_tng.models import (
     Label,
     Movement,
     OpenPackage,
+    current_aliases,
     fold,
     fuzzy,
 )
@@ -123,17 +127,31 @@ NAME_IS_ALIAS = "item_name_is_alias"
 ALIAS_IS_NAME = "item_alias_is_name"
 
 
+def _current_alias(key: str) -> tuple[ColumnElement[bool], ...]:
+    """Whether an alias is current and has this key."""
+    return ItemAlias.name_key == key, CURRENT_ALIAS
+
+
 def _alias_of(key: str) -> ColumnElement[bool]:
     """Whether a current alias of the item has this key."""
-    return (
-        select(ItemAlias.id)
-        .where(
-            ItemAlias.item_id == Item.id,
-            ItemAlias.name_key == key,
-            ItemAlias.retired_at.is_(None),
-        )
-        .exists()
-    )
+    of_item = ItemAlias.item_id == Item.id
+    return select(ItemAlias.id).where(of_item, *_current_alias(key)).exists()
+
+
+def _held_by(
+    session: Session,
+    wanted: list[tuple[str, ColumnElement[bool]]],
+    item_id: int | None = None,
+) -> tuple[str, Item] | None:
+    """The first of `wanted`'s fields an item other than `item_id` has, by
+    its condition, and that item."""
+    for field, where in wanted:
+        query = select(Item).where(where)
+        if item_id is not None:
+            query = query.where(Item.id != item_id)
+        if (other := session.scalars(query.limit(1)).first()) is not None:
+            return field, other
+    return None
 
 
 def taken_by(
@@ -157,13 +175,7 @@ def taken_by(
         wanted.append(("part_number", both))
     if fields.old_code is not None:
         wanted.append(("old_code", Item.old_code == fields.old_code))
-    for field, where in wanted:
-        query = select(Item).where(where)
-        if item_id is not None:
-            query = query.where(Item.id != item_id)
-        if (other := session.scalars(query.limit(1)).first()) is not None:
-            return field, other
-    return None
+    return _held_by(session, wanted, item_id)
 
 
 # How many close names an administrator is shown at most.
@@ -188,25 +200,23 @@ def similar(session: Session, name: str, item_id: int) -> list[Close]:
     (models.fold)."""
     folded = fold(name)
 
-    def close(column: SQLColumnExpression[str]) -> ColumnElement[bool]:
+    def close(
+        of: SQLColumnExpression[int],
+        alias: SQLColumnExpression[Any],
+        column: SQLColumnExpression[str],
+        *where: ColumnElement[bool],
+    ) -> Select[int, Any, float]:
+        """Items, by `of`, whose `column` is close, the alias it is if any,
+        and how close."""
         within = column.op("<%", is_comparison=True)(literal(folded))
-        return or_(fuzzy(column, folded), within)
+        score = func.similarity(column, folded)
+        return select(
+            of.label("item_id"), alias.label("alias"), score.label("score")
+        ).where(or_(fuzzy(column, folded), within), of != item_id, *where)
 
     found = union_all(
-        select(
-            Item.id.label("item_id"),
-            null().label("alias"),
-            func.similarity(Item.name_folded, folded).label("score"),
-        ).where(close(Item.name_folded), Item.id != item_id),
-        select(
-            ItemAlias.item_id,
-            ItemAlias.name,
-            func.similarity(ItemAlias.name_folded, folded),
-        ).where(
-            close(ItemAlias.name_folded),
-            ItemAlias.retired_at.is_(None),
-            ItemAlias.item_id != item_id,
-        ),
+        close(Item.id, null(), Item.name_folded),
+        close(ItemAlias.item_id, ItemAlias.name, ItemAlias.name_folded, CURRENT_ALIAS),
     ).subquery()
     best = (
         select(found)
@@ -225,7 +235,7 @@ def similar(session: Session, name: str, item_id: int) -> list[Close]:
 
 def _not_an_alias(session: Session, name: str) -> None:
     """RuleBroken unless no current alias has `name`'s key."""
-    taken = ItemAlias.name_key == name_key(name), ItemAlias.retired_at.is_(None)
+    taken = _current_alias(name_key(name))
     enforce(NAME_IS_ALIAS, when=exists_where(session, *taken))
 
 
@@ -263,7 +273,7 @@ def save(session: Session, item: Item, fields: Fields, *, seen: Seen) -> Renamed
     if fields.category_id != item.category_id:
         _in_current_category(session, fields.category_id)
     old, renamed = item.name, name_key(fields.name) != item.name_key
-    swapped = own_alias(session, item.id, fields.name) if renamed else None
+    swapped = _own_alias(session, item.id, fields.name) if renamed else None
     if swapped is None:
         _not_an_alias(session, fields.name)
     for column, value in asdict(fields).items():
@@ -271,45 +281,42 @@ def save(session: Session, item: Item, fields: Fields, *, seen: Seen) -> Renamed
     if not renamed:
         return None
     if swapped is not None:
-        relock(session, swapped, current=True)
-        swapped.retired_at = datetime.now(UTC)
+        _retire_alias(session, swapped, datetime.now(UTC))
     return Renamed(_aliased(session, item, old), swapped)
 
 
-def own_alias(session: Session, item_id: int, name: str) -> ItemAlias | None:
+def _own_alias(session: Session, item_id: int, name: str) -> ItemAlias | None:
     """The item's current alias with `name`'s key, if it has one."""
-    query = select(ItemAlias).where(
-        ItemAlias.item_id == item_id,
-        ItemAlias.name_key == name_key(name),
-        ItemAlias.retired_at.is_(None),
-    )
+    query = current_aliases(item_id).where(ItemAlias.name_key == name_key(name))
     return session.scalars(query).first()
 
 
 def _aliased(session: Session, item: Item, name: str) -> ItemAlias:
-    """`name` written as the item's alias, and the item refolded to find it
-    by it: refold reads the aliases written."""
+    """`name` written as the item's alias; the flush refolds the item to
+    find it by it (models._refold)."""
     alias = ItemAlias(item_id=item.id, name=name)
     session.add(alias)
     session.flush()
-    item.refold()
     return alias
+
+
+def _retire_alias(session: Session, alias: ItemAlias, at: datetime) -> None:
+    relock(session, alias, current=True)
+    alias.retired_at = at
 
 
 def aliases(session: Session, item_id: int) -> list[ItemAlias]:
     """The item's current aliases, oldest first."""
-    query = select(ItemAlias).where(
-        ItemAlias.item_id == item_id, ItemAlias.retired_at.is_(None)
-    )
-    return list(session.scalars(query.order_by(ItemAlias.id)))
+    return list(session.scalars(current_aliases(item_id)))
 
 
-def alias_taken_by(session: Session, name: str) -> Item | None:
-    """The item whose name, or one of whose current aliases, has `name`'s
-    key, retired items' too, if any."""
+def alias_taken_by(session: Session, name: str) -> tuple[str, Item] | None:
+    """ "name" and the item whose name has `name`'s key, retired items' too,
+    or "alias" and the item one of whose current aliases has; if any."""
     key = name_key(name)
-    query = select(Item).where(or_(Item.name_key == key, _alias_of(key)))
-    return session.scalars(query.limit(1)).first()
+    return _held_by(
+        session, [("name", Item.name_key == key), ("alias", _alias_of(key))]
+    )
 
 
 def add_alias(session: Session, item: Item, name: str) -> ItemAlias:
@@ -330,11 +337,9 @@ def remove_alias(session: Session, alias: ItemAlias, at: datetime) -> None:
     retired, read only."""
     item = session.get_one(Item, alias.item_id)
     relock(session, item)
-    relock(session, alias, current=True)
+    _retire_alias(session, alias, at)
     enforce("retired_read_only", when=item.retired_at is not None)
-    alias.retired_at = at
     session.flush()
-    item.refold()
 
 
 def retire(session: Session, item: Item, at: datetime) -> None:
