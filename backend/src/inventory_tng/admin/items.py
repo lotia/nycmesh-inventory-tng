@@ -432,10 +432,12 @@ def _decided(typed: Typed, **ids: int) -> None:
 def _name_problem(
     name: str, asked: Sequence[units.Found], item_id: int | None
 ) -> str | None:
-    """What is wrong with an item's or a package's name: one of
-    _key_name_problem's, or a unit in it to ask about."""
-    if problem := _key_name_problem(name):
+    """What is wrong with an item's or a package's name, compared as items'
+    are (names.name_key), or a unit in it to ask about."""
+    if problem := name_problem(name):
         return problem
+    if nameless(name):
+        return NO_LETTERS
     if asked:
         log.debug("unit asked about", item_id=item_id, asked=len(asked))
         return ASK_UNIT
@@ -446,16 +448,6 @@ def _confirmed(session: Session, form: Mapping[str, str], fields: items.Fields) 
     """Whether the name was sent before and asked about, then sent again
     unchanged: a different item's, whatever is close."""
     return _typed_name(session, form.get(DIFFERENT, ""), form).name == fields.name
-
-
-def _key_name_problem(name: str) -> str | None:
-    """What is wrong with a name compared as items' are (names.name_key),
-    an item's or a package's."""
-    if problem := name_problem(name):
-        return problem
-    if nameless(name):
-        return NO_LETTERS
-    return None
 
 
 def _fields(

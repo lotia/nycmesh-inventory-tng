@@ -25,14 +25,12 @@ with it again (reread), refused if two would then read alike
 (2026-11-15)."""
 
 import re
-import unicodedata
 from collections.abc import Collection, Iterable
 from dataclasses import asdict, dataclass
 from datetime import UTC, datetime
 from decimal import Decimal
 from typing import Any
 
-from anyascii import anyascii
 from sqlalchemy import (
     ColumnElement,
     Select,
@@ -70,6 +68,7 @@ from inventory_tng.models import (
     current_aliases,
     fold,
     fuzzy,
+    in_ascii,
     reading_rules,
     unit_key,
 )
@@ -507,16 +506,21 @@ READ_ALIKE = "names_read_alike"
 
 @dataclass(frozen=True)
 class Named:
-    """A row whose name a reading rule reads: its table, id and name, and
-    its item's id (a package's or an alias's; an item's own)."""
+    """A row whose name a reading rule reads: its table, id and name."""
 
     table: str
     id: int
     name: str
-    item_id: int
 
 
 type Rows = tuple[list[Item], list[ItemPackage], list[ItemAlias]]
+# Each row's unit key as `rules` read its name (_keyed).
+type Keyed = dict[Item | ItemPackage | ItemAlias, str]
+
+
+def _keyed(rows: Rows, rules: units.Rules) -> Keyed:
+    """Each of `rows` with its name's unit key by `rules`."""
+    return {row: unit_key(row.name, rules) for row in (*rows[0], *rows[1], *rows[2])}
 
 
 def _after_a_number(token: str) -> str:
@@ -537,9 +541,7 @@ def _with_units(session: Session, tokens: Iterable[str], *, lock: bool) -> Rows:
     if not tokens:
         return [], [], []
     raw = [_after_a_number(token) for token in tokens]
-    folded = {
-        _after_a_number(anyascii(unicodedata.normalize("NFKC", t))) for t in tokens
-    }
+    folded = {_after_a_number(in_ascii(t)) for t in tokens}
 
     def read[M: (Item, ItemPackage, ItemAlias)](
         model: type[M], matches: list[ColumnElement[bool]], *also: ColumnElement[bool]
@@ -561,15 +563,12 @@ def _with_units(session: Session, tokens: Iterable[str], *, lock: bool) -> Rows:
     )
 
 
-def _read_alike(session: Session, rows: Rows, rules: units.Rules) -> list[list[Named]]:
-    """Names that would read alike, by `rules`, of which one at least is
-    in `rows`, read again: each group, by table and id. Items' names and
-    current aliases are one namespace; an item's packages another."""
+def _read_alike(session: Session, rows: Rows, new: Keyed) -> list[list[Named]]:
+    """Names that would read alike, by their `new` keys, of which one at
+    least is in `rows`, read again: each group, by table and id. Items'
+    names and current aliases are one namespace; an item's packages
+    another."""
     items_, packages, aliases = rows
-    new = {
-        (row.__tablename__, row.id): unit_key(row.name, rules)
-        for row in (*items_, *packages, *aliases)
-    }
     keys = set(new.values())
 
     def others[M: (Item, ItemPackage, ItemAlias)](
@@ -581,27 +580,19 @@ def _read_alike(session: Session, rows: Rows, rules: units.Rules) -> list[list[N
         )
         return [(row, row.unit_key) for row in session.scalars(query)]
 
-    def named(row: Item | ItemPackage | ItemAlias) -> Named:
-        of = row.id if isinstance(row, Item) else row.item_id
-        return Named(row.__tablename__, row.id, row.name, of)
-
     groups: dict[tuple[object, ...], list[Named]] = {}
     every = [
-        *(
-            (row, new[row.__tablename__, row.id])
-            for row in (*items_, *packages, *aliases)
-        ),
+        *new.items(),
         *others(Item, items_),
         *others(ItemPackage, packages),
         *others(ItemAlias, aliases, CURRENT_ALIAS),
     ]
     for row, key in every:
         scope = (row.item_id,) if isinstance(row, ItemPackage) else ()
-        groups.setdefault((*scope, key), []).append(named(row))
+        named = Named(row.__tablename__, row.id, row.name)
+        groups.setdefault((*scope, key), []).append(named)
     changed = {
-        (row.__tablename__, row.id)
-        for row in (*items_, *packages, *aliases)
-        if new[row.__tablename__, row.id] != row.unit_key
+        (row.__tablename__, row.id) for row, key in new.items() if key != row.unit_key
     }
     return [
         group
@@ -616,7 +607,8 @@ def read_alike(
     """Names that would read alike by `rules`, of those with these units
     after a number: what reread refuses, said after its savepoint is
     undone."""
-    return _read_alike(session, _with_units(session, tokens, lock=False), rules)
+    rows = _with_units(session, tokens, lock=False)
+    return _read_alike(session, rows, _keyed(rows, rules))
 
 
 def reread(session: Session, tokens: Iterable[str]) -> None:
@@ -628,9 +620,9 @@ def reread(session: Session, tokens: Iterable[str]) -> None:
     lock_catalogue(session)
     rules = reading_rules(session)
     rows = _with_units(session, tokens, lock=True)
-    enforce(READ_ALIKE, when=bool(_read_alike(session, rows, rules)))
-    items_, packages, aliases = rows
-    keys = {row: unit_key(row.name, rules) for row in (*items_, *packages, *aliases)}
+    keys = _keyed(rows, rules)
+    enforce(READ_ALIKE, when=bool(_read_alike(session, rows, keys)))
+    items_, packages, _ = rows
     changing = {row: key for row, key in keys.items() if key != row.unit_key}
     # Set apart first, as migration 0043 does: unique indexes check row by
     # row, so two names trading keys would clash halfway.

@@ -265,6 +265,8 @@ def catalogue(session: Session) -> Catalogue:
         aliases.setdefault(item_id, []).append(alias)
     found = session.scalars(select(Label).where(Label.revoked_at.is_(None)))
     places = [LocationEntry.model_validate(x) for x in locations]
+    # Each category folded once, not once an item in it.
+    categories = {category: held(category) for _, category in items}
     entries = [
         ItemEntry(
             id=item.id,
@@ -274,7 +276,7 @@ def catalogue(session: Session) -> Catalogue:
             manufacturer=item.manufacturer,
             part_number=item.part_number,
             old_code=item.old_code,
-            search_text=f"{item.search_text} {held(category)}",
+            search_text=f"{item.search_text} {categories[category]}",
             aliases=aliases.get(item.id, []),
             packages=packages.get(item.id, []),
             retired=item.retired_at is not None,

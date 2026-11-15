@@ -218,6 +218,13 @@ def holds(column: SQLColumnExpression[str], search: str) -> ColumnElement[bool]:
     return column.ilike(f"%{escaped}%", escape="\\")
 
 
+def in_ascii(text: str) -> str:
+    """`text` with compatibility characters made their canonical ones
+    (NFKC), then in ASCII as anyascii spells it: what fold() and folds() do
+    last."""
+    return anyascii(unicodedata.normalize("NFKC", text))
+
+
 def fold(text: str, rules: units.Rules | None = None) -> str:
     """`text` as searches compare it: in ASCII, as anyascii spells it, so
     "cafe" finds "Café" and "lodz" "Łódź" (docs/decisions/0021, 2026-11-12),
@@ -227,7 +234,7 @@ def fold(text: str, rules: units.Rules | None = None) -> str:
     "10uF", as `rules` read it first. What is searched is kept so and as
     typed (held); what is typed is matched so and as typed (folds)."""
     decomposed = unicodedata.normalize("NFKD", text)
-    return anyascii(unicodedata.normalize("NFKC", units.respell(decomposed, rules)))
+    return in_ascii(units.respell(decomposed, rules))
 
 
 def folds(text: str, rules: units.Rules | None = None) -> tuple[str, ...]:
@@ -236,12 +243,12 @@ def folds(text: str, rules: units.Rules | None = None) -> tuple[str, ...]:
     so a unit's word alone ("feet"), a unit typed shorter than a token not
     one ("48 V" in "48 VDC") and a unit half typed ("10 μ") find what they
     found before units were read, and "10 µF" finds "10uf" too."""
-    typed = anyascii(unicodedata.normalize("NFKC", text))
+    typed = in_ascii(text)
     decomposed = unicodedata.normalize("NFKD", text)
     respelling = units.respell(decomposed, rules)
     if respelling == decomposed:
         return (typed,)
-    respelt = anyascii(unicodedata.normalize("NFKC", respelling))
+    respelt = in_ascii(respelling)
     # Case aside: search ignores it.
     return (typed,) if respelt.lower() == typed.lower() else (typed, respelt)
 
