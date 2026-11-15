@@ -878,7 +878,7 @@ def _shown_number(number: str) -> str:
 
 # What, right before a number, makes it part of a word or a code, such as
 # a part number (`UF-SM-10G`, `ES-8-150W`): left as typed.
-_IN_A_CODE = re.compile(r"[^\W]|[-/.+]")
+_IN_A_CODE = re.compile(r"[\w/.+-]")
 
 
 def shown_name(name: str, rules: Rules | None = None) -> str:
