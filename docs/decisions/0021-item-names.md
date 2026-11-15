@@ -560,7 +560,9 @@ a name copied from a page finds the item.
 
 Decided in building it (inventory-tng-ist.3, 2026-11-15): only commas
 group thousands here, as a plain space may part two numbers (`Pack 2 100
-ft`), which search accepts but a name shown must not join; a number
+ft`), which search accepts but a name shown must not join, and a comma
+after a lone nought (`0,500 m`) groups none, being perhaps a decimal
+comma, so is shown as typed; a number
 within a word or a code, right after a letter, digit, `-`, `/`, `.` or
 `+` (`UF-SM-10G`, `ES-8-150W`), is shown as typed; the seeding page shows
 names as typed, as evidence of how a unit was typed; and an item's form,

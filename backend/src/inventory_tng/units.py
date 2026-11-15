@@ -855,8 +855,10 @@ NO_BREAK_SPACE = "\u00a0"
 THIN_NO_BREAK_SPACE = "\u202f"
 # A number as a name may type it before a unit: a sign, its whole part, plain
 # or grouped by commas in thousands as US conventions write them, and any
-# decimal part. Another use of commas (`1,2,3`) is left as typed.
-_SHOWN_NUMBER = re.compile(r"([-\u2212]?)([0-9]{1,3}(?:,[0-9]{3})+|[0-9]+)([.][0-9]+)?")
+# decimal part. Another use of commas (`1,2,3`, `0,500`) is left as typed.
+_SHOWN_NUMBER = re.compile(
+    r"([-\u2212]?)([1-9][0-9]{0,2}(?:,[0-9]{3})+|[0-9]+)([.][0-9]+)?"
+)
 
 
 def _shown_number(number: str) -> str:

@@ -533,6 +533,10 @@ NB, THIN = "\u00a0", "\u202f"
         ("Probe -40°C", f"Probe -40{NB}°C"),
         # Commas that group no thousands, as typed.
         ("Pack 1,2 m", f"Pack 1,2{NB}m"),
+        # Nor one whose first group is a nought: no thousands, maybe a
+        # decimal comma, not `0500`.
+        ("Reel 0,500 m", f"Reel 0,500{NB}m"),
+        ("Reel 00,500 m", f"Reel 00,500{NB}m"),
         # Products, words of units, units no rule or word settles, and
         # tokens no unit, as typed.
         ("Cat6a cable 5AC SFP+", "Cat6a cable 5AC SFP+"),
