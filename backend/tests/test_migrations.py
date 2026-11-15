@@ -1,10 +1,13 @@
+import re
+from functools import partial
+
 import pytest
 from alembic import command
 from alembic.config import Config
 from sqlalchemy import Connection, text
 
 from inventory_tng.models import FOLDED_WITH
-from inventory_tng.names import name_key
+from inventory_tng.names import IGNORED, name_key
 
 from helpers.sign_in import TOTP_KEYS
 
@@ -465,6 +468,102 @@ def test_name_keys_name_what_would_clash_going_up(alembic_config: Config) -> Non
     )
 
 
+def _key_before(name: str) -> str:
+    """`name`'s key as 0037 wrote it: no look-alike read as ASCII's."""
+    return "".join(c.lower() if c.isascii() else c for c in re.sub(IGNORED, "", name))
+
+
+def _keyed(connection: Connection, table: str, name: str, **values: object) -> int:
+    """A row of `table` named `name`, keyed as 0037 keys it, as 0039
+    holds one."""
+    values = {"name": name, "name_key": _key_before(name), **values}
+    if table != "item_alias":
+        values |= {"search_text": "", "folded_with": ""}
+    return connection.scalar(
+        text(
+            f"INSERT INTO {table} ({', '.join(values)})"
+            f" VALUES ({', '.join(f':{column}' for column in values)})"
+            " RETURNING id"
+        ),
+        values,
+    )
+
+
+def test_name_keys_read_look_alikes_as_ascii(alembic_config: Config) -> None:
+    """Migration 0040: each item's, package's and alias's key refilled,
+    reading a look-alike space, quote or dash as ASCII's; names kept; and
+    back again."""
+    command.downgrade(alembic_config, "0039")
+    connection = alembic_config.attributes["connection"]
+    category_id = connection.scalar(
+        text("INSERT INTO category (name) VALUES ('Cables') RETURNING id")
+    )
+    tough = _keyed(
+        connection, "item", "Tough\u00a0cable", category_id=category_id, name_folded=""
+    )
+    _keyed(connection, "item_package", "Reel\u2013A", item_id=tough, size=1)
+    _keyed(connection, "item_alias", "Ubiquiti\u2019s", item_id=tough)
+    query = text(
+        "SELECT i.name, i.name_key, p.name, p.name_key, a.name, a.name_key"
+        " FROM item i JOIN item_package p ON p.item_id = i.id"
+        " JOIN item_alias a ON a.item_id = i.id"
+    )
+    before = connection.execute(query).one()
+    command.upgrade(alembic_config, "head")
+    assert connection.execute(query).one() == (
+        *("Tough\u00a0cable", "toughcable"),
+        *("Reel\u2013A", "reela"),
+        *("Ubiquiti\u2019s", "ubiquitis"),
+    )
+    command.downgrade(alembic_config, "0039")
+    assert connection.execute(query).one() == before
+    command.upgrade(alembic_config, "head")
+
+
+def test_look_alike_name_keys_name_what_would_clash(alembic_config: Config) -> None:
+    """Migration 0040's upgrade: names it would make one, among items, an
+    item's packages, current aliases, or an alias and an item's name, are
+    named by id to rename; nothing is changed until none are. A retired
+    alias clashes with nothing."""
+    command.downgrade(alembic_config, "0039")
+    connection = alembic_config.attributes["connection"]
+    category_id = connection.scalar(
+        text("INSERT INTO category (name) VALUES ('Cables') RETURNING id")
+    )
+    item = partial(_keyed, connection, "item", category_id=category_id, name_folded="")
+    plain, spaced = item("Tough cable"), item("Tough\u00a0cable")
+    patch = item("Patch-cord")
+    reel, dashed = (
+        _keyed(connection, "item_package", name, item_id=plain, size=1)
+        for name in ("Reel A", "Reel\u2013A")
+    )
+    alias = partial(_keyed, connection, "item_alias", item_id=plain)
+    quoted, curly, cord = (
+        alias("Ubiquiti's"),
+        alias("Ubiquiti\u2019s"),
+        alias("Patch\u2014cord"),
+    )
+    for name in ("Ubiquiti\u02bcs", "Patch\u2212cord"):
+        connection.execute(
+            text("UPDATE item_alias SET retired_at = now() WHERE id = :i"),
+            {"i": alias(name)},
+        )
+    with pytest.raises(RuntimeError) as refused:
+        command.upgrade(alembic_config, "head")
+    assert str(refused.value) == (
+        "Names differing only by look-alike spaces, quotes or dashes would be"
+        f" one name, by id: item {plain}, {spaced}; item_package {reel}, {dashed};"
+        f" item_alias {quoted}, {curly}; item_alias {cord} and item {patch}."
+        " Rename all but one in each, then migrate again."
+    )
+    assert (
+        connection.scalar(
+            text("SELECT name_key FROM item WHERE id = :i"), {"i": spaced}
+        )
+        == "tough\u00a0cable"
+    )
+
+
 def test_going_back_before_name_keys_names_what_would_clash(
     alembic_config: Config,
 ) -> None:
@@ -474,6 +573,8 @@ def test_going_back_before_name_keys_names_what_would_clash(
     connection = alembic_config.attributes["connection"]
     if connection.scalar(text("SELECT lower('Â')")) == "Â":
         pytest.skip("Under a C locale the keys before were the same.")
+    # Keys as 0037 wrote them, which keep an en dash.
+    command.downgrade(alembic_config, "0039")
     category_id = connection.scalar(
         text("INSERT INTO category (name) VALUES ('Cables') RETURNING id")
     )

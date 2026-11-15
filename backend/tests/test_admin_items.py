@@ -10,6 +10,7 @@ from functools import partial
 import pytest
 from fastapi.testclient import TestClient
 from httpx2 import Response
+from markupsafe import escape
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
@@ -73,9 +74,7 @@ def test_an_item_name_needs_more_than_punctuation(
     form = {"category_id": str(radios.id), "unit": "each"}
     refused = admin_client.post(ITEMS, data=form | {"name": "- ?"})
     assert refused.status_code == 400
-    assert "Give it a name with more than spaces and punctuation in it." in text(
-        refused
-    )
+    assert "A name needs at least one letter or number." in text(refused)
     assert admin_client.post(ITEMS, data=form | {"name": "Câble ½"}).status_code == 303
     assert admin_client.post(ITEMS, data=form | {"name": "1234"}).status_code == 303
 
@@ -151,6 +150,28 @@ def test_names_and_part_numbers_are_unique_naming_the_other(
         )
         assert refused.status_code == 400
         assert f'id="{field}-problem">{words}</span>' in refused.text
+
+
+def test_a_name_pasted_with_look_alikes_clashes_naming_the_other(
+    admin_client: TestClient, session: Session, radios: Category
+) -> None:
+    """A non-breaking space, a curly quote or an en dash is read as the
+    plain one, so the name clashes with the one typed plainly, which the
+    form names; a name is kept as typed."""
+    form = {"category_id": str(radios.id), "unit": "each"}
+    for kept, pasted in (
+        ("Tough cable", "Tough\u00a0Cable"),
+        ("Ubiquiti's dish", "Ubiquiti\u2019s dish"),
+        ("Patch\u2014cord", "Patch-cord"),
+    ):
+        assert admin_client.post(ITEMS, data=form | {"name": kept}).status_code == 303
+        refused = admin_client.post(ITEMS, data=form | {"name": pasted})
+        assert refused.status_code == 400
+        assert (
+            f'id="name-problem">{escape(kept)} already has that name, or one '
+            "differing from it only in case, spaces or punctuation.</span>"
+        ) in refused.text
+    assert named(session, Item, "Patch\u2014cord").name_key == "patchcord"
 
 
 def test_a_saved_item_is_refused_what_another_has_its_own_respelt(

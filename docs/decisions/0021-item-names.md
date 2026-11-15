@@ -67,7 +67,9 @@ so admins would type half a name in each field.
 - Which characters are spaces and punctuation, and how case folds, is
   ASCII's, as a C locale has it, whatever the database's locale (Amendment,
   2026-11-14): letters such as `â` are kept, but `Â` and `â` are not
-  folded together, and signs beyond ASCII, such as `–`, are kept.
+  folded together, and signs beyond ASCII, such as `±`, are kept; a space,
+  quote or dash that looks like ASCII's, such as `–`, is read as ASCII's
+  (Amendment, 2026-11-15).
 
 ## Amendment: a decimal point tells names apart (2026-11-12)
 
@@ -231,8 +233,9 @@ write it as PostgreSQL checks it: only ASCII's spaces and punctuation are
 left out, and only its letters lowered. Production, on CloudNativePG's
 default C locale, compares names as it did. The development database,
 made with `en_US.utf8`, now compares them as production does: `Câble` and
-`CÂBLE`, or an en dash and a hyphen, are two names there, where they were
-one. Accents stay apart in uniqueness, as above. A name still needs a
+`CÂBLE` are two names there, where they were one. An en dash and a hyphen
+were two names too, until look-alikes were read as ASCII's (2026-11-15,
+below). Accents stay apart in uniqueness, as above. A name still needs a
 letter or a digit, Unicode's, which the app checks, so a name of an en
 dash alone is refused though its key keeps it.
 
@@ -326,3 +329,26 @@ read only by search, never to spell a name (Q14 A), and `in` is no unit,
 as it is a word more often than an inch: an inch is read by its words and
 by its UCUM code, `[in_i]`, its symbol in what search compares. A lone `Ω`
 or `ω` is read as ohms, as above (Q11 A).
+
+## Amendment: look-alike spaces, quotes and dashes clash (2026-11-15)
+
+A name's key reads a space, quote or dash that looks like ASCII's as
+ASCII's, before leaving spaces and punctuation out (Ali, 2026-11-15,
+inventory-tng-6sb, Q12 A): every Unicode space (a non-breaking one, a thin
+one), curly and other apostrophes and quotes, primes, and en and em
+dashes, the minus sign and other hyphens. So `Tough cable` pasted with a
+non-breaking space, or `Ubiquiti’s` with a curly apostrophe, clashes with
+the name typed plainly, and the form names the item that has it. Names
+are stored as typed, look-alikes kept.
+
+`names.LOOK_ALIKES` lists them code point by code point, read by Python's
+`str.translate` and PostgreSQL's `translate()`, so the CHECK reads the
+same list whatever the database's version, where a Unicode category would
+follow its version. The agreement test checks the two on every character,
+and that the list holds every space Unicode has. Migration 0040 wrote the
+CHECKs again and refilled every key, items', packages' and aliases',
+naming by id first any names it would make one, an alias and an item's
+name included.
+
+A name with no letter or number is refused with "A name needs at least one
+letter or number." (Q16 A).

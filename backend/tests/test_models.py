@@ -5,6 +5,7 @@ function by the rule's name (db.RuleBroken), whose every case
 test_catalogue_rules.py tests without a database."""
 
 import dataclasses
+import unicodedata
 from collections.abc import Callable
 from datetime import UTC, datetime
 from decimal import Decimal
@@ -33,7 +34,7 @@ from inventory_tng.models import (
     mint_code,
     mint_label_code,
 )
-from inventory_tng.names import name_key, name_key_sql
+from inventory_tng.names import LOOK_ALIKES, name_key, name_key_sql
 
 from helpers.rows import add, breaks, item_fields, violates
 
@@ -92,7 +93,16 @@ def test_item_names_are_unique_ignoring_case_spaces_and_punctuation(
     tough = new_item("ToughCable")
     assert tough.name_key == "toughcable"
     assert name_key("Tough-Cable, Pro!") == "toughcablepro"
-    for clash in ("Tough cable", "TOUGH-CABLE", "tough_cable.", " Tough  Cable "):
+    for clash in (
+        "Tough cable",
+        "TOUGH-CABLE",
+        "tough_cable.",
+        " Tough  Cable ",
+        # Look-alikes, read as ASCII's.
+        "Tough\u00a0cable",
+        "Tough\u2013cable",
+        "\u201cTough\u201d cable",
+    ):
         with violates(session, "uq_item_name"):
             new_item(clash)
     tough.retired_at = NOW
@@ -106,9 +116,10 @@ def test_item_names_are_unique_ignoring_case_spaces_and_punctuation(
     new_item("LiteBeam 5AC Gen1")
     new_item("LiteBeam 5AC Gen2")
     # Only ASCII's letters are lowered, and only its spaces and punctuation
-    # ignored, whatever the database's locale (names.py).
+    # ignored, and their look-alikes, whatever the database's locale
+    # (names.py).
     new_item("CÂBLE")
-    new_item("Tough\u2013cable")
+    new_item("Tough\u00b1cable")
 
 
 def test_names_are_stored_in_canonical_spelling(
@@ -201,7 +212,16 @@ TRICKY_NAMES = {
     "Câble": "câble",
     "CÂBLE": "cÂble",
     "Tab\tand\vfeed\x0c": "tabandfeed",
-    "\u00a0\u2013\u2019": "\u00a0\u2013\u2019",
+    # Look-alikes read as ASCII's: spaces, quotes, dashes.
+    "\u00a0\u2013\u2019": "",
+    "Tough\u00a0cable": "toughcable",
+    "Tough\u3000cable\u202f": "toughcable",
+    "Ubiquiti\u2019s": "ubiquitis",
+    "\u201cPro\u201d": "pro",
+    "6\u2033 \u2014 12\u2032": "612",
+    "a\u2212b\u2011c\u00adD": "abcd",
+    "1\u2013.5": "15",
+    "\u00b1\u2026": "\u00b1\u2026",
     "...": "",
 }
 
@@ -256,6 +276,19 @@ def test_names_are_keyed_alike_by_the_app_and_the_database(session: Session) -> 
     assert [
         name for name, row in zip(sample, rows, strict=True) if not all(row[1:])
     ] == []
+
+
+def test_every_unicode_space_is_read_as_a_space() -> None:
+    """names.LOOK_ALIKES, listed by hand so PostgreSQL reads the same list,
+    holds every space Unicode has (Zs), so none tells two names apart; and
+    reads each look-alike as an ASCII space, quote or dash."""
+    spaces = {
+        chr(c)
+        for c in range(0x110000)
+        if unicodedata.category(chr(c)) == "Zs" and chr(c) != " "
+    }
+    assert spaces <= LOOK_ALIKES.keys()
+    assert set(LOOK_ALIKES.values()) == {" ", "'", '"', "-"}
 
 
 def test_a_name_key_written_wrong_is_refused(

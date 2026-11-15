@@ -64,7 +64,7 @@ TAKEN = (
     "Another item, perhaps a retired one, already has that name, that "
     "manufacturer and part number, or that old code."
 )
-NO_LETTERS = "Give it a name with more than spaces and punctuation in it."
+NO_LETTERS = "A name needs at least one letter or number."
 # A field saying which reading of a unit in a name was meant, where case
 # leaves two (units.spell): this, then the unit as typed; its value is
 # str(Reading).
