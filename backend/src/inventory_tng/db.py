@@ -436,9 +436,9 @@ def locked[*Ts](
     inserting a row that refers to these); with `shared` too, FOR KEY SHARE,
     which only FOR UPDATE waits for. Only `of`'s rows if given. With
     `skip_locked`, rows another transaction holds are left out, not waited
-    for. Rows locked
-    to change, not `shared`, are noted as held (the guard below): all the
-    query loads, or `of`'s if it is a model; none for other `of`s."""
+    for. Rows locked to change, not `shared`, are noted as held (the guard
+    below): all the query loads, or `of`'s if it is a model; none for other
+    `of`s."""
     options: dict[str, Any] = {"populate_existing": True}
     if not shared and (of is None or (isinstance(of, type) and issubclass(of, Base))):
         options[LOCKING] = of or Base
