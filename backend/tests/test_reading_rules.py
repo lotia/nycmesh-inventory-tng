@@ -25,6 +25,7 @@ from inventory_tng.models import (
     ReadingRule,
     unit_key,
 )
+from inventory_tng.models import reading_rules as reading_rules_held
 
 from helpers.rows import add, breaks, history, item_fields, named, shown, violates
 from helpers.sign_in import text
@@ -43,6 +44,22 @@ def new_item(session: Session, category: Category, name: str) -> Item:
 
 def rule_of(session: Session, token: str) -> ReadingRule:
     return session.scalars(select(ReadingRule).where(ReadingRule.token == token)).one()
+
+
+def test_the_rules_are_read_once_until_written_or_rolled_back(
+    session: Session,
+) -> None:
+    """models.reading_rules keeps what it read for the transaction, read
+    again after a rule is written or a savepoint rolled back."""
+    held = reading_rules_held(session)
+    assert reading_rules_held(session) is held
+    with session.begin_nested() as savepoint:
+        reading_rules.decide(session, {"g": GBPS}, None)
+        assert reading_rules_held(session) == {"g": GBPS}
+        savepoint.rollback()
+    assert reading_rules_held(session) == {}
+    reading_rules.decide(session, {"g": GBPS}, None)
+    assert reading_rules_held(session) == {"g": GBPS}
 
 
 def test_a_rule_reads_a_unit_before_the_table() -> None:

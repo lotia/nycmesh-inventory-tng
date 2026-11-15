@@ -25,13 +25,6 @@ const lowered = (pairs: Pairs): Map<string, string> =>
 
 const whole = new Map([...prefixed, ...alone]);
 const wholeLoose = lowered([...prefixed, ...alone]);
-const takesPrefixLoose = lowered(prefixed);
-const prefixSpellings = table.prefixes.flatMap(({ spellings }) =>
-  spellings.map((spelling): [string, string] => [
-    spelling,
-    spellings[0] as string,
-  ]),
-);
 
 /** The unit `token` spells, by its symbol, if any: as typed first, then
  * with its prefix as typed and the unit in any case, then all in any case
@@ -39,20 +32,20 @@ const prefixSpellings = table.prefixes.flatMap(({ spellings }) =>
 export function read(token: string): string | undefined {
   const found = whole.get(token);
   if (found !== undefined) return found;
-  for (const [spelling, prefix] of prefixSpellings) {
+  for (const [spelling, [prefix]] of exponents) {
     if (token.startsWith(spelling)) {
       const rest = token.slice(spelling.length);
-      const unit = takesPrefixLoose.get(rest.toLowerCase());
-      if (unit !== undefined) return prefix + unit;
+      const unit = takesPrefixUnits.get(rest.toLowerCase());
+      if (unit !== undefined) return prefix + unit.symbol;
     }
   }
   const lower = token.toLowerCase();
   const loose = wholeLoose.get(lower);
   if (loose !== undefined) return loose;
-  for (const [spelling, prefix] of prefixSpellings) {
+  for (const [spelling, [prefix]] of exponents) {
     if (lower.startsWith(spelling.toLowerCase())) {
-      const unit = takesPrefixLoose.get(lower.slice(spelling.length));
-      if (unit !== undefined) return prefix + unit;
+      const unit = takesPrefixUnits.get(lower.slice(spelling.length));
+      if (unit !== undefined) return prefix + unit.symbol;
     }
   }
   return undefined;
@@ -90,7 +83,6 @@ type Unit = (typeof table.units)[number];
  * if any, and the unit; `symbol` as str(Reading) spells it. */
 type Reading = { prefix: string; exponent: number; unit: Unit; symbol: string };
 
-const units = new Map(table.units.map((unit) => [unit.symbol, unit]));
 const reading = (prefix: string, exponent: number, unit: Unit): Reading => ({
   prefix,
   exponent,
@@ -122,6 +114,8 @@ const takesPrefixUnits = new Map(
     ]),
   ),
 );
+// What a bare rate is a prefix of (units.BARE_RATES).
+const bitRate = table.units.find((unit) => unit.symbol === "bit/s") as Unit;
 const rank = (each: Reading): number => table.profile.indexOf(each.unit.kind);
 const bareRates: Record<string, string> = table.bare_rates;
 const clues: Record<string, string[]> = table.clues;
@@ -153,7 +147,7 @@ function readings(token: string): [Reading, boolean][] {
   if (rate !== undefined) {
     // Every bare rate is a prefix's symbol.
     const [prefix, exponent] = exponents.get(rate) as [string, number];
-    found.push([reading(prefix, exponent, units.get("bit/s") as Unit), false]);
+    found.push([reading(prefix, exponent, bitRate), false]);
   }
   return found.sort(
     ([a, exactA], [b, exactB]) =>
@@ -173,6 +167,7 @@ function plausible(each: Reading, number: number): boolean {
 }
 
 const WORD = /[A-Za-z0-9+]+(?:-[A-Za-z0-9+]+)*/g;
+// A word, as clues have them; a part of one between hyphens, as products.
 const PART = /[A-Za-z0-9+]+/g;
 const BEFORE = /([A-Za-z0-9+]+)[ -]?$/;
 
@@ -199,7 +194,7 @@ function product(text: string, at: number): boolean {
  * (units._clue). */
 function clue(text: string, readable: Reading[]): Reading | undefined {
   const words = new Set(
-    Array.from(text.matchAll(/[A-Za-z0-9+]+/g), ([word]) => word.toLowerCase()),
+    Array.from(text.matchAll(PART), ([word]) => word.toLowerCase()),
   );
   const said = readable.map((each): [Reading, number] => [
     each,
@@ -231,12 +226,12 @@ function settled(
   rules: Rules | undefined,
 ): string | null | undefined {
   const rule = rules?.get(token.normalize("NFC"));
-  const value = Number(number.replaceAll(",", "").replace("−", "-"));
-  const found = readings(token).filter(([each]) => plausible(each, value));
-  const readable = found.map(([each]) => each);
   // A rule's reading the table no longer reads is none (units.reading_of).
   if (rule !== undefined)
     return rule !== null && read(rule) === rule ? rule : null;
+  const value = Number(number.replaceAll(",", "").replace("−", "-"));
+  const found = readings(token).filter(([each]) => plausible(each, value));
+  const readable = found.map(([each]) => each);
   const clued = readable.length > 1 ? clue(text, readable) : undefined;
   if (clued !== undefined) return clued.symbol;
   if (table.asked.includes(token) && found.length > 1) return undefined;

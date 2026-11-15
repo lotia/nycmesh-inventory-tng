@@ -540,8 +540,8 @@ CLUES: dict[str, frozenset[str]] = {
         )
     ),
 }
-# A word, as CLUES has them.
-CLUE_WORD = re.compile(r"[A-Za-z0-9+]+")
+# A word, as CLUES has them; a part of one between hyphens, as PRODUCTS.
+_PART = re.compile(r"[A-Za-z0-9+]+")
 # Words in names that are products, never a number and its unit (Ali,
 # 2026-11-15), compared in lower case: Cat6a is no 6 amperes.
 PRODUCTS = frozenset(
@@ -569,10 +569,9 @@ PRODUCTS = frozenset(
         "4-in-1",
     )
 )
-# A word, as PRODUCTS has them: letters, digits, + and - within; a part
-# of one between hyphens; and the word or part right before one.
+# A word, as PRODUCTS has them: letters, digits, + and - within (a part
+# of one between hyphens is a _PART); and the word or part right before one.
 _WORD = re.compile(r"[A-Za-z0-9+]+(?:-[A-Za-z0-9+]+)*")
-_PART = re.compile(r"[A-Za-z0-9+]+")
 _BEFORE = re.compile(r"([A-Za-z0-9+]+)[ -]?\Z")
 
 
@@ -704,15 +703,14 @@ def _found(text: str, match: re.Match[str], rules: Rules | None) -> Found | None
     value = float(number.replace(",", "").replace("\u2212", "-"))
     plausible = [(r, exact) for r, exact in every if r.plausible(value)]
     readable = tuple(r for r, _ in plausible)
-    clue = None
+    words: tuple[str, ...] = ()
     if rule is not None:
         settled = None if rule.reading is None else reading_of(rule.reading)
     elif len(readable) > 1 and (clue := _clue(text, readable)) is not None:
-        settled = clue[0]
+        settled, words = clue
     else:
         asked = token in ASKED and len(plausible) > 1
         settled = None if asked else _likeliest(plausible)
-    words = clue[1] if clue else ()
     return Found(
         number, token, match.end(1), match.end(), readable, settled, rule, words
     )
@@ -723,7 +721,7 @@ def _clue(
 ) -> tuple[Reading, tuple[str, ...]] | None:
     """The reading the words in `text` say (CLUES), if they say one kind,
     and those words."""
-    words = {word.lower() for word in CLUE_WORD.findall(text)}
+    words = {word.lower() for word in _PART.findall(text)}
     said = [
         (r, tuple(sorted(words & CLUES.get(r.unit.kind, frozenset()))))
         for r in readable

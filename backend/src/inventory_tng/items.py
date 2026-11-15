@@ -148,8 +148,14 @@ class Keys:
     units: str
 
     @classmethod
-    def of(cls, session: Session, name: str) -> Keys:
-        return cls(name_key(name), unit_key(name, reading_rules(session)))
+    def of(cls, session: Session, name: str, rules: units.Rules | None = None) -> Keys:
+        """`name`'s keys, its units read by `rules`, else by those held."""
+        held = reading_rules(session) if rules is None else rules
+        return cls(name_key(name), unit_key(name, held))
+
+    def same(self, row: Item | ItemAlias) -> bool:
+        """Whether `row` has either key: the same name, only respelt."""
+        return self.name == row.name_key or self.units == row.unit_key
 
     def match(self, model: type[Item | ItemAlias]) -> ColumnElement[bool]:
         """Whether a row of `model` has either key."""
@@ -184,13 +190,17 @@ def _held_by(
 
 
 def taken_by(
-    session: Session, fields: Fields, item_id: int | None = None
+    session: Session,
+    fields: Fields,
+    item_id: int | None = None,
+    rules: units.Rules | None = None,
 ) -> tuple[str, Item] | None:
     """The field of `fields` another item than `item_id` already has, and
-    that item, as the unique indexes compare them, or "alias" and the other
-    item whose alias the name is: a unique violation says neither. None if
-    none has, as when the other changed meanwhile."""
-    keys = Keys.of(session, fields.name)
+    that item, as the unique indexes compare them, its name's units read by
+    `rules` (Keys.of), or "alias" and the other item whose alias the name
+    is: a unique violation says neither. None if none has, as when the
+    other changed meanwhile."""
+    keys = Keys.of(session, fields.name, rules)
     wanted: list[tuple[str, ColumnElement[bool]]] = [
         ("alias", _alias_of(keys)),
         ("name", keys.match(Item)),
@@ -262,9 +272,9 @@ def similar(session: Session, name: str, item_id: int) -> list[Close]:
     return [Close(item, alias) for item, alias in session.execute(query)]
 
 
-def _not_an_alias(session: Session, name: str, but: ItemAlias | None = None) -> None:
-    """RuleBroken unless no current alias has `name`'s keys, `but` aside."""
-    taken = _current_alias(Keys.of(session, name))
+def _not_an_alias(session: Session, keys: Keys, but: ItemAlias | None = None) -> None:
+    """RuleBroken unless no current alias has `keys`, `but` aside."""
+    taken = _current_alias(keys)
     other = () if but is None else (ItemAlias.id != but.id,)
     enforce(NAME_IS_ALIAS, when=exists_where(session, *taken, *other))
 
@@ -272,7 +282,7 @@ def _not_an_alias(session: Session, name: str, but: ItemAlias | None = None) -> 
 def add(session: Session, fields: Fields) -> Item:
     lock_catalogue(session)
     _in_current_category(session, fields.category_id)
-    _not_an_alias(session, fields.name)
+    _not_an_alias(session, Keys.of(session, fields.name))
     item = Item(**asdict(fields))
     session.add(item)
     session.flush()
@@ -304,11 +314,11 @@ def save(session: Session, item: Item, fields: Fields, *, seen: Seen) -> Renamed
         _in_current_category(session, fields.category_id)
     keys = Keys.of(session, fields.name)
     # Only respelt, its units too, it is the same name.
-    renamed = keys.name != item.name_key and keys.units != item.unit_key
+    renamed = not keys.same(item)
     old = item.name
     swapped = _own_alias(session, item.id, keys) if renamed else None
     # Its own alias aside, swapped, as matched by either key: no other.
-    _not_an_alias(session, fields.name, but=swapped)
+    _not_an_alias(session, keys, but=swapped)
     for column, value in asdict(fields).items():
         setattr(item, column, value)
     if not renamed:
@@ -343,10 +353,13 @@ def aliases(session: Session, item_id: int) -> list[ItemAlias]:
     return list(session.scalars(current_aliases(item_id)))
 
 
-def alias_taken_by(session: Session, name: str) -> tuple[str, Item] | None:
-    """ "name" and the item whose name has `name`'s keys, retired items'
-    too, or "alias" and the item one of whose current aliases has; if any."""
-    keys = Keys.of(session, name)
+def alias_taken_by(
+    session: Session, name: str, rules: units.Rules | None = None
+) -> tuple[str, Item] | None:
+    """ "name" and the item whose name has `name`'s keys (Keys.of, by
+    `rules`), retired items' too, or "alias" and the item one of whose
+    current aliases has; if any."""
+    keys = Keys.of(session, name, rules)
     return _held_by(session, [("name", keys.match(Item)), ("alias", _alias_of(keys))])
 
 

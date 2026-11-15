@@ -66,6 +66,7 @@ from sqlalchemy.orm import (
     Mapped,
     MappedColumn,
     Session,
+    SessionTransaction,
     mapped_column,
     object_session,
     validates,
@@ -665,12 +666,40 @@ class ReadingRule(Versioned, Base):
         return units.Rule(self.reading, self.respell)
 
 
-def reading_rules(session: Session) -> dict[str, units.Rule]:
-    """Every reading rule, by its token."""
-    rows = session.execute(
-        select(ReadingRule.token, ReadingRule.reading, ReadingRule.respell)
-    )
-    return {token: units.Rule(reading, respell) for token, reading, respell in rows}
+# The reading rules a transaction has read (reading_rules), kept until one
+# is written or a savepoint rolled back, so a request reads them once.
+RULES_INFO = "inventory.reading_rules"
+
+
+def reading_rules(session: Session) -> units.Rules:
+    """Every reading rule, by its token: read once, and again after a write
+    to them, a rollback or the transaction's end."""
+    held = session.info.get(RULES_INFO)
+    if held is None:
+        rows = session.execute(
+            select(ReadingRule.token, ReadingRule.reading, ReadingRule.respell)
+        )
+        held = {token: units.Rule(reading, respell) for token, reading, respell in rows}
+        session.info[RULES_INFO] = held
+    return held
+
+
+@event.listens_for(Session, "after_flush")
+def _rules_written(session: Session, _context: object) -> None:
+    changed = (*session.new, *session.dirty, *session.deleted)
+    if any(isinstance(row, ReadingRule) for row in changed):
+        session.info.pop(RULES_INFO, None)
+
+
+@event.listens_for(Session, "after_soft_rollback")
+def _rules_rolled_back(session: Session, _transaction: object) -> None:
+    session.info.pop(RULES_INFO, None)
+
+
+@event.listens_for(Session, "after_transaction_end")
+def _rules_forgotten(session: Session, transaction: SessionTransaction) -> None:
+    if transaction.parent is None:
+        session.info.pop(RULES_INFO, None)
 
 
 class OpenPackage(Base):

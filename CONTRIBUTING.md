@@ -319,8 +319,11 @@ settles how a unit as typed after a number, case kept (`M`, `g`), is read,
 or that it is no unit, on both sides: the catalogue sends the rules. Each
 change to one reads every name with that unit after a number again
 (`items.reread`), refused where two names would then read alike.
-Administrators see and correct them on the Unit readings page, linked
-from Items.
+Read them with `models.reading_rules`, which reads them once a
+transaction, and again after one is written or a savepoint rolled back;
+a form's answers, not yet kept, are read on top of them (`Typed.rules`
+in `admin/items.py`). Administrators see and correct them on the Unit
+readings page, linked from Items.
 
 Search, the forms and the scan page read a unit after a number alike
 (`units.found_in`, `units.respell`, `units.ts`): never in a product's

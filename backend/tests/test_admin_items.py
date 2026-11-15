@@ -1156,6 +1156,54 @@ def test_not_right_is_offered_where_words_decide_and_its_rule_wins(
     assert "Read as 305Mbps · data rate." in page
 
 
+def test_a_rename_the_forms_answer_reads_as_its_own_name_asks_nothing(
+    admin_client: TestClient, session: Session, radios: Category
+) -> None:
+    """Answered as gigabits a second, Box 10g is Box 10Gbps respelt: the
+    same name, so close names are not asked about, nor an alias kept."""
+    item = new_item(session, radios, "Box 10Gbps")
+    new_item(session, radios, "Box 10g spare")
+    form = {
+        "name": "Box 10g",
+        "category_id": str(radios.id),
+        "unit": "each",
+        "version": shown(item),
+        "unit:g": "Gbit/s",
+    }
+    assert admin_client.post(f"{ITEMS}/{item.id}", data=form).status_code == 303
+    assert item.name == "Box 10g"
+    assert items.aliases(session, item.id) == []
+
+
+def test_a_name_taken_once_read_as_answered_names_the_item(
+    admin_client: TestClient, session: Session, radios: Category
+) -> None:
+    """Refused, the answer undone, the taken name is still found as the
+    form's answer reads it."""
+    other = new_item(session, radios, "Box 10Gbps")
+    item = new_item(session, radios, "Spare")
+    said = (
+        "Box 10Gbps already has that name, or one differing from it only in "
+        "case, spaces, punctuation or how its units are spelt."
+    )
+    form = {"category_id": str(radios.id), "unit": "each", "unit:g": "Gbit/s"}
+    added = admin_client.post(ITEMS, data=form | {"name": "Box 10g"})
+    assert added.status_code == 400
+    assert escape(said) in added.text
+    renamed = form | {"name": "Box 10g", "version": shown(item)}
+    saved = admin_client.post(f"{ITEMS}/{item.id}", data=renamed)
+    assert saved.status_code == 400
+    assert escape(said) in saved.text
+    alias = admin_client.post(
+        f"{ITEMS}/{item.id}/aliases",
+        data={"alias_name": "Box 10g", "unit:g": "Gbit/s"},
+    )
+    assert alias.status_code == 400
+    assert escape(said) in alias.text
+    assert session.scalars(select(ReadingRule)).all() == []
+    assert other.name == "Box 10Gbps"
+
+
 def test_a_correction_reading_names_alike_is_refused_naming_them(
     admin_client: TestClient, session: Session, radios: Category
 ) -> None:

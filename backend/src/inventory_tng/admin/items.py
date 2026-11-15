@@ -53,11 +53,10 @@ from inventory_tng.models import (
     Movement,
     OpenPackage,
     canonical,
-    unit_key,
     whole,
 )
 from inventory_tng.models import reading_rules as rules_held
-from inventory_tng.names import name_key, nameless
+from inventory_tng.names import nameless
 from inventory_tng.pages import NOTICES, not_found, redirect
 from inventory_tng.sign_in import AdminSignedIn, SignedIn
 
@@ -106,10 +105,11 @@ REFUSED_FIELDS = {
 
 
 def _taken(
-    session: Session, fields: items.Fields, item_id: int | None
+    session: Session, fields: items.Fields, typed: Typed, item_id: int | None
 ) -> tuple[str, str]:
-    """The field another item already has, and words naming that item."""
-    found = items.taken_by(session, fields, item_id)
+    """The field another item already has, its name's units read as the
+    form's answers say too, and words naming that item."""
+    found = items.taken_by(session, fields, item_id, typed.rules)
     field, other = found or ("name", None)
     # Beside the name, whose field "alias" is.
     shown = "name" if field == "alias" else field
@@ -174,7 +174,7 @@ def _change_or_note[T](
         log.debug("close names asked about", item_id=item_id, found=len(asked or ()))
         return None, CLOSE
     if broken in ("unique", items.NAME_IS_ALIAS):
-        field, words = _taken(session, fields, item_id)
+        field, words = _taken(session, fields, typed, item_id)
         problems[field] = words
     elif broken == items.READ_ALIKE:
         problems["name"] = _read_alike(session, typed)
@@ -186,8 +186,7 @@ def _change_or_note[T](
 def _read_alike(session: Session, typed: Typed) -> str:
     """Words for answers refused as they would read names alike, naming
     them by id, the savepoint undone (items.read_alike)."""
-    rules = {**rules_held(session), **typed.answered}
-    groups = items.read_alike(session, typed.answered, rules)
+    groups = items.read_alike(session, typed.answered, typed.rules)
     log.debug("unit answer refused", read_alike=len(groups))
     if not groups:  # Renamed meanwhile: none to name now.
         return "Read so, names would read as one. Try again, or answer otherwise."
@@ -251,7 +250,7 @@ def _categories(session: Session) -> list[Category]:
 
 
 # How the items list finds an item: by anything a volunteer might type.
-SEARCHED = Searched(ITEMS, Item, Item.search_text, Item.name, reads_rules=True)
+SEARCHED = Searched(ITEMS, Item, Item.search_text, Item.name)
 
 
 def _name_field(session: Session, similar: Sequence[items.Close]) -> dict[str, object]:
@@ -378,12 +377,14 @@ def _item_page(
 @dataclass(frozen=True)
 class Typed:
     """A name as it will be stored, the units in it still to ask about, the
-    answers and corrections given, to keep as reading rules, and the rules
-    that wrote, once written."""
+    answers and corrections given, to keep as reading rules, the rules it
+    is read by (those held, with the answers), and the rules the answers
+    wrote, once written."""
 
     name: str
     asked: list[units.Found]
     answered: dict[str, units.Rule]
+    rules: units.Rules
     decided: list[int] = field(default_factory=list)
 
 
@@ -405,9 +406,10 @@ def _typed_name(session: Session, typed: str, form: Mapping[str, str]) -> Typed:
             # Corrected, a rule respelling it goes on doing so.
             kept = found.rule is not None and found.rule.respell and rule.reading
             answered[found.key] = units.Rule(rule.reading, bool(kept))
-    found = units.found_in(name, {**rules, **answered})
+    rules = {**rules, **answered}
+    found = units.found_in(name, rules)
     asked = [each for each in found if each.asks]
-    return Typed(units.spell(name, found), asked, answered)
+    return Typed(units.spell(name, found), asked, answered, rules)
 
 
 def _deciding[T](
@@ -607,11 +609,9 @@ def save_item(
         seen = form_version(form.get("version", ""))
         # Its own name, or a respelling of it, its units' too, asks
         # nothing: it is the same; nor one of its aliases (_change_or_note).
-        same = (
-            name_key(fields.name) == found.name_key
-            or unit_key(fields.name, rules_held(session)) == found.unit_key
-            or _confirmed(session, form, fields)
-        )
+        same = items.Keys.of(session, fields.name, typed.rules).same(
+            found
+        ) or _confirmed(session, form, fields)
         asked = None if same else []
         saving = _deciding(
             session,
@@ -972,10 +972,14 @@ def package_settings(
     return redirect(f"{ITEMS}/{item_id}", notice="package_settings", section="packages")
 
 
-def _alias_problem(session: Session, item: Item, name: str, broken: str | None) -> str:
+def _alias_problem(
+    session: Session, item: Item, typed: Typed, broken: str | None
+) -> str:
     """Words for an alias refused (`broken`, logged) as an item's name or
-    another alias, naming that item, or what is wrong with the name itself."""
-    whose, other = items.alias_taken_by(session, name) or ("name", None)
+    another alias, its units read as the form's answers say too, naming
+    that item, or what is wrong with the name itself."""
+    found = items.alias_taken_by(session, typed.name, typed.rules)
+    whose, other = found or ("name", None)
     log.debug(
         "alias refused",
         rule=broken,
@@ -1033,7 +1037,7 @@ def add_alias(
         problem = (
             _read_alike(session, typed)
             if broken == items.READ_ALIKE
-            else _alias_problem(session, found, name, broken)
+            else _alias_problem(session, found, typed, broken)
         )
     values = {**form, "alias_name": name}
     problems = {"alias_name": problem}

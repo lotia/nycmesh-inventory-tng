@@ -67,9 +67,9 @@ class Searched[T]:
     if joined to more; a column a search matches only whole, held in
     capitals, such as a label's code, put first; which are current, if not
     those with no retired_at; what the filter between Current and All calls
-    the rest; each row as the page shows it, with a `name`, if not the
-    row itself; and whether reading rules read its units (items', as
-    models.Searchable.READS_RULES)."""
+    the rest; and each row as the page shows it, with a `name`, if not the
+    row itself. Its search reads units by the reading rules where the
+    model's search_text does (models.Searchable.READS_RULES)."""
 
     here: str
     model: type[T]
@@ -80,7 +80,6 @@ class Searched[T]:
     current: ColumnElement[bool] | None = None
     lapsed: Lapsed = "retired"
     shown: Callable[[Session, Sequence[T]], Sequence[Any]] | None = None
-    reads_rules: bool = False
 
     def read(
         self, q: str = "", show: str = "", page: str = "", pick: str = ""
@@ -112,7 +111,8 @@ class Searched[T]:
         return query.where(current if show == "current" else not_(current))
 
     def rules(self, session: Session) -> units.Rules | None:
-        return reading_rules(session) if self.reads_rules else None
+        reads = getattr(self.model, "READS_RULES", False)
+        return reading_rules(session) if reads else None
 
     def matching(
         self, search: str, rules: units.Rules | None = None

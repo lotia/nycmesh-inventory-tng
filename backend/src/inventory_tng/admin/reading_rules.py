@@ -163,7 +163,7 @@ def _refused(
     if broken != items.READ_ALIKE:
         return _rule_page(request, session, signed, rule, alert=RULES[broken])
     # What the change would have read, the savepoint undone.
-    rules = models.reading_rules(session)
+    rules = {**models.reading_rules(session)}
     if change is None:
         rules.pop(rule.token, None)
     else:
@@ -242,9 +242,11 @@ def _seed_page(
     sent: Mapping[str, str] | None = None,
     problem: str | None = None,
     read_alike: Sequence[str] = (),
+    proposals: list[reading_rules.Proposal] | None = None,
 ) -> HTMLResponse:
-    rules = models.reading_rules(session)
-    proposals = reading_rules.propose(reading_rules.names(session), rules)
+    """The seeding page: `proposals`, if already made, else made now."""
+    if proposals is None:
+        proposals = _proposals(session)
     at = max(0, min(at, len(proposals) - 1))
     return admin_page(
         request,
@@ -266,6 +268,12 @@ def _seed_page(
         },
         400 if problem else 409 if read_alike else None,
     )
+
+
+def _proposals(session: Session) -> list[reading_rules.Proposal]:
+    """What the seeding page proposes, from every name, by the rules held."""
+    names = reading_rules.names(session)
+    return reading_rules.propose(names, models.reading_rules(session))
 
 
 @router.get(SEED)
@@ -294,10 +302,8 @@ def accept(
     left as it is."""
     one, at = bool(form.get("one")), whole(form.get("at", ""), 0, INTEGER_MAX) or 0
     rules = models.reading_rules(session)
-    proposals = {
-        proposal.found.key: proposal
-        for proposal in reading_rules.propose(reading_rules.names(session), rules)
-    }
+    made = _proposals(session)
+    proposals = {proposal.found.key: proposal for proposal in made}
     chosen: dict[str, units.Rule] = {}
     unchosen = False
     for key, value in form.items():
@@ -311,7 +317,14 @@ def accept(
             chosen[proposal.found.key] = rule
     if unchosen:
         return _seed_page(
-            request, session, signed, one=one, at=at, sent=form, problem=CHOOSE
+            request,
+            session,
+            signed,
+            one=one,
+            at=at,
+            sent=form,
+            problem=CHOOSE,
+            proposals=made,
         )
     written, broken = refusal(
         session,
@@ -323,7 +336,14 @@ def accept(
         log.debug("readings refused", read_alike=len(groups))
         words = read_alike_words(groups)
         return _seed_page(
-            request, session, signed, one=one, at=at, sent=form, read_alike=words
+            request,
+            session,
+            signed,
+            one=one,
+            at=at,
+            sent=form,
+            read_alike=words,
+            proposals=made,
         )
     session.commit()
     log.info(
