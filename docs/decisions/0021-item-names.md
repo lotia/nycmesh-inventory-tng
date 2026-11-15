@@ -566,7 +566,8 @@ ft`), which search accepts but a name shown must not join, and a comma
 after a lone nought (`0,500 m`) groups none, being perhaps a decimal
 comma, so is shown as typed; a number
 within a word or a code, right after a letter, digit, `-`, `/`, `.` or
-`+` (`UF-SM-10G`, `ES-8-150W`), is shown as typed; the seeding page shows
+`+` (`UF-SM-10G`, `ES-8-150W`), or whose unit runs on into one by `-`
+or `/` (`10G-SFP+`, `48V-to-12V`), is shown as typed; the seeding page shows
 names as typed, as evidence of how a unit was typed; and an item's form,
 its packages' and its aliases' fields hold the name as typed.
 

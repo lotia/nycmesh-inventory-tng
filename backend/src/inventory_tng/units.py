@@ -880,8 +880,11 @@ def _shown_number(number: str) -> str:
 
 
 # What, right before a number, makes it part of a word or a code, such as
-# a part number (`UF-SM-10G`, `ES-8-150W`): left as typed.
+# a part number (`UF-SM-10G`, `ES-8-150W`): left as typed. And what, right
+# after its unit, runs it on into one (`10G-SFP+`, `48V-to-12V`,
+# `10GHz/20 MHz`).
 _IN_A_CODE = re.compile(r"[\w/.+-]")
+_INTO_A_CODE = re.compile(r"[/-]")
 
 
 def shown_name(name: str, rules: Rules | None = None) -> str:
@@ -892,12 +895,16 @@ def shown_name(name: str, rules: Rules | None = None) -> str:
     a no-break space between it and its unit, spelt as typed: `Cap 10uF
     50V` is `Cap 10 uF 50 V`, `Box 10,000 ft` `Box 10 000 ft`. The rest, a
     unit not read or a unit's word (`48 VDC`, `100 feet`) among it, and a
-    number within a word or a code (_IN_A_CODE), as typed. `name` is as
+    number within a word or a code (_IN_A_CODE, _INTO_A_CODE), as typed. `name` is as
     saved (models.canonical, spell)."""
     edits = []
     for found in found_in(name, rules):
         start = found.start - len(found.number)
-        if found.read is None or _IN_A_CODE.match(name[start - 1 : start]):
+        if (
+            found.read is None
+            or _IN_A_CODE.match(name[start - 1 : start])
+            or _INTO_A_CODE.match(name, found.end)
+        ):
             continue
         spelt = _shown_number(found.number) + NO_BREAK_SPACE + found.token
         edits.append((start, found.end, spelt))

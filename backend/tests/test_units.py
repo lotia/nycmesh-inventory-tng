@@ -552,6 +552,11 @@ NB, THIN = "\u00a0", "\u202f"
             "UF-SM-10G ES-8-150W ab07f 2x10G 1/10G",
         ),
         ("Patch (3ft)", f"Patch (3{NB}ft)"),
+        # Nor one whose unit runs on into a code or another number.
+        ("10G-SFP+ module", "10G-SFP+ module"),
+        ("48V-to-12V converter", "48V-to-12V converter"),
+        ("Radio 10GHz/20 MHz", "Radio 10GHz/20 MHz"),
+        ("Box 3ft+", f"Box 3{NB}ft+"),
     ],
 )
 def test_a_name_is_shown_with_each_number_and_unit_spaced(
