@@ -1254,8 +1254,11 @@ export function bare(text: string): string {
  * "48 v" in "48 vdc" and a half-typed "10 μ" find what they did before
  * units were read. */
 export function bares(text: string): string[] {
-  const typed = unmarked(text.normalize("NFKD"));
-  const respelt = bare(text);
+  const decomposed = text.normalize("NFKD");
+  const typed = unmarked(decomposed);
+  const respelling = respell(decomposed);
+  if (respelling === decomposed) return [typed];
+  const respelt = unmarked(respelling);
   return respelt === typed ? [typed] : [typed, respelt];
 }
 

@@ -124,26 +124,18 @@ def test_the_scan_pages_table_is_current() -> None:
             "The unit table changed: raise units.VERSION, fold the rows again "
             "in a migration, then write units.json again"
         )
-        pytest.fail("Run `uv run python -m inventory_tng.units` from backend/")
-    # Laid out as Biome lays it out, so its check passes.
-    assert units.TABLE.read_text(encoding="utf-8") == units.laid_out(committed) + "\n"
+        pytest.fail("Run `mise run regenerate-units`")
 
 
 def test_the_newest_unit_table_has_a_migration_folding_again() -> None:
     """Rows folded with an older table are folded again on deploy, by a
     migration such as 0036 naming units.VERSION in FOLDS_UNITS."""
-    named = [
-        int(found[1])
-        for migration in MIGRATIONS.glob("*.py")
-        if (
-            found := re.search(
-                r"^FOLDS_UNITS = (\d+)$",
-                migration.read_text(encoding="utf-8"),
-                re.MULTILINE,
-            )
-        )
-    ]
-    assert max(named) == units.VERSION, (
+    named = re.findall(
+        r"^FOLDS_UNITS = (\d+)$",
+        "\n".join(m.read_text(encoding="utf-8") for m in MIGRATIONS.glob("*.py")),
+        re.MULTILINE,
+    )
+    assert max(map(int, named)) == units.VERSION, (
         "Add a migration folding again the rows folded with an older table"
     )
 

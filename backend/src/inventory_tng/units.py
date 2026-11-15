@@ -88,6 +88,15 @@ class Unit:
         """The spellings a prefix may go before, the symbol first."""
         return tuple(dict.fromkeys((self.symbol, *self.ucum, *self.spellings)))
 
+    def takes_prefix(self) -> tuple[str, ...]:
+        """The spellings read after a prefix, if it takes one."""
+        return self.prefixed() if self.prefixes else ()
+
+    def alone(self) -> tuple[str, ...]:
+        """The spellings read only unprefixed: its words, and its symbols if
+        it takes no prefix."""
+        return (*(() if self.prefixes else self.prefixed()), *self.words)
+
 
 # Ali, 2026-11-12: this inventory's kinds, each with one plausible size.
 KINDS: dict[str, Kind] = {
@@ -215,11 +224,8 @@ def table() -> dict[str, Any]:
         "units": [
             {
                 "symbol": unit.symbol,
-                "prefixed": list(unit.prefixed()) if unit.prefixes else [],
-                "alone": [
-                    *([] if unit.prefixes else unit.prefixed()),
-                    *unit.words,
-                ],
+                "prefixed": list(unit.takes_prefix()),
+                "alone": list(unit.alone()),
             }
             for unit in UNITS
         ],
@@ -261,26 +267,20 @@ class Reading:
         return low <= (abs(size) if low > 0 else size) <= high
 
 
-def _first(pairs: list[tuple[str, Unit]]) -> dict[str, Unit]:
-    """The unit each spelling reads as: the first unit spelt so."""
-    found: dict[str, Unit] = {}
-    for spelling, unit in pairs:
-        found.setdefault(spelling, unit)
-    return found
+def _lowered(pairs: list[tuple[str, Unit]]) -> dict[str, Unit]:
+    """The unit each spelling reads as in any case: one, as no two units
+    share a spelling in any case."""
+    return {spelling.lower(): unit for spelling, unit in pairs}
 
 
-_ALONE = [
-    (spelling, unit)
-    for unit in UNITS
-    for spelling in (unit.words if unit.prefixes else (*unit.prefixed(), *unit.words))
-]
-_PREFIXED = [(s, unit) for unit in UNITS if unit.prefixes for s in unit.prefixed()]
-_SYMBOLS = [(s, unit) for unit in UNITS if not unit.prefixes for s in unit.prefixed()]
+_PREFIXED = [(s, unit) for unit in UNITS for s in unit.takes_prefix()]
+_ALONE = [(s, unit) for unit in UNITS for s in unit.alone()]
 # Every unspaced spelling, unprefixed, as typed and in lower case.
-_WHOLE = _first([*_PREFIXED, *_ALONE])
-_WHOLE_LOOSE = _first([(s.lower(), unit) for s, unit in [*_PREFIXED, *_ALONE]])
-_TAKES_PREFIX = _first(_PREFIXED)
-_TAKES_PREFIX_LOOSE = _first([(s.lower(), unit) for s, unit in _PREFIXED])
+_WHOLE = dict([*_PREFIXED, *_ALONE])
+_WHOLE_LOOSE = _lowered([*_PREFIXED, *_ALONE])
+_TAKES_PREFIX_LOOSE = _lowered(_PREFIXED)
+# Every symbol and spelling, not words, in lower case (readings).
+_SPELT_LOOSE = _lowered([(s, unit) for unit in UNITS for s in unit.prefixed()])
 _PREFIX_SPELLINGS = [
     (spelling, prefix)
     for prefix in PREFIXES
@@ -298,8 +298,7 @@ def read(token: str) -> Reading | None:
     for spelling, prefix in _PREFIX_SPELLINGS:
         if token.startswith(spelling):
             rest = token[len(spelling) :]
-            unit = _TAKES_PREFIX.get(rest) or _TAKES_PREFIX_LOOSE.get(rest.lower())
-            if unit:
+            if unit := _TAKES_PREFIX_LOOSE.get(rest.lower()):
                 return Reading(prefix, unit)
     lower = token.lower()
     if unit := _WHOLE_LOOSE.get(lower):
@@ -374,24 +373,18 @@ def readings(token: str) -> list[tuple[Reading, bool]]:
     spelt so as typed, those first: `MF` is megafarads as typed and
     millifarads otherwise."""
     lower = token.lower()
-    found: dict[str, tuple[Reading, bool]] = {}
-
-    def add(reading: Reading, exact: bool) -> None:
-        if exact or str(reading) not in found:
-            found[str(reading)] = (reading, exact)
-
+    found: list[tuple[Reading, bool]] = []
     # A word ("feet", "volts") never spells a name (Ali, 2026-11-15).
-    for spelling, unit in [*_PREFIXED, *_SYMBOLS]:
-        if spelling.lower() == lower:
-            add(Reading(None, unit), spelling == token)
+    if unit := _SPELT_LOOSE.get(lower):
+        found.append((Reading(None, unit), token in unit.prefixed()))
+    # One unit at most per prefix, as no two share a spelling in any case.
     for spelling, prefix in _PREFIX_SPELLINGS:
         if lower.startswith(spelling.lower()):
             rest = token[len(spelling) :]
-            for each, unit in _PREFIXED:
-                if each.lower() == rest.lower():
-                    exact = token.startswith(spelling) and each == rest
-                    add(Reading(prefix, unit), exact)
-    return sorted(found.values(), key=lambda pair: not pair[1])
+            if unit := _TAKES_PREFIX_LOOSE.get(rest.lower()):
+                exact = token.startswith(spelling) and rest in unit.prefixed()
+                found.append((Reading(prefix, unit), exact))
+    return sorted(found, key=lambda pair: not pair[1])
 
 
 @dataclass(frozen=True)
@@ -469,25 +462,11 @@ def spell(name: str, chosen: Mapping[str, str]) -> tuple[str, list[Found]]:
     return "".join([*spelt, name[at:]]), asked
 
 
-def laid_out(value: object, depth: int = 0) -> str:
-    """`value` in JSON as Biome lays it out: a list of values on one line."""
-    if isinstance(value, dict):
-        lines = [
-            f"{json.dumps(key)}: {laid_out(v, depth + 1)}" for key, v in value.items()
-        ]
-    elif isinstance(value, list) and any(isinstance(v, list | dict) for v in value):
-        lines = [laid_out(v, depth + 1) for v in value]
-    else:
-        return json.dumps(value, ensure_ascii=False)
-    inside = "  " * (depth + 1)
-    opening, closing = "{}" if isinstance(value, dict) else "[]"
-    body = ",\n".join(inside + line for line in lines)
-    return f"{opening}\n{body}\n{'  ' * depth}{closing}"
-
-
 def main(path: Path = TABLE) -> None:
-    """Write units.json, which the scan page reads."""
-    path.write_text(laid_out(table()) + "\n", encoding="utf-8")
+    """Write units.json, which the scan page reads; the task then lays it
+    out as Biome does."""
+    text = json.dumps(table(), indent=2, ensure_ascii=False) + "\n"
+    path.write_text(text, encoding="utf-8")
     print(f"Wrote {path}")
 
 

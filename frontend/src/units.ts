@@ -16,22 +16,14 @@ const alone: Pairs = table.units.flatMap((unit) =>
   unit.alone.map((spelling): [string, string] => [spelling, unit.symbol]),
 );
 
-/** The unit each spelling reads as: the first unit spelt so. */
-function first(pairs: Pairs): Map<string, string> {
-  const found = new Map<string, string>();
-  for (const [spelling, symbol] of pairs) {
-    if (!found.has(spelling)) found.set(spelling, symbol);
-  }
-  return found;
-}
+/** The unit each spelling reads as in any case (units._lowered): one, as
+ * no two units share a spelling in any case. */
+const lowered = (pairs: Pairs): Map<string, string> =>
+  new Map(pairs.map(([spelling, symbol]) => [spelling.toLowerCase(), symbol]));
 
-const lowered = (pairs: Pairs): Pairs =>
-  pairs.map(([spelling, symbol]) => [spelling.toLowerCase(), symbol]);
-
-const whole = first([...prefixed, ...alone]);
-const wholeLoose = first(lowered([...prefixed, ...alone]));
-const takesPrefix = first(prefixed);
-const takesPrefixLoose = first(lowered(prefixed));
+const whole = new Map([...prefixed, ...alone]);
+const wholeLoose = lowered([...prefixed, ...alone]);
+const takesPrefixLoose = lowered(prefixed);
 const prefixSpellings = table.prefixes.flatMap(([symbol = "", ...others]) =>
   [symbol, ...others].map((spelling): [string, string] => [spelling, symbol]),
 );
@@ -45,8 +37,7 @@ export function read(token: string): string | undefined {
   for (const [spelling, prefix] of prefixSpellings) {
     if (token.startsWith(spelling)) {
       const rest = token.slice(spelling.length);
-      const unit =
-        takesPrefix.get(rest) ?? takesPrefixLoose.get(rest.toLowerCase());
+      const unit = takesPrefixLoose.get(rest.toLowerCase());
       if (unit !== undefined) return prefix + unit;
     }
   }
@@ -95,9 +86,8 @@ export function respell(text: string): string {
       },
     )
     .replace(ALONE, (match, token: string, at: number, whole: string) => {
-      // TOKEN's only characters not ASCII.
       if (
-        !/[°µμΜΩω]/u.test(token) ||
+        !/\P{ASCII}/u.test(token) ||
         marked(whole, at - 1, at + match.length)
       ) {
         return match;

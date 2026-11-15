@@ -229,7 +229,11 @@ def folds(text: str) -> tuple[str, ...]:
     one ("48 V" in "48 VDC") and a unit half typed ("10 μ") find what they
     found before units were read, and "10 µF" finds "10uf" too."""
     typed = anyascii(unicodedata.normalize("NFKC", text))
-    respelt = fold(text)
+    decomposed = unicodedata.normalize("NFKD", text)
+    respelling = units.respell(decomposed)
+    if respelling == decomposed:
+        return (typed,)
+    respelt = anyascii(unicodedata.normalize("NFKC", respelling))
     # Case aside: search ignores it.
     return (typed,) if respelt.lower() == typed.lower() else (typed, respelt)
 
