@@ -48,13 +48,30 @@ def test_a_file_gone_before_it_is_read_is_skipped(
     assert text_files() == {tmp_path / "kept.md": "text"}
 
 
-def test_other_checkouts_are_not_walked(monkeypatch: pytest.MonkeyPatch) -> None:
-    """Such as one an agent works apart in, which may hold anything."""
-    folders = ["worktrees", "skills"]
-    walked = [(str(CLONE / ".claude"), folders, [])]
+def test_what_a_gitignore_leaves_out_is_not_read(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Tools' output, such as pytest's cache, which holds test ids with
+    whatever the tests are given (a run of test_artifact_links once failed
+    the next on its own links); secrets, such as .env; and other checkouts,
+    such as one an agent works apart in, which may hold anything: by every
+    .gitignore in the clone, the root's and those below it."""
+    top = [".git", ".local", "backend", "frontend"]
+    backend = [".pytest_cache", "src"]
+    frontend = ["coverage", "node_modules", "test-results", "src"]
+    claude = ["worktrees", "skills"]
+    beads = ["dolt", "backup"]
+    walked = [
+        (str(CLONE), top, [".env", "README.md"]),
+        (str(CLONE / "backend"), backend, []),
+        (str(CLONE / "frontend"), frontend, []),
+        (str(CLONE / ".claude"), claude, []),
+        (str(CLONE / ".beads"), beads, ["dolt-server.pid", "config.yaml"]),
+    ]
     monkeypatch.setattr(os, "walk", lambda _: iter(walked))
-    text_files()
-    assert folders == ["skills"]
+    assert list(text_files()) == [CLONE / "README.md", CLONE / ".beads/config.yaml"]
+    assert top == ["backend", "frontend"]
+    assert (backend, frontend, claude, beads) == (["src"], ["src"], ["skills"], [])
 
 
 def test_every_mise_task_is_in_contributing() -> None:

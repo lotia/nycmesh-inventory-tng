@@ -41,6 +41,7 @@ coverage = ["diff-cover>=11.0"]
 dev = [
     { include-group = "coverage" },
     "httpx2>=2.16",
+    "pathspec>=1.1",
     "pytest>=9.2",
     "pytest-cov>=7.1",
     "pytest-randomly>=5.0",
