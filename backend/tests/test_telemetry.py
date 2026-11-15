@@ -952,6 +952,8 @@ def test_counts_lines_recorded_more_than_moved_raised_and_settled(
     place = Place(session)
     _, token = new_device(session)
     client.cookies.set(devices.COOKIE, token)
+    raised = counted(reader, "inventory.over_recorded.raised")
+    settled = counted(reader, "inventory.over_recorded.settled")
     first = place.batch(
         lines=[
             {"item_id": place.item.id, "quantity": "3"},
@@ -966,7 +968,7 @@ def test_counts_lines_recorded_more_than_moved_raised_and_settled(
     }
     assert client.post("/api/transactions", json=changed).status_code == 409
     client.cookies.clear()
-    assert counted(reader, "inventory.over_recorded.raised") == {(): 2}
+    assert added(reader, "inventory.over_recorded.raised", raised) == {(): 2}
     _, key = new_admin(session)
     sign_in_with(client, code=code(key))
     page = "/admin/stock/recorded-more"
@@ -975,7 +977,7 @@ def test_counts_lines_recorded_more_than_moved_raised_and_settled(
     ).all()
     for check, do in ((first_check, "correct"), (second_check, "checked")):
         client.post(f"{page}/{check.id}/{do}", data={"seen": over_recorded.seen(check)})
-    assert counted(reader, "inventory.over_recorded.settled") == {
+    assert added(reader, "inventory.over_recorded.settled", settled) == {
         (("how", "corrected"),): 1,
         (("how", "checked"),): 1,
     }
