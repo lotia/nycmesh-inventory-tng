@@ -364,10 +364,18 @@ def _settle(
     """Settle one waiting, still as seen, holding its row. RuleBroken
     as waiting()."""
     row = waiting(session, check_id, seen_as)
-    row.settled_at = func.now()
+    _settled(row, admin_id, how)
+    return row
+
+
+def _settled(
+    row: OverRecorded, admin_id: int, how: Settled, at: datetime | None = None
+) -> None:
+    """Mark one settled, by an administrator, how, and when: `at`, else
+    now."""
+    row.settled_at = func.now() if at is None else at
     row.settled_by_admin_id = admin_id
     row.settled_how = how
-    return row
 
 
 def waiting(session: Session, check_id: int, seen_as: str) -> OverRecorded:
@@ -660,9 +668,7 @@ def counted(
         if (left_at is None or whole or row.left_count_id) and (
             arrived_at is None or row.arrived_count_id or closed_on is not None
         ):
-            row.settled_at = func.now()
-            row.settled_by_admin_id = admin_id
-            row.settled_how = "counted"
+            _settled(row, admin_id, "counted")
             closed += 1
             log.info(
                 "over recorded counted",
@@ -708,9 +714,7 @@ def open_package_closed(
         )
     ).all()
     for row in found:
-        row.settled_at = at
-        row.settled_by_admin_id = admin_id
-        row.settled_how = "counted"
+        _settled(row, admin_id, "counted", at)
         log.info(
             "over recorded closed",
             over_recorded_id=row.id,
