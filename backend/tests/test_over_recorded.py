@@ -29,7 +29,7 @@ from inventory_tng.admin import over_recorded as over_recorded_page
 from inventory_tng.admin.common import RULES
 from inventory_tng.admin.counts import COUNTS
 from inventory_tng.db import RuleBroken, attempt
-from inventory_tng.ledger import Entry, Form, _more_written
+from inventory_tng.ledger import Entry, Form, _more_written, expected
 from inventory_tng.local_time import show_day, site_zone
 from inventory_tng.models import (
     OVER_RECORDED_REASONS,
@@ -1484,10 +1484,33 @@ def test_a_count_after_it_puts_that_end_right_and_says_what_is_left(
         in text_of(page)
     )
     assert f"Correct {place.store.name}<span" in page
-    assert f'<a href="{COUNTS}/{place.store.id}">Count {place.store.name}<span' in page
+    link = f"{COUNTS}/{place.store.id}?item={place.item.id}"
+    assert f'<a href="{link}">Count {place.store.name}<span' in page
     assert "Mark checked" in page
     # Still waiting under "Needs your action".
     assert "Recorded more than moved" in text(admin_client.get("/admin"))
+
+
+def test_the_count_its_link_opens_counts_the_item_and_closes_it(
+    admin_client: TestClient,
+    registered_client: TestClient,
+    session: Session,
+    place: Place,
+) -> None:
+    """The store's count, of the radios alone (inventory-tng-hnv), puts its
+    end right too; the cable there is left as it is."""
+    received(session, place, [{"item_id": place.cable.id, "quantity": "20"}])
+    radios_raised(registered_client, place)
+    count_at(admin_client, place.van.id, {f"counted_{place.item.id}": "1"})
+    link = f"{COUNTS}/{place.store.id}?item={place.item.id}"
+    assert f'name="counted_{place.cable.id}"' not in admin_client.get(link).text
+    form = count_form_at(admin_client, place.store.id)
+    done = admin_client.post(link, data=form | {f"counted_{place.item.id}": "2"})
+    assert done.status_code == 303
+    (check,) = checks(session)
+    assert check.left_count_id is not None
+    assert check.settled_at is not None
+    assert expected(session, place.store.id)[place.cable.id] == Decimal(20)
 
 
 def text_of(page: str) -> str:

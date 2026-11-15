@@ -4,7 +4,7 @@
 unregistered device is blocked), 2026-11-03 (counts, retired items),
 2026-11-06 (counting while stock moves), 2026-11-08 by 0016 (where the
 rules live, balance), 2026-11-09 (stock at a retired place), 2026-11-11
-by 0020 (sealed and open packages)
+by 0020 (sealed and open packages), 2026-11-15 (counting some items)
 
 ## Context
 
@@ -49,7 +49,10 @@ while. So we need more than one location from the start.
   form of an item separately, and may add or close an open package (0020). It
   also puts right the end at that place of a line recorded more than moved
   (0020). A count names each item once: a form naming one twice is refused,
-  saying why, as it isn't clear which number is right (Ali, 2026-11-08). An
+  saying why, as it isn't clear which number is right (Ali, 2026-11-08). A
+  place's count page can show one item, or those whose names match a search
+  as the items list searches; then only those are counted, and the rest stay
+  as they are (Ali, 2026-11-15). An
   adjustment gives a reason from a list administrators extend, seeded with
   Damaged, Lost or stolen, Found, Used for testing and Records were wrong (Ali,
   2026-11-03), and Used up, for closing an open package (0020). A volunteer

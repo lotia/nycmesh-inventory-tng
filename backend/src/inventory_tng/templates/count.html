@@ -7,6 +7,17 @@ is here: a save brought or took it after it was retired. Count what is really
 there: usually nothing. Anything you find, take to a current place, count
 this one as empty, and record it found there.</p>
 {% endif %}
+{#- Which items: a search over their names, and the filter on, if any,
+with a way to show them all (admin/counts.py). #}
+<form method="get" action="{{ here }}" role="search" class="actions">
+  <label class="grow">Find items
+    <input name="q" type="search" value="{{ shown.search }}" maxlength="200" autocomplete="off">
+  </label>
+  <button>Find</button>
+</form>
+{% if shown.only or shown.search %}
+<p>Only {{ shown.only.name if shown.only else "items" }}{% if shown.search %} matching “{{ shown.search }}”{% endif %}. Only these are counted; the rest stay as they are. <a href="{{ here }}">Show all</a></p>
+{% endif %}
 {% if items %}
 <p>Something came in or went out of each of these after you started, so it's
 not clear whether you counted it before or after. Count them again now.</p>
@@ -14,7 +25,7 @@ not clear whether you counted it before or after. Count them again now.</p>
 <p>Type what is really there. Leave a line as it is if it's right, or blank
 if you didn't count it. Anything else here, add below.</p>
 {% endif %}
-<form method="post" action="{{ here }}">
+<form method="post" action="{{ here }}{{ shown.query() }}">
   <input type="hidden" name="key" value="{{ key }}">
   <input type="hidden" name="as_of" value="{{ as_of }}">
   {% if items %}<input type="hidden" name="items" value="{{ items | join(' ') }}">{% endif %}
@@ -57,9 +68,10 @@ if you didn't count it. Anything else here, add below.</p>
     </tr>
     {% endif %}
     {% else %}
-    <tr><td colspan="3">The records say nothing is here.</td></tr>
+    <tr><td colspan="3">{% if shown.only or shown.search %}Nothing here matches.{% else %}The records say nothing is here.{% endif %}</td></tr>
     {% endfor %}
   {% endcall %}
+  {% if others %}
   <fieldset>
     <legend>Something else here</legend>
     <label>Item
@@ -73,6 +85,7 @@ if you didn't count it. Anything else here, add below.</p>
       {% with name = "extra_quantity" %}{% include "_field_problem.html" %}{% endwith %}
     </label>
   </fieldset>
+  {% endif %}
   {% if found_packages %}
   {#- Under what is left on one: how to read a printed length, if any
   offered is of an item in a length (inventory-tng-lby). #}

@@ -20,12 +20,19 @@ and counted_05, or the select at the foot choosing an item listed above) is
 refused and shown again saying why, as it isn't clear which number is
 right. The page itself never sends one. The ledger refuses a repeat too
 (movement_item_once), but the page checks first, to say which fields.
+
+A place's count can show only some items: one (`?item=`, as the pages of
+what needs an administrator's action take it), those whose names match a
+search (`?q=`, as the items list searches), or both. Only those are
+counted; the rest stay as they are, as any item left uncounted does. The
+filter rides on the form's action, so a form shown again keeps it.
 """
 
 import uuid
 from collections.abc import Collection, Mapping, Sequence
 from decimal import Decimal
 from typing import Annotated, Any, NamedTuple
+from urllib.parse import urlencode
 
 import structlog
 from fastapi import APIRouter, Depends, Request
@@ -35,6 +42,7 @@ from sqlalchemy.orm import Session
 
 from inventory_tng import open_packages, over_recorded
 from inventory_tng.adjustment_reasons import LOST, USED_UP
+from inventory_tng.admin import needs_action
 from inventory_tng.admin.common import (
     ADMIN,
     QUANTITY_MAX,
@@ -47,6 +55,8 @@ from inventory_tng.admin.common import (
     row_id,
     text_form,
 )
+from inventory_tng.admin.items import SEARCHED
+from inventory_tng.admin.needs_action import OnlyItem
 from inventory_tng.admin.settings import SETTINGS
 from inventory_tng.db import DbSession, by_name, refusal
 from inventory_tng.ledger import (
@@ -220,6 +230,42 @@ def choose_place(location_id: str = "") -> Response:
     return redirect(f"{COUNTS}/{location_id}")
 
 
+class Shown(NamedTuple):
+    """Which items a place's count shows (module docstring): one, those
+    matching a search, or both; neither for all."""
+
+    only: Item | None = None
+    search: str = ""
+
+    def ids(self, session: Session) -> set[int] | None:
+        """The items shown, of any at all; None for every one."""
+        if self.only is None and not self.search:
+            return None
+        query = select(Item.id)
+        if self.only is not None:
+            query = query.where(Item.id == self.only.id)
+        if self.search:
+            query = query.where(SEARCHED.matching(self.search, SEARCHED.rules(session)))
+        return set(session.scalars(query))
+
+    def query(self) -> str:
+        """The query string that shows the count so, for links and the
+        form's action."""
+        query = needs_action.query(self.only) | (
+            {"q": self.search} if self.search else {}
+        )
+        return f"?{urlencode(query)}" if query else ""
+
+
+def shown_items(only: OnlyItem, q: str = "") -> Shown:
+    """The filter a count's query string asks for: an odd search is none,
+    as the items list reads it."""
+    return Shown(only, SEARCHED.read(q=q).search)
+
+
+ShownItems = Annotated[Shown, Depends(shown_items)]
+
+
 def _count_page(
     request: Request,
     session: Session,
@@ -227,6 +273,7 @@ def _count_page(
     place: Location,
     as_of: int,
     *,
+    shown: Shown,
     problems: Mapping[str, str] | None = None,
     values: Mapping[str, str] | None = None,
     items: Collection[int] = (),
@@ -237,13 +284,19 @@ def _count_page(
     """The count form, with the records as of `as_of`: of everything there,
     or a recount of `items` only, which the form carries. With `recount`, a
     recount of its items: what was typed for each and what came in and went
-    out while it was counted."""
+    out while it was counted. Of those, only the items `shown`."""
     items = items or (recount or {}).keys()
     was = expected(session, place.id, as_of=as_of, items=items or None)
     if items:
         was = {item_id: was.get(item_id, Decimal(0)) for item_id in items}
     listed = _items(session)
     named = {item.id: item for item in listed}
+    if shown.only is not None and not items and shown.only.id in named:
+        # The item asked for, to count, though the records say none is here.
+        was.setdefault(shown.only.id, Decimal(0))
+    if (ids := shown.ids(session)) is not None:
+        was = {item_id: amount for item_id, amount in was.items() if item_id in ids}
+        listed = [item for item in listed if item.id in ids]
     if missing := was.keys() - named.keys():
         # What the records had then but cannot be counted now, or what the
         # form's items, sent back, name that is no item at all.
@@ -269,12 +322,17 @@ def _count_page(
             "place": place,
             "rows": rows,
             "forms": forms,
-            "found_packages": _followed(session),
+            "found_packages": [
+                found
+                for found in _followed(session)
+                if ids is None or found[0].item_id in ids
+            ],
             "recount": recount,
             "items": sorted(items),
             "others": [item for item in listed if item.id not in was],
             "key": (values or {}).get("key") or uuid.uuid4(),
             "as_of": as_of,
+            "shown": shown,
             "alert": alert,
             "problems": problems,
             "values": values,
@@ -285,14 +343,20 @@ def _count_page(
 
 @router.get(f"{COUNTS}/{{location_id:int}}")
 def count_form(
-    request: Request, signed: AdminSignedIn, session: DbSession, location_id: int
+    request: Request,
+    signed: AdminSignedIn,
+    session: DbSession,
+    location_id: int,
+    shown: ShownItems,
 ) -> Response:
     place = session.scalar(
         select(Location).where(Location.id == location_id, countable())
     )
     if place is None:
         return not_found()
-    return _count_page(request, session, signed, place, moment(session, place.id))
+    return _count_page(
+        request, session, signed, place, moment(session, place.id), shown=shown
+    )
 
 
 class FormRow(NamedTuple):
@@ -565,6 +629,7 @@ def count(
     session: DbSession,
     location_id: int,
     form: TextForm,
+    shown: ShownItems,
 ) -> Response:
     key = form_key(form.get("key", ""))
     place = session.get(Location, location_id)
@@ -600,6 +665,7 @@ def count(
             values=form,
             alert=TWICE if repeats else problems.get(CLOSED_MEANWHILE),
             items=sent_items,
+            shown=shown,
         )
     closed: list[open_packages.Closed | None] = []
     # Recorded more than moved, closed by this count at each end.
@@ -681,6 +747,7 @@ def count(
             values=form,
             alert=None if problems else RULES[broken],
             items=sent_items,
+            shown=shown,
             status_code=400,
         )
     assert result is not None
@@ -711,6 +778,7 @@ def count(
         },
         alert=(f"Saved {saved} line{'s' if saved != 1 else ''}. " if saved else "")
         + "These moved while you counted, so count them again.",
+        shown=shown,
         status_code=409,
     )
 

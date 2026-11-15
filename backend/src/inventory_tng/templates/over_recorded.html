@@ -79,7 +79,7 @@ with an adjustment. Mark checked if you already fixed it.</p>
           <button>Correct{% if one %} {{ one.still }}{% endif %}<span class="sr-only"> {{ each.item }}, transaction {{ each.transaction_id }}</span></button>
         </form>
         {% if one and one.countable %}
-        <a href="{{ counts_path }}/{{ one.still_id }}">Count {{ one.still }}<span class="sr-only"> {{ each.item }}, transaction {{ each.transaction_id }}</span></a>
+        <a href="{{ counts_path }}/{{ one.still_id }}?item={{ each.item_id }}">Count {{ one.still }}<span class="sr-only"> {{ each.item }}, transaction {{ each.transaction_id }}</span></a>
         {% endif %}
         <form method="post" action="{{ here }}/{{ row.id }}/checked{{ query }}">
           <input type="hidden" name="seen" value="{{ seen(row) }}">

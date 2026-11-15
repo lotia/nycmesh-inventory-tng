@@ -386,7 +386,8 @@ you" counts every report in one line, which hides what is waiting.
 - **One end put right**, the row says "Shelf B3 counted 14 Nov. Rack A
   still to put right." (the day in the site's zone) and offers "Correct
   Rack A", one adjustment at that end only, under a key of its own;
-  "Count Rack A", the place's count page, if it may be counted; and Mark
+  "Count Rack A", the place's count page showing that item only (0003),
+  if it may be counted; and Mark
   checked. A Correct sent as seen before the count is refused as changed
   meanwhile. A retired place that holds nothing cannot be counted, so
   Bring back stays the way to put it right there.

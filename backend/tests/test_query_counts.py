@@ -235,6 +235,8 @@ PAGES: dict[str, tuple[More, *tuple[Path, ...]]] = {
     "/admin/counts/{location_id:int}": (
         item_in_store,
         lambda w: f"/admin/counts/{w.spools.store.id}",
+        # Only the items a search finds.
+        lambda w: f"/admin/counts/{w.spools.store.id}?q=Radio",
     ),
     "/admin/devices": (new_device_in,),
     "/admin/devices/all": (new_device_in,),
@@ -285,9 +287,15 @@ def test_every_admin_page_is_measured(
 
 
 CASES = [
-    pytest.param(route, more, where, id=where if isinstance(where, str) else route)
+    pytest.param(
+        route,
+        more,
+        where,
+        # A route's second way and on, by a function, by its number.
+        id=where if isinstance(where, str) else f"{route}{f' {n}' if n else ''}",
+    )
     for route, (more, *paths) in sorted(PAGES.items())
-    for where in paths or [route]
+    for n, where in enumerate(paths or [route])
 ]
 
 

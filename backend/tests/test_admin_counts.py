@@ -821,3 +821,100 @@ def test_the_counts_page_says_its_links_start_a_task(admin_client: TestClient) -
     assert "<button>Start a count</button>" in page
     assert '<button class="primary">Record it</button>' in page
     assert "Count it" not in page
+
+
+# A count of some items only (Ali, 2026-11-15, inventory-tng-hnv).
+
+
+def test_a_count_can_show_one_item(admin_client: TestClient, session: Session) -> None:
+    place = stocked(session)
+    with_cable(session, place)
+    path = f"{COUNTS}/{place.store.id}"
+    page = admin_client.get(f"{path}?item={place.cable.id}")
+    assert f'name="counted_{place.cable.id}"' in page.text
+    assert f'name="counted_{place.item.id}"' not in page.text
+    assert f'<form method="post" action="{path}?item={place.cable.id}">' in page.text
+    words = text(page)
+    assert f"Only {place.cable.name}. Only these are counted" in words
+    assert f'<a href="{path}">Show all</a>' in page.text
+    # Nothing else of it to add at the foot.
+    assert "Something else here" not in words
+
+
+def test_an_item_asked_for_is_shown_though_none_is_there(
+    admin_client: TestClient, session: Session
+) -> None:
+    place = stocked(session)
+    page = admin_client.get(f"{COUNTS}/{place.store.id}?item={place.cable.id}").text
+    assert f'name="counted_{place.cable.id}" inputmode="decimal" value="0"' in page
+    assert f'name="counted_{place.item.id}"' not in page
+
+
+def test_a_count_can_show_the_items_a_search_finds(
+    admin_client: TestClient, session: Session
+) -> None:
+    """As the items list searches: typos forgiven."""
+    place = stocked(session)
+    with_cable(session, place)
+    path = f"{COUNTS}/{place.store.id}"
+    page = admin_client.get(f"{path}?q=litebeem")
+    assert f'name="counted_{place.item.id}"' in page.text
+    assert f'name="counted_{place.cable.id}"' not in page.text
+    assert f'<form method="post" action="{path}?q=litebeem">' in page.text
+    assert "Only items matching “litebeem”." in text(page)
+    nothing = admin_client.get(f"{path}?q=zzzzzzzz")
+    assert "Nothing here matches." in text(nothing)
+    # A search of nothing once folded, or an item there is not: all shown.
+    for odd in ("?q=%CC%81", "?item=x", f"?item={INTEGER_MAX}"):
+        every = admin_client.get(f"{path}{odd}").text
+        assert f'name="counted_{place.cable.id}"' in every, odd
+        assert f'name="counted_{place.item.id}"' in every, odd
+        assert "Show all" not in every, odd
+
+
+def test_a_count_of_one_item_leaves_the_others_as_they_are(
+    admin_client: TestClient, session: Session
+) -> None:
+    place = stocked(session)
+    with_cable(session, place)
+    path = f"{COUNTS}/{place.store.id}?item={place.cable.id}"
+    done = admin_client.post(
+        path, data=count_form(admin_client, path) | {f"counted_{place.cable.id}": "18"}
+    )
+    assert done.headers["location"] == f"{COUNTS}?notice=counted&section=count#count"
+    assert expected(session, place.store.id) == {
+        place.item.id: Decimal(5),
+        place.cable.id: Decimal(18),
+    }
+
+
+def test_a_count_sent_back_keeps_its_filter(
+    admin_client: TestClient, session: Session
+) -> None:
+    place = stocked(session)
+    with_cable(session, place)
+    path = f"{COUNTS}/{place.store.id}?item={place.cable.id}&q=cable"
+    refused = admin_client.post(
+        path, data=count_form(admin_client, path) | {f"counted_{place.cable.id}": "x"}
+    )
+    assert refused.status_code == 400
+    assert f'name="counted_{place.cable.id}" inputmode="decimal" value="x"' in (
+        refused.text
+    )
+    assert f'name="counted_{place.item.id}"' not in refused.text
+    assert f'action="{COUNTS}/{place.store.id}?item={place.cable.id}&amp;q=cable"' in (
+        refused.text
+    )
+    assert f"Only {place.cable.name} matching “cable”." in text(refused)
+
+
+def test_a_recount_keeps_its_filter(admin_client: TestClient, session: Session) -> None:
+    place = stocked(session)
+    with_cable(session, place)
+    path = f"{COUNTS}/{place.store.id}?q=litebeam"
+    shown = count_form(admin_client, path)
+    write(session, place)  # Three radios to the van.
+    asked = admin_client.post(path, data=shown | {f"counted_{place.item.id}": "5"})
+    assert asked.status_code == 409
+    assert f'action="{path}"' in asked.text
+    assert "Only items matching “litebeam”." in text(asked)
