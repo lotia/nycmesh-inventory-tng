@@ -401,12 +401,21 @@ function rekeyRefused(entries: Entry[], key: string | undefined): Entry[] {
   );
 }
 
+/** Each body's batchId, worked out once: bodies are never changed in
+ * place, and each render and update names every batch listed. */
+const batchIds = new WeakMap<Entry["body"], string>();
+
 /** What names a batch, as storage reads it (parsed, so its fields in one
  * order): its key and what it holds, as one key may name two
  * (Outbox.queue). What it was changed from is not what it is, as the
  * server compares. */
 export function batchId(body: Entry["body"]): string {
-  return JSON.stringify({ ...body, changed_from: undefined });
+  let id = batchIds.get(body);
+  if (id === undefined) {
+    id = JSON.stringify({ ...body, changed_from: undefined });
+    batchIds.set(body, id);
+  }
+  return id;
 }
 
 /** Whether two batches, each as storage reads it, are the same. */
