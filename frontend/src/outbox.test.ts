@@ -1489,6 +1489,49 @@ describe("listening", () => {
     stop();
   });
 
+  /** A saved batch, and a refused one an older build's tab queued again
+   * under its key (inventory-tng-0p8). */
+  function underOneKey() {
+    const saved = entry({ state: "saved", transactionId: 1, queuedAt: 1 });
+    const refused = entry({
+      body: { ...saved.body, lines: [{ item_id: 6, quantity: "1" }] },
+      state: "refused",
+      reason: { code: "refused", problems: [] },
+      queuedAt: 2,
+    });
+    return { saved, refused };
+  }
+
+  test("a saved batch another tab forgets stays here, though another batch holds its key", () => {
+    const { saved, refused } = underOneKey();
+    store(saved, refused);
+    const outbox = new Outbox(answering(() => json({}, 500)).api);
+    const stop = outbox.listen();
+    store(refused);
+    window.dispatchEvent(new StorageEvent("storage", { key: STORAGE_KEY }));
+    // Still counted (cart.ts, unseen), and its sibling still listed.
+    expect(outbox.entries.value).toEqual([saved, refused]);
+    expect(outbox.shown()).toEqual([refused]);
+    outbox.forgetShown([saved.body.key]);
+    expect(outbox.entries.value).toEqual([refused]);
+    expect(outbox.shown()).toEqual([refused]);
+    stop();
+  });
+
+  test("a batch another tab keeps under the key of one it forgot shows here", () => {
+    const { saved, refused } = underOneKey();
+    store(saved);
+    const outbox = new Outbox(answering(() => json({}, 500)).api);
+    const stop = outbox.listen();
+    store();
+    window.dispatchEvent(new StorageEvent("storage", { key: STORAGE_KEY }));
+    store(refused);
+    window.dispatchEvent(new StorageEvent("storage", { key: STORAGE_KEY }));
+    expect(outbox.entries.value).toEqual([saved, refused]);
+    expect(outbox.shown()).toEqual([refused]);
+    stop();
+  });
+
   test("another tab's change shows here", () => {
     const outbox = new Outbox(answering(() => saved()).api);
     const stop = outbox.listen();

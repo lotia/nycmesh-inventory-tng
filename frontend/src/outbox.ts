@@ -480,7 +480,8 @@ export class Outbox {
   private retry: ReturnType<typeof setTimeout> | undefined;
   /** Saved batches another tab let storage forget, as its catalogue showed
    * them: kept in `entries` until this tab's shows them too (forgetShown),
-   * as its page counts them until then. Off the list. */
+   * as its page counts them until then. Off the list. By batchId, as one
+   * key may name two (queue). */
   private readonly forgottenElsewhere = new Map<string, Entry>();
 
   constructor(
@@ -494,9 +495,9 @@ export class Outbox {
 
   /** `stored`, and the batches forgotten elsewhere, oldest first. */
   private show(stored: Entry[]): void {
-    const here = new Set(stored.map((entry) => entry.body.key));
-    const elsewhere = [...this.forgottenElsewhere.values()].filter(
-      (entry) => !here.has(entry.body.key),
+    const here = new Set(stored.map((entry) => batchId(entry.body)));
+    const elsewhere = [...this.forgottenElsewhere].flatMap(([id, entry]) =>
+      here.has(id) ? [] : [entry],
     );
     this.entries.value = oldestFirst(elsewhere, stored);
   }
@@ -546,7 +547,8 @@ export class Outbox {
   /** What the list shows: all but the saved batches dismissed. */
   shown(): Entry[] {
     return this.entries.value.filter(
-      (entry) => onList(entry) && !this.forgottenElsewhere.has(entry.body.key),
+      (entry) =>
+        onList(entry) && !this.forgottenElsewhere.has(batchId(entry.body)),
     );
   }
 
@@ -559,8 +561,10 @@ export class Outbox {
   forgetShown(saved: readonly string[]): void {
     const inCatalogue = new Set(saved);
     const before = this.forgottenElsewhere.size;
-    for (const key of inCatalogue) {
-      this.forgottenElsewhere.delete(key);
+    for (const [id, entry] of this.forgottenElsewhere) {
+      if (inCatalogue.has(entry.body.key)) {
+        this.forgottenElsewhere.delete(id);
+      }
     }
     if (this.forgottenElsewhere.size !== before) {
       this.show(this.read());
@@ -999,10 +1003,11 @@ export class Outbox {
     };
     const follow = () => {
       const stored = this.read();
-      const here = new Set(stored.map((entry) => entry.body.key));
+      const here = new Set(stored.map((entry) => batchId(entry.body)));
       for (const entry of this.entries.value) {
-        if (entry.state === "saved" && !here.has(entry.body.key)) {
-          this.forgottenElsewhere.set(entry.body.key, entry);
+        const id = batchId(entry.body);
+        if (entry.state === "saved" && !here.has(id)) {
+          this.forgottenElsewhere.set(id, entry);
         }
       }
       this.show(stored);
