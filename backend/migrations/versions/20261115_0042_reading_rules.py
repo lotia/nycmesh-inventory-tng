@@ -1,8 +1,8 @@
 """reading rules, and names unique once their units are read
 (inventory-tng-c0c.4, Ali, 2026-11-12 and 2026-11-15)
 
-reading_rule keeps how a number and its unit, as typed, are read, or that
-they are no unit, as an administrator settled it (models.ReadingRule).
+reading_rule keeps how a unit, as typed after a number, is read, or that
+it is no unit, as an administrator settled it (models.ReadingRule).
 Nothing to fill: no rule is settled yet.
 
 Items, packages and aliases gain unit_key, the key of the name with each

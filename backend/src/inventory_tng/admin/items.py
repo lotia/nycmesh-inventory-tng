@@ -74,9 +74,9 @@ TAKEN = (
     "manufacturer and part number, or that old code."
 )
 NO_LETTERS = "A name needs at least one letter or number."
-# A field saying how a number and its unit in a name are read, asked where
-# nothing settles it, or corrected ("Not right?"): this, then the number
-# and unit as typed (units.rule_key); its value is str(Reading), or
+# A field saying how a unit after a number in a name is read, asked where
+# nothing settles it, or corrected ("Not right?"): this, then the unit as
+# typed (units.rule_key); its value is str(Reading), or
 # NOT_A_UNIT, or blank: as read. Kept as a reading rule
 # (reading_rules.decide), so it is asked once.
 READING = "unit:"
@@ -189,6 +189,8 @@ def _read_alike(session: Session, typed: Typed) -> str:
     rules = {**rules_held(session), **typed.answered}
     groups = items.read_alike(session, typed.answered, rules)
     log.debug("unit answer refused", read_alike=len(groups))
+    if not groups:  # Renamed meanwhile: none to name now.
+        return "Read so, names would read as one. Try again, or answer otherwise."
     return (
         "Read so, these names would read as one: "
         + "; ".join(read_alike_words(groups))
@@ -259,7 +261,11 @@ def _name_field(session: Session, similar: Sequence[items.Close]) -> dict[str, o
     rules = rules_held(session)
 
     def units_read(typed: str) -> list[units.Found]:
-        return units.found_in(canonical(typed.strip()), rules)
+        # One per unit as typed, as one answer reads them all.
+        once: dict[str, units.Found] = {}
+        for each in units.found_in(canonical(typed.strip()), rules):
+            once.setdefault(each.key, each)
+        return list(once.values())
 
     return {
         "similar": similar,
@@ -392,7 +398,8 @@ def _typed_name(session: Session, typed: str, form: Mapping[str, str]) -> Typed:
     answered = {}
     for found in units.found_in(name, rules):
         rule = chosen_rule(form.get(READING + found.key, ""), found.offered)
-        if rule is None:
+        # The words near it settle it, whatever a rule says: none is asked.
+        if rule is None or found.clue:
             continue
         current = None if found.read is None else str(found.read)
         if found.asks or rule.reading != current:

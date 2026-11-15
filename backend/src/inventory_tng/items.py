@@ -25,12 +25,14 @@ with it again (reread), refused if two would then read alike
 (2026-11-15)."""
 
 import re
+import unicodedata
 from collections.abc import Collection, Iterable
 from dataclasses import asdict, dataclass
 from datetime import UTC, datetime
 from decimal import Decimal
 from typing import Any
 
+from anyascii import anyascii
 from sqlalchemy import (
     ColumnElement,
     Select,
@@ -68,7 +70,6 @@ from inventory_tng.models import (
     current_aliases,
     fold,
     fuzzy,
-    holds,
     reading_rules,
     unit_key,
 )
@@ -261,10 +262,11 @@ def similar(session: Session, name: str, item_id: int) -> list[Close]:
     return [Close(item, alias) for item, alias in session.execute(query)]
 
 
-def _not_an_alias(session: Session, name: str) -> None:
-    """RuleBroken unless no current alias has `name`'s keys."""
+def _not_an_alias(session: Session, name: str, but: ItemAlias | None = None) -> None:
+    """RuleBroken unless no current alias has `name`'s keys, `but` aside."""
     taken = _current_alias(Keys.of(session, name))
-    enforce(NAME_IS_ALIAS, when=exists_where(session, *taken))
+    other = () if but is None else (ItemAlias.id != but.id,)
+    enforce(NAME_IS_ALIAS, when=exists_where(session, *taken, *other))
 
 
 def add(session: Session, fields: Fields) -> Item:
@@ -305,8 +307,8 @@ def save(session: Session, item: Item, fields: Fields, *, seen: Seen) -> Renamed
     renamed = keys.name != item.name_key and keys.units != item.unit_key
     old = item.name
     swapped = _own_alias(session, item.id, keys) if renamed else None
-    if swapped is None:
-        _not_an_alias(session, fields.name)
+    # Its own alias aside, swapped, as matched by either key: no other.
+    _not_an_alias(session, fields.name, but=swapped)
     for column, value in asdict(fields).items():
         setattr(item, column, value)
     if not renamed:
@@ -501,31 +503,48 @@ class Named:
     item_id: int
 
 
-# The number a reading rule's token starts with, without its sign.
-_DIGITS = re.compile(r"[-\u2212]?([0-9][0-9,]*(?:[.][0-9]+)?)")
-
 type Rows = tuple[list[Item], list[ItemPackage], list[ItemAlias]]
 
 
-def _with_numbers(session: Session, tokens: Iterable[str], *, lock: bool) -> Rows:
-    """Items, packages and current aliases with any token's number in what
-    is searched of them (an item's search_text holds its aliases), by id,
-    locked if `lock`: every one a rule for those tokens may read otherwise."""
-    numbers = {m[1] for t in tokens if (m := _DIGITS.match(t)) is not None}
-    if not numbers:
+def _after_a_number(token: str) -> str:
+    """A PostgreSQL regular expression for `token` right after a number, as
+    units.AFTER_A_NUMBER finds a unit: a digit, perhaps a space, then it,
+    then no letter or digit. Case kept, as a rule's token is."""
+    return rf"[0-9] ?{re.escape(token)}(?![[:alnum:]])"
+
+
+def _with_units(session: Session, tokens: Iterable[str], *, lock: bool) -> Rows:
+    """Items, packages and current aliases with any token right after a
+    number in a name or what is searched of them (an item's search_text
+    holds its aliases' too, as typed), by id, locked if `lock`: every one a
+    rule for those tokens may read otherwise, and no other (Ali,
+    2026-11-15: rules are kept by the unit, so a common number locks
+    nothing more)."""
+    tokens = list(tokens)
+    if not tokens:
         return [], [], []
+    raw = [_after_a_number(token) for token in tokens]
+    folded = {
+        _after_a_number(anyascii(unicodedata.normalize("NFKC", t))) for t in tokens
+    }
 
     def read[M: (Item, ItemPackage, ItemAlias)](
-        model: type[M], text: SQLColumnExpression[str], *where: ColumnElement[bool]
+        model: type[M], matches: list[ColumnElement[bool]], *also: ColumnElement[bool]
     ) -> list[M]:
-        query = select(model).where(or_(*(holds(text, n) for n in numbers)), *where)
-        query = query.order_by(model.id)
+        query = select(model).where(or_(*matches), *also).order_by(model.id)
         return list(session.scalars(locked(query) if lock else query))
 
+    def searched(model: type[Item | ItemPackage]) -> list[ColumnElement[bool]]:
+        return [
+            *(model.name.regexp_match(p) for p in raw),
+            *(model.search_text.regexp_match(p) for p in folded),
+        ]
+
+    aliases = [ItemAlias.name.regexp_match(p) for p in raw]
     return (
-        read(Item, Item.search_text),
-        read(ItemPackage, ItemPackage.search_text),
-        read(ItemAlias, ItemAlias.name, CURRENT_ALIAS),
+        read(Item, searched(Item)),
+        read(ItemPackage, searched(ItemPackage)),
+        read(ItemAlias, aliases, CURRENT_ALIAS),
     )
 
 
@@ -581,20 +600,21 @@ def _read_alike(session: Session, rows: Rows, rules: units.Rules) -> list[list[N
 def read_alike(
     session: Session, tokens: Iterable[str], rules: units.Rules
 ) -> list[list[Named]]:
-    """Names that would read alike by `rules`, of those with these tokens'
-    numbers: what reread refuses, said after its savepoint is undone."""
-    return _read_alike(session, _with_numbers(session, tokens, lock=False), rules)
+    """Names that would read alike by `rules`, of those with these units
+    after a number: what reread refuses, said after its savepoint is
+    undone."""
+    return _read_alike(session, _with_units(session, tokens, lock=False), rules)
 
 
 def reread(session: Session, tokens: Iterable[str]) -> None:
-    """Every name, package and alias with these tokens' numbers read again
-    by the reading rules as the session holds them: their unit keys and
+    """Every name, package and alias with these units after a number read
+    again by the reading rules as the session holds them: their unit keys and
     what is searched of them. Refused (READ_ALIKE) if two names would then
     read alike, naming nothing: read_alike says which. The rules are
     written first (reading_rules.py), holding the catalogue lock."""
     lock_catalogue(session)
     rules = reading_rules(session)
-    rows = _with_numbers(session, list(tokens), lock=True)
+    rows = _with_units(session, tokens, lock=True)
     enforce(READ_ALIKE, when=bool(_read_alike(session, rows, rules)))
     items_, packages, aliases = rows
     for row in (*items_, *packages, *aliases):

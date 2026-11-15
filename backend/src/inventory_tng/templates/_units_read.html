@@ -1,20 +1,24 @@
-{#- How the units in a name are read (units.found_in, docs/decisions/0021, Ali, 2026-11-15): a name is saved as typed; under it, each unit's reading, with "Not right?" to correct it, and where nothing settles one, the question, asked once. An answer or a correction is kept as a reading rule as the form saves. `typed` is the name in the field, `sent` the form sent, holding any answer. -#}
+{#- How the units in a name are read (units.found_in, docs/decisions/0021, Ali, 2026-11-15): a name is saved as typed; under it, each unit's reading, with "Not right?" to correct it, and where nothing settles one, the question, asked once. An answer or a correction is kept as a reading rule for the unit after a number as the form saves; a reading the words near it settle is said, as no rule changes it. `typed` is the name in the field, `sent` the form sent, holding any answer. -#}
 {% for each in units_read(typed) %}
 {% set field = reading_field ~ each.key %}
 {% set chosen = sent.get(field, "") %}
 {% if each.asks %}
 <fieldset>
-  <legend>“{{ each.key }}” is new. Is it a unit?</legend>
+  <legend>“{{ each.typed }}” is new. Is it a unit?</legend>
   {% for reading in each.offered %}
-  <label><input type="radio" name="{{ field }}" value="{{ reading }}" {% if chosen == reading | string %}checked{% endif %} required> {{ each.shown(reading) }} · {{ reading.unit.kind }}</label>
+  <label><input type="radio" name="{{ field }}" value="{{ reading }}" {% if chosen == reading | string %}checked{% endif %} required> {{ each.shown(reading) }} · {{ reading.called }}</label>
   {% endfor %}
-  <label><input type="radio" name="{{ field }}" value="{{ not_a_unit }}" {% if chosen == not_a_unit %}checked{% endif %} required> Not a unit: keep “{{ each.key }}”</label>
+  <label><input type="radio" name="{{ field }}" value="{{ not_a_unit }}" {% if chosen == not_a_unit %}checked{% endif %} required> Not a unit: keep “{{ each.typed }}”</label>
+  <span class="hint">Remembered for “{{ each.key }}” after a number when the name has no other clue.</span>
 </fieldset>
+{% elif each.clue %}
+<div class="hint">Read as {{ each.shown(each.read) }} · {{ each.read.unit.kind }}, by “{{ each.clue | join("”, “") }}”.
+  {% if each.rule and each.rule.respell %}Saved as {{ each.shown(each.read) }}.{% else %}Saved as typed.{% endif %}</div>
 {% elif each.read or each.rule %}
 <div class="hint">
   {% if each.read %}Read as {{ each.shown(each.read) }} · {{ each.read.unit.kind }}.
   {% if each.rule and each.rule.respell %}Saved as {{ each.shown(each.read) }}.{% else %}Saved as typed.{% endif %}
-  {%- else %}“{{ each.key }}” is not read as a unit.{% endif %}
+  {%- else %}“{{ each.typed }}” is not read as a unit.{% endif %}
   {% if each.offered or each.read %}
   <details {% if chosen %}open{% endif %}>
     <summary>Not right?</summary>
@@ -23,9 +27,9 @@
     <label><input type="radio" name="{{ field }}" value="{{ reading }}" {% if chosen == reading | string %}checked{% endif %}> {{ each.shown(reading) }} · {{ reading.unit.kind }}</label>
     {% endfor %}
     {% if each.read %}
-    <label><input type="radio" name="{{ field }}" value="{{ not_a_unit }}" {% if chosen == not_a_unit %}checked{% endif %}> Not a unit: keep “{{ each.key }}”</label>
+    <label><input type="radio" name="{{ field }}" value="{{ not_a_unit }}" {% if chosen == not_a_unit %}checked{% endif %}> Not a unit: keep “{{ each.typed }}”</label>
     {% endif %}
-    <span>Saved, it reads every name with “{{ each.key }}” so.</span>
+    <span>Saved, it reads “{{ each.key }}” after a number so in every name with no other clue.</span>
   </details>
   {% endif %}
 </div>

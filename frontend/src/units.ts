@@ -4,8 +4,8 @@
  * the same table, which the server writes to units.json, read the same
  * way, so a search spells "10 µF", "10μF" and "10uf" all "10uF" here as
  * there, and the reading rules the catalogue sends first (units.Rule),
- * as the server does. units-vectors.json holds what both must make of
- * some text.
+ * as the server does, and the words near a unit and the profile as it
+ * does too. units-vectors.json holds what both must make of some text.
  */
 import table from "./units.json";
 
@@ -26,8 +26,11 @@ const lowered = (pairs: Pairs): Map<string, string> =>
 const whole = new Map([...prefixed, ...alone]);
 const wholeLoose = lowered([...prefixed, ...alone]);
 const takesPrefixLoose = lowered(prefixed);
-const prefixSpellings = table.prefixes.flatMap(([symbol = "", ...others]) =>
-  [symbol, ...others].map((spelling): [string, string] => [spelling, symbol]),
+const prefixSpellings = table.prefixes.flatMap(({ spellings }) =>
+  spellings.map((spelling): [string, string] => [
+    spelling,
+    spellings[0] as string,
+  ]),
 );
 
 /** The unit `token` spells, by its symbol, if any: as typed first, then
@@ -74,32 +77,190 @@ const ALONE = new RegExp(String.raw`(?<![\p{L}\p{N}])(${TOKEN})${ENDS}`, "gu");
 const marked = (text: string, ...at: number[]): boolean =>
   at.some((i) => /\p{M}/u.test(text.charAt(i)));
 
-/** Reading rules, by a number and its unit as typed (units.rule_key):
- * the unit each reads as, by its symbol, or null, no unit. */
+/** Reading rules, by a unit as typed after a number, case kept
+ * (units.rule_key): the unit each reads as, by its symbol, or null, no
+ * unit. */
 export type Rules = ReadonlyMap<string, string | null>;
 
 // The number a unit follows, ending at its last digit (units._NUMBER).
-const NUMBER = /(?:(?<![\p{L}\p{N}])[-\u2212])?[0-9][0-9,]*(?:[.][0-9]+)?$/u;
+const NUMBER = /(?:(?<![\p{L}\p{N}])[-−])?[0-9][0-9,]*(?:[.][0-9]+)?$/u;
+
+type Unit = (typeof table.units)[number];
+/** A unit as read (units.Reading): its prefix's symbol and power of ten,
+ * if any, and the unit; `symbol` as str(Reading) spells it. */
+type Reading = { prefix: string; exponent: number; unit: Unit; symbol: string };
+
+const units = new Map(table.units.map((unit) => [unit.symbol, unit]));
+const reading = (prefix: string, exponent: number, unit: Unit): Reading => ({
+  prefix,
+  exponent,
+  unit,
+  symbol: prefix + unit.symbol,
+});
+const exponents = new Map(
+  table.prefixes.flatMap(({ spellings, exponent }) =>
+    spellings.map((spelling): [string, [string, number]] => [
+      spelling,
+      [spellings[0] ?? "", exponent],
+    ]),
+  ),
+);
+// Every symbol and spelling, not words, in lower case (units._SPELT_LOOSE).
+const speltLoose = new Map(
+  table.units.flatMap((unit) =>
+    unit.symbols.map((spelling): [string, Unit] => [
+      spelling.toLowerCase(),
+      unit,
+    ]),
+  ),
+);
+const takesPrefixUnits = new Map(
+  table.units.flatMap((unit) =>
+    unit.prefixed.map((spelling): [string, Unit] => [
+      spelling.toLowerCase(),
+      unit,
+    ]),
+  ),
+);
+const rank = (each: Reading): number => table.profile.indexOf(each.unit.kind);
+const bareRates: Record<string, string> = table.bare_rates;
+const clues: Record<string, string[]> = table.clues;
+const kinds: Record<string, number[]> = table.kinds;
+const products = new Set(table.products);
+
+/** Each unit `token` spells in any case, a bare rate too, and whether it
+ * is spelt so as typed: by the profile, those first in each kind
+ * (units.readings). */
+function readings(token: string): [Reading, boolean][] {
+  const lower = token.toLowerCase();
+  const found: [Reading, boolean][] = [];
+  const unit = speltLoose.get(lower);
+  if (unit !== undefined) {
+    found.push([reading("", 0, unit), unit.symbols.includes(token)]);
+  }
+  for (const [spelling, [prefix, exponent]] of exponents) {
+    if (lower.startsWith(spelling.toLowerCase())) {
+      const rest = token.slice(spelling.length);
+      const prefixed = takesPrefixUnits.get(rest.toLowerCase());
+      if (prefixed !== undefined) {
+        const exact =
+          token.startsWith(spelling) && prefixed.symbols.includes(rest);
+        found.push([reading(prefix, exponent, prefixed), exact]);
+      }
+    }
+  }
+  const rate = bareRates[token];
+  if (rate !== undefined) {
+    // Every bare rate is a prefix's symbol.
+    const [prefix, exponent] = exponents.get(rate) as [string, number];
+    found.push([reading(prefix, exponent, units.get("bit/s") as Unit), false]);
+  }
+  return found.sort(
+    ([a, exactA], [b, exactB]) =>
+      rank(a) - rank(b) || Number(!exactA) - Number(!exactB),
+  );
+}
+
+/** Whether `number` of it is a size this inventory may hold
+ * (units.Reading.plausible). */
+function plausible(each: Reading, number: number): boolean {
+  const [low, high] = kinds[each.unit.kind] as [number, number];
+  const { factor, offset, power } = each.unit;
+  if (factor === null) return low <= number && number <= high;
+  const size = number * 10 ** (each.exponent * power) * factor + offset;
+  const compared = low > 0 ? Math.abs(size) : size;
+  return low <= compared && compared <= high;
+}
+
+const WORD = /[A-Za-z0-9+]+(?:-[A-Za-z0-9+]+)*/g;
+const PART = /[A-Za-z0-9+]+/g;
+const BEFORE = /([A-Za-z0-9+]+)[ -]?$/;
+
+/** The match of `pattern` in `text` holding the character at `at`. */
+const holding = (pattern: RegExp, text: string, at: number) =>
+  Array.from(text.matchAll(pattern)).find(
+    (each) => each.index <= at && at < each.index + each[0].length,
+  );
+
+/** Whether the word the digit at `at` is in, or its part between hyphens,
+ * alone or joined to the word or part before it, is a product's
+ * (units._product). */
+function product(text: string, at: number): boolean {
+  // The digit is in a word, and a part of one.
+  const said = [WORD, PART].flatMap((pattern) => {
+    const each = holding(pattern, text, at) as RegExpExecArray;
+    const before = BEFORE.exec(text.slice(0, each.index))?.[1] ?? "";
+    return [each[0], before + each[0]];
+  });
+  return said.some((each) => products.has(each.toLowerCase()));
+}
+
+/** The reading the words in `text` say, if they say one kind
+ * (units._clue). */
+function clue(text: string, readable: Reading[]): Reading | undefined {
+  const words = new Set(
+    Array.from(text.matchAll(/[A-Za-z0-9+]+/g), ([word]) => word.toLowerCase()),
+  );
+  const said = readable.map((each): [Reading, number] => [
+    each,
+    (clues[each.unit.kind] ?? []).filter((word) => words.has(word)).length,
+  ]);
+  const most = Math.max(...said.map(([, count]) => count));
+  const best = said.filter(([, count]) => count === most);
+  return most > 0 && best.length === 1 ? best[0]?.[0] : undefined;
+}
+
+/** The one plausible reading, else the one of a likely kind, else, none
+ * being likely, the one spelt as typed (units._likeliest). */
+function likeliest(found: [Reading, boolean][]): Reading | undefined {
+  if (found.length === 1) return found[0]?.[0];
+  const likely = found.filter(([each]) =>
+    table.likely.includes(each.unit.kind),
+  );
+  if (likely.length === 1) return likely[0]?.[0];
+  const exact = found.filter(([, spelt]) => spelt);
+  return likely.length === 0 && exact.length === 1 ? exact[0]?.[0] : undefined;
+}
+
+/** What the unit after `number` in `text` reads as (units._found): its
+ * symbol, null for no unit by its rule, or undefined, nothing settling it. */
+function settled(
+  text: string,
+  number: string,
+  token: string,
+  rules: Rules | undefined,
+): string | null | undefined {
+  const rule = rules?.get(token.normalize("NFC"));
+  const value = Number(number.replaceAll(",", "").replace("−", "-"));
+  const found = readings(token).filter(([each]) => plausible(each, value));
+  const readable = found.map(([each]) => each);
+  const clued = readable.length > 1 ? clue(text, readable) : undefined;
+  if (clued !== undefined) return clued.symbol;
+  // A rule's reading the table no longer reads is none (units.reading_of).
+  if (rule !== undefined)
+    return rule !== null && read(rule) === rule ? rule : null;
+  if (table.asked.includes(token) && found.length > 1) return undefined;
+  return likeliest(found)?.symbol;
+}
 
 /** `text`, decomposed (NFKD), with each unit read right after a number
- * spelt by its symbol, joined to the number, as its reading rule says if it
- * has one (`rules`), and each unit alone spelt with a sign no word is (not
- * ASCII) by its symbol. */
+ * spelt by its symbol, joined to the number, as the forms read it (the
+ * words near it, its reading rule in `rules`, the profile), else as the
+ * table reads it; a product's name as it is; and each unit alone spelt
+ * with a sign no word is (not ASCII) by its symbol (units.respell). */
 export function respell(text: string, rules?: Rules): string {
   return text
     .replace(
       AFTER_A_NUMBER,
       (match, digit: string, token: string, at: number, whole: string) => {
-        if (marked(whole, at + match.length)) return match;
-        if (rules !== undefined && rules.size > 0) {
-          // It ends at the digit the match starts with, so it is found.
-          const [number] = NUMBER.exec(
-            whole.slice(0, at + 1),
-          ) as RegExpExecArray;
-          const ruled = rules.get((number + token).normalize("NFC"));
-          if (ruled !== undefined) {
-            return ruled === null ? match : digit + ruled;
-          }
+        if (marked(whole, at + match.length) || product(whole, at)) {
+          return match;
+        }
+        // It ends at the digit the match starts with, so it is found.
+        const [number] = NUMBER.exec(whole.slice(0, at + 1)) as RegExpExecArray;
+        const reading = settled(whole, number, token, rules);
+        if (reading !== undefined) {
+          return reading === null ? match : digit + reading;
         }
         const unit = read(token);
         return unit === undefined ? match : digit + unit;

@@ -1,4 +1,4 @@
-# models.fold, with anyascii 0.3.3, Unicode 17.0.0, units 2: each input, its code point, what it folds to (∅: nothing). Written by mise run regenerate-fold-reference, or from backend/: uv run python -m tests.helpers.fold_reference.
+# models.fold, with anyascii 0.3.3, Unicode 17.0.0, units 3: each input, its code point, what it folds to (∅: nothing). Written by mise run regenerate-fold-reference, or from backend/: uv run python -m tests.helpers.fold_reference.
 \xa0	U+00A0	\x20
 ¡	U+00A1	!
 ¢	U+00A2	c

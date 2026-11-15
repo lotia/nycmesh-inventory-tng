@@ -296,7 +296,7 @@ class KeyedName(CanonicalName):
 def unit_key(name: str, rules: units.Rules | None = None) -> str:
     """The key of `name` with each unit after a number spelt by what it
     reads as, its rule first (units.read_as): `10 µF`, `10 uF` and `10μF`
-    alike, and `305M` as `305m` where a rule reads it so."""
+    alike, and `3M` as `3m` where a rule reads `M` so."""
     return names.name_key(units.read_as(name, rules))
 
 
@@ -632,9 +632,9 @@ def current_aliases(item_id: int) -> Select[ItemAlias]:
 
 
 class ReadingRule(Versioned, Base):
-    """How a number and its unit, as typed, are read, settled by an
+    """How a unit, as typed after a number, is read, settled by an
     administrator (units.Rule, docs/decisions/0021, 2026-11-15): `token`,
-    such as `305M`, read as `reading`, a unit as str(units.Reading) spells
+    such as `M`, case kept, read as `reading`, a unit as str(units.Reading) spells
     it, or as no unit (NULL); and whether a name typed with it spells it by
     its symbol (`respell`). Looked up before the unit table wherever a unit
     is read. Changed or deleted by an administrator, when every name with

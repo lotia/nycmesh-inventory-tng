@@ -74,8 +74,8 @@
     },
     {
       "text": "300 K",
-      "respelt": "300K",
-      "searched": "300k",
+      "respelt": "300kbit/s",
+      "searched": "300kbit/s",
       "typed": "300 k"
     },
     {
@@ -547,7 +547,7 @@
     {
       "text": "SFP+ 10G",
       "rules": {
-        "10G": "Gbit/s"
+        "G": "Gbit/s"
       },
       "respelt": "SFP+ 10Gbit/s",
       "searched": "sfp+ 10gbit/s",
@@ -556,7 +556,7 @@
     {
       "text": "Uplink 10 G, 10G",
       "rules": {
-        "10G": "Gbit/s"
+        "G": "Gbit/s"
       },
       "respelt": "Uplink 10Gbit/s, 10Gbit/s",
       "searched": "uplink 10gbit/s, 10gbit/s",
@@ -565,7 +565,7 @@
     {
       "text": "Spool 305 M",
       "rules": {
-        "305M": "m"
+        "M": "m"
       },
       "respelt": "Spool 305m",
       "searched": "spool 305m",
@@ -574,7 +574,7 @@
     {
       "text": "Tape 3M 25 m",
       "rules": {
-        "3M": null
+        "M": null
       },
       "respelt": "Tape 3M 25m",
       "searched": "tape 3m 25m",
@@ -583,7 +583,7 @@
     {
       "text": "Cable 1,000 FT",
       "rules": {
-        "1,000FT": "ft"
+        "FT": "ft"
       },
       "respelt": "Cable 1,000ft",
       "searched": "cable 1,000ft",
@@ -592,11 +592,131 @@
     {
       "text": "Pad 16P",
       "rules": {
-        "16P": null
+        "P": null
       },
       "respelt": "Pad 16P",
       "searched": "pad 16p",
       "typed": "pad 16p"
+    },
+    {
+      "text": "Hub 4 K",
+      "respelt": "Hub 4kbit/s",
+      "searched": "hub 4kbit/s",
+      "typed": "hub 4 k"
+    },
+    {
+      "text": "Switch 100M",
+      "respelt": "Switch 100Mbit/s",
+      "searched": "switch 100mbit/s",
+      "typed": "switch 100m"
+    },
+    {
+      "text": "Spool 305M",
+      "respelt": "Spool 305m",
+      "searched": "spool 305m",
+      "typed": "spool 305m"
+    },
+    {
+      "text": "Tape 3M",
+      "respelt": "Tape 3m",
+      "searched": "tape 3m",
+      "typed": "tape 3m"
+    },
+    {
+      "text": "Tape 3M",
+      "rules": {
+        "M": "Mbit/s"
+      },
+      "respelt": "Tape 3Mbit/s",
+      "searched": "tape 3mbit/s",
+      "typed": "tape 3m"
+    },
+    {
+      "text": "Cable 3M",
+      "rules": {
+        "M": "Mbit/s"
+      },
+      "respelt": "Cable 3m",
+      "searched": "cable 3m",
+      "typed": "cable 3m"
+    },
+    {
+      "text": "Cat6a 5 m",
+      "respelt": "Cat6a 5m",
+      "searched": "cat6a 5m",
+      "typed": "cat6a 5 m"
+    },
+    {
+      "text": "Thermal paste 10g",
+      "respelt": "Thermal paste 10g",
+      "searched": "thermal paste 10g",
+      "typed": "thermal paste 10g"
+    },
+    {
+      "text": "SFP 10g",
+      "respelt": "SFP 10Gbit/s",
+      "searched": "sfp 10gbit/s",
+      "typed": "sfp 10g"
+    },
+    {
+      "text": "Box 10g",
+      "respelt": "Box 10g",
+      "searched": "box 10g",
+      "typed": "box 10g"
+    },
+    {
+      "text": "Box 10g",
+      "rules": {
+        "g": "Gbit/s"
+      },
+      "respelt": "Box 10Gbit/s",
+      "searched": "box 10gbit/s",
+      "typed": "box 10g"
+    },
+    {
+      "text": "Box 10G",
+      "respelt": "Box 10Gbit/s",
+      "searched": "box 10gbit/s",
+      "typed": "box 10g"
+    },
+    {
+      "text": "Box 10G",
+      "rules": {
+        "G": null
+      },
+      "respelt": "Box 10G",
+      "searched": "box 10g",
+      "typed": "box 10g"
+    },
+    {
+      "text": "Patch Cat-6a 2 m",
+      "respelt": "Patch Cat-6a 2m",
+      "searched": "patch cat-6a 2m",
+      "typed": "patch cat-6a 2 m"
+    },
+    {
+      "text": "Cat6a-patch 3 m",
+      "respelt": "Cat6a-patch 3m",
+      "searched": "cat6a-patch 3m",
+      "typed": "cat6a-patch 3 m"
+    },
+    {
+      "text": "Box 10G",
+      "rules": {
+        "G": "xyz"
+      },
+      "respelt": "Box 10G",
+      "searched": "box 10g",
+      "typed": "box 10g"
+    },
+    {
+      "text": "Switch 10G",
+      "rules": {
+        "G": null
+      },
+      "respelt": "Switch 10Gbit/s",
+      "searched": "switch 10gbit/s",
+      "typed": "switch 10g"
     }
   ]
 }

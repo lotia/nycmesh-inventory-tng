@@ -1200,7 +1200,7 @@
         "type": "object",
         "required": ["token", "reading"],
         "title": "ReadingRuleEntry",
-        "description": "A reading rule (models.ReadingRule): a number and its unit as typed\n(units.rule_key), and what it reads as, by its symbol as searches spell\nit (str(units.Reading)), or null: no unit. The page reads units by them\nbefore its table, as the server does (units.respell)."
+        "description": "A reading rule (models.ReadingRule): a unit as typed after a number\n(units.rule_key), and what it reads as, by its symbol as searches spell\nit (str(units.Reading)), or null: no unit. The page reads units by them\nbefore its table, as the server does (units.respell)."
       },
       "RecordedBatch": {
         "properties": {

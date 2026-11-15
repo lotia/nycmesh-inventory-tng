@@ -446,3 +446,44 @@ unlikely. A reading is written by its usual printed symbol: data rates as
 places, the seeding page, the form and the rules page, and each reads every
 name with that spelling again. Search still reads a bare `K` as kelvins
 where no rule says otherwise: the profile is the forms'.
+
+## Amendment: rules kept by the unit, and search reads as the forms do (2026-11-15)
+
+Ali's option D, its mockups and text, decided the implement stage's
+questions (2026-11-15, inventory-tng-c0c.3 and c0c.4), and Ali added a
+seventh the same day. This replaces, above, keeping a rule by its number
+and unit (`305M`) and search not reading the profile.
+
+1. A rule is kept by the unit as typed after a number, case kept (`M`,
+   `G`, `g`), so one answer reads `10G`, `1G` and `40 G` ("Remembered for
+   "M" after a number when the name has no other clue"). `G` never
+   settles `g`.
+2. Where a unit may be several kinds, the words near it in the name
+   decide first (`units.CLUES`: `spool`, `cable`, `Cat6` a length;
+   `switch`, `port`, `uplink`, `SFP` a data rate; `paste`, `grease`,
+   `weight` grams), then its rule, then the profile. So a rule reads only
+   names with no other clue, and "Not right?" is not offered for a
+   reading the words settle.
+3. The profile settles silently where its ranking decides: `G` and `K`
+   after a number are Gbps and kbps without asking, grams and kelvins
+   ranking below (`Hub 4 K` is 4 kbps). `M`, a data rate or a length, both
+   ranked high, is asked where no word near it says.
+4. A `g` after a number is a data rate or grams: never silently grams,
+   asked where no word near it says (Ali, the seventh).
+5. The hint names the kind (`Read as 10Gbps · data rate. Saved as
+   typed.`); the question's choices name the unit (`3m · meters`,
+   `10g · grams`), a data rate so (`3Mbps · data rate`).
+6. Search, here and on the scan page, reads units as the forms do, the
+   profile, the words near each unit, products and rules alike (units
+   version 3, migration 0043 folding every row again), so what a form
+   reads and what search finds agree. What nothing settles, search reads
+   by the table, as before.
+
+A rule change reads again only names with that unit after a number, found
+by a regular expression on the name and what is searched of it, so a
+common number locks nothing more.
+
+Words the app shows for units are in US spelling, as the app follows US
+conventions (inventory-tng-g6u): `meters`, `liters`, `cubic meters`,
+`metric tons` (Ali, 2026-11-15). Both spellings are still read, in a
+search and as words near a unit (`metre`, `fibre`).

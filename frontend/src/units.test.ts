@@ -71,17 +71,18 @@ describe("units, as the server reads them", () => {
   test("the catalogue's reading rules read a unit before the table", () => {
     const ruled = (reading: string | null) => ({
       ...CATALOGUE,
-      items: [{ ...cable, id: 104, name: "SFP+ 10G", search_text: "" }],
-      reading_rules: [{ token: "10G", reading }],
+      items: [{ ...cable, id: 104, name: "Box 10g", search_text: "" }],
+      reading_rules: [{ token: "g", reading }],
     });
     const finds = (reading: string | null, typed: string) =>
       search(ruled(reading), typed).map((item) => item.id);
-    // Read as gigabits a second, not grams, as the server reads it.
+    // A g with no word near it saying which, read as its rule says, as
+    // the server reads it.
     expect(finds("Gbit/s", "10 Gbps")).toEqual([104]);
-    expect(finds("Gbit/s", "10G")).toEqual([104]);
+    expect(finds("Gbit/s", "10g")).toEqual([104]);
     // No unit: found only as typed.
     expect(finds(null, "10 Gbps")).toEqual([]);
-    expect(finds(null, "10G")).toEqual([104]);
+    expect(finds(null, "10g")).toEqual([104]);
   });
 
   test("what was found before units were read still is (Ali, 2026-11-15)", () => {

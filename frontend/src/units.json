@@ -1,151 +1,458 @@
 {
-  "version": 2,
+  "version": 3,
   "prefixes": [
-    ["Q"],
-    ["R"],
-    ["Y"],
-    ["Z"],
-    ["E"],
-    ["P"],
-    ["T"],
-    ["G"],
-    ["M"],
-    ["k"],
-    ["h"],
-    ["da"],
-    ["d"],
-    ["c"],
-    ["m"],
-    ["u", "μ", "µ"],
-    ["n"],
-    ["p"],
-    ["f"],
-    ["a"],
-    ["z"],
-    ["y"],
-    ["r"],
-    ["q"]
+    {
+      "spellings": ["Q"],
+      "exponent": 30
+    },
+    {
+      "spellings": ["R"],
+      "exponent": 27
+    },
+    {
+      "spellings": ["Y"],
+      "exponent": 24
+    },
+    {
+      "spellings": ["Z"],
+      "exponent": 21
+    },
+    {
+      "spellings": ["E"],
+      "exponent": 18
+    },
+    {
+      "spellings": ["P"],
+      "exponent": 15
+    },
+    {
+      "spellings": ["T"],
+      "exponent": 12
+    },
+    {
+      "spellings": ["G"],
+      "exponent": 9
+    },
+    {
+      "spellings": ["M"],
+      "exponent": 6
+    },
+    {
+      "spellings": ["k"],
+      "exponent": 3
+    },
+    {
+      "spellings": ["h"],
+      "exponent": 2
+    },
+    {
+      "spellings": ["da"],
+      "exponent": 1
+    },
+    {
+      "spellings": ["d"],
+      "exponent": -1
+    },
+    {
+      "spellings": ["c"],
+      "exponent": -2
+    },
+    {
+      "spellings": ["m"],
+      "exponent": -3
+    },
+    {
+      "spellings": ["u", "μ", "µ"],
+      "exponent": -6
+    },
+    {
+      "spellings": ["n"],
+      "exponent": -9
+    },
+    {
+      "spellings": ["p"],
+      "exponent": -12
+    },
+    {
+      "spellings": ["f"],
+      "exponent": -15
+    },
+    {
+      "spellings": ["a"],
+      "exponent": -18
+    },
+    {
+      "spellings": ["z"],
+      "exponent": -21
+    },
+    {
+      "spellings": ["y"],
+      "exponent": -24
+    },
+    {
+      "spellings": ["r"],
+      "exponent": -27
+    },
+    {
+      "spellings": ["q"],
+      "exponent": -30
+    }
   ],
   "units": [
     {
       "symbol": "m",
       "prefixed": ["m"],
-      "alone": ["meter", "meters", "metre", "metres"]
+      "alone": ["meter", "meters", "metre", "metres"],
+      "symbols": ["m"],
+      "kind": "length",
+      "factor": 1.0,
+      "offset": 0.0,
+      "power": 1
     },
     {
       "symbol": "[in_i]",
       "prefixed": [],
-      "alone": ["[in_i]", "inch", "inches"]
+      "alone": ["[in_i]", "inch", "inches"],
+      "symbols": ["[in_i]"],
+      "kind": "length",
+      "factor": 0.0254,
+      "offset": 0.0,
+      "power": 1
     },
     {
       "symbol": "ft",
       "prefixed": [],
-      "alone": ["ft", "[ft_i]", "foot", "feet"]
+      "alone": ["ft", "[ft_i]", "foot", "feet"],
+      "symbols": ["ft", "[ft_i]"],
+      "kind": "length",
+      "factor": 0.3048,
+      "offset": 0.0,
+      "power": 1
     },
     {
       "symbol": "yd",
       "prefixed": [],
-      "alone": ["yd", "[yd_i]", "yard", "yards"]
+      "alone": ["yd", "[yd_i]", "yard", "yards"],
+      "symbols": ["yd", "[yd_i]"],
+      "kind": "length",
+      "factor": 0.9144,
+      "offset": 0.0,
+      "power": 1
     },
     {
       "symbol": "mi",
       "prefixed": [],
-      "alone": ["mi", "[mi_i]", "mile", "miles"]
+      "alone": ["mi", "[mi_i]", "mile", "miles"],
+      "symbols": ["mi", "[mi_i]"],
+      "kind": "length",
+      "factor": 1609.344,
+      "offset": 0.0,
+      "power": 1
     },
     {
       "symbol": "Hz",
       "prefixed": ["Hz"],
-      "alone": ["hertz"]
+      "alone": ["hertz"],
+      "symbols": ["Hz"],
+      "kind": "frequency",
+      "factor": 1.0,
+      "offset": 0.0,
+      "power": 1
     },
     {
       "symbol": "bit/s",
       "prefixed": ["bit/s", "bps", "b/s"],
-      "alone": []
+      "alone": [],
+      "symbols": ["bit/s", "bps", "b/s"],
+      "kind": "data rate",
+      "factor": 1.0,
+      "offset": 0.0,
+      "power": 1
     },
     {
       "symbol": "W",
       "prefixed": ["W"],
-      "alone": ["watt", "watts"]
+      "alone": ["watt", "watts"],
+      "symbols": ["W"],
+      "kind": "power",
+      "factor": 1.0,
+      "offset": 0.0,
+      "power": 1
     },
     {
       "symbol": "dBm",
       "prefixed": [],
-      "alone": ["dBm"]
+      "alone": ["dBm"],
+      "symbols": ["dBm"],
+      "kind": "power level",
+      "factor": null,
+      "offset": 0.0,
+      "power": 1
     },
     {
       "symbol": "dBi",
       "prefixed": [],
-      "alone": ["dBi"]
+      "alone": ["dBi"],
+      "symbols": ["dBi"],
+      "kind": "gain",
+      "factor": null,
+      "offset": 0.0,
+      "power": 1
     },
     {
       "symbol": "V",
       "prefixed": ["V"],
-      "alone": ["volt", "volts"]
+      "alone": ["volt", "volts"],
+      "symbols": ["V"],
+      "kind": "voltage",
+      "factor": 1.0,
+      "offset": 0.0,
+      "power": 1
     },
     {
       "symbol": "A",
       "prefixed": ["A"],
-      "alone": ["amp", "amps", "ampere", "amperes"]
+      "alone": ["amp", "amps", "ampere", "amperes"],
+      "symbols": ["A"],
+      "kind": "current",
+      "factor": 1.0,
+      "offset": 0.0,
+      "power": 1
     },
     {
       "symbol": "degC",
       "prefixed": [],
-      "alone": ["degC", "Cel", "°C", "deg C"]
+      "alone": ["degC", "Cel", "°C", "deg C"],
+      "symbols": ["degC", "Cel", "°C", "deg C"],
+      "kind": "temperature",
+      "factor": 1.0,
+      "offset": 0.0,
+      "power": 1
     },
     {
       "symbol": "degF",
       "prefixed": [],
-      "alone": ["degF", "[degF]", "°F", "deg F"]
+      "alone": ["degF", "[degF]", "°F", "deg F"],
+      "symbols": ["degF", "[degF]", "°F", "deg F"],
+      "kind": "temperature",
+      "factor": 0.5555555555555556,
+      "offset": -17.77777777777778,
+      "power": 1
     },
     {
       "symbol": "K",
       "prefixed": ["K"],
-      "alone": ["kelvin"]
+      "alone": ["kelvin"],
+      "symbols": ["K"],
+      "kind": "temperature",
+      "factor": 1.0,
+      "offset": -273.15,
+      "power": 1
     },
     {
       "symbol": "F",
       "prefixed": ["F"],
-      "alone": ["farad", "farads"]
+      "alone": ["farad", "farads"],
+      "symbols": ["F"],
+      "kind": "capacitance",
+      "factor": 1.0,
+      "offset": 0.0,
+      "power": 1
     },
     {
       "symbol": "Ohm",
       "prefixed": ["Ohm", "Ω", "ohm", "ohms"],
-      "alone": []
+      "alone": [],
+      "symbols": ["Ohm", "Ω", "ohm", "ohms"],
+      "kind": "resistance",
+      "factor": 1.0,
+      "offset": 0.0,
+      "power": 1
     },
     {
       "symbol": "g",
       "prefixed": ["g"],
-      "alone": ["gram", "grams"]
+      "alone": ["gram", "grams"],
+      "symbols": ["g"],
+      "kind": "mass",
+      "factor": 1.0,
+      "offset": 0.0,
+      "power": 1
     },
     {
       "symbol": "t",
       "prefixed": [],
-      "alone": ["t", "tonne", "tonnes"]
+      "alone": ["t", "tonne", "tonnes"],
+      "symbols": ["t"],
+      "kind": "mass",
+      "factor": 1000000.0,
+      "offset": 0.0,
+      "power": 1
     },
     {
       "symbol": "lb",
       "prefixed": [],
-      "alone": ["lb", "[lb_av]", "lbs", "pound", "pounds"]
+      "alone": ["lb", "[lb_av]", "lbs", "pound", "pounds"],
+      "symbols": ["lb", "[lb_av]", "lbs"],
+      "kind": "mass",
+      "factor": 453.59237,
+      "offset": 0.0,
+      "power": 1
     },
     {
       "symbol": "oz",
       "prefixed": [],
-      "alone": ["oz", "[oz_av]", "ounce", "ounces"]
+      "alone": ["oz", "[oz_av]", "ounce", "ounces"],
+      "symbols": ["oz", "[oz_av]"],
+      "kind": "mass",
+      "factor": 28.349523125,
+      "offset": 0.0,
+      "power": 1
     },
     {
       "symbol": "L",
       "prefixed": ["L", "l"],
-      "alone": ["liter", "liters", "litre", "litres"]
+      "alone": ["liter", "liters", "litre", "litres"],
+      "symbols": ["L", "l"],
+      "kind": "volume",
+      "factor": 1.0,
+      "offset": 0.0,
+      "power": 1
     },
     {
       "symbol": "m3",
       "prefixed": ["m3"],
-      "alone": []
+      "alone": [],
+      "symbols": ["m3"],
+      "kind": "volume",
+      "factor": 1000.0,
+      "offset": 0.0,
+      "power": 3
     },
     {
       "symbol": "gal",
       "prefixed": [],
-      "alone": ["gal", "[gal_us]", "gallon", "gallons"]
+      "alone": ["gal", "[gal_us]", "gallon", "gallons"],
+      "symbols": ["gal", "[gal_us]"],
+      "kind": "volume",
+      "factor": 3.785411784,
+      "offset": 0.0,
+      "power": 1
     }
-  ]
+  ],
+  "kinds": {
+    "length": [0.0001, 100000.0],
+    "frequency": [1.0, 1000000000000.0],
+    "data rate": [1000.0, 1000000000000.0],
+    "power": [1e-6, 100000.0],
+    "power level": [-120.0, 60.0],
+    "gain": [-10.0, 50.0],
+    "voltage": [0.001, 100000.0],
+    "current": [1e-6, 1000.0],
+    "temperature": [-100.0, 1000.0],
+    "capacitance": [1e-15, 1000.0],
+    "resistance": [0.001, 1000000000.0],
+    "mass": [0.001, 10000000.0],
+    "volume": [0.001, 10000.0]
+  },
+  "profile": [
+    "data rate",
+    "length",
+    "power level",
+    "gain",
+    "power",
+    "voltage",
+    "current",
+    "frequency",
+    "temperature",
+    "capacitance",
+    "resistance",
+    "volume",
+    "mass"
+  ],
+  "likely": ["data rate", "length"],
+  "bare_rates": {
+    "G": "G",
+    "M": "M",
+    "K": "k",
+    "g": "G"
+  },
+  "asked": ["g"],
+  "products": [
+    "2-in-1",
+    "2ac",
+    "3-in-1",
+    "4-in-1",
+    "5ac",
+    "cat5",
+    "cat5e",
+    "cat6",
+    "cat6a",
+    "cat7",
+    "cat8",
+    "gen2",
+    "gen3",
+    "poe",
+    "poe+",
+    "qsfp",
+    "qsfp+",
+    "qsfp28",
+    "sfp",
+    "sfp+",
+    "sfp28"
+  ],
+  "clues": {
+    "data rate": [
+      "backhaul",
+      "ethernet",
+      "fiber",
+      "fibre",
+      "gbe",
+      "lan",
+      "link",
+      "nic",
+      "port",
+      "ports",
+      "qsfp",
+      "router",
+      "sfp",
+      "sfp+",
+      "switch",
+      "transceiver",
+      "uplink",
+      "wan"
+    ],
+    "length": [
+      "cable",
+      "cat5",
+      "cat5e",
+      "cat6",
+      "cat6a",
+      "cat7",
+      "cat8",
+      "conduit",
+      "cord",
+      "drop",
+      "jumper",
+      "patch",
+      "pigtail",
+      "reel",
+      "roll",
+      "rope",
+      "spool",
+      "wire"
+    ],
+    "gain": ["antenna", "dish", "horn", "omni", "sector"],
+    "voltage": ["adapter", "battery", "injector", "psu", "supply"],
+    "mass": [
+      "compound",
+      "epoxy",
+      "grease",
+      "lubricant",
+      "paste",
+      "sealant",
+      "weighs",
+      "weight"
+    ]
+  }
 }

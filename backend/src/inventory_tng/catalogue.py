@@ -171,7 +171,7 @@ class Settings(Entry):
 
 
 class ReadingRuleEntry(BaseModel):
-    """A reading rule (models.ReadingRule): a number and its unit as typed
+    """A reading rule (models.ReadingRule): a unit as typed after a number
     (units.rule_key), and what it reads as, by its symbol as searches spell
     it (str(units.Reading)), or null: no unit. The page reads units by them
     before its table, as the server does (units.respell)."""

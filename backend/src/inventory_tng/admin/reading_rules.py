@@ -1,7 +1,7 @@
 """Unit readings: the reading rules administrators have settled, how a
 number and its unit as typed are read (models.ReadingRule,
 docs/decisions/0021, 2026-11-15), listed, changed and deleted. A change
-reads every name with that number again, and is refused, naming them, if
+reads every name with that unit after a number again, and is refused, naming them, if
 two names would then read alike. And the seeding page, which proposes
 rules from every name saved (reading_rules.propose), to accept all at
 once, change any first, or review one by one (Ali, 2026-11-15)."""
@@ -39,6 +39,7 @@ SEED = f"{READINGS}/seed"
 # The seeding page's field for each token's reading: this, then the token.
 PROPOSED = "reading:"
 CHOOSE = "Choose how to read each one marked “Choose…” first."
+CHOOSE_ONE = "Choose one of the readings offered."
 # What a form sends for "not a unit".
 NOT_A_UNIT = "none"
 TABLES = {"item": "item", "item_package": "package", "item_alias": "alias"}
@@ -66,11 +67,13 @@ def chosen_rule(
 
 
 def offered(token: str, rule: units.Rule) -> tuple[units.Reading, ...]:
-    """The readings a rule's token may be given (units.Found.offered): its
-    plausible ones, and the rule's."""
-    found = units.found_in(token, {token: rule})
-    # None for a token no name could hold.
-    return found[0].offered if found else ()
+    """The readings a rule's unit may be given: every one it spells
+    (units.readings), whatever the number, and the rule's."""
+    every = [reading for reading, _ in units.readings(token)]
+    ruled = units.reading_of(rule.reading) if rule.reading else None
+    if ruled is not None and ruled not in every:
+        every.append(ruled)
+    return tuple(every)
 
 
 def read_alike_words(groups: Sequence[Sequence[items.Named]]) -> list[str]:
@@ -109,6 +112,7 @@ def _rule_page(
     *,
     alert: str | None = None,
     read_alike: Sequence[str] = (),
+    problem: str | None = None,
 ) -> HTMLResponse:
     return admin_page(
         request,
@@ -123,8 +127,9 @@ def _rule_page(
             "not_a_unit": NOT_A_UNIT,
             "alert": alert,
             "read_alike": read_alike,
+            "problem": problem,
         },
-        409 if alert or read_alike else None,
+        409 if alert or read_alike else 400 if problem else None,
     )
 
 
@@ -185,7 +190,7 @@ def save_reading(
     offers = offered(found.token, found.rule)
     change = chosen_rule(reading, offers, respell=respell == "on")
     if change is None:
-        return _rule_page(request, session, signed, found)
+        return _rule_page(request, session, signed, found, problem=CHOOSE_ONE)
     seen = form_version(version)
     _, broken = refusal(
         session,
@@ -204,13 +209,21 @@ def save_reading(
 
 @router.post(f"{READINGS}/{{rule_id:int}}/delete")
 def delete_reading(
-    request: Request, signed: AdminSignedIn, session: DbSession, rule_id: int
+    request: Request,
+    signed: AdminSignedIn,
+    session: DbSession,
+    rule_id: int,
+    version: Annotated[str, Form()] = "",
 ) -> Response:
     found = session.get(ReadingRule, rule_id)
     if found is None:
         return not_found()
+    seen = form_version(version)
     _, broken = refusal(
-        session, lambda: reading_rules.delete(session, found), items.READ_ALIKE
+        session,
+        lambda: reading_rules.delete(session, found, seen=seen),
+        items.READ_ALIKE,
+        *ALERTS,
     )
     if broken is not None:
         return _refused(request, session, signed, found, broken, None)
@@ -263,7 +276,7 @@ def seed(
     one: str = "",
     at: str = "",
 ) -> Response:
-    """Every number and unit no rule settles, proposed: all, or one by one
+    """Every unit after a number no rule settles, proposed: all, or one by one
     from `at`."""
     first = whole(at, 0, INTEGER_MAX) or 0
     return _seed_page(request, session, signed, one=bool(one), at=first)

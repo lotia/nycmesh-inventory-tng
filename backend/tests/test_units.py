@@ -156,7 +156,9 @@ def test_writes_the_table(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> No
     json.loads(VECTORS.read_text(encoding="utf-8"))["vectors"]
     if VECTORS.exists()
     else [],
-    ids=lambda vector: vector["text"],
+    ids=lambda vector: " ".join(
+        [vector["text"], *(f"{k}={v}" for k, v in vector.get("rules", {}).items())]
+    ),
 )
 def test_the_server_and_the_scan_page_read_units_alike(vector: dict[str, Any]) -> None:
     """units-vectors.json, which the scan page's tests read too, its
@@ -306,17 +308,16 @@ def test_a_name_is_saved_as_typed_and_its_units_read(typed: str, shown: str) -> 
     assert found.read is not None
     assert f"{found.shown(found.read)} · {found.read.unit.kind}" == shown
     assert units.spell(typed, [found]) == typed
-    # Searched alike, but a bare K, which search reads as kelvins.
-    if found.token != "K":
-        assert fold(units.read_as(typed)).lower() == fold(typed).lower()
+    # Searched alike: search reads the profile too (option D).
+    assert fold(units.read_as(typed)).lower() == fold(typed).lower()
 
 
 def test_a_rule_respelling_a_unit_spells_the_name_by_its_symbol() -> None:
     """Saved as typed, unless its reading rule says to respell it."""
-    rules = {"305M": units.Rule("m", respell=True), "10G": units.Rule("Gbit/s")}
-    typed = "Spool 305 M, SFP+ 10G"
+    rules = {"M": units.Rule("m", respell=True), "G": units.Rule("Gbit/s")}
+    typed = "Tape 305 M, Box 10G"
     found = units.found_in(typed, rules)
-    assert units.spell(typed, found) == "Spool 305m, SFP+ 10G"
+    assert units.spell(typed, found) == "Tape 305m, Box 10G"
 
 
 @pytest.mark.parametrize(
@@ -326,6 +327,8 @@ def test_a_rule_respelling_a_unit_spells_the_name_by_its_symbol() -> None:
         "Cat6a cable",
         "Cable Cat 6a, outdoor",
         "Patch Cat5e 2 m",
+        "Patch Cat-6a 2 m",
+        "Cat6a-patch",
         "Adapter 2-in-1",
         "2 g\u00e2teaux",
     ],
@@ -333,23 +336,40 @@ def test_a_rule_respelling_a_unit_spells_the_name_by_its_symbol() -> None:
 def test_a_product_is_never_read_as_a_unit(typed: str) -> None:
     """Cat6a is no 6 amperes, 5AC nothing (Ali, 2026-11-15, the product
     list); a unit after it still is."""
-    assert [f.key for f in units.found_in(typed)] == (
+    assert [f.typed for f in units.found_in(typed)] == (
         ["2m"] if typed.endswith("2 m") else []
     )
+    # Nor by search, as the forms do not.
+    assert units.respell(typed).startswith(typed.removesuffix(" 2 m"))
 
 
-def test_a_bare_g_m_or_k_may_be_a_data_rate_and_asks() -> None:
-    """10G may be 10 Gbps or 10 grams, 3M 3 Mbps or 3 metres: nothing
-    settles either, so a form asks, data rates first (the profile)."""
+def test_a_bare_g_m_or_k_may_be_a_data_rate() -> None:
+    """Ali, 2026-11-15 (option D): 10G is 10 Gbps and 4 K 4 kbps without
+    asking, the profile ranking grams and kelvins below; 3M may be 3 Mbps
+    or 3 meters, both ranked high, and 10g 10 Gbps or 10 grams, never
+    silently grams: the words near it decide, else a form asks, offering
+    data rates first, each by its unit in words, a data rate so."""
+    for typed, expected in (("Box 10G", "Gbit/s"), ("Hub 4 K", "kbit/s")):
+        (found,) = units.found_in(typed)
+        assert (str(found.read), found.asks) == (expected, False), typed
     for typed, offered in (
-        ("SFP+ 10G", ["10Gbps · data rate", "10g · mass"]),
-        ("Tape 3M", ["3Mbps · data rate", "3m · length"]),
-        ("Switch 100 M", ["100Mbps · data rate", "100m · length"]),
+        ("Tape 3M", ["3Mbps · data rate", "3m · meters"]),
+        ("Box 100 M", ["100Mbps · data rate", "100m · meters"]),
+        ("Box 10g", ["10Gbps · data rate", "10g · grams"]),
     ):
         (found,) = units.found_in(typed)
         assert found.asks, typed
-        said = [f"{found.shown(r)} · {r.unit.kind}" for r in found.offered]
+        said = [f"{found.shown(r)} · {r.called}" for r in found.offered]
         assert said == offered
+    for typed, expected in (
+        ("Switch 100 M", "Mbit/s"),
+        ("Spool 305M", "m"),
+        ("SFP 10g", "Gbit/s"),
+        ("Thermal paste 10g", "g"),
+        ("Grease 500 g", "g"),
+    ):
+        (found,) = units.found_in(typed)
+        assert (str(found.read), found.asks) == (expected, False), typed
     assert units.PROFILE[0] == "data rate"
     assert units.PROFILE[-1] == "mass"
     assert set(units.PROFILE) == set(KINDS)
@@ -357,25 +377,22 @@ def test_a_bare_g_m_or_k_may_be_a_data_rate_and_asks() -> None:
 
 def test_case_asks_only_between_two_plausible_readings() -> None:
     """5 MG may be megagrams or milligrams, both likely sizes, and neither
-    spelt as typed: asked, by the number and token as typed; a rule
-    settles it."""
+    spelt as typed: asked, by the token as typed; one rule settles it
+    after every number."""
     typed = "Weights 5 MG, 10 MG"
     asked = [each for each in units.found_in(typed) if each.asks]
     assert [(each.number, each.token, each.key) for each in asked] == [
-        ("5", "MG", "5MG"),
-        ("10", "MG", "10MG"),
+        ("5", "MG", "MG"),
+        ("10", "MG", "MG"),
     ]
     assert [str(r) for r in asked[0].plausible] == ["Mg", "mg"]
     assert [r.named for r in asked[0].plausible] == ["megagrams", "milligrams"]
-    rules = {"5MG": units.Rule("mg"), "10MG": units.Rule(None)}
-    first, second = units.found_in(typed, rules)
-    assert (str(first.read), first.asks) == ("mg", False)
-    assert (second.read, second.asks, second.offered) == (
-        None,
-        False,
-        asked[1].plausible,
-    )
-    assert units.read_as(typed, rules) == "Weights 5mg, 10 MG"
+    first, second = units.found_in(typed, {"MG": units.Rule("mg")})
+    assert (str(first.read), first.asks, str(second.read)) == ("mg", False, "mg")
+    assert units.read_as(typed, {"MG": units.Rule("mg")}) == "Weights 5mg, 10mg"
+    (none, _) = units.found_in(typed, {"MG": units.Rule(None)})
+    assert (none.read, none.asks, none.offered) == (None, False, asked[0].plausible)
+    assert units.read_as(typed, {"MG": units.Rule(None)}) == typed
 
 
 def test_every_reading_is_shown_and_named_and_read_back_as_itself() -> None:
@@ -390,4 +407,10 @@ def test_every_reading_is_shown_and_named_and_read_back_as_itself() -> None:
         assert "{" not in reading.named
     cubic = read("km3")
     assert cubic is not None
-    assert cubic.named == "cubic kilometres"
+    assert cubic.named == "cubic kilometers"
+    # In US spelling, as the app follows US conventions (inventory-tng-g6u).
+    assert [getattr(read(t), "named", None) for t in ("mL", "t", "m")] == [
+        "milliliters",
+        "metric tons",
+        "meters",
+    ]

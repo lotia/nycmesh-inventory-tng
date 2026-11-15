@@ -92,11 +92,12 @@ def reading_rule(world: World) -> None:
 
 
 def unsettled_unit(world: World) -> None:
-    """An item more whose name has a number and unit no rule settles."""
+    """An item more whose name has a unit after a number no rule or word
+    near it settles."""
     session = world.session
     spools = world.spools
     count = session.scalar(select(func.count()).select_from(Item))
-    add(session, Item(name=f"Uplink {count}0G", category_id=spools.cable.category_id))
+    add(session, Item(name=f"Box {count}0g", category_id=spools.cable.category_id))
 
 
 def over_recorded_line(world: World) -> None:

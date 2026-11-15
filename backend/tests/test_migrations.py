@@ -420,7 +420,7 @@ def test_what_is_searched_is_kept_as_typed_too(alembic_config: Config) -> None:
         retired_at=datetime.now(UTC),
     )
     reel = row("item_package", "Reel 305 m", item_id=cable, size=1)
-    command.upgrade(alembic_config, "head")
+    command.upgrade(alembic_config, "0039")
     assert connection.execute(
         text("SELECT search_text, name_folded, folded_with FROM item")
     ).one() == ("Cable 100 feet Cable 100ft    Patch 2 in 1", "kept", FOLDED_WITH)
@@ -631,6 +631,140 @@ def test_going_back_before_name_keys_names_what_would_clash(
     )
     command.downgrade(alembic_config, "0036")
     command.upgrade(alembic_config, "head")
+
+
+def test_what_is_searched_reads_units_as_the_forms_do(alembic_config: Config) -> None:
+    """Migration 0043: every row folded again as search now reads units, as
+    the forms do (option D): 10G as Gbps, Cat6a no unit, an item's and a
+    package's G by the reading rules there are, a place's not; items' and
+    aliases' name_folded too."""
+    command.downgrade(alembic_config, "0042")
+    connection = alembic_config.attributes["connection"]
+    category_id = connection.scalar(
+        text("INSERT INTO category (name) VALUES ('Links') RETURNING id")
+    )
+
+    def row(table: str, name: str, **values: object) -> int:
+        values = {"name": name, "name_key": name_key(name), **values}
+        if table != "item_alias":
+            values |= {"search_text": "kept", "folded_with": "kept"}
+        return _insert(connection, table, **values)
+
+    link = row(
+        "item", "Box 10G", category_id=category_id, name_folded="kept", unit_key=""
+    )
+    cat = row("item_alias", "Cat6a 4 K", item_id=link, name_folded="kept", unit_key="")
+    gone = row(
+        "item_alias",
+        "Gone 2 K",
+        item_id=link,
+        name_folded="kept",
+        unit_key="",
+        retired_at=datetime.now(UTC),
+    )
+    reel = row("item_package", "Tape 3M", item_id=link, size=1, unit_key="")
+    place = _insert(
+        connection,
+        "location",
+        name="Rack 10G",
+        kind="store",
+        search_text="kept",
+        folded_with="kept",
+    )
+    _insert(connection, "reading_rule", token="M", reading=None)
+    _insert(connection, "reading_rule", token="G", reading="g")
+    command.upgrade(alembic_config, "0043")
+    assert connection.execute(
+        text("SELECT search_text, name_folded, folded_with FROM item")
+    ).one() == (
+        # Its G grams by the rule, so as typed; its name_folded by none.
+        "Box 10G    Cat6a 4 K Cat6a 4kbit/s",
+        "Box 10Gbit/s",
+        FOLDED_WITH,
+    )
+    # A retired alias folded too, but not searched.
+    assert connection.execute(
+        text("SELECT id, name_folded FROM item_alias ORDER BY id")
+    ).all() == [(cat, "Cat6a 4kbit/s"), (gone, "Gone 2kbit/s")]
+    assert (
+        connection.scalar(
+            text("SELECT search_text FROM item_package WHERE id = :i"), {"i": reel}
+        )
+        == "Tape 3M"
+    )
+    assert (
+        connection.scalar(
+            text("SELECT search_text FROM location WHERE id = :i"), {"i": place}
+        )
+        == "Rack 10G Rack 10Gbit/s"
+    )
+
+
+def test_unit_keys_are_read_again_as_the_forms_read(alembic_config: Config) -> None:
+    """Migration 0043: every unit key read again, by the rules there are;
+    names that would then be one named by id first, nothing changed."""
+    command.downgrade(alembic_config, "0042")
+    connection = alembic_config.attributes["connection"]
+    category_id = connection.scalar(
+        text("INSERT INTO category (name) VALUES ('Links') RETURNING id")
+    )
+
+    def item(name: str, key: str) -> int:
+        return _insert(
+            connection,
+            "item",
+            name=name,
+            name_key=name_key(name),
+            unit_key=key,
+            category_id=category_id,
+            name_folded="",
+            search_text="",
+            folded_with="",
+        )
+
+    box = item("Box 10G", "stale")
+    package = _insert(
+        connection,
+        "item_package",
+        name="Tape 3M",
+        name_key=name_key("Tape 3M"),
+        unit_key="stale",
+        item_id=box,
+        size=1,
+        search_text="",
+        folded_with="",
+    )
+    _insert(connection, "reading_rule", token="M", reading="m")
+
+    def alias(name: str, **values: object) -> int:
+        return _insert(
+            connection,
+            "item_alias",
+            name=name,
+            name_key=name_key(name),
+            unit_key=f"stale {name}",
+            item_id=box,
+            name_folded="",
+            **values,
+        )
+
+    # Retired, it clashes with nothing.
+    alias("Box 10 Gbit/s", retired_at=datetime.now(UTC))
+    command.upgrade(alembic_config, "0043")
+    assert connection.execute(
+        text("SELECT unit_key FROM item UNION ALL SELECT unit_key FROM item_package")
+    ).scalars().all() == ["box10gbits", "tape3m"]
+    assert package
+    command.downgrade(alembic_config, "0042")
+    other = item("Box 10 Gbps", "other")
+    with pytest.raises(RuntimeError) as refused:
+        command.upgrade(alembic_config, "0043")
+    assert f"by id: item {box}, {other}." in str(refused.value)
+    connection.execute(text("DELETE FROM item WHERE id = :i"), {"i": other})
+    current = alias("Box 10 Gbit/s")
+    with pytest.raises(RuntimeError) as refused:
+        command.upgrade(alembic_config, "0043")
+    assert f"by id: item_alias {current} and item {box}." in str(refused.value)
 
 
 def test_unit_keys_are_filled_by_the_migration(alembic_config: Config) -> None:

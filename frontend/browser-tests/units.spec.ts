@@ -3,14 +3,31 @@
  * 2026-11-15, option D): saved as typed; a number and unit nothing settles
  * asked once, inline, the answer kept as a reading rule; under the name,
  * how each is read, with "Not right?" to correct it; and the seeding page,
- * which proposes rules from every name. Each test's number is its own, as
- * rules are kept by the number and unit as typed, for every test at once.
+ * which proposes rules from every name. Rules are kept by the unit as typed
+ * after a number, for every test at once, so each browser's tests read a
+ * unit of their own (UNITS), which no other test's name has.
  */
-import { expect, type Page, test } from "@playwright/test";
+import { expect, type Page, type TestInfo, test } from "@playwright/test";
 import { unique } from "./own";
 
-/** A number no other test, or run of this one, likely has. */
+/** A number for a name, so names the tests make differ. */
 const number = (): number => 100 + Math.floor(Math.random() * 900);
+
+/**
+ * Each browser's units: one the form asks about with no word near it
+ * (a data rate, or not), and one the table reads only loosely, as a
+ * prefix of another case.
+ */
+type Units = { asked: [string, string]; loose: [string, string] };
+const CHROMIUM: Units = {
+  asked: ["g", "Gbps"],
+  loose: ["MF", "mF · capacitance"],
+};
+const UNITS: Record<string, Units> = {
+  chromium: CHROMIUM,
+  webkit: { asked: ["M", "Mbps"], loose: ["MV", "mV · voltage"] },
+};
+const unitsOf = (info: TestInfo): Units => UNITS[info.project.name] ?? CHROMIUM;
 
 /** Fills in a new item named `name`, in Cables, counted each. */
 async function newItem(page: Page, name: string): Promise<void> {
@@ -34,50 +51,55 @@ async function add(page: Page, name: string): Promise<void> {
 
 test("a unit nothing settles is asked once, then said under the name", async ({
   page,
-}) => {
+}, info) => {
+  const [unit, rate] = unitsOf(info).asked;
   const n = number();
-  const name = unique(`Uplink SFP+ ${n}G`);
+  const name = unique(`Box ${n}${unit}`);
   await newItem(page, name);
   await page.getByRole("button", { name: "Add", exact: true }).click();
   const asked = page.getByRole("group", {
-    name: `“${n}G” is new. Is it a unit?`,
+    name: `“${n}${unit}” is new. Is it a unit?`,
   });
   await expect(asked).toBeVisible();
-  await expect(asked.getByLabel(`${n}g · mass`)).toBeVisible();
-  await expect(asked.getByLabel(`Not a unit: keep “${n}G”`)).toBeVisible();
-  await asked.getByLabel(`${n}Gbps · data rate`).check();
+  await expect(
+    asked.getByLabel(`Not a unit: keep “${n}${unit}”`),
+  ).toBeVisible();
+  await asked.getByLabel(`${n}${rate} · data rate`).check();
   await add(page, name);
   // Saved as typed, read as answered.
   await expect(
-    page.getByText(`Read as ${n}Gbps · data rate. Saved as typed.`),
+    page.getByText(`Read as ${n}${rate} · data rate. Saved as typed.`),
   ).toBeVisible();
 
   // Not right? A correction, saved with the item, is the rule now.
   await page.getByText("Not right?").first().click();
-  await page.getByLabel(`Not a unit: keep “${n}G”`).first().check();
+  await page.getByLabel(`Not a unit: keep “${n}${unit}”`).first().check();
   await page.getByRole("button", { name: "Save", exact: true }).first().click();
-  await expect(page.getByText(`“${n}G” is not read as a unit.`)).toBeVisible();
+  await expect(
+    page.getByText(`“${n}${unit}” is not read as a unit.`),
+  ).toBeVisible();
   await page.goto("/admin/unit-readings");
-  const row = page.getByRole("row", { name: new RegExp(`^${n}G `) });
+  const row = page.getByRole("row", { name: new RegExp(`^${unit} `) });
   await expect(row).toContainText("Not a unit");
 });
 
 test("the seeding page proposes readings, each accepted as a rule", async ({
   page,
-}) => {
-  // Read loosely by the table, as millifarads: proposed so, to confirm.
+}, info) => {
+  // Read loosely by the table: proposed so, to confirm.
+  const [unit, reading] = unitsOf(info).loose;
   const n = number();
-  const name = unique(`Cap ${n}MF`);
+  const name = unique(`Cap ${n}${unit}`);
   await newItem(page, name);
   await add(page, name);
-  await expect(page.getByText(`Read as ${n}mF · capacitance.`)).toBeVisible();
+  await expect(page.getByText(`Read as ${n}${reading}.`)).toBeVisible();
 
   await page.goto("/admin/unit-readings");
   await page
     .getByRole("link", { name: "Propose readings from every name" })
     .click();
-  const read = page.getByLabel(`Read “${n}MF” as`);
-  await expect(read).toHaveValue("mF");
+  const read = page.getByLabel(`Read “${unit}” as`);
+  await expect(read).toHaveValue(reading.split(" ")[0] ?? "");
   await expect(
     page.getByRole("link", { name: "Review one by one" }),
   ).toBeVisible();
@@ -90,9 +112,9 @@ test("the seeding page proposes readings, each accepted as a rule", async ({
   }
   await page.getByRole("button", { name: "Accept all" }).click();
   await expect(page.getByRole("status")).toContainText("Accepted.");
-  await expect(page.getByLabel(`Read “${n}MF” as`)).toHaveCount(0);
+  await expect(page.getByLabel(`Read “${unit}” as`)).toHaveCount(0);
   await page.goto("/admin/unit-readings");
   await expect(
-    page.getByRole("row", { name: new RegExp(`^${n}MF `) }),
+    page.getByRole("row", { name: new RegExp(`^${unit} `) }),
   ).toContainText("Not a unit");
 });

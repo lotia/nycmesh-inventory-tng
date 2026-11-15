@@ -27,7 +27,7 @@ from fastapi.responses import Response
 from fastapi.testclient import TestClient
 from httpx2 import Response as Answer
 from sqlalchemy import Engine, delete, select, text
-from sqlalchemy.exc import OperationalError
+from sqlalchemy.exc import IntegrityError, OperationalError
 from sqlalchemy.orm import Session
 
 from inventory_tng import (
@@ -39,7 +39,9 @@ from inventory_tng import (
     locations,
     mail,
     open_packages,
+    reading_rules,
     sign_in,
+    units,
     volunteers,
 )
 from inventory_tng import catalogue as scan_catalogue
@@ -1064,6 +1066,49 @@ def test_a_name_and_an_alias_the_same_not_both(
 
     first, second = doing(Item, one.id, renaming), doing(Item, other.id, aliasing)
     assert either_first(committed, first, second, swapped=swapped) == refused
+
+
+@pytest.mark.concurrency
+@pytest.mark.parametrize("swapped", [False, True])
+def test_a_name_saved_as_a_rule_changes_never_reads_as_another(
+    committed: Committed, swapped: bool
+) -> None:
+    """A rule reading g as Gbps, and an item named with a g that would then
+    read as another item's name, at once: the second waits for the
+    catalogue lock, then reads what the first committed. The rule is
+    refused (READ_ALIKE), or the name is, by its unit key: never both
+    taken, two names reading alike."""
+    name = tag()
+    category = Category(name=f"Parts {name}")
+    made(committed, category)
+    made(committed, Item(name=f"Box {name} 10 Gbps", category_id=category.id))
+
+    def ruling(session: Session) -> None:
+        reading_rules.decide(session, {"g": units.Rule("Gbit/s")}, None)
+
+    def adding(session: Session) -> None:
+        fields = items.Fields.new(name=f"Box {name} 10g", category_id=category.id)
+        items.add(session, fields)
+
+    first, second = (adding, ruling) if swapped else (ruling, adding)
+    one, two = committed.session(), committed.session()
+    first(one)
+    one.flush()
+
+    def write_second() -> None:
+        second(two)
+        two.flush()
+
+    worker = committed.blocked(two, write_second)
+    one.commit()
+    error = worker.finished().error
+    two.rollback()
+    if swapped:
+        assert isinstance(error, RuleBroken), error
+        assert error.rule == items.READ_ALIKE
+    else:
+        assert isinstance(error, IntegrityError), error
+        assert "uq_item_unit_key" in str(error.orig)
 
 
 def receiving(item: Item, store: Location, amount: str) -> Write:

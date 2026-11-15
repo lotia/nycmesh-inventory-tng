@@ -1,16 +1,17 @@
 {% extends "admin_base.html" %}
 {% from "_table.html" import table %}
-{#- The reading rules: how a number and its unit, as typed, are read
+{#- The reading rules: how a unit, as typed after a number, is read
 (models.ReadingRule, docs/decisions/0021), each changed or deleted on its
 own page. -#}
 {% block main %}
-<p>How a number and its unit, as typed in a name, are read: by searches,
-  here and on the scan page, and by the item forms, before the unit table.
-  Settled as an item's form asks, or corrected here.
+<p>How a unit, as typed after a number in a name, is read where the words
+  near it do not say: by searches, here and on the scan page, and by the
+  item forms, before the unit table. Settled as an item's form asks, or
+  corrected here.
   <a href="{{ here }}/seed">Propose readings from every name</a>.</p>
 <section>
   {% call table() %}
-    <tr><th>Typed</th><th>Read as</th><th>Saved</th><th>Settled by</th><th>When</th></tr>
+    <tr><th>After a number</th><th>Read as</th><th>Saved</th><th>Settled by</th><th>When</th></tr>
     {% for rule, username in rows %}
     {% set reading = reading_of(rule.reading) if rule.reading else none %}
     <tr>

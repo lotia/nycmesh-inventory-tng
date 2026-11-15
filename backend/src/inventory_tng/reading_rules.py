@@ -1,12 +1,11 @@
-"""Reading rules: how a number and its unit, as typed, are read, settled by
+"""Reading rules: how a unit, as typed after a number, is read, settled by
 an administrator (models.ReadingRule, docs/decisions/0021, 2026-11-15):
 every write to the reading_rule table. Each change reads every name with
-that number again (items.reread), and is refused if two names would then
-read alike (items.READ_ALIKE), holding the catalogue lock, as every name's
-write does. The seeding page proposes rules from every name there is
-(propose), by the words near each number and its unit (EVIDENCE)."""
+that unit after a number again (items.reread), and is refused if two names
+would then read alike (items.READ_ALIKE), holding the catalogue lock, as
+every name's write does. The seeding page proposes rules from every name
+there is (propose), by the words near each unit (units.CLUES)."""
 
-import re
 from collections import Counter
 from collections.abc import Iterable, Mapping
 from dataclasses import dataclass, field
@@ -88,72 +87,24 @@ def change(
     items.reread(session, [row.token])
 
 
-def delete(session: Session, row: ReadingRule) -> None:
-    """A rule deleted: its token read by the unit table again, every name
-    with it read so."""
-    relock(session, row)
+def delete(session: Session, row: ReadingRule, *, seen: Seen) -> None:
+    """A rule deleted, unless changed since `seen`: its token read by the
+    unit table again, every name with it read so."""
+    relock(session, row, seen=seen)
     session.delete(row)
     session.flush()
     items.reread(session, [row.token])
 
 
-# Words that, near a number and its unit in a name, say what kind it is
-# (Ali, 2026-11-15): "10G" near "SFP+" or "uplink" is a data rate, "305M"
-# near "spool" a length. Compared in lower case.
-EVIDENCE: dict[str, frozenset[str]] = {
-    "data rate": frozenset(
-        (
-            "sfp",
-            "sfp+",
-            "qsfp",
-            "switch",
-            "uplink",
-            "port",
-            "ports",
-            "ethernet",
-            "router",
-            "transceiver",
-            "nic",
-            "lan",
-            "wan",
-            "link",
-            "gbe",
-            "fiber",
-            "fibre",
-            "backhaul",
-        )
-    ),
-    "length": frozenset(
-        (
-            "spool",
-            "cable",
-            "cord",
-            "wire",
-            "reel",
-            "roll",
-            "drop",
-            "patch",
-            "conduit",
-            "jumper",
-            "pigtail",
-            "rope",
-        )
-    ),
-    "gain": frozenset(("antenna", "dish", "sector", "omni", "horn")),
-    "voltage": frozenset(("battery", "psu", "supply", "adapter", "injector")),
-    "mass": frozenset(("weight", "weighs")),
-}
-_WORDS = re.compile(r"[A-Za-z][A-Za-z+]*")
-
-
 @dataclass
 class Proposal:
-    """A number and its unit as typed that no rule settles, in the names
-    there are, and how the seeding page proposes to read it: `found`, as
-    first found; how many names have it, a few of them, and the words
-    near it that say a kind (`near`, each with how many names have it);
-    and the reading proposed, if anything settles one, with why. Unsettled,
-    an administrator chooses."""
+    """A unit as typed after a number (units.rule_key) that no rule settles
+    and some name needs settled, and how the seeding page proposes to read
+    it: `found`, as first found; how many names need it, a few of them; the
+    kinds the words near it say in the names where they settle it
+    (`near`, each clue word with how many names have it); and the reading
+    proposed, if anything settles one, with why. Unsettled, an
+    administrator chooses."""
 
     found: units.Found
     count: int = 0
@@ -168,29 +119,27 @@ EXAMPLES = 3
 
 
 def propose(names: Iterable[str], rules: units.Rules) -> list[Proposal]:
-    """What the seeding page proposes, by token as typed (units.rule_key):
-    each number and unit in `names` no rule settles that the form would ask
-    about, or that the table reads only in another case or by the profile
-    (units.readings); proposed by the kind the words near it say, else by
-    the table's one likely reading. Most names first."""
+    """What the seeding page proposes, by unit as typed (units.rule_key):
+    each in `names` no rule settles, where the form would ask, or the table
+    reads it only in another case or by the profile (units.readings), but
+    not where the words near it settle it (units.CLUES), as those names
+    need no rule; proposed by the kind the words near it say in those
+    names, else by the profile's reading. Most names first."""
     found: dict[str, Proposal] = {}
+    clued: dict[str, Counter[str]] = {}
     for name in names:
-        words = {word.lower() for word in _WORDS.findall(name)}
         for each in units.found_in(name, rules):
+            if each.clue:
+                clued.setdefault(each.key, Counter()).update(each.clue)
+                continue
             if each.rule is not None or not (each.asks or _loose(each)):
                 continue
             proposal = found.setdefault(each.key, Proposal(each))
             proposal.count += 1
             if len(proposal.names) < EXAMPLES:
                 proposal.names.append(name)
-            kinds = {reading.unit.kind for reading in each.offered}
-            proposal.near.update(
-                word
-                for word in words
-                for kind in kinds
-                if word in EVIDENCE.get(kind, ())
-            )
-    for proposal in found.values():
+    for key, proposal in found.items():
+        proposal.near = clued.get(key, Counter())
         _settle(proposal)
     return sorted(found.values(), key=lambda p: (-p.count, p.found.key))
 
@@ -202,26 +151,24 @@ def _loose(found: units.Found) -> bool:
     )
 
 
+def _clues(reading: units.Reading) -> frozenset[str]:
+    return units.CLUES.get(reading.unit.kind, frozenset())
+
+
 def _settle(proposal: Proposal) -> None:
-    """The reading the words near it say, the profile's first among those
-    as near; else the one the table reads it as."""
+    """The reading the words near it say most often where they settle it,
+    the profile's first among those as often; else the one it is read as."""
     scores = {
         reading: sum(
-            count
-            for word, count in proposal.near.items()
-            if word in EVIDENCE.get(reading.unit.kind, ())
+            count for word, count in proposal.near.items() if word in _clues(reading)
         )
         for reading in proposal.found.offered
     }
     best = max(scores.values(), default=0)
     if best > 0:
         proposal.proposed = next(r for r, score in scores.items() if score == best)
-        words = sorted(
-            word
-            for word in proposal.near
-            if word in EVIDENCE.get(proposal.proposed.unit.kind, ())
-        )
-        proposal.why = "near " + ", ".join(words)
+        words = sorted(w for w in proposal.near if w in _clues(proposal.proposed))
+        proposal.why = "elsewhere near " + ", ".join(words)
     elif proposal.found.read is not None:
         proposal.proposed = proposal.found.read
         proposal.why = "the one likely reading"
