@@ -1,10 +1,10 @@
 /**
  * How a name's units are read on the item forms (docs/decisions/0021, Ali,
- * 2026-11-15, option D): saved as typed; a number and unit nothing settles
- * asked once, inline, the answer kept as a reading rule; under the name,
- * how each is read, with "Not right?" to correct it; and the seeding page,
- * which proposes rules from every name. Rules are kept by the unit as typed
- * after a number, for every test at once, so each browser's tests read a
+ * 2026-11-15, inventory-tng-c0c.3): saved as typed; a number and unit nothing
+ * settles asked once, inline, the answer kept as a reading rule; under the
+ * name, how each is read, with "Not right?" to correct it; and the seeding
+ * page, which proposes rules from every name. Rules are kept by the unit as
+ * typed after a number, for every test at once, so each browser's tests read a
  * unit of their own (UNITS), which no other test's name has; each starts by
  * deleting its unit's rule, if a run before left one (forget), and accepts
  * only its own proposal, so none settles another's.

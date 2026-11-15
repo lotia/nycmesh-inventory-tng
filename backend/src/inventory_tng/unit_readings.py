@@ -1,4 +1,4 @@
-"""The import's readings file (docs/decisions/0021, Ali's Q5-A,
+"""The import's readings file (docs/decisions/0021, Ali, 2026-11-12,
 inventory-tng-c0c.5): how each unit typed after a number in the names an
 import brings is read, proposed in a file the operator corrects once and
 keeps, then loaded into the reading_rule table, the first rules a new

@@ -278,7 +278,7 @@ inventory-tng-c0c.4's.
 ## Amendment: items have aliases, taken as names are (2026-11-14)
 
 An item may have aliases: other names it is found by, such as one it was
-known by (Ali, 2026-11-12, inventory-tng-c0c, Q6-A; built in
+known by (Ali, 2026-11-12, inventory-tng-c0c; built in
 inventory-tng-c0c.6). An administrator adds and removes them on the item's
 page, typed and stored as a name is: in canonical spelling, each unit
 after a number spelt by its symbol, asked about where its case leaves two
@@ -310,7 +310,7 @@ the survivor's aliases, does not exist yet.
 
 Search keeps each searched field folded twice where the two differ: as
 typed, its units as they are, and with its units respelt, and matches what
-is typed both ways (Ali, 2026-11-15, inventory-tng-c0c.2, Q10 C). So every
+is typed both ways (Ali, 2026-11-15, inventory-tng-c0c.2). So every
 search that found something before units were read still does, and the
 unit matches above are added: `feet` finds `Cable 100 feet`, as `100 ft`
 does; `48 V` finds `48 VDC`; `2.5 mm` finds `2.5 mm²`; and on the scan
@@ -323,17 +323,18 @@ A search mixing the two, such as `100 ft 48 V` for `100 feet 48 VDC`, is
 matched group by group as well (below). Two spellings, not every spelling,
 so the rejection above stands.
 
-A unit's word (`inch`, `feet`, `volts`, `watt`, `amps` and the like) is
-read only by search, never to spell a name (Q14 A), and `in` is no unit,
-as it is a word more often than an inch: an inch is read by its words and
-by its UCUM code, `[in_i]`, its symbol in what search compares. A lone `Ω`
-or `ω` is read as ohms, as above (Q11 A).
+A unit's word (`inch`, `feet`, `volts`, `watt`, `amps` and the like) is read
+only by search, never to spell a name (Ali, 2026-11-15, inventory-tng-c0c.2),
+and `in` is no unit, as it is a word more often than an inch: an inch is read
+by its words and by its UCUM code, `[in_i]`, its symbol in what search
+compares. A lone `Ω` or `ω` is read as ohms, as above (Ali, 2026-11-15,
+inventory-tng-c0c.2).
 
 ## Amendment: look-alike spaces, quotes and dashes clash (2026-11-15)
 
 A name's key reads a space, quote or dash that looks like ASCII's as
 ASCII's, before leaving spaces and punctuation out (Ali, 2026-11-15,
-inventory-tng-6sb, Q12 A): every Unicode space (a non-breaking one, a thin
+inventory-tng-6sb): every Unicode space (a non-breaking one, a thin
 one), curly and other apostrophes and quotes, primes, and en and em
 dashes, the minus sign and other hyphens. So `Tough cable` pasted with a
 non-breaking space, or `Ubiquiti’s` with a curly apostrophe, clashes with
@@ -350,13 +351,13 @@ naming by id first any names it would make one, an alias and an item's
 name included.
 
 A name with no letter or number is refused with "A name needs at least one
-letter or number." (Q16 A).
+letter or number." (Ali, 2026-11-15, inventory-tng-6sb).
 
 ## Amendment: a rename keeps the old name as an alias (2026-11-15)
 
 Renaming an item keeps its old name as an alias, so a search for it still
 finds the item; the administrator may remove it (Ali, 2026-11-15,
-inventory-tng-c0c.6, Q17 A). Renaming an item to one of its own aliases
+inventory-tng-c0c.6). Renaming an item to one of its own aliases
 swaps the two: the alias is removed and the old name becomes one, where
 before the rename was refused. A name only respelt, its key the same,
 keeps nothing. Both are part of the save, so a save refused for any field
@@ -369,8 +370,8 @@ whose current aliases are close, saying which alias (`items.similar`):
 each item once, by its name where that is as close. Each alias keeps its
 name folded (`name_folded`, migration 0041), as an item does.
 
-Merging items is its own decision (inventory-tng-2f1), the merged item's
-name then moving to the survivor as an alias (Q18).
+Merging items is its own decision (inventory-tng-2f1), the merged item's name
+then moving to the survivor as an alias (Ali, 2026-11-15, inventory-tng-c0c.6).
 
 ## Amendment: reading rules, and names that read alike are one (2026-11-15)
 
@@ -414,7 +415,7 @@ function reading the unit table (0016), and keying rules by the unit alone
 
 A name is saved as typed, in canonical spelling: a reading changes what
 search matches and how names are compared, not the name (Ali, 2026-11-15,
-inventory-tng-c0c.3, option D). This replaces respelling each unit by its
+inventory-tng-c0c.3). This replaces respelling each unit by its
 symbol (2026-11-14, above), which changed names silently: `SFP+ 10G` was
 saved as `SFP+ 10g`, read as grams. A name is respelt only where its
 reading rule says so (`respell`, set on the rule's page).
@@ -441,14 +442,15 @@ length` and `Not a unit: keep "3M"`), only kinds this inventory uses
 offered: `24P`, which none reads, is simply no unit. Where one reading
 alone is likely, it is taken, and said, as `4 K` is 4 kbps, kelvins being
 unlikely. A reading is written by its usual printed symbol: data rates as
-`bps`, `Mbps`, `Gbps`, and `m³` (Q15). Corrections are made in three
+`bps`, `Mbps`, `Gbps`, and `m³`. Corrections are made in three
 places, the seeding page, the form and the rules page, and each reads every
 name with that spelling again. Search still reads a bare `K` as kelvins
 where no rule says otherwise: the profile is the forms'.
 
 ## Amendment: rules kept by the unit, and search reads as the forms do (2026-11-15)
 
-Ali's option D, its mockups and text, decided the implement stage's
+Ali's choice above, that names are saved as typed and units read by
+rules, with the wording Ali gave for it, settled the implement stage's
 questions (2026-11-15, inventory-tng-c0c.3 and c0c.4), and Ali added a
 seventh the same day. This replaces, above, keeping a rule by its number
 and unit (`305M`) and search not reading the profile.
@@ -508,15 +510,15 @@ eight groups (`units.GROUPS_MAX`) is matched whole only.
 Both sides find a row holding a whole form, as before, so typos are still
 forgiven, or one holding every group, each as typed or respelt, groups
 perhaps in different fields. On the server, a row holding a whole form
-ranks first, then one holding every group, then one only close (Q1 A):
+ranks first, then one holding every group, then one only close:
 `100 ft 48 V` lists `PoE cable 100 ft 48 V`, then `Cable 100 feet, PoE 48
 VDC`, then `Antenna, 1000 FT, 48A`. The scan page lists what it finds in
 catalogue order, as before.
 
 Search also reads `VDC` and `VAC`, in any case, after a number as volts,
 and a number before a unit it reads without its thousands separators, so
-`1000 ft`, `1,000 ft` and `1 000 ft` (a thin space too) find each other
-(Q2 C). Both are search's only: no name is respelt by them, nor its key
+`1000 ft`, `1,000 ft` and `1 000 ft` (a thin space too) find each other.
+Both are search's only: no name is respelt by them, nor its key
 read so. Units version 4; migration 0046 folded every row again.
 
 Accepted misreading (review, 2026-11-15): as a plain space groups
@@ -571,7 +573,7 @@ its packages' and its aliases' fields hold the name as typed.
 ## Amendment: the import's readings file (2026-11-14)
 
 An import starts with no reading rules, and its readings are settled
-before it writes a name (Ali, 2026-11-12, Q5-A, inventory-tng-c0c.5). An
+before it writes a name (Ali, 2026-11-12, inventory-tng-c0c.5). An
 operator command, `unit_readings`, writes the dry run's readings to a
 file: one row per unit as typed after a number that the seeding page
 would propose, with the same proposal and evidence (the reading proposed

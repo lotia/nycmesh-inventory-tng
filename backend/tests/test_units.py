@@ -195,7 +195,7 @@ def test_the_server_and_the_scan_page_group_a_search_alike(
 
 
 def test_search_reads_vdc_and_thousands_but_never_in_a_name() -> None:
-    """Ali, 2026-11-15 (inventory-tng-ist.1, Q2 C): VDC and VAC are volts
+    """Ali, 2026-11-15 (inventory-tng-ist.1): VDC and VAC are volts
     and `1,000 ft`, `1 000 ft` and `1000 ft` one, to search only; a name
     is never respelt so, nor its key read so."""
     assert fold("48 VDC 24 vac 1,000 ft 1\N{THIN SPACE}000 ft") == (
@@ -243,8 +243,9 @@ def test_each_field_is_read_alone() -> None:
 
 
 def test_each_field_is_kept_as_typed_and_respelt_where_they_differ() -> None:
-    """Ali, 2026-11-15 (Q10 C): what search keeps of a field, and what it
-    matches of a search, is its fold as typed, then respelt if that differs."""
+    """Ali, 2026-11-15 (inventory-tng-c0c.2): what search keeps of a field, and
+    what it matches of a search, is its fold as typed, then respelt if that
+    differs."""
     assert folds("Cable 100 feet") == ("Cable 100 feet", "Cable 100ft")
     assert folds("Cap 10 µF") == ("Cap 10 mF", "Cap 10uF")
     assert folds("Spool 305m") == ("Spool 305m",)
@@ -254,8 +255,8 @@ def test_each_field_is_kept_as_typed_and_respelt_where_they_differ() -> None:
 
 
 def test_in_is_no_unit_and_words_never_spell_a_name() -> None:
-    """Ali, 2026-11-15 (Q14 A): "in" is a word, not an inch; a unit's word
-    ("feet", "volts") is read by search, never to spell a name."""
+    """Ali, 2026-11-15 (inventory-tng-c0c.2): "in" is a word, not an inch; a
+    unit's word ("feet", "volts") is read by search, never to spell a name."""
     assert read("in") is None
     assert fold("2 in 1, 6 in") == "2 in 1, 6 in"
     assert fold("6 inch 6 inches 6 [in_i]") == "6[in_i] 6[in_i] 6[in_i]"
@@ -268,9 +269,9 @@ def test_in_is_no_unit_and_words_never_spell_a_name() -> None:
 def test_what_was_found_before_units_were_read_still_is(
     admin_client: TestClient, session: Session
 ) -> None:
-    """Ali, 2026-11-15 (Q10 C): a unit's word alone, a unit typed shorter
-    than a token not one, and a unit half typed find what they found before
-    units were read; and a unit spelt otherwise finds it too."""
+    """Ali, 2026-11-15 (inventory-tng-c0c.2): a unit's word alone, a unit typed
+    shorter than a token not one, and a unit half typed find what they found
+    before units were read; and a unit spelt otherwise finds it too."""
     parts = add(session, Category(name=f"Parts {tag()}"))
     for name, typed in (
         ("Cable 100 feet", ("feet", "100 feet", "100 ft", "100ft")),
@@ -288,7 +289,7 @@ def test_what_was_found_before_units_were_read_still_is(
 def test_a_search_mixing_spellings_is_matched_group_by_group(
     admin_client: TestClient, session: Session
 ) -> None:
-    """Ali, 2026-11-15 (inventory-tng-ist.1, Q1 A): a row holding every
+    """Ali, 2026-11-15 (inventory-tng-ist.1): a row holding every
     group of a search, each as typed or respelt, is found, and ranks below
     one holding the search whole and above one only close to it."""
     parts = add(session, Category(name=f"Parts {tag()}"))
@@ -322,7 +323,7 @@ def test_a_search_mixing_spellings_is_matched_group_by_group(
 def test_a_search_finds_thousands_and_vdc_however_written(
     admin_client: TestClient, session: Session
 ) -> None:
-    """Ali, 2026-11-15 (inventory-tng-ist.1, Q2 C)."""
+    """Ali, 2026-11-15 (inventory-tng-ist.1)."""
     parts = add(session, Category(name=f"Parts {tag()}"))
     for name, typed in (
         ("Spool 1000 FT", ("1,000 ft", "1 000 ft", "1\N{THIN SPACE}000 ft")),
@@ -387,7 +388,7 @@ def test_a_unit_ends_where_a_letter_or_digit_of_any_script_does_not_follow() -> 
         ("Box 1,000 ft", "1,000ft · length"),
         ("Tank 2 m3", "2m\u00b3 · volume"),
         ("Radio 100 mhz", "100MHz · frequency"),
-        # Data rates as printed (Q15).
+        # Data rates as printed.
         ("Link 1 Gbps", "1Gbps · data rate"),
         ("Link 1Gbit/s", "1Gbps · data rate"),
         # Megafarads are not likely, millifarads are.
@@ -395,19 +396,19 @@ def test_a_unit_ends_where_a_letter_or_digit_of_any_script_does_not_follow() -> 
         # Both likely, but spelt as typed, so not asked.
         ("Pill 5 mg", "5mg · mass"),
         ("Resistor 10 MOhm", "10M\u03a9 · resistance"),
-        # No kelvins likely (-269 °C); a bare K is a data rate (option D).
+        # No kelvins likely (-269 °C); a bare K is a data rate.
         ("Hub 4 K", "4kbps · data rate"),
     ],
 )
 def test_a_name_is_saved_as_typed_and_its_units_read(typed: str, shown: str) -> None:
-    """Ali, 2026-11-15 (option D): a reading changes what search matches,
-    not the name; each said as its symbol joined to its number, and its
-    kind."""
+    """Ali, 2026-11-15 (inventory-tng-c0c.3): a reading changes what search
+    matches, not the name; each said as its symbol joined to its number, and
+    its kind."""
     (found,) = units.found_in(typed)
     assert found.read is not None
     assert f"{found.shown(found.read)} · {found.read.unit.kind}" == shown
     assert units.spell(typed, [found]) == typed
-    # Searched alike: search reads the profile too (option D).
+    # Searched alike: search reads the profile too.
     assert fold(units.read_as(typed)).lower() == fold(typed).lower()
 
 
@@ -443,11 +444,11 @@ def test_a_product_is_never_read_as_a_unit(typed: str) -> None:
 
 
 def test_a_bare_g_m_or_k_may_be_a_data_rate() -> None:
-    """Ali, 2026-11-15 (option D): 10G is 10 Gbps and 4 K 4 kbps without
-    asking, the profile ranking grams and kelvins below; 3M may be 3 Mbps
-    or 3 meters, both ranked high, and 10g 10 Gbps or 10 grams, never
-    silently grams: the words near it decide, else a form asks, offering
-    data rates first, each by its unit in words, a data rate so."""
+    """Ali, 2026-11-15 (inventory-tng-c0c.3): 10G is 10 Gbps and 4 K 4 kbps
+    without asking, the profile ranking grams and kelvins below; 3M may be 3
+    Mbps or 3 meters, both ranked high, and 10g 10 Gbps or 10 grams, never
+    silently grams: the words near it decide, else a form asks, offering data
+    rates first, each by its unit in words, a data rate so."""
     for typed, expected in (("Box 10G", "Gbit/s"), ("Hub 4 K", "kbit/s")):
         (found,) = units.found_in(typed)
         assert (str(found.read), found.asks) == (expected, False), typed

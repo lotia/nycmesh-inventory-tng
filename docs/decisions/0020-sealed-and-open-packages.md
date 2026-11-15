@@ -245,7 +245,7 @@ though spools or boxes of one item behave alike) and per category alone
 
 ## Amendment: an open package on the scan page, and correcting its length (2026-11-12)
 
-Ali reviewed mockups of cutting from an open spool (inventory-tng-ck0).
+Ali reviewed cutting from an open spool (inventory-tng-ck0).
 On the page as built, an open package is one more grey box among the
 sealed and loose ones and easy to miss; the used-up question changes its
 wording silently as the volunteer types; and what an open package shows

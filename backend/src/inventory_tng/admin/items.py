@@ -406,10 +406,10 @@ class Typed:
 
 def _typed_name(session: Session, typed: str, form: Mapping[str, str]) -> Typed:
     """An item's or a package's name as it will be stored: as typed, in
-    canonical spelling (models.CanonicalName), each unit respelt only where
-    its reading rule says (units.spell, Ali, 2026-11-15, option D); the
-    units still to ask about; and how `form` says a unit is read, where
-    that is new: an answer, or a correction of what it was read as."""
+    canonical spelling (models.CanonicalName), each unit respelt only where its
+    reading rule says (units.spell; Ali, 2026-11-15, inventory-tng-c0c.3); the
+    units still to ask about; and how `form` says a unit is read, where that is
+    new: an answer, or a correction of what it was read as."""
     name = canonical(typed.strip())
     rules = rules_held(session)
     answered = {}

@@ -635,7 +635,7 @@ def test_going_back_before_name_keys_names_what_would_clash(
 
 def test_what_is_searched_reads_units_as_the_forms_do(alembic_config: Config) -> None:
     """Migration 0043: every row folded again as search now reads units, as
-    the forms do (option D): 10G as Gbps, Cat6a no unit, an item's and a
+    the forms do: 10G as Gbps, Cat6a no unit, an item's and a
     package's G by the reading rules there are, a place's not; items' and
     aliases' name_folded too."""
     command.downgrade(alembic_config, "0042")

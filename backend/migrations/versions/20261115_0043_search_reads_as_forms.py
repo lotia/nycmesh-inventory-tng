@@ -1,5 +1,5 @@
 """search reads units as the forms do: what is searched folded again
-(inventory-tng-c0c.3, Ali, 2026-11-15, option D)
+(inventory-tng-c0c.3, Ali, 2026-11-15)
 
 Search now reads a unit after a number as an item's form does
 (units.respell, docs/decisions/0021): by the words near it, then its

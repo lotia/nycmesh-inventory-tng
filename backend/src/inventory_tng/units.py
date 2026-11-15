@@ -25,7 +25,7 @@ looked up before the table, wherever a unit after a number is read, by
 search here and on the scan page, and by the forms, always first. Where
 none is and a unit may be several kinds, the words near it in a name
 decide (CLUES), then the profile (PROFILE, LIKELY), on both sides alike
-(Ali, 2026-11-15, option D).
+(Ali, 2026-11-15, inventory-tng-c0c.3).
 """
 
 import json
@@ -44,9 +44,10 @@ from inventory_tng.local_env import CLONE
 # (models.FOLDED_WITH), so those folded before can be folded again, and a
 # test fails until it is raised. 2: each field kept as typed too, and "in"
 # no unit (Ali, 2026-11-15). 3: search reads units as the forms do, by
-# the words near them, the profile and products (option D). 4: search
-# reads VDC and VAC as volts, and a number before a unit without its
-# thousands separators (Ali, 2026-11-15, inventory-tng-ist.1).
+# the words near them, the profile and products (Ali, 2026-11-15,
+# inventory-tng-c0c.3). 4: search reads VDC and VAC as volts, and a
+# number before a unit without its thousands separators (Ali, 2026-11-15,
+# inventory-tng-ist.1).
 VERSION = 4
 
 # The most groups (groups) a search is matched by, each alone; one with more
@@ -229,7 +230,8 @@ NAMES: dict[str, str] = {
     "m3": "cubic {}meters",
     "gal": "US gallons",
 }
-# Data rates as printed: bps, Mbps, Gbps (Ali, 2026-11-15, Q15).
+# Data rates as printed: bps, Mbps, Gbps (Ali, 2026-11-15,
+# inventory-tng-c0c.3).
 SHOWN: dict[str, str] = {
     "degC": "°C",
     "degF": "°F",
@@ -301,8 +303,8 @@ class Reading:
 
     @property
     def called(self) -> str:
-        """What a form's question calls it, as option D's mockups do (Ali,
-        2026-11-15): its unit in words, `meters`, but a data rate so,
+        """What a form's question calls it, as Ali worded it (2026-11-15,
+        inventory-tng-c0c.3): its unit in words, `meters`, but a data rate so,
         `3Mbps · data rate`."""
         return self.unit.kind if self.unit.kind == "data rate" else self.named
 
@@ -381,7 +383,8 @@ type Rules = Mapping[str, Rule]
 def rule_key(token: str) -> str:
     """What a reading rule is kept by: a unit as typed after a number, case
     kept, in canonical spelling (NFC), so one rule reads `10G`, `1G` and
-    `40 G` (Ali, 2026-11-15, option D), and `G` never settles `g`."""
+    `40 G` (Ali, 2026-11-15, inventory-tng-c0c.3), and `G` never settles
+    `g`."""
     return unicodedata.normalize("NFC", token)
 
 
@@ -515,7 +518,7 @@ def groups(text: str, rules: Rules | None = None) -> list[tuple[str, str]]:
 
 
 # How a name an administrator types is read (docs/decisions/0021, Ali,
-# 2026-11-15, option D, inventory-tng-c0c.3): saved as typed, each unit
+# 2026-11-15, inventory-tng-c0c.3): saved as typed, each unit
 # right after a number read by its reading rule, else by the one likely
 # reading the table leaves, else asked once, the answer kept as a rule.
 
@@ -663,7 +666,7 @@ def readings(token: str) -> list[tuple[Reading, bool]]:
     """Every unit `token` spells in any case, each once, a bare G, M or K
     as a data rate too (BARE_RATES), and whether it is spelt so as typed:
     by PROFILE's kinds, those spelt as typed first in each, as a form
-    offers them (option D: `10Gbps · data rate`, then `10g · grams`). `MF`
+    offers them (`10Gbps · data rate`, then `10g · grams`). `MF`
     is megafarads as typed and millifarads otherwise."""
     lower = token.lower()
     found: list[tuple[Reading, bool]] = []
@@ -770,12 +773,12 @@ def _found(
     text: str, match: re.Match[str], rules: Rules | None, number: str | None = None
 ) -> Found | None:
     """The unit AFTER_A_NUMBER found in `text`, as read (Ali, 2026-11-15,
-    option D): by its reading rule, which always wins; else, where several
-    readings are plausible, by the words near it (CLUES), if they say one
-    kind; else by the one plausible reading, the one of a LIKELY kind, or
+    inventory-tng-c0c.3): by its reading rule, which always wins; else, where
+    several readings are plausible, by the words near it (CLUES), if they say
+    one kind; else by the one plausible reading, the one of a LIKELY kind, or
     the one spelt as typed where none is likely. None if it is no unit's
-    spelling and no rule's. Its number is as typed, or `number` where
-    search reads it so (respell: `1 000` as `1000`)."""
+    spelling and no rule's. Its number is as typed, or `number` where search
+    reads it so (respell: `1 000` as `1000`)."""
     number, token = number or _number(text, match.end(1)), match[2]
     rule = (rules or {}).get(rule_key(token))
     every = readings(token)

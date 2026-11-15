@@ -397,7 +397,7 @@ def test_a_package_is_renamed_and_resized_until_it_moves(
     fixed = send(spools.spool, "Spool", "300")
     assert "Its size is fixed" in text(fixed)
     assert send(spools.spool, "Spool 305 m", "305").status_code == 303
-    # Saved as typed (option D, Ali, 2026-11-15).
+    # Saved as typed (Ali, 2026-11-15, inventory-tng-c0c.3).
     assert (spools.spool.name, spools.spool.size) == ("Spool 305 m", 305)
     # A form shown before another's save is refused, as it was changed.
     stale = admin_client.post(
@@ -1029,8 +1029,9 @@ def test_a_too_short_length_refused_as_resized_meanwhile_says_so_beside_it(
 def test_a_name_is_saved_as_typed_and_its_units_said_under_it(
     admin_client: TestClient, session: Session, radios: Category
 ) -> None:
-    """Option D (Ali, 2026-11-15): saved as typed, in canonical spelling;
-    under the name, how each unit is read, with Not right? to correct it."""
+    """Ali, 2026-11-15 (inventory-tng-c0c.3): saved as typed, in canonical
+    spelling; under the name, how each unit is read, with Not right? to correct
+    it."""
     form = {"category_id": str(radios.id), "unit": "each"}
     done = admin_client.post(ITEMS, data=form | {"name": "Cable 305 m, 10 \u00b5F"})
     assert done.status_code == 303
