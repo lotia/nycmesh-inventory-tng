@@ -136,8 +136,10 @@ class OneCounted(NamedTuple):
     and when, the end still to put right, as a sentence starts with each,
     and as its Correct button names it; and the place to count, by id and
     name, and whether it may be counted (ledger.countable). A move's ends
-    are its places; an opening's, both at one place, its forms
-    (form_words; Ali, 2026-11-15, inventory-tng-r5z)."""
+    are its places; an opening's, both at one place, its forms: "Sealed
+    Spool" where it left, "Open Spool" or "Loose Screws" where it arrived,
+    the names as the administrators gave them (Ali, 2026-11-15,
+    inventory-tng-r5z)."""
 
     counted: str
     on: datetime
@@ -192,17 +194,6 @@ def amount_words(
     return f"{amount(quantity)}{after}"
 
 
-def form_words(item: str, package: str | None, form: ledger.Form) -> str:
-    """An opening's end, as a sentence starts with it: "Sealed Spool" where
-    it left, "Open Spool" or "Loose Screws" where it arrived (the names as
-    the administrators gave them; Ali, 2026-11-15, inventory-tng-r5z)."""
-    if form.package_id is not None:
-        return f"Sealed {package}"
-    if form.open_package_id is not None:
-        return f"Open {package}"
-    return f"Loose {item}"
-
-
 def shown(session: Session, *where: ColumnElement[bool]) -> list[Shown]:
     """The checks waiting that `where` picks, by item name, oldest first:
     one query, however many."""
@@ -215,9 +206,7 @@ def shown(session: Session, *where: ColumnElement[bool]) -> list[Shown]:
             Item.unit,
             ItemPackage.name,
             ItemPackage.size,
-            Movement.from_package_id,
             Movement.from_open_package_id,
-            Movement.to_package_id,
             Movement.to_open_package_id,
             Movement.quantity,
             LedgerTransaction.id,
@@ -265,9 +254,7 @@ def shown(session: Session, *where: ColumnElement[bool]) -> list[Shown]:
         unit,
         package,
         size,
-        from_package,
         from_open,
-        to_package,
         to_open,
         held,
         transaction_id,
@@ -293,22 +280,24 @@ def shown(session: Session, *where: ColumnElement[bool]) -> list[Shown]:
             and (left_on is None) != (arrived_on is None)
         ):
             if kind == "open":
-                left = form_words(item, package, ledger.Form(from_package, from_open))
-                arrived = form_words(item, package, ledger.Form(to_package, to_open))
+                # An opening leaves sealed, and arrives open if its item
+                # tracks opened, else loose (ledger._opening_breaks).
+                left = f"Sealed {package}"
+                arrived = f"Open {package}" if to_open is not None else f"Loose {item}"
             else:
                 left, arrived = from_place or "", to_place or ""
             # The other end's words, and the button's: a form's in the
             # sentence's middle ("Correct open Spool"), a place's as named.
-            counted_end, on, still, still_id, still_place = (
+            counted_end, on, other, still_id, still_place = (
                 (left, left_on, arrived, to_id, to_place)
                 if left_on is not None
                 else (arrived, arrived_on, left, from_id, from_place)
             )
-            correct = still[0].lower() + still[1:] if kind == "open" else still
+            correct = other[0].lower() + other[1:] if kind == "open" else other
             one = OneCounted(
                 counted_end,
                 on,
-                still,
+                other,
                 correct,
                 still_id,
                 still_place or "",
