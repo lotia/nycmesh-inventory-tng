@@ -13,7 +13,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 from structlog.testing import capture_logs
 
-from inventory_tng import ledger, over_recorded
+from inventory_tng import adjustment_reasons, ledger, over_recorded
 from inventory_tng.db import RuleBroken
 from inventory_tng.ledger import Entry, Form, _more_written
 from inventory_tng.models import (
@@ -289,6 +289,21 @@ def test_only_the_lines_less_was_sent_of_are_over() -> None:
     started = [Entry(1, Decimal(100), sealed, sealed), Entry(2, Decimal(1))]
     assert _more_written(written, sent, started) == {1: Decimal(50)}
     assert _more_written(written, sent, None) == {}
+
+
+def test_lines_of_one_item_in_the_same_forms_are_over_once_together() -> None:
+    """Two lines of the same item and forms (a batch may send them) are
+    taken off together: 5 and 5 recorded, started from 5, sent none, is 5
+    over, not 10."""
+    written = {1: Entry(1, Decimal(5)), 2: Entry(1, Decimal(5))}
+    assert _more_written(written, [], [Entry(1, Decimal(5))]) == {1: Decimal(5)}
+    # Started from both, sent 6: 4 over, from the first then the second.
+    started = list(written.values())
+    assert _more_written(written, [Entry(1, Decimal(6))], started) == {1: Decimal(4)}
+    assert _more_written(written, [Entry(1, Decimal(2))], started) == {
+        1: Decimal(5),
+        2: Decimal(3),
+    }
 
 
 def test_a_batch_older_than_the_one_recorded_takes_nothing_off(
@@ -650,6 +665,37 @@ def test_its_count_corrected_adjusts_it_where_it_arrived(
     _, again = counted(admin_client, session, "180", seen="305")
     assert "over_recorded_unchanged" in again.headers["location"]
     assert len(adjustments(session)) == 1
+
+
+def test_its_count_corrected_under_a_key_written_already_says_so(
+    admin_client: TestClient, registered_client: TestClient, session: Session
+) -> None:
+    """The notice says how it was settled, not whether anything new was
+    written: its adjustment's key written already still corrects it."""
+    spools = Spools(session)
+    made = moved_whole(registered_client, spools)
+    (check,) = checks(session)
+    movement = session.get_one(Movement, check.movement_id)
+    transaction = session.get_one(LedgerTransaction, movement.transaction_id)
+    key = uuid.uuid5(transaction.idempotency_key, f"over recorded {check.id} count")
+    admin, _ = new_admin(session, f"ada-{tag()}", totp=False)
+    reason = adjustment_reasons.seeded(session, over_recorded.REASON)
+    written = ledger.record_adjustment(
+        session,
+        key,
+        admin.id,
+        spools.van.id,
+        spools.cable.id,
+        Decimal(125),
+        found=False,
+        reason_id=reason.id,
+        form=Form(open_package_id=made.id),
+    )
+    assert written
+    session.commit()
+    _, response = counted(admin_client, session, "180")
+    assert "over_recorded_count_corrected" in response.headers["location"]
+    assert checks(session)[0].settled_how == "corrected"
 
 
 def test_its_count_raised_is_found_in_it(

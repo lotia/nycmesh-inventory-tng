@@ -165,7 +165,11 @@ def answer(
     over_recorded.measure_settled(how)
     notice = f"over_recorded_{how}"
     if do == "count":
+        # By how it was settled, not by what was written: an adjustment
+        # whose key was written already writes nothing, and still corrects.
         notice = (
-            "over_recorded_count_corrected" if written else "over_recorded_confirmed"
+            "over_recorded_count_corrected"
+            if how == "corrected"
+            else "over_recorded_confirmed"
         )
     return redirect(OVER_RECORDED, notice=notice, **query(only))

@@ -2044,12 +2044,20 @@ def _more_written(
         return by
 
     sent_by, started_by = tally(sent), tally(started)
+    # By form, then shared out over its movements: two lines of one item in
+    # the same forms (a batch may send them) take off what they hold
+    # together, once.
+    left = {
+        form: min(written_quantity, started_by[form]) - sent_by[form]
+        for form, written_quantity in tally(list(written.values())).items()
+    }
     over = {}
     for movement_id, line in written.items():
         form = line.item_id, line.leaves, line.arrives
-        more = min(line.quantity, started_by[form]) - sent_by[form]
+        more = min(line.quantity, left[form])
         if more > 0:
             over[movement_id] = more
+            left[form] -= more
     return over
 
 
