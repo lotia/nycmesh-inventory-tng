@@ -31,10 +31,12 @@ from typing import Any
 
 from inventory_tng.local_env import CLONE
 
-# Raise it whenever a change to the table reads any text otherwise: rows
-# record what folded them (models.FOLDED_WITH), so those folded before can
-# be folded again, and a test fails until it is raised.
-VERSION = 1
+# Raise it whenever a change to the table reads any text otherwise, or
+# search keeps it otherwise (models.held): rows record what folded them
+# (models.FOLDED_WITH), so those folded before can be folded again, and a
+# test fails until it is raised. 2: each field kept as typed too, and "in"
+# no unit (Ali, 2026-11-15).
+VERSION = 2
 
 TABLE = CLONE / "frontend" / "src" / "units.json"
 
@@ -67,9 +69,10 @@ class Unit:
 
     `ucum` are its UCUM codes and `spellings` its other symbols: with the
     symbol, each takes a prefix if `prefixes` says so. `words` never take
-    one. A size in it is `factor` times the size (its prefix's power `power`
-    times, as for m3) + `offset` in its kind's base; a level in decibels has
-    no factor."""
+    one, and are read only by search, never to spell a name (Ali,
+    2026-11-15). A size in it is `factor` times the size (its prefix's
+    power `power` times, as for m3) + `offset` in its kind's base; a level
+    in decibels has no factor."""
 
     symbol: str
     kind: str
@@ -135,7 +138,8 @@ PREFIXES: tuple[Prefix, ...] = (
 
 UNITS: tuple[Unit, ...] = (
     Unit("m", "length", True, ("m",), (), ("meter", "meters", "metre", "metres")),
-    Unit("in", "length", False, ("[in_i]",), (), ("inch", "inches"), 0.0254),
+    # Not "in", a word more often than an inch (Ali, 2026-11-15).
+    Unit("[in_i]", "length", False, ("[in_i]",), (), ("inch", "inches"), 0.0254),
     Unit("ft", "length", False, ("[ft_i]",), (), ("foot", "feet"), 0.3048),
     Unit("yd", "length", False, ("[yd_i]",), (), ("yard", "yards"), 0.9144),
     Unit("mi", "length", False, ("[mi_i]",), (), ("mile", "miles"), 1609.344),
@@ -174,7 +178,7 @@ UNITS: tuple[Unit, ...] = (
 # spelling models.canonical keeps (docs/decisions/0021, 2026-11-14).
 NAMES: dict[str, str] = {
     "m": "{}metres",
-    "in": "inches",
+    "[in_i]": "inches",
     "ft": "feet",
     "yd": "yards",
     "mi": "miles",
@@ -271,6 +275,7 @@ _ALONE = [
     for spelling in (unit.words if unit.prefixes else (*unit.prefixed(), *unit.words))
 ]
 _PREFIXED = [(s, unit) for unit in UNITS if unit.prefixes for s in unit.prefixed()]
+_SYMBOLS = [(s, unit) for unit in UNITS if not unit.prefixes for s in unit.prefixed()]
 # Every unspaced spelling, unprefixed, as typed and in lower case.
 _WHOLE = _first([*_PREFIXED, *_ALONE])
 _WHOLE_LOOSE = _first([(s.lower(), unit) for s, unit in [*_PREFIXED, *_ALONE]])
@@ -375,7 +380,8 @@ def readings(token: str) -> list[tuple[Reading, bool]]:
         if exact or str(reading) not in found:
             found[str(reading)] = (reading, exact)
 
-    for spelling, unit in [*_PREFIXED, *_ALONE]:
+    # A word ("feet", "volts") never spells a name (Ali, 2026-11-15).
+    for spelling, unit in [*_PREFIXED, *_SYMBOLS]:
         if spelling.lower() == lower:
             add(Reading(None, unit), spelling == token)
     for spelling, prefix in _PREFIX_SPELLINGS:

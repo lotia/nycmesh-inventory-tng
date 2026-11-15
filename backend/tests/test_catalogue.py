@@ -214,7 +214,8 @@ def test_an_item_is_found_by_its_folded_text_but_shown_by_its_name(
 def test_an_item_is_found_by_its_current_aliases(
     registered_client: TestClient, session: Session
 ) -> None:
-    """Sent as spelt, for the page to match; in its folded text too."""
+    """Sent as spelt, for the page to match; in its folded text too, as
+    typed and respelt (models.held)."""
     mark = tag()
     category = add(session, Category(name=f"Cables {mark}"))
     item = add(session, Item(name=f"Cat6 cable {mark}", category_id=category.id))
@@ -224,7 +225,10 @@ def test_an_item_is_found_by_its_current_aliases(
     items.remove_alias(session, gone, datetime.now(UTC))
     entry = by_id(registered_client.get(URL).json()["items"])[item.id]
     assert entry["aliases"] == [f"Tough Câble {mark}", f"Ω-wire {mark}"]
-    expected = f"Cat6 cable {mark} Tough Cable {mark} Ohm-wire {mark} Cables {mark}"
+    expected = (
+        f"Cat6 cable {mark} Tough Cable {mark} O-wire {mark} Ohm-wire {mark}"
+        f" Cables {mark}"
+    )
     assert entry["search_text"].lower().split() == expected.lower().split()
 
 

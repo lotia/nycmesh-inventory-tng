@@ -37,7 +37,7 @@ from inventory_tng.models import (
     OpenPackage,
     ScanSettings,
     Volunteer,
-    fold,
+    held,
 )
 from inventory_tng.open_packages import tracks_opened
 
@@ -130,7 +130,7 @@ class ItemEntry(BaseModel):
     manufacturer: str | None
     part_number: str | None
     old_code: str | None
-    # Its details and category, folded as searches fold them (models.fold):
+    # Its details and category, as searches keep them (models.held):
     # matched, never shown (0021). The category is folded here, as it is
     # read, on purpose: categories keep no folded column for so few names.
     search_text: str
@@ -260,7 +260,7 @@ def catalogue(session: Session) -> Catalogue:
             manufacturer=item.manufacturer,
             part_number=item.part_number,
             old_code=item.old_code,
-            search_text=f"{item.search_text} {fold(category)}",
+            search_text=f"{item.search_text} {held(category)}",
             aliases=aliases.get(item.id, []),
             packages=packages.get(item.id, []),
             retired=item.retired_at is not None,

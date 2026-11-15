@@ -37,7 +37,7 @@ def test_fold_spells_in_ascii_what_decomposing_would_miss() -> None:
 
 
 def test_what_is_typed_is_folded_short_and_nothing_is_no_search() -> None:
-    assert len(folded("\N{GRINNING FACE}" * SEARCH_MAX)) == SEARCH_MAX
+    assert [len(f) for f in folded("\N{GRINNING FACE}" * SEARCH_MAX)] == [SEARCH_MAX]
     # A lone accent folds to nothing: not a search matching everything.
     assert SEARCHED.read(q="\N{COMBINING ACUTE ACCENT}").search == ""
     assert SEARCHED.read(q="Café").search == "Café"

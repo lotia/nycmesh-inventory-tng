@@ -247,7 +247,8 @@ is stored with each unit right after a number spelt by its symbol and
 joined to the number, whatever the spelling or spacing typed (Ali,
 2026-11-12, inventory-tng-c0c.3): `Spool 305 m` is stored `Spool 305m`,
 `10 uF` and `10 µF` as `10μF`, `4.7 kohm` as `4.7kΩ`, `85 deg C` as
-`85°C`, `2 m3` as `2m³` and `100 feet` as `100ft`. The symbol is the one
+`85°C` and `2 m3` as `2m³`; a unit's word, such as `feet`, never spells
+a name (amended 2026-11-15, below). The symbol is the one
 the SI Brochure writes, in canonical spelling (`μ`, `Ω`, `°C`), not the
 ASCII one searches compare. Only units in the table are read, and only
 after a number; the rest of the name is as typed.
@@ -301,3 +302,27 @@ are read only until it is brought back.
 
 Merging two items, which would keep the merged one's name and aliases as
 the survivor's aliases, does not exist yet.
+
+## Amendment: searches keep what was typed too (2026-11-15)
+
+Search keeps each searched field folded twice where the two differ: as
+typed, its units as they are, and with its units respelt, and matches what
+is typed both ways (Ali, 2026-11-15, inventory-tng-c0c.2, Q10 C). So every
+search that found something before units were read still does, and the
+unit matches above are added: `feet` finds `Cable 100 feet`, as `100 ft`
+does; `48 V` finds `48 VDC`; `2.5 mm` finds `2.5 mm²`; and on the scan
+page, a unit half typed, such as `10 μ`, finds `10μF` as one types.
+`models.folds` gives the two, `models.held` what `search_text` keeps of a
+field, aliases and the category the catalogue sends included, and the scan
+page's `cart.bares` does the same; `units-vectors.json` holds both forms
+where both sides spell them alike. Migration 0039 folded every row again.
+Accepted gap: one search mixing the two, such as `100 ft 48 V` for
+`100 feet 48 VDC`, finds only what search finds close, as each form is
+matched whole. Two spellings, not every spelling, so the rejection above
+stands.
+
+A unit's word (`inch`, `feet`, `volts`, `watt`, `amps` and the like) is
+read only by search, never to spell a name (Q14 A), and `in` is no unit,
+as it is a word more often than an inch: an inch is read by its words and
+by its UCUM code, `[in_i]`, its symbol in what search compares. A lone `Ω`
+or `ω` is read as ohms, as above (Q11 A).

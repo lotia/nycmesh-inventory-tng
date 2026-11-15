@@ -4,6 +4,7 @@ from alembic.config import Config
 from sqlalchemy import Connection, text
 
 from inventory_tng.models import FOLDED_WITH
+from inventory_tng.names import name_key
 
 from helpers.sign_in import TOTP_KEYS
 
@@ -361,7 +362,7 @@ def test_what_is_searched_is_folded_again_with_units(alembic_config: Config) -> 
             " VALUES ('Cold room 4 °C', 'store', 'kept', 'x') RETURNING id"
         )
     )
-    command.upgrade(alembic_config, "head")
+    command.upgrade(alembic_config, "0036")
     rows = connection.execute(
         text("SELECT id, search_text, name_folded, folded_with FROM item")
     ).all()
@@ -373,6 +374,47 @@ def test_what_is_searched_is_folded_again_with_units(alembic_config: Config) -> 
         text("SELECT search_text, folded_with FROM location WHERE id = :i"),
         {"i": place},
     ).one() == ("Cold room 4degC", FOLDED_WITH)
+
+
+def test_what_is_searched_is_kept_as_typed_too(alembic_config: Config) -> None:
+    """Migration 0039: every row folded again, each field as typed and with
+    its units respelt (models.held), an item's current aliases too; 'in'
+    no unit. Every row: 0036 stamped its rows with this FOLDED_WITH."""
+    command.downgrade(alembic_config, "0038")
+    connection = alembic_config.attributes["connection"]
+    category_id = connection.scalar(
+        text("INSERT INTO category (name) VALUES ('Cables') RETURNING id")
+    )
+
+    def row(table: str, name: str, searched: bool = True, **values: object) -> int:
+        """A row named `name`, its search text 'kept' if it has one, stamped
+        as 0036 stamps rows on a database made new."""
+        values = {"name": name, "name_key": name_key(name), **values}
+        if searched:
+            values |= {"search_text": "kept", "folded_with": FOLDED_WITH}
+        return connection.scalar(
+            text(
+                f"INSERT INTO {table} ({', '.join(values)})"
+                f" VALUES ({', '.join(f':{column}' for column in values)})"
+                " RETURNING id"
+            ),
+            values,
+        )
+
+    cable = row("item", "Cable 100 feet", category_id=category_id, name_folded="kept")
+    row("item_alias", "Patch 2 in 1", searched=False, item_id=cable)
+    gone = row("item_alias", "Gone 5 V", searched=False, item_id=cable)
+    connection.execute(
+        text("UPDATE item_alias SET retired_at = now() WHERE id = :i"), {"i": gone}
+    )
+    reel = row("item_package", "Reel 305 m", item_id=cable, size=1)
+    command.upgrade(alembic_config, "head")
+    assert connection.execute(
+        text("SELECT search_text, name_folded, folded_with FROM item")
+    ).one() == ("Cable 100 feet Cable 100ft    Patch 2 in 1", "kept", FOLDED_WITH)
+    assert connection.scalar(
+        text("SELECT search_text FROM item_package WHERE id = :i"), {"i": reel}
+    ) == ("Reel 305 m Reel 305m")
 
 
 def test_name_keys_are_filled_by_the_migration(alembic_config: Config) -> None:

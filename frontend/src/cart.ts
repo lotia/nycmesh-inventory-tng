@@ -346,9 +346,9 @@ export function indexOf(catalogue: Catalogue): Index {
     haystacks: new Map(
       catalogue.items.map((item) => [
         item.id,
-        // Each field bare alone, as the server folds each (Searchable), so
-        // no field's number reads the next's start as a unit; the server's
-        // text, folded so already, only in lower case.
+        // Each field bare alone, as typed and respelt, as the server keeps
+        // each (models.held), so no field's number reads the next's start
+        // as a unit; the server's text, kept so already, only in lower case.
         [
           ...[
             item.name,
@@ -357,7 +357,7 @@ export function indexOf(catalogue: Catalogue): Index {
             item.old_code,
             item.category,
             ...item.aliases,
-          ].map((field) => bare(field ?? "")),
+          ].flatMap((field) => bares(field ?? "")),
           item.search_text.toLowerCase(),
         ]
           .filter(Boolean)
@@ -1215,22 +1215,27 @@ function withOffered(cart: Cart, here: ReadonlyMap<string, unknown>): Cart {
   };
 }
 
-/** Items whose name, maker, part number, code or category holds every word,
- * both bare (`bare`): in the details as spelt or the server's folded text
- * (docs/decisions/0021, 2026-11-12). */
+/** Items whose name, maker, part number, code or category holds every word
+ * of what was typed, as typed or respelt (`bares`): in the details as spelt
+ * or the server's folded text (docs/decisions/0021, 2026-11-12, and Ali,
+ * 2026-11-15). */
 export function search(catalogue: Catalogue, text: string, limit = 20): Item[] {
-  const words = bare(text)
-    .split(/\s+/)
-    // A lone accent is no word: not a search matching everything.
-    .filter((word) => word !== "");
-  if (words.length === 0) {
+  const forms = bares(text)
+    .map((form) =>
+      // A lone accent is no word: not a search matching everything.
+      form.split(/\s+/).filter((word) => word !== ""),
+    )
+    .filter((words) => words.length > 0);
+  if (forms.length === 0) {
     return [];
   }
   const { haystacks } = indexOf(catalogue);
   return catalogue.items
     .filter((item) => {
       const haystack = haystacks.get(item.id) ?? "";
-      return words.every((word) => haystack.includes(word));
+      return forms.some((words) =>
+        words.every((word) => haystack.includes(word)),
+      );
     })
     .slice(0, limit);
 }
@@ -1241,5 +1246,18 @@ export function search(catalogue: Catalogue, text: string, limit = 20): Item[] {
  * and "10 µF" is "10uf"; "ł", "ø", "æ" and "ß", which do not decompose,
  * stay as they are, and so do Greek letters, but in units. */
 export function bare(text: string): string {
-  return respell(text.normalize("NFKD")).replace(/\p{M}/gu, "").toLowerCase();
+  return unmarked(respell(text.normalize("NFKD")));
 }
+
+/** `text` bare as typed, its units as they are, then `bare` if that
+ * differs, as the server keeps and matches it (models.folds): so "feet",
+ * "48 v" in "48 vdc" and a half-typed "10 μ" find what they did before
+ * units were read. */
+export function bares(text: string): string[] {
+  const typed = unmarked(text.normalize("NFKD"));
+  const respelt = bare(text);
+  return respelt === typed ? [typed] : [typed, respelt];
+}
+
+const unmarked = (decomposed: string): string =>
+  decomposed.replace(/\p{M}/gu, "").toLowerCase();

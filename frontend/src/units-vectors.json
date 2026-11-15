@@ -1,10 +1,11 @@
 {
-  "about": "What the server (models.fold, in lower case) and the scan page (cart.bare) both make of each text, as searched, and what units.respell makes of it decomposed (NFKD), on both sides: backend tests/test_units.py and frontend src/units.test.ts read it. A text with letters anyascii spells otherwise than decomposing, as Greek or Cyrillic, has no 'searched': only respell is compared.",
+  "about": "What the server (models.folds, in lower case) and the scan page (cart.bares) both make of each text, as searched: 'typed', folded as typed, units as they are, and 'searched', with its units respelt, the second form only where it differs; and what units.respell makes of it decomposed (NFKD), on both sides: backend tests/test_units.py and frontend src/units.test.ts read it. A text with letters anyascii spells otherwise than decomposing, as Greek or Cyrillic, or signs, as °, has no 'typed', and no 'searched' where its respelt form has such: only what does is compared.",
   "vectors": [
     {
       "text": "10uF",
       "respelt": "10uF",
-      "searched": "10uf"
+      "searched": "10uf",
+      "typed": "10uf"
     },
     {
       "text": "10 µF",
@@ -24,12 +25,14 @@
     {
       "text": "Capacitor 10 UF",
       "respelt": "Capacitor 10uF",
-      "searched": "capacitor 10uf"
+      "searched": "capacitor 10uf",
+      "typed": "capacitor 10 uf"
     },
     {
       "text": "85 degC",
       "respelt": "85degC",
-      "searched": "85degc"
+      "searched": "85degc",
+      "typed": "85 degc"
     },
     {
       "text": "85°C",
@@ -49,17 +52,20 @@
     {
       "text": "85 Cel",
       "respelt": "85degC",
-      "searched": "85degc"
+      "searched": "85degc",
+      "typed": "85 cel"
     },
     {
       "text": "85 deg C",
       "respelt": "85degC",
-      "searched": "85degc"
+      "searched": "85degc",
+      "typed": "85 deg c"
     },
     {
       "text": "85 DEG c",
       "respelt": "85degC",
-      "searched": "85degc"
+      "searched": "85degc",
+      "typed": "85 deg c"
     },
     {
       "text": "-40 °F",
@@ -69,7 +75,8 @@
     {
       "text": "300 K",
       "respelt": "300K",
-      "searched": "300k"
+      "searched": "300k",
+      "typed": "300 k"
     },
     {
       "text": "4.7 kΩ",
@@ -79,12 +86,14 @@
     {
       "text": "4.7kohm",
       "respelt": "4.7kOhm",
-      "searched": "4.7kohm"
+      "searched": "4.7kohm",
+      "typed": "4.7kohm"
     },
     {
       "text": "4.7 KOHMS",
       "respelt": "4.7kOhm",
-      "searched": "4.7kohm"
+      "searched": "4.7kohm",
+      "typed": "4.7 kohms"
     },
     {
       "text": "50Ω",
@@ -104,182 +113,218 @@
     {
       "text": "5 MHz",
       "respelt": "5MHz",
-      "searched": "5mhz"
+      "searched": "5mhz",
+      "typed": "5 mhz"
     },
     {
       "text": "5.8 GHz",
       "respelt": "5.8GHz",
-      "searched": "5.8ghz"
+      "searched": "5.8ghz",
+      "typed": "5.8 ghz"
     },
     {
       "text": "2.4 ghz",
       "respelt": "2.4GHz",
-      "searched": "2.4ghz"
+      "searched": "2.4ghz",
+      "typed": "2.4 ghz"
     },
     {
       "text": "1 Gbps",
       "respelt": "1Gbit/s",
-      "searched": "1gbit/s"
+      "searched": "1gbit/s",
+      "typed": "1 gbps"
     },
     {
       "text": "100 Kbps",
       "respelt": "100kbit/s",
-      "searched": "100kbit/s"
+      "searched": "100kbit/s",
+      "typed": "100 kbps"
     },
     {
       "text": "10 Mb/s",
       "respelt": "10Mbit/s",
-      "searched": "10mbit/s"
+      "searched": "10mbit/s",
+      "typed": "10 mb/s"
     },
     {
       "text": "1 Gbit/s",
       "respelt": "1Gbit/s",
-      "searched": "1gbit/s"
+      "searched": "1gbit/s",
+      "typed": "1 gbit/s"
     },
     {
       "text": "24 dBm",
       "respelt": "24dBm",
-      "searched": "24dbm"
+      "searched": "24dbm",
+      "typed": "24 dbm"
     },
     {
       "text": "23 dBi",
       "respelt": "23dBi",
-      "searched": "23dbi"
+      "searched": "23dbi",
+      "typed": "23 dbi"
     },
     {
       "text": "12 V/2 A",
       "respelt": "12V/2A",
-      "searched": "12v/2a"
+      "searched": "12v/2a",
+      "typed": "12 v/2 a"
     },
     {
       "text": "48 V",
       "respelt": "48V",
-      "searched": "48v"
+      "searched": "48v",
+      "typed": "48 v"
     },
     {
       "text": "0.5 A",
       "respelt": "0.5A",
-      "searched": "0.5a"
+      "searched": "0.5a",
+      "typed": "0.5 a"
     },
     {
       "text": "30 mW",
       "respelt": "30mW",
-      "searched": "30mw"
+      "searched": "30mw",
+      "typed": "30 mw"
     },
     {
       "text": "10 W",
       "respelt": "10W",
-      "searched": "10w"
+      "searched": "10w",
+      "typed": "10 w"
     },
     {
       "text": "Spool 305 m",
       "respelt": "Spool 305m",
-      "searched": "spool 305m"
+      "searched": "spool 305m",
+      "typed": "spool 305 m"
     },
     {
       "text": "Spool 305m",
       "respelt": "Spool 305m",
-      "searched": "spool 305m"
+      "searched": "spool 305m",
+      "typed": "spool 305m"
     },
     {
       "text": "Spool 30.5 m",
       "respelt": "Spool 30.5m",
-      "searched": "spool 30.5m"
+      "searched": "spool 30.5m",
+      "typed": "spool 30.5 m"
     },
     {
       "text": "1,000 ft",
       "respelt": "1,000ft",
-      "searched": "1,000ft"
+      "searched": "1,000ft",
+      "typed": "1,000 ft"
     },
     {
       "text": "100 feet",
       "respelt": "100ft",
-      "searched": "100ft"
+      "searched": "100ft",
+      "typed": "100 feet"
     },
     {
       "text": "6 in",
-      "respelt": "6in",
-      "searched": "6in"
+      "respelt": "6 in",
+      "searched": "6 in",
+      "typed": "6 in"
     },
     {
       "text": "10 [in_i]",
-      "respelt": "10in",
-      "searched": "10in"
+      "respelt": "10[in_i]",
+      "searched": "10[in_i]",
+      "typed": "10 [in_i]"
     },
     {
       "text": "5 kg",
       "respelt": "5kg",
-      "searched": "5kg"
+      "searched": "5kg",
+      "typed": "5 kg"
     },
     {
       "text": "1 lb",
       "respelt": "1lb",
-      "searched": "1lb"
+      "searched": "1lb",
+      "typed": "1 lb"
     },
     {
       "text": "2 L",
       "respelt": "2L",
-      "searched": "2l"
+      "searched": "2l",
+      "typed": "2 l"
     },
     {
       "text": "500 mL",
       "respelt": "500mL",
-      "searched": "500ml"
+      "searched": "500ml",
+      "typed": "500 ml"
     },
     {
       "text": "1 m3",
       "respelt": "1m3",
-      "searched": "1m3"
+      "searched": "1m3",
+      "typed": "1 m3"
     },
     {
       "text": "5 gal",
       "respelt": "5gal",
-      "searched": "5gal"
+      "searched": "5gal",
+      "typed": "5 gal"
     },
     {
       "text": "LiteBeam 5AC Gen2",
       "respelt": "LiteBeam 5AC Gen2",
-      "searched": "litebeam 5ac gen2"
+      "searched": "litebeam 5ac gen2",
+      "typed": "litebeam 5ac gen2"
     },
     {
       "text": "Cat 6A",
       "respelt": "Cat 6A",
-      "searched": "cat 6a"
+      "searched": "cat 6a",
+      "typed": "cat 6a"
     },
     {
       "text": "RJ45 coupler",
       "respelt": "RJ45 coupler",
-      "searched": "rj45 coupler"
+      "searched": "rj45 coupler",
+      "typed": "rj45 coupler"
     },
     {
       "text": "10 Cell",
       "respelt": "10 Cell",
-      "searched": "10 cell"
+      "searched": "10 cell",
+      "typed": "10 cell"
     },
     {
       "text": "10 mé",
       "respelt": "10 mé",
-      "searched": "10 me"
+      "searched": "10 me",
+      "typed": "10 me"
     },
     {
       "text": "10 ḿ",
       "respelt": "10 ḿ",
-      "searched": "10 m"
+      "searched": "10 m",
+      "typed": "10 m"
     },
     {
       "text": "10 m/s",
       "respelt": "10 m/s",
-      "searched": "10 m/s"
+      "searched": "10 m/s",
+      "typed": "10 m/s"
     },
     {
       "text": "(10 m)",
       "respelt": "(10m)",
-      "searched": "(10m)"
+      "searched": "(10m)",
+      "typed": "(10 m)"
     },
     {
       "text": "2 in 1",
-      "respelt": "2in 1",
-      "searched": "2in 1"
+      "respelt": "2 in 1",
+      "searched": "2 in 1",
+      "typed": "2 in 1"
     },
     {
       "text": "Café 10 µF",
@@ -289,12 +334,14 @@
     {
       "text": "fullwidth １０ｍ",
       "respelt": "fullwidth 10m",
-      "searched": "fullwidth 10m"
+      "searched": "fullwidth 10m",
+      "typed": "fullwidth 10m"
     },
     {
       "text": "10 m",
       "respelt": "10m",
-      "searched": "10m"
+      "searched": "10m",
+      "typed": "10 m"
     },
     {
       "text": "10 kΩ",
@@ -304,17 +351,20 @@
     {
       "text": "Mbps",
       "respelt": "Mbps",
-      "searched": "mbps"
+      "searched": "mbps",
+      "typed": "mbps"
     },
     {
       "text": "uF",
       "respelt": "uF",
-      "searched": "uf"
+      "searched": "uf",
+      "typed": "uf"
     },
     {
       "text": "Cel",
       "respelt": "Cel",
-      "searched": "cel"
+      "searched": "cel",
+      "typed": "cel"
     },
     {
       "text": "μF",
@@ -376,17 +426,20 @@
     {
       "text": "F",
       "respelt": "F",
-      "searched": "f"
+      "searched": "f",
+      "typed": "f"
     },
     {
       "text": "degC",
       "respelt": "degC",
-      "searched": "degc"
+      "searched": "degc",
+      "typed": "degc"
     },
     {
       "text": "Ohm",
       "respelt": "Ohm",
-      "searched": "ohm"
+      "searched": "ohm",
+      "typed": "ohm"
     },
     {
       "text": "10 mж",
@@ -403,7 +456,8 @@
     {
       "text": "10 m_",
       "respelt": "10m_",
-      "searched": "10m_"
+      "searched": "10m_",
+      "typed": "10 m_"
     },
     {
       "text": "10 m·",
@@ -433,12 +487,62 @@
     {
       "text": "2 gâteaux",
       "respelt": "2 gâteaux",
-      "searched": "2 gateaux"
+      "searched": "2 gateaux",
+      "typed": "2 gateaux"
     },
     {
       "text": "2 GÂTEAUX",
       "respelt": "2 GÂTEAUX",
-      "searched": "2 gateaux"
+      "searched": "2 gateaux",
+      "typed": "2 gateaux"
+    },
+    {
+      "text": "Cable 100 feet",
+      "respelt": "Cable 100ft",
+      "searched": "cable 100ft",
+      "typed": "cable 100 feet"
+    },
+    {
+      "text": "feet",
+      "respelt": "feet",
+      "searched": "feet",
+      "typed": "feet"
+    },
+    {
+      "text": "PoE 48 VDC",
+      "respelt": "PoE 48 VDC",
+      "searched": "poe 48 vdc",
+      "typed": "poe 48 vdc"
+    },
+    {
+      "text": "2.5 mm² red",
+      "respelt": "2.5 mm2 red",
+      "searched": "2.5 mm2 red",
+      "typed": "2.5 mm2 red"
+    },
+    {
+      "text": "50 Ω/m",
+      "respelt": "50 Ω/m"
+    },
+    {
+      "text": "10 μ",
+      "respelt": "10 μ"
+    },
+    {
+      "text": "85 °",
+      "respelt": "85 °"
+    },
+    {
+      "text": "100 fe",
+      "respelt": "100 fe",
+      "searched": "100 fe",
+      "typed": "100 fe"
+    },
+    {
+      "text": "6 inch",
+      "respelt": "6[in_i]",
+      "searched": "6[in_i]",
+      "typed": "6 inch"
     }
   ]
 }

@@ -289,11 +289,14 @@ spelling.
 
 Searches read a unit right after a number in one spelling, on the server
 and the scan page alike (decision 0021): `10 µF` is `10uF`, and so is a
-unit alone spelt with `°`, `μ`, `µ` or `Ω`: `μF` is `uF`. The table is
-`backend/src/inventory_tng/units.py`. After changing it, raise its
-`VERSION`, write the scan page's copy and the fold reference again, and
-add a migration that folds again the rows whose `folded_with` names the
-old version, as 0036 does, with `FOLDS_UNITS` the new version, folding
+unit alone spelt with `°`, `μ`, `µ` or `Ω`: `μF` is `uF`. Each searched
+field is kept, and each search matched, both as typed and so respelt,
+where the two differ (`models.folds` and `models.held`, `cart.bares` on the
+scan page), so `feet` still finds `100 feet`. The table is
+`backend/src/inventory_tng/units.py`. After changing it, or what search
+keeps, raise its `VERSION`, write the scan page's copy and the fold
+reference again, and add a migration that folds every row again with
+`models.held`, as 0039 does, with `FOLDS_UNITS` the new version, folding
 an item's current aliases after its fields, as `Item.refold` does:
 
 ```sh
@@ -308,9 +311,10 @@ An item's or a package's form stores each unit after a number by its
 symbol as a name shows it, joined to the number (`units.spell`: `305 m` is
 `305m`, `10 uF` is `10μF`), reading case loosely only as a size in its
 kind's plausible range (`units.KINDS`), and asks which was meant where two
-readings are likely. A new unit needs its name in words and, if a name
-spells it otherwise than its symbol, that spelling: `units.NAMES` and
-`units.SHOWN`.
+readings are likely. A unit's words (`units.Unit.words`, such as `feet`)
+are read by search only, never to spell a name. A new unit needs its name
+in words and, if a name spells it otherwise than its symbol, that
+spelling: `units.NAMES` and `units.SHOWN`.
 
 ### Locking a row
 

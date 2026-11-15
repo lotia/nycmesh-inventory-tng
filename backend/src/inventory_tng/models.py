@@ -216,10 +216,27 @@ def fold(text: str) -> str:
     after compatibility characters are made their canonical ones (NFKC), so
     "ﬁ" is "fi", and each unit right after a number is spelt by its symbol
     (units.respell, 2026-11-14), so "10 µF", "10μF" and "10uf" are all
-    "10uF". What is searched is kept folded (Searchable); what is typed is
-    folded before it is compared."""
+    "10uF". What is searched is kept so and as typed (held); what is typed
+    is matched so and as typed (folds)."""
     decomposed = unicodedata.normalize("NFKD", text)
     return anyascii(unicodedata.normalize("NFKC", units.respell(decomposed)))
+
+
+def folds(text: str) -> tuple[str, ...]:
+    """`text` folded as typed, units as they are, then by fold() if that
+    differs: searches match either (Ali, 2026-11-15, inventory-tng-c0c.2),
+    so a unit's word alone ("feet"), a unit typed shorter than a token not
+    one ("48 V" in "48 VDC") and a unit half typed ("10 μ") find what they
+    found before units were read, and "10 µF" finds "10uf" too."""
+    typed = anyascii(unicodedata.normalize("NFKC", text))
+    respelt = fold(text)
+    # Case aside: search ignores it.
+    return (typed,) if respelt.lower() == typed.lower() else (typed, respelt)
+
+
+def held(text: str) -> str:
+    """What search_text keeps of `text`: each of its folds, spaced."""
+    return " ".join(folds(text))
 
 
 # Signs a name is stored without, for the spelling Unicode and the SI
@@ -284,10 +301,11 @@ FOLDED_WITH = (
 
 class Searchable:
     """A row a search finds: `search_text`, what it is found by (SEARCHED,
-    its name unless a model says more), spaced and folded, and
+    its name unless a model says more), spaced, each field as held() keeps
+    it, and
     `folded_with`, what folded it (FOLDED_WITH). Kept by the app as each row
     is added or changed (_refold), never by PostgreSQL (docs/decisions/0016);
-    migrations 0032, 0033 and 0036 filled the rows there were."""
+    migrations 0032, 0033, 0036 and 0039 filled the rows there were."""
 
     SEARCHED: ClassVar[tuple[str, ...]] = ("name",)
     # Not a change alone: what is searched changes with it, or another row
@@ -298,8 +316,8 @@ class Searchable:
     def refold(self) -> None:
         # Each folded alone, so no field's number reads the next's start
         # as a unit.
-        held = (fold(getattr(self, field) or "") for field in self.SEARCHED)
-        self.search_text = " ".join(held)
+        fields = (held(getattr(self, field) or "") for field in self.SEARCHED)
+        self.search_text = " ".join(fields)
         self.folded_with = FOLDED_WITH
 
 
@@ -466,7 +484,7 @@ class Item(KeyedName, Searchable, Versioned, Base):
                 .where(ItemAlias.item_id == self.id, ItemAlias.retired_at.is_(None))
                 .order_by(ItemAlias.id)
             )
-            self.search_text = " ".join([self.search_text, *map(fold, aliases)])
+            self.search_text = " ".join([self.search_text, *map(held, aliases)])
 
 
 class ItemPackage(KeyedName, Searchable, Versioned, Base):

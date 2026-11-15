@@ -14,7 +14,7 @@ from sqlalchemy.orm import Session
 
 from inventory_tng import items, units
 from inventory_tng.admin.items import ITEMS
-from inventory_tng.models import Category, Item, fold
+from inventory_tng.models import Category, Item, fold, folds
 from inventory_tng.units import KINDS, PREFIXES, UNITS, Reading, read, respell
 
 from helpers.rows import add, tag
@@ -169,8 +169,12 @@ def test_the_server_and_the_scan_page_read_units_alike(vector: dict[str, str]) -
     """units-vectors.json, which the scan page's tests read too."""
     text = vector["text"]
     assert respell(unicodedata.normalize("NFKD", text)) == vector["respelt"]
+    forms = [form.lower() for form in folds(text)]
     if "searched" in vector:
-        assert fold(text).lower() == vector["searched"]
+        assert forms[-1] == vector["searched"]
+    if "typed" in vector:
+        assert forms[0] == vector["typed"]
+        assert len(forms) == (1 if vector["typed"] == vector["searched"] else 2)
 
 
 def test_units_are_read_only_after_a_number_and_greek_elsewhere_is_letters() -> None:
@@ -189,8 +193,54 @@ def test_each_field_is_read_alone() -> None:
     """A field's number never reads the next field's start as a unit."""
     item = Item(name="Spool 305", manufacturer="M Corp", part_number="10 m")
     item.refold()
-    assert item.search_text == "Spool 305 M Corp 10m "
+    assert item.search_text == "Spool 305 M Corp 10 m 10m "
     assert item.name_folded == "Spool 305"
+
+
+def test_each_field_is_kept_as_typed_and_respelt_where_they_differ() -> None:
+    """Ali, 2026-11-15 (Q10 C): what search keeps of a field, and what it
+    matches of a search, is its fold as typed, then respelt if that differs."""
+    assert folds("Cable 100 feet") == ("Cable 100 feet", "Cable 100ft")
+    assert folds("Cap 10 µF") == ("Cap 10 mF", "Cap 10uF")
+    assert folds("Spool 305m") == ("Spool 305m",)
+    item = Item(name="Cable 100 feet", manufacturer="Cap 10 µF", part_number="X1")
+    item.refold()
+    assert item.search_text == "Cable 100 feet Cable 100ft Cap 10 mF Cap 10uF X1 "
+
+
+def test_in_is_no_unit_and_words_never_spell_a_name() -> None:
+    """Ali, 2026-11-15 (Q14 A): "in" is a word, not an inch; a unit's word
+    ("feet", "volts") is read by search, never to spell a name."""
+    assert read("in") is None
+    assert fold("2 in 1, 6 in") == "2 in 1, 6 in"
+    assert fold("6 inch 6 inches 6 [in_i]") == "6[in_i] 6[in_i] 6[in_i]"
+    for word in ("feet", "volts", "watt", "amps", "inch", "meters"):
+        assert read(word) is not None, word
+        assert units.readings(word) == [], word
+    assert units.spell("Cable 100 feet, 48 volts", {}) == (
+        "Cable 100 feet, 48 volts",
+        [],
+    )
+
+
+def test_what_was_found_before_units_were_read_still_is(
+    admin_client: TestClient, session: Session
+) -> None:
+    """Ali, 2026-11-15 (Q10 C): a unit's word alone, a unit typed shorter
+    than a token not one, and a unit half typed find what they found before
+    units were read; and a unit spelt otherwise finds it too."""
+    parts = add(session, Category(name=f"Parts {tag()}"))
+    for name, typed in (
+        ("Cable 100 feet", ("feet", "100 feet", "100 ft", "100ft")),
+        ("PoE injector 48 VDC", ("48 V", "48 VDC")),
+        ("Wire 2.5 mm² red", ("2.5 mm", "mm²")),
+        ("Load 50 Ω/m", ("50 Ω",)),
+        ("Volts meter 5 volts", ("volts", "5 V", "5v")),
+    ):
+        item = add(session, Item(name=f"{name} {tag()}", category_id=parts.id))
+        for each in typed:
+            listed = page_text(admin_client.get(ITEMS, params={"q": each}))
+            assert item.name in listed, each
 
 
 def test_every_spelling_of_a_unit_finds_the_others(

@@ -1,5 +1,5 @@
 {
-  "version": 1,
+  "version": 2,
   "prefixes": [
     ["Q"],
     ["R"],
@@ -33,9 +33,9 @@
       "alone": ["meter", "meters", "metre", "metres"]
     },
     {
-      "symbol": "in",
+      "symbol": "[in_i]",
       "prefixed": [],
-      "alone": ["in", "[in_i]", "inch", "inches"]
+      "alone": ["[in_i]", "inch", "inches"]
     },
     {
       "symbol": "ft",

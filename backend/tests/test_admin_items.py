@@ -1085,7 +1085,8 @@ def test_an_alias_is_searched_and_its_removal_frees_it(
     admin_client: TestClient, session: Session, radios: Category
 ) -> None:
     """Stored canonical and keyed as names are; in the item's search text,
-    each folded alone, until removed (retired), which frees the name."""
+    each folded alone, as typed and respelt (models.held), until removed
+    (retired), which frees the name."""
     item = new_item(session, radios, "Cat6 cable, outdoor")
     tough, capacitor = aliased(session, item, "ToughCable", "Cap 10 µF")
     assert (capacitor.name, capacitor.name_key) == ("Cap 10 μF", "cap10μf")
@@ -1095,12 +1096,15 @@ def test_an_alias_is_searched_and_its_removal_frees_it(
         "outdoor",
         "ToughCable",
         "Cap",
+        "10",
+        "mF",
+        "Cap",
         "10uF",
     ]
     found = items_named(text(admin_client.get(ITEMS, params={"q": "toughcable"})))
     assert found == ["Cat6 cable, outdoor"]
     items.remove_alias(session, tough, NOW)
-    assert item.search_text.split() == ["Cat6", "cable,", "outdoor", "Cap", "10uF"]
+    assert item.search_text.split()[3:] == ["Cap", "10", "mF", "Cap", "10uF"]
     assert [each.name for each in items.aliases(session, item.id)] == ["Cap 10 μF"]
     # Free again: another item may be named so, and this one given it again.
     new_item(session, radios, "Tough cable")

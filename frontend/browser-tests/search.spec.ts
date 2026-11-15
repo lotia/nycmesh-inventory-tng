@@ -1,7 +1,8 @@
 /**
  * A long list's search box suggests as one types, and picking one narrows
  * the list to it (docs/decisions/0019). Searches ignore accents, the scan
- * page's too (docs/decisions/0021), and read units after a number alike.
+ * page's too (docs/decisions/0021), and read units after a number alike,
+ * as well as finding what they found before units were read.
  */
 import { expect, test } from "@playwright/test";
 import { ownCable } from "./own";
@@ -73,4 +74,29 @@ test("a unit after a number is found however it is spelt, on both sides", async 
   await expect(
     page.getByRole("table").getByRole("link", { name, exact: true }),
   ).toBeVisible();
+});
+
+test("a search finds what it found before units were read, and by units too", async ({
+  page,
+}) => {
+  // Saved as typed: a unit's word never spells a name (Ali, 2026-11-15).
+  const name = await ownCable(page, "PoE 100 feet 48 VDC");
+  const find = page.getByLabel(/Find an item/);
+  const found = page.getByRole("button", { name, exact: true });
+  await page.goto("/scan");
+  // A unit typed shorter than the token it begins, as typed.
+  await find.fill(name.replace("48 VDC", "48 V"));
+  await expect(found).toBeVisible();
+  // A unit spelt otherwise.
+  await find.fill(name.replace("100 feet", "100 ft"));
+  await expect(found).toBeVisible();
+  for (const typed of [
+    name.replace("PoE 100 ", ""),
+    name.replace("PoE 100 feet", "100 ft"),
+  ]) {
+    await page.goto(`/admin/items?q=${encodeURIComponent(typed)}`);
+    await expect(
+      page.getByRole("table").getByRole("link", { name, exact: true }),
+    ).toBeVisible();
+  }
 });

@@ -1,4 +1,4 @@
-# models.fold, with anyascii 0.3.3, Unicode 17.0.0, units 1: each input, its code point, what it folds to (∅: nothing). Written by mise run regenerate-fold-reference, or from backend/: uv run python -m tests.helpers.fold_reference.
+# models.fold, with anyascii 0.3.3, Unicode 17.0.0, units 2: each input, its code point, what it folds to (∅: nothing). Written by mise run regenerate-fold-reference, or from backend/: uv run python -m tests.helpers.fold_reference.
 \xa0	U+00A0	\x20
 ¡	U+00A1	!
 ¢	U+00A2	c
@@ -1063,7 +1063,7 @@ è́̂	string	e
 10µF 10μF	string	10uF 10uF
 10 uF 4.7 kΩ 85 ℃ 85 Cel 5 GHz 1 Gbps 24 dBm 305 m	string	10uF 4.7kOhm 85degC 85degC 5GHz 1Gbit/s 24dBm 305m
 μF Ω Cel μέρα 10 Cell	string	uF Ohm Cel mera 10 Cell
-½ ¼ ¾ in	string	1/2 1/4 3/4in
+½ ¼ ¾ in	string	1/2 1/4 3/4 in
 2×4 30° ±5%	string	2*4 30deg +-5%
 Москва кабель	string	Moskva kabel'
 Αθήνα καλώδιο	string	Athina kalodio
