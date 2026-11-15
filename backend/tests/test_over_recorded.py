@@ -1484,19 +1484,38 @@ def test_a_marker_not_of_a_refusal_draws_no_alert(
     admin_client: TestClient, registered_client: TestClient, session: Session
 ) -> None:
     """The place read again, not trusted: one not of its transaction,
-    though retired and empty, or one that may be counted (here, the van,
-    current) is not drawn as refused; the problem is the row's."""
+    though retired and empty, one that may be counted (here, the van,
+    current), or no id at all is not drawn as refused; the problem is the
+    row's."""
     place = from_emptied_store(registered_client, session)
     elsewhere = add(session, Location(name=f"Store {tag()}", kind="store"))
     retire(session, elsewhere)
     (check,) = checks(session)
-    for at in (elsewhere, place.van):
-        response = checked_from_alert(admin_client, session, at)
+    for marker in (str(elsewhere.id), str(place.van.id), "x", "-1", "1.0"):
+        response = mark_checked(admin_client, session, refused=marker)
         assert response.status_code == 400
         assert 'role="alert"' not in response.text
         assert "Bring back" not in response.text
         (row,) = checked_forms(response.text)
         assert problem_of(check) in row
+
+
+def test_an_alert_drawn_again_keeps_only_one_item(
+    admin_client: TestClient, registered_client: TestClient, session: Session
+) -> None:
+    """Its forms post back to the list of that item alone."""
+    place = from_emptied_store(registered_client, session)
+    (check,) = checks(session)
+    response = admin_client.post(
+        f"{PAGE}/{check.id}/checked?item={place.item.id}",
+        data={"seen": over_recorded.seen(check), "refused": str(place.store.id)},
+    )
+    assert response.status_code == 400
+    assert f"Only {place.item.name}." in text(response)
+    for each in ("bring-back", "checked"):
+        assert f'action="{PAGE}/{check.id}/{each}?item={place.item.id}"' in (
+            response.text
+        )
 
 
 def test_a_place_brought_back_since_its_alert_draws_no_alert(
