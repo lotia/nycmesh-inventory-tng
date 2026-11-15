@@ -295,6 +295,12 @@ def _count_page(
     if shown.only is not None and not items and shown.only.id in named:
         # The item asked for, to count, though the records say none is here.
         was.setdefault(shown.only.id, Decimal(0))
+    openings = over_recorded.openings_waiting(session, place.id, as_of)
+    if not items:
+        # An opening recorded more than opened, waiting here: its item, to
+        # count, though the records say none is here.
+        for item_id in openings:
+            was.setdefault(item_id, Decimal(0))
     if (ids := shown.ids(session)) is not None:
         if not items:
             # A recount's items were shown when counted: each is asked for
@@ -314,7 +320,7 @@ def _count_page(
         ),
         key=lambda row: row[0].name.lower(),
     )
-    forms = _forms(session, place.id, as_of, [item.id for item, _ in rows])
+    forms = _forms(session, place.id, as_of, [item.id for item, _ in rows], openings)
     return admin_page(
         request,
         signed,
@@ -375,11 +381,19 @@ class FormRow(NamedTuple):
 
 
 def _forms(
-    session: Session, place_id: int, as_of: int, item_ids: Sequence[int]
+    session: Session,
+    place_id: int,
+    as_of: int,
+    item_ids: Sequence[int],
+    openings: Mapping[int, Collection[int]],
 ) -> dict[int, list[FormRow]]:
     """The items at the place whose stock was in more than loose units, as
     of the form, each form a row: sealed packages, by how many; open
-    packages; loose. Others are counted by their total, as before."""
+    packages; loose. Others are counted by their total, as before, but an
+    item of an opening waiting here, recorded more than opened (`openings`,
+    over_recorded.openings_waiting): it is counted by form, with a row of
+    each package it opened sealed, though the records hold none, as a total
+    puts neither of its ends right (docs/decisions/0020)."""
     found = expected_forms(session, place_id, as_of, item_ids)
     packages = {
         package.id: package
@@ -406,6 +420,11 @@ def _forms(
         held.setdefault(row.item_id, {}).setdefault(
             Form(open_package_id=row.id), Decimal(0)
         )
+    for item_id in openings.keys() & set(item_ids):
+        for package_id in openings[item_id]:
+            held.setdefault(item_id, {}).setdefault(
+                Form(package_id=package_id), Decimal(0)
+            )
     rows: dict[int, list[FormRow]] = {}
     for item_id, forms in held.items():
         if set(forms) <= {LOOSE}:
@@ -714,6 +733,17 @@ def count(
             counted_now = record_count(
                 session, key, signed.admin.id, place.id, totals, as_of, by_form=lines
             )
+        # Closed after the count: one not there, or used up, as said. Each
+        # closed is at 0, as counted so, for an opening that arrived in it.
+        at_nothing: list[tuple[int, Form]] = []
+        for open_id, reason in forms.close:
+            done = open_packages.close(
+                session, open_id, signed.admin.id, now(), reason=reason
+            )
+            closed.append(done)
+            if done is not None:
+                item_id = session.get_one(OpenPackage, open_id).item_id
+                at_nothing.append((item_id, Form(open_package_id=open_id)))
         settled = over_recorded.counted(
             session,
             signed.admin.id,
@@ -721,14 +751,8 @@ def count(
             as_of,
             counted_now.written,
             counted_now.put_right,
+            at_nothing,
         )
-        # Closed after the count: one not there, or used up, as said.
-        for open_id, reason in forms.close:
-            closed.append(
-                open_packages.close(
-                    session, open_id, signed.admin.id, now(), reason=reason
-                )
-            )
         return counted_now
 
     result, broken = refusal(

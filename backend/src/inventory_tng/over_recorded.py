@@ -482,6 +482,32 @@ def confirm_count(
     return "corrected", written
 
 
+def openings_waiting(
+    session: Session, place_id: int, as_of: int
+) -> dict[int, set[int]]:
+    """Of those waiting, the openings at a place as of moment `as_of`: by
+    item, the packages each opened. Its count asks each such item by form,
+    with a line of those packages sealed though the records hold none, so
+    the sealed ones really there can be counted and each end put right
+    (Ali, 2026-11-15, inventory-tng-he9, inventory-tng-dd8)."""
+    found: dict[int, set[int]] = {}
+    for item_id, package_id in session.execute(
+        select(Movement.item_id, Movement.from_package_id)
+        .join(OverRecorded, OverRecorded.movement_id == Movement.id)
+        .join(LedgerTransaction, LedgerTransaction.id == Movement.transaction_id)
+        .where(
+            WAITING,
+            LedgerTransaction.kind == "open",
+            LedgerTransaction.from_location_id == place_id,
+            LedgerTransaction.id <= as_of,
+        )
+    ):
+        # An opening leaves sealed (ledger._opening_breaks).
+        assert package_id is not None
+        found.setdefault(item_id, set()).add(package_id)
+    return found
+
+
 def counted(
     session: Session,
     admin_id: int,
@@ -489,6 +515,7 @@ def counted(
     as_of: int,
     written: Sequence[ledger.Written],
     put_right: Collection[tuple[int, ledger.Form | None]],
+    emptied: Collection[tuple[int, ledger.Form]] = (),
 ) -> int:
     """Put right the ends at a place of those waiting that a count there
     has, as of moment `as_of`, after their movement (Ali, 2026-11-15,
@@ -500,14 +527,18 @@ def counted(
     has one end, where it arrived, which only that open package's own count
     puts right; an opening's ends, both at one place, only a count of each
     one's form, as a total cannot show the sealed and open split (Ali,
-    2026-11-15, inventory-tng-r5z). One with every end it has put right
-    closes as counted, by the count's administrator, then. How many closed.
+    2026-11-15, inventory-tng-r5z). An open package the count closed
+    (`emptied`: used up, or not there) puts right an opening's end that
+    arrived in it, as a count of it at 0 would, so Correct writes only the
+    sealed end (Ali, 2026-11-15, inventory-tng-he9); a move's it does not.
+    One with every end it has put right closes as counted, by the count's
+    administrator, then. How many closed.
 
     Call it in the count's transaction, holding the place (ledger.lock_place):
     it holds the rows it reads, by id, as Correct and Mark checked take a
     check after its places, so none waits on another the wrong way round.
     A send that wrote nothing (sent before) puts nothing right."""
-    if not written or not put_right:
+    if not written or not (put_right or emptied):
         return 0
     count_id = written[0].id
     totals = {item_id for item_id, form in put_right if form is None}
@@ -524,7 +555,7 @@ def counted(
         .join(LedgerTransaction, LedgerTransaction.id == Movement.transaction_id)
         .where(
             WAITING,
-            Movement.item_id.in_({item_id for item_id, _ in put_right}),
+            Movement.item_id.in_({item_id for item_id, _ in [*put_right, *emptied]}),
             LedgerTransaction.id <= as_of,
             or_(
                 LedgerTransaction.from_location_id == place_id,
@@ -555,7 +586,11 @@ def counted(
         if (
             arrived_at == place_id
             and row.arrived_count_id is None
-            and (by_total or (item_id, arrived) in forms)
+            and (
+                by_total
+                or (item_id, arrived) in forms
+                or (kind == "open" and (item_id, arrived) in emptied)
+            )
         ):
             row.arrived_count_id = count_id
             _end_counted(row.id, "arrived", count_id, admin_id)

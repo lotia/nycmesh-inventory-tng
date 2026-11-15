@@ -392,6 +392,21 @@ you" counts every report in one line, which hides what is waiting.
   never changes the total and a total cannot show the sealed and open
   split, so the row waits for Correct (both adjustments at the place,
   the total unchanged) or Mark checked.
+- **An opening waiting is counted by form** (Ali, 2026-11-15,
+  inventory-tng-he9, inventory-tng-dd8). While one waits at a place (as
+  of the count form), its count shows that item, at 0 if the records
+  hold none there, by form, with a line of the package opened, sealed,
+  at 0 if the records hold none: so the sealed ones really there can be
+  counted. So it is even where the place holds loose units alone, which
+  is otherwise counted by total, and while only its other end waits, so
+  a count can put either end right. Left at 0, the line counts none
+  sealed, as any line left as it is. A count that closes the open
+  package an opening arrived in (used up, or not there) puts that end
+  right, as a count of it at 0 would, so Correct writes only the sealed
+  end. Closing one by Confirm used up, or from its item's page, is no
+  count and puts no end right (inventory-tng-nyl), nor does a count of a
+  move's open package closed. A length check's Set never closes one; it
+  counts it, which puts an opening's end in it right already.
 - **One end put right**, the row says "Shelf B3 counted 14 Nov. Rack A
   still to put right." (the day in the site's zone) and offers "Correct
   Rack A", one adjustment at that end only, under a key of its own;
