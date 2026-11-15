@@ -11,7 +11,7 @@ wrong there until someone counts it.</p>
   <h2>{{ group.heading.name }}</h2>
   {% call table() %}
     {% for row in group.rows %}
-    <tr><td>{{ row.item.name }}</td><td>{{ row.quantity | amount }} {{ row.item.unit }}</td></tr>
+    <tr><td>{{ row.item.name_shown }}</td><td>{{ row.quantity | amount }} {{ row.item.unit }}</td></tr>
     {% endfor %}
   {% endcall %}
   <p><a href="{{ counts_path }}/{{ group.heading.id }}">Start counting {{ group.heading.name }}</a>{{ retired(group.heading) }}</p>

@@ -23,7 +23,7 @@ test("a package counted on the scan page is saved sealed", async ({ page }) => {
   await page.getByLabel("To", { exact: true }).selectOption({ label: "Van" });
   await pick(page, cable);
   // Picking it adds a metre; a box instead.
-  await page.getByLabel(/^Box of 305m/).fill("1");
+  await page.getByLabel(/^Box of 305\sm/).fill("1");
   await page.getByLabel(/^Loose/).fill("");
   const saving = page.waitForResponse(
     (response) =>
@@ -54,7 +54,7 @@ test("the same opening recorded twice is one transaction, said by no note (inven
     .getByLabel("Where", { exact: true })
     .selectOption({ label: "Supernode 1 › Shelf A" });
   await pick(page, cable);
-  await page.getByLabel(/^Box of 305m/).fill("2");
+  await page.getByLabel(/^Box of 305\sm/).fill("2");
   await page.getByLabel(/^Loose/).fill("");
   const left = await page.evaluate(
     () => localStorage.getItem("inventory.cart.v2") ?? "",
@@ -104,7 +104,7 @@ test("a package opened on the scan page is saved as an opening", async ({
     .getByLabel("Where", { exact: true })
     .selectOption({ label: "Supernode 1 › Shelf A" });
   await pick(page, cable);
-  await page.getByLabel(/^Box of 305m/).fill("1");
+  await page.getByLabel(/^Box of 305\sm/).fill("1");
   await page.getByLabel(/^Loose/).fill("");
   const saving = page.waitForResponse(
     (response) =>
@@ -128,15 +128,15 @@ test("a package opened on the scan page is saved as an opening", async ({
     .selectOption({ label: "Supernode 1 › Shelf A" });
   await page.getByLabel("To", { exact: true }).selectOption({ label: "Van" });
   await pick(page, cable);
-  await page.getByLabel(/^Box of 305m/).fill("");
+  await page.getByLabel(/^Box of 305\sm/).fill("");
   await page.getByLabel(/^Loose/).fill("");
   // A cut of all it shows ticks the box, and says why (inventory-tng-ck0).
-  const cutBox = page.getByLabel(/^Cut or take from the Box of 305m opened/);
+  const cutBox = page.getByLabel(/^Cut or take from the Box of 305\sm opened/);
   const nothingLeft = page.getByLabel("Nothing usable left on it");
   await cutBox.fill("305");
   await expect(nothingLeft).toBeChecked();
   await expect(
-    page.getByText("Your cut uses up the Box of 305m"),
+    page.getByText("Your cut uses up the Box of 305 m"),
   ).toBeVisible();
   await cutBox.fill("20");
   await expect(nothingLeft).not.toBeChecked();
@@ -157,7 +157,7 @@ test("a package opened on the scan page is saved as an opening", async ({
     .getByLabel("From", { exact: true })
     .selectOption({ label: "Supernode 1 › Shelf A" });
   await pick(page, cable);
-  await page.getByLabel(/^Box of 305m/).fill("");
+  await page.getByLabel(/^Box of 305\sm/).fill("");
   await page.getByLabel(/^Loose/).fill("");
   await page.getByLabel("Nothing usable left on it").check();
   const reporting = page.waitForResponse(
@@ -187,7 +187,7 @@ test("opening, an item fills its package sealed where it is opened", async ({
     .getByLabel("To", { exact: true })
     .selectOption({ label: "Supernode 1 › Shelf A" });
   await pick(page, cable);
-  await page.getByLabel(/^Box of 305m/).fill("1");
+  await page.getByLabel(/^Box of 305\sm/).fill("1");
   await page.getByLabel(/^Loose/).fill("");
   const receiving = page.waitForResponse(
     (each) =>
@@ -201,7 +201,7 @@ test("opening, an item fills its package sealed where it is opened", async ({
   await page.goto("/scan");
   await page.getByLabel("Opening packages").check();
   const where = page.getByLabel("Where", { exact: true });
-  const box = page.getByLabel(/^Box of 305m/);
+  const box = page.getByLabel(/^Box of 305\sm/);
   await where.selectOption({ label: "Van" });
   await pick(page, cable);
   await expect(box).toHaveValue("");
@@ -234,7 +234,7 @@ test("what is on an open package, said, is set by an administrator", async ({
     .getByLabel("Where", { exact: true })
     .selectOption({ label: "Supernode 1 › Shelf A" });
   await pick(page, cable);
-  await page.getByLabel(/^Box of 305m/).fill("1");
+  await page.getByLabel(/^Box of 305\sm/).fill("1");
   let saved = saving();
   await page.getByRole("button", { name: "Record" }).click();
   expect((await saved).status()).toBe(201);
@@ -242,11 +242,11 @@ test("what is on an open package, said, is set by an administrator", async ({
   await page.goto("/scan");
   await page.getByLabel("Moving stock").check();
   await pick(page, cable);
-  await page.getByLabel(/^Box of 305m/).fill("");
+  await page.getByLabel(/^Box of 305\sm/).fill("");
   await page.getByLabel(/^Loose/).fill("");
   await page.getByRole("button", { name: "Shows the wrong length?" }).click();
   await page
-    .getByLabel("What's on the Box of 305m now (m), if you can tell")
+    .getByLabel("What's on the Box of 305 m now (m), if you can tell")
     .fill("250");
   saved = saving();
   await page.getByRole("button", { name: "Record" }).click();
@@ -258,7 +258,7 @@ test("what is on an open package, said, is set by an administrator", async ({
   });
   await page.goto("/admin");
   await page
-    .getByRole("link", { name: `${cable}: 1 \u00d7 Box of 305m` })
+    .getByRole("link", { name: `${cable}: 1 \u00d7 Box of 305 m` })
     .click();
   await expect(page.getByText("said 250 m is on it")).toBeVisible();
   await page.getByRole("button", { name: `Set to 250 m ${cable}` }).click();

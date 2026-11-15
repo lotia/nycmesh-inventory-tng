@@ -354,8 +354,8 @@ def shown(session: Session, *where: ColumnElement[bool]) -> list[Shown]:
     rows = session.execute(
         select(
             OpenPackage,
-            Item.name,
-            ItemPackage.name,
+            Item.name_shown,
+            ItemPackage.name_shown,
             Item.unit,
             Location.name,
             Volunteer.name,
@@ -463,7 +463,7 @@ def forms_of(
     ).all()
     item_ids = {row[0] for row in rows}
     packages = {
-        package.id: PackageSize(package.name, package.size, package.short_below)
+        package.id: PackageSize(package.name_shown, package.size, package.short_below)
         for package in session.scalars(
             select(ItemPackage).where(ItemPackage.item_id.in_(item_ids))
         )

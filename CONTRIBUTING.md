@@ -313,6 +313,15 @@ Every name an administrator types is stored in canonical spelling
 as `°C` and `°F`, case kept. A form checks and compares a name in that
 spelling.
 
+An item's, a package's and an alias's name is shown, wherever it is read,
+as `name_shown` holds it (decision 0021): each number and the unit read
+after it spaced by a no-break space, thousands without commas and grouped
+by thin no-break spaces from five digits (`units.shown_name`). The app
+writes it as the session flushes and when a reading rule changes
+(`items.reread`). A page or reply that names one reads `name_shown`; only
+a form's field reads `name`. `tests/test_query_counts.py` checks every
+page for it.
+
 Searches read a unit right after a number in one spelling, on the server
 and the scan page alike (decision 0021): `10 µF` is `10uF`, and so is a
 unit alone spelt with `°`, `μ`, `µ` or `Ω`: `μF` is `uF`. Each searched

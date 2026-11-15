@@ -444,13 +444,13 @@ def _forms(
                 each.append(
                     FormRow(
                         f"{SEALED}{item_id}_{package.id}",
-                        f"{package.name}, sealed: how many",
+                        f"{package.name_shown}, sealed: how many",
                         amount / package.size,
                     )
                 )
             elif form.open_package_id is not None:
                 row = opened[form.open_package_id]
-                name = packages[row.package_id].name
+                name = packages[row.package_id].name_shown
                 each.append(
                     FormRow(
                         f"{OPENED}{row.id}",
@@ -470,7 +470,7 @@ def _followed(session: Session) -> list[tuple[ItemPackage, str, str]]:
     """Current packages of current items followed once opened, with their
     item's name and unit: what an open package nobody recorded may be."""
     rows = session.execute(
-        select(ItemPackage, Item.name, Item.unit, Item.track_opened)
+        select(ItemPackage, Item.name_shown, Item.unit, Item.track_opened)
         .join(Item, Item.id == ItemPackage.item_id)
         .where(ItemPackage.retired_at.is_(None), Item.retired_at.is_(None))
         .order_by(func.lower(Item.name), ItemPackage.size)

@@ -69,8 +69,8 @@ None is left, so nobody can pick it.{% endif %}{% endcall %}
   {% call table() %}
     {% for alias in aliases %}
     <tr>
-      <td>{{ alias.name }}</td>
-      <td>{% if not retired %}<form method="post" action="{{ here }}/aliases/{{ alias.id }}/remove"><button>Remove<span class="sr-only"> {{ alias.name }}</span></button></form>{% endif %}</td>
+      <td>{{ alias.name_shown }}</td>
+      <td>{% if not retired %}<form method="post" action="{{ here }}/aliases/{{ alias.id }}/remove"><button>Remove<span class="sr-only"> {{ alias.name_shown }}</span></button></form>{% endif %}</td>
     </tr>
     {% else %}
     <tr><td>None.</td></tr>
@@ -115,22 +115,22 @@ None is left, so nobody can pick it.{% endif %}{% endcall %}
             {% if sent %}{% with name = "size" %}{% include "_field_problem.html" %}{% endwith %}{% endif %}
           </label>
           {% endif %}
-          <button>Save<span class="sr-only"> {{ "the name of" if package.id in sizes_fixed else "the name and size of" }} {{ package.name }}</span></button>
+          <button>Save<span class="sr-only"> {{ "the name of" if package.id in sizes_fixed else "the name and size of" }} {{ package.name_shown }}</span></button>
         </form>
-      {% else %}{{ package.name }}{% endif %}
+      {% else %}{{ package.name_shown }}{% endif %}
         <span class="hint block">{{ "Opened ones followed" if followed else "Opened ones loose" }}
         ({{ "set on this package" if own and followed != item.track_opened else "as the item" }})</span></td>
       <td>{{ package.size | amount }} {{ item.unit }}</td>
       <td>{% if not package.retired_at and not retired %}
         <form method="post" action="{{ here }}/packages/{{ package.id }}/tracking" class="actions">
-          <label><span class="sr-only">When one of {{ package.name }} is opened</span>
+          <label><span class="sr-only">When one of {{ package.name_shown }} is opened</span>
             <select name="track">
               <option value="" {% if not own %}selected{% endif %}>Same as the item</option>
               <option value="on" {% if own and package.track_opened %}selected{% endif %}>Track</option>
               <option value="off" {% if own and not package.track_opened %}selected{% endif %}>Don't track</option>
             </select>
           </label>
-          <button>Set<span class="sr-only"> for {{ package.name }}</span></button>
+          <button>Set<span class="sr-only"> for {{ package.name_shown }}</span></button>
         </form>
       {% endif %}</td>
       <td>{% if not package.retired_at and not retired %}
@@ -143,13 +143,13 @@ None is left, so nobody can pick it.{% endif %}{% endcall %}
             <input name="minimum_sealed" inputmode="numeric" value="{{ sent.get('minimum_sealed', keep) }}">
             {% if sent %}{% with name = "minimum_sealed" %}{% include "_field_problem.html" %}{% endwith %}{% endif %}
           </label>
-          <button>Save<span class="sr-only"> {{ package.name }}</span></button>
+          <button>Save<span class="sr-only"> {{ package.name_shown }}</span></button>
         </form>
       {% endif %}</td>
       <td>{% if package.retired_at %}<span class="tag">Retired</span>
-        {% if not retired %}<form method="post" action="{{ here }}/packages/{{ package.id }}/restore"><button>Bring it back<span class="sr-only"> {{ package.name }}</span></button></form>{% endif %}
+        {% if not retired %}<form method="post" action="{{ here }}/packages/{{ package.id }}/restore"><button>Bring it back<span class="sr-only"> {{ package.name_shown }}</span></button></form>{% endif %}
       {% elif not retired %}
-        <form method="post" action="{{ here }}/packages/{{ package.id }}/retire"><button>Retire<span class="sr-only"> {{ package.name }}</span></button></form>
+        <form method="post" action="{{ here }}/packages/{{ package.id }}/retire"><button>Retire<span class="sr-only"> {{ package.name_shown }}</span></button></form>
       {% endif %}</td>
     </tr>
     {% else %}
@@ -201,7 +201,7 @@ None is left, so nobody can pick it.{% endif %}{% endcall %}
     <select name="package_id">
       <option value="">One {{ "unit" if item.unit == "each" else item.unit }}</option>
       {% for package in packages if not package.retired_at %}
-      <option value="{{ package.id }}">{{ package.name }} of {{ package.size | amount }}</option>
+      <option value="{{ package.id }}">{{ package.name_shown }} of {{ package.size | amount }}</option>
       {% endfor %}
     </select>
   </label>

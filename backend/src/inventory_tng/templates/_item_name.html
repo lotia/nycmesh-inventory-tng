@@ -10,7 +10,7 @@
 {% if similar %}
 <p class="warning" role="status">Similar: {% for close in similar -%}
   {% set other = close.item -%}
-  <a href="{{ items_path }}/{{ other.id }}">{{ other.name }}</a>
+  <a href="{{ items_path }}/{{ other.id }}">{{ other.name_shown }}</a>
   {%- if close.alias %} (alias {{ close.alias }}){% endif %}
   {%- if other.retired_at %} <span class="tag">Retired</span>{% endif %}{{ ", " if not loop.last }}
   {%- endfor %}. A different item? {{ again }} again.</p>

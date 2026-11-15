@@ -45,7 +45,7 @@ Mark checked asked again, for a row without it. #}
 so the inventory shows more moved than was. Correct moves the extra back
 with an adjustment. Mark checked if you already fixed it.</p>
 {% if only %}
-<p>Only {{ only.name }}. <a href="{{ here }}">Show all</a></p>
+<p>Only {{ only.name_shown }}. <a href="{{ here }}">Show all</a></p>
 {% endif %}
 {% call table() %}
   <tr><th>Item</th><th>Recorded more</th><th>Where</th><th>Transaction</th><th></th></tr>

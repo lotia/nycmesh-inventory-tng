@@ -527,6 +527,45 @@ ft` and `100 feet` still find it. A product's number is never the first
 of such a group, so `Cat 6 305 m` is `Cat 6 305m`, and after a number and
 a space only commas group, so `Cat 6 1,000 ft` is `Cat 6 1000ft`.
 
+## Amendment: names are shown with each number and unit spaced (2026-11-15)
+
+Ali decided on 2026-11-15 (inventory-tng-ist.3) that a name stays saved
+as typed, and beside it each item, package and alias keeps the name as
+the app shows it, in its own column, `name_shown` (`models.KeyedName`),
+so a later change of mind changes only which is shown, and nothing typed
+is lost:
+
+- Each number a unit is read right after, as the forms read it (its rule,
+  the words near it, the profile; never a product's), is spaced from the
+  unit by a no-break space, the unit spelt as typed: `Cable 100ft 48 VDC`
+  is shown `Cable 100 ft 48 VDC`, `Cap 10uF 50V` `Cap 10 uF 50 V` and
+  `Spool 305M` `Spool 305 M`. A rule's respell still spells the name saved.
+  What is not read as a unit, a unit's word (`48 VDC`, `100 feet`) and a
+  product (`Cat6a`, `5AC`, `SFP+`) are shown as typed.
+- That number is shown without its thousands separators, `Box 1,000 ft`
+  as `Box 1000 ft`, and from five digits with a thin no-break space
+  (U+202F) between each three, as the SI writes it: `10,000 ft` is
+  `10 000 ft`, which never wraps.
+- It is shown wherever a name is read: the admin lists and item pages,
+  the scan page (the catalogue sends it), labels and notices. The item
+  form edits the name as typed and says how it is shown where that
+  differs (`Shown as Box 10 000 ft.`), as do the package and alias forms.
+
+`units.shown_name` makes it. The app writes it as the session flushes,
+wherever a name is written, and again when a reading rule changes
+(`items.reread`); migration 0047 filled it, and a migration like it fills
+it again if the rules change. Uniqueness and search are unchanged: search
+keeps the name as typed, and reads a no-break or thin space as a space, so
+a name copied from a page finds the item.
+
+Decided in building it (inventory-tng-ist.3, 2026-11-15): only commas
+group thousands here, as a plain space may part two numbers (`Pack 2 100
+ft`), which search accepts but a name shown must not join; a number
+within a word or a code, right after a letter, digit, `-`, `/`, `.` or
+`+` (`UF-SM-10G`, `ES-8-150W`), is shown as typed; the seeding page shows
+names as typed, as evidence of how a unit was typed; and an item's form,
+its packages' and its aliases' fields hold the name as typed.
+
 ## Amendment: the import's readings file (2026-11-14)
 
 An import starts with no reading rules, and its readings are settled

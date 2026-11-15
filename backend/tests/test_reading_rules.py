@@ -172,7 +172,7 @@ def test_a_name_reading_as_another_is_refused_naming_it(
     refused = admin_client.post(ITEMS, data=form | {"name": "Cap 10 µF"})
     assert refused.status_code == 400
     assert (
-        "Cap 10 uF already has that name, or one differing from it only in "
+        "Cap 10\u00a0uF already has that name, or one differing from it only in "
         "case, spaces, punctuation or how its units are spelt."
     ) in text(refused)
     rocket = new_item(session, radios, "Rocket")

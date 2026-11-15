@@ -219,7 +219,7 @@ def test_a_name_is_checked_and_saved_in_canonical_spelling(
     item = named(session, Item, "Cap 10\u03bcF")
     refused = admin_client.post(ITEMS, data=form | {"name": "cap 10\u00b5f"})
     assert refused.status_code == 400
-    assert "Cap 10\u03bcF already has that name" in refused.text
+    assert "Cap 10\u00a0\u03bcF already has that name" in refused.text
     path = f"{ITEMS}/{item.id}"
     edit = form | {"version": str(item.edit_version)}
     saved = admin_client.post(path, data=edit | {"name": "Cap 10\u00b5F"})
@@ -1183,7 +1183,8 @@ def test_a_name_taken_once_read_as_answered_names_the_item(
     other = new_item(session, radios, "Box 10Gbps")
     item = new_item(session, radios, "Spare")
     said = (
-        "Box 10Gbps already has that name, or one differing from it only in "
+        # As shown (KeyedName.name_shown).
+        "Box 10\u00a0Gbps already has that name, or one differing from it only in "
         "case, spaces, punctuation or how its units are spelt."
     )
     form = {"category_id": str(radios.id), "unit": "each", "unit:g": "Gbit/s"}
@@ -1415,7 +1416,7 @@ def test_the_items_form_adds_and_removes_aliases(
     assert (line["item_id"], line["item_alias_id"]) == (item.id, alias.id)
     assert "Tough" not in str(line)
     page = text(admin_client.get(f"{ITEMS}/{item.id}"))
-    assert "Tough  cable 305 m" in page
+    assert "Tough  cable 305\u00a0m" in page
     refused = admin_client.post(path, data={"alias_name": "- ?"})
     assert refused.status_code == 400
     assert NO_LETTERS in text(refused)

@@ -223,7 +223,7 @@ SIMILAR = 5
 @dataclass(frozen=True)
 class Close:
     """An item whose name is close to another, or one of whose current
-    aliases is: that alias, then, as spelt."""
+    aliases is: that alias, then, as shown (KeyedName.name_shown)."""
 
     item: Item
     alias: str | None = None
@@ -254,7 +254,12 @@ def similar(session: Session, name: str, item_id: int) -> list[Close]:
 
     found = union_all(
         close(Item.id, null(), Item.name_folded),
-        close(ItemAlias.item_id, ItemAlias.name, ItemAlias.name_folded, CURRENT_ALIAS),
+        close(
+            ItemAlias.item_id,
+            ItemAlias.name_shown,
+            ItemAlias.name_folded,
+            CURRENT_ALIAS,
+        ),
     ).subquery()
     best = (
         select(found)
@@ -613,10 +618,11 @@ def read_alike(
 
 def reread(session: Session, tokens: Iterable[str]) -> None:
     """Every name, package and alias with these units after a number read
-    again by the reading rules as the session holds them: their unit keys and
-    what is searched of them. Refused (READ_ALIKE) if two names would then
-    read alike, naming nothing: read_alike says which. The rules are
-    written first (reading_rules.py), holding the catalogue lock."""
+    again by the reading rules as the session holds them: their unit keys,
+    how each is shown and what is searched of them. Refused (READ_ALIKE) if
+    two names would then read alike, naming nothing: read_alike says which.
+    The rules are written first (reading_rules.py), holding the catalogue
+    lock."""
     lock_catalogue(session)
     rules = reading_rules(session)
     rows = _with_units(session, tokens, lock=True)
@@ -631,6 +637,9 @@ def reread(session: Session, tokens: Iterable[str]) -> None:
     session.flush()
     for row, key in changing.items():
         row.unit_key = key
+    # And each shown as it now reads (KeyedName.name_shown).
+    for row in keys:
+        row.name_shown = units.shown_name(row.name, rules)
     # The items' current aliases in one read, not one read an item.
     written: dict[int, list[ItemAlias]] = {item.id: [] for item in items_}
     if written:

@@ -6,7 +6,7 @@
  * search mixing spellings group by group.
  */
 import { expect, test } from "@playwright/test";
-import { ownCable } from "./own";
+import { ownCable, unique } from "./own";
 
 test("a suggestion picked with the keyboard narrows the list", async ({
   page,
@@ -66,14 +66,18 @@ test("the scan page finds an item without its accents, and shows them", async ({
 test("a unit after a number is found however it is spelt, on both sides", async ({
   page,
 }) => {
-  const name = await ownCable(page, "Cap 10μF");
+  const name = await ownCable(page, "Cap 10μF", "Cap 10\u00a0μF");
+  // Shown with its number and unit spaced.
+  const shown = name.replace("10μF", "10\u00a0μF");
   await page.goto("/scan");
   await page.getByLabel(/Find an item/).fill(name.replace("10μF", "10uf"));
-  await expect(page.getByRole("button", { name, exact: true })).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: shown, exact: true }),
+  ).toBeVisible();
   const typed = name.replace("10μF", "10 µF");
   await page.goto(`/admin/items?q=${encodeURIComponent(typed)}`);
   await expect(
-    page.getByRole("table").getByRole("link", { name, exact: true }),
+    page.getByRole("table").getByRole("link", { name: shown, exact: true }),
   ).toBeVisible();
 });
 
@@ -115,4 +119,35 @@ test("a search mixing spellings is matched group by group, on both sides", async
   await expect(
     page.getByRole("table").getByRole("link", { name, exact: true }),
   ).toBeVisible();
+});
+
+test("a name is shown with its number and unit spaced, on both sides", async ({
+  page,
+}) => {
+  // Saved as typed, shown corrected (Ali, 2026-11-15, inventory-tng-ist.3).
+  const name = unique("Box 10,000ft");
+  const shown = name.replace("10,000ft", "10 000 ft");
+  await page.goto("/admin/items");
+  await page.getByLabel(/^Name/).fill(name);
+  await page.getByLabel("Category").selectOption({ label: "Cables" });
+  const add = page.getByRole("button", { name: "Add", exact: true });
+  await add.click();
+  const heading = page.getByRole("heading", { level: 1 });
+  const asked = page.getByText("A different item?");
+  await expect(heading.or(asked)).toBeVisible();
+  if (await asked.isVisible()) {
+    await add.click();
+  }
+  await expect(heading).toHaveText(shown);
+  expect(await heading.textContent()).toBe(shown);
+  await expect(page.getByLabel(/^Name/)).toHaveValue(name);
+  await expect(page.getByText(`Shown as ${shown}.`)).toBeVisible();
+  await page.goto("/scan");
+  // Found as typed, and as shown, as copied from a page.
+  for (const typed of [name, shown]) {
+    await page.getByLabel(/Find an item/).fill(typed);
+    const found = page.getByRole("button", { name: shown, exact: true });
+    await expect(found).toBeVisible();
+    expect(await found.textContent()).toContain(shown);
+  }
 });

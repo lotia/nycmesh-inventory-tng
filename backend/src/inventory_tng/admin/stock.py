@@ -193,7 +193,7 @@ def reorder_rows(
     for item in items:
         in_stock = usable.get(item.id, Decimal(0))
         low = [
-            (package.name, count, minimum)
+            (package.name_shown, count, minimum)
             for package in minimums.get(item.id, [])
             if (minimum := package.minimum_sealed) is not None
             and (count := sealed.get(item.id, {}).get(package.id, Decimal(0))) < minimum

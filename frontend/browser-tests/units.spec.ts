@@ -49,11 +49,20 @@ async function newItem(page: Page, name: string): Promise<void> {
   await page.getByLabel("Category").selectOption({ label: "Cables" });
 }
 
-/** Adds it, saying it is a different item if a close name is asked about. */
-async function add(page: Page, name: string): Promise<void> {
+/**
+ * Adds it, saying it is a different item if a close name is asked about.
+ * Its page is headed by it as shown: `unit` read after its number, spaced
+ * from it (docs/decisions/0021, names shown).
+ */
+async function add(page: Page, name: string, unit: string): Promise<void> {
   const button = page.getByRole("button", { name: "Add", exact: true });
   await button.click();
-  const heading = page.getByRole("heading", { level: 1, name, exact: true });
+  const shown = name.replace(new RegExp(`([0-9])${unit}`), `$1 ${unit}`);
+  const heading = page.getByRole("heading", {
+    level: 1,
+    name: shown,
+    exact: true,
+  });
   const asked = page.getByText("A different item?");
   await expect(heading.or(asked)).toBeVisible();
   if (await asked.isVisible()) {
@@ -79,7 +88,7 @@ test("a unit nothing settles is asked once, then said under the name", async ({
     asked.getByLabel(`Not a unit: keep “${n}${unit}”`),
   ).toBeVisible();
   await asked.getByLabel(`${n}${rate} · data rate`).check();
-  await add(page, name);
+  await add(page, name, unit);
   // Saved as typed, read as answered.
   await expect(
     page.getByText(`Read as ${n}${rate} · data rate. Saved as typed.`),
@@ -106,7 +115,7 @@ test("the seeding page proposes readings, each accepted as a rule", async ({
   const n = number();
   const name = unique(`Cap ${n}${unit}`);
   await newItem(page, name);
-  await add(page, name);
+  await add(page, name, unit);
   await expect(page.getByText(`Read as ${n}${reading}.`)).toBeVisible();
 
   await page.goto("/admin/unit-readings");

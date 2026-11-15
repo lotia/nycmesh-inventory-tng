@@ -1,6 +1,9 @@
 """No page reads row by row (inventory-tng-du6): CONTRIBUTING.md, Running
-the checks, says what this measures and what a new page needs here."""
+the checks, says what this measures and what a new page needs here. And
+every page names items and packages as shown (inventory-tng-ist.3)."""
 
+import json
+import re
 from collections.abc import Callable
 from dataclasses import dataclass, field
 from datetime import timedelta
@@ -16,6 +19,7 @@ from sqlalchemy.orm import Session
 
 from inventory_tng import accounts, devices, over_recorded
 from inventory_tng.admin.length_checks import KINDS
+from inventory_tng.db import lock_catalogue
 from inventory_tng.models import (
     Admin,
     Authenticator,
@@ -349,3 +353,67 @@ def test_a_page_reads_alike_for_one_row_or_eleven(
     # Else what it adds is not what the page lists.
     assert longer > shorter, f"{route} shows nothing more"
     assert eleven == one, f"{route}: {one} statements for one row, {eleven} for eleven"
+
+
+# Pages that name no item or package, and why the one that does names them
+# as typed.
+NAMES_NO_ITEM = {
+    "/admin/account",
+    "/admin/volunteers",
+    "/admin/volunteers/suggest",
+    "/admin/volunteers/{volunteer_id}",
+    "/admin/locations",
+    "/admin/locations/{location_id}",
+    "/admin/unit-readings",
+    "/admin/devices",
+    "/admin/devices/all",
+    "/admin/devices/codes/{code_id}",
+    "/admin/admins",
+    "/admin/categories",
+    # Counts list places, and what was counted: none yet.
+    "/admin/counts",
+}
+# Its names are evidence of how a unit was typed.
+NAMES_AS_TYPED = {"/admin/unit-readings/seed"}
+
+
+@pytest.mark.parametrize(("route", "more", "where"), CASES)
+def test_every_page_names_items_and_packages_as_shown(
+    route: str,
+    more: More,
+    where: Path,
+    request: pytest.FixtureRequest,
+    session: Session,
+) -> None:
+    """Each name ending in `1,000ft`, as typed, is read as `1000 ft` with a
+    no-break space (models.KeyedName.name_shown), on every page and the
+    scan page's catalogue; only a form's field holds it as typed (Ali,
+    2026-11-15, inventory-tng-ist.3)."""
+    client: TestClient = request.getfixturevalue(
+        "registered_client" if route == CATALOGUE else "admin_client"
+    )
+    world = World(session)
+    more(world)
+    lock_catalogue(session)
+    for row in [*session.scalars(select(Item)), *session.scalars(select(ItemPackage))]:
+        row.name = f"{row.name} 1,000ft"
+    session.flush()
+    path = where if isinstance(where, str) else where(world)
+    response = client.get(path)
+    assert response.status_code == 200, path
+    if response.headers["content-type"].startswith("application/json"):
+        reply = response.json()
+        # What is searched holds names as typed, matched, never shown.
+        for item in reply.get("items", []) if isinstance(reply, dict) else []:
+            item.pop("search_text")
+        page = json.dumps(reply, ensure_ascii=False)
+    else:
+        # A form's fields, and under a name's how its units typed are read
+        # (_units_read.html), as typed.
+        page = re.sub(r' value="[^"]*"', "", response.text)
+        page = re.sub(r'<div class="hint">.*?</div>', "", page, flags=re.DOTALL)
+    if route in NAMES_AS_TYPED:
+        return
+    assert "1,000ft" not in page, path
+    if route not in NAMES_NO_ITEM:
+        assert "1000\u00a0ft" in page, path

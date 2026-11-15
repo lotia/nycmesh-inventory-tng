@@ -21,8 +21,8 @@ back to. #}
     {% set category = category_names.get(item.category_id, "") %}
     {% set part = ((item.manufacturer or "") ~ " " ~ (item.part_number or "")) | trim %}
     <tr>
-      <td>{% if not item.retired_at %}<input type="checkbox" name="item" value="{{ item.id }}" form="track-items" aria-label="Pick {{ item.name }}">{% endif %}</td>
-      <td><a href="{{ here }}/{{ item.id }}">{{ item.name }}</a>
+      <td>{% if not item.retired_at %}<input type="checkbox" name="item" value="{{ item.id }}" form="track-items" aria-label="Pick {{ item.name_shown }}">{% endif %}</td>
+      <td><a href="{{ here }}/{{ item.id }}">{{ item.name_shown }}</a>
         {%- if item.track_opened %} <span class="tag">Opened followed</span>{% endif %}
         {%- if item.retired_at %} <span class="tag">Retired</span>{% endif %}
         <span class="hint block sm:hidden">{{ [category, item.unit, part] | select | join(" · ") }}</span></td>

@@ -293,7 +293,7 @@ def test_a_search_mixing_spellings_is_matched_group_by_group(
     one holding the search whole and above one only close to it."""
     parts = add(session, Category(name=f"Parts {tag()}"))
     whole, grouped, close, cap, wrong = (
-        add(session, Item(name=f"{name} {tag()}", category_id=parts.id)).name
+        add(session, Item(name=f"{name} {tag()}", category_id=parts.id)).name_shown
         for name in (
             "PoE cable 100 ft 48 V",
             "Cable 100 feet, PoE 48 VDC",
@@ -333,7 +333,7 @@ def test_a_search_finds_thousands_and_vdc_however_written(
         assert item.name.startswith(name)
         for each in typed:
             listed = page_text(admin_client.get(ITEMS, params={"q": each}))
-            assert item.name in listed, each
+            assert item.name_shown in listed, each
 
 
 def test_every_spelling_of_a_unit_finds_the_others(
@@ -354,7 +354,7 @@ def test_every_spelling_of_a_unit_finds_the_others(
         item = add(session, Item(name=f"{name} {tag()}", category_id=parts.id))
         for each in typed:
             listed = page_text(admin_client.get(ITEMS, params={"q": each}))
-            assert item.name in listed, each
+            assert item.name_shown in listed, each
     assert any(
         found.item.name.startswith("Cap 10μF")
         for found in items.similar(session, "Cap 10 uF", 0)
@@ -513,3 +513,59 @@ def test_every_reading_is_shown_and_named_and_read_back_as_itself() -> None:
         "metric tons",
         "meters",
     ]
+
+
+NB, THIN = "\u00a0", "\u202f"
+
+
+@pytest.mark.parametrize(
+    ("name", "shown"),
+    [
+        # Ali's examples (2026-11-15, inventory-tng-ist.3).
+        ("Cable 100ft 48 VDC", f"Cable 100{NB}ft 48 VDC"),
+        ("Cap 10uF 50V", f"Cap 10{NB}uF 50{NB}V"),
+        ("Box 1,000 ft", f"Box 1000{NB}ft"),
+        ("10,000 ft", f"10{THIN}000{NB}ft"),
+        ("Spool 305M", f"Spool 305{NB}M"),
+        # Thousands grouped from five digits, a decimal part and a sign kept.
+        ("Reel 12345 ft", f"Reel 12{THIN}345{NB}ft"),
+        ("Drum 1,234,567.5 mm", f"Drum 1{THIN}234{THIN}567.5{NB}mm"),
+        ("Probe -40°C", f"Probe -40{NB}°C"),
+        # Commas that group no thousands, as typed.
+        ("Pack 1,2 m", f"Pack 1,2{NB}m"),
+        # Products, words of units, units no rule or word settles, and
+        # tokens no unit, as typed.
+        ("Cat6a cable 5AC SFP+", "Cat6a cable 5AC SFP+"),
+        ("Cable 100 feet", "Cable 100 feet"),
+        ("Box 3M", "Box 3M"),
+        ("Bolt 24P", "Bolt 24P"),
+        # Spaced already with a no-break space, as typed.
+        (f"Cable 100{NB}ft", f"Cable 100{NB}ft"),
+        # A number within a word or a code, as typed; one in brackets not.
+        (
+            "UF-SM-10G ES-8-150W ab07f 2x10G 1/10G",
+            "UF-SM-10G ES-8-150W ab07f 2x10G 1/10G",
+        ),
+        ("Patch (3ft)", f"Patch (3{NB}ft)"),
+    ],
+)
+def test_a_name_is_shown_with_each_number_and_unit_spaced(
+    name: str, shown: str
+) -> None:
+    """Each number and the unit read after it are spaced by a no-break space,
+    the unit as typed; thousands without commas, from five digits grouped by
+    thin no-break spaces (Ali, 2026-11-15, inventory-tng-ist.3)."""
+    assert units.shown_name(name) == shown
+
+
+def test_a_name_is_shown_as_its_rules_read_it() -> None:
+    """A unit read by its rule is spaced, one a rule says is no unit not:
+    `3M` near nothing is asked, so as typed, until a rule reads it."""
+    length = units.Rule("m")
+    assert units.shown_name("Box 3M", {"M": length}) == f"Box 3{NB}M"
+    assert units.shown_name("Cap 10uF", {"uF": units.Rule(None)}) == "Cap 10uF"
+    # A rule respelling its unit spells the name saved, which is shown so.
+    saved = units.spell(
+        "Box 3M", units.found_in("Box 3M", {"M": units.Rule("m", True)})
+    )
+    assert units.shown_name(saved, {"M": units.Rule("m", True)}) == f"Box 3{NB}m"

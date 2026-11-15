@@ -79,6 +79,9 @@ class SealedAt(BaseModel):
 
 class PackageEntry(Entry):
     id: int
+    # As the app shows it (models.KeyedName.name_shown), as are items' and
+    # retired ones' names here: searched by search_text, which holds it as
+    # typed.
     name: str
     # In the item's unit.
     size: Decimal
@@ -118,7 +121,7 @@ class OpenPackageEntry(Entry):
     short_below: Decimal | None
 
 
-class RetiredPackage(Entry):
+class RetiredPackage(BaseModel):
     id: int
     name: str
     size: Decimal
@@ -236,13 +239,15 @@ def catalogue(session: Session) -> Catalogue:
         offered = package.retired_at is None or package.id in sealed
         if package.item_id in gone_ids or not offered:
             named.setdefault(package.item_id, []).append(
-                RetiredPackage.model_validate(package)
+                RetiredPackage(
+                    id=package.id, name=package.name_shown, size=package.size
+                )
             )
             continue
         packages.setdefault(package.item_id, []).append(
             PackageEntry(
                 id=package.id,
-                name=package.name,
+                name=package.name_shown,
                 size=package.size,
                 track_opened=tracks_opened(item_tracks, package.track_opened),
                 retired=package.retired_at is not None,
@@ -270,7 +275,7 @@ def catalogue(session: Session) -> Catalogue:
     entries = [
         ItemEntry(
             id=item.id,
-            name=item.name,
+            name=item.name_shown,
             unit=item.unit,
             category=category,
             manufacturer=item.manufacturer,
@@ -306,7 +311,7 @@ def catalogue(session: Session) -> Catalogue:
         retired_items=[
             RetiredItem(
                 id=item.id,
-                name=item.name,
+                name=item.name_shown,
                 unit=item.unit,
                 packages=named.get(item.id, []),
             )
@@ -347,7 +352,7 @@ def open_to_take(session: Session, item_ids: set[int]) -> list[OpenPackageEntry]
     first. One whose records say nothing is left is sent too, at that: it
     is where a volunteer says it is used up."""
     found = session.execute(
-        select(OpenPackage, ItemPackage.name, ItemPackage.short_below)
+        select(OpenPackage, ItemPackage.name_shown, ItemPackage.short_below)
         .join(ItemPackage, ItemPackage.id == OpenPackage.package_id)
         .where(
             OpenPackage.closed_at.is_(None),

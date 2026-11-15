@@ -299,9 +299,9 @@ def shown(session: Session, *where: ColumnElement[bool]) -> list[Shown]:
         select(
             OverRecorded,
             Item.id,
-            Item.name,
+            Item.name_shown,
             Item.unit,
-            ItemPackage.name,
+            ItemPackage.name_shown,
             ItemPackage.size,
             Movement.from_open_package_id,
             Movement.to_open_package_id,
@@ -505,9 +505,9 @@ def settled(
         select(
             OverRecorded,
             Item.id,
-            Item.name,
+            Item.name_shown,
             Item.unit,
-            ItemPackage.name,
+            ItemPackage.name_shown,
             ItemPackage.size,
             Movement.from_open_package_id,
             Movement.to_open_package_id,

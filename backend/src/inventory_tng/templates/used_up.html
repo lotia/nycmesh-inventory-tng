@@ -5,7 +5,7 @@
 one to close it: what it still shows is written off, with the reason Used
 up. Not used up offers it again, for a box ticked by mistake.</p>
 {% if only %}
-<p>Only {{ only.name }}. <a href="{{ here }}">Show all</a></p>
+<p>Only {{ only.name_shown }}. <a href="{{ here }}">Show all</a></p>
 {% endif %}
 {#- The packages ticked belong to this form. #}
 <form method="post" action="{{ here }}{{ query }}" id="answer-ticked"></form>

@@ -754,6 +754,71 @@ def test_what_is_searched_reads_vdc_and_thousands(alembic_config: Config) -> Non
     )
 
 
+def test_names_shown_are_filled_by_the_rules_there_are(
+    alembic_config: Config,
+) -> None:
+    """Migration 0047: each item's, package's and alias's name as shown,
+    its numbers and units spaced as the reading rules there are read them,
+    names kept as typed; and gone again, going back (inventory-tng-ist.3)."""
+    command.downgrade(alembic_config, "0046")
+    connection = alembic_config.attributes["connection"]
+    connection.execute(
+        text("INSERT INTO reading_rule (token, reading) VALUES ('M', 'm')")
+    )
+    category_id = connection.scalar(
+        text("INSERT INTO category (name) VALUES ('Parts') RETURNING id")
+    )
+    item = partial(_insert, connection, "item", category_id=category_id)
+    box = item(
+        name="Box 10,000ft",
+        name_key=name_key("Box 10,000ft"),
+        unit_key="kept",
+        name_folded="kept",
+        search_text="kept",
+        folded_with="kept",
+    )
+    _insert(
+        connection,
+        "item_package",
+        name="Tape 3M",
+        name_key=name_key("Tape 3M"),
+        unit_key="kept",
+        item_id=box,
+        size=305,
+        search_text="kept",
+        folded_with="kept",
+    )
+    _insert(
+        connection,
+        "item_alias",
+        name="Cap 10uF 50V",
+        name_key=name_key("Cap 10uF 50V"),
+        unit_key="kept",
+        item_id=box,
+        name_folded="kept",
+    )
+    command.upgrade(alembic_config, "0047")
+    assert connection.execute(
+        text(
+            "SELECT name, name_shown FROM item UNION ALL"
+            " SELECT name, name_shown FROM item_package UNION ALL"
+            " SELECT name, name_shown FROM item_alias"
+        )
+    ).all() == [
+        ("Box 10,000ft", "Box 10\u202f000\u00a0ft"),
+        # Asked, but for the rule there is.
+        ("Tape 3M", "Tape 3\u00a0M"),
+        ("Cap 10uF 50V", "Cap 10\u00a0uF 50\u00a0V"),
+    ]
+    command.downgrade(alembic_config, "0046")
+    assert not connection.scalar(
+        text(
+            "SELECT count(*) FROM information_schema.columns"
+            " WHERE column_name = 'name_shown'"
+        )
+    )
+
+
 def test_unit_keys_are_read_again_as_the_forms_read(alembic_config: Config) -> None:
     """Migration 0043: every unit key read again, by the rules there are;
     names that would then be one named by id first, nothing changed."""

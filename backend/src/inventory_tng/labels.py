@@ -105,7 +105,7 @@ class Named:
 
 def _package_words(item: Item, package: ItemPackage) -> str:
     unit = "" if item.unit == "each" else f" {item.unit}"
-    return f"{item.name}: {package.name} of {amount(package.size)}{unit}"
+    return f"{item.name_shown}: {package.name_shown} of {amount(package.size)}{unit}"
 
 
 def _by_id[M: (Item, ItemPackage, Location)](
@@ -161,7 +161,9 @@ def named(session: Session, labels: Sequence[Label]) -> list[Named]:
         else:
             item = items[label.item_id or 0]
             package = packages.get(label.package_id or 0)
-            words = item.name if package is None else _package_words(item, package)
+            words = (
+                item.name_shown if package is None else _package_words(item, package)
+            )
         found.append(Named(label, words, inactive(label, sent)))
     return found
 

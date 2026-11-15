@@ -300,10 +300,15 @@ class KeyedName(CanonicalName):
     units read (unit_key), so names that differ only in how a unit is
     spelt are one: written as the session flushes, as reading rules are
     in the database, and again when a rule changes (items.reread); no
-    CHECK can hold it, the unit table being the app's (2026-11-15)."""
+    CHECK can hold it, the unit table being the app's (2026-11-15).
+    `name_shown` is the name as the app shows it wherever a name is read
+    (units.shown_name: each number and the unit read after it spaced, its
+    thousands so too), written alike, the name as typed kept for its form
+    (Ali, 2026-11-15, inventory-tng-ist.3)."""
 
     name_key: Mapped[str] = mapped_column(Text)
     unit_key: Mapped[str] = mapped_column(Text, info={"not_a_change": True})
+    name_shown: Mapped[str] = mapped_column(Text, info={"not_a_change": True})
 
     def _named(self, name: str) -> None:
         self.name_key = names.name_key(name)
@@ -377,8 +382,8 @@ def _refold(session: Session, _context: object, _instances: object) -> None:
         )
     ]
     # An alias added or removed is searched as its item's (Item.refold).
-    # And each name new or changed keyed with its units read, by the
-    # reading rules (KeyedName.unit_key).
+    # And each name new or changed keyed with its units read, and spaced to
+    # be shown, by the reading rules (KeyedName).
     rows += [
         session.get_one(Item, row.item_id)
         for row in changed
@@ -397,6 +402,7 @@ def _refold(session: Session, _context: object, _instances: object) -> None:
         row.refold(rules)
     for row in keyed:
         row.unit_key = unit_key(row.name or "", rules)
+        row.name_shown = units.shown_name(row.name or "", rules)
 
 
 def fuzzy(column: SQLColumnExpression[str], search: str) -> ColumnElement[bool]:

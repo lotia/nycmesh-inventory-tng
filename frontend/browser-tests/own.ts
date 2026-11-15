@@ -38,23 +38,32 @@ export async function ownVolunteer(page: Page): Promise<string> {
 /**
  * A new cable, in metres, that comes in a box of 305 m whose opened ones
  * are followed (docs/decisions/0020), as the seed's is, named `what` and
- * something unique. Its name.
+ * something unique, its page headed by it as shown, `shown` in place of
+ * `what` (docs/decisions/0021, names shown). Its name as typed.
  */
-export async function ownCable(page: Page, what = "Cable"): Promise<string> {
+export async function ownCable(
+  page: Page,
+  what = "Cable",
+  shown = what,
+): Promise<string> {
   const name = await named(page, "/admin/items", what);
   await page.getByLabel("Category").selectOption({ label: "Cables" });
   await page.getByLabel(/^Unit/).selectOption("m");
   const add = page.getByRole("button", { name: "Add", exact: true });
   await add.click();
   // Close to another test's name, it asks once.
-  const heading = page.getByRole("heading", { level: 1, name, exact: true });
+  const heading = page.getByRole("heading", {
+    level: 1,
+    name: name.replace(what, shown),
+    exact: true,
+  });
   const asked = page.getByText("A different item?");
   await expect(heading.or(asked)).toBeVisible();
   if (await asked.isVisible()) {
     await add.click();
   }
   await expect(heading).toBeVisible();
-  const box = "Box of 305m";
+  const box = "Box of 305 m";
   await page.getByLabel("Package", { exact: true }).fill(box);
   await page.getByLabel("Holds").fill("305");
   await page.getByRole("button", { name: "Add package" }).click();

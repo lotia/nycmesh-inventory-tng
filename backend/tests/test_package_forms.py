@@ -1302,7 +1302,7 @@ def test_an_items_packages_are_counted_by_name(
     # By name, never a word made from it (inventory-tng-b1z).
     assert (
         line().packages
-        == "1 \N{MULTIPLICATION SIGN} Spool, 1 \N{MULTIPLICATION SIGN} Spool 150 m"
+        == "1 \N{MULTIPLICATION SIGN} Spool, 1 \N{MULTIPLICATION SIGN} Spool 150\u00a0m"
     )
     reel = add(
         session, ItemPackage(item_id=spools.cable.id, name="Reel", size=Decimal(100))
@@ -1314,7 +1314,7 @@ def test_an_items_packages_are_counted_by_name(
     session.flush()
     every = (
         "1 \N{MULTIPLICATION SIGN} Reel, 1 \N{MULTIPLICATION SIGN} Spool,"
-        " 1 \N{MULTIPLICATION SIGN} Spool 150 m"
+        " 1 \N{MULTIPLICATION SIGN} Spool 150\u00a0m"
     )
     assert (line().packages, line().below) == (every, 0)
 
@@ -1473,7 +1473,9 @@ def test_stock_splits_into_forms_and_short_ends_are_not_usable() -> None:
 def test_reorder_on_usable_stock_and_sealed_minimums() -> None:
     cable = Item(id=1, name="Cable", minimum=Decimal(400))
     rope = Item(id=2, name="Rope", minimum=None)
-    spool = ItemPackage(id=10, item_id=1, name="Spool", minimum_sealed=3)
+    spool = ItemPackage(
+        id=10, item_id=1, name="Spool", name_shown="Spool", minimum_sealed=3
+    )
     coil = ItemPackage(id=11, item_id=2, name="Coil", minimum_sealed=1)
     usable = {1: Decimal(500), 2: Decimal(50)}
     sealed = {1: {10: Decimal(2)}, 2: {11: Decimal(1)}}

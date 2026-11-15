@@ -6,7 +6,7 @@ what is really on one, or a save took one below zero. Set it to what it
 really had when it showed that, or leave it as it shows. A cut saved since
 stays.</p>
 {% if only %}
-<p>Only {{ only.name }}. <a href="{{ all_path }}">Show all</a></p>
+<p>Only {{ only.name_shown }}. <a href="{{ all_path }}">Show all</a></p>
 {% endif %}
 {#- The packages ticked belong to this form. #}
 <form method="post" action="{{ here }}{{ query }}" id="answer-ticked">

@@ -122,8 +122,8 @@ def test_compatibility_characters_find_their_canonical_ones(
         second = add(session, Item(name=f"{canonical} {tag()}", category_id=cables.id))
         for typed in (sign, canonical):
             listed = page_text(admin_client.get(ITEMS, params={"q": typed}))
-            assert first.name in listed, typed
-            assert second.name in listed, typed
+            assert first.name_shown in listed, typed
+            assert second.name_shown in listed, typed
 
 
 def test_close_names_are_found_whatever_their_accents(session: Session) -> None:

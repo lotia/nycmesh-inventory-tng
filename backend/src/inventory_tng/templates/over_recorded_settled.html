@@ -9,7 +9,7 @@
 {% block main %}
 {{ views("Recorded more than moved", recorded_views, "settled") }}
 {% if only %}
-<p>Only {{ only.name }}. <a href="{{ here }}">Show all</a></p>
+<p>Only {{ only.name_shown }}. <a href="{{ here }}">Show all</a></p>
 {% endif %}
 {% call table() %}
   <tr><th>Settled</th><th>Item</th><th>Amount</th><th>Where</th><th>How</th><th>Why</th><th>By</th></tr>

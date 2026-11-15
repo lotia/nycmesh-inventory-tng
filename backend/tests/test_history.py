@@ -194,17 +194,24 @@ VERSIONED = (
                 table: {"edit_version", "search_text", "folded_with"}
                 for table in ("item", "item_package", "volunteer", "location")
             }
-            # And each name's unit key (models.KeyedName), which a reading
-            # rule moves.
+            # And each name's unit key and name as shown (models.KeyedName),
+            # which a reading rule moves.
             | {
-                "item": {"edit_version", "search_text", "folded_with", "unit_key"},
+                "item": {
+                    "edit_version",
+                    "search_text",
+                    "folded_with",
+                    "unit_key",
+                    "name_shown",
+                },
                 "item_package": {
                     "edit_version",
                     "search_text",
                     "folded_with",
                     "unit_key",
+                    "name_shown",
                 },
-                "item_alias": {"unit_key"},
+                "item_alias": {"unit_key", "name_shown"},
             },
         ),
         ("row_lock_only", {"item": {"on_order"}}),

@@ -848,6 +848,57 @@ def _spelt(name: str, spelt: Mapping[Found, str]) -> str:
     return _applied(name, [(f.start, f.end, s) for f, s in spelt.items()])
 
 
+# Between a number and its unit in a name as shown, and between thousands
+# in a number of five digits or more, as the SI Brochure writes them (Ali,
+# 2026-11-15, inventory-tng-ist.3): neither breaks a line.
+NO_BREAK_SPACE = "\u00a0"
+THIN_NO_BREAK_SPACE = "\u202f"
+# A number as a name may type it before a unit: a sign, its whole part, plain
+# or grouped by commas in thousands as US conventions write them, and any
+# decimal part. Another use of commas (`1,2,3`) is left as typed.
+_SHOWN_NUMBER = re.compile(r"([-\u2212]?)([0-9]{1,3}(?:,[0-9]{3})+|[0-9]+)([.][0-9]+)?")
+
+
+def _shown_number(number: str) -> str:
+    """`number` without its thousands separators, and grouped by thin
+    no-break spaces from five digits (`10,000` is `10 000`, `1,000`
+    `1000`); as typed if it is not plainly a number (_SHOWN_NUMBER)."""
+    parts = _SHOWN_NUMBER.fullmatch(number)
+    if parts is None:
+        return number
+    sign, whole, fraction = parts[1], parts[2].replace(",", ""), parts[3] or ""
+    if len(whole) >= 5:
+        head = len(whole) % 3 or 3
+        thousands = [whole[i : i + 3] for i in range(head, len(whole), 3)]
+        whole = THIN_NO_BREAK_SPACE.join([whole[:head], *thousands])
+    return sign + whole + fraction
+
+
+# What, right before a number, makes it part of a word or a code, such as
+# a part number (`UF-SM-10G`, `ES-8-150W`): left as typed.
+_IN_A_CODE = re.compile(r"[^\W]|[-/.+]")
+
+
+def shown_name(name: str, rules: Rules | None = None) -> str:
+    """`name` as the app shows it, wherever a name is read (Ali, 2026-11-15,
+    inventory-tng-ist.3): each number a unit is read right after (found_in:
+    its rule, the words near it, the profile; never a product's) without
+    its thousands separators, grouped from five digits (_shown_number), and
+    a no-break space between it and its unit, spelt as typed: `Cap 10uF
+    50V` is `Cap 10 uF 50 V`, `Box 10,000 ft` `Box 10 000 ft`. The rest, a
+    unit not read or a unit's word (`48 VDC`, `100 feet`) among it, and a
+    number within a word or a code (_IN_A_CODE), as typed. `name` is as
+    saved (models.canonical, spell)."""
+    edits = []
+    for found in found_in(name, rules):
+        start = found.start - len(found.number)
+        if found.read is None or _IN_A_CODE.match(name[start - 1 : start]):
+            continue
+        spelt = _shown_number(found.number) + NO_BREAK_SPACE + found.token
+        edits.append((start, found.end, spelt))
+    return _applied(name, edits)
+
+
 def main(path: Path = TABLE) -> None:
     """Write units.json, which the scan page reads; the task then lays it
     out as Biome does."""

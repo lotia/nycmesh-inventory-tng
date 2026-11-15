@@ -119,7 +119,7 @@ def _taken(
     if other is None:
         return shown, TAKEN
     retired = " It is retired." if other.retired_at is not None else ""
-    return shown, f"{other.name} {TAKEN_FIELDS[field]}{retired}"
+    return shown, f"{other.name_shown} {TAKEN_FIELDS[field]}{retired}"
 
 
 class _AskFirst(Exception):
@@ -245,14 +245,27 @@ def _categories(session: Session) -> list[Category]:
     return list(session.scalars(select(Category).order_by(func.lower(Category.name))))
 
 
+@dataclass(frozen=True)
+class _Shown:
+    """An item as its list's suggestions name it."""
+
+    name: str
+
+
+def _as_shown(_session: Session, rows: Sequence[Item]) -> list[_Shown]:
+    """Each item by its name as shown (KeyedName.name_shown)."""
+    return [_Shown(row.name_shown) for row in rows]
+
+
 # How the items list finds an item: by anything a volunteer might type.
-SEARCHED = Searched(ITEMS, Item, Item.search_text, Item.name)
+SEARCHED = Searched(ITEMS, Item, Item.search_text, Item.name, shown=_as_shown)
 
 
 def _name_field(session: Session, similar: Sequence[items.Close]) -> dict[str, object]:
     """What _item_name.html and _units_read.html need besides the form's
     values: units_read, what may be units in a name as typed, as the
-    reading rules read them."""
+    reading rules read them, and shown_as, how a name typed is shown where
+    that is not as saved (units.shown_name, Ali, 2026-11-15)."""
     rules = rules_held(session)
 
     def units_read(typed: str) -> list[units.Found]:
@@ -262,11 +275,18 @@ def _name_field(session: Session, similar: Sequence[items.Close]) -> dict[str, o
             once.setdefault(each.key, each)
         return list(once.values())
 
+    def shown_as(typed: str) -> str | None:
+        name = canonical(typed.strip())
+        saved = units.spell(name, units.found_in(name, rules))
+        shown = units.shown_name(saved, rules)
+        return shown if shown != saved else None
+
     return {
         "similar": similar,
         "items_path": ITEMS,
         "different": DIFFERENT,
         "units_read": units_read,
+        "shown_as": shown_as,
         "reading_field": READING,
         "not_a_unit": NOT_A_UNIT,
     }
@@ -341,7 +361,7 @@ def _item_page(
         signed,
         "item.html",
         {
-            "title": item.name,
+            "title": item.name_shown,
             "here": f"{ITEMS}/{item.id}",
             "back_link": (ITEMS, "Items"),
             "item": item,
@@ -981,7 +1001,7 @@ def _alias_problem(
         return f"That is its {whose} already."
     retired = " It is retired." if other.retired_at is not None else ""
     return (
-        f"{other.name} already has that {whose}, or one differing from it only "
+        f"{other.name_shown} already has that {whose}, or one differing from it only "
         f"in case, spaces, punctuation or how its units are spelt.{retired}"
     )
 
