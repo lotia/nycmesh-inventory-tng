@@ -17,6 +17,7 @@ from databases import (
     NO_DATABASE,
     SERVER_URL,
     SWEEP_LOCK,
+    SWEEP_WAIT,
     TEST_CONNECTION_LIMIT,
     database_name,
     drop_left_behind,
@@ -86,10 +87,13 @@ def test_a_sweep_waits_for_another_then_leaves_nothing_old(
                 time.sleep(0.3)
                 assert not sweep.done()
                 holder.execute(text("SELECT pg_advisory_unlock(:k)"), {"k": SWEEP_LOCK})
-                # Longer than SWEEP_WAIT, as other sweeps may be queued first.
-                sweep.result(timeout=90)
-            left = holder.scalars(text("SELECT datname FROM pg_database")).all()
-        assert old not in left
+                # Its own wait for the lock is at most SWEEP_WAIT; then the drops.
+                sweep.result(timeout=SWEEP_WAIT.total_seconds() + 30)
+            still_there = holder.scalar(
+                text("SELECT EXISTS (SELECT FROM pg_database WHERE datname = :n)"),
+                {"n": old},
+            )
+        assert not still_there
     finally:
         with server.connect() as connection:
             connection.execute(text(f'DROP DATABASE IF EXISTS "{old}"'))

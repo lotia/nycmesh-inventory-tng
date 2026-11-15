@@ -72,7 +72,7 @@ LEFT_BEHIND = timedelta(hours=1)
 # would wait on the first's DROP past lock_timeout); and how long a sweep
 # waits for it.
 SWEEP_LOCK = 0x7E57_5EEB
-SWEEP_WAIT = "1min"
+SWEEP_WAIT = timedelta(minutes=1)
 
 
 class Unreachable(Exception):
@@ -85,7 +85,9 @@ def drop_left_behind(now: float | None = None) -> None:
     now = time.time() if now is None else now
     with as_superuser(SERVER_URL) as connection:
         # Held until the connection closes, so any other sweep has finished.
-        connection.execute(text(f"SET lock_timeout = '{SWEEP_WAIT}'"))
+        connection.execute(
+            text(f"SET lock_timeout = '{SWEEP_WAIT.total_seconds():.0f}s'")
+        )
         connection.execute(text("SELECT pg_advisory_lock(:key)"), {"key": SWEEP_LOCK})
         connection.execute(text(f"SET lock_timeout = '{LOCK_TIMEOUT}'"))
         idle = connection.scalars(
