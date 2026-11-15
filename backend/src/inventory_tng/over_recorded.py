@@ -30,6 +30,7 @@ from inventory_tng.models import (
     LedgerTransaction,
     Location,
     Movement,
+    OpenPackage,
     OverRecorded,
 )
 from inventory_tng.pages import amount
@@ -144,15 +145,17 @@ def within(name: str) -> str:
 
 class OneCounted(NamedTuple):
     """A check one of whose two ends a count put right: the end counted
-    and when, the end still to put right, as a sentence starts with each,
-    and as its Correct button names it; and the place to count, by id and
-    name, and whether it may be counted (ledger.countable). A move's ends
-    are its places; an opening's, both at one place, its forms: "Sealed
-    spool" where it left, "Open spool" or "Loose cat6 cable" where it
-    arrived, the names as within() shows them (Ali, 2026-11-15,
-    inventory-tng-r5z)."""
+    and how ("counted", or "closed" for an opening's open package closed
+    since, inventory-tng-nyl) and when, the end still to put right, as a
+    sentence starts with each, and as its Correct button names it; and the
+    place to count, by id and name, and whether it may be counted
+    (ledger.countable). A move's ends are its places; an opening's, both
+    at one place, its forms: "Sealed spool" where it left, "Open spool" or
+    "Loose cat6 cable" where it arrived, the names as within() shows them
+    (Ali, 2026-11-15, inventory-tng-r5z)."""
 
     counted: str
+    how: Literal["counted", "closed"]
     on: datetime
     still: str
     correct: str
@@ -229,6 +232,7 @@ def shown(session: Session, *where: ColumnElement[bool]) -> list[Shown]:
             LedgerTransaction.to_location_id,
             LEFT_COUNT.created_at,
             ARRIVED_COUNT.created_at,
+            OpenPackage.closed_at,
         )
         .join(Movement, Movement.id == OverRecorded.movement_id)
         .join(LedgerTransaction, LedgerTransaction.id == Movement.transaction_id)
@@ -238,14 +242,16 @@ def shown(session: Session, *where: ColumnElement[bool]) -> list[Shown]:
         .outerjoin(TO, TO.id == LedgerTransaction.to_location_id)
         .outerjoin(LEFT_COUNT, LEFT_COUNT.id == OverRecorded.left_count_id)
         .outerjoin(ARRIVED_COUNT, ARRIVED_COUNT.id == OverRecorded.arrived_count_id)
+        .outerjoin(OpenPackage, OpenPackage.id == Movement.to_open_package_id)
         .where(WAITING, *where)
         .order_by(func.lower(Item.name), Item.id, OverRecorded.id)
     ).all()
     # Only a place that may be counted is offered for counting: the end
-    # still to put right of one with one end counted.
+    # still to put right of one with one end counted. An opening's ends are
+    # both at one place, so one closed needs no telling apart here.
     still = {
         to_id if left_on else from_id
-        for *_, from_id, to_id, left_on, arrived_on in found
+        for *_, from_id, to_id, left_on, arrived_on, _closed in found
         if (left_on is None) != (arrived_on is None)
     }
     countable = (
@@ -277,11 +283,17 @@ def shown(session: Session, *where: ColumnElement[bool]) -> list[Shown]:
         to_id,
         left_on,
         arrived_on,
+        closed_on,
     ) in found:
         words = amount_words(row.quantity, unit, package, size)
         if from_open is not None and kind != "open":
             words += " from an open package"
         whole = from_open is not None and from_open == to_open
+        # An opening's open package closed since: Correct skips that end
+        # (correct()), so the row says it is closed.
+        arrived_how: Literal["counted", "closed"] = "counted"
+        if kind == "open" and arrived_on is None and closed_on is not None:
+            arrived_on, arrived_how = closed_on, "closed"
         one = None
         # Moved whole, it has one end only: where it arrived.
         if (
@@ -303,14 +315,15 @@ def shown(session: Session, *where: ColumnElement[bool]) -> list[Shown]:
                 left, arrived = from_place or "", to_place or ""
             # The other end's words, and the button's: a form's in the
             # sentence's middle ("Correct open spool"), a place's as named.
-            counted_end, on, other, still_id, still_place = (
-                (left, left_on, arrived, to_id, to_place)
+            counted_end, how, on, other, still_id, still_place = (
+                (left, "counted", left_on, arrived, to_id, to_place)
                 if left_on is not None
-                else (arrived, arrived_on, left, from_id, from_place)
+                else (arrived, arrived_how, arrived_on, left, from_id, from_place)
             )
             correct = other[0].lower() + other[1:] if kind == "open" else other
             one = OneCounted(
                 counted_end,
+                how,
                 on,
                 other,
                 correct,
@@ -406,14 +419,37 @@ def correct(
     """Settle one, as corrected: an adjustment on each side its transaction
     has, but one a count put right (counted), undoes what was recorded more
     than moved, in the forms it moved in, with the reason REASON. Found
-    again where it left, written off where it arrived. Call it holding its
-    places (places_of), locked first. Each under a key of the check's, so
-    it is written once; with one end counted, a key of its own. RuleBroken
-    as _settle, or as ledger.record_adjustment."""
+    again where it left, written off where it arrived. An opening's open
+    package closed since, however (used up, Close, a count), wrote off what
+    it showed, so its end is skipped: the sealed end alone is written (Ali,
+    2026-11-15, inventory-tng-nyl). Call it holding its places (places_of),
+    locked first. Each under a key of the check's, so it is written once;
+    with one end counted, a key of its own. RuleBroken as _settle, or as
+    ledger.record_adjustment."""
     row = _settle(session, check_id, seen_as, admin_id, "corrected")
     movement = session.get_one(Movement, row.movement_id)
     transaction = session.get_one(LedgerTransaction, movement.transaction_id)
     reason = adjustment_reasons.seeded(session, REASON)
+    # Read under the place's lock: a close takes its open package's place
+    # first (open_packages.close), and an opening's open package is at its
+    # place unless moved since, where writing off in it is refused anyway
+    # (movement_open_package_place). Closed is never undone.
+    open_id = movement.to_open_package_id
+    closed = (
+        transaction.kind == "open"
+        and open_id is not None
+        and row.arrived_count_id is None
+        and session.scalar(
+            select(OpenPackage.closed_at).where(OpenPackage.id == open_id)
+        )
+        is not None
+    )
+    if closed:
+        log.info(
+            "over recorded closed end skipped",
+            over_recorded_id=check_id,
+            open_package_id=open_id,
+        )
     # The other end only, after a count put one right.
     only = " only" if row.left_count_id or row.arrived_count_id else ""
     sides = (
@@ -424,7 +460,7 @@ def correct(
             movement.from_open_package_id,
         ),
         (
-            None if row.arrived_count_id else transaction.to_location_id,
+            None if row.arrived_count_id or closed else transaction.to_location_id,
             False,
             movement.to_package_id,
             movement.to_open_package_id,

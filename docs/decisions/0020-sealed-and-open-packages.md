@@ -410,9 +410,21 @@ you" counts every report in one line, which hides what is waiting.
   package an opening arrived in (used up, or not there) puts that end
   right, as a count of it at 0 would, so Correct writes only the sealed
   end. Closing one by Confirm used up, or from its item's page, is no
-  count and puts no end right (inventory-tng-nyl), nor does a count of a
-  move's open package closed. A length check's Set never closes one; it
-  counts it, which puts an opening's end in it right already.
+  count and puts no end right, nor does a count of a move's open package
+  closed. A length check's Set never closes one; it counts it, which puts
+  an opening's end in it right already.
+- **An opening's open package closed** since, however it closed (Confirm
+  used up, Close on its item's page, a count, even one whose every line
+  was withheld as moved meanwhile, which writes no count), wrote off what
+  it showed, so Correct skips that end and writes only the sealed end,
+  not refused (Ali, 2026-11-15, inventory-tng-nyl). The row then says
+  "Open spool closed 14 Nov. Sealed spool still to put right." (the day it
+  closed) and offers "Correct sealed spool", as for one end counted. It
+  settles as `corrected`; the skipped end keeps no count, as the close was
+  none. A Correct seen before the close is not refused, as the sealed end
+  alone is right either way. Correct reads the close under the place's
+  lock, which a close takes first, so the two go one at a time. Moves are
+  unchanged: a move's open package closed still refuses its Correct.
 - **One end put right**, the row says "Shelf B3 counted 14 Nov. Rack A
   still to put right." (the day in the site's zone) and offers "Correct
   Rack A", one adjustment at that end only, under a key of its own;

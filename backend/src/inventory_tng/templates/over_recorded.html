@@ -70,10 +70,11 @@ with an adjustment. Mark checked if you already fixed it.</p>
         <button>Confirm count<span class="sr-only"> {{ each.item }}, transaction {{ each.transaction_id }}</span></button>
       </form>
       {% else %}
-      {#- A count put one end right: the other end's next step. #}
+      {#- A count put one end right, or an opening's open package closed: the
+      other end's next step. #}
       {% set one = each.one_counted %}
       {% if one %}
-      <p>{{ one.counted }} counted {{ one.on | day(zone) }}. {{ one.still }} still to put right.</p>
+      <p>{{ one.counted }} {{ one.how }} {{ one.on | day(zone) }}. {{ one.still }} still to put right.</p>
       {% endif %}
       {#- Forms of their own, so Enter in the words marks it checked. #}
       <div class="actions">

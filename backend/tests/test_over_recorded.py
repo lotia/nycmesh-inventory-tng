@@ -6,6 +6,7 @@ it checked, under "Needs your action"."""
 import re
 import uuid
 from collections.abc import Callable
+from datetime import UTC, datetime
 from decimal import Decimal
 from functools import partial
 from typing import Any
@@ -2521,3 +2522,172 @@ def test_both_ends_counted_at_once_the_second_closes_it(
     assert (finished.error, finished.result) == (None, 1)
     (check,) = checks(first)
     assert check.settled_how == "counted"
+
+
+# An opening's open package closed since (Confirm used up, Close, a count
+# whose lines were all withheld): Correct writes the sealed end alone, as
+# closing wrote off what it showed (Ali, 2026-11-15, inventory-tng-nyl).
+
+
+def closed_by_confirm(admin_client: TestClient, spools: Spools, open_id: int) -> None:
+    """Reported used up by a volunteer, then confirmed."""
+    session = spools.session
+    open_packages.report(
+        session, [open_id], spools.place.volunteer.id, datetime.now(UTC)
+    )
+    session.commit()
+    done = admin_client.post(f"/admin/stock/used-up/{open_id}/confirm")
+    assert "used_up_confirmed" in done.headers["location"]
+
+
+def closed_from_its_item(
+    admin_client: TestClient, spools: Spools, open_id: int
+) -> None:
+    done = admin_client.post(
+        f"/admin/items/{spools.cable.id}/open-packages/{open_id}/close"
+    )
+    assert "open_package_closed" in done.headers["location"]
+
+
+def sealed_found_only(session: Session, spools: Spools) -> None:
+    """Correct wrote one line: the sealed spool found again."""
+    (line,) = reason_adjustments(session, over_recorded.REASON)
+    assert (line.quantity, line.to_package_id, line.to_open_package_id) == (
+        305,
+        spools.spool.id,
+        None,
+    )
+
+
+@pytest.mark.parametrize("close", [closed_by_confirm, closed_from_its_item])
+def test_its_open_package_closed_outside_a_count_correct_writes_the_sealed_end(
+    admin_client: TestClient,
+    registered_client: TestClient,
+    session: Session,
+    close: Callable[[TestClient, Spools, int], None],
+) -> None:
+    spools = Spools(session)
+    check = opening_raised(registered_client, spools)
+    open_id = opened_into(session, check).open_package_id
+    assert open_id is not None
+    close(admin_client, spools, open_id)
+    on = session.get_one(OpenPackage, open_id).closed_at
+    assert on is not None
+    day = show_day(on, site_zone(session))
+    page = admin_client.get(f"{PAGE}?item={spools.cable.id}").text
+    assert f"Open spool closed {day}. Sealed spool still to put right." in text_of(page)
+    assert "Correct sealed spool<span" in page
+    (check,) = checks(session)
+    with capture_logs() as logs:
+        done = admin_client.post(
+            f"{PAGE}/{check.id}/correct", data={"seen": over_recorded.seen(check)}
+        )
+    assert "over_recorded_corrected" in done.headers["location"]
+    sealed_found_only(session, spools)
+    (check,) = checks(session)
+    assert (check.settled_how, check.left_count_id, check.arrived_count_id) == (
+        "corrected",
+        None,
+        None,
+    )
+    assert {
+        "event": "over recorded closed end skipped",
+        "log_level": "info",
+        "over_recorded_id": check.id,
+        "open_package_id": open_id,
+    } in logs
+    # Sent again: settled, so nothing more is written.
+    again = admin_client.post(
+        f"{PAGE}/{check.id}/correct", data={"seen": over_recorded.seen(check)}
+    )
+    assert "over_recorded_unchanged" in again.headers["location"]
+    sealed_found_only(session, spools)
+
+
+def test_its_open_package_closed_on_a_count_whose_lines_were_withheld(
+    admin_client: TestClient, registered_client: TestClient, session: Session
+) -> None:
+    """Every line of the count withheld as moved meanwhile, it writes no
+    count transaction, so puts no end right; its close still closes the
+    open package, and Correct then writes the sealed end alone."""
+    spools = Spools(session)
+    check = opening_raised(registered_client, spools)
+    open_id = opened_into(session, check).open_package_id
+    (other,) = session.scalars(
+        select(OpenPackage).where(
+            OpenPackage.item_id == spools.cable.id, OpenPackage.id != open_id
+        )
+    )
+    shown = count_form_at(admin_client, spools.store.id)
+    spools.move(Entry(spools.cable.id, Decimal(5), Form(open_package_id=other.id)))
+    session.commit()
+    done = count_at(
+        admin_client,
+        spools.store.id,
+        {
+            f"opened_{other.id}": "300",
+            f"opened_{open_id}": "",
+            f"state_{open_id}": "missing",
+        },
+        shown,
+    )
+    assert done.status_code == 409
+    assert count_ids(session) == []
+    (check,) = checks(session)
+    assert (check.left_count_id, check.arrived_count_id) == (None, None)
+    assert session.get_one(OpenPackage, open_id).closed_at is not None
+    assert (
+        "over_recorded_corrected" in correct(admin_client, session).headers["location"]
+    )
+    sealed_found_only(session, spools)
+
+
+def test_a_cut_from_an_open_package_closed_since_is_still_refused(
+    admin_client: TestClient, registered_client: TestClient, session: Session
+) -> None:
+    """Moves unchanged: only an opening skips an end closed since."""
+    spools = Spools(session)
+    made = spools.opened()
+    session.commit()
+    first = spools.place.batch(lines=[cut(made, "20")])
+    recorded_then_changed(registered_client, first, lines=[cut(made, "15")])
+    closed_from_its_item(admin_client, spools, made.id)
+    page = admin_client.get(f"{PAGE}?item={spools.cable.id}").text
+    assert " closed " not in text_of(page)
+    response = correct(admin_client, session)
+    assert response.status_code == 409
+    assert reason_adjustments(session, over_recorded.REASON) == []
+    (check,) = checks(session)
+    assert check.settled_at is None
+
+
+@pytest.mark.concurrency
+def test_a_correct_waits_for_a_close_of_its_open_package_then_skips_it(
+    own_committed: Committed,
+) -> None:
+    """The close holds the store, then the open package; Correct takes the
+    store first, so waits, then finds it closed and writes the sealed end
+    alone."""
+    setup = own_committed.session()
+    spools = Spools(setup)
+    made = spools.opened()
+    movement_id = setup.scalar(
+        select(Movement.id).where(Movement.to_open_package_id == made.id)
+    )
+    assert movement_id is not None
+    over_recorded.raise_checks(setup, {movement_id: Decimal(305)})
+    admin = admin_id(setup)
+    adjustment_reasons.seeded(setup, over_recorded.REASON)
+    setup.commit()
+    (check,) = checks(setup)
+    first, second = own_committed.session(), own_committed.session()
+    assert open_packages.close(first, made.id, admin, datetime.now(UTC)) is not None
+    worker = own_committed.blocked(
+        second, lambda: correct_check(second, check, over_recorded.seen(check), admin)
+    )
+    first.commit()
+    finished = worker.finished()
+    assert finished.error is None
+    second.commit()
+    (line,) = reason_adjustments(first, over_recorded.REASON)
+    assert (line.to_package_id, line.to_open_package_id) == (spools.spool.id, None)
