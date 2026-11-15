@@ -37,57 +37,26 @@ from sqlalchemy import ColumnElement, SQLColumnExpression, collate, func
 # Ranges of code points, not [[:space:][:punct:]], which Python lacks.
 IGNORED = r"(?!(?<=[0-9])[.][0-9])[\t-\r -/:-@[-`{-~]"
 
-# Each character that looks like an ASCII space, quote or dash, and the one
-# it is read as before IGNORED. Listed one by one, not by Unicode category,
-# so PostgreSQL's translate() reads the same list whatever its version.
+# The characters that look like an ASCII space, quote or dash, by the one
+# each is read as before IGNORED. Listed by code point, not by Unicode
+# category, so PostgreSQL's translate() reads the same list whatever its
+# version.
+_LOOK_ALIKE = {
+    # Unicode's spaces (Zs) but the space itself: no-break, Ogham, en quad
+    # to hair, narrow no-break, medium mathematical, ideographic.
+    " ": (0x00A0, 0x1680, *range(0x2000, 0x200B), 0x202F, 0x205F, 0x3000),
+    # Acute accent, modifier apostrophe, single quotation marks (left,
+    # right, low-9, high-reversed-9), prime, reversed prime, fullwidth.
+    "'": (0x00B4, 0x02BC, *range(0x2018, 0x201C), 0x2032, 0x2035, 0xFF07),
+    # Double quotation marks (left, right, low-9, high-reversed-9), double
+    # prime, reversed double prime, fullwidth.
+    '"': (*range(0x201C, 0x2020), 0x2033, 0x2036, 0xFF02),
+    # Soft hyphen, hyphen to horizontal bar, minus sign, small em dash,
+    # small hyphen-minus, fullwidth hyphen-minus.
+    "-": (0x00AD, *range(0x2010, 0x2016), 0x2212, 0xFE58, 0xFE63, 0xFF0D),
+}
 LOOK_ALIKES = {
-    # Spaces: Unicode's (Zs), but the space itself.
-    "\u00a0": " ",  # no-break space
-    "\u1680": " ",  # Ogham space mark
-    "\u2000": " ",  # en quad
-    "\u2001": " ",  # em quad
-    "\u2002": " ",  # en space
-    "\u2003": " ",  # em space
-    "\u2004": " ",  # three-per-em space
-    "\u2005": " ",  # four-per-em space
-    "\u2006": " ",  # six-per-em space
-    "\u2007": " ",  # figure space
-    "\u2008": " ",  # punctuation space
-    "\u2009": " ",  # thin space
-    "\u200a": " ",  # hair space
-    "\u202f": " ",  # narrow no-break space
-    "\u205f": " ",  # medium mathematical space
-    "\u3000": " ",  # ideographic space
-    # Apostrophes and single quotes.
-    "\u00b4": "'",  # acute accent
-    "\u02bc": "'",  # modifier letter apostrophe
-    "\u2018": "'",  # left single quotation mark
-    "\u2019": "'",  # right single quotation mark
-    "\u201a": "'",  # single low-9 quotation mark
-    "\u201b": "'",  # single high-reversed-9 quotation mark
-    "\u2032": "'",  # prime
-    "\u2035": "'",  # reversed prime
-    "\uff07": "'",  # fullwidth apostrophe
-    # Double quotes.
-    "\u201c": '"',  # left double quotation mark
-    "\u201d": '"',  # right double quotation mark
-    "\u201e": '"',  # double low-9 quotation mark
-    "\u201f": '"',  # double high-reversed-9 quotation mark
-    "\u2033": '"',  # double prime
-    "\u2036": '"',  # reversed double prime
-    "\uff02": '"',  # fullwidth quotation mark
-    # Dashes and hyphens.
-    "\u00ad": "-",  # soft hyphen
-    "\u2010": "-",  # hyphen
-    "\u2011": "-",  # non-breaking hyphen
-    "\u2012": "-",  # figure dash
-    "\u2013": "-",  # en dash
-    "\u2014": "-",  # em dash
-    "\u2015": "-",  # horizontal bar
-    "\u2212": "-",  # minus sign
-    "\ufe58": "-",  # small em dash
-    "\ufe63": "-",  # small hyphen-minus
-    "\uff0d": "-",  # fullwidth hyphen-minus
+    chr(code): plain for plain, codes in _LOOK_ALIKE.items() for code in codes
 }
 _FROM = "".join(LOOK_ALIKES)
 _TO = "".join(LOOK_ALIKES.values())

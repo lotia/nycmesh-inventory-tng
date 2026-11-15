@@ -243,9 +243,14 @@ def _sample() -> list[str]:
 def test_names_are_keyed_alike_by_the_app_and_the_database(session: Session) -> None:
     """names.name_key, which the app writes, and names.name_key_sql, which
     the CHECK constraints hold it to, agree on every character, as each
-    migrated CHECK does (migration 0037 writes it out); Python has no
-    [[:punct:]], so the pattern names code points."""
+    migrated CHECK does (migration 0040 writes it out); Python has no
+    [[:punct:]], so the pattern names code points. names.LOOK_ALIKES, listed
+    by hand so PostgreSQL reads the same list, holds every space Unicode
+    has (Zs), so none tells two names apart."""
     assert {name: name_key(name) for name in TRICKY_NAMES} == TRICKY_NAMES
+    assert {chr(c) for c in range(0x110000) if unicodedata.category(chr(c)) == "Zs"} - {
+        " "
+    } <= LOOK_ALIKES.keys()
     sample = _sample()
     keys = [name_key(name) for name in sample]
     key = name_key_sql(literal_column("name")).compile(
@@ -276,19 +281,6 @@ def test_names_are_keyed_alike_by_the_app_and_the_database(session: Session) -> 
     assert [
         name for name, row in zip(sample, rows, strict=True) if not all(row[1:])
     ] == []
-
-
-def test_every_unicode_space_is_read_as_a_space() -> None:
-    """names.LOOK_ALIKES, listed by hand so PostgreSQL reads the same list,
-    holds every space Unicode has (Zs), so none tells two names apart; and
-    reads each look-alike as an ASCII space, quote or dash."""
-    spaces = {
-        chr(c)
-        for c in range(0x110000)
-        if unicodedata.category(chr(c)) == "Zs" and chr(c) != " "
-    }
-    assert spaces <= LOOK_ALIKES.keys()
-    assert set(LOOK_ALIKES.values()) == {" ", "'", '"', "-"}
 
 
 def test_a_name_key_written_wrong_is_refused(

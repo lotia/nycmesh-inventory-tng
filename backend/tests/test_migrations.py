@@ -1,4 +1,5 @@
 import re
+from datetime import UTC, datetime
 from functools import partial
 
 import pytest
@@ -261,6 +262,18 @@ def test_going_back_before_package_forms_names_what_it_cannot_hold(
         command.downgrade(alembic_config, "0023")
 
 
+def _insert(connection: Connection, table: str, **values: object) -> int:
+    """A row of `table` with `values`; its id."""
+    return connection.scalar(
+        text(
+            f"INSERT INTO {table} ({', '.join(values)})"
+            f" VALUES ({', '.join(f':{column}' for column in values)})"
+            " RETURNING id"
+        ),
+        values,
+    )
+
+
 def _item(connection: Connection, category_id: int, name: str) -> int:
     """An item as 0034 holds one, its search text 'kept'."""
     return connection.scalar(
@@ -395,20 +408,16 @@ def test_what_is_searched_is_kept_as_typed_too(alembic_config: Config) -> None:
         values = {"name": name, "name_key": name_key(name), **values}
         if searched:
             values |= {"search_text": "kept", "folded_with": FOLDED_WITH}
-        return connection.scalar(
-            text(
-                f"INSERT INTO {table} ({', '.join(values)})"
-                f" VALUES ({', '.join(f':{column}' for column in values)})"
-                " RETURNING id"
-            ),
-            values,
-        )
+        return _insert(connection, table, **values)
 
     cable = row("item", "Cable 100 feet", category_id=category_id, name_folded="kept")
     row("item_alias", "Patch 2 in 1", searched=False, item_id=cable)
-    gone = row("item_alias", "Gone 5 V", searched=False, item_id=cable)
-    connection.execute(
-        text("UPDATE item_alias SET retired_at = now() WHERE id = :i"), {"i": gone}
+    row(
+        "item_alias",
+        "Gone 5 V",
+        searched=False,
+        item_id=cable,
+        retired_at=datetime.now(UTC),
     )
     reel = row("item_package", "Reel 305 m", item_id=cable, size=1)
     command.upgrade(alembic_config, "head")
@@ -479,14 +488,7 @@ def _keyed(connection: Connection, table: str, name: str, **values: object) -> i
     values = {"name": name, "name_key": _key_before(name), **values}
     if table != "item_alias":
         values |= {"search_text": "", "folded_with": ""}
-    return connection.scalar(
-        text(
-            f"INSERT INTO {table} ({', '.join(values)})"
-            f" VALUES ({', '.join(f':{column}' for column in values)})"
-            " RETURNING id"
-        ),
-        values,
-    )
+    return _insert(connection, table, **values)
 
 
 def test_name_keys_read_look_alikes_as_ascii(alembic_config: Config) -> None:
@@ -544,10 +546,7 @@ def test_look_alike_name_keys_name_what_would_clash(alembic_config: Config) -> N
         alias("Patch\u2014cord"),
     )
     for name in ("Ubiquiti\u02bcs", "Patch\u2212cord"):
-        connection.execute(
-            text("UPDATE item_alias SET retired_at = now() WHERE id = :i"),
-            {"i": alias(name)},
-        )
+        alias(name, retired_at=datetime.now(UTC))
     with pytest.raises(RuntimeError) as refused:
         command.upgrade(alembic_config, "head")
     assert str(refused.value) == (
@@ -580,14 +579,14 @@ def test_going_back_before_name_keys_names_what_would_clash(
     )
 
     def row(table: str, name: str, key: str, **values: object) -> int:
-        columns = ", ".join(values)
-        return connection.scalar(
-            text(
-                f"INSERT INTO {table} (name, name_key, search_text, folded_with,"
-                f" {columns}) VALUES (:n, :k, '', '', :{', :'.join(values)})"
-                " RETURNING id"
-            ),
-            {"n": name, "k": key, **values},
+        return _insert(
+            connection,
+            table,
+            name=name,
+            name_key=key,
+            search_text="",
+            folded_with="",
+            **values,
         )
 
     lower, upper = (

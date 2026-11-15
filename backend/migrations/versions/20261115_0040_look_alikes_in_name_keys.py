@@ -28,21 +28,18 @@ branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 
 # names.name_key_sql's, written out: migrations do not import the app.
-# names.LOOK_ALIKES's characters.
-LOOK_ALIKES = "".join(
-    map(
-        chr,
-        (
-            *(0x00A0, 0x1680, *range(0x2000, 0x200B), 0x202F, 0x205F, 0x3000),
-            *(0x00B4, 0x02BC, 0x2018, 0x2019, 0x201A, 0x201B, 0x2032, 0x2035),
-            0xFF07,
-            *(0x201C, 0x201D, 0x201E, 0x201F, 0x2033, 0x2036, 0xFF02),
-            *(0x00AD, *range(0x2010, 0x2016), 0x2212, 0xFE58, 0xFE63, 0xFF0D),
-        ),
-    )
+# names._LOOK_ALIKE's code points, by the ASCII character each is read as.
+LOOK_ALIKE = {
+    " ": (0x00A0, 0x1680, *range(0x2000, 0x200B), 0x202F, 0x205F, 0x3000),
+    "'": (0x00B4, 0x02BC, *range(0x2018, 0x201C), 0x2032, 0x2035, 0xFF07),
+    '"': (*range(0x201C, 0x2020), 0x2033, 0x2036, 0xFF02),
+    "-": (0x00AD, *range(0x2010, 0x2016), 0x2212, 0xFE58, 0xFE63, 0xFF0D),
+}
+LOOK_ALIKES = "".join(chr(code) for codes in LOOK_ALIKE.values() for code in codes)
+# Each one's ASCII counterpart, quoted for SQL.
+PLAIN = "".join(plain * len(codes) for plain, codes in LOOK_ALIKE.items()).replace(
+    "'", "''"
 )
-# Each one's ASCII counterpart, quoted for SQL (each ' doubled).
-PLAIN = " " * 16 + "''" * 9 + '"' * 7 + "-" * 11
 IGNORED = "'(?!(?<=[0-9])[.][0-9])[\\t-\\r -/:-@[-`{-~]'"
 
 
@@ -82,17 +79,13 @@ def _rekey(new: str) -> None:
 def _refuse_clashes() -> None:
     """RuntimeError naming by id the rows the new key would make one name,
     if any."""
-    current = "WHERE retired_at IS NULL"
+    groups = (
+        ("item", f"FROM item GROUP BY {KEY}"),
+        ("item_package", f"FROM item_package GROUP BY item_id, {KEY}"),
+        ("item_alias", f"FROM item_alias WHERE retired_at IS NULL GROUP BY {KEY}"),
+    )
     clashing = [
-        *(f"item {ids}" for ids in _clashing(f"FROM item GROUP BY {KEY}")),
-        *(
-            f"item_package {ids}"
-            for ids in _clashing(f"FROM item_package GROUP BY item_id, {KEY}")
-        ),
-        *(
-            f"item_alias {ids}"
-            for ids in _clashing(f"FROM item_alias {current} GROUP BY {KEY}")
-        ),
+        *(f"{table} {ids}" for table, rows in groups for ids in _clashing(rows)),
         *(
             f"item_alias {alias} and item {item}"
             for alias, item in op.get_bind().execute(
