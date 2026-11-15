@@ -410,9 +410,10 @@ you" counts every report in one line, which hides what is waiting.
   package an opening arrived in (used up, or not there) puts that end
   right, as a count of it at 0 would, so Correct writes only the sealed
   end. Closing one by Confirm used up, or from its item's page, is no
-  count and puts no end right by itself, nor does a count of a move's
-  open package closed. A length check's Set never closes one; it counts
-  it, which puts an opening's end in it right already.
+  count, so that end keeps no count, though the close wrote off what it
+  showed (below). A count of a move's open package closed puts no end
+  right. A length check's Set never closes one; it counts it, which puts
+  an opening's end in it right already.
 - **An opening's open package closed** since, however it closed (Confirm
   used up, Close on its item's page, a count, even one whose every line
   was withheld as moved meanwhile, which writes no count), wrote off what
