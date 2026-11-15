@@ -65,7 +65,7 @@ def test_databases_left_behind_are_dropped_and_no_others(database_url: str) -> N
         server.dispose()
 
 
-def test_a_sweep_waits_for_another_then_drops_what_is_left(
+def test_a_sweep_waits_for_another_then_leaves_nothing_old(
     database_url: str,
 ) -> None:
     """While another sweep holds the lock, this one waits; once it is let go,
@@ -86,7 +86,8 @@ def test_a_sweep_waits_for_another_then_drops_what_is_left(
                 time.sleep(0.3)
                 assert not sweep.done()
                 holder.execute(text("SELECT pg_advisory_unlock(:k)"), {"k": SWEEP_LOCK})
-                sweep.result(timeout=30)
+                # Longer than SWEEP_WAIT, as other sweeps may be queued first.
+                sweep.result(timeout=90)
             left = holder.scalars(text("SELECT datname FROM pg_database")).all()
         assert old not in left
     finally:

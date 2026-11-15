@@ -79,7 +79,7 @@ class Unreachable(Exception):
     """The database server does not answer."""
 
 
-def drop_left_behind(now: float | None = None) -> list[str]:
+def drop_left_behind(now: float | None = None) -> None:
     """Test databases made over an hour ago that nothing is connected to:
     never one still in use. One sweep at a time (SWEEP_LOCK)."""
     now = time.time() if now is None else now
@@ -103,7 +103,6 @@ def drop_left_behind(now: float | None = None) -> list[str]:
                 dropped.append(name)
     if dropped:
         log.info("dropped test databases left behind", databases=dropped)
-    return dropped
 
 
 def database_name(at: int) -> str:
