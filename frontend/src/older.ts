@@ -908,7 +908,7 @@ export function toCart(
  * inventory-tng-0su). */
 const GONE = "a removed package or item";
 /** After an amount taken from an open package. */
-const FROM_OPEN = " from an open package";
+export const FROM_OPEN = " from an open package";
 
 /** `item`'s package `packageId` no longer offered, if the catalogue still
  * names it (Item.retired_packages). */
@@ -1060,12 +1060,12 @@ function saidOfOpen(said: unknown): boolean {
 }
 
 /** An item's name, or words for one gone from the catalogue. */
-function nameOf(item: { name: string } | undefined): string {
+export function nameOf(item: { name: string } | undefined): string {
   return item?.name ?? "An item no longer in the catalogue";
 }
 
 /** An item's unit after an amount: none for things counted. */
-function unitOf(item: Item | undefined): string {
+export function unitOf(item: Item | undefined): string {
   return item === undefined || item.unit === "each" ? "" : ` ${item.unit}`;
 }
 

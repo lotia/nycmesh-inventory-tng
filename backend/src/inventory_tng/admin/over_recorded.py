@@ -60,22 +60,19 @@ NOTICES.update(
 def by_item(session: Session) -> list[ItemWaiting]:
     """Those waiting, one line per item, as "Needs your action" lists
     them: each amount, said once with how many."""
-    lines: dict[int, ItemWaiting] = {}
-    amounts: dict[int, list[str]] = {}
+    grouped: dict[int, list[over_recorded.Shown]] = {}
     for each in over_recorded.shown(session):
-        amounts.setdefault(each.item_id, []).append(each.amount)
-        before = lines.get(each.item_id)
-        lines[each.item_id] = ItemWaiting(
-            each.item_id,
-            each.item,
-            "",
-            (before.count if before else 0) + 1,
-            Decimal(0),
-            each.unit,
-        )
+        grouped.setdefault(each.item_id, []).append(each)
     return [
-        line._replace(packages=", ".join(amounts[item_id]))
-        for item_id, line in lines.items()
+        ItemWaiting(
+            item_id,
+            found[0].item,
+            ", ".join(each.amount for each in found),
+            len(found),
+            Decimal(0),
+            found[0].unit,
+        )
+        for item_id, found in grouped.items()
     ]
 
 

@@ -341,7 +341,8 @@ you" counts every report in one line, which hides what is waiting.
   settles the row and writes nothing ("Confirmed."); changed, an
   adjustment at that place, in the package, for the difference, with the
   reason "Recorded more than moved" ("Count corrected."). Once edited, the
-  box says what it held under it ("Was 180 m"). We rejected offering only
+  box says what it held under it ("Was 180 m"; without JavaScript, once
+  sent back with another count). We rejected offering only
   Mark checked there, which left the count to be fixed elsewhere.
 - **The page's words** (Ali, 2026-11-15): "Another tab recorded these
   before a volunteer changed them, so the inventory shows more moved than

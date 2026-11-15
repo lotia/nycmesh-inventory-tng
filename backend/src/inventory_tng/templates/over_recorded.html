@@ -44,12 +44,4 @@ with an adjustment. Mark checked if you already fixed it.</p>
   <tr><td colspan="5">Nothing waits.</td></tr>
   {% endfor %}
 {% endcall %}
-{#- What a count box held before shows under it once it is edited. #}
-<script>
-  for (const box of document.querySelectorAll("input[data-was]")) {
-    box.addEventListener("input", () => {
-      document.getElementById(`${box.id}-was`).hidden = box.value === box.dataset.was;
-    });
-  }
-</script>
 {% endblock %}

@@ -39,6 +39,7 @@ import { Field } from "./Field";
 import { placeSides, readLabel, type Scanned } from "./labels";
 import { NOTHING_TAKEN, OpenPackageCard } from "./OpenPackageCard";
 import {
+  asSave,
   type Gaps,
   linesSaid,
   nextWhole,
@@ -68,7 +69,6 @@ import {
   ADD_DIFFERENCE,
   changesShown,
   differenceOf,
-  differenceToCart,
   IN_CART,
   recordedLines,
 } from "./recorded";
@@ -637,27 +637,28 @@ function CartForm({
     return store.forSaving() ?? cart.value;
   }
 
-  /** Put an older build's save, or cart, in this cart, which must be
-   * empty, and forget it there: moved, never copied, so it is saved once.
-   * Why not, if it was not and there is anything to say: of one gone
-   * meanwhile, nothing, as it is no longer listed to say it under. */
-  function putInCart(each: Older, automatically = false): NotPut | null {
+  /** Fill this cart, as stored, which must be empty, with `save`, once
+   * `ready` says it still may (else why not), and `forget` it where it
+   * was (false if that could not be): putInCart's and addDifference's
+   * steps. True once filled, else why not. */
+  function fill(
+    save: Older,
+    automatically: boolean,
+    forget: () => boolean,
+    ready: () => NotPut | null | true = () => true,
+  ): NotPut | null | true {
     const current = storedCart();
     if (current.lines.length > 0) {
       return "cart_not_empty";
     }
-    const { cart: filled, gaps } = toCart(each, catalogue, current);
-    // Read again first: an older tab may have sent or changed it
-    // meanwhile, or another tab discarded a line of it, which this would
-    // put back. Listed again, as it is now, to check.
-    const now = older.compared(each);
-    if (now !== "unchanged") {
-      older.refresh();
-      return now === "changed" ? "changed" : null;
+    const { cart: filled, gaps } = toCart(save, catalogue, current);
+    const why = ready();
+    if (why !== true) {
+      return why;
     }
     const before = cart.value;
     if (!store.change(filled)) {
-      // Not kept, a reload would empty it while the older one stays
+      // Not kept, a reload would empty it while what it came from stays
       // listed, to be put back and saved twice: the cart stays as it was.
       cart.value = before;
       return "not_kept";
@@ -667,14 +668,41 @@ function CartForm({
       // Put in after a save, without a tap, it leaves that save said.
       saved.value = null;
     }
-    if (older.remove(each) !== "done") {
+    if (!forget()) {
       problems.value = [[NOT_REMOVED]];
+    }
+    putBack.value = gaps;
+    return true;
+  }
+
+  /** Put an older build's save, or cart, in this cart, which must be
+   * empty, and forget it there: moved, never copied, so it is saved once.
+   * Why not, if it was not and there is anything to say: of one gone
+   * meanwhile, nothing, as it is no longer listed to say it under. */
+  function putInCart(each: Older, automatically = false): NotPut | null {
+    const why = fill(
+      each,
+      automatically,
+      () => older.remove(each) === "done",
+      () => {
+        // Read again first: an older tab may have sent or changed it
+        // meanwhile, or another tab discarded a line of it, which this
+        // would put back. Listed again, as it is now, to check.
+        const now = older.compared(each);
+        if (now === "unchanged") {
+          return true;
+        }
+        older.refresh();
+        return now === "changed" ? "changed" : null;
+      },
+    );
+    if (why !== true) {
+      return why;
     }
     recordOlder(
       each,
       automatically ? "put_in_cart_automatically" : "put_in_cart",
     );
-    putBack.value = gaps;
     return null;
   }
 
@@ -687,32 +715,16 @@ function CartForm({
     difference: Body,
     automatically = false,
   ): NotPut | null {
-    const current = storedCart();
-    if (current.lines.length > 0) {
-      return "cart_not_empty";
-    }
-    const { cart: filled, gaps } = differenceToCart(
-      difference,
-      catalogue,
-      current,
+    const why = fill(asSave(difference), automatically, () =>
+      outbox.differenceAdded(entry.body.key),
     );
-    const before = cart.value;
-    if (!store.change(filled)) {
-      cart.value = before;
-      return "not_kept";
-    }
-    kept(true);
-    if (!automatically) {
-      saved.value = null;
-    }
-    if (!outbox.differenceAdded(entry.body.key)) {
-      problems.value = [[NOT_REMOVED]];
+    if (why !== true) {
+      return why;
     }
     telemetry.record({
       kind: "difference_added",
       how: automatically ? "automatic" : "tap",
     });
-    putBack.value = gaps;
     return null;
   }
   adder.current = addDifference;
@@ -1790,10 +1802,9 @@ function OutboxList({
         {entries.map((entry) => {
           const key = entry.body.key;
           const { reason } = entry;
-          const recorded =
-            reason?.code === "recorded_elsewhere" && catalogue !== null
-              ? reason.recorded
-              : undefined;
+          const elsewhere =
+            reason?.code === "recorded_elsewhere" ? reason : undefined;
+          const recorded = catalogue === null ? undefined : elsewhere?.recorded;
           const lines = recorded === undefined ? (linesOf.get(key) ?? []) : [];
           return (
             <li key={key} class="flex flex-col items-start gap-1">
@@ -1807,8 +1818,9 @@ function OutboxList({
                 // Not role="alert": every one is there as the page loads.
                 <NoteSaid note={noteOf(reason, online)} />
               )}
-              {reason?.code === "recorded_elsewhere" &&
-                reason.recorded === undefined && <h3>{MAKE_CHANGES}</h3>}
+              {elsewhere !== undefined && elsewhere.recorded === undefined && (
+                <h3>{MAKE_CHANGES}</h3>
+              )}
               {lines.length > 0 && (
                 <ul class="list-none p-0">
                   {keyedByWords(lines).map((key, at) => (
@@ -1821,7 +1833,7 @@ function OutboxList({
                   entry={entry}
                   recorded={recorded}
                   catalogue={catalogue}
-                  added={reason?.code === "recorded_elsewhere" && reason.added}
+                  added={elsewhere?.added === true}
                   cartKey={cartKey}
                   onAdd={(difference) => {
                     const why = onAddDifference(entry, difference);

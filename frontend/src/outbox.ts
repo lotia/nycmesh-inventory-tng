@@ -698,7 +698,8 @@ export class Outbox {
     const tried: Entry["body"][] = [];
     try {
       for (;;) {
-        const waiting = this.read().filter((each) => each.state === "waiting");
+        const stored = this.read();
+        const waiting = stored.filter((each) => each.state === "waiting");
         // An open package an earlier batch still waiting makes, takes from
         // or reports: a later one naming it waits too, in order, or the
         // server, which checks what is left on it and where, would refuse
@@ -718,7 +719,7 @@ export class Outbox {
         // under the key held for it once nothing under that key waits.
         const asked =
           entry ??
-          this.read().find((each) => {
+          stored.find((each) => {
             const held = heldKeyOf(each);
             return (
               held !== undefined &&

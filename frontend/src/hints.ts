@@ -73,3 +73,24 @@ export function followTyped(document: Document): void {
     say();
   }
 }
+
+/**
+ * What a field held when the page was sent, shown under it once it is
+ * changed: "Was 305 m" under an open package's count on the recorded-more
+ * page (inventory-tng-0gg). The field carries `data-was`, what it held; the
+ * words are the element with its id and `-was`. Without this, they show
+ * only on a page sent back with another count.
+ */
+export function followWas(document: Document): void {
+  for (const field of document.querySelectorAll<HTMLInputElement>(
+    "input[data-was]",
+  )) {
+    const was = document.getElementById(`${field.id}-was`);
+    if (was === null) {
+      continue;
+    }
+    field.addEventListener("input", () => {
+      was.hidden = field.value === field.dataset.was;
+    });
+  }
+}

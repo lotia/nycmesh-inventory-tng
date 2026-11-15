@@ -1,5 +1,5 @@
 import { beforeEach, expect, test } from "vitest";
-import { followPicks, followTyped } from "./hints";
+import { followPicks, followTyped, followWas } from "./hints";
 
 beforeEach(() => {
   document.body.innerHTML = `
@@ -87,4 +87,20 @@ test("with no unit, the number alone", () => {
   expect((document.querySelector("button") as HTMLElement).textContent).toBe(
     "Set to 3",
   );
+});
+
+test("what a field held shows once it is changed, and hides back", () => {
+  document.body.innerHTML = `
+    <input id="count-3" value="305" data-was="305">
+    <p id="count-3-was" hidden>Was 305 m</p>
+    <input id="lonely" value="1" data-was="1">`;
+  followWas(document);
+  const field = document.getElementById("count-3") as HTMLInputElement;
+  const was = document.getElementById("count-3-was") as HTMLElement;
+  field.value = "300";
+  field.dispatchEvent(new Event("input"));
+  expect(was.hidden).toBe(false);
+  field.value = "305";
+  field.dispatchEvent(new Event("input"));
+  expect(was.hidden).toBe(true);
 });

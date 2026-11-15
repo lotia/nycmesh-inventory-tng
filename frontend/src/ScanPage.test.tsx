@@ -3208,9 +3208,8 @@ describe("what an older build left", () => {
   });
 
   test("its difference put in the cart, but not kept as put there, says so (inventory-tng-0gg)", async () => {
-    let refused: { mockRestore: () => void } | undefined;
     await differing([boxed(1)], "2", fillMove);
-    refused = refusingWrites(OUTBOX_KEY);
+    const refused = refusingWrites(OUTBOX_KEY);
     fireEvent.click(screen.getByRole("button", { name: "Discard cart" }));
     fireEvent.click(screen.getByRole("button", { name: "Discard" }));
     await vi.waitFor(() => expect(boxes()).toBe("1"));

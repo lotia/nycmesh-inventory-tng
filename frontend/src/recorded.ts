@@ -4,15 +4,15 @@
  * that tab recorded, as the server said (outbox.Recorded), and what this
  * save holds otherwise, line by line, in words (Ali, inventory-tng-0gg).
  * What it holds more of, or new, goes in an empty cart, under a new key
- * (differenceToCart); what was taken from an open package, or said of one,
+ * (older.toCart); what was taken from an open package, or said of one,
  * cannot, as the open package may have changed since. What it holds less
  * of was recorded, and only an administrator can correct the ledger
  * (docs/decisions/0003): the server keeps that for one (over_recorded.py),
  * as it refused the save.
  */
 import { v5 as uuidFrom } from "uuid";
-import { type Cart, type Catalogue, type Item, indexOf } from "./cart";
-import { asSave, type Gaps, RESCAN, toCart, withRetired } from "./older";
+import { type Catalogue, type Item, indexOf } from "./cart";
+import { FROM_OPEN, nameOf, RESCAN, unitOf, withRetired } from "./older";
 import {
   type Body,
   type Draft,
@@ -68,7 +68,7 @@ function formOf(line: Line, kind: Body["kind"]): string {
     // An opening's open package is made from the cart's key, so the same
     // package opened is the same line; anyone else's is taken from.
     open,
-    kind !== "open" && open !== null && line.whole === true,
+    fromOpen(line, kind) && line.whole === true,
   ]);
 }
 
@@ -161,13 +161,7 @@ class Namer {
 
   /** An item's name, as it is, never in italic. */
   name(line: Line): Said {
-    return [
-      {
-        quoted:
-          this.items.get(line.item_id)?.name ??
-          "An item no longer in the catalogue",
-      },
-    ];
+    return [{ quoted: nameOf(this.items.get(line.item_id)) }];
   }
 
   /** The package a line counts, and its size in thousandths, if whole
@@ -193,7 +187,7 @@ class Namer {
       pack === null
         ? [this.inUnit(line, amount)]
         : [`${pack.n} × `, { quoted: pack.name }];
-    return fromOpen(line, kind) ? [...said, " from an open package"] : said;
+    return fromOpen(line, kind) ? [...said, FROM_OPEN] : said;
   }
 
   /** `amount` as the volunteer changed a line to: how many packages, as
@@ -207,8 +201,7 @@ class Namer {
   }
 
   private inUnit(line: Line, amount: number): string {
-    const unit = this.items.get(line.item_id)?.unit;
-    return `${decimal(amount)}${unit === undefined || unit === "each" ? "" : ` ${unit}`}`;
+    return `${decimal(amount)}${unitOf(this.items.get(line.item_id))}`;
   }
 }
 
@@ -321,16 +314,4 @@ export function differenceOf(recorded: Body, mine: Body): Body | null {
     key: uuidFrom("difference", key),
     lines,
   } satisfies Draft & { key: string };
-}
-
-/** `difference` (differenceOf) as a cart to check and record, keeping
- * `last`'s choices where it has none, as a save put back is (older.toCart),
- * under its key; and what it could not hold, in words. */
-export function differenceToCart(
-  difference: Body,
-  catalogue: Catalogue,
-  last: Cart,
-): { cart: Cart; gaps: Gaps } {
-  const { cart, gaps } = toCart(asSave(difference), catalogue, last);
-  return { cart, gaps };
 }

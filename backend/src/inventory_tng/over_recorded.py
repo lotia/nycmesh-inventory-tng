@@ -29,6 +29,7 @@ from inventory_tng.models import (
     Movement,
     OverRecorded,
 )
+from inventory_tng.pages import amount
 
 log = structlog.get_logger(__name__)
 meter = metrics.get_meter(__name__)
@@ -92,7 +93,7 @@ def measure_settled(how: Settled) -> None:
 def seen(row: OverRecorded) -> str:
     """What an administrator saw of a check, to settle it only as seen: a
     later batch may say another amount meanwhile."""
-    return f"{row.quantity.normalize():f}"
+    return amount(row.quantity)
 
 
 # Where stock left, and where it arrived.
@@ -137,7 +138,7 @@ def amount_words(
     if package is not None and size and quantity % size == 0:
         return f"{quantity // size} \N{MULTIPLICATION SIGN} {package}"
     after = "" if unit == "each" else f" {unit}"
-    return f"{quantity.normalize():f}{after}"
+    return f"{amount(quantity)}{after}"
 
 
 def shown(session: Session, *where: ColumnElement[bool]) -> list[Shown]:
@@ -202,9 +203,7 @@ def shown(session: Session, *where: ColumnElement[bool]) -> list[Shown]:
                 at,
                 from_place,
                 to_place if kind != "open" else None,
-                MovedWhole(
-                    f"{held.normalize():f}", amount_words(held, unit, None, None)
-                )
+                MovedWhole(amount(held), amount_words(held, unit, None, None))
                 if from_open is not None and from_open == to_open
                 else None,
             )

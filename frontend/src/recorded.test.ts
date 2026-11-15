@@ -1,11 +1,11 @@
 import { describe, expect, test } from "vitest";
 import { freshCart } from "./cart";
+import { asSave, toCart } from "./older";
 import { type Body, type Recorded, wordsOf } from "./outbox";
 import {
   changesShown,
   differenceOf,
   differences,
-  differenceToCart,
   recordedLines,
   reportsAdded,
 } from "./recorded";
@@ -242,11 +242,7 @@ describe("the difference", () => {
     const was = move([boxes(1)]);
     const difference = differenceOf(was, putBack(was, move([boxes(3)])));
     expect(difference).not.toBeNull();
-    const { cart, gaps } = differenceToCart(
-      difference as Body,
-      CATALOGUE,
-      freshCart(),
-    );
+    const { cart, gaps } = toCart(asSave(difference), CATALOGUE, freshCart());
     expect(cart).toMatchObject({
       kind: "move",
       fromId: 10,
