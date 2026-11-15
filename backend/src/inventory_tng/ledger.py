@@ -1672,6 +1672,10 @@ class Counted(NamedTuple):
     written: list[Written]
     # How many lines it withheld that no earlier send of it did.
     withheld: int
+    # What this send put right, as of its moment: each item counted by its
+    # total (no form), and each form of one counted by form. Nothing if an
+    # earlier send of it did.
+    put_right: list[tuple[int, Form | None]]
 
 
 def corrected(
@@ -1874,7 +1878,25 @@ def record_count(
     if out:
         header = {"admin_id": admin_id, "from_location_id": location_id}
         written += _correct(session, lost_key, "count", header, out)
-    return Counted(bool(into or out), moved, written, len(moved) if sent is None else 0)
+    put_right: list[tuple[int, Form | None]] = []
+    if sent is None:
+        put_right = [(item_id, None) for item_id in sorted(kept)]
+        put_right += [(item_id, form) for item_id, form, _ in kept_forms]
+    return Counted(
+        bool(into or out),
+        moved,
+        written,
+        len(moved) if sent is None else 0,
+        put_right,
+    )
+
+
+class OpenCounted(NamedTuple):
+    """An open package counted: what it shows then, and what was written,
+    nothing if it already showed that."""
+
+    shows: Decimal
+    written: list[Written]
 
 
 def count_open_package(
@@ -1884,14 +1906,14 @@ def count_open_package(
     row: OpenPackage,
     left: Decimal,
     showed: Decimal,
-) -> Decimal | None:
+) -> OpenCounted | None:
     """Put an open package right (docs/decisions/0020, amended by
     inventory-tng-b1z): `left` is what it really had when it `showed`
     this, so what it shows now moves by the difference, and a cut since
     stays as saved. A count of only this package, at its place, so a cut of
-    another does not stop it. What it shows then; None if sent before
-    under its key, and so written once, then. NotCountable
-    (location_countable), as record_count."""
+    another does not stop it. What it shows then, and what this send
+    wrote; None if sent before under its key, and so written once, then.
+    NotCountable (location_countable), as record_count."""
     place = row.location_id
     lock_place(session, place)
     lost_key = uuid.uuid5(key, "lost")
@@ -1904,13 +1926,14 @@ def count_open_package(
     found, lost = count_corrections(
         [(row.item_id, form, now)], {(row.item_id, form): shows}
     )
+    written: list[Written] = []
     if found:
         header = {"admin_id": admin_id, "to_location_id": place}
-        _correct(session, key, "count", header, found)
+        written += _correct(session, key, "count", header, found)
     if lost:
         header = {"admin_id": admin_id, "from_location_id": place}
-        _correct(session, lost_key, "count", header, lost)
-    return now
+        written += _correct(session, lost_key, "count", header, lost)
+    return OpenCounted(now, written)
 
 
 def record_adjustment(

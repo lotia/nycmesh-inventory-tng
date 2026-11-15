@@ -5,22 +5,25 @@ line already recorded is kept here, for an administrator to correct. The
 ledger never changes, so the volunteer cannot take it back; an
 administrator corrects it with adjustments that undo the difference on
 each side, or marks it checked, as "Needs your action" on the home page
-asks. Every write to the over_recorded table."""
+asks. A count of its item at one of its ends, as of a moment after it,
+puts that end right; one counted at every end it has closes as counted
+(counted(); Ali, 2026-11-15, inventory-tng-qs8). Every write to the
+over_recorded table."""
 
 import uuid
-from collections.abc import Mapping
+from collections.abc import Collection, Mapping, Sequence
 from datetime import datetime
 from decimal import Decimal
 from typing import Literal, NamedTuple
 
 import structlog
 from opentelemetry import metrics
-from sqlalchemy import ColumnElement, func, select
+from sqlalchemy import ColumnElement, func, or_, select
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.orm import Session, aliased
 
 from inventory_tng import adjustment_reasons, ledger
-from inventory_tng.db import RuleBroken, get_locked
+from inventory_tng.db import RuleBroken, get_locked, locked
 from inventory_tng.models import (
     Item,
     ItemPackage,
@@ -37,7 +40,7 @@ meter = metrics.get_meter(__name__)
 # The reason the adjustments correcting one give.
 REASON = "Recorded more than moved"
 
-Settled = Literal["corrected", "checked"]
+Settled = Literal["corrected", "checked", "counted"]
 
 # Why one marked checked is right as it is, as the page says each
 # (models.OVER_RECORDED_REASONS; Ali, 2026-11-15, inventory-tng-zgy). Mark
@@ -60,9 +63,9 @@ raised_counter = meter.create_counter(
 settled_counter = meter.create_counter(
     "inventory.over_recorded.settled",
     unit="{line}",
-    description="Lines recorded with more than was moved that an administrator "
-    "settled, by how: corrected with adjustments, or marked checked, then by "
-    "why it was right as it was",
+    description="Lines recorded with more than was moved that were settled, "
+    "by how: corrected with adjustments, marked checked, then by why it was "
+    "right as it was, or counted at every end",
 )
 brought_back_counter = meter.create_counter(
     "inventory.over_recorded.places_brought_back",
@@ -116,12 +119,30 @@ def measure_brought_back() -> None:
 
 def seen(row: OverRecorded) -> str:
     """What an administrator saw of a check, to settle it only as seen: a
-    later batch may say another amount meanwhile."""
-    return amount(row.quantity)
+    later batch may say another amount meanwhile, and a count may put one
+    of its ends right, so Correct would write only the other."""
+    ends = ("left",) * bool(row.left_count_id) + ("arrived",) * bool(
+        row.arrived_count_id
+    )
+    return " ".join((amount(row.quantity), *ends))
 
 
-# Where stock left, and where it arrived.
+# Where stock left, and where it arrived, and the counts that put each
+# right.
 FROM, TO = aliased(Location), aliased(Location)
+LEFT_COUNT, ARRIVED_COUNT = aliased(LedgerTransaction), aliased(LedgerTransaction)
+
+
+class OneCounted(NamedTuple):
+    """A check one of whose two ends a count put right: the place counted
+    and when, and the place still to put right, by id and name, and
+    whether it may be counted (ledger.countable)."""
+
+    place: str
+    on: datetime
+    still_id: int
+    still: str
+    countable: bool
 
 
 class MovedWhole(NamedTuple):
@@ -152,6 +173,9 @@ class Shown(NamedTuple):
     # to be confirmed or corrected there (confirm_count). None for others,
     # which Correct undoes.
     moved_whole: MovedWhole | None
+    # One end of two put right by a count; None if neither is, or it has
+    # one end only.
+    one_counted: OneCounted | None
 
 
 def amount_words(
@@ -185,6 +209,10 @@ def shown(session: Session, *where: ColumnElement[bool]) -> list[Shown]:
             LedgerTransaction.created_at,
             FROM.name,
             TO.name,
+            LedgerTransaction.from_location_id,
+            LedgerTransaction.to_location_id,
+            LEFT_COUNT.created_at,
+            ARRIVED_COUNT.created_at,
         )
         .join(Movement, Movement.id == OverRecorded.movement_id)
         .join(LedgerTransaction, LedgerTransaction.id == Movement.transaction_id)
@@ -192,6 +220,8 @@ def shown(session: Session, *where: ColumnElement[bool]) -> list[Shown]:
         .outerjoin(ItemPackage, ItemPackage.id == package_id)
         .outerjoin(FROM, FROM.id == LedgerTransaction.from_location_id)
         .outerjoin(TO, TO.id == LedgerTransaction.to_location_id)
+        .outerjoin(LEFT_COUNT, LEFT_COUNT.id == OverRecorded.left_count_id)
+        .outerjoin(ARRIVED_COUNT, ARRIVED_COUNT.id == OverRecorded.arrived_count_id)
         .where(WAITING, *where)
         .order_by(func.lower(Item.name), Item.id, OverRecorded.id)
     ).all()
@@ -211,10 +241,22 @@ def shown(session: Session, *where: ColumnElement[bool]) -> list[Shown]:
         at,
         from_place,
         to_place,
+        from_id,
+        to_id,
+        left_on,
+        arrived_on,
     ) in found:
         words = amount_words(row.quantity, unit, package, size)
         if from_open is not None and kind != "open":
             words += " from an open package"
+        whole = from_open is not None and from_open == to_open
+        one = None
+        # Moved whole, it has one end only: where it arrived.
+        if from_id is not None and to_id is not None and not whole:
+            if left_on is not None and arrived_on is None:
+                one = OneCounted(from_place, left_on, to_id, to_place, True)
+            elif arrived_on is not None and left_on is None:
+                one = OneCounted(to_place, arrived_on, from_id, from_place, True)
         lines.append(
             Shown(
                 row,
@@ -228,10 +270,29 @@ def shown(session: Session, *where: ColumnElement[bool]) -> list[Shown]:
                 from_place,
                 to_place if kind != "open" else None,
                 MovedWhole(amount(held), amount_words(held, unit, None, None))
-                if from_open is not None and from_open == to_open
+                if whole
                 else None,
+                one,
             )
         )
+    still = {each.one_counted.still_id for each in lines if each.one_counted}
+    if still:
+        # Only a place that may be counted is offered for counting.
+        countable = set(
+            session.scalars(
+                select(Location.id).where(Location.id.in_(still), ledger.countable())
+            )
+        )
+        lines = [
+            each._replace(
+                one_counted=each.one_counted._replace(
+                    countable=each.one_counted.still_id in countable
+                )
+            )
+            if each.one_counted
+            else each
+            for each in lines
+        ]
     return lines
 
 
@@ -300,24 +361,27 @@ def correct(
     session: Session, check_id: int, seen_as: str, admin_id: int
 ) -> list[ledger.Written]:
     """Settle one, as corrected: an adjustment on each side its transaction
-    has undoes what was recorded more than moved, in the forms it moved in,
-    with the reason REASON. Found again where it left, written off where it
-    arrived. Call it holding its places (places_of), locked first. Each under
-    a key of the check's, so it is written once. RuleBroken as _settle, or
-    as ledger.record_adjustment."""
+    has, but one a count put right (counted), undoes what was recorded more
+    than moved, in the forms it moved in, with the reason REASON. Found
+    again where it left, written off where it arrived. Call it holding its
+    places (places_of), locked first. Each under a key of the check's, so
+    it is written once; with one end counted, a key of its own. RuleBroken
+    as _settle, or as ledger.record_adjustment."""
     row = _settle(session, check_id, seen_as, admin_id, "corrected")
     movement = session.get_one(Movement, row.movement_id)
     transaction = session.get_one(LedgerTransaction, movement.transaction_id)
     reason = adjustment_reasons.seeded(session, REASON)
+    # The other end only, after a count put one right.
+    only = " only" if row.left_count_id or row.arrived_count_id else ""
     sides = (
         (
-            transaction.from_location_id,
+            None if row.left_count_id else transaction.from_location_id,
             True,
             movement.from_package_id,
             movement.from_open_package_id,
         ),
         (
-            transaction.to_location_id,
+            None if row.arrived_count_id else transaction.to_location_id,
             False,
             movement.to_package_id,
             movement.to_open_package_id,
@@ -329,7 +393,7 @@ def correct(
             continue
         key = uuid.uuid5(
             transaction.idempotency_key,
-            f"over recorded {row.id} {'found' if found else 'off'}",
+            f"over recorded {row.id} {'found' if found else 'off'}{only}",
         )
         written += ledger.record_adjustment(
             session,
@@ -388,3 +452,110 @@ def confirm_count(
         "over recorded count corrected", over_recorded_id=check_id, admin_id=admin_id
     )
     return "corrected", written
+
+
+def counted(
+    session: Session,
+    admin_id: int,
+    place_id: int,
+    as_of: int,
+    written: Sequence[ledger.Written],
+    put_right: Collection[tuple[int, ledger.Form | None]],
+) -> int:
+    """Put right the ends at a place of those waiting that a count there
+    has, as of moment `as_of`, after their movement (Ali, 2026-11-15,
+    inventory-tng-qs8): `put_right` is what it counted, each item by its
+    total (no form) or a form of it (ledger.Counted.put_right), and
+    `written` its transactions, the first of which each end keeps. An end
+    is put right by its item counted by its total, or by the form it is in
+    at that end counted (docs/decisions/0020); an open package moved whole
+    has one end, where it arrived, which only that open package's own count
+    puts right. One with every end it has put right closes as counted, by
+    the count's administrator, then. How many closed.
+
+    Call it in the count's transaction, holding the place (ledger.lock_place):
+    it holds the rows it reads, by id, as Correct and Mark checked take a
+    check after its places, so none waits on another the wrong way round.
+    A send that wrote nothing (sent before) puts nothing right."""
+    if not written or not put_right:
+        return 0
+    count_id = written[0].id
+    totals = {item_id for item_id, form in put_right if form is None}
+    forms = {(item_id, form) for item_id, form in put_right if form is not None}
+    query = (
+        select(
+            OverRecorded,
+            Movement,
+            LedgerTransaction.from_location_id,
+            LedgerTransaction.to_location_id,
+        )
+        .join(Movement, Movement.id == OverRecorded.movement_id)
+        .join(LedgerTransaction, LedgerTransaction.id == Movement.transaction_id)
+        .where(
+            WAITING,
+            Movement.item_id.in_({item_id for item_id, _ in put_right}),
+            LedgerTransaction.id <= as_of,
+            or_(
+                LedgerTransaction.from_location_id == place_id,
+                LedgerTransaction.to_location_id == place_id,
+            ),
+        )
+        .order_by(OverRecorded.id)
+    )
+    found = session.execute(locked(query, of=OverRecorded)).all()
+    closed = 0
+    for row, movement, left_at, arrived_at in found:
+        whole = (
+            movement.from_open_package_id is not None
+            and movement.from_open_package_id == movement.to_open_package_id
+        )
+        item_id = movement.item_id
+        by_total = item_id in totals and not whole
+        left = ledger.Form(movement.from_package_id, movement.from_open_package_id)
+        arrived = ledger.Form(movement.to_package_id, movement.to_open_package_id)
+        if (
+            left_at == place_id
+            and not whole
+            and row.left_count_id is None
+            and (by_total or (item_id, left) in forms)
+        ):
+            row.left_count_id = count_id
+            _end_counted(row.id, "left", count_id, admin_id)
+        if (
+            arrived_at == place_id
+            and row.arrived_count_id is None
+            and (by_total or (item_id, arrived) in forms)
+        ):
+            row.arrived_count_id = count_id
+            _end_counted(row.id, "arrived", count_id, admin_id)
+        # Every end it has put right: one it has not is no end to put right.
+        if (left_at is None or whole or row.left_count_id) and (
+            arrived_at is None or row.arrived_count_id
+        ):
+            row.settled_at = func.now()
+            row.settled_by_admin_id = admin_id
+            row.settled_how = "counted"
+            closed += 1
+            log.info(
+                "over recorded counted",
+                over_recorded_id=row.id,
+                ledger_transaction_id=count_id,
+                admin_id=admin_id,
+            )
+    return closed
+
+
+def _end_counted(check_id: int, end: str, count_id: int, admin_id: int) -> None:
+    log.info(
+        "over recorded end counted",
+        over_recorded_id=check_id,
+        end=end,
+        ledger_transaction_id=count_id,
+        admin_id=admin_id,
+    )
+
+
+def measure_counted(closed: int) -> None:
+    """Those a count closed, measured once committed."""
+    if closed:
+        settled_counter.add(closed, {"how": "counted"})

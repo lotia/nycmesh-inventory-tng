@@ -16,12 +16,13 @@ from starlette.exceptions import HTTPException
 from starlette.types import Scope
 
 from inventory_tng.db import Gone
-from inventory_tng.local_time import show
+from inventory_tng.local_time import show, show_day
 
 templates = Jinja2Templates(directory=Path(__file__).parent / "templates")
 # {{ moment | when(zone) }}: a stored UTC time as people read it
-# (docs/decisions/0013).
+# (docs/decisions/0013); {{ moment | day(zone) }}, its day alone ("14 Nov").
 templates.env.filters["when"] = show
+templates.env.filters["day"] = show_day
 
 
 def amount(value: Decimal | None) -> str:

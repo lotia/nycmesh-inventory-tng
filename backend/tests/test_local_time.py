@@ -12,7 +12,14 @@ from sqlalchemy.orm import Session
 from structlog.testing import capture_logs
 
 from inventory_tng import local_time, registration_codes
-from inventory_tng.local_time import DEFAULT_ZONE, local, parse_local, show, site_zone
+from inventory_tng.local_time import (
+    DEFAULT_ZONE,
+    local,
+    parse_local,
+    show,
+    show_day,
+    site_zone,
+)
 from inventory_tng.models import SiteSettings
 from inventory_tng.time_zones import is_time_zone, known_zones
 
@@ -48,6 +55,13 @@ def test_shown_times_follow_daylight_saving(
     session: Session, utc: datetime, shown: str
 ) -> None:
     assert show(utc, site_zone(session)) == shown
+
+
+def test_a_day_is_said_in_the_zone_as_a_sentence_says_it() -> None:
+    """Late on the 14th in New York is the 15th in UTC."""
+    moment = datetime(2026, 11, 15, 3, 30, tzinfo=UTC)
+    assert show_day(moment, ZoneInfo("America/New_York")) == "14 Nov"
+    assert show_day(moment, ZoneInfo("UTC")) == "15 Nov"
 
 
 def test_another_zone_can_be_chosen(session: Session) -> None:

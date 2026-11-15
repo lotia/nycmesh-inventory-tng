@@ -7,6 +7,7 @@ import re
 import uuid
 from collections.abc import Callable
 from decimal import Decimal
+from functools import partial
 from typing import Any
 
 import pytest
@@ -16,11 +17,19 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 from structlog.testing import capture_logs
 
-from inventory_tng import adjustment_reasons, ledger, locations, over_recorded
+from inventory_tng import (
+    adjustment_reasons,
+    ledger,
+    locations,
+    open_packages,
+    over_recorded,
+)
+from inventory_tng.admin import length_checks
 from inventory_tng.admin import over_recorded as over_recorded_page
 from inventory_tng.admin.common import RULES
 from inventory_tng.db import RuleBroken, attempt
 from inventory_tng.ledger import Entry, Form, _more_written
+from inventory_tng.local_time import show_day, site_zone
 from inventory_tng.models import (
     OVER_RECORDED_REASONS,
     AdjustmentReason,
@@ -1339,3 +1348,426 @@ def test_a_place_whose_own_place_is_retired_says_so(
     assert f"Not changed: {RULES['location_parent_current']}" in page
     session.expire_all()
     assert shelf.retired_at is not None
+
+
+# A count of an end puts it right (Ali, 2026-11-15, inventory-tng-qs8).
+
+COUNTS = "/admin/counts"
+
+
+def count_form_at(client: TestClient, place_id: int) -> dict[str, str]:
+    """A place's count form's hidden fields, as shown now: its key, and the
+    place's latest ledger entry then."""
+    page = client.get(f"{COUNTS}/{place_id}")
+    return dict(
+        re.findall(r'type="hidden" name="(key|as_of|items)" value="([^"]*)"', page.text)
+    )
+
+
+def count_at(
+    client: TestClient,
+    place_id: int,
+    lines: dict[str, str],
+    shown: dict[str, str] | None = None,
+) -> Response:
+    """A count of a place sent with `lines`, from its form as shown now, or
+    as `shown`."""
+    form = shown if shown is not None else count_form_at(client, place_id)
+    return client.post(f"{COUNTS}/{place_id}", data=form | lines)
+
+
+def radios_raised(client: TestClient, place: Place) -> None:
+    """Three radios recorded moved from the store to the van, then one: two
+    wait, loose at each end."""
+    recorded_then_changed(
+        client,
+        place.batch(),
+        lines=[{"item_id": place.item.id, "quantity": "1"}],
+    )
+
+
+def count_ids(session: Session) -> list[int]:
+    return list(
+        session.scalars(
+            select(LedgerTransaction.id)
+            .where(LedgerTransaction.kind == "count")
+            .order_by(LedgerTransaction.id)
+        )
+    )
+
+
+def test_a_count_after_it_puts_that_end_right_and_says_what_is_left(
+    admin_client: TestClient,
+    registered_client: TestClient,
+    session: Session,
+    place: Place,
+) -> None:
+    radios_raised(registered_client, place)
+    with capture_logs() as logs:
+        done = count_at(admin_client, place.van.id, {f"counted_{place.item.id}": "1"})
+    assert done.status_code == 303
+    (counted,) = count_ids(session)
+    (check,) = checks(session)
+    assert (check.left_count_id, check.arrived_count_id) == (None, counted)
+    assert check.settled_at is None
+    assert {
+        "event": "over recorded end counted",
+        "over_recorded_id": check.id,
+        "end": "arrived",
+        "ledger_transaction_id": counted,
+        "admin_id": session.get_one(LedgerTransaction, counted).admin_id,
+        "log_level": "info",
+    } in logs
+    on = session.get_one(LedgerTransaction, counted).created_at
+    day = show_day(on, site_zone(session))
+    page = admin_client.get(f"{PAGE}?item={place.item.id}").text
+    assert (
+        f"{place.van.name} counted {day}. {place.store.name} still to put right."
+        in text_of(page)
+    )
+    assert f"Correct {place.store.name}<span" in page
+    assert f'<a href="{COUNTS}/{place.store.id}">Count {place.store.name}<span' in page
+    assert "Mark checked" in page
+    # Still waiting under "Needs your action".
+    assert "Recorded more than moved" in text(admin_client.get("/admin"))
+
+
+def text_of(page: str) -> str:
+    """A page's words, tags taken out, spaces as one."""
+    return " ".join(re.sub(r"<[^>]+>", " ", page).split())
+
+
+def test_a_place_that_cannot_be_counted_is_not_offered_for_counting(
+    admin_client: TestClient,
+    registered_client: TestClient,
+    session: Session,
+    place: Place,
+) -> None:
+    """Retired holding nothing: Correct says so, and offers to bring it
+    back."""
+    received(session, place)
+    radios_raised(registered_client, place)
+    count_at(admin_client, place.van.id, {f"counted_{place.item.id}": "1"})
+    retire(session, place.store)
+    page = admin_client.get(f"{PAGE}?item={place.item.id}").text
+    assert f"Correct {place.store.name}<span" in page
+    assert f"{COUNTS}/{place.store.id}" not in page
+
+
+def test_both_ends_counted_it_closes_as_counted_once(
+    admin_client: TestClient,
+    registered_client: TestClient,
+    session: Session,
+    place: Place,
+) -> None:
+    radios_raised(registered_client, place)
+    count_at(admin_client, place.van.id, {f"counted_{place.item.id}": "1"})
+    shown = count_form_at(admin_client, place.store.id)
+    with capture_logs() as logs:
+        count_at(admin_client, place.store.id, {f"counted_{place.item.id}": "2"}, shown)
+    at_van, at_store = count_ids(session)
+    (check,) = checks(session)
+    closing = session.get_one(LedgerTransaction, at_store)
+    assert (
+        check.settled_how,
+        check.settled_by_admin_id,
+        check.settled_at,
+        check.left_count_id,
+        check.arrived_count_id,
+    ) == ("counted", closing.admin_id, closing.created_at, at_store, at_van)
+    assert any(line["event"] == "over recorded counted" for line in logs)
+    assert "Recorded more than moved" not in text(admin_client.get("/admin"))
+    # Sent again, as a second tap would: nothing more.
+    count_at(admin_client, place.store.id, {f"counted_{place.item.id}": "2"}, shown)
+    assert count_ids(session) == [at_van, at_store]
+
+
+def test_a_count_shown_before_it_moved_puts_nothing_right(
+    admin_client: TestClient,
+    registered_client: TestClient,
+    session: Session,
+    place: Place,
+) -> None:
+    """As of a moment before the move, it does not know of the move: the
+    item moved since, so it is asked again, and nothing is put right."""
+    shown = count_form_at(admin_client, place.van.id)
+    radios_raised(registered_client, place)
+    count_at(admin_client, place.van.id, {f"counted_{place.item.id}": "1"}, shown)
+    (check,) = checks(session)
+    assert (check.left_count_id, check.arrived_count_id) == (None, None)
+
+
+def test_only_a_count_as_of_its_movement_or_after_puts_an_end_right(
+    registered_client: TestClient, session: Session, place: Place
+) -> None:
+    radios_raised(registered_client, place)
+    (check,) = checks(session)
+    moved = session.get_one(Movement, check.movement_id).transaction_id
+    admin = admin_id(session)
+    # The movement's own transaction, as the count's: any will do here.
+    written = [ledger.Written(moved, "count", 1)]
+    at_van = partial(
+        over_recorded.counted, session, admin, place.van.id, written=written
+    )
+    assert at_van(moved - 1, put_right=[(place.item.id, None)]) == 0
+    # Another item, or nothing written (a count sent again), neither.
+    assert at_van(moved, put_right=[(place.cable.id, None)]) == 0
+    assert (
+        over_recorded.counted(
+            session, admin, place.van.id, moved, [], [(place.item.id, None)]
+        )
+        == 0
+    )
+    assert checks(session)[0].arrived_count_id is None
+    assert at_van(moved, put_right=[(place.item.id, None)]) == 0
+    session.flush()
+    assert checks(session)[0].arrived_count_id == moved
+
+
+def test_a_count_of_another_form_puts_nothing_right(
+    admin_client: TestClient,
+    registered_client: TestClient,
+    session: Session,
+    place: Place,
+    bags: ItemPackage,
+) -> None:
+    """Counted by form, an end is put right by the form it is in there: the
+    bags arrived sealed, so their loose cable is no count of them
+    (docs/decisions/0020)."""
+    raised(registered_client, place, bags)
+    for where in (place.van, place.store):
+        count_at(admin_client, where.id, {f"loose_{place.cable.id}": "0"})
+    (check,) = checks(session)
+    assert (check.left_count_id, check.arrived_count_id) == (None, None)
+    count_at(admin_client, place.van.id, {f"sealed_{place.cable.id}_{bags.id}": "1"})
+    (check,) = checks(session)
+    assert check.arrived_count_id is not None
+
+
+@pytest.mark.parametrize("at_van", [True, False])
+def test_one_end_counted_correct_writes_the_other_end_only(
+    admin_client: TestClient,
+    registered_client: TestClient,
+    session: Session,
+    place: Place,
+    at_van: bool,
+) -> None:
+    radios_raised(registered_client, place)
+    (check,) = checks(session)
+    before = over_recorded.seen(check)
+    counted, other = (place.van, place.store) if at_van else (place.store, place.van)
+    count_at(admin_client, counted.id, {f"counted_{place.item.id}": "1"})
+    page = text_of(admin_client.get(f"{PAGE}?item={place.item.id}").text)
+    assert f"{counted.name} counted " in page
+    assert f"{other.name} still to put right." in page
+    # Seen before the count: it changed meanwhile.
+    stale = admin_client.post(f"{PAGE}/{check.id}/correct", data={"seen": before})
+    assert "over_recorded_unchanged" in stale.headers["location"]
+    (check,) = checks(session)
+    form = {"seen": over_recorded.seen(check)}
+    done = admin_client.post(f"{PAGE}/{check.id}/correct", data=form)
+    assert "over_recorded_corrected" in done.headers["location"]
+    again = admin_client.post(f"{PAGE}/{check.id}/correct", data=form)
+    assert "over_recorded_unchanged" in again.headers["location"]
+    (adjusted,) = session.scalars(
+        select(LedgerTransaction).where(LedgerTransaction.kind == "adjustment")
+    )
+    moved = session.get_one(
+        LedgerTransaction, session.get_one(Movement, check.movement_id).transaction_id
+    )
+    # Found again where it left, or written off where it arrived, under a
+    # key of its own, not a full Correct's.
+    side = "found" if at_van else "off"
+    assert (adjusted.from_location_id, adjusted.to_location_id) == (
+        (None, place.store.id) if at_van else (place.van.id, None)
+    )
+    assert adjusted.idempotency_key == uuid.uuid5(
+        moved.idempotency_key, f"over recorded {check.id} {side} only"
+    )
+    (check,) = checks(session)
+    assert check.settled_how == "corrected"
+    assert (check.left_count_id is None, check.arrived_count_id is None) == (
+        at_van,
+        not at_van,
+    )
+
+
+def test_one_moved_whole_is_closed_by_a_count_of_its_open_package_where_it_arrived(
+    admin_client: TestClient, registered_client: TestClient, session: Session
+) -> None:
+    spools = Spools(session)
+    made = moved_whole(registered_client, spools)
+    # Where it left is no end of it; nor is its cable counted by its total,
+    # or loose, a count of the open package.
+    count_at(admin_client, spools.store.id, {f"counted_{spools.cable.id}": "0"})
+    count_at(admin_client, spools.van.id, {f"counted_{spools.cable.id}": "300"})
+    count_at(admin_client, spools.van.id, {f"loose_{spools.cable.id}": "0"})
+    (check,) = checks(session)
+    assert (check.left_count_id, check.arrived_count_id) == (None, None)
+    count_at(admin_client, spools.van.id, {f"opened_{made.id}": "300"})
+    (check,) = checks(session)
+    assert check.settled_how == "counted"
+    assert check.left_count_id is None
+    assert check.arrived_count_id == count_ids(session)[-1]
+
+
+def test_one_moved_whole_is_closed_by_setting_its_length_where_it_arrived(
+    registered_client: TestClient, session: Session
+) -> None:
+    spools = Spools(session)
+    made = moved_whole(registered_client, spools)
+    made.below_zero_at = made.opened_at  # A check to settle.
+    session.flush()
+    moment = session.scalar(select(func.max(LedgerTransaction.id)))
+    assert moment is not None
+    answer = length_checks.Answer(
+        made.id, open_packages.check_seen(made), Decimal(300), Decimal(305), moment
+    )
+    assert length_checks._set(session, admin_id(session), answer, [spools.van.id]) == (
+        True,
+        False,
+        1,
+    )
+    (check,) = checks(session)
+    assert check.settled_how == "counted"
+
+
+@pytest.mark.parametrize(
+    ("how", "ends", "broken"),
+    [
+        (None, (True, True), "counted_waiting"),
+        ("counted", (False, False), "counted"),
+        ("counted", (True, True), None),
+        ("checked", (True, True), None),
+        ("guessed", (True, False), "how"),
+    ],
+)
+def test_the_database_keeps_counted_ends_only_as_counts_give_them(
+    registered_client: TestClient,
+    session: Session,
+    place: Place,
+    how: str | None,
+    ends: tuple[bool, bool],
+    broken: str | None,
+) -> None:
+    """At most one end counted while it waits; one closed as counted has
+    one at least."""
+    radios_raised(registered_client, place)
+    (check,) = checks(session)
+    moved = session.get_one(Movement, check.movement_id).transaction_id
+    admin = admin_id(session)
+
+    def settle() -> None:
+        if how is not None:
+            check.settled_at = func.now()
+            check.settled_by_admin_id = admin
+            check.settled_how = how
+            check.checked_reason = "both" if how == "checked" else None
+        check.left_count_id = moved if ends[0] else None
+        check.arrived_count_id = moved if ends[1] else None
+        session.flush()
+
+    done = attempt(session, settle)
+    assert done == (None, None if broken is None else f"ck_over_recorded_{broken}")
+
+
+def committed_check(
+    own_committed: Committed,
+) -> tuple[Place, OverRecorded, int, LedgerTransaction]:
+    """A move of three radios from the store to the van with one recorded
+    more, committed: its place, the check, an administrator, and the
+    move."""
+    setup = own_committed.session()
+    place = Place(setup)
+    moved = write(setup, place)
+    movement_id = setup.scalar(
+        select(Movement.id).where(Movement.transaction_id == moved.id)
+    )
+    assert movement_id is not None
+    over_recorded.raise_checks(setup, {movement_id: Decimal(1)})
+    admin = admin_id(setup)
+    adjustment_reasons.seeded(setup, over_recorded.REASON)
+    setup.commit()
+    (check,) = checks(setup)
+    return place, check, admin, moved
+
+
+def count_van(
+    session: Session, place: Place, admin: int, as_of: int, at: Location | None = None
+) -> int:
+    """The van, or `at`, counted as of `as_of`, as the count page does: how
+    many it closed."""
+    where = (at or place.van).id
+    counted = ledger.record_count(
+        session, uuid.uuid4(), admin, where, [(place.item.id, Decimal(2))], as_of
+    )
+    return over_recorded.counted(
+        session, admin, where, as_of, counted.written, counted.put_right
+    )
+
+
+def correct_check(session: Session, check: OverRecorded, seen: str, admin: int) -> None:
+    """Corrected as the page does: its places, then it."""
+    ledger.lock_places(session, over_recorded.places_of(session, check.id))
+    over_recorded.correct(session, check.id, seen, admin)
+
+
+@pytest.mark.concurrency
+def test_a_correct_waits_for_a_count_of_its_end_then_is_refused(
+    own_committed: Committed,
+) -> None:
+    """The count holds the van, then the check; Correct takes its places
+    first, so waits, then finds an end counted since it was seen."""
+    place, check, admin, moved = committed_check(own_committed)
+    first, second = own_committed.session(), own_committed.session()
+    seen = over_recorded.seen(check)
+    assert count_van(first, place, admin, moved.id) == 0
+    worker = own_committed.blocked(
+        second, lambda: correct_check(second, check, seen, admin)
+    )
+    first.commit()
+    finished = worker.finished()
+    second.rollback()
+    assert isinstance(finished.error, RuleBroken)
+    assert finished.error.rule == "over_recorded_unchanged"
+    (check,) = checks(first)
+    assert (check.settled_at, check.arrived_count_id) == (None, count_ids(first)[0])
+
+
+@pytest.mark.concurrency
+def test_a_count_waits_for_a_correct_then_puts_nothing_right(
+    own_committed: Committed,
+) -> None:
+    place, check, admin, moved = committed_check(own_committed)
+    first, second = own_committed.session(), own_committed.session()
+    correct_check(first, check, over_recorded.seen(check), admin)
+    worker = own_committed.blocked(
+        second, lambda: count_van(second, place, admin, moved.id)
+    )
+    first.commit()
+    finished = worker.finished()
+    second.commit()
+    assert (finished.error, finished.result) == (None, 0)
+    (check,) = checks(first)
+    assert (check.settled_how, check.arrived_count_id) == ("corrected", None)
+
+
+@pytest.mark.concurrency
+def test_both_ends_counted_at_once_the_second_closes_it(
+    own_committed: Committed,
+) -> None:
+    """Each count holds the check it puts right, so the second reads the
+    first's end once it is in, and closes it, never two ends counted and
+    still waiting."""
+    place, check, admin, moved = committed_check(own_committed)
+    first, second = own_committed.session(), own_committed.session()
+    assert count_van(first, place, admin, moved.id) == 0
+    worker = own_committed.blocked(
+        second, lambda: count_van(second, place, admin, moved.id, place.store)
+    )
+    first.commit()
+    finished = worker.finished()
+    second.commit()
+    assert (finished.error, finished.result) == (None, 1)
+    (check,) = checks(first)
+    assert check.settled_how == "counted"

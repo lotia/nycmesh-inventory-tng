@@ -1168,7 +1168,9 @@ class Movement(Base):
     to_open_package_id: Mapped[int | None] = _reference("open_package.id")
 
 
-OVER_RECORDED_SETTLED = ("corrected", "checked")
+# Corrected with adjustments, marked checked, or counted at each of its
+# ends (over_recorded.counted; Ali, 2026-11-15, inventory-tng-qs8).
+OVER_RECORDED_SETTLED = ("corrected", "checked", "counted")
 # Why one marked checked is right as it is (Ali, 2026-11-15,
 # inventory-tng-zgy): counted where it left, where it arrived, at both ends,
 # or put right another way, said in words of the administrator's.
@@ -1184,7 +1186,8 @@ class OverRecorded(Base):
     its movement than was recorded, and was refused (409 key_reused). One a
     movement; a later such batch says how much again while it waits. Settled
     when an administrator corrects it, with adjustments, or marks it checked,
-    saying why it is right as it is (over_recorded.py)."""
+    saying why it is right as it is, or when a count after it has put right
+    each of its ends (over_recorded.py)."""
 
     __tablename__ = "over_recorded"
     __table_args__ = (
@@ -1208,6 +1211,20 @@ class OverRecorded(Base):
             f" AND length(checked_words) <= {OVER_RECORDED_WORDS_MAX}",
             name="checked_words",
         ),
+        # Counted at every end it has closes one, so one waiting has at most
+        # one counted (it has two at most), and one closed as counted has
+        # one at least. Which ends it has is its transaction's, so
+        # over_recorded.counted says when it closes.
+        CheckConstraint(
+            "settled_at IS NOT NULL"
+            " OR num_nonnulls(left_count_id, arrived_count_id) <= 1",
+            name="counted_waiting",
+        ),
+        CheckConstraint(
+            "settled_how IS DISTINCT FROM 'counted'"
+            " OR num_nonnulls(left_count_id, arrived_count_id) >= 1",
+            name="counted",
+        ),
         # Raised by one statement, which a check settled leaves as it is;
         # settled holding its row (over_recorded.py).
         protection(owner="over_recorded.py", lock=None, history=False),
@@ -1229,6 +1246,11 @@ class OverRecorded(Base):
     # admin/over_recorded.py, which checks their length so). Never logged.
     checked_reason: Mapped[str | None] = mapped_column(Text)
     checked_words: Mapped[str | None] = mapped_column(Text)
+    # The count transaction, as of a moment after its movement, that put
+    # right where it left, and where it arrived (over_recorded.counted):
+    # kept once settled, however it was, for a list of those settled.
+    left_count_id: Mapped[int | None] = _reference("ledger_transaction.id")
+    arrived_count_id: Mapped[int | None] = _reference("ledger_transaction.id")
 
 
 class ScanSettings(Versioned, Base):

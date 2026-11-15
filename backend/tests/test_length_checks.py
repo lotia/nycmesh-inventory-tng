@@ -305,9 +305,11 @@ def test_counting_an_open_package_twice_under_its_key_writes_once(
     key = uuid.uuid4()
     count = partial(ledger.count_open_package, session, key, counter.id, made)
     # What it shows already: nothing differs, nothing is written.
-    assert count(Decimal(305), Decimal(305)) == 305
+    assert count(Decimal(305), Decimal(305)) == (305, [])
     assert left_on(session, made) == 305
-    assert count(Decimal(300), Decimal(305)) == 300
+    counted = count(Decimal(300), Decimal(305))
+    assert counted is not None
+    assert (counted.shows, [each.kind for each in counted.written]) == (300, ["count"])
     # Sent again under its key: written once.
     assert count(Decimal(290), Decimal(305)) is None
     assert left_on(session, made) == 300
@@ -639,9 +641,30 @@ def test_a_package_moved_from_the_places_locked_is_not_set(
     assert length_checks._set(session, admin.id, answer, [made.location_id + 1]) == (
         False,
         False,
+        0,
     )
     session.refresh(made)
     assert made.below_zero_at is not None
+
+
+def test_a_set_whose_count_is_written_already_writes_nothing_more(
+    session: Session, spools: Spools
+) -> None:
+    """Its count's key written before, as by an earlier send: set, once."""
+    admin = add(session, Admin(username=f"setter-{tag()}"))
+    made = spools.opened()
+    made.below_zero_at = made.opened_at
+    session.flush()
+    checked = seen(session, made)
+    key = uuid.uuid5(made.key, f"length {checked}")
+    ledger.count_open_package(session, key, admin.id, made, Decimal(1), Decimal(305))
+    answer = length_checks.Answer(made.id, checked, Decimal(2), Decimal(305), 0)
+    assert length_checks._set(session, admin.id, answer, [made.location_id]) == (
+        True,
+        False,
+        0,
+    )
+    assert left_on(session, made) == 1
 
 
 def test_ticked_boxes_that_name_no_package_are_passed_over(

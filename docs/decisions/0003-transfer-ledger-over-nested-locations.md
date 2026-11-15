@@ -46,13 +46,14 @@ while. So we need more than one location from the start.
   still apply. An item that moved at the place meanwhile might have been counted
   before or after the move, so its line is not saved; the page asks for it
   again, and saves every other line (Ali, 2026-11-03). A count asks for each
-  form of an item separately, and may add or close an open package (0020). A
-  count names each item once: a form naming one twice is refused, saying why, as
-  it isn't clear which number is right (Ali, 2026-11-08). An adjustment gives a
-  reason from a list administrators extend, seeded with Damaged, Lost or stolen,
-  Found, Used for testing and Records were wrong (Ali, 2026-11-03), and Used up,
-  for closing an open package (0020). A volunteer only reports an open package
-  used up; an administrator closes it.
+  form of an item separately, and may add or close an open package (0020). It
+  also puts right the end at that place of a line recorded more than moved
+  (0020). A count names each item once: a form naming one twice is refused,
+  saying why, as it isn't clear which number is right (Ali, 2026-11-08). An
+  adjustment gives a reason from a list administrators extend, seeded with
+  Damaged, Lost or stolen, Found, Used for testing and Records were wrong (Ali,
+  2026-11-03), and Used up, for closing an open package (0020). A volunteer
+  only reports an open package used up; an administrator closes it.
 - **Nothing is deleted: retiring is the soft delete**, and bringing back
   undoes it. A retired item that still has stock, or a retired package
   with some still sealed, is never received again, but volunteers may take

@@ -6,7 +6,8 @@ Mark checked settles it as it is, for one corrected another way, saying
 why it is right as it is (Ali, 2026-11-15, inventory-tng-zgy). An open
 package moved whole is now where it arrived: Confirm count settles it with
 the count it held then, as it was, or corrected there by an adjustment
-(Ali, 2026-11-15)."""
+(Ali, 2026-11-15). One a count put right at one end says so, and offers
+Correct, Count or Mark checked for the other (inventory-tng-qs8)."""
 
 from decimal import Decimal
 from typing import Annotated, Any
@@ -19,6 +20,7 @@ from sqlalchemy.orm import Session
 
 from inventory_tng import ledger, locations, over_recorded
 from inventory_tng.admin.common import admin_page, quantity, row_id, rule_words
+from inventory_tng.admin.counts import COUNTS
 from inventory_tng.admin.locations import changeable
 from inventory_tng.admin.needs_action import (
     ItemWaiting,
@@ -156,6 +158,7 @@ def _page(
             "words_max": OVER_RECORDED_WORDS_MAX,
             "seen": over_recorded.seen,
             "zone": site_zone(session),
+            "counts_path": COUNTS,
             "problems": problems,
             "values": values,
             "alert": alert,

@@ -349,8 +349,8 @@ you" counts every report in one line, which hides what is waiting.
   allow a reason only on a row settled as checked and words only, and
   always, for another way. Confirm count, which settles a row as checked
   too, keeps no reason: the movement holds the count. The words are never
-  logged. No page lists settled rows yet, so the reason is not shown
-  anywhere.
+  logged. No page lists settled rows yet, so the reason, and the counts
+  that put its ends right, are not shown anywhere.
 - **An open package moved whole** is now where it arrived, so cannot be
   found again where it left. Its row says "An open package moved to
   the van. Confirm or correct count.", naming the place, with a box, "Count in the
@@ -362,6 +362,33 @@ you" counts every report in one line, which hides what is waiting.
   box says what it held under it ("Was 180 m"; without JavaScript, once
   sent back with another count). We rejected offering only
   Mark checked there, which left the count to be fixed elsewhere.
+- **A count puts an end right** (Ali, 2026-11-15, inventory-tng-qs8). A
+  row has two ends, where the stock left and where it arrived, or one
+  when its transaction has no place on the other side (a receipt, an
+  install). A count at an end, as of a moment at or after the movement's
+  transaction (the place's latest when the count form was shown, 0003),
+  puts that end right if it counted the item by its total, or, counted
+  by form, the form the movement left or arrived in there: those
+  sealed packages, that open package, or loose. A count shown before the
+  move does not, nor does a line it withheld as moved meanwhile, nor a
+  count sent again. An open package moved whole has the arrival end
+  only, put right by a count of that open package there, on the count
+  form or by Set on its length check (one that writes nothing, as it
+  showed that already, puts nothing right). The row keeps the count's
+  transaction for each end (`left_count_id`, `arrived_count_id`),
+  written in the count's own transaction under the place's lock, the
+  rows held by id after it, as Correct and Mark checked take them.
+- **One end put right**, the row says "Shelf B3 counted 14 Nov. Rack A
+  still to put right." (the day in the site's zone) and offers "Correct
+  Rack A", one adjustment at that end only, under a key of its own;
+  "Count Rack A", the place's count page, if it may be counted; and Mark
+  checked. A Correct sent as seen before the count is refused as changed
+  meanwhile. A retired place that holds nothing cannot be counted, so
+  Bring back stays the way to put it right there.
+- **Every end put right**, the row closes as `counted`, by the
+  administrator of the count that closed it, then, and leaves "Needs your
+  action". A CHECK allows one end counted at most while it waits, and
+  one at least on a row closed so.
 - **The page's words** (Ali, 2026-11-15): "Another tab recorded these
   before a volunteer changed them, so the inventory shows more moved than
   was. Correct moves the extra back with an adjustment. Mark checked if
@@ -404,7 +431,7 @@ you" counts every report in one line, which hides what is waiting.
 - Metrics, besides those above: checks of a package's length raised, by
   how (`volunteer`, `below_zero`), and settled, by how (`set`, `left`,
   `closed`); lines recorded more than moved raised, and settled, by how
-  (`corrected`, `checked`), and those marked checked by their reason
+  (`corrected`, `checked`, `counted`), and those marked checked by their reason
   (`left`, `arrived`, `both`, `other`); places brought back to correct
   one.
 - Built by inventory-tng-ck0 (the card and its box), inventory-tng-pll

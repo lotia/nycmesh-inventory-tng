@@ -33,7 +33,7 @@ from fastapi.responses import HTMLResponse, Response
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
-from inventory_tng import open_packages
+from inventory_tng import open_packages, over_recorded
 from inventory_tng.adjustment_reasons import LOST, USED_UP
 from inventory_tng.admin.common import (
     ADMIN,
@@ -602,6 +602,8 @@ def count(
             items=sent_items,
         )
     closed: list[open_packages.Closed | None] = []
+    # Recorded more than moved, closed by this count at each end.
+    settled = 0
 
     # An item counted by its total holds loose units alone (_forms): with
     # an open package of it found, its total is its loose units.
@@ -612,6 +614,7 @@ def count(
     ]
 
     def put_right() -> Counted:
+        nonlocal settled
         # The place, then the items, as every count and save takes them
         # (ledger.py), before a package found is held.
         lock_place(session, place.id)
@@ -641,6 +644,14 @@ def count(
             counted_now = record_count(
                 session, key, signed.admin.id, place.id, totals, as_of, by_form=lines
             )
+        settled = over_recorded.counted(
+            session,
+            signed.admin.id,
+            place.id,
+            as_of,
+            counted_now.written,
+            counted_now.put_right,
+        )
         # Closed after the count: one not there, or used up, as said.
         for open_id, reason in forms.close:
             closed.append(
@@ -676,6 +687,7 @@ def count(
     session.commit()
     corrected(signed.admin.id, place.id, result.written, result.withheld)
     open_packages.measure_closing("count", closed)
+    over_recorded.measure_counted(settled)
     if not result.moved:
         return redirect(
             COUNTS,

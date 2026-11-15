@@ -19,7 +19,7 @@ from fastapi.responses import Response
 from sqlalchemy import ColumnElement, and_, func, or_, select, true
 from sqlalchemy.orm import Session
 
-from inventory_tng import ledger, open_packages
+from inventory_tng import ledger, open_packages, over_recorded
 from inventory_tng.admin.common import admin_page, now, quantity, row_id
 from inventory_tng.admin.needs_action import (
     Kind,
@@ -214,22 +214,24 @@ def kind_page(
 
 def _set(
     session: Session, admin_id: int, answer: Answer, places: Collection[int]
-) -> tuple[bool, bool]:
+) -> tuple[bool, bool, int]:
     """A count of the open package by the difference between what it really
     had and what it showed then (docs/decisions/0020, amended by
     inventory-tng-b1z), so a cut since stays as saved: then is the report,
     for the figure a volunteer said, else the page (set_one). Under a key of
     its check, so sending it twice writes it once, and the check settled:
     both, if the check is still as `seen` and the package still at one of
-    `places`, locked already; else neither. Whether it was set, and whether
-    that left it below zero, asked about again."""
+    `places`, locked already; else neither. A count of it puts right the
+    end of one recorded more than moved it is in there (over_recorded.counted).
+    Whether it was set, whether that left it below zero, asked about again,
+    and how many recorded more than moved it closed."""
     open_id, seen, left, showed, as_of = answer
     # A Set's, never a Leave's.
     assert left is not None
     row = session.get_one(OpenPackage, open_id)
     key = uuid.uuid5(row.key, f"length {seen}")
 
-    def both() -> bool:
+    def both() -> tuple[bool, int]:
         if not open_packages.settle_check(session, open_id, seen):
             raise RuleBroken("length_unchanged")
         # Moved since its place was locked: its place is not, so nothing
@@ -243,11 +245,22 @@ def _set(
             if showed is None
             else showed + ledger.corrected_since(session, open_id, as_of)
         )
-        shows = ledger.count_open_package(session, key, admin_id, row, left, then)
-        return shows is not None and open_packages.left_below_zero(row, shows, now())
+        counted = ledger.count_open_package(session, key, admin_id, row, left, then)
+        if counted is None:
+            return False, 0
+        closed = over_recorded.counted(
+            session,
+            admin_id,
+            row.location_id,
+            as_of,
+            counted.written,
+            [(row.item_id, ledger.Form(open_package_id=open_id))],
+        )
+        return open_packages.left_below_zero(row, counted.shows, now()), closed
 
-    below, broken = attempt(session, both)
-    return broken is None, bool(below)
+    done, broken = attempt(session, both)
+    below, closed = done or (False, 0)
+    return broken is None, below, closed
 
 
 def _showed(typed: str) -> Decimal | None:
@@ -294,18 +307,20 @@ def _answer(
     named = OpenPackage.id.in_([each.open_id for each in answers])
     places = set(session.scalars(select(OpenPackage.location_id).where(named)))
     ledger.lock_places(session, places)
-    set_, left_, below = 0, 0, 0
+    set_, left_, below, closed = 0, 0, 0, 0
     for each in sorted(answers):
         if each.left is None:
             left_ += open_packages.settle_check(session, each.open_id, each.seen)
         else:
-            done, still_below = _set(session, signed.admin.id, each, places)
+            done, still_below, counted = _set(session, signed.admin.id, each, places)
             set_ += done
             below += still_below
+            closed += counted
     session.commit()
     open_packages.measure_checks_settled("set", set_)
     open_packages.measure_checks_settled("left", left_)
     open_packages.measure_checks_raised("below_zero", below)
+    over_recorded.measure_counted(closed)
     log.info("length checks answered", set=set_, left=left_, admin_id=signed.admin.id)
     if set_:
         notice = "length_set"

@@ -1,4 +1,5 @@
 import logging
+import re
 import uuid
 from collections.abc import Callable, Generator, Iterator, Mapping
 from contextlib import contextmanager
@@ -983,6 +984,41 @@ def test_counts_lines_recorded_more_than_moved_raised_and_settled(
     assert added(reader, "inventory.over_recorded.settled", settled) == {
         (("how", "corrected"),): 1,
         (("how", "checked"), ("reason", "other")): 1,
+    }
+
+
+def test_counts_lines_recorded_more_than_moved_settled_by_counts(
+    rolled_back: Recorded, session: Session
+) -> None:
+    """Counted at each end, once however often the count is sent
+    (inventory-tng-qs8)."""
+    client, _, reader, _ = rolled_back
+    place = Place(session)
+    _, token = new_device(session)
+    client.cookies.set(devices.COOKIE, token)
+    first = place.batch()
+    assert client.post("/api/transactions", json=first).status_code == 201
+    changed = first | {
+        "lines": [{"item_id": place.item.id, "quantity": "1"}],
+        "changed_from": first["lines"],
+    }
+    assert client.post("/api/transactions", json=changed).status_code == 409
+    client.cookies.clear()
+    _, key = new_admin(session)
+    sign_in_with(client, code=code(key))
+    settled = counted(reader, "inventory.over_recorded.settled")
+    for place_id, amount in ((place.van.id, "1"), (place.store.id, "2")):
+        path = f"{COUNTS}/{place_id}"
+        form = dict(
+            re.findall(
+                r'type="hidden" name="(key|as_of)" value="([^"]*)"',
+                client.get(path).text,
+            )
+        )
+        for _ in range(2):
+            client.post(path, data=form | {f"counted_{place.item.id}": amount})
+    assert added(reader, "inventory.over_recorded.settled", settled) == {
+        (("how", "counted"),): 1
     }
 
 

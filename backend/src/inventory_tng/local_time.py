@@ -83,6 +83,12 @@ def show(moment: datetime, zone: ZoneInfo | str) -> str:
     return f"{local(moment, zone):%Y-%m-%d %H:%M %Z}"
 
 
+def show_day(moment: datetime, zone: ZoneInfo) -> str:
+    """ "14 Nov": the day, as a short line of a sentence says it, in `zone`."""
+    day = local(moment, zone)
+    return f"{day.day} {day:%b}"
+
+
 def parse_local(typed: str, zone: ZoneInfo) -> datetime | None:
     """A time typed as the clock on the wall in `zone` showed it, such as a
     datetime-local field sends ("2026-11-02T13:05"), in UTC; None if it is
