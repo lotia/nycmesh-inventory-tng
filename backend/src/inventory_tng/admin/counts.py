@@ -420,8 +420,8 @@ def _forms(
         held.setdefault(row.item_id, {}).setdefault(
             Form(open_package_id=row.id), Decimal(0)
         )
-    for item_id in openings.keys() & set(item_ids):
-        for package_id in openings[item_id]:
+    for item_id in item_ids:
+        for package_id in openings.get(item_id, ()):
             held.setdefault(item_id, {}).setdefault(
                 Form(package_id=package_id), Decimal(0)
             )
@@ -735,7 +735,7 @@ def count(
             )
         # Closed after the count: one not there, or used up, as said. Each
         # closed is at 0, as counted so, for an opening that arrived in it.
-        at_nothing: list[tuple[int, Form]] = []
+        emptied: list[tuple[int, Form]] = []
         for open_id, reason in forms.close:
             done = open_packages.close(
                 session, open_id, signed.admin.id, now(), reason=reason
@@ -743,7 +743,7 @@ def count(
             closed.append(done)
             if done is not None:
                 item_id = session.get_one(OpenPackage, open_id).item_id
-                at_nothing.append((item_id, Form(open_package_id=open_id)))
+                emptied.append((item_id, Form(open_package_id=open_id)))
         settled = over_recorded.counted(
             session,
             signed.admin.id,
@@ -751,7 +751,7 @@ def count(
             as_of,
             counted_now.written,
             counted_now.put_right,
-            at_nothing,
+            emptied,
         )
         return counted_now
 
