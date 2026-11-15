@@ -232,6 +232,24 @@ export interface components {
        */
       reason: "unregistered" | "revoked";
     };
+    /**
+     * DifferenceAdded
+     * @description What a save refused as another tab recorded its cart first holds
+     *     more of, or new, put in the scan page's cart: by the page itself into
+     *     an empty cart, or by a volunteer's tap (frontend/src/recorded.ts).
+     */
+    DifferenceAdded: {
+      /**
+       * @description discriminator enum property added by openapi-typescript
+       * @enum {string}
+       */
+      kind: "difference_added";
+      /**
+       * How
+       * @enum {string}
+       */
+      how: "automatic" | "tap";
+    };
     /** HTTPValidationError */
     HTTPValidationError: {
       /** Detail */
@@ -565,6 +583,7 @@ export interface components {
         | components["schemas"]["OutOfDate"]
         | components["schemas"]["OlderStorage"]
         | components["schemas"]["CartDiscarded"]
+        | components["schemas"]["DifferenceAdded"]
       )[];
     };
     /**

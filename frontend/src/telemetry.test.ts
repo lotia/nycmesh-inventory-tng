@@ -95,13 +95,15 @@ describe("reporting", () => {
     ]);
   });
 
-  test("a page sends 60 events an hour at most, 20 of them times to save", () => {
+  test("a page sends 60 events an hour at most, 18 of them times to save", () => {
     // The build events (out_of_date, older_storage) were added beside
     // scan_to_save's 20 and web_vital's 10, not taken from them: a busy hub
     // tablet saves many, and a page loaded three times an hour reports each.
-    // cart_discarded's four were added the same way.
+    // cart_discarded's four were added the same way; difference_added's two
+    // were taken from scan_to_save (Ali, inventory-tng-0gg).
     expect(Object.values(PER_HOUR).reduce((sum, n) => sum + n)).toBe(60);
-    expect(PER_HOUR.scan_to_save).toBe(20);
+    expect(PER_HOUR.scan_to_save).toBe(18);
+    expect(PER_HOUR.difference_added).toBe(2);
     expect(PER_HOUR.web_vital).toBe(10);
   });
 

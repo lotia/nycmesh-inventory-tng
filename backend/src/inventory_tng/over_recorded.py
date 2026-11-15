@@ -99,6 +99,14 @@ def seen(row: OverRecorded) -> str:
 FROM, TO = aliased(Location), aliased(Location)
 
 
+class MovedWhole(NamedTuple):
+    """What an open package moved whole held when it moved: as its count
+    box is filled, and in words."""
+
+    count: str
+    words: str
+
+
 class Shown(NamedTuple):
     """A check waiting, as the administrators' pages show it."""
 
@@ -114,9 +122,11 @@ class Shown(NamedTuple):
     recorded_at: datetime
     from_place: str | None
     to_place: str | None
-    # Whether Correct can undo it: not a move of an open package whole,
-    # which is now where it arrived, so cannot be found again where it left.
-    correctable: bool
+    # A move of an open package whole, which is now where it arrived, so
+    # cannot be found again where it left: what it held then, for its count
+    # to be confirmed or corrected there (confirm_count). None for others,
+    # which Correct undoes.
+    moved_whole: MovedWhole | None
 
 
 def amount_words(
@@ -144,6 +154,7 @@ def shown(session: Session, *where: ColumnElement[bool]) -> list[Shown]:
             ItemPackage.size,
             Movement.from_open_package_id,
             Movement.to_open_package_id,
+            Movement.quantity,
             LedgerTransaction.id,
             LedgerTransaction.kind,
             LedgerTransaction.created_at,
@@ -169,6 +180,7 @@ def shown(session: Session, *where: ColumnElement[bool]) -> list[Shown]:
         size,
         from_open,
         to_open,
+        held,
         transaction_id,
         kind,
         at,
@@ -190,7 +202,11 @@ def shown(session: Session, *where: ColumnElement[bool]) -> list[Shown]:
                 at,
                 from_place,
                 to_place if kind != "open" else None,
-                from_open is None or from_open != to_open,
+                MovedWhole(
+                    f"{held.normalize():f}", amount_words(held, unit, None, None)
+                )
+                if from_open is not None and from_open == to_open
+                else None,
             )
         )
     return lines
@@ -276,3 +292,47 @@ def correct(
         )
     log.info("over recorded corrected", over_recorded_id=check_id, admin_id=admin_id)
     return written
+
+
+def confirm_count(
+    session: Session, check_id: int, seen_as: str, admin_id: int, count: Decimal
+) -> tuple[Settled, list[ledger.Written]]:
+    """Settle one of an open package moved whole (Shown.moved_whole), given
+    the count an administrator says it held when it moved: as it was, as
+    checked, writing nothing; else as corrected, with an adjustment at the
+    place it arrived, in it, for the difference, with the reason REASON,
+    under a key of the check's. How it was settled, and what was written.
+    Call it holding its places (places_of), locked first. RuleBroken as
+    _settle, if it is not such a move (over_recorded_not_whole), or as
+    ledger.record_adjustment."""
+    row = _settle(session, check_id, seen_as, admin_id, "checked")
+    movement = session.get_one(Movement, row.movement_id)
+    transaction = session.get_one(LedgerTransaction, movement.transaction_id)
+    open_id = movement.to_open_package_id
+    if (
+        open_id is None
+        or open_id != movement.from_open_package_id
+        or transaction.to_location_id is None
+    ):
+        raise RuleBroken("over_recorded_not_whole")
+    if count == movement.quantity:
+        log.info(
+            "over recorded confirmed", over_recorded_id=check_id, admin_id=admin_id
+        )
+        return "checked", []
+    row.settled_how = "corrected"
+    written = ledger.record_adjustment(
+        session,
+        uuid.uuid5(transaction.idempotency_key, f"over recorded {row.id} count"),
+        admin_id,
+        transaction.to_location_id,
+        movement.item_id,
+        abs(count - movement.quantity),
+        found=count > movement.quantity,
+        reason_id=adjustment_reasons.seeded(session, REASON).id,
+        form=ledger.Form(movement.to_package_id, open_id),
+    )
+    log.info(
+        "over recorded count corrected", over_recorded_id=check_id, admin_id=admin_id
+    )
+    return "corrected", written

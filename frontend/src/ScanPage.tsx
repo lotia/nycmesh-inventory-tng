@@ -52,6 +52,7 @@ import {
 import {
   type Body,
   type Entry,
+  MAKE_CHANGES,
   type Note,
   noteOf,
   STORAGE_KEY as OUTBOX_KEY,
@@ -68,8 +69,8 @@ import {
   changesShown,
   differenceOf,
   differenceToCart,
+  IN_CART,
   recordedLines,
-  YOUR_CHANGES,
 } from "./recorded";
 import { NOT_REGISTERED } from "./registration";
 import { Scanner } from "./Scanner";
@@ -142,6 +143,9 @@ export function ScanPage({
   // Whether the cart holds no lines: until it does, a newer build is not
   // loaded, as it would not read this build's cart (build.ts).
   const cartEmpty = useMemo(() => signal(storedCartEmpty()), []);
+  // The cart's batch key, while the cart is shown (CartForm): a save's
+  // difference put in it is said to be there until it is recorded.
+  const cartKey = useMemo(() => signal<string | undefined>(undefined), []);
   // What older builds left, listed to put back in the cart or discard.
   const older = useMemo(() => new OlderStore(), []);
   useEffect(() => {
@@ -313,6 +317,7 @@ export function ScanPage({
           pending={pending}
           outbox={outbox}
           cartEmpty={cartEmpty}
+          cartKey={cartKey}
           older={older}
           adder={adder}
         />
@@ -320,6 +325,7 @@ export function ScanPage({
       <OutboxList
         outbox={outbox}
         catalogue={shown}
+        cartKey={cartKey.value}
         onAddDifference={(entry, difference) =>
           adder.current?.(entry, difference) ?? null
         }
@@ -397,6 +403,7 @@ function CartForm({
   pending,
   outbox,
   cartEmpty,
+  cartKey,
   older,
   adder,
 }: {
@@ -406,6 +413,8 @@ function CartForm({
   outbox: Outbox;
   /** Kept as the cart changes, here or in another tab (NewerBuild). */
   cartEmpty: Signal<boolean>;
+  /** Kept as the cart's batch key changes. */
+  cartKey: Signal<string | undefined>;
   /** What older builds left, to put back in the cart or discard. */
   older: OlderStore;
   /** Given what puts a save's difference in this cart (addDifference). */
@@ -439,6 +448,10 @@ function CartForm({
   useEffect(() => store.listen(), [store]);
   useEffect(() => store.useCatalogue(catalogue), [catalogue]);
   const empty = cart.value.lines.length === 0;
+  const batchKey = cart.value.batchKey;
+  useEffect(() => {
+    cartKey.value = batchKey;
+  }, [batchKey]);
   useEffect(() => {
     cartEmpty.value = empty;
     // Emptied, here or in another tab, nothing is left to confirm: what
@@ -667,8 +680,13 @@ function CartForm({
 
   /** Put what a save recorded elsewhere adds (recorded.ts, differenceOf)
    * in this cart, which must be empty, under the difference's own key,
-   * and mark the save so, offering it no more. Why not, if it was not. */
-  function addDifference(entry: Entry, difference: Body): NotPut | null {
+   * and mark the save so, offering it no more: by a tap, or `automatically`
+   * into an empty cart. Why not, if it was not. */
+  function addDifference(
+    entry: Entry,
+    difference: Body,
+    automatically = false,
+  ): NotPut | null {
     const current = storedCart();
     if (current.lines.length > 0) {
       return "cart_not_empty";
@@ -684,14 +702,56 @@ function CartForm({
       return "not_kept";
     }
     kept(true);
-    saved.value = null;
+    if (!automatically) {
+      saved.value = null;
+    }
     if (!outbox.differenceAdded(entry.body.key)) {
       problems.value = [[NOT_REMOVED]];
     }
+    telemetry.record({
+      kind: "difference_added",
+      how: automatically ? "automatic" : "tap",
+    });
     putBack.value = gaps;
     return null;
   }
   adder.current = addDifference;
+
+  // An empty cart takes what a save recorded elsewhere adds, without a
+  // tap, as it takes what an older build left (Ali, inventory-tng-0gg,
+  // 2026-11-15, 2): the oldest first, each tried once a load, so one the
+  // browser would not keep is not tried for ever, and stays offered.
+  const differencesTried = useRef(new Set<string>());
+  const outboxEntries = outbox.entries.value;
+  useEffect(() => {
+    if (!empty) {
+      return;
+    }
+    for (const entry of outboxEntries) {
+      const { reason } = entry;
+      if (
+        reason?.code !== "recorded_elsewhere" ||
+        reason.recorded === undefined ||
+        reason.added === true ||
+        differencesTried.current.has(entry.body.key)
+      ) {
+        continue;
+      }
+      const difference = differenceOf(reason.recorded.batch, entry.body);
+      if (difference === null) {
+        continue;
+      }
+      differencesTried.current.add(entry.body.key);
+      const why = addDifference(entry, difference, true);
+      if (why === "cart_not_empty") {
+        // Filled in another tab meanwhile: tried again once it is empty.
+        differencesTried.current.delete(entry.body.key);
+      } else if (why !== null) {
+        problems.value = [[olderSaid(why, true)]];
+      }
+      return;
+    }
+  }, [empty, outboxEntries, catalogue]);
 
   // An empty cart takes what an older build left that goes back whole,
   // without a tap: the oldest first, one at a time. Each is tried once a
@@ -1079,6 +1139,9 @@ function OlderList({
                       : FIX_THEN_RECORD
                   }
                 />
+              )}
+              {each.refused?.code === "recorded_elsewhere" && (
+                <h3>{MAKE_CHANGES}</h3>
               )}
               {lost !== null && <NoteSaid note={lost} />}
               {lines.length > 0 && (
@@ -1683,11 +1746,14 @@ function Finder({
 function OutboxList({
   outbox,
   catalogue,
+  cartKey,
   onAddDifference,
 }: {
   outbox: Outbox;
   /** To name the lines of one refused; null until it is loaded. */
   catalogue: Catalogue | null;
+  /** The cart's batch key, if it has one. */
+  cartKey: string | undefined;
   onAddDifference: AddDifference;
 }) {
   const online = useOnline();
@@ -1741,6 +1807,8 @@ function OutboxList({
                 // Not role="alert": every one is there as the page loads.
                 <NoteSaid note={noteOf(reason, online)} />
               )}
+              {reason?.code === "recorded_elsewhere" &&
+                reason.recorded === undefined && <h3>{MAKE_CHANGES}</h3>}
               {lines.length > 0 && (
                 <ul class="list-none p-0">
                   {keyedByWords(lines).map((key, at) => (
@@ -1754,6 +1822,7 @@ function OutboxList({
                   recorded={recorded}
                   catalogue={catalogue}
                   added={reason?.code === "recorded_elsewhere" && reason.added}
+                  cartKey={cartKey}
                   onAdd={(difference) => {
                     const why = onAddDifference(entry, difference);
                     notAdded.value = why === null ? null : { on: key, why };
@@ -1786,13 +1855,15 @@ function OutboxList({
  * then what the save holds otherwise, each with why it cannot go back, if
  * it cannot, and under one it holds less of, that an administrator will
  * correct it; and a button that puts what it adds in the cart, until it
- * has.
+ * has, which an empty cart takes without it (CartForm), then that it is
+ * there, until recorded (2026-11-15).
  */
 function RecordedElsewhere({
   entry,
   recorded,
   catalogue,
   added,
+  cartKey,
   onAdd,
 }: {
   entry: Entry;
@@ -1800,6 +1871,8 @@ function RecordedElsewhere({
   catalogue: Catalogue;
   /** Its difference is in the cart already. */
   added: boolean | undefined;
+  /** The cart's batch key, if it has one. */
+  cartKey: string | undefined;
   onAdd: (difference: Body) => void;
 }) {
   const { was, changes, difference } = useMemo(
@@ -1825,7 +1898,7 @@ function RecordedElsewhere({
       </ul>
       {changes.length > 0 && (
         <>
-          <h3>{YOUR_CHANGES}</h3>
+          <h3>{MAKE_CHANGES}</h3>
           <ul class="list-none p-0">
             {changes.map(({ words, note }, at) => (
               <li key={changeKeys[at]} class="flex flex-col items-start gap-1">
@@ -1842,6 +1915,9 @@ function RecordedElsewhere({
         <button type="button" onClick={() => onAdd(difference)}>
           {ADD_DIFFERENCE}
         </button>
+      )}
+      {difference !== null && added === true && cartKey === difference.key && (
+        <p>{IN_CART}</p>
       )}
     </>
   );

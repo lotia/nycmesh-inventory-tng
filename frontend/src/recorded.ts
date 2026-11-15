@@ -3,7 +3,7 @@
  * same key, as it was then (outbox.ts, reason recorded_elsewhere): what
  * that tab recorded, as the server said (outbox.Recorded), and what this
  * save holds otherwise, line by line, in words (Ali, inventory-tng-0gg).
- * What it holds more of, or new, can go in an empty cart, under a new key
+ * What it holds more of, or new, goes in an empty cart, under a new key
  * (differenceToCart); what was taken from an open package, or said of one,
  * cannot, as the open package may have changed since. What it holds less
  * of was recorded, and only an administrator can correct the ledger
@@ -40,24 +40,24 @@ export type Difference = {
 };
 
 /** Under a line the save holds less of than was recorded, in Ali's words
- * (inventory-tng-0gg, 3): `was` recorded, `now` what the save holds. */
-export function loweredWords(was: Said, now: Said): Said {
+ * (inventory-tng-0gg, 3, and 2026-11-15, 7): `was` recorded, `now` what
+ * the save holds, or null if it holds none. */
+export function loweredWords(was: Said, now: Said | null): Said {
   return [
     "Recorded ",
     ...was,
-    ", you changed it to ",
-    ...now,
+    ...(now === null ? [", you removed it"] : [", you changed it to ", ...now]),
     ". An administrator will correct it.",
   ];
 }
 
-/** The heading over what the save holds otherwise (Ali, inventory-tng-0gg,
- * 1). */
-export const YOUR_CHANGES = "Your changes, not recorded";
+/** The button that puts what the save adds in a cart with lines (Ali,
+ * inventory-tng-0gg, 2026-11-15, 2). */
+export const ADD_DIFFERENCE = "Add these to cart";
 
-/** The button that puts what the save adds in the cart (Ali,
- * inventory-tng-0gg, 2). */
-export const ADD_DIFFERENCE = "Add the difference to cart";
+/** Beside what the save adds, once it is in the cart (Ali,
+ * inventory-tng-0gg, 2026-11-15, 2). */
+export const IN_CART = "These are in your cart, waiting to be recorded.";
 
 /** A line's form, to tell lines of one item apart. */
 function formOf(line: Line, kind: Body["kind"]): string {
@@ -245,8 +245,9 @@ function reportsOf(body: Body): ReportKind[] {
 
 /**
  * What `mine` holds otherwise than was recorded, in Ali's words
- * (inventory-tng-0gg, 1): "LiteBeam 5AC: 1 more", "Cat6 cable: 20 m, new",
- * "RJ45 connectors: 1 × Bag of 50 fewer"; under one taken from an open
+ * (inventory-tng-0gg, 1, and 2026-11-15, 7): "LiteBeam 5AC: 1 more",
+ * "Cat6 cable: 20 m, new", "RJ45 connectors: 1 × Bag of 50 fewer", or
+ * "RJ45 connectors: removed"; under one taken from an open
  * package, or a report, that it cannot go back (RESCAN); under one it holds
  * less of, that an administrator will correct it.
  */
@@ -261,12 +262,15 @@ export function changesShown(
     ({ line, kind, recorded: was, mine: now, changed }): Shown => {
       const name = [...named.name(line), ": "];
       if (changed < 0) {
+        const removed = now === 0;
         return {
-          words: [...name, ...named.amount(line, kind, -changed), " fewer"],
+          words: removed
+            ? [...name, "removed"]
+            : [...name, ...named.amount(line, kind, -changed), " fewer"],
           note: {
             bold: loweredWords(
               named.amount(line, kind, was),
-              named.changedTo(line, was, now),
+              removed ? null : named.changedTo(line, was, now),
             ),
           },
         };

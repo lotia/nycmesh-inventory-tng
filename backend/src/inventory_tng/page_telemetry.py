@@ -103,6 +103,15 @@ class CartDiscarded(Strict):
     kind: Literal["cart_discarded"]
 
 
+class DifferenceAdded(Strict):
+    """What a save refused as another tab recorded its cart first holds
+    more of, or new, put in the scan page's cart: by the page itself into
+    an empty cart, or by a volunteer's tap (frontend/src/recorded.ts)."""
+
+    kind: Literal["difference_added"]
+    how: Literal["automatic", "tap"]
+
+
 AnyEvent = (
     WebVital
     | PageError
@@ -111,6 +120,7 @@ AnyEvent = (
     | OutOfDate
     | OlderStorage
     | CartDiscarded
+    | DifferenceAdded
 )
 Event = Annotated[AnyEvent, Field(discriminator="kind")]
 
@@ -169,6 +179,12 @@ cart_discards = meter.create_counter(
     unit="{cart}",
     description="Carts a volunteer discarded on the scan page",
 )
+differences_added = meter.create_counter(
+    "inventory.cart.differences_added",
+    unit="{batch}",
+    description="What saves refused as another tab recorded their cart first "
+    "held more of, put in the scan page's cart, by the page itself or a tap",
+)
 scan_to_save = meter.create_histogram(
     "inventory.scan.to_save.duration",
     unit="s",
@@ -204,6 +220,8 @@ def record(event: AnyEvent) -> None:
             older_acted_on.add(1, {"held": event.held, "action": event.action})
         case CartDiscarded():
             cart_discards.add(1)
+        case DifferenceAdded():
+            differences_added.add(1, {"how": event.how})
         case _:  # ScanToSave, the last kind left.
             scan_to_save.record(event.seconds)
 

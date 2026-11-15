@@ -782,6 +782,8 @@ def test_records_what_the_pages_report(rolled_back: Recorded) -> None:
             "action": "put_in_cart_automatically",
         },
         {"kind": "cart_discarded"},
+        {"kind": "difference_added", "how": "automatic"},
+        {"kind": "difference_added", "how": "tap"},
     ]
     assert client.post("/api/telemetry", json={"events": events}).status_code == 204
     durations = histogram_counts(reader, "inventory.page.web_vital.duration")
@@ -811,6 +813,9 @@ def test_records_what_the_pages_report(rolled_back: Recorded) -> None:
     automatically = (("action", "put_in_cart_automatically"), ("held", "saves"))
     assert acted_on[automatically] >= 1
     assert counted(reader, "inventory.cart.discards")[()] >= 1
+    added = counted(reader, "inventory.cart.differences_added")
+    assert added[(("how", "automatic"),)] >= 1
+    assert added[(("how", "tap"),)] >= 1
     # Buckets that fit the values, not the SDK's own from 5 up.
     bounds = {
         name: {

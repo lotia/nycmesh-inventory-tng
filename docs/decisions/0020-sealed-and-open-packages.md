@@ -331,10 +331,24 @@ you" counts every report in one line, which hides what is waiting.
 - **Correct** writes an adjustment on each side of the transaction, with
   the reason "Recorded more than moved", in the forms it moved in: found
   again where it left, written off where it arrived. **Mark checked**
-  settles it as it is, for one corrected another way, and is all that is
-  offered for an open package moved whole, which is now where it arrived
-  and so cannot be found again where it left. Either settles it only as
-  the administrator saw it.
+  settles it as it is, for one corrected another way. Either settles it
+  only as the administrator saw it.
+- **An open package moved whole** is now where it arrived, so cannot be
+  found again where it left. Its row says "An open package moved to
+  the van. Confirm or correct count.", naming the place, with a box, "Count in the
+  package", filled with what it held when it moved, and one button,
+  Confirm count (Ali, 2026-11-15, inventory-tng-0gg). Unchanged, it
+  settles the row and writes nothing ("Confirmed."); changed, an
+  adjustment at that place, in the package, for the difference, with the
+  reason "Recorded more than moved" ("Count corrected."). Once edited, the
+  box says what it held under it ("Was 180 m"). We rejected offering only
+  Mark checked there, which left the count to be fixed elsewhere.
+- **The page's words** (Ali, 2026-11-15): "Another tab recorded these
+  before a volunteer changed them, so the inventory shows more moved than
+  was. Correct moves the extra back with an adjustment. Mark checked if
+  you already fixed it."; notices "Corrected.", "Marked checked." and, for
+  one answered or changed meanwhile, "Not changed: someone answered or
+  changed it meanwhile. Reload to see it as it is."
 
 ### Rejected in this amendment
 

@@ -391,6 +391,7 @@ def test_correcting_one_undoes_it_on_each_side(
         response = admin_client.post(f"{PAGE}/{check.id}/correct", data=form)
     assert response.status_code == 303
     assert "over_recorded_corrected" in response.headers["location"]
+    assert "Corrected." in text(admin_client.get(response.headers["location"]))
     (check,) = checks(session)
     assert check.settled_how == "corrected"
     # The bag found again in the store, written off from the van, sealed.
@@ -416,6 +417,10 @@ def test_correcting_one_undoes_it_on_each_side(
     # Sent again, as a second tap would: nothing more.
     again = admin_client.post(f"{PAGE}/{check.id}/correct", data=form)
     assert "over_recorded_unchanged" in again.headers["location"]
+    assert (
+        "Not changed: someone answered or changed it meanwhile. Reload to see it "
+        "as it is." in text(admin_client.get(again.headers["location"]))
+    )
     assert "Recorded more than moved" not in text(admin_client.get("/admin"))
 
 
@@ -432,6 +437,7 @@ def test_marking_one_checked_writes_nothing(
         f"{PAGE}/{check.id}/checked", data={"seen": over_recorded.seen(check)}
     )
     assert "over_recorded_checked" in response.headers["location"]
+    assert "Marked checked." in text(admin_client.get(response.headers["location"]))
     assert checks(session)[0].settled_how == "checked"
     assert (
         session.scalar(
@@ -549,22 +555,152 @@ def test_what_a_batch_was_changed_from_does_not_make_it_another(
     assert again.json() == created.json()
 
 
-def test_one_moved_whole_from_an_open_package_is_only_marked_checked(
+def moved_whole(client: TestClient, spools: Spools) -> OpenPackage:
+    """A spool's open package moved whole from the store to the van and
+    recorded, then sent again without it: it waits, whole."""
+    made = spools.opened()
+    whole = cut(made, "305") | {"whole": True}
+    loose = {"item_id": spools.place.item.id, "quantity": "1"}
+    recorded_then_changed(
+        client, spools.place.batch(lines=[whole, loose]), lines=[loose]
+    )
+    return made
+
+
+def counted(
+    admin_client: TestClient, session: Session, count: str, **form: str
+) -> tuple[OverRecorded, Any]:
+    """The one waiting, and the answer to its count sent as `count`."""
+    (check,) = checks(session)
+    data = {"seen": over_recorded.seen(check), "count": count} | form
+    return check, admin_client.post(f"{PAGE}/{check.id}/count", data=data)
+
+
+def adjustments(session: Session) -> list[tuple[object, ...]]:
+    return [
+        tuple(each)
+        for each in session.execute(
+            select(
+                LedgerTransaction.from_location_id,
+                LedgerTransaction.to_location_id,
+                Movement.quantity,
+                Movement.from_open_package_id,
+                Movement.to_open_package_id,
+                AdjustmentReason.name,
+            )
+            .join(Movement, Movement.transaction_id == LedgerTransaction.id)
+            .join(AdjustmentReason, AdjustmentReason.id == LedgerTransaction.reason_id)
+            .where(LedgerTransaction.kind == "adjustment")
+        )
+    ]
+
+
+def test_one_moved_whole_from_an_open_package_asks_for_its_count(
     admin_client: TestClient, registered_client: TestClient, session: Session
 ) -> None:
     """The open package is now where it arrived, so it cannot be found again
-    where it left: Correct is not offered, which the ledger would refuse."""
+    where it left: its count there is asked for, filled with what it held
+    as it moved, under one button (Ali, 2026-11-15)."""
     spools = Spools(session)
-    made = spools.opened()
-    whole = cut(made, "305") | {"whole": True}
-    recorded_then_changed(
-        registered_client,
-        spools.place.batch(
-            lines=[whole, {"item_id": spools.place.item.id, "quantity": "1"}]
-        ),
-        lines=[{"item_id": spools.place.item.id, "quantity": "1"}],
-    )
-    assert len(checks(session)) == 1
+    moved_whole(registered_client, spools)
     page = admin_client.get(f"{PAGE}?item={spools.cable.id}").text
-    assert "Mark checked" in page
+    (check,) = checks(session)
+    assert (
+        f"An open package moved to {spools.van.name}. Confirm or correct count."
+        in text(admin_client.get(PAGE))
+    )
+    assert "Count in the package" in page
+    assert 'value="305"' in page
+    assert f'<p class="hint" id="count-{check.id}-was" hidden>Was 305 m</p>' in page
+    assert "Confirm count" in page
+    assert "/checked" not in page
     assert "/correct" not in page
+
+
+def test_its_count_confirmed_as_it_was_writes_nothing(
+    admin_client: TestClient, registered_client: TestClient, session: Session
+) -> None:
+    spools = Spools(session)
+    moved_whole(registered_client, spools)
+    with capture_logs() as logs:
+        _, response = counted(admin_client, session, "305")
+    assert "over_recorded_confirmed" in response.headers["location"]
+    assert checks(session)[0].settled_how == "checked"
+    assert adjustments(session) == []
+    assert any(line["event"] == "over recorded confirmed" for line in logs)
+    assert "Confirmed." in text(admin_client.get(response.headers["location"]))
+
+
+def test_its_count_corrected_adjusts_it_where_it_arrived(
+    admin_client: TestClient, registered_client: TestClient, session: Session
+) -> None:
+    """Written off at the van, from the open package, for the difference."""
+    spools = Spools(session)
+    made = moved_whole(registered_client, spools)
+    with capture_logs() as logs:
+        _, response = counted(admin_client, session, "180")
+    assert "over_recorded_count_corrected" in response.headers["location"]
+    assert checks(session)[0].settled_how == "corrected"
+    assert adjustments(session) == [
+        (spools.van.id, None, Decimal(125), made.id, None, over_recorded.REASON)
+    ]
+    assert any(line["event"] == "over recorded count corrected" for line in logs)
+    assert "Count corrected." in text(admin_client.get(response.headers["location"]))
+    # Sent again, as a second tap would: nothing more.
+    _, again = counted(admin_client, session, "180", seen="305")
+    assert "over_recorded_unchanged" in again.headers["location"]
+    assert len(adjustments(session)) == 1
+
+
+def test_its_count_raised_is_found_in_it(
+    admin_client: TestClient, registered_client: TestClient, session: Session
+) -> None:
+    spools = Spools(session)
+    made = moved_whole(registered_client, spools)
+    counted(admin_client, session, "310")
+    assert adjustments(session) == [
+        (None, spools.van.id, Decimal(5), None, made.id, over_recorded.REASON)
+    ]
+
+
+def test_a_count_not_a_number_is_asked_again(
+    admin_client: TestClient, registered_client: TestClient, session: Session
+) -> None:
+    spools = Spools(session)
+    moved_whole(registered_client, spools)
+    for typed, problem in (("lots", "Type a number"), ("-1", "Use 0 or more.")):
+        check, response = counted(admin_client, session, typed)
+        assert response.status_code == 400
+        page = response.text
+        assert problem in page
+        assert f'value="{typed}"' in page
+        # Edited, what it held shows under it.
+        assert f'<p class="hint" id="count-{check.id}-was">Was 305 m</p>' in page
+    assert checks(session)[0].settled_at is None
+    assert adjustments(session) == []
+
+
+def test_a_count_is_taken_only_for_an_open_package_moved_whole(
+    admin_client: TestClient,
+    registered_client: TestClient,
+    session: Session,
+    place: Place,
+    bags: ItemPackage,
+) -> None:
+    raised(registered_client, place, bags)
+    with capture_logs() as logs:
+        _, response = counted(admin_client, session, "50")
+    assert "over_recorded_unchanged" in response.headers["location"]
+    assert checks(session)[0].settled_at is None
+    assert adjustments(session) == []
+    refused = [line for line in logs if line["event"] == "over recorded not settled"]
+    assert refused[0]["rule"] == "over_recorded_not_whole"
+
+
+def test_the_page_says_what_it_is_for(admin_client: TestClient) -> None:
+    page = " ".join(text(admin_client.get(PAGE)).split())
+    assert (
+        "Another tab recorded these before a volunteer changed them, so the "
+        "inventory shows more moved than was. Correct moves the extra back with "
+        "an adjustment. Mark checked if you already fixed it." in page
+    )

@@ -19,14 +19,14 @@ import {
 import { PRINTED_LENGTH } from "./OpenPackageCard";
 import {
   KEY_REUSED,
+  MAKE_CHANGES,
   NO_ANSWER,
   OFFLINE,
   STORAGE_KEY as OUTBOX_KEY,
   Outbox,
-  recordedFirst,
-  SCAN_AGAIN_CHANGED,
+  SOME_NOT_RECORDED,
 } from "./outbox";
-import { ADD_DIFFERENCE, YOUR_CHANGES } from "./recorded";
+import { ADD_DIFFERENCE, IN_CART } from "./recorded";
 import { ScanPage } from "./ScanPage";
 import { MOST_SECONDS_TO_SAVE, telemetry } from "./telemetry";
 import { fakeCamera } from "./test-camera";
@@ -357,13 +357,13 @@ describe("filling and saving a cart", () => {
       return sent;
     };
     expect(saves(await again(left))).toHaveLength(0);
-    expect(screen.queryByText(SCAN_AGAIN_CHANGED)).toBeNull();
+    expect(screen.queryByText(SOME_NOT_RECORDED)).toBeNull();
     // Changed, by a tab that had not heard: listed as recorded elsewhere,
     // and asked about once, under the cart's key, not recorded.
     const changed = JSON.parse(left);
     changed.lines.push({ itemId: 100, packages: {}, loose: "1" });
     const asked = await again(JSON.stringify(changed));
-    await screen.findByText(SCAN_AGAIN_CHANGED);
+    await screen.findByText(SOME_NOT_RECORDED);
     expect(saves(asked)).toHaveLength(1);
     expect(record).not.toHaveBeenCalledWith(
       expect.objectContaining({ kind: "scan_to_save" }),
@@ -2944,7 +2944,7 @@ describe("what an older build left", () => {
       target: { value: "2" },
     });
     save();
-    return screen.findByText(SCAN_AGAIN_CHANGED);
+    return screen.findByText(SOME_NOT_RECORDED);
   }
 
   test("one an older build's tab saved meanwhile is saved once, under its key", async () => {
@@ -2974,7 +2974,10 @@ describe("what an older build left", () => {
     // inventory-tng-g0e, d).
     expect(said.tagName).toBe("STRONG");
     const entry = said.closest("li") as HTMLElement;
-    // Its lines, to compare with what was recorded.
+    // From a server that says nothing of what it recorded, the heading
+    // over its lines, to compare with what was recorded (Ali,
+    // inventory-tng-0gg, 2026-11-15, 1).
+    expect(within(entry).getByText(MAKE_CHANGES).tagName).toBe("H3");
     within(entry).getByText("1. LiteBeam 5AC: 2 × Box");
     expect(within(entry).queryByRole("button", { name: "Reload" })).toBeNull();
     // The stock, asked for again at once, shows what the other tab
@@ -2983,7 +2986,7 @@ describe("what an older build left", () => {
     await new Promise((settled) => setTimeout(settled, 50));
     expect(catalogues()).toBe(before + 1);
     fireEvent.click(within(entry).getByRole("button", { name: "Dismiss" }));
-    expect(screen.queryByText(SCAN_AGAIN_CHANGED)).toBeNull();
+    expect(screen.queryByText(SOME_NOT_RECORDED)).toBeNull();
     expect(catalogues()).toBe(before + 1);
   });
 
@@ -3001,7 +3004,7 @@ describe("what an older build left", () => {
     const before = sent.filter(isCatalogue).length;
     localStorage.setItem(OUTBOX_KEY, refused);
     window.dispatchEvent(new StorageEvent("storage", { key: OUTBOX_KEY }));
-    await screen.findByText(SCAN_AGAIN_CHANGED);
+    await screen.findByText(SOME_NOT_RECORDED);
     await vi.waitFor(() =>
       expect(sent.filter(isCatalogue).length).toBe(before + 1),
     );
@@ -3010,7 +3013,7 @@ describe("what an older build left", () => {
     const again = server();
     open(again.api);
     await ready();
-    await screen.findByText(SCAN_AGAIN_CHANGED);
+    await screen.findByText(SOME_NOT_RECORDED);
     await new Promise((settled) => setTimeout(settled, 50));
     expect(again.sent.filter(isCatalogue).length).toBe(1);
   });
@@ -3020,14 +3023,18 @@ describe("what an older build left", () => {
     const entry = (await changedRefused()).closest("li") as HTMLElement;
     fillMove();
     act(() => outbox.builds.learn("other_tab"));
-    within(entry).getByText(SCAN_AGAIN_CHANGED);
+    within(entry).getByText(SOME_NOT_RECORDED);
     within(entry).getByRole("button", { name: "Dismiss" });
   });
 
   /** The batch endpoint as a server since inventory-tng-0gg answers a
    * key whose first batch held `first`: the same again is that
-   * transaction (1); another is refused, saying what was recorded. */
-  function recordingLedger(first: { quantity: string }[]) {
+   * transaction (1); another is refused, saying what was recorded, once
+   * `held` lets it. */
+  function recordingLedger(
+    first: { quantity: string }[],
+    held: Promise<unknown> = Promise.resolve(),
+  ) {
     return answering(async (request) => {
       if (isCatalogue(request)) {
         return json(CATALOGUE, 200);
@@ -3039,6 +3046,7 @@ describe("what an older build left", () => {
       if (linesOf(body) === linesOf({ lines: first })) {
         return json({ transaction_id: 1 }, 200);
       }
+      await held;
       const lines = first.map((line) => ({
         package_id: null,
         package_size: null,
@@ -3062,21 +3070,37 @@ describe("what an older build left", () => {
     });
   }
 
+  const RECORDED_HEADING = "Recorded in another tab in transaction 1";
+
   /** `first` put back without a tap, saved first by the older build's
    * tab; then the cart's boxes of radios changed to `boxes` and recorded,
-   * refused: its entry, once it shows what was recorded. */
-  async function differing(first: object[], boxes: string) {
+   * refused, once `held` lets it: its entry, once it shows what was
+   * recorded. `meanwhile` is done after Record, before the refusal. */
+  async function differing(
+    first: object[],
+    boxes: string,
+    meanwhile?: () => void,
+  ) {
     leaveMoves([KEY, AT, first]);
-    open(recordingLedger(first as { quantity: string }[]).api);
+    const refusal = deferred();
+    open(
+      recordingLedger(
+        first as { quantity: string }[],
+        meanwhile === undefined ? undefined : refusal.promise,
+      ).api,
+    );
     await ready();
     await screen.findByText(ADDED_BACK);
     fireEvent.input(screen.getByLabelText("Box (4 each)"), {
       target: { value: boxes },
     });
     save();
-    const heading = await screen.findByText(
-      "Recorded by the other tab (transaction 1)",
-    );
+    if (meanwhile !== undefined) {
+      await screen.findByText("Nothing in the cart yet.");
+      meanwhile();
+      refusal.resolve(new Response());
+    }
+    const heading = await screen.findByText(RECORDED_HEADING);
     return heading.closest("li") as HTMLElement;
   }
 
@@ -3091,19 +3115,26 @@ describe("what an older build left", () => {
         ![...element.children].some((child) => child.textContent === text),
     );
 
-  test("one changed after another tab recorded it shows what that tab recorded and what differs, not to scan again (inventory-tng-0gg)", async () => {
+  /** The cart's lines' items. */
+  const itemsInCart = () =>
+    storedCart().lines.map((line: { itemId: number }) => line.itemId);
+
+  test("one changed after another tab recorded it says some items were not recorded, then what that tab recorded and what was not (Ali, inventory-tng-0gg, 2026-11-15)", async () => {
     const entry = await differing([boxed(1)], "2");
     // The note, bold as a whole, in the alert's style.
-    expectBold(whole(entry, recordedFirst()).closest("p"), recordedFirst());
-    expect(within(entry).queryByText(SCAN_AGAIN_CHANGED)).toBeNull();
+    expectBold(whole(entry, SOME_NOT_RECORDED).closest("p"), SOME_NOT_RECORDED);
     expect(within(entry).queryByText(/Scan again only/)).toBeNull();
-    // What was recorded, then what differs, the page's counts in italic,
+    expect(within(entry).queryByText(/another tab recorded this/)).toBeNull();
+    // What was recorded, then what was not, the page's counts in italic,
     // never a name's.
     const was = whole(entry, "LiteBeam 5AC: 1 × Box");
     expect([...was.querySelectorAll("em")].map((em) => em.textContent)).toEqual(
       ["1"],
     );
-    within(entry).getByText(YOUR_CHANGES);
+    expect(MAKE_CHANGES).toBe(
+      "Not recorded. Make any changes and record again.",
+    );
+    expect(within(entry).getByText(MAKE_CHANGES).tagName).toBe("H3");
     const more = whole(entry, "LiteBeam 5AC: 1 × Box more");
     expect(
       [...more.querySelectorAll("em")].map((em) => em.textContent),
@@ -3111,26 +3142,34 @@ describe("what an older build left", () => {
     within(entry).getByRole("button", { name: "Dismiss" });
   });
 
-  test("its difference goes in an empty cart under a new key, once (inventory-tng-0gg)", async () => {
+  test("its difference goes in an empty cart by itself, under a new key, once, and says so until recorded (Ali, inventory-tng-0gg, 2026-11-15, 2)", async () => {
+    const record = vi.spyOn(telemetry, "record");
+    record.mockClear();
     const entry = await differing([boxed(1)], "2");
-    expect(storedCart().lines).toEqual([]);
-    fireEvent.click(
-      within(entry).getByRole("button", { name: ADD_DIFFERENCE }),
-    );
-    expect(boxes()).toBe("1");
+    await vi.waitFor(() => expect(boxes()).toBe("1"));
     const key = storedCart().batchKey;
     expect(key).toMatch(UUID);
     expect(key).not.toBe(KEY);
-    // Offered no more; the entry stays, to read.
+    expect(IN_CART).toBe("These are in your cart, waiting to be recorded.");
+    within(entry).getByText(IN_CART);
     expect(
       within(entry).queryByRole("button", { name: ADD_DIFFERENCE }),
     ).toBeNull();
+    expect(
+      record.mock.calls.filter(([event]) => event.kind === "difference_added"),
+    ).toEqual([[{ kind: "difference_added", how: "automatic" }]]);
+    // The entry stays, to read; recorded, the cart no longer holds it.
     whole(entry, "LiteBeam 5AC: 1 × Box more");
+    save();
+    await screen.findByText("Recorded (transaction 2).");
+    expect(within(entry).queryByText(IN_CART)).toBeNull();
+    // Emptied, the cart does not take it again.
+    expect(storedCart().lines).toEqual([]);
   });
 
-  test("its difference goes only in an empty cart (inventory-tng-0gg)", async () => {
-    const entry = await differing([boxed(1)], "2");
-    fillMove();
+  test("its difference waits on a button while the cart has lines, and goes in by itself once it is empty (Ali, inventory-tng-0gg, 2026-11-15, 2)", async () => {
+    const entry = await differing([boxed(1)], "2", fillMove);
+    expect(ADD_DIFFERENCE).toBe("Add these to cart");
     fireEvent.click(
       within(entry).getByRole("button", { name: ADD_DIFFERENCE }),
     );
@@ -3138,34 +3177,44 @@ describe("what an older build left", () => {
       within(entry).getByRole("alert"),
       "Record or discard the current cart before adding more items",
     );
-    expect(
-      storedCart().lines.map((line: { itemId: number }) => line.itemId),
-    ).toEqual([101]);
+    expect(itemsInCart()).toEqual([101]);
+    expect(within(entry).queryByText(IN_CART)).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "Discard cart" }));
+    fireEvent.click(screen.getByRole("button", { name: "Discard" }));
+    await vi.waitFor(() => expect(boxes()).toBe("1"));
+    within(entry).getByText(IN_CART);
   });
 
-  test("its difference the browser would not keep says so, and the cart stays empty (inventory-tng-0gg)", async () => {
-    const entry = await differing([boxed(1)], "2");
-    const refused = refusingWrites(CART_KEY);
+  test("its difference the browser would not keep says so, the cart stays empty, and a tap puts it in (inventory-tng-0gg)", async () => {
+    const record = vi.spyOn(telemetry, "record");
+    record.mockClear();
+    let refused: { mockRestore: () => void } | undefined;
+    const entry = await differing([boxed(1)], "2", () => {
+      refused = refusingWrites(CART_KEY);
+    });
+    await screen.findByText(
+      "This browser can't keep the cart. Clear local data, reload the page and try again.",
+    );
+    refused?.mockRestore();
+    expect(storedCart().lines).toEqual([]);
     fireEvent.click(
       within(entry).getByRole("button", { name: ADD_DIFFERENCE }),
     );
-    refused.mockRestore();
-    expectBold(
-      within(entry).getByRole("alert"),
-      "This browser can't keep the cart. Clear local data, reload the page and try again.",
-    );
-    expect(storedCart().lines).toEqual([]);
-    within(entry).getByRole("button", { name: ADD_DIFFERENCE });
+    expect(boxes()).toBe("1");
+    within(entry).getByText(IN_CART);
+    expect(
+      record.mock.calls.filter(([event]) => event.kind === "difference_added"),
+    ).toEqual([[{ kind: "difference_added", how: "tap" }]]);
   });
 
   test("its difference put in the cart, but not kept as put there, says so (inventory-tng-0gg)", async () => {
-    const entry = await differing([boxed(1)], "2");
-    const refused = refusingWrites(OUTBOX_KEY);
-    fireEvent.click(
-      within(entry).getByRole("button", { name: ADD_DIFFERENCE }),
-    );
+    let refused: { mockRestore: () => void } | undefined;
+    await differing([boxed(1)], "2", fillMove);
+    refused = refusingWrites(OUTBOX_KEY);
+    fireEvent.click(screen.getByRole("button", { name: "Discard cart" }));
+    fireEvent.click(screen.getByRole("button", { name: "Discard" }));
+    await vi.waitFor(() => expect(boxes()).toBe("1"));
     refused.mockRestore();
-    expect(boxes()).toBe("1");
     screen.getByText(
       "This item wasn't automatically removed. Record the cart and try to remove.",
     );
@@ -3180,6 +3229,31 @@ describe("what an older build left", () => {
     expect(
       within(entry).queryByRole("button", { name: ADD_DIFFERENCE }),
     ).toBeNull();
+    await new Promise((settled) => setTimeout(settled, 50));
+    expect(storedCart().lines).toEqual([]);
+  });
+
+  test("its difference waits while another tab, unheard yet, filled the cart, and goes in by itself once it is empty (inventory-tng-0gg)", async () => {
+    const entry = await differing([boxed(1)], "2", () => {
+      // Written as another tab writes it, its storage event not yet heard.
+      new CartStore(CATALOGUE).change({
+        ...freshCart(),
+        volunteerId: 1,
+        fromId: 10,
+        toId: 12,
+        lines: [{ itemId: 101, packages: {}, loose: "1" }],
+      });
+    });
+    await new Promise((settled) => setTimeout(settled, 50));
+    expect(itemsInCart()).toEqual([101]);
+    act(() => {
+      window.dispatchEvent(new StorageEvent("storage", { key: CART_KEY }));
+    });
+    within(entry).getByRole("button", { name: ADD_DIFFERENCE });
+    fireEvent.click(screen.getByRole("button", { name: "Discard cart" }));
+    fireEvent.click(screen.getByRole("button", { name: "Discard" }));
+    await vi.waitFor(() => expect(boxes()).toBe("1"));
+    within(entry).getByText(IN_CART);
   });
 
   test("a cart not put back, refused as a tab of a newer build recorded it changed, lists no changes of its own (inventory-tng-0gg review)", async () => {
@@ -3209,11 +3283,9 @@ describe("what an older build left", () => {
       target: { value: "3" },
     });
     save();
-    const heading = await screen.findByText(
-      "Recorded by the other tab (transaction 1)",
-    );
+    const heading = await screen.findByText(RECORDED_HEADING);
     const entry = heading.closest("li") as HTMLElement;
-    expect(within(entry).queryByText(YOUR_CHANGES)).toBeNull();
+    expect(within(entry).queryByText(MAKE_CHANGES)).toBeNull();
     expect(
       within(entry).queryByRole("button", { name: ADD_DIFFERENCE }),
     ).toBeNull();
@@ -3232,7 +3304,7 @@ describe("what an older build left", () => {
     fireEvent.click(discardOf("Cat6 cable: 3 m from an open package"));
     await screen.findByText(ADDED_BACK);
     save();
-    await screen.findByText(SCAN_AGAIN_CHANGED);
+    await screen.findByText(SOME_NOT_RECORDED);
     expect(written.size).toBe(1);
   });
 
@@ -3312,8 +3384,9 @@ describe("what an older build left", () => {
     await ready();
     // What it held is recorded: once more would record it twice (Ali,
     // inventory-tng-wyq, question c).
-    const why = within(listing()).getByText(noted(SCAN_AGAIN_CHANGED));
+    const why = within(listing()).getByText(noted(SOME_NOT_RECORDED));
     expect(why.firstElementChild?.tagName).toBe("STRONG");
+    within(listing()).getByText(MAKE_CHANGES);
     expect(
       within(listing()).queryByRole("button", { name: "Add to cart" }),
     ).toBeNull();

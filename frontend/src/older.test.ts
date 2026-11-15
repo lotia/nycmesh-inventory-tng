@@ -21,7 +21,7 @@ import {
   unreadWords,
   withRetired,
 } from "./older";
-import { KEY_REUSED, noteOf, SCAN_AGAIN_CHANGED } from "./outbox";
+import { KEY_REUSED, noteOf, SOME_NOT_RECORDED } from "./outbox";
 import { CATALOGUE } from "./test-catalogue";
 import { refusing } from "./test-storage";
 
@@ -551,7 +551,7 @@ describe("as a cart", () => {
     expect(noteOf({ code: "key_reused" })).toEqual({ bold: [KEY_REUSED] });
     expect(
       refusedFor({ reason: { code: "recorded_elsewhere" } })?.note,
-    ).toEqual({ bold: [SCAN_AGAIN_CHANGED] });
+    ).toEqual({ bold: [SOME_NOT_RECORDED] });
   });
 
   test("what the cart cannot hold is told, to do again", () => {

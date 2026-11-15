@@ -2,8 +2,9 @@
  * What the pages tell the backend about themselves (docs/decisions/0006):
  * errors, three Web Vitals, the outbox's retries, how long a batch took
  * from its first line to saving, a tab learning a newer build is out,
- * what an older build left behind and what volunteers did with it, and a
- * cart discarded. No
+ * what an older build left behind and what volunteers did with it, a cart
+ * discarded, and what a save another tab recorded first held more of put
+ * in the cart. No
  * OpenTelemetry here: events go to POST /api/telemetry on this origin,
  * whose schema is the list of what may be sent, and the backend turns them
  * into metrics. Nothing names a volunteer, an item or a place, and an error
@@ -27,7 +28,8 @@ export const PER_HOUR: Record<Event["kind"], number> = {
   web_vital: 10,
   error: 10,
   outbox_retry: 10,
-  scan_to_save: 20,
+  // Two taken for difference_added (Ali, inventory-tng-0gg, 2026-11-15).
+  scan_to_save: 18,
   // Once a tab, or twice, then too old (build.ts); once a load for each
   // of saves and a cart an older build left, and once for each put back in
   // the cart, by a tap or not, discarded, or a line of one discarded
@@ -36,6 +38,8 @@ export const PER_HOUR: Record<Event["kind"], number> = {
   older_storage: 4,
   // A volunteer starting again; more than four an hour is no new news.
   cart_discarded: 4,
+  // Rare: a cart recorded in two tabs, changed in one.
+  difference_added: 2,
 };
 export const HOUR_MS = 3_600_000;
 /** The longest scan_to_save the backend takes (page_telemetry.ScanToSave):

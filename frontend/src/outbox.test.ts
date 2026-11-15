@@ -11,9 +11,9 @@ import {
   Outbox,
   REPORT_AFTER,
   RETRY_MS,
-  recordedFirst,
+  recordedHeading,
   SAVED_MOST,
-  SCAN_AGAIN_CHANGED,
+  SOME_NOT_RECORDED,
   STORAGE_KEY,
   wordsOf,
 } from "./outbox";
@@ -405,9 +405,9 @@ describe("refusals", () => {
       putBack: true,
       reason: { code: "recorded_elsewhere" },
     });
-    expect(said(outbox)).toBe(SCAN_AGAIN_CHANGED);
-    expect(SCAN_AGAIN_CHANGED).toBe(
-      "Not recorded: another tab recorded this cart before your changes. Scan again only what you changed.",
+    expect(said(outbox)).toBe(SOME_NOT_RECORDED);
+    expect(SOME_NOT_RECORDED).toBe(
+      "Some items were not recorded. Details below.",
     );
     expect((await bodies(sent))[0]).toMatchObject({ key });
   });
@@ -644,7 +644,17 @@ describe("what another tab recorded (inventory-tng-0gg)", () => {
       },
     });
     // Then it says only that it was not recorded: the list shows the rest.
-    expect(said(outbox)).toBe(recordedFirst());
+    expect(said(outbox)).toBe(SOME_NOT_RECORDED);
+  });
+
+  test("what was recorded is headed by who recorded it: this tab, or another (Ali, inventory-tng-0gg, 2026-11-15, 1 and 6)", () => {
+    const batch = { ...draft(), key: uuid() };
+    expect(recordedHeading({ by: "here", transactionId: 412, batch })).toBe(
+      "Already recorded from this tab in transaction 412",
+    );
+    expect(
+      recordedHeading({ by: "elsewhere", transactionId: 412, batch }),
+    ).toBe("Recorded in another tab in transaction 412");
   });
 
   test("a keyless batch refused for its key still asks for a report", async () => {
@@ -674,7 +684,7 @@ describe("what another tab recorded (inventory-tng-0gg)", () => {
     const { outbox, sent, key } = await askedAbout(() => recordedReply());
     // Until the server says, nothing to scan again.
     expect(noteOf(second(outbox)?.reason ?? { code: "no_answer" })).toEqual({
-      bold: [recordedFirst("here")],
+      bold: [SOME_NOT_RECORDED],
     });
     await vi.waitFor(() =>
       expect(second(outbox)?.reason).toHaveProperty("recorded"),

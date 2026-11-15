@@ -250,34 +250,29 @@ export function wordsOf(said: Said): string {
 export const KEY_REUSED =
   "Not recorded: its key was already used for a different batch. Please report this.";
 
-/**
- * What the page says first of a recorded_elsewhere, bold, as an alert, by
- * who recorded it (Recorded.by; undefined while the server has not said).
- * One wording today (Ali, inventory-tng-0gg); Ali is still choosing, and
- * may say this browser's own tab apart ("here": it recorded the cart
- * itself) from another: change the words here alone.
- */
-export function recordedFirst(_by?: Recorded["by"]): string {
-  return "Not recorded: another tab recorded this cart before your changes.";
-}
+/** What the page says first of a recorded_elsewhere, bold, as an alert,
+ * with details below it (Ali, inventory-tng-0gg, 2026-11-15, 1). */
+export const SOME_NOT_RECORDED = "Some items were not recorded. Details below.";
 
 /**
- * The heading over what another tab recorded (Ali, inventory-tng-0gg, 1),
- * by who recorded it, as recordedFirst: the words for both are changed
- * here alone.
+ * The heading over what another tab recorded, by who recorded it
+ * (Recorded.by): this browser's own tab, as when it could not empty the
+ * cart it recorded, or another (Ali, inventory-tng-0gg, 2026-11-15, 1 and
+ * 6).
  */
 export function recordedHeading(recorded: Recorded): string {
-  return `Recorded by the other tab (transaction ${recorded.transactionId})`;
+  return recorded.by === "here"
+    ? `Already recorded from this tab in transaction ${recorded.transactionId}`
+    : `Recorded in another tab in transaction ${recorded.transactionId}`;
 }
 
-/** What the page says of a recorded_elsewhere whose recorded transaction
- * it does not know (a server, or a build, from before inventory-tng-0gg
- * kept none), with Dismiss, or Discard in the older list: what it held is
- * recorded, but not the changes since, so it never goes in a cart again,
- * which would record it twice (Ali, inventory-tng-wyq, question c, and
- * inventory-tng-g0e, d). Knowing it, the page shows what differs instead
- * (recorded.ts). */
-export const SCAN_AGAIN_CHANGED = `${recordedFirst()} Scan again only what you changed.`;
+/** The heading over what a recorded_elsewhere holds otherwise than was
+ * recorded (recorded.ts), or, with nothing known of what was recorded,
+ * over its lines (Ali, inventory-tng-0gg, 2026-11-15, 1). What it held is
+ * recorded, but not the changes since, so it never goes in a cart whole
+ * again, which would record it twice (Ali, inventory-tng-wyq, question c,
+ * and inventory-tng-g0e, d). */
+export const MAKE_CHANGES = "Not recorded. Make any changes and record again.";
 
 /** A batch waiting after no_answer, while the browser is online. */
 export const NO_ANSWER = "No answer from the inventory. Trying again shortly.";
@@ -306,17 +301,7 @@ export function noteOf(reason: Reason, online = true): Note {
     case "key_reused":
       return { bold: [KEY_REUSED] };
     case "recorded_elsewhere":
-      // Known, or to be asked (heldKey), what was recorded is shown
-      // instead of asking to scan again.
-      return {
-        bold: [
-          reason.recorded !== undefined
-            ? recordedFirst(reason.recorded.by)
-            : reason.heldKey !== undefined
-              ? recordedFirst("here")
-              : SCAN_AGAIN_CHANGED,
-        ],
-      };
+      return { bold: [SOME_NOT_RECORDED] };
     case "unexpected":
       return {
         bold: [

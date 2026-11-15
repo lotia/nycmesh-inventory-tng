@@ -242,11 +242,18 @@ const answered = (page: Page, status: number) =>
       response.status() === status,
   );
 
-/** What the page says first of a save another tab recorded first. */
-const NOT_RECORDED =
-  "Not recorded: another tab recorded this cart before your changes.";
+/** What the page says first of a save another tab recorded first, and the
+ * heading over what was not recorded (Ali, inventory-tng-0gg, 2026-11-15). */
+const NOT_RECORDED = "Some items were not recorded. Details below.";
+const MAKE_CHANGES = "Not recorded. Make any changes and record again.";
+const IN_CART = "These are in your cart, waiting to be recorded.";
+const ADD_THESE = "Add these to cart";
 
-test("a save an older build's tab saved meanwhile is saved once, under its key; changed after it went back, it is not recorded, the stock is refreshed, and it shows what differs until dismissed", async ({
+/** Its entry in the outbox's list. */
+const refusedEntry = (page: Page) =>
+  page.getByRole("listitem").filter({ hasText: NOT_RECORDED });
+
+test("a save an older build's tab saved meanwhile is saved once, under its key; changed after it went back, it is not recorded, the stock is refreshed, it shows what differs until dismissed, and what it adds goes in the empty cart by itself", async ({
   page,
 }) => {
   const cable = await ownCable(page);
@@ -273,34 +280,76 @@ test("a save an older build's tab saved meanwhile is saved once, under its key; 
   await page.getByRole("button", { name: "Record" }).click();
   await refused;
   await refreshed;
-  // One note, bold whole, then what the other tab recorded and what
-  // differs, with Dismiss at once and no Reload (Ali, inventory-tng-0gg).
-  const entry = page.getByRole("listitem").filter({ hasText: NOT_RECORDED });
+  // One note, bold whole, then what the other tab recorded and what was
+  // not, with Dismiss at once and no Reload.
+  const entry = refusedEntry(page);
   await expect(entry.locator("p.alert strong").first()).toHaveText(
     NOT_RECORDED,
   );
   await expect(
-    entry.getByText(`Recorded by the other tab (transaction ${first})`),
+    entry.getByText(`Recorded in another tab in transaction ${first}`),
   ).toBeVisible();
   await expect(entry.getByText(`${cable}: 2 m`, { exact: true })).toBeVisible();
-  await expect(entry.getByText("Your changes, not recorded")).toBeVisible();
+  await expect(entry.getByText(MAKE_CHANGES)).toBeVisible();
   await expect(entry.getByText(`${cable}: 1 m more`)).toBeVisible();
   await expect(entry.getByText(/Scan again/)).toHaveCount(0);
   await expect(entry.getByRole("button", { name: "Reload" })).toHaveCount(0);
-  // The difference goes in the empty cart, under a new key, once.
-  await entry
-    .getByRole("button", { name: "Add the difference to cart" })
-    .click();
+  // The difference goes in the empty cart by itself, under a new key,
+  // once, and is said to be there until recorded.
   await expect(page.getByLabel(/^Loose/)).toHaveValue("1");
-  await expect(
-    entry.getByRole("button", { name: "Add the difference to cart" }),
-  ).toHaveCount(0);
+  await expect(entry.getByText(IN_CART)).toBeVisible();
+  await expect(entry.getByRole("button", { name: ADD_THESE })).toHaveCount(0);
   const difference = await save(page);
   expect(difference.lines).toEqual([
     expect.objectContaining({ item_id: itemId, quantity: "1" }),
   ]);
+  await expect(entry.getByText(IN_CART)).toHaveCount(0);
   await entry.getByRole("button", { name: "Dismiss" }).click();
   await expect(page.getByText(NOT_RECORDED)).toHaveCount(0);
+});
+
+test("what a save another tab recorded first adds waits on a button while the cart has lines, and goes in by itself once it is empty (inventory-tng-0gg)", async ({
+  page,
+}) => {
+  const cable = await ownCable(page);
+  const itemId = Number(new URL(page.url()).pathname.split("/").at(-1));
+  await page.goto("/scan");
+  await leaveSaved(page, itemId);
+  await page.getByLabel(/^Loose/).fill("3");
+  // Its refusal held until the cart has lines again.
+  let release = () => {};
+  const held = new Promise<void>((done) => {
+    release = done;
+  });
+  await page.route("**/api/transactions", async (route) => {
+    await held;
+    await route.continue();
+  });
+  await page.getByRole("button", { name: "Record" }).click();
+  await expect(page.getByText("Nothing in the cart yet.")).toBeVisible();
+  await page.getByLabel(/Find an item/).fill(cable);
+  await page.getByRole("button", { name: cable, exact: true }).click();
+  await page.getByLabel(/^Loose/).fill("5");
+  const refused = answered(page, 409);
+  release();
+  await refused;
+  await page.unroute("**/api/transactions");
+
+  const entry = refusedEntry(page);
+  await expect(entry.getByText(`${cable}: 1 m more`)).toBeVisible();
+  await expect(entry.getByText(IN_CART)).toHaveCount(0);
+  await entry.getByRole("button", { name: ADD_THESE }).click();
+  await expect(
+    entry.getByText(
+      "Record or discard the current cart before adding more items",
+    ),
+  ).toBeVisible();
+  await expect(page.getByLabel(/^Loose/)).toHaveValue("5");
+  await page.getByRole("button", { name: "Discard cart" }).click();
+  await page.getByRole("button", { name: "Discard", exact: true }).click();
+  await expect(page.getByLabel(/^Loose/)).toHaveValue("1");
+  await expect(entry.getByText(IN_CART)).toBeVisible();
+  await expect(entry.getByRole("button", { name: ADD_THESE })).toHaveCount(0);
 });
 
 test("a save another tab recorded first, taken down since, says an administrator will correct it, and the administrators' home lists it until corrected (inventory-tng-0gg)", async ({
@@ -314,14 +363,12 @@ test("a save another tab recorded first, taken down since, says an administrator
   const refused = answered(page, 409);
   await page.getByRole("button", { name: "Record" }).click();
   await refused;
-  const entry = page.getByRole("listitem").filter({ hasText: NOT_RECORDED });
+  const entry = refusedEntry(page);
   await expect(entry.getByText(`${cable}: 1 m fewer`)).toBeVisible();
   const lowered =
     "Recorded 2 m, you changed it to 1 m. An administrator will correct it.";
   await expect(entry.locator("p.alert strong").last()).toHaveText(lowered);
-  await expect(
-    entry.getByRole("button", { name: "Add the difference to cart" }),
-  ).toHaveCount(0);
+  await expect(entry.getByRole("button", { name: ADD_THESE })).toHaveCount(0);
 
   await page.goto("/admin");
   const needs = page.locator("#needs-action");
@@ -330,11 +377,7 @@ test("a save another tab recorded first, taken down since, says an administrator
   const row = page.getByRole("row").filter({ hasText: String(first) });
   await expect(row.getByText("1 m", { exact: true })).toBeVisible();
   await row.getByRole("button", { name: /^Correct/ }).click();
-  await expect(
-    page.getByText(
-      "Corrected: adjustments undo what was recorded more than moved.",
-    ),
-  ).toBeVisible();
+  await expect(page.getByText("Corrected.", { exact: true })).toBeVisible();
   await page.goto("/admin");
   await expect(
     page.locator("#needs-action").getByRole("link", { name: `${cable}: 1 m` }),

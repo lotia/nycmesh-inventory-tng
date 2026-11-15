@@ -272,6 +272,27 @@ the compressed copy (fiddly header code ServeStatic already gets right).
   them, which leaves the save as that build shows it. We rejected a new
   storage key, which would have listed every save waiting at a deploy
   with what older builds left.
+  Ali reworded it all (2026-11-15, inventory-tng-0gg), in place of every
+  earlier wording of this refusal, the older list's too, in three parts:
+  the alert, bold as a whole, "Some items were not recorded. Details
+  below."; the heading "Recorded in another tab in transaction 412", or,
+  where this browser's own tab recorded it (it could not empty the cart,
+  as when storage was full), "Already recorded from this tab in
+  transaction 412", with no reason given, and the lines recorded; then
+  the heading "Not recorded. Make any changes and record again." over
+  each difference. A removed line reads "RJ45 connectors: removed", with
+  "Recorded 2 × Bag of 50, you removed it. An administrator will correct
+  it."; a loose count keeps its unit. From a server that says nothing,
+  the alert and that heading over the save's lines. What was added or
+  raised goes in an empty cart by itself, as a save put back does, saying
+  "These are in your cart, waiting to be recorded." until recorded; while
+  the cart has lines, "Add these to cart" waits beside them, which, as
+  Add to cart in the older list, takes only an empty cart. We rejected
+  keeping the button alone, a tap more for what is nearly always wanted,
+  and adding to a cart with lines, which may be of another kind or
+  between other places. The page counts each add, by itself or by a tap,
+  as a telemetry event of its own, two an hour taken from the times to
+  save (20 to 18).
   The page's words drop "save" (Ali, 2026-11-13, inventory-tng-wyq): the
   cart lives in the browser, written to storage as it changes, so what
   the browser holds is "kept", and what the inventory takes is

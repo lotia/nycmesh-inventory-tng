@@ -68,7 +68,11 @@ describe("what differs", () => {
       "Cat6 cable: 3 m from an open package, new / Can't add these items. Please rescan.",
     ]);
     expect(shown(move([metres(5)]), move([]))).toEqual([
-      "Cat6 cable: 5 m fewer / Recorded 5 m, you changed it to 0 m. An administrator will correct it.",
+      // Removed, in Ali's words (inventory-tng-0gg, 2026-11-15, 7).
+      "Cat6 cable: removed / Recorded 5 m, you removed it. An administrator will correct it.",
+    ]);
+    expect(shown(move([boxes(2)]), move([]))).toEqual([
+      "LiteBeam 5AC: removed / Recorded 2 × Box, you removed it. An administrator will correct it.",
     ]);
     expect(shown(move([]), move([{ item_id: 100, quantity: "1" }]))).toEqual([
       "LiteBeam 5AC: 1, new",
@@ -180,7 +184,7 @@ describe("what differs", () => {
     const opening = move([opened], { kind: "open", to_location_id: 10 });
     expect(
       shown(opening, move([metres(1)])).map((said) => said.split(" / ")[0]),
-    ).toEqual(["Cat6 cable: 1 m, new", "LiteBeam 5AC: 1 × Box fewer"]);
+    ).toEqual(["Cat6 cable: 1 m, new", "LiteBeam 5AC: removed"]);
   });
 
   test("what was recorded, line by line, then its reports", () => {

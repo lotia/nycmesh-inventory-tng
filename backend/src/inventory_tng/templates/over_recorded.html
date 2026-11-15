@@ -1,11 +1,9 @@
 {% extends "admin_base.html" %}
 {% from "_table.html" import table %}
 {% block main %}
-<p class="hint">A volunteer changed a cart after another tab recorded it,
-taking these off lines already recorded. Correct one to undo what was
-recorded more than moved: an adjustment finds it again where it left and
-writes it off where it arrived, with the reason Recorded more than moved.
-Mark checked if you corrected it another way.</p>
+<p class="hint">Another tab recorded these before a volunteer changed them,
+so the inventory shows more moved than was. Correct moves the extra back
+with an adjustment. Mark checked if you already fixed it.</p>
 {% if only %}
 <p>Only {{ only.name }}. <a href="{{ here }}">Show all</a></p>
 {% endif %}
@@ -13,23 +11,45 @@ Mark checked if you corrected it another way.</p>
   <tr><th>Item</th><th>Recorded more</th><th>Where</th><th>Transaction</th><th></th></tr>
   {% for each in waiting %}
   {% set row = each.row %}
+  {% set whole = each.moved_whole %}
   <tr>
     <td>{{ each.item }}</td>
     <td>{{ each.amount }}</td>
     <td>{% if each.from_place %}from {{ each.from_place }}{% endif %}{% if each.from_place and each.to_place %} {% endif %}{% if each.to_place %}to {{ each.to_place }}{% endif %}</td>
     <td>{{ each.transaction_id }}, {{ each.recorded_at | when(zone) }}</td>
     <td>
+      {% if whole %}
+      {#- Now where it arrived, it cannot be found again where it left: its
+      count there is confirmed, or corrected by an adjustment. #}
+      {% set name = "count-" ~ row.id %}
+      <form method="post" action="{{ here }}/{{ row.id }}/count{{ query }}">
+        <p>An open package moved to {{ each.to_place }}. Confirm or correct count.</p>
+        <input type="hidden" name="seen" value="{{ seen(row) }}">
+        <label for="{{ name }}">Count in the package</label>
+        <input id="{{ name }}" name="count" inputmode="decimal" required value="{{ values.get(name, whole.count) }}" data-was="{{ whole.count }}" aria-describedby="{{ name }}-was{% if problems.get(name) %} {{ name }}-problem{% endif %}">
+        {% include "_field_problem.html" %}
+        <p class="hint" id="{{ name }}-was"{% if values.get(name, whole.count) == whole.count %} hidden{% endif %}>Was {{ whole.words }}</p>
+        <button>Confirm count<span class="sr-only"> {{ each.item }}, transaction {{ each.transaction_id }}</span></button>
+      </form>
+      {% else %}
       <form method="post" action="{{ here }}/{{ row.id }}/checked{{ query }}" class="actions">
         <input type="hidden" name="seen" value="{{ seen(row) }}">
-        {% if each.correctable %}
         <button formaction="{{ here }}/{{ row.id }}/correct{{ query }}">Correct<span class="sr-only"> {{ each.item }}, transaction {{ each.transaction_id }}</span></button>
-        {% endif %}
         <button>Mark checked<span class="sr-only"> {{ each.item }}, transaction {{ each.transaction_id }}</span></button>
       </form>
+      {% endif %}
     </td>
   </tr>
   {% else %}
   <tr><td colspan="5">Nothing waits.</td></tr>
   {% endfor %}
 {% endcall %}
+{#- What a count box held before shows under it once it is edited. #}
+<script>
+  for (const box of document.querySelectorAll("input[data-was]")) {
+    box.addEventListener("input", () => {
+      document.getElementById(`${box.id}-was`).hidden = box.value === box.dataset.was;
+    });
+  }
+</script>
 {% endblock %}

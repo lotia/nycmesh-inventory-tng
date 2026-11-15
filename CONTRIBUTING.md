@@ -458,23 +458,30 @@ the server then takes it once, or, changed since, refuses it (409
 `key_reused`), saying what it recorded under the key, to the request
 holding it only. The page then asks for the catalogue and
 stock at once, as its periodic refresh does, whichever tab sent it, and
-the save stays listed with Dismiss, saying "Not recorded: another tab
-recorded this cart before your changes.", then what that tab recorded,
-and what the volunteer changed since the cart went back, line by line
-(`frontend/src/recorded.ts`): a cart put back under its key keeps the
+the save stays listed with Dismiss, saying "Some items were not
+recorded. Details below.", then what was recorded, headed as recorded in
+another tab or, where this browser's outbox holds it recorded, already
+recorded from this tab (`outbox.recordedHeading`), and, under "Not
+recorded. Make any changes and record again.", what the volunteer changed
+since the cart went back, line by line (`frontend/src/recorded.ts`): a
+cart put back under its key keeps the
 lines it went back with (`changedFrom`), and Record sends them
 (`changed_from`), which the server compares with nothing else. Without
 them, as from a build before or a cart never put back, it changed
-nothing: what differs is the other tab's change. "Add the difference to
-cart" puts what it holds more of, or new, in an empty cart under a key
-made from the save's, so added twice it is recorded once; never what was
+nothing: what differs is the other tab's change. What it holds more of,
+or new, goes in an empty cart by itself, under a key made from the
+save's, so added twice it is recorded once, and is said to be there until
+recorded; while the cart has lines, "Add these to cart" waits, which
+takes only an empty cart. Never what was
 taken from or said of an open package. Under a line it holds less of, it
 says an administrator will correct it: the server, refusing it, keeps
 that difference (`over_recorded.py`), and the administrators' home page lists
 it under "Needs your action" as "Recorded more than moved" until one
 corrects it, with adjustments that undo it on each side, or marks it
-checked. From a server that says nothing of what it recorded, the note
-goes on "Scan again only what you changed." Such a save never goes in a
+checked; an open package moved whole, now where it arrived, has its
+count there confirmed, or corrected by an adjustment, instead. From a
+server that says nothing of what it recorded, that heading goes over the
+save's lines. Such a save never goes in a
 cart whole again, here or in the older list, which offers only Discard:
 what it held is recorded, and once more would record it twice (reason
 `recorded_elsewhere`, which keeps what was recorded). Any other save
@@ -521,7 +528,8 @@ from. The camera works only over HTTPS or on `localhost`.
 Both pages report their errors, three Web Vitals, the outbox's retries,
 how long a batch took from its first line to Record, a tab learning that a
 newer build is out, what an older build left in storage and what
-volunteers did with it, and a cart discarded, through
+volunteers did with it, a cart discarded, and what a save another tab
+recorded first added put in the cart, through
 `frontend/src/telemetry.ts`, to `POST /api/telemetry`, which turns them into
 `inventory.*` metrics (docs/decisions/0006). Its schema, in
 `backend/src/inventory_tng/page_telemetry.py`, lists all a page may send:

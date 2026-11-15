@@ -596,6 +596,25 @@
         "required": ["reason"],
         "title": "DeviceRefusedReply"
       },
+      "DifferenceAdded": {
+        "properties": {
+          "kind": {
+            "type": "string",
+            "const": "difference_added",
+            "title": "Kind"
+          },
+          "how": {
+            "type": "string",
+            "enum": ["automatic", "tap"],
+            "title": "How"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": ["kind", "how"],
+        "title": "DifferenceAdded",
+        "description": "What a save refused as another tab recorded its cart first holds\nmore of, or new, put in the scan page's cart: by the page itself into\nan empty cart, or by a volunteer's tap (frontend/src/recorded.ts)."
+      },
       "HTTPValidationError": {
         "properties": {
           "detail": {
@@ -1370,12 +1389,16 @@
                 },
                 {
                   "$ref": "#/components/schemas/CartDiscarded"
+                },
+                {
+                  "$ref": "#/components/schemas/DifferenceAdded"
                 }
               ],
               "discriminator": {
                 "propertyName": "kind",
                 "mapping": {
                   "cart_discarded": "#/components/schemas/CartDiscarded",
+                  "difference_added": "#/components/schemas/DifferenceAdded",
                   "error": "#/components/schemas/PageError",
                   "older_storage": "#/components/schemas/OlderStorage",
                   "out_of_date": "#/components/schemas/OutOfDate",
