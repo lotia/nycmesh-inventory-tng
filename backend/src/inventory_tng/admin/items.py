@@ -6,6 +6,7 @@ received (docs/decisions/0003)."""
 from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass, field
 from decimal import Decimal
+from functools import cache
 from typing import Annotated, Literal
 
 import structlog
@@ -268,16 +269,21 @@ def _name_field(session: Session, similar: Sequence[items.Close]) -> dict[str, o
     that is not as saved (units.shown_name, Ali, 2026-11-15)."""
     rules = rules_held(session)
 
+    # Each name typed read once, though both below read it.
+    @cache
+    def found_in(typed: str) -> tuple[str, list[units.Found]]:
+        name = canonical(typed.strip())
+        return name, units.found_in(name, rules)
+
     def units_read(typed: str) -> list[units.Found]:
         # One per unit as typed, as one answer reads them all.
         once: dict[str, units.Found] = {}
-        for each in units.found_in(canonical(typed.strip()), rules):
+        for each in found_in(typed)[1]:
             once.setdefault(each.key, each)
         return list(once.values())
 
     def shown_as(typed: str) -> str | None:
-        name = canonical(typed.strip())
-        saved = units.spell(name, units.found_in(name, rules))
+        saved = units.spell(*found_in(typed))
         shown = units.shown_name(saved, rules)
         return shown if shown != saved else None
 
