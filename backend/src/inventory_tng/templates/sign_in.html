@@ -2,16 +2,16 @@
 {% block main %}
 <form method="post" action="{{ paths.sign_in }}">
   <input type="hidden" name="next" value="{{ next }}">
-  <label>Username
+  <label>{% trans %}Username{% endtrans %}
     <input name="username" value="{{ username }}" autocomplete="username" required autofocus>
   </label>
-  <label>Password
+  <label>{% trans %}Password{% endtrans %}
     <input name="password" type="password" autocomplete="current-password" required>
   </label>
-  <label>Code <span class="hint">from your authenticator, or a recovery code; leave blank if you don't use one</span>
+  <label>{% trans %}Code{% endtrans %} <span class="hint">{% trans %}from your authenticator, or a recovery code; leave blank if you don't use one{% endtrans %}</span>
     <input name="code" autocomplete="one-time-code" maxlength="{{ limits.code_max }}">
   </label>
-  <button class="primary">Sign in</button>
+  <button class="primary">{% trans %}Sign in{% endtrans %}</button>
 </form>
-{% if mail_on %}<p><a href="{{ paths.forgot }}">Forgot your password?</a></p>{% endif %}
+{% if mail_on %}<p><a href="{{ paths.forgot }}">{% trans %}Forgot your password?{% endtrans %}</a></p>{% endif %}
 {% endblock %}

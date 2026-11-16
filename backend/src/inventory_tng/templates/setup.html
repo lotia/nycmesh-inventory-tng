@@ -1,37 +1,37 @@
 {% extends "admin_base.html" %}
 {% block main %}
 {% if off %}
-<p>Setup is off. Whoever runs the server turns it on by setting
+<p>{% trans %}Setup is off. Whoever runs the server turns it on by setting
 <code>SETUP_TOKEN</code> in the deployment's settings, then gives you that
-token.</p>
+token.{% endtrans %}</p>
 {% else %}
-<p>There are no administrators yet. Make the first one: you. Later ones are
-invited from the administrator pages.</p>
+<p>{% trans %}There are no administrators yet. Make the first one: you. Later ones are
+invited from the administrator pages.{% endtrans %}</p>
 <form method="post" action="{{ paths.setup }}">
-  <label>Setup token <span class="hint">from whoever runs the server</span>
+  <label>{% trans %}Setup token{% endtrans %} <span class="hint">{% trans %}from whoever runs the server{% endtrans %}</span>
     <input name="token" value="{{ values.get('token', '') }}" autocomplete="off" required>
     {% with name = "token" %}{% include "_field_problem.html" %}{% endwith %}
   </label>
-  <label>Username
+  <label>{% trans %}Username{% endtrans %}
     <input name="username" value="{{ values.get('username', '') }}" autocomplete="username" maxlength="{{ limits.username_max }}" required>
     {% with name = "username" %}{% include "_field_problem.html" %}{% endwith %}
   </label>
-  <label>Email <span class="hint">optional: lets you reset your own password</span>
+  <label>{% trans %}Email{% endtrans %} <span class="hint">{% trans %}optional: lets you reset your own password{% endtrans %}</span>
     <input name="email" type="email" value="{{ values.get('email', '') }}" autocomplete="email">
     {% with name = "email" %}{% include "_field_problem.html" %}{% endwith %}
   </label>
-  <label>Password <span class="hint">at least {{ limits.password_min }} characters</span>
+  <label>{% trans %}Password{% endtrans %} <span class="hint">{% trans count=limits.password_min %}at least {{ count }} character{% pluralize %}at least {{ count }} characters{% endtrans %}</span>
     <input name="password" type="password" autocomplete="new-password" minlength="{{ limits.password_min }}" required>
     {% with name = "password" %}{% include "_field_problem.html" %}{% endwith %}
   </label>
-  <label>Password again
+  <label>{% trans %}Password again{% endtrans %}
     <input name="password_again" type="password" autocomplete="new-password" required>
   </label>
   <fieldset>
-    <legend>Authenticator{% if totp_optional %} (optional){% endif %}</legend>
+    <legend>{% if totp_optional %}{% trans %}Authenticator (optional){% endtrans %}{% else %}{% trans %}Authenticator{% endtrans %}{% endif %}</legend>
     {% include "_totp_fields.html" %}
   </fieldset>
-  <button class="primary">Set up</button>
+  <button class="primary">{% trans %}Set up{% endtrans %}</button>
 </form>
 {% endif %}
 {% endblock %}

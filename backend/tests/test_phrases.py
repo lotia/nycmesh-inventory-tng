@@ -41,6 +41,8 @@ from inventory_tng.models import (
     UNITS,
     AdjustmentReason,
     Admin,
+    AdminSession,
+    Authenticator,
     Category,
     Device,
     Item,
@@ -73,6 +75,7 @@ from inventory_tng.resets import RESET_NOTICE
 
 from helpers.devices import new_device
 from helpers.rows import add
+from helpers.sign_in import new_admin
 from helpers.stock import Spools, cut, length, report, retire, write
 
 # Each letter accented, so English left out of the catalogue shows plain.
@@ -633,6 +636,49 @@ COVERED: dict[str, Callable[[], str]] = {
             here="/",
         )
     ),
+    "the sign-in pages' forms": lambda: " ".join(
+        without_brand(render(name, **SIGNED_IN, **context))
+        for name, context in (
+            (
+                "recover.html",
+                {"values": SimpleNamespace(username=NAME), "problems": {}},
+            ),
+            ("setup.html", {"off": True}),
+            ("setup.html", {"values": {}, "problems": {}, "totp_optional": True}),
+            ("recovery_codes.html", {"codes": [1]}),
+            (
+                "authenticator_new.html",
+                {"required": True, "values": {}, "problems": {}},
+            ),
+            *(
+                (
+                    "reset.html",
+                    {
+                        "link": SimpleNamespace(resets_authenticators=True, kind=kind),
+                        "totp_required": True,
+                        "problems": {},
+                    },
+                )
+                for kind in ("reset", "recovery", "emailed")
+            ),
+            *(
+                ("confirm.html", {"uses_totp": totp, "retype": ["password_again"]})
+                for totp in (True, False)
+            ),
+            *(
+                (
+                    "link_made.html",
+                    {
+                        "brought_back": True,
+                        "kind": kind,
+                        "other": SimpleNamespace(username=NAME),
+                    },
+                )
+                for kind in ("reset", "invite")
+            ),
+            ("sent_again.html", {"made": "change", "back": "/"}),
+        )
+    ),
     "_print_controls.html": lambda: from_macros(
         '{% from "_print_controls.html" import print_controls %}'
         '{% call print_controls("") %}{% endcall %}'
@@ -672,6 +718,8 @@ class World:
     merged: Volunteer
     device: Device
     rule: ReadingRule
+    other_admin: Admin
+    retired_admin: Admin
 
 
 def world(session: Session) -> World:
@@ -706,6 +754,9 @@ def world(session: Session) -> World:
     rule = add(session, ReadingRule(token="P", decided_by_admin_id=admin_id(session)))
     # A unit after a number no rule settles, for the readings to propose.
     add(session, Item(name=f"{NAME} 10g", category_id=cable.category_id))
+    other_admin, _ = new_admin(session, "grace", email="grace@example.org")
+    retired_admin, _ = new_admin(session, "hopper", totp=False)
+    retired_admin.retired_at = datetime.now(UTC)
     return World(
         spools,
         opened,
@@ -719,6 +770,8 @@ def world(session: Session) -> World:
         merged,
         device,
         rule,
+        other_admin,
+        retired_admin,
     )
 
 
@@ -763,6 +816,10 @@ def not_english(session: Session) -> None:
         for row in session.scalars(select(model)):
             if re.search("[A-Za-z]{2,}", row.name):
                 row.name = f"{NAME} {row.id}"
+    for authenticator in session.scalars(select(Authenticator)):
+        authenticator.name = NAME
+    for signed_in in session.scalars(select(AdminSession)):
+        signed_in.user_agent = NAME
     for admin in session.scalars(select(Admin)):
         # ASCII, as a username is: one letter, so no word.
         admin.username = f"a{admin.id:04d}"
@@ -846,7 +903,16 @@ PAGES: dict[str, Callable[[World], str]] = {
     "unit readings to settle": lambda w: "/admin/unit-readings/seed",
     "unit readings to settle, one by one": lambda w: "/admin/unit-readings/seed?one=1",
     "settings": lambda w: "/admin/settings",
+    "home": lambda w: "/admin",
+    "administrators": lambda w: "/admin/admins",
+    "an administrator": lambda w: f"/admin/admins/{w.other_admin.id}",
+    "a retired administrator": lambda w: f"/admin/admins/{w.retired_admin.id}",
+    "an administrator to reset": lambda w: f"/admin/admins/{w.other_admin.id}/reset",
+    "your account": lambda w: "/admin/account",
+    "a new authenticator": lambda w: "/admin/authenticators/new",
 }
+# Every page one signed out sees, whose words have all moved.
+SIGNED_OUT = ["/admin/sign-in", "/admin/forgot", "/admin/reset?token=none"]
 
 
 @pytest.mark.parametrize("page", PAGES)
@@ -862,9 +928,24 @@ def test_a_page_whose_words_have_moved_says_none_in_plain_english(
     english = {
         word
         for word in words
-        if re.search("[A-Za-z]{2,}", word) and not is_a_symbol(word)
+        if re.search("[A-Za-z]{2,}", word)
+        and not is_a_symbol(word)
+        # A new authenticator's key, in groups of four to type.
+        and not re.fullmatch("[A-Z2-7]{4}", word)
     }
     assert english - data_words(session) == set()
+
+
+@pytest.mark.parametrize("where", SIGNED_OUT)
+def test_a_page_signed_out_says_none_in_plain_english(
+    where: str, client: TestClient
+) -> None:
+    with speaking(PSEUDO):
+        response = client.get(where)
+    # A reset link that doesn't work says so, as not found.
+    assert response.status_code in {200, 404}, where
+    words = re.findall(r"[\w/+-]+", re.sub(r"&\w+;", " ", without_brand(response.text)))
+    assert [word for word in words if re.search("[A-Za-z]{2,}", word)] == []
 
 
 def test_english_is_the_catalogues_own_words() -> None:

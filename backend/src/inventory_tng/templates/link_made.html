@@ -1,24 +1,27 @@
 {% extends "admin_base.html" %}
 {% block main %}
-{% if brought_back %}<p>Brought back. Retiring removed anything they signed
-in with, so they start again with this link.</p>{% endif %}
+{% if brought_back %}<p>{% trans %}Brought back. Retiring removed anything they signed
+in with, so they start again with this link.{% endtrans %}</p>{% endif %}
 {% if kind == "reset" %}
-<p>Their sign-in is reset: they are signed out everywhere, and their
-password, authenticators and recovery codes no longer work.</p>
+<p>{% trans %}Their sign-in is reset: they are signed out everywhere, and their
+password, authenticators and recovery codes no longer work.{% endtrans %}</p>
 {% endif %}
-<p><strong>Shown only now.</strong> Pass this link on to {{ other.username }}
+<p><strong>{% trans %}Shown only now.{% endtrans %}</strong> {% if kind == "invite" %}{% trans name=other.username %}Pass this link on to {{ name }}
 yourself, in person or in a message only they read. It works once,
-within a day, and with it they choose {% if kind == "invite" %}their{% else %}a new{% endif %} password.</p>
+within a day, and with it they choose their password.{% endtrans %}
+{%- else %}{% trans name=other.username %}Pass this link on to {{ name }}
+yourself, in person or in a message only they read. It works once,
+within a day, and with it they choose a new password.{% endtrans %}{% endif %}</p>
 <p class="key">{{ link }}</p>
 <p class="actions">
-  <button type="button" id="copy" hidden>Copy the link</button>
+  <button type="button" id="copy" hidden>{% trans %}Copy the link{% endtrans %}</button>
   <span id="copied" aria-live="polite"></span>
 </p>
-<p class="hint">A copied link stays in any clipboard history: once it is
-passed on, copy something else.</p>
+<p class="hint">{% trans %}A copied link stays in any clipboard history: once it is
+passed on, copy something else.{% endtrans %}</p>
 <details>
-  <summary>Show a QR code for their phone</summary>
-  <p class="hint">Only with them beside you: any camera in view can read it.</p>
+  <summary>{% trans %}Show a QR code for their phone{% endtrans %}</summary>
+  <p class="hint">{% trans %}Only with them beside you: any camera in view can read it.{% endtrans %}</p>
   <div class="qr">{{ qr }}</div>
 </details>
 {#- Copying needs the clipboard, so the button shows only where it can be
@@ -33,8 +36,8 @@ used; the link above can always be copied by hand. #}
       // Emptied first, so the same words are said again.
       status.textContent = "";
       navigator.clipboard.writeText(document.querySelector(".key").textContent).then(
-        () => { status.textContent = "Copied."; },
-        () => { status.textContent = "Couldn't copy: select it and copy it by hand."; },
+        () => { status.textContent = {{ _("Copied.") | tojson }}; },
+        () => { status.textContent = {{ _("Couldn't copy: select it and copy it by hand.") | tojson }}; },
       );
     });
   })();

@@ -3,48 +3,49 @@
 {% block main %}
 {% with name = "admin" %}{% if problems.get(name) %}<p role="alert">{{ problems[name] }}</p>{% endif %}{% endwith %}
 {% if other.retired_at %}
-{% call retired_record(other, person=true, restore=false) %}They can't sign in.{% if other.email %} They gave an email address.{% endif %}{% endcall %}
+{% call retired_record(other, person=true, restore=false) %}{% trans %}They can't sign in.{% endtrans %}{% if other.email %} {% trans %}They gave an email address.{% endtrans %}{% endif %}{% endcall %}
 {% else %}
 <p>
-  {% if not has_password %}<span class="tag">Invited</span> No password yet: they choose one with the link they were given.
-  {% else %}Signs in with a password{{ " and an authenticator" if uses_totp else "" }}.{% endif %}
-  {% if other.email %}They gave an email address.{% endif %}
+  {% if not has_password %}{% trans %}<span class="tag">Invited</span> No password yet: they choose one with the link they were given.{% endtrans %}
+  {% elif uses_totp %}{% trans %}Signs in with a password and an authenticator.{% endtrans %}
+  {% else %}{% trans %}Signs in with a password.{% endtrans %}{% endif %}
+  {% if other.email %}{% trans %}They gave an email address.{% endtrans %}{% endif %}
 </p>
 {% endif %}
 
 {% if not other.retired_at and not themselves %}
 <section>
-  <h2>Locked out, or a password or phone stolen?</h2>
-  <p class="hint">Resetting their sign-in signs them out everywhere at once,
+  <h2>{% trans %}Locked out, or a password or phone stolen?{% endtrans %}</h2>
+  <p class="hint">{% trans %}Resetting their sign-in signs them out everywhere at once,
   and gives you a link to pass on for them to choose a new password. You'll be
   asked first. Changing another administrator asks for your code, unless you
-  typed one recently, and every administrator is told.</p>
-  <form method="get" action="{{ here }}/reset"><button>Reset their sign-in</button></form>
+  typed one recently, and every administrator is told.{% endtrans %}</p>
+  <form method="get" action="{{ here }}/reset"><button>{% trans %}Reset their sign-in{% endtrans %}</button></form>
 </section>
 {% endif %}
 
 {% if other.retired_at %}
 <section>
-  <h2>Bring them back</h2>
-  <p class="hint">Retiring removed anything they signed in with, so you get
+  <h2>{% trans %}Bring them back{% endtrans %}</h2>
+  <p class="hint">{% trans %}Retiring removed anything they signed in with, so you get
   a link to pass on, which works once, within a day, for them to choose a
-  password.</p>
+  password.{% endtrans %}</p>
   <form method="post" action="{{ here }}/restore">
     {{ once_field() }}
     {% if code_needed %}{% include "_code_field.html" %}{% endif %}
-    <div class="actions"><button>Bring them back</button></div>
+    <div class="actions"><button>{% trans %}Bring them back{% endtrans %}</button></div>
   </form>
 </section>
 {% elif not themselves %}
 <section>
-  <h2>Retire them</h2>
-  <p class="hint">They can no longer sign in, and their password,
+  <h2>{% trans %}Retire them{% endtrans %}</h2>
+  <p class="hint">{% trans %}They can no longer sign in, and their password,
   authenticators and recovery codes are removed. You can bring them back
-  later.</p>
+  later.{% endtrans %}</p>
   <form method="post" action="{{ here }}/retire">
     {{ once_field() }}
     {% if code_needed %}{% include "_code_field.html" %}{% endif %}
-    <div class="actions"><button>Retire</button></div>
+    <div class="actions"><button>{% trans %}Retire{% endtrans %}</button></div>
   </form>
 </section>
 {% endif %}

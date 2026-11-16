@@ -285,6 +285,20 @@ msgstr ""
 msgid "%(item)s: %(package)s of %(size)s"
 msgstr ""
 
+#: src/inventory_tng/templates/account.html
+#, python-format
+msgid ""
+"%(left)s left. Making new ones voids the old, and asks for a code from "
+"your authenticator, not a recovery code."
+msgstr ""
+
+#: src/inventory_tng/templates/account.html
+#, python-format
+msgid ""
+"%(left)s left: make new ones soon. Making new ones voids the old, and "
+"asks for a code from your authenticator, not a recovery code."
+msgstr ""
+
 #: src/inventory_tng/templates/volunteer_merge.html
 #, python-format
 msgid ""
@@ -521,6 +535,30 @@ msgstr ""
 msgid "(retired)"
 msgstr ""
 
+#: src/inventory_tng/templates/account.html
+msgid "(this one)"
+msgstr ""
+
+#: src/inventory_tng/templates/sent_again.html
+#, python-format
+msgid "<a href=\"%(back)s\">Go back</a>, and make another there if you need one."
+msgstr ""
+
+#: src/inventory_tng/templates/admin_home.html
+#, python-format
+msgid ""
+"<a href=\"%(link)s\">%(item)s: %(packages)s</a>, %(below)s %(unit)s below"
+" zero"
+msgstr ""
+
+#: src/inventory_tng/templates/account.html
+#, python-format
+msgid ""
+"<a href=\"%(link)s\">Add another<span class=\"sr-only\"> "
+"authenticator</span></a>, such as a new phone, before removing the old "
+"one."
+msgstr ""
+
 #: src/inventory_tng/templates/devices.html
 #, python-format
 msgid ""
@@ -531,6 +569,12 @@ msgstr ""
 #: src/inventory_tng/templates/admin_base.html
 #, python-format
 msgid "<span class=\"sr-only\">Back to </span>%(place)s"
+msgstr ""
+
+#: src/inventory_tng/templates/admin.html
+msgid ""
+"<span class=\"tag\">Invited</span> No password yet: they choose one with "
+"the link they were given."
 msgstr ""
 
 #: src/inventory_tng/templates/_retired_record.html
@@ -556,6 +600,12 @@ msgstr ""
 
 #: src/inventory_tng/admin/devices.py
 msgid "A code's number."
+msgstr ""
+
+#: src/inventory_tng/templates/link_made.html
+msgid ""
+"A copied link stays in any clipboard history: once it is passed on, copy "
+"something else."
 msgstr ""
 
 #: src/inventory_tng/admin/devices.py
@@ -680,6 +730,10 @@ msgstr ""
 msgid "Add package"
 msgstr ""
 
+#: src/inventory_tng/templates/account.html
+msgid "Added"
+msgstr ""
+
 #: src/inventory_tng/admin/common.py
 msgid "Added."
 msgstr ""
@@ -691,6 +745,10 @@ msgstr ""
 
 #: src/inventory_tng/templates/counts.html
 msgid "Adjustments"
+msgstr ""
+
+#: src/inventory_tng/templates/admins.html
+msgid "Administrator"
 msgstr ""
 
 #: src/inventory_tng/admin/common.py
@@ -726,6 +784,11 @@ msgstr ""
 
 #: src/inventory_tng/templates/_listing.html
 msgid "All"
+msgstr ""
+
+#: src/inventory_tng/templates/admin_home.html
+#, python-format
+msgid "All %(total)s"
 msgstr ""
 
 #: src/inventory_tng/templates/_labels.html
@@ -909,6 +972,12 @@ msgstr ""
 msgid "Areas inside"
 msgstr ""
 
+#: src/inventory_tng/templates/admin_reset.html
+msgid ""
+"As changing another administrator matters, it needs your code: you "
+"haven't typed one recently."
+msgstr ""
+
 #: src/inventory_tng/templates/_units_read.html
 msgid "As read"
 msgstr ""
@@ -921,12 +990,29 @@ msgstr ""
 msgid "Ask whose name it is after"
 msgstr ""
 
+#: src/inventory_tng/templates/admins.html
+#: src/inventory_tng/templates/setup.html
+msgid "Authenticator"
+msgstr ""
+
+#: src/inventory_tng/templates/setup.html
+msgid "Authenticator (optional)"
+msgstr ""
+
 #: src/inventory_tng/templates/settings.html
 msgid "Authenticator app (TOTP)"
 msgstr ""
 
+#: src/inventory_tng/templates/account.html
+msgid "Authenticators"
+msgstr ""
+
 #: src/inventory_tng/templates/_shown_once.html
 msgid "Back and Forward can't show this page again."
+msgstr ""
+
+#: src/inventory_tng/templates/forgot.html
+msgid "Back to sign in"
 msgstr ""
 
 #: src/inventory_tng/templates/_listing.html
@@ -969,6 +1055,7 @@ msgstr ""
 
 #: src/inventory_tng/admin/volunteers.py
 #: src/inventory_tng/templates/_retired_record.html
+#: src/inventory_tng/templates/admin.html
 msgid "Bring them back"
 msgstr ""
 
@@ -982,6 +1069,16 @@ msgstr ""
 
 #: src/inventory_tng/admin/over_recorded.py
 msgid "Brought back. Correct it now."
+msgstr ""
+
+#: src/inventory_tng/templates/link_made.html
+msgid ""
+"Brought back. Retiring removed anything they signed in with, so they "
+"start again with this link."
+msgstr ""
+
+#: src/inventory_tng/templates/account.html
+msgid "Browser"
 msgstr ""
 
 #: src/inventory_tng/templates/counts.html
@@ -1010,8 +1107,16 @@ msgstr ""
 msgid "Category"
 msgstr ""
 
+#: src/inventory_tng/templates/account.html
+msgid "Change password"
+msgstr ""
+
 #: src/inventory_tng/admin/admins.py
 msgid "Change your own on your account page."
+msgstr ""
+
+#: src/inventory_tng/templates/account.html
+msgid "Changing it signs you out everywhere else."
 msgstr ""
 
 #: src/inventory_tng/templates/settings.html
@@ -1075,6 +1180,7 @@ msgstr ""
 #: src/inventory_tng/templates/devices.html
 #: src/inventory_tng/templates/labels.html
 #: src/inventory_tng/templates/labels_print.html
+#: src/inventory_tng/templates/sign_in.html
 msgid "Code"
 msgstr ""
 
@@ -1085,6 +1191,10 @@ msgstr ""
 
 #: src/inventory_tng/templates/devices.html
 msgid "Codes"
+msgstr ""
+
+#: src/inventory_tng/templates/confirm.html
+msgid "Confirm"
 msgstr ""
 
 #: src/inventory_tng/templates/over_recorded.html
@@ -1107,12 +1217,20 @@ msgstr ""
 msgid "Confirmed."
 msgstr ""
 
+#: src/inventory_tng/templates/link_made.html
+msgid "Copied."
+msgstr ""
+
 #: src/inventory_tng/templates/_labels.html
 msgid "Copies"
 msgstr ""
 
 #: src/inventory_tng/templates/labels.html
 msgid "Copies of each"
+msgstr ""
+
+#: src/inventory_tng/templates/link_made.html
+msgid "Copy the link"
 msgstr ""
 
 #: src/inventory_tng/templates/over_recorded.html
@@ -1130,6 +1248,10 @@ msgstr ""
 
 #: src/inventory_tng/admin/over_recorded.py
 msgid "Corrected."
+msgstr ""
+
+#: src/inventory_tng/templates/link_made.html
+msgid "Couldn't copy: select it and copy it by hand."
 msgstr ""
 
 #. a count, as a kind of save, before what it saved.
@@ -1260,9 +1382,17 @@ msgstr ""
 msgid "Don't track"
 msgstr ""
 
+#: src/inventory_tng/templates/account.html
+#: src/inventory_tng/templates/admins.html
+#: src/inventory_tng/templates/setup.html
 #: src/inventory_tng/templates/volunteer.html
 #: src/inventory_tng/templates/volunteers.html
 msgid "Email"
+msgstr ""
+
+#: src/inventory_tng/templates/account.html
+#, python-format
+msgid "End<span class=\"sr-only\"> the session signed in %(when)s</span>"
 msgstr ""
 
 #: src/inventory_tng/templates/_labels.html
@@ -1374,7 +1504,7 @@ msgid ""
 "is followed until used up. A package that says otherwise keeps its own."
 msgstr ""
 
-#: src/inventory_tng/resets.py
+#: src/inventory_tng/resets.py src/inventory_tng/templates/sign_in.html
 msgid "Forgot your password?"
 msgstr ""
 
@@ -1483,6 +1613,10 @@ msgstr ""
 msgid "How much."
 msgstr ""
 
+#: src/inventory_tng/templates/recovery_codes.html
+msgid "I've kept them: carry on"
+msgstr ""
+
 #: src/inventory_tng/mail.py
 msgid "If it wasn't you, ask another administrator to reset your account at once."
 msgstr ""
@@ -1498,8 +1632,25 @@ msgstr ""
 msgid "If this was not agreed, check with the other administrators."
 msgstr ""
 
+#: src/inventory_tng/templates/recovery_codes.html
+msgid ""
+"If you lose your authenticator, each of these codes signs you in once in "
+"place of a code. Print them or keep them in a password manager. "
+"<strong>They are not shown again.</strong>"
+msgstr ""
+
+#: src/inventory_tng/templates/reset.html
+msgid "If you use an authenticator, signing in still asks for its code."
+msgstr ""
+
 #: src/inventory_tng/mail.py
 msgid "If you weren't expecting this, ignore this mail."
+msgstr ""
+
+#: src/inventory_tng/templates/forgot.html
+msgid ""
+"If your account has an email address, we'll send a link to choose a new "
+"password. If it doesn't, ask another administrator to reset your sign-in."
 msgstr ""
 
 #: src/inventory_tng/templates/reading_seed.html
@@ -1519,8 +1670,20 @@ msgstr ""
 msgid "Inventory"
 msgstr ""
 
+#: src/inventory_tng/templates/admins.html
+msgid "Invite"
+msgstr ""
+
+#: src/inventory_tng/templates/admins.html
+msgid "Invite an administrator"
+msgstr ""
+
 #: src/inventory_tng/admin/home.py
 msgid "Invite another"
+msgstr ""
+
+#: src/inventory_tng/templates/admins.html
+msgid "Invited"
 msgstr ""
 
 #. Translators: before a box for a number of minutes.
@@ -1641,6 +1804,10 @@ msgstr ""
 msgid "Keep it"
 msgstr ""
 
+#: src/inventory_tng/templates/admin_reset.html
+msgid "Keep it as it is"
+msgstr ""
+
 #: src/inventory_tng/templates/open_package_close.html
 msgid "Keep it open"
 msgstr ""
@@ -1665,6 +1832,7 @@ msgstr ""
 msgid "Larger than its too-short length, or change that first."
 msgstr ""
 
+#: src/inventory_tng/templates/account.html
 #: src/inventory_tng/templates/code.html
 #: src/inventory_tng/templates/device.html
 #: src/inventory_tng/templates/device_list.html
@@ -1699,6 +1867,17 @@ msgstr ""
 msgid "Locations"
 msgstr ""
 
+#: src/inventory_tng/templates/admin.html
+msgid "Locked out, or a password or phone stolen?"
+msgstr ""
+
+#: src/inventory_tng/templates/recover.html
+msgid ""
+"Locked out, with no other administrator to let you back in? Whoever runs "
+"the server can set a recovery token and give it to you. With it, reset "
+"your password and authenticators here. Each token works once."
+msgstr ""
+
 #: src/inventory_tng/admin/counts.py
 msgid "Loose"
 msgstr ""
@@ -1730,6 +1909,10 @@ msgid ""
 "Make labels from an <a href=\"%(items)s\">item's</a> or a <a "
 "href=\"%(locations)s\">location's</a> page. Each has one code, printed as"
 " often as needed; pick some here to print them again."
+msgstr ""
+
+#: src/inventory_tng/templates/account.html
+msgid "Make new recovery codes"
 msgstr ""
 
 #: src/inventory_tng/templates/item.html src/inventory_tng/templates/items.html
@@ -1787,6 +1970,7 @@ msgid ""
 msgstr ""
 
 #: src/inventory_tng/templates/_item_name.html
+#: src/inventory_tng/templates/account.html
 #: src/inventory_tng/templates/category.html
 #: src/inventory_tng/templates/device.html
 #: src/inventory_tng/templates/item.html
@@ -1818,8 +2002,23 @@ msgstr ""
 msgid "Needs counting"
 msgstr ""
 
+#: src/inventory_tng/templates/admin_home.html
+#, python-format
+msgid "Needs your action (%(total)s)"
+msgstr ""
+
 #: src/inventory_tng/templates/categories.html
 msgid "New category"
+msgstr ""
+
+#: src/inventory_tng/templates/account.html
+#: src/inventory_tng/templates/reset.html
+msgid "New password"
+msgstr ""
+
+#: src/inventory_tng/templates/account.html
+#: src/inventory_tng/templates/reset.html
+msgid "New password again"
 msgstr ""
 
 #: src/inventory_tng/templates/settings.html
@@ -2114,6 +2313,10 @@ msgstr ""
 msgid "On %(brand)s: %(words)s."
 msgstr ""
 
+#: src/inventory_tng/templates/account.html
+msgid "On this page"
+msgstr ""
+
 #: src/inventory_tng/templates/item.html
 msgid ""
 "On: a package opened is followed until used up, for spools and the like. "
@@ -2183,6 +2386,10 @@ msgstr[1] ""
 msgid ""
 "Only items matching “%(search)s”. Only these are counted; the rest stay "
 "as they are."
+msgstr ""
+
+#: src/inventory_tng/templates/link_made.html
+msgid "Only with them beside you: any camera in view can read it."
 msgstr ""
 
 #: src/inventory_tng/admin/devices.py
@@ -2304,6 +2511,34 @@ msgstr ""
 
 #: src/inventory_tng/templates/item.html src/inventory_tng/templates/items.html
 msgid "Part number"
+msgstr ""
+
+#: src/inventory_tng/templates/link_made.html
+#, python-format
+msgid ""
+"Pass this link on to %(name)s yourself, in person or in a message only "
+"they read. It works once, within a day, and with it they choose a new "
+"password."
+msgstr ""
+
+#: src/inventory_tng/templates/link_made.html
+#, python-format
+msgid ""
+"Pass this link on to %(name)s yourself, in person or in a message only "
+"they read. It works once, within a day, and with it they choose their "
+"password."
+msgstr ""
+
+#: src/inventory_tng/templates/account.html
+#: src/inventory_tng/templates/confirm.html
+#: src/inventory_tng/templates/setup.html
+#: src/inventory_tng/templates/sign_in.html
+msgid "Password"
+msgstr ""
+
+#: src/inventory_tng/templates/confirm.html
+#: src/inventory_tng/templates/setup.html
+msgid "Password again"
 msgstr ""
 
 #: src/inventory_tng/templates/_totp_fields.html
@@ -2521,6 +2756,11 @@ msgstr ""
 msgid "Reasons for an adjustment"
 msgstr ""
 
+#: src/inventory_tng/templates/admin_home.html
+#: src/inventory_tng/templates/admins.html
+msgid "Recent changes"
+msgstr ""
+
 #: src/inventory_tng/templates/length_checks.html
 msgid "Recent cuts"
 msgstr ""
@@ -2560,8 +2800,16 @@ msgstr ""
 msgid "Recover an account"
 msgstr ""
 
+#: src/inventory_tng/templates/account.html
+msgid "Recovery codes"
+msgstr ""
+
 #: src/inventory_tng/account.py
 msgid "Recovery codes come with an authenticator."
+msgstr ""
+
+#: src/inventory_tng/templates/recover.html
+msgid "Recovery token"
 msgstr ""
 
 #: src/inventory_tng/cross_site.py
@@ -2596,6 +2844,7 @@ msgstr ""
 msgid "Remembered for “%(key)s” after a number in every name."
 msgstr ""
 
+#: src/inventory_tng/templates/account.html
 #: src/inventory_tng/templates/item.html
 msgid "Remove"
 msgstr ""
@@ -2604,6 +2853,13 @@ msgstr ""
 msgid "Removed."
 msgstr ""
 
+#: src/inventory_tng/templates/account.html
+msgid ""
+"Removing your only one turns TOTP off: your password alone will sign you "
+"in."
+msgstr ""
+
+#: src/inventory_tng/templates/account.html
 #: src/inventory_tng/templates/category.html
 #: src/inventory_tng/templates/settings.html
 msgid "Rename"
@@ -2644,9 +2900,22 @@ msgstr ""
 msgid "Required or optional?"
 msgstr ""
 
+#: src/inventory_tng/templates/reset.html
+msgid "Reset"
+msgstr ""
+
 #: src/inventory_tng/admin/admins.py
 #, python-format
 msgid "Reset %(username)s's sign-in?"
+msgstr ""
+
+#: src/inventory_tng/templates/recover.html
+msgid "Reset my account"
+msgstr ""
+
+#: src/inventory_tng/templates/admin.html
+#: src/inventory_tng/templates/admin_reset.html
+msgid "Reset their sign-in"
 msgstr ""
 
 #: src/inventory_tng/mail.py
@@ -2658,6 +2927,29 @@ msgstr ""
 msgid "Reset your account"
 msgstr ""
 
+#: src/inventory_tng/templates/admin_reset.html
+#, python-format
+msgid ""
+"Resetting %(name)s's sign-in signs them out everywhere at once: their "
+"password, authenticators and recovery codes stop working. It can't be "
+"undone. You get a link to pass on, which works once, within a day, for "
+"them to choose a new password. Every administrator is told."
+msgstr ""
+
+#: src/inventory_tng/templates/forgot.html
+msgid ""
+"Resetting a password by email isn't set up here. Ask another "
+"administrator to reset your sign-in."
+msgstr ""
+
+#: src/inventory_tng/templates/admin.html
+msgid ""
+"Resetting their sign-in signs them out everywhere at once, and gives you "
+"a link to pass on for them to choose a new password. You'll be asked "
+"first. Changing another administrator asks for your code, unless you "
+"typed one recently, and every administrator is told."
+msgstr ""
+
 #: src/inventory_tng/templates/reading_rule.html
 msgid "Respell it"
 msgstr ""
@@ -2667,9 +2959,13 @@ msgid "Respelt"
 msgstr ""
 
 #: src/inventory_tng/templates/_retired_record.html
-#: src/inventory_tng/templates/item.html
+#: src/inventory_tng/templates/admin.html src/inventory_tng/templates/item.html
 #: src/inventory_tng/templates/settings.html
 msgid "Retire"
+msgstr ""
+
+#: src/inventory_tng/templates/admin.html
+msgid "Retire them"
 msgstr ""
 
 #: src/inventory_tng/templates/category.html
@@ -2690,6 +2986,7 @@ msgstr ""
 
 #: src/inventory_tng/templates/_item_name.html
 #: src/inventory_tng/templates/_listing.html
+#: src/inventory_tng/templates/admins.html
 #: src/inventory_tng/templates/categories.html
 #: src/inventory_tng/templates/item.html src/inventory_tng/templates/items.html
 #: src/inventory_tng/templates/location.html
@@ -2711,6 +3008,12 @@ msgstr ""
 msgid ""
 "Retired: they can no longer sign in, and their password, authenticators "
 "and recovery codes are removed."
+msgstr ""
+
+#: src/inventory_tng/templates/admin.html
+msgid ""
+"Retiring removed anything they signed in with, so you get a link to pass "
+"on, which works once, within a day, for them to choose a password."
 msgstr ""
 
 #: src/inventory_tng/templates/reading_seed.html
@@ -2798,6 +3101,7 @@ msgstr ""
 msgid "Same as the item"
 msgstr ""
 
+#: src/inventory_tng/templates/authenticator_new.html
 #: src/inventory_tng/templates/device.html
 #: src/inventory_tng/templates/item.html
 #: src/inventory_tng/templates/location.html
@@ -2805,6 +3109,10 @@ msgstr ""
 #: src/inventory_tng/templates/settings.html
 #: src/inventory_tng/templates/volunteer.html
 msgid "Save"
+msgstr ""
+
+#: src/inventory_tng/templates/account.html
+msgid "Save email"
 msgstr ""
 
 #: src/inventory_tng/templates/count.html
@@ -2926,6 +3234,10 @@ msgstr ""
 msgid "Select %(device)s"
 msgstr ""
 
+#: src/inventory_tng/templates/forgot.html
+msgid "Send the link"
+msgstr ""
+
 #: src/inventory_tng/admin/settings.py
 msgid "Sessions last"
 msgstr ""
@@ -2943,8 +3255,12 @@ msgstr ""
 msgid "Set to <span data-follows=\"%(field)s\" data-unit=\"%(unit)s\">it</span>"
 msgstr ""
 
-#: src/inventory_tng/sign_in.py
+#: src/inventory_tng/sign_in.py src/inventory_tng/templates/setup.html
 msgid "Set up"
+msgstr ""
+
+#: src/inventory_tng/templates/reset.html
+msgid "Set up a new authenticator when you next sign in."
 msgstr ""
 
 #: src/inventory_tng/sign_in.py
@@ -2976,12 +3292,27 @@ msgstr ""
 msgid "Settled by"
 msgstr ""
 
+#: src/inventory_tng/templates/setup.html
+msgid ""
+"Setup is off. Whoever runs the server turns it on by setting "
+"<code>SETUP_TOKEN</code> in the deployment's settings, then gives you "
+"that token."
+msgstr ""
+
+#: src/inventory_tng/templates/setup.html
+msgid "Setup token"
+msgstr ""
+
 #: src/inventory_tng/admin/items.py
 msgid "Shorter than a whole one, or blank."
 msgstr ""
 
 #: src/inventory_tng/templates/_listing.html
 msgid "Show"
+msgstr ""
+
+#: src/inventory_tng/templates/link_made.html
+msgid "Show a QR code for their phone"
 msgstr ""
 
 #: src/inventory_tng/templates/count.html
@@ -3002,6 +3333,7 @@ msgid "Shown as %(shown)s."
 msgstr ""
 
 #: src/inventory_tng/templates/code_made.html
+#: src/inventory_tng/templates/link_made.html
 msgid "Shown only now."
 msgstr ""
 
@@ -3018,12 +3350,24 @@ msgstr ""
 msgid "Shows the wrong length"
 msgstr ""
 
-#: src/inventory_tng/sign_in.py
+#: src/inventory_tng/sign_in.py src/inventory_tng/templates/sign_in.html
 msgid "Sign in"
 msgstr ""
 
 #: src/inventory_tng/templates/_masthead.html
 msgid "Sign out"
+msgstr ""
+
+#: src/inventory_tng/templates/account.html
+msgid "Sign out everywhere else"
+msgstr ""
+
+#: src/inventory_tng/templates/account.html
+msgid "Sign out<span class=\"sr-only\"> here</span>"
+msgstr ""
+
+#: src/inventory_tng/templates/account.html
+msgid "Signed in"
 msgstr ""
 
 #: src/inventory_tng/templates/_masthead.html
@@ -3035,9 +3379,27 @@ msgstr ""
 msgid "Signing in"
 msgstr ""
 
+#: src/inventory_tng/templates/authenticator_new.html
+msgid ""
+"Signing in here needs an authenticator app as well as your password. Set "
+"one up to carry on."
+msgstr ""
+
+#: src/inventory_tng/templates/admin.html
+msgid "Signs in with a password and an authenticator."
+msgstr ""
+
+#: src/inventory_tng/templates/admin.html
+msgid "Signs in with a password."
+msgstr ""
+
 #: src/inventory_tng/templates/_item_name.html
 #, python-format
 msgid "Similar: %(items)s."
+msgstr ""
+
+#: src/inventory_tng/templates/admin_home.html
+msgid "Since you last signed in"
 msgstr ""
 
 #: src/inventory_tng/admin/common.py
@@ -3185,6 +3547,13 @@ msgstr ""
 msgid ""
 "That form was already sent, and made recovery codes, shown then. Nothing "
 "new was made. It can't be shown again: Back and Forward don't keep it."
+msgstr ""
+
+#: src/inventory_tng/templates/sent_again.html
+msgid ""
+"That form was already sent, and nothing was done again. Anything it "
+"showed, such as a link, can't be shown again: Back and Forward don't keep"
+" it."
 msgstr ""
 
 #: src/inventory_tng/admin/items.py
@@ -3352,6 +3721,24 @@ msgid ""
 "say otherwise."
 msgstr ""
 
+#: src/inventory_tng/templates/link_made.html
+msgid ""
+"Their sign-in is reset: they are signed out everywhere, and their "
+"password, authenticators and recovery codes no longer work."
+msgstr ""
+
+#: src/inventory_tng/templates/confirm.html
+msgid ""
+"Then type the passwords you gave again: passwords are never kept in a "
+"page."
+msgstr ""
+
+#: src/inventory_tng/templates/setup.html
+msgid ""
+"There are no administrators yet. Make the first one: you. Later ones are "
+"invited from the administrator pages."
+msgstr ""
+
 #: src/inventory_tng/admin/categories.py
 msgid ""
 "There is already a category by that name, perhaps a retired one: bring "
@@ -3388,10 +3775,24 @@ msgstr ""
 msgid "They can hold stock: it shows as theirs, wherever they take it."
 msgstr ""
 
+#: src/inventory_tng/templates/admin.html
+msgid ""
+"They can no longer sign in, and their password, authenticators and "
+"recovery codes are removed. You can bring them back later."
+msgstr ""
+
+#: src/inventory_tng/templates/admin.html
+msgid "They can't sign in."
+msgstr ""
+
 #: src/inventory_tng/templates/volunteer.html
 msgid ""
 "They don't hold stock: what they take goes straight to an install or "
 "another place."
+msgstr ""
+
+#: src/inventory_tng/templates/admin.html
+msgid "They gave an email address."
 msgstr ""
 
 #: src/inventory_tng/admin/volunteers.py
@@ -3400,6 +3801,14 @@ msgstr ""
 
 #: src/inventory_tng/admin/volunteers.py
 msgid "They still hold stock: move it back to a store first."
+msgstr ""
+
+#: src/inventory_tng/templates/confirm.html
+msgid "This changes something that matters, so it needs a fresh code."
+msgstr ""
+
+#: src/inventory_tng/templates/confirm.html
+msgid "This changes something that matters, so it needs a fresh password."
 msgstr ""
 
 #: src/inventory_tng/admin/counts.py
@@ -3428,6 +3837,15 @@ msgid ""
 "one line"
 msgstr ""
 
+#: src/inventory_tng/templates/reset.html
+#, python-format
+msgid ""
+"This link doesn't work any more: it has been used, a newer one replaced "
+"it, or its time ran out. <a href=\"%(link)s\">Ask for a new one</a>, or "
+"ask another administrator. If nobody else can help, ask whoever runs the "
+"server for a new recovery token."
+msgstr ""
+
 #: src/inventory_tng/ledger.py
 msgid "This package is retired: what is left may be taken, never received"
 msgstr ""
@@ -3446,6 +3864,14 @@ msgstr ""
 
 #: src/inventory_tng/templates/page.html
 msgid "This page needs JavaScript."
+msgstr ""
+
+#: src/inventory_tng/templates/reset.html
+msgid "This removes your authenticators and recovery codes."
+msgstr ""
+
+#: src/inventory_tng/templates/reset.html
+msgid "This signs you out everywhere."
 msgstr ""
 
 #: src/inventory_tng/admin/items.py
@@ -3524,6 +3950,10 @@ msgstr ""
 msgid "Unit readings"
 msgstr ""
 
+#: src/inventory_tng/templates/account.html
+msgid "Unknown"
+msgstr ""
+
 #: src/inventory_tng/templates/devices.html
 msgid "Until"
 msgstr ""
@@ -3580,6 +4010,13 @@ msgstr ""
 
 #: src/inventory_tng/templates/count.html
 msgid "Used up: close it"
+msgstr ""
+
+#: src/inventory_tng/templates/admins.html
+#: src/inventory_tng/templates/forgot.html
+#: src/inventory_tng/templates/setup.html
+#: src/inventory_tng/templates/sign_in.html
+msgid "Username"
 msgstr ""
 
 #: src/inventory_tng/admin/locations.py
@@ -3664,6 +4101,10 @@ msgstr ""
 msgid "Where"
 msgstr ""
 
+#: src/inventory_tng/templates/account.html
+msgid "Where you're signed in"
+msgstr ""
+
 #: src/inventory_tng/templates/count.html
 msgid "While you counted"
 msgstr ""
@@ -3735,6 +4176,10 @@ msgstr ""
 msgid "With code"
 msgstr ""
 
+#: src/inventory_tng/templates/admins.html
+msgid "You"
+msgstr ""
+
 #: src/inventory_tng/sign_in.py
 msgid "You already have one by that name."
 msgstr ""
@@ -3756,6 +4201,19 @@ msgstr ""
 msgid ""
 "You can put the key into more than one app now, as a spare. It isn't "
 "shown again once saved."
+msgstr ""
+
+#: src/inventory_tng/templates/admins.html
+msgid ""
+"You get a link to pass on. With it they choose a password, then set up an"
+" authenticator when they first sign in. It works once, within a day."
+msgstr ""
+
+#: src/inventory_tng/templates/account.html
+#, python-format
+msgid ""
+"You sign in with your password alone. <a href=\"%(link)s\">Set up an "
+"authenticator</a> to need a code as well."
 msgstr ""
 
 #: src/inventory_tng/sign_in.py
@@ -3813,6 +4271,7 @@ msgid "Your %(brand)s sign-in was reset"
 msgstr ""
 
 #: src/inventory_tng/sign_in.py src/inventory_tng/templates/_masthead.html
+#: src/inventory_tng/templates/admin_home.html
 msgid "Your account"
 msgstr ""
 
@@ -3844,8 +4303,18 @@ msgstr ""
 msgid "Your password is changed. Your other sessions have ended."
 msgstr ""
 
+#: src/inventory_tng/templates/reset.html
+msgid ""
+"Your password, authenticators and recovery codes stopped working when "
+"this link was made."
+msgstr ""
+
 #: src/inventory_tng/sign_in.py
 msgid "Your recovery codes"
+msgstr ""
+
+#: src/inventory_tng/templates/recover.html
+msgid "Your username"
 msgstr ""
 
 #: src/inventory_tng/templates/reading_rule.html
@@ -3886,6 +4355,15 @@ msgid ""
 "at <a href=\"%(link)s\">the registration page</a>, in the browser the "
 "volunteer will use for the scan page."
 msgstr ""
+
+#: src/inventory_tng/templates/account.html
+#: src/inventory_tng/templates/reset.html
+#: src/inventory_tng/templates/setup.html
+#, python-format
+msgid "at least %(count)s character"
+msgid_plural "at least %(count)s characters"
+msgstr[0] ""
+msgstr[1] ""
 
 #: src/inventory_tng/templates/item.html
 #, python-format
@@ -3979,12 +4457,23 @@ msgstr ""
 msgid "from %(place)s"
 msgstr ""
 
+#: src/inventory_tng/templates/recover.html
+#: src/inventory_tng/templates/setup.html
+msgid "from whoever runs the server"
+msgstr ""
+
 #: src/inventory_tng/templates/_code_field.html
 msgid "from your authenticator"
 msgstr ""
 
 #: src/inventory_tng/templates/_code_field.html
 msgid "from your authenticator, or a recovery code"
+msgstr ""
+
+#: src/inventory_tng/templates/sign_in.html
+msgid ""
+"from your authenticator, or a recovery code; leave blank if you don't use"
+" one"
 msgstr ""
 
 #: src/inventory_tng/units.py
@@ -4087,6 +4576,10 @@ msgstr ""
 msgid "move"
 msgstr ""
 
+#: src/inventory_tng/templates/account.html
+msgid "never"
+msgstr ""
+
 #: src/inventory_tng/templates/device.html
 msgid "not known"
 msgstr ""
@@ -4129,6 +4622,15 @@ msgstr ""
 #: src/inventory_tng/templates/device.html
 #, python-format
 msgid "optional, such as \"Store tablet\"; without one, it is %(name)s"
+msgstr ""
+
+#: src/inventory_tng/templates/admins.html
+msgid "optional: lets them reset their own password"
+msgstr ""
+
+#: src/inventory_tng/templates/account.html
+#: src/inventory_tng/templates/setup.html
+msgid "optional: lets you reset your own password"
 msgstr ""
 
 #: src/inventory_tng/units.py
@@ -4271,6 +4773,7 @@ msgstr ""
 msgid "yards"
 msgstr ""
 
+#: src/inventory_tng/templates/admins.html
 #: src/inventory_tng/templates/volunteers.html
 msgid "yes"
 msgstr ""

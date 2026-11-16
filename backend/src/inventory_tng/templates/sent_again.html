@@ -2,12 +2,12 @@
 {% extends "admin_base.html" %}
 {% block main %}
 {% if made == "change" %}
-<p>That form was already sent, and nothing was done again. Anything it
+<p>{% trans %}That form was already sent, and nothing was done again. Anything it
 showed, such as a link, can't be shown again: Back and Forward don't keep
-it.</p>
+it.{% endtrans %}</p>
 {% else %}
 <p>{{ said }}</p>
 {% endif %}
-<p><a href="{{ back }}">Go back</a>, and make another there if you need
-one.</p>
+<p>{% trans back=back %}<a href="{{ back }}">Go back</a>, and make another there if you need
+one.{% endtrans %}</p>
 {% endblock %}

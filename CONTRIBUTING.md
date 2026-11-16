@@ -900,8 +900,8 @@ When you move words into the catalogue, add what you moved to its
 `COVERED`. On the server, every phrase named as a constant, alone or in a
 table such as `NOTICES`, is covered already; add a phrase said with values
 to `SAID_WITH_VALUES`, a page to `PAGES`, which fetches it signed in with
-every name in the database not English, and a template no page there
-shows, or a branch of one, to `COVERED`.
+every name in the database not English, or to `SIGNED_OUT`, and a template
+no page there shows, or a branch of one, to `COVERED`.
 
 ## Running the checks
 

@@ -1,29 +1,29 @@
 {% extends "admin_base.html" %}
 {% block main %}
 {% if not link %}
-<p>This link doesn't work any more: it has been used, a newer one replaced
-it, or its time ran out. <a href="{{ paths.forgot }}">Ask for a new one</a>,
+<p>{% trans link=paths.forgot %}This link doesn't work any more: it has been used, a newer one replaced
+it, or its time ran out. <a href="{{ link }}">Ask for a new one</a>,
 or ask another administrator. If nobody else can help, ask whoever runs the
-server for a new recovery token.</p>
+server for a new recovery token.{% endtrans %}</p>
 {% else %}
 <form method="post" action="{{ paths.reset }}">
   <input type="hidden" name="token" value="{{ token }}">
   {% if link.resets_authenticators %}
-  <p>{% if link.kind == "reset" %}Your password, authenticators and recovery
-  codes stopped working when this link was made.{% else %}This removes your
-  authenticators and recovery codes.{% endif %}{% if totp_required %}
-  Set up a new authenticator when you next sign in.{% endif %}</p>
+  <p>{% if link.kind == "reset" %}{% trans %}Your password, authenticators and recovery
+  codes stopped working when this link was made.{% endtrans %}{% else %}{% trans %}This removes your
+  authenticators and recovery codes.{% endtrans %}{% endif %}{% if totp_required %}
+  {% trans %}Set up a new authenticator when you next sign in.{% endtrans %}{% endif %}</p>
   {% endif %}
-  <label>New password <span class="hint">at least {{ limits.password_min }} characters</span>
+  <label>{% trans %}New password{% endtrans %} <span class="hint">{% trans count=limits.password_min %}at least {{ count }} character{% pluralize %}at least {{ count }} characters{% endtrans %}</span>
     <input name="password" type="password" autocomplete="new-password" minlength="{{ limits.password_min }}" required autofocus>
     {% with name = "password" %}{% include "_field_problem.html" %}{% endwith %}
   </label>
-  <label>New password again
+  <label>{% trans %}New password again{% endtrans %}
     <input name="password_again" type="password" autocomplete="new-password" required>
   </label>
-  <button class="primary">Reset</button>
+  <button class="primary">{% trans %}Reset{% endtrans %}</button>
 </form>
-<p class="hint">This signs you out everywhere.{% if link.kind == "emailed" %}
-If you use an authenticator, signing in still asks for its code.{% endif %}</p>
+<p class="hint">{% trans %}This signs you out everywhere.{% endtrans %}{% if link.kind == "emailed" %}
+{% trans %}If you use an authenticator, signing in still asks for its code.{% endtrans %}{% endif %}</p>
 {% endif %}
 {% endblock %}

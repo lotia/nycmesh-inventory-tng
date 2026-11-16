@@ -5,16 +5,16 @@
 <section>
   {{ sizes(view) }}
   {% call table() %}
-    <tr>{{ sort_heading(view, "name", "Administrator") }}
-      {{- sort_heading(view, "email", "Email") }}
-      {{- sort_heading(view, "authenticator", "Authenticator") }}</tr>
+    <tr>{{ sort_heading(view, "name", _("Administrator")) }}
+      {{- sort_heading(view, "email", _("Email")) }}
+      {{- sort_heading(view, "authenticator", _("Authenticator")) }}</tr>
     {% for other in current %}
     <tr>
       <td><a href="{{ here }}/{{ other.id }}">{{ other.username }}</a>
-        {%- if other.id == admin.id %} <span class="tag">You</span>{% endif %}
-        {%- if other.id not in with_password %} <span class="tag">Invited</span>{% endif %}</td>
-      <td>{{ "yes" if other.email else "" }}</td>
-      <td>{{ "yes" if other.id in with_totp else "" }}</td>
+        {%- if other.id == admin.id %} <span class="tag">{% trans %}You{% endtrans %}</span>{% endif %}
+        {%- if other.id not in with_password %} <span class="tag">{% trans %}Invited{% endtrans %}</span>{% endif %}</td>
+      <td>{% if other.email %}{% trans %}yes{% endtrans %}{% endif %}</td>
+      <td>{% if other.id in with_totp %}{% trans %}yes{% endtrans %}{% endif %}</td>
     </tr>
     {% endfor %}
   {% endcall %}
@@ -22,35 +22,35 @@
 </section>
 
 <section>
-  <h2>Invite an administrator</h2>
-  <p class="hint">You get a link to pass on. With it they choose a password,
+  <h2>{% trans %}Invite an administrator{% endtrans %}</h2>
+  <p class="hint">{% trans %}You get a link to pass on. With it they choose a password,
   then set up an authenticator when they first sign in. It works once, within
-  a day.</p>
+  a day.{% endtrans %}</p>
   <form method="post" action="{{ here }}">
     {{ once_field() }}
-    <label>Username
+    <label>{% trans %}Username{% endtrans %}
       <input name="username" value="{{ values.get('username', '') }}" maxlength="{{ limits.username_max }}" required>
       {% with name = "username" %}{% include "_field_problem.html" %}{% endwith %}
     </label>
-    <label>Email <span class="hint">optional: lets them reset their own password</span>
+    <label>{% trans %}Email{% endtrans %} <span class="hint">{% trans %}optional: lets them reset their own password{% endtrans %}</span>
       <input name="email" type="email" value="{{ values.get('email', '') }}">
       {% with name = "email" %}{% include "_field_problem.html" %}{% endwith %}
     </label>
     {% if code_needed %}{% include "_code_field.html" %}{% endif %}
-    <button class="primary">Invite</button>
+    <button class="primary">{% trans %}Invite{% endtrans %}</button>
   </form>
 </section>
 
 {% if changes %}
 <section id="changes">
-  <h2>Recent changes</h2>
+  <h2>{% trans %}Recent changes{% endtrans %}</h2>
   {% include "_activity.html" %}
 </section>
 {% endif %}
 
 {% if retired %}
 <section id="retired">
-  <h2>Retired</h2>
+  <h2>{% trans %}Retired{% endtrans %}</h2>
   {% with section_id="retired" %}{% include "_notice.html" %}{% endwith %}
   <ul>{% for other in retired %}<li><a href="{{ here }}/{{ other.id }}">{{ other.username }}</a></li>{% endfor %}</ul>
 </section>

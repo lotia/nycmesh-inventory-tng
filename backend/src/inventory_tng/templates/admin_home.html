@@ -5,24 +5,25 @@
 {% endfor %}
 {% if needs %}
 <section id="needs-action">
-  <h2>Needs your action ({{ needs | sum(attribute="total") }})</h2>
+  <h2>{% trans total=needs | sum(attribute="total") %}Needs your action ({{ total }}){% endtrans %}</h2>
   {% for found in needs %}{% set kind = found.kind %}
   <h3>{{ kind.title }}</h3>
   <ul>
     {% for line in found.items %}
-    <li><a href="{{ kind.path }}?item={{ line.item_id }}">{{ line.item }}: {{ line.packages }}</a>
-      {%- if line.below %}, {{ line.below | amount }} {{ line.unit }} below zero{% endif %}</li>
+    {% set link = kind.path ~ "?item=" ~ line.item_id %}
+    <li>{% if line.below %}{% trans link=link, item=line.item, packages=line.packages, below=line.below | amount, unit=line.unit %}<a href="{{ link }}">{{ item }}: {{ packages }}</a>, {{ below }} {{ unit }} below zero{% endtrans %}
+      {%- else %}<a href="{{ link }}">{{ line.item }}: {{ line.packages }}</a>{% endif %}</li>
     {% endfor %}
-    <li><a href="{{ kind.path }}">All {{ found.total }}</a></li>
+    <li><a href="{{ kind.path }}">{% trans total=found.total %}All {{ total }}{% endtrans %}</a></li>
   </ul>
   {% endfor %}
 </section>
 {% endif %}
 {% if changes %}
 <section id="since">
-  <h2>Since you last signed in</h2>
+  <h2>{% trans %}Since you last signed in{% endtrans %}</h2>
   {% include "_activity.html" %}
-  <p><a href="{{ admins_path }}#changes">Recent changes</a></p>
+  <p><a href="{{ admins_path }}#changes">{% trans %}Recent changes{% endtrans %}</a></p>
 </section>
 {% endif %}
 {% include "_retired_holding.html" %}
@@ -30,6 +31,6 @@
   {% for path, label, _ in sections %}
   <li><a href="{{ path }}">{{ label }}</a>{% if current.get(path) is not none %}: {{ current[path] }}{% endif %}</li>
   {% endfor %}
-  <li><a href="{{ paths.account }}">Your account</a></li>
+  <li><a href="{{ paths.account }}">{% trans %}Your account{% endtrans %}</a></li>
 </ul>
 {% endblock %}

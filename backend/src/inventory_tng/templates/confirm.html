@@ -1,18 +1,22 @@
 {% extends "admin_base.html" %}
 {% block main %}
-<p>This changes something that matters, so it needs a fresh
-{{ "code" if uses_totp else "password" }}.{% if retype %}
-Then type the passwords you gave again: passwords are never kept in a page.{% endif %}</p>
+<p>{% if uses_totp %}{% trans %}This changes something that matters, so it needs a fresh
+code.{% endtrans %}{% else %}{% trans %}This changes something that matters, so it needs a fresh
+password.{% endtrans %}{% endif %}{% if retype %}
+{% trans %}Then type the passwords you gave again: passwords are never kept in a page.{% endtrans %}{% endif %}</p>
 <form method="post" action="{{ action }}">
   {% for name, value in carried %}
   <input type="hidden" name="{{ name }}" value="{{ value }}">
   {% endfor %}
   {% with code_totp = uses_totp, autofocus = true %}{% include "_code_field.html" %}{% endwith %}
+  {#- Words for each secret field a form sends; any other is named by its
+  field (inventory-tng-pem). #}
+  {% set secrets = {"password": _("Password"), "password_again": _("Password again")} %}
   {% for secret in retype %}
-  <label>{{ secret | replace("_", " ") | capitalize }}
+  <label>{{ secrets.get(secret) or secret | replace("_", " ") | capitalize }}
     <input name="{{ secret }}" type="password" autocomplete="new-password" required>
   </label>
   {% endfor %}
-  <button class="primary">Confirm</button>
+  <button class="primary">{% trans %}Confirm{% endtrans %}</button>
 </form>
 {% endblock %}

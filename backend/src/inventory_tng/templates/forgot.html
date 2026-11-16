@@ -1,18 +1,18 @@
 {% extends "admin_base.html" %}
 {% block main %}
 {% if not mail_on %}
-<p>Resetting a password by email isn't set up here. Ask another
-administrator to reset your sign-in.</p>
+<p>{% trans %}Resetting a password by email isn't set up here. Ask another
+administrator to reset your sign-in.{% endtrans %}</p>
 {% elif not notice %}
-<p>If your account has an email address, we'll send a link to choose a new
+<p>{% trans %}If your account has an email address, we'll send a link to choose a new
 password. If it doesn't, ask another administrator to reset your
-sign-in.</p>
+sign-in.{% endtrans %}</p>
 <form method="post" action="{{ paths.forgot }}">
-  <label>Username
+  <label>{% trans %}Username{% endtrans %}
     <input name="username" autocomplete="username" maxlength="{{ limits.username_max }}" required autofocus>
   </label>
-  <button class="primary">Send the link</button>
+  <button class="primary">{% trans %}Send the link{% endtrans %}</button>
 </form>
 {% endif %}
-<p><a href="{{ paths.sign_in }}">Back to sign in</a></p>
+<p><a href="{{ paths.sign_in }}">{% trans %}Back to sign in{% endtrans %}</a></p>
 {% endblock %}

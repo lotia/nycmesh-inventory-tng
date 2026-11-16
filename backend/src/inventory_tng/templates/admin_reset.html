@@ -1,13 +1,13 @@
 {% extends "admin_base.html" %}
 {% from "_confirm.html" import confirm %}
 {% block main %}
-<p>Resetting {{ other.username }}'s sign-in signs them out everywhere at
+<p>{% trans name=other.username %}Resetting {{ name }}'s sign-in signs them out everywhere at
 once: their password, authenticators and recovery codes stop working. It
 can't be undone. You get a link to pass on, which works once, within a day,
-for them to choose a new password. Every administrator is told.{% if code_needed %}
-As changing another administrator matters, it needs your code: you haven't
-typed one recently.{% endif %}</p>
-{% call confirm(here, "Reset their sign-in", keep, "Keep it as it is") %}
+for them to choose a new password. Every administrator is told.{% endtrans %}{% if code_needed %}
+{% trans %}As changing another administrator matters, it needs your code: you haven't
+typed one recently.{% endtrans %}{% endif %}</p>
+{% call confirm(here, _("Reset their sign-in"), keep, _("Keep it as it is")) %}
   {{ once_field() }}
   {% if code_needed %}{% include "_code_field.html" %}{% endif %}
 {% endcall %}

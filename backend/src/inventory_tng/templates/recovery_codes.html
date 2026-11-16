@@ -1,11 +1,11 @@
 {% extends "admin_base.html" %}
 {% block main %}
-<p>If you lose your authenticator, each of these codes signs you in once in
+<p>{% trans %}If you lose your authenticator, each of these codes signs you in once in
 place of a code. Print them or keep them in a password manager. <strong>They
-are not shown again.</strong></p>
+are not shown again.</strong>{% endtrans %}</p>
 <ol class="codes">
   {% for code in codes %}<li>{{ code }}</li>{% endfor %}
 </ol>
 {% include "_shown_once.html" %}
-<p><a href="{{ paths.home }}">I've kept them: carry on</a></p>
+<p><a href="{{ paths.home }}">{% trans %}I've kept them: carry on{% endtrans %}</a></p>
 {% endblock %}
