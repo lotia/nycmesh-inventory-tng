@@ -1,9 +1,9 @@
 {% extends "admin_base.html" %}
 {% from "_confirm.html" import confirm %}
 {% block main %}
-<p>{{ shown.item }}, {{ shown.package }}, at {{ shown.place }}: it shows
-{{ shown.left | amount }} {{ shown.unit }}. Closing it writes that off, with
+<p>{% trans item=shown.item, package=shown.package, place=shown.place, left=shown.left | amount, unit=shown.unit %}{{ item }}, {{ package }}, at {{ place }}: it shows
+{{ left }} {{ unit }}. Closing it writes that off, with
 the reason Used up, and it is offered no more. It can't be opened again;
-a count puts right a mistake.</p>
-{{ confirm(here, "Close as used up", keep, "Keep it open") }}
+a count puts right a mistake.{% endtrans %}</p>
+{{ confirm(here, _("Close as used up"), keep, _("Keep it open")) }}
 {% endblock %}

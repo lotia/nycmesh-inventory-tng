@@ -3,21 +3,21 @@
 {% from "_listing.html" import sizes, sort_heading, pager %}
 {% block main %}
 <form method="post" action="{{ here }}" class="actions">
-  <label>New category
+  <label>{% trans %}New category{% endtrans %}
     <input name="name" value="{{ values.get('name', '') }}" maxlength="{{ name_max }}" required>
     {% with name = "name" %}{% include "_field_problem.html" %}{% endwith %}
   </label>
-  <button class="primary">Add</button>
+  <button class="primary">{% trans %}Add{% endtrans %}</button>
 </form>
 
 <section>
   {{ sizes(view) }}
   {% call table() %}
-    <tr>{{ sort_heading(view, "name", "Category") }}{{ sort_heading(view, "items", "Items") }}</tr>
+    <tr>{{ sort_heading(view, "name", _("Category")) }}{{ sort_heading(view, "items", _("Items")) }}</tr>
     {% for category, items in current %}
     <tr><td><a href="{{ here }}/{{ category.id }}">{{ category.name }}</a></td><td>{{ items }}</td></tr>
     {% else %}
-    <tr><td colspan="2">None yet.</td></tr>
+    <tr><td colspan="2">{% trans %}None yet.{% endtrans %}</td></tr>
     {% endfor %}
   {% endcall %}
   {{ pager(view) }}
@@ -25,7 +25,7 @@
 
 {% if retired %}
 <section id="retired">
-  <h2>Retired</h2>
+  <h2>{% trans %}Retired{% endtrans %}</h2>
   <ul>
     {% for category in retired %}<li><a href="{{ here }}/{{ category.id }}">{{ category.name }}</a></li>{% endfor %}
   </ul>

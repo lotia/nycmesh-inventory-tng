@@ -5,14 +5,18 @@ import importlib
 import pkgutil
 import re
 from collections.abc import Callable
+from dataclasses import dataclass
 from datetime import UTC, datetime
 from decimal import Decimal
 from types import SimpleNamespace
-from zoneinfo import ZoneInfo
+from zoneinfo import ZoneInfo, available_timezones
 
 import pytest
 from babel.messages.catalog import Catalog, Message
 from babel.support import LazyProxy, Translations
+from fastapi.testclient import TestClient
+from sqlalchemy import select
+from sqlalchemy.orm import Session
 
 import inventory_tng
 from inventory_tng import (
@@ -32,7 +36,19 @@ from inventory_tng.admin import over_recorded as admin_over_recorded
 from inventory_tng.admin import reading_rules as admin_reading_rules
 from inventory_tng.admin import settings as admin_settings
 from inventory_tng.admin import volunteers as admin_volunteers
-from inventory_tng.models import SignInSettings
+from inventory_tng.models import (
+    UNITS,
+    Admin,
+    Category,
+    Item,
+    ItemAlias,
+    ItemPackage,
+    Label,
+    Location,
+    OpenPackage,
+    SignInSettings,
+    Volunteer,
+)
 from inventory_tng.pages import retired_holding, templates
 from inventory_tng.phrases import (
     BRAND,
@@ -48,6 +64,9 @@ from inventory_tng.phrases import (
     speaking,
 )
 from inventory_tng.resets import RESET_NOTICE
+
+from helpers.rows import add
+from helpers.stock import Spools, retire
 
 # Each letter accented, so English left out of the catalogue shows plain.
 ACCENTS = str.maketrans(
@@ -338,6 +357,44 @@ def retired_parts() -> str:
     )
 
 
+READING = SimpleNamespace(called=NAME, kind_words=NAME)
+
+
+def unit_read(**differs: object) -> SimpleNamespace:
+    """A unit in a name, as units.found_in reads it (_units_read.html)."""
+    return SimpleNamespace(
+        **{
+            "key": NAME,
+            "typed": NAME,
+            "asks": False,
+            "offered": [READING, SimpleNamespace(called=NAME, kind_words=NAME)],
+            "shown": lambda reading: NAME,
+            "read": READING,
+            "clue": [NAME, NAME],
+            "rule": SimpleNamespace(respell=True),
+        }
+        | differs
+    )
+
+
+def units_read() -> str:
+    """Each way _units_read.html says a unit was read, or asks."""
+    each = [
+        unit_read(asks=True),
+        unit_read(),
+        unit_read(clue=[], rule=None),
+        unit_read(read=None),
+    ]
+    return render(
+        "_units_read.html",
+        units_read=lambda typed: each,
+        shown_as=lambda typed, sent: NAME,
+        typed=NAME,
+        sent={},
+        not_a_unit="",
+    )
+
+
 COVERED: dict[str, Callable[[], str]] = {
     "every phrase named as a constant": lambda: " ".join(
         str(phrase) for phrase in named_phrases()
@@ -393,6 +450,24 @@ COVERED: dict[str, Callable[[], str]] = {
     "_totp_fields.html": lambda: render(
         "_totp_fields.html", values={}, problems={}, limits={}, totp_optional=True
     ),
+    "_units_read.html": units_read,
+    "_item_name.html, with similar names": lambda: render(
+        "_item_name.html",
+        values={},
+        problems={},
+        default=NAME,
+        again=NAME,
+        units_read=lambda typed: [],
+        shown_as=lambda typed, sent: "",
+        similar=[
+            SimpleNamespace(
+                item=SimpleNamespace(id=1, name_shown=NAME, retired_at=1), alias=NAME
+            ),
+            SimpleNamespace(
+                item=SimpleNamespace(id=2, name_shown=NAME, retired_at=None), alias=None
+            ),
+        ],
+    ),
     "_print_controls.html": lambda: from_macros(
         '{% from "_print_controls.html" import print_controls %}'
         '{% call print_controls("") %}{% endcall %}'
@@ -408,6 +483,109 @@ def test_what_has_moved_says_nothing_in_plain_english(part: str) -> None:
     words = re.sub(r"<script.*?</script>|<[^>]*>|&\w+;", " ", shown, flags=re.DOTALL)
     assert re.findall(r"[A-Za-z]{2,}", words) == []
     assert words.strip()
+
+
+@dataclass
+class World:
+    """What the pages walked below show: spools of cable in a store, one
+    opened, with a label and an alias; an area in the store; a volunteer
+    holding stock; and a retired item, category and place."""
+
+    spools: Spools
+    opened: OpenPackage
+    area: Location
+    custody: Location
+    retired_item: Item
+    retired_category: Category
+    retired_place: Location
+
+
+def world(session: Session) -> World:
+    spools = Spools(session)
+    opened = spools.opened()
+    cable = spools.cable
+    # An alias is never changed: named not in English as it is made.
+    add(session, ItemAlias(item_id=cable.id, name=f"{NAME} ἄλλο"))
+    add(session, Label(item_id=cable.id, package_id=spools.spool.id))
+    area = add(session, Location(name="Shelf", kind="area", parent_id=spools.store.id))
+    custody = add(
+        session,
+        Location(
+            name="Custody",
+            kind="custody",
+            volunteer_id=spools.place.volunteer.id,
+        ),
+    )
+    retired_category = add(session, Category(name="Old"))
+    retired_item = add(session, Item(name="Old", category_id=retired_category.id))
+    retired_place = add(session, Location(name="Old", kind="store"))
+    retire(session, retired_item, retired_category, retired_place)
+    return World(
+        spools,
+        opened,
+        area,
+        custody,
+        retired_item,
+        retired_category,
+        retired_place,
+    )
+
+
+def not_english(session: Session) -> None:
+    """Every name the pages show, made not English, so that what is left in
+    English on a page is a word not said through the catalogue."""
+    for model in (Item, ItemPackage, Category, Location, Volunteer):
+        for row in session.scalars(select(model)):
+            row.name = f"{NAME} {row.id}"
+    for admin in session.scalars(select(Admin)):
+        # ASCII, as a username is: one letter, so no word.
+        admin.username = f"a{admin.id:04d}"
+    session.flush()
+
+
+def data_words(session: Session) -> set[str]:
+    """What a page shows that is the same in every language: unit keys
+    (models.UNITS), time zones and their abbreviations, and labels' codes."""
+    now = datetime.now(UTC)
+    zones = available_timezones()
+    shortened = {now.astimezone(ZoneInfo(zone)).tzname() or "" for zone in zones}
+    codes = set(session.scalars(select(Label.code)))
+    return {*UNITS, *zones, *shortened, *codes}
+
+
+# Every page whose words have all moved, by a path in a World.
+PAGES: dict[str, Callable[[World], str]] = {
+    "items": lambda w: "/admin/items",
+    "items, retired": lambda w: "/admin/items?show=retired",
+    "items, searched": lambda w: f"/admin/items?q={NAME}",
+    "an item": lambda w: f"/admin/items/{w.spools.cable.id}",
+    "a retired item": lambda w: f"/admin/items/{w.retired_item.id}",
+    "an open package to close": lambda w: (
+        f"/admin/items/{w.spools.cable.id}/open-packages/{w.opened.id}/close"
+    ),
+    "categories": lambda w: "/admin/categories",
+    "a category": lambda w: f"/admin/categories/{w.spools.cable.category_id}",
+    "a retired category": lambda w: f"/admin/categories/{w.retired_category.id}",
+    "locations": lambda w: "/admin/locations",
+    "a store": lambda w: f"/admin/locations/{w.spools.store.id}",
+    "an area": lambda w: f"/admin/locations/{w.area.id}",
+    "a volunteer's custody": lambda w: f"/admin/locations/{w.custody.id}",
+    "a retired place": lambda w: f"/admin/locations/{w.retired_place.id}",
+}
+
+
+@pytest.mark.parametrize("page", PAGES)
+def test_a_page_whose_words_have_moved_says_none_in_plain_english(
+    page: str, admin_client: TestClient, session: Session
+) -> None:
+    where = PAGES[page](world(session))
+    not_english(session)
+    with speaking(PSEUDO):
+        response = admin_client.get(where)
+    assert response.status_code == 200, where
+    words = re.findall(r"[\w/+-]+", re.sub(r"&\w+;", " ", without_brand(response.text)))
+    english = {word for word in words if re.search("[A-Za-z]{2,}", word)}
+    assert english - data_words(session) == set()
 
 
 def test_english_is_the_catalogues_own_words() -> None:

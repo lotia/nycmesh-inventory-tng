@@ -11,44 +11,44 @@
 {% endmacro %}
 {% block main %}
 <section>
-  {% if tree %}{{ branch(tree) }}{% else %}<p>None yet.</p>{% endif %}
+  {% if tree %}{{ branch(tree) }}{% else %}<p>{% trans %}None yet.{% endtrans %}</p>{% endif %}
 </section>
 
 <section>
-  <h2>Add a location</h2>
+  <h2>{% trans %}Add a location{% endtrans %}</h2>
   <form method="post" action="{{ here }}">
-    <label>Name
+    <label>{% trans %}Name{% endtrans %}
       <input name="name" value="{{ values.get('name', '') }}" maxlength="{{ name_max }}" required>
       {% with name = "name" %}{% include "_field_problem.html" %}{% endwith %}
     </label>
-    <label>What it is
+    <label>{% trans %}What it is{% endtrans %}
       <select name="kind" required>
         {% for kind, label in kinds.items() %}<option value="{{ kind }}" {% if values.get('kind') == kind %}selected{% endif %}>{{ label }}</option>{% endfor %}
       </select>
       {% with name = "kind" %}{% include "_field_problem.html" %}{% endwith %}
     </label>
-    <label>Inside <span class="hint">for an area only</span>
+    <label>{% trans %}Inside{% endtrans %} <span class="hint">{% trans %}for an area only{% endtrans %}</span>
       <select name="parent_id">
-        <option value="">Nowhere</option>
+        <option value="">{% trans %}Nowhere{% endtrans %}</option>
         {% for parent in parents %}<option value="{{ parent.id }}" {% if values.get('parent_id') == parent.id | string %}selected{% endif %}>{{ parent.name }}</option>{% endfor %}
       </select>
       {% with name = "parent_id" %}{% include "_field_problem.html" %}{% endwith %}
     </label>
-    <button class="primary">Add</button>
+    <button class="primary">{% trans %}Add{% endtrans %}</button>
   </form>
 </section>
 
 {% if custody %}
 <section>
-  <h2>Held by volunteers</h2>
-  <p class="hint">Made and retired with the volunteer.</p>
+  <h2>{% trans %}Held by volunteers{% endtrans %}</h2>
+  <p class="hint">{% trans %}Made and retired with the volunteer.{% endtrans %}</p>
   <ul>{% for location, volunteer in custody %}<li>{{ location.name }} <span class="hint">{{ volunteer }}</span></li>{% endfor %}</ul>
 </section>
 {% endif %}
 
 {% if retired %}
 <section id="retired">
-  <h2>Retired</h2>
+  <h2>{% trans %}Retired{% endtrans %}</h2>
   <ul>{% for location in retired %}<li><a href="{{ here }}/{{ location.id }}">{{ location.name }}</a></li>{% endfor %}</ul>
 </section>
 {% endif %}

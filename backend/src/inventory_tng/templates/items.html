@@ -6,11 +6,11 @@
 {{ search_box(listing, _("Find items")) }}
 {{ filters(listing) }}
 {% call filter_form(view) %}
-  <label>Filter by category
+  <label>{% trans %}Filter by category{% endtrans %}
     <select name="category">
-      <option value="">Any</option>
+      <option value="">{% trans %}Any{% endtrans %}</option>
       {% for category in all_categories %}
-      <option value="{{ category.id }}"{% if view.filtered("category") == category.id | string %} selected{% endif %}>{{ category.name }}{% if category.retired_at %} (retired){% endif %}</option>
+      <option value="{{ category.id }}"{% if view.filtered("category") == category.id | string %} selected{% endif %}>{{ category.name }}{% if category.retired_at %} {% trans %}(retired){% endtrans %}{% endif %}</option>
       {% endfor %}
     </select>
   </label>
@@ -26,18 +26,18 @@ address, to come back to. #}
   {%- endcall %}
   {{ sizes(view) }}
   {% call table() %}
-    <tr><th>Pick</th>{{ sort_heading(view, "name", "Item") }}
-      {{- sort_heading(view, "category", "Category", "hidden sm:table-cell") }}
-      {{- sort_heading(view, "unit", "Unit", "hidden sm:table-cell") }}
-      {{- sort_heading(view, "part", "Part", "hidden sm:table-cell") }}</tr>
+    <tr><th>{% trans %}Pick{% endtrans %}</th>{{ sort_heading(view, "name", _("Item")) }}
+      {{- sort_heading(view, "category", _("Category"), "hidden sm:table-cell") }}
+      {{- sort_heading(view, "unit", _("Unit"), "hidden sm:table-cell") }}
+      {{- sort_heading(view, "part", _("Part"), "hidden sm:table-cell") }}</tr>
     {% for item in listing.rows %}
     {% set category = category_names.get(item.category_id, "") %}
     {% set part = ((item.manufacturer or "") ~ " " ~ (item.part_number or "")) | trim %}
     <tr>
-      <td>{% if not item.retired_at %}<input type="checkbox" name="item" value="{{ item.id }}" form="track-items" aria-label="Pick {{ item.name_shown }}">{% endif %}</td>
+      <td>{% if not item.retired_at %}<input type="checkbox" name="item" value="{{ item.id }}" form="track-items" aria-label="{% trans item=item.name_shown %}Pick {{ item }}{% endtrans %}">{% endif %}</td>
       <td><a href="{{ here }}/{{ item.id }}">{{ item.name_shown }}</a>
-        {%- if item.track_opened %} <span class="tag">Opened followed</span>{% endif %}
-        {%- if item.retired_at %} <span class="tag">Retired</span>{% endif %}
+        {%- if item.track_opened %} <span class="tag">{% trans %}Opened followed{% endtrans %}</span>{% endif %}
+        {%- if item.retired_at %} <span class="tag">{% trans %}Retired{% endtrans %}</span>{% endif %}
         <span class="hint block sm:hidden">{{ [category, item.unit, part] | select | join(" · ") }}</span></td>
       <td class="hidden sm:table-cell">{{ category }}</td>
       <td class="hidden sm:table-cell">{{ item.unit }}</td>
@@ -50,51 +50,51 @@ address, to come back to. #}
   {{ pager(listing.view) }}
   {% if listing.rows | rejectattr("retired_at") | list %}
   <div class="actions">
-    <button name="track" value="on" form="track-items">Track opened packages</button>
-    <button name="track" value="off" form="track-items">Don't</button>
+    <button name="track" value="on" form="track-items">{% trans %}Track opened packages{% endtrans %}</button>
+    <button name="track" value="off" form="track-items">{% trans %}Don't{% endtrans %}</button>
   </div>
-  <p class="hint">For the items ticked on this page: whether a package of
+  <p class="hint">{% trans %}For the items ticked on this page: whether a package of
   theirs, opened, is followed until used up. A package that says otherwise
-  keeps its own.</p>
+  keeps its own.{% endtrans %}</p>
   {% endif %}
 </section>
 
 <section>
-  <h2>Add an item</h2>
+  <h2>{% trans %}Add an item{% endtrans %}</h2>
   {% if not categories %}
-  <p>Add a <a href="{{ categories_path }}">category</a> first: every item has one.</p>
+  <p>{% trans link=categories_path %}Add a <a href="{{ link }}">category</a> first: every item has one.{% endtrans %}</p>
   {% endif %}
   <form method="post" action="{{ here }}">
-    {% with default = "", again = "Add it" %}{% include "_item_name.html" %}{% endwith %}
-    <label>Category
+    {% with default = "", again = _("A different item? Add it again.") %}{% include "_item_name.html" %}{% endwith %}
+    <label>{% trans %}Category{% endtrans %}
       <select name="category_id" required>
-        <option value="">Pick one</option>
+        <option value="">{% trans %}Pick one{% endtrans %}</option>
         {% for category in categories %}
         <option value="{{ category.id }}" {% if values.get('category_id') == category.id | string %}selected{% endif %}>{{ category.name }}</option>
         {% endfor %}
       </select>
       {% with name = "category_id" %}{% include "_field_problem.html" %}{% endwith %}
     </label>
-    <label>Unit <span class="hint">what it is counted in</span>
+    <label>{% trans %}Unit{% endtrans %} <span class="hint">{% trans %}what it is counted in{% endtrans %}</span>
       <select name="unit">
         {% for unit in units %}<option {% if values.get('unit', 'each') == unit %}selected{% endif %}>{{ unit }}</option>{% endfor %}
       </select>
     </label>
-    <label>Manufacturer <span class="hint">optional</span>
+    <label>{% trans %}Manufacturer{% endtrans %} <span class="hint">{% trans %}optional{% endtrans %}</span>
       <input name="manufacturer" value="{{ values.get('manufacturer', '') }}">
     </label>
-    <label>Part number <span class="hint">optional</span>
+    <label>{% trans %}Part number{% endtrans %} <span class="hint">{% trans %}optional{% endtrans %}</span>
       <input name="part_number" value="{{ values.get('part_number', '') }}">
       {% with name = "part_number" %}{% include "_field_problem.html" %}{% endwith %}
     </label>
-    <button class="primary">Add</button>
+    <button class="primary">{% trans %}Add{% endtrans %}</button>
   </form>
 </section>
 
 <section>
-  <h2>Unit readings</h2>
-  <p>How a unit after a number in a name is read, as settled on the item
-    forms: <a href="{{ readings_path }}">see and correct them</a>.</p>
+  <h2>{% trans %}Unit readings{% endtrans %}</h2>
+  <p>{% trans link=readings_path %}How a unit after a number in a name is read, as settled on the item
+    forms: <a href="{{ link }}">see and correct them</a>.{% endtrans %}</p>
 </section>
 
 {% endblock %}

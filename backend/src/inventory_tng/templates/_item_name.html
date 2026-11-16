@@ -1,19 +1,22 @@
-{#- An item's name field, as adding and saving one show it: the naming convention as a hint, and items with similar names or aliases (saying which alias), when the name sent was close to theirs, with that name kept in `different`, so sending it again unchanged saves it (docs/decisions/0021). `default` is the name shown with nothing sent. #}
-<label>Name <span class="hint">what it is, then what tells it apart from the
+{#- An item's name field, as adding and saving one show it: the naming convention as a hint, and items with similar names or aliases (saying which alias), when the name sent was close to theirs, with that name kept in `different`, so sending it again unchanged saves it (docs/decisions/0021). `default` is the name shown with nothing sent, `again` the words asking to send it again. #}
+<label>{% trans %}Name{% endtrans %} <span class="hint">{% trans %}what it is, then what tells it apart from the
   items nearest it, such as LiteBeam 5AC Gen2, or Cat6 cable, outdoor,
-  shielded; the maker goes in Manufacturer</span>
+  shielded; the maker goes in Manufacturer{% endtrans %}</span>
   <input name="name" value="{{ values.get('name', default) }}" maxlength="{{ name_max }}" required>
   {% with name = "name" %}{% include "_field_problem.html" %}{% endwith %}
 </label>
 {#- Only the name's own form's answers: another form sent back holds its own. #}
 {% with typed = values.get('name', default), sent = values if 'name' in values else {} %}{% include "_units_read.html" %}{% endwith %}
 {% if similar %}
-<p class="warning" role="status">Similar: {% for close in similar -%}
+{% set items -%}
+  {% for close in similar -%}
   {% set other = close.item -%}
   <a href="{{ items_path }}/{{ other.id }}">{{ other.name_shown }}</a>
-  {%- if close.alias %} (alias {{ close.alias }}){% endif %}
-  {%- if other.retired_at %} <span class="tag">Retired</span>{% endif %}{{ ", " if not loop.last }}
-  {%- endfor %}. A different item? {{ again }} again.</p>
+  {%- if close.alias %} {% trans alias=close.alias %}(alias {{ alias }}){% endtrans %}{% endif %}
+  {%- if other.retired_at %} <span class="tag">{% trans %}Retired{% endtrans %}</span>{% endif %}{{ ", " if not loop.last }}
+  {%- endfor %}
+{%- endset %}
+<p class="warning" role="status">{% trans items=items %}Similar: {{ items }}.{% endtrans %} {{ again }}</p>
 <input type="hidden" name="{{ different }}" value="{{ values.get('name', '') | trim }}">
 {% elif values.get(different) %}
 {#- Asked about already, and refused since for something else: kept. #}

@@ -4,33 +4,35 @@
 {% set chosen = sent.get(field, "") %}
 {% if each.asks %}
 <fieldset>
-  <legend>“{{ each.typed }}” is new. Is it a unit?</legend>
+  <legend>{% trans typed=each.typed %}“{{ typed }}” is new. Is it a unit?{% endtrans %}</legend>
   {% for reading in each.offered %}
   <label><input type="radio" name="{{ field }}" value="{{ reading }}" {% if chosen == reading | string %}checked{% endif %} required> {{ each.shown(reading) }} · {{ reading.called }}</label>
   {% endfor %}
-  <label><input type="radio" name="{{ field }}" value="{{ not_a_unit }}" {% if chosen == not_a_unit %}checked{% endif %} required> Not a unit: keep “{{ each.typed }}”</label>
-  <span class="hint">Remembered for “{{ each.key }}” after a number in every name.</span>
+  <label><input type="radio" name="{{ field }}" value="{{ not_a_unit }}" {% if chosen == not_a_unit %}checked{% endif %} required> {% trans typed=each.typed %}Not a unit: keep “{{ typed }}”{% endtrans %}</label>
+  <span class="hint">{% trans key=each.key %}Remembered for “{{ key }}” after a number in every name.{% endtrans %}</span>
 </fieldset>
 {% elif each.read or each.rule %}
 <div class="hint">
-  {% if each.read %}Read as {{ each.shown(each.read) }} · {{ each.read.kind_words }}{% if each.clue %}, by “{{ each.clue | join("”, “") }}”{% endif %}.
-  {% if each.rule and each.rule.respell %}Saved as {{ each.shown(each.read) }}.{% else %}Saved as typed.{% endif %}
-  {%- else %}“{{ each.typed }}” is not read as a unit.{% endif %}
+  {% if each.read %}
+  {%- if each.clue %}{% trans read=each.shown(each.read), kind=each.read.kind_words, clues=each.clue | join("”, “") %}Read as {{ read }} · {{ kind }}, by “{{ clues }}”.{% endtrans %}
+  {%- else %}{% trans read=each.shown(each.read), kind=each.read.kind_words %}Read as {{ read }} · {{ kind }}.{% endtrans %}{% endif %}
+  {% if each.rule and each.rule.respell %}{% trans read=each.shown(each.read) %}Saved as {{ read }}.{% endtrans %}{% else %}{% trans %}Saved as typed.{% endtrans %}{% endif %}
+  {%- else %}{% trans typed=each.typed %}“{{ typed }}” is not read as a unit.{% endtrans %}{% endif %}
   {% if each.offered or each.read %}
   <details {% if chosen %}open{% endif %}>
-    <summary>Not right?</summary>
-    <label><input type="radio" name="{{ field }}" value="" {% if not chosen %}checked{% endif %}> As read</label>
+    <summary>{% trans %}Not right?{% endtrans %}</summary>
+    <label><input type="radio" name="{{ field }}" value="" {% if not chosen %}checked{% endif %}> {% trans %}As read{% endtrans %}</label>
     {% for reading in each.offered if reading != each.read %}
     <label><input type="radio" name="{{ field }}" value="{{ reading }}" {% if chosen == reading | string %}checked{% endif %}> {{ each.shown(reading) }} · {{ reading.kind_words }}</label>
     {% endfor %}
     {% if each.read %}
-    <label><input type="radio" name="{{ field }}" value="{{ not_a_unit }}" {% if chosen == not_a_unit %}checked{% endif %}> Not a unit: keep “{{ each.typed }}”</label>
+    <label><input type="radio" name="{{ field }}" value="{{ not_a_unit }}" {% if chosen == not_a_unit %}checked{% endif %}> {% trans typed=each.typed %}Not a unit: keep “{{ typed }}”{% endtrans %}</label>
     {% endif %}
-    <span>Saved, it reads “{{ each.key }}” after a number so in every name.</span>
+    <span>{% trans key=each.key %}Saved, it reads “{{ key }}” after a number so in every name.{% endtrans %}</span>
   </details>
   {% endif %}
 </div>
 {% endif %}
 {% endfor %}
 {% set shown = shown_as(typed, sent) %}
-{% if shown %}<p class="hint">Shown as {{ shown }}.</p>{% endif %}
+{% if shown %}<p class="hint">{% trans shown=shown %}Shown as {{ shown }}.{% endtrans %}</p>{% endif %}

@@ -3,28 +3,28 @@
 {% block main %}
 {% set retired = category.retired_at is not none %}
 {% if retired %}
-{% call retired_record(category) %}Nobody can pick it for an item.{% endcall %}
+{% call retired_record(category) %}{% trans %}Nobody can pick it for an item.{% endtrans %}{% endcall %}
 {% endif %}
 <form method="post" action="{{ here }}/name" class="actions">
   <input type="hidden" name="version" value="{{ category.edit_version }}">
-  <label>Name
+  <label>{% trans %}Name{% endtrans %}
     <input name="name" value="{{ category.name }}" maxlength="{{ name_max }}" required {% if retired %}disabled{% endif %}>
     {% with name = "name" %}{% include "_field_problem.html" %}{% endwith %}
   </label>
-  {% if not retired %}<button class="primary">Rename</button>{% endif %}
+  {% if not retired %}<button class="primary">{% trans %}Rename{% endtrans %}</button>{% endif %}
 </form>
 
 <section>
-  <h2>Items</h2>
+  <h2>{% trans %}Items{% endtrans %}</h2>
   {% if items %}
   <ul>{% for item in items %}<li>{{ item.name_shown }}</li>{% endfor %}</ul>
   {% else %}
-  <p>None.</p>
+  <p>{% trans %}None.{% endtrans %}</p>
   {% endif %}
 </section>
 
 {% if not retired %}
-{% call retire_section(_("Retire this category")) %}Nobody can pick it for an item any more. Move or retire its
-  items first.{% endcall %}
+{% call retire_section(_("Retire this category")) %}{% trans %}Nobody can pick it for an item any more. Move or retire its
+  items first.{% endtrans %}{% endcall %}
 {% endif %}
 {% endblock %}
