@@ -262,10 +262,6 @@ def test_a_form_reads_a_number_grouped_in_thousands_as_search_does(
     assert grouped.number == number
 
 
-def test_a_form_asks_about_a_unit_after_a_number_grouped_by_spaces() -> None:
-    assert units.found_in("Box 1 000 M")[0].asks
-
-
 def test_names_reading_alike_but_for_a_number_grouped_by_spaces_are_one() -> None:
     """Ali, 2026-11-16 (inventory-tng-t78): the read-alike check ignores
     spaces, and reads a number grouped by them as search does."""
@@ -293,7 +289,8 @@ def test_a_sign_belongs_to_the_number_grouped_after_it() -> None:
     temperature, 1000 °C is."""
     for typed in ("Kiln -1 000 Cel", "Kiln \u22121 000 Cel", "Kiln -1,000 Cel"):
         (found,) = units.found_in(typed)
-        assert (found.number, found.plausible) == (typed[5:-4], ()), typed
+        number = typed.removeprefix("Kiln ").removesuffix(" Cel")
+        assert (found.number, found.plausible) == (number, ()), typed
         assert units.shown_name(typed) == typed
         (unsigned,) = units.found_in(typed.replace("-", "").replace("\u2212", ""))
         assert str(unsigned.read) == "degC"

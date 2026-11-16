@@ -255,6 +255,8 @@ type Edit = [start: number, end: number, spelling: string];
 /** What respell changes in `text`, in order (units._edits). */
 function edits(text: string, rules: Rules | undefined): Edit[] {
   const found: Edit[] = [];
+  // Any space a plain one, one for one, as units._after_a_number reads it.
+  const plain = text.replaceAll(/\p{Zs}/gu, " ");
   for (const match of text.matchAll(AFTER_A_NUMBER)) {
     const [whole, digit, token] = match as unknown as [string, string, string];
     const at = match.index;
@@ -265,15 +267,10 @@ function edits(text: string, rules: Rules | undefined): Edit[] {
     let grouped = NOUGHT.exec(before);
     if (grouped) number = grouped[0].replace(",", ".");
     else {
-      // Any space a plain one, one for one, as units._searched reads it.
-      const plain = text.replaceAll(/\p{Zs}/gu, " ");
       grouped = GROUPED.exec(plain.slice(0, at + 1));
       // `Cat 6 305 m`: a product's number, then another, not thousands;
       // judged at its first digit, after any sign.
-      if (
-        grouped &&
-        product(plain, grouped.index + Number(/^[-−]/.test(grouped[0])))
-      )
+      if (grouped && product(plain, grouped.index + grouped[0].search(/[0-9]/)))
         grouped = null;
       // It ends at the digit the match starts with, so it is found.
       number = grouped

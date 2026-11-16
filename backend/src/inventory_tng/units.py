@@ -39,6 +39,7 @@ from typing import Any
 
 from babel.support import LazyProxy
 
+from inventory_tng import names
 from inventory_tng.local_env import CLONE
 from inventory_tng.phrases import gettext, lazy_gettext
 
@@ -455,7 +456,7 @@ def _marked(text: str, *at: int) -> bool:
 # inventory-tng-ist.1): frontend/src/units.ts's, character for character.
 _GROUPED = re.compile(
     r"(?:(?<![^\W_])[-\u2212])?(?<![^\W_])"
-    r"(?:(?<![0-9][.,])(?!0,)[0-9]{1,3}(?:,[0-9]{3})+"
+    r"(?P<digits>(?<![0-9][.,])(?!0,)[0-9]{1,3}(?:,[0-9]{3})+"
     r"|(?<![0-9][., ])[0-9]{1,3}(?: [0-9]{3})+)(?:[.][0-9]+)?\Z"
 )
 # A lone nought, then a comma and digits, ending at its last digit, with
@@ -465,23 +466,28 @@ _GROUPED = re.compile(
 _NOUGHT = re.compile(r"(?:(?<![^\W_])[-\u2212])?(?<![^\W_])(?<![0-9][.,])0,[0-9]+\Z")
 
 
-def _searched(text: str, end: int) -> tuple[re.Match[str], str] | None:
-    """The number ending at `end` in `text` where search reads it otherwise
-    than as typed, and how it reads it, its sign kept: a lone nought's comma
-    as a point (_NOUGHT), or thousands (_GROUPED) without their separators,
-    any space (Zs) one as decomposing (NFKD) makes it, unless a product's
+# Every space (Zs) but the space itself as the space, one character for
+# one, as decomposing (NFKD) reads most of them (names.LOOK_ALIKES).
+_PLAIN_SPACES = str.maketrans(
+    {each: " " for each, plain in names.LOOK_ALIKES.items() if plain == " "}
+)
+
+# What _searched finds: the number as matched, and as search reads it.
+type Searched = tuple[re.Match[str], str]
+
+
+def _searched(plain: str, end: int) -> Searched | None:
+    """The number ending at `end` in `plain`, a text with plain spaces
+    (_PLAIN_SPACES), where search reads it otherwise than as typed, and how
+    it reads it, its sign kept: a lone nought's comma as a point (_NOUGHT),
+    or thousands (_GROUPED) without their separators, unless a product's
     number starts them (`Cat 6 305 m` is a product's number, then another).
-    The match is in a copy of `text` with plain spaces, one character for
-    one, so where it is holds in `text`. None: read as typed. Search, the
-    forms and the shown name all judge a number so (inventory-tng-uxo6)."""
-    if nought := _NOUGHT.search(text, 0, end):
+    None: read as typed. Search, the forms and the shown name all judge a
+    number so (inventory-tng-uxo6)."""
+    if nought := _NOUGHT.search(plain, 0, end):
         return nought, nought[0].replace(",", ".")
-    plain = "".join(" " if unicodedata.category(c) == "Zs" else c for c in text)
     grouped = _GROUPED.search(plain, 0, end)
-    if grouped is None:
-        return None
-    # Its first digit, after any sign; a product's name before any space.
-    if _product(plain, grouped.start() + (grouped[0][0] in "-\u2212")):
+    if grouped is None or _product(plain, grouped.start("digits")):
         return None
     return grouped, re.sub("[, ]", "", grouped[0])
 
@@ -490,12 +496,15 @@ def _searched(text: str, end: int) -> tuple[re.Match[str], str] | None:
 type Edit = tuple[int, int, str]
 
 
-def _after_a_number(text: str) -> Iterator[re.Match[str]]:
+def _after_a_number(text: str) -> Iterator[tuple[re.Match[str], Searched | None]]:
     """Each match of AFTER_A_NUMBER in `text` that may be a unit: none
-    beside a combining mark (_marked) or in a product's name (_product)."""
+    beside a combining mark (_marked) or in a product's name (_product);
+    with its number as search reads it (_searched), where it is in `text`
+    as in its copy with plain spaces."""
+    plain = text.translate(_PLAIN_SPACES)
     for match in AFTER_A_NUMBER.finditer(text):
         if not _marked(text, match.end()) and not _product(text, match.end(1) - 1):
-            yield match
+            yield match, _searched(plain, match.end(1))
 
 
 def _edits(text: str, rules: Rules | None) -> list[Edit]:
@@ -503,9 +512,9 @@ def _edits(text: str, rules: Rules | None) -> list[Edit]:
     a number, from its number, and each unit alone spelt with a sign no word
     is."""
     edits: list[Edit] = []
-    for match in _after_a_number(text):
-        grouped, number = _searched(text, match.end(1)) or (None, None)
-        found = _found(text, match, rules)
+    for match, searched in _after_a_number(text):
+        grouped, number = searched or (None, None)
+        found = _found(text, match, searched, rules)
         if found is not None and (found.read or found.rule):
             # Read, or no unit by its rule.
             reading = found.read
@@ -822,26 +831,28 @@ def found_in(name: str, rules: Rules | None = None) -> list[Found]:
     so `℃` is `°C`."""
     return [
         found
-        for match in _after_a_number(name)
-        if (found := _found(name, match, rules)) is not None
+        for match, searched in _after_a_number(name)
+        if (found := _found(name, match, searched, rules)) is not None
     ]
 
 
-def _found(text: str, match: re.Match[str], rules: Rules | None) -> Found | None:
+def _found(
+    text: str, match: re.Match[str], searched: Searched | None, rules: Rules | None
+) -> Found | None:
     """The unit AFTER_A_NUMBER found in `text`, as read (Ali, 2026-11-15,
     inventory-tng-c0c.3): by its reading rule, which always wins; else, where
     several readings are plausible, by the words near it (CLUES), if they say
     one kind; else by the one plausible reading, the one of a LIKELY kind, or
     the one spelt as typed where none is likely. None if it is no unit's
     spelling and no rule's. Its number is as typed, judged as search reads
-    it (_searched: `1 000` as `1000`, `0,5` as `0.5`, its sign kept), else
-    any comma left out."""
+    it, `searched` (_searched: `1 000` as `1000`, `0,5` as `0.5`, its sign
+    kept), else any comma left out."""
     end, token = match.end(1), match[2]
     rule = (rules or {}).get(rule_key(token))
     every = readings(token)
     if rule is None and not every:
         return None
-    if searched := _searched(text, end):
+    if searched:
         number, judged = text[searched[0].start() : end], searched[1]
     else:
         number = _number(text, end)
@@ -964,10 +975,10 @@ def shown_name(name: str, rules: Rules | None = None) -> str:
     line (Ali, 2026-11-16, inventory-tng-t78). `name` is as saved
     (models.canonical, spell)."""
     edits = []
-    for match in _after_a_number(name):
+    for match, searched in _after_a_number(name):
         token = match[2]
-        if (hit := _searched(name, match.end(1))) and " " in hit[0][0]:
-            start = hit[0].start()
+        if searched and " " in searched[0][0]:
+            start = searched[0].start()
             # Its ordinary spaces no-break, the rest as typed.
             shown = name[start : match.end(1)].replace(" ", NO_BREAK_SPACE)
         else:
@@ -977,7 +988,7 @@ def shown_name(name: str, rules: Rules | None = None) -> str:
             name, match.end()
         ):
             continue
-        found = _found(name, match, rules)
+        found = _found(name, match, searched, rules)
         # A word no form reads, as _edits reads it.
         if (read(token) if found is None else found.read) is None:
             continue
