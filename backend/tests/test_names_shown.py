@@ -176,6 +176,31 @@ def test_close_and_taken_names_are_named_as_shown(
     assert spool.retired_at is None
 
 
+def test_a_read_alike_refusal_names_each_as_typed(
+    admin_client: TestClient, session: Session, cables: Category
+) -> None:
+    """Not as shown: the refusal is about how typed names read
+    (reading_rules.read_alike_words; Ali, 2026-11-15, inventory-tng-dfz)."""
+    mark = tag()
+    one = add(session, Item(name=f"Box {mark} 1,000g", category_id=cables.id))
+    other = add(session, Item(name=f"Box {mark} 1,000 Gbps", category_id=cables.id))
+    spare = add(session, Item(name=f"Spare {mark}", category_id=cables.id))
+    session.flush()
+    assert other.name_shown != other.name
+    form = {
+        "name": f"Spare {mark} 10g",
+        "category_id": str(cables.id),
+        "unit": "each",
+        "unit:g": "Gbit/s",
+        "version": version(spare),
+    }
+    refused = text(admin_client.post(f"{ITEMS}/{spare.id}", data=form))
+    assert (
+        f"item {one.id} (Box {mark} 1,000g) and item {other.id} "
+        f"(Box {mark} 1,000 Gbps)."
+    ) in refused
+
+
 @pytest.mark.parametrize("typed", [f"10{THIN}000{NB}ft", "10,000 ft", "10000ft"])
 def test_a_name_is_found_as_shown(
     admin_client: TestClient, session: Session, cables: Category, typed: str

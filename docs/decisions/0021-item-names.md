@@ -560,7 +560,8 @@ is lost:
   (U+202F) between each three, as the SI writes it: `10,000 ft` is
   `10 000 ft`, which never wraps.
 - It is shown wherever a name is read: the admin lists and item pages,
-  the scan page (the catalogue sends it), labels and notices. The item
+  the scan page (the catalogue sends it), labels and notices, save the
+  exceptions below. The item
   form edits the name as typed and says how it is shown where that
   differs (`Shown as Box 10 000 ft.`), as do the package and alias forms.
 
