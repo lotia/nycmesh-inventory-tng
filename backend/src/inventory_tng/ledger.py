@@ -2282,9 +2282,8 @@ PATH = "/transactions"
             "description": "Refused: each problem's kind (type) and where "
             "(loc), never in words, which the page makes from the kind. A "
             "body that cannot be a batch at all gets FastAPI's own 422 "
-            "(BodyRefusedReply), with pydantic's types and words, "
-            "package_size_required and package_size_without_package among "
-            "them",
+            "(BodyRefusedReply), with pydantic's types and words, a line's "
+            "package size among them (SizeProblem)",
         },
         409: {
             "model": KeyReusedReply | BuildTooOldReply,

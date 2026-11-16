@@ -102,9 +102,8 @@ them open:
   no words for is "Not accepted", as is FastAPI's own 422 for a body
   that cannot be a batch at all (`BodyRefusedReply` in the schema),
   except the two kinds of a line's package size (`SizeProblem` in the
-  schema), which it words. That
-  problem still names its line. The server says these kinds nowhere
-  itself, so it keeps no words for them (2026-11-16).
+  schema), which it words. Each still names its line. The server says
+  these kinds nowhere itself, so it keeps no words for them (2026-11-16).
 - Catalogues name the file each message comes from, not its line, so a
   phrase moving within its file leaves them unchanged.
 - `mise run check-catalogues`, and CI's job of that name, fail when either

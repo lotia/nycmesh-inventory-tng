@@ -20,10 +20,12 @@ from inventory_tng.admin import items as items_page
 from inventory_tng.admin.items import SHORTER_THAN_WHOLE
 from inventory_tng.ledger import (
     LOOSE,
+    BodyRefusedReply,
     Entry,
     Form,
     OpenFacts,
     PackageFacts,
+    SizeProblem,
     balance,
     by_form,
     form_breaks,
@@ -614,9 +616,11 @@ def test_a_size_is_said_only_of_a_package_of_the_lines_item(
     for line, (kind, words) in cases:
         response = registered_client.post(URL, json=spools.place.batch(lines=[line]))
         assert response.status_code == 422
-        assert [
-            (p["loc"][1:], p["type"], p["msg"]) for p in response.json()["detail"]
-        ] == [(["lines", 0, "package_size"], kind, words)]
+        # As the schema says it: a SizeProblem, of a kind the page words.
+        refused = BodyRefusedReply.model_validate(response.json())
+        assert [(type(p), p.loc[1:], p.type, p.msg) for p in refused.detail] == [
+            (SizeProblem, ["lines", 0, "package_size"], kind, words)
+        ]
     bad = sealed_line(spools, "305") | {"package_id": 0}
     response = registered_client.post(URL, json=spools.place.batch(lines=[bad]))
     assert response.status_code == 422
