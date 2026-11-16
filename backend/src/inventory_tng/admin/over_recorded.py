@@ -15,7 +15,7 @@ from decimal import Decimal
 from typing import Annotated, Any
 
 import structlog
-from fastapi import APIRouter, Form, Request
+from fastapi import APIRouter, Depends, Form, Request
 from fastapi.responses import Response
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -125,26 +125,12 @@ WAITING_SORTING = Sorting(
 )
 
 
-@router.get(OVER_RECORDED)
-def over_recorded_page(
-    request: Request,
-    signed: AdminSignedIn,
-    session: DbSession,
-    only: OnlyItem,
-    notice: str = "",
-    brought: str = "",
-    sort: str = "",
-    order: str = "",
-    per: str = "",
-    page: str = "",
-) -> Response:
-    """All those waiting, or only one item's, sorted and in pages as asked;
-    after a place is brought back, its name in the notice."""
-    place = None
-    if notice == "over_recorded_brought_back" and (ident := row_id(brought)):
-        place = session.get(Location, ident)
-    said = f"{place.name} brought back. Correct it now." if place else None
-    view = View.read(
+def _waiting_view(
+    only: OnlyItem, sort: str = "", order: str = "", per: str = "", page: str = ""
+) -> View:
+    """The list's item, sort, page size and page, as its query string asks:
+    the page's, and each answer's, which comes back to it so."""
+    return View.read(
         OVER_RECORDED,
         WAITING_SORTING,
         sort=sort,
@@ -153,7 +139,28 @@ def over_recorded_page(
         page=page,
         kept=query(only),
     )
-    return _page(request, signed, session, only, notice=said, view=view)
+
+
+WaitingView = Annotated[View, Depends(_waiting_view)]
+
+
+@router.get(OVER_RECORDED)
+def over_recorded_page(
+    request: Request,
+    signed: AdminSignedIn,
+    session: DbSession,
+    only: OnlyItem,
+    view: WaitingView,
+    notice: str = "",
+    brought: str = "",
+) -> Response:
+    """All those waiting, or only one item's, sorted and in pages as asked;
+    after a place is brought back, its name in the notice."""
+    place = None
+    if notice == "over_recorded_brought_back" and (ident := row_id(brought)):
+        place = session.get(Location, ident)
+    said = f"{place.name} brought back. Correct it now." if place else None
+    return _page(request, signed, session, only, view, notice=said)
 
 
 def _views(waiting: int, only: Item | None) -> list[tuple[str, str, str]]:
@@ -258,6 +265,7 @@ def _page(
     signed: AdminSignedIn,
     session: DbSession,
     only: OnlyItem,
+    view: View,
     problems: dict[str, str] | None = None,
     values: dict[str, str] | None = None,
     *,
@@ -265,7 +273,6 @@ def _page(
     refused: dict[str, Any] | None = None,
     notice: str | None = None,
     checking: int | None = None,
-    view: View | None = None,
 ) -> Response:
     """The page, with the problems of a count or a Mark checked sent, and
     what was typed; a refusal's alert; or a notice in words of its own.
@@ -281,14 +288,10 @@ def _page(
     if checking is not None:
         found = next((each for each in waiting if each.row.id == checking), None)
         if found is None:
-            return redirect(
-                OVER_RECORDED, notice="over_recorded_unchanged", **query(only)
-            )
+            return redirect(view.link(), notice="over_recorded_unchanged")
         if found.moved_whole:
             asking = found
-    shown, view = arranged(
-        waiting, view or View.read(OVER_RECORDED, WAITING_SORTING, kept=query(only))
-    )
+    shown, view = arranged(waiting, view)
     log.debug("over recorded listed", found=view.found, sort=view.by, page=view.page)
     return admin_page(
         request,
@@ -299,7 +302,6 @@ def _page(
             "here": OVER_RECORDED,
             "back_link": (STOCK, "Stock"),
             "only": only,
-            "query": query_string(only),
             "waiting": shown,
             "view": view,
             "recorded_views": _views(len(waiting), only),
@@ -377,6 +379,7 @@ def bring_back(
     session: DbSession,
     check_id: int,
     only: OnlyItem,
+    view: WaitingView,
     seen: Annotated[str, Form()] = "",
     place: Annotated[str, Form()] = "",
 ) -> Response:
@@ -415,11 +418,9 @@ def bring_back(
             rule=broken,
         )
         if broken == "over_recorded_unchanged":
-            return redirect(
-                OVER_RECORDED, notice="over_recorded_unchanged", **query(only)
-            )
+            return redirect(view.link(), notice="over_recorded_unchanged")
         alert = f"Not changed: {rule_words(broken)}"
-        return _page(request, signed, session, only, alert=alert)
+        return _page(request, signed, session, only, view, alert=alert)
     if brought:
         over_recorded.measure_brought_back()
         log.info(
@@ -429,10 +430,7 @@ def bring_back(
             admin_id=signed.admin.id,
         )
     return redirect(
-        OVER_RECORDED,
-        notice="over_recorded_brought_back",
-        brought=str(location.id),
-        **query(only),
+        view.link(), notice="over_recorded_brought_back", brought=str(location.id)
     )
 
 
@@ -444,6 +442,7 @@ def answer(
     check_id: int,
     do: str,
     only: OnlyItem,
+    view: WaitingView,
     seen: Annotated[str, Form()] = "",
     typed: Annotated[str, Form(alias="count")] = "",
     reason: Annotated[str, Form()] = "",
@@ -468,7 +467,13 @@ def answer(
             field = f"count-{check_id}"
             log.debug("over recorded count refused", over_recorded_id=check_id)
             return _page(
-                request, signed, session, only, {field: str(count)}, {field: typed}
+                request,
+                signed,
+                session,
+                only,
+                view,
+                {field: str(count)},
+                {field: typed},
             )
     words = None
     if do == "checked":
@@ -483,6 +488,7 @@ def answer(
                 signed,
                 session,
                 only,
+                view,
                 {f"reason-{check_id}": problem},
                 values,
                 refused=_refused_again(session, check_id, marker),
@@ -521,11 +527,11 @@ def answer(
         if broken is not None and broken not in MEANWHILE:
             refused = _refusal(session, check_id, do, broken, refused_at)
         if refused is None:
-            return redirect(
-                OVER_RECORDED, notice="over_recorded_unchanged", **query(only)
-            )
+            return redirect(view.link(), notice="over_recorded_unchanged")
         values = {f"count-{check_id}": typed} if count is not None else None
-        return _page(request, signed, session, only, values=values, refused=refused)
+        return _page(
+            request, signed, session, only, view, values=values, refused=refused
+        )
     how, written = settled
     ledger.corrected(admin_id, 0, written)
     over_recorded.measure_settled(how, reason if do == "checked" else None)
@@ -538,7 +544,7 @@ def answer(
             if how == "corrected"
             else "over_recorded_confirmed"
         )
-    return redirect(OVER_RECORDED, notice=notice, **query(only))
+    return redirect(view.link(), notice=notice)
 
 
 def _why_problem(reason: str, words: str) -> str | None:

@@ -679,7 +679,10 @@ utilities. When you style a page:
   pages the groups with `paged` and sorts each group's rows with
   `in_order`. In the template,
   `_listing.html`'s `sort_heading` for each sortable heading, `sizes` above
-  the table, `filter_form` for the filters and `pager` below.
+  the table, `filter_form` for the filters and `pager` below. A form that
+  acts on the list's rows sends the view in its action's query string
+  (`view.query_string`), and its route reads the same `View` (a
+  dependency) to go back to the list as it was, with `view.link()`.
 - A list that grows past a screen, as items and volunteers do, is a
   `Listing` (`admin/listing.py`), with a `View` of its own: search that
   forgives typos, with suggestions from its own `/suggest`; and "Current ·

@@ -373,8 +373,8 @@ def closeness(
 class Searched[T]:
     """How a list page, at `here`, finds its kind of record: the model, the
     text a search reads, folded (models.held), such as an item's
-    search_text, and its name, by which the list is sorted unless its
-    `sorting` says more. Optionally: the select of the model it reads,
+    search_text, its name, by which suggestions are sorted, and the
+    headings its list sorts by (`sorting`). Optionally: the select of the model it reads,
     if joined to more; a column a search matches only whole, held in
     capitals, such as a label's code, put first; which are current, if not
     those with no retired_at; what the filter between Current and All calls
@@ -386,13 +386,12 @@ class Searched[T]:
     model: type[T]
     text: SQLColumnExpression[str]
     name: SQLColumnExpression[str]
+    sorting: Sorting
     query: Select | None = None
     whole: SQLColumnExpression[str] | None = None
     current: ColumnElement[bool] | None = None
     lapsed: Lapsed = "retired"
     shown: Callable[[Session, Sequence[T]], Sequence[Any]] | None = None
-    # The headings it sorts by; else by name alone, as "name".
-    sorting: Sorting | None = None
 
     def read(
         self,
@@ -423,7 +422,7 @@ class Searched[T]:
         picked = whole(pick, 1, INTEGER_MAX)
         view = View.read(
             self.here,
-            self.sorts(),
+            self.sorting,
             sort=sort,
             order=order,
             per=per,
@@ -433,11 +432,6 @@ class Searched[T]:
             kept=_kept(search, shown, picked),
         )
         return Listing(self, view, search, shown, picked, tuple(where))
-
-    def sorts(self) -> Sorting:
-        if self.sorting is not None:
-            return self.sorting
-        return Sorting("name", {"name": Sort.of(func.lower(self.name))})
 
     def base(self, show: Show) -> Select:
         """The records `show` asks for."""
@@ -559,8 +553,8 @@ class Listing[T]:
     @property
     def suggest_address(self) -> str:
         """Where the search box asks for suggestions: of the records the
-        filters show."""
-        query = self.view.fields("q", "pick", "sort", "order", "per", "page")
+        filters show, each leading to its page size, as Find keeps it."""
+        query = self.view.fields("q", "pick", "sort", "order", "page")
         return f"{self.here}/suggest" + (f"?{urlencode(query)}" if query else "")
 
     def link(

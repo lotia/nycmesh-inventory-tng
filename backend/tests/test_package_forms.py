@@ -1876,3 +1876,31 @@ def test_those_reported_used_up_sort_and_come_in_pages(
         f'<a href="{USED_UP}?item={spools.cable.id}&amp;sort=shows">Shows</a>' in page
     )
     assert f'<a href="{USED_UP}?item={spools.cable.id}&amp;per=25">25</a>' in page
+
+
+def test_an_answer_comes_back_to_the_used_up_list_as_it_was(
+    admin_client: TestClient, session: Session, spools: Spools
+) -> None:
+    """Its sort, page size, page and item go with each answer and come
+    back; a page past the end, as after the last one on it is answered,
+    shows the last there is (inventory-tng-qwb)."""
+    one, two = reported(session, spools), reported(session, spools)
+    view = f"item={spools.cable.id}&sort=shows&order=desc&per=25&page=2"
+    page = admin_client.get(f"{USED_UP}?{view}").text
+    # Drawn, the page is 1 of 1: a page past the end shows the last.
+    shown = view.removesuffix("&page=2").replace("&", "&amp;")
+    assert f'action="{USED_UP}?{shown}"' in page
+    assert f'action="{USED_UP}/{one.id}/confirm?{shown}"' in page
+    assert f'formaction="{USED_UP}/{one.id}/clear?{shown}"' in page
+    done = admin_client.post(f"{USED_UP}/{one.id}/clear?{view}")
+    back = done.headers["location"]
+    assert back == f"{USED_UP}?{view}&notice=used_up_cleared"
+    # Page 2 of 25 a page is past the end: the last page, the first.
+    page = admin_client.get(back).text
+    assert re.findall(r'name="open_package" value="(\d+)"', page)
+    ticked = admin_client.post(
+        f"{USED_UP}?{view}", data={"open_package": [str(two.id)], "do": "confirm"}
+    )
+    assert ticked.headers["location"] == f"{USED_UP}?{view}&notice=used_up_confirmed"
+    none = admin_client.post(f"{USED_UP}?{view}", data={"do": "clear"})
+    assert none.headers["location"] == f"{USED_UP}?{view}&notice=used_up_none"

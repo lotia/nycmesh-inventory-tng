@@ -9,6 +9,7 @@ of it since), so a cut since stays; Leave it clears the check
 
 import uuid
 from collections.abc import Collection, Sequence
+from dataclasses import replace
 from datetime import datetime
 from decimal import Decimal, InvalidOperation
 from typing import Annotated, NamedTuple
@@ -27,7 +28,6 @@ from inventory_tng.admin.needs_action import (
     OnlyItem,
     of_only,
     query,
-    query_string,
 )
 from inventory_tng.admin.stock import STOCK
 from inventory_tng.db import DbSession, RuleBroken, attempt
@@ -211,7 +211,6 @@ def _checks_page(
             "all_path": request.url.path,
             "back_link": (STOCK, "Stock"),
             "only": only,
-            "query": query_string(only),
             "checked": checked,
             "view": view,
             "moment": moment,
@@ -228,7 +227,9 @@ def _view(
     per: str = "",
     page: str = "",
 ) -> View:
-    """The list's sort and page size, as its query string asks."""
+    """The list's item, sort, page size and page, as its query string
+    asks: the page's, and each answer's, which comes back to it so
+    (_back)."""
     return View.read(
         request.url.path,
         SORTING,
@@ -336,9 +337,12 @@ def _showed(typed: str) -> Decimal | None:
     return found if found.is_finite() else None
 
 
-def _page(sent: str) -> str:
-    """The page an answer came from, to go back to: this one or a kind's."""
-    return sent if sent in {kind.path for kind in KINDS} else LENGTHS
+def _back(view: View, sent: str) -> View:
+    """The page an answer came from, to go back to, this one or a kind's
+    (`sent`), as it was: its item, sort, page size and page."""
+    return replace(
+        view, here=sent if sent in {kind.path for kind in KINDS} else LENGTHS
+    )
 
 
 class Answer(NamedTuple):
@@ -359,10 +363,9 @@ def _answer(
     session: Session,
     signed: SignedIn,
     answers: Sequence[Answer],
-    only: Item | None,
+    back: View,
     *,
     unsaid: int = 0,
-    page: str = LENGTHS,
 ) -> Response:
     """Set or leave each of `answers` still as seen, and say so. Their
     places locked first, by id, as saves take places: only here, never as
@@ -393,7 +396,7 @@ def _answer(
         notice = "length_none_said"
     else:
         notice = "length_unchanged"
-    return redirect(page, notice=notice, **query(only))
+    return redirect(back.link(), notice=notice)
 
 
 @router.post(f"{LENGTHS}/{{open_id}}/set")
@@ -401,7 +404,7 @@ def set_one(
     signed: AdminSignedIn,
     session: DbSession,
     open_id: int,
-    only: OnlyItem,
+    view: Viewed,
     left: Annotated[str, Form()] = "",
     seen: Annotated[str, Form()] = "",
     showed: Annotated[str, Form()] = "",
@@ -412,11 +415,11 @@ def set_one(
     row = session.get(OpenPackage, open_id)
     if row is None:
         return not_found()
-    back = _page(page)
+    back = _back(view, page)
     unit = session.get_one(Item, row.item_id).unit
     length = quantity(left, positive=False, unit=unit)
     if not isinstance(length, Decimal):
-        return redirect(back, notice="length_bad", **query(only))
+        return redirect(back.link(), notice="length_bad")
     # The volunteer's figure, as the box is filled, is set against what it
     # showed at the report; any other, against what the page showed.
     if row.length_reported_in_id is not None and length == row.length_reported:
@@ -428,9 +431,9 @@ def set_one(
                 "length not set: the form said not what it showed",
                 open_package_id=open_id,
             )
-            return redirect(back, notice="length_reload", **query(only))
+            return redirect(back.link(), notice="length_reload")
         answer = Answer(open_id, seen, length, shown, moment)
-    return _answer(session, signed, [answer], only, page=back)
+    return _answer(session, signed, [answer], back)
 
 
 @router.post(f"{LENGTHS}/{{open_id}}/leave")
@@ -438,7 +441,7 @@ def leave_one(
     signed: AdminSignedIn,
     session: DbSession,
     open_id: int,
-    only: OnlyItem,
+    view: Viewed,
     seen: Annotated[str, Form()] = "",
     page: Annotated[str, Form()] = "",
 ) -> Response:
@@ -446,14 +449,14 @@ def leave_one(
     if session.get(OpenPackage, open_id) is None:
         return not_found()
     answer = [Answer(open_id, seen)]
-    return _answer(session, signed, answer, only, page=_page(page))
+    return _answer(session, signed, answer, _back(view, page))
 
 
 @router.post(LENGTHS)
 def answer_ticked(
     signed: AdminSignedIn,
     session: DbSession,
-    only: OnlyItem,
+    view: Viewed,
     open_package: Annotated[list[str], Form()] = [],  # noqa: B006  FastAPI copies it.
     do: Annotated[str, Form()] = "",
     page: Annotated[str, Form()] = "",
@@ -469,9 +472,9 @@ def answer_ticked(
         for typed, _, seen in [each.partition(" ")]
         if (open_id := row_id(typed)) is not None
     }
-    back = _page(page)
+    back = _back(view, page)
     if not ticked:
-        return redirect(back, notice="length_none", **query(only))
+        return redirect(back.link(), notice="length_none")
     rows = session.scalars(
         select(OpenPackage).where(OpenPackage.id.in_(list(ticked)), *CHECKED)
     ).all()
@@ -488,4 +491,4 @@ def answer_ticked(
             answers.append(Answer(row.id, seen, row.length_reported, as_of=report))
         else:
             unsaid += 1
-    return _answer(session, signed, answers, only, unsaid=unsaid, page=back)
+    return _answer(session, signed, answers, back, unsaid=unsaid)

@@ -635,6 +635,13 @@ def test_suggestions_come_from_the_filter_the_list_shows(
     assert [each["name"] for each in retired] == [old.name]
     assert retired[0]["href"] == f"{ITEMS}?show=retired&pick={old.id}"
     assert admin_client.get(f"{ITEMS}/suggest").json() == []
+    # A page size kept, as Find keeps it (inventory-tng-qwb).
+    page = admin_client.get(ITEMS, params={"per": "100", "sort": "unit"}).text
+    assert f'data-suggest="{ITEMS}/suggest?per=100"' in page
+    sized = admin_client.get(
+        f"{ITEMS}/suggest", params={"q": "litebem", "per": "100"}
+    ).json()
+    assert sized[0]["href"] == f"{ITEMS}?pick={beam.id}&per=100"
 
 
 def test_picking_a_suggestion_narrows_the_list_to_it(

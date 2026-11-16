@@ -736,3 +736,41 @@ def test_those_to_check_sort_and_come_in_pages(
     )
     assert f'<a href="{reported}">Show all</a>' in page
     assert len(listed(per="25")) == 2
+
+
+def test_an_answer_comes_back_to_the_checks_as_they_were(
+    admin_client: TestClient,
+    registered_client: TestClient,
+    session: Session,
+    spools: Spools,
+) -> None:
+    """The page it came from, with its sort, page size, page and item, goes
+    with each answer and comes back (inventory-tng-qwb)."""
+    first, second = spools.opened(), spools.opened()
+    spools.move(Entry(spools.cable.id, Decimal(100), Form(open_package_id=second.id)))
+    registered_client.post(
+        URL, json=report(spools, length(first, "250"), length(second, "150"))
+    )
+    reported = f"{LENGTHS}/reported"
+    view = f"item={spools.cable.id}&sort=shows&order=desc&per=25&page=2"
+    page = admin_client.get(f"{reported}?{view}").text
+    # Drawn, the page is 1 of 1: a page past the end shows the last.
+    shown = view.removesuffix("&page=2").replace("&", "&amp;")
+    assert f'action="{LENGTHS}?{shown}"' in page
+    assert f'action="{LENGTHS}/{first.id}/set?{shown}"' in page
+    assert f'formaction="{LENGTHS}/{first.id}/leave?{shown}"' in page
+    left = admin_client.post(
+        f"{LENGTHS}/{first.id}/leave?{view}",
+        data={"seen": seen(session, first), "page": reported},
+    )
+    assert left.headers["location"] == f"{reported}?{view}&notice=length_left"
+    # Page 2 of 25 a page is past the end: the last page, the first.
+    page = admin_client.get(left.headers["location"]).text
+    assert re.findall(r'name="open_package" value="(\d+) ', page)
+    bad = admin_client.post(
+        f"{LENGTHS}/{second.id}/set?{view}",
+        data=set_form(session, second, "x") | {"page": reported},
+    )
+    assert bad.headers["location"] == f"{reported}?{view}&notice=length_bad"
+    none = admin_client.post(f"{LENGTHS}?{view}", data={"do": "leave"})
+    assert none.headers["location"] == f"{LENGTHS}?{view}&notice=length_none"

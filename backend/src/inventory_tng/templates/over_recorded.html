@@ -28,12 +28,12 @@ Mark checked asked again, for a row without it. #}
 {#- Forms of their own, so Enter in the words marks it checked. #}
 <div class="actions">
   {% if refused and refused.place %}
-  <form method="post" action="{{ here }}/{{ each.row.id }}/bring-back{{ query }}">
+  <form method="post" action="{{ here }}/{{ each.row.id }}/bring-back{{ view.query_string }}">
     <input type="hidden" name="seen" value="{{ seen(each.row) }}">
     <button class="primary" name="place" value="{{ refused.place.id }}">Bring back {{ refused.place.name }}</button>
   </form>
   {% endif %}
-  <form method="post" action="{{ here }}/{{ each.row.id }}/checked{{ query }}">
+  <form method="post" action="{{ here }}/{{ each.row.id }}/checked{{ view.query_string }}">
     <input type="hidden" name="seen" value="{{ seen(each.row) }}">
     {#- So a Mark checked refused draws this alert again (_refused_again). #}
     {% if refused and refused.at %}<input type="hidden" name="refused" value="{{ refused.at }}">{% endif %}
@@ -67,7 +67,7 @@ with an adjustment. Mark checked if you already fixed it.</p>
       {#- Now where it arrived, it cannot be found again where it left: its
       count there is confirmed, or corrected by an adjustment. #}
       {% set name = "count-" ~ row.id %}
-      <form method="post" action="{{ here }}/{{ row.id }}/count{{ query }}">
+      <form method="post" action="{{ here }}/{{ row.id }}/count{{ view.query_string }}">
         <p>An open package moved to {{ each.to_place }}. Confirm or correct count.</p>
         <input type="hidden" name="seen" value="{{ seen(row) }}">
         <label for="{{ name }}">Count in the package</label>
@@ -88,14 +88,14 @@ with an adjustment. Mark checked if you already fixed it.</p>
       {% endif %}
       {#- Forms of their own, so Enter in the words marks it checked. #}
       <div class="actions">
-        <form method="post" action="{{ here }}/{{ row.id }}/{{ 'close' if both else 'correct' }}{{ query }}">
+        <form method="post" action="{{ here }}/{{ row.id }}/{{ 'close' if both else 'correct' }}{{ view.query_string }}">
           <input type="hidden" name="seen" value="{{ seen(row) }}">
           <button>{% if both %}Close it{% else %}Correct{% if one %} {{ one.correct }}{% endif %}{% endif %}<span class="sr-only"> {{ each.item }}, transaction {{ each.transaction_id }}</span></button>
         </form>
         {% if one and one.countable %}
         <a href="{{ counts_path }}/{{ one.place_id }}?item={{ each.item_id }}">Count {{ one.place }}<span class="sr-only"> {{ each.item }}, transaction {{ each.transaction_id }}</span></a>
         {% endif %}
-        <form method="post" action="{{ here }}/{{ row.id }}/checked{{ query }}">
+        <form method="post" action="{{ here }}/{{ row.id }}/checked{{ view.query_string }}">
           <input type="hidden" name="seen" value="{{ seen(row) }}">
           {{ why(row, not refused) }}
           <button>Mark checked<span class="sr-only"> {{ each.item }}, transaction {{ each.transaction_id }}</span></button>

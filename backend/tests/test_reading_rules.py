@@ -609,3 +609,6 @@ def test_the_rules_page_sorts_filters_and_finds_a_unit(
     assert '<option value="admin" selected>' in page
     assert f'<a href="{READINGS}?per=25">Clear</a>' in page
     assert f'<a href="{READINGS}?by=admin&amp;sort=when&amp;per=25">When</a>' in page
+    # Whatever their case, as people sort them.
+    reading_rules.decide(session, {"h": units.Rule(None)}, None)
+    assert listed() == ["G", "h", "MF"]

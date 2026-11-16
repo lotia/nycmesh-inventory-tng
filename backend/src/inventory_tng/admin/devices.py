@@ -84,13 +84,9 @@ CODE_SORTING = Sorting(
         "until": Sort.keyed(lambda row: row[0].expires_at),
     },
 )
-# What the codes' state filter offers, as it is said, and each state's.
-CODE_STATES: dict[str, State] = {
-    "usable": "open",
-    "used up": "used up",
-    "expired": "expired",
-    "revoked": "revoked",
-}
+# What the codes' state filter offers: each state in the words the table
+# shows it in (inventory-tng-qwb).
+CODE_STATES: tuple[State, ...] = ("open", "used up", "expired", "revoked")
 
 
 def _list_page(
@@ -114,7 +110,7 @@ def _list_page(
         ).all()
     )
     at = now()
-    wanted = CODE_STATES.get(view.filtered("state"))
+    wanted = view.filtered("state") or None
     rows, view = arranged(
         (
             (code, state(code, at), counts.get(code.id, 0))

@@ -377,6 +377,11 @@ def test_devices_come_in_pages_of_the_size_asked(
     assert listed_ids(page) == [d.id for d in reversed(made)][:25]
     assert "26 listed." in page
     assert "Page 1 of 2" in page
+    # Revoke selected reaches this page's alone, and says so.
+    assert "Every current one on this page is selected" in page
+    assert "</a> to revoke those on the other pages too." in page
+    shown = admin_client.get(DEVICE_LIST, params=window | {"per": "25"}).text
+    assert re.search(rf'<a href="{DEVICE_LIST}\?[^"]*per=all">Show All</a>', shown)
     second = text(
         admin_client.get(DEVICE_LIST, params=window | {"per": "25", "page": "2"})
     )
@@ -386,6 +391,8 @@ def test_devices_come_in_pages_of_the_size_asked(
     assert '<input type="hidden" name="page" value="2">' in second
     every = text(admin_client.get(DEVICE_LIST, params=window | {"per": "all"}))
     assert len(listed_ids(every)) == 26
+    assert "Every current one listed is selected" in every
+    assert "other pages" not in every
     # Clear drops the filter, not the size.
     assert f'<a href="{DEVICE_LIST}?per=all">Clear</a>' in every
 
@@ -430,9 +437,9 @@ def test_an_end_at_the_last_minute_there_is_lists_without_an_end(
 def test_codes_sort_filter_by_state_and_come_in_pages(
     admin_client: TestClient, session: Session
 ) -> None:
-    """Newest first unless a heading sorts them; filtered by state (usable,
-    used up, expired, revoked); in pages of 25, 50, 100 or all (Ali,
-    2026-11-15, inventory-tng-qwb)."""
+    """Newest first unless a heading sorts them; filtered by state (open,
+    used up, expired, revoked: the words the table shows); in pages of 25,
+    50, 100 or all (Ali, 2026-11-15, inventory-tng-qwb)."""
     at = datetime.now(UTC)
     made: dict[str, RegistrationCode] = {}
     for label, uses, days, revoked in (
@@ -461,12 +468,14 @@ def test_codes_sort_filter_by_state_and_come_in_pages(
     assert listed(sort="state") == ["Charlie", "Bravo", "Delta", "Alpha"]
     assert listed(sort="used", order="desc")[0] == "Alpha"
     assert listed(sort="until") == ["Charlie", "Delta", "Alpha", "Bravo"]
-    assert listed(state="usable") == ["Bravo"]
+    assert listed(state="open") == ["Bravo"]
     assert listed(state="used up") == ["Alpha"]
     assert listed(state="expired") == ["Charlie"]
     assert listed(state="revoked") == ["Delta"]
     assert listed(state="lost") == listed()
+    assert listed(state="usable") == listed()
     page = admin_client.get(DEVICES, params={"state": "expired"}).text
+    assert '<option value="open">Open</option>' in page
     assert '<option value="expired" selected>Expired</option>' in page
     assert f'<a href="{DEVICES}">Clear</a>' in page
     assert f'<a href="{DEVICES}?state=expired&amp;sort=until">Until</a>' in page

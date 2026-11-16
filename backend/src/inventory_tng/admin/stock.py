@@ -95,18 +95,10 @@ class Holding:
 
 @dataclass
 class Group:
-    """A place's items, or an item's places, with their total."""
+    """A place's items, or an item's places."""
 
     heading: Location | Item
     rows: list[Holding] = field(default_factory=list)
-
-    @property
-    def total(self) -> Decimal:
-        return sum((row.quantity for row in self.rows), Decimal(0))
-
-    @property
-    def needs_count(self) -> bool:
-        return any(row.quantity < 0 or row.negative for row in self.rows)
 
 
 def _holdings(session: Session, where: ColumnElement[bool]) -> list[Holding]:
@@ -196,6 +188,14 @@ def stock(
         for (item_id, spot), held in forms.items()
         if item_id in items and place_id in (None, spot)
     ]
+    # The whole stock's, whatever the filter shows: each item's in all, and
+    # the places, or items, short somewhere.
+    in_all: dict[int, Decimal] = {}
+    short: set[int] = set()
+    for (item_id, spot), held in forms.items():
+        in_all[item_id] = in_all.get(item_id, Decimal(0)) + held.total
+        if held.total < 0 or held.negative:
+            short.add(item_id if by == "item" else spot)
     groups = _grouped(sorted(holdings, key=_by_names), by)
     shown, view = paged(groups, view)
     for group in shown:
@@ -213,7 +213,8 @@ def stock(
             "groups": shown,
             "forms": forms,
             "places": sorted(places.values(), key=lambda each: each.name.lower()),
-            "needing_count": sum(group.needs_count for group in groups),
+            "in_all": in_all,
+            "needing_count": len(short),
             "retired_places": retired_places_holding_stock(session),
             "counts_path": COUNTS,
         },
@@ -268,7 +269,8 @@ def reorder_rows(
 
 
 # How the reorder list sorts: by name, as it always has, or by a heading;
-# those with no level to reorder at last (Ali, 2026-11-15,
+# those with no level to reorder at after the rest, or before them the
+# other way, as the database sorts a blank (Ali, 2026-11-15,
 # inventory-tng-qwb).
 REORDER_SORTING = Sorting(
     "item",

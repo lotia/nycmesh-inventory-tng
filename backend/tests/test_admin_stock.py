@@ -322,3 +322,20 @@ def test_needs_counting_sorts_within_each_place_and_pages_places(
     assert amounts(sort="item", order="desc") == ["-3", "-5"]
     page = admin_client.get(NEEDS_COUNTING, params={"per": "25"}).text
     assert f'<a href="{NEEDS_COUNTING}?sort=quantity&amp;per=25">How much</a>' in page
+
+
+def test_a_filter_leaves_the_whole_stocks_figures_whole(
+    admin_client: TestClient, session: Session
+) -> None:
+    """An item's "in all" and the count of those short say the whole
+    stock's, whatever a filter shows (inventory-tng-qwb)."""
+    place = stocked(session)  # Five radios at the store.
+    write(session, place)  # Three of them to the van.
+    write(session, place, lines=[{"item_id": place.cable.id, "quantity": "1"}])
+    van = {"by": "item", "place": str(place.van.id)}
+    by_item = text(admin_client.get(STOCK, params=van))
+    assert "5 each in all" in by_item
+    # The cable is short at the store, not at the van.
+    assert re.search(r"1 item shows\s+less than nothing", by_item)
+    at_van = text(admin_client.get(STOCK, params={"place": str(place.van.id)}))
+    assert re.search(r"1 place shows\s+less than nothing", at_van)

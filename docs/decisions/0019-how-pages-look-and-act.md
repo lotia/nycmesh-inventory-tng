@@ -89,8 +89,10 @@ the scan pages, on a phone (360 to 430 px, one hand) and a desktop alike.
   searching, matches come best first; a heading sorts them instead, and a
   "Best match" link puts the match order back. Sort, filters and page size
   live in the address only: nothing is remembered per administrator, and
-  the navigation opens each list as it starts. All of it works without
-  JavaScript, and the page's statements do not grow with its rows.
+  the navigation opens each list as it starts; an answer sent from a list
+  comes back to it as it was, or to its last page if that one is gone.
+  All of it works without JavaScript, and the page's statements do not
+  grow with its rows.
 - **Grouped lists keep their groups.** Stock by place or by item, and
   Needs counting, stay in groups in name order: the headings sort the rows
   within each group, and the page size counts groups, so a group is never

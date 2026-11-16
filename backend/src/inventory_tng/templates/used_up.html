@@ -9,7 +9,7 @@ up. Not used up offers it again, for a box ticked by mistake.</p>
 <p>Only {{ only.name_shown }}. <a href="{{ view.link(kept=(), page=1) }}">Show all</a></p>
 {% endif %}
 {#- The packages ticked belong to this form. #}
-<form method="post" action="{{ here }}{{ query }}" id="answer-ticked"></form>
+<form method="post" action="{{ here }}{{ view.query_string }}" id="answer-ticked"></form>
 {{ sizes(view) }}
 {% call table() %}
   <tr><th>Pick</th>{{ sort_heading(view, "package", "Open package") }}
@@ -24,9 +24,9 @@ up. Not used up offers it again, for a box ticked by mistake.</p>
     <td class="hidden sm:table-cell">{{ each.left | amount }} {{ each.unit }}</td>
     <td class="hidden sm:table-cell">{{ each.reported_by or "someone" }}, {{ row.reported_at | when(zone) }}</td>
     <td>
-      <form method="post" action="{{ here }}/{{ row.id }}/confirm{{ query }}" class="actions">
+      <form method="post" action="{{ here }}/{{ row.id }}/confirm{{ view.query_string }}" class="actions">
         <button>Confirm used up<span class="sr-only"> {{ each.item }} at {{ each.place }}</span></button>
-        <button formaction="{{ here }}/{{ row.id }}/clear{{ query }}">Not used up<span class="sr-only"> {{ each.item }} at {{ each.place }}</span></button>
+        <button formaction="{{ here }}/{{ row.id }}/clear{{ view.query_string }}">Not used up<span class="sr-only"> {{ each.item }} at {{ each.place }}</span></button>
       </form>
     </td>
   </tr>

@@ -10,7 +10,7 @@ stays.</p>
 <p>Only {{ only.name_shown }}. <a href="{{ view.link(kept=(), page=1) }}">Show all</a></p>
 {% endif %}
 {#- The packages ticked belong to this form. #}
-<form method="post" action="{{ here }}{{ query }}" id="answer-ticked">
+<form method="post" action="{{ here }}{{ view.query_string }}" id="answer-ticked">
   <input type="hidden" name="page" value="{{ all_path }}">
 </form>
 {{ sizes(view) }}
@@ -30,7 +30,7 @@ stays.</p>
       {% if row.below_zero_at %}Went below zero {{ row.below_zero_at | when(zone) }}.{% endif %}</td>
     <td>{% for cut in each.cuts %}{{ cut.quantity | amount }} {{ shown.unit }}, {{ cut.volunteer or cut.kind }}, {{ cut.at | when(zone) }}{% if not loop.last %}<br>{% endif %}{% else %}None{% endfor %}</td>
     <td>
-      <form method="post" action="{{ here }}/{{ row.id }}/set{{ query }}" class="actions">
+      <form method="post" action="{{ here }}/{{ row.id }}/set{{ view.query_string }}" class="actions">
         <input type="hidden" name="seen" value="{{ each.seen }}">
         <input type="hidden" name="showed" value="{{ shown.left }}">
         <input type="hidden" name="as_of" value="{{ moment }}">
@@ -42,7 +42,7 @@ stays.</p>
         {#- "Set to 40 m", following the box in the browser (frontend/src/hints.ts);
         "Set to it" without, as the box may be changed. #}
         <button>Set to <span data-follows="left-{{ row.id }}" data-unit="{{ shown.unit }}">it</span><span class="sr-only"> {{ shown.item }} at {{ shown.place }}</span></button>
-        <button formaction="{{ here }}/{{ row.id }}/leave{{ query }}">Leave it<span class="sr-only"> {{ shown.item }} at {{ shown.place }}</span></button>
+        <button formaction="{{ here }}/{{ row.id }}/leave{{ view.query_string }}">Leave it<span class="sr-only"> {{ shown.item }} at {{ shown.place }}</span></button>
       </form>
     </td>
   </tr>

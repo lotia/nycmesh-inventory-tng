@@ -52,7 +52,12 @@ registered while it lasted, then revoke the ones that look wrong.</p>
   {% endcall %}
   {{ pager(view) }}
   {% if devices | selectattr("revoked_at", "none") | list %}
+  {% if view.pages > 1 %}
+  <p class="hint">Every current one on this page is selected: clear any to
+  keep. <a href="{{ view.size_link(none) }}">Show All</a> to revoke those on the other pages too.</p>
+  {% else %}
   <p class="hint">Every current one listed is selected: clear any to keep.</p>
+  {% endif %}
   <div class="actions"><button>Revoke selected</button></div>
   {% endif %}
 </form>

@@ -655,3 +655,34 @@ def test_those_waiting_sort_by_each_heading_and_come_in_pages(
         moved(session, places[0])
     assert len(rows_of(admin_client.get(f"{only}&per=25").text)) == 25
     assert len(rows_of(admin_client.get(f"{only}&per=25&page=2").text)) == 1
+
+
+def test_an_answer_comes_back_to_those_waiting_as_they_were(
+    admin_client: TestClient, session: Session
+) -> None:
+    """Their sort, page size, page and item go with each answer, and come
+    back, or are drawn again with a problem; a page past the end, as after
+    the last one on it is answered, shows the last there is
+    (inventory-tng-qwb)."""
+    place = Place(session)
+    check, other = moved(session, place), moved(session, place)
+    view = f"item={place.item.id}&sort=amount&order=desc&per=25&page=2"
+    # Drawn, the page is 1 of 1: a page past the end shows the last.
+    shown = view.removesuffix("&page=2").replace("&", "&amp;")
+    page = admin_client.get(f"{WAITING}?{view}").text
+    assert f'action="{WAITING}/{check.id}/checked?{shown}"' in page
+    assert f'action="{WAITING}/{check.id}/correct?{shown}"' in page
+    asked = admin_client.post(
+        f"{WAITING}/{check.id}/checked?{view}", data={"seen": seen(check)}
+    )
+    assert asked.status_code == 400
+    assert f'action="{WAITING}/{check.id}/checked?{shown}"' in asked.text
+    assert 'aria-sort="descending"' in asked.text
+    done = admin_client.post(
+        f"{WAITING}/{check.id}/checked?{view}",
+        data={"seen": seen(check), "reason": "both"},
+    )
+    back = done.headers["location"]
+    assert back == f"{WAITING}?{view}&notice=over_recorded_checked"
+    # Page 2 of 25 a page is past the end: the last page, the first.
+    assert f'action="{WAITING}/{other.id}/checked?' in admin_client.get(back).text

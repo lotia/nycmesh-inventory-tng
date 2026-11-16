@@ -78,13 +78,13 @@ def _row(rule: ReadingRule, username: str | None) -> _Row:
     )
 
 
-# How the list sorts: by the unit, as it always has, or by a heading, each
-# by its words as shown; the newest first by When (Ali, 2026-11-15,
-# inventory-tng-qwb).
+# How the list sorts: by the unit, as it always has, whatever its case, or
+# by a heading, each by its words as shown; the newest first by When (Ali,
+# 2026-11-15, inventory-tng-qwb).
 SORTING = Sorting(
     "unit",
     {
-        "unit": Sort.keyed(lambda row: row.rule.token),
+        "unit": Sort.keyed(lambda row: (row.rule.token.lower(), row.rule.token)),
         "read_as": Sort.keyed(lambda row: row.read_as.lower()),
         "saved": Sort.keyed(lambda row: row.saved),
         "by": Sort.keyed(lambda row: row.by.lower()),

@@ -8,7 +8,7 @@ from collections.abc import Sequence
 from typing import Annotated, Literal
 
 import structlog
-from fastapi import APIRouter, Form, Request
+from fastapi import APIRouter, Depends, Form, Request
 from fastapi.responses import Response
 from opentelemetry import metrics
 from sqlalchemy import select
@@ -23,7 +23,6 @@ from inventory_tng.admin.needs_action import (
     OnlyItem,
     of_only,
     query,
-    query_string,
 )
 from inventory_tng.admin.stock import STOCK
 from inventory_tng.db import DbSession, attempt
@@ -81,28 +80,29 @@ SORTING = Sorting(
 )
 
 
+def _view(
+    only: OnlyItem, sort: str = "", order: str = "", per: str = "", page: str = ""
+) -> View:
+    """The list's item, sort, page size and page, as its query string asks:
+    the page's, and each answer's, which comes back to it so."""
+    return View.read(
+        USED_UP, SORTING, sort=sort, order=order, per=per, page=page, kept=query(only)
+    )
+
+
+Viewed = Annotated[View, Depends(_view)]
+
+
 @router.get(USED_UP)
 def used_up_page(
     request: Request,
     signed: AdminSignedIn,
     session: DbSession,
     only: OnlyItem,
-    sort: str = "",
-    order: str = "",
-    per: str = "",
-    page: str = "",
+    view: Viewed,
 ) -> Response:
     """All those reported, or only one item's, sorted and in pages as
     asked."""
-    view = View.read(
-        USED_UP,
-        SORTING,
-        sort=sort,
-        order=order,
-        per=per,
-        page=page,
-        kept=query(only),
-    )
     reported, view = arranged(
         open_packages.shown(session, *of_only(REPORTED, only)), view
     )
@@ -116,8 +116,6 @@ def used_up_page(
             "here": USED_UP,
             "back_link": (STOCK, "Stock"),
             "only": only,
-            # Answered, the page shows the same item again.
-            "query": query_string(only),
             "reported": reported,
             "view": view,
             "zone": site_zone(session),
@@ -134,7 +132,7 @@ def _answer(
     signed: SignedIn,
     ids: Sequence[int],
     do: str,
-    back: dict[str, str],
+    back: View,
 ) -> Response:
     """Confirm, or clear, each of `ids` still reported, and say so. Their
     places locked first, by id, as saves take places, so none waits on
@@ -172,9 +170,7 @@ def _answer(
         admin_id=signed.admin.id,
     )
     return redirect(
-        USED_UP,
-        notice=DONE[answer] if changed else "used_up_unchanged",
-        **back,
+        back.link(), notice=DONE[answer] if changed else "used_up_unchanged"
     )
 
 
@@ -182,14 +178,14 @@ def _answer(
 def answer_ticked(
     signed: AdminSignedIn,
     session: DbSession,
-    only: OnlyItem,
+    view: Viewed,
     open_package: Annotated[list[int], Form()] = [],  # noqa: B006  FastAPI copies it.
     do: Annotated[str, Form()] = "",
 ) -> Response:
     """Confirm, or clear, the open packages ticked."""
     if do in DONE and not open_package:
-        return redirect(USED_UP, notice="used_up_none", **query(only))
-    return _answer(session, signed, open_package, do, query(only))
+        return redirect(view.link(), notice="used_up_none")
+    return _answer(session, signed, open_package, do, view)
 
 
 @router.post(f"{USED_UP}/{{open_id}}/{{do}}")
@@ -198,12 +194,12 @@ def answer_one(
     session: DbSession,
     open_id: int,
     do: str,
-    only: OnlyItem,
+    view: Viewed,
 ) -> Response:
     """Confirm, or clear, one."""
     if session.get(OpenPackage, open_id) is None:
         return not_found()
-    return _answer(session, signed, [open_id], do, query(only))
+    return _answer(session, signed, [open_id], do, view)
 
 
 CLOSE = f"{ITEMS}/{{item_id}}/open-packages/{{open_id}}/close"
