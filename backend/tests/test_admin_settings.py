@@ -24,7 +24,7 @@ from inventory_tng.models import (
 
 from helpers.mail import SentMail
 from helpers.rows import history, shown
-from helpers.sign_in import code, new_admin, sign_in_with, text, with_code
+from helpers.sign_in import new_admin, sign_in_with, text, with_code
 
 
 def test_shows_and_changes_the_name_check(
@@ -80,7 +80,7 @@ def test_sign_in_settings_change_and_everyone_is_told(
     _, key = new_admin(session, email="ada@example.org")
     new_admin(session, "ben", email="ben@example.org")
     new_admin(session, "carol")  # No address: not told.
-    sign_in_with(client, code=code(key))
+    sign_in_with(client, key=key)
     version = shown(session.get_one(SignInSettings, 1))
     done = client.post(
         f"{SETTINGS}/sign-in", data=SIGN_IN_FORM | {"sign_in_version": version}
@@ -202,7 +202,7 @@ def test_saving_the_same_sign_in_settings_tells_nobody(
 ) -> None:
     client = make_client(mailer=sent_mail)
     _, key = new_admin(session, email="ada@example.org")
-    sign_in_with(client, code=code(key))
+    sign_in_with(client, key=key)
     same = SIGN_IN_FORM | {"totp_policy": "required", "session_days": "7"}
     same |= {"confirm_hours": "24", "confirm_idle_minutes": "60"}
     same |= {"account_change_minutes": "30"}

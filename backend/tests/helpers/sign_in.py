@@ -1,9 +1,12 @@
 """Administrators, and signing them in."""
 
 import base64
+import contextlib
 import html
 import uuid
+from collections.abc import Generator
 from datetime import UTC, datetime, timedelta
+from unittest import mock
 
 import pyotp
 from fastapi.testclient import TestClient
@@ -123,13 +126,32 @@ def policy(session: Session, value: str) -> None:
     session.flush()
 
 
+@contextlib.contextmanager
+def app_clock(at: datetime) -> Generator[None]:
+    """The app's clock (sign_in._now) stopped at `at`, for a request that
+    must not depend on how long it takes to arrive."""
+    with mock.patch.object(sign_in, "_now", return_value=at):
+        yield
+
+
 def sign_in_with(
-    client: TestClient, username: str = "ada", password: str = PASSWORD, **form: str
+    client: TestClient,
+    username: str = "ada",
+    password: str = PASSWORD,
+    *,
+    key: str | None = None,
+    **form: str,
 ) -> Response:
-    return client.post(
-        sign_in.SIGN_IN,
-        data={"username": username, "password": password} | form,
-    )
+    """Sign in; with `key`, typing the code its authenticator shows now. The
+    app reads that moment as now too: a request held up past the time step
+    after its code's, as on a busy machine, would otherwise be refused, as
+    the app rightly refuses a code that old (inventory-tng-tuie)."""
+    data = {"username": username, "password": password} | form
+    if key is None:
+        return client.post(sign_in.SIGN_IN, data=data)
+    at = datetime.now(UTC)
+    with app_clock(at):
+        return client.post(sign_in.SIGN_IN, data=data | {"code": code(key, at)})
 
 
 def text(response: Response) -> str:

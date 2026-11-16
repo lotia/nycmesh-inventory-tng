@@ -55,7 +55,7 @@ from inventory_tng.phrases import compiled, speaking
 
 from helpers.concurrency import Committed
 from helpers.rows import item_fields, shown, violates
-from helpers.sign_in import code, new_admin, sign_in_with, text
+from helpers.sign_in import new_admin, sign_in_with, text
 from helpers.stock import (
     Place,
     adjustment_form,
@@ -642,7 +642,7 @@ def test_a_unit_changed_to_each_as_the_page_writes_is_said_and_nothing_is_writte
     setup.commit()
     page = own_committed.session()
     client = make_client(on=page)
-    assert sign_in_with(client, code=code(totp)).status_code == 303
+    assert sign_in_with(client, key=totp).status_code == 303
     if kind == "count":
         path = f"{COUNTS}/{place.store.id}"
         form = count_form(client, path) | {

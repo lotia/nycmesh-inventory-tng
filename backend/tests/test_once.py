@@ -20,7 +20,7 @@ from inventory_tng.once import SENT_AGAIN
 
 from helpers.mail import NO_MAIL, SentMail
 from helpers.rows import tag
-from helpers.sign_in import code, later_code, new_admin, sign_in_with, text, with_code
+from helpers.sign_in import later_code, new_admin, sign_in_with, text, with_code
 
 AGAIN = "That form was already sent"
 CANT_SHOW = "Back and Forward can't show this page again"
@@ -92,7 +92,7 @@ def test_recovery_codes_are_made_once(
     back to the page it came from."""
     client = make_client()
     _, key = new_admin(session)
-    sign_in_with(client, code=code(key))
+    sign_in_with(client, key=key)
     action = f"{ACCOUNT}/recovery-codes"
     later = later_code(key)
     referer = {"referer": f"https://testserver{ACCOUNT}"}
@@ -118,7 +118,7 @@ def test_a_reset_link_is_made_and_mailed_once(
 ) -> None:
     client = make_client(mailer=sent_mail)
     _, key = new_admin(session)
-    sign_in_with(client, code=code(key))
+    sign_in_with(client, key=key)
     ben, _ = new_admin(session, "ben", email="ben@example.org")
     page = f"{ADMINS}/{ben.id}"
     # The form is on the page asking to confirm; the way back, their page.

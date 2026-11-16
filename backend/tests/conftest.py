@@ -55,7 +55,7 @@ from helpers.devices import new_device
 from helpers.mail import SITE_MAIL, SentMail
 from helpers.pools import checked_out
 from helpers.rows import setting_up
-from helpers.sign_in import TOTP_KEY, TOTP_KEYS, code, new_admin, sign_in_with
+from helpers.sign_in import TOTP_KEY, TOTP_KEYS, new_admin, sign_in_with
 
 # structlog's lines go through the standard library, where caplog sees them.
 configure_structlog()
@@ -654,7 +654,7 @@ def admin_client(
     window open."""
     client = make_client()
     _, key = new_admin(session)
-    assert sign_in_with(client, code=code(key)).status_code == 303
+    assert sign_in_with(client, key=key).status_code == 303
     return client
 
 

@@ -44,7 +44,7 @@ from inventory_tng.models import (
 
 from helpers.concurrency import Committed, made
 from helpers.rows import shown
-from helpers.sign_in import code, new_admin, sign_in_with
+from helpers.sign_in import new_admin, sign_in_with
 from helpers.source import SOURCE, offending, outside
 
 # The only code that may lock with with_for_update: the wrappers' bodies.
@@ -200,7 +200,7 @@ def primed(
     client = make_client(on=session)
     _, key = new_admin(session, "primer")
     session.commit()
-    assert sign_in_with(client, "primer", code=code(key)).status_code == 303
+    assert sign_in_with(client, "primer", key=key).status_code == 303
     return client, session
 
 

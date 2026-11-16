@@ -51,7 +51,7 @@ def ada(client: TestClient, session: Session) -> tuple[Admin, str]:
     """Ada, signed in with a fresh code: the window is open."""
     admin, key = new_admin(session)
     assert key is not None
-    sign_in_with(client, code=code(key))
+    sign_in_with(client, key=key)
     return admin, key
 
 
@@ -347,7 +347,7 @@ def test_the_owner_is_told_when_an_authenticator_comes_or_goes(
     then make new recovery codes with it: the owner hears of it."""
     client = make_client(mailer=sent_mail)
     _, key = new_admin(session, email="ada@example.org")
-    sign_in_with(client, code=code(key))
+    sign_in_with(client, key=key)
     new_key = accounts.new_totp_key()
     form = {"authenticator_name": "Laptop", "key": new_key, "code": code(new_key)}
     assert client.post(sign_in.NEW_AUTHENTICATOR, data=form).status_code == 303
@@ -522,7 +522,7 @@ def test_changing_the_email_voids_reset_links_and_tells_the_old_address(
 ) -> None:
     client = make_client(mailer=sent_mail)
     admin, key = new_admin(session, email="old@example.org")
-    sign_in_with(client, code=code(key))
+    sign_in_with(client, key=key)
     reset_link(session, admin)
     client.post(f"{ACCOUNT}/email", data={"email": "new@example.org"})
     (link,) = session.scalars(select(ResetLink)).all()

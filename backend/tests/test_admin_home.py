@@ -40,7 +40,7 @@ def test_no_email_is_told_only_where_mail_is_set_up(
 ) -> None:
     with_mail = make_client(mailer=sent_mail)
     ada, key = new_admin(session)
-    assert sign_in_with(with_mail, code=code(key)).status_code == 303
+    assert sign_in_with(with_mail, key=key).status_code == 303
     assert str(NO_EMAIL) in text(with_mail.get("/admin"))
     ada.email = "ada@example.org"
     session.flush()

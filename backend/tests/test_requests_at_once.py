@@ -663,7 +663,7 @@ def real_client(
 
 
 def signed_in_as_ben(committed: Committed, client: TestClient, key: str | None) -> int:
-    assert sign_in_with(client, "ben", code=code(key)).status_code == 303
+    assert sign_in_with(client, "ben", key=key).status_code == 303
     found = committed.session().scalar(
         select(AdminSession.id).where(AdminSession.ended_at.is_(None))
     )

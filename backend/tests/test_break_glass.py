@@ -97,7 +97,7 @@ def test_let_in_brings_one_back_with_a_link_that_resets_everything(
     client = make_client()
     assert client.post(sign_in.RESET, data=form).status_code == 303
     # The old authenticator is gone: in with the password, then set one up.
-    assert sign_in_with(client, "ada", code=code(key)).status_code == 400
+    assert sign_in_with(client, "ada", key=key).status_code == 400
     assert sign_in_with(client, "ada", NEW_PASSWORD).status_code == 303
     assert client.get(sign_in.HOME).headers["location"] == sign_in.NEW_AUTHENTICATOR
 

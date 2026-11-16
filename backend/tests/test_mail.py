@@ -241,7 +241,7 @@ def test_an_emailed_link_resets_the_password(
     client: TestClient, session: Session, sent_mail: SentMail
 ) -> None:
     admin, key = with_email(session)
-    sign_in_with(client, code=code(key))
+    sign_in_with(client, key=key)
     signed_in = session.query(AdminSession).one()
     assert str(ASKED) in ask(client)
     link = the_link(sent_mail)
@@ -410,7 +410,7 @@ def test_a_password_changed_on_the_account_page_is_told(
     client: TestClient, session: Session, sent_mail: SentMail
 ) -> None:
     _, key = with_email(session)
-    sign_in_with(client, code=code(key))
+    sign_in_with(client, key=key)
     form = {"password": NEW_PASSWORD, "password_again": NEW_PASSWORD}
     client.post(f"{sign_in.ACCOUNT}/password", data=form)
     assert [m.kind for m in sent_mail] == ["password_changed"]
@@ -420,7 +420,7 @@ def test_no_address_no_notice(
     client: TestClient, session: Session, sent_mail: SentMail
 ) -> None:
     _, key = new_admin(session)
-    sign_in_with(client, code=code(key))
+    sign_in_with(client, key=key)
     form = {"password": NEW_PASSWORD, "password_again": NEW_PASSWORD}
     client.post(f"{sign_in.ACCOUNT}/password", data=form)
     assert sent_mail == []

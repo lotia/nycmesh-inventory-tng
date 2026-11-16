@@ -44,6 +44,7 @@ from helpers.sign_in import (
     PASSWORD,
     RECOVERY_CODE,
     TOTP_KEYS,
+    app_clock,
     code,
     new_admin,
     opened,
@@ -197,7 +198,7 @@ def test_setup_refuses_once_any_admin_exists_even_retired(
 
 def test_signing_in_with_all_three(client: TestClient, session: Session) -> None:
     _, key = new_admin(session)
-    response = sign_in_with(client, code=code(key), next="/admin?x=1")
+    response = sign_in_with(client, key=key, next="/admin?x=1")
     assert response.status_code == 303
     assert response.headers["location"] == "/admin?x=1"
     cookie = response.headers["set-cookie"]
@@ -212,8 +213,8 @@ def test_signing_in_with_all_three(client: TestClient, session: Session) -> None
 def test_every_refusal_says_the_same(client: TestClient, session: Session) -> None:
     _, key = new_admin(session)
     refusals = [
-        sign_in_with(client, "nobody", code=code(key)),
-        sign_in_with(client, password="wrong password here", code=code(key)),
+        sign_in_with(client, "nobody", key=key),
+        sign_in_with(client, password="wrong password here", key=key),
         sign_in_with(client, code="000000" if code(key) != "000000" else "111111"),
         sign_in_with(client),
     ]
@@ -250,10 +251,25 @@ def test_an_unknown_name_is_checked_against_a_password_all_the_same(
 
 def test_a_code_works_once(client: TestClient, session: Session) -> None:
     _, key = new_admin(session)
-    once = code(key)
-    assert sign_in_with(client, code=once).status_code == 303
-    client.cookies.clear()
-    assert sign_in_with(client, code=once).status_code == 400
+    at = datetime.now(UTC)
+    once = code(key, at)
+    with app_clock(at):
+        assert sign_in_with(client, code=once).status_code == 303
+        client.cookies.clear()
+        assert sign_in_with(client, code=once).status_code == 400
+
+
+def test_a_sign_in_held_up_past_a_time_step_still_signs_in(
+    client: TestClient, session: Session, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The tests' sign-in does not depend on how long its request takes:
+    here the app reads its clock a minute after the code was made, as on a
+    busy machine (inventory-tng-tuie)."""
+    _, key = new_admin(session)
+    monkeypatch.setattr(
+        sign_in, "_now", lambda: datetime.now(UTC) + timedelta(minutes=1)
+    )
+    assert sign_in_with(client, key=key).status_code == 303
 
 
 def second_factor(session: Session, admin_id: int, typed: str) -> str | None:
@@ -361,7 +377,7 @@ def test_wrong_passwords_never_lock_an_admin_out(
     clients = from_many_addresses(make_client, client)
     for _ in range(20):
         sign_in_with(next(clients), password="wrong password here")
-    assert sign_in_with(next(clients), code=code(key)).status_code == 303
+    assert sign_in_with(next(clients), key=key).status_code == 303
 
 
 def test_wrong_codes_after_a_right_password_are_limited(
@@ -372,7 +388,7 @@ def test_wrong_codes_after_a_right_password_are_limited(
     clients = from_many_addresses(make_client, client)
     for _ in range(10):
         sign_in_with(next(clients), code=wrong)
-    limited = sign_in_with(next(clients), code=code(key))
+    limited = sign_in_with(next(clients), key=key)
     assert limited.status_code == 429
     assert str(sign_in.TOO_MANY) in alert(limited)
 
@@ -384,7 +400,7 @@ def test_every_attempt_counts_against_its_address(
     _, key = new_admin(session)
     for _ in range(10):
         sign_in_with(client, "nobody")
-    assert sign_in_with(client, code=code(key)).status_code == 429
+    assert sign_in_with(client, key=key).status_code == 429
 
 
 def limited_to(
@@ -407,7 +423,7 @@ def test_the_limit_per_address_is_a_setting(
     client = limited_to(make_app, make_client, RateLimits(per_address=3))
     for _ in range(3):
         sign_in_with(client, "nobody")
-    assert sign_in_with(client, code=code(key)).status_code == 429
+    assert sign_in_with(client, key=key).status_code == 429
 
 
 @pytest.mark.parametrize("target", ["//example.org/x", "https://example.org", "x"])
@@ -415,7 +431,7 @@ def test_sign_in_only_goes_on_to_this_site(
     client: TestClient, session: Session, target: str
 ) -> None:
     _, key = new_admin(session)
-    response = sign_in_with(client, code=code(key), next=target)
+    response = sign_in_with(client, key=key, next=target)
     assert response.headers["location"] == sign_in.HOME
 
 
@@ -428,7 +444,7 @@ def test_a_page_sends_someone_signed_out_to_sign_in_and_back(
 
 def signed_in_row(client: TestClient, session: Session) -> AdminSession:
     _, key = new_admin(session)
-    sign_in_with(client, code=code(key))
+    sign_in_with(client, key=key)
     return session.scalars(select(AdminSession)).one()
 
 
@@ -635,7 +651,7 @@ def test_signing_in_logs_ids_the_masker_keeps(
 ) -> None:
     _, key = new_admin(session)
     with capture_logs() as logs:
-        sign_in_with(client, code=code(key))
+        sign_in_with(client, key=key)
     (line,) = [line for line in logs if line["event"] == "signed in"]
     kept = Masker().fields(line)
     assert kept["admin_id"] == line["admin_id"]
@@ -694,7 +710,7 @@ def test_the_cookie_lasts_as_long_as_the_session(
     client: TestClient, session: Session
 ) -> None:
     _, key = new_admin(session)
-    response = sign_in_with(client, code=code(key))
+    response = sign_in_with(client, key=key)
     row = session.scalars(select(AdminSession)).one()
     expires = row.expires_at.astimezone(UTC).strftime("%a, %d %b %Y %H:%M:%S GMT")
     assert f"expires={expires}" in response.headers["set-cookie"]

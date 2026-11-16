@@ -55,7 +55,7 @@ def assert_sign_in_was_reset(
     assert not accounts.has_password(session, admin.id)
     assert not accounts.uses_totp(session, admin.id)
     assert accounts.recovery_codes_left(session, admin.id) == 0
-    assert sign_in_with(theirs, admin.username, code=code(key)).status_code == 400
+    assert sign_in_with(theirs, admin.username, key=key).status_code == 400
     form = {
         "token": token_of(link_on(made.text)),
         "password": NEW_PASSWORD,
@@ -71,7 +71,7 @@ def test_inviting_an_administrator(
 ) -> None:
     admin_client = make_client(mailer=sent_mail)
     _, key = new_admin(session)
-    sign_in_with(admin_client, code=code(key))
+    sign_in_with(admin_client, key=key)
     form = {"username": "grace", "email": "grace@example.org"}
     made = admin_client.post(ADMINS, data=with_code(session, **form))
     assert made.status_code == 200
@@ -150,11 +150,11 @@ def test_resetting_another_admins_sign_in(
     when it is used, so it stays that way if the link is never used."""
     client = make_client(mailer=sent_mail)
     _, key = new_admin(session)
-    sign_in_with(client, code=code(key))
+    sign_in_with(client, key=key)
     ben, ben_key = new_admin(session, "ben", email="ben@example.org")
     accounts.make_recovery_codes(session, ben.id, datetime.now(UTC))
     theirs = make_client(client.app, address="192.0.2.71")
-    assert sign_in_with(theirs, "ben", code=code(ben_key)).status_code == 303
+    assert sign_in_with(theirs, "ben", key=ben_key).status_code == 303
     assert theirs.get(sign_in.HOME).status_code == 200
     emailed = accounts.emailed_reset(session, "ben", datetime.now(UTC))
     assert emailed is not None
@@ -205,7 +205,7 @@ def test_retiring_another_removes_their_sign_in(
     """Nothing to steal or crack is left on a retired account."""
     admin_client = make_client(mailer=sent_mail)
     _, key = new_admin(session)
-    sign_in_with(admin_client, code=code(key))
+    sign_in_with(admin_client, key=key)
     ben, _ = new_admin(session, "ben", email="ben@example.org")
     now = datetime.now(UTC)
     accounts.make_recovery_codes(session, ben.id, now)
@@ -232,7 +232,7 @@ def test_bringing_one_back_starts_their_sign_in_again(
     """Retired for a stolen password or phone, say: neither works again."""
     admin_client = make_client(mailer=sent_mail)
     _, key = new_admin(session)
-    sign_in_with(admin_client, code=code(key))
+    sign_in_with(admin_client, key=key)
     ben, ben_key = new_admin(session, "ben", email="ben@example.org")
     accounts.make_recovery_codes(session, ben.id, datetime.now(UTC))
     assert (
@@ -486,7 +486,7 @@ def test_every_administrator_is_told_of_a_change(
     is told in their own words; and on the administrators page."""
     client = make_client(mailer=sent_mail)
     _, key = new_admin(session, email="ada@example.org")
-    sign_in_with(client, code=code(key))
+    sign_in_with(client, key=key)
     ben, _ = new_admin(session, "ben", email="ben@example.org")
     new_admin(session, "carol", email="carol@example.org")
     new_admin(session, "dan")
@@ -513,7 +513,7 @@ def test_since_you_last_signed_in(
     ben, ben_key = new_admin(session, "ben")
     carol, _ = new_admin(session, "carol")
     theirs = make_client(address="192.0.2.80")
-    assert sign_in_with(theirs, "ben", code=code(ben_key)).status_code == 303
+    assert sign_in_with(theirs, "ben", key=ben_key).status_code == 303
     assert "Since you last signed in" not in text(theirs.get(sign_in.HOME))
     now = datetime.now(UTC)
     accounts.retire_admin(session, carol.id, ada.id, now, NO_MAIL)

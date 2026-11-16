@@ -62,7 +62,6 @@ from helpers.rows import add, shown, tag
 from helpers.sign_in import (
     PASSWORD,
     TOTP_KEYS,
-    code,
     codes_with_left,
     new_admin,
     sign_in_with,
@@ -457,7 +456,7 @@ def counting(
     """Ada signed in, and a count of five radios that finds three, and a
     metre of cable: two transactions, one out of the store, one into it."""
     _, key = new_admin(session)
-    sign_in_with(client, code=code(key))
+    sign_in_with(client, key=key)
     place = stocked(session)
     form = {
         "key": str(uuid.uuid4()),
@@ -672,7 +671,7 @@ def test_counts_saves_refused_as_changed_since_shown(
 ) -> None:
     client, _, reader, _ = rolled_back
     _, key = new_admin(session)
-    sign_in_with(client, code=code(key))
+    sign_in_with(client, key=key)
     radios = add(session, Category(name=f"Radios {tag()}"))
     form = {"name": f"Antennas {tag()}", "version": shown(radios)}
     radios.name = f"Wireless {tag()}"
@@ -839,7 +838,7 @@ def test_counts_package_tracking_changed_by_where(
 ) -> None:
     client, _, reader, _ = rolled_back
     _, key = new_admin(session)
-    sign_in_with(client, code=code(key))
+    sign_in_with(client, key=key)
     spools = Spools(session, tracked=False)
     cable = spools.cable
     items_path = "/admin/items"
@@ -879,7 +878,7 @@ def test_counts_open_packages_closed_and_cleared(
     closed = "inventory.open_packages.closed"
     before = counted(reader, closed)
     _, key = new_admin(session)
-    sign_in_with(client, code=code(key))
+    sign_in_with(client, key=key)
     spools = Spools(session)
     one, two, three = spools.opened(), spools.opened(), spools.opened()
     volunteer = spools.place.volunteer.id
@@ -927,7 +926,7 @@ def test_counts_length_checks_raised_and_settled(
         (("how", "below_zero"),): 1,
     }
     _, key = new_admin(session)
-    sign_in_with(client, code=code(key))
+    sign_in_with(client, key=key)
     lengths = "/admin/stock/length-checks"
     for row in (reported, cut_from):
         session.refresh(row)
@@ -972,7 +971,7 @@ def test_counts_lines_recorded_more_than_moved_raised_and_settled(
     client.cookies.clear()
     assert added(reader, "inventory.over_recorded.raised", raised) == {(): 2}
     _, key = new_admin(session)
-    sign_in_with(client, code=code(key))
+    sign_in_with(client, key=key)
     page = "/admin/stock/recorded-more"
     first_check, second_check = session.scalars(
         select(OverRecorded).order_by(OverRecorded.id)
@@ -1006,7 +1005,7 @@ def test_counts_lines_recorded_more_than_moved_settled_by_counts(
     assert client.post("/api/transactions", json=changed).status_code == 409
     client.cookies.clear()
     _, key = new_admin(session)
-    sign_in_with(client, code=code(key))
+    sign_in_with(client, key=key)
     settled = counted(reader, "inventory.over_recorded.settled")
     for place_id, amount in ((place.van.id, "1"), (place.store.id, "2")):
         path = f"{COUNTS}/{place_id}"
@@ -1030,7 +1029,7 @@ def test_counts_lines_recorded_more_than_moved_closed_with_their_open_package(
     as counted, once however often the close is sent (inventory-tng-die)."""
     client, _, reader, _ = rolled_back
     admin, key = new_admin(session)
-    sign_in_with(client, code=code(key))
+    sign_in_with(client, key=key)
     spools = Spools(session)
     made = spools.opened()
     movement_id = session.scalar(
@@ -1069,7 +1068,7 @@ def test_counts_lines_recorded_more_than_moved_closed_with_both_ends_right(
     often it is sent (inventory-tng-dro)."""
     client, _, reader, _ = rolled_back
     admin, key = new_admin(session)
-    sign_in_with(client, code=code(key))
+    sign_in_with(client, key=key)
     spools = Spools(session)
     made = spools.opened()
     movement_id = session.scalar(
@@ -1124,7 +1123,7 @@ def test_counts_places_brought_back_to_correct_one(
     client.cookies.clear()
     retire(session, place.store)
     _, key = new_admin(session)
-    sign_in_with(client, code=code(key))
+    sign_in_with(client, key=key)
     check = session.scalars(select(OverRecorded)).one()
     form = {"seen": over_recorded.seen(check), "place": str(place.store.id)}
     name = "inventory.over_recorded.places_brought_back"
