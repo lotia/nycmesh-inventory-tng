@@ -795,8 +795,10 @@ def _found(
     every = readings(token)
     if rule is None and not every:
         return None
-    # A comma after a lone nought is a decimal point (_NOUGHT), else groups.
-    point = "." if _NOUGHT.search(text, 0, match.end(1)) else ""
+    # A comma after a lone nought is a decimal point (_NOUGHT), else groups;
+    # respell's `number` has none left to judge.
+    nought = "," in number and _NOUGHT.search(text, 0, match.end(1))
+    point = "." if nought else ""
     value = float(number.replace(",", point).replace("\u2212", "-"))
     plausible = [(r, exact) for r, exact in every if r.plausible(value)]
     readable = tuple(r for r, _ in plausible)

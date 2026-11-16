@@ -261,16 +261,18 @@ function edits(text: string, rules: Rules | undefined): Edit[] {
     const end = at + whole.length;
     if (marked(text, end) || product(text, at)) continue;
     const before = text.slice(0, at + 1);
-    const nought = NOUGHT.exec(before);
-    let grouped = nought ?? GROUPED.exec(before);
-    // `Cat 6 305 m`: a product's number, then another, not thousands.
-    if (!nought && grouped && product(text, grouped.index)) grouped = null;
-    // It ends at the digit the match starts with, so it is found.
-    const number = nought
-      ? nought[0].replace(",", ".")
-      : grouped
+    let number: string;
+    let grouped = NOUGHT.exec(before);
+    if (grouped) number = grouped[0].replace(",", ".");
+    else {
+      grouped = GROUPED.exec(before);
+      // `Cat 6 305 m`: a product's number, then another, not thousands.
+      if (grouped && product(text, grouped.index)) grouped = null;
+      // It ends at the digit the match starts with, so it is found.
+      number = grouped
         ? grouped[0].replaceAll(/[, ]/g, "")
         : (NUMBER.exec(before) as RegExpExecArray)[0];
+    }
     const reading = settled(text, number, token, rules);
     // Null: no unit by its rule.
     const spelt = reading === undefined ? read(token) : reading;
