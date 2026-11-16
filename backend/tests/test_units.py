@@ -577,22 +577,24 @@ NB, THIN = "\u00a0", "\u202f"
         ("Reel 0,500 metres", f"Reel 0,500{NB}metres"),
         ("Box 3 Feet", f"Box 3{NB}Feet"),
         # A number grouped by spaces, whole and as typed, as it may be a pack
-        # count and a size; judged as search reads it, one number (Ali,
+        # count and a size, its ordinary spaces no-break so it never breaks
+        # across a line; judged as search reads it, one number (Ali,
         # 2026-11-16, inventory-tng-t78).
-        ("Box 1 000 feet", f"Box 1 000{NB}feet"),
-        ("Box 1 000 ft", f"Box 1 000{NB}ft"),
-        ("Cable 2 100 ft", f"Cable 2 100{NB}ft"),
-        ("Reel 12 345 678.5 mm", f"Reel 12 345 678.5{NB}mm"),
+        ("Box 1 000 feet", f"Box 1{NB}000{NB}feet"),
+        ("Box 1 000 ft", f"Box 1{NB}000{NB}ft"),
+        ("Cable 2 100 ft", f"Cable 2{NB}100{NB}ft"),
+        ("Reel 12 345 678.5 mm", f"Reel 12{NB}345{NB}678.5{NB}mm"),
         ("X-1 000 feet", "X-1 000 feet"),
         ("Cat 6 305 m", f"Cat 6 305{NB}m"),
         ("Cable 2 1,000 ft", f"Cable 2 1000{NB}ft"),
         # Its sign kept with it, and grouped by any space search reads as
-        # one, as typed.
-        ("Supply -1 000 V", f"Supply -1 000{NB}V"),
-        ("Supply \u22121 000 V", f"Supply \u22121 000{NB}V"),
+        # one; no-break and thin spaces as typed.
+        ("Supply -1 000 V", f"Supply -1{NB}000{NB}V"),
+        ("Supply \u22121 000 V", f"Supply \u22121{NB}000{NB}V"),
         ("Box 1\u202f000 ft", f"Box 1\u202f000{NB}ft"),
         (f"Box 1{NB}000 ft", f"Box 1{NB}000{NB}ft"),
         ("Cable 2\u2009100 ft", f"Cable 2\u2009100{NB}ft"),
+        ("Reel 1\u2009000 000 mm", f"Reel 1\u2009000{NB}000{NB}mm"),
         # Products, units no rule or word settles, and tokens no unit, as
         # typed.
         ("Cat6a cable 5AC SFP+", "Cat6a cable 5AC SFP+"),

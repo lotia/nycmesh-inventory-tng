@@ -954,7 +954,8 @@ def shown_name(name: str, rules: Rules | None = None) -> str:
     (_GROUPED, any space search reads as one), with its sign, is read as
     search reads it, one number, but shown whole and as typed, as it may be
     a pack count and a size: `Cable 2 100 ft` is `Cable 2 100 ft`, never
-    `2100 ft` (Ali, 2026-11-16, inventory-tng-t78). `name` is as saved
+    `2100 ft`, its ordinary spaces no-break so it never breaks across a
+    line (Ali, 2026-11-16, inventory-tng-t78). `name` is as saved
     (models.canonical, spell)."""
     # Any space as search reads it, a plain one (NFKD), so `1\u202f000` is
     # grouped too; one character for one, so where each is stays.
@@ -967,7 +968,8 @@ def shown_name(name: str, rules: Rules | None = None) -> str:
             grouped, joined = hit
             sign = _SIGN.search(name, 0, grouped.start())
             start = grouped.start() if sign is None else sign.start()
-            shown = name[start : match.end(1)]
+            # Its ordinary spaces no-break, the rest as typed.
+            shown = name[start : match.end(1)].replace(" ", NO_BREAK_SPACE)
             searched = name[start : grouped.start()] + joined
         else:
             number = _number(name, match.end(1))

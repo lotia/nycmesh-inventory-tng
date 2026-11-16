@@ -887,7 +887,8 @@ def test_a_comma_after_a_lone_nought_is_read_again(alembic_config: Config) -> No
 def test_a_number_grouped_by_spaces_is_shown_whole(alembic_config: Config) -> None:
     """Migration 0049: each item's, package's and alias's name as shown
     again, a number grouped by spaces before its unit shown whole and as
-    typed, as search reads it judged one number (Ali, 2026-11-16,
+    typed, its ordinary spaces no-break, as search reads it judged one
+    number (Ali, 2026-11-16,
     inventory-tng-t78); names, keys and search kept."""
     command.downgrade(alembic_config, "0048")
     connection = alembic_config.attributes["connection"]
@@ -933,8 +934,8 @@ def test_a_number_grouped_by_spaces_is_shown_whole(alembic_config: Config) -> No
             " SELECT name, unit_key, name_shown FROM item_alias"
         )
     ).all() == [
-        ("Box 1 000 ft", "kept", "Box 1 000\u00a0ft"),
-        ("Cable 2 100 ft", "kept", "Cable 2 100\u00a0ft"),
+        ("Box 1 000 ft", "kept", "Box 1\u00a0000\u00a0ft"),
+        ("Cable 2 100 ft", "kept", "Cable 2\u00a0100\u00a0ft"),
         # Within a code, as typed.
         ("X-1 000 feet", "kept", "X-1 000 feet"),
     ]

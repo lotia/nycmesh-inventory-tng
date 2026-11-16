@@ -612,8 +612,13 @@ no-break space, and judged by the number as search reads it, so
 The read-alike check still ignores spaces. Rejected: joining it in the
 shown name too, which shows packs as one long cable; and reading it as
 typed in search too, which loses `Box 1 000 feet` as `1000 ft` and gains
-nothing. Writing packs as `2 x 100 ft` reads correctly either way.
-Migration 0049 shows existing names so.
+nothing. Writing packs as `2 x 100 ft` reads correctly either way. Ali
+then decided, the same day, that the ordinary spaces within such a number
+are shown as no-break spaces, so `Box 1 000 ft` never breaks across a
+line. They look the same, and nothing else changes: no digits are joined,
+and no-break and thin spaces stay as typed. A pack count such as
+`Cable 2 100 ft` is one grouped number as search reads it, so its space
+is no-break too. Migration 0049 shows existing names so.
 
 ## Amendment: the import's readings file (2026-11-14)
 

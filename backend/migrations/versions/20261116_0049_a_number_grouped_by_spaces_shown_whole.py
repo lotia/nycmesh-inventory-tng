@@ -2,10 +2,11 @@
 as typed (inventory-tng-t78, Ali, 2026-11-16)
 
 A number grouped by spaces before a unit is now shown whole and as typed,
-with a no-break space before its unit as for any number, and judged as
-search reads it, one number: `Box 1 000 ft` is shown `Box 1 000 ft`, where
-it had been left as typed, and `Cable 2 100 ft` is never `Cable 2100 ft`
-(units.shown_name, docs/decisions/0021). So each item's, package's and
+its ordinary spaces no-break so it never breaks across a line, with a
+no-break space before its unit as for any number, and judged as search
+reads it, one number: `Box 1 000 ft` is shown `Box 1 000 ft` with no-break
+spaces, where it had been left as typed, and `Cable 2 100 ft` is never
+`Cable 2100 ft` (units.shown_name, docs/decisions/0021). So each item's, package's and
 alias's name_shown is filled again, as 0047 filled it. No name, key or
 search changes.
 
