@@ -734,16 +734,19 @@ export const LENGTHS = msg`What's on it: {packages} at {from}`;
 export const SAID_USED_UP = msg`({packages} said used up)`;
 export const SAID_LENGTHS = msg`(what is on {packages} said)`;
 
+/** The cart as the batch endpoint takes it, less the key the outbox adds,
+ * and its places' names for its summary (outbox.Summary). */
+export type Batch = { draft: Draft; summary: Summary };
+
 /**
- * The cart as the batch endpoint takes it, less the key the outbox adds,
- * and what its summary is made from (outbox.Summary); or what still needs
- * doing before it can be saved.
+ * The cart as a batch (Batch), or what still needs doing before it can be
+ * saved.
  */
 export function toBatch(
   filled: Cart,
   catalogue: Catalogue,
   all?: readonly Offered[],
-): { draft: Draft; summary: Summary } | { problems: Said[] } {
+): Batch | { problems: Said[] } {
   const reconciled = reconcile(filled, catalogue);
   // Only what the page offers to take from, where it comes from.
   const here = new Map(
@@ -820,7 +823,6 @@ export function toBatch(
     problems.push([say(INSTALL_RANGE)]);
   }
   const lines: Draft["lines"] = [];
-  let items = 0;
   for (const line of cart.lines) {
     const item = index.items.get(line.itemId);
     if (item === undefined) {
@@ -864,7 +866,6 @@ export function toBatch(
       problems.push(sayParts(OPEN_WHOLE, { name }));
     } else if (cart.kind === "open" && quantity.amount > 0) {
       lines.push(...openings(item, quantity.sealed, cart.batchKey));
-      items += 1;
     } else if (quantity.amount > 0) {
       // Each package counted on a line of its own, sealed, so stock keeps
       // them sealed where they arrive (docs/decisions/0020); then loose.
@@ -883,7 +884,6 @@ export function toBatch(
           ...(whole && cart.kind === "move" ? { whole: true } : {}),
         });
       }
-      items += 1;
     }
   }
   if (
@@ -924,16 +924,19 @@ export function toBatch(
   // Each kind names the places its batch must have (problems above).
   const place = (placeId: number | null) =>
     placeId === null ? null : String(index.places.get(placeId));
-  return { draft, summary: { items, from: place(fromId), to: place(toId) } };
+  return { draft, summary: { from: place(fromId), to: place(toId) } };
 }
 
 /**
  * A batch's summary in words, in the language spoken now: its kind,
- * counts and install number from `body`, its places as `summary` kept
- * them (outbox.Summary).
+ * counts and install number from `body`, its items counted by its lines'
+ * (one cart line each), its places as `summary` kept them (outbox.Summary).
  */
 export function batchWords(
-  body: Pick<Draft, "kind" | "install_number" | "used_up" | "lengths">,
+  body: Pick<
+    Draft,
+    "kind" | "install_number" | "lines" | "used_up" | "lengths"
+  >,
   summary: Summary,
 ): string {
   const usedUp = body.used_up?.length ?? 0;
@@ -945,7 +948,9 @@ export function batchWords(
   const lengthsOnly = reporting && usedUp === 0;
   const number = body.install_number ?? null;
   const named = {
-    items: say(ITEMS, { count: summary.items }),
+    items: say(ITEMS, {
+      count: new Set(body.lines.map((line) => line.item_id)).size,
+    }),
     packages: lengthsOnly ? measured : packages,
     from: summary.from ?? "",
     to: summary.to ?? "",

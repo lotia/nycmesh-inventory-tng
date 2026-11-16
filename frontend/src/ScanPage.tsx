@@ -9,6 +9,7 @@ import { MUST_UPGRADE, UPDATED, UPGRADE } from "./build";
 import {
   addOne,
   askWho,
+  type Batch,
   batchWords,
   STORAGE_KEY as CART_KEY,
   type Cart,
@@ -57,7 +58,6 @@ import {
 import {
   type Body,
   batchId,
-  type Draft,
   type Entry,
   MAKE_CHANGES,
   type Note,
@@ -67,7 +67,6 @@ import {
   type Recorded,
   recordedHeading,
   type Said,
-  type Summary,
   sharedOutbox,
   wordsOf,
 } from "./outbox";
@@ -553,7 +552,7 @@ function CartForm({
   const query = useSignal("");
   const problems = useSignal<Said[]>([]);
   // What was last sent to be recorded, worded as it is shown.
-  const saved = useSignal<{ draft: Draft; summary: Summary } | null>(null);
+  const saved = useSignal<Batch | null>(null);
   // While Discard cart waits to be confirmed, the cart's revision then.
   const discarding = useSignal<string | null>(null);
   // An older save just put back in the cart, and what it left to do again.

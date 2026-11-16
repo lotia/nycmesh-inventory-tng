@@ -251,7 +251,7 @@ describe("turning a cart into a batch", () => {
     const lines = [{ itemId: 100, packages: {}, loose: "1" }];
     const batch = toBatch(cart({ lines }), CATALOGUE);
     if (!("summary" in batch)) throw new Error("the cart is recordable");
-    expect(batch.summary).toEqual({ items: 1, from: "Hub", to: "Van" });
+    expect(batch.summary).toEqual({ from: "Hub", to: "Van" });
     expect(batchWords(batch.draft, batch.summary)).toBe(
       "Move: 1 item from Hub to Van",
     );

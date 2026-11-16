@@ -44,7 +44,7 @@ function draft(fields: Partial<Draft> = {}): Draft {
 }
 
 /** A batch's summary, told apart from others' by the place it names. */
-const named = (from: string): Summary => ({ items: 1, from, to: null });
+const named = (from: string): Summary => ({ from, to: null });
 
 /** An entry as storage might hold it. */
 function entry(fields: Partial<Entry> = {}): Entry {
@@ -1410,7 +1410,6 @@ describe("storage", () => {
         "state = waiting | saved | refused | too_old",
         "summary",
         "summary.from",
-        "summary.items",
         "summary.to",
         "transactionId",
         "waitingFor",

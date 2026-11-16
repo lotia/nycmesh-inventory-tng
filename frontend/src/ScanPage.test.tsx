@@ -229,7 +229,7 @@ function leaveInOutbox(
             to_location_id: 12,
             lines: [{ item_id: 100, quantity: "8", package_id: 1000 }],
           },
-          summary: { items: 1, from: "Hub", to: "Van" },
+          summary: { from: "Hub", to: "Van" },
           queuedAt,
           build,
           state,
@@ -1014,7 +1014,7 @@ describe("filling and saving a cart", () => {
           {
             ...kept,
             body: batch("1"),
-            summary: { items: 1, from: "Hub", to: "Van" },
+            summary: { from: "Hub", to: "Van" },
             state: "saved",
             reason: null,
             transactionId: 41,
@@ -1022,7 +1022,7 @@ describe("filling and saving a cart", () => {
           {
             ...kept,
             body: batch("2"),
-            summary: { items: 2, from: "Hub", to: "Van" },
+            summary: { from: "Hub", to: "Shelf" },
             state: "refused",
             reason: { code: "key_reused" },
             transactionId: null,
@@ -1037,7 +1037,7 @@ describe("filling and saving a cart", () => {
     const lines = (what: string) =>
       [...row(what).querySelectorAll("ul li")].map((each) => each.textContent);
     const first = "Move: 1 item from Hub to Van";
-    const second = "Move: 2 items from Hub to Van";
+    const second = "Move: 1 item from Hub to Shelf";
     expect(lines(first)).toEqual([]);
     expect(lines(second)).toEqual(["1. Cat6 cable: 2 m"]);
     fireEvent.click(
@@ -1150,7 +1150,7 @@ describe("filling and saving a cart", () => {
     expect(note.parentElement?.className).toBe("alert");
     expect(outbox.entries.value[0]).toMatchObject({
       state: "waiting",
-      summary: { items: 1, from: null, to: "Hub › Shelf A" },
+      summary: { from: null, to: "Hub › Shelf A" },
     });
   });
 
@@ -1623,7 +1623,7 @@ describe("scanning labels with the camera", () => {
     save();
     await vi.waitFor(() =>
       expect(outbox.entries.value.map((each) => each.summary)).toEqual([
-        { items: 1, from: "Hub", to: null },
+        { from: "Hub", to: null },
       ]),
     );
   });
@@ -3096,7 +3096,7 @@ describe("what an older build left", () => {
     // Listed, to save the changes again.
     expect(outbox.shown()[0]).toMatchObject({
       state: "refused",
-      summary: { items: 1, from: "Hub", to: "Van" },
+      summary: { from: "Hub", to: "Van" },
     });
   });
 
@@ -3319,7 +3319,7 @@ describe("what an older build left", () => {
       failures: 0,
       // Put back from what was recorded, then changed.
       body: { ...move([boxed(n)]), changed_from: [boxed(1)] },
-      summary: { items: n, from: "Hub", to: "Van" },
+      summary: { from: "Hub", to: "Van" },
       state: "refused",
       reason: {
         code: "recorded_elsewhere",

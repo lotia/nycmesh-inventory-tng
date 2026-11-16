@@ -380,12 +380,10 @@ function problemSaid({ names, kind }: Problem): Said {
 }
 
 /** What a batch's summary is made from besides its body, so two batches
- * can be told apart: how many items it holds, and its places' names as
- * the catalogue gave them when it was queued, as a place may leave the
- * catalogue. Worded as it is shown (cart.ts, batchWords), in the language
- * spoken then (inventory-tng-ar8). */
+ * can be told apart: its places' names as the catalogue gave them when it
+ * was queued, as a place may leave the catalogue. Worded as it is shown
+ * (cart.ts, batchWords), in the language spoken then (inventory-tng-ar8). */
 export const Summary = v.object({
-  items: whole,
   from: v.nullable(v.string()),
   to: v.nullable(v.string()),
 });

@@ -180,7 +180,7 @@ function entry(n: number, fields: Record<string, unknown> = {}) {
         { item_id: 101, quantity: "3", open_package_key: OPEN_KEY },
       ],
     },
-    summary: { items: 2, from: "Κέντρο", to: "Βαν" },
+    summary: { from: "Κέντρο", to: "Βαν" },
     queuedAt: 1,
     build: BUILD,
     state: "waiting",
