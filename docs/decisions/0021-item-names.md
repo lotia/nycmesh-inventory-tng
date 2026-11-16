@@ -582,6 +582,11 @@ or `/` (`10G-SFP+`, `48V-to-12V`), is shown as typed; the seeding page shows
 names as typed, as evidence of how a unit was typed; and an item's form,
 its packages' and its aliases' fields hold the name as typed.
 
+Ali decided on 2026-11-15 (inventory-tng-dfz) that a refusal because
+names would read alike, on a form, a rule's page, the seeding page or
+`unit_readings load`, names each as typed, not as shown, as it is about
+how typed names read (`reading_rules.read_alike_words`).
+
 Ali decided on 2026-11-15 (inventory-tng-tze) that a unit's word
 (`feet`, `metres`, `VDC`, `VAC`) is shown as a unit's symbol is: a
 no-break space between the number and the word, the number without

@@ -285,6 +285,19 @@ def test_a_rule_reading_names_alike_is_refused(
     assert items.read_alike(session, ["g"], {}) == []
 
 
+def test_a_read_alike_refusal_names_each_as_typed(
+    session: Session, radios: Category
+) -> None:
+    """Not as shown, unlike every other page: the refusal is about how
+    typed names read (Ali, 2026-11-15, inventory-tng-dfz)."""
+    one = new_item(session, radios, "Box 1,000g")
+    other = new_item(session, radios, "Box 1,000 Gbps")
+    assert other.name_shown != other.name
+    assert reading_rules.read_alike_words(session, ["g"], {"g": GBPS}) == [
+        f"item {one.id} (Box 1,000g) and item {other.id} (Box 1,000 Gbps)"
+    ]
+
+
 def test_a_rule_may_read_what_the_table_finds_unlikely() -> None:
     """Offered with the likely readings; on its page, every reading of the
     unit, whatever the number; one no unit spells offers none."""

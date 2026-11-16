@@ -219,7 +219,8 @@ def read_alike_words(
     session: Session, tokens: Iterable[str], rules: units.Rules
 ) -> list[str]:
     """Each group of names that would read alike by `rules`, of those with
-    these units after a number (items.read_alike), in words, by id."""
+    these units after a number (items.read_alike), in words, by id, each
+    named as typed, not as shown (Ali, 2026-11-15, inventory-tng-dfz)."""
     return [
         " and ".join(f"{TABLES[each.table]} {each.id} ({each.name})" for each in group)
         for group in items.read_alike(session, tokens, rules)
