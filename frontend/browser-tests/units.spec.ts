@@ -46,7 +46,7 @@ async function forget(page: Page, unit: string): Promise<void> {
 async function newItem(page: Page, name: string): Promise<void> {
   await page.goto("/admin/items");
   await page.getByLabel(/^Name/).fill(name);
-  await page.getByLabel("Category").selectOption({ label: "Cables" });
+  await page.getByLabel(/^Category/).selectOption({ label: "Cables" });
 }
 
 test("a unit nothing settles is asked once, then said under the name", async ({

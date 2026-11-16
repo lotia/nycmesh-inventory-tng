@@ -6,7 +6,7 @@ have to register again with a new code.</p>
 <ul>
   {% for device in devices %}<li>{{ device.name }}</li>{% endfor %}
 </ul>
-{% call confirm(here, "Revoke " ~ devices | length, keep ~ "?" ~ filter | urlencode, "Keep them") %}
+{% call confirm(here, "Revoke " ~ devices | length, keep ~ ("?" ~ filter | urlencode if filter else ""), "Keep them") %}
   {% for name, value in filter.items() %}
   <input type="hidden" name="{{ name }}" value="{{ value }}">
   {% endfor %}

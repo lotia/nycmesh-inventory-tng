@@ -1,5 +1,6 @@
 """Items and their packages (admin/items.py)."""
 
+import html
 import re
 import uuid
 from collections.abc import Callable
@@ -33,7 +34,7 @@ from inventory_tng.models import (
     ReadingRule,
 )
 
-from helpers.rows import add, history, item_fields, named, shown
+from helpers.rows import add, history, item_fields, named, shown, tag
 from helpers.sign_in import text
 from helpers.stock import Spools, retire
 
@@ -587,6 +588,10 @@ def test_changes_are_logged_by_id(
     assert "Radio X" not in str(line)
 
 
+def text_of(page: str) -> str:
+    return html.unescape(page)
+
+
 def items_named(page: str) -> list[str]:
     """The items the list shows, in its order."""
     return re.findall(r'<td><a href="/admin/items/\d+">([^<]+)</a>', page)
@@ -684,6 +689,142 @@ def test_pages_of_fifty(
     assert "Page 1 of 2" in text(
         admin_client.get(ITEMS, params={"q": "Paged", "page": "x"})
     )
+
+
+def test_items_sort_by_each_heading_either_way(
+    admin_client: TestClient, session: Session, radios: Category
+) -> None:
+    """By name unless a heading sorts them; pressed again, the other way
+    (Ali, 2026-11-15, inventory-tng-qwb)."""
+    mark = tag()
+    antennas = add(session, Category(name=f"Antennas {mark}"))
+    for name, category, unit, maker in (
+        ("Bravo", radios, "m", "Ubiquiti"),
+        ("Alpha", antennas, "each", "Mikrotik"),
+        ("Charlie", antennas, "ft", None),
+    ):
+        add(
+            session,
+            Item(
+                name=f"Sorted {mark} {name}",
+                category_id=category.id,
+                unit=unit,
+                manufacturer=maker,
+            ),
+        )
+
+    def order(**query: str) -> list[str]:
+        page = text(admin_client.get(ITEMS, params={"per": "all"} | query))
+        return [n.rsplit(" ", 1)[1] for n in items_named(page) if mark in n]
+
+    assert order() == ["Alpha", "Bravo", "Charlie"]
+    assert order(sort="name", order="desc") == ["Charlie", "Bravo", "Alpha"]
+    # Within a category, by name.
+    assert order(sort="category") == ["Alpha", "Charlie", "Bravo"]
+    assert order(sort="category", order="desc") == ["Bravo", "Alpha", "Charlie"]
+    assert order(sort="unit") == ["Alpha", "Charlie", "Bravo"]
+    assert order(sort="part") == ["Alpha", "Bravo", "Charlie"]
+    assert order(sort="part", order="desc") == ["Charlie", "Bravo", "Alpha"]
+    assert order(sort="nonsense", order="up") == ["Alpha", "Bravo", "Charlie"]
+    page = admin_client.get(ITEMS).text
+    assert (
+        '<th aria-sort="ascending"><a href="/admin/items?sort=name&amp;order=desc">Item'
+        in page
+    )
+    assert '<a href="/admin/items?sort=category">Category</a>' in page
+    page = admin_client.get(ITEMS, params={"sort": "category"}).text
+    assert (
+        '<th class="hidden sm:table-cell" aria-sort="ascending">'
+        '<a href="/admin/items?sort=category&amp;order=desc">Category'
+    ) in page
+    assert '<a href="/admin/items?sort=name">Item</a>' in page
+
+
+def test_items_show_25_50_100_or_all(
+    admin_client: TestClient, session: Session, radios: Category
+) -> None:
+    mark = tag()
+    for number in range(30):
+        new_item(session, radios, f"Sized {mark} {number:03}")
+    query = {"q": f"Sized {mark}"}
+    page = admin_client.get(ITEMS, params=query).text
+    assert len(items_named(page)) == 30
+    assert f'<a href="{ITEMS}?q=Sized+{mark}&amp;per=25">25</a>' in page
+    assert f'<a href="{ITEMS}?q=Sized+{mark}" aria-current="page">50</a>' in page
+    page = text(admin_client.get(ITEMS, params=query | {"per": "25"}))
+    assert len(items_named(page)) == 25
+    assert "Page 1 of 2" in page
+    second = text(admin_client.get(ITEMS, params=query | {"per": "25", "page": "2"}))
+    assert len(items_named(second)) == 5
+    every = admin_client.get(ITEMS, params=query | {"per": "all"}).text
+    assert len(items_named(every)) == 30
+    assert '" aria-current="page">All</a>' in every
+    assert "Page 1 of" not in every
+    # A size not offered is 50; a new search keeps the size.
+    assert len(items_named(text(admin_client.get(ITEMS, params={"per": "7"})))) <= 50
+    assert (
+        '<input type="hidden" name="per" value="25">'
+        in admin_client.get(ITEMS, params={"per": "25"}).text
+    )
+
+
+def test_items_filter_by_category(
+    admin_client: TestClient, session: Session, radios: Category
+) -> None:
+    mark = tag()
+    antennas = add(session, Category(name=f"Antennas {mark}"))
+    kept = new_item(session, antennas, f"Filtered {mark} dish")
+    new_item(session, radios, f"Filtered {mark} radio")
+    page = text(admin_client.get(ITEMS, params={"category": str(antennas.id)}))
+    assert items_named(page) == [kept.name]
+    assert f'<option value="{antennas.id}" selected>' in page
+    assert f'<a href="{ITEMS}">Clear</a>' in page
+    # Kept by a search, a sort and the pages; the search box's suggestions
+    # come from it too.
+    found = admin_client.get(
+        ITEMS, params={"category": str(antennas.id), "q": f"Filtered {mark}"}
+    ).text
+    assert [kept.name] == items_named(text_of(found))
+    assert f"sort=name&amp;order=desc&amp;category={antennas.id}" not in found
+    assert f"category={antennas.id}&amp;sort=name" in found
+    assert f'data-suggest="{ITEMS}/suggest?category={antennas.id}"' in found
+    offered = admin_client.get(
+        f"{ITEMS}/suggest", params={"q": f"Filtered {mark}", "category": str(radios.id)}
+    ).json()
+    assert [each["name"] for each in offered] == [f"Filtered {mark} radio"]
+    # None in it: it says so; one not a number is no filter.
+    empty = add(session, Category(name=f"Empty {mark}"))
+    page = text(admin_client.get(ITEMS, params={"category": str(empty.id)}))
+    assert "None is in the filter." in page
+    assert kept.name in text(
+        admin_client.get(ITEMS, params={"category": "x", "per": "all", "q": kept.name})
+    )
+
+
+def test_a_search_sorted_by_a_heading_goes_back_to_best_match(
+    admin_client: TestClient, session: Session, radios: Category
+) -> None:
+    """Best match first while searching; a heading sorts the matches, and
+    Best match puts their order back (Ali, 2026-11-15, inventory-tng-qwb)."""
+    mark = tag()
+    # The closest last by name: a typo's one first.
+    for name in ("LiteBeam", "Aaa LiteBeem"):
+        new_item(session, radios, f"{name} {mark}")
+    query = {"q": f"LiteBeam {mark}"}
+    best = admin_client.get(ITEMS, params=query).text
+    assert items_named(text_of(best))[0] == f"LiteBeam {mark}"
+    assert "aria-sort" not in best
+    assert '" aria-current="page">Best match</a>' in best
+    by_name = admin_client.get(ITEMS, params=query | {"sort": "name"}).text
+    assert items_named(text_of(by_name)) == sorted(
+        items_named(text_of(by_name)), key=str.lower
+    )
+    assert items_named(text_of(by_name))[0] == f"Aaa LiteBeem {mark}"
+    assert f'<a href="{ITEMS}?q=LiteBeam+{mark}">Best match</a>' in by_name
+    # A new search from the box is best match first again: no sort sent.
+    assert 'name="sort"' not in by_name.split('role="search"', 1)[1].split("</form>")[0]
+    # Without a search, no Best match.
+    assert "Best match" not in admin_client.get(ITEMS).text
 
 
 def test_an_empty_list_says_what_to_do_next(admin_client: TestClient) -> None:
@@ -914,11 +1055,17 @@ def test_items_ticked_are_set_together_and_packages_keep_their_own(
     page = text(admin_client.get(ITEMS))
     assert f'name="item" value="{cable.id}"' in page
     assert f'name="item" value="{gone.id}"' not in page
+    # The list as shown comes in the form's address, sorted and sized too.
+    assert f'action="{ITEMS}/tracking"' in page
+    sorted_page = admin_client.get(ITEMS, params={"sort": "unit", "per": "25"}).text
+    assert f'action="{ITEMS}/tracking?sort=unit&amp;per=25"' in sorted_page
     done = admin_client.post(
-        f"{ITEMS}/tracking",
-        data={"item": [str(cable.id), str(gone.id)], "track": "on", "q": "cable"},
+        f"{ITEMS}/tracking?q=cable&sort=unit&per=25",
+        data={"item": [str(cable.id), str(gone.id)], "track": "on"},
     )
-    assert done.headers["location"] == f"{ITEMS}?q=cable&notice=tracking_on"
+    assert done.headers["location"] == (
+        f"{ITEMS}?q=cable&sort=unit&per=25&notice=tracking_on"
+    )
     for row in (cable, rope, gone, own):
         session.refresh(row)
     assert (cable.track_opened, rope.track_opened, gone.track_opened) == (
@@ -930,13 +1077,8 @@ def test_items_ticked_are_set_together_and_packages_keep_their_own(
     assert '<span class="tag">Opened followed</span>' in text(admin_client.get(ITEMS))
     # Ticked again, or kept: nothing to change, and it says so.
     again = admin_client.post(
-        f"{ITEMS}/tracking",
-        data={
-            "item": [str(cable.id)],
-            "track": "on",
-            "q": "cable",
-            "pick": str(cable.id),
-        },
+        f"{ITEMS}/tracking?q=cable&pick={cable.id}",
+        data={"item": [str(cable.id)], "track": "on"},
     )
     assert again.headers["location"] == (
         f"{ITEMS}?q=cable&pick={cable.id}&notice=tracking_same"

@@ -670,10 +670,19 @@ utilities. When you style a page:
   `back`, a path and its words, in its context, which shows a link above
   its title. A retire form has `data-retire`, so a page with changes not
   yet saved asks before it retires.
+- A list page reads a `View` from its query string (`View.read` in
+  `admin/listing.py`): a `Sorting` of the columns it sorts by, each a SQL
+  expression (`Sort.of`) or, for rows built in Python, a key
+  (`Sort.keyed`), its first one the page's own order; its filters, as the
+  address says them; and the page size. `ordered` applies it to a select,
+  after `count`, with the id last; `arranged` to a list. In the template,
+  `_listing.html`'s `sort_heading` for each sortable heading, `sizes` above
+  the table, `filter_form` for the filters and `pager` below.
 - A list that grows past a screen, as items and volunteers do, is a
-  `Listing` (`admin/listing.py`), drawn with `_listing.html`'s macros:
-  search that forgives typos, with suggestions from its own `/suggest`;
-  "Current · Retired · All"; and pages of 50.
+  `Listing` (`admin/listing.py`), with a `View` of its own: search that
+  forgives typos, with suggestions from its own `/suggest`; and "Current ·
+  Retired · All". `Searched.read` takes the page's filters and what they
+  pick.
 - What administrator pages do in the browser beyond plain HTML is in
   `frontend/src/admin.ts`; each still works without it.
 - A page that prints a QR code puts a `.printable` in its `main`: the

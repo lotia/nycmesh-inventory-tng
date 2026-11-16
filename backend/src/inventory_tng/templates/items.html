@@ -1,22 +1,32 @@
 {% extends "admin_base.html" %}
 {% from "_table.html" import table %}
-{% from "_listing.html" import search_box, filters, summary, empty, pager %}
+{% from "_listing.html" import search_box, filters, filter_form, sizes, sort_heading, summary, empty, pager %}
 {% block main %}
+{% set view = listing.view %}
 {{ search_box(listing, "items") }}
 {{ filters(listing) }}
+{% call filter_form(view) %}
+  <label>Filter by category
+    <select name="category">
+      <option value="">Any</option>
+      {% for category in all_categories %}
+      <option value="{{ category.id }}"{% if view.filtered("category") == category.id | string %} selected{% endif %}>{{ category.name }}{% if category.retired_at %} (retired){% endif %}</option>
+      {% endfor %}
+    </select>
+  </label>
+{% endcall %}
 
-{#- The items ticked belong to this form, and the list as shown, to come
-back to. #}
-<form method="post" action="{{ here }}/tracking" id="track-items">
-  {% if listing.search %}<input type="hidden" name="q" value="{{ listing.search }}">{% endif %}
-  {% if listing.show != "current" %}<input type="hidden" name="show" value="{{ listing.show }}">{% endif %}
-  {% if listing.page > 1 %}<input type="hidden" name="page" value="{{ listing.page }}">{% endif %}
-  {% if listing.pick %}<input type="hidden" name="pick" value="{{ listing.pick }}">{% endif %}
-</form>
+{#- The items ticked belong to this form, and the list as shown, in its
+address, to come back to. #}
+<form method="post" action="{{ here }}/tracking{{ view.query_string }}" id="track-items"></form>
 <section>
   {{ summary(listing, "item", "items") }}
+  {{ sizes(view) }}
   {% call table() %}
-    <tr><th>Pick</th><th>Item</th><th class="hidden sm:table-cell">Category</th><th class="hidden sm:table-cell">Unit</th><th class="hidden sm:table-cell">Part</th></tr>
+    <tr><th>Pick</th>{{ sort_heading(view, "name", "Item") }}
+      {{- sort_heading(view, "category", "Category", "hidden sm:table-cell") }}
+      {{- sort_heading(view, "unit", "Unit", "hidden sm:table-cell") }}
+      {{- sort_heading(view, "part", "Part", "hidden sm:table-cell") }}</tr>
     {% for item in listing.rows %}
     {% set category = category_names.get(item.category_id, "") %}
     {% set part = ((item.manufacturer or "") ~ " " ~ (item.part_number or "")) | trim %}

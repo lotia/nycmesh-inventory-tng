@@ -1,7 +1,8 @@
 # 0019 — How pages look and act: links, your account, actions and lists
 
 **Status:** accepted · 2026-11-10 · builds on 0014 (one stylesheet in NYC
-Mesh's look) · amended 2026-11-12 (packages renamed and brought back)
+Mesh's look) · amended 2026-11-12 (packages renamed and brought back),
+2026-11-15 (lists sort, filter and choose their page size)
 
 ## Context
 
@@ -77,7 +78,19 @@ the scan pages, on a phone (360 to 430 px, one hand) and a desktop alike.
 - **Lists are tables**, on a phone too: columns that do not fit move to a
   hint line under the name. A Retired section apart while lists are short;
   once a list has search, "Current · Retired · All" filter links instead.
-  Pages of 50 past 50 rows. An empty list says what to do next.
+  An empty list says what to do next.
+- **Lists sort, filter and choose their page size** with one control of
+  our own, not a library (Ali, 2026-11-15, inventory-tng-qwb). Headings are
+  links: the sorted one has `aria-sort` and an arrow, and pressing it again
+  reverses the order. "Show 25 · 50 · 100 · All" links above the table,
+  the current one marked; 50 by default, and the pager below once there is
+  more than one page. Filters are a form above the list, Filter and Clear.
+  Each list opens in its own order, as before it could be sorted. While
+  searching, matches come best first; a heading sorts them instead, and a
+  "Best match" link puts the match order back. Sort, filters and page size
+  live in the address only: nothing is remembered per administrator, and
+  the navigation opens each list as it starts. All of it works without
+  JavaScript, and the page's statements do not grow with its rows.
 - **Search forgives typos** (PostgreSQL's trigram matching) and offers
   suggestions from the current list, as its filter shows it, narrowing as
   one types (an ARIA combobox: arrows, Enter, Escape; 44 px rows).
@@ -102,8 +115,8 @@ list's box.
 - Pages change to match in the follow-up work under inventory-tng-8i4.60;
   until then, some still differ, and new pages follow this record.
 - "Settings" moves to "Site settings" in the masthead and its page title.
-- Each kind of list gains search, filters and paging as it grows past what
-  one screen shows.
+- Each kind of list gains search as it grows past what one screen shows,
+  and the list control's sorting, filters and page size.
 - A retired record being read only, a name a retired one holds would keep
   it from coming back. So the names of items, categories and places are
   unique among retired ones too (Ali, 2026-11-10,

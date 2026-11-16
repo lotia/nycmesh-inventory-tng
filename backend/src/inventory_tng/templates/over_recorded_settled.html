@@ -1,7 +1,7 @@
 {% extends "admin_base.html" %}
 {% from "_table.html" import table %}
 {% from "_views.html" import views %}
-{% from "_listing.html" import pager %}
+{% from "_listing.html" import pager, sizes, sort_heading %}
 {#- A place, linked to its count of the item if it may be counted. #}
 {% macro place(spot, each) -%}
 {% if spot.countable %}<a href="{{ counts_path }}/{{ spot.id }}?item={{ each.item_id }}">{{ spot.name }}</a>{% else %}{{ spot.name }}{% endif %}
@@ -9,10 +9,16 @@
 {% block main %}
 {{ views("Recorded more than moved", recorded_views, "settled") }}
 {% if only %}
-<p>Only {{ only.name_shown }}. <a href="{{ here }}">Show all</a></p>
+<p>Only {{ only.name_shown }}. <a href="{{ view.link(kept=(), page=1) }}">Show all</a></p>
 {% endif %}
+{{ sizes(view) }}
 {% call table() %}
-  <tr><th>Settled</th><th>Item</th><th>Amount</th><th>Where</th><th>How</th><th>Why</th><th>By</th></tr>
+  <tr>{{ sort_heading(view, "settled", "Settled") }}
+    {{- sort_heading(view, "item", "Item") }}
+    {{- sort_heading(view, "amount", "Amount") }}
+    {{- sort_heading(view, "where", "Where") }}
+    {{- sort_heading(view, "how", "How") }}<th>Why</th>
+    {{- sort_heading(view, "by", "By") }}</tr>
   {% for each in rows %}
   <tr>
     <td>{{ each.at | when(zone) }}</td>
@@ -32,5 +38,5 @@
   <tr><td colspan="7">Nothing settled yet.</td></tr>
   {% endfor %}
 {% endcall %}
-{{ pager(listing) }}
+{{ pager(view) }}
 {% endblock %}

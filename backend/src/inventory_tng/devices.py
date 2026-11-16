@@ -258,10 +258,6 @@ def name_device(
     log.info("device named", device_id=device.id)
 
 
-# How many devices a page lists at most.
-LISTED = 500
-
-
 @dataclass(frozen=True)
 class DeviceFilter:
     """Which devices to list or revoke: registered at or after `since` and
@@ -290,29 +286,9 @@ class DeviceFilter:
         return found
 
 
-# How a list of devices may be sorted: by when each registered or was last
-# used, newest or oldest first.
-type Sort = Literal["registered", "registered-oldest", "used", "used-oldest"]
-SORTS: tuple[Sort, ...] = ("registered", "registered-oldest", "used", "used-oldest")
-
-
-def find_devices(
-    session: Session, chosen: DeviceFilter, sort: Sort = "registered"
-) -> list[Device]:
-    """The devices the filter matches, sorted, at most LISTED."""
-    column = Device.last_seen_at if sort.startswith("used") else Device.created_at
-    oldest = sort.endswith("oldest")
-    return list(
-        session.scalars(
-            select(Device)
-            .where(*chosen.where())
-            .order_by(
-                column.asc() if oldest else column.desc(),
-                Device.id.asc() if oldest else Device.id.desc(),
-            )
-            .limit(LISTED)
-        )
-    )
+def find_devices(chosen: DeviceFilter) -> Select[Device]:
+    """The devices the filter matches, to sort and page (admin/devices.py)."""
+    return select(Device).where(*chosen.where())
 
 
 def _current_among(chosen: DeviceFilter, device_ids: Collection[int]) -> Select[Device]:

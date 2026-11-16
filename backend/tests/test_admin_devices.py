@@ -342,20 +342,52 @@ def test_devices_are_sorted_by_registered_or_last_used(
     session.flush()
     window = {"since": "2026-11-05T07:00", "until": "2026-11-05T08:00"}
 
-    def order(sort: str) -> list[int]:
-        page = text(admin_client.get(DEVICE_LIST, params=window | {"sort": sort}))
+    def order(sort: str, way: str = "") -> list[int]:
+        asked = window | {"sort": sort, "order": way}
+        page = text(admin_client.get(DEVICE_LIST, params=asked))
         return [i for i in listed_ids(page) if i in (early.id, late.id)]
 
+    assert order("") == [late.id, early.id]
     assert order("registered") == [late.id, early.id]
-    assert order("registered-oldest") == [early.id, late.id]
+    assert order("registered", "asc") == [early.id, late.id]
     assert order("used") == [early.id, late.id]
-    assert order("used-oldest") == [late.id, early.id]
-    assert order("nonsense") == [late.id, early.id]
-    # The headings sort, the filter kept, and say how it is sorted now.
+    assert order("used", "asc") == [late.id, early.id]
+    assert order("nonsense", "sideways") == [late.id, early.id]
+    # The headings sort, the filter kept, and say how it is sorted now:
+    # newest registered first, so pressed again, oldest first.
     page = admin_client.get(DEVICE_LIST, params=window).text
     assert 'aria-sort="descending"' in page
-    assert "sort=registered-oldest" in page
+    assert "sort=registered&amp;order=asc" in page
+    assert 'sort=used"' in page
     assert "until=2026-11-05T08%3A00" in page
+
+
+def test_devices_come_in_pages_of_the_size_asked(
+    admin_client: TestClient, session: Session
+) -> None:
+    """Pages of 25, 50, 100 or All, not a cap (Ali, 2026-11-15,
+    inventory-tng-qwb); the filter kept, and cleared by Clear."""
+    start = datetime(2026, 11, 7, 12, tzinfo=UTC)
+    made = [device_at(session, start + timedelta(minutes=n)) for n in range(26)]
+    window = {"since": "2026-11-07T07:00", "until": "2026-11-07T08:00"}
+    page = text(admin_client.get(DEVICE_LIST, params=window))
+    assert len(listed_ids(page)) == 26
+    assert "26 listed." in page
+    page = text(admin_client.get(DEVICE_LIST, params=window | {"per": "25"}))
+    assert listed_ids(page) == [d.id for d in reversed(made)][:25]
+    assert "26 listed." in page
+    assert "Page 1 of 2" in page
+    second = text(
+        admin_client.get(DEVICE_LIST, params=window | {"per": "25", "page": "2"})
+    )
+    assert listed_ids(second) == [made[0].id]
+    # Revoking from a page keeps its page and size.
+    assert '<input type="hidden" name="per" value="25">' in second
+    assert '<input type="hidden" name="page" value="2">' in second
+    every = text(admin_client.get(DEVICE_LIST, params=window | {"per": "all"}))
+    assert len(listed_ids(every)) == 26
+    # Clear drops the filter, not the size.
+    assert f'<a href="{DEVICE_LIST}?per=all">Clear</a>' in every
 
 
 def test_a_revoke_keeps_the_window_and_sort(

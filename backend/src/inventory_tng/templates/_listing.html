@@ -1,15 +1,57 @@
-{#- A long list's parts (admin/listing.py, docs/decisions/0019), each
-given the page's Listing. `one` and `many` name the kind of record, such
-as "item" and "items". -#}
+{#- A list's parts (admin/listing.py, docs/decisions/0019). Those of a
+long list with search are given the page's Listing, the rest any list's
+View (a Listing's is listing.view). `one` and `many` name the kind of
+record, such as "item" and "items". -#}
+
+{#- A heading that sorts by its column, the way it sorts first, or the
+other way if sorted by it already: the sorted one says so, and shows an
+arrow. `class` is the cell's. -#}
+{% macro sort_heading(view, column, words, class="") -%}
+{%- set sorted = view.aria_sort(column) -%}
+<th{% if class %} class="{{ class }}"{% endif %}{% if sorted %} aria-sort="{{ sorted }}"{% endif %}><a href="{{ view.sort_link(column) }}">{{ words }}
+  {%- if sorted %} <span aria-hidden="true">{{ "↓" if sorted == "descending" else "↑" }}</span>{% endif %}</a></th>
+{%- endmacro %}
+
+{#- How many rows a page shows, the one shown marked; while searching,
+"Best match" puts the closest first again once a heading sorted them. -#}
+{% macro sizes(view) -%}
+<nav aria-label="Rows" class="filters">
+  <span>Show</span>
+  {% for size in view.sizes %}
+  <a href="{{ view.size_link(size) }}"{% if view.per_page == size %} aria-current="page"{% endif %}>{{ size or "All" }}</a>
+  {%- if not loop.last %} <span aria-hidden="true">·</span>{% endif %}
+  {% endfor %}
+  {% if view.searching %}<span aria-hidden="true">·</span>
+  <a href="{{ view.best_match_link() }}"{% if view.by is none %} aria-current="page"{% endif %}>Best match</a>{% endif %}
+</nav>
+{%- endmacro %}
+
+{#- A list's own filters, its fields the call's body: sent in the address,
+as a search is, the rest of the view kept but its page. -#}
+{% macro filter_form(view) -%}
+<form method="get" action="{{ view.here }}">
+  {% for name, value in view.unfiltered_fields() %}
+  <input type="hidden" name="{{ name }}" value="{{ value }}">
+  {% endfor %}
+  {{ caller() }}
+  <div class="actions">
+    <button>Filter</button>
+    {% if view.filters %}<a href="{{ view.unfiltered_link() }}">Clear</a>{% endif %}
+  </div>
+</form>
+{%- endmacro %}
 
 {#- The search box. Without JavaScript, Find lists every close match, best
 first; with it (frontend/src/combobox.ts), suggestions come from
 `here`/suggest as one types, and picking one narrows the list to it. -#}
 {% macro search_box(listing, many) -%}
+{#- A new search comes best match first: no sort kept. -#}
 <form method="get" action="{{ listing.here }}" role="search" class="actions">
-  {% if listing.show != "current" %}<input type="hidden" name="show" value="{{ listing.show }}">{% endif %}
+  {% for name, value in listing.view.fields("q", "pick", "sort", "order", "page") %}
+  <input type="hidden" name="{{ name }}" value="{{ value }}">
+  {% endfor %}
   <label class="relative grow">Find {{ many }}
-    <input name="q" type="search" value="{{ listing.search }}" maxlength="200" autocomplete="off" data-suggest="{{ listing.here }}/suggest{% if listing.show != 'current' %}?show={{ listing.show }}{% endif %}">
+    <input name="q" type="search" value="{{ listing.search }}" maxlength="200" autocomplete="off" data-suggest="{{ listing.suggest_address }}">
   </label>
   <button>Find</button>
 </form>
@@ -39,12 +81,13 @@ first; with it (frontend/src/combobox.ts), suggestions come from
 {% macro empty(listing, columns, none_yet) -%}
 <tr><td colspan="{{ columns }}">
   {%- if listing.narrowed %}Nothing matches. Check the spelling, or <a href="{{ listing.link(search='') }}">clear the search</a>.
+  {%- elif listing.view.filters %}None is in the filter. <a href="{{ listing.view.unfiltered_link() }}">Clear it</a>.
   {%- elif listing.show == listing.lapsed %}None is {{ listing.lapsed }}.
   {%- else %}{{ none_yet }}{% endif -%}
 </td></tr>
 {%- endmacro %}
 
-{#- Pages of 50, once there are more. -#}
+{#- Pages, once there are more than one: given a Listing or a View. -#}
 {% macro pager(listing) -%}
 {% if listing.pages > 1 %}
 <nav aria-label="Pages" class="actions">

@@ -212,7 +212,15 @@ PAGES: dict[str, tuple[More, *tuple[Path, ...]]] = {
     CATALOGUE: (everything,),
     "/admin": (everything,),
     "/admin/account": (authenticator,),
-    "/admin/items": (everything,),
+    "/admin/items": (
+        everything,
+        "/admin/items",
+        # Sorted by a heading, all on one page, and filtered.
+        "/admin/items?sort=category&order=desc&per=all",
+        lambda w: (
+            f"/admin/items?q=Cable&sort=part&category={w.spools.cable.category_id}"
+        ),
+    ),
     "/admin/items/suggest": (everything, "/admin/items/suggest?q=Cable"),
     "/admin/items/{item_id}": (
         item_parts,
@@ -247,7 +255,11 @@ PAGES: dict[str, tuple[More, *tuple[Path, ...]]] = {
     "/admin/stock/used-up": (everything,),
     "/admin/stock/length-checks": (everything,),
     "/admin/stock/recorded-more": (over_recorded_line,),
-    "/admin/stock/recorded-more/settled": (over_recorded_settled,),
+    "/admin/stock/recorded-more/settled": (
+        over_recorded_settled,
+        "/admin/stock/recorded-more/settled",
+        "/admin/stock/recorded-more/settled?sort=how&per=all",
+    ),
     "/admin/stock/length-checks/{which}": (everything, *(k.path for k in KINDS)),
     "/admin/counts": (everything,),
     "/admin/unit-readings": (reading_rule,),
@@ -259,7 +271,11 @@ PAGES: dict[str, tuple[More, *tuple[Path, ...]]] = {
         lambda w: f"/admin/counts/{w.spools.store.id}?q=Radio",
     ),
     "/admin/devices": (new_device_in,),
-    "/admin/devices/all": (new_device_in,),
+    "/admin/devices/all": (
+        new_device_in,
+        "/admin/devices/all",
+        "/admin/devices/all?sort=used&order=asc&per=all",
+    ),
     "/admin/devices/codes/{code_id}": (
         device_of_code,
         lambda w: f"/admin/devices/codes/{w.code_id}",

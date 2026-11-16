@@ -12,7 +12,11 @@ test("a suggestion picked with the keyboard narrows the list", async ({
   page,
 }) => {
   await page.goto("/admin/items");
-  const first = page.getByRole("table").getByRole("link").first();
+  const first = page
+    .getByRole("table")
+    .getByRole("cell")
+    .getByRole("link")
+    .first();
   const name = (await first.textContent()) ?? "";
   const box = page.getByRole("combobox", { name: "Find items" });
   // A typo: its first word with a letter dropped.
@@ -28,10 +32,16 @@ test("a suggestion picked with the keyboard narrows the list", async ({
   const picked = (await options.first().textContent()) ?? "";
   await box.press("Enter");
   await expect(page).toHaveURL(/pick=\d+/);
-  await expect(page.getByRole("table").getByRole("link")).toHaveCount(1);
+  await expect(
+    page.getByRole("table").getByRole("cell").getByRole("link"),
+  ).toHaveCount(1);
   await expect(page.getByRole("main")).toContainText("matching");
   expect(picked).toContain(
-    (await page.getByRole("table").getByRole("link").textContent()) ?? "",
+    (await page
+      .getByRole("table")
+      .getByRole("cell")
+      .getByRole("link")
+      .textContent()) ?? "",
   );
   await page.getByRole("link", { name: "Clear search" }).click();
   await expect(page).toHaveURL(/\/admin\/items$/);
@@ -138,7 +148,7 @@ test("a name is shown with its number and unit spaced, on both sides", async ({
   const shown = name.replace("10,000ft", "10 000 ft");
   await page.goto("/admin/items");
   await page.getByLabel(/^Name/).fill(name);
-  await page.getByLabel("Category").selectOption({ label: "Cables" });
+  await page.getByLabel(/^Category/).selectOption({ label: "Cables" });
   const heading = await addItem(page, shown);
   expect(await heading.textContent()).toBe(shown);
   await expect(page.getByLabel(/^Name/)).toHaveValue(name);

@@ -62,8 +62,11 @@ async function linksOn(page: Page): Promise<string[]> {
         !url.pathname.startsWith("/api/"),
     )
     .map((url) => {
-      // What a page says after a change is not another page.
-      url.searchParams.delete("notice");
+      // What a page says after a change is not another page, nor is its
+      // list sorted or sized otherwise (docs/decisions/0019, Lists).
+      for (const same of ["notice", "sort", "order", "per"]) {
+        url.searchParams.delete(same);
+      }
       return url.pathname + url.search;
     });
 }

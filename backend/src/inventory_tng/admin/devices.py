@@ -7,9 +7,9 @@ open the registration page with it filled in; only its hash is kept.
 """
 
 from datetime import datetime, timedelta
-from typing import Annotated, Literal, cast
-from urllib.parse import urlencode
+from typing import Annotated, Literal
 
+import structlog
 from fastapi import APIRouter, Form, Request
 from fastapi.responses import HTMLResponse, Response
 from sqlalchemy import func, select
@@ -26,12 +26,15 @@ from inventory_tng.admin.common import (
     now,
     site_link,
 )
+from inventory_tng.admin.listing import Sort, Sorting, View, count, ordered
 from inventory_tng.db import DbSession, attempt
 from inventory_tng.local_time import parse_local, site_zone
 from inventory_tng.models import Device, RegistrationCode, whole
 from inventory_tng.once import OnceKey, sent_before
 from inventory_tng.pages import NOTICES, not_found, redirect
 from inventory_tng.sign_in import AdminSignedIn, ConfirmedAdmin, SignedIn, changed
+
+log = structlog.get_logger(__name__)
 
 router = APIRouter(include_in_schema=False)
 
@@ -333,15 +336,24 @@ NOTICES.update({"devices_revoked": "Revoked: they can't save anything now."})
 A_TIME = "A date and time, such as 2026-11-02 13:05."
 
 
+# How the devices list sorts: newest registered first, or by a heading,
+# either way (Ali, 2026-11-15, inventory-tng-qwb).
+SORTING = Sorting(
+    "registered",
+    {
+        "registered": Sort.of(Device.created_at, first="desc"),
+        "used": Sort.of(Device.last_seen_at, first="desc"),
+    },
+)
+
+
 def _chosen(
-    session: Session, since: str, until: str, code: str, shown: str, sort: str
+    session: Session, since: str, until: str, code: str, shown: str
 ) -> tuple[devices.DeviceFilter, dict[str, str], dict[str, str]]:
     """The filter a form or link chose, what was wrong with it, and the
-    filter and sort as the page carries them (an unknown `shown` is
-    current, an unknown `sort` newest registered first). `until` takes in
-    the whole minute it names."""
+    filter as the page carries it, each field as typed (an unknown `shown`
+    is current). `until` takes in the whole minute it names."""
     shown = shown if shown in STATES else "current"
-    sort = sort if sort in devices.SORTS else "registered"
     zone = site_zone(session)
     problems: dict[str, str] = {}
     start = end = None
@@ -366,22 +378,30 @@ def _chosen(
     chosen = devices.DeviceFilter(
         since=start, until=end, code_id=code_id, current=STATES[shown]
     )
-    query = {"since": since, "until": until, "code": code, "state": shown, "sort": sort}
-    return chosen, problems, query
+    return (
+        chosen,
+        problems,
+        {"since": since, "until": until, "code": code, "state": shown},
+    )
 
 
-def _sorting(query: dict[str, str]) -> dict[str, tuple[str, str | None]]:
-    """Each sortable column's heading link, which sorts by it newest first,
-    or oldest first if it is so already, the filter kept; and its aria-sort,
-    if the list is sorted by it."""
-    links: dict[str, tuple[str, str | None]] = {}
-    for column in ("registered", "used"):
-        newest = query["sort"] == column
-        oldest = query["sort"] == f"{column}-oldest"
-        to = f"{column}-oldest" if newest else column
-        order = "descending" if newest else "ascending" if oldest else None
-        links[column] = (f"{DEVICE_LIST}?{urlencode(query | {'sort': to})}", order)
-    return links
+def _view(typed: dict[str, str], sort: str, order: str, per: str, page: str) -> View:
+    """The list's view, its filter as typed: those left blank, and state
+    current, not said."""
+    filters = {
+        name: value
+        for name, value in typed.items()
+        if value and (name, value) != ("state", "current")
+    }
+    return View.read(
+        DEVICE_LIST,
+        SORTING,
+        sort=sort,
+        order=order,
+        per=per,
+        page=page,
+        filters=filters,
+    )
 
 
 @router.get(DEVICE_LIST)
@@ -393,11 +413,25 @@ def device_list(
     until: str = "",
     code: str = "",
     state: str = "current",
-    sort: str = "registered",
+    sort: str = "",
+    order: str = "",
+    per: str = "",
+    page: str = "",
 ) -> Response:
-    chosen, problems, query = _chosen(session, since, until, code, state, sort)
-    by = cast(devices.Sort, query["sort"])  # One of SORTS: _chosen checked it.
-    found = [] if problems else devices.find_devices(session, chosen, by)
+    chosen, problems, typed = _chosen(session, since, until, code, state)
+    view = _view(typed, sort, order, per, page)
+    found: list[Device] = []
+    if not problems:
+        query = devices.find_devices(chosen)
+        view = view.counted(count(session, query))
+        found = list(session.scalars(ordered(query, view, Device.id)))
+    log.debug(
+        "devices listed",
+        found=view.found,
+        page=view.page,
+        sort=view.by,
+        per_page=view.per_page,
+    )
     return admin_page(
         request,
         signed,
@@ -409,11 +443,10 @@ def device_list(
             "back_link": (DEVICES, "Devices"),
             "codes_path": CODES,
             "devices_path": DEVICES,
-            "filter": query,
-            "sorting": _sorting(query),
+            "filter": typed,
+            "view": view,
             "states": list(STATES),
             "devices": found,
-            "listed": devices.LISTED,
             "zone": site_zone(session),
             "problems": problems or None,
         },
@@ -431,13 +464,18 @@ def revoke_devices(
     until: Annotated[str, Form()] = "",
     code: Annotated[str, Form()] = "",
     state: Annotated[str, Form()] = "current",
-    sort: Annotated[str, Form()] = "registered",
+    sort: Annotated[str, Form()] = "",
+    order: Annotated[str, Form()] = "",
+    per: Annotated[str, Form()] = "",
+    page: Annotated[str, Form()] = "",
     sure: Annotated[str, Form()] = "",
     once: OnceKey = "",
 ) -> Response:
     """Asks first, saying how many, then revokes those selected that the
     filter still matches, once."""
-    chosen, problems, query = _chosen(session, since, until, code, state, sort)
+    chosen, problems, typed = _chosen(session, since, until, code, state)
+    # The list as it was, to come back to.
+    query = dict(_view(typed, sort, order, per, page).fields())
     current = [] if problems else devices.current_among(session, chosen, device or [])
     if not current:
         return redirect(DEVICE_LIST, **query)

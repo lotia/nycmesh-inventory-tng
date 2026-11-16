@@ -24,6 +24,7 @@ from sqlalchemy import (
     Select,
     SQLColumnExpression,
     and_,
+    case,
     func,
     or_,
     select,
@@ -492,6 +493,39 @@ SETTLED_HOW = {
 
 SETTLED = OverRecorded.settled_at.is_not(None)
 
+# What the list of those settled sorts by, a column each, as settled()
+# reads them (Ali, 2026-11-15, inventory-tng-73p): How by its words, as
+# settled() words it; Where by where it left, then where it arrived.
+SETTLED_ORDER: dict[str, tuple[Any, ...]] = {
+    "settled": (OverRecorded.settled_at,),
+    "item": (func.lower(Item.name_shown),),
+    "amount": (OverRecorded.quantity,),
+    "where": (func.lower(FROM.name), func.lower(TO.name)),
+    "how": (
+        case(
+            (
+                and_(
+                    OverRecorded.settled_how == "checked",
+                    OverRecorded.checked_reason.is_(None),
+                ),
+                SETTLED_HOW["confirmed"],
+            ),
+            (
+                and_(
+                    OverRecorded.settled_how == "corrected",
+                    Movement.from_open_package_id == Movement.to_open_package_id,
+                ),
+                SETTLED_HOW["count corrected"],
+            ),
+            *(
+                (OverRecorded.settled_how == how, SETTLED_HOW[how])
+                for how in ("corrected", "checked", "counted")
+            ),
+        ),
+    ),
+    "by": (func.lower(Admin.username),),
+}
+
 
 def _spot(
     place_id: int | None, name: str | None, countable: Collection[int]
@@ -519,11 +553,14 @@ def settled(
     session: Session,
     zone: ZoneInfo,
     *where: ColumnElement[bool],
-    limit: int,
+    order: Sequence[Any] = (),
+    limit: int | None,
     offset: int = 0,
 ) -> list[WasSettled]:
-    """Those settled that `where` picks (of Movement), newest first: the
-    same few queries, however many. Days in `zone`."""
+    """Those settled that `where` picks (of Movement), in `order` (of
+    SETTLED_ORDER, then OverRecorded.id), else newest first; `limit` of
+    them, None for all: the same few queries, however many. Days in
+    `zone`."""
     found = session.execute(
         _checks(
             LedgerTransaction.idempotency_key,
@@ -538,7 +575,7 @@ def settled(
         )
         .join(Admin, Admin.id == OverRecorded.settled_by_admin_id)
         .where(SETTLED, *where)
-        .order_by(OverRecorded.settled_at.desc(), OverRecorded.id.desc())
+        .order_by(*(order or (OverRecorded.settled_at.desc(), OverRecorded.id.desc())))
         .limit(limit)
         .offset(offset)
     ).all()

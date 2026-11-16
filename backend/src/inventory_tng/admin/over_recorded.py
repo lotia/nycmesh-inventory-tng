@@ -23,7 +23,8 @@ from sqlalchemy.orm import Session
 from inventory_tng import ledger, locations, over_recorded
 from inventory_tng.admin.common import admin_page, quantity, row_id, rule_words
 from inventory_tng.admin.counts import COUNTS
-from inventory_tng.admin.listing import PER_PAGE, Pages
+from inventory_tng.admin.listing import Sort, Sorting, View
+from inventory_tng.admin.listing import order as order_of
 from inventory_tng.admin.locations import changeable
 from inventory_tng.admin.needs_action import (
     ItemWaiting,
@@ -133,6 +134,17 @@ def _views(waiting: int, only: Item | None) -> list[tuple[str, str, str]]:
     ]
 
 
+# Every column but Why sorts, either way; newest first unless asked (Ali,
+# 2026-11-15, inventory-tng-73p).
+SETTLED_SORTING = Sorting(
+    "settled",
+    {
+        name: Sort.of(*by, first="desc" if name == "settled" else "asc")
+        for name, by in over_recorded.SETTLED_ORDER.items()
+    },
+)
+
+
 @router.get(RECORDED_MORE_SETTLED)
 def settled_page(
     request: Request,
@@ -140,22 +152,39 @@ def settled_page(
     session: DbSession,
     only: OnlyItem,
     page: str = "",
+    sort: str = "",
+    order: str = "",
+    per: str = "",
 ) -> Response:
-    """Those settled, newest first, in pages, all or one item's: how each
-    was settled, why, by whom and when (Ali, 2026-11-15, inventory-tng-73p).
-    Read only."""
+    """Those settled, newest first unless a heading sorts them, in pages,
+    all or one item's: how each was settled, why, by whom and when (Ali,
+    2026-11-15, inventory-tng-73p). Read only."""
     where = [Movement.item_id == only.id] if only else []
-    pages = Pages.read(
+    view = View.read(
         RECORDED_MORE_SETTLED,
-        over_recorded.how_many(session, over_recorded.SETTLED, *where),
-        page,
-        query(only),
-    )
+        SETTLED_SORTING,
+        sort=sort,
+        order=order,
+        per=per,
+        page=page,
+        kept=query(only),
+    ).counted(over_recorded.how_many(session, over_recorded.SETTLED, *where))
     zone = site_zone(session)
     rows = over_recorded.settled(
-        session, zone, *where, limit=PER_PAGE, offset=pages.offset
+        session,
+        zone,
+        *where,
+        order=order_of(view, OverRecorded.id),
+        limit=view.per_page,
+        offset=view.offset,
     )
-    log.debug("over recorded settled listed", found=pages.found, page=pages.page)
+    log.debug(
+        "over recorded settled listed",
+        found=view.found,
+        page=view.page,
+        sort=view.by,
+        per_page=view.per_page,
+    )
     return admin_page(
         request,
         signed,
@@ -169,7 +198,7 @@ def settled_page(
                 over_recorded.how_many(session, over_recorded.WAITING, *where), only
             ),
             "rows": rows,
-            "listing": pages,
+            "view": view,
             "zone": zone,
             "counts_path": COUNTS,
             "stock_path": STOCK,

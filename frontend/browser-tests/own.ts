@@ -75,7 +75,7 @@ export async function ownCable(
   shown = what,
 ): Promise<string> {
   const name = await named(page, "/admin/items", what);
-  await page.getByLabel("Category").selectOption({ label: "Cables" });
+  await page.getByLabel(/^Category/).selectOption({ label: "Cables" });
   await page.getByLabel(/^Unit/).selectOption("m");
   await addItem(page, name.replace(what, shown));
   const box = "Box of 305 m";

@@ -1,11 +1,11 @@
 {% extends "admin_base.html" %}
 {% from "_table.html" import table %}
+{% from "_listing.html" import filter_form, sizes, sort_heading, pager %}
 {% block main %}
 <p>Every registered phone or computer. After a compromise, list those
 registered while it lasted, then revoke the ones that look wrong.</p>
 
-<form method="get" action="{{ here }}">
-  <input type="hidden" name="sort" value="{{ filter.sort }}">
+{% call filter_form(view) %}
   <label>Registered from <span class="hint">{{ zone.key }} time, optional</span>
     <input name="since" type="datetime-local" value="{{ filter.since }}">
     {% with name = "since" %}{% include "_field_problem.html" %}{% endwith %}
@@ -25,23 +25,19 @@ registered while it lasted, then revoke the ones that look wrong.</p>
       {% endfor %}
     </select>
   </label>
-  <div class="actions"><button>List them</button></div>
-</form>
+{% endcall %}
 
 <form method="post" action="{{ revoke }}">
   {{ once_field() }}
-  {% for name, value in filter.items() %}
+  {% for name, value in view.fields() %}
   <input type="hidden" name="{{ name }}" value="{{ value }}">
   {% endfor %}
-  {% if not problems %}<p class="hint">{{ devices | length }} listed{% if devices | length >= listed %}, the first
-  {{ listed }}: narrow it to see the rest{% endif %}.</p>{% endif %}
+  {% if not problems %}<p class="hint">{{ view.found }} listed.</p>{% endif %}
+  {{ sizes(view) }}
   {% call table() %}
     <tr><th>Select</th><th>Device</th>
-      {%- for column, words in [("registered", "Registered"), ("used", "Last used")] %}
-      {%- set link, order = sorting[column] %}
-      <th{% if order %} aria-sort="{{ order }}"{% endif %}><a href="{{ link }}">{{ words }}
-        {%- if order %} <span aria-hidden="true">{{ "↓" if order == "descending" else "↑" }}</span>{% endif %}</a></th>
-      {%- endfor %}<th>Code</th></tr>
+      {{- sort_heading(view, "registered", "Registered") }}
+      {{- sort_heading(view, "used", "Last used") }}<th>Code</th></tr>
     {% for device in devices %}
     <tr>
       <td>{% if device.revoked_at %}<span class="tag">Revoked</span>{% else %}<input type="checkbox" name="device" value="{{ device.id }}" checked aria-label="Select {{ device.name }}">{% endif %}</td>
@@ -54,6 +50,7 @@ registered while it lasted, then revoke the ones that look wrong.</p>
     <tr><td colspan="5">None.</td></tr>
     {% endfor %}
   {% endcall %}
+  {{ pager(view) }}
   {% if devices | selectattr("revoked_at", "none") | list %}
   <p class="hint">Every current one listed is selected: clear any to keep.</p>
   <div class="actions"><button>Revoke selected</button></div>

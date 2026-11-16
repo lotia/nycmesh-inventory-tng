@@ -14,7 +14,6 @@ from sqlalchemy.orm import Session
 
 from inventory_tng import open_packages, over_recorded
 from inventory_tng.admin import listing
-from inventory_tng.admin import over_recorded as over_recorded_page
 from inventory_tng.admin.counts import COUNTS
 from inventory_tng.local_time import show, show_day, site_zone
 from inventory_tng.models import Admin, LedgerTransaction, Movement, OverRecorded
@@ -329,7 +328,6 @@ def test_newest_first_in_pages_of_one_item_or_all(
     admin_client: TestClient, session: Session, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     monkeypatch.setattr(listing, "PER_PAGE", 2)
-    monkeypatch.setattr(over_recorded_page, "PER_PAGE", 2)
     place, other = Place(session), Place(session)
     admin = ada(session)
     start = datetime(2026, 11, 14, 12, tzinfo=UTC)
@@ -537,3 +535,79 @@ def test_one_end_only_counted_names_that_end(
             f"{place.store.name} {counted_on(used.left_count_id)}",
         ),
     ]
+
+
+def test_every_column_but_why_sorts_either_way(
+    admin_client: TestClient, session: Session
+) -> None:
+    """Newest first, unless a heading sorts them: pressed, the way it
+    sorts first; pressed again, the other way (Ali, 2026-11-15,
+    inventory-tng-73p, inventory-tng-qwb)."""
+    zed, _ = new_admin(session, f"zed{tag()}")
+    start = datetime(2026, 11, 14, 12, tzinfo=UTC)
+    places = [Place(session) for _ in range(3)]
+    for n, place in enumerate(places):
+        check = raised(session, write(session, place), Decimal(n + 1))
+        if n == 1:
+            over_recorded.correct(session, check.id, seen(check), ada(session))
+        else:
+            over_recorded.mark_checked(
+                session, check.id, seen(check), ada(session), "both"
+            )
+        session.flush()
+        check.settled_at = start + timedelta(hours=n)
+        if n == 2:
+            check.settled_by_admin_id = zed.id
+    session.flush()
+    mine = {place.item.name_shown for place in places}
+
+    def shown(query: str = "") -> list[list[str]]:
+        rows = settled_rows(admin_client, f"{SETTLED}?per=all{query}")
+        return [row for row in rows if row[1] in mine]
+
+    newest = shown()
+    assert [row[2] for row in newest] == ["3", "2", "1"]
+    assert shown("&sort=settled") == newest
+    assert shown("&sort=settled&order=asc") == newest[::-1]
+    for column, cell in (
+        ("item", 1),
+        ("amount", 2),
+        ("where", 3),
+        ("how", 4),
+        ("by", 6),
+    ):
+        first = [row[cell].lower() for row in shown(f"&sort={column}")]
+        assert first == sorted(row[cell].lower() for row in newest), column
+        last = [row[cell].lower() for row in shown(f"&sort={column}&order=desc")]
+        assert last == first[::-1], column
+    page = admin_client.get(f"{SETTLED}?sort=item").text
+    assert '<th aria-sort="ascending"><a href="' in page
+    assert f'href="{SETTLED}?sort=item&amp;order=desc"' in page
+    # Why does not sort; a sort not offered is newest first.
+    assert "sort=why" not in page
+    assert shown("&sort=why") == newest
+
+
+def test_rows_per_page_25_50_100_or_all(
+    admin_client: TestClient, session: Session
+) -> None:
+    place = Place(session)
+    admin = ada(session)
+    for _ in range(26):
+        check = moved(session, place)
+        over_recorded.mark_checked(session, check.id, seen(check), admin, "both")
+        session.flush()
+    only = f"{SETTLED}?item={place.item.id}"
+    page = admin_client.get(only).text
+    assert len(rows_of(page)) == 26
+    assert f'<a href="{only}&amp;per=25">25</a>' in page
+    assert '<a href="' + f'{only}" aria-current="page">50</a>' in page
+    assert f'<a href="{only}&amp;per=all">All</a>' in page
+    page = admin_client.get(f"{only}&per=25").text
+    assert len(rows_of(page)) == 25
+    assert "Page 1 of 2" in page
+    assert f'href="{only}&amp;per=25&amp;page=2"' in page
+    assert len(settled_rows(admin_client, f"{only}&per=25&page=2")) == 1
+    assert len(settled_rows(admin_client, f"{only}&per=all")) == 26
+    # A size not offered is 50.
+    assert len(settled_rows(admin_client, f"{only}&per=7")) == 26

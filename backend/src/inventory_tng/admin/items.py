@@ -32,7 +32,7 @@ from inventory_tng.admin.common import (
     text_form,
     undo_retire,
 )
-from inventory_tng.admin.listing import Listing, Searched
+from inventory_tng.admin.listing import Listing, Searched, Sort, Sorting
 from inventory_tng.admin.reading_rules import READINGS
 from inventory_tng.db import DbSession, exists_where, refusal
 from inventory_tng.ledger import balance
@@ -257,8 +257,56 @@ def _as_shown(_session: Session, rows: Sequence[Item]) -> list[_Shown]:
     return [_Shown(row.name_shown) for row in rows]
 
 
+# How the items list sorts: by name first, as it always has, or by a
+# heading (Ali, 2026-11-15, inventory-tng-qwb).
+SORTING = Sorting(
+    "name",
+    {
+        "name": Sort.of(func.lower(Item.name)),
+        "category": Sort.of(
+            func.lower(
+                select(Category.name)
+                .where(Category.id == Item.category_id)
+                .scalar_subquery()
+            )
+        ),
+        "unit": Sort.of(Item.unit),
+        "part": Sort.of(func.lower(Item.manufacturer), func.lower(Item.part_number)),
+    },
+)
 # How the items list finds an item: by anything a volunteer might type.
-SEARCHED = Searched(ITEMS, Item, Item.search_text, Item.name, shown=_as_shown)
+SEARCHED = Searched(
+    ITEMS, Item, Item.search_text, Item.name, shown=_as_shown, sorting=SORTING
+)
+
+
+def _listed(
+    q: str = "",
+    show: str = "",
+    page: str = "",
+    pick: str = "",
+    sort: str = "",
+    order: str = "",
+    per: str = "",
+    category: str = "",
+) -> Listing[Item]:
+    """The items list as its query string asks for it, with its filter by
+    category (Ali, 2026-11-15): one not a number is none."""
+    category_id = whole(category, 1, INTEGER_MAX)
+    return SEARCHED.read(
+        q,
+        show,
+        page,
+        pick,
+        sort=sort,
+        order=order,
+        per=per,
+        filters={"category": str(category_id)} if category_id else None,
+        where=[Item.category_id == category_id] if category_id else (),
+    )
+
+
+Listed = Annotated[Listing[Item], Depends(_listed)]
 
 
 def _name_field(session: Session, similar: Sequence[items.Close]) -> dict[str, object]:
@@ -317,6 +365,7 @@ def _list_page(
             "readings_path": READINGS,
             "listing": listing,
             "categories": [c for c in categories if c.retired_at is None],
+            "all_categories": categories,
             "category_names": {c.id: c.name for c in categories},
             "units": UNITS,
             "problems": problems,
@@ -515,23 +564,18 @@ def list_items(
     request: Request,
     signed: AdminSignedIn,
     session: DbSession,
-    q: str = "",
-    show: str = "",
-    page: str = "",
-    pick: str = "",
+    listing: Listed,
     undo: str = "",
 ) -> Response:
-    listing = SEARCHED.read(q, show, page, pick)
     back = undo_retire(session, Item, undo, ITEMS)
     return _list_page(request, session, signed, listing=listing, undo=back)
 
 
 @router.get(f"{ITEMS}/suggest")
 def suggest_items(
-    session: DbSession, signed: AdminSignedIn, q: str = "", show: str = ""
+    session: DbSession, signed: AdminSignedIn, listing: Listed
 ) -> JSONResponse:
     """What the search box offers as one types (_listing.html)."""
-    listing = SEARCHED.read(q, show)
     names = {c.id: c.name for c in _categories(session)}
     offered = listing.suggest(session, lambda item: names.get(item.category_id, ""))
     return JSONResponse(offered, headers={"Cache-Control": "no-store"})
@@ -566,16 +610,14 @@ def add_item(
 def track_items(
     signed: AdminSignedIn,
     session: DbSession,
+    listing: Listed,
     item: Annotated[list[int], Form()] = [],  # noqa: B006  FastAPI copies it.
     track: Annotated[str, Form()] = "",
-    q: Annotated[str, Form()] = "",
-    show: Annotated[str, Form()] = "",
-    page: Annotated[str, Form()] = "",
-    pick: Annotated[str, Form()] = "",
 ) -> Response:
     """Set "track each opened package" on the items ticked, on the page
-    shown, and come back to it as it was."""
-    back = SEARCHED.read(q, show, page, pick).link()
+    shown, and come back to it as it was: the list's view comes in the
+    form's address."""
+    back = listing.link()
     if TRACKING.get(track) is None:
         return not_found()
     if not item:

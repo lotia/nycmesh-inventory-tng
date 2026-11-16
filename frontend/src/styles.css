@@ -136,6 +136,11 @@
     @apply border-b border-heading text-heading;
   }
 
+  /* A heading that sorts its list: as easy to tap as a button (0019). */
+  th > a {
+    @apply inline-flex min-h-11 items-center gap-1;
+  }
+
   /* A cell keeps its longest word whole: a table that cannot fit then
      scrolls in its own box (the table macro), rather than splitting it. */
   td,
