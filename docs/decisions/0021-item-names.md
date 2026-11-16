@@ -638,7 +638,7 @@ other space, so `Cap 1000 μF` with a no-break space and `Cap 1000 uF`
 were two names, and a form never asked about `Box 1000 M` spaced so,
 though search reads every space as a plain one. Now search, the forms,
 the read-alike check and the shown name all look for a unit after a
-number in the name with every space (`names.LOOK_ALIKES`) plain, one
+number in the name with every space (`names.SPACES`) plain, one
 character for one, so what a form says is where it was typed. The shown
 name puts a no-break space before the unit whatever space was typed
 there; within a number grouped by spaces, no-break and thin spaces stay

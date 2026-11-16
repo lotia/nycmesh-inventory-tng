@@ -264,12 +264,13 @@ function edits(text: string, rules: Rules | undefined): Edit[] {
     const at = match.index;
     const end = at + whole.length;
     if (marked(text, end) || product(plain, at)) continue;
-    const before = text.slice(0, at + 1);
+    // Judged as search reads it, on the plain text (units._searched).
+    const before = plain.slice(0, at + 1);
     let number: string;
     let grouped = NOUGHT.exec(before);
     if (grouped) number = grouped[0].replace(",", ".");
     else {
-      grouped = GROUPED.exec(plain.slice(0, at + 1));
+      grouped = GROUPED.exec(before);
       // `Cat 6 305 m`: a product's number, then another, not thousands;
       // judged at its first digit, after any sign.
       if (grouped && product(plain, grouped.index + grouped[0].search(/[0-9]/)))

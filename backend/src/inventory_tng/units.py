@@ -804,7 +804,7 @@ class Found:
 
     @property
     def typed(self) -> str:
-        """The number and its unit as typed, joined: `3M`."""
+        """The number as typed and its unit (`token`), joined: `3M`."""
         return self.number + self.token
 
     @property
