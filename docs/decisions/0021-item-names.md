@@ -561,9 +561,9 @@ is lost:
   `10 000 ft`, which never wraps.
 - It is shown wherever a name is read: the admin lists and item pages,
   the scan page (the catalogue sends it), labels and notices, save the
-  exceptions below. The item
-  form edits the name as typed and says how it is shown where that
-  differs (`Shown as Box 10 000 ft.`), as do the package and alias forms.
+  exceptions below. The item form edits the name as typed and says how
+  it is shown where that differs (`Shown as Box 10 000 ft.`), as do the
+  package and alias forms.
 
 `units.shown_name` makes it. The app writes it as the session flushes,
 wherever a name is written, and again when a reading rule changes
