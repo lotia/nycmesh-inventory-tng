@@ -32,7 +32,11 @@ less than nothing somewhere: the records are wrong there, so count it
     </select>
   </label>
 {% endcall %}
-{{ sizes(view, _("Items shown") if by == "item" else _("Places shown")) }}
+{% if by == "item" %}
+{{ sizes(view, _("Items shown"), _("Items shown:")) }}
+{% else %}
+{{ sizes(view, _("Places shown"), _("Places shown:")) }}
+{% endif %}
 {% for group in groups %}
 <section{% if by == "item" %} id="item-{{ group.heading.id }}"{% endif %}>
   <h2>{{ group.heading.name_shown if by == "item" else group.heading.name }}{{ retired(group.heading) }}{% if by == "item" %} <span class="hint">{% trans amount=in_all[group.heading.id] | amount, unit=group.heading.unit %}{{ amount }} {{ unit }} in all{% endtrans %}</span>{% endif %}</h2>

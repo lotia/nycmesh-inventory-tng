@@ -288,9 +288,9 @@ def test_stock_size_rows_say_they_count_places_or_items(
     """Not lines: each group whole, however many lines (Ali, 2026-11-16,
     inventory-tng-xjh)."""
     by_place = text(admin_client.get(STOCK))
-    assert size_row(by_place) == ("Places shown", "Places shown")
+    assert size_row(by_place) == ("Places shown", "Places shown:")
     by_item = text(admin_client.get(STOCK, params={"by": "item"}))
-    assert size_row(by_item) == ("Items shown", "Items shown")
+    assert size_row(by_item) == ("Items shown", "Items shown:")
 
 
 def test_other_lists_size_rows_still_say_show(admin_client: TestClient) -> None:
