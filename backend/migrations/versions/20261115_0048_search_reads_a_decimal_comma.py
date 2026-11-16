@@ -19,9 +19,8 @@ finds a unit after a number and any space, `Cap 1000<no-break space>μF`
 as 1000 μF, as search reads it, so unit keys and names shown read so too
 (units version 7, inventory-tng-vw0f). A number grouped by spaces before a
 unit is shown whole and as typed, its ordinary spaces no-break, `Box 1 000
-ft` as `Box 1 000 ft` with no-break spaces (inventory-tng-t78), and this
-fills names shown so too, rather than a later migration filling them again
-(inventory-tng-ma72).
+ft` as `Box 1 000 ft` with no-break spaces, so names shown read so too
+(inventory-tng-t78, inventory-tng-ma72).
 
 Revision ID: 0048
 Revises: 0047

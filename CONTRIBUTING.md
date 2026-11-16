@@ -210,10 +210,9 @@ and migrates it again, empty. Never rebuild with `mise run compose -- down
 and in `inventory-tng` every checkout's that shares it. Once production runs,
 a migration is never edited: add a new one.
 
-When the edited migration, and every one after it, changes only what rows
-hold and has a downgrade that changes nothing, refresh your database
-instead, losing no data, in `backend`, naming the revision before the
-edited one:
+You can keep your data instead when the edited migration and every one
+after it only rewrite rows and have downgrades that do nothing. In
+`backend`, downgrade to the revision before the edited one, then upgrade:
 
 ```sh
 uv run alembic downgrade <revision> && uv run alembic upgrade head
