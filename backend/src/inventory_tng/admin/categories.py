@@ -14,13 +14,13 @@ from inventory_tng import categories
 from inventory_tng.admin.common import (
     ADMIN,
     ALERTS,
+    RULES,
     SECTION_CATEGORIES,
     admin_page,
     form_version,
     name_problem,
     now,
     retirement,
-    rule_words,
     undo_retire,
 )
 from inventory_tng.admin.listing import AskedView, Sort, Sorting, View, arranged
@@ -195,7 +195,7 @@ def rename_category(
         )
         if broken in ALERTS:
             return _category_page(
-                request, session, signed, found, alert=rule_words(broken)
+                request, session, signed, found, alert=str(RULES[broken])
             )
         problem = broken and str(TAKEN)
     if problem is not None:
@@ -218,7 +218,7 @@ def retire_category(
     )
     if broken:
         return _category_page(
-            request, session, signed, found, rule_words("category_has_items")
+            request, session, signed, found, str(RULES["category_has_items"])
         )
     session.commit()
     log.info("category retired", category_id=category_id)

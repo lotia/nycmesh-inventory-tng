@@ -240,8 +240,10 @@ def new_recovery_codes(
     """With a code from an authenticator each time (ConfirmedByAuthenticator),
     and told to the owner: new codes void the old."""
     if not signed.uses_totp:
+        # Sent from a page shown before the last authenticator went, which
+        # took the recovery codes section with it: said by the authenticators.
         problem = str(CODES_NEED_TOTP)
-        return _refused(request, session, signed, "recovery_codes", problem)
+        return _refused(request, session, signed, "authenticators", problem)
     if again := sent_before(request, session, signed, once, "recovery_codes", ACCOUNT):
         return again
     codes = accounts.make_recovery_codes(session, signed.admin.id, _now())

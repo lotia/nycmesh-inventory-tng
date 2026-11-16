@@ -46,6 +46,7 @@ from inventory_tng.admin import needs_action
 from inventory_tng.admin.common import (
     ADMIN,
     QUANTITY_MAX,
+    RULES,
     SECTION_COUNTS,
     admin_page,
     chosen,
@@ -53,7 +54,6 @@ from inventory_tng.admin.common import (
     now,
     quantity,
     row_id,
-    rule_words,
     text_form,
 )
 from inventory_tng.admin.items import SEARCHED
@@ -715,7 +715,7 @@ def _by_form(
                 problems[field] = str(NO_SUCH_OPEN_PACKAGE)
             elif row.closed_at is not None:
                 # Its line is gone from the form, so said above it.
-                problems[CLOSED_MEANWHILE] = rule_words(CLOSED_MEANWHILE)
+                problems[CLOSED_MEANWHILE] = str(RULES[CLOSED_MEANWHILE])
             elif (reason := STATES[state]) is not None:
                 close.append((row.id, reason))
             elif isinstance(amount, str):
@@ -897,7 +897,7 @@ def count(
             as_of,
             problems=problems,
             values=form,
-            alert=None if problems else rule_words(broken),
+            alert=None if problems else str(RULES[broken]),
             items=sent_items,
             shown=shown,
             status_code=400,
@@ -988,7 +988,7 @@ def adjust(
         log.info("adjustment refused by a rule", item_id=item.id, rule=broken)
         field = "location_id" if broken == COUNTABLE else "amount"
         return _counts_page(
-            request, session, signed, problems={field: rule_words(broken)}, values=form
+            request, session, signed, problems={field: str(RULES[broken])}, values=form
         )
     assert written is not None
     session.commit()

@@ -10,7 +10,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from inventory_tng import accounts, sign_in
-from inventory_tng.account import EMAIL_TAKEN
+from inventory_tng.account import CODES_NEED_TOTP, EMAIL_TAKEN
 from inventory_tng.models import (
     Admin,
     AdminPassword,
@@ -205,9 +205,11 @@ def test_recovery_codes_need_an_authenticator(
     sign_in_with(client)
     form = once(**{sign_in.CONFIRM_FIELD: PASSWORD})
     refused = client.post(f"{ACCOUNT}/recovery-codes", data=form)
-    # Refused, with nothing made: an account without TOTP has no section to
-    # say CODES_NEED_TOTP in, as its page offers no recovery codes.
+    # Sent from a page shown before its last authenticator went: refused,
+    # with nothing made, and said by the authenticators, as the page now has
+    # no recovery codes section.
     assert refused.status_code == 400
+    assert str(CODES_NEED_TOTP) in text(refused)
     assert not accounts.has_recovery_codes(session, admin.id)
 
 

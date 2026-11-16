@@ -18,6 +18,7 @@ from inventory_tng.accounts import email_problem
 from inventory_tng.admin.common import (
     ADMIN,
     ALERTS,
+    RULES,
     SECTION_VOLUNTEERS,
     admin_page,
     chosen,
@@ -290,7 +291,7 @@ def save_volunteer(
             lambda: volunteers.save(session, found, name, email or None, seen=seen),
         )
         if broken in ALERTS:
-            alert = rule_words(broken)
+            alert = str(RULES[broken])
             return _volunteer_page(request, session, signed, found, alert=alert)
         if broken:
             problems["name"] = rule_words(broken, str(TAKEN))

@@ -20,12 +20,12 @@ from inventory_tng.accounts import qr_svg
 from inventory_tng.admin.common import (
     ADMIN,
     NAME_MAX,
+    RULES,
     SECTION_DEVICES,
     admin_page,
     form_version,
     now,
     revoke_title,
-    rule_words,
     site_link,
     up_to,
 )
@@ -351,7 +351,7 @@ def name_device(
         session, lambda: devices.name_device(session, device, label or None, seen=seen)
     )
     if broken:
-        return _device_page(request, signed, session, device, alert=rule_words(broken))
+        return _device_page(request, signed, session, device, alert=str(RULES[broken]))
     session.commit()
     return redirect(f"{DEVICES}/{device_id}", notice="saved")
 

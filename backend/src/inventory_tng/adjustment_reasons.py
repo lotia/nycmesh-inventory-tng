@@ -15,6 +15,11 @@ from inventory_tng.models import AdjustmentReason
 
 log = structlog.get_logger(__name__)
 
+# The reasons the app gives itself are rows, found by name (seeded), so
+# their names are stored data, not catalogue phrases, as an administrator's
+# own reasons are: inventory-tng-0z5 would say them in the reader's
+# language where shown.
+
 # The reason closing an open package gives (docs/decisions/0020): kept
 # apart from Lost or stolen, so cable used is told from cable lost.
 USED_UP = "Used up"

@@ -232,7 +232,7 @@ class Shown(NamedTuple):
     item_id: int
     item: str
     unit: str
-    # How much more was recorded: whole packages ("1 TIMES Bag of 50"), or
+    # How much more was recorded: whole packages, as times() words them, or
     # so much in the item's unit.
     amount: str
     transaction_id: int

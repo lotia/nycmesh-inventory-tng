@@ -21,6 +21,7 @@ from inventory_tng.admin.common import (
     ADMIN,
     ALERTS,
     RETIRED,
+    RULES,
     SECTION_ITEMS,
     admin_page,
     chosen,
@@ -29,7 +30,6 @@ from inventory_tng.admin.common import (
     now,
     quantity,
     retirement,
-    rule_words,
     text_form,
     undo_retire,
 )
@@ -213,7 +213,7 @@ def _change_or_note[T](
     elif broken == items.READ_ALIKE:
         problems["name"] = _read_alike(session, typed)
     elif broken in REFUSED_FIELDS:
-        problems[REFUSED_FIELDS[broken]] = rule_words(broken)
+        problems[REFUSED_FIELDS[broken]] = str(RULES[broken])
     return done, broken
 
 
@@ -747,7 +747,7 @@ def save_item(
                 request, session, signed, found, values=form, similar=asked or ()
             )
         if broken in ALERTS:
-            alert = rule_words(broken)
+            alert = str(RULES[broken])
             return _item_page(request, session, signed, found, alert=alert)
     if problems:
         return _item_page(
@@ -792,7 +792,7 @@ def restore_item(
     )
     # Beside the name: the category list shows only current categories.
     if broken:
-        problem = rule_words(broken)
+        problem = str(RULES[broken])
         return _item_page(request, session, signed, found, problems={"name": problem})
     session.commit()
     log.info("item restored", item_id=item_id)
@@ -874,7 +874,7 @@ def add_package(
         )
         if broken == RETIRED:
             return _item_page(
-                request, session, signed, found, alert=rule_words(RETIRED)
+                request, session, signed, found, alert=str(RULES[RETIRED])
             )
         if package is not None:
             session.commit()
@@ -934,7 +934,7 @@ def save_package(
         # Its size field is gone once fixed: said above the page, as for a
         # form that went stale.
         if broken in {*ALERTS, "package_size_fixed"}:
-            return _item_page(request, session, signed, found, alert=rule_words(broken))
+            return _item_page(request, session, signed, found, alert=str(RULES[broken]))
         if broken is None:
             session.commit()
             log.info("package saved", item_package_id=package_id)
@@ -947,7 +947,7 @@ def save_package(
         elif broken == items.READ_ALIKE:
             problems["package_name"] = _read_alike(session, typed)
         else:  # SHORT_UNDER_SIZE, the one other refusal it expects.
-            problems["size"] = rule_words(broken)
+            problems["size"] = str(RULES[broken])
     # Beside the fields of the package it was sent for, with the units
     # chosen, if any.
     values = {
@@ -976,7 +976,7 @@ def restore_package(
     )
     if broken:
         found = session.get_one(Item, item_id)
-        return _item_page(request, session, signed, found, alert=rule_words(RETIRED))
+        return _item_page(request, session, signed, found, alert=str(RULES[RETIRED]))
     session.commit()
     log.info("package restored", item_package_id=package_id)
     return redirect(f"{ITEMS}/{item_id}", notice="package_restored", section="packages")
@@ -998,7 +998,7 @@ def retire_package(
     )
     if broken:
         found = session.get_one(Item, item_id)
-        return _item_page(request, session, signed, found, alert=rule_words(RETIRED))
+        return _item_page(request, session, signed, found, alert=str(RULES[RETIRED]))
     session.commit()
     log.info("package retired", item_package_id=package_id)
     return redirect(
@@ -1028,7 +1028,7 @@ def track_package(
     )
     if broken:
         found = session.get_one(Item, item_id)
-        return _item_page(request, session, signed, found, alert=rule_words(RETIRED))
+        return _item_page(request, session, signed, found, alert=str(RULES[RETIRED]))
     session.commit()
     if TRACKING[track] != before:
         _tracking_changed("package", 1, TRACKING[track], item_package_id=package_id)
@@ -1077,7 +1077,7 @@ def package_settings(
         SHORT_UNDER_SIZE,
     )
     if broken == RETIRED:
-        return _item_page(request, session, signed, found, alert=rule_words(RETIRED))
+        return _item_page(request, session, signed, found, alert=str(RULES[RETIRED]))
     if broken:
         # Resized meanwhile to no more than it: said beside it, as above.
         values = {
@@ -1150,7 +1150,7 @@ def add_alias(
         )
         if broken == RETIRED:
             return _item_page(
-                request, session, signed, found, alert=rule_words(RETIRED)
+                request, session, signed, found, alert=str(RULES[RETIRED])
             )
         if alias is not None:
             session.commit()
@@ -1186,7 +1186,7 @@ def remove_alias(
     )
     if broken:
         found = session.get_one(Item, item_id)
-        return _item_page(request, session, signed, found, alert=rule_words(RETIRED))
+        return _item_page(request, session, signed, found, alert=str(RULES[RETIRED]))
     session.commit()
     log.info("alias removed", item_id=item_id, item_alias_id=alias_id)
     return redirect(f"{ITEMS}/{item_id}", notice="alias_removed", section="aliases")

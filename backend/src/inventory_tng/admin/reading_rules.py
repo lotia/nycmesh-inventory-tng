@@ -20,9 +20,9 @@ from inventory_tng import items, models, reading_rules, units
 from inventory_tng.admin.common import (
     ADMIN,
     ALERTS,
+    RULES,
     admin_page,
     form_version,
-    rule_words,
     text_form,
 )
 from inventory_tng.admin.listing import (
@@ -215,7 +215,7 @@ def _refused(
     """The rule's page again, saying why a change to it was refused: names
     it would read alike, by id, or one of ALERTS."""
     if broken != items.READ_ALIKE:
-        return _rule_page(request, session, signed, rule, alert=rule_words(broken))
+        return _rule_page(request, session, signed, rule, alert=str(RULES[broken]))
     # What the change would have read, the savepoint undone.
     rules = {**models.reading_rules(session)}
     if change is None:

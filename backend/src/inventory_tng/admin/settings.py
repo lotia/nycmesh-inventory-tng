@@ -20,12 +20,12 @@ from inventory_tng import accounts, activity, adjustment_reasons, mail, scan_set
 from inventory_tng.admin.common import (
     ADMIN,
     CHANGED,
+    RULES,
     SECTION_SETTINGS,
     admin_page,
     form_version,
     name_problem,
     now,
-    rule_words,
     text_form,
 )
 from inventory_tng.db import DbSession, RuleBroken, refusal, settings_row
@@ -189,7 +189,7 @@ def _page(
 
 def _changed(request: Request, session: Session, signed: SignedIn) -> HTMLResponse:
     """The page as it is now, as a form's row changed since it was shown."""
-    return _page(request, session, signed, alert=rule_words(CHANGED))
+    return _page(request, session, signed, alert=str(RULES[CHANGED]))
 
 
 @router.get(SETTINGS)
@@ -364,7 +364,7 @@ def save_site_settings(
             request,
             session,
             signed,
-            problems={"time_zone": rule_words(broken)},
+            problems={"time_zone": str(RULES[broken])},
             values={"time_zone": time_zone, "site_version": site_version},
         )
     session.commit()

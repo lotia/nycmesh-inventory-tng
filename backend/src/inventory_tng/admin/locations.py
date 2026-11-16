@@ -17,6 +17,7 @@ from inventory_tng import labels, locations
 from inventory_tng.admin.common import (
     ADMIN,
     ALERTS,
+    RULES,
     SECTION_LOCATIONS,
     admin_page,
     chosen,
@@ -251,7 +252,7 @@ def save_location(
 
         _, broken = attempt(session, save)
         if broken in ALERTS:
-            alert = rule_words(broken)
+            alert = str(RULES[broken])
             return _location_page(request, session, signed, found, alert=alert)
         problem = broken and rule_words(broken, str(TAKEN))
     if problem is not None:
@@ -296,7 +297,7 @@ def restore_location(
         return not_found()
     _, broken = attempt(session, lambda: locations.restore(session, found))
     if broken:
-        return _location_page(request, session, signed, found, rule_words(broken))
+        return _location_page(request, session, signed, found, str(RULES[broken]))
     session.commit()
     log.info("location restored", location_id=location_id)
     return redirect(f"{LOCATIONS}/{location_id}", notice="restored")
