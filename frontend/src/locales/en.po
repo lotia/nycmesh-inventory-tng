@@ -31,6 +31,10 @@ msgstr "Item retired"
 msgid "This page has changes you haven't saved. Retiring now loses them."
 msgstr "This page has changes you haven't saved. Retiring now loses them."
 
+#: src/outbox.ts
+msgid "This package is retired: what is left may be taken, never received"
+msgstr "This package is retired: what is left may be taken, never received"
+
 #. An item's name, then how much of it, or what is wrong with it.
 #: src/cart.ts
 msgid "{name}: {what}"
@@ -95,6 +99,10 @@ msgstr "({packages} said used up)"
 #: src/outbox.ts
 msgid "Line {n}: {why}"
 msgstr "Line {n}: {why}"
+
+#: src/outbox.ts
+msgid "This item is retired: what is left may be taken, never received"
+msgstr "This item is retired: what is left may be taken, never received"
 
 #: src/registration.ts
 msgid "That phrase has expired. Ask for a new one."
@@ -217,9 +225,17 @@ msgstr "To"
 msgid "Discard"
 msgstr "Discard"
 
+#: src/outbox.ts
+msgid "This package's size changed since the page loaded: load the page again, and count it again"
+msgstr "This package's size changed since the page loaded: load the page again, and count it again"
+
 #: src/OpenPackageCard.tsx
 msgid "Now"
 msgstr "Now"
+
+#: src/outbox.ts
+msgid "Whole packages only"
+msgstr "Whole packages only"
 
 #: src/ScanPage.tsx
 msgid "Moving stock"
@@ -398,6 +414,10 @@ msgstr "Too many tries from here. Wait a minute, then try again."
 msgid "A loose line says a package's size: load the page again, and count it again"
 msgstr "A loose line says a package's size: load the page again, and count it again"
 
+#: src/outbox.ts
+msgid "There is no such row"
+msgstr "There is no such row"
+
 #: src/OpenPackageCard.tsx
 msgid "Read the length printed on the cable where it leaves the spool. If it counts up from the start, what's left is the package size minus the mark."
 msgstr "Read the length printed on the cable where it leaves the spool. If it counts up from the start, what's left is the package size minus the mark."
@@ -507,6 +527,10 @@ msgid "An item"
 msgstr "An item"
 
 #: src/outbox.ts
+msgid "Moving an open package whole takes all that is left on it, which changed: load the page again"
+msgstr "Moving an open package whole takes all that is left on it, which changed: load the page again"
+
+#: src/outbox.ts
 msgid "A line of a package says the size it was counted in: load the page again, and count it again"
 msgstr "A line of a package says the size it was counted in: load the page again, and count it again"
 
@@ -542,6 +566,10 @@ msgstr "A package counted here is no longer used. Remove the line and add it aga
 msgid "Discard cart"
 msgstr "Discard cart"
 
+#: src/outbox.ts
+msgid "Open one package a line: it is followed until used up"
+msgstr "Open one package a line: it is followed until used up"
+
 #: src/OpenPackageCard.tsx
 msgid "Now:"
 msgstr "Now:"
@@ -549,6 +577,10 @@ msgstr "Now:"
 #: src/RegisterPage.tsx
 msgid "Registration phrase"
 msgstr "Registration phrase"
+
+#: src/outbox.ts
+msgid "That open package is at another place now"
+msgstr "That open package is at another place now"
 
 #: src/ScanPage.tsx
 msgid "Nothing in the cart yet."
@@ -561,6 +593,10 @@ msgstr "A cart: receiving stock"
 #: src/ScanPage.tsx
 msgid "Cannot Add to Cart"
 msgstr "Cannot Add to Cart"
+
+#: src/outbox.ts
+msgid "That open package was closed as used up: take from another"
+msgstr "That open package was closed as used up: take from another"
 
 #: src/OpenPackageCard.tsx
 msgid "Your cut uses up the {name}, so it's ticked. Untick it if any is left. An administrator confirms."
@@ -587,6 +623,10 @@ msgstr "to {place}"
 msgid "Torch"
 msgstr "Torch"
 
+#: src/outbox.ts
+msgid "This item is counted in whole units"
+msgstr "This item is counted in whole units"
+
 #: src/older.ts
 msgid "Can't add these items. Please rescan."
 msgstr "Can't add these items. Please rescan."
@@ -606,6 +646,10 @@ msgstr "{name}: enter what is on the open package, up to 3 decimals, or leave it
 #: src/ScanPage.tsx
 msgid "<0>Register it</0>, then come back."
 msgstr "<0>Register it</0>, then come back."
+
+#: src/outbox.ts
+msgid "The inventory's rules refuse this as sent: it changed since the page loaded. Load the page again, and do it again"
+msgstr "The inventory's rules refuse this as sent: it changed since the page loaded. Load the page again, and do it again"
 
 #: src/ScanPage.tsx
 msgid "Kept on this device, not sent."
@@ -824,6 +868,10 @@ msgstr "This browser isn't keeping the cart, so a reload will empty it. Free som
 msgid "Are you {name}? This phone hasn't been used for a while."
 msgstr "Are you {name}? This phone hasn't been used for a while."
 
+#: src/outbox.ts
+msgid "This item, in this package or loose, is on another line too: put it on one line"
+msgstr "This item, in this package or loose, is on another line too: put it on one line"
+
 #: src/older.ts
 msgid "An item no longer in the catalogue"
 msgstr "An item no longer in the catalogue"
@@ -875,6 +923,10 @@ msgstr "Counted in whole units."
 #: src/ScanPage.tsx
 msgid "Where"
 msgstr "Where"
+
+#: src/outbox.ts
+msgid "That open package moves whole, still open: it is not used up"
+msgstr "That open package moves whole, still open: it is not used up"
 
 #: src/outbox.ts
 msgid "Register it to send this batch."

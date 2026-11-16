@@ -158,6 +158,38 @@ export interface components {
       changed_from?: components["schemas"]["Line"][] | null;
     };
     /**
+     * BatchProblem
+     * @description One problem of a refused batch, shaped as FastAPI's own are: where,
+     *     and its kind, which the scan page words itself.
+     */
+    BatchProblem: {
+      /** Type */
+      type:
+        | (
+            | "not_found"
+            | "not_whole"
+            | "not_whole_packages"
+            | "one_package"
+            | "open_package_closed"
+            | "open_package_elsewhere"
+            | "open_package_whole"
+            | "moved_whole"
+            | "package_resized"
+            | "refused"
+            | "retired"
+            | "retired_package"
+            | "repeated"
+          )
+        | ("package_size_required" | "package_size_without_package");
+      /** Loc */
+      loc: (string | number)[];
+    };
+    /** BatchRefusedReply */
+    BatchRefusedReply: {
+      /** Detail */
+      detail: components["schemas"]["BatchProblem"][];
+    };
+    /**
      * BuildTooOldReply
      * @description A batch from a build of the scan page older than this server takes:
      *     not checked, nor saved.
@@ -862,13 +894,13 @@ export interface operations {
             | components["schemas"]["BuildTooOldReply"];
         };
       };
-      /** @description Validation Error */
+      /** @description Refused: each problem's kind (type) and where (loc), never in words, which the page makes from the kind. A body that cannot be a batch at all gets FastAPI's own 422, of the same shape, with pydantic's types and words, package_size_required and package_size_without_package among them */
       422: {
         headers: {
           [name: string]: unknown;
         };
         content: {
-          "application/json": components["schemas"]["HTTPValidationError"];
+          "application/json": components["schemas"]["BatchRefusedReply"];
         };
       };
       /** @description The database cannot answer; try again */

@@ -371,15 +371,10 @@ const COVERED: Record<string, () => Promise<HTMLElement[]>> = {
         reason: {
           code: "refused",
           problems: [
-            { names: { of: "line", n: 1 }, size: null, msg: null },
-            { names: { of: "used_up", n: 1 }, size: null, msg: null },
-            { names: { of: "lengths", n: 1 }, size: null, msg: null },
-            {
-              names: null,
-              size: "package_size_without_package",
-              msg: null,
-            },
-            { names: null, size: "package_size_required", msg: null },
+            { names: { of: "line", n: 1 }, kind: "not_whole" },
+            { names: { of: "used_up", n: 1 }, kind: "open_package_closed" },
+            { names: { of: "lengths", n: 1 }, kind: "made_up" },
+            { names: null, kind: "package_size_without_package" },
           ],
         },
       }),

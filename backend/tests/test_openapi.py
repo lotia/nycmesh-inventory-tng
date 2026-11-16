@@ -4,7 +4,7 @@ from typing import Any, get_args
 
 import pytest
 
-from inventory_tng import devices, openapi
+from inventory_tng import devices, ledger, openapi
 
 
 @pytest.fixture(scope="module")
@@ -45,6 +45,20 @@ def test_refusals_name_their_reasons(schema: dict[str, Any]) -> None:
     assert reasons("CodeRefusedReply") == set(get_args(devices.BadCode))
     assert reasons("RateLimitedReply") == {"rate_limited"}
     assert reasons("DeviceRefusedReply") == set(get_args(devices.Refusal))
+
+
+def test_a_refused_batch_names_every_kind_of_problem(schema: dict[str, Any]) -> None:
+    """The scan page words each kind the schema lists (outbox.ts, PROBLEMS),
+    so every kind the ledger or a line's check refuses with is listed."""
+    refused = schema["paths"]["/api/transactions"]["post"]["responses"]["422"]
+    assert refused["content"]["application/json"]["schema"] == {
+        "$ref": "#/components/schemas/BatchRefusedReply"
+    }
+    kind = schema["components"]["schemas"]["BatchProblem"]["properties"]["type"]
+    listed = {each for options in kind["anyOf"] for each in options["enum"]}
+    assert listed == set(get_args(ledger.ProblemKind)) | set(
+        get_args(ledger.SizeProblemKind)
+    )
 
 
 def test_routes_that_need_a_registered_device_say_so(schema: dict[str, Any]) -> None:

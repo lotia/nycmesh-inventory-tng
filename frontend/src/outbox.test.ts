@@ -1,16 +1,24 @@
 import { v4 as uuid } from "uuid";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
+import openapi from "./api/openapi.json";
 import { BUILD, Builds, HEADER, MUST_UPGRADE } from "./build";
-import { say } from "./i18n";
+import { say, speak } from "./i18n";
+import { messages as english } from "./locales/en.po";
+import { messages as pseudo } from "./locales/pseudo.po";
 import {
   batchId,
   type Draft,
   Entry,
   KEY_REUSED,
   Kept,
+  NOT_ACCEPTED,
+  NOT_RECORDED,
   newEntry,
   noteOf,
+  ON_LINE,
   Outbox,
+  PROBLEMS,
+  type ProblemKind,
   REPORT_AFTER,
   RETRY_MS,
   recordedHeading,
@@ -454,7 +462,7 @@ describe("refusals", () => {
     expect((await bodies(sent))[0]).toMatchObject({ key });
   });
 
-  test("a 422 says which line of the cart, in the server's words", async () => {
+  test("a 422 says which line of the cart, and why in the page's words for its kind", async () => {
     // The cart's first line went as two, a box and loose units.
     const lines = [
       { item_id: 5, quantity: "4", package_id: 9, package_size: "4" },
@@ -462,50 +470,73 @@ describe("refusals", () => {
       { item_id: 6, quantity: "2" },
     ];
     const detail = [
-      {
-        type: "not_found",
-        loc: ["body", "lines", 2, "item_id"],
-        msg: "There is no such row",
-      },
+      { type: "not_found", loc: ["body", "lines", 2, "item_id"] },
+      // FastAPI's own, its words not the page's: said plainly.
       {
         type: "value_error",
         loc: ["body"],
         msg: "Value error, a move has only a from and to location",
       },
-      // No words of the server's: said plainly.
       { type: "missing", loc: ["body", "lines", 0, "quantity"] },
-      {
-        type: "not_found",
-        loc: ["body", "used_up", 0],
-        msg: "There is no such row",
-      },
-      {
-        type: "not_found",
-        loc: ["body", "lengths", 0, "open_package_key"],
-        msg: "There is no such row",
-      },
+      { type: "not_found", loc: ["body", "used_up", 0] },
+      { type: "repeated", loc: ["body", "lengths", 0, "open_package_key"] },
     ];
     const { api } = answering(() => json({ detail }, 422));
     const outbox = new Outbox(api);
     outbox.queue(draft({ lines }), "a");
     await vi.waitFor(() => expect(states(outbox)).toEqual(["refused"]));
-    // Kept as a code and data, the words made from them on show.
-    const row = "There is no such row";
+    // Kept as kinds, the words made from them on show.
     expect(
       JSON.parse(localStorage.getItem(STORAGE_KEY) ?? "").entries[0].reason,
     ).toEqual({
       code: "refused",
       problems: [
-        { names: { of: "line", n: 2 }, size: null, msg: row },
-        { names: null, size: null, msg: detail[1]?.msg },
-        { names: { of: "line", n: 1 }, size: null, msg: null },
-        { names: { of: "used_up", n: 1 }, size: null, msg: row },
-        { names: { of: "lengths", n: 1 }, size: null, msg: row },
+        { names: { of: "line", n: 2 }, kind: "not_found" },
+        { names: null, kind: "value_error" },
+        { names: { of: "line", n: 1 }, kind: "missing" },
+        { names: { of: "used_up", n: 1 }, kind: "not_found" },
+        { names: { of: "lengths", n: 1 }, kind: "repeated" },
       ],
     });
+    const row = say(PROBLEMS.not_found);
     expect(said(outbox)).toBe(
-      "Not recorded. Line 2: There is no such row Value error, a move has only a from and to location Line 1: Not accepted Open package said used up, 1: There is no such row What is on an open package, 1: There is no such row",
+      `Not recorded. Line 2: ${row} Not accepted Line 1: Not accepted Open package said used up, 1: ${row} What is on an open package, 1: ${say(PROBLEMS.repeated)}`,
     );
+  });
+
+  test.each(
+    openapi.components.schemas.BatchProblem.properties.type.anyOf.flatMap(
+      (each: { enum: string[] }) => each.enum,
+    ),
+  )(
+    "a problem of kind %s is said in the page's words for it, in the language spoken as it is shown",
+    async (kind) => {
+      const detail = [{ type: kind, loc: ["body", "lines", 0, "quantity"] }];
+      const outbox = new Outbox(answering(() => json({ detail }, 422)).api);
+      outbox.queue(draft(), "a");
+      await vi.waitFor(() => expect(states(outbox)).toEqual(["refused"]));
+      const words = say(PROBLEMS[kind as ProblemKind]);
+      expect(words).not.toBe(say(NOT_ACCEPTED));
+      expect(said(outbox)).toBe(`Not recorded. Line 1: ${words}`);
+      // Kept as its kind, it is worded anew in another language.
+      speak("pseudo", pseudo);
+      try {
+        expect(said(outbox)).toBe(
+          `${say(NOT_RECORDED)} ${say(ON_LINE, { n: 1, why: say(PROBLEMS[kind as ProblemKind]) })}`,
+        );
+        expect(said(outbox)).not.toContain(words);
+      } finally {
+        speak("en", english);
+      }
+    },
+  );
+
+  test("a problem of a kind this build has no words for is not accepted", async () => {
+    const detail = [{ type: "made_up", loc: ["body", "lines", 0, "item_id"] }];
+    const outbox = new Outbox(answering(() => json({ detail }, 422)).api);
+    outbox.queue(draft(), "a");
+    await vi.waitFor(() => expect(states(outbox)).toEqual(["refused"]));
+    expect(said(outbox)).toBe(`Not recorded. Line 1: ${say(NOT_ACCEPTED)}`);
   });
 
   test("a 422 naming a report by no whole number is kept all the same", async () => {
@@ -518,7 +549,7 @@ describe("refusals", () => {
     expect(
       new Outbox(answering(() => json({}, 500)).api).entries.value,
     ).toEqual(outbox.entries.value);
-    expect(said(outbox)).toBe("Not recorded. Not accepted");
+    expect(said(outbox)).toBe(`Not recorded. ${say(PROBLEMS.not_found)}`);
   });
 
   test("a batch taking from an opening not yet saved waits for it", async () => {
@@ -1180,20 +1211,16 @@ describe("storage", () => {
     );
   });
 
-  test("another refusal of a line's package_size keeps the server's words", async () => {
-    const msg =
-      "This package's size changed since the page loaded: load the page again, and count it again";
+  test("another refusal of a line's package_size is worded by its kind", async () => {
     const detail = [
-      {
-        type: "package_resized",
-        loc: ["body", "lines", 0, "package_size"],
-        msg,
-      },
+      { type: "package_resized", loc: ["body", "lines", 0, "package_size"] },
     ];
     store(entry());
     const outbox = new Outbox(answering(() => json({ detail }, 422)).api);
     await outbox.send();
-    expect(said(outbox)).toBe(`Not recorded. Line 1: ${msg}`);
+    expect(said(outbox)).toBe(
+      `Not recorded. Line 1: ${say(PROBLEMS.package_resized)}`,
+    );
   });
 
   test("an older build's keys are neither read, sent, nor written", async () => {
@@ -1357,13 +1384,11 @@ describe("storage", () => {
         "reason.code = refused",
         "reason.code = unexpected",
         "reason.problems",
-        "reason.problems.msg",
+        "reason.problems.kind",
         "reason.problems.names",
         "reason.problems.names.n",
         "reason.problems.names.of",
         "reason.problems.names.of = line | used_up | lengths",
-        "reason.problems.size",
-        "reason.problems.size = package_size_required | package_size_without_package",
         "reason.status",
         "reason.tries",
         "reason.why",

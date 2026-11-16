@@ -43,6 +43,7 @@ import {
   OFFLINE,
   STORAGE_KEY as OUTBOX_KEY,
   Outbox,
+  PROBLEMS,
   SOME_NOT_RECORDED,
 } from "./outbox";
 import { ADD_DIFFERENCE, IN_CART } from "./recorded";
@@ -957,11 +958,7 @@ describe("filling and saving a cart", () => {
 
   test("a refused batch says why in the alert's style, and lists its lines", async () => {
     const detail = [
-      {
-        type: "value_error",
-        loc: ["body", "lines", 1, "quantity"],
-        msg: "No more than 0.5 left.",
-      },
+      { type: "not_whole", loc: ["body", "lines", 1, "quantity"] },
     ];
     open(server(() => json({ detail }, 422)).api);
     await ready();
@@ -972,11 +969,11 @@ describe("filling and saving a cart", () => {
     const note = await screen.findByText(
       (_, element) =>
         element?.className === "alert" &&
-        element.textContent === "Not recorded. Line 2: No more than 0.5 left.",
+        element.textContent ===
+          `Not recorded. Line 2: ${say(PROBLEMS.not_whole)}`,
     );
     // Only say(NOT_RECORDED) in bold; in what follows, the line's number
-    // the page wrote in italic, the server's words as they are (Ali,
-    // inventory-tng-93z).
+    // the page wrote in italic (Ali, inventory-tng-93z).
     expectRefusal(note, say(NOT_RECORDED), ["2"]);
     const entry = note.closest("li") as HTMLElement;
     // Numbered as the problems name them.

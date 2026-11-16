@@ -93,6 +93,15 @@ them open:
   or with words only a screen reader hears, is one message, its markup in
   it; the values filled into it are escaped, never marked safe. A sentence
   with several counts says each as a plural of its own, filled into it.
+- A refused batch's 422 is `{"detail": [{"type": kind, "loc": [...]}]}`,
+  FastAPI's shape without its `msg`, documented in the OpenAPI schema as
+  `BatchRefusedReply`: no kind takes values yet, so none are sent. The
+  scan page's outbox keeps each problem's kind, never words, so a refusal
+  kept is worded in the language spoken when it is shown; a kind it has
+  no words for is "Not accepted", as is FastAPI's own 422 for a body
+  that cannot be a batch at all, except the two kinds of a line's
+  package size, which it words. The server says these kinds nowhere
+  itself, so it keeps no words for them (2026-11-16).
 - Catalogues name the file each message comes from, not its line, so a
   phrase moving within its file leaves them unchanged.
 - `mise run check-catalogues`, and CI's job of that name, fail when either

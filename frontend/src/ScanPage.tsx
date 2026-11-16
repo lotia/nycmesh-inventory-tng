@@ -1405,7 +1405,8 @@ function ConfirmDiscard({
  * A failure or refusal note's words, in bold, the counts the page wrote
  * in it in bold italic, never a number of a name it quotes (Ali,
  * inventory-tng-93z); of a refusal, the problems after "Not recorded."
- * (Note.plain) not in bold, the server's words in them as they are.
+ * (Note.plain) not in bold, words an older build kept in them as they
+ * are.
  */
 function AlertWords({ note: { bold, plain = [] } }: { note: Note }) {
   return (

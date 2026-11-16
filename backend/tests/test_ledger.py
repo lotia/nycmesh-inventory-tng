@@ -144,6 +144,8 @@ def test_a_refusal_names_each_bad_line(
         (["body", "lines", 2, "item_id"], "repeated"),
         (["body", "lines", 2, "quantity"], "not_whole"),
     ]
+    # Kinds, never words: the scan page words each kind itself.
+    assert {tuple(p) for p in response.json()["detail"]} == {("type", "loc")}
     assert saved(session, batch["key"]) == []
 
 

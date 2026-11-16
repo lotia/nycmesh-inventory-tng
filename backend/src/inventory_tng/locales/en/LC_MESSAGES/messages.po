@@ -1975,12 +1975,6 @@ msgstr ""
 msgid "Move what is here elsewhere, or count it, first."
 msgstr ""
 
-#: src/inventory_tng/ledger.py
-msgid ""
-"Moving an open package whole takes all that is left on it, which changed:"
-" load the page again"
-msgstr ""
-
 #: src/inventory_tng/templates/_item_name.html
 #: src/inventory_tng/templates/account.html
 #: src/inventory_tng/templates/category.html
@@ -2409,10 +2403,6 @@ msgstr ""
 #: src/inventory_tng/over_recorded.py
 #, python-format
 msgid "Open %(package)s"
-msgstr ""
-
-#: src/inventory_tng/ledger.py
-msgid "Open one package a line: it is followed until used up"
 msgstr ""
 
 #: src/inventory_tng/templates/length_checks.html
@@ -3592,18 +3582,6 @@ msgstr ""
 msgid "That number is too big."
 msgstr ""
 
-#: src/inventory_tng/ledger.py
-msgid "That open package is at another place now"
-msgstr ""
-
-#: src/inventory_tng/ledger.py
-msgid "That open package moves whole, still open: it is not used up"
-msgstr ""
-
-#: src/inventory_tng/ledger.py
-msgid "That open package was closed as used up: take from another"
-msgstr ""
-
 #: src/inventory_tng/admin/common.py
 msgid ""
 "That package isn't followed once opened any more: count what is on it as "
@@ -3668,12 +3646,6 @@ msgstr ""
 
 #: src/inventory_tng/pages.py
 msgid "The inventory could not take that as it was sent. Go back and try again."
-msgstr ""
-
-#: src/inventory_tng/ledger.py
-msgid ""
-"The inventory's rules refuse this as sent: it changed since the page "
-"loaded. Load the page again, and do it again"
 msgstr ""
 
 #. Translators: who did something, at the start of a sentence.
@@ -3757,10 +3729,6 @@ msgstr ""
 msgid "There is already a reason by that name."
 msgstr ""
 
-#: src/inventory_tng/ledger.py
-msgid "There is no such row"
-msgstr ""
-
 #: src/inventory_tng/pages.py
 msgid "There is nothing here. The link may be old, or mistyped."
 msgstr ""
@@ -3823,26 +3791,12 @@ msgstr ""
 msgid "This form is out of date: try again."
 msgstr ""
 
-#: src/inventory_tng/ledger.py
-msgid "This item is counted in whole units"
-msgstr ""
-
 #: src/inventory_tng/admin/common.py
 msgid "This item is counted in whole units."
 msgstr ""
 
 #: src/inventory_tng/admin/counts.py
 msgid "This item is on the form more than once."
-msgstr ""
-
-#: src/inventory_tng/ledger.py
-msgid "This item is retired: what is left may be taken, never received"
-msgstr ""
-
-#: src/inventory_tng/ledger.py
-msgid ""
-"This item, in this package or loose, is on another line too: put it on "
-"one line"
 msgstr ""
 
 #: src/inventory_tng/templates/reset.html
@@ -3852,16 +3806,6 @@ msgid ""
 "it, or its time ran out. <a href=\"%(link)s\">Ask for a new one</a>, or "
 "ask another administrator. If nobody else can help, ask whoever runs the "
 "server for a new recovery token."
-msgstr ""
-
-#: src/inventory_tng/ledger.py
-msgid "This package is retired: what is left may be taken, never received"
-msgstr ""
-
-#: src/inventory_tng/ledger.py
-msgid ""
-"This package's size changed since the page loaded: load the page again, "
-"and count it again"
 msgstr ""
 
 #: src/inventory_tng/admin/length_checks.py
@@ -4165,10 +4109,6 @@ msgstr ""
 #: src/inventory_tng/admin/settings.py
 #, python-format
 msgid "Whole minutes, from %(low)d to %(high)d."
-msgstr ""
-
-#: src/inventory_tng/ledger.py
-msgid "Whole packages only"
 msgstr ""
 
 #: src/inventory_tng/templates/counts.html

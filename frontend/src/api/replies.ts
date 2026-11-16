@@ -72,13 +72,13 @@ export const BuildTooOldReply = v.looseObject({
 export const Saved = v.object({ transaction_id: id });
 
 /** FastAPI's 422, and the ledger's, which has the same shape: only the parts
- * the pages read are checked. */
+ * the pages read are checked, where and of what kind, never the words
+ * (backend ledger.BatchProblem). */
 export const ValidationFailed = v.object({
   detail: v.array(
     v.looseObject({
       loc: v.array(v.union([v.string(), v.number()])),
       type: v.string(),
-      msg: v.optional(v.string()),
     }),
   ),
 });

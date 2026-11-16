@@ -661,8 +661,8 @@ utilities. When you style a page:
 - A failure or refusal note on the scan page is in the alert's style
   (`role="alert"`, or `class="alert"` for notes shown with a list), in
   bold as a whole, with no "Sorry.", and the counts the page wrote in it
-  in bold italic, never the numbers of a name or of the server's words
-  (`AlertWords` in `ScanPage.tsx`). A refusal's problems, after "Not
+  in bold italic, never the numbers of a name or of words an older build
+  kept (`AlertWords` in `ScanPage.tsx`). A refusal's problems, after "Not
   recorded.", are not bold. A status that reports no problem is plain.
 - Follow docs/decisions/0019 for links, buttons and lists. A button is
   secondary unless it is its form's main one, `class="primary"`, or the one

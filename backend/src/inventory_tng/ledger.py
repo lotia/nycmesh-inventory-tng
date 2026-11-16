@@ -77,7 +77,6 @@ from inventory_tng.models import (
     Volunteer,
 )
 from inventory_tng.page_builds import BuildTooOldReply
-from inventory_tng.phrases import lazy_gettext
 
 log = structlog.get_logger(__name__)
 meter = metrics.get_meter(__name__)
@@ -877,6 +876,8 @@ class Batch(BaseModel):
 
 
 # Where in the batch, as pydantic gives it ("lines", 2, "item_id"), and what.
+# The 422 sends the kind, never words: the scan page words each kind itself
+# (docs/decisions/0022). None takes values yet.
 ProblemKind = Literal[
     "not_found",
     "not_whole",
@@ -893,43 +894,20 @@ ProblemKind = Literal[
     "repeated",
 ]
 Problem = tuple[tuple[str | int, ...], ProblemKind]
-MESSAGES = {
-    "one_package": lazy_gettext(
-        "Open one package a line: it is followed until used up"
-    ),
-    "open_package_closed": lazy_gettext(
-        "That open package was closed as used up: take from another"
-    ),
-    "open_package_elsewhere": lazy_gettext("That open package is at another place now"),
-    "open_package_whole": lazy_gettext(
-        "Moving an open package whole takes all that is left on it, which "
-        "changed: load the page again"
-    ),
-    "moved_whole": lazy_gettext(
-        "That open package moves whole, still open: it is not used up"
-    ),
-    "package_resized": lazy_gettext(
-        "This package's size changed since the page loaded: load the page "
-        "again, and count it again"
-    ),
-    "refused": lazy_gettext(
-        "The inventory's rules refuse this as sent: it changed since the page "
-        "loaded. Load the page again, and do it again"
-    ),
-    "not_found": lazy_gettext("There is no such row"),
-    "repeated": lazy_gettext(
-        "This item, in this package or loose, is on another line too: put it "
-        "on one line"
-    ),
-    "not_whole": lazy_gettext("This item is counted in whole units"),
-    "not_whole_packages": lazy_gettext("Whole packages only"),
-    "retired": lazy_gettext(
-        "This item is retired: what is left may be taken, never received"
-    ),
-    "retired_package": lazy_gettext(
-        "This package is retired: what is left may be taken, never received"
-    ),
-}
+# A line's package_size refused by Line's own check, in FastAPI's own 422.
+SizeProblemKind = Literal["package_size_required", "package_size_without_package"]
+
+
+class BatchProblem(BaseModel):
+    """One problem of a refused batch, shaped as FastAPI's own are: where,
+    and its kind, which the scan page words itself."""
+
+    type: ProblemKind | SizeProblemKind
+    loc: list[str | int]
+
+
+class BatchRefusedReply(BaseModel):
+    detail: list[BatchProblem]
 
 
 class BatchRefused(Exception):
@@ -2276,6 +2254,15 @@ PATH = "/transactions"
             "model": DeviceRefusedReply,
             "description": "This device is not registered",
         },
+        422: {
+            "model": BatchRefusedReply,
+            "description": "Refused: each problem's kind (type) and where "
+            "(loc), never in words, which the page makes from the kind. A "
+            "body that cannot be a batch at all gets FastAPI's own 422, of "
+            "the same shape, with pydantic's types and words, "
+            "package_size_required and package_size_without_package among "
+            "them",
+        },
         409: {
             "model": KeyReusedReply | BuildTooOldReply,
             "description": "The key was used for another batch "
@@ -2360,10 +2347,10 @@ def install(app: FastAPI) -> None:
     @app.exception_handler(BatchRefused)
     def batch_refused(_request: Request, error: BatchRefused) -> JSONResponse:
         detail = [
-            {"type": kind, "loc": ["body", *loc], "msg": str(MESSAGES[kind])}
-            for loc, kind in error.problems
+            BatchProblem(type=kind, loc=["body", *loc]) for loc, kind in error.problems
         ]
-        return JSONResponse({"detail": detail}, status_code=422)
+        body = BatchRefusedReply(detail=detail)
+        return JSONResponse(body.model_dump(mode="json"), status_code=422)
 
     @app.exception_handler(KeyReused)
     def key_reused(_request: Request, error: KeyReused) -> JSONResponse:

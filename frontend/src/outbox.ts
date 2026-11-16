@@ -39,7 +39,7 @@ import {
   ValidationFailed,
 } from "./api/replies";
 import { Builds, HEADER, MUST_UPGRADE } from "./build";
-import { say, sayParts } from "./i18n";
+import { say } from "./i18n";
 import { NOT_REGISTERED } from "./registration";
 import { onStoredChange, readStored, writeStored } from "./stored";
 import { telemetry } from "./telemetry";
@@ -145,13 +145,32 @@ export type ReportKind = keyof typeof REPORTS;
 const isReport = (kind: unknown): kind is ReportKind =>
   typeof kind === "string" && Object.hasOwn(REPORTS, kind);
 
-/** A line's package_size refused as a page's bug, as a build from before
- * sizes were sent kept its lines (inventory-tng-1p8), by the server's type:
- * its words are for whoever writes a client, these for the volunteer. */
-const SIZE_REFUSED = {
+/** A kind of problem a 422 names (backend ledger.BatchProblem). */
+export type ProblemKind = Schemas["BatchProblem"]["type"];
+
+/** Each kind of problem in words: the server sends kinds, never words
+ * (Ali, inventory-tng-oic, 2026-11-15). Typed by the schema, so a kind new
+ * on the server fails the type check until it has words here. A line's
+ * package_size refused, as a build from before sizes were sent kept its
+ * lines (inventory-tng-1p8), is in FastAPI's own 422, whose words are for
+ * whoever writes a client: these are for the volunteer. */
+export const PROBLEMS: Record<ProblemKind, MessageDescriptor> = {
+  not_found: msg`There is no such row`,
+  not_whole: msg`This item is counted in whole units`,
+  not_whole_packages: msg`Whole packages only`,
+  one_package: msg`Open one package a line: it is followed until used up`,
+  open_package_closed: msg`That open package was closed as used up: take from another`,
+  open_package_elsewhere: msg`That open package is at another place now`,
+  open_package_whole: msg`Moving an open package whole takes all that is left on it, which changed: load the page again`,
+  moved_whole: msg`That open package moves whole, still open: it is not used up`,
+  package_resized: msg`This package's size changed since the page loaded: load the page again, and count it again`,
+  refused: msg`The inventory's rules refuse this as sent: it changed since the page loaded. Load the page again, and do it again`,
+  retired: msg`This item is retired: what is left may be taken, never received`,
+  retired_package: msg`This package is retired: what is left may be taken, never received`,
+  repeated: msg`This item, in this package or loose, is on another line too: put it on one line`,
   package_size_required: msg`A line of a package says the size it was counted in: load the page again, and count it again`,
   package_size_without_package: msg`A loose line says a package's size: load the page again, and count it again`,
-} as const;
+};
 
 /** A whole number, as kept. */
 const whole = v.pipe(v.number(), v.integer());
@@ -166,13 +185,10 @@ const Problem = v.object({
       n: whole,
     }),
   ),
-  /** A line's package_size refused as a page's bug: said in the page's
-   * words (SIZE_REFUSED), not the server's. */
-  size: v.nullable(
-    v.picklist(Object.keys(SIZE_REFUSED) as (keyof typeof SIZE_REFUSED)[]),
-  ),
-  /** The server's words, if it gave any. */
-  msg: v.nullable(v.string()),
+  /** Its kind, as the server named it: worded as it is shown (PROBLEMS),
+   * so in the language then; one this build has no words for is "Not
+   * accepted". */
+  kind: v.string(),
 });
 
 type Problem = v.InferOutput<typeof Problem>;
@@ -233,7 +249,8 @@ export type Reason = v.InferOutput<typeof Reason>;
 
 /** Words for an alert: a string is the page's own, its numbers counts it
  * wrote, shown in italic; `{ quoted }` is words it did not write, such as
- * a name or the server's, shown as they are (Ali, inventory-tng-93z). */
+ * a name or what an older build kept, shown as they are (Ali,
+ * inventory-tng-93z). */
 export type Said = readonly (string | { quoted: string })[];
 
 /** A note on show: `bold`, then `plain`, not bold, as a refusal's
@@ -343,20 +360,19 @@ export function noteOf(reason: Reason, online = true): Note {
   }
 }
 
-/** One of a 422's problems, after a space: what it names in the page's
- * words, then why, in the server's, or the page's for a size refused. */
-function problemSaid({ names, size, msg: server }: Problem): Said {
-  const why =
-    size !== null
-      ? say(SIZE_REFUSED[size])
-      : server === null
-        ? say(NOT_ACCEPTED)
-        : { quoted: server };
+/** One of a 422's problems, after a space: what it names, then why, in
+ * the page's words for its kind. */
+function problemSaid({ names, kind }: Problem): Said {
+  const why = say(
+    Object.hasOwn(PROBLEMS, kind)
+      ? PROBLEMS[kind as ProblemKind]
+      : NOT_ACCEPTED,
+  );
   if (names === null) {
     return [" ", why];
   }
   const where = names.of === "line" ? ON_LINE : ON_REPORT[names.of];
-  return [" ", ...sayParts(where, { n: String(names.n), why: [why] })];
+  return [" ", say(where, { n: names.n, why })];
 }
 
 /** A batch as kept: once a build keeping it under STORAGE_KEY is deployed,
@@ -464,13 +480,8 @@ function problems(
   body: Body,
 ): Problem[] {
   const lineOf = lineNumbers(body.lines.map((line) => line.item_id));
-  return detail.map(({ loc, msg, type }) => {
+  return detail.map(({ loc, type: kind }) => {
     const line = loc[0] === "body" && loc[1] === "lines" ? loc[2] : undefined;
-    const size =
-      loc[3] === "package_size" && Object.hasOwn(SIZE_REFUSED, type)
-        ? (type as keyof typeof SIZE_REFUSED)
-        : null;
-    const said = { size, msg: typeof msg === "string" ? msg : null };
     // A report's, by its place in the batch's list of them.
     if (
       loc[0] === "body" &&
@@ -479,13 +490,13 @@ function problems(
       typeof loc[2] === "number" &&
       Number.isInteger(loc[2])
     ) {
-      return { names: { of: loc[1], n: loc[2] + 1 }, ...said };
+      return { names: { of: loc[1], n: loc[2] + 1 }, kind };
     }
     const sent = typeof line === "number" ? body.lines[line] : undefined;
     return {
       names:
         sent === undefined ? null : { of: "line", n: lineOf(sent.item_id) },
-      ...said,
+      kind,
     };
   });
 }

@@ -184,6 +184,16 @@
               }
             }
           },
+          "422": {
+            "description": "Refused: each problem's kind (type) and where (loc), never in words, which the page makes from the kind. A body that cannot be a batch at all gets FastAPI's own 422, of the same shape, with pydantic's types and words, package_size_required and package_size_without_package among them",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BatchRefusedReply"
+                }
+              }
+            }
+          },
           "409": {
             "description": "The key was used for another batch (key_reused), or the page's build is too old for this server (build_too_old): keep the batch, and load the page again",
             "content": {
@@ -198,16 +208,6 @@
                     }
                   ],
                   "title": "Response 409 Save Batch Api Transactions Post"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
                 }
               }
             }
@@ -460,6 +460,72 @@
         "type": "object",
         "required": ["key", "kind", "volunteer_id", "lines"],
         "title": "Batch"
+      },
+      "BatchProblem": {
+        "properties": {
+          "type": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "not_found",
+                  "not_whole",
+                  "not_whole_packages",
+                  "one_package",
+                  "open_package_closed",
+                  "open_package_elsewhere",
+                  "open_package_whole",
+                  "moved_whole",
+                  "package_resized",
+                  "refused",
+                  "retired",
+                  "retired_package",
+                  "repeated"
+                ]
+              },
+              {
+                "type": "string",
+                "enum": [
+                  "package_size_required",
+                  "package_size_without_package"
+                ]
+              }
+            ],
+            "title": "Type"
+          },
+          "loc": {
+            "items": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "integer"
+                }
+              ]
+            },
+            "type": "array",
+            "title": "Loc"
+          }
+        },
+        "type": "object",
+        "required": ["type", "loc"],
+        "title": "BatchProblem",
+        "description": "One problem of a refused batch, shaped as FastAPI's own are: where,\nand its kind, which the scan page words itself."
+      },
+      "BatchRefusedReply": {
+        "properties": {
+          "detail": {
+            "items": {
+              "$ref": "#/components/schemas/BatchProblem"
+            },
+            "type": "array",
+            "title": "Detail"
+          }
+        },
+        "type": "object",
+        "required": ["detail"],
+        "title": "BatchRefusedReply"
       },
       "BuildTooOldReply": {
         "properties": {
