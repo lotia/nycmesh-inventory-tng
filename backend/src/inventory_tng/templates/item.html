@@ -188,7 +188,7 @@ None is left, so nobody can pick it.{% endtrans %}{% endif %}{% endcall %}
         {%- if each.row.reported_at %} <span class="tag">{% trans %}Reported used up{% endtrans %}</span>{% endif %}
         <span class="hint block">{% trans when=each.row.opened_at | when(zone) %}opened {{ when }}{% endtrans %}</span></td>
       <td>{{ each.left | amount }} {{ each.unit }}</td>
-      <td><form method="get" action="{{ here }}/open-packages/{{ each.row.id }}/close"><button>{% trans package=each.package, place=each.place %}Close as used up<span class="sr-only"> {{ package }} at {{ place }}</span>{% endtrans %}</button></form></td>
+      <td><form method="get" action="{{ here }}/open-packages/{{ each.row.id }}/close"><button>{% trans %}Close as used up{% endtrans %}<span class="sr-only"> {% trans what=each.package, place=each.place %}{{ what }} at {{ place }}{% endtrans %}</span></button></form></td>
     </tr>
     {% endfor %}
   {% endcall %}

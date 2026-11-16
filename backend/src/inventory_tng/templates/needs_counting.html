@@ -4,23 +4,23 @@
 {% from "_listing.html" import sizes, sort_heading, pager %}
 {% from "_retired.html" import retired %}
 {% block main %}
-{{ views("Stock views", stock_views, "needs-counting") }}
-<p class="hint">Places that show less than nothing of an item: the records are
-wrong there until someone counts it.</p>
+{{ views(_("Stock views"), stock_views, "needs-counting") }}
+<p class="hint">{% trans %}Places that show less than nothing of an item: the records are
+wrong there until someone counts it.{% endtrans %}</p>
 {{ sizes(view) }}
 {% for group in places %}
 <section>
   <h2>{{ group.heading.name }}</h2>
   {% call table() %}
-    <tr>{{ sort_heading(view, "item", "Item") }}{{ sort_heading(view, "quantity", "How much") }}</tr>
+    <tr>{{ sort_heading(view, "item", _("Item")) }}{{ sort_heading(view, "quantity", _("How much")) }}</tr>
     {% for row in group.rows %}
     <tr><td>{{ row.item.name_shown }}</td><td>{{ row.quantity | amount }} {{ row.item.unit }}</td></tr>
     {% endfor %}
   {% endcall %}
-  <p><a href="{{ counts_path }}/{{ group.heading.id }}">Start counting {{ group.heading.name }}</a>{{ retired(group.heading) }}</p>
+  <p><a href="{{ counts_path }}/{{ group.heading.id }}">{% trans name=group.heading.name %}Start counting {{ name }}{% endtrans %}</a>{{ retired(group.heading) }}</p>
 </section>
 {% else %}
-<p>Nothing shows less than nothing.</p>
+<p>{% trans %}Nothing shows less than nothing.{% endtrans %}</p>
 {% endfor %}
 {{ pager(view) }}
 {% endblock %}

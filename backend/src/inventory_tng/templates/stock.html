@@ -5,20 +5,27 @@
 {% from "_forms.html" import forms_lines %}
 {% from "_listing.html" import filter_form, sizes, sort_heading, pager, unfiltered_or %}
 {% block main %}
-{{ views("Stock views", stock_views, by) }}
+{{ views(_("Stock views"), stock_views, by) }}
 {% include "_retired_holding.html" %}
 {% if needing_count %}
-<p role="alert">{{ needing_count }} {{ by ~ (" shows" if needing_count == 1 else "s show") }}
+<p role="alert">{% if by == "item" %}{% trans count=needing_count, link=needs_counting_path %}{{ count }} item shows
 less than nothing somewhere: the records are wrong there, so count it
-(<a href="{{ needs_counting_path }}">Needs counting</a>).</p>
+(<a href="{{ link }}">Needs counting</a>).{% pluralize %}{{ count }} items show
+less than nothing somewhere: the records are wrong there, so count it
+(<a href="{{ link }}">Needs counting</a>).{% endtrans %}
+{%- else %}{% trans count=needing_count, link=needs_counting_path %}{{ count }} place shows
+less than nothing somewhere: the records are wrong there, so count it
+(<a href="{{ link }}">Needs counting</a>).{% pluralize %}{{ count }} places show
+less than nothing somewhere: the records are wrong there, so count it
+(<a href="{{ link }}">Needs counting</a>).{% endtrans %}{% endif %}</p>
 {% endif %}
 {% call filter_form(view) %}
-  <label>Find items
+  <label>{% trans %}Find items{% endtrans %}
     <input name="q" type="search" value="{{ view.filtered('q') }}" maxlength="200" autocomplete="off">
   </label>
-  <label>Filter by place
+  <label>{% trans %}Filter by place{% endtrans %}
     <select name="place">
-      <option value="">Any</option>
+      <option value="">{% trans %}Any{% endtrans %}</option>
       {% for place in places %}
       <option value="{{ place.id }}"{% if view.filtered("place") == place.id | string %} selected{% endif %}>{{ place.name }}</option>
       {% endfor %}
@@ -28,21 +35,21 @@ less than nothing somewhere: the records are wrong there, so count it
 {{ sizes(view) }}
 {% for group in groups %}
 <section{% if by == "item" %} id="item-{{ group.heading.id }}"{% endif %}>
-  <h2>{{ group.heading.name_shown if by == "item" else group.heading.name }}{{ retired(group.heading) }}{% if by == "item" %} <span class="hint">{{ in_all[group.heading.id] | amount }} {{ group.heading.unit }} in all</span>{% endif %}</h2>
+  <h2>{{ group.heading.name_shown if by == "item" else group.heading.name }}{{ retired(group.heading) }}{% if by == "item" %} <span class="hint">{% trans amount=in_all[group.heading.id] | amount, unit=group.heading.unit %}{{ amount }} {{ unit }} in all{% endtrans %}</span>{% endif %}</h2>
   {% call table() %}
-    <tr>{% if by == "place" %}{{ sort_heading(view, "item", "Item") }}{% else %}{{ sort_heading(view, "place", "Place") }}{% endif %}
-      {{- sort_heading(view, "quantity", "How much") }}</tr>
+    <tr>{% if by == "place" %}{{ sort_heading(view, "item", _("Item")) }}{% else %}{{ sort_heading(view, "place", _("Place")) }}{% endif %}
+      {{- sort_heading(view, "quantity", _("How much")) }}</tr>
     {% for row in group.rows %}
     <tr>
       <td>{% if by == "place" %}{{ row.item.name_shown }}{% else %}{{ row.location.name }}{{ retired(row.location) }}{% endif %}</td>
-      <td>{{ row.quantity | amount }} {{ row.item.unit }}{% if row.quantity < 0 or row.negative %} <strong>count it</strong>{% endif %}
+      <td>{{ row.quantity | amount }} {{ row.item.unit }}{% if row.quantity < 0 or row.negative %} <strong>{% trans %}count it{% endtrans %}</strong>{% endif %}
         {{- forms_lines(forms[(row.item.id, row.location.id)], row.item.unit) }}</td>
     </tr>
     {% endfor %}
   {% endcall %}
 </section>
 {% else %}
-<p>{% call unfiltered_or(view) %}Nothing is recorded anywhere yet.{% endcall %}</p>
+<p>{% call unfiltered_or(view) %}{% trans %}Nothing is recorded anywhere yet.{% endtrans %}{% endcall %}</p>
 {% endfor %}
 {{ pager(view) }}
 {% endblock %}

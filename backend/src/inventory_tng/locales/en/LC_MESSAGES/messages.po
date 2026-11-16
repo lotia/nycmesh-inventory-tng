@@ -16,6 +16,19 @@ msgstr ""
 "Content-Transfer-Encoding: 8bit\n"
 "Generated-By: Babel 2.18.0\n"
 
+#: src/inventory_tng/templates/count.html
+#: src/inventory_tng/templates/stock.html
+#, python-format
+msgid "%(amount)s %(unit)s in all"
+msgstr ""
+
+#: src/inventory_tng/templates/count.html
+#, python-format
+msgid ""
+"%(amount)s %(unit)s in all; while you counted, %(came)s in, %(went)s out;"
+" you typed %(typed)s"
+msgstr ""
+
 #: src/inventory_tng/over_recorded.py
 #, python-format
 msgid "%(amount)s from an open package"
@@ -71,6 +84,11 @@ msgstr ""
 msgid "%(by)s retired the authenticators a lost or leaked key sealed"
 msgstr ""
 
+#: src/inventory_tng/templates/count.html
+#, python-format
+msgid "%(came)s in, %(went)s out; you typed %(typed)s"
+msgstr ""
+
 #: src/inventory_tng/templates/labels.html
 #, python-format
 msgid "%(count)s inactive label"
@@ -85,10 +103,32 @@ msgid_plural "%(count)s items"
 msgstr[0] ""
 msgstr[1] ""
 
+#: src/inventory_tng/templates/stock.html
+#, python-format
+msgid ""
+"%(count)s item shows less than nothing somewhere: the records are wrong "
+"there, so count it (<a href=\"%(link)s\">Needs counting</a>)."
+msgid_plural ""
+"%(count)s items show less than nothing somewhere: the records are wrong "
+"there, so count it (<a href=\"%(link)s\">Needs counting</a>)."
+msgstr[0] ""
+msgstr[1] ""
+
 #: src/inventory_tng/templates/labels.html
 #, python-format
 msgid "%(count)s label"
 msgid_plural "%(count)s labels"
+msgstr[0] ""
+msgstr[1] ""
+
+#: src/inventory_tng/templates/stock.html
+#, python-format
+msgid ""
+"%(count)s place shows less than nothing somewhere: the records are wrong "
+"there, so count it (<a href=\"%(link)s\">Needs counting</a>)."
+msgid_plural ""
+"%(count)s places show less than nothing somewhere: the records are wrong "
+"there, so count it (<a href=\"%(link)s\">Needs counting</a>)."
 msgstr[0] ""
 msgstr[1] ""
 
@@ -124,6 +164,16 @@ msgid_plural "%(count)s volunteers"
 msgstr[0] ""
 msgstr[1] ""
 
+#: src/inventory_tng/templates/over_recorded.html
+#, python-format
+msgid "%(counted)s closed %(day)s. %(still)s still to put right."
+msgstr ""
+
+#: src/inventory_tng/templates/over_recorded.html
+#, python-format
+msgid "%(counted)s counted %(day)s. %(still)s still to put right."
+msgstr ""
+
 #. Translators: a place or a form, then the day it was counted ("14 Nov").
 #: src/inventory_tng/over_recorded.py
 #, python-format
@@ -157,12 +207,27 @@ msgstr ""
 msgid "%(found)s of %(counted)s."
 msgstr ""
 
+#: src/inventory_tng/templates/count.html
+#, python-format
+msgid "%(item)s counted"
+msgstr ""
+
+#: src/inventory_tng/templates/count.html
+#, python-format
+msgid "%(item)s, %(form)s: is it here?"
+msgstr ""
+
 #: src/inventory_tng/templates/open_package_close.html
 #, python-format
 msgid ""
 "%(item)s, %(package)s, at %(place)s: it shows %(left)s %(unit)s. Closing "
 "it writes that off, with the reason Used up, and it is offered no more. "
 "It can't be opened again; a count puts right a mistake."
+msgstr ""
+
+#: src/inventory_tng/templates/over_recorded.html
+#, python-format
+msgid "%(item)s, transaction %(transaction)s"
 msgstr ""
 
 #: src/inventory_tng/labels.py
@@ -261,9 +326,23 @@ msgstr ""
 msgid "%(package)s, sealed: how many"
 msgstr ""
 
+#: src/inventory_tng/templates/over_recorded_settled.html
+#, python-format
+msgid "%(place)s (opened)"
+msgstr ""
+
 #: src/inventory_tng/admin/over_recorded.py
 #, python-format
 msgid "%(place)s brought back. Correct it now."
+msgstr ""
+
+#: src/inventory_tng/templates/count.html
+#, python-format
+msgid ""
+"%(place)s is retired, but the records say something is here: a save "
+"brought or took it after it was retired. Count what is really there: "
+"usually nothing. Anything you find, take to a current place, count this "
+"one as empty, and record it found there."
 msgstr ""
 
 #: src/inventory_tng/labels.py
@@ -332,9 +411,26 @@ msgstr ""
 msgid "%(sealed)s sealed %(package)s"
 msgstr ""
 
+#: src/inventory_tng/templates/reorder.html
+#, python-format
+msgid "%(sealed)s sealed %(package)s, of %(minimum)s to keep"
+msgstr ""
+
 #: src/inventory_tng/templates/item.html
 #, python-format
 msgid "%(unit)s: fixed, as stock has moved in it"
+msgstr ""
+
+#: src/inventory_tng/templates/item.html
+#: src/inventory_tng/templates/length_checks.html
+#: src/inventory_tng/templates/used_up.html
+#, python-format
+msgid "%(what)s at %(place)s"
+msgstr ""
+
+#: src/inventory_tng/templates/length_checks.html
+#, python-format
+msgid "%(who)s said %(said)s %(unit)s is on it, %(when)s."
 msgstr ""
 
 #: src/inventory_tng/templates/_item_name.html
@@ -469,6 +565,10 @@ msgstr ""
 msgid "Adjusted at %(place)s"
 msgstr ""
 
+#: src/inventory_tng/templates/counts.html
+msgid "Adjustments"
+msgstr ""
+
 #: src/inventory_tng/admin/common.py
 msgid "Administrators"
 msgstr ""
@@ -499,6 +599,10 @@ msgstr ""
 
 #: src/inventory_tng/once.py
 msgid "Already sent"
+msgstr ""
+
+#: src/inventory_tng/templates/over_recorded_settled.html
+msgid "Amount"
 msgstr ""
 
 #: src/inventory_tng/mail.py
@@ -570,6 +674,15 @@ msgid ""
 "isn't clear which number is right: nothing was saved."
 msgstr ""
 
+#: src/inventory_tng/templates/over_recorded.html
+#, python-format
+msgid "An open package moved to %(place)s. Confirm or correct count."
+msgstr ""
+
+#: src/inventory_tng/templates/count.html
+msgid "An open package nobody recorded"
+msgstr ""
+
 #: src/inventory_tng/admin/common.py
 msgid "An open package was closed meanwhile: count what is on it as loose."
 msgstr ""
@@ -629,7 +742,16 @@ msgstr ""
 msgid "Another place beside it, perhaps a retired one, already has that name."
 msgstr ""
 
+#: src/inventory_tng/templates/over_recorded.html
+msgid ""
+"Another tab recorded these before a volunteer changed them, so the "
+"inventory shows more moved than was. Correct moves the extra back with an"
+" adjustment. Mark checked if you already fixed it."
+msgstr ""
+
+#: src/inventory_tng/templates/counts.html
 #: src/inventory_tng/templates/items.html
+#: src/inventory_tng/templates/stock.html
 msgid "Any"
 msgstr ""
 
@@ -657,8 +779,27 @@ msgstr ""
 msgid "Best match"
 msgstr ""
 
+#: src/inventory_tng/templates/over_recorded.html
+#, python-format
+msgid ""
+"Both ends are right: %(left)s counted %(left_on)s, %(arrived)s closed "
+"%(arrived_on)s."
+msgstr ""
+
+#: src/inventory_tng/templates/over_recorded.html
+#, python-format
+msgid ""
+"Both ends are right: %(left)s counted %(left_on)s, %(arrived)s counted "
+"%(arrived_on)s."
+msgstr ""
+
 #: src/inventory_tng/templates/item.html
 msgid "Box"
+msgstr ""
+
+#: src/inventory_tng/templates/over_recorded.html
+#, python-format
+msgid "Bring back %(place)s"
 msgstr ""
 
 #: src/inventory_tng/templates/_notice.html
@@ -686,6 +827,11 @@ msgstr ""
 
 #: src/inventory_tng/admin/over_recorded.py
 msgid "Brought back. Correct it now."
+msgstr ""
+
+#: src/inventory_tng/templates/counts.html
+#: src/inventory_tng/templates/over_recorded_settled.html
+msgid "By"
 msgstr ""
 
 #: src/inventory_tng/admin/stock.py
@@ -733,13 +879,13 @@ msgstr ""
 msgid "Clear search"
 msgstr ""
 
+#: src/inventory_tng/templates/item.html
 #: src/inventory_tng/templates/open_package_close.html
 msgid "Close as used up"
 msgstr ""
 
-#: src/inventory_tng/templates/item.html
-#, python-format
-msgid "Close as used up<span class=\"sr-only\"> %(package)s at %(place)s</span>"
+#: src/inventory_tng/templates/over_recorded.html
+msgid "Close it"
 msgstr ""
 
 #: src/inventory_tng/admin/used_up.py
@@ -763,8 +909,20 @@ msgstr ""
 msgid "Code"
 msgstr ""
 
+#: src/inventory_tng/templates/over_recorded.html
+msgid "Confirm count"
+msgstr ""
+
 #: src/inventory_tng/sign_in.py
 msgid "Confirm it's you"
+msgstr ""
+
+#: src/inventory_tng/templates/used_up.html
+msgid "Confirm the ones ticked"
+msgstr ""
+
+#: src/inventory_tng/templates/used_up.html
+msgid "Confirm used up"
 msgstr ""
 
 #: src/inventory_tng/admin/over_recorded.py
@@ -775,6 +933,15 @@ msgstr ""
 msgid "Copies"
 msgstr ""
 
+#: src/inventory_tng/templates/over_recorded.html
+msgid "Correct"
+msgstr ""
+
+#: src/inventory_tng/templates/over_recorded.html
+#, python-format
+msgid "Correct %(end)s"
+msgstr ""
+
 #: src/inventory_tng/over_recorded.py
 msgid "Corrected"
 msgstr ""
@@ -783,9 +950,19 @@ msgstr ""
 msgid "Corrected."
 msgstr ""
 
+#. a count, as a kind of save, before what it saved.
+#: src/inventory_tng/templates/counts.html
+msgid "Count"
+msgstr ""
+
 #: src/inventory_tng/admin/counts.py
+#: src/inventory_tng/templates/over_recorded.html
 #, python-format
 msgid "Count %(place)s"
+msgstr ""
+
+#: src/inventory_tng/templates/counts.html
+msgid "Count a place"
 msgstr ""
 
 #: src/inventory_tng/over_recorded.py
@@ -800,8 +977,24 @@ msgstr ""
 msgid "Count corrected."
 msgstr ""
 
-#: src/inventory_tng/over_recorded.py
+#: src/inventory_tng/templates/reorder.html
+#, python-format
+msgid ""
+"Count first: somewhere in the stores shows less than nothing of it, so "
+"the total is not to be trusted until it is counted (<a "
+"href=\"%(link)s\">Needs counting</a>)."
+msgstr ""
+
+#: src/inventory_tng/templates/over_recorded.html
+msgid "Count in the package"
+msgstr ""
+
+#: src/inventory_tng/over_recorded.py src/inventory_tng/templates/count.html
 msgid "Counted"
+msgstr ""
+
+#: src/inventory_tng/templates/counts.html
+msgid "Counted and adjusted"
 msgstr ""
 
 #: src/inventory_tng/over_recorded.py
@@ -824,7 +1017,7 @@ msgstr ""
 msgid "Counted: everything was as the records say."
 msgstr ""
 
-#: src/inventory_tng/admin/common.py
+#: src/inventory_tng/admin/common.py src/inventory_tng/templates/counts.html
 msgid "Counts"
 msgstr ""
 
@@ -860,15 +1053,31 @@ msgstr ""
 msgid "Filter"
 msgstr ""
 
+#: src/inventory_tng/templates/counts.html
+msgid "Filter by administrator"
+msgstr ""
+
 #: src/inventory_tng/templates/items.html
 msgid "Filter by category"
 msgstr ""
 
+#: src/inventory_tng/templates/counts.html
+msgid "Filter by kind"
+msgstr ""
+
+#: src/inventory_tng/templates/counts.html
+#: src/inventory_tng/templates/stock.html
+msgid "Filter by place"
+msgstr ""
+
 #: src/inventory_tng/templates/_listing.html
+#: src/inventory_tng/templates/count.html
 msgid "Find"
 msgstr ""
 
+#: src/inventory_tng/templates/count.html
 #: src/inventory_tng/templates/items.html
+#: src/inventory_tng/templates/stock.html
 msgid "Find items"
 msgstr ""
 
@@ -888,6 +1097,10 @@ msgstr ""
 
 #: src/inventory_tng/resets.py
 msgid "Forgot your password?"
+msgstr ""
+
+#: src/inventory_tng/templates/counts.html
+msgid "Found or written off"
 msgstr ""
 
 #: src/inventory_tng/admin/counts.py
@@ -925,12 +1138,20 @@ msgstr ""
 msgid "Held by volunteers"
 msgstr ""
 
+#: src/inventory_tng/templates/count.html
+msgid "Here"
+msgstr ""
+
 #: src/inventory_tng/templates/item.html
 msgid "Holds"
 msgstr ""
 
 #: src/inventory_tng/templates/_masthead.html
 msgid "Home"
+msgstr ""
+
+#: src/inventory_tng/templates/over_recorded_settled.html
+msgid "How"
 msgstr ""
 
 #: src/inventory_tng/templates/items.html
@@ -942,6 +1163,13 @@ msgstr ""
 
 #: src/inventory_tng/admin/items.py
 msgid "How many of the item's unit it holds."
+msgstr ""
+
+#: src/inventory_tng/templates/count.html
+#: src/inventory_tng/templates/counts.html
+#: src/inventory_tng/templates/needs_counting.html
+#: src/inventory_tng/templates/stock.html
+msgid "How much"
 msgstr ""
 
 #: src/inventory_tng/admin/counts.py
@@ -1020,7 +1248,18 @@ msgstr ""
 msgid "It is retired."
 msgstr ""
 
+#: src/inventory_tng/templates/counts.html
+msgid "It was"
+msgstr ""
+
+#: src/inventory_tng/templates/count.html
+#: src/inventory_tng/templates/counts.html
 #: src/inventory_tng/templates/items.html
+#: src/inventory_tng/templates/needs_counting.html
+#: src/inventory_tng/templates/over_recorded.html
+#: src/inventory_tng/templates/over_recorded_settled.html
+#: src/inventory_tng/templates/reorder.html
+#: src/inventory_tng/templates/stock.html
 msgid "Item"
 msgstr ""
 
@@ -1032,6 +1271,14 @@ msgstr ""
 #: src/inventory_tng/templates/categories.html
 #: src/inventory_tng/templates/category.html
 msgid "Items"
+msgstr ""
+
+#: src/inventory_tng/templates/reorder.html
+msgid ""
+"Items whose usable stock in the stores, across their areas, is at or "
+"below the level to reorder at (short ends are not usable), or with fewer "
+"sealed packages there than a package's minimum. Both are set on the "
+"item's page; an item with neither is never listed."
 msgstr ""
 
 #: src/inventory_tng/admin/common.py
@@ -1075,8 +1322,20 @@ msgstr ""
 msgid "Larger than its too-short length, or change that first."
 msgstr ""
 
+#: src/inventory_tng/templates/length_checks.html
+msgid "Leave it"
+msgstr ""
+
+#: src/inventory_tng/templates/length_checks.html
+msgid "Leave the ones ticked"
+msgstr ""
+
 #: src/inventory_tng/admin/length_checks.py
 msgid "Left as it shows."
+msgstr ""
+
+#: src/inventory_tng/templates/count.html
+msgid "Left on it"
 msgstr ""
 
 #: src/inventory_tng/admin/length_checks.py
@@ -1102,6 +1361,10 @@ msgstr ""
 
 #: src/inventory_tng/templates/item.html src/inventory_tng/templates/items.html
 msgid "Manufacturer"
+msgstr ""
+
+#: src/inventory_tng/templates/over_recorded.html
+msgid "Mark checked"
 msgstr ""
 
 #: src/inventory_tng/admin/over_recorded.py
@@ -1217,6 +1480,11 @@ msgstr ""
 msgid "Nobody said what is on those: type what is on each, and set it on its own."
 msgstr ""
 
+#: src/inventory_tng/templates/count.html
+#: src/inventory_tng/templates/length_checks.html
+msgid "None"
+msgstr ""
+
 #: src/inventory_tng/templates/_listing.html
 #, python-format
 msgid "None is in the filter. <a href=\"%(link)s\">Clear it</a>."
@@ -1231,6 +1499,7 @@ msgid "None is retired."
 msgstr ""
 
 #: src/inventory_tng/templates/categories.html
+#: src/inventory_tng/templates/counts.html
 #: src/inventory_tng/templates/locations.html
 msgid "None yet."
 msgstr ""
@@ -1298,6 +1567,10 @@ msgstr ""
 msgid "Not here"
 msgstr ""
 
+#: src/inventory_tng/templates/count.html
+msgid "Not here: close it, lost"
+msgstr ""
+
 #: src/inventory_tng/templates/_units_read.html
 msgid "Not right?"
 msgstr ""
@@ -1310,6 +1583,14 @@ msgstr ""
 msgid ""
 "Not saved: someone else saved this after you opened it. Here it is as it "
 "is now: make your change again."
+msgstr ""
+
+#: src/inventory_tng/templates/used_up.html
+msgid "Not used up"
+msgstr ""
+
+#: src/inventory_tng/templates/used_up.html
+msgid "Not used up, the ones ticked"
 msgstr ""
 
 #: src/inventory_tng/templates/item.html
@@ -1332,11 +1613,44 @@ msgstr ""
 msgid "Nothing changed: those ticked were set so already, or are retired."
 msgstr ""
 
+#: src/inventory_tng/templates/count.html
+msgid "Nothing else"
+msgstr ""
+
+#: src/inventory_tng/templates/count.html
+msgid "Nothing here matches."
+msgstr ""
+
+#: src/inventory_tng/templates/reorder.html
+msgid "Nothing is at or below its level."
+msgstr ""
+
+#: src/inventory_tng/templates/stock.html
+msgid "Nothing is recorded anywhere yet."
+msgstr ""
+
 #: src/inventory_tng/templates/_listing.html
 #, python-format
 msgid ""
 "Nothing matches. Check the spelling, or <a href=\"%(link)s\">clear the "
 "search</a>."
+msgstr ""
+
+#: src/inventory_tng/templates/over_recorded_settled.html
+msgid "Nothing settled yet."
+msgstr ""
+
+#: src/inventory_tng/templates/needs_counting.html
+msgid "Nothing shows less than nothing."
+msgstr ""
+
+#: src/inventory_tng/templates/length_checks.html
+msgid "Nothing to check."
+msgstr ""
+
+#: src/inventory_tng/templates/over_recorded.html
+#: src/inventory_tng/templates/used_up.html
+msgid "Nothing waits."
 msgstr ""
 
 #: src/inventory_tng/templates/locations.html
@@ -1388,6 +1702,26 @@ msgstr ""
 msgid "One unit"
 msgstr ""
 
+#: src/inventory_tng/templates/count.html
+#, python-format
+msgid ""
+"Only %(item)s matching “%(search)s”. Only these are counted; the rest "
+"stay as they are."
+msgstr ""
+
+#: src/inventory_tng/templates/length_checks.html
+#: src/inventory_tng/templates/over_recorded.html
+#: src/inventory_tng/templates/over_recorded_settled.html
+#: src/inventory_tng/templates/used_up.html
+#, python-format
+msgid "Only %(item)s."
+msgstr ""
+
+#: src/inventory_tng/templates/count.html
+#, python-format
+msgid "Only %(item)s. Only these are counted; the rest stay as they are."
+msgstr ""
+
 #: src/inventory_tng/mail.py
 #, python-format
 msgid ""
@@ -1399,6 +1733,13 @@ msgid_plural ""
 msgstr[0] ""
 msgstr[1] ""
 
+#: src/inventory_tng/templates/count.html
+#, python-format
+msgid ""
+"Only items matching “%(search)s”. Only these are counted; the rest stay "
+"as they are."
+msgstr ""
+
 #: src/inventory_tng/over_recorded.py
 #, python-format
 msgid "Open %(package)s"
@@ -1406,6 +1747,11 @@ msgstr ""
 
 #: src/inventory_tng/ledger.py
 msgid "Open one package a line: it is followed until used up"
+msgstr ""
+
+#: src/inventory_tng/templates/length_checks.html
+#: src/inventory_tng/templates/used_up.html
+msgid "Open package"
 msgstr ""
 
 #: src/inventory_tng/templates/item.html
@@ -1446,7 +1792,7 @@ msgid ""
 "current volunteer to merge into."
 msgstr ""
 
-#: src/inventory_tng/templates/item.html
+#: src/inventory_tng/templates/count.html src/inventory_tng/templates/item.html
 msgid "Package"
 msgstr ""
 
@@ -1500,12 +1846,20 @@ msgid "Phone"
 msgstr ""
 
 #: src/inventory_tng/templates/items.html
+#: src/inventory_tng/templates/length_checks.html
+#: src/inventory_tng/templates/used_up.html
 msgid "Pick"
 msgstr ""
 
 #: src/inventory_tng/templates/items.html
 #, python-format
 msgid "Pick %(item)s"
+msgstr ""
+
+#: src/inventory_tng/templates/length_checks.html
+#: src/inventory_tng/templates/used_up.html
+#, python-format
+msgid "Pick %(item)s, %(package)s, at %(place)s"
 msgstr ""
 
 #: src/inventory_tng/admin/items.py
@@ -1536,6 +1890,7 @@ msgstr ""
 msgid "Pick an item."
 msgstr ""
 
+#: src/inventory_tng/templates/counts.html
 #: src/inventory_tng/templates/items.html
 msgid "Pick one"
 msgstr ""
@@ -1552,8 +1907,19 @@ msgstr ""
 msgid "Pick who they duplicate."
 msgstr ""
 
+#: src/inventory_tng/templates/counts.html
+#: src/inventory_tng/templates/stock.html
+msgid "Place"
+msgstr ""
+
 #: src/inventory_tng/labels.py
 msgid "Place retired"
+msgstr ""
+
+#: src/inventory_tng/templates/needs_counting.html
+msgid ""
+"Places that show less than nothing of an item: the records are wrong "
+"there until someone counts it."
 msgstr ""
 
 #: src/inventory_tng/templates/_listing.html
@@ -1582,6 +1948,10 @@ msgstr[1] ""
 
 #: src/inventory_tng/admin/reading_rules.py
 msgid "Propose unit readings"
+msgstr ""
+
+#: src/inventory_tng/templates/over_recorded.html
+msgid "Put right another way"
 msgstr ""
 
 #. Translators: followed by the administrator's own words.
@@ -1621,12 +1991,31 @@ msgstr ""
 msgid "Reading of %(token)s"
 msgstr ""
 
+#: src/inventory_tng/templates/length_checks.html
+#, python-format
+msgid "Really on it (%(unit)s)"
+msgstr ""
+
+#: src/inventory_tng/templates/length_checks.html
+msgid "Recent cuts"
+msgstr ""
+
+#: src/inventory_tng/templates/counts.html
+msgid "Record it"
+msgstr ""
+
+#: src/inventory_tng/templates/over_recorded.html
+msgid "Recorded more"
+msgstr ""
+
 #: src/inventory_tng/admin/stock.py
 #, python-format
 msgid "Recorded more (%(count)d)"
 msgstr ""
 
 #: src/inventory_tng/admin/over_recorded.py
+#: src/inventory_tng/templates/over_recorded.html
+#: src/inventory_tng/templates/over_recorded_settled.html
 msgid "Recorded more than moved"
 msgstr ""
 
@@ -1636,6 +2025,10 @@ msgstr ""
 
 #: src/inventory_tng/admin/counts.py
 msgid "Recorded."
+msgstr ""
+
+#: src/inventory_tng/templates/count.html
+msgid "Records say"
 msgstr ""
 
 #: src/inventory_tng/resets.py
@@ -1690,7 +2083,12 @@ msgid "Reorder"
 msgstr ""
 
 #: src/inventory_tng/templates/item.html
+#: src/inventory_tng/templates/reorder.html
 msgid "Reorder at"
+msgstr ""
+
+#: src/inventory_tng/templates/used_up.html
+msgid "Reported"
 msgstr ""
 
 #: src/inventory_tng/admin/used_up.py src/inventory_tng/templates/item.html
@@ -1812,6 +2210,10 @@ msgstr ""
 msgid "Save"
 msgstr ""
 
+#: src/inventory_tng/templates/count.html
+msgid "Save the count"
+msgstr ""
+
 #: src/inventory_tng/templates/item.html
 #, python-format
 msgid "Save<span class=\"sr-only\"> the name and size of %(package)s</span>"
@@ -1894,8 +2296,25 @@ msgstr ""
 msgid "Sections"
 msgstr ""
 
+#: src/inventory_tng/templates/counts.html
+msgid "See what the records say is there, and put right what isn't."
+msgstr ""
+
 #: src/inventory_tng/admin/settings.py
 msgid "Sessions last"
+msgstr ""
+
+#: src/inventory_tng/templates/length_checks.html
+msgid "Set it"
+msgstr ""
+
+#: src/inventory_tng/templates/length_checks.html
+msgid "Set the ones ticked to what was said"
+msgstr ""
+
+#: src/inventory_tng/templates/length_checks.html
+#, python-format
+msgid "Set to <span data-follows=\"%(field)s\" data-unit=\"%(unit)s\">it</span>"
 msgstr ""
 
 #: src/inventory_tng/sign_in.py
@@ -1923,6 +2342,7 @@ msgid "Set<span class=\"sr-only\"> for %(package)s</span>"
 msgstr ""
 
 #: src/inventory_tng/admin/common.py
+#: src/inventory_tng/templates/over_recorded_settled.html
 msgid "Settled"
 msgstr ""
 
@@ -1934,9 +2354,26 @@ msgstr ""
 msgid "Show"
 msgstr ""
 
+#: src/inventory_tng/templates/count.html
+#: src/inventory_tng/templates/length_checks.html
+#: src/inventory_tng/templates/over_recorded.html
+#: src/inventory_tng/templates/over_recorded_settled.html
+#: src/inventory_tng/templates/used_up.html
+msgid "Show all"
+msgstr ""
+
 #: src/inventory_tng/templates/_units_read.html
 #, python-format
 msgid "Shown as %(shown)s."
+msgstr ""
+
+#: src/inventory_tng/templates/used_up.html
+msgid "Shows"
+msgstr ""
+
+#: src/inventory_tng/templates/length_checks.html
+#, python-format
+msgid "Shows %(left)s %(unit)s."
 msgstr ""
 
 #: src/inventory_tng/admin/length_checks.py
@@ -1983,6 +2420,11 @@ msgid ""
 "If it wasn't you, ignore this mail: your password stays as it is."
 msgstr ""
 
+#: src/inventory_tng/templates/length_checks.html
+#, python-format
+msgid "Someone said %(said)s %(unit)s is on it, %(when)s."
+msgstr ""
+
 #: src/inventory_tng/mail.py
 #, python-format
 msgid ""
@@ -1991,17 +2433,38 @@ msgid ""
 "within the hour."
 msgstr ""
 
+#: src/inventory_tng/templates/count.html
+msgid ""
+"Something came in or went out of each of these after you started, so it's"
+" not clear whether you counted it before or after. Count them again now."
+msgstr ""
+
+#: src/inventory_tng/templates/count.html
+msgid "Something else here"
+msgstr ""
+
 #: src/inventory_tng/pages.py
 msgid "Something went wrong"
 msgstr ""
 
+#: src/inventory_tng/templates/counts.html
+msgid "Start a count"
+msgstr ""
+
 #: src/inventory_tng/templates/_retired_holding.html
+#: src/inventory_tng/templates/needs_counting.html
 #, python-format
 msgid "Start counting %(name)s"
 msgstr ""
 
 #: src/inventory_tng/admin/common.py
 msgid "Stock"
+msgstr ""
+
+#: src/inventory_tng/templates/needs_counting.html
+#: src/inventory_tng/templates/reorder.html
+#: src/inventory_tng/templates/stock.html
+msgid "Stock views"
 msgstr ""
 
 #: src/inventory_tng/admin/common.py
@@ -2193,6 +2656,10 @@ msgid ""
 " and your other sessions were signed out."
 msgstr ""
 
+#: src/inventory_tng/templates/count.html
+msgid "The records say nothing is here."
+msgstr ""
+
 #: src/inventory_tng/bundle.py
 msgid "The scan page is not built yet."
 msgstr ""
@@ -2330,6 +2797,10 @@ msgstr ""
 msgid "Track opened packages"
 msgstr ""
 
+#: src/inventory_tng/templates/over_recorded.html
+msgid "Transaction"
+msgstr ""
+
 #: src/inventory_tng/over_recorded.py
 msgid "Two adjustments"
 msgstr ""
@@ -2340,6 +2811,12 @@ msgstr ""
 
 #: src/inventory_tng/admin/length_checks.py
 msgid "Type what is on it: a number, 0 or more."
+msgstr ""
+
+#: src/inventory_tng/templates/count.html
+msgid ""
+"Type what is really there. Leave a line as it is if it's right, or blank "
+"if you didn't count it. Anything else here, add below."
 msgstr ""
 
 #: src/inventory_tng/templates/_print_controls.html
@@ -2362,6 +2839,10 @@ msgstr ""
 #: src/inventory_tng/admin/common.py
 #, python-format
 msgid "Up to %(max)d characters."
+msgstr ""
+
+#: src/inventory_tng/templates/reorder.html
+msgid "Usable in the stores"
 msgstr ""
 
 #: src/inventory_tng/admin/common.py
@@ -2392,6 +2873,10 @@ msgstr ""
 msgid "Use at most %(places)d decimal places."
 msgstr ""
 
+#: src/inventory_tng/templates/count.html
+msgid "Used up: close it"
+msgstr ""
+
 #: src/inventory_tng/admin/locations.py
 msgid "Vehicle"
 msgstr ""
@@ -2404,22 +2889,69 @@ msgstr ""
 msgid "Volunteers"
 msgstr ""
 
+#: src/inventory_tng/templates/used_up.html
+msgid ""
+"Volunteers said these open packages are used up. Confirm one to close it:"
+" what it still shows is written off, with the reason Used up. Not used up"
+" offers it again, for a box ticked by mistake."
+msgstr ""
+
 #: src/inventory_tng/admin/over_recorded.py
 #, python-format
 msgid "Waiting (%(count)d)"
+msgstr ""
+
+#: src/inventory_tng/templates/over_recorded.html
+#, python-format
+msgid "Was %(words)s"
 msgstr ""
 
 #: src/inventory_tng/admin/length_checks.py
 msgid "Went below zero"
 msgstr ""
 
+#: src/inventory_tng/templates/length_checks.html
+#, python-format
+msgid "Went below zero %(when)s."
+msgstr ""
+
+#: src/inventory_tng/templates/counts.html
+msgid "What"
+msgstr ""
+
 #: src/inventory_tng/templates/locations.html
 msgid "What it is"
+msgstr ""
+
+#: src/inventory_tng/templates/length_checks.html
+msgid "What it shows, and why"
+msgstr ""
+
+#: src/inventory_tng/templates/length_checks.html
+msgid ""
+"What these open packages show may be wrong: a volunteer said what is "
+"really on one, or a save took one below zero. Set it to what it really "
+"had when it showed that, or leave it as it shows. A cut saved since "
+"stays."
+msgstr ""
+
+#: src/inventory_tng/templates/counts.html
+msgid "When"
 msgstr ""
 
 #: src/inventory_tng/templates/item.html
 #, python-format
 msgid "When one of %(package)s is opened"
+msgstr ""
+
+#: src/inventory_tng/templates/counts.html
+#: src/inventory_tng/templates/over_recorded.html
+#: src/inventory_tng/templates/over_recorded_settled.html
+msgid "Where"
+msgstr ""
+
+#: src/inventory_tng/templates/count.html
+msgid "While you counted"
 msgstr ""
 
 #: src/inventory_tng/mail.py
@@ -2474,6 +3006,15 @@ msgstr ""
 
 #: src/inventory_tng/ledger.py
 msgid "Whole packages only"
+msgstr ""
+
+#: src/inventory_tng/templates/counts.html
+#: src/inventory_tng/templates/over_recorded_settled.html
+msgid "Why"
+msgstr ""
+
+#: src/inventory_tng/templates/over_recorded.html
+msgid "Why it is right as it is"
 msgstr ""
 
 #: src/inventory_tng/sign_in.py
@@ -2589,6 +3130,10 @@ msgstr ""
 msgid "Your recovery codes"
 msgstr ""
 
+#: src/inventory_tng/admin/length_checks.py
+msgid "adjustment"
+msgstr ""
+
 #: src/inventory_tng/reading_rules.py
 #, python-format
 msgid "alias %(id)d (%(name)s)"
@@ -2598,6 +3143,10 @@ msgstr ""
 msgid "as the item"
 msgstr ""
 
+#: src/inventory_tng/templates/counts.html
+msgid "as the records said"
+msgstr ""
+
 #: src/inventory_tng/templates/item.html
 #, python-format
 msgid "below, in %(unit)s; blank: none"
@@ -2605,6 +3154,18 @@ msgstr ""
 
 #: src/inventory_tng/units.py
 msgid "capacitance"
+msgstr ""
+
+#: src/inventory_tng/admin/length_checks.py
+msgid "count"
+msgstr ""
+
+#: src/inventory_tng/templates/reorder.html
+msgid "count first"
+msgstr ""
+
+#: src/inventory_tng/templates/stock.html
+msgid "count it"
 msgstr ""
 
 #: src/inventory_tng/units.py
@@ -2654,8 +3215,23 @@ msgstr ""
 msgid "for an area only"
 msgstr ""
 
+#: src/inventory_tng/templates/counts.html
+msgid "found there"
+msgstr ""
+
 #: src/inventory_tng/units.py
 msgid "frequency"
+msgstr ""
+
+#: src/inventory_tng/templates/over_recorded.html
+#, python-format
+msgid "from %(from_place)s to %(to_place)s"
+msgstr ""
+
+#: src/inventory_tng/templates/over_recorded.html
+#: src/inventory_tng/templates/over_recorded_settled.html
+#, python-format
+msgid "from %(place)s"
 msgstr ""
 
 #: src/inventory_tng/templates/_code_field.html
@@ -2687,6 +3263,10 @@ msgstr ""
 msgid "inches"
 msgstr ""
 
+#: src/inventory_tng/admin/length_checks.py
+msgid "install"
+msgstr ""
+
 #: src/inventory_tng/reading_rules.py
 #, python-format
 msgid "item %(id)d (%(name)s)"
@@ -2698,6 +3278,10 @@ msgstr ""
 
 #: src/inventory_tng/units.py
 msgid "length"
+msgstr ""
+
+#: src/inventory_tng/templates/count.html
+msgid "less than nothing"
 msgstr ""
 
 #: src/inventory_tng/templates/_forms.html
@@ -2726,6 +3310,14 @@ msgstr ""
 msgid ""
 "minutes, and only while the code above lasts; 0 asks each time, and an "
 "authenticator gives a new code only every 30 seconds"
+msgstr ""
+
+#: src/inventory_tng/admin/length_checks.py
+msgid "move"
+msgstr ""
+
+#: src/inventory_tng/admin/length_checks.py
+msgid "open"
 msgstr ""
 
 #: src/inventory_tng/templates/_forms.html
@@ -2764,6 +3356,14 @@ msgstr ""
 msgid "power level"
 msgstr ""
 
+#: src/inventory_tng/admin/length_checks.py
+msgid "receipt"
+msgstr ""
+
+#: src/inventory_tng/admin/length_checks.py
+msgid "report"
+msgstr ""
+
 #. Translators: as in "TOTP is now required".
 #: src/inventory_tng/mail.py
 msgid "required"
@@ -2782,12 +3382,26 @@ msgstr ""
 msgid "short end: %(left)s %(unit)s"
 msgstr ""
 
+#: src/inventory_tng/templates/used_up.html
+#, python-format
+msgid "shows %(left)s %(unit)s; %(who)s, %(when)s"
+msgstr ""
+
+#: src/inventory_tng/templates/used_up.html
+msgid "someone"
+msgstr ""
+
 #: src/inventory_tng/templates/_totp_fields.html
 msgid "such as the phone or app"
 msgstr ""
 
 #: src/inventory_tng/units.py
 msgid "temperature"
+msgstr ""
+
+#: src/inventory_tng/templates/counts.html
+#, python-format
+msgid "the list is under <a href=\"%(link)s\">Site settings</a>"
 msgstr ""
 
 #: src/inventory_tng/reading_rules.py
@@ -2800,6 +3414,12 @@ msgstr ""
 
 #: src/inventory_tng/templates/item.html
 msgid "the sheet's NYCM- code"
+msgstr ""
+
+#: src/inventory_tng/templates/over_recorded.html
+#: src/inventory_tng/templates/over_recorded_settled.html
+#, python-format
+msgid "to %(place)s"
 msgstr ""
 
 #: src/inventory_tng/templates/item.html
@@ -2833,6 +3453,10 @@ msgstr ""
 
 #: src/inventory_tng/templates/location.html
 msgid "what its times are shown in; times already recorded keep theirs"
+msgstr ""
+
+#: src/inventory_tng/templates/counts.html
+msgid "written off from there"
 msgstr ""
 
 #: src/inventory_tng/units.py

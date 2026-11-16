@@ -50,7 +50,7 @@ from inventory_tng.models import (
     whole,
 )
 from inventory_tng.pages import NOTICES, not_found, redirect
-from inventory_tng.phrases import lazy_gettext
+from inventory_tng.phrases import Words, lazy_gettext
 from inventory_tng.sign_in import AdminSignedIn, SignedIn
 
 log = structlog.get_logger(__name__)
@@ -120,11 +120,29 @@ KINDS = (
 RECENT = 5
 
 
+# A cut's transaction kind (models.TRANSACTION_KINDS), in words, where no
+# volunteer made it: the kind of save that took some of an open package.
+CUT_KINDS = {
+    "move": lazy_gettext("move"),
+    "receipt": lazy_gettext("receipt"),
+    "install": lazy_gettext("install"),
+    "count": lazy_gettext("count"),
+    "adjustment": lazy_gettext("adjustment"),
+    "open": lazy_gettext("open"),
+    "report": lazy_gettext("report"),
+}
+
+
 class Cut(NamedTuple):
     at: datetime
     quantity: Decimal
     kind: str
     volunteer: str | None
+
+    @property
+    def by(self) -> Words:
+        """Who made it, or, made by no volunteer, its kind in words."""
+        return self.volunteer or CUT_KINDS[self.kind]
 
 
 class Checked(NamedTuple):

@@ -3,31 +3,31 @@
 {% from "_table.html" import table %}
 {% from "_listing.html" import sizes, sort_heading, pager %}
 {% block main %}
-{{ views("Stock views", stock_views, "reorder") }}
-<p class="hint">Items whose usable stock in the stores, across their areas,
+{{ views(_("Stock views"), stock_views, "reorder") }}
+<p class="hint">{% trans %}Items whose usable stock in the stores, across their areas,
 is at or below the level to reorder at (short ends are not usable), or with
 fewer sealed packages there than a package's minimum. Both are set on the
-item's page; an item with neither is never listed.</p>
+item's page; an item with neither is never listed.{% endtrans %}</p>
 {{ sizes(view) }}
 {% call table() %}
-  <tr>{{ sort_heading(view, "item", "Item") }}
-    {{- sort_heading(view, "usable", "Usable in the stores") }}
-    {{- sort_heading(view, "reorder_at", "Reorder at") }}</tr>
+  <tr>{{ sort_heading(view, "item", _("Item")) }}
+    {{- sort_heading(view, "usable", _("Usable in the stores")) }}
+    {{- sort_heading(view, "reorder_at", _("Reorder at")) }}</tr>
   {% for row in rows %}
   <tr>
     <td><a href="{{ items_path }}/{{ row.item.id }}">{{ row.item.name_shown }}</a></td>
-    <td>{{ row.in_stores | amount }} {{ row.item.unit }}{% if row.count_first %} <strong>count first</strong>{% endif %}
-      {%- for name, count, minimum in row.low_sealed %}<span class="hint block">{{ count | amount }} sealed {{ name }}, of {{ minimum }} to keep</span>{% endfor %}</td>
+    <td>{{ row.in_stores | amount }} {{ row.item.unit }}{% if row.count_first %} <strong>{% trans %}count first{% endtrans %}</strong>{% endif %}
+      {%- for name, count, minimum in row.low_sealed %}<span class="hint block">{% trans sealed=count | amount, package=name, minimum=minimum %}{{ sealed }} sealed {{ package }}, of {{ minimum }} to keep{% endtrans %}</span>{% endfor %}</td>
     <td>{% if row.item.minimum is not none %}{{ row.item.minimum | amount }} {{ row.item.unit }}{% endif %}</td>
   </tr>
   {% else %}
-  <tr><td colspan="3">Nothing is at or below its level.</td></tr>
+  <tr><td colspan="3">{% trans %}Nothing is at or below its level.{% endtrans %}</td></tr>
   {% endfor %}
 {% endcall %}
 {{ pager(view) }}
 {% if any_short %}
-<p class="hint">Count first: somewhere in the stores shows less than nothing
+<p class="hint">{% trans link=needs_counting_path %}Count first: somewhere in the stores shows less than nothing
 of it, so the total is not to be trusted until it is counted
-(<a href="{{ needs_counting_path }}">Needs counting</a>).</p>
+(<a href="{{ link }}">Needs counting</a>).{% endtrans %}</p>
 {% endif %}
 {% endblock %}

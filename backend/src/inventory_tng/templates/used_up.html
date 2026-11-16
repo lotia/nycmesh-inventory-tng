@@ -2,43 +2,45 @@
 {% from "_table.html" import table %}
 {% from "_listing.html" import sizes, sort_heading, pager %}
 {% block main %}
-<p class="hint">Volunteers said these open packages are used up. Confirm
+<p class="hint">{% trans %}Volunteers said these open packages are used up. Confirm
 one to close it: what it still shows is written off, with the reason Used
-up. Not used up offers it again, for a box ticked by mistake.</p>
+up. Not used up offers it again, for a box ticked by mistake.{% endtrans %}</p>
 {% if only %}
-<p>Only {{ only.name_shown }}. <a href="{{ view.link(kept=(), page=1) }}">Show all</a></p>
+<p>{% trans item=only.name_shown %}Only {{ item }}.{% endtrans %} <a href="{{ view.link(kept=(), page=1) }}">{% trans %}Show all{% endtrans %}</a></p>
 {% endif %}
 {#- The packages ticked belong to this form. #}
 <form method="post" action="{{ here }}{{ view.query_string }}" id="answer-ticked"></form>
 {{ sizes(view) }}
 {% call table() %}
-  <tr><th>Pick</th>{{ sort_heading(view, "package", "Open package") }}
-    {{- sort_heading(view, "shows", "Shows", "hidden sm:table-cell") }}
-    {{- sort_heading(view, "reported", "Reported", "hidden sm:table-cell") }}<th></th></tr>
+  <tr><th>{% trans %}Pick{% endtrans %}</th>{{ sort_heading(view, "package", _("Open package")) }}
+    {{- sort_heading(view, "shows", _("Shows"), "hidden sm:table-cell") }}
+    {{- sort_heading(view, "reported", _("Reported"), "hidden sm:table-cell") }}<th></th></tr>
   {% for each in reported %}
   {% set row = each.row %}
+  {% set who = each.reported_by or _("someone") %}
+  {% set which %}{% trans what=each.item, place=each.place %}{{ what }} at {{ place }}{% endtrans %}{% endset %}
   <tr>
-    <td><input type="checkbox" name="open_package" value="{{ row.id }}" form="answer-ticked" aria-label="Pick {{ each.item }}, {{ each.package }}, at {{ each.place }}"></td>
+    <td><input type="checkbox" name="open_package" value="{{ row.id }}" form="answer-ticked" aria-label="{% trans item=each.item, package=each.package, place=each.place %}Pick {{ item }}, {{ package }}, at {{ place }}{% endtrans %}"></td>
     <td>{{ each.item }}, {{ each.package }} · {{ each.place }}
-      <span class="hint block sm:hidden">shows {{ each.left | amount }} {{ each.unit }}; {{ each.reported_by or "someone" }}, {{ row.reported_at | when(zone) }}</span></td>
+      <span class="hint block sm:hidden">{% trans left=each.left | amount, unit=each.unit, who=who, when=row.reported_at | when(zone) %}shows {{ left }} {{ unit }}; {{ who }}, {{ when }}{% endtrans %}</span></td>
     <td class="hidden sm:table-cell">{{ each.left | amount }} {{ each.unit }}</td>
-    <td class="hidden sm:table-cell">{{ each.reported_by or "someone" }}, {{ row.reported_at | when(zone) }}</td>
+    <td class="hidden sm:table-cell">{{ who }}, {{ row.reported_at | when(zone) }}</td>
     <td>
       <form method="post" action="{{ here }}/{{ row.id }}/confirm{{ view.query_string }}" class="actions">
-        <button>Confirm used up<span class="sr-only"> {{ each.item }} at {{ each.place }}</span></button>
-        <button formaction="{{ here }}/{{ row.id }}/clear{{ view.query_string }}">Not used up<span class="sr-only"> {{ each.item }} at {{ each.place }}</span></button>
+        <button>{% trans %}Confirm used up{% endtrans %}<span class="sr-only"> {{ which }}</span></button>
+        <button formaction="{{ here }}/{{ row.id }}/clear{{ view.query_string }}">{% trans %}Not used up{% endtrans %}<span class="sr-only"> {{ which }}</span></button>
       </form>
     </td>
   </tr>
   {% else %}
-  <tr><td colspan="5">Nothing waits.</td></tr>
+  <tr><td colspan="5">{% trans %}Nothing waits.{% endtrans %}</td></tr>
   {% endfor %}
 {% endcall %}
 {{ pager(view) }}
 {% if reported %}
 <div class="actions">
-  <button name="do" value="confirm" form="answer-ticked">Confirm the ones ticked</button>
-  <button name="do" value="clear" form="answer-ticked">Not used up, the ones ticked</button>
+  <button name="do" value="confirm" form="answer-ticked">{% trans %}Confirm the ones ticked{% endtrans %}</button>
+  <button name="do" value="clear" form="answer-ticked">{% trans %}Not used up, the ones ticked{% endtrans %}</button>
 </div>
 {% endif %}
 {% endblock %}

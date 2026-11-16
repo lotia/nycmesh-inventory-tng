@@ -2,12 +2,12 @@
 {% from "_table.html" import table %}
 {% from "_listing.html" import sizes, sort_heading, pager %}
 {% block main %}
-<p class="hint">What these open packages show may be wrong: a volunteer said
+<p class="hint">{% trans %}What these open packages show may be wrong: a volunteer said
 what is really on one, or a save took one below zero. Set it to what it
 really had when it showed that, or leave it as it shows. A cut saved since
-stays.</p>
+stays.{% endtrans %}</p>
 {% if only %}
-<p>Only {{ only.name_shown }}. <a href="{{ view.link(kept=(), page=1) }}">Show all</a></p>
+<p>{% trans item=only.name_shown %}Only {{ item }}.{% endtrans %} <a href="{{ view.link(kept=(), page=1) }}">{% trans %}Show all{% endtrans %}</a></p>
 {% endif %}
 {#- The packages ticked belong to this form. #}
 <form method="post" action="{{ here }}{{ view.query_string }}" id="answer-ticked">
@@ -15,20 +15,22 @@ stays.</p>
 </form>
 {{ sizes(view) }}
 {% call table() %}
-  <tr><th>Pick</th>{{ sort_heading(view, "package", "Open package") }}
-    {{- sort_heading(view, "shows", "What it shows, and why") }}<th>Recent cuts</th><th>Set it</th></tr>
+  <tr><th>{% trans %}Pick{% endtrans %}</th>{{ sort_heading(view, "package", _("Open package")) }}
+    {{- sort_heading(view, "shows", _("What it shows, and why")) }}<th>{% trans %}Recent cuts{% endtrans %}</th><th>{% trans %}Set it{% endtrans %}</th></tr>
   {% for each in checked %}
   {% set shown = each.shown %}
   {% set row = shown.row %}
+  {% set which %}{% trans what=shown.item, place=shown.place %}{{ what }} at {{ place }}{% endtrans %}{% endset %}
   <tr>
-    <td><input type="checkbox" name="open_package" value="{{ row.id }} {{ each.seen }}" form="answer-ticked" aria-label="Pick {{ shown.item }}, {{ shown.package }}, at {{ shown.place }}"></td>
+    <td><input type="checkbox" name="open_package" value="{{ row.id }} {{ each.seen }}" form="answer-ticked" aria-label="{% trans item=shown.item, package=shown.package, place=shown.place %}Pick {{ item }}, {{ package }}, at {{ place }}{% endtrans %}"></td>
     <td>{{ shown.item }}, {{ shown.package }} · {{ shown.place }}</td>
-    <td>Shows {{ shown.left | amount }} {{ shown.unit }}.
+    <td>{% trans left=shown.left | amount, unit=shown.unit %}Shows {{ left }} {{ unit }}.{% endtrans %}
       {% if row.length_reported is not none %}
-      {{ each.reported_by or "Someone" }} said {{ row.length_reported | amount }} {{ shown.unit }} is on it, {{ row.length_reported_at | when(zone) }}.
+      {% if each.reported_by %}{% trans who=each.reported_by, said=row.length_reported | amount, unit=shown.unit, when=row.length_reported_at | when(zone) %}{{ who }} said {{ said }} {{ unit }} is on it, {{ when }}.{% endtrans %}
+      {%- else %}{% trans said=row.length_reported | amount, unit=shown.unit, when=row.length_reported_at | when(zone) %}Someone said {{ said }} {{ unit }} is on it, {{ when }}.{% endtrans %}{% endif %}
       {% endif %}
-      {% if row.below_zero_at %}Went below zero {{ row.below_zero_at | when(zone) }}.{% endif %}</td>
-    <td>{% for cut in each.cuts %}{{ cut.quantity | amount }} {{ shown.unit }}, {{ cut.volunteer or cut.kind }}, {{ cut.at | when(zone) }}{% if not loop.last %}<br>{% endif %}{% else %}None{% endfor %}</td>
+      {% if row.below_zero_at %}{% trans when=row.below_zero_at | when(zone) %}Went below zero {{ when }}.{% endtrans %}{% endif %}</td>
+    <td>{% for cut in each.cuts %}{{ cut.quantity | amount }} {{ shown.unit }}, {{ cut.by }}, {{ cut.at | when(zone) }}{% if not loop.last %}<br>{% endif %}{% else %}{% trans %}None{% endtrans %}{% endfor %}</td>
     <td>
       <form method="post" action="{{ here }}/{{ row.id }}/set{{ view.query_string }}" class="actions">
         <input type="hidden" name="seen" value="{{ each.seen }}">
@@ -36,25 +38,25 @@ stays.</p>
         <input type="hidden" name="as_of" value="{{ moment }}">
         <input type="hidden" name="page" value="{{ all_path }}">
         {% set hint = shown.unit | printed_length %}
-        <label>Really on it ({{ shown.unit }})
+        <label>{% trans unit=shown.unit %}Really on it ({{ unit }}){% endtrans %}
           <input name="left" id="left-{{ row.id }}" inputmode="decimal" value="{{ row.length_reported | amount if row.length_reported is not none else '' }}"{% if hint %} aria-describedby="hint-{{ row.id }}"{% endif %}></label>
         {% if hint %}<p class="hint" id="hint-{{ row.id }}">{{ hint }}</p>{% endif %}
         {#- "Set to 40 m", following the box in the browser (frontend/src/hints.ts);
         "Set to it" without, as the box may be changed. #}
-        <button>Set to <span data-follows="left-{{ row.id }}" data-unit="{{ shown.unit }}">it</span><span class="sr-only"> {{ shown.item }} at {{ shown.place }}</span></button>
-        <button formaction="{{ here }}/{{ row.id }}/leave{{ view.query_string }}">Leave it<span class="sr-only"> {{ shown.item }} at {{ shown.place }}</span></button>
+        <button>{% trans field="left-" ~ row.id, unit=shown.unit %}Set to <span data-follows="{{ field }}" data-unit="{{ unit }}">it</span>{% endtrans %}<span class="sr-only"> {{ which }}</span></button>
+        <button formaction="{{ here }}/{{ row.id }}/leave{{ view.query_string }}">{% trans %}Leave it{% endtrans %}<span class="sr-only"> {{ which }}</span></button>
       </form>
     </td>
   </tr>
   {% else %}
-  <tr><td colspan="5">Nothing to check.</td></tr>
+  <tr><td colspan="5">{% trans %}Nothing to check.{% endtrans %}</td></tr>
   {% endfor %}
 {% endcall %}
 {{ pager(view) }}
 {% if checked %}
 <div class="actions">
-  <button name="do" value="set" form="answer-ticked">Set the ones ticked to what was said</button>
-  <button name="do" value="leave" form="answer-ticked">Leave the ones ticked</button>
+  <button name="do" value="set" form="answer-ticked">{% trans %}Set the ones ticked to what was said{% endtrans %}</button>
+  <button name="do" value="leave" form="answer-ticked">{% trans %}Leave the ones ticked{% endtrans %}</button>
 </div>
 {% endif %}
 {% endblock %}

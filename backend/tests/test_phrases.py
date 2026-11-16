@@ -29,7 +29,7 @@ from inventory_tng import (
     units,
 )
 from inventory_tng.admin import admins as admin_admins
-from inventory_tng.admin import common, counts, stock, used_up
+from inventory_tng.admin import common, counts, length_checks, stock, used_up
 from inventory_tng.admin import devices as admin_devices
 from inventory_tng.admin import items as admin_items
 from inventory_tng.admin import over_recorded as admin_over_recorded
@@ -37,7 +37,9 @@ from inventory_tng.admin import reading_rules as admin_reading_rules
 from inventory_tng.admin import settings as admin_settings
 from inventory_tng.admin import volunteers as admin_volunteers
 from inventory_tng.models import (
+    TRANSACTION_KINDS,
     UNITS,
+    AdjustmentReason,
     Admin,
     Category,
     Item,
@@ -45,7 +47,9 @@ from inventory_tng.models import (
     ItemPackage,
     Label,
     Location,
+    Movement,
     OpenPackage,
+    OverRecorded,
     SignInSettings,
     Volunteer,
 )
@@ -66,7 +70,7 @@ from inventory_tng.phrases import (
 from inventory_tng.resets import RESET_NOTICE
 
 from helpers.rows import add
-from helpers.stock import Spools, retire
+from helpers.stock import Spools, cut, length, report, retire, write
 
 # Each letter accented, so English left out of the catalogue shows plain.
 ACCENTS = str.maketrans(
@@ -298,6 +302,7 @@ VIEW = SimpleNamespace(
     filters=True,
     unfiltered_link=link,
     fields=lambda *_: [("q", NAME)],
+    filtered=lambda name: "",
     pages=3,
     page=2,
     link=link,
@@ -395,6 +400,138 @@ def units_read() -> str:
     )
 
 
+DAY = datetime(2026, 11, 15, tzinfo=UTC)
+PLACE = SimpleNamespace(id=1, name=NAME, retired_at=DAY)
+
+
+def recorded(**differs: object) -> SimpleNamespace:
+    """A line recorded with more than was moved, as over_recorded.html
+    shows it (over_recorded.Shown)."""
+    return SimpleNamespace(
+        **{
+            "row": SimpleNamespace(id=1),
+            "item": NAME,
+            "item_id": 1,
+            "amount": NAME,
+            "from_place": NAME,
+            "to_place": NAME,
+            "transaction_id": 1,
+            "recorded_at": DAY,
+            "moved_whole": None,
+            "one_counted": None,
+            "both_right": None,
+        }
+        | differs
+    )
+
+
+def recorded_more() -> str:
+    """over_recorded.html, a row of each kind, and a refusal."""
+    one = {
+        "counted": NAME,
+        "on": DAY,
+        "still": NAME,
+        "correct": NAME,
+        "place_id": 1,
+        "place": NAME,
+        "countable": True,
+    }
+    both = {"left": NAME, "left_on": DAY, "arrived": NAME, "arrived_on": DAY}
+    waiting = [
+        recorded(moved_whole=SimpleNamespace(count="1", words=NAME)),
+        *(
+            recorded(one_counted=SimpleNamespace(**one, how=how))
+            for how in ("counted", "closed")
+        ),
+        *(
+            recorded(both_right=SimpleNamespace(**both, arrived_how=how))
+            for how in ("counted", "closed")
+        ),
+        recorded(from_place=None),
+        recorded(to_place=None),
+    ]
+    refused = SimpleNamespace(shown=waiting[1], words=NAME, place=PLACE, at=None)
+    shown = without_brand(
+        render(
+            "over_recorded.html",
+            **SIGNED_IN,
+            view=VIEW,
+            recorded_views=[],
+            refused=refused,
+            values={},
+            problems={},
+            reasons={"a": NAME},
+            waiting=waiting,
+            seen=link,
+            only=SimpleNamespace(name_shown=NAME),
+            zone=ZONE,
+        )
+    )
+    # A day's month, as strftime names it until the dates are said in the
+    # reader's language (inventory-tng-ist.2).
+    return re.sub(rf"\b{DAY:%b}\b", "", shown)
+
+
+def count_page() -> str:
+    """count.html for a retired place, a recount of an item counted by
+    its forms and of one in loose units, and the fields for more."""
+    item = SimpleNamespace(id=1, name_shown=NAME, unit=NAME)
+    package = SimpleNamespace(id=1, name_shown=NAME)
+    return without_brand(
+        render(
+            "count.html",
+            **SIGNED_IN,
+            place=PLACE,
+            shown=SimpleNamespace(only=item, search=NAME, query=link),
+            items=[1],
+            rows=[
+                (item, Decimal(1)),
+                (SimpleNamespace(**(vars(item) | {"id": 2})), Decimal(-1)),
+            ],
+            forms={
+                1: [
+                    SimpleNamespace(
+                        field="open_1", words=NAME, amount=Decimal(1), open_id=1
+                    )
+                ]
+            },
+            recount={1: (Decimal(1),) * 3, 2: (Decimal(1),) * 3},
+            values={},
+            problems={},
+            others=[item],
+            found_packages=[(package, NAME, NAME)],
+        )
+    )
+
+
+def counts_page() -> str:
+    """counts.html, a count and an adjustment among those listed."""
+    entry = SimpleNamespace(
+        transaction=SimpleNamespace(kind="count", created_at=DAY, time_zone=ZONE),
+        lines=[],
+        found=True,
+        place=NAME,
+        admin=NAME,
+        reason=NAME,
+    )
+    return without_brand(
+        render(
+            "counts.html",
+            **SIGNED_IN,
+            view=VIEW,
+            places=[PLACE],
+            values={},
+            problems={},
+            items=[],
+            reasons=[],
+            counted_places=[],
+            kinds=["count", "adjustment"],
+            counters=[],
+            recent=[entry],
+        )
+    )
+
+
 COVERED: dict[str, Callable[[], str]] = {
     "every phrase named as a constant": lambda: " ".join(
         str(phrase) for phrase in named_phrases()
@@ -468,6 +605,9 @@ COVERED: dict[str, Callable[[], str]] = {
             ),
         ],
     ),
+    "over_recorded.html, a row of each kind": recorded_more,
+    "count.html, a recount": count_page,
+    "counts.html, a count listed": counts_page,
     "_print_controls.html": lambda: from_macros(
         '{% from "_print_controls.html" import print_controls %}'
         '{% call print_controls("") %}{% endcall %}'
@@ -489,7 +629,11 @@ def test_what_has_moved_says_nothing_in_plain_english(part: str) -> None:
 class World:
     """What the pages walked below show: spools of cable in a store, one
     opened, with a label and an alias; an area in the store; a volunteer
-    holding stock; and a retired item, category and place."""
+    holding stock; a retired item, category and place; and stock to put
+    right, as test_query_counts.everything makes it: an item to reorder,
+    less than none at a place, open packages cut below zero, said to show
+    the wrong length and said used up, and a line recorded with more than
+    was moved, and another one corrected."""
 
     spools: Spools
     opened: OpenPackage
@@ -520,6 +664,7 @@ def world(session: Session) -> World:
     retired_item = add(session, Item(name="Old", category_id=retired_category.id))
     retired_place = add(session, Location(name="Old", kind="store"))
     retire(session, retired_item, retired_category, retired_place)
+    stock_to_put_right(spools)
     return World(
         spools,
         opened,
@@ -531,10 +676,39 @@ def world(session: Session) -> World:
     )
 
 
+def stock_to_put_right(spools: Spools) -> None:
+    session = spools.session
+    spools.cable.minimum = Decimal(10_000)
+    spools.spool.minimum_sealed = 99
+    write(session, spools.place, lines=[cut(spools.opened(), "400")])
+    write(session, spools.place, **report(spools, length(spools.opened(), "250")))
+    # Radios the store never had moved out: less than none there.
+    write(session, spools.place)
+    used_up = report(spools) | {"lengths": None, "used_up": [str(spools.opened().key)]}
+    write(session, spools.place, **used_up)
+    admin_id = session.scalars(select(Admin.id)).first()
+    assert admin_id is not None
+    for corrected in (False, True):
+        transaction = write(session, spools.place)
+        movement_id = session.scalars(
+            select(Movement.id).where(Movement.transaction_id == transaction.id)
+        ).one()
+        over_recorded.raise_checks(session, {movement_id: Decimal(1)})
+        if corrected:
+            check = session.scalars(
+                select(OverRecorded).where(OverRecorded.movement_id == movement_id)
+            ).one()
+            over_recorded.correct(
+                session, check.id, over_recorded.seen(check), admin_id
+            )
+
+
 def not_english(session: Session) -> None:
     """Every name the pages show, made not English, so that what is left in
     English on a page is a word not said through the catalogue."""
-    for model in (Item, ItemPackage, Category, Location, Volunteer):
+    # Adjustment reasons too, though the seeded ones stay English
+    # (inventory-tng-0z5): they are rows, as names are.
+    for model in (Item, ItemPackage, Category, Location, Volunteer, AdjustmentReason):
         for row in session.scalars(select(model)):
             row.name = f"{NAME} {row.id}"
     for admin in session.scalars(select(Admin)):
@@ -571,6 +745,24 @@ PAGES: dict[str, Callable[[World], str]] = {
     "an area": lambda w: f"/admin/locations/{w.area.id}",
     "a volunteer's custody": lambda w: f"/admin/locations/{w.custody.id}",
     "a retired place": lambda w: f"/admin/locations/{w.retired_place.id}",
+    "stock by place": lambda w: "/admin/stock",
+    "stock by item": lambda w: "/admin/stock?by=item",
+    "stock, filtered to nothing": lambda w: "/admin/stock?q=qqqq",
+    "reorder": lambda w: "/admin/stock/reorder",
+    "needs counting": lambda w: "/admin/stock/needs-counting",
+    "used up": lambda w: "/admin/stock/used-up",
+    "length checks": lambda w: "/admin/stock/length-checks",
+    **{
+        f"length checks, {kind.path}": lambda w, kind=kind: kind.path
+        for kind in length_checks.KINDS
+    },
+    "recorded more than moved": lambda w: "/admin/stock/recorded-more",
+    "recorded more than moved, settled": lambda w: "/admin/stock/recorded-more/settled",
+    "counts": lambda w: "/admin/counts",
+    "a count": lambda w: f"/admin/counts/{w.spools.store.id}",
+    "a count of one item": lambda w: (
+        f"/admin/counts/{w.spools.store.id}?item={w.spools.cable.id}&q={NAME}"
+    ),
 }
 
 
@@ -642,3 +834,7 @@ def test_no_message_has_a_lone_per_cent() -> None:
     said = [form for message in catalogue if message.id for form in forms(message)]
     assert said
     assert [form for form in said if lone_per_cents(form)] == []
+
+
+def test_every_kind_of_save_has_words_for_a_cut() -> None:
+    assert length_checks.CUT_KINDS.keys() == set(TRANSACTION_KINDS)

@@ -7,36 +7,36 @@
 {% if spot.countable %}<a href="{{ counts_path }}/{{ spot.id }}?item={{ each.item_id }}">{{ spot.name }}</a>{% else %}{{ spot.name }}{% endif %}
 {%- endmacro %}
 {% block main %}
-{{ views("Recorded more than moved", recorded_views, "settled") }}
+{{ views(_("Recorded more than moved"), recorded_views, "settled") }}
 {% if only %}
-<p>Only {{ only.name_shown }}. <a href="{{ view.link(kept=(), page=1) }}">Show all</a></p>
+<p>{% trans item=only.name_shown %}Only {{ item }}.{% endtrans %} <a href="{{ view.link(kept=(), page=1) }}">{% trans %}Show all{% endtrans %}</a></p>
 {% endif %}
 {{ sizes(view) }}
 {% call table() %}
-  <tr>{{ sort_heading(view, "settled", "Settled") }}
-    {{- sort_heading(view, "item", "Item") }}
-    {{- sort_heading(view, "amount", "Amount") }}
-    {{- sort_heading(view, "where", "Where") }}
-    {{- sort_heading(view, "how", "How") }}
-    {{- sort_heading(view, "why", "Why") }}
-    {{- sort_heading(view, "by", "By") }}</tr>
+  <tr>{{ sort_heading(view, "settled", _("Settled")) }}
+    {{- sort_heading(view, "item", _("Item")) }}
+    {{- sort_heading(view, "amount", _("Amount")) }}
+    {{- sort_heading(view, "where", _("Where")) }}
+    {{- sort_heading(view, "how", _("How")) }}
+    {{- sort_heading(view, "why", _("Why")) }}
+    {{- sort_heading(view, "by", _("By")) }}</tr>
   {% for each in rows %}
   <tr>
     <td>{{ each.at | when(zone) }}</td>
     <td><a href="{{ stock_path }}?by=item#item-{{ each.item_id }}">{{ each.item }}</a></td>
     <td>{{ each.amount }}</td>
     <td>
-      {%- if each.opening %}{{ place(each.from_place, each) }} (opened)
+      {%- if each.opening %}{% trans place=place(each.from_place, each) %}{{ place }} (opened){% endtrans %}
       {%- elif each.from_place and each.to_place %}{{ place(each.from_place, each) }} → {{ place(each.to_place, each) }}
-      {%- elif each.from_place %}from {{ place(each.from_place, each) }}
-      {%- elif each.to_place %}to {{ place(each.to_place, each) }}{% endif -%}
+      {%- elif each.from_place %}{% trans place=place(each.from_place, each) %}from {{ place }}{% endtrans %}
+      {%- elif each.to_place %}{% trans place=place(each.to_place, each) %}to {{ place }}{% endtrans %}{% endif -%}
     </td>
     <td>{{ each.how }}</td>
     <td>{{ each.why }}</td>
     <td>{{ each.by }}</td>
   </tr>
   {% else %}
-  <tr><td colspan="7">Nothing settled yet.</td></tr>
+  <tr><td colspan="7">{% trans %}Nothing settled yet.{% endtrans %}</td></tr>
   {% endfor %}
 {% endcall %}
 {{ pager(view) }}

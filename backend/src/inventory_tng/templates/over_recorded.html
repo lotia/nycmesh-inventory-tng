@@ -10,19 +10,21 @@ refusal's alert, when drawn, is where it was sent from. #}
 {% set chosen = values.get(name) if sent %}
 {% set described = problems.get(name) if sent %}
 <fieldset>
-  <legend>Why it is right as it is</legend>
+  <legend>{% trans %}Why it is right as it is{% endtrans %}</legend>
   {% for value, words in reasons.items() %}
   <label><input type="radio" name="reason" value="{{ value }}"{% if chosen == value %} checked{% endif %}{% if described %} aria-describedby="{{ name }}-problem"{% endif %} required> {{ words }}</label>
   {% endfor %}
-  <input name="words" value="{{ values.get('words-' ~ row.id, '') if sent }}" maxlength="{{ words_max }}" aria-label="Put right another way"{% if described %} aria-describedby="{{ name }}-problem"{% endif %}>
+  <input name="words" value="{{ values.get('words-' ~ row.id, '') if sent }}" maxlength="{{ words_max }}" aria-label="{% trans %}Put right another way{% endtrans %}"{% if described %} aria-describedby="{{ name }}-problem"{% endif %}>
   {% if sent %}{% include "_field_problem.html" %}{% endif %}
 </fieldset>
 {% endmacro %}
 {% block main %}
-{{ views("Recorded more than moved", recorded_views, "waiting") }}
+{{ views(_("Recorded more than moved"), recorded_views, "waiting") }}
 {#- A correction or count a rule refused: why, and what puts it right. Or
 Mark checked asked again, for a row without it. #}
 {% set each = refused.shown if refused else asking %}
+{#- Which row a button acts on, for a screen reader. #}
+{% macro which(each) %}{% trans item=each.item, transaction=each.transaction_id %}{{ item }}, transaction {{ transaction }}{% endtrans %}{% endmacro %}
 {% if each %}
 {% if refused %}<p role="alert">{{ refused.words }}</p>{% endif %}
 {#- Forms of their own, so Enter in the words marks it checked. #}
@@ -30,7 +32,7 @@ Mark checked asked again, for a row without it. #}
   {% if refused and refused.place %}
   <form method="post" action="{{ here }}/{{ each.row.id }}/bring-back{{ view.query_string }}">
     <input type="hidden" name="seen" value="{{ seen(each.row) }}">
-    <button class="primary" name="place" value="{{ refused.place.id }}">Bring back {{ refused.place.name }}</button>
+    <button class="primary" name="place" value="{{ refused.place.id }}">{% trans place=refused.place.name %}Bring back {{ place }}{% endtrans %}</button>
   </form>
   {% endif %}
   <form method="post" action="{{ here }}/{{ each.row.id }}/checked{{ view.query_string }}">
@@ -38,29 +40,31 @@ Mark checked asked again, for a row without it. #}
     {#- So a Mark checked refused draws this alert again (_refused_again). #}
     {% if refused and refused.at %}<input type="hidden" name="refused" value="{{ refused.at }}">{% endif %}
     {{ why(each.row, true) }}
-    <button>Mark checked<span class="sr-only"> {{ each.item }}, transaction {{ each.transaction_id }}</span></button>
+    <button>{% trans %}Mark checked{% endtrans %}<span class="sr-only"> {{ which(each) }}</span></button>
   </form>
 </div>
 {% endif %}
-<p class="hint">Another tab recorded these before a volunteer changed them,
+<p class="hint">{% trans %}Another tab recorded these before a volunteer changed them,
 so the inventory shows more moved than was. Correct moves the extra back
-with an adjustment. Mark checked if you already fixed it.</p>
+with an adjustment. Mark checked if you already fixed it.{% endtrans %}</p>
 {% if only %}
-<p>Only {{ only.name_shown }}. <a href="{{ view.link(kept=(), page=1) }}">Show all</a></p>
+<p>{% trans item=only.name_shown %}Only {{ item }}.{% endtrans %} <a href="{{ view.link(kept=(), page=1) }}">{% trans %}Show all{% endtrans %}</a></p>
 {% endif %}
 {{ sizes(view) }}
 {% call table() %}
-  <tr>{{ sort_heading(view, "item", "Item") }}
-    {{- sort_heading(view, "amount", "Recorded more") }}
-    {{- sort_heading(view, "where", "Where") }}
-    {{- sort_heading(view, "transaction", "Transaction") }}<th></th></tr>
+  <tr>{{ sort_heading(view, "item", _("Item")) }}
+    {{- sort_heading(view, "amount", _("Recorded more")) }}
+    {{- sort_heading(view, "where", _("Where")) }}
+    {{- sort_heading(view, "transaction", _("Transaction")) }}<th></th></tr>
   {% for each in waiting %}
   {% set row = each.row %}
   {% set whole = each.moved_whole %}
   <tr>
     <td>{{ each.item }}</td>
     <td>{{ each.amount }}</td>
-    <td>{% if each.from_place %}from {{ each.from_place }}{% endif %}{% if each.from_place and each.to_place %} {% endif %}{% if each.to_place %}to {{ each.to_place }}{% endif %}</td>
+    <td>{% if each.from_place and each.to_place %}{% trans from_place=each.from_place, to_place=each.to_place %}from {{ from_place }} to {{ to_place }}{% endtrans %}
+      {%- elif each.from_place %}{% trans place=each.from_place %}from {{ place }}{% endtrans %}
+      {%- elif each.to_place %}{% trans place=each.to_place %}to {{ place }}{% endtrans %}{% endif %}</td>
     <td>{{ each.transaction_id }}, {{ each.recorded_at | when(zone) }}</td>
     <td>
       {% if whole %}
@@ -68,44 +72,48 @@ with an adjustment. Mark checked if you already fixed it.</p>
       count there is confirmed, or corrected by an adjustment. #}
       {% set name = "count-" ~ row.id %}
       <form method="post" action="{{ here }}/{{ row.id }}/count{{ view.query_string }}">
-        <p>An open package moved to {{ each.to_place }}. Confirm or correct count.</p>
+        <p>{% trans place=each.to_place %}An open package moved to {{ place }}. Confirm or correct count.{% endtrans %}</p>
         <input type="hidden" name="seen" value="{{ seen(row) }}">
-        <label for="{{ name }}">Count in the package</label>
+        <label for="{{ name }}">{% trans %}Count in the package{% endtrans %}</label>
         <input id="{{ name }}" name="count" inputmode="decimal" required value="{{ values.get(name, whole.count) }}" data-was="{{ whole.count }}" aria-describedby="{{ name }}-was{% if problems.get(name) %} {{ name }}-problem{% endif %}">
         {% include "_field_problem.html" %}
-        <p class="hint" id="{{ name }}-was"{% if values.get(name, whole.count) == whole.count %} hidden{% endif %}>Was {{ whole.words }}</p>
-        <button>Confirm count<span class="sr-only"> {{ each.item }}, transaction {{ each.transaction_id }}</span></button>
+        <p class="hint" id="{{ name }}-was"{% if values.get(name, whole.count) == whole.count %} hidden{% endif %}>{% trans words=whole.words %}Was {{ words }}{% endtrans %}</p>
+        <button>{% trans %}Confirm count{% endtrans %}<span class="sr-only"> {{ which(each) }}</span></button>
       </form>
       {% else %}
       {#- A count put one end right, or an opening's open package closed: the
       other end's next step. Both: nothing left to write, so Close it. #}
       {% set one = each.one_counted %}
       {% set both = each.both_right %}
+      {#- How an end was put right (over_recorded.OneCounted, BothRight):
+      "counted", or "closed", an opening's open package closed since. #}
       {% if one %}
-      <p>{{ one.counted }} {{ one.how }} {{ one.on | day(zone) }}. {{ one.still }} still to put right.</p>
+      <p>{% if one.how == "closed" %}{% trans counted=one.counted, day=one.on | day(zone), still=one.still %}{{ counted }} closed {{ day }}. {{ still }} still to put right.{% endtrans %}
+      {%- else %}{% trans counted=one.counted, day=one.on | day(zone), still=one.still %}{{ counted }} counted {{ day }}. {{ still }} still to put right.{% endtrans %}{% endif %}</p>
       {% elif both %}
-      <p>Both ends are right: {{ both.left }} counted {{ both.left_on | day(zone) }}, {{ both.arrived }} {{ both.arrived_how }} {{ both.arrived_on | day(zone) }}.</p>
+      <p>{% if both.arrived_how == "closed" %}{% trans left=both.left, left_on=both.left_on | day(zone), arrived=both.arrived, arrived_on=both.arrived_on | day(zone) %}Both ends are right: {{ left }} counted {{ left_on }}, {{ arrived }} closed {{ arrived_on }}.{% endtrans %}
+      {%- else %}{% trans left=both.left, left_on=both.left_on | day(zone), arrived=both.arrived, arrived_on=both.arrived_on | day(zone) %}Both ends are right: {{ left }} counted {{ left_on }}, {{ arrived }} counted {{ arrived_on }}.{% endtrans %}{% endif %}</p>
       {% endif %}
       {#- Forms of their own, so Enter in the words marks it checked. #}
       <div class="actions">
         <form method="post" action="{{ here }}/{{ row.id }}/{{ 'close' if both else 'correct' }}{{ view.query_string }}">
           <input type="hidden" name="seen" value="{{ seen(row) }}">
-          <button>{% if both %}Close it{% else %}Correct{% if one %} {{ one.correct }}{% endif %}{% endif %}<span class="sr-only"> {{ each.item }}, transaction {{ each.transaction_id }}</span></button>
+          <button>{% if both %}{% trans %}Close it{% endtrans %}{% elif one %}{% trans end=one.correct %}Correct {{ end }}{% endtrans %}{% else %}{% trans %}Correct{% endtrans %}{% endif %}<span class="sr-only"> {{ which(each) }}</span></button>
         </form>
         {% if one and one.countable %}
-        <a href="{{ counts_path }}/{{ one.place_id }}?item={{ each.item_id }}">Count {{ one.place }}<span class="sr-only"> {{ each.item }}, transaction {{ each.transaction_id }}</span></a>
+        <a href="{{ counts_path }}/{{ one.place_id }}?item={{ each.item_id }}">{% trans place=one.place %}Count {{ place }}{% endtrans %}<span class="sr-only"> {{ which(each) }}</span></a>
         {% endif %}
         <form method="post" action="{{ here }}/{{ row.id }}/checked{{ view.query_string }}">
           <input type="hidden" name="seen" value="{{ seen(row) }}">
           {{ why(row, not refused) }}
-          <button>Mark checked<span class="sr-only"> {{ each.item }}, transaction {{ each.transaction_id }}</span></button>
+          <button>{% trans %}Mark checked{% endtrans %}<span class="sr-only"> {{ which(each) }}</span></button>
         </form>
       </div>
       {% endif %}
     </td>
   </tr>
   {% else %}
-  <tr><td colspan="5">Nothing waits.</td></tr>
+  <tr><td colspan="5">{% trans %}Nothing waits.{% endtrans %}</td></tr>
   {% endfor %}
 {% endcall %}
 {{ pager(view) }}
