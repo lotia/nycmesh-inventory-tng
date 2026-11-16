@@ -115,14 +115,15 @@ def admins(committed: Committed) -> Admins:
 def signing_in(
     session: Session, key: str | None
 ) -> tuple[AdminSession, str, accounts.Factor]:
+    now = datetime.now(UTC)
     return accounts.sign_in(
         session,
         "ben",
         PASSWORD,
-        code(key),
+        code(key, now),
         address="192.0.2.80",
         user_agent=None,
-        now=datetime.now(UTC),
+        now=now,
         keys=TOTP_KEYS,
         limits=RateLimits(),
     )

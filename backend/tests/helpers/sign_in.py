@@ -6,9 +6,10 @@ import html
 import uuid
 from collections.abc import Generator
 from datetime import UTC, datetime, timedelta
-from unittest import mock
+from typing import Protocol
 
 import pyotp
+import pytest
 from fastapi.testclient import TestClient
 from httpx2 import Response
 from sqlalchemy import select
@@ -106,11 +107,6 @@ def code(key: str | None, at: datetime | None = None) -> str:
     return pyotp.TOTP(key).at(at or datetime.now(UTC))
 
 
-def later_code(key: str | None) -> str:
-    """A code from the next step: the one that just signed in is spent."""
-    return code(key, datetime.now(UTC) + timedelta(seconds=30))
-
-
 def codes_with_left(session: Session, admin_id: int, left: int) -> list[str]:
     """New recovery codes, all but the last `left` used: those are returned."""
     codes = accounts.make_recovery_codes(session, admin_id, datetime.now(UTC))
@@ -126,12 +122,31 @@ def policy(session: Session, value: str) -> None:
     session.flush()
 
 
+class Shown(Protocol):
+    def __call__(self, key: str | None, *, later: bool = False) -> str: ...
+
+
 @contextlib.contextmanager
-def app_clock(at: datetime) -> Generator[None]:
-    """The app's clock (sign_in._now) stopped at `at`, for a request that
-    must not depend on how long it takes to arrive."""
-    with mock.patch.object(sign_in, "_now", return_value=at):
-        yield
+def app_clock() -> Generator[Shown]:
+    """The clock that checks codes (sign_in._now) held at this moment, for
+    every thread, through the block; and what an authenticator shows then:
+    shown(key), or with later=True the next step's, as the one now is
+    spent. A request held up past the time step after its code's, as on a
+    busy machine, would otherwise be refused, as the app rightly refuses a
+    code that old (inventory-tng-tuie)."""
+    at = datetime.now(UTC)
+    step = timedelta(seconds=accounts.TOTP_INTERVAL)
+
+    def shown(key: str | None, *, later: bool = False) -> str:
+        return code(key, at + step if later else at)
+
+    with pytest.MonkeyPatch.context() as patch:
+        patch.setattr(sign_in, "_now", lambda: at)
+        yield shown
+
+
+# sign_in_with's key when no code is typed: None is a missing key.
+_NO_KEY = ""
 
 
 def sign_in_with(
@@ -139,19 +154,19 @@ def sign_in_with(
     username: str = "ada",
     password: str = PASSWORD,
     *,
-    key: str | None = None,
+    key: str | None = _NO_KEY,
+    later: bool = False,
     **form: str,
 ) -> Response:
-    """Sign in; with `key`, typing the code its authenticator shows now. The
-    app reads that moment as now too: a request held up past the time step
-    after its code's, as on a busy machine, would otherwise be refused, as
-    the app rightly refuses a code that old (inventory-tng-tuie)."""
+    """Sign in; with `key`, typing its code (app_clock)."""
     data = {"username": username, "password": password} | form
-    if key is None:
+    if key == _NO_KEY:
         return client.post(sign_in.SIGN_IN, data=data)
-    at = datetime.now(UTC)
-    with app_clock(at):
-        return client.post(sign_in.SIGN_IN, data=data | {"code": code(key, at)})
+    assert "code" not in form, "a key or a code, not both"
+    with app_clock() as shown:
+        return client.post(
+            sign_in.SIGN_IN, data=data | {"code": shown(key, later=later)}
+        )
 
 
 def text(response: Response) -> str:

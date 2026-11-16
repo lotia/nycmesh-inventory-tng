@@ -2,7 +2,6 @@
 the navigation's badge."""
 
 from collections.abc import Callable
-from datetime import UTC, datetime, timedelta
 
 from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
@@ -14,7 +13,7 @@ from inventory_tng.pages import retired_holding
 
 from helpers.mail import SentMail
 from helpers.rows import add, tag
-from helpers.sign_in import code, new_admin, sign_in_with, text
+from helpers.sign_in import new_admin, sign_in_with, text
 from helpers.stock import badge_html, retire, stocked, write
 
 
@@ -46,8 +45,7 @@ def test_no_email_is_told_only_where_mail_is_set_up(
     session.flush()
     assert str(NO_EMAIL) not in text(with_mail.get("/admin"))
     without = make_client(address="192.0.2.80")
-    later = code(key, datetime.now(UTC) + timedelta(seconds=30))
-    assert sign_in_with(without, code=later).status_code == 303
+    assert sign_in_with(without, key=key, later=True).status_code == 303
     assert str(NO_EMAIL) not in text(without.get("/admin"))
 
 

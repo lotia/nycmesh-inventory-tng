@@ -29,7 +29,6 @@ from inventory_tng.settings import MailConfig, Settings, SettingsError
 from helpers.mail import NO_MAIL, SITE_MAIL, FailingMail, SentMail
 from helpers.sign_in import (
     TOTP_KEYS,
-    code,
     new_admin,
     policy,
     reset_link,
@@ -267,8 +266,8 @@ def test_an_emailed_link_resets_the_password(
     # TOTP is still asked for.
     client.cookies.clear()
     assert sign_in_with(client, password=NEW_PASSWORD).status_code == 400
-    later = code(key, datetime.now(UTC) + timedelta(seconds=30))
-    assert sign_in_with(client, password=NEW_PASSWORD, code=later).status_code == 303
+    again = sign_in_with(client, password=NEW_PASSWORD, key=key, later=True)
+    assert again.status_code == 303
 
 
 def test_the_answer_is_the_same_for_anyone(

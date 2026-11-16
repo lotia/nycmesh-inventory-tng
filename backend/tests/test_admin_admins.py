@@ -23,7 +23,6 @@ from inventory_tng.settings import RateLimits
 from helpers.mail import NO_MAIL, SentMail
 from helpers.sign_in import (
     admin_named,
-    code,
     new_admin,
     once,
     reset_link,
@@ -519,8 +518,7 @@ def test_since_you_last_signed_in(
     accounts.retire_admin(session, carol.id, ada.id, now, NO_MAIL)
     accounts.restore_admin(session, carol.id, ben.id, now, NO_MAIL)
     later = make_client(address="192.0.2.81")
-    again = code(ben_key, now + timedelta(seconds=30))
-    assert sign_in_with(later, "ben", code=again).status_code == 303
+    assert sign_in_with(later, "ben", key=ben_key, later=True).status_code == 303
     home = text(later.get(sign_in.HOME))
     assert "Since you last signed in" in home
     assert "ada retired carol" in home

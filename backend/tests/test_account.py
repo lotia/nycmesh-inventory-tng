@@ -25,9 +25,8 @@ from helpers.sign_in import (
     PASSWORD,
     RECOVERY_CODE,
     TOTP_KEYS,
-    code,
+    app_clock,
     codes_with_left,
-    later_code,
     new_admin,
     once,
     other_session,
@@ -289,8 +288,9 @@ def test_new_recovery_codes(
     asked = client.post(f"{ACCOUNT}/recovery-codes", data=once())
     assert asked.status_code == 403
     assert "or a recovery code" not in text(asked)
-    form = once(**{sign_in.CONFIRM_FIELD: later_code(ada[1])})
-    made = client.post(f"{ACCOUNT}/recovery-codes", data=form)
+    with app_clock() as shown:
+        form = once(**{sign_in.CONFIRM_FIELD: shown(ada[1], later=True)})
+        made = client.post(f"{ACCOUNT}/recovery-codes", data=form)
     codes = re.findall(RECOVERY_CODE, made.text)
     assert len(codes) == accounts.RECOVERY_CODES
     assert made.headers["cache-control"] == "no-store"
@@ -311,8 +311,10 @@ def test_a_recovery_code_does_not_make_new_ones(
     refused = client.post(f"{ACCOUNT}/recovery-codes", data=form)
     assert refused.status_code == 400
     assert accounts.recovery_codes_left(session, ada.id) == accounts.RECOVERY_CODES - 1
-    form = once(**{sign_in.CONFIRM_FIELD: later_code(key)})
-    assert client.post(f"{ACCOUNT}/recovery-codes", data=form).status_code == 200
+    with app_clock() as shown:
+        form = once(**{sign_in.CONFIRM_FIELD: shown(key, later=True)})
+        made = client.post(f"{ACCOUNT}/recovery-codes", data=form)
+    assert made.status_code == 200
     assert "recovery_codes_made" in [m.kind for m in sent_mail]
 
 
@@ -349,8 +351,9 @@ def test_the_owner_is_told_when_an_authenticator_comes_or_goes(
     _, key = new_admin(session, email="ada@example.org")
     sign_in_with(client, key=key)
     new_key = accounts.new_totp_key()
-    form = {"authenticator_name": "Laptop", "key": new_key, "code": code(new_key)}
-    assert client.post(sign_in.NEW_AUTHENTICATOR, data=form).status_code == 303
+    with app_clock() as shown:
+        form = {"authenticator_name": "Laptop", "key": new_key, "code": shown(new_key)}
+        assert client.post(sign_in.NEW_AUTHENTICATOR, data=form).status_code == 303
     laptop = session.scalars(
         select(Authenticator).where(Authenticator.name == "Laptop")
     ).one()
@@ -439,11 +442,12 @@ def test_a_late_form_asks_for_a_code_and_keeps_what_was_typed(
     )
     assert wrong.status_code == 400
     assert 'value="ada@example.org"' in text(wrong)
-    later = code(key, datetime.now(UTC) + timedelta(seconds=30))
-    done = client.post(
-        f"{ACCOUNT}/email",
-        data={"email": "ada@example.org", sign_in.CONFIRM_FIELD: later},
-    )
+    with app_clock() as shown:
+        later = shown(key, later=True)
+        done = client.post(
+            f"{ACCOUNT}/email",
+            data={"email": "ada@example.org", sign_in.CONFIRM_FIELD: later},
+        )
     assert done.headers["location"] == f"{ACCOUNT}?notice=email&section=email#email"
     assert admin.email == "ada@example.org"
 
@@ -473,14 +477,13 @@ def test_a_late_new_authenticator_keeps_its_key(
     """The QR code already scanned stays good: its key comes back."""
     new_key = accounts.new_totp_key()
     close_window(session)
-    form = {"authenticator_name": "Laptop", "key": new_key, "code": code(new_key)}
-    asked = client.post(sign_in.NEW_AUTHENTICATOR, data=form)
-    assert f'value="{new_key}"' in asked.text
     _, key = ada
-    later = code(key, datetime.now(UTC) + timedelta(seconds=30))
-    done = client.post(
-        sign_in.NEW_AUTHENTICATOR, data=form | {sign_in.CONFIRM_FIELD: later}
-    )
+    with app_clock() as shown:
+        form = {"authenticator_name": "Laptop", "key": new_key, "code": shown(new_key)}
+        asked = client.post(sign_in.NEW_AUTHENTICATOR, data=form)
+        assert f'value="{new_key}"' in asked.text
+        later = {sign_in.CONFIRM_FIELD: shown(key, later=True)}
+        done = client.post(sign_in.NEW_AUTHENTICATOR, data=form | later)
     assert done.headers["location"] == sign_in.HOME
     names = {a.name for a in session.scalars(select(Authenticator))}
     assert names == {"Phone", "Laptop"}

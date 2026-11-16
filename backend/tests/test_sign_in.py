@@ -93,7 +93,9 @@ def test_setup_makes_the_first_admin_signed_in_with_recovery_codes(
     client: TestClient, session: Session
 ) -> None:
     key = hidden_key(client.get(sign_in.SETUP))
-    response = client.post(sign_in.SETUP, data=setup_form(key))
+    with app_clock() as shown:
+        form = setup_form(key, code=shown(key))
+        response = client.post(sign_in.SETUP, data=form)
     assert response.status_code == 200
     codes = re.findall(RECOVERY_CODE, response.text)
     assert len(codes) == accounts.RECOVERY_CODES
@@ -251,25 +253,50 @@ def test_an_unknown_name_is_checked_against_a_password_all_the_same(
 
 def test_a_code_works_once(client: TestClient, session: Session) -> None:
     _, key = new_admin(session)
-    at = datetime.now(UTC)
-    once = code(key, at)
-    with app_clock(at):
+    with app_clock() as shown:
+        once = shown(key)
         assert sign_in_with(client, code=once).status_code == 303
         client.cookies.clear()
         assert sign_in_with(client, code=once).status_code == 400
 
 
+@pytest.mark.helper
 def test_a_sign_in_held_up_past_a_time_step_still_signs_in(
     client: TestClient, session: Session, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """The tests' sign-in does not depend on how long its request takes:
-    here the app reads its clock a minute after the code was made, as on a
-    busy machine (inventory-tng-tuie)."""
+    """The tests' sign-in does not depend on how long its request takes: a
+    clock read a minute after the code was made, as on a busy machine, is
+    held at the code's moment (app_clock; inventory-tng-tuie). The app's
+    own window is tested on its clock below (accepted_step)."""
     _, key = new_admin(session)
     monkeypatch.setattr(
         sign_in, "_now", lambda: datetime.now(UTC) + timedelta(minutes=1)
     )
     assert sign_in_with(client, key=key).status_code == 303
+
+
+@pytest.mark.helper
+def test_forms_held_up_past_a_time_step_still_take_their_codes(
+    client: TestClient, session: Session, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """So do setup, a new authenticator and confirming (inventory-tng-1101)."""
+    monkeypatch.setattr(
+        sign_in, "_now", lambda: datetime.now(UTC) + timedelta(minutes=1)
+    )
+    key = hidden_key(client.get(sign_in.SETUP))
+    with app_clock() as shown:
+        form = setup_form(key, code=shown(key))
+        assert client.post(sign_in.SETUP, data=form).status_code == 200
+    new_key = accounts.new_totp_key()
+    with app_clock() as shown:
+        form = {"authenticator_name": "Laptop", "key": new_key, "code": shown(new_key)}
+        assert client.post(sign_in.NEW_AUTHENTICATOR, data=form).status_code == 303
+    row = session.scalars(select(AdminSession)).one()
+    row.confirmed_at = row.last_sensitive_at = datetime.now(UTC) - timedelta(hours=2)
+    session.flush()
+    with app_clock() as shown:
+        confirm = {sign_in.CONFIRM_FIELD: shown(key, later=True), "next": sign_in.HOME}
+        assert client.post(sign_in.CONFIRM, data=confirm).status_code == 303
 
 
 def second_factor(session: Session, admin_id: int, typed: str) -> str | None:
@@ -352,10 +379,11 @@ def test_required_totp_sends_an_admin_without_it_to_set_it_up(
     form = client.get(sign_in.NEW_AUTHENTICATOR)
     assert "needs an authenticator app" in form.text
     key = hidden_key(form)
-    saved = client.post(
-        sign_in.NEW_AUTHENTICATOR,
-        data={"authenticator_name": "Phone", "key": key, "code": code(key)},
-    )
+    with app_clock() as shown:
+        saved = client.post(
+            sign_in.NEW_AUTHENTICATOR,
+            data={"authenticator_name": "Phone", "key": key, "code": shown(key)},
+        )
     assert str(sign_in.RECOVERY_CODES_TITLE) in saved.text
     assert client.get(sign_in.HOME).status_code == 200
 
@@ -530,15 +558,16 @@ def test_a_sensitive_page_asks_for_a_code_then_carries_on(
         in client.get(asked.headers["location"]).text
     )
     # A wrong code is refused; the next step's code goes on.
-    later = code(key, datetime.now(UTC) + timedelta(seconds=30))
     wrong = client.post(
         sign_in.CONFIRM, data={sign_in.CONFIRM_FIELD: "12345", "next": "/x"}
     )
     assert wrong.status_code == 400
-    done = client.post(
-        sign_in.CONFIRM,
-        data={sign_in.CONFIRM_FIELD: later, "next": sign_in.NEW_AUTHENTICATOR},
-    )
+    with app_clock() as shown:
+        later = shown(key, later=True)
+        done = client.post(
+            sign_in.CONFIRM,
+            data={sign_in.CONFIRM_FIELD: later, "next": sign_in.NEW_AUTHENTICATOR},
+        )
     assert done.headers["location"] == sign_in.NEW_AUTHENTICATOR
     assert client.get(sign_in.NEW_AUTHENTICATOR).status_code == 200
 
@@ -587,10 +616,11 @@ def test_a_second_authenticator_needs_its_own_name(
         data={"authenticator_name": "phone", "key": key, "code": code(key)},
     )
     assert str(sign_in.NAME_TAKEN) in text(taken)
-    added = client.post(
-        sign_in.NEW_AUTHENTICATOR,
-        data={"authenticator_name": "Laptop", "key": key, "code": code(key)},
-    )
+    with app_clock() as shown:
+        added = client.post(
+            sign_in.NEW_AUTHENTICATOR,
+            data={"authenticator_name": "Laptop", "key": key, "code": shown(key)},
+        )
     # Not the first, so no new recovery codes.
     assert added.headers["location"] == sign_in.HOME
     assert len(session.scalars(select(Authenticator)).all()) == 2
@@ -603,10 +633,11 @@ def test_a_name_taken_meanwhile_is_refused_by_its_index(
     signed_in_row(client, session)
     monkeypatch.setattr(accounts, "authenticator_named", lambda *_: False)
     key = hidden_key(client.get(sign_in.NEW_AUTHENTICATOR))
-    taken = client.post(
-        sign_in.NEW_AUTHENTICATOR,
-        data={"authenticator_name": "phone", "key": key, "code": code(key)},
-    )
+    with app_clock() as shown:
+        taken = client.post(
+            sign_in.NEW_AUTHENTICATOR,
+            data={"authenticator_name": "phone", "key": key, "code": shown(key)},
+        )
     assert taken.status_code == 400
     assert str(sign_in.NAME_TAKEN) in text(taken)
     assert len(session.scalars(select(Authenticator)).all()) == 1
