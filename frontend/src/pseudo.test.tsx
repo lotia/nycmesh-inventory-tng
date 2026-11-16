@@ -13,14 +13,14 @@ import { BUILD } from "./build";
 import { DecoderUnavailable } from "./camera";
 import { type Catalogue, freshCart, type Item, storeCart } from "./cart";
 import { suggest } from "./combobox";
-import { speak } from "./i18n";
+import { say, speak } from "./i18n";
 import { messages as pseudo } from "./locales/pseudo.po";
 import { OpenPackageCard } from "./OpenPackageCard";
 import { STORAGE_KEY as OUTBOX_KEY, Outbox } from "./outbox";
 import { RegisterPage } from "./RegisterPage";
 import { guardRetire } from "./retire";
 import { Scanner } from "./Scanner";
-import { ScanPage } from "./ScanPage";
+import { HELD, ScanPage } from "./ScanPage";
 import { answering, deferred, json } from "./test-fetch";
 
 afterEach(() => {
@@ -369,10 +369,18 @@ const COVERED: Record<string, () => Promise<HTMLElement[]>> = {
     await screen.findByRole("alert");
     return [document.body];
   },
-  "the scan page, a newer build out": async () => {
+  "the scan page, too old, a save held": async () => {
+    localStorage.setItem(
+      OUTBOX_KEY,
+      JSON.stringify({
+        build: BUILD,
+        entries: [entry(0, { reason: { code: "must_upgrade" } }), entry(1)],
+      }),
+    );
     const outbox = await loaded();
     outbox.builds.learn("too_old");
     await screen.findByRole("alert");
+    expect(await screen.findAllByText(say(HELD))).toHaveLength(2);
     return [document.body];
   },
   "the outbox's list, each reason": async () => {

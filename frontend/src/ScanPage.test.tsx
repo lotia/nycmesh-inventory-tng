@@ -70,6 +70,7 @@ import {
   FIND,
   FIX_THEN_RECORD,
   FROM,
+  HELD,
   INSTALL_NUMBER,
   KEEP_IT,
   KIND_WORDS,
@@ -1831,27 +1832,74 @@ describe("a newer build", () => {
     await vi.waitFor(() => expect(banner()).toBe(UPDATED));
   });
 
-  test("a save from a build too old is kept, not refused, and the upgrade asked for", async () => {
-    const { api } = server(() => json(TOO_OLD, 409));
+  /** The list of carts from this device. */
+  const list = () =>
+    screen
+      .getByRole("heading", { name: say(CARTS_FROM_DEVICE) })
+      .closest("section") as HTMLElement;
+
+  /** That the list's `count` saves each say they are held, in the banner's
+   * caution style, to stand out without reading as a failure, and not read
+   * out: every entry is there as the page loads (Ali, 2026-11-16,
+   * inventory-tng-odn, inventory-tng-n7yv). None says it is on its way. */
+  function expectAllHeld(count: number) {
+    const notes = within(list()).getAllByText(say(HELD));
+    expect(notes).toHaveLength(count);
+    for (const note of notes) {
+      expect(note.classList).toContain("border-caution");
+    }
+    expect(within(list()).queryByText(say(SENDING))).toBeNull();
+    expect(within(list()).queryByText(MUST_UPGRADE)).toBeNull();
+    expect(within(list()).queryByRole("alert")).toBeNull();
+  }
+
+  test("saves from a build too old are kept, not refused, each held, and the upgrade asked for", async () => {
+    const first = deferred();
+    let answer: () => Response | Promise<Response> = () => first.promise;
+    const { api } = server(() => answer());
     const { outbox, reload } = openMine(api);
     await ready();
     fillMove();
     save();
+    fillMove();
+    save();
+    // The first is out; the second waits its turn, said to be on its way.
+    await vi.waitFor(() =>
+      expect(within(list()).getAllByText(say(SENDING))).toHaveLength(2),
+    );
+    // Any send after is answered so too, each with a Response of its own.
+    answer = () => json(TOO_OLD, 409);
+    first.resolve(json(TOO_OLD, 409));
     await vi.waitFor(() => expect(banner()).toBe(MUST_UPGRADE));
-    expect(outbox.entries.value.map((each) => each.state)).toEqual(["waiting"]);
-    // The save itself says the same, and nothing more.
-    const list = screen
-      .getByRole("heading", { name: say(CARTS_FROM_DEVICE) })
-      .closest("section") as HTMLElement;
-    // In the banner's caution style, to stand out without reading as a
-    // failure, and not read out: every entry is there as the page loads
-    // (Ali, 2026-11-16, inventory-tng-odn).
-    const note = within(list).getByText(MUST_UPGRADE);
-    expect(note.classList).toContain("border-caution");
-    expect(within(list).queryByRole("alert")).toBeNull();
+    expect(outbox.entries.value.map((each) => each.state)).toEqual([
+      "waiting",
+      "waiting",
+    ]);
+    expectAllHeld(2);
+    // One saved after the banner shows is held too, never sent.
+    fillMove();
+    save();
+    await vi.waitFor(() => expectAllHeld(3));
     expect(screen.queryByRole("button", { name: say(DISMISS) })).toBeNull();
     fireEvent.click(reloadButton() as HTMLElement);
     expect(reload).toHaveBeenCalledOnce();
+    // Loaded again, as the build now current: they are sent as usual.
+    cleanup();
+    answer = () => saved();
+    const upgraded = new Outbox(
+      api,
+      localStorage,
+      new Builds("2026-11-12T11:00:00.000Z"),
+    );
+    render(<ScanPage api={api} outbox={upgraded} reload={vi.fn()} />);
+    await vi.waitFor(() =>
+      expect(upgraded.entries.value.map((each) => each.state)).toEqual([
+        "saved",
+        "saved",
+        "saved",
+      ]),
+    );
+    expect(within(list()).queryByText(say(HELD))).toBeNull();
   });
 
   test("a save on its way is said in plain small text", async () => {

@@ -225,6 +225,13 @@ the compressed copy (fiddly header code ServeStatic already gets right).
   every note there (Ali, 2026-11-16, inventory-tng-odn): it should stand out
   without reading as a failure. We rejected plain small text, which did
   not stand out, and the alert's style, which reads as a failure.
+  Once the tab is too old, every save waiting there is held, the one the
+  server held back included, and each says "Held until you upgrade." in
+  that box, never "Sending…", while the banner keeps the full note and
+  the Upgrade button (Ali, 2026-11-16, inventory-tng-n7yv); after the
+  reload they are sent as usual. We rejected the full note on every held
+  save, which repeats the banner, and the full note on the one held back
+  with plain small text on the others.
   The outbox keeps why a batch was refused, or waits, as a code with
   its data (the HTTP status and tries, a 422's problems by line or
   report with each one's kind), and the page makes the words as it

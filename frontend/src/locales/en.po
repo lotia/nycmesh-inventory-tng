@@ -788,6 +788,10 @@ msgid "Pick your name."
 msgstr "Pick your name."
 
 #: src/ScanPage.tsx
+msgid "Held until you upgrade."
+msgstr "Held until you upgrade."
+
+#: src/ScanPage.tsx
 msgid "This item was changed in another tab. Check it before discarding."
 msgstr "This item was changed in another tab. Check it before discarding."
 

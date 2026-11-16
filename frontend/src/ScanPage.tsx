@@ -235,13 +235,16 @@ export const CARTS_FROM_DEVICE = msg`Carts from this device`;
 export const REGISTER_TO_SEND_WAITING = msg`<0>Register this browser</0> to send what is waiting.`;
 export const RECORDED_IN = msg`Recorded (transaction {transaction}).`;
 export const SENDING = msg`Sending…`;
+/** A save waiting while the page is too old to send it (Ali, 2026-11-16,
+ * inventory-tng-n7yv): the banner says what to do. */
+export const HELD = msg`Held until you upgrade.`;
 export const DISMISS = msg`Dismiss`;
 
 /** A list whose entries are ruled apart: the cart's lines, the outbox. */
 const RULED_LIST = "list-none p-0 *:border-t *:border-line *:py-3";
 
 /** A box that asks the volunteer to act, as the upgrade and the name check
- * do, or says a save waits on the upgrade. */
+ * do, or says a save is held for the upgrade. */
 const CAUTION_BOX =
   "flex flex-col items-start gap-3 border-2 border-caution p-3";
 
@@ -1903,6 +1906,9 @@ function OutboxList({
   if (entries.length === 0) {
     return null;
   }
+  // Too old, nothing this tab sends is taken, so none waiting is sent
+  // until the page is loaded again (Outbox.send).
+  const held = outbox.builds.newer.value === "too_old";
   const needsRegistering = entries.some((e) => e.waitingFor === "registration");
   return (
     <section>
@@ -1929,12 +1935,13 @@ function OutboxList({
                 <small>
                   {say(RECORDED_IN, { transaction: entry.transactionId })}
                 </small>
-              ) : reason === null ? (
-                <small>{say(SENDING)}</small>
-              ) : reason.code === "must_upgrade" ? (
+              ) : held && entry.state === "waiting" ? (
                 // Asked for, an upgrade is no failure: the banner's caution,
                 // not role="alert", as every one is there as the page loads.
-                <div class={CAUTION_BOX}>{say(MUST_UPGRADE)}</div>
+                <div class={CAUTION_BOX}>{say(HELD)}</div>
+              ) : reason === null || reason.code === "must_upgrade" ? (
+                // On its way, held as too old only by a build before this.
+                <small>{say(SENDING)}</small>
               ) : (
                 // Not role="alert": every one is there as the page loads.
                 <NoteSaid note={noteOf(reason, online)} />
