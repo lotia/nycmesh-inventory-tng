@@ -84,10 +84,10 @@ def test_every_mise_task_is_in_contributing() -> None:
     assert missing == set()
 
 
-def test_compose_runs_through_mise() -> None:
+def test_compose_runs_through_mise(clone_files: dict[Path, str]) -> None:
     direct = {
         str(path.relative_to(CLONE)): hits
-        for path, text in text_files().items()
+        for path, text in clone_files.items()
         if path not in ALLOWED and (hits := DIRECT.findall(text))
     }
     assert direct == {}

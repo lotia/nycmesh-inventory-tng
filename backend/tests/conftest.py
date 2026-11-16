@@ -49,6 +49,7 @@ from databases import (
 )
 from helpers.apps import on_session
 from helpers.categories import marked_against_its_needs, needs_database
+from helpers.clone_files import text_files
 from helpers.concurrency import LOCK_TIMEOUT, Committed, delete_made, newest_ids
 from helpers.devices import new_device
 from helpers.mail import SITE_MAIL, SentMail
@@ -117,6 +118,13 @@ def cheap_password_hashing() -> Iterator[None]:
         monkeypatch.setattr(accounts, "_hasher", cheap)
         monkeypatch.setattr(accounts, "_DUMMY_HASH", cheap.hash("not a password"))
         yield
+
+
+@pytest.fixture(scope="session")
+def clone_files() -> dict[Path, str]:
+    """The clone's text files, walked once for every rule that reads them
+    all (test_artifact_links.py, test_contributing.py)."""
+    return text_files()
 
 
 @pytest.fixture(autouse=True)

@@ -11,8 +11,6 @@ import pytest
 
 from inventory_tng.local_env import CLONE
 
-from helpers.clone_files import text_files
-
 pytestmark = pytest.mark.clone
 
 # An artifact's link, as claude.ai gives it, or as Claude Code does (under
@@ -26,18 +24,11 @@ LINK = re.compile(r"claude\.ai/(?:code/)?artifact/")
 # sign or a list item is left. A question's code ends in its choice's
 # letter or a closing bracket, and starts no word, path or hash, so a test
 # id, base64 or a quarter's year is left, but not a quarter in brackets.
-# The examples below show each.
 CITATION = re.compile(
     r"\b(?:[Cc]hoice|[Oo]ption|[Aa]nswer)s?\s+"
     r"(?:[A-H]\b|[a-h](?=[),.;:'?!])|\([a-hA-H]\))"
     r"|(?<![\w/+=])Q\d{1,2}(?:[- ][A-H]\b|\))"
 )
-
-
-@pytest.fixture(scope="module")
-def files() -> dict[Path, str]:
-    """The clone's text files, walked once for both rules."""
-    return text_files()
 
 
 def _holding(files: dict[Path, str], pattern: re.Pattern[str]) -> list[str]:
@@ -48,12 +39,14 @@ def _holding(files: dict[Path, str], pattern: re.Pattern[str]) -> list[str]:
     )
 
 
-def test_no_file_links_to_an_artifact(files: dict[Path, str]) -> None:
-    assert _holding(files, LINK) == []
+def test_no_file_links_to_an_artifact(clone_files: dict[Path, str]) -> None:
+    assert _holding(clone_files, LINK) == []
 
 
-def test_no_file_cites_a_decision_by_letter(files: dict[Path, str]) -> None:
-    assert _holding(files, CITATION) == []
+def test_no_file_cites_a_decision_by_letter(
+    clone_files: dict[Path, str],
+) -> None:
+    assert _holding(clone_files, CITATION) == []
 
 
 @pytest.mark.parametrize(
