@@ -63,6 +63,9 @@ KEPT = {
     "database_name": "inventory",
     "table_name": "item",
     "bypass": True,
+    # Sign-in settings, named like secrets.
+    "totp_policy": "required",
+    "session_days": 7,
 }
 
 

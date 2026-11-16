@@ -56,6 +56,8 @@ SECRET_PARTS = (
 # Or if a whole word of its name is one of these, too short to look for inside
 # other words ("otp" is in "footprint").
 SECRET_WORDS = frozenset({"otp", "pass"})
+# Whole names kept though they contain a secret part: sign-in settings.
+NOT_SECRETS = frozenset({"session_days", "totp_policy"})
 # Personal data, masked only when redacting: whole words, from snake_case and
 # camelCase alike, so `volunteer_email` matches but `username`
 # (administrators' usernames may be logged) and `hostname` do not.
@@ -260,7 +262,7 @@ def mask_query(query: str) -> str:
 
 def is_secret_name(name: str) -> bool:
     """Whether a field's name means its value is a secret (SECRET_PARTS,
-    SECRET_WORDS)."""
+    SECRET_WORDS, NOT_SECRETS)."""
     return _classify(name)[0]
 
 
@@ -271,8 +273,9 @@ def _classify(key: str) -> tuple[bool, bool]:
     words = re.split(r"[^a-z0-9]+", re.sub(r"([a-z0-9])([A-Z])", r"\1_\2", key).lower())
     words = [word for word in words if word]
     compact = "".join(words)
-    secret = any(part in compact for part in SECRET_PARTS) or bool(
-        SECRET_WORDS.intersection(words)
+    secret = key not in NOT_SECRETS and (
+        any(part in compact for part in SECRET_PARTS)
+        or bool(SECRET_WORDS.intersection(words))
     )
     personal = (
         bool(PERSONAL_WORDS.intersection(words))

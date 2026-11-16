@@ -8,8 +8,9 @@ import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy import select
 from sqlalchemy.orm import Session
+from structlog.testing import capture_logs
 
-from inventory_tng import accounts, mail, masking, sign_in
+from inventory_tng import accounts, mail, sign_in
 from inventory_tng.account import CODES_NEED_TOTP, EMAIL_TAKEN
 from inventory_tng.models import (
     Admin,
@@ -475,7 +476,10 @@ def test_a_late_password_form_never_writes_the_password_into_the_page(
     assert 'name="password_again" type="password"' in page
 
 
-@pytest.mark.parametrize("name", ["current_password", "api_token", "totp_secret"])
+SECRET_FIELDS = ["current_password", "api_token", "totp_secret"]
+
+
+@pytest.mark.parametrize("name", SECRET_FIELDS)
 def test_a_late_form_never_carries_a_secret_into_the_page(
     client: TestClient,
     session: Session,
@@ -483,18 +487,35 @@ def test_a_late_form_never_carries_a_secret_into_the_page(
     name: str,
 ) -> None:
     """A confirmed form that gains a field the log masker calls secret is
-    refused before its value is written as a hidden field (inventory-tng-2qy6)."""
+    refused, a bad request, before its value is written as a hidden field
+    (inventory-tng-2qy6). Logged with the admin's id, not the field's
+    name, which the browser chose."""
+    admin, _ = ada
     close_window(session)
     form = {"email": "ada@example.org", name: "hunter2"}
-    refused = client.post(f"{ACCOUNT}/email", data=form)
-    assert refused.status_code == 500
+    with capture_logs() as logs:
+        refused = client.post(f"{ACCOUNT}/email", data=form)
+    assert refused.status_code == 400
     assert "hunter2" not in refused.text
+    (line,) = [entry for entry in logs if entry["event"] == "secret field refused"]
+    assert line["log_level"] == "warning"
+    assert line["admin_id"] == admin.id
+    assert name not in str(line)
 
 
-def test_only_masked_settings_are_carried_though_masked() -> None:
-    """Each name let through is one the masker calls secret: the list holds
-    no name the guard would pass anyway."""
-    assert all(masking.is_secret_name(n) for n in sign_in.CARRIED_THOUGH_MASKED)
+@pytest.mark.parametrize("name", SECRET_FIELDS)
+def test_a_form_with_a_secret_field_is_refused_while_the_window_is_open(
+    client: TestClient,
+    ada: tuple[Admin, str],
+    name: str,
+) -> None:
+    """Refused whether or not a code is asked for, so any test of a form
+    that gains a secret field, not only a late one, fails until the field
+    joins sign_in.RETYPED."""
+    admin, _ = ada
+    form = {"email": "ada@example.org", name: "hunter2"}
+    assert client.post(f"{ACCOUNT}/email", data=form).status_code == 400
+    assert admin.email is None
 
 
 def test_a_late_new_authenticator_keeps_its_key(
