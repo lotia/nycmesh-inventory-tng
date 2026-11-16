@@ -888,8 +888,8 @@ def test_a_number_grouped_by_spaces_is_shown_whole(alembic_config: Config) -> No
     """Migration 0049: each item's, package's and alias's name as shown
     again, a number grouped by spaces before its unit shown whole and as
     typed, its ordinary spaces no-break, as search reads it judged one
-    number (Ali, 2026-11-16,
-    inventory-tng-t78); names, keys and search kept."""
+    number (Ali, 2026-11-16, inventory-tng-t78); names, keys and search
+    kept."""
     command.downgrade(alembic_config, "0048")
     connection = alembic_config.attributes["connection"]
     category_id = connection.scalar(
