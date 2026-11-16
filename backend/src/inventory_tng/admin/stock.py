@@ -50,7 +50,7 @@ from inventory_tng.models import (
     whole,
 )
 from inventory_tng.pages import templates
-from inventory_tng.phrases import gettext, lazy_gettext
+from inventory_tng.phrases import Words, gettext, lazy_gettext
 from inventory_tng.sign_in import AdminSignedIn
 
 log = structlog.get_logger(__name__)
@@ -80,21 +80,21 @@ def recorded_more_view(waiting: int) -> str:
     return gettext("Recorded more (%(count)d)", count=waiting)
 
 
-def stock_views(session: Session) -> list[tuple[str, str, str]]:
+def stock_views(session: Session) -> list[tuple[str, Words, str]]:
     """The stock pages' views, for the links between them (_views.html):
     by path, words and name. Recorded more says how many wait, even none
     (Ali, 2026-11-15, inventory-tng-73p)."""
     return [
-        (STOCK, str(BY_PLACE), "place"),
-        (f"{STOCK}?by=item", str(BY_ITEM), "item"),
-        (REORDER, str(REORDER_TITLE), "reorder"),
-        (NEEDS_COUNTING, str(NEEDS_COUNTING_TITLE), "needs-counting"),
+        (STOCK, BY_PLACE, "place"),
+        (f"{STOCK}?by=item", BY_ITEM, "item"),
+        (REORDER, REORDER_TITLE, "reorder"),
+        (NEEDS_COUNTING, NEEDS_COUNTING_TITLE, "needs-counting"),
         (
             RECORDED_MORE,
             recorded_more_view(over_recorded.how_many(session, over_recorded.WAITING)),
             "recorded-more",
         ),
-        (RECORDED_MORE_SETTLED, str(SETTLED_VIEW), "settled"),
+        (RECORDED_MORE_SETTLED, SETTLED_VIEW, "settled"),
     ]
 
 

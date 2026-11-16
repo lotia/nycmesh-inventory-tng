@@ -33,7 +33,7 @@ from inventory_tng.admin.listing import AskedView, Listing, Searched, Sort, Sort
 from inventory_tng.db import DbSession, attempt
 from inventory_tng.models import Location, Volunteer
 from inventory_tng.pages import NOTICES, not_found, redirect
-from inventory_tng.phrases import gettext, lazy_gettext
+from inventory_tng.phrases import Words, gettext, lazy_gettext
 from inventory_tng.sign_in import AdminSignedIn, SignedIn
 
 log = structlog.get_logger(__name__)
@@ -115,7 +115,7 @@ def _list_page(
     signed: SignedIn,
     *,
     listing: Listing[Volunteer] | None = None,
-    problems: Mapping[str, str] | None = None,
+    problems: Mapping[str, Words] | None = None,
     values: Mapping[str, str] | None = None,
     undo: str | None = None,
 ) -> HTMLResponse:
@@ -157,9 +157,9 @@ def _volunteer_page(
     signed: SignedIn,
     volunteer: Volunteer,
     *,
-    problems: Mapping[str, str] | None = None,
+    problems: Mapping[str, Words] | None = None,
     values: Mapping[str, str] | None = None,
-    alert: str | None = None,
+    alert: Words | None = None,
 ) -> HTMLResponse:
     others = session.scalars(
         select(Volunteer)
@@ -196,7 +196,7 @@ def _refused(
     session: Session,
     signed: SignedIn,
     volunteer: Volunteer,
-    problem: str,
+    problem: Words,
 ) -> HTMLResponse:
     """Their page again, saying why that was not done."""
     return _volunteer_page(
@@ -204,7 +204,7 @@ def _refused(
     )
 
 
-def _checked(name: str, email: str) -> dict[str, str]:
+def _checked(name: str, email: str) -> dict[str, Words]:
     problems = {}
     if problem := name_problem(name):
         problems["name"] = problem
@@ -250,7 +250,7 @@ def add_volunteer(
             session, lambda: volunteers.add(session, name, email or None)
         )
     if broken:
-        problems["name"] = rule_words(broken, str(TAKEN))
+        problems["name"] = rule_words(broken, TAKEN)
     if volunteer is None:
         values = {"name": name, "email": email}
         return _list_page(request, session, signed, problems=problems, values=values)
@@ -291,10 +291,10 @@ def save_volunteer(
             lambda: volunteers.save(session, found, name, email or None, seen=seen),
         )
         if broken in ALERTS:
-            alert = str(RULES[broken])
+            alert = RULES[broken]
             return _volunteer_page(request, session, signed, found, alert=alert)
         if broken:
-            problems["name"] = rule_words(broken, str(TAKEN))
+            problems["name"] = rule_words(broken, TAKEN)
     if problems:
         values = {"name": name, "email": email, "version": version}
         return _volunteer_page(
@@ -315,7 +315,7 @@ def hold_stock(
         return not_found()
     _, broken = attempt(session, lambda: volunteers.hold_stock(session, found))
     if broken:
-        return _refused(request, session, signed, found, rule_words(broken, str(TAKEN)))
+        return _refused(request, session, signed, found, rule_words(broken, TAKEN))
     session.commit()
     log.info("custody started", volunteer_id=volunteer_id)
     return redirect(
@@ -335,7 +335,7 @@ def stop_holding_stock(
     )
     if broken:
         # location_holds_stock: the one rule ending custody can break.
-        problem = str(STILL_HOLD)
+        problem = STILL_HOLD
         return _refused(request, session, signed, found, problem)
     session.commit()
     log.info("custody ended", volunteer_id=volunteer_id)
@@ -353,7 +353,7 @@ def retire_volunteer(
         return not_found()
     _, broken = attempt(session, lambda: volunteers.retire(session, found, now()))
     if broken:
-        return _refused(request, session, signed, found, rule_words(broken, str(TAKEN)))
+        return _refused(request, session, signed, found, rule_words(broken, TAKEN))
     session.commit()
     log.info("volunteer retired", volunteer_id=volunteer_id)
     return redirect(VOLUNTEERS, notice="retired", undo=str(volunteer_id))
@@ -385,7 +385,7 @@ def confirm_merge(
     if found is None:
         return not_found()
     if into is None:
-        return _refused(request, session, signed, found, str(PICK_INTO))
+        return _refused(request, session, signed, found, PICK_INTO)
     return admin_page(
         request,
         signed,
@@ -413,12 +413,12 @@ def merge_volunteer(
     if found is None:
         return not_found()
     if into is None:
-        return _refused(request, session, signed, found, str(PICK_INTO))
+        return _refused(request, session, signed, found, PICK_INTO)
     _, broken = attempt(
         session, lambda: volunteers.merge(session, found, into.id, now())
     )
     if broken:
-        return _refused(request, session, signed, found, rule_words(broken, str(TAKEN)))
+        return _refused(request, session, signed, found, rule_words(broken, TAKEN))
     session.commit()
     log.info("volunteer merged", volunteer_id=volunteer_id, merged_into_id=into.id)
     return redirect(f"{VOLUNTEERS}/{volunteer_id}", notice="volunteer_merged")
@@ -433,7 +433,7 @@ def restore_volunteer(
         return not_found()
     _, broken = attempt(session, lambda: volunteers.restore(session, found))
     if broken:
-        return _refused(request, session, signed, found, rule_words(broken, str(TAKEN)))
+        return _refused(request, session, signed, found, rule_words(broken, TAKEN))
     session.commit()
     log.info("volunteer restored", volunteer_id=volunteer_id)
     return redirect(f"{VOLUNTEERS}/{volunteer_id}", notice="restored")

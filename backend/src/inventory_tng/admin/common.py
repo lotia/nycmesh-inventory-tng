@@ -28,7 +28,7 @@ from inventory_tng.models import (
     whole,
 )
 from inventory_tng.pages import NOTICES, page, templates
-from inventory_tng.phrases import gettext, lazy_gettext
+from inventory_tng.phrases import Words, gettext, lazy_gettext
 from inventory_tng.sign_in import SignedIn
 
 ADMIN = "/admin"
@@ -139,12 +139,12 @@ RETIRED = "retired_read_only"
 ALERTS = frozenset({CHANGED, RETIRED})
 
 
-def rule_words(broken: str, unique: str | None = None) -> str:
+def rule_words(broken: str, unique: Words | None = None) -> Words:
     """RULES' words for a rule broken; `unique`'s for a unique index, where
     a page can say which."""
     if broken == "unique" and unique is not None:
         return unique
-    return str(RULES.get(broken, BREAKS_A_RULE))
+    return RULES.get(broken, BREAKS_A_RULE)
 
 
 def now() -> datetime:
@@ -229,7 +229,7 @@ BY_OPERATOR = lazy_gettext("the operator")
 type Retirable = Item | Category | Location | Volunteer | Admin
 
 
-def retired_by(session: Session, row: Retirable) -> str | None:
+def retired_by(session: Session, row: Retirable) -> Words | None:
     """Who retired `row`, as its page says it (docs/decisions/0019): the
     administrator's username, or "the operator" for a command, from the
     history of the change that last set its retired_at; None if the
@@ -248,7 +248,7 @@ def retired_by(session: Session, row: Retirable) -> str | None:
     )
     kind, _, ident = (actor or "").partition(":")
     if kind == "system":
-        return str(BY_OPERATOR)
+        return BY_OPERATOR
     admin = session.get(Admin, int(ident)) if kind == "admin" else None
     return admin.username if admin else None
 
@@ -302,7 +302,7 @@ def quantity(
     *,
     positive: bool,
     unit: str | None = None,
-    required: str | None = None,
+    required: Words | None = None,
 ) -> Decimal | str | None:
     """A quantity typed into a form: a Decimal, or what is wrong with it as a
     str. Blank is None, or `required` if one must be given. Up to three
@@ -310,7 +310,7 @@ def quantity(
     zero or more; whole, for an item in `unit` "each"."""
     text = text.strip()
     if not text:
-        return required
+        return None if required is None else str(required)
     try:
         value = Decimal(text)
     except InvalidOperation:

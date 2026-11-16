@@ -61,7 +61,7 @@ from inventory_tng.pages import (
     sections,
     templates,
 )
-from inventory_tng.phrases import gettext, lazy_gettext
+from inventory_tng.phrases import Words, gettext, lazy_gettext
 from inventory_tng.settings import RateLimits
 from inventory_tng.totp_keys import TotpKeys
 from inventory_tng.web import rate_key, set_private_cookie
@@ -280,7 +280,7 @@ class ConfirmHere(Exception):
         self,
         signed: SignedIn,
         carried: list[tuple[str, str]],
-        alert: str | None = None,
+        alert: Words | None = None,
         status_code: int = 403,
         *,
         recovery: bool = True,
@@ -467,9 +467,9 @@ def _codes_left(
     return accounts.recovery_codes_left(session, admin.id)
 
 
-def _refused(outcome: accounts.Confirmation, signed: SignedIn) -> str:
+def _refused(outcome: accounts.Confirmation, signed: SignedIn) -> Words:
     if outcome == "rate_limited":
-        return str(TOO_MANY)
+        return TOO_MANY
     return str(CODE_USED if signed.asks_code else NOT_YOUR_PASSWORD)
 
 
@@ -523,7 +523,7 @@ def _confirm_page(
     *,
     action: str,
     carried: list[tuple[str, str]],
-    alert: str | None = None,
+    alert: Words | None = None,
     status_code: int = 200,
     navigation: list[tuple[str, str | LazyProxy, Badge | None]] | None = None,
     recovery: bool = True,
@@ -592,9 +592,9 @@ def _setup_page(
     optional: bool,
     key: str | None = None,
     values: Mapping[str, str] | None = None,
-    problems: Mapping[str, str] | None = None,
+    problems: Mapping[str, Words] | None = None,
     status_code: int = 200,
-    alert: str | None = None,
+    alert: Words | None = None,
 ) -> HTMLResponse:
     values = values or {}
     totp = _totp_context(
@@ -670,8 +670,8 @@ def setup(
             optional=optional,
             key=key,
             values=values,
-            problems={} if limited else {"token": str(NOT_THE_TOKEN)},
-            alert=str(TOO_MANY) if limited else None,
+            problems={} if limited else {"token": NOT_THE_TOKEN},
+            alert=TOO_MANY if limited else None,
             status_code=429 if limited else 400,
         )
     values["token"] = token
@@ -725,7 +725,7 @@ def setup(
     return response
 
 
-def _authenticator_problems(name: str, step: int | None) -> dict[str, str]:
+def _authenticator_problems(name: str, step: int | None) -> dict[str, Words]:
     """A new authenticator's name, and the step its code was for: None if
     the code did not match."""
     problems = {}
@@ -754,7 +754,7 @@ def _sign_in_page(
     next: str,
     *,
     username: str = "",
-    alert: str | None = None,
+    alert: Words | None = None,
     status_code: int = 200,
 ) -> HTMLResponse:
     return page(
@@ -883,7 +883,7 @@ def _new_authenticator_page(
     *,
     key: str | None = None,
     name: str | None = None,
-    problems: Mapping[str, str] | None = None,
+    problems: Mapping[str, Words] | None = None,
     status_code: int = 200,
 ) -> HTMLResponse:
     totp = _totp_context(
@@ -936,7 +936,7 @@ def new_authenticator(
     if "authenticator_name" not in problems and accounts.authenticator_named(
         session, admin_id, name
     ):
-        problems["authenticator_name"] = str(NAME_TAKEN)
+        problems["authenticator_name"] = NAME_TAKEN
     # Recovery codes come with the first authenticator, unless some are
     # left: set up again after the operator retired the old one, the printed
     # codes still work, and making new ones would void them.
@@ -949,7 +949,7 @@ def new_authenticator(
             with session.begin_nested():
                 accounts.add_authenticator(session, keys, admin_id, name, key, step)
         except IntegrityError:
-            problems["authenticator_name"] = str(NAME_TAKEN)
+            problems["authenticator_name"] = NAME_TAKEN
     if problems:
         session.rollback()
         return _new_authenticator_page(

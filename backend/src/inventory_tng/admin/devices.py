@@ -44,7 +44,7 @@ from inventory_tng.local_time import parse_local, site_zone
 from inventory_tng.models import Device, RegistrationCode, whole
 from inventory_tng.once import OnceKey, sent_before
 from inventory_tng.pages import NOTICES, not_found, redirect
-from inventory_tng.phrases import gettext, lazy_gettext, ngettext
+from inventory_tng.phrases import Words, gettext, lazy_gettext, ngettext
 from inventory_tng.sign_in import AdminSignedIn, ConfirmedAdmin, SignedIn, changed
 
 log = structlog.get_logger(__name__)
@@ -114,7 +114,7 @@ def _list_page(
     signed: SignedIn,
     *,
     view: View | None = None,
-    problems: dict[str, str] | None = None,
+    problems: dict[str, Words] | None = None,
     values: dict[str, str] | None = None,
 ) -> HTMLResponse:
     view = view or View.read(DEVICES, CODE_SORTING)
@@ -295,9 +295,9 @@ def _device_page(
     session: Session,
     device: Device,
     *,
-    problems: dict[str, str] | None = None,
+    problems: dict[str, Words] | None = None,
     values: dict[str, str] | None = None,
-    alert: str | None = None,
+    alert: Words | None = None,
 ) -> HTMLResponse:
     return admin_page(
         request,
@@ -351,7 +351,7 @@ def name_device(
         session, lambda: devices.name_device(session, device, label or None, seen=seen)
     )
     if broken:
-        return _device_page(request, signed, session, device, alert=str(RULES[broken]))
+        return _device_page(request, signed, session, device, alert=RULES[broken])
     session.commit()
     return redirect(f"{DEVICES}/{device_id}", notice="saved")
 
@@ -420,22 +420,22 @@ SORTING = Sorting(
 
 def _chosen(
     session: Session, since: str, until: str, code: str, shown: str
-) -> tuple[devices.DeviceFilter, dict[str, str], dict[str, str]]:
+) -> tuple[devices.DeviceFilter, dict[str, Words], dict[str, str]]:
     """The filter a form or link chose, what was wrong with it, and the
     filter as the page carries it, each field as typed (an unknown `shown`
     is current). `until` takes in the whole minute it names."""
     shown = shown if shown in STATES else "current"
     zone = site_zone(session)
-    problems: dict[str, str] = {}
+    problems: dict[str, Words] = {}
     start = end = None
     if since.strip() and (start := parse_local(since, zone)) is None:
-        problems["since"] = str(A_TIME)
+        problems["since"] = A_TIME
     if until.strip():
         end = parse_local(until, zone)
         if end is None:
-            problems["until"] = str(A_TIME)
+            problems["until"] = A_TIME
         elif start is not None and end < start:
-            problems["until"] = str(AFTER_FROM)
+            problems["until"] = AFTER_FROM
         else:
             # Whatever seconds were typed. At the last minute a datetime
             # holds, no end at all.
@@ -445,7 +445,7 @@ def _chosen(
                 end = None
     code_id = whole(code, 1, 2**31 - 1) if code.strip() else None
     if code.strip() and code_id is None:
-        problems["code"] = str(A_CODE_NUMBER)
+        problems["code"] = A_CODE_NUMBER
     chosen = devices.DeviceFilter(
         since=start, until=end, code_id=code_id, current=STATES[shown]
     )

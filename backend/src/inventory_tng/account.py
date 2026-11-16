@@ -19,7 +19,7 @@ from inventory_tng.mail import Notify
 from inventory_tng.models import running_low
 from inventory_tng.once import OnceKey, sent_before
 from inventory_tng.pages import NOTICES, not_found, page, redirect
-from inventory_tng.phrases import lazy_gettext
+from inventory_tng.phrases import Words, lazy_gettext
 from inventory_tng.sign_in import (
     ACCOUNT,
     ACCOUNT_TITLE,
@@ -73,7 +73,7 @@ def _account_page(
     session: Session,
     signed: SignedIn,
     *,
-    problems: Mapping[str, str] | None = None,
+    problems: Mapping[str, Words] | None = None,
     values: Mapping[str, str] | None = None,
     status_code: int = 200,
 ) -> HTMLResponse:
@@ -110,7 +110,7 @@ def _refused(
     session: Session,
     signed: SignedIn,
     field: str,
-    problem: str,
+    problem: Words,
     values: Mapping[str, str] | None = None,
 ) -> HTMLResponse:
     """The page again, with what was wrong, and nothing of the change kept."""
@@ -152,7 +152,7 @@ def change_email(
     if not unique(
         session, lambda: accounts.change_email(session, admin, email, _now())
     ):
-        taken = str(EMAIL_TAKEN)
+        taken = EMAIL_TAKEN
         return _refused(request, session, signed, "email", taken, values)
     response = _done(signed, session, "email", section="email")
     # Told at the old address, in case it was not them: someone with their
@@ -200,7 +200,7 @@ def rename_authenticator(
         )
 
     if not unique(session, rename):
-        return _refused(request, session, signed, field, str(NAME_TAKEN))
+        return _refused(request, session, signed, field, NAME_TAKEN)
     if not found[0]:
         return not_found()  # Someone else's, or gone: ids reveal nothing.
     return _done(signed, session, "renamed", section="authenticators")
@@ -220,7 +220,7 @@ def remove_authenticator(
     if outcome == "missing":
         return not_found()
     if outcome == "last_required":
-        problem = str(LAST_REQUIRED)
+        problem = LAST_REQUIRED
         return _refused(request, session, signed, "authenticators", problem)
     done = _done(signed, session, outcome, section="authenticators")
     notify.tell(
@@ -242,7 +242,7 @@ def new_recovery_codes(
     if not signed.uses_totp:
         # Sent from a page shown before the last authenticator went, which
         # took the recovery codes section with it: said by the authenticators.
-        problem = str(CODES_NEED_TOTP)
+        problem = CODES_NEED_TOTP
         return _refused(request, session, signed, "authenticators", problem)
     if again := sent_before(request, session, signed, once, "recovery_codes", ACCOUNT):
         return again

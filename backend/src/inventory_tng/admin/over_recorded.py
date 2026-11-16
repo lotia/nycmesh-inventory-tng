@@ -63,7 +63,7 @@ from inventory_tng.models import (
     canonical,
 )
 from inventory_tng.pages import NOTICES, not_found, redirect
-from inventory_tng.phrases import gettext, lazy_gettext
+from inventory_tng.phrases import Words, gettext, lazy_gettext
 from inventory_tng.sign_in import AdminSignedIn
 
 log = structlog.get_logger(__name__)
@@ -111,7 +111,7 @@ def place_brought_back(place: str) -> str:
     return gettext("%(place)s brought back. Correct it now.", place=place)
 
 
-def not_changed(why: str) -> str:
+def not_changed(why: Words) -> str:
     """A change refused, and why."""
     return gettext("Not changed: %(why)s", why=why)
 
@@ -213,13 +213,13 @@ def waiting_view(waiting: int) -> str:
     return gettext("Waiting (%(count)d)", count=waiting)
 
 
-def _views(waiting: int, only: Item | None) -> list[tuple[str, str, str]]:
+def _views(waiting: int, only: Item | None) -> list[tuple[str, Words, str]]:
     """The links between those waiting and those settled, for _views.html,
     each of one item still if one (Ali, 2026-11-15, inventory-tng-73p)."""
     kept = query_string(only)
     return [
         (f"{OVER_RECORDED}{kept}", waiting_view(waiting), "waiting"),
-        (f"{RECORDED_MORE_SETTLED}{kept}", str(SETTLED_VIEW), "settled"),
+        (f"{RECORDED_MORE_SETTLED}{kept}", SETTLED_VIEW, "settled"),
     ]
 
 
@@ -307,10 +307,10 @@ def _page(
     session: DbSession,
     only: OnlyItem,
     view: View,
-    problems: dict[str, str] | None = None,
+    problems: dict[str, Words] | None = None,
     values: dict[str, str] | None = None,
     *,
-    alert: str | None = None,
+    alert: Words | None = None,
     refused: dict[str, Any] | None = None,
     notice: str | None = None,
     checking: int | None = None,
@@ -503,7 +503,7 @@ def answer(
             .join(Movement, Movement.item_id == Item.id)
             .where(Movement.id == check.movement_id)
         ).one()
-        count = quantity(typed, positive=False, unit=unit, required=str(TYPE_A_NUMBER))
+        count = quantity(typed, positive=False, unit=unit, required=TYPE_A_NUMBER)
         if not isinstance(count, Decimal):
             field = f"count-{check_id}"
             log.debug("over recorded count refused", over_recorded_id=check_id)
@@ -588,16 +588,16 @@ def answer(
     return redirect(view.link(), notice=notice)
 
 
-def _why_problem(reason: str, words: str) -> str | None:
+def _why_problem(reason: str, words: str) -> Words | None:
     """What is wrong with why one is marked checked, `words` stripped: no
     reason picked, put right another way with no words or too many, or
     words with another reason."""
     if reason not in over_recorded.CHECKED_REASONS:
-        return str(SAY_WHY)
+        return SAY_WHY
     if reason != "other":
-        return str(WORDS_FOR_ANOTHER) if words else None
+        return WORDS_FOR_ANOTHER if words else None
     if not words:
-        return str(SAY_WHY)
+        return SAY_WHY
     if len(words) > OVER_RECORDED_WORDS_MAX:
         return up_to(OVER_RECORDED_WORDS_MAX)
     return None

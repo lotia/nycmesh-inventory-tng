@@ -37,7 +37,7 @@ from inventory_tng.db import DbSession, refusal
 from inventory_tng.local_time import site_zone
 from inventory_tng.models import INTEGER_MAX, Admin, ReadingRule, whole
 from inventory_tng.pages import NOTICES, not_found, redirect
-from inventory_tng.phrases import gettext, lazy_gettext
+from inventory_tng.phrases import Words, gettext, lazy_gettext
 from inventory_tng.reading_rules import (
     NOT_A_UNIT,
     chosen_rule,
@@ -86,18 +86,18 @@ class _Row:
     """A reading rule as the list shows it, in words."""
 
     rule: ReadingRule
-    read_as: str
-    saved: str
-    by: str
+    read_as: Words
+    saved: Words
+    by: Words
 
 
 def _row(rule: ReadingRule, username: str | None) -> _Row:
     reading = units.reading_of(rule.reading) if rule.reading else None
     return _Row(
         rule,
-        f"{reading.shown} · {reading.kind_words}" if reading else str(NOT_A_UNIT_WORDS),
-        str(RESPELT if rule.respell else AS_TYPED),
-        username or str(THE_IMPORT),
+        f"{reading.shown} · {reading.kind_words}" if reading else NOT_A_UNIT_WORDS,
+        RESPELT if rule.respell else AS_TYPED,
+        username or THE_IMPORT,
     )
 
 
@@ -127,9 +127,9 @@ def _rule_page(
     signed: SignedIn,
     rule: ReadingRule,
     *,
-    alert: str | None = None,
+    alert: Words | None = None,
     read_alike: Sequence[str] = (),
-    problem: str | None = None,
+    problem: Words | None = None,
 ) -> HTMLResponse:
     return admin_page(
         request,
@@ -215,7 +215,7 @@ def _refused(
     """The rule's page again, saying why a change to it was refused: names
     it would read alike, by id, or one of ALERTS."""
     if broken != items.READ_ALIKE:
-        return _rule_page(request, session, signed, rule, alert=str(RULES[broken]))
+        return _rule_page(request, session, signed, rule, alert=RULES[broken])
     # What the change would have read, the savepoint undone.
     rules = {**models.reading_rules(session)}
     if change is None:
@@ -243,7 +243,7 @@ def save_reading(
     offers = offered(found.token, found.rule)
     change = chosen_rule(reading, offers, respell=respell == "on")
     if change is None:
-        return _rule_page(request, session, signed, found, problem=str(CHOOSE_ONE))
+        return _rule_page(request, session, signed, found, problem=CHOOSE_ONE)
     seen = form_version(version)
     _, broken = refusal(
         session,
@@ -293,7 +293,7 @@ def _seed_page(
     one: bool,
     at: int,
     sent: Mapping[str, str] | None = None,
-    problem: str | None = None,
+    problem: Words | None = None,
     read_alike: Sequence[str] = (),
     proposals: list[reading_rules.Proposal] | None = None,
 ) -> HTMLResponse:
@@ -376,7 +376,7 @@ def accept(
             one=one,
             at=at,
             sent=form,
-            problem=str(CHOOSE),
+            problem=CHOOSE,
             proposals=made,
         )
     written, broken = refusal(

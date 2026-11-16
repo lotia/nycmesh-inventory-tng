@@ -11,7 +11,7 @@ A context (`pgettext`) only where the same English means two things, from
 the fixed list in CONTRIBUTING.md (Phrases).
 """
 
-from collections.abc import Generator
+from collections.abc import Callable, Generator
 from contextlib import contextmanager
 from io import BytesIO
 from pathlib import Path
@@ -71,14 +71,24 @@ def ngettext(singular: str, plural: str, num: int, **values: object) -> str:
     return _active.ngettext(singular, plural, num) % ({"num": num} | values)
 
 
+# A phrase as code holds it: said already, or a lazy one said when shown.
+Words = str | LazyProxy
+
+
+def lazy(say: Callable[..., str], *values: object) -> LazyProxy:
+    """What `say(*values)` says, said in the locale active when it is shown,
+    not when named: a phrase with values or a plural that a table holds."""
+    return LazyProxy(say, *values, enable_cache=False)
+
+
 def lazy_gettext(message: str) -> LazyProxy:
     """`message`, said in the locale active when it is shown, not when named."""
-    return LazyProxy(gettext, message, enable_cache=False)
+    return lazy(gettext, message)
 
 
 def lazy_pgettext(context: str, message: str) -> LazyProxy:
     """`message`, as `context` means it, said when shown."""
-    return LazyProxy(pgettext, context, message, enable_cache=False)
+    return lazy(pgettext, context, message)
 
 
 def install(environment: Environment) -> None:

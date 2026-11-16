@@ -27,7 +27,7 @@ from inventory_tng.admin.listing import AskedView, Sort, Sorting, View, arranged
 from inventory_tng.db import DbSession, refusal
 from inventory_tng.models import Category, Item
 from inventory_tng.pages import not_found, redirect
-from inventory_tng.phrases import lazy_gettext
+from inventory_tng.phrases import Words, lazy_gettext
 from inventory_tng.sign_in import AdminSignedIn, SignedIn
 
 log = structlog.get_logger(__name__)
@@ -67,7 +67,7 @@ def _list_page(
     request: Request,
     session: Session,
     signed: SignedIn,
-    problem: str | None = None,
+    problem: Words | None = None,
     name: str | None = None,
     *,
     view: View | None = None,
@@ -103,8 +103,8 @@ def _category_page(
     session: Session,
     signed: SignedIn,
     category: Category,
-    problem: str | None = None,
-    alert: str | None = None,
+    problem: Words | None = None,
+    alert: Words | None = None,
 ) -> HTMLResponse:
     items = session.scalars(
         select(Item)
@@ -153,7 +153,7 @@ def add_category(
     added = None
     if problem is None:
         added, _ = refusal(session, lambda: categories.add(session, name), "unique")
-        problem = None if added else str(TAKEN)
+        problem = None if added else TAKEN
     if added is None:
         return _list_page(request, session, signed, problem, name)
     session.commit()
@@ -194,10 +194,8 @@ def rename_category(
             *ALERTS,
         )
         if broken in ALERTS:
-            return _category_page(
-                request, session, signed, found, alert=str(RULES[broken])
-            )
-        problem = broken and str(TAKEN)
+            return _category_page(request, session, signed, found, alert=RULES[broken])
+        problem = broken and TAKEN
     if problem is not None:
         return _category_page(request, session, signed, found, problem)
     session.commit()
@@ -218,7 +216,7 @@ def retire_category(
     )
     if broken:
         return _category_page(
-            request, session, signed, found, str(RULES["category_has_items"])
+            request, session, signed, found, RULES["category_has_items"]
         )
     session.commit()
     log.info("category retired", category_id=category_id)

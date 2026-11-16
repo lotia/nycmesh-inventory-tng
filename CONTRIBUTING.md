@@ -840,7 +840,12 @@ On the server (`backend/src/inventory_tng/phrases.py`):
   `RESET_NOTICE = lazy_gettext("Your account is reset: sign in.")`. A
   phrase with values, or a plural, is a function that says it with
   `gettext("To %(place)s", place=name)` or `ngettext("%(num)d place",
-  "%(num)d places", n)`, which fills `%(num)d` with `n`.
+  "%(num)d places", n)`, which fills `%(num)d` with `n`. A table that
+  holds such a phrase holds `lazy(function)`.
+- Code that passes a phrase on, such as a field's problem or a page's
+  alert, types it `Words` and leaves it lazy: the template says it.
+  `str()` it only where a str must go, such as a response body, JSON, SQL
+  or `isinstance` checks.
 - Values are always filled, so a per cent sign in a message is `%%`; a
   test refuses a lone one.
 

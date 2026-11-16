@@ -44,7 +44,7 @@ from inventory_tng.models import (
     whole,
 )
 from inventory_tng.pages import NOTICES, not_found, redirect
-from inventory_tng.phrases import gettext, lazy_gettext
+from inventory_tng.phrases import Words, gettext, lazy_gettext
 from inventory_tng.sign_in import AdminSignedIn, ConfirmedAdmin, SignedIn, changed
 from inventory_tng.time_zones import zones
 
@@ -143,9 +143,9 @@ def _page(
     session: Session,
     signed: SignedIn,
     *,
-    problems: dict[str, str] | None = None,
+    problems: dict[str, Words] | None = None,
     values: dict[str, str] | None = None,
-    alert: str | None = None,
+    alert: Words | None = None,
 ) -> HTMLResponse:
     scan = session.get_one(ScanSettings, 1)
     sign_in = accounts.sign_in_settings(session)
@@ -189,7 +189,7 @@ def _page(
 
 def _changed(request: Request, session: Session, signed: SignedIn) -> HTMLResponse:
     """The page as it is now, as a form's row changed since it was shown."""
-    return _page(request, session, signed, alert=str(RULES[CHANGED]))
+    return _page(request, session, signed, alert=RULES[CHANGED])
 
 
 @router.get(SETTINGS)
@@ -245,7 +245,7 @@ def add_reason(
             session, lambda: adjustment_reasons.add(session, name), "unique"
         )
     if added is None:
-        problems = {"reason": problem or str(REASON_TAKEN)}
+        problems = {"reason": problem or REASON_TAKEN}
         return _page(request, session, signed, problems=problems)
     session.commit()
     log.info("adjustment reason added", adjustment_reason_id=added.id)
@@ -282,7 +282,7 @@ def change_reason(
         _, broken = refusal(session, change, "unique", CHANGED)
         if broken == CHANGED:
             return _changed(request, session, signed)
-        problem = broken and str(REASON_TAKEN)
+        problem = broken and REASON_TAKEN
     if problem is not None:
         return _page(
             request,
@@ -304,10 +304,10 @@ def save_sign_in_settings(
     notify: Notify,
     form: Annotated[dict[str, str], Depends(text_form)],
 ) -> Response:
-    problems: dict[str, str] = {}
+    problems: dict[str, Words] = {}
     policy = form.get("totp_policy", "")
     if policy not in TOTP_POLICIES:
-        problems["totp_policy"] = str(REQUIRED_OR_OPTIONAL)
+        problems["totp_policy"] = REQUIRED_OR_OPTIONAL
     chosen: dict[str, object] = {"totp_policy": policy}
     for n in NUMBERS:
         chosen[n.field] = whole(form.get(n.field, ""), n.low, n.high)
@@ -364,7 +364,7 @@ def save_site_settings(
             request,
             session,
             signed,
-            problems={"time_zone": str(RULES[broken])},
+            problems={"time_zone": RULES[broken]},
             values={"time_zone": time_zone, "site_version": site_version},
         )
     session.commit()

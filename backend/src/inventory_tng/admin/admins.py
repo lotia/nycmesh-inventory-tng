@@ -34,7 +34,7 @@ from inventory_tng.mail import Notify
 from inventory_tng.models import Admin
 from inventory_tng.once import OnceKey, sent_before
 from inventory_tng.pages import NOTICES, not_found, redirect
-from inventory_tng.phrases import gettext, lazy_gettext
+from inventory_tng.phrases import Words, gettext, lazy_gettext
 from inventory_tng.sign_in import (
     CONFIRM_FIELD,
     RESET,
@@ -98,7 +98,7 @@ def _list_page(
     signed: SignedIn,
     *,
     view: View | None = None,
-    problems: Mapping[str, str] | None = None,
+    problems: Mapping[str, Words] | None = None,
     values: Mapping[str, str] | None = None,
 ) -> HTMLResponse:
     admins = session.scalars(select(Admin).order_by(func.lower(Admin.username))).all()
@@ -135,7 +135,7 @@ def _admin_page(
     session: Session,
     signed: SignedIn,
     other: Admin,
-    problem: str | None = None,
+    problem: Words | None = None,
 ) -> HTMLResponse:
     return admin_page(
         request,
@@ -188,7 +188,7 @@ def _refused(
     session: Session,
     signed: SignedIn,
     refused: accounts.AdminRefused,
-    own: str,
+    own: Words,
 ) -> Response:
     """Not found, or their own page saying `own` (as they acted on
     themselves)."""
@@ -237,7 +237,7 @@ def invite(
         return again
     try:
         if not problems and (broken := attempt(session, make)[1]):
-            problems["username"] = rule_words(broken, str(TAKEN))
+            problems["username"] = rule_words(broken, TAKEN)
     except accounts.AdminRefused:
         return not_found()
     if problems:
@@ -267,7 +267,7 @@ def confirm_reset(
     if other is None or other.retired_at is not None:
         return not_found()
     if other.id == signed.admin.id:
-        return _admin_page(request, session, signed, other, str(OWN_RESET))
+        return _admin_page(request, session, signed, other, OWN_RESET)
     return admin_page(
         request,
         signed,
@@ -300,7 +300,7 @@ def reset(
             session, admin_id, signed.admin.id, now(), notify
         )
     except accounts.AdminRefused as refused:
-        return _refused(request, session, signed, refused, str(OWN_RESET))
+        return _refused(request, session, signed, refused, OWN_RESET)
     changed(signed, session)
     return _link_page(request, signed, other, token, kind)
 
@@ -321,7 +321,7 @@ def retire(
     try:
         accounts.retire_admin(session, admin_id, signed.admin.id, now(), notify)
     except accounts.AdminRefused as refused:
-        return _refused(request, session, signed, refused, str(OWN_RETIRE))
+        return _refused(request, session, signed, refused, OWN_RETIRE)
     changed(signed, session)
     return redirect(ADMINS, notice="admin_retired", section="retired")
 

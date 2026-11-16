@@ -41,7 +41,7 @@ from inventory_tng.models import (
     SignInSettings,
     mint_code,
 )
-from inventory_tng.phrases import gettext, lazy_gettext
+from inventory_tng.phrases import Words, gettext, lazy_gettext
 from inventory_tng.rate_limits import limiter
 from inventory_tng.settings import RateLimits
 from inventory_tng.totp_keys import TotpKeys, Unreadable
@@ -171,13 +171,13 @@ def username_problem(username: str) -> str | None:
     return None
 
 
-def email_problem(email: str) -> str | None:
+def email_problem(email: str) -> Words | None:
     if email and (not EMAIL.fullmatch(email) or len(email) > EMAIL_MAX):
-        return str(NOT_AN_EMAIL)
+        return NOT_AN_EMAIL
     return None
 
 
-def password_problem(password: str, again: str) -> str | None:
+def password_problem(password: str, again: str) -> Words | None:
     if len(password) < PASSWORD_MIN:
         return gettext(
             "Use at least %(min)d characters. A few words make a good one.",
@@ -186,7 +186,7 @@ def password_problem(password: str, again: str) -> str | None:
     if len(password) > PASSWORD_MAX:
         return gettext("Use at most %(max)d characters.", max=PASSWORD_MAX)
     if password != again:
-        return str(PASSWORDS_DIFFER)
+        return PASSWORDS_DIFFER
     return None
 
 

@@ -7,7 +7,6 @@ printed again from its address."""
 from typing import Annotated, Any, cast
 
 import structlog
-from babel.support import LazyProxy
 from fastapi import APIRouter, Depends, Form, Query, Request
 from fastapi.responses import JSONResponse, Response
 from sqlalchemy import ColumnElement, exists, func, select
@@ -36,7 +35,7 @@ from inventory_tng.models import (
     whole,
 )
 from inventory_tng.pages import NOTICES, not_found, redirect, templates
-from inventory_tng.phrases import gettext, lazy_gettext, ngettext
+from inventory_tng.phrases import gettext, lazy, lazy_gettext, ngettext
 from inventory_tng.sign_in import AdminSignedIn
 
 log = structlog.get_logger(__name__)
@@ -70,8 +69,8 @@ def _copies() -> str:
     return gettext("Print from 1 to %(max)d copies of each.", max=labels.MAX_COPIES)
 
 
-TOO_MANY = LazyProxy(_too_many, enable_cache=False)
-COPIES = LazyProxy(_copies, enable_cache=False)
+TOO_MANY = lazy(_too_many)
+COPIES = lazy(_copies)
 PRINT_TITLE = lazy_gettext("Print labels")
 NOTICES.update(
     {

@@ -31,6 +31,7 @@ from inventory_tng.admin import volunteers as admin_volunteers
 from inventory_tng.pages import retired_holding, templates
 from inventory_tng.phrases import (
     ENGLISH_PO,
+    Words,
     compiled,
     gettext,
     lazy_gettext,
@@ -111,7 +112,7 @@ def named_phrases() -> list[LazyProxy]:
 
 
 # Each phrase said with values, by its function, the values not English.
-SAID_WITH_VALUES: list[Callable[[], str]] = [
+SAID_WITH_VALUES: list[Callable[[], Words]] = [
     lambda: accounts.username_problem("!") or "",
     lambda: accounts.name_up_to(9),
     lambda: accounts.password_problem("", "") or "",
@@ -171,7 +172,7 @@ COVERED: dict[str, Callable[[], str]] = {
         str(phrase) for phrase in named_phrases()
     ),
     "every phrase said with values": lambda: " ".join(
-        said() for said in SAID_WITH_VALUES
+        str(said()) for said in SAID_WITH_VALUES
     ),
     "the reset notice": lambda: str(RESET_NOTICE),
     "one retired place holding stock": lambda: retired_holding(1),

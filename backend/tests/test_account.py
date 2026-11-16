@@ -165,7 +165,7 @@ def test_a_short_password_is_refused(
     assert refused.status_code == 400
     problem = accounts.password_problem("short", "short")
     assert problem
-    assert problem in text(refused)
+    assert str(problem) in text(refused)
 
 
 def test_renaming_an_authenticator(

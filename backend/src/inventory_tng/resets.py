@@ -22,7 +22,7 @@ from inventory_tng.db import DbSession, SessionFactory, Sessions
 from inventory_tng.mail import Notify
 from inventory_tng.models import ResetLink
 from inventory_tng.pages import NOTICES, not_found, page, redirect
-from inventory_tng.phrases import lazy_gettext
+from inventory_tng.phrases import Words, lazy_gettext
 from inventory_tng.sign_in import FORGOT, RESET, SIGN_IN, TOO_MANY, reset_url
 from inventory_tng.web import rate_key
 
@@ -57,8 +57,8 @@ def _now() -> datetime:
 def _forgot_page(
     request: Request,
     *,
-    notice: str | None = None,
-    alert: str | None = None,
+    notice: Words | None = None,
+    alert: Words | None = None,
     status_code: int = 200,
 ) -> HTMLResponse:
     return page(
@@ -93,10 +93,10 @@ def forgot(
     if not accounts.may_ask_for_reset(
         session, rate_key(request), request.app.state.settings.rate_limits
     ):
-        return _forgot_page(request, alert=str(TOO_MANY), status_code=429)
+        return _forgot_page(request, alert=TOO_MANY, status_code=429)
     site_url = config.site_url
     notify.later(lambda mailer: _email_reset(sessions, mailer, site_url, username))
-    return _forgot_page(request, notice=str(ASKED))
+    return _forgot_page(request, notice=ASKED)
 
 
 def _email_reset(
@@ -118,7 +118,7 @@ def _reset_page(
     token: str,
     link: ResetLink | None,
     *,
-    problems: dict[str, str] | None = None,
+    problems: dict[str, Words] | None = None,
     status_code: int = 200,
 ) -> HTMLResponse:
     """The form for a usable link, or, as a 404, why it is not."""
@@ -157,7 +157,7 @@ def reset(
         session, rate_key(request), request.app.state.settings.rate_limits
     ):
         found = accounts.find_reset_link(session, token, now)
-        problems = {"password": str(TOO_MANY)}
+        problems = {"password": TOO_MANY}
         link = found[0] if found else None
         return _reset_page(
             request, session, token, link, problems=problems, status_code=429
@@ -184,8 +184,8 @@ def _recover_page(
     request: Request,
     *,
     username: str = "",
-    problems: dict[str, str] | None = None,
-    alert: str | None = None,
+    problems: dict[str, Words] | None = None,
+    alert: Words | None = None,
     status_code: int = 200,
 ) -> HTMLResponse:
     return page(
@@ -236,7 +236,7 @@ def recover(
     except accounts.TokenRefused as refused:
         if refused.reason == "rate_limited":
             return _recover_page(
-                request, username=username, alert=str(TOO_MANY), status_code=429
+                request, username=username, alert=TOO_MANY, status_code=429
             )
         field, words = REFUSED[refused.reason]
         return _recover_page(

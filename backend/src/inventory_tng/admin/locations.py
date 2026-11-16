@@ -33,7 +33,7 @@ from inventory_tng.db import DbSession, attempt
 from inventory_tng.local_time import zone_at
 from inventory_tng.models import STORE_KINDS, Label, Location, Volunteer
 from inventory_tng.pages import not_found, redirect
-from inventory_tng.phrases import lazy_gettext
+from inventory_tng.phrases import Words, lazy_gettext
 from inventory_tng.sign_in import AdminSignedIn, SignedIn
 from inventory_tng.time_zones import zones
 
@@ -87,7 +87,7 @@ def _list_page(
     session: Session,
     signed: SignedIn,
     *,
-    problems: Mapping[str, str] | None = None,
+    problems: Mapping[str, Words] | None = None,
     values: Mapping[str, str] | None = None,
     undo: str | None = None,
 ) -> HTMLResponse:
@@ -129,9 +129,9 @@ def _location_page(
     session: Session,
     signed: SignedIn,
     location: Location,
-    problem: str | None = None,
+    problem: Words | None = None,
     values: Mapping[str, str] | None = None,
-    alert: str | None = None,
+    alert: Words | None = None,
     field: str = "name",
 ) -> HTMLResponse:
     areas = session.scalars(
@@ -182,14 +182,14 @@ def add_location(
 ) -> Response:
     name = name.strip()
     form = {"name": name, "kind": kind, "parent_id": parent_id}
-    problems: dict[str, str] = {}
+    problems: dict[str, Words] = {}
     if problem := name_problem(name):
         problems["name"] = problem
     if kind not in KINDS:
-        problems["kind"] = str(PICK_WHAT)
+        problems["kind"] = PICK_WHAT
     parent = chosen(session, Location, parent_id) if kind == "area" else None
     if kind == "area" and parent is None:
-        problems["parent_id"] = str(PICK_WHERE)
+        problems["parent_id"] = PICK_WHERE
     location, broken = None, None
     if not problems:
         under = parent.id if parent else None
@@ -197,7 +197,7 @@ def add_location(
             session, lambda: locations.add(session, name, kind, under)
         )
     if broken:
-        problems["name"] = rule_words(broken, str(TAKEN))
+        problems["name"] = rule_words(broken, TAKEN)
     if location is None:
         return _list_page(request, session, signed, problems=problems, values=form)
     session.commit()
@@ -240,7 +240,7 @@ def save_location(
     problem, broken = name_problem(name), None
     parent = chosen(session, Location, parent_id) if found.kind == "area" else None
     if found.kind == "area" and parent is None:
-        problem = str(PICK_WHERE)
+        problem = PICK_WHERE
 
     if problem is None:
         under = parent.id if parent else None
@@ -252,9 +252,9 @@ def save_location(
 
         _, broken = attempt(session, save)
         if broken in ALERTS:
-            alert = str(RULES[broken])
+            alert = RULES[broken]
             return _location_page(request, session, signed, found, alert=alert)
-        problem = broken and rule_words(broken, str(TAKEN))
+        problem = broken and rule_words(broken, TAKEN)
     if problem is not None:
         values = {
             "name": name,
@@ -281,7 +281,7 @@ def retire_location(
         return not_found()
     _, broken = attempt(session, lambda: locations.retire(session, found, now()))
     if broken:
-        problem = rule_words(broken, str(TAKEN))
+        problem = rule_words(broken, TAKEN)
         return _location_page(request, session, signed, found, problem)
     session.commit()
     log.info("location retired", location_id=location_id)
@@ -297,7 +297,7 @@ def restore_location(
         return not_found()
     _, broken = attempt(session, lambda: locations.restore(session, found))
     if broken:
-        return _location_page(request, session, signed, found, str(RULES[broken]))
+        return _location_page(request, session, signed, found, RULES[broken])
     session.commit()
     log.info("location restored", location_id=location_id)
     return redirect(f"{LOCATIONS}/{location_id}", notice="restored")

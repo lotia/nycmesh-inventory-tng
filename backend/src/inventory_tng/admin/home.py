@@ -21,7 +21,7 @@ from inventory_tng.db import DbSession
 from inventory_tng.ledger import retired_places_holding_stock
 from inventory_tng.local_time import site_zone
 from inventory_tng.models import Category, Item, Location, Volunteer
-from inventory_tng.phrases import lazy_gettext
+from inventory_tng.phrases import Words, lazy_gettext
 from inventory_tng.sign_in import ACCOUNT, HOME, AdminSignedIn
 
 router = APIRouter(include_in_schema=False)
@@ -41,9 +41,9 @@ HOME_TITLE = lazy_gettext("Inventory")
 class Advice(NamedTuple):
     """Something to put right, and where."""
 
-    words: str
+    words: Words
     path: str
-    action: str
+    action: Words
 
 
 # How many current rows of each, on the home page, by its section's path.
@@ -66,9 +66,9 @@ def home(request: Request, signed: AdminSignedIn, session: DbSession) -> Respons
     # While it is so, every administrator is told.
     warnings: list[Advice] = []
     if accounts.admins_who_can_sign_in(session) == 1:
-        warnings.append(Advice(str(ALONE), ADMINS, str(INVITE_ANOTHER)))
+        warnings.append(Advice(ALONE, ADMINS, INVITE_ANOTHER))
     if not signed.admin.email and request.app.state.settings.mail is not None:
-        warnings.append(Advice(str(NO_EMAIL), ACCOUNT, str(ADD_ONE)))
+        warnings.append(Advice(NO_EMAIL, ACCOUNT, ADD_ONE))
     # What others changed of who may sign in since this administrator last
     # signed in, so those without an email hear of it too.
     since = signed.row.signed_in_before
