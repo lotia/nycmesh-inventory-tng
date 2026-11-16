@@ -215,6 +215,11 @@ the compressed copy (fiddly header code ServeStatic already gets right).
   naming the problem, which Ali found hard to spot once seen, opening
   "Sorry.", which delays the problem, and italicising the numbers of
   names and the server's words, which are no counts.
+  In "Carts from this device", a save held until the volunteer upgrades
+  is in the upgrade banner's caution box, not read out, like every note
+  there (Ali, 2026-11-16, inventory-tng-odn): it should stand out
+  without reading as a failure. We rejected plain small text, which did
+  not stand out, and the alert's style, which reads as a failure.
   The outbox keeps why a batch was refused, or waits, as a code with
   its data (the HTTP status and tries, a 422's problems by line or
   report with each one's kind), and the page makes the words as it

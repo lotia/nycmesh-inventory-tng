@@ -86,6 +86,7 @@ import {
   REMOVE,
   SCAN_WITH_CAMERA,
   ScanPage,
+  SENDING,
   SENDING_WHAT,
   SOMETHING,
   THATS_ME,
@@ -1842,10 +1843,29 @@ describe("a newer build", () => {
     const list = screen
       .getByRole("heading", { name: say(CARTS_FROM_DEVICE) })
       .closest("section") as HTMLElement;
-    within(list).getByText(MUST_UPGRADE);
+    // In the banner's caution style, to stand out without reading as a
+    // failure, and not read out: every entry is there as the page loads
+    // (Ali, 2026-11-16, inventory-tng-odn).
+    const note = within(list).getByText(MUST_UPGRADE);
+    expect(note.classList).toContain("border-caution");
+    expect(within(list).queryByRole("alert")).toBeNull();
     expect(screen.queryByRole("button", { name: say(DISMISS) })).toBeNull();
     fireEvent.click(reloadButton() as HTMLElement);
     expect(reload).toHaveBeenCalledOnce();
+  });
+
+  test("a save on its way is said in plain small text", async () => {
+    const answer = deferred();
+    open(server(() => answer.promise).api);
+    await ready();
+    fillMove();
+    save();
+    const list = screen
+      .getByRole("heading", { name: say(CARTS_FROM_DEVICE) })
+      .closest("section") as HTMLElement;
+    const note = within(list).getByText(say(SENDING));
+    expect(note.tagName).toBe("SMALL");
+    expect(note.className).toBe("");
   });
 
   test("too old, a newer build's save waiting here is not counted, as that build sends it", async () => {
