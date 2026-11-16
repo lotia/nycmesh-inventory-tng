@@ -19,19 +19,18 @@ pytestmark = pytest.mark.clone
 # /code). The escaped dot keeps this file from holding what it looks for.
 LINK = re.compile(r"claude\.ai/(?:code/)?artifact/")
 
-# A decision cited by a choice's letter, or by a question's code. A capital
-# letter after "option" is a choice; a small one only where punctuation
-# ends it, as a word goes on ("an option a person sees"). A letter in
-# brackets is a choice only after "choice", "option" or "answer", so a
-# copyright sign or a list item is left. A question's code ends in its
-# choice's letter or a closing bracket, and starts no word, path or hash,
-# so a quarter, a test id or base64 is left. The examples below show each.
+# A decision cited by a choice's letter, or by a question's code. After
+# "choice", "option" or "answer", even wrapped onto the next line, a capital
+# letter or one in brackets is a choice; a small one only where punctuation
+# ends it, as a word goes on ("an option a person sees"). So a copyright
+# sign or a list item is left. A question's code ends in its choice's
+# letter or a closing bracket, and starts no word, path or hash, so a test
+# id, base64 or a quarter's year is left, but not a quarter in brackets.
+# The examples below show each.
 CITATION = re.compile(
-    r"\b[Oo]ption [A-H]\b"
-    r"|\b[Oo]ption [a-h](?=[),.;:]|$)"
-    r"|\b(?:[Cc]hoice|[Oo]ption|[Aa]nswer)s? \([a-hA-H]\)"
-    r"|(?<![\w/+=])Q\d{1,2}(?:[- ][A-H]\b|\))",
-    re.MULTILINE,
+    r"\b(?:[Cc]hoice|[Oo]ption|[Aa]nswer)s?\s+"
+    r"(?:[A-H]\b|[a-h](?=[),.;:'?!])|\([a-hA-H]\))"
+    r"|(?<![\w/+=])Q\d{1,2}(?:[- ][A-H]\b|\))"
 )
 
 
@@ -84,6 +83,11 @@ def test_each_form_of_link_is_found(text: str) -> None:
         "(Ali, 2026-11-15, Q15" + ").",
         "an alias (Q18" + ").",
         "Q10" + " C: what search keeps",
+        "as Ali chose, option" + "\nD, on 2026-11-15",
+        "Ali took options" + " A and B",
+        "choice" + " B (Ali, 2026-11-15)",
+        "as option" + " a's mockups do",
+        "was it option" + " b?",
     ],
 )
 def test_each_lettered_citation_is_found(text: str) -> None:
@@ -94,6 +98,7 @@ def test_each_lettered_citation_is_found(text: str) -> None:
     "text",
     [
         "an option a person sees",
+        "an option a\nperson sees",
         "options are listed",
         "the --option flag",
         "Copyright (c) 2026",
