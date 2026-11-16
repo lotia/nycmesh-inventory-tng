@@ -529,6 +529,15 @@ ft` and `100 feet` still find it. A product's number is never the first
 of such a group, so `Cat 6 305 m` is `Cat 6 305m`, and after a number and
 a space only commas group, so `Cat 6 1,000 ft` is `Cat 6 1000ft`.
 
+Ali decided on 2026-11-15 (inventory-tng-4i1) that, to search, a comma
+right after a lone nought is a decimal point, so `0,500 m` is `0.500 m`
+and `0,5 m` `0.5 m`, where it had been read as `500 m`. Every other comma
+between digits still groups thousands: `10,500 m` is `10500 m`, and
+`0,500,000 m` is left as typed. A lone nought starts a decimal in every
+convention, so reading names by locale later need not change this. Names
+are not affected: they are shown as typed. Units version 5; migration
+0048 folded every row again.
+
 ## Amendment: names are shown with each number and unit spaced (2026-11-15)
 
 Ali decided on 2026-11-15 (inventory-tng-ist.3) that a name stays saved

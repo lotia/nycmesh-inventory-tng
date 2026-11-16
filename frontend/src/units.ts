@@ -242,7 +242,10 @@ function settled(
 // last digit, as search keeps it, before a unit it reads, without them
 // (units._GROUPED).
 const GROUPED =
-  /(?<![\p{L}\p{N}])(?:(?<![0-9][.,])[0-9]{1,3}(?:,[0-9]{3})+|(?<![0-9][., ])[0-9]{1,3}(?: [0-9]{3})+)(?:[.][0-9]+)?$/u;
+  /(?<![\p{L}\p{N}])(?:(?<![0-9][.,])(?!0,)[0-9]{1,3}(?:,[0-9]{3})+|(?<![0-9][., ])[0-9]{1,3}(?: [0-9]{3})+)(?:[.][0-9]+)?$/u;
+// A lone nought, then a comma and digits, ending at its last digit: the
+// comma is a decimal point to search (units._NOUGHT).
+const NOUGHT = /(?<![\p{L}\p{N}])(?<![0-9][.,])0,[0-9]+$/u;
 
 /** Where respell changes a text, and what to (units.Edit). */
 type Edit = [start: number, end: number, spelling: string];
@@ -260,9 +263,11 @@ function edits(text: string, rules: Rules | undefined): Edit[] {
     // `Cat 6 305 m`: a product's number, then another, not thousands.
     if (grouped && product(text, grouped.index)) grouped = null;
     // It ends at the digit the match starts with, so it is found.
-    const number = grouped
+    let number = grouped
       ? grouped[0].replaceAll(/[, ]/g, "")
       : (NUMBER.exec(before) as RegExpExecArray)[0];
+    const nought = NOUGHT.exec(before);
+    if (nought) [grouped, number] = [nought, nought[0].replace(",", ".")];
     const reading = settled(text, number, token, rules);
     // Null: no unit by its rule.
     const spelt = reading === undefined ? read(token) : reading;

@@ -210,6 +210,15 @@ def test_search_reads_vdc_and_thousands_but_never_in_a_name() -> None:
     )
 
 
+def test_search_reads_a_comma_after_a_lone_nought_as_a_decimal_point() -> None:
+    """Ali, 2026-11-15 (inventory-tng-4i1): `0,500 m` is `0.500 m` to
+    search, every other comma between digits groups thousands, and a name
+    is read and shown as typed."""
+    assert fold("0,500 m 0,5 m 10,500 m") == fold("0.500 m 0.5 m 10500 m")
+    assert units.read_as("Cable 0,500 m") == "Cable 0,500m"
+    assert units.shown_name("Cable 0,500 m") == "Cable 0,500\N{NO-BREAK SPACE}m"
+
+
 def test_numbers_spaced_as_thousands_are_one_but_each_still_found() -> None:
     """docs/decisions/0021, accepted misreading: `2 100 ft` is searched as
     `2100ft` too, kept as typed beside it, so `100 ft` and `100 feet` still
@@ -329,6 +338,9 @@ def test_a_search_finds_thousands_and_vdc_however_written(
         ("Spool 1000 FT", ("1,000 ft", "1 000 ft", "1\N{THIN SPACE}000 ft")),
         ("Box 1,000 ft", ("1000 ft", "1 000 feet")),
         ("PSU 48 VDC", ("48V", "48 volts")),
+        # Ali, 2026-11-15 (inventory-tng-4i1).
+        ("Cable 0.500 m", ("0,500 m", "0,500m")),
+        ("Cable 0,5 m", ("0.5 m",)),
     ):
         item = add(session, Item(name=f"{name} {tag()}", category_id=parts.id))
         assert item.name.startswith(name)

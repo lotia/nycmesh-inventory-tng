@@ -183,6 +183,54 @@
       "typed": "0.5 a"
     },
     {
+      "text": "0.500 m",
+      "respelt": "0.500m",
+      "searched": "0.500m",
+      "typed": "0.500 m"
+    },
+    {
+      "text": "0,500 m",
+      "respelt": "0.500m",
+      "searched": "0.500m",
+      "typed": "0,500 m"
+    },
+    {
+      "text": "0,5 m",
+      "respelt": "0.5m",
+      "searched": "0.5m",
+      "typed": "0,5 m"
+    },
+    {
+      "text": "0,50 m",
+      "respelt": "0.50m",
+      "searched": "0.50m",
+      "typed": "0,50 m"
+    },
+    {
+      "text": "-0,5 V",
+      "respelt": "-0.5V",
+      "searched": "-0.5v",
+      "typed": "-0,5 v"
+    },
+    {
+      "text": "10,500 m",
+      "respelt": "10500m",
+      "searched": "10500m",
+      "typed": "10,500 m"
+    },
+    {
+      "text": "1,0,5 m",
+      "respelt": "1,0,5m",
+      "searched": "1,0,5m",
+      "typed": "1,0,5 m"
+    },
+    {
+      "text": "0,500,000 m",
+      "respelt": "0,500,000m",
+      "searched": "0,500,000m",
+      "typed": "0,500,000 m"
+    },
+    {
       "text": "30 mW",
       "respelt": "30mW",
       "searched": "30mw",
@@ -829,6 +877,10 @@
     {
       "text": "Cat 6 1,000 ft",
       "groups": [["Cat", "Cat"], ["6", "6"], ["1,000 ft", "1000ft"]]
+    },
+    {
+      "text": "Cable 0,500 m",
+      "groups": [["Cable", "Cable"], ["0,500 m", "0.500m"]]
     },
     {
       "text": "PoE\ufeff48 V\u001c100 ft\u0085SFP",

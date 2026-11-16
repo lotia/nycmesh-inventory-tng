@@ -47,8 +47,9 @@ from inventory_tng.local_env import CLONE
 # the words near them, the profile and products (Ali, 2026-11-15,
 # inventory-tng-c0c.3). 4: search reads VDC and VAC as volts, and a
 # number before a unit without its thousands separators (Ali, 2026-11-15,
-# inventory-tng-ist.1).
-VERSION = 4
+# inventory-tng-ist.1). 5: search reads a comma after a lone nought as a
+# decimal point, `0,500 m` as `0.500 m` (Ali, 2026-11-15, inventory-tng-4i1).
+VERSION = 5
 
 # The most groups (groups) a search is matched by, each alone; one with more
 # is matched whole only (Ali, 2026-11-15, inventory-tng-ist.1).
@@ -422,13 +423,19 @@ def _marked(text: str, *at: int) -> bool:
 # A number grouped in thousands by commas or by spaces, a thin one
 # decomposed being one, ending at its last digit: `1,000`, `1 000`, not
 # starting within another so grouped (`345 678` in `12 345 678`), and by
-# commas after a number and a space (`6 1,000`). Search keeps it, before a
-# unit it reads, without them (Ali, 2026-11-15, inventory-tng-ist.1):
-# frontend/src/units.ts's, character for character.
+# commas after a number and a space (`6 1,000`), nor by commas after a lone
+# nought (_NOUGHT). Search keeps it, before a unit it reads, without them
+# (Ali, 2026-11-15, inventory-tng-ist.1): frontend/src/units.ts's,
+# character for character.
 _GROUPED = re.compile(
-    r"(?<![^\W_])(?:(?<![0-9][.,])[0-9]{1,3}(?:,[0-9]{3})+"
+    r"(?<![^\W_])(?:(?<![0-9][.,])(?!0,)[0-9]{1,3}(?:,[0-9]{3})+"
     r"|(?<![0-9][., ])[0-9]{1,3}(?: [0-9]{3})+)(?:[.][0-9]+)?\Z"
 )
+# A lone nought, then a comma and digits, ending at its last digit: the
+# comma is a decimal point, so search keeps `0,500` as `0.500` (Ali,
+# 2026-11-15, inventory-tng-4i1): frontend/src/units.ts's, character for
+# character.
+_NOUGHT = re.compile(r"(?<![^\W_])(?<![0-9][.,])0,[0-9]+\Z")
 
 # Where respell changes a text, and what to: a start, an end and the spelling.
 type Edit = tuple[int, int, str]
@@ -447,6 +454,8 @@ def _edits(text: str, rules: Rules | None) -> list[Edit]:
             # `Cat 6 305 m`: a product's number, then another, not thousands.
             grouped = None
         number = re.sub("[, ]", "", grouped[0]) if grouped else None
+        if nought := _NOUGHT.search(text, 0, match.end(1)):
+            grouped, number = nought, nought[0].replace(",", ".")
         found = _found(text, match, rules, number)
         if found is not None and (found.read or found.rule):
             # Read, or no unit by its rule.
@@ -481,7 +490,7 @@ def _applied(text: str, edits: list[Edit], start: int = 0, end: int = -1) -> str
 def respell(text: str, rules: Rules | None = None) -> str:
     """`text` with each unit read right after a number spelt by its symbol
     (str(Reading)), joined to the number, the number without thousands
-    separators, as the forms read it (_found: its reading rule in `rules`,
+    separators and a comma after a lone nought a point, as the forms read it (_found: its reading rule in `rules`,
     the words near it, the profile), else as the table reads it, case
     first, and each unit alone spelt with a sign no word is (not ASCII) by
     its symbol; a product's name (PRODUCTS) as it is. `text` is decomposed
