@@ -71,14 +71,14 @@ def ngettext(singular: str, plural: str, num: int, **values: object) -> str:
     return _active.ngettext(singular, plural, num) % ({"num": num} | values)
 
 
-def lazy_gettext(message: str, **values: object) -> LazyProxy:
+def lazy_gettext(message: str) -> LazyProxy:
     """`message`, said in the locale active when it is shown, not when named."""
-    return LazyProxy(gettext, message, enable_cache=False, **values)
+    return LazyProxy(gettext, message, enable_cache=False)
 
 
-def lazy_pgettext(context: str, message: str, **values: object) -> LazyProxy:
+def lazy_pgettext(context: str, message: str) -> LazyProxy:
     """`message`, as `context` means it, said when shown."""
-    return LazyProxy(pgettext, context, message, enable_cache=False, **values)
+    return LazyProxy(pgettext, context, message, enable_cache=False)
 
 
 def install(environment: Environment) -> None:

@@ -3,14 +3,12 @@ docs/decisions/0022), in Python and in the templates."""
 
 import re
 from collections.abc import Callable
-from io import BytesIO
 from types import SimpleNamespace
 
 import pytest
-from babel.messages.pofile import read_po
+from babel.messages.catalog import Catalog, Message
 from babel.support import Translations
 
-from inventory_tng import phrases
 from inventory_tng.pages import retired_holding, templates
 from inventory_tng.phrases import (
     ENGLISH_PO,
@@ -47,16 +45,19 @@ def lone_per_cents(message: str) -> list[str]:
     return re.findall("%", PLACEHOLDER.sub("", message))
 
 
+def forms(message: Message) -> tuple[str, ...]:
+    """A message's English: one form, or a plural's forms."""
+    return (message.id,) if isinstance(message.id, str) else tuple(message.id)
+
+
 def pseudo_locale() -> Translations:
     """The English catalogue with every message accented, built by Babel."""
     catalogue = read(ENGLISH_PO)
     for message in catalogue:
         if not message.id:  # The header.
             continue
-        if isinstance(message.id, str):
-            message.string = accented(message.id)
-        else:
-            message.string = tuple(accented(form) for form in message.id)
+        said = tuple(accented(form) for form in forms(message))
+        message.string = said[0] if isinstance(message.id, str) else said
     return compiled(catalogue)
 
 
@@ -102,11 +103,11 @@ def test_values_fill_their_placeholders_and_a_double_per_cent_is_one() -> None:
     assert gettext("Half: 50%%") == "Half: 50%"
     assert ngettext("%(num)d box", "%(num)d boxes", 2) == "2 boxes"
     assert ngettext("%(num)d %(what)s", "%(num)d %(what)ss", 1, what="box") == "1 box"
-    assert str(lazy_gettext("To %(place)s", place="Shelf")) == "To Shelf"
+    assert str(lazy_gettext("Half: 50%%")) == "Half: 50%"
 
 
 def test_a_context_tells_two_meanings_of_the_same_english_apart() -> None:
-    catalogue = read_po(BytesIO(b'msgid ""\nmsgstr ""\n'))
+    catalogue = Catalog()
     catalogue.add("To", "Into", context="place")
     catalogue.add("To", "Recipient", context="mail")
     with speaking(compiled(catalogue)):
@@ -125,7 +126,6 @@ def test_a_templates_values_are_escaped_and_its_lines_read_as_one() -> None:
 def test_speaking_ends_with_its_block_even_on_an_error() -> None:
     with pytest.raises(ValueError, match="stop"), speaking(PSEUDO):
         raise ValueError("stop")
-    assert phrases.gettext("Your account is reset: sign in.") == str(RESET_NOTICE)
     assert str(RESET_NOTICE) == "Your account is reset: sign in."
 
 
@@ -137,11 +137,6 @@ def test_a_lone_per_cent_is_found() -> None:
 def test_no_message_has_a_lone_per_cent() -> None:
     # Every message is %-formatted when said, so a lone % would fail the page.
     catalogue = read(ENGLISH_PO)
-    forms = [
-        form
-        for message in catalogue
-        if message.id
-        for form in ((message.id,) if isinstance(message.id, str) else message.id)
-    ]
-    assert forms
-    assert [form for form in forms if lone_per_cents(form)] == []
+    said = [form for message in catalogue if message.id for form in forms(message)]
+    assert said
+    assert [form for form in said if lone_per_cents(form)] == []

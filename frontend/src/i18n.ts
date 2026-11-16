@@ -9,14 +9,11 @@ import { i18n, type MessageDescriptor } from "@lingui/core";
 import { signal } from "@preact/signals";
 import { messages } from "./locales/en.po";
 
-/** The active locale, as a signal. */
-export const locale = signal("");
 /** Counts each change of locale or catalogue: a component that says
  * anything reads it, through `say`, so it renders again on each. */
 const changes = signal(0);
 
 i18n.on("change", () => {
-  locale.value = i18n.locale;
   changes.value++;
 });
 

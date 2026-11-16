@@ -1,6 +1,7 @@
+import { i18n } from "@lingui/core";
 import { render, screen } from "@testing-library/preact";
 import { afterEach, expect, test } from "vitest";
-import { locale, say, speak } from "./i18n";
+import { say, speak } from "./i18n";
 import { messages as english } from "./locales/en.po";
 import { messages as pseudo } from "./locales/pseudo.po";
 import { BATCHES_WAITING, REGISTERED } from "./RegisterPage";
@@ -8,7 +9,7 @@ import { BATCHES_WAITING, REGISTERED } from "./RegisterPage";
 afterEach(() => speak("en", english));
 
 test("the page speaks English, from its catalogue", () => {
-  expect(locale.value).toBe("en");
+  expect(i18n.locale).toBe("en");
   expect(say(REGISTERED)).toBe("This browser is registered.");
 });
 
