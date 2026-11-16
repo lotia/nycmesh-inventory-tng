@@ -819,6 +819,61 @@ def test_names_shown_are_filled_by_the_rules_there_are(
     )
 
 
+def test_a_comma_after_a_lone_nought_is_read_again(alembic_config: Config) -> None:
+    """Migration 0048: every row folded again, and each unit key and name
+    as shown read again, as search and the forms now read a comma after a
+    lone nought as a decimal point (Ali, 2026-11-15, inventory-tng-4i1);
+    names kept as typed; names that would then be one named by id first."""
+    command.downgrade(alembic_config, "0047")
+    connection = alembic_config.attributes["connection"]
+    category_id = connection.scalar(
+        text("INSERT INTO category (name) VALUES ('Parts') RETURNING id")
+    )
+
+    def row(table: str, name: str, **values: object) -> int:
+        values = {
+            "name": name,
+            "name_key": name_key(name),
+            "unit_key": "kept",
+            "name_shown": "kept",
+            **values,
+        }
+        if table != "item_alias":
+            values |= {"search_text": "kept", "folded_with": "kept"}
+        return _insert(connection, table, **values)
+
+    # 0,5 GOhm a plausible resistance, 500 GOhm not.
+    name = "Resistor 0,5 GOHMS"
+    resistor = row("item", name, category_id=category_id, name_folded="kept")
+    row("item_alias", "Scale 0,500 T", item_id=resistor, name_folded="kept")
+    row("item_package", "Reel 0,5 KM", item_id=resistor, size=1)
+    command.upgrade(alembic_config, "0048")
+    assert connection.execute(
+        text(
+            "SELECT name, search_text, name_folded, folded_with, unit_key,"
+            " name_shown FROM item"
+        )
+    ).one() == (
+        name,
+        f"{name} Resistor 0.5GOhm    Scale 0,500 T Scale 0.500t",
+        "Resistor 0.5GOhm",
+        FOLDED_WITH,
+        "resistor05gohm",
+        "Resistor 0,5\u00a0GOHMS",
+    )
+    assert connection.execute(
+        text("SELECT name, name_folded, unit_key, name_shown FROM item_alias")
+    ).one() == ("Scale 0,500 T", "Scale 0.500t", "scale0500t", "Scale 0,500\u00a0T")
+    assert connection.execute(
+        text("SELECT search_text, unit_key, name_shown FROM item_package")
+    ).one() == ("Reel 0,5 KM Reel 0.5km", "reel05km", "Reel 0,5\u00a0KM")
+    command.downgrade(alembic_config, "0047")
+    other = row("item", "Resistor 0,5 GOhm", category_id=category_id, name_folded="")
+    with pytest.raises(RuntimeError) as refused:
+        command.upgrade(alembic_config, "0048")
+    assert f"by id: item {resistor}, {other}." in str(refused.value)
+
+
 def test_unit_keys_are_read_again_as_the_forms_read(alembic_config: Config) -> None:
     """Migration 0043: every unit key read again, by the rules there are;
     names that would then be one named by id first, nothing changed."""

@@ -219,6 +219,23 @@ def test_search_reads_a_comma_after_a_lone_nought_as_a_decimal_point() -> None:
     assert units.shown_name("Cable 0,500 m") == "Cable 0,500\N{NO-BREAK SPACE}m"
 
 
+@pytest.mark.parametrize(
+    "typed", ["Scale 0,500 Mg", "Resistor 0,5 MOHM", "Probe -0,001 mK"]
+)
+def test_a_form_reads_a_comma_after_a_lone_nought_as_search_does(typed: str) -> None:
+    """Ali, 2026-11-15 (inventory-tng-4i1): a form judges `0,500 Mg` as
+    `0.500 Mg`, as search reads it, not as 500, and keeps it as typed."""
+    (comma,) = units.found_in(typed)
+    (point,) = units.found_in(typed.replace(",", "."))
+    assert (comma.read, comma.plausible, comma.asks) == (
+        point.read,
+        point.plausible,
+        point.asks,
+    )
+    assert comma.number == point.number.replace(".", ",")
+    assert units.respell(typed) == units.respell(typed.replace(",", "."))
+
+
 def test_numbers_spaced_as_thousands_are_one_but_each_still_found() -> None:
     """docs/decisions/0021, accepted misreading: `2 100 ft` is searched as
     `2100ft` too, kept as typed beside it, so `100 ft` and `100 feet` still

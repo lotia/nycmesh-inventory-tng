@@ -213,6 +213,12 @@
       "typed": "-0,5 v"
     },
     {
+      "text": "-0,001 mK",
+      "respelt": "-0.001mK",
+      "searched": "-0.001mk",
+      "typed": "-0,001 mk"
+    },
+    {
       "text": "10,500 m",
       "respelt": "10500m",
       "searched": "10500m",

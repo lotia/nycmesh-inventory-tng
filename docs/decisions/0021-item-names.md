@@ -535,8 +535,10 @@ and `0,5 m` `0.5 m`, where it had been read as `500 m`. Every other comma
 between digits still groups thousands: `10,500 m` is `10500 m`, and
 `0,500,000 m` is left as typed. A lone nought starts a decimal in every
 convention, so reading names by locale later need not change this. Names
-are not affected: they are shown as typed. Units version 5; migration
-0048 folded every row again.
+are not affected: they are shown as typed. The forms judge which unit
+such a number has by the same reading, so `0,500 Mg` is megagrams to
+both, not milligrams to the form. Units version 5; migration 0048 folded
+every row again and read each unit key and name as shown again.
 
 ## Amendment: names are shown with each number and unit spaced (2026-11-15)
 

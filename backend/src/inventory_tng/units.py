@@ -431,11 +431,11 @@ _GROUPED = re.compile(
     r"(?<![^\W_])(?:(?<![0-9][.,])(?!0,)[0-9]{1,3}(?:,[0-9]{3})+"
     r"|(?<![0-9][., ])[0-9]{1,3}(?: [0-9]{3})+)(?:[.][0-9]+)?\Z"
 )
-# A lone nought, then a comma and digits, ending at its last digit: the
-# comma is a decimal point, so search keeps `0,500` as `0.500` (Ali,
-# 2026-11-15, inventory-tng-4i1): frontend/src/units.ts's, character for
-# character.
-_NOUGHT = re.compile(r"(?<![^\W_])(?<![0-9][.,])0,[0-9]+\Z")
+# A lone nought, then a comma and digits, ending at its last digit, with
+# its minus as _NUMBER's: the comma is a decimal point, so search keeps
+# `0,500` as `0.500` and a form judges it so (Ali, 2026-11-15,
+# inventory-tng-4i1): frontend/src/units.ts's, character for character.
+_NOUGHT = re.compile(r"(?:(?<![^\W_])[-\u2212])?(?<![^\W_])(?<![0-9][.,])0,[0-9]+\Z")
 
 # Where respell changes a text, and what to: a start, an end and the spelling.
 type Edit = tuple[int, int, str]
@@ -449,13 +449,14 @@ def _edits(text: str, rules: Rules | None) -> list[Edit]:
     for match in AFTER_A_NUMBER.finditer(text):
         if _marked(text, match.end()) or _product(text, match.end(1) - 1):
             continue
-        grouped = _GROUPED.search(text, 0, match.end(1))
-        if grouped and _product(text, grouped.start()):
-            # `Cat 6 305 m`: a product's number, then another, not thousands.
-            grouped = None
-        number = re.sub("[, ]", "", grouped[0]) if grouped else None
-        if nought := _NOUGHT.search(text, 0, match.end(1)):
-            grouped, number = nought, nought[0].replace(",", ".")
+        if grouped := _NOUGHT.search(text, 0, match.end(1)):
+            number = grouped[0].replace(",", ".")
+        else:
+            grouped = _GROUPED.search(text, 0, match.end(1))
+            if grouped and _product(text, grouped.start()):
+                # `Cat 6 305 m`: a product's number, then another, not thousands.
+                grouped = None
+            number = re.sub("[, ]", "", grouped[0]) if grouped else None
         found = _found(text, match, rules, number)
         if found is not None and (found.read or found.rule):
             # Read, or no unit by its rule.
@@ -490,12 +491,13 @@ def _applied(text: str, edits: list[Edit], start: int = 0, end: int = -1) -> str
 def respell(text: str, rules: Rules | None = None) -> str:
     """`text` with each unit read right after a number spelt by its symbol
     (str(Reading)), joined to the number, the number without thousands
-    separators and a comma after a lone nought a point, as the forms read it (_found: its reading rule in `rules`,
-    the words near it, the profile), else as the table reads it, case
-    first, and each unit alone spelt with a sign no word is (not ASCII) by
-    its symbol; a product's name (PRODUCTS) as it is. `text` is decomposed
-    (NFKD), as both the server and the scan page fold it, so `℃` is `°C`,
-    `µ` `μ` and a thin space a space."""
+    separators and a comma after a lone nought a point, as the forms read
+    it (_found: its reading rule in `rules`, the words near it, the
+    profile), else as the table reads it, case first, and each unit alone
+    spelt with a sign no word is (not ASCII) by its symbol; a product's
+    name (PRODUCTS) as it is. `text` is decomposed (NFKD), as both the
+    server and the scan page fold it, so `℃` is `°C`, `µ` `μ` and a thin
+    space a space."""
     return _applied(text, _edits(text, rules))
 
 
@@ -793,7 +795,9 @@ def _found(
     every = readings(token)
     if rule is None and not every:
         return None
-    value = float(number.replace(",", "").replace("\u2212", "-"))
+    # A comma after a lone nought is a decimal point (_NOUGHT), else groups.
+    point = "." if _NOUGHT.search(text, 0, match.end(1)) else ""
+    value = float(number.replace(",", point).replace("\u2212", "-"))
     plausible = [(r, exact) for r, exact in every if r.plausible(value)]
     readable = tuple(r for r, _ in plausible)
     words: tuple[str, ...] = ()

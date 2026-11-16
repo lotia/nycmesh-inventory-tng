@@ -1,11 +1,15 @@
-"""search reads a decimal comma after a nought: what is searched folded
-again (inventory-tng-4i1, Ali, 2026-11-15)
+"""search and the forms read a decimal comma after a nought: what is
+searched folded again, unit keys and names shown read again
+(inventory-tng-4i1, Ali, 2026-11-15)
 
-Search now reads a comma right after a lone nought as a decimal point, so
-`0,500 m` is `0.500 m`; every other comma between digits still groups
-thousands (units version 5, docs/decisions/0021). Search only: no name is
-respelt or shown otherwise. So every row is folded again, as 0046 did and
-as the app folds it.
+Search and the forms now read a comma right after a lone nought as a
+decimal point, so `0,500 m` is `0.500 m`; every other comma between digits
+still groups thousands (units version 5, docs/decisions/0021). No name is
+respelt. So every row is folded again, as 0046 did and as the app folds
+it; and as a form now judges which unit `0,5 GOhms` has by 0.5, not 5, each
+item's, package's and alias's unit_key read again, naming by id first any
+names that would then be one, as 0043 does, and its name_shown, as 0047
+filled it.
 
 Revision ID: 0048
 Revises: 0047
@@ -18,7 +22,7 @@ import sqlalchemy as sa
 from alembic import op
 
 from inventory_tng import units
-from inventory_tng.models import FOLDED_WITH, fold, held
+from inventory_tng.models import FOLDED_WITH, fold, held, unit_key
 
 revision: str = "0048"
 down_revision: str | Sequence[str] | None = "0047"
@@ -46,6 +50,17 @@ def upgrade() -> None:
             sa.text("SELECT token, reading, respell FROM reading_rule")
         )
     }
+    _rekey(rules)
+    for table in ("item", "item_package", "item_alias"):
+        shown = [
+            {"id": row.id, "name_shown": units.shown_name(row.name, rules)}
+            for row in bind.execute(sa.text(f"SELECT id, name FROM {table}"))
+        ]
+        if shown:
+            bind.execute(
+                sa.text(f"UPDATE {table} SET name_shown = :name_shown WHERE id = :id"),
+                shown,
+            )
     aliases: dict[int, list[str]] = {}
     folded_aliases = []
     for alias_id, item_id, name, current in bind.execute(
@@ -88,6 +103,51 @@ def upgrade() -> None:
             )
 
 
+def _rekey(rules: units.Rules) -> None:
+    """Each item's, package's and alias's unit_key as the app now reads it,
+    unless names would then be one: RuntimeError naming them by id (0043's)."""
+    bind = op.get_bind()
+    for table in ("item", "item_package", "item_alias"):
+        scope = "item_id" if table == "item_package" else "NULL"
+        current = "retired_at IS NULL" if table == "item_alias" else "true"
+        rows = bind.execute(
+            sa.text(f"SELECT id, name, {scope}, {current} FROM {table} ORDER BY id")
+        ).all()
+        keyed = [{"id": i, "unit_key": unit_key(name, rules)} for i, name, _, _ in rows]
+        # Of an item's packages, or current aliases, or items.
+        groups: dict[tuple[object, str], list[int]] = {}
+        for (row_id, _, scoped, counted), key in zip(rows, keyed, strict=True):
+            if counted:
+                groups.setdefault((scoped, str(key["unit_key"])), []).append(row_id)
+        clashing = [ids for ids in groups.values() if len(ids) > 1]
+        if clashing:
+            said = "; ".join(f"{table} {', '.join(map(str, ids))}" for ids in clashing)
+            raise RuntimeError(
+                "Names differing only in how their units are spelt would be one"
+                f" name, by id: {said}. Rename all but one in each, then migrate"
+                " again."
+            )
+        if keyed:
+            # Each row's key set apart first, as two may swap keys.
+            bind.execute(sa.text(f"UPDATE {table} SET unit_key = '#' || id"))
+            bind.execute(
+                sa.text(f"UPDATE {table} SET unit_key = :unit_key WHERE id = :id"),
+                keyed,
+            )
+    clashing = bind.execute(
+        sa.text(
+            "SELECT a.id, i.id FROM item_alias a JOIN item i"
+            " ON a.unit_key = i.unit_key WHERE a.retired_at IS NULL ORDER BY a.id, i.id"
+        )
+    ).all()
+    if clashing:
+        said = "; ".join(f"item_alias {a} and item {i}" for a, i in clashing)
+        raise RuntimeError(
+            "Names differing only in how their units are spelt would be one"
+            f" name, by id: {said}. Rename all but one in each, then migrate again."
+        )
+
+
 def downgrade() -> None:
-    # Folded as the app now folds, and saying so: left as they are.
+    # Folded, keyed and shown as the app now reads them: left as they are.
     pass

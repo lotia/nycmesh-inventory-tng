@@ -243,9 +243,11 @@ function settled(
 // (units._GROUPED).
 const GROUPED =
   /(?<![\p{L}\p{N}])(?:(?<![0-9][.,])(?!0,)[0-9]{1,3}(?:,[0-9]{3})+|(?<![0-9][., ])[0-9]{1,3}(?: [0-9]{3})+)(?:[.][0-9]+)?$/u;
-// A lone nought, then a comma and digits, ending at its last digit: the
-// comma is a decimal point to search (units._NOUGHT).
-const NOUGHT = /(?<![\p{L}\p{N}])(?<![0-9][.,])0,[0-9]+$/u;
+// A lone nought, then a comma and digits, ending at its last digit, with
+// its minus as NUMBER's: the comma is a decimal point to search
+// (units._NOUGHT).
+const NOUGHT =
+  /(?:(?<![\p{L}\p{N}])[-−])?(?<![\p{L}\p{N}])(?<![0-9][.,])0,[0-9]+$/u;
 
 /** Where respell changes a text, and what to (units.Edit). */
 type Edit = [start: number, end: number, spelling: string];
@@ -259,15 +261,16 @@ function edits(text: string, rules: Rules | undefined): Edit[] {
     const end = at + whole.length;
     if (marked(text, end) || product(text, at)) continue;
     const before = text.slice(0, at + 1);
-    let grouped = GROUPED.exec(before);
-    // `Cat 6 305 m`: a product's number, then another, not thousands.
-    if (grouped && product(text, grouped.index)) grouped = null;
-    // It ends at the digit the match starts with, so it is found.
-    let number = grouped
-      ? grouped[0].replaceAll(/[, ]/g, "")
-      : (NUMBER.exec(before) as RegExpExecArray)[0];
     const nought = NOUGHT.exec(before);
-    if (nought) [grouped, number] = [nought, nought[0].replace(",", ".")];
+    let grouped = nought ?? GROUPED.exec(before);
+    // `Cat 6 305 m`: a product's number, then another, not thousands.
+    if (!nought && grouped && product(text, grouped.index)) grouped = null;
+    // It ends at the digit the match starts with, so it is found.
+    const number = nought
+      ? nought[0].replace(",", ".")
+      : grouped
+        ? grouped[0].replaceAll(/[, ]/g, "")
+        : (NUMBER.exec(before) as RegExpExecArray)[0];
     const reading = settled(text, number, token, rules);
     // Null: no unit by its rule.
     const spelt = reading === undefined ? read(token) : reading;
