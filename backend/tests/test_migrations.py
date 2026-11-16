@@ -822,8 +822,9 @@ def test_names_shown_are_filled_by_the_rules_there_are(
 def test_a_comma_after_a_lone_nought_is_read_again(alembic_config: Config) -> None:
     """Migration 0048: every row folded again, and each unit key and name
     as shown read again, as search and the forms now read a comma after a
-    lone nought as a decimal point (Ali, 2026-11-15, inventory-tng-4i1);
-    names kept as typed; names that would then be one named by id first."""
+    lone nought as a decimal point (Ali, 2026-11-15, inventory-tng-4i1),
+    and a unit's word is shown as a symbol is (inventory-tng-tze); names
+    kept as typed; names that would then be one named by id first."""
     command.downgrade(alembic_config, "0047")
     connection = alembic_config.attributes["connection"]
     category_id = connection.scalar(
@@ -847,6 +848,8 @@ def test_a_comma_after_a_lone_nought_is_read_again(alembic_config: Config) -> No
     resistor = row("item", name, category_id=category_id, name_folded="kept")
     row("item_alias", "Scale 0,500 T", item_id=resistor, name_folded="kept")
     row("item_package", "Reel 0,5 KM", item_id=resistor, size=1)
+    # A unit's word is shown spaced too (inventory-tng-tze).
+    row("item_package", "Spool 10,000 metres", item_id=resistor, size=2, unit_key="")
     command.upgrade(alembic_config, "0048")
     assert connection.execute(
         text(
@@ -865,8 +868,15 @@ def test_a_comma_after_a_lone_nought_is_read_again(alembic_config: Config) -> No
         text("SELECT name, name_folded, unit_key, name_shown FROM item_alias")
     ).one() == ("Scale 0,500 T", "Scale 0.500t", "scale0500t", "Scale 0,500\u00a0T")
     assert connection.execute(
-        text("SELECT search_text, unit_key, name_shown FROM item_package")
-    ).one() == ("Reel 0,5 KM Reel 0.5km", "reel05km", "Reel 0,5\u00a0KM")
+        text("SELECT search_text, unit_key, name_shown FROM item_package ORDER BY id")
+    ).all() == [
+        ("Reel 0,5 KM Reel 0.5km", "reel05km", "Reel 0,5\u00a0KM"),
+        (
+            "Spool 10,000 metres Spool 10000m",
+            "spool10000metres",
+            "Spool 10\u202f000\u00a0metres",
+        ),
+    ]
     command.downgrade(alembic_config, "0047")
     other = row("item", "Resistor 0,5 GOhm", category_id=category_id, name_folded="")
     with pytest.raises(RuntimeError) as refused:

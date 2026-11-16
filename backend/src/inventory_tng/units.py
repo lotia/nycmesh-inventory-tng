@@ -900,29 +900,43 @@ def _shown_number(number: str) -> str:
 # `10GHz/20 MHz`).
 _IN_A_CODE = re.compile(r"[\w/.+-]")
 _INTO_A_CODE = re.compile(r"[/-]")
+# Units' words, in lower case: `feet`, `VDC`.
+_WORDS = frozenset(word.lower() for unit in UNITS for word in unit.words)
 
 
 def shown_name(name: str, rules: Rules | None = None) -> str:
     """`name` as the app shows it, wherever a name is read (Ali, 2026-11-15,
     inventory-tng-ist.3): each number a unit is read right after (found_in:
-    its rule, the words near it, the profile; never a product's) without
-    its thousands separators, grouped from five digits (_shown_number), and
-    a no-break space between it and its unit, spelt as typed: `Cap 10uF
-    50V` is `Cap 10 uF 50 V`, `Box 10,000 ft` `Box 10 000 ft`. The rest, a
-    unit not read or a unit's word (`48 VDC`, `100 feet`) among it, and a
-    number within a word or a code (_IN_A_CODE, _INTO_A_CODE), as typed. `name` is as
-    saved (models.canonical, spell)."""
+    its rule, the words near it, the profile; never a product's), or a
+    unit's word as search reads it (inventory-tng-tze), without its
+    thousands separators, grouped from five digits (_shown_number), and a
+    no-break space between it and its unit, spelt as typed: `Cap 10uF 50V`
+    is `Cap 10 uF 50 V`, `Box 10,000 feet` `Box 10 000 feet`. The rest, a
+    unit not read among it, and a number within a word or a code
+    (_IN_A_CODE, _INTO_A_CODE), as typed. `name` is as saved
+    (models.canonical, spell)."""
+    found = {f.end: f for f in found_in(name, rules)}
     edits = []
-    for found in found_in(name, rules):
-        start = found.start - len(found.number)
+    for match in AFTER_A_NUMBER.finditer(name):
+        number, token = _number(name, match.end(1)), match[2]
+        start = match.end(1) - len(number)
+        if match.end() in found:
+            read = found[match.end()].read is not None
+        else:
+            # A word, never read by a form, read as search reads it (_edits).
+            read = (
+                token.lower() in _WORDS
+                and not _marked(name, match.end())
+                and not _product(name, match.end(1) - 1)
+            )
         if (
-            found.read is None
+            not read
             or _IN_A_CODE.match(name[start - 1 : start])
-            or _INTO_A_CODE.match(name, found.end)
+            or _INTO_A_CODE.match(name, match.end())
         ):
             continue
-        spelt = _shown_number(found.number) + NO_BREAK_SPACE + found.token
-        edits.append((start, found.end, spelt))
+        spelt = _shown_number(number) + NO_BREAK_SPACE + token
+        edits.append((start, match.end(), spelt))
     return _applied(name, edits)
 
 

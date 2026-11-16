@@ -84,10 +84,13 @@ test("a unit after a number is found however it is spelt, on both sides", async 
 test("a search finds what it found before units were read, and by units too", async ({
   page,
 }) => {
-  // Saved as typed: a unit's word never spells a name (Ali, 2026-11-15).
-  const name = await ownCable(page, "PoE 100 feet 48 VDC");
+  // Saved as typed: a unit's word never spells a name (Ali, 2026-11-15),
+  // and is shown spaced as a symbol is (inventory-tng-tze).
+  const words = "PoE 100\u00a0feet 48\u00a0VDC";
+  const name = await ownCable(page, "PoE 100 feet 48 VDC", words);
+  const shown = name.replace("PoE 100 feet 48 VDC", words);
   const find = page.getByLabel(/Find an item/);
-  const found = page.getByRole("button", { name, exact: true });
+  const found = page.getByRole("button", { name: shown, exact: true });
   await page.goto("/scan");
   // A unit typed shorter than the token it begins, as typed.
   await find.fill(name.replace("48 VDC", "48 V"));
@@ -101,7 +104,7 @@ test("a search finds what it found before units were read, and by units too", as
   ]) {
     await page.goto(`/admin/items?q=${encodeURIComponent(typed)}`);
     await expect(
-      page.getByRole("table").getByRole("link", { name, exact: true }),
+      page.getByRole("table").getByRole("link", { name: shown, exact: true }),
     ).toBeVisible();
   }
 });
@@ -109,15 +112,20 @@ test("a search finds what it found before units were read, and by units too", as
 test("a search mixing spellings is matched group by group, on both sides", async ({
   page,
 }) => {
-  const name = await ownCable(page, "Cable 100 feet, PoE 48 VDC");
+  const what = "Cable 100 feet, PoE 48 VDC";
+  const words = "Cable 100\u00a0feet, PoE 48\u00a0VDC";
+  const name = await ownCable(page, what, words);
+  const shown = name.replace(what, words);
   // Neither form whole: each group as typed or respelt (Ali, 2026-11-15).
-  const typed = name.replace("Cable 100 feet, PoE 48 VDC", "100 ft 48 V");
+  const typed = name.replace(what, "100 ft 48 V");
   await page.goto("/scan");
   await page.getByLabel(/Find an item/).fill(typed);
-  await expect(page.getByRole("button", { name, exact: true })).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: shown, exact: true }),
+  ).toBeVisible();
   await page.goto(`/admin/items?q=${encodeURIComponent(typed)}`);
   await expect(
-    page.getByRole("table").getByRole("link", { name, exact: true }),
+    page.getByRole("table").getByRole("link", { name: shown, exact: true }),
   ).toBeVisible();
 });
 

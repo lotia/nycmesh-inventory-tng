@@ -9,7 +9,9 @@ respelt. So every row is folded again, as 0046 did and as the app folds
 it; and as a form now judges which unit `0,5 GOhms` has by 0.5, not 5, each
 item's, package's and alias's unit_key read again, naming by id first any
 names that would then be one, as 0043 does, and its name_shown, as 0047
-filled it.
+filled it. Written before it was pushed, it also shows a unit's word as a
+unit's symbol is, `Box 1,000 feet` as `Box 1000 feet` (inventory-tng-tze,
+Ali, 2026-11-15), as units.shown_name now does.
 
 Revision ID: 0048
 Revises: 0047

@@ -309,7 +309,7 @@ def test_what_was_found_before_units_were_read_still_is(
         item = add(session, Item(name=f"{name} {tag()}", category_id=parts.id))
         for each in typed:
             listed = page_text(admin_client.get(ITEMS, params={"q": each}))
-            assert item.name in listed, each
+            assert item.name_shown in listed, each
 
 
 def test_a_search_mixing_spellings_is_matched_group_by_group(
@@ -552,7 +552,7 @@ NB, THIN = "\u00a0", "\u202f"
     ("name", "shown"),
     [
         # Ali's examples (2026-11-15, inventory-tng-ist.3).
-        ("Cable 100ft 48 VDC", f"Cable 100{NB}ft 48 VDC"),
+        ("Cable 100ft 48 VDC", f"Cable 100{NB}ft 48{NB}VDC"),
         ("Cap 10uF 50V", f"Cap 10{NB}uF 50{NB}V"),
         ("Box 1,000 ft", f"Box 1000{NB}ft"),
         ("10,000 ft", f"10{THIN}000{NB}ft"),
@@ -567,10 +567,17 @@ NB, THIN = "\u00a0", "\u202f"
         # decimal comma, not `0500`.
         ("Reel 0,500 m", f"Reel 0,500{NB}m"),
         ("Reel 00,500 m", f"Reel 00,500{NB}m"),
-        # Products, words of units, units no rule or word settles, and
-        # tokens no unit, as typed.
+        # Units' words likewise, each as typed (Ali, 2026-11-15,
+        # inventory-tng-tze).
+        ("Box 1,000 feet", f"Box 1000{NB}feet"),
+        ("Cable 100feet", f"Cable 100{NB}feet"),
+        ("PoE 48VDC", f"PoE 48{NB}VDC"),
+        ("Spool 10,000 metres", f"Spool 10{THIN}000{NB}metres"),
+        ("Supply -12 Volts", f"Supply -12{NB}Volts"),
+        ("Reel 0,500 metres", f"Reel 0,500{NB}metres"),
+        # Products, units no rule or word settles, and tokens no unit, as
+        # typed.
         ("Cat6a cable 5AC SFP+", "Cat6a cable 5AC SFP+"),
-        ("Cable 100 feet", "Cable 100 feet"),
         ("Box 3M", "Box 3M"),
         ("Bolt 24P", "Bolt 24P"),
         # Spaced already with a no-break space, as typed.
@@ -584,6 +591,8 @@ NB, THIN = "\u00a0", "\u202f"
         # Nor one whose unit runs on into a code or another number.
         ("10G-SFP+ module", "10G-SFP+ module"),
         ("48V-to-12V converter", "48V-to-12V converter"),
+        ("48VDC-to-12VDC converter", "48VDC-to-12VDC converter"),
+        ("ES-8-100feet x2feet", "ES-8-100feet x2feet"),
         ("Radio 10GHz/20 MHz", "Radio 10GHz/20 MHz"),
         ("Box 3ft+", f"Box 3{NB}ft+"),
     ],
@@ -599,7 +608,9 @@ def test_a_name_is_shown_with_each_number_and_unit_spaced(
 
 def test_a_name_is_shown_as_its_rules_read_it() -> None:
     """A unit read by its rule is spaced, one a rule says is no unit not:
-    `3M` near nothing is asked, so as typed, until a rule reads it."""
+    `3M` near nothing is asked, so as typed, until a rule reads it, and a
+    unit's word a rule says is no unit not either."""
+    assert units.shown_name("Box 3 feet", {"feet": units.Rule(None)}) == "Box 3 feet"
     length = units.Rule("m")
     assert units.shown_name("Box 3M", {"M": length}) == f"Box 3{NB}M"
     assert units.shown_name("Cap 10uF", {"uF": units.Rule(None)}) == "Cap 10uF"

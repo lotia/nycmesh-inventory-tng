@@ -42,7 +42,7 @@ def test_items_packages_and_aliases_keep_the_name_typed_beside_it_shown(
     # Renamed, shown anew.
     box.name = f"Cable {mark} 100ft 48 VDC"
     session.flush()
-    assert box.name_shown == f"Cable {mark} 100{NB}ft 48 VDC"
+    assert box.name_shown == f"Cable {mark} 100{NB}ft 48{NB}VDC"
 
 
 def test_a_rule_changed_shows_every_name_with_its_unit_anew(

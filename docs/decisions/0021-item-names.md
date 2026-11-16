@@ -549,11 +549,11 @@ so a later change of mind changes only which is shown, and nothing typed
 is lost:
 
 - Each number a unit is read right after, as the forms read it (its rule,
-  the words near it, the profile; never a product's), is spaced from the
-  unit by a no-break space, the unit spelt as typed: `Cable 100ft 48 VDC`
-  is shown `Cable 100 ft 48 VDC`, `Cap 10uF 50V` `Cap 10 uF 50 V` and
-  `Spool 305M` `Spool 305 M`. A rule's respell still spells the name saved.
-  What is not read as a unit, a unit's word (`48 VDC`, `100 feet`) and a
+  the words near it, the profile; never a product's), or a unit's word
+  as search reads it, is spaced from the unit by a no-break space, the
+  unit spelt as typed: `Cable 100ft 48 VDC` is shown `Cable 100 ft 48 VDC`,
+  `Cap 10uF 50V` `Cap 10 uF 50 V` and `Spool 305M` `Spool 305 M`. A rule's
+  respell still spells the name saved. What is not read as a unit and a
   product (`Cat6a`, `5AC`, `SFP+`) are shown as typed.
 - That number is shown without its thousands separators, `Box 1,000 ft`
   as `Box 1000 ft`, and from five digits with a thin no-break space
@@ -581,6 +581,16 @@ within a word or a code, right after a letter, digit, `-`, `/`, `.` or
 or `/` (`10G-SFP+`, `48V-to-12V`), is shown as typed; the seeding page shows
 names as typed, as evidence of how a unit was typed; and an item's form,
 its packages' and its aliases' fields hold the name as typed.
+
+Ali decided on 2026-11-15 (inventory-tng-tze) that a unit's word
+(`feet`, `metres`, `VDC`, `VAC`) is shown as a unit's symbol is: a
+no-break space between the number and the word, the number without
+thousands separators and grouped from five digits, the word kept as
+typed, never respelt as the symbol. So `Box 1,000 feet` is shown
+`Box 1000 feet`, `Cable 100feet` `Cable 100 feet`, `PoE 48VDC`
+`PoE 48 VDC` and `Spool 10,000 metres` `Spool 10 000 metres`. A number
+within a word or a code is shown as typed, as for a symbol. Nothing typed
+and no search changes; migration 0048 shows existing names so.
 
 ## Amendment: the import's readings file (2026-11-14)
 
