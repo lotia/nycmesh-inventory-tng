@@ -16,24 +16,30 @@ from contextlib import contextmanager
 from io import BytesIO
 from pathlib import Path
 
+from babel.messages.catalog import Catalog
 from babel.messages.mofile import write_mo
 from babel.messages.pofile import read_po
 from babel.support import LazyProxy, Translations
 from jinja2 import Environment
 
-LOCALES = Path(__file__).parent / "locales"
+ENGLISH_PO = Path(__file__).parent / "locales" / "en" / "LC_MESSAGES" / "messages.po"
 
 
-def catalogue(path: Path) -> Translations:
-    """A PO catalogue, compiled in memory by Babel, as gettext reads it."""
+def read(path: Path) -> Catalog:
+    """A PO catalogue, as Babel reads it."""
     with path.open("rb") as po:
-        compiled = BytesIO()
-        write_mo(compiled, read_po(po))
-    compiled.seek(0)
-    return Translations(compiled)
+        return read_po(po)
 
 
-ENGLISH = catalogue(LOCALES / "en" / "LC_MESSAGES" / "messages.po")
+def compiled(catalogue: Catalog) -> Translations:
+    """`catalogue`, compiled in memory by Babel, as gettext reads it."""
+    mo = BytesIO()
+    write_mo(mo, catalogue)
+    mo.seek(0)
+    return Translations(mo)
+
+
+ENGLISH = compiled(read(ENGLISH_PO))
 _active = ENGLISH
 
 
@@ -63,9 +69,6 @@ def pgettext(context: str, message: str, **values: object) -> str:
 def ngettext(singular: str, plural: str, num: int, **values: object) -> str:
     """The form for `num` in the active locale, with `%(num)d` filled."""
     return _active.ngettext(singular, plural, num) % ({"num": num} | values)
-
-
-_ = gettext
 
 
 def lazy_gettext(message: str, **values: object) -> LazyProxy:

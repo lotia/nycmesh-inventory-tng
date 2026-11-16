@@ -9,12 +9,15 @@ import { i18n, type MessageDescriptor } from "@lingui/core";
 import { signal } from "@preact/signals";
 import { messages } from "./locales/en.po";
 
-/** The active locale, as a signal: a component that says anything reads
- * it, through `say`, so it renders again when the locale changes. */
+/** The active locale, as a signal. */
 export const locale = signal("");
+/** Counts each change of locale or catalogue: a component that says
+ * anything reads it, through `say`, so it renders again on each. */
+const changes = signal(0);
 
 i18n.on("change", () => {
   locale.value = i18n.locale;
+  changes.value++;
 });
 
 /** Make `name`, with its compiled catalogue, the locale every phrase is
@@ -30,8 +33,8 @@ export function say(
   phrase: MessageDescriptor,
   values?: Record<string, unknown>,
 ): string {
-  // Read so a component rendering this renders again on a change of locale.
-  void locale.value;
+  // Read so a component rendering this renders again on a change.
+  void changes.value;
   const filled = { ...phrase, values: { ...phrase.values, ...values } };
   return i18n._(filled);
 }

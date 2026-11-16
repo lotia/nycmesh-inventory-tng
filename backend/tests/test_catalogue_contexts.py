@@ -5,14 +5,14 @@ import re
 from pathlib import Path
 
 import pytest
-from babel.messages.pofile import read_po
 
 from inventory_tng.local_env import CLONE
+from inventory_tng.phrases import ENGLISH_PO, read
 
 pytestmark = pytest.mark.clone
 
 CATALOGUES = [
-    CLONE / "backend/src/inventory_tng/locales/en/LC_MESSAGES/messages.po",
+    ENGLISH_PO,
     CLONE / "frontend/src/locales/en.po",
 ]
 
@@ -25,8 +25,7 @@ def listed() -> set[str]:
 
 
 def contexts(catalogue: Path) -> set[str]:
-    with catalogue.open("rb") as po:
-        return {message.context for message in read_po(po) if message.context}
+    return {message.context for message in read(catalogue) if message.context}
 
 
 def test_the_list_is_there() -> None:

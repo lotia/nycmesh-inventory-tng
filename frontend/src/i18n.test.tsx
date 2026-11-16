@@ -33,3 +33,12 @@ test("a component that says a phrase renders again when the locale changes", asy
   expect(await screen.findByText("Ţĥĩś ƀŕōŵśēŕ ĩś ŕēĝĩśţēŕēď.")).not.toBeNull();
   expect(shown).toBeGreaterThan(before);
 });
+
+test("a component renders again when its locale's catalogue is loaded again", async () => {
+  function Said() {
+    return <p>{say(REGISTERED)}</p>;
+  }
+  render(<Said />);
+  speak("en", { ...english, [REGISTERED.id]: "Registered again." });
+  expect(await screen.findByText("Registered again.")).not.toBeNull();
+});

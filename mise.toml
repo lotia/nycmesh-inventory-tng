@@ -104,7 +104,8 @@ run = "uv run python -m tests.helpers.batch_schema"
 
 # The catalogues of words people read (CONTRIBUTING.md, Phrases): the
 # server's from Python and the templates, by Babel; the scan page's by
-# Lingui. Each is written over a copy for the check, never in place.
+# Lingui. SERVER_CATALOGUE and LINGUI_CATALOGUES write them elsewhere, as
+# check-catalogues does, into a copy.
 [tasks.extract-catalogues]
 description = "Write the server's and the scan page's English catalogues again from the code (CONTRIBUTING.md, Phrases)"
 run = [
@@ -114,35 +115,28 @@ run = [
     cd backend
     uv run --quiet pybabel -q extract -F pyproject.toml --project=inventory-tng \
       --add-location=file --sort-output -o "$pot" src/inventory_tng
-    uv run --quiet pybabel -q update -i "$pot" -d src/inventory_tng/locales -l en \
+    uv run --quiet pybabel -q update -i "$pot" -l en \
+      -o "${SERVER_CATALOGUE:-src/inventory_tng/locales/en/LC_MESSAGES/messages.po}" \
       --ignore-obsolete --ignore-pot-creation-date -N
     """,
-    "cd frontend && npx lingui extract --clean",
+    "cd frontend && npx lingui extract --clean > /dev/null",
 ]
 
 [tasks.check-catalogues]
 description = "Check that both sides' catalogues are what mise run extract-catalogues would write"
-run = [
-    """
-    pot=$(mktemp)
-    trap 'rm -f "$pot"' EXIT
-    cd backend
-    uv run --quiet pybabel -q extract -F pyproject.toml --project=inventory-tng \
-      --add-location=file --sort-output -o "$pot" src/inventory_tng
-    uv run --quiet pybabel -q update -i "$pot" -d src/inventory_tng/locales -l en \
-      --ignore-obsolete --ignore-pot-creation-date -N --check ||
-      { echo "The server's catalogue is not current: mise run extract-catalogues" >&2; exit 1; }
-    """,
-    """
-    copy=$(mktemp -d)
-    trap 'rm -rf "$copy"' EXIT
-    cd frontend
-    cp -R src/locales/. "$copy"
-    LINGUI_CATALOGUES="$copy" npx lingui extract --clean > /dev/null
-    diff -r src/locales "$copy" ||
-      { echo "The scan page's catalogue is not current: mise run extract-catalogues" >&2; exit 1; }
-    """,
-]
+run = """
+copy=$(mktemp -d)
+trap 'rm -rf "$copy"' EXIT
+server=backend/src/inventory_tng/locales/en/LC_MESSAGES/messages.po
+cp "$server" "$copy/messages.po"
+cp -R frontend/src/locales "$copy/locales"
+SERVER_CATALOGUE="$copy/messages.po" LINGUI_CATALOGUES="$copy/locales" \
+  mise run --quiet extract-catalogues
+current=true
+diff "$server" "$copy/messages.po" || current=false
+diff -r frontend/src/locales "$copy/locales" || current=false
+$current || { echo "The catalogues are not current: mise run extract-catalogues" >&2; exit 1; }
+"""
 
 [tasks.check-markdown]
 description = "Lint every Markdown file the project writes (AGENTS.md rule 9)"

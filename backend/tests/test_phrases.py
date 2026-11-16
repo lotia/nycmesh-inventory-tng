@@ -7,24 +7,24 @@ from io import BytesIO
 from types import SimpleNamespace
 
 import pytest
-from babel.messages.mofile import write_mo
 from babel.messages.pofile import read_po
 from babel.support import Translations
 
 from inventory_tng import phrases
 from inventory_tng.pages import retired_holding, templates
 from inventory_tng.phrases import (
-    LOCALES,
+    ENGLISH_PO,
+    compiled,
     gettext,
     lazy_gettext,
     lazy_pgettext,
     ngettext,
     pgettext,
+    read,
     speaking,
 )
 from inventory_tng.resets import RESET_NOTICE
 
-ENGLISH_PO = LOCALES / "en" / "LC_MESSAGES" / "messages.po"
 # Each letter accented, so English left out of the catalogue shows plain.
 ACCENTS = str.maketrans(
     "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ",
@@ -42,10 +42,14 @@ def accented(message: str) -> str:
     )
 
 
+def lone_per_cents(message: str) -> list[str]:
+    """Each per cent sign that is neither a placeholder nor `%%`."""
+    return re.findall("%", PLACEHOLDER.sub("", message))
+
+
 def pseudo_locale() -> Translations:
     """The English catalogue with every message accented, built by Babel."""
-    with ENGLISH_PO.open("rb") as po:
-        catalogue = read_po(po)
+    catalogue = read(ENGLISH_PO)
     for message in catalogue:
         if not message.id:  # The header.
             continue
@@ -53,10 +57,7 @@ def pseudo_locale() -> Translations:
             message.string = accented(message.id)
         else:
             message.string = tuple(accented(form) for form in message.id)
-    compiled = BytesIO()
-    write_mo(compiled, catalogue)
-    compiled.seek(0)
-    return Translations(compiled)
+    return compiled(catalogue)
 
 
 PSEUDO = pseudo_locale()
@@ -105,13 +106,10 @@ def test_values_fill_their_placeholders_and_a_double_per_cent_is_one() -> None:
 
 
 def test_a_context_tells_two_meanings_of_the_same_english_apart() -> None:
-    contexts = BytesIO()
     catalogue = read_po(BytesIO(b'msgid ""\nmsgstr ""\n'))
     catalogue.add("To", "Into", context="place")
     catalogue.add("To", "Recipient", context="mail")
-    write_mo(contexts, catalogue)
-    contexts.seek(0)
-    with speaking(Translations(contexts)):
+    with speaking(compiled(catalogue)):
         assert pgettext("place", "To") == "Into"
         assert str(lazy_pgettext("mail", "To")) == "Recipient"
     assert pgettext("place", "To") == "To"
@@ -129,3 +127,21 @@ def test_speaking_ends_with_its_block_even_on_an_error() -> None:
         raise ValueError("stop")
     assert phrases.gettext("Your account is reset: sign in.") == str(RESET_NOTICE)
     assert str(RESET_NOTICE) == "Your account is reset: sign in."
+
+
+def test_a_lone_per_cent_is_found() -> None:
+    assert lone_per_cents("Half: 50%") == ["%"]
+    assert lone_per_cents("%(num)d of 50%%") == []
+
+
+def test_no_message_has_a_lone_per_cent() -> None:
+    # Every message is %-formatted when said, so a lone % would fail the page.
+    catalogue = read(ENGLISH_PO)
+    forms = [
+        form
+        for message in catalogue
+        if message.id
+        for form in ((message.id,) if isinstance(message.id, str) else message.id)
+    ]
+    assert forms
+    assert [form for form in forms if lone_per_cents(form)] == []

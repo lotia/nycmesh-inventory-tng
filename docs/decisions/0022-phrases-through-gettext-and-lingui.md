@@ -34,15 +34,12 @@ Ali decided on 2026-11-15:
   ist.2 will need. Fluent's Python runtime (last released March 2023, with
   no Jinja integration) was rejected as stale.
 - **The scan page: Lingui's core**, with no React bindings. Messages are
-  ICU MessageFormat in PO catalogues, compiled by Lingui's Vite plugin as
-  the build imports them, so the browser compiles nothing and evaluates
-  nothing (the Content-Security-Policy allows no `eval`). Its macros are
-  turned into plain descriptors by the plugin's own transform, without
-  Babel. A component reads a phrase through a signal (`i18n.ts`, `say`),
-  so it renders again when the locale changes. intl-messageformat parses
-  at run time unless compiled first, i18next is about six times the size,
-  and Fluent's and MessageFormat 2's libraries are inactive on one side or
-  the other.
+  ICU MessageFormat in PO catalogues, compiled at build time, so the
+  browser compiles nothing and evaluates nothing (the
+  Content-Security-Policy allows no `eval`). intl-messageformat parses at
+  run time unless compiled first, i18next is about six times the size, and
+  Fluent's and MessageFormat 2's libraries are inactive on one side or the
+  other.
 - **PO on both sides**, so translators have one file format and one tool,
   though plural syntax differs inside: gettext's forms on the server,
   ICU's on the page. The sides keep separate catalogues.
@@ -63,8 +60,9 @@ Ali decided on 2026-11-15:
   `{% trans %}`.
 - **What is in:** every page's words, mail included. **What is out:** the
   operator commands (admins, registration codes, scan settings, unit
-  readings, TOTP keys, seed), left for inventory-tng-8f4; OpenAPI and
-  metric descriptions; comments and docstrings.
+  readings, TOTP keys, seed), left for inventory-tng-8f4; comments and
+  docstrings. OpenAPI and metric descriptions stay out too, as the
+  research proposed.
 - **The scan page owns the words for the server's batch problems**, keyed
   by the problem's kind with the values the message needs. The server sends
   kinds, not sentences, and words only its own pages and mail.
@@ -74,8 +72,12 @@ them open:
 
 - The server reads its PO catalogue as it starts, compiled in memory by
   Babel, so no compiled MO file is kept or built. The scan page's are
-  compiled by Vite's build. So there is no separate compile step, only
+  compiled by Lingui's Vite plugin as the build imports them, and its
+  macros turned into plain descriptors by the plugin's own transform,
+  without Babel. So there is no separate compile step, only
   `mise run extract-catalogues`.
+- A component on the scan page reads a phrase through a signal
+  (`i18n.ts`, `say`), so it renders again when the locale changes.
 - Catalogues name the file each message comes from, not its line, so a
   phrase moving within its file leaves them unchanged.
 - `mise run check-catalogues`, and CI's job of that name, fail when either

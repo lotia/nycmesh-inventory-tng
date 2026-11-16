@@ -841,7 +841,8 @@ On the server (`backend/src/inventory_tng/phrases.py`):
   phrase with values, or a plural, is a function that says it with
   `gettext("To %(place)s", place=name)` or `ngettext("%(num)d place",
   "%(num)d places", n)`, which fills `%(num)d` with `n`.
-- Values are always filled, so a per cent sign in a message is `%%`.
+- Values are always filled, so a per cent sign in a message is `%%`; a
+  test refuses a lone one.
 
 On the scan page (`frontend/src/i18n.ts`):
 

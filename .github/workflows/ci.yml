@@ -134,8 +134,8 @@ jobs:
       - run: npm run build
 
   # Both sides' catalogues are what extracting from the code writes
-  # (CONTRIBUTING.md, Phrases): the server's checked by Babel, the scan
-  # page's extracted into a copy and compared.
+  # (CONTRIBUTING.md, Phrases): each side's written into a copy and
+  # compared.
   check-catalogues:
     runs-on: ubuntu-latest
     timeout-minutes: 10
@@ -152,14 +152,22 @@ jobs:
       - run: uv sync --locked
         working-directory: backend
       - run: >-
+          cp src/inventory_tng/locales/en/LC_MESSAGES/messages.po
+          "$RUNNER_TEMP/messages.po"
+        working-directory: backend
+      - run: >-
           uv run pybabel -q extract -F pyproject.toml --project=inventory-tng
           --add-location=file --sort-output -o "$RUNNER_TEMP/messages.pot"
           src/inventory_tng
         working-directory: backend
       - run: >-
           uv run pybabel -q update -i "$RUNNER_TEMP/messages.pot"
-          -d src/inventory_tng/locales -l en
-          --ignore-obsolete --ignore-pot-creation-date -N --check
+          -o "$RUNNER_TEMP/messages.po" -l en
+          --ignore-obsolete --ignore-pot-creation-date -N
+        working-directory: backend
+      - run: >-
+          diff src/inventory_tng/locales/en/LC_MESSAGES/messages.po
+          "$RUNNER_TEMP/messages.po"
         working-directory: backend
       - run: npm ci
         working-directory: frontend
