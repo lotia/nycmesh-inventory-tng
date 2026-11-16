@@ -461,6 +461,15 @@ _GROUPED = re.compile(
 # inventory-tng-4i1): frontend/src/units.ts's, character for character.
 _NOUGHT = re.compile(r"(?:(?<![^\W_])[-\u2212])?(?<![^\W_])(?<![0-9][.,])0,[0-9]+\Z")
 
+
+def _grouped(text: str, end: int) -> re.Match[str] | None:
+    """The number grouped in thousands ending at `end` in `text` (_GROUPED),
+    unless a product's number starts it: `Cat 6 305 m` is a product's
+    number, then another, not thousands."""
+    grouped = _GROUPED.search(text, 0, end)
+    return None if grouped is None or _product(text, grouped.start()) else grouped
+
+
 # Where respell changes a text, and what to: a start, an end and the spelling.
 type Edit = tuple[int, int, str]
 
@@ -482,10 +491,7 @@ def _edits(text: str, rules: Rules | None) -> list[Edit]:
         if grouped := _NOUGHT.search(text, 0, match.end(1)):
             number = grouped[0].replace(",", ".")
         else:
-            grouped = _GROUPED.search(text, 0, match.end(1))
-            if grouped and _product(text, grouped.start()):
-                # `Cat 6 305 m`: a product's number, then another, not thousands.
-                grouped = None
+            grouped = _grouped(text, match.end(1))
             number = re.sub("[, ]", "", grouped[0]) if grouped else None
         found = _found(text, match, rules, number)
         if found is not None and (found.read or found.rule):
@@ -940,21 +946,28 @@ def shown_name(name: str, rules: Rules | None = None) -> str:
     no-break space between it and its unit, spelt as typed: `Cap 10uF 50V`
     is `Cap 10 uF 50 V`, `Box 10,000 feet` `Box 10 000 feet`. The rest, a
     unit not read among it, and a number within a word or a code
-    (_IN_A_CODE, _INTO_A_CODE), as typed. `name` is as saved
-    (models.canonical, spell)."""
+    (_IN_A_CODE, _INTO_A_CODE), as typed. A number grouped by spaces
+    (_GROUPED) is read as search reads it, one number, but shown whole and
+    as typed, as it may be a pack count and a size: `Cable 2 100 ft` is
+    `Cable 2 100 ft`, never `2100 ft` (Ali, 2026-11-16, inventory-tng-t78).
+    `name` is as saved (models.canonical, spell)."""
     edits = []
     for match in _after_a_number(name):
-        number, token = _number(name, match.end(1)), match[2]
+        token = match[2]
+        grouped = _grouped(name, match.end(1))
+        spaced = grouped is not None and " " in grouped[0]
+        number = grouped[0] if spaced else _number(name, match.end(1))
         start = match.end(1) - len(number)
         if _IN_A_CODE.match(name[start - 1 : start]) or _INTO_A_CODE.match(
             name, match.end()
         ):
             continue
-        found = _found(name, match, rules)
+        found = _found(name, match, rules, number.replace(" ", "") if spaced else None)
         # A word no form reads, as _edits reads it.
         if (read(token) if found is None else found.read) is None:
             continue
-        spelt = _shown_number(number) + NO_BREAK_SPACE + token
+        shown = number if spaced else _shown_number(number)
+        spelt = shown + NO_BREAK_SPACE + token
         edits.append((start, match.end(), spelt))
     return _applied(name, edits)
 

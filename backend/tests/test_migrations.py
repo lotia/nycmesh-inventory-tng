@@ -884,6 +884,63 @@ def test_a_comma_after_a_lone_nought_is_read_again(alembic_config: Config) -> No
     assert f"by id: item {resistor}, {other}." in str(refused.value)
 
 
+def test_a_number_grouped_by_spaces_is_shown_whole(alembic_config: Config) -> None:
+    """Migration 0049: each item's, package's and alias's name as shown
+    again, a number grouped by spaces before its unit shown whole and as
+    typed, as search reads it judged one number (Ali, 2026-11-16,
+    inventory-tng-t78); names, keys and search kept."""
+    command.downgrade(alembic_config, "0048")
+    connection = alembic_config.attributes["connection"]
+    category_id = connection.scalar(
+        text("INSERT INTO category (name) VALUES ('Parts') RETURNING id")
+    )
+    kept = {"unit_key": "kept", "name_shown": "kept"}
+    searched = {"search_text": "kept", "folded_with": "kept"}
+    box = _insert(
+        connection,
+        "item",
+        name="Box 1 000 ft",
+        name_key=name_key("Box 1 000 ft"),
+        category_id=category_id,
+        name_folded="kept",
+        **kept,
+        **searched,
+    )
+    _insert(
+        connection,
+        "item_package",
+        name="Cable 2 100 ft",
+        name_key=name_key("Cable 2 100 ft"),
+        item_id=box,
+        size=1,
+        **kept,
+        **searched,
+    )
+    _insert(
+        connection,
+        "item_alias",
+        name="X-1 000 feet",
+        name_key=name_key("X-1 000 feet"),
+        item_id=box,
+        name_folded="kept",
+        **kept,
+    )
+    command.upgrade(alembic_config, "0049")
+    assert connection.execute(
+        text(
+            "SELECT name, unit_key, name_shown FROM item UNION ALL"
+            " SELECT name, unit_key, name_shown FROM item_package UNION ALL"
+            " SELECT name, unit_key, name_shown FROM item_alias"
+        )
+    ).all() == [
+        ("Box 1 000 ft", "kept", "Box 1 000\u00a0ft"),
+        ("Cable 2 100 ft", "kept", "Cable 2 100\u00a0ft"),
+        # Within a code, as typed.
+        ("X-1 000 feet", "kept", "X-1 000 feet"),
+    ]
+    assert connection.scalar(text("SELECT search_text FROM item")) == "kept"
+
+
 def test_unit_keys_are_read_again_as_the_forms_read(alembic_config: Config) -> None:
     """Migration 0043: every unit key read again, by the rules there are;
     names that would then be one named by id first, nothing changed."""

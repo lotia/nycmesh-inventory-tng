@@ -574,14 +574,15 @@ a name copied from a page finds the item.
 
 Decided in building it (inventory-tng-ist.3, 2026-11-15): only commas
 group thousands here, as a plain space may part two numbers (`Pack 2 100
-ft`), which search accepts but a name shown must not join, and a comma
-after a lone nought (`0,500 m`) groups none, being perhaps a decimal
-comma, so is shown as typed; a number
-within a word or a code, right after a letter, digit, `-`, `/`, `.` or
-`+` (`UF-SM-10G`, `ES-8-150W`), or whose unit runs on into one by `-`
-or `/` (`10G-SFP+`, `48V-to-12V`), is shown as typed; the seeding page shows
-names as typed, as evidence of how a unit was typed; and an item's form,
-its packages' and its aliases' fields hold the name as typed.
+ft`), which search accepts but a name shown must not join (a number
+grouped by spaces is shown whole and as typed, as decided below), and a
+comma after a lone nought (`0,500 m`) groups none, being perhaps a
+decimal comma, so is shown as typed; a number within a word or a code,
+right after a letter, digit, `-`, `/`, `.` or `+` (`UF-SM-10G`,
+`ES-8-150W`), or whose unit runs on into one by `-` or `/` (`10G-SFP+`,
+`48V-to-12V`), is shown as typed; the seeding page shows names as typed,
+as evidence of how a unit was typed; and an item's form, its packages'
+and its aliases' fields hold the name as typed.
 
 Ali decided on 2026-11-15 (inventory-tng-dfz) that a refusal because
 names would read alike, on a form, a rule's page, the seeding page or
@@ -597,6 +598,22 @@ typed, never respelt as the symbol. So `Box 1,000 feet` is shown
 `PoE 48 VDC` and `Spool 10,000 metres` `Spool 10 000 metres`. A number
 within a word or a code is shown as typed, as for a symbol. Nothing typed
 and no search changes; migration 0048 shows existing names so.
+
+Ali decided on 2026-11-16 (inventory-tng-t78) that a number grouped by
+spaces before a unit is shown whole and exactly as typed, and search
+keeps reading it as one number. Pack counts written with a space before
+the size are realistic, and showing them as one long length would
+mislead. So `Box 1 000 feet` is shown `Box 1 000 feet` and still found as
+`1000 ft`; `Cable 2 100 ft` (two of 100 ft) is shown as typed, never
+`Cable 2100 ft`, and found by `100 ft`, and by `2100 ft` too, an extra
+result accepted. As for any number, its unit is spaced from it by a
+no-break space, and judged by the number as search reads it, so
+`Box 1 000 ft` gains one before `ft`, where it had been shown as typed.
+The read-alike check still ignores spaces. Rejected: joining it in the
+shown name too, which shows packs as one long cable; and reading it as
+typed in search too, which loses `Box 1 000 feet` as `1000 ft` and gains
+nothing. Writing packs as `2 x 100 ft` reads correctly either way.
+Migration 0049 shows existing names so.
 
 ## Amendment: the import's readings file (2026-11-14)
 

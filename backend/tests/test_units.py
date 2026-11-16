@@ -576,6 +576,16 @@ NB, THIN = "\u00a0", "\u202f"
         ("Supply -12 Volts", f"Supply -12{NB}Volts"),
         ("Reel 0,500 metres", f"Reel 0,500{NB}metres"),
         ("Box 3 Feet", f"Box 3{NB}Feet"),
+        # A number grouped by spaces, whole and as typed, as it may be a pack
+        # count and a size; judged as search reads it, one number (Ali,
+        # 2026-11-16, inventory-tng-t78).
+        ("Box 1 000 feet", f"Box 1 000{NB}feet"),
+        ("Box 1 000 ft", f"Box 1 000{NB}ft"),
+        ("Cable 2 100 ft", f"Cable 2 100{NB}ft"),
+        ("Reel 12 345 678.5 mm", f"Reel 12 345 678.5{NB}mm"),
+        ("X-1 000 feet", "X-1 000 feet"),
+        ("Cat 6 305 m", f"Cat 6 305{NB}m"),
+        ("Cable 2 1,000 ft", f"Cable 2 1000{NB}ft"),
         # Products, units no rule or word settles, and tokens no unit, as
         # typed.
         ("Cat6a cable 5AC SFP+", "Cat6a cable 5AC SFP+"),
