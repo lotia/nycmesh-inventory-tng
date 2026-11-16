@@ -261,8 +261,7 @@ CONFIRM_FIELD = "confirm_code"
 # The fields of a form a confirmation carries that hold a password the person
 # typed, by name, with their labels, in the order asked: never written into
 # the confirm page, but asked for again, empty. Every other field is carried
-# as sent, though the log masker masks the values of some by their names
-# (totp_policy, session_days).
+# as sent, though the log masker (masking.py) masks some values by name.
 RETYPED: dict[str, LazyProxy] = {
     "password": lazy_gettext("Password"),
     "password_again": lazy_gettext("Password again"),

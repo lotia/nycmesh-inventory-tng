@@ -94,12 +94,12 @@ describe("queueing", () => {
   test("a batch gets a key, is kept, sent at once, and settles as saved", async () => {
     const { api, sent } = answering(() => saved(41));
     const outbox = new Outbox(api);
-    expect(outbox.queue(draft(), named("Move: 1 item"))).toBe("queued");
+    expect(outbox.queue(draft(), named("a"))).toBe("queued");
     await vi.waitFor(() => expect(states(outbox)).toEqual(["saved"]));
     const [kept] = outbox.entries.value;
     expect(kept).toMatchObject({
       transactionId: 41,
-      summary: named("Move: 1 item"),
+      summary: named("a"),
     });
     expect(kept?.body.key).toMatch(/^[0-9a-f-]{36}$/);
     expect(await bodies(sent)).toEqual([kept?.body]);

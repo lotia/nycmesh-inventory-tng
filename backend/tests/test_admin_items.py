@@ -254,37 +254,37 @@ def test_a_name_is_checked_and_saved_in_canonical_spelling(
     named(session, Item, "Cap 10\u03bcF 5OV")
 
 
-def test_a_number_grouped_by_spaces_is_judged_as_search_reads_it(
-    admin_client: TestClient, session: Session, radios: Category
+@pytest.mark.parametrize(
+    ("asked", "legend", "refused"),
+    [
+        # Ali, 2026-11-16 (inventory-tng-t78, inventory-tng-uxo6).
+        ("Box 1 000 M", "1 000M", "Cap 1 000 \u03bcF"),
+        # inventory-tng-vw0f.
+        ("Box 1000\u00a0M", "1000M", "Cap 1000\u00a0\u03bcF"),
+    ],
+)
+def test_a_number_and_its_unit_are_judged_as_search_reads_them(
+    admin_client: TestClient,
+    session: Session,
+    radios: Category,
+    asked: str,
+    legend: str,
+    refused: str,
 ) -> None:
-    """Ali, 2026-11-16 (inventory-tng-t78, inventory-tng-uxo6): the form
-    reads `1 000` before a unit as one number, as search does, so asks
-    about `M` after it, and refuses a name reading alike with another's,
-    spaces ignored, naming it."""
+    """The form reads a number grouped by spaces before a unit as one
+    number, and finds a unit after a number and a no-break space as after
+    a plain one, as search does: so asks about `M` after it, and refuses a
+    name reading alike with another's, naming it."""
     form = {"category_id": str(radios.id), "unit": "each"}
-    asked = admin_client.post(ITEMS, data=form | {"name": "Box 1 000 M"})
-    assert asked.status_code == 400
-    assert "<legend>\u201c1 000M\u201d is new. Is it a unit?</legend>" in text(asked)
+    asking = admin_client.post(ITEMS, data=form | {"name": asked})
+    assert asking.status_code == 400
+    assert f"<legend>\u201c{legend}\u201d is new. Is it a unit?</legend>" in text(
+        asking
+    )
     add(session, Item(name="Cap 1000 uF", category_id=radios.id))
-    refused = admin_client.post(ITEMS, data=form | {"name": "Cap 1 000 \u03bcF"})
-    assert refused.status_code == 400
-    assert TAKEN_FIELDS["name"]("Cap 1000\u00a0uF") in refused.text
-
-
-def test_a_unit_after_any_space_is_judged_as_search_reads_it(
-    admin_client: TestClient, session: Session, radios: Category
-) -> None:
-    """inventory-tng-vw0f: the form finds a unit after a number and a
-    no-break space as after a plain one, so asks about `M` after it, and
-    refuses a name reading alike with another's, naming it."""
-    form = {"category_id": str(radios.id), "unit": "each"}
-    asked = admin_client.post(ITEMS, data=form | {"name": "Box 1000\u00a0M"})
-    assert asked.status_code == 400
-    assert "<legend>\u201c1000M\u201d is new. Is it a unit?</legend>" in text(asked)
-    add(session, Item(name="Cap 1000 uF", category_id=radios.id))
-    refused = admin_client.post(ITEMS, data=form | {"name": "Cap 1000\u00a0\u03bcF"})
-    assert refused.status_code == 400
-    assert TAKEN_FIELDS["name"]("Cap 1000\u00a0uF") in refused.text
+    refusing = admin_client.post(ITEMS, data=form | {"name": refused})
+    assert refusing.status_code == 400
+    assert TAKEN_FIELDS["name"]("Cap 1000\u00a0uF") in refusing.text
 
 
 def test_a_package_name_is_checked_in_canonical_spelling(

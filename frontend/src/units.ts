@@ -244,12 +244,30 @@ function settled(
 // last digit, with its minus as NUMBER's, as search keeps it, before a
 // unit it reads, without them (units._GROUPED).
 const GROUPED =
-  /(?:(?<![\p{L}\p{N}])[-−])?(?<![\p{L}\p{N}])(?:(?<![0-9][.,])(?!0,)[0-9]{1,3}(?:,[0-9]{3})+|(?<![0-9][., ])[0-9]{1,3}(?: [0-9]{3})+)(?:[.][0-9]+)?$/u;
+  /(?:(?<![\p{L}\p{N}])[-−])?(?<![\p{L}\p{N}])(?<digits>(?<![0-9][.,])(?!0,)[0-9]{1,3}(?:,[0-9]{3})+|(?<![0-9][., ])[0-9]{1,3}(?: [0-9]{3})+)(?:[.][0-9]+)?$/du;
 // A lone nought, then a comma and digits, ending at its last digit, with
 // its minus as NUMBER's: the comma is a decimal point to search
 // (units._NOUGHT).
 const NOUGHT =
   /(?:(?<![\p{L}\p{N}])[-−])?(?<![\p{L}\p{N}])(?<![0-9][.,])0,[0-9]+$/u;
+
+/** The number ending at `end` in `plain`, a text with plain spaces, where
+ * search reads it otherwise than as typed, and how: a lone nought's comma
+ * as a point (NOUGHT), or thousands (GROUPED) without their separators,
+ * unless a product's number starts them (`Cat 6 305 m`). Undefined: read
+ * as typed (units._searched). */
+function searched(
+  plain: string,
+  end: number,
+): [match: RegExpExecArray, number: string] | undefined {
+  const before = plain.slice(0, end);
+  const nought = NOUGHT.exec(before);
+  if (nought) return [nought, nought[0].replace(",", ".")];
+  const grouped = GROUPED.exec(before);
+  const digits = grouped?.indices?.groups?.digits;
+  if (!grouped || !digits || product(plain, digits[0])) return undefined;
+  return [grouped, grouped[0].replaceAll(/[, ]/g, "")];
+}
 
 /** Where respell changes a text, and what to (units.Edit). */
 type Edit = [start: number, end: number, spelling: string];
@@ -264,22 +282,10 @@ function edits(text: string, rules: Rules | undefined): Edit[] {
     const at = match.index;
     const end = at + whole.length;
     if (marked(text, end) || product(plain, at)) continue;
-    // Judged as search reads it, on the plain text (units._searched).
-    const before = plain.slice(0, at + 1);
-    let number: string;
-    let grouped = NOUGHT.exec(before);
-    if (grouped) number = grouped[0].replace(",", ".");
-    else {
-      grouped = GROUPED.exec(before);
-      // `Cat 6 305 m`: a product's number, then another, not thousands;
-      // judged at its first digit, after any sign.
-      if (grouped && product(plain, grouped.index + grouped[0].search(/[0-9]/)))
-        grouped = null;
-      // It ends at the digit the match starts with, so it is found.
-      number = grouped
-        ? grouped[0].replaceAll(/[, ]/g, "")
-        : (NUMBER.exec(before) as RegExpExecArray)[0];
-    }
+    const [grouped, searchedAs] = searched(plain, at + 1) ?? [];
+    // It ends at the digit the match starts with, so it is found.
+    const number =
+      searchedAs ?? (NUMBER.exec(plain.slice(0, at + 1)) as RegExpExecArray)[0];
     const reading = settled(text, number, token, rules);
     // Null: no unit by its rule.
     const spelt = reading === undefined ? read(token) : reading;
