@@ -9,7 +9,7 @@ from fastapi.testclient import TestClient
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from inventory_tng import accounts, mail, sign_in
+from inventory_tng import accounts, mail, masking, sign_in
 from inventory_tng.account import CODES_NEED_TOTP, EMAIL_TAKEN
 from inventory_tng.models import (
     Admin,
@@ -473,6 +473,28 @@ def test_a_late_password_form_never_writes_the_password_into_the_page(
     # Asked for again under their own names, empty.
     assert 'name="password" type="password"' in page
     assert 'name="password_again" type="password"' in page
+
+
+@pytest.mark.parametrize("name", ["current_password", "api_token", "totp_secret"])
+def test_a_late_form_never_carries_a_secret_into_the_page(
+    client: TestClient,
+    session: Session,
+    ada: tuple[Admin, str],
+    name: str,
+) -> None:
+    """A confirmed form that gains a field the log masker calls secret is
+    refused before its value is written as a hidden field (inventory-tng-2qy6)."""
+    close_window(session)
+    form = {"email": "ada@example.org", name: "hunter2"}
+    refused = client.post(f"{ACCOUNT}/email", data=form)
+    assert refused.status_code == 500
+    assert "hunter2" not in refused.text
+
+
+def test_only_masked_settings_are_carried_though_masked() -> None:
+    """Each name let through is one the masker calls secret: the list holds
+    no name the guard would pass anyway."""
+    assert all(masking.is_secret_name(n) for n in sign_in.CARRIED_THOUGH_MASKED)
 
 
 def test_a_late_new_authenticator_keeps_its_key(

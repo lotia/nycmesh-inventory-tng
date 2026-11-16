@@ -251,11 +251,17 @@ def mask_query(query: str) -> str:
         [
             (
                 name,
-                MASK if _classify(name)[0] or name in SECRET_QUERY_NAMES else value,
+                MASK if is_secret_name(name) or name in SECRET_QUERY_NAMES else value,
             )
             for name, value in parse_qsl(query, keep_blank_values=True)
         ]
     )
+
+
+def is_secret_name(name: str) -> bool:
+    """Whether a field's name means its value is a secret (SECRET_PARTS,
+    SECRET_WORDS)."""
+    return _classify(name)[0]
 
 
 @functools.lru_cache(maxsize=1024)

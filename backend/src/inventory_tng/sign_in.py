@@ -42,7 +42,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 from starlette.concurrency import run_in_threadpool
 
-from inventory_tng import accounts, mail, once, request_logging
+from inventory_tng import accounts, mail, masking, once, request_logging
 from inventory_tng.db import (
     DbSession,
     hold_until_commit,
@@ -261,11 +261,18 @@ CONFIRM_FIELD = "confirm_code"
 # The fields of a form a confirmation carries that hold a password the person
 # typed, by name, with their labels, in the order asked: never written into
 # the confirm page, but asked for again, empty. Every other field is carried
-# as sent, though the log masker (masking.py) masks some values by name.
+# as sent, in plain HTML.
 RETYPED: dict[str, LazyProxy] = {
     "password": lazy_gettext("Password"),
     "password_again": lazy_gettext("Password again"),
 }
+# Fields the log masker calls secret by name (masking.is_secret_name) that a
+# confirmed form may still carry: sign-in settings, not secrets. The confirm
+# page refuses any other such field, so a form that gains a secret field
+# fails before that secret can be written into a page (_carried). The new
+# authenticator's TOTP key (`key`, not secret by that rule) is carried by
+# design: the page it came from already shows it.
+CARRIED_THOUGH_MASKED = frozenset({"totp_policy", "session_days"})
 
 
 class Answered(Exception):
@@ -548,7 +555,7 @@ def _confirm_page(
             "admin": signed.admin,
             "alert": alert,
             "action": action,
-            "carried": [(n, v) for n, v in carried if n not in RETYPED],
+            "carried": _carried(carried),
             "retype": [(n, label) for n, label in RETYPED.items() if n in sent],
             "field": CONFIRM_FIELD,
             "totp_only": not recovery,
@@ -556,6 +563,19 @@ def _confirm_page(
         },
         status_code,
     )
+
+
+def _carried(sent: list[tuple[str, str]]) -> list[tuple[str, str]]:
+    """The fields to write into the confirm page as hidden fields: all but
+    RETYPED. Raises ValueError, rather than write it, for any other field
+    the log masker calls secret and CARRIED_THOUGH_MASKED does not name.
+    The field's name stays out of the message: a browser chose it."""
+    carried = [(n, v) for n, v in sent if n not in RETYPED]
+    if any(
+        masking.is_secret_name(n) and n not in CARRIED_THOUGH_MASKED for n, _ in carried
+    ):
+        raise ValueError("a confirmed form sent a secret field to carry")
+    return carried
 
 
 def install(app: FastAPI) -> None:
