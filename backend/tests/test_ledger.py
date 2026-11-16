@@ -18,6 +18,7 @@ from inventory_tng import items
 from inventory_tng.db import set_actor
 from inventory_tng.history import LEDGER
 from inventory_tng.ledger import (
+    BodyRefusedReply,
     balance,
     countable,
     insert_transaction,
@@ -147,6 +148,20 @@ def test_a_refusal_names_each_bad_line(
     # Kinds, never words: the scan page words each kind itself.
     assert {tuple(p) for p in response.json()["detail"]} == {("type", "loc")}
     assert saved(session, batch["key"]) == []
+
+
+def test_a_body_that_cannot_be_a_batch_is_refused_as_the_schema_says(
+    client: TestClient, place: Place
+) -> None:
+    """FastAPI's own 422, in pydantic's types and words, is the other shape
+    the route declares (BodyRefusedReply)."""
+    batch = place.batch(lines=[{"item_id": place.item.id}])
+    response = client.post(URL, json=batch)
+    assert response.status_code == 422
+    refused = BodyRefusedReply.model_validate(response.json())
+    assert [(p.loc, p.type) for p in refused.detail] == [
+        (["body", "lines", 0, "quantity"], "missing")
+    ]
 
 
 def test_a_batch_naming_an_item_twice_is_refused(

@@ -51,9 +51,11 @@ def test_a_refused_batch_names_every_kind_of_problem(schema: dict[str, Any]) -> 
     """The scan page words each kind the schema lists (outbox.ts, PROBLEMS),
     so every kind the ledger or a line's check refuses with is listed."""
     refused = schema["paths"]["/api/transactions"]["post"]["responses"]["422"]
-    assert refused["content"]["application/json"]["schema"] == {
-        "$ref": "#/components/schemas/BatchRefusedReply"
-    }
+    # Or FastAPI's own, for a body that cannot be a batch at all.
+    assert refused["content"]["application/json"]["schema"]["anyOf"] == [
+        {"$ref": "#/components/schemas/BatchRefusedReply"},
+        {"$ref": "#/components/schemas/BodyRefusedReply"},
+    ]
     kind = schema["components"]["schemas"]["BatchProblem"]["properties"]["type"]
     listed = {each for options in kind["anyOf"] for each in options["enum"]}
     assert listed == set(get_args(ledger.ProblemKind)) | set(

@@ -182,12 +182,35 @@ export const KEEP_IT = msg`Keep it`;
 export const SAYING_WHAT_IS_ON = msg`Saying what is on open packages`;
 export const SOMETHING = msg`Something`;
 export const A_CART_SOMETHING = msg`A cart: something`;
-/** Where an older build's save was for, clause by clause (olderWhere). */
-export const AT_PLACE = msg`at {place}`;
-export const FROM_PLACE = msg`from {place}`;
-export const TO_PLACE = msg`to {place}`;
-export const FOR_INSTALL = msg`for install {number}`;
-export const BY = msg`{where}, by {name}`;
+/** Where an older build's save was for, clause by clause (olderWhere):
+ * each clause is whole, so a translator words it alone, and they follow
+ * in this order, joined by spaces, rather than as a message for each of
+ * the 20 ways they combine. */
+export const AT_PLACE = msg({
+  comment:
+    "A clause of where a save was for; clauses that apply follow in this order, joined by spaces: at or from, to, for install.",
+  message: "at {place}",
+});
+export const FROM_PLACE = msg({
+  comment:
+    "A clause of where a save was for; clauses that apply follow in this order, joined by spaces: at or from, to, for install.",
+  message: "from {place}",
+});
+export const TO_PLACE = msg({
+  comment:
+    "A clause of where a save was for; clauses that apply follow in this order, joined by spaces: at or from, to, for install.",
+  message: "to {place}",
+});
+export const FOR_INSTALL = msg({
+  comment:
+    "A clause of where a save was for; clauses that apply follow in this order, joined by spaces: at or from, to, for install.",
+  message: "for install {number}",
+});
+export const BY = msg({
+  comment:
+    "The clauses saying where an older build's save was for, then the volunteer's name.",
+  message: "{where}, by {name}",
+});
 export const PLACE_GONE = msg`a place no longer in the catalogue`;
 export const ADDED_NOT_SENT = msg`Added but not sent`;
 export const ADDED_ON_NOT_SENT = msg`Added on {when} but not sent`;

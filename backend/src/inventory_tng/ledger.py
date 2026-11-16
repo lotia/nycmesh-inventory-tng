@@ -910,6 +910,20 @@ class BatchRefusedReply(BaseModel):
     detail: list[BatchProblem]
 
 
+class BodyProblem(BaseModel):
+    """One problem of a body that cannot be a batch at all, in FastAPI's
+    own 422: pydantic's type, where, and words for whoever writes a
+    client, which the scan page does not show."""
+
+    type: str
+    loc: list[str | int]
+    msg: str
+
+
+class BodyRefusedReply(BaseModel):
+    detail: list[BodyProblem]
+
+
 class BatchRefused(Exception):
     def __init__(self, problems: list[Problem]) -> None:
         super().__init__(f"{len(problems)} problems")
@@ -2255,11 +2269,11 @@ PATH = "/transactions"
             "description": "This device is not registered",
         },
         422: {
-            "model": BatchRefusedReply,
+            "model": BatchRefusedReply | BodyRefusedReply,
             "description": "Refused: each problem's kind (type) and where "
             "(loc), never in words, which the page makes from the kind. A "
-            "body that cannot be a batch at all gets FastAPI's own 422, of "
-            "the same shape, with pydantic's types and words, "
+            "body that cannot be a batch at all gets FastAPI's own 422 "
+            "(BodyRefusedReply), with pydantic's types and words, "
             "package_size_required and package_size_without_package among "
             "them",
         },

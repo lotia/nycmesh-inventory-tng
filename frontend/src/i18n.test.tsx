@@ -1,10 +1,12 @@
 import { i18n } from "@lingui/core";
 import { render, screen } from "@testing-library/preact";
 import { afterEach, expect, test } from "vitest";
-import { say, speak } from "./i18n";
+import { ITEM_SAYS } from "./cart";
+import { say, sayParts, speak } from "./i18n";
 import { messages as english } from "./locales/en.po";
 import { messages as pseudo } from "./locales/pseudo.po";
 import { BATCHES_WAITING, REGISTERED } from "./RegisterPage";
+import { ADDED_ONE, REGISTER_IT } from "./ScanPage";
 
 afterEach(() => speak("en", english));
 
@@ -42,4 +44,29 @@ test("a component renders again when its locale's catalogue is loaded again", as
   render(<Said />);
   speak("en", { ...english, [REGISTERED.id]: "Registered again." });
   expect(await screen.findByText("Registered again.")).not.toBeNull();
+});
+
+// A name is shown exactly as typed: Lingui decodes \\uXXXX and \\xXX in
+// what it fills in, and a name may hold such text, or a mark's.
+const TYPED = String.raw`A\u0042 \x43 <0>D</0> {e} #`;
+
+test("a value is said exactly as given", () => {
+  expect(say(ADDED_ONE, { item: TYPED })).toBe(`Added one: ${TYPED}.`);
+  expect(say(ADDED_ONE, { item: undefined })).toBe("Added one: .");
+});
+
+test("a value said in parts is put in whole, never read as the phrase's marks", () => {
+  const bold = (inside: unknown[]) => ({ bold: inside });
+  expect(sayParts(ITEM_SAYS, { name: TYPED, what: ["2 m"] }, [bold])).toEqual([
+    TYPED,
+    ": ",
+    "2 m",
+  ]);
+});
+
+test("words marked for no part given keep their place, unmarked", () => {
+  // As a translation numbering its marks otherwise would leave them.
+  expect(sayParts(REGISTER_IT, {}).join("")).toBe(
+    "Register it, then come back.",
+  );
 });

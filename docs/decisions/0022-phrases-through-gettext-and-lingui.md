@@ -99,8 +99,9 @@ them open:
   scan page's outbox keeps each problem's kind, never words, so a refusal
   kept is worded in the language spoken when it is shown; a kind it has
   no words for is "Not accepted", as is FastAPI's own 422 for a body
-  that cannot be a batch at all, except the two kinds of a line's
-  package size, which it words. The server says these kinds nowhere
+  that cannot be a batch at all (`BodyRefusedReply` in the schema),
+  except the two kinds of a line's package size, which it words. That
+  problem still names its line. The server says these kinds nowhere
   itself, so it keeps no words for them (2026-11-16).
 - Catalogues name the file each message comes from, not its line, so a
   phrase moving within its file leaves them unchanged.

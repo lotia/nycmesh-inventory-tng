@@ -80,6 +80,7 @@ msgstr ""
 msgid "Opening packages"
 msgstr ""
 
+#. A clause of where a save was for; clauses that apply follow in this order, joined by spaces: at or from, to, for install.
 #: src/ScanPage.tsx
 msgid "at {place}"
 msgstr ""
@@ -615,6 +616,7 @@ msgstr ""
 msgid "{name}: enter the count"
 msgstr ""
 
+#. A clause of where a save was for; clauses that apply follow in this order, joined by spaces: at or from, to, for install.
 #: src/ScanPage.tsx
 msgid "to {place}"
 msgstr ""
@@ -659,6 +661,7 @@ msgstr ""
 msgid "Your name"
 msgstr ""
 
+#. The clauses saying where an older build's save was for, then the volunteer's name.
 #: src/ScanPage.tsx
 msgid "{where}, by {name}"
 msgstr ""
@@ -904,6 +907,7 @@ msgstr ""
 msgid "{amount} from an open package"
 msgstr ""
 
+#. A clause of where a save was for; clauses that apply follow in this order, joined by spaces: at or from, to, for install.
 #: src/ScanPage.tsx
 msgid "for install {number}"
 msgstr ""
@@ -944,6 +948,7 @@ msgstr ""
 msgid "What is happening"
 msgstr ""
 
+#. A clause of where a save was for; clauses that apply follow in this order, joined by spaces: at or from, to, for install.
 #: src/ScanPage.tsx
 msgid "from {place}"
 msgstr ""

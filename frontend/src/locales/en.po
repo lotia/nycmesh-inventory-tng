@@ -80,6 +80,7 @@ msgstr "The cart was changed in another tab. Check it, then record it again."
 msgid "Opening packages"
 msgstr "Opening packages"
 
+#. A clause of where a save was for; clauses that apply follow in this order, joined by spaces: at or from, to, for install.
 #: src/ScanPage.tsx
 msgid "at {place}"
 msgstr "at {place}"
@@ -615,6 +616,7 @@ msgstr "open"
 msgid "{name}: enter the count"
 msgstr "{name}: enter the count"
 
+#. A clause of where a save was for; clauses that apply follow in this order, joined by spaces: at or from, to, for install.
 #: src/ScanPage.tsx
 msgid "to {place}"
 msgstr "to {place}"
@@ -659,6 +661,7 @@ msgstr "Kept on this device, not sent."
 msgid "Your name"
 msgstr "Your name"
 
+#. The clauses saying where an older build's save was for, then the volunteer's name.
 #: src/ScanPage.tsx
 msgid "{where}, by {name}"
 msgstr "{where}, by {name}"
@@ -904,6 +907,7 @@ msgstr "Some items were not recorded. Details below."
 msgid "{amount} from an open package"
 msgstr "{amount} from an open package"
 
+#. A clause of where a save was for; clauses that apply follow in this order, joined by spaces: at or from, to, for install.
 #: src/ScanPage.tsx
 msgid "for install {number}"
 msgstr "for install {number}"
@@ -944,6 +948,7 @@ msgstr "This device is offline. Sending when it's back."
 msgid "What is happening"
 msgstr "What is happening"
 
+#. A clause of where a save was for; clauses that apply follow in this order, joined by spaces: at or from, to, for install.
 #: src/ScanPage.tsx
 msgid "from {place}"
 msgstr "from {place}"

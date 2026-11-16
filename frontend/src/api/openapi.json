@@ -185,11 +185,19 @@
             }
           },
           "422": {
-            "description": "Refused: each problem's kind (type) and where (loc), never in words, which the page makes from the kind. A body that cannot be a batch at all gets FastAPI's own 422, of the same shape, with pydantic's types and words, package_size_required and package_size_without_package among them",
+            "description": "Refused: each problem's kind (type) and where (loc), never in words, which the page makes from the kind. A body that cannot be a batch at all gets FastAPI's own 422 (BodyRefusedReply), with pydantic's types and words, package_size_required and package_size_without_package among them",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/BatchRefusedReply"
+                  "anyOf": [
+                    {
+                      "$ref": "#/components/schemas/BatchRefusedReply"
+                    },
+                    {
+                      "$ref": "#/components/schemas/BodyRefusedReply"
+                    }
+                  ],
+                  "title": "Response 422 Save Batch Api Transactions Post"
                 }
               }
             }
@@ -526,6 +534,50 @@
         "type": "object",
         "required": ["detail"],
         "title": "BatchRefusedReply"
+      },
+      "BodyProblem": {
+        "properties": {
+          "type": {
+            "type": "string",
+            "title": "Type"
+          },
+          "loc": {
+            "items": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "integer"
+                }
+              ]
+            },
+            "type": "array",
+            "title": "Loc"
+          },
+          "msg": {
+            "type": "string",
+            "title": "Msg"
+          }
+        },
+        "type": "object",
+        "required": ["type", "loc", "msg"],
+        "title": "BodyProblem",
+        "description": "One problem of a body that cannot be a batch at all, in FastAPI's\nown 422: pydantic's type, where, and words for whoever writes a\nclient, which the scan page does not show."
+      },
+      "BodyRefusedReply": {
+        "properties": {
+          "detail": {
+            "items": {
+              "$ref": "#/components/schemas/BodyProblem"
+            },
+            "type": "array",
+            "title": "Detail"
+          }
+        },
+        "type": "object",
+        "required": ["detail"],
+        "title": "BodyRefusedReply"
       },
       "BuildTooOldReply": {
         "properties": {

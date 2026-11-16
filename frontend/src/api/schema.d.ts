@@ -190,6 +190,25 @@ export interface components {
       detail: components["schemas"]["BatchProblem"][];
     };
     /**
+     * BodyProblem
+     * @description One problem of a body that cannot be a batch at all, in FastAPI's
+     *     own 422: pydantic's type, where, and words for whoever writes a
+     *     client, which the scan page does not show.
+     */
+    BodyProblem: {
+      /** Type */
+      type: string;
+      /** Loc */
+      loc: (string | number)[];
+      /** Msg */
+      msg: string;
+    };
+    /** BodyRefusedReply */
+    BodyRefusedReply: {
+      /** Detail */
+      detail: components["schemas"]["BodyProblem"][];
+    };
+    /**
      * BuildTooOldReply
      * @description A batch from a build of the scan page older than this server takes:
      *     not checked, nor saved.
@@ -894,13 +913,15 @@ export interface operations {
             | components["schemas"]["BuildTooOldReply"];
         };
       };
-      /** @description Refused: each problem's kind (type) and where (loc), never in words, which the page makes from the kind. A body that cannot be a batch at all gets FastAPI's own 422, of the same shape, with pydantic's types and words, package_size_required and package_size_without_package among them */
+      /** @description Refused: each problem's kind (type) and where (loc), never in words, which the page makes from the kind. A body that cannot be a batch at all gets FastAPI's own 422 (BodyRefusedReply), with pydantic's types and words, package_size_required and package_size_without_package among them */
       422: {
         headers: {
           [name: string]: unknown;
         };
         content: {
-          "application/json": components["schemas"]["BatchRefusedReply"];
+          "application/json":
+            | components["schemas"]["BatchRefusedReply"]
+            | components["schemas"]["BodyRefusedReply"];
         };
       };
       /** @description The database cannot answer; try again */

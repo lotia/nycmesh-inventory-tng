@@ -25,60 +25,81 @@ export function speak(name: string, catalogue: typeof messages): void {
 
 speak("en", messages);
 
+/** Marks a value's place in a message as it is said: private-use
+ * characters no phrase or catalogue holds. */
+const HOLE = /\uE000(\d+)\uE001/;
+/** Words a phrase marks `<n>…</n>`, such as a link's. */
+const MARKED = /<(\d+)>([\s\S]*?)<\/\1>/;
+
+/**
+ * `phrase` said in the active locale with each value left as a hole, and
+ * the values held for those holes. Lingui never reads a value, as it
+ * would decode `\uXXXX` in one, so a name is shown exactly as typed.
+ * Numbers are filled, so a plural can count them, and a missing value is
+ * left out, as Lingui leaves it.
+ */
+function holed(
+  phrase: MessageDescriptor,
+  values: Record<string, unknown>,
+): [string, unknown[]] {
+  // Read so a component rendering this renders again on a change.
+  void changes.value;
+  const held: unknown[] = [];
+  const filled = Object.fromEntries(
+    Object.entries({ ...phrase.values, ...values }).map(([name, value]) => {
+      if (typeof value === "number" || value == null) {
+        return [name, value];
+      }
+      held.push(value);
+      return [name, `\uE000${held.length - 1}\uE001`];
+    }),
+  );
+  return [i18n._({ ...phrase, values: filled }), held];
+}
+
 /** A phrase in the active locale, with the values its placeholders name. */
 export function say(
   phrase: MessageDescriptor,
-  values?: Record<string, unknown>,
+  values: Record<string, unknown> = {},
 ): string {
-  // Read so a component rendering this renders again on a change.
-  void changes.value;
-  const filled = { ...phrase, values: { ...phrase.values, ...values } };
-  return i18n._(filled);
+  const [said, held] = holed(phrase, values);
+  return said.replace(new RegExp(HOLE, "g"), (_, at) => String(held[at]));
 }
-
-/** Marks a value's place in a message as it is said: private-use
- * characters no phrase or catalogue holds. */
-const HOLE = /(\d+)/;
-/** Words a phrase marks `<n>…</n>`, such as a link's. */
-const MARKED = /<(\d+)>([\s\S]*?)<\/\1>/;
 
 /**
  * A phrase in parts, for words that are more than a string: each value
  * other than a number, such as a name in bold or a list of parts (outbox's
  * Said), put in whole where the phrase places it, never read as part of
  * the phrase; and each `<n>…</n>` in it, such as a link's words, made by
- * `marks[n]` from the parts inside it. Numbers are filled as `say` fills
- * them, so a plural can count them.
+ * `marks[n]` from the parts inside it, or left as they are if there is no
+ * `marks[n]`.
  */
 export function sayParts<Part>(
   phrase: MessageDescriptor,
   values: Record<string, number | string | Part | readonly (string | Part)[]>,
   marks: readonly ((inside: (string | Part)[]) => Part)[] = [],
 ): (string | Part)[] {
-  const held: (readonly (string | Part)[])[] = [];
-  const filled = Object.fromEntries(
-    Object.entries(values).map(([name, value]) => {
-      if (typeof value === "number") {
-        return [name, value];
+  const [words, held] = holed(phrase, values);
+  const unhole = (bits: string): (string | Part)[] =>
+    bits.split(HOLE).flatMap((bit, at) => {
+      if (at % 2 === 0) {
+        return bit === "" ? [] : [bit];
       }
-      held.push(Array.isArray(value) ? value : [value as string | Part]);
-      return [name, `${held.length - 1}`];
-    }),
-  );
-  const unhole = (words: string): (string | Part)[] =>
-    words
-      .split(HOLE)
-      .flatMap((bit, at) =>
-        at % 2 === 1 ? [...(held[Number(bit)] as [])] : bit === "" ? [] : [bit],
-      );
-  const said = say(phrase, filled).split(MARKED);
+      const value = held[Number(bit)] as
+        | string
+        | Part
+        | readonly (string | Part)[];
+      return Array.isArray(value) ? value : [value as string | Part];
+    });
+  const said = words.split(MARKED);
   // split gives, after each part, a mark's number and the words inside it.
   const parts: (string | Part)[] = [];
   for (let at = 0; at < said.length; at += 3) {
     parts.push(...unhole(said[at] as string));
-    const mark = marks[Number(said[at + 1])];
-    if (at + 2 < said.length && mark !== undefined) {
-      parts.push(mark(unhole(said[at + 2] as string)));
+    if (at + 2 < said.length) {
+      const inside = unhole(said[at + 2] as string);
+      const mark = marks[Number(said[at + 1])];
+      parts.push(...(mark === undefined ? inside : [mark(inside)]));
     }
   }
   return parts;
