@@ -50,7 +50,6 @@ from inventory_tng.db import (
     set_actor,
 )
 from inventory_tng.mail import Notify
-from inventory_tng.masking import is_secret_name
 from inventory_tng.models import Admin, AdminSession, SignInSettings, running_low
 from inventory_tng.pages import (
     NOTICES,
@@ -259,6 +258,11 @@ AdminSignedIn = Annotated[SignedIn, Depends(admin_signed_in)]
 
 # The field a confirmation's code comes in, which no form uses for itself.
 CONFIRM_FIELD = "confirm_code"
+# The fields of a form a confirmation carries that hold a password the person
+# typed, by name, in the order asked: never written into the confirm page,
+# but asked for again, empty. Every other field is carried as sent, though
+# the log masker may mask its name (totp_policy, session_days).
+RETYPED = ("password", "password_again")
 
 
 class Answered(Exception):
@@ -529,9 +533,9 @@ def _confirm_page(
     recovery: bool = True,
 ) -> HTMLResponse:
     """Asks for a code (a recovery code too, unless not `recovery`), then
-    sends `carried` on to `action`. Fields whose
-    names say they are secret, as the log masker reads them (masking.py), are
-    never written into the page: they are asked for again, empty."""
+    sends `carried` on to `action`. A password typed (RETYPED) is never
+    written into the page: it is asked for again, empty."""
+    sent = {name for name, _ in carried}
     return page(
         request,
         "confirm.html",
@@ -541,8 +545,8 @@ def _confirm_page(
             "admin": signed.admin,
             "alert": alert,
             "action": action,
-            "carried": [(n, v) for n, v in carried if not is_secret_name(n)],
-            "retype": list(dict.fromkeys(n for n, _ in carried if is_secret_name(n))),
+            "carried": [(n, v) for n, v in carried if n not in RETYPED],
+            "retype": [name for name in RETYPED if name in sent],
             "field": CONFIRM_FIELD,
             "totp_only": not recovery,
             "sections": navigation,

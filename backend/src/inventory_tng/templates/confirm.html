@@ -9,11 +9,10 @@ password.{% endtrans %}{% endif %}{% if retype %}
   <input type="hidden" name="{{ name }}" value="{{ value }}">
   {% endfor %}
   {% with code_totp = uses_totp, autofocus = true %}{% include "_code_field.html" %}{% endwith %}
-  {#- Words for each secret field a form sends; any other is named by its
-  field (inventory-tng-pem). #}
+  {#- Words for each field sign_in.RETYPED names. #}
   {% set secrets = {"password": _("Password"), "password_again": _("Password again")} %}
   {% for secret in retype %}
-  <label>{{ secrets.get(secret) or secret | replace("_", " ") | capitalize }}
+  <label>{{ secrets[secret] }}
     <input name="{{ secret }}" type="password" autocomplete="new-password" required>
   </label>
   {% endfor %}

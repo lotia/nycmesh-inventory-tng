@@ -1,5 +1,7 @@
 """The settings page: how the scan page behaves (admin/settings.py)."""
 
+import html
+import re
 from collections.abc import Callable
 from datetime import UTC, datetime, timedelta
 
@@ -22,7 +24,7 @@ from inventory_tng.models import (
 
 from helpers.mail import SentMail
 from helpers.rows import history, shown
-from helpers.sign_in import code, new_admin, sign_in_with, text
+from helpers.sign_in import code, new_admin, sign_in_with, text, with_code
 
 
 def test_shows_and_changes_the_name_check(
@@ -137,6 +139,35 @@ def test_sign_in_settings_ask_for_a_fresh_code(
     asked = admin_client.post(f"{SETTINGS}/sign-in", data=SIGN_IN_FORM)
     assert asked.status_code == 403
     assert session.get_one(SignInSettings, 1).totp_policy == "required"
+
+
+def test_sign_in_settings_go_on_through_the_confirm_page(
+    admin_client: TestClient, session: Session
+) -> None:
+    """Only a password typed is asked for again: the settings' own fields
+    are carried, though the log masker masks their names (inventory-tng-pem)."""
+    for row in session.scalars(select(AdminSession)):
+        row.confirmed_at = datetime.now(UTC) - timedelta(hours=2)
+        row.last_sensitive_at = None
+    session.flush()
+    version = shown(session.get_one(SignInSettings, 1))
+    form = SIGN_IN_FORM | {"sign_in_version": version}
+    asked = admin_client.post(f"{SETTINGS}/sign-in", data=form)
+    assert asked.status_code == 403
+    assert 'autocomplete="new-password"' not in asked.text  # Nothing to retype.
+    carried = {
+        name: html.unescape(value)
+        for name, value in re.findall(
+            r'<input type="hidden" name="([^"]*)" value="([^"]*)">', asked.text
+        )
+    }
+    assert carried == form
+    done = admin_client.post(f"{SETTINGS}/sign-in", data=with_code(session, **carried))
+    assert (
+        done.headers["location"] == f"{SETTINGS}?notice=saved&section=sign-in#sign-in"
+    )
+    settings = session.get_one(SignInSettings, 1)
+    assert (settings.totp_policy, settings.session_days) == ("optional", 3)
 
 
 def test_the_time_zone(admin_client: TestClient, session: Session) -> None:
