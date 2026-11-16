@@ -5,7 +5,10 @@ import importlib
 import pkgutil
 import re
 from collections.abc import Callable
+from datetime import UTC, datetime
+from decimal import Decimal
 from types import SimpleNamespace
+from zoneinfo import ZoneInfo
 
 import pytest
 from babel.messages.catalog import Catalog, Message
@@ -230,6 +233,111 @@ def test_every_mail_names_the_app_in_its_subject_and_body() -> None:
         assert BRAND in told.body, told.kind
 
 
+def render(name: str, **context: object) -> str:
+    """Template `name`, rendered with `context`."""
+    return templates.get_template(name).render(context)
+
+
+def from_macros(source: str, **context: object) -> str:
+    """`source`, a template calling shared macros, rendered with `context`."""
+    return templates.env.from_string(source).render(context)
+
+
+def without_brand(html: str) -> str:
+    """`html`'s words but the app's name, the same in every language, which
+    the masthead shows in parts."""
+    words = re.sub(r"<script.*?</script>|<[^>]*>", " ", html, flags=re.DOTALL)
+    return " ".join(words.split()).replace(BRAND, "")
+
+
+def link(*_: object, **__: object) -> str:
+    return "/here"
+
+
+# What a page signed in shows around its own words (admin_base.html).
+SIGNED_IN = {
+    "request": SimpleNamespace(
+        url=SimpleNamespace(path="/admin/stock/x"),
+        app=SimpleNamespace(state=SimpleNamespace(bundle=SimpleNamespace(tags=link))),
+    ),
+    "admin": SimpleNamespace(username=NAME),
+    "sections": [("/admin/stock", NAME, SimpleNamespace(count=2, words=NAME))],
+    "title": NAME,
+    "back_link": ("/admin", NAME),
+}
+VIEW = SimpleNamespace(
+    aria_sort=lambda column: "descending",
+    sort_link=link,
+    sizes=[25, None],
+    size_link=link,
+    per_page=25,
+    searching=True,
+    best_match_link=link,
+    by=None,
+    here="/here",
+    unfiltered_fields=lambda: [("q", NAME)],
+    filters=True,
+    unfiltered_link=link,
+    fields=lambda *_: [("q", NAME)],
+    pages=3,
+    page=2,
+    link=link,
+)
+
+
+def listing(**differs: object) -> SimpleNamespace:
+    """A long list with search (admin/listing.py), as _listing.html reads it."""
+    return SimpleNamespace(
+        **{
+            "here": "/here",
+            "view": VIEW,
+            "search": NAME,
+            "suggest_address": "/here/suggest",
+            "lapsed": "retired",
+            "link": link,
+            "show": "retired",
+            "narrowed": True,
+            "picked": None,
+            "found": 1,
+            "total": 3,
+            "rows": [],
+        }
+        | differs
+    )
+
+
+LISTING_PARTS = """{% from "_listing.html" import sort_heading, sizes, filter_form,
+  search_box, filters, summary, empty, pager %}
+{{ sort_heading(view, "name", "") }}{{ sizes(view) }}
+{% call filter_form(view) %}{% endcall %}
+{{ search_box(listing, "") }}{{ filters(listing) }}
+{% call(total, lapsed) summary(listing) %}{{ total }}{% endcall %}
+{{ empty(listing, 2, "") }}{{ pager(view) }}"""
+FORMS = SimpleNamespace(
+    sealed=[(NAME, Decimal(2), Decimal(3))],
+    open=[Decimal(1)],
+    loose=Decimal(2),
+    short_ends=[Decimal(1)],
+    usable=Decimal(4),
+)
+# A zone whose name has no letters, as a time shows it.
+ZONE = ZoneInfo("Etc/GMT-3")
+RETIRED_PARTS = """{% from "_retired_record.html" import retired_record, retire_section
+  with context %}{% from "_retired.html" import retired %}
+{% for person in [true, false] %}
+{% call retired_record(row, person=person) %}{% endcall %}
+{% call retire_section("", person=person) %}{% endcall %}
+{% endfor %}{{ retired(row) }}"""
+
+
+def retired_parts() -> str:
+    row = SimpleNamespace(retired_at=datetime(2026, 11, 15, tzinfo=UTC))
+    return " ".join(
+        from_macros(RETIRED_PARTS, row=row, here="/here", zone=ZONE, retired_by=by)
+        for by in (NAME, None)
+    )
+
+
 COVERED: dict[str, Callable[[], str]] = {
     "every phrase named as a constant": lambda: " ".join(
         str(phrase) for phrase in named_phrases()
@@ -244,6 +352,51 @@ COVERED: dict[str, Callable[[], str]] = {
     "_retired_holding.html": lambda: templates.get_template(
         "_retired_holding.html"
     ).render(retired_places=[SHELF, SHELF], counts_path="/admin/counts"),
+    "page.html": lambda: without_brand(
+        render(
+            "page.html",
+            **SIGNED_IN,
+            tags=SimpleNamespace(styles=[], preloads=[], scripts=[]),
+        )
+    ),
+    "error.html, admin_base.html and _masthead.html": lambda: without_brand(
+        render("error.html", **SIGNED_IN, words=NAME)
+    ),
+    "_listing.html, narrowed by a search": lambda: from_macros(
+        LISTING_PARTS, view=VIEW, listing=listing()
+    ),
+    "_listing.html, narrowed by a pick": lambda: from_macros(
+        LISTING_PARTS, view=VIEW, listing=listing(picked=NAME, lapsed="inactive")
+    ),
+    "_listing.html, not narrowed": lambda: from_macros(
+        LISTING_PARTS, view=VIEW, listing=listing(narrowed=False, search="")
+    ),
+    "_listing.html, filtered": lambda: from_macros(
+        LISTING_PARTS,
+        view=VIEW,
+        listing=listing(narrowed=False, search="", show="current"),
+    ),
+    "_forms.html": lambda: from_macros(
+        '{% from "_forms.html" import forms_lines %}{{ forms_lines(f, unit) }}',
+        f=FORMS,
+        unit=NAME,
+    ),
+    "_retired_record.html and _retired.html": retired_parts,
+    "_notice.html": lambda: render(
+        "_notice.html", notice=NAME, notice_section=None, section_id=None, undo="/"
+    ),
+    "_shown_once.html": lambda: render("_shown_once.html"),
+    "_code_field.html": lambda: " ".join(
+        render("_code_field.html", code_totp=totp, totp_only=only, limits={})
+        for totp, only in ((True, True), (True, False), (False, False))
+    ),
+    "_totp_fields.html": lambda: render(
+        "_totp_fields.html", values={}, problems={}, limits={}, totp_optional=True
+    ),
+    "_print_controls.html": lambda: from_macros(
+        '{% from "_print_controls.html" import print_controls %}'
+        '{% call print_controls("") %}{% endcall %}'
+    ),
 }
 
 
@@ -251,7 +404,8 @@ COVERED: dict[str, Callable[[], str]] = {
 def test_what_has_moved_says_nothing_in_plain_english(part: str) -> None:
     with speaking(PSEUDO):
         shown = COVERED[part]()
-    words = re.sub(r"<[^>]*>", " ", shown)
+    # What people read: neither scripts, tags nor character references.
+    words = re.sub(r"<script.*?</script>|<[^>]*>|&\w+;", " ", shown, flags=re.DOTALL)
     assert re.findall(r"[A-Za-z]{2,}", words) == []
     assert words.strip()
 

@@ -6,19 +6,24 @@ retired (admin/common.retired_by), the call's body, what that means, and
 its one action, bringing it back, unless `restore` is false, for a page
 whose own form does that. -#}
 {% macro retired_record(row, person=false, restore=true) -%}
-{% set them = "them" if person else "it" %}
-<p><span class="tag">Retired</span> on {{ row.retired_at | when(zone) }}{% if retired_by %} by {{ retired_by }}{% endif %}.</p>
-<p>{{ caller() }} Bring {{ them }} back to change anything here.</p>
-{% if restore %}<form method="post" action="{{ here }}/restore"><button class="primary">Bring {{ them }} back</button></form>{% endif %}
+{% set retired_on = row.retired_at | when(zone) %}
+<p>{% if retired_by %}{% trans when=retired_on, by=retired_by %}<span class="tag">Retired</span> on {{ when }} by {{ by }}.{% endtrans %}
+{%- else %}{% trans when=retired_on %}<span class="tag">Retired</span> on {{ when }}.{% endtrans %}{% endif %}</p>
+<p>{{ caller() }} {% if person %}{% trans %}Bring them back to change anything here.{% endtrans %}
+{%- else %}{% trans %}Bring it back to change anything here.{% endtrans %}{% endif %}</p>
+{% if restore %}<form method="post" action="{{ here }}/restore"><button class="primary">
+{%- if person %}{% trans %}Bring them back{% endtrans %}{% else %}{% trans %}Bring it back{% endtrans %}{% endif -%}
+</button></form>{% endif %}
 {%- endmacro %}
 
-{#- The last section of a current record's page: retiring it, one tap, as
-it can be undone; frontend/src/retire.ts asks first while the page has
-changes not saved. The call's body says what retiring means. -#}
-{% macro retire_section(kind, person=false) -%}
+{#- The last section of a current record's page, `heading` its title:
+retiring it, one tap, as it can be undone; frontend/src/retire.ts asks
+first while the page has changes not saved. The call's body says what
+retiring means. -#}
+{% macro retire_section(heading, person=false) -%}
 <section id="retire">
-  <h2>Retire this {{ kind }}</h2>
-  <p class="hint">{{ caller() }} You can bring {{ "them" if person else "it" }} back.</p>
-  <form method="post" action="{{ here }}/retire" data-retire><button>Retire</button></form>
+  <h2>{{ heading }}</h2>
+  <p class="hint">{{ caller() }} {% if person %}{% trans %}You can bring them back.{% endtrans %}{% else %}{% trans %}You can bring it back.{% endtrans %}{% endif %}</p>
+  <form method="post" action="{{ here }}/retire" data-retire><button>{% trans %}Retire{% endtrans %}</button></form>
 </section>
 {%- endmacro %}

@@ -3,12 +3,12 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>{{ title }} · NYC Mesh Inventory</title>
+  <title>{{ title }} · {{ BRAND }}</title>
   {% include "_tags.html" %}
 </head>
 <body>
   {% include "_masthead.html" %}
   <div id="app"></div>
-  <noscript>This page needs JavaScript.</noscript>
+  <noscript>{% trans %}This page needs JavaScript.{% endtrans %}</noscript>
 </body>
 </html>

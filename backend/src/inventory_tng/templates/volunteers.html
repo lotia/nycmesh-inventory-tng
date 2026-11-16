@@ -3,7 +3,7 @@
 {% from "_listing.html" import search_box, filters, filter_form, sizes, sort_heading, summary, empty, pager %}
 {% block main %}
 {% set view = listing.view %}
-{{ search_box(listing, "volunteers") }}
+{{ search_box(listing, _("Find volunteers")) }}
 {{ filters(listing) }}
 {% call filter_form(view) %}
   <label>Filter by holding stock
@@ -16,7 +16,10 @@
 {% endcall %}
 
 <section>
-  {{ summary(listing, "volunteer", "volunteers") }}
+  {% call(total, lapsed) summary(listing) -%}
+  {%- if lapsed %}{% trans count=total %}{{ count }} retired volunteer{% pluralize %}{{ count }} retired volunteers{% endtrans %}
+  {%- else %}{% trans count=total %}{{ count }} volunteer{% pluralize %}{{ count }} volunteers{% endtrans %}{% endif -%}
+  {%- endcall %}
   {{ sizes(view) }}
   {% call table() %}
     <tr>{{ sort_heading(view, "name", "Volunteer") }}
@@ -31,7 +34,7 @@
       <td class="hidden sm:table-cell">{{ "yes" if holds else "" }}</td>
     </tr>
     {% else %}
-    {{ empty(listing, 2, "None yet: add one below.") }}
+    {{ empty(listing, 2, _("None yet: add one below.")) }}
     {% endfor %}
   {% endcall %}
   {{ pager(listing.view) }}

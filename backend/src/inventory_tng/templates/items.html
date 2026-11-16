@@ -3,7 +3,7 @@
 {% from "_listing.html" import search_box, filters, filter_form, sizes, sort_heading, summary, empty, pager %}
 {% block main %}
 {% set view = listing.view %}
-{{ search_box(listing, "items") }}
+{{ search_box(listing, _("Find items")) }}
 {{ filters(listing) }}
 {% call filter_form(view) %}
   <label>Filter by category
@@ -20,7 +20,10 @@
 address, to come back to. #}
 <form method="post" action="{{ here }}/tracking{{ view.query_string }}" id="track-items"></form>
 <section>
-  {{ summary(listing, "item", "items") }}
+  {% call(total, lapsed) summary(listing) -%}
+  {%- if lapsed %}{% trans count=total %}{{ count }} retired item{% pluralize %}{{ count }} retired items{% endtrans %}
+  {%- else %}{% trans count=total %}{{ count }} item{% pluralize %}{{ count }} items{% endtrans %}{% endif -%}
+  {%- endcall %}
   {{ sizes(view) }}
   {% call table() %}
     <tr><th>Pick</th>{{ sort_heading(view, "name", "Item") }}
@@ -41,7 +44,7 @@ address, to come back to. #}
       <td class="hidden sm:table-cell">{{ part }}</td>
     </tr>
     {% else %}
-    {{ empty(listing, 5, "None yet: add one below.") }}
+    {{ empty(listing, 5, _("None yet: add one below.")) }}
     {% endfor %}
   {% endcall %}
   {{ pager(listing.view) }}

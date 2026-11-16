@@ -24,7 +24,7 @@
 </section>
 
 {% if not retired %}
-{% call retire_section("category") %}Nobody can pick it for an item any more. Move or retire its
+{% call retire_section(_("Retire this category")) %}Nobody can pick it for an item any more. Move or retire its
   items first.{% endcall %}
 {% endif %}
 {% endblock %}

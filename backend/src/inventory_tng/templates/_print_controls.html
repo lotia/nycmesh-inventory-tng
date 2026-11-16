@@ -7,11 +7,11 @@ hint below the button. -#}
   {#- Not a form: nothing is sent, and Enter must not leave the page. #}
   <div class="flex flex-col items-start gap-4 *:my-0">
     <fieldset>
-      <legend>Paper</legend>
-      <label><input type="radio" name="paper" value="letter" checked> US Letter</label>
-      <label><input type="radio" name="paper" value="a4"> A4</label>
+      <legend>{% trans %}Paper{% endtrans %}</legend>
+      <label><input type="radio" name="paper" value="letter" checked> {% trans %}US Letter{% endtrans %}</label>
+      <label><input type="radio" name="paper" value="a4"> {% trans %}A4{% endtrans %}</label>
     </fieldset>
-    <button type="button" onclick="print()">Print</button>
+    <button type="button" onclick="print()">{% trans %}Print{% endtrans %}</button>
     <p class="hint">{{ caller() }}</p>
   </div>
 </section>

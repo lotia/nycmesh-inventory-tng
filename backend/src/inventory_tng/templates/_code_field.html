@@ -1,10 +1,10 @@
 {# The code a sensitive action asks for: `code_totp` whether the one acting uses TOTP, `field` the field's name (sign_in.CONFIRM_FIELD), `totp_only` where a recovery code will not do. #}
 {% if code_totp %}
-<label>Your code <span class="hint">from your authenticator{% if not totp_only %}, or a recovery code{% endif %}</span>
+<label>{% trans %}Your code{% endtrans %} <span class="hint">{% if totp_only %}{% trans %}from your authenticator{% endtrans %}{% else %}{% trans %}from your authenticator, or a recovery code{% endtrans %}{% endif %}</span>
   <input name="{{ field }}" autocomplete="one-time-code" maxlength="{{ limits.code_max }}" required{% if autofocus %} autofocus{% endif %}>
 </label>
 {% else %}
-<label>Your password
+<label>{% trans %}Your password{% endtrans %}
   <input name="{{ field }}" type="password" autocomplete="current-password" required{% if autofocus %} autofocus{% endif %}>
 </label>
 {% endif %}

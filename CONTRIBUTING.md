@@ -835,7 +835,10 @@ On the server (`backend/src/inventory_tng/phrases.py`):
   `{% trans name=place.name %}Start counting {{ name }}{% endtrans %}`. A
   plural takes `count`: `{% trans count=places | length %}{{ count }}
   place{% pluralize %}{{ count }} places{% endtrans %}`. Values are
-  escaped, and the lines of a message read as one.
+  escaped, and the lines of a message read as one. Words a template
+  passes as a value, such as a macro's argument, are `_("Find items")`.
+  A sentence with a link in it is one message, the link's markup inside
+  it.
 - In Python, name a phrase as a constant, said when it is shown:
   `RESET_NOTICE = lazy_gettext("Your account is reset: sign in.")`. A
   phrase with values, or a plural, is a function that says it with
@@ -850,7 +853,8 @@ On the server (`backend/src/inventory_tng/phrases.py`):
   test refuses a lone one.
 - The app's name is `phrases.BRAND`, the same in every language: a
   message takes it as a value, `%(brand)s`, never as words of its own.
-  Mail says such a message with `mail.branded`, which fills it in.
+  Mail says such a message with `mail.branded`, which fills it in; a
+  template writes `{{ BRAND }}`.
 
 On the scan page (`frontend/src/i18n.ts`):
 

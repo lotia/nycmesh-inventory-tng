@@ -4,7 +4,7 @@ page or a redirect is sent."""
 from collections.abc import Callable, Mapping
 from decimal import Decimal
 from pathlib import Path
-from typing import Any, NamedTuple, NoReturn
+from typing import Any, NamedTuple, NoReturn, cast
 from urllib.parse import urlencode
 
 from babel.support import LazyProxy
@@ -18,10 +18,12 @@ from starlette.types import Scope
 
 from inventory_tng.db import Gone
 from inventory_tng.local_time import show, show_day
-from inventory_tng.phrases import install, lazy_gettext, ngettext
+from inventory_tng.phrases import BRAND, install, lazy_gettext, ngettext
 
 templates = Jinja2Templates(directory=Path(__file__).parent / "templates")
 install(templates.env)
+# The app's name, the same in every language (phrases.BRAND).
+cast(dict[str, Any], templates.env.globals)["BRAND"] = BRAND
 # {{ moment | when(zone) }}: a stored UTC time as people read it
 # (docs/decisions/0013); {{ moment | day(zone) }}, its day alone ("14 Nov").
 templates.env.filters["when"] = show

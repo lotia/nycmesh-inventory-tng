@@ -56,7 +56,7 @@ count as theirs.{% else %}The scan page doesn't offer them.{% endif %}{% endcall
 {% endif %}
 
 {% if not retired %}
-{% call retire_section("volunteer", person=true) %}The scan page stops offering them; their past records stay
+{% call retire_section(_("Retire this volunteer"), person=true) %}The scan page stops offering them; their past records stay
   theirs.{% endcall %}
 {% endif %}
 {% endblock %}

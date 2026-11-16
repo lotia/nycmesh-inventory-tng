@@ -209,7 +209,7 @@ None is left, so nobody can pick it.{% endif %}{% endcall %}
 {% endif %}
 
 {% if not retired %}
-{% call retire_section("item") %}It can't be received any more, though volunteers can still
+{% call retire_section(_("Retire this item")) %}It can't be received any more, though volunteers can still
   take what is left.{% endcall %}
 {% endif %}
 {% endblock %}

@@ -53,7 +53,7 @@
 {% endif %}
 
 {% if location.kind != "custody" and not retired %}
-{% call retire_section("location") %}Nobody can pick it any more. Move what is here elsewhere, or
+{% call retire_section(_("Retire this location")) %}Nobody can pick it any more. Move what is here elsewhere, or
   count it, first.{% endcall %}
 {% endif %}
 {% endblock %}

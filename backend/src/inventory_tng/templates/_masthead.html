@@ -11,7 +11,7 @@ its own page, "true" on a page inside it (docs/decisions/0019). -#}
 {%- endmacro %}
 
 {% macro sections_links() %}
-<a href="{{ paths.home }}"{{ current(paths.home, exact=true) }}>Home</a>
+<a href="{{ paths.home }}"{{ current(paths.home, exact=true) }}>{% trans %}Home{% endtrans %}</a>
 {% for path, label, badge in sections %}<a href="{{ path }}"{{ current(path) }}>{{ label }}
 {%- if badge %} <span class="badge"><span aria-hidden="true">{{ badge.count }}</span><span class="sr-only">: {{ badge.words }}</span></span>{% endif -%}
 </a>{% endfor %}
@@ -19,9 +19,10 @@ its own page, "true" on a page inside it (docs/decisions/0019). -#}
 
 {#- One's own account, apart from the sections (docs/decisions/0019). -#}
 {% macro your_account(classes) %}
-<nav class="signed-in {{ classes }}" aria-label="Your account">
-  <span>Signed in as <a href="{{ paths.account }}" aria-label="{{ admin.username }}, your account"{{ current(paths.account) }}><strong>{{ admin.username }}</strong></a></span>
-  <form method="post" action="{{ paths.sign_out }}"><button>Sign out</button></form>
+<nav class="signed-in {{ classes }}" aria-label="{% trans %}Your account{% endtrans %}">
+  {%- set account %}<a href="{{ paths.account }}" aria-label="{% trans name=admin.username %}{{ name }}, your account{% endtrans %}"{{ current(paths.account) }}><strong>{{ admin.username }}</strong></a>{% endset %}
+  <span>{% trans account=account %}Signed in as {{ account }}{% endtrans %}</span>
+  <form method="post" action="{{ paths.sign_out }}"><button>{% trans %}Sign out{% endtrans %}</button></form>
 </nav>
 {% endmacro %}
 
@@ -29,19 +30,21 @@ its own page, "true" on a page inside it (docs/decisions/0019). -#}
   <div class="masthead-inner page-width">
     <a class="brand" href="{{ brand_home | default(paths.home) }}">
       {% include "_nycmesh_logo.svg" %}
-      <span>NYC Mesh</span><span class="brand-rule"></span><span>Inventory</span>
+      {#- The app's name (phrases.BRAND), its last word apart. #}
+      {%- set network, product = BRAND.rsplit(" ", 1) %}
+      <span>{{ network }}</span><span class="brand-rule"></span><span>{{ product }}</span>
     </a>
     {% if admin %}
     {{ your_account("hidden md:flex") }}
-    <button class="md:hidden" popovertarget="menu">Menu</button>
+    <button class="md:hidden" popovertarget="menu">{% trans %}Menu{% endtrans %}</button>
     <div id="menu" class="menu-panel" popover>
-      <nav class="menu-sections" aria-label="Sections">{{ sections_links() }}</nav>
-      <p class="hint mt-4 mb-1" aria-hidden="true">Your account</p>
+      <nav class="menu-sections" aria-label="{% trans %}Sections{% endtrans %}">{{ sections_links() }}</nav>
+      <p class="hint mt-4 mb-1" aria-hidden="true">{% trans %}Your account{% endtrans %}</p>
       {{ your_account("") }}
     </div>
     {% endif %}
   </div>
   {% if admin %}
-  <nav class="sections page-width" aria-label="Sections">{{ sections_links() }}</nav>
+  <nav class="sections page-width" aria-label="{% trans %}Sections{% endtrans %}">{{ sections_links() }}</nav>
   {% endif %}
 </header>

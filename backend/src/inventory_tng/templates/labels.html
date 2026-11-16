@@ -3,7 +3,7 @@
 {% from "_listing.html" import search_box, filters, filter_form, sizes, sort_heading, summary, empty, pager %}
 {% block main %}
 {% set view = listing.view %}
-{{ search_box(listing, "labels") }}
+{{ search_box(listing, _("Find labels")) }}
 {{ filters(listing) }}
 {% call filter_form(view) %}
   <label>Filter by kind
@@ -34,7 +34,10 @@ the list as shown, to come back to if printing is refused. #}
   {% endfor %}
 </form>
 <section>
-  {{ summary(listing, "label", "labels") }}
+  {% call(total, lapsed) summary(listing) -%}
+  {%- if lapsed %}{% trans count=total %}{{ count }} inactive label{% pluralize %}{{ count }} inactive labels{% endtrans %}
+  {%- else %}{% trans count=total %}{{ count }} label{% pluralize %}{{ count }} labels{% endtrans %}{% endif -%}
+  {%- endcall %}
   {% if listing.show != "current" %}<p class="hint">The scan page doesn't read a label tagged here.</p>{% endif %}
   {{ sizes(view) }}
   {% call table() %}
@@ -54,7 +57,7 @@ the list as shown, to come back to if printing is refused. #}
       <td>{% if named.current %}<a href="{{ here }}/{{ label.id }}/revoke">Revoke<span class="sr-only"> {{ label.code }}</span></a>{% endif %}</td>
     </tr>
     {% else %}
-    {{ empty(listing, 5, "None yet: make one from an item's or a place's page.") }}
+    {{ empty(listing, 5, _("None yet: make one from an item's or a place's page.")) }}
     {% endfor %}
   {% endcall %}
   {{ pager(listing.view) }}
