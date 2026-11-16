@@ -24,8 +24,10 @@ from helpers.mail import SentMail
 from helpers.sign_in import (
     PASSWORD,
     RECOVERY_CODE,
+    TIME_STEP,
     TOTP_KEYS,
     app_clock,
+    code,
     codes_with_left,
     new_admin,
     once,
@@ -288,8 +290,8 @@ def test_new_recovery_codes(
     asked = client.post(f"{ACCOUNT}/recovery-codes", data=once())
     assert asked.status_code == 403
     assert "or a recovery code" not in text(asked)
-    with app_clock() as shown:
-        form = once(**{sign_in.CONFIRM_FIELD: shown(ada[1], later=True)})
+    with app_clock() as at:
+        form = once(**{sign_in.CONFIRM_FIELD: code(ada[1], at + TIME_STEP)})
         made = client.post(f"{ACCOUNT}/recovery-codes", data=form)
     codes = re.findall(RECOVERY_CODE, made.text)
     assert len(codes) == accounts.RECOVERY_CODES
@@ -311,8 +313,8 @@ def test_a_recovery_code_does_not_make_new_ones(
     refused = client.post(f"{ACCOUNT}/recovery-codes", data=form)
     assert refused.status_code == 400
     assert accounts.recovery_codes_left(session, ada.id) == accounts.RECOVERY_CODES - 1
-    with app_clock() as shown:
-        form = once(**{sign_in.CONFIRM_FIELD: shown(key, later=True)})
+    with app_clock() as at:
+        form = once(**{sign_in.CONFIRM_FIELD: code(key, at + TIME_STEP)})
         made = client.post(f"{ACCOUNT}/recovery-codes", data=form)
     assert made.status_code == 200
     assert "recovery_codes_made" in [m.kind for m in sent_mail]
@@ -351,8 +353,12 @@ def test_the_owner_is_told_when_an_authenticator_comes_or_goes(
     _, key = new_admin(session, email="ada@example.org")
     sign_in_with(client, key=key)
     new_key = accounts.new_totp_key()
-    with app_clock() as shown:
-        form = {"authenticator_name": "Laptop", "key": new_key, "code": shown(new_key)}
+    with app_clock() as at:
+        form = {
+            "authenticator_name": "Laptop",
+            "key": new_key,
+            "code": code(new_key, at),
+        }
         assert client.post(sign_in.NEW_AUTHENTICATOR, data=form).status_code == 303
     laptop = session.scalars(
         select(Authenticator).where(Authenticator.name == "Laptop")
@@ -442,8 +448,8 @@ def test_a_late_form_asks_for_a_code_and_keeps_what_was_typed(
     )
     assert wrong.status_code == 400
     assert 'value="ada@example.org"' in text(wrong)
-    with app_clock() as shown:
-        later = shown(key, later=True)
+    with app_clock() as at:
+        later = code(key, at + TIME_STEP)
         done = client.post(
             f"{ACCOUNT}/email",
             data={"email": "ada@example.org", sign_in.CONFIRM_FIELD: later},
@@ -478,11 +484,15 @@ def test_a_late_new_authenticator_keeps_its_key(
     new_key = accounts.new_totp_key()
     close_window(session)
     _, key = ada
-    with app_clock() as shown:
-        form = {"authenticator_name": "Laptop", "key": new_key, "code": shown(new_key)}
+    with app_clock() as at:
+        form = {
+            "authenticator_name": "Laptop",
+            "key": new_key,
+            "code": code(new_key, at),
+        }
         asked = client.post(sign_in.NEW_AUTHENTICATOR, data=form)
         assert f'value="{new_key}"' in asked.text
-        later = {sign_in.CONFIRM_FIELD: shown(key, later=True)}
+        later = {sign_in.CONFIRM_FIELD: code(key, at + TIME_STEP)}
         done = client.post(sign_in.NEW_AUTHENTICATOR, data=form | later)
     assert done.headers["location"] == sign_in.HOME
     names = {a.name for a in session.scalars(select(Authenticator))}

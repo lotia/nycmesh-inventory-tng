@@ -20,7 +20,15 @@ from inventory_tng.once import SENT_AGAIN
 
 from helpers.mail import NO_MAIL, SentMail
 from helpers.rows import tag
-from helpers.sign_in import app_clock, new_admin, sign_in_with, text, with_code
+from helpers.sign_in import (
+    TIME_STEP,
+    app_clock,
+    code,
+    new_admin,
+    sign_in_with,
+    text,
+    with_code,
+)
 
 AGAIN = "That form was already sent"
 CANT_SHOW = "Back and Forward can't show this page again"
@@ -95,8 +103,8 @@ def test_recovery_codes_are_made_once(
     sign_in_with(client, key=key)
     action = f"{ACCOUNT}/recovery-codes"
     referer = {"referer": f"https://testserver{ACCOUNT}"}
-    with app_clock() as shown:
-        later = shown(key, later=True)
+    with app_clock() as at:
+        later = code(key, at + TIME_STEP)
         form = {"once": key_on(client.get(ACCOUNT), action), "confirm_code": later}
         made = client.post(action, data=form, headers=referer)
         again = client.post(action, data=form, headers=referer)

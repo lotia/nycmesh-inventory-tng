@@ -43,6 +43,7 @@ from inventory_tng.settings import RateLimits
 from helpers.sign_in import (
     PASSWORD,
     RECOVERY_CODE,
+    TIME_STEP,
     TOTP_KEYS,
     app_clock,
     code,
@@ -93,8 +94,8 @@ def test_setup_makes_the_first_admin_signed_in_with_recovery_codes(
     client: TestClient, session: Session
 ) -> None:
     key = hidden_key(client.get(sign_in.SETUP))
-    with app_clock() as shown:
-        form = setup_form(key, code=shown(key))
+    with app_clock() as at:
+        form = setup_form(key, code=code(key, at))
         response = client.post(sign_in.SETUP, data=form)
     assert response.status_code == 200
     codes = re.findall(RECOVERY_CODE, response.text)
@@ -253,8 +254,8 @@ def test_an_unknown_name_is_checked_against_a_password_all_the_same(
 
 def test_a_code_works_once(client: TestClient, session: Session) -> None:
     _, key = new_admin(session)
-    with app_clock() as shown:
-        once = shown(key)
+    with app_clock() as at:
+        once = code(key, at)
         assert sign_in_with(client, code=once).status_code == 303
         client.cookies.clear()
         assert sign_in_with(client, code=once).status_code == 400
@@ -284,18 +285,25 @@ def test_forms_held_up_past_a_time_step_still_take_their_codes(
         sign_in, "_now", lambda: datetime.now(UTC) + timedelta(minutes=1)
     )
     key = hidden_key(client.get(sign_in.SETUP))
-    with app_clock() as shown:
-        form = setup_form(key, code=shown(key))
+    with app_clock() as at:
+        form = setup_form(key, code=code(key, at))
         assert client.post(sign_in.SETUP, data=form).status_code == 200
     new_key = accounts.new_totp_key()
-    with app_clock() as shown:
-        form = {"authenticator_name": "Laptop", "key": new_key, "code": shown(new_key)}
+    with app_clock() as at:
+        form = {
+            "authenticator_name": "Laptop",
+            "key": new_key,
+            "code": code(new_key, at),
+        }
         assert client.post(sign_in.NEW_AUTHENTICATOR, data=form).status_code == 303
     row = session.scalars(select(AdminSession)).one()
     row.confirmed_at = row.last_sensitive_at = datetime.now(UTC) - timedelta(hours=2)
     session.flush()
-    with app_clock() as shown:
-        confirm = {sign_in.CONFIRM_FIELD: shown(key, later=True), "next": sign_in.HOME}
+    with app_clock() as at:
+        confirm = {
+            sign_in.CONFIRM_FIELD: code(key, at + TIME_STEP),
+            "next": sign_in.HOME,
+        }
         assert client.post(sign_in.CONFIRM, data=confirm).status_code == 303
 
 
@@ -379,10 +387,10 @@ def test_required_totp_sends_an_admin_without_it_to_set_it_up(
     form = client.get(sign_in.NEW_AUTHENTICATOR)
     assert "needs an authenticator app" in form.text
     key = hidden_key(form)
-    with app_clock() as shown:
+    with app_clock() as at:
         saved = client.post(
             sign_in.NEW_AUTHENTICATOR,
-            data={"authenticator_name": "Phone", "key": key, "code": shown(key)},
+            data={"authenticator_name": "Phone", "key": key, "code": code(key, at)},
         )
     assert str(sign_in.RECOVERY_CODES_TITLE) in saved.text
     assert client.get(sign_in.HOME).status_code == 200
@@ -562,8 +570,8 @@ def test_a_sensitive_page_asks_for_a_code_then_carries_on(
         sign_in.CONFIRM, data={sign_in.CONFIRM_FIELD: "12345", "next": "/x"}
     )
     assert wrong.status_code == 400
-    with app_clock() as shown:
-        later = shown(key, later=True)
+    with app_clock() as at:
+        later = code(key, at + TIME_STEP)
         done = client.post(
             sign_in.CONFIRM,
             data={sign_in.CONFIRM_FIELD: later, "next": sign_in.NEW_AUTHENTICATOR},
@@ -616,10 +624,10 @@ def test_a_second_authenticator_needs_its_own_name(
         data={"authenticator_name": "phone", "key": key, "code": code(key)},
     )
     assert str(sign_in.NAME_TAKEN) in text(taken)
-    with app_clock() as shown:
+    with app_clock() as at:
         added = client.post(
             sign_in.NEW_AUTHENTICATOR,
-            data={"authenticator_name": "Laptop", "key": key, "code": shown(key)},
+            data={"authenticator_name": "Laptop", "key": key, "code": code(key, at)},
         )
     # Not the first, so no new recovery codes.
     assert added.headers["location"] == sign_in.HOME
@@ -633,10 +641,10 @@ def test_a_name_taken_meanwhile_is_refused_by_its_index(
     signed_in_row(client, session)
     monkeypatch.setattr(accounts, "authenticator_named", lambda *_: False)
     key = hidden_key(client.get(sign_in.NEW_AUTHENTICATOR))
-    with app_clock() as shown:
+    with app_clock() as at:
         taken = client.post(
             sign_in.NEW_AUTHENTICATOR,
-            data={"authenticator_name": "phone", "key": key, "code": shown(key)},
+            data={"authenticator_name": "phone", "key": key, "code": code(key, at)},
         )
     assert taken.status_code == 400
     assert str(sign_in.NAME_TAKEN) in text(taken)

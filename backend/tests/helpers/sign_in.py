@@ -6,7 +6,6 @@ import html
 import uuid
 from collections.abc import Generator
 from datetime import UTC, datetime, timedelta
-from typing import Protocol
 
 import pyotp
 import pytest
@@ -122,27 +121,23 @@ def policy(session: Session, value: str) -> None:
     session.flush()
 
 
-class Shown(Protocol):
-    def __call__(self, key: str | None, *, later: bool = False) -> str: ...
+# How long an authenticator shows each code.
+TIME_STEP = timedelta(seconds=accounts.TOTP_INTERVAL)
 
 
 @contextlib.contextmanager
-def app_clock() -> Generator[Shown]:
-    """The clock that checks codes (sign_in._now) held at this moment, for
-    every thread, through the block; and what an authenticator shows then:
-    shown(key), or with later=True the next step's, as the one now is
-    spent. A request held up past the time step after its code's, as on a
-    busy machine, would otherwise be refused, as the app rightly refuses a
-    code that old (inventory-tng-tuie)."""
+def app_clock() -> Generator[datetime]:
+    """Hold the clock that checks codes (sign_in._now) at this moment, for
+    the block and every thread, and give that moment: code(key, at) is the
+    code shown now, code(key, at + TIME_STEP) the next one.
+
+    Without it a code made on the wall clock can be refused when a busy
+    machine holds the request up past the code's time step
+    (inventory-tng-tuie)."""
     at = datetime.now(UTC)
-    step = timedelta(seconds=accounts.TOTP_INTERVAL)
-
-    def shown(key: str | None, *, later: bool = False) -> str:
-        return code(key, at + step if later else at)
-
     with pytest.MonkeyPatch.context() as patch:
         patch.setattr(sign_in, "_now", lambda: at)
-        yield shown
+        yield at
 
 
 # sign_in_with's key when no code is typed: None is a missing key.
@@ -158,15 +153,15 @@ def sign_in_with(
     later: bool = False,
     **form: str,
 ) -> Response:
-    """Sign in; with `key`, typing its code (app_clock)."""
+    """Sign in; with `key`, typing its code (app_clock), or with later=True
+    the next one, as the one now is spent."""
     data = {"username": username, "password": password} | form
     if key == _NO_KEY:
         return client.post(sign_in.SIGN_IN, data=data)
     assert "code" not in form, "a key or a code, not both"
-    with app_clock() as shown:
-        return client.post(
-            sign_in.SIGN_IN, data=data | {"code": shown(key, later=later)}
-        )
+    with app_clock() as at:
+        typed = code(key, at + TIME_STEP if later else at)
+        return client.post(sign_in.SIGN_IN, data=data | {"code": typed})
 
 
 def text(response: Response) -> str:

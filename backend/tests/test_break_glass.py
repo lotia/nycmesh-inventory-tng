@@ -23,6 +23,7 @@ from helpers.mail import NO_MAIL, SentMail
 from helpers.sign_in import (
     TOTP_KEYS,
     app_clock,
+    code,
     codes_with_left,
     new_admin,
     policy,
@@ -279,8 +280,12 @@ def test_setting_up_again_keeps_the_printed_codes(
     client = make_client()
     sign_in_with(client, code=left[0])
     new_key = accounts.new_totp_key()
-    with app_clock() as shown:
-        form = {"authenticator_name": "Laptop", "key": new_key, "code": shown(new_key)}
+    with app_clock() as at:
+        form = {
+            "authenticator_name": "Laptop",
+            "key": new_key,
+            "code": code(new_key, at),
+        }
         assert client.post(sign_in.NEW_AUTHENTICATOR, data=form).status_code == 303
     assert not ada.must_set_up_totp
     assert accounts.recovery_codes_left(session, ada.id) == 2
