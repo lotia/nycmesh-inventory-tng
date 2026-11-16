@@ -42,9 +42,9 @@ export async function ownVolunteer(page: Page): Promise<string> {
 
 /**
  * Adds the item filled in on the items page, saying it is a different item
- * if its name is close to another's, which is asked once. Waits for its
- * page, headed by it as `shown`: named, as the list's own heading matches
- * before then. The heading.
+ * if its name is close to another's, which is asked once. Waits for the
+ * item's page by its heading, `shown` exactly, since the list's own heading
+ * is also a level-1 heading. That heading.
  */
 export async function addItem(page: Page, shown: string): Promise<Locator> {
   const add = page.getByRole("button", { name: "Add", exact: true });
