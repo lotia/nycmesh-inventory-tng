@@ -104,6 +104,39 @@ def test_the_form_edits_the_name_as_typed_and_says_how_it_is_shown(
     assert [each["name"] for each in suggested.json()] == [shown]
 
 
+def test_a_form_sent_back_shows_the_name_as_the_unit_answered_reads_it(
+    admin_client: TestClient, session: Session, cables: Category
+) -> None:
+    """Not saved, as its name is close to another's, the form says how the
+    name will be shown as the unit answered in it reads it, as saving would
+    (inventory-tng-nbo). A package's and an alias's forms alike."""
+    mark = tag()
+    add(session, Item(name=f"Box {mark} 10g spare", category_id=cables.id))
+    session.flush()
+    form = {"name": f"Box {mark} 10g", "category_id": str(cables.id), "unit": "each"}
+    asked = text(admin_client.post(ITEMS, data=form))
+    assert "Shown as" not in asked
+    close = text(admin_client.post(ITEMS, data=form | {"unit:g": "Gbit/s"}))
+    assert "A different item?" in close
+    assert f"Shown as Box {mark} 10{NB}g." in close
+    # Answered as not a unit: as typed, so nothing more.
+    kept = text(admin_client.post(ITEMS, data=form | {"unit:g": "none"}))
+    assert "A different item?" in kept
+    assert "Shown as" not in kept
+    # Refused for another reason, on its page.
+    item = add(session, Item(name=f"Hub {mark}", category_id=cables.id))
+    session.flush()
+    path = f"{ITEMS}/{item.id}"
+    package = {"package_name": "Reel 5g", "size": "0", "unit:g": "Gbit/s"}
+    assert f"Shown as Reel 5{NB}g." in text(
+        admin_client.post(f"{path}/packages", data=package)
+    )
+    alias = {"alias_name": f"Box {mark} 10g spare", "unit:g": "Gbit/s"}
+    taken = text(admin_client.post(f"{path}/aliases", data=alias))
+    assert "already has that name" in taken
+    assert f"Shown as Box {mark} 10{NB}g spare." in taken
+
+
 def test_a_name_shown_as_typed_says_nothing_more(
     admin_client: TestClient, session: Session, cables: Category
 ) -> None:

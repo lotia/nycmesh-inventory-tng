@@ -1,4 +1,4 @@
-{#- How the units in a name are read (units.found_in, docs/decisions/0021, Ali, 2026-11-15): a name is saved as typed; under it, each unit's reading, with "Not right?" to correct it, and where nothing settles one, the question, asked once. An answer or a correction is kept as a reading rule for the unit after a number as the form saves, which then wins over the words near it; a reading those words settle says them. `typed` is the name in the field, `sent` the form sent, holding any answer. Then how the name is shown, where that is not as saved (units.shown_name, Ali, 2026-11-15). -#}
+{#- How the units in a name are read (units.found_in, docs/decisions/0021, Ali, 2026-11-15): a name is saved as typed; under it, each unit's reading, with "Not right?" to correct it, and where nothing settles one, the question, asked once. An answer or a correction is kept as a reading rule for the unit after a number as the form saves, which then wins over the words near it; a reading those words settle says them. `typed` is the name in the field, `sent` the form sent, holding any answer. Then how the name is shown, where that is not as saved (units.shown_name, Ali, 2026-11-15), as the answers in `sent` read it, as saving it would. -#}
 {% for each in units_read(typed) %}
 {% set field = reading_field ~ each.key %}
 {% set chosen = sent.get(field, "") %}
@@ -32,5 +32,5 @@
 </div>
 {% endif %}
 {% endfor %}
-{% set shown = shown_as(typed) %}
+{% set shown = shown_as(typed, sent) %}
 {% if shown %}<p class="hint">Shown as {{ shown }}.</p>{% endif %}

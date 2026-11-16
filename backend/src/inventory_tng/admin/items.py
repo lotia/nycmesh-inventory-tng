@@ -6,7 +6,6 @@ received (docs/decisions/0003)."""
 from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass, field
 from decimal import Decimal
-from functools import cache
 from typing import Annotated, Literal
 
 import structlog
@@ -266,26 +265,21 @@ def _name_field(session: Session, similar: Sequence[items.Close]) -> dict[str, o
     """What _item_name.html and _units_read.html need besides the form's
     values: units_read, what may be units in a name as typed, as the
     reading rules read them, and shown_as, how a name typed is shown where
-    that is not as saved (units.shown_name, Ali, 2026-11-15)."""
+    that is not as saved (units.shown_name, Ali, 2026-11-15), read as the
+    form sent answers it, as saving it would (inventory-tng-nbo)."""
     rules = rules_held(session)
-
-    # Each name typed read once, though both below read it.
-    @cache
-    def found_in(typed: str) -> tuple[str, list[units.Found]]:
-        name = canonical(typed.strip())
-        return name, units.found_in(name, rules)
 
     def units_read(typed: str) -> list[units.Found]:
         # One per unit as typed, as one answer reads them all.
         once: dict[str, units.Found] = {}
-        for each in found_in(typed)[1]:
+        for each in units.found_in(canonical(typed.strip()), rules):
             once.setdefault(each.key, each)
         return list(once.values())
 
-    def shown_as(typed: str) -> str | None:
-        saved = units.spell(*found_in(typed))
-        shown = units.shown_name(saved, rules)
-        return shown if shown != saved else None
+    def shown_as(typed: str, sent: Mapping[str, str]) -> str | None:
+        read = _read(typed, rules, sent)
+        shown = units.shown_name(read.name, read.rules)
+        return shown if shown != read.name else None
 
     return {
         "similar": similar,
@@ -416,8 +410,12 @@ def _typed_name(session: Session, typed: str, form: Mapping[str, str]) -> Typed:
     reading rule says (units.spell; Ali, 2026-11-15, inventory-tng-c0c.3); the
     units still to ask about; and how `form` says a unit is read, where that is
     new: an answer, or a correction of what it was read as."""
+    return _read(typed, rules_held(session), form)
+
+
+def _read(typed: str, rules: units.Rules, form: Mapping[str, str]) -> Typed:
+    """_typed_name, by the reading rules `rules`."""
     name = canonical(typed.strip())
-    rules = rules_held(session)
     answered = {}
     for found in units.found_in(name, rules):
         rule = chosen_rule(form.get(READING + found.key, ""), found.offered)
