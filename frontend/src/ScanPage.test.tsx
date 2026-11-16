@@ -1883,23 +1883,51 @@ describe("a newer build", () => {
     expect(screen.queryByRole("button", { name: say(DISMISS) })).toBeNull();
     fireEvent.click(reloadButton() as HTMLElement);
     expect(reload).toHaveBeenCalledOnce();
-    // Loaded again, as the build now current: they are sent as usual.
+    // Loaded again, as the build now current: each is sent as the build
+    // that queued it, which the server still holds back, so each is listed
+    // as an older build's, the first put back in the empty cart.
     cleanup();
-    answer = () => saved();
     const upgraded = new Outbox(
       api,
       localStorage,
       new Builds("2026-11-12T11:00:00.000Z"),
     );
     render(<ScanPage api={api} outbox={upgraded} reload={vi.fn()} />);
+    await screen.findByText(say(ADDED_BACK_PHRASE));
+    expect(upgraded.builds.newer.value).toBeNull();
     await vi.waitFor(() =>
-      expect(upgraded.entries.value.map((each) => each.state)).toEqual([
-        "saved",
-        "saved",
-        "saved",
+      expect(
+        within(
+          screen
+            .getByRole("heading", { name: say(CHECKED_OUT) })
+            .closest("section") as HTMLElement,
+        ).getAllByRole("button", { name: say(ADD_TO_CART) }),
+      ).toHaveLength(2),
+    );
+    expect(screen.queryByText(say(HELD))).toBeNull();
+  });
+
+  test("saves held for the upgrade do not ask to register, which would not send them", async () => {
+    let answer = () => json({ reason: "unregistered" }, 403);
+    const { api } = server(() => answer());
+    const { outbox } = openMine(api);
+    await ready();
+    fillMove();
+    save();
+    fillMove();
+    save();
+    await vi.waitFor(() =>
+      expect(outbox.entries.value.map((each) => each.waitingFor)).toEqual([
+        "registration",
+        "registration",
       ]),
     );
-    expect(within(list()).queryByText(say(HELD))).toBeNull();
+    // Registered, the first sent again is held back as too old.
+    answer = () => json(TOO_OLD, 409);
+    await outbox.send();
+    await vi.waitFor(() => expect(banner()).toBe(MUST_UPGRADE));
+    expectAllHeld(2);
+    expect(within(list()).queryByRole("link")).toBeNull();
   });
 
   test("a save on its way is said in plain small text", async () => {

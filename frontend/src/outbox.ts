@@ -223,7 +223,8 @@ export const Reason = v.union([
       "no_answer",
       // The inventory cannot record just now (503): tried again.
       "unavailable",
-      // This tab's own, or a newer build's, held back as too old.
+      // This tab's own, or a newer build's, held back as too old: the
+      // build's other tabs learn from it that they are too old (listen).
       "must_upgrade",
       // 409 key_reused: the inventory holds its key for another batch.
       "key_reused",
@@ -1058,7 +1059,18 @@ export class Outbox {
           this.forgottenElsewhere.set(batchId(entry.body), entry);
         }
       }
-      this.show(this.read());
+      const entries = this.read();
+      // Another tab of this build held one back: this tab is too old too.
+      if (
+        entries.some(
+          (each) =>
+            each.build === this.builds.build &&
+            each.reason?.code === "must_upgrade",
+        )
+      ) {
+        this.builds.learn("too_old");
+      }
+      this.show(entries);
     };
     const stopFollowing = onStoredChange([STORAGE_KEY], follow);
     target.addEventListener("online", send);

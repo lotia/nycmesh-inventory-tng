@@ -1627,6 +1627,20 @@ describe("listening", () => {
     stop();
   });
 
+  test("another tab of this build held back as too old makes this one too old", () => {
+    const outbox = new Outbox(answering(() => saved()).api);
+    const stop = outbox.listen();
+    const held = { reason: { code: "must_upgrade" as const } };
+    // An older build's tab, sharing the key, is too old, not this one.
+    store(entry({ ...held, build: "2026-11-12T09:00:00.000Z" }));
+    window.dispatchEvent(new StorageEvent("storage", { key: STORAGE_KEY }));
+    expect(outbox.builds.newer.value).toBeNull();
+    store(entry(held));
+    window.dispatchEvent(new StorageEvent("storage", { key: STORAGE_KEY }));
+    expect(outbox.builds.newer.value).toBe("too_old");
+    stop();
+  });
+
   test("an older build's tab's batch does not show here", () => {
     const outbox = new Outbox(answering(() => saved()).api);
     const stop = outbox.listen();

@@ -1909,7 +1909,9 @@ function OutboxList({
   // Too old, nothing this tab sends is taken, so none waiting is sent
   // until the page is loaded again (Outbox.send).
   const held = outbox.builds.newer.value === "too_old";
-  const needsRegistering = entries.some((e) => e.waitingFor === "registration");
+  // Registering sends nothing held: the banner asks for the upgrade.
+  const needsRegistering =
+    !held && entries.some((e) => e.waitingFor === "registration");
   return (
     <section>
       <h2>{say(CARTS_FROM_DEVICE)}</h2>
@@ -1940,7 +1942,8 @@ function OutboxList({
                 // not role="alert", as every one is there as the page loads.
                 <div class={CAUTION_BOX}>{say(HELD)}</div>
               ) : reason === null || reason.code === "must_upgrade" ? (
-                // On its way, held as too old only by a build before this.
+                // On its way: a newer build's tab sends one an older build
+                // held back here, under that build, as too old (Outbox).
                 <small>{say(SENDING)}</small>
               ) : (
                 // Not role="alert": every one is there as the page loads.

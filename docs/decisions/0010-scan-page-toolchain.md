@@ -228,10 +228,13 @@ the compressed copy (fiddly header code ServeStatic already gets right).
   Once the tab is too old, every save waiting there is held, the one the
   server held back included, and each says "Held until you upgrade." in
   that box, never "Sending…", while the banner keeps the full note and
-  the Upgrade button (Ali, 2026-11-16, inventory-tng-n7yv); after the
-  reload they are sent as usual. We rejected the full note on every held
-  save, which repeats the banner, and the full note on the one held back
-  with plain small text on the others.
+  the Upgrade button (Ali, 2026-11-16, inventory-tng-n7yv). The build's
+  other tabs learn from the one held back that they are too old too.
+  After the reload each is sent as the build that queued it, and one the
+  server still holds back is listed with what older builds left. We
+  rejected the full note on every held save, which repeats the banner,
+  and the full note on the one held back with plain small text on the
+  others.
   The outbox keeps why a batch was refused, or waits, as a code with
   its data (the HTTP status and tries, a 422's problems by line or
   report with each one's kind), and the page makes the words as it
