@@ -38,6 +38,7 @@ from inventory_tng.admin.needs_action import (
     query,
 )
 from inventory_tng.admin.stock import STOCK
+from inventory_tng.admin.used_up import BY_PACKAGE, BY_SHOWS
 from inventory_tng.db import DbSession, RuleBroken, attempt
 from inventory_tng.local_time import site_zone
 from inventory_tng.models import (
@@ -213,14 +214,8 @@ SORTING = Sorting(
                 each.row.id,
             )
         ),
-        "package": Sort.keyed(
-            lambda each: (
-                each.item.lower(),
-                each.package.lower(),
-                each.place.lower(),
-            )
-        ),
-        "shows": Sort.keyed(lambda each: each.left),
+        "package": BY_PACKAGE,
+        "shows": BY_SHOWS,
     },
 )
 

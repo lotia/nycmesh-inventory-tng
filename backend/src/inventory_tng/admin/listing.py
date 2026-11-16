@@ -303,12 +303,13 @@ def arranged[R](rows: Iterable[R], view: View) -> tuple[list[R], View]:
 
 def in_order[R](rows: Iterable[R], view: View) -> list[R]:
     """Rows built in Python in the view's order, as arranged() puts them,
-    all of them: such as the rows of each group on a page of groups."""
+    all of them: such as the rows of each group on a page of groups. Rows
+    a select gave come in the list's own order already, where it is SQL."""
     found = list(rows)
     sorting = view.sorting
     if view.by is not None:
         default = sorting.columns[sorting.default]
-        if view.by != sorting.default:
+        if view.by != sorting.default and callable(default.by):
             found.sort(key=_key(default), reverse=default.first == "desc")
         found.sort(key=_key(sorting.columns[view.by]), reverse=view.desc)
     return found

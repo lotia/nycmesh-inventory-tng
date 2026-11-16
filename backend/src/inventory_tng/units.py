@@ -37,6 +37,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
+from babel.support import LazyProxy
+
 from inventory_tng.local_env import CLONE
 from inventory_tng.phrases import gettext, lazy_gettext
 
@@ -61,11 +63,13 @@ TABLE = CLONE / "frontend" / "src" / "units.json"
 
 @dataclass(frozen=True)
 class Kind:
-    """A kind of quantity: the unit its sizes are measured in, and a size
-    that is plausible for this inventory, low to high, in that unit."""
+    """A kind of quantity: the unit its sizes are measured in, a size that
+    is plausible for this inventory, low to high, in that unit, and the
+    kind in words, as the pages say it."""
 
     base: str
     plausible: tuple[float, float]
+    words: LazyProxy
 
 
 @dataclass(frozen=True)
@@ -116,39 +120,24 @@ class Unit:
         return (*(() if self.prefixes else self.prefixed()), *self.words)
 
 
-# Each kind, in words, as the pages say it.
-KIND_WORDS = {
-    "length": lazy_gettext("length"),
-    "frequency": lazy_gettext("frequency"),
-    "data rate": lazy_gettext("data rate"),
-    "power": lazy_gettext("power"),
-    "power level": lazy_gettext("power level"),
-    "gain": lazy_gettext("gain"),
-    "voltage": lazy_gettext("voltage"),
-    # Translators: electric current, a kind of unit.
-    "current": lazy_gettext("current"),
-    "temperature": lazy_gettext("temperature"),
-    "capacitance": lazy_gettext("capacitance"),
-    "resistance": lazy_gettext("resistance"),
-    "mass": lazy_gettext("mass"),
-    "volume": lazy_gettext("volume"),
-}
-# Ali, 2026-11-12: this inventory's kinds, each with one plausible size.
+# Ali, 2026-11-12: this inventory's kinds, each with one plausible size
+# and its words, as the pages say it.
 KINDS: dict[str, Kind] = {
-    "length": Kind("m", (1e-4, 1e5)),
-    "frequency": Kind("Hz", (1.0, 1e12)),
-    "data rate": Kind("bit/s", (1e3, 1e12)),
-    "power": Kind("W", (1e-6, 1e5)),
+    "length": Kind("m", (1e-4, 1e5), lazy_gettext("length")),
+    "frequency": Kind("Hz", (1.0, 1e12), lazy_gettext("frequency")),
+    "data rate": Kind("bit/s", (1e3, 1e12), lazy_gettext("data rate")),
+    "power": Kind("W", (1e-6, 1e5), lazy_gettext("power")),
     # Power as a level, and an antenna's gain, both in decibels.
-    "power level": Kind("dBm", (-120.0, 60.0)),
-    "gain": Kind("dBi", (-10.0, 50.0)),
-    "voltage": Kind("V", (1e-3, 1e5)),
-    "current": Kind("A", (1e-6, 1e3)),
-    "temperature": Kind("degC", (-100.0, 1000.0)),
-    "capacitance": Kind("F", (1e-15, 1e3)),
-    "resistance": Kind("Ohm", (1e-3, 1e9)),
-    "mass": Kind("g", (1e-3, 1e7)),
-    "volume": Kind("L", (1e-3, 1e4)),
+    "power level": Kind("dBm", (-120.0, 60.0), lazy_gettext("power level")),
+    "gain": Kind("dBi", (-10.0, 50.0), lazy_gettext("gain")),
+    "voltage": Kind("V", (1e-3, 1e5), lazy_gettext("voltage")),
+    # Translators: electric current, a kind of unit.
+    "current": Kind("A", (1e-6, 1e3), lazy_gettext("current")),
+    "temperature": Kind("degC", (-100.0, 1000.0), lazy_gettext("temperature")),
+    "capacitance": Kind("F", (1e-15, 1e3), lazy_gettext("capacitance")),
+    "resistance": Kind("Ohm", (1e-3, 1e9), lazy_gettext("resistance")),
+    "mass": Kind("g", (1e-3, 1e7), lazy_gettext("mass")),
+    "volume": Kind("L", (1e-3, 1e4), lazy_gettext("volume")),
 }
 
 # The SI's, largest first, as UCUM lists them; ronna, quetta, ronto and
@@ -342,7 +331,7 @@ class Reading:
     @property
     def kind_words(self) -> str:
         """Its kind, in words: `data rate`."""
-        return str(KIND_WORDS[self.unit.kind])
+        return str(KINDS[self.unit.kind].words)
 
     def plausible(self, number: float) -> bool:
         """Whether `number` of it is a size this inventory may hold: in its
@@ -961,7 +950,7 @@ def shown_name(name: str, rules: Rules | None = None) -> str:
             name, match.end()
         ):
             continue
-        found = _found(name, match, rules, number)
+        found = _found(name, match, rules)
         # A word no form reads, as _edits reads it.
         if (read(token) if found is None else found.read) is None:
             continue

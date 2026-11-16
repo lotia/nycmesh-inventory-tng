@@ -88,8 +88,9 @@ them open:
   value. A name reads the same in every language, and authenticator apps
   show it as the issuer of the account's key, which must not change with
   the reader's language.
-- Templates are extracted as newstyle gettext, as they are rendered, so a
-  literal per cent is `%%` in their messages too. A sentence with a link,
+- Templates are extracted as newstyle gettext, as they are rendered, and
+  Python formats a message's values the same way, always, so a literal
+  per cent is `%%` in every message on the server. A sentence with a link,
   or with words only a screen reader hears, is one message, its markup in
   it; the values filled into it are escaped, never marked safe. A sentence
   with several counts says each as a plural of its own, filled into it.
@@ -116,8 +117,6 @@ them open:
 
 - A phrase is added in the code, then the catalogues are extracted again
   (CONTRIBUTING.md, Phrases); the check fails until they are.
-- Python formats a message's values the way Jinja's newstyle gettext does,
-  always, so a literal per cent sign is written `%%` on the server.
 - Until locales are chosen (ist.2), only English is spoken, and one
   catalogue is active for the whole process (`phrases.speaking` switches
   it for tests). Choosing a locale per request will make that a

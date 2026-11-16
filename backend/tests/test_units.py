@@ -624,5 +624,5 @@ def test_a_name_is_shown_as_its_rules_read_it() -> None:
 
 
 def test_every_kind_of_unit_has_a_plausible_size_and_words() -> None:
-    # A kind missing from either fails only when a page shows one.
-    assert {unit.kind for unit in UNITS} == set(KINDS) == set(units.KIND_WORDS)
+    # A kind missing fails only when a page shows one.
+    assert {unit.kind for unit in UNITS} == set(KINDS)

@@ -836,11 +836,9 @@ On the server (`backend/src/inventory_tng/phrases.py`):
   plural takes `count`: `{% trans count=places | length %}{{ count }}
   place{% pluralize %}{{ count }} places{% endtrans %}`. A count is a
   plural even where English says both forms the same, as other languages
-  may not. Values are
-  escaped, and the lines of a message read as one. Words a template
-  passes as a value, such as a macro's argument, are `_("Find items")`.
-  A sentence with a link in it is one message, the link's markup inside
-  it.
+  may not. Values are escaped, and the lines of a message read as one.
+  Words a template passes as a value, such as a macro's argument, are
+  `_("Find items")`.
 - In Python, name a phrase as a constant, said when it is shown:
   `RESET_NOTICE = lazy_gettext("Your account is reset: sign in.")`. A
   phrase with values, or a plural, is a function that says it with
@@ -867,16 +865,16 @@ On the scan page (`frontend/src/i18n.ts`):
   batch} other {# batches}}" })`.
 - Say it with `say(REGISTERED)`, or `say(BATCHES, { count })`. A component
   that says a phrase renders again when the locale changes.
-- A sentence is one message, never pieces glued together: `{name}: enter
-  the count`, not the name and then `: enter the count`. Where a value is
-  more than a string, such as a name in bold or a name kept apart from
-  the page's own words, or the sentence has a link, say it with
-  `sayParts`, which puts each such value where the message places it and
-  makes `<0>…</0>` with the function given for it:
+- Where a value is more than a string, such as a name in bold or a name
+  kept apart from the page's own words, or the sentence has a link, say
+  it with `sayParts`, which puts each such value where the message places
+  it and makes `<0>…</0>` with the function given for it:
   `sayParts(REGISTER_IT, {}, [(inside) => <a href="/register">{inside}</a>])`.
 
-On either side, a test reads a phrase by its name, never by repeating its
-words.
+On either side, a sentence is one message, any link's markup inside it,
+never pieces glued together: `{name}: enter the count`, not the name and
+then `: enter the count`. A test reads a phrase by its name, never by
+repeating its words.
 
 Where the same English means two things, give each a context from this
 list, and add to the list rather than inventing one on the spot; a test

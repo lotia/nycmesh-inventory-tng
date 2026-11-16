@@ -607,10 +607,6 @@ def test_changes_are_logged_by_id(
     assert "Radio X" not in str(line)
 
 
-def text_of(page: str) -> str:
-    return html.unescape(page)
-
-
 def items_named(page: str) -> list[str]:
     """The items the list shows, in its order."""
     return re.findall(r'<td><a href="/admin/items/\d+">([^<]+)</a>', page)
@@ -810,7 +806,7 @@ def test_items_filter_by_category(
     found = admin_client.get(
         ITEMS, params={"category": str(antennas.id), "q": f"Filtered {mark}"}
     ).text
-    assert [kept.name] == items_named(text_of(found))
+    assert [kept.name] == items_named(html.unescape(found))
     assert f"sort=name&amp;order=desc&amp;category={antennas.id}" not in found
     assert f"category={antennas.id}&amp;sort=name" in found
     assert f'data-suggest="{ITEMS}/suggest?category={antennas.id}"' in found
@@ -838,14 +834,14 @@ def test_a_search_sorted_by_a_heading_goes_back_to_best_match(
         new_item(session, radios, f"{name} {mark}")
     query = {"q": f"LiteBeam {mark}"}
     best = admin_client.get(ITEMS, params=query).text
-    assert items_named(text_of(best))[0] == f"LiteBeam {mark}"
+    assert items_named(html.unescape(best))[0] == f"LiteBeam {mark}"
     assert "aria-sort" not in best
     assert '" aria-current="page">Best match</a>' in best
     by_name = admin_client.get(ITEMS, params=query | {"sort": "name"}).text
-    assert items_named(text_of(by_name)) == sorted(
-        items_named(text_of(by_name)), key=str.lower
+    assert items_named(html.unescape(by_name)) == sorted(
+        items_named(html.unescape(by_name)), key=str.lower
     )
-    assert items_named(text_of(by_name))[0] == f"Aaa LiteBeem {mark}"
+    assert items_named(html.unescape(by_name))[0] == f"Aaa LiteBeem {mark}"
     assert f'<a href="{ITEMS}?q=LiteBeam+{mark}">Best match</a>' in by_name
     # A new search from the box is best match first again: no sort sent.
     assert 'name="sort"' not in by_name.split('role="search"', 1)[1].split("</form>")[0]

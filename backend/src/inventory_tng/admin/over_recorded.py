@@ -39,7 +39,6 @@ from inventory_tng.admin.listing import (
     Sorting,
     View,
     arranged,
-    paged,
 )
 from inventory_tng.admin.listing import order as order_of
 from inventory_tng.admin.locations import changeable
@@ -254,17 +253,17 @@ def settled_page(
     all or one item's: how each was settled, why, by whom and when (Ali,
     2026-11-15, inventory-tng-73p). Read only."""
     where = [Movement.item_id == only.id] if only else []
-    view = View.read(
-        RECORDED_MORE_SETTLED, SETTLED_SORTING, asked, kept=query(only)
-    ).counted(over_recorded.how_many(session, over_recorded.SETTLED, *where))
+    view = View.read(RECORDED_MORE_SETTLED, SETTLED_SORTING, asked, kept=query(only))
     zone = site_zone(session)
     if view.by == "why":
         # Every one, newest first, worded, then sorted by its words: the
         # same few queries.
         every = over_recorded.settled(session, zone, *where, limit=None)
-        every.sort(key=_why, reverse=view.desc)
-        rows, view = paged(every, view)
+        rows, view = arranged(every, view)
     else:
+        view = view.counted(
+            over_recorded.how_many(session, over_recorded.SETTLED, *where)
+        )
         rows = over_recorded.settled(
             session,
             zone,

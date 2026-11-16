@@ -14,7 +14,6 @@ from inventory_tng import open_packages, over_recorded
 from inventory_tng.ledger import LOOSE, Batch, Entry, Form, insert_transaction, record
 from inventory_tng.models import (
     AdjustmentReason,
-    Admin,
     Category,
     Item,
     ItemPackage,
@@ -29,6 +28,7 @@ from inventory_tng.pages import retired_holding
 
 from helpers.concurrency import Committed
 from helpers.rows import add, tag
+from helpers.sign_in import admin_named
 
 
 class Place:
@@ -110,7 +110,7 @@ def raised(
 
 def ada_id(session: Session) -> int:
     """The id of admin_client's administrator."""
-    return session.scalars(select(Admin.id).where(Admin.username == "ada")).one()
+    return admin_named(session, "ada").id
 
 
 class Retirable(Protocol):
