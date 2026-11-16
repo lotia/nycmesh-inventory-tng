@@ -2067,7 +2067,7 @@ describe("what an older build left", () => {
         kept,
         {
           ...kept,
-          body: { ...kept.body, key: "1c2d3e4f-5a6b-4c7d-8e9f-0a1b2c3d4e5f" },
+          body: { ...kept.body, key: "other" },
           queuedAt: afternoon,
         },
       ]),
