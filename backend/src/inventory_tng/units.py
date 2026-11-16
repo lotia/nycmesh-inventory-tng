@@ -52,7 +52,9 @@ from inventory_tng.phrases import gettext, lazy_gettext
 # number before a unit without its thousands separators (Ali, 2026-11-15,
 # inventory-tng-ist.1). 5: search reads a comma after a lone nought as a
 # decimal point, `0,500 m` as `0.500 m` (Ali, 2026-11-15, inventory-tng-4i1).
-VERSION = 5
+# 6: the forms judge a number grouped by spaces as search reads it, one
+# number, its sign with it, so unit keys read so (inventory-tng-uxo6).
+VERSION = 6
 
 # The most groups (groups) a search is matched by, each alone; one with more
 # is matched whole only (Ali, 2026-11-15, inventory-tng-ist.1).
@@ -445,14 +447,15 @@ def _marked(text: str, *at: int) -> bool:
 
 
 # A number grouped in thousands by commas or by spaces, a thin one
-# decomposed being one, ending at its last digit: `1,000`, `1 000`, not
-# starting within another so grouped (`345 678` in `12 345 678`), and by
-# commas after a number and a space (`6 1,000`), nor by commas after a lone
-# nought (_NOUGHT). Search keeps it, before a unit it reads, without them
-# (Ali, 2026-11-15, inventory-tng-ist.1): frontend/src/units.ts's,
-# character for character.
+# decomposed being one, ending at its last digit, with its minus as
+# _NUMBER's: `1,000`, `-1 000`, not starting within another so grouped
+# (`345 678` in `12 345 678`), and by commas after a number and a space
+# (`6 1,000`), nor by commas after a lone nought (_NOUGHT). Search keeps
+# it, before a unit it reads, without them (Ali, 2026-11-15,
+# inventory-tng-ist.1): frontend/src/units.ts's, character for character.
 _GROUPED = re.compile(
-    r"(?<![^\W_])(?:(?<![0-9][.,])(?!0,)[0-9]{1,3}(?:,[0-9]{3})+"
+    r"(?:(?<![^\W_])[-\u2212])?(?<![^\W_])"
+    r"(?:(?<![0-9][.,])(?!0,)[0-9]{1,3}(?:,[0-9]{3})+"
     r"|(?<![0-9][., ])[0-9]{1,3}(?: [0-9]{3})+)(?:[.][0-9]+)?\Z"
 )
 # A lone nought, then a comma and digits, ending at its last digit, with
@@ -464,14 +467,21 @@ _NOUGHT = re.compile(r"(?:(?<![^\W_])[-\u2212])?(?<![^\W_])(?<![0-9][.,])0,[0-9]
 
 def _searched(text: str, end: int) -> tuple[re.Match[str], str] | None:
     """The number ending at `end` in `text` where search reads it otherwise
-    than as typed, and how it reads it: a lone nought's comma as a point
-    (_NOUGHT), or thousands (_GROUPED) without their separators, unless a
-    product's number starts them (`Cat 6 305 m` is a product's number, then
-    another). None: read as typed."""
+    than as typed, and how it reads it, its sign kept: a lone nought's comma
+    as a point (_NOUGHT), or thousands (_GROUPED) without their separators,
+    any space (Zs) one as decomposing (NFKD) makes it, unless a product's
+    number starts them (`Cat 6 305 m` is a product's number, then another).
+    The match is in a copy of `text` with plain spaces, one character for
+    one, so where it is holds in `text`. None: read as typed. Search, the
+    forms and the shown name all judge a number so (inventory-tng-uxo6)."""
     if nought := _NOUGHT.search(text, 0, end):
         return nought, nought[0].replace(",", ".")
-    grouped = _GROUPED.search(text, 0, end)
-    if grouped is None or _product(text, grouped.start()):
+    plain = "".join(" " if unicodedata.category(c) == "Zs" else c for c in text)
+    grouped = _GROUPED.search(plain, 0, end)
+    if grouped is None:
+        return None
+    # Its first digit, after any sign.
+    if _product(text, grouped.start() + (grouped[0][0] in "-\u2212")):
         return None
     return grouped, re.sub("[, ]", "", grouped[0])
 
@@ -495,7 +505,7 @@ def _edits(text: str, rules: Rules | None) -> list[Edit]:
     edits: list[Edit] = []
     for match in _after_a_number(text):
         grouped, number = _searched(text, match.end(1)) or (None, None)
-        found = _found(text, match, rules, number)
+        found = _found(text, match, rules)
         if found is not None and (found.read or found.rule):
             # Read, or no unit by its rule.
             reading = found.read
@@ -817,26 +827,26 @@ def found_in(name: str, rules: Rules | None = None) -> list[Found]:
     ]
 
 
-def _found(
-    text: str, match: re.Match[str], rules: Rules | None, number: str | None = None
-) -> Found | None:
+def _found(text: str, match: re.Match[str], rules: Rules | None) -> Found | None:
     """The unit AFTER_A_NUMBER found in `text`, as read (Ali, 2026-11-15,
     inventory-tng-c0c.3): by its reading rule, which always wins; else, where
     several readings are plausible, by the words near it (CLUES), if they say
     one kind; else by the one plausible reading, the one of a LIKELY kind, or
     the one spelt as typed where none is likely. None if it is no unit's
-    spelling and no rule's. Its number is as typed, or `number` where search
-    reads it so (respell: `1 000` as `1000`)."""
-    number, token = number or _number(text, match.end(1)), match[2]
+    spelling and no rule's. Its number is as typed, judged as search reads
+    it (_searched: `1 000` as `1000`, `0,5` as `0.5`, its sign kept), else
+    any comma left out."""
+    end, token = match.end(1), match[2]
     rule = (rules or {}).get(rule_key(token))
     every = readings(token)
     if rule is None and not every:
         return None
-    # A comma after a lone nought is a decimal point (_NOUGHT), else groups;
-    # respell's `number` has none left to judge.
-    nought = "," in number and _NOUGHT.search(text, 0, match.end(1))
-    point = "." if nought else ""
-    value = float(number.replace(",", point).replace("\u2212", "-"))
+    if searched := _searched(text, end):
+        number, judged = text[searched[0].start() : end], searched[1]
+    else:
+        number = _number(text, end)
+        judged = number.replace(",", "")
+    value = float(judged.replace("\u2212", "-"))
     plausible = [(r, exact) for r, exact in every if r.plausible(value)]
     readable = tuple(r for r, _ in plausible)
     words: tuple[str, ...] = ()
@@ -847,9 +857,7 @@ def _found(
     else:
         asked = token in ASKED and len(plausible) > 1
         settled = None if asked else _likeliest(plausible)
-    return Found(
-        number, token, match.end(1), match.end(), readable, settled, rule, words
-    )
+    return Found(number, token, end, match.end(), readable, settled, rule, words)
 
 
 def _clue(
@@ -937,8 +945,6 @@ def _shown_number(number: str) -> str:
 # `10GHz/20 MHz`).
 _IN_A_CODE = re.compile(r"[\w/.+-]")
 _INTO_A_CODE = re.compile(r"[/-]")
-# A sign alone right before a number, as _NUMBER takes it.
-_SIGN = re.compile(r"(?<![^\W_])[-\u2212]\Z")
 
 
 def shown_name(name: str, rules: Rules | None = None) -> str:
@@ -957,20 +963,13 @@ def shown_name(name: str, rules: Rules | None = None) -> str:
     `2100 ft`, its ordinary spaces no-break so it never breaks across a
     line (Ali, 2026-11-16, inventory-tng-t78). `name` is as saved
     (models.canonical, spell)."""
-    # Any space as search reads it, a plain one (NFKD), so `1\u202f000` is
-    # grouped too; one character for one, so where each is stays.
-    plain = "".join(" " if unicodedata.category(c) == "Zs" else c for c in name)
     edits = []
     for match in _after_a_number(name):
         token = match[2]
-        searched: str | None = None
-        if (hit := _searched(plain, match.end(1))) and " " in hit[0][0]:
-            grouped, joined = hit
-            sign = _SIGN.search(name, 0, grouped.start())
-            start = grouped.start() if sign is None else sign.start()
+        if (hit := _searched(name, match.end(1))) and " " in hit[0][0]:
+            start = hit[0].start()
             # Its ordinary spaces no-break, the rest as typed.
             shown = name[start : match.end(1)].replace(" ", NO_BREAK_SPACE)
-            searched = name[start : grouped.start()] + joined
         else:
             number = _number(name, match.end(1))
             start, shown = match.end(1) - len(number), _shown_number(number)
@@ -978,7 +977,7 @@ def shown_name(name: str, rules: Rules | None = None) -> str:
             name, match.end()
         ):
             continue
-        found = _found(name, match, rules, searched)
+        found = _found(name, match, rules)
         # A word no form reads, as _edits reads it.
         if (read(token) if found is None else found.read) is None:
             continue

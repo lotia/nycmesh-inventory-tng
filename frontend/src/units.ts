@@ -239,10 +239,10 @@ function settled(
 }
 
 // A number grouped in thousands by commas or by spaces, ending at its
-// last digit, as search keeps it, before a unit it reads, without them
-// (units._GROUPED).
+// last digit, with its minus as NUMBER's, as search keeps it, before a
+// unit it reads, without them (units._GROUPED).
 const GROUPED =
-  /(?<![\p{L}\p{N}])(?:(?<![0-9][.,])(?!0,)[0-9]{1,3}(?:,[0-9]{3})+|(?<![0-9][., ])[0-9]{1,3}(?: [0-9]{3})+)(?:[.][0-9]+)?$/u;
+  /(?:(?<![\p{L}\p{N}])[-−])?(?<![\p{L}\p{N}])(?:(?<![0-9][.,])(?!0,)[0-9]{1,3}(?:,[0-9]{3})+|(?<![0-9][., ])[0-9]{1,3}(?: [0-9]{3})+)(?:[.][0-9]+)?$/u;
 // A lone nought, then a comma and digits, ending at its last digit, with
 // its minus as NUMBER's: the comma is a decimal point to search
 // (units._NOUGHT).
@@ -265,9 +265,14 @@ function edits(text: string, rules: Rules | undefined): Edit[] {
     let grouped = NOUGHT.exec(before);
     if (grouped) number = grouped[0].replace(",", ".");
     else {
-      grouped = GROUPED.exec(before);
-      // `Cat 6 305 m`: a product's number, then another, not thousands.
-      if (grouped && product(text, grouped.index)) grouped = null;
+      // Any space a plain one, one for one, as units._searched reads it.
+      grouped = GROUPED.exec(before.replaceAll(/\p{Zs}/gu, " "));
+      // `Cat 6 305 m`: a product's number, then another, not thousands;
+      // judged at its first digit, after any sign.
+      const first = grouped
+        ? grouped.index + Number(/^[-−]/.test(grouped[0]))
+        : 0;
+      if (grouped && product(text, first)) grouped = null;
       // It ends at the digit the match starts with, so it is found.
       number = grouped
         ? grouped[0].replaceAll(/[, ]/g, "")

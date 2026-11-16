@@ -11,7 +11,10 @@ item's, package's and alias's unit_key read again, naming by id first any
 names that would then be one, as 0043 does, and its name_shown, as 0047
 filled it. Written before it was pushed, it also shows a unit's word as a
 unit's symbol is, `Box 1,000 feet` as `Box 1000 feet` (inventory-tng-tze,
-Ali, 2026-11-15), as units.shown_name now does.
+Ali, 2026-11-15), as units.shown_name now does. And, rewritten in place
+(Ali, 2026-11-16), a form judges a number grouped by spaces as search
+reads it, one number with its sign, `Cap 1 000 μF` as 1000 μF, not 000, so
+unit keys read so too (units version 6, inventory-tng-uxo6).
 
 Revision ID: 0048
 Revises: 0047
@@ -32,7 +35,7 @@ branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 
 # The units.VERSION this folds again for (0036 says how they follow).
-FOLDS_UNITS = 5
+FOLDS_UNITS = 6
 
 # Each table's searched fields, in order, as models' SEARCHED at 0048, and
 # whether reading rules read them (models.Searchable.READS_RULES).

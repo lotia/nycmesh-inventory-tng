@@ -254,6 +254,23 @@ def test_a_name_is_checked_and_saved_in_canonical_spelling(
     named(session, Item, "Cap 10\u03bcF 5OV")
 
 
+def test_a_number_grouped_by_spaces_is_judged_as_search_reads_it(
+    admin_client: TestClient, session: Session, radios: Category
+) -> None:
+    """Ali, 2026-11-16 (inventory-tng-t78, inventory-tng-uxo6): the form
+    reads `1 000` before a unit as one number, as search does, so asks
+    about `M` after it, and refuses a name reading alike with another's,
+    spaces ignored, naming it."""
+    form = {"category_id": str(radios.id), "unit": "each"}
+    asked = admin_client.post(ITEMS, data=form | {"name": "Box 1 000 M"})
+    assert asked.status_code == 400
+    assert "<legend>\u201c1 000M\u201d is new. Is it a unit?</legend>" in text(asked)
+    add(session, Item(name="Cap 1000 uF", category_id=radios.id))
+    refused = admin_client.post(ITEMS, data=form | {"name": "Cap 1 000 \u03bcF"})
+    assert refused.status_code == 400
+    assert TAKEN_FIELDS["name"]("Cap 1000\u00a0uF") in refused.text
+
+
 def test_a_package_name_is_checked_in_canonical_spelling(
     admin_client: TestClient, session: Session, radios: Category
 ) -> None:

@@ -823,8 +823,9 @@ def test_a_comma_after_a_lone_nought_is_read_again(alembic_config: Config) -> No
     """Migration 0048: every row folded again, and each unit key and name
     as shown read again, as search and the forms now read a comma after a
     lone nought as a decimal point (Ali, 2026-11-15, inventory-tng-4i1),
-    and a unit's word is shown as a symbol is (inventory-tng-tze); names
-    kept as typed; names that would then be one named by id first."""
+    and a number grouped by spaces as one (inventory-tng-uxo6), and a
+    unit's word is shown as a symbol is (inventory-tng-tze); names kept as
+    typed; names that would then be one named by id first."""
     command.downgrade(alembic_config, "0047")
     connection = alembic_config.attributes["connection"]
     category_id = connection.scalar(
@@ -850,6 +851,10 @@ def test_a_comma_after_a_lone_nought_is_read_again(alembic_config: Config) -> No
     row("item_package", "Reel 0,5 KM", item_id=resistor, size=1)
     # A unit's word is shown spaced too (inventory-tng-tze).
     row("item_package", "Spool 10,000 metres", item_id=resistor, size=2, unit_key="")
+    # Judged 1000 μF, not 000 (inventory-tng-uxo6).
+    cap = row(
+        "item_package", "Cap 1 000 \u03bcF", item_id=resistor, size=3, unit_key="c"
+    )
     command.upgrade(alembic_config, "0048")
     assert connection.execute(
         text(
@@ -876,12 +881,22 @@ def test_a_comma_after_a_lone_nought_is_read_again(alembic_config: Config) -> No
             "spool10000metres",
             "Spool 10\u202f000\u00a0metres",
         ),
+        (
+            "Cap 1 000 mF Cap 1000uF",
+            "cap1000uf",
+            "Cap 1\u00a0000\u00a0\u03bcF",
+        ),
     ]
     command.downgrade(alembic_config, "0047")
     other = row("item", "Resistor 0,5 GOhm", category_id=category_id, name_folded="")
     with pytest.raises(RuntimeError) as refused:
         command.upgrade(alembic_config, "0048")
     assert f"by id: item {resistor}, {other}." in str(refused.value)
+    connection.execute(text("DELETE FROM item WHERE id = :id"), {"id": other})
+    alike = row("item_package", "Cap 1000 uF", item_id=resistor, size=4, unit_key="d")
+    with pytest.raises(RuntimeError) as refused:
+        command.upgrade(alembic_config, "0048")
+    assert f"by id: item_package {cap}, {alike}." in str(refused.value)
 
 
 def test_a_number_grouped_by_spaces_is_shown_whole(alembic_config: Config) -> None:

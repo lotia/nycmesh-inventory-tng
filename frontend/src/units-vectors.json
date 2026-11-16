@@ -791,6 +791,20 @@
       "typed": "1000 ft"
     },
     {
+      "text": "Kiln -1 000 Cel",
+      "respelt": "Kiln -1000degC",
+      "searched": "kiln -1000degc",
+      "typed": "kiln -1 000 cel"
+    },
+    {
+      "text": "Supply \u22121 000 V",
+      "respelt": "Supply \u22121000V"
+    },
+    {
+      "text": "Box 1\u1680000 ft",
+      "respelt": "Box 1000ft"
+    },
+    {
       "text": "Box of 1,000",
       "respelt": "Box of 1,000",
       "searched": "box of 1,000",
@@ -883,6 +897,10 @@
     {
       "text": "Cat 6 1,000 ft",
       "groups": [["Cat", "Cat"], ["6", "6"], ["1,000 ft", "1000ft"]]
+    },
+    {
+      "text": "-1 000 V",
+      "groups": [["-1 000 V", "-1000V"]]
     },
     {
       "text": "Cable 0,500 m",

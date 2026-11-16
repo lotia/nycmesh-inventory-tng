@@ -15,7 +15,7 @@ from sqlalchemy.orm import Session
 
 from inventory_tng import items, units
 from inventory_tng.admin.items import ITEMS
-from inventory_tng.models import Category, Item, fold, folds, held
+from inventory_tng.models import Category, Item, fold, folds, held, unit_key
 from inventory_tng.units import KINDS, PREFIXES, UNITS, Reading, read, respell
 
 from helpers.rows import add, tag
@@ -234,6 +234,62 @@ def test_a_form_reads_a_comma_after_a_lone_nought_as_search_does(typed: str) -> 
     )
     assert comma.number == point.number.replace(".", ",")
     assert units.respell(typed) == units.respell(typed.replace(",", "."))
+
+
+@pytest.mark.parametrize(
+    ("typed", "number"),
+    [
+        ("Box 1 000 M", "1 000"),
+        ("Box 1\u202f000 M", "1\u202f000"),
+        ("Box 1,000 M", "1,000"),
+        ("Box 12 345 m", "12 345"),
+    ],
+)
+def test_a_form_reads_a_number_grouped_in_thousands_as_search_does(
+    typed: str, number: str
+) -> None:
+    """Ali, 2026-11-16 (inventory-tng-t78, inventory-tng-uxo6): a form
+    judges `1 000 M` as `1000 M`, as search reads it, not as 000, so asks
+    about it, and keeps the number as typed."""
+    (grouped,) = units.found_in(typed)
+    joined = re.sub(r"[ ,\u202f]", "", number)
+    (plain,) = units.found_in(typed.replace(number, joined))
+    assert (grouped.read, grouped.plausible, grouped.asks) == (
+        plain.read,
+        plain.plausible,
+        plain.asks,
+    )
+    assert grouped.number == number
+
+
+def test_a_form_asks_about_a_unit_after_a_number_grouped_by_spaces() -> None:
+    assert units.found_in("Box 1 000 M")[0].asks
+
+
+def test_names_reading_alike_but_for_a_number_grouped_by_spaces_are_one() -> None:
+    """Ali, 2026-11-16 (inventory-tng-t78): the read-alike check ignores
+    spaces, and reads a number grouped by them as search does."""
+    for spaced, joined in (
+        ("Cap 1 000 μF", "Cap 1000 uF"),
+        ("Res 1 000 Ω", "Res 1000 ohm"),
+        ("Res 1\u202f000 Ω", "Res 1000 ohm"),
+    ):
+        assert unit_key(spaced) == unit_key(joined), spaced
+
+
+def test_a_sign_belongs_to_the_number_grouped_after_it() -> None:
+    """inventory-tng-uxo6: `-1 000` and `-1,000` are minus a thousand to the
+    forms, to search and to the shown name alike, so a kind that may be at
+    or below nought is judged by the sign: -1000 °C is no plausible
+    temperature, 1000 °C is."""
+    for typed in ("Kiln -1 000 Cel", "Kiln \u22121 000 Cel", "Kiln -1,000 Cel"):
+        (found,) = units.found_in(typed)
+        assert (found.number, found.plausible) == (typed[5:-4], ()), typed
+        assert units.shown_name(typed) == typed
+        (unsigned,) = units.found_in(typed.replace("-", "").replace("\u2212", ""))
+        assert str(unsigned.read) == "degC"
+    assert units.respell("Kiln -1 000 Cel") == "Kiln -1000degC"
+    assert units.groups("-1 000 V") == [("-1 000 V", "-1000V")]
 
 
 def test_numbers_spaced_as_thousands_are_one_but_each_still_found() -> None:

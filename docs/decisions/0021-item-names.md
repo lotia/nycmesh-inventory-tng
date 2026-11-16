@@ -620,6 +620,18 @@ and no-break and thin spaces stay as typed. A pack count such as
 `Cable 2 100 ft` is one grouped number as search reads it, so its space
 is no-break too. Migration 0049 shows existing names so.
 
+Found in review (inventory-tng-uxo6, 2026-11-16): the forms and the
+read-alike check judged a unit by the last group of such a number, `000`
+in `Box 1 000 M`, so a form never asked about it, and `Cap 1 000 μF` and
+`Cap 1000 uF` were two names, though search read both as one. Now search,
+the forms, the read-alike check and the shown name all judge a number as
+search reads it (`units._searched`): one number, grouped by commas or by
+any space, its sign with it, so `-1 000 °C` is minus a thousand, no
+plausible temperature, wherever it is read. The read-alike check still
+ignores spaces, so those two names are one. Units version 6; migration
+0048, rewritten in place, as nothing is deployed (Ali, 2026-11-16), read
+each unit key again and folded every row again.
+
 ## Amendment: the import's readings file (2026-11-14)
 
 An import starts with no reading rules, and its readings are settled
