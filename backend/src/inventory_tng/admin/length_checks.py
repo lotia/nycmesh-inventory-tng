@@ -123,12 +123,19 @@ RECENT = 5
 # A cut's transaction kind (models.TRANSACTION_KINDS), in words, where no
 # volunteer made it: the kind of save that took some of an open package.
 CUT_KINDS = {
+    # Translators: a kind of save, a noun.
     "move": lazy_gettext("move"),
+    # Translators: a kind of save, a noun.
     "receipt": lazy_gettext("receipt"),
+    # Translators: a kind of save, a noun.
     "install": lazy_gettext("install"),
+    # Translators: a kind of save, a noun.
     "count": lazy_gettext("count"),
+    # Translators: a kind of save, a noun.
     "adjustment": lazy_gettext("adjustment"),
+    # Translators: a kind of save, a noun.
     "open": lazy_gettext("open"),
+    # Translators: a kind of save, a noun.
     "report": lazy_gettext("report"),
 }
 

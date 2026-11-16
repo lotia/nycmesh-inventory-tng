@@ -33,7 +33,7 @@ registered while it lasted, then revoke the ones that look wrong.{% endtrans %}<
   {% for name, value in view.fields() %}
   <input type="hidden" name="{{ name }}" value="{{ value }}">
   {% endfor %}
-  {% if not problems %}<p class="hint">{% trans found=view.found %}{{ found }} listed.{% endtrans %}</p>{% endif %}
+  {% if not problems %}<p class="hint">{% trans count=view.found %}{{ count }} listed.{% pluralize %}{{ count }} listed.{% endtrans %}</p>{% endif %}
   {{ sizes(view) }}
   {% call table() %}
     <tr><th>{% trans %}Select{% endtrans %}</th><th>{% trans %}Device{% endtrans %}</th>

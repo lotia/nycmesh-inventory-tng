@@ -83,11 +83,14 @@
   <h2>{% trans %}Recovery codes{% endtrans %}</h2>
   {% with section_id="recovery-codes" %}{% include "_notice.html" %}{% endwith %}
   {% with name = "recovery_codes" %}{% include "_field_problem.html" %}{% endwith %}
-  <p>{% if codes_low %}{% trans left=recovery_codes_left %}{{ left }} left: make new ones
+  <p>{% if codes_low %}{% trans count=recovery_codes_left %}{{ count }} left: make new ones
   soon. Making new ones voids the old, and asks for a code from
-  your authenticator, not a recovery code.{% endtrans %}
-  {%- else %}{% trans left=recovery_codes_left %}{{ left }} left. Making new ones voids the old, and asks for a code from
-  your authenticator, not a recovery code.{% endtrans %}{% endif %}</p>
+  your authenticator, not a recovery code.{% pluralize %}{{ count }} left:
+  make new ones soon. Making new ones voids the old, and asks for a code
+  from your authenticator, not a recovery code.{% endtrans %}
+  {%- else %}{% trans count=recovery_codes_left %}{{ count }} left. Making new ones voids the old, and asks for a code from
+  your authenticator, not a recovery code.{% pluralize %}{{ count }} left. Making new ones voids the old,
+  and asks for a code from your authenticator, not a recovery code.{% endtrans %}{% endif %}</p>
   <form method="post" action="{{ paths.account }}/recovery-codes">
     {{ once_field() }}
     {% with code_totp = true, totp_only = true %}{% include "_code_field.html" %}{% endwith %}

@@ -9,6 +9,7 @@ from dataclasses import dataclass
 from datetime import UTC, datetime
 from decimal import Decimal
 from types import SimpleNamespace
+from typing import get_args
 from zoneinfo import ZoneInfo, available_timezones
 
 import pytest
@@ -36,6 +37,7 @@ from inventory_tng.admin import over_recorded as admin_over_recorded
 from inventory_tng.admin import reading_rules as admin_reading_rules
 from inventory_tng.admin import settings as admin_settings
 from inventory_tng.admin import volunteers as admin_volunteers
+from inventory_tng.admin.listing import Lapsed
 from inventory_tng.models import (
     TRANSACTION_KINDS,
     UNITS,
@@ -272,11 +274,26 @@ def from_macros(source: str, **context: object) -> str:
     return templates.env.from_string(source).render(context)
 
 
+# Attributes whose words people read or hear.
+SAID_IN = re.compile(
+    r'\b(?:title|alt|placeholder|aria-label|aria-description)="([^"]*)"'
+)
+
+
+def words_shown(html: str) -> str:
+    """`html`'s words people read or hear: its text and what its tags say
+    in attributes, but not its scripts."""
+    html = re.sub(r"<script.*?</script>", " ", html, flags=re.DOTALL)
+    words = re.sub(
+        r"<[^>]*>", lambda tag: " ".join(["", *SAID_IN.findall(tag[0]), ""]), html
+    )
+    return " ".join(words.split())
+
+
 def without_brand(html: str) -> str:
     """`html`'s words but the app's name, the same in every language, which
     the masthead shows in parts."""
-    words = re.sub(r"<script.*?</script>|<[^>]*>", " ", html, flags=re.DOTALL)
-    return " ".join(words.split()).replace(BRAND, "")
+    return words_shown(html).replace(BRAND, "")
 
 
 def link(*_: object, **__: object) -> str:
@@ -691,7 +708,7 @@ def test_what_has_moved_says_nothing_in_plain_english(part: str) -> None:
     with speaking(PSEUDO):
         shown = COVERED[part]()
     # What people read: neither scripts, tags nor character references.
-    words = re.sub(r"<script.*?</script>|<[^>]*>|&\w+;", " ", shown, flags=re.DOTALL)
+    words = re.sub(r"&\w+;", " ", words_shown(shown))
     assert re.findall(r"[A-Za-z]{2,}", words) == []
     assert words.strip()
 
@@ -989,6 +1006,47 @@ def test_speaking_ends_with_its_block_even_on_an_error() -> None:
     with pytest.raises(ValueError, match="stop"), speaking(PSEUDO):
         raise ValueError("stop")
     assert str(RESET_NOTICE) == "Your account is reset: sign in."
+
+
+def test_a_count_is_said_as_a_plural() -> None:
+    # Other languages word a count by its number, even where English
+    # doesn't: these say the same in either form.
+    counts = {
+        "%(count)s listed.",
+        "All %(count)s",
+        "Revoke %(num)d",
+    }
+    plurals = {m.id[0] for m in read(ENGLISH_PO) if isinstance(m.id, tuple)}
+    assert counts <= plurals
+    left = [id for id in plurals if id.startswith("%(count)s left")]
+    assert len(left) == 2
+
+
+def test_cut_kinds_tell_translators_they_are_kinds_of_save() -> None:
+    kinds = {str(kind) for kind in length_checks.CUT_KINDS.values()}
+    told = {
+        m.id
+        for m in read(ENGLISH_PO)
+        if any("kind of save" in comment for comment in m.auto_comments)
+    }
+    assert kinds <= told
+
+
+@pytest.mark.parametrize("lapsed", get_args(Lapsed.__value__))
+def test_every_kind_of_lapsed_has_words(lapsed: str) -> None:
+    # _listing.html words each in a table: a missing key would say nothing.
+    shown = from_macros(
+        '{% from "_listing.html" import filters, empty %}'
+        "{{ filters(listing) }}{{ empty(listing, 2, '') }}",
+        listing=listing(lapsed=lapsed, show=lapsed, narrowed=False, search=""),
+    )
+    assert re.findall(r"<a [^>]*>([^<]*)</a>", shown)[1].strip()
+    assert re.search(r"<td[^>]*>\s*(\w[^<]*)", shown)
+
+
+def test_the_walk_reads_the_words_an_attribute_says() -> None:
+    shown = '<h2 title="Hello">x</h2><img alt="Cat"><input placeholder="Type">'
+    assert words_shown(shown).split() == ["Hello", "x", "Cat", "Type"]
 
 
 def test_a_lone_per_cent_is_found() -> None:

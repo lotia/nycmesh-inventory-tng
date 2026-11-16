@@ -51,7 +51,7 @@ export function followPicks(document: Document): void {
  * length-checks page (inventory-tng-b1z). Without this, the page says
  * "Set to it", true whatever is typed. The words carry `data-follows`,
  * the field's id, and `data-unit`; with no number in the field, they say
- * "it".
+ * what the page sent, "it" in the page's language.
  */
 export function followTyped(document: Document): void {
   for (const words of document.querySelectorAll<HTMLElement>(
@@ -63,11 +63,12 @@ export function followTyped(document: Document): void {
       continue;
     }
     const unit = words.dataset.unit ? ` ${words.dataset.unit}` : "";
+    const sent = words.textContent;
     const say = () => {
       // A number, as the page takes one; else what is typed is no length.
       const typed = field.value.trim();
       const length = typed === "" ? null : thousandths(typed);
-      words.textContent = length === null ? "it" : `${decimal(length)}${unit}`;
+      words.textContent = length === null ? sent : `${decimal(length)}${unit}`;
     };
     field.addEventListener("input", say);
     say();

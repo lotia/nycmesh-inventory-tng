@@ -145,6 +145,35 @@ msgid_plural "%(count)s labels"
 msgstr[0] ""
 msgstr[1] ""
 
+#: src/inventory_tng/templates/account.html
+#, python-format
+msgid ""
+"%(count)s left. Making new ones voids the old, and asks for a code from "
+"your authenticator, not a recovery code."
+msgid_plural ""
+"%(count)s left. Making new ones voids the old, and asks for a code from "
+"your authenticator, not a recovery code."
+msgstr[0] ""
+msgstr[1] ""
+
+#: src/inventory_tng/templates/account.html
+#, python-format
+msgid ""
+"%(count)s left: make new ones soon. Making new ones voids the old, and "
+"asks for a code from your authenticator, not a recovery code."
+msgid_plural ""
+"%(count)s left: make new ones soon. Making new ones voids the old, and "
+"asks for a code from your authenticator, not a recovery code."
+msgstr[0] ""
+msgstr[1] ""
+
+#: src/inventory_tng/templates/device_list.html
+#, python-format
+msgid "%(count)s listed."
+msgid_plural "%(count)s listed."
+msgstr[0] ""
+msgstr[1] ""
+
 #: src/inventory_tng/templates/reading_seed.html
 #, python-format
 msgid "%(count)s name"
@@ -240,11 +269,6 @@ msgstr ""
 msgid "%(first)s and %(second)s"
 msgstr ""
 
-#: src/inventory_tng/templates/device_list.html
-#, python-format
-msgid "%(found)s listed."
-msgstr ""
-
 #. counted is how many there are, such as "12 items".
 #: src/inventory_tng/templates/_listing.html
 #, python-format
@@ -283,20 +307,6 @@ msgstr ""
 #: src/inventory_tng/labels.py
 #, python-format
 msgid "%(item)s: %(package)s of %(size)s"
-msgstr ""
-
-#: src/inventory_tng/templates/account.html
-#, python-format
-msgid ""
-"%(left)s left. Making new ones voids the old, and asks for a code from "
-"your authenticator, not a recovery code."
-msgstr ""
-
-#: src/inventory_tng/templates/account.html
-#, python-format
-msgid ""
-"%(left)s left: make new ones soon. Making new ones voids the old, and "
-"asks for a code from your authenticator, not a recovery code."
 msgstr ""
 
 #: src/inventory_tng/templates/volunteer_merge.html
@@ -788,8 +798,10 @@ msgstr ""
 
 #: src/inventory_tng/templates/admin_home.html
 #, python-format
-msgid "All %(total)s"
-msgstr ""
+msgid "All %(count)s"
+msgid_plural "All %(count)s"
+msgstr[0] ""
+msgstr[1] ""
 
 #: src/inventory_tng/templates/_labels.html
 msgid "All labels"
@@ -1357,7 +1369,7 @@ msgstr ""
 msgid "Device"
 msgstr ""
 
-#: src/inventory_tng/models.py src/inventory_tng/templates/device.html
+#: src/inventory_tng/models.py
 #, python-format
 msgid "Device %(number)s"
 msgstr ""
@@ -3029,15 +3041,17 @@ msgstr ""
 msgid "Revoke"
 msgstr ""
 
-#: src/inventory_tng/templates/device_revoke.html
-#, python-format
-msgid "Revoke %(count)s"
-msgstr ""
-
 #: src/inventory_tng/admin/common.py
 #, python-format
 msgid "Revoke %(name)s?"
 msgstr ""
+
+#: src/inventory_tng/templates/device_revoke.html
+#, python-format
+msgid "Revoke %(num)d"
+msgid_plural "Revoke %(num)d"
+msgstr[0] ""
+msgstr[1] ""
 
 #: src/inventory_tng/admin/devices.py
 #, python-format
@@ -4324,6 +4338,7 @@ msgid ""
 "symbol, joined to its number; otherwise names are saved as typed"
 msgstr ""
 
+#. Translators: a kind of save, a noun.
 #: src/inventory_tng/admin/length_checks.py
 msgid "adjustment"
 msgstr ""
@@ -4374,6 +4389,7 @@ msgstr ""
 msgid "capacitance"
 msgstr ""
 
+#. Translators: a kind of save, a noun.
 #: src/inventory_tng/admin/length_checks.py
 msgid "count"
 msgstr ""
@@ -4501,6 +4517,7 @@ msgstr ""
 msgid "inches"
 msgstr ""
 
+#. Translators: a kind of save, a noun.
 #: src/inventory_tng/admin/length_checks.py
 msgid "install"
 msgstr ""
@@ -4572,6 +4589,7 @@ msgid ""
 "authenticator gives a new code only every 30 seconds"
 msgstr ""
 
+#. Translators: a kind of save, a noun.
 #: src/inventory_tng/admin/length_checks.py
 msgid "move"
 msgstr ""
@@ -4589,6 +4607,7 @@ msgstr ""
 msgid "on %(when)s"
 msgstr ""
 
+#. Translators: a kind of save, a noun.
 #: src/inventory_tng/admin/length_checks.py
 msgid "open"
 msgstr ""
@@ -4654,10 +4673,12 @@ msgstr ""
 msgid "power level"
 msgstr ""
 
+#. Translators: a kind of save, a noun.
 #: src/inventory_tng/admin/length_checks.py
 msgid "receipt"
 msgstr ""
 
+#. Translators: a kind of save, a noun.
 #: src/inventory_tng/admin/length_checks.py
 msgid "report"
 msgstr ""

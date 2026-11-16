@@ -14,7 +14,7 @@
     <li>{% if line.below %}{% trans link=link, item=line.item, packages=line.packages, below=line.below | amount, unit=line.unit %}<a href="{{ link }}">{{ item }}: {{ packages }}</a>, {{ below }} {{ unit }} below zero{% endtrans %}
       {%- else %}<a href="{{ link }}">{{ line.item }}: {{ line.packages }}</a>{% endif %}</li>
     {% endfor %}
-    <li><a href="{{ kind.path }}">{% trans total=found.total %}All {{ total }}{% endtrans %}</a></li>
+    <li><a href="{{ kind.path }}">{% trans count=found.total %}All {{ count }}{% pluralize %}All {{ count }}{% endtrans %}</a></li>
   </ul>
   {% endfor %}
 </section>

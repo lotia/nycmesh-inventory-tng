@@ -1054,7 +1054,12 @@ class Device(Versioned, Base):
     @property
     def name(self) -> str:
         """As pages show it: its label, or its number."""
-        return self.label or gettext("Device %(number)s", number=self.id)
+        return self.label or self.number_name
+
+    @property
+    def number_name(self) -> str:
+        """Its name without a label, by its number."""
+        return gettext("Device %(number)s", number=self.id)
 
 
 class LedgerTransaction(Base):

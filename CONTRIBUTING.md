@@ -834,7 +834,9 @@ On the server (`backend/src/inventory_tng/phrases.py`):
 - In a template, put the words in `{% trans %}`, with each value named:
   `{% trans name=place.name %}Start counting {{ name }}{% endtrans %}`. A
   plural takes `count`: `{% trans count=places | length %}{{ count }}
-  place{% pluralize %}{{ count }} places{% endtrans %}`. Values are
+  place{% pluralize %}{{ count }} places{% endtrans %}`. A count is a
+  plural even where English says both forms the same, as other languages
+  may not. Values are
   escaped, and the lines of a message read as one. Words a template
   passes as a value, such as a macro's argument, are `_("Find items")`.
   A sentence with a link in it is one message, the link's markup inside

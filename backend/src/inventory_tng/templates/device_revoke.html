@@ -6,7 +6,7 @@ have to register again with a new code.{% endtrans %}</p>
 <ul>
   {% for device in devices %}<li>{{ device.name }}</li>{% endfor %}
 </ul>
-{% call confirm(here, _("Revoke %(count)s", count=devices | length), keep ~ ("?" ~ filter | urlencode if filter else ""), _("Keep them")) %}
+{% call confirm(here, ngettext("Revoke %(num)d", "Revoke %(num)d", devices | length), keep ~ ("?" ~ filter | urlencode if filter else ""), _("Keep them")) %}
   {% for name, value in filter.items() %}
   <input type="hidden" name="{{ name }}" value="{{ value }}">
   {% endfor %}
