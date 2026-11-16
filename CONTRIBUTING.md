@@ -1082,7 +1082,8 @@ Change an existing doc rather than adding one, and add a new file only when
 an issue asks for it.
 
 Record a decision in words, with who made it and when, not as a link to
-where it was discussed. A test refuses claude.ai artifact links in the
+where it was discussed or the letter of a choice made there. A test refuses
+claude.ai artifact links, lettered choices and question codes in the
 clone's files.
 
 Lint what you write or change with `mise run check-markdown`.

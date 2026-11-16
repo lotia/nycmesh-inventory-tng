@@ -57,8 +57,9 @@ is, read [README.md](README.md).
     words like "the questions page") in beads, docs, decision records or
     code comments, unless the person asks. Artifacts are tools to guide the
     work, deleted when it is done. Write the decision itself, in words, with
-    who decided and when. `backend/tests/test_artifact_links.py` refuses
-    artifact links in the clone's files.
+    who decided and when, not as a choice's letter or a question's code.
+    `backend/tests/test_artifact_links.py` refuses artifact links and such
+    citations in the clone's files.
 
 ## More guidance
 
