@@ -121,6 +121,8 @@ const bareRates: Record<string, string> = table.bare_rates;
 const clues: Record<string, string[]> = table.clues;
 const kinds: Record<string, number[]> = table.kinds;
 const products = new Set(table.products);
+// Every space but the space itself (names.SPACES).
+const SPACES = new RegExp(`[${table.spaces}]`, "g");
 
 /** Each unit `token` spells in any case, a bare rate too, and whether it
  * is spelt so as typed: by the profile, those first in each kind
@@ -255,9 +257,8 @@ type Edit = [start: number, end: number, spelling: string];
 /** What respell changes in `text`, in order (units._edits). */
 function edits(text: string, rules: Rules | undefined): Edit[] {
   const found: Edit[] = [];
-  // Any space a plain one, one for one, as units._after_a_number reads it.
-  const plain = text.replaceAll(/\p{Zs}/gu, " ");
-  // Matched with plain spaces, as search reads them (units._after_a_number).
+  // Matched with any space plain, one for one (units._after_a_number).
+  const plain = text.replaceAll(SPACES, " ");
   for (const match of plain.matchAll(AFTER_A_NUMBER)) {
     const [whole, digit, token] = match as unknown as [string, string, string];
     const at = match.index;

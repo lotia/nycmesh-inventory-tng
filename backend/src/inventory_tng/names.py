@@ -58,6 +58,9 @@ _LOOK_ALIKE = {
 LOOK_ALIKES = {
     chr(code): plain for plain, codes in _LOOK_ALIKE.items() for code in codes
 }
+# Every space (Zs) but the space itself, each read as the space: units
+# and items read any of them as one (inventory-tng-vw0f).
+SPACES = "".join(map(chr, _LOOK_ALIKE[" "]))
 _FROM = "".join(LOOK_ALIKES)
 _TO = "".join(LOOK_ALIKES.values())
 

@@ -271,7 +271,8 @@ def table() -> dict[str, Any]:
     each prefix's spellings, the symbol first, and power of ten; each
     unit's spellings, in the order they are tried, its kind and how a size
     in it is one in its kind's base; each kind's plausible sizes; and the
-    profile, products and clues that decide a reading."""
+    profile, products and clues that decide a reading, and the spaces read
+    as the space (names.SPACES)."""
     return {
         "version": VERSION,
         "prefixes": [
@@ -300,6 +301,7 @@ def table() -> dict[str, Any]:
         "bare_rates": BARE_RATES,
         "asked": sorted(ASKED),
         "products": sorted(PRODUCTS),
+        "spaces": names.SPACES,
         "clues": {kind: sorted(words) for kind, words in CLUES.items()},
         "groups_max": GROUPS_MAX,
     }
@@ -469,10 +471,8 @@ _NOUGHT = re.compile(r"(?:(?<![^\W_])[-\u2212])?(?<![^\W_])(?<![0-9][.,])0,[0-9]
 
 
 # Every space (Zs) but the space itself as the space, one character for
-# one, as decomposing (NFKD) reads most of them (names.LOOK_ALIKES).
-_PLAIN_SPACES = str.maketrans(
-    {each: " " for each, plain in names.LOOK_ALIKES.items() if plain == " "}
-)
+# one, as decomposing (NFKD) reads most of them (names.SPACES).
+_PLAIN_SPACES = str.maketrans(dict.fromkeys(names.SPACES, " "))
 
 # What _searched finds: the number as matched, and as search reads it.
 type Searched = tuple[re.Match[str], str]
@@ -499,12 +499,11 @@ type Edit = tuple[int, int, str]
 
 
 def _after_a_number(text: str) -> Iterator[tuple[re.Match[str], Searched | None]]:
-    """Each match of AFTER_A_NUMBER in `text` with plain spaces
-    (_PLAIN_SPACES), as search reads it (inventory-tng-vw0f), that may be
-    a unit: none beside a combining mark (_marked) or in a product's name
-    (_product); with its number as search reads it (_searched). Each is
-    where it is in `text`, one character for one, its token as matched,
-    with plain spaces."""
+    """Each match of AFTER_A_NUMBER in `text` with its spaces plain
+    (_PLAIN_SPACES), as search reads them (inventory-tng-vw0f), so where it
+    is in `text`, that may be a unit: none beside a combining mark
+    (_marked) or in a product's name (_product); with its number as search
+    reads it (_searched)."""
     plain = text.translate(_PLAIN_SPACES)
     for match in AFTER_A_NUMBER.finditer(plain):
         if not _marked(text, match.end()) and not _product(plain, match.end(1) - 1):
@@ -997,8 +996,7 @@ def shown_name(name: str, rules: Rules | None = None) -> str:
         # A word no form reads, as _edits reads it.
         if (read(token) if found is None else found.read) is None:
             continue
-        # Its unit as typed.
-        typed = name[match.start(2) : match.end()]
+        typed = name[match.start(2) : match.end(2)]
         edits.append((start, match.end(), shown + NO_BREAK_SPACE + typed))
     return _applied(name, edits)
 
