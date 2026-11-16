@@ -240,8 +240,8 @@ export const DISMISS = msg`Dismiss`;
 /** A list whose entries are ruled apart: the cart's lines, the outbox. */
 const RULED_LIST = "list-none p-0 *:border-t *:border-line *:py-3";
 
-/** A box that asks the volunteer to act: the upgrade, a save held for it,
- * the name check. */
+/** A box that asks the volunteer to act, as the upgrade and the name check
+ * do, or says a save waits on the upgrade. */
 const CAUTION_BOX =
   "flex flex-col items-start gap-3 border-2 border-caution p-3";
 

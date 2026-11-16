@@ -667,8 +667,8 @@ utilities. When you style a page:
   in bold italic, never the numbers of a name or of words an older build
   kept (`AlertWords` in `ScanPage.tsx`). A refusal's problems, after "Not
   recorded.", are not bold. A status that reports no problem is plain,
-  but a save held for an upgrade is in the upgrade banner's caution box
-  (`CAUTION_BOX`), with no `role="alert"`.
+  but a save held for an upgrade is in a caution box like the upgrade
+  banner's (`CAUTION_BOX`), with no `role="alert"`.
 - Follow docs/decisions/0019 for links, buttons and lists. A button is
   secondary unless it is its form's main one, `class="primary"`, or the one
   a confirmation page asks for, `class="danger"`. A page's way back is
