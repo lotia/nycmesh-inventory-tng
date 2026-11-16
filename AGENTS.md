@@ -14,8 +14,10 @@ is, read [README.md](README.md).
    for people and agents alike, so follow it as written.
 2. **Track work in beads (`bd`)**, not in TODO lists or a harness's own task
    tool. Run `bd prime` if beads context is missing. Label every bead you
-   file from the list in [Labels](CONTRIBUTING.md#labels), and
-   `needs-decision` whenever it waits on the person.
+   file: run `bd label list-all` first and reuse a label that fits before
+   making a new one. Label a bead `needs-decision` whenever it waits on the
+   person, and remove the label once they answer. A bug only requests at
+   once can cause is labelled `race` and is P1, ahead of features.
 3. **Never implement cryptography.** No hashing, encryption, signing, key
    derivation, MAC or random-number algorithm written by hand, however
    small, and none copied in. Always call an established library or a
