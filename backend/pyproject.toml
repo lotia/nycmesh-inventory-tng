@@ -60,7 +60,7 @@ required-version = ">=0.13"
 # mise run extract-catalogues).
 [tool.babel]
 mappings = [
-    { method = "python", pattern = "**.py", keywords = "lazy_gettext lazy_pgettext:1c,2", add_comments = "Translators:" },
+    { method = "python", pattern = "**.py", keywords = "lazy_gettext lazy_pgettext:1c,2 branded", add_comments = "Translators:" },
     { method = "jinja2", pattern = "templates/**.html", trimmed = "true", silent = "false", add_comments = "Translators:" },
 ]
 

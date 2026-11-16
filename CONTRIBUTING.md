@@ -850,6 +850,7 @@ On the server (`backend/src/inventory_tng/phrases.py`):
   test refuses a lone one.
 - The app's name is `phrases.BRAND`, the same in every language: a
   message takes it as a value, `%(brand)s`, never as words of its own.
+  Mail says such a message with `mail.branded`, which fills it in.
 
 On the scan page (`frontend/src/i18n.ts`):
 

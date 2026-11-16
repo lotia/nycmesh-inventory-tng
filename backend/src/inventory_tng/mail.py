@@ -234,16 +234,22 @@ TOTP_POLICY_WORDS = {
 }
 
 
+def branded(message: str, **values: object) -> str:
+    """`message`, as gettext says it, naming the app where it says
+    %(brand)s. A keyword the extractor knows (pyproject.toml)."""
+    return gettext(message, brand=BRAND, **values)
+
+
 def _paragraphs(*said: Words) -> str:
     return "\n\n".join(str(each) for each in said)
 
 
 def _sign_in_reset() -> str:
-    return gettext("Your %(brand)s sign-in was reset", brand=BRAND)
+    return branded("Your %(brand)s sign-in was reset")
 
 
 def _invited() -> str:
-    return gettext("You were invited to administer %(brand)s", brand=BRAND)
+    return branded("You were invited to administer %(brand)s")
 
 
 def codes_running_low(left: int) -> str:
@@ -275,14 +281,13 @@ def minutes(num: int) -> str:
 def reset_link(to: str, admin_id: int, link: str) -> Message:
     return Message(
         to,
-        gettext("Reset your %(brand)s password", brand=BRAND),
-        gettext(
+        branded("Reset your %(brand)s password"),
+        branded(
             "Someone asked to reset the password of your administrator account "
             "on %(brand)s. If it was you, choose a new one here, within the "
             "hour:\n\n%(link)s\n\nThe link works once. If you use an "
             "authenticator app, signing in still asks for its code.\n\nIf it "
             "wasn't you, ignore this mail: your password stays as it is.",
-            brand=BRAND,
             link=link,
         ),
         "reset_link",
@@ -295,12 +300,11 @@ def reset_link_made(to: str, admin_id: int) -> Message:
         to,
         _sign_in_reset(),
         _paragraphs(
-            gettext(
+            branded(
                 "Another administrator just reset your sign-in on %(brand)s: you "
                 "were signed out everywhere, and your password, authenticators "
                 "and recovery codes no longer work. They will pass on a link for "
                 "you to choose a new password, which works once, within a day.",
-                brand=BRAND,
             ),
             IF_NOT_YOU,
         ),
@@ -314,11 +318,10 @@ def invited(to: str, admin_id: int) -> Message:
         to,
         _invited(),
         _paragraphs(
-            gettext(
+            branded(
                 "An administrator of %(brand)s just invited you to be one too, "
                 "and will pass you a link to choose your password with. It works "
                 "once, within a day.",
-                brand=BRAND,
             ),
             NOT_EXPECTING,
         ),
@@ -330,14 +333,13 @@ def invited(to: str, admin_id: int) -> Message:
 def restored(to: str, admin_id: int) -> Message:
     return Message(
         to,
-        gettext("Your %(brand)s account was brought back", brand=BRAND),
+        branded("Your %(brand)s account was brought back"),
         _paragraphs(
-            gettext(
+            branded(
                 "Another administrator just brought back your administrator "
                 "account on %(brand)s. Anything you signed in with was removed "
                 "when it was retired. They will pass on a link for you to choose "
                 "a password with, which works once, within a day.",
-                brand=BRAND,
             ),
             IF_NOT_YOU,
         ),
@@ -349,13 +351,12 @@ def restored(to: str, admin_id: int) -> Message:
 def recovery_link_made(to: str, admin_id: int) -> Message:
     return Message(
         to,
-        gettext("Your %(brand)s account is being recovered", brand=BRAND),
+        branded("Your %(brand)s account is being recovered"),
         _paragraphs(
-            gettext(
+            branded(
                 "Someone with the recovery token that whoever runs %(brand)s set "
                 "just made a link that resets your password and authenticators. "
                 "It works once, within the hour.",
-                brand=BRAND,
             ),
             IF_NOT_YOU,
         ),
@@ -369,11 +370,10 @@ def invited_by_operator(to: str, admin_id: int) -> Message:
         to,
         _invited(),
         _paragraphs(
-            gettext(
+            branded(
                 "Whoever runs %(brand)s just invited you to be one of its "
                 "administrators, and will pass you a link to choose your "
                 "password with. It works once, within the hour.",
-                brand=BRAND,
             ),
             NOT_EXPECTING,
         ),
@@ -385,14 +385,13 @@ def invited_by_operator(to: str, admin_id: int) -> Message:
 def let_in(to: str, admin_id: int) -> Message:
     return Message(
         to,
-        gettext("You are being let back in to %(brand)s", brand=BRAND),
-        gettext(
+        branded("You are being let back in to %(brand)s"),
+        branded(
             "Whoever runs %(brand)s just made a link that lets you back in to "
             "your administrator account: anything you signed in with no longer "
             "works. With the link they pass on, you choose a new password and "
             "set up TOTP again. It works once, within the hour.\n\nIf you "
             "weren't expecting this, tell whoever runs %(brand)s at once.",
-            brand=BRAND,
         ),
         "let_in",
         admin_id,
@@ -402,12 +401,11 @@ def let_in(to: str, admin_id: int) -> Message:
 def password_changed(to: str, admin_id: int) -> Message:
     return Message(
         to,
-        gettext("Your %(brand)s password was changed", brand=BRAND),
+        branded("Your %(brand)s password was changed"),
         _paragraphs(
-            gettext(
+            branded(
                 "The password of your administrator account on %(brand)s was "
                 "just changed, and your other sessions were signed out.",
-                brand=BRAND,
             ),
             IF_NOT_YOU,
         ),
@@ -419,13 +417,12 @@ def password_changed(to: str, admin_id: int) -> Message:
 def email_changed(to: str, admin_id: int) -> Message:
     return Message(
         to,
-        gettext("Your %(brand)s email was changed", brand=BRAND),
+        branded("Your %(brand)s email was changed"),
         _paragraphs(
-            gettext(
+            branded(
                 "The email address of your administrator account on %(brand)s "
                 "was just changed from this one. Password reset links now go to "
                 "the new address.",
-                brand=BRAND,
             ),
             IF_NOT_YOU,
         ),
@@ -444,15 +441,14 @@ def recovery_code_used(left: int) -> Told:
             then = codes_left(left)
         return Message(
             to,
-            gettext("A recovery code was used on your %(brand)s account", brand=BRAND),
+            branded("A recovery code was used on your %(brand)s account"),
             _paragraphs(
                 # Translators: %(left)s is a sentence saying how many recovery
                 # codes are left, and what to do about it.
-                gettext(
+                branded(
                     "One of your recovery codes was just used on your "
                     "administrator account on %(brand)s. %(left)s If you lost "
                     "your phone, set up a new authenticator there first.",
-                    brand=BRAND,
                     left=then,
                 ),
                 IF_NOT_YOU,
@@ -470,23 +466,20 @@ def authenticators_changed(*, added: bool) -> Told:
 
     def build(to: str, admin_id: int) -> Message:
         if added:
-            subject = gettext(
-                "An authenticator was added to your %(brand)s account", brand=BRAND
+            subject = branded(
+                "An authenticator was added to your %(brand)s account",
             )
-            body = gettext(
+            body = branded(
                 "An authenticator was just added to your administrator account "
                 "on %(brand)s.",
-                brand=BRAND,
             )
         else:
-            subject = gettext(
+            subject = branded(
                 "An authenticator was removed from your %(brand)s account",
-                brand=BRAND,
             )
-            body = gettext(
+            body = branded(
                 "An authenticator was just removed from your administrator "
                 "account on %(brand)s.",
-                brand=BRAND,
             )
         return Message(
             to,
@@ -502,14 +495,13 @@ def authenticators_changed(*, added: bool) -> Told:
 def authenticators_retired(to: str, admin_id: int) -> Message:
     return Message(
         to,
-        gettext("Set up your authenticator again on %(brand)s", brand=BRAND),
+        branded("Set up your authenticator again on %(brand)s"),
         _paragraphs(
-            gettext(
+            branded(
                 "Whoever runs %(brand)s retired your authenticator, as the key "
                 "it was kept with was lost or leaked, and signed you out. Sign "
                 "in with your password and one of your recovery codes, then set "
                 "up an authenticator again.",
-                brand=BRAND,
             ),
             IF_NOT_YOU,
         ),
@@ -522,11 +514,10 @@ def left_without_a_factor(to: str, admin_id: int) -> Message:
     return Message(
         to,
         _sign_in_reset(),
-        gettext(
+        branded(
             "Whoever runs %(brand)s retired your authenticator, as the key it "
             "was kept with was lost or leaked. You had no recovery code left, so "
             "your password was removed too: ask them to let you back in.",
-            brand=BRAND,
         ),
         "left_without_a_factor",
         admin_id,
@@ -536,14 +527,13 @@ def left_without_a_factor(to: str, admin_id: int) -> Message:
 def retired(to: str, admin_id: int) -> Message:
     return Message(
         to,
-        gettext("Your %(brand)s account was retired", brand=BRAND),
-        gettext(
+        branded("Your %(brand)s account was retired"),
+        branded(
             "Another administrator just retired your administrator account on "
             "%(brand)s: you can no longer sign in, and anything you signed in "
             "with was removed. Another administrator can bring you back.\n\nIf "
             "this was not agreed, tell the other administrators, or whoever "
             "runs %(brand)s, at once.",
-            brand=BRAND,
         ),
         "retired",
         admin_id,
@@ -553,12 +543,11 @@ def retired(to: str, admin_id: int) -> Message:
 def recovery_codes_made(to: str, admin_id: int) -> Message:
     return Message(
         to,
-        gettext("New recovery codes for your %(brand)s account", brand=BRAND),
+        branded("New recovery codes for your %(brand)s account"),
         _paragraphs(
-            gettext(
+            branded(
                 "New recovery codes were just made for your administrator "
                 "account on %(brand)s. The ones you had no longer work.",
-                brand=BRAND,
             ),
             IF_NOT_YOU,
         ),
@@ -574,11 +563,11 @@ def activity(words: str) -> Told:
     def build(to: str, admin_id: int) -> Message:
         return Message(
             to,
-            gettext("An administrator account on %(brand)s changed", brand=BRAND),
+            branded("An administrator account on %(brand)s changed"),
             _paragraphs(
                 # Translators: %(words)s says what changed, such as "ada
                 # reset ben's sign-in".
-                gettext("On %(brand)s: %(words)s.", brand=BRAND, words=words),
+                branded("On %(brand)s: %(words)s.", words=words),
                 NOT_AGREED,
             ),
             "activity",
@@ -598,14 +587,13 @@ def sign_in_settings_changed(settings: SignInSettings) -> Told:
 
     def build(to: str, admin_id: int) -> Message:
         values = {
-            "brand": BRAND,
             "totp": TOTP_POLICY_WORDS[totp],
             "days": days(session_days),
             "hours": hours(confirm_hours),
             "idle": minutes(confirm_idle_minutes),
         }
         if account_change_minutes:
-            said = gettext(
+            said = branded(
                 "An administrator just changed how administrators sign in to "
                 "%(brand)s. TOTP is now %(totp)s; sessions last %(days)s; a code "
                 "typed for a sensitive change lasts %(hours)s, or %(idle)s "
@@ -615,7 +603,7 @@ def sign_in_settings_changed(settings: SignInSettings) -> Told:
                 **values,
             )
         else:
-            said = gettext(
+            said = branded(
                 "An administrator just changed how administrators sign in to "
                 "%(brand)s. TOTP is now %(totp)s; sessions last %(days)s; a code "
                 "typed for a sensitive change lasts %(hours)s, or %(idle)s "
@@ -625,7 +613,7 @@ def sign_in_settings_changed(settings: SignInSettings) -> Told:
             )
         return Message(
             to,
-            gettext("%(brand)s's sign-in settings were changed", brand=BRAND),
+            branded("%(brand)s's sign-in settings were changed"),
             _paragraphs(said, NOT_AGREED),
             "sign_in_settings_changed",
             admin_id,
