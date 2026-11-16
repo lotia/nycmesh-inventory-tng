@@ -86,10 +86,10 @@ class Unit:
 
     `ucum` are its UCUM codes and `spellings` its other symbols: with the
     symbol, each takes a prefix if `prefixes` says so. `words` never take
-    one, and are read only by search, never to spell a name (Ali,
-    2026-11-15). A size in it is `factor` times the size (its prefix's
-    power `power` times, as for m3) + `offset` in its kind's base; a level
-    in decibels has no factor."""
+    one, and are read by search and to space a name as shown
+    (shown_name), never to spell one (Ali, 2026-11-15). A size in it is
+    `factor` times the size (its prefix's power `power` times, as for m3)
+    + `offset` in its kind's base; a level in decibels has no factor."""
 
     symbol: str
     kind: str
@@ -900,13 +900,11 @@ def _shown_number(number: str) -> str:
 # `10GHz/20 MHz`).
 _IN_A_CODE = re.compile(r"[\w/.+-]")
 _INTO_A_CODE = re.compile(r"[/-]")
-# Units' words, in lower case: `feet`, `VDC`.
-_WORDS = frozenset(word.lower() for unit in UNITS for word in unit.words)
 
 
 def shown_name(name: str, rules: Rules | None = None) -> str:
     """`name` as the app shows it, wherever a name is read (Ali, 2026-11-15,
-    inventory-tng-ist.3): each number a unit is read right after (found_in:
+    inventory-tng-ist.3): each number a unit is read right after (_found:
     its rule, the words near it, the profile; never a product's), or a
     unit's word as search reads it (inventory-tng-tze), without its
     thousands separators, grouped from five digits (_shown_number), and a
@@ -915,22 +913,17 @@ def shown_name(name: str, rules: Rules | None = None) -> str:
     unit not read among it, and a number within a word or a code
     (_IN_A_CODE, _INTO_A_CODE), as typed. `name` is as saved
     (models.canonical, spell)."""
-    found = {f.end: f for f in found_in(name, rules)}
     edits = []
     for match in AFTER_A_NUMBER.finditer(name):
+        if _marked(name, match.end()) or _product(name, match.end(1) - 1):
+            continue
         number, token = _number(name, match.end(1)), match[2]
         start = match.end(1) - len(number)
-        if match.end() in found:
-            read = found[match.end()].read is not None
-        else:
-            # A word, never read by a form, read as search reads it (_edits).
-            read = (
-                token.lower() in _WORDS
-                and not _marked(name, match.end())
-                and not _product(name, match.end(1) - 1)
-            )
+        found = _found(name, match, rules)
+        # A word, which no form reads, is read as search reads it (_edits).
+        unit = read(token) if found is None else found.read
         if (
-            not read
+            unit is None
             or _IN_A_CODE.match(name[start - 1 : start])
             or _INTO_A_CODE.match(name, match.end())
         ):

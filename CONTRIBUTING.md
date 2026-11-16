@@ -376,14 +376,14 @@ read. Where nothing settles one, it asks, offering the readings in
 `units.PROFILE`'s order; the answer, or a correction under "Not right?",
 is kept as a rule as the form saves. A name is respelt only where its rule
 says (`units.spell`). A unit's words (`units.Unit.words`, such as `feet`)
-are read by search only, never in a name. A new unit needs its name in
-words and, if a name spells it otherwise than its symbol, that spelling:
-`units.NAMES` and `units.SHOWN`. The seeding page (Unit readings, then
-Propose) proposes rules from every name, by the words near each unit in
-the names they settle. The import's readings file (`unit_readings.py`,
-an operator command, DEPLOYMENT.md) proposes from the names an import
-brings with the same function (`reading_rules.propose`), and loads the
-operator's corrected file as rules by no administrator.
+are read by search and spaced in a name as shown, never respelt. A new
+unit needs its name in words and, if a name spells it otherwise than its
+symbol, that spelling: `units.NAMES` and `units.SHOWN`. The seeding page
+(Unit readings, then Propose) proposes rules from every name, by the words
+near each unit in the names they settle. The import's readings file
+(`unit_readings.py`, an operator command, DEPLOYMENT.md) proposes from the
+names an import brings with the same function (`reading_rules.propose`),
+and loads the operator's corrected file as rules by no administrator.
 
 ### Locking a row
 

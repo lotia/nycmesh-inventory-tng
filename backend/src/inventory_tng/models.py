@@ -302,9 +302,9 @@ class KeyedName(CanonicalName):
     in the database, and again when a rule changes (items.reread); no
     CHECK can hold it, the unit table being the app's (2026-11-15).
     `name_shown` is the name as the app shows it wherever a name is read
-    (units.shown_name: each number and the unit read after it spaced, its
-    thousands so too), written alike, the name as typed kept for its form
-    (Ali, 2026-11-15, inventory-tng-ist.3)."""
+    (units.shown_name: each number and the unit or unit's word read after
+    it spaced, its thousands so too), written alike, the name as typed kept
+    for its form (Ali, 2026-11-15, inventory-tng-ist.3)."""
 
     name_key: Mapped[str] = mapped_column(Text)
     unit_key: Mapped[str] = mapped_column(Text, info={"not_a_change": True})

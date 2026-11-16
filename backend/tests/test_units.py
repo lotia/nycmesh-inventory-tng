@@ -575,6 +575,7 @@ NB, THIN = "\u00a0", "\u202f"
         ("Spool 10,000 metres", f"Spool 10{THIN}000{NB}metres"),
         ("Supply -12 Volts", f"Supply -12{NB}Volts"),
         ("Reel 0,500 metres", f"Reel 0,500{NB}metres"),
+        ("Box 3 Feet", f"Box 3{NB}Feet"),
         # Products, units no rule or word settles, and tokens no unit, as
         # typed.
         ("Cat6a cable 5AC SFP+", "Cat6a cable 5AC SFP+"),
@@ -593,6 +594,7 @@ NB, THIN = "\u00a0", "\u202f"
         ("48V-to-12V converter", "48V-to-12V converter"),
         ("48VDC-to-12VDC converter", "48VDC-to-12VDC converter"),
         ("ES-8-100feet x2feet", "ES-8-100feet x2feet"),
+        ("Tape 12 inch/30 cm", "Tape 12 inch/30 cm"),
         ("Radio 10GHz/20 MHz", "Radio 10GHz/20 MHz"),
         ("Box 3ft+", f"Box 3{NB}ft+"),
     ],
