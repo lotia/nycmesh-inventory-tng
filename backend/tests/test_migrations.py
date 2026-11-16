@@ -913,16 +913,17 @@ def test_a_comma_after_a_lone_nought_is_read_again(alembic_config: Config) -> No
     ]
     assert connection.execute(
         text(
-            "SELECT name, name_shown FROM item WHERE id = :id UNION ALL"
-            " SELECT name, name_shown FROM item_package WHERE item_id = :id"
-            " UNION ALL SELECT name, name_shown FROM item_alias WHERE item_id = :id"
+            "SELECT name, unit_key, name_shown FROM item WHERE id = :id UNION ALL"
+            " SELECT name, unit_key, name_shown FROM item_package WHERE item_id = :id"
+            " UNION ALL SELECT name, unit_key, name_shown FROM item_alias"
+            " WHERE item_id = :id ORDER BY name"
         ),
         {"id": box},
     ).all() == [
-        ("Box 1 000 ft", "Box 1\u00a0000\u00a0ft"),
-        ("Cable 2 100 ft", "Cable 2\u00a0100\u00a0ft"),
+        ("Box 1 000 ft", "box1000ft", "Box 1\u00a0000\u00a0ft"),
+        ("Cable 2 100 ft", "cable2100ft", "Cable 2\u00a0100\u00a0ft"),
         # Within a code, as typed.
-        ("X-1 000 feet", "X-1 000 feet"),
+        ("X-1 000 feet", "x1000feet", "X-1 000 feet"),
     ]
     command.downgrade(alembic_config, "0047")
     other = row("item", "Resistor 0,5 GOhm", category_id=category_id, name_folded="")
