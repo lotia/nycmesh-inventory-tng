@@ -261,7 +261,8 @@ CONFIRM_FIELD = "confirm_code"
 # The fields of a form a confirmation carries that hold a password the person
 # typed, by name, in the order asked: never written into the confirm page,
 # but asked for again, empty. Every other field is carried as sent, though
-# the log masker may mask its name (totp_policy, session_days).
+# the log masker masks the values of some by their names (totp_policy,
+# session_days).
 RETYPED = ("password", "password_again")
 
 
