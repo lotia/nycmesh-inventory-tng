@@ -4,8 +4,9 @@
  * puts the closest first again. All of it without JavaScript, as links
  * (docs/decisions/0019, Lists).
  */
-import { expect, type Page, test } from "@playwright/test";
+import { expect, type Page } from "@playwright/test";
 import { addItem, unique } from "./own";
+import { test } from "./policy";
 
 test.use({ javaScriptEnabled: false });
 

@@ -3,8 +3,9 @@
  * button is clicked (inventory-tng-8i4.83): a second sending would answer
  * "Already sent", and the code the first made would never be seen.
  */
-import { expect, type Locator, test } from "@playwright/test";
+import { expect, type Locator } from "@playwright/test";
 import { makeCode } from "./codes";
+import { test } from "./policy";
 
 /**
  * Clicked twice, a person's double-click apart: Playwright's dblclick fires
@@ -22,7 +23,10 @@ test("a double-click sends the form once, and shows the code", async ({
 }) => {
   let posts = 0;
   page.on("request", (request) => {
-    if (request.method() === "POST") posts += 1;
+    // The form's, not a report the browser sends of itself, such as
+    // WebKit's of the policy (policy.ts).
+    const api = new URL(request.url()).pathname.startsWith("/api/");
+    if (request.method() === "POST" && !api) posts += 1;
   });
   // Asked to confirm, the confirm form is sent next: once too.
   const asked = await makeCode(page, "Double-click", doubleClick);

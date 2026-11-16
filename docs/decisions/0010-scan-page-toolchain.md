@@ -335,6 +335,33 @@ the compressed copy (fiddly header code ServeStatic already gets right).
 - ServeStatic is a younger fork of WhiteNoise, made to add ASGI. If it
   stalls, a server such as Caddy or nginx, which serves the same `.br` and
   `.gz` files, can replace it without changing the build.
-- The Content-Security-Policy allows `'wasm-unsafe-eval'` for the decoder.
+- **Every response carries an enforced Content-Security-Policy** (Ali,
+  2026-11-16, inventory-tng-e0y), defined in
+  `backend/src/inventory_tng/security_headers.py`. Scripts, styles, images
+  and requests come from this origin only, and the policy allows
+  `'wasm-unsafe-eval'` for the decoder. No page has an inline script,
+  `<style>` or style attribute: the administrator pages' inline scripts
+  (sending a form once, the Print and Copy buttons) moved into
+  `frontend/src/admin.ts`, which Vite builds, and a test refuses any in a
+  template. Two things need a nonce, made for each response with Python's
+  `secrets`: in development, the `<style>` elements Vite's dev server adds,
+  whose client reads the nonce from the page, with the dev server's address
+  and websocket allowed there only; and the API's docs page, FastAPI's,
+  whose inline script starts Swagger UI from its CDN, which that page alone
+  allows. Ali chose to enforce it from the start, as nothing is deployed
+  and both browser suites fail on any violation, which they listen for in
+  every page they open; we rejected report-only first. Violations are
+  counted (Ali, same day): browsers report them to an endpoint the policy
+  names (`report-uri`, and `report-to` for browsers with the Reporting API,
+  which sends only over HTTPS), counted in `inventory.csp.violations` by
+  the directive violated, from a fixed list or "other", and rate limited by
+  address as the pages' telemetry is. Nothing else a report says is kept
+  or logged: it names pages, addresses and what the page held. We rejected
+  sending no reports. Beside it, every response says `nosniff`, sends no
+  `Referer` (`Referrer-Policy: no-referrer`, as the administrator pages
+  already asked: reset and sign-in links carry a token in their address,
+  and the app needs no referrer from its own pages), and allows the camera
+  to this origin only, denying every other feature a page could ask for
+  (`Permissions-Policy`).
 - Testing the camera on a phone in development needs HTTPS for the dev
   server, or a tunnel.

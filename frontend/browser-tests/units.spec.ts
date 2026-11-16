@@ -9,8 +9,9 @@
  * deleting its unit's rule, if a run before left one (forget), and accepts
  * only its own proposal, so none settles another's.
  */
-import { expect, type Page, type TestInfo, test } from "@playwright/test";
+import { expect, type Page, type TestInfo } from "@playwright/test";
 import { addItem, unique } from "./own";
+import { test } from "./policy";
 
 /** A number for a name, so names the tests make differ. */
 const number = (): number => 100 + Math.floor(Math.random() * 900);

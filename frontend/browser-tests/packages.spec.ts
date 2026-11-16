@@ -4,8 +4,9 @@
  * arrive (inventory-tng-8i4.133.2). Each test has a cable of its own
  * (own.ts), so none sees another's open packages.
  */
-import { expect, type Page, test } from "@playwright/test";
+import { expect, type Page } from "@playwright/test";
 import { ownCable } from "./own";
+import { test } from "./policy";
 
 /** Picks `cable` on the scan page, from a search for it. */
 async function pick(page: Page, cable: string): Promise<void> {

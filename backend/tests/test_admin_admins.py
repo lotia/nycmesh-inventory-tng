@@ -635,7 +635,7 @@ def test_a_link_page_offers_a_copy_and_a_qr_code(
     ben, _ = new_admin(session, "ben")
     made = admin_client.post(f"{ADMINS}/{ben.id}/reset", data=with_code(session))
     link = html.unescape(link_on(made.text))
-    assert 'id="copy"' in made.text
+    assert 'data-copy="link"' in made.text
     assert str(qr_svg(link)) in made.text
 
 

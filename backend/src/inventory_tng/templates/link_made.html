@@ -12,9 +12,13 @@ within a day, and with it they choose their password.{% endtrans %}
 {%- else %}{% trans name=other.username %}Pass this link on to {{ name }}
 yourself, in person or in a message only they read. It works once,
 within a day, and with it they choose a new password.{% endtrans %}{% endif %}</p>
-<p class="key">{{ link }}</p>
+<p id="link" class="key">{{ link }}</p>
+{#- Copying needs the clipboard, so the button shows only where it can be
+used (frontend/src/buttons.ts); the link above can always be copied by hand. #}
 <p class="actions">
-  <button type="button" id="copy" hidden>{% trans %}Copy the link{% endtrans %}</button>
+  <button type="button" data-copy="link" data-status="copied"
+    data-copied="{{ _("Copied.") }}"
+    data-failed="{{ _("Couldn't copy: select it and copy it by hand.") }}" hidden>{% trans %}Copy the link{% endtrans %}</button>
   <span id="copied" aria-live="polite"></span>
 </p>
 <p class="hint">{% trans %}A copied link stays in any clipboard history: once it is
@@ -24,23 +28,5 @@ passed on, copy something else.{% endtrans %}</p>
   <p class="hint">{% trans %}Only with them beside you: any camera in view can read it.{% endtrans %}</p>
   <div class="qr">{{ qr }}</div>
 </details>
-{#- Copying needs the clipboard, so the button shows only where it can be
-used; the link above can always be copied by hand. #}
-<script>
-  (() => {
-    const button = document.getElementById("copy");
-    const status = document.getElementById("copied");
-    if (!navigator.clipboard) return;
-    button.hidden = false;
-    button.addEventListener("click", () => {
-      // Emptied first, so the same words are said again.
-      status.textContent = "";
-      navigator.clipboard.writeText(document.querySelector(".key").textContent).then(
-        () => { status.textContent = {{ _("Copied.") | tojson }}; },
-        () => { status.textContent = {{ _("Couldn't copy: select it and copy it by hand.") | tojson }}; },
-      );
-    });
-  })();
-</script>
 {% include "_shown_once.html" %}
 {% endblock %}

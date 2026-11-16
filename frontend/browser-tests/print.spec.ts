@@ -2,8 +2,9 @@
  * A registration code prints cleanly (inventory-tng-8i4.61, 8i4.60.9): only
  * the code, one to a page, on US Letter or A4.
  */
-import { expect, type Page, test } from "@playwright/test";
+import { expect, type Page } from "@playwright/test";
 import { makeCode } from "./codes";
+import { test } from "./policy";
 
 const sheet = (page: Page) =>
   page.locator(".print-sheet").filter({ visible: true });

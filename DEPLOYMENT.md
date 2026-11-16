@@ -16,7 +16,9 @@ There is no production container image or Helm chart yet
 - HTTPS in front of it, from a reverse proxy or ingress. Outside development
   the device and sign-in cookies are `Secure`: over plain http a browser
   never keeps them, so no device stays registered and nobody stays signed
-  in.
+  in. The app sets its own Content-Security-Policy and related headers on
+  every response (`backend/src/inventory_tng/security_headers.py`): pass
+  them on unchanged.
 
 ## Settings
 

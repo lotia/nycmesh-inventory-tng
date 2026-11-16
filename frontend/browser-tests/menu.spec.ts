@@ -3,7 +3,8 @@
  * page holds each link twice, for the menu and for a wide screen's bar:
  * only one shows.
  */
-import { expect, type Page, test } from "@playwright/test";
+import { expect, type Page } from "@playwright/test";
+import { test } from "./policy";
 
 /** In the band at the top of the page, or the menu it opens, as shown now. */
 function shown(page: Page, role: "link" | "button", name: string) {

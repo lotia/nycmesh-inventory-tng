@@ -6,7 +6,7 @@ Forward offers to send the form again. Each form carries a key made when it
 was shown ({{ once_field() }}), and its route asks sent_before() first: sent
 again, the key is found spent and nothing is made, rather than a second
 secret that voids the first. A double-click is stopped before that, in the
-browser (admin_base.html): it would show only the second answer, and the
+browser (frontend/src/once.ts): it would show only the second answer, and the
 first's secret never.
 """
 
@@ -64,7 +64,8 @@ ALREADY_SENT = lazy_gettext("Already sent")
 
 
 # The page a form was on, which a page saying it was sent before links back
-# to: browsers send no Referer to these pages (admin_base.html).
+# to: browsers send no Referer to these pages
+# (security_headers.REFERRER_POLICY).
 BACK = "back"
 
 
@@ -79,9 +80,7 @@ def once_field(context: Context) -> Markup:
     ).format(FIELD, uuid.uuid4(), BACK, context["request"].url.path)
 
 
-cast(dict[str, Any], templates.env.globals).update(
-    once_field=once_field, once_name=FIELD
-)
+cast(dict[str, Any], templates.env.globals)["once_field"] = once_field
 
 
 def form_key(typed: object) -> uuid.UUID | None:

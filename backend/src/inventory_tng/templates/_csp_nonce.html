@@ -1,0 +1,3 @@
+{#- In development, the nonce Vite's client gives each stylesheet it adds to
+the page, which the policy allows by it (security_headers.py). -#}
+{% if csp_nonce(request) %}<meta property="csp-nonce" nonce="{{ csp_nonce(request) }}">{% endif %}

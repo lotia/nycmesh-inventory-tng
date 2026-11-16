@@ -24,6 +24,7 @@ from inventory_tng import (
     page_telemetry,
     pages,
     resets,
+    security_headers,
     sign_in,
 )
 from inventory_tng.cross_site import CrossSiteRefusal
@@ -77,7 +78,8 @@ def create_app(
         title=BRAND,
         lifespan=lifespan,
         openapi_url="/api/schema",
-        docs_url="/api/docs",
+        # Served by security_headers.docs, under a policy of its own.
+        docs_url=None,
         redoc_url=None,
         responses=db.UNAVAILABLE,
     )
@@ -97,11 +99,17 @@ def create_app(
         if settings.logging.health_checks
         else frozenset({API + health.PATH}),
     )
+    # Outermost, so every answer has them, failures and refusals included.
+    # Vite's dev server: development only (Settings).
+    app.add_middleware(
+        security_headers.SecurityHeaders, dev_server=settings.frontend.dev_server
+    )
     app.include_router(health.router, prefix=API)
     app.include_router(devices.router, prefix=API)
     app.include_router(ledger.router, prefix=API)
     app.include_router(catalogue.router, prefix=API)
     app.include_router(page_telemetry.router, prefix=API)
+    app.include_router(security_headers.router)
     app.include_router(bundle.router)
     app.include_router(sign_in.router)
     app.include_router(account.router)

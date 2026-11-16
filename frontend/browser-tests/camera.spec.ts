@@ -3,7 +3,8 @@
  * whose fake camera shows the seed's labelled item (playwright.config.ts):
  * the camera, the decoder from this origin and the cart, together.
  */
-import { expect, test } from "@playwright/test";
+import { expect } from "@playwright/test";
+import { test } from "./policy";
 import { prepared } from "./prepared";
 
 test("a label shown to the camera adds its item to the cart", async ({

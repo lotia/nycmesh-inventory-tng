@@ -1,0 +1,270 @@
+"""The headers every response carries for the browser's protection
+(docs/decisions/0010, inventory-tng-e0y): an enforced Content-Security-Policy,
+and the endpoint its violations are reported to; nosniff; the
+Referrer-Policy; and the Permissions-Policy.
+
+The policy allows scripts, styles, images and requests from this origin
+only. No page has an inline script, a <style> or a style attribute: what a
+page does is a file Vite builds, and its look a class in the shared
+stylesheet (CONTRIBUTING.md, Styles). The decoder's WebAssembly needs
+'wasm-unsafe-eval'. In development, Vite's dev server serves the scripts and
+styles, reloads them over a websocket, and adds each stylesheet as a
+<style>, which the policy allows by a nonce made for each response
+(csp_nonce, which the pages put where Vite's client reads it). So does the
+API's docs page, FastAPI's, for the one inline script that starts Swagger UI,
+which comes from its CDN.
+
+A violation is counted by its directive, from a fixed list, and nothing else
+a report says is kept or logged: it names pages, addresses and what the page
+held. Reports count against their address as the pages' telemetry does
+(page_telemetry.py).
+"""
+
+import json
+import secrets
+from collections.abc import Iterator
+from typing import Any, cast
+
+import structlog
+from fastapi import APIRouter, Request, Response
+from fastapi.openapi.docs import get_swagger_ui_html
+from fastapi.responses import HTMLResponse, JSONResponse
+from limits import RateLimitItemPerMinute
+from limits.strategies import MovingWindowRateLimiter
+from opentelemetry import metrics
+from starlette.datastructures import MutableHeaders
+from starlette.types import ASGIApp, Message, Receive, Scope, Send
+
+from inventory_tng.devices import RateLimitedReply
+from inventory_tng.pages import templates
+from inventory_tng.phrases import BRAND
+from inventory_tng.web import rate_key
+
+log = structlog.get_logger(__name__)
+meter = metrics.get_meter(__name__)
+
+router = APIRouter()
+
+# Where browsers send violation reports: report-uri's address, and the
+# Reporting API's endpoint, named by report-to.
+REPORTS = "/api/csp-reports"
+REPORT_GROUP = "csp"
+# The API's docs page (app.py), FastAPI's Swagger UI, and where its script
+# and stylesheet come from (fastapi.openapi.docs).
+DOCS = "/api/docs"
+SWAGGER_CDN = "https://cdn.jsdelivr.net"
+SWAGGER_FAVICON = "https://fastapi.tiangolo.com"
+
+# Where the response's nonce is kept, in the request's state.
+NONCE = "csp_nonce"
+NONCE_BYTES = 16
+
+# A page's violations come a few at a time, and each is one request in
+# browsers that use report-uri.
+REPORTS_ALLOWED = RateLimitItemPerMinute(30)
+# A report is a few hundred bytes, the Reporting API's a list of them.
+MOST_BYTES = 32 * 1024
+MOST_REPORTS = 20
+# The directives counted by name; any other is "other".
+DIRECTIVES = frozenset(
+    {
+        "default-src",
+        "script-src",
+        "script-src-elem",
+        "script-src-attr",
+        "style-src",
+        "style-src-elem",
+        "style-src-attr",
+        "img-src",
+        "font-src",
+        "connect-src",
+        "media-src",
+        "object-src",
+        "frame-src",
+        "child-src",
+        "worker-src",
+        "manifest-src",
+        "frame-ancestors",
+        "form-action",
+        "base-uri",
+    }
+)
+OTHER = "other"
+
+# What the pages may use: the camera, on this origin, for the scan page.
+# Every other feature a page could ask for, denied.
+PERMISSIONS = ", ".join(
+    ["camera=(self)"]
+    + [
+        f"{feature}=()"
+        for feature in (
+            "accelerometer",
+            "display-capture",
+            "geolocation",
+            "gyroscope",
+            "hid",
+            "magnetometer",
+            "microphone",
+            "midi",
+            "payment",
+            "serial",
+            "usb",
+        )
+    ]
+)
+# No address is sent on: reset and sign-in links carry their token in it.
+REFERRER_POLICY = "no-referrer"
+
+violations = meter.create_counter(
+    "inventory.csp.violations",
+    unit="{violation}",
+    description="Content-Security-Policy violations browsers reported, by directive",
+)
+
+
+def content_security_policy(
+    *, dev_server: str | None = None, nonce: str | None = None, docs: bool = False
+) -> str:
+    """The policy for a response: with Vite's dev server (development only),
+    and the nonce of what it adds; or for the API's docs page."""
+    dev = [] if dev_server is None else [dev_server]
+    # Vite reloads over a websocket at its own address.
+    reloads = [dev_server.replace("http", "ws", 1)] if dev_server else []
+    allowed = [f"'nonce-{nonce}'"] if nonce else []
+    swagger = [SWAGGER_CDN] if docs else []
+    sources = {
+        "default-src": ["'self'", *dev],
+        "script-src": ["'self'", "'wasm-unsafe-eval'", *dev, *swagger],
+        "style-src": ["'self'", *dev, *swagger],
+        "img-src": ["'self'", *dev],
+        "connect-src": ["'self'", *dev, *reloads],
+        "object-src": ["'none'"],
+        "base-uri": ["'none'"],
+        "frame-ancestors": ["'none'"],
+        "form-action": ["'self'"],
+        "report-uri": [REPORTS],
+        "report-to": [REPORT_GROUP],
+    }
+    # The docs page's own script; Vite's styles.
+    sources["script-src" if docs else "style-src"] += allowed
+    if docs:
+        # Swagger UI's stylesheet draws some icons from data: URLs.
+        sources["img-src"] += ["data:", SWAGGER_FAVICON]
+    return "; ".join(" ".join([name, *values]) for name, values in sources.items())
+
+
+class SecurityHeaders:
+    """Adds the headers to every response, the app's error pages and its
+    static files included. `dev_server`: Vite's, in development only."""
+
+    def __init__(self, app: ASGIApp, *, dev_server: str | None) -> None:
+        self.app = app
+        self.dev_server = dev_server
+
+    async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
+        if scope["type"] != "http":
+            await self.app(scope, receive, send)
+            return
+        docs = scope["path"] == DOCS
+        nonce = None
+        if self.dev_server is not None or docs:
+            nonce = secrets.token_urlsafe(NONCE_BYTES)
+            scope.setdefault("state", {})[NONCE] = nonce
+        headers = {
+            "Content-Security-Policy": content_security_policy(
+                dev_server=self.dev_server, nonce=nonce, docs=docs
+            ),
+            "Reporting-Endpoints": f'{REPORT_GROUP}="{REPORTS}"',
+            "X-Content-Type-Options": "nosniff",
+            "Referrer-Policy": REFERRER_POLICY,
+            "Permissions-Policy": PERMISSIONS,
+        }
+
+        async def send_with_headers(message: Message) -> None:
+            if message["type"] == "http.response.start":
+                MutableHeaders(scope=message).update(headers)
+            await send(message)
+
+        await self.app(scope, receive, send_with_headers)
+
+
+def csp_nonce(request: Request) -> str | None:
+    """This response's nonce; None where the policy needs none, as outside
+    development."""
+    return request.scope.get("state", {}).get(NONCE)
+
+
+# Jinja types its globals by its own defaults' types; any value will do.
+cast(dict[str, Any], templates.env.globals)["csp_nonce"] = csp_nonce
+
+
+@router.get(DOCS, include_in_schema=False)
+def docs(request: Request) -> HTMLResponse:
+    """FastAPI's docs page, its inline script allowed by the nonce."""
+    page = get_swagger_ui_html(
+        openapi_url=str(request.app.openapi_url), title=f"{BRAND} API"
+    )
+    nonce = csp_nonce(request)
+    body = bytes(page.body).replace(b"<script>", f'<script nonce="{nonce}">'.encode())
+    return HTMLResponse(body)
+
+
+def violated(report: object) -> list[str]:
+    """Each violation's directive, from report-uri's one report or the
+    Reporting API's list (its csp-violation reports, MOST_REPORTS at most);
+    "other" for one not in DIRECTIVES."""
+    found: Iterator[object]
+    if isinstance(report, dict) and isinstance(body := report.get("csp-report"), dict):
+        # Older browsers name the whole directive, sources and all.
+        named = body.get("violated-directive")
+        first = named.split()[0] if isinstance(named, str) and named else None
+        found = iter([body.get("effective-directive") or first])
+    elif isinstance(report, list):
+        found = (
+            entry["body"].get("effectiveDirective")
+            for entry in report[:MOST_REPORTS]
+            if isinstance(entry, dict)
+            and entry.get("type") == "csp-violation"
+            and isinstance(entry.get("body"), dict)
+        )
+    else:
+        return []
+    return [name if name in DIRECTIVES else OTHER for name in found]
+
+
+async def _body(request: Request) -> bytes | None:
+    """The request's body; None past MOST_BYTES."""
+    body = bytearray()
+    async for chunk in request.stream():
+        body += chunk
+        if len(body) > MOST_BYTES:
+            return None
+    return bytes(body)
+
+
+# Async: it works in memory only, as page_telemetry.report does.
+@router.post(REPORTS, status_code=204, include_in_schema=False)
+async def report(request: Request) -> Response:
+    """Count what a browser reports its policy refused."""
+    limiter: MovingWindowRateLimiter = request.app.state.page_reports
+    if not limiter.hit(REPORTS_ALLOWED, "csp", rate_key(request)):
+        log.info("policy report refused", reason="rate_limited")
+        body = RateLimitedReply(reason="rate_limited").model_dump()
+        return JSONResponse(body, status_code=429)
+    raw = await _body(request)
+    if raw is None:
+        return Response(status_code=413)
+    try:
+        found = violated(json.loads(raw))
+    except ValueError:
+        found = []
+    if not found:
+        return Response(status_code=400)
+    for directive in found:
+        violations.add(1, {"directive": directive})
+    log.warning(
+        "content security policy violated",
+        directives=sorted(set(found)),
+        count=len(found),
+    )
+    return Response(status_code=204)

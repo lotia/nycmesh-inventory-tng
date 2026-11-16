@@ -3,7 +3,8 @@
  * an administrator can reach by following links, and the volunteers' pages,
  * at 360 pixels wide, also with a long word in everything that shows text.
  */
-import { expect, type Page, test } from "@playwright/test";
+import { expect, type Page } from "@playwright/test";
+import { test } from "./policy";
 
 /** How far past the screen's edge the page reaches, in pixels. */
 async function overflow(page: Page): Promise<number> {

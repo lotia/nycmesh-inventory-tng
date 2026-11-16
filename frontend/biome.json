@@ -32,5 +32,27 @@
         "organizeImports": "on"
       }
     }
-  }
+  },
+  "overrides": [
+    {
+      "includes": ["browser-tests/**", "!browser-tests/policy.ts"],
+      "linter": {
+        "rules": {
+          "style": {
+            "noRestrictedImports": {
+              "level": "error",
+              "options": {
+                "paths": {
+                  "@playwright/test": {
+                    "importNames": ["test"],
+                    "message": "Import test from ./policy (or ./own), which fails a test on a Content-Security-Policy violation."
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  ]
 }

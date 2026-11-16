@@ -684,7 +684,11 @@ utilities. When you style a page:
   Retired · All". `Searched.read` takes the page's filters and what they
   pick.
 - What administrator pages do in the browser beyond plain HTML is in
-  `frontend/src/admin.ts`; each still works without it.
+  `frontend/src/admin.ts`; each still works without it. No template has
+  an inline script, a `<style>` or a `style` attribute: the
+  Content-Security-Policy refuses them (docs/decisions/0010,
+  `security_headers.py`). Give an element a class, or a `data-` attribute
+  that `admin.ts` acts on, as the Print button's `data-print`.
 - A page that prints a QR code puts a `.printable` in its `main`: the
   `print_controls` macro (`_print_controls.html`: the paper and a Print
   button), then a `.print-sheet` for each page, what prints
@@ -952,6 +956,10 @@ only a real browser can, such as that no page scrolls sideways:
 ```sh
 mise run check-browser           # builds, starts the app, runs them
 ```
+
+A test fails on any Content-Security-Policy violation in a page it opens:
+tests import `test` from `browser-tests/policy.ts`, or `own.ts`, which
+extends it, never from Playwright, which Biome refuses.
 
 The tests run at once, in several workers, against that one database, so
 none may change rows another reads: a test that changes data first makes

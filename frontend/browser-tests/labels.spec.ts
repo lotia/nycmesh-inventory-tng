@@ -2,7 +2,8 @@
  * Labels print twelve to a page, cut apart or on sticker paper
  * (inventory-tng-8i4.16), on US Letter or A4.
  */
-import { expect, type Page, test } from "@playwright/test";
+import { expect, type Page } from "@playwright/test";
+import { test } from "./policy";
 import { prepared } from "./prepared";
 
 /** Prints `copies` labels of the seed's labelled item, from its page. */

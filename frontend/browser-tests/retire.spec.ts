@@ -3,8 +3,9 @@
  * the page asks first (docs/decisions/0019). Each test retires a volunteer
  * of its own (own.ts), and brings them back.
  */
-import { expect, test } from "@playwright/test";
+import { expect } from "@playwright/test";
 import { ownVolunteer } from "./own";
+import { test } from "./policy";
 
 test("a page with unsaved changes asks before retiring", async ({ page }) => {
   const was = await ownVolunteer(page);

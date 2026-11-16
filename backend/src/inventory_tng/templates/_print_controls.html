@@ -1,5 +1,6 @@
 {#- What a .printable shows on screen (styles.css, Printing): the paper,
-which the print styles read, and a Print button. The call's body is a
+which the print styles read, and a Print button, which the page's script
+shows (frontend/src/buttons.ts). The call's body is a
 hint below the button. -#}
 {% macro print_controls(heading) -%}
 <section>
@@ -11,7 +12,7 @@ hint below the button. -#}
       <label><input type="radio" name="paper" value="letter" checked> {% trans %}US Letter{% endtrans %}</label>
       <label><input type="radio" name="paper" value="a4"> {% trans %}A4{% endtrans %}</label>
     </fieldset>
-    <button type="button" onclick="print()">{% trans %}Print{% endtrans %}</button>
+    <button type="button" data-print hidden>{% trans %}Print{% endtrans %}</button>
     <p class="hint">{{ caller() }}</p>
   </div>
 </section>

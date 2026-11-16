@@ -5,8 +5,9 @@
  * as well as finding what they found before units were read, and match a
  * search mixing spellings group by group.
  */
-import { expect, test } from "@playwright/test";
+import { expect } from "@playwright/test";
 import { addItem, ownCable, unique } from "./own";
+import { test } from "./policy";
 
 test("a suggestion picked with the keyboard narrows the list", async ({
   page,

@@ -314,6 +314,7 @@ def link(*_: object, **__: object) -> str:
 SIGNED_IN = {
     "request": SimpleNamespace(
         url=SimpleNamespace(path="/admin/stock/x"),
+        scope={},
         app=SimpleNamespace(state=SimpleNamespace(bundle=SimpleNamespace(tags=link))),
     ),
     "admin": SimpleNamespace(username=NAME),

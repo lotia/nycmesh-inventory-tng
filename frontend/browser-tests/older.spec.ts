@@ -5,8 +5,9 @@
  * add to the cart and save again, on a phone's width. The cable is the
  * test's own (own.ts).
  */
-import { expect, type Locator, type Page, test } from "@playwright/test";
+import { expect, type Locator, type Page } from "@playwright/test";
 import { ownCable } from "./own";
+import { test } from "./policy";
 
 const HEADING = "Checked out items. Add to cart or discard before sending";
 const PUT_BACK = "Added back to cart. Review before Record.";

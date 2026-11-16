@@ -4,12 +4,8 @@
  * against one database (playwright.config.ts).
  */
 import { randomUUID } from "node:crypto";
-import {
-  test as base,
-  expect,
-  type Locator,
-  type Page,
-} from "@playwright/test";
+import { expect, type Locator, type Page } from "@playwright/test";
+import { assertNone, test as base, watch } from "./policy";
 import { prepared } from "./prepared";
 
 /**
@@ -127,6 +123,7 @@ export const test = base.extend<{
       // Not the shared session, which a new context otherwise starts with.
       storageState: { cookies: [], origins: [] },
     });
+    const violations = await watch(context);
     const admin = await context.newPage();
     const password = randomUUID();
     await admin.goto(link);
@@ -139,5 +136,6 @@ export const test = base.extend<{
     await expect(admin).toHaveURL(/\/admin$/);
     await use({ page: admin, password });
     await context.close();
+    assertNone(violations);
   },
 });

@@ -3,7 +3,8 @@
  * and registers the browser as a device, then keeps both cookies for every
  * test (prepared.ts, adminState).
  */
-import { expect, test } from "@playwright/test";
+import { expect } from "@playwright/test";
+import { test } from "./policy";
 import { adminState, prepared } from "./prepared";
 
 test("sign in and register", async ({ page }) => {

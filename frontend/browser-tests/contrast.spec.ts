@@ -5,7 +5,8 @@
  * section with keyboard focus (docs/decisions/0019), which also shows it
  * plainly.
  */
-import { expect, type Locator, test } from "@playwright/test";
+import { expect, type Locator } from "@playwright/test";
+import { test } from "./policy";
 
 /** An element's text against the nearest background behind it, and how
  * much anything around it fades it. */

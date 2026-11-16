@@ -386,7 +386,7 @@ async def _confirmed(
         once.spent, session, form.get(once.FIELD)
     ):
         # The page the form was on (once.once_field): browsers send no
-        # Referer here (admin_base.html).
+        # Referer here (security_headers.REFERRER_POLICY).
         back = _local(str(form.get(once.BACK, "")))
         raise Answered(once.sent_again(request, signed, need.made, back))
     if not was_open:

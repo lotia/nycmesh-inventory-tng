@@ -35,6 +35,7 @@ from inventory_tng import (
     over_recorded,
     page_builds,
     page_telemetry,
+    security_headers,
 )
 from inventory_tng.admin.categories import CATEGORIES
 from inventory_tng.admin.counts import ADJUSTMENTS, COUNTS
@@ -830,6 +831,25 @@ def test_records_what_the_pages_report(rolled_back: Recorded) -> None:
     assert bounds == {
         "inventory.page.web_vital.duration": {page_telemetry.VITAL_SECONDS},
         "inventory.page.web_vital.layout_shift": {page_telemetry.LAYOUT_SHIFTS},
+    }
+
+
+def test_counts_policy_violations_by_directive(rolled_back: Recorded) -> None:
+    client, _, reader, _ = rolled_back
+    before = counted(reader, "inventory.csp.violations")
+    reports = [
+        {"type": "csp-violation", "body": {"effectiveDirective": "script-src-elem"}},
+        {"type": "csp-violation", "body": {"effectiveDirective": "made-up-src"}},
+    ]
+    answer = client.post(
+        security_headers.REPORTS,
+        json=reports,
+        headers={"Content-Type": "application/reports+json"},
+    )
+    assert answer.status_code == 204
+    assert added(reader, "inventory.csp.violations", before) == {
+        (("directive", "script-src-elem"),): 1,
+        (("directive", "other"),): 1,
     }
 
 
