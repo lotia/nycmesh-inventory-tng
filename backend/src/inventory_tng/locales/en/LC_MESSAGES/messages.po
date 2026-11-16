@@ -1,0 +1,45 @@
+# The server's English catalogue (docs/decisions/0022): each msgid is the
+# English said. mise run extract-catalogues writes it from the code.
+#
+msgid ""
+msgstr ""
+"Project-Id-Version:  inventory-tng\n"
+"Report-Msgid-Bugs-To: EMAIL@ADDRESS\n"
+"POT-Creation-Date: 2026-11-15 21:32-0500\n"
+"PO-Revision-Date: 2026-11-15 21:32-0500\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language: en\n"
+"Language-Team: en <LL@li.org>\n"
+"Plural-Forms: nplurals=2; plural=(n != 1);\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=utf-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Generated-By: Babel 2.18.0\n"
+
+#: src/inventory_tng/templates/_retired_holding.html
+#, python-format
+msgid ""
+"%(count)s retired place holds stock that a save brought or took after "
+"retirement: count each to put the records right."
+msgid_plural ""
+"%(count)s retired places hold stock that a save brought or took after "
+"retirement: count each to put the records right."
+msgstr[0] ""
+msgstr[1] ""
+
+#: src/inventory_tng/pages.py
+#, python-format
+msgid "%(num)d retired place holds stock"
+msgid_plural "%(num)d retired places hold stock"
+msgstr[0] ""
+msgstr[1] ""
+
+#: src/inventory_tng/templates/_retired_holding.html
+#, python-format
+msgid "Start counting %(name)s"
+msgstr ""
+
+#: src/inventory_tng/resets.py
+msgid "Your account is reset: sign in."
+msgstr ""
+

@@ -7,6 +7,7 @@ from pathlib import Path
 from typing import Any, NamedTuple, NoReturn
 from urllib.parse import urlencode
 
+from babel.support import LazyProxy
 from fastapi import FastAPI, Request
 from fastapi.exception_handlers import http_exception_handler
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse, Response
@@ -17,8 +18,10 @@ from starlette.types import Scope
 
 from inventory_tng.db import Gone
 from inventory_tng.local_time import show, show_day
+from inventory_tng.phrases import install, ngettext
 
 templates = Jinja2Templates(directory=Path(__file__).parent / "templates")
+install(templates.env)
 # {{ moment | when(zone) }}: a stored UTC time as people read it
 # (docs/decisions/0013); {{ moment | day(zone) }}, its day alone ("14 Nov").
 templates.env.filters["when"] = show
@@ -35,12 +38,11 @@ templates.env.filters["amount"] = amount
 
 def retired_holding(places: int) -> str:
     """How many retired places hold stock, in words."""
-    if places == 1:
-        return "1 retired place holds stock"
-    return f"{places} retired places hold stock"
-
-
-templates.env.filters["retired_holding"] = retired_holding
+    return ngettext(
+        "%(num)d retired place holds stock",
+        "%(num)d retired places hold stock",
+        places,
+    )
 
 
 # One wording, wherever what is on an open package is typed: the count
@@ -90,7 +92,7 @@ def sections(admin: object) -> list[tuple[str, str, Badge | None]]:
 
 # What a page says after a change, by the ?notice= it was sent back with
 # (redirect(..., notice=)). A fixed list: a link can only show one of these.
-NOTICES: dict[str, str] = {}
+NOTICES: dict[str, str | LazyProxy] = {}
 # Where on a page a notice is said: by the heading of the section with this
 # id (_notice.html), which the redirect also scrolls to; without one, under
 # the page's title. A fixed list, which a test checks against the templates'

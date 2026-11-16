@@ -10,6 +10,7 @@
  */
 import { existsSync, readFileSync } from "node:fs";
 import { parseEnv } from "node:util";
+import { lingui } from "@lingui/vite-plugin";
 import preact from "@preact/preset-vite";
 import tailwindcss from "@tailwindcss/vite";
 import { defineConfig } from "vitest/config";
@@ -50,6 +51,9 @@ if (!port || port === "0") {
 export default defineConfig({
   plugins: [
     preact(),
+    // Each catalogue compiled as it is imported, and Lingui's macros
+    // turned into plain descriptors, without Babel (docs/decisions/0022).
+    lingui({ macroTransform: true, failOnCompileError: true }),
     tailwindcss(),
     {
       name: "build-id",

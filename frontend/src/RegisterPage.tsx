@@ -1,11 +1,19 @@
+import { msg } from "@lingui/core/macro";
 import { useSignal } from "@preact/signals";
 import type { ComponentChildren, TargetedSubmitEvent } from "preact";
 import { type Api, makeApi } from "./api/client";
 import { Field } from "./Field";
+import { say } from "./i18n";
 import { type Outbox, sharedOutbox } from "./outbox";
 import { type Outcome, REFUSALS, register } from "./registration";
 
 const CODE = "code";
+
+export const REGISTERED = msg`This browser is registered.`;
+export const BATCHES_WAITING = msg({
+  message:
+    "{count, plural, one {The batch waiting on this browser is being sent.} other {The # batches waiting on this browser are being sent.}}",
+});
 
 // One for every page, rather than one for each render.
 const API = makeApi();
@@ -69,13 +77,9 @@ export function RegisterPage({
   if (outcome.value?.kind === "registered") {
     return (
       <Page>
-        <p role="status">This browser is registered.</p>
+        <p role="status">{say(REGISTERED)}</p>
         {waiting.value > 0 && (
-          <p>
-            {waiting.value === 1
-              ? "The batch waiting on this browser is being sent."
-              : `The ${waiting.value} batches waiting on this browser are being sent.`}
-          </p>
+          <p>{say(BATCHES_WAITING, { count: waiting.value })}</p>
         )}
         <p>
           <a href="/scan">Go to the scan page</a>

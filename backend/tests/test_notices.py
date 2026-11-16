@@ -57,7 +57,7 @@ def test_a_notice_is_said_by_its_sections_heading(
     admin_client: TestClient, path: str, notice: str, section: str
 ) -> None:
     page = text(admin_client.get(f"{path}?notice={notice}&section={section}"))
-    assert pages.NOTICES[notice] in page
+    assert str(pages.NOTICES[notice]) in page
     assert said_in(page) == section
 
 

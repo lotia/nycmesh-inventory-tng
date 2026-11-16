@@ -822,6 +822,70 @@ and this section (inventory-tng-46w). Run the second after upgrading
 Podman or crun. Neither is one of the checks, and both say "not applicable"
 in CI, whose Docker runs as root, where the bug never shows.
 
+## Phrases
+
+The words people read go through a catalogue on each side
+(docs/decisions/0022): Babel's on the server, for Python and the templates,
+and Lingui's on the scan page. Each message's id is its English. The
+operator commands' words are not in it yet (inventory-tng-8f4).
+
+On the server (`backend/src/inventory_tng/phrases.py`):
+
+- In a template, put the words in `{% trans %}`, with each value named:
+  `{% trans name=place.name %}Start counting {{ name }}{% endtrans %}`. A
+  plural takes `count`: `{% trans count=places | length %}{{ count }}
+  place{% pluralize %}{{ count }} places{% endtrans %}`. Values are
+  escaped, and the lines of a message read as one.
+- In Python, name a phrase as a constant, said when it is shown:
+  `RESET_NOTICE = lazy_gettext("Your account is reset: sign in.")`. A
+  phrase with values, or a plural, is a function that says it with
+  `gettext("To %(place)s", place=name)` or `ngettext("%(num)d place",
+  "%(num)d places", n)`, which fills `%(num)d` with `n`.
+- Values are always filled, so a per cent sign in a message is `%%`.
+
+On the scan page (`frontend/src/i18n.ts`):
+
+- Name a phrase with Lingui's `msg` macro, exported where it is used:
+  ``export const REGISTERED = msg`This browser is registered.`;``. A plural
+  or a value is ICU MessageFormat: `msg({ message: "{count, plural, one {#
+  batch} other {# batches}}" })`.
+- Say it with `say(REGISTERED)`, or `say(BATCHES, { count })`. A component
+  that says a phrase renders again when the locale changes.
+
+On either side, a test reads a phrase by its name, never by repeating its
+words.
+
+Where the same English means two things, give each a context from this
+list, and add to the list rather than inventing one on the spot; a test
+refuses any other. In Python, `pgettext("place", "To")` or
+`lazy_pgettext`; in a template, `{% trans "place" %}To{% endtrans %}`; on
+the page, `msg({ context: "place", message: "To" })`.
+
+| Context | For | Such as |
+| --- | --- | --- |
+| `place` | Where something comes from or goes | From, To on the scan page |
+| `mail header` | A mail's header | From, To in mail |
+| `action` | Something to do, on a button or link | Open a package |
+| `state` | How something is | An open package |
+
+For a translator, a comment starting `Translators:` just before a message
+goes into the catalogue with it: `# Translators: …` in Python, `{#
+Translators: … #}` in a template, and `msg`'s `comment` on the page.
+
+After adding or changing a phrase, write the catalogues again, and commit
+them:
+
+```sh
+mise run extract-catalogues  # backend's locales/en, frontend's src/locales
+mise run check-catalogues    # fails while either is not current
+```
+
+Each side has a test that renders what has moved into the catalogue in a
+pseudo-locale, every letter accented, and fails on a word left in plain
+English: `backend/tests/test_phrases.py` and `frontend/src/pseudo.test.tsx`.
+When you move words into the catalogue, add what you moved to its
+`COVERED`.
+
 ## Running the checks
 
 ```sh
@@ -928,6 +992,7 @@ mise run check-changed-lines  # both sides, then coverage of what you changed
 mise run check-scripts  # shellcheck, on the scripts in mise-tasks/
 mise run check-markdown # markdownlint (mise run fix-markdown fixes)
 mise run check-toml     # taplo: lint and formatting (mise run fix-toml formats)
+mise run check-catalogues  # both sides' catalogues are current (Phrases)
 ```
 
 Each test run creates a database of its own on that server and drops it at

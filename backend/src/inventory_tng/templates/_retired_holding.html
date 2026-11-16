@@ -2,10 +2,13 @@
 each to count; gone once each is counted to nothing. -#}
 {% if retired_places %}
 <div class="warning">
-  <p>{{ retired_places | length | retired_holding }} that a save brought or
-  took after retirement: count each to put the records right.</p>
+  <p>{% trans count=retired_places | length %}{{ count }} retired place holds
+  stock that a save brought or took after retirement: count each to put the
+  records right.{% pluralize %}{{ count }} retired places hold stock that a
+  save brought or took after retirement: count each to put the records
+  right.{% endtrans %}</p>
   <ul>
-    {% for place in retired_places %}<li><a href="{{ counts_path }}/{{ place.id }}">Start counting {{ place.name }}</a></li>{% endfor %}
+    {% for place in retired_places %}<li><a href="{{ counts_path }}/{{ place.id }}">{% trans name=place.name %}Start counting {{ name }}{% endtrans %}</a></li>{% endfor %}
   </ul>
 </div>
 {% endif %}

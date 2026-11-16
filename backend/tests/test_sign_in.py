@@ -31,6 +31,7 @@ from inventory_tng.models import (
     RecoveryCode,
     SignInSettings,
 )
+from inventory_tng.pages import retired_holding
 from inventory_tng.settings import RateLimits
 
 from helpers.sign_in import (
@@ -530,7 +531,7 @@ def test_a_form_asked_to_confirm_shows_the_navigations_badge(
     session.flush()
     held = client.post(sign_in.NEW_AUTHENTICATOR, data={"authenticator_name": "x"})
     assert held.status_code == 403
-    assert ": 1 retired place holds stock" in text(held)
+    assert f": {retired_holding(1)}" in text(held)
 
 
 def test_without_totp_the_password_confirms(

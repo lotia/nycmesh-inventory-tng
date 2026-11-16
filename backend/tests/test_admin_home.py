@@ -10,6 +10,7 @@ from sqlalchemy.orm import Session
 from inventory_tng.admin.counts import COUNTS
 from inventory_tng.admin.home import ALONE, NO_EMAIL
 from inventory_tng.models import Location
+from inventory_tng.pages import retired_holding
 
 from helpers.mail import SentMail
 from helpers.rows import add, tag
@@ -62,7 +63,7 @@ def test_retired_places_holding_stock_are_told_and_counted_in_the_navigation(
     write(session, place)
     write(session, place, from_location_id=shelf.id)
     page = text(admin_client.get("/admin"))
-    assert "2 retired places hold stock" in page
+    assert retired_holding(2) in page
     for retired in (place.van, shelf):
         assert (
             f'<a href="{COUNTS}/{retired.id}">Start counting {retired.name}</a>' in page

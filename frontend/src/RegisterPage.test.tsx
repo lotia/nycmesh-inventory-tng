@@ -1,8 +1,9 @@
 import { fireEvent, render, screen } from "@testing-library/preact";
 import { expect, test, vi } from "vitest";
 import { BUILD } from "./build";
+import { say } from "./i18n";
 import { Outbox, STORAGE_KEY } from "./outbox";
-import { RegisterPage } from "./RegisterPage";
+import { BATCHES_WAITING, REGISTERED, RegisterPage } from "./RegisterPage";
 import { REFUSALS } from "./registration";
 import { answering, deferred, json } from "./test-fetch";
 
@@ -31,9 +32,7 @@ test("registering says so, links to the scan page and drops the phrase", async (
   openAt("/register?code=a-b-c-d-e&from=qr");
   render(<RegisterPage api={api} />);
   fireEvent.submit(button());
-  expect((await screen.findByRole("status")).textContent).toBe(
-    "This browser is registered.",
-  );
+  expect((await screen.findByRole("status")).textContent).toBe(say(REGISTERED));
   expect(await sent[0]?.json()).toEqual({ code: "a-b-c-d-e" });
   expect(screen.getByRole("link").getAttribute("href")).toBe("/scan");
   expect(window.location.search).toBe("?from=qr");
@@ -159,7 +158,7 @@ test("registering sends the batches that waited for it", async () => {
   openAt("/register?code=a-b-c-d-e");
   render(<RegisterPage api={api} outbox={outbox} />);
   fireEvent.submit(button());
-  await screen.findByText("The batch waiting on this browser is being sent.");
+  await screen.findByText(say(BATCHES_WAITING, { count: 1 }));
   await vi.waitFor(() => expect(outbox.entries.value[0]?.state).toBe("saved"));
   expect(await sent[1]?.json()).toEqual(waiting.body);
 });

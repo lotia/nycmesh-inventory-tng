@@ -22,6 +22,7 @@ from inventory_tng.db import DbSession, SessionFactory, Sessions
 from inventory_tng.mail import Notify
 from inventory_tng.models import ResetLink
 from inventory_tng.pages import NOTICES, not_found, page, redirect
+from inventory_tng.phrases import lazy_gettext
 from inventory_tng.sign_in import FORGOT, RESET, SIGN_IN, TOO_MANY, reset_url
 from inventory_tng.web import rate_key
 
@@ -32,7 +33,8 @@ ASKED = (
     "its way. It works once, within the hour. If none comes, ask another "
     "administrator to reset your sign-in."
 )
-NOTICES["reset"] = "Your account is reset: sign in."
+RESET_NOTICE = lazy_gettext("Your account is reset: sign in.")
+NOTICES["reset"] = RESET_NOTICE
 
 RECOVER = "/recover"
 REFUSED = {

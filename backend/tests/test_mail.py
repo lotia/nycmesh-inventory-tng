@@ -17,6 +17,7 @@ from structlog.testing import capture_logs
 
 from inventory_tng import accounts, mail, sign_in
 from inventory_tng.models import Admin, AdminSession, ResetLink
+from inventory_tng.resets import RESET_NOTICE
 from inventory_tng.settings import MailConfig, Settings, SettingsError
 
 from helpers.mail import NO_MAIL, SITE_MAIL, FailingMail, SentMail
@@ -252,6 +253,7 @@ def test_an_emailed_link_resets_the_password(
         },
     )
     assert done.headers["location"] == f"{sign_in.SIGN_IN}?notice=reset"
+    assert str(RESET_NOTICE) in text(client.get(done.headers["location"]))
     assert signed_in.ended_at is not None
     assert accounts.check_password(session, admin.id, NEW_PASSWORD)
     # The owner is told.
