@@ -14,7 +14,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 from structlog.testing import capture_logs
 
-from inventory_tng import accounts, activity, sign_in
+from inventory_tng import accounts, activity, mail, sign_in
 from inventory_tng.accounts import NOT_AN_EMAIL, qr_svg, username_problem
 from inventory_tng.admin.admins import ADMINS, OWN_RESET, OWN_RETIRE, TAKEN
 from inventory_tng.models import ACTIVITY_KINDS, Admin, AdminSession, SignInSettings
@@ -96,9 +96,7 @@ def test_inviting_an_administrator(
     assert theirs.get(sign_in.HOME).headers["location"] == sign_in.NEW_AUTHENTICATOR
     # Told they were invited; not warned that their first password "changed".
     assert [m.kind for m in sent_mail] == ["invited"]
-    assert (
-        "An administrator of NYC Mesh Inventory just invited you" in sent_mail[0].body
-    )
+    assert sent_mail[0] == mail.invited("grace@example.org", grace.id)
 
 
 def test_resetting_an_invite_replaces_its_link(

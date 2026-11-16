@@ -9,7 +9,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 from structlog.testing import capture_logs
 
-from inventory_tng import activity
+from inventory_tng import activity, mail
 from inventory_tng.admin.common import PICK_A_ZONE
 from inventory_tng.admin.settings import SETTINGS, whole_minutes
 from inventory_tng.models import (
@@ -95,7 +95,9 @@ def test_sign_in_settings_change_and_everyone_is_told(
         settings.account_change_minutes,
     ) == ("optional", 3, 12, 30, 5)
     assert sorted(m.to for m in sent_mail) == ["ada@example.org", "ben@example.org"]
-    assert "TOTP is now optional" in sent_mail[0].body
+    assert sent_mail[0] == mail.sign_in_settings_changed(settings)(
+        sent_mail[0].to, sent_mail[0].admin_id
+    )
     assert (history(session, "sign_in_settings")[-1].actor or "").startswith("admin:")
     # And in the feed, for carol, without an address.
     assert activity.recent(session)[0].words == activity.WORDS[

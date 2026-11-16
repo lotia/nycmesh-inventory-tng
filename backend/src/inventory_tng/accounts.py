@@ -41,7 +41,7 @@ from inventory_tng.models import (
     SignInSettings,
     mint_code,
 )
-from inventory_tng.phrases import Words, gettext, lazy_gettext
+from inventory_tng.phrases import BRAND, Words, gettext, lazy_gettext
 from inventory_tng.rate_limits import limiter
 from inventory_tng.settings import RateLimits
 from inventory_tng.totp_keys import TotpKeys, Unreadable
@@ -72,7 +72,7 @@ TOTP_FIELD_MAX = 8
 TOTP_CODE = re.compile(r"\d{6}")
 TOTP_INTERVAL = pyotp.TOTP(pyotp.random_base32()).interval
 # What authenticator apps show beside the account.
-ISSUER = "NYC Mesh Inventory"
+ISSUER = BRAND
 # How often a session's last use is written: often enough for the account
 # page's list, not on every request.
 SEEN_EVERY = timedelta(minutes=5)

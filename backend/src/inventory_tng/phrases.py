@@ -22,6 +22,10 @@ from babel.messages.pofile import read_po
 from babel.support import LazyProxy, Translations
 from jinja2 import Environment
 
+# The app's name: a name, not a phrase, so the same in every language, and
+# never in the catalogue. Messages take it as %(brand)s. Authenticator apps
+# show it too (accounts.ISSUER), so it must not change with the locale.
+BRAND = "NYC Mesh Inventory"
 ENGLISH_PO = Path(__file__).parent / "locales" / "en" / "LC_MESSAGES" / "messages.po"
 
 

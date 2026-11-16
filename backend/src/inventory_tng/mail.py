@@ -29,6 +29,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from inventory_tng.models import Admin, SignInSettings, running_low
+from inventory_tng.phrases import BRAND, Words, gettext, lazy_gettext, ngettext
 from inventory_tng.settings import MailConfig
 
 log = structlog.get_logger(__name__)
@@ -207,23 +208,83 @@ def deliver(mailer: Mailer, message: Message) -> None:
     log.info("mail sent", kind=message.kind, admin_id=message.admin_id)
 
 
-# What each says. Plain text: nothing to render, nothing to track.
+# What each says, through the catalogue (phrases.py), in the locale active
+# when the mail is made. Plain text, so nothing is escaped: a value goes in
+# as it is. Nothing to render, nothing to track. Each mail's own words are
+# one message; a paragraph several mails end with is a phrase of its own.
 
-IF_NOT_YOU = (
+IF_NOT_YOU = lazy_gettext(
     "If it wasn't you, ask another administrator to reset your account at once."
 )
+NOT_EXPECTING = lazy_gettext("If you weren't expecting this, ignore this mail.")
+NOT_AGREED = lazy_gettext(
+    "If this was not agreed, check with the other administrators."
+)
+LAST_CODE = lazy_gettext(
+    "That was your last one: make new ones from your account page now, with a "
+    "code from your authenticator."
+)
+# The sign-in settings' TOTP policies (models.TOTP_POLICIES), as the mail
+# says them.
+TOTP_POLICY_WORDS = {
+    # Translators: as in "TOTP is now required".
+    "required": lazy_gettext("required"),
+    # Translators: as in "TOTP is now optional".
+    "optional": lazy_gettext("optional"),
+}
+
+
+def _paragraphs(*said: Words) -> str:
+    return "\n\n".join(str(each) for each in said)
+
+
+def _sign_in_reset() -> str:
+    return gettext("Your %(brand)s sign-in was reset", brand=BRAND)
+
+
+def _invited() -> str:
+    return gettext("You were invited to administer %(brand)s", brand=BRAND)
+
+
+def codes_running_low(left: int) -> str:
+    return ngettext(
+        "Only %(num)d is left: make new ones from your account page soon, with "
+        "a code from your authenticator.",
+        "Only %(num)d are left: make new ones from your account page soon, with "
+        "a code from your authenticator.",
+        left,
+    )
+
+
+def codes_left(left: int) -> str:
+    return ngettext("%(num)d is left.", "%(num)d are left.", left)
+
+
+def days(num: int) -> str:
+    return ngettext("%(num)d day", "%(num)d days", num)
+
+
+def hours(num: int) -> str:
+    return ngettext("%(num)d hour", "%(num)d hours", num)
+
+
+def minutes(num: int) -> str:
+    return ngettext("%(num)d minute", "%(num)d minutes", num)
 
 
 def reset_link(to: str, admin_id: int, link: str) -> Message:
     return Message(
         to,
-        "Reset your NYC Mesh Inventory password",
-        "Someone asked to reset the password of your administrator account on "
-        "NYC Mesh Inventory. If it was you, choose a new one here, within the "
-        f"hour:\n\n{link}\n\n"
-        "The link works once. If you use an authenticator app, signing in still "
-        "asks for its code.\n\n"
-        "If it wasn't you, ignore this mail: your password stays as it is.",
+        gettext("Reset your %(brand)s password", brand=BRAND),
+        gettext(
+            "Someone asked to reset the password of your administrator account "
+            "on %(brand)s. If it was you, choose a new one here, within the "
+            "hour:\n\n%(link)s\n\nThe link works once. If you use an "
+            "authenticator app, signing in still asks for its code.\n\nIf it "
+            "wasn't you, ignore this mail: your password stays as it is.",
+            brand=BRAND,
+            link=link,
+        ),
         "reset_link",
         admin_id,
     )
@@ -232,11 +293,17 @@ def reset_link(to: str, admin_id: int, link: str) -> Message:
 def reset_link_made(to: str, admin_id: int) -> Message:
     return Message(
         to,
-        "Your NYC Mesh Inventory sign-in was reset",
-        "Another administrator just reset your sign-in on NYC Mesh Inventory: "
-        "you were signed out everywhere, and your password, authenticators "
-        "and recovery codes no longer work. They will pass on a link for you "
-        f"to choose a new password, which works once, within a day.\n\n{IF_NOT_YOU}",
+        _sign_in_reset(),
+        _paragraphs(
+            gettext(
+                "Another administrator just reset your sign-in on %(brand)s: you "
+                "were signed out everywhere, and your password, authenticators "
+                "and recovery codes no longer work. They will pass on a link for "
+                "you to choose a new password, which works once, within a day.",
+                brand=BRAND,
+            ),
+            IF_NOT_YOU,
+        ),
         "reset_link_made",
         admin_id,
     )
@@ -245,11 +312,16 @@ def reset_link_made(to: str, admin_id: int) -> Message:
 def invited(to: str, admin_id: int) -> Message:
     return Message(
         to,
-        "You were invited to administer NYC Mesh Inventory",
-        "An administrator of NYC Mesh Inventory just invited you to be one too, "
-        "and will pass you a link to choose your password with. It works once, "
-        "within a day.\n\n"
-        "If you weren't expecting this, ignore this mail.",
+        _invited(),
+        _paragraphs(
+            gettext(
+                "An administrator of %(brand)s just invited you to be one too, "
+                "and will pass you a link to choose your password with. It works "
+                "once, within a day.",
+                brand=BRAND,
+            ),
+            NOT_EXPECTING,
+        ),
         "invited",
         admin_id,
     )
@@ -258,11 +330,17 @@ def invited(to: str, admin_id: int) -> Message:
 def restored(to: str, admin_id: int) -> Message:
     return Message(
         to,
-        "Your NYC Mesh Inventory account was brought back",
-        "Another administrator just brought back your administrator account "
-        "on NYC Mesh Inventory. Anything you signed in with was removed when "
-        "it was retired. They will pass on a link for you to choose a "
-        f"password with, which works once, within a day.\n\n{IF_NOT_YOU}",
+        gettext("Your %(brand)s account was brought back", brand=BRAND),
+        _paragraphs(
+            gettext(
+                "Another administrator just brought back your administrator "
+                "account on %(brand)s. Anything you signed in with was removed "
+                "when it was retired. They will pass on a link for you to choose "
+                "a password with, which works once, within a day.",
+                brand=BRAND,
+            ),
+            IF_NOT_YOU,
+        ),
         "restored",
         admin_id,
     )
@@ -271,10 +349,16 @@ def restored(to: str, admin_id: int) -> Message:
 def recovery_link_made(to: str, admin_id: int) -> Message:
     return Message(
         to,
-        "Your NYC Mesh Inventory account is being recovered",
-        "Someone with the recovery token that whoever runs NYC Mesh Inventory "
-        "set just made a link that resets your password and authenticators. "
-        f"It works once, within the hour.\n\n{IF_NOT_YOU}",
+        gettext("Your %(brand)s account is being recovered", brand=BRAND),
+        _paragraphs(
+            gettext(
+                "Someone with the recovery token that whoever runs %(brand)s set "
+                "just made a link that resets your password and authenticators. "
+                "It works once, within the hour.",
+                brand=BRAND,
+            ),
+            IF_NOT_YOU,
+        ),
         "recovery_link_made",
         admin_id,
     )
@@ -283,11 +367,16 @@ def recovery_link_made(to: str, admin_id: int) -> Message:
 def invited_by_operator(to: str, admin_id: int) -> Message:
     return Message(
         to,
-        "You were invited to administer NYC Mesh Inventory",
-        "Whoever runs NYC Mesh Inventory just invited you to be one of its "
-        "administrators, and will pass you a link to choose your password "
-        "with. It works once, within the hour.\n\n"
-        "If you weren't expecting this, ignore this mail.",
+        _invited(),
+        _paragraphs(
+            gettext(
+                "Whoever runs %(brand)s just invited you to be one of its "
+                "administrators, and will pass you a link to choose your "
+                "password with. It works once, within the hour.",
+                brand=BRAND,
+            ),
+            NOT_EXPECTING,
+        ),
         "invited_by_operator",
         admin_id,
     )
@@ -296,13 +385,15 @@ def invited_by_operator(to: str, admin_id: int) -> Message:
 def let_in(to: str, admin_id: int) -> Message:
     return Message(
         to,
-        "You are being let back in to NYC Mesh Inventory",
-        "Whoever runs NYC Mesh Inventory just made a link that lets you back "
-        "in to your administrator account: anything you signed in with no "
-        "longer works. With the link they pass on, you choose a new password "
-        "and set up TOTP again. It works once, within the hour.\n\n"
-        "If you weren't expecting this, tell whoever runs NYC Mesh Inventory at "
-        "once.",
+        gettext("You are being let back in to %(brand)s", brand=BRAND),
+        gettext(
+            "Whoever runs %(brand)s just made a link that lets you back in to "
+            "your administrator account: anything you signed in with no longer "
+            "works. With the link they pass on, you choose a new password and "
+            "set up TOTP again. It works once, within the hour.\n\nIf you "
+            "weren't expecting this, tell whoever runs %(brand)s at once.",
+            brand=BRAND,
+        ),
         "let_in",
         admin_id,
     )
@@ -311,9 +402,15 @@ def let_in(to: str, admin_id: int) -> Message:
 def password_changed(to: str, admin_id: int) -> Message:
     return Message(
         to,
-        "Your NYC Mesh Inventory password was changed",
-        "The password of your administrator account on NYC Mesh Inventory was "
-        f"just changed, and your other sessions were signed out.\n\n{IF_NOT_YOU}",
+        gettext("Your %(brand)s password was changed", brand=BRAND),
+        _paragraphs(
+            gettext(
+                "The password of your administrator account on %(brand)s was "
+                "just changed, and your other sessions were signed out.",
+                brand=BRAND,
+            ),
+            IF_NOT_YOU,
+        ),
         "password_changed",
         admin_id,
     )
@@ -322,10 +419,16 @@ def password_changed(to: str, admin_id: int) -> Message:
 def email_changed(to: str, admin_id: int) -> Message:
     return Message(
         to,
-        "Your NYC Mesh Inventory email was changed",
-        "The email address of your administrator account on NYC Mesh Inventory "
-        "was just changed from this one. Password reset links now go to the new "
-        f"address.\n\n{IF_NOT_YOU}",
+        gettext("Your %(brand)s email was changed", brand=BRAND),
+        _paragraphs(
+            gettext(
+                "The email address of your administrator account on %(brand)s "
+                "was just changed from this one. Password reset links now go to "
+                "the new address.",
+                brand=BRAND,
+            ),
+            IF_NOT_YOU,
+        ),
         "email_changed",
         admin_id,
     )
@@ -334,23 +437,26 @@ def email_changed(to: str, admin_id: int) -> Message:
 def recovery_code_used(left: int) -> Told:
     def build(to: str, admin_id: int) -> Message:
         if left == 0:
-            then = (
-                "That was your last one: make new ones from your account page "
-                "now, with a code from your authenticator."
-            )
+            then: Words = LAST_CODE
         elif running_low(left):
-            then = (
-                f"Only {left} {'is' if left == 1 else 'are'} left: make new ones "
-                "from your account page soon, with a code from your authenticator."
-            )
+            then = codes_running_low(left)
         else:
-            then = f"{left} are left."
+            then = codes_left(left)
         return Message(
             to,
-            "A recovery code was used on your NYC Mesh Inventory account",
-            "One of your recovery codes was just used on your administrator "
-            f"account on NYC Mesh Inventory. {then} If you lost your phone, set "
-            f"up a new authenticator there first.\n\n{IF_NOT_YOU}",
+            gettext("A recovery code was used on your %(brand)s account", brand=BRAND),
+            _paragraphs(
+                # Translators: %(left)s is a sentence saying how many recovery
+                # codes are left, and what to do about it.
+                gettext(
+                    "One of your recovery codes was just used on your "
+                    "administrator account on %(brand)s. %(left)s If you lost "
+                    "your phone, set up a new authenticator there first.",
+                    brand=BRAND,
+                    left=then,
+                ),
+                IF_NOT_YOU,
+            ),
             "recovery_code_used",
             admin_id,
         )
@@ -361,14 +467,31 @@ def recovery_code_used(left: int) -> Told:
 def authenticators_changed(*, added: bool) -> Told:
     """Told to the owner: one who signed in with a stolen recovery code could
     otherwise add their own authenticator, then make new recovery codes."""
-    what = "added to" if added else "removed from"
 
     def build(to: str, admin_id: int) -> Message:
+        if added:
+            subject = gettext(
+                "An authenticator was added to your %(brand)s account", brand=BRAND
+            )
+            body = gettext(
+                "An authenticator was just added to your administrator account "
+                "on %(brand)s.",
+                brand=BRAND,
+            )
+        else:
+            subject = gettext(
+                "An authenticator was removed from your %(brand)s account",
+                brand=BRAND,
+            )
+            body = gettext(
+                "An authenticator was just removed from your administrator "
+                "account on %(brand)s.",
+                brand=BRAND,
+            )
         return Message(
             to,
-            f"An authenticator was {what} your NYC Mesh Inventory account",
-            f"An authenticator was just {what} your administrator account on "
-            f"NYC Mesh Inventory.\n\n{IF_NOT_YOU}",
+            subject,
+            _paragraphs(body, IF_NOT_YOU),
             "authenticators_changed",
             admin_id,
         )
@@ -379,11 +502,17 @@ def authenticators_changed(*, added: bool) -> Told:
 def authenticators_retired(to: str, admin_id: int) -> Message:
     return Message(
         to,
-        "Set up your authenticator again on NYC Mesh Inventory",
-        "Whoever runs NYC Mesh Inventory retired your authenticator, as the "
-        "key it was kept with was lost or leaked, and signed you out. Sign in "
-        "with your password and one of your recovery codes, then set up an "
-        f"authenticator again.\n\n{IF_NOT_YOU}",
+        gettext("Set up your authenticator again on %(brand)s", brand=BRAND),
+        _paragraphs(
+            gettext(
+                "Whoever runs %(brand)s retired your authenticator, as the key "
+                "it was kept with was lost or leaked, and signed you out. Sign "
+                "in with your password and one of your recovery codes, then set "
+                "up an authenticator again.",
+                brand=BRAND,
+            ),
+            IF_NOT_YOU,
+        ),
         "authenticators_retired",
         admin_id,
     )
@@ -392,10 +521,13 @@ def authenticators_retired(to: str, admin_id: int) -> Message:
 def left_without_a_factor(to: str, admin_id: int) -> Message:
     return Message(
         to,
-        "Your NYC Mesh Inventory sign-in was reset",
-        "Whoever runs NYC Mesh Inventory retired your authenticator, as the "
-        "key it was kept with was lost or leaked. You had no recovery code "
-        "left, so your password was removed too: ask them to let you back in.",
+        _sign_in_reset(),
+        gettext(
+            "Whoever runs %(brand)s retired your authenticator, as the key it "
+            "was kept with was lost or leaked. You had no recovery code left, so "
+            "your password was removed too: ask them to let you back in.",
+            brand=BRAND,
+        ),
         "left_without_a_factor",
         admin_id,
     )
@@ -404,12 +536,15 @@ def left_without_a_factor(to: str, admin_id: int) -> Message:
 def retired(to: str, admin_id: int) -> Message:
     return Message(
         to,
-        "Your NYC Mesh Inventory account was retired",
-        "Another administrator just retired your administrator account on NYC "
-        "Mesh Inventory: you can no longer sign in, and anything you signed in "
-        "with was removed. Another administrator can bring you back.\n\n"
-        "If this was not agreed, tell the other administrators, or whoever runs "
-        "NYC Mesh Inventory, at once.",
+        gettext("Your %(brand)s account was retired", brand=BRAND),
+        gettext(
+            "Another administrator just retired your administrator account on "
+            "%(brand)s: you can no longer sign in, and anything you signed in "
+            "with was removed. Another administrator can bring you back.\n\nIf "
+            "this was not agreed, tell the other administrators, or whoever "
+            "runs %(brand)s, at once.",
+            brand=BRAND,
+        ),
         "retired",
         admin_id,
     )
@@ -418,10 +553,15 @@ def retired(to: str, admin_id: int) -> Message:
 def recovery_codes_made(to: str, admin_id: int) -> Message:
     return Message(
         to,
-        "New recovery codes for your NYC Mesh Inventory account",
-        "New recovery codes were just made for your administrator account on "
-        "NYC Mesh Inventory. The ones you had no longer work.\n\n"
-        f"{IF_NOT_YOU}",
+        gettext("New recovery codes for your %(brand)s account", brand=BRAND),
+        _paragraphs(
+            gettext(
+                "New recovery codes were just made for your administrator "
+                "account on %(brand)s. The ones you had no longer work.",
+                brand=BRAND,
+            ),
+            IF_NOT_YOU,
+        ),
         "recovery_codes_made",
         admin_id,
     )
@@ -434,9 +574,13 @@ def activity(words: str) -> Told:
     def build(to: str, admin_id: int) -> Message:
         return Message(
             to,
-            "An administrator account on NYC Mesh Inventory changed",
-            f"On NYC Mesh Inventory: {words}.\n\n"
-            "If this was not agreed, check with the other administrators.",
+            gettext("An administrator account on %(brand)s changed", brand=BRAND),
+            _paragraphs(
+                # Translators: %(words)s says what changed, such as "ada
+                # reset ben's sign-in".
+                gettext("On %(brand)s: %(words)s.", brand=BRAND, words=words),
+                NOT_AGREED,
+            ),
             "activity",
             admin_id,
         )
@@ -450,22 +594,39 @@ def sign_in_settings_changed(settings: SignInSettings) -> Told:
     totp, session_days = settings.totp_policy, settings.session_days
     confirm_hours = settings.confirm_hours
     confirm_idle_minutes = settings.confirm_idle_minutes
-    account_change = (
-        f"within {settings.account_change_minutes} minutes"
-        if settings.account_change_minutes
-        else "each time"
-    )
+    account_change_minutes = settings.account_change_minutes
 
     def build(to: str, admin_id: int) -> Message:
+        values = {
+            "brand": BRAND,
+            "totp": TOTP_POLICY_WORDS[totp],
+            "days": days(session_days),
+            "hours": hours(confirm_hours),
+            "idle": minutes(confirm_idle_minutes),
+        }
+        if account_change_minutes:
+            said = gettext(
+                "An administrator just changed how administrators sign in to "
+                "%(brand)s. TOTP is now %(totp)s; sessions last %(days)s; a code "
+                "typed for a sensitive change lasts %(hours)s, or %(idle)s "
+                "unused; changing another administrator needs a code typed "
+                "within %(minutes)s.",
+                minutes=minutes(account_change_minutes),
+                **values,
+            )
+        else:
+            said = gettext(
+                "An administrator just changed how administrators sign in to "
+                "%(brand)s. TOTP is now %(totp)s; sessions last %(days)s; a code "
+                "typed for a sensitive change lasts %(hours)s, or %(idle)s "
+                "unused; changing another administrator needs a code typed each "
+                "time.",
+                **values,
+            )
         return Message(
             to,
-            "NYC Mesh Inventory's sign-in settings were changed",
-            "An administrator just changed how administrators sign in to NYC "
-            f"Mesh Inventory. TOTP is now {totp}; sessions last {session_days} "
-            f"days; a code typed for a sensitive change lasts {confirm_hours} "
-            f"hours, or {confirm_idle_minutes} minutes unused; changing another "
-            f"administrator needs a code typed {account_change}.\n\n"
-            "If this was not agreed, check with the other administrators.",
+            gettext("%(brand)s's sign-in settings were changed", brand=BRAND),
+            _paragraphs(said, NOT_AGREED),
             "sign_in_settings_changed",
             admin_id,
         )

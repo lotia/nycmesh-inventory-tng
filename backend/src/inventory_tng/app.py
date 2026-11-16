@@ -29,6 +29,7 @@ from inventory_tng import (
 from inventory_tng.cross_site import CrossSiteRefusal
 from inventory_tng.db import Database, make_database
 from inventory_tng.mail import SmtpMailer
+from inventory_tng.phrases import BRAND
 from inventory_tng.request_logging import RequestLogging
 from inventory_tng.settings import Settings
 from inventory_tng.totp_keys import TotpKeys
@@ -73,7 +74,7 @@ def create_app(
             log.info("stopped")
 
     app = FastAPI(
-        title="NYC Mesh Inventory",
+        title=BRAND,
         lifespan=lifespan,
         openapi_url="/api/schema",
         docs_url="/api/docs",

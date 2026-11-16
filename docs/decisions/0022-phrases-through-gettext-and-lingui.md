@@ -78,6 +78,11 @@ them open:
   `mise run extract-catalogues`.
 - A component on the scan page reads a phrase through a signal
   (`i18n.ts`, `say`), so it renders again when the locale changes.
+- The app's name, NYC Mesh Inventory, is a name and not a phrase
+  (`phrases.BRAND`), kept out of the catalogue: a message takes it as a
+  value. A name reads the same in every language, and authenticator apps
+  show it as the issuer of the account's key, which must not change with
+  the reader's language.
 - Catalogues name the file each message comes from, not its line, so a
   phrase moving within its file leaves them unchanged.
 - `mise run check-catalogues`, and CI's job of that name, fail when either

@@ -848,6 +848,8 @@ On the server (`backend/src/inventory_tng/phrases.py`):
   or `isinstance` checks.
 - Values are always filled, so a per cent sign in a message is `%%`; a
   test refuses a lone one.
+- The app's name is `phrases.BRAND`, the same in every language: a
+  message takes it as a value, `%(brand)s`, never as words of its own.
 
 On the scan page (`frontend/src/i18n.ts`):
 

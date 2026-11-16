@@ -16,6 +16,7 @@ from inventory_tng import (
     accounts,
     activity,
     labels,
+    mail,
     over_recorded,
     reading_rules,
     units,
@@ -28,8 +29,10 @@ from inventory_tng.admin import over_recorded as admin_over_recorded
 from inventory_tng.admin import reading_rules as admin_reading_rules
 from inventory_tng.admin import settings as admin_settings
 from inventory_tng.admin import volunteers as admin_volunteers
+from inventory_tng.models import SignInSettings
 from inventory_tng.pages import retired_holding, templates
 from inventory_tng.phrases import (
+    BRAND,
     ENGLISH_PO,
     Words,
     compiled,
@@ -167,6 +170,56 @@ SAID_WITH_VALUES: list[Callable[[], Words]] = [
     *(lambda said=said: said("") for said in units.NAMES.values()),
 ]
 
+
+def every_mail() -> str:
+    """Every mail's subject and body, with values that are not English, and
+    without the app's name, which is the same in every language."""
+    told = [
+        mail.reset_link(NAME, 1, NAME),
+        *(
+            build(NAME, 1)
+            for build in (
+                mail.reset_link_made,
+                mail.invited,
+                mail.restored,
+                mail.recovery_link_made,
+                mail.invited_by_operator,
+                mail.let_in,
+                mail.password_changed,
+                mail.email_changed,
+                mail.authenticators_retired,
+                mail.left_without_a_factor,
+                mail.retired,
+                mail.recovery_codes_made,
+                mail.recovery_code_used(0),
+                mail.recovery_code_used(1),
+                mail.recovery_code_used(3),
+                mail.recovery_code_used(9),
+                mail.authenticators_changed(added=True),
+                mail.authenticators_changed(added=False),
+                mail.activity(NAME),
+                *(
+                    mail.sign_in_settings_changed(
+                        SignInSettings(
+                            totp_policy=policy,
+                            session_days=days,
+                            confirm_hours=days,
+                            confirm_idle_minutes=days,
+                            account_change_minutes=change,
+                        )
+                    )
+                    for policy, days, change in (
+                        ("required", 1, 0),
+                        ("optional", 2, 1),
+                        ("required", 3, 5),
+                    )
+                ),
+            )
+        ),
+    ]
+    return " ".join(f"{m.subject} {m.body}" for m in told).replace(BRAND, "")
+
+
 COVERED: dict[str, Callable[[], str]] = {
     "every phrase named as a constant": lambda: " ".join(
         str(phrase) for phrase in named_phrases()
@@ -175,6 +228,7 @@ COVERED: dict[str, Callable[[], str]] = {
         str(said()) for said in SAID_WITH_VALUES
     ),
     "the reset notice": lambda: str(RESET_NOTICE),
+    "every mail": every_mail,
     "one retired place holding stock": lambda: retired_holding(1),
     "retired places holding stock": lambda: retired_holding(3),
     "_retired_holding.html": lambda: templates.get_template(

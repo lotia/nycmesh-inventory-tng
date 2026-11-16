@@ -9,7 +9,7 @@ from fastapi.testclient import TestClient
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from inventory_tng import accounts, sign_in
+from inventory_tng import accounts, mail, sign_in
 from inventory_tng.account import CODES_NEED_TOTP, EMAIL_TAKEN
 from inventory_tng.models import (
     Admin,
@@ -326,16 +326,16 @@ def test_signing_in_with_one_of_few_codes_left_goes_to_make_more(
     assert signed.headers["location"] == (
         f"{ACCOUNT}?notice=codes_low&section=recovery-codes#recovery-codes"
     )
-    assert "Only 3 are left" in sent_mail[-1].body
+    assert mail.codes_running_low(3) in sent_mail[-1].body
     assert sign_in_with(make_client(address="192.0.2.91"), code=codes[1])
     assert sign_in_with(
         make_client(mailer=sent_mail, address="192.0.2.92"), code=codes[2]
     )
-    assert "Only 1 is left" in sent_mail[-1].body
+    assert mail.codes_running_low(1) in sent_mail[-1].body
     other = make_client(mailer=sent_mail, address="192.0.2.90")
     last = sign_in_with(other, code=codes[3])
     assert "notice=codes_none" in last.headers["location"]
-    assert "That was your last one" in sent_mail[-1].body
+    assert str(mail.LAST_CODE) in sent_mail[-1].body
     page = text(client.get(ACCOUNT + "?notice=codes_low&section=recovery-codes"))
     assert "few are left" in page
 
@@ -355,11 +355,12 @@ def test_the_owner_is_told_when_an_authenticator_comes_or_goes(
         select(Authenticator).where(Authenticator.name == "Laptop")
     ).one()
     client.post(f"{ACCOUNT}/authenticators/{laptop.id}/remove")
-    told = [m.subject for m in sent_mail if m.kind == "authenticators_changed"]
+    told = [m for m in sent_mail if m.kind == "authenticators_changed"]
     assert told == [
-        "An authenticator was added to your NYC Mesh Inventory account",
-        "An authenticator was removed from your NYC Mesh Inventory account",
+        mail.authenticators_changed(added=True)("ada@example.org", told[0].admin_id),
+        mail.authenticators_changed(added=False)("ada@example.org", told[0].admin_id),
     ]
+    assert told[0].subject != told[1].subject
 
 
 def test_a_page_asked_for_wins_over_the_codes_reminder(

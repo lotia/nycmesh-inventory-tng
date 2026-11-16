@@ -16,7 +16,7 @@ from sqlalchemy.orm import Session
 from structlog.testing import capture_logs
 
 from inventory_tng import accounts, mail, sign_in
-from inventory_tng.models import Admin, AdminSession, ResetLink
+from inventory_tng.models import Admin, AdminSession, ResetLink, SignInSettings
 from inventory_tng.resets import ASKED, RESET_NOTICE
 from inventory_tng.settings import MailConfig, Settings, SettingsError
 
@@ -372,7 +372,28 @@ def test_a_recovery_code_used_is_told(
     assert sign_in_with(client, code=codes[0]).status_code == 303
     (message,) = sent_mail
     assert message.kind == "recovery_code_used"
-    assert "9 are left" in message.body
+    assert mail.codes_left(9) in message.body
+
+
+@pytest.mark.parametrize("change", [0, 1, 45])
+def test_the_sign_in_settings_mail_counts_each_setting_in_its_own_plural(
+    change: int,
+) -> None:
+    settings = SignInSettings(
+        totp_policy="required",
+        session_days=1,
+        confirm_hours=2,
+        confirm_idle_minutes=1,
+        account_change_minutes=change,
+    )
+    body = mail.sign_in_settings_changed(settings)("ada@example.org", 1).body
+    assert f"{mail.TOTP_POLICY_WORDS['required']};" in body
+    assert f"{mail.days(1)};" in body
+    assert f"{mail.hours(2)}, or {mail.minutes(1)} unused" in body
+    # A code each time, or within so many minutes.
+    said = body.split("\n\n")[0]
+    assert said.endswith(f"{mail.minutes(change)}.") == bool(change)
+    assert body.endswith(str(mail.NOT_AGREED))
 
 
 def test_a_password_changed_on_the_account_page_is_told(
