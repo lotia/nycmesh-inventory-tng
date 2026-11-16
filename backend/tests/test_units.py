@@ -586,6 +586,13 @@ NB, THIN = "\u00a0", "\u202f"
         ("X-1 000 feet", "X-1 000 feet"),
         ("Cat 6 305 m", f"Cat 6 305{NB}m"),
         ("Cable 2 1,000 ft", f"Cable 2 1000{NB}ft"),
+        # Its sign kept with it, and grouped by any space search reads as
+        # one, as typed.
+        ("Supply -1 000 V", f"Supply -1 000{NB}V"),
+        ("Supply \u22121 000 V", f"Supply \u22121 000{NB}V"),
+        ("Box 1\u202f000 ft", f"Box 1\u202f000{NB}ft"),
+        (f"Box 1{NB}000 ft", f"Box 1{NB}000{NB}ft"),
+        ("Cable 2\u2009100 ft", f"Cable 2\u2009100{NB}ft"),
         # Products, units no rule or word settles, and tokens no unit, as
         # typed.
         ("Cat6a cable 5AC SFP+", "Cat6a cable 5AC SFP+"),

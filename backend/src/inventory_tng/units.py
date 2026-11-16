@@ -934,6 +934,8 @@ def _shown_number(number: str) -> str:
 # after its unit, runs it on into one (`10G-SFP+`, `48V-to-12V`,
 # `10GHz/20 MHz`).
 _IN_A_CODE = re.compile(r"[\w/.+-]")
+# A sign alone right before a number, as _NUMBER takes it.
+_SIGN = re.compile(r"(?<![^\W_])[-\u2212]\Z")
 _INTO_A_CODE = re.compile(r"[/-]")
 
 
@@ -947,22 +949,30 @@ def shown_name(name: str, rules: Rules | None = None) -> str:
     is `Cap 10 uF 50 V`, `Box 10,000 feet` `Box 10 000 feet`. The rest, a
     unit not read among it, and a number within a word or a code
     (_IN_A_CODE, _INTO_A_CODE), as typed. A number grouped by spaces
-    (_GROUPED) is read as search reads it, one number, but shown whole and
-    as typed, as it may be a pack count and a size: `Cable 2 100 ft` is
+    (_GROUPED, any space search reads as one), with its sign, is read as
+    search reads it, one number, but shown whole and as typed, as it may be a pack count and a size: `Cable 2 100 ft` is
     `Cable 2 100 ft`, never `2100 ft` (Ali, 2026-11-16, inventory-tng-t78).
     `name` is as saved (models.canonical, spell)."""
+    # Any space as search reads it, a plain one (NFKD), so `1\u202f000` is
+    # grouped too; one character for one, so where each is stays.
+    plain = "".join(" " if unicodedata.category(c) == "Zs" else c for c in name)
     edits = []
     for match in _after_a_number(name):
         token = match[2]
-        grouped = _grouped(name, match.end(1))
-        spaced = grouped is not None and " " in grouped[0]
-        number = grouped[0] if spaced else _number(name, match.end(1))
-        start = match.end(1) - len(number)
+        grouped = _grouped(plain, match.end(1))
+        if spaced := grouped is not None and " " in grouped[0]:
+            sign = _SIGN.search(name, 0, grouped.start())
+            start = grouped.start() if sign is None else sign.start()
+            number = name[start : match.end(1)]
+        else:
+            number = _number(name, match.end(1))
+            start = match.end(1) - len(number)
         if _IN_A_CODE.match(name[start - 1 : start]) or _INTO_A_CODE.match(
             name, match.end()
         ):
             continue
-        found = _found(name, match, rules, number.replace(" ", "") if spaced else None)
+        searched = re.sub(r"\s", "", number) if spaced else None
+        found = _found(name, match, rules, searched)
         # A word no form reads, as _edits reads it.
         if (read(token) if found is None else found.read) is None:
             continue
