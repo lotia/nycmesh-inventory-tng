@@ -15,7 +15,12 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from inventory_tng import ledger, open_packages
-from inventory_tng.admin.common import admin_page, now
+from inventory_tng.admin.common import (
+    SECTION_STOCK,
+    TICK_OPEN_PACKAGES,
+    admin_page,
+    now,
+)
 from inventory_tng.admin.items import ITEMS
 from inventory_tng.admin.listing import AskedView, Sort, Sorting, View, arranged
 from inventory_tng.admin.needs_action import (
@@ -29,6 +34,7 @@ from inventory_tng.db import DbSession, attempt
 from inventory_tng.local_time import site_zone
 from inventory_tng.models import OpenPackage
 from inventory_tng.pages import NOTICES, not_found, redirect
+from inventory_tng.phrases import gettext, lazy_gettext
 from inventory_tng.sign_in import AdminSignedIn, SignedIn
 
 log = structlog.get_logger(__name__)
@@ -38,16 +44,27 @@ router = APIRouter(include_in_schema=False)
 
 USED_UP = f"{STOCK}/used-up"
 
+USED_UP_CONFIRMED = lazy_gettext("Closed: what they showed is written off as used up.")
+USED_UP_CLEARED = lazy_gettext("Offered again: not used up.")
+OPEN_PACKAGE_CLOSED = lazy_gettext("Closed: what it showed is written off as used up.")
+USED_UP_UNCHANGED = lazy_gettext(
+    "Nothing changed: it was answered meanwhile, moved, or its place can't be "
+    "adjusted until counted."
+)
 NOTICES.update(
     {
-        "used_up_confirmed": "Closed: what they showed is written off as used up.",
-        "used_up_cleared": "Offered again: not used up.",
-        "used_up_none": "Tick the open packages first.",
-        "open_package_closed": "Closed: what it showed is written off as used up.",
-        "used_up_unchanged": "Nothing changed: it was answered meanwhile, moved, "
-        "or its place can't be adjusted until counted.",
+        "used_up_confirmed": USED_UP_CONFIRMED,
+        "used_up_cleared": USED_UP_CLEARED,
+        "used_up_none": TICK_OPEN_PACKAGES,
+        "open_package_closed": OPEN_PACKAGE_CLOSED,
+        "used_up_unchanged": USED_UP_UNCHANGED,
     }
 )
+
+
+def close_title(package: str) -> str:
+    return gettext("Close this %(package)s as used up?", package=package)
+
 
 cleared = meter.create_counter(
     "inventory.open_packages.cleared",
@@ -61,7 +78,7 @@ cleared = meter.create_counter(
 REPORTED = (OpenPackage.reported_at.is_not(None), OpenPackage.closed_at.is_(None))
 
 
-TITLE = "Reported used up"
+TITLE = lazy_gettext("Reported used up")
 # As "Needs your action" lists it (needs_action.py).
 KIND = Kind(TITLE, USED_UP, REPORTED)
 
@@ -110,7 +127,7 @@ def used_up_page(
         {
             "title": TITLE,
             "here": USED_UP,
-            "back_link": (STOCK, "Stock"),
+            "back_link": (STOCK, SECTION_STOCK),
             "only": only,
             "reported": reported,
             "view": view,
@@ -227,7 +244,7 @@ def confirm_close(
         signed,
         "open_package_close.html",
         {
-            "title": f"Close this {each.package} as used up?",
+            "title": close_title(each.package),
             "here": f"{ITEMS}/{item_id}/open-packages/{open_id}/close",
             "keep": f"{ITEMS}/{item_id}",
             "shown": each,

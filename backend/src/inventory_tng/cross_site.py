@@ -14,7 +14,10 @@ from starlette.datastructures import Headers
 from starlette.responses import PlainTextResponse
 from starlette.types import ASGIApp, Receive, Scope, Send
 
+from inventory_tng.phrases import lazy_gettext
+
 log = structlog.get_logger(__name__)
+REFUSED = lazy_gettext("Refused: this came from another site's page.")
 
 SAFE_METHODS = frozenset({"GET", "HEAD", "OPTIONS"})
 # "none" is the person typing the address or using a bookmark.
@@ -41,9 +44,7 @@ class CrossSiteRefusal:
             scope["method"], Headers(scope=scope)
         ):
             log.warning("cross-site request refused", path=scope["path"])
-            response = PlainTextResponse(
-                "Refused: this came from another site's page.", status_code=403
-            )
+            response = PlainTextResponse(str(REFUSED), status_code=403)
             await response(scope, receive, send)
             return
         await self.app(scope, receive, send)

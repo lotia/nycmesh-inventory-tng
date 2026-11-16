@@ -10,8 +10,17 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from inventory_tng import devices
-from inventory_tng.admin.common import NAME_MAX
-from inventory_tng.admin.devices import BULK_REVOKE, CODES, DEVICE_LIST, DEVICES
+from inventory_tng.admin.common import NAME_MAX, up_to
+from inventory_tng.admin.devices import (
+    AFTER_FROM,
+    BULK_REVOKE,
+    CODES,
+    DEVICE_LIST,
+    DEVICES,
+    days_problem,
+    revoke_many_title,
+    uses_problem,
+)
 from inventory_tng.models import AdminSession, Device, RegistrationCode, SiteSettings
 
 from helpers.devices import new_device
@@ -66,14 +75,14 @@ def test_a_code_made_here_registers_a_phone(
 
 def test_limits_on_a_code(admin_client: TestClient) -> None:
     for form, problem in (
-        ({"uses": "0"}, "From 1 to 500 devices."),
-        ({"uses": "many"}, "From 1 to 500 devices."),
-        ({"days": "91"}, "From 1 to 90 days."),
-        ({"label": "x" * (NAME_MAX + 1)}, f"Up to {NAME_MAX} characters."),
+        ({"uses": "0"}, uses_problem(500)),
+        ({"uses": "many"}, uses_problem(500)),
+        ({"days": "91"}, days_problem(90)),
+        ({"label": "x" * (NAME_MAX + 1)}, up_to(NAME_MAX)),
     ):
         refused, _ = make_code(admin_client, **form)
         assert refused.status_code == 400
-        assert problem in text(refused)
+        assert str(problem) in text(refused)
 
 
 def test_revoking_a_code_and_a_device(
@@ -172,7 +181,7 @@ def test_revoking_the_ticked_ones_asks_first(
     form = once(since="2026-11-03T00:00", code="", state="current")
     ticked = form | {"device": [str(a.id), str(b.id), str(old.id)]}
     asked = admin_client.post(BULK_REVOKE, data=ticked)
-    assert "Revoke 2 devices?" in text(asked)
+    assert revoke_many_title(2) in text(asked)
     assert a.revoked_at is None
     done = admin_client.post(BULK_REVOKE, data=ticked | {"sure": "yes"})
     assert done.status_code == 303
@@ -194,7 +203,7 @@ def test_one_device_is_asked_about_in_the_singular(
 ) -> None:
     a = device_at(session, datetime(2026, 11, 5, 12, tzinfo=UTC))
     asked = admin_client.post(BULK_REVOKE, data=once(device=str(a.id)))
-    assert "Revoke 1 device?" in text(asked)
+    assert revoke_many_title(1) in text(asked)
 
 
 def test_a_date_past_what_a_time_holds_is_refused(admin_client: TestClient) -> None:
@@ -327,7 +336,7 @@ def test_devices_are_listed_between_two_times(
     backwards = {"since": "2026-11-05T10:30", "until": "2026-11-05T09:00"}
     refused = admin_client.get(DEVICE_LIST, params=backwards)
     assert refused.status_code == 400
-    assert "A time after the one it is from" in text(refused)
+    assert str(AFTER_FROM) in text(refused)
     bad = admin_client.get(DEVICE_LIST, params={"until": "later"})
     assert bad.status_code == 400
 

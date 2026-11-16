@@ -14,7 +14,7 @@ reads every name with it again, refused where two would read alike. -#}
   <fieldset>
     <legend>“{{ rule.token }}” after a number is</legend>
     {% for reading in offered %}
-    <label><input type="radio" name="reading" value="{{ reading }}" {% if rule.reading == reading | string %}checked{% endif %} required> {{ reading.shown }} · {{ reading.unit.kind }}</label>
+    <label><input type="radio" name="reading" value="{{ reading }}" {% if rule.reading == reading | string %}checked{% endif %} required> {{ reading.shown }} · {{ reading.kind_words }}</label>
     {% endfor %}
     <label><input type="radio" name="reading" value="{{ not_a_unit }}" {% if rule.reading is none %}checked{% endif %} required> Not a unit</label>
   </fieldset>

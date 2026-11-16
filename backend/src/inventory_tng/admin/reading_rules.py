@@ -20,9 +20,9 @@ from inventory_tng import items, models, reading_rules, units
 from inventory_tng.admin.common import (
     ADMIN,
     ALERTS,
-    RULES,
     admin_page,
     form_version,
+    rule_words,
     text_form,
 )
 from inventory_tng.admin.listing import (
@@ -37,6 +37,7 @@ from inventory_tng.db import DbSession, refusal
 from inventory_tng.local_time import site_zone
 from inventory_tng.models import INTEGER_MAX, Admin, ReadingRule, whole
 from inventory_tng.pages import NOTICES, not_found, redirect
+from inventory_tng.phrases import gettext, lazy_gettext
 from inventory_tng.reading_rules import (
     NOT_A_UNIT,
     chosen_rule,
@@ -53,16 +54,31 @@ READINGS = f"{ADMIN}/unit-readings"
 SEED = f"{READINGS}/seed"
 # The seeding page's field for each token's reading: this, then the token.
 PROPOSED = "reading:"
-CHOOSE = "Choose how to read each one marked “Choose…” first."
-CHOOSE_ONE = "Choose one of the readings offered."
+CHOOSE = lazy_gettext("Choose how to read each one marked “Choose…” first.")
+CHOOSE_ONE = lazy_gettext("Choose one of the readings offered.")
 
+READING_SAVED = lazy_gettext("Saved. Every name with it is read so now.")
+READING_DELETED = lazy_gettext(
+    "Deleted. Names with it are read by the unit table again."
+)
+READINGS_ACCEPTED = lazy_gettext("Accepted. Every name with them is read so now.")
 NOTICES.update(
     {
-        "reading_saved": "Saved. Every name with it is read so now.",
-        "reading_deleted": "Deleted. Names with it are read by the unit table again.",
-        "readings_accepted": "Accepted. Every name with them is read so now.",
+        "reading_saved": READING_SAVED,
+        "reading_deleted": READING_DELETED,
+        "readings_accepted": READINGS_ACCEPTED,
     }
 )
+NOT_A_UNIT_WORDS = lazy_gettext("Not a unit")
+RESPELT = lazy_gettext("Respelt")
+AS_TYPED = lazy_gettext("As typed")
+THE_IMPORT = lazy_gettext("The import")
+UNIT_READINGS = lazy_gettext("Unit readings")
+PROPOSE_TITLE = lazy_gettext("Propose unit readings")
+
+
+def reading_title(token: str) -> str:
+    return gettext("Reading of %(token)s", token=token)
 
 
 @dataclass(frozen=True)
@@ -79,9 +95,9 @@ def _row(rule: ReadingRule, username: str | None) -> _Row:
     reading = units.reading_of(rule.reading) if rule.reading else None
     return _Row(
         rule,
-        f"{reading.shown} · {reading.unit.kind}" if reading else "Not a unit",
-        "Respelt" if rule.respell else "As typed",
-        username or "The import",
+        f"{reading.shown} · {reading.kind_words}" if reading else str(NOT_A_UNIT_WORDS),
+        str(RESPELT if rule.respell else AS_TYPED),
+        username or str(THE_IMPORT),
     )
 
 
@@ -120,9 +136,9 @@ def _rule_page(
         signed,
         "reading_rule.html",
         {
-            "title": f"Reading of {rule.token}",
+            "title": reading_title(rule.token),
             "here": f"{READINGS}/{rule.id}",
-            "back_link": (READINGS, "Unit readings"),
+            "back_link": (READINGS, UNIT_READINGS),
             "rule": rule,
             "offered": offered(rule.token, rule.rule),
             "not_a_unit": NOT_A_UNIT,
@@ -169,7 +185,7 @@ def list_readings(
         signed,
         "reading_rules.html",
         {
-            "title": "Unit readings",
+            "title": UNIT_READINGS,
             "here": READINGS,
             "rows": rows,
             "view": view,
@@ -199,7 +215,7 @@ def _refused(
     """The rule's page again, saying why a change to it was refused: names
     it would read alike, by id, or one of ALERTS."""
     if broken != items.READ_ALIKE:
-        return _rule_page(request, session, signed, rule, alert=RULES[broken])
+        return _rule_page(request, session, signed, rule, alert=rule_words(broken))
     # What the change would have read, the savepoint undone.
     rules = {**models.reading_rules(session)}
     if change is None:
@@ -227,7 +243,7 @@ def save_reading(
     offers = offered(found.token, found.rule)
     change = chosen_rule(reading, offers, respell=respell == "on")
     if change is None:
-        return _rule_page(request, session, signed, found, problem=CHOOSE_ONE)
+        return _rule_page(request, session, signed, found, problem=str(CHOOSE_ONE))
     seen = form_version(version)
     _, broken = refusal(
         session,
@@ -290,9 +306,9 @@ def _seed_page(
         signed,
         "reading_seed.html",
         {
-            "title": "Propose unit readings",
+            "title": PROPOSE_TITLE,
             "here": SEED,
-            "back_link": (READINGS, "Unit readings"),
+            "back_link": (READINGS, UNIT_READINGS),
             "proposals": proposals[at : at + 1] if one else proposals,
             "total": len(proposals),
             "one": one,
@@ -360,7 +376,7 @@ def accept(
             one=one,
             at=at,
             sent=form,
-            problem=CHOOSE,
+            problem=str(CHOOSE),
             proposals=made,
         )
     written, broken = refusal(

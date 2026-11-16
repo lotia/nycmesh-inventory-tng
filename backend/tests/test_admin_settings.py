@@ -10,8 +10,10 @@ from sqlalchemy.orm import Session
 from structlog.testing import capture_logs
 
 from inventory_tng import activity
-from inventory_tng.admin.settings import SETTINGS
+from inventory_tng.admin.common import PICK_A_ZONE
+from inventory_tng.admin.settings import SETTINGS, whole_minutes
 from inventory_tng.models import (
+    NAME_CHECK_MINUTES,
     AdminSession,
     ScanSettings,
     SignInSettings,
@@ -45,7 +47,7 @@ def test_shows_and_changes_the_name_check(
 def test_refuses_what_is_not_minutes(admin_client: TestClient, typed: str) -> None:
     refused = admin_client.post(f"{SETTINGS}/scan", data={"name_check_minutes": typed})
     assert refused.status_code == 400
-    assert "A whole number of minutes" in refused.text
+    assert whole_minutes(*NAME_CHECK_MINUTES) in refused.text
 
 
 def test_zero_never_asks(admin_client: TestClient, session: Session) -> None:
@@ -96,7 +98,9 @@ def test_sign_in_settings_change_and_everyone_is_told(
     assert "TOTP is now optional" in sent_mail[0].body
     assert (history(session, "sign_in_settings")[-1].actor or "").startswith("admin:")
     # And in the feed, for carol, without an address.
-    assert activity.recent(session)[0].words == "ada changed the sign-in settings"
+    assert activity.recent(session)[0].words == activity.WORDS[
+        "sign_in_settings_changed"
+    ]("ada", "")
 
 
 @pytest.mark.parametrize(
@@ -156,7 +160,7 @@ def test_the_time_zone(admin_client: TestClient, session: Session) -> None:
     form = {"time_zone": "Mars/Olympus", "site_version": shown(site)}
     refused = admin_client.post(f"{SETTINGS}/site", data=form)
     assert refused.status_code == 400
-    assert "Pick a zone from the list." in refused.text
+    assert str(PICK_A_ZONE) in refused.text
 
 
 def test_saving_the_same_sign_in_settings_tells_nobody(

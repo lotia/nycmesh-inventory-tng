@@ -41,6 +41,7 @@ from inventory_tng.models import (
     SignInSettings,
     mint_code,
 )
+from inventory_tng.phrases import gettext, lazy_gettext
 from inventory_tng.rate_limits import limiter
 from inventory_tng.settings import RateLimits
 from inventory_tng.totp_keys import TotpKeys, Unreadable
@@ -157,25 +158,35 @@ def check_password(session: Session, admin_id: int | None, password: str) -> boo
     return True
 
 
+NOT_AN_EMAIL = lazy_gettext("That doesn't look like an email address.")
+PASSWORDS_DIFFER = lazy_gettext("The two passwords are different.")
+
+
 def username_problem(username: str) -> str | None:
     if not USERNAME.fullmatch(username):
-        return f"Use 1 to {USERNAME_MAX} letters, digits, dots, dashes or underscores."
+        return gettext(
+            "Use 1 to %(max)d letters, digits, dots, dashes or underscores.",
+            max=USERNAME_MAX,
+        )
     return None
 
 
 def email_problem(email: str) -> str | None:
     if email and (not EMAIL.fullmatch(email) or len(email) > EMAIL_MAX):
-        return "That doesn't look like an email address."
+        return str(NOT_AN_EMAIL)
     return None
 
 
 def password_problem(password: str, again: str) -> str | None:
     if len(password) < PASSWORD_MIN:
-        return f"Use at least {PASSWORD_MIN} characters. A few words make a good one."
+        return gettext(
+            "Use at least %(min)d characters. A few words make a good one.",
+            min=PASSWORD_MIN,
+        )
     if len(password) > PASSWORD_MAX:
-        return f"Use at most {PASSWORD_MAX} characters."
+        return gettext("Use at most %(max)d characters.", max=PASSWORD_MAX)
     if password != again:
-        return "The two passwords are different."
+        return str(PASSWORDS_DIFFER)
     return None
 
 
@@ -294,9 +305,14 @@ def retire(authenticator: Authenticator, now: datetime) -> None:
     authenticator.retired_at = now
 
 
+def name_up_to(limit: int) -> str:
+    """A name too long, refused: in characters."""
+    return gettext("Give it a name of up to %(max)d characters.", max=limit)
+
+
 def authenticator_name_problem(name: str) -> str | None:
     if not 1 <= len(name) <= AUTHENTICATOR_NAME_MAX:
-        return f"Give it a name of up to {AUTHENTICATOR_NAME_MAX} characters."
+        return name_up_to(AUTHENTICATOR_NAME_MAX)
     return None
 
 

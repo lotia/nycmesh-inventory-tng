@@ -15,8 +15,8 @@ from sqlalchemy.orm import Session
 from structlog.testing import capture_logs
 
 from inventory_tng import accounts, activity, sign_in
-from inventory_tng.accounts import qr_svg
-from inventory_tng.admin.admins import ADMINS
+from inventory_tng.accounts import NOT_AN_EMAIL, qr_svg, username_problem
+from inventory_tng.admin.admins import ADMINS, OWN_RESET, OWN_RETIRE, TAKEN
 from inventory_tng.models import ACTIVITY_KINDS, Admin, AdminSession, SignInSettings
 from inventory_tng.settings import RateLimits
 
@@ -136,13 +136,13 @@ def test_an_invite_needs_a_free_username(
     admin_client: TestClient, session: Session
 ) -> None:
     for form, problem in (
-        ({"username": "ADA"}, "already has that username"),
-        ({"username": "two words"}, "Use 1 to 64"),
-        ({"username": "grace", "email": "nope"}, "doesn't look like an email"),
+        ({"username": "ADA"}, TAKEN),
+        ({"username": "two words"}, username_problem("two words")),
+        ({"username": "grace", "email": "nope"}, NOT_AN_EMAIL),
     ):
         refused = admin_client.post(ADMINS, data=with_code(session, **form))
         assert refused.status_code == 400
-        assert problem in text(refused)
+        assert str(problem) in text(refused)
 
 
 def test_resetting_another_admins_sign_in(
@@ -174,7 +174,7 @@ def test_your_own_reset_is_on_your_account_page(
 ) -> None:
     me = admin_named(session, "ada")
     refused = admin_client.post(f"{ADMINS}/{me.id}/reset", data=with_code(session))
-    assert "Change your own on your account page." in text(refused)
+    assert str(OWN_RESET) in text(refused)
 
 
 def test_resetting_another_asks_to_confirm_first(
@@ -195,7 +195,7 @@ def test_resetting_another_asks_to_confirm_first(
     assert accounts.has_password(session, ben.id)  # Only its button resets.
     me = admin_named(session, "ada")
     own = admin_client.get(f"{ADMINS}/{me.id}/reset")
-    assert "Change your own on your account page." in text(own)
+    assert str(OWN_RESET) in text(own)
     assert admin_client.get(f"{ADMINS}/999999/reset").status_code == 404
     accounts.retire_admin(session, ben.id, me.id, datetime.now(UTC), NO_MAIL)
     assert admin_client.get(f"{path}/reset").status_code == 404
@@ -301,7 +301,7 @@ def test_retiring_or_bringing_back_one_there_is_not_is_not_found(
 def test_nobody_retires_themselves(admin_client: TestClient, session: Session) -> None:
     me = admin_named(session, "ada")
     refused = admin_client.post(f"{ADMINS}/{me.id}/retire", data=with_code(session))
-    assert "Another administrator must retire you." in text(refused)
+    assert str(OWN_RETIRE) in text(refused)
 
 
 def test_one_who_cannot_sign_in_changes_nobody(session: Session) -> None:
@@ -496,13 +496,14 @@ def test_every_administrator_is_told_of_a_change(
     assert made.status_code == 200
     told = {m.to: m for m in sent_mail if m.kind == "activity"}
     assert set(told) == {"ada@example.org", "carol@example.org"}
-    assert "ada reset ben's sign-in." in told["carol@example.org"].body
+    reset = activity.WORDS["sign_in_reset"]("ada", "ben")
+    assert f"{reset}." in told["carol@example.org"].body
     assert [m.to for m in sent_mail if m.kind == "reset_link_made"] == [
         "ben@example.org"
     ]
     listed = text(client.get(ADMINS))
     assert "Recent changes" in listed
-    assert "ada reset ben's sign-in" in listed
+    assert reset in listed
 
 
 def test_since_you_last_signed_in(
@@ -531,7 +532,9 @@ def test_since_you_last_signed_in(
 def test_the_operators_changes_say_so(session: Session) -> None:
     ben, _ = new_admin(session, "ben")
     activity.record(session, "retired", None, ben.id, NO_MAIL)
-    assert activity.recent(session)[0].words == "The operator retired ben"
+    assert activity.recent(session)[0].words == activity.WORDS["retired"](
+        str(activity.OPERATOR), "ben"
+    )
 
 
 def test_every_kind_of_activity_has_its_words() -> None:
@@ -578,8 +581,8 @@ def test_the_operators_recovery_link_is_told(session: Session) -> None:
         NO_MAIL,
         RateLimits(),
     )
-    assert activity.recent(session)[0].words == (
-        "The operator made a link for ada with the recovery token"
+    assert activity.recent(session)[0].words == activity.WORDS["recovery_link_made"](
+        str(activity.OPERATOR), "ada"
     )
 
 

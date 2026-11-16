@@ -14,6 +14,7 @@ import uuid
 from typing import TYPE_CHECKING, Annotated, Any, Literal, cast
 
 import structlog
+from babel.support import LazyProxy
 from fastapi import Form, Request
 from fastapi.responses import HTMLResponse
 from jinja2 import pass_context
@@ -26,6 +27,7 @@ from starlette.exceptions import HTTPException
 from inventory_tng.db import exists_where
 from inventory_tng.models import SentForm
 from inventory_tng.pages import page, templates
+from inventory_tng.phrases import lazy_gettext
 
 if TYPE_CHECKING:  # sign_in imports this module.
     from inventory_tng.sign_in import SignedIn
@@ -40,12 +42,25 @@ OnceKey = Annotated[str, Form(alias=FIELD)]
 # form that showed nothing made, or what one sent again is answered with
 # before its route says more (sign_in.ConfirmedAccountChange).
 Made = Literal["registration_code", "recovery_codes", "link", "change"]
-WORDS: dict[Made, str] = {
-    "registration_code": "a registration code",
-    "recovery_codes": "recovery codes",
-    "link": "a sign-in link",
-    "change": "its change",
+# What the page says of each but "change", which sent_again.html words.
+SENT_AGAIN: dict[Made, LazyProxy] = {
+    "registration_code": lazy_gettext(
+        "That form was already sent, and made a registration code, shown then. "
+        "Nothing new was made. It can't be shown again: Back and Forward don't "
+        "keep it."
+    ),
+    "recovery_codes": lazy_gettext(
+        "That form was already sent, and made recovery codes, shown then. "
+        "Nothing new was made. It can't be shown again: Back and Forward don't "
+        "keep it."
+    ),
+    "link": lazy_gettext(
+        "That form was already sent, and made a sign-in link, shown then. "
+        "Nothing new was made. It can't be shown again: Back and Forward don't "
+        "keep it."
+    ),
 }
+ALREADY_SENT = lazy_gettext("Already sent")
 
 
 # The page a form was on, which a page saying it was sent before links back
@@ -123,10 +138,10 @@ def sent_again(
         request,
         "sent_again.html",
         {
-            "title": "Already sent",
+            "title": ALREADY_SENT,
             "admin": signed.admin,
             "made": made,
-            "words": WORDS[made],
+            "said": SENT_AGAIN.get(made),
             "back": back,
         },
         409,

@@ -47,7 +47,7 @@ the list as shown, to come back to if printing is refused. #}
       <td>{% if named.current %}<input type="checkbox" name="label" value="{{ label.id }}" form="print-labels" aria-label="Print {{ label.code }}">{% endif %}</td>
       <td class="key">{{ label.code }}</td>
       <td><a href="{{ items_path ~ '/' ~ label.item_id if label.item_id else locations_path ~ '/' ~ label.location_id }}">{{ named.words }}</a>
-        {%- if named.why %} <span class="tag">{{ named.why | capitalize }}</span>{% endif %}
+        {%- if named.why %} <span class="tag">{{ named.why_words }}</span>{% endif %}
         {%- if label.revoked_at %} <span class="hint">on {{ label.revoked_at | when(zone) }}</span>{% endif %}
         <span class="hint block sm:hidden">made {{ label.created_at | when(zone) }}</span></td>
       <td class="hidden sm:table-cell">{{ label.created_at | when(zone) }}</td>

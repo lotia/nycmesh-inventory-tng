@@ -15,9 +15,20 @@ from sqlalchemy.orm import Session
 from structlog.testing import capture_logs
 
 from inventory_tng import items, locations
-from inventory_tng.admin.common import RULES
-from inventory_tng.admin.counts import ADJUSTMENTS, COUNTS, lines, named_twice
-from inventory_tng.admin.settings import SETTINGS
+from inventory_tng.admin.common import ABOVE_ZERO, RULES, TYPE_A_NUMBER, WHOLE_UNITS
+from inventory_tng.admin.counts import (
+    ADJUSTMENTS,
+    COUNTS,
+    FOUND_OR_OFF,
+    ON_THE_FORM_TWICE,
+    OUT_OF_DATE,
+    PICK_A_PLACE,
+    PICK_A_REASON,
+    PICK_AN_ITEM,
+    lines,
+    named_twice,
+)
+from inventory_tng.admin.settings import REASON_TAKEN, SETTINGS
 from inventory_tng.admin.stock import STOCK
 from inventory_tng.db import RuleBroken
 from inventory_tng.ledger import (
@@ -37,6 +48,7 @@ from inventory_tng.models import (
     Location,
     Movement,
 )
+from inventory_tng.pages import retired_holding
 
 from helpers.concurrency import Committed
 from helpers.rows import item_fields, shown, violates
@@ -172,12 +184,12 @@ def test_a_count_refuses_what_is_not_a_quantity(
     place = stocked(session)
     path = f"{COUNTS}/{place.store.id}"
     shown = count_form(admin_client, path)
-    for typed, problem in (("lots", "Type a number"), ("1.5", "whole units")):
+    for typed, problem in (("lots", TYPE_A_NUMBER), ("1.5", WHOLE_UNITS)):
         refused = admin_client.post(
             path, data=shown | {f"counted_{place.item.id}": typed}
         )
         assert refused.status_code == 400
-        assert problem in text(refused)
+        assert str(problem) in text(refused)
     assert counts_written(session) == []
 
 
@@ -261,7 +273,7 @@ def test_a_count_naming_an_item_twice_is_refused(
     page = text(refused)
     assert "An item is on this form more than once." in page
     assert "Each item is counted once" in page
-    assert "This item is on the form more than once." in page
+    assert str(ON_THE_FORM_TWICE) in page
     assert counts_written(session) == []
     assert expected(session, place.store.id) == {place.item.id: Decimal(5)}
     done = admin_client.post(path, data=shown)
@@ -290,14 +302,15 @@ def test_found_and_written_off(admin_client: TestClient, session: Session) -> No
 @pytest.mark.parametrize(
     ("change", "problem"),
     [
-        ({"location_id": ""}, "Pick a place."),
-        ({"item_id": "999999"}, "Pick an item."),
+        ({"location_id": ""}, PICK_A_PLACE),
+        ({"item_id": "999999"}, PICK_AN_ITEM),
         # A digit int() cannot read.
-        ({"item_id": "²"}, "Pick an item."),
-        ({"amount": "0"}, "Use a number above 0."),
-        ({"amount": "1.5"}, "whole units"),
-        ({"direction": "sideways"}, "Found or written off?"),
-        ({"reason_id": ""}, "Pick a reason."),
+        ({"item_id": "²"}, PICK_AN_ITEM),
+        ({"amount": "0"}, ABOVE_ZERO),
+        ({"amount": "1.5"}, WHOLE_UNITS),
+        ({"direction": "sideways"}, FOUND_OR_OFF),
+        ({"reason_id": ""}, PICK_A_REASON),
+        ({"key": "not a key"}, OUT_OF_DATE),
     ],
 )
 def test_an_adjustment_says_what_is_missing(
@@ -307,7 +320,7 @@ def test_an_adjustment_says_what_is_missing(
     form = adjustment_form(session, place.store, place.item) | change
     refused = admin_client.post(ADJUSTMENTS, data=form)
     assert refused.status_code == 400
-    assert problem in text(refused)
+    assert str(problem) in text(refused)
 
 
 def test_the_database_holds_counts_to_their_rules(session: Session) -> None:
@@ -357,7 +370,7 @@ def test_reasons_can_be_added_renamed_retired_and_brought_back(
     admin_client.post(path, data=form | {"action": "restore"})
     assert given.retired_at is None
     taken = admin_client.post(f"{SETTINGS}/reasons", data={"name": "damaged"})
-    assert "already a reason by that name" in text(taken)
+    assert str(REASON_TAKEN) in text(taken)
     too_long = form | {"name": "x" * 1000, "version": shown(given), "action": "rename"}
     assert admin_client.post(path, data=too_long).status_code == 400
     assert given.name == "Donated"
@@ -652,7 +665,7 @@ def test_a_unit_changed_to_each_as_the_page_writes_is_said_and_nothing_is_writte
     answer = worker.finished().result
     assert isinstance(answer, Response)
     assert answer.status_code == 400
-    assert RULES["movement_whole_units"] in text(answer)
+    assert str(RULES["movement_whole_units"]) in text(answer)
     assert counts_written(own_committed.session()) == []
 
 
@@ -666,7 +679,7 @@ def signals(client: TestClient, place: Place) -> dict[str, bool]:
     return {
         "home": f'href="{COUNTS}/{place.van.id}"' in text(client.get("/admin")),
         "badge": badge_html(1) in stock,
-        "stock": "1 retired place holds stock" in stock,
+        "stock": retired_holding(1) in stock,
         "counts": f"{place.van.name} (retired)" in text(client.get(COUNTS)),
         "form": client.get(f"{COUNTS}/{place.van.id}").status_code == 200,
     }
@@ -735,7 +748,7 @@ def test_a_form_for_a_retired_place_holding_nothing_writes_nothing(
     form = adjustment_form(session, place.van, place.item, direction="found")
     adjusted = admin_client.post(ADJUSTMENTS, data=form)
     assert adjusted.status_code == 400
-    assert RULES["location_countable"] in text(adjusted)
+    assert str(RULES["location_countable"]) in text(adjusted)
     assert counts_written(session) == []
 
 

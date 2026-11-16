@@ -20,6 +20,7 @@ from sqlalchemy.orm import Session
 from inventory_tng import mail
 from inventory_tng.mail import Notifier, Told
 from inventory_tng.models import Activity, ActivityKind, Admin
+from inventory_tng.phrases import gettext, lazy_gettext
 
 log = structlog.get_logger(__name__)
 meter = metrics.get_meter(__name__)
@@ -27,24 +28,40 @@ meter = metrics.get_meter(__name__)
 # How each kind reads, from who did it and the administrator it was done to
 # ("" for a kind done to none).
 WORDS: Mapping[ActivityKind, Callable[[str, str], str]] = {
-    "invited": lambda by, admin: f"{by} invited {admin}",
-    "sign_in_reset": lambda by, admin: f"{by} reset {admin}'s sign-in",
-    "retired": lambda by, admin: f"{by} retired {admin}",
-    "restored": lambda by, admin: f"{by} brought back {admin}",
-    "recovery_link_made": lambda by, admin: (
-        f"{by} made a link for {admin} with the recovery token"
+    "invited": lambda by, admin: gettext(
+        "%(by)s invited %(admin)s", by=by, admin=admin
     ),
-    "sign_in_settings_changed": lambda by, _: f"{by} changed the sign-in settings",
-    "locked_down": lambda by, _: (
-        f"{by} retired every administrator and revoked every registration code"
+    "sign_in_reset": lambda by, admin: gettext(
+        "%(by)s reset %(admin)s's sign-in", by=by, admin=admin
     ),
-    "let_in": lambda by, admin: f"{by} let {admin} back in",
-    "authenticators_retired": lambda by, _: (
-        f"{by} retired the authenticators a lost or leaked key sealed"
+    "retired": lambda by, admin: gettext(
+        "%(by)s retired %(admin)s", by=by, admin=admin
+    ),
+    "restored": lambda by, admin: gettext(
+        "%(by)s brought back %(admin)s", by=by, admin=admin
+    ),
+    "recovery_link_made": lambda by, admin: gettext(
+        "%(by)s made a link for %(admin)s with the recovery token",
+        by=by,
+        admin=admin,
+    ),
+    "sign_in_settings_changed": lambda by, _: gettext(
+        "%(by)s changed the sign-in settings", by=by
+    ),
+    "locked_down": lambda by, _: gettext(
+        "%(by)s retired every administrator and revoked every registration code",
+        by=by,
+    ),
+    "let_in": lambda by, admin: gettext(
+        "%(by)s let %(admin)s back in", by=by, admin=admin
+    ),
+    "authenticators_retired": lambda by, _: gettext(
+        "%(by)s retired the authenticators a lost or leaked key sealed", by=by
     ),
 }
 # Who did it, when no administrator did: a command run by the operator.
-OPERATOR = "The operator"
+# Translators: who did something, at the start of a sentence.
+OPERATOR = lazy_gettext("The operator")
 # How many a page lists, newest first.
 SHOWN = 20
 
@@ -140,6 +157,6 @@ def _usernames(session: Session, ids: Iterable[int | None]) -> dict[int, str]:
 
 
 def _words(row: Activity, names: Mapping[int, str]) -> str:
-    by = OPERATOR if row.by_admin_id is None else names[row.by_admin_id]
+    by = str(OPERATOR) if row.by_admin_id is None else names[row.by_admin_id]
     admin = names[row.admin_id] if row.admin_id is not None else ""
     return WORDS[row.kind](by, admin)

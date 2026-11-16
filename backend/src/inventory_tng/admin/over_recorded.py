@@ -11,6 +11,7 @@ Correct, Count or Mark checked for the other (inventory-tng-qs8); one
 with both ends right says so, and offers Close it, which settles it as
 counted (Ali, 2026-11-15, inventory-tng-dro)."""
 
+from collections.abc import Callable
 from decimal import Decimal
 from typing import Annotated, Any
 
@@ -21,7 +22,16 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from inventory_tng import ledger, locations, over_recorded
-from inventory_tng.admin.common import admin_page, quantity, row_id, rule_words
+from inventory_tng.admin.common import (
+    SECTION_STOCK,
+    SETTLED_VIEW,
+    TYPE_A_NUMBER,
+    admin_page,
+    quantity,
+    row_id,
+    rule_words,
+    up_to,
+)
 from inventory_tng.admin.counts import COUNTS
 from inventory_tng.admin.listing import (
     AskedView,
@@ -53,21 +63,20 @@ from inventory_tng.models import (
     canonical,
 )
 from inventory_tng.pages import NOTICES, not_found, redirect
+from inventory_tng.phrases import gettext, lazy_gettext
 from inventory_tng.sign_in import AdminSignedIn
 
 log = structlog.get_logger(__name__)
 
 router = APIRouter(include_in_schema=False)
 
-TITLE = "Recorded more than moved"
-SETTLED_TITLE = "Recorded more than moved, settled"
-# A count left blank, in quantity()'s words for one not a number.
-TYPE_A_NUMBER = "Type a number, such as 12 or 0.5."
+TITLE = lazy_gettext("Recorded more than moved")
+SETTLED_TITLE = lazy_gettext("Recorded more than moved, settled")
 # Mark checked with no reason, or put right another way with no words.
-SAY_WHY = "Say why it is right as it is."
+SAY_WHY = lazy_gettext("Say why it is right as it is.")
 # Words typed with a reason other than another way: asked, never dropped
 # (Ali, 2026-11-15, inventory-tng-zgy).
-WORDS_FOR_ANOTHER = (
+WORDS_FOR_ANOTHER = lazy_gettext(
     "You wrote why, but picked another reason. Pick Put right another way "
     "to keep your words, or clear them."
 )
@@ -75,19 +84,59 @@ WORDS_FOR_ANOTHER = (
 # packages, so no open packages' where.
 KIND = Kind(TITLE, OVER_RECORDED, ())
 
+CORRECTED = lazy_gettext("Corrected.")
+MARKED_CHECKED = lazy_gettext("Marked checked.")
+CLOSED = lazy_gettext("Closed.")
+CONFIRMED = lazy_gettext("Confirmed.")
+COUNT_CORRECTED = lazy_gettext("Count corrected.")
+UNCHANGED = lazy_gettext(
+    "Not changed: someone answered or changed it meanwhile. Reload to see it as it is."
+)
+BROUGHT_BACK = lazy_gettext("Brought back. Correct it now.")
 NOTICES.update(
     {
-        "over_recorded_corrected": "Corrected.",
-        "over_recorded_checked": "Marked checked.",
-        "over_recorded_counted": "Closed.",
-        "over_recorded_confirmed": "Confirmed.",
-        "over_recorded_count_corrected": "Count corrected.",
-        "over_recorded_unchanged": "Not changed: someone answered or changed "
-        "it meanwhile. Reload to see it as it is.",
+        "over_recorded_corrected": CORRECTED,
+        "over_recorded_checked": MARKED_CHECKED,
+        "over_recorded_counted": CLOSED,
+        "over_recorded_confirmed": CONFIRMED,
+        "over_recorded_count_corrected": COUNT_CORRECTED,
+        "over_recorded_unchanged": UNCHANGED,
         # The page names the place brought back (?brought=) when it can.
-        "over_recorded_brought_back": "Brought back. Correct it now.",
+        "over_recorded_brought_back": BROUGHT_BACK,
     }
 )
+
+
+def place_brought_back(place: str) -> str:
+    return gettext("%(place)s brought back. Correct it now.", place=place)
+
+
+def not_changed(why: str) -> str:
+    """A change refused, and why."""
+    return gettext("Not changed: %(why)s", why=why)
+
+
+# A change refused at a place retired and empty, by what it would do
+# there, which (Correct's) needs the amount.
+RETIRED_EMPTY: dict[str, Callable[[str, str], str]] = {
+    "count": lambda place, _amount: gettext(
+        "Not changed: %(place)s is retired and holds nothing, so its count "
+        "can't be corrected there.",
+        place=place,
+    ),
+    "found": lambda place, amount: gettext(
+        "Not changed: %(place)s is retired and holds nothing, so the "
+        "%(amount)s can't be found there again.",
+        place=place,
+        amount=amount,
+    ),
+    "written_off": lambda place, amount: gettext(
+        "Not changed: %(place)s is retired and holds nothing, so the "
+        "%(amount)s can't be written off there.",
+        place=place,
+        amount=amount,
+    ),
+}
 # Refusals said as one answered or changed meanwhile: settled or said again
 # (_settle), not an open package moved whole any more, or its adjustment's
 # key written by another (unique).
@@ -156,8 +205,12 @@ def over_recorded_page(
     place = None
     if notice == "over_recorded_brought_back" and (ident := row_id(brought)):
         place = session.get(Location, ident)
-    said = f"{place.name} brought back. Correct it now." if place else None
+    said = place_brought_back(place.name) if place else None
     return _page(request, signed, session, only, view, notice=said)
+
+
+def waiting_view(waiting: int) -> str:
+    return gettext("Waiting (%(count)d)", count=waiting)
 
 
 def _views(waiting: int, only: Item | None) -> list[tuple[str, str, str]]:
@@ -165,8 +218,8 @@ def _views(waiting: int, only: Item | None) -> list[tuple[str, str, str]]:
     each of one item still if one (Ali, 2026-11-15, inventory-tng-73p)."""
     kept = query_string(only)
     return [
-        (f"{OVER_RECORDED}{kept}", f"Waiting ({waiting})", "waiting"),
-        (f"{RECORDED_MORE_SETTLED}{kept}", "Settled", "settled"),
+        (f"{OVER_RECORDED}{kept}", waiting_view(waiting), "waiting"),
+        (f"{RECORDED_MORE_SETTLED}{kept}", str(SETTLED_VIEW), "settled"),
     ]
 
 
@@ -234,7 +287,7 @@ def settled_page(
         {
             "title": SETTLED_TITLE,
             "here": RECORDED_MORE_SETTLED,
-            "back_link": (STOCK, "Stock"),
+            "back_link": (STOCK, SECTION_STOCK),
             "only": only,
             "recorded_views": _views(
                 over_recorded.how_many(session, over_recorded.WAITING, *where), only
@@ -288,7 +341,7 @@ def _page(
         {
             "title": TITLE,
             "here": OVER_RECORDED,
-            "back_link": (STOCK, "Stock"),
+            "back_link": (STOCK, SECTION_STOCK),
             "only": only,
             "waiting": shown,
             "view": view,
@@ -325,21 +378,21 @@ def _refusal(
         return None
     (each,) = found
     if at is None:
-        words = f"Not changed: {rule_words(broken)}"
+        words = not_changed(rule_words(broken))
         return {"shown": each, "words": words, "place": None, "at": None}
     if do == "checked":
         do = "count" if each.moved_whole else "correct"
     place = session.get_one(Location, at)
     # correct() finds it again where it left, writes it off where it arrived.
     if do != "correct":
-        so = "its count can't be corrected there"
+        refused = "count"
     elif at == over_recorded.ends(session, check_id)[0]:
-        so = f"the {each.amount} can't be found there again"
+        refused = "found"
     else:
-        so = f"the {each.amount} can't be written off there"
+        refused = "written_off"
     return {
         "shown": each,
-        "words": f"Not changed: {place.name} is retired and holds nothing, so {so}.",
+        "words": RETIRED_EMPTY[refused](place.name, each.amount),
         "place": place if place.kind != "custody" else None,
         "at": at,
     }
@@ -407,7 +460,7 @@ def bring_back(
         )
         if broken == "over_recorded_unchanged":
             return redirect(view.link(), notice="over_recorded_unchanged")
-        alert = f"Not changed: {rule_words(broken)}"
+        alert = not_changed(rule_words(broken))
         return _page(request, signed, session, only, view, alert=alert)
     if brought:
         over_recorded.measure_brought_back()
@@ -450,7 +503,7 @@ def answer(
             .join(Movement, Movement.item_id == Item.id)
             .where(Movement.id == check.movement_id)
         ).one()
-        count = quantity(typed, positive=False, unit=unit, required=TYPE_A_NUMBER)
+        count = quantity(typed, positive=False, unit=unit, required=str(TYPE_A_NUMBER))
         if not isinstance(count, Decimal):
             field = f"count-{check_id}"
             log.debug("over recorded count refused", over_recorded_id=check_id)
@@ -540,11 +593,11 @@ def _why_problem(reason: str, words: str) -> str | None:
     reason picked, put right another way with no words or too many, or
     words with another reason."""
     if reason not in over_recorded.CHECKED_REASONS:
-        return SAY_WHY
+        return str(SAY_WHY)
     if reason != "other":
-        return WORDS_FOR_ANOTHER if words else None
+        return str(WORDS_FOR_ANOTHER) if words else None
     if not words:
-        return SAY_WHY
+        return str(SAY_WHY)
     if len(words) > OVER_RECORDED_WORDS_MAX:
-        return f"Up to {OVER_RECORDED_WORDS_MAX} characters."
+        return up_to(OVER_RECORDED_WORDS_MAX)
     return None

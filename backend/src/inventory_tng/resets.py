@@ -28,7 +28,7 @@ from inventory_tng.web import rate_key
 
 router = APIRouter(include_in_schema=False)
 
-ASKED = (
+ASKED = lazy_gettext(
     "If that account has an email address, a link to reset its password is on "
     "its way. It works once, within the hour. If none comes, ask another "
     "administrator to reset your sign-in."
@@ -38,10 +38,16 @@ NOTICES["reset"] = RESET_NOTICE
 
 RECOVER = "/recover"
 REFUSED = {
-    "bad_token": ("token", "That isn't the recovery token."),
-    "used": ("token", "That token was used already: ask for a new one."),
-    "no_admin": ("username", "No current administrator has that username."),
+    "bad_token": ("token", lazy_gettext("That isn't the recovery token.")),
+    "used": ("token", lazy_gettext("That token was used already: ask for a new one.")),
+    "no_admin": (
+        "username",
+        lazy_gettext("No current administrator has that username."),
+    ),
 }
+FORGOT_TITLE = lazy_gettext("Forgot your password?")
+RESET_TITLE = lazy_gettext("Reset your account")
+RECOVER_TITLE = lazy_gettext("Recover an account")
 
 
 def _now() -> datetime:
@@ -59,7 +65,7 @@ def _forgot_page(
         request,
         "forgot.html",
         {
-            "title": "Forgot your password?",
+            "title": FORGOT_TITLE,
             "mail_on": request.app.state.settings.mail is not None,
             "notice": notice,
             "alert": alert,
@@ -87,10 +93,10 @@ def forgot(
     if not accounts.may_ask_for_reset(
         session, rate_key(request), request.app.state.settings.rate_limits
     ):
-        return _forgot_page(request, alert=TOO_MANY, status_code=429)
+        return _forgot_page(request, alert=str(TOO_MANY), status_code=429)
     site_url = config.site_url
     notify.later(lambda mailer: _email_reset(sessions, mailer, site_url, username))
-    return _forgot_page(request, notice=ASKED)
+    return _forgot_page(request, notice=str(ASKED))
 
 
 def _email_reset(
@@ -120,7 +126,7 @@ def _reset_page(
         request,
         "reset.html",
         {
-            "title": "Reset your account",
+            "title": RESET_TITLE,
             "token": token,
             "link": link,
             "totp_required": link is not None
@@ -151,7 +157,7 @@ def reset(
         session, rate_key(request), request.app.state.settings.rate_limits
     ):
         found = accounts.find_reset_link(session, token, now)
-        problems = {"password": TOO_MANY}
+        problems = {"password": str(TOO_MANY)}
         link = found[0] if found else None
         return _reset_page(
             request, session, token, link, problems=problems, status_code=429
@@ -186,7 +192,7 @@ def _recover_page(
         request,
         "recover.html",
         {
-            "title": "Recover an account",
+            "title": RECOVER_TITLE,
             "here": RECOVER,
             "values": {"username": username},
             "problems": problems or {},
@@ -230,11 +236,11 @@ def recover(
     except accounts.TokenRefused as refused:
         if refused.reason == "rate_limited":
             return _recover_page(
-                request, username=username, alert=TOO_MANY, status_code=429
+                request, username=username, alert=str(TOO_MANY), status_code=429
             )
         field, words = REFUSED[refused.reason]
         return _recover_page(
-            request, username=username, problems={field: words}, status_code=400
+            request, username=username, problems={field: str(words)}, status_code=400
         )
     session.commit()
     return redirect(RESET, token=link)

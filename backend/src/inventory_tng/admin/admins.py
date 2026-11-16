@@ -20,6 +20,7 @@ from sqlalchemy.orm import Session
 from inventory_tng import accounts, activity
 from inventory_tng.admin.common import (
     ADMINS,
+    SECTION_ADMINS,
     admin_page,
     now,
     retirement,
@@ -33,6 +34,7 @@ from inventory_tng.mail import Notify
 from inventory_tng.models import Admin
 from inventory_tng.once import OnceKey, sent_before
 from inventory_tng.pages import NOTICES, not_found, redirect
+from inventory_tng.phrases import gettext, lazy_gettext
 from inventory_tng.sign_in import (
     CONFIRM_FIELD,
     RESET,
@@ -46,16 +48,23 @@ log = structlog.get_logger(__name__)
 
 router = APIRouter(include_in_schema=False)
 
-TAKEN = "Another administrator already has that username or email."
-OWN_RESET = "Change your own on your account page."
-OWN_RETIRE = "Another administrator must retire you."
+TAKEN = lazy_gettext("Another administrator already has that username or email.")
+OWN_RESET = lazy_gettext("Change your own on your account page.")
+OWN_RETIRE = lazy_gettext("Another administrator must retire you.")
 
-NOTICES.update(
-    {
-        "admin_retired": "Retired: they can no longer sign in, and their password, "
-        "authenticators and recovery codes are removed.",
-    }
+ADMIN_RETIRED = lazy_gettext(
+    "Retired: they can no longer sign in, and their password, authenticators "
+    "and recovery codes are removed."
 )
+NOTICES["admin_retired"] = ADMIN_RETIRED
+
+
+def link_title(username: str) -> str:
+    return gettext("A link for %(username)s", username=username)
+
+
+def reset_title(username: str) -> str:
+    return gettext("Reset %(username)s's sign-in?", username=username)
 
 
 def _code_field(signed: SignedIn) -> dict[str, object]:
@@ -104,7 +113,7 @@ def _list_page(
         signed,
         "admins.html",
         {
-            "title": "Administrators",
+            "title": SECTION_ADMINS,
             "here": ADMINS,
             "view": view,
             "current": [a for a, _ in rows],
@@ -135,7 +144,7 @@ def _admin_page(
         {
             "title": other.username,
             "here": f"{ADMINS}/{other.id}",
-            "back_link": (ADMINS, "Administrators"),
+            "back_link": (ADMINS, SECTION_ADMINS),
             "other": other,
             **retirement(session, other),
             "uses_totp": accounts.uses_totp(session, other.id),
@@ -163,8 +172,8 @@ def _link_page(
         signed,
         "link_made.html",
         {
-            "title": f"A link for {other.username}",
-            "back_link": (ADMINS, "Administrators"),
+            "title": link_title(other.username),
+            "back_link": (ADMINS, SECTION_ADMINS),
             "other": other,
             "link": link,
             "qr": accounts.qr_svg(link),
@@ -228,7 +237,7 @@ def invite(
         return again
     try:
         if not problems and (broken := attempt(session, make)[1]):
-            problems["username"] = rule_words(broken, TAKEN)
+            problems["username"] = rule_words(broken, str(TAKEN))
     except accounts.AdminRefused:
         return not_found()
     if problems:
@@ -258,13 +267,13 @@ def confirm_reset(
     if other is None or other.retired_at is not None:
         return not_found()
     if other.id == signed.admin.id:
-        return _admin_page(request, session, signed, other, OWN_RESET)
+        return _admin_page(request, session, signed, other, str(OWN_RESET))
     return admin_page(
         request,
         signed,
         "admin_reset.html",
         {
-            "title": f"Reset {other.username}'s sign-in?",
+            "title": reset_title(other.username),
             "here": f"{ADMINS}/{admin_id}/reset",
             "keep": f"{ADMINS}/{admin_id}",
             "other": other,
@@ -291,7 +300,7 @@ def reset(
             session, admin_id, signed.admin.id, now(), notify
         )
     except accounts.AdminRefused as refused:
-        return _refused(request, session, signed, refused, OWN_RESET)
+        return _refused(request, session, signed, refused, str(OWN_RESET))
     changed(signed, session)
     return _link_page(request, signed, other, token, kind)
 
@@ -312,7 +321,7 @@ def retire(
     try:
         accounts.retire_admin(session, admin_id, signed.admin.id, now(), notify)
     except accounts.AdminRefused as refused:
-        return _refused(request, session, signed, refused, OWN_RETIRE)
+        return _refused(request, session, signed, refused, str(OWN_RETIRE))
     changed(signed, session)
     return redirect(ADMINS, notice="admin_retired", section="retired")
 

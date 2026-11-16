@@ -46,6 +46,7 @@ from inventory_tng.models import (
     OverRecorded,
 )
 from inventory_tng.pages import amount
+from inventory_tng.phrases import gettext, lazy_gettext
 
 log = structlog.get_logger(__name__)
 meter = metrics.get_meter(__name__)
@@ -60,10 +61,11 @@ Settled = Literal["corrected", "checked", "counted"]
 # checked is the only way of settling one that writes nothing, so a bare
 # one could mean fixed elsewhere, nothing fixed, or one end fixed.
 CHECKED_REASONS = {
-    "left": "Counted where it left",
-    "arrived": "Counted where it arrived",
-    "both": "Counted both ends",
-    "other": "Put right another way:",
+    "left": lazy_gettext("Counted where it left"),
+    "arrived": lazy_gettext("Counted where it arrived"),
+    "both": lazy_gettext("Counted both ends"),
+    # Translators: followed by the administrator's own words.
+    "other": lazy_gettext("Put right another way:"),
 }
 
 raised_counter = meter.create_counter(
@@ -250,15 +252,27 @@ class Shown(NamedTuple):
     both_right: BothRight | None
 
 
+def times(num: object, package: str) -> str:
+    """So many of a package: 2, a multiplication sign, "Spool 305 m"."""
+    return gettext(
+        "%(num)s \N{MULTIPLICATION SIGN} %(package)s", num=num, package=package
+    )
+
+
 def amount_words(
     quantity: Decimal, unit: str, package: str | None, size: Decimal | None
 ) -> str:
     """`quantity` of an item as a volunteer counted it: whole packages of
     one, or so much in its unit."""
     if package is not None and size and quantity % size == 0:
-        return f"{quantity // size} \N{MULTIPLICATION SIGN} {package}"
+        return times(quantity // size, package)
     after = "" if unit == "each" else f" {unit}"
     return f"{amount(quantity)}{after}"
+
+
+def from_an_open_package(amount: str) -> str:
+    """So much cut from an open package."""
+    return gettext("%(amount)s from an open package", amount=amount)
 
 
 def _amount(
@@ -273,8 +287,23 @@ def _amount(
     whether a cut, not an opening, took it from an open package."""
     words = amount_words(quantity, unit, package, size)
     if from_open is not None and kind != "open":
-        words += " from an open package"
+        return from_an_open_package(words)
     return words
+
+
+def sealed(package: str) -> str:
+    """Where an opening left: its package, sealed."""
+    return gettext("Sealed %(package)s", package=within(package))
+
+
+def opened(package: str) -> str:
+    """Where an opening arrived, its item followed once opened."""
+    return gettext("Open %(package)s", package=within(package))
+
+
+def loose(item: str) -> str:
+    """Where an opening arrived, its item not followed once opened."""
+    return gettext("Loose %(item)s", item=within(item))
 
 
 def _end_names(
@@ -292,12 +321,8 @@ def _end_names(
         return from_place or "", to_place or ""
     # An opening leaves sealed, and arrives open if its item tracks opened,
     # else loose (ledger._opening_breaks).
-    arrived = (
-        f"Open {within(package or '')}"
-        if to_open is not None
-        else f"Loose {within(item)}"
-    )
-    return f"Sealed {within(package or '')}", arrived
+    arrived = opened(package or "") if to_open is not None else loose(item)
+    return sealed(package or ""), arrived
 
 
 def _checks(*columns: SQLColumnExpression[Any]) -> Select:
@@ -480,22 +505,52 @@ class WasSettled(NamedTuple):
     by: str
 
 
+def held_words(amount: str) -> str:
+    """Why a count of one moved whole was confirmed: what it held."""
+    return gettext("Held %(amount)s", amount=amount)
+
+
+def adjusted_at(place: str) -> str:
+    """Why a count of one moved whole was corrected: where."""
+    return gettext("Adjusted at %(place)s", place=place)
+
+
+def closed_on_day(end: str, day: str) -> str:
+    """An opening's open end, closed since, and the day."""
+    return gettext("%(end)s closed %(day)s", end=end, day=day)
+
+
+def end_only(end: str) -> str:
+    """Correct wrote one end only."""
+    return gettext("%(end)s only", end=end)
+
+
+def counted_on(end: str, day: str) -> str:
+    """An end of a settled check, and the day a count put it right."""
+    # Translators: a place or a form, then the day it was counted ("14 Nov").
+    return gettext("%(end)s %(day)s", end=end, day=day)
+
+
 # How one was settled, in words. Confirm count settles one as checked
 # with no reason, or as corrected, an open package moved whole, which
 # Correct cannot be (its open package is no longer where it left).
 SETTLED_HOW = {
-    "corrected": "Corrected",
-    "confirmed": "Count confirmed",
-    "count corrected": "Count corrected",
-    "checked": "Checked",
-    "counted": "Counted",
+    "corrected": lazy_gettext("Corrected"),
+    "confirmed": lazy_gettext("Count confirmed"),
+    "count corrected": lazy_gettext("Count corrected"),
+    "checked": lazy_gettext("Checked"),
+    "counted": lazy_gettext("Counted"),
 }
+TWO_ADJUSTMENTS = lazy_gettext("Two adjustments")
+NO_ADJUSTMENT = lazy_gettext("No adjustment")
 
 SETTLED = OverRecorded.settled_at.is_not(None)
 
 # What the list of those settled sorts by, a column each, as settled()
 # reads them (Ali, 2026-11-15, inventory-tng-73p): How by its words, as
 # settled() words it; Where by where it left, then where it arrived.
+# The words are read once, as the server starts: in English, the one
+# locale it speaks (inventory-tng-ist.2 would sort by the reader's).
 SETTLED_ORDER: dict[str, tuple[Any, ...]] = {
     "settled": (OverRecorded.settled_at,),
     "item": (func.lower(Item.name_shown),),
@@ -508,17 +563,17 @@ SETTLED_ORDER: dict[str, tuple[Any, ...]] = {
                     OverRecorded.settled_how == "checked",
                     OverRecorded.checked_reason.is_(None),
                 ),
-                SETTLED_HOW["confirmed"],
+                str(SETTLED_HOW["confirmed"]),
             ),
             (
                 and_(
                     OverRecorded.settled_how == "corrected",
                     Movement.from_open_package_id == Movement.to_open_package_id,
                 ),
-                SETTLED_HOW["count corrected"],
+                str(SETTLED_HOW["count corrected"]),
             ),
             *(
-                (OverRecorded.settled_how == how, SETTLED_HOW[how])
+                (OverRecorded.settled_how == how, str(SETTLED_HOW[how]))
                 for how in ("corrected", "checked", "counted")
             ),
         ),
@@ -642,14 +697,14 @@ def settled(
         assert how is not None
         if how == "checked" and reason is None:
             how = "confirmed"
-            why = f"Held {amount_words(held, unit, None, None)}"
+            why = held_words(amount_words(held, unit, None, None))
         elif how == "checked" and reason is not None:
-            why = CHECKED_REASONS[reason]
+            why = str(CHECKED_REASONS[reason])
             if row.checked_words:
                 why += f" {row.checked_words}"
         elif how == "corrected" and whole:
             how = "count corrected"
-            why = f"Adjusted at {to_place}"
+            why = adjusted_at(to_place or "")
         elif how == "corrected":
             # The ends Correct wrote (correct()): each it has but one a
             # count put right, or an opening's open package closed before
@@ -668,22 +723,22 @@ def settled(
                 if there
             ]
             why = (
-                "Two adjustments"
+                str(TWO_ADJUSTMENTS)
                 if len(written) > 1
-                else f"{written[0]} only"
+                else end_only(written[0])
                 if written
-                else "No adjustment"
+                else str(NO_ADJUSTMENT)
             )
         else:
             # Each end it has by the count that put it right, or an
             # opening's open package closed (counted(), open_package_closed()).
             said = []
             if left_on is not None:
-                said.append(f"{left} {show_day(left_on, zone)}")
+                said.append(counted_on(left, show_day(left_on, zone)))
             if arrived_on is not None:
-                said.append(f"{arrived} {show_day(arrived_on, zone)}")
+                said.append(counted_on(arrived, show_day(arrived_on, zone)))
             elif closed_on is not None:
-                said.append(f"{arrived} closed {show_day(closed_on, zone)}")
+                said.append(closed_on_day(arrived, show_day(closed_on, zone)))
             if kind == "open":
                 said[1:] = [within(each) for each in said[1:]]
             why = ", ".join(said)
@@ -696,7 +751,7 @@ def settled(
                 kind == "open",
                 _spot(from_id, from_place, countable),
                 _spot(to_id, to_place, countable),
-                SETTLED_HOW[how],
+                str(SETTLED_HOW[how]),
                 why,
                 by,
             )

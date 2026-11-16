@@ -4,6 +4,7 @@ between it, those waiting and the stock pages (Ali, 2026-11-15,
 inventory-tng-73p)."""
 
 import re
+from collections.abc import Callable
 from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 
@@ -14,13 +15,24 @@ from sqlalchemy.orm import Session
 
 from inventory_tng import open_packages, over_recorded
 from inventory_tng.admin import listing
+from inventory_tng.admin import over_recorded as over_recorded_page
+from inventory_tng.admin.common import SETTLED_VIEW
 from inventory_tng.admin.counts import COUNTS
+from inventory_tng.admin.over_recorded import waiting_view
+from inventory_tng.admin.stock import recorded_more_view
 from inventory_tng.local_time import show, show_day, site_zone
 from inventory_tng.models import Admin, LedgerTransaction, Movement, OverRecorded
 
 from helpers.rows import tag
 from helpers.sign_in import new_admin
 from helpers.stock import Place, Spools, cut, retire, write
+
+# As the list says each, in English.
+HOW = {how: str(words) for how, words in over_recorded.SETTLED_HOW.items()}
+REASONS = {why: str(words) for why, words in over_recorded.CHECKED_REASONS.items()}
+TWO = str(over_recorded.TWO_ADJUSTMENTS)
+SEALED_ONLY = over_recorded.end_only(over_recorded.sealed("Spool"))
+OPEN_SPOOL = over_recorded.opened("Spool")
 
 WAITING = "/admin/stock/recorded-more"
 SETTLED = f"{WAITING}/settled"
@@ -101,8 +113,8 @@ def test_a_correction_is_listed_with_when_who_and_where(
             place.item.name_shown,
             "1",
             f"{place.store.name} → {place.van.name}",
-            "Corrected",
-            "Two adjustments",
+            HOW["corrected"],
+            TWO,
             "ada",
         ]
     ]
@@ -146,12 +158,12 @@ def test_each_reason_marked_checked_says_why(
     found = [(row[4], row[5]) for row in rows_of(page)]
     assert found == [
         (
-            "Checked",
-            "Put right another way: Moved back by &lt;b&gt;hand&lt;/b&gt; &amp; told Alex",
+            HOW["checked"],
+            f"{REASONS['other']} Moved back by &lt;b&gt;hand&lt;/b&gt; &amp; told Alex",
         ),
-        ("Checked", "Counted both ends"),
-        ("Checked", "Counted where it arrived"),
-        ("Checked", "Counted where it left"),
+        (HOW["checked"], REASONS["both"]),
+        (HOW["checked"], REASONS["arrived"]),
+        (HOW["checked"], REASONS["left"]),
     ]
     assert "<b>hand</b>" not in page
 
@@ -168,12 +180,16 @@ def moved_whole(session: Session) -> tuple[Spools, OverRecorded]:
 @pytest.mark.parametrize(
     ("count", "how", "why"),
     [
-        ("305", "Count confirmed", "Held 305 m"),
-        ("180", "Count corrected", "Adjusted at {van}"),
+        ("305", HOW["confirmed"], lambda _: over_recorded.held_words("305 m")),
+        ("180", HOW["count corrected"], over_recorded.adjusted_at),
     ],
 )
 def test_a_count_of_one_moved_whole_says_if_it_was_confirmed(
-    admin_client: TestClient, session: Session, count: str, how: str, why: str
+    admin_client: TestClient,
+    session: Session,
+    count: str,
+    how: str,
+    why: Callable[[str], str],
 ) -> None:
     """Confirm count settles one as checked with no reason, or as
     corrected: told apart by what is kept."""
@@ -183,7 +199,7 @@ def test_a_count_of_one_moved_whole_says_if_it_was_confirmed(
     )
     session.flush()
     ((*_, shown_how, shown_why, _),) = settled_rows(admin_client)
-    assert (shown_how, shown_why) == (how, why.format(van=spools.van.name))
+    assert (shown_how, shown_why) == (how, why(spools.van.name))
 
 
 def test_a_count_at_each_end_says_where_and_when(
@@ -199,8 +215,13 @@ def test_a_count_at_each_end_says_where_and_when(
     day = show_day(settled_at(check), site_zone(session))
     ((*_, how, why, _),) = settled_rows(admin_client)
     assert (how, why) == (
-        "Counted",
-        f"{place.store.name} {day}, {place.van.name} {day}",
+        HOW["counted"],
+        ", ".join(
+            (
+                over_recorded.counted_on(place.store.name, day),
+                over_recorded.counted_on(place.van.name, day),
+            )
+        ),
     )
 
 
@@ -215,7 +236,7 @@ def test_corrected_after_one_end_counted_names_the_other(
     over_recorded.correct(session, check.id, seen(check), ada(session))
     session.flush()
     ((*_, how, why, _),) = settled_rows(admin_client)
-    assert (how, why) == ("Corrected", f"{place.store.name} only")
+    assert (how, why) == (HOW["corrected"], over_recorded.end_only(place.store.name))
 
 
 def opening(session: Session) -> tuple[Spools, OverRecorded]:
@@ -239,10 +260,10 @@ def test_an_opening_is_listed_at_its_place_opened(
     ((_, _, amount, where, how, why, _),) = settled_rows(admin_client)
     assert (where, how, why) == (
         f"{spools.store.name} (opened)",
-        "Corrected",
-        "Two adjustments",
+        HOW["corrected"],
+        TWO,
     )
-    assert amount == "1 \N{MULTIPLICATION SIGN} Spool"
+    assert amount == over_recorded.times(1, "Spool")
 
 
 def test_an_openings_open_package_closed_before_correct_names_the_sealed_end(
@@ -260,7 +281,7 @@ def test_an_openings_open_package_closed_before_correct_names_the_sealed_end(
     over_recorded.correct(session, check.id, seen(check), admin)
     session.flush()
     ((*_, how, why, _),) = settled_rows(admin_client)
-    assert (how, why) == ("Corrected", "Sealed spool only")
+    assert (how, why) == (HOW["corrected"], SEALED_ONLY)
 
 
 @pytest.mark.parametrize(
@@ -268,10 +289,10 @@ def test_an_openings_open_package_closed_before_correct_names_the_sealed_end(
     [
         # Closed before, timed after: the close's time is the server's
         # clock as it began, and Correct's when its transaction began.
-        (True, 1, "Sealed spool only"),
+        (True, 1, SEALED_ONLY),
         # Closed after, timed before: begun before Correct, it waited for
         # the place Correct held.
-        (False, -1, "Two adjustments"),
+        (False, -1, TWO),
     ],
 )
 def test_what_correct_wrote_is_told_by_what_it_wrote_not_when(
@@ -298,7 +319,7 @@ def test_what_correct_wrote_is_told_by_what_it_wrote_not_when(
         assert open_packages.close(session, open_id, admin, at)
         session.flush()
     ((*_, how, shown_why, _),) = settled_rows(admin_client)
-    assert (how, shown_why) == ("Corrected", why)
+    assert (how, shown_why) == (HOW["corrected"], why)
 
 
 def test_an_openings_ends_counted_name_their_forms(
@@ -321,7 +342,15 @@ def test_an_openings_ends_counted_name_their_forms(
     assert check.settled_how == "counted"
     day = show_day(settled_at(check), site_zone(session))
     ((*_, how, why, _),) = settled_rows(admin_client)
-    assert (how, why) == ("Counted", f"Sealed spool {day}, open spool {day}")
+    assert (how, why) == (
+        HOW["counted"],
+        ", ".join(
+            (
+                over_recorded.counted_on(over_recorded.sealed("Spool"), day),
+                over_recorded.within(over_recorded.counted_on(OPEN_SPOOL, day)),
+            )
+        ),
+    )
 
 
 def test_newest_first_in_pages_of_one_item_or_all(
@@ -385,13 +414,13 @@ def test_the_stock_views_link_to_those_waiting_and_settled_always(
     """Even with none waiting."""
     page = admin_client.get(path).text
     nav = views_of(page, "Stock views")
-    assert f'<a href="{WAITING}">Recorded more (0)</a>' in nav
-    assert f'<a href="{SETTLED}">Settled</a>' in nav
+    assert f'<a href="{WAITING}">{recorded_more_view(0)}</a>' in nav
+    assert f'<a href="{SETTLED}">{SETTLED_VIEW}</a>' in nav
     place = Place(session)
     moved(session, place)
     moved(session, place)
     nav = views_of(admin_client.get(path).text, "Stock views")
-    assert f'<a href="{WAITING}">Recorded more (2)</a>' in nav
+    assert f'<a href="{WAITING}">{recorded_more_view(2)}</a>' in nav
 
 
 def test_waiting_and_settled_link_to_each_other_keeping_the_item(
@@ -400,22 +429,32 @@ def test_waiting_and_settled_link_to_each_other_keeping_the_item(
     place, other = Place(session), Place(session)
     moved(session, place)
     moved(session, other)
-    label = "Recorded more than moved"
+    label = str(over_recorded_page.TITLE)
     nav = views_of(admin_client.get(WAITING).text, label)
-    assert nav == f'<strong>Waiting (2)</strong> <a href="{SETTLED}">Settled</a>'
+    assert nav == (
+        f'<strong>{waiting_view(2)}</strong> <a href="{SETTLED}">{SETTLED_VIEW}</a>'
+    )
     nav = views_of(admin_client.get(SETTLED).text, label)
-    assert nav == f'<a href="{WAITING}">Waiting (2)</a> <strong>Settled</strong>'
+    assert nav == (
+        f'<a href="{WAITING}">{waiting_view(2)}</a> <strong>{SETTLED_VIEW}</strong>'
+    )
     only = f"?item={place.item.id}"
     nav = views_of(admin_client.get(f"{WAITING}{only}").text, label)
-    assert nav == f'<strong>Waiting (1)</strong> <a href="{SETTLED}{only}">Settled</a>'
+    assert nav == (
+        f"<strong>{waiting_view(1)}</strong> "
+        f'<a href="{SETTLED}{only}">{SETTLED_VIEW}</a>'
+    )
     nav = views_of(admin_client.get(f"{SETTLED}{only}").text, label)
-    assert nav == f'<a href="{WAITING}{only}">Waiting (1)</a> <strong>Settled</strong>'
+    assert nav == (
+        f'<a href="{WAITING}{only}">{waiting_view(1)}</a> '
+        f"<strong>{SETTLED_VIEW}</strong>"
+    )
     # None waiting, still linked.
     for check in session.scalars(select(OverRecorded)):
         over_recorded.mark_checked(session, check.id, seen(check), ada(session), "both")
     session.flush()
     nav = views_of(admin_client.get(SETTLED).text, label)
-    assert f'<a href="{WAITING}">Waiting (0)</a>' in nav
+    assert f'<a href="{WAITING}">{waiting_view(0)}</a>' in nav
 
 
 def test_settled_by_another_administrator_names_them(
@@ -455,8 +494,13 @@ def test_an_openings_sealed_end_counted_then_closed_says_so(
     ((*_, how, why, _),) = settled_rows(admin_client)
     sealed, opened = show_day(counted_on, zone), show_day(at, zone)
     assert (how, why) == (
-        "Counted",
-        f"Sealed spool {sealed}, open spool closed {opened}",
+        HOW["counted"],
+        ", ".join(
+            (
+                over_recorded.counted_on(over_recorded.sealed("Spool"), sealed),
+                over_recorded.within(over_recorded.closed_on_day(OPEN_SPOOL, opened)),
+            )
+        ),
     )
 
 
@@ -492,8 +536,13 @@ def test_both_ends_right_then_closed_names_the_count_and_the_close(
     sealed, opened = show_day(counted_on, zone), show_day(at, zone)
     ((*_, how, why, by),) = settled_rows(admin_client)
     assert (how, why, by) == (
-        "Counted",
-        f"Sealed spool {sealed}, open spool closed {opened}",
+        HOW["counted"],
+        ", ".join(
+            (
+                over_recorded.counted_on(over_recorded.sealed("Spool"), sealed),
+                over_recorded.within(over_recorded.closed_on_day(OPEN_SPOOL, opened)),
+            )
+        ),
         "ada",
     )
 
@@ -526,13 +575,15 @@ def test_one_end_only_counted_names_that_end(
     assert found == [
         (
             f"{spools.store.name} → {spools.van.name}",
-            "Counted",
-            f"{spools.van.name} {counted_on(check.arrived_count_id)}",
+            HOW["counted"],
+            over_recorded.counted_on(
+                spools.van.name, counted_on(check.arrived_count_id)
+            ),
         ),
         (
             f"from {place.store.name}",
-            "Counted",
-            f"{place.store.name} {counted_on(used.left_count_id)}",
+            HOW["counted"],
+            over_recorded.counted_on(place.store.name, counted_on(used.left_count_id)),
         ),
     ]
 

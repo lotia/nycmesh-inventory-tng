@@ -12,7 +12,7 @@ from fastapi.responses import HTMLResponse
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from inventory_tng.activity import OPERATOR
+from inventory_tng.accounts import name_up_to
 from inventory_tng.db import Base, by_name
 from inventory_tng.ledger import whole_enough
 from inventory_tng.local_time import site_zone
@@ -28,6 +28,7 @@ from inventory_tng.models import (
     whole,
 )
 from inventory_tng.pages import NOTICES, page, templates
+from inventory_tng.phrases import gettext, lazy_gettext
 from inventory_tng.sign_in import SignedIn
 
 ADMIN = "/admin"
@@ -38,49 +39,96 @@ NAME_MAX = 200
 _globals = cast(dict[str, Any], templates.env.globals)
 _globals["name_max"] = NAME_MAX
 
+# The sections' names: in the navigation, in links back to them, and as
+# their pages' titles.
+SECTION_ITEMS = lazy_gettext("Items")
+SECTION_CATEGORIES = lazy_gettext("Categories")
+SECTION_LOCATIONS = lazy_gettext("Locations")
+SECTION_LABELS = lazy_gettext("Labels")
+SECTION_VOLUNTEERS = lazy_gettext("Volunteers")
+SECTION_STOCK = lazy_gettext("Stock")
+SECTION_COUNTS = lazy_gettext("Counts")
+SECTION_DEVICES = lazy_gettext("Devices")
+SECTION_ADMINS = lazy_gettext("Administrators")
+SECTION_SETTINGS = lazy_gettext("Site settings")
+
+# A view of those settled, beside those waiting (_views.html).
+SETTLED_VIEW = lazy_gettext("Settled")
+
+# A form for open packages sent with none ticked.
+TICK_OPEN_PACKAGES = lazy_gettext("Tick the open packages first.")
+
 # What most changes say once done; a page adds its own where the words differ.
+ADDED = lazy_gettext("Added.")
+SAVED = lazy_gettext("Saved.")
+RETIRED_NOTICE = lazy_gettext("Retired.")
+RESTORED = lazy_gettext("Brought back.")
 NOTICES.update(
     {
-        "added": "Added.",
-        "saved": "Saved.",
-        "retired": "Retired.",
-        "restored": "Brought back.",
+        "added": ADDED,
+        "saved": SAVED,
+        "retired": RETIRED_NOTICE,
+        "restored": RESTORED,
     }
 )
 
+PICK_A_ZONE = lazy_gettext("Pick a zone from the list.")
+WHOLE_UNITS = lazy_gettext("This item is counted in whole units.")
 # The rules domain functions check, by the name db.attempt gives one that a
 # change broke (db.RuleBroken's), in words. A page passes its own words for
 # "unique", which depend on what it is naming.
 RULES = {
-    "location_area_parent": "An area goes inside a store or another area.",
-    "location_no_cycle": "That would put it inside itself.",
-    "location_parent_current": "Its place is retired, or places are still "
-    "inside it: bring that back, or move those, first.",
-    "location_custody_volunteer": "Stop them holding stock first.",
-    "location_holds_stock": "Move what is here elsewhere, or count it, first.",
-    "volunteer_merge_target": "Others are merged into them: merge those "
-    "elsewhere first, or pick a current volunteer to merge into.",
-    "item_category_current": "Its category is retired: bring that back, or "
-    "pick another, first.",
-    "item_unit_fixed": "Its unit is fixed, as stock has moved in it.",
-    "package_size_fixed": "Its size is fixed, as some has moved, been opened "
-    "or labelled: add a package of the new size instead.",
-    "ck_item_package_short_below_under_size": "Larger than its too-short "
-    "length, or change that first.",
-    "category_has_items": "Move or retire its items first.",
-    "site_settings_time_zone": "Pick a zone from the list.",
-    "location_time_zone": "Pick a zone from the list.",
-    "movement_whole_units": "This item is counted in whole units.",
-    "open_package_untracked": "That package isn't followed once opened any "
-    "more: count what is on it as loose.",
-    "movement_item_once": "An item is on the count twice: count it once.",
-    "movement_open_package_closed": "An open package was closed meanwhile: "
-    "count what is on it as loose.",
-    "location_countable": "That place is retired and holds nothing: pick another.",
-    "changed_since_shown": "Not saved: someone else saved this after you opened "
-    "it. Here it is as it is now: make your change again.",
-    "retired_read_only": "Not saved: it's retired. Bring it back first to change it.",
+    "location_area_parent": lazy_gettext(
+        "An area goes inside a store or another area."
+    ),
+    "location_no_cycle": lazy_gettext("That would put it inside itself."),
+    "location_parent_current": lazy_gettext(
+        "Its place is retired, or places are still "
+        "inside it: bring that back, or move those, first."
+    ),
+    "location_custody_volunteer": lazy_gettext("Stop them holding stock first."),
+    "location_holds_stock": lazy_gettext(
+        "Move what is here elsewhere, or count it, first."
+    ),
+    "volunteer_merge_target": lazy_gettext(
+        "Others are merged into them: merge those "
+        "elsewhere first, or pick a current volunteer to merge into."
+    ),
+    "item_category_current": lazy_gettext(
+        "Its category is retired: bring that back, or pick another, first."
+    ),
+    "item_unit_fixed": lazy_gettext("Its unit is fixed, as stock has moved in it."),
+    "package_size_fixed": lazy_gettext(
+        "Its size is fixed, as some has moved, been opened "
+        "or labelled: add a package of the new size instead."
+    ),
+    "ck_item_package_short_below_under_size": lazy_gettext(
+        "Larger than its too-short length, or change that first."
+    ),
+    "category_has_items": lazy_gettext("Move or retire its items first."),
+    "site_settings_time_zone": PICK_A_ZONE,
+    "location_time_zone": PICK_A_ZONE,
+    "movement_whole_units": WHOLE_UNITS,
+    "open_package_untracked": lazy_gettext(
+        "That package isn't followed once opened any "
+        "more: count what is on it as loose."
+    ),
+    "movement_item_once": lazy_gettext("An item is on the count twice: count it once."),
+    "movement_open_package_closed": lazy_gettext(
+        "An open package was closed meanwhile: count what is on it as loose."
+    ),
+    "location_countable": lazy_gettext(
+        "That place is retired and holds nothing: pick another."
+    ),
+    "changed_since_shown": lazy_gettext(
+        "Not saved: someone else saved this after you opened "
+        "it. Here it is as it is now: make your change again."
+    ),
+    "retired_read_only": lazy_gettext(
+        "Not saved: it's retired. Bring it back first to change it."
+    ),
 }
+BREAKS_A_RULE = lazy_gettext("That breaks one of the inventory's rules.")
 # A save refused as its row changed since its form was shown (db.unchanged):
 # the page shows it again as it is now, with RULES' words as an alert.
 CHANGED = "changed_since_shown"
@@ -96,7 +144,7 @@ def rule_words(broken: str, unique: str | None = None) -> str:
     a page can say which."""
     if broken == "unique" and unique is not None:
         return unique
-    return RULES.get(broken, "That breaks one of the inventory's rules.")
+    return str(RULES.get(broken, BREAKS_A_RULE))
 
 
 def now() -> datetime:
@@ -174,6 +222,9 @@ def undo_retire[T: Base](
     return f"{base}/{ident}/restore"
 
 
+# Who retired a record when a command did, in "Retired by …".
+BY_OPERATOR = lazy_gettext("the operator")
+
 # A kind of record an administrator retires from its own page.
 type Retirable = Item | Category | Location | Volunteer | Admin
 
@@ -197,7 +248,7 @@ def retired_by(session: Session, row: Retirable) -> str | None:
     )
     kind, _, ident = (actor or "").partition(":")
     if kind == "system":
-        return OPERATOR[0].lower() + OPERATOR[1:]
+        return str(BY_OPERATOR)
     admin = session.get(Admin, int(ident)) if kind == "admin" else None
     return admin.username if admin else None
 
@@ -216,13 +267,32 @@ def current_rows[T: Base](session: Session, model: type[T]) -> list[T]:
     return by_name(session, model, table.retired_at.is_(None))
 
 
+def revoke_title(name: str) -> str:
+    """The title of a page asking before something is revoked."""
+    return gettext("Revoke %(name)s?", name=name)
+
+
+def up_to(limit: int) -> str:
+    """A field's longest, refused: in characters."""
+    return gettext("Up to %(max)d characters.", max=limit)
+
+
+def at_most_places(places: int) -> str:
+    """A quantity typed too finely, refused."""
+    return gettext("Use at most %(places)d decimal places.", places=places)
+
+
 def name_problem(name: str) -> str | None:
     # As stored (models.CanonicalName): °C for ℃ is a character longer.
     if not 1 <= len(canonical(name)) <= NAME_MAX:
-        return f"Give it a name of up to {NAME_MAX} characters."
+        return name_up_to(NAME_MAX)
     return None
 
 
+TYPE_A_NUMBER = lazy_gettext("Type a number, such as 12 or 0.5.")
+TOO_BIG = lazy_gettext("That number is too big.")
+ABOVE_ZERO = lazy_gettext("Use a number above 0.")
+ZERO_OR_MORE = lazy_gettext("Use 0 or more.")
 QUANTITY_PLACES = 3  # numeric(12,3), as models.QUANTITY keeps them.
 QUANTITY_MAX = Decimal("999999999.999")
 
@@ -244,13 +314,13 @@ def quantity(
     try:
         value = Decimal(text)
     except InvalidOperation:
-        return "Type a number, such as 12 or 0.5."
+        return str(TYPE_A_NUMBER)
     if not value.is_finite() or value > QUANTITY_MAX:
-        return "That number is too big."
+        return str(TOO_BIG)
     if value.as_tuple().exponent < -QUANTITY_PLACES:  # ty: ignore[unsupported-operator]
-        return f"Use at most {QUANTITY_PLACES} decimal places."
+        return at_most_places(QUANTITY_PLACES)
     if value < 0 or (positive and value == 0):
-        return "Use a number above 0." if positive else "Use 0 or more."
+        return str(ABOVE_ZERO if positive else ZERO_OR_MORE)
     if unit is not None and not whole_enough(unit, value):
-        return RULES["movement_whole_units"]
+        return str(WHOLE_UNITS)
     return value

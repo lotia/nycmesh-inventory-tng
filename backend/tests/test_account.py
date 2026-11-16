@@ -10,6 +10,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from inventory_tng import accounts, sign_in
+from inventory_tng.account import EMAIL_TAKEN
 from inventory_tng.models import (
     Admin,
     AdminPassword,
@@ -17,6 +18,7 @@ from inventory_tng.models import (
     Authenticator,
     ResetLink,
 )
+from inventory_tng.sign_in import NAME_TAKEN
 
 from helpers.mail import SentMail
 from helpers.sign_in import (
@@ -130,7 +132,7 @@ def test_an_email_another_admin_uses_is_refused(
     session.flush()
     refused = client.post(f"{ACCOUNT}/email", data={"email": "BEN@example.org"})
     assert refused.status_code == 400
-    assert "Another administrator uses that address." in text(refused)
+    assert str(EMAIL_TAKEN) in text(refused)
 
 
 def test_changing_the_password_ends_the_other_sessions(
@@ -161,7 +163,9 @@ def test_a_short_password_is_refused(
     form = {"password": "short", "password_again": "short"}
     refused = client.post(f"{ACCOUNT}/password", data=form)
     assert refused.status_code == 400
-    assert "at least 15" in text(refused)
+    problem = accounts.password_problem("short", "short")
+    assert problem
+    assert problem in text(refused)
 
 
 def test_renaming_an_authenticator(
@@ -175,6 +179,36 @@ def test_renaming_an_authenticator(
     assert authenticator.name == "Pixel"
     blank = client.post(path, data={"authenticator_name": " "})
     assert blank.status_code == 400
+
+
+def test_an_authenticator_keeps_a_name_of_its_own(
+    client: TestClient,
+    session: Session,
+    ada: tuple[Admin, str],
+) -> None:
+    admin, _ = ada
+    (first,) = accounts.authenticators(session, admin.id)
+    accounts.add_authenticator(
+        session, TOTP_KEYS, admin.id, "Spare", accounts.new_totp_key(), 0
+    )
+    path = f"{ACCOUNT}/authenticators/{first.id}/name"
+    refused = client.post(path, data={"authenticator_name": "Spare"})
+    assert refused.status_code == 400
+    assert str(NAME_TAKEN) in text(refused)
+
+
+def test_recovery_codes_need_an_authenticator(
+    client: TestClient, session: Session
+) -> None:
+    policy(session, "optional")
+    admin, _ = new_admin(session, totp=False)
+    sign_in_with(client)
+    form = once(**{sign_in.CONFIRM_FIELD: PASSWORD})
+    refused = client.post(f"{ACCOUNT}/recovery-codes", data=form)
+    # Refused, with nothing made: an account without TOTP has no section to
+    # say CODES_NEED_TOTP in, as its page offers no recovery codes.
+    assert refused.status_code == 400
+    assert not accounts.has_recovery_codes(session, admin.id)
 
 
 def test_another_admins_authenticator_is_not_found(

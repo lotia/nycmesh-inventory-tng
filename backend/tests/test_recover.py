@@ -11,12 +11,12 @@ from sqlalchemy.orm import Session
 
 from inventory_tng import accounts, sign_in
 from inventory_tng.models import ResetLink
-from inventory_tng.resets import RECOVER
+from inventory_tng.resets import RECOVER, REFUSED
 from inventory_tng.settings import RateLimits, Settings, SettingsError
 
 from helpers.mail import NO_MAIL, SentMail
 from helpers.rows import history
-from helpers.sign_in import new_admin, sign_in_with
+from helpers.sign_in import new_admin, sign_in_with, text
 
 TOKEN = "the operator's recovery token, long enough"
 NEW_PASSWORD = "a long passphrase of their own"
@@ -60,24 +60,24 @@ def test_each_token_works_once(client: TestClient, session: Session) -> None:
     )
     again = client.post(RECOVER, data={"token": TOKEN, "username": "ada"})
     assert again.status_code == 400
-    assert "That token was used already" in again.text
+    assert str(REFUSED["used"][1]) in text(again)
     assert len(session.scalars(select(ResetLink)).all()) == 1
 
 
 @pytest.mark.parametrize(
     ("form", "words"),
     [
-        ({"token": "not it", "username": "ada"}, "isn&#39;t the recovery token"),
-        ({"token": TOKEN, "username": "ben"}, "No current administrator"),
+        ({"token": "not it", "username": "ada"}, REFUSED["bad_token"][1]),
+        ({"token": TOKEN, "username": "ben"}, REFUSED["no_admin"][1]),
     ],
 )
 def test_what_is_refused(
-    client: TestClient, session: Session, form: dict[str, str], words: str
+    client: TestClient, session: Session, form: dict[str, str], words: object
 ) -> None:
     new_admin(session)
     refused = client.post(RECOVER, data=form)
     assert refused.status_code == 400
-    assert words in refused.text
+    assert str(words) in text(refused)
     assert session.scalars(select(ResetLink)).first() is None
 
 

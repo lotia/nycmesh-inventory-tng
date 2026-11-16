@@ -8,9 +8,10 @@ there is (propose), by the words near each unit (units.CLUES), as the
 import's readings file does from the names it brings (unit_readings)."""
 
 from collections import Counter
-from collections.abc import Iterable, Mapping, Sequence
+from collections.abc import Callable, Iterable, Mapping, Sequence
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
+from functools import reduce
 
 from sqlalchemy import select, union_all
 from sqlalchemy.orm import Session
@@ -24,13 +25,35 @@ from inventory_tng.models import (
     ItemPackage,
     ReadingRule,
 )
+from inventory_tng.phrases import gettext, lazy_gettext
 
 # Refused: a reading no unit has, or a rule respelling no unit.
 NOT_A_READING = "reading_rule_reading"
 # What a form, or the import's readings file, says for "not a unit".
 NOT_A_UNIT = "none"
 # What each table's names are called, naming names that would read alike.
-TABLES = {"item": "item", "item_package": "package", "item_alias": "alias"}
+NAMED: dict[str, Callable[[int, str], str]] = {
+    "item": lambda ident, name: gettext("item %(id)d (%(name)s)", id=ident, name=name),
+    "item_package": lambda ident, name: gettext(
+        "package %(id)d (%(name)s)", id=ident, name=name
+    ),
+    "item_alias": lambda ident, name: gettext(
+        "alias %(id)d (%(name)s)", id=ident, name=name
+    ),
+}
+
+
+def both(first: str, second: str) -> str:
+    """Two names that would read alike, or more, the first already joined."""
+    return gettext("%(first)s and %(second)s", first=first, second=second)
+
+
+def near(words: str) -> str:
+    """Why a reading is proposed: the words near it that settle it."""
+    return gettext("elsewhere near %(words)s", words=words)
+
+
+LIKELY = lazy_gettext("the one likely reading")
 
 
 def _check(rule: units.Rule) -> None:
@@ -173,10 +196,10 @@ def _settle(proposal: Proposal) -> None:
     if best > 0:
         proposal.proposed = next(r for r, score in scores.items() if score == best)
         words = sorted(w for w in proposal.near if w in _clues(proposal.proposed))
-        proposal.why = "elsewhere near " + ", ".join(words)
+        proposal.why = near(", ".join(words))
     elif proposal.found.read is not None:
         proposal.proposed = proposal.found.read
-        proposal.why = "the one likely reading"
+        proposal.why = str(LIKELY)
 
 
 def names(session: Session) -> list[str]:
@@ -222,6 +245,6 @@ def read_alike_words(
     these units after a number (items.read_alike), in words, by id, each
     named as typed, not as shown (Ali, 2026-11-15, inventory-tng-dfz)."""
     return [
-        " and ".join(f"{TABLES[each.table]} {each.id} ({each.name})" for each in group)
+        reduce(both, (NAMED[each.table](each.id, each.name) for each in group))
         for group in items.read_alike(session, tokens, rules)
     ]

@@ -14,9 +14,9 @@ from sqlalchemy.orm import Session
 from structlog.testing import capture_logs
 
 from inventory_tng import items, names, reading_rules, sign_in, units
-from inventory_tng.admin.items import ITEMS, SEARCHED
+from inventory_tng.admin.items import ITEMS, PACKAGE_TAKEN, SEARCHED, TAKEN_FIELDS
 from inventory_tng.admin.listing import folded
-from inventory_tng.admin.reading_rules import READINGS, SEED
+from inventory_tng.admin.reading_rules import CHOOSE_ONE, READINGS, SEED
 from inventory_tng.catalogue import catalogue
 from inventory_tng.db import lock_catalogue
 from inventory_tng.models import (
@@ -29,6 +29,7 @@ from inventory_tng.models import (
     unit_key,
 )
 from inventory_tng.models import reading_rules as reading_rules_held
+from inventory_tng.reading_rules import LIKELY, NAMED, both, near
 
 from helpers.concurrency import Committed
 from helpers.queries import counting
@@ -173,14 +174,11 @@ def test_a_name_reading_as_another_is_refused_naming_it(
     form = {"category_id": str(radios.id), "unit": "each"}
     refused = admin_client.post(ITEMS, data=form | {"name": "Cap 10 µF"})
     assert refused.status_code == 400
-    assert (
-        "Cap 10\u00a0uF already has that name, or one differing from it only in "
-        "case, spaces, punctuation or how its units are spelt."
-    ) in text(refused)
+    assert TAKEN_FIELDS["name"]("Cap 10\u00a0uF") in text(refused)
     rocket = new_item(session, radios, "Rocket")
     items.add_alias(session, rocket, "Link 1 Gbps")
     refused = admin_client.post(ITEMS, data=form | {"name": "Link 1Gbit/s"})
-    assert "Rocket has that name" in text(refused)
+    assert TAKEN_FIELDS["alias"]("Rocket") in text(refused)
     package = admin_client.post(
         f"{ITEMS}/{rocket.id}/packages", data={"package_name": "Box 1 kg", "size": "1"}
     )
@@ -188,7 +186,7 @@ def test_a_name_reading_as_another_is_refused_naming_it(
     again = admin_client.post(
         f"{ITEMS}/{rocket.id}/packages", data={"package_name": "Box 1kg", "size": "2"}
     )
-    assert "It already has a package by that name." in text(again)
+    assert str(PACKAGE_TAKEN) in text(again)
 
 
 def test_a_respelling_rule_respells_whatever_the_words_near_it() -> None:
@@ -395,7 +393,7 @@ def test_the_rules_page_lists_changes_and_deletes_them(
     # A reading not offered shows the form again.
     unknown = admin_client.post(path, data={"reading": "xx", "version": shown(rule)})
     assert unknown.status_code == 400
-    assert "Choose one of the readings offered." in text(unknown)
+    assert str(CHOOSE_ONE) in text(unknown)
     stale = admin_client.post(path, data={"reading": "none", "version": "1"})
     assert stale.status_code == 409
     # Nor deleted, changed since it was shown.
@@ -424,7 +422,10 @@ def test_a_rule_change_reading_names_alike_names_them(
     one = new_item(session, radios, "Probe 85 Cel")
     other = new_item(session, radios, "Probe 85\u00b0C")
     path = f"{READINGS}/{rule.id}"
-    said = f"item {one.id} (Probe 85 Cel) and item {other.id} (Probe 85\u00b0C)"
+    said = both(
+        NAMED["item"](one.id, "Probe 85 Cel"),
+        NAMED["item"](other.id, "Probe 85\u00b0C"),
+    )
     for refused in (
         admin_client.post(path, data={"reading": "degC", "version": shown(rule)}),
         admin_client.post(f"{path}/delete", data={"version": shown(rule)}),
@@ -467,9 +468,9 @@ def test_proposals_read_the_words_near_each_unit() -> None:
         for p in proposals
     }
     assert said == {
-        "G": (4, "Gbit/s", "elsewhere near link, port, sfp+, switch, uplink"),
-        "M": (1, "m", "elsewhere near cable, spool"),
-        "MF": (1, "mF", "the one likely reading"),
+        "G": (4, "Gbit/s", near("link, port, sfp+, switch, uplink")),
+        "M": (1, "m", near("cable, spool")),
+        "MF": (1, "mF", str(LIKELY)),
         "g": (1, None, ""),
     }
     assert proposals[0].found.key == "G"
@@ -487,7 +488,7 @@ def test_the_seeding_page_proposes_and_accepts_readings(
     items.add_alias(session, link, "Tape 3M")
     page = text(admin_client.get(SEED))
     assert "“G”" in page
-    assert "elsewhere near sfp+, uplink" in page
+    assert near("sfp+, uplink") in page
     assert '<option value="">Choose…</option>' in page
     assert "Mbps · data rate" in page
     assert "m · meters" in page
@@ -548,9 +549,9 @@ def test_the_seeding_page_names_what_would_read_alike(
     other = new_item(session, radios, "Box 10 Gbps")
     refused = admin_client.post(SEED, data={"reading:g": "Gbit/s"})
     assert refused.status_code == 409
-    assert f"item {one.id} (Box 10g) and item {other.id} (Box 10 Gbps)" in (
-        text(refused)
-    )
+    assert both(
+        NAMED["item"](one.id, "Box 10g"), NAMED["item"](other.id, "Box 10 Gbps")
+    ) in text(refused)
 
 
 def test_a_rule_may_respell_names_typed_with_it(

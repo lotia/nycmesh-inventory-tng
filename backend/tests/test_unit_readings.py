@@ -67,7 +67,7 @@ def test_a_dry_run_proposes_as_the_seeding_page_does(tmp_path: Path) -> None:
         "correction": "",
         "respell": "",
         "offered": "Mbit/s (data rate) | m (meters) | none (not a unit)",
-        "why": "elsewhere near cable, cat6, spool",
+        "why": reading_rules.near("cable, cat6, spool"),
         "names": "1",
         "near": "cable 1 | cat6 1 | spool 1",
         "examples": "Tape 3M",
@@ -266,7 +266,10 @@ def test_a_load_that_would_make_two_names_one_is_refused(
     assert run_load(session, path) == 1
     assert capsys.readouterr().err.splitlines() == [
         "Nothing loaded: these names would read alike; rename one of each first.",
-        f"item {grams.id} (Box 10g) and item {rate.id} (Box 10 Gbps)",
+        reading_rules.both(
+            reading_rules.NAMED["item"](grams.id, "Box 10g"),
+            reading_rules.NAMED["item"](rate.id, "Box 10 Gbps"),
+        ),
     ]
     assert session.scalars(select(ReadingRule)).all() == []
 

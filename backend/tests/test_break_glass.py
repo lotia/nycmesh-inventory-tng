@@ -64,8 +64,8 @@ def test_lockdown_retires_everyone_and_revokes_every_code(
     assert session.scalars(current_codes).all() == []
     # Told by mail, as nobody is left to see it in the app.
     assert [(m.to, m.kind) for m in sent_mail] == [("ada@example.org", "activity")]
-    assert activity.recent(session)[0].words == (
-        "The operator retired every administrator and revoked every registration code"
+    assert activity.recent(session)[0].words == activity.WORDS["locked_down"](
+        str(activity.OPERATOR), ""
     )
 
 
@@ -106,7 +106,9 @@ def test_let_in_works_without_a_lockdown(session: Session) -> None:
     ada, _ = new_admin(session)
     accounts.let_in(session, "ada", NOW, NO_MAIL)
     assert not accounts.has_password(session, ada.id)
-    assert activity.recent(session)[0].words == "The operator let ada back in"
+    assert activity.recent(session)[0].words == activity.WORDS["let_in"](
+        str(activity.OPERATOR), "ada"
+    )
 
 
 def test_let_in_refuses_nobody(session: Session) -> None:
@@ -175,7 +177,7 @@ def test_with_authenticators_retired_a_recovery_code_is_still_asked_for(
     # In, and asked to set up an authenticator there and then, even with
     # TOTP optional: else a code each sign-in until none were left.
     policy(session, "optional")
-    assert "Set up an authenticator" in sign_in_with(client, code=first).text
+    assert str(sign_in.AUTHENTICATOR_TITLE) in sign_in_with(client, code=first).text
 
 
 def test_the_commands_run_as_operator_commands(
@@ -207,7 +209,9 @@ def test_the_commands_run_as_operator_commands(
 
 def test_the_operator_invites_without_mail(session: Session) -> None:
     grace, _ = accounts.invite_by_operator(session, "grace", None, NOW, NO_MAIL)
-    assert activity.recent(session)[0].words == "The operator invited grace"
+    assert activity.recent(session)[0].words == activity.WORDS["invited"](
+        str(activity.OPERATOR), "grace"
+    )
     assert grace.retired_at is None
 
 

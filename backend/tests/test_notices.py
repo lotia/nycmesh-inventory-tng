@@ -11,6 +11,7 @@ from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
 
 from inventory_tng import pages
+from inventory_tng.admin.volunteers import BRING_THEM_BACK
 from inventory_tng.models import Admin, Category, Item, Label, Location, Volunteer
 
 from helpers.rows import add, tag
@@ -116,11 +117,11 @@ def test_the_notice_sections_are_the_sections_pages_say_notices_by() -> None:
         ("/admin/items", "item", "Bring it back"),
         ("/admin/categories", "category", "Bring it back"),
         ("/admin/locations", "location", "Bring it back"),
-        ("/admin/volunteers", "volunteer", "Bring them back"),
+        ("/admin/volunteers", "volunteer", BRING_THEM_BACK),
     ],
 )
 def test_a_retire_is_undone_from_its_notice(
-    admin_client: TestClient, session: Session, path: str, row: str, words: str
+    admin_client: TestClient, session: Session, path: str, row: str, words: object
 ) -> None:
     """One tap retires, and its notice offers a button to bring it back,
     while it is retired (docs/decisions/0019)."""

@@ -17,7 +17,7 @@ from structlog.testing import capture_logs
 
 from inventory_tng import accounts, mail, sign_in
 from inventory_tng.models import Admin, AdminSession, ResetLink
-from inventory_tng.resets import RESET_NOTICE
+from inventory_tng.resets import ASKED, RESET_NOTICE
 from inventory_tng.settings import MailConfig, Settings, SettingsError
 
 from helpers.mail import NO_MAIL, SITE_MAIL, FailingMail, SentMail
@@ -237,7 +237,7 @@ def test_an_emailed_link_resets_the_password(
     admin, key = with_email(session)
     sign_in_with(client, code=code(key))
     signed_in = session.query(AdminSession).one()
-    assert "a link to reset its password is on its way" in ask(client)
+    assert str(ASKED) in ask(client)
     link = the_link(sent_mail)
     assert link.startswith(f"{SITE_MAIL.site_url}{sign_in.RESET}?token=")
     assert sent_mail[0].to == "ada@example.org"

@@ -14,18 +14,20 @@ from inventory_tng import categories
 from inventory_tng.admin.common import (
     ADMIN,
     ALERTS,
-    RULES,
+    SECTION_CATEGORIES,
     admin_page,
     form_version,
     name_problem,
     now,
     retirement,
+    rule_words,
     undo_retire,
 )
 from inventory_tng.admin.listing import AskedView, Sort, Sorting, View, arranged
 from inventory_tng.db import DbSession, refusal
 from inventory_tng.models import Category, Item
 from inventory_tng.pages import not_found, redirect
+from inventory_tng.phrases import lazy_gettext
 from inventory_tng.sign_in import AdminSignedIn, SignedIn
 
 log = structlog.get_logger(__name__)
@@ -33,7 +35,7 @@ log = structlog.get_logger(__name__)
 router = APIRouter(include_in_schema=False)
 
 CATEGORIES = f"{ADMIN}/categories"
-TAKEN = (
+TAKEN = lazy_gettext(
     "There is already a category by that name, perhaps a retired one: "
     "bring that back instead."
 )
@@ -83,7 +85,7 @@ def _list_page(
         signed,
         "categories.html",
         {
-            "title": "Categories",
+            "title": SECTION_CATEGORIES,
             "undo": undo,
             "here": CATEGORIES,
             "view": view,
@@ -116,7 +118,7 @@ def _category_page(
         {
             "title": category.name,
             "here": f"{CATEGORIES}/{category.id}",
-            "back_link": (CATEGORIES, "Categories"),
+            "back_link": (CATEGORIES, SECTION_CATEGORIES),
             "category": category,
             **retirement(session, category),
             "items": items,
@@ -151,7 +153,7 @@ def add_category(
     added = None
     if problem is None:
         added, _ = refusal(session, lambda: categories.add(session, name), "unique")
-        problem = None if added else TAKEN
+        problem = None if added else str(TAKEN)
     if added is None:
         return _list_page(request, session, signed, problem, name)
     session.commit()
@@ -192,8 +194,10 @@ def rename_category(
             *ALERTS,
         )
         if broken in ALERTS:
-            return _category_page(request, session, signed, found, alert=RULES[broken])
-        problem = broken and TAKEN
+            return _category_page(
+                request, session, signed, found, alert=rule_words(broken)
+            )
+        problem = broken and str(TAKEN)
     if problem is not None:
         return _category_page(request, session, signed, found, problem)
     session.commit()
@@ -214,7 +218,7 @@ def retire_category(
     )
     if broken:
         return _category_page(
-            request, session, signed, found, RULES["category_has_items"]
+            request, session, signed, found, rule_words("category_has_items")
         )
     session.commit()
     log.info("category retired", category_id=category_id)

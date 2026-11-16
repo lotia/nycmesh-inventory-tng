@@ -72,7 +72,7 @@ def test_the_check_page_hints_at_the_printed_length(
     made = spools.opened()
     registered_client.post(URL, json=report(spools, length(made, "250")))
     page = text(admin_client.get(LENGTHS))
-    assert pages.PRINTED_LENGTH in page
+    assert str(pages.PRINTED_LENGTH) in page
     assert f'aria-describedby="hint-{made.id}"' in page
 
 
@@ -172,8 +172,8 @@ def test_needs_your_action_lists_lengths_to_check(
     registered_client.post(URL, json=spools.place.batch(lines=[cut(below, "310")]))
     home = text(admin_client.get("/admin"))
     assert "Needs your action (2)" in home
-    assert "Shows the wrong length" in home
-    assert "Went below zero" in home
+    assert str(length_checks.KINDS[0].title) in home
+    assert str(length_checks.KINDS[1].title) in home
     assert (
         f"{spools.cable.name}: 1 \N{MULTIPLICATION SIGN} Spool</a>, 5 m below zero"
         in home
@@ -280,7 +280,7 @@ def test_leave_it_and_what_is_refused(
     session.refresh(made)
     assert made.length_reported is None
     assert left_on(session, made) == 305
-    assert "Shows the wrong length" not in text(admin_client.get("/admin"))
+    assert str(length_checks.KINDS[0].title) not in text(admin_client.get("/admin"))
 
 
 def test_bulk_set_passes_over_one_nobody_said_a_length_of(
@@ -349,7 +349,7 @@ def test_each_kind_has_its_page(
     only = f"?item={spools.cable.id}"
     said = text(admin_client.get(f"{LENGTHS}/reported{only}"))
     assert "said 250 m is on it" in said
-    assert "Went below zero" not in said.split("<main", 1)[1]
+    assert str(length_checks.KINDS[1].title) not in said.split("<main", 1)[1]
     gone = text(admin_client.get(f"{LENGTHS}/below-zero{only}"))
     assert "said 250 m" not in gone
     assert f'href="{LENGTHS}/below-zero">Show all' in gone
@@ -393,7 +393,7 @@ def test_one_reported_used_up_is_not_also_below_zero(
     assert registered_client.post(URL, json=over).status_code == 201
     home = text(admin_client.get("/admin"))
     assert "Needs your action (1)" in home
-    assert "Went below zero" not in home
+    assert str(length_checks.KINDS[1].title) not in home
 
 
 def test_answers_go_back_to_the_page_they_came_from(
@@ -458,7 +458,7 @@ def test_the_count_page_hints_at_the_printed_length_of_items_in_length(
     made = spools.opened()
     page = text(admin_client.get(f"/admin/counts/{store}"))
     # Each open package's, and under one nobody recorded (inventory-tng-lby).
-    assert page.count(pages.PRINTED_LENGTH) == 3
+    assert page.count(str(pages.PRINTED_LENGTH)) == 3
     assert f'aria-describedby="hint-opened_{made.id}"' in page
     assert 'aria-describedby="hint-found_left"' in page
     # Beside a box of plugs, counted each: only the spool's option is one
@@ -479,7 +479,7 @@ def test_the_count_page_hints_at_the_printed_length_of_items_in_length(
     spools.cable.unit = "each"
     session.flush()
     page = text(admin_client.get(f"/admin/counts/{store}"))
-    assert pages.PRINTED_LENGTH not in page
+    assert str(pages.PRINTED_LENGTH) not in page
     assert "hint-found_left" not in page
 
 

@@ -16,6 +16,7 @@ from inventory_tng.account import ACCOUNT
 from inventory_tng.admin.admins import ADMINS
 from inventory_tng.admin.devices import CODES, DEVICES
 from inventory_tng.models import Admin, RegistrationCode, ResetLink
+from inventory_tng.once import SENT_AGAIN
 
 from helpers.mail import NO_MAIL, SentMail
 from helpers.rows import tag
@@ -76,7 +77,7 @@ def test_a_registration_code_is_made_once(
     assert made.status_code == 200
     assert CANT_SHOW in text(made)
     assert_sent_again(again, DEVICES)
-    assert "made a registration code" in text(again)
+    assert str(SENT_AGAIN["registration_code"]) in text(again)
     made_here = select(func.count()).where(RegistrationCode.label == label)
     assert session.scalar(made_here) == 1
     assert {"event": "form sent again", "made": "registration_code"} in [

@@ -15,12 +15,14 @@ from pathlib import Path
 from typing import Any, cast
 
 import structlog
+from babel.support import LazyProxy
 from fastapi import APIRouter, FastAPI, Request
 from fastapi.responses import PlainTextResponse, RedirectResponse, Response
 from servestatic import ServeStaticASGI
 from starlette.types import ASGIApp
 
 from inventory_tng.pages import templates
+from inventory_tng.phrases import lazy_gettext
 from inventory_tng.settings import FrontendConfig, Settings
 
 log = structlog.get_logger(__name__)
@@ -39,9 +41,10 @@ BUILD_ID = re.compile(r"\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d\.\d{3}Z")
 # Each page and the entry in frontend/vite.config.ts that it loads.
 SCAN = "/scan"
 PAGES = {
-    SCAN: ("Scan", "src/scan.tsx"),
-    "/register": ("Register this device", "src/register.tsx"),
+    SCAN: (lazy_gettext("Scan"), "src/scan.tsx"),
+    "/register": (lazy_gettext("Register this device"), "src/register.tsx"),
 }
+NOT_BUILT = lazy_gettext("The scan page is not built yet.")
 # The stylesheet the server-rendered pages load: an entry of its own.
 STYLES = "src/styles.css"
 # Their script: what they do beyond plain HTML (docs/decisions/0019).
@@ -161,11 +164,11 @@ def _from_manifest(manifest: dict[str, dict], entry: str) -> Tags:
     )
 
 
-def _page(title: str, entry: str) -> Callable[[Request], Response]:
+def _page(title: LazyProxy, entry: str) -> Callable[[Request], Response]:
     def page(request: Request) -> Response:
         page_tags = request.app.state.bundle.tags(entry)
         if page_tags is None:
-            return PlainTextResponse("The scan page is not built yet.", status_code=503)
+            return PlainTextResponse(str(NOT_BUILT), status_code=503)
         return templates.TemplateResponse(
             request,
             "page.html",

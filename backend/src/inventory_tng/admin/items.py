@@ -21,7 +21,7 @@ from inventory_tng.admin.common import (
     ADMIN,
     ALERTS,
     RETIRED,
-    RULES,
+    SECTION_ITEMS,
     admin_page,
     chosen,
     form_version,
@@ -29,6 +29,7 @@ from inventory_tng.admin.common import (
     now,
     quantity,
     retirement,
+    rule_words,
     text_form,
     undo_retire,
 )
@@ -59,6 +60,7 @@ from inventory_tng.models import (
 from inventory_tng.models import reading_rules as rules_held
 from inventory_tng.names import nameless
 from inventory_tng.pages import NOTICES, not_found, redirect
+from inventory_tng.phrases import gettext, lazy_gettext
 from inventory_tng.reading_rules import NOT_A_UNIT, chosen_rule, read_alike_words
 from inventory_tng.sign_in import AdminSignedIn, SignedIn
 
@@ -70,32 +72,63 @@ router = APIRouter(include_in_schema=False)
 ITEMS = f"{ADMIN}/items"
 TEXT_FIELDS = ("manufacturer", "part_number", "old_code", "notes", "ordering_notes")
 # Said when another item had what was asked for, but no longer does.
-TAKEN = (
+TAKEN = lazy_gettext(
     "Another item, perhaps a retired one, already has that name, that "
     "manufacturer and part number, or that old code."
 )
-NO_LETTERS = "A name needs at least one letter or number."
+NO_LETTERS = lazy_gettext("A name needs at least one letter or number.")
 # A field saying how a unit after a number in a name is read, asked where
 # nothing settles it, or corrected ("Not right?"): this, then the unit as
 # typed (units.rule_key); its value is str(Reading), or
 # NOT_A_UNIT, or blank: as read. Kept as a reading rule
 # (reading_rules.decide), so it is asked once.
 READING = "unit:"
-ASK_UNIT = "Say below whether it is a unit."
+ASK_UNIT = lazy_gettext("Say below whether it is a unit.")
 # The form's field holding the name an administrator was shown close names
 # for, and sent again: a different item's, so not asked about again.
 DIFFERENT = "different"
 # Refused by _change_or_note, as a rule would be, to ask about close names.
 CLOSE = "close_names"
-# After another item's name, what of it is taken (items.taken_by).
-TAKEN_FIELDS = {
-    "name": "already has that name, or one differing from it only in case, "
-    "spaces, punctuation or how its units are spelt.",
-    "part_number": "already has that manufacturer and part number.",
-    "old_code": "already has that old code.",
-    "alias": "has that name, or one differing from it only in case, spaces, "
-    "punctuation or how its units are spelt, as an alias.",
+# What of another item is taken (items.taken_by), naming it.
+TAKEN_FIELDS: dict[str, Callable[[str], str]] = {
+    "name": lambda other: gettext(
+        "%(other)s already has that name, or one differing from it only in "
+        "case, spaces, punctuation or how its units are spelt.",
+        other=other,
+    ),
+    "part_number": lambda other: gettext(
+        "%(other)s already has that manufacturer and part number.", other=other
+    ),
+    "old_code": lambda other: gettext(
+        "%(other)s already has that old code.", other=other
+    ),
+    "alias": lambda other: gettext(
+        "%(other)s has that name, or one differing from it only in case, "
+        "spaces, punctuation or how its units are spelt, as an alias.",
+        other=other,
+    ),
 }
+# What of another item an alias would be (items.alias_taken_by), naming it.
+ALIAS_TAKEN: dict[str, Callable[[str], str]] = {
+    "name": TAKEN_FIELDS["name"],
+    "alias": lambda other: gettext(
+        "%(other)s already has that alias, or one differing from it only in "
+        "case, spaces, punctuation or how its units are spelt.",
+        other=other,
+    ),
+}
+# An alias an item has already, as its name or as an alias.
+ALIAS_ITS_OWN = {
+    "name": lazy_gettext("That is its name already."),
+    "alias": lazy_gettext("That is its alias already."),
+}
+# After another item is named as having what was asked for.
+IS_RETIRED = lazy_gettext("It is retired.")
+
+
+def _retired(other: Item, words: str) -> str:
+    """`words` naming `other`, saying so if it is retired."""
+    return f"{words} {IS_RETIRED}" if other.retired_at is not None else words
 
 
 # The rules a change to an item may break, besides "unique", and the field
@@ -123,9 +156,8 @@ def _taken(
         other_item_id=other and other.id,
     )
     if other is None:
-        return shown, TAKEN
-    retired = " It is retired." if other.retired_at is not None else ""
-    return shown, f"{other.name_shown} {TAKEN_FIELDS[field]}{retired}"
+        return shown, str(TAKEN)
+    return shown, _retired(other, TAKEN_FIELDS[field](other.name_shown))
 
 
 class _AskFirst(Exception):
@@ -181,8 +213,22 @@ def _change_or_note[T](
     elif broken == items.READ_ALIKE:
         problems["name"] = _read_alike(session, typed)
     elif broken in REFUSED_FIELDS:
-        problems[REFUSED_FIELDS[broken]] = RULES[broken]
+        problems[REFUSED_FIELDS[broken]] = rule_words(broken)
     return done, broken
+
+
+READ_AS_ONE = lazy_gettext(
+    "Read so, names would read as one. Try again, or answer otherwise."
+)
+
+
+def read_as_one(names: str) -> str:
+    """Names that answers would read alike, refused."""
+    return gettext(
+        "Read so, these names would read as one: %(names)s. Rename one of "
+        "each, or answer otherwise.",
+        names=names,
+    )
 
 
 def _read_alike(session: Session, typed: Typed) -> str:
@@ -191,34 +237,50 @@ def _read_alike(session: Session, typed: Typed) -> str:
     words = read_alike_words(session, typed.answered, typed.rules)
     log.debug("unit answer refused", read_alike=len(words))
     if not words:  # Renamed meanwhile: none to name now.
-        return "Read so, names would read as one. Try again, or answer otherwise."
-    return (
-        "Read so, these names would read as one: "
-        + "; ".join(words)
-        + ". Rename one of each, or answer otherwise."
-    )
+        return str(READ_AS_ONE)
+    return read_as_one("; ".join(words))
 
 
+PACKAGE_ADDED = lazy_gettext("Package added.")
+PACKAGE_RETIRED = lazy_gettext("Package retired.")
+PACKAGE_SAVED = lazy_gettext("Package saved.")
+PACKAGE_RESTORED = lazy_gettext("Package brought back.")
+PACKAGE_TRACKING = lazy_gettext("Saved: how its opened packages are followed.")
+PACKAGE_SETTINGS = lazy_gettext(
+    "Saved: when an open one is a short end, and how many sealed to keep."
+)
+TRACKING_ON = lazy_gettext(
+    "Their opened packages are followed now, where a package does not say otherwise."
+)
+TRACKING_OFF = lazy_gettext(
+    "Their opened packages become loose units now, where a package does not "
+    "say otherwise."
+)
+TRACKING_NONE = lazy_gettext("Tick the items to change first.")
+TRACKING_SAME = lazy_gettext(
+    "Nothing changed: those ticked were set so already, or are retired."
+)
+ALIAS_ADDED = lazy_gettext("Alias added.")
+RENAMED = lazy_gettext(
+    "Renamed. The old name is kept as an alias so searches still find it; "
+    "remove it below if it shouldn't be."
+)
+ALIAS_REMOVED = lazy_gettext("Alias removed.")
 NOTICES.update(
     {
-        "package_added": "Package added.",
-        "package_retired": "Package retired.",
-        "package_saved": "Package saved.",
-        "package_restored": "Package brought back.",
-        "package_tracking": "Saved: how its opened packages are followed.",
-        "package_settings": "Saved: when an open one is a short end, and how "
-        "many sealed to keep.",
-        "tracking_on": "Their opened packages are followed now, where a "
-        "package does not say otherwise.",
-        "tracking_off": "Their opened packages become loose units now, where "
-        "a package does not say otherwise.",
-        "tracking_none": "Tick the items to change first.",
-        "tracking_same": "Nothing changed: those ticked were set so already, "
-        "or are retired.",
-        "alias_added": "Alias added.",
-        "renamed": "Renamed. The old name is kept as an alias so searches "
-        "still find it; remove it below if it shouldn't be.",
-        "alias_removed": "Alias removed.",
+        "package_added": PACKAGE_ADDED,
+        "package_retired": PACKAGE_RETIRED,
+        "package_saved": PACKAGE_SAVED,
+        "package_restored": PACKAGE_RESTORED,
+        "package_tracking": PACKAGE_TRACKING,
+        "package_settings": PACKAGE_SETTINGS,
+        "tracking_on": TRACKING_ON,
+        "tracking_off": TRACKING_OFF,
+        "tracking_none": TRACKING_NONE,
+        "tracking_same": TRACKING_SAME,
+        "alias_added": ALIAS_ADDED,
+        "renamed": RENAMED,
+        "alias_removed": ALIAS_REMOVED,
     }
 )
 
@@ -358,7 +420,7 @@ def _list_page(
         signed,
         "items.html",
         {
-            "title": "Items",
+            "title": SECTION_ITEMS,
             "undo": undo,
             "here": ITEMS,
             "categories_path": CATEGORIES,
@@ -412,7 +474,7 @@ def _item_page(
         {
             "title": item.name_shown,
             "here": f"{ITEMS}/{item.id}",
-            "back_link": (ITEMS, "Items"),
+            "back_link": (ITEMS, SECTION_ITEMS),
             "item": item,
             **retirement(session, item),
             "packages": packages,
@@ -510,11 +572,15 @@ def _name_problem(
     if problem := name_problem(name):
         return problem
     if nameless(name):
-        return NO_LETTERS
+        return str(NO_LETTERS)
     if asked:
         log.debug("unit asked about", item_id=item_id, asked=len(asked))
-        return ASK_UNIT
+        return str(ASK_UNIT)
     return None
+
+
+PICK_A_CATEGORY = lazy_gettext("Pick a category.")
+PICK_A_UNIT = lazy_gettext("Pick a unit.")
 
 
 def _confirmed(session: Session, form: Mapping[str, str], fields: items.Fields) -> bool:
@@ -535,10 +601,10 @@ def _fields(
         problems["name"] = problem
     category = chosen(session, Category, form.get("category_id", ""))
     if category is None:
-        problems["category_id"] = "Pick a category."
+        problems["category_id"] = str(PICK_A_CATEGORY)
     unit = form.get("unit", "")
     if unit not in UNITS:
-        problems["unit"] = "Pick a unit."
+        problems["unit"] = str(PICK_A_UNIT)
     minimum = quantity(form.get("minimum", ""), positive=False)
     if isinstance(minimum, str):
         problems["minimum"] = minimum
@@ -681,7 +747,7 @@ def save_item(
                 request, session, signed, found, values=form, similar=asked or ()
             )
         if broken in ALERTS:
-            alert = RULES[broken]
+            alert = rule_words(broken)
             return _item_page(request, session, signed, found, alert=alert)
     if problems:
         return _item_page(
@@ -726,7 +792,7 @@ def restore_item(
     )
     # Beside the name: the category list shows only current categories.
     if broken:
-        problem = RULES[broken]
+        problem = rule_words(broken)
         return _item_page(request, session, signed, found, problems={"name": problem})
     session.commit()
     log.info("item restored", item_id=item_id)
@@ -740,7 +806,10 @@ def _package(session: Session, item_id: int, package_id: int) -> ItemPackage | N
 
 
 # A package refused as another of its item's, retired ones too, has its name.
-PACKAGE_TAKEN = "It already has a package by that name."
+PACKAGE_TAKEN = lazy_gettext("It already has a package by that name.")
+SIZE_REQUIRED = lazy_gettext("How many of the item's unit it holds.")
+SHORTER_THAN_WHOLE = lazy_gettext("Shorter than a whole one, or blank.")
+WHOLE_PACKAGES = lazy_gettext("A whole number of packages, or blank.")
 # A size at or below its too-short length (models.ItemPackage).
 SHORT_UNDER_SIZE = "ck_item_package_short_below_under_size"
 
@@ -767,7 +836,7 @@ def _package_fields(
         size,
         positive=True,
         unit=item.unit,
-        required="How many of the item's unit it holds.",
+        required=str(SIZE_REQUIRED),
     )
     if isinstance(parsed, str):
         problems["size"] = parsed
@@ -804,7 +873,9 @@ def add_package(
             items.READ_ALIKE,
         )
         if broken == RETIRED:
-            return _item_page(request, session, signed, found, alert=RULES[RETIRED])
+            return _item_page(
+                request, session, signed, found, alert=rule_words(RETIRED)
+            )
         if package is not None:
             session.commit()
             log.info("package added", item_package_id=package.id)
@@ -813,7 +884,9 @@ def add_package(
                 f"{ITEMS}/{item_id}", notice="package_added", section="packages"
             )
         problems["package_name"] = (
-            _read_alike(session, typed) if broken == items.READ_ALIKE else PACKAGE_TAKEN
+            _read_alike(session, typed)
+            if broken == items.READ_ALIKE
+            else str(PACKAGE_TAKEN)
         )
     # With the units chosen, if any: not a package's own form's (package_id).
     values = {**form, "package_name": name, "size": size}
@@ -861,7 +934,7 @@ def save_package(
         # Its size field is gone once fixed: said above the page, as for a
         # form that went stale.
         if broken in {*ALERTS, "package_size_fixed"}:
-            return _item_page(request, session, signed, found, alert=RULES[broken])
+            return _item_page(request, session, signed, found, alert=rule_words(broken))
         if broken is None:
             session.commit()
             log.info("package saved", item_package_id=package_id)
@@ -870,11 +943,11 @@ def save_package(
                 f"{ITEMS}/{item_id}", notice="package_saved", section="packages"
             )
         if broken == "unique":
-            problems["package_name"] = PACKAGE_TAKEN
+            problems["package_name"] = str(PACKAGE_TAKEN)
         elif broken == items.READ_ALIKE:
             problems["package_name"] = _read_alike(session, typed)
         else:  # SHORT_UNDER_SIZE, the one other refusal it expects.
-            problems["size"] = RULES[broken]
+            problems["size"] = rule_words(broken)
     # Beside the fields of the package it was sent for, with the units
     # chosen, if any.
     values = {
@@ -903,7 +976,7 @@ def restore_package(
     )
     if broken:
         found = session.get_one(Item, item_id)
-        return _item_page(request, session, signed, found, alert=RULES[RETIRED])
+        return _item_page(request, session, signed, found, alert=rule_words(RETIRED))
     session.commit()
     log.info("package restored", item_package_id=package_id)
     return redirect(f"{ITEMS}/{item_id}", notice="package_restored", section="packages")
@@ -925,7 +998,7 @@ def retire_package(
     )
     if broken:
         found = session.get_one(Item, item_id)
-        return _item_page(request, session, signed, found, alert=RULES[RETIRED])
+        return _item_page(request, session, signed, found, alert=rule_words(RETIRED))
     session.commit()
     log.info("package retired", item_package_id=package_id)
     return redirect(
@@ -955,7 +1028,7 @@ def track_package(
     )
     if broken:
         found = session.get_one(Item, item_id)
-        return _item_page(request, session, signed, found, alert=RULES[RETIRED])
+        return _item_page(request, session, signed, found, alert=rule_words(RETIRED))
     session.commit()
     if TRACKING[track] != before:
         _tracking_changed("package", 1, TRACKING[track], item_package_id=package_id)
@@ -984,9 +1057,9 @@ def package_settings(
     if isinstance(short, str):
         problems["short_below"] = short
     elif short is not None and short >= package.size:
-        problems["short_below"] = "Shorter than a whole one, or blank."
+        problems["short_below"] = str(SHORTER_THAN_WHOLE)
     if minimum_sealed.strip() and minimum is None:
-        problems["minimum_sealed"] = "A whole number of packages, or blank."
+        problems["minimum_sealed"] = str(WHOLE_PACKAGES)
     if problems or isinstance(short, str):  # The second narrows the type.
         # Beside the fields of the package it was sent for.
         values = {
@@ -1004,7 +1077,7 @@ def package_settings(
         SHORT_UNDER_SIZE,
     )
     if broken == RETIRED:
-        return _item_page(request, session, signed, found, alert=RULES[RETIRED])
+        return _item_page(request, session, signed, found, alert=rule_words(RETIRED))
     if broken:
         # Resized meanwhile to no more than it: said beside it, as above.
         values = {
@@ -1012,7 +1085,7 @@ def package_settings(
             "short_below": short_below,
             "minimum_sealed": minimum_sealed,
         }
-        problems = {"short_below": "Shorter than a whole one, or blank."}
+        problems = {"short_below": str(SHORTER_THAN_WHOLE)}
         return _item_page(
             request, session, signed, found, problems=problems, values=values
         )
@@ -1042,14 +1115,10 @@ def _alias_problem(
     )
     # Its holder changed since, as the refusal let go of the lock: rare.
     if other is None:
-        return TAKEN
+        return str(TAKEN)
     if other.id == item.id:
-        return f"That is its {whose} already."
-    retired = " It is retired." if other.retired_at is not None else ""
-    return (
-        f"{other.name_shown} already has that {whose}, or one differing from it only "
-        f"in case, spaces, punctuation or how its units are spelt.{retired}"
-    )
+        return str(ALIAS_ITS_OWN[whose])
+    return _retired(other, ALIAS_TAKEN[whose](other.name_shown))
 
 
 @router.post(f"{ITEMS}/{{item_id}}/aliases")
@@ -1080,7 +1149,9 @@ def add_alias(
             RETIRED,
         )
         if broken == RETIRED:
-            return _item_page(request, session, signed, found, alert=RULES[RETIRED])
+            return _item_page(
+                request, session, signed, found, alert=rule_words(RETIRED)
+            )
         if alias is not None:
             session.commit()
             log.info("alias added", item_id=item_id, item_alias_id=alias.id)
@@ -1115,7 +1186,7 @@ def remove_alias(
     )
     if broken:
         found = session.get_one(Item, item_id)
-        return _item_page(request, session, signed, found, alert=RULES[RETIRED])
+        return _item_page(request, session, signed, found, alert=rule_words(RETIRED))
     session.commit()
     log.info("alias removed", item_id=item_id, item_alias_id=alias_id)
     return redirect(f"{ITEMS}/{item_id}", notice="alias_removed", section="aliases")

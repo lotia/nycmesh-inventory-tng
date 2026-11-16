@@ -35,6 +35,7 @@ from typing import Annotated, Any, cast
 from urllib.parse import quote, urlencode
 
 import structlog
+from babel.support import LazyProxy
 from fastapi import APIRouter, Depends, FastAPI, Form, Request
 from fastapi.responses import HTMLResponse, Response
 from sqlalchemy.exc import IntegrityError
@@ -60,6 +61,7 @@ from inventory_tng.pages import (
     sections,
     templates,
 )
+from inventory_tng.phrases import gettext, lazy_gettext
 from inventory_tng.settings import RateLimits
 from inventory_tng.totp_keys import TotpKeys
 from inventory_tng.web import rate_key, set_private_cookie
@@ -108,8 +110,29 @@ cast(dict[str, Any], templates.env.globals).update(
     },
 )
 
-TOO_MANY = "Too many tries. Wait a few minutes, then try again."
-NAME_TAKEN = "You already have one by that name."
+TOO_MANY = lazy_gettext("Too many tries. Wait a few minutes, then try again.")
+NAME_TAKEN = lazy_gettext("You already have one by that name.")
+CODE_USED = lazy_gettext(
+    "That didn't match. Each code works once: if you just used it, wait for the next."
+)
+NOT_YOUR_PASSWORD = lazy_gettext("That isn't your password.")
+NOT_THE_TOKEN = lazy_gettext("That isn't the setup token.")
+DID_NOT_MATCH = lazy_gettext("That username, password or code didn't match.")
+CONFIRM_TITLE = lazy_gettext("Confirm it's you")
+SET_UP_TITLE = lazy_gettext("Set up")
+RECOVERY_CODES_TITLE = lazy_gettext("Your recovery codes")
+SIGN_IN_TITLE = lazy_gettext("Sign in")
+AUTHENTICATOR_TITLE = lazy_gettext("Set up an authenticator")
+ACCOUNT_TITLE = lazy_gettext("Your account")
+
+
+def code_mismatch() -> str:
+    """A new authenticator's code refused, naming the app as it shows us."""
+    return gettext(
+        "That code didn't match. Check the app shows %(issuer)s, and type the "
+        "code it shows now.",
+        issuer=accounts.ISSUER,
+    )
 
 
 def _now() -> datetime:
@@ -138,17 +161,18 @@ def _set_cookie(
     )
 
 
-NOTICES.update(
-    {
-        "codes_low": "You signed in with a recovery code, and few are left: "
-        "make new ones now, with a code from your authenticator. Lost your "
-        "phone? Set up a new authenticator first.",
-        "codes_none": "That was your last recovery code. Make new ones now, "
-        "with a code from your authenticator (lost your phone? set up a new "
-        "one first): without them, a lost phone locks you out until another "
-        "administrator resets your sign-in.",
-    }
+CODES_LOW = lazy_gettext(
+    "You signed in with a recovery code, and few are left: make new ones now, "
+    "with a code from your authenticator. Lost your phone? Set up a new "
+    "authenticator first."
 )
+CODES_NONE = lazy_gettext(
+    "That was your last recovery code. Make new ones now, with a code from "
+    "your authenticator (lost your phone? set up a new one first): without "
+    "them, a lost phone locks you out until another administrator resets your "
+    "sign-in."
+)
+NOTICES.update({"codes_low": CODES_LOW, "codes_none": CODES_NONE})
 
 
 # What administrator pages depend on
@@ -445,13 +469,8 @@ def _codes_left(
 
 def _refused(outcome: accounts.Confirmation, signed: SignedIn) -> str:
     if outcome == "rate_limited":
-        return TOO_MANY
-    if signed.asks_code:
-        return (
-            "That didn't match. Each code works once: if you just used it, "
-            "wait for the next."
-        )
-    return "That isn't your password."
+        return str(TOO_MANY)
+    return str(CODE_USED if signed.asks_code else NOT_YOUR_PASSWORD)
 
 
 def _status(outcome: accounts.Confirmation) -> int:
@@ -506,7 +525,7 @@ def _confirm_page(
     carried: list[tuple[str, str]],
     alert: str | None = None,
     status_code: int = 200,
-    navigation: list[tuple[str, str, Badge | None]] | None = None,
+    navigation: list[tuple[str, str | LazyProxy, Badge | None]] | None = None,
     recovery: bool = True,
 ) -> HTMLResponse:
     """Asks for a code (a recovery code too, unless not `recovery`), then
@@ -517,7 +536,7 @@ def _confirm_page(
         request,
         "confirm.html",
         {
-            "title": "Confirm it's you",
+            "title": CONFIRM_TITLE,
             "uses_totp": signed.asks_code,
             "admin": signed.admin,
             "alert": alert,
@@ -584,7 +603,7 @@ def _setup_page(
     return page(
         request,
         "setup.html",
-        {"title": "Set up", "values": values, "problems": problems or {}}
+        {"title": SET_UP_TITLE, "values": values, "problems": problems or {}}
         | {"alert": alert}
         | totp,
         status_code,
@@ -592,7 +611,7 @@ def _setup_page(
 
 
 def _setup_off(request: Request) -> HTMLResponse:
-    return page(request, "setup.html", {"title": "Set up", "off": True}, 403)
+    return page(request, "setup.html", {"title": SET_UP_TITLE, "off": True}, 403)
 
 
 def _totp_optional(session: DbSession) -> bool:
@@ -651,8 +670,8 @@ def setup(
             optional=optional,
             key=key,
             values=values,
-            problems={} if limited else {"token": "That isn't the setup token."},
-            alert=TOO_MANY if limited else None,
+            problems={} if limited else {"token": str(NOT_THE_TOKEN)},
+            alert=str(TOO_MANY) if limited else None,
             status_code=429 if limited else 400,
         )
     values["token"] = token
@@ -713,10 +732,7 @@ def _authenticator_problems(name: str, step: int | None) -> dict[str, str]:
     if problem := accounts.authenticator_name_problem(name):
         problems["authenticator_name"] = problem
     if step is None:
-        problems["code"] = (
-            "That code didn't match. Check the app shows NYC Mesh Inventory, "
-            "and type the code it shows now."
-        )
+        problems["code"] = code_mismatch()
     return problems
 
 
@@ -726,7 +742,7 @@ def _recovery_codes_page(
     return page(
         request,
         "recovery_codes.html",
-        {"title": "Your recovery codes", "codes": codes, "admin": admin},
+        {"title": RECOVERY_CODES_TITLE, "codes": codes, "admin": admin},
     )
 
 
@@ -745,7 +761,7 @@ def _sign_in_page(
         request,
         "sign_in.html",
         {
-            "title": "Sign in",
+            "title": SIGN_IN_TITLE,
             "next": _local(next),
             "username": username,
             "alert": alert,
@@ -790,9 +806,7 @@ def sign_in(
             request,
             next,
             username=username,
-            alert=TOO_MANY
-            if limited
-            else "That username, password or code didn't match.",
+            alert=str(TOO_MANY if limited else DID_NOT_MATCH),
             status_code=429 if limited else 400,
         )
     session.commit()
@@ -879,11 +893,11 @@ def _new_authenticator_page(
         request,
         "authenticator_new.html",
         {
-            "title": "Set up an authenticator",
+            "title": AUTHENTICATOR_TITLE,
             "admin": signed.admin,
             "required": signed.needs_totp_setup,
             # Set up when first signing in, there is nowhere yet to go back to.
-            "back_link": None if signed.needs_totp_setup else (ACCOUNT, "Your account"),
+            "back_link": None if signed.needs_totp_setup else (ACCOUNT, ACCOUNT_TITLE),
             "values": {} if name is None else {"authenticator_name": name},
             "problems": problems or {},
         }
@@ -922,7 +936,7 @@ def new_authenticator(
     if "authenticator_name" not in problems and accounts.authenticator_named(
         session, admin_id, name
     ):
-        problems["authenticator_name"] = NAME_TAKEN
+        problems["authenticator_name"] = str(NAME_TAKEN)
     # Recovery codes come with the first authenticator, unless some are
     # left: set up again after the operator retired the old one, the printed
     # codes still work, and making new ones would void them.
@@ -935,7 +949,7 @@ def new_authenticator(
             with session.begin_nested():
                 accounts.add_authenticator(session, keys, admin_id, name, key, step)
         except IntegrityError:
-            problems["authenticator_name"] = NAME_TAKEN
+            problems["authenticator_name"] = str(NAME_TAKEN)
     if problems:
         session.rollback()
         return _new_authenticator_page(

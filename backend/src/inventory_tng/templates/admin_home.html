@@ -28,7 +28,7 @@
 {% include "_retired_holding.html" %}
 <ul>
   {% for path, label, _ in sections %}
-  <li><a href="{{ path }}">{{ label }}</a>{% if current.get(label) is not none %}: {{ current[label] }}{% endif %}</li>
+  <li><a href="{{ path }}">{{ label }}</a>{% if current.get(path) is not none %}: {{ current[path] }}{% endif %}</li>
   {% endfor %}
   <li><a href="{{ paths.account }}">Your account</a></li>
 </ul>

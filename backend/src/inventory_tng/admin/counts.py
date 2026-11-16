@@ -46,13 +46,14 @@ from inventory_tng.admin import needs_action
 from inventory_tng.admin.common import (
     ADMIN,
     QUANTITY_MAX,
-    RULES,
+    SECTION_COUNTS,
     admin_page,
     chosen,
     current_rows,
     now,
     quantity,
     row_id,
+    rule_words,
     text_form,
 )
 from inventory_tng.admin.items import SEARCHED
@@ -100,6 +101,7 @@ from inventory_tng.pages import (
     redirect,
     retired_holding,
 )
+from inventory_tng.phrases import gettext, lazy_gettext, ngettext
 from inventory_tng.sign_in import AdminSignedIn, SignedIn
 
 log = structlog.get_logger(__name__)
@@ -119,16 +121,50 @@ COUNTABLE = "location_countable"
 UNTRACKED = "open_package_untracked"
 ONCE = "movement_item_once"
 CLOSED_MEANWHILE = "movement_open_package_closed"
-TWICE = (
+TWICE = lazy_gettext(
     "An item is on this form more than once. Each item is counted once, so "
     "it isn't clear which number is right: nothing was saved."
 )
+ON_THE_FORM_TWICE = lazy_gettext("This item is on the form more than once.")
+NO_SUCH_PACKAGE = lazy_gettext("No such package.")
+NO_SUCH_ITEM = lazy_gettext("No such item.")
+NO_SUCH_OPEN_PACKAGE = lazy_gettext("No such open package here.")
+WHOLE_PACKAGES = lazy_gettext("A whole number of packages.")
+TOO_MANY = lazy_gettext("That is more than the inventory can count.")
+HOW_MUCH_LEFT = lazy_gettext("How much is left on it.")
+PICK_A_PLACE = lazy_gettext("Pick a place.")
+PICK_AN_ITEM = lazy_gettext("Pick an item.")
+HOW_MUCH = lazy_gettext("How much.")
+FOUND_OR_OFF = lazy_gettext("Found or written off?")
+PICK_A_REASON = lazy_gettext("Pick a reason.")
+OUT_OF_DATE = lazy_gettext("This form is out of date: try again.")
+COUNTS_TITLE = lazy_gettext("Counts and adjustments")
 
+
+def count_title(place: str) -> str:
+    return gettext("Count %(place)s", place=place)
+
+
+def moved_meanwhile(saved: int) -> str:
+    """A count refused as some of it moved while it was counted, the lines
+    saved besides, if any."""
+    if not saved:
+        return gettext("These moved while you counted, so count them again.")
+    return ngettext(
+        "Saved %(num)d line. These moved while you counted, so count them again.",
+        "Saved %(num)d lines. These moved while you counted, so count them again.",
+        saved,
+    )
+
+
+COUNTED_NOTICE = lazy_gettext("Counted. The records now match what you found.")
+COUNTED_SAME = lazy_gettext("Counted: everything was as the records say.")
+ADJUSTED = lazy_gettext("Recorded.")
 NOTICES.update(
     {
-        "counted": "Counted. The records now match what you found.",
-        "counted_same": "Counted: everything was as the records say.",
-        "adjusted": "Recorded.",
+        "counted": COUNTED_NOTICE,
+        "counted_same": COUNTED_SAME,
+        "adjusted": ADJUSTED,
     }
 )
 
@@ -257,7 +293,7 @@ def _counts_page(
         signed,
         "counts.html",
         {
-            "title": "Counts and adjustments",
+            "title": COUNTS_TITLE,
             "here": COUNTS,
             "settings_path": SETTINGS,
             "places": _places(session),
@@ -398,9 +434,9 @@ def _count_page(
         signed,
         "count.html",
         {
-            "title": f"Count {place.name}",
+            "title": count_title(place.name),
             "here": f"{COUNTS}/{place.id}",
-            "back_link": (COUNTS, "Counts"),
+            "back_link": (COUNTS, SECTION_COUNTS),
             "place": place,
             "rows": rows,
             "forms": forms,
@@ -439,6 +475,18 @@ def count_form(
     return _count_page(
         request, session, signed, place, moment(session, place.id), shown=shown
     )
+
+
+# How the count form asks for each form of an item.
+LOOSE_WORDS = lazy_gettext("Loose")
+
+
+def sealed_how_many(package: str) -> str:
+    return gettext("%(package)s, sealed: how many", package=package)
+
+
+def opened_left(package: str, day: str) -> str:
+    return gettext("%(package)s, opened %(day)s: left", package=package, day=day)
 
 
 class FormRow(NamedTuple):
@@ -516,7 +564,7 @@ def _forms(
                 each.append(
                     FormRow(
                         f"{SEALED}{item_id}_{package.id}",
-                        f"{package.name_shown}, sealed: how many",
+                        sealed_how_many(package.name_shown),
                         amount / package.size,
                     )
                 )
@@ -526,15 +574,19 @@ def _forms(
                 each.append(
                     FormRow(
                         f"{OPENED}{row.id}",
-                        f"{name}, opened {row.opened_at:%Y-%m-%d}: left",
+                        opened_left(name, f"{row.opened_at:%Y-%m-%d}"),
                         amount,
                         row.id,
                     )
                 )
             else:
-                each.append(FormRow(f"{LOOSE_FIELD}{item_id}", "Loose", amount))
+                each.append(
+                    FormRow(f"{LOOSE_FIELD}{item_id}", str(LOOSE_WORDS), amount)
+                )
         if not any(row.field.startswith(LOOSE_FIELD) for row in each):
-            each.append(FormRow(f"{LOOSE_FIELD}{item_id}", "Loose", Decimal(0)))
+            each.append(
+                FormRow(f"{LOOSE_FIELD}{item_id}", str(LOOSE_WORDS), Decimal(0))
+            )
     return rows
 
 
@@ -635,11 +687,11 @@ def _by_form(
             package = session.get(ItemPackage, row_id(package_part) or 0)
             count = whole(typed, 0, INTEGER_MAX)
             if package is None or package.item_id != row_id(item_part):
-                problems[field] = "No such package."
+                problems[field] = str(NO_SUCH_PACKAGE)
             elif count is None:
-                problems[field] = "A whole number of packages."
+                problems[field] = str(WHOLE_PACKAGES)
             elif count * package.size > QUANTITY_MAX:
-                problems[field] = "That is more than the inventory can count."
+                problems[field] = str(TOO_MANY)
             else:
                 lines.append(
                     (package.item_id, Form(package_id=package.id), count * package.size)
@@ -647,7 +699,7 @@ def _by_form(
         elif field.startswith(LOOSE_FIELD):
             item = items.get(row_id(field.removeprefix(LOOSE_FIELD)) or 0)
             if item is None:
-                problems[field] = "No such item."
+                problems[field] = str(NO_SUCH_ITEM)
                 continue
             amount = quantity(typed, positive=False, unit=item.unit)
             if isinstance(amount, str):
@@ -660,10 +712,10 @@ def _by_form(
             unit = session.get_one(Item, row.item_id).unit if row else "m"
             amount = quantity(typed, positive=False, unit=unit)
             if row is None or row.location_id != place_id or state not in STATES:
-                problems[field] = "No such open package here."
+                problems[field] = str(NO_SUCH_OPEN_PACKAGE)
             elif row.closed_at is not None:
                 # Its line is gone from the form, so said above it.
-                problems[CLOSED_MEANWHILE] = RULES[CLOSED_MEANWHILE]
+                problems[CLOSED_MEANWHILE] = rule_words(CLOSED_MEANWHILE)
             elif (reason := STATES[state]) is not None:
                 close.append((row.id, reason))
             elif isinstance(amount, str):
@@ -679,10 +731,10 @@ def _by_form(
             form.get(FOUND_LEFT, ""),
             positive=True,
             unit=unit,
-            required="How much is left on it.",
+            required=str(HOW_MUCH_LEFT),
         )
         if package is None:
-            problems[FOUND_PACKAGE] = "No such package."
+            problems[FOUND_PACKAGE] = str(NO_SUCH_PACKAGE)
         elif isinstance(left, str):
             problems[FOUND_LEFT] = left
         else:
@@ -707,7 +759,7 @@ def _counted(
     problems: dict[str, str] = {}
     for field, item_id, typed in found:
         if item_id is None or (unit := units.get(item_id)) is None:
-            problems[field] = "No such item."
+            problems[field] = str(NO_SUCH_ITEM)
             continue
         amount = quantity(typed, positive=False, unit=unit)
         if isinstance(amount, str):
@@ -741,7 +793,7 @@ def count(
     forms, form_problems = _by_form(session, form, place.id)
     problems |= form_problems
     if repeats := named_twice(found):
-        problems |= dict.fromkeys(repeats, "This item is on the form more than once.")
+        problems |= dict.fromkeys(repeats, str(ON_THE_FORM_TWICE))
         log.info(
             "count refused: an item named twice",
             location_id=place.id,
@@ -758,7 +810,7 @@ def count(
             as_of,
             problems=problems,
             values=form,
-            alert=TWICE if repeats else problems.get(CLOSED_MEANWHILE),
+            alert=str(TWICE) if repeats else problems.get(CLOSED_MEANWHILE),
             items=sent_items,
             shown=shown,
         )
@@ -845,7 +897,7 @@ def count(
             as_of,
             problems=problems,
             values=form,
-            alert=None if problems else RULES[broken],
+            alert=None if problems else rule_words(broken),
             items=sent_items,
             shown=shown,
             status_code=400,
@@ -876,8 +928,7 @@ def count(
             item_id: (amounts[item_id], came, went)
             for item_id, (came, went) in result.moved.items()
         },
-        alert=(f"Saved {saved} line{'s' if saved != 1 else ''}. " if saved else "")
-        + "These moved while you counted, so count them again.",
+        alert=moved_meanwhile(saved),
         shown=shown,
         status_code=409,
     )
@@ -892,26 +943,26 @@ def adjust(
     location_id = row_id(form.get("location_id", ""))
     place = session.get(Location, location_id) if location_id is not None else None
     if place is None:
-        problems["location_id"] = "Pick a place."
+        problems["location_id"] = str(PICK_A_PLACE)
     item = chosen(session, Item, form.get("item_id", ""), current=False)
     if item is None:
-        problems["item_id"] = "Pick an item."
+        problems["item_id"] = str(PICK_AN_ITEM)
     amount = quantity(
         form.get("amount", ""),
         positive=True,
         unit=item.unit if item else None,
-        required="How much.",
+        required=str(HOW_MUCH),
     )
     if isinstance(amount, str):
         problems["amount"] = amount
     direction = form.get("direction")
     if direction not in ("found", "off"):
-        problems["direction"] = "Found or written off?"
+        problems["direction"] = str(FOUND_OR_OFF)
     reason = chosen(session, AdjustmentReason, form.get("reason_id", ""))
     if reason is None:
-        problems["reason_id"] = "Pick a reason."
+        problems["reason_id"] = str(PICK_A_REASON)
     if key is None:
-        problems["amount"] = "This form is out of date: try again."
+        problems["amount"] = str(OUT_OF_DATE)
     if (
         problems
         or not (place and item and reason and key)
@@ -937,7 +988,7 @@ def adjust(
         log.info("adjustment refused by a rule", item_id=item.id, rule=broken)
         field = "location_id" if broken == COUNTABLE else "amount"
         return _counts_page(
-            request, session, signed, problems={field: RULES[broken]}, values=form
+            request, session, signed, problems={field: rule_words(broken)}, values=form
         )
     assert written is not None
     session.commit()

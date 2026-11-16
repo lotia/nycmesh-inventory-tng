@@ -77,6 +77,7 @@ from inventory_tng.models import (
     Volunteer,
 )
 from inventory_tng.page_builds import BuildTooOldReply
+from inventory_tng.phrases import lazy_gettext
 
 log = structlog.get_logger(__name__)
 meter = metrics.get_meter(__name__)
@@ -893,24 +894,41 @@ ProblemKind = Literal[
 ]
 Problem = tuple[tuple[str | int, ...], ProblemKind]
 MESSAGES = {
-    "one_package": "Open one package a line: it is followed until used up",
-    "open_package_closed": "That open package was closed as used up: take from another",
-    "open_package_elsewhere": "That open package is at another place now",
-    "open_package_whole": "Moving an open package whole takes all that is "
-    "left on it, which changed: load the page again",
-    "moved_whole": "That open package moves whole, still open: it is not used up",
-    "package_resized": "This package's size changed since the page loaded: "
-    "load the page again, and count it again",
-    "refused": "The inventory's rules refuse this as sent: it changed since "
-    "the page loaded. Load the page again, and do it again",
-    "not_found": "There is no such row",
-    "repeated": "This item, in this package or loose, is on another line too: "
-    "put it on one line",
-    "not_whole": "This item is counted in whole units",
-    "not_whole_packages": "Whole packages only",
-    "retired": "This item is retired: what is left may be taken, never received",
-    "retired_package": "This package is retired: what is left may be taken, "
-    "never received",
+    "one_package": lazy_gettext(
+        "Open one package a line: it is followed until used up"
+    ),
+    "open_package_closed": lazy_gettext(
+        "That open package was closed as used up: take from another"
+    ),
+    "open_package_elsewhere": lazy_gettext("That open package is at another place now"),
+    "open_package_whole": lazy_gettext(
+        "Moving an open package whole takes all that is left on it, which "
+        "changed: load the page again"
+    ),
+    "moved_whole": lazy_gettext(
+        "That open package moves whole, still open: it is not used up"
+    ),
+    "package_resized": lazy_gettext(
+        "This package's size changed since the page loaded: load the page "
+        "again, and count it again"
+    ),
+    "refused": lazy_gettext(
+        "The inventory's rules refuse this as sent: it changed since the page "
+        "loaded. Load the page again, and do it again"
+    ),
+    "not_found": lazy_gettext("There is no such row"),
+    "repeated": lazy_gettext(
+        "This item, in this package or loose, is on another line too: put it "
+        "on one line"
+    ),
+    "not_whole": lazy_gettext("This item is counted in whole units"),
+    "not_whole_packages": lazy_gettext("Whole packages only"),
+    "retired": lazy_gettext(
+        "This item is retired: what is left may be taken, never received"
+    ),
+    "retired_package": lazy_gettext(
+        "This package is retired: what is left may be taken, never received"
+    ),
 }
 
 
@@ -2342,7 +2360,7 @@ def install(app: FastAPI) -> None:
     @app.exception_handler(BatchRefused)
     def batch_refused(_request: Request, error: BatchRefused) -> JSONResponse:
         detail = [
-            {"type": kind, "loc": ["body", *loc], "msg": MESSAGES[kind]}
+            {"type": kind, "loc": ["body", *loc], "msg": str(MESSAGES[kind])}
             for loc, kind in error.problems
         ]
         return JSONResponse({"detail": detail}, status_code=422)

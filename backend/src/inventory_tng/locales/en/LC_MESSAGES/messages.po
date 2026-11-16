@@ -16,6 +16,56 @@ msgstr ""
 "Content-Transfer-Encoding: 8bit\n"
 "Generated-By: Babel 2.18.0\n"
 
+#: src/inventory_tng/over_recorded.py
+#, python-format
+msgid "%(amount)s from an open package"
+msgstr ""
+
+#: src/inventory_tng/activity.py
+#, python-format
+msgid "%(by)s brought back %(admin)s"
+msgstr ""
+
+#: src/inventory_tng/activity.py
+#, python-format
+msgid "%(by)s changed the sign-in settings"
+msgstr ""
+
+#: src/inventory_tng/activity.py
+#, python-format
+msgid "%(by)s invited %(admin)s"
+msgstr ""
+
+#: src/inventory_tng/activity.py
+#, python-format
+msgid "%(by)s let %(admin)s back in"
+msgstr ""
+
+#: src/inventory_tng/activity.py
+#, python-format
+msgid "%(by)s made a link for %(admin)s with the recovery token"
+msgstr ""
+
+#: src/inventory_tng/activity.py
+#, python-format
+msgid "%(by)s reset %(admin)s's sign-in"
+msgstr ""
+
+#: src/inventory_tng/activity.py
+#, python-format
+msgid "%(by)s retired %(admin)s"
+msgstr ""
+
+#: src/inventory_tng/activity.py
+#, python-format
+msgid "%(by)s retired every administrator and revoked every registration code"
+msgstr ""
+
+#: src/inventory_tng/activity.py
+#, python-format
+msgid "%(by)s retired the authenticators a lost or leaked key sealed"
+msgstr ""
+
 #: src/inventory_tng/templates/_retired_holding.html
 #, python-format
 msgid ""
@@ -27,6 +77,32 @@ msgid_plural ""
 msgstr[0] ""
 msgstr[1] ""
 
+#. Translators: a place or a form, then the day it was counted ("14 Nov").
+#: src/inventory_tng/over_recorded.py
+#, python-format
+msgid "%(end)s %(day)s"
+msgstr ""
+
+#: src/inventory_tng/over_recorded.py
+#, python-format
+msgid "%(end)s closed %(day)s"
+msgstr ""
+
+#: src/inventory_tng/over_recorded.py
+#, python-format
+msgid "%(end)s only"
+msgstr ""
+
+#: src/inventory_tng/reading_rules.py
+#, python-format
+msgid "%(first)s and %(second)s"
+msgstr ""
+
+#: src/inventory_tng/labels.py
+#, python-format
+msgid "%(item)s: %(package)s of %(size)s"
+msgstr ""
+
 #: src/inventory_tng/pages.py
 #, python-format
 msgid "%(num)d retired place holds stock"
@@ -34,12 +110,1549 @@ msgid_plural "%(num)d retired places hold stock"
 msgstr[0] ""
 msgstr[1] ""
 
+#: src/inventory_tng/over_recorded.py
+#, python-format
+msgid "%(num)s × %(package)s"
+msgstr ""
+
+#: src/inventory_tng/admin/items.py
+#, python-format
+msgid ""
+"%(other)s already has that alias, or one differing from it only in case, "
+"spaces, punctuation or how its units are spelt."
+msgstr ""
+
+#: src/inventory_tng/admin/items.py
+#, python-format
+msgid "%(other)s already has that manufacturer and part number."
+msgstr ""
+
+#: src/inventory_tng/admin/items.py
+#, python-format
+msgid ""
+"%(other)s already has that name, or one differing from it only in case, "
+"spaces, punctuation or how its units are spelt."
+msgstr ""
+
+#: src/inventory_tng/admin/items.py
+#, python-format
+msgid "%(other)s already has that old code."
+msgstr ""
+
+#: src/inventory_tng/admin/items.py
+#, python-format
+msgid ""
+"%(other)s has that name, or one differing from it only in case, spaces, "
+"punctuation or how its units are spelt, as an alias."
+msgstr ""
+
+#: src/inventory_tng/admin/counts.py
+#, python-format
+msgid "%(package)s, opened %(day)s: left"
+msgstr ""
+
+#: src/inventory_tng/admin/counts.py
+#, python-format
+msgid "%(package)s, sealed: how many"
+msgstr ""
+
+#: src/inventory_tng/admin/over_recorded.py
+#, python-format
+msgid "%(place)s brought back. Correct it now."
+msgstr ""
+
+#: src/inventory_tng/labels.py
+#, python-format
+msgid "%(place)s, in %(parent)s"
+msgstr ""
+
+#: src/inventory_tng/units.py
+#, python-format
+msgid "%(prefix)samperes"
+msgstr ""
+
+#: src/inventory_tng/units.py
+#, python-format
+msgid "%(prefix)sbits per second"
+msgstr ""
+
+#: src/inventory_tng/units.py
+#, python-format
+msgid "%(prefix)sfarads"
+msgstr ""
+
+#: src/inventory_tng/units.py
+#, python-format
+msgid "%(prefix)sgrams"
+msgstr ""
+
+#: src/inventory_tng/units.py
+#, python-format
+msgid "%(prefix)shertz"
+msgstr ""
+
+#: src/inventory_tng/units.py
+#, python-format
+msgid "%(prefix)skelvins"
+msgstr ""
+
+#: src/inventory_tng/units.py
+#, python-format
+msgid "%(prefix)sliters"
+msgstr ""
+
+#. Translators: prefix is an SI prefix in English, such as kilo, or none.
+#: src/inventory_tng/units.py
+#, python-format
+msgid "%(prefix)smeters"
+msgstr ""
+
+#: src/inventory_tng/units.py
+#, python-format
+msgid "%(prefix)sohms"
+msgstr ""
+
+#: src/inventory_tng/units.py
+#, python-format
+msgid "%(prefix)svolts"
+msgstr ""
+
+#: src/inventory_tng/units.py
+#, python-format
+msgid "%(prefix)swatts"
+msgstr ""
+
+#: src/inventory_tng/admin/settings.py
+msgid "A code for a sensitive change lasts"
+msgstr ""
+
+#: src/inventory_tng/admin/devices.py
+msgid "A code's number."
+msgstr ""
+
+#: src/inventory_tng/admin/devices.py
+msgid "A date and time, such as 2026-11-02 13:05."
+msgstr ""
+
+#: src/inventory_tng/admin/admins.py
+#, python-format
+msgid "A link for %(username)s"
+msgstr ""
+
+#: src/inventory_tng/admin/items.py
+msgid "A name needs at least one letter or number."
+msgstr ""
+
+#: src/inventory_tng/admin/devices.py
+msgid "A new registration code"
+msgstr ""
+
+#: src/inventory_tng/admin/devices.py
+msgid "A time after the one it is from."
+msgstr ""
+
+#: src/inventory_tng/admin/settings.py
+#, python-format
+msgid "A whole number of minutes, from %(low)d to %(high)d."
+msgstr ""
+
+#: src/inventory_tng/admin/items.py
+msgid "A whole number of packages, or blank."
+msgstr ""
+
+#: src/inventory_tng/admin/counts.py
+msgid "A whole number of packages."
+msgstr ""
+
+#: src/inventory_tng/admin/reading_rules.py
+msgid "Accepted. Every name with them is read so now."
+msgstr ""
+
+#: src/inventory_tng/admin/home.py
+msgid "Add one"
+msgstr ""
+
+#: src/inventory_tng/admin/common.py
+msgid "Added."
+msgstr ""
+
+#: src/inventory_tng/over_recorded.py
+#, python-format
+msgid "Adjusted at %(place)s"
+msgstr ""
+
+#: src/inventory_tng/admin/common.py
+msgid "Administrators"
+msgstr ""
+
+#: src/inventory_tng/admin/items.py
+msgid "Alias added."
+msgstr ""
+
+#: src/inventory_tng/admin/items.py
+msgid "Alias removed."
+msgstr ""
+
+#: src/inventory_tng/once.py
+msgid "Already sent"
+msgstr ""
+
+#: src/inventory_tng/admin/common.py
+msgid "An area goes inside a store or another area."
+msgstr ""
+
+#: src/inventory_tng/admin/common.py
+msgid "An item is on the count twice: count it once."
+msgstr ""
+
+#: src/inventory_tng/admin/counts.py
+msgid ""
+"An item is on this form more than once. Each item is counted once, so it "
+"isn't clear which number is right: nothing was saved."
+msgstr ""
+
+#: src/inventory_tng/admin/common.py
+msgid "An open package was closed meanwhile: count what is on it as loose."
+msgstr ""
+
+#: src/inventory_tng/admin/admins.py
+msgid "Another administrator already has that username or email."
+msgstr ""
+
+#: src/inventory_tng/admin/admins.py
+msgid "Another administrator must retire you."
+msgstr ""
+
+#: src/inventory_tng/account.py
+msgid "Another administrator uses that address."
+msgstr ""
+
+#: src/inventory_tng/admin/volunteers.py
+msgid "Another current volunteer already has that name or email."
+msgstr ""
+
+#: src/inventory_tng/admin/items.py
+msgid ""
+"Another item, perhaps a retired one, already has that name, that "
+"manufacturer and part number, or that old code."
+msgstr ""
+
+#: src/inventory_tng/admin/locations.py
+msgid "Another place beside it, perhaps a retired one, already has that name."
+msgstr ""
+
+#: src/inventory_tng/admin/locations.py
+msgid "Area inside another"
+msgstr ""
+
+#: src/inventory_tng/admin/reading_rules.py
+msgid "As typed"
+msgstr ""
+
+#: src/inventory_tng/admin/volunteers.py
+msgid "Bring them back"
+msgstr ""
+
+#: src/inventory_tng/admin/common.py
+msgid "Brought back."
+msgstr ""
+
+#: src/inventory_tng/admin/over_recorded.py
+msgid "Brought back. Correct it now."
+msgstr ""
+
+#: src/inventory_tng/admin/stock.py
+msgid "By item"
+msgstr ""
+
+#: src/inventory_tng/admin/stock.py
+msgid "By place"
+msgstr ""
+
+#: src/inventory_tng/admin/common.py
+msgid "Categories"
+msgstr ""
+
+#: src/inventory_tng/admin/admins.py
+msgid "Change your own on your account page."
+msgstr ""
+
+#: src/inventory_tng/over_recorded.py
+msgid "Checked"
+msgstr ""
+
+#: src/inventory_tng/admin/reading_rules.py
+msgid "Choose how to read each one marked “Choose…” first."
+msgstr ""
+
+#: src/inventory_tng/admin/reading_rules.py
+msgid "Choose one of the readings offered."
+msgstr ""
+
+#: src/inventory_tng/admin/used_up.py
+#, python-format
+msgid "Close this %(package)s as used up?"
+msgstr ""
+
+#: src/inventory_tng/admin/over_recorded.py
+msgid "Closed."
+msgstr ""
+
+#: src/inventory_tng/admin/used_up.py
+msgid "Closed: what it showed is written off as used up."
+msgstr ""
+
+#: src/inventory_tng/admin/used_up.py
+msgid "Closed: what they showed is written off as used up."
+msgstr ""
+
+#: src/inventory_tng/sign_in.py
+msgid "Confirm it's you"
+msgstr ""
+
+#: src/inventory_tng/admin/over_recorded.py
+msgid "Confirmed."
+msgstr ""
+
+#: src/inventory_tng/over_recorded.py
+msgid "Corrected"
+msgstr ""
+
+#: src/inventory_tng/admin/over_recorded.py
+msgid "Corrected."
+msgstr ""
+
+#: src/inventory_tng/admin/counts.py
+#, python-format
+msgid "Count %(place)s"
+msgstr ""
+
+#: src/inventory_tng/over_recorded.py
+msgid "Count confirmed"
+msgstr ""
+
+#: src/inventory_tng/over_recorded.py
+msgid "Count corrected"
+msgstr ""
+
+#: src/inventory_tng/admin/over_recorded.py
+msgid "Count corrected."
+msgstr ""
+
+#: src/inventory_tng/over_recorded.py
+msgid "Counted"
+msgstr ""
+
+#: src/inventory_tng/over_recorded.py
+msgid "Counted both ends"
+msgstr ""
+
+#: src/inventory_tng/over_recorded.py
+msgid "Counted where it arrived"
+msgstr ""
+
+#: src/inventory_tng/over_recorded.py
+msgid "Counted where it left"
+msgstr ""
+
+#: src/inventory_tng/admin/counts.py
+msgid "Counted. The records now match what you found."
+msgstr ""
+
+#: src/inventory_tng/admin/counts.py
+msgid "Counted: everything was as the records say."
+msgstr ""
+
+#: src/inventory_tng/admin/common.py
+msgid "Counts"
+msgstr ""
+
+#: src/inventory_tng/admin/counts.py
+msgid "Counts and adjustments"
+msgstr ""
+
+#: src/inventory_tng/admin/reading_rules.py
+msgid "Deleted. Names with it are read by the unit table again."
+msgstr ""
+
+#: src/inventory_tng/admin/common.py
+msgid "Devices"
+msgstr ""
+
+#: src/inventory_tng/resets.py
+msgid "Forgot your password?"
+msgstr ""
+
+#: src/inventory_tng/admin/counts.py
+msgid "Found or written off?"
+msgstr ""
+
+#: src/inventory_tng/admin/devices.py
+#, python-format
+msgid "From 1 to %(max)d days."
+msgstr ""
+
+#: src/inventory_tng/admin/devices.py
+#, python-format
+msgid "From 1 to %(max)d devices."
+msgstr ""
+
+#: src/inventory_tng/accounts.py
+#, python-format
+msgid "Give it a name of up to %(max)d characters."
+msgstr ""
+
+#: src/inventory_tng/over_recorded.py
+#, python-format
+msgid "Held %(amount)s"
+msgstr ""
+
+#: src/inventory_tng/admin/items.py
+msgid "How many of the item's unit it holds."
+msgstr ""
+
+#: src/inventory_tng/admin/counts.py
+msgid "How much is left on it."
+msgstr ""
+
+#: src/inventory_tng/admin/counts.py
+msgid "How much."
+msgstr ""
+
+#: src/inventory_tng/resets.py
+msgid ""
+"If that account has an email address, a link to reset its password is on "
+"its way. It works once, within the hour. If none comes, ask another "
+"administrator to reset your sign-in."
+msgstr ""
+
+#: src/inventory_tng/admin/home.py
+msgid "Inventory"
+msgstr ""
+
+#: src/inventory_tng/admin/home.py
+msgid "Invite another"
+msgstr ""
+
+#. Translators: before a box for a number of minutes.
+#: src/inventory_tng/admin/settings.py
+msgid ""
+"Inviting, resetting, retiring or bringing back an administrator needs a "
+"code typed within"
+msgstr ""
+
+#: src/inventory_tng/admin/items.py
+msgid "It already has a package by that name."
+msgstr ""
+
+#: src/inventory_tng/admin/items.py
+msgid "It is retired."
+msgstr ""
+
+#: src/inventory_tng/labels.py
+msgid "Item retired"
+msgstr ""
+
+#: src/inventory_tng/admin/common.py
+msgid "Items"
+msgstr ""
+
+#: src/inventory_tng/admin/common.py
+msgid "Its category is retired: bring that back, or pick another, first."
+msgstr ""
+
+#: src/inventory_tng/admin/common.py
+msgid ""
+"Its place is retired, or places are still inside it: bring that back, or "
+"move those, first."
+msgstr ""
+
+#: src/inventory_tng/admin/common.py
+msgid ""
+"Its size is fixed, as some has moved, been opened or labelled: add a "
+"package of the new size instead."
+msgstr ""
+
+#: src/inventory_tng/admin/common.py
+msgid "Its unit is fixed, as stock has moved in it."
+msgstr ""
+
+#: src/inventory_tng/admin/common.py
+msgid "Labels"
+msgstr ""
+
+#: src/inventory_tng/admin/common.py
+msgid "Larger than its too-short length, or change that first."
+msgstr ""
+
+#: src/inventory_tng/admin/length_checks.py
+msgid "Left as it shows."
+msgstr ""
+
+#: src/inventory_tng/admin/length_checks.py
+msgid "Lengths to check"
+msgstr ""
+
+#: src/inventory_tng/admin/common.py
+msgid "Locations"
+msgstr ""
+
+#: src/inventory_tng/admin/counts.py
+msgid "Loose"
+msgstr ""
+
+#: src/inventory_tng/over_recorded.py
+#, python-format
+msgid "Loose %(item)s"
+msgstr ""
+
+#: src/inventory_tng/admin/over_recorded.py
+msgid "Marked checked."
+msgstr ""
+
+#: src/inventory_tng/admin/volunteers.py
+#, python-format
+msgid "Merge %(name)s into %(into)s?"
+msgstr ""
+
+#: src/inventory_tng/admin/volunteers.py
+msgid "Merged. Their past records now count as the other's."
+msgstr ""
+
+#: src/inventory_tng/admin/common.py
+msgid "Move or retire its items first."
+msgstr ""
+
+#: src/inventory_tng/admin/common.py
+msgid "Move what is here elsewhere, or count it, first."
+msgstr ""
+
+#: src/inventory_tng/ledger.py
+msgid ""
+"Moving an open package whole takes all that is left on it, which changed:"
+" load the page again"
+msgstr ""
+
+#: src/inventory_tng/admin/stock.py
+msgid "Needs counting"
+msgstr ""
+
+#: src/inventory_tng/over_recorded.py
+msgid "No adjustment"
+msgstr ""
+
+#: src/inventory_tng/resets.py
+msgid "No current administrator has that username."
+msgstr ""
+
+#: src/inventory_tng/admin/counts.py
+msgid "No such item."
+msgstr ""
+
+#: src/inventory_tng/admin/counts.py
+msgid "No such open package here."
+msgstr ""
+
+#: src/inventory_tng/admin/counts.py
+msgid "No such package."
+msgstr ""
+
+#: src/inventory_tng/admin/length_checks.py
+msgid "Nobody said what is on those: type what is on each, and set it on its own."
+msgstr ""
+
+#: src/inventory_tng/admin/reading_rules.py
+msgid "Not a unit"
+msgstr ""
+
+#: src/inventory_tng/admin/over_recorded.py
+#, python-format
+msgid ""
+"Not changed: %(place)s is retired and holds nothing, so its count can't "
+"be corrected there."
+msgstr ""
+
+#: src/inventory_tng/admin/over_recorded.py
+#, python-format
+msgid ""
+"Not changed: %(place)s is retired and holds nothing, so the %(amount)s "
+"can't be found there again."
+msgstr ""
+
+#: src/inventory_tng/admin/over_recorded.py
+#, python-format
+msgid ""
+"Not changed: %(place)s is retired and holds nothing, so the %(amount)s "
+"can't be written off there."
+msgstr ""
+
+#: src/inventory_tng/admin/over_recorded.py
+#, python-format
+msgid "Not changed: %(why)s"
+msgstr ""
+
+#: src/inventory_tng/admin/over_recorded.py
+msgid ""
+"Not changed: someone answered or changed it meanwhile. Reload to see it "
+"as it is."
+msgstr ""
+
+#: src/inventory_tng/pages.py
+msgid "Not found"
+msgstr ""
+
+#: src/inventory_tng/pages.py
+msgid "Not here"
+msgstr ""
+
+#: src/inventory_tng/admin/common.py
+msgid "Not saved: it's retired. Bring it back first to change it."
+msgstr ""
+
+#: src/inventory_tng/admin/common.py
+msgid ""
+"Not saved: someone else saved this after you opened it. Here it is as it "
+"is now: make your change again."
+msgstr ""
+
+#: src/inventory_tng/admin/used_up.py
+msgid ""
+"Nothing changed: it was answered meanwhile, moved, or its place can't be "
+"adjusted until counted."
+msgstr ""
+
+#: src/inventory_tng/admin/length_checks.py
+msgid ""
+"Nothing changed: it was checked meanwhile, or its place can't be counted."
+" Look again."
+msgstr ""
+
+#: src/inventory_tng/admin/items.py
+msgid "Nothing changed: those ticked were set so already, or are retired."
+msgstr ""
+
+#: src/inventory_tng/admin/used_up.py
+msgid "Offered again: not used up."
+msgstr ""
+
+#: src/inventory_tng/over_recorded.py
+#, python-format
+msgid "Open %(package)s"
+msgstr ""
+
+#: src/inventory_tng/ledger.py
+msgid "Open one package a line: it is followed until used up"
+msgstr ""
+
+#: src/inventory_tng/admin/common.py
+msgid ""
+"Others are merged into them: merge those elsewhere first, or pick a "
+"current volunteer to merge into."
+msgstr ""
+
+#: src/inventory_tng/admin/items.py
+msgid "Package added."
+msgstr ""
+
+#: src/inventory_tng/admin/items.py
+msgid "Package brought back."
+msgstr ""
+
+#: src/inventory_tng/labels.py
+msgid "Package retired"
+msgstr ""
+
+#: src/inventory_tng/admin/items.py
+msgid "Package retired."
+msgstr ""
+
+#: src/inventory_tng/admin/items.py
+msgid "Package saved."
+msgstr ""
+
+#: src/inventory_tng/admin/items.py
+msgid "Pick a category."
+msgstr ""
+
+#: src/inventory_tng/admin/labels.py
+msgid "Pick a current label to print."
+msgstr ""
+
+#: src/inventory_tng/admin/counts.py
+msgid "Pick a place."
+msgstr ""
+
+#: src/inventory_tng/admin/counts.py
+msgid "Pick a reason."
+msgstr ""
+
+#: src/inventory_tng/admin/items.py
+msgid "Pick a unit."
+msgstr ""
+
+#: src/inventory_tng/admin/common.py
+msgid "Pick a zone from the list."
+msgstr ""
+
+#: src/inventory_tng/admin/counts.py
+msgid "Pick an item."
+msgstr ""
+
+#: src/inventory_tng/admin/locations.py
+msgid "Pick what it is."
+msgstr ""
+
+#: src/inventory_tng/admin/locations.py
+msgid "Pick where it is."
+msgstr ""
+
+#: src/inventory_tng/admin/volunteers.py
+msgid "Pick who they duplicate."
+msgstr ""
+
+#: src/inventory_tng/labels.py
+msgid "Place retired"
+msgstr ""
+
+#: src/inventory_tng/admin/labels.py
+#, python-format
+msgid "Print from 1 to %(max)d copies of each."
+msgstr ""
+
+#: src/inventory_tng/admin/labels.py
+msgid "Print labels"
+msgstr ""
+
+#: src/inventory_tng/admin/labels.py
+#, python-format
+msgid "Print up to %(num)d label at once."
+msgid_plural "Print up to %(num)d labels at once."
+msgstr[0] ""
+msgstr[1] ""
+
+#: src/inventory_tng/admin/reading_rules.py
+msgid "Propose unit readings"
+msgstr ""
+
+#. Translators: followed by the administrator's own words.
+#: src/inventory_tng/over_recorded.py
+msgid "Put right another way:"
+msgstr ""
+
+#: src/inventory_tng/admin/items.py
+msgid "Read so, names would read as one. Try again, or answer otherwise."
+msgstr ""
+
+#: src/inventory_tng/admin/items.py
+#, python-format
+msgid ""
+"Read so, these names would read as one: %(names)s. Rename one of each, or"
+" answer otherwise."
+msgstr ""
+
+#: src/inventory_tng/pages.py
+msgid ""
+"Read the length printed on the cable where it leaves the spool. If it "
+"counts up from the start, what's left is the package size minus the mark."
+msgstr ""
+
+#: src/inventory_tng/admin/reading_rules.py
+#, python-format
+msgid "Reading of %(token)s"
+msgstr ""
+
+#: src/inventory_tng/admin/stock.py
+#, python-format
+msgid "Recorded more (%(count)d)"
+msgstr ""
+
+#: src/inventory_tng/admin/over_recorded.py
+msgid "Recorded more than moved"
+msgstr ""
+
+#: src/inventory_tng/admin/over_recorded.py
+msgid "Recorded more than moved, settled"
+msgstr ""
+
+#: src/inventory_tng/admin/counts.py
+msgid "Recorded."
+msgstr ""
+
+#: src/inventory_tng/resets.py
+msgid "Recover an account"
+msgstr ""
+
+#: src/inventory_tng/account.py
+msgid "Recovery codes come with an authenticator."
+msgstr ""
+
+#: src/inventory_tng/cross_site.py
+msgid "Refused: this came from another site's page."
+msgstr ""
+
+#: src/inventory_tng/bundle.py
+msgid "Register this device"
+msgstr ""
+
+#: src/inventory_tng/admin/devices.py
+msgid "Registered devices"
+msgstr ""
+
+#: src/inventory_tng/account.py
+msgid "Removed."
+msgstr ""
+
+#: src/inventory_tng/account.py
+msgid "Renamed."
+msgstr ""
+
+#: src/inventory_tng/admin/items.py
+msgid ""
+"Renamed. The old name is kept as an alias so searches still find it; "
+"remove it below if it shouldn't be."
+msgstr ""
+
+#: src/inventory_tng/admin/stock.py
+msgid "Reorder"
+msgstr ""
+
+#: src/inventory_tng/admin/used_up.py
+msgid "Reported used up"
+msgstr ""
+
+#: src/inventory_tng/admin/settings.py
+msgid "Required or optional?"
+msgstr ""
+
+#: src/inventory_tng/admin/admins.py
+#, python-format
+msgid "Reset %(username)s's sign-in?"
+msgstr ""
+
+#: src/inventory_tng/resets.py
+msgid "Reset your account"
+msgstr ""
+
+#: src/inventory_tng/admin/reading_rules.py
+msgid "Respelt"
+msgstr ""
+
+#: src/inventory_tng/admin/common.py
+msgid "Retired."
+msgstr ""
+
+#: src/inventory_tng/admin/settings.py
+msgid "Retired: it is no longer offered."
+msgstr ""
+
+#: src/inventory_tng/admin/admins.py
+msgid ""
+"Retired: they can no longer sign in, and their password, authenticators "
+"and recovery codes are removed."
+msgstr ""
+
+#: src/inventory_tng/admin/common.py
+#, python-format
+msgid "Revoke %(name)s?"
+msgstr ""
+
+#: src/inventory_tng/admin/devices.py
+#, python-format
+msgid "Revoke %(num)d device?"
+msgid_plural "Revoke %(num)d devices?"
+msgstr[0] ""
+msgstr[1] ""
+
+#: src/inventory_tng/labels.py
+msgid "Revoked"
+msgstr ""
+
+#: src/inventory_tng/admin/devices.py
+msgid "Revoked: it can't save anything now."
+msgstr ""
+
+#: src/inventory_tng/admin/devices.py
+msgid ""
+"Revoked: it registers nothing more. Its devices stay registered; revoke "
+"any that look wrong."
+msgstr ""
+
+#: src/inventory_tng/admin/labels.py
+msgid ""
+"Revoked: its copies now scan as a label the inventory doesn't have. "
+"Making labels for it again makes a new code."
+msgstr ""
+
+#: src/inventory_tng/admin/devices.py
+msgid "Revoked: they can't save anything now."
+msgstr ""
+
+#: src/inventory_tng/admin/counts.py
+#, python-format
+msgid "Saved %(num)d line. These moved while you counted, so count them again."
+msgid_plural "Saved %(num)d lines. These moved while you counted, so count them again."
+msgstr[0] ""
+msgstr[1] ""
+
+#: src/inventory_tng/admin/common.py
+msgid "Saved."
+msgstr ""
+
+#: src/inventory_tng/admin/reading_rules.py
+msgid "Saved. Every name with it is read so now."
+msgstr ""
+
+#: src/inventory_tng/admin/settings.py
+msgid "Saved. Open scan pages pick it up within ten minutes."
+msgstr ""
+
+#: src/inventory_tng/admin/items.py
+msgid "Saved: how its opened packages are followed."
+msgstr ""
+
+#: src/inventory_tng/admin/settings.py
+msgid "Saved: times are shown in the new zone."
+msgstr ""
+
+#: src/inventory_tng/admin/items.py
+msgid "Saved: when an open one is a short end, and how many sealed to keep."
+msgstr ""
+
+#: src/inventory_tng/admin/items.py
+msgid "Say below whether it is a unit."
+msgstr ""
+
+#: src/inventory_tng/admin/over_recorded.py
+msgid "Say why it is right as it is."
+msgstr ""
+
+#: src/inventory_tng/bundle.py
+msgid "Scan"
+msgstr ""
+
+#: src/inventory_tng/over_recorded.py
+#, python-format
+msgid "Sealed %(package)s"
+msgstr ""
+
+#: src/inventory_tng/admin/settings.py
+msgid "Sessions last"
+msgstr ""
+
+#: src/inventory_tng/sign_in.py
+msgid "Set up"
+msgstr ""
+
+#: src/inventory_tng/sign_in.py
+msgid "Set up an authenticator"
+msgstr ""
+
+#: src/inventory_tng/admin/length_checks.py
+msgid ""
+"Set: a count of each writes the difference from what it showed then; cuts"
+" since stay."
+msgstr ""
+
+#: src/inventory_tng/admin/common.py
+msgid "Settled"
+msgstr ""
+
+#: src/inventory_tng/admin/items.py
+msgid "Shorter than a whole one, or blank."
+msgstr ""
+
+#: src/inventory_tng/admin/length_checks.py
+msgid "Shows the wrong length"
+msgstr ""
+
+#: src/inventory_tng/sign_in.py
+msgid "Sign in"
+msgstr ""
+
+#: src/inventory_tng/admin/common.py
+msgid "Site settings"
+msgstr ""
+
+#: src/inventory_tng/pages.py
+msgid "Something went wrong"
+msgstr ""
+
 #: src/inventory_tng/templates/_retired_holding.html
 #, python-format
 msgid "Start counting %(name)s"
 msgstr ""
 
+#: src/inventory_tng/admin/common.py
+msgid "Stock"
+msgstr ""
+
+#: src/inventory_tng/admin/common.py
+msgid "Stop them holding stock first."
+msgstr ""
+
+#: src/inventory_tng/admin/locations.py
+msgid "Store"
+msgstr ""
+
+#: src/inventory_tng/account.py
+msgid "TOTP is off: your password alone signs you in."
+msgstr ""
+
+#: src/inventory_tng/account.py
+msgid ""
+"TOTP is required here, so your last authenticator stays. Add another "
+"first to replace it."
+msgstr ""
+
+#: src/inventory_tng/admin/common.py
+msgid "That breaks one of the inventory's rules."
+msgstr ""
+
+#: src/inventory_tng/pages.py
+msgid "That can't be done at this address."
+msgstr ""
+
+#: src/inventory_tng/sign_in.py
+#, python-format
+msgid ""
+"That code didn't match. Check the app shows %(issuer)s, and type the code"
+" it shows now."
+msgstr ""
+
+#: src/inventory_tng/sign_in.py
+msgid ""
+"That didn't match. Each code works once: if you just used it, wait for "
+"the next."
+msgstr ""
+
+#: src/inventory_tng/pages.py
+msgid "That didn't work"
+msgstr ""
+
+#: src/inventory_tng/accounts.py
+msgid "That doesn't look like an email address."
+msgstr ""
+
+#: src/inventory_tng/once.py
+msgid ""
+"That form was already sent, and made a registration code, shown then. "
+"Nothing new was made. It can't be shown again: Back and Forward don't "
+"keep it."
+msgstr ""
+
+#: src/inventory_tng/once.py
+msgid ""
+"That form was already sent, and made a sign-in link, shown then. Nothing "
+"new was made. It can't be shown again: Back and Forward don't keep it."
+msgstr ""
+
+#: src/inventory_tng/once.py
+msgid ""
+"That form was already sent, and made recovery codes, shown then. Nothing "
+"new was made. It can't be shown again: Back and Forward don't keep it."
+msgstr ""
+
+#: src/inventory_tng/admin/items.py
+msgid "That is its alias already."
+msgstr ""
+
+#: src/inventory_tng/admin/items.py
+msgid "That is its name already."
+msgstr ""
+
+#: src/inventory_tng/admin/counts.py
+msgid "That is more than the inventory can count."
+msgstr ""
+
+#: src/inventory_tng/resets.py
+msgid "That isn't the recovery token."
+msgstr ""
+
+#: src/inventory_tng/sign_in.py
+msgid "That isn't the setup token."
+msgstr ""
+
+#: src/inventory_tng/sign_in.py
+msgid "That isn't your password."
+msgstr ""
+
+#: src/inventory_tng/admin/common.py
+msgid "That number is too big."
+msgstr ""
+
+#: src/inventory_tng/ledger.py
+msgid "That open package is at another place now"
+msgstr ""
+
+#: src/inventory_tng/ledger.py
+msgid "That open package moves whole, still open: it is not used up"
+msgstr ""
+
+#: src/inventory_tng/ledger.py
+msgid "That open package was closed as used up: take from another"
+msgstr ""
+
+#: src/inventory_tng/admin/common.py
+msgid ""
+"That package isn't followed once opened any more: count what is on it as "
+"loose."
+msgstr ""
+
+#: src/inventory_tng/admin/common.py
+msgid "That place is retired and holds nothing: pick another."
+msgstr ""
+
+#: src/inventory_tng/account.py
+msgid "That session has ended."
+msgstr ""
+
+#: src/inventory_tng/resets.py
+msgid "That token was used already: ask for a new one."
+msgstr ""
+
+#: src/inventory_tng/sign_in.py
+msgid "That username, password or code didn't match."
+msgstr ""
+
+#: src/inventory_tng/sign_in.py
+msgid ""
+"That was your last recovery code. Make new ones now, with a code from "
+"your authenticator (lost your phone? set up a new one first): without "
+"them, a lost phone locks you out until another administrator resets your "
+"sign-in."
+msgstr ""
+
+#: src/inventory_tng/admin/common.py
+msgid "That would put it inside itself."
+msgstr ""
+
+#: src/inventory_tng/admin/reading_rules.py
+msgid "The import"
+msgstr ""
+
+#: src/inventory_tng/pages.py
+msgid ""
+"The inventory could not do that. Try again; if it happens again, tell "
+"whoever looks after it."
+msgstr ""
+
+#: src/inventory_tng/pages.py
+msgid "The inventory could not take that as it was sent. Go back and try again."
+msgstr ""
+
+#: src/inventory_tng/ledger.py
+msgid ""
+"The inventory's rules refuse this as sent: it changed since the page "
+"loaded. Load the page again, and do it again"
+msgstr ""
+
+#. Translators: who did something, at the start of a sentence.
+#: src/inventory_tng/activity.py
+msgid "The operator"
+msgstr ""
+
+#: src/inventory_tng/bundle.py
+msgid "The scan page is not built yet."
+msgstr ""
+
+#: src/inventory_tng/accounts.py
+msgid "The two passwords are different."
+msgstr ""
+
+#: src/inventory_tng/admin/items.py
+msgid ""
+"Their opened packages are followed now, where a package does not say "
+"otherwise."
+msgstr ""
+
+#: src/inventory_tng/admin/items.py
+msgid ""
+"Their opened packages become loose units now, where a package does not "
+"say otherwise."
+msgstr ""
+
+#: src/inventory_tng/admin/categories.py
+msgid ""
+"There is already a category by that name, perhaps a retired one: bring "
+"that back instead."
+msgstr ""
+
+#: src/inventory_tng/admin/settings.py
+msgid "There is already a reason by that name."
+msgstr ""
+
+#: src/inventory_tng/ledger.py
+msgid "There is no such row"
+msgstr ""
+
+#: src/inventory_tng/pages.py
+msgid "There is nothing here. The link may be old, or mistyped."
+msgstr ""
+
+#: src/inventory_tng/admin/counts.py
+msgid "These moved while you counted, so count them again."
+msgstr ""
+
+#: src/inventory_tng/admin/volunteers.py
+msgid "They can hold stock now."
+msgstr ""
+
+#: src/inventory_tng/admin/volunteers.py
+msgid "They no longer hold stock."
+msgstr ""
+
+#: src/inventory_tng/admin/volunteers.py
+msgid "They still hold stock: move it back to a store first."
+msgstr ""
+
+#: src/inventory_tng/admin/counts.py
+msgid "This form is out of date: try again."
+msgstr ""
+
+#: src/inventory_tng/ledger.py
+msgid "This item is counted in whole units"
+msgstr ""
+
+#: src/inventory_tng/admin/common.py
+msgid "This item is counted in whole units."
+msgstr ""
+
+#: src/inventory_tng/admin/counts.py
+msgid "This item is on the form more than once."
+msgstr ""
+
+#: src/inventory_tng/ledger.py
+msgid "This item is retired: what is left may be taken, never received"
+msgstr ""
+
+#: src/inventory_tng/ledger.py
+msgid ""
+"This item, in this package or loose, is on another line too: put it on "
+"one line"
+msgstr ""
+
+#: src/inventory_tng/ledger.py
+msgid "This package is retired: what is left may be taken, never received"
+msgstr ""
+
+#: src/inventory_tng/ledger.py
+msgid ""
+"This package's size changed since the page loaded: load the page again, "
+"and count it again"
+msgstr ""
+
+#: src/inventory_tng/admin/length_checks.py
+msgid ""
+"This page is from before the last change to how lengths are set: load it "
+"again, then set it."
+msgstr ""
+
+#: src/inventory_tng/admin/items.py
+msgid "Tick the items to change first."
+msgstr ""
+
+#: src/inventory_tng/admin/common.py
+msgid "Tick the open packages first."
+msgstr ""
+
+#: src/inventory_tng/sign_in.py
+msgid "Too many tries. Wait a few minutes, then try again."
+msgstr ""
+
+#: src/inventory_tng/over_recorded.py
+msgid "Two adjustments"
+msgstr ""
+
+#: src/inventory_tng/admin/common.py
+msgid "Type a number, such as 12 or 0.5."
+msgstr ""
+
+#: src/inventory_tng/admin/length_checks.py
+msgid "Type what is on it: a number, 0 or more."
+msgstr ""
+
+#: src/inventory_tng/units.py
+msgid "US gallons"
+msgstr ""
+
+#: src/inventory_tng/admin/reading_rules.py
+msgid "Unit readings"
+msgstr ""
+
+#: src/inventory_tng/admin/common.py
+#, python-format
+msgid "Up to %(max)d characters."
+msgstr ""
+
+#: src/inventory_tng/admin/common.py
+msgid "Use 0 or more."
+msgstr ""
+
+#: src/inventory_tng/accounts.py
+#, python-format
+msgid "Use 1 to %(max)d letters, digits, dots, dashes or underscores."
+msgstr ""
+
+#: src/inventory_tng/admin/common.py
+msgid "Use a number above 0."
+msgstr ""
+
+#: src/inventory_tng/accounts.py
+#, python-format
+msgid "Use at least %(min)d characters. A few words make a good one."
+msgstr ""
+
+#: src/inventory_tng/accounts.py
+#, python-format
+msgid "Use at most %(max)d characters."
+msgstr ""
+
+#: src/inventory_tng/admin/common.py
+#, python-format
+msgid "Use at most %(places)d decimal places."
+msgstr ""
+
+#: src/inventory_tng/admin/locations.py
+msgid "Vehicle"
+msgstr ""
+
+#: src/inventory_tng/admin/locations.py
+msgid "Volunteer's custody"
+msgstr ""
+
+#: src/inventory_tng/admin/common.py
+msgid "Volunteers"
+msgstr ""
+
+#: src/inventory_tng/admin/over_recorded.py
+#, python-format
+msgid "Waiting (%(count)d)"
+msgstr ""
+
+#: src/inventory_tng/admin/length_checks.py
+msgid "Went below zero"
+msgstr ""
+
+#: src/inventory_tng/admin/settings.py
+#, python-format
+msgid "Whole days, from %(low)d to %(high)d."
+msgstr ""
+
+#: src/inventory_tng/admin/settings.py
+#, python-format
+msgid "Whole hours, from %(low)d to %(high)d."
+msgstr ""
+
+#: src/inventory_tng/admin/settings.py
+#, python-format
+msgid "Whole minutes, from %(low)d to %(high)d."
+msgstr ""
+
+#: src/inventory_tng/ledger.py
+msgid "Whole packages only"
+msgstr ""
+
+#: src/inventory_tng/sign_in.py
+msgid "You already have one by that name."
+msgstr ""
+
+#: src/inventory_tng/sign_in.py
+msgid ""
+"You signed in with a recovery code, and few are left: make new ones now, "
+"with a code from your authenticator. Lost your phone? Set up a new "
+"authenticator first."
+msgstr ""
+
+#: src/inventory_tng/admin/over_recorded.py
+msgid ""
+"You wrote why, but picked another reason. Pick Put right another way to "
+"keep your words, or clear them."
+msgstr ""
+
+#: src/inventory_tng/admin/home.py
+msgid ""
+"You're the only administrator: if you were locked out, nobody could let "
+"you back in."
+msgstr ""
+
+#: src/inventory_tng/sign_in.py
+msgid "Your account"
+msgstr ""
+
+#: src/inventory_tng/admin/home.py
+msgid "Your account has no email address, so you can't reset your own password."
+msgstr ""
+
 #: src/inventory_tng/resets.py
 msgid "Your account is reset: sign in."
+msgstr ""
+
+#: src/inventory_tng/account.py
+msgid "Your email is changed."
+msgstr ""
+
+#: src/inventory_tng/account.py
+msgid "Your other sessions have ended."
+msgstr ""
+
+#: src/inventory_tng/account.py
+msgid "Your password is changed. Your other sessions have ended."
+msgstr ""
+
+#: src/inventory_tng/sign_in.py
+msgid "Your recovery codes"
+msgstr ""
+
+#: src/inventory_tng/reading_rules.py
+#, python-format
+msgid "alias %(id)d (%(name)s)"
+msgstr ""
+
+#: src/inventory_tng/units.py
+msgid "capacitance"
+msgstr ""
+
+#: src/inventory_tng/units.py
+#, python-format
+msgid "cubic %(prefix)smeters"
+msgstr ""
+
+#. Translators: electric current, a kind of unit.
+#: src/inventory_tng/units.py
+msgid "current"
+msgstr ""
+
+#: src/inventory_tng/units.py
+msgid "data rate"
+msgstr ""
+
+#: src/inventory_tng/admin/settings.py
+msgid "days, used or not; from the next sign-in"
+msgstr ""
+
+#: src/inventory_tng/units.py
+msgid "decibel-milliwatts"
+msgstr ""
+
+#: src/inventory_tng/units.py
+msgid "decibels isotropic"
+msgstr ""
+
+#: src/inventory_tng/units.py
+msgid "degrees Celsius"
+msgstr ""
+
+#: src/inventory_tng/units.py
+msgid "degrees Fahrenheit"
+msgstr ""
+
+#: src/inventory_tng/reading_rules.py
+#, python-format
+msgid "elsewhere near %(words)s"
+msgstr ""
+
+#: src/inventory_tng/units.py
+msgid "feet"
+msgstr ""
+
+#: src/inventory_tng/units.py
+msgid "frequency"
+msgstr ""
+
+#: src/inventory_tng/units.py
+msgid "gain"
+msgstr ""
+
+#: src/inventory_tng/admin/settings.py
+msgid "hours"
+msgstr ""
+
+#: src/inventory_tng/units.py
+msgid "inches"
+msgstr ""
+
+#: src/inventory_tng/reading_rules.py
+#, python-format
+msgid "item %(id)d (%(name)s)"
+msgstr ""
+
+#: src/inventory_tng/units.py
+msgid "length"
+msgstr ""
+
+#: src/inventory_tng/units.py
+msgid "mass"
+msgstr ""
+
+#: src/inventory_tng/units.py
+msgid "metric tons"
+msgstr ""
+
+#: src/inventory_tng/units.py
+msgid "miles"
+msgstr ""
+
+#: src/inventory_tng/admin/settings.py
+msgid "minutes"
+msgstr ""
+
+#. Translators: after a box for a number of minutes.
+#: src/inventory_tng/admin/settings.py
+msgid ""
+"minutes, and only while the code above lasts; 0 asks each time, and an "
+"authenticator gives a new code only every 30 seconds"
+msgstr ""
+
+#: src/inventory_tng/units.py
+msgid "ounces"
+msgstr ""
+
+#: src/inventory_tng/reading_rules.py
+#, python-format
+msgid "package %(id)d (%(name)s)"
+msgstr ""
+
+#: src/inventory_tng/units.py
+msgid "pounds"
+msgstr ""
+
+#: src/inventory_tng/units.py
+msgid "power"
+msgstr ""
+
+#: src/inventory_tng/units.py
+msgid "power level"
+msgstr ""
+
+#: src/inventory_tng/units.py
+msgid "resistance"
+msgstr ""
+
+#: src/inventory_tng/units.py
+msgid "temperature"
+msgstr ""
+
+#: src/inventory_tng/reading_rules.py
+msgid "the one likely reading"
+msgstr ""
+
+#: src/inventory_tng/admin/common.py
+msgid "the operator"
+msgstr ""
+
+#: src/inventory_tng/units.py
+msgid "voltage"
+msgstr ""
+
+#: src/inventory_tng/units.py
+msgid "volume"
+msgstr ""
+
+#: src/inventory_tng/units.py
+msgid "yards"
+msgstr ""
+
+#: src/inventory_tng/admin/settings.py
+msgid "…or until unused for"
 msgstr ""
 

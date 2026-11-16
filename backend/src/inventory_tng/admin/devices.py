@@ -20,11 +20,14 @@ from inventory_tng.accounts import qr_svg
 from inventory_tng.admin.common import (
     ADMIN,
     NAME_MAX,
-    RULES,
+    SECTION_DEVICES,
     admin_page,
     form_version,
     now,
+    revoke_title,
+    rule_words,
     site_link,
+    up_to,
 )
 from inventory_tng.admin.listing import (
     Asked,
@@ -41,6 +44,7 @@ from inventory_tng.local_time import parse_local, site_zone
 from inventory_tng.models import Device, RegistrationCode, whole
 from inventory_tng.once import OnceKey, sent_before
 from inventory_tng.pages import NOTICES, not_found, redirect
+from inventory_tng.phrases import gettext, lazy_gettext, ngettext
 from inventory_tng.sign_in import AdminSignedIn, ConfirmedAdmin, SignedIn, changed
 
 log = structlog.get_logger(__name__)
@@ -54,13 +58,26 @@ MAX_DAYS = 90
 
 State = Literal["open", "expired", "used up", "revoked"]
 
-NOTICES.update(
-    {
-        "code_revoked": "Revoked: it registers nothing more. Its devices stay "
-        "registered; revoke any that look wrong.",
-        "device_revoked": "Revoked: it can't save anything now.",
-    }
+CODE_REVOKED = lazy_gettext(
+    "Revoked: it registers nothing more. Its devices stay registered; revoke "
+    "any that look wrong."
 )
+DEVICE_REVOKED = lazy_gettext("Revoked: it can't save anything now.")
+NOTICES.update({"code_revoked": CODE_REVOKED, "device_revoked": DEVICE_REVOKED})
+NEW_CODE_TITLE = lazy_gettext("A new registration code")
+REGISTERED_DEVICES = lazy_gettext("Registered devices")
+
+
+def uses_problem(most: int) -> str:
+    return gettext("From 1 to %(max)d devices.", max=most)
+
+
+def days_problem(most: int) -> str:
+    return gettext("From 1 to %(max)d days.", max=most)
+
+
+def revoke_many_title(many: int) -> str:
+    return ngettext("Revoke %(num)d device?", "Revoke %(num)d devices?", many)
 
 
 def state(code: RegistrationCode, at: datetime) -> State:
@@ -125,7 +142,7 @@ def _list_page(
         signed,
         "devices.html",
         {
-            "title": "Devices",
+            "title": SECTION_DEVICES,
             "here": DEVICES,
             "codes_path": CODES,
             "device_list": DEVICE_LIST,
@@ -176,12 +193,12 @@ def make_code(
     problems = {}
     max_uses, lifetime = whole(uses, 1, MAX_USES), whole(days, 1, MAX_DAYS)
     if max_uses is None:
-        problems["uses"] = f"From 1 to {MAX_USES} devices."
+        problems["uses"] = uses_problem(MAX_USES)
     if lifetime is None:
-        problems["days"] = f"From 1 to {MAX_DAYS} days."
+        problems["days"] = days_problem(MAX_DAYS)
     # Any longer would not fit the printed page.
     if len(label) > NAME_MAX:
-        problems["label"] = f"Up to {NAME_MAX} characters."
+        problems["label"] = up_to(NAME_MAX)
     if problems or max_uses is None or lifetime is None:
         return _list_page(request, session, signed, problems=problems, values=form)
     if again := sent_before(
@@ -201,8 +218,8 @@ def make_code(
         signed,
         "code_made.html",
         {
-            "title": "A new registration code",
-            "back_link": (DEVICES, "Devices"),
+            "title": NEW_CODE_TITLE,
+            "back_link": (DEVICES, SECTION_DEVICES),
             "code": code,
             "phrase": phrase,
             "link": link,
@@ -228,7 +245,7 @@ def code(
         {
             "title": found.name,
             "here": f"{CODES}/{found.id}",
-            "back_link": (DEVICES, "Devices"),
+            "back_link": (DEVICES, SECTION_DEVICES),
             "code": found,
             "state": state(found, now()),
             "devices": registered,
@@ -250,7 +267,7 @@ def confirm_revoke_code(
         signed,
         "code_revoke.html",
         {
-            "title": f"Revoke {found.name}?",
+            "title": revoke_title(found.name),
             "here": f"{CODES}/{code_id}/revoke",
             "keep": f"{CODES}/{code_id}",
             "code": found,
@@ -289,7 +306,7 @@ def _device_page(
         {
             "title": device.name,
             "here": f"{DEVICES}/{device.id}",
-            "back_link": (DEVICE_LIST, "Registered devices"),
+            "back_link": (DEVICE_LIST, REGISTERED_DEVICES),
             "codes_path": CODES,
             "device": device,
             "zone": site_zone(session),
@@ -324,7 +341,7 @@ def name_device(
         return not_found()
     label = label.strip()
     if len(label) > NAME_MAX:
-        problems = {"label": f"Up to {NAME_MAX} characters."}
+        problems = {"label": up_to(NAME_MAX)}
         values = {"label": label, "version": version}
         return _device_page(
             request, signed, session, device, problems=problems, values=values
@@ -334,7 +351,7 @@ def name_device(
         session, lambda: devices.name_device(session, device, label or None, seen=seen)
     )
     if broken:
-        return _device_page(request, signed, session, device, alert=RULES[broken])
+        return _device_page(request, signed, session, device, alert=rule_words(broken))
     session.commit()
     return redirect(f"{DEVICES}/{device_id}", notice="saved")
 
@@ -352,7 +369,7 @@ def revoke_device_page(
         signed,
         "device_revoke_one.html",
         {
-            "title": f"Revoke {device.name}?",
+            "title": revoke_title(device.name),
             "here": f"{DEVICES}/{device.id}/revoke",
             "keep": f"{DEVICES}/{device.id}",
             "device": device,
@@ -381,10 +398,13 @@ DEVICE_LIST = f"{DEVICES}/all"
 BULK_REVOKE = f"{DEVICES}/revoke"
 STATES: dict[str, bool | None] = {"current": True, "revoked": False, "all": None}
 
-NOTICES.update({"devices_revoked": "Revoked: they can't save anything now."})
+DEVICES_REVOKED = lazy_gettext("Revoked: they can't save anything now.")
+NOTICES["devices_revoked"] = DEVICES_REVOKED
 
 
-A_TIME = "A date and time, such as 2026-11-02 13:05."
+A_TIME = lazy_gettext("A date and time, such as 2026-11-02 13:05.")
+AFTER_FROM = lazy_gettext("A time after the one it is from.")
+A_CODE_NUMBER = lazy_gettext("A code's number.")
 
 
 # How the devices list sorts: newest registered first, or by a heading,
@@ -409,13 +429,13 @@ def _chosen(
     problems: dict[str, str] = {}
     start = end = None
     if since.strip() and (start := parse_local(since, zone)) is None:
-        problems["since"] = A_TIME
+        problems["since"] = str(A_TIME)
     if until.strip():
         end = parse_local(until, zone)
         if end is None:
-            problems["until"] = A_TIME
+            problems["until"] = str(A_TIME)
         elif start is not None and end < start:
-            problems["until"] = "A time after the one it is from."
+            problems["until"] = str(AFTER_FROM)
         else:
             # Whatever seconds were typed. At the last minute a datetime
             # holds, no end at all.
@@ -425,7 +445,7 @@ def _chosen(
                 end = None
     code_id = whole(code, 1, 2**31 - 1) if code.strip() else None
     if code.strip() and code_id is None:
-        problems["code"] = "A code's number."
+        problems["code"] = str(A_CODE_NUMBER)
     chosen = devices.DeviceFilter(
         since=start, until=end, code_id=code_id, current=STATES[shown]
     )
@@ -476,10 +496,10 @@ def device_list(
         signed,
         "device_list.html",
         {
-            "title": "Registered devices",
+            "title": REGISTERED_DEVICES,
             "here": DEVICE_LIST,
             "revoke": BULK_REVOKE,
-            "back_link": (DEVICES, "Devices"),
+            "back_link": (DEVICES, SECTION_DEVICES),
             "codes_path": CODES,
             "devices_path": DEVICES,
             "filter": typed,
@@ -519,13 +539,12 @@ def revoke_devices(
     if not current:
         return redirect(DEVICE_LIST, **query)
     if sure != "yes":
-        many = f"{len(current)} device{'' if len(current) == 1 else 's'}"
         return admin_page(
             request,
             signed,
             "device_revoke.html",
             {
-                "title": f"Revoke {many}?",
+                "title": revoke_many_title(len(current)),
                 "here": BULK_REVOKE,
                 "keep": DEVICE_LIST,
                 "filter": query,

@@ -16,7 +16,12 @@ from sqlalchemy import ColumnElement, any_, func, or_, select, true
 from sqlalchemy.orm import Session
 
 from inventory_tng import open_packages, over_recorded
-from inventory_tng.admin.common import ADMIN, admin_page
+from inventory_tng.admin.common import (
+    ADMIN,
+    SECTION_STOCK,
+    SETTLED_VIEW,
+    admin_page,
+)
 from inventory_tng.admin.counts import COUNTS
 from inventory_tng.admin.items import ITEMS, SEARCHED
 from inventory_tng.admin.listing import (
@@ -45,6 +50,7 @@ from inventory_tng.models import (
     whole,
 )
 from inventory_tng.pages import templates
+from inventory_tng.phrases import gettext, lazy_gettext
 from inventory_tng.sign_in import AdminSignedIn
 
 log = structlog.get_logger(__name__)
@@ -64,21 +70,31 @@ _globals = cast(dict[str, Any], templates.env.globals)
 _globals["needs_counting_path"] = NEEDS_COUNTING
 
 
+BY_PLACE = lazy_gettext("By place")
+BY_ITEM = lazy_gettext("By item")
+REORDER_TITLE = lazy_gettext("Reorder")
+NEEDS_COUNTING_TITLE = lazy_gettext("Needs counting")
+
+
+def recorded_more_view(waiting: int) -> str:
+    return gettext("Recorded more (%(count)d)", count=waiting)
+
+
 def stock_views(session: Session) -> list[tuple[str, str, str]]:
     """The stock pages' views, for the links between them (_views.html):
     by path, words and name. Recorded more says how many wait, even none
     (Ali, 2026-11-15, inventory-tng-73p)."""
     return [
-        (STOCK, "By place", "place"),
-        (f"{STOCK}?by=item", "By item", "item"),
-        (REORDER, "Reorder", "reorder"),
-        (NEEDS_COUNTING, "Needs counting", "needs-counting"),
+        (STOCK, str(BY_PLACE), "place"),
+        (f"{STOCK}?by=item", str(BY_ITEM), "item"),
+        (REORDER, str(REORDER_TITLE), "reorder"),
+        (NEEDS_COUNTING, str(NEEDS_COUNTING_TITLE), "needs-counting"),
         (
             RECORDED_MORE,
-            f"Recorded more ({over_recorded.how_many(session, over_recorded.WAITING)})",
+            recorded_more_view(over_recorded.how_many(session, over_recorded.WAITING)),
             "recorded-more",
         ),
-        (RECORDED_MORE_SETTLED, "Settled", "settled"),
+        (RECORDED_MORE_SETTLED, str(SETTLED_VIEW), "settled"),
     ]
 
 
@@ -203,7 +219,7 @@ def stock(
         signed,
         "stock.html",
         {
-            "title": "Stock",
+            "title": SECTION_STOCK,
             "by": by,
             "view": view,
             "stock_views": stock_views(session),
@@ -334,7 +350,7 @@ def reorder(
         signed,
         "reorder.html",
         {
-            "title": "Reorder",
+            "title": REORDER_TITLE,
             "stock_views": stock_views(session),
             "rows": shown,
             "view": view,
@@ -369,7 +385,7 @@ def needs_counting(
         signed,
         "needs_counting.html",
         {
-            "title": "Needs counting",
+            "title": NEEDS_COUNTING_TITLE,
             "stock_views": stock_views(session),
             "places": places,
             "view": view,

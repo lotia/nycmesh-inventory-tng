@@ -32,12 +32,13 @@ import json
 import re
 import sys
 import unicodedata
-from collections.abc import Iterator, Mapping
+from collections.abc import Callable, Iterator, Mapping
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
 from inventory_tng.local_env import CLONE
+from inventory_tng.phrases import gettext, lazy_gettext
 
 # Raise it whenever a change to the table reads any text otherwise, or
 # search keeps it otherwise (models.held): rows record what folded them
@@ -115,6 +116,23 @@ class Unit:
         return (*(() if self.prefixes else self.prefixed()), *self.words)
 
 
+# Each kind, in words, as the pages say it.
+KIND_WORDS = {
+    "length": lazy_gettext("length"),
+    "frequency": lazy_gettext("frequency"),
+    "data rate": lazy_gettext("data rate"),
+    "power": lazy_gettext("power"),
+    "power level": lazy_gettext("power level"),
+    "gain": lazy_gettext("gain"),
+    "voltage": lazy_gettext("voltage"),
+    # Translators: electric current, a kind of unit.
+    "current": lazy_gettext("current"),
+    "temperature": lazy_gettext("temperature"),
+    "capacitance": lazy_gettext("capacitance"),
+    "resistance": lazy_gettext("resistance"),
+    "mass": lazy_gettext("mass"),
+    "volume": lazy_gettext("volume"),
+}
 # Ali, 2026-11-12: this inventory's kinds, each with one plausible size.
 KINDS: dict[str, Kind] = {
     "length": Kind("m", (1e-4, 1e5)),
@@ -200,36 +218,37 @@ UNITS: tuple[Unit, ...] = (
     Unit("gal", "volume", False, ("[gal_us]",), (), ("gallon", "gallons"), 3.785411784),
 )
 
-# Each unit's name, its prefix's where "{}" is, in US spelling, as the app
+# Each unit's name, given its prefix's (or ""), in US spelling, as the app
 # follows US conventions (Ali, 2026-11-15, inventory-tng-g6u); and its
 # symbol in a name where that is not its symbol here: as the SI Brochure
 # writes it, in the spelling models.canonical keeps (docs/decisions/0021,
 # 2026-11-14).
-NAMES: dict[str, str] = {
-    "m": "{}meters",
-    "[in_i]": "inches",
-    "ft": "feet",
-    "yd": "yards",
-    "mi": "miles",
-    "Hz": "{}hertz",
-    "bit/s": "{}bits per second",
-    "W": "{}watts",
-    "dBm": "decibel-milliwatts",
-    "dBi": "decibels isotropic",
-    "V": "{}volts",
-    "A": "{}amperes",
-    "degC": "degrees Celsius",
-    "degF": "degrees Fahrenheit",
-    "K": "{}kelvins",
-    "F": "{}farads",
-    "Ohm": "{}ohms",
-    "g": "{}grams",
-    "t": "metric tons",
-    "lb": "pounds",
-    "oz": "ounces",
-    "L": "{}liters",
-    "m3": "cubic {}meters",
-    "gal": "US gallons",
+NAMES: dict[str, Callable[[str], str]] = {
+    # Translators: prefix is an SI prefix in English, such as kilo, or none.
+    "m": lambda prefix: gettext("%(prefix)smeters", prefix=prefix),
+    "[in_i]": lambda _: gettext("inches"),
+    "ft": lambda _: gettext("feet"),
+    "yd": lambda _: gettext("yards"),
+    "mi": lambda _: gettext("miles"),
+    "Hz": lambda prefix: gettext("%(prefix)shertz", prefix=prefix),
+    "bit/s": lambda prefix: gettext("%(prefix)sbits per second", prefix=prefix),
+    "W": lambda prefix: gettext("%(prefix)swatts", prefix=prefix),
+    "dBm": lambda _: gettext("decibel-milliwatts"),
+    "dBi": lambda _: gettext("decibels isotropic"),
+    "V": lambda prefix: gettext("%(prefix)svolts", prefix=prefix),
+    "A": lambda prefix: gettext("%(prefix)samperes", prefix=prefix),
+    "degC": lambda _: gettext("degrees Celsius"),
+    "degF": lambda _: gettext("degrees Fahrenheit"),
+    "K": lambda prefix: gettext("%(prefix)skelvins", prefix=prefix),
+    "F": lambda prefix: gettext("%(prefix)sfarads", prefix=prefix),
+    "Ohm": lambda prefix: gettext("%(prefix)sohms", prefix=prefix),
+    "g": lambda prefix: gettext("%(prefix)sgrams", prefix=prefix),
+    "t": lambda _: gettext("metric tons"),
+    "lb": lambda _: gettext("pounds"),
+    "oz": lambda _: gettext("ounces"),
+    "L": lambda prefix: gettext("%(prefix)sliters", prefix=prefix),
+    "m3": lambda prefix: gettext("cubic %(prefix)smeters", prefix=prefix),
+    "gal": lambda _: gettext("US gallons"),
 }
 # Data rates as printed: bps, Mbps, Gbps (Ali, 2026-11-15,
 # inventory-tng-c0c.3).
@@ -300,14 +319,19 @@ class Reading:
     @property
     def named(self) -> str:
         """In words: `microfarads`, `cubic kilometers`."""
-        return NAMES[self.unit.symbol].format(self.prefix.name if self.prefix else "")
+        return NAMES[self.unit.symbol](self.prefix.name if self.prefix else "")
 
     @property
     def called(self) -> str:
         """What a form's question calls it, as Ali worded it (2026-11-15,
         inventory-tng-c0c.3): its unit in words, `meters`, but a data rate so,
         `3Mbps · data rate`."""
-        return self.unit.kind if self.unit.kind == "data rate" else self.named
+        return self.kind_words if self.unit.kind == "data rate" else self.named
+
+    @property
+    def kind_words(self) -> str:
+        """Its kind, in words: `data rate`."""
+        return str(KIND_WORDS[self.unit.kind])
 
     def plausible(self, number: float) -> bool:
         """Whether `number` of it is a size this inventory may hold: in its

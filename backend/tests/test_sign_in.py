@@ -21,6 +21,12 @@ from starlette.datastructures import Headers
 from structlog.testing import capture_logs
 
 from inventory_tng import accounts, sign_in
+from inventory_tng.accounts import (
+    NOT_AN_EMAIL,
+    PASSWORDS_DIFFER,
+    password_problem,
+    username_problem,
+)
 from inventory_tng.cross_site import cross_site
 from inventory_tng.masking import Masker
 from inventory_tng.models import (
@@ -115,7 +121,7 @@ def test_setup_refuses_a_wrong_token_then_too_many(client: TestClient) -> None:
     key = hidden_key(client.get(sign_in.SETUP))
     wrong = client.post(sign_in.SETUP, data=setup_form(key, token="x" * 40))
     assert wrong.status_code == 400
-    assert "That isn't the setup token." in text(wrong)
+    assert str(sign_in.NOT_THE_TOKEN) in text(wrong)
     # The form keeps the key, so the app need not be set up again.
     assert hidden_key(wrong) == key
     for _ in range(9):
@@ -127,12 +133,15 @@ def test_setup_refuses_a_wrong_token_then_too_many(client: TestClient) -> None:
 @pytest.mark.parametrize(
     ("fields", "problem"),
     [
-        ({"username": "ada lovelace"}, "Use 1 to 64 letters"),
-        ({"password": "short", "password_again": "short"}, "at least 15"),
-        ({"password_again": PASSWORD + "!"}, "two passwords are different"),
-        ({"email": "not an address"}, "doesn't look like an email"),
-        ({"code": "000000"}, "That code didn't match"),
-        ({"code": ""}, "That code didn't match"),
+        ({"username": "ada lovelace"}, username_problem("ada lovelace")),
+        (
+            {"password": "short", "password_again": "short"},
+            password_problem("short", "short"),
+        ),
+        ({"password_again": PASSWORD + "!"}, PASSWORDS_DIFFER),
+        ({"email": "not an address"}, NOT_AN_EMAIL),
+        ({"code": "000000"}, sign_in.code_mismatch()),
+        ({"code": ""}, sign_in.code_mismatch()),
     ],
 )
 def test_setup_says_what_is_wrong(
@@ -144,7 +153,7 @@ def test_setup_says_what_is_wrong(
         form["code"] = "111111"
     response = client.post(sign_in.SETUP, data=form)
     assert response.status_code == 400
-    assert problem in text(response)
+    assert str(problem) in text(response)
     assert hidden_key(response) == key
     assert session.scalars(select(Admin)).first() is None
 
@@ -209,9 +218,7 @@ def test_every_refusal_says_the_same(client: TestClient, session: Session) -> No
         sign_in_with(client),
     ]
     assert {response.status_code for response in refusals} == {400}
-    assert {alert(response) for response in refusals} == {
-        "That username, password or code didn't match."
-    }
+    assert {alert(response) for response in refusals} == {str(sign_in.DID_NOT_MATCH)}
     assert sign_in.COOKIE not in client.cookies
 
 
@@ -333,7 +340,7 @@ def test_required_totp_sends_an_admin_without_it_to_set_it_up(
         sign_in.NEW_AUTHENTICATOR,
         data={"authenticator_name": "Phone", "key": key, "code": code(key)},
     )
-    assert "Your recovery codes" in saved.text
+    assert str(sign_in.RECOVERY_CODES_TITLE) in saved.text
     assert client.get(sign_in.HOME).status_code == 200
 
 
@@ -367,7 +374,7 @@ def test_wrong_codes_after_a_right_password_are_limited(
         sign_in_with(next(clients), code=wrong)
     limited = sign_in_with(next(clients), code=code(key))
     assert limited.status_code == 429
-    assert "Too many tries" in alert(limited)
+    assert str(sign_in.TOO_MANY) in alert(limited)
 
 
 def test_every_attempt_counts_against_its_address(
@@ -545,7 +552,7 @@ def test_without_totp_the_password_confirms(
     session.flush()
     assert "Your password" in client.get(sign_in.CONFIRM).text
     wrong = client.post(sign_in.CONFIRM, data={sign_in.CONFIRM_FIELD: "nope"})
-    assert alert(wrong) == "That isn't your password."
+    assert alert(wrong) == sign_in.NOT_YOUR_PASSWORD
     assert (
         client.post(sign_in.CONFIRM, data={sign_in.CONFIRM_FIELD: PASSWORD}).status_code
         == 303
@@ -563,7 +570,7 @@ def test_a_second_authenticator_needs_its_own_name(
         sign_in.NEW_AUTHENTICATOR,
         data={"authenticator_name": "phone", "key": key, "code": code(key)},
     )
-    assert "already have one by that name" in taken.text
+    assert str(sign_in.NAME_TAKEN) in text(taken)
     added = client.post(
         sign_in.NEW_AUTHENTICATOR,
         data={"authenticator_name": "Laptop", "key": key, "code": code(key)},
@@ -571,6 +578,22 @@ def test_a_second_authenticator_needs_its_own_name(
     # Not the first, so no new recovery codes.
     assert added.headers["location"] == sign_in.HOME
     assert len(session.scalars(select(Authenticator)).all()) == 2
+
+
+def test_a_name_taken_meanwhile_is_refused_by_its_index(
+    client: TestClient, session: Session, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Free when looked at, taken by the time it is added."""
+    signed_in_row(client, session)
+    monkeypatch.setattr(accounts, "authenticator_named", lambda *_: False)
+    key = hidden_key(client.get(sign_in.NEW_AUTHENTICATOR))
+    taken = client.post(
+        sign_in.NEW_AUTHENTICATOR,
+        data={"authenticator_name": "phone", "key": key, "code": code(key)},
+    )
+    assert taken.status_code == 400
+    assert str(sign_in.NAME_TAKEN) in text(taken)
+    assert len(session.scalars(select(Authenticator)).all()) == 1
 
 
 # Cross-site requests
@@ -650,7 +673,7 @@ def test_a_rate_limited_confirmation_says_so(
         client.post(sign_in.CONFIRM, data={sign_in.CONFIRM_FIELD: "nope"})
     limited = client.post(sign_in.CONFIRM, data={sign_in.CONFIRM_FIELD: "nope"})
     assert limited.status_code == 429
-    assert "Too many tries" in alert(limited)
+    assert str(sign_in.TOO_MANY) in alert(limited)
 
 
 def test_the_limit_per_account_is_a_setting(

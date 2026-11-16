@@ -9,7 +9,9 @@ from fastapi.testclient import TestClient
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from inventory_tng.admin.volunteers import VOLUNTEERS
+from inventory_tng.accounts import NOT_AN_EMAIL, name_up_to
+from inventory_tng.admin.common import NAME_MAX, RULES
+from inventory_tng.admin.volunteers import PICK_INTO, STILL_HOLD, TAKEN, VOLUNTEERS
 from inventory_tng.local_time import DEFAULT_ZONE
 from inventory_tng.models import (
     Category,
@@ -61,13 +63,13 @@ def test_names_and_emails_are_unique_and_checked(
 ) -> None:
     add(session, Volunteer(name="Ada", email="ada@example.org"))
     for form, problem in (
-        ({"name": "ada"}, "already has that name or email"),
-        ({"name": "Ben", "email": "ADA@example.org"}, "already has that name or email"),
-        ({"name": "Ben", "email": "nope"}, "doesn't look like an email"),
+        ({"name": "ada"}, TAKEN),
+        ({"name": "Ben", "email": "ADA@example.org"}, TAKEN),
+        ({"name": "Ben", "email": "nope"}, NOT_AN_EMAIL),
     ):
         refused = admin_client.post(VOLUNTEERS, data=form)
         assert refused.status_code == 400
-        assert problem in text(refused)
+        assert str(problem) in text(refused)
 
 
 def test_renaming_renames_their_custody(
@@ -93,7 +95,7 @@ def test_holding_stock_and_stopping(admin_client: TestClient, session: Session) 
     # Not while they hold something.
     give(session, custody)
     refused = admin_client.post(f"{path}/custody/end")
-    assert "still hold stock" in text(refused)
+    assert str(STILL_HOLD) in text(refused)
     assert custody.retired_at is None
 
 
@@ -112,7 +114,7 @@ def test_retiring_needs_custody_stopped_first(
     path = f"{VOLUNTEERS}/{ada.id}"
     admin_client.post(f"{path}/custody")
     refused = admin_client.post(f"{path}/retire")
-    assert "Stop them holding stock first." in text(refused)
+    assert str(RULES["location_custody_volunteer"]) in text(refused)
     admin_client.post(f"{path}/custody/end")
     assert admin_client.post(f"{path}/retire").status_code == 303
     assert ada.retired_at is not None
@@ -157,7 +159,7 @@ def test_merging_asks_to_confirm_first(
     assert dup.retired_at is None  # Only its button merges.
     for into in ("", str(dup.id), "999999"):
         refused = admin_client.get(f"{path}/merge", params={"into_id": into})
-        assert "Pick who they duplicate." in text(refused)
+        assert str(PICK_INTO) in text(refused)
     admin_client.post(f"{path}/merge", data={"into_id": str(ada.id)})
     assert (
         admin_client.get(f"{path}/merge", params={"into_id": str(ada.id)}).status_code
@@ -173,7 +175,7 @@ def test_merging_needs_a_current_other_volunteer(
     path = f"{VOLUNTEERS}/{ada.id}"
     for into in ("", str(ada.id), "999999"):
         refused = admin_client.post(f"{path}/merge", data={"into_id": into})
-        assert "Pick who they duplicate." in text(refused)
+        assert str(PICK_INTO) in text(refused)
 
 
 def test_bringing_back_one_whose_name_is_taken_says_so(
@@ -183,7 +185,7 @@ def test_bringing_back_one_whose_name_is_taken_says_so(
     add(session, Volunteer(name="ADA"))
     refused = admin_client.post(f"{VOLUNTEERS}/{gone.id}/restore")
     assert refused.status_code == 400
-    assert "already has that name or email" in text(refused)
+    assert str(TAKEN) in text(refused)
     assert gone.retired_at is not None
 
 
@@ -197,7 +199,7 @@ def test_holding_stock_where_the_name_is_taken_says_so(
     add(session, Location(name="ada", kind="custody", volunteer_id=ben.id))
     refused = admin_client.post(f"{VOLUNTEERS}/{ada.id}/custody")
     assert refused.status_code == 400
-    assert "already has that name or email" in text(refused)
+    assert str(TAKEN) in text(refused)
     assert custody_of(session, ada) is None
 
 
@@ -205,10 +207,10 @@ def test_saving_needs_a_free_name(admin_client: TestClient, session: Session) ->
     ada = add(session, Volunteer(name="Ada"))
     add(session, Volunteer(name="Ben"))
     path = f"{VOLUNTEERS}/{ada.id}"
-    for name, problem in (("", "Give it a name"), ("ben", "already has that name")):
+    for name, problem in (("", name_up_to(NAME_MAX)), ("ben", TAKEN)):
         refused = admin_client.post(path, data={"name": name, "version": shown(ada)})
         assert refused.status_code == 400
-        assert problem in text(refused)
+        assert str(problem) in text(refused)
     assert ada.name == "Ada"
 
 
@@ -246,7 +248,7 @@ def test_one_holding_stock_is_not_merged(
     refused = admin_client.post(
         f"{VOLUNTEERS}/{dup.id}/merge", data={"into_id": str(ada.id)}
     )
-    assert "Stop them holding stock first." in text(refused)
+    assert str(RULES["location_custody_volunteer"]) in text(refused)
     assert dup.merged_into_id is None
 
 

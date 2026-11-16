@@ -12,8 +12,9 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from inventory_tng import items, reading_rules, units
-from inventory_tng.admin.items import ITEMS
+from inventory_tng.admin.items import ITEMS, TAKEN_FIELDS
 from inventory_tng.models import Category, Item, ItemPackage
+from inventory_tng.reading_rules import NAMED, both
 
 from helpers.rows import add, named, tag
 from helpers.rows import shown as version
@@ -113,7 +114,7 @@ def test_a_form_sent_back_shows_the_name_as_the_unit_answered_reads_it(
     name will be shown as the unit answered in it reads it, as saving would
     (inventory-tng-nbo). A package's and an alias's forms alike."""
     mark = tag()
-    add(session, Item(name=f"Box {mark} 10g spare", category_id=cables.id))
+    spare = add(session, Item(name=f"Box {mark} 10g spare", category_id=cables.id))
     session.flush()
     form = {"name": f"Box {mark} 10g", "category_id": str(cables.id), "unit": "each"}
     asked = text(admin_client.post(ITEMS, data=form))
@@ -141,7 +142,7 @@ def test_a_form_sent_back_shows_the_name_as_the_unit_answered_reads_it(
     assert edited.count(f"Shown as Reel 5{NB}g.") == 1
     alias = {"alias_name": f"Box {mark} 10g spare", "unit:g": "Gbit/s"}
     taken = text(admin_client.post(f"{path}/aliases", data=alias))
-    assert "already has that name" in taken
+    assert TAKEN_FIELDS["name"](spare.name_shown) in taken
     assert f"Shown as Box {mark} 10{NB}g spare." in taken
 
 
@@ -172,7 +173,7 @@ def test_close_and_taken_names_are_named_as_shown(
     taken = text(
         admin_client.post(ITEMS, data=form | {"name": f"spool {mark} 1000 ft"})
     )
-    assert f"Spool {mark} 1000{NB}ft already has that name" in taken
+    assert TAKEN_FIELDS["name"](f"Spool {mark} 1000{NB}ft") in taken
     assert spool.retired_at is None
 
 
@@ -196,9 +197,12 @@ def test_a_read_alike_refusal_names_each_as_typed(
     }
     refused = text(admin_client.post(f"{ITEMS}/{spare.id}", data=form))
     assert (
-        f"item {one.id} (Box {mark} 1,000g) and item {other.id} "
-        f"(Box {mark} 1,000 Gbps)."
-    ) in refused
+        both(
+            NAMED["item"](one.id, f"Box {mark} 1,000g"),
+            NAMED["item"](other.id, f"Box {mark} 1,000 Gbps"),
+        )
+        in refused
+    )
 
 
 @pytest.mark.parametrize("typed", [f"10{THIN}000{NB}ft", "10,000 ft", "10000ft"])

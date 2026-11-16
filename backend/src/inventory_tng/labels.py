@@ -12,6 +12,7 @@ from datetime import datetime
 from typing import Literal
 
 import structlog
+from babel.support import LazyProxy
 from opentelemetry import metrics
 from sqlalchemy import ColumnElement, and_, or_, select
 from sqlalchemy.orm import Session
@@ -20,6 +21,7 @@ from inventory_tng.db import get_locked, locked_row
 from inventory_tng.ledger import takeable, takeable_package
 from inventory_tng.models import Item, ItemPackage, Label, Location
 from inventory_tng.pages import amount
+from inventory_tng.phrases import gettext, lazy_gettext
 
 log = structlog.get_logger(__name__)
 meter = metrics.get_meter(__name__)
@@ -47,6 +49,13 @@ revoked = meter.create_counter(
 
 # Why the scan page doesn't read a label.
 Inactive = Literal["revoked", "item retired", "package retired", "place retired"]
+# Each, as the labels page says it.
+INACTIVE_WORDS: dict[Inactive, LazyProxy] = {
+    "revoked": lazy_gettext("Revoked"),
+    "item retired": lazy_gettext("Item retired"),
+    "package retired": lazy_gettext("Package retired"),
+    "place retired": lazy_gettext("Place retired"),
+}
 
 
 @dataclass(frozen=True)
@@ -98,6 +107,11 @@ class Named:
         return self.why is None
 
     @property
+    def why_words(self) -> LazyProxy | None:
+        """Why it is inactive, in words; None if it is current."""
+        return INACTIVE_WORDS[self.why] if self.why else None
+
+    @property
     def name(self) -> str:
         """What a list calls it (admin/listing.py)."""
         return self.words
@@ -105,7 +119,23 @@ class Named:
 
 def _package_words(item: Item, package: ItemPackage) -> str:
     unit = "" if item.unit == "each" else f" {item.unit}"
-    return f"{item.name_shown}: {package.name_shown} of {amount(package.size)}{unit}"
+    return package_label(
+        item.name_shown, package.name_shown, f"{amount(package.size)}{unit}"
+    )
+
+
+def package_label(item: str, package: str, size: str) -> str:
+    """A package's label's words: its item, and the package and its size."""
+    return gettext(
+        "%(item)s: %(package)s of %(size)s", item=item, package=package, size=size
+    )
+
+
+def place_words(place: str, parent: str | None) -> str:
+    """A place's label's words: the place, and the place around it."""
+    if parent is None:
+        return place
+    return gettext("%(place)s, in %(parent)s", place=place, parent=parent)
 
 
 def _by_id[M: (Item, ItemPackage, Location)](
@@ -157,7 +187,7 @@ def named(session: Session, labels: Sequence[Label]) -> list[Named]:
         if label.location_id is not None:
             place = places[label.location_id]
             parent = places.get(place.parent_id or 0)
-            words = place.name + (f", in {parent.name}" if parent else "")
+            words = place_words(place.name, parent.name if parent else None)
         else:
             item = items[label.item_id or 0]
             package = packages.get(label.package_id or 0)

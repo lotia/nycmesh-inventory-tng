@@ -7,6 +7,7 @@ printed again from its address."""
 from typing import Annotated, Any, cast
 
 import structlog
+from babel.support import LazyProxy
 from fastapi import APIRouter, Depends, Form, Query, Request
 from fastapi.responses import JSONResponse, Response
 from sqlalchemy import ColumnElement, exists, func, select
@@ -14,7 +15,13 @@ from sqlalchemy.orm import aliased
 
 from inventory_tng import labels
 from inventory_tng.accounts import qr_svg
-from inventory_tng.admin.common import LABELS, admin_page, now
+from inventory_tng.admin.common import (
+    LABELS,
+    SECTION_LABELS,
+    admin_page,
+    now,
+    revoke_title,
+)
 from inventory_tng.admin.items import ITEMS
 from inventory_tng.admin.listing import AskedView, Listing, Searched, Sort, Sorting
 from inventory_tng.admin.locations import LOCATIONS
@@ -29,6 +36,7 @@ from inventory_tng.models import (
     whole,
 )
 from inventory_tng.pages import NOTICES, not_found, redirect, templates
+from inventory_tng.phrases import gettext, lazy_gettext, ngettext
 from inventory_tng.sign_in import AdminSignedIn
 
 log = structlog.get_logger(__name__)
@@ -43,13 +51,34 @@ router = APIRouter(include_in_schema=False)
 PRINT = f"{LABELS}/print"
 PER_PAGE = 12  # Three across, four down: styles.css.
 
+LABEL_REVOKED = lazy_gettext(
+    "Revoked: its copies now scan as a label the inventory doesn't have. "
+    "Making labels for it again makes a new code."
+)
+PICK_LABELS = lazy_gettext("Pick a current label to print.")
+
+
+def _too_many() -> str:
+    return ngettext(
+        "Print up to %(num)d label at once.",
+        "Print up to %(num)d labels at once.",
+        labels.MAX_LABELS,
+    )
+
+
+def _copies() -> str:
+    return gettext("Print from 1 to %(max)d copies of each.", max=labels.MAX_COPIES)
+
+
+TOO_MANY = LazyProxy(_too_many, enable_cache=False)
+COPIES = LazyProxy(_copies, enable_cache=False)
+PRINT_TITLE = lazy_gettext("Print labels")
 NOTICES.update(
     {
-        "label_revoked": "Revoked: its copies now scan as a label the inventory "
-        "doesn't have. Making labels for it again makes a new code.",
-        "pick_labels": "Pick a current label to print.",
-        "too_many": f"Print up to {labels.MAX_LABELS} labels at once.",
-        "copies": f"Print from 1 to {labels.MAX_COPIES} copies of each.",
+        "label_revoked": LABEL_REVOKED,
+        "pick_labels": PICK_LABELS,
+        "too_many": TOO_MANY,
+        "copies": COPIES,
     }
 )
 
@@ -152,7 +181,7 @@ def list_labels(
         signed,
         "labels.html",
         {
-            "title": "Labels",
+            "title": SECTION_LABELS,
             "here": LABELS,
             "print_path": PRINT,
             "items_path": ITEMS,
@@ -223,8 +252,8 @@ def print_labels(
         signed,
         "labels_print.html",
         {
-            "title": "Print labels",
-            "back_link": (LABELS, "Labels"),
+            "title": PRINT_TITLE,
+            "back_link": (LABELS, SECTION_LABELS),
             "picked": picked,
             "copies": count,
             "total": total,
@@ -249,7 +278,7 @@ def confirm_revoke(
         signed,
         "label_revoke.html",
         {
-            "title": f"Revoke {found.code}?",
+            "title": revoke_title(found.code),
             "here": f"{LABELS}/{label_id}/revoke",
             "keep": LABELS,
             "named": named,

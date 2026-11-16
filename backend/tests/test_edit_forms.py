@@ -117,7 +117,7 @@ def test_a_save_after_another_since_the_form_was_shown_is_refused(
     session.flush()
     refused = admin_client.post(path, data=form)
     assert refused.status_code == 409
-    assert RULES[CHANGED] in text(refused)
+    assert str(RULES[CHANGED]) in text(refused)
     session.refresh(row)
     assert getattr(row, column) == meanwhile
     # Shown again as it is now, the form saves.

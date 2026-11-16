@@ -27,8 +27,8 @@ def test_the_root_goes_to_the_scan_page(
 @pytest.mark.parametrize(
     ("method", "path", "status", "title"),
     [
-        ("GET", "/nowhere", 404, "Not found"),
-        ("POST", SCAN, 405, "Not here"),
+        ("GET", "/nowhere", 404, pages.NOT_FOUND),
+        ("POST", SCAN, 405, pages.NOT_HERE),
     ],
 )
 def test_a_page_error_is_a_page(
@@ -36,7 +36,7 @@ def test_a_page_error_is_a_page(
     method: str,
     path: str,
     status: int,
-    title: str,
+    title: object,
 ) -> None:
     answer = make_client_without_database().request(method, path)
     assert answer.status_code == status
@@ -52,7 +52,7 @@ def test_a_page_error_is_a_page(
 def test_nothing_by_that_id_is_the_same_page(admin_client: TestClient) -> None:
     answer = admin_client.get(f"{ITEMS}/999999")
     assert answer.status_code == 404
-    assert "<h1>Not found</h1>" in text(answer)
+    assert f"<h1>{pages.NOT_FOUND}</h1>" in text(answer)
 
 
 @pytest.mark.parametrize(
@@ -107,7 +107,7 @@ def failing(make_app_without_database: Callable[..., FastAPI]) -> Iterator[TestC
 def test_a_failure_on_a_page_is_a_page(failing: TestClient) -> None:
     answer = failing.get("/broken")
     assert answer.status_code == 500
-    assert "<h1>Something went wrong</h1>" in text(answer)
+    assert f"<h1>{pages.WENT_WRONG}</h1>" in text(answer)
     assert "a bug" not in answer.text
 
 
@@ -133,7 +133,7 @@ def test_a_failure_page_that_fails_falls_back_to_text(
 def test_a_request_the_app_cannot_take_says_so(failing: TestClient) -> None:
     answer = failing.get("/refused/400")
     assert answer.status_code == 400
-    assert "<h1>That didn't work</h1>" in text(answer)
+    assert f"<h1>{pages.DID_NOT_WORK}</h1>" in text(answer)
 
 
 def test_below_400_is_no_error_page(failing: TestClient) -> None:

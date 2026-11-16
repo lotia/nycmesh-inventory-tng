@@ -27,7 +27,7 @@ from inventory_tng import (
 )
 from inventory_tng.admin import length_checks
 from inventory_tng.admin import over_recorded as over_recorded_page
-from inventory_tng.admin.common import RULES
+from inventory_tng.admin.common import RULES, up_to
 from inventory_tng.admin.counts import COUNTS
 from inventory_tng.db import RuleBroken, attempt
 from inventory_tng.ledger import Entry, Form, _more_written, expected
@@ -404,7 +404,7 @@ def test_needs_your_action_lists_it(
 ) -> None:
     raised(registered_client, place, bags)
     home = text(admin_client.get("/admin"))
-    assert "Recorded more than moved" in home
+    assert str(over_recorded_page.TITLE) in home
     assert f"{place.cable.name}: 1 \N{MULTIPLICATION SIGN} Bag of 50" in home
     page = text(admin_client.get(f"{PAGE}?item={place.cable.id}"))
     assert f"from {place.store.name} to {place.van.name}" in page
@@ -455,7 +455,7 @@ def test_correcting_one_undoes_it_on_each_side(
         "Not changed: someone answered or changed it meanwhile. Reload to see it "
         "as it is." in text(admin_client.get(again.headers["location"]))
     )
-    assert "Recorded more than moved" not in text(admin_client.get("/admin"))
+    assert str(over_recorded_page.TITLE) not in text(admin_client.get("/admin"))
 
 
 def test_marking_one_checked_writes_nothing(
@@ -468,7 +468,9 @@ def test_marking_one_checked_writes_nothing(
     raised(registered_client, place, bags)
     response = mark_checked(admin_client, session, reason="arrived")
     assert "over_recorded_checked" in response.headers["location"]
-    assert "Marked checked." in text(admin_client.get(response.headers["location"]))
+    assert str(over_recorded_page.MARKED_CHECKED) in text(
+        admin_client.get(response.headers["location"])
+    )
     (check,) = checks(session)
     assert (check.settled_how, check.checked_reason, check.checked_words) == (
         "checked",
@@ -502,12 +504,7 @@ def test_marking_one_checked_offers_each_reason(
     raised(registered_client, place, bags)
     page = admin_client.get(PAGE).text
     assert "<legend>Why it is right as it is</legend>" in page
-    for value, words in (
-        ("left", "Counted where it left"),
-        ("arrived", "Counted where it arrived"),
-        ("both", "Counted both ends"),
-        ("other", "Put right another way:"),
-    ):
+    for value, words in over_recorded.CHECKED_REASONS.items():
         assert f'value="{value}" required> {words}</label>' in page
 
 
@@ -532,7 +529,7 @@ def test_marking_one_checked_asks_why(
     (check,) = checks(session)
     assert (
         f'<span class="problem" id="reason-{check.id}-problem">'
-        "Say why it is right as it is.</span>" in response.text
+        f"{over_recorded_page.SAY_WHY}</span>" in response.text
     )
     # Each reason, and the words, described by it, as the count is.
     assert response.text.count(f'aria-describedby="reason-{check.id}-problem"') == 5
@@ -606,8 +603,7 @@ def test_words_for_another_reason_are_asked_about(
     (check,) = checks(session)
     assert (
         f'<span class="problem" id="reason-{check.id}-problem">'
-        "You wrote why, but picked another reason. Pick Put right another way "
-        "to keep your words, or clear them.</span>" in response.text
+        f"{over_recorded_page.WORDS_FOR_ANOTHER}</span>" in response.text
     )
     assert response.text.count(f'aria-describedby="reason-{check.id}-problem"') == 5
     assert f'value="{reason}" checked' in response.text
@@ -643,7 +639,7 @@ def test_words_too_long_are_asked_again(
     raised(registered_client, place, bags)
     response = mark_checked(admin_client, session, reason="other", words="x" * 201)
     assert response.status_code == 400
-    assert "Up to 200 characters." in response.text
+    assert up_to(200) in response.text
     assert checks(session)[0].settled_at is None
 
 
@@ -759,7 +755,7 @@ def test_one_moved_whole_marked_checked_without_a_reason_is_asked_again_above(
     assert response.status_code == 400
     (check,) = checks(session)
     assert response.text.count(f'action="{PAGE}/{check.id}/checked"') == 1
-    assert "Say why it is right as it is." in response.text
+    assert str(over_recorded_page.SAY_WHY) in response.text
     assert 'role="alert"' not in response.text
 
 
@@ -853,7 +849,7 @@ def test_a_cut_taken_down_is_listed_from_its_open_package(
     first = spools.place.batch(lines=[cut(made, "20")])
     recorded_then_changed(registered_client, first, lines=[cut(made, "15")])
     page = text(admin_client.get(PAGE))
-    assert "5 m from an open package" in page
+    assert over_recorded.from_an_open_package("5 m") in page
 
 
 def test_what_a_batch_was_changed_from_does_not_make_it_another(
@@ -971,7 +967,9 @@ def test_its_count_corrected_adjusts_it_where_it_arrived(
         (spools.van.id, None, Decimal(125), made.id, None, over_recorded.REASON)
     ]
     assert any(line["event"] == "over recorded count corrected" for line in logs)
-    assert "Count corrected." in text(admin_client.get(response.headers["location"]))
+    assert str(over_recorded_page.COUNT_CORRECTED) in text(
+        admin_client.get(response.headers["location"])
+    )
     # Sent again, as a second tap would: nothing more.
     _, again = counted(admin_client, session, "180", seen="305")
     assert "over_recorded_unchanged" in again.headers["location"]
@@ -1100,10 +1098,7 @@ def test_refused_at_a_retired_place_it_says_why_and_offers_a_fix(
     response = correct(admin_client, session)
     assert response.status_code == 409
     page = " ".join(text(response).split())
-    assert (
-        f"Not changed: {place.store.name} is retired and holds nothing, so the 2 "
-        "can't be found there again." in page
-    )
+    assert over_recorded_page.RETIRED_EMPTY["found"](place.store.name, "2") in page
     assert f"Bring back {place.store.name}" in page
     (check,) = checks(session)
     assert f'action="{PAGE}/{check.id}/bring-back"' in response.text
@@ -1133,10 +1128,7 @@ def test_refused_where_it_arrived_it_names_that_place(
     )
     retire(session, place.van)
     page = " ".join(text(correct(admin_client, session)).split())
-    assert (
-        f"Not changed: {place.van.name} is retired and holds nothing, so the 2 "
-        "can't be written off there." in page
-    )
+    assert over_recorded_page.RETIRED_EMPTY["written_off"](place.van.name, "2") in page
     assert f"Bring back {place.van.name}" in page
 
 
@@ -1206,10 +1198,7 @@ def test_refused_at_a_place_brought_back_meanwhile_it_names_that_place(
     response = correct(admin_client, session)
     assert response.status_code == 409
     page = " ".join(text(response).split())
-    assert (
-        f"Not changed: {place.store.name} is retired and holds nothing, so the 2 "
-        "can't be found there again." in page
-    )
+    assert over_recorded_page.RETIRED_EMPTY["found"](place.store.name, "2") in page
     assert f"Bring back {place.store.name}" in page
 
 
@@ -1271,7 +1260,7 @@ def test_refused_by_another_rule_it_says_that_rule(
     response = correct(admin_client, session)
     assert response.status_code == 409
     page = " ".join(text(response).split())
-    assert "Not changed: This item is counted in whole units." in page
+    assert over_recorded_page.not_changed(str(RULES["movement_whole_units"])) in page
     assert "Bring back" not in page
     assert "Mark checked" in page
     # Asking why there too, as the row does (inventory-tng-zgy).
@@ -1287,7 +1276,7 @@ def test_bringing_the_place_back_lets_it_be_corrected(
     assert response.status_code == 303
     location = response.headers["location"]
     assert "over_recorded_brought_back" in location
-    assert f"{place.store.name} brought back. Correct it now." in text(
+    assert over_recorded_page.place_brought_back(place.store.name) in text(
         admin_client.get(location)
     )
     session.expire_all()
@@ -1423,12 +1412,9 @@ def problem_of(check: OverRecorded) -> str:
 @pytest.mark.parametrize(
     ("form", "problem"),
     [
-        ({}, "Say why it is right as it is."),
-        (
-            {"reason": "both", "words": "typed"},
-            "You wrote why, but picked another reason.",
-        ),
-        ({"reason": "other", "words": "x" * 201}, "Up to 200 characters."),
+        ({}, over_recorded_page.SAY_WHY),
+        ({"reason": "both", "words": "typed"}, over_recorded_page.WORDS_FOR_ANOTHER),
+        ({"reason": "other", "words": "x" * 201}, up_to(200)),
     ],
 )
 def test_mark_checked_refused_from_an_alert_draws_the_alert_again(
@@ -1436,7 +1422,7 @@ def test_mark_checked_refused_from_an_alert_draws_the_alert_again(
     registered_client: TestClient,
     session: Session,
     form: dict[str, str],
-    problem: str,
+    problem: object,
 ) -> None:
     """With Bring back, the problem under it, in its form only, what was
     typed kept there (Claude, 2026-11-15, left to Claude by Ali)."""
@@ -1446,12 +1432,9 @@ def test_mark_checked_refused_from_an_alert_draws_the_alert_again(
     response = checked_from_alert(admin_client, session, place.store, **form)
     assert response.status_code == 400
     page = " ".join(text(response).split())
-    assert (
-        f"Not changed: {place.store.name} is retired and holds nothing, so the 2 "
-        "can't be found there again." in page
-    )
+    assert over_recorded_page.RETIRED_EMPTY["found"](place.store.name, "2") in page
     assert f"Bring back {place.store.name}" in page
-    assert problem in page
+    assert str(problem) in page
     (check,) = checks(session)
     alert, row = checked_forms(response.text)
     assert problem_of(check) in alert
@@ -1478,7 +1461,7 @@ def test_mark_checked_refused_from_a_counts_alert_draws_it_again(
         "count can't be corrected there." in page
     )
     assert f"Bring back {spools.van.name}" in page
-    assert "Say why it is right as it is." in page
+    assert str(over_recorded_page.SAY_WHY) in page
 
 
 def test_a_marker_not_of_a_refusal_draws_no_alert(
@@ -1530,7 +1513,7 @@ def test_a_place_brought_back_since_its_alert_draws_no_alert(
     assert response.status_code == 400
     assert 'role="alert"' not in response.text
     assert "Bring back" not in response.text
-    assert "Say why it is right as it is." in response.text
+    assert str(over_recorded_page.SAY_WHY) in response.text
 
 
 # A count of an end puts it right (Ali, 2026-11-15, inventory-tng-qs8).
@@ -1611,7 +1594,7 @@ def test_a_count_after_it_puts_that_end_right_and_says_what_is_left(
     assert f'<a href="{link}">Count {place.store.name}<span' in page
     assert "Mark checked" in page
     # Still waiting under "Needs your action".
-    assert "Recorded more than moved" in text(admin_client.get("/admin"))
+    assert str(over_recorded_page.TITLE) in text(admin_client.get("/admin"))
 
 
 def test_the_count_its_link_opens_counts_the_item_and_closes_it(
@@ -1680,7 +1663,7 @@ def test_both_ends_counted_it_closes_as_counted_once(
         check.arrived_count_id,
     ) == ("counted", closing.admin_id, closing.created_at, at_store, at_van)
     assert any(line["event"] == "over recorded counted" for line in logs)
-    assert "Recorded more than moved" not in text(admin_client.get("/admin"))
+    assert str(over_recorded_page.TITLE) not in text(admin_client.get("/admin"))
     # Sent again, as a second tap would: nothing more.
     count_at(admin_client, place.store.id, {f"counted_{place.item.id}": "2"}, shown)
     assert count_ids(session) == [at_van, at_store]

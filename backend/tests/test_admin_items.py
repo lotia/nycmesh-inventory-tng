@@ -16,8 +16,35 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from inventory_tng import items, open_packages
-from inventory_tng.admin.common import quantity
-from inventory_tng.admin.items import ITEMS, NO_LETTERS
+from inventory_tng.accounts import name_up_to
+from inventory_tng.admin.common import (
+    ABOVE_ZERO,
+    NAME_MAX,
+    RULES,
+    TOO_BIG,
+    TYPE_A_NUMBER,
+    ZERO_OR_MORE,
+    at_most_places,
+    quantity,
+)
+from inventory_tng.admin.items import (
+    ALIAS_ITS_OWN,
+    ALIAS_TAKEN,
+    ASK_UNIT,
+    IS_RETIRED,
+    ITEMS,
+    NO_LETTERS,
+    PACKAGE_RETIRED,
+    PACKAGE_TAKEN,
+    PICK_A_CATEGORY,
+    PICK_A_UNIT,
+    READ_AS_ONE,
+    RENAMED,
+    SHORTER_THAN_WHOLE,
+    TAKEN,
+    TAKEN_FIELDS,
+    read_as_one,
+)
 from inventory_tng.admin.listing import PER_PAGE
 from inventory_tng.db import RuleBroken, attempt
 from inventory_tng.local_time import DEFAULT_ZONE
@@ -33,6 +60,7 @@ from inventory_tng.models import (
     Movement,
     ReadingRule,
 )
+from inventory_tng.reading_rules import NAMED, both
 
 from helpers.rows import add, history, item_fields, named, shown, tag
 from helpers.sign_in import text
@@ -77,7 +105,7 @@ def test_an_item_name_needs_more_than_punctuation(
     form = {"category_id": str(radios.id), "unit": "each"}
     refused = admin_client.post(ITEMS, data=form | {"name": "- ?"})
     assert refused.status_code == 400
-    assert "A name needs at least one letter or number." in text(refused)
+    assert str(NO_LETTERS) in text(refused)
     assert admin_client.post(ITEMS, data=form | {"name": "Câble ½"}).status_code == 303
     assert admin_client.post(ITEMS, data=form | {"name": "1234"}).status_code == 303
 
@@ -93,10 +121,10 @@ def test_a_name_of_signs_beyond_ascii_needs_a_letter_or_digit(
     for name in ("\u2013", "\u201c \u2014 \u201d", "\u00b1\u00b0"):
         refused = admin_client.post(ITEMS, data=form | {"name": name})
         assert refused.status_code == 400
-        assert NO_LETTERS in text(refused)
+        assert str(NO_LETTERS) in text(refused)
         refused = admin_client.post(path, data={"package_name": name, "size": "1"})
         assert refused.status_code == 400
-        assert NO_LETTERS in text(refused)
+        assert str(NO_LETTERS) in text(refused)
     assert (
         admin_client.post(
             path, data={"package_name": "\u00b2", "size": "1"}
@@ -115,8 +143,8 @@ def test_an_item_needs_a_name_and_a_current_category(
     )
     assert refused.status_code == 400
     page = text(refused)
-    assert "Give it a name" in page
-    assert "Pick a category" in page
+    assert name_up_to(NAME_MAX) in page
+    assert str(PICK_A_CATEGORY) in page
     assert "Add a" in page  # No current categories: add one first.
 
 
@@ -137,15 +165,12 @@ def test_names_and_part_numbers_are_unique_naming_the_other(
         (
             {"name": "litebeam 5ac"},
             "name",
-            (
-                "Lite-Beam 5AC already has that name, or one differing from it "
-                "only in case, spaces, punctuation or how its units are spelt."
-            ),
+            TAKEN_FIELDS["name"]("Lite-Beam 5AC"),
         ),
         (
             {"name": "Other", "manufacturer": "ubiquiti", "part_number": "lbe"},
             "part_number",
-            "Lite-Beam 5AC already has that manufacturer and part number.",
+            TAKEN_FIELDS["part_number"]("Lite-Beam 5AC"),
         ),
     ):
         refused = admin_client.post(
@@ -170,11 +195,8 @@ def test_a_name_pasted_with_look_alikes_clashes_naming_the_other(
         assert admin_client.post(ITEMS, data=form | {"name": kept}).status_code == 303
         refused = admin_client.post(ITEMS, data=form | {"name": pasted})
         assert refused.status_code == 400
-        assert (
-            f'id="name-problem">{escape(kept)} already has that name, or one '
-            "differing from it only in case, spaces, punctuation or how its "
-            "units are spelt.</span>"
-        ) in refused.text
+        taken = escape(TAKEN_FIELDS["name"](kept))
+        assert f'id="name-problem">{taken}</span>' in refused.text
     assert named(session, Item, "Patch\u2014cord").name_key == "patchcord"
 
 
@@ -197,10 +219,8 @@ def test_a_saved_item_is_refused_what_another_has_its_own_respelt(
     path = f"{ITEMS}/{item.id}"
     refused = admin_client.post(path, data=form | {"old_code": "NYCM-1"})
     assert refused.status_code == 400
-    assert (
-        f'id="old_code-problem">{other.name} already has that old code. '
-        "It is retired.</span>"
-    ) in refused.text
+    taken = TAKEN_FIELDS["old_code"](other.name)
+    assert f'id="old_code-problem">{taken} {IS_RETIRED}</span>' in refused.text
     assert admin_client.post(path, data=form).status_code == 303
     session.refresh(item)
     assert item.name == "Lite Beam"
@@ -220,7 +240,7 @@ def test_a_name_is_checked_and_saved_in_canonical_spelling(
     item = named(session, Item, "Cap 10\u03bcF")
     refused = admin_client.post(ITEMS, data=form | {"name": "cap 10\u00b5f"})
     assert refused.status_code == 400
-    assert "Cap 10\u00a0\u03bcF already has that name" in refused.text
+    assert TAKEN_FIELDS["name"]("Cap 10\u00a0\u03bcF") in refused.text
     path = f"{ITEMS}/{item.id}"
     edit = form | {"version": str(item.edit_version)}
     saved = admin_client.post(path, data=edit | {"name": "Cap 10\u00b5F"})
@@ -265,7 +285,7 @@ def test_a_clash_gone_meanwhile_is_said_in_general(
     monkeypatch.setattr(items, "taken_by", lambda *_: None)
     form = {"name": "litebeam", "category_id": str(radios.id), "unit": "each"}
     refused = admin_client.post(ITEMS, data=form)
-    assert "Another item, perhaps a retired one, already has" in text(refused)
+    assert str(TAKEN) in text(refused)
 
 
 def test_searching(
@@ -331,14 +351,14 @@ def test_the_unit_is_fixed_once_stock_has_moved(
     form |= {"version": shown(item)}
     refused = admin_client.post(f"{ITEMS}/{item.id}", data=form)
     assert refused.status_code == 400
-    assert "Its unit is fixed, as stock has moved in it." in text(refused)
+    assert str(RULES["item_unit_fixed"]) in text(refused)
     assert item.unit == "each"
     # The form sends the fixed unit back as it is, so the rest still saves.
     kept = admin_client.post(f"{ITEMS}/{item.id}", data=form | {"unit": "each"})
     assert kept.status_code == 303
     # A form without a unit is refused, rather than keeping the one stored.
     unitless = admin_client.post(f"{ITEMS}/{item.id}", data=form | {"unit": ""})
-    assert "Pick a unit." in text(unitless)
+    assert str(PICK_A_UNIT) in text(unitless)
     negative = admin_client.post(f"{ITEMS}/{item.id}", data=form | {"minimum": "-1"})
     assert negative.status_code == 400
 
@@ -352,7 +372,7 @@ def test_packages(admin_client: TestClient, session: Session, radios: Category) 
     assert (box.name, box.size) == ("Box", Decimal(4))
     assert "4 each" in text(admin_client.get(f"{ITEMS}/{item.id}"))
     taken = admin_client.post(path, data={"package_name": "box", "size": "2"})
-    assert "already has a package by that name" in text(taken)
+    assert str(PACKAGE_TAKEN) in text(taken)
     for size in ("0", "-1", "lots", "1.2345", ""):
         refused = admin_client.post(path, data={"package_name": "Bag", "size": size})
         assert refused.status_code == 400, size
@@ -392,7 +412,7 @@ def test_a_package_is_renamed_and_resized_until_it_moves(
     # A retired package's name, spelt another way, is taken.
     taken = send(box, "old-REEL", "25")
     assert taken.status_code == 400
-    assert "already has a package by that name" in text(taken)
+    assert str(PACKAGE_TAKEN) in text(taken)
     assert 'value="old-REEL"' in taken.text
     # Moved in its size: renamed, never resized.
     fixed = send(spools.spool, "Spool", "300")
@@ -445,7 +465,7 @@ def test_a_retired_package_is_brought_back(
     # The notice offers it back, as the row does.
     offered = admin_client.get(retired.headers["location"])
     assert f'action="{path}/restore"' in offered.text
-    assert "Package retired." in text(offered)
+    assert str(PACKAGE_RETIRED) in text(offered)
     assert admin_client.post(f"{path}/restore").status_code == 303
     assert box.retired_at is None
     # A current one is not brought back.
@@ -474,8 +494,7 @@ def test_retiring_and_bringing_back(
         ITEMS, data={"name": item.name, "category_id": str(radios.id), "unit": "each"}
     )
     assert taken.status_code == 400
-    assert f"{item.name} already has that name" in text(taken)
-    assert "It is retired." in text(taken)
+    assert f"{TAKEN_FIELDS['name'](item.name)} {IS_RETIRED}" in text(taken)
     assert admin_client.post(f"{ITEMS}/{item.id}/restore").status_code == 303
 
 
@@ -503,12 +522,12 @@ def test_unknown_items_and_others_packages_are_not_found(
         ("", True, None),
         (" 2.5 ", True, Decimal("2.5")),
         ("0", False, Decimal(0)),
-        ("0", True, "Use a number above 0."),
-        ("-1", False, "Use 0 or more."),
-        ("1.2345", False, "Use at most 3 decimal places."),
-        ("NaN", False, "That number is too big."),
-        ("1e12", False, "That number is too big."),
-        ("lots", False, "Type a number, such as 12 or 0.5."),
+        ("0", True, ABOVE_ZERO),
+        ("-1", False, ZERO_OR_MORE),
+        ("1.2345", False, at_most_places(3)),
+        ("NaN", False, TOO_BIG),
+        ("1e12", False, TOO_BIG),
+        ("lots", False, TYPE_A_NUMBER),
     ],
 )
 def test_quantities_typed(typed: str, positive: bool, parsed: object) -> None:
@@ -1172,7 +1191,7 @@ def test_a_too_short_length_refused_as_resized_meanwhile_says_so_beside_it(
         data={"short_below": "5", "minimum_sealed": ""},
     )
     assert refused.status_code == 400
-    assert "Shorter than a whole one, or blank." in text(refused)
+    assert str(SHORTER_THAN_WHOLE) in text(refused)
 
 
 def test_a_name_is_saved_as_typed_and_its_units_said_under_it(
@@ -1208,7 +1227,7 @@ def test_a_spelling_nothing_settles_is_asked_once(
         asked = admin_client.post(ITEMS, data=form)
     assert asked.status_code == 400
     page = text(asked)
-    assert "Say below whether it is a unit." in page
+    assert str(ASK_UNIT) in page
     assert "<legend>“10g” is new. Is it a unit?</legend>" in page
     assert "10Gbps · data rate" in page
     assert "10g · grams" in page
@@ -1332,11 +1351,8 @@ def test_a_name_taken_once_read_as_answered_names_the_item(
     form's answer reads it."""
     other = new_item(session, radios, "Box 10Gbps")
     item = new_item(session, radios, "Spare")
-    said = (
-        # As shown (KeyedName.name_shown).
-        "Box 10\u00a0Gbps already has that name, or one differing from it only in "
-        "case, spaces, punctuation or how its units are spelt."
-    )
+    # As shown (KeyedName.name_shown).
+    said = TAKEN_FIELDS["name"]("Box 10\u00a0Gbps")
     form = {"category_id": str(radios.id), "unit": "each", "unit:g": "Gbit/s"}
     added = admin_client.post(ITEMS, data=form | {"name": "Box 10g"})
     assert added.status_code == 400
@@ -1362,9 +1378,8 @@ def test_a_correction_reading_names_alike_is_refused_naming_them(
     one = new_item(session, radios, "Box 10g")
     other = new_item(session, radios, "Box 10 Gbps")
     spare = new_item(session, radios, "Spare")
-    said = (
-        "Read so, these names would read as one: "
-        f"item {one.id} (Box 10g) and item {other.id} (Box 10 Gbps)."
+    said = read_as_one(
+        both(NAMED["item"](one.id, "Box 10g"), NAMED["item"](other.id, "Box 10 Gbps"))
     )
     base = f"{ITEMS}/{spare.id}"
     for path, form, field in (
@@ -1407,9 +1422,7 @@ def test_a_read_alike_refusal_with_none_left_to_name_says_so(
     form = {"alias_name": "Extra 10g", "unit:g": "Gbit/s"}
     refused = admin_client.post(f"{ITEMS}/{spare.id}/aliases", data=form)
     assert refused.status_code == 400
-    assert "Read so, names would read as one. Try again, or answer otherwise." in (
-        text(refused)
-    )
+    assert str(READ_AS_ONE) in text(refused)
 
 
 def test_an_alias_answer_refused_is_not_the_items_name_answer(
@@ -1569,7 +1582,7 @@ def test_the_items_form_adds_and_removes_aliases(
     assert "Tough  cable 305\u00a0m" in page
     refused = admin_client.post(path, data={"alias_name": "- ?"})
     assert refused.status_code == 400
-    assert NO_LETTERS in text(refused)
+    assert str(NO_LETTERS) in text(refused)
     with capture_logs() as logs:
         done = admin_client.post(f"{path}/{alias.id}/remove")
     assert done.headers["location"] == (
@@ -1592,44 +1605,37 @@ def test_a_clash_with_an_alias_names_the_item(
     beam = new_item(session, radios, "LiteBeam 5AC Gen2")
     aliased(session, beam, "LBE Gen2")
     rocket = new_item(session, radios, "Rocket")
-    words = (
-        "LiteBeam 5AC Gen2 already has that {}, or one differing from it only in"
-        " case, spaces, punctuation or how its units are spelt."
-    )
+    beams = "LiteBeam 5AC Gen2"
     for target, form, field, said in (
         (
             f"{ITEMS}/{rocket.id}/aliases",
             {"alias_name": "lbe-gen2"},
             "alias_name",
-            words.format("alias"),
+            ALIAS_TAKEN["alias"](beams),
         ),
         (
             f"{ITEMS}/{rocket.id}/aliases",
             {"alias_name": "Lite Beam 5AC gen2"},
             "alias_name",
-            words.format("name"),
+            ALIAS_TAKEN["name"](beams),
         ),
         (
             f"{ITEMS}/{beam.id}/aliases",
             {"alias_name": "LBE gen2"},
             "alias_name",
-            "That is its alias already.",
+            ALIAS_ITS_OWN["alias"],
         ),
         (
             f"{ITEMS}/{beam.id}/aliases",
             {"alias_name": "litebeam5acgen2"},
             "alias_name",
-            "That is its name already.",
+            ALIAS_ITS_OWN["name"],
         ),
         (
             ITEMS,
             {"name": "LBE gen2", "category_id": str(radios.id), "unit": "each"},
             "name",
-            (
-                "LiteBeam 5AC Gen2 has that name, or one differing from it only "
-                "in case, spaces, punctuation or how its units are spelt, as an "
-                "alias."
-            ),
+            TAKEN_FIELDS["alias"](beams),
         ),
         (
             f"{ITEMS}/{rocket.id}",
@@ -1640,11 +1646,7 @@ def test_a_clash_with_an_alias_names_the_item(
                 "version": shown(rocket),
             },
             "name",
-            (
-                "LiteBeam 5AC Gen2 has that name, or one differing from it only "
-                "in case, spaces, punctuation or how its units are spelt, as an "
-                "alias."
-            ),
+            TAKEN_FIELDS["alias"](beams),
         ),
     ):
         refused = admin_client.post(target, data=form)
@@ -1690,7 +1692,7 @@ def test_an_alias_clash_gone_meanwhile_is_said_in_general(
     path = f"{ITEMS}/{item.id}/aliases"
     refused = admin_client.post(path, data={"alias_name": "litebeam"})
     assert refused.status_code == 400
-    assert "Another item, perhaps a retired one, already has" in text(refused)
+    assert str(TAKEN) in text(refused)
     assert items.aliases(session, item.id) == []
 
 
@@ -1749,10 +1751,7 @@ def test_a_rename_keeps_the_old_name_as_an_alias(
         "insert"
     ]
     page = text(admin_client.get(done.headers["location"]))
-    assert (
-        "Renamed. The old name is kept as an alias so searches still find it;"
-        " remove it below if it shouldn't be." in page
-    )
+    assert str(RENAMED) in page
     session.refresh(item)
     assert item.name == "LiteBeam 5AC Gen1"
     found = items_named(text(admin_client.get(ITEMS, params={"q": "litebeam 5ac"})))
@@ -1828,9 +1827,8 @@ def test_a_rename_refused_keeps_its_aliases(
         }
         refused = admin_client.post(f"{ITEMS}/{item.id}", data=form)
         assert refused.status_code == 400, name
-        assert 'id="old_code-problem">Rocket already has that old code.' in (
-            refused.text
-        )
+        taken = TAKEN_FIELDS["old_code"]("Rocket")
+        assert f'id="old_code-problem">{taken}' in refused.text
         session.refresh(item)
         session.refresh(pro)
         assert (item.name, pro.retired_at) == ("ToughCable", None)

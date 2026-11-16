@@ -18,7 +18,7 @@ from starlette.types import Scope
 
 from inventory_tng.db import Gone
 from inventory_tng.local_time import show, show_day
-from inventory_tng.phrases import install, ngettext
+from inventory_tng.phrases import install, lazy_gettext, ngettext
 
 templates = Jinja2Templates(directory=Path(__file__).parent / "templates")
 install(templates.env)
@@ -49,7 +49,7 @@ def retired_holding(places: int) -> str:
 # page, the length checks and the scan page (frontend/src/OpenPackageCard.tsx),
 # which a test keeps the same (docs/decisions/0020, 2026-11-12;
 # inventory-tng-pg7).
-PRINTED_LENGTH = (
+PRINTED_LENGTH = lazy_gettext(
     "Read the length printed on the cable where it leaves the spool. If it "
     "counts up from the start, what's left is the package size minus the mark."
 )
@@ -58,7 +58,7 @@ PRINTED_LENGTH = (
 def printed_length(unit: str) -> str:
     """How to read the length printed on an open package of an item in
     `unit`, if it is a length (any but each, models.UNITS); else nothing."""
-    return PRINTED_LENGTH if unit != "each" else ""
+    return str(PRINTED_LENGTH) if unit != "each" else ""
 
 
 templates.env.filters["printed_length"] = printed_length
@@ -74,11 +74,11 @@ class Badge(NamedTuple):
 
 # The administrator pages' sections, in the navigation's order, by path and
 # name, and the badge of any that has one, by path (admin/__init__.py).
-SECTIONS: list[tuple[str, str]] = []
+SECTIONS: list[tuple[str, str | LazyProxy]] = []
 BADGES: dict[str, Callable[[Session], Badge | None]] = {}
 
 
-def sections(admin: object) -> list[tuple[str, str, Badge | None]]:
+def sections(admin: object) -> list[tuple[str, str | LazyProxy, Badge | None]]:
     """The navigation, for a page drawn for `admin`: each section with its
     badge, read in the session that loaded `admin`. With none open, no
     badges."""
@@ -178,20 +178,24 @@ def redirect(
 
 # What a page answering an error says, by status code: 400 for any other
 # client error, 500 for any server error.
+DID_NOT_WORK = lazy_gettext("That didn't work")
+NOT_TAKEN = lazy_gettext(
+    "The inventory could not take that as it was sent. Go back and try again."
+)
+NOT_FOUND = lazy_gettext("Not found")
+NOTHING_HERE = lazy_gettext("There is nothing here. The link may be old, or mistyped.")
+NOT_HERE = lazy_gettext("Not here")
+NOT_AT_THIS_ADDRESS = lazy_gettext("That can't be done at this address.")
+WENT_WRONG = lazy_gettext("Something went wrong")
+COULD_NOT_DO = lazy_gettext(
+    "The inventory could not do that. Try again; if it happens again, "
+    "tell whoever looks after it."
+)
 ERRORS = {
-    400: (
-        "That didn't work",
-        "The inventory could not take that as it was sent. Go back and try again.",
-    ),
-    404: ("Not found", "There is nothing here. The link may be old, or mistyped."),
-    405: ("Not here", "That can't be done at this address."),
-    500: (
-        "Something went wrong",
-        (
-            "The inventory could not do that. Try again; if it happens again, "
-            "tell whoever looks after it."
-        ),
-    ),
+    400: (DID_NOT_WORK, NOT_TAKEN),
+    404: (NOT_FOUND, NOTHING_HERE),
+    405: (NOT_HERE, NOT_AT_THIS_ADDRESS),
+    500: (WENT_WRONG, COULD_NOT_DO),
 }
 
 

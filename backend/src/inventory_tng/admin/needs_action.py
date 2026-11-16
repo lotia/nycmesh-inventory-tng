@@ -9,6 +9,7 @@ from decimal import Decimal
 from typing import Annotated, NamedTuple
 from urllib.parse import urlencode
 
+from babel.support import LazyProxy
 from fastapi import Depends
 from sqlalchemy import ColumnElement
 from sqlalchemy.orm import Session
@@ -17,9 +18,7 @@ from inventory_tng import open_packages
 from inventory_tng.admin.common import row_id
 from inventory_tng.db import DbSession
 from inventory_tng.models import Item, OpenPackage
-
-# Between how many and a package's name, as an administrator reads it.
-TIMES = "\N{MULTIPLICATION SIGN}"
+from inventory_tng.over_recorded import times
 
 
 class ItemWaiting(NamedTuple):
@@ -28,7 +27,7 @@ class ItemWaiting(NamedTuple):
 
     item_id: int
     item: str
-    # How many of each package, by its name: 3 TIMES "Spool 305 m".
+    # How many of each package, by its name (over_recorded.times).
     packages: str
     count: int
     # How far below zero those showing less than nothing are, together, in
@@ -45,13 +44,13 @@ def by_item(session: Session, *where: ColumnElement[bool]) -> list[ItemWaiting]:
     lines = []
     for item_id, found in grouped.items():
         # Each package as named, never a word made from its name
-        # (inventory-tng-b1z): "2 TIMES Spool 305 m, 1 TIMES Box 100 m".
+        # (inventory-tng-b1z), each as over_recorded.times says it.
         names = Counter(each.package for each in found)
         lines.append(
             ItemWaiting(
                 item_id,
                 found[0].item,
-                ", ".join(f"{n} {TIMES} {name}" for name, n in sorted(names.items())),
+                ", ".join(times(n, name) for name, n in sorted(names.items())),
                 len(found),
                 -sum((each.left for each in found if each.left < 0), Decimal(0)),
                 found[0].unit,
@@ -63,7 +62,7 @@ def by_item(session: Session, *where: ColumnElement[bool]) -> list[ItemWaiting]:
 class Kind(NamedTuple):
     """A kind of decision, its page, and which open packages wait for it."""
 
-    title: str
+    title: LazyProxy
     path: str
     where: tuple[ColumnElement[bool], ...]
 

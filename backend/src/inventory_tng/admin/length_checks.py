@@ -15,13 +15,21 @@ from decimal import Decimal, InvalidOperation
 from typing import Annotated, NamedTuple
 
 import structlog
+from babel.support import LazyProxy
 from fastapi import APIRouter, Depends, Form, Request
 from fastapi.responses import Response
 from sqlalchemy import ColumnElement, and_, func, or_, select, true
 from sqlalchemy.orm import Session
 
 from inventory_tng import ledger, open_packages, over_recorded
-from inventory_tng.admin.common import admin_page, now, quantity, row_id
+from inventory_tng.admin.common import (
+    SECTION_STOCK,
+    TICK_OPEN_PACKAGES,
+    admin_page,
+    now,
+    quantity,
+    row_id,
+)
 from inventory_tng.admin.listing import AskedView, Sort, Sorting, View, arranged
 from inventory_tng.admin.needs_action import (
     Kind,
@@ -42,6 +50,7 @@ from inventory_tng.models import (
     whole,
 )
 from inventory_tng.pages import NOTICES, not_found, redirect
+from inventory_tng.phrases import lazy_gettext
 from inventory_tng.sign_in import AdminSignedIn, SignedIn
 
 log = structlog.get_logger(__name__)
@@ -50,21 +59,35 @@ router = APIRouter(include_in_schema=False)
 
 LENGTHS = f"{STOCK}/length-checks"
 
+LENGTH_SET = lazy_gettext(
+    "Set: a count of each writes the difference from what it showed then; "
+    "cuts since stay."
+)
+LENGTH_LEFT = lazy_gettext("Left as it shows.")
+LENGTH_UNCHANGED = lazy_gettext(
+    "Nothing changed: it was checked meanwhile, or its place can't be counted. "
+    "Look again."
+)
+LENGTH_BAD = lazy_gettext("Type what is on it: a number, 0 or more.")
+LENGTH_RELOAD = lazy_gettext(
+    "This page is from before the last change to how lengths are set: load it "
+    "again, then set it."
+)
+LENGTH_NONE_SAID = lazy_gettext(
+    "Nobody said what is on those: type what is on each, and set it on its own."
+)
 NOTICES.update(
     {
-        "length_set": "Set: a count of each writes the difference from what "
-        "it showed then; cuts since stay.",
-        "length_left": "Left as it shows.",
-        "length_none": "Tick the open packages first.",
-        "length_unchanged": "Nothing changed: it was checked meanwhile, or "
-        "its place can't be counted. Look again.",
-        "length_bad": "Type what is on it: a number, 0 or more.",
-        "length_reload": "This page is from before the last change to how "
-        "lengths are set: load it again, then set it.",
-        "length_none_said": "Nobody said what is on those: type what is on "
-        "each, and set it on its own.",
+        "length_set": LENGTH_SET,
+        "length_left": LENGTH_LEFT,
+        "length_none": TICK_OPEN_PACKAGES,
+        "length_unchanged": LENGTH_UNCHANGED,
+        "length_bad": LENGTH_BAD,
+        "length_reload": LENGTH_RELOAD,
+        "length_none_said": LENGTH_NONE_SAID,
     }
 )
+LENGTHS_TITLE = lazy_gettext("Lengths to check")
 
 # Waiting for a check, not closed: reported by a volunteer, or gone below
 # zero.
@@ -81,8 +104,16 @@ CHECKED = (or_(REPORTED, and_(*BELOW_ONLY)), OPEN)
 # volunteer reported is under the first, whether or not it went below zero
 # too.
 KINDS = (
-    Kind("Shows the wrong length", f"{LENGTHS}/reported", (REPORTED, OPEN)),
-    Kind("Went below zero", f"{LENGTHS}/below-zero", (*BELOW_ONLY, OPEN)),
+    Kind(
+        lazy_gettext("Shows the wrong length"),
+        f"{LENGTHS}/reported",
+        (REPORTED, OPEN),
+    ),
+    Kind(
+        lazy_gettext("Went below zero"),
+        f"{LENGTHS}/below-zero",
+        (*BELOW_ONLY, OPEN),
+    ),
 )
 
 # Cuts shown beside each, newest first.
@@ -174,7 +205,7 @@ def _checks_page(
     signed: SignedIn,
     session: Session,
     only: Item | None,
-    title: str,
+    title: LazyProxy,
     where: Sequence[ColumnElement[bool]],
     view: View,
 ) -> Response:
@@ -209,7 +240,7 @@ def _checks_page(
             "title": title,
             "here": LENGTHS,
             "all_path": request.url.path,
-            "back_link": (STOCK, "Stock"),
+            "back_link": (STOCK, SECTION_STOCK),
             "only": only,
             "checked": checked,
             "view": view,
@@ -238,9 +269,7 @@ def length_checks_page(
     view: Viewed,
 ) -> Response:
     """All those to check, or only one item's."""
-    return _checks_page(
-        request, signed, session, only, "Lengths to check", CHECKED, view
-    )
+    return _checks_page(request, signed, session, only, LENGTHS_TITLE, CHECKED, view)
 
 
 @router.get(f"{LENGTHS}/{{which}}")

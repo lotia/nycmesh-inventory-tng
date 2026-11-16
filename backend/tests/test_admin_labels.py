@@ -16,10 +16,11 @@ from inventory_tng import labels
 from inventory_tng.accounts import qr_svg
 from inventory_tng.admin.common import LABELS
 from inventory_tng.admin.items import ITEMS
-from inventory_tng.admin.labels import PRINT
+from inventory_tng.admin.labels import PICK_LABELS, PRINT
 from inventory_tng.admin.listing import PER_PAGE
 from inventory_tng.admin.locations import LOCATIONS
 from inventory_tng.catalogue import catalogue
+from inventory_tng.labels import INACTIVE_WORDS, Inactive, package_label, place_words
 from inventory_tng.models import (
     Category,
     Item,
@@ -98,8 +99,8 @@ def test_a_package_and_a_place_have_codes_of_their_own(
     assert (loose.package_id, on_reel.package_id) == (None, reel.id)
     (on_shelf,) = labels_of(session, location_id=shelf.id)
     page = text(admin_client.get(LABELS))
-    assert "Cat6 cable: Reel of 305 m" in page
-    assert "Shelf A, in Hub" in page
+    assert package_label("Cat6 cable", "Reel", "305 m") in page
+    assert place_words("Shelf A", "Hub") in page
     page = text(admin_client.get(f"{LOCATIONS}/{shelf.id}"))
     assert on_shelf.code in page
     assert f'<form method="post" action="{LABELS}"' in page
@@ -180,7 +181,7 @@ def test_copies_and_picks_must_make_sense(
     for picks in ({}, {"label": gone.id}, {"label": 0}):
         sent = admin_client.get(PRINT, params=picks)
         assert sent.headers["location"] == f"{LABELS}?notice=pick_labels"
-    assert "Pick a current label" in text(
+    assert str(PICK_LABELS) in text(
         admin_client.get(LABELS, params={"notice": "pick_labels"})
     )
 
@@ -269,15 +270,15 @@ def test_inactive_labels_say_why_and_agree_with_the_scan_page(
     hub = add(session, Location(name="Hub", kind="store"))
     when = cable.created_at
     still_stocked = add(session, Label(item_id=place.item.id))
-    rows = {
-        "Revoked": add(session, Label(location_id=hub.id, revoked_at=when)),
-        "Item retired": add(session, Label(item_id=cable.id)),
-        "Place retired": add(session, Label(location_id=place.van.id)),
+    rows: dict[Inactive, Label] = {
+        "revoked": add(session, Label(location_id=hub.id, revoked_at=when)),
+        "item retired": add(session, Label(item_id=cable.id)),
+        "place retired": add(session, Label(location_id=place.van.id)),
     }
     radio_box = add(
         session, ItemPackage(item_id=place.item.id, name="Box", size=Decimal(4))
     )
-    rows["Package retired"] = add(
+    rows["package retired"] = add(
         session, Label(item_id=place.item.id, package_id=radio_box.id)
     )
     # A retired package with some still sealed scans too (inventory-tng-96a).
@@ -317,7 +318,7 @@ def test_inactive_labels_say_why_and_agree_with_the_scan_page(
     assert sealed.code not in page
     for why, label in rows.items():
         row = page[page.index(label.code) :].split("</tr>")[0]
-        assert f'<span class="tag">{why}</span>' in row, why
+        assert f'<span class="tag">{INACTIVE_WORDS[why]}</span>' in row, why
         # Neither printed nor revoked again from here.
         assert 'type="checkbox"' not in row
         assert "/revoke" not in row
@@ -375,7 +376,7 @@ def test_label_suggestions_name_it_and_narrow_the_list(
     offered = admin_client.get(f"{LABELS}/suggest", params={"q": "reel"}).json()
     assert offered == [
         {
-            "name": "Cat6 cable: Reel of 305 m",
+            "name": package_label("Cat6 cable", "Reel", "305 m"),
             "hint": on_reel.code,
             "href": f"{LABELS}?pick={on_reel.id}",
         }
@@ -383,7 +384,8 @@ def test_label_suggestions_name_it_and_narrow_the_list(
     page = text(admin_client.get(LABELS, params={"pick": str(on_reel.id)}))
     assert codes_listed(page) == [on_reel.code]
     assert loose.code not in page
-    assert "matching “Cat6 cable: Reel of 305 m”" in " ".join(page.split())
+    reel_words = package_label("Cat6 cable", "Reel", "305 m")
+    assert f"matching “{reel_words}”" in " ".join(page.split())
     revoked = admin_client.get(
         f"{LABELS}/suggest", params={"q": "reel", "show": "inactive"}
     )

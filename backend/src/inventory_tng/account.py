@@ -19,10 +19,13 @@ from inventory_tng.mail import Notify
 from inventory_tng.models import running_low
 from inventory_tng.once import OnceKey, sent_before
 from inventory_tng.pages import NOTICES, not_found, page, redirect
+from inventory_tng.phrases import lazy_gettext
 from inventory_tng.sign_in import (
     ACCOUNT,
+    ACCOUNT_TITLE,
     CONFIRM_FIELD,
     NAME_TAKEN,
+    RECOVERY_CODES_TITLE,
     AdminSignedIn,
     ConfirmedAdmin,
     ConfirmedByAuthenticator,
@@ -33,17 +36,32 @@ from inventory_tng.sign_in import (
 
 router = APIRouter(include_in_schema=False)
 
+EMAIL_CHANGED = lazy_gettext("Your email is changed.")
+PASSWORD_CHANGED = lazy_gettext(
+    "Your password is changed. Your other sessions have ended."
+)
+AUTHENTICATOR_RENAMED = lazy_gettext("Renamed.")
+AUTHENTICATOR_REMOVED = lazy_gettext("Removed.")
+TOTP_OFF = lazy_gettext("TOTP is off: your password alone signs you in.")
+SESSION_ENDED = lazy_gettext("That session has ended.")
+OTHERS_ENDED = lazy_gettext("Your other sessions have ended.")
 NOTICES.update(
     {
-        "email": "Your email is changed.",
-        "password": "Your password is changed. Your other sessions have ended.",
-        "renamed": "Renamed.",
-        "removed": "Removed.",
-        "totp_off": "TOTP is off: your password alone signs you in.",
-        "session": "That session has ended.",
-        "others": "Your other sessions have ended.",
+        "email": EMAIL_CHANGED,
+        "password": PASSWORD_CHANGED,
+        "renamed": AUTHENTICATOR_RENAMED,
+        "removed": AUTHENTICATOR_REMOVED,
+        "totp_off": TOTP_OFF,
+        "session": SESSION_ENDED,
+        "others": OTHERS_ENDED,
     }
 )
+EMAIL_TAKEN = lazy_gettext("Another administrator uses that address.")
+LAST_REQUIRED = lazy_gettext(
+    "TOTP is required here, so your last authenticator stays. Add another "
+    "first to replace it."
+)
+CODES_NEED_TOTP = lazy_gettext("Recovery codes come with an authenticator.")
 
 
 def _now() -> datetime:
@@ -66,7 +84,7 @@ def _account_page(
         request,
         "account.html",
         {
-            "title": "Your account",
+            "title": ACCOUNT_TITLE,
             "admin": signed.admin,
             "zone": site_zone(session),
             "problems": problems or {},
@@ -134,7 +152,7 @@ def change_email(
     if not unique(
         session, lambda: accounts.change_email(session, admin, email, _now())
     ):
-        taken = "Another administrator uses that address."
+        taken = str(EMAIL_TAKEN)
         return _refused(request, session, signed, "email", taken, values)
     response = _done(signed, session, "email", section="email")
     # Told at the old address, in case it was not them: someone with their
@@ -182,7 +200,7 @@ def rename_authenticator(
         )
 
     if not unique(session, rename):
-        return _refused(request, session, signed, field, NAME_TAKEN)
+        return _refused(request, session, signed, field, str(NAME_TAKEN))
     if not found[0]:
         return not_found()  # Someone else's, or gone: ids reveal nothing.
     return _done(signed, session, "renamed", section="authenticators")
@@ -202,10 +220,7 @@ def remove_authenticator(
     if outcome == "missing":
         return not_found()
     if outcome == "last_required":
-        problem = (
-            "TOTP is required here, so your last authenticator stays. "
-            "Add another first to replace it."
-        )
+        problem = str(LAST_REQUIRED)
         return _refused(request, session, signed, "authenticators", problem)
     done = _done(signed, session, outcome, section="authenticators")
     notify.tell(
@@ -225,7 +240,7 @@ def new_recovery_codes(
     """With a code from an authenticator each time (ConfirmedByAuthenticator),
     and told to the owner: new codes void the old."""
     if not signed.uses_totp:
-        problem = "Recovery codes come with an authenticator."
+        problem = str(CODES_NEED_TOTP)
         return _refused(request, session, signed, "recovery_codes", problem)
     if again := sent_before(request, session, signed, once, "recovery_codes", ACCOUNT):
         return again
@@ -235,7 +250,7 @@ def new_recovery_codes(
     return page(
         request,
         "recovery_codes.html",
-        {"title": "Your recovery codes", "codes": codes, "admin": signed.admin},
+        {"title": RECOVERY_CODES_TITLE, "codes": codes, "admin": signed.admin},
     )
 
 

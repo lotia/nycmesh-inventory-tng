@@ -13,7 +13,7 @@
 </fieldset>
 {% elif each.read or each.rule %}
 <div class="hint">
-  {% if each.read %}Read as {{ each.shown(each.read) }} · {{ each.read.unit.kind }}{% if each.clue %}, by “{{ each.clue | join("”, “") }}”{% endif %}.
+  {% if each.read %}Read as {{ each.shown(each.read) }} · {{ each.read.kind_words }}{% if each.clue %}, by “{{ each.clue | join("”, “") }}”{% endif %}.
   {% if each.rule and each.rule.respell %}Saved as {{ each.shown(each.read) }}.{% else %}Saved as typed.{% endif %}
   {%- else %}“{{ each.typed }}” is not read as a unit.{% endif %}
   {% if each.offered or each.read %}
@@ -21,7 +21,7 @@
     <summary>Not right?</summary>
     <label><input type="radio" name="{{ field }}" value="" {% if not chosen %}checked{% endif %}> As read</label>
     {% for reading in each.offered if reading != each.read %}
-    <label><input type="radio" name="{{ field }}" value="{{ reading }}" {% if chosen == reading | string %}checked{% endif %}> {{ each.shown(reading) }} · {{ reading.unit.kind }}</label>
+    <label><input type="radio" name="{{ field }}" value="{{ reading }}" {% if chosen == reading | string %}checked{% endif %}> {{ each.shown(reading) }} · {{ reading.kind_words }}</label>
     {% endfor %}
     {% if each.read %}
     <label><input type="radio" name="{{ field }}" value="{{ not_a_unit }}" {% if chosen == not_a_unit %}checked{% endif %}> Not a unit: keep “{{ each.typed }}”</label>

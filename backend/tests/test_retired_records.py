@@ -12,6 +12,7 @@ from sqlalchemy.orm import Session
 
 from inventory_tng import categories
 from inventory_tng.admin.common import RETIRED, RULES, retired_by
+from inventory_tng.admin.volunteers import BRING_THEM_BACK
 from inventory_tng.db import set_actor
 from inventory_tng.models import (
     Admin,
@@ -68,7 +69,7 @@ def test_a_retired_records_page_says_when_and_by_whom_and_is_read_only(
     assert re.search(r"<fieldset class=\"contents\" disabled>|required disabled>", page)
     buttons = re.findall(r"<button[^>]*>([^<]*)", page)
     assert [b for b in buttons if b not in ("Menu", "Sign out")] == [
-        "Bring them back" if kind == "volunteer" else "Bring it back"
+        BRING_THEM_BACK if kind == "volunteer" else "Bring it back"
     ]
 
 
@@ -93,7 +94,7 @@ def test_a_save_to_a_retired_record_is_refused(
         form |= {"category_id": str(row.category_id), "unit": row.unit}
     refused = admin_client.post(f"{path}/{row.id}{save}", data=form)
     assert refused.status_code == 409
-    assert RULES[RETIRED] in text(refused)
+    assert str(RULES[RETIRED]) in text(refused)
     session.refresh(row)
     assert row.name == was
 
@@ -107,7 +108,7 @@ def test_a_package_is_not_added_to_a_retired_item(
         f"/admin/items/{item.id}/packages", data={"package_name": "Box", "size": "10"}
     )
     assert refused.status_code == 409
-    assert RULES[RETIRED] in text(refused)
+    assert str(RULES[RETIRED]) in text(refused)
 
 
 def test_a_retired_items_package_is_not_retired(
@@ -118,7 +119,7 @@ def test_a_retired_items_package_is_not_retired(
     admin_client.post(f"/admin/items/{item.id}/retire")
     refused = admin_client.post(f"/admin/items/{item.id}/packages/{package.id}/retire")
     assert refused.status_code == 409
-    assert RULES[RETIRED] in text(refused)
+    assert str(RULES[RETIRED]) in text(refused)
     session.refresh(package)
     assert package.retired_at is None
 

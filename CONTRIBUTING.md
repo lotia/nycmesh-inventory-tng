@@ -885,7 +885,9 @@ Each side has a test that renders what has moved into the catalogue in a
 pseudo-locale, every letter accented, and fails on a word left in plain
 English: `backend/tests/test_phrases.py` and `frontend/src/pseudo.test.tsx`.
 When you move words into the catalogue, add what you moved to its
-`COVERED`.
+`COVERED`. On the server, every phrase named as a constant, alone or in a
+table such as `NOTICES`, is covered already; add a phrase said with values
+to `SAID_WITH_VALUES`, and a template to `COVERED`.
 
 ## Running the checks
 

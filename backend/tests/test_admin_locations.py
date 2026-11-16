@@ -6,7 +6,8 @@ from fastapi.testclient import TestClient
 from sqlalchemy import update
 from sqlalchemy.orm import Session
 
-from inventory_tng.admin.locations import LOCATIONS
+from inventory_tng.admin.common import PICK_A_ZONE, RULES
+from inventory_tng.admin.locations import LOCATIONS, PICK_WHAT, PICK_WHERE, TAKEN
 from inventory_tng.models import Location, Volunteer
 
 from helpers.rows import add, history, named, shown, tag
@@ -42,7 +43,21 @@ def test_an_area_needs_a_place_to_be(
 ) -> None:
     refused = admin_client.post(LOCATIONS, data={"name": "Shelf", "kind": "area"})
     assert refused.status_code == 400
-    assert "Pick where it is." in text(refused)
+    assert str(PICK_WHERE) in text(refused)
+
+
+def test_a_place_needs_a_kind_and_an_area_keeps_a_place(
+    admin_client: TestClient, session: Session
+) -> None:
+    refused = admin_client.post(LOCATIONS, data={"name": "Shelf", "kind": "cave"})
+    assert refused.status_code == 400
+    assert str(PICK_WHAT) in text(refused)
+    hub = place(session, "Hub", "store")
+    shelf = place(session, "Shelf", "area", hub)
+    form = {"name": "Shelf", "parent_id": "", "version": shown(shelf)}
+    refused = admin_client.post(f"{LOCATIONS}/{shelf.id}", data=form)
+    assert refused.status_code == 400
+    assert str(PICK_WHERE) in text(refused)
 
 
 def test_an_area_goes_inside_a_store_or_area_not_a_vehicle(
@@ -53,7 +68,7 @@ def test_an_area_goes_inside_a_store_or_area_not_a_vehicle(
         LOCATIONS, data={"name": "Glovebox", "kind": "area", "parent_id": str(van.id)}
     )
     assert refused.status_code == 400
-    assert "An area goes inside a store or another area." in text(refused)
+    assert str(RULES["location_area_parent"]) in text(refused)
 
 
 def test_names_are_unique_beside_each_other_only(
@@ -65,7 +80,7 @@ def test_names_are_unique_beside_each_other_only(
     taken = admin_client.post(
         LOCATIONS, data={"name": "shelf a", "kind": "area", "parent_id": str(hub.id)}
     )
-    assert "already has that name" in text(taken)
+    assert str(TAKEN) in text(taken)
     elsewhere = admin_client.post(
         LOCATIONS, data={"name": "Shelf A", "kind": "area", "parent_id": str(depot.id)}
     )
@@ -139,7 +154,7 @@ def test_a_place_holding_stock_is_not_retired(
     write(session, stock)  # Three into the van.
     refused = admin_client.post(f"{LOCATIONS}/{stock.van.id}/retire")
     assert refused.status_code == 400
-    assert "Move what is here elsewhere, or count it, first." in text(refused)
+    assert str(RULES["location_holds_stock"]) in text(refused)
     assert stock.van.retired_at is None
 
 
@@ -169,7 +184,9 @@ def test_a_location_has_a_zone_of_its_own_or_its_parents(
     )
     assert refused.status_code == 400
     # Under the zone, not the name.
-    assert re.search(r"Time zone.*Pick a zone from the list", text(refused), re.DOTALL)
+    assert re.search(
+        rf"Time zone.*{re.escape(str(PICK_A_ZONE))}", text(refused), re.DOTALL
+    )
 
 
 def test_a_zone_these_rules_dropped_stays_through_a_rename(

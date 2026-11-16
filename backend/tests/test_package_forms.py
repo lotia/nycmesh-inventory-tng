@@ -15,7 +15,9 @@ from sqlalchemy.orm import Session
 from structlog.testing import capture_logs
 
 from inventory_tng import adjustment_reasons, ledger, open_packages
-from inventory_tng.admin import needs_action, stock, used_up
+from inventory_tng.admin import counts, needs_action, stock, used_up
+from inventory_tng.admin import items as items_page
+from inventory_tng.admin.items import SHORTER_THAN_WHOLE
 from inventory_tng.ledger import (
     LOOSE,
     Entry,
@@ -1532,12 +1534,12 @@ def test_a_packages_settings_are_set_on_its_items_page(
     assert (spools.spool.short_below, spools.spool.minimum_sealed) == (None, None)
     for bad, words in (
         ({"short_below": "-1"}, None),
-        ({"short_below": "305"}, "Shorter than a whole one, or blank."),
-        ({"minimum_sealed": "lots"}, "A whole number of packages, or blank."),
+        ({"short_below": "305"}, SHORTER_THAN_WHOLE),
+        ({"minimum_sealed": "lots"}, items_page.WHOLE_PACKAGES),
     ):
         refused = admin_client.post(path, data=bad)
         assert refused.status_code == 400
-        assert words is None or words in text(refused)
+        assert words is None or str(words) in text(refused)
     other = f"/admin/items/{spools.place.item.id}/packages/{spools.spool.id}/settings"
     assert admin_client.post(other, data={}).status_code == 404
     # Its item retired: read only.
@@ -1703,13 +1705,13 @@ def test_the_count_page_counts_sealed_and_says_whats_wrong(
     response = admin_client.post(f"{COUNTS}/{store}", data=bad)
     # Refused whole; what the page shows a field for is said by it.
     assert response.status_code == 400
-    assert "A whole number of packages." in text(response)
+    assert str(counts.WHOLE_PACKAGES) in text(response)
     left = base | {
         "key": str(uuid.uuid4()),
         "found_package_id": str(spool),
         "found_left": "",
     }
-    assert "How much is left on it." in text(
+    assert str(counts.HOW_MUCH_LEFT) in text(
         admin_client.post(f"{COUNTS}/{store}", data=left)
     )
 

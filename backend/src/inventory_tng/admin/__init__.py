@@ -15,6 +15,7 @@ from inventory_tng import pages
 from inventory_tng.admin import (
     admins,
     categories,
+    common,
     counts,
     devices,
     home,
@@ -32,16 +33,16 @@ from inventory_tng.admin import (
 
 # The sections, in the order the navigation shows them, and their badges.
 pages.SECTIONS[:] = (
-    (items.ITEMS, "Items"),
-    (categories.CATEGORIES, "Categories"),
-    (locations.LOCATIONS, "Locations"),
-    (labels.LABELS, "Labels"),
-    (volunteers.VOLUNTEERS, "Volunteers"),
-    (stock.STOCK, "Stock"),
-    (counts.COUNTS, "Counts"),
-    (devices.DEVICES, "Devices"),
-    (admins.ADMINS, "Administrators"),
-    (settings.SETTINGS, "Site settings"),
+    (items.ITEMS, common.SECTION_ITEMS),
+    (categories.CATEGORIES, common.SECTION_CATEGORIES),
+    (locations.LOCATIONS, common.SECTION_LOCATIONS),
+    (labels.LABELS, common.SECTION_LABELS),
+    (volunteers.VOLUNTEERS, common.SECTION_VOLUNTEERS),
+    (stock.STOCK, common.SECTION_STOCK),
+    (counts.COUNTS, common.SECTION_COUNTS),
+    (devices.DEVICES, common.SECTION_DEVICES),
+    (admins.ADMINS, common.SECTION_ADMINS),
+    (settings.SETTINGS, common.SECTION_SETTINGS),
 )
 pages.BADGES[counts.COUNTS] = counts.badge
 
