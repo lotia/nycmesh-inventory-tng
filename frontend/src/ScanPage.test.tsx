@@ -7,27 +7,87 @@ import {
   within,
 } from "@testing-library/preact";
 import { describe, expect, type MockInstance, test, vi } from "vitest";
-import { BUILD, BUILD_KEY, Builds } from "./build";
+import {
+  BUILD,
+  BUILD_KEY,
+  Builds,
+  MUST_UPGRADE as MUST_UPGRADE_PHRASE,
+  UPDATED as UPDATED_PHRASE,
+  UPGRADE,
+} from "./build";
 import { openCamera } from "./camera";
 import {
   addOne,
   STORAGE_KEY as CART_KEY,
   CartStore,
   freshCart,
+  PICK_FROM,
+  PICK_TO,
+  PICK_YOUR_NAME,
   storeCart,
 } from "./cart";
-import { PRINTED_LENGTH } from "./OpenPackageCard";
+import { say } from "./i18n";
+import {
+  ALL_OF_IT,
+  NOTHING_USABLE,
+  PRINTED_LENGTH,
+  SHOWS_NOTHING_LEFT,
+  WRONG_LENGTH,
+} from "./OpenPackageCard";
+import { ITEM_RETIRED, RESCAN as RESCAN_PHRASE } from "./older";
 import {
   KEY_REUSED,
   MAKE_CHANGES,
   NO_ANSWER,
+  NOT_RECORDED,
   OFFLINE,
   STORAGE_KEY as OUTBOX_KEY,
   Outbox,
   SOME_NOT_RECORDED,
 } from "./outbox";
 import { ADD_DIFFERENCE, IN_CART } from "./recorded";
-import { ScanPage } from "./ScanPage";
+import { DONE, POINT } from "./Scanner";
+import {
+  ADD_TO_CART,
+  ADDED_BACK as ADDED_BACK_PHRASE,
+  CANNOT_ADD,
+  CART_NOT_EMPTY,
+  CARTS_FROM_DEVICE,
+  CHANGED_BEFORE_DISCARD,
+  CHANGED_CHECK_AGAIN,
+  CHANGED_ELSEWHERE,
+  CHANGED_NOT_DISCARDED,
+  CHECKED_OUT,
+  CONFIRM_DISCARD,
+  COULD_NOT_LOAD,
+  DISCARD,
+  DISCARD_CART,
+  DISMISS,
+  FIX_THEN_RECORD,
+  FROM,
+  INSTALL_NUMBER,
+  KEEP_IT,
+  KIND_WORDS,
+  NO_NAME_PICKED,
+  NOT_DISCARDED as NOT_DISCARDED_PHRASE,
+  NOT_KEEPING as NOT_KEEPING_PHRASE,
+  NOT_KEPT as NOT_KEPT_PHRASE,
+  NOT_ME,
+  NOT_REMOVED as NOT_REMOVED_PHRASE,
+  NOT_SENT,
+  NOTHING_IN_CART,
+  PICK_A_PLACE,
+  RECORD,
+  REMOVE,
+  SCAN_WITH_CAMERA,
+  ScanPage,
+  SOMETHING,
+  THATS_ME,
+  TO,
+  TRY_AGAIN,
+  WHERE,
+  YOUR_NAME,
+} from "./ScanPage";
 import { MOST_SECONDS_TO_SAVE, telemetry } from "./telemetry";
 import { fakeCamera } from "./test-camera";
 import { CATALOGUE, WITH_CAFE } from "./test-catalogue";
@@ -92,7 +152,7 @@ const saves = (sent: Request[]) =>
   sent.filter((request) => request.url.endsWith("/api/transactions"));
 
 async function ready() {
-  await screen.findByLabelText("Your name");
+  await screen.findByLabelText(say(YOUR_NAME));
 }
 
 function find(text: string) {
@@ -103,15 +163,15 @@ function find(text: string) {
 
 /** A move from the hub to the van, of one cable, by Ada. */
 function fillMove(cable = "Cat6 cable") {
-  pick("Your name", "1");
-  pick("From", "10");
-  pick("To", "12");
+  pick(say(YOUR_NAME), "1");
+  pick(say(FROM), "10");
+  pick(say(TO), "12");
   find("cable");
   fireEvent.click(screen.getByRole("button", { name: cable }));
 }
 
 const save = () =>
-  fireEvent.click(screen.getByRole("button", { name: "Record" }));
+  fireEvent.click(screen.getByRole("button", { name: say(RECORD) }));
 
 /** Storage refusing every write to `key`, until restored. */
 function refusingWrites(key: string) {
@@ -181,17 +241,19 @@ describe("loading", () => {
   test("the catalogue fills the choices", async () => {
     open();
     await ready();
-    const names = within(screen.getByLabelText("Your name")).getAllByRole(
+    const names = within(screen.getByLabelText(say(YOUR_NAME))).getAllByRole(
       "option",
     );
     expect(names.map((option) => option.textContent)).toEqual([
-      "Pick your name",
+      say(NO_NAME_PICKED),
       "Ada",
       "Grace",
     ]);
-    const places = within(screen.getByLabelText("From")).getAllByRole("option");
+    const places = within(screen.getByLabelText(say(FROM))).getAllByRole(
+      "option",
+    );
     expect(places.map((option) => option.textContent)).toEqual([
-      "Pick a place",
+      say(PICK_A_PLACE),
       "Hub",
       "Hub › Shelf A",
       "Van",
@@ -251,10 +313,10 @@ describe("loading", () => {
       return json(CATALOGUE, 200);
     });
     open(api);
-    expect(
-      (await screen.findByText("Couldn't load the catalogue.")).tagName,
-    ).toBe("STRONG");
-    fireEvent.click(screen.getByRole("button", { name: "Try again" }));
+    expect((await screen.findByText(say(COULD_NOT_LOAD))).tagName).toBe(
+      "STRONG",
+    );
+    fireEvent.click(screen.getByRole("button", { name: say(TRY_AGAIN) }));
     await ready();
   });
 
@@ -283,7 +345,7 @@ describe("filling and saving a cart", () => {
     );
     open(api);
     await ready();
-    pick("From", "10");
+    pick(say(FROM), "10");
     find("cat6");
     fireEvent.click(screen.getByRole("button", { name: "Cat6 cable" }));
   }
@@ -302,7 +364,7 @@ describe("filling and saving a cart", () => {
   });
 
   const CUT = "Cut or take from the Spool opened 2026-11-03 (m)";
-  const NOTHING_LEFT = "Nothing usable left on it";
+  const NOTHING_LEFT = say(NOTHING_USABLE);
   const ticked = () =>
     (screen.getByLabelText(NOTHING_LEFT) as HTMLInputElement).checked;
   const note = () =>
@@ -314,7 +376,7 @@ describe("filling and saving a cart", () => {
     const { api, sent } = server();
     const outbox = open(api);
     await ready();
-    pick("Your name", "1");
+    pick(say(YOUR_NAME), "1");
     expect(storedCart()).not.toHaveProperty("batchKey");
     fillMove();
     const key = storedCart().batchKey;
@@ -353,17 +415,17 @@ describe("filling and saving a cart", () => {
       await ready();
       save();
       expect(screen.queryByText(/^Sending:/)).toBeNull();
-      expect(screen.getByText("Nothing in the cart yet.")).toBeDefined();
+      expect(screen.getByText(say(NOTHING_IN_CART))).toBeDefined();
       return sent;
     };
     expect(saves(await again(left))).toHaveLength(0);
-    expect(screen.queryByText(SOME_NOT_RECORDED)).toBeNull();
+    expect(screen.queryByText(say(SOME_NOT_RECORDED))).toBeNull();
     // Changed, by a tab that had not heard: listed as recorded elsewhere,
     // and asked about once, under the cart's key, not recorded.
     const changed = JSON.parse(left);
     changed.lines.push({ itemId: 100, packages: {}, loose: "1" });
     const asked = await again(JSON.stringify(changed));
-    await screen.findByText(SOME_NOT_RECORDED);
+    await screen.findByText(say(SOME_NOT_RECORDED));
     expect(saves(asked)).toHaveLength(1);
     expect(record).not.toHaveBeenCalledWith(
       expect.objectContaining({ kind: "scan_to_save" }),
@@ -385,9 +447,7 @@ describe("filling and saving a cart", () => {
       });
     save();
     setItem.mockRestore();
-    screen.getByText(
-      "This browser wouldn't keep the cart, so it wasn't sent. Free some space or leave private browsing, then try again.",
-    );
+    screen.getByText(say(NOT_SENT));
     screen.getByText("Cat6 cable");
     expect(outbox.entries.value).toEqual([]);
   });
@@ -404,12 +464,11 @@ describe("filling and saving a cart", () => {
         }
         real(key, value);
       });
-    const NOT_KEEPING =
-      "This browser isn't keeping the cart, so a reload will empty it. Free some space or leave private browsing.";
+    const NOT_KEEPING = say(NOT_KEEPING_PHRASE);
     fillMove();
     expectBold(screen.getByText(NOT_KEEPING).closest("li"), NOT_KEEPING);
     setItem.mockRestore();
-    pick("To", "10");
+    pick(say(TO), "10");
     expect(screen.queryByText(NOT_KEEPING)).toBeNull();
   });
 
@@ -450,16 +509,16 @@ describe("filling and saving a cart", () => {
     fireEvent.input(field, { target: { value: "20" } });
     expect(ticked()).toBe(false);
     // Moved whole: no cut, no box.
-    fireEvent.click(screen.getByLabelText("All of it, moved still open"));
+    fireEvent.click(screen.getByLabelText(say(ALL_OF_IT)));
     expect(field.value).toBe("120");
     expect(field.disabled).toBe(true);
     expect(screen.queryByLabelText(NOTHING_LEFT)).toBeNull();
-    fireEvent.click(screen.getByLabelText("All of it, moved still open"));
+    fireEvent.click(screen.getByLabelText(say(ALL_OF_IT)));
     expect(field.value).toBe("");
     // Another place: what was taken from this one's packages goes.
     fireEvent.input(field, { target: { value: "20" } });
-    pick("From", "12");
-    pick("From", "10");
+    pick(say(FROM), "12");
+    pick(say(FROM), "10");
     expect((screen.getByLabelText(CUT) as HTMLInputElement).value).toBe("");
   });
 
@@ -475,9 +534,7 @@ describe("filling and saving a cart", () => {
     ).toBeDefined();
     fireEvent.input(screen.getByLabelText(CUT), { target: { value: "" } });
     expect(screen.queryByLabelText(now)).toBeNull();
-    fireEvent.click(
-      screen.getByRole("button", { name: "Shows the wrong length?" }),
-    );
+    fireEvent.click(screen.getByRole("button", { name: say(WRONG_LENGTH) }));
     const field = screen.getByLabelText(now) as HTMLInputElement;
     fireEvent.input(field, { target: { value: "90" } });
     expect(field.value).toBe("90");
@@ -485,7 +542,7 @@ describe("filling and saving a cart", () => {
     const hint = document.getElementById(
       field.getAttribute("aria-describedby") ?? "",
     );
-    expect(hint?.textContent).toBe(PRINTED_LENGTH);
+    expect(hint?.textContent).toBe(say(PRINTED_LENGTH));
   });
 
   test("a cut leaving less than the package's short length ticks the box", async () => {
@@ -508,10 +565,10 @@ describe("filling and saving a cart", () => {
       cards.map((card) => within(card).getAllByText(/ m$/)[0]?.textContent),
     ).toEqual(["Now: 120 m", "Now: 40 m", "Now: -4 m"]);
     expect(
-      within(cards[2] as HTMLElement).getByText("Shows nothing left"),
+      within(cards[2] as HTMLElement).getByText(say(SHOWS_NOTHING_LEFT)),
     ).toBeDefined();
     expect(
-      within(cards[0] as HTMLElement).queryByText("Shows nothing left"),
+      within(cards[0] as HTMLElement).queryByText(say(SHOWS_NOTHING_LEFT)),
     ).toBeNull();
   });
 
@@ -534,12 +591,12 @@ describe("filling and saving a cart", () => {
   test("opening packages asks where, not from and to; an item adds its package", async () => {
     open();
     await ready();
-    fireEvent.click(screen.getByLabelText("Opening packages"));
-    expect(screen.getByLabelText("Where")).toBeDefined();
-    expect(screen.queryByLabelText("To")).toBeNull();
+    fireEvent.click(screen.getByLabelText(say(KIND_WORDS.open)));
+    expect(screen.getByLabelText(say(WHERE))).toBeDefined();
+    expect(screen.queryByLabelText(say(TO))).toBeNull();
     // Only whole packages are opened: the radio's box sealed here, not a
     // radio.
-    pick("Where", "10");
+    pick(say(WHERE), "10");
     find("beam");
     fireEvent.click(screen.getByRole("button", { name: "LiteBeam 5AC" }));
     expect(
@@ -550,30 +607,30 @@ describe("filling and saving a cart", () => {
   test("opening, a place picked fills what was added before and not typed", async () => {
     open();
     await ready();
-    fireEvent.click(screen.getByLabelText("Opening packages"));
+    fireEvent.click(screen.getByLabelText(say(KIND_WORDS.open)));
     const box = () => (screen.getByLabelText(/^Box/) as HTMLInputElement).value;
     // No place yet: the radio's one package (inventory-tng-prp).
     find("beam");
     fireEvent.click(screen.getByRole("button", { name: "LiteBeam 5AC" }));
     expect(box()).toBe("1");
     // None sealed at the van; one at the hub.
-    pick("Where", "12");
+    pick(say(WHERE), "12");
     expect(box()).toBe("");
-    pick("Where", "10");
+    pick(say(WHERE), "10");
     expect(box()).toBe("1");
     // Picked again, then through a place with none: still two.
     find("beam");
     fireEvent.click(screen.getByRole("button", { name: "LiteBeam 5AC" }));
-    pick("Where", "12");
-    pick("Where", "10");
+    pick(say(WHERE), "12");
+    pick(say(WHERE), "10");
     expect(box()).toBe("2");
     // Switched to another kind and back, the place kept: as it was.
-    fireEvent.click(screen.getByLabelText("Moving stock"));
-    fireEvent.click(screen.getByLabelText("Opening packages"));
+    fireEvent.click(screen.getByLabelText(say(KIND_WORDS.move)));
+    fireEvent.click(screen.getByLabelText(say(KIND_WORDS.open)));
     expect(box()).toBe("2");
     // Typed into: never filled again.
     fireEvent.input(screen.getByLabelText(/^Box/), { target: { value: "3" } });
-    pick("Where", "12");
+    pick(say(WHERE), "12");
     expect(box()).toBe("3");
   });
 
@@ -606,16 +663,16 @@ describe("filling and saving a cart", () => {
     const { api } = answering(() => json(withOld, 200));
     open(api);
     await ready();
-    fireEvent.click(screen.getByLabelText("Opening packages"));
+    fireEvent.click(screen.getByLabelText(say(KIND_WORDS.open)));
     const field = (name: RegExp) =>
       (screen.getByLabelText(name) as HTMLInputElement).value;
     // At the van only the old crate is sealed (inventory-tng-f9h).
-    pick("Where", "12");
+    pick(say(WHERE), "12");
     find("beam");
     fireEvent.click(screen.getByRole("button", { name: "LiteBeam 5AC" }));
     expect([field(/^Box/), field(/^Old crate/)]).toEqual(["", "1"]);
     // At the hub both are: neither is picked for the volunteer.
-    pick("Where", "10");
+    pick(say(WHERE), "10");
     fireEvent.input(screen.getByLabelText(/^Old crate/), {
       target: { value: "" },
     });
@@ -635,26 +692,32 @@ describe("filling and saving a cart", () => {
     open(api);
     await ready();
     // Nothing to discard in an empty cart.
-    expect(screen.queryByRole("button", { name: "Discard cart" })).toBeNull();
+    expect(
+      screen.queryByRole("button", { name: say(DISCARD_CART) }),
+    ).toBeNull();
     fillMove();
-    fireEvent.click(screen.getByRole("button", { name: "Discard cart" }));
+    fireEvent.click(screen.getByRole("button", { name: say(DISCARD_CART) }));
     // Row 15's pattern (Ali, inventory-tng-wyq).
-    expect(screen.getByRole("alert").textContent).toBe("Confirm discard");
-    expect(screen.getByRole("button", { name: "Discard" }).className).toBe(
+    expect(screen.getByRole("alert").textContent).toBe(say(CONFIRM_DISCARD));
+    expect(screen.getByRole("button", { name: say(DISCARD) }).className).toBe(
       "danger",
     );
-    expect(screen.queryByRole("button", { name: "Discard cart" })).toBeNull();
-    fireEvent.click(screen.getByRole("button", { name: "Keep it" }));
+    expect(
+      screen.queryByRole("button", { name: say(DISCARD_CART) }),
+    ).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: say(KEEP_IT) }));
     screen.getByText("Cat6 cable");
-    expect(screen.queryByText("Confirm discard")).toBeNull();
-    fireEvent.click(screen.getByRole("button", { name: "Discard cart" }));
-    fireEvent.click(screen.getByRole("button", { name: "Discard" }));
-    screen.getByText("Nothing in the cart yet.");
-    expect(screen.queryByText("Confirm discard")).toBeNull();
-    expect(screen.queryByRole("button", { name: "Discard cart" })).toBeNull();
+    expect(screen.queryByText(say(CONFIRM_DISCARD))).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: say(DISCARD_CART) }));
+    fireEvent.click(screen.getByRole("button", { name: say(DISCARD) }));
+    screen.getByText(say(NOTHING_IN_CART));
+    expect(screen.queryByText(say(CONFIRM_DISCARD))).toBeNull();
+    expect(
+      screen.queryByRole("button", { name: say(DISCARD_CART) }),
+    ).toBeNull();
     expect(storedCart().lines).toEqual([]);
-    expect(selected("Your name")).toBe("1");
-    expect(selected("From")).toBe("10");
+    expect(selected(say(YOUR_NAME))).toBe("1");
+    expect(selected(say(FROM))).toBe("10");
     expect(
       record.mock.calls.filter(([event]) => event.kind === "cart_discarded"),
     ).toEqual([[{ kind: "cart_discarded" }]]);
@@ -671,7 +734,7 @@ describe("filling and saving a cart", () => {
       open();
       await ready();
       fillMove();
-      fireEvent.click(screen.getByRole("button", { name: "Discard cart" }));
+      fireEvent.click(screen.getByRole("button", { name: say(DISCARD_CART) }));
       // Another tab counts 4 m, which this tab's volunteer never confirmed.
       const theirs = {
         ...freshCart(),
@@ -688,12 +751,12 @@ describe("filling and saving a cart", () => {
           screen.getByText("4 m in all");
         });
       }
-      fireEvent.click(screen.getByRole("button", { name: "Discard" }));
+      fireEvent.click(screen.getByRole("button", { name: say(DISCARD) }));
       expect(screen.getByRole("alert").textContent).toBe(
-        "The cart was changed in another tab. Check it, then discard it again.",
+        say(CHANGED_BEFORE_DISCARD),
       );
       screen.getByText("4 m in all");
-      expect(screen.queryByText("Confirm discard")).toBeNull();
+      expect(screen.queryByText(say(CONFIRM_DISCARD))).toBeNull();
       expect(storedCart().lines).toEqual(theirs.lines);
       expect(
         record.mock.calls.filter(([event]) => event.kind === "cart_discarded"),
@@ -705,18 +768,18 @@ describe("filling and saving a cart", () => {
     open();
     await ready();
     fillMove();
-    fireEvent.click(screen.getByRole("button", { name: "Discard cart" }));
-    screen.getByText("Confirm discard");
+    fireEvent.click(screen.getByRole("button", { name: say(DISCARD_CART) }));
+    screen.getByText(say(CONFIRM_DISCARD));
     const other = (lines: ReturnType<typeof freshCart>["lines"]) => {
       storeCart({ ...freshCart(), volunteerId: 1, lines, revision: "x" });
       window.dispatchEvent(new StorageEvent("storage", { key: CART_KEY }));
     };
     other([]);
-    await screen.findByText("Nothing in the cart yet.");
+    await screen.findByText(say(NOTHING_IN_CART));
     other([{ itemId: 101, packages: {}, loose: "4" }]);
     await screen.findByText("4 m in all");
-    expect(screen.queryByText("Confirm discard")).toBeNull();
-    screen.getByRole("button", { name: "Discard cart" });
+    expect(screen.queryByText(say(CONFIRM_DISCARD))).toBeNull();
+    screen.getByRole("button", { name: say(DISCARD_CART) });
   });
 
   test("a move is saved, sent, and a new cart keeps the choices", async () => {
@@ -724,9 +787,9 @@ describe("filling and saving a cart", () => {
     const { api, sent } = server();
     const outbox = open(api);
     await ready();
-    pick("Your name", "1");
-    pick("From", "10");
-    pick("To", "12");
+    pick(say(YOUR_NAME), "1");
+    pick(say(FROM), "10");
+    pick(say(TO), "12");
     find("beam");
     fireEvent.click(screen.getByRole("button", { name: "LiteBeam 5AC" }));
     fireEvent.input(screen.getByLabelText("Box (4 each)"), {
@@ -758,9 +821,9 @@ describe("filling and saving a cart", () => {
       seconds: expect.any(Number),
     });
     // The next cart: empty, with the same name and places.
-    expect(screen.getByText("Nothing in the cart yet.")).toBeDefined();
-    expect(selected("Your name")).toBe("1");
-    expect(selected("To")).toBe("12");
+    expect(screen.getByText(say(NOTHING_IN_CART))).toBeDefined();
+    expect(selected(say(YOUR_NAME))).toBe("1");
+    expect(selected(say(TO))).toBe("12");
   });
 
   test("a scanned label adds its package; Enter adds the only match", async () => {
@@ -791,7 +854,7 @@ describe("filling and saving a cart", () => {
     const finder = screen.getByLabelText(/Find an item/);
     fireEvent.keyDown(finder, { key: "a" });
     fireEvent.keyDown(finder, { key: "Enter" });
-    expect(screen.getByText("Nothing in the cart yet.")).toBeDefined();
+    expect(screen.getByText(say(NOTHING_IN_CART))).toBeDefined();
   });
 
   test("Save says what is missing, and sends nothing", async () => {
@@ -803,9 +866,9 @@ describe("filling and saving a cart", () => {
       "listitem",
     );
     expect(problems.map((p) => p.textContent)).toEqual([
-      "Pick your name.",
-      "Pick where it comes from.",
-      "Pick where it goes.",
+      say(PICK_YOUR_NAME),
+      say(PICK_FROM),
+      say(PICK_TO),
     ]);
     expect(saves(sent)).toEqual([]);
   });
@@ -852,10 +915,10 @@ describe("filling and saving a cart", () => {
   test("an install asks for its number and has no To", async () => {
     open();
     await ready();
-    fireEvent.click(screen.getByLabelText("Taking it to an install"));
+    fireEvent.click(screen.getByLabelText(say(KIND_WORDS.install)));
     expect(screen.getByLabelText(/install number/)).toBeDefined();
-    expect(screen.queryByLabelText("To")).toBeNull();
-    expect(screen.getByLabelText("From")).toBeDefined();
+    expect(screen.queryByLabelText(say(TO))).toBeNull();
+    expect(screen.getByLabelText(say(FROM))).toBeDefined();
   });
 
   test("a line is changed or removed on its own, and an install number typed", async () => {
@@ -871,11 +934,11 @@ describe("filling and saving a cart", () => {
     expect(screen.getByText("2 m in all")).toBeDefined();
     expect(screen.getByText("1 each in all")).toBeDefined();
     fireEvent.click(
-      screen.getAllByRole("button", { name: "Remove" })[1] as Element,
+      screen.getAllByRole("button", { name: say(REMOVE) })[1] as Element,
     );
     expect(screen.queryByText("1 each in all")).toBeNull();
     expect(screen.getByText("2 m in all")).toBeDefined();
-    fireEvent.click(screen.getByLabelText("Taking it to an install"));
+    fireEvent.click(screen.getByLabelText(say(KIND_WORDS.install)));
     const number = screen.getByLabelText(/install number/) as HTMLInputElement;
     fireEvent.input(number, { target: { value: "1234" } });
     expect(number.value).toBe("1234");
@@ -911,16 +974,16 @@ describe("filling and saving a cart", () => {
         element?.className === "alert" &&
         element.textContent === "Not recorded. Line 2: No more than 0.5 left.",
     );
-    // Only "Not recorded." in bold; in what follows, the line's number
+    // Only say(NOT_RECORDED) in bold; in what follows, the line's number
     // the page wrote in italic, the server's words as they are (Ali,
     // inventory-tng-93z).
-    expectRefusal(note, "Not recorded.", ["2"]);
+    expectRefusal(note, say(NOT_RECORDED), ["2"]);
     const entry = note.closest("li") as HTMLElement;
     // Numbered as the problems name them.
     expect(
       [...entry.querySelectorAll("ul li")].map((each) => each.textContent),
     ).toEqual(["1. Cat6 cable: 1 m", "2. LiteBeam 5AC: 1"]);
-    within(entry).getByRole("button", { name: "Dismiss" });
+    within(entry).getByRole("button", { name: say(DISMISS) });
   });
 
   test("two batches under one key are listed each with its own lines, and dismissed alone (inventory-tng-suo)", async () => {
@@ -974,7 +1037,7 @@ describe("filling and saving a cart", () => {
     expect(lines("first")).toEqual([]);
     expect(lines("second")).toEqual(["1. Cat6 cable: 2 m"]);
     fireEvent.click(
-      within(row("second")).getByRole("button", { name: "Dismiss" }),
+      within(row("second")).getByRole("button", { name: say(DISMISS) }),
     );
     expect(screen.queryByText("second")).toBeNull();
     screen.getByText("first");
@@ -1023,9 +1086,9 @@ describe("filling and saving a cart", () => {
     );
     open(api);
     await ready();
-    pick("Your name", "1");
-    pick("From", "10");
-    pick("To", "12");
+    pick(say(YOUR_NAME), "1");
+    pick(say(FROM), "10");
+    pick(say(TO), "12");
     find("3");
     fireEvent.click(screen.getByRole("button", { name: "3" }));
     fireEvent.input(screen.getByLabelText("Loose m"), {
@@ -1046,17 +1109,15 @@ describe("filling and saving a cart", () => {
     );
     const outbox = open(api);
     await ready();
-    pick("Your name", "2");
-    fireEvent.click(screen.getByLabelText("Receiving stock"));
-    pick("To", "11");
+    pick(say(YOUR_NAME), "2");
+    fireEvent.click(screen.getByLabelText(say(KIND_WORDS.receipt)));
+    pick(say(TO), "11");
     find("cable");
     fireEvent.click(screen.getByRole("button", { name: "Cat6 cable" }));
     save();
     // A failure, in the alert's style, in bold, but not read out: every
     // note in the list is there as the page loads (Ali, inventory-tng-93z).
-    const note = await screen.findByText(
-      "No answer from the inventory. Trying again shortly.",
-    );
+    const note = await screen.findByText(say(NO_ANSWER));
     expect(note.tagName).toBe("STRONG");
     expect(note.parentElement?.className).toBe("alert");
     expect(outbox.entries.value[0]).toMatchObject({
@@ -1079,14 +1140,14 @@ describe("filling and saving a cart", () => {
     });
     save();
     // Bold whole, in the alert's style (Ali, inventory-tng-wyq, 'Offline').
-    const note = await screen.findByText(OFFLINE);
+    const note = await screen.findByText(say(OFFLINE));
     expect(note.tagName).toBe("STRONG");
-    expect(screen.queryByText(NO_ANSWER)).toBeNull();
+    expect(screen.queryByText(say(NO_ANSWER))).toBeNull();
     setOnline(onLine, true);
-    await screen.findByText(NO_ANSWER);
-    expect(screen.queryByText(OFFLINE)).toBeNull();
+    await screen.findByText(say(NO_ANSWER));
+    expect(screen.queryByText(say(OFFLINE))).toBeNull();
     setOnline(onLine, false);
-    await screen.findByText(OFFLINE);
+    await screen.findByText(say(OFFLINE));
     onLine.mockRestore();
   });
 });
@@ -1160,7 +1221,7 @@ describe("other tabs and a changing catalogue", () => {
     expect((await screen.findByRole("alert")).textContent).toContain(
       "changed in another tab",
     );
-    expect(screen.getByText("Nothing in the cart yet.")).toBeDefined();
+    expect(screen.getByText(say(NOTHING_IN_CART))).toBeDefined();
     expect(saves(sent)).toEqual([]);
   });
 
@@ -1215,7 +1276,7 @@ describe("other tabs and a changing catalogue", () => {
       ["8"],
     );
     // It stays through other changes.
-    pick("To", "11");
+    pick(say(TO), "11");
     expect(screen.getByText(/since this item was added/)).toBeDefined();
     fireEvent.input(count, { target: { value: "1" } });
     expect(screen.queryByText(/since this item was added/)).toBeNull();
@@ -1250,8 +1311,8 @@ describe("other tabs and a changing catalogue", () => {
     storeCart({ ...freshCart(), volunteerId: 99, toId: 98 });
     open();
     await ready();
-    expect(selected("Your name")).toBe("");
-    expect(selected("To")).toBe("");
+    expect(selected(say(YOUR_NAME))).toBe("");
+    expect(selected(say(TO))).toBe("");
   });
 });
 
@@ -1261,7 +1322,7 @@ describe("whose name it is", () => {
     open(api);
     await ready();
     fillMove();
-    pick("Your name", "2");
+    pick(say(YOUR_NAME), "2");
     expect(screen.getByText(/Recording as/).textContent).toBe(
       "Recording as Grace. Change",
     );
@@ -1289,9 +1350,9 @@ describe("whose name it is", () => {
     usedAgo(IDLE + 1000);
     open();
     await ready();
-    fireEvent.click(screen.getByRole("button", { name: "That's me" }));
+    fireEvent.click(screen.getByRole("button", { name: say(THATS_ME) }));
     expect(screen.queryByText(/Are you/)).toBeNull();
-    expect(selected("Your name")).toBe("1");
+    expect(selected(say(YOUR_NAME))).toBe("1");
     // And the cart counts as used now, so a reload does not ask again.
     document.body.innerHTML = "";
     open();
@@ -1307,7 +1368,7 @@ describe("whose name it is", () => {
     save();
     await screen.findByText(/A new cart is ready/);
     await vi.advanceTimersByTimeAsync(IDLE + 60_000);
-    fireEvent.click(await screen.findByRole("button", { name: "That's me" }));
+    fireEvent.click(await screen.findByRole("button", { name: say(THATS_ME) }));
     expect(screen.getByText(/A new cart is ready/)).toBeDefined();
   });
 
@@ -1315,9 +1376,9 @@ describe("whose name it is", () => {
     usedAgo(IDLE + 1000);
     open();
     await ready();
-    fireEvent.click(screen.getByRole("button", { name: "Not me" }));
-    expect(selected("Your name")).toBe("");
-    expect(document.activeElement).toBe(screen.getByLabelText("Your name"));
+    fireEvent.click(screen.getByRole("button", { name: say(NOT_ME) }));
+    expect(selected(say(YOUR_NAME))).toBe("");
+    expect(document.activeElement).toBe(screen.getByLabelText(say(YOUR_NAME)));
     expect(screen.queryByText(/Recording as/)).toBeNull();
   });
 
@@ -1365,17 +1426,17 @@ describe("scanning labels with the camera", () => {
     await ready();
     camera.state.inView = [];
     fireEvent.click(
-      screen.getByRole("button", { name: "Scan with the camera" }),
+      screen.getByRole("button", { name: say(SCAN_WITH_CAMERA) }),
     );
-    await screen.findByText("Point the camera at a label.");
+    await screen.findByText(say(POINT));
     return outbox;
   }
 
   /** Ada opens the van's sealed spool, by its label. */
   async function openSpoolInVan() {
-    pick("Your name", "1");
-    fireEvent.click(screen.getByLabelText("Opening packages"));
-    pick("Where", "12");
+    pick(say(YOUR_NAME), "1");
+    fireEvent.click(screen.getByLabelText(say(KIND_WORDS.open)));
+    pick(say(WHERE), "12");
     scan("K7QX2M");
     await screen.findByText("Added a Spool: Cat6 cable.");
   }
@@ -1389,14 +1450,14 @@ describe("scanning labels with the camera", () => {
     expect(vibrate).toHaveBeenCalled();
     scan("K7QX2M");
     await screen.findByText("Added a Spool: Cat6 cable.");
-    expect(screen.queryByText("Nothing in the cart yet.")).toBeNull();
+    expect(screen.queryByText(say(NOTHING_IN_CART))).toBeNull();
   });
 
   test("opening, an item's label asks which package if none is sealed there", async () => {
     await opened();
-    fireEvent.click(screen.getByLabelText("Opening packages"));
+    fireEvent.click(screen.getByLabelText(say(KIND_WORDS.open)));
     // The radio's box is sealed at the hub, not the van.
-    pick("Where", "12");
+    pick(say(WHERE), "12");
     scan("B3ZT9W");
     await screen.findByText(
       "LiteBeam 5AC: type how many of which package to open.",
@@ -1452,7 +1513,7 @@ describe("scanning labels with the camera", () => {
     save();
     await screen.findByText(/^Sending: Opening/);
     // The radio's box, sealed at the hub.
-    pick("Where", "10");
+    pick(say(WHERE), "10");
     find("beam");
     fireEvent.click(screen.getByRole("button", { name: "LiteBeam 5AC" }));
     save();
@@ -1482,8 +1543,8 @@ describe("scanning labels with the camera", () => {
     await screen.findByText("Recorded (transaction 77).");
     await vi.waitFor(() => expect(asked).toBe(2));
     await new Promise((done) => setTimeout(done, 0));
-    expect(screen.queryByText("Couldn't load the catalogue.")).toBeNull();
-    expect(screen.getByLabelText("Your name")).toBeDefined();
+    expect(screen.queryByText(say(COULD_NOT_LOAD))).toBeNull();
+    expect(screen.getByLabelText(say(YOUR_NAME))).toBeDefined();
   });
 
   /** Ada's opening of the van's spool, saved and dismissed while the
@@ -1505,7 +1566,7 @@ describe("scanning labels with the camera", () => {
     save();
     await screen.findByText("Recorded (transaction 77).");
     await vi.waitFor(() => expect(asked).toBe(2));
-    fireEvent.click(screen.getByRole("button", { name: "Dismiss" }));
+    fireEvent.click(screen.getByRole("button", { name: say(DISMISS) }));
     expect(screen.queryByText(/^Recorded \(/)).toBeNull();
     const [batch] = outbox.entries.value;
     return { api, outbox, later, key: batch?.body.key ?? "" };
@@ -1526,9 +1587,9 @@ describe("scanning labels with the camera", () => {
     // The next catalogue, asked for after the next save, shows it: the
     // outbox forgets it.
     later.answer = () => json({ ...CATALOGUE, saved: [key] }, 200);
-    fireEvent.click(screen.getByRole("button", { name: "Remove" }));
+    fireEvent.click(screen.getByRole("button", { name: say(REMOVE) }));
     // The radio's box, sealed at the hub.
-    pick("Where", "10");
+    pick(say(WHERE), "10");
     find("beam");
     fireEvent.click(screen.getByRole("button", { name: "LiteBeam 5AC" }));
     save();
@@ -1561,11 +1622,11 @@ describe("scanning labels with the camera", () => {
       ),
     };
     await opened(answering(() => json(loose, 200)).api);
-    fireEvent.click(screen.getByLabelText("Opening packages"));
-    pick("Where", "10");
+    fireEvent.click(screen.getByLabelText(say(KIND_WORDS.open)));
+    pick(say(WHERE), "10");
     scan("B3ZT9W");
     await screen.findByText("LiteBeam 5AC comes in no package to open.");
-    expect(screen.getByText("Nothing in the cart yet.")).toBeDefined();
+    expect(screen.getByText(say(NOTHING_IN_CART))).toBeDefined();
   });
 
   test("a place's label asks from or to, the empty side first", async () => {
@@ -1576,10 +1637,10 @@ describe("scanning labels with the camera", () => {
     const sides = screen
       .getAllByRole("button", { name: /^(From|To)$/ })
       .map((button) => button.textContent);
-    expect(sides).toEqual(["From", "To"]);
-    fireEvent.click(screen.getByRole("button", { name: "To" }));
-    expect(selected("To")).toBe("11");
-    expect(screen.queryByRole("button", { name: "From" })).toBeNull();
+    expect(sides).toEqual([say(FROM), say(TO)]);
+    fireEvent.click(screen.getByRole("button", { name: say(TO) }));
+    expect(selected(say(TO))).toBe("11");
+    expect(screen.queryByRole("button", { name: say(FROM) })).toBeNull();
   });
 
   test("a place's label sets the only side a kind has, at once", async () => {
@@ -1587,8 +1648,8 @@ describe("scanning labels with the camera", () => {
     await opened();
     scan("S4HELF");
     await screen.findByText("Hub › Shelf A: to here.");
-    expect(selected("To")).toBe("11");
-    expect(screen.queryByRole("button", { name: "From" })).toBeNull();
+    expect(selected(say(TO))).toBe("11");
+    expect(screen.queryByRole("button", { name: say(FROM) })).toBeNull();
   });
 
   test("for an install, a place's label is where it comes from", async () => {
@@ -1596,7 +1657,7 @@ describe("scanning labels with the camera", () => {
     await opened();
     scan("S4HELF");
     await screen.findByText("Hub › Shelf A: from here.");
-    expect(selected("From")).toBe("11");
+    expect(selected(say(FROM))).toBe("11");
   });
 
   test("opening, a place's label is where", async () => {
@@ -1604,25 +1665,25 @@ describe("scanning labels with the camera", () => {
     await opened();
     scan("S4HELF");
     await screen.findByText("Hub › Shelf A: here.");
-    expect(selected("Where")).toBe("11");
+    expect(selected(say(WHERE))).toBe("11");
   });
 
   test("an item read next puts a place's question away", async () => {
     await opened();
     scan("S4HELF");
-    await screen.findByRole("button", { name: "From" });
+    await screen.findByRole("button", { name: say(FROM) });
     scan("B3ZT9W");
     await screen.findByText("Added one: LiteBeam 5AC.");
-    expect(screen.queryByRole("button", { name: "From" })).toBeNull();
+    expect(screen.queryByRole("button", { name: say(FROM) })).toBeNull();
   });
 
   test("a stray code leaves a place's question to answer", async () => {
     await opened();
     scan("S4HELF");
-    await screen.findByRole("button", { name: "From" });
+    await screen.findByRole("button", { name: say(FROM) });
     scan("NOT-OURS");
     await screen.findByText("That label isn't in the inventory (NOT-OURS).");
-    screen.getByRole("button", { name: "From" });
+    screen.getByRole("button", { name: say(FROM) });
   });
 
   test("a scanner gun's place label asks too", async () => {
@@ -1630,16 +1691,16 @@ describe("scanning labels with the camera", () => {
     await ready();
     find("s4helf");
     fireEvent.keyDown(screen.getByLabelText(/Find an item/), { key: "Enter" });
-    fireEvent.click(await screen.findByRole("button", { name: "To" }));
-    expect(selected("To")).toBe("11");
+    fireEvent.click(await screen.findByRole("button", { name: say(TO) }));
+    expect(selected(say(TO))).toBe("11");
   });
 
   test("an unknown label says so, and Done closes the camera", async () => {
     await opened();
     scan("OLD-FORM");
     await screen.findByText("That label isn't in the inventory (OLD-FORM).");
-    fireEvent.click(screen.getByRole("button", { name: "Done" }));
-    screen.getByRole("button", { name: "Scan with the camera" });
+    fireEvent.click(screen.getByRole("button", { name: say(DONE) }));
+    screen.getByRole("button", { name: say(SCAN_WITH_CAMERA) });
   });
 });
 
@@ -1663,10 +1724,10 @@ describe("a newer build", () => {
     );
   }
 
-  const reloadButton = () => screen.queryByRole("button", { name: "Upgrade" });
-  const UPDATED = "The scanner has been updated.";
-  const MUST_UPGRADE =
-    "The scanner has been updated. You must upgrade. Your data will be kept but may need some changes before sending.";
+  const reloadButton = () =>
+    screen.queryByRole("button", { name: say(UPGRADE) });
+  const UPDATED = say(UPDATED_PHRASE);
+  const MUST_UPGRADE = say(MUST_UPGRADE_PHRASE);
   /** The banner's words, if it shows. */
   const banner = () =>
     screen
@@ -1751,10 +1812,10 @@ describe("a newer build", () => {
     expect(outbox.entries.value.map((each) => each.state)).toEqual(["waiting"]);
     // The save itself says the same, and nothing more.
     const list = screen
-      .getByRole("heading", { name: "Carts from this device" })
+      .getByRole("heading", { name: say(CARTS_FROM_DEVICE) })
       .closest("section") as HTMLElement;
     within(list).getByText(MUST_UPGRADE);
-    expect(screen.queryByRole("button", { name: "Dismiss" })).toBeNull();
+    expect(screen.queryByRole("button", { name: say(DISMISS) })).toBeNull();
     fireEvent.click(reloadButton() as HTMLElement);
     expect(reload).toHaveBeenCalledOnce();
   });
@@ -1796,8 +1857,8 @@ describe("a newer build", () => {
     // Once the page has done what it does as the catalogue arrives.
     await act(() => new Promise((done) => setTimeout(done, 20)));
     expect(banner()).toBe(UPDATED);
-    screen.getByText("Nothing in the cart yet.");
-    screen.getByRole("button", { name: "Add to cart" });
+    screen.getByText(say(NOTHING_IN_CART));
+    screen.getByRole("button", { name: say(ADD_TO_CART) });
     expect(localStorage.getItem("inventory.outbox.v3")).not.toBeNull();
   });
 
@@ -1820,16 +1881,14 @@ describe("a newer build", () => {
 });
 
 describe("what an older build left", () => {
-  const HEADING = "Checked out items. Add to cart or discard before sending";
-  const ADDED_BACK = "Added back to cart. Review before Record.";
-  const RETIRED = "This item has been retired.";
+  const HEADING = say(CHECKED_OUT);
+  const ADDED_BACK = say(ADDED_BACK_PHRASE);
+  const RETIRED = say(ITEM_RETIRED);
   // Failures, in bold (Ali, inventory-tng-93z).
-  const NOT_KEPT =
-    "This browser can't keep the cart. Clear local data, reload the page and try again.";
-  const NOT_DISCARDED = "Unable to discard. Clear your site data to remove.";
-  const NOT_REMOVED =
-    "This item wasn't automatically removed. Record the cart and try to remove.";
-  const RESCAN = "Can't add these items. Please rescan.";
+  const NOT_KEPT = say(NOT_KEPT_PHRASE);
+  const NOT_DISCARDED = say(NOT_DISCARDED_PHRASE);
+  const NOT_REMOVED = say(NOT_REMOVED_PHRASE);
+  const RESCAN = say(RESCAN_PHRASE);
   const KEY = "0b7c6a51-9a3d-4d39-8f3e-1d1f2c4b5a61";
   const AT = 1_700_000_000_000;
   const OLDER = "2026-11-12T09:00:00.000Z";
@@ -1897,13 +1956,13 @@ describe("what an older build left", () => {
    * after any of its lines' own; once tapped, the one confirming it. */
   const lastDiscard = (entry: HTMLElement = listing()) =>
     within(entry)
-      .getAllByRole("button", { name: "Discard" })
+      .getAllByRole("button", { name: say(DISCARD) })
       .at(-1) as HTMLElement;
   /** The Discard of the listed line that says `words`. */
   const discardOf = (words: string) =>
     within(
       within(listing()).getByText(words).closest("li") as HTMLElement,
-    ).getByRole("button", { name: "Discard" });
+    ).getByRole("button", { name: say(DISCARD) });
 
   test("each is listed in words, and counted once as found", async () => {
     const record = vi.spyOn(telemetry, "record");
@@ -1923,7 +1982,7 @@ describe("what an older build left", () => {
       .getByText("Cat6 cable: 3 m from an open package")
       .closest("li") as HTMLElement;
     expectBold(within(taken).getByText(noted(RESCAN)), RESCAN);
-    within(taken).getByRole("button", { name: "Discard" });
+    within(taken).getByRole("button", { name: say(DISCARD) });
     // What goes back has none.
     expect(
       within(
@@ -1990,7 +2049,7 @@ describe("what an older build left", () => {
     // Nothing in it can go in the cart: discarding is all there is.
     expect(
       within(report as HTMLElement).queryByRole("button", {
-        name: "Add to cart",
+        name: say(ADD_TO_CART),
       }),
     ).toBeNull();
     within(opening as HTMLElement).getByText("Cat6 cable: 1 × Spool");
@@ -2023,7 +2082,7 @@ describe("what an older build left", () => {
     );
     open();
     await ready();
-    within(listing()).getByText("Something");
+    within(listing()).getByText(say(SOMETHING));
   });
 
   test("a browser that will not keep the cart keeps the older one", async () => {
@@ -2034,13 +2093,13 @@ describe("what an older build left", () => {
       throw new DOMException("full", "QuotaExceededError");
     });
     fireEvent.click(
-      within(listing()).getByRole("button", { name: "Add to cart" }),
+      within(listing()).getByRole("button", { name: say(ADD_TO_CART) }),
     );
     setItem.mockRestore();
     expect(within(listing()).getByText(NOT_KEPT).tagName).toBe("STRONG");
     // Not filled either: saved from here, then put back, it would go twice.
-    screen.getByText("Nothing in the cart yet.");
-    expect(selected("From")).not.toBe("10");
+    screen.getByText(say(NOTHING_IN_CART));
+    expect(selected(say(FROM))).not.toBe("10");
     expect(localStorage.getItem("inventory.outbox.v3")).not.toBeNull();
   });
 
@@ -2096,12 +2155,12 @@ describe("what an older build left", () => {
       });
     fireEvent.click(
       within(listing()).getAllByRole("button", {
-        name: "Add to cart",
+        name: say(ADD_TO_CART),
       })[0] as HTMLElement,
     );
     setItem.mockRestore();
     expect(screen.getByText(NOT_REMOVED).tagName).toBe("STRONG");
-    expect(selected("From")).toBe("10");
+    expect(selected(say(FROM))).toBe("10");
   });
 
   test("an older cart discarded goes", async () => {
@@ -2159,7 +2218,7 @@ describe("what an older build left", () => {
     await screen.findByText(ADDED_BACK);
     expect(outbox.builds.newer.value).toBeNull();
     expect(screen.queryByRole("alert")).toBeNull();
-    expect(screen.queryByText("Carts from this device")).toBeNull();
+    expect(screen.queryByText(say(CARTS_FROM_DEVICE))).toBeNull();
     expect(screen.queryByText(HEADING)).toBeNull();
     expect(
       (screen.getByLabelText("Box (4 each)") as HTMLInputElement).value,
@@ -2205,7 +2264,7 @@ describe("what an older build left", () => {
     // What to do, in bold as after any other refusal (row 11).
     expect(
       [...why.querySelectorAll("strong")].map((each) => each.textContent),
-    ).toEqual(["Not saved.", "Add it to the cart, fix that, then record it."]);
+    ).toEqual(["Not saved.", say(FIX_THEN_RECORD)]);
   });
 
   test("put in the cart, it fills the cart, goes from the list, and saves as any cart", async () => {
@@ -2215,16 +2274,16 @@ describe("what an older build left", () => {
     const outbox = open(api);
     await ready();
     fireEvent.click(
-      within(listing()).getByRole("button", { name: "Add to cart" }),
+      within(listing()).getByRole("button", { name: say(ADD_TO_CART) }),
     );
     expect(screen.queryByText(HEADING)).toBeNull();
     expect(localStorage.getItem("inventory.outbox.v3")).toBeNull();
     screen.getByText(ADDED_BACK);
     // Each note left behind, naming its item (Ali, inventory-tng-0su).
     screen.getByText(`Cat6 cable: ${RESCAN}`);
-    expect(selected("Your name")).toBe("1");
-    expect(selected("From")).toBe("10");
-    expect(selected("To")).toBe("12");
+    expect(selected(say(YOUR_NAME))).toBe("1");
+    expect(selected(say(FROM))).toBe("10");
+    expect(selected(say(TO))).toBe("12");
     expect(
       (screen.getByLabelText("Box (4 each)") as HTMLInputElement).value,
     ).toBe("2");
@@ -2267,10 +2326,10 @@ describe("what an older build left", () => {
     await ready();
     within(listing()).getByText(noted(RESCAN));
     expect(
-      within(listing()).queryByRole("button", { name: "Add to cart" }),
+      within(listing()).queryByRole("button", { name: say(ADD_TO_CART) }),
     ).toBeNull();
     const [line, entry] = within(listing()).getAllByRole("button", {
-      name: "Discard",
+      name: say(DISCARD),
     });
     expect(line?.getAttribute("aria-describedby")).toBe("older-0-0");
     expect(screen.getByText("Cat6 cable: 3 m from an open package").id).toBe(
@@ -2366,21 +2425,25 @@ describe("what an older build left", () => {
     within(listing()).getByText("Cat6 cable: 5 m from an open package");
     fireEvent.click(lastDiscard());
     fireEvent.click(
-      within(listing()).getByRole("button", { name: "Add to cart" }),
+      within(listing()).getByRole("button", { name: say(ADD_TO_CART) }),
     );
-    expect(within(listing()).queryByText("Confirm discard")).toBeNull();
+    expect(within(listing()).queryByText(say(CONFIRM_DISCARD))).toBeNull();
     expect(localStorage.getItem("inventory.outbox.v3")).not.toBeNull();
     await vi.advanceTimersByTimeAsync(500);
     fireEvent.click(lastDiscard());
-    within(listing()).getByText("Confirm discard");
+    within(listing()).getByText(say(CONFIRM_DISCARD));
     // Asked, a line discarded meanwhile holds the answer back too.
     fireEvent.click(discardOf("Cat6 cable: 5 m from an open package"));
     fireEvent.click(lastDiscard());
-    fireEvent.click(within(listing()).getByRole("button", { name: "Keep it" }));
-    within(listing()).getByText("Confirm discard");
+    fireEvent.click(
+      within(listing()).getByRole("button", { name: say(KEEP_IT) }),
+    );
+    within(listing()).getByText(say(CONFIRM_DISCARD));
     await vi.advanceTimersByTimeAsync(500);
-    fireEvent.click(within(listing()).getByRole("button", { name: "Keep it" }));
-    expect(within(listing()).queryByText("Confirm discard")).toBeNull();
+    fireEvent.click(
+      within(listing()).getByRole("button", { name: say(KEEP_IT) }),
+    );
+    expect(within(listing()).queryByText(say(CONFIRM_DISCARD))).toBeNull();
   });
 
   test("a cart's line of an item no longer in the catalogue says so, and can be removed", async () => {
@@ -2396,7 +2459,7 @@ describe("what an older build left", () => {
         screen
           .getByText(/^No longer in the catalogue\./)
           .closest("li") as HTMLElement,
-      ).getByRole("button", { name: "Remove" }),
+      ).getByRole("button", { name: say(REMOVE) }),
     );
     expect(screen.queryByText(/^No longer in the catalogue\./)).toBeNull();
   });
@@ -2431,7 +2494,7 @@ describe("what an older build left", () => {
       within(listing())
         .getAllByRole("button")
         .map((each) => each.textContent),
-    ).toEqual(["Discard"]);
+    ).toEqual([say(DISCARD)]);
     await vi.advanceTimersByTimeAsync(500);
     fireEvent.click(lastDiscard());
     fireEvent.click(lastDiscard());
@@ -2466,9 +2529,7 @@ describe("what an older build left", () => {
     fireEvent.click(discardOf("Cat6 cable: 3 m from an open package"));
     expect(within(listing()).queryByText(NOT_DISCARDED)).toBeNull();
     expect(
-      within(listing()).getByText(
-        "This item was changed in another tab. Check it before discarding.",
-      ).tagName,
+      within(listing()).getByText(say(CHANGED_NOT_DISCARDED)).tagName,
     ).toBe("STRONG");
     within(listing()).getByText(
       noted("No. Add it to the cart, fix that, then record it."),
@@ -2482,7 +2543,7 @@ describe("what an older build left", () => {
     const outbox = open(api);
     await ready();
     fireEvent.click(
-      within(listing()).getByRole("button", { name: "Add to cart" }),
+      within(listing()).getByRole("button", { name: say(ADD_TO_CART) }),
     );
     save();
     await screen.findByText(/^Sending: /);
@@ -2497,16 +2558,12 @@ describe("what an older build left", () => {
     open();
     await ready();
     fireEvent.click(
-      within(listing()).getByRole("button", { name: "Add to cart" }),
+      within(listing()).getByRole("button", { name: say(ADD_TO_CART) }),
     );
     expect(localStorage.getItem("inventory.cart.v1")).toBeNull();
-    expect(selected("Your name")).toBe("2");
+    expect(selected(say(YOUR_NAME))).toBe("2");
     expect(
-      (
-        screen.getByLabelText(
-          "MeshDB install number (if you know it)",
-        ) as HTMLInputElement
-      ).value,
+      (screen.getByLabelText(say(INSTALL_NUMBER)) as HTMLInputElement).value,
     ).toBe("456");
   });
 
@@ -2516,13 +2573,11 @@ describe("what an older build left", () => {
     await ready();
     fillMove();
     fireEvent.click(
-      within(listing()).getByRole("button", { name: "Add to cart" }),
+      within(listing()).getByRole("button", { name: say(ADD_TO_CART) }),
     );
-    expect(
-      within(listing()).getByText(
-        "Record or discard the current cart before adding more items",
-      ).tagName,
-    ).toBe("STRONG");
+    expect(within(listing()).getByText(say(CART_NOT_EMPTY)).tagName).toBe(
+      "STRONG",
+    );
     expect(localStorage.getItem("inventory.outbox.v3")).not.toBeNull();
   });
 
@@ -2535,8 +2590,10 @@ describe("what an older build left", () => {
     open();
     await ready();
     fireEvent.click(lastDiscard());
-    within(listing()).getByText("Confirm discard");
-    fireEvent.click(within(listing()).getByRole("button", { name: "Keep it" }));
+    within(listing()).getByText(say(CONFIRM_DISCARD));
+    fireEvent.click(
+      within(listing()).getByRole("button", { name: say(KEEP_IT) }),
+    );
     expect(localStorage.getItem("inventory.outbox.v3")).not.toBeNull();
     fireEvent.click(lastDiscard());
     fireEvent.click(lastDiscard());
@@ -2557,7 +2614,7 @@ describe("what an older build left", () => {
     open();
     await ready();
     const button = within(listing()).getByRole("button", {
-      name: "Add to cart",
+      name: say(ADD_TO_CART),
     });
     // Sent, but the storage event not yet heard.
     const sent = JSON.parse(localStorage.getItem("inventory.outbox.v3") ?? "");
@@ -2565,7 +2622,7 @@ describe("what an older build left", () => {
     localStorage.setItem("inventory.outbox.v3", JSON.stringify(sent));
     fireEvent.click(button);
     expect(screen.queryByText(HEADING)).toBeNull();
-    expect(screen.getByText("Nothing in the cart yet.")).not.toBeNull();
+    expect(screen.getByText(say(NOTHING_IN_CART))).not.toBeNull();
   });
 
   test("one an older tab refused for its key meanwhile is not put in the cart under that key", async () => {
@@ -2573,7 +2630,7 @@ describe("what an older build left", () => {
     open();
     await ready();
     const button = within(listing()).getByRole("button", {
-      name: "Add to cart",
+      name: say(ADD_TO_CART),
     });
     // Refused for its key, which the inventory holds for another batch,
     // but the storage event not yet heard: put back under it, it would
@@ -2585,14 +2642,14 @@ describe("what an older build left", () => {
     kept[0] = { ...kept[0], state: "refused", note: words };
     localStorage.setItem("inventory.outbox.v3", JSON.stringify(kept));
     fireEvent.click(button);
-    screen.getByText("Nothing in the cart yet.");
+    screen.getByText(say(NOTHING_IN_CART));
     expect(localStorage.getItem(CART_KEY)).toBeNull();
     // Listed as it is now, it goes back without its key.
     within(listing()).getByText(
       noted(`${words} Add it to the cart, fix that, then record it.`),
     );
     fireEvent.click(
-      within(listing()).getByRole("button", { name: "Add to cart" }),
+      within(listing()).getByRole("button", { name: say(ADD_TO_CART) }),
     );
     expect(boxes()).toBe("2");
     // Under a key of its own, made as it went in.
@@ -2605,26 +2662,24 @@ describe("what an older build left", () => {
     open();
     await ready();
     const button = within(listing()).getByRole("button", {
-      name: "Add to cart",
+      name: say(ADD_TO_CART),
     });
     // Refused there, but the storage event not yet heard.
     const kept = JSON.parse(localStorage.getItem("inventory.outbox.v3") ?? "");
     kept[0] = { ...kept[0], state: "refused", note: "No." };
     localStorage.setItem("inventory.outbox.v3", JSON.stringify(kept));
     fireEvent.click(button);
-    screen.getByText("Nothing in the cart yet.");
-    expect(
-      within(listing()).getByText(
-        "That one was changed in another tab. Check it, then add it to the cart again.",
-      ).tagName,
-    ).toBe("STRONG");
+    screen.getByText(say(NOTHING_IN_CART));
+    expect(within(listing()).getByText(say(CHANGED_ELSEWHERE)).tagName).toBe(
+      "STRONG",
+    );
     expect(within(listing()).queryByText(/has gone/)).toBeNull();
     within(listing()).getByText(
       noted("No. Add it to the cart, fix that, then record it."),
     );
     // Checked, it goes in.
     fireEvent.click(
-      within(listing()).getByRole("button", { name: "Add to cart" }),
+      within(listing()).getByRole("button", { name: say(ADD_TO_CART) }),
     );
     expect(boxes()).toBe("2");
   });
@@ -2633,7 +2688,7 @@ describe("what an older build left", () => {
     [
       "nothing of it goes back",
       [{ item_id: 101, quantity: "3", open_package_key: KEY }],
-      "Add to cart",
+      say(ADD_TO_CART),
     ],
     [
       "it holds an item retired since",
@@ -2641,7 +2696,7 @@ describe("what an older build left", () => {
         { item_id: 100, quantity: "8", package_id: 1000 },
         { item_id: 103, quantity: "4", package_id: 1003 },
       ],
-      "Cannot Add to Cart",
+      say(CANNOT_ADD),
     ],
   ])(
     "one changed meanwhile so that %s says only to check it, bold whole",
@@ -2650,7 +2705,7 @@ describe("what an older build left", () => {
       open();
       await ready();
       const button = within(listing()).getByRole("button", {
-        name: "Add to cart",
+        name: say(ADD_TO_CART),
       });
       // Changed there, the storage event not yet heard.
       const kept = JSON.parse(
@@ -2659,19 +2714,17 @@ describe("what an older build left", () => {
       kept[0] = { ...kept[0], body: { ...kept[0].body, lines } };
       localStorage.setItem("inventory.outbox.v3", JSON.stringify(kept));
       fireEvent.click(button);
-      screen.getByText("Nothing in the cart yet.");
+      screen.getByText(say(NOTHING_IN_CART));
       expect(
-        within(listing()).getByText(
-          "That one was changed in another tab. Check it again.",
-        ).tagName,
+        within(listing()).getByText(say(CHANGED_CHECK_AGAIN)).tagName,
       ).toBe("STRONG");
       expect(
         within(listing()).queryByText(/add it to the cart again/),
       ).toBeNull();
       expect(
-        within(listing()).queryByRole("button", { name: "Add to cart" }),
+        within(listing()).queryByRole("button", { name: say(ADD_TO_CART) }),
       ).toBeNull();
-      if (gone !== "Add to cart") {
+      if (gone !== say(ADD_TO_CART)) {
         within(listing()).getByRole("button", { name: gone });
       }
     },
@@ -2688,9 +2741,7 @@ describe("what an older build left", () => {
     localStorage.setItem("inventory.outbox.v3", JSON.stringify(kept));
     fireEvent.click(lastDiscard());
     expect(
-      within(listing()).getByText(
-        "This item was changed in another tab. Check it before discarding.",
-      ).tagName,
+      within(listing()).getByText(say(CHANGED_NOT_DISCARDED)).tagName,
     ).toBe("STRONG");
     expect(
       JSON.parse(localStorage.getItem("inventory.outbox.v3") ?? ""),
@@ -2713,9 +2764,7 @@ describe("what an older build left", () => {
     const changed = { ...kept, installNumber: "789" };
     localStorage.setItem("inventory.cart.v1", JSON.stringify(changed));
     fireEvent.click(lastDiscard());
-    within(listing()).getByText(
-      "This item was changed in another tab. Check it before discarding.",
-    );
+    within(listing()).getByText(say(CHANGED_NOT_DISCARDED));
     expect(JSON.parse(localStorage.getItem("inventory.cart.v1") ?? "")).toEqual(
       changed,
     );
@@ -2725,7 +2774,7 @@ describe("what an older build left", () => {
     leaveSave();
     open();
     await ready();
-    screen.getByText("Nothing in the cart yet.");
+    screen.getByText(say(NOTHING_IN_CART));
     const theirs = {
       ...freshCart(),
       lines: [{ itemId: 101, packages: {}, loose: "4" }],
@@ -2733,13 +2782,11 @@ describe("what an older build left", () => {
     };
     storeCart(theirs);
     fireEvent.click(
-      within(listing()).getByRole("button", { name: "Add to cart" }),
+      within(listing()).getByRole("button", { name: say(ADD_TO_CART) }),
     );
-    expect(
-      within(listing()).getByText(
-        "Record or discard the current cart before adding more items",
-      ).tagName,
-    ).toBe("STRONG");
+    expect(within(listing()).getByText(say(CART_NOT_EMPTY)).tagName).toBe(
+      "STRONG",
+    );
     expect(storedCart().lines).toEqual(theirs.lines);
     screen.getByText("4 m in all");
     expect(localStorage.getItem("inventory.outbox.v3")).not.toBeNull();
@@ -2788,7 +2835,7 @@ describe("what an older build left", () => {
     save();
     await screen.findByText(/^Sending: /);
     fireEvent.click(
-      within(listing()).getByRole("button", { name: "Add to cart" }),
+      within(listing()).getByRole("button", { name: say(ADD_TO_CART) }),
     );
     screen.getByText(ADDED_BACK);
     expect(screen.queryByText(/^Sending: /)).toBeNull();
@@ -2839,7 +2886,7 @@ describe("what an older build left", () => {
     within(listing()).getByText(noted(RETIRED));
     within(listing()).getByText("LiteBeam 5AC: 1 × Box");
     fireEvent.click(
-      within(listing()).getByRole("button", { name: "Add to cart" }),
+      within(listing()).getByRole("button", { name: say(ADD_TO_CART) }),
     );
     screen.getByText(`LiteBeam 5AC: ${RETIRED}`);
     expect(boxes()).toBe("1");
@@ -2867,7 +2914,7 @@ describe("what an older build left", () => {
     await ready();
     within(listing()).getByText(noted(RETIRED));
     fireEvent.click(
-      within(listing()).getByRole("button", { name: "Add to cart" }),
+      within(listing()).getByRole("button", { name: say(ADD_TO_CART) }),
     );
     screen.getByText(`LiteBeam 5AC: ${RETIRED}`);
     expect(boxes()).toBe("1");
@@ -2910,7 +2957,7 @@ describe("what an older build left", () => {
     within(listing()).getByText("LiteBeam 5AC: 1 × a removed package or item");
     fireEvent.click(
       within(listing()).getAllByRole("button", {
-        name: "Add to cart",
+        name: say(ADD_TO_CART),
       })[0] as HTMLElement,
     );
     expect(boxes()).toBe("1");
@@ -3003,7 +3050,7 @@ describe("what an older build left", () => {
       target: { value: "2" },
     });
     save();
-    return screen.findByText(SOME_NOT_RECORDED);
+    return screen.findByText(say(SOME_NOT_RECORDED));
   }
 
   test("one an older build's tab saved meanwhile is saved once, under its key", async () => {
@@ -3036,7 +3083,7 @@ describe("what an older build left", () => {
     // From a server that says nothing of what it recorded, the heading
     // over its lines, to compare with what was recorded (Ali,
     // inventory-tng-0gg, 2026-11-15, 1).
-    expect(within(entry).getByText(MAKE_CHANGES).tagName).toBe("H3");
+    expect(within(entry).getByText(say(MAKE_CHANGES)).tagName).toBe("H3");
     within(entry).getByText("1. LiteBeam 5AC: 2 × Box");
     expect(within(entry).queryByRole("button", { name: "Reload" })).toBeNull();
     // The stock, asked for again at once, shows what the other tab
@@ -3044,8 +3091,8 @@ describe("what an older build left", () => {
     await vi.waitFor(() => expect(catalogues()).toBe(before + 1));
     await new Promise((settled) => setTimeout(settled, 50));
     expect(catalogues()).toBe(before + 1);
-    fireEvent.click(within(entry).getByRole("button", { name: "Dismiss" }));
-    expect(screen.queryByText(SOME_NOT_RECORDED)).toBeNull();
+    fireEvent.click(within(entry).getByRole("button", { name: say(DISMISS) }));
+    expect(screen.queryByText(say(SOME_NOT_RECORDED))).toBeNull();
     expect(catalogues()).toBe(before + 1);
   });
 
@@ -3063,7 +3110,7 @@ describe("what an older build left", () => {
     const before = sent.filter(isCatalogue).length;
     localStorage.setItem(OUTBOX_KEY, refused);
     window.dispatchEvent(new StorageEvent("storage", { key: OUTBOX_KEY }));
-    await screen.findByText(SOME_NOT_RECORDED);
+    await screen.findByText(say(SOME_NOT_RECORDED));
     await vi.waitFor(() =>
       expect(sent.filter(isCatalogue).length).toBe(before + 1),
     );
@@ -3072,7 +3119,7 @@ describe("what an older build left", () => {
     const again = server();
     open(again.api);
     await ready();
-    await screen.findByText(SOME_NOT_RECORDED);
+    await screen.findByText(say(SOME_NOT_RECORDED));
     await new Promise((settled) => setTimeout(settled, 50));
     expect(again.sent.filter(isCatalogue).length).toBe(1);
   });
@@ -3082,8 +3129,8 @@ describe("what an older build left", () => {
     const entry = (await changedRefused()).closest("li") as HTMLElement;
     fillMove();
     act(() => outbox.builds.learn("other_tab"));
-    within(entry).getByText(SOME_NOT_RECORDED);
-    within(entry).getByRole("button", { name: "Dismiss" });
+    within(entry).getByText(say(SOME_NOT_RECORDED));
+    within(entry).getByRole("button", { name: say(DISMISS) });
   });
 
   /** The batch endpoint as a server since inventory-tng-0gg answers a
@@ -3155,7 +3202,7 @@ describe("what an older build left", () => {
     });
     save();
     if (meanwhile !== undefined) {
-      await screen.findByText("Nothing in the cart yet.");
+      await screen.findByText(say(NOTHING_IN_CART));
       meanwhile();
       refusal.resolve(new Response());
     }
@@ -3181,7 +3228,10 @@ describe("what an older build left", () => {
   test("one changed after another tab recorded it says some items were not recorded, then what that tab recorded and what was not (Ali, inventory-tng-0gg, 2026-11-15)", async () => {
     const entry = await differing([boxed(1)], "2");
     // The note, bold as a whole, in the alert's style.
-    expectBold(whole(entry, SOME_NOT_RECORDED).closest("p"), SOME_NOT_RECORDED);
+    expectBold(
+      whole(entry, say(SOME_NOT_RECORDED)).closest("p"),
+      say(SOME_NOT_RECORDED),
+    );
     expect(within(entry).queryByText(/Scan again only/)).toBeNull();
     expect(within(entry).queryByText(/another tab recorded this/)).toBeNull();
     // What was recorded, then what was not, the page's counts in italic,
@@ -3190,15 +3240,12 @@ describe("what an older build left", () => {
     expect([...was.querySelectorAll("em")].map((em) => em.textContent)).toEqual(
       ["1"],
     );
-    expect(MAKE_CHANGES).toBe(
-      "Not recorded. Make any changes and record again.",
-    );
-    expect(within(entry).getByText(MAKE_CHANGES).tagName).toBe("H3");
+    expect(within(entry).getByText(say(MAKE_CHANGES)).tagName).toBe("H3");
     const more = whole(entry, "LiteBeam 5AC: 1 × Box more");
     expect(
       [...more.querySelectorAll("em")].map((em) => em.textContent),
     ).toEqual(["1"]);
-    within(entry).getByRole("button", { name: "Dismiss" });
+    within(entry).getByRole("button", { name: say(DISMISS) });
   });
 
   test("its difference goes in an empty cart by itself, under a new key, once, and says so until recorded (Ali, inventory-tng-0gg, 2026-11-15, 2)", async () => {
@@ -3209,10 +3256,9 @@ describe("what an older build left", () => {
     const key = storedCart().batchKey;
     expect(key).toMatch(UUID);
     expect(key).not.toBe(KEY);
-    expect(IN_CART).toBe("These are in your cart, waiting to be recorded.");
-    within(entry).getByText(IN_CART);
+    within(entry).getByText(say(IN_CART));
     expect(
-      within(entry).queryByRole("button", { name: ADD_DIFFERENCE }),
+      within(entry).queryByRole("button", { name: say(ADD_DIFFERENCE) }),
     ).toBeNull();
     expect(
       record.mock.calls.filter(([event]) => event.kind === "difference_added"),
@@ -3221,7 +3267,7 @@ describe("what an older build left", () => {
     whole(entry, "LiteBeam 5AC: 1 × Box more");
     save();
     await screen.findByText("Recorded (transaction 2).");
-    expect(within(entry).queryByText(IN_CART)).toBeNull();
+    expect(within(entry).queryByText(say(IN_CART))).toBeNull();
     // Emptied, the cart does not take it again.
     expect(storedCart().lines).toEqual([]);
   });
@@ -3291,20 +3337,16 @@ describe("what an older build left", () => {
 
   test("its difference waits on a button while the cart has lines, and goes in by itself once it is empty (Ali, inventory-tng-0gg, 2026-11-15, 2)", async () => {
     const entry = await differing([boxed(1)], "2", fillMove);
-    expect(ADD_DIFFERENCE).toBe("Add these to cart");
     fireEvent.click(
-      within(entry).getByRole("button", { name: ADD_DIFFERENCE }),
+      within(entry).getByRole("button", { name: say(ADD_DIFFERENCE) }),
     );
-    expectBold(
-      within(entry).getByRole("alert"),
-      "Record or discard the current cart before adding more items",
-    );
+    expectBold(within(entry).getByRole("alert"), say(CART_NOT_EMPTY));
     expect(itemsInCart()).toEqual([101]);
-    expect(within(entry).queryByText(IN_CART)).toBeNull();
-    fireEvent.click(screen.getByRole("button", { name: "Discard cart" }));
-    fireEvent.click(screen.getByRole("button", { name: "Discard" }));
+    expect(within(entry).queryByText(say(IN_CART))).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: say(DISCARD_CART) }));
+    fireEvent.click(screen.getByRole("button", { name: say(DISCARD) }));
     await vi.waitFor(() => expect(boxes()).toBe("1"));
-    within(entry).getByText(IN_CART);
+    within(entry).getByText(say(IN_CART));
   });
 
   test("its difference the browser would not keep says so, the cart stays empty, and a tap puts it in (inventory-tng-0gg)", async () => {
@@ -3314,16 +3356,14 @@ describe("what an older build left", () => {
     const entry = await differing([boxed(1)], "2", () => {
       refused = refusingWrites(CART_KEY);
     });
-    await screen.findByText(
-      "This browser can't keep the cart. Clear local data, reload the page and try again.",
-    );
+    await screen.findByText(say(NOT_KEPT_PHRASE));
     refused?.mockRestore();
     expect(storedCart().lines).toEqual([]);
     fireEvent.click(
-      within(entry).getByRole("button", { name: ADD_DIFFERENCE }),
+      within(entry).getByRole("button", { name: say(ADD_DIFFERENCE) }),
     );
     expect(boxes()).toBe("1");
-    within(entry).getByText(IN_CART);
+    within(entry).getByText(say(IN_CART));
     expect(
       record.mock.calls.filter(([event]) => event.kind === "difference_added"),
     ).toEqual([[{ kind: "difference_added", how: "tap" }]]);
@@ -3332,13 +3372,11 @@ describe("what an older build left", () => {
   test("its difference put in the cart, but not kept as put there, says so (inventory-tng-0gg)", async () => {
     await differing([boxed(1)], "2", fillMove);
     const refused = refusingWrites(OUTBOX_KEY);
-    fireEvent.click(screen.getByRole("button", { name: "Discard cart" }));
-    fireEvent.click(screen.getByRole("button", { name: "Discard" }));
+    fireEvent.click(screen.getByRole("button", { name: say(DISCARD_CART) }));
+    fireEvent.click(screen.getByRole("button", { name: say(DISCARD) }));
     await vi.waitFor(() => expect(boxes()).toBe("1"));
     refused.mockRestore();
-    screen.getByText(
-      "This item wasn't automatically removed. Record the cart and try to remove.",
-    );
+    screen.getByText(say(NOT_REMOVED_PHRASE));
   });
 
   test("a line taken down says an administrator will correct it, and nothing goes in the cart (inventory-tng-0gg)", async () => {
@@ -3348,7 +3386,7 @@ describe("what an older build left", () => {
       "Recorded 2 × Box, you changed it to 1. An administrator will correct it.";
     expectBold(whole(entry, lowered).closest("p"), lowered, ["2", "1"]);
     expect(
-      within(entry).queryByRole("button", { name: ADD_DIFFERENCE }),
+      within(entry).queryByRole("button", { name: say(ADD_DIFFERENCE) }),
     ).toBeNull();
     await new Promise((settled) => setTimeout(settled, 50));
     expect(storedCart().lines).toEqual([]);
@@ -3370,11 +3408,11 @@ describe("what an older build left", () => {
     act(() => {
       window.dispatchEvent(new StorageEvent("storage", { key: CART_KEY }));
     });
-    within(entry).getByRole("button", { name: ADD_DIFFERENCE });
-    fireEvent.click(screen.getByRole("button", { name: "Discard cart" }));
-    fireEvent.click(screen.getByRole("button", { name: "Discard" }));
+    within(entry).getByRole("button", { name: say(ADD_DIFFERENCE) });
+    fireEvent.click(screen.getByRole("button", { name: say(DISCARD_CART) }));
+    fireEvent.click(screen.getByRole("button", { name: say(DISCARD) }));
     await vi.waitFor(() => expect(boxes()).toBe("1"));
-    within(entry).getByText(IN_CART);
+    within(entry).getByText(say(IN_CART));
   });
 
   test("a cart not put back, refused as a tab of a newer build recorded it changed, lists no changes of its own (inventory-tng-0gg review)", async () => {
@@ -3406,9 +3444,9 @@ describe("what an older build left", () => {
     save();
     const heading = await screen.findByText(RECORDED_HEADING);
     const entry = heading.closest("li") as HTMLElement;
-    expect(within(entry).queryByText(MAKE_CHANGES)).toBeNull();
+    expect(within(entry).queryByText(say(MAKE_CHANGES))).toBeNull();
     expect(
-      within(entry).queryByRole("button", { name: ADD_DIFFERENCE }),
+      within(entry).queryByRole("button", { name: say(ADD_DIFFERENCE) }),
     ).toBeNull();
   });
 
@@ -3425,15 +3463,15 @@ describe("what an older build left", () => {
     fireEvent.click(discardOf("Cat6 cable: 3 m from an open package"));
     await screen.findByText(ADDED_BACK);
     save();
-    await screen.findByText(SOME_NOT_RECORDED);
+    await screen.findByText(say(SOME_NOT_RECORDED));
     expect(written.size).toBe(1);
   });
 
   test("discarded, a cart that went back drops its key, and what fills it next goes under a new one", async () => {
     const { outbox } = await putBackSavedFirst();
     expect(storedCart().batchKey).toBe(KEY);
-    fireEvent.click(screen.getByRole("button", { name: "Discard cart" }));
-    fireEvent.click(screen.getByRole("button", { name: "Discard" }));
+    fireEvent.click(screen.getByRole("button", { name: say(DISCARD_CART) }));
+    fireEvent.click(screen.getByRole("button", { name: say(DISCARD) }));
     expect(storedCart()).not.toHaveProperty("batchKey");
     fillMove();
     save();
@@ -3444,7 +3482,7 @@ describe("what an older build left", () => {
   test("emptied, a cart that went back saves what fills it next under a new key", async () => {
     const { outbox } = await putBackSavedFirst();
     const radio = screen.getByText("LiteBeam 5AC").closest("li") as HTMLElement;
-    fireEvent.click(within(radio).getByRole("button", { name: "Remove" }));
+    fireEvent.click(within(radio).getByRole("button", { name: say(REMOVE) }));
     fillMove();
     save();
     await screen.findByText("Recorded (transaction 2).");
@@ -3485,7 +3523,7 @@ describe("what an older build left", () => {
     const outbox = open(api);
     await ready();
     fireEvent.click(
-      within(listing()).getByRole("button", { name: "Add to cart" }),
+      within(listing()).getByRole("button", { name: say(ADD_TO_CART) }),
     );
     const key = storedCart().batchKey;
     expect(key).toMatch(UUID);
@@ -3505,16 +3543,16 @@ describe("what an older build left", () => {
     await ready();
     // What it held is recorded: once more would record it twice (Ali,
     // inventory-tng-wyq, question c).
-    const why = within(listing()).getByText(noted(SOME_NOT_RECORDED));
+    const why = within(listing()).getByText(noted(say(SOME_NOT_RECORDED)));
     expect(why.firstElementChild?.tagName).toBe("STRONG");
-    within(listing()).getByText(MAKE_CHANGES);
+    within(listing()).getByText(say(MAKE_CHANGES));
     expect(
-      within(listing()).queryByRole("button", { name: "Add to cart" }),
+      within(listing()).queryByRole("button", { name: say(ADD_TO_CART) }),
     ).toBeNull();
     fireEvent.click(lastDiscard());
     fireEvent.click(lastDiscard());
     expect(screen.queryByText(HEADING)).toBeNull();
-    expect(screen.getByText("Nothing in the cart yet.")).toBeDefined();
+    expect(screen.getByText(say(NOTHING_IN_CART))).toBeDefined();
   });
 
   test("one refused for its key goes back without it, and saves under a new one", async () => {
@@ -3526,10 +3564,10 @@ describe("what an older build left", () => {
     await ready();
     // Said from its code, in this build's words.
     within(listing()).getByText(
-      noted(`${KEY_REUSED} Add it to the cart, fix that, then record it.`),
+      noted(`${say(KEY_REUSED)} Add it to the cart, fix that, then record it.`),
     );
     fireEvent.click(
-      within(listing()).getByRole("button", { name: "Add to cart" }),
+      within(listing()).getByRole("button", { name: say(ADD_TO_CART) }),
     );
     save();
     await screen.findByText("Recorded (transaction 2).");
@@ -3541,7 +3579,7 @@ describe("what an older build left", () => {
     leaveMoves([KEY, AT, [radios(1)]]);
     open();
     await ready();
-    within(listing()).getByRole("button", { name: "Add to cart" });
+    within(listing()).getByRole("button", { name: say(ADD_TO_CART) });
     expect(screen.queryByText(ADDED_BACK)).toBeNull();
   });
 
@@ -3577,8 +3615,8 @@ describe("what an older build left", () => {
     await ready();
     await screen.findByText(NOT_KEPT);
     setItem.mockRestore();
-    screen.getByText("Nothing in the cart yet.");
-    within(listing()).getByRole("button", { name: "Add to cart" });
+    screen.getByText(say(NOTHING_IN_CART));
+    within(listing()).getByRole("button", { name: say(ADD_TO_CART) });
   });
 
   test("an item retired since, with none left, is named, and the rest goes in the cart only once that line is discarded", async () => {
@@ -3600,11 +3638,13 @@ describe("what an older build left", () => {
       .closest("li") as HTMLElement;
     expect(within(radio).queryByRole("button")).toBeNull();
     const add = within(listing()).getByRole("button", {
-      name: "Cannot Add to Cart",
+      name: say(CANNOT_ADD),
     }) as HTMLButtonElement;
     expect(add.disabled).toBe(true);
     expect(screen.queryByText(ADDED_BACK)).toBeNull();
-    fireEvent.click(within(retired).getByRole("button", { name: "Discard" }));
+    fireEvent.click(
+      within(retired).getByRole("button", { name: say(DISCARD) }),
+    );
     // The rest, whole now, goes in the empty cart without a tap.
     await screen.findByText(ADDED_BACK);
     expect(boxes()).toBe("1");

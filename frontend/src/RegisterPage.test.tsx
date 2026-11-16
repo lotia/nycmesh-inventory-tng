@@ -3,7 +3,13 @@ import { expect, test, vi } from "vitest";
 import { BUILD } from "./build";
 import { say } from "./i18n";
 import { Outbox, STORAGE_KEY } from "./outbox";
-import { BATCHES_WAITING, REGISTERED, RegisterPage } from "./RegisterPage";
+import {
+  BATCHES_WAITING,
+  PHRASE,
+  REGISTERED,
+  REGISTERING,
+  RegisterPage,
+} from "./RegisterPage";
 import { REFUSALS } from "./registration";
 import { answering, deferred, json } from "./test-fetch";
 
@@ -11,8 +17,7 @@ function openAt(path: string) {
   window.history.replaceState(null, "", path);
 }
 
-const phrase = () =>
-  screen.getByLabelText<HTMLInputElement>("Registration phrase");
+const phrase = () => screen.getByLabelText<HTMLInputElement>(say(PHRASE));
 const button = () => screen.getByRole<HTMLButtonElement>("button");
 const registered = () => json({ device_id: 4 }, 201);
 
@@ -66,7 +71,7 @@ test("the button waits while the phrase is checked", async () => {
   render(<RegisterPage api={api} />);
   fireEvent.submit(button());
   expect(button().disabled).toBe(true);
-  expect(button().textContent).toBe("Registering…");
+  expect(button().textContent).toBe(say(REGISTERING));
   reply.resolve(json({ reason: "expired" }, 400));
   await screen.findByRole("alert");
   expect(button().disabled).toBe(false);
@@ -89,7 +94,9 @@ test("a refusal is explained, and the phrase stays to correct", async () => {
   openAt("/register?code=x");
   render(<RegisterPage api={api} />);
   fireEvent.submit(button());
-  expect((await screen.findByRole("alert")).textContent).toBe(REFUSALS.used_up);
+  expect((await screen.findByRole("alert")).textContent).toBe(
+    say(REFUSALS.used_up),
+  );
   expect(phrase().value).toBe("x");
   expect(window.location.search).toBe("?code=x");
 });
@@ -105,7 +112,9 @@ test("trying again clears the last refusal while it waits", async () => {
   fireEvent.submit(button());
   expect(screen.queryByRole("alert")).toBeNull();
   second.resolve(json({ reason: "expired" }, 400));
-  expect((await screen.findByRole("alert")).textContent).toBe(REFUSALS.expired);
+  expect((await screen.findByRole("alert")).textContent).toBe(
+    say(REFUSALS.expired),
+  );
 });
 
 test.each([

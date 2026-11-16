@@ -11,12 +11,14 @@
  * sending it. Emptied or discarded, it drops its key: what fills it next
  * is another batch.
  */
+import { msg } from "@lingui/core/macro";
 import { type Signal, signal } from "@preact/signals";
 import { v4 as uuid, v5 as uuidFrom } from "uuid";
 import * as v from "valibot";
 import type { Schemas } from "./api/client";
 import { id } from "./api/replies";
 import { BUILD } from "./build";
+import { say, sayParts } from "./i18n";
 import {
   BatchKey,
   BatchLine,
@@ -626,11 +628,7 @@ export function quantityOf(
   const current = new Set(item.packages.map((pack) => String(pack.id)));
   for (const [packageId, typed] of Object.entries(line.packages)) {
     if (!current.has(packageId) && holdsSome(typed)) {
-      return {
-        problem: [
-          "A package counted here is no longer used. Remove the line and add it again.",
-        ],
-      };
+      return { problem: [say(PACKAGE_NO_LONGER_USED)] };
     }
   }
   let amount = 0;
@@ -641,7 +639,9 @@ export function quantityOf(
     const size = thousandths(line.sizes?.[pack.id] ?? pack.size);
     if (packs === null || size === null) {
       return {
-        problem: ["Count whole packages: ", { quoted: pack.name }, "."],
+        problem: sayParts(COUNT_WHOLE_PACKAGES, {
+          package: { quoted: pack.name },
+        }),
       };
     }
     if (packs > 0) {
@@ -651,9 +651,7 @@ export function quantityOf(
   }
   const loose = thousandths(line.loose);
   if (loose === null) {
-    return {
-      problem: [`Enter the loose amount in ${item.unit}, up to 3 decimals.`],
-    };
+    return { problem: [say(LOOSE_DECIMALS, { unit: item.unit })] };
   }
   amount += loose;
   const taken = new Map<string, { amount: number; whole: boolean }>();
@@ -662,9 +660,7 @@ export function quantityOf(
   )) {
     const part = thousandths(typed);
     if (part === null) {
-      return {
-        problem: ["Enter how much from the open package, up to 3 decimals."],
-      };
+      return { problem: [say(OPEN_DECIMALS)] };
     }
     if (part > 0) {
       taken.set(key, { amount: part, whole });
@@ -678,21 +674,64 @@ export function quantityOf(
     ...[...taken.values()].map((t) => t.amount),
   ];
   if (item.unit === "each" && parts.some((part) => part % 1000 !== 0)) {
-    return { problem: ["Counted in whole units."] };
+    return { problem: [say(WHOLE_UNITS)] };
   }
   return { amount, sealed, loose, taken };
 }
 
-const KINDS: Record<Draft["kind"], string> = {
-  move: "Move",
-  receipt: "Receipt",
-  install: "Install",
-  open: "Opening",
-  report: "Used up",
-};
+export const PACKAGE_NO_LONGER_USED = msg`A package counted here is no longer used. Remove the line and add it again.`;
+export const COUNT_WHOLE_PACKAGES = msg`Count whole packages: {package}.`;
+export const LOOSE_DECIMALS = msg`Enter the loose amount in {unit}, up to 3 decimals.`;
+export const OPEN_DECIMALS = msg`Enter how much from the open package, up to 3 decimals.`;
+export const WHOLE_UNITS = msg`Counted in whole units.`;
 
 /** What the page says beside a retired item, or package. */
-export const RETIRED = "retired: taking only";
+export const RETIRED = msg`retired: taking only`;
+
+/** A line in words: its item's name, then what of it, or what is wrong. */
+export const ITEM_SAYS = msg({
+  message: "{name}: {what}",
+  comment: "An item's name, then how much of it, or what is wrong with it.",
+});
+
+/** Why a cart cannot be recorded yet (toBatch). Those of a line start
+ * with its item's name. */
+export const AN_ITEM = msg`An item`;
+export const OPEN_NOW_WHOLE = msg`{name}: enter what is on the open package, in whole units, or leave it blank.`;
+export const OPEN_NOW_DECIMALS = msg`{name}: enter what is on the open package, up to 3 decimals, or leave it blank.`;
+export const TOO_MUCH = msg`{name}: That is more than the inventory can count.`;
+export const PICK_YOUR_NAME = msg`Pick your name.`;
+export const PICK_FROM = msg`Pick where it comes from.`;
+export const PICK_TO = msg`Pick where it goes.`;
+export const SAME_PLACE = msg`From and to must be different places.`;
+export const INSTALL_DIGITS = msg`An install number is digits only.`;
+export const INSTALL_RANGE = msg`That install number is out of range.`;
+export const ITEM_GONE = msg`An item in the cart is no longer in the catalogue. Remove it.`;
+export const RETIRED_NOT_RECEIVED = msg`{name}: retired: taking only, so it can't be received.`;
+export const PACKAGE_RETIRED_NOT_RECEIVED = msg`{name}, {package}: retired: taking only, so it can't be received.`;
+export const ENTER_THE_COUNT = msg`{name}: enter the count`;
+export const NOTHING_FROM_OPEN = msg`{name}: Nothing is taken from an open package here.`;
+export const OPEN_WHOLE = msg`{name}: Open whole packages: leave loose empty.`;
+export const ADD_SOMETHING = msg`Add something to the cart.`;
+export const TOO_MUCH_FOR_ONE = msg`That is too much for one batch: record some, then the rest.`;
+
+/** A batch in words, for the outbox, by what it is (toBatch). */
+export const ITEMS = msg({
+  message: "{count, plural, one {# item} other {# items}}",
+});
+export const OPEN_PACKAGES = msg({
+  message: "{count, plural, one {# open package} other {# open packages}}",
+});
+export const MOVE = msg`Move: {items} from {from} to {to}`;
+export const RECEIPT = msg`Receipt: {items} to {to}`;
+export const INSTALL = msg`Install: {items} from {from}`;
+export const INSTALL_NUMBERED = msg`Install: {items} from {from} for install {number}`;
+export const OPENING = msg`Opening: {items} at {from}`;
+export const REPORT = msg`Used up: {packages} at {from}`;
+export const LENGTHS = msg`What's on it: {packages} at {from}`;
+/** After a batch that takes from open packages, and says of some. */
+export const SAID_USED_UP = msg`({packages} said used up)`;
+export const SAID_LENGTHS = msg`(what is on {packages} said)`;
 
 /**
  * The cart as the batch endpoint takes it, less the key the outbox adds,
@@ -729,7 +768,7 @@ export function toBatch(
   const problems: Said[] = [];
   for (const line of cart.lines) {
     const item = index.items.get(line.itemId);
-    const named = item === undefined ? "An item" : { quoted: item.name };
+    const named = item === undefined ? say(AN_ITEM) : { quoted: item.name };
     const each = item?.unit === "each";
     for (const [key, { now }] of Object.entries(line.open ?? {})) {
       if (now === undefined || now.trim() === "") {
@@ -737,12 +776,11 @@ export function toBatch(
       }
       const left = thousandths(now);
       if (left === null || (each && left % 1000 !== 0)) {
-        problems.push([
-          named,
-          `: enter what is on the open package${each ? ", in whole units" : ", up to 3 decimals"}, or leave it blank.`,
-        ]);
+        problems.push(
+          sayParts(each ? OPEN_NOW_WHOLE : OPEN_NOW_DECIMALS, { name: named }),
+        );
       } else if (left >= MAX_AMOUNT) {
-        problems.push([named, ": That is more than the inventory can count."]);
+        problems.push(sayParts(TOO_MUCH, { name: named }));
       } else {
         lengths.push({ open_package_key: key, left: decimal(left) });
       }
@@ -762,69 +800,67 @@ export function toBatch(
   const fromId = sides.from ? cart.fromId : null;
   const toId = sides.to ? cart.toId : null;
   if (cart.volunteerId === null) {
-    problems.push(["Pick your name."]);
+    problems.push([say(PICK_YOUR_NAME)]);
   }
   if (sides.from && fromId === null) {
-    problems.push(["Pick where it comes from."]);
+    problems.push([say(PICK_FROM)]);
   }
   if (sides.to && toId === null) {
-    problems.push(["Pick where it goes."]);
+    problems.push([say(PICK_TO)]);
   }
   if (fromId !== null && fromId === toId) {
-    problems.push(["From and to must be different places."]);
+    problems.push([say(SAME_PLACE)]);
   }
   const installNumber = kind === "install" ? cart.installNumber.trim() : "";
   const install = count(installNumber);
   if (install === null) {
-    problems.push(["An install number is digits only."]);
+    problems.push([say(INSTALL_DIGITS)]);
   } else if (installNumber !== "" && (install < 1 || install > MAX_ID)) {
-    problems.push(["That install number is out of range."]);
+    problems.push([say(INSTALL_RANGE)]);
   }
   const lines: Draft["lines"] = [];
   let items = 0;
   for (const line of cart.lines) {
     const item = index.items.get(line.itemId);
     if (item === undefined) {
-      problems.push([
-        "An item in the cart is no longer in the catalogue. Remove it.",
-      ]);
+      problems.push([say(ITEM_GONE)]);
       continue;
     }
     const name = { quoted: item.name };
     if (item.retired && cart.kind === "receipt") {
-      problems.push([name, `: ${RETIRED}, so it can't be received.`]);
+      problems.push(sayParts(RETIRED_NOT_RECEIVED, { name }));
       continue;
     }
     if (cart.kind === "receipt") {
       for (const pack of item.packages) {
         if (pack.retired && (count(line.packages[pack.id] ?? "") ?? 0) > 0) {
-          problems.push([
-            name,
-            ", ",
-            { quoted: pack.name },
-            `: ${RETIRED}, so it can't be received.`,
-          ]);
+          problems.push(
+            sayParts(PACKAGE_RETIRED_NOT_RECEIVED, {
+              name,
+              package: { quoted: pack.name },
+            }),
+          );
         }
       }
     }
     // Cleared as resized (reconcile), it is to be counted again, not
     // left out: saving the rest would record less than was moved.
     if (item.packages.some((pack) => resized(line, pack))) {
-      problems.push([name, ": enter the count"]);
+      problems.push(sayParts(ENTER_THE_COUNT, { name }));
       continue;
     }
     const quantity = quantityOf(line, item);
     if ("problem" in quantity) {
-      problems.push([name, ": ", ...quantity.problem]);
+      problems.push(sayParts(ITEM_SAYS, { name, what: quantity.problem }));
     } else if (quantity.amount >= MAX_AMOUNT) {
-      problems.push([name, ": That is more than the inventory can count."]);
+      problems.push(sayParts(TOO_MUCH, { name }));
     } else if (
       (cart.kind === "open" || cart.kind === "receipt") &&
       quantity.taken.size > 0
     ) {
-      problems.push([name, ": Nothing is taken from an open package here."]);
+      problems.push(sayParts(NOTHING_FROM_OPEN, { name }));
     } else if (cart.kind === "open" && quantity.loose > 0) {
-      problems.push([name, ": Open whole packages: leave loose empty."]);
+      problems.push(sayParts(OPEN_WHOLE, { name }));
     } else if (cart.kind === "open" && quantity.amount > 0) {
       lines.push(...openings(item, quantity.sealed, cart.batchKey));
       items += 1;
@@ -853,25 +889,19 @@ export function toBatch(
     lines.length + usedUp.length + lengths.length === 0 &&
     problems.length === 0
   ) {
-    problems.push(["Add something to the cart."]);
+    problems.push([say(ADD_SOMETHING)]);
   }
   if (lines.length > MAX_LINES) {
-    problems.push([
-      "That is too much for one batch: record some, then the rest.",
-    ]);
+    problems.push([say(TOO_MUCH_FOR_ONE)]);
   }
   // The volunteer check again only narrows the type; it was reported above.
   if (problems.length > 0 || cart.volunteerId === null) {
     return { problems };
   }
-  const packages = openPackages(usedUp.length);
-  const measured = openPackages(lengths.length);
+  const packages = say(OPEN_PACKAGES, { count: usedUp.length });
+  const measured = say(OPEN_PACKAGES, { count: lengths.length });
   // A report of lengths alone says so; one of used up, as ever.
   const lengthsOnly = reporting && usedUp.length === 0;
-  const counted = items === 1 ? "1 item" : `${items} items`;
-  const things = lengthsOnly ? measured : reporting ? packages : counted;
-  const named = lengthsOnly ? "What's on it" : KINDS[kind];
-  const words = [`${named}: ${things}`];
   const draft: Draft = { kind, volunteer_id: cart.volunteerId, lines };
   if (cart.changedFrom !== undefined) {
     draft.changed_from = cart.changedFrom;
@@ -882,35 +912,47 @@ export function toBatch(
   if (lengths.length > 0) {
     draft.lengths = lengths;
   }
-  if (fromId !== null && (kind === "open" || kind === "report")) {
+  if (fromId !== null) {
     draft.from_location_id = fromId;
     if (kind === "open") {
       draft.to_location_id = fromId;
     }
-    words.push(`at ${index.places.get(fromId)}`);
-  } else if (fromId !== null) {
-    draft.from_location_id = fromId;
-    words.push(`from ${index.places.get(fromId)}`);
   }
   if (toId !== null) {
     draft.to_location_id = toId;
-    words.push(`to ${index.places.get(toId)}`);
   }
   if (installNumber !== "") {
     draft.install_number = Number(installNumber);
-    words.push(`for install ${installNumber}`);
   }
+  // Each kind names the places its batch must have (problems above).
+  const place = (placeId: number | null) =>
+    placeId === null ? "" : `${index.places.get(placeId)}`;
+  const named = {
+    items: say(ITEMS, { count: items }),
+    packages: lengthsOnly ? measured : packages,
+    from: place(fromId),
+    to: place(toId),
+    number: installNumber,
+  };
+  const head = lengthsOnly
+    ? LENGTHS
+    : kind === "install" && installNumber !== ""
+      ? INSTALL_NUMBERED
+      : {
+          move: MOVE,
+          receipt: RECEIPT,
+          install: INSTALL,
+          open: OPENING,
+          report: REPORT,
+        }[kind];
+  const words = [say(head, named)];
   if (usedUp.length > 0 && !reporting) {
-    words.push(`(${packages} said used up)`);
+    words.push(say(SAID_USED_UP, { packages }));
   }
   if (lengths.length > 0 && !lengthsOnly) {
-    words.push(`(what is on ${measured} said)`);
+    words.push(say(SAID_LENGTHS, { packages: measured }));
   }
   return { draft, what: words.join(" ") };
-}
-
-function openPackages(count: number): string {
-  return count === 1 ? "1 open package" : `${count} open packages`;
 }
 
 /**

@@ -3,6 +3,12 @@
  * yet saved warns first (docs/decisions/0019): retire anyway, losing them,
  * or go back. A retire form says it is one with `data-retire`.
  */
+import { msg } from "@lingui/core/macro";
+import { say } from "./i18n";
+
+export const UNSAVED_CHANGES = msg`This page has changes you haven't saved. Retiring now loses them.`;
+export const GO_BACK = msg`Go back`;
+export const RETIRE_ANYWAY = msg`Retire anyway`;
 
 /** Whether a form's fields differ from what the page was sent with. */
 export function unsaved(form: HTMLFormElement): boolean {
@@ -37,15 +43,32 @@ function question(document: Document): HTMLDialogElement {
   dialog.className =
     "m-auto max-w-sm rounded border border-line bg-page p-4 text-ink backdrop:bg-black/50";
   dialog.setAttribute("aria-labelledby", "retire-question");
-  dialog.innerHTML = `
-    <p id="retire-question" class="mt-0">This page has changes you haven't
-    saved. Retiring now loses them.</p>
-    <form method="dialog" class="actions">
-      <button value="back" class="primary" autofocus>Go back</button>
-      <button value="retire">Retire anyway</button>
-    </form>`;
+  const words = document.createElement("p");
+  words.id = "retire-question";
+  words.className = "mt-0";
+  words.textContent = say(UNSAVED_CHANGES);
+  const form = document.createElement("form");
+  form.method = "dialog";
+  form.className = "actions";
+  const back = button(document, "back", say(GO_BACK));
+  back.className = "primary";
+  back.autofocus = true;
+  form.append(back, button(document, "retire", say(RETIRE_ANYWAY)));
+  dialog.append(words, form);
   document.body.append(dialog);
   return dialog;
+}
+
+/** A button closing the dialog with `value`, saying `words`. */
+function button(
+  document: Document,
+  value: string,
+  words: string,
+): HTMLButtonElement {
+  const made = document.createElement("button");
+  made.value = value;
+  made.textContent = words;
+  return made;
 }
 
 /** Asks before a retire form is sent while another form on the page has

@@ -866,6 +866,13 @@ On the scan page (`frontend/src/i18n.ts`):
   batch} other {# batches}}" })`.
 - Say it with `say(REGISTERED)`, or `say(BATCHES, { count })`. A component
   that says a phrase renders again when the locale changes.
+- A sentence is one message, never pieces glued together: `{name}: enter
+  the count`, not the name and then `: enter the count`. Where a value is
+  more than a string, such as a name in bold or a name kept apart from
+  the page's own words, or the sentence has a link, say it with
+  `sayParts`, which puts each such value where the message places it and
+  makes `<0>…</0>` with the function given for it:
+  `sayParts(REGISTER_IT, {}, [(inside) => <a href="/register">{inside}</a>])`.
 
 On either side, a test reads a phrase by its name, never by repeating its
 words.
@@ -895,15 +902,17 @@ mise run extract-catalogues  # backend's locales/en, frontend's src/locales
 mise run check-catalogues    # fails while either is not current
 ```
 
-Each side has a test that renders what has moved into the catalogue in a
-pseudo-locale, every letter accented, and fails on a word left in plain
-English: `backend/tests/test_phrases.py` and `frontend/src/pseudo.test.tsx`.
-When you move words into the catalogue, add what you moved to its
-`COVERED`. On the server, every phrase named as a constant, alone or in a
-table such as `NOTICES`, is covered already; add a phrase said with values
-to `SAID_WITH_VALUES`, a page to `PAGES`, which fetches it signed in with
-every name in the database not English, or to `SIGNED_OUT`, and a template
-no page there shows, or a branch of one, to `COVERED`.
+Each side has a test that renders its words in a pseudo-locale, every
+letter accented, and fails on a word left in plain English:
+`backend/tests/test_phrases.py` and `frontend/src/pseudo.test.tsx`. On
+the scan page, every component is in its `COVERED`, with names that are
+not English; add a part for a new component, or for a state of one that
+says something no part shows. On the server, every phrase named as a
+constant, alone or in a table such as `NOTICES`, is covered already; add
+a phrase said with values to `SAID_WITH_VALUES`, a page to `PAGES`, which
+fetches it signed in with every name in the database not English, or to
+`SIGNED_OUT`, and a template no page there shows, or a branch of one, to
+`COVERED`.
 
 ## Running the checks
 

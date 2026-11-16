@@ -1,7 +1,8 @@
 import { fireEvent, render, screen } from "@testing-library/preact";
 import { expect, test, vi } from "vitest";
 import { DecoderUnavailable, type Session } from "./camera";
-import { Scanner } from "./Scanner";
+import { say } from "./i18n";
+import { DONE, POINT, Scanner, TORCH, TORCH_FAILED } from "./Scanner";
 import { fakeCamera as camera } from "./test-camera";
 
 /** A read that answers only when `finish` is called. */
@@ -20,7 +21,7 @@ test("a label in view is taken once, and said what it did", async () => {
   const { state, open } = camera();
   const onCode = vi.fn((code: string) => `Read ${code}.`);
   render(<Scanner open={open} onCode={onCode} onDone={() => {}} />);
-  await screen.findByText("Point the camera at a label.");
+  await screen.findByText(say(POINT));
   state.inView = ["B3ZT9W"];
   await screen.findByText("Read B3ZT9W.");
   // Still in view a moment later: not taken again.
@@ -34,8 +35,8 @@ test("Done stops the camera", async () => {
   const { unmount } = render(
     <Scanner open={open} onCode={() => ""} onDone={onDone} />,
   );
-  await screen.findByText("Point the camera at a label.");
-  fireEvent.click(screen.getByRole("button", { name: "Done" }));
+  await screen.findByText(say(POINT));
+  fireEvent.click(screen.getByRole("button", { name: say(DONE) }));
   expect(onDone).toHaveBeenCalled();
   unmount();
   await vi.waitFor(() => expect(state.stopped).toBe(true));
@@ -49,7 +50,7 @@ test("the torch shows where the camera has one, and switches", async () => {
     },
   });
   render(<Scanner open={open} onCode={() => ""} onDone={() => {}} />);
-  const torch = await screen.findByRole("button", { name: "Torch" });
+  const torch = await screen.findByRole("button", { name: say(TORCH) });
   fireEvent.click(torch);
   await vi.waitFor(() =>
     expect(torch.getAttribute("aria-pressed")).toBe("true"),
@@ -60,8 +61,8 @@ test("the torch shows where the camera has one, and switches", async () => {
 
 test("no torch, no button", async () => {
   render(<Scanner open={camera().open} onCode={() => ""} onDone={() => {}} />);
-  await screen.findByText("Point the camera at a label.");
-  expect(screen.queryByRole("button", { name: "Torch" })).toBeNull();
+  await screen.findByText(say(POINT));
+  expect(screen.queryByRole("button", { name: say(TORCH) })).toBeNull();
 });
 
 test("a camera refused, or none, says so and leaves the lists", async () => {
@@ -118,7 +119,7 @@ test("a slow read is waited for, not piled on", async () => {
       onDone={() => {}}
     />,
   );
-  await screen.findByText("Point the camera at a label.");
+  await screen.findByText(say(POINT));
   await new Promise((resolve) => setTimeout(resolve, 650));
   expect(read).toHaveBeenCalledTimes(1);
   finish(["B3ZT9W"]);
@@ -140,8 +141,8 @@ test("a torch that won't switch says so", async () => {
     },
   });
   render(<Scanner open={open} onCode={() => ""} onDone={() => {}} />);
-  fireEvent.click(await screen.findByRole("button", { name: "Torch" }));
-  await screen.findByText("The torch wouldn't switch.");
+  fireEvent.click(await screen.findByRole("button", { name: say(TORCH) }));
+  await screen.findByText(say(TORCH_FAILED));
 });
 
 test("a label read as the camera closes is not taken", async () => {
@@ -150,7 +151,7 @@ test("a label read as the camera closes is not taken", async () => {
   const { unmount } = render(
     <Scanner open={camera({ read }).open} onCode={onCode} onDone={() => {}} />,
   );
-  await screen.findByText("Point the camera at a label.");
+  await screen.findByText(say(POINT));
   await new Promise((resolve) => setTimeout(resolve, 250));
   unmount();
   await new Promise((resolve) => setTimeout(resolve, 20));

@@ -6,6 +6,11 @@
  * with none picked sends the form, which lists every close match, as it
  * does without this script.
  */
+import { msg } from "@lingui/core/macro";
+import { say } from "./i18n";
+
+/** The list's name, for a screen reader. */
+export const SUGGESTIONS = msg`Suggestions`;
 
 /** A suggestion, as the backend sends it. */
 export interface Suggestion {
@@ -34,7 +39,7 @@ export function suggest(
   const list = document.createElement("ul");
   list.id = id;
   list.setAttribute("role", "listbox");
-  list.setAttribute("aria-label", "Suggestions");
+  list.setAttribute("aria-label", say(SUGGESTIONS));
   list.className =
     "absolute inset-x-0 top-full z-10 m-0 list-none rounded border border-line bg-page p-0 font-normal shadow-md";
   list.hidden = true;

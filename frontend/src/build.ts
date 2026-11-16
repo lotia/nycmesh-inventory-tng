@@ -13,6 +13,7 @@
  * build_too_old). The scan page then asks for a reload: once nothing waits
  * to send and the cart is saved; at once, if too old.
  */
+import { msg } from "@lingui/core/macro";
 import { signal } from "@preact/signals";
 import { onStoredChange, parseStored, writeStored } from "./stored";
 import { telemetry } from "./telemetry";
@@ -28,9 +29,9 @@ export const BUILD_KEY = "inventory.build";
  * words (inventory-tng-3c0): UPDATED once nothing is left to send or save,
  * MUST_UPGRADE where the server takes nothing more from it but it holds
  * something; each with the button UPGRADE, which reloads. */
-export const UPDATED = "The scanner has been updated.";
-export const MUST_UPGRADE = `${UPDATED} You must upgrade. Your data will be kept but may need some changes before sending.`;
-export const UPGRADE = "Upgrade";
+export const UPDATED = msg`The scanner has been updated.`;
+export const MUST_UPGRADE = msg`The scanner has been updated. You must upgrade. Your data will be kept but may need some changes before sending.`;
+export const UPGRADE = msg`Upgrade`;
 /** The header a batch names its build in, and the reply the server's. */
 export const HEADER = "X-Inventory-Build";
 /** As the backend checks one (bundle.BUILD_ID). */

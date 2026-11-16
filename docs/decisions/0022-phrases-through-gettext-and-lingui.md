@@ -78,6 +78,11 @@ them open:
   `mise run extract-catalogues`.
 - A component on the scan page reads a phrase through a signal
   (`i18n.ts`, `say`), so it renders again when the locale changes.
+- On the scan page, a sentence holding a name in bold, a name kept apart
+  from the page's own words, or a link is still one message, said in
+  parts (`i18n.ts`, `sayParts`): each such value, and the words a link
+  marks as `<0>…</0>`, goes where the message places it, so a translation
+  may move it (2026-11-16).
 - The app's name, NYC Mesh Inventory, is a name and not a phrase
   (`phrases.BRAND`), kept out of the catalogue: a message takes it as a
   value. A name reads the same in every language, and authenticator apps

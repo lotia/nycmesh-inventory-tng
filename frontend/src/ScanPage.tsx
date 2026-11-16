@@ -1,3 +1,5 @@
+import type { MessageDescriptor } from "@lingui/core";
+import { msg } from "@lingui/core/macro";
 import { type Signal, signal, useSignal } from "@preact/signals";
 import { Fragment, type TargetedSubmitEvent } from "preact";
 import { useEffect, useMemo, useRef } from "preact/hooks";
@@ -36,6 +38,7 @@ import {
   withLineChanged,
 } from "./cart";
 import { Field } from "./Field";
+import { say, sayParts } from "./i18n";
 import { placeSides, readLabel, type Scanned } from "./labels";
 import { NOTHING_TAKEN, OpenPackageCard } from "./OpenPackageCard";
 import {
@@ -115,12 +118,99 @@ async function loadCatalogue(api: Api, outbox: Outbox): Promise<Loaded> {
 }
 
 /** What a cart is filled for, in the words the page asks it in. */
-const KIND_WORDS: Record<Kind, string> = {
-  move: "Moving stock",
-  receipt: "Receiving stock",
-  install: "Taking it to an install",
-  open: "Opening packages",
+export const KIND_WORDS: Record<Kind, MessageDescriptor> = {
+  move: msg`Moving stock`,
+  receipt: msg`Receiving stock`,
+  install: msg`Taking it to an install`,
+  open: msg`Opening packages`,
 };
+
+/** An older build's cart, filled for each kind (olderKind). */
+const CART_KIND_WORDS: Record<Kind, MessageDescriptor> = {
+  move: msg`A cart: moving stock`,
+  receipt: msg`A cart: receiving stock`,
+  install: msg`A cart: taking it to an install`,
+  open: msg`A cart: opening packages`,
+};
+
+export const SCAN = msg`Scan`;
+export const LOADING = msg`Loading the catalogue…`;
+/** After why this browser cannot record (registration.NOT_REGISTERED). */
+export const REGISTER_IT = msg`<0>Register it</0>, then come back.`;
+export const COULD_NOT_LOAD = msg`Couldn't load the catalogue.`;
+export const TRY_AGAIN = msg`Try again`;
+export const NOT_KEEPING = msg`This browser isn't keeping the cart, so a reload will empty it. Free some space or leave private browsing.`;
+/** What a label or a tap did, said under the camera. */
+export const NO_PACKAGE_TO_OPEN = msg`{item} comes in no package to open.`;
+export const WHICH_PACKAGE = msg`{item}: type how many of which package to open.`;
+export const ADDED_ONE = msg`Added one: {item}.`;
+export const ADDED_PACKAGE = msg`Added a {package}: {item}.`;
+export const UNKNOWN_LABEL = msg`That label isn't in the inventory ({code}).`;
+export const PLACE_HERE = msg`{place}: here.`;
+export const PLACE_FROM_HERE = msg`{place}: from here.`;
+export const PLACE_TO_HERE = msg`{place}: to here.`;
+export const PLACE_WHICH = msg`{place}: from here, or to here?`;
+export const CHANGED_BEFORE_RECORD = msg`The cart was changed in another tab. Check it, then record it again.`;
+export const NOT_SENT = msg`This browser wouldn't keep the cart, so it wasn't sent. Free some space or leave private browsing, then try again.`;
+export const ARE_YOU = msg`Are you {name}? This phone hasn't been used for a while.`;
+export const THATS_ME = msg`That's me`;
+export const NOT_ME = msg`Not me`;
+export const YOUR_NAME = msg`Your name`;
+/** The name list's first choice, none picked. */
+export const NO_NAME_PICKED = msg`Pick your name`;
+export const WHAT_IS_HAPPENING = msg`What is happening`;
+export const WHERE = msg`Where`;
+export const FROM = msg({ context: "place", message: "From" });
+export const TO = msg({ context: "place", message: "To" });
+export const INSTALL_NUMBER = msg`MeshDB install number (if you know it)`;
+export const CART = msg`Cart`;
+export const ADDED_BACK = msg`Added back to cart. Review before Record.`;
+export const NOTHING_IN_CART = msg`Nothing in the cart yet.`;
+export const SCAN_WITH_CAMERA = msg`Scan with the camera`;
+export const SENDING_WHAT = msg`Sending: {what}. A new cart is ready.`;
+export const RECORDING_AS = msg`Recording as {name}.`;
+export const CHANGE = msg`Change`;
+export const RECORD = msg`Record`;
+export const DISCARD_CART = msg`Discard cart`;
+export const CHECKED_OUT = msg`Checked out items. Add to cart or discard before sending`;
+export const RETIRED_ITEM = msg`Item retired`;
+export const DISCARD = msg`Discard`;
+export const CANNOT_ADD = msg`Cannot Add to Cart`;
+export const ADD_TO_CART = msg`Add to cart`;
+export const CONFIRM_DISCARD = msg`Confirm discard`;
+export const KEEP_IT = msg`Keep it`;
+export const SAYING_WHAT_IS_ON = msg`Saying what is on open packages`;
+export const SOMETHING = msg`Something`;
+export const A_CART_SOMETHING = msg`A cart: something`;
+/** Where an older build's save was for, clause by clause (olderWhere). */
+export const AT_PLACE = msg`at {place}`;
+export const FROM_PLACE = msg`from {place}`;
+export const TO_PLACE = msg`to {place}`;
+export const FOR_INSTALL = msg`for install {number}`;
+export const BY = msg`{where}, by {name}`;
+export const PLACE_GONE = msg`a place no longer in the catalogue`;
+export const ADDED_NOT_SENT = msg`Added but not sent`;
+export const ADDED_ON_NOT_SENT = msg`Added on {when} but not sent`;
+export const KEPT_NOT_SENT = msg`Kept on this device, not sent.`;
+export const KEPT_ON_NOT_SENT = msg`Kept on this device {when}, not sent.`;
+export const PICK_A_PLACE = msg`Pick a place`;
+export const LINE_GONE = msg`No longer in the catalogue.`;
+export const REMOVE = msg`Remove`;
+export const RESIZED_TO = msg`The package size has changed to {size} since this item was added. Enter the count again.`;
+export const PACKAGE_COUNT = msg`{package} ({size} {unit})`;
+export const PACKAGE_COUNT_RETIRED = msg`{package} ({size} {unit}), retired: taking only`;
+export const LOOSE_UNITS = msg`Loose units`;
+export const LOOSE_IN = msg`Loose {unit}`;
+export const HOW_MANY = msg`How many`;
+export const HOW_MANY_IN = msg`How many {unit}`;
+export const IN_ALL = msg`{amount} {unit} in all`;
+export const FIND = msg`Find an item, or type or scan its code`;
+export const NOTHING_MATCHES = msg`Nothing matches “{typed}”.`;
+export const CARTS_FROM_DEVICE = msg`Carts from this device`;
+export const REGISTER_TO_SEND_WAITING = msg`<0>Register this browser</0> to send what is waiting.`;
+export const RECORDED_IN = msg`Recorded (transaction {transaction}).`;
+export const SENDING = msg`Sending…`;
+export const DISMISS = msg`Dismiss`;
 
 /** A list whose entries are ruled apart: the cart's lines, the outbox. */
 const RULED_LIST = "list-none p-0 *:border-t *:border-line *:py-3";
@@ -293,22 +383,24 @@ export function ScanPage({
   const current = loaded.value;
   return (
     <main class="volunteer page-width">
-      <h1>Scan</h1>
+      <h1>{say(SCAN)}</h1>
       <NewerBuild outbox={outbox} cartEmpty={cartEmpty.value} reload={reload} />
-      {current.state === "loading" && <p>Loading the catalogue…</p>}
+      {current.state === "loading" && <p>{say(LOADING)}</p>}
       {current.state === "unregistered" && (
         <p role="alert">
           <strong>
-            {NOT_REGISTERED[current.reason]} <a href="/register">Register it</a>
-            , then come back.
+            {say(NOT_REGISTERED[current.reason])}{" "}
+            {sayParts(REGISTER_IT, {}, [
+              (inside) => <a href="/register">{inside}</a>,
+            ])}
           </strong>
         </p>
       )}
       {current.state === "unavailable" && (
         <p role="alert">
-          <strong>Couldn't load the catalogue.</strong>{" "}
+          <strong>{say(COULD_NOT_LOAD)}</strong>{" "}
           <button type="button" onClick={load}>
-            Try again
+            {say(TRY_AGAIN)}
           </button>
         </p>
       )}
@@ -368,9 +460,9 @@ function NewerBuild({
   }
   return (
     <div role="alert" class={CAUTION_BOX}>
-      <div>{holds ? MUST_UPGRADE : UPDATED}</div>
+      <div>{say(holds ? MUST_UPGRADE : UPDATED)}</div>
       <button type="button" class="primary" onClick={reload}>
-        {UPGRADE}
+        {say(UPGRADE)}
       </button>
     </div>
   );
@@ -486,13 +578,7 @@ function CartForm({
 
   /** Say so if the browser would not keep the cart. */
   function kept(stored: boolean) {
-    problems.value = stored
-      ? []
-      : [
-          [
-            "This browser isn't keeping the cart, so a reload will empty it. Free some space or leave private browsing.",
-          ],
-        ];
+    problems.value = stored ? [] : [[say(NOT_KEEPING)]];
   }
 
   function change(next: Cart) {
@@ -519,10 +605,10 @@ function CartForm({
     query.value = "";
     if (opening && pack === undefined) {
       if (item?.packages.length === 0) {
-        return `${item.name} comes in no package to open.`;
+        return say(NO_PACKAGE_TO_OPEN, { item: item.name });
       }
       change(withLine(cart.value, itemId));
-      return `${item?.name}: type how many of which package to open.`;
+      return say(WHICH_PACKAGE, { item: item?.name });
     }
     const next = addOne(cart.value, itemId, pack?.id);
     // A package's own label is the volunteer's choice (Line.typed).
@@ -531,7 +617,9 @@ function CartForm({
         ? next
         : withLineChanged(next, itemId, (line) => ({ ...line, typed: true })),
     );
-    return `Added ${pack === undefined ? "one" : `a ${pack.name}`}: ${item?.name}.`;
+    return pack === undefined
+      ? say(ADDED_ONE, { item: item?.name })
+      : say(ADDED_PACKAGE, { package: pack.name, item: item?.name });
   }
 
   // The camera, while open, and a place it read, asking From or To.
@@ -542,7 +630,7 @@ function CartForm({
   function actOn(read: Scanned): string {
     if (read.kind === "unknown") {
       // A stray code leaves a place's question to answer.
-      return `That label isn't in the inventory (${read.code}).`;
+      return say(UNKNOWN_LABEL, { code: read.code });
     }
     placeRead.value = null;
     const { places } = indexOf(catalogue);
@@ -552,11 +640,11 @@ function CartForm({
       query.value = "";
       if (only !== undefined && other === undefined) {
         placeOn(only, read.locationId);
-        const here = cart.value.kind === "open" ? "here" : "from here";
-        return `${place}: ${only === "from" ? here : "to here"}.`;
+        const here = cart.value.kind === "open" ? PLACE_HERE : PLACE_FROM_HERE;
+        return say(only === "from" ? here : PLACE_TO_HERE, { place });
       }
       placeRead.value = read.locationId;
-      return `${place}: from here, or to here?`;
+      return say(PLACE_WHICH, { place });
     }
     const added = add(read.itemId, read.packageId);
     // A buzz where the phone has one (not iOS Safari).
@@ -575,11 +663,7 @@ function CartForm({
     // shows could record it twice, so it shows that cart instead.
     const current = store.forSaving();
     if (current === null) {
-      problems.value = [
-        [
-          "The cart was changed in another tab. Check it, then record it again.",
-        ],
-      ];
+      problems.value = [[say(CHANGED_BEFORE_RECORD)]];
       return;
     }
     const batch = toBatch(current, catalogue, opens);
@@ -591,11 +675,7 @@ function CartForm({
     const queued = outbox.queue(batch.draft, batch.what, current.batchKey);
     if (queued === "not_kept") {
       // Nothing was sent, and the cart stays to try again.
-      problems.value = [
-        [
-          "This browser wouldn't keep the cart, so it wasn't sent. Free some space or leave private browsing, then try again.",
-        ],
-      ];
+      problems.value = [[say(NOT_SENT)]];
       return;
     }
     if (queued !== "queued") {
@@ -625,7 +705,7 @@ function CartForm({
     const current = store.forSaving();
     if (current === null || current.revision !== asked) {
       discarding.value = null;
-      problems.value = [[CHANGED_BEFORE_DISCARD]];
+      problems.value = [[say(CHANGED_BEFORE_DISCARD)]];
       return;
     }
     change(freshCart(current));
@@ -670,7 +750,7 @@ function CartForm({
       saved.value = null;
     }
     if (!forget()) {
-      problems.value = [[NOT_REMOVED]];
+      problems.value = [[say(NOT_REMOVED)]];
     }
     putBack.value = gaps;
     return true;
@@ -816,10 +896,7 @@ function CartForm({
       <OlderList older={older} catalogue={catalogue} onPutBack={putInCart} />
       {checkName.value && name !== undefined && (
         <div role="alert" class={CAUTION_BOX}>
-          <div>
-            Are you <strong>{name}</strong>? This phone hasn't been used for a
-            while.
-          </div>
+          <div>{sayParts(ARE_YOU, { name: <strong>{name}</strong> })}</div>
           <div class="actions">
             <button
               type="button"
@@ -829,7 +906,7 @@ function CartForm({
                 kept(store.touch());
               }}
             >
-              That's me
+              {say(THATS_ME)}
             </button>
             <button
               type="button"
@@ -838,12 +915,12 @@ function CartForm({
                 changeName();
               }}
             >
-              Not me
+              {say(NOT_ME)}
             </button>
           </div>
         </div>
       )}
-      <Field label="Your name">
+      <Field label={say(YOUR_NAME)}>
         {(id) => (
           <select
             id={id}
@@ -853,7 +930,7 @@ function CartForm({
               set({ volunteerId: idOrNull(event.currentTarget.value) })
             }
           >
-            <option value="">Pick your name</option>
+            <option value="">{say(NO_NAME_PICKED)}</option>
             {catalogue.volunteers.map((volunteer) => (
               <option key={volunteer.id} value={volunteer.id}>
                 {volunteer.name}
@@ -865,8 +942,8 @@ function CartForm({
 
       {/* Choices close together, each tall enough to tap. */}
       <fieldset class="gap-1">
-        <legend>What is happening</legend>
-        {(Object.entries(KIND_WORDS) as [Kind, string][]).map(
+        <legend>{say(WHAT_IS_HAPPENING)}</legend>
+        {(Object.entries(KIND_WORDS) as [Kind, MessageDescriptor][]).map(
           ([kind, words]) => (
             <label key={kind} class="flex items-center gap-2 py-1 font-normal">
               <input
@@ -876,7 +953,7 @@ function CartForm({
                 checked={cart.value.kind === kind}
                 onChange={() => set({ kind })}
               />
-              {words}
+              {say(words)}
             </label>
           ),
         )}
@@ -884,7 +961,7 @@ function CartForm({
 
       {sides.from && (
         <Place
-          label={cart.value.kind === "open" ? "Where" : "From"}
+          label={say(cart.value.kind === "open" ? WHERE : FROM)}
           catalogue={catalogue}
           value={cart.value.fromId}
           onPick={(fromId) => set({ fromId })}
@@ -892,14 +969,14 @@ function CartForm({
       )}
       {sides.to && (
         <Place
-          label="To"
+          label={say(TO)}
           catalogue={catalogue}
           value={cart.value.toId}
           onPick={(toId) => set({ toId })}
         />
       )}
       {cart.value.kind === "install" && (
-        <Field label="MeshDB install number (if you know it)">
+        <Field label={say(INSTALL_NUMBER)}>
           {(id) => (
             <input
               id={id}
@@ -914,10 +991,10 @@ function CartForm({
         </Field>
       )}
 
-      <h2>Cart</h2>
+      <h2>{say(CART)}</h2>
       {putBack.value !== null && (
         <div role="status">
-          <p>Added back to cart. Review before Record.</p>
+          <p>{say(ADDED_BACK)}</p>
           {putBack.value.length > 0 && (
             <ul>
               {putBack.value.map((gap) => (
@@ -928,7 +1005,7 @@ function CartForm({
         </div>
       )}
       {cart.value.lines.length === 0 ? (
-        <p>Nothing in the cart yet.</p>
+        <p>{say(NOTHING_IN_CART)}</p>
       ) : (
         <ul class={RULED_LIST}>
           {cart.value.lines.map((line) => {
@@ -974,7 +1051,7 @@ function CartForm({
         />
       ) : (
         <button type="button" onClick={() => (scanning.value = true)}>
-          Scan with the camera
+          {say(SCAN_WITH_CAMERA)}
         </button>
       )}
       {placeRead.value !== null && (
@@ -998,18 +1075,18 @@ function CartForm({
         </ul>
       )}
       {saved.value !== null && (
-        <p role="status">Sending: {saved.value}. A new cart is ready.</p>
+        <p role="status">{say(SENDING_WHAT, { what: saved.value })}</p>
       )}
       {name !== undefined && (
         <p>
-          Recording as <strong>{name}</strong>.{" "}
+          {sayParts(RECORDING_AS, { name: <strong>{name}</strong> })}{" "}
           <button type="button" onClick={changeName}>
-            Change
+            {say(CHANGE)}
           </button>
         </p>
       )}
       <button type="submit" class="primary w-full text-xl">
-        Record
+        {say(RECORD)}
       </button>
       {!empty &&
         (discarding.value !== null ? (
@@ -1027,7 +1104,7 @@ function CartForm({
               discarding.value = cart.value.revision;
             }}
           >
-            Discard cart
+            {say(DISCARD_CART)}
           </button>
         ))}
     </form>
@@ -1132,7 +1209,7 @@ function OlderList({
         };
   return (
     <section>
-      <h2>Checked out items. Add to cart or discard before sending</h2>
+      <h2>{say(CHECKED_OUT)}</h2>
       <ul class={RULED_LIST}>
         {shown.map(({ each, lost, lines, fills, retired }, n) => {
           const on = olderId(each);
@@ -1151,12 +1228,12 @@ function OlderList({
                   then={
                     each.refused.code === "recorded_elsewhere"
                       ? undefined
-                      : FIX_THEN_RECORD
+                      : say(FIX_THEN_RECORD)
                   }
                 />
               )}
               {each.refused?.code === "recorded_elsewhere" && (
-                <h3>{MAKE_CHANGES}</h3>
+                <h3>{say(MAKE_CHANGES)}</h3>
               )}
               {lost !== null && <NoteSaid note={lost} />}
               {lines.length > 0 && (
@@ -1171,7 +1248,7 @@ function OlderList({
                         <div id={named}>
                           {line.retired && (
                             <>
-                              <strong>Item retired</strong>
+                              <strong>{say(RETIRED_ITEM)}</strong>
                               <br />
                             </>
                           )}
@@ -1198,7 +1275,7 @@ function OlderList({
                               }
                             })}
                           >
-                            Discard
+                            {say(DISCARD)}
                           </button>
                         )}
                       </li>
@@ -1243,7 +1320,7 @@ function OlderList({
                         said.value = why === null ? null : { on, why };
                       })}
                     >
-                      {retired ? "Cannot Add to Cart" : "Add to cart"}
+                      {say(retired ? CANNOT_ADD : ADD_TO_CART)}
                     </button>
                   )}
                   <button
@@ -1254,7 +1331,7 @@ function OlderList({
                       discarding.value = on;
                     })}
                   >
-                    Discard
+                    {say(DISCARD)}
                   </button>
                 </div>
               )}
@@ -1306,7 +1383,7 @@ function ConfirmDiscard({
 }) {
   return (
     <div class="flex flex-col items-start gap-3">
-      <div role="alert">Confirm discard</div>
+      <div role="alert">{say(CONFIRM_DISCARD)}</div>
       <div class="actions">
         <button
           type="button"
@@ -1314,10 +1391,10 @@ function ConfirmDiscard({
           aria-describedby={describedBy}
           onClick={onDiscard}
         >
-          Discard
+          {say(DISCARD)}
         </button>
         <button type="button" onClick={onKeep}>
-          Keep it
+          {say(KEEP_IT)}
         </button>
       </div>
     </div>
@@ -1373,19 +1450,15 @@ function keyedByWords(says: readonly string[]): string[] {
 }
 
 /** Why one cannot go in the cart: it is not empty (row 17). */
-const CART_NOT_EMPTY =
-  "Record or discard the current cart before adding more items";
+export const CART_NOT_EMPTY = msg`Record or discard the current cart before adding more items`;
 /** The cart one went in was not kept (row 21). */
-const NOT_KEPT =
-  "This browser can't keep the cart. Clear local data, reload the page and try again.";
+export const NOT_KEPT = msg`This browser can't keep the cart. Clear local data, reload the page and try again.`;
 /** One went in the cart, but stays listed (row 22). */
-const NOT_REMOVED =
-  "This item wasn't automatically removed. Record the cart and try to remove.";
+export const NOT_REMOVED = msg`This item wasn't automatically removed. Record the cart and try to remove.`;
 /** Discard cart, confirmed after another tab changed the cart. */
-const CHANGED_BEFORE_DISCARD =
-  "The cart was changed in another tab. Check it, then discard it again.";
+export const CHANGED_BEFORE_DISCARD = msg`The cart was changed in another tab. Check it, then discard it again.`;
 /** The browser would not keep a discard. */
-const NOT_DISCARDED = "Unable to discard. Clear your site data to remove.";
+export const NOT_DISCARDED = msg`Unable to discard. Clear your site data to remove.`;
 
 /** How long after a line's Discard taps on its entry's buttons are
  * ignored, in milliseconds. */
@@ -1393,18 +1466,15 @@ const SETTLE_MS = 500;
 
 /** Add to cart, tapped on one changed in another tab since it was listed
  * (Ali, inventory-tng-8gj). */
-const CHANGED_ELSEWHERE =
-  "That one was changed in another tab. Check it, then add it to the cart again.";
+export const CHANGED_ELSEWHERE = msg`That one was changed in another tab. Check it, then add it to the cart again.`;
 
 /** CHANGED_ELSEWHERE's words once, as it is now, it offers no Add to cart
  * (Ali, inventory-tng-8gj). */
-const CHANGED_CHECK_AGAIN =
-  "That one was changed in another tab. Check it again.";
+export const CHANGED_CHECK_AGAIN = msg`That one was changed in another tab. Check it again.`;
 
 /** An entry's Discard, or a line's, tapped on one changed in another tab
  * since it was listed: nothing is discarded (Ali, inventory-tng-8gj). */
-const CHANGED_NOT_DISCARDED =
-  "This item was changed in another tab. Check it before discarding.";
+export const CHANGED_NOT_DISCARDED = msg`This item was changed in another tab. Check it before discarding.`;
 
 /** Why one was not put in the cart: the cart is not empty, it changed
  * meanwhile, or the browser would not keep the cart. */
@@ -1424,15 +1494,15 @@ type OlderWhy = NotPut | "discard_changed" | "discard_not_kept";
 function olderSaid(why: OlderWhy, offersAdd: boolean): string {
   switch (why) {
     case "cart_not_empty":
-      return CART_NOT_EMPTY;
+      return say(CART_NOT_EMPTY);
     case "changed":
-      return offersAdd ? CHANGED_ELSEWHERE : CHANGED_CHECK_AGAIN;
+      return say(offersAdd ? CHANGED_ELSEWHERE : CHANGED_CHECK_AGAIN);
     case "not_kept":
-      return NOT_KEPT;
+      return say(NOT_KEPT);
     case "discard_changed":
-      return CHANGED_NOT_DISCARDED;
+      return say(CHANGED_NOT_DISCARDED);
     case "discard_not_kept":
-      return NOT_DISCARDED;
+      return say(NOT_DISCARDED);
   }
 }
 
@@ -1452,47 +1522,51 @@ function recordOlder(
 /** What it was for, in the words the page asks it in. */
 function olderKind(each: Older): string {
   if (each.kind === "report") {
-    return "Saying what is on open packages";
+    return say(SAYING_WHAT_IS_ON);
   }
-  const words = each.kind === null ? "Something" : KIND_WORDS[each.kind];
-  return each.batch === null ? `A cart: ${words.toLowerCase()}` : words;
+  const cart = each.batch === null;
+  if (each.kind === null) {
+    return say(cart ? A_CART_SOMETHING : SOMETHING);
+  }
+  return say((cart ? CART_KIND_WORDS : KIND_WORDS)[each.kind]);
 }
 
 /** Where, for which install, and by whom, as the catalogue names them. */
 function olderWhere(each: Older, catalogue: Catalogue): string {
   const { places, volunteers } = indexOf(catalogue);
-  const place = (placeId: number) =>
-    places.get(placeId) ?? "a place no longer in the catalogue";
+  const place = (placeId: number) => places.get(placeId) ?? say(PLACE_GONE);
   const words: string[] = [];
   const at = each.kind === "open" || each.kind === "report";
   if (each.fromId !== null) {
-    words.push(`${at ? "at" : "from"} ${place(each.fromId)}`);
+    words.push(say(at ? AT_PLACE : FROM_PLACE, { place: place(each.fromId) }));
   }
   if (each.toId !== null && !at) {
-    words.push(`to ${place(each.toId)}`);
+    words.push(say(TO_PLACE, { place: place(each.toId) }));
   }
   if (each.installNumber !== "") {
-    words.push(`for install ${each.installNumber}`);
+    words.push(say(FOR_INSTALL, { number: each.installNumber }));
   }
   const who =
     each.volunteerId === null ? undefined : volunteers.get(each.volunteerId);
   const where = words.length > 0 ? ` ${words.join(" ")}` : "";
-  return who === undefined ? where : `${where}, by ${who}`;
+  return who === undefined ? where : say(BY, { where, name: who });
 }
 
 /** What to do with one the inventory refused, after why (row 11). */
-const FIX_THEN_RECORD = "Add it to the cart, fix that, then record it.";
+export const FIX_THEN_RECORD = msg`Add it to the cart, fix that, then record it.`;
 
 /** When it was kept, or the cart last changed. */
 function olderWhen(each: Older): string {
-  const at =
-    each.at === null
-      ? ""
-      : ` ${new Date(each.at).toLocaleString([], { dateStyle: "medium", timeStyle: "short" })}`;
-  if (each.batch === null) {
-    return at === "" ? "Added but not sent" : `Added on${at} but not sent`;
+  if (each.at === null) {
+    return say(each.batch === null ? ADDED_NOT_SENT : KEPT_NOT_SENT);
   }
-  return `Kept on this device${at}, not sent.`;
+  const when = new Date(each.at).toLocaleString([], {
+    dateStyle: "medium",
+    timeStyle: "short",
+  });
+  return say(each.batch === null ? ADDED_ON_NOT_SENT : KEPT_ON_NOT_SENT, {
+    when,
+  });
 }
 
 /** From or To, for a place a label named: the side still empty first. */
@@ -1513,7 +1587,7 @@ function PlaceSides({
       <div class="actions">
         {sides.map((side) => (
           <button key={side} type="button" onClick={() => onPick(side, place)}>
-            {side === "from" ? "From" : "To"}
+            {say(side === "from" ? FROM : TO)}
           </button>
         ))}
       </div>
@@ -1545,7 +1619,7 @@ function Place({
           value={String(value ?? "")}
           onChange={(event) => onPick(idOrNull(event.currentTarget.value))}
         >
-          <option value="">Pick a place</option>
+          <option value="">{say(PICK_A_PLACE)}</option>
           {places.map((place) => (
             <option key={place.id} value={place.id}>
               {place.name}
@@ -1577,9 +1651,9 @@ function CartLine({
   if (item === undefined) {
     return (
       <li>
-        No longer in the catalogue.{" "}
+        {say(LINE_GONE)}{" "}
         <button type="button" onClick={onRemove}>
-          Remove
+          {say(REMOVE)}
         </button>
       </li>
     );
@@ -1589,7 +1663,7 @@ function CartLine({
     <li class="flex flex-col gap-2">
       <div>
         <strong>{item.name}</strong>
-        {item.retired && <small> {RETIRED}</small>}
+        {item.retired && <small> {say(RETIRED)}</small>}
       </div>
       {opens.map((open) => (
         <OpenPackageCard
@@ -1613,16 +1687,18 @@ function CartLine({
               <p role="alert">
                 <AlertWords
                   note={{
-                    bold: [
-                      `The package size has changed to ${size} since this item was added. Enter the count again.`,
-                    ],
+                    bold: [say(RESIZED_TO, { size })],
                   }}
                 />
               </p>
             )}
             <Field
               quiet
-              label={`${pack.name} (${size} ${item.unit})${pack.retired ? `, ${RETIRED}` : ""}`}
+              label={say(pack.retired ? PACKAGE_COUNT_RETIRED : PACKAGE_COUNT, {
+                package: pack.name,
+                size,
+                unit: item.unit,
+              })}
             >
               {(id) => (
                 <input
@@ -1647,11 +1723,11 @@ function CartLine({
       <Field
         quiet
         label={
-          item.packages.length > 0
-            ? `Loose ${item.unit === "each" ? "units" : item.unit}`
-            : item.unit === "each"
-              ? "How many"
-              : `How many ${item.unit}`
+          item.unit === "each"
+            ? say(item.packages.length > 0 ? LOOSE_UNITS : HOW_MANY)
+            : say(item.packages.length > 0 ? LOOSE_IN : HOW_MANY_IN, {
+                unit: item.unit,
+              })
         }
       >
         {(id) => (
@@ -1668,10 +1744,10 @@ function CartLine({
       <div>
         {"problem" in quantity
           ? wordsOf(quantity.problem)
-          : `${decimal(quantity.amount)} ${item.unit} in all`}
+          : say(IN_ALL, { amount: decimal(quantity.amount), unit: item.unit })}
       </div>
       <button type="button" class="self-start" onClick={onRemove}>
-        Remove
+        {say(REMOVE)}
       </button>
     </li>
   );
@@ -1692,7 +1768,7 @@ function Finder({
   const matches = search(catalogue, query.value);
   return (
     <>
-      <Field label="Find an item, or type or scan its code">
+      <Field label={say(FIND)}>
         {(id) => (
           <input
             id={id}
@@ -1721,7 +1797,7 @@ function Finder({
         )}
       </Field>
       {query.value.trim() !== "" && matches.length === 0 && (
-        <p>Nothing matches “{query.value.trim()}”.</p>
+        <p>{say(NOTHING_MATCHES, { typed: query.value.trim() })}</p>
       )}
       {matches.length > 0 && (
         <ul class="list-none p-0 *:py-1">
@@ -1732,7 +1808,7 @@ function Finder({
               </button>{" "}
               <small>
                 {[
-                  item.retired ? RETIRED : null,
+                  item.retired ? say(RETIRED) : null,
                   item.category,
                   item.manufacturer,
                   item.part_number,
@@ -1799,10 +1875,12 @@ function OutboxList({
   const needsRegistering = entries.some((e) => e.waitingFor === "registration");
   return (
     <section>
-      <h2>Carts from this device</h2>
+      <h2>{say(CARTS_FROM_DEVICE)}</h2>
       {needsRegistering && (
         <p>
-          <a href="/register">Register this browser</a> to send what is waiting.
+          {sayParts(REGISTER_TO_SEND_WAITING, {}, [
+            (inside) => <a href="/register">{inside}</a>,
+          ])}
         </p>
       )}
       <ul class={RULED_LIST}>
@@ -1817,16 +1895,18 @@ function OutboxList({
             <li key={id} class="flex flex-col items-start gap-1">
               <div>{entry.what}</div>
               {entry.state === "saved" ? (
-                <small>Recorded (transaction {entry.transactionId}).</small>
+                <small>
+                  {say(RECORDED_IN, { transaction: entry.transactionId })}
+                </small>
               ) : reason === null || reason.code === "must_upgrade" ? (
                 // Asked for, an upgrade is no failure.
-                <small>{reason === null ? "Sending…" : MUST_UPGRADE}</small>
+                <small>{say(reason === null ? SENDING : MUST_UPGRADE)}</small>
               ) : (
                 // Not role="alert": every one is there as the page loads.
                 <NoteSaid note={noteOf(reason, online)} />
               )}
               {elsewhere !== undefined && elsewhere.recorded === undefined && (
-                <h3>{MAKE_CHANGES}</h3>
+                <h3>{say(MAKE_CHANGES)}</h3>
               )}
               {lines.length > 0 && (
                 <ul class="list-none p-0">
@@ -1857,7 +1937,7 @@ function OutboxList({
               )}
               {entry.state !== "waiting" && (
                 <button type="button" onClick={() => outbox.dismiss(entry)}>
-                  Dismiss
+                  {say(DISMISS)}
                 </button>
               )}
             </li>
@@ -1917,7 +1997,7 @@ function RecordedElsewhere({
       </ul>
       {changes.length > 0 && (
         <>
-          <h3>{MAKE_CHANGES}</h3>
+          <h3>{say(MAKE_CHANGES)}</h3>
           <ul class="list-none p-0">
             {changes.map(({ words, note }, at) => (
               <li key={changeKeys[at]} class="flex flex-col items-start gap-1">
@@ -1932,11 +2012,11 @@ function RecordedElsewhere({
       )}
       {difference !== null && added !== true && (
         <button type="button" onClick={() => onAdd(difference)}>
-          {ADD_DIFFERENCE}
+          {say(ADD_DIFFERENCE)}
         </button>
       )}
       {difference !== null && added === true && cartKey === difference.key && (
-        <p>{IN_CART}</p>
+        <p>{say(IN_CART)}</p>
       )}
     </>
   );

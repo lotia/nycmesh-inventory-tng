@@ -1,6 +1,7 @@
 import { v4 as uuid } from "uuid";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
-import { BUILD, Builds, HEADER } from "./build";
+import { BUILD, Builds, HEADER, MUST_UPGRADE } from "./build";
+import { say } from "./i18n";
 import {
   batchId,
   type Draft,
@@ -16,6 +17,7 @@ import {
   SAVED_MOST,
   SOME_NOT_RECORDED,
   STORAGE_KEY,
+  UNAVAILABLE,
   wordsOf,
 } from "./outbox";
 import { telemetry } from "./telemetry";
@@ -332,11 +334,7 @@ describe("sending again", () => {
     );
     const outbox = new Outbox(api);
     outbox.queue(draft(), "a");
-    await vi.waitFor(() =>
-      expect(said(outbox)).toBe(
-        "The inventory can't record this just now. Trying again shortly.",
-      ),
-    );
+    await vi.waitFor(() => expect(said(outbox)).toBe(say(UNAVAILABLE)));
   });
 
   test("a revoked device is told to register again", async () => {
@@ -436,7 +434,7 @@ describe("refusals", () => {
     await vi.waitFor(() =>
       expect(states(outbox)).toEqual(["refused", "saved"]),
     );
-    expect(said(outbox)).toBe(KEY_REUSED);
+    expect(said(outbox)).toBe(say(KEY_REUSED));
   });
 
   test("a save put back goes under its key, and refused as reused keeps that another tab recorded it first, not the page's reload words", async () => {
@@ -452,10 +450,7 @@ describe("refusals", () => {
       putBack: true,
       reason: { code: "recorded_elsewhere" },
     });
-    expect(said(outbox)).toBe(SOME_NOT_RECORDED);
-    expect(SOME_NOT_RECORDED).toBe(
-      "Some items were not recorded. Details below.",
-    );
+    expect(said(outbox)).toBe(say(SOME_NOT_RECORDED));
     expect((await bodies(sent))[0]).toMatchObject({ key });
   });
 
@@ -691,7 +686,7 @@ describe("what another tab recorded (inventory-tng-0gg)", () => {
       },
     });
     // Then it says only that it was not recorded: the list shows the rest.
-    expect(said(outbox)).toBe(SOME_NOT_RECORDED);
+    expect(said(outbox)).toBe(say(SOME_NOT_RECORDED));
   });
 
   test("what was recorded is headed by who recorded it: this tab, or another (Ali, inventory-tng-0gg, 2026-11-15, 1 and 6)", () => {
@@ -709,7 +704,7 @@ describe("what another tab recorded (inventory-tng-0gg)", () => {
     const outbox = new Outbox(api);
     outbox.queue(changed(), "b");
     await vi.waitFor(() => expect(states(outbox)).toEqual(["refused"]));
-    expect(said(outbox)).toBe(KEY_REUSED);
+    expect(said(outbox)).toBe(say(KEY_REUSED));
   });
 
   /** A cart recorded here (41), then queued again changed, under its key:
@@ -731,7 +726,7 @@ describe("what another tab recorded (inventory-tng-0gg)", () => {
     const { outbox, sent, key } = await askedAbout(() => recordedReply());
     // Until the server says, nothing to scan again.
     expect(noteOf(second(outbox)?.reason ?? { code: "no_answer" })).toEqual({
-      bold: [SOME_NOT_RECORDED],
+      bold: [say(SOME_NOT_RECORDED)],
     });
     await vi.waitFor(() =>
       expect(second(outbox)?.reason).toHaveProperty("recorded"),
@@ -1019,9 +1014,7 @@ describe("builds", () => {
       outbox.queue(draft(), "second");
       await vi.waitFor(() => expect(outbox.builds.newer.value).toBe("too_old"));
       expect(states(outbox)).toEqual(["waiting", "waiting"]);
-      expect(said(outbox)).toBe(
-        "The scanner has been updated. You must upgrade. Your data will be kept but may need some changes before sending.",
-      );
+      expect(said(outbox)).toBe(say(MUST_UPGRADE));
       expect(stored().map((each: Entry) => each.state)).toEqual([
         "waiting",
         "waiting",

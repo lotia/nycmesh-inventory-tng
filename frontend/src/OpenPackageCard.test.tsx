@@ -1,7 +1,13 @@
 import { fireEvent, render, screen } from "@testing-library/preact";
 import { describe, expect, test, vi } from "vitest";
 import { afterCut, cutOf, usedUpOf } from "./cart";
-import { endingNote, OpenPackageCard, PRINTED_LENGTH } from "./OpenPackageCard";
+import { say } from "./i18n";
+import {
+  ALL_OF_IT,
+  endingNote,
+  OpenPackageCard,
+  PRINTED_LENGTH,
+} from "./OpenPackageCard";
 import { cable, radio } from "./test-catalogue";
 
 describe("an open package's card", () => {
@@ -70,29 +76,29 @@ function card(
 test("things counted each get no hint to read a printed length", () => {
   card(radio, { amount: "", whole: false, now: "" });
   expect(screen.getByLabelText(/^What's on the Box now/)).toBeDefined();
-  expect(screen.queryByText(PRINTED_LENGTH)).toBeNull();
+  expect(screen.queryByText(say(PRINTED_LENGTH))).toBeNull();
 });
 
 test("an item in a length gets the hint once its field is asked for", () => {
   card(cable, { amount: "", whole: false }).unmount();
-  expect(screen.queryByText(PRINTED_LENGTH)).toBeNull();
+  expect(screen.queryByText(say(PRINTED_LENGTH))).toBeNull();
   card(cable, { amount: "", whole: false, now: "" });
   const field = screen.getByLabelText(/^What's on the Spool now/);
   expect(
     document.getElementById(field.getAttribute("aria-describedby") ?? "")
       ?.textContent,
-  ).toBe(PRINTED_LENGTH);
+  ).toBe(say(PRINTED_LENGTH));
 });
 
 test("moved whole, then shown at nothing, its box stays to untick", () => {
   const whole = { amount: "20", whole: true };
   card(cable, whole, { left: -4000, moving: true });
-  expect(screen.getByLabelText("All of it, moved still open")).toBeDefined();
+  expect(screen.getByLabelText(say(ALL_OF_IT))).toBeDefined();
 });
 
 test("showing nothing, nothing is offered to move whole", () => {
   card(cable, { amount: "", whole: false }, { left: 0, moving: true });
-  expect(screen.queryByLabelText("All of it, moved still open")).toBeNull();
+  expect(screen.queryByLabelText(say(ALL_OF_IT))).toBeNull();
 });
 
 test("what is on it, typed, is asked again once the box asks otherwise", () => {
@@ -120,7 +126,7 @@ test("what is on it, typed, is asked again once the box asks otherwise", () => {
 test("moved whole, what is on it as typed now is said still", () => {
   const onTake = vi.fn();
   card(cable, { amount: "", whole: false, now: "3" }, { moving: true, onTake });
-  fireEvent.click(screen.getByLabelText("All of it, moved still open"));
+  fireEvent.click(screen.getByLabelText(say(ALL_OF_IT)));
   expect(onTake).toHaveBeenLastCalledWith({
     amount: "4",
     whole: true,

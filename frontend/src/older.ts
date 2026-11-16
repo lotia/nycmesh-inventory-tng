@@ -23,6 +23,7 @@
  * that filled it, or, since inventory-tng-e2d, made with its first line;
  * and each line's sizes, the size each package was counted at.
  */
+import { msg } from "@lingui/core/macro";
 import { type Signal, signal } from "@preact/signals";
 import * as v from "valibot";
 import { id } from "./api/replies";
@@ -32,6 +33,7 @@ import {
   type Catalogue,
   freshCart,
   holdsSome,
+  ITEM_SAYS,
   type Item,
   indexOf,
   type Kind,
@@ -39,6 +41,7 @@ import {
   reconcile,
   toBatch,
 } from "./cart";
+import { say } from "./i18n";
 import {
   BatchKey,
   fromOpen,
@@ -246,7 +249,8 @@ export function asSave(body: unknown): Older {
   );
 }
 
-/** What main's build (v3) kept of a batch refused for its key. */
+/** What main's build (v3) kept of a batch refused for its key: its words
+ * as kept, read for their code and shown as kept, never said anew. */
 const KEY_REUSED_KEPT =
   "Not saved: its key was already used for a different batch. Please report this.";
 /** Before the problems main's build kept of a batch refused (422). */
@@ -304,7 +308,7 @@ export function linesSaid(entry: unknown, catalogue: Catalogue): string[] {
     ),
   );
   return toCart(save, withRetired(catalogue)).parts.map(({ itemId, words }) =>
-    itemId === null ? words : `${lineOf(itemId)}. ${words}`,
+    itemId === null ? words : say(NUMBERED, { n: lineOf(itemId), words }),
   );
 }
 
@@ -615,23 +619,34 @@ export type Gaps = string[];
 /** Why something cannot go back, in Ali's words (inventory-tng-3c0,
  * inventory-tng-0su, inventory-tng-93z), shown in the alert's style. Atop
  * the save. */
-export const LINES_LOST =
-  "Could not read previously added items, scan them again.";
+export const LINES_LOST = msg`Could not read previously added items, scan them again.`;
 /** Under a save's line of a package resized since. */
-export const RESIZED =
-  "The package size has changed since this item was added. Discard and re-add the new package size.";
+export const RESIZED = msg`The package size has changed since this item was added. Discard and re-add the new package size.`;
 /** Under a sealed count of a package no longer offered: retired, with none
  * sealed left. */
-export const ITEM_RETIRED = "This item has been retired.";
+export const ITEM_RETIRED = msg`This item has been retired.`;
 /** Under what was taken from, or said of, an open package. */
-export const RESCAN = "Can't add these items. Please rescan.";
+export const RESCAN = msg`Can't add these items. Please rescan.`;
+/** Lines that could not be read, counted. */
+export const UNREAD = msg({
+  message:
+    "{count, plural, one {Could not read # previously added item, scan it again.} other {Could not read # previously added items, scan them again.}}",
+});
 
 /** Lines that could not be read, counted. */
-export function unreadWords(n: number): string {
-  return n === 1
-    ? "Could not read 1 previously added item, scan it again."
-    : `Could not read ${n} previously added items, scan them again.`;
+export function unreadWords(count: number): string {
+  return say(UNREAD, { count });
 }
+
+/** A line of a batch refused, numbered as its problems name it. */
+export const NUMBERED = msg`{n}. {words}`;
+/** Whole packages, counted. */
+export const PACKAGES_OF = msg({
+  message: "{count} × {package}",
+  comment: "How many of a package, the package's name after the sign.",
+});
+/** After a count of packages, what is loose besides. */
+export const LOOSE = msg`{amount} loose`;
 
 /** What discarding a part drops from what is kept, by where in what was
  * read: a line whole, or of a cart's line the counts of some packages, its
@@ -721,12 +736,14 @@ export function toCart(
           // 24), so it is done again.
           const packs = count(n);
           leave(
-            `${nameOf(item)}: ${
-              packs === null
-                ? `${n} × ${pack.name}`
-                : inUnit(packs * countedAt, item)
-            }`,
-            RESIZED,
+            say(ITEM_SAYS, {
+              name: nameOf(item),
+              what:
+                packs === null
+                  ? say(PACKAGES_OF, { count: n, package: pack.name })
+                  : inUnit(packs * countedAt, item),
+            }),
+            say(RESIZED),
             { at, packages: [packageId] },
           );
         } else if (item === undefined || pack !== undefined) {
@@ -735,15 +752,22 @@ export function toCart(
           // Neither shown nor saved by the cart, so said, not kept: named
           // if the catalogue still names it (Item.retired_packages).
           const gone = retiredPackage(item, packageId);
-          leave(`${item.name}: ${n} × ${gone?.name ?? GONE}`, ITEM_RETIRED, {
-            at,
-            packages: [packageId],
-          });
+          leave(
+            say(ITEM_SAYS, {
+              name: item.name,
+              what: say(PACKAGES_OF, {
+                count: n,
+                package: gone?.name ?? say(GONE),
+              }),
+            }),
+            say(ITEM_RETIRED),
+            { at, packages: [packageId] },
+          );
         }
       }
       for (const [key, each] of Object.entries(line.open)) {
         if (saidOfOpen(each)) {
-          leave(openWords(item, each), RESCAN, { at, open: [key] });
+          leave(openWords(item, each), say(RESCAN), { at, open: [key] });
         }
       }
       const holds =
@@ -771,12 +795,12 @@ export function toCart(
       const leave = (note: string, what = by) =>
         left.push({
           itemId: line.item_id,
-          words: `${nameOf(item)}: ${what}`,
+          words: say(ITEM_SAYS, { name: nameOf(item), what }),
           note,
           drop: [{ at }],
         });
       if (fromOpen(line, older.kind)) {
-        leave(RESCAN, `${by}${FROM_OPEN}`);
+        leave(say(RESCAN), say(FROM_OPEN, { amount: by }));
         return;
       }
       const pack = item?.packages.find((each) => each.id === line.package_id);
@@ -794,9 +818,9 @@ export function toCart(
             ? 0
             : (thousandths(String(line.package_size ?? gone.size)) ?? 0);
         leave(
-          ITEM_RETIRED,
+          say(ITEM_RETIRED),
           gone !== undefined && size > 0 && amount % size === 0
-            ? `${amount / size} × ${gone.name}`
+            ? say(PACKAGES_OF, { count: amount / size, package: gone.name })
             : by,
         );
         return;
@@ -809,7 +833,7 @@ export function toCart(
       ) {
         // Resized since: neither its count of packages nor loose would say
         // what was moved, so it is done again, as the server would ask.
-        leave(RESIZED);
+        leave(say(RESIZED));
         return;
       }
       const made = lineOf(line.item_id, { at });
@@ -835,8 +859,8 @@ export function toCart(
   const report = (kind: ReportKind, n: number) =>
     Array.from({ length: n }, (_, at) => ({
       itemId: null,
-      words: REPORTS[kind],
-      note: RESCAN,
+      words: say(REPORTS[kind]),
+      note: say(RESCAN),
       drop: [{ report: kind, at }],
     }));
   left.push(
@@ -844,7 +868,7 @@ export function toCart(
     ...report("lengths", older.reports.lengths),
   );
   const lost = older.linesLost
-    ? LINES_LOST
+    ? say(LINES_LOST)
     : unread > 0
       ? unreadWords(unread)
       : null;
@@ -898,7 +922,12 @@ export function toCart(
       ...parts.flatMap(({ itemId, words, note }) =>
         note === null
           ? []
-          : [`${itemId === null ? words : nameOf(named(itemId))}: ${note}`],
+          : [
+              say(ITEM_SAYS, {
+                name: itemId === null ? words : nameOf(named(itemId)),
+                what: note,
+              }),
+            ],
       ),
     ]),
   ];
@@ -907,9 +936,11 @@ export function toCart(
 
 /** A package, or its item, the catalogue no longer names (Ali,
  * inventory-tng-0su). */
-const GONE = "a removed package or item";
-/** After an amount taken from an open package. */
-export const FROM_OPEN = " from an open package";
+const GONE = msg`a removed package or item`;
+/** An amount taken from an open package. */
+export const FROM_OPEN = msg`{amount} from an open package`;
+/** An item gone from the catalogue, in place of its name. */
+export const NO_LONGER_IN_CATALOGUE = msg`An item no longer in the catalogue`;
 
 /** `item`'s package `packageId` no longer offered, if the catalogue still
  * names it (Item.retired_packages). */
@@ -923,9 +954,9 @@ function openWords(item: Item | undefined, said: unknown): string {
   const taken = typeof amount === "string" ? (thousandths(amount) ?? 0) : 0;
   const what =
     taken > 0
-      ? `${inUnit(taken, item)}${FROM_OPEN}`
-      : REPORTS[usedUp === true ? "used_up" : "lengths"];
-  return `${nameOf(item)}: ${what}`;
+      ? say(FROM_OPEN, { amount: inUnit(taken, item) })
+      : say(REPORTS[usedUp === true ? "used_up" : "lengths"]);
+  return say(ITEM_SAYS, { name: nameOf(item), what });
 }
 
 /** A cart's line in words: its item, then how many of each package, and
@@ -934,21 +965,23 @@ export function lineWords(line: Line, item: Item | undefined): string | null {
   // An item gone: its packages too (Ali, inventory-tng-93z).
   const packages =
     item?.packages ??
-    Object.keys(line.packages).map((id) => ({ id, name: GONE }));
+    Object.keys(line.packages).map((id) => ({ id, name: say(GONE) }));
   const parts = packages.flatMap((pack) => {
     const packs = count(line.packages[pack.id] ?? "") ?? 0;
-    return packs > 0 ? [`${packs} × ${pack.name}`] : [];
+    return packs > 0
+      ? [say(PACKAGES_OF, { count: packs, package: pack.name })]
+      : [];
   });
   const loose = thousandths(line.loose) ?? 0;
   if (loose > 0) {
-    const after = parts.length > 0 ? " loose" : "";
-    parts.push(`${inUnit(loose, item)}${after}`);
+    const amount = inUnit(loose, item);
+    parts.push(parts.length > 0 ? say(LOOSE, { amount }) : amount);
   }
   if (parts.length === 0) {
     // An item gone is said, as the cart shows it, even holding none.
     return item === undefined ? nameOf(item) : null;
   }
-  return `${nameOf(item)}: ${parts.join(", ")}`;
+  return say(ITEM_SAYS, { name: nameOf(item), what: parts.join(", ") });
 }
 
 /**
@@ -1062,7 +1095,7 @@ function saidOfOpen(said: unknown): boolean {
 
 /** An item's name, or words for one gone from the catalogue. */
 export function nameOf(item: { name: string } | undefined): string {
-  return item?.name ?? "An item no longer in the catalogue";
+  return item?.name ?? say(NO_LONGER_IN_CATALOGUE);
 }
 
 /** `amount`, in thousandths, of `item` in its unit: "20 m", or "2" for

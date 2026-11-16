@@ -485,8 +485,8 @@ def test_the_count_page_hints_at_the_printed_length_of_items_in_length(
 
 @pytest.mark.clone
 def test_the_scan_page_hints_in_the_same_words() -> None:
-    card = (CLONE / "frontend" / "src" / "OpenPackageCard.tsx").read_text()
-    assert f'"{pages.PRINTED_LENGTH}"' in card
+    catalogue = (CLONE / "frontend" / "src" / "locales" / "en.po").read_text()
+    assert f'msgid "{pages.PRINTED_LENGTH}"' in catalogue
 
 
 def test_set_moves_it_by_what_it_was_off_so_cuts_since_stay(

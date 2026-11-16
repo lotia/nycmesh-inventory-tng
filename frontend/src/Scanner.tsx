@@ -4,10 +4,23 @@
  * word on what it did. A refused or missing camera says so; the lists below
  * still work.
  */
+import type { MessageDescriptor } from "@lingui/core";
+import { msg } from "@lingui/core/macro";
 import { useSignal } from "@preact/signals";
 import { useEffect, useRef } from "preact/hooks";
 import { DecoderUnavailable, openCamera, type Session } from "./camera";
+import { say } from "./i18n";
 import { Repeats } from "./labels";
+
+export const CAMERA = msg`Camera`;
+export const STARTING = msg`Starting the camera…`;
+export const POINT = msg`Point the camera at a label.`;
+export const TORCH_FAILED = msg`The torch wouldn't switch.`;
+export const DONE = msg`Done`;
+export const TORCH = msg`Torch`;
+export const NO_DECODER = msg`The label reader didn't load. Check the connection, then press Done and try again.`;
+export const NOT_ALLOWED = msg`The camera isn't allowed for this page. Allow it in the browser's settings, or find items in the list.`;
+export const NO_CAMERA = msg`No camera could be opened. Find items in the list instead.`;
 
 /** How often the camera's picture is read, in milliseconds. */
 const READ_EVERY_MS = 200;
@@ -26,7 +39,8 @@ export function Scanner({
   // The newest onCode, so a refreshed catalogue is read from at once.
   const handle = useRef(onCode);
   handle.current = onCode;
-  const said = useSignal("Starting the camera…");
+  // A phrase, said as shown, or the words onCode said.
+  const said = useSignal<MessageDescriptor | string>(STARTING);
   const torch = useSignal<((on: boolean) => Promise<void>) | null>(null);
 
   useEffect(() => {
@@ -40,7 +54,7 @@ export function Scanner({
           return;
         }
         torch.value = session.torch;
-        said.value = "Point the camera at a label.";
+        said.value = POINT;
         // Each read waits for the one before: a slow phone never piles
         // them up.
         const read = async () => {
@@ -77,39 +91,41 @@ export function Scanner({
   }, []);
 
   return (
-    <section aria-label="Camera">
+    <section aria-label={say(CAMERA)}>
       <video
         class="block max-h-[60vh] w-full rounded bg-black object-cover"
         ref={video}
         muted
         playsInline
       />
-      <p role="status">{said.value}</p>
+      <p role="status">
+        {typeof said.value === "string" ? said.value : say(said.value)}
+      </p>
       <div class="actions">
         {torch.value !== null && (
           <Torch
             turn={torch.value}
             onFail={() => {
-              said.value = "The torch wouldn't switch.";
+              said.value = TORCH_FAILED;
             }}
           />
         )}
         <button type="button" onClick={onDone}>
-          Done
+          {say(DONE)}
         </button>
       </div>
     </section>
   );
 }
 
-/** Why the camera could not be used, in words. */
-function refused(error: unknown): string {
+/** Why the camera could not be used. */
+function refused(error: unknown): MessageDescriptor {
   if (error instanceof DecoderUnavailable) {
-    return "The label reader didn't load. Check the connection, then press Done and try again.";
+    return NO_DECODER;
   }
   return error instanceof DOMException && error.name === "NotAllowedError"
-    ? "The camera isn't allowed for this page. Allow it in the browser's settings, or find items in the list."
-    : "No camera could be opened. Find items in the list instead.";
+    ? NOT_ALLOWED
+    : NO_CAMERA;
 }
 
 /** Turns the camera's torch on and off. */
@@ -134,7 +150,7 @@ function Torch({
         }
       }}
     >
-      Torch
+      {say(TORCH)}
     </button>
   );
 }

@@ -1,4 +1,6 @@
 /** Registering this browser with a phrase (docs/decisions/0009). */
+import type { MessageDescriptor } from "@lingui/core";
+import { msg } from "@lingui/core/macro";
 import { type Api, check, type Schemas } from "./api/client";
 import { CodeRefusedReply, RateLimitedReply, Registered } from "./api/replies";
 
@@ -20,22 +22,20 @@ export type Outcome =
  * Typed by the schema, as REFUSALS is. */
 export const NOT_REGISTERED: Record<
   Schemas["DeviceRefusedReply"]["reason"],
-  string
+  MessageDescriptor
 > = {
-  unregistered: "This browser isn't registered yet.",
-  revoked: "This browser's registration was withdrawn.",
+  unregistered: msg`This browser isn't registered yet.`,
+  revoked: msg`This browser's registration was withdrawn.`,
 };
 
 /** What to tell a volunteer. Typed by the schema, so a new reason on the
  * server fails the type check until it has a message here. */
-export const REFUSALS: Record<Rejection, string> = {
-  unknown:
-    "That phrase isn't one we know. Check it word by word against the one you were given.",
-  expired: "That phrase has expired. Ask for a new one.",
-  used_up:
-    "That phrase has registered all the devices it may. Ask for a new one.",
-  revoked: "That phrase has been withdrawn. Ask for a new one.",
-  rate_limited: "Too many tries from here. Wait a minute, then try again.",
+export const REFUSALS: Record<Rejection, MessageDescriptor> = {
+  unknown: msg`That phrase isn't one we know. Check it word by word against the one you were given.`,
+  expired: msg`That phrase has expired. Ask for a new one.`,
+  used_up: msg`That phrase has registered all the devices it may. Ask for a new one.`,
+  revoked: msg`That phrase has been withdrawn. Ask for a new one.`,
+  rate_limited: msg`Too many tries from here. Wait a minute, then try again.`,
 };
 
 /** Send the phrase, as typed or as the link carried it. */

@@ -1,3 +1,4 @@
+import type { MessageDescriptor } from "@lingui/core";
 import { msg } from "@lingui/core/macro";
 import { useSignal } from "@preact/signals";
 import type { ComponentChildren, TargetedSubmitEvent } from "preact";
@@ -18,14 +19,20 @@ export const BATCHES_WAITING = msg({
 // One for every page, rather than one for each render.
 const API = makeApi();
 
-const PROBLEMS = {
-  blank: "Enter the phrase you were given.",
-  unavailable: "The inventory can't answer just now. Try again in a minute.",
-  failed:
-    "Couldn't reach the inventory. Check your connection, then try again.",
+export const GO_TO_SCAN = msg`Go to the scan page`;
+export const WHAT_REGISTERING_DOES = msg`Registering lets this browser record in the inventory. It covers only this browser, so use the same one for the scan page. If the QR code opened a browser you don't usually use, open the link in yours.`;
+export const PHRASE = msg`Registration phrase`;
+export const REGISTERING = msg`Registering…`;
+export const REGISTER = msg`Register`;
+export const REGISTER_THIS_DEVICE = msg`Register this device`;
+
+export const PROBLEMS = {
+  blank: msg`Enter the phrase you were given.`,
+  unavailable: msg`The inventory can't answer just now. Try again in a minute.`,
+  failed: msg`Couldn't reach the inventory. Check your connection, then try again.`,
 };
 
-function problem(outcome: Outcome | null): string | null {
+function problem(outcome: Outcome | null): MessageDescriptor | null {
   if (outcome === null || outcome.kind === "registered") {
     return null;
   }
@@ -82,7 +89,7 @@ export function RegisterPage({
           <p>{say(BATCHES_WAITING, { count: waiting.value })}</p>
         )}
         <p>
-          <a href="/scan">Go to the scan page</a>
+          <a href="/scan">{say(GO_TO_SCAN)}</a>
         </p>
       </Page>
     );
@@ -91,13 +98,9 @@ export function RegisterPage({
   const message = problem(outcome.value);
   return (
     <Page>
-      <p>
-        Registering lets this browser record in the inventory. It covers only
-        this browser, so use the same one for the scan page. If the QR code
-        opened a browser you don't usually use, open the link in yours.
-      </p>
+      <p>{say(WHAT_REGISTERING_DOES)}</p>
       <form onSubmit={submit}>
-        <Field label="Registration phrase">
+        <Field label={say(PHRASE)}>
           {(id) => (
             <input
               id={id}
@@ -114,10 +117,10 @@ export function RegisterPage({
           )}
         </Field>
         <button type="submit" class="primary" disabled={sending.value}>
-          {sending.value ? "Registering…" : "Register"}
+          {say(sending.value ? REGISTERING : REGISTER)}
         </button>
       </form>
-      {message !== null && <p role="alert">{message}</p>}
+      {message !== null && <p role="alert">{say(message)}</p>}
     </Page>
   );
 }
@@ -125,7 +128,7 @@ export function RegisterPage({
 function Page({ children }: { children: ComponentChildren }) {
   return (
     <main class="volunteer page-width">
-      <h1>Register this device</h1>
+      <h1>{say(REGISTER_THIS_DEVICE)}</h1>
       {children}
     </main>
   );

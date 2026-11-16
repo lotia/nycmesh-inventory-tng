@@ -1,19 +1,21 @@
 import { describe, expect, test } from "vitest";
 import { addOne, freshCart, type Item, toBatch } from "./cart";
+import { say } from "./i18n";
 import {
   compared,
   dropPart,
   goesBackWhole,
+  ITEM_RETIRED as ITEM_RETIRED_PHRASE,
   LINES_LOST,
   linesSaid,
   lineWords,
+  NO_LONGER_IN_CATALOGUE,
   nextWhole,
   type Older,
   OlderStore,
   olderId,
-  RESCAN as RESCAN_NOTE,
-  RESIZED as RESIZED_NOTE,
-  ITEM_RETIRED as RETIRED_NOTE,
+  RESCAN as RESCAN_PHRASE,
+  RESIZED as RESIZED_PHRASE,
   readOlder,
   removeOlder,
   tidyOlder,
@@ -26,10 +28,9 @@ import { CATALOGUE } from "./test-catalogue";
 import { refusing } from "./test-storage";
 
 /** In Ali's words (inventory-tng-0su), without "Sorry." (inventory-tng-93z). */
-const ITEM_RETIRED = "This item has been retired.";
-const RESCAN = "Can't add these items. Please rescan.";
-const RESIZED =
-  "The package size has changed since this item was added. Discard and re-add the new package size.";
+const ITEM_RETIRED = say(ITEM_RETIRED_PHRASE);
+const RESCAN = say(RESCAN_PHRASE);
+const RESIZED = say(RESIZED_PHRASE);
 
 const KEY = "0b7c6a51-9a3d-4d39-8f3e-1d1f2c4b5a61";
 const OTHER = "6f1e2d3c-4b5a-4968-8776-5a4b3c2d1e0f";
@@ -548,10 +549,10 @@ describe("as a cart", () => {
       code: "key_reused",
       note: noteOf({ code: "key_reused" }),
     });
-    expect(noteOf({ code: "key_reused" })).toEqual({ bold: [KEY_REUSED] });
+    expect(noteOf({ code: "key_reused" })).toEqual({ bold: [say(KEY_REUSED)] });
     expect(
       refusedFor({ reason: { code: "recorded_elsewhere" } })?.note,
-    ).toEqual({ bold: [SOME_NOT_RECORDED] });
+    ).toEqual({ bold: [say(SOME_NOT_RECORDED)] });
   });
 
   test("what the cart cannot hold is told, to do again", () => {
@@ -739,9 +740,7 @@ describe("as a cart", () => {
       CATALOGUE,
     );
     expect(cart.lines).toEqual([]);
-    expect(gaps).toEqual([
-      "Could not read previously added items, scan them again.",
-    ]);
+    expect(gaps).toEqual([say(LINES_LOST)]);
   });
 
   test("a package resized since is not counted again in today's size", () => {
@@ -929,7 +928,7 @@ describe("line by line", () => {
       "An item no longer in the catalogue: 2 × a removed package or item, 1.5 loose",
     );
     expect(lineWords({ itemId: 999, packages: {}, loose: "" }, undefined)).toBe(
-      "An item no longer in the catalogue",
+      say(NO_LONGER_IN_CATALOGUE),
     );
   });
 
@@ -1066,18 +1065,10 @@ describe("line by line", () => {
   });
 
   test("notes are in Ali's words, without 'Sorry.'", () => {
-    expect([
-      RETIRED_NOTE,
-      RESCAN_NOTE,
-      RESIZED_NOTE,
-      LINES_LOST,
-      unreadWords(1),
-      unreadWords(2),
-    ]).toEqual([
-      ITEM_RETIRED,
-      RESCAN,
-      RESIZED,
-      "Could not read previously added items, scan them again.",
+    const notes = [ITEM_RETIRED, RESCAN, RESIZED, say(LINES_LOST)];
+    expect(notes.filter((note) => note.includes("Sorry"))).toEqual([]);
+    // Counted as a plural, one and more.
+    expect([unreadWords(1), unreadWords(2)]).toEqual([
       "Could not read 1 previously added item, scan it again.",
       "Could not read 2 previously added items, scan them again.",
     ]);

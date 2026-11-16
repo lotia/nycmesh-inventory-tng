@@ -8,9 +8,890 @@ msgstr ""
 "Language: pseudo\n"
 
 #: src/RegisterPage.tsx
+msgid "Enter the phrase you were given."
+msgstr ""
+
+#: src/ScanPage.tsx
+msgid "That's me"
+msgstr ""
+
+#: src/outbox.ts
+msgid "What is on an open package"
+msgstr ""
+
+#: src/outbox.ts
+msgid "{tries, plural, one {The inventory keeps failing on this batch ({status}, # try). It is kept and tried again; please report this.} other {The inventory keeps failing on this batch ({status}, # tries). It is kept and tried again; please report this.}}"
+msgstr ""
+
+#: src/ScanPage.tsx
+msgid "Item retired"
+msgstr ""
+
+#: src/retire.ts
+msgid "This page has changes you haven't saved. Retiring now loses them."
+msgstr ""
+
+#. An item's name, then how much of it, or what is wrong with it.
+#: src/cart.ts
+msgid "{name}: {what}"
+msgstr ""
+
+#: src/registration.ts
+msgid "This browser isn't registered yet."
+msgstr ""
+
+#: src/retire.ts
+msgid "Retire anyway"
+msgstr ""
+
+#: src/OpenPackageCard.tsx
+msgid "After this cut:"
+msgstr ""
+
+#: src/older.ts
+msgid "a removed package or item"
+msgstr ""
+
+#: src/OpenPackageCard.tsx
+msgid "What's on the {name} now ({unit}), if you can tell"
+msgstr ""
+
+#: src/ScanPage.tsx
+msgid "Dismiss"
+msgstr ""
+
+#: src/ScanPage.tsx
+msgid "Recorded (transaction {transaction})."
+msgstr ""
+
+#: src/ScanPage.tsx
+msgid "Loading the catalogue…"
+msgstr ""
+
+#: src/ScanPage.tsx
+msgid "The cart was changed in another tab. Check it, then record it again."
+msgstr ""
+
+#: src/ScanPage.tsx
+msgid "Opening packages"
+msgstr ""
+
+#: src/ScanPage.tsx
+msgid "at {place}"
+msgstr ""
+
+#: src/OpenPackageCard.tsx
+msgid "Shows nothing left"
+msgstr ""
+
+#: src/cart.ts
+msgid "That is too much for one batch: record some, then the rest."
+msgstr ""
+
+#: src/cart.ts
+msgid "({packages} said used up)"
+msgstr ""
+
+#: src/outbox.ts
+msgid "Line {n}: {why}"
+msgstr ""
+
+#: src/registration.ts
+msgid "That phrase has expired. Ask for a new one."
+msgstr ""
+
+#: src/ScanPage.tsx
+msgid "Add to cart"
+msgstr ""
+
+#: src/ScanPage.tsx
+msgid "Checked out items. Add to cart or discard before sending"
+msgstr ""
+
+#: src/outbox.ts
+msgid "Not recorded."
+msgstr ""
+
+#: src/recorded.ts
+msgid "{name}: {amount}, new"
+msgstr ""
+
+#: src/ScanPage.tsx
+msgid "That one was changed in another tab. Check it again."
+msgstr ""
+
+#: src/outbox.ts
+msgid "Open package said used up"
+msgstr ""
+
+#: src/ScanPage.tsx
+msgid "Sending: {what}. A new cart is ready."
+msgstr ""
+
+#: src/ScanPage.tsx
+msgid "Scan with the camera"
+msgstr ""
+
+#: src/cart.ts
+msgid "Pick where it comes from."
+msgstr ""
+
+#: src/OpenPackageCard.tsx
+msgid "opened {date}"
+msgstr ""
+
+#: src/outbox.ts
+msgid "Not accepted"
+msgstr ""
+
+#: src/combobox.ts
+msgid "Suggestions"
+msgstr ""
+
+#: src/ScanPage.tsx
+msgid "Recording as {name}."
+msgstr ""
+
+#: src/ScanPage.tsx
+msgid "Added back to cart. Review before Record."
+msgstr ""
+
+#: src/cart.ts
+msgid "Pick where it goes."
+msgstr ""
+
+#: src/cart.ts
+msgid "Move: {items} from {from} to {to}"
+msgstr ""
+
+#: src/ScanPage.tsx
+msgid "Loose units"
+msgstr ""
+
+#: src/cart.ts
+msgid "Receipt: {items} to {to}"
+msgstr ""
+
+#: src/RegisterPage.tsx
+msgid "Couldn't reach the inventory. Check your connection, then try again."
+msgstr ""
+
+#: src/recorded.ts
+msgid "Open package said used up, new"
+msgstr ""
+
+#: src/ScanPage.tsx
+msgid "Cart"
+msgstr ""
+
+#: src/ScanPage.tsx
+msgid "{item}: type how many of which package to open."
+msgstr ""
+
+#: src/cart.ts
+msgid "Install: {items} from {from} for install {number}"
+msgstr ""
+
+#: src/ScanPage.tsx
+msgid "{package} ({size} {unit}), retired: taking only"
+msgstr ""
+
+#: src/ScanPage.tsx
+msgid "Pick a place"
+msgstr ""
+
+#: src/ScanPage.tsx
+msgid "Added a {package}: {item}."
+msgstr ""
+
+#: src/OpenPackageCard.tsx
+msgid "After this cut"
+msgstr ""
+
+#: src/ScanPage.tsx
+msgctxt "place"
+msgid "To"
+msgstr ""
+
+#: src/ScanPage.tsx
+msgid "Discard"
+msgstr ""
+
+#: src/OpenPackageCard.tsx
+msgid "Now"
+msgstr ""
+
+#: src/ScanPage.tsx
+msgid "Moving stock"
+msgstr ""
+
+#: src/ScanPage.tsx
+msgid "No longer in the catalogue."
+msgstr ""
+
+#: src/RegisterPage.tsx
+msgid "Registering…"
+msgstr ""
+
+#: src/retire.ts
+msgid "Go back"
+msgstr ""
+
+#: src/cart.ts
+msgid "What's on it: {packages} at {from}"
+msgstr ""
+
+#: src/RegisterPage.tsx
+msgid "The inventory can't answer just now. Try again in a minute."
+msgstr ""
+
+#: src/outbox.ts
+msgid "Open package said used up, {n}: {why}"
+msgstr ""
+
+#: src/cart.ts
+msgid "Count whole packages: {package}."
+msgstr ""
+
+#: src/OpenPackageCard.tsx
+msgid "Cut or take from the {name} opened {date} ({unit})"
+msgstr ""
+
+#: src/ScanPage.tsx
+msgid "Saying what is on open packages"
+msgstr ""
+
+#: src/outbox.ts
+msgid "The inventory can't record this just now. Trying again shortly."
+msgstr ""
+
+#: src/Scanner.tsx
+msgid "Done"
+msgstr ""
+
+#: src/ScanPage.tsx
+msgid "Pick your name"
+msgstr ""
+
+#: src/ScanPage.tsx
+msgid "Add it to the cart, fix that, then record it."
+msgstr ""
+
+#: src/cart.ts
+msgid "From and to must be different places."
+msgstr ""
+
+#: src/Scanner.tsx
+msgid "The torch wouldn't switch."
+msgstr ""
+
+#: src/ScanPage.tsx
+msgid "{place}: from here."
+msgstr ""
+
+#: src/recorded.ts
+msgid "{name}: removed"
+msgstr ""
+
+#: src/OpenPackageCard.tsx
+msgid "Nothing usable left on it"
+msgstr ""
+
+#: src/recorded.ts
+msgid "{name}: {amount} more"
+msgstr ""
+
+#: src/registration.ts
+msgid "That phrase has been withdrawn. Ask for a new one."
+msgstr ""
+
+#: src/Scanner.tsx
+msgid "Point the camera at a label."
+msgstr ""
+
+#: src/RegisterPage.tsx
+msgid "Register this device"
+msgstr ""
+
+#: src/cart.ts
+msgid "(what is on {packages} said)"
+msgstr ""
+
+#: src/outbox.ts
+msgid "Already recorded from this tab in transaction {transaction}"
+msgstr ""
+
+#: src/RegisterPage.tsx
+msgid "Register"
+msgstr ""
+
+#: src/ScanPage.tsx
+msgid "Added on {when} but not sent"
+msgstr ""
+
+#: src/cart.ts
+msgid "That install number is out of range."
+msgstr ""
+
+#: src/cart.ts
+msgid "{name}: Open whole packages: leave loose empty."
+msgstr ""
+
+#: src/cart.ts
+msgid "{name}: Nothing is taken from an open package here."
+msgstr ""
+
+#: src/ScanPage.tsx
+msgid "Added but not sent"
+msgstr ""
+
+#: src/registration.ts
+msgid "That phrase has registered all the devices it may. Ask for a new one."
+msgstr ""
+
+#: src/registration.ts
+msgid "This browser's registration was withdrawn."
+msgstr ""
+
+#: src/ScanPage.tsx
+msgid "That label isn't in the inventory ({code})."
+msgstr ""
+
+#. How many of a package, the package's name after the sign.
+#: src/older.ts
+msgid "{count} × {package}"
+msgstr ""
+
+#: src/ScanPage.tsx
+msgid "Confirm discard"
+msgstr ""
+
+#: src/ScanPage.tsx
+msgid "Carts from this device"
+msgstr ""
+
+#: src/ScanPage.tsx
+msgid "How many"
+msgstr ""
+
+#: src/recorded.ts
+msgid "What is on an open package, new"
+msgstr ""
+
+#: src/older.ts
+msgid "Could not read previously added items, scan them again."
+msgstr ""
+
+#: src/outbox.ts
+msgid "Recorded in another tab in transaction {transaction}"
+msgstr ""
+
+#: src/cart.ts
+msgid "Add something to the cart."
+msgstr ""
+
+#: src/registration.ts
+msgid "Too many tries from here. Wait a minute, then try again."
+msgstr ""
+
+#: src/outbox.ts
+msgid "A loose line says a package's size: load the page again, and count it again"
+msgstr ""
+
+#: src/OpenPackageCard.tsx
+msgid "Read the length printed on the cable where it leaves the spool. If it counts up from the start, what's left is the package size minus the mark."
+msgstr ""
+
+#: src/ScanPage.tsx
+msgid "Nothing matches “{typed}”."
+msgstr ""
+
+#: src/ScanPage.tsx
+msgid "Scan"
+msgstr ""
+
+#: src/cart.ts
+msgid "Enter how much from the open package, up to 3 decimals."
+msgstr ""
+
+#: src/cart.ts
+msgid "{name}, {package}: retired: taking only, so it can't be received."
+msgstr ""
+
+#: src/OpenPackageCard.tsx
+msgid "Your cut is more than the {name} shows, so it's ticked. It's recorded as you typed it, and an administrator will check the {name}."
+msgstr ""
+
+#: src/recorded.ts
+msgid "Recorded {was}, you changed it to {now}. An administrator will correct it."
+msgstr ""
+
+#: src/ScanPage.tsx
+msgid "That one was changed in another tab. Check it, then add it to the cart again."
+msgstr ""
+
+#: src/ScanPage.tsx
+msgid "A cart: moving stock"
+msgstr ""
+
+#: src/ScanPage.tsx
+msgid "Something"
+msgstr ""
+
+#: src/cart.ts
+msgid "{name}: That is more than the inventory can count."
+msgstr ""
+
+#: src/RegisterPage.tsx
 msgid "{count, plural, one {The batch waiting on this browser is being sent.} other {The # batches waiting on this browser are being sent.}}"
 msgstr ""
 
 #: src/RegisterPage.tsx
+msgid "Go to the scan page"
+msgstr ""
+
+#: src/ScanPage.tsx
+msgid "A cart: something"
+msgstr ""
+
+#: src/ScanPage.tsx
+msgid "{place}: to here."
+msgstr ""
+
+#: src/ScanPage.tsx
+msgid "How many {unit}"
+msgstr ""
+
+#: src/OpenPackageCard.tsx
+msgid "Shows the wrong length?"
+msgstr ""
+
+#: src/ScanPage.tsx
+msgid "Try again"
+msgstr ""
+
+#: src/ScanPage.tsx
+msgid "Kept on this device {when}, not sent."
+msgstr ""
+
+#: src/cart.ts
+msgid "Used up: {packages} at {from}"
+msgstr ""
+
+#: src/build.ts
+msgid "Upgrade"
+msgstr ""
+
+#: src/ScanPage.tsx
+msgid "Record or discard the current cart before adding more items"
+msgstr ""
+
+#: src/ScanPage.tsx
+msgid "a place no longer in the catalogue"
+msgstr ""
+
+#: src/ScanPage.tsx
+msgid "Added one: {item}."
+msgstr ""
+
+#: src/ScanPage.tsx
+msgid "Couldn't load the catalogue."
+msgstr ""
+
+#: src/ScanPage.tsx
+msgid "{place}: from here, or to here?"
+msgstr ""
+
+#: src/cart.ts
+msgid "An item"
+msgstr ""
+
+#: src/outbox.ts
+msgid "A line of a package says the size it was counted in: load the page again, and count it again"
+msgstr ""
+
+#: src/build.ts
+msgid "The scanner has been updated. You must upgrade. Your data will be kept but may need some changes before sending."
+msgstr ""
+
+#: src/OpenPackageCard.tsx
+msgid "All of it, moved still open"
+msgstr ""
+
+#: src/cart.ts
+msgid "{count, plural, one {# item} other {# items}}"
+msgstr ""
+
+#: src/outbox.ts
+msgid "What is on an open package, {n}: {why}"
+msgstr ""
+
+#: src/ScanPage.tsx
+msgid "{item} comes in no package to open."
+msgstr ""
+
+#: src/RegisterPage.tsx
+msgid "Registering lets this browser record in the inventory. It covers only this browser, so use the same one for the scan page. If the QR code opened a browser you don't usually use, open the link in yours."
+msgstr ""
+
+#: src/cart.ts
+msgid "A package counted here is no longer used. Remove the line and add it again."
+msgstr ""
+
+#: src/ScanPage.tsx
+msgid "Discard cart"
+msgstr ""
+
+#: src/OpenPackageCard.tsx
+msgid "Now:"
+msgstr ""
+
+#: src/RegisterPage.tsx
+msgid "Registration phrase"
+msgstr ""
+
+#: src/ScanPage.tsx
+msgid "Nothing in the cart yet."
+msgstr ""
+
+#: src/ScanPage.tsx
+msgid "A cart: receiving stock"
+msgstr ""
+
+#: src/ScanPage.tsx
+msgid "Cannot Add to Cart"
+msgstr ""
+
+#: src/OpenPackageCard.tsx
+msgid "Your cut uses up the {name}, so it's ticked. Untick it if any is left. An administrator confirms."
+msgstr ""
+
+#: src/ScanPage.tsx
+msgid "Change"
+msgstr ""
+
+#: src/OpenPackageCard.tsx
+msgctxt "state"
+msgid "open"
+msgstr ""
+
+#: src/cart.ts
+msgid "{name}: enter the count"
+msgstr ""
+
+#: src/ScanPage.tsx
+msgid "to {place}"
+msgstr ""
+
+#: src/Scanner.tsx
+msgid "Torch"
+msgstr ""
+
+#: src/older.ts
+msgid "Can't add these items. Please rescan."
+msgstr ""
+
+#: src/cart.ts
+msgid "{name}: enter what is on the open package, in whole units, or leave it blank."
+msgstr ""
+
+#: src/outbox.ts
+msgid "No answer from the inventory. Trying again shortly."
+msgstr ""
+
+#: src/cart.ts
+msgid "{name}: enter what is on the open package, up to 3 decimals, or leave it blank."
+msgstr ""
+
+#: src/ScanPage.tsx
+msgid "<0>Register it</0>, then come back."
+msgstr ""
+
+#: src/ScanPage.tsx
+msgid "Kept on this device, not sent."
+msgstr ""
+
+#: src/ScanPage.tsx
+msgid "Your name"
+msgstr ""
+
+#: src/ScanPage.tsx
+msgid "{where}, by {name}"
+msgstr ""
+
+#: src/ScanPage.tsx
+msgid "Loose {unit}"
+msgstr ""
+
+#: src/recorded.ts
+msgid "Recorded {was}, you removed it. An administrator will correct it."
+msgstr ""
+
+#: src/OpenPackageCard.tsx
+msgid "What's on the {name} after this cut ({unit}), if you can tell"
+msgstr ""
+
+#: src/ScanPage.tsx
+msgid "Not me"
+msgstr ""
+
+#: src/RegisterPage.tsx
 msgid "This browser is registered."
+msgstr ""
+
+#: src/ScanPage.tsx
+msgid "Receiving stock"
+msgstr ""
+
+#: src/ScanPage.tsx
+msgid "This browser wouldn't keep the cart, so it wasn't sent. Free some space or leave private browsing, then try again."
+msgstr ""
+
+#: src/older.ts
+msgid "{count, plural, one {Could not read # previously added item, scan it again.} other {Could not read # previously added items, scan them again.}}"
+msgstr ""
+
+#: src/Scanner.tsx
+msgid "No camera could be opened. Find items in the list instead."
+msgstr ""
+
+#: src/registration.ts
+msgid "That phrase isn't one we know. Check it word by word against the one you were given."
+msgstr ""
+
+#: src/older.ts
+msgid "This item has been retired."
+msgstr ""
+
+#: src/ScanPage.tsx
+msgid "Find an item, or type or scan its code"
+msgstr ""
+
+#: src/ScanPage.tsx
+msgid "Keep it"
+msgstr ""
+
+#: src/Scanner.tsx
+msgid "Camera"
+msgstr ""
+
+#: src/build.ts
+msgid "The scanner has been updated."
+msgstr ""
+
+#: src/recorded.ts
+msgid "Add these to cart"
+msgstr ""
+
+#: src/cart.ts
+msgid "{name}: retired: taking only, so it can't be received."
+msgstr ""
+
+#: src/ScanPage.tsx
+msgid "Sending…"
+msgstr ""
+
+#: src/ScanPage.tsx
+msgid "Unable to discard. Clear your site data to remove."
+msgstr ""
+
+#: src/ScanPage.tsx
+msgid "The cart was changed in another tab. Check it, then discard it again."
+msgstr ""
+
+#: src/ScanPage.tsx
+msgid "Remove"
+msgstr ""
+
+#: src/outbox.ts
+msgid "Not recorded: its key was already used for a different batch. Please report this."
+msgstr ""
+
+#: src/ScanPage.tsx
+msgid "MeshDB install number (if you know it)"
+msgstr ""
+
+#: src/ScanPage.tsx
+msgctxt "place"
+msgid "From"
+msgstr ""
+
+#: src/ScanPage.tsx
+msgid "{package} ({size} {unit})"
+msgstr ""
+
+#: src/OpenPackageCard.tsx
+msgid "{amount} {unit} over"
+msgstr ""
+
+#: src/ScanPage.tsx
+msgid "{amount} {unit} in all"
+msgstr ""
+
+#: src/older.ts
+msgid "{n}. {words}"
+msgstr ""
+
+#: src/ScanPage.tsx
+msgid "<0>Register this browser</0> to send what is waiting."
+msgstr ""
+
+#: src/cart.ts
+msgid "Pick your name."
+msgstr ""
+
+#: src/ScanPage.tsx
+msgid "This item was changed in another tab. Check it before discarding."
+msgstr ""
+
+#: src/ScanPage.tsx
+msgid "{place}: here."
+msgstr ""
+
+#: src/cart.ts
+msgid "An item in the cart is no longer in the catalogue. Remove it."
+msgstr ""
+
+#: src/ScanPage.tsx
+msgid "Taking it to an install"
+msgstr ""
+
+#: src/Scanner.tsx
+msgid "The label reader didn't load. Check the connection, then press Done and try again."
+msgstr ""
+
+#: src/cart.ts
+msgid "An install number is digits only."
+msgstr ""
+
+#: src/Scanner.tsx
+msgid "The camera isn't allowed for this page. Allow it in the browser's settings, or find items in the list."
+msgstr ""
+
+#: src/outbox.ts
+msgid "The inventory answered unexpectedly ({status}). Trying again shortly."
+msgstr ""
+
+#: src/recorded.ts
+msgid "{name}: {amount} fewer"
+msgstr ""
+
+#: src/cart.ts
+msgid "Enter the loose amount in {unit}, up to 3 decimals."
+msgstr ""
+
+#: src/cart.ts
+msgid "Opening: {items} at {from}"
+msgstr ""
+
+#: src/cart.ts
+msgid "retired: taking only"
+msgstr ""
+
+#: src/recorded.ts
+msgid "These are in your cart, waiting to be recorded."
+msgstr ""
+
+#: src/ScanPage.tsx
+msgid "A cart: taking it to an install"
+msgstr ""
+
+#: src/ScanPage.tsx
+msgid "This browser can't keep the cart. Clear local data, reload the page and try again."
+msgstr ""
+
+#: src/ScanPage.tsx
+msgid "A cart: opening packages"
+msgstr ""
+
+#: src/ScanPage.tsx
+msgid "Record"
+msgstr ""
+
+#: src/older.ts
+msgid "The package size has changed since this item was added. Discard and re-add the new package size."
+msgstr ""
+
+#: src/ScanPage.tsx
+msgid "The package size has changed to {size} since this item was added. Enter the count again."
+msgstr ""
+
+#: src/ScanPage.tsx
+msgid "This browser isn't keeping the cart, so a reload will empty it. Free some space or leave private browsing."
+msgstr ""
+
+#: src/ScanPage.tsx
+msgid "Are you {name}? This phone hasn't been used for a while."
+msgstr ""
+
+#: src/older.ts
+msgid "An item no longer in the catalogue"
+msgstr ""
+
+#: src/OpenPackageCard.tsx
+msgid "This {name} will be unusable after this cut, so it's ticked. Untick it if you'll keep the short end."
+msgstr ""
+
+#: src/cart.ts
+msgid "{count, plural, one {# open package} other {# open packages}}"
+msgstr ""
+
+#: src/Scanner.tsx
+msgid "Starting the camera…"
+msgstr ""
+
+#: src/cart.ts
+msgid "Install: {items} from {from}"
+msgstr ""
+
+#: src/older.ts
+msgid "{amount} loose"
+msgstr ""
+
+#: src/outbox.ts
+msgid "Some items were not recorded. Details below."
+msgstr ""
+
+#: src/older.ts
+msgid "{amount} from an open package"
+msgstr ""
+
+#: src/ScanPage.tsx
+msgid "for install {number}"
+msgstr ""
+
+#: src/OpenPackageCard.tsx
+msgid "Your cut uses up the {name}, so it's ticked. Untick it if cable is left. An administrator confirms."
+msgstr ""
+
+#: src/outbox.ts
+msgid "Not recorded. Make any changes and record again."
+msgstr ""
+
+#: src/cart.ts
+msgid "Counted in whole units."
+msgstr ""
+
+#: src/ScanPage.tsx
+msgid "Where"
+msgstr ""
+
+#: src/outbox.ts
+msgid "Register it to send this batch."
+msgstr ""
+
+#: src/ScanPage.tsx
+msgid "This item wasn't automatically removed. Record the cart and try to remove."
+msgstr ""
+
+#: src/outbox.ts
+msgid "This device is offline. Sending when it's back."
+msgstr ""
+
+#: src/ScanPage.tsx
+msgid "What is happening"
+msgstr ""
+
+#: src/ScanPage.tsx
+msgid "from {place}"
 msgstr ""

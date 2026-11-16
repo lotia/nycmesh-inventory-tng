@@ -23,6 +23,8 @@
  * build left that filled it: if another tab recorded it first, a tab that
  * took it over or one that had not heard, the server takes it once.
  */
+import type { MessageDescriptor } from "@lingui/core";
+import { msg } from "@lingui/core/macro";
 import { signal } from "@preact/signals";
 import { v4 as uuid } from "uuid";
 import * as v from "valibot";
@@ -37,6 +39,7 @@ import {
   ValidationFailed,
 } from "./api/replies";
 import { Builds, HEADER, MUST_UPGRADE } from "./build";
+import { say, sayParts } from "./i18n";
 import { NOT_REGISTERED } from "./registration";
 import { onStoredChange, readStored, writeStored } from "./stored";
 import { telemetry } from "./telemetry";
@@ -132,8 +135,8 @@ export type Draft = Omit<Body, "key">;
 
 /** A batch's reports, as a 422 names them. */
 export const REPORTS = {
-  used_up: "Open package said used up",
-  lengths: "What is on an open package",
+  used_up: msg`Open package said used up`,
+  lengths: msg`What is on an open package`,
 } as const;
 
 /** A kind of report a batch holds (REPORTS). */
@@ -146,10 +149,8 @@ const isReport = (kind: unknown): kind is ReportKind =>
  * sizes were sent kept its lines (inventory-tng-1p8), by the server's type:
  * its words are for whoever writes a client, these for the volunteer. */
 const SIZE_REFUSED = {
-  package_size_required:
-    "A line of a package says the size it was counted in: load the page again, and count it again",
-  package_size_without_package:
-    "A loose line says a package's size: load the page again, and count it again",
+  package_size_required: msg`A line of a package says the size it was counted in: load the page again, and count it again`,
+  package_size_without_package: msg`A loose line says a package's size: load the page again, and count it again`,
 } as const;
 
 /** A whole number, as kept. */
@@ -247,12 +248,14 @@ export function wordsOf(said: Said): string {
 }
 
 /** A batch refused for its key (key_reused), in words. */
-export const KEY_REUSED =
-  "Not recorded: its key was already used for a different batch. Please report this.";
+export const KEY_REUSED = msg`Not recorded: its key was already used for a different batch. Please report this.`;
 
 /** What the page says first of a recorded_elsewhere, bold, as an alert,
  * with details below it (Ali, inventory-tng-0gg, 2026-11-15, 1). */
-export const SOME_NOT_RECORDED = "Some items were not recorded. Details below.";
+export const SOME_NOT_RECORDED = msg`Some items were not recorded. Details below.`;
+
+export const RECORDED_HERE = msg`Already recorded from this tab in transaction {transaction}`;
+export const RECORDED_ELSEWHERE = msg`Recorded in another tab in transaction {transaction}`;
 
 /**
  * The heading over what another tab recorded, by who recorded it
@@ -261,9 +264,9 @@ export const SOME_NOT_RECORDED = "Some items were not recorded. Details below.";
  * 6).
  */
 export function recordedHeading(recorded: Recorded): string {
-  return recorded.by === "here"
-    ? `Already recorded from this tab in transaction ${recorded.transactionId}`
-    : `Recorded in another tab in transaction ${recorded.transactionId}`;
+  return say(recorded.by === "here" ? RECORDED_HERE : RECORDED_ELSEWHERE, {
+    transaction: recorded.transactionId,
+  });
 }
 
 /** The heading over what a recorded_elsewhere holds otherwise than was
@@ -272,51 +275,69 @@ export function recordedHeading(recorded: Recorded): string {
  * recorded, but not the changes since, so it never goes in a cart whole
  * again, which would record it twice (Ali, inventory-tng-wyq, question c,
  * and inventory-tng-g0e, d). */
-export const MAKE_CHANGES = "Not recorded. Make any changes and record again.";
+export const MAKE_CHANGES = msg`Not recorded. Make any changes and record again.`;
 
 /** A batch waiting after no_answer, while the browser is online. */
-export const NO_ANSWER = "No answer from the inventory. Trying again shortly.";
+export const NO_ANSWER = msg`No answer from the inventory. Trying again shortly.`;
 
 /** NO_ANSWER's words while the browser says it is offline (Ali,
  * inventory-tng-wyq, 'Offline'). */
-export const OFFLINE = "This device is offline. Sending when it's back.";
+export const OFFLINE = msg`This device is offline. Sending when it's back.`;
 
 /** Before a refused batch's problems (422), in bold. */
-const NOT_RECORDED = "Not recorded.";
+export const NOT_RECORDED = msg`Not recorded.`;
+
+export const UNAVAILABLE = msg`The inventory can't record this just now. Trying again shortly.`;
+/** An unexpected answer to a batch, REPORT_AFTER times or more in a row. */
+export const KEEPS_FAILING = msg({
+  message:
+    "{tries, plural, one {The inventory keeps failing on this batch ({status}, # try). It is kept and tried again; please report this.} other {The inventory keeps failing on this batch ({status}, # tries). It is kept and tried again; please report this.}}",
+});
+export const UNEXPECTED = msg`The inventory answered unexpectedly ({status}). Trying again shortly.`;
+/** After why this browser cannot save (registration.NOT_REGISTERED). */
+export const REGISTER_TO_SEND = msg`Register it to send this batch.`;
+
+/** A 422's problem the page has no words for. */
+export const NOT_ACCEPTED = msg`Not accepted`;
+/** A problem with the line it names, numbered as the cart's. */
+export const ON_LINE = msg`Line {n}: {why}`;
+/** A problem with the report it names, numbered among those of its kind. */
+const ON_REPORT: Record<ReportKind, MessageDescriptor> = {
+  used_up: msg`Open package said used up, {n}: {why}`,
+  lengths: msg`What is on an open package, {n}: {why}`,
+};
 
 /** What the page says of `reason`; of no_answer, as the browser is
  * `online` or not. */
 export function noteOf(reason: Reason, online = true): Note {
   switch (reason.code) {
     case "no_answer":
-      return { bold: [online ? NO_ANSWER : OFFLINE] };
+      return { bold: [say(online ? NO_ANSWER : OFFLINE)] };
     case "unavailable":
-      return {
-        bold: [
-          "The inventory can't record this just now. Trying again shortly.",
-        ],
-      };
+      return { bold: [say(UNAVAILABLE)] };
     case "must_upgrade":
-      return { bold: [MUST_UPGRADE] };
+      return { bold: [say(MUST_UPGRADE)] };
     case "key_reused":
-      return { bold: [KEY_REUSED] };
+      return { bold: [say(KEY_REUSED)] };
     case "recorded_elsewhere":
-      return { bold: [SOME_NOT_RECORDED] };
-    case "unexpected":
+      return { bold: [say(SOME_NOT_RECORDED)] };
+    case "unexpected": {
+      const { status, tries } = reason;
       return {
         bold: [
-          reason.tries >= REPORT_AFTER
-            ? `The inventory keeps failing on this batch (${reason.status}, ${reason.tries} tries). It is kept and tried again; please report this.`
-            : `The inventory answered unexpectedly (${reason.status}). Trying again shortly.`,
+          tries >= REPORT_AFTER
+            ? say(KEEPS_FAILING, { status, tries })
+            : say(UNEXPECTED, { status }),
         ],
       };
+    }
     case "not_registered":
       return {
-        bold: [`${NOT_REGISTERED[reason.why]} Register it to send this batch.`],
+        bold: [`${say(NOT_REGISTERED[reason.why])} ${say(REGISTER_TO_SEND)}`],
       };
     case "refused":
       return {
-        bold: [NOT_RECORDED],
+        bold: [say(NOT_RECORDED)],
         plain: reason.problems.flatMap(problemSaid),
       };
   }
@@ -324,22 +345,18 @@ export function noteOf(reason: Reason, online = true): Note {
 
 /** One of a 422's problems, after a space: what it names in the page's
  * words, then why, in the server's, or the page's for a size refused. */
-function problemSaid({ names, size, msg }: Problem): Said {
-  const where =
-    names === null
-      ? []
-      : [
-          names.of === "line"
-            ? `Line ${names.n}: `
-            : `${REPORTS[names.of]}, ${names.n}: `,
-        ];
+function problemSaid({ names, size, msg: server }: Problem): Said {
   const why =
     size !== null
-      ? SIZE_REFUSED[size]
-      : msg === null
-        ? "Not accepted"
-        : { quoted: msg };
-  return [" ", ...where, why];
+      ? say(SIZE_REFUSED[size])
+      : server === null
+        ? say(NOT_ACCEPTED)
+        : { quoted: server };
+  if (names === null) {
+    return [" ", why];
+  }
+  const where = names.of === "line" ? ON_LINE : ON_REPORT[names.of];
+  return [" ", ...sayParts(where, { n: String(names.n), why: [why] })];
 }
 
 /** A batch as kept: once a build keeping it under STORAGE_KEY is deployed,

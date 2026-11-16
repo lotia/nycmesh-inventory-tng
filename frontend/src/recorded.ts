@@ -10,9 +10,19 @@
  * (docs/decisions/0003): the server keeps that for one (over_recorded.py),
  * as it refused the save.
  */
+import type { MessageDescriptor } from "@lingui/core";
+import { msg } from "@lingui/core/macro";
 import { v5 as uuidFrom } from "uuid";
-import { type Catalogue, type Item, indexOf } from "./cart";
-import { FROM_OPEN, inUnit, nameOf, RESCAN, withRetired } from "./older";
+import { type Catalogue, ITEM_SAYS, type Item, indexOf } from "./cart";
+import { say, sayParts } from "./i18n";
+import {
+  FROM_OPEN,
+  inUnit,
+  nameOf,
+  PACKAGES_OF,
+  RESCAN,
+  withRetired,
+} from "./older";
 import {
   type Body,
   batchId,
@@ -45,21 +55,33 @@ export type Difference = {
  * (inventory-tng-0gg, 3, and 2026-11-15, 7): `was` recorded, `now` what
  * the save holds, or null if it holds none. */
 export function loweredWords(was: Said, now: Said | null): Said {
-  return [
-    "Recorded ",
-    ...was,
-    ...(now === null ? [", you removed it"] : [", you changed it to ", ...now]),
-    ". An administrator will correct it.",
-  ];
+  return now === null
+    ? sayParts(REMOVED_IT, { was })
+    : sayParts(CHANGED_IT, { was, now });
 }
+
+export const REMOVED_IT = msg`Recorded {was}, you removed it. An administrator will correct it.`;
+export const CHANGED_IT = msg`Recorded {was}, you changed it to {now}. An administrator will correct it.`;
 
 /** The button that puts what the save adds in a cart with lines (Ali,
  * inventory-tng-0gg, 2026-11-15, 2). */
-export const ADD_DIFFERENCE = "Add these to cart";
+export const ADD_DIFFERENCE = msg`Add these to cart`;
 
 /** Beside what the save adds, once it is in the cart (Ali,
  * inventory-tng-0gg, 2026-11-15, 2). */
-export const IN_CART = "These are in your cart, waiting to be recorded.";
+export const IN_CART = msg`These are in your cart, waiting to be recorded.`;
+
+/** What the save holds otherwise than was recorded, line by line (Ali,
+ * inventory-tng-0gg, 1, and 2026-11-15, 7). */
+export const REMOVED = msg`{name}: removed`;
+export const FEWER = msg`{name}: {amount} fewer`;
+export const NEW = msg`{name}: {amount}, new`;
+export const MORE = msg`{name}: {amount} more`;
+/** A report the save makes that was not recorded. */
+export const REPORT_NEW: Record<ReportKind, MessageDescriptor> = {
+  used_up: msg`Open package said used up, new`,
+  lengths: msg`What is on an open package, new`,
+};
 
 /** A line's form, to tell lines of one item apart. */
 function formOf(line: Line, kind: Body["kind"]): string {
@@ -182,8 +204,11 @@ class Namer {
     const said: Said =
       pack === null
         ? [this.inUnit(line, amount)]
-        : [`${pack.n} × `, { quoted: pack.name }];
-    return fromOpen(line, kind) ? [...said, FROM_OPEN] : said;
+        : sayParts(PACKAGES_OF, {
+            count: pack.n,
+            package: { quoted: pack.name },
+          });
+    return fromOpen(line, kind) ? sayParts(FROM_OPEN, { amount: said }) : said;
   }
 
   /** `amount` as the volunteer changed a line to: how many packages, as
@@ -212,16 +237,17 @@ export function recordedLines(
   const named = new Namer(catalogue);
   const { batch } = recorded;
   return [
-    ...batch.lines.map((line) => [
-      ...named.name(line),
-      ": ",
-      ...named.amount(
-        line,
-        batch.kind,
-        thousandths(String(line.quantity)) ?? 0,
-      ),
-    ]),
-    ...reportsOf(batch).map((kind): Said => [REPORTS[kind]]),
+    ...batch.lines.map((line) =>
+      sayParts(ITEM_SAYS, {
+        name: named.name(line),
+        what: named.amount(
+          line,
+          batch.kind,
+          thousandths(String(line.quantity)) ?? 0,
+        ),
+      }),
+    ),
+    ...reportsOf(batch).map((kind): Said => [say(REPORTS[kind])]),
   ];
 }
 
@@ -246,16 +272,19 @@ export function changesShown(
   catalogue: Catalogue,
 ): Shown[] {
   const named = new Namer(catalogue);
-  const rescan: Note = { bold: [RESCAN] };
+  const rescan: Note = { bold: [say(RESCAN)] };
   const lines = differences(recorded.batch, mine).map(
     ({ line, kind, recorded: was, mine: now, changed }): Shown => {
-      const name = [...named.name(line), ": "];
+      const name = named.name(line);
       if (changed < 0) {
         const removed = now === 0;
         return {
           words: removed
-            ? [...name, "removed"]
-            : [...name, ...named.amount(line, kind, -changed), " fewer"],
+            ? sayParts(REMOVED, { name })
+            : sayParts(FEWER, {
+                name,
+                amount: named.amount(line, kind, -changed),
+              }),
           note: {
             bold: loweredWords(
               named.amount(line, kind, was),
@@ -266,15 +295,15 @@ export function changesShown(
       }
       const words: Said =
         changed === now
-          ? [...name, ...named.amount(line, kind, now), ", new"]
-          : [...name, ...named.amount(line, kind, changed), " more"];
+          ? sayParts(NEW, { name, amount: named.amount(line, kind, now) })
+          : sayParts(MORE, { name, amount: named.amount(line, kind, changed) });
       return { words, note: fromOpen(line, kind) ? rescan : null };
     },
   );
   return [
     ...lines,
     ...reportsAdded(recorded.batch, mine).map(
-      (each): Shown => ({ words: [REPORTS[each], ", new"], note: rescan }),
+      (each): Shown => ({ words: [say(REPORT_NEW[each])], note: rescan }),
     ),
   ];
 }
