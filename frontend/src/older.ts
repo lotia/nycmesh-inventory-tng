@@ -13,9 +13,10 @@
  *
  * Each version's shape is in the history of outbox.ts and cart.ts. Every
  * batch kept its key, kind, volunteer_id, places, install_number and lines
- * of item_id and quantity (a number in v1, then a decimal), with what,
- * queuedAt and state, and why it was refused: note, in words, to v3,
- * then reason, a code (outbox.Reason); package_id came in v1, open
+ * of item_id and quantity (a number in v1, then a decimal), with
+ * queuedAt and state; its summary in words (what) to v4, then what that
+ * is made from (outbox.Summary); and why it was refused: note, in words,
+ * to v3, then reason, a code (outbox.Reason); package_id came in v1, open
  * packages later.
  * Every cart kept its kind, volunteerId, places, installNumber, usedAt and
  * lines of itemId, packages (counts by package id) and loose; from v2, the
@@ -175,7 +176,7 @@ function linesOf<T extends v.GenericSchema>(lines: unknown[], schema: T) {
 }
 
 /** The entries a stored outbox holds: a list, as v1 to v3 kept them, or
- * {entries}, as v4 does. */
+ * {entries}, as every one since does. */
 function entriesOf(stored: unknown): unknown[] {
   if (Array.isArray(stored)) {
     return stored;

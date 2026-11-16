@@ -416,7 +416,7 @@ export const Entry = v.object({
   /** Sent under its cart's key (cart.ts, batchKey), which another tab may
    * have recorded first: a tab of an older build, whose save or cart this
    * took over (older.ts), or one that had not heard it was recorded. Named
-   * for the save put back, which first had one, as v4 keeps it. */
+   * for the save put back, which first had one, as kept since v4. */
   putBack: v.exactOptional(v.literal(true)),
 });
 
