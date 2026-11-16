@@ -7,6 +7,7 @@ from collections.abc import Callable
 from decimal import Decimal
 
 import pytest
+from babel.messages.catalog import Catalog
 from fastapi.testclient import TestClient
 from httpx2 import Response
 from sqlalchemy import Engine, select
@@ -18,6 +19,7 @@ from inventory_tng import items, locations
 from inventory_tng.admin.common import ABOVE_ZERO, RULES, TYPE_A_NUMBER, WHOLE_UNITS
 from inventory_tng.admin.counts import (
     ADJUSTMENTS,
+    COUNT_KIND,
     COUNTS,
     FOUND_OR_OFF,
     ON_THE_FORM_TWICE,
@@ -49,6 +51,7 @@ from inventory_tng.models import (
     Movement,
 )
 from inventory_tng.pages import retired_holding
+from inventory_tng.phrases import compiled, speaking
 
 from helpers.concurrency import Committed
 from helpers.rows import item_fields, shown, violates
@@ -1014,6 +1017,13 @@ def test_counts_sort_filter_and_come_in_pages(
     assert listed(sort="when", order="asc") == ["Damaged", "Found", "Count"]
     assert listed(sort="what") == ["Count", "Damaged", "Found"]
     assert listed(sort="what", order="desc") == ["Found", "Damaged", "Count"]
+    # What by its words in the language spoken, not English.
+    catalogue = Catalog()
+    catalogue.add(str(COUNT_KIND), "Inventur")
+    with speaking(compiled(catalogue)):
+        page = " ".join(text(admin_client.get(COUNTS, params={"sort": "what"})).split())
+    said = re.findall(r"<td> (Inventur|Damaged|Found):", page)
+    assert said == ["Damaged", "Found", "Inventur"]
     assert listed(sort="where") == ["Found", "Count", "Damaged"]
     assert listed(sort="by") == ["Damaged", "Count", "Found"]
     assert listed(place=str(shelf.id)) == ["Found"]

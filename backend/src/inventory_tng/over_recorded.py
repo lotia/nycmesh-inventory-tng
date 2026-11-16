@@ -46,7 +46,7 @@ from inventory_tng.models import (
     OverRecorded,
 )
 from inventory_tng.pages import amount
-from inventory_tng.phrases import gettext, lazy_gettext
+from inventory_tng.phrases import gettext, in_query, lazy_gettext
 
 log = structlog.get_logger(__name__)
 meter = metrics.get_meter(__name__)
@@ -548,9 +548,8 @@ SETTLED = OverRecorded.settled_at.is_not(None)
 
 # What the list of those settled sorts by, a column each, as settled()
 # reads them (Ali, 2026-11-15, inventory-tng-73p): How by its words, as
-# settled() words it; Where by where it left, then where it arrived.
-# The words are read once, as the server starts: in English, the one
-# locale it speaks (inventory-tng-ist.2 would sort by the reader's).
+# settled() words it, in the language spoken when the list is asked for;
+# Where by where it left, then where it arrived.
 SETTLED_ORDER: dict[str, tuple[Any, ...]] = {
     "settled": (OverRecorded.settled_at,),
     "item": (func.lower(Item.name_shown),),
@@ -563,17 +562,17 @@ SETTLED_ORDER: dict[str, tuple[Any, ...]] = {
                     OverRecorded.settled_how == "checked",
                     OverRecorded.checked_reason.is_(None),
                 ),
-                str(SETTLED_HOW["confirmed"]),
+                in_query(SETTLED_HOW["confirmed"]),
             ),
             (
                 and_(
                     OverRecorded.settled_how == "corrected",
                     Movement.from_open_package_id == Movement.to_open_package_id,
                 ),
-                str(SETTLED_HOW["count corrected"]),
+                in_query(SETTLED_HOW["count corrected"]),
             ),
             *(
-                (OverRecorded.settled_how == how, str(SETTLED_HOW[how]))
+                (OverRecorded.settled_how == how, in_query(SETTLED_HOW[how]))
                 for how in ("corrected", "checked", "counted")
             ),
         ),

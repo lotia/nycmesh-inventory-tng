@@ -21,6 +21,7 @@ from babel.messages.mofile import write_mo
 from babel.messages.pofile import read_po
 from babel.support import LazyProxy, Translations
 from jinja2 import Environment
+from sqlalchemy import BindParameter, String, bindparam
 
 # The app's name: a name, not a phrase, so the same in every language, and
 # never in the catalogue. Messages take it as %(brand)s. Authenticator apps
@@ -93,6 +94,12 @@ def lazy_gettext(message: str) -> LazyProxy:
 def lazy_pgettext(context: str, message: str) -> LazyProxy:
     """`message`, as `context` means it, said when shown."""
     return lazy(pgettext, context, message)
+
+
+def in_query(phrase: Words) -> BindParameter[str]:
+    """`phrase` as a value in a query, such as words a list sorts by: said
+    in the locale active when the query runs, not when it is written."""
+    return bindparam(None, callable_=lambda: str(phrase), type_=String())
 
 
 def install(environment: Environment) -> None:

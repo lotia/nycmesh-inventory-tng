@@ -555,6 +555,7 @@ def counts_page() -> str:
         reasons=[],
         counted_places=[],
         kinds=["count", "adjustment"],
+        count_kind=counts.COUNT_KIND,
         counters=[],
         recent=[entry],
     )
@@ -1045,3 +1046,12 @@ def test_no_message_has_a_lone_per_cent() -> None:
 
 def test_every_kind_of_save_has_words_for_a_cut() -> None:
     assert length_checks.CUT_KINDS.keys() == set(TRANSACTION_KINDS)
+
+
+def test_a_unit_name_with_a_prefix_tells_translators_what_it_is() -> None:
+    untold = [
+        m.id
+        for m in read(ENGLISH_PO)
+        if isinstance(m.id, str) and "%(prefix)s" in m.id and not m.auto_comments
+    ]
+    assert untold == []

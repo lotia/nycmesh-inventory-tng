@@ -9,6 +9,7 @@ from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 
 import pytest
+from babel.messages.catalog import Catalog
 from fastapi.testclient import TestClient
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
@@ -22,6 +23,7 @@ from inventory_tng.admin.over_recorded import waiting_view
 from inventory_tng.admin.stock import recorded_more_view
 from inventory_tng.local_time import show, show_day, site_zone
 from inventory_tng.models import LedgerTransaction, Movement, OverRecorded
+from inventory_tng.phrases import compiled, speaking
 
 from helpers.rows import tag
 from helpers.sign_in import new_admin
@@ -622,6 +624,29 @@ def test_every_column_sorts_either_way(
     assert f'href="{SETTLED}?sort=why"' in page
     # A sort not offered is newest first.
     assert shown("&sort=whom") == newest
+
+
+def test_how_sorts_by_its_words_in_the_language_spoken(
+    admin_client: TestClient, session: Session
+) -> None:
+    """How is sorted by its words as the list says them, in the language
+    spoken when the list is asked for, not English."""
+    places = [Place(session) for _ in range(2)]
+    first = raised(session, write(session, places[0]))
+    over_recorded.correct(session, first.id, seen(first), ada_id(session))
+    second = raised(session, write(session, places[1]))
+    over_recorded.mark_checked(
+        session, second.id, seen(second), ada_id(session), "both"
+    )
+    session.flush()
+    mine = {place.item.name_shown for place in places}
+    # English sorts Checked before Corrected; this language the other way.
+    catalogue = Catalog()
+    catalogue.add(HOW["checked"], "Zu prüfen")
+    catalogue.add(HOW["corrected"], "Angepasst")
+    with speaking(compiled(catalogue)):
+        rows = settled_rows(admin_client, f"{SETTLED}?per=all&sort=how")
+    assert [row[4] for row in rows if row[1] in mine] == ["Angepasst", "Zu prüfen"]
 
 
 def test_rows_per_page_25_50_100_or_all(

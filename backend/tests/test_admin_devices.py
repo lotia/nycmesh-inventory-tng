@@ -4,6 +4,7 @@ import re
 from collections.abc import Callable
 from datetime import UTC, datetime, timedelta
 
+from babel.messages.catalog import Catalog
 from fastapi.testclient import TestClient
 from httpx2 import Response
 from sqlalchemy import select
@@ -22,6 +23,7 @@ from inventory_tng.admin.devices import (
     uses_problem,
 )
 from inventory_tng.models import AdminSession, Device, RegistrationCode, SiteSettings
+from inventory_tng.phrases import compiled, speaking
 
 from helpers.devices import new_device
 from helpers.rows import history
@@ -475,6 +477,11 @@ def test_codes_sort_filter_by_state_and_come_in_pages(
     assert listed(sort="code") == ["Alpha", "Bravo", "Charlie", "Delta"]
     assert listed(sort="code", order="desc") == ["Delta", "Charlie", "Bravo", "Alpha"]
     assert listed(sort="state") == ["Charlie", "Bravo", "Delta", "Alpha"]
+    # By the state's words in the language spoken, not English.
+    catalogue = Catalog()
+    catalogue.add("Expired", "Verfallen")
+    with speaking(compiled(catalogue)):
+        assert listed(sort="state") == ["Bravo", "Delta", "Alpha", "Charlie"]
     assert listed(sort="used", order="desc")[0] == "Alpha"
     assert listed(sort="until") == ["Charlie", "Delta", "Alpha", "Bravo"]
     assert listed(state="open") == ["Bravo"]

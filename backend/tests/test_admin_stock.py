@@ -235,6 +235,9 @@ def test_stock_sorts_within_each_group_and_filters(
     assert f'<a href="{STOCK}">Clear</a>' in filtered
     nothing = text(admin_client.get(STOCK, params={"q": "zzzqqqxxx"}))
     assert "None is in the filter." in nothing
+    # A search that folds to nothing, such as a lone accent, is none.
+    accent = text(admin_client.get(STOCK, params={"q": "\u0301"}))
+    assert f'<a href="{STOCK}">Clear</a>' not in accent
 
 
 def test_stock_pages_count_groups_and_never_split_one(

@@ -98,8 +98,7 @@
     <tr>
       <td>{{ t.created_at | when(t.time_zone) }}</td>
       <td>
-        {#- Translators: a count, as a kind of save, before what it saved. #}
-        {% if t.kind == "count" %}{% trans %}Count{% endtrans %}{% else %}{{ entry.reason }}{% endif %}:
+        {% if t.kind == "count" %}{{ count_kind }}{% else %}{{ entry.reason }}{% endif %}:
         {% for item, amount in entry.lines %}{{ "+" if entry.found else "-" }}{{ amount | amount }} {{ item.unit }} {{ item.name_shown }}{{ ", " if not loop.last }}{% else %}{% trans %}as the records said{% endtrans %}{% endfor %}
       </td>
       <td>{{ entry.place }}</td>

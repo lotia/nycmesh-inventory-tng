@@ -99,13 +99,13 @@ def state(code: RegistrationCode, at: datetime) -> State:
 
 # How the codes list sorts, each row a code, its state and how many
 # devices it registered: newest first, as it always has, or by a heading
-# (Ali, 2026-11-15, inventory-tng-qwb).
+# (Ali, 2026-11-15, inventory-tng-qwb), a state by its words as shown.
 CODE_SORTING = Sorting(
     "made",
     {
         "made": Sort.keyed(lambda row: row[0].created_at, first="desc"),
         "code": Sort.keyed(lambda row: row[0].name.lower()),
-        "state": Sort.keyed(lambda row: row[1]),
+        "state": Sort.keyed(lambda row: str(STATE_WORDS[row[1]]).lower()),
         "used": Sort.keyed(lambda row: row[0].uses),
         "until": Sort.keyed(lambda row: row[0].expires_at),
     },

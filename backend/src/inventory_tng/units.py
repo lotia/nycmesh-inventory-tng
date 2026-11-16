@@ -230,23 +230,34 @@ NAMES: dict[str, Callable[[str], str]] = {
     "ft": lambda _: gettext("feet"),
     "yd": lambda _: gettext("yards"),
     "mi": lambda _: gettext("miles"),
+    # Translators: prefix is an SI prefix in English, such as kilo, or none.
     "Hz": lambda prefix: gettext("%(prefix)shertz", prefix=prefix),
+    # Translators: prefix is an SI prefix in English, such as kilo, or none.
     "bit/s": lambda prefix: gettext("%(prefix)sbits per second", prefix=prefix),
+    # Translators: prefix is an SI prefix in English, such as kilo, or none.
     "W": lambda prefix: gettext("%(prefix)swatts", prefix=prefix),
     "dBm": lambda _: gettext("decibel-milliwatts"),
     "dBi": lambda _: gettext("decibels isotropic"),
+    # Translators: prefix is an SI prefix in English, such as kilo, or none.
     "V": lambda prefix: gettext("%(prefix)svolts", prefix=prefix),
+    # Translators: prefix is an SI prefix in English, such as kilo, or none.
     "A": lambda prefix: gettext("%(prefix)samperes", prefix=prefix),
     "degC": lambda _: gettext("degrees Celsius"),
     "degF": lambda _: gettext("degrees Fahrenheit"),
+    # Translators: prefix is an SI prefix in English, such as kilo, or none.
     "K": lambda prefix: gettext("%(prefix)skelvins", prefix=prefix),
+    # Translators: prefix is an SI prefix in English, such as kilo, or none.
     "F": lambda prefix: gettext("%(prefix)sfarads", prefix=prefix),
+    # Translators: prefix is an SI prefix in English, such as kilo, or none.
     "Ohm": lambda prefix: gettext("%(prefix)sohms", prefix=prefix),
+    # Translators: prefix is an SI prefix in English, such as kilo, or none.
     "g": lambda prefix: gettext("%(prefix)sgrams", prefix=prefix),
     "t": lambda _: gettext("metric tons"),
     "lb": lambda _: gettext("pounds"),
     "oz": lambda _: gettext("ounces"),
+    # Translators: prefix is an SI prefix in English, such as kilo, or none.
     "L": lambda prefix: gettext("%(prefix)sliters", prefix=prefix),
+    # Translators: prefix is an SI prefix in English, such as kilo, or none.
     "m3": lambda prefix: gettext("cubic %(prefix)smeters", prefix=prefix),
     "gal": lambda _: gettext("US gallons"),
 }

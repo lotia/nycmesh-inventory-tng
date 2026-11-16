@@ -101,7 +101,7 @@ from inventory_tng.pages import (
     redirect,
     retired_holding,
 )
-from inventory_tng.phrases import Words, gettext, lazy_gettext, ngettext
+from inventory_tng.phrases import Words, gettext, in_query, lazy_gettext, ngettext
 from inventory_tng.sign_in import AdminSignedIn, SignedIn
 
 log = structlog.get_logger(__name__)
@@ -195,15 +195,18 @@ _place = func.coalesce(
 )
 # What the list of counts and adjustments may be filtered to, by kind.
 KINDS = ("count", "adjustment")
+# Translators: a count, as a kind of save, before what it saved.
+COUNT_KIND = lazy_gettext("Count")
 # How it sorts: newest first, as it always has, or by a heading; What by
-# its words, Count or the reason (Ali, 2026-11-15, inventory-tng-qwb).
+# its words, Count or the reason (Ali, 2026-11-15, inventory-tng-qwb), in
+# the language spoken.
 SORTING = Sorting(
     "when",
     {
         "when": Sort.of(LedgerTransaction.id, first="desc"),
         "what": Sort.of(
             case(
-                (LedgerTransaction.kind == "count", "count"),
+                (LedgerTransaction.kind == "count", func.lower(in_query(COUNT_KIND))),
                 else_=func.lower(AdjustmentReason.name),
             )
         ),
@@ -302,6 +305,7 @@ def _counts_page(
             "recent": recent,
             "view": view,
             "kinds": KINDS,
+            "count_kind": COUNT_KIND,
             "counted_places": session.execute(
                 select(Location.id, Location.name)
                 .where(Location.id.in_(done.with_only_columns(_place)))

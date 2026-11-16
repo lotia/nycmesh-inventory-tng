@@ -621,3 +621,8 @@ def test_a_name_is_shown_as_its_rules_read_it() -> None:
         "Box 3M", units.found_in("Box 3M", {"M": units.Rule("m", True)})
     )
     assert units.shown_name(saved, {"M": units.Rule("m", True)}) == f"Box 3{NB}m"
+
+
+def test_every_kind_of_unit_has_a_plausible_size_and_words() -> None:
+    # A kind missing from either fails only when a page shows one.
+    assert {unit.kind for unit in UNITS} == set(KINDS) == set(units.KIND_WORDS)

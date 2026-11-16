@@ -432,36 +432,43 @@ msgstr ""
 msgid "%(place)s, in %(parent)s"
 msgstr ""
 
+#. Translators: prefix is an SI prefix in English, such as kilo, or none.
 #: src/inventory_tng/units.py
 #, python-format
 msgid "%(prefix)samperes"
 msgstr ""
 
+#. Translators: prefix is an SI prefix in English, such as kilo, or none.
 #: src/inventory_tng/units.py
 #, python-format
 msgid "%(prefix)sbits per second"
 msgstr ""
 
+#. Translators: prefix is an SI prefix in English, such as kilo, or none.
 #: src/inventory_tng/units.py
 #, python-format
 msgid "%(prefix)sfarads"
 msgstr ""
 
+#. Translators: prefix is an SI prefix in English, such as kilo, or none.
 #: src/inventory_tng/units.py
 #, python-format
 msgid "%(prefix)sgrams"
 msgstr ""
 
+#. Translators: prefix is an SI prefix in English, such as kilo, or none.
 #: src/inventory_tng/units.py
 #, python-format
 msgid "%(prefix)shertz"
 msgstr ""
 
+#. Translators: prefix is an SI prefix in English, such as kilo, or none.
 #: src/inventory_tng/units.py
 #, python-format
 msgid "%(prefix)skelvins"
 msgstr ""
 
+#. Translators: prefix is an SI prefix in English, such as kilo, or none.
 #: src/inventory_tng/units.py
 #, python-format
 msgid "%(prefix)sliters"
@@ -473,16 +480,19 @@ msgstr ""
 msgid "%(prefix)smeters"
 msgstr ""
 
+#. Translators: prefix is an SI prefix in English, such as kilo, or none.
 #: src/inventory_tng/units.py
 #, python-format
 msgid "%(prefix)sohms"
 msgstr ""
 
+#. Translators: prefix is an SI prefix in English, such as kilo, or none.
 #: src/inventory_tng/units.py
 #, python-format
 msgid "%(prefix)svolts"
 msgstr ""
 
+#. Translators: prefix is an SI prefix in English, such as kilo, or none.
 #: src/inventory_tng/units.py
 #, python-format
 msgid "%(prefix)swatts"
@@ -1266,8 +1276,8 @@ msgstr ""
 msgid "Couldn't copy: select it and copy it by hand."
 msgstr ""
 
-#. a count, as a kind of save, before what it saved.
-#: src/inventory_tng/templates/counts.html
+#. Translators: a count, as a kind of save, before what it saved.
+#: src/inventory_tng/admin/counts.py
 msgid "Count"
 msgstr ""
 
@@ -4334,6 +4344,7 @@ msgstr ""
 msgid "count it"
 msgstr ""
 
+#. Translators: prefix is an SI prefix in English, such as kilo, or none.
 #: src/inventory_tng/units.py
 #, python-format
 msgid "cubic %(prefix)smeters"

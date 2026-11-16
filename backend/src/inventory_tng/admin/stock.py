@@ -32,7 +32,6 @@ from inventory_tng.admin.listing import (
     arranged,
     in_order,
     paged,
-    tidied,
 )
 from inventory_tng.db import DbSession
 from inventory_tng.ledger import (
@@ -173,7 +172,8 @@ def stock(
     read of the ledger by form (open_packages.forms_of); the items a search
     finds, at one place, if asked (Ali, 2026-11-15). Page size counts
     groups."""
-    search = tidied(q)
+    # An odd search is none, as the items list reads it.
+    search = SEARCHED.read(q=q).search
     place_id = whole(place, 1, INTEGER_MAX)
     filters = {"q": search, "place": str(place_id or "")}
     view = View.read(
