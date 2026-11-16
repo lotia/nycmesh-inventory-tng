@@ -22,7 +22,7 @@ from sqlalchemy.orm import Session
 
 from inventory_tng import ledger, open_packages, over_recorded
 from inventory_tng.admin.common import admin_page, now, quantity, row_id
-from inventory_tng.admin.listing import Sort, Sorting, View, arranged
+from inventory_tng.admin.listing import AskedView, Sort, Sorting, View, arranged
 from inventory_tng.admin.needs_action import (
     Kind,
     OnlyItem,
@@ -143,28 +143,28 @@ def recent_cuts(session: Session, open_ids: Collection[int]) -> dict[int, list[C
     return cuts
 
 
-# How those to check sort: as they always have, as open_packages.shown()
-# lists them, the first reported used up, then the first opened; or by a
-# heading (Ali, 2026-11-15, inventory-tng-qwb).
+# How those to check (open_packages.Shown) sort: as they always have, as
+# open_packages.shown() lists them, the first reported used up, then the
+# first opened; or by a heading (Ali, 2026-11-15, inventory-tng-qwb).
 SORTING = Sorting(
     "waiting",
     {
         "waiting": Sort.keyed(
             lambda each: (
-                each.shown.row.reported_at is None,
-                each.shown.row.reported_at or each.shown.row.opened_at,
-                each.shown.row.opened_at,
-                each.shown.row.id,
+                each.row.reported_at is None,
+                each.row.reported_at or each.row.opened_at,
+                each.row.opened_at,
+                each.row.id,
             )
         ),
         "package": Sort.keyed(
             lambda each: (
-                each.shown.item.lower(),
-                each.shown.package.lower(),
-                each.shown.place.lower(),
+                each.item.lower(),
+                each.package.lower(),
+                each.place.lower(),
             )
         ),
-        "shows": Sort.keyed(lambda each: each.shown.left),
+        "shows": Sort.keyed(lambda each: each.left),
     },
 )
 
@@ -181,7 +181,8 @@ def _checks_page(
     # Read first: a count or adjustment since is added to what the page
     # showed when it is set (_set).
     moment = session.scalar(select(func.max(LedgerTransaction.id))) or 0
-    found = open_packages.shown(session, *of_only(where, only))
+    found, view = arranged(open_packages.shown(session, *of_only(where, only)), view)
+    # Only the page's own cuts and reporters.
     cuts = recent_cuts(session, [each.row.id for each in found])
     reporters = {each.row.length_reported_by_volunteer_id for each in found}
     volunteers: dict[int | None, str] = {
@@ -199,7 +200,6 @@ def _checks_page(
         )
         for each in found
     ]
-    checked, view = arranged(checked, view)
     log.debug("length checks listed", found=view.found, sort=view.by, page=view.page)
     return admin_page(
         request,
@@ -219,26 +219,11 @@ def _checks_page(
     )
 
 
-def _view(
-    request: Request,
-    only: OnlyItem,
-    sort: str = "",
-    order: str = "",
-    per: str = "",
-    page: str = "",
-) -> View:
+def _view(request: Request, only: OnlyItem, asked: AskedView) -> View:
     """The list's item, sort, page size and page, as its query string
     asks: the page's, and each answer's, which comes back to it so
     (_back)."""
-    return View.read(
-        request.url.path,
-        SORTING,
-        sort=sort,
-        order=order,
-        per=per,
-        page=page,
-        kept=query(only),
-    )
+    return View.read(request.url.path, SORTING, asked, kept=query(only))
 
 
 Viewed = Annotated[View, Depends(_view)]

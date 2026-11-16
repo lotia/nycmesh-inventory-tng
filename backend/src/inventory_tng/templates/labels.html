@@ -57,7 +57,7 @@ the list as shown, to come back to if printing is refused. #}
     {{ empty(listing, 5, "None yet: make one from an item's or a place's page.") }}
     {% endfor %}
   {% endcall %}
-  {{ pager(listing) }}
+  {{ pager(listing.view) }}
   {% if listing.shown | selectattr("current") | first %}
   <div class="actions">
     <label>Copies of each

@@ -3,7 +3,7 @@
 {% from "_table.html" import table %}
 {% from "_retired.html" import retired %}
 {% from "_forms.html" import forms_lines %}
-{% from "_listing.html" import filter_form, sizes, sort_heading, pager %}
+{% from "_listing.html" import filter_form, sizes, sort_heading, pager, unfiltered_or %}
 {% block main %}
 {{ views("Stock views", stock_views, by) }}
 {% include "_retired_holding.html" %}
@@ -42,11 +42,7 @@ less than nothing somewhere: the records are wrong there, so count it
   {% endcall %}
 </section>
 {% else %}
-{% if view.filters %}
-<p>None is in the filter. <a href="{{ view.unfiltered_link() }}">Clear it</a>.</p>
-{% else %}
-<p>Nothing is recorded anywhere yet.</p>
-{% endif %}
+<p>{% call unfiltered_or(view) %}Nothing is recorded anywhere yet.{% endcall %}</p>
 {% endfor %}
 {{ pager(view) }}
 {% endblock %}

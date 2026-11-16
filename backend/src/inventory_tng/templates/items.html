@@ -44,7 +44,7 @@ address, to come back to. #}
     {{ empty(listing, 5, "None yet: add one below.") }}
     {% endfor %}
   {% endcall %}
-  {{ pager(listing) }}
+  {{ pager(listing.view) }}
   {% if listing.rows | rejectattr("retired_at") | list %}
   <div class="actions">
     <button name="track" value="on" form="track-items">Track opened packages</button>

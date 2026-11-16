@@ -16,7 +16,7 @@ from inventory_tng import labels
 from inventory_tng.accounts import qr_svg
 from inventory_tng.admin.common import LABELS, admin_page, now
 from inventory_tng.admin.items import ITEMS
-from inventory_tng.admin.listing import Listing, Searched, Sort, Sorting
+from inventory_tng.admin.listing import AskedView, Listing, Searched, Sort, Sorting
 from inventory_tng.admin.locations import LOCATIONS
 from inventory_tng.db import DbSession
 from inventory_tng.local_time import site_zone
@@ -101,13 +101,10 @@ SEARCHED = Searched(
 
 
 def _listed(
+    asked: AskedView,
     q: str = "",
     show: str = "",
-    page: str = "",
     pick: str = "",
-    sort: str = "",
-    order: str = "",
-    per: str = "",
     kind: str = "",
     item: str = "",
 ) -> Listing[Label]:
@@ -126,11 +123,8 @@ def _listed(
     return SEARCHED.read(
         q,
         show,
-        page,
         pick,
-        sort=sort,
-        order=order,
-        per=per,
+        asked,
         filters=filters,
         where=where,
     )

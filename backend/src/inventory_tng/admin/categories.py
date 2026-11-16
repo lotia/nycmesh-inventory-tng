@@ -22,7 +22,7 @@ from inventory_tng.admin.common import (
     retirement,
     undo_retire,
 )
-from inventory_tng.admin.listing import Sort, Sorting, View, arranged
+from inventory_tng.admin.listing import AskedView, Sort, Sorting, View, arranged
 from inventory_tng.db import DbSession, refusal
 from inventory_tng.models import Category, Item
 from inventory_tng.pages import not_found, redirect
@@ -131,14 +131,11 @@ def list_categories(
     request: Request,
     signed: AdminSignedIn,
     session: DbSession,
+    asked: AskedView,
     undo: str = "",
-    sort: str = "",
-    order: str = "",
-    per: str = "",
-    page: str = "",
 ) -> Response:
     back = undo_retire(session, Category, undo, CATEGORIES)
-    view = View.read(CATEGORIES, SORTING, sort=sort, order=order, per=per, page=page)
+    view = View.read(CATEGORIES, SORTING, asked)
     return _list_page(request, session, signed, view=view, undo=back)
 
 

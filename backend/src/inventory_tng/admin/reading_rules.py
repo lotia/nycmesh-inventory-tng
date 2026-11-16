@@ -25,7 +25,14 @@ from inventory_tng.admin.common import (
     form_version,
     text_form,
 )
-from inventory_tng.admin.listing import SEARCH_MAX, Sort, Sorting, View, arranged
+from inventory_tng.admin.listing import (
+    AskedView,
+    Sort,
+    Sorting,
+    View,
+    arranged,
+    tidied,
+)
 from inventory_tng.db import DbSession, refusal
 from inventory_tng.local_time import site_zone
 from inventory_tng.models import INTEGER_MAX, Admin, ReadingRule, whole
@@ -132,33 +139,22 @@ def list_readings(
     request: Request,
     signed: AdminSignedIn,
     session: DbSession,
+    asked: AskedView,
     by: str = "",
     unit: str = "",
-    sort: str = "",
-    order: str = "",
-    per: str = "",
-    page: str = "",
 ) -> Response:
     """The rules, filtered by who settled them and by what the unit holds,
     as typed in any case (Ali, 2026-11-15)."""
-    unit = " ".join(unit.split())[:SEARCH_MAX]
+    unit = tidied(unit)
     settled = SETTLED_BY.get(by)
     filters = {"by": by if settled is not None else "", "unit": unit}
-    view = View.read(
-        READINGS,
-        SORTING,
-        sort=sort,
-        order=order,
-        per=per,
-        page=page,
-        filters={name: value for name, value in filters.items() if value},
-    )
+    view = View.read(READINGS, SORTING, asked, filters=filters)
     query = select(ReadingRule, Admin.username).outerjoin(
         Admin, Admin.id == ReadingRule.decided_by_admin_id
     )
     if settled is not None:
         query = query.where(settled)
-    found = session.execute(query.order_by(ReadingRule.token)).all()
+    found = session.execute(query).all()
     rows, view = arranged(
         (
             _row(rule, name)

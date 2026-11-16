@@ -56,7 +56,7 @@ from inventory_tng.admin.common import (
     text_form,
 )
 from inventory_tng.admin.items import SEARCHED
-from inventory_tng.admin.listing import Sort, Sorting, View, ordered
+from inventory_tng.admin.listing import UNASKED, AskedView, Sort, Sorting, View, ordered
 from inventory_tng.admin.listing import count as how_many
 from inventory_tng.admin.needs_action import OnlyItem
 from inventory_tng.admin.settings import SETTINGS
@@ -189,13 +189,10 @@ def _done(*where: ColumnElement[bool]) -> Select:
 
 
 def _view(
+    asked: AskedView,
     place: str = "",
     kind: str = "",
     admin: str = "",
-    sort: str = "",
-    order: str = "",
-    per: str = "",
-    page: str = "",
 ) -> View:
     """The list's view as its query string asks: a place or an admin not a
     number, or a kind not offered, is no filter (Ali, 2026-11-15)."""
@@ -206,15 +203,7 @@ def _view(
         "kind": kind if kind in KINDS else "",
         "admin": str(admin_id or ""),
     }
-    return View.read(
-        COUNTS,
-        SORTING,
-        sort=sort,
-        order=order,
-        per=per,
-        page=page,
-        filters={name: value for name, value in filters.items() if value},
-    )
+    return View.read(COUNTS, SORTING, asked, filters=filters)
 
 
 def _recent(session: Session, view: View) -> tuple[list[dict[str, Any]], View]:
@@ -260,7 +249,7 @@ def _counts_page(
     problems: Mapping[str, str] | None = None,
     values: Mapping[str, str] | None = None,
 ) -> HTMLResponse:
-    recent, view = _recent(session, view or _view())
+    recent, view = _recent(session, view or _view(UNASKED))
     # The filters offer where and by whom there are any.
     done = select(LedgerTransaction).where(LedgerTransaction.kind.in_(KINDS))
     return admin_page(

@@ -20,11 +20,12 @@ narrows the list to it; each filter by its own name; `sort` and `order`;
 from collections.abc import Callable, Iterable, Mapping, Sequence
 from dataclasses import dataclass, replace
 from math import ceil
-from typing import Any, Literal
+from typing import Annotated, Any, Literal
 from unicodedata import normalize
 from urllib.parse import urlencode
 
 import structlog
+from fastapi import Depends
 from sqlalchemy import (
     ColumnElement,
     Select,
@@ -99,6 +100,23 @@ class Sorting:
 
 
 @dataclass(frozen=True)
+class Asked:
+    """How a list's query string asks for it to be shown, as typed: its
+    sort, order, page size and page (View.read)."""
+
+    sort: str = ""
+    order: str = ""
+    per: str = ""
+    page: str = ""
+
+
+# A list route's view, as its query string asks.
+AskedView = Annotated[Asked, Depends()]
+# Nothing asked: the list's own view.
+UNASKED = Asked()
+
+
+@dataclass(frozen=True)
 class View:
     """How a list is shown, as its query string asks (View.read): sorted by
     one of `sorting`'s columns, or by its default (a search's best match
@@ -122,11 +140,8 @@ class View:
         cls,
         here: str,
         sorting: Sorting,
+        asked: Asked = UNASKED,
         *,
-        sort: str = "",
-        order: str = "",
-        per: str = "",
-        page: str = "",
         searching: bool = False,
         filters: Mapping[str, str] | None = None,
         kept: Mapping[str, str] | None = None,
@@ -134,7 +149,8 @@ class View:
         """Anything odd is the default's, never an error, as a link may
         have been typed by hand: a sort not offered, the list's own order;
         an order not asc or desc, the column's first; a size not offered,
-        PER_PAGE."""
+        PER_PAGE. Filters and kept names left blank are not said."""
+        sort, order = asked.sort, asked.order
         column = sorting.columns.get(sort)
         if order not in ("asc", "desc"):
             order = column.first if column is not None else "asc"
@@ -144,8 +160,8 @@ class View:
             sorting,
             sort=sort if column is not None else None,
             descending=column is not None and order == "desc",
-            per_page=sized.get(per, PER_PAGE),
-            page=whole(page, 1, INTEGER_MAX) or 1,
+            per_page=sized.get(asked.per, PER_PAGE),
+            page=whole(asked.page, 1, INTEGER_MAX) or 1,
             searching=searching,
             filters=_pairs(filters),
             kept=_pairs(kept),
@@ -245,7 +261,8 @@ class View:
 
 
 def _pairs(query: Mapping[str, str] | None) -> tuple[tuple[str, str], ...]:
-    return tuple((query or {}).items())
+    """The names and values said: those left blank are not."""
+    return tuple((name, value) for name, value in (query or {}).items() if value)
 
 
 def _directed(sort: Sort, descending: bool) -> list[Any]:
@@ -315,6 +332,12 @@ def _key(sort: Sort) -> Callable[[Any], Any]:
 def count(session: Session, query: Select) -> int:
     """How many rows `query` finds."""
     return session.scalar(select(func.count()).select_from(query.subquery())) or 0
+
+
+def tidied(typed: str) -> str:
+    """What was typed in a search or filter box, its spaces tidied, no
+    longer than SEARCH_MAX."""
+    return " ".join(typed.split())[:SEARCH_MAX]
 
 
 def folded(search: str, rules: units.Rules | None = None) -> tuple[str, ...]:
@@ -397,12 +420,9 @@ class Searched[T]:
         self,
         q: str = "",
         show: str = "",
-        page: str = "",
         pick: str = "",
+        asked: Asked = UNASKED,
         *,
-        sort: str = "",
-        order: str = "",
-        per: str = "",
         filters: Mapping[str, str] | None = None,
         where: Sequence[ColumnElement[bool]] = (),
     ) -> Listing[T]:
@@ -415,7 +435,7 @@ class Searched[T]:
             self.lapsed: self.lapsed,
             "all": "all",
         }
-        search = " ".join(q.split())[:SEARCH_MAX]
+        search = tidied(q)
         # Nothing once folded, such as a lone accent: no search.
         search = search if any(f.strip() for f in folded(search)) else ""
         shown = shows.get(show, "current")
@@ -423,10 +443,7 @@ class Searched[T]:
         view = View.read(
             self.here,
             self.sorting,
-            sort=sort,
-            order=order,
-            per=per,
-            page=page,
+            asked,
             searching=bool(search),
             filters=filters,
             kept=_kept(search, shown, picked),
@@ -531,14 +548,6 @@ class Listing[T]:
     @property
     def lapsed(self) -> Lapsed:
         return self.searched.lapsed
-
-    @property
-    def page(self) -> int:
-        return self.view.page
-
-    @property
-    def pages(self) -> int:
-        return self.view.pages
 
     @property
     def found(self) -> int:

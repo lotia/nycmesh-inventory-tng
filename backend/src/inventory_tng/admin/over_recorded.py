@@ -23,7 +23,14 @@ from sqlalchemy.orm import Session
 from inventory_tng import ledger, locations, over_recorded
 from inventory_tng.admin.common import admin_page, quantity, row_id, rule_words
 from inventory_tng.admin.counts import COUNTS
-from inventory_tng.admin.listing import Sort, Sorting, View, arranged, paged
+from inventory_tng.admin.listing import (
+    AskedView,
+    Sort,
+    Sorting,
+    View,
+    arranged,
+    paged,
+)
 from inventory_tng.admin.listing import order as order_of
 from inventory_tng.admin.locations import changeable
 from inventory_tng.admin.needs_action import (
@@ -125,20 +132,10 @@ WAITING_SORTING = Sorting(
 )
 
 
-def _waiting_view(
-    only: OnlyItem, sort: str = "", order: str = "", per: str = "", page: str = ""
-) -> View:
+def _waiting_view(only: OnlyItem, asked: AskedView) -> View:
     """The list's item, sort, page size and page, as its query string asks:
     the page's, and each answer's, which comes back to it so."""
-    return View.read(
-        OVER_RECORDED,
-        WAITING_SORTING,
-        sort=sort,
-        order=order,
-        per=per,
-        page=page,
-        kept=query(only),
-    )
+    return View.read(OVER_RECORDED, WAITING_SORTING, asked, kept=query(only))
 
 
 WaitingView = Annotated[View, Depends(_waiting_view)]
@@ -198,23 +195,14 @@ def settled_page(
     signed: AdminSignedIn,
     session: DbSession,
     only: OnlyItem,
-    page: str = "",
-    sort: str = "",
-    order: str = "",
-    per: str = "",
+    asked: AskedView,
 ) -> Response:
     """Those settled, newest first unless a heading sorts them, in pages,
     all or one item's: how each was settled, why, by whom and when (Ali,
     2026-11-15, inventory-tng-73p). Read only."""
     where = [Movement.item_id == only.id] if only else []
     view = View.read(
-        RECORDED_MORE_SETTLED,
-        SETTLED_SORTING,
-        sort=sort,
-        order=order,
-        per=per,
-        page=page,
-        kept=query(only),
+        RECORDED_MORE_SETTLED, SETTLED_SORTING, asked, kept=query(only)
     ).counted(over_recorded.how_many(session, over_recorded.SETTLED, *where))
     zone = site_zone(session)
     if view.by == "why":

@@ -32,7 +32,13 @@ from inventory_tng.admin.common import (
     text_form,
     undo_retire,
 )
-from inventory_tng.admin.listing import Listing, Searched, Sort, Sorting
+from inventory_tng.admin.listing import (
+    AskedView,
+    Listing,
+    Searched,
+    Sort,
+    Sorting,
+)
 from inventory_tng.admin.reading_rules import READINGS
 from inventory_tng.db import DbSession, exists_where, refusal
 from inventory_tng.ledger import balance
@@ -281,13 +287,10 @@ SEARCHED = Searched(
 
 
 def _listed(
+    asked: AskedView,
     q: str = "",
     show: str = "",
-    page: str = "",
     pick: str = "",
-    sort: str = "",
-    order: str = "",
-    per: str = "",
     category: str = "",
 ) -> Listing[Item]:
     """The items list as its query string asks for it, with its filter by
@@ -296,12 +299,9 @@ def _listed(
     return SEARCHED.read(
         q,
         show,
-        page,
         pick,
-        sort=sort,
-        order=order,
-        per=per,
-        filters={"category": str(category_id)} if category_id else None,
+        asked,
+        filters={"category": str(category_id or "")},
         where=[Item.category_id == category_id] if category_id else (),
     )
 

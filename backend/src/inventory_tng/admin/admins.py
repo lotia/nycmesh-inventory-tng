@@ -26,7 +26,7 @@ from inventory_tng.admin.common import (
     rule_words,
     site_link,
 )
-from inventory_tng.admin.listing import Sort, Sorting, View, arranged
+from inventory_tng.admin.listing import AskedView, Sort, Sorting, View, arranged
 from inventory_tng.db import DbSession, attempt
 from inventory_tng.local_time import site_zone
 from inventory_tng.mail import Notify
@@ -193,12 +193,9 @@ def admins(
     request: Request,
     signed: AdminSignedIn,
     session: DbSession,
-    sort: str = "",
-    order: str = "",
-    per: str = "",
-    page: str = "",
+    asked: AskedView,
 ) -> Response:
-    view = View.read(ADMINS, SORTING, sort=sort, order=order, per=per, page=page)
+    view = View.read(ADMINS, SORTING, asked)
     return _list_page(request, session, signed, view=view)
 
 

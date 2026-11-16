@@ -123,6 +123,15 @@ def test_a_count_puts_the_records_right(
     assert "Count" in text(admin_client.get(COUNTS))
 
 
+def test_count_a_place_goes_to_the_place_picked(admin_client: TestClient) -> None:
+    """The "Count a place" form, sent as a GET, goes to that place's count;
+    anything but a number goes back to the list."""
+    picked = admin_client.get(f"{COUNTS}/place", params={"location_id": "7"})
+    assert picked.headers["location"] == f"{COUNTS}/7"
+    odd = admin_client.get(f"{COUNTS}/place", params={"location_id": "x"})
+    assert odd.headers["location"] == COUNTS
+
+
 def test_a_count_that_matches_is_still_recorded(
     admin_client: TestClient, session: Session
 ) -> None:

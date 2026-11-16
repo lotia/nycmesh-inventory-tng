@@ -11,6 +11,7 @@ from sqlalchemy.dialects import postgresql
 
 from inventory_tng.admin.listing import (
     PER_PAGE,
+    Asked,
     Sort,
     Sorting,
     View,
@@ -34,7 +35,7 @@ ROWS = Sorting(
 
 
 def read(sort: str = "", order: str = "", per: str = "", page: str = "") -> View:
-    return View.read("/list", SQL, sort=sort, order=order, per=per, page=page)
+    return View.read("/list", SQL, Asked(sort, order, per, page))
 
 
 def test_nothing_asked_is_the_lists_own_order_and_fifty() -> None:
@@ -104,12 +105,12 @@ def test_links_keep_the_rest_and_start_again_at_page_one() -> None:
     view = View.read(
         "/list",
         SQL,
-        sort="unit",
-        per="25",
-        page="3",
-        filters={"category": "4"},
+        Asked(sort="unit", per="25", page="3"),
+        filters={"category": "4", "place": ""},
         kept={"q": "cable", "show": ""},
     ).counted(100)
+    # A filter left blank is not said.
+    assert view.filters == (("category", "4"),)
     assert view.page == 3
     assert view.link() == "/list?q=cable&category=4&sort=unit&per=25&page=3"
     assert view.size_link(None) == "/list?q=cable&category=4&sort=unit&per=all"
@@ -126,7 +127,7 @@ def test_searching_is_best_match_first_until_a_heading_sorts() -> None:
     assert view.by is None
     assert view.aria_sort("name") is None
     assert view.sort_link("name") == "/list?sort=name"
-    sorted_ = View.read("/list", SQL, sort="unit", searching=True)
+    sorted_ = View.read("/list", SQL, Asked(sort="unit"), searching=True)
     assert sorted_.by == "unit"
     assert sorted_.best_match_link() == "/list"
 
@@ -163,7 +164,7 @@ def test_rows_built_in_python_are_sorted_and_paged() -> None:
     def arrange(
         sort: str = "", order: str = "", per: str = "", page: str = ""
     ) -> tuple[list[tuple[str, int]], View]:
-        view = View.read("/list", ROWS, sort=sort, order=order, per=per, page=page)
+        view = View.read("/list", ROWS, Asked(sort, order, per, page))
         return arranged(rows, view)
 
     shown, view = arrange()
@@ -183,8 +184,8 @@ def test_rows_built_in_python_are_sorted_and_paged() -> None:
 
 def test_rows_built_in_python_in_pages() -> None:
     rows = [(f"{n:03}", n) for n in range(60)]
-    shown, view = arranged(rows, View.read("/list", ROWS, per="25", page="3"))
+    shown, view = arranged(rows, View.read("/list", ROWS, Asked(per="25", page="3")))
     assert [name for name, _ in shown] == [f"{n:03}" for n in range(50, 60)]
     assert (view.page, view.pages) == (3, 3)
-    shown, _ = arranged(rows, View.read("/list", ROWS, per="all"))
+    shown, _ = arranged(rows, View.read("/list", ROWS, Asked(per="all")))
     assert len(shown) == 60

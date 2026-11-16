@@ -671,15 +671,16 @@ utilities. When you style a page:
   its title. A retire form has `data-retire`, so a page with changes not
   yet saved asks before it retires.
 - A list page reads a `View` from its query string (`View.read` in
-  `admin/listing.py`): a `Sorting` of the columns it sorts by, each a SQL
-  expression (`Sort.of`) or, for rows built in Python, a key
-  (`Sort.keyed`), its first one the page's own order; its filters, as the
-  address says them; and the page size. `ordered` applies it to a select,
-  after `count`, with the id last; `arranged` to a list. A list of groups
-  pages the groups with `paged` and sorts each group's rows with
-  `in_order`. In the template,
-  `_listing.html`'s `sort_heading` for each sortable heading, `sizes` above
-  the table, `filter_form` for the filters and `pager` below. A form that
+  `admin/listing.py`): its route takes `asked: AskedView`, the sort, order,
+  page size and page as asked; a `Sorting` of the columns it sorts by, each
+  a SQL expression (`Sort.of`) or, for rows built in Python, a key
+  (`Sort.keyed`), its first one the page's own order; and its filters, as
+  the address says them, those left blank dropped. `ordered` applies it to
+  a select, after `count`, with the id last; `arranged` to a list. A list
+  of groups pages the groups with `paged` and sorts each group's rows with
+  `in_order`. In the template, `_listing.html`'s `sort_heading` for each
+  sortable heading, `sizes` above the table, `filter_form` for the
+  filters, `unfiltered_or` for the empty list and `pager` below. A form that
   acts on the list's rows sends the view in its action's query string
   (`view.query_string`), and its route reads the same `View` (a
   dependency) to go back to the list as it was, with `view.link()`.

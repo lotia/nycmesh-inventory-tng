@@ -1,6 +1,6 @@
 {% extends "admin_base.html" %}
 {% from "_table.html" import table %}
-{% from "_listing.html" import filter_form, sizes, sort_heading, pager %}
+{% from "_listing.html" import filter_form, sizes, sort_heading, pager, unfiltered_or %}
 {#- The reading rules: how a unit, as typed after a number, is read
 (models.ReadingRule, docs/decisions/0021), each changed or deleted on its
 own page. -#}
@@ -39,10 +39,7 @@ own page. -#}
       <td>{{ row.rule.decided_at | when(zone) }}</td>
     </tr>
     {% else %}
-    <tr><td colspan="5">
-      {%- if view.filters %}None is in the filter. <a href="{{ view.unfiltered_link() }}">Clear it</a>.
-      {%- else %}None yet: <a href="{{ here }}/seed">propose them from the names</a>.{% endif -%}
-    </td></tr>
+    <tr><td colspan="5">{% call unfiltered_or(view) %}None yet: <a href="{{ here }}/seed">propose them from the names</a>.{% endcall %}</td></tr>
     {% endfor %}
   {% endcall %}
   {{ pager(view) }}

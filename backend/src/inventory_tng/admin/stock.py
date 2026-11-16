@@ -20,13 +20,14 @@ from inventory_tng.admin.common import ADMIN, admin_page
 from inventory_tng.admin.counts import COUNTS
 from inventory_tng.admin.items import ITEMS, SEARCHED
 from inventory_tng.admin.listing import (
-    SEARCH_MAX,
+    AskedView,
     Sort,
     Sorting,
     View,
     arranged,
     in_order,
     paged,
+    tidied,
 )
 from inventory_tng.db import DbSession
 from inventory_tng.ledger import (
@@ -147,33 +148,29 @@ def stock(
     request: Request,
     signed: AdminSignedIn,
     session: DbSession,
+    asked: AskedView,
     by: Literal["place", "item"] = "place",
     q: str = "",
     place: str = "",
-    sort: str = "",
-    order: str = "",
-    per: str = "",
-    page: str = "",
 ) -> Response:
     """Every item at every place it is, each form on its own line, from one
     read of the ledger by form (open_packages.forms_of); the items a search
     finds, at one place, if asked (Ali, 2026-11-15). Page size counts
     groups."""
-    search = " ".join(q.split())[:SEARCH_MAX]
+    search = tidied(q)
     place_id = whole(place, 1, INTEGER_MAX)
     filters = {"q": search, "place": str(place_id or "")}
     view = View.read(
         STOCK,
         STOCK_SORTING[by],
-        sort=sort,
-        order=order,
-        per=per,
-        page=page,
-        filters={name: value for name, value in filters.items() if value},
+        asked,
+        filters=filters,
         kept={"by": by} if by == "item" else None,
     )
     forms = open_packages.forms_of(session, true())
-    found = select(Item).where(Item.id.in_({item_id for item_id, _ in forms}))
+    found = select(Item).where(
+        Item.id.in_({item_id for item_id, spot in forms if place_id in (None, spot)})
+    )
     if search:
         found = found.where(SEARCHED.matching(search, SEARCHED.rules(session)))
     items = {item.id: item for item in session.scalars(found)}
@@ -289,16 +286,11 @@ def reorder(
     request: Request,
     signed: AdminSignedIn,
     session: DbSession,
-    sort: str = "",
-    order: str = "",
-    per: str = "",
-    page: str = "",
+    asked: AskedView,
 ) -> Response:
     """Current items with a reorder level, at or below it in usable stock
     across the stores, or with a package's sealed below its minimum."""
-    view = View.read(
-        REORDER, REORDER_SORTING, sort=sort, order=order, per=per, page=page
-    )
+    view = View.read(REORDER, REORDER_SORTING, asked)
     packages = session.scalars(
         select(ItemPackage).where(
             ItemPackage.minimum_sealed.is_not(None), ItemPackage.retired_at.is_(None)
@@ -363,16 +355,11 @@ def needs_counting(
     request: Request,
     signed: AdminSignedIn,
     session: DbSession,
-    sort: str = "",
-    order: str = "",
-    per: str = "",
-    page: str = "",
+    asked: AskedView,
 ) -> Response:
     """Every place that shows less than nothing of an item, with what it is
     short of, to count."""
-    view = View.read(
-        NEEDS_COUNTING, SHORT_SORTING, sort=sort, order=order, per=per, page=page
-    )
+    view = View.read(NEEDS_COUNTING, SHORT_SORTING, asked)
     places, view = paged(_grouped(_holdings(session, SHORT), "place"), view)
     for group in places:
         group.rows = in_order(group.rows, view)

@@ -34,7 +34,7 @@
     {{ empty(listing, 2, "None yet: add one below.") }}
     {% endfor %}
   {% endcall %}
-  {{ pager(listing) }}
+  {{ pager(listing.view) }}
 </section>
 
 <section>

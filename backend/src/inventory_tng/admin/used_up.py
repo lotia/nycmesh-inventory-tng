@@ -17,7 +17,7 @@ from sqlalchemy.orm import Session
 from inventory_tng import ledger, open_packages
 from inventory_tng.admin.common import admin_page, now
 from inventory_tng.admin.items import ITEMS
-from inventory_tng.admin.listing import Sort, Sorting, View, arranged
+from inventory_tng.admin.listing import AskedView, Sort, Sorting, View, arranged
 from inventory_tng.admin.needs_action import (
     Kind,
     OnlyItem,
@@ -80,14 +80,10 @@ SORTING = Sorting(
 )
 
 
-def _view(
-    only: OnlyItem, sort: str = "", order: str = "", per: str = "", page: str = ""
-) -> View:
+def _view(only: OnlyItem, asked: AskedView) -> View:
     """The list's item, sort, page size and page, as its query string asks:
     the page's, and each answer's, which comes back to it so."""
-    return View.read(
-        USED_UP, SORTING, sort=sort, order=order, per=per, page=page, kept=query(only)
-    )
+    return View.read(USED_UP, SORTING, asked, kept=query(only))
 
 
 Viewed = Annotated[View, Depends(_view)]

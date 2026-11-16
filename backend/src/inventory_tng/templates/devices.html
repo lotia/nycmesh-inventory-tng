@@ -1,6 +1,6 @@
 {% extends "admin_base.html" %}
 {% from "_table.html" import table %}
-{% from "_listing.html" import filter_form, sizes, sort_heading, pager %}
+{% from "_listing.html" import filter_form, sizes, sort_heading, pager, unfiltered_or %}
 {% block main %}
 <p>A phone or computer must be registered before it can record anything.
 Make a code, then show its QR code in the room, or send its phrase to
@@ -55,10 +55,7 @@ they registered, and revoke many at once.</p>
       <td>{{ code.expires_at | when(zone) }}</td>
     </tr>
     {% else %}
-    <tr><td colspan="4">
-      {%- if view.filters %}None is in the filter. <a href="{{ view.unfiltered_link() }}">Clear it</a>.
-      {%- else %}None yet.{% endif -%}
-    </td></tr>
+    <tr><td colspan="4">{% call unfiltered_or(view) %}None yet.{% endcall %}</td></tr>
     {% endfor %}
   {% endcall %}
   {{ pager(view) }}

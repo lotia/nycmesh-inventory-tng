@@ -77,23 +77,31 @@ first; with it (frontend/src/combobox.ts), suggestions come from
 </p>
 {%- endmacro %}
 
+{#- Why a list is empty when its filters leave nothing, with a link to
+clear them; otherwise the call's body. -#}
+{% macro unfiltered_or(view) -%}
+{%- if view.filters %}None is in the filter. <a href="{{ view.unfiltered_link() }}">Clear it</a>.
+{%- else %}{{ caller() }}{% endif -%}
+{%- endmacro %}
+
 {#- A table row saying why the list is empty, and what to do next. -#}
 {% macro empty(listing, columns, none_yet) -%}
 <tr><td colspan="{{ columns }}">
   {%- if listing.narrowed %}Nothing matches. Check the spelling, or <a href="{{ listing.link(search='') }}">clear the search</a>.
-  {%- elif listing.view.filters %}None is in the filter. <a href="{{ listing.view.unfiltered_link() }}">Clear it</a>.
-  {%- elif listing.show == listing.lapsed %}None is {{ listing.lapsed }}.
-  {%- else %}{{ none_yet }}{% endif -%}
+  {%- else %}{% call unfiltered_or(listing.view) %}
+    {%- if listing.show == listing.lapsed %}None is {{ listing.lapsed }}.
+    {%- else %}{{ none_yet }}{% endif -%}
+  {% endcall %}{% endif -%}
 </td></tr>
 {%- endmacro %}
 
-{#- Pages, once there are more than one: given a Listing or a View. -#}
-{% macro pager(listing) -%}
-{% if listing.pages > 1 %}
+{#- Pages, once there are more than one. -#}
+{% macro pager(view) -%}
+{% if view.pages > 1 %}
 <nav aria-label="Pages" class="actions">
-  {% if listing.page > 1 %}<a href="{{ listing.link(page=listing.page - 1) }}" rel="prev"><span aria-hidden="true">‹&nbsp;</span>Previous</a>{% endif %}
-  <span>Page {{ listing.page }} of {{ listing.pages }}</span>
-  {% if listing.page < listing.pages %}<a href="{{ listing.link(page=listing.page + 1) }}" rel="next">Next<span aria-hidden="true">&nbsp;›</span></a>{% endif %}
+  {% if view.page > 1 %}<a href="{{ view.link(page=view.page - 1) }}" rel="prev"><span aria-hidden="true">‹&nbsp;</span>Previous</a>{% endif %}
+  <span>Page {{ view.page }} of {{ view.pages }}</span>
+  {% if view.page < view.pages %}<a href="{{ view.link(page=view.page + 1) }}" rel="next">Next<span aria-hidden="true">&nbsp;›</span></a>{% endif %}
 </nav>
 {% endif %}
 {%- endmacro %}

@@ -27,6 +27,8 @@ from inventory_tng.admin.common import (
     site_link,
 )
 from inventory_tng.admin.listing import (
+    Asked,
+    AskedView,
     Sort,
     Sorting,
     View,
@@ -102,23 +104,21 @@ def _list_page(
     codes = session.scalars(
         select(RegistrationCode).order_by(RegistrationCode.created_at.desc())
     ).all()
-    counts = dict(
-        session.execute(
-            select(Device.registration_code_id, func.count()).group_by(
-                Device.registration_code_id
-            )
-        ).all()
-    )
     at = now()
     wanted = view.filtered("state") or None
-    rows, view = arranged(
-        (
-            (code, state(code, at), counts.get(code.id, 0))
-            for code in codes
-            if wanted is None or state(code, at) == wanted
-        ),
-        view,
+    stated = ((code, state(code, at)) for code in codes)
+    shown, view = arranged(
+        (row for row in stated if wanted is None or row[1] == wanted), view
     )
+    # How many devices each code on the page registered.
+    counts = dict(
+        session.execute(
+            select(Device.registration_code_id, func.count())
+            .where(Device.registration_code_id.in_([code.id for code, _ in shown]))
+            .group_by(Device.registration_code_id)
+        ).all()
+    )
+    rows = [(code, said, counts.get(code.id, 0)) for code, said in shown]
     log.debug("codes listed", found=view.found, sort=view.by, page=view.page)
     return admin_page(
         request,
@@ -147,22 +147,16 @@ def codes(
     request: Request,
     signed: AdminSignedIn,
     session: DbSession,
+    asked: AskedView,
     state: str = "",
-    sort: str = "",
-    order: str = "",
-    per: str = "",
-    page: str = "",
 ) -> Response:
     """The codes, filtered by state (Ali, 2026-11-15): one not offered is
     none."""
     view = View.read(
         DEVICES,
         CODE_SORTING,
-        sort=sort,
-        order=order,
-        per=per,
-        page=page,
-        filters={"state": state} if state in CODE_STATES else None,
+        asked,
+        filters={"state": state if state in CODE_STATES else ""},
     )
     return _list_page(request, session, signed, view=view)
 
@@ -442,23 +436,14 @@ def _chosen(
     )
 
 
-def _view(typed: dict[str, str], sort: str, order: str, per: str, page: str) -> View:
-    """The list's view, its filter as typed: those left blank, and state
-    current, not said."""
+def _view(typed: dict[str, str], asked: Asked) -> View:
+    """The list's view, its filter as typed: state current not said."""
     filters = {
         name: value
         for name, value in typed.items()
-        if value and (name, value) != ("state", "current")
+        if (name, value) != ("state", "current")
     }
-    return View.read(
-        DEVICE_LIST,
-        SORTING,
-        sort=sort,
-        order=order,
-        per=per,
-        page=page,
-        filters=filters,
-    )
+    return View.read(DEVICE_LIST, SORTING, asked, filters=filters)
 
 
 @router.get(DEVICE_LIST)
@@ -466,17 +451,14 @@ def device_list(
     request: Request,
     signed: AdminSignedIn,
     session: DbSession,
+    asked: AskedView,
     since: str = "",
     until: str = "",
     code: str = "",
     state: str = "current",
-    sort: str = "",
-    order: str = "",
-    per: str = "",
-    page: str = "",
 ) -> Response:
     chosen, problems, typed = _chosen(session, since, until, code, state)
-    view = _view(typed, sort, order, per, page)
+    view = _view(typed, asked)
     found: list[Device] = []
     if not problems:
         query = devices.find_devices(chosen)
@@ -532,7 +514,7 @@ def revoke_devices(
     filter still matches, once."""
     chosen, problems, typed = _chosen(session, since, until, code, state)
     # The list as it was, to come back to.
-    query = dict(_view(typed, sort, order, per, page).fields())
+    query = dict(_view(typed, Asked(sort, order, per, page)).fields())
     current = [] if problems else devices.current_among(session, chosen, device or [])
     if not current:
         return redirect(DEVICE_LIST, **query)

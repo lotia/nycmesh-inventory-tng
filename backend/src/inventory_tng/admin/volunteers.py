@@ -28,7 +28,7 @@ from inventory_tng.admin.common import (
     rule_words,
     undo_retire,
 )
-from inventory_tng.admin.listing import Listing, Searched, Sort, Sorting
+from inventory_tng.admin.listing import AskedView, Listing, Searched, Sort, Sorting
 from inventory_tng.db import DbSession, attempt
 from inventory_tng.models import Location, Volunteer
 from inventory_tng.pages import NOTICES, not_found, redirect
@@ -76,13 +76,10 @@ SEARCHED = Searched(
 
 
 def _listed(
+    asked: AskedView,
     q: str = "",
     show: str = "",
-    page: str = "",
     pick: str = "",
-    sort: str = "",
-    order: str = "",
-    per: str = "",
     holds: str = "",
 ) -> Listing[Volunteer]:
     """The volunteers list as its query string asks for it, with its filter
@@ -91,12 +88,9 @@ def _listed(
     return SEARCHED.read(
         q,
         show,
-        page,
         pick,
-        sort=sort,
-        order=order,
-        per=per,
-        filters={"holds": holds} if held is not None else None,
+        asked,
+        filters={"holds": holds if held is not None else ""},
         where=[held] if held is not None else (),
     )
 
@@ -117,13 +111,7 @@ def _list_page(
     listing = (listing or SEARCHED.read()).find(session)
     shown = [v.id for v in listing.rows]
     holders = set(
-        session.scalars(
-            select(Location.volunteer_id).where(
-                Location.kind == "custody",
-                Location.retired_at.is_(None),
-                Location.volunteer_id.in_(shown),
-            )
-        )
+        session.scalars(select(Volunteer.id).where(Volunteer.id.in_(shown), HOLDS))
     )
     merged_into = {v.merged_into_id for v in listing.rows} - {None}
     names = (
