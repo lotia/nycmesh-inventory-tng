@@ -210,6 +210,13 @@ and migrates it again, empty. Never rebuild with `mise run compose -- down
 and in `inventory-tng` every checkout's that shares it. Once production runs,
 a migration is never edited: add a new one.
 
+Migration 0048 changes only what rows hold, and its downgrade changes
+nothing, so a database that ran it before it was rewritten is refreshed
+without losing data, in `backend`: `uv run alembic downgrade 0047 && uv
+run alembic upgrade head`. A database at 0049, folded into 0048 and gone,
+stops alembic with `Can't locate revision identified by '0049'`: run `uv
+run alembic stamp --purge 0048` first. A plain `stamp` stops the same way.
+
 Migrations run as the owner, and every table they create gives the app
 `SELECT`, `INSERT`, `UPDATE` and `DELETE` (migration 0001). A migration
 that creates a table the app must not change revokes what it must not do

@@ -618,7 +618,8 @@ are shown as no-break spaces, so `Box 1 000 ft` never breaks across a
 line. They look the same, and nothing else changes: no digits are joined,
 and no-break and thin spaces stay as typed. A pack count such as
 `Cable 2 100 ft` is one grouped number as search reads it, so its space
-is no-break too. Migration 0049 shows existing names so.
+is no-break too. Migration 0048, rewritten in place, shows existing
+names so.
 
 Found in review (inventory-tng-uxo6, 2026-11-16): the forms and the
 read-alike check judged a unit by the last group of such a number, `000`

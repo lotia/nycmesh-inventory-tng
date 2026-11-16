@@ -826,7 +826,9 @@ def test_a_comma_after_a_lone_nought_is_read_again(alembic_config: Config) -> No
     and a number grouped by spaces as one (inventory-tng-uxo6), and a
     unit after a number and any space as after a plain one
     (inventory-tng-vw0f), and a unit's word is shown as a symbol is
-    (inventory-tng-tze); names kept as typed; names that would then be one
+    (inventory-tng-tze), and a number grouped by spaces before its unit
+    shown whole and as typed, its ordinary spaces no-break
+    (inventory-tng-t78); names kept as typed; names that would then be one
     named by id first."""
     command.downgrade(alembic_config, "0047")
     connection = alembic_config.attributes["connection"]
@@ -861,12 +863,19 @@ def test_a_comma_after_a_lone_nought_is_read_again(alembic_config: Config) -> No
     spaced = row(
         "item_package", "Cap 2000\u00a0\u03bcF", item_id=resistor, size=5, unit_key="e"
     )
+    # Shown whole and as typed, its spaces no-break (inventory-tng-t78).
+    box = row(
+        "item", "Box 1 000 ft", category_id=category_id, name_folded="", unit_key="b"
+    )
+    row("item_package", "Cable 2 100 ft", item_id=box, size=1)
+    row("item_alias", "X-1 000 feet", item_id=box, name_folded="", unit_key="x")
     command.upgrade(alembic_config, "0048")
     assert connection.execute(
         text(
             "SELECT name, search_text, name_folded, folded_with, unit_key,"
-            " name_shown FROM item"
-        )
+            " name_shown FROM item WHERE id = :id"
+        ),
+        {"id": resistor},
     ).one() == (
         name,
         f"{name} Resistor 0.5GOhm    Scale 0,500 T Scale 0.500t",
@@ -876,10 +885,18 @@ def test_a_comma_after_a_lone_nought_is_read_again(alembic_config: Config) -> No
         "Resistor 0,5\u00a0GOHMS",
     )
     assert connection.execute(
-        text("SELECT name, name_folded, unit_key, name_shown FROM item_alias")
+        text(
+            "SELECT name, name_folded, unit_key, name_shown FROM item_alias"
+            " WHERE item_id = :id"
+        ),
+        {"id": resistor},
     ).one() == ("Scale 0,500 T", "Scale 0.500t", "scale0500t", "Scale 0,500\u00a0T")
     assert connection.execute(
-        text("SELECT search_text, unit_key, name_shown FROM item_package ORDER BY id")
+        text(
+            "SELECT search_text, unit_key, name_shown FROM item_package"
+            " WHERE item_id = :id ORDER BY id"
+        ),
+        {"id": resistor},
     ).all() == [
         ("Reel 0,5 KM Reel 0.5km", "reel05km", "Reel 0,5\u00a0KM"),
         (
@@ -893,6 +910,19 @@ def test_a_comma_after_a_lone_nought_is_read_again(alembic_config: Config) -> No
             "Cap 1\u00a0000\u00a0\u03bcF",
         ),
         ("Cap 2000 mF Cap 2000uF", "cap2000uf", "Cap 2000\u00a0\u03bcF"),
+    ]
+    assert connection.execute(
+        text(
+            "SELECT name, name_shown FROM item WHERE id = :id UNION ALL"
+            " SELECT name, name_shown FROM item_package WHERE item_id = :id"
+            " UNION ALL SELECT name, name_shown FROM item_alias WHERE item_id = :id"
+        ),
+        {"id": box},
+    ).all() == [
+        ("Box 1 000 ft", "Box 1\u00a0000\u00a0ft"),
+        ("Cable 2 100 ft", "Cable 2\u00a0100\u00a0ft"),
+        # Within a code, as typed.
+        ("X-1 000 feet", "X-1 000 feet"),
     ]
     command.downgrade(alembic_config, "0047")
     other = row("item", "Resistor 0,5 GOhm", category_id=category_id, name_folded="")
@@ -909,64 +939,6 @@ def test_a_comma_after_a_lone_nought_is_read_again(alembic_config: Config) -> No
     with pytest.raises(RuntimeError) as refused:
         command.upgrade(alembic_config, "0048")
     assert f"by id: item_package {spaced}, {alike}." in str(refused.value)
-
-
-def test_a_number_grouped_by_spaces_is_shown_whole(alembic_config: Config) -> None:
-    """Migration 0049: each item's, package's and alias's name as shown
-    again, a number grouped by spaces before its unit shown whole and as
-    typed, its ordinary spaces no-break, as search reads it judged one
-    number (Ali, 2026-11-16, inventory-tng-t78); names, keys and search
-    kept."""
-    command.downgrade(alembic_config, "0048")
-    connection = alembic_config.attributes["connection"]
-    category_id = connection.scalar(
-        text("INSERT INTO category (name) VALUES ('Parts') RETURNING id")
-    )
-    kept = {"unit_key": "kept", "name_shown": "kept"}
-    searched = {"search_text": "kept", "folded_with": "kept"}
-    box = _insert(
-        connection,
-        "item",
-        name="Box 1 000 ft",
-        name_key=name_key("Box 1 000 ft"),
-        category_id=category_id,
-        name_folded="kept",
-        **kept,
-        **searched,
-    )
-    _insert(
-        connection,
-        "item_package",
-        name="Cable 2 100 ft",
-        name_key=name_key("Cable 2 100 ft"),
-        item_id=box,
-        size=1,
-        **kept,
-        **searched,
-    )
-    _insert(
-        connection,
-        "item_alias",
-        name="X-1 000 feet",
-        name_key=name_key("X-1 000 feet"),
-        item_id=box,
-        name_folded="kept",
-        **kept,
-    )
-    command.upgrade(alembic_config, "0049")
-    assert connection.execute(
-        text(
-            "SELECT name, unit_key, name_shown FROM item UNION ALL"
-            " SELECT name, unit_key, name_shown FROM item_package UNION ALL"
-            " SELECT name, unit_key, name_shown FROM item_alias"
-        )
-    ).all() == [
-        ("Box 1 000 ft", "kept", "Box 1\u00a0000\u00a0ft"),
-        ("Cable 2 100 ft", "kept", "Cable 2\u00a0100\u00a0ft"),
-        # Within a code, as typed.
-        ("X-1 000 feet", "kept", "X-1 000 feet"),
-    ]
-    assert connection.scalar(text("SELECT search_text FROM item")) == "kept"
 
 
 def test_unit_keys_are_read_again_as_the_forms_read(alembic_config: Config) -> None:
