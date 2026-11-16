@@ -462,12 +462,18 @@ _GROUPED = re.compile(
 _NOUGHT = re.compile(r"(?:(?<![^\W_])[-\u2212])?(?<![^\W_])(?<![0-9][.,])0,[0-9]+\Z")
 
 
-def _grouped(text: str, end: int) -> re.Match[str] | None:
-    """The number grouped in thousands ending at `end` in `text` (_GROUPED),
-    unless a product's number starts it: `Cat 6 305 m` is a product's
-    number, then another, not thousands."""
+def _searched(text: str, end: int) -> tuple[re.Match[str], str] | None:
+    """The number ending at `end` in `text` where search reads it otherwise
+    than as typed, and how it reads it: a lone nought's comma as a point
+    (_NOUGHT), or thousands (_GROUPED) without their separators, unless a
+    product's number starts them (`Cat 6 305 m` is a product's number, then
+    another). None: read as typed."""
+    if nought := _NOUGHT.search(text, 0, end):
+        return nought, nought[0].replace(",", ".")
     grouped = _GROUPED.search(text, 0, end)
-    return None if grouped is None or _product(text, grouped.start()) else grouped
+    if grouped is None or _product(text, grouped.start()):
+        return None
+    return grouped, re.sub("[, ]", "", grouped[0])
 
 
 # Where respell changes a text, and what to: a start, an end and the spelling.
@@ -488,11 +494,7 @@ def _edits(text: str, rules: Rules | None) -> list[Edit]:
     is."""
     edits: list[Edit] = []
     for match in _after_a_number(text):
-        if grouped := _NOUGHT.search(text, 0, match.end(1)):
-            number = grouped[0].replace(",", ".")
-        else:
-            grouped = _grouped(text, match.end(1))
-            number = re.sub("[, ]", "", grouped[0]) if grouped else None
+        grouped, number = _searched(text, match.end(1)) or (None, None)
         found = _found(text, match, rules, number)
         if found is not None and (found.read or found.rule):
             # Read, or no unit by its rule.
@@ -934,9 +936,9 @@ def _shown_number(number: str) -> str:
 # after its unit, runs it on into one (`10G-SFP+`, `48V-to-12V`,
 # `10GHz/20 MHz`).
 _IN_A_CODE = re.compile(r"[\w/.+-]")
+_INTO_A_CODE = re.compile(r"[/-]")
 # A sign alone right before a number, as _NUMBER takes it.
 _SIGN = re.compile(r"(?<![^\W_])[-\u2212]\Z")
-_INTO_A_CODE = re.compile(r"[/-]")
 
 
 def shown_name(name: str, rules: Rules | None = None) -> str:
@@ -950,35 +952,35 @@ def shown_name(name: str, rules: Rules | None = None) -> str:
     unit not read among it, and a number within a word or a code
     (_IN_A_CODE, _INTO_A_CODE), as typed. A number grouped by spaces
     (_GROUPED, any space search reads as one), with its sign, is read as
-    search reads it, one number, but shown whole and as typed, as it may be a pack count and a size: `Cable 2 100 ft` is
-    `Cable 2 100 ft`, never `2100 ft` (Ali, 2026-11-16, inventory-tng-t78).
-    `name` is as saved (models.canonical, spell)."""
+    search reads it, one number, but shown whole and as typed, as it may be
+    a pack count and a size: `Cable 2 100 ft` is `Cable 2 100 ft`, never
+    `2100 ft` (Ali, 2026-11-16, inventory-tng-t78). `name` is as saved
+    (models.canonical, spell)."""
     # Any space as search reads it, a plain one (NFKD), so `1\u202f000` is
     # grouped too; one character for one, so where each is stays.
     plain = "".join(" " if unicodedata.category(c) == "Zs" else c for c in name)
     edits = []
     for match in _after_a_number(name):
         token = match[2]
-        grouped = _grouped(plain, match.end(1))
-        if spaced := grouped is not None and " " in grouped[0]:
+        searched: str | None = None
+        if (hit := _searched(plain, match.end(1))) and " " in hit[0][0]:
+            grouped, joined = hit
             sign = _SIGN.search(name, 0, grouped.start())
             start = grouped.start() if sign is None else sign.start()
-            number = name[start : match.end(1)]
+            shown = name[start : match.end(1)]
+            searched = name[start : grouped.start()] + joined
         else:
             number = _number(name, match.end(1))
-            start = match.end(1) - len(number)
+            start, shown = match.end(1) - len(number), _shown_number(number)
         if _IN_A_CODE.match(name[start - 1 : start]) or _INTO_A_CODE.match(
             name, match.end()
         ):
             continue
-        searched = re.sub(r"\s", "", number) if spaced else None
         found = _found(name, match, rules, searched)
         # A word no form reads, as _edits reads it.
         if (read(token) if found is None else found.read) is None:
             continue
-        shown = number if spaced else _shown_number(number)
-        spelt = shown + NO_BREAK_SPACE + token
-        edits.append((start, match.end(), spelt))
+        edits.append((start, match.end(), shown + NO_BREAK_SPACE + token))
     return _applied(name, edits)
 
 
