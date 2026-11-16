@@ -4,6 +4,7 @@ inventory-tng-ist.3). Every page showing them so is
 test_query_counts.test_every_page_names_items_and_packages_as_shown."""
 
 from datetime import UTC, datetime
+from decimal import Decimal
 
 import pytest
 from fastapi.testclient import TestClient
@@ -15,6 +16,7 @@ from inventory_tng.admin.items import ITEMS
 from inventory_tng.models import Category, Item, ItemPackage
 
 from helpers.rows import add, named, tag
+from helpers.rows import shown as version
 from helpers.sign_in import text
 
 NB, THIN = "\u00a0", "\u202f"
@@ -131,6 +133,12 @@ def test_a_form_sent_back_shows_the_name_as_the_unit_answered_reads_it(
     assert f"Shown as Reel 5{NB}g." in text(
         admin_client.post(f"{path}/packages", data=package)
     )
+    # An existing package's form, beside it, and only there.
+    held = add(session, ItemPackage(item_id=item.id, name="Reel", size=Decimal(1)))
+    session.flush()
+    edit = package | {"package_version": version(held)}
+    edited = text(admin_client.post(f"{path}/packages/{held.id}", data=edit))
+    assert edited.count(f"Shown as Reel 5{NB}g.") == 1
     alias = {"alias_name": f"Box {mark} 10g spare", "unit:g": "Gbit/s"}
     taken = text(admin_client.post(f"{path}/aliases", data=alias))
     assert "already has that name" in taken
