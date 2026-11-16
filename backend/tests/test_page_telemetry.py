@@ -95,3 +95,17 @@ def test_the_page_clamps_scan_to_save_to_what_is_taken() -> None:
         if hasattr(meta, "le")
     )
     assert int(clamp.group(1).replace("_", "")) == bound
+
+
+@pytest.mark.clone
+def test_a_pages_hour_of_events_is_well_under_the_reports_limit() -> None:
+    """frontend/src/telemetry.ts sends 60 events an hour at most (Ali,
+    inventory-tng-6wr, 2026-11-16): even each in a report of its own, one
+    a minute, well under what one address may send in a minute."""
+    source = (CLONE / "frontend" / "src" / "telemetry.ts").read_text()
+    shares = re.search(r"PER_HOUR: Record<[^>]*> = \{(.*?)\n\};", source, re.DOTALL)
+    assert shares is not None
+    total = sum(map(int, re.findall(r"^ +\w+: (\d+),$", shares.group(1), re.MULTILINE)))
+    assert total == 60
+    assert page_telemetry.REPORTS.GRANULARITY.name == "minute"
+    assert total / 60 < page_telemetry.REPORTS.amount

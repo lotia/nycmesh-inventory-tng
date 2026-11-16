@@ -315,7 +315,10 @@ the compressed copy (fiddly header code ServeStatic already gets right).
   volunteers never see them and a renamed metric loses its history. We
   rejected keeping "Save", which says the cart is not kept until it is
   pressed, when every change already is, and emptying a cart only by
-  removing each line.
+  removing each line. Each discard is a telemetry event, four an hour
+  added to the page's budget, not taken from another's: the page sends
+  60 events an hour at most, well under the server's 30 reports a minute
+  (Ali, 2026-11-16, inventory-tng-6wr).
 - Compression behaves the same in compose and in Kubernetes, because the
   app serves the compressed files itself. The image holds three copies of
   each file; the bundle is small, so that costs little.
