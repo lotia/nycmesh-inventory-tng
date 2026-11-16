@@ -173,9 +173,19 @@ describe("reading what older builds left", () => {
     expect(listed().map((each) => each.key)).toEqual(["inventory.outbox.v2"]);
   });
 
+  test("v4's saves, kept with their summaries in words, are listed as an older build's (inventory-tng-ar8)", () => {
+    keep("inventory.outbox.v4", {
+      build: "2026-11-12T10:00:00.000Z",
+      entries: [saveOf({}, { key: OTHER })],
+    });
+    expect(listed()).toEqual([
+      { key: "inventory.outbox.v4", batch: OTHER, refused: null },
+    ]);
+  });
+
   test("a save held back as too old is listed from this build's key, whose rest are the outbox's", () => {
     const build = "2026-11-12T10:00:00.000Z";
-    keep("inventory.outbox.v4", {
+    keep("inventory.outbox.v5", {
       build,
       entries: [
         saveOf({ state: "too_old", build }, { key: OTHER }),
@@ -185,7 +195,7 @@ describe("reading what older builds left", () => {
       ],
     });
     expect(listed()).toEqual([
-      { key: "inventory.outbox.v4", batch: OTHER, refused: null },
+      { key: "inventory.outbox.v5", batch: OTHER, refused: null },
     ]);
   });
 
@@ -205,7 +215,7 @@ describe("reading what older builds left", () => {
   });
 
   test("this build's own keys are not older", () => {
-    keep("inventory.outbox.v4", {
+    keep("inventory.outbox.v5", {
       build: "x",
       entries: [saveOf({ build: "x" })],
     });
@@ -265,9 +275,9 @@ describe("tidying on load", () => {
       build: "x",
       entries: [saveOf({ state: "saved", build: "x" })],
     });
-    localStorage.setItem("inventory.outbox.v4", kept);
+    localStorage.setItem("inventory.outbox.v5", kept);
     tidyOlder();
-    expect(localStorage.getItem("inventory.outbox.v4")).toBe(kept);
+    expect(localStorage.getItem("inventory.outbox.v5")).toBe(kept);
   });
 
   test("text no build wrote is left alone", () => {
@@ -315,7 +325,7 @@ describe("removing one", () => {
   test("one held back under this build's key goes from it, which stays with the rest", () => {
     const build = "2026-11-12T10:00:00.000Z";
     const waiting = saveOf({ build }, { key: OTHER });
-    keep("inventory.outbox.v4", {
+    keep("inventory.outbox.v5", {
       build,
       entries: [saveOf({ state: "too_old", build }), waiting],
     });
@@ -323,16 +333,16 @@ describe("removing one", () => {
     expect(removeOlder(save as Older)).toBe("done");
     expect(readOlder()).toEqual([]);
     expect(
-      JSON.parse(localStorage.getItem("inventory.outbox.v4") ?? ""),
+      JSON.parse(localStorage.getItem("inventory.outbox.v5") ?? ""),
     ).toEqual({ build, entries: [waiting] });
     // Its last: the key is still the outbox's.
-    keep("inventory.outbox.v4", {
+    keep("inventory.outbox.v5", {
       build,
       entries: [saveOf({ state: "too_old", build })],
     });
     expect(removeOlder(readOlder()[0] as Older)).toBe("done");
     expect(
-      JSON.parse(localStorage.getItem("inventory.outbox.v4") ?? ""),
+      JSON.parse(localStorage.getItem("inventory.outbox.v5") ?? ""),
     ).toEqual({ build, entries: [] });
   });
 

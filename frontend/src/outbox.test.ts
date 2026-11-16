@@ -24,6 +24,7 @@ import {
   SAVED_MOST,
   SOME_NOT_RECORDED,
   STORAGE_KEY,
+  type Summary,
   UNAVAILABLE,
   wordsOf,
 } from "./outbox";
@@ -42,10 +43,13 @@ function draft(fields: Partial<Draft> = {}): Draft {
   };
 }
 
+/** A batch's summary, told apart from others' by the place it names. */
+const named = (from: string): Summary => ({ items: 1, from, to: null });
+
 /** An entry as storage might hold it. */
 function entry(fields: Partial<Entry> = {}): Entry {
   return {
-    ...newEntry({ ...draft(), key: uuid() }, "a", BUILD, 1),
+    ...newEntry({ ...draft(), key: uuid() }, named("a"), BUILD, 1),
     ...fields,
   };
 }
@@ -90,10 +94,13 @@ describe("queueing", () => {
   test("a batch gets a key, is kept, sent at once, and settles as saved", async () => {
     const { api, sent } = answering(() => saved(41));
     const outbox = new Outbox(api);
-    expect(outbox.queue(draft(), "Move: 1 item")).toBe("queued");
+    expect(outbox.queue(draft(), named("Move: 1 item"))).toBe("queued");
     await vi.waitFor(() => expect(states(outbox)).toEqual(["saved"]));
     const [kept] = outbox.entries.value;
-    expect(kept).toMatchObject({ transactionId: 41, what: "Move: 1 item" });
+    expect(kept).toMatchObject({
+      transactionId: 41,
+      summary: named("Move: 1 item"),
+    });
     expect(kept?.body.key).toMatch(/^[0-9a-f-]{36}$/);
     expect(await bodies(sent)).toEqual([kept?.body]);
     expect(new URL(sent[0]?.url ?? "").pathname).toBe("/api/transactions");
@@ -103,8 +110,8 @@ describe("queueing", () => {
   test("each batch queued gets a key of its own", () => {
     const { api } = answering(() => json({ reason: "unregistered" }, 403));
     const outbox = new Outbox(api);
-    outbox.queue(draft(), "a");
-    outbox.queue(draft(), "b");
+    outbox.queue(draft(), named("a"));
+    outbox.queue(draft(), named("b"));
     const [first, second] = outbox.entries.value.map((e) => e.body.key);
     expect(first).not.toBe(second);
   });
@@ -113,10 +120,10 @@ describe("queueing", () => {
     const { api, sent } = answering(() => saved(41));
     const outbox = new Outbox(api);
     const key = uuid();
-    expect(outbox.queue(draft(), "a", key)).toBe("queued");
+    expect(outbox.queue(draft(), named("a"), key)).toBe("queued");
     await vi.waitFor(() => expect(states(outbox)).toEqual(["saved"]));
     // The cart, emptied by Record but not kept so, recorded again.
-    expect(outbox.queue(draft(), "a", key)).toBe("already");
+    expect(outbox.queue(draft(), named("a"), key)).toBe("already");
     expect(states(outbox)).toEqual(["saved"]);
     expect(sent).toHaveLength(1);
   });
@@ -131,13 +138,17 @@ describe("queueing", () => {
     );
     const outbox = new Outbox(api);
     const key = uuid();
-    outbox.queue(draft(), "a", key);
+    outbox.queue(draft(), named("a"), key);
     // Filled again by a tab that had not heard, and changed there.
     expect(
-      outbox.queue(draft({ lines: [{ item_id: 6, quantity: "1" }] }), "b", key),
+      outbox.queue(
+        draft({ lines: [{ item_id: 6, quantity: "1" }] }),
+        named("b"),
+        key,
+      ),
     ).toBe("refused");
     expect(outbox.entries.value[1]).toMatchObject({
-      what: "b",
+      summary: named("b"),
       state: "refused",
       reason: { code: "recorded_elsewhere" },
     });
@@ -154,7 +165,9 @@ describe("queueing", () => {
     const own = outbox.entries.value[1]?.body.key ?? "";
     expect(own).not.toBe(key);
     outbox.dismiss(outbox.entries.value[1] as Entry);
-    expect(outbox.entries.value).toMatchObject([{ what: "a", state: "saved" }]);
+    expect(outbox.entries.value).toMatchObject([
+      { summary: named("a"), state: "saved" },
+    ]);
     expect(outbox.entries.value[0]).not.toHaveProperty("dismissed");
   });
 
@@ -162,9 +175,13 @@ describe("queueing", () => {
     const { api } = answering(() => new Promise<Response>(() => {}));
     const outbox = new Outbox(api);
     const key = uuid();
-    outbox.queue(draft(), "a", key);
+    outbox.queue(draft(), named("a"), key);
     // Refused at once, listed under a key of its own, never read back yet.
-    outbox.queue(draft({ lines: [{ item_id: 6, quantity: "1" }] }), "b", key);
+    outbox.queue(
+      draft({ lines: [{ item_id: 6, quantity: "1" }] }),
+      named("b"),
+      key,
+    );
     const shown = outbox.entries.value.map((each) => batchId(each.body));
     const readBack = new Outbox(api).entries.value.map((each) =>
       batchId(each.body),
@@ -179,7 +196,7 @@ describe("queueing", () => {
     const first = entry({ body: { ...draft(), key }, putBack: true });
     const changed = entry({
       body: { ...draft({ lines: [{ item_id: 6, quantity: "1" }] }), key },
-      what: "b",
+      summary: named("b"),
       putBack: true,
     });
     store(first, changed);
@@ -194,7 +211,11 @@ describe("queueing", () => {
     expect(sent).toHaveLength(2);
     expect(outbox.entries.value).toMatchObject([
       { state: "saved", transactionId: 41 },
-      { what: "b", state: "refused", reason: { code: "recorded_elsewhere" } },
+      {
+        summary: named("b"),
+        state: "refused",
+        reason: { code: "recorded_elsewhere" },
+      },
     ]);
   });
 
@@ -205,7 +226,7 @@ describe("queueing", () => {
     const changed = (quantity: string, what: string): Entry =>
       entry({
         body: { ...draft({ lines: [{ item_id: 6, quantity }] }), key },
-        what,
+        summary: named(what),
         state: "refused",
         reason: { code: "recorded_elsewhere" },
         putBack: true,
@@ -226,7 +247,7 @@ describe("queueing", () => {
       { code: "recorded_elsewhere", added: true },
     ]);
     outbox.dismiss(second);
-    expect(outbox.entries.value.map((e) => e.what)).toEqual(["a", "c"]);
+    expect(outbox.entries.value.map((e) => e.summary.from)).toEqual(["a", "c"]);
     expect(outbox.entries.value[0]).not.toHaveProperty("dismissed");
   });
 
@@ -235,11 +256,15 @@ describe("queueing", () => {
     const { api, sent } = answering(() => reply);
     const outbox = new Outbox(api);
     const key = uuid();
-    outbox.queue(draft(), "a", key);
+    outbox.queue(draft(), named("a"), key);
     await vi.waitFor(() => expect(states(outbox)).toEqual(["refused"]));
     // Fixed in the cart, whose emptying was not kept, and recorded again.
     reply = saved(41);
-    outbox.queue(draft({ lines: [{ item_id: 6, quantity: "1" }] }), "b", key);
+    outbox.queue(
+      draft({ lines: [{ item_id: 6, quantity: "1" }] }),
+      named("b"),
+      key,
+    );
     await vi.waitFor(() =>
       expect(states(outbox)).toEqual(["refused", "saved"]),
     );
@@ -254,7 +279,7 @@ describe("queueing", () => {
   test("a browser that will not store it says so, shows and sends nothing", () => {
     const { api, sent } = answering(() => saved());
     const outbox = new Outbox(api, full);
-    expect(outbox.queue(draft(), "a")).toBe("not_kept");
+    expect(outbox.queue(draft(), named("a"))).toBe("not_kept");
     expect(outbox.entries.value).toEqual([]);
     expect(sent).toEqual([]);
   });
@@ -274,7 +299,7 @@ describe("sending again", () => {
     async (_name, first) => {
       const { api, sent } = answering(replies(first));
       const outbox = new Outbox(api);
-      outbox.queue(draft(), "a");
+      outbox.queue(draft(), named("a"));
       await vi.waitFor(() =>
         expect(outbox.entries.value[0]?.waitingFor).toBe("network"),
       );
@@ -291,7 +316,7 @@ describe("sending again", () => {
       replies(() => json({ reason: "unregistered" }, 403)),
     );
     const outbox = new Outbox(api);
-    outbox.queue(draft(), "a");
+    outbox.queue(draft(), named("a"));
     await vi.waitFor(() =>
       expect(outbox.entries.value[0]?.waitingFor).toBe("registration"),
     );
@@ -327,7 +352,7 @@ describe("sending again", () => {
     async (reason, first) => {
       const record = vi.spyOn(telemetry, "record");
       const { api } = answering(replies(first));
-      new Outbox(api).queue(draft(), "a");
+      new Outbox(api).queue(draft(), named("a"));
       await vi.waitFor(() =>
         expect(record).toHaveBeenCalledWith({ kind: "outbox_retry", reason }),
       );
@@ -340,14 +365,14 @@ describe("sending again", () => {
       json({ reason: "database_unavailable" }, 503),
     );
     const outbox = new Outbox(api);
-    outbox.queue(draft(), "a");
+    outbox.queue(draft(), named("a"));
     await vi.waitFor(() => expect(said(outbox)).toBe(say(UNAVAILABLE)));
   });
 
   test("a revoked device is told to register again", async () => {
     const { api } = answering(() => json({ reason: "revoked" }, 403));
     const outbox = new Outbox(api);
-    outbox.queue(draft(), "a");
+    outbox.queue(draft(), named("a"));
     await vi.waitFor(() => expect(said(outbox)).toContain("withdrawn"));
   });
 
@@ -356,11 +381,11 @@ describe("sending again", () => {
       replies(() => json({ reason: "database_unavailable" }, 503)),
     );
     const outbox = new Outbox(api);
-    outbox.queue(draft(), "first");
+    outbox.queue(draft(), named("first"));
     await vi.waitFor(() =>
       expect(outbox.entries.value[0]?.waitingFor).toBe("network"),
     );
-    outbox.queue(draft(), "second");
+    outbox.queue(draft(), named("second"));
     await vi.waitFor(() => expect(states(outbox)).toEqual(["saved", "saved"]));
     const [first, second] = outbox.entries.value.map((e) => e.body.key);
     // The first goes again before the second goes at all.
@@ -383,8 +408,8 @@ describe("a batch the server keeps failing on", () => {
         : saved(),
     );
     const outbox = new Outbox(api);
-    outbox.queue(draft({ volunteer_id: 9 }), "stuck");
-    outbox.queue(draft(), "next");
+    outbox.queue(draft({ volunteer_id: 9 }), named("stuck"));
+    outbox.queue(draft(), named("next"));
     await vi.waitFor(() =>
       expect(states(outbox)).toEqual(["waiting", "saved"]),
     );
@@ -402,7 +427,7 @@ describe("a batch the server keeps failing on", () => {
   test("asks for a report after failing again and again, and still keeps it", async () => {
     const { api } = answering(() => new Response("oops", { status: 500 }));
     const outbox = new Outbox(api);
-    outbox.queue(draft(), "stuck");
+    outbox.queue(draft(), named("stuck"));
     for (let round = 1; round < REPORT_AFTER; round += 1) {
       await vi.waitFor(() =>
         expect(outbox.entries.value[0]?.failures).toBe(round),
@@ -422,7 +447,7 @@ describe("a batch the server keeps failing on", () => {
       replies(() => new Response("oops", { status: 500 })),
     );
     const outbox = new Outbox(api);
-    outbox.queue(draft(), "a");
+    outbox.queue(draft(), named("a"));
     await vi.waitFor(() => expect(outbox.entries.value[0]?.failures).toBe(1));
     await vi.advanceTimersByTimeAsync(RETRY_MS);
     await vi.waitFor(() => expect(states(outbox)).toEqual(["saved"]));
@@ -436,8 +461,8 @@ describe("refusals", () => {
       replies(() => json({ reason: "key_reused" }, 409)),
     );
     const outbox = new Outbox(api);
-    outbox.queue(draft(), "first");
-    outbox.queue(draft(), "second");
+    outbox.queue(draft(), named("first"));
+    outbox.queue(draft(), named("second"));
     await vi.waitFor(() =>
       expect(states(outbox)).toEqual(["refused", "saved"]),
     );
@@ -450,7 +475,7 @@ describe("refusals", () => {
     );
     const outbox = new Outbox(api);
     const key = "0b7c6a51-9a3d-4d39-8f3e-1d1f2c4b5a61";
-    outbox.queue(draft(), "first", key);
+    outbox.queue(draft(), named("first"), key);
     await vi.waitFor(() => expect(states(outbox)).toEqual(["refused"]));
     expect(outbox.entries.value[0]).toMatchObject({
       body: { key },
@@ -482,7 +507,7 @@ describe("refusals", () => {
     ];
     const { api } = answering(() => json({ detail }, 422));
     const outbox = new Outbox(api);
-    outbox.queue(draft({ lines }), "a");
+    outbox.queue(draft({ lines }), named("a"));
     await vi.waitFor(() => expect(states(outbox)).toEqual(["refused"]));
     // Kept as kinds, the words made from them on show.
     expect(
@@ -511,7 +536,7 @@ describe("refusals", () => {
     async (kind) => {
       const detail = [{ type: kind, loc: ["body", "lines", 0, "quantity"] }];
       const outbox = new Outbox(answering(() => json({ detail }, 422)).api);
-      outbox.queue(draft(), "a");
+      outbox.queue(draft(), named("a"));
       await vi.waitFor(() => expect(states(outbox)).toEqual(["refused"]));
       const words = say(PROBLEMS[kind as ProblemKind]);
       expect(words).not.toBe(say(NOT_ACCEPTED));
@@ -528,7 +553,7 @@ describe("refusals", () => {
   test("a problem of a kind this build has no words for is not accepted", async () => {
     const detail = [{ type: "made_up", loc: ["body", "lines", 0, "item_id"] }];
     const outbox = new Outbox(answering(() => json({ detail }, 422)).api);
-    outbox.queue(draft(), "a");
+    outbox.queue(draft(), named("a"));
     await vi.waitFor(() => expect(states(outbox)).toEqual(["refused"]));
     expect(said(outbox)).toBe(`Not recorded. Line 1: ${say(NOT_ACCEPTED)}`);
   });
@@ -538,7 +563,7 @@ describe("refusals", () => {
     // read as one, and the next write would drop the batch.
     const detail = [{ type: "not_found", loc: ["body", "used_up", 0.5] }];
     const outbox = new Outbox(answering(() => json({ detail }, 422)).api);
-    outbox.queue(draft(), "a");
+    outbox.queue(draft(), named("a"));
     await vi.waitFor(() => expect(states(outbox)).toEqual(["refused"]));
     expect(
       new Outbox(answering(() => json({}, 500)).api).entries.value,
@@ -571,8 +596,8 @@ describe("refusals", () => {
       replies(() => new Response("", { status: 500 })),
     );
     const outbox = new Outbox(api);
-    outbox.queue(opening, "opening");
-    outbox.queue(cut, "cut");
+    outbox.queue(opening, named("opening"));
+    outbox.queue(cut, named("cut"));
     await vi.waitFor(() => expect(sent.length).toBeGreaterThan(0));
     await outbox.send();
     expect((await bodies(sent)).map((body) => body.kind)).toEqual(["open"]);
@@ -595,8 +620,8 @@ describe("refusals", () => {
       replies(() => new Response("", { status: 500 })),
     );
     const outbox = new Outbox(api);
-    outbox.queue(cut, "cut");
-    outbox.queue(whole, "whole");
+    outbox.queue(cut, named("cut"));
+    outbox.queue(whole, named("whole"));
     await vi.waitFor(() => expect(sent.length).toBeGreaterThan(0));
     await outbox.send();
     // Only the cut was tried: the whole move waits behind it.
@@ -630,8 +655,8 @@ describe("refusals", () => {
       replies(() => new Response("", { status: 500 })),
     );
     const outbox = new Outbox(api);
-    outbox.queue(opening, "opening");
-    outbox.queue(report, "report");
+    outbox.queue(opening, named("opening"));
+    outbox.queue(report, named("report"));
     await vi.waitFor(() => expect(sent.length).toBeGreaterThan(0));
     await outbox.send();
     expect((await bodies(sent)).map((body) => body.kind)).toEqual(["open"]);
@@ -681,7 +706,7 @@ describe("what another tab recorded (inventory-tng-0gg)", () => {
     const { api } = answering(() => recordedReply());
     const outbox = new Outbox(api);
     const key = uuid();
-    outbox.queue(changed(), "b", key);
+    outbox.queue(changed(), named("b"), key);
     await vi.waitFor(() => expect(states(outbox)).toEqual(["refused"]));
     expect(outbox.entries.value[0]?.reason).toEqual({
       code: "recorded_elsewhere",
@@ -727,7 +752,7 @@ describe("what another tab recorded (inventory-tng-0gg)", () => {
   test("a keyless batch refused for its key still asks for a report", async () => {
     const { api } = answering(() => recordedReply());
     const outbox = new Outbox(api);
-    outbox.queue(changed(), "b");
+    outbox.queue(changed(), named("b"));
     await vi.waitFor(() => expect(states(outbox)).toEqual(["refused"]));
     expect(said(outbox)).toBe(say(KEY_REUSED));
   });
@@ -738,9 +763,9 @@ describe("what another tab recorded (inventory-tng-0gg)", () => {
     const { api, sent } = answering(replies(() => saved(41), reply));
     const outbox = new Outbox(api);
     const key = uuid();
-    outbox.queue(draft(), "a", key);
+    outbox.queue(draft(), named("a"), key);
     await vi.waitFor(() => expect(states(outbox)).toEqual(["saved"]));
-    expect(outbox.queue(changed(), "b", key)).toBe("refused");
+    expect(outbox.queue(changed(), named("b"), key)).toBe("refused");
     return { outbox, sent, key };
   }
 
@@ -785,7 +810,7 @@ describe("what another tab recorded (inventory-tng-0gg)", () => {
       // Its cart not emptied, as the browser would not keep that, and
       // recorded again: two listed would put their difference in the cart
       // twice, each under a key of its own, to be recorded twice.
-      expect(outbox.queue(changed(), "b", key)).toBe("already");
+      expect(outbox.queue(changed(), named("b"), key)).toBe("already");
       expect(states(outbox)).toEqual(["saved", "refused"]);
     },
   );
@@ -794,11 +819,11 @@ describe("what another tab recorded (inventory-tng-0gg)", () => {
     const { api } = answering(() => json({ reason: "key_reused" }, 409));
     const outbox = new Outbox(api);
     const key = uuid();
-    outbox.queue(draft(), "a", key);
+    outbox.queue(draft(), named("a"), key);
     await vi.waitFor(() => expect(states(outbox)).toEqual(["refused"]));
     // Another cart under a key of its own is no such one.
-    expect(outbox.queue(draft(), "b", uuid())).toBe("queued");
-    expect(outbox.queue(draft(), "a", key)).toBe("already");
+    expect(outbox.queue(draft(), named("b"), uuid())).toBe("queued");
+    expect(outbox.queue(draft(), named("a"), key)).toBe("already");
     expect(outbox.entries.value).toHaveLength(2);
   });
 
@@ -825,9 +850,9 @@ describe("what another tab recorded (inventory-tng-0gg)", () => {
     );
     const outbox = new Outbox(api);
     const key = uuid();
-    outbox.queue(draft(), "a", key);
+    outbox.queue(draft(), named("a"), key);
     // Queued while the first waits: listed refused, to be asked about.
-    expect(outbox.queue(changed(), "b", key)).toBe("refused");
+    expect(outbox.queue(changed(), named("b"), key)).toBe("refused");
     await vi.waitFor(() => expect(second(outbox)?.state).toBe("saved"));
     const [first, recorded] = outbox.entries.value;
     expect(first?.reason?.code).toBe("refused");
@@ -842,11 +867,11 @@ describe("what another tab recorded (inventory-tng-0gg)", () => {
     const key = uuid();
     outbox.queue(
       draft({ changed_from: [{ item_id: 5, quantity: "9" }] }),
-      "a",
+      named("a"),
       key,
     );
     await vi.waitFor(() => expect(states(outbox)).toEqual(["saved"]));
-    expect(outbox.queue(draft(), "a", key)).toBe("already");
+    expect(outbox.queue(draft(), named("a"), key)).toBe("already");
     expect(sent).toHaveLength(1);
   });
 
@@ -924,9 +949,9 @@ describe("what another tab recorded (inventory-tng-0gg)", () => {
     );
     const outbox = new Outbox(api);
     const key = uuid();
-    outbox.queue(draft(), "a");
+    outbox.queue(draft(), named("a"));
     await vi.waitFor(() => expect(states(outbox)).toEqual(["saved"]));
-    outbox.queue(changed(), "b", key);
+    outbox.queue(changed(), named("b"), key);
     await vi.waitFor(() =>
       expect(states(outbox)).toEqual(["saved", "refused"]),
     );
@@ -939,9 +964,9 @@ describe("what another tab recorded (inventory-tng-0gg)", () => {
     const { api, sent } = answering(() => json({}, 500));
     const outbox = new Outbox(api);
     const key = uuid();
-    outbox.queue(draft(), "a", key);
+    outbox.queue(draft(), named("a"), key);
     await vi.waitFor(() => expect(sent).toHaveLength(1));
-    expect(outbox.queue(changed(), "b", key)).toBe("refused");
+    expect(outbox.queue(changed(), named("b"), key)).toBe("refused");
     await outbox.send();
     const bodies = await Promise.all(sent.map((each) => each.clone().json()));
     expect(bodies.map((body) => body.lines[0].quantity)).toEqual(
@@ -983,7 +1008,7 @@ describe("builds", () => {
 
   test("each batch names this build", async () => {
     const { outbox, sent } = of(() => saved());
-    outbox.queue(draft(), "a");
+    outbox.queue(draft(), named("a"));
     await vi.waitFor(() => expect(states(outbox)).toEqual(["saved"]));
     expect(sent[0]?.headers.get(HEADER)).toBe(MINE);
   });
@@ -991,8 +1016,8 @@ describe("builds", () => {
   test("a reply naming a newer build says one is out, and sending goes on", async () => {
     const record = vi.spyOn(telemetry, "record");
     const { outbox } = of(savedBy(NEWER));
-    outbox.queue(draft(), "a");
-    outbox.queue(draft(), "b");
+    outbox.queue(draft(), named("a"));
+    outbox.queue(draft(), named("b"));
     await vi.waitFor(() => expect(states(outbox)).toEqual(["saved", "saved"]));
     expect(outbox.builds.newer.value).toBe("server");
     expect(record).toHaveBeenCalledWith({
@@ -1011,7 +1036,7 @@ describe("builds", () => {
     ["no build at all", "not a build"],
   ])("a reply naming %s says nothing", async (_name, build) => {
     const { outbox } = of(savedBy(build));
-    outbox.queue(draft(), "a");
+    outbox.queue(draft(), named("a"));
     await vi.waitFor(() => expect(states(outbox)).toEqual(["saved"]));
     expect(outbox.builds.newer.value).toBeNull();
   });
@@ -1035,8 +1060,8 @@ describe("builds", () => {
     "a batch from a build too old, %s, is kept waiting, not refused, and nothing more is sent",
     async (_name, body) => {
       const { outbox, sent } = of(() => json(body, 409));
-      outbox.queue(draft(), "first");
-      outbox.queue(draft(), "second");
+      outbox.queue(draft(), named("first"));
+      outbox.queue(draft(), named("second"));
       await vi.waitFor(() => expect(outbox.builds.newer.value).toBe("too_old"));
       expect(states(outbox)).toEqual(["waiting", "waiting"]);
       expect(said(outbox)).toBe(say(MUST_UPGRADE));
@@ -1055,7 +1080,7 @@ describe("builds", () => {
   test("each batch names the build that queued it, which may be older", async () => {
     const { outbox, sent } = of(() => saved());
     store(entry({ build: OLDER }));
-    outbox.queue(draft(), "mine");
+    outbox.queue(draft(), named("mine"));
     await vi.waitFor(() => expect(states(outbox)).toEqual(["saved", "saved"]));
     expect(sent.map((each) => each.headers.get(HEADER))).toEqual([OLDER, MINE]);
   });
@@ -1066,7 +1091,7 @@ describe("builds", () => {
     const { outbox, sent } = of((request) =>
       request.headers.get(HEADER) === OLDER ? json(TOO_OLD, 409) : saved(),
     );
-    outbox.queue(draft(), "mine");
+    outbox.queue(draft(), named("mine"));
     await vi.waitFor(() =>
       expect(states(outbox)).toEqual(["too_old", "saved"]),
     );
@@ -1077,7 +1102,7 @@ describe("builds", () => {
     });
     // Listed with what older builds left (older.ts), not here, and never
     // sent again.
-    expect(outbox.shown().map((each) => each.what)).toEqual(["mine"]);
+    expect(outbox.shown().map((each) => each.summary.from)).toEqual(["mine"]);
     await outbox.send();
     expect(sent).toHaveLength(2);
     expect(stored()[0].state).toBe("too_old");
@@ -1133,7 +1158,7 @@ describe("builds", () => {
     ["no reason", { build: MINE, oldest: NEWER, message: "Load again." }],
   ])("a 409 with %s is unexpected, not too old", async (_name, body) => {
     const { outbox } = of(() => json(body, 409));
-    outbox.queue(draft(), "a");
+    outbox.queue(draft(), named("a"));
     await vi.waitFor(() => expect(outbox.entries.value[0]?.failures).toBe(1));
     expect(said(outbox)).toContain("answered unexpectedly");
     expect(states(outbox)).toEqual(["waiting"]);
@@ -1226,7 +1251,7 @@ describe("storage", () => {
     const { api, sent } = answering(() => saved());
     const outbox = new Outbox(api);
     expect(outbox.entries.value).toEqual([]);
-    outbox.queue(draft(), "mine");
+    outbox.queue(draft(), named("mine"));
     await vi.waitFor(() => expect(states(outbox)).toEqual(["saved"]));
     expect(sent).toHaveLength(1);
     expect(keys.map((key) => localStorage.getItem(key))).toEqual(before);
@@ -1238,7 +1263,7 @@ describe("storage", () => {
       localStorage,
       new Builds("2026-11-12T10:00:00.000Z"),
     );
-    outbox.queue(draft(), "a");
+    outbox.queue(draft(), named("a"));
     expect(JSON.parse(localStorage.getItem(STORAGE_KEY) ?? "")).toEqual({
       build: "2026-11-12T10:00:00.000Z",
       entries: outbox.entries.value,
@@ -1282,64 +1307,25 @@ describe("storage", () => {
       const inner = s.options ?? [s.item ?? s.wrapped].filter(Boolean);
       return inner.flatMap((each) => paths(each, at));
     };
-    // Optional fields added since a build keeping v4 was deployed (Ali,
-    // inventory-tng-0gg): a tab of 42b1595b drops them from what it writes
-    // back, which leaves the entry as that build itself would have kept it
-    // (a recorded_elsewhere it says to scan again), so they need no new key.
-    // Only such a field may be added here without one. What a batch was
-    // changed from, dropped so, leaves it sent as that build sends it, and
-    // the server then keeps nothing for an administrator.
-    const changedFrom = (at: string) => [
-      `${at}.changed_from`,
-      ...[
-        "item_id",
-        "open_package_key",
-        "package_id",
-        "package_size",
-        "quantity",
-        "whole",
-      ].map((field) => `${at}.changed_from.${field}`),
-    ];
-    const droppedAsBefore = [
-      ...changedFrom("body"),
-      ...changedFrom("reason.recorded.batch"),
-      "reason.added",
-      "reason.added = true",
-      "reason.heldKey",
-      "reason.recorded",
-      "reason.recorded.batch",
-      ...[
-        "from_location_id",
-        "install_number",
-        "key",
-        "kind",
-        "kind = move | receipt | install | open | report",
-        "lengths",
-        "lengths.left",
-        "lengths.open_package_key",
-        "lines",
-        "lines.item_id",
-        "lines.open_package_key",
-        "lines.package_id",
-        "lines.package_size",
-        "lines.quantity",
-        "lines.whole",
-        "to_location_id",
-        "used_up",
-        "volunteer_id",
-      ].map((path) => `reason.recorded.batch.${path}`),
-      "reason.recorded.by",
-      "reason.recorded.by = here | elsewhere",
-      "reason.recorded.transactionId",
-    ];
+    // Optional fields added since a build keeping this key was deployed
+    // whose loss leaves an entry as that build itself would have kept it:
+    // only such a field may be added here without a new key. None yet.
+    const droppedAsBefore: string[] = [];
     expect(Object.keys(Kept.entries)).toEqual(["build", "entries"]);
     expect({
       [STORAGE_KEY]: paths(Entry)
         .filter((path) => !droppedAsBefore.includes(path))
         .sort(),
     }).toEqual({
-      "inventory.outbox.v4": [
+      "inventory.outbox.v5": [
         "body",
+        "body.changed_from",
+        "body.changed_from.item_id",
+        "body.changed_from.open_package_key",
+        "body.changed_from.package_id",
+        "body.changed_from.package_size",
+        "body.changed_from.quantity",
+        "body.changed_from.whole",
         "body.from_location_id",
         "body.install_number",
         "body.key",
@@ -1366,6 +1352,8 @@ describe("storage", () => {
         "putBack = true",
         "queuedAt",
         "reason",
+        "reason.added",
+        "reason.added = true",
         "reason.code",
         "reason.code",
         "reason.code",
@@ -1377,22 +1365,56 @@ describe("storage", () => {
         "reason.code = recorded_elsewhere",
         "reason.code = refused",
         "reason.code = unexpected",
+        "reason.heldKey",
         "reason.problems",
         "reason.problems.kind",
         "reason.problems.names",
         "reason.problems.names.n",
         "reason.problems.names.of",
         "reason.problems.names.of = line | used_up | lengths",
+        "reason.recorded",
+        "reason.recorded.batch",
+        "reason.recorded.batch.changed_from",
+        "reason.recorded.batch.changed_from.item_id",
+        "reason.recorded.batch.changed_from.open_package_key",
+        "reason.recorded.batch.changed_from.package_id",
+        "reason.recorded.batch.changed_from.package_size",
+        "reason.recorded.batch.changed_from.quantity",
+        "reason.recorded.batch.changed_from.whole",
+        "reason.recorded.batch.from_location_id",
+        "reason.recorded.batch.install_number",
+        "reason.recorded.batch.key",
+        "reason.recorded.batch.kind",
+        "reason.recorded.batch.kind = move | receipt | install | open | report",
+        "reason.recorded.batch.lengths",
+        "reason.recorded.batch.lengths.left",
+        "reason.recorded.batch.lengths.open_package_key",
+        "reason.recorded.batch.lines",
+        "reason.recorded.batch.lines.item_id",
+        "reason.recorded.batch.lines.open_package_key",
+        "reason.recorded.batch.lines.package_id",
+        "reason.recorded.batch.lines.package_size",
+        "reason.recorded.batch.lines.quantity",
+        "reason.recorded.batch.lines.whole",
+        "reason.recorded.batch.to_location_id",
+        "reason.recorded.batch.used_up",
+        "reason.recorded.batch.volunteer_id",
+        "reason.recorded.by",
+        "reason.recorded.by = here | elsewhere",
+        "reason.recorded.transactionId",
         "reason.status",
         "reason.tries",
         "reason.why",
         "reason.why = unregistered | revoked",
         "state",
         "state = waiting | saved | refused | too_old",
+        "summary",
+        "summary.from",
+        "summary.items",
+        "summary.to",
         "transactionId",
         "waitingFor",
         "waitingFor = network | registration",
-        "what",
       ],
     });
   });
@@ -1420,18 +1442,18 @@ describe("storage", () => {
     const { api } = answering(() => saved(++id));
     const outbox = new Outbox(api);
     for (let n = 0; n < 12; n += 1) {
-      outbox.queue(draft(), `batch ${n}`);
+      outbox.queue(draft(), named(`batch ${n}`));
       await vi.waitFor(() => expect(states(outbox).at(-1)).toBe("saved"));
     }
     expect(outbox.entries.value).toHaveLength(12);
     const keys = outbox.entries.value.map((e) => e.body.key);
     // A catalogue showing only the oldest: the second, unshown, stays.
     outbox.forgetShown([keys[0] ?? ""]);
-    expect(outbox.entries.value.map((e) => e.what)).toEqual(
+    expect(outbox.entries.value.map((e) => e.summary.from)).toEqual(
       Array.from({ length: 11 }, (_, n) => `batch ${n + 1}`),
     );
     outbox.forgetShown(keys);
-    expect(outbox.entries.value.map((e) => e.what)).toEqual(
+    expect(outbox.entries.value.map((e) => e.summary.from)).toEqual(
       Array.from({ length: 10 }, (_, n) => `batch ${n + 2}`),
     );
   });
@@ -1439,13 +1461,17 @@ describe("storage", () => {
   test("at most SAVED_MOST saved batches are kept, shown or not", async () => {
     store(
       ...Array.from({ length: SAVED_MOST }, (_, n) =>
-        entry({ state: "saved", transactionId: n + 1, what: `batch ${n}` }),
+        entry({
+          state: "saved",
+          transactionId: n + 1,
+          summary: named(`batch ${n}`),
+        }),
       ),
     );
     const outbox = new Outbox(answering(() => saved()).api);
-    outbox.queue(draft(), "newest");
+    outbox.queue(draft(), named("newest"));
     await vi.waitFor(() => expect(states(outbox).at(-1)).toBe("saved"));
-    const kept = outbox.entries.value.map((e) => e.what);
+    const kept = outbox.entries.value.map((e) => e.summary.from);
     expect(kept).toHaveLength(SAVED_MOST);
     expect(kept[0]).toBe("batch 1");
     expect(kept.at(-1)).toBe("newest");
@@ -1469,10 +1495,13 @@ describe("storage", () => {
     const { api } = answering(() => json({ reason: "unregistered" }, 403));
     const here = new Outbox(api);
     const there = new Outbox(api);
-    there.queue(draft(), "there");
-    here.queue(draft(), "here");
+    there.queue(draft(), named("there"));
+    here.queue(draft(), named("here"));
     await vi.waitFor(() => expect(stored()).toHaveLength(2));
-    expect(here.entries.value.map((e) => e.what)).toEqual(["there", "here"]);
+    expect(here.entries.value.map((e) => e.summary.from)).toEqual([
+      "there",
+      "here",
+    ]);
   });
 });
 
@@ -1483,7 +1512,7 @@ describe("listening", () => {
     );
     const outbox = new Outbox(api);
     const stop = outbox.listen();
-    outbox.queue(draft(), "a");
+    outbox.queue(draft(), named("a"));
     await vi.waitFor(() =>
       expect(outbox.entries.value[0]?.waitingFor).toBe("network"),
     );

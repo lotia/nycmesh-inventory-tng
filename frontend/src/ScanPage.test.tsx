@@ -21,12 +21,15 @@ import {
   STORAGE_KEY as CART_KEY,
   CartStore,
   freshCart,
+  ITEMS,
+  MOVE,
   PICK_FROM,
   PICK_TO,
   PICK_YOUR_NAME,
   storeCart,
 } from "./cart";
-import { say } from "./i18n";
+import { say, speak } from "./i18n";
+import { messages as pseudo } from "./locales/pseudo.po";
 import {
   ALL_OF_IT,
   NOTHING_USABLE,
@@ -83,6 +86,7 @@ import {
   REMOVE,
   SCAN_WITH_CAMERA,
   ScanPage,
+  SENDING_WHAT,
   SOMETHING,
   THATS_ME,
   TO,
@@ -225,7 +229,7 @@ function leaveInOutbox(
             to_location_id: 12,
             lines: [{ item_id: 100, quantity: "8", package_id: 1000 }],
           },
-          what: "Move: 1 item from Hub to Van",
+          summary: { items: 1, from: "Hub", to: "Van" },
           queuedAt,
           build,
           state,
@@ -1010,7 +1014,7 @@ describe("filling and saving a cart", () => {
           {
             ...kept,
             body: batch("1"),
-            what: "first",
+            summary: { items: 1, from: "Hub", to: "Van" },
             state: "saved",
             reason: null,
             transactionId: 41,
@@ -1018,7 +1022,7 @@ describe("filling and saving a cart", () => {
           {
             ...kept,
             body: batch("2"),
-            what: "second",
+            summary: { items: 2, from: "Hub", to: "Van" },
             state: "refused",
             reason: { code: "key_reused" },
             transactionId: null,
@@ -1032,15 +1036,41 @@ describe("filling and saving a cart", () => {
       screen.getByText(what).closest("li") as HTMLElement;
     const lines = (what: string) =>
       [...row(what).querySelectorAll("ul li")].map((each) => each.textContent);
-    expect(lines("first")).toEqual([]);
-    expect(lines("second")).toEqual(["1. Cat6 cable: 2 m"]);
+    const first = "Move: 1 item from Hub to Van";
+    const second = "Move: 2 items from Hub to Van";
+    expect(lines(first)).toEqual([]);
+    expect(lines(second)).toEqual(["1. Cat6 cable: 2 m"]);
     fireEvent.click(
-      within(row("second")).getByRole("button", { name: say(DISMISS) }),
+      within(row(second)).getByRole("button", { name: say(DISMISS) }),
     );
-    expect(screen.queryByText("second")).toBeNull();
-    screen.getByText("first");
+    expect(screen.queryByText(second)).toBeNull();
+    screen.getByText(first);
     expect(outbox.entries.value).toHaveLength(1);
     expect(outbox.entries.value[0]).not.toHaveProperty("dismissed");
+  });
+
+  test("a batch queued is worded in the language spoken as it is shown, its places as named when queued (inventory-tng-ar8)", async () => {
+    const answer = deferred();
+    open(server(() => answer.promise).api);
+    await ready();
+    fillMove();
+    fireEvent.input(screen.getByLabelText("Loose m"), {
+      target: { value: "2" },
+    });
+    save();
+    const english = "Move: 1 item from Hub to Van";
+    screen.getByText(`Sending: ${english}. A new cart is ready.`);
+    screen.getByText(english);
+    act(() => speak("pseudo", pseudo));
+    const words = say(MOVE, {
+      items: say(ITEMS, { count: 1 }),
+      from: "Hub",
+      to: "Van",
+    });
+    expect(words).not.toBe(english);
+    screen.getByText(say(SENDING_WHAT, { what: words }));
+    screen.getByText(words);
+    expect(screen.queryByText(english)).toBeNull();
   });
 
   test("a cart's problem puts in italic the counts the page wrote, not a name's numbers", async () => {
@@ -1120,7 +1150,7 @@ describe("filling and saving a cart", () => {
     expect(note.parentElement?.className).toBe("alert");
     expect(outbox.entries.value[0]).toMatchObject({
       state: "waiting",
-      what: "Receipt: 1 item to Hub › Shelf A",
+      summary: { items: 1, from: null, to: "Hub › Shelf A" },
     });
   });
 
@@ -1592,8 +1622,8 @@ describe("scanning labels with the camera", () => {
     fireEvent.click(screen.getByRole("button", { name: "LiteBeam 5AC" }));
     save();
     await vi.waitFor(() =>
-      expect(outbox.entries.value.map((each) => each.what)).toEqual([
-        "Opening: 1 item at Hub",
+      expect(outbox.entries.value.map((each) => each.summary)).toEqual([
+        { items: 1, from: "Hub", to: null },
       ]),
     );
   });
@@ -3066,7 +3096,7 @@ describe("what an older build left", () => {
     // Listed, to save the changes again.
     expect(outbox.shown()[0]).toMatchObject({
       state: "refused",
-      what: "Move: 1 item from Hub to Van",
+      summary: { items: 1, from: "Hub", to: "Van" },
     });
   });
 
@@ -3289,7 +3319,7 @@ describe("what an older build left", () => {
       failures: 0,
       // Put back from what was recorded, then changed.
       body: { ...move([boxed(n)]), changed_from: [boxed(1)] },
-      what: `save ${n}`,
+      summary: { items: n, from: "Hub", to: "Van" },
       state: "refused",
       reason: {
         code: "recorded_elsewhere",

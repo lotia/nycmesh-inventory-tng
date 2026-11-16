@@ -49,8 +49,9 @@ import { telemetry } from "./telemetry";
  * from what it writes back. v4's is stamped with the build that wrote it,
  * its entries each with the build that queued them, says which were
  * sent under a cart's key (putBack), and keeps why each was
- * refused or waits as a code (reason), not in words. */
-export const STORAGE_KEY = "inventory.outbox.v4";
+ * refused or waits as a code (reason), not in words. v5 keeps what each
+ * batch's summary is made from (summary), not its words. */
+export const STORAGE_KEY = "inventory.outbox.v5";
 /** How long to wait before trying again after no answer. */
 export const RETRY_MS = 30_000;
 /** Unexpected answers to one batch before its note asks for a report. */
@@ -378,12 +379,24 @@ function problemSaid({ names, kind }: Problem): Said {
   return [" ", say(where, { n: names.n, why })];
 }
 
+/** What a batch's summary is made from besides its body, so two batches
+ * can be told apart: how many items it holds, and its places' names as
+ * the catalogue gave them when it was queued, as a place may leave the
+ * catalogue. Worded as it is shown (cart.ts, batchWords), in the language
+ * spoken then (inventory-tng-ar8). */
+export const Summary = v.object({
+  items: whole,
+  from: v.nullable(v.string()),
+  to: v.nullable(v.string()),
+});
+
+export type Summary = v.InferOutput<typeof Summary>;
+
 /** A batch as kept: once a build keeping it under STORAGE_KEY is deployed,
  * a field added here takes a new key. */
 export const Entry = v.object({
   body: BatchBody,
-  /** What is in it, in words, so two batches can be told apart. */
-  what: v.string(),
+  summary: Summary,
   queuedAt: v.number(),
   /** The build that queued it, named when it is sent (build.HEADER). */
   build: v.string(),
@@ -647,10 +660,10 @@ export class Outbox {
    * refused for what it held (422) holds no key: it takes a key of its
    * own, and this batch goes under the cart's.
    */
-  queue(draft: Draft, what: string, key?: string): Queued {
+  queue(draft: Draft, summary: Summary, key?: string): Queued {
     const entry = newEntry(
       { ...draft, key: key ?? uuid() },
-      what,
+      summary,
       this.builds.build,
     );
     if (key !== undefined) {
@@ -1153,13 +1166,13 @@ function keysNamed(body: Body): string[] {
 /** A batch as first kept by `build`: waiting, and not yet tried. */
 export function newEntry(
   body: Body,
-  what: string,
+  summary: Summary,
   build: string,
   now = Date.now(),
 ): Entry {
   return {
     body,
-    what,
+    summary,
     queuedAt: now,
     build,
     state: "waiting",

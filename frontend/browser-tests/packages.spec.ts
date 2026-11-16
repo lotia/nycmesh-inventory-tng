@@ -78,7 +78,7 @@ test("the same opening recorded twice is one transaction, said by no note (inven
   // emptying not kept, and its outbox lost.
   await page.evaluate((cart) => {
     localStorage.setItem("inventory.cart.v2", cart);
-    localStorage.removeItem("inventory.outbox.v4");
+    localStorage.removeItem("inventory.outbox.v5");
   }, left);
   await page.reload();
   const again = await record();

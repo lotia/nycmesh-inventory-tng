@@ -26,6 +26,7 @@ import {
   type Entry,
   fromOpen,
   type Said,
+  type Summary,
 } from "./outbox";
 import { count, decimal, sent, thousandths } from "./quantity";
 import { onStoredChange, readStored, writeStored } from "./stored";
@@ -715,7 +716,7 @@ export const OPEN_WHOLE = msg`{name}: Open whole packages: leave loose empty.`;
 export const ADD_SOMETHING = msg`Add something to the cart.`;
 export const TOO_MUCH_FOR_ONE = msg`That is too much for one batch: record some, then the rest.`;
 
-/** A batch in words, for the outbox, by what it is (toBatch). */
+/** A batch in words, for the outbox, by what it is (batchWords). */
 export const ITEMS = msg({
   message: "{count, plural, one {# item} other {# items}}",
 });
@@ -735,14 +736,14 @@ export const SAID_LENGTHS = msg`(what is on {packages} said)`;
 
 /**
  * The cart as the batch endpoint takes it, less the key the outbox adds,
- * and in words for the outbox; or what still needs doing before it can be
- * saved.
+ * and what its summary is made from (outbox.Summary); or what still needs
+ * doing before it can be saved.
  */
 export function toBatch(
   filled: Cart,
   catalogue: Catalogue,
   all?: readonly Offered[],
-): { draft: Draft; what: string } | { problems: Said[] } {
+): { draft: Draft; summary: Summary } | { problems: Said[] } {
   const reconciled = reconcile(filled, catalogue);
   // Only what the page offers to take from, where it comes from.
   const here = new Map(
@@ -898,10 +899,6 @@ export function toBatch(
   if (problems.length > 0 || cart.volunteerId === null) {
     return { problems };
   }
-  const packages = say(OPEN_PACKAGES, { count: usedUp.length });
-  const measured = say(OPEN_PACKAGES, { count: lengths.length });
-  // A report of lengths alone says so; one of used up, as ever.
-  const lengthsOnly = reporting && usedUp.length === 0;
   const draft: Draft = { kind, volunteer_id: cart.volunteerId, lines };
   if (cart.changedFrom !== undefined) {
     draft.changed_from = cart.changedFrom;
@@ -926,17 +923,37 @@ export function toBatch(
   }
   // Each kind names the places its batch must have (problems above).
   const place = (placeId: number | null) =>
-    placeId === null ? "" : `${index.places.get(placeId)}`;
+    placeId === null ? null : String(index.places.get(placeId));
+  return { draft, summary: { items, from: place(fromId), to: place(toId) } };
+}
+
+/**
+ * A batch's summary in words, in the language spoken now: its kind,
+ * counts and install number from `body`, its places as `summary` kept
+ * them (outbox.Summary).
+ */
+export function batchWords(
+  body: Pick<Draft, "kind" | "install_number" | "used_up" | "lengths">,
+  summary: Summary,
+): string {
+  const usedUp = body.used_up?.length ?? 0;
+  const lengths = body.lengths?.length ?? 0;
+  const packages = say(OPEN_PACKAGES, { count: usedUp });
+  const measured = say(OPEN_PACKAGES, { count: lengths });
+  const reporting = body.kind === "report";
+  // A report of lengths alone says so; one of used up, as ever.
+  const lengthsOnly = reporting && usedUp === 0;
+  const number = body.install_number ?? null;
   const named = {
-    items: say(ITEMS, { count: items }),
+    items: say(ITEMS, { count: summary.items }),
     packages: lengthsOnly ? measured : packages,
-    from: place(fromId),
-    to: place(toId),
-    number: installNumber,
+    from: summary.from ?? "",
+    to: summary.to ?? "",
+    number: number === null ? "" : String(number),
   };
   const head = lengthsOnly
     ? LENGTHS
-    : kind === "install" && installNumber !== ""
+    : body.kind === "install" && number !== null
       ? INSTALL_NUMBERED
       : {
           move: MOVE,
@@ -944,15 +961,15 @@ export function toBatch(
           install: INSTALL,
           open: OPENING,
           report: REPORT,
-        }[kind];
+        }[body.kind];
   const words = [say(head, named)];
-  if (usedUp.length > 0 && !reporting) {
+  if (usedUp > 0 && !reporting) {
     words.push(say(SAID_USED_UP, { packages }));
   }
-  if (lengths.length > 0 && !lengthsOnly) {
+  if (lengths > 0 && !lengthsOnly) {
     words.push(say(SAID_LENGTHS, { packages: measured }));
   }
-  return { draft, what: words.join(" ") };
+  return words.join(" ");
 }
 
 /**

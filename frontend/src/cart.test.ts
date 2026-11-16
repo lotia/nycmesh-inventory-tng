@@ -4,17 +4,20 @@ import {
   ADD_SOMETHING,
   addOne,
   askWho,
+  batchWords,
   type Cart,
   CartStore,
   freshCart,
   INSTALL_DIGITS,
   INSTALL_RANGE,
   ITEM_GONE,
+  ITEMS,
   type Item,
   indexOf,
   keysToAsk,
   type Line,
   loadCart,
+  MOVE,
   offered,
   offeredAt,
   openingPackage,
@@ -39,7 +42,8 @@ import {
   WHOLE_UNITS,
   withLine,
 } from "./cart";
-import { say } from "./i18n";
+import { say, speak } from "./i18n";
+import { messages as pseudo } from "./locales/pseudo.po";
 import type { Body, Draft, Said } from "./outbox";
 
 /** A batch with a key, as the outbox keeps it. */
@@ -68,6 +72,13 @@ function shown<T extends object>(result: T) {
   return "problem" in result
     ? { problem: text(result.problem as Said) }
     : result;
+}
+
+/** A batch with its summary in words, as the outbox says it now. */
+function worded(batch: ReturnType<typeof toBatch>) {
+  return "summary" in batch
+    ? { draft: batch.draft, what: batchWords(batch.draft, batch.summary) }
+    : batch;
 }
 
 function cart(fields: Partial<Cart> = {}): Cart {
@@ -215,7 +226,7 @@ describe("turning a cart into a batch", () => {
         { itemId: 101, packages: {}, loose: "0.25" },
       ],
     };
-    expect(toBatch(full, CATALOGUE)).toEqual({
+    expect(worded(toBatch(full, CATALOGUE))).toEqual({
       draft: {
         kind: "move",
         volunteer_id: 1,
@@ -234,6 +245,27 @@ describe("turning a cart into a batch", () => {
       },
       what: "Move: 2 items from Hub to Van",
     });
+  });
+
+  test("a batch keeps what its words are made from, its places named as they are now, and is worded as it is shown (inventory-tng-ar8)", () => {
+    const lines = [{ itemId: 100, packages: {}, loose: "1" }];
+    const batch = toBatch(cart({ lines }), CATALOGUE);
+    if (!("summary" in batch)) throw new Error("the cart is recordable");
+    expect(batch.summary).toEqual({ items: 1, from: "Hub", to: "Van" });
+    expect(batchWords(batch.draft, batch.summary)).toBe(
+      "Move: 1 item from Hub to Van",
+    );
+    // The places as named when queued, whatever the catalogue says now.
+    const renamed = { ...batch.summary, from: "Old hub" };
+    expect(batchWords(batch.draft, renamed)).toBe(
+      "Move: 1 item from Old hub to Van",
+    );
+    speak("pseudo", pseudo);
+    const words = batchWords(batch.draft, batch.summary);
+    expect(words).toBe(
+      say(MOVE, { items: say(ITEMS, { count: 1 }), from: "Hub", to: "Van" }),
+    );
+    expect(words).not.toContain("Move");
   });
 
   test("a batch of more lines than the server takes is held back", () => {
@@ -272,7 +304,7 @@ describe("turning a cart into a batch", () => {
       cart({ kind: "open", lines, fromId: 10 }),
       CATALOGUE,
     );
-    expect(opened).toMatchObject({
+    expect(worded(opened)).toMatchObject({
       draft: { kind: "open", from_location_id: 10, to_location_id: 10 },
       what: "Opening: 2 items at Hub",
     });
@@ -327,7 +359,7 @@ describe("turning a cart into a batch", () => {
       { itemId: 100, packages: {}, loose: "" },
     ];
     expect(
-      toBatch(cart({ kind: "open", lines, fromId: 10 }), CATALOGUE),
+      worded(toBatch(cart({ kind: "open", lines, fromId: 10 }), CATALOGUE)),
     ).toMatchObject({ what: "Opening: 1 item at Hub" });
   });
 
@@ -539,7 +571,7 @@ describe("turning a cart into a batch", () => {
       },
     });
     const alone = toBatch(cart({ lines: line("") }), CATALOGUE);
-    expect(alone).toEqual({
+    expect(worded(alone)).toEqual({
       draft: {
         kind: "report",
         volunteer_id: 1,
@@ -568,7 +600,9 @@ describe("turning a cart into a batch", () => {
     const noTo = toBatch(cart({ toId: null, lines: line("") }), CATALOGUE);
     expect(noTo).toMatchObject({ draft: { kind: "report" } });
     // With a cut, the words say so.
-    expect(toBatch(cart({ lines: line("120") }), CATALOGUE)).toMatchObject({
+    expect(
+      worded(toBatch(cart({ lines: line("120") }), CATALOGUE)),
+    ).toMatchObject({
       what: "Move: 1 item from Hub to Van (1 open package said used up)",
     });
   });
@@ -584,7 +618,9 @@ describe("turning a cart into a batch", () => {
       },
     ];
     expect(
-      toBatch(cart({ lines: line({ amount: "20", now: "250" }) }), CATALOGUE),
+      worded(
+        toBatch(cart({ lines: line({ amount: "20", now: "250" }) }), CATALOGUE),
+      ),
     ).toMatchObject({
       draft: {
         kind: "move",
@@ -592,7 +628,9 @@ describe("turning a cart into a batch", () => {
       },
       what: "Move: 1 item from Hub to Van (what is on 1 open package said)",
     });
-    expect(toBatch(cart({ lines: line({ now: "12.5" }) }), CATALOGUE)).toEqual({
+    expect(
+      worded(toBatch(cart({ lines: line({ now: "12.5" }) }), CATALOGUE)),
+    ).toEqual({
       draft: {
         kind: "report",
         volunteer_id: 1,
@@ -604,7 +642,9 @@ describe("turning a cart into a batch", () => {
     });
     // With used up too, and the words say both.
     expect(
-      toBatch(cart({ lines: line({ now: "0", usedUp: true }) }), CATALOGUE),
+      worded(
+        toBatch(cart({ lines: line({ now: "0", usedUp: true }) }), CATALOGUE),
+      ),
     ).toMatchObject({
       what: "Used up: 1 open package at Hub (what is on 1 open package said)",
     });
@@ -749,7 +789,7 @@ describe("turning a cart into a batch", () => {
   test("a receipt has only a to; an install only a from, and its number", () => {
     const lines = [{ itemId: 100, packages: {}, loose: "1" }];
     const receipt = toBatch(cart({ kind: "receipt", lines }), CATALOGUE);
-    expect(receipt).toMatchObject({ what: "Receipt: 1 item to Van" });
+    expect(worded(receipt)).toMatchObject({ what: "Receipt: 1 item to Van" });
     expect("draft" in receipt && receipt.draft.from_location_id).toBe(
       undefined,
     );
@@ -757,7 +797,7 @@ describe("turning a cart into a batch", () => {
       cart({ kind: "install", installNumber: " 4242 ", lines, fromId: 11 }),
       CATALOGUE,
     );
-    expect(install).toMatchObject({
+    expect(worded(install)).toMatchObject({
       draft: { from_location_id: 11, install_number: 4242 },
       what: "Install: 1 item from Hub › Shelf A for install 4242",
     });
@@ -777,7 +817,7 @@ describe("turning a cart into a batch", () => {
         "[LiteBeam 5AC]: retired: taking only, so it can't be received.",
       ],
     });
-    expect(toBatch(cart({ lines }), retired)).toMatchObject({
+    expect(worded(toBatch(cart({ lines }), retired))).toMatchObject({
       what: "Move: 1 item from Hub to Van",
     });
   });
@@ -830,7 +870,7 @@ describe("turning a cart into a batch", () => {
     // Loose units of its item are received as ever.
     const loose = [{ itemId: 100, packages: {}, loose: "2" }];
     expect(
-      toBatch(cart({ kind: "receipt", lines: loose }), retired),
+      worded(toBatch(cart({ kind: "receipt", lines: loose }), retired)),
     ).toMatchObject({ what: "Receipt: 1 item to Van" });
   });
 

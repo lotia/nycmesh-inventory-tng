@@ -9,6 +9,7 @@ import { MUST_UPGRADE, UPDATED, UPGRADE } from "./build";
 import {
   addOne,
   askWho,
+  batchWords,
   STORAGE_KEY as CART_KEY,
   type Cart,
   CartStore,
@@ -56,6 +57,7 @@ import {
 import {
   type Body,
   batchId,
+  type Draft,
   type Entry,
   MAKE_CHANGES,
   type Note,
@@ -65,6 +67,7 @@ import {
   type Recorded,
   recordedHeading,
   type Said,
+  type Summary,
   sharedOutbox,
   wordsOf,
 } from "./outbox";
@@ -549,8 +552,8 @@ function CartForm({
   const cart = store.cart;
   const query = useSignal("");
   const problems = useSignal<Said[]>([]);
-  // What was last sent to be recorded, in words.
-  const saved = useSignal<string | null>(null);
+  // What was last sent to be recorded, worded as it is shown.
+  const saved = useSignal<{ draft: Draft; summary: Summary } | null>(null);
   // While Discard cart waits to be confirmed, the cart's revision then.
   const discarding = useSignal<string | null>(null);
   // An older save just put back in the cart, and what it left to do again.
@@ -695,7 +698,7 @@ function CartForm({
       return;
     }
     // Under the cart's key, which any tab that records this cart sends.
-    const queued = outbox.queue(batch.draft, batch.what, current.batchKey);
+    const queued = outbox.queue(batch.draft, batch.summary, current.batchKey);
     if (queued === "not_kept") {
       // Nothing was sent, and the cart stays to try again.
       problems.value = [[say(NOT_SENT)]];
@@ -716,7 +719,7 @@ function CartForm({
       telemetry.record({ kind: "scan_to_save", seconds });
     }
     change(freshCart(current));
-    saved.value = batch.what;
+    saved.value = batch;
   }
 
   /** Drop the cart's lines, and with them its batch key, as Record does,
@@ -1098,7 +1101,11 @@ function CartForm({
         </ul>
       )}
       {saved.value !== null && (
-        <p role="status">{say(SENDING_WHAT, { what: saved.value })}</p>
+        <p role="status">
+          {say(SENDING_WHAT, {
+            what: batchWords(saved.value.draft, saved.value.summary),
+          })}
+        </p>
       )}
       {name !== undefined && (
         <p>
@@ -1917,7 +1924,7 @@ function OutboxList({
           const lines = recorded === undefined ? (linesOf.get(id) ?? []) : [];
           return (
             <li key={id} class="flex flex-col items-start gap-1">
-              <div>{entry.what}</div>
+              <div>{batchWords(entry.body, entry.summary)}</div>
               {entry.state === "saved" ? (
                 <small>
                   {say(RECORDED_IN, { transaction: entry.transactionId })}
