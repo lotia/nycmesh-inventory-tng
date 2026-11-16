@@ -147,16 +147,16 @@ the compressed copy (fiddly header code ServeStatic already gets right).
   sent, the tab says nothing of a newer build, then "The scanner has been
   updated." with an Upgrade button; too old, it says at once that the
   volunteer must upgrade and that their data is kept. Each one listed
-  says when it was kept, by date and time, as "Kept on this device 14 Nov
-  2026, 09:30, not sent." or, for a cart, "Added on 14 Nov 2026, 09:30
-  but not sent" (Ali, 2026-11-16, inventory-tng-6fl), so two carts of
-  one day are told apart. We rejected the date alone, first chosen,
-  which left them alike. The newer build puts
-  an older save that goes back whole into an empty cart without a tap,
-  and lists the rest to add to the cart or discard; one holding an item
-  retired since is named from the catalogue, which now lists retired
-  items' names apart from those offered, and goes in the cart only once
-  that line is discarded (inventory-tng-0su). We
+  says when it was kept, by date and time in the device's own format,
+  as "Kept on this device 14 Nov 2026, 09:30, not sent." or, for a
+  cart, "Added on 14 Nov 2026, 09:30 but not sent" (Ali, 2026-11-16,
+  inventory-tng-6fl), so two carts of one day are told apart. We
+  rejected the date alone, first chosen, which left them alike. The
+  newer build puts an older save that goes back whole into an empty
+  cart without a tap, and lists the rest to add to the cart or discard;
+  one holding an item retired since is named from the catalogue, which
+  now lists retired items' names apart from those offered, and goes in
+  the cart only once that line is discarded (inventory-tng-0su). We
   rejected asking only for a tap on each, which Ali found needless where
   nothing needs the volunteer, and naming such an item only by its
   absence, which left the volunteer unable to tell what the save held.

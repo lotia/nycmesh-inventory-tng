@@ -192,8 +192,9 @@ function entry(n: number, fields: Record<string, unknown> = {}) {
   };
 }
 
-/** Saves and a cart an older build left, kept at `at`, or at a time not
- * known. */
+/** Saves and a cart an older build left: a refused save kept at a time
+ * not known, and a waiting save and the cart kept at `at`, or at a time
+ * not known when it is null. */
 function leaveOlder(at: number | null) {
   localStorage.setItem(
     "inventory.outbox.v3",

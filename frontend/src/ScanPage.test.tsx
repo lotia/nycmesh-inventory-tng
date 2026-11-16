@@ -1973,7 +1973,7 @@ describe("what an older build left", () => {
 
   /** A cart filled for an install, under v1, with a line no build wrote:
    * not whole, so it waits for the volunteer. */
-  function leaveCart() {
+  function leaveCart(fields = {}) {
     localStorage.setItem(
       "inventory.cart.v1",
       JSON.stringify({
@@ -1984,6 +1984,7 @@ describe("what an older build left", () => {
         installNumber: "456",
         lines: [{ itemId: 101, packages: {}, loose: "12.5" }, { loose: 1 }],
         usedAt: AT,
+        ...fields,
       }),
     );
   }
@@ -2071,14 +2072,7 @@ describe("what an older build left", () => {
         },
       ]),
     );
-    leaveCart();
-    localStorage.setItem(
-      "inventory.cart.v1",
-      JSON.stringify({
-        ...JSON.parse(localStorage.getItem("inventory.cart.v1") ?? "{}"),
-        usedAt: afternoon,
-      }),
-    );
+    leaveCart({ usedAt: afternoon });
     open();
     await ready();
     const time = (at: number) =>
