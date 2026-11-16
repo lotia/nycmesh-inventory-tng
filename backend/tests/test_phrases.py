@@ -27,6 +27,7 @@ from inventory_tng import (
     mail,
     over_recorded,
     reading_rules,
+    sign_in,
     units,
 )
 from inventory_tng.admin import admins as admin_admins
@@ -678,7 +679,10 @@ COVERED: dict[str, Callable[[], str]] = {
                 for kind in ("reset", "recovery", "emailed")
             ),
             *(
-                ("confirm.html", {"uses_totp": totp, "retype": ["password_again"]})
+                (
+                    "confirm.html",
+                    {"uses_totp": totp, "retype": list(sign_in.RETYPED.items())},
+                )
                 for totp in (True, False)
             ),
             *(

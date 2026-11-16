@@ -259,11 +259,14 @@ AdminSignedIn = Annotated[SignedIn, Depends(admin_signed_in)]
 # The field a confirmation's code comes in, which no form uses for itself.
 CONFIRM_FIELD = "confirm_code"
 # The fields of a form a confirmation carries that hold a password the person
-# typed, by name, in the order asked: never written into the confirm page,
-# but asked for again, empty. Every other field is carried as sent, though
-# the log masker masks the values of some by their names (totp_policy,
-# session_days).
-RETYPED = ("password", "password_again")
+# typed, by name, with their labels, in the order asked: never written into
+# the confirm page, but asked for again, empty. Every other field is carried
+# as sent, though the log masker masks the values of some by their names
+# (totp_policy, session_days).
+RETYPED: dict[str, LazyProxy] = {
+    "password": lazy_gettext("Password"),
+    "password_again": lazy_gettext("Password again"),
+}
 
 
 class Answered(Exception):
@@ -547,7 +550,7 @@ def _confirm_page(
             "alert": alert,
             "action": action,
             "carried": [(n, v) for n, v in carried if n not in RETYPED],
-            "retype": [name for name in RETYPED if name in sent],
+            "retype": [(n, label) for n, label in RETYPED.items() if n in sent],
             "field": CONFIRM_FIELD,
             "totp_only": not recovery,
             "sections": navigation,

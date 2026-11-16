@@ -2538,15 +2538,13 @@ msgid ""
 "password."
 msgstr ""
 
-#: src/inventory_tng/templates/account.html
-#: src/inventory_tng/templates/confirm.html
+#: src/inventory_tng/sign_in.py src/inventory_tng/templates/account.html
 #: src/inventory_tng/templates/setup.html
 #: src/inventory_tng/templates/sign_in.html
 msgid "Password"
 msgstr ""
 
-#: src/inventory_tng/templates/confirm.html
-#: src/inventory_tng/templates/setup.html
+#: src/inventory_tng/sign_in.py src/inventory_tng/templates/setup.html
 msgid "Password again"
 msgstr ""
 

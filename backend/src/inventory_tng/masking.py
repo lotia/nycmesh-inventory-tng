@@ -239,12 +239,6 @@ def _mask_quoted(line: str, quote: str) -> str:
     return line[: first + 1] + MASK + (line[last:] if last > first else "")
 
 
-@functools.lru_cache(maxsize=4096)
-def is_secret_name(name: str) -> bool:
-    """Whether a field by this name holds a secret, by the masker's rule."""
-    return _classify(name)[0]
-
-
 # Query parameters that carry a secret without saying so by name: the
 # registration phrase and a sign-in code are both sent as `code`. Not a
 # secret word in general, which would mask `status_code`.
@@ -257,7 +251,7 @@ def mask_query(query: str) -> str:
         [
             (
                 name,
-                MASK if is_secret_name(name) or name in SECRET_QUERY_NAMES else value,
+                MASK if _classify(name)[0] or name in SECRET_QUERY_NAMES else value,
             )
             for name, value in parse_qsl(query, keep_blank_values=True)
         ]
