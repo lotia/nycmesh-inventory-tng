@@ -1782,6 +1782,10 @@ msgstr ""
 msgid "Items"
 msgstr ""
 
+#: src/inventory_tng/templates/stock.html
+msgid "Items shown"
+msgstr ""
+
 #: src/inventory_tng/templates/reorder.html
 msgid ""
 "Items whose usable stock in the stores, across their areas, is at or "
@@ -2635,6 +2639,10 @@ msgstr ""
 
 #: src/inventory_tng/labels.py
 msgid "Place retired"
+msgstr ""
+
+#: src/inventory_tng/templates/stock.html
+msgid "Places shown"
 msgstr ""
 
 #: src/inventory_tng/templates/needs_counting.html

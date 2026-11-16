@@ -271,6 +271,32 @@ def test_stock_pages_count_groups_and_never_split_one(
     assert "Page 1 of" not in by_item
 
 
+def size_row(page: str) -> tuple[str, str]:
+    """The page-size row's name and the words before its sizes."""
+    found = re.search(
+        r'<nav aria-label="([^"]+)" class="filters">\s*<span>([^<]+)</span>\s*'
+        r'<a href="[^"]*per=25"',
+        page,
+    )
+    assert found, "no page-size row"
+    return found[1], found[2]
+
+
+def test_stock_size_rows_say_they_count_places_or_items(
+    admin_client: TestClient,
+) -> None:
+    """Not lines: each group whole, however many lines (Ali, 2026-11-16,
+    inventory-tng-xjh)."""
+    by_place = text(admin_client.get(STOCK))
+    assert size_row(by_place) == ("Places shown", "Places shown")
+    by_item = text(admin_client.get(STOCK, params={"by": "item"}))
+    assert size_row(by_item) == ("Items shown", "Items shown")
+
+
+def test_other_lists_size_rows_still_say_show(admin_client: TestClient) -> None:
+    assert size_row(text(admin_client.get(REORDER))) == ("Rows", "Show")
+
+
 def test_reorder_sorts_by_each_heading_and_shows_25_50_100_or_all(
     admin_client: TestClient, session: Session
 ) -> None:

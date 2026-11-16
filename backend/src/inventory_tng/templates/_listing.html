@@ -12,10 +12,12 @@ arrow. `class` is the cell's. -#}
 {%- endmacro %}
 
 {#- How many rows a page shows, the one shown marked; while searching,
-"Best match" puts the closest first again once a heading sorted them. -#}
-{% macro sizes(view) -%}
-<nav aria-label="{% trans %}Rows{% endtrans %}" class="filters">
-  <span>{% trans %}Show{% endtrans %}</span>
+"Best match" puts the closest first again once a heading sorted them.
+`label`, if given, names what a grouped list counts instead, and the row
+by it. -#}
+{% macro sizes(view, label=none) -%}
+<nav aria-label="{{ label or _("Rows") }}" class="filters">
+  <span>{{ label or _("Show") }}</span>
   {% for size in view.sizes %}
   <a href="{{ view.size_link(size) }}"{% if view.per_page == size %} aria-current="page"{% endif %}>{{ size or _("All") }}</a>
   {%- if not loop.last %} <span aria-hidden="true">·</span>{% endif %}
