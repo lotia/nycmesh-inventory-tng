@@ -266,13 +266,15 @@ function edits(text: string, rules: Rules | undefined): Edit[] {
     if (grouped) number = grouped[0].replace(",", ".");
     else {
       // Any space a plain one, one for one, as units._searched reads it.
-      grouped = GROUPED.exec(before.replaceAll(/\p{Zs}/gu, " "));
+      const plain = text.replaceAll(/\p{Zs}/gu, " ");
+      grouped = GROUPED.exec(plain.slice(0, at + 1));
       // `Cat 6 305 m`: a product's number, then another, not thousands;
       // judged at its first digit, after any sign.
-      const first = grouped
-        ? grouped.index + Number(/^[-−]/.test(grouped[0]))
-        : 0;
-      if (grouped && product(text, first)) grouped = null;
+      if (
+        grouped &&
+        product(plain, grouped.index + Number(/^[-−]/.test(grouped[0])))
+      )
+        grouped = null;
       // It ends at the digit the match starts with, so it is found.
       number = grouped
         ? grouped[0].replaceAll(/[, ]/g, "")

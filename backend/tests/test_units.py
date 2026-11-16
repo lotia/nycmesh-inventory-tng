@@ -277,6 +277,15 @@ def test_names_reading_alike_but_for_a_number_grouped_by_spaces_are_one() -> Non
         assert unit_key(spaced) == unit_key(joined), spaced
 
 
+def test_a_product_before_any_space_is_not_grouped_with_the_next_number() -> None:
+    """inventory-tng-uxo6: `Cat 6 305 m` is a product's number, then 305 m,
+    whatever space is after `Cat`, to the forms and to search alike."""
+    for space in ("\u00a0", "\u202f", "\u1680"):
+        typed = f"Cat{space}6 305 m"
+        assert [f.number for f in units.found_in(typed)] == ["305"], space
+        assert units.respell(typed) == f"Cat{space}6 305m", space
+
+
 def test_a_sign_belongs_to_the_number_grouped_after_it() -> None:
     """inventory-tng-uxo6: `-1 000` and `-1,000` are minus a thousand to the
     forms, to search and to the shown name alike, so a kind that may be at
@@ -642,6 +651,8 @@ NB, THIN = "\u00a0", "\u202f"
         ("Reel 12 345 678.5 mm", f"Reel 12{NB}345{NB}678.5{NB}mm"),
         ("X-1 000 feet", "X-1 000 feet"),
         ("Cat 6 305 m", f"Cat 6 305{NB}m"),
+        # A product's name before any space is one still (inventory-tng-uxo6).
+        (f"Cat{NB}6 305 m", f"Cat{NB}6 305{NB}m"),
         ("Cable 2 1,000 ft", f"Cable 2 1000{NB}ft"),
         # Its sign kept with it, and grouped by any space search reads as
         # one; no-break and thin spaces as typed.

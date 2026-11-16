@@ -446,8 +446,8 @@ def _marked(text: str, *at: int) -> bool:
     )
 
 
-# A number grouped in thousands by commas or by spaces, a thin one
-# decomposed being one, ending at its last digit, with its minus as
+# A number grouped in thousands by commas or by spaces (_searched reads
+# any space as one), ending at its last digit, with its minus as
 # _NUMBER's: `1,000`, `-1 000`, not starting within another so grouped
 # (`345 678` in `12 345 678`), and by commas after a number and a space
 # (`6 1,000`), nor by commas after a lone nought (_NOUGHT). Search keeps
@@ -480,8 +480,8 @@ def _searched(text: str, end: int) -> tuple[re.Match[str], str] | None:
     grouped = _GROUPED.search(plain, 0, end)
     if grouped is None:
         return None
-    # Its first digit, after any sign.
-    if _product(text, grouped.start() + (grouped[0][0] in "-\u2212")):
+    # Its first digit, after any sign; a product's name before any space.
+    if _product(plain, grouped.start() + (grouped[0][0] in "-\u2212")):
         return None
     return grouped, re.sub("[, ]", "", grouped[0])
 
