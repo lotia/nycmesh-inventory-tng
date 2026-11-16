@@ -192,6 +192,71 @@ function entry(n: number, fields: Record<string, unknown> = {}) {
   };
 }
 
+/** Saves and a cart an older build left, kept at `at`, or at a time not
+ * known. */
+function leaveOlder(at: number | null) {
+  localStorage.setItem(
+    "inventory.outbox.v3",
+    JSON.stringify([
+      {
+        body: {
+          key: KEY,
+          kind: "move",
+          volunteer_id: 1,
+          from_location_id: 10,
+          to_location_id: 99,
+          install_number: 5,
+          lines: [
+            { item_id: 100, quantity: "8", package_id: 1000 },
+            { item_id: 100, quantity: "2", package_id: 1003 },
+            { item_id: 101, quantity: "3", open_package_key: KEY },
+            { item_id: 103, quantity: "4", package_id: 1004 },
+            { item_id: 101, quantity: "x" },
+          ],
+          used_up: [KEY],
+        },
+        what: "Ραδιόφωνο",
+        queuedAt: null,
+        state: "refused",
+        reason: { code: "key_reused" },
+      },
+      {
+        body: {
+          key: OTHER_KEY,
+          kind: "report",
+          volunteer_id: 2,
+          from_location_id: 10,
+          to_location_id: null,
+          lines: null,
+        },
+        what: "Ραδιόφωνο",
+        queuedAt: at,
+        state: "waiting",
+      },
+    ]),
+  );
+  localStorage.setItem(
+    "inventory.cart.v1",
+    JSON.stringify({
+      ...freshCart(),
+      // A kind no build knows.
+      kind: "lost",
+      volunteerId: 2,
+      fromId: 10,
+      lines: [
+        {
+          itemId: 101,
+          packages: { 1001: "1" },
+          loose: "2",
+          open: { [KEY]: { amount: "3", usedUp: true } },
+        },
+        { itemId: 98, packages: { 1: "1" }, loose: "" },
+      ],
+      usedAt: at,
+    }),
+  );
+}
+
 /** Each part covered: what renders it, and the elements it says. */
 const COVERED: Record<string, () => Promise<HTMLElement[]>> = {
   "the registration page, a phrase left blank": async () => {
@@ -389,66 +454,17 @@ const COVERED: Record<string, () => Promise<HTMLElement[]>> = {
     return [document.body];
   },
   "what older builds left": async () => {
-    localStorage.setItem(
-      "inventory.outbox.v3",
-      JSON.stringify([
-        {
-          body: {
-            key: KEY,
-            kind: "move",
-            volunteer_id: 1,
-            from_location_id: 10,
-            to_location_id: 99,
-            install_number: 5,
-            lines: [
-              { item_id: 100, quantity: "8", package_id: 1000 },
-              { item_id: 100, quantity: "2", package_id: 1003 },
-              { item_id: 101, quantity: "3", open_package_key: KEY },
-              { item_id: 103, quantity: "4", package_id: 1004 },
-              { item_id: 101, quantity: "x" },
-            ],
-            used_up: [KEY],
-          },
-          what: "Ραδιόφωνο",
-          queuedAt: null,
-          state: "refused",
-          reason: { code: "key_reused" },
-        },
-        {
-          body: {
-            key: OTHER_KEY,
-            kind: "report",
-            volunteer_id: 2,
-            from_location_id: 10,
-            to_location_id: null,
-            lines: null,
-          },
-          what: "Ραδιόφωνο",
-          queuedAt: null,
-          state: "waiting",
-        },
-      ]),
+    leaveOlder(null);
+    await loaded();
+    return [document.body];
+  },
+  "what older builds left, with when it was kept": async () => {
+    // The date and time are in the device's locale, not the page's, so
+    // in digits here.
+    vi.spyOn(Date.prototype, "toLocaleString").mockReturnValue(
+      "14.11.2026 09:30",
     );
-    localStorage.setItem(
-      "inventory.cart.v1",
-      JSON.stringify({
-        ...freshCart(),
-        // A kind no build knows.
-        kind: "lost",
-        volunteerId: 2,
-        fromId: 10,
-        lines: [
-          {
-            itemId: 101,
-            packages: { 1001: "1" },
-            loose: "2",
-            open: { [KEY]: { amount: "3", usedUp: true } },
-          },
-          { itemId: 98, packages: { 1: "1" }, loose: "" },
-        ],
-        usedAt: null,
-      }),
-    );
+    leaveOlder(1);
     await loaded();
     return [document.body];
   },

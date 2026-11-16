@@ -2051,6 +2051,49 @@ describe("what an older build left", () => {
     record.mockRestore();
   });
 
+  test("each says the time it was kept, so two of one day differ", async () => {
+    // Two saves and a cart of one day, by the device's clock (Ali,
+    // 2026-11-16, inventory-tng-6fl).
+    const morning = new Date(2026, 10, 14, 9, 30).getTime();
+    const afternoon = new Date(2026, 10, 14, 14, 5).getTime();
+    leaveSave({ queuedAt: morning });
+    const [kept] = JSON.parse(
+      localStorage.getItem("inventory.outbox.v3") ?? "[]",
+    );
+    localStorage.setItem(
+      "inventory.outbox.v3",
+      JSON.stringify([
+        kept,
+        {
+          ...kept,
+          body: { ...kept.body, key: "1c2d3e4f-5a6b-4c7d-8e9f-0a1b2c3d4e5f" },
+          queuedAt: afternoon,
+        },
+      ]),
+    );
+    leaveCart();
+    localStorage.setItem(
+      "inventory.cart.v1",
+      JSON.stringify({
+        ...JSON.parse(localStorage.getItem("inventory.cart.v1") ?? "{}"),
+        usedAt: afternoon,
+      }),
+    );
+    open();
+    await ready();
+    const time = (at: number) =>
+      new Date(at).toLocaleTimeString([], { timeStyle: "short" });
+    const [first, second, cart] = [
+      ...(listing().querySelector("ul")?.children ?? []),
+    ].map((entry) => entry.querySelector("small")?.textContent ?? "");
+    expect(first).toMatch(/^Kept on this device .+, not sent\.$/);
+    expect(first).toContain(time(morning));
+    expect(second).toContain(time(afternoon));
+    expect(second).not.toBe(first);
+    expect(cart).toMatch(/^Added on .+ but not sent$/);
+    expect(cart).toContain(time(afternoon));
+  });
+
   test("each kind, and what the catalogue no longer has, are told plainly", async () => {
     const save = (key: string, body: object, fields = {}) => ({
       body: { key, volunteer_id: 99, lines: [], ...body },
