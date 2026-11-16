@@ -14,7 +14,6 @@ import { DecoderUnavailable } from "./camera";
 import { type Catalogue, freshCart, type Item, storeCart } from "./cart";
 import { suggest } from "./combobox";
 import { speak } from "./i18n";
-import { messages as english } from "./locales/en.po";
 import { messages as pseudo } from "./locales/pseudo.po";
 import { OpenPackageCard } from "./OpenPackageCard";
 import { STORAGE_KEY as OUTBOX_KEY, Outbox } from "./outbox";
@@ -25,7 +24,6 @@ import { ScanPage } from "./ScanPage";
 import { answering, deferred, json } from "./test-fetch";
 
 afterEach(() => {
-  speak("en", english);
   vi.restoreAllMocks();
   // What a part wrote to the document itself, which cleanup leaves.
   document.body.replaceChildren();

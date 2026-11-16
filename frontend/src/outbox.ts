@@ -148,6 +148,9 @@ const isReport = (kind: unknown): kind is ReportKind =>
 /** A kind of problem a 422 names (backend ledger.BatchProblem). */
 export type ProblemKind = Schemas["BatchProblem"]["type"];
 
+const isProblem = (kind: string): kind is ProblemKind =>
+  Object.hasOwn(PROBLEMS, kind);
+
 /** Each kind of problem in words: the server sends kinds, never words
  * (Ali, inventory-tng-oic, 2026-11-15). Typed by the schema, so a kind new
  * on the server fails the type check until it has words here. A line's
@@ -363,11 +366,7 @@ export function noteOf(reason: Reason, online = true): Note {
 /** One of a 422's problems, after a space: what it names, then why, in
  * the page's words for its kind. */
 function problemSaid({ names, kind }: Problem): Said {
-  const why = say(
-    Object.hasOwn(PROBLEMS, kind)
-      ? PROBLEMS[kind as ProblemKind]
-      : NOT_ACCEPTED,
-  );
+  const why = say(isProblem(kind) ? PROBLEMS[kind] : NOT_ACCEPTED);
   if (names === null) {
     return [" ", why];
   }

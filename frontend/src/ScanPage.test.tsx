@@ -64,6 +64,7 @@ import {
   DISCARD,
   DISCARD_CART,
   DISMISS,
+  FIND,
   FIX_THEN_RECORD,
   FROM,
   INSTALL_NUMBER,
@@ -157,7 +158,7 @@ async function ready() {
 }
 
 function find(text: string) {
-  fireEvent.input(screen.getByLabelText(/Find an item/), {
+  fireEvent.input(screen.getByLabelText(say(FIND)), {
     target: { value: text },
   });
 }
@@ -831,10 +832,10 @@ describe("filling and saving a cart", () => {
     open();
     await ready();
     find("K7QX2M");
-    fireEvent.keyDown(screen.getByLabelText(/Find an item/), { key: "Enter" });
+    fireEvent.keyDown(screen.getByLabelText(say(FIND)), { key: "Enter" });
     expect(screen.getByText("305 m in all")).toBeDefined();
     find("litebeam");
-    fireEvent.keyDown(screen.getByLabelText(/Find an item/), { key: "Enter" });
+    fireEvent.keyDown(screen.getByLabelText(say(FIND)), { key: "Enter" });
     expect(screen.getByText("1 each in all")).toBeDefined();
   });
 
@@ -852,7 +853,7 @@ describe("filling and saving a cart", () => {
     find("a");
     expect(screen.getByRole("button", { name: "LiteBeam 5AC" })).toBeDefined();
     expect(screen.getByRole("button", { name: "Cat6 cable" })).toBeDefined();
-    const finder = screen.getByLabelText(/Find an item/);
+    const finder = screen.getByLabelText(say(FIND));
     fireEvent.keyDown(finder, { key: "a" });
     fireEvent.keyDown(finder, { key: "Enter" });
     expect(screen.getByText(say(NOTHING_IN_CART))).toBeDefined();
@@ -1687,7 +1688,7 @@ describe("scanning labels with the camera", () => {
     open();
     await ready();
     find("s4helf");
-    fireEvent.keyDown(screen.getByLabelText(/Find an item/), { key: "Enter" });
+    fireEvent.keyDown(screen.getByLabelText(say(FIND)), { key: "Enter" });
     fireEvent.click(await screen.findByRole("button", { name: say(TO) }));
     expect(selected(say(TO))).toBe("11");
   });

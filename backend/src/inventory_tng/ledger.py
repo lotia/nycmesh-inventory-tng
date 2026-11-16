@@ -877,7 +877,7 @@ class Batch(BaseModel):
 
 # Where in the batch, as pydantic gives it ("lines", 2, "item_id"), and what.
 # The 422 sends the kind, never words: the scan page words each kind itself
-# (docs/decisions/0022). None takes values yet.
+# (docs/decisions/0022). No kind takes values yet.
 ProblemKind = Literal[
     "not_found",
     "not_whole",

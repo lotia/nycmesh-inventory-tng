@@ -28,6 +28,7 @@ speak("en", messages);
 /** Marks a value's place in a message as it is said: private-use
  * characters no phrase or catalogue holds. */
 const HOLE = /\uE000(\d+)\uE001/;
+const HOLES = new RegExp(HOLE, "g");
 /** Words a phrase marks `<n>…</n>`, such as a link's. */
 const MARKED = /<(\d+)>([\s\S]*?)<\/\1>/;
 
@@ -63,7 +64,7 @@ export function say(
   values: Record<string, unknown> = {},
 ): string {
   const [said, held] = holed(phrase, values);
-  return said.replace(new RegExp(HOLE, "g"), (_, at) => String(held[at]));
+  return said.replace(HOLES, (_, at) => String(held[at]));
 }
 
 /**

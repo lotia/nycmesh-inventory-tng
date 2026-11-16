@@ -3,7 +3,6 @@ import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import openapi from "./api/openapi.json";
 import { BUILD, Builds, HEADER, MUST_UPGRADE } from "./build";
 import { say, speak } from "./i18n";
-import { messages as english } from "./locales/en.po";
 import { messages as pseudo } from "./locales/pseudo.po";
 import {
   batchId,
@@ -520,14 +519,10 @@ describe("refusals", () => {
       expect(said(outbox)).toBe(`Not recorded. Line 1: ${words}`);
       // Kept as its kind, it is worded anew in another language.
       speak("pseudo", pseudo);
-      try {
-        expect(said(outbox)).toBe(
-          `${say(NOT_RECORDED)} ${say(ON_LINE, { n: 1, why: say(PROBLEMS[kind as ProblemKind]) })}`,
-        );
-        expect(said(outbox)).not.toContain(words);
-      } finally {
-        speak("en", english);
-      }
+      expect(said(outbox)).toBe(
+        `${say(NOT_RECORDED)} ${say(ON_LINE, { n: 1, why: say(PROBLEMS[kind as ProblemKind]) })}`,
+      );
+      expect(said(outbox)).not.toContain(words);
     },
   );
 
