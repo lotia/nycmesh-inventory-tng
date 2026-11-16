@@ -824,8 +824,10 @@ def test_a_comma_after_a_lone_nought_is_read_again(alembic_config: Config) -> No
     as shown read again, as search and the forms now read a comma after a
     lone nought as a decimal point (Ali, 2026-11-15, inventory-tng-4i1),
     and a number grouped by spaces as one (inventory-tng-uxo6), and a
-    unit's word is shown as a symbol is (inventory-tng-tze); names kept as
-    typed; names that would then be one named by id first."""
+    unit after a number and any space as after a plain one
+    (inventory-tng-vw0f), and a unit's word is shown as a symbol is
+    (inventory-tng-tze); names kept as typed; names that would then be one
+    named by id first."""
     command.downgrade(alembic_config, "0047")
     connection = alembic_config.attributes["connection"]
     category_id = connection.scalar(

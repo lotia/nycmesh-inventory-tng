@@ -231,6 +231,30 @@ def test_a_rule_reads_every_name_with_it_again(
     assert "Gbit/s" not in link.search_text
 
 
+@pytest.mark.parametrize("space", ["\u00a0", "\u2009", "\u1680"])
+def test_a_rule_reads_again_a_name_with_its_unit_after_any_space(
+    session: Session, radios: Category, space: str
+) -> None:
+    """inventory-tng-vw0f review: a unit is found after a number and any
+    space, so a rule for it reads such names again, `deg C` spaced so
+    too."""
+    link = new_item(session, radios, f"Thing 10{space}g")
+    spare = new_item(session, radios, "Spare")
+    box = add(session, ItemPackage(item_id=spare.id, name=f"Box 40{space}g", size=1))
+    alias = items.add_alias(session, spare, f"Other 1{space}g")
+    kiln = new_item(session, radios, f"Kiln 100{space}deg{space}C")
+    found = items._with_units(session, ["g"], lock=False)
+    assert found == ([link, spare], [box], [alias])
+    assert items._with_units(session, ["deg C"], lock=False) == ([kiln], [], [])
+    reading_rules.decide(session, {"g": GBPS}, None)
+    session.flush()
+    assert (link.unit_key, box.unit_key, alias.unit_key) == (
+        "thing10gbits",
+        "box40gbits",
+        "other1gbits",
+    )
+
+
 def test_a_rule_reads_aliases_alike_for_one_item_or_many(
     session: Session, radios: Category
 ) -> None:

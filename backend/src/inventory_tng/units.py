@@ -782,10 +782,10 @@ def _product(name: str, at: int) -> bool:
 @dataclass(frozen=True)
 class Found:
     """What may be a unit right after a number in a name: the number as
-    typed, the unit as typed, its spaces plain (`token`), where the space before it, if any,
-    and it are (`start`, `end`), and the readings of it that are plausible
-    sizes (Reading.plausible), the one spelt as typed first, then by
-    PROFILE. `read` is what it reads as (_found): by its rule (`rule`;
+    typed, the unit as typed, its spaces plain (`token`), where the space
+    before it, if any, and it are (`start`, `end`), and the readings of it
+    that are plausible sizes (Reading.plausible), the one spelt as typed
+    first, then by PROFILE. `read` is what it reads as (_found): by its rule (`rule`;
     None: no unit), else by the words near it (`clue`, those words), else
     the one likely."""
 

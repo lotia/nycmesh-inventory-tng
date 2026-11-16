@@ -72,7 +72,7 @@ from inventory_tng.models import (
     reading_rules,
     unit_key,
 )
-from inventory_tng.names import name_key
+from inventory_tng.names import LOOK_ALIKES, name_key
 
 
 def _in_current_category(session: Session, category_id: int) -> None:
@@ -528,11 +528,19 @@ def _keyed(rows: Rows, rules: units.Rules) -> Keyed:
     return {row: unit_key(row.name, rules) for row in (*rows[0], *rows[1], *rows[2])}
 
 
+# Any space, as units._after_a_number reads each one plain (inventory-tng-vw0f).
+_SPACE = (
+    "[ " + "".join(each for each, plain in LOOK_ALIKES.items() if plain == " ") + "]"
+)
+
+
 def _after_a_number(token: str) -> str:
     """A PostgreSQL regular expression for `token` right after a number, as
-    units.AFTER_A_NUMBER finds a unit: a digit, perhaps a space, then it,
-    then no letter or digit. Case kept, as a rule's token is."""
-    return rf"[0-9] ?{re.escape(token)}(?![[:alnum:]])"
+    units.AFTER_A_NUMBER finds a unit: a digit, perhaps a space (any, as
+    _SPACE), then it, then no letter or digit. Case kept, as a rule's token
+    is; a space in it (`deg C`) is any space too."""
+    spelt = re.escape(token).replace(r"\ ", _SPACE)
+    return rf"[0-9]{_SPACE}?{spelt}(?![[:alnum:]])"
 
 
 def _with_units(session: Session, tokens: Iterable[str], *, lock: bool) -> Rows:
