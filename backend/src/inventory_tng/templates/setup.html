@@ -20,7 +20,7 @@ invited from the administrator pages.{% endtrans %}</p>
     <input name="email" type="email" value="{{ values.get('email', '') }}" autocomplete="email">
     {% with name = "email" %}{% include "_field_problem.html" %}{% endwith %}
   </label>
-  <label>{% trans %}Password{% endtrans %} <span class="hint">{% trans count=limits.password_min %}at least {{ count }} character{% pluralize %}at least {{ count }} characters{% endtrans %}</span>
+  <label>{% trans %}Password{% endtrans %} {% include "_password_hint.html" %}
     <input name="password" type="password" autocomplete="new-password" minlength="{{ limits.password_min }}" required>
     {% with name = "password" %}{% include "_field_problem.html" %}{% endwith %}
   </label>

@@ -1,7 +1,7 @@
 {% extends "admin_base.html" %}
 {% from "_table.html" import table %}
 {% from "_views.html" import views %}
-{% from "_listing.html" import sizes, sort_heading, pager %}
+{% from "_listing.html" import sizes, sort_heading, pager, only_one %}
 {#- Why one marked checked is right as it is: one reason, and words for
 another way. Kept as sent with its problem, if `sent` from this form: a
 refusal's alert, when drawn, is where it was sent from. #}
@@ -48,7 +48,7 @@ Mark checked asked again, for a row without it. #}
 so the inventory shows more moved than was. Correct moves the extra back
 with an adjustment. Mark checked if you already fixed it.{% endtrans %}</p>
 {% if only %}
-<p>{% trans item=only.name_shown %}Only {{ item }}.{% endtrans %} <a href="{{ view.link(kept=(), page=1) }}">{% trans %}Show all{% endtrans %}</a></p>
+{{ only_one(view, only) }}
 {% endif %}
 {{ sizes(view) }}
 {% call table() %}

@@ -1,7 +1,7 @@
 {% extends "admin_base.html" %}
 {% from "_table.html" import table %}
 {% from "_views.html" import views %}
-{% from "_listing.html" import pager, sizes, sort_heading %}
+{% from "_listing.html" import pager, sizes, sort_heading, only_one %}
 {#- A place, linked to its count of the item if it may be counted. #}
 {% macro place(spot, each) -%}
 {% if spot.countable %}<a href="{{ counts_path }}/{{ spot.id }}?item={{ each.item_id }}">{{ spot.name }}</a>{% else %}{{ spot.name }}{% endif %}
@@ -9,7 +9,7 @@
 {% block main %}
 {{ views(_("Recorded more than moved"), recorded_views, "settled") }}
 {% if only %}
-<p>{% trans item=only.name_shown %}Only {{ item }}.{% endtrans %} <a href="{{ view.link(kept=(), page=1) }}">{% trans %}Show all{% endtrans %}</a></p>
+{{ only_one(view, only) }}
 {% endif %}
 {{ sizes(view) }}
 {% call table() %}

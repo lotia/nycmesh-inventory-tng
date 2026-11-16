@@ -21,11 +21,11 @@ from inventory_tng.admin.counts import COUNTS
 from inventory_tng.admin.over_recorded import waiting_view
 from inventory_tng.admin.stock import recorded_more_view
 from inventory_tng.local_time import show, show_day, site_zone
-from inventory_tng.models import Admin, LedgerTransaction, Movement, OverRecorded
+from inventory_tng.models import LedgerTransaction, Movement, OverRecorded
 
 from helpers.rows import tag
 from helpers.sign_in import new_admin
-from helpers.stock import Place, Spools, cut, retire, write
+from helpers.stock import Place, Spools, ada_id, cut, raised, retire, write
 
 # As the list says each, in English.
 HOW = {how: str(words) for how, words in over_recorded.SETTLED_HOW.items()}
@@ -38,30 +38,9 @@ WAITING = "/admin/stock/recorded-more"
 SETTLED = f"{WAITING}/settled"
 
 
-def raised(
-    session: Session,
-    transaction: LedgerTransaction | None,
-    more: Decimal = Decimal(1),
-) -> OverRecorded:
-    """`more` recorded than moved of the transaction's line."""
-    assert transaction is not None
-    movement_id = session.scalars(
-        select(Movement.id).where(Movement.transaction_id == transaction.id)
-    ).one()
-    over_recorded.raise_checks(session, {movement_id: more})
-    return session.scalars(
-        select(OverRecorded).where(OverRecorded.movement_id == movement_id)
-    ).one()
-
-
 def moved(session: Session, place: Place) -> OverRecorded:
     """Radios moved from the store to the van, one recorded more."""
     return raised(session, write(session, place))
-
-
-def ada(session: Session) -> int:
-    """The id of admin_client's administrator."""
-    return session.scalars(select(Admin.id).where(Admin.username == "ada")).one()
 
 
 def settled_at(check: OverRecorded) -> datetime:
@@ -103,7 +82,7 @@ def test_a_correction_is_listed_with_when_who_and_where(
 ) -> None:
     place = Place(session)
     check = moved(session, place)
-    over_recorded.correct(session, check.id, seen(check), ada(session))
+    over_recorded.correct(session, check.id, seen(check), ada_id(session))
     session.flush()
     page = admin_client.get(SETTLED).text
     when = show(settled_at(check), site_zone(session))
@@ -133,7 +112,7 @@ def test_a_place_that_cannot_be_counted_is_not_linked(
     again, and retired, may not be counted."""
     place = Place(session)
     check = raised(session, write(session, place), Decimal(3))
-    over_recorded.correct(session, check.id, seen(check), ada(session))
+    over_recorded.correct(session, check.id, seen(check), ada_id(session))
     retire(session, place.store)
     page = admin_client.get(SETTLED).text
     assert f"{COUNTS}/{place.store.id}" not in page
@@ -146,7 +125,7 @@ def test_each_reason_marked_checked_says_why(
     admin_client: TestClient, session: Session
 ) -> None:
     place = Place(session)
-    admin = ada(session)
+    admin = ada_id(session)
     for reason in ("left", "arrived", "both"):
         check = moved(session, place)
         over_recorded.mark_checked(session, check.id, seen(check), admin, reason)
@@ -195,7 +174,7 @@ def test_a_count_of_one_moved_whole_says_if_it_was_confirmed(
     corrected: told apart by what is kept."""
     spools, check = moved_whole(session)
     over_recorded.confirm_count(
-        session, check.id, seen(check), ada(session), Decimal(count)
+        session, check.id, seen(check), ada_id(session), Decimal(count)
     )
     session.flush()
     ((*_, shown_how, shown_why, _),) = settled_rows(admin_client)
@@ -233,7 +212,7 @@ def test_corrected_after_one_end_counted_names_the_other(
     count_at(admin_client, place.van.id, {f"counted_{place.item.id}": "1"})
     session.expire_all()
     check = session.scalars(select(OverRecorded)).one()
-    over_recorded.correct(session, check.id, seen(check), ada(session))
+    over_recorded.correct(session, check.id, seen(check), ada_id(session))
     session.flush()
     ((*_, how, why, _),) = settled_rows(admin_client)
     assert (how, why) == (HOW["corrected"], over_recorded.end_only(place.store.name))
@@ -255,7 +234,7 @@ def test_an_opening_is_listed_at_its_place_opened(
     admin_client: TestClient, session: Session
 ) -> None:
     spools, check = opening(session)
-    over_recorded.correct(session, check.id, seen(check), ada(session))
+    over_recorded.correct(session, check.id, seen(check), ada_id(session))
     session.flush()
     ((_, _, amount, where, how, why, _),) = settled_rows(admin_client)
     assert (where, how, why) == (
@@ -271,7 +250,7 @@ def test_an_openings_open_package_closed_before_correct_names_the_sealed_end(
 ) -> None:
     """Correct skips the end a close wrote off (inventory-tng-nyl)."""
     _, check = opening(session)
-    admin = ada(session)
+    admin = ada_id(session)
     movement = session.get_one(Movement, check.movement_id)
     assert movement.to_open_package_id is not None
     # Before Correct: in one test transaction, now() is when it began.
@@ -303,7 +282,7 @@ def test_what_correct_wrote_is_told_by_what_it_wrote_not_when(
     why: str,
 ) -> None:
     _, check = opening(session)
-    admin = ada(session)
+    admin = ada_id(session)
     movement = session.get_one(Movement, check.movement_id)
     open_id = movement.to_open_package_id
     assert open_id is not None
@@ -358,7 +337,7 @@ def test_newest_first_in_pages_of_one_item_or_all(
 ) -> None:
     monkeypatch.setattr(listing, "PER_PAGE", 2)
     place, other = Place(session), Place(session)
-    admin = ada(session)
+    admin = ada_id(session)
     start = datetime(2026, 11, 14, 12, tzinfo=UTC)
     for n, at in enumerate((place, other, place, place)):
         check = moved(session, at)
@@ -451,7 +430,9 @@ def test_waiting_and_settled_link_to_each_other_keeping_the_item(
     )
     # None waiting, still linked.
     for check in session.scalars(select(OverRecorded)):
-        over_recorded.mark_checked(session, check.id, seen(check), ada(session), "both")
+        over_recorded.mark_checked(
+            session, check.id, seen(check), ada_id(session), "both"
+        )
     session.flush()
     nav = views_of(admin_client.get(SETTLED).text, label)
     assert f'<a href="{WAITING}">{waiting_view(0)}</a>' in nav
@@ -482,7 +463,9 @@ def test_an_openings_sealed_end_counted_then_closed_says_so(
         {f"sealed_{spools.cable.id}_{spools.spool.id}": "1"},
     )
     at = datetime(2026, 11, 20, 15, tzinfo=UTC)
-    closed = open_packages.close(session, movement.to_open_package_id, ada(session), at)
+    closed = open_packages.close(
+        session, movement.to_open_package_id, ada_id(session), at
+    )
     assert closed
     session.flush()
     session.expire_all()
@@ -522,13 +505,13 @@ def test_both_ends_right_then_closed_names_the_count_and_the_close(
     with monkeypatch.context() as patched:
         patched.setattr(over_recorded, "open_package_closed", lambda *_: 0)
         closed = open_packages.close(
-            session, movement.to_open_package_id, ada(session), at
+            session, movement.to_open_package_id, ada_id(session), at
         )
     assert closed == open_packages.Closed(False, 0)
     session.flush()
     session.expire_all()
     check = session.get_one(OverRecorded, check.id)
-    over_recorded.close(session, check.id, seen(check), ada(session))
+    over_recorded.close(session, check.id, seen(check), ada_id(session))
     session.flush()
     assert check.left_count_id is not None
     counted_on = session.get_one(LedgerTransaction, check.left_count_id).created_at
@@ -600,10 +583,10 @@ def test_every_column_sorts_either_way(
     for n, place in enumerate(places):
         check = raised(session, write(session, place), Decimal(n + 1))
         if n == 1:
-            over_recorded.correct(session, check.id, seen(check), ada(session))
+            over_recorded.correct(session, check.id, seen(check), ada_id(session))
         else:
             over_recorded.mark_checked(
-                session, check.id, seen(check), ada(session), "both"
+                session, check.id, seen(check), ada_id(session), "both"
             )
         session.flush()
         check.settled_at = start + timedelta(hours=n)
@@ -645,7 +628,7 @@ def test_rows_per_page_25_50_100_or_all(
     admin_client: TestClient, session: Session
 ) -> None:
     place = Place(session)
-    admin = ada(session)
+    admin = ada_id(session)
     for _ in range(26):
         check = moved(session, place)
         over_recorded.mark_checked(session, check.id, seen(check), admin, "both")

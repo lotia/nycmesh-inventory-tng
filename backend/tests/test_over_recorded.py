@@ -49,7 +49,17 @@ from inventory_tng.models import (
 from helpers.concurrency import Committed
 from helpers.rows import add, tag
 from helpers.sign_in import new_admin, text
-from helpers.stock import Place, Spools, cut, length, received, report, retire, write
+from helpers.stock import (
+    Place,
+    Spools,
+    ada_id,
+    cut,
+    length,
+    received,
+    report,
+    retire,
+    write,
+)
 
 URL = "/api/transactions"
 PAGE = "/admin/stock/recorded-more"
@@ -2992,11 +3002,6 @@ def test_a_close_skips_one_a_count_holds_and_correct_then_closes_it_as_counted(
     assert (check.settled_how, check.settled_by_admin_id) == ("counted", admin)
     assert (check.left_count_id, check.arrived_count_id) == (waits.left_count_id, None)
     assert reason_adjustments(first, over_recorded.REASON) == []
-
-
-def ada_id(session: Session) -> int:
-    """The id of admin_client's administrator."""
-    return session.scalars(select(Admin.id).where(Admin.username == "ada")).one()
 
 
 def both_right(

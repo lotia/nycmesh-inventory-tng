@@ -1,13 +1,13 @@
 {% extends "admin_base.html" %}
 {% from "_table.html" import table %}
-{% from "_listing.html" import sizes, sort_heading, pager %}
+{% from "_listing.html" import sizes, sort_heading, pager, only_one %}
 {% block main %}
 <p class="hint">{% trans %}What these open packages show may be wrong: a volunteer said
 what is really on one, or a save took one below zero. Set it to what it
 really had when it showed that, or leave it as it shows. A cut saved since
 stays.{% endtrans %}</p>
 {% if only %}
-<p>{% trans item=only.name_shown %}Only {{ item }}.{% endtrans %} <a href="{{ view.link(kept=(), page=1) }}">{% trans %}Show all{% endtrans %}</a></p>
+{{ only_one(view, only) }}
 {% endif %}
 {#- The packages ticked belong to this form. #}
 <form method="post" action="{{ here }}{{ view.query_string }}" id="answer-ticked">

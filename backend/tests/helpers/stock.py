@@ -10,16 +10,19 @@ from typing import Any, Protocol
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from inventory_tng import open_packages
+from inventory_tng import open_packages, over_recorded
 from inventory_tng.ledger import LOOSE, Batch, Entry, Form, insert_transaction, record
 from inventory_tng.models import (
     AdjustmentReason,
+    Admin,
     Category,
     Item,
     ItemPackage,
     LedgerTransaction,
     Location,
+    Movement,
     OpenPackage,
+    OverRecorded,
     Volunteer,
 )
 from inventory_tng.pages import retired_holding
@@ -87,6 +90,27 @@ def write(session: Session, place: Place, **fields: object) -> LedgerTransaction
     return record(
         session, Batch.model_validate(place.batch(**fields)), device_id=None
     ).transaction
+
+
+def raised(
+    session: Session,
+    transaction: LedgerTransaction | None,
+    more: Decimal = Decimal(1),
+) -> OverRecorded:
+    """`more` recorded than moved of the transaction's line."""
+    assert transaction is not None
+    movement_id = session.scalars(
+        select(Movement.id).where(Movement.transaction_id == transaction.id)
+    ).one()
+    over_recorded.raise_checks(session, {movement_id: more})
+    return session.scalars(
+        select(OverRecorded).where(OverRecorded.movement_id == movement_id)
+    ).one()
+
+
+def ada_id(session: Session) -> int:
+    """The id of admin_client's administrator."""
+    return session.scalars(select(Admin.id).where(Admin.username == "ada")).one()
 
 
 class Retirable(Protocol):

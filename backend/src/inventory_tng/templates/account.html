@@ -27,7 +27,7 @@
   <h2>{% trans %}Password{% endtrans %}</h2>
   {% with section_id="password" %}{% include "_notice.html" %}{% endwith %}
   <form method="post" action="{{ paths.account }}/password">
-    <label>{% trans %}New password{% endtrans %} <span class="hint">{% trans count=limits.password_min %}at least {{ count }} character{% pluralize %}at least {{ count }} characters{% endtrans %}</span>
+    <label>{% trans %}New password{% endtrans %} {% include "_password_hint.html" %}
       <input name="password" type="password" autocomplete="new-password" minlength="{{ limits.password_min }}" required>
       {% with name = "password" %}{% include "_field_problem.html" %}{% endwith %}
     </label>

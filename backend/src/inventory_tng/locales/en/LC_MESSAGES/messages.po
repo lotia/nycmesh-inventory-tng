@@ -2369,10 +2369,7 @@ msgid ""
 "stay as they are."
 msgstr ""
 
-#: src/inventory_tng/templates/length_checks.html
-#: src/inventory_tng/templates/over_recorded.html
-#: src/inventory_tng/templates/over_recorded_settled.html
-#: src/inventory_tng/templates/used_up.html
+#: src/inventory_tng/templates/_listing.html
 #, python-format
 msgid "Only %(item)s."
 msgstr ""
@@ -3329,11 +3326,8 @@ msgstr ""
 msgid "Show a QR code for their phone"
 msgstr ""
 
+#: src/inventory_tng/templates/_listing.html
 #: src/inventory_tng/templates/count.html
-#: src/inventory_tng/templates/length_checks.html
-#: src/inventory_tng/templates/over_recorded.html
-#: src/inventory_tng/templates/over_recorded_settled.html
-#: src/inventory_tng/templates/used_up.html
 msgid "Show all"
 msgstr ""
 
@@ -4371,9 +4365,7 @@ msgid ""
 "volunteer will use for the scan page."
 msgstr ""
 
-#: src/inventory_tng/templates/account.html
-#: src/inventory_tng/templates/reset.html
-#: src/inventory_tng/templates/setup.html
+#: src/inventory_tng/templates/_password_hint.html
 #, python-format
 msgid "at least %(count)s character"
 msgid_plural "at least %(count)s characters"

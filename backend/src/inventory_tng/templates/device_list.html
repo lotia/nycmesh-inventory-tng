@@ -20,9 +20,9 @@ registered while it lasted, then revoke the ones that look wrong.{% endtrans %}<
   </label>
   <label>{% trans %}Showing{% endtrans %}
     <select name="state">
-      {% set state_words = {"current": pgettext("state", "current"), "revoked": _("revoked"), "all": _("all")} %}
+      {% set showing_words = {"current": pgettext("state", "current"), "revoked": _("revoked"), "all": _("all")} %}
       {% for state in states %}
-      <option value="{{ state }}"{% if state == filter.state %} selected{% endif %}>{{ state_words[state] }}</option>
+      <option value="{{ state }}"{% if state == filter.state %} selected{% endif %}>{{ showing_words[state] }}</option>
       {% endfor %}
     </select>
   </label>

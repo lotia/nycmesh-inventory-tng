@@ -93,6 +93,11 @@ clear them; otherwise the call's body. -#}
 {%- else %}{{ caller() }}{% endif -%}
 {%- endmacro %}
 
+{#- That the list shows only `only`'s rows, with a link to show all. -#}
+{% macro only_one(view, only) -%}
+<p>{% trans item=only.name_shown %}Only {{ item }}.{% endtrans %} <a href="{{ view.link(kept=(), page=1) }}">{% trans %}Show all{% endtrans %}</a></p>
+{%- endmacro %}
+
 {#- A table row saying why the list is empty, and what to do next. -#}
 {% macro empty(listing, columns, none_yet) -%}
 <tr><td colspan="{{ columns }}">

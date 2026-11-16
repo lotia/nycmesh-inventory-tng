@@ -52,9 +52,7 @@ from inventory_tng.models import (
     ItemPackage,
     Label,
     Location,
-    Movement,
     OpenPackage,
-    OverRecorded,
     ReadingRule,
     SignInSettings,
     Volunteer,
@@ -78,7 +76,16 @@ from inventory_tng.resets import RESET_NOTICE
 from helpers.devices import new_device
 from helpers.rows import add
 from helpers.sign_in import new_admin
-from helpers.stock import Spools, cut, length, report, retire, write
+from helpers.stock import (
+    Spools,
+    ada_id,
+    cut,
+    length,
+    raised,
+    report,
+    retire,
+    write,
+)
 
 # Each letter accented, so English left out of the catalogue shows plain.
 ACCENTS = str.maketrans(
@@ -253,9 +260,8 @@ def all_mail() -> list[mail.Message]:
 
 
 def every_mail() -> str:
-    """Every mail's subject and body, without the app's name, which is the
-    same in every language."""
-    return " ".join(f"{m.subject} {m.body}" for m in all_mail()).replace(BRAND, "")
+    """Every mail's subject and body."""
+    return " ".join(f"{m.subject} {m.body}" for m in all_mail())
 
 
 def test_every_mail_names_the_app_in_its_subject_and_body() -> None:
@@ -290,10 +296,13 @@ def words_shown(html: str) -> str:
     return " ".join(words.split())
 
 
-def without_brand(html: str) -> str:
-    """`html`'s words but the app's name, the same in every language, which
-    the masthead shows in parts."""
-    return words_shown(html).replace(BRAND, "")
+def english(html: str) -> list[str]:
+    """The words `html` shows in plain English: those with two letters of
+    the English alphabet in a row, not counting character references or
+    the app's name, the same in every language."""
+    shown = words_shown(html).replace(BRAND, "")
+    words = re.findall(r"[\w/+-]+", re.sub(r"&\w+;", " ", shown))
+    return [word for word in words if re.search("[A-Za-z]{2,}", word)]
 
 
 def link(*_: object, **__: object) -> str:
@@ -311,6 +320,13 @@ SIGNED_IN = {
     "title": NAME,
     "back_link": ("/admin", NAME),
 }
+
+
+def signed_in(name: str, **context: object) -> str:
+    """Template `name`, rendered signed in with `context`."""
+    return render(name, **SIGNED_IN, **context)
+
+
 VIEW = SimpleNamespace(
     aria_sort=lambda column: "descending",
     sort_link=link,
@@ -369,6 +385,8 @@ FORMS = SimpleNamespace(
 )
 # A zone whose name has no letters, as a time shows it.
 ZONE = ZoneInfo("Etc/GMT-3")
+DAY = datetime(2026, 11, 15, tzinfo=UTC)
+PLACE = SimpleNamespace(id=1, name=NAME, retired_at=DAY)
 RETIRED_PARTS = """{% from "_retired_record.html" import retired_record, retire_section
   with context %}{% from "_retired.html" import retired %}
 {% for person in [true, false] %}
@@ -378,7 +396,7 @@ RETIRED_PARTS = """{% from "_retired_record.html" import retired_record, retire_
 
 
 def retired_parts() -> str:
-    row = SimpleNamespace(retired_at=datetime(2026, 11, 15, tzinfo=UTC))
+    row = SimpleNamespace(retired_at=DAY)
     return " ".join(
         from_macros(RETIRED_PARTS, row=row, here="/here", zone=ZONE, retired_by=by)
         for by in (NAME, None)
@@ -421,10 +439,6 @@ def units_read() -> str:
         sent={},
         not_a_unit="",
     )
-
-
-DAY = datetime(2026, 11, 15, tzinfo=UTC)
-PLACE = SimpleNamespace(id=1, name=NAME, retired_at=DAY)
 
 
 def recorded(**differs: object) -> SimpleNamespace:
@@ -474,21 +488,18 @@ def recorded_more() -> str:
         recorded(to_place=None),
     ]
     refused = SimpleNamespace(shown=waiting[1], words=NAME, place=PLACE, at=None)
-    shown = without_brand(
-        render(
-            "over_recorded.html",
-            **SIGNED_IN,
-            view=VIEW,
-            recorded_views=[],
-            refused=refused,
-            values={},
-            problems={},
-            reasons={"a": NAME},
-            waiting=waiting,
-            seen=link,
-            only=SimpleNamespace(name_shown=NAME),
-            zone=ZONE,
-        )
+    shown = signed_in(
+        "over_recorded.html",
+        view=VIEW,
+        recorded_views=[],
+        refused=refused,
+        values={},
+        problems={},
+        reasons={"a": NAME},
+        waiting=waiting,
+        seen=link,
+        only=SimpleNamespace(name_shown=NAME),
+        zone=ZONE,
     )
     # A day's month, as strftime names it until the dates are said in the
     # reader's language (inventory-tng-ist.2).
@@ -500,30 +511,27 @@ def count_page() -> str:
     its forms and of one in loose units, and the fields for more."""
     item = SimpleNamespace(id=1, name_shown=NAME, unit=NAME)
     package = SimpleNamespace(id=1, name_shown=NAME)
-    return without_brand(
-        render(
-            "count.html",
-            **SIGNED_IN,
-            place=PLACE,
-            shown=SimpleNamespace(only=item, search=NAME, query=link),
-            items=[1],
-            rows=[
-                (item, Decimal(1)),
-                (SimpleNamespace(**(vars(item) | {"id": 2})), Decimal(-1)),
-            ],
-            forms={
-                1: [
-                    SimpleNamespace(
-                        field="open_1", words=NAME, amount=Decimal(1), open_id=1
-                    )
-                ]
-            },
-            recount={1: (Decimal(1),) * 3, 2: (Decimal(1),) * 3},
-            values={},
-            problems={},
-            others=[item],
-            found_packages=[(package, NAME, NAME)],
-        )
+    return signed_in(
+        "count.html",
+        place=PLACE,
+        shown=SimpleNamespace(only=item, search=NAME, query=link),
+        items=[1],
+        rows=[
+            (item, Decimal(1)),
+            (SimpleNamespace(**(vars(item) | {"id": 2})), Decimal(-1)),
+        ],
+        forms={
+            1: [
+                SimpleNamespace(
+                    field="open_1", words=NAME, amount=Decimal(1), open_id=1
+                )
+            ]
+        },
+        recount={1: (Decimal(1),) * 3, 2: (Decimal(1),) * 3},
+        values={},
+        problems={},
+        others=[item],
+        found_packages=[(package, NAME, NAME)],
     )
 
 
@@ -537,21 +545,18 @@ def counts_page() -> str:
         admin=NAME,
         reason=NAME,
     )
-    return without_brand(
-        render(
-            "counts.html",
-            **SIGNED_IN,
-            view=VIEW,
-            places=[PLACE],
-            values={},
-            problems={},
-            items=[],
-            reasons=[],
-            counted_places=[],
-            kinds=["count", "adjustment"],
-            counters=[],
-            recent=[entry],
-        )
+    return signed_in(
+        "counts.html",
+        view=VIEW,
+        places=[PLACE],
+        values={},
+        problems={},
+        items=[],
+        reasons=[],
+        counted_places=[],
+        kinds=["count", "adjustment"],
+        counters=[],
+        recent=[entry],
     )
 
 
@@ -566,18 +571,17 @@ COVERED: dict[str, Callable[[], str]] = {
     "every mail": every_mail,
     "one retired place holding stock": lambda: retired_holding(1),
     "retired places holding stock": lambda: retired_holding(3),
-    "_retired_holding.html": lambda: templates.get_template(
-        "_retired_holding.html"
-    ).render(retired_places=[SHELF, SHELF], counts_path="/admin/counts"),
-    "page.html": lambda: without_brand(
-        render(
-            "page.html",
-            **SIGNED_IN,
-            tags=SimpleNamespace(styles=[], preloads=[], scripts=[]),
-        )
+    "_retired_holding.html": lambda: render(
+        "_retired_holding.html",
+        retired_places=[SHELF, SHELF],
+        counts_path="/admin/counts",
     ),
-    "error.html, admin_base.html and _masthead.html": lambda: without_brand(
-        render("error.html", **SIGNED_IN, words=NAME)
+    "page.html": lambda: signed_in(
+        "page.html",
+        tags=SimpleNamespace(styles=[], preloads=[], scripts=[]),
+    ),
+    "error.html, admin_base.html and _masthead.html": lambda: signed_in(
+        "error.html", words=NAME
     ),
     "_listing.html, narrowed by a search": lambda: from_macros(
         LISTING_PARTS, view=VIEW, listing=listing()
@@ -631,30 +635,24 @@ COVERED: dict[str, Callable[[], str]] = {
     "over_recorded.html, a row of each kind": recorded_more,
     "count.html, a recount": count_page,
     "counts.html, a count listed": counts_page,
-    "code_made.html": lambda: without_brand(
-        render(
-            "code_made.html",
-            **SIGNED_IN,
-            code=SimpleNamespace(max_uses=2, expires_at=DAY, label=NAME),
-            qr="",
-            phrase=NAME,
-            link="/",
-            register=NAME,
-            zone=ZONE,
-        )
+    "code_made.html": lambda: signed_in(
+        "code_made.html",
+        code=SimpleNamespace(max_uses=2, expires_at=DAY, label=NAME),
+        qr="",
+        phrase=NAME,
+        link="/",
+        register=NAME,
+        zone=ZONE,
     ),
-    "device_revoke.html": lambda: without_brand(
-        render(
-            "device_revoke.html",
-            **SIGNED_IN,
-            devices=[SimpleNamespace(id=1, name=NAME)],
-            filter={},
-            keep="/",
-            here="/",
-        )
+    "device_revoke.html": lambda: signed_in(
+        "device_revoke.html",
+        devices=[SimpleNamespace(id=1, name=NAME)],
+        filter={},
+        keep="/",
+        here="/",
     ),
     "the sign-in pages' forms": lambda: " ".join(
-        without_brand(render(name, **SIGNED_IN, **context))
+        signed_in(name, **context)
         for name, context in (
             (
                 "recover.html",
@@ -707,10 +705,8 @@ COVERED: dict[str, Callable[[], str]] = {
 def test_what_has_moved_says_nothing_in_plain_english(part: str) -> None:
     with speaking(PSEUDO):
         shown = COVERED[part]()
-    # What people read: neither scripts, tags nor character references.
-    words = re.sub(r"&\w+;", " ", words_shown(shown))
-    assert re.findall(r"[A-Za-z]{2,}", words) == []
-    assert words.strip()
+    assert english(shown) == []
+    assert words_shown(shown).strip()
 
 
 @dataclass
@@ -759,7 +755,8 @@ def world(session: Session) -> World:
     retired_item = add(session, Item(name="Old", category_id=retired_category.id))
     retired_place = add(session, Location(name="Old", kind="store"))
     retire(session, retired_item, retired_category, retired_place)
-    stock_to_put_right(spools)
+    admin_id = ada_id(session)
+    stock_to_put_right(spools, admin_id)
     other = add(session, Volunteer(name="Other"))
     merged = add(
         session,
@@ -768,7 +765,7 @@ def world(session: Session) -> World:
     device, _ = new_device(session)
     revoked, _ = new_device(session)
     revoked.revoked_at = datetime.now(UTC)
-    rule = add(session, ReadingRule(token="P", decided_by_admin_id=admin_id(session)))
+    rule = add(session, ReadingRule(token="P", decided_by_admin_id=admin_id))
     # A unit after a number no rule settles, for the readings to propose.
     add(session, Item(name=f"{NAME} 10g", category_id=cable.category_id))
     other_admin, _ = new_admin(session, "grace", email="grace@example.org")
@@ -792,14 +789,7 @@ def world(session: Session) -> World:
     )
 
 
-def admin_id(session: Session) -> int:
-    """The administrator signed in (admin_client)."""
-    found = session.scalars(select(Admin.id)).first()
-    assert found is not None
-    return found
-
-
-def stock_to_put_right(spools: Spools) -> None:
+def stock_to_put_right(spools: Spools, admin_id: int) -> None:
     session = spools.session
     spools.cable.minimum = Decimal(10_000)
     spools.spool.minimum_sealed = 99
@@ -809,19 +799,9 @@ def stock_to_put_right(spools: Spools) -> None:
     write(session, spools.place)
     used_up = report(spools) | {"lengths": None, "used_up": [str(spools.opened().key)]}
     write(session, spools.place, **used_up)
-    for corrected in (False, True):
-        transaction = write(session, spools.place)
-        movement_id = session.scalars(
-            select(Movement.id).where(Movement.transaction_id == transaction.id)
-        ).one()
-        over_recorded.raise_checks(session, {movement_id: Decimal(1)})
-        if corrected:
-            check = session.scalars(
-                select(OverRecorded).where(OverRecorded.movement_id == movement_id)
-            ).one()
-            over_recorded.correct(
-                session, check.id, over_recorded.seen(check), admin_id(session)
-            )
+    raised(session, write(session, spools.place))
+    check = raised(session, write(session, spools.place))
+    over_recorded.correct(session, check.id, over_recorded.seen(check), admin_id)
 
 
 def not_english(session: Session) -> None:
@@ -843,15 +823,19 @@ def not_english(session: Session) -> None:
     session.flush()
 
 
+# Time zones and what they are called now for short, such as EST.
+ZONES = {
+    name
+    for zone in available_timezones()
+    for name in (zone, datetime.now(UTC).astimezone(ZoneInfo(zone)).tzname() or "")
+}
+
+
 def data_words(session: Session) -> set[str]:
     """What a page shows that is the same in every language: unit keys
     (models.UNITS), time zones and their abbreviations, and labels' codes.
     A unit's symbol too (is_a_symbol)."""
-    now = datetime.now(UTC)
-    zones = available_timezones()
-    shortened = {now.astimezone(ZoneInfo(zone)).tzname() or "" for zone in zones}
-    codes = set(session.scalars(select(Label.code)))
-    return {*UNITS, *zones, *shortened, *codes}
+    return {*UNITS, *ZONES, *set(session.scalars(select(Label.code)))}
 
 
 def is_a_symbol(word: str) -> bool:
@@ -941,16 +925,14 @@ def test_a_page_whose_words_have_moved_says_none_in_plain_english(
     with speaking(PSEUDO):
         response = admin_client.get(where)
     assert response.status_code == 200, where
-    words = re.findall(r"[\w/+-]+", re.sub(r"&\w+;", " ", without_brand(response.text)))
-    english = {
+    left = {
         word
-        for word in words
-        if re.search("[A-Za-z]{2,}", word)
-        and not is_a_symbol(word)
+        for word in english(response.text)
+        if not is_a_symbol(word)
         # A new authenticator's key, in groups of four to type.
         and not re.fullmatch("[A-Z2-7]{4}", word)
     }
-    assert english - data_words(session) == set()
+    assert left - data_words(session) == set()
 
 
 @pytest.mark.parametrize("where", SIGNED_OUT)
@@ -961,8 +943,7 @@ def test_a_page_signed_out_says_none_in_plain_english(
         response = client.get(where)
     # A reset link that doesn't work says so, as not found.
     assert response.status_code in {200, 404}, where
-    words = re.findall(r"[\w/+-]+", re.sub(r"&\w+;", " ", without_brand(response.text)))
-    assert [word for word in words if re.search("[A-Za-z]{2,}", word)] == []
+    assert english(response.text) == []
 
 
 def test_english_is_the_catalogues_own_words() -> None:

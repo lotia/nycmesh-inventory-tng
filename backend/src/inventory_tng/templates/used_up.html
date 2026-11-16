@@ -1,12 +1,12 @@
 {% extends "admin_base.html" %}
 {% from "_table.html" import table %}
-{% from "_listing.html" import sizes, sort_heading, pager %}
+{% from "_listing.html" import sizes, sort_heading, pager, only_one %}
 {% block main %}
 <p class="hint">{% trans %}Volunteers said these open packages are used up. Confirm
 one to close it: what it still shows is written off, with the reason Used
 up. Not used up offers it again, for a box ticked by mistake.{% endtrans %}</p>
 {% if only %}
-<p>{% trans item=only.name_shown %}Only {{ item }}.{% endtrans %} <a href="{{ view.link(kept=(), page=1) }}">{% trans %}Show all{% endtrans %}</a></p>
+{{ only_one(view, only) }}
 {% endif %}
 {#- The packages ticked belong to this form. #}
 <form method="post" action="{{ here }}{{ view.query_string }}" id="answer-ticked"></form>
