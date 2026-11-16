@@ -86,9 +86,10 @@ test("a search finds what it found before units were read, and by units too", as
 }) => {
   // Saved as typed: a unit's word never spells a name (Ali, 2026-11-15),
   // and is shown spaced as a symbol is (inventory-tng-tze).
+  const what = "PoE 100 feet 48 VDC";
   const words = "PoE 100\u00a0feet 48\u00a0VDC";
-  const name = await ownCable(page, "PoE 100 feet 48 VDC", words);
-  const shown = name.replace("PoE 100 feet 48 VDC", words);
+  const name = await ownCable(page, what, words);
+  const shown = name.replace(what, words);
   const find = page.getByLabel(/Find an item/);
   const found = page.getByRole("button", { name: shown, exact: true });
   await page.goto("/scan");

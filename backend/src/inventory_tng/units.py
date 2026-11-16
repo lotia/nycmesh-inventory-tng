@@ -32,7 +32,7 @@ import json
 import re
 import sys
 import unicodedata
-from collections.abc import Mapping
+from collections.abc import Iterator, Mapping
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -441,14 +441,20 @@ _NOUGHT = re.compile(r"(?:(?<![^\W_])[-\u2212])?(?<![^\W_])(?<![0-9][.,])0,[0-9]
 type Edit = tuple[int, int, str]
 
 
+def _after_a_number(text: str) -> Iterator[re.Match[str]]:
+    """Each match of AFTER_A_NUMBER in `text` that may be a unit: none
+    beside a combining mark (_marked) or in a product's name (_product)."""
+    for match in AFTER_A_NUMBER.finditer(text):
+        if not _marked(text, match.end()) and not _product(text, match.end(1) - 1):
+            yield match
+
+
 def _edits(text: str, rules: Rules | None) -> list[Edit]:
     """What respell changes in `text`, in order: each unit read right after
     a number, from its number, and each unit alone spelt with a sign no word
     is."""
     edits: list[Edit] = []
-    for match in AFTER_A_NUMBER.finditer(text):
-        if _marked(text, match.end()) or _product(text, match.end(1) - 1):
-            continue
+    for match in _after_a_number(text):
         if grouped := _NOUGHT.search(text, 0, match.end(1)):
             number = grouped[0].replace(",", ".")
         else:
@@ -774,8 +780,7 @@ def found_in(name: str, rules: Rules | None = None) -> list[Found]:
     so `℃` is `°C`."""
     return [
         found
-        for match in AFTER_A_NUMBER.finditer(name)
-        if not _marked(name, match.end()) and not _product(name, match.end(1) - 1)
+        for match in _after_a_number(name)
         if (found := _found(name, match, rules)) is not None
     ]
 
@@ -914,19 +919,16 @@ def shown_name(name: str, rules: Rules | None = None) -> str:
     (_IN_A_CODE, _INTO_A_CODE), as typed. `name` is as saved
     (models.canonical, spell)."""
     edits = []
-    for match in AFTER_A_NUMBER.finditer(name):
-        if _marked(name, match.end()) or _product(name, match.end(1) - 1):
-            continue
+    for match in _after_a_number(name):
         number, token = _number(name, match.end(1)), match[2]
         start = match.end(1) - len(number)
-        found = _found(name, match, rules)
-        # A word, which no form reads, is read as search reads it (_edits).
-        unit = read(token) if found is None else found.read
-        if (
-            unit is None
-            or _IN_A_CODE.match(name[start - 1 : start])
-            or _INTO_A_CODE.match(name, match.end())
+        if _IN_A_CODE.match(name[start - 1 : start]) or _INTO_A_CODE.match(
+            name, match.end()
         ):
+            continue
+        found = _found(name, match, rules, number)
+        # A word no form reads, as _edits reads it.
+        if (read(token) if found is None else found.read) is None:
             continue
         spelt = _shown_number(number) + NO_BREAK_SPACE + token
         edits.append((start, match.end(), spelt))
