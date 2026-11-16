@@ -145,8 +145,12 @@ export type ReportKind = keyof typeof REPORTS;
 const isReport = (kind: unknown): kind is ReportKind =>
   typeof kind === "string" && Object.hasOwn(REPORTS, kind);
 
-/** A kind of problem a 422 names (backend ledger.BatchProblem). */
-export type ProblemKind = Schemas["BatchProblem"]["type"];
+/** A kind of problem a 422 names: the ledger's (backend
+ * ledger.BatchProblem), or a line's package size in FastAPI's own
+ * (ledger.SizeProblem). */
+export type ProblemKind =
+  | Schemas["BatchProblem"]["type"]
+  | Schemas["SizeProblem"]["type"];
 
 const isProblem = (kind: string): kind is ProblemKind =>
   Object.hasOwn(PROBLEMS, kind);

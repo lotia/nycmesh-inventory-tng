@@ -163,24 +163,24 @@ export interface components {
      *     and its kind, which the scan page words itself.
      */
     BatchProblem: {
-      /** Type */
+      /**
+       * Type
+       * @enum {string}
+       */
       type:
-        | (
-            | "not_found"
-            | "not_whole"
-            | "not_whole_packages"
-            | "one_package"
-            | "open_package_closed"
-            | "open_package_elsewhere"
-            | "open_package_whole"
-            | "moved_whole"
-            | "package_resized"
-            | "refused"
-            | "retired"
-            | "retired_package"
-            | "repeated"
-          )
-        | ("package_size_required" | "package_size_without_package");
+        | "not_found"
+        | "not_whole"
+        | "not_whole_packages"
+        | "one_package"
+        | "open_package_closed"
+        | "open_package_elsewhere"
+        | "open_package_whole"
+        | "moved_whole"
+        | "package_resized"
+        | "refused"
+        | "retired"
+        | "retired_package"
+        | "repeated";
       /** Loc */
       loc: (string | number)[];
     };
@@ -206,7 +206,10 @@ export interface components {
     /** BodyRefusedReply */
     BodyRefusedReply: {
       /** Detail */
-      detail: components["schemas"]["BodyProblem"][];
+      detail: (
+        | components["schemas"]["SizeProblem"]
+        | components["schemas"]["BodyProblem"]
+      )[];
     };
     /**
      * BuildTooOldReply
@@ -707,6 +710,22 @@ export interface components {
     Settings: {
       /** Name Check Minutes */
       name_check_minutes: number;
+    };
+    /**
+     * SizeProblem
+     * @description A line's package_size refused by its own check, in FastAPI's own
+     *     422: one of the kinds there the scan page words itself.
+     */
+    SizeProblem: {
+      /**
+       * Type
+       * @enum {string}
+       */
+      type: "package_size_required" | "package_size_without_package";
+      /** Loc */
+      loc: (string | number)[];
+      /** Msg */
+      msg: string;
     };
     /** UnavailableReply */
     UnavailableReply: {

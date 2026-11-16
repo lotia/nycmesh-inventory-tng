@@ -472,32 +472,21 @@
       "BatchProblem": {
         "properties": {
           "type": {
-            "anyOf": [
-              {
-                "type": "string",
-                "enum": [
-                  "not_found",
-                  "not_whole",
-                  "not_whole_packages",
-                  "one_package",
-                  "open_package_closed",
-                  "open_package_elsewhere",
-                  "open_package_whole",
-                  "moved_whole",
-                  "package_resized",
-                  "refused",
-                  "retired",
-                  "retired_package",
-                  "repeated"
-                ]
-              },
-              {
-                "type": "string",
-                "enum": [
-                  "package_size_required",
-                  "package_size_without_package"
-                ]
-              }
+            "type": "string",
+            "enum": [
+              "not_found",
+              "not_whole",
+              "not_whole_packages",
+              "one_package",
+              "open_package_closed",
+              "open_package_elsewhere",
+              "open_package_whole",
+              "moved_whole",
+              "package_resized",
+              "refused",
+              "retired",
+              "retired_package",
+              "repeated"
             ],
             "title": "Type"
           },
@@ -569,7 +558,14 @@
         "properties": {
           "detail": {
             "items": {
-              "$ref": "#/components/schemas/BodyProblem"
+              "anyOf": [
+                {
+                  "$ref": "#/components/schemas/SizeProblem"
+                },
+                {
+                  "$ref": "#/components/schemas/BodyProblem"
+                }
+              ]
             },
             "type": "array",
             "title": "Detail"
@@ -1670,6 +1666,37 @@
         "required": ["name_check_minutes"],
         "title": "Settings",
         "description": "How the page behaves, as administrators set it (models.ScanSettings)."
+      },
+      "SizeProblem": {
+        "properties": {
+          "type": {
+            "type": "string",
+            "enum": ["package_size_required", "package_size_without_package"],
+            "title": "Type"
+          },
+          "loc": {
+            "items": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "integer"
+                }
+              ]
+            },
+            "type": "array",
+            "title": "Loc"
+          },
+          "msg": {
+            "type": "string",
+            "title": "Msg"
+          }
+        },
+        "type": "object",
+        "required": ["type", "loc", "msg"],
+        "title": "SizeProblem",
+        "description": "A line's package_size refused by its own check, in FastAPI's own\n422: one of the kinds there the scan page words itself."
       },
       "UnavailableReply": {
         "properties": {

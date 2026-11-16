@@ -902,7 +902,7 @@ class BatchProblem(BaseModel):
     """One problem of a refused batch, shaped as FastAPI's own are: where,
     and its kind, which the scan page words itself."""
 
-    type: ProblemKind | SizeProblemKind
+    type: ProblemKind
     loc: list[str | int]
 
 
@@ -920,8 +920,17 @@ class BodyProblem(BaseModel):
     msg: str
 
 
+class SizeProblem(BaseModel):
+    """A line's package_size refused by its own check, in FastAPI's own
+    422: one of the kinds there the scan page words itself."""
+
+    type: SizeProblemKind
+    loc: list[str | int]
+    msg: str
+
+
 class BodyRefusedReply(BaseModel):
-    detail: list[BodyProblem]
+    detail: list[SizeProblem | BodyProblem]
 
 
 class BatchRefused(Exception):

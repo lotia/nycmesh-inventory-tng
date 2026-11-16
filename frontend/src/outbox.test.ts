@@ -503,11 +503,10 @@ describe("refusals", () => {
     );
   });
 
-  test.each(
-    openapi.components.schemas.BatchProblem.properties.type.anyOf.flatMap(
-      (each: { enum: string[] }) => each.enum,
-    ),
-  )(
+  test.each([
+    ...openapi.components.schemas.BatchProblem.properties.type.enum,
+    ...openapi.components.schemas.SizeProblem.properties.type.enum,
+  ])(
     "a problem of kind %s is said in the page's words for it, in the language spoken as it is shown",
     async (kind) => {
       const detail = [{ type: kind, loc: ["body", "lines", 0, "quantity"] }];

@@ -49,16 +49,29 @@ def test_refusals_name_their_reasons(schema: dict[str, Any]) -> None:
 
 def test_a_refused_batch_names_every_kind_of_problem(schema: dict[str, Any]) -> None:
     """The scan page words each kind the schema lists (outbox.ts, PROBLEMS),
-    so every kind the ledger or a line's check refuses with is listed."""
+    so every kind the ledger or a line's check refuses with is listed: the
+    ledger's in its own reply, a line's package size in FastAPI's, never
+    the one where the other is."""
+    replies = schema["components"]["schemas"]
     refused = schema["paths"]["/api/transactions"]["post"]["responses"]["422"]
     # Or FastAPI's own, for a body that cannot be a batch at all.
     assert refused["content"]["application/json"]["schema"]["anyOf"] == [
         {"$ref": "#/components/schemas/BatchRefusedReply"},
         {"$ref": "#/components/schemas/BodyRefusedReply"},
     ]
-    kind = schema["components"]["schemas"]["BatchProblem"]["properties"]["type"]
-    listed = {each for options in kind["anyOf"] for each in options["enum"]}
-    assert listed == set(get_args(ledger.ProblemKind)) | set(
+    assert replies["BatchRefusedReply"]["properties"]["detail"]["items"] == {
+        "$ref": "#/components/schemas/BatchProblem"
+    }
+    assert set(replies["BatchProblem"]["properties"]["type"]["enum"]) == set(
+        get_args(ledger.ProblemKind)
+    )
+    assert replies["BodyRefusedReply"]["properties"]["detail"]["items"] == {
+        "anyOf": [
+            {"$ref": "#/components/schemas/SizeProblem"},
+            {"$ref": "#/components/schemas/BodyProblem"},
+        ]
+    }
+    assert set(replies["SizeProblem"]["properties"]["type"]["enum"]) == set(
         get_args(ledger.SizeProblemKind)
     )
 
