@@ -5,8 +5,9 @@ docs/decisions/0010; inventory-tng-e0y)."""
 
 import json
 import re
-from collections.abc import Callable, Iterator
+from collections.abc import Callable, Iterator, MutableMapping
 from pathlib import Path
+from typing import Any
 
 import pytest
 from fastapi import FastAPI
@@ -172,19 +173,33 @@ def test_a_dev_server_over_https_reloads_over_wss() -> None:
     assert "wss://localhost:5173" in policy
 
 
-def test_the_api_docs_load_swagger_with_a_nonce(
+def test_the_api_docs_load_swagger_with_a_nonce_in_development(
     make_client_without_database: Callable[..., TestClient],
 ) -> None:
     """FastAPI's page loads Swagger UI from its CDN and starts it with an
-    inline script, which only that page's policy allows, by its nonce."""
-    response = make_client_without_database().get(security_headers.DOCS)
+    inline script, which only that page's policy allows, by its nonce; never
+    kept, as the nonce is this response's only."""
+    client = make_client_without_database(development=True)
+    response = client.get(security_headers.DOCS)
     assert response.status_code == 200
+    assert response.headers["cache-control"] == "no-store"
     policy = directives(response)
     (nonce,) = set(re.findall(r'<script nonce="([^"]+)">', response.text))
     assert f"'nonce-{nonce}'" in policy["script-src"]
     assert security_headers.SWAGGER_CDN in policy["script-src"]
     assert security_headers.SWAGGER_CDN in policy["style-src"]
     assert "<script>" not in response.text
+    assert nonce not in client.get(security_headers.DOCS).text
+
+
+def test_no_api_docs_outside_development(built: TestClient) -> None:
+    """A CDN's script would run as this origin's: outside development there
+    is no docs page, and its address has the policy every page has. The
+    schema stays."""
+    response = built.get(security_headers.DOCS)
+    assert response.status_code == 404
+    assert_protected(response)
+    assert built.get("/api/schema").status_code == 200
 
 
 @pytest.mark.clone
@@ -192,7 +207,8 @@ def test_no_template_has_inline_script_or_style() -> None:
     """The policy refuses them: a page's script is a file Vite builds
     (frontend/src/admin.ts), its look a class in the shared stylesheet."""
     inline = re.compile(
-        r"<script(?![^>]*\bsrc=)[^>]*>|<style\b|\sstyle=|\son[a-z]+=", re.IGNORECASE
+        r"<script(?![^>]*\bsrc=)[^>]*>|<style\b|\sstyle=|\son[a-z]+=|javascript:",
+        re.IGNORECASE,
     )
     templates = CLONE / "backend" / "src" / "inventory_tng" / "templates"
     found = {
@@ -231,6 +247,11 @@ REPORTING_API = [
 ]
 
 
+def refusals(logs: list[MutableMapping[str, Any]]) -> list[object]:
+    """Why the report endpoint said each refusal it logged was refused."""
+    return [line["reason"] for line in logs if line["event"] == "policy report refused"]
+
+
 @pytest.fixture
 def reports(make_client_without_database: Callable[..., TestClient]) -> TestClient:
     return make_client_without_database()
@@ -256,6 +277,26 @@ def send(client: TestClient, report: object, content_type: str) -> Response:
             ["img-src"],
         ),
         ({"csp-report": {"effective-directive": 7}}, "application/json", ["other"]),
+        (
+            {"csp-report": {"effective-directive": {"script-src": 1}}},
+            "application/csp-report",
+            ["other"],
+        ),
+        (
+            {
+                "csp-report": {
+                    "effective-directive": "img-src",
+                    "violated-directive": " ",
+                }
+            },
+            "application/csp-report",
+            ["img-src"],
+        ),
+        (
+            [{"type": "csp-violation", "body": {"effectiveDirective": ["img-src"]}}],
+            "application/reports+json",
+            ["other"],
+        ),
     ],
 )
 def test_a_report_is_counted_by_directive_and_nothing_it_says_is_kept(
@@ -278,22 +319,52 @@ def test_a_report_is_counted_by_directive_and_nothing_it_says_is_kept(
 
 @pytest.mark.parametrize(
     "body",
-    [b"not json", b"{}", b"[]", b'{"csp-report": "x"}', b'[{"type": "deprecation"}]'],
+    [
+        b"not json",
+        b"\xff",
+        b"{}",
+        b"[]",
+        b'{"csp-report": "x"}',
+        b'[{"type": "deprecation"}]',
+        # Nested deeper than the parser goes, well inside MOST_BYTES.
+        b"[" * 10_000 + b"]" * 10_000,
+        b"[" * 20_000,
+    ],
 )
 def test_what_is_no_report_is_refused(reports: TestClient, body: bytes) -> None:
-    response = reports.post(
-        security_headers.REPORTS,
-        content=body,
-        headers={"Content-Type": "application/csp-report"},
-    )
+    with capture_logs() as logs:
+        response = reports.post(
+            security_headers.REPORTS,
+            content=body,
+            headers={"Content-Type": "application/csp-report"},
+        )
     assert response.status_code == 400
+    assert refusals(logs) == ["not_a_report"]
+
+
+@pytest.mark.parametrize(
+    "content_type", ["text/plain", "application/x-www-form-urlencoded", None]
+)
+def test_a_report_of_another_type_is_refused(
+    reports: TestClient, content_type: str | None
+) -> None:
+    """Browsers send reports as JSON of their own types; nothing else is one."""
+    headers = {} if content_type is None else {"Content-Type": content_type}
+    with capture_logs() as logs:
+        response = reports.post(
+            security_headers.REPORTS, content=json.dumps(REPORT_URI), headers=headers
+        )
+    assert response.status_code == 415
+    assert refusals(logs) == ["not_a_report_type"]
 
 
 def test_a_report_too_large_is_refused(reports: TestClient) -> None:
     long = "x" * security_headers.MOST_BYTES
     padded = {"csp-report": {"effective-directive": "img-src", "sample": long}}
-    response = send(reports, padded, "application/csp-report")
+    with capture_logs() as logs:
+        response = send(reports, padded, "application/csp-report")
     assert response.status_code == 413
+    assert refusals(logs) == ["too_large"]
 
 
 def test_a_batch_counts_only_so_many(reports: TestClient) -> None:

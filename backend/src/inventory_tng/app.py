@@ -78,7 +78,8 @@ def create_app(
         title=BRAND,
         lifespan=lifespan,
         openapi_url="/api/schema",
-        # Served by security_headers.docs, under a policy of its own.
+        # security_headers.docs, in development only, under a policy of its
+        # own.
         docs_url=None,
         redoc_url=None,
         responses=db.UNAVAILABLE,
@@ -102,7 +103,9 @@ def create_app(
     # Outermost, so every answer has them, failures and refusals included.
     # Vite's dev server: development only (Settings).
     app.add_middleware(
-        security_headers.SecurityHeaders, dev_server=settings.frontend.dev_server
+        security_headers.SecurityHeaders,
+        dev_server=settings.frontend.dev_server,
+        docs=settings.development,
     )
     app.include_router(health.router, prefix=API)
     app.include_router(devices.router, prefix=API)
@@ -110,6 +113,8 @@ def create_app(
     app.include_router(catalogue.router, prefix=API)
     app.include_router(page_telemetry.router, prefix=API)
     app.include_router(security_headers.router)
+    if settings.development:
+        app.include_router(security_headers.docs_router)
     app.include_router(bundle.router)
     app.include_router(sign_in.router)
     app.include_router(account.router)

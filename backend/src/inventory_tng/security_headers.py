@@ -12,7 +12,8 @@ styles, reloads them over a websocket, and adds each stylesheet as a
 <style>, which the policy allows by a nonce made for each response
 (csp_nonce, which the pages put where Vite's client reads it). So does the
 API's docs page, FastAPI's, for the one inline script that starts Swagger UI,
-which comes from its CDN.
+which comes from its CDN: in development only, as the CDN's script would run
+as this origin's, a signed-in administrator's requests included.
 
 A violation is counted by its directive, from a fixed list, and nothing else
 a report says is kept or logged: it names pages, addresses and what the page
@@ -22,7 +23,7 @@ held. Reports count against their address as the pages' telemetry does
 
 import json
 import secrets
-from collections.abc import Iterator
+from collections.abc import Iterable
 from typing import Any, cast
 
 import structlog
@@ -50,9 +51,10 @@ router = APIRouter()
 REPORTS = "/api/csp-reports"
 REPORT_GROUP = "csp"
 # The API's docs page (app.py), FastAPI's Swagger UI, and where its script
-# and stylesheet come from (fastapi.openapi.docs).
+# and stylesheet come from (fastapi.openapi.docs): that package only, not
+# the rest of the CDN.
 DOCS = "/api/docs"
-SWAGGER_CDN = "https://cdn.jsdelivr.net"
+SWAGGER_CDN = "https://cdn.jsdelivr.net/npm/swagger-ui-dist@5/"
 SWAGGER_FAVICON = "https://fastapi.tiangolo.com"
 
 # Where the response's nonce is kept, in the request's state.
@@ -62,6 +64,11 @@ NONCE_BYTES = 16
 # A page's violations come a few at a time, and each is one request in
 # browsers that use report-uri.
 REPORTS_ALLOWED = RateLimitItemPerMinute(30)
+# What browsers send reports as: report-uri's, the Reporting API's, and
+# plain JSON, which older browsers used.
+REPORT_TYPES = frozenset(
+    {"application/csp-report", "application/reports+json", "application/json"}
+)
 # A report is a few hundred bytes, the Reporting API's a list of them.
 MOST_BYTES = 32 * 1024
 MOST_REPORTS = 20
@@ -155,17 +162,21 @@ def content_security_policy(
 
 class SecurityHeaders:
     """Adds the headers to every response, the app's error pages and its
-    static files included. `dev_server`: Vite's, in development only."""
+    static files included. `dev_server`: Vite's, and `docs`, whether the
+    API's docs page is served: both in development only."""
 
-    def __init__(self, app: ASGIApp, *, dev_server: str | None) -> None:
+    def __init__(
+        self, app: ASGIApp, *, dev_server: str | None, docs: bool = False
+    ) -> None:
         self.app = app
         self.dev_server = dev_server
+        self.docs = docs
 
     async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
         if scope["type"] != "http":
             await self.app(scope, receive, send)
             return
-        docs = scope["path"] == DOCS
+        docs = self.docs and scope["path"] == DOCS
         nonce = None
         if self.dev_server is not None or docs:
             nonce = secrets.token_urlsafe(NONCE_BYTES)
@@ -198,27 +209,32 @@ def csp_nonce(request: Request) -> str | None:
 cast(dict[str, Any], templates.env.globals)["csp_nonce"] = csp_nonce
 
 
-@router.get(DOCS, include_in_schema=False)
+# The API's docs page, which app.py adds in development only.
+docs_router = APIRouter()
+
+
+@docs_router.get(DOCS, include_in_schema=False)
 def docs(request: Request) -> HTMLResponse:
-    """FastAPI's docs page, its inline script allowed by the nonce."""
+    """FastAPI's docs page, its inline script allowed by the nonce, which is
+    this response's only: never kept."""
     page = get_swagger_ui_html(
         openapi_url=str(request.app.openapi_url), title=f"{BRAND} API"
     )
     nonce = csp_nonce(request)
     body = bytes(page.body).replace(b"<script>", f'<script nonce="{nonce}">'.encode())
-    return HTMLResponse(body)
+    return HTMLResponse(body, headers={"Cache-Control": "no-store"})
 
 
 def violated(report: object) -> list[str]:
     """Each violation's directive, from report-uri's one report or the
     Reporting API's list (its csp-violation reports, MOST_REPORTS at most);
     "other" for one not in DIRECTIVES."""
-    found: Iterator[object]
+    found: Iterable[object]
     if isinstance(report, dict) and isinstance(body := report.get("csp-report"), dict):
         # Older browsers name the whole directive, sources and all.
         named = body.get("violated-directive")
-        first = named.split()[0] if isinstance(named, str) and named else None
-        found = iter([body.get("effective-directive") or first])
+        first = named.split()[0] if isinstance(named, str) and named.strip() else None
+        found = [body.get("effective-directive") or first]
     elif isinstance(report, list):
         found = (
             entry["body"].get("effectiveDirective")
@@ -229,7 +245,10 @@ def violated(report: object) -> list[str]:
         )
     else:
         return []
-    return [name if name in DIRECTIVES else OTHER for name in found]
+    return [
+        name if isinstance(name, str) and name in DIRECTIVES else OTHER
+        for name in found
+    ]
 
 
 async def _body(request: Request) -> bytes | None:
@@ -251,14 +270,20 @@ async def report(request: Request) -> Response:
         log.info("policy report refused", reason="rate_limited")
         body = RateLimitedReply(reason="rate_limited").model_dump()
         return JSONResponse(body, status_code=429)
+    content_type = request.headers.get("content-type", "").split(";")[0]
+    if content_type.strip().lower() not in REPORT_TYPES:
+        log.info("policy report refused", reason="not_a_report_type")
+        return Response(status_code=415)
     raw = await _body(request)
     if raw is None:
+        log.info("policy report refused", reason="too_large")
         return Response(status_code=413)
     try:
         found = violated(json.loads(raw))
-    except ValueError:
+    except ValueError, RecursionError:
         found = []
     if not found:
+        log.info("policy report refused", reason="not_a_report")
         return Response(status_code=400)
     for directive in found:
         violations.add(1, {"directive": directive})

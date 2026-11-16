@@ -34,9 +34,10 @@ keys, below).
   authenticators (TOTP keys, below).
 - `APP_ENV`: leave unset in production. `development` is for local work
   only: it stops masking personal data in logs and redacting traces, lets the
-  cookie travel over http, re-reads the scan page's build on every page, and
-  allows `UNMASK_SECRETS`, `LOG_REDACTION=off`, `TRACE_REDACTION=off` and
-  `VITE_DEV_SERVER`.
+  cookie travel over http, re-reads the scan page's build on every page,
+  serves the API's docs page (`/api/docs`, whose Swagger UI comes from a
+  CDN), and allows `UNMASK_SECRETS`, `LOG_REDACTION=off`,
+  `TRACE_REDACTION=off` and `VITE_DEV_SERVER`.
 - `SETUP_TOKEN`: lets the first administrator set up (below); at least 32
   characters. Remove it once they have.
 - `RECOVERY_TOKEN`: lets a locked-out administrator back in (below); at

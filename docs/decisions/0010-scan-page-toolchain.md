@@ -348,8 +348,16 @@ the compressed copy (fiddly header code ServeStatic already gets right).
   whose client reads the nonce from the page, with the dev server's address
   and websocket allowed there only; and the API's docs page, FastAPI's,
   whose inline script starts Swagger UI from its CDN, which that page alone
-  allows. Ali chose to enforce it from the start, as nothing is deployed
-  and both browser suites fail on any violation, which they listen for in
+  allows. That page is served in development only (decided in the review
+  of inventory-tng-e0y, 2026-11-16): the CDN's script would run as this
+  origin's, with a signed-in administrator's cookie, so a compromised CDN
+  could act as them. We rejected serving Swagger UI's files ourselves from
+  a pinned package (more to build and keep current for a page operators
+  rarely need) and keeping the CDN with Subresource Integrity hashes
+  (FastAPI's page has none, and they would have to follow its versions).
+  The schema, `/api/schema`, is served everywhere. Ali chose to enforce
+  the policy from the start, as nothing is deployed and both browser
+  suites fail on any violation, which they listen for in
   every page they open; we rejected report-only first. Violations are
   counted (Ali, same day): browsers report them to an endpoint the policy
   names (`report-uri`, and `report-to` for browsers with the Reporting API,
