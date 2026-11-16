@@ -1,14 +1,26 @@
 {% extends "admin_base.html" %}
 {% from "_table.html" import table %}
-{% from "_listing.html" import search_box, filters, summary, empty, pager %}
+{% from "_listing.html" import search_box, filters, filter_form, sizes, sort_heading, summary, empty, pager %}
 {% block main %}
+{% set view = listing.view %}
 {{ search_box(listing, "volunteers") }}
 {{ filters(listing) }}
+{% call filter_form(view) %}
+  <label>Filter by holding stock
+    <select name="holds">
+      <option value="">Any</option>
+      <option value="yes"{% if view.filtered("holds") == "yes" %} selected{% endif %}>Holds stock</option>
+      <option value="no"{% if view.filtered("holds") == "no" %} selected{% endif %}>Holds none</option>
+    </select>
+  </label>
+{% endcall %}
 
 <section>
   {{ summary(listing, "volunteer", "volunteers") }}
+  {{ sizes(view) }}
   {% call table() %}
-    <tr><th>Volunteer</th><th class="hidden sm:table-cell">Holds stock</th></tr>
+    <tr>{{ sort_heading(view, "name", "Volunteer") }}
+      {{- sort_heading(view, "holds", "Holds stock", "hidden sm:table-cell") }}</tr>
     {% for volunteer in listing.rows %}
     {% set holds = volunteer.id in holders %}
     <tr>

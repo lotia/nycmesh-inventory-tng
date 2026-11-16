@@ -2,6 +2,7 @@
 revoked from the labels page (admin/labels.py)."""
 
 import re
+from datetime import UTC, datetime
 from decimal import Decimal
 from urllib.parse import parse_qs, urlsplit
 
@@ -28,7 +29,7 @@ from inventory_tng.models import (
     Volunteer,
 )
 
-from helpers.rows import add, history
+from helpers.rows import add, history, tag
 from helpers.sign_in import text
 from helpers.stock import stocked, write
 
@@ -419,3 +420,97 @@ def test_printing_refused_goes_back_to_the_list_as_it_was(
         sent.headers["location"]
         == f"{LABELS}?q=cat6&show=all&page=2&notice=pick_labels"
     )
+
+
+def test_labels_sort_by_each_heading_either_way(
+    admin_client: TestClient, session: Session
+) -> None:
+    """By what they name unless a heading sorts them; pressed again, the
+    other way (Ali, 2026-11-15, inventory-tng-qwb)."""
+    mark = tag()
+    stuff = add(session, Category(name=f"Sorted {mark}"))
+    bravo, alpha = (
+        add(
+            session,
+            Label(
+                item_id=add(session, Item(name=name, category_id=stuff.id)).id,
+                created_at=datetime(2026, 1, day, tzinfo=UTC),
+            ),
+        )
+        for day, name in ((1, f"Sorted {mark} Bravo"), (2, f"Sorted {mark} Alpha"))
+    )
+
+    def order(**query: str) -> list[str]:
+        params = {"q": f"Sorted {mark}", "per": "all"} | query
+        return codes_listed(text(admin_client.get(LABELS, params=params)))
+
+    assert order(sort="names") == [alpha.code, bravo.code]
+    assert order(sort="names", order="desc") == [bravo.code, alpha.code]
+    assert order(sort="made") == [alpha.code, bravo.code]
+    assert order(sort="made", order="asc") == [bravo.code, alpha.code]
+    assert order(sort="code") == sorted([alpha.code, bravo.code])
+    assert order(sort="code", order="desc") == sorted(
+        [alpha.code, bravo.code], reverse=True
+    )
+    page = admin_client.get(LABELS).text
+    assert (
+        '<th aria-sort="ascending"><a href="/admin/labels?sort=names&amp;order=desc">'
+        "Names"
+    ) in page
+    assert '<a href="/admin/labels?sort=made">Made</a>' in page
+
+
+def test_labels_show_25_50_100_or_all(
+    admin_client: TestClient, session: Session, shelf: Location
+) -> None:
+    mark = tag()
+    for number in range(30):
+        area = add(
+            session,
+            Location(name=f"Sized {mark} {number:03}", kind="area", parent_id=shelf.id),
+        )
+        add(session, Label(location_id=area.id))
+    query = {"q": f"Sized {mark}"}
+    assert len(codes_listed(text(admin_client.get(LABELS, params=query)))) == 30
+    sized = text(admin_client.get(LABELS, params=query | {"per": "25"}))
+    assert len(codes_listed(sized)) == 25
+    assert "Page 1 of 2" in sized
+    every = admin_client.get(LABELS, params=query | {"per": "all"}).text
+    assert len(codes_listed(every)) == 30
+    assert '" aria-current="page">All</a>' in every
+
+
+def test_labels_filter_by_kind_and_item(
+    admin_client: TestClient, session: Session, cable: Item, shelf: Location
+) -> None:
+    """Items' labels or places', and one item's (Ali, 2026-11-15)."""
+    on_cable = add(session, Label(item_id=cable.id))
+    on_shelf = add(session, Label(location_id=shelf.id))
+    other = add(session, Item(name="Patch cord", category_id=cable.category_id))
+    on_other = add(session, Label(item_id=other.id))
+
+    def listed(**query: str) -> set[str]:
+        page = text(admin_client.get(LABELS, params={"per": "all"} | query))
+        return set(codes_listed(page))
+
+    mine = {on_cable.code, on_shelf.code, on_other.code}
+    assert listed(kind="item") & mine == {on_cable.code, on_other.code}
+    assert listed(kind="place") & mine == {on_shelf.code}
+    assert listed(item=str(cable.id)) == {on_cable.code}
+    assert listed(kind="place", item=str(cable.id)) == set()
+    # A kind not offered, or an item not a number, is no filter.
+    assert listed(kind="box", item="x") >= mine
+    page = text(admin_client.get(LABELS, params={"item": str(cable.id)}))
+    assert f'<option value="{cable.id}" selected>Cat6 cable</option>' in page
+    assert f'<a href="{LABELS}">Clear</a>' in page
+    # Printing keeps the filter, to come back to.
+    assert '<input type="hidden" name="item" value="' in page
+    sent = admin_client.get(PRINT, params={"item": str(cable.id), "per": "25"})
+    assert sent.headers["location"] == (
+        f"{LABELS}?item={cable.id}&per=25&notice=pick_labels"
+    )
+    # The search box's suggestions come from the filter too.
+    offered = admin_client.get(
+        f"{LABELS}/suggest", params={"q": "cable", "kind": "place"}
+    ).json()
+    assert on_cable.code not in [each["hint"] for each in offered]

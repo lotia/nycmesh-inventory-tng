@@ -8,9 +8,9 @@ from collections.abc import Mapping
 from typing import Annotated
 
 import structlog
-from fastapi import APIRouter, Form, Request
+from fastapi import APIRouter, Depends, Form, Request
 from fastapi.responses import HTMLResponse, JSONResponse, Response
-from sqlalchemy import func, select
+from sqlalchemy import exists, func, not_, select
 from sqlalchemy.orm import Session
 
 from inventory_tng import volunteers
@@ -28,7 +28,7 @@ from inventory_tng.admin.common import (
     rule_words,
     undo_retire,
 )
-from inventory_tng.admin.listing import Listing, Searched
+from inventory_tng.admin.listing import Listing, Searched, Sort, Sorting
 from inventory_tng.db import DbSession, attempt
 from inventory_tng.models import Location, Volunteer
 from inventory_tng.pages import NOTICES, not_found, redirect
@@ -51,8 +51,57 @@ NOTICES.update(
 )
 
 
+# Whether a volunteer holds stock: has a current custody location.
+HOLDS = exists().where(
+    Location.kind == "custody",
+    Location.retired_at.is_(None),
+    Location.volunteer_id == Volunteer.id,
+)
+# How the volunteers list sorts: by name, as it always has, or by whether
+# they hold stock, those who do first (Ali, 2026-11-15, inventory-tng-qwb).
+SORTING = Sorting(
+    "name",
+    {
+        "name": Sort.of(func.lower(Volunteer.name)),
+        "holds": Sort.of(HOLDS, first="desc"),
+    },
+)
+# What the holds-stock filter offers.
+HOLDING = {"yes": HOLDS, "no": not_(HOLDS)}
+
 # How the volunteers list finds one: by name.
-SEARCHED = Searched(VOLUNTEERS, Volunteer, Volunteer.search_text, Volunteer.name)
+SEARCHED = Searched(
+    VOLUNTEERS, Volunteer, Volunteer.search_text, Volunteer.name, sorting=SORTING
+)
+
+
+def _listed(
+    q: str = "",
+    show: str = "",
+    page: str = "",
+    pick: str = "",
+    sort: str = "",
+    order: str = "",
+    per: str = "",
+    holds: str = "",
+) -> Listing[Volunteer]:
+    """The volunteers list as its query string asks for it, with its filter
+    by holding stock or not (Ali, 2026-11-15): anything else is none."""
+    held = HOLDING.get(holds)
+    return SEARCHED.read(
+        q,
+        show,
+        page,
+        pick,
+        sort=sort,
+        order=order,
+        per=per,
+        filters={"holds": holds} if held is not None else None,
+        where=[held] if held is not None else (),
+    )
+
+
+Listed = Annotated[Listing[Volunteer], Depends(_listed)]
 
 
 def _list_page(
@@ -170,23 +219,18 @@ def list_volunteers(
     request: Request,
     signed: AdminSignedIn,
     session: DbSession,
-    q: str = "",
-    show: str = "",
-    page: str = "",
-    pick: str = "",
+    listing: Listed,
     undo: str = "",
 ) -> Response:
-    listing = SEARCHED.read(q, show, page, pick)
     back = undo_retire(session, Volunteer, undo, VOLUNTEERS)
     return _list_page(request, session, signed, listing=listing, undo=back)
 
 
 @router.get(f"{VOLUNTEERS}/suggest")
 def suggest_volunteers(
-    session: DbSession, signed: AdminSignedIn, q: str = "", show: str = ""
+    session: DbSession, signed: AdminSignedIn, listing: Listed
 ) -> JSONResponse:
     """What the search box offers as one types (_listing.html)."""
-    listing = SEARCHED.read(q, show)
     offered = listing.suggest(session)
     return JSONResponse(offered, headers={"Cache-Control": "no-store"})
 

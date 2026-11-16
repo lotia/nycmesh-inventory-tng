@@ -22,6 +22,7 @@ from inventory_tng.admin.common import (
     retirement,
     undo_retire,
 )
+from inventory_tng.admin.listing import Sort, Sorting, View, arranged
 from inventory_tng.db import DbSession, refusal
 from inventory_tng.models import Category, Item
 from inventory_tng.pages import not_found, redirect
@@ -48,6 +49,18 @@ def _items(session: Session) -> dict[int, int]:
     return {category_id: count for category_id, count in rows}
 
 
+# How the categories list sorts, each row a category and how many current
+# items it has: by name, as it always has, or by a heading (Ali,
+# 2026-11-15, inventory-tng-qwb).
+SORTING = Sorting(
+    "name",
+    {
+        "name": Sort.keyed(lambda row: row[0].name.lower()),
+        "items": Sort.keyed(lambda row: row[1]),
+    },
+)
+
+
 def _list_page(
     request: Request,
     session: Session,
@@ -55,9 +68,16 @@ def _list_page(
     problem: str | None = None,
     name: str | None = None,
     *,
+    view: View | None = None,
     undo: str | None = None,
 ) -> HTMLResponse:
     rows = session.scalars(select(Category).order_by(func.lower(Category.name))).all()
+    items = _items(session)
+    current, view = arranged(
+        ((c, items.get(c.id, 0)) for c in rows if c.retired_at is None),
+        view or View.read(CATEGORIES, SORTING),
+    )
+    log.debug("categories listed", found=view.found, sort=view.by, page=view.page)
     return admin_page(
         request,
         signed,
@@ -66,9 +86,9 @@ def _list_page(
             "title": "Categories",
             "undo": undo,
             "here": CATEGORIES,
-            "current": [c for c in rows if c.retired_at is None],
+            "view": view,
+            "current": current,
             "retired": [c for c in rows if c.retired_at is not None],
-            "items": _items(session),
             "problems": {"name": problem} if problem else None,
             "values": {"name": name} if name is not None else None,
         },
@@ -108,10 +128,18 @@ def _category_page(
 
 @router.get(CATEGORIES)
 def list_categories(
-    request: Request, signed: AdminSignedIn, session: DbSession, undo: str = ""
+    request: Request,
+    signed: AdminSignedIn,
+    session: DbSession,
+    undo: str = "",
+    sort: str = "",
+    order: str = "",
+    per: str = "",
+    page: str = "",
 ) -> Response:
     back = undo_retire(session, Category, undo, CATEGORIES)
-    return _list_page(request, session, signed, undo=back)
+    view = View.read(CATEGORIES, SORTING, sort=sort, order=order, per=per, page=page)
+    return _list_page(request, session, signed, view=view, undo=back)
 
 
 @router.post(CATEGORIES)

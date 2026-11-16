@@ -1,6 +1,7 @@
 {% extends "admin_base.html" %}
 {% from "_table.html" import table %}
 {% from "_views.html" import views %}
+{% from "_listing.html" import sizes, sort_heading, pager %}
 {#- Why one marked checked is right as it is: one reason, and words for
 another way. Kept as sent with its problem, if `sent` from this form: a
 refusal's alert, when drawn, is where it was sent from. #}
@@ -45,10 +46,14 @@ Mark checked asked again, for a row without it. #}
 so the inventory shows more moved than was. Correct moves the extra back
 with an adjustment. Mark checked if you already fixed it.</p>
 {% if only %}
-<p>Only {{ only.name_shown }}. <a href="{{ here }}">Show all</a></p>
+<p>Only {{ only.name_shown }}. <a href="{{ view.link(kept=(), page=1) }}">Show all</a></p>
 {% endif %}
+{{ sizes(view) }}
 {% call table() %}
-  <tr><th>Item</th><th>Recorded more</th><th>Where</th><th>Transaction</th><th></th></tr>
+  <tr>{{ sort_heading(view, "item", "Item") }}
+    {{- sort_heading(view, "amount", "Recorded more") }}
+    {{- sort_heading(view, "where", "Where") }}
+    {{- sort_heading(view, "transaction", "Transaction") }}<th></th></tr>
   {% for each in waiting %}
   {% set row = each.row %}
   {% set whole = each.moved_whole %}
@@ -103,4 +108,5 @@ with an adjustment. Mark checked if you already fixed it.</p>
   <tr><td colspan="5">Nothing waits.</td></tr>
   {% endfor %}
 {% endcall %}
+{{ pager(view) }}
 {% endblock %}

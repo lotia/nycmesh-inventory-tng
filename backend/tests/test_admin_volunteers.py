@@ -1,5 +1,6 @@
 """Volunteers, holding stock and merging duplicates (admin/volunteers.py)."""
 
+import re
 import uuid
 from datetime import UTC, datetime
 
@@ -263,3 +264,50 @@ def test_volunteers_are_found_by_a_name_typed_roughly(
     page = text(admin_client.get(VOLUNTEERS, params={"q": "okonkow"}))
     assert f'<a href="{VOLUNTEERS}/{sam.id}">{sam.name}</a>' in page
     assert ">Bo</a>" not in page
+
+
+def volunteers_named(page: str) -> list[str]:
+    """The volunteers the list shows, in its order."""
+    return re.findall(r'<td><a href="/admin/volunteers/\d+">([^<]+)</a>', page)
+
+
+def test_volunteers_sort_filter_and_show_25_50_100_or_all(
+    admin_client: TestClient, session: Session
+) -> None:
+    """By name unless a heading sorts them; by holding stock or not; in
+    pages of 25, 50, 100 or all (Ali, 2026-11-15, inventory-tng-qwb)."""
+    mark = tag()
+    for name in ("Bravo", "Alpha", "Charlie"):
+        add(session, Volunteer(name=f"Sorted {mark} {name}"))
+    bravo = named(session, Volunteer, f"Sorted {mark} Bravo")
+    assert admin_client.post(f"{VOLUNTEERS}/{bravo.id}/custody").status_code == 303
+
+    def listed(**query: str) -> list[str]:
+        params = {"q": f"Sorted {mark}", "per": "all"} | query
+        page = text(admin_client.get(VOLUNTEERS, params=params))
+        return [n.rsplit(" ", 1)[1] for n in volunteers_named(page)]
+
+    assert listed(sort="name") == ["Alpha", "Bravo", "Charlie"]
+    assert listed(sort="name", order="desc") == ["Charlie", "Bravo", "Alpha"]
+    assert listed(sort="holds") == ["Bravo", "Alpha", "Charlie"]
+    assert listed(sort="holds", order="asc") == ["Alpha", "Charlie", "Bravo"]
+    assert listed(holds="yes") == ["Bravo"]
+    assert listed(holds="no", sort="name") == ["Alpha", "Charlie"]
+    assert listed(holds="maybe", sort="name") == ["Alpha", "Bravo", "Charlie"]
+    page = admin_client.get(VOLUNTEERS, params={"holds": "yes"}).text
+    assert '<option value="yes" selected>Holds stock</option>' in page
+    assert f'<a href="{VOLUNTEERS}">Clear</a>' in page
+    assert f'<a href="{VOLUNTEERS}?holds=yes&amp;sort=holds">Holds stock</a>' in page
+    other = tag()
+    for number in range(27):
+        add(session, Volunteer(name=f"Sized {other} {number:03}"))
+    sized = {"q": f"Sized {other}"}
+    assert len(volunteers_named(admin_client.get(VOLUNTEERS, params=sized).text)) == 27
+    small = text(admin_client.get(VOLUNTEERS, params=sized | {"per": "25"}))
+    assert len(volunteers_named(small)) == 25
+    assert "Page 1 of 2" in small
+    # Suggestions come from the filter.
+    offered = admin_client.get(
+        f"{VOLUNTEERS}/suggest", params={"q": f"Sorted {mark}", "holds": "yes"}
+    ).json()
+    assert [each["name"] for each in offered] == [bravo.name]

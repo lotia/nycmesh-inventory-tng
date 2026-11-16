@@ -91,6 +91,10 @@ the scan pages, on a phone (360 to 430 px, one hand) and a desktop alike.
   live in the address only: nothing is remembered per administrator, and
   the navigation opens each list as it starts. All of it works without
   JavaScript, and the page's statements do not grow with its rows.
+- **Grouped lists keep their groups.** Stock by place or by item, and
+  Needs counting, stay in groups in name order: the headings sort the rows
+  within each group, and the page size counts groups, so a group is never
+  split across pages. Locations stay a tree, with no list control.
 - **Search forgives typos** (PostgreSQL's trigram matching) and offers
   suggestions from the current list, as its filter shows it, narrowing as
   one types (an ARIA combobox: arrows, Enter, Escape; 44 px rows).

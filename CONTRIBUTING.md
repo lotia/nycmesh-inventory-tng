@@ -675,7 +675,9 @@ utilities. When you style a page:
   expression (`Sort.of`) or, for rows built in Python, a key
   (`Sort.keyed`), its first one the page's own order; its filters, as the
   address says them; and the page size. `ordered` applies it to a select,
-  after `count`, with the id last; `arranged` to a list. In the template,
+  after `count`, with the id last; `arranged` to a list. A list of groups
+  pages the groups with `paged` and sorts each group's rows with
+  `in_order`. In the template,
   `_listing.html`'s `sort_heading` for each sortable heading, `sizes` above
   the table, `filter_form` for the filters and `pager` below.
 - A list that grows past a screen, as items and volunteers do, is a

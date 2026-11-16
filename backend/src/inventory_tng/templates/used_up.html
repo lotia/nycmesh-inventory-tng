@@ -1,16 +1,20 @@
 {% extends "admin_base.html" %}
 {% from "_table.html" import table %}
+{% from "_listing.html" import sizes, sort_heading, pager %}
 {% block main %}
 <p class="hint">Volunteers said these open packages are used up. Confirm
 one to close it: what it still shows is written off, with the reason Used
 up. Not used up offers it again, for a box ticked by mistake.</p>
 {% if only %}
-<p>Only {{ only.name_shown }}. <a href="{{ here }}">Show all</a></p>
+<p>Only {{ only.name_shown }}. <a href="{{ view.link(kept=(), page=1) }}">Show all</a></p>
 {% endif %}
 {#- The packages ticked belong to this form. #}
 <form method="post" action="{{ here }}{{ query }}" id="answer-ticked"></form>
+{{ sizes(view) }}
 {% call table() %}
-  <tr><th>Pick</th><th>Open package</th><th class="hidden sm:table-cell">Shows</th><th class="hidden sm:table-cell">Reported</th><th></th></tr>
+  <tr><th>Pick</th>{{ sort_heading(view, "package", "Open package") }}
+    {{- sort_heading(view, "shows", "Shows", "hidden sm:table-cell") }}
+    {{- sort_heading(view, "reported", "Reported", "hidden sm:table-cell") }}<th></th></tr>
   {% for each in reported %}
   {% set row = each.row %}
   <tr>
@@ -30,6 +34,7 @@ up. Not used up offers it again, for a box ticked by mistake.</p>
   <tr><td colspan="5">Nothing waits.</td></tr>
   {% endfor %}
 {% endcall %}
+{{ pager(view) }}
 {% if reported %}
 <div class="actions">
   <button name="do" value="confirm" form="answer-ticked">Confirm the ones ticked</button>

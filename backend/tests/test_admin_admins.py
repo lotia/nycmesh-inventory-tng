@@ -638,3 +638,38 @@ def test_a_link_page_offers_a_copy_and_a_qr_code(
     link = html.unescape(link_on(made.text))
     assert 'id="copy"' in made.text
     assert str(qr_svg(link)) in made.text
+
+
+def test_administrators_sort_by_each_heading_and_show_25_50_100_or_all(
+    admin_client: TestClient, session: Session
+) -> None:
+    """By name unless a heading sorts them; pressed again, the other way
+    (Ali, 2026-11-15, inventory-tng-qwb)."""
+    for name, email in (("bravo", None), ("alpha", "alpha@example.org")):
+        session.add(Admin(username=name, email=email))
+    session.commit()
+    using = accounts.admins_using_totp(session)
+    rows = session.scalars(select(Admin).where(Admin.retired_at.is_(None))).all()
+
+    def listed(**query: str) -> list[str]:
+        page = admin_client.get(ADMINS, params=query).text
+        return re.findall(r'<td><a href="/admin/admins/\d+">([^<]+)</a>', page)
+
+    by_name = sorted((a.username for a in rows), key=str.lower)
+    assert listed() == by_name
+    assert listed(sort="name", order="desc") == by_name[::-1]
+    with_email = [a.username for a in rows if a.email]
+    assert listed(sort="email")[: len(with_email)] == sorted(with_email, key=str.lower)
+    assert listed(sort="email", order="asc")[-len(with_email) :] == sorted(
+        with_email, key=str.lower
+    )
+    with_totp = sorted((a.username for a in rows if a.id in using), key=str.lower)
+    assert listed(sort="authenticator")[: len(with_totp)] == with_totp
+    page = admin_client.get(ADMINS).text
+    assert (
+        f'<th aria-sort="ascending"><a href="{ADMINS}?sort=name&amp;order=desc">'
+        "Administrator"
+    ) in page
+    assert f'<a href="{ADMINS}?sort=authenticator">Authenticator</a>' in page
+    assert f'<a href="{ADMINS}" aria-current="page">50</a>' in page
+    assert len(listed(per="25")) == len(rows)

@@ -14,13 +14,14 @@ from decimal import Decimal, InvalidOperation
 from typing import Annotated, NamedTuple
 
 import structlog
-from fastapi import APIRouter, Form, Request
+from fastapi import APIRouter, Depends, Form, Request
 from fastapi.responses import Response
 from sqlalchemy import ColumnElement, and_, func, or_, select, true
 from sqlalchemy.orm import Session
 
 from inventory_tng import ledger, open_packages, over_recorded
 from inventory_tng.admin.common import admin_page, now, quantity, row_id
+from inventory_tng.admin.listing import Sort, Sorting, View, arranged
 from inventory_tng.admin.needs_action import (
     Kind,
     OnlyItem,
@@ -142,6 +143,32 @@ def recent_cuts(session: Session, open_ids: Collection[int]) -> dict[int, list[C
     return cuts
 
 
+# How those to check sort: as they always have, as open_packages.shown()
+# lists them, the first reported used up, then the first opened; or by a
+# heading (Ali, 2026-11-15, inventory-tng-qwb).
+SORTING = Sorting(
+    "waiting",
+    {
+        "waiting": Sort.keyed(
+            lambda each: (
+                each.shown.row.reported_at is None,
+                each.shown.row.reported_at or each.shown.row.opened_at,
+                each.shown.row.opened_at,
+                each.shown.row.id,
+            )
+        ),
+        "package": Sort.keyed(
+            lambda each: (
+                each.shown.item.lower(),
+                each.shown.package.lower(),
+                each.shown.place.lower(),
+            )
+        ),
+        "shows": Sort.keyed(lambda each: each.shown.left),
+    },
+)
+
+
 def _checks_page(
     request: Request,
     signed: SignedIn,
@@ -149,6 +176,7 @@ def _checks_page(
     only: Item | None,
     title: str,
     where: Sequence[ColumnElement[bool]],
+    view: View,
 ) -> Response:
     # Read first: a count or adjustment since is added to what the page
     # showed when it is set (_set).
@@ -171,6 +199,8 @@ def _checks_page(
         )
         for each in found
     ]
+    checked, view = arranged(checked, view)
+    log.debug("length checks listed", found=view.found, sort=view.by, page=view.page)
     return admin_page(
         request,
         signed,
@@ -183,18 +213,48 @@ def _checks_page(
             "only": only,
             "query": query_string(only),
             "checked": checked,
+            "view": view,
             "moment": moment,
             "zone": site_zone(session),
         },
     )
 
 
+def _view(
+    request: Request,
+    only: OnlyItem,
+    sort: str = "",
+    order: str = "",
+    per: str = "",
+    page: str = "",
+) -> View:
+    """The list's sort and page size, as its query string asks."""
+    return View.read(
+        request.url.path,
+        SORTING,
+        sort=sort,
+        order=order,
+        per=per,
+        page=page,
+        kept=query(only),
+    )
+
+
+Viewed = Annotated[View, Depends(_view)]
+
+
 @router.get(LENGTHS)
 def length_checks_page(
-    request: Request, signed: AdminSignedIn, session: DbSession, only: OnlyItem
+    request: Request,
+    signed: AdminSignedIn,
+    session: DbSession,
+    only: OnlyItem,
+    view: Viewed,
 ) -> Response:
     """All those to check, or only one item's."""
-    return _checks_page(request, signed, session, only, "Lengths to check", CHECKED)
+    return _checks_page(
+        request, signed, session, only, "Lengths to check", CHECKED, view
+    )
 
 
 @router.get(f"{LENGTHS}/{{which}}")
@@ -204,12 +264,13 @@ def kind_page(
     session: DbSession,
     only: OnlyItem,
     which: str,
+    view: Viewed,
 ) -> Response:
     """One kind's, as "Needs your action" links to it."""
     kind = next((each for each in KINDS if each.path == f"{LENGTHS}/{which}"), None)
     if kind is None:
         return not_found()
-    return _checks_page(request, signed, session, only, kind.title, kind.where)
+    return _checks_page(request, signed, session, only, kind.title, kind.where, view)
 
 
 def _set(

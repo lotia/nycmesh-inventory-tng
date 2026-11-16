@@ -1,15 +1,18 @@
 {% extends "admin_base.html" %}
 {% from "_views.html" import views %}
 {% from "_table.html" import table %}
+{% from "_listing.html" import sizes, sort_heading, pager %}
 {% from "_retired.html" import retired %}
 {% block main %}
-{{ views("Stock views", stock_views, view) }}
+{{ views("Stock views", stock_views, "needs-counting") }}
 <p class="hint">Places that show less than nothing of an item: the records are
 wrong there until someone counts it.</p>
+{{ sizes(view) }}
 {% for group in places %}
 <section>
   <h2>{{ group.heading.name }}</h2>
   {% call table() %}
+    <tr>{{ sort_heading(view, "item", "Item") }}{{ sort_heading(view, "quantity", "How much") }}</tr>
     {% for row in group.rows %}
     <tr><td>{{ row.item.name_shown }}</td><td>{{ row.quantity | amount }} {{ row.item.unit }}</td></tr>
     {% endfor %}
@@ -19,4 +22,5 @@ wrong there until someone counts it.</p>
 {% else %}
 <p>Nothing shows less than nothing.</p>
 {% endfor %}
+{{ pager(view) }}
 {% endblock %}

@@ -1,6 +1,7 @@
 {% extends "admin_base.html" %}
 {% from "_table.html" import table %}
 {% from "_retired.html" import retired %}
+{% from "_listing.html" import filter_form, sizes, sort_heading, pager %}
 {% block main %}
 <section id="count">
   <h2>Count a place</h2>
@@ -58,9 +59,39 @@
 </section>
 
 <section>
-  <h2>Recently</h2>
+  <h2>Counted and adjusted</h2>
+  {% call filter_form(view) %}
+    <label>Filter by place
+      <select name="place">
+        <option value="">Any</option>
+        {% for id, name in counted_places %}
+        <option value="{{ id }}"{% if view.filtered("place") == id | string %} selected{% endif %}>{{ name }}</option>
+        {% endfor %}
+      </select>
+    </label>
+    <label>Filter by kind
+      <select name="kind">
+        <option value="">Any</option>
+        {% for kind in kinds %}
+        <option value="{{ kind }}"{% if view.filtered("kind") == kind %} selected{% endif %}>{{ kind | capitalize }}s</option>
+        {% endfor %}
+      </select>
+    </label>
+    <label>Filter by administrator
+      <select name="admin">
+        <option value="">Any</option>
+        {% for id, username in counters %}
+        <option value="{{ id }}"{% if view.filtered("admin") == id | string %} selected{% endif %}>{{ username }}</option>
+        {% endfor %}
+      </select>
+    </label>
+  {% endcall %}
+  {{ sizes(view) }}
   {% call table() %}
-    <tr><th>When</th><th>What</th><th>Where</th><th>By</th></tr>
+    <tr>{{ sort_heading(view, "when", "When") }}
+      {{- sort_heading(view, "what", "What") }}
+      {{- sort_heading(view, "where", "Where") }}
+      {{- sort_heading(view, "by", "By") }}</tr>
     {% for entry in recent %}
     {% set t = entry.transaction %}
     <tr>
@@ -73,8 +104,12 @@
       <td>{{ entry.admin }}</td>
     </tr>
     {% else %}
-    <tr><td colspan="4">None yet.</td></tr>
+    <tr><td colspan="4">
+      {%- if view.filters %}None is in the filter. <a href="{{ view.unfiltered_link() }}">Clear it</a>.
+      {%- else %}None yet.{% endif -%}
+    </td></tr>
     {% endfor %}
   {% endcall %}
+  {{ pager(view) }}
 </section>
 {% endblock %}

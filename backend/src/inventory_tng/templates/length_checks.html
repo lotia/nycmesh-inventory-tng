@@ -1,19 +1,22 @@
 {% extends "admin_base.html" %}
 {% from "_table.html" import table %}
+{% from "_listing.html" import sizes, sort_heading, pager %}
 {% block main %}
 <p class="hint">What these open packages show may be wrong: a volunteer said
 what is really on one, or a save took one below zero. Set it to what it
 really had when it showed that, or leave it as it shows. A cut saved since
 stays.</p>
 {% if only %}
-<p>Only {{ only.name_shown }}. <a href="{{ all_path }}">Show all</a></p>
+<p>Only {{ only.name_shown }}. <a href="{{ view.link(kept=(), page=1) }}">Show all</a></p>
 {% endif %}
 {#- The packages ticked belong to this form. #}
 <form method="post" action="{{ here }}{{ query }}" id="answer-ticked">
   <input type="hidden" name="page" value="{{ all_path }}">
 </form>
+{{ sizes(view) }}
 {% call table() %}
-  <tr><th>Pick</th><th>Open package</th><th>What it shows, and why</th><th>Recent cuts</th><th>Set it</th></tr>
+  <tr><th>Pick</th>{{ sort_heading(view, "package", "Open package") }}
+    {{- sort_heading(view, "shows", "What it shows, and why") }}<th>Recent cuts</th><th>Set it</th></tr>
   {% for each in checked %}
   {% set shown = each.shown %}
   {% set row = shown.row %}
@@ -47,6 +50,7 @@ stays.</p>
   <tr><td colspan="5">Nothing to check.</td></tr>
   {% endfor %}
 {% endcall %}
+{{ pager(view) }}
 {% if checked %}
 <div class="actions">
   <button name="do" value="set" form="answer-ticked">Set the ones ticked to what was said</button>

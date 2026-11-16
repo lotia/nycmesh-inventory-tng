@@ -7,6 +7,7 @@ rules from every name saved (reading_rules.propose), to accept all at
 once, change any first, or review one by one (Ali, 2026-11-15)."""
 
 from collections.abc import Mapping, Sequence
+from dataclasses import dataclass
 from typing import Annotated
 
 import structlog
@@ -24,6 +25,7 @@ from inventory_tng.admin.common import (
     form_version,
     text_form,
 )
+from inventory_tng.admin.listing import SEARCH_MAX, Sort, Sorting, View, arranged
 from inventory_tng.db import DbSession, refusal
 from inventory_tng.local_time import site_zone
 from inventory_tng.models import INTEGER_MAX, Admin, ReadingRule, whole
@@ -56,24 +58,44 @@ NOTICES.update(
 )
 
 
-def _list_page(request: Request, session: Session, signed: SignedIn) -> HTMLResponse:
-    rows = session.execute(
-        select(ReadingRule, Admin.username)
-        .outerjoin(Admin, Admin.id == ReadingRule.decided_by_admin_id)
-        .order_by(ReadingRule.token)
-    ).all()
-    return admin_page(
-        request,
-        signed,
-        "reading_rules.html",
-        {
-            "title": "Unit readings",
-            "here": READINGS,
-            "rows": rows,
-            "zone": site_zone(session),
-            "reading_of": units.reading_of,
-        },
+@dataclass(frozen=True)
+class _Row:
+    """A reading rule as the list shows it, in words."""
+
+    rule: ReadingRule
+    read_as: str
+    saved: str
+    by: str
+
+
+def _row(rule: ReadingRule, username: str | None) -> _Row:
+    reading = units.reading_of(rule.reading) if rule.reading else None
+    return _Row(
+        rule,
+        f"{reading.shown} · {reading.unit.kind}" if reading else "Not a unit",
+        "Respelt" if rule.respell else "As typed",
+        username or "The import",
     )
+
+
+# How the list sorts: by the unit, as it always has, or by a heading, each
+# by its words as shown; the newest first by When (Ali, 2026-11-15,
+# inventory-tng-qwb).
+SORTING = Sorting(
+    "unit",
+    {
+        "unit": Sort.keyed(lambda row: row.rule.token),
+        "read_as": Sort.keyed(lambda row: row.read_as.lower()),
+        "saved": Sort.keyed(lambda row: row.saved),
+        "by": Sort.keyed(lambda row: row.by.lower()),
+        "when": Sort.keyed(lambda row: row.rule.decided_at, first="desc"),
+    },
+)
+# What the settled-by filter offers: by the import, or by an administrator.
+SETTLED_BY = {
+    "import": ReadingRule.decided_by_admin_id.is_(None),
+    "admin": ReadingRule.decided_by_admin_id.is_not(None),
+}
 
 
 def _rule_page(
@@ -107,9 +129,57 @@ def _rule_page(
 
 @router.get(READINGS)
 def list_readings(
-    request: Request, signed: AdminSignedIn, session: DbSession
+    request: Request,
+    signed: AdminSignedIn,
+    session: DbSession,
+    by: str = "",
+    unit: str = "",
+    sort: str = "",
+    order: str = "",
+    per: str = "",
+    page: str = "",
 ) -> Response:
-    return _list_page(request, session, signed)
+    """The rules, filtered by who settled them and by what the unit holds,
+    as typed in any case (Ali, 2026-11-15)."""
+    unit = " ".join(unit.split())[:SEARCH_MAX]
+    settled = SETTLED_BY.get(by)
+    filters = {"by": by if settled is not None else "", "unit": unit}
+    view = View.read(
+        READINGS,
+        SORTING,
+        sort=sort,
+        order=order,
+        per=per,
+        page=page,
+        filters={name: value for name, value in filters.items() if value},
+    )
+    query = select(ReadingRule, Admin.username).outerjoin(
+        Admin, Admin.id == ReadingRule.decided_by_admin_id
+    )
+    if settled is not None:
+        query = query.where(settled)
+    found = session.execute(query.order_by(ReadingRule.token)).all()
+    rows, view = arranged(
+        (
+            _row(rule, name)
+            for rule, name in found
+            if unit.lower() in rule.token.lower()
+        ),
+        view,
+    )
+    log.debug("readings listed", found=view.found, sort=view.by, page=view.page)
+    return admin_page(
+        request,
+        signed,
+        "reading_rules.html",
+        {
+            "title": "Unit readings",
+            "here": READINGS,
+            "rows": rows,
+            "view": view,
+            "zone": site_zone(session),
+        },
+    )
 
 
 @router.get(f"{READINGS}/{{rule_id:int}}")

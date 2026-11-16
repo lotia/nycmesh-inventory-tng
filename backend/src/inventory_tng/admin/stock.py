@@ -9,6 +9,7 @@ from dataclasses import dataclass, field
 from decimal import Decimal
 from typing import Any, Literal, cast
 
+import structlog
 from fastapi import APIRouter, Request
 from fastapi.responses import Response
 from sqlalchemy import ColumnElement, any_, func, or_, select, true
@@ -17,7 +18,16 @@ from sqlalchemy.orm import Session
 from inventory_tng import open_packages, over_recorded
 from inventory_tng.admin.common import ADMIN, admin_page
 from inventory_tng.admin.counts import COUNTS
-from inventory_tng.admin.items import ITEMS
+from inventory_tng.admin.items import ITEMS, SEARCHED
+from inventory_tng.admin.listing import (
+    SEARCH_MAX,
+    Sort,
+    Sorting,
+    View,
+    arranged,
+    in_order,
+    paged,
+)
 from inventory_tng.db import DbSession
 from inventory_tng.ledger import (
     SHORT,
@@ -25,9 +35,18 @@ from inventory_tng.ledger import (
     by_form,
     retired_places_holding_stock,
 )
-from inventory_tng.models import STORE_KINDS, Item, ItemPackage, Location
+from inventory_tng.models import (
+    INTEGER_MAX,
+    STORE_KINDS,
+    Item,
+    ItemPackage,
+    Location,
+    whole,
+)
 from inventory_tng.pages import templates
 from inventory_tng.sign_in import AdminSignedIn
+
+log = structlog.get_logger(__name__)
 
 router = APIRouter(include_in_schema=False)
 
@@ -112,43 +131,88 @@ def _grouped(holdings: list[Holding], by: Literal["place", "item"]) -> list[Grou
     return sorted(groups.values(), key=lambda group: group.heading.name.lower())
 
 
+# How the rows within each group sort: by the item's or the place's name,
+# as they always have, or by how much; the groups stay in name order (Ali,
+# 2026-11-15, inventory-tng-qwb).
+_QUANTITY = Sort.keyed(lambda row: row.quantity)
+STOCK_SORTING = {
+    "place": Sorting(
+        "item",
+        {"item": Sort.keyed(lambda row: row.item.name.lower()), "quantity": _QUANTITY},
+    ),
+    "item": Sorting(
+        "place",
+        {
+            "place": Sort.keyed(lambda row: row.location.name.lower()),
+            "quantity": _QUANTITY,
+        },
+    ),
+}
+
+
 @router.get(STOCK)
 def stock(
     request: Request,
     signed: AdminSignedIn,
     session: DbSession,
     by: Literal["place", "item"] = "place",
+    q: str = "",
+    place: str = "",
+    sort: str = "",
+    order: str = "",
+    per: str = "",
+    page: str = "",
 ) -> Response:
     """Every item at every place it is, each form on its own line, from one
-    read of the ledger by form (open_packages.forms_of)."""
+    read of the ledger by form (open_packages.forms_of); the items a search
+    finds, at one place, if asked (Ali, 2026-11-15). Page size counts
+    groups."""
+    search = " ".join(q.split())[:SEARCH_MAX]
+    place_id = whole(place, 1, INTEGER_MAX)
+    filters = {"q": search, "place": str(place_id or "")}
+    view = View.read(
+        STOCK,
+        STOCK_SORTING[by],
+        sort=sort,
+        order=order,
+        per=per,
+        page=page,
+        filters={name: value for name, value in filters.items() if value},
+        kept={"by": by} if by == "item" else None,
+    )
     forms = open_packages.forms_of(session, true())
-    items = {
-        item.id: item
-        for item in session.scalars(
-            select(Item).where(Item.id.in_({item_id for item_id, _ in forms}))
-        )
-    }
+    found = select(Item).where(Item.id.in_({item_id for item_id, _ in forms}))
+    if search:
+        found = found.where(SEARCHED.matching(search, SEARCHED.rules(session)))
+    items = {item.id: item for item in session.scalars(found)}
     places = {
-        place.id: place
-        for place in session.scalars(
-            select(Location).where(Location.id.in_({place for _, place in forms}))
+        spot.id: spot
+        for spot in session.scalars(
+            select(Location).where(Location.id.in_({spot for _, spot in forms}))
         )
     }
     holdings = [
-        Holding(items[item_id], places[place], held.total, held.negative)
-        for (item_id, place), held in forms.items()
+        Holding(items[item_id], places[spot], held.total, held.negative)
+        for (item_id, spot), held in forms.items()
+        if item_id in items and place_id in (None, spot)
     ]
     groups = _grouped(sorted(holdings, key=_by_names), by)
+    shown, view = paged(groups, view)
+    for group in shown:
+        group.rows = in_order(group.rows, view)
+    log.debug("stock listed", by=by, found=view.found, sort=view.by, page=view.page)
     return admin_page(
         request,
         signed,
         "stock.html",
         {
             "title": "Stock",
-            "view": by,
+            "by": by,
+            "view": view,
             "stock_views": stock_views(session),
-            "groups": groups,
+            "groups": shown,
             "forms": forms,
+            "places": sorted(places.values(), key=lambda each: each.name.lower()),
             "needing_count": sum(group.needs_count for group in groups),
             "retired_places": retired_places_holding_stock(session),
             "counts_path": COUNTS,
@@ -203,10 +267,36 @@ def reorder_rows(
     return rows
 
 
+# How the reorder list sorts: by name, as it always has, or by a heading;
+# those with no level to reorder at last (Ali, 2026-11-15,
+# inventory-tng-qwb).
+REORDER_SORTING = Sorting(
+    "item",
+    {
+        "item": Sort.keyed(lambda row: row.item.name.lower()),
+        "usable": Sort.keyed(lambda row: row.in_stores),
+        "reorder_at": Sort.keyed(
+            lambda row: (row.item.minimum is None, row.item.minimum or 0)
+        ),
+    },
+)
+
+
 @router.get(REORDER)
-def reorder(request: Request, signed: AdminSignedIn, session: DbSession) -> Response:
+def reorder(
+    request: Request,
+    signed: AdminSignedIn,
+    session: DbSession,
+    sort: str = "",
+    order: str = "",
+    per: str = "",
+    page: str = "",
+) -> Response:
     """Current items with a reorder level, at or below it in usable stock
     across the stores, or with a package's sealed below its minimum."""
+    view = View.read(
+        REORDER, REORDER_SORTING, sort=sort, order=order, per=per, page=page
+    )
     packages = session.scalars(
         select(ItemPackage).where(
             ItemPackage.minimum_sealed.is_not(None), ItemPackage.retired_at.is_(None)
@@ -243,36 +333,57 @@ def reorder(request: Request, signed: AdminSignedIn, session: DbSession) -> Resp
             counts = sealed.setdefault(item_id, {})
             counts[package_id] = counts.get(package_id, Decimal(0)) + count
     rows = reorder_rows(items, usable, sealed, packages, short)
+    shown, view = arranged(rows, view)
+    log.debug("reorder listed", found=view.found, sort=view.by, page=view.page)
     return admin_page(
         request,
         signed,
         "reorder.html",
         {
             "title": "Reorder",
-            "view": "reorder",
             "stock_views": stock_views(session),
-            "rows": rows,
+            "rows": shown,
+            "view": view,
             "any_short": any(row.count_first for row in rows),
             "items_path": ITEMS,
         },
     )
 
 
+# How the rows within each place needing a count sort: by item, as they
+# always have, or by how much; the places stay in name order, and page size
+# counts places (Ali, 2026-11-15, inventory-tng-qwb).
+SHORT_SORTING = STOCK_SORTING["place"]
+
+
 @router.get(NEEDS_COUNTING)
 def needs_counting(
-    request: Request, signed: AdminSignedIn, session: DbSession
+    request: Request,
+    signed: AdminSignedIn,
+    session: DbSession,
+    sort: str = "",
+    order: str = "",
+    per: str = "",
+    page: str = "",
 ) -> Response:
     """Every place that shows less than nothing of an item, with what it is
     short of, to count."""
+    view = View.read(
+        NEEDS_COUNTING, SHORT_SORTING, sort=sort, order=order, per=per, page=page
+    )
+    places, view = paged(_grouped(_holdings(session, SHORT), "place"), view)
+    for group in places:
+        group.rows = in_order(group.rows, view)
+    log.debug("needs counting listed", found=view.found, sort=view.by, page=view.page)
     return admin_page(
         request,
         signed,
         "needs_counting.html",
         {
             "title": "Needs counting",
-            "view": "needs-counting",
             "stock_views": stock_views(session),
-            "places": _grouped(_holdings(session, SHORT), "place"),
+            "places": places,
+            "view": view,
             "counts_path": COUNTS,
         },
     )

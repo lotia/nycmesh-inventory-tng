@@ -226,7 +226,11 @@ PAGES: dict[str, tuple[More, *tuple[Path, ...]]] = {
         item_parts,
         lambda w: f"/admin/items/{w.spools.cable.id}",
     ),
-    "/admin/categories": (everything,),
+    "/admin/categories": (
+        everything,
+        "/admin/categories",
+        "/admin/categories?sort=items&order=desc&per=25",
+    ),
     "/admin/categories/{category_id}": (
         item_in_category,
         lambda w: f"/admin/categories/{w.spools.cable.category_id}",
@@ -236,33 +240,79 @@ PAGES: dict[str, tuple[More, *tuple[Path, ...]]] = {
         in_store,
         lambda w: f"/admin/locations/{w.spools.store.id}",
     ),
-    "/admin/labels": (everything,),
+    "/admin/labels": (
+        everything,
+        "/admin/labels",
+        "/admin/labels?sort=made&per=all&kind=place",
+        lambda w: f"/admin/labels?q=Cable&sort=code&item={w.spools.cable.id}",
+    ),
     "/admin/labels/suggest": (everything, "/admin/labels/suggest?q=Cable"),
     "/admin/labels/print": (
         everything,
         lambda w: "/admin/labels/print?" + "&".join(f"label={i}" for i in w.labels),
     ),
-    "/admin/volunteers": (everything,),
+    "/admin/volunteers": (
+        everything,
+        "/admin/volunteers",
+        "/admin/volunteers?sort=holds&per=all&holds=no",
+    ),
     "/admin/volunteers/suggest": (everything, "/admin/volunteers/suggest?q=Volunteer"),
     # Their custody is one place, or none: the others, to merge into, grow.
     "/admin/volunteers/{volunteer_id}": (
         volunteer,
         lambda w: f"/admin/volunteers/{w.spools.place.volunteer.id}",
     ),
-    "/admin/stock": (everything, "/admin/stock", "/admin/stock?by=item"),
-    "/admin/stock/reorder": (everything,),
-    "/admin/stock/needs-counting": (everything,),
-    "/admin/stock/used-up": (everything,),
-    "/admin/stock/length-checks": (everything,),
-    "/admin/stock/recorded-more": (over_recorded_line,),
+    "/admin/stock": (
+        everything,
+        "/admin/stock",
+        "/admin/stock?by=item",
+        # Sorted within groups, a page of groups, and filtered.
+        "/admin/stock?by=item&sort=quantity&order=desc&per=25",
+        lambda w: f"/admin/stock?q=Cable&place={w.spools.store.id}&per=all",
+    ),
+    "/admin/stock/reorder": (
+        everything,
+        "/admin/stock/reorder",
+        "/admin/stock/reorder?sort=usable&per=all",
+    ),
+    "/admin/stock/needs-counting": (
+        everything,
+        "/admin/stock/needs-counting",
+        "/admin/stock/needs-counting?sort=quantity&per=25",
+    ),
+    "/admin/stock/used-up": (
+        everything,
+        "/admin/stock/used-up",
+        "/admin/stock/used-up?sort=shows&per=all",
+    ),
+    "/admin/stock/length-checks": (
+        everything,
+        "/admin/stock/length-checks",
+        "/admin/stock/length-checks?sort=package&order=desc&per=25",
+    ),
+    "/admin/stock/recorded-more": (
+        over_recorded_line,
+        "/admin/stock/recorded-more",
+        "/admin/stock/recorded-more?sort=amount&per=all",
+    ),
     "/admin/stock/recorded-more/settled": (
         over_recorded_settled,
         "/admin/stock/recorded-more/settled",
         "/admin/stock/recorded-more/settled?sort=how&per=all",
+        "/admin/stock/recorded-more/settled?sort=why&order=desc&per=25",
     ),
     "/admin/stock/length-checks/{which}": (everything, *(k.path for k in KINDS)),
-    "/admin/counts": (everything,),
-    "/admin/unit-readings": (reading_rule,),
+    "/admin/counts": (
+        everything,
+        "/admin/counts",
+        "/admin/counts?sort=where&per=all&kind=count",
+        lambda w: f"/admin/counts?place={w.spools.store.id}&sort=by&order=desc",
+    ),
+    "/admin/unit-readings": (
+        reading_rule,
+        "/admin/unit-readings",
+        "/admin/unit-readings?sort=read_as&per=all&by=admin&unit=p",
+    ),
     "/admin/unit-readings/seed": (unsettled_unit,),
     "/admin/counts/{location_id:int}": (
         item_in_store,
@@ -270,7 +320,11 @@ PAGES: dict[str, tuple[More, *tuple[Path, ...]]] = {
         # Only the items a search finds.
         lambda w: f"/admin/counts/{w.spools.store.id}?q=Radio",
     ),
-    "/admin/devices": (new_device_in,),
+    "/admin/devices": (
+        new_device_in,
+        "/admin/devices",
+        "/admin/devices?sort=used&per=all&state=used+up",
+    ),
     "/admin/devices/all": (
         new_device_in,
         "/admin/devices/all",
@@ -280,7 +334,11 @@ PAGES: dict[str, tuple[More, *tuple[Path, ...]]] = {
         device_of_code,
         lambda w: f"/admin/devices/codes/{w.code_id}",
     ),
-    "/admin/admins": (admin,),
+    "/admin/admins": (
+        admin,
+        "/admin/admins",
+        "/admin/admins?sort=authenticator&order=asc&per=25",
+    ),
 }
 
 # GET routes under /admin that list nothing that grows, and why.

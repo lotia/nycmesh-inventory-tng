@@ -26,6 +26,7 @@ from inventory_tng.admin.common import (
     rule_words,
     site_link,
 )
+from inventory_tng.admin.listing import Sort, Sorting, View, arranged
 from inventory_tng.db import DbSession, attempt
 from inventory_tng.local_time import site_zone
 from inventory_tng.mail import Notify
@@ -69,15 +70,35 @@ def _code_field(signed: SignedIn) -> dict[str, object]:
     }
 
 
+# How the list of administrators sorts, each row an Admin and whether it
+# uses an authenticator: by name, as it always has, or by a heading, those
+# with one first (Ali, 2026-11-15, inventory-tng-qwb).
+SORTING = Sorting(
+    "name",
+    {
+        "name": Sort.keyed(lambda row: row[0].username.lower()),
+        "email": Sort.keyed(lambda row: row[0].email is not None, first="desc"),
+        "authenticator": Sort.keyed(lambda row: row[1], first="desc"),
+    },
+)
+
+
 def _list_page(
     request: Request,
     session: Session,
     signed: SignedIn,
     *,
+    view: View | None = None,
     problems: Mapping[str, str] | None = None,
     values: Mapping[str, str] | None = None,
 ) -> HTMLResponse:
     admins = session.scalars(select(Admin).order_by(func.lower(Admin.username))).all()
+    with_totp = accounts.admins_using_totp(session)
+    rows, view = arranged(
+        ((a, a.id in with_totp) for a in admins if a.retired_at is None),
+        view or View.read(ADMINS, SORTING),
+    )
+    log.debug("admins listed", found=view.found, sort=view.by, page=view.page)
     return admin_page(
         request,
         signed,
@@ -85,9 +106,10 @@ def _list_page(
         {
             "title": "Administrators",
             "here": ADMINS,
-            "current": [a for a in admins if a.retired_at is None],
+            "view": view,
+            "current": [a for a, _ in rows],
             "retired": [a for a in admins if a.retired_at is not None],
-            "with_totp": accounts.admins_using_totp(session),
+            "with_totp": with_totp,
             "with_password": accounts.admins_with_passwords(session),
             **_code_field(signed),
             "changes": activity.recent(session),
@@ -167,8 +189,17 @@ def _refused(
 
 
 @router.get(ADMINS)
-def admins(request: Request, signed: AdminSignedIn, session: DbSession) -> Response:
-    return _list_page(request, session, signed)
+def admins(
+    request: Request,
+    signed: AdminSignedIn,
+    session: DbSession,
+    sort: str = "",
+    order: str = "",
+    per: str = "",
+    page: str = "",
+) -> Response:
+    view = View.read(ADMINS, SORTING, sort=sort, order=order, per=per, page=page)
+    return _list_page(request, session, signed, view=view)
 
 
 @router.post(ADMINS)

@@ -937,3 +937,91 @@ def test_a_recount_shows_each_item_it_asks_for_though_the_search_no_longer_finds
     assert asked.status_code == 409
     assert f'name="counted_{place.item.id}"' in asked.text
     assert "Nothing here matches." not in text(asked)
+
+
+def test_counts_sort_filter_and_come_in_pages(
+    admin_client: TestClient, session: Session
+) -> None:
+    """Newest first unless a heading sorts them; filtered by place, kind and
+    administrator; in pages of 25, 50, 100 or all, not only the newest 30
+    (Ali, 2026-11-15, inventory-tng-qwb)."""
+    place = stocked(session)
+    shelf = Location(name="Aa shelf", kind="store")
+    session.add(shelf)
+    ada = session.scalars(select(Admin)).one()
+    bob = Admin(username="bob")
+    session.add(bob)
+    session.flush()
+    reasons = {
+        name: id_
+        for name, id_ in session.execute(
+            select(AdjustmentReason.name, AdjustmentReason.id)
+        )
+    }
+    for who, where, found, reason in (
+        (ada, place.store, False, "Damaged"),
+        (bob, shelf, True, "Found"),
+    ):
+        record_adjustment(
+            session,
+            uuid.uuid4(),
+            who.id,
+            where.id,
+            place.item.id,
+            Decimal(1),
+            found=found,
+            reason_id=reasons[reason],
+        )
+    session.commit()
+    as_of = moment(session, place.store.id)
+    record_count(
+        session,
+        uuid.uuid4(),
+        bob.id,
+        place.store.id,
+        [(place.item.id, Decimal(4))],
+        as_of,
+    )
+    session.commit()
+
+    def listed(**query: str) -> list[str]:
+        page = " ".join(text(admin_client.get(COUNTS, params=query)).split())
+        return re.findall(r"<td> (Count|Damaged|Found):", page)
+
+    assert listed() == ["Count", "Found", "Damaged"]
+    assert listed(sort="when", order="asc") == ["Damaged", "Found", "Count"]
+    assert listed(sort="what") == ["Count", "Damaged", "Found"]
+    assert listed(sort="what", order="desc") == ["Found", "Damaged", "Count"]
+    assert listed(sort="where") == ["Found", "Count", "Damaged"]
+    assert listed(sort="by") == ["Damaged", "Count", "Found"]
+    assert listed(place=str(shelf.id)) == ["Found"]
+    assert listed(kind="count") == ["Count"]
+    assert listed(kind="adjustment") == ["Found", "Damaged"]
+    assert listed(admin=str(bob.id)) == ["Count", "Found"]
+    assert listed(admin=str(bob.id), kind="adjustment") == ["Found"]
+    assert listed(place="x", kind="audit", admin="") == listed()
+    page = admin_client.get(COUNTS, params={"admin": str(bob.id)}).text
+    assert f'<option value="{bob.id}" selected>bob</option>' in page
+    assert f'<option value="{shelf.id}">Aa shelf</option>' in page
+    assert f'<a href="{COUNTS}">Clear</a>' in page
+    assert "None is in the filter." in text(
+        admin_client.get(COUNTS, params={"place": str(INTEGER_MAX)})
+    )
+    for _ in range(28):
+        record_adjustment(
+            session,
+            uuid.uuid4(),
+            ada.id,
+            shelf.id,
+            place.item.id,
+            Decimal(1),
+            found=True,
+            reason_id=reasons["Found"],
+        )
+    session.commit()
+    assert len(listed()) == 31
+    assert len(listed(per="25")) == 25
+    assert len(listed(per="25", page="2")) == 6
+    assert "Page 2 of 2" in text(
+        admin_client.get(COUNTS, params={"per": "25", "page": "2"})
+    )

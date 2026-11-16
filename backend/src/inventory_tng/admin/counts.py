@@ -37,7 +37,7 @@ from urllib.parse import urlencode
 import structlog
 from fastapi import APIRouter, Depends, Request
 from fastapi.responses import HTMLResponse, Response
-from sqlalchemy import func, select
+from sqlalchemy import ColumnElement, Select, case, func, select
 from sqlalchemy.orm import Session
 
 from inventory_tng import open_packages, over_recorded
@@ -56,6 +56,8 @@ from inventory_tng.admin.common import (
     text_form,
 )
 from inventory_tng.admin.items import SEARCHED
+from inventory_tng.admin.listing import Sort, Sorting, View, ordered
+from inventory_tng.admin.listing import count as how_many
 from inventory_tng.admin.needs_action import OnlyItem
 from inventory_tng.admin.settings import SETTINGS
 from inventory_tng.db import DbSession, by_name, refusal
@@ -106,7 +108,6 @@ router = APIRouter(include_in_schema=False)
 
 COUNTS = f"{ADMIN}/counts"
 ADJUSTMENTS = f"{COUNTS}/adjustments"
-RECENT = 30
 COUNTED = "counted_"
 EXTRA = "extra_quantity"
 # The ledger rules a race can break past the page's checks (module
@@ -152,23 +153,84 @@ def _places(session: Session) -> list[Location]:
     return by_name(session, Location, countable())
 
 
-def _recent(session: Session) -> list[dict[str, Any]]:
-    """The latest counts and adjustments, newest first, with their lines."""
-    rows = session.execute(
+# The place a count or an adjustment was at.
+_place = func.coalesce(
+    LedgerTransaction.to_location_id, LedgerTransaction.from_location_id
+)
+# What the list of counts and adjustments may be filtered to, by kind.
+KINDS = ("count", "adjustment")
+# How it sorts: newest first, as it always has, or by a heading; What by
+# its words, Count or the reason (Ali, 2026-11-15, inventory-tng-qwb).
+SORTING = Sorting(
+    "when",
+    {
+        "when": Sort.of(LedgerTransaction.id, first="desc"),
+        "what": Sort.of(
+            case(
+                (LedgerTransaction.kind == "count", "count"),
+                else_=func.lower(AdjustmentReason.name),
+            )
+        ),
+        "where": Sort.of(func.lower(Location.name)),
+        "by": Sort.of(func.lower(Admin.username)),
+    },
+)
+
+
+def _done(*where: ColumnElement[bool]) -> Select:
+    """The counts and adjustments `where` picks, with who, where and why."""
+    return (
         select(LedgerTransaction, Admin.username, Location.name, AdjustmentReason.name)
         .join(Admin, Admin.id == LedgerTransaction.admin_id)
-        .join(
-            Location,
-            Location.id
-            == func.coalesce(
-                LedgerTransaction.to_location_id, LedgerTransaction.from_location_id
-            ),
-        )
+        .join(Location, Location.id == _place)
         .outerjoin(AdjustmentReason, AdjustmentReason.id == LedgerTransaction.reason_id)
-        .where(LedgerTransaction.kind.in_(("count", "adjustment")))
-        .order_by(LedgerTransaction.id.desc())
-        .limit(RECENT)
-    ).all()
+        .where(LedgerTransaction.kind.in_(KINDS), *where)
+    )
+
+
+def _view(
+    place: str = "",
+    kind: str = "",
+    admin: str = "",
+    sort: str = "",
+    order: str = "",
+    per: str = "",
+    page: str = "",
+) -> View:
+    """The list's view as its query string asks: a place or an admin not a
+    number, or a kind not offered, is no filter (Ali, 2026-11-15)."""
+    place_id = whole(place, 1, INTEGER_MAX)
+    admin_id = whole(admin, 1, INTEGER_MAX)
+    filters = {
+        "place": str(place_id or ""),
+        "kind": kind if kind in KINDS else "",
+        "admin": str(admin_id or ""),
+    }
+    return View.read(
+        COUNTS,
+        SORTING,
+        sort=sort,
+        order=order,
+        per=per,
+        page=page,
+        filters={name: value for name, value in filters.items() if value},
+    )
+
+
+def _recent(session: Session, view: View) -> tuple[list[dict[str, Any]], View]:
+    """The counts and adjustments the view picks, in its order, one page
+    of them, with their lines; and the view counted."""
+    where = []
+    if place := view.filtered("place"):
+        where.append(_place == int(place))
+    if kind := view.filtered("kind"):
+        where.append(LedgerTransaction.kind == kind)
+    if admin := view.filtered("admin"):
+        where.append(LedgerTransaction.admin_id == int(admin))
+    query = _done(*where)
+    view = view.counted(how_many(session, query))
+    rows = session.execute(ordered(query, view, LedgerTransaction.id)).all()
+    log.debug("counts listed", found=view.found, sort=view.by, page=view.page)
     lines: dict[int, list[tuple[Item, Decimal]]] = {}
     for transaction_id, item, amount in session.execute(
         select(Movement.transaction_id, Item, Movement.quantity)
@@ -186,7 +248,7 @@ def _recent(session: Session) -> list[dict[str, Any]]:
             "lines": lines.get(transaction.id, []),
         }
         for transaction, admin, place, reason in rows
-    ]
+    ], view
 
 
 def _counts_page(
@@ -194,9 +256,13 @@ def _counts_page(
     session: Session,
     signed: SignedIn,
     *,
+    view: View | None = None,
     problems: Mapping[str, str] | None = None,
     values: Mapping[str, str] | None = None,
 ) -> HTMLResponse:
+    recent, view = _recent(session, view or _view())
+    # The filters offer where and by whom there are any.
+    done = select(LedgerTransaction).where(LedgerTransaction.kind.in_(KINDS))
     return admin_page(
         request,
         signed,
@@ -208,7 +274,19 @@ def _counts_page(
             "places": _places(session),
             "items": _items(session),
             "reasons": current_rows(session, AdjustmentReason),
-            "recent": _recent(session),
+            "recent": recent,
+            "view": view,
+            "kinds": KINDS,
+            "counted_places": session.execute(
+                select(Location.id, Location.name)
+                .where(Location.id.in_(done.with_only_columns(_place)))
+                .order_by(func.lower(Location.name), Location.id)
+            ).all(),
+            "counters": session.execute(
+                select(Admin.id, Admin.username)
+                .where(Admin.id.in_(done.with_only_columns(LedgerTransaction.admin_id)))
+                .order_by(func.lower(Admin.username), Admin.id)
+            ).all(),
             "key": uuid.uuid4(),
             "problems": problems,
             "values": values,
@@ -218,8 +296,13 @@ def _counts_page(
 
 
 @router.get(COUNTS)
-def counts(request: Request, signed: AdminSignedIn, session: DbSession) -> Response:
-    return _counts_page(request, session, signed)
+def counts(
+    request: Request,
+    signed: AdminSignedIn,
+    session: DbSession,
+    view: Annotated[View, Depends(_view)],
+) -> Response:
+    return _counts_page(request, session, signed, view=view)
 
 
 @router.get(f"{COUNTS}/place")

@@ -1,5 +1,6 @@
 {% extends "admin_base.html" %}
 {% from "_table.html" import table %}
+{% from "_listing.html" import sizes, sort_heading, pager %}
 {% block main %}
 <form method="post" action="{{ here }}" class="actions">
   <label>New category
@@ -10,14 +11,16 @@
 </form>
 
 <section>
+  {{ sizes(view) }}
   {% call table() %}
-    <tr><th>Category</th><th>Items</th></tr>
-    {% for category in current %}
-    <tr><td><a href="{{ here }}/{{ category.id }}">{{ category.name }}</a></td><td>{{ items.get(category.id, 0) }}</td></tr>
+    <tr>{{ sort_heading(view, "name", "Category") }}{{ sort_heading(view, "items", "Items") }}</tr>
+    {% for category, items in current %}
+    <tr><td><a href="{{ here }}/{{ category.id }}">{{ category.name }}</a></td><td>{{ items }}</td></tr>
     {% else %}
     <tr><td colspan="2">None yet.</td></tr>
     {% endfor %}
   {% endcall %}
+  {{ pager(view) }}
 </section>
 
 {% if retired %}

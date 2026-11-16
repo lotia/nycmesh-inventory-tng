@@ -4,6 +4,7 @@ reading_rules.py, models.ReadingRule; docs/decisions/0021, 2026-11-15,
 inventory-tng-c0c.4), and names unique once their units are read
 (models.KeyedName.unit_key)."""
 
+import re
 from collections.abc import Callable
 
 import pytest
@@ -19,6 +20,7 @@ from inventory_tng.admin.reading_rules import READINGS, SEED
 from inventory_tng.catalogue import catalogue
 from inventory_tng.db import lock_catalogue
 from inventory_tng.models import (
+    Admin,
     Category,
     Item,
     ItemAlias,
@@ -572,3 +574,38 @@ def test_a_rule_may_respell_names_typed_with_it(
     assert before.name == "Tape A 305M"
     page = text(admin_client.get(f"{ITEMS}/{before.id}"))
     assert "Read as 305m · length.\n  Saved as 305m." in page
+
+
+def test_the_rules_page_sorts_filters_and_finds_a_unit(
+    admin_client: TestClient, session: Session
+) -> None:
+    """By the unit unless a heading sorts them; filtered by who settled
+    them, and by what the unit holds (Ali, 2026-11-15, inventory-tng-qwb)."""
+    admin = session.scalars(select(Admin)).first()
+    assert admin is not None
+    reading_rules.decide(session, {"G": units.Rule(None)}, None)
+    reading_rules.decide(session, {"MF": units.Rule("mF", respell=True)}, admin.id)
+
+    def listed(**query: str) -> list[str]:
+        page = admin_client.get(READINGS, params=query).text
+        return re.findall(rf'<td><a href="{READINGS}/\d+">([^<]+)</a>', page)
+
+    assert listed() == ["G", "MF"]
+    assert listed(sort="unit", order="desc") == ["MF", "G"]
+    # Not a unit after mF's words; respelt before as typed.
+    assert listed(sort="read_as") == ["MF", "G"]
+    assert listed(sort="saved") == ["G", "MF"]
+    assert listed(sort="saved", order="desc") == ["MF", "G"]
+    assert listed(sort="by", order="desc") == ["G", "MF"]
+    assert listed(sort="when", order="asc") == listed(sort="when")[::-1]
+    assert listed(by="import") == ["G"]
+    assert listed(by="admin") == ["MF"]
+    assert listed(by="anyone") == ["G", "MF"]
+    assert listed(unit="mf") == ["MF"]
+    assert listed(unit="  ") == ["G", "MF"]
+    empty = text(admin_client.get(READINGS, params={"unit": "zz"}))
+    assert "None is in the filter." in empty
+    page = admin_client.get(READINGS, params={"by": "admin", "per": "25"}).text
+    assert '<option value="admin" selected>' in page
+    assert f'<a href="{READINGS}?per=25">Clear</a>' in page
+    assert f'<a href="{READINGS}?by=admin&amp;sort=when&amp;per=25">When</a>' in page

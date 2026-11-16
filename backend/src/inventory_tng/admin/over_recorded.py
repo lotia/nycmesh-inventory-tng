@@ -23,7 +23,7 @@ from sqlalchemy.orm import Session
 from inventory_tng import ledger, locations, over_recorded
 from inventory_tng.admin.common import admin_page, quantity, row_id, rule_words
 from inventory_tng.admin.counts import COUNTS
-from inventory_tng.admin.listing import Sort, Sorting, View
+from inventory_tng.admin.listing import Sort, Sorting, View, arranged, paged
 from inventory_tng.admin.listing import order as order_of
 from inventory_tng.admin.locations import changeable
 from inventory_tng.admin.needs_action import (
@@ -106,6 +106,25 @@ def by_item(session: Session) -> list[ItemWaiting]:
     ]
 
 
+# How those waiting sort: by item, oldest first, as they always have, or
+# by a heading; the newest transaction first by Transaction (Ali,
+# 2026-11-15, inventory-tng-qwb).
+WAITING_SORTING = Sorting(
+    "item",
+    {
+        "item": Sort.keyed(lambda each: each.item.lower()),
+        "amount": Sort.keyed(lambda each: each.row.quantity),
+        "where": Sort.keyed(
+            lambda each: (
+                (each.from_place or "").lower(),
+                (each.to_place or "").lower(),
+            )
+        ),
+        "transaction": Sort.keyed(lambda each: each.transaction_id, first="desc"),
+    },
+)
+
+
 @router.get(OVER_RECORDED)
 def over_recorded_page(
     request: Request,
@@ -114,14 +133,27 @@ def over_recorded_page(
     only: OnlyItem,
     notice: str = "",
     brought: str = "",
+    sort: str = "",
+    order: str = "",
+    per: str = "",
+    page: str = "",
 ) -> Response:
-    """All those waiting, or only one item's; after a place is brought
-    back, its name in the notice."""
+    """All those waiting, or only one item's, sorted and in pages as asked;
+    after a place is brought back, its name in the notice."""
     place = None
     if notice == "over_recorded_brought_back" and (ident := row_id(brought)):
         place = session.get(Location, ident)
     said = f"{place.name} brought back. Correct it now." if place else None
-    return _page(request, signed, session, only, notice=said)
+    view = View.read(
+        OVER_RECORDED,
+        WAITING_SORTING,
+        sort=sort,
+        order=order,
+        per=per,
+        page=page,
+        kept=query(only),
+    )
+    return _page(request, signed, session, only, notice=said, view=view)
 
 
 def _views(waiting: int, only: Item | None) -> list[tuple[str, str, str]]:
@@ -134,13 +166,21 @@ def _views(waiting: int, only: Item | None) -> list[tuple[str, str, str]]:
     ]
 
 
-# Every column but Why sorts, either way; newest first unless asked (Ali,
-# 2026-11-15, inventory-tng-73p).
+def _why(each: over_recorded.WasSettled) -> str:
+    return each.why.lower()
+
+
+# Every column sorts, either way; newest first unless asked (Ali,
+# 2026-11-15, inventory-tng-73p). Why by its words as shown, which
+# settled() words in Python, so sorted there (settled_page).
 SETTLED_SORTING = Sorting(
     "settled",
     {
-        name: Sort.of(*by, first="desc" if name == "settled" else "asc")
-        for name, by in over_recorded.SETTLED_ORDER.items()
+        **{
+            name: Sort.of(*by, first="desc" if name == "settled" else "asc")
+            for name, by in over_recorded.SETTLED_ORDER.items()
+        },
+        "why": Sort.keyed(_why),
     },
 )
 
@@ -170,14 +210,21 @@ def settled_page(
         kept=query(only),
     ).counted(over_recorded.how_many(session, over_recorded.SETTLED, *where))
     zone = site_zone(session)
-    rows = over_recorded.settled(
-        session,
-        zone,
-        *where,
-        order=order_of(view, OverRecorded.id),
-        limit=view.per_page,
-        offset=view.offset,
-    )
+    if view.by == "why":
+        # Every one, newest first, worded, then sorted by its words: the
+        # same few queries.
+        every = over_recorded.settled(session, zone, *where, limit=None)
+        every.sort(key=_why, reverse=view.desc)
+        rows, view = paged(every, view)
+    else:
+        rows = over_recorded.settled(
+            session,
+            zone,
+            *where,
+            order=order_of(view, OverRecorded.id),
+            limit=view.per_page,
+            offset=view.offset,
+        )
     log.debug(
         "over recorded settled listed",
         found=view.found,
@@ -218,6 +265,7 @@ def _page(
     refused: dict[str, Any] | None = None,
     notice: str | None = None,
     checking: int | None = None,
+    view: View | None = None,
 ) -> Response:
     """The page, with the problems of a count or a Mark checked sent, and
     what was typed; a refusal's alert; or a notice in words of its own.
@@ -238,6 +286,10 @@ def _page(
             )
         if found.moved_whole:
             asking = found
+    shown, view = arranged(
+        waiting, view or View.read(OVER_RECORDED, WAITING_SORTING, kept=query(only))
+    )
+    log.debug("over recorded listed", found=view.found, sort=view.by, page=view.page)
     return admin_page(
         request,
         signed,
@@ -248,7 +300,8 @@ def _page(
             "back_link": (STOCK, "Stock"),
             "only": only,
             "query": query_string(only),
-            "waiting": waiting,
+            "waiting": shown,
+            "view": view,
             "recorded_views": _views(len(waiting), only),
             "reasons": over_recorded.CHECKED_REASONS,
             "words_max": OVER_RECORDED_WORDS_MAX,

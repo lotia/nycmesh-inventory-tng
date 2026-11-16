@@ -2,6 +2,7 @@
 inventory-tng-wy7): a volunteer reports it, a save below zero raises a
 check, and an administrator sets it or leaves it."""
 
+import re
 import uuid
 from decimal import Decimal
 from functools import partial
@@ -13,6 +14,7 @@ from sqlalchemy.orm import Session
 
 from inventory_tng import ledger, open_packages, pages
 from inventory_tng.admin import length_checks
+from inventory_tng.ledger import Entry, Form
 from inventory_tng.local_env import CLONE
 from inventory_tng.models import (
     Admin,
@@ -701,3 +703,36 @@ def test_the_volunteers_figure_typed_is_set_against_the_report(
     done = admin_client.post(f"{LENGTHS}/{made.id}/set", data=form)
     assert done.headers["location"] == f"{LENGTHS}?notice=length_set"
     assert left_on(session, made) == 240
+
+
+def test_those_to_check_sort_and_come_in_pages(
+    admin_client: TestClient,
+    registered_client: TestClient,
+    session: Session,
+    spools: Spools,
+) -> None:
+    """As listed unless a heading sorts them; in pages of 25, 50, 100 or
+    all, on every kind's page (Ali, 2026-11-15, inventory-tng-qwb)."""
+    first, second = spools.opened(), spools.opened()
+    spools.move(Entry(spools.cable.id, Decimal(100), Form(open_package_id=second.id)))
+    registered_client.post(
+        URL, json=report(spools, length(first, "250"), length(second, "150"))
+    )
+
+    def listed(path: str = LENGTHS, **query: str) -> list[int]:
+        page = admin_client.get(path, params=query).text
+        return [int(n) for n in re.findall(r'name="open_package" value="(\d+) ', page)]
+
+    assert listed() == [first.id, second.id]
+    assert listed(sort="shows") == [second.id, first.id]
+    assert listed(sort="shows", order="desc") == [first.id, second.id]
+    assert listed(sort="package") == [first.id, second.id]
+    reported = f"{LENGTHS}/reported"
+    assert listed(reported, sort="shows") == [second.id, first.id]
+    page = admin_client.get(reported, params={"item": str(spools.cable.id)}).text
+    assert (
+        f'<a href="{reported}?item={spools.cable.id}&amp;sort=shows">What it shows'
+        in page
+    )
+    assert f'<a href="{reported}">Show all</a>' in page
+    assert len(listed(per="25")) == 2

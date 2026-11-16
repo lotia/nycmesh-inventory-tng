@@ -3,21 +3,38 @@
 {% from "_table.html" import table %}
 {% from "_retired.html" import retired %}
 {% from "_forms.html" import forms_lines %}
+{% from "_listing.html" import filter_form, sizes, sort_heading, pager %}
 {% block main %}
-{{ views("Stock views", stock_views, view) }}
+{{ views("Stock views", stock_views, by) }}
 {% include "_retired_holding.html" %}
 {% if needing_count %}
-<p role="alert">{{ needing_count }} {{ view ~ (" shows" if needing_count == 1 else "s show") }}
+<p role="alert">{{ needing_count }} {{ by ~ (" shows" if needing_count == 1 else "s show") }}
 less than nothing somewhere: the records are wrong there, so count it
 (<a href="{{ needs_counting_path }}">Needs counting</a>).</p>
 {% endif %}
+{% call filter_form(view) %}
+  <label>Find items
+    <input name="q" type="search" value="{{ view.filtered('q') }}" maxlength="200" autocomplete="off">
+  </label>
+  <label>Filter by place
+    <select name="place">
+      <option value="">Any</option>
+      {% for place in places %}
+      <option value="{{ place.id }}"{% if view.filtered("place") == place.id | string %} selected{% endif %}>{{ place.name }}</option>
+      {% endfor %}
+    </select>
+  </label>
+{% endcall %}
+{{ sizes(view) }}
 {% for group in groups %}
-<section{% if view == "item" %} id="item-{{ group.heading.id }}"{% endif %}>
-  <h2>{{ group.heading.name_shown if view == "item" else group.heading.name }}{{ retired(group.heading) }}{% if view == "item" %} <span class="hint">{{ group.total | amount }} {{ group.heading.unit }} in all</span>{% endif %}</h2>
+<section{% if by == "item" %} id="item-{{ group.heading.id }}"{% endif %}>
+  <h2>{{ group.heading.name_shown if by == "item" else group.heading.name }}{{ retired(group.heading) }}{% if by == "item" %} <span class="hint">{{ group.total | amount }} {{ group.heading.unit }} in all</span>{% endif %}</h2>
   {% call table() %}
+    <tr>{% if by == "place" %}{{ sort_heading(view, "item", "Item") }}{% else %}{{ sort_heading(view, "place", "Place") }}{% endif %}
+      {{- sort_heading(view, "quantity", "How much") }}</tr>
     {% for row in group.rows %}
     <tr>
-      <td>{% if view == "place" %}{{ row.item.name_shown }}{% else %}{{ row.location.name }}{{ retired(row.location) }}{% endif %}</td>
+      <td>{% if by == "place" %}{{ row.item.name_shown }}{% else %}{{ row.location.name }}{{ retired(row.location) }}{% endif %}</td>
       <td>{{ row.quantity | amount }} {{ row.item.unit }}{% if row.quantity < 0 or row.negative %} <strong>count it</strong>{% endif %}
         {{- forms_lines(forms[(row.item.id, row.location.id)], row.item.unit) }}</td>
     </tr>
@@ -25,6 +42,11 @@ less than nothing somewhere: the records are wrong there, so count it
   {% endcall %}
 </section>
 {% else %}
+{% if view.filters %}
+<p>None is in the filter. <a href="{{ view.unfiltered_link() }}">Clear it</a>.</p>
+{% else %}
 <p>Nothing is recorded anywhere yet.</p>
+{% endif %}
 {% endfor %}
+{{ pager(view) }}
 {% endblock %}

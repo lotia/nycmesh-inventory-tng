@@ -1,5 +1,6 @@
 {% extends "admin_base.html" %}
 {% from "_table.html" import table %}
+{% from "_listing.html" import filter_form, sizes, sort_heading, pager %}
 {#- The reading rules: how a unit, as typed after a number, is read
 (models.ReadingRule, docs/decisions/0021), each changed or deleted on its
 own page. -#}
@@ -9,21 +10,41 @@ own page. -#}
   item forms, before the unit table. Settled as an item's form asks, or
   corrected here.
   <a href="{{ here }}/seed">Propose readings from every name</a>.</p>
+{% call filter_form(view) %}
+  <label>Find a unit
+    <input name="unit" type="search" value="{{ view.filtered('unit') }}" maxlength="200" autocomplete="off">
+  </label>
+  <label>Filter by who settled it
+    <select name="by">
+      <option value="">Anyone</option>
+      <option value="import"{% if view.filtered("by") == "import" %} selected{% endif %}>The import</option>
+      <option value="admin"{% if view.filtered("by") == "admin" %} selected{% endif %}>An administrator</option>
+    </select>
+  </label>
+{% endcall %}
 <section>
+  {{ sizes(view) }}
   {% call table() %}
-    <tr><th>After a number</th><th>Read as</th><th>Saved</th><th>Settled by</th><th>When</th></tr>
-    {% for rule, username in rows %}
-    {% set reading = reading_of(rule.reading) if rule.reading else none %}
+    <tr>{{ sort_heading(view, "unit", "After a number") }}
+      {{- sort_heading(view, "read_as", "Read as") }}
+      {{- sort_heading(view, "saved", "Saved") }}
+      {{- sort_heading(view, "by", "Settled by") }}
+      {{- sort_heading(view, "when", "When") }}</tr>
+    {% for row in rows %}
     <tr>
-      <td><a href="{{ here }}/{{ rule.id }}">{{ rule.token }}</a></td>
-      <td>{% if reading %}{{ reading.shown }} · {{ reading.unit.kind }}{% else %}Not a unit{% endif %}</td>
-      <td>{{ "Respelt" if rule.respell else "As typed" }}</td>
-      <td>{{ username or "The import" }}</td>
-      <td>{{ rule.decided_at | when(zone) }}</td>
+      <td><a href="{{ here }}/{{ row.rule.id }}">{{ row.rule.token }}</a></td>
+      <td>{{ row.read_as }}</td>
+      <td>{{ row.saved }}</td>
+      <td>{{ row.by }}</td>
+      <td>{{ row.rule.decided_at | when(zone) }}</td>
     </tr>
     {% else %}
-    <tr><td colspan="5">None yet: <a href="{{ here }}/seed">propose them from the names</a>.</td></tr>
+    <tr><td colspan="5">
+      {%- if view.filters %}None is in the filter. <a href="{{ view.unfiltered_link() }}">Clear it</a>.
+      {%- else %}None yet: <a href="{{ here }}/seed">propose them from the names</a>.{% endif -%}
+    </td></tr>
     {% endfor %}
   {% endcall %}
+  {{ pager(view) }}
 </section>
 {% endblock %}

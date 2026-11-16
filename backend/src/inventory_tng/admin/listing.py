@@ -281,6 +281,12 @@ def arranged[R](rows: Iterable[R], view: View) -> tuple[list[R], View]:
     """Rows built in Python, by Sort.keyed columns, in the view's order,
     then the list's own, then as they came (best match first, while
     searching unsorted); one page of them, and the view counted."""
+    return paged(in_order(rows, view), view)
+
+
+def in_order[R](rows: Iterable[R], view: View) -> list[R]:
+    """Rows built in Python in the view's order, as arranged() puts them,
+    all of them: such as the rows of each group on a page of groups."""
     found = list(rows)
     sorting = view.sorting
     if view.by is not None:
@@ -288,6 +294,14 @@ def arranged[R](rows: Iterable[R], view: View) -> tuple[list[R], View]:
         if view.by != sorting.default:
             found.sort(key=_key(default), reverse=default.first == "desc")
         found.sort(key=_key(sorting.columns[view.by]), reverse=view.desc)
+    return found
+
+
+def paged[R](rows: Iterable[R], view: View) -> tuple[list[R], View]:
+    """One page of `rows`, in the order given, and the view counted: of
+    groups, such as Stock's, the page size counts groups, so none is split
+    across pages (Ali, 2026-11-15, inventory-tng-qwb)."""
+    found = list(rows)
     view = view.counted(len(found))
     end = None if view.per_page is None else view.offset + view.per_page
     return found[view.offset : end], view

@@ -7,20 +7,27 @@ printed again from its address."""
 from typing import Annotated, Any, cast
 
 import structlog
-from fastapi import APIRouter, Form, Query, Request
+from fastapi import APIRouter, Depends, Form, Query, Request
 from fastapi.responses import JSONResponse, Response
-from sqlalchemy import func, select
+from sqlalchemy import ColumnElement, exists, func, select
 from sqlalchemy.orm import aliased
 
 from inventory_tng import labels
 from inventory_tng.accounts import qr_svg
 from inventory_tng.admin.common import LABELS, admin_page, now
 from inventory_tng.admin.items import ITEMS
-from inventory_tng.admin.listing import Searched
+from inventory_tng.admin.listing import Listing, Searched, Sort, Sorting
 from inventory_tng.admin.locations import LOCATIONS
 from inventory_tng.db import DbSession
 from inventory_tng.local_time import site_zone
-from inventory_tng.models import Item, ItemPackage, Label, Location, whole
+from inventory_tng.models import (
+    INTEGER_MAX,
+    Item,
+    ItemPackage,
+    Label,
+    Location,
+    whole,
+)
 from inventory_tng.pages import NOTICES, not_found, redirect, templates
 from inventory_tng.sign_in import AdminSignedIn
 
@@ -50,6 +57,23 @@ NOTICES.update(
 # The place around a place, which a label's search reads too.
 _parent = aliased(Location)
 
+# What a label is called in a list: its place's name, or its item's.
+_NAME = func.coalesce(Location.name, Item.name)
+
+# How the labels list sorts: by what it names, as it always has, or by a
+# heading, made newest first (Ali, 2026-11-15, inventory-tng-qwb).
+SORTING = Sorting(
+    "names",
+    {
+        "code": Sort.of(Label.code),
+        "names": Sort.of(func.lower(_NAME)),
+        "made": Sort.of(Label.created_at, first="desc"),
+    },
+)
+
+# What the kind filter offers: labels of items, or of places.
+KINDS = {"item": Label.item_id.is_not(None), "place": Label.location_id.is_not(None)}
+
 # How the labels list finds one: by its whole code, or the words naming it,
 # reading each label with what it names.
 SEARCHED = Searched(
@@ -62,7 +86,7 @@ SEARCHED = Searched(
         Location.search_text,
         _parent.search_text,
     ),
-    func.coalesce(Location.name, Item.name),
+    _NAME,
     query=select(Label)
     .outerjoin(Item, Item.id == Label.item_id)
     .outerjoin(ItemPackage, ItemPackage.id == Label.package_id)
@@ -72,7 +96,47 @@ SEARCHED = Searched(
     current=labels.scanned(),
     lapsed="inactive",
     shown=labels.named,
+    sorting=SORTING,
 )
+
+
+def _listed(
+    q: str = "",
+    show: str = "",
+    page: str = "",
+    pick: str = "",
+    sort: str = "",
+    order: str = "",
+    per: str = "",
+    kind: str = "",
+    item: str = "",
+) -> Listing[Label]:
+    """The labels list as its query string asks for it, with its filters
+    (Ali, 2026-11-15): items' or places' labels, and one item's; a kind not
+    offered, or an item not a number, is no filter."""
+    item_id = whole(item, 1, INTEGER_MAX)
+    filters: dict[str, str] = {}
+    where: list[ColumnElement[bool]] = []
+    if kind in KINDS:
+        filters["kind"] = kind
+        where.append(KINDS[kind])
+    if item_id is not None:
+        filters["item"] = str(item_id)
+        where.append(Label.item_id == item_id)
+    return SEARCHED.read(
+        q,
+        show,
+        page,
+        pick,
+        sort=sort,
+        order=order,
+        per=per,
+        filters=filters,
+        where=where,
+    )
+
+
+Listed = Annotated[Listing[Label], Depends(_listed)]
 
 
 @router.get(LABELS)
@@ -80,12 +144,15 @@ def list_labels(
     request: Request,
     signed: AdminSignedIn,
     session: DbSession,
-    q: str = "",
-    show: str = "",
-    page: str = "",
-    pick: str = "",
+    listed: Listed,
 ) -> Response:
-    listing = SEARCHED.read(q, show, page, pick).find(session)
+    listing = listed.find(session)
+    # The item filter offers the items that have labels.
+    labelled = session.execute(
+        select(Item.id, Item.name_shown)
+        .where(exists().where(Label.item_id == Item.id))
+        .order_by(func.lower(Item.name_shown), Item.id)
+    ).all()
     return admin_page(
         request,
         signed,
@@ -97,6 +164,7 @@ def list_labels(
             "items_path": ITEMS,
             "locations_path": LOCATIONS,
             "listing": listing,
+            "labelled": labelled,
             "zone": site_zone(session),
         },
     )
@@ -104,10 +172,10 @@ def list_labels(
 
 @router.get(f"{LABELS}/suggest")
 def suggest_labels(
-    session: DbSession, signed: AdminSignedIn, q: str = "", show: str = ""
+    session: DbSession, signed: AdminSignedIn, listing: Listed
 ) -> JSONResponse:
     """What the search box offers as one types (_listing.html)."""
-    offered = SEARCHED.read(q, show).suggest(session, lambda label: label.code)
+    offered = listing.suggest(session, lambda label: label.code)
     return JSONResponse(offered, headers={"Cache-Control": "no-store"})
 
 
@@ -141,15 +209,12 @@ def print_labels(
     request: Request,
     signed: AdminSignedIn,
     session: DbSession,
+    listing: Listed,
     label: Annotated[list[int] | None, Query()] = None,
     copies: str = "1",
-    q: str = "",
-    show: str = "",
-    page: str = "",
-    pick: str = "",
 ) -> Response:
     # A refusal goes back to the list as it was, picked from (labels.html).
-    back = SEARCHED.read(q, show, page, pick).link()
+    back = listing.link()
     count = whole(copies, 1, labels.MAX_COPIES)
     if count is None:
         return redirect(back, notice="copies")

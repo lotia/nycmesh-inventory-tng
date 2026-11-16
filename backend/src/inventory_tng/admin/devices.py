@@ -26,7 +26,14 @@ from inventory_tng.admin.common import (
     now,
     site_link,
 )
-from inventory_tng.admin.listing import Sort, Sorting, View, count, ordered
+from inventory_tng.admin.listing import (
+    Sort,
+    Sorting,
+    View,
+    arranged,
+    count,
+    ordered,
+)
 from inventory_tng.db import DbSession, attempt
 from inventory_tng.local_time import parse_local, site_zone
 from inventory_tng.models import Device, RegistrationCode, whole
@@ -64,14 +71,38 @@ def state(code: RegistrationCode, at: datetime) -> State:
     return "open"
 
 
+# How the codes list sorts, each row a code, its state and how many
+# devices it registered: newest first, as it always has, or by a heading
+# (Ali, 2026-11-15, inventory-tng-qwb).
+CODE_SORTING = Sorting(
+    "made",
+    {
+        "made": Sort.keyed(lambda row: row[0].created_at, first="desc"),
+        "code": Sort.keyed(lambda row: row[0].name.lower()),
+        "state": Sort.keyed(lambda row: row[1]),
+        "used": Sort.keyed(lambda row: row[0].uses),
+        "until": Sort.keyed(lambda row: row[0].expires_at),
+    },
+)
+# What the codes' state filter offers, as it is said, and each state's.
+CODE_STATES: dict[str, State] = {
+    "usable": "open",
+    "used up": "used up",
+    "expired": "expired",
+    "revoked": "revoked",
+}
+
+
 def _list_page(
     request: Request,
     session: Session,
     signed: SignedIn,
     *,
+    view: View | None = None,
     problems: dict[str, str] | None = None,
     values: dict[str, str] | None = None,
 ) -> HTMLResponse:
+    view = view or View.read(DEVICES, CODE_SORTING)
     codes = session.scalars(
         select(RegistrationCode).order_by(RegistrationCode.created_at.desc())
     ).all()
@@ -83,6 +114,16 @@ def _list_page(
         ).all()
     )
     at = now()
+    wanted = CODE_STATES.get(view.filtered("state"))
+    rows, view = arranged(
+        (
+            (code, state(code, at), counts.get(code.id, 0))
+            for code in codes
+            if wanted is None or state(code, at) == wanted
+        ),
+        view,
+    )
+    log.debug("codes listed", found=view.found, sort=view.by, page=view.page)
     return admin_page(
         request,
         signed,
@@ -92,9 +133,9 @@ def _list_page(
             "here": DEVICES,
             "codes_path": CODES,
             "device_list": DEVICE_LIST,
-            "codes": [
-                (code, state(code, at), counts.get(code.id, 0)) for code in codes
-            ],
+            "view": view,
+            "states": CODE_STATES,
+            "codes": rows,
             "zone": site_zone(session),
             "max_uses": MAX_USES,
             "max_days": MAX_DAYS,
@@ -106,8 +147,28 @@ def _list_page(
 
 
 @router.get(DEVICES)
-def codes(request: Request, signed: AdminSignedIn, session: DbSession) -> Response:
-    return _list_page(request, session, signed)
+def codes(
+    request: Request,
+    signed: AdminSignedIn,
+    session: DbSession,
+    state: str = "",
+    sort: str = "",
+    order: str = "",
+    per: str = "",
+    page: str = "",
+) -> Response:
+    """The codes, filtered by state (Ali, 2026-11-15): one not offered is
+    none."""
+    view = View.read(
+        DEVICES,
+        CODE_SORTING,
+        sort=sort,
+        order=order,
+        per=per,
+        page=page,
+        filters={"state": state} if state in CODE_STATES else None,
+    )
+    return _list_page(request, session, signed, view=view)
 
 
 @router.post(CODES)

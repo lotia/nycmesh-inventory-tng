@@ -3,6 +3,7 @@ each line leaves and arrives in, balance by form, and the rules
 insert_transaction and open_packages.make keep. The rules as pure
 functions first, then each through its write on PostgreSQL."""
 
+import re
 import uuid
 from datetime import UTC, datetime
 from decimal import Decimal
@@ -1840,3 +1841,38 @@ def test_an_open_package_showing_less_than_nothing_is_listed(
     )
     listed = registered_client.get("/api/catalogue").json()["open_packages"]
     assert [entry["left"] for entry in listed if entry["id"] == made.id] == [amount]
+
+
+def test_those_reported_used_up_sort_and_come_in_pages(
+    admin_client: TestClient, session: Session, spools: Spools
+) -> None:
+    """The first reported first unless a heading sorts them; in pages of
+    25, 50, 100 or all (Ali, 2026-11-15, inventory-tng-qwb)."""
+    later = reported(session, spools)  # 5 m left.
+    earlier = spools.opened()
+    spools.move(Entry(spools.cable.id, Decimal(100), Form(open_package_id=earlier.id)))
+    open_packages.report(
+        session,
+        [earlier.id],
+        spools.place.volunteer.id,
+        datetime(2026, 1, 1, tzinfo=UTC),
+    )
+    session.flush()
+
+    def listed(**query: str) -> list[int]:
+        page = admin_client.get(USED_UP, params=query).text
+        return [int(n) for n in re.findall(r'name="open_package" value="(\d+)"', page)]
+
+    assert listed() == [earlier.id, later.id]
+    assert listed(sort="reported", order="desc") == [later.id, earlier.id]
+    assert listed(sort="shows") == [later.id, earlier.id]
+    assert listed(sort="shows", order="desc") == [earlier.id, later.id]
+    # One item, package and place: as reported, either way.
+    assert listed(sort="package") == [earlier.id, later.id]
+    assert listed(sort="package", order="desc") == [earlier.id, later.id]
+    assert listed(per="all") == [earlier.id, later.id]
+    page = admin_client.get(USED_UP, params={"item": str(spools.cable.id)}).text
+    assert (
+        f'<a href="{USED_UP}?item={spools.cable.id}&amp;sort=shows">Shows</a>' in page
+    )
+    assert f'<a href="{USED_UP}?item={spools.cable.id}&amp;per=25">25</a>' in page

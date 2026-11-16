@@ -1,14 +1,18 @@
 {% extends "admin_base.html" %}
 {% from "_views.html" import views %}
 {% from "_table.html" import table %}
+{% from "_listing.html" import sizes, sort_heading, pager %}
 {% block main %}
-{{ views("Stock views", stock_views, view) }}
+{{ views("Stock views", stock_views, "reorder") }}
 <p class="hint">Items whose usable stock in the stores, across their areas,
 is at or below the level to reorder at (short ends are not usable), or with
 fewer sealed packages there than a package's minimum. Both are set on the
 item's page; an item with neither is never listed.</p>
+{{ sizes(view) }}
 {% call table() %}
-  <tr><th>Item</th><th>Usable in the stores</th><th>Reorder at</th></tr>
+  <tr>{{ sort_heading(view, "item", "Item") }}
+    {{- sort_heading(view, "usable", "Usable in the stores") }}
+    {{- sort_heading(view, "reorder_at", "Reorder at") }}</tr>
   {% for row in rows %}
   <tr>
     <td><a href="{{ items_path }}/{{ row.item.id }}">{{ row.item.name_shown }}</a></td>
@@ -20,6 +24,7 @@ item's page; an item with neither is never listed.</p>
   <tr><td colspan="3">Nothing is at or below its level.</td></tr>
   {% endfor %}
 {% endcall %}
+{{ pager(view) }}
 {% if any_short %}
 <p class="hint">Count first: somewhere in the stores shows less than nothing
 of it, so the total is not to be trusted until it is counted

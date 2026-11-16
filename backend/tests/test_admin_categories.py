@@ -1,5 +1,6 @@
 """Categories, and the pattern every catalogue page follows (admin/)."""
 
+import re
 from collections.abc import Callable
 
 import pytest
@@ -132,3 +133,33 @@ def test_a_page_shown_again_after_a_refusal_still_links_right(
     page = refused.text
     assert f'action="{CATEGORIES}/{radios.id}/name"' in page
     assert f'<p class="back"><a href="{CATEGORIES}">' in page
+
+
+def test_categories_sort_by_name_or_items_and_show_25_50_100_or_all(
+    admin_client: TestClient, session: Session
+) -> None:
+    """By name unless a heading sorts them (Ali, 2026-11-15,
+    inventory-tng-qwb)."""
+    many = add(session, Category(name="Bravo"))
+    add(session, Category(name="alpha"))
+    add(session, Category(name="Charlie"))
+    for number in range(2):
+        add(session, Item(name=f"Thing {number}", category_id=many.id))
+
+    def listed(**query: str) -> list[str]:
+        page = admin_client.get(CATEGORIES, params=query).text
+        return re.findall(r'<td><a href="/admin/categories/\d+">([^<]+)</a>', page)
+
+    assert listed() == ["alpha", "Bravo", "Charlie"]
+    assert listed(sort="name", order="desc") == ["Charlie", "Bravo", "alpha"]
+    assert listed(sort="items") == ["alpha", "Charlie", "Bravo"]
+    assert listed(sort="items", order="desc") == ["Bravo", "alpha", "Charlie"]
+    for number in range(30):
+        add(session, Category(name=f"Sized {number:03}"))
+    assert len(listed(per="25")) == 25
+    assert "Page 2 of 2" in text(
+        admin_client.get(CATEGORIES, params={"per": "25", "page": "2"})
+    )
+    assert len(listed(per="all")) == 33
+    page = admin_client.get(CATEGORIES).text
+    assert f'<a href="{CATEGORIES}?sort=items">Items</a>' in page

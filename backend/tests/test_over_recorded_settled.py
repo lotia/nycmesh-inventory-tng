@@ -98,7 +98,7 @@ def test_a_correction_is_listed_with_when_who_and_where(
     assert settled_rows(admin_client) == [
         [
             when,
-            place.item.name,
+            place.item.name_shown,
             "1",
             f"{place.store.name} → {place.van.name}",
             "Corrected",
@@ -353,10 +353,10 @@ def test_newest_first_in_pages_of_one_item_or_all(
     page = admin_client.get(only).text
     assert [row[0] for row in rows_of(page)] == [times[3], times[2]]
     assert f'href="{SETTLED}?item={place.item.id}&amp;page=2"' in page
-    assert f"Only {place.item.name}." in page
+    assert f"Only {place.item.name_shown}." in page
     second = rows_of(admin_client.get(f"{only}&page=2").text)
     assert [row[0] for row in second] == [times[0]]
-    assert {row[1] for row in [*rows_of(page), *second]} == {place.item.name}
+    assert {row[1] for row in [*rows_of(page), *second]} == {place.item.name_shown}
 
 
 def test_nothing_settled_says_so(admin_client: TestClient, session: Session) -> None:
@@ -537,7 +537,7 @@ def test_one_end_only_counted_names_that_end(
     ]
 
 
-def test_every_column_but_why_sorts_either_way(
+def test_every_column_sorts_either_way(
     admin_client: TestClient, session: Session
 ) -> None:
     """Newest first, unless a heading sorts them: pressed, the way it
@@ -574,6 +574,8 @@ def test_every_column_but_why_sorts_either_way(
         ("amount", 2),
         ("where", 3),
         ("how", 4),
+        # Why by its words as shown (Ali, 2026-11-15, inventory-tng-73p).
+        ("why", 5),
         ("by", 6),
     ):
         first = [row[cell].lower() for row in shown(f"&sort={column}")]
@@ -583,9 +585,9 @@ def test_every_column_but_why_sorts_either_way(
     page = admin_client.get(f"{SETTLED}?sort=item").text
     assert '<th aria-sort="ascending"><a href="' in page
     assert f'href="{SETTLED}?sort=item&amp;order=desc"' in page
-    # Why does not sort; a sort not offered is newest first.
-    assert "sort=why" not in page
-    assert shown("&sort=why") == newest
+    assert f'href="{SETTLED}?sort=why"' in page
+    # A sort not offered is newest first.
+    assert shown("&sort=whom") == newest
 
 
 def test_rows_per_page_25_50_100_or_all(
@@ -608,6 +610,48 @@ def test_rows_per_page_25_50_100_or_all(
     assert "Page 1 of 2" in page
     assert f'href="{only}&amp;per=25&amp;page=2"' in page
     assert len(settled_rows(admin_client, f"{only}&per=25&page=2")) == 1
+    # Sorted by Why, worded in Python, in pages too.
+    assert len(settled_rows(admin_client, f"{only}&per=25&sort=why&page=2")) == 1
     assert len(settled_rows(admin_client, f"{only}&per=all")) == 26
     # A size not offered is 50.
     assert len(settled_rows(admin_client, f"{only}&per=7")) == 26
+
+
+def test_those_waiting_sort_by_each_heading_and_come_in_pages(
+    admin_client: TestClient, session: Session
+) -> None:
+    """By item unless a heading sorts them; pressed again, the other way;
+    in pages of 25, 50, 100 or all (Ali, 2026-11-15, inventory-tng-qwb)."""
+    places = [Place(session) for _ in range(3)]
+    for n, place in enumerate(places):
+        raised(session, write(session, place), Decimal(3 - n))
+    session.flush()
+    mine = {place.item.name_shown for place in places}
+
+    def items(query: str = "") -> list[str]:
+        rows = rows_of(admin_client.get(f"{WAITING}?per=all{query}").text)
+        return [row[0] for row in rows if row[0] in mine]
+
+    by_name = sorted(mine, key=str.lower)
+    assert items() == by_name
+    assert items("&sort=item&order=desc") == by_name[::-1]
+    names = [place.item.name_shown for place in places]
+    # Recorded more: 3, 2, 1.
+    assert items("&sort=amount") == names[::-1]
+    assert items("&sort=amount&order=desc") == names
+    # The newest transaction first.
+    assert items("&sort=transaction") == names[::-1]
+    assert items("&sort=transaction&order=asc") == names
+    where = sorted(names, key=lambda n: places[names.index(n)].store.name.lower())
+    assert items("&sort=where") == where
+    page = admin_client.get(WAITING).text
+    assert f'<a href="{WAITING}?sort=amount">Recorded more</a>' in page
+    assert f'<a href="{WAITING}?per=25">25</a>' in page
+    only = f"{WAITING}?item={places[0].item.id}"
+    sorted_only = admin_client.get(f"{only}&sort=amount").text
+    assert f'href="{only}&amp;sort=amount&amp;order=desc"' in sorted_only
+    assert f'<a href="{WAITING}?sort=amount">Show all</a>' in sorted_only
+    for _ in range(25):
+        moved(session, places[0])
+    assert len(rows_of(admin_client.get(f"{only}&per=25").text)) == 25
+    assert len(rows_of(admin_client.get(f"{only}&per=25&page=2").text)) == 1

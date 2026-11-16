@@ -1,9 +1,13 @@
 {% extends "admin_base.html" %}
 {% from "_table.html" import table %}
+{% from "_listing.html" import sizes, sort_heading, pager %}
 {% block main %}
 <section>
+  {{ sizes(view) }}
   {% call table() %}
-    <tr><th>Administrator</th><th>Email</th><th>Authenticator</th></tr>
+    <tr>{{ sort_heading(view, "name", "Administrator") }}
+      {{- sort_heading(view, "email", "Email") }}
+      {{- sort_heading(view, "authenticator", "Authenticator") }}</tr>
     {% for other in current %}
     <tr>
       <td><a href="{{ here }}/{{ other.id }}">{{ other.username }}</a>
@@ -14,6 +18,7 @@
     </tr>
     {% endfor %}
   {% endcall %}
+  {{ pager(view) }}
 </section>
 
 <section>

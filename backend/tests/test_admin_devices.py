@@ -425,3 +425,57 @@ def test_an_end_at_the_last_minute_there_is_lists_without_an_end(
     listed = admin_client.get(DEVICE_LIST, params={"until": "9999-12-31T23:59"})
     assert listed.status_code == 200
     assert device.id in listed_ids(text(listed))
+
+
+def test_codes_sort_filter_by_state_and_come_in_pages(
+    admin_client: TestClient, session: Session
+) -> None:
+    """Newest first unless a heading sorts them; filtered by state (usable,
+    used up, expired, revoked); in pages of 25, 50, 100 or all (Ali,
+    2026-11-15, inventory-tng-qwb)."""
+    at = datetime.now(UTC)
+    made: dict[str, RegistrationCode] = {}
+    for label, uses, days, revoked in (
+        ("Bravo", 0, 3, False),
+        ("Alpha", 2, 2, False),
+        ("Charlie", 0, -1, False),
+        ("Delta", 0, 1, True),
+    ):
+        code, _phrase = devices.create_code(
+            session, max_uses=2, lifetime=timedelta(days=1), label=label
+        )
+        code.uses = uses
+        code.expires_at = at + timedelta(days=days)
+        code.created_at = at - timedelta(days=len(made))
+        code.revoked_at = at if revoked else None
+        made[label] = code
+    session.commit()
+
+    def listed(**query: str) -> list[str]:
+        page = admin_client.get(DEVICES, params=query).text
+        return re.findall(rf'<td><a href="{CODES}/\d+">([^<]+)</a>', page)
+
+    assert listed() == ["Bravo", "Alpha", "Charlie", "Delta"]
+    assert listed(sort="code") == ["Alpha", "Bravo", "Charlie", "Delta"]
+    assert listed(sort="code", order="desc") == ["Delta", "Charlie", "Bravo", "Alpha"]
+    assert listed(sort="state") == ["Charlie", "Bravo", "Delta", "Alpha"]
+    assert listed(sort="used", order="desc")[0] == "Alpha"
+    assert listed(sort="until") == ["Charlie", "Delta", "Alpha", "Bravo"]
+    assert listed(state="usable") == ["Bravo"]
+    assert listed(state="used up") == ["Alpha"]
+    assert listed(state="expired") == ["Charlie"]
+    assert listed(state="revoked") == ["Delta"]
+    assert listed(state="lost") == listed()
+    page = admin_client.get(DEVICES, params={"state": "expired"}).text
+    assert '<option value="expired" selected>Expired</option>' in page
+    assert f'<a href="{DEVICES}">Clear</a>' in page
+    assert f'<a href="{DEVICES}?state=expired&amp;sort=until">Until</a>' in page
+    for number in range(26):
+        devices.create_code(
+            session, max_uses=1, lifetime=timedelta(days=1), label=f"More {number}"
+        )
+    session.commit()
+    paged = text(admin_client.get(DEVICES, params={"per": "25"}))
+    assert len(re.findall(rf'<td><a href="{CODES}/\d+">', paged)) == 25
+    assert "Page 1 of 2" in paged
+    assert len(listed(per="all")) == 30

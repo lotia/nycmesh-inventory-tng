@@ -17,6 +17,7 @@ from sqlalchemy.orm import Session
 from inventory_tng import ledger, open_packages
 from inventory_tng.admin.common import admin_page, now
 from inventory_tng.admin.items import ITEMS
+from inventory_tng.admin.listing import Sort, Sorting, View, arranged
 from inventory_tng.admin.needs_action import (
     Kind,
     OnlyItem,
@@ -66,11 +67,46 @@ TITLE = "Reported used up"
 KIND = Kind(TITLE, USED_UP, REPORTED)
 
 
+# How those reported sort: the first reported first, as they always have,
+# or by a heading (Ali, 2026-11-15, inventory-tng-qwb).
+SORTING = Sorting(
+    "reported",
+    {
+        "package": Sort.keyed(
+            lambda each: (each.item.lower(), each.package.lower(), each.place.lower())
+        ),
+        "shows": Sort.keyed(lambda each: each.left),
+        "reported": Sort.keyed(lambda each: each.row.reported_at),
+    },
+)
+
+
 @router.get(USED_UP)
 def used_up_page(
-    request: Request, signed: AdminSignedIn, session: DbSession, only: OnlyItem
+    request: Request,
+    signed: AdminSignedIn,
+    session: DbSession,
+    only: OnlyItem,
+    sort: str = "",
+    order: str = "",
+    per: str = "",
+    page: str = "",
 ) -> Response:
-    """All those reported, or only one item's."""
+    """All those reported, or only one item's, sorted and in pages as
+    asked."""
+    view = View.read(
+        USED_UP,
+        SORTING,
+        sort=sort,
+        order=order,
+        per=per,
+        page=page,
+        kept=query(only),
+    )
+    reported, view = arranged(
+        open_packages.shown(session, *of_only(REPORTED, only)), view
+    )
+    log.debug("used up listed", found=view.found, sort=view.by, page=view.page)
     return admin_page(
         request,
         signed,
@@ -82,7 +118,8 @@ def used_up_page(
             "only": only,
             # Answered, the page shows the same item again.
             "query": query_string(only),
-            "reported": open_packages.shown(session, *of_only(REPORTED, only)),
+            "reported": reported,
+            "view": view,
             "zone": site_zone(session),
         },
     )

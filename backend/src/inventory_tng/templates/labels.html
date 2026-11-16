@@ -1,9 +1,27 @@
 {% extends "admin_base.html" %}
 {% from "_table.html" import table %}
-{% from "_listing.html" import search_box, filters, summary, empty, pager %}
+{% from "_listing.html" import search_box, filters, filter_form, sizes, sort_heading, summary, empty, pager %}
 {% block main %}
+{% set view = listing.view %}
 {{ search_box(listing, "labels") }}
 {{ filters(listing) }}
+{% call filter_form(view) %}
+  <label>Filter by kind
+    <select name="kind">
+      <option value="">Any</option>
+      <option value="item"{% if view.filtered("kind") == "item" %} selected{% endif %}>Item labels</option>
+      <option value="place"{% if view.filtered("kind") == "place" %} selected{% endif %}>Place labels</option>
+    </select>
+  </label>
+  <label>Filter by item
+    <select name="item">
+      <option value="">Any</option>
+      {% for id, name in labelled %}
+      <option value="{{ id }}"{% if view.filtered("item") == id | string %} selected{% endif %}>{{ name }}</option>
+      {% endfor %}
+    </select>
+  </label>
+{% endcall %}
 <p class="hint">Make labels from an <a href="{{ items_path }}">item's</a> or a
 <a href="{{ locations_path }}">location's</a> page. Each has one code, printed as
 often as needed; pick some here to print them again.</p>
@@ -11,16 +29,18 @@ often as needed; pick some here to print them again.</p>
 {#- The picks and copies belong to this form, from wherever they are; and
 the list as shown, to come back to if printing is refused. #}
 <form method="get" action="{{ print_path }}" id="print-labels">
-  {% if listing.search %}<input type="hidden" name="q" value="{{ listing.search }}">{% endif %}
-  {% if listing.show != "current" %}<input type="hidden" name="show" value="{{ listing.show }}">{% endif %}
-  {% if listing.page > 1 %}<input type="hidden" name="page" value="{{ listing.page }}">{% endif %}
-  {% if listing.pick %}<input type="hidden" name="pick" value="{{ listing.pick }}">{% endif %}
+  {% for name, value in view.fields() %}
+  <input type="hidden" name="{{ name }}" value="{{ value }}">
+  {% endfor %}
 </form>
 <section>
   {{ summary(listing, "label", "labels") }}
   {% if listing.show != "current" %}<p class="hint">The scan page doesn't read a label tagged here.</p>{% endif %}
+  {{ sizes(view) }}
   {% call table() %}
-    <tr><th>Print</th><th>Code</th><th>Names</th><th class="hidden sm:table-cell">Made</th><th></th></tr>
+    <tr><th>Print</th>{{ sort_heading(view, "code", "Code") }}
+      {{- sort_heading(view, "names", "Names") }}
+      {{- sort_heading(view, "made", "Made", "hidden sm:table-cell") }}<th></th></tr>
     {% for named in listing.shown %}
     {% set label = named.label %}
     <tr>
