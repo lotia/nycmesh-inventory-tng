@@ -1,28 +1,29 @@
 {% extends "admin_base.html" %}
 {% from "_table.html" import table %}
 {% block main %}
-<p>{% if state == "open" %}Open{% else %}<span class="tag">{{ state | capitalize }}</span>{% endif %}: {{ code.uses }} of {{ code.max_uses }} used,
-until {{ code.expires_at | when(zone) }}.</p>
+{% set state_shown %}{% if state == "open" %}{{ state_words[state] }}{% else %}<span class="tag">{{ state_words[state] }}</span>{% endif %}{% endset %}
+<p>{% trans state=state_shown, uses=code.uses, most=code.max_uses, until=code.expires_at | when(zone) %}{{ state }}: {{ uses }} of {{ most }} used,
+until {{ until }}.{% endtrans %}</p>
 {% if not code.revoked_at %}
-<form method="get" action="{{ here }}/revoke"><button>Revoke</button></form>
-<p class="hint">Revoking stops new registrations. Devices it registered stay
+<form method="get" action="{{ here }}/revoke"><button>{% trans %}Revoke{% endtrans %}</button></form>
+<p class="hint">{% trans %}Revoking stops new registrations. Devices it registered stay
 registered; revoke any that look wrong from its own page. You'll be asked
-first.</p>
+first.{% endtrans %}</p>
 {% endif %}
 
 <section id="devices">
-  <h2>Devices it registered</h2>
+  <h2>{% trans %}Devices it registered{% endtrans %}</h2>
   {% call table() %}
-    <tr><th>Device</th><th>Registered</th><th>Last used</th><th>From</th></tr>
+    <tr><th>{% trans %}Device{% endtrans %}</th><th>{% trans %}Registered{% endtrans %}</th><th>{% trans %}Last used{% endtrans %}</th><th>{% trans %}From{% endtrans %}</th></tr>
     {% for device, before in devices %}
     <tr>
-      <td><a href="{{ back_link[0] }}/{{ device.id }}">{{ device.name }}</a>{% if device.revoked_at %} <span class="tag">Revoked</span>{% endif %}</td>
-      <td>{{ device.created_at | when(zone) }}{% if before is not none %} <span class="hint">{{ before }} before revoking</span>{% endif %}</td>
+      <td><a href="{{ back_link[0] }}/{{ device.id }}">{{ device.name }}</a>{% if device.revoked_at %} <span class="tag">{% trans %}Revoked{% endtrans %}</span>{% endif %}</td>
+      <td>{{ device.created_at | when(zone) }}{% if before is not none %} <span class="hint">{% trans before=before %}{{ before }} before revoking{% endtrans %}</span>{% endif %}</td>
       <td>{{ device.last_seen_at | when(zone) }}</td>
       <td><span class="wrap-anywhere">{{ device.first_seen_from or "" }}</span></td>
     </tr>
     {% else %}
-    <tr><td colspan="4">None yet.</td></tr>
+    <tr><td colspan="4">{% trans %}None yet.{% endtrans %}</td></tr>
     {% endfor %}
   {% endcall %}
 </section>

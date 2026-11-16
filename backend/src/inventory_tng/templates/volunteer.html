@@ -4,59 +4,59 @@
 {% set retired = volunteer.retired_at is not none %}
 {% with name = "volunteer" %}{% if problems.get(name) %}<p role="alert">{{ problems[name] }}</p>{% endif %}{% endwith %}
 {% if retired %}
-{% call retired_record(volunteer, person=true) %}{% if merged_into %}A duplicate, merged into
-<a href="{{ back_link[0] }}/{{ merged_into.id }}">{{ merged_into.name }}</a>: their past records
-count as theirs.{% else %}The scan page doesn't offer them.{% endif %}{% endcall %}
+{% call retired_record(volunteer, person=true) %}{% if merged_into %}{% trans link=back_link[0] ~ "/" ~ merged_into.id, name=merged_into.name %}A duplicate, merged into
+<a href="{{ link }}">{{ name }}</a>: their past records
+count as theirs.{% endtrans %}{% else %}{% trans %}The scan page doesn't offer them.{% endtrans %}{% endif %}{% endcall %}
 {% endif %}
 
 <form method="post" action="{{ here }}">
   <fieldset class="contents" {% if retired %}disabled{% endif %}>
   <input type="hidden" name="version" value="{{ values.get('version', volunteer.edit_version) }}">
-  <label>Name
+  <label>{% trans %}Name{% endtrans %}
     <input name="name" value="{{ values.get('name', volunteer.name) }}" maxlength="{{ name_max }}" required>
     {% with name = "name" %}{% include "_field_problem.html" %}{% endwith %}
   </label>
-  <label>Email <span class="hint">optional</span>
+  <label>{% trans %}Email{% endtrans %} <span class="hint">{% trans %}optional{% endtrans %}</span>
     <input name="email" type="email" value="{{ values.get('email', volunteer.email or '') }}">
     {% with name = "email" %}{% include "_field_problem.html" %}{% endwith %}
   </label>
   </fieldset>
-  {% if not retired %}<button class="primary">Save</button>{% endif %}
+  {% if not retired %}<button class="primary">{% trans %}Save{% endtrans %}</button>{% endif %}
 </form>
 
 {% if not retired %}
 <section id="holding">
-  <h2>Holding stock</h2>
+  <h2>{% trans %}Holding stock{% endtrans %}</h2>
   {% with section_id="holding" %}{% include "_notice.html" %}{% endwith %}
   {% if custody %}
-  <p>They can hold stock: it shows as theirs, wherever they take it.</p>
-  <form method="post" action="{{ here }}/custody/end"><button>Stop</button></form>
+  <p>{% trans %}They can hold stock: it shows as theirs, wherever they take it.{% endtrans %}</p>
+  <form method="post" action="{{ here }}/custody/end"><button>{% trans %}Stop{% endtrans %}</button></form>
   {% else %}
-  <p>They don't hold stock: what they take goes straight to an install or another place.</p>
-  <form method="post" action="{{ here }}/custody"><button>Let them hold stock</button></form>
+  <p>{% trans %}They don't hold stock: what they take goes straight to an install or another place.{% endtrans %}</p>
+  <form method="post" action="{{ here }}/custody"><button>{% trans %}Let them hold stock{% endtrans %}</button></form>
   {% endif %}
 </section>
 
 {% if others %}
 <section>
-  <h2>A duplicate?</h2>
-  <p class="hint">Merging retires them, and their past records count as the
-  other's. You'll be asked first.</p>
+  <h2>{% trans %}A duplicate?{% endtrans %}</h2>
+  <p class="hint">{% trans %}Merging retires them, and their past records count as the
+  other's. You'll be asked first.{% endtrans %}</p>
   <form method="get" action="{{ here }}/merge" class="actions">
-    <label>Merge into
+    <label>{% trans %}Merge into{% endtrans %}
       <select name="into_id" required>
-        <option value="">Pick who they duplicate</option>
+        <option value="">{% trans %}Pick who they duplicate{% endtrans %}</option>
         {% for other in others %}<option value="{{ other.id }}">{{ other.name }}</option>{% endfor %}
       </select>
     </label>
-    <button>Merge</button>
+    <button>{% trans %}Merge{% endtrans %}</button>
   </form>
 </section>
 {% endif %}
 {% endif %}
 
 {% if not retired %}
-{% call retire_section(_("Retire this volunteer"), person=true) %}The scan page stops offering them; their past records stay
-  theirs.{% endcall %}
+{% call retire_section(_("Retire this volunteer"), person=true) %}{% trans %}The scan page stops offering them; their past records stay
+  theirs.{% endtrans %}{% endcall %}
 {% endif %}
 {% endblock %}

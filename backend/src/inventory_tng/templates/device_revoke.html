@@ -1,12 +1,12 @@
 {% extends "admin_base.html" %}
 {% from "_confirm.html" import confirm %}
 {% block main %}
-<p>These can't save anything once revoked, and stay revoked: each would
-have to register again with a new code.</p>
+<p>{% trans %}These can't save anything once revoked, and stay revoked: each would
+have to register again with a new code.{% endtrans %}</p>
 <ul>
   {% for device in devices %}<li>{{ device.name }}</li>{% endfor %}
 </ul>
-{% call confirm(here, "Revoke " ~ devices | length, keep ~ ("?" ~ filter | urlencode if filter else ""), "Keep them") %}
+{% call confirm(here, _("Revoke %(count)s", count=devices | length), keep ~ ("?" ~ filter | urlencode if filter else ""), _("Keep them")) %}
   {% for name, value in filter.items() %}
   <input type="hidden" name="{{ name }}" value="{{ value }}">
   {% endfor %}

@@ -6,11 +6,11 @@
 {{ search_box(listing, _("Find volunteers")) }}
 {{ filters(listing) }}
 {% call filter_form(view) %}
-  <label>Filter by holding stock
+  <label>{% trans %}Filter by holding stock{% endtrans %}
     <select name="holds">
-      <option value="">Any</option>
-      <option value="yes"{% if view.filtered("holds") == "yes" %} selected{% endif %}>Holds stock</option>
-      <option value="no"{% if view.filtered("holds") == "no" %} selected{% endif %}>Holds none</option>
+      <option value="">{% trans %}Any{% endtrans %}</option>
+      <option value="yes"{% if view.filtered("holds") == "yes" %} selected{% endif %}>{% trans %}Holds stock{% endtrans %}</option>
+      <option value="no"{% if view.filtered("holds") == "no" %} selected{% endif %}>{% trans %}Holds none{% endtrans %}</option>
     </select>
   </label>
 {% endcall %}
@@ -22,16 +22,16 @@
   {%- endcall %}
   {{ sizes(view) }}
   {% call table() %}
-    <tr>{{ sort_heading(view, "name", "Volunteer") }}
-      {{- sort_heading(view, "holds", "Holds stock", "hidden sm:table-cell") }}</tr>
+    <tr>{{ sort_heading(view, "name", _("Volunteer")) }}
+      {{- sort_heading(view, "holds", _("Holds stock"), "hidden sm:table-cell") }}</tr>
     {% for volunteer in listing.rows %}
     {% set holds = volunteer.id in holders %}
     <tr>
       <td><a href="{{ here }}/{{ volunteer.id }}">{{ volunteer.name }}</a>
-        {%- if volunteer.retired_at %} <span class="tag">Retired</span>{% endif %}
-        {%- if volunteer.merged_into_id %} <span class="hint">merged into {{ names.get(volunteer.merged_into_id, "") }}</span>{% endif %}
-        {%- if holds %} <span class="hint block sm:hidden">holds stock</span>{% endif %}</td>
-      <td class="hidden sm:table-cell">{{ "yes" if holds else "" }}</td>
+        {%- if volunteer.retired_at %} <span class="tag">{% trans %}Retired{% endtrans %}</span>{% endif %}
+        {%- if volunteer.merged_into_id %} <span class="hint">{% trans name=names.get(volunteer.merged_into_id, "") %}merged into {{ name }}{% endtrans %}</span>{% endif %}
+        {%- if holds %} <span class="hint block sm:hidden">{% trans %}holds stock{% endtrans %}</span>{% endif %}</td>
+      <td class="hidden sm:table-cell">{% if holds %}{% trans %}yes{% endtrans %}{% endif %}</td>
     </tr>
     {% else %}
     {{ empty(listing, 2, _("None yet: add one below.")) }}
@@ -41,17 +41,17 @@
 </section>
 
 <section>
-  <h2>Add a volunteer</h2>
+  <h2>{% trans %}Add a volunteer{% endtrans %}</h2>
   <form method="post" action="{{ here }}">
-    <label>Name <span class="hint">as they pick it on the scan page</span>
+    <label>{% trans %}Name{% endtrans %} <span class="hint">{% trans %}as they pick it on the scan page{% endtrans %}</span>
       <input name="name" value="{{ values.get('name', '') }}" maxlength="{{ name_max }}" required>
       {% with name = "name" %}{% include "_field_problem.html" %}{% endwith %}
     </label>
-    <label>Email <span class="hint">optional</span>
+    <label>{% trans %}Email{% endtrans %} <span class="hint">{% trans %}optional{% endtrans %}</span>
       <input name="email" type="email" value="{{ values.get('email', '') }}">
       {% with name = "email" %}{% include "_field_problem.html" %}{% endwith %}
     </label>
-    <button class="primary">Add</button>
+    <button class="primary">{% trans %}Add{% endtrans %}</button>
   </form>
 </section>
 {% endblock %}

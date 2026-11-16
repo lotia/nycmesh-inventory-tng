@@ -2,26 +2,27 @@
 {% from "_table.html" import table %}
 {% from "_listing.html" import filter_form, sizes, sort_heading, pager %}
 {% block main %}
-<p>Every registered phone or computer. After a compromise, list those
-registered while it lasted, then revoke the ones that look wrong.</p>
+<p>{% trans %}Every registered phone or computer. After a compromise, list those
+registered while it lasted, then revoke the ones that look wrong.{% endtrans %}</p>
 
 {% call filter_form(view) %}
-  <label>Registered from <span class="hint">{{ zone.key }} time, optional</span>
+  <label>{% trans %}Registered from{% endtrans %} <span class="hint">{% trans zone=zone.key %}{{ zone }} time, optional{% endtrans %}</span>
     <input name="since" type="datetime-local" value="{{ filter.since }}">
     {% with name = "since" %}{% include "_field_problem.html" %}{% endwith %}
   </label>
-  <label>to <span class="hint">that minute included, optional</span>
+  <label>{% trans %}to{% endtrans %} <span class="hint">{% trans %}that minute included, optional{% endtrans %}</span>
     <input name="until" type="datetime-local" value="{{ filter.until }}">
     {% with name = "until" %}{% include "_field_problem.html" %}{% endwith %}
   </label>
-  <label>With code <span class="hint">its number, optional</span>
+  <label>{% trans %}With code{% endtrans %} <span class="hint">{% trans %}its number, optional{% endtrans %}</span>
     <input name="code" inputmode="numeric" value="{{ filter.code }}">
     {% with name = "code" %}{% include "_field_problem.html" %}{% endwith %}
   </label>
-  <label>Showing
+  <label>{% trans %}Showing{% endtrans %}
     <select name="state">
+      {% set state_words = {"current": pgettext("state", "current"), "revoked": _("revoked"), "all": _("all")} %}
       {% for state in states %}
-      <option value="{{ state }}"{% if state == filter.state %} selected{% endif %}>{{ state }}</option>
+      <option value="{{ state }}"{% if state == filter.state %} selected{% endif %}>{{ state_words[state] }}</option>
       {% endfor %}
     </select>
   </label>
@@ -32,33 +33,33 @@ registered while it lasted, then revoke the ones that look wrong.</p>
   {% for name, value in view.fields() %}
   <input type="hidden" name="{{ name }}" value="{{ value }}">
   {% endfor %}
-  {% if not problems %}<p class="hint">{{ view.found }} listed.</p>{% endif %}
+  {% if not problems %}<p class="hint">{% trans found=view.found %}{{ found }} listed.{% endtrans %}</p>{% endif %}
   {{ sizes(view) }}
   {% call table() %}
-    <tr><th>Select</th><th>Device</th>
-      {{- sort_heading(view, "registered", "Registered") }}
-      {{- sort_heading(view, "used", "Last used") }}<th>Code</th></tr>
+    <tr><th>{% trans %}Select{% endtrans %}</th><th>{% trans %}Device{% endtrans %}</th>
+      {{- sort_heading(view, "registered", _("Registered")) }}
+      {{- sort_heading(view, "used", _("Last used")) }}<th>{% trans %}Code{% endtrans %}</th></tr>
     {% for device in devices %}
     <tr>
-      <td>{% if device.revoked_at %}<span class="tag">Revoked</span>{% else %}<input type="checkbox" name="device" value="{{ device.id }}" checked aria-label="Select {{ device.name }}">{% endif %}</td>
+      <td>{% if device.revoked_at %}<span class="tag">{% trans %}Revoked{% endtrans %}</span>{% else %}<input type="checkbox" name="device" value="{{ device.id }}" checked aria-label="{% trans device=device.name %}Select {{ device }}{% endtrans %}">{% endif %}</td>
       <td><a href="{{ devices_path }}/{{ device.id }}">{{ device.name }}</a></td>
       <td>{{ device.created_at | when(zone) }}</td>
       <td>{{ device.last_seen_at | when(zone) }}</td>
       <td><a href="{{ codes_path }}/{{ device.registration_code_id }}">{{ device.registration_code_id }}</a></td>
     </tr>
     {% else %}
-    <tr><td colspan="5">None.</td></tr>
+    <tr><td colspan="5">{% trans %}None.{% endtrans %}</td></tr>
     {% endfor %}
   {% endcall %}
   {{ pager(view) }}
   {% if devices | selectattr("revoked_at", "none") | list %}
   {% if view.pages > 1 %}
-  <p class="hint">Every current one on this page is selected: clear any to
-  keep. <a href="{{ view.size_link(none) }}">Show All</a> to revoke those on the other pages too.</p>
+  <p class="hint">{% trans link=view.size_link(none) %}Every current one on this page is selected: clear any to
+  keep. <a href="{{ link }}">Show All</a> to revoke those on the other pages too.{% endtrans %}</p>
   {% else %}
-  <p class="hint">Every current one listed is selected: clear any to keep.</p>
+  <p class="hint">{% trans %}Every current one listed is selected: clear any to keep.{% endtrans %}</p>
   {% endif %}
-  <div class="actions"><button>Revoke selected</button></div>
+  <div class="actions"><button>{% trans %}Revoke selected{% endtrans %}</button></div>
   {% endif %}
 </form>
 {% endblock %}

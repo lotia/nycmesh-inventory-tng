@@ -42,6 +42,7 @@ from inventory_tng.models import (
     AdjustmentReason,
     Admin,
     Category,
+    Device,
     Item,
     ItemAlias,
     ItemPackage,
@@ -50,6 +51,7 @@ from inventory_tng.models import (
     Movement,
     OpenPackage,
     OverRecorded,
+    ReadingRule,
     SignInSettings,
     Volunteer,
 )
@@ -69,6 +71,7 @@ from inventory_tng.phrases import (
 )
 from inventory_tng.resets import RESET_NOTICE
 
+from helpers.devices import new_device
 from helpers.rows import add
 from helpers.stock import Spools, cut, length, report, retire, write
 
@@ -608,6 +611,28 @@ COVERED: dict[str, Callable[[], str]] = {
     "over_recorded.html, a row of each kind": recorded_more,
     "count.html, a recount": count_page,
     "counts.html, a count listed": counts_page,
+    "code_made.html": lambda: without_brand(
+        render(
+            "code_made.html",
+            **SIGNED_IN,
+            code=SimpleNamespace(max_uses=2, expires_at=DAY, label=NAME),
+            qr="",
+            phrase=NAME,
+            link="/",
+            register=NAME,
+            zone=ZONE,
+        )
+    ),
+    "device_revoke.html": lambda: without_brand(
+        render(
+            "device_revoke.html",
+            **SIGNED_IN,
+            devices=[SimpleNamespace(id=1, name=NAME)],
+            filter={},
+            keep="/",
+            here="/",
+        )
+    ),
     "_print_controls.html": lambda: from_macros(
         '{% from "_print_controls.html" import print_controls %}'
         '{% call print_controls("") %}{% endcall %}'
@@ -642,6 +667,11 @@ class World:
     retired_item: Item
     retired_category: Category
     retired_place: Location
+    label: Label
+    other: Volunteer
+    merged: Volunteer
+    device: Device
+    rule: ReadingRule
 
 
 def world(session: Session) -> World:
@@ -650,7 +680,7 @@ def world(session: Session) -> World:
     cable = spools.cable
     # An alias is never changed: named not in English as it is made.
     add(session, ItemAlias(item_id=cable.id, name=f"{NAME} ἄλλο"))
-    add(session, Label(item_id=cable.id, package_id=spools.spool.id))
+    label = add(session, Label(item_id=cable.id, package_id=spools.spool.id))
     area = add(session, Location(name="Shelf", kind="area", parent_id=spools.store.id))
     custody = add(
         session,
@@ -665,6 +695,17 @@ def world(session: Session) -> World:
     retired_place = add(session, Location(name="Old", kind="store"))
     retire(session, retired_item, retired_category, retired_place)
     stock_to_put_right(spools)
+    other = add(session, Volunteer(name="Other"))
+    merged = add(
+        session,
+        Volunteer(name="Merged", merged_into_id=other.id, retired_at=datetime.now(UTC)),
+    )
+    device, _ = new_device(session)
+    revoked, _ = new_device(session)
+    revoked.revoked_at = datetime.now(UTC)
+    rule = add(session, ReadingRule(token="P", decided_by_admin_id=admin_id(session)))
+    # A unit after a number no rule settles, for the readings to propose.
+    add(session, Item(name=f"{NAME} 10g", category_id=cable.category_id))
     return World(
         spools,
         opened,
@@ -673,7 +714,19 @@ def world(session: Session) -> World:
         retired_item,
         retired_category,
         retired_place,
+        label,
+        other,
+        merged,
+        device,
+        rule,
     )
+
+
+def admin_id(session: Session) -> int:
+    """The administrator signed in (admin_client)."""
+    found = session.scalars(select(Admin.id)).first()
+    assert found is not None
+    return found
 
 
 def stock_to_put_right(spools: Spools) -> None:
@@ -686,8 +739,6 @@ def stock_to_put_right(spools: Spools) -> None:
     write(session, spools.place)
     used_up = report(spools) | {"lengths": None, "used_up": [str(spools.opened().key)]}
     write(session, spools.place, **used_up)
-    admin_id = session.scalars(select(Admin.id)).first()
-    assert admin_id is not None
     for corrected in (False, True):
         transaction = write(session, spools.place)
         movement_id = session.scalars(
@@ -699,7 +750,7 @@ def stock_to_put_right(spools: Spools) -> None:
                 select(OverRecorded).where(OverRecorded.movement_id == movement_id)
             ).one()
             over_recorded.correct(
-                session, check.id, over_recorded.seen(check), admin_id
+                session, check.id, over_recorded.seen(check), admin_id(session)
             )
 
 
@@ -710,7 +761,8 @@ def not_english(session: Session) -> None:
     # (inventory-tng-0z5): they are rows, as names are.
     for model in (Item, ItemPackage, Category, Location, Volunteer, AdjustmentReason):
         for row in session.scalars(select(model)):
-            row.name = f"{NAME} {row.id}"
+            if re.search("[A-Za-z]{2,}", row.name):
+                row.name = f"{NAME} {row.id}"
     for admin in session.scalars(select(Admin)):
         # ASCII, as a username is: one letter, so no word.
         admin.username = f"a{admin.id:04d}"
@@ -719,12 +771,19 @@ def not_english(session: Session) -> None:
 
 def data_words(session: Session) -> set[str]:
     """What a page shows that is the same in every language: unit keys
-    (models.UNITS), time zones and their abbreviations, and labels' codes."""
+    (models.UNITS), time zones and their abbreviations, and labels' codes.
+    A unit's symbol too (is_a_symbol)."""
     now = datetime.now(UTC)
     zones = available_timezones()
     shortened = {now.astimezone(ZoneInfo(zone)).tzname() or "" for zone in zones}
     codes = set(session.scalars(select(Label.code)))
     return {*UNITS, *zones, *shortened, *codes}
+
+
+def is_a_symbol(word: str) -> bool:
+    """Whether `word` is a unit's symbol as a name shows it, such as Gbps."""
+    reading = units.read(word)
+    return reading is not None and reading.shown == word
 
 
 # Every page whose words have all moved, by a path in a World.
@@ -763,6 +822,30 @@ PAGES: dict[str, Callable[[World], str]] = {
     "a count of one item": lambda w: (
         f"/admin/counts/{w.spools.store.id}?item={w.spools.cable.id}&q={NAME}"
     ),
+    "labels": lambda w: "/admin/labels",
+    "labels, inactive": lambda w: "/admin/labels?show=inactive",
+    "labels to print": lambda w: f"/admin/labels/print?label={w.label.id}",
+    "a label to revoke": lambda w: f"/admin/labels/{w.label.id}/revoke",
+    "volunteers": lambda w: "/admin/volunteers",
+    "volunteers, searched": lambda w: f"/admin/volunteers?q={NAME}",
+    "a volunteer": lambda w: f"/admin/volunteers/{w.spools.place.volunteer.id}",
+    "a volunteer merged": lambda w: f"/admin/volunteers/{w.merged.id}",
+    "a volunteer to merge": lambda w: (
+        f"/admin/volunteers/{w.spools.place.volunteer.id}/merge?into_id={w.other.id}"
+    ),
+    "devices": lambda w: "/admin/devices",
+    "devices, all": lambda w: "/admin/devices/all?state=all",
+    "a device": lambda w: f"/admin/devices/{w.device.id}",
+    "a device to revoke": lambda w: f"/admin/devices/{w.device.id}/revoke",
+    "a code": lambda w: f"/admin/devices/codes/{w.device.registration_code_id}",
+    "a code to revoke": lambda w: (
+        f"/admin/devices/codes/{w.device.registration_code_id}/revoke"
+    ),
+    "unit readings": lambda w: "/admin/unit-readings",
+    "a unit reading": lambda w: f"/admin/unit-readings/{w.rule.id}",
+    "unit readings to settle": lambda w: "/admin/unit-readings/seed",
+    "unit readings to settle, one by one": lambda w: "/admin/unit-readings/seed?one=1",
+    "settings": lambda w: "/admin/settings",
 }
 
 
@@ -776,7 +859,11 @@ def test_a_page_whose_words_have_moved_says_none_in_plain_english(
         response = admin_client.get(where)
     assert response.status_code == 200, where
     words = re.findall(r"[\w/+-]+", re.sub(r"&\w+;", " ", without_brand(response.text)))
-    english = {word for word in words if re.search("[A-Za-z]{2,}", word)}
+    english = {
+        word
+        for word in words
+        if re.search("[A-Za-z]{2,}", word) and not is_a_symbol(word)
+    }
     assert english - data_words(session) == set()
 
 

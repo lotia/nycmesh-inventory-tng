@@ -10,6 +10,7 @@ from datetime import datetime, timedelta
 from typing import Annotated, Literal
 
 import structlog
+from babel.support import LazyProxy
 from fastapi import APIRouter, Form, Request
 from fastapi.responses import HTMLResponse, Response
 from sqlalchemy import func, select
@@ -44,7 +45,13 @@ from inventory_tng.local_time import parse_local, site_zone
 from inventory_tng.models import Device, RegistrationCode, whole
 from inventory_tng.once import OnceKey, sent_before
 from inventory_tng.pages import NOTICES, not_found, redirect
-from inventory_tng.phrases import Words, gettext, lazy_gettext, ngettext
+from inventory_tng.phrases import (
+    Words,
+    gettext,
+    lazy_gettext,
+    lazy_pgettext,
+    ngettext,
+)
 from inventory_tng.sign_in import AdminSignedIn, ConfirmedAdmin, SignedIn, changed
 
 log = structlog.get_logger(__name__)
@@ -106,6 +113,13 @@ CODE_SORTING = Sorting(
 # What the codes' state filter offers: each state in the words the table
 # shows it in (inventory-tng-qwb).
 CODE_STATES: tuple[State, ...] = ("open", "used up", "expired", "revoked")
+# Each state in words, as a filter or a tag says it.
+STATE_WORDS: dict[State, LazyProxy] = {
+    "open": lazy_pgettext("state", "Open"),
+    "used up": lazy_gettext("Used up"),
+    "expired": lazy_gettext("Expired"),
+    "revoked": lazy_gettext("Revoked"),
+}
 
 
 def _list_page(
@@ -148,6 +162,7 @@ def _list_page(
             "device_list": DEVICE_LIST,
             "view": view,
             "states": CODE_STATES,
+            "state_words": STATE_WORDS,
             "codes": rows,
             "zone": site_zone(session),
             "max_uses": MAX_USES,
@@ -248,6 +263,7 @@ def code(
             "back_link": (DEVICES, SECTION_DEVICES),
             "code": found,
             "state": state(found, now()),
+            "state_words": STATE_WORDS,
             "devices": registered,
             "zone": site_zone(session),
         },

@@ -4,7 +4,7 @@ reads every name with it again, refused where two would read alike. -#}
 {% block main %}
 {% if read_alike %}
 <div role="alert">
-  <p>Not saved: these names would read as one. Rename one of each first.</p>
+  <p>{% trans %}Not saved: these names would read as one. Rename one of each first.{% endtrans %}</p>
   <ul>{% for words in read_alike %}<li>{{ words }}</li>{% endfor %}</ul>
 </div>
 {% endif %}
@@ -12,22 +12,22 @@ reads every name with it again, refused where two would read alike. -#}
 <form method="post" action="{{ here }}" class="actions">
   <input type="hidden" name="version" value="{{ rule.edit_version }}">
   <fieldset>
-    <legend>“{{ rule.token }}” after a number is</legend>
+    <legend>{% trans token=rule.token %}“{{ token }}” after a number is{% endtrans %}</legend>
     {% for reading in offered %}
     <label><input type="radio" name="reading" value="{{ reading }}" {% if rule.reading == reading | string %}checked{% endif %} required> {{ reading.shown }} · {{ reading.kind_words }}</label>
     {% endfor %}
-    <label><input type="radio" name="reading" value="{{ not_a_unit }}" {% if rule.reading is none %}checked{% endif %} required> Not a unit</label>
+    <label><input type="radio" name="reading" value="{{ not_a_unit }}" {% if rule.reading is none %}checked{% endif %} required> {% trans %}Not a unit{% endtrans %}</label>
   </fieldset>
-  <label><input type="checkbox" name="respell" {% if rule.respell %}checked{% endif %}> Respell it
-    <span class="hint">a name typed with “{{ rule.token }}” after a number is saved with the
-    unit's symbol, joined to its number; otherwise names are saved as typed</span></label>
-  <button class="primary">Save</button>
+  <label><input type="checkbox" name="respell" {% if rule.respell %}checked{% endif %}> {% trans %}Respell it{% endtrans %}
+    <span class="hint">{% trans token=rule.token %}a name typed with “{{ token }}” after a number is saved with the
+    unit's symbol, joined to its number; otherwise names are saved as typed{% endtrans %}</span></label>
+  <button class="primary">{% trans %}Save{% endtrans %}</button>
 </form>
 
 <section>
-  <h2>Delete</h2>
-  <p>Names with “{{ rule.token }}” after a number are read by the unit table
-    again, and an item's form asks about it where that leaves two readings.</p>
-  <form method="post" action="{{ here }}/delete"><input type="hidden" name="version" value="{{ rule.edit_version }}"><button>Delete</button></form>
+  <h2>{% trans %}Delete{% endtrans %}</h2>
+  <p>{% trans token=rule.token %}Names with “{{ token }}” after a number are read by the unit table
+    again, and an item's form asks about it where that leaves two readings.{% endtrans %}</p>
+  <form method="post" action="{{ here }}/delete"><input type="hidden" name="version" value="{{ rule.edit_version }}"><button>{% trans %}Delete{% endtrans %}</button></form>
 </section>
 {% endblock %}

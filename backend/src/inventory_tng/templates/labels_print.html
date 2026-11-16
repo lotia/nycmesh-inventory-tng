@@ -3,20 +3,23 @@
 {% from "_print_controls.html" import print_controls %}
 {% block main %}
 {% call table() %}
-  <tr><th>Code</th><th>Names</th></tr>
+  <tr><th>{% trans %}Code{% endtrans %}</th><th>{% trans %}Names{% endtrans %}</th></tr>
   {% for named in picked %}
   <tr><td class="key">{{ named.label.code }}</td><td>{{ named.words }}</td></tr>
   {% endfor %}
 {% endcall %}
-<p>{{ copies }} cop{{ "y" if copies == 1 else "ies" }} of each: {{ total }}
-label{{ "s" if total != 1 else "" }}, on {{ sheets | length }}
-page{{ "s" if sheets | length != 1 else "" }}.</p>
+{#- Three counts, each a plural of its own, said in one sentence. #}
+{% set copies_words %}{% trans count=copies %}{{ count }} copy{% pluralize %}{{ count }} copies{% endtrans %}{% endset %}
+{% set labels_words %}{% trans count=total %}{{ count }} label{% pluralize %}{{ count }} labels{% endtrans %}{% endset %}
+{% set pages_words %}{% trans count=sheets | length %}{{ count }} page{% pluralize %}{{ count }} pages{% endtrans %}{% endset %}
+{#- Translators: such as "2 copies of each: 6 labels, on 1 page." #}
+<p>{% trans copies=copies_words, labels=labels_words, pages=pages_words %}{{ copies }} of each: {{ labels }}, on {{ pages }}.{% endtrans %}</p>
 
 {#- Printing (styles.css): the paper, then what prints, twelve to a page. #}
 <div class="printable">
-  {% call print_controls("Print them") %}Cut along the dashed lines, or print
+  {% call print_controls(_("Print them")) %}{% trans %}Cut along the dashed lines, or print
   on full-sheet sticker paper. If the print dialog offers paper sizes, pick
-  the same one there, at 100% scale.{% endcall %}
+  the same one there, at 100% scale.{% endtrans %}{% endcall %}
   {% for sheet in sheets %}
   <div class="print-sheet label-sheet">
     {% for named in sheet %}

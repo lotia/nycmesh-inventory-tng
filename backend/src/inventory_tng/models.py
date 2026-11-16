@@ -86,6 +86,7 @@ from inventory_tng.db import (
     enforce,
     protection,
 )
+from inventory_tng.phrases import gettext
 from inventory_tng.time_zones import is_time_zone
 
 QUANTITY = Numeric(12, 3)
@@ -1025,7 +1026,7 @@ class RegistrationCode(Base):
     @property
     def name(self) -> str:
         """As pages show it: its label, or its number."""
-        return self.label or f"Code {self.id}"
+        return self.label or gettext("Code %(number)s", number=self.id)
 
 
 class Device(Versioned, Base):
@@ -1053,7 +1054,7 @@ class Device(Versioned, Base):
     @property
     def name(self) -> str:
         """As pages show it: its label, or its number."""
-        return self.label or f"Device {self.id}"
+        return self.label or gettext("Device %(number)s", number=self.id)
 
 
 class LedgerTransaction(Base):

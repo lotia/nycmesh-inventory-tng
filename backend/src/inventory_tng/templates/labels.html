@@ -6,25 +6,25 @@
 {{ search_box(listing, _("Find labels")) }}
 {{ filters(listing) }}
 {% call filter_form(view) %}
-  <label>Filter by kind
+  <label>{% trans %}Filter by kind{% endtrans %}
     <select name="kind">
-      <option value="">Any</option>
-      <option value="item"{% if view.filtered("kind") == "item" %} selected{% endif %}>Item labels</option>
-      <option value="place"{% if view.filtered("kind") == "place" %} selected{% endif %}>Place labels</option>
+      <option value="">{% trans %}Any{% endtrans %}</option>
+      <option value="item"{% if view.filtered("kind") == "item" %} selected{% endif %}>{% trans %}Item labels{% endtrans %}</option>
+      <option value="place"{% if view.filtered("kind") == "place" %} selected{% endif %}>{% trans %}Place labels{% endtrans %}</option>
     </select>
   </label>
-  <label>Filter by item
+  <label>{% trans %}Filter by item{% endtrans %}
     <select name="item">
-      <option value="">Any</option>
+      <option value="">{% trans %}Any{% endtrans %}</option>
       {% for id, name in labelled %}
       <option value="{{ id }}"{% if view.filtered("item") == id | string %} selected{% endif %}>{{ name }}</option>
       {% endfor %}
     </select>
   </label>
 {% endcall %}
-<p class="hint">Make labels from an <a href="{{ items_path }}">item's</a> or a
-<a href="{{ locations_path }}">location's</a> page. Each has one code, printed as
-often as needed; pick some here to print them again.</p>
+<p class="hint">{% trans items=items_path, locations=locations_path %}Make labels from an <a href="{{ items }}">item's</a> or a
+<a href="{{ locations }}">location's</a> page. Each has one code, printed as
+often as needed; pick some here to print them again.{% endtrans %}</p>
 
 {#- The picks and copies belong to this form, from wherever they are; and
 the list as shown, to come back to if printing is refused. #}
@@ -38,23 +38,23 @@ the list as shown, to come back to if printing is refused. #}
   {%- if lapsed %}{% trans count=total %}{{ count }} inactive label{% pluralize %}{{ count }} inactive labels{% endtrans %}
   {%- else %}{% trans count=total %}{{ count }} label{% pluralize %}{{ count }} labels{% endtrans %}{% endif -%}
   {%- endcall %}
-  {% if listing.show != "current" %}<p class="hint">The scan page doesn't read a label tagged here.</p>{% endif %}
+  {% if listing.show != "current" %}<p class="hint">{% trans %}The scan page doesn't read a label tagged here.{% endtrans %}</p>{% endif %}
   {{ sizes(view) }}
   {% call table() %}
-    <tr><th>Print</th>{{ sort_heading(view, "code", "Code") }}
-      {{- sort_heading(view, "names", "Names") }}
-      {{- sort_heading(view, "made", "Made", "hidden sm:table-cell") }}<th></th></tr>
+    <tr><th>{% trans %}Print{% endtrans %}</th>{{ sort_heading(view, "code", _("Code")) }}
+      {{- sort_heading(view, "names", _("Names")) }}
+      {{- sort_heading(view, "made", _("Made"), "hidden sm:table-cell") }}<th></th></tr>
     {% for named in listing.shown %}
     {% set label = named.label %}
     <tr>
-      <td>{% if named.current %}<input type="checkbox" name="label" value="{{ label.id }}" form="print-labels" aria-label="Print {{ label.code }}">{% endif %}</td>
+      <td>{% if named.current %}<input type="checkbox" name="label" value="{{ label.id }}" form="print-labels" aria-label="{% trans code=label.code %}Print {{ code }}{% endtrans %}">{% endif %}</td>
       <td class="key">{{ label.code }}</td>
       <td><a href="{{ items_path ~ '/' ~ label.item_id if label.item_id else locations_path ~ '/' ~ label.location_id }}">{{ named.words }}</a>
         {%- if named.why %} <span class="tag">{{ named.why_words }}</span>{% endif %}
-        {%- if label.revoked_at %} <span class="hint">on {{ label.revoked_at | when(zone) }}</span>{% endif %}
-        <span class="hint block sm:hidden">made {{ label.created_at | when(zone) }}</span></td>
+        {%- if label.revoked_at %} <span class="hint">{% trans when=label.revoked_at | when(zone) %}on {{ when }}{% endtrans %}</span>{% endif %}
+        <span class="hint block sm:hidden">{% trans when=label.created_at | when(zone) %}made {{ when }}{% endtrans %}</span></td>
       <td class="hidden sm:table-cell">{{ label.created_at | when(zone) }}</td>
-      <td>{% if named.current %}<a href="{{ here }}/{{ label.id }}/revoke">Revoke<span class="sr-only"> {{ label.code }}</span></a>{% endif %}</td>
+      <td>{% if named.current %}<a href="{{ here }}/{{ label.id }}/revoke">{% trans %}Revoke{% endtrans %}<span class="sr-only"> {{ label.code }}</span></a>{% endif %}</td>
     </tr>
     {% else %}
     {{ empty(listing, 5, _("None yet: make one from an item's or a place's page.")) }}
@@ -63,13 +63,13 @@ the list as shown, to come back to if printing is refused. #}
   {{ pager(listing.view) }}
   {% if listing.shown | selectattr("current") | first %}
   <div class="actions">
-    <label>Copies of each
+    <label>{% trans %}Copies of each{% endtrans %}
       <input name="copies" form="print-labels" type="number" inputmode="numeric" min="1" max="{{ max_copies }}" value="1" required>
     </label>
-    <button class="primary" form="print-labels">Print the ones picked</button>
+    <button class="primary" form="print-labels">{% trans %}Print the ones picked{% endtrans %}</button>
   </div>
-  <p class="hint">Picks on this page print; search to bring the ones you want
-  onto one page. Revoking a code stops every copy of it scanning.</p>
+  <p class="hint">{% trans %}Picks on this page print; search to bring the ones you want
+  onto one page. Revoking a code stops every copy of it scanning.{% endtrans %}</p>
   {% endif %}
 </section>
 {% endblock %}

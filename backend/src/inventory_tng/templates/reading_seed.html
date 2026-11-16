@@ -8,47 +8,47 @@ proposed reading to accept, all at once or one by one, or change first. Those no
 {% block main %}
 {% if read_alike %}
 <div role="alert">
-  <p>Not saved: read so, these names would read as one. Rename one of each, or read it otherwise.</p>
+  <p>{% trans %}Not saved: read so, these names would read as one. Rename one of each, or read it otherwise.{% endtrans %}</p>
   <ul>{% for words in read_alike %}<li>{{ words }}</li>{% endfor %}</ul>
 </div>
 {% endif %}
 {% if problem %}<p role="alert">{{ problem }}</p>{% endif %}
-<p>Every unit after a number in the names saved that no rule or nearby word settles yet, and
+<p>{% trans link=back_link[0] %}Every unit after a number in the names saved that no rule or nearby word settles yet, and
   how it would be read: accept them all, change any first, or review them
-  one by one. Each accepted becomes a <a href="{{ back_link[0] }}">reading rule</a>.
-  Run it again after an import.</p>
+  one by one. Each accepted becomes a <a href="{{ link }}">reading rule</a>.
+  Run it again after an import.{% endtrans %}</p>
 {% if not proposals %}
-<p>Nothing to settle: every unit after a number in a name is read one way, or by a rule.</p>
+<p>{% trans %}Nothing to settle: every unit after a number in a name is read one way, or by a rule.{% endtrans %}</p>
 {% else %}
 {% if one %}
-<p>{{ at + 1 }} of {{ total }}. <a href="{{ here }}">See them all</a></p>
+<p>{% trans at=at + 1, total=total %}{{ at }} of {{ total }}.{% endtrans %} <a href="{{ here }}">{% trans %}See them all{% endtrans %}</a></p>
 {% else %}
-<p><a href="{{ here }}?one=1">Review one by one</a></p>
+<p><a href="{{ here }}?one=1">{% trans %}Review one by one{% endtrans %}</a></p>
 {% endif %}
 <form method="post" action="{{ here }}" class="actions">
   {% if one %}<input type="hidden" name="one" value="1"><input type="hidden" name="at" value="{{ at }}">{% endif %}
   {% call table() %}
-    <tr><th>After a number</th><th>In</th><th>Read as</th></tr>
+    <tr><th>{% trans %}After a number{% endtrans %}</th><th>{% trans %}In{% endtrans %}</th><th>{% trans %}Read as{% endtrans %}</th></tr>
     {% for proposal in proposals %}
     {% set found = proposal.found %}
     {% set name = field ~ found.key %}
     {% set chosen = sent.get(name, (proposal.proposed | string) if proposal.proposed else "") %}
     <tr>
-      <td>“{{ found.key }}”<span class="hint block">{{ proposal.count }} name{{ "s" if proposal.count != 1 }}</span></td>
-      <td>{{ proposal.names | join("; ") }}<span class="hint block">{{ proposal.why or "Nothing says which: choose." }}</span></td>
-      <td><label><span class="sr-only">Read “{{ found.key }}” as</span>
+      <td>“{{ found.key }}”<span class="hint block">{% trans count=proposal.count %}{{ count }} name{% pluralize %}{{ count }} names{% endtrans %}</span></td>
+      <td>{{ proposal.names | join("; ") }}<span class="hint block">{{ proposal.why or _("Nothing says which: choose.") }}</span></td>
+      <td><label><span class="sr-only">{% trans key=found.key %}Read “{{ key }}” as{% endtrans %}</span>
         <select name="{{ name }}">
-          {% if not proposal.proposed %}<option value="">Choose…</option>{% endif %}
+          {% if not proposal.proposed %}<option value="">{% trans %}Choose…{% endtrans %}</option>{% endif %}
           {% for reading in found.offered %}
           <option value="{{ reading }}" {% if chosen == reading | string %}selected{% endif %}>{{ reading.shown }} · {{ reading.called }}</option>
           {% endfor %}
-          <option value="{{ not_a_unit }}" {% if chosen == not_a_unit %}selected{% endif %}>Not a unit</option>
+          <option value="{{ not_a_unit }}" {% if chosen == not_a_unit %}selected{% endif %}>{% trans %}Not a unit{% endtrans %}</option>
         </select></label></td>
     </tr>
     {% endfor %}
   {% endcall %}
-  <button class="primary">{{ "Accept" if one else "Accept all" }}</button>
-  {% if one and at + 1 < total %}<a href="{{ here }}?one=1&amp;at={{ at + 1 }}">Skip</a>{% endif %}
+  <button class="primary">{{ _("Accept") if one else _("Accept all") }}</button>
+  {% if one and at + 1 < total %}<a href="{{ here }}?one=1&amp;at={{ at + 1 }}">{% trans %}Skip{% endtrans %}</a>{% endif %}
 </form>
 {% endif %}
 {% endblock %}

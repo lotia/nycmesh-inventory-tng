@@ -1,7 +1,7 @@
 {% extends "admin_base.html" %}
 {% from "_confirm.html" import confirm %}
 {% block main %}
-<p>Once revoked, {{ code.name }} registers no more devices, and stays revoked:
-make a new code to register more. Devices it registered stay registered.</p>
-{{ confirm(here, "Revoke", keep, "Keep it") }}
+<p>{% trans code=code.name %}Once revoked, {{ code }} registers no more devices, and stays revoked:
+make a new code to register more. Devices it registered stay registered.{% endtrans %}</p>
+{{ confirm(here, _("Revoke"), keep, _("Keep it")) }}
 {% endblock %}

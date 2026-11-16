@@ -2,60 +2,60 @@
 {% from "_table.html" import table %}
 {% from "_listing.html" import filter_form, sizes, sort_heading, pager, unfiltered_or %}
 {% block main %}
-<p>A phone or computer must be registered before it can record anything.
+<p>{% trans %}A phone or computer must be registered before it can record anything.
 Make a code, then show its QR code in the room, or send its phrase to
-someone remote. Making one asks for a fresh code.</p>
+someone remote. Making one asks for a fresh code.{% endtrans %}</p>
 
 <section>
-  <h2>Make a registration code</h2>
+  <h2>{% trans %}Make a registration code{% endtrans %}</h2>
   <form method="post" action="{{ codes_path }}">
     {{ once_field() }}
-    <label>What it's for <span class="hint">optional, such as "Hub open day"</span>
+    <label>{% trans %}What it's for{% endtrans %} <span class="hint">{% trans %}optional, such as "Hub open day"{% endtrans %}</span>
       <input name="label" value="{{ values.get('label', '') }}" maxlength="{{ name_max }}">
       {% with name = "label" %}{% include "_field_problem.html" %}{% endwith %}
     </label>
-    <label>Devices it may register <span class="hint">keep it small</span>
+    <label>{% trans %}Devices it may register{% endtrans %} <span class="hint">{% trans %}keep it small{% endtrans %}</span>
       <input name="uses" type="number" min="1" max="{{ max_uses }}" value="{{ values.get('uses', '1') }}" required>
       {% with name = "uses" %}{% include "_field_problem.html" %}{% endwith %}
     </label>
-    <label>Days it lasts
+    <label>{% trans %}Days it lasts{% endtrans %}
       <input name="days" type="number" min="1" max="{{ max_days }}" value="{{ values.get('days', '1') }}" required>
       {% with name = "days" %}{% include "_field_problem.html" %}{% endwith %}
     </label>
-    <button class="primary">Make a code</button>
+    <button class="primary">{% trans %}Make a code{% endtrans %}</button>
   </form>
 </section>
 
-<p><a href="{{ device_list }}">All registered devices</a>: list them by when
-they registered, and revoke many at once.</p>
+<p>{% trans link=device_list %}<a href="{{ link }}">All registered devices</a>: list them by when
+they registered, and revoke many at once.{% endtrans %}</p>
 
 <section>
-  <h2>Codes</h2>
+  <h2>{% trans %}Codes{% endtrans %}</h2>
   {% call filter_form(view) %}
-    <label>Filter by state
+    <label>{% trans %}Filter by state{% endtrans %}
       <select name="state">
-        <option value="">Any</option>
+        <option value="">{% trans %}Any{% endtrans %}</option>
         {% for words in states %}
-        <option value="{{ words }}"{% if view.filtered("state") == words %} selected{% endif %}>{{ words | capitalize }}</option>
+        <option value="{{ words }}"{% if view.filtered("state") == words %} selected{% endif %}>{{ state_words[words] }}</option>
         {% endfor %}
       </select>
     </label>
   {% endcall %}
   {{ sizes(view) }}
   {% call table() %}
-    <tr>{{ sort_heading(view, "code", "Code") }}
-      {{- sort_heading(view, "state", "State") }}
-      {{- sort_heading(view, "used", "Used") }}
-      {{- sort_heading(view, "until", "Until") }}</tr>
+    <tr>{{ sort_heading(view, "code", _("Code")) }}
+      {{- sort_heading(view, "state", _("State")) }}
+      {{- sort_heading(view, "used", _("Used")) }}
+      {{- sort_heading(view, "until", _("Until")) }}</tr>
     {% for code, state, registered in codes %}
     <tr>
       <td><a href="{{ codes_path }}/{{ code.id }}">{{ code.name }}</a></td>
-      <td>{% if state == "open" %}open{% else %}<span class="tag">{{ state | capitalize }}</span>{% endif %}</td>
-      <td>{{ code.uses }} of {{ code.max_uses }}</td>
+      <td>{% if state == "open" %}{% trans "state" %}open{% endtrans %}{% else %}<span class="tag">{{ state_words[state] }}</span>{% endif %}</td>
+      <td>{% trans uses=code.uses, most=code.max_uses %}{{ uses }} of {{ most }}{% endtrans %}</td>
       <td>{{ code.expires_at | when(zone) }}</td>
     </tr>
     {% else %}
-    <tr><td colspan="4">{% call unfiltered_or(view) %}None yet.{% endcall %}</td></tr>
+    <tr><td colspan="4">{% call unfiltered_or(view) %}{% trans %}None yet.{% endtrans %}{% endcall %}</td></tr>
     {% endfor %}
   {% endcall %}
   {{ pager(view) }}

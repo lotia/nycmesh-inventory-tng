@@ -1,27 +1,28 @@
 {% extends "admin_base.html" %}
 {% from "_print_controls.html" import print_controls %}
 {% block main %}
-<p><strong>Shown only now.</strong> It registers up to {{ code.max_uses }}
-device{{ "s" if code.max_uses != 1 else "" }}, until {{ code.expires_at | when(zone) }}.</p>
-<h2>Scan this with the phone's camera</h2>
+<p><strong>{% trans %}Shown only now.{% endtrans %}</strong> {% trans count=code.max_uses, until=code.expires_at | when(zone) %}It registers up to {{ count }}
+device, until {{ until }}.{% pluralize %}It registers up to {{ count }}
+devices, until {{ until }}.{% endtrans %}</p>
+<h2>{% trans %}Scan this with the phone's camera{% endtrans %}</h2>
 <div class="qr">{{ qr }}</div>
-<h2>Or type this phrase</h2>
+<h2>{% trans %}Or type this phrase{% endtrans %}</h2>
 <p class="key">{{ phrase }}</p>
-<p class="hint">at <a href="{{ link }}">the registration page</a>, in the browser the
-volunteer will use for the scan page.</p>
+<p class="hint">{% trans link=link %}at <a href="{{ link }}">the registration page</a>, in the browser the
+volunteer will use for the scan page.{% endtrans %}</p>
 
 {#- Printing (styles.css): the paper, then what prints, one code to a page. #}
 <div class="printable">
-  {% call print_controls("Print it") %}Print it now: the phrase is never shown
-  again. If the print dialog offers paper sizes, pick the same one there.{% endcall %}
+  {% call print_controls(_("Print it")) %}{% trans %}Print it now: the phrase is never shown
+  again. If the print dialog offers paper sizes, pick the same one there.{% endtrans %}{% endcall %}
   <div class="print-sheet">
-    <p class="print-title">Register your phone for NYC Mesh Inventory</p>
+    <p class="print-title">{% trans brand=BRAND %}Register your phone for {{ brand }}{% endtrans %}</p>
     <div class="qr">{{ qr }}</div>
-    <p>Scan this with your phone's camera.</p>
-    <p>Or open <strong>{{ register }}</strong> and type
-      <span class="key">{{ phrase }}</span></p>
+    <p>{% trans %}Scan this with your phone's camera.{% endtrans %}</p>
+    <p>{% trans register=register, phrase=phrase %}Or open <strong>{{ register }}</strong> and type
+      <span class="key">{{ phrase }}</span>{% endtrans %}</p>
     {% if code.label %}<p class="print-small">{{ code.label }}</p>{% endif %}
-    <p class="print-small">Until {{ code.expires_at | when(zone) }}</p>
+    <p class="print-small">{% trans until=code.expires_at | when(zone) %}Until {{ until }}{% endtrans %}</p>
   </div>
 </div>
 

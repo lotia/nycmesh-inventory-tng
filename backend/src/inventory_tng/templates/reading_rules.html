@@ -5,31 +5,31 @@
 (models.ReadingRule, docs/decisions/0021), each changed or deleted on its
 own page. -#}
 {% block main %}
-<p>How a unit, as typed after a number in a name, is read where the words
+<p>{% trans %}How a unit, as typed after a number in a name, is read where the words
   near it do not say: by searches, here and on the scan page, and by the
   item forms, before the unit table. Settled as an item's form asks, or
-  corrected here.
-  <a href="{{ here }}/seed">Propose readings from every name</a>.</p>
+  corrected here.{% endtrans %}
+  <a href="{{ here }}/seed">{% trans %}Propose readings from every name{% endtrans %}</a>.</p>
 {% call filter_form(view) %}
-  <label>Find a unit
+  <label>{% trans %}Find a unit{% endtrans %}
     <input name="unit" type="search" value="{{ view.filtered('unit') }}" maxlength="200" autocomplete="off">
   </label>
-  <label>Filter by who settled it
+  <label>{% trans %}Filter by who settled it{% endtrans %}
     <select name="by">
-      <option value="">Anyone</option>
-      <option value="import"{% if view.filtered("by") == "import" %} selected{% endif %}>The import</option>
-      <option value="admin"{% if view.filtered("by") == "admin" %} selected{% endif %}>An administrator</option>
+      <option value="">{% trans %}Anyone{% endtrans %}</option>
+      <option value="import"{% if view.filtered("by") == "import" %} selected{% endif %}>{% trans %}The import{% endtrans %}</option>
+      <option value="admin"{% if view.filtered("by") == "admin" %} selected{% endif %}>{% trans %}An administrator{% endtrans %}</option>
     </select>
   </label>
 {% endcall %}
 <section>
   {{ sizes(view) }}
   {% call table() %}
-    <tr>{{ sort_heading(view, "unit", "After a number") }}
-      {{- sort_heading(view, "read_as", "Read as") }}
-      {{- sort_heading(view, "saved", "Saved") }}
-      {{- sort_heading(view, "by", "Settled by") }}
-      {{- sort_heading(view, "when", "When") }}</tr>
+    <tr>{{ sort_heading(view, "unit", _("After a number")) }}
+      {{- sort_heading(view, "read_as", _("Read as")) }}
+      {{- sort_heading(view, "saved", _("Saved")) }}
+      {{- sort_heading(view, "by", _("Settled by")) }}
+      {{- sort_heading(view, "when", _("When")) }}</tr>
     {% for row in rows %}
     <tr>
       <td><a href="{{ here }}/{{ row.rule.id }}">{{ row.rule.token }}</a></td>
@@ -39,7 +39,7 @@ own page. -#}
       <td>{{ row.rule.decided_at | when(zone) }}</td>
     </tr>
     {% else %}
-    <tr><td colspan="5">{% call unfiltered_or(view) %}None yet: <a href="{{ here }}/seed">propose them from the names</a>.{% endcall %}</td></tr>
+    <tr><td colspan="5">{% call unfiltered_or(view) %}{% trans link=here ~ "/seed" %}None yet: <a href="{{ link }}">propose them from the names</a>.{% endtrans %}{% endcall %}</td></tr>
     {% endfor %}
   {% endcall %}
   {{ pager(view) }}
