@@ -16,7 +16,13 @@ from sqlalchemy.orm import Session
 from structlog.testing import capture_logs
 
 from inventory_tng import accounts, mail, sign_in
-from inventory_tng.models import Admin, AdminSession, ResetLink, SignInSettings
+from inventory_tng.models import (
+    TOTP_POLICIES,
+    Admin,
+    AdminSession,
+    ResetLink,
+    SignInSettings,
+)
 from inventory_tng.resets import ASKED, RESET_NOTICE
 from inventory_tng.settings import MailConfig, Settings, SettingsError
 
@@ -394,6 +400,10 @@ def test_the_sign_in_settings_mail_counts_each_setting_in_its_own_plural(
     said = body.split("\n\n")[0]
     assert said.endswith(f"{mail.minutes(change)}.") == bool(change)
     assert body.endswith(str(mail.NOT_AGREED))
+
+
+def test_every_totp_policy_has_words_for_the_settings_mail() -> None:
+    assert set(mail.TOTP_POLICY_WORDS) == set(TOTP_POLICIES)
 
 
 def test_a_password_changed_on_the_account_page_is_told(

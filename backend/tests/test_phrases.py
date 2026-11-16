@@ -171,10 +171,9 @@ SAID_WITH_VALUES: list[Callable[[], Words]] = [
 ]
 
 
-def every_mail() -> str:
-    """Every mail's subject and body, with values that are not English, and
-    without the app's name, which is the same in every language."""
-    told = [
+def all_mail() -> list[mail.Message]:
+    """Every mail, each branch of it, with values that are not English."""
+    return [
         mail.reset_link(NAME, 1, NAME),
         *(
             build(NAME, 1)
@@ -217,7 +216,18 @@ def every_mail() -> str:
             )
         ),
     ]
-    return " ".join(f"{m.subject} {m.body}" for m in told).replace(BRAND, "")
+
+
+def every_mail() -> str:
+    """Every mail's subject and body, without the app's name, which is the
+    same in every language."""
+    return " ".join(f"{m.subject} {m.body}" for m in all_mail()).replace(BRAND, "")
+
+
+def test_every_mail_names_the_app_in_its_subject_and_body() -> None:
+    for told in all_mail():
+        assert BRAND in told.subject, told.kind
+        assert BRAND in told.body, told.kind
 
 
 COVERED: dict[str, Callable[[], str]] = {
