@@ -855,6 +855,10 @@ def test_a_comma_after_a_lone_nought_is_read_again(alembic_config: Config) -> No
     cap = row(
         "item_package", "Cap 1 000 \u03bcF", item_id=resistor, size=3, unit_key="c"
     )
+    # Its unit found after a no-break space (inventory-tng-vw0f).
+    spaced = row(
+        "item_package", "Cap 2000\u00a0\u03bcF", item_id=resistor, size=5, unit_key="e"
+    )
     command.upgrade(alembic_config, "0048")
     assert connection.execute(
         text(
@@ -886,6 +890,7 @@ def test_a_comma_after_a_lone_nought_is_read_again(alembic_config: Config) -> No
             "cap1000uf",
             "Cap 1\u00a0000\u00a0\u03bcF",
         ),
+        ("Cap 2000 mF Cap 2000uF", "cap2000uf", "Cap 2000\u00a0\u03bcF"),
     ]
     command.downgrade(alembic_config, "0047")
     other = row("item", "Resistor 0,5 GOhm", category_id=category_id, name_folded="")
@@ -897,6 +902,11 @@ def test_a_comma_after_a_lone_nought_is_read_again(alembic_config: Config) -> No
     with pytest.raises(RuntimeError) as refused:
         command.upgrade(alembic_config, "0048")
     assert f"by id: item_package {cap}, {alike}." in str(refused.value)
+    connection.execute(text("DELETE FROM item_package WHERE id = :id"), {"id": alike})
+    alike = row("item_package", "Cap 2000 uF", item_id=resistor, size=6, unit_key="f")
+    with pytest.raises(RuntimeError) as refused:
+        command.upgrade(alembic_config, "0048")
+    assert f"by id: item_package {spaced}, {alike}." in str(refused.value)
 
 
 def test_a_number_grouped_by_spaces_is_shown_whole(alembic_config: Config) -> None:

@@ -302,7 +302,8 @@ are read are one too (`10 uF` and `10μF`): each row keeps `unit_key`,
 which the app writes as the session flushes (`models.unit_key`), unique
 as `name_key` is, with no CHECK, as the units are the app's. A unit is
 judged by its number as search reads it (`units._searched`), sign and all,
-so `Cap 1 000 μF` and `Cap 1000 uF` are one too. `backend/src/inventory_tng/names.py`
+so `Cap 1 000 μF` and `Cap 1000 uF` are one too, and found after any
+space, as search reads every space as a plain one. `backend/src/inventory_tng/names.py`
 has the rule: one pattern and one table of look-alikes
 (`LOOK_ALIKES`), read by Python (`name_key`) and PostgreSQL
 (`name_key_sql`), and a test checks both agree on every character. To

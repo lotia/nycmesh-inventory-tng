@@ -273,6 +273,31 @@ def test_names_reading_alike_but_for_a_number_grouped_by_spaces_are_one() -> Non
         assert unit_key(spaced) == unit_key(joined), spaced
 
 
+@pytest.mark.parametrize("space", ["\u00a0", "\u202f", "\u2009", "\u1680"])
+def test_a_unit_after_any_space_is_judged_as_search_reads_it(space: str) -> None:
+    """inventory-tng-vw0f: search reads every space as a plain one, so the
+    forms and the read-alike check find a unit after a number and a
+    no-break, thin or other space as after a plain one, and say where it is
+    in the name as typed."""
+    typed = f"Box 1000{space}M"
+    (found,) = units.found_in(typed)
+    (plain,) = units.found_in("Box 1000 M")
+    assert (found.read, found.plausible, found.asks) == (
+        plain.read,
+        plain.plausible,
+        plain.asks,
+    )
+    assert (found.number, found.token, found.start, found.end) == (
+        "1000",
+        "M",
+        8,
+        len(typed),
+    )
+    assert unit_key(f"Cap 1000{space}\u03bcF") == unit_key("Cap 1000 uF")
+    assert units.read_as(f"Cap 1000{space}\u03bcF") == "Cap 1000uF"
+    assert units.respell(f"Cap 1000{space}\u03bcF") == "Cap 1000uF"
+
+
 def test_a_product_before_any_space_is_not_grouped_with_the_next_number() -> None:
     """inventory-tng-uxo6: `Cat 6 305 m` is a product's number, then 305 m,
     whatever space is after `Cat`, to the forms and to search alike."""
@@ -657,6 +682,13 @@ NB, THIN = "\u00a0", "\u202f"
         ("Supply \u22121 000 V", f"Supply \u22121{NB}000{NB}V"),
         ("Box 1\u202f000 ft", f"Box 1\u202f000{NB}ft"),
         (f"Box 1{NB}000 ft", f"Box 1{NB}000{NB}ft"),
+        # A unit after any space found as after a plain one, a no-break
+        # space before it (inventory-tng-vw0f).
+        (f"Cap 1000{NB}\u03bcF", f"Cap 1000{NB}\u03bcF"),
+        (f"Cap 1000{THIN}\u03bcF", f"Cap 1000{NB}\u03bcF"),
+        ("Cap 1000\u1680\u03bcF", f"Cap 1000{NB}\u03bcF"),
+        (f"Box 1{THIN}000{THIN}ft", f"Box 1{THIN}000{NB}ft"),
+        (f"Box 1 000{NB}feet", f"Box 1{NB}000{NB}feet"),
         ("Cable 2\u2009100 ft", f"Cable 2\u2009100{NB}ft"),
         ("Reel 1\u2009000 000 mm", f"Reel 1\u2009000{NB}000{NB}mm"),
         # Products, units no rule or word settles, and tokens no unit, as

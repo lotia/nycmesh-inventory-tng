@@ -632,6 +632,19 @@ ignores spaces, so those two names are one. Units version 6; migration
 0048, rewritten in place, as nothing is deployed (Ali, 2026-11-16), read
 each unit key again and folded every row again.
 
+Found in review (inventory-tng-vw0f, 2026-11-16): the forms and the
+read-alike check found no unit after a number and a no-break, thin or
+other space, so `Cap 1000 μF` with a no-break space and `Cap 1000 uF`
+were two names, and a form never asked about `Box 1000 M` spaced so,
+though search reads every space as a plain one. Now search, the forms,
+the read-alike check and the shown name all look for a unit after a
+number in the name with every space (`names.LOOK_ALIKES`) plain, one
+character for one, so what a form says is where it was typed. The shown
+name puts a no-break space before the unit whatever space was typed
+there; within a number grouped by spaces, no-break and thin spaces stay
+as typed. Units version 7; migration 0048, rewritten in place again,
+reads each unit key and name shown again, naming clashes by id.
+
 ## Amendment: the import's readings file (2026-11-14)
 
 An import starts with no reading rules, and its readings are settled

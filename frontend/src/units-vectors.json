@@ -809,6 +809,14 @@
       "respelt": "Cat\u16806 305m"
     },
     {
+      "text": "Cap 1000\u1680\u03bcF",
+      "respelt": "Cap 1000uF"
+    },
+    {
+      "text": "Box 1 000\u1680deg C",
+      "respelt": "Box 1000degC"
+    },
+    {
       "text": "Box of 1,000",
       "respelt": "Box of 1,000",
       "searched": "box of 1,000",
@@ -822,6 +830,10 @@
     }
   ],
   "groups": [
+    {
+      "text": "Cap 1000\u1680\u03bcF",
+      "groups": [["Cap", "Cap"], ["1000\u1680\u03bcF", "1000uF"]]
+    },
     {
       "text": "100 ft 48 V",
       "groups": [["100 ft", "100ft"], ["48 V", "48V"]]

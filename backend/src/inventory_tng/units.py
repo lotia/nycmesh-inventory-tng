@@ -55,7 +55,9 @@ from inventory_tng.phrases import gettext, lazy_gettext
 # decimal point, `0,500 m` as `0.500 m` (Ali, 2026-11-15, inventory-tng-4i1).
 # 6: the forms judge a number grouped by spaces as search reads it, one
 # number, its sign with it, so unit keys read so (inventory-tng-uxo6).
-VERSION = 6
+# 7: search and the forms find a unit after a number and any space as
+# after a plain one, so unit keys read so (inventory-tng-vw0f).
+VERSION = 7
 
 # The most groups (groups) a search is matched by, each alone; one with more
 # is matched whole only (Ali, 2026-11-15, inventory-tng-ist.1).
@@ -497,13 +499,15 @@ type Edit = tuple[int, int, str]
 
 
 def _after_a_number(text: str) -> Iterator[tuple[re.Match[str], Searched | None]]:
-    """Each match of AFTER_A_NUMBER in `text` that may be a unit: none
-    beside a combining mark (_marked) or in a product's name (_product);
-    with its number as search reads it (_searched), where it is in `text`
-    as in its copy with plain spaces."""
+    """Each match of AFTER_A_NUMBER in `text` with plain spaces
+    (_PLAIN_SPACES), as search reads it (inventory-tng-vw0f), that may be
+    a unit: none beside a combining mark (_marked) or in a product's name
+    (_product); with its number as search reads it (_searched). Each is
+    where it is in `text`, one character for one, its token as matched,
+    with plain spaces."""
     plain = text.translate(_PLAIN_SPACES)
-    for match in AFTER_A_NUMBER.finditer(text):
-        if not _marked(text, match.end()) and not _product(text, match.end(1) - 1):
+    for match in AFTER_A_NUMBER.finditer(plain):
+        if not _marked(text, match.end()) and not _product(plain, match.end(1) - 1):
             yield match, _searched(plain, match.end(1))
 
 
@@ -778,7 +782,7 @@ def _product(name: str, at: int) -> bool:
 @dataclass(frozen=True)
 class Found:
     """What may be a unit right after a number in a name: the number as
-    typed, the unit as typed (`token`), where the space before it, if any,
+    typed, the unit as typed, its spaces plain (`token`), where the space before it, if any,
     and it are (`start`, `end`), and the readings of it that are plausible
     sizes (Reading.plausible), the one spelt as typed first, then by
     PROFILE. `read` is what it reads as (_found): by its rule (`rule`;
@@ -965,7 +969,8 @@ def shown_name(name: str, rules: Rules | None = None) -> str:
     unit's word as search reads it (inventory-tng-tze), without its
     thousands separators, grouped from five digits (_shown_number), and a
     no-break space between it and its unit, spelt as typed: `Cap 10uF 50V`
-    is `Cap 10 uF 50 V`, `Box 10,000 feet` `Box 10 000 feet`. The rest, a
+    is `Cap 10 uF 50 V`, `Box 10,000 feet` `Box 10 000 feet`, whatever
+    space was typed before the unit (inventory-tng-vw0f). The rest, a
     unit not read among it, and a number within a word or a code
     (_IN_A_CODE, _INTO_A_CODE), as typed. A number grouped by spaces
     (_GROUPED, any space search reads as one), with its sign, is read as
@@ -992,7 +997,9 @@ def shown_name(name: str, rules: Rules | None = None) -> str:
         # A word no form reads, as _edits reads it.
         if (read(token) if found is None else found.read) is None:
             continue
-        edits.append((start, match.end(), shown + NO_BREAK_SPACE + token))
+        # Its unit as typed.
+        typed = name[match.start(2) : match.end()]
+        edits.append((start, match.end(), shown + NO_BREAK_SPACE + typed))
     return _applied(name, edits)
 
 

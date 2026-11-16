@@ -257,11 +257,12 @@ function edits(text: string, rules: Rules | undefined): Edit[] {
   const found: Edit[] = [];
   // Any space a plain one, one for one, as units._after_a_number reads it.
   const plain = text.replaceAll(/\p{Zs}/gu, " ");
-  for (const match of text.matchAll(AFTER_A_NUMBER)) {
+  // Matched with plain spaces, as search reads them (units._after_a_number).
+  for (const match of plain.matchAll(AFTER_A_NUMBER)) {
     const [whole, digit, token] = match as unknown as [string, string, string];
     const at = match.index;
     const end = at + whole.length;
-    if (marked(text, end) || product(text, at)) continue;
+    if (marked(text, end) || product(plain, at)) continue;
     const before = text.slice(0, at + 1);
     let number: string;
     let grouped = NOUGHT.exec(before);

@@ -14,7 +14,10 @@ unit's symbol is, `Box 1,000 feet` as `Box 1000 feet` (inventory-tng-tze,
 Ali, 2026-11-15), as units.shown_name now does. And, rewritten in place
 (Ali, 2026-11-16), a form judges a number grouped by spaces as search
 reads it, one number with its sign, `Cap 1 000 μF` as 1000 μF, not 000, so
-unit keys read so too (units version 6, inventory-tng-uxo6).
+unit keys read so too (units version 6, inventory-tng-uxo6); and a form
+finds a unit after a number and any space, `Cap 1000<no-break space>μF`
+as 1000 μF, as search reads it, so unit keys and names shown read so too
+(units version 7, inventory-tng-vw0f).
 
 Revision ID: 0048
 Revises: 0047
@@ -35,7 +38,7 @@ branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 
 # The units.VERSION this folds again for (0036 says how they follow).
-FOLDS_UNITS = 6
+FOLDS_UNITS = 7
 
 # Each table's searched fields, in order, as models' SEARCHED at 0048, and
 # whether reading rules read them (models.Searchable.READS_RULES).
