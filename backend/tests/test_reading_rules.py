@@ -15,7 +15,12 @@ from structlog.testing import capture_logs
 from inventory_tng import items, names, reading_rules, sign_in, units
 from inventory_tng.admin.items import ITEMS, PACKAGE_TAKEN, SEARCHED, TAKEN_FIELDS
 from inventory_tng.admin.listing import folded
-from inventory_tng.admin.reading_rules import CHOOSE_ONE, READINGS, SEED
+from inventory_tng.admin.reading_rules import (
+    CHOOSE_ONE,
+    READINGS,
+    READINGS_ACCEPTED,
+    SEED,
+)
 from inventory_tng.catalogue import catalogue
 from inventory_tng.db import lock_catalogue
 from inventory_tng.models import (
@@ -31,7 +36,7 @@ from inventory_tng.models import reading_rules as reading_rules_held
 from inventory_tng.reading_rules import LIKELY, NAMED, both, near
 
 from helpers.concurrency import Committed
-from helpers.markup import links, options, row_links
+from helpers.markup import links, options, read, row_links
 from helpers.queries import counting
 from helpers.rows import (
     add,
@@ -107,7 +112,7 @@ def test_a_rule_wins_over_the_words_near_a_unit() -> None:
     words near a unit decide where no rule does, on the forms and in
     search alike."""
     rules = {"M": units.Rule("Mbit/s"), "G": units.Rule(None)}
-    for name, read, clue, ruled in [
+    for name, unruled, clue, ruled in [
         ("Spool 305M", "m", ("spool",), "Mbit/s"),
         ("Cat6 patch 3M", "m", ("cat6", "patch"), "Mbit/s"),
         ("Tape 3M", None, (), "Mbit/s"),
@@ -116,7 +121,7 @@ def test_a_rule_wins_over_the_words_near_a_unit() -> None:
     ]:
         (found,) = units.found_in(name)
         assert (str(found.read) if found.read else None, found.clue) == (
-            read,
+            unruled,
             clue,
         ), name
         (found,) = units.found_in(name, rules)
@@ -395,6 +400,7 @@ def test_the_rules_page_lists_changes_and_deletes_them(
     (rule,) = reading_rules.decide(session, {"G": units.Rule(None)}, None)
     listed = admin_client.get(READINGS).text
     assert ("G", f"{READINGS}/{rule.id}") in links(listed)
+    assert ("Propose readings from every name", SEED) in links(listed)
     assert "Not a unit" in listed
     assert "The import" in listed
     page = text(admin_client.get(f"{READINGS}/{rule.id}"))
@@ -510,6 +516,9 @@ def test_the_seeding_page_proposes_and_accepts_readings(
     assert "“G”" in page
     assert near("sfp+, uplink") in page
     assert ("", "Choose…", False) in options(seeding.text)
+    # Each proposed reading chosen already, to accept as it is.
+    assert ("Gbit/s", "Gbps · data rate", True) in options(seeding.text)
+    assert ("Review one by one", f"{SEED}?one=1") in links(seeding.text)
     assert "Mbps · data rate" in page
     assert "m · meters" in page
     form = {"reading:G": "g", "reading:M": ""}
@@ -556,7 +565,10 @@ def test_the_seeding_page_reviews_one_by_one(
     form = {"one": "1", "at": "0", "reading:G": "Gbit/s"}
     done = admin_client.post(SEED, data=form)
     assert done.headers["location"] == (f"{SEED}?one=1&at=0&notice=readings_accepted")
-    assert "“M”" in text(admin_client.get(done.headers["location"]))
+    accepted = admin_client.get(done.headers["location"])
+    assert "“M”" in text(accepted)
+    said = read(accepted.text).one("p", role="status").text
+    assert said == str(READINGS_ACCEPTED)
     # A row settled meanwhile is left as it is.
     again = admin_client.post(SEED, data=form | {"reading:G": "g"})
     assert again.status_code == 303

@@ -132,11 +132,57 @@ test("a save an older build left goes back in the cart, whole without a tap, and
   ).toBeNull();
 });
 
-test("saves holding an item retired since, with none left, name it, and go by its line's Discard or their own", async ({
+test("a save's package retired since is named, never offered, and goes by its line's Discard; saves of an item retired since name it, and go by its line's Discard or their own", async ({
   page,
 }) => {
   const cable = await ownCable(page, "Retired cable");
-  const itemId = Number(new URL(page.url()).pathname.split("/").at(-1));
+  const itemPage = page.url();
+  const itemId = Number(new URL(itemPage).pathname.split("/").at(-1));
+  const box = "Box of 305 m";
+  const retireBox = page.getByRole("button", { name: `Retire ${box}` });
+  const packageId = Number(
+    (
+      (await page.locator("form", { has: retireBox }).getAttribute("action")) ??
+      ""
+    )
+      .split("/")
+      .at(-2),
+  );
+  await retireBox.click();
+  await expect(
+    page.getByRole("button", { name: `Bring it back ${box}` }),
+  ).toBeVisible();
+  await page.goto("/scan");
+  await leave(page, [
+    { item_id: itemId, quantity: "610", package_id: packageId },
+    { item_id: itemId, quantity: "3" },
+  ]);
+  await page.reload();
+
+  // The package, retired with none left: named from the catalogue
+  // (retired_packages), in bold, without "Sorry."
+  const listing = listingOf(page);
+  await expect(listing.getByText(`${cable}: 2 × ${box}`)).toBeVisible();
+  const note = listing.locator(".alert", {
+    hasText: "This item has been retired.",
+  });
+  await expect(note.locator("strong")).toHaveText(
+    "This item has been retired.",
+  );
+  await lineDiscard(listing, `${cable}: 2 × ${box}`).click();
+  // What is left goes back whole, without a tap; the box is not offered.
+  await expect(listing).toHaveCount(0);
+  await expect(page.getByText(PUT_BACK)).toBeVisible();
+  // Its only count, the box not offered.
+  await expect(page.getByLabel("How many m")).toHaveValue("3");
+  await expect(page.getByLabel(new RegExp(`^${box}`))).toHaveCount(0);
+  // Discarded, not saved: a retired item with stock left is still offered.
+  await page.getByRole("button", { name: "Discard cart" }).click();
+  await page.getByRole("button", { name: "Discard", exact: true }).click();
+  await expect(page.getByText("Nothing in the cart yet.")).toBeVisible();
+
+  // Then the item, retired with none left.
+  await page.goto(itemPage);
   await page.getByRole("button", { name: "Retire", exact: true }).click();
   await expect(page.getByRole("status")).toContainText("Retired.");
   await page.goto("/scan");
@@ -147,7 +193,6 @@ test("saves holding an item retired since, with none left, name it, and go by it
   );
   await page.reload();
 
-  const listing = listingOf(page);
   await expect(listing.getByText("Item retired")).toHaveCount(2);
   await expect(listing.getByText(`${cable}: 2 m`)).toBeVisible();
   await expect(
@@ -167,48 +212,6 @@ test("saves holding an item retired since, with none left, name it, and go by it
   expect(
     await page.evaluate(() => localStorage.getItem("inventory.outbox.v3")),
   ).toBeNull();
-});
-
-test("a save's package retired since, with none left, is named, never offered, and goes by its line's Discard", async ({
-  page,
-}) => {
-  const cable = await ownCable(page, "Boxed cable");
-  const itemId = Number(new URL(page.url()).pathname.split("/").at(-1));
-  const box = "Box of 305 m";
-  const retire = page.getByRole("button", { name: `Retire ${box}` });
-  const packageId = Number(
-    ((await page.locator("form", { has: retire }).getAttribute("action")) ?? "")
-      .split("/")
-      .at(-2),
-  );
-  await retire.click();
-  await expect(
-    page.getByRole("button", { name: `Bring it back ${box}` }),
-  ).toBeVisible();
-  await page.goto("/scan");
-  await leave(page, [
-    { item_id: itemId, quantity: "610", package_id: packageId },
-    { item_id: itemId, quantity: "3" },
-  ]);
-  await page.reload();
-
-  // Named from the catalogue (retired_packages), in bold, without "Sorry."
-  const listing = listingOf(page);
-  await expect(listing.getByText(`${cable}: 2 × ${box}`)).toBeVisible();
-  const note = listing.locator(".alert", {
-    hasText: "This item has been retired.",
-  });
-  await expect(note.locator("strong")).toHaveText(
-    "This item has been retired.",
-  );
-  await lineDiscard(listing, `${cable}: 2 × ${box}`).click();
-  // What is left goes back whole, without a tap; the box is not offered.
-  await expect(listing).toHaveCount(0);
-  await expect(page.getByText(PUT_BACK)).toBeVisible();
-  await expect(page.getByLabel(new RegExp(`^${box}`))).toHaveCount(0);
-  expect(await save(page)).toMatchObject({
-    lines: [{ item_id: itemId, quantity: "3" }],
-  });
 });
 
 /** One left, which the older build's tab then saves, as its request in
