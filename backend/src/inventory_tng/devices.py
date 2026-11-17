@@ -49,7 +49,7 @@ from inventory_tng.core.db import (
 )
 from inventory_tng.core.rate_limits import limiter, refund
 from inventory_tng.models import Device, RegistrationCode
-from inventory_tng.web import client_address, set_private_cookie
+from inventory_tng.web.browser import client_address, set_private_cookie
 
 log = structlog.get_logger(__name__)
 meter = metrics.get_meter(__name__)

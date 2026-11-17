@@ -6,8 +6,8 @@ ledger).
 
 Today's breaks are listed in BREAKS, which may only shrink: a new break
 fails, and so does one fixed but still listed. Rules naming folders that do
-not exist yet (web/, a feature's package, routes.py, queries.py,
-command.py, manage.py) apply as they appear.
+not exist yet (a feature's package, routes.py, queries.py, command.py,
+manage.py) apply as they appear.
 """
 
 import ast
@@ -25,7 +25,7 @@ from helpers.source import SOURCE, modules
 # import only the models, kept whole (0023).
 CORE_MAY_IMPORT = {"models.py"}
 # What every server-rendered page shares, until it moves into web/.
-WEB = {"pages.py", "web.py"}
+WEB = {"pages.py"}
 # Rules: each table's owner (db.protection), any queries.py, and these,
 # which hold rules but own no table.
 RULES = {"ledger.py", "names.py", "scan_settings.py", "unit_readings.py", "units.py"}
@@ -54,7 +54,7 @@ type Check = Callable[[ast.Module, str, Collection[str]], list[str]]
 BREAKS: dict[str, dict[str, list[str]]] = {
     "core_imports_a_feature": {},
     "rules_import_fastapi_or_web": {
-        "devices.py": ["fastapi", "web.py"],
+        "devices.py": ["fastapi", "web/browser.py"],
         "labels.py": ["pages.py"],
         "ledger.py": ["fastapi"],
         "once.py": ["fastapi", "pages.py", "starlette"],

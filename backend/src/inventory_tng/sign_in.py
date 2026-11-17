@@ -65,7 +65,7 @@ from inventory_tng.pages import (
     templates,
 )
 from inventory_tng.totp_keys import TotpKeys
-from inventory_tng.web import rate_key, set_private_cookie
+from inventory_tng.web.browser import rate_key, set_private_cookie
 
 log = structlog.get_logger(__name__)
 

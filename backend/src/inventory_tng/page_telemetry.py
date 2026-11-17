@@ -23,7 +23,7 @@ from opentelemetry import metrics
 from pydantic import BaseModel, ConfigDict, Field
 
 from inventory_tng.devices import RateLimitedReply
-from inventory_tng.web import rate_key
+from inventory_tng.web.browser import rate_key
 
 log = structlog.get_logger(__name__)
 meter = metrics.get_meter(__name__)

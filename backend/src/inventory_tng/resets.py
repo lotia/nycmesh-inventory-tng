@@ -25,7 +25,7 @@ from inventory_tng.core.phrases import Words, lazy_gettext
 from inventory_tng.models import ResetLink
 from inventory_tng.pages import NOTICES, not_found, page, redirect
 from inventory_tng.sign_in import FORGOT, RESET, SIGN_IN, TOO_MANY, reset_url
-from inventory_tng.web import rate_key
+from inventory_tng.web.browser import rate_key
 
 router = APIRouter(include_in_schema=False)
 

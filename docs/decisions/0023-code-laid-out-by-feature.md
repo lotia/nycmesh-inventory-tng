@@ -73,3 +73,4 @@ short test. `core/` is the name FastAPI's full-stack template uses;
 | `dev_database.py` | `dev/dev_database.py` |
 | `seed.py` | `dev/seed.py` |
 | `stacks.py` | `dev/stacks.py` |
+| `web.py` | `web/browser.py` |
