@@ -601,8 +601,8 @@ def make_app_without_database() -> Iterator[Callable[..., FastAPI]]:
 
 @pytest.fixture
 def make_app(database_url: str, session: Session) -> Callable[..., FastAPI]:
-    """Apps on the test database, whose requests use the test's session, or
-    the one given `on`."""
+    """Apps on the test database, or the one at `url`, whose requests use
+    the test's session, or the one given `on`."""
 
     def make(
         logging: LogConfig | None = None,
@@ -615,9 +615,10 @@ def make_app(database_url: str, session: Session) -> Callable[..., FastAPI]:
         rate_limits: RateLimits | None = None,
         own_sessions: bool = False,
         on: Session | None = None,
+        url: str | None = None,
     ) -> FastAPI:
         app = _app(
-            database_url,
+            url or database_url,
             logging,
             frontend,
             development=development,

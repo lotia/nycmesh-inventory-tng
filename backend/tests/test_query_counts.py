@@ -57,6 +57,13 @@ def test_every_admin_page_is_measured(
             f"{route}: give where its words are read (worded, signed_out), or "
             "why they aren't (unworded), not both"
         )
+        assert page.more or not page.counted, (
+            f"{route}: where it is counted (counted) is never read without what "
+            "it lists (more)"
+        )
+    names = [name for page in PAGES.values() for name in page.worded]
+    twice = {name for name in names if names.count(name) > 1}
+    assert not twice, f"each worded page needs a name of its own: {twice}"
 
 
 CASES = [
@@ -86,8 +93,10 @@ def test_a_page_reads_alike_for_one_row_or_eleven(
         with world.visit(make_client, device=route == CATALOGUE) as (client, session):
             url = path(where, world.world)
             # Warmed first: what a first request reads once, such as settings.
-            client.get(url)
+            warmed = client.get(url)
+            assert warmed.status_code == 200, (url, warmed.status_code)
             # As a request's own session would start: nothing loaded.
+            session.flush()
             session.expire_all()
             with counting(session) as sent:
                 response = client.get(url)

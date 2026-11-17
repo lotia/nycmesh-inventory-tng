@@ -637,8 +637,9 @@ def build(session: Session, times: int) -> World:
 
 @dataclass
 class Built:
-    """A world built and committed in its own database."""
+    """A world built and committed in its own database, at `url`."""
 
+    url: str
     database: Database
     world: World
 
@@ -648,9 +649,11 @@ class Built:
     ) -> Generator[tuple[TestClient, Session]]:
         """A client signed in as Ada, or as the registered device, whose
         requests go on a session of the world's database, rolled back after:
-        whatever a page writes is not left for the next test."""
+        whatever a page writes is not left for the next test. The app is on
+        that database too, for what it writes in a transaction of its own,
+        such as when Ada was last seen (db.record_last_seen)."""
         with rolled_back(self.database.engine, self.database) as session:
-            client = make_client(on=session)
+            client = make_client(on=session, url=self.url)
             if device:
                 client.cookies.set(devices.COOKIE, self.world.device_cookie)
             else:
@@ -676,6 +679,6 @@ def built(
                 world = build(setting_up(session), times)
                 then(session)
                 session.commit()
-            yield Built(database, world)
+            yield Built(url, database, world)
         finally:
             database.dispose()
