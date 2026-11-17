@@ -32,7 +32,7 @@ from helpers.over_recorded import (
     mark_checked,
     moved_whole,
     new_admin_id,
-    raised,
+    one_bag_waits,
     recorded_then_changed,
 )
 from helpers.stock import URL, Place, Spools, cut, write
@@ -46,7 +46,7 @@ def test_needs_your_action_lists_it(
     place: Place,
     bags: ItemPackage,
 ) -> None:
-    raised(registered_client, place, bags)
+    one_bag_waits(registered_client, place, bags)
     home = text(admin_client.get("/admin"))
     assert str(over_recorded_page.TITLE) in home
     assert f"{place.cable.name}: 1 \N{MULTIPLICATION SIGN} Bag of 50" in home
@@ -62,7 +62,7 @@ def test_correcting_one_undoes_it_on_each_side(
     place: Place,
     bags: ItemPackage,
 ) -> None:
-    raised(registered_client, place, bags)
+    one_bag_waits(registered_client, place, bags)
     (check,) = checks(session)
     form = {"seen": over_recorded.seen(check)}
     with capture_logs() as logs:
@@ -109,7 +109,7 @@ def test_marking_one_checked_writes_nothing(
     place: Place,
     bags: ItemPackage,
 ) -> None:
-    raised(registered_client, place, bags)
+    one_bag_waits(registered_client, place, bags)
     response = mark_checked(admin_client, session, reason="arrived")
     assert "over_recorded_checked" in response.headers["location"]
     assert str(over_recorded_page.MARKED_CHECKED) in text(
@@ -138,7 +138,7 @@ def test_marking_one_checked_offers_each_reason(
     bags: ItemPackage,
 ) -> None:
     """Ali, 2026-11-15 (inventory-tng-zgy)."""
-    raised(registered_client, place, bags)
+    one_bag_waits(registered_client, place, bags)
     page = admin_client.get(PAGE).text
     shown = read(page)
     assert shown.all("legend", "Why it is right as it is")
@@ -166,7 +166,7 @@ def test_marking_one_checked_asks_why(
 ) -> None:
     """No reason picked, or put right another way with nothing said: asked
     again, beside the reasons, what was typed kept."""
-    raised(registered_client, place, bags)
+    one_bag_waits(registered_client, place, bags)
     with capture_logs() as logs:
         response = mark_checked(admin_client, session, **form)
     assert response.status_code == 400
@@ -194,7 +194,7 @@ def test_put_right_another_way_keeps_the_words_as_typed(
     bags: ItemPackage,
 ) -> None:
     """In canonical spelling (models.canonical), never logged."""
-    raised(registered_client, place, bags)
+    one_bag_waits(registered_client, place, bags)
     words = "Moved back by hand, 10µF"
     with capture_logs() as logs:
         response = mark_checked(
@@ -217,7 +217,7 @@ def waiting_as(
     alert (here, Correct refused at a retired place), or, for an open
     package moved whole, only in a refusal's alert."""
     if form == "row":
-        raised(client, place, bags)
+        one_bag_waits(client, place, bags)
     elif form == "refusal":
         from_emptied_store(client, session)
     else:
@@ -268,7 +268,7 @@ def test_words_of_only_spaces_with_another_reason_are_none(
     bags: ItemPackage,
     words: str,
 ) -> None:
-    raised(registered_client, place, bags)
+    one_bag_waits(registered_client, place, bags)
     response = mark_checked(admin_client, session, reason="both", words=words)
     assert "over_recorded_checked" in response.headers["location"]
     (check,) = checks(session)
@@ -282,7 +282,7 @@ def test_words_too_long_are_asked_again(
     place: Place,
     bags: ItemPackage,
 ) -> None:
-    raised(registered_client, place, bags)
+    one_bag_waits(registered_client, place, bags)
     response = mark_checked(admin_client, session, reason="other", words="x" * 201)
     assert response.status_code == 400
     assert up_to(200) in response.text
@@ -313,7 +313,7 @@ def test_the_database_keeps_reasons_only_as_mark_checked_gives_them(
 ) -> None:
     """A reason from the fixed list, only on one checked; words for another
     way, and only for it."""
-    raised(registered_client, place, bags)
+    one_bag_waits(registered_client, place, bags)
     (check,) = checks(session)
     admin = new_admin_id(session)
 
@@ -341,7 +341,7 @@ def test_enter_in_the_words_marks_checked(
 ) -> None:
     """Enter submits a form by its first button: Mark checked's form has
     no other, so Enter in the words never corrects it."""
-    raised(registered_client, place, bags)
+    one_bag_waits(registered_client, place, bags)
     (form,) = checked_forms(admin_client.get(PAGE).text)
     assert "Correct" not in form
     assert "formaction" not in form
@@ -370,7 +370,7 @@ def test_one_settled_meanwhile_marked_checked_without_a_reason_says_so(
 ) -> None:
     """Not asked why for a row no longer there: told it changed, as with a
     reason."""
-    raised(registered_client, place, bags)
+    one_bag_waits(registered_client, place, bags)
     (check,) = checks(session)
     seen = over_recorded.seen(check)
     mark_checked(admin_client, session, reason="both")
@@ -405,7 +405,7 @@ def test_one_said_again_since_it_was_shown_is_not_settled(
     place: Place,
     bags: ItemPackage,
 ) -> None:
-    raised(registered_client, place, bags)
+    one_bag_waits(registered_client, place, bags)
     (check,) = checks(session)
     response = admin_client.post(
         f"{PAGE}/{check.id}/checked", data={"seen": "2", "reason": "both"}
@@ -421,7 +421,7 @@ def test_only_its_answers_are_taken(
     place: Place,
     bags: ItemPackage,
 ) -> None:
-    raised(registered_client, place, bags)
+    one_bag_waits(registered_client, place, bags)
     (check,) = checks(session)
     assert admin_client.post(f"{PAGE}/{check.id}/delete").status_code == 404
     assert admin_client.post(f"{PAGE}/{check.id + 1000}/checked").status_code == 404

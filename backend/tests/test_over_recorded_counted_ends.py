@@ -29,9 +29,9 @@ from helpers.over_recorded import (
     count_ids,
     moved_whole,
     new_admin_id,
+    one_bag_waits,
     opened_into,
     opening_raised,
-    raised,
     recorded_then_changed,
     text_of,
 )
@@ -217,7 +217,7 @@ def test_a_count_of_another_form_puts_nothing_right(
     """Counted by form, an end is put right by the form it is in there: the
     bags arrived sealed, so their loose cable is no count of them
     (docs/decisions/0020)."""
-    raised(registered_client, place, bags)
+    one_bag_waits(registered_client, place, bags)
     for where in (place.van, place.store):
         count_at(admin_client, where.id, {f"loose_{place.cable.id}": "0"})
     (check,) = checks(session)

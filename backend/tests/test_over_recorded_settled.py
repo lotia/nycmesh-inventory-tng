@@ -29,7 +29,16 @@ from helpers.markup import Element, links, read, sorted_columns
 from helpers.over_recorded import PAGE
 from helpers.rows import tag
 from helpers.sign_in import new_admin
-from helpers.stock import Place, Spools, ada_id, count_at, cut, raised, retire, write
+from helpers.stock import (
+    Place,
+    Spools,
+    ada_id,
+    count_at,
+    cut,
+    raise_check,
+    retire,
+    write,
+)
 
 # As the list says each, in English.
 HOW = {how: str(words) for how, words in over_recorded.SETTLED_HOW.items()}
@@ -43,7 +52,7 @@ SETTLED = f"{PAGE}/settled"
 
 def moved(session: Session, place: Place) -> OverRecorded:
     """Radios moved from the store to the van, one recorded more."""
-    return raised(session, write(session, place))
+    return raise_check(session, write(session, place))
 
 
 def settled_at(check: OverRecorded) -> datetime:
@@ -103,7 +112,7 @@ def test_a_place_that_cannot_be_counted_is_not_linked(
     """All three radios recorded more, corrected: the store holds none
     again, and retired, may not be counted."""
     place = Place(session)
-    check = raised(session, write(session, place), Decimal(3))
+    check = raise_check(session, write(session, place), Decimal(3))
     over_recorded.correct(session, check.id, seen(check), ada_id(session))
     retire(session, place.store)
     page = admin_client.get(SETTLED).text
@@ -146,7 +155,7 @@ def whole_recorded_more(session: Session) -> tuple[Spools, OverRecorded]:
     spools = Spools(session)
     made = spools.opened()
     line = cut(made, "305") | {"whole": True}
-    return spools, raised(session, write(session, spools.place, lines=[line]))
+    return spools, raise_check(session, write(session, spools.place, lines=[line]))
 
 
 @pytest.mark.parametrize(
@@ -220,7 +229,7 @@ def opening(session: Session) -> tuple[Spools, OverRecorded]:
         .where(LedgerTransaction.kind == "open")
         .order_by(LedgerTransaction.id.desc())
     ).first()
-    return spools, raised(session, transaction, Decimal(305))
+    return spools, raise_check(session, transaction, Decimal(305))
 
 
 def test_an_opening_is_listed_at_its_place_opened(
@@ -532,7 +541,7 @@ def test_one_end_only_counted_names_that_end(
     has one end only, where it arrived."""
     place = Place(session)
     install = write(session, place, kind="install", to_location_id=None)
-    used = raised(session, install)
+    used = raise_check(session, install)
     count_at(admin_client, place.store.id, {f"counted_{place.item.id}": "0"})
     spools, check = whole_recorded_more(session)
     movement = session.get_one(Movement, check.movement_id)
@@ -576,7 +585,7 @@ def test_every_column_sorts_either_way(
     start = datetime(2026, 11, 14, 12, tzinfo=UTC)
     places = [Place(session) for _ in range(3)]
     for n, place in enumerate(places):
-        check = raised(session, write(session, place), Decimal(n + 1))
+        check = raise_check(session, write(session, place), Decimal(n + 1))
         if n == 1:
             over_recorded.correct(session, check.id, seen(check), ada_id(session))
         else:
@@ -626,9 +635,9 @@ def test_how_sorts_by_its_words_in_the_language_spoken(
     """How is sorted by its words as the list says them, in the language
     spoken when the list is asked for, not English."""
     places = [Place(session) for _ in range(2)]
-    first = raised(session, write(session, places[0]))
+    first = raise_check(session, write(session, places[0]))
     over_recorded.correct(session, first.id, seen(first), ada_id(session))
-    second = raised(session, write(session, places[1]))
+    second = raise_check(session, write(session, places[1]))
     over_recorded.mark_checked(
         session, second.id, seen(second), ada_id(session), "both"
     )
@@ -677,7 +686,7 @@ def test_those_waiting_sort_by_each_heading_and_come_in_pages(
     in pages of 25, 50, 100 or all (Ali, 2026-11-15, inventory-tng-qwb)."""
     places = [Place(session) for _ in range(3)]
     for n, place in enumerate(places):
-        raised(session, write(session, place), Decimal(3 - n))
+        raise_check(session, write(session, place), Decimal(3 - n))
     session.flush()
     mine = {place.item.name_shown for place in places}
 

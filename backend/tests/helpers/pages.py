@@ -42,7 +42,7 @@ from helpers.stock import (
     Spools,
     cut,
     length,
-    raised,
+    raise_check,
     received,
     report,
     retire,
@@ -218,14 +218,14 @@ def unsettled_unit(world: World) -> None:
 
 def over_recorded_line(world: World) -> None:
     """A line more recorded with more than was moved (over_recorded.py)."""
-    raised(world.session, write(world.session, world.spools.place))
+    raise_check(world.session, write(world.session, world.spools.place))
 
 
 def over_recorded_settled(world: World) -> None:
     """A line more recorded with more than was moved, corrected: its two
     places, each linked to its count, and who corrected it."""
     session = world.session
-    check = raised(session, write(session, world.spools.place))
+    check = raise_check(session, write(session, world.spools.place))
     seen = over_recorded.seen(check)
     over_recorded.correct(session, check.id, seen, world.ada_id)
 

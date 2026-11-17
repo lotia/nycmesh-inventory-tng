@@ -99,13 +99,13 @@ def write(session: Session, place: Place, **fields: object) -> LedgerTransaction
     ).transaction
 
 
-def raised(
+def raise_check(
     session: Session,
     transaction: LedgerTransaction | None,
     more: Decimal = Decimal(1),
 ) -> OverRecorded:
     """`more` recorded than moved of the transaction's line, raised
-    directly; over_recorded.raised goes through the API."""
+    directly; over_recorded.one_bag_waits goes through the API."""
     assert transaction is not None
     movement_id = session.scalars(
         select(Movement.id).where(Movement.transaction_id == transaction.id)

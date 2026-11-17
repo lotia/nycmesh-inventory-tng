@@ -21,7 +21,7 @@ from helpers.over_recorded import (
     checks,
     counted,
     moved_whole,
-    raised,
+    one_bag_waits,
 )
 from helpers.rows import tag
 from helpers.sign_in import new_admin
@@ -165,7 +165,7 @@ def test_a_count_is_taken_only_for_an_open_package_moved_whole(
     place: Place,
     bags: ItemPackage,
 ) -> None:
-    raised(registered_client, place, bags)
+    one_bag_waits(registered_client, place, bags)
     with capture_logs() as logs:
         _, response = counted(admin_client, session, "50")
     assert "over_recorded_unchanged" in response.headers["location"]

@@ -69,9 +69,9 @@ def new_admin_id(session: Session) -> int:
     return admin.id
 
 
-def raised(client: TestClient, place: Place, bags: ItemPackage) -> None:
+def one_bag_waits(client: TestClient, place: Place, bags: ItemPackage) -> None:
     """Two bags recorded, then one: one bag waits. Through the API, as a
-    page sends it; stock.raised raises a check on a written transaction
+    page sends it; stock.raise_check raises a check on a written transaction
     directly."""
     first = place.batch(lines=[bagged(bags, 2)])
     recorded_then_changed(client, first, lines=[bagged(bags, 1)])
