@@ -23,7 +23,7 @@ import type { Schemas } from "./api/client";
 export const PATH = "/api/telemetry";
 export const FLUSH_AT = 10;
 /** How many of each kind a page sends an hour: 60 in all, under the
- * server's limit (page_telemetry.REPORTS). */
+ * server's limit (RATE_LIMIT_PAGE_REPORTS). */
 export const PER_HOUR: Record<Event["kind"], number> = {
   web_vital: 10,
   error: 10,
@@ -41,6 +41,12 @@ export const PER_HOUR: Record<Event["kind"], number> = {
   // Rare: a cart recorded in two tabs, changed in one.
   difference_added: 2,
 };
+/** How many a page sends an hour in all: PER_HOUR's sum, never written
+ * out. */
+export const PER_HOUR_IN_ALL = Object.values(PER_HOUR).reduce(
+  (sum, n) => sum + n,
+  0,
+);
 export const HOUR_MS = 3_600_000;
 /** The longest scan_to_save the backend takes (page_telemetry.ScanToSave):
  * an event outside its bounds would have the whole report refused. */

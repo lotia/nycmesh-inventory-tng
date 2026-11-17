@@ -53,6 +53,10 @@ keys, below).
   one, at signing in and to confirm; 10 unless set. Leave both unset in
   production: they are raised for the browser tests, which sign in and
   confirm many times over.
+- `RATE_LIMIT_PAGE_REPORTS`: reports the scan and register pages send of
+  themselves from one address in a minute; settings.py's default unless set
+  (`RateLimits`). Raise it where many pages share one address, such as
+  behind one network's NAT.
 - `LOG_FORMAT`: `json` for a log collector; the default is `console`.
 - `LOG_LEVEL`, `LOG_LEVELS`: `INFO` by default.
 - `LOG_CLIENT_ADDRESS`: `false` when the proxy logs client addresses itself.

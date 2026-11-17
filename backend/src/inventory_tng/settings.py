@@ -163,10 +163,13 @@ class RateLimits:
     the first administrator, recovery, and asking for or using a reset
     link, each counted apart (RATE_LIMIT_PER_ADDRESS). For one
     administrator, in 15 minutes: codes, or the password where it stands
-    in for one, at signing in and to confirm (RATE_LIMIT_PER_ACCOUNT)."""
+    in for one, at signing in and to confirm (RATE_LIMIT_PER_ACCOUNT).
+    And how many reports of themselves the pages may send from one
+    address in a minute (page_telemetry.py, RATE_LIMIT_PAGE_REPORTS)."""
 
     per_address: int = 10
     per_account: int = 10
+    page_reports: int = 30
 
     @classmethod
     def from_environ(cls, environ: Mapping[str, str] = os.environ) -> Self:
@@ -177,6 +180,13 @@ class RateLimits:
             ),
             per_account=_attempts(
                 environ, "RATE_LIMIT_PER_ACCOUNT", default.per_account
+            ),
+            page_reports=_whole_number(
+                environ,
+                "RATE_LIMIT_PAGE_REPORTS",
+                default.page_reports,
+                "reports",
+                MAX_ATTEMPTS,
             ),
         )
 

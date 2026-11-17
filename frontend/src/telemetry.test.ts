@@ -14,6 +14,7 @@ import {
   HOUR_MS,
   PATH,
   PER_HOUR,
+  PER_HOUR_IN_ALL,
   Telemetry,
 } from "./telemetry";
 
@@ -95,13 +96,40 @@ describe("reporting", () => {
     ]);
   });
 
-  test("a page sends 60 events an hour at most, 18 of them times to save", () => {
+  test("a page sends PER_HOUR's sum an hour at most, however many come", async () => {
+    const { telemetry, reports } = kept();
+    started(telemetry);
+    const each: Record<Event["kind"], Event> = {
+      web_vital: {
+        kind: "web_vital",
+        page: "scan",
+        name: "LCP",
+        value: 900,
+        rating: "good",
+      },
+      error: { kind: "error", page: "scan", source: "error" },
+      outbox_retry: RETRY,
+      scan_to_save: { kind: "scan_to_save", seconds: 30 },
+      out_of_date: { kind: "out_of_date", learned: "server" },
+      older_storage: { kind: "older_storage", held: "cart", action: "found" },
+      cart_discarded: { kind: "cart_discarded" },
+      difference_added: { kind: "difference_added", how: "tap" },
+    };
+    for (const event of Object.values(each)) {
+      for (let i = 0; i <= PER_HOUR_IN_ALL; i++) {
+        telemetry.record(event);
+      }
+    }
+    telemetry.flush();
+    expect((await Promise.all(reports)).flat()).toHaveLength(PER_HOUR_IN_ALL);
+  });
+
+  test("each kind's share is as decided", () => {
     // The build events (out_of_date, older_storage) were added beside
     // scan_to_save's 20 and web_vital's 10, not taken from them: a busy hub
     // tablet saves many, and a page loaded three times an hour reports each.
     // cart_discarded's four were added the same way; difference_added's two
     // were taken from scan_to_save (Ali, inventory-tng-0gg).
-    expect(Object.values(PER_HOUR).reduce((sum, n) => sum + n)).toBe(60);
     expect(PER_HOUR.scan_to_save).toBe(18);
     expect(PER_HOUR.difference_added).toBe(2);
     expect(PER_HOUR.web_vital).toBe(10);

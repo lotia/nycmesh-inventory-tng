@@ -1,15 +1,18 @@
 """POST /api/telemetry: what the scan and register pages report about
 themselves (page_telemetry.py, frontend/src/telemetry.ts)."""
 
+import dataclasses
 import re
 from collections.abc import Callable
 
 import pytest
+from fastapi import FastAPI
 from fastapi.testclient import TestClient
 from structlog.testing import capture_logs
 
 from inventory_tng import page_telemetry
 from inventory_tng.local_env import CLONE
+from inventory_tng.settings import RateLimits
 
 PATH = "/api/telemetry"
 RETRY = {"kind": "outbox_retry", "reason": "unavailable"}
@@ -74,11 +77,25 @@ def test_a_reports_errors_are_logged_once_without_anything_the_page_said(
 
 
 def test_reports_count_against_their_address(client: TestClient) -> None:
-    for _ in range(page_telemetry.REPORTS.amount):
+    for _ in range(RateLimits().page_reports):
         assert client.post(PATH, json={"events": [RETRY]}).status_code == 204
     refused = client.post(PATH, json={"events": [RETRY]})
     assert refused.status_code == 429
     assert refused.json() == {"reason": "rate_limited"}
+
+
+def test_the_limit_on_reports_is_a_setting(
+    make_app: Callable[..., FastAPI], make_client: Callable[..., TestClient]
+) -> None:
+    """RATE_LIMIT_PAGE_REPORTS, read as each report comes."""
+    app = make_app()
+    app.state.settings = dataclasses.replace(
+        app.state.settings, rate_limits=RateLimits(page_reports=3)
+    )
+    client = make_client(app)
+    for _ in range(3):
+        assert client.post(PATH, json={"events": [RETRY]}).status_code == 204
+    assert client.post(PATH, json={"events": [RETRY]}).status_code == 429
 
 
 @pytest.mark.clone

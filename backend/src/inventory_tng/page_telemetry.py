@@ -31,9 +31,6 @@ meter = metrics.get_meter(__name__)
 router = APIRouter()
 
 PATH = "/telemetry"
-# A page flushes at ten events and sends 60 an hour at most (telemetry.ts,
-# PER_HOUR); a few pages open at once on one network share an address.
-REPORTS = RateLimitItemPerMinute(30)
 MOST_EVENTS = 50
 
 Page = Literal["scan", "register"]
@@ -238,7 +235,12 @@ def record(event: AnyEvent) -> None:
 async def report(report: Report, request: Request) -> Response:
     """Record what a page reports about itself."""
     reports: MovingWindowRateLimiter = request.app.state.page_reports
-    if not reports.hit(REPORTS, "telemetry", rate_key(request)):
+    # A page flushes at ten events and sends 60 an hour at most (telemetry.ts,
+    # PER_HOUR); a few pages open at once on one network share an address.
+    allowed = RateLimitItemPerMinute(
+        request.app.state.settings.rate_limits.page_reports
+    )
+    if not reports.hit(allowed, "telemetry", rate_key(request)):
         log.info("page report refused", reason="rate_limited")
         body = RateLimitedReply(reason="rate_limited").model_dump()
         return JSONResponse(body, status_code=429)
