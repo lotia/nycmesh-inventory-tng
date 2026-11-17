@@ -1,15 +1,17 @@
 /**
  * Without scripts, the buttons that need them stay hidden, as the page's
  * script shows them (frontend/src/buttons.ts), and what they act on is
- * still shown: a code to print by hand, a link to copy by hand
- * (inventory-tng-vxxc). Hidden by the `hidden` attribute the script would
- * remove, not by a style. No script runs, so the policy watch (policy.ts)
+ * still shown: a code or labels to print by hand, a link to copy by hand
+ * (inventory-tng-vxxc, inventory-tng-f8kw). Hidden by the `hidden`
+ * attribute the script would remove, not by a style. No script runs, so the policy watch (policy.ts)
  * sees nothing here.
  */
 import { expect, type Page } from "@playwright/test";
 import { makeCode } from "./codes";
+import { printLabels } from "./labels";
 import { invite } from "./own";
 import { test } from "./policy";
+import { prepared } from "./prepared";
 
 test.use({ javaScriptEnabled: false });
 
@@ -33,6 +35,16 @@ test("a code's page offers no Print, and shows the code", async ({ page }) => {
   const phrase = page.locator(".key").first();
   await expect(phrase).toBeVisible();
   await expect(phrase).not.toBeEmpty();
+  await expect(page.getByLabel("US Letter")).toBeVisible();
+});
+
+test("a label page offers no Print, and shows the labels", async ({ page }) => {
+  await printLabels(page, 1);
+  await expectHiddenButton(page, "Print");
+  // On screen, the labels are a table of codes and names.
+  const label = page.getByRole("row").filter({ hasText: prepared().labelled });
+  await expect(label).toBeVisible();
+  await expect(label.locator(".key")).not.toBeEmpty();
   await expect(page.getByLabel("US Letter")).toBeVisible();
 });
 

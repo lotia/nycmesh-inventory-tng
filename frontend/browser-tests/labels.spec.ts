@@ -2,22 +2,10 @@
  * Labels print twelve to a page, cut apart or on sticker paper
  * (inventory-tng-8i4.16), on US Letter or A4.
  */
-import { expect, type Page } from "@playwright/test";
+import { expect } from "@playwright/test";
+import { printLabels } from "./labels";
 import { test } from "./policy";
 import { prepared } from "./prepared";
-
-/** Prints `copies` labels of the seed's labelled item, from its page. */
-async function printLabels(page: Page, copies: number): Promise<void> {
-  const { labelled } = prepared();
-  // Found by name: other tests add items, which may push it off a page.
-  await page.goto(`/admin/items?q=${encodeURIComponent(labelled)}`);
-  await page.getByRole("link", { name: labelled, exact: true }).click();
-  await page.getByLabel("Copies").fill(String(copies));
-  await page.getByRole("button", { name: "Print labels" }).click();
-  await expect(
-    page.getByRole("heading", { name: "Print labels" }),
-  ).toBeVisible();
-}
 
 /** How many pages a PDF has. */
 function pageCount(pdf: Buffer): number {
