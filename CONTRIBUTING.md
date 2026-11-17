@@ -200,15 +200,16 @@ container: `mise run compose -- exec app python -m inventory_tng.seed`.
 
 ### Migrations
 
-Until the first production deploy, a change may edit an existing migration
-instead of adding one, so the schema's history stays short. After a pull
+Until a test deployment holds people's data, a change may edit an existing
+migration instead of adding one, so the schema's history stays short
+(decision 0016). After a pull
 that does, your local database no longer matches its migrations: rebuild
 it, losing its data, with `mise run reset-dev-database -- <its name>`. It
 drops only this checkout's database, which you name to confirm, then makes
 and migrates it again, empty. Never rebuild with `mise run compose -- down
 --volumes`: that removes the stack's volume, with every database in it,
-and in `inventory-tng` every checkout's that shares it. Once production runs,
-a migration is never edited: add a new one.
+and in `inventory-tng` every checkout's that shares it. Once a test
+deployment holds people's data, a migration is never edited: add a new one.
 
 You can keep your data instead when the edited migration and every one
 after it only rewrite rows and have downgrades that do nothing. In
@@ -221,9 +222,9 @@ uv run alembic downgrade <revision> && uv run alembic upgrade head
 Migrations run as the owner, and every table they create gives the app
 `SELECT`, `INSERT`, `UPDATE` and `DELETE` (the initial migration's default
 privileges). A migration that creates a table the app must not change
-revokes what it must not do there, as the initial migration does for
-history, the ledger, columns set only as a row is made, and deleting a
-settings row.
+revokes what it must not do there, as the initial migration does for the
+tables the app only adds to, those it never deletes from, and columns set
+only as a row is made (`READ_AND_ADD`, `NEVER_DELETED` and `UPDATED_ONLY`).
 `tests/test_database_role.py` lists those columns, so a new column the app
 cannot change fails there until listed. What a migration writes is not in
 the history. Migrations create no trigger, function or view: the rules are

@@ -86,7 +86,10 @@ test("a <select> is refused nothing, and keeps its ellipsis", async ({
     page.locator(`#${id}`).screenshot({ caret: "initial" });
   expect((await drawn("ellipsis")).equals(await drawn("clip"))).toBe(false);
   // WebKit refuses a <style> Playwright adds to take a screenshot: that
-  // alone is let pass.
+  // alone is let pass. Each refusal reaches the test a task after it
+  // happens, so one more task in the page brings in the last screenshot's
+  // before they are cleared, never after, when the fixture would fail.
+  await page.evaluate(() => new Promise((resolve) => setTimeout(resolve)));
   const screenshots = /^style-src-elem refused inline \(#document\) /;
   expect(violations.filter((found) => !screenshots.test(found))).toEqual([]);
   violations.length = 0;

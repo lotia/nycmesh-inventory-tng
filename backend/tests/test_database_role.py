@@ -133,9 +133,9 @@ def test_the_app_may_not_delete_a_settings_row(session: Session, table: str) -> 
 # Columns the app may not change once a row is made (the initial
 # migration), so the rules that rely on them need no check: a label's code
 # and what it names, a package's item, a place's kind and volunteer, an open
-# package's key and what it was opened from, and all of an item's alias but
-# whether it is retired. Every other column of every other table is the
-# app's to change, but in the tables it only adds to.
+# package's key and what it was opened from, and an alias's item and name.
+# Every other column of every other table is the app's to change, but in
+# the tables it only adds to.
 FIXED = {
     "label": {"id", "created_at", "code", "item_id", "package_id", "location_id"},
     "item_package": {"id", "created_at", "item_id"},
