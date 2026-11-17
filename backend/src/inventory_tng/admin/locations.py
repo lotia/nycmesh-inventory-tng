@@ -10,7 +10,6 @@ from typing import Annotated
 import structlog
 from fastapi import APIRouter, Form, Request
 from fastapi.responses import HTMLResponse, Response
-from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from inventory_tng import locations
@@ -35,8 +34,9 @@ from inventory_tng.core.local_time import zone_at
 from inventory_tng.core.phrases import Words, lazy_gettext
 from inventory_tng.core.time_zones import zones
 from inventory_tng.labels import labels
-from inventory_tng.models import STORE_KINDS, Label, Location, Volunteer
+from inventory_tng.models import STORE_KINDS, Label, Location
 from inventory_tng.pages import not_found, redirect
+from inventory_tng.places import queries
 
 log = structlog.get_logger(__name__)
 
@@ -94,13 +94,7 @@ def _list_page(
 ) -> HTMLResponse:
     current = current_rows(session, Location)
     custody = [loc for loc in current if loc.kind == "custody"]
-    volunteers = dict(
-        session.execute(
-            select(Volunteer.id, Volunteer.name).where(
-                Volunteer.id.in_([loc.volunteer_id for loc in custody])
-            )
-        ).all()
-    )
+    volunteers = queries.volunteer_names(session, [loc.volunteer_id for loc in custody])
     return admin_page(
         request,
         signed,
@@ -111,11 +105,7 @@ def _list_page(
             "here": LOCATIONS,
             "tree": _tree([loc for loc in current if loc.kind != "custody"]),
             "custody": [(loc, volunteers.get(loc.volunteer_id, "")) for loc in custody],
-            "retired": session.scalars(
-                select(Location)
-                .where(Location.retired_at.is_not(None))
-                .order_by(func.lower(Location.name))
-            ).all(),
+            "retired": queries.retired_places(session),
             "kinds": KINDS,
             "parents": _parents(current),
             "problems": problems,
@@ -135,11 +125,7 @@ def _location_page(
     alert: Words | None = None,
     field: str = "name",
 ) -> HTMLResponse:
-    areas = session.scalars(
-        select(Location)
-        .where(Location.parent_id == location.id, Location.retired_at.is_(None))
-        .order_by(func.lower(Location.name))
-    ).all()
+    areas = queries.current_areas_of(session, location.id)
     return admin_page(
         request,
         signed,

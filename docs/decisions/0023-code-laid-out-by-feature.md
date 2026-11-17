@@ -104,3 +104,4 @@ short test. `core/` is the name FastAPI's full-stack template uses;
 | `admin/home.py`: its query | `catalogue/queries.py`: `current_count` |
 | `labels.py` | `labels/labels.py` |
 | `admin/labels.py`: its queries | `labels/queries.py` |
+| `admin/locations.py`: its queries | `places/queries.py` |
