@@ -33,25 +33,12 @@ from typing import Literal, NamedTuple, cast
 
 import structlog
 from opentelemetry import metrics
-from sqlalchemy import (
-    ColumnElement,
-    case,
-    func,
-    insert,
-    or_,
-    select,
-)
+from sqlalchemy import ColumnElement, case, func, insert, or_, select
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.orm import Session
 
 from inventory_tng import open_packages
-from inventory_tng.core.db import (
-    RuleBroken,
-    enforce,
-    exists_where,
-    get_locked,
-    locked,
-)
+from inventory_tng.core.db import RuleBroken, enforce, exists_where, get_locked, locked
 from inventory_tng.core.local_time import zone_at
 from inventory_tng.models import (
     Item,
