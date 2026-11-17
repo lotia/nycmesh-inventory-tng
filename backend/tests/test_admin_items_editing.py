@@ -14,9 +14,9 @@ from sqlalchemy.orm import Session
 from inventory_tng import items
 from inventory_tng.accounts import name_up_to
 from inventory_tng.admin.common import RULES
-from inventory_tng.admin.items import (
+from inventory_tng.admin.items import ITEMS
+from inventory_tng.catalogue.forms import (
     IS_RETIRED,
-    ITEMS,
     NO_LETTERS,
     PICK_A_CATEGORY,
     PICK_A_UNIT,

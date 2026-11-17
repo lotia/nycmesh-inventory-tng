@@ -13,7 +13,7 @@ from sqlalchemy.orm import Session
 from structlog.testing import capture_logs
 
 from inventory_tng import items, names, reading_rules, units
-from inventory_tng.admin.items import ITEMS, PACKAGE_TAKEN, SEARCHED, TAKEN_FIELDS
+from inventory_tng.admin.items import ITEMS, SEARCHED
 from inventory_tng.admin.listing import folded
 from inventory_tng.admin.reading_rules import (
     CHOOSE_ONE,
@@ -22,6 +22,7 @@ from inventory_tng.admin.reading_rules import (
     SEED,
 )
 from inventory_tng.admins import guards
+from inventory_tng.catalogue.forms import PACKAGE_TAKEN, TAKEN_FIELDS
 from inventory_tng.core.db import lock_catalogue
 from inventory_tng.models import (
     Admin,

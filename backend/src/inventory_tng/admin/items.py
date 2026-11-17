@@ -4,8 +4,7 @@ change it. A retired item with stock left may still be taken, never
 received (docs/decisions/0003)."""
 
 from collections.abc import Callable, Mapping, Sequence
-from dataclasses import dataclass, field
-from decimal import Decimal
+from dataclasses import dataclass
 from typing import Annotated, Literal
 
 import structlog
@@ -38,15 +37,14 @@ from inventory_tng.admin.listing import (
 )
 from inventory_tng.admin.reading_rules import READINGS
 from inventory_tng.admins.guards import AdminSignedIn, SignedIn
-from inventory_tng.catalogue import queries
+from inventory_tng.catalogue import forms, queries
 from inventory_tng.core.db import DbSession, exists_where, refusal
 from inventory_tng.core.local_time import site_zone
-from inventory_tng.core.phrases import Words, gettext, lazy_gettext
+from inventory_tng.core.phrases import Words, lazy_gettext
 from inventory_tng.labels import labels
 from inventory_tng.models import (
     INTEGER_MAX,
     UNITS,
-    Category,
     Item,
     ItemAlias,
     ItemPackage,
@@ -57,11 +55,10 @@ from inventory_tng.models import (
     whole,
 )
 from inventory_tng.models import reading_rules as rules_held
-from inventory_tng.names import nameless
 from inventory_tng.pages import NOTICES, not_found, redirect
-from inventory_tng.reading_rules import NOT_A_UNIT, chosen_rule, read_alike_words
+from inventory_tng.reading_rules import NOT_A_UNIT
 from inventory_tng.stock import queries as stock_queries
-from inventory_tng.web.forms import chosen, form_version, name_problem, quantity
+from inventory_tng.web.forms import form_version
 
 log = structlog.get_logger(__name__)
 meter = metrics.get_meter(__name__)
@@ -69,94 +66,14 @@ meter = metrics.get_meter(__name__)
 router = APIRouter(include_in_schema=False)
 
 ITEMS = f"{ADMIN}/items"
-TEXT_FIELDS = ("manufacturer", "part_number", "old_code", "notes", "ordering_notes")
-# Said when another item had what was asked for, but no longer does.
-TAKEN = lazy_gettext(
-    "Another item, perhaps a retired one, already has that name, that "
-    "manufacturer and part number, or that old code."
-)
-NO_LETTERS = lazy_gettext("A name needs at least one letter or number.")
-# A field saying how a unit after a number in a name is read, asked where
-# nothing settles it, or corrected ("Not right?"): this, then the unit as
-# typed (units.rule_key); its value is str(Reading), or
-# NOT_A_UNIT, or blank: as read. Kept as a reading rule
-# (reading_rules.decide), so it is asked once.
-READING = "unit:"
-ASK_UNIT = lazy_gettext("Say below whether it is a unit.")
-# The form's field holding the name an administrator was shown close names
-# for, and sent again: a different item's, so not asked about again.
-DIFFERENT = "different"
 # Refused by _change_or_note, as a rule would be, to ask about close names.
 CLOSE = "close_names"
-# What of another item is taken (items.taken_by), naming it.
-TAKEN_FIELDS: dict[str, Callable[[str], str]] = {
-    "name": lambda other: gettext(
-        "%(other)s already has that name, or one differing from it only in "
-        "case, spaces, punctuation or how its units are spelt.",
-        other=other,
-    ),
-    "part_number": lambda other: gettext(
-        "%(other)s already has that manufacturer and part number.", other=other
-    ),
-    "old_code": lambda other: gettext(
-        "%(other)s already has that old code.", other=other
-    ),
-    "alias": lambda other: gettext(
-        "%(other)s has that name, or one differing from it only in case, "
-        "spaces, punctuation or how its units are spelt, as an alias.",
-        other=other,
-    ),
-}
-# What of another item an alias would be (items.alias_taken_by), naming it.
-ALIAS_TAKEN: dict[str, Callable[[str], str]] = {
-    "name": TAKEN_FIELDS["name"],
-    "alias": lambda other: gettext(
-        "%(other)s already has that alias, or one differing from it only in "
-        "case, spaces, punctuation or how its units are spelt.",
-        other=other,
-    ),
-}
-# An alias an item has already, as its name or as an alias.
-ALIAS_ITS_OWN = {
-    "name": lazy_gettext("That is its name already."),
-    "alias": lazy_gettext("That is its alias already."),
-}
-# After another item is named as having what was asked for.
-IS_RETIRED = lazy_gettext("It is retired.")
-
-
-def _retired(other: Item, words: str) -> str:
-    """`words` naming `other`, saying so if it is retired."""
-    return f"{words} {IS_RETIRED}" if other.retired_at is not None else words
-
-
 # The rules a change to an item may break, besides "unique", and the field
 # each is shown by.
 REFUSED_FIELDS = {
     "item_category_current": "category_id",
     "item_unit_fixed": "unit",
 }
-
-
-def _taken(
-    session: Session, fields: items.Fields, typed: Typed, item_id: int | None
-) -> tuple[str, Words]:
-    """The field another item already has, its name's units read as the
-    form's answers say too, and words naming that item."""
-    found = items.taken_by(session, fields, item_id, typed.rules)
-    field, other = found or ("name", None)
-    # Beside the name, whose field "alias" is.
-    shown = "name" if field == "alias" else field
-    log.debug(
-        "item refused",
-        rule="unique",
-        field=field,
-        item_id=item_id,
-        other_item_id=other and other.id,
-    )
-    if other is None:
-        return shown, TAKEN
-    return shown, _retired(other, TAKEN_FIELDS[field](other.name_shown))
 
 
 class _AskFirst(Exception):
@@ -168,7 +85,7 @@ def _change_or_note[T](
     change: Callable[[], T],
     problems: dict[str, Words],
     fields: items.Fields,
-    typed: Typed,
+    typed: forms.Typed,
     item_id: int | None = None,
     *,
     asked: list[items.Close] | None = None,
@@ -207,37 +124,13 @@ def _change_or_note[T](
         log.debug("close names asked about", item_id=item_id, found=len(asked or ()))
         return None, CLOSE
     if broken in ("unique", items.NAME_IS_ALIAS):
-        field, words = _taken(session, fields, typed, item_id)
+        field, words = forms.taken(session, fields, typed, item_id)
         problems[field] = words
     elif broken == items.READ_ALIKE:
-        problems["name"] = _read_alike(session, typed)
+        problems["name"] = forms.read_alike(session, typed)
     elif broken in REFUSED_FIELDS:
         problems[REFUSED_FIELDS[broken]] = RULES[broken]
     return done, broken
-
-
-READ_AS_ONE = lazy_gettext(
-    "Read so, names would read as one. Try again, or answer otherwise."
-)
-
-
-def read_as_one(names: str) -> str:
-    """Names that answers would read alike, refused."""
-    return gettext(
-        "Read so, these names would read as one: %(names)s. Rename one of "
-        "each, or answer otherwise.",
-        names=names,
-    )
-
-
-def _read_alike(session: Session, typed: Typed) -> Words:
-    """Words for answers refused as they would read names alike, naming
-    them by id, the savepoint undone (items.read_alike)."""
-    words = read_alike_words(session, typed.answered, typed.rules)
-    log.debug("unit answer refused", read_alike=len(words))
-    if not words:  # Renamed meanwhile: none to name now.
-        return READ_AS_ONE
-    return read_as_one("; ".join(words))
 
 
 PACKAGE_ADDED = lazy_gettext("Package added.")
@@ -375,17 +268,17 @@ def _name_field(session: Session, similar: Sequence[items.Close]) -> dict[str, o
         return list(once.values())
 
     def shown_as(typed: str, sent: Mapping[str, str]) -> str | None:
-        read = _read(typed, rules, sent)
+        read = forms.read(typed, rules, sent)
         shown = units.shown_name(read.name, read.rules)
         return shown if shown != read.name else None
 
     return {
         "similar": similar,
         "items_path": ITEMS,
-        "different": DIFFERENT,
+        "different": forms.DIFFERENT,
         "units_read": units_read,
         "shown_as": shown_as,
-        "reading_field": READING,
+        "reading_field": forms.READING,
         "not_a_unit": NOT_A_UNIT,
     }
 
@@ -479,50 +372,8 @@ def _item_page(
     )
 
 
-@dataclass(frozen=True)
-class Typed:
-    """A name as it will be stored, the units in it still to ask about, the
-    answers and corrections given, to keep as reading rules, the rules it
-    is read by (those held, with the answers), and the rules the answers
-    wrote, once written."""
-
-    name: str
-    asked: list[units.Found]
-    answered: dict[str, units.Rule]
-    rules: units.Rules
-    decided: list[int] = field(default_factory=list)
-
-
-def _typed_name(session: Session, typed: str, form: Mapping[str, str]) -> Typed:
-    """An item's or a package's name as it will be stored: as typed, in
-    canonical spelling (models.CanonicalName), each unit respelt only where its
-    reading rule says (units.spell; Ali, 2026-11-15, inventory-tng-c0c.3); the
-    units still to ask about; and how `form` says a unit is read, where that is
-    new: an answer, or a correction of what it was read as."""
-    return _read(typed, rules_held(session), form)
-
-
-def _read(typed: str, rules: units.Rules, form: Mapping[str, str]) -> Typed:
-    """_typed_name, by the reading rules `rules`."""
-    name = canonical(typed.strip())
-    answered = {}
-    for found in units.found_in(name, rules):
-        rule = chosen_rule(form.get(READING + found.key, ""), found.offered)
-        if rule is None:
-            continue
-        current = None if found.read is None else str(found.read)
-        if found.asks or rule.reading != current:
-            # Corrected, a rule respelling it goes on doing so.
-            kept = found.rule is not None and found.rule.respell and rule.reading
-            answered[found.key] = units.Rule(rule.reading, bool(kept))
-    rules = {**rules, **answered}
-    found = units.found_in(name, rules)
-    asked = [each for each in found if each.asks]
-    return Typed(units.spell(name, found), asked, answered, rules)
-
-
 def _deciding[T](
-    session: Session, typed: Typed, signed: SignedIn, change: Callable[[], T]
+    session: Session, typed: forms.Typed, signed: SignedIn, change: Callable[[], T]
 ) -> Callable[[], T]:
     """`change`, after the answers it was asked keep as reading rules, in
     its savepoint: refused, it keeps neither."""
@@ -536,71 +387,10 @@ def _deciding[T](
     return deciding
 
 
-def _decided(typed: Typed, **ids: int) -> None:
+def _decided(typed: forms.Typed, **ids: int) -> None:
     """Log the reading rules a form wrote, once committed."""
     if typed.decided:
         log.info("reading rules set", reading_rule_ids=typed.decided, by="form", **ids)
-
-
-def _name_problem(
-    name: str, asked: Sequence[units.Found], item_id: int | None
-) -> Words | None:
-    """What is wrong with an item's or a package's name, compared as items'
-    are (names.name_key), or a unit in it to ask about."""
-    if problem := name_problem(name):
-        return problem
-    if nameless(name):
-        return NO_LETTERS
-    if asked:
-        log.debug("unit asked about", item_id=item_id, asked=len(asked))
-        return ASK_UNIT
-    return None
-
-
-PICK_A_CATEGORY = lazy_gettext("Pick a category.")
-PICK_A_UNIT = lazy_gettext("Pick a unit.")
-
-
-def _confirmed(session: Session, form: Mapping[str, str], fields: items.Fields) -> bool:
-    """Whether the name was sent before and asked about, then sent again
-    unchanged: a different item's, whatever is close."""
-    return _typed_name(session, form.get(DIFFERENT, ""), form).name == fields.name
-
-
-def _fields(
-    session: Session, form: Mapping[str, str], item_id: int | None = None
-) -> tuple[items.Fields | None, dict[str, Words], Typed]:
-    """What to set, unless something is wrong, what is, and the name as
-    typed."""
-    typed = _typed_name(session, form.get("name", ""), form)
-    name = typed.name
-    problems: dict[str, Words] = {}
-    if problem := _name_problem(name, typed.asked, item_id):
-        problems["name"] = problem
-    category = chosen(session, Category, form.get("category_id", ""))
-    if category is None:
-        problems["category_id"] = PICK_A_CATEGORY
-    unit = form.get("unit", "")
-    if unit not in UNITS:
-        problems["unit"] = PICK_A_UNIT
-    minimum = quantity(form.get("minimum", ""), positive=False)
-    if isinstance(minimum, str):
-        problems["minimum"] = minimum
-    # Each None or str here is a problem already; checked again for the types.
-    if problems or category is None or isinstance(minimum, str):
-        return None, problems, typed
-    texts = {field: form.get(field, "").strip() or None for field in TEXT_FIELDS}
-    fields = items.Fields(
-        name=name,
-        category_id=category.id,
-        unit=unit,
-        minimum=minimum,
-        # A box left unticked is not sent: so is the add form's, which has
-        # none, and a new item does not follow its opened packages.
-        track_opened=form.get("track_opened") == "on",
-        **texts,
-    )
-    return fields, problems, typed
 
 
 @router.get(ITEMS)
@@ -629,10 +419,10 @@ def suggest_items(
 def add_item(
     request: Request, signed: AdminSignedIn, session: DbSession, form: TextForm
 ) -> Response:
-    fields, problems, typed = _fields(session, form)
+    fields, problems, typed = forms.item_fields(session, form)
     item = None
     if fields is not None:
-        asked = None if _confirmed(session, form, fields) else []
+        asked = None if forms.confirmed(session, form, fields) else []
         adding = _deciding(session, typed, signed, lambda: items.add(session, fields))
         item, broken = _change_or_note(
             session, adding, problems, fields, typed, asked=asked
@@ -701,15 +491,11 @@ def save_item(
     found = session.get(Item, item_id)
     if found is None:
         return not_found()
-    fields, problems, typed = _fields(session, form, item_id)
+    fields, problems, typed = forms.item_fields(session, form, item_id)
     tracked, renamed = found.track_opened, None
     if fields is not None:
         seen = form_version(form.get("version", ""))
-        # Its own name, or a respelling of it, its units' too, asks
-        # nothing: it is the same; nor one of its aliases (_change_or_note).
-        same = items.Keys.of(session, fields.name, typed.rules).same(
-            found
-        ) or _confirmed(session, form, fields)
+        same = forms.same_name(session, found, form, fields, typed)
         asked = None if same else []
         saving = _deciding(
             session,
@@ -783,42 +569,8 @@ def _package(session: Session, item_id: int, package_id: int) -> ItemPackage | N
     return package if package is not None and package.item_id == item_id else None
 
 
-# A package refused as another of its item's, retired ones too, has its name.
-PACKAGE_TAKEN = lazy_gettext("It already has a package by that name.")
-SIZE_REQUIRED = lazy_gettext("How many of the item's unit it holds.")
-SHORTER_THAN_WHOLE = lazy_gettext("Shorter than a whole one, or blank.")
-WHOLE_PACKAGES = lazy_gettext("A whole number of packages, or blank.")
 # A size at or below its too-short length (models.ItemPackage).
 SHORT_UNDER_SIZE = "ck_item_package_short_below_under_size"
-
-
-def _package_fields(
-    item: Item,
-    name: str,
-    asked: Sequence[units.Found],
-    size: str,
-    *,
-    kept: Decimal | None = None,
-) -> tuple[Decimal | None, dict[str, Words]]:
-    """A package's size as typed, and what is wrong with its name or size:
-    its name compared as items' are, so it needs a letter or a digit, with
-    no unit in it `asked` about; its size whole, for an item counted each.
-    A blank size is `kept`, if given: a size fixed is not on the form, and
-    stays as it is, whatever its item's unit has become since."""
-    problems: dict[str, Words] = {}
-    if problem := _name_problem(name, asked, item.id):
-        problems["package_name"] = problem
-    if kept is not None and not size.strip():
-        return kept, problems
-    parsed = quantity(
-        size,
-        positive=True,
-        unit=item.unit,
-        required=SIZE_REQUIRED,
-    )
-    if isinstance(parsed, str):
-        problems["size"] = parsed
-    return (parsed if isinstance(parsed, Decimal) else None), problems
 
 
 @router.post(f"{ITEMS}/{{item_id}}/packages")
@@ -834,9 +586,9 @@ def add_package(
     found = session.get(Item, item_id)
     if found is None:
         return not_found()
-    typed = _typed_name(session, package_name, form)
+    typed = forms.typed_name(session, package_name, form)
     name = typed.name
-    parsed, problems = _package_fields(found, name, typed.asked, size)
+    parsed, problems = forms.package_fields(found, name, typed.asked, size)
     if parsed is not None and not problems:
         package, broken = refusal(
             session,
@@ -860,7 +612,9 @@ def add_package(
                 f"{ITEMS}/{item_id}", notice="package_added", section="packages"
             )
         problems["package_name"] = (
-            _read_alike(session, typed) if broken == items.READ_ALIKE else PACKAGE_TAKEN
+            forms.read_alike(session, typed)
+            if broken == items.READ_ALIKE
+            else forms.PACKAGE_TAKEN
         )
     # With the units chosen, if any: not a package's own form's (package_id).
     values = {**form, "package_name": name, "size": size}
@@ -884,9 +638,9 @@ def save_package(
     if package is None:
         return not_found()
     found = session.get_one(Item, item_id)
-    typed = _typed_name(session, package_name, form)
+    typed = forms.typed_name(session, package_name, form)
     name = typed.name
-    parsed, problems = _package_fields(
+    parsed, problems = forms.package_fields(
         found, name, typed.asked, size, kept=package.size
     )
     if parsed is not None and not problems:
@@ -917,9 +671,9 @@ def save_package(
                 f"{ITEMS}/{item_id}", notice="package_saved", section="packages"
             )
         if broken == "unique":
-            problems["package_name"] = PACKAGE_TAKEN
+            problems["package_name"] = forms.PACKAGE_TAKEN
         elif broken == items.READ_ALIKE:
-            problems["package_name"] = _read_alike(session, typed)
+            problems["package_name"] = forms.read_alike(session, typed)
         else:  # SHORT_UNDER_SIZE, the one other refusal it expects.
             problems["size"] = RULES[broken]
     # Beside the fields of the package it was sent for, with the units
@@ -1025,16 +779,10 @@ def package_settings(
     if package is None:
         return not_found()
     found = session.get_one(Item, item_id)
-    short = quantity(short_below, positive=True, unit=found.unit)
-    minimum = whole(minimum_sealed, 0, INTEGER_MAX) if minimum_sealed.strip() else None
-    problems = {}
-    if isinstance(short, str):
-        problems["short_below"] = short
-    elif short is not None and short >= package.size:
-        problems["short_below"] = SHORTER_THAN_WHOLE
-    if minimum_sealed.strip() and minimum is None:
-        problems["minimum_sealed"] = WHOLE_PACKAGES
-    if problems or isinstance(short, str):  # The second narrows the type.
+    short, minimum, problems = forms.package_settings_fields(
+        package, found.unit, short_below, minimum_sealed
+    )
+    if problems:
         # Beside the fields of the package it was sent for.
         values = {
             "package_id": str(package_id),
@@ -1059,7 +807,7 @@ def package_settings(
             "short_below": short_below,
             "minimum_sealed": minimum_sealed,
         }
-        problems = {"short_below": SHORTER_THAN_WHOLE}
+        problems = {"short_below": forms.SHORTER_THAN_WHOLE}
         return _item_page(
             request, session, signed, found, problems=problems, values=values
         )
@@ -1071,28 +819,6 @@ def package_settings(
         minimum_sealed=minimum,
     )
     return redirect(f"{ITEMS}/{item_id}", notice="package_settings", section="packages")
-
-
-def _alias_problem(
-    session: Session, item: Item, typed: Typed, broken: str | None
-) -> Words:
-    """Words for an alias refused (`broken`, logged) as an item's name or
-    another alias, its units read as the form's answers say too, naming
-    that item, or what is wrong with the name itself."""
-    found = items.alias_taken_by(session, typed.name, typed.rules)
-    whose, other = found or ("name", None)
-    log.debug(
-        "alias refused",
-        rule=broken,
-        item_id=item.id,
-        other_item_id=other and other.id,
-    )
-    # Its holder changed since, as the refusal let go of the lock: rare.
-    if other is None:
-        return TAKEN
-    if other.id == item.id:
-        return ALIAS_ITS_OWN[whose]
-    return _retired(other, ALIAS_TAKEN[whose](other.name_shown))
 
 
 @router.post(f"{ITEMS}/{{item_id}}/aliases")
@@ -1108,9 +834,9 @@ def add_alias(
     found = session.get(Item, item_id)
     if found is None:
         return not_found()
-    typed = _typed_name(session, alias_name, form)
+    typed = forms.typed_name(session, alias_name, form)
     name = typed.name
-    problem = _name_problem(name, typed.asked, item_id)
+    problem = forms.item_name_problem(name, typed.asked, item_id)
     if problem is None:
         alias, broken = refusal(
             session,
@@ -1132,9 +858,9 @@ def add_alias(
                 f"{ITEMS}/{item_id}", notice="alias_added", section="aliases"
             )
         problem = (
-            _read_alike(session, typed)
+            forms.read_alike(session, typed)
             if broken == items.READ_ALIKE
-            else _alias_problem(session, found, typed, broken)
+            else forms.alias_problem(session, found, typed, broken)
         )
     values = {**form, "alias_name": name}
     problems = {"alias_name": problem}

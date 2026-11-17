@@ -362,31 +362,31 @@ msgstr[1] ""
 msgid "%(num)s × %(package)s"
 msgstr ""
 
-#: src/inventory_tng/admin/items.py
+#: src/inventory_tng/catalogue/forms.py
 #, python-format
 msgid ""
 "%(other)s already has that alias, or one differing from it only in case, "
 "spaces, punctuation or how its units are spelt."
 msgstr ""
 
-#: src/inventory_tng/admin/items.py
+#: src/inventory_tng/catalogue/forms.py
 #, python-format
 msgid "%(other)s already has that manufacturer and part number."
 msgstr ""
 
-#: src/inventory_tng/admin/items.py
+#: src/inventory_tng/catalogue/forms.py
 #, python-format
 msgid ""
 "%(other)s already has that name, or one differing from it only in case, "
 "spaces, punctuation or how its units are spelt."
 msgstr ""
 
-#: src/inventory_tng/admin/items.py
+#: src/inventory_tng/catalogue/forms.py
 #, python-format
 msgid "%(other)s already has that old code."
 msgstr ""
 
-#: src/inventory_tng/admin/items.py
+#: src/inventory_tng/catalogue/forms.py
 #, python-format
 msgid ""
 "%(other)s has that name, or one differing from it only in case, spaces, "
@@ -656,7 +656,7 @@ msgstr ""
 msgid "A link for %(username)s"
 msgstr ""
 
-#: src/inventory_tng/admin/items.py
+#: src/inventory_tng/catalogue/forms.py
 msgid "A name needs at least one letter or number."
 msgstr ""
 
@@ -689,7 +689,7 @@ msgstr ""
 msgid "A whole number of minutes, from %(low)d to %(high)d."
 msgstr ""
 
-#: src/inventory_tng/admin/items.py
+#: src/inventory_tng/catalogue/forms.py
 msgid "A whole number of packages, or blank."
 msgstr ""
 
@@ -956,7 +956,7 @@ msgstr ""
 msgid "Another current volunteer already has that name or email."
 msgstr ""
 
-#: src/inventory_tng/admin/items.py
+#: src/inventory_tng/catalogue/forms.py
 msgid ""
 "Another item, perhaps a retired one, already has that name, that "
 "manufacturer and part number, or that old code."
@@ -1616,7 +1616,7 @@ msgid ""
 "corrected here."
 msgstr ""
 
-#: src/inventory_tng/admin/items.py
+#: src/inventory_tng/catalogue/forms.py
 msgid "How many of the item's unit it holds."
 msgstr ""
 
@@ -1715,7 +1715,7 @@ msgid ""
 "code typed within"
 msgstr ""
 
-#: src/inventory_tng/admin/items.py
+#: src/inventory_tng/catalogue/forms.py
 msgid "It already has a package by that name."
 msgstr ""
 
@@ -1742,7 +1742,7 @@ msgid ""
 "register again with a new code. You'll be asked first."
 msgstr ""
 
-#: src/inventory_tng/admin/items.py
+#: src/inventory_tng/catalogue/forms.py
 msgid "It is retired."
 msgstr ""
 
@@ -2577,7 +2577,7 @@ msgstr ""
 msgid "Pick %(item)s, %(package)s, at %(place)s"
 msgstr ""
 
-#: src/inventory_tng/admin/items.py
+#: src/inventory_tng/catalogue/forms.py
 msgid "Pick a category."
 msgstr ""
 
@@ -2593,7 +2593,7 @@ msgstr ""
 msgid "Pick a reason."
 msgstr ""
 
-#: src/inventory_tng/admin/items.py
+#: src/inventory_tng/catalogue/forms.py
 msgid "Pick a unit."
 msgstr ""
 
@@ -2741,11 +2741,11 @@ msgstr ""
 msgid "Read as %(read)s · %(kind)s."
 msgstr ""
 
-#: src/inventory_tng/admin/items.py
+#: src/inventory_tng/catalogue/forms.py
 msgid "Read so, names would read as one. Try again, or answer otherwise."
 msgstr ""
 
-#: src/inventory_tng/admin/items.py
+#: src/inventory_tng/catalogue/forms.py
 #, python-format
 msgid ""
 "Read so, these names would read as one: %(names)s. Rename one of each, or"
@@ -3205,7 +3205,7 @@ msgstr ""
 msgid "Saved: when an open one is a short end, and how many sealed to keep."
 msgstr ""
 
-#: src/inventory_tng/admin/items.py
+#: src/inventory_tng/catalogue/forms.py
 msgid "Say below whether it is a unit."
 msgstr ""
 
@@ -3331,7 +3331,7 @@ msgstr ""
 msgid "Setup token"
 msgstr ""
 
-#: src/inventory_tng/admin/items.py
+#: src/inventory_tng/catalogue/forms.py
 msgid "Shorter than a whole one, or blank."
 msgstr ""
 
@@ -3582,11 +3582,11 @@ msgid ""
 " it."
 msgstr ""
 
-#: src/inventory_tng/admin/items.py
+#: src/inventory_tng/catalogue/forms.py
 msgid "That is its alias already."
 msgstr ""
 
-#: src/inventory_tng/admin/items.py
+#: src/inventory_tng/catalogue/forms.py
 msgid "That is its name already."
 msgstr ""
 

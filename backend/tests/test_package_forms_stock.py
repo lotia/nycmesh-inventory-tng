@@ -10,9 +10,8 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from inventory_tng import open_packages
-from inventory_tng.admin import items as items_page
 from inventory_tng.admin import stock
-from inventory_tng.admin.items import SHORTER_THAN_WHOLE
+from inventory_tng.catalogue.forms import SHORTER_THAN_WHOLE, WHOLE_PACKAGES
 from inventory_tng.ledger import Entry, Form
 from inventory_tng.models import Item, ItemPackage
 from inventory_tng.stock import balance
@@ -119,7 +118,7 @@ def test_a_packages_settings_are_set_on_its_items_page(
     for bad, words in (
         ({"short_below": "-1"}, None),
         ({"short_below": "305"}, SHORTER_THAN_WHOLE),
-        ({"minimum_sealed": "lots"}, items_page.WHOLE_PACKAGES),
+        ({"minimum_sealed": "lots"}, WHOLE_PACKAGES),
     ):
         refused = admin_client.post(path, data=bad)
         assert refused.status_code == 400

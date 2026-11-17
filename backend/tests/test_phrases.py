@@ -31,13 +31,13 @@ from inventory_tng import (
 from inventory_tng.admin import admins as admin_admins
 from inventory_tng.admin import common, counts, length_checks, stock, used_up
 from inventory_tng.admin import devices as admin_devices
-from inventory_tng.admin import items as admin_items
 from inventory_tng.admin import over_recorded as admin_over_recorded
 from inventory_tng.admin import reading_rules as admin_reading_rules
 from inventory_tng.admin import settings as admin_settings
 from inventory_tng.admin import volunteers as admin_volunteers
 from inventory_tng.admin.listing import Lapsed
 from inventory_tng.admins import guards
+from inventory_tng.catalogue import forms as catalogue_forms
 from inventory_tng.core import mail
 from inventory_tng.core.phrases import (
     BRAND,
@@ -154,10 +154,13 @@ SAID_WITH_VALUES: list[Callable[[], Words]] = [
     ),
     *(
         lambda said=said: said(NOT_ENGLISH)
-        for said in admin_items.TAKEN_FIELDS.values()
+        for said in catalogue_forms.TAKEN_FIELDS.values()
     ),
-    *(lambda said=said: said(NOT_ENGLISH) for said in admin_items.ALIAS_TAKEN.values()),
-    lambda: admin_items.read_as_one(NOT_ENGLISH),
+    *(
+        lambda said=said: said(NOT_ENGLISH)
+        for said in catalogue_forms.ALIAS_TAKEN.values()
+    ),
+    lambda: catalogue_forms.read_as_one(NOT_ENGLISH),
     *(lambda said=said: said(1, NOT_ENGLISH) for said in reading_rules.NAMED.values()),
     lambda: reading_rules.both(NOT_ENGLISH, NOT_ENGLISH),
     lambda: reading_rules.near(NOT_ENGLISH),

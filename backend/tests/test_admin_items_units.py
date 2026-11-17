@@ -11,9 +11,9 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from inventory_tng import items
-from inventory_tng.admin.items import (
+from inventory_tng.admin.items import ITEMS
+from inventory_tng.catalogue.forms import (
     ASK_UNIT,
-    ITEMS,
     READ_AS_ONE,
     TAKEN_FIELDS,
     read_as_one,

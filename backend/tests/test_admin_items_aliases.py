@@ -11,12 +11,11 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from inventory_tng import items
-from inventory_tng.admin.items import (
+from inventory_tng.admin.items import ITEMS, RENAMED
+from inventory_tng.catalogue.forms import (
     ALIAS_ITS_OWN,
     ALIAS_TAKEN,
-    ITEMS,
     NO_LETTERS,
-    RENAMED,
     TAKEN,
     TAKEN_FIELDS,
 )
