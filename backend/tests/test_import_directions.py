@@ -295,19 +295,21 @@ def is_rules(path: str) -> bool:
     return path in OWNERS or path in RULES or Path(path).name == "queries.py"
 
 
+def _called(node: ast.AST) -> str | None:
+    """The name a call calls, bare or as a method: f(...) or x.f(...)."""
+    match node:
+        case ast.Call(func=ast.Name(id=name) | ast.Attribute(attr=name)):
+            return name
+    return None
+
+
 def is_routes(tree: ast.Module, path: str) -> bool:
     """A module of routes: named for them, or making an APIRouter."""
     name = path.split("/")[-1]
     return (
         name in ROUTE_NAMES
         or name.endswith(("_routes.py", "_api.py"))
-        or any(
-            isinstance(node, ast.Call)
-            and isinstance(node.func, ast.Name | ast.Attribute)
-            and getattr(node.func, "id", getattr(node.func, "attr", None))
-            == "APIRouter"
-            for node in ast.walk(tree)
-        )
+        or any(_called(node) == "APIRouter" for node in ast.walk(tree))
     )
 
 
@@ -367,13 +369,7 @@ def routes_run_queries(
     for statement in tree.body:
         name = getattr(statement, "name", "<module>")
         for node in ast.walk(statement):
-            if isinstance(node, ast.Call) and (
-                (isinstance(node.func, ast.Name) and node.func.id == "select")
-                or (
-                    isinstance(node.func, ast.Attribute)
-                    and node.func.attr in QUERY_CALLS
-                )
-            ):
+            if _called(node) in QUERY_CALLS:
                 found[name] += 1
     return [f"{name}: {count}" for name, count in sorted(found.items())]
 
@@ -396,12 +392,7 @@ def init_not_empty(tree: ast.Module, path: str, _known: Collection[str]) -> list
     if not path.endswith("__init__.py"):
         return []
     body = tree.body
-    if (
-        body
-        and isinstance(body[0], ast.Expr)
-        and isinstance(body[0].value, ast.Constant)
-        and isinstance(body[0].value.value, str)
-    ):
+    if ast.get_docstring(tree, clean=False) is not None:
         body = body[1:]
     return sorted({type(statement).__name__ for statement in body})
 
@@ -442,6 +433,17 @@ def found(check: Check) -> dict[str, list[str]]:
     }
 
 
+def _left_out(
+    these: dict[str, list[str]], those: dict[str, list[str]]
+) -> dict[str, list[str]]:
+    """The breaks in `these` that `those` does not have, by module."""
+    return {
+        path: missing
+        for path, what in these.items()
+        if (missing := [w for w in what if w not in those.get(path, [])])
+    }
+
+
 @pytest.mark.parametrize("rule", CHECKS)
 def test_the_app_breaks_no_import_rule_but_those_listed(rule: str) -> None:
     now = found(CHECKS[rule])
@@ -455,17 +457,6 @@ def test_the_app_breaks_no_import_rule_but_those_listed(rule: str) -> None:
         f"{rule} (docs/decisions/0023): put right what is new, not in BREAKS, "
         f"and take out of BREAKS what is fixed. New: {new}. Fixed: {fixed}."
     )
-
-
-def _left_out(
-    these: dict[str, list[str]], those: dict[str, list[str]]
-) -> dict[str, list[str]]:
-    """The breaks in `these` that `those` does not have, by module."""
-    return {
-        path: missing
-        for path, what in these.items()
-        if (missing := [w for w in what if w not in those.get(path, [])])
-    }
 
 
 def test_breaks_are_compared_one_by_one() -> None:
