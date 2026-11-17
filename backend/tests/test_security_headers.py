@@ -160,12 +160,10 @@ def test_the_one_style_attribute_allowed_is_webkits_for_a_select(
     """WebKit bug 327212: Safari 27.2 checks a <select>'s own style against
     the page's policy. Its hash, checked here against the text, allows that
     style alone (docs/decisions/0010)."""
-    unsafe_hashes, allowed = directives(built.get("/scan"))["style-src-attr"]
-    assert unsafe_hashes == "'unsafe-hashes'"
-    hashed = re.fullmatch(r"'sha256-([A-Za-z0-9+/=]+)'", allowed)
-    assert hashed
     digest = hashlib.sha256(b"text-overflow:inherit").digest()
-    assert base64.b64decode(hashed.group(1)) == digest
+    hashed = f"'sha256-{base64.b64encode(digest).decode()}'"
+    allowed = directives(built.get("/scan"))["style-src-attr"]
+    assert allowed == ["'unsafe-hashes'", hashed]
 
 
 @pytest.fixture

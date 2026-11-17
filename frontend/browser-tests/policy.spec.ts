@@ -48,59 +48,46 @@ test("a <select> is refused nothing, and keeps its ellipsis", async ({
   });
   // The scan page has selects of its own too.
   await page.goto("/scan");
-  // What the policy refuses, by id, until a style attribute of ours is:
   // Safari 27.2 refuses its own style for a <select> as each is made
   // (WebKit bug 327212, fixed in Playwright 1.65's WebKit), unless the
   // policy allows it by its hash (security_headers.py). A page's own
   // attribute of the same text is allowed with it.
-  const refused = await page.evaluate(
-    () =>
-      new Promise<string[]>((resolve) => {
-        const seen: string[] = [];
-        document.addEventListener(
-          "securitypolicyviolation",
-          (event) => {
-            const { id } = event.target as Element;
-            seen.push(id);
-            if (id === "ours") resolve(seen);
-          },
-          true,
-        );
-        // Two selects, cut short by an ellipsis or not, set by script,
-        // which the policy allows.
-        for (const textOverflow of ["ellipsis", "clip"]) {
-          const select = document.createElement("select");
-          select.id = textOverflow;
-          select.style.width = "6em";
-          select.style.textOverflow = textOverflow;
-          select.append(new Option("An option too long for its select"));
-          document.body.prepend(select);
-        }
-        const same = document.createElement("p");
-        same.id = "same";
-        same.setAttribute("style", "text-overflow:inherit");
-        const ours = document.createElement("p");
-        ours.id = "ours";
-        ours.setAttribute("style", "color: red");
-        document.body.append(same, ours);
-      }),
-  );
-  expect(refused).toEqual(["ours"]);
+  await page.evaluate(() => {
+    // Two selects, cut short by an ellipsis or not, set by script, which
+    // the policy allows.
+    for (const textOverflow of ["ellipsis", "clip"]) {
+      const select = document.createElement("select");
+      select.id = textOverflow;
+      select.style.width = "6em";
+      select.style.textOverflow = textOverflow;
+      select.append(new Option("An option too long for its select"));
+      document.body.prepend(select);
+    }
+    const same = document.createElement("span");
+    same.setAttribute("style", "text-overflow:inherit");
+    const ours = document.createElement("p");
+    ours.setAttribute("style", "color: red");
+    document.body.append(same, ours);
+  });
+  // Caught: this test's own <p>, made on purpose, and nothing else, as
+  // the browser says each in the order the elements were made.
+  await expect
+    .poll(() => violations)
+    .toEqual([expect.stringMatching(/^style-src-attr refused inline \(P\) /)]);
+  violations.length = 0;
   // WebKit reports ours alone; Chromium sends its reports by the Reporting
   // API, over HTTPS only.
   await expect
     .poll(() => reports.length)
     .toBe(browserName === "webkit" ? 1 : 0);
-  // Caught: this test's own, made on purpose, and nothing else.
-  await expect
-    .poll(() => violations)
-    .toEqual([expect.stringMatching(/^style-src-attr refused inline \(P\) /)]);
-  violations.length = 0;
   // Refused, WebKit's style takes the select's text-overflow with it.
   // Not hiding the caret, which Playwright does by a <style> of its own.
   const drawn = (id: string) =>
     page.locator(`#${id}`).screenshot({ caret: "initial" });
   expect((await drawn("ellipsis")).equals(await drawn("clip"))).toBe(false);
-  // WebKit refuses a <style> Playwright adds to take a screenshot anyway.
+  // WebKit refuses a <style> Playwright adds to take a screenshot: that
+  // alone is let pass.
+  const screenshots = /^style-src-elem refused inline \(#document\) /;
+  expect(violations.filter((found) => !screenshots.test(found))).toEqual([]);
   violations.length = 0;
 });
