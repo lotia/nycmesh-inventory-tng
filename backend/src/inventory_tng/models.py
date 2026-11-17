@@ -72,9 +72,10 @@ from sqlalchemy.orm import (
     validates,
 )
 
+from inventory_tng import names, units
+
 # Imported for its flush listeners: whatever can write these tables records
 # their history.
-from inventory_tng import names, units
 from inventory_tng.core import history  # noqa: F401
 from inventory_tng.core.db import (
     ACTOR_PATTERN,
