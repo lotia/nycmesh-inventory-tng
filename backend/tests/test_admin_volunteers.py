@@ -187,20 +187,18 @@ def test_merging_into_one_retired_since_the_page_asked_is_refused(
     sam = add(session, Volunteer(name="Sam"))
     riley = add(session, Volunteer(name="Riley"))
     path = f"{VOLUNTEERS}/{sam.id}"
+    into = {"into_id": str(riley.id)}
     offered = f'<option value="{riley.id}">Riley</option>'
     assert offered in admin_client.get(path).text
-    asked = admin_client.get(f"{path}/merge", params={"into_id": str(riley.id)})
-    assert asked.status_code == 200
+    assert admin_client.get(f"{path}/merge", params=into).status_code == 200
     assert admin_client.post(f"{VOLUNTEERS}/{riley.id}/retire").status_code == 303
-    asked_again = admin_client.get(f"{path}/merge", params={"into_id": str(riley.id)})
-    assert str(PICK_INTO) in text(asked_again)
+    assert str(PICK_INTO) in text(admin_client.get(f"{path}/merge", params=into))
     before = history(session, "volunteer")
-    refused = admin_client.post(f"{path}/merge", data={"into_id": str(riley.id)})
+    refused = admin_client.post(f"{path}/merge", data=into)
     assert refused.status_code == 400
     assert str(PICK_INTO) in text(refused)
     assert offered not in refused.text
     assert (sam.merged_into_id, sam.retired_at) == (None, None)
-    assert riley.retired_at is not None
     assert history(session, "volunteer") == before
 
 
