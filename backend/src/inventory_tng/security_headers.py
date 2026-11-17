@@ -39,7 +39,7 @@ from starlette.types import ASGIApp, Message, Receive, Scope, Send
 
 from inventory_tng import page_telemetry
 from inventory_tng.core.phrases import BRAND
-from inventory_tng.devices import RateLimitedReply
+from inventory_tng.devices.devices import RateLimitedReply
 from inventory_tng.pages import NONCE, csp_nonce
 
 log = structlog.get_logger(__name__)

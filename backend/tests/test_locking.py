@@ -21,7 +21,6 @@ from fastapi.testclient import TestClient
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from inventory_tng import devices
 from inventory_tng.admin.categories import CATEGORIES
 from inventory_tng.admin.items import ITEMS
 from inventory_tng.admin.locations import LOCATIONS
@@ -32,6 +31,7 @@ from inventory_tng.core.db import (
     get_locked,
     locked,
 )
+from inventory_tng.devices import devices
 from inventory_tng.models import (
     AdjustmentReason,
     Category,

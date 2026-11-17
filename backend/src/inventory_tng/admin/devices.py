@@ -16,7 +16,6 @@ from fastapi.responses import HTMLResponse, Response
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
-from inventory_tng import devices
 from inventory_tng.accounts import qr_svg
 from inventory_tng.admin.common import (
     ADMIN,
@@ -50,6 +49,7 @@ from inventory_tng.core.phrases import (
     lazy_pgettext,
     ngettext,
 )
+from inventory_tng.devices import devices
 from inventory_tng.models import Device, RegistrationCode, whole
 from inventory_tng.once import OnceKey, sent_before
 from inventory_tng.pages import NOTICES, not_found, redirect

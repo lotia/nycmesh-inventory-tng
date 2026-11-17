@@ -9,7 +9,7 @@ from opentelemetry import metrics
 
 from inventory_tng import open_packages, over_recorded, page_builds
 from inventory_tng.core.db import DbSession, set_actor
-from inventory_tng.devices import DeviceRefusedReply, RegisteredDevice
+from inventory_tng.devices.devices import DeviceRefusedReply, RegisteredDevice
 from inventory_tng.ledger import BatchRefused, KeyReused, record
 from inventory_tng.page_builds import BuildTooOldReply
 from inventory_tng.scan.batch_schemas import (

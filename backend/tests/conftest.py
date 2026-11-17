@@ -19,7 +19,7 @@ from sqlalchemy import Engine, TextClause, delete, event, exc, make_url, text
 from sqlalchemy.engine.interfaces import DBAPIConnection
 from sqlalchemy.orm import Session
 
-from inventory_tng import accounts, devices
+from inventory_tng import accounts
 from inventory_tng.core import db, local_env
 from inventory_tng.core.database_role import refusals
 from inventory_tng.core.db import (
@@ -31,6 +31,7 @@ from inventory_tng.core.db import (
 from inventory_tng.core.history import LEDGER
 from inventory_tng.core.logs import configure_structlog
 from inventory_tng.core.settings import FrontendConfig, LogConfig, RateLimits
+from inventory_tng.devices import devices
 from inventory_tng.models import Category, ItemPackage, RateLimit
 
 from databases import (

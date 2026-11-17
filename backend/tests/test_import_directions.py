@@ -64,7 +64,7 @@ type Check = Callable[[ast.Module, str, Collection[str]], list[str]]
 BREAKS: dict[str, dict[str, list[str]]] = {
     "core_imports_a_feature": {},
     "rules_import_fastapi_or_web": {
-        "devices.py": ["fastapi", "web/browser.py"],
+        "devices/devices.py": ["fastapi", "web/browser.py"],
         "once.py": ["fastapi", "pages.py", "starlette"],
     },
     "routes_run_queries": {
@@ -105,7 +105,7 @@ BREAKS: dict[str, dict[str, list[str]]] = {
         "admin/used_up.py": ["_answer: 2"],
         "admin/volunteers.py": ["_list_page: 4", "_volunteer_page: 2"],
         "catalogue.py": ["catalogue: 12", "open_to_take: 2", "saved_of: 2"],
-        "devices.py": [
+        "devices/devices.py": [
             "_current_among: 1",
             "_usable_code: 2",
             "current_among: 1",
@@ -136,7 +136,7 @@ BREAKS: dict[str, dict[str, list[str]]] = {
             "admin/volunteers.py",
         ],
         "admin/counts.py": ["admin/items.py", "admin/settings.py"],
-        "admin/devices.py": ["devices.py"],
+        "admin/devices.py": ["devices/devices.py"],
         "admin/home.py": [
             "admin/categories.py",
             "admin/counts.py",
@@ -154,10 +154,10 @@ BREAKS: dict[str, dict[str, list[str]]] = {
         ],
         "admin/stock.py": ["admin/counts.py", "admin/items.py"],
         "admin/used_up.py": ["admin/items.py", "admin/stock.py"],
-        "catalogue.py": ["devices.py"],
-        "page_telemetry.py": ["devices.py"],
-        "scan/batch_api.py": ["devices.py"],
-        "security_headers.py": ["devices.py", "page_telemetry.py"],
+        "catalogue.py": ["devices/devices.py"],
+        "page_telemetry.py": ["devices/devices.py"],
+        "scan/batch_api.py": ["devices/devices.py"],
+        "security_headers.py": ["devices/devices.py", "page_telemetry.py"],
     },
     "init_not_empty": {
         "admin/__init__.py": ["Assign", "For", "ImportFrom"],

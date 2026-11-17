@@ -14,11 +14,12 @@ from fastapi.testclient import TestClient
 from sqlalchemy import Engine, select, update
 from sqlalchemy.orm import Session
 
-from inventory_tng import devices, registration_codes
+from inventory_tng import registration_codes
 from inventory_tng.core.db import Database, get_locked
 from inventory_tng.core.logs import configure_logging
 from inventory_tng.core.settings import LogConfig, Settings
-from inventory_tng.devices import COOKIE, RegisteredDevice, RegistrationRejected
+from inventory_tng.devices import devices
+from inventory_tng.devices.devices import COOKIE, RegisteredDevice, RegistrationRejected
 from inventory_tng.models import CatalogueHistory, Device, RegistrationCode
 
 from helpers.concurrency import Committed

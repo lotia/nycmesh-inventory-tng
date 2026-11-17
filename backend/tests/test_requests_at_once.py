@@ -34,7 +34,6 @@ from inventory_tng import (
     accounts,
     adjustment_reasons,
     categories,
-    devices,
     items,
     locations,
     open_packages,
@@ -59,6 +58,7 @@ from inventory_tng.core.db import (
 )
 from inventory_tng.core.mail import Message, Notify
 from inventory_tng.core.settings import RateLimits
+from inventory_tng.devices import devices
 from inventory_tng.ledger import (
     BatchRefused,
     Entry,

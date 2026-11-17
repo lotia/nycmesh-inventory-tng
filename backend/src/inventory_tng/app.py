@@ -15,7 +15,6 @@ from inventory_tng import (
     admin,
     bundle,
     catalogue,
-    devices,
     health,
     page_builds,
     page_telemetry,
@@ -31,6 +30,7 @@ from inventory_tng.core.phrases import BRAND
 from inventory_tng.core.request_logging import RequestLogging
 from inventory_tng.core.settings import Settings
 from inventory_tng.cross_site import CrossSiteRefusal
+from inventory_tng.devices import devices
 from inventory_tng.scan import batch_api
 from inventory_tng.totp_keys import TotpKeys
 

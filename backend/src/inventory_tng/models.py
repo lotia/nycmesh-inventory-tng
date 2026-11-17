@@ -1006,7 +1006,7 @@ class RegistrationCode(Base):
     __table_args__ = (
         CheckConstraint("max_uses > 0", name="max_uses"),
         CheckConstraint("uses BETWEEN 0 AND max_uses", name="uses"),
-        protection(owner="devices.py", lock="row", history=True),
+        protection(owner="devices/devices.py", lock="row", history=True),
     )
 
     id: Mapped[IntId]
@@ -1033,7 +1033,7 @@ class Device(Versioned, Base):
     beside the volunteer picked. Only the cookie's hash is kept."""
 
     __tablename__ = "device"
-    __table_args__ = (protection(owner="devices.py", lock="row", history=True),)
+    __table_args__ = (protection(owner="devices/devices.py", lock="row", history=True),)
 
     id: Mapped[IntId]
     created_at: Mapped[CreatedAt]

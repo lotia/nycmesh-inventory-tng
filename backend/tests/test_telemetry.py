@@ -25,7 +25,6 @@ from structlog.testing import capture_logs
 
 from inventory_tng import (
     accounts,
-    devices,
     labels,
     ledger,
     open_packages,
@@ -42,7 +41,8 @@ from inventory_tng.core.db import NoSession, RuleBroken
 from inventory_tng.core.masking import MASK, Masker
 from inventory_tng.core.settings import RateLimits, Settings
 from inventory_tng.core.telemetry import Telemetry, enabled
-from inventory_tng.devices import RegisteredDevice
+from inventory_tng.devices import devices
+from inventory_tng.devices.devices import RegisteredDevice
 from inventory_tng.models import (
     Category,
     Device,

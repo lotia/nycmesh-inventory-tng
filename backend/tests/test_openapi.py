@@ -4,7 +4,8 @@ from typing import Any, get_args
 
 import pytest
 
-from inventory_tng import devices, openapi
+from inventory_tng import openapi
+from inventory_tng.devices import devices
 from inventory_tng.scan import batch_schemas
 
 

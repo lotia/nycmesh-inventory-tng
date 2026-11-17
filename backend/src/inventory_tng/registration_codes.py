@@ -19,10 +19,10 @@ from urllib.parse import urlencode
 import segno
 from sqlalchemy.orm import Session
 
-from inventory_tng import devices
 from inventory_tng.core.command import run_command
 from inventory_tng.core.db import CLI_ACTOR, set_actor
 from inventory_tng.core.local_time import show, site_zone
+from inventory_tng.devices import devices
 
 
 def main(argv: Sequence[str] | None = None) -> int:

@@ -21,7 +21,6 @@ import pytest
 from sqlalchemy import Executable, delete, exc, text, update
 from sqlalchemy.orm import Session
 
-from inventory_tng import devices
 from inventory_tng.core.db import Base, Flag, set_actor
 from inventory_tng.core.history import (
     Change,
@@ -29,6 +28,7 @@ from inventory_tng.core.history import (
     has_history,
     json_value,
 )
+from inventory_tng.devices import devices
 from inventory_tng.models import (
     Admin,
     AdminPassword,

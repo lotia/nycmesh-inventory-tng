@@ -27,14 +27,15 @@ from opentelemetry import metrics
 from sqlalchemy import ColumnElement, exists, func, or_, select, text, update
 from sqlalchemy.orm import Session
 
-from inventory_tng import activity, devices
+from inventory_tng import activity
 from inventory_tng.core import mail
 from inventory_tng.core.db import exists_where, get_locked, locked, set_actor, unique
 from inventory_tng.core.mail import Notifier
 from inventory_tng.core.phrases import BRAND, Words, gettext, lazy_gettext
 from inventory_tng.core.rate_limits import limiter
 from inventory_tng.core.settings import RateLimits
-from inventory_tng.devices import digest
+from inventory_tng.devices import devices
+from inventory_tng.devices.devices import digest
 from inventory_tng.models import (
     Admin,
     AdminPassword,
