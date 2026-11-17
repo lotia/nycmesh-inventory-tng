@@ -31,6 +31,7 @@ from sqlalchemy import (
     func,
     inspect,
     select,
+    text,
     update,
 )
 from sqlalchemy.engine.interfaces import DBAPIConnection
@@ -380,6 +381,12 @@ def set_actor(session: Session, actor: str) -> None:
 def current_actor(session: Session) -> str | None:
     """Who set_actor named, or None."""
     return session.info.get(ACTOR_INFO)
+
+
+def ping(session: Session) -> None:
+    """Asks the database the least it can answer: raises if it does not
+    (health.py)."""
+    session.execute(text("SELECT 1"))
 
 
 def exists_where(session: Session, *criteria: ColumnElement[bool]) -> bool:

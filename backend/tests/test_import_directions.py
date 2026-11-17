@@ -66,9 +66,7 @@ BREAKS: dict[str, dict[str, list[str]]] = {
     "rules_import_fastapi_or_web": {
         "once.py": ["fastapi", "pages.py", "starlette"],
     },
-    "routes_run_queries": {
-        "health.py": ["healthz: 1"],
-    },
+    "routes_run_queries": {},
     "routes_import_another_features_routes": {
         "admin/__init__.py": [
             "admin/admins.py",

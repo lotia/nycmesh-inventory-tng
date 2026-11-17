@@ -2,9 +2,8 @@
 
 from fastapi import APIRouter, Request
 from pydantic import BaseModel, Field
-from sqlalchemy import text
 
-from inventory_tng.core.db import DbSession
+from inventory_tng.core.db import DbSession, ping
 
 router = APIRouter()
 
@@ -23,5 +22,5 @@ class Health(BaseModel):
 @router.get(PATH)
 def healthz(session: DbSession, request: Request) -> Health:
     """Answers once the database does. db.install() makes a failure a 503."""
-    session.execute(text("SELECT 1"))
+    ping(session)
     return Health(status="ok", build=request.app.state.bundle.build_id())
