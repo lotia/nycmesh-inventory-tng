@@ -184,19 +184,11 @@ class RateLimits:
             per_account=_attempts(
                 environ, "RATE_LIMIT_PER_ACCOUNT", default.per_account
             ),
-            page_reports=_whole_number(
-                environ,
-                "RATE_LIMIT_PAGE_REPORTS",
-                default.page_reports,
-                "reports",
-                MAX_ATTEMPTS,
+            page_reports=_reports(
+                environ, "RATE_LIMIT_PAGE_REPORTS", default.page_reports
             ),
-            csp_reports=_whole_number(
-                environ,
-                "RATE_LIMIT_CSP_REPORTS",
-                default.csp_reports,
-                "reports",
-                MAX_ATTEMPTS,
+            csp_reports=_reports(
+                environ, "RATE_LIMIT_CSP_REPORTS", default.csp_reports
             ),
         )
 
@@ -485,6 +477,10 @@ MAX_ATTEMPTS = 1_000_000
 
 def _attempts(environ: Mapping[str, str], name: str, default: int) -> int:
     return _whole_number(environ, name, default, "attempts", MAX_ATTEMPTS)
+
+
+def _reports(environ: Mapping[str, str], name: str, default: int) -> int:
+    return _whole_number(environ, name, default, "reports", MAX_ATTEMPTS)
 
 
 def _whole_number(

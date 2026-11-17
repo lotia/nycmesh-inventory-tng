@@ -223,6 +223,14 @@ def record(event: AnyEvent) -> None:
             scan_to_save.record(event.seconds)
 
 
+def over_limit(request: Request, per_minute: int, kind: str) -> bool:
+    """Whether a report of this kind from this address is more than
+    per_minute allows, counted in this process's reports (install)."""
+    reports: MovingWindowRateLimiter = request.app.state.page_reports
+    allowed = RateLimitItemPerMinute(per_minute)
+    return not reports.hit(allowed, kind, rate_key(request))
+
+
 # Async: it works in memory only, so it holds no thread a request for the
 # database would want.
 @router.post(
@@ -234,14 +242,11 @@ def record(event: AnyEvent) -> None:
 )
 async def report(report: Report, request: Request) -> Response:
     """Record what a page reports about itself."""
-    reports: MovingWindowRateLimiter = request.app.state.page_reports
     # A page flushes at FLUSH_AT events and sends PER_HOUR_IN_ALL an hour at
     # most (telemetry.ts); a few pages open at once on one network share an
     # address.
-    allowed = RateLimitItemPerMinute(
-        request.app.state.settings.rate_limits.page_reports
-    )
-    if not reports.hit(allowed, "telemetry", rate_key(request)):
+    limit = request.app.state.settings.rate_limits.page_reports
+    if over_limit(request, limit, "telemetry"):
         log.info("page report refused", reason="rate_limited")
         body = RateLimitedReply(reason="rate_limited").model_dump()
         return JSONResponse(body, status_code=429)

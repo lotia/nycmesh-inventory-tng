@@ -30,16 +30,14 @@ import structlog
 from fastapi import APIRouter, Request, Response
 from fastapi.openapi.docs import get_swagger_ui_html
 from fastapi.responses import HTMLResponse, JSONResponse
-from limits import RateLimitItemPerMinute
-from limits.strategies import MovingWindowRateLimiter
 from opentelemetry import metrics
 from starlette.datastructures import MutableHeaders
 from starlette.types import ASGIApp, Message, Receive, Scope, Send
 
+from inventory_tng import page_telemetry
 from inventory_tng.devices import RateLimitedReply
 from inventory_tng.pages import templates
 from inventory_tng.phrases import BRAND
-from inventory_tng.web import rate_key
 
 log = structlog.get_logger(__name__)
 meter = metrics.get_meter(__name__)
@@ -268,11 +266,10 @@ async def _body(request: Request) -> bytes | None:
 @router.post(REPORTS, status_code=204, include_in_schema=False)
 async def report(request: Request) -> Response:
     """Count what a browser reports its policy refused."""
-    limiter: MovingWindowRateLimiter = request.app.state.page_reports
     # A page's violations come a few at a time, and each is one request in
     # browsers that use report-uri.
-    allowed = RateLimitItemPerMinute(request.app.state.settings.rate_limits.csp_reports)
-    if not limiter.hit(allowed, "csp", rate_key(request)):
+    limit = request.app.state.settings.rate_limits.csp_reports
+    if page_telemetry.over_limit(request, limit, "csp"):
         log.info("policy report refused", reason="rate_limited")
         body = RateLimitedReply(reason="rate_limited").model_dump()
         return JSONResponse(body, status_code=429)
