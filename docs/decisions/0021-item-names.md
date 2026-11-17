@@ -646,6 +646,25 @@ there; within a number grouped by spaces, no-break and thin spaces stay
 as typed. Units version 7; migration 0048, rewritten in place again,
 reads each unit key and name shown again, naming clashes by id.
 
+Ali decided on 2026-11-16 (inventory-tng-mz31) that every breaking space
+within a number grouped by spaces is shown as a no-break one, which
+replaces t78's "no-break and thin spaces stay as typed", as a thin space
+still let such a number break across a line. In the shown name, within
+such a number: the space (U+0020) becomes a no-break space (U+00A0), as
+before; thin (U+2009), hair (U+200A), punctuation (U+2008), six-per-em
+(U+2006) and medium mathematical (U+205F) spaces become narrow no-break
+spaces (U+202F), as close to their width as a no-break space comes; en
+and em quads to four- and five-per-em spaces (U+2000 to U+2005),
+ideographic (U+3000) and Ogham (U+1680) spaces become no-break spaces.
+No-break (U+00A0), narrow no-break (U+202F) and figure (U+2007) spaces
+stay as typed. The space before the unit is a no-break space, as before.
+The name is kept as typed; search, the forms and the read-alike check do
+not change. Rejected: every breaking space a no-break space (U+00A0).
+The mapping is `names.NO_BREAK`, beside `names.SPACES`. The units
+version stays 7, as no reading changes and the scan page has no shown
+name of its own; migration 0048, which already fills each name shown as
+`units.shown_name` does, shows existing names so.
+
 ## Amendment: the import's readings file (2026-11-14)
 
 An import starts with no reading rules, and its readings are settled

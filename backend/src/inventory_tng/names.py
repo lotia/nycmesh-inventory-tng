@@ -61,6 +61,20 @@ LOOK_ALIKES = {
 # Every space (Zs) but the space itself, each read as the space: units
 # and items read any of them as one (inventory-tng-vw0f).
 SPACES = "".join(map(chr, _LOOK_ALIKE[" "]))
+# Each breaking space as the shown name makes it inside a number grouped
+# by spaces, so the number never breaks across a line (Ali, 2026-11-16,
+# inventory-tng-mz31): thin, hair, punctuation, six-per-em and medium
+# mathematical narrow no-break; the space, en and em quads to four- and
+# five-per-em, ideographic and Ogham no-break. The no-break ones (no-break,
+# narrow no-break, figure) are kept.
+NO_BREAK = str.maketrans(
+    {
+        **dict.fromkeys(map(chr, (0x2006, 0x2008, 0x2009, 0x200A, 0x205F)), "\u202f"),
+        **dict.fromkeys(
+            map(chr, (0x0020, 0x1680, *range(0x2000, 0x2006), 0x3000)), "\u00a0"
+        ),
+    }
+)
 _FROM = "".join(LOOK_ALIKES)
 _TO = "".join(LOOK_ALIKES.values())
 

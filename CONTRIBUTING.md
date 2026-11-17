@@ -305,8 +305,8 @@ An item's, a package's and an alias's name is shown, wherever it is read,
 as `name_shown` holds it (decision 0021): each number and the unit or
 unit's word read after it spaced by a no-break space, thousands without
 commas and grouped by thin no-break spaces from five digits, but a number
-grouped by spaces as typed, its ordinary spaces no-break
-(`units.shown_name`). The app writes it as
+grouped by spaces as typed, its breaking spaces no-break
+(`names.NO_BREAK`, `units.shown_name`). The app writes it as
 the session flushes and when a reading rule changes (`items.reread`). A
 page or reply that names one reads `name_shown`; only a form's field
 reads `name`.

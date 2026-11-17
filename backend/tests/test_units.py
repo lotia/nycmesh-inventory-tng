@@ -677,7 +677,8 @@ NB, THIN = "\u00a0", "\u202f"
         (f"Cat{NB}6 305 m", f"Cat{NB}6 305{NB}m"),
         ("Cable 2 1,000 ft", f"Cable 2 1000{NB}ft"),
         # Its sign kept with it, and grouped by any space search reads as
-        # one; no-break and thin spaces as typed.
+        # one; no-break spaces as typed, the others no-break
+        # (inventory-tng-mz31).
         ("Supply -1 000 V", f"Supply -1{NB}000{NB}V"),
         ("Supply \u22121 000 V", f"Supply \u22121{NB}000{NB}V"),
         ("Box 1\u202f000 ft", f"Box 1\u202f000{NB}ft"),
@@ -689,8 +690,8 @@ NB, THIN = "\u00a0", "\u202f"
         ("Cap 1000\u1680\u03bcF", f"Cap 1000{NB}\u03bcF"),
         (f"Box 1{THIN}000{THIN}ft", f"Box 1{THIN}000{NB}ft"),
         (f"Box 1 000{NB}feet", f"Box 1{NB}000{NB}feet"),
-        ("Cable 2\u2009100 ft", f"Cable 2\u2009100{NB}ft"),
-        ("Reel 1\u2009000 000 mm", f"Reel 1\u2009000{NB}000{NB}mm"),
+        ("Cable 2\u2009100 ft", f"Cable 2{THIN}100{NB}ft"),
+        ("Reel 1\u2009000 000 mm", f"Reel 1{THIN}000{NB}000{NB}mm"),
         # Products, units no rule or word settles, and tokens no unit, as
         # typed.
         ("Cat6a cable 5AC SFP+", "Cat6a cable 5AC SFP+"),
@@ -721,6 +722,49 @@ def test_a_name_is_shown_with_each_number_and_unit_spaced(
     the unit as typed; thousands without commas, from five digits grouped by
     thin no-break spaces (Ali, 2026-11-15, inventory-tng-ist.3)."""
     assert units.shown_name(name) == shown
+
+
+# Each space (Zs) and what it is shown as inside a number grouped by spaces
+# (Ali, 2026-11-16, inventory-tng-mz31): the narrow ones narrow no-break,
+# the other breaking ones no-break, the no-break ones as typed.
+NO_BREAK = {
+    " ": NB,
+    **dict.fromkeys("\u2009\u200a\u2008\u2006\u205f", THIN),
+    **dict.fromkeys("\u2000\u2001\u2002\u2003\u2004\u2005\u3000\u1680", NB),
+    **{kept: kept for kept in (NB, THIN, "\u2007")},
+}
+
+
+def test_every_space_has_its_shown_form() -> None:
+    """Every space (Zs) is listed, so none is left breaking by omission."""
+    zs = {
+        chr(c)
+        for c in range(sys.maxunicode + 1)
+        if unicodedata.category(chr(c)) == "Zs"
+    }
+    assert set(NO_BREAK) == zs
+
+
+@pytest.mark.parametrize("space", sorted(NO_BREAK))
+def test_a_space_in_a_grouped_number_is_shown_no_break(space: str) -> None:
+    """Inside a number grouped by spaces, each space is shown in its
+    no-break form; the space before the unit is a no-break one, and the
+    name's other spaces as typed."""
+    shown = NO_BREAK[space]
+    assert units.shown_name(f"Box{space}1{space}000 ft") == (
+        f"Box{space}1{shown}000{NB}ft"
+    )
+    assert units.shown_name(f"Cable 2{space}100{space}ft") == (
+        f"Cable 2{shown}100{NB}ft"
+    )
+
+
+def test_mixed_spaces_in_a_grouped_number_are_each_shown_no_break() -> None:
+    """Each space keeps its own no-break form, a sign kept, in each number."""
+    typed = "Supply -1\u2009000 V cap 1\u205f000\u3000000\u2007000 pF"
+    assert units.shown_name(typed) == (
+        f"Supply -1{THIN}000{NB}V cap 1{THIN}000{NB}000\u2007000{NB}pF"
+    )
 
 
 def test_a_name_is_shown_as_its_rules_read_it() -> None:

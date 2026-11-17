@@ -975,16 +975,17 @@ def shown_name(name: str, rules: Rules | None = None) -> str:
     (_GROUPED, any space search reads as one), with its sign, is read as
     search reads it, one number, but shown whole and as typed, as it may be
     a pack count and a size: `Cable 2 100 ft` is `Cable 2 100 ft`, never
-    `2100 ft`, its ordinary spaces no-break so it never breaks across a
-    line (Ali, 2026-11-16, inventory-tng-t78). `name` is as saved
+    `2100 ft`, its breaking spaces no-break so it never breaks across a
+    line, a narrow one narrow (Ali, 2026-11-16, inventory-tng-t78,
+    inventory-tng-mz31: names.NO_BREAK). `name` is as saved
     (models.canonical, spell)."""
     edits = []
     for match, searched in _after_a_number(name):
         token = match[2]
         if searched and " " in searched[0][0]:
             start = searched[0].start()
-            # Its ordinary spaces no-break, the rest as typed.
-            shown = name[start : match.end(1)].replace(" ", NO_BREAK_SPACE)
+            # Its breaking spaces no-break (names.NO_BREAK), the rest as typed.
+            shown = name[start : match.end(1)].translate(names.NO_BREAK)
         else:
             number = _number(name, match.end(1))
             start, shown = match.end(1) - len(number), _shown_number(number)

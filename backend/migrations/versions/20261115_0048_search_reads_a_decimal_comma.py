@@ -20,7 +20,8 @@ as 1000 μF, as search reads it, so unit keys and names shown read so too
 (units version 7, inventory-tng-vw0f). A number grouped by spaces before a
 unit is shown whole and as typed, its ordinary spaces no-break, `Box 1 000
 ft` as `Box 1 000 ft` with no-break spaces, so names shown read so too
-(inventory-tng-t78, inventory-tng-ma72).
+(inventory-tng-t78, inventory-tng-ma72); every breaking space in it is
+shown no-break, a thin one narrow (names.NO_BREAK, inventory-tng-mz31).
 
 Revision ID: 0048
 Revises: 0047

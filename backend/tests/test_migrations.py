@@ -827,8 +827,8 @@ def test_a_comma_after_a_lone_nought_is_read_again(alembic_config: Config) -> No
     unit after a number and any space as after a plain one
     (inventory-tng-vw0f), and a unit's word is shown as a symbol is
     (inventory-tng-tze), and a number grouped by spaces before its unit
-    shown whole and as typed, its ordinary spaces no-break
-    (inventory-tng-t78); names kept as typed; names that would then be one
+    shown whole and as typed, its breaking spaces no-break
+    (inventory-tng-t78, inventory-tng-mz31); names kept as typed; names that would then be one
     named by id first."""
     command.downgrade(alembic_config, "0047")
     connection = alembic_config.attributes["connection"]
@@ -869,6 +869,14 @@ def test_a_comma_after_a_lone_nought_is_read_again(alembic_config: Config) -> No
     )
     row("item_package", "Cable 2 100 ft", item_id=box, size=1)
     row("item_alias", "X-1 000 feet", item_id=box, name_folded="", unit_key="x")
+    # Its breaking spaces no-break, a thin one narrow (inventory-tng-mz31).
+    row(
+        "item_alias",
+        "Reel 1\u2009000\u3000000 mm",
+        item_id=box,
+        name_folded="",
+        unit_key="r",
+    )
     command.upgrade(alembic_config, "0048")
     assert connection.execute(
         text(
@@ -922,6 +930,11 @@ def test_a_comma_after_a_lone_nought_is_read_again(alembic_config: Config) -> No
     ).all() == [
         ("Box 1 000 ft", "box1000ft", "Box 1\u00a0000\u00a0ft"),
         ("Cable 2 100 ft", "cable2100ft", "Cable 2\u00a0100\u00a0ft"),
+        (
+            "Reel 1\u2009000\u3000000 mm",
+            "reel1000000mm",
+            "Reel 1\u202f000\u00a0000\u00a0mm",
+        ),
         # Within a code, as typed.
         ("X-1 000 feet", "x1000feet", "X-1 000 feet"),
     ]
