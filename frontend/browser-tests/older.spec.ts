@@ -173,14 +173,15 @@ test("a save's package retired since is named, never offered, and goes by its li
       "This item has been retired.",
     );
     await lineDiscard(listing, `${cable}: 2 × ${box}`).click();
-    // What is left goes back whole, without a tap; the box is not offered.
+    // What is left goes back whole, without a tap: its only count, the box
+    // not offered.
     await expect(listing).toHaveCount(0);
     await expect(page.getByText(PUT_BACK)).toBeVisible();
-    // Its only count, the box not offered.
     await expect(page.getByLabel("How many m")).toHaveValue("3");
     await expect(page.getByLabel(new RegExp(`^${box}`))).toHaveCount(0);
     // Discarded, not saved: a save would leave the item stock, and the
-    // item's half needs it retired with none left.
+    // item's half needs it retired with none left. What such a cart saves
+    // ScanPage.older-build.test.tsx checks.
     await page.getByRole("button", { name: "Discard cart" }).click();
     await page.getByRole("button", { name: "Discard", exact: true }).click();
     await expect(page.getByText("Nothing in the cart yet.")).toBeVisible();

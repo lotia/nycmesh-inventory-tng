@@ -16,15 +16,16 @@ import { expect, type Page, type TestInfo } from "@playwright/test";
 import { addItem, unique } from "./own";
 import { test } from "./policy";
 
-/** Each browser's unit the form asks about with no word near it (a data
- * rate, or not), and the data rate it is read as. */
-const CHROMIUM: [string, string] = ["g", "Gbps"];
-const UNITS: Record<string, [string, string]> = {
+/** A unit the form asks about with no word near it (a data rate, or
+ * not), and the data rate it is read as. */
+type Unit = [unit: string, rate: string];
+const CHROMIUM: Unit = ["g", "Gbps"];
+/** Each browser's own. */
+const UNITS: Record<string, Unit> = {
   chromium: CHROMIUM,
   webkit: ["M", "Mbps"],
 };
-const unitOf = (info: TestInfo): [string, string] =>
-  UNITS[info.project.name] ?? CHROMIUM;
+const unitOf = (info: TestInfo): Unit => UNITS[info.project.name] ?? CHROMIUM;
 
 /** Its unit's reading rule deleted, if there is one. */
 async function forget(page: Page, unit: string): Promise<void> {
