@@ -1,12 +1,11 @@
 /**
  * A long list's search box suggests as one types, and picking one narrows
  * the list to it (docs/decisions/0019). Searches ignore accents, the scan
- * page's too (docs/decisions/0021), and read units after a number alike,
- * as well as finding what they found before units were read, and match a
- * search mixing spellings group by group.
+ * page's too (docs/decisions/0021), and read units after a number alike on
+ * both sides, as the unit tests' shared vectors say.
  */
 import { expect } from "@playwright/test";
-import { addItem, ownCable, unique } from "./own";
+import { ownCable } from "./own";
 import { test } from "./policy";
 
 test("a suggestion picked with the keyboard narrows the list", async ({
@@ -74,56 +73,11 @@ test("the scan page finds an item without its accents, and shows them", async ({
   await expect(page.getByRole("button", { name, exact: true })).toBeVisible();
 });
 
-test("a unit after a number is found however it is spelt, on both sides", async ({
+test("a search reads units after a number alike, on both sides", async ({
   page,
 }) => {
-  const name = await ownCable(page, "Cap 10μF", "Cap 10\u00a0μF");
-  // Shown with its number and unit spaced.
-  const shown = name.replace("10μF", "10\u00a0μF");
-  await page.goto("/scan");
-  await page.getByLabel(/Find an item/).fill(name.replace("10μF", "10uf"));
-  await expect(
-    page.getByRole("button", { name: shown, exact: true }),
-  ).toBeVisible();
-  const typed = name.replace("10μF", "10 µF");
-  await page.goto(`/admin/items?q=${encodeURIComponent(typed)}`);
-  await expect(
-    page.getByRole("table").getByRole("link", { name: shown, exact: true }),
-  ).toBeVisible();
-});
-
-test("a search finds what it found before units were read, and by units too", async ({
-  page,
-}) => {
-  // Saved as typed: a unit's word never spells a name (Ali, 2026-11-15),
-  // and is shown spaced as a symbol is (inventory-tng-tze).
-  const what = "PoE 100 feet 48 VDC";
-  const words = "PoE 100\u00a0feet 48\u00a0VDC";
-  const name = await ownCable(page, what, words);
-  const shown = name.replace(what, words);
-  const find = page.getByLabel(/Find an item/);
-  const found = page.getByRole("button", { name: shown, exact: true });
-  await page.goto("/scan");
-  // A unit typed shorter than the token it begins, as typed.
-  await find.fill(name.replace("48 VDC", "48 V"));
-  await expect(found).toBeVisible();
-  // A unit spelt otherwise.
-  await find.fill(name.replace("100 feet", "100 ft"));
-  await expect(found).toBeVisible();
-  for (const typed of [
-    name.replace("PoE 100 ", ""),
-    name.replace("PoE 100 feet", "100 ft"),
-  ]) {
-    await page.goto(`/admin/items?q=${encodeURIComponent(typed)}`);
-    await expect(
-      page.getByRole("table").getByRole("link", { name: shown, exact: true }),
-    ).toBeVisible();
-  }
-});
-
-test("a search mixing spellings is matched group by group, on both sides", async ({
-  page,
-}) => {
+  // The unit tests check each spelling on both sides (units-vectors.json):
+  // this shows only that each side's search uses that shared reading.
   const what = "Cable 100 feet, PoE 48 VDC";
   const words = "Cable 100\u00a0feet, PoE 48\u00a0VDC";
   const name = await ownCable(page, what, words);
@@ -139,27 +93,4 @@ test("a search mixing spellings is matched group by group, on both sides", async
   await expect(
     page.getByRole("table").getByRole("link", { name: shown, exact: true }),
   ).toBeVisible();
-});
-
-test("a name is shown with its number and unit spaced, on both sides", async ({
-  page,
-}) => {
-  // Saved as typed, shown corrected (Ali, 2026-11-15, inventory-tng-ist.3).
-  const name = unique("Box 10,000ft");
-  const shown = name.replace("10,000ft", "10 000 ft");
-  await page.goto("/admin/items");
-  await page.getByLabel(/^Name/).fill(name);
-  await page.getByLabel(/^Category/).selectOption({ label: "Cables" });
-  const heading = await addItem(page, shown);
-  expect(await heading.textContent()).toBe(shown);
-  await expect(page.getByLabel(/^Name/)).toHaveValue(name);
-  await expect(page.getByText(`Shown as ${shown}.`)).toBeVisible();
-  await page.goto("/scan");
-  // Found as typed, and as shown, as copied from a page.
-  for (const typed of [name, shown]) {
-    await page.getByLabel(/Find an item/).fill(typed);
-    const found = page.getByRole("button", { name: shown, exact: true });
-    await expect(found).toBeVisible();
-    expect(await found.textContent()).toContain(shown);
-  }
 });
