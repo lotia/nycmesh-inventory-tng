@@ -82,6 +82,7 @@ from inventory_tng.models import (
 )
 from inventory_tng.scan import catalogue_api as scan_catalogue
 from inventory_tng.scan.batch_schemas import Batch
+from inventory_tng.scan.catalogue_schemas import Catalogue
 
 from helpers.concurrency import Committed, Worker, delete_made, made, newest_ids
 from helpers.devices import new_device
@@ -1575,7 +1576,7 @@ def test_the_catalogue_route_reads_one_snapshot(
     seen: list[tuple[str | None, str | None]] = []
     answer = scan_catalogue.with_saved
 
-    def isolation(session: Session, keys: list[uuid.UUID]) -> scan_catalogue.Catalogue:
+    def isolation(session: Session, keys: list[uuid.UUID]) -> Catalogue:
         shown = session.execute(
             text(
                 "SELECT current_setting('transaction_isolation'),"
