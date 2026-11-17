@@ -39,7 +39,6 @@ from inventory_tng import (
     open_packages,
     reading_rules,
     units,
-    volunteers,
 )
 from inventory_tng.admin.admins import ADMINS
 from inventory_tng.admin.volunteers import VOLUNTEERS
@@ -83,6 +82,7 @@ from inventory_tng.models import (
 from inventory_tng.scan import catalogue_api as scan_catalogue
 from inventory_tng.scan.batch_schemas import Batch
 from inventory_tng.scan.catalogue_schemas import Catalogue
+from inventory_tng.volunteers import volunteers
 
 from helpers.concurrency import Committed, Worker, delete_made, made, newest_ids
 from helpers.devices import new_device

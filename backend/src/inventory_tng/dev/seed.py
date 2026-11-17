@@ -21,7 +21,6 @@ from inventory_tng import (
     categories,
     items,
     locations,
-    volunteers,
 )
 from inventory_tng.core.command import run_command
 from inventory_tng.core.db import CLI_ACTOR, exists_where, set_actor, settings_row
@@ -29,6 +28,7 @@ from inventory_tng.labels import labels
 from inventory_tng.ledger import record
 from inventory_tng.models import Admin, Location, SignInSettings
 from inventory_tng.scan.batch_schemas import Batch
+from inventory_tng.volunteers import volunteers
 
 log = structlog.get_logger(__name__)
 

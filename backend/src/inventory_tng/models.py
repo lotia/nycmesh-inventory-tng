@@ -860,7 +860,7 @@ class Volunteer(CanonicalName, Searchable, Versioned, Base):
             postgresql_using="gin",
             postgresql_ops={"search_text": "gin_trgm_ops"},
         ),
-        protection(owner="volunteers.py", lock="catalogue", history=True),
+        protection(owner="volunteers/volunteers.py", lock="catalogue", history=True),
     )
 
     id: Mapped[IntId]

@@ -2,7 +2,7 @@
 can hold stock has a custody location of their own, named for them. A
 duplicate is merged into the volunteer it duplicates: it is retired, and the
 ledger keeps its rows, which readers follow forward. The rules are
-volunteers.py's; this page says them in words."""
+volunteers/volunteers.py's; this page says them in words."""
 
 from collections.abc import Mapping
 from typing import Annotated
@@ -13,7 +13,6 @@ from fastapi.responses import HTMLResponse, JSONResponse, Response
 from sqlalchemy import exists, func, not_, select
 from sqlalchemy.orm import Session
 
-from inventory_tng import volunteers
 from inventory_tng.accounts import email_problem
 from inventory_tng.admin.common import (
     ADMIN,
@@ -35,6 +34,7 @@ from inventory_tng.core.db import DbSession, attempt
 from inventory_tng.core.phrases import Words, gettext, lazy_gettext
 from inventory_tng.models import Location, Volunteer
 from inventory_tng.pages import NOTICES, not_found, redirect
+from inventory_tng.volunteers import volunteers
 
 log = structlog.get_logger(__name__)
 

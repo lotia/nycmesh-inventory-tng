@@ -5,8 +5,9 @@ to show, on PostgreSQL."""
 
 import pytest
 
-from inventory_tng import locations, volunteers
+from inventory_tng import locations
 from inventory_tng.locations import Parent
+from inventory_tng.volunteers import volunteers
 
 STORE, AREA, VAN = Parent("store", True), Parent("area", True), Parent("vehicle", True)
 
