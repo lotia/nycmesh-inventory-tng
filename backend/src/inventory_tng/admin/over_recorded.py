@@ -18,7 +18,6 @@ from typing import Annotated, Any
 import structlog
 from fastapi import APIRouter, Depends, Form, Request
 from fastapi.responses import Response
-from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from inventory_tng import ledger, locations, over_recorded
@@ -64,7 +63,7 @@ from inventory_tng.models import (
     canonical,
 )
 from inventory_tng.pages import NOTICES, not_found, redirect
-from inventory_tng.stock import balance
+from inventory_tng.stock import balance, queries
 
 log = structlog.get_logger(__name__)
 
@@ -498,11 +497,7 @@ def answer(
         return not_found()
     count = None
     if do == "count":
-        unit = session.scalars(
-            select(Item.unit)
-            .join(Movement, Movement.item_id == Item.id)
-            .where(Movement.id == check.movement_id)
-        ).one()
+        unit = queries.unit_moved(session, check.movement_id)
         count = quantity(typed, positive=False, unit=unit, required=TYPE_A_NUMBER)
         if not isinstance(count, Decimal):
             field = f"count-{check_id}"

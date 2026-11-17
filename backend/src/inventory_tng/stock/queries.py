@@ -296,3 +296,12 @@ def open_with_ids(
     return session.scalars(
         select(OpenPackage).where(OpenPackage.id.in_(open_ids), *where)
     ).all()
+
+
+def unit_moved(session: Session, movement_id: int) -> str:
+    """The unit of the item a ledger line moved."""
+    return session.scalars(
+        select(Item.unit)
+        .join(Movement, Movement.item_id == Item.id)
+        .where(Movement.id == movement_id)
+    ).one()

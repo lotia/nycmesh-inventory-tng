@@ -93,3 +93,4 @@ short test. `core/` is the name FastAPI's full-stack template uses;
 | `admin/counts.py`: its queries | `stock/queries.py` |
 | `admin/length_checks.py`: its queries | `stock/queries.py` |
 | `admin/used_up.py`: its query | `stock/queries.py` |
+| `admin/over_recorded.py`: its query | `stock/queries.py` |
