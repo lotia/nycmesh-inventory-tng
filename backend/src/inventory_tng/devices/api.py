@@ -9,14 +9,16 @@ from inventory_tng.core.db import DbSession
 from inventory_tng.devices.devices import (
     COOKIE,
     COOKIE_MAX_AGE,
-    CodeRefusedReply,
     DeviceRefused,
+    RegistrationRejected,
+    register,
+)
+from inventory_tng.devices.schemas import (
+    CodeRefusedReply,
     DeviceRefusedReply,
     RateLimitedReply,
     Registered,
     Registration,
-    RegistrationRejected,
-    register,
 )
 from inventory_tng.web.browser import client_address, set_private_cookie
 

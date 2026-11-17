@@ -24,7 +24,8 @@ from sqlalchemy.orm import Session
 
 from inventory_tng import labels
 from inventory_tng.core.db import SnapshotSession
-from inventory_tng.devices.devices import DeviceRefusedReply, RegisteredDevice
+from inventory_tng.devices.devices import RegisteredDevice
+from inventory_tng.devices.schemas import DeviceRefusedReply
 from inventory_tng.models import (
     CURRENT_ALIAS,
     Category,

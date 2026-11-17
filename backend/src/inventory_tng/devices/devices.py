@@ -31,7 +31,6 @@ from fastapi import Depends, Request
 from fastapi.security import APIKeyCookie
 from limits import RateLimitItemPerMinute
 from opentelemetry import metrics
-from pydantic import BaseModel
 from sqlalchemy import ColumnElement, Select, select
 from sqlalchemy.orm import Session
 
@@ -402,27 +401,6 @@ def current_device(
 
 
 RegisteredDevice = Annotated[Device, Depends(current_device)]
-
-
-class Registration(BaseModel):
-    # The phrase as typed, or as the QR code's link carries it.
-    code: str
-
-
-class Registered(BaseModel):
-    device_id: int
-
-
-class CodeRefusedReply(BaseModel):
-    reason: BadCode
-
-
-class RateLimitedReply(BaseModel):
-    reason: Literal["rate_limited"]
-
-
-class DeviceRefusedReply(BaseModel):
-    reason: Refusal
 
 
 # The page a registration code's link and QR code open (bundle.PAGES).

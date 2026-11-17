@@ -85,3 +85,4 @@ short test. `core/` is the name FastAPI's full-stack template uses;
 | `ledger.py`: the balance queries | `stock/balance.py` |
 | `devices.py` | `devices/devices.py` |
 | `devices.py`: the registration endpoint, `register_device` | `devices/api.py` |
+| `devices.py`: the request and reply schemas | `devices/schemas.py` |
