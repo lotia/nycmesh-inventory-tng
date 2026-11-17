@@ -8,6 +8,7 @@ from contextlib import contextmanager
 from dataclasses import dataclass, field, replace
 from datetime import UTC, datetime, timedelta
 from decimal import Decimal
+from unittest.mock import patch
 
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
@@ -101,9 +102,7 @@ class World:
 
 def base(session: Session) -> World:
     ada, _ = new_admin(session)
-    signed_in, admin_cookie = accounts.start_session(
-        session, ada.id, None, datetime.now(UTC)
-    )
+    _, admin_cookie = accounts.start_session(session, ada.id, None, datetime.now(UTC))
     spools = Spools(session)
     opened = spools.opened()
     cable = spools.cable
@@ -130,13 +129,6 @@ def base(session: Session) -> World:
         Volunteer(name="Merged", merged_into_id=other.id, retired_at=datetime.now(UTC)),
     )
     device, device_cookie = new_device(session)
-    # Last seen ahead by the longer wait between two records of it
-    # (accounts.SEEN_EVERY, devices.LAST_SEEN_EVERY), so no visit in the
-    # module's run records them seen (db.record_last_seen): each reads the
-    # world as built.
-    signed_in.last_seen_at = device.last_seen_at = datetime.now(UTC) + max(
-        accounts.SEEN_EVERY, devices.LAST_SEEN_EVERY
-    )
     revoked, _ = new_device(session)
     revoked.revoked_at = datetime.now(UTC)
     rule = add(session, ReadingRule(token="P", decided_by_admin_id=ada.id))
@@ -649,6 +641,10 @@ def build(session: Session, times: int) -> World:
     return world
 
 
+# Longer than any run, and still a time once taken from now.
+UNSEEN = timedelta(days=36500)
+
+
 @dataclass
 class Built:
     """A world built and committed in its own database, and one app on it
@@ -663,9 +659,15 @@ class Built:
     def visit(self, *, device: bool = False) -> Generator[tuple[TestClient, Session]]:
         """The client signed in as Ada, or as the registered device, its
         requests on a session of the world's database rolled back after:
-        whatever a page writes is not left for the next test. Ada and the
-        device are never recorded seen (base)."""
-        with rolled_back(self.database.engine, self.database) as session:
+        whatever a page writes is not left for the next test. What the app
+        writes in a transaction of its own would reach the world's database:
+        when Ada or the device was last seen (db.record_last_seen) is never
+        written, its wait made longer than any run."""
+        with (
+            patch.object(accounts, "SEEN_EVERY", UNSEEN),
+            patch.object(devices, "LAST_SEEN_EVERY", UNSEEN),
+            rolled_back(self.database.engine, self.database) as session,
+        ):
             self.app.dependency_overrides |= on_session(session)
             self.client.cookies.clear()
             if device:

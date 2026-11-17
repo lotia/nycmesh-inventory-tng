@@ -68,6 +68,7 @@ def test_every_admin_page_is_measured(
     names = [name for page in PAGES.values() for name in page.worded]
     twice = {name for name in names if names.count(name) > 1}
     assert not twice, f"each worded page needs a name of its own: {twice}"
+    assert set(names) >= SHOW_NO_ITEM, "SHOW_NO_ITEM names a place not worded"
 
 
 def case(route: str, n: int, where: Path) -> object:
@@ -135,10 +136,14 @@ def ok(client: TestClient, url: str) -> Response:
     return response
 
 
+def is_json(response: Response) -> bool:
+    return response.headers["content-type"].startswith("application/json")
+
+
 def listed(response: Response) -> str:
     """A page without its masthead, whose badges count what other pages
     list (_masthead.html). A reply in JSON has none."""
-    if response.headers["content-type"].startswith("application/json"):
+    if is_json(response):
         return response.text
     page, cut = re.subn(
         r'<header class="masthead">.*?</header>', "", response.text, flags=re.DOTALL
@@ -178,14 +183,17 @@ NAMES_NO_ITEM = {
 NAMES_AS_TYPED = {"/admin/unit-readings/seed"}
 
 
-# Each counted page, each way it is counted, and every other page where its
-# words are read (worded). Left out: forms read signed out, which name
+# Places words are read (worded) that show no item or package to check.
+SHOW_NO_ITEM = {"stock, filtered to nothing", "a retired category"}
+# Each counted page, each way it is counted, and each other place its words
+# are read, by that name. Left out too: forms read signed out, which name
 # nothing, and the redirect and the form only another page sends one to.
 NAMED = CASES + [
-    case(route, n, where)
+    pytest.param(route, where, id=name)
     for route, page in sorted(PAGES.items())
-    if not page.more
-    for n, where in enumerate(page.worded.values())
+    for name, where in page.worded.items()
+    if name not in SHOW_NO_ITEM
+    and where not in (page.counted or [route] if page.more else [])
 ]
 
 
@@ -210,7 +218,7 @@ def test_every_page_names_items_and_packages_as_shown(
         url = path(where, one.world)
         response = client.get(url)
     assert response.status_code == 200, url
-    if response.headers["content-type"].startswith("application/json"):
+    if is_json(response):
         reply = response.json()
         # What is searched holds names as typed, matched, never shown.
         for item in reply.get("items", []) if isinstance(reply, dict) else []:
