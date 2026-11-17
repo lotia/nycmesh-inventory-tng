@@ -229,7 +229,12 @@ the compressed copy (fiddly header code ServeStatic already gets right).
   server held back included, and each says "Held until you upgrade." in
   that box, never "Sending…", while the banner keeps the full note and
   the Upgrade button (Ali, 2026-11-16, inventory-tng-n7yv). The build's
-  other tabs learn from the one held back that they are too old too.
+  other tabs learn from the one held back that they are too old too,
+  but only from one held back after they loaded: one held earlier stays
+  kept until sent, and after a rollback would hold a current tab for
+  good (inventory-tng-1trb, 2026-11-16). We rejected clearing the hold
+  when the build is next accepted, which needs a send, so offline the
+  stale hold still spreads.
   After the reload each is sent as the build that queued it, and one the
   server still holds back is listed with what older builds left. We
   rejected the full note on every held save, which repeats the banner,

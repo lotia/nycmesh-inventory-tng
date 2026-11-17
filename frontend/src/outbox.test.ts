@@ -1641,6 +1641,36 @@ describe("listening", () => {
     stop();
   });
 
+  test("a batch this tab saw waiting, then held back by another tab, makes this one too old", () => {
+    const waiting = entry();
+    store(waiting);
+    const outbox = new Outbox(answering(() => saved()).api);
+    const stop = outbox.listen();
+    store({ ...waiting, reason: { code: "must_upgrade" } });
+    window.dispatchEvent(new StorageEvent("storage", { key: STORAGE_KEY }));
+    expect(outbox.builds.newer.value).toBe("too_old");
+    stop();
+  });
+
+  test("a batch held back before this tab loaded does not make it too old", async () => {
+    // Held back while this build was too old; the build is current again
+    // (rolled back), and this tab was loaded since.
+    const stale = entry({ reason: { code: "must_upgrade" } });
+    store(stale);
+    const { api, sent } = answering(() => saved());
+    const outbox = new Outbox(api);
+    const stop = outbox.listen();
+    // Another tab writes, the stale one still kept.
+    const fresh = entry();
+    store(stale, fresh);
+    window.dispatchEvent(new StorageEvent("storage", { key: STORAGE_KEY }));
+    expect(outbox.builds.newer.value).toBeNull();
+    await outbox.send();
+    expect(sent).toHaveLength(2);
+    expect(states(outbox)).toEqual(["saved", "saved"]);
+    stop();
+  });
+
   test("an older build's tab's batch does not show here", () => {
     const outbox = new Outbox(answering(() => saved()).api);
     const stop = outbox.listen();

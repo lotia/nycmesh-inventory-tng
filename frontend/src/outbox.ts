@@ -1061,11 +1061,19 @@ export class Outbox {
       }
       const entries = this.read();
       // Another tab of this build held one back: this tab is too old too.
+      // Only one held back since this tab last read storage: one held
+      // before it loaded, kept until sent, may be from before a rollback,
+      // and a reload would never clear it (as stale stamps, Builds.listen).
+      const held = (each: Entry) => each.reason?.code === "must_upgrade";
+      const heldBefore = new Set(
+        this.entries.value.filter(held).map((each) => batchId(each.body)),
+      );
       if (
         entries.some(
           (each) =>
             each.build === this.builds.build &&
-            each.reason?.code === "must_upgrade",
+            held(each) &&
+            !heldBefore.has(batchId(each.body)),
         )
       ) {
         this.builds.learn("too_old");
