@@ -21,11 +21,6 @@ SERVERS = "2026-11-12T12:00:00.000Z"
 
 
 @pytest.fixture
-def place(session: Session) -> Place:
-    return Place(session)
-
-
-@pytest.fixture
 def served(
     registered_client: TestClient, monkeypatch: pytest.MonkeyPatch
 ) -> TestClient:

@@ -48,11 +48,6 @@ from helpers.sign_in import text
 GBPS = units.Rule("Gbit/s")
 
 
-@pytest.fixture
-def radios(session: Session) -> Category:
-    return add(session, Category(name="Radios"))
-
-
 def new_item(session: Session, category: Category, name: str) -> Item:
     return add(session, Item(name=name, category_id=category.id))
 

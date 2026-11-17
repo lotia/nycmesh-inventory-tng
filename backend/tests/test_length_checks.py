@@ -33,11 +33,6 @@ URL = "/api/transactions"
 LENGTHS = "/admin/stock/length-checks"
 
 
-@pytest.fixture
-def spools(session: Session) -> Spools:
-    return Spools(session)
-
-
 def left_on(session: Session, made: OpenPackage) -> Decimal:
     return ledger.left_on(session, [made])[made.id]
 

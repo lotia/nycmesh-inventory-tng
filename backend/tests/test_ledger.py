@@ -50,11 +50,6 @@ URL = "/api/transactions"
 
 
 @pytest.fixture
-def place(session: Session) -> Place:
-    return Place(session)
-
-
-@pytest.fixture
 def client(registered_client: TestClient) -> TestClient:
     """Every request here is from a registered device."""
     return registered_client
