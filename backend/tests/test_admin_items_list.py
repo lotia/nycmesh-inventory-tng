@@ -107,7 +107,9 @@ def test_pages_of_fifty(
     first = admin_client.get(ITEMS, params={"q": "Paged"})
     assert len(items_named(first.text)) == PER_PAGE
     assert "Page 1 of 2" in text(first)
-    assert f'href="{ITEMS}?q=Paged&amp;page=2"' in first.text
+    assert read(first.text).one("a", rel="next").attrs["href"] == (
+        f"{ITEMS}?q=Paged&page=2"
+    )
     second = admin_client.get(ITEMS, params={"q": "Paged", "page": "2"}).text
     assert len(items_named(second)) == 5
     # A page past the end, or none, is the last or the first.
@@ -252,8 +254,9 @@ def test_a_search_sorted_by_a_heading_goes_back_to_best_match(
     assert "aria-sort" not in best
     assert read(best).one("a", "Best match", aria_current="page")
     by_name = admin_client.get(ITEMS, params=query | {"sort": "name"}).text
-    assert items_named(by_name) == sorted(items_named(by_name), key=str.lower)
-    assert items_named(by_name)[0] == f"Aaa LiteBeem {mark}"
+    named = items_named(by_name)
+    assert named == sorted(named, key=str.lower)
+    assert named[0] == f"Aaa LiteBeem {mark}"
     assert ("Best match", f"{ITEMS}?q=LiteBeam+{mark}") in links(by_name)
     # A new search from the box is best match first again: no sort sent.
     assert not read(by_name).one("form", role="search").all("*", name="sort")

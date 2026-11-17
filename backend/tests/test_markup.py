@@ -3,7 +3,7 @@ tests built on it can be trusted."""
 
 import pytest
 
-from helpers.markup import Unescaped, read
+from helpers.markup import Unescaped, read, row_links
 
 pytestmark = pytest.mark.helper
 
@@ -31,14 +31,30 @@ def test_text_puts_a_space_between_blocks(markup: str) -> None:
 
 
 def test_text_runs_inline_words_together_and_keeps_no_break_spaces() -> None:
-    page = read("<p>  5&nbsp;m of <a href='/x'>cable</a>,\n left </p>")
-    assert page.one("p").text == "5\N{NO-BREAK SPACE}m of cable, left"
+    page = read(
+        "<p>  5&nbsp;m of <a href='/x'>cable</a>,\n left<del>s</del><ins>!</ins></p>"
+    )
+    assert page.one("p").text == "5\N{NO-BREAK SPACE}m of cable, lefts!"
 
 
-@pytest.mark.parametrize("hide", ['aria-hidden="true"', "hidden"])
-def test_spoken_leaves_out_what_a_screen_reader_skips(hide: str) -> None:
+@pytest.mark.parametrize(
+    ("hide", "shown"),
+    [('aria-hidden="true"', "Name ▲up"), ("hidden", "Name up")],
+)
+def test_text_leaves_out_what_is_hidden_and_spoken_also_what_is_not_read(
+    hide: str, shown: str
+) -> None:
     page = read(f'<a>Name <span {hide}>▲</span><span class="sr-only">up</span></a>')
-    assert (page.one("a").text, page.one("a").spoken) == ("Name ▲up", "Name up")
+    assert (page.one("a").text, page.one("a").spoken) == (shown, "Name up")
+
+
+def test_row_links_counts_each_link_in_a_cell_once() -> None:
+    page = (
+        '<a href="/r/1">Out</a><table><tr><td><table><tr><td>'
+        '<a href="/r/2">In</a> <a href="/r/2/edit">Edit</a>'
+        "</td></tr></table></td></tr></table>"
+    )
+    assert row_links(page, "/r") == ["In"]
 
 
 def test_one_refuses_none_or_several() -> None:

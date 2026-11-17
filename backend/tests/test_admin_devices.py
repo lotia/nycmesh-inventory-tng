@@ -317,8 +317,12 @@ def listed_ids(page: str) -> list[int]:
     """The devices a list shows, in its order."""
     return [
         int(found[1])
-        for _, href in links(page)
-        if (found := re.fullmatch(rf"{DEVICES}/(\d+)", href))
+        for a in read(page).all("a")
+        if (
+            found := re.fullmatch(
+                rf"{re.escape(DEVICES)}/(\d+)", a.attrs.get("href", "")
+            )
+        )
     ]
 
 

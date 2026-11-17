@@ -567,10 +567,10 @@ def test_an_opening_with_one_end_counted_corrects_the_other_only(
 
 
 def says(page: str, words: str, tag: str, **attrs: str) -> bool:
-    """Whether a link or button shows these words, and what it is for only
-    to a screen reader."""
+    """Whether a link or button shows these words, then says what it is for
+    only to a screen reader, in its last span."""
     return any(
-        "".join(found.find_all(string=True, recursive=False)).strip() == words
-        and found.all("span", class_="sr-only")
+        (only_said := found.all("span", class_="sr-only"))
+        and found.text.removesuffix(only_said[-1].text).rstrip() == words
         for found in read(page).all(tag, **attrs)
     )

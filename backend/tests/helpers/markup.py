@@ -1,6 +1,9 @@
 """Readers of a page's HTML, so a test checks what the page offers (a link's
 words and address, a button's class) and not how its tags are spelt. The
-page is read by BeautifulSoup with lxml's parser, as a browser would."""
+page is read by BeautifulSoup with lxml's parser. For the markup the
+templates write it builds the tree a browser does, though not for all
+markup: it keeps a form put straight in a table around its rows, and
+closes an ordinary element written as `<span/>`."""
 
 from __future__ import annotations
 
@@ -11,8 +14,9 @@ from bs4 import BeautifulSoup, NavigableString, Tag
 from lxml.html import defs
 
 # Elements that start a line, so their words never run into their
-# neighbours': lxml's block elements, HTML5's sections, and a line break.
-_BREAKS = defs.block_tags | {
+# neighbours': lxml's block elements but del and ins, which a browser shows
+# in the line, HTML5's sections, and a line break.
+_BREAKS = defs.block_tags - {"del", "ins"} | {
     "article",
     "aside",
     "br",
@@ -36,12 +40,12 @@ class Unescaped(str):
 
 
 def _words(tag: Tag, *, spoken: bool) -> Iterator[str]:
-    """Its words, leaving out script, style and comments; spoken, also
-    what is hidden from a screen reader (aria-hidden, or hidden)."""
+    """Its words, leaving out script, style, comments and what is hidden;
+    spoken, also what is hidden from a screen reader (aria-hidden)."""
     for child in tag.contents:
         if isinstance(child, Tag):
-            if spoken and (
-                child.get("aria-hidden") == "true" or "hidden" in child.attrs
+            if "hidden" in child.attrs or (
+                spoken and child.get("aria-hidden") == "true"
             ):
                 continue
             gap = " " if child.name in _BREAKS else ""
@@ -65,7 +69,8 @@ class Element(Tag):
     @property
     def text(self) -> str:
         """Its words as a browser lays them out, screen-reader-only ones
-        included: spaces run together, no-break spaces kept."""
+        included and hidden ones not: spaces run together, no-break spaces
+        kept."""
         return _SPACES.sub(" ", "".join(_words(self, spoken=False))).strip()
 
     @property
@@ -126,9 +131,9 @@ def row_links(page: str | Element, path: str) -> list[str]:
     `path` (path/id), in the page's order: the names a list shows."""
     return [
         a.text
-        for td in read(page).all("td")
-        for a in td.all("a")
-        if re.fullmatch(rf"{re.escape(path)}/\d+", a.attrs.get("href", ""))
+        for a in read(page).all("a")
+        if a.find_parent("td")
+        and re.fullmatch(rf"{re.escape(path)}/\d+", a.attrs.get("href", ""))
     ]
 
 

@@ -9,6 +9,7 @@ from decimal import Decimal
 
 import pytest
 from babel.messages.catalog import Catalog
+from bs4 import NavigableString
 from fastapi.testclient import TestClient
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
@@ -364,14 +365,14 @@ def test_nothing_settled_says_so(admin_client: TestClient, session: Session) -> 
 
 def views_of(page: str, label: str) -> list[tuple[str, str, str | None]]:
     """What a nav holds, in order: each part's tag (text for words between
-    them), words and link."""
+    them), words and link. A comment is not a part."""
     nav = read(page).one("nav", aria_label=label)
     return [
         (part.name, part.text, part.attrs.get("href"))
         if isinstance(part, Element)
         else ("text", str(part).strip(), None)
         for part in nav.contents
-        if isinstance(part, Element) or str(part).strip()
+        if isinstance(part, Element) or (type(part) is NavigableString and part.strip())
     ]
 
 

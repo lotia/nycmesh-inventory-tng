@@ -902,13 +902,20 @@ def test_cut_kinds_tell_translators_they_are_kinds_of_save() -> None:
 @pytest.mark.parametrize("lapsed", get_args(Lapsed.__value__))
 def test_every_kind_of_lapsed_has_words(lapsed: str) -> None:
     # _listing.html words each in a table: a missing key would say nothing.
+    # The row sits in a table, as on a page, or a browser's parser drops it.
     shown = from_macros(
         '{% from "_listing.html" import filters, empty %}'
-        "{{ filters(listing) }}{{ empty(listing, 2, '') }}",
-        listing=listing(lapsed=lapsed, show=lapsed, narrowed=False, search=""),
+        "{{ filters(listing) }}<table>{{ empty(listing, 2, '') }}</table>",
+        listing=listing(
+            lapsed=lapsed,
+            show=lapsed,
+            narrowed=False,
+            search="",
+            view=SimpleNamespace(**vars(VIEW) | {"filters": False}),
+        ),
     )
     assert markup.links(shown)[1][0]
-    assert any(re.match(r"\w", cell.text) for cell in markup.read(shown).all("td"))
+    assert re.match(r"\w", markup.read(shown).one("td").text)
 
 
 def test_the_walk_reads_the_words_an_attribute_says() -> None:
