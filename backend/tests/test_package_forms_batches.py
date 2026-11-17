@@ -8,8 +8,8 @@ from decimal import Decimal
 from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
 
-from inventory_tng.ledger import BodyRefusedReply, SizeProblem
 from inventory_tng.models import ItemPackage
+from inventory_tng.scan.batch_schemas import BodyRefusedReply, SizeProblem
 
 from helpers.package_forms import quantities_by_form
 from helpers.rows import add, tag

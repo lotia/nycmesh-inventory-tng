@@ -4,7 +4,8 @@ from typing import Any, get_args
 
 import pytest
 
-from inventory_tng import devices, ledger, openapi
+from inventory_tng import devices, openapi
+from inventory_tng.scan import batch_schemas
 
 
 @pytest.fixture(scope="module")
@@ -63,7 +64,7 @@ def test_a_refused_batch_names_every_kind_of_problem(schema: dict[str, Any]) -> 
         "$ref": "#/components/schemas/BatchProblem"
     }
     assert set(replies["BatchProblem"]["properties"]["type"]["enum"]) == set(
-        get_args(ledger.ProblemKind)
+        get_args(batch_schemas.ProblemKind)
     )
     assert replies["BodyRefusedReply"]["properties"]["detail"]["items"] == {
         "anyOf": [
@@ -72,7 +73,7 @@ def test_a_refused_batch_names_every_kind_of_problem(schema: dict[str, Any]) -> 
         ]
     }
     assert set(replies["SizeProblem"]["properties"]["type"]["enum"]) == set(
-        get_args(ledger.SizeProblemKind)
+        get_args(batch_schemas.SizeProblemKind)
     )
 
 

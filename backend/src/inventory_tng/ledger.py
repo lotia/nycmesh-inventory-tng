@@ -29,12 +29,10 @@ from collections import Counter, defaultdict
 from collections.abc import Collection, Iterable, Mapping, Sequence
 from decimal import Decimal
 from types import MappingProxyType
-from typing import Annotated, Literal, NamedTuple, cast
+from typing import Literal, NamedTuple, cast
 
 import structlog
 from opentelemetry import metrics
-from pydantic import BaseModel, Field, ValidationInfo, field_validator, model_validator
-from pydantic_core import PydanticCustomError
 from sqlalchemy import (
     ColumnElement,
     Select,
@@ -61,7 +59,6 @@ from inventory_tng.core.db import (
 )
 from inventory_tng.core.local_time import zone_at
 from inventory_tng.models import (
-    INTEGER_MAX,
     STORE_KINDS,
     Item,
     ItemPackage,
@@ -71,6 +68,7 @@ from inventory_tng.models import (
     OpenPackage,
     Volunteer,
 )
+from inventory_tng.scan import batch_schemas
 
 log = structlog.get_logger(__name__)
 meter = metrics.get_meter(__name__)
@@ -614,21 +612,6 @@ def _flows(
     return flows
 
 
-# What a volunteer records. Counts and adjustments are an administrator's
-# (inventory-tng-8i4.14). Whether each kind has a from side and a to side; the
-# database's ck_ledger_transaction_sides says the same.
-VolunteerKind = Literal["move", "receipt", "install", "open", "report"]
-SIDES: dict[str, tuple[bool, bool]] = {
-    "move": (True, True),
-    "receipt": (False, True),
-    "install": (True, False),
-    # At one place: from and to are the same (docs/decisions/0020).
-    "open": (True, True),
-    # Nothing moves: the place the open packages reported used up are at.
-    "report": (True, False),
-}
-MAX_LINES = 500
-
 replayed = meter.create_counter(
     "inventory.transactions.replayed",
     unit="{transaction}",
@@ -643,293 +626,11 @@ refused = meter.create_counter(
     "a package resized since the page read it, or for reusing a key, by reason",
 )
 
-# An id or install number: positive, and fits PostgreSQL's integer.
-Number = Annotated[int, Field(gt=0, le=INTEGER_MAX)]
-# An amount in an item's unit, as the ledger's quantities are kept; one
-# left on something may be none.
-Amount = Annotated[Decimal, Field(gt=0, max_digits=12, decimal_places=3)]
-Remaining = Annotated[Decimal, Field(ge=0, max_digits=12, decimal_places=3)]
-
-
-class Line(BaseModel):
-    item_id: Number
-    # In the item's unit: the scan page turns packages into units first.
-    quantity: Amount
-    package_id: Annotated[
-        Number | None,
-        Field(
-            description="Sealed packages of this package of the item, "
-            "kept sealed (docs/decisions/0020): `quantity` is a whole "
-            "number of them, in units. None: loose units. An opening's "
-            "lines name the package opened."
-        ),
-    ] = None
-    package_size: Annotated[
-        Amount | None,
-        Field(
-            description="Required when `package_id` is given, and only allowed "
-            "then: the size, in the item's unit, the package was counted in, "
-            "from the catalogue. Left out with `package_id`, it is refused as "
-            "package_size_required; given without, as "
-            "package_size_without_package. A line of a package resized since "
-            "is refused (package_resized), never counted in the new size.",
-            # Checked when left out too.
-            validate_default=True,
-        ),
-    ] = None
-    open_package_key: Annotated[
-        uuid.UUID | None,
-        Field(
-            description="An opening's: the key of the open package made, if "
-            "its item tracks opened packages, made by the page so a later "
-            "line can name it. One package a line, then. Any other line's: "
-            "the open package it is taken from, cut loose, or moved whole."
-        ),
-    ] = None
-    whole: Annotated[
-        bool | None,
-        Field(
-            description="A move's line taken from an open package: all that "
-            "is left on it, `quantity`, moves with it, and it stays open there."
-        ),
-    ] = None
-
-    @field_validator("package_size")
-    @classmethod
-    def _size(cls, size: Decimal | None, info: ValidationInfo) -> Decimal | None:
-        """Refused on `package_size` itself, in words naming both fields, for
-        whoever writes a client. `info.data` holds the fields declared before
-        this one that were not refused: so `package_id` stays before it, and
-        one refused already is left at that."""
-        if "package_id" not in info.data:
-            return size
-        if info.data["package_id"] is not None and size is None:
-            raise PydanticCustomError(
-                "package_size_required",
-                "package_size is required when package_id is given: the "
-                "size, in the item's unit, the package was counted in, from "
-                "the catalogue",
-            )
-        if info.data["package_id"] is None and size is not None:
-            raise PydanticCustomError(
-                "package_size_without_package",
-                "package_size is only allowed with package_id",
-            )
-        return size
-
-    def entry(self, kind: str, opened: int | None = None) -> Entry:
-        """As the ledger writes it: sealed on each side the kind has, loose
-        outside. An opening's leaves sealed and arrives as the open package
-        `opened`, or loose."""
-        sealed = Form(package_id=self.package_id)
-        if kind == "open":
-            arrives = Form(open_package_id=opened) if opened else LOOSE
-            return Entry(self.item_id, self.quantity, sealed, arrives)
-        if opened is not None:
-            # Taken from an open package: cut loose, or moved whole.
-            taken = Form(open_package_id=opened)
-            return Entry(
-                self.item_id, self.quantity, taken, taken if self.whole else LOOSE
-            )
-        has_from, has_to = SIDES[kind]
-        return Entry(
-            self.item_id,
-            self.quantity,
-            sealed if has_from else LOOSE,
-            sealed if has_to else LOOSE,
-        )
-
-
-class LengthReport(BaseModel):
-    """What a volunteer says is really on an open package, for an
-    administrator to check (docs/decisions/0020, 2026-11-12)."""
-
-    open_package_key: uuid.UUID
-    # In the item's unit.
-    left: Remaining
-
-
-class Batch(BaseModel):
-    key: uuid.UUID
-    kind: VolunteerKind
-    volunteer_id: Number
-    from_location_id: Number | None = None
-    to_location_id: Number | None = None
-    install_number: Number | None = None
-    lines: Annotated[
-        list[Line],
-        Field(
-            max_length=MAX_LINES,
-            description="One line per item and package (or loose): a batch "
-            "naming one on more than one line is refused, 422 with type repeated "
-            "on each of those lines. None only in a report.",
-        ),
-    ]
-    used_up: Annotated[
-        list[uuid.UUID] | None,
-        Field(
-            max_length=MAX_LINES,
-            description="Keys of open packages the volunteer says are used up, "
-            "for an administrator to confirm (docs/decisions/0020): with a cut "
-            "that took all they showed, or alone, in a report.",
-        ),
-    ] = None
-    lengths: Annotated[
-        list[LengthReport] | None,
-        Field(
-            max_length=MAX_LINES,
-            description="What the volunteer says is really on open packages, "
-            "by key, for an administrator to check (docs/decisions/0020): "
-            "with a cut, or alone, in a report. Never an adjustment.",
-        ),
-    ] = None
-    changed_from: Annotated[
-        list[Line] | None,
-        Field(
-            max_length=MAX_LINES,
-            description="The lines this batch held when its cart was put back "
-            "under its key, before the volunteer changed it: what it holds "
-            "less of than these, and than another batch recorded under the "
-            "key, the volunteer took off, kept for an administrator when "
-            "this batch is refused (409 key_reused). Compared with nothing "
-            "else: a batch sent again with other lines here is the same batch.",
-        ),
-    ] = None
-
-    @model_validator(mode="after")
-    def _sides(self) -> Batch:
-        if (self.kind == "report") != (not self.lines):
-            raise ValueError("a report has no lines; every other batch has some")
-        reports = bool(self.used_up or self.lengths)
-        if self.kind == "report" and not reports:
-            raise ValueError(
-                "a report names the open packages used up, or what is on them"
-            )
-        if reports and self.kind not in ("move", "install", "report"):
-            raise ValueError("only a batch taking from where it is reports")
-        has_from, has_to = SIDES[self.kind]
-        if (self.from_location_id is not None) != has_from or (
-            self.to_location_id is not None
-        ) != has_to:
-            sides = " and ".join(
-                side for side, wanted in (("from", has_from), ("to", has_to)) if wanted
-            )
-            raise ValueError(f"a {self.kind} has only a {sides} location")
-        if self.kind == "open":
-            if self.from_location_id != self.to_location_id:
-                raise ValueError("an opening is at one place: from and to are it")
-            if any(line.package_id is None for line in self.lines):
-                raise ValueError("an opening's lines each name a package")
-        elif self.from_location_id == self.to_location_id:
-            raise ValueError("from and to must be different locations")
-        for line in self.lines:
-            taken = line.open_package_key is not None and self.kind != "open"
-            if taken and (line.package_id is not None or self.kind == "receipt"):
-                raise ValueError("a line is taken from an open package, or not")
-            if line.whole and not (taken and self.kind == "move"):
-                raise ValueError("only a move's open package moves whole")
-        if self.install_number is not None and self.kind != "install":
-            raise ValueError("only an install has an install number")
-        return self
-
-
-# Where in the batch, as pydantic gives it ("lines", 2, "item_id"), and what.
-# The 422 sends the kind, never words: the scan page words each kind itself
-# (docs/decisions/0022). No kind takes values yet.
-ProblemKind = Literal[
-    "not_found",
-    "not_whole",
-    "not_whole_packages",
-    "one_package",
-    "open_package_closed",
-    "open_package_elsewhere",
-    "open_package_whole",
-    "moved_whole",
-    "package_resized",
-    "refused",
-    "retired",
-    "retired_package",
-    "repeated",
-]
-Problem = tuple[tuple[str | int, ...], ProblemKind]
-# A line's package_size refused by Line's own check, in FastAPI's own 422.
-SizeProblemKind = Literal["package_size_required", "package_size_without_package"]
-
-
-class BatchProblem(BaseModel):
-    """One problem of a refused batch, shaped as FastAPI's own are: where,
-    and its kind, which the scan page words itself."""
-
-    type: ProblemKind
-    loc: list[str | int]
-
-
-class BatchRefusedReply(BaseModel):
-    detail: list[BatchProblem]
-
-
-class BodyProblem(BaseModel):
-    """One problem of a body that cannot be a batch at all, in FastAPI's
-    own 422: pydantic's type, where, and words for whoever writes a
-    client, which the scan page does not show."""
-
-    type: str
-    loc: list[str | int]
-    msg: str
-
-
-class SizeProblem(BaseModel):
-    """A line's package_size refused by its own check, in FastAPI's own
-    422: one of the kinds there the scan page words itself."""
-
-    type: SizeProblemKind
-    loc: list[str | int]
-    msg: str
-
-
-class BodyRefusedReply(BaseModel):
-    detail: list[SizeProblem | BodyProblem]
-
 
 class BatchRefused(Exception):
-    def __init__(self, problems: list[Problem]) -> None:
+    def __init__(self, problems: list[batch_schemas.Problem]) -> None:
         super().__init__(f"{len(problems)} problems")
         self.problems = problems
-
-
-class RecordedLine(BaseModel):
-    """A line of the transaction recorded under a batch's key, as a batch
-    sends one (Line), so the scan page compares it with what it sent."""
-
-    item_id: int
-    quantity: Decimal
-    package_id: int | None
-    # The package's size now, with package_id.
-    package_size: Decimal | None
-    open_package_key: uuid.UUID | None
-    whole: bool | None
-
-
-class RecordedLength(BaseModel):
-    """A report of what is on an open package, as recorded (LengthReport)."""
-
-    open_package_key: uuid.UUID
-    left: Decimal
-
-
-class RecordedBatch(BaseModel):
-    """The transaction recorded under a batch's key, as a batch sends one
-    (Batch), with its id."""
-
-    transaction_id: int
-    kind: VolunteerKind
-    volunteer_id: int
-    from_location_id: int | None
-    to_location_id: int | None
-    install_number: int | None
-    lines: list[RecordedLine]
-    used_up: list[uuid.UUID]
-    lengths: list[RecordedLength]
 
 
 class KeyReused(Exception):
@@ -940,7 +641,7 @@ class KeyReused(Exception):
     for an administrator to correct (over_recorded.py)."""
 
     def __init__(
-        self, recorded: RecordedBatch | None, over: Mapping[int, Decimal]
+        self, recorded: batch_schemas.RecordedBatch | None, over: Mapping[int, Decimal]
     ) -> None:
         super().__init__("key reused")
         self.recorded = recorded
@@ -975,7 +676,9 @@ class Recorded(NamedTuple):
     checks: Mapping[open_packages.CheckRaised, int] = MappingProxyType({})
 
 
-def record(session: Session, batch: Batch, *, device_id: int | None) -> Recorded:
+def record(
+    session: Session, batch: batch_schemas.Batch, *, device_id: int | None
+) -> Recorded:
     """Write the batch, or find the one already written with its key. The
     caller commits.
 
@@ -1107,12 +810,14 @@ Into = Literal["open", "loose"]
 Reported = Literal["cut", "button"]
 
 
-def _packages_in(line: Line, size: Decimal) -> int:
+def _packages_in(line: batch_schemas.Line, size: Decimal) -> int:
     """How many whole packages of `size` a line holds."""
     return int(line.quantity / size)
 
 
-def _opening_keys(batch: Batch, number: int, count: int) -> list[uuid.UUID]:
+def _opening_keys(
+    batch: batch_schemas.Batch, number: int, count: int
+) -> list[uuid.UUID]:
     """The keys an opening's line makes its open packages under, one for
     each of the `count` packages it opens: the page's, for its one, or made from
     the batch's, so they are the same however often sent. A line of several
@@ -1123,13 +828,13 @@ def _opening_keys(batch: Batch, number: int, count: int) -> list[uuid.UUID]:
     return [
         uuid.uuid5(batch.key, f"open {number} {each}" if each else f"open {number}")
         # A page never sent more: a replay of more is another batch's.
-        for each in range(min(count, MAX_LINES))
+        for each in range(min(count, batch_schemas.MAX_LINES))
     ]
 
 
 def _opening(
     session: Session,
-    batch: Batch,
+    batch: batch_schemas.Batch,
     packages: Mapping[int, PackageFacts],
     lines: list[Entry],
 ) -> tuple[list[Entry], dict[Into, int]]:
@@ -1166,7 +871,9 @@ def _opening(
     return _as_opened(batch, made), opened
 
 
-def _as_opened(batch: Batch, made: Mapping[int, Sequence[int]]) -> list[Entry]:
+def _as_opened(
+    batch: batch_schemas.Batch, made: Mapping[int, Sequence[int]]
+) -> list[Entry]:
     """An opening's lines, into the open packages `made` for a line by its
     number, if any, a line for each and its share; the others loose, one
     line for each package."""
@@ -1505,7 +1212,7 @@ def _line_form_breaks(
 # Each of the rules a batch's line can break, as its problem: which field,
 # and what. A batch's forms are sealed or loose alike on both sides
 # (Line.entry), or an opening's, so no other form rule can be broken by one.
-LINE_PROBLEMS: dict[str, tuple[str, ProblemKind]] = {
+LINE_PROBLEMS: dict[str, tuple[str, batch_schemas.ProblemKind]] = {
     "movement_whole_units": ("quantity", "not_whole"),
     "receipt_retired_item": ("item_id", "retired"),
     "movement_package_of_item": ("package_id", "not_found"),
@@ -1522,7 +1229,7 @@ LINE_PROBLEMS: dict[str, tuple[str, ProblemKind]] = {
 
 
 def _as_counted(
-    line: Line, packages: Mapping[int, PackageFacts]
+    line: batch_schemas.Line, packages: Mapping[int, PackageFacts]
 ) -> PackageFacts | None:
     """The package a line names, in the size it was counted in, if the
     package is of its item: no quantity in another size says what the
@@ -1534,7 +1241,9 @@ def _as_counted(
     return package._replace(size=line.package_size)
 
 
-def _packages_opened(batch: Batch, packages: Mapping[int, PackageFacts]) -> int:
+def _packages_opened(
+    batch: batch_schemas.Batch, packages: Mapping[int, PackageFacts]
+) -> int:
     """How many open packages an opening would make (_opening), in the
     size each line was counted in (_as_counted)."""
     return sum(
@@ -1546,15 +1255,15 @@ def _packages_opened(batch: Batch, packages: Mapping[int, PackageFacts]) -> int:
 
 def _problems(
     session: Session,
-    batch: Batch,
+    batch: batch_schemas.Batch,
     held: Held,
     lines: Sequence[Entry],
     packages: Mapping[int, PackageFacts],
     opens: Mapping[int, OpenFacts],
-) -> list[Problem]:
+) -> list[batch_schemas.Problem]:
     """What is wrong with a batch, line by line (`lines`, its own), with its
     rows held (hold)."""
-    problems: list[Problem] = []
+    problems: list[batch_schemas.Problem] = []
     if session.get(Volunteer, batch.volunteer_id) is None:
         problems.append((("volunteer_id",), "not_found"))
     for field in ("from_location_id", "to_location_id"):
@@ -1594,7 +1303,10 @@ def _problems(
             field, kind = LINE_PROBLEMS[rule]
             problems.append((("lines", number, field), kind))
     # Never more open packages than a page could have sent a line each for.
-    if batch.kind == "open" and _packages_opened(batch, packages) > MAX_LINES:
+    if (
+        batch.kind == "open"
+        and _packages_opened(batch, packages) > batch_schemas.MAX_LINES
+    ):
         problems += [
             (("lines", number, "quantity"), "one_package")
             for number, line in enumerate(batch.lines)
@@ -1940,7 +1652,7 @@ def record_adjustment(
     return _correct(session, key, "adjustment", header, [line])
 
 
-def _header(batch: Batch) -> dict[str, object]:
+def _header(batch: batch_schemas.Batch) -> dict[str, object]:
     """The batch's own columns: everything but its key, lines and reports,
     which are compared apart (_replay), and what it was changed from."""
     return batch.model_dump(
@@ -1948,7 +1660,9 @@ def _header(batch: Batch) -> dict[str, object]:
     )
 
 
-def _lengths_as_kept(lengths: Sequence[LengthReport]) -> list[dict[str, str]]:
+def _lengths_as_kept(
+    lengths: Sequence[batch_schemas.LengthReport],
+) -> list[dict[str, str]]:
     """A batch's reports of what is on open packages, as its transaction
     keeps them."""
     return [
@@ -1962,7 +1676,7 @@ def _kept_as_sent(kept: Mapping[str, str]) -> tuple[uuid.UUID, Decimal]:
     return uuid.UUID(kept["open_package_key"]), Decimal(kept["left"])
 
 
-def _replay(session: Session, batch: Batch) -> LedgerTransaction | None:
+def _replay(session: Session, batch: batch_schemas.Batch) -> LedgerTransaction | None:
     """The transaction already written with the batch's key, if any, and
     KeyReused if it is not this batch."""
     transaction = session.scalar(
@@ -2073,19 +1787,19 @@ def _more_written(
 
 def _as_batch(
     session: Session, transaction: LedgerTransaction, movements: Mapping[int, Entry]
-) -> RecordedBatch | None:
+) -> batch_schemas.RecordedBatch | None:
     """`transaction`, written with `movements`, as a batch would send it:
     a sealed line by its package, at its size now; one taken from an open
     package, or an opening's, by the open package's key. None if no
     volunteer's batch wrote it."""
-    if transaction.kind not in SIDES or transaction.volunteer_id is None:
+    if transaction.kind not in batch_schemas.SIDES or transaction.volunteer_id is None:
         return None
     lines = list(movements.values())
     forms = [form for line in lines for form in (line.leaves, line.arrives)]
     keys = _keys_of(session, {f.open_package_id for f in forms if f.open_package_id})
     sizes = _sizes(session, {f.package_id for f in forms if f.package_id})
 
-    def line_of(line: Entry) -> RecordedLine:
+    def line_of(line: Entry) -> batch_schemas.RecordedLine:
         if transaction.kind == "open":
             # Sealed, opened into a followed open package or loose.
             package_id = line.leaves.package_id
@@ -2099,7 +1813,7 @@ def _as_batch(
             package_id = line.leaves.package_id or line.arrives.package_id
             open_id = None
             whole = None
-        return RecordedLine(
+        return batch_schemas.RecordedLine(
             item_id=line.item_id,
             quantity=line.quantity,
             package_id=package_id,
@@ -2108,9 +1822,9 @@ def _as_batch(
             whole=whole,
         )
 
-    return RecordedBatch(
+    return batch_schemas.RecordedBatch(
         transaction_id=transaction.id,
-        kind=cast(VolunteerKind, transaction.kind),
+        kind=cast(batch_schemas.VolunteerKind, transaction.kind),
         volunteer_id=transaction.volunteer_id,
         from_location_id=transaction.from_location_id,
         to_location_id=transaction.to_location_id,
@@ -2118,7 +1832,7 @@ def _as_batch(
         lines=[line_of(line) for line in lines],
         used_up=list(transaction.used_up),
         lengths=[
-            RecordedLength(open_package_key=key, left=left)
+            batch_schemas.RecordedLength(open_package_key=key, left=left)
             for key, left in map(_kept_as_sent, transaction.lengths)
         ],
     )
@@ -2154,7 +1868,9 @@ def _sizes(session: Session, package_ids: Collection[int]) -> dict[int, Decimal]
     return {package_id: size for package_id, size in found}
 
 
-def _open_packages_named(session: Session, batch: Batch) -> dict[int, int]:
+def _open_packages_named(
+    session: Session, batch: batch_schemas.Batch
+) -> dict[int, int]:
     """The open packages a batch's lines take from, by key, by line number.
     A key with none is left out."""
     keys = {
@@ -2168,7 +1884,9 @@ def _open_packages_named(session: Session, batch: Batch) -> dict[int, int]:
     return {number: found[key] for number, key in keys.items() if key in found}
 
 
-def _made_by_opening(session: Session, batch: Batch) -> dict[int, list[int]]:
+def _made_by_opening(
+    session: Session, batch: batch_schemas.Batch
+) -> dict[int, list[int]]:
     """The open packages an opening's lines made, under their keys
     (_opening_keys), by line number."""
     sizes = _sizes(
@@ -2193,7 +1911,7 @@ def _made_by_opening(session: Session, batch: Batch) -> dict[int, list[int]]:
     }
 
 
-def _written_as(session: Session, batch: Batch) -> list[Entry]:
+def _written_as(session: Session, batch: batch_schemas.Batch) -> list[Entry]:
     """A batch's lines as written once, to compare with what was: an
     opening's with the open packages made under their keys (_opening),
     another's taken from the open packages they name."""
@@ -2204,20 +1922,3 @@ def _written_as(session: Session, batch: Batch) -> list[Entry]:
         line.entry(batch.kind, named.get(number))
         for number, line in enumerate(batch.lines)
     ]
-
-
-class Saved(BaseModel):
-    transaction_id: int
-
-
-class KeyReusedReply(BaseModel):
-    reason: Literal["key_reused"]
-    recorded: Annotated[
-        RecordedBatch | None,
-        Field(
-            description="The transaction recorded under the key, as a batch "
-            "sends one, for the page to show what differs; none if no "
-            "volunteer's batch recorded it. Only one sending the key learns "
-            "of it."
-        ),
-    ] = None

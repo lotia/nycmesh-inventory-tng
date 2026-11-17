@@ -14,7 +14,7 @@ from sqlalchemy.orm import Session
 
 from inventory_tng import open_packages, over_recorded
 from inventory_tng.admin.counts import COUNTS
-from inventory_tng.ledger import LOOSE, Batch, Entry, Form, insert_transaction, record
+from inventory_tng.ledger import LOOSE, Entry, Form, insert_transaction, record
 from inventory_tng.models import (
     AdjustmentReason,
     Category,
@@ -28,6 +28,7 @@ from inventory_tng.models import (
     Volunteer,
 )
 from inventory_tng.pages import retired_holding
+from inventory_tng.scan.batch_schemas import Batch
 
 from helpers.concurrency import Committed
 from helpers.markup import Element, hidden_fields, read

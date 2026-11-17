@@ -60,7 +60,6 @@ from inventory_tng.core.db import (
 from inventory_tng.core.mail import Message, Notify
 from inventory_tng.core.settings import RateLimits
 from inventory_tng.ledger import (
-    Batch,
     BatchRefused,
     Entry,
     Form,
@@ -82,6 +81,7 @@ from inventory_tng.models import (
     SignInSettings,
     Volunteer,
 )
+from inventory_tng.scan.batch_schemas import Batch
 
 from helpers.concurrency import Committed, Worker, delete_made, made, newest_ids
 from helpers.devices import new_device

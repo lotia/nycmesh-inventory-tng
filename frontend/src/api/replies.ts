@@ -34,7 +34,7 @@ export const RecordedLine = v.object({
 });
 
 /** The transaction recorded under a batch's key, as a batch sends one,
- * with its id (backend ledger.RecordedBatch). */
+ * with its id (backend scan/batch_schemas.RecordedBatch). */
 export const RecordedBatch = v.object({
   transaction_id: id,
   kind: v.picklist(["move", "receipt", "install", "open", "report"]),
@@ -73,7 +73,7 @@ export const Saved = v.object({ transaction_id: id });
 
 /** FastAPI's 422, and the ledger's, which has the same shape: only the parts
  * the pages read are checked, where and of what kind, never the words
- * (backend ledger.BatchProblem). */
+ * (backend scan/batch_schemas.BatchProblem). */
 export const ValidationFailed = v.object({
   detail: v.array(
     v.looseObject({

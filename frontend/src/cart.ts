@@ -38,12 +38,12 @@ import { groups, type Rules, respell } from "./units";
  * before kept one only from a save put back), and keeps the size each
  * package was counted at (sizes). */
 export const STORAGE_KEY = "inventory.cart.v2";
-/** The server's limits (ledger.py), checked here too, so a batch it would
- * refuse is never queued and the cart is kept to fix it. */
+/** The server's limits (scan/batch_schemas.py), checked here too, so a
+ * batch it would refuse is never queued and the cart is kept to fix it. */
 const MAX_ID = 2 ** 31 - 1;
 /** numeric(12,3): under a billion units, in thousandths. */
 const MAX_AMOUNT = 10 ** 12;
-/** Lines in a batch (ledger.MAX_LINES): a cart line may be several. */
+/** Lines in a batch (batch_schemas.MAX_LINES): a cart line may be several. */
 const MAX_LINES = 500;
 /** Batch keys a catalogue is asked about (catalogue.py, MOST_KEYS). */
 export const MAX_KEYS_ASKED = 100;
@@ -123,7 +123,7 @@ export type Cart = v.InferOutput<typeof CartSchema>;
 export type Kind = Cart["kind"];
 
 /** Which sides a kind has: a receipt comes from outside, an install goes to
- * one (the ledger's rule, in ledger.py). */
+ * one (the ledger's rule, in scan/batch_schemas.py). */
 export const SIDES: Record<Kind, Record<Side, boolean>> = {
   move: { from: true, to: true },
   receipt: { from: false, to: true },

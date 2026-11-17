@@ -19,7 +19,6 @@ from inventory_tng.core.db import set_actor
 from inventory_tng.core.history import LEDGER
 from inventory_tng.core.local_time import DEFAULT_ZONE, zone_at
 from inventory_tng.ledger import (
-    BodyRefusedReply,
     balance,
     countable,
     insert_transaction,
@@ -42,6 +41,7 @@ from inventory_tng.models import (
     Location,
     Movement,
 )
+from inventory_tng.scan.batch_schemas import BodyRefusedReply
 
 from helpers.rows import add, breaks, item_fields, named, refused, tag, violates
 from helpers.stock import URL, Place, received, retire, stocked, write

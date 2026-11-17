@@ -10,8 +10,9 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 from structlog.testing import capture_logs
 
-from inventory_tng import ledger, open_packages
+from inventory_tng import open_packages
 from inventory_tng.models import Admin, OpenPackage
+from inventory_tng.scan import batch_schemas
 
 from helpers.package_forms import quantities_by_form
 from helpers.rows import add, tag
@@ -159,7 +160,7 @@ def test_an_opening_written_loose_is_found_after_tracking_is_turned_on(
 def test_an_opening_of_more_packages_than_lines_is_refused(
     registered_client: TestClient, spools: Spools, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    monkeypatch.setattr(ledger, "MAX_LINES", 1)
+    monkeypatch.setattr(batch_schemas, "MAX_LINES", 1)
     batch = opening(spools, sealed_line(spools, "610"))
     response = registered_client.post(URL, json=batch)
     assert response.status_code == 422

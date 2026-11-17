@@ -147,8 +147,8 @@ const isReport = (kind: unknown): kind is ReportKind =>
   typeof kind === "string" && Object.hasOwn(REPORTS, kind);
 
 /** A kind of problem a 422 names: the ledger's (backend
- * ledger.BatchProblem), or a line's package size in FastAPI's own
- * (ledger.SizeProblem). */
+ * scan/batch_schemas.BatchProblem), or a line's package size in FastAPI's
+ * own (scan/batch_schemas.SizeProblem). */
 export type ProblemKind =
   | Schemas["BatchProblem"]["type"]
   | Schemas["SizeProblem"]["type"];
