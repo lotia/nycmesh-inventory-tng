@@ -9,7 +9,9 @@ from collections.abc import Callable, Iterator
 import pytest
 from fastapi import FastAPI
 from fastapi.routing import iter_route_contexts
+from fastapi.testclient import TestClient
 from sqlalchemy import select
+from sqlalchemy.orm import Session
 
 from inventory_tng.db import lock_catalogue
 from inventory_tng.models import Item, ItemPackage
@@ -18,7 +20,8 @@ from helpers.pages import CATALOGUE, PAGES, Built, Path, built, path
 from helpers.queries import counting
 
 # A world with one of what each page lists, and one with eleven, each built
-# once for the module.
+# once for the module. Each holds every page's more, so a page's own more is
+# checked alone, in the visit.
 
 
 @pytest.fixture(scope="module")
@@ -86,25 +89,35 @@ def test_a_page_reads_alike_for_one_row_or_eleven(
     one: Built,
     eleven: Built,
 ) -> None:
-    def read(world: Built) -> tuple[int, int]:
-        """The statements the page sent, and how long it is, in `world`."""
-        with world.visit(device=route == CATALOGUE) as (client, session):
-            url = path(where, world.world)
-            # Warmed first: what a first request reads once, such as settings.
-            warmed = client.get(url)
-            assert warmed.status_code == 200, (url, warmed.status_code)
-            # As a request's own session would start: nothing loaded.
-            session.flush()
-            session.expire_all()
-            with counting(session) as sent:
-                response = client.get(url)
+    def read(client: TestClient, session: Session, url: str) -> tuple[int, bytes]:
+        """The statements the page sent, and the page."""
+        # Warmed first: what a first request reads once, such as settings.
+        warmed = client.get(url)
+        assert warmed.status_code == 200, (url, warmed.status_code)
+        # As a request's own session would start: nothing loaded.
+        session.flush()
+        session.expire_all()
+        with counting(session) as sent:
+            response = client.get(url)
         assert response.status_code == 200, (url, response.status_code)
-        return len(sent), len(response.content)
+        return len(sent), response.content
 
-    few, shorter = read(one)
-    many, longer = read(eleven)
-    # Else what it adds is not what the page lists.
-    assert longer > shorter, f"{route} shows nothing more"
+    with one.visit(device=route == CATALOGUE) as (client, session):
+        few, shown = read(client, session, path(where, one.world))
+        # One more of what the page lists, by its own more, alone: the page
+        # shows it, so what each world holds is what it lists.
+        world = one.world.on(session)
+        more = PAGES[route].more
+        assert more
+        more(world)
+        url = path(where, world)
+        grown = client.get(url)
+    assert grown.status_code == 200, (url, grown.status_code)
+    assert len(grown.content) > len(shown), (
+        f"{route}: what its more adds is not shown at {url}"
+    )
+    with eleven.visit(device=route == CATALOGUE) as (client, session):
+        many, _ = read(client, session, path(where, eleven.world))
     assert many == few, f"{route}: {few} statements for one row, {many} for eleven"
 
 

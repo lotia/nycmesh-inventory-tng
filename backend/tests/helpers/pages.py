@@ -2,6 +2,7 @@
 world they read: built once a module, in a database of its own, committed,
 so a test only reads it, in a transaction of its own rolled back after."""
 
+import copy
 from collections.abc import Callable, Generator, Mapping
 from contextlib import contextmanager
 from dataclasses import dataclass, field
@@ -15,7 +16,7 @@ from sqlalchemy.orm import Session
 
 from inventory_tng import accounts, devices, over_recorded, sign_in
 from inventory_tng.admin.length_checks import KINDS
-from inventory_tng.db import DATABASE_INFO, Database, make_database
+from inventory_tng.db import DATABASE_INFO, Base, Database, make_database
 from inventory_tng.models import (
     Admin,
     Authenticator,
@@ -37,6 +38,7 @@ from helpers.devices import ADDRESS, new_device
 from helpers.rows import add, rolled_back, setting_up, tag
 from helpers.sign_in import new_admin, sealed
 from helpers.stock import (
+    Place,
     Spools,
     cut,
     length,
@@ -88,6 +90,26 @@ class World:
     labels: list[int] = field(default_factory=list)
     code_id: int = 0
     phrase: str = ""
+
+    def on(self, session: Session) -> World:
+        """This world in `session`, its rows merged in, so what is added to
+        it there goes with that session, and this one is left as built."""
+        return _in(session, self)
+
+
+def _in[T](session: Session, holder: T) -> T:
+    copied = copy.copy(holder)
+    for name, value in vars(holder).items():
+        if isinstance(value, Base):
+            value = session.merge(value, load=False)
+        elif isinstance(value, Session):
+            value = session
+        elif isinstance(value, Spools | Place):
+            value = _in(session, value)
+        elif isinstance(value, list):
+            value = list(value)
+        setattr(copied, name, value)
+    return copied
 
 
 def base(session: Session) -> World:
