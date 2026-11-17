@@ -272,7 +272,7 @@ class DeviceFilter:
 
 
 def find_devices(chosen: DeviceFilter) -> Select[Device]:
-    """The devices the filter matches, to sort and page (admin/devices.py)."""
+    """The devices the filter matches, to sort and page (devices/queries.py)."""
     return select(Device).where(*chosen.where())
 
 

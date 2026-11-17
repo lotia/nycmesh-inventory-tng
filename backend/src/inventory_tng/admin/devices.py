@@ -13,7 +13,6 @@ import structlog
 from babel.support import LazyProxy
 from fastapi import APIRouter, Form, Request
 from fastapi.responses import HTMLResponse, Response
-from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from inventory_tng.accounts import qr_svg
@@ -36,9 +35,8 @@ from inventory_tng.admin.listing import (
     Sorting,
     View,
     arranged,
-    count,
-    ordered,
 )
+from inventory_tng.admin.listing import order as order_of
 from inventory_tng.admins.guards import AdminSignedIn, ConfirmedAdmin, SignedIn, changed
 from inventory_tng.core.db import DbSession, attempt
 from inventory_tng.core.local_time import parse_local, site_zone
@@ -49,7 +47,7 @@ from inventory_tng.core.phrases import (
     lazy_pgettext,
     ngettext,
 )
-from inventory_tng.devices import devices
+from inventory_tng.devices import devices, queries
 from inventory_tng.models import Device, RegistrationCode, whole
 from inventory_tng.once import OnceKey, sent_before
 from inventory_tng.pages import NOTICES, not_found, redirect
@@ -132,9 +130,7 @@ def _list_page(
     values: dict[str, str] | None = None,
 ) -> HTMLResponse:
     view = view or View.read(DEVICES, CODE_SORTING)
-    codes = session.scalars(
-        select(RegistrationCode).order_by(RegistrationCode.created_at.desc())
-    ).all()
+    codes = queries.codes_newest_first(session)
     at = now()
     wanted = view.filtered("state") or None
     stated = ((code, state(code, at)) for code in codes)
@@ -142,13 +138,7 @@ def _list_page(
         (row for row in stated if wanted is None or row[1] == wanted), view
     )
     # How many devices each code on the page registered.
-    counts = dict(
-        session.execute(
-            select(Device.registration_code_id, func.count())
-            .where(Device.registration_code_id.in_([code.id for code, _ in shown]))
-            .group_by(Device.registration_code_id)
-        ).all()
-    )
+    counts = queries.devices_registered_by(session, [code.id for code, _ in shown])
     rows = [(code, said, counts.get(code.id, 0)) for code, said in shown]
     log.debug("codes listed", found=view.found, sort=view.by, page=view.page)
     return admin_page(
@@ -497,9 +487,14 @@ def device_list(
     view = _view(typed, asked)
     found: list[Device] = []
     if not problems:
-        query = devices.find_devices(chosen)
-        view = view.counted(count(session, query))
-        found = list(session.scalars(ordered(query, view, Device.id)))
+        view = view.counted(queries.devices_found(session, chosen))
+        found = queries.devices_chosen(
+            session,
+            chosen,
+            order=order_of(view, Device.id),
+            limit=view.per_page,
+            offset=view.offset,
+        )
     log.debug(
         "devices listed",
         found=view.found,
