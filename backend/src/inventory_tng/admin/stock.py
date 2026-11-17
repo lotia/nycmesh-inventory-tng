@@ -12,7 +12,7 @@ from typing import Any, Literal, cast
 import structlog
 from fastapi import APIRouter, Request
 from fastapi.responses import Response
-from sqlalchemy import ColumnElement, any_, func, or_, select, true
+from sqlalchemy import ColumnElement, true
 from sqlalchemy.orm import Session
 
 from inventory_tng import open_packages, over_recorded
@@ -36,21 +36,10 @@ from inventory_tng.admin.listing import (
 from inventory_tng.admins.guards import AdminSignedIn
 from inventory_tng.core.db import DbSession
 from inventory_tng.core.phrases import Words, gettext, lazy_gettext
-from inventory_tng.models import (
-    INTEGER_MAX,
-    STORE_KINDS,
-    Item,
-    ItemPackage,
-    Location,
-    whole,
-)
+from inventory_tng.models import INTEGER_MAX, Item, ItemPackage, Location, whole
 from inventory_tng.pages import templates
-from inventory_tng.stock.balance import (
-    SHORT,
-    balance,
-    by_form,
-    retired_places_holding_stock,
-)
+from inventory_tng.stock import queries
+from inventory_tng.stock.balance import SHORT, retired_places_holding_stock
 
 log = structlog.get_logger(__name__)
 
@@ -121,13 +110,7 @@ def _holdings(session: Session, where: ColumnElement[bool]) -> list[Holding]:
     """The balances `where` picks, by place then item, as people sort them."""
     return [
         Holding(item, location, quantity)
-        for item, location, quantity in session.execute(
-            select(Item, Location, balance.c.quantity)
-            .join(Item, Item.id == balance.c.item_id)
-            .join(Location, Location.id == balance.c.location_id)
-            .where(where)
-            .order_by(func.lower(Location.name), func.lower(Item.name))
-        )
+        for item, location, quantity in queries.balances(session, where)
     ]
 
 
@@ -184,17 +167,18 @@ def stock(
         kept={"by": by} if by == "item" else None,
     )
     forms = open_packages.forms_of(session, true())
-    found = select(Item).where(
-        Item.id.in_({item_id for item_id, spot in forms if place_id in (None, spot)})
-    )
-    if search:
-        found = found.where(SEARCHED.matching(search, SEARCHED.rules(session)))
-    items = {item.id: item for item in session.scalars(found)}
+    matching = SEARCHED.matching(search, SEARCHED.rules(session)) if search else None
+    items = {
+        item.id: item
+        for item in queries.items_with_ids(
+            session,
+            {item_id for item_id, spot in forms if place_id in (None, spot)},
+            matching,
+        )
+    }
     places = {
         spot.id: spot
-        for spot in session.scalars(
-            select(Location).where(Location.id.in_({spot for _, spot in forms}))
-        )
+        for spot in queries.places_with_ids(session, {spot for _, spot in forms})
     }
     holdings = [
         Holding(items[item_id], places[spot], held.total, held.negative)
@@ -307,35 +291,14 @@ def reorder(
     """Current items with a reorder level, at or below it in usable stock
     across the stores, or with a package's sealed below its minimum."""
     view = View.read(REORDER, REORDER_SORTING, asked)
-    packages = session.scalars(
-        select(ItemPackage).where(
-            ItemPackage.minimum_sealed.is_not(None), ItemPackage.retired_at.is_(None)
-        )
-    ).all()
-    items = session.scalars(
-        select(Item)
-        .where(
-            Item.retired_at.is_(None),
-            or_(
-                Item.minimum.is_not(None),
-                Item.id.in_([package.item_id for package in packages]),
-            ),
-        )
-        .order_by(func.lower(Item.name))
-    ).all()
-    # The stores' ids as an array, so only their balances are summed, as
-    # in_stores (stock/balance.py) does.
-    stores = func.array(
-        select(Location.id)
-        .where(Location.kind.in_(STORE_KINDS), Location.retired_at.is_(None))
-        .scalar_subquery()
+    packages = queries.packages_with_minimum(session)
+    items = queries.items_to_reorder_by(
+        session, [package.item_id for package in packages]
     )
     usable: dict[int, Decimal] = {}
     sealed: dict[int, dict[int, Decimal]] = {}
     short: set[int] = set()
-    for (item_id, _), held in open_packages.forms_of(
-        session, by_form.c.location_id == any_(stores)
-    ).items():
+    for (item_id, _), held in queries.forms_in_stores(session).items():
         usable[item_id] = usable.get(item_id, Decimal(0)) + held.usable
         if held.total < 0:
             short.add(item_id)
