@@ -21,12 +21,7 @@ from fastapi.responses import Response
 from sqlalchemy.orm import Session
 
 from inventory_tng import ledger, locations, over_recorded
-from inventory_tng.admin.common import (
-    SECTION_STOCK,
-    SETTLED_VIEW,
-    admin_page,
-    rule_words,
-)
+from inventory_tng.admin.common import SECTION_STOCK, SETTLED_VIEW, admin_page
 from inventory_tng.admin.counts import COUNTS
 from inventory_tng.admin.listing import (
     AskedView,
@@ -60,7 +55,7 @@ from inventory_tng.models import (
 )
 from inventory_tng.pages import NOTICES, not_found, redirect
 from inventory_tng.stock import balance, queries
-from inventory_tng.web.forms import TYPE_A_NUMBER, quantity, row_id, up_to
+from inventory_tng.web.forms import TYPE_A_NUMBER, quantity, row_id, rule_words, up_to
 
 log = structlog.get_logger(__name__)
 

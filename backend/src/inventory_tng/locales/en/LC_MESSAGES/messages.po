@@ -860,7 +860,7 @@ msgid ""
 "day."
 msgstr ""
 
-#: src/inventory_tng/admin/common.py
+#: src/inventory_tng/web/forms.py
 msgid "An area goes inside a store or another area."
 msgstr ""
 
@@ -888,7 +888,7 @@ msgstr ""
 msgid "An authenticator was removed from your %(brand)s account"
 msgstr ""
 
-#: src/inventory_tng/admin/common.py
+#: src/inventory_tng/web/forms.py
 msgid "An item is on the count twice: count it once."
 msgstr ""
 
@@ -907,7 +907,7 @@ msgstr ""
 msgid "An open package nobody recorded"
 msgstr ""
 
-#: src/inventory_tng/admin/common.py
+#: src/inventory_tng/web/forms.py
 msgid "An open package was closed meanwhile: count what is on it as loose."
 msgstr ""
 
@@ -1798,7 +1798,7 @@ msgid ""
 "item's page; an item with neither is never listed."
 msgstr ""
 
-#: src/inventory_tng/admin/common.py
+#: src/inventory_tng/web/forms.py
 msgid "Its category is retired: bring that back, or pick another, first."
 msgstr ""
 
@@ -1812,19 +1812,19 @@ msgstr ""
 msgid "Its parent's (%(zone)s)"
 msgstr ""
 
-#: src/inventory_tng/admin/common.py
+#: src/inventory_tng/web/forms.py
 msgid ""
 "Its place is retired, or places are still inside it: bring that back, or "
 "move those, first."
 msgstr ""
 
-#: src/inventory_tng/admin/common.py
+#: src/inventory_tng/web/forms.py
 msgid ""
 "Its size is fixed, as some has moved, been opened or labelled: add a "
 "package of the new size instead."
 msgstr ""
 
-#: src/inventory_tng/admin/common.py
+#: src/inventory_tng/web/forms.py
 msgid "Its unit is fixed, as stock has moved in it."
 msgstr ""
 
@@ -1858,7 +1858,7 @@ msgstr ""
 msgid "Labels"
 msgstr ""
 
-#: src/inventory_tng/admin/common.py
+#: src/inventory_tng/web/forms.py
 msgid "Larger than its too-short length, or change that first."
 msgstr ""
 
@@ -1985,11 +1985,11 @@ msgid ""
 " be asked first."
 msgstr ""
 
-#: src/inventory_tng/admin/common.py
+#: src/inventory_tng/web/forms.py
 msgid "Move or retire its items first."
 msgstr ""
 
-#: src/inventory_tng/admin/common.py
+#: src/inventory_tng/web/forms.py
 msgid "Move what is here elsewhere, or count it, first."
 msgstr ""
 
@@ -2212,7 +2212,7 @@ msgstr ""
 msgid "Not right?"
 msgstr ""
 
-#: src/inventory_tng/admin/common.py
+#: src/inventory_tng/web/forms.py
 msgid "Not saved: it's retired. Bring it back first to change it."
 msgstr ""
 
@@ -2222,7 +2222,7 @@ msgid ""
 " read it otherwise."
 msgstr ""
 
-#: src/inventory_tng/admin/common.py
+#: src/inventory_tng/web/forms.py
 msgid ""
 "Not saved: someone else saved this after you opened it. Here it is as it "
 "is now: make your change again."
@@ -2475,7 +2475,7 @@ msgid ""
 "as a name is: no other item can have it."
 msgstr ""
 
-#: src/inventory_tng/admin/common.py
+#: src/inventory_tng/web/forms.py
 msgid ""
 "Others are merged into them: merge those elsewhere first, or pick a "
 "current volunteer to merge into."
@@ -2597,7 +2597,7 @@ msgstr ""
 msgid "Pick a unit."
 msgstr ""
 
-#: src/inventory_tng/admin/common.py
+#: src/inventory_tng/web/forms.py
 msgid "Pick a zone from the list."
 msgstr ""
 
@@ -3509,7 +3509,7 @@ msgstr ""
 msgid "Stop"
 msgstr ""
 
-#: src/inventory_tng/admin/common.py
+#: src/inventory_tng/web/forms.py
 msgid "Stop them holding stock first."
 msgstr ""
 
@@ -3527,7 +3527,7 @@ msgid ""
 "first to replace it."
 msgstr ""
 
-#: src/inventory_tng/admin/common.py
+#: src/inventory_tng/web/forms.py
 msgid "That breaks one of the inventory's rules."
 msgstr ""
 
@@ -3610,13 +3610,13 @@ msgstr ""
 msgid "That number is too big."
 msgstr ""
 
-#: src/inventory_tng/admin/common.py
+#: src/inventory_tng/web/forms.py
 msgid ""
 "That package isn't followed once opened any more: count what is on it as "
 "loose."
 msgstr ""
 
-#: src/inventory_tng/admin/common.py
+#: src/inventory_tng/web/forms.py
 msgid "That place is retired and holds nothing: pick another."
 msgstr ""
 
@@ -3646,7 +3646,7 @@ msgid ""
 "sign-in."
 msgstr ""
 
-#: src/inventory_tng/admin/common.py
+#: src/inventory_tng/web/forms.py
 msgid "That would put it inside itself."
 msgstr ""
 

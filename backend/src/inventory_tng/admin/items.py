@@ -18,9 +18,6 @@ from inventory_tng import items, open_packages, reading_rules, units
 from inventory_tng.admin.categories import CATEGORIES
 from inventory_tng.admin.common import (
     ADMIN,
-    ALERTS,
-    RETIRED,
-    RULES,
     SECTION_ITEMS,
     admin_page,
     now,
@@ -58,7 +55,7 @@ from inventory_tng.models import reading_rules as rules_held
 from inventory_tng.pages import NOTICES, not_found, redirect
 from inventory_tng.reading_rules import NOT_A_UNIT
 from inventory_tng.stock import queries as stock_queries
-from inventory_tng.web.forms import form_version
+from inventory_tng.web.forms import ALERTS, RETIRED, RULES, form_version
 
 log = structlog.get_logger(__name__)
 meter = metrics.get_meter(__name__)

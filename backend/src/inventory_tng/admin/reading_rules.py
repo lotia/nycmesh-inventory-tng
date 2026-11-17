@@ -16,7 +16,7 @@ from fastapi.responses import HTMLResponse, Response
 from sqlalchemy.orm import Session
 
 from inventory_tng import items, models, reading_rules, units
-from inventory_tng.admin.common import ADMIN, ALERTS, RULES, admin_page, text_form
+from inventory_tng.admin.common import ADMIN, admin_page, text_form
 from inventory_tng.admin.listing import (
     AskedView,
     Sort,
@@ -38,7 +38,7 @@ from inventory_tng.reading_rules import (
     offered,
     read_alike_words,
 )
-from inventory_tng.web.forms import form_version
+from inventory_tng.web.forms import ALERTS, RULES, form_version
 
 log = structlog.get_logger(__name__)
 

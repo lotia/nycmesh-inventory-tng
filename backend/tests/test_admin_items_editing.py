@@ -13,7 +13,6 @@ from sqlalchemy.orm import Session
 
 from inventory_tng import items
 from inventory_tng.accounts import name_up_to
-from inventory_tng.admin.common import RULES
 from inventory_tng.admin.items import ITEMS
 from inventory_tng.catalogue.forms import (
     IS_RETIRED,
@@ -35,6 +34,7 @@ from inventory_tng.models import (
 from inventory_tng.web.forms import (
     ABOVE_ZERO,
     NAME_MAX,
+    RULES,
     TOO_BIG,
     TYPE_A_NUMBER,
     ZERO_OR_MORE,

@@ -11,7 +11,6 @@ from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
 
 from inventory_tng.admin.categories import CATEGORIES
-from inventory_tng.admin.common import CHANGED, RULES
 from inventory_tng.admin.items import ITEMS
 from inventory_tng.admin.locations import LOCATIONS
 from inventory_tng.admin.settings import SETTINGS
@@ -27,6 +26,7 @@ from inventory_tng.models import (
     SiteSettings,
     Volunteer,
 )
+from inventory_tng.web.forms import CHANGED, RULES
 
 from helpers.markup import text
 from helpers.rows import add, shown

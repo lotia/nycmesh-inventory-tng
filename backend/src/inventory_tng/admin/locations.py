@@ -15,14 +15,11 @@ from sqlalchemy.orm import Session
 from inventory_tng import locations
 from inventory_tng.admin.common import (
     ADMIN,
-    ALERTS,
-    RULES,
     SECTION_LOCATIONS,
     admin_page,
     current_rows,
     now,
     retirement,
-    rule_words,
     undo_retire,
 )
 from inventory_tng.admins.guards import AdminSignedIn, SignedIn
@@ -35,7 +32,14 @@ from inventory_tng.models import STORE_KINDS, Label, Location
 from inventory_tng.pages import not_found, redirect
 from inventory_tng.places import queries
 from inventory_tng.volunteers import queries as volunteers_queries
-from inventory_tng.web.forms import chosen, form_version, name_problem
+from inventory_tng.web.forms import (
+    ALERTS,
+    RULES,
+    chosen,
+    form_version,
+    name_problem,
+    rule_words,
+)
 
 log = structlog.get_logger(__name__)
 

@@ -562,7 +562,7 @@ def record_last_seen(
 
 class RuleBroken(Exception):
     """A change the app's rules refuse (the catalogue's, the ledger's, the
-    site settings'), by the rule's name, as admin.common.RULES puts into
+    site settings'), by the rule's name, as web.forms.RULES puts into
     words. Raised before anything is written."""
 
     def __init__(self, rule: str) -> None:

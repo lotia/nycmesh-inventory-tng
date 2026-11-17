@@ -45,7 +45,6 @@ from inventory_tng.adjustment_reasons import LOST, USED_UP
 from inventory_tng.admin import needs_action
 from inventory_tng.admin.common import (
     ADMIN,
-    RULES,
     SECTION_COUNTS,
     admin_page,
     current_rows,
@@ -96,7 +95,7 @@ from inventory_tng.pages import (
 )
 from inventory_tng.stock import queries
 from inventory_tng.stock.balance import countable, retired_holding_stock_count, takeable
-from inventory_tng.web.forms import QUANTITY_MAX, chosen, quantity, row_id
+from inventory_tng.web.forms import QUANTITY_MAX, RULES, chosen, quantity, row_id
 
 log = structlog.get_logger(__name__)
 

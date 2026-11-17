@@ -8,9 +8,9 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from inventory_tng.admin.categories import CATEGORIES, TAKEN
-from inventory_tng.admin.common import RULES
 from inventory_tng.admins import guards
 from inventory_tng.models import Admin, Category, Item
+from inventory_tng.web.forms import RULES
 
 from helpers.markup import links, read, row_links, text
 from helpers.rows import add, history, named, shown

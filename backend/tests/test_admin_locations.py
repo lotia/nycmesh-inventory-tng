@@ -6,9 +6,9 @@ from fastapi.testclient import TestClient
 from sqlalchemy import update
 from sqlalchemy.orm import Session
 
-from inventory_tng.admin.common import PICK_A_ZONE, RULES
 from inventory_tng.admin.locations import LOCATIONS, PICK_WHAT, PICK_WHERE, TAKEN
 from inventory_tng.models import Location, Volunteer
+from inventory_tng.web.forms import PICK_A_ZONE, RULES
 
 from helpers.markup import options, text
 from helpers.rows import add, history, named, shown, tag

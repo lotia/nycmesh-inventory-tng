@@ -1,6 +1,6 @@
-"""What the administrator pages share: how a page is sent, how a form is
-read, and how the catalogue's rules are put into words. How a form is
-checked is web/forms.py's."""
+"""What the administrator pages share: how a page is sent and how a form
+is read. How a form is checked, and the catalogue's rules put into words,
+are web/forms.py's."""
 
 from collections.abc import Mapping
 from datetime import UTC, datetime
@@ -25,7 +25,7 @@ from inventory_tng.models import (
     Volunteer,
 )
 from inventory_tng.pages import NOTICES, page, templates
-from inventory_tng.web.forms import NAME_MAX, WHOLE_UNITS, row_id
+from inventory_tng.web.forms import NAME_MAX, row_id
 
 ADMIN = "/admin"
 ADMINS = f"{ADMIN}/admins"
@@ -66,79 +66,6 @@ NOTICES.update(
         "restored": RESTORED,
     }
 )
-
-PICK_A_ZONE = lazy_gettext("Pick a zone from the list.")
-# The rules domain functions check, by the name db.attempt gives one that a
-# change broke (db.RuleBroken's), in words. A page passes its own words for
-# "unique", which depend on what it is naming.
-RULES = {
-    "location_area_parent": lazy_gettext(
-        "An area goes inside a store or another area."
-    ),
-    "location_no_cycle": lazy_gettext("That would put it inside itself."),
-    "location_parent_current": lazy_gettext(
-        "Its place is retired, or places are still "
-        "inside it: bring that back, or move those, first."
-    ),
-    "location_custody_volunteer": lazy_gettext("Stop them holding stock first."),
-    "location_holds_stock": lazy_gettext(
-        "Move what is here elsewhere, or count it, first."
-    ),
-    "volunteer_merge_target": lazy_gettext(
-        "Others are merged into them: merge those "
-        "elsewhere first, or pick a current volunteer to merge into."
-    ),
-    "item_category_current": lazy_gettext(
-        "Its category is retired: bring that back, or pick another, first."
-    ),
-    "item_unit_fixed": lazy_gettext("Its unit is fixed, as stock has moved in it."),
-    "package_size_fixed": lazy_gettext(
-        "Its size is fixed, as some has moved, been opened "
-        "or labelled: add a package of the new size instead."
-    ),
-    "ck_item_package_short_below_under_size": lazy_gettext(
-        "Larger than its too-short length, or change that first."
-    ),
-    "category_has_items": lazy_gettext("Move or retire its items first."),
-    "site_settings_time_zone": PICK_A_ZONE,
-    "location_time_zone": PICK_A_ZONE,
-    "movement_whole_units": WHOLE_UNITS,
-    "open_package_untracked": lazy_gettext(
-        "That package isn't followed once opened any "
-        "more: count what is on it as loose."
-    ),
-    "movement_item_once": lazy_gettext("An item is on the count twice: count it once."),
-    "movement_open_package_closed": lazy_gettext(
-        "An open package was closed meanwhile: count what is on it as loose."
-    ),
-    "location_countable": lazy_gettext(
-        "That place is retired and holds nothing: pick another."
-    ),
-    "changed_since_shown": lazy_gettext(
-        "Not saved: someone else saved this after you opened "
-        "it. Here it is as it is now: make your change again."
-    ),
-    "retired_read_only": lazy_gettext(
-        "Not saved: it's retired. Bring it back first to change it."
-    ),
-}
-BREAKS_A_RULE = lazy_gettext("That breaks one of the inventory's rules.")
-# A save refused as its row changed since its form was shown (db.unchanged):
-# the page shows it again as it is now, with RULES' words as an alert.
-CHANGED = "changed_since_shown"
-# A change to a retired row, which is read only until brought back
-# (docs/decisions/0019): said the same way.
-RETIRED = "retired_read_only"
-# The refusals said as an alert above the page, not beside a field.
-ALERTS = frozenset({CHANGED, RETIRED})
-
-
-def rule_words(broken: str, unique: Words | None = None) -> Words:
-    """RULES' words for a rule broken; `unique`'s for a unique index, where
-    a page can say which."""
-    if broken == "unique" and unique is not None:
-        return unique
-    return RULES.get(broken, BREAKS_A_RULE)
 
 
 def now() -> datetime:

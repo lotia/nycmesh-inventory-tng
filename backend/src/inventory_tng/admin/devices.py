@@ -18,7 +18,6 @@ from sqlalchemy.orm import Session
 from inventory_tng.accounts import qr_svg
 from inventory_tng.admin.common import (
     ADMIN,
-    RULES,
     SECTION_DEVICES,
     admin_page,
     now,
@@ -48,7 +47,7 @@ from inventory_tng.devices import devices, queries
 from inventory_tng.models import Device, RegistrationCode, whole
 from inventory_tng.once import OnceKey, sent_before
 from inventory_tng.pages import NOTICES, not_found, redirect
-from inventory_tng.web.forms import NAME_MAX, form_version, up_to
+from inventory_tng.web.forms import NAME_MAX, RULES, form_version, up_to
 
 log = structlog.get_logger(__name__)
 

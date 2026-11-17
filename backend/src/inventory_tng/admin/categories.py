@@ -12,8 +12,6 @@ from sqlalchemy.orm import Session
 from inventory_tng import categories
 from inventory_tng.admin.common import (
     ADMIN,
-    ALERTS,
-    RULES,
     SECTION_CATEGORIES,
     admin_page,
     now,
@@ -27,7 +25,7 @@ from inventory_tng.core.db import DbSession, refusal
 from inventory_tng.core.phrases import Words, lazy_gettext
 from inventory_tng.models import Category
 from inventory_tng.pages import not_found, redirect
-from inventory_tng.web.forms import form_version, name_problem
+from inventory_tng.web.forms import ALERTS, RULES, form_version, name_problem
 
 log = structlog.get_logger(__name__)
 

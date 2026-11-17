@@ -14,11 +14,10 @@ from structlog.testing import capture_logs
 
 from inventory_tng import locations, over_recorded
 from inventory_tng.admin import over_recorded as over_recorded_page
-from inventory_tng.admin.common import RULES
 from inventory_tng.core.db import RuleBroken
 from inventory_tng.ledger import Entry, Form
 from inventory_tng.models import Admin, CatalogueHistory, Location, OverRecorded
-from inventory_tng.web.forms import up_to
+from inventory_tng.web.forms import RULES, up_to
 
 from helpers.markup import read, text
 from helpers.over_recorded import (

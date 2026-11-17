@@ -9,7 +9,6 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from inventory_tng.accounts import NOT_AN_EMAIL, name_up_to
-from inventory_tng.admin.common import RULES
 from inventory_tng.admin.volunteers import PICK_INTO, STILL_HOLD, TAKEN, VOLUNTEERS
 from inventory_tng.core.local_time import DEFAULT_ZONE
 from inventory_tng.models import (
@@ -20,7 +19,7 @@ from inventory_tng.models import (
     Movement,
     Volunteer,
 )
-from inventory_tng.web.forms import NAME_MAX
+from inventory_tng.web.forms import NAME_MAX, RULES
 
 from helpers.markup import (
     button,

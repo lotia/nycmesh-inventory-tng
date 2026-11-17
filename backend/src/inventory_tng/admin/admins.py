@@ -23,7 +23,6 @@ from inventory_tng.admin.common import (
     admin_page,
     now,
     retirement,
-    rule_words,
     site_link,
 )
 from inventory_tng.admin.listing import AskedView, Sort, Sorting, View, arranged
@@ -43,6 +42,7 @@ from inventory_tng.core.phrases import Words, gettext, lazy_gettext
 from inventory_tng.models import Admin
 from inventory_tng.once import OnceKey, sent_before
 from inventory_tng.pages import NOTICES, not_found, redirect
+from inventory_tng.web.forms import rule_words
 
 log = structlog.get_logger(__name__)
 

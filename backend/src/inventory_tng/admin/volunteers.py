@@ -16,13 +16,10 @@ from sqlalchemy.orm import Session
 from inventory_tng.accounts import email_problem
 from inventory_tng.admin.common import (
     ADMIN,
-    ALERTS,
-    RULES,
     SECTION_VOLUNTEERS,
     admin_page,
     now,
     retirement,
-    rule_words,
     undo_retire,
 )
 from inventory_tng.admin.listing import AskedView, Listing, Searched, Sort, Sorting
@@ -32,7 +29,14 @@ from inventory_tng.core.phrases import Words, gettext, lazy_gettext
 from inventory_tng.models import Location, Volunteer
 from inventory_tng.pages import NOTICES, not_found, redirect
 from inventory_tng.volunteers import queries, volunteers
-from inventory_tng.web.forms import chosen, form_version, name_problem
+from inventory_tng.web.forms import (
+    ALERTS,
+    RULES,
+    chosen,
+    form_version,
+    name_problem,
+    rule_words,
+)
 
 log = structlog.get_logger(__name__)
 
