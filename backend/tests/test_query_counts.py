@@ -70,13 +70,15 @@ def test_every_admin_page_is_measured(
     assert not twice, f"each worded page needs a name of its own: {twice}"
 
 
+def case(route: str, n: int, where: Path) -> object:
+    # A route's second way and on, by a function, by its number.
+    name = where if isinstance(where, str) else f"{route}{f' {n}' if n else ''}"
+    return pytest.param(route, where, id=name)
+
+
+# Each counted page, each way it is counted.
 CASES = [
-    pytest.param(
-        route,
-        where,
-        # A route's second way and on, by a function, by its number.
-        id=where if isinstance(where, str) else f"{route}{f' {n}' if n else ''}",
-    )
+    case(route, n, where)
     for route, page in sorted(PAGES.items())
     if page.more
     for n, where in enumerate(page.counted or [route])
@@ -106,7 +108,7 @@ def test_a_page_reads_alike_for_one_row_or_eleven(
         session.expire_all()
         with counting(session) as sent:
             response = ok(client, url)
-        return len(sent), listed(response.text)
+        return len(sent), listed(response)
 
     device = route == CATALOGUE
     with one.visit(device=device) as (client, session):
@@ -117,7 +119,7 @@ def test_a_page_reads_alike_for_one_row_or_eleven(
         MORES[route](world)
         url = path(where, world)
         grown = ok(client, url)
-    assert len(listed(grown.text)) > len(shown), (
+    assert len(listed(grown)) > len(shown), (
         f"{route}: what its more adds is not shown at {url}"
     )
     with eleven.visit(device=device) as (client, session):
@@ -133,10 +135,16 @@ def ok(client: TestClient, url: str) -> Response:
     return response
 
 
-def listed(page: str) -> str:
+def listed(response: Response) -> str:
     """A page without its masthead, whose badges count what other pages
-    list (_masthead.html)."""
-    return re.sub(r'<header class="masthead">.*?</header>', "", page, flags=re.DOTALL)
+    list (_masthead.html). A reply in JSON has none."""
+    if response.headers["content-type"].startswith("application/json"):
+        return response.text
+    page, cut = re.subn(
+        r'<header class="masthead">.*?</header>', "", response.text, flags=re.DOTALL
+    )
+    assert cut == 1, f"{response.url}: no masthead to cut, or more than one"
+    return page
 
 
 # Pages that name no item or package, and why the one that does names them
@@ -148,11 +156,20 @@ NAMES_NO_ITEM = {
     "/admin/volunteers/{volunteer_id}",
     "/admin/locations",
     "/admin/locations/{location_id}",
+    "/admin/volunteers/{volunteer_id}/merge",
     "/admin/unit-readings",
+    "/admin/unit-readings/{rule_id:int}",
     "/admin/devices",
     "/admin/devices/all",
+    "/admin/devices/{device_id:int}",
+    "/admin/devices/{device_id:int}/revoke",
     "/admin/devices/codes/{code_id}",
+    "/admin/devices/codes/{code_id}/revoke",
     "/admin/admins",
+    "/admin/admins/{admin_id}",
+    "/admin/admins/{admin_id}/reset",
+    "/admin/settings",
+    "/admin/authenticators/new",
     "/admin/categories",
     # Counts list places, and what was counted: none yet.
     "/admin/counts",
@@ -161,7 +178,18 @@ NAMES_NO_ITEM = {
 NAMES_AS_TYPED = {"/admin/unit-readings/seed"}
 
 
-@pytest.mark.parametrize(("route", "where"), CASES)
+# Each counted page, each way it is counted, and every other page where its
+# words are read (worded). Left out: forms read signed out, which name
+# nothing, and the redirect and the form only another page sends one to.
+NAMED = CASES + [
+    case(route, n, where)
+    for route, page in sorted(PAGES.items())
+    if not page.more
+    for n, where in enumerate(page.worded.values())
+]
+
+
+@pytest.mark.parametrize(("route", "where"), NAMED)
 def test_every_page_names_items_and_packages_as_shown(
     route: str,
     where: Path,
