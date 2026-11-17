@@ -22,7 +22,8 @@ def test_a_search_forgives_typos_best_first(
 ) -> None:
     for name in ("LiteAP AC", "LiteBeam 5AC", "Patch cable", "NanoBeam"):
         new_item(session, radios, name)
-    page = text(admin_client.get(ITEMS, params={"q": "litebeam"}))
+    found = admin_client.get(ITEMS, params={"q": "litebeam"})
+    page = text(found)
     shown = items_named(page)
     assert shown[0] == "LiteBeam 5AC"
     assert "Patch cable" not in shown
@@ -31,7 +32,7 @@ def test_a_search_forgives_typos_best_first(
     )
     said = " ".join(page.split())
     assert f"{len(shown)} of {total} items, matching “litebeam”" in said
-    assert ("Clear search", "/admin/items") in links(page)
+    assert ("Clear search", "/admin/items") in links(found.text)
     # A typo still finds it.
     misspelt = items_named(text(admin_client.get(ITEMS, params={"q": "litebeem"})))
     assert "LiteBeam 5AC" in misspelt
@@ -89,7 +90,7 @@ def test_current_retired_and_all(
         ("retired", {"Gone"}),
         ("all", {"Kept", "Gone"}),
     ):
-        page = text(admin_client.get(ITEMS, params={"show": show}))
+        page = admin_client.get(ITEMS, params={"show": show}).text
         assert {kept.name, gone.name} & set(items_named(page)) == expected
         chosen = show or "current"
         link = f"{ITEMS}{'?show=' + show if show else ''}"
@@ -213,7 +214,7 @@ def test_items_filter_by_category(
     antennas = add(session, Category(name=f"Antennas {mark}"))
     kept = new_item(session, antennas, f"Filtered {mark} dish")
     new_item(session, radios, f"Filtered {mark} radio")
-    page = text(admin_client.get(ITEMS, params={"category": str(antennas.id)}))
+    page = admin_client.get(ITEMS, params={"category": str(antennas.id)}).text
     assert items_named(page) == [kept.name]
     offered = read(page).all("option", value=str(antennas.id))
     assert any("selected" in choice.attrs for choice in offered)

@@ -166,7 +166,7 @@ def test_needs_your_action_lists_lengths_to_check(
     reported, below = spools.opened(), spools.opened()
     registered_client.post(URL, json=report(spools, length(reported, "250")))
     registered_client.post(URL, json=spools.place.batch(lines=[cut(below, "310")]))
-    home = text(admin_client.get("/admin"))
+    home = admin_client.get("/admin").text
     assert "Needs your action (2)" in home
     assert str(length_checks.KINDS[0].title) in home
     assert str(length_checks.KINDS[1].title) in home
@@ -346,7 +346,7 @@ def test_each_kind_has_its_page(
     assert "said 250 m is on it" in said
     # As text on purpose: nowhere in the main part, its attributes included.
     assert str(length_checks.KINDS[1].title) not in said.split("<main", 1)[1]
-    gone = text(admin_client.get(f"{LENGTHS}/below-zero{only}"))
+    gone = admin_client.get(f"{LENGTHS}/below-zero{only}").text
     assert "said 250 m" not in gone
     assert ("Show all", f"{LENGTHS}/below-zero") in links(gone)
     assert admin_client.get(f"{LENGTHS}/nothing").status_code == 404

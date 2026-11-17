@@ -394,7 +394,7 @@ def test_the_rules_page_lists_changes_and_deletes_them(
 ) -> None:
     new_item(session, radios, "Box 10G")
     (rule,) = reading_rules.decide(session, {"G": units.Rule(None)}, None)
-    listed = text(admin_client.get(READINGS))
+    listed = admin_client.get(READINGS).text
     assert ("G", f"{READINGS}/{rule.id}") in links(listed)
     assert "Not a unit" in listed
     assert "The import" in listed
@@ -506,10 +506,11 @@ def test_the_seeding_page_proposes_and_accepts_readings(
     link = new_item(session, radios, "Uplink SFP+ 10G")
     box = add(session, ItemPackage(item_id=link.id, name="Box 1G", size=1))
     items.add_alias(session, link, "Tape 3M")
-    page = text(admin_client.get(SEED))
+    seeding = admin_client.get(SEED)
+    page = text(seeding)
     assert "“G”" in page
     assert near("sfp+, uplink") in page
-    assert ("", "Choose…", False) in options(page)
+    assert ("", "Choose…", False) in options(seeding.text)
     assert "Mbps · data rate" in page
     assert "m · meters" in page
     form = {"reading:G": "g", "reading:M": ""}
@@ -544,11 +545,12 @@ def test_the_seeding_page_reviews_one_by_one(
 ) -> None:
     new_item(session, radios, "Box 10G")
     new_item(session, radios, "Tape 3M")
-    page = text(admin_client.get(f"{SEED}?one=1"))
+    first = admin_client.get(f"{SEED}?one=1")
+    page = text(first)
     assert "1 of 2." in page
     assert "“G”" in page
     assert "“M”" not in page
-    assert ("Skip", f"{SEED}?one=1&at=1") in links(page)
+    assert ("Skip", f"{SEED}?one=1&at=1") in links(first.text)
     skipped = text(admin_client.get(f"{SEED}?one=1&at=1"))
     assert "2 of 2." in skipped
     assert "“M”" in skipped

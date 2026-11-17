@@ -25,6 +25,11 @@ _ENDS = {
 _SPACES = re.compile(r"[ \t\n\r\f]+")
 
 
+class Unescaped(str):
+    """A page with its escaping undone, for finding its words. Read as HTML,
+    its escaping would be undone twice: a quote in a value would end it."""
+
+
 @dataclass
 class Element:
     tag: str
@@ -121,6 +126,8 @@ def read(page: str | Element) -> Element:
     one already read as it is."""
     if isinstance(page, Element):
         return page
+    if isinstance(page, Unescaped):
+        raise TypeError("read the response's text, not text(response)")
     reader = _Reader()
     reader.feed(page)
     reader.close()

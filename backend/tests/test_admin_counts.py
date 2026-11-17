@@ -665,7 +665,7 @@ def test_a_unit_changed_to_each_as_the_page_writes_is_said_and_nothing_is_writte
 def signals(client: TestClient, place: Place) -> dict[str, bool]:
     """Where the van shows as retired and holding stock: each is shown by
     its page's own tests, so these only check that each clears."""
-    stock = text(client.get(STOCK))
+    stock = client.get(STOCK).text
     return {
         "home": f'href="{COUNTS}/{place.van.id}"' in text(client.get("/admin")),
         "badge": badge(stock) == badge_of(1),
@@ -826,7 +826,7 @@ def test_a_count_shows_in_the_zone_of_its_place(
 def test_the_counts_page_says_its_links_start_a_task(admin_client: TestClient) -> None:
     """Only the button that changes the records promises a change
     (docs/decisions/0019)."""
-    page = text(admin_client.get(COUNTS))
+    page = admin_client.get(COUNTS).text
     assert button(page, "Start a count").classes == []
     assert button(page, "Record it").classes == ["primary"]
     assert "Count it" not in page

@@ -70,15 +70,16 @@ def test_the_page_shows_the_account(
     client: TestClient,
     ada: tuple[Admin, str],
 ) -> None:
-    page = text(client.get(ACCOUNT))
+    page = client.get(ACCOUNT).text
     assert "Phone" in page
     assert "(this one)" in page
     # Times in the site's zone, New York's by default.
     assert re.search(r"\d{4}-\d\d-\d\d \d\d:\d\d E[SD]T", page)
     # It starts with links, each to a section on the page (docs/decisions/0019).
+    read_page = read(page)
     jumps = [
         href.removeprefix("#")
-        for item in read(page).all("li")
+        for item in read_page.all("li")
         for _, href in links(item)
         if href.startswith("#")
     ]
@@ -90,7 +91,7 @@ def test_the_page_shows_the_account(
         "sessions",
     ]
     for section in jumps:
-        assert read(page).one("section", id=section)
+        assert read_page.one("section", id=section)
 
 
 def test_viewing_it_needs_signing_in(

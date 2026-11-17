@@ -72,9 +72,9 @@ def test_stock_and_reorder_pages_show_forms(
     made = spools.opened()
     spools.move(Entry(spools.cable.id, Decimal(295), Form(open_package_id=made.id)))
     session.flush()
-    page = text(admin_client.get("/admin/stock"))
+    page = read(admin_client.get("/admin/stock").text)
     for line in ("1 sealed Spool", "short end: 10 m", "usable: 305 m"):
-        assert read(page).all("span", line, class_="hint block")
+        assert page.all("span", line, class_="hint block")
     reorder = " ".join(text(admin_client.get("/admin/stock/reorder")).split())
     assert spools.cable.name in reorder
     assert "1 sealed Spool, of 2 to keep" in reorder

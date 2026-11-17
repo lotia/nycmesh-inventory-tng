@@ -43,7 +43,7 @@ def test_a_page_error_is_a_page(
     assert answer.status_code == status
     assert answer.headers["content-type"].startswith("text/html")
     page = text(answer)
-    assert read(page).all("h1", str(title))
+    assert read(answer.text).all("h1", str(title))
     assert f'href="{SCAN}"' in page
     if status == 405:
         # In no fixed order.

@@ -61,8 +61,9 @@ def test_retired_places_holding_stock_are_told_and_counted_in_the_navigation(
     retire(session, place.van, shelf)
     write(session, place)
     write(session, place, from_location_id=shelf.id)
-    page = text(admin_client.get("/admin"))
-    assert retired_holding(2) in page
+    home = admin_client.get("/admin")
+    page = home.text
+    assert retired_holding(2) in text(home)
     for retired in (place.van, shelf):
         start = (f"Start counting {retired.name}", f"{COUNTS}/{retired.id}")
         assert start in links(page)
@@ -74,13 +75,13 @@ def test_the_navigation_marks_the_section_a_page_is_in(
 ) -> None:
     """Its own page as the page, one inside it as within it, and Home only
     on itself (docs/decisions/0019)."""
-    home = text(admin_client.get("/admin"))
+    home = admin_client.get("/admin").text
     assert ("Home", "/admin", "page") in current(home)
     assert "/admin/items" not in [href for _, href, _ in current(home)]
-    items = text(admin_client.get("/admin/items"))
+    items = admin_client.get("/admin/items").text
     assert ("Items", "/admin/items", "page") in current(items)
     assert "/admin" not in [href for _, href, _ in current(items)]
-    stock = text(admin_client.get("/admin/stock/reorder"))
+    stock = admin_client.get("/admin/stock/reorder").text
     assert ("Stock", "/admin/stock", "true") in current(stock)
 
 

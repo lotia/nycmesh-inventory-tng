@@ -448,5 +448,6 @@ def test_close_names_include_close_aliases(
         "unit": "each",
     }
     asked = read(admin_client.post(ITEMS, data=form).text)
-    assert ("ToughCable", f"{ITEMS}/{tough.id}") in links(asked)
-    assert "ToughCable (alias Tuff cable outdoor)." in asked.text
+    similar = asked.one("p", class_="warning", role="status")
+    assert ("ToughCable", f"{ITEMS}/{tough.id}") in links(similar)
+    assert "ToughCable (alias Tuff cable outdoor)." in similar.text

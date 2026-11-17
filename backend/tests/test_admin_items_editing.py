@@ -336,7 +336,7 @@ def test_the_unit_is_fixed_once_stock_has_moved(
         ),
     )
     add(session, Movement(transaction_id=batch.id, item_id=item.id, quantity=1))
-    page = text(admin_client.get(f"{ITEMS}/{item.id}"))
+    page = admin_client.get(f"{ITEMS}/{item.id}").text
     assert "fixed, as stock has moved in it" in page
     assert ("unit", "each") in hidden(page)
     form = {"name": item.name, "category_id": str(radios.id), "unit": "m"}

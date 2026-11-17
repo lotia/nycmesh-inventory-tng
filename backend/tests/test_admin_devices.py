@@ -302,7 +302,7 @@ def test_a_device_is_revoked_after_a_confirmation(
     session.refresh(device)
     assert device.revoked_at is not None
     # Revoked: read only, and not asked about again.
-    page = text(admin_client.get(path))
+    page = admin_client.get(path).text
     assert read(page).all("span", "Revoked", class_="tag")
     assert "Revoke this device" not in page
     assert not read(page).all("button", "Save")
@@ -398,14 +398,14 @@ def test_devices_come_in_pages_of_the_size_asked(
     ]
     show_all = offer.one("a", "Show All").attrs["href"] or ""
     assert re.fullmatch(rf"{DEVICE_LIST}\?.*per=all", show_all)
-    second = text(
-        admin_client.get(DEVICE_LIST, params=window | {"per": "25", "page": "2"})
-    )
+    second = admin_client.get(
+        DEVICE_LIST, params=window | {"per": "25", "page": "2"}
+    ).text
     assert listed_ids(second) == [made[0].id]
     # Revoking from a page keeps its page and size.
     assert ("per", "25") in hidden(second)
     assert ("page", "2") in hidden(second)
-    every = text(admin_client.get(DEVICE_LIST, params=window | {"per": "all"}))
+    every = admin_client.get(DEVICE_LIST, params=window | {"per": "all"}).text
     assert len(listed_ids(every)) == 26
     assert "Every current one listed is selected" in every
     assert "other pages" not in every
@@ -505,7 +505,7 @@ def test_codes_sort_filter_by_state_and_come_in_pages(
             session, max_uses=1, lifetime=timedelta(days=1), label=f"More {number}"
         )
     session.commit()
-    paged = text(admin_client.get(DEVICES, params={"per": "25"}))
+    paged = admin_client.get(DEVICES, params={"per": "25"}).text
     codes = [href for cell in read(paged).all("td") for _, href in links(cell)]
     assert len([c for c in codes if re.fullmatch(rf"{CODES}/\d+", c)]) == 25
     assert "Page 1 of 2" in paged

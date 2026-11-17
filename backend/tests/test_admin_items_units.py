@@ -37,10 +37,11 @@ def test_a_name_is_saved_as_typed_and_its_units_said_under_it(
     done = admin_client.post(ITEMS, data=form | {"name": "Cable 305 m, 10 \u00b5F"})
     assert done.status_code == 303
     item = named(session, Item, "Cable 305 m, 10 \u03bcF")
-    page = text(admin_client.get(f"{ITEMS}/{item.id}"))
+    response = admin_client.get(f"{ITEMS}/{item.id}")
+    page = text(response)
     assert "Read as 305m · length.\n  Saved as typed." in page
     assert "Read as 10\u03bcF · capacitance." in page
-    assert read(page).all("summary", "Not right?")
+    assert read(response.text).all("summary", "Not right?")
     assert 'name="unit:m" value="none"' in page
     assert session.scalars(select(ReadingRule)).all() == []
 

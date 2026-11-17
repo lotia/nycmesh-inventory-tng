@@ -107,10 +107,11 @@ def test_the_form_edits_the_name_as_typed_and_says_how_it_is_shown(
     assert admin_client.post(ITEMS, data=form).status_code == 303
     item = named(session, Item, typed)
     assert item.name_shown == shown
-    page = text(admin_client.get(f"{ITEMS}/{item.id}"))
+    response = admin_client.get(f"{ITEMS}/{item.id}")
+    page = text(response)
     # Exact markup on purpose: the thin and no-break spaces as sent.
     assert f"<h1>{shown}</h1>" in page
-    assert read(page).one("input", name="name").attrs["value"] == typed
+    assert read(response.text).one("input", name="name").attrs["value"] == typed
     assert f"Shown as {shown}." in page
     # A package and an alias, added on its page, alike.
     path = f"{ITEMS}/{item.id}"

@@ -140,7 +140,7 @@ def test_a_retired_place_short_is_offered_for_a_count(
     place = Place(session)
     retire(session, place.van)
     write(session, place, from_location_id=place.van.id, to_location_id=place.store.id)
-    page = needs_counting_page(admin_client)
+    page = admin_client.get(NEEDS_COUNTING).text
     (van,) = [
         section
         for section in read(page).all("section")
@@ -156,12 +156,12 @@ def test_the_stock_page_warns_of_stock_at_a_retired_place(
 ) -> None:
     assert "retired place" not in text(admin_client.get(STOCK))
     place = at_retired_van(session)
-    page = text(admin_client.get(STOCK))
+    page = admin_client.get(STOCK).text
     assert "1 retired place holds" in page
     start = f"Start counting {place.van.name}"
     assert (start, f"{COUNTS}/{place.van.id}") in links(page)
     assert read(page).all("h2", f"{place.van.name} (retired)")
-    by_item = text(admin_client.get(STOCK, params={"by": "item"}))
+    by_item = admin_client.get(STOCK, params={"by": "item"}).text
     assert "1 retired place holds" in by_item
     cells = read(by_item).all("td")
     assert any(cell.text.endswith(f"{place.van.name} (retired)") for cell in cells)
@@ -236,14 +236,14 @@ def test_stock_sorts_within_each_group_and_filters(
     assert amounts(place=str(place.van.id)) == ["3"]
     assert amounts(by="item", place=str(place.store.id)) == ["7", "2"]
     assert amounts(place="x") == ["7", "2", "3"]
-    filtered = text(admin_client.get(STOCK, params={"place": str(place.van.id)}))
+    filtered = admin_client.get(STOCK, params={"place": str(place.van.id)}).text
     chosen = [value for value, _, selected in options(filtered) if selected]
     assert str(place.van.id) in chosen
     assert ("Clear", STOCK) in links(filtered)
     nothing = text(admin_client.get(STOCK, params={"q": "zzzqqqxxx"}))
     assert "None is in the filter." in nothing
     # A search that folds to nothing, such as a lone accent, is none.
-    accent = text(admin_client.get(STOCK, params={"q": "\u0301"}))
+    accent = admin_client.get(STOCK, params={"q": "\u0301"}).text
     assert ("Clear", STOCK) not in links(accent)
 
 
@@ -285,7 +285,10 @@ def size_row(page: str) -> tuple[str, str]:
         for nav in read(page).all("nav", class_="filters")
         if any(href.endswith("per=25") for _, href in links(nav))
     ]
-    return row.attrs["aria-label"] or "", row.all("span")[0].text
+    # The words come first in the row, before its sizes.
+    first = next(part for part in row.children if not isinstance(part, str))
+    assert first.tag == "span"
+    return row.attrs["aria-label"] or "", first.text
 
 
 def test_stock_size_rows_say_they_count_places_or_items(
@@ -293,9 +296,9 @@ def test_stock_size_rows_say_they_count_places_or_items(
 ) -> None:
     """Not lines: each group whole, however many lines (Ali, 2026-11-16,
     inventory-tng-xjh)."""
-    by_place = text(admin_client.get(STOCK))
+    by_place = admin_client.get(STOCK).text
     assert size_row(by_place) == ("Places shown", "Places shown:")
-    by_item = text(admin_client.get(STOCK, params={"by": "item"}))
+    by_item = admin_client.get(STOCK, params={"by": "item"}).text
     assert size_row(by_item) == ("Items shown", "Items shown:")
 
 
@@ -304,12 +307,12 @@ def test_needs_counting_size_row_says_it_counts_places(
 ) -> None:
     """As Stock's By place: a place's lines are never split (Ali,
     2026-11-16, inventory-tng-r9ex)."""
-    page = text(admin_client.get(NEEDS_COUNTING))
+    page = admin_client.get(NEEDS_COUNTING).text
     assert size_row(page) == ("Places shown", "Places shown:")
 
 
 def test_other_lists_size_rows_still_say_show(admin_client: TestClient) -> None:
-    assert size_row(text(admin_client.get(REORDER))) == ("Rows", "Show")
+    assert size_row(admin_client.get(REORDER).text) == ("Rows", "Show")
 
 
 def test_reorder_sorts_by_each_heading_and_shows_25_50_100_or_all(

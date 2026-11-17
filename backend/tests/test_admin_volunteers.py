@@ -198,7 +198,7 @@ def test_merging_into_one_retired_since_the_page_asked_is_refused(
     refused = admin_client.post(f"{path}/merge", data=into)
     assert refused.status_code == 400
     assert str(PICK_INTO) in text(refused)
-    assert offered not in options(refused.text)
+    assert str(riley.id) not in [value for value, _, _ in options(refused.text)]
     assert (sam.merged_into_id, sam.retired_at) == (None, None)
     assert history(session, "volunteer") == before
 

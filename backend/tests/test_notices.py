@@ -54,9 +54,9 @@ def said_in(page: str) -> str:
 def test_a_notice_is_said_by_its_sections_heading(
     admin_client: TestClient, path: str, notice: str, section: str
 ) -> None:
-    page = text(admin_client.get(f"{path}?notice={notice}&section={section}"))
-    assert str(pages.NOTICES[notice]) in page
-    assert said_in(page) == section
+    response = admin_client.get(f"{path}?notice={notice}&section={section}")
+    assert str(pages.NOTICES[notice]) in text(response)
+    assert said_in(response.text) == section
 
 
 @pytest.fixture
@@ -76,7 +76,7 @@ def one_of_each_retired(session: Session) -> None:
 def test_a_notice_about_the_whole_page_is_said_under_its_title(
     admin_client: TestClient,
 ) -> None:
-    page = text(admin_client.get("/admin/categories?notice=added"))
+    page = admin_client.get("/admin/categories?notice=added").text
     assert said_in(page) == "top"
 
 
@@ -84,7 +84,7 @@ def test_a_section_no_page_has_says_the_notice_under_the_title(
     admin_client: TestClient,
 ) -> None:
     """A link with any other section, made by hand, loses no notice."""
-    page = text(admin_client.get("/admin/settings?notice=saved&section=no-such-place"))
+    page = admin_client.get("/admin/settings?notice=saved&section=no-such-place").text
     assert said_in(page) == "top"
 
 
@@ -141,7 +141,7 @@ def test_a_retire_is_undone_from_its_notice(
     assert [(b.text, b.classes) for b in undo.all("button")] == [(words, [])]
     assert admin_client.post(f"{path}/{retiring.id}/restore").status_code == 303
     # Back already: the notice says what was done, and offers nothing more.
-    page = text(admin_client.get(landed))
+    page = admin_client.get(landed).text
     assert read(page).all("p", "Retired.", role="status")
     assert "/restore" not in page
 

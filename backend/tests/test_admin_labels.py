@@ -81,7 +81,7 @@ def test_labels_for_an_item_are_copies_of_one_code(
     # Again: the same code, printed again.
     made(admin_client, copies="3", item_id=cable.id)
     assert labels_of(session, item_id=cable.id) == [label]
-    page = text(admin_client.get(f"{ITEMS}/{cable.id}"))
+    page = admin_client.get(f"{ITEMS}/{cable.id}").text
     assert label.code in page
     assert ("post", LABELS) in forms(page)
 
@@ -102,7 +102,7 @@ def test_a_package_and_a_place_have_codes_of_their_own(
     page = text(admin_client.get(LABELS))
     assert package_label("Cat6 cable", "Reel", "305 m") in page
     assert place_words("Shelf A", "Hub") in page
-    page = text(admin_client.get(f"{LOCATIONS}/{shelf.id}"))
+    page = admin_client.get(f"{LOCATIONS}/{shelf.id}").text
     assert on_shelf.code in page
     assert ("post", LABELS) in forms(page)
 
@@ -317,15 +317,17 @@ def test_inactive_labels_say_why_and_agree_with_the_scan_page(
     assert still_stocked.code in current
     assert sealed.code in current
     assert not any(label.code in current for label in rows.values())
-    page = " ".join(text(admin_client.get(LABELS, params={"show": "inactive"})).split())
+    inactive = admin_client.get(LABELS, params={"show": "inactive"})
+    page = " ".join(text(inactive).split())
     assert still_stocked.code not in page
     assert sealed.code not in page
+    lines = read(inactive.text).all("tr")
     for why, label in rows.items():
-        row = page[page.index(label.code) :].split("</tr>")[0]
-        assert read(row).all("span", str(INACTIVE_WORDS[why]), class_="tag"), why
+        (row,) = [line for line in lines if label.code in line.text]
+        assert row.all("span", str(INACTIVE_WORDS[why]), class_="tag"), why
         # Neither printed nor revoked again from here.
-        assert 'type="checkbox"' not in row
-        assert "/revoke" not in row
+        assert not row.all("input", type="checkbox")
+        assert not [to for _, to in links(row) + forms(row) if "/revoke" in to]
     assert "4 inactive labels" in page
 
 
@@ -365,10 +367,10 @@ def test_labels_list_current_inactive_and_all(
     ):
         page = text(admin_client.get(LABELS, params={"show": show}))
         assert {kept.code, gone.code} & set(codes_listed(page)) == expected, show
-    page = text(admin_client.get(LABELS, params={"show": "all"}))
-    assert ("Inactive", f"{LABELS}?show=inactive") in links(page)
-    assert not [words for words, _ in links(page) if words.endswith("Retired")]
-    assert "The scan page doesn't read a label tagged here." in page
+    every = admin_client.get(LABELS, params={"show": "all"})
+    assert ("Inactive", f"{LABELS}?show=inactive") in links(every.text)
+    assert not [words for words, _ in links(every.text) if words.endswith("Retired")]
+    assert "The scan page doesn't read a label tagged here." in text(every)
     assert "doesn't read a label tagged" not in text(admin_client.get(LABELS))
 
 
@@ -418,7 +420,7 @@ def test_printing_refused_goes_back_to_the_list_as_it_was(
     admin_client: TestClient, session: Session, cable: Item
 ) -> None:
     add(session, Label(item_id=cable.id))
-    page = text(admin_client.get(LABELS, params={"q": "cat6", "show": "all"}))
+    page = admin_client.get(LABELS, params={"q": "cat6", "show": "all"}).text
     assert ("q", "cat6") in hidden(page)
     assert ("show", "all") in hidden(page)
     sent = admin_client.get(PRINT, params={"q": "cat6", "show": "all", "page": "2"})
@@ -509,7 +511,7 @@ def test_labels_filter_by_kind_and_item(
     assert listed(kind="place", item=str(cable.id)) == set()
     # A kind not offered, or an item not a number, is no filter.
     assert listed(kind="box", item="x") >= mine
-    page = text(admin_client.get(LABELS, params={"item": str(cable.id)}))
+    page = admin_client.get(LABELS, params={"item": str(cable.id)}).text
     assert (str(cable.id), "Cat6 cable", True) in options(page)
     assert ("Clear", LABELS) in links(page)
     # Printing keeps the filter, to come back to.

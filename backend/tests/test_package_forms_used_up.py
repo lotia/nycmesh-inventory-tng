@@ -242,7 +242,7 @@ def test_needs_your_action_until_each_report_is_answered(
     admin_client: TestClient, session: Session, spools: Spools
 ) -> None:
     made = reported(session, spools)
-    home = text(admin_client.get("/admin"))
+    home = admin_client.get("/admin").text
     assert "Needs your action (1)" in home
     spool = f"{spools.cable.name}: 1 \N{MULTIPLICATION SIGN} Spool"
     assert (spool, f"{USED_UP}?item={spools.cable.id}") in links(home)
@@ -292,14 +292,14 @@ def test_needs_your_action_lists_each_item_and_what_is_below_zero(
     other = Spools(session)
     theirs = reported(session, other)
     session.flush()
-    home = text(admin_client.get("/admin"))
-    assert "Needs your action (3)" in home
+    home = read(admin_client.get("/admin").text)
+    assert "Needs your action (3)" in home.text
     spool = f"{spools.cable.name}: 2 \N{MULTIPLICATION SIGN} Spool"
     assert spool in [words for words, _ in links(home)]
-    assert f"{spool}, 7 m below zero" in read(home).text
+    assert f"{spool}, 7 m below zero" in home.text
     # The other's line is its link alone.
     other_spool = f"{other.cable.name}: 1 \N{MULTIPLICATION SIGN} Spool"
-    lines = read(home).all("li")
+    lines = home.all("li")
     assert any(
         [words for words, _ in links(line)] == [line.text] == [other_spool]
         for line in lines
@@ -404,7 +404,7 @@ def test_an_open_package_is_closed_from_its_items_page(
     assert "Close as used up" in text(admin_client.get(page))
     path = f"{page}/open-packages/{made.id}/close"
     # Asked first: it writes off what it shows.
-    asked = text(admin_client.get(path))
+    asked = admin_client.get(path).text
     assert "it shows\n-5 m" in asked or "it shows -5 m" in " ".join(asked.split())
     assert "danger" in button(asked, "Close as used up").classes
     done = admin_client.post(path)

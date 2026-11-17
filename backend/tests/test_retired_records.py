@@ -62,8 +62,8 @@ def test_a_retired_records_page_says_when_and_by_whom_and_is_read_only(
     assert admin_client.post(f"{path}/{row.id}/retire").status_code == 303
 
     page = read(admin_client.get(f"{path}/{row.id}").text)
-    assert page.one("span", "Retired", class_="tag")
-    said = re.search(r"\bRetired on (.+?) by (\w+)\.", page.text)
+    (line,) = [p.text for p in page.all("p") if p.all("span", "Retired", class_="tag")]
+    said = re.fullmatch(r"Retired on (.+) by (\w+)\.", line)
     assert said is not None
     # In the site's zone, New York's by default.
     assert re.fullmatch(r"\d{4}-\d\d-\d\d \d\d:\d\d E[SD]T", said.group(1))
@@ -139,9 +139,14 @@ def test_a_retired_administrators_page_says_who_retired_them(
     set_actor(session, f"admin:{ada.id}")
     ben.retired_at = datetime.now(UTC)
     session.flush()
-    page = text(admin_client.get(f"/admin/admins/{ben.id}"))
-    assert read(page).one("span", "Retired", class_="tag")
-    assert re.search(r"\bRetired on .+ by ada\.", read(page).text)
+    response = admin_client.get(f"/admin/admins/{ben.id}")
+    page = text(response)
+    (line,) = [
+        p.text
+        for p in read(response.text).all("p")
+        if p.all("span", "Retired", class_="tag")
+    ]
+    assert re.fullmatch(r"Retired on .+ by ada\.", line)
     assert "They can't sign in." in page
 
 
