@@ -28,6 +28,7 @@ CORE = {
     "database_role.py",
     "db.py",
     "history.py",
+    "local_env.py",
     "local_time.py",
     "logs.py",
     "mail.py",
@@ -45,9 +46,9 @@ CORE_MAY_IMPORT = {"models.py"}
 WEB = {"pages.py", "web.py"}
 # Rules: each table's owner (db.protection), any queries.py, and these,
 # which hold rules but own no table.
-RULES = {"ledger.py"}
+RULES = {"ledger.py", "names.py", "scan_settings.py", "unit_readings.py", "units.py"}
 # Folders that are not features.
-NOT_FEATURES = {"core", "web"}
+NOT_FEATURES = {"core", "dev", "web"}
 # Until its modules move into their features' packages, each module in
 # admin/ is a feature of its own.
 SPLIT = "admin"
@@ -58,7 +59,9 @@ OWNERS = {
 }
 FASTAPI = ("fastapi", "starlette")
 ROUTE_NAMES = {"routes.py", "api.py"}
-QUERY_CALLS = {"execute", "scalar", "scalars"}
+# Calls that make or run a query: select(...), or session.execute and the
+# like.
+QUERY_CALLS = {"select", "execute", "scalar", "scalars"}
 MANAGE = "manage.py"
 
 # What one module breaks a rule with, given its tree, its path under SOURCE
@@ -67,10 +70,7 @@ type Check = Callable[[ast.Module, str, Collection[str]], list[str]]
 
 # Today's breaks, by rule: each module that breaks it, and what with.
 BREAKS: dict[str, dict[str, list[str]]] = {
-    "core_imports_a_feature": {
-        "command.py": ["local_env.py"],
-        "settings.py": ["local_env.py"],
-    },
+    "core_imports_a_feature": {},
     "rules_import_fastapi_or_web": {
         "devices.py": ["fastapi", "web.py"],
         "labels.py": ["pages.py"],
@@ -264,6 +264,8 @@ def imported(tree: ast.Module, path: str, known: Collection[str]) -> list[str]:
                     found.append(module)
         elif isinstance(node, ast.ImportFrom):
             named: list[str] = node.module.split(".") if node.module else []
+            if node.level > len(package) + 1:
+                continue  # Above inventory_tng, so none of the app's.
             if node.level:
                 base = package[: len(package) - (node.level - 1)] + named
             elif named[:1] == ["inventory_tng"]:
@@ -325,6 +327,8 @@ def _tree(path: str) -> ast.Module:
 def core_imports_a_feature(
     tree: ast.Module, path: str, known: Collection[str]
 ) -> list[str]:
+    """What core imports besides core and the models: features, web/ and
+    dev/ alike."""
     if not is_core(path):
         return []
     return [
@@ -354,9 +358,9 @@ def rules_import_fastapi_or_web(
 def routes_run_queries(
     tree: ast.Module, path: str, _known: Collection[str]
 ) -> list[str]:
-    """The queries a module of routes runs, counted by the top-level
-    function (or class) they are in: select(...), or session.execute,
-    .scalar or .scalars. A session.get may stay."""
+    """The query calls in a module of routes (QUERY_CALLS), counted by the
+    top-level function (or class) they are in, so session.scalars(select(X))
+    counts 2. A session.get may stay."""
     if not is_routes(tree, path):
         return []
     found: Counter[str] = Counter()
@@ -367,7 +371,7 @@ def routes_run_queries(
                 (isinstance(node.func, ast.Name) and node.func.id == "select")
                 or (
                     isinstance(node.func, ast.Attribute)
-                    and node.func.attr in {"select", *QUERY_CALLS}
+                    and node.func.attr in QUERY_CALLS
                 )
             ):
                 found[name] += 1
@@ -396,6 +400,7 @@ def init_not_empty(tree: ast.Module, path: str, _known: Collection[str]) -> list
         body
         and isinstance(body[0], ast.Expr)
         and isinstance(body[0].value, ast.Constant)
+        and isinstance(body[0].value.value, str)
     ):
         body = body[1:]
     return sorted({type(statement).__name__ for statement in body})
@@ -441,12 +446,36 @@ def found(check: Check) -> dict[str, list[str]]:
 def test_the_app_breaks_no_import_rule_but_those_listed(rule: str) -> None:
     now = found(CHECKS[rule])
     listed = BREAKS[rule]
-    new = {path: what for path, what in now.items() if listed.get(path) != what}
-    assert new == {}, (
-        f"{rule} (docs/decisions/0023): put these right, not in BREAKS: {new}"
+    # Compared break by break, so one of a module's breaks fixed shows as
+    # fixed, not as the module's list being new. A changed count shows as
+    # both: the old one fixed, the new one new.
+    new = _left_out(now, listed)
+    fixed = _left_out(listed, now)
+    assert (new, fixed) == ({}, {}), (
+        f"{rule} (docs/decisions/0023): put right what is new, not in BREAKS, "
+        f"and take out of BREAKS what is fixed. New: {new}. Fixed: {fixed}."
     )
-    fixed = {path: what for path, what in listed.items() if now.get(path) != what}
-    assert fixed == {}, f"{rule}: fixed, so take them out of BREAKS: {fixed}"
+
+
+def _left_out(
+    these: dict[str, list[str]], those: dict[str, list[str]]
+) -> dict[str, list[str]]:
+    """The breaks in `these` that `those` does not have, by module."""
+    return {
+        path: missing
+        for path, what in these.items()
+        if (missing := [w for w in what if w not in those.get(path, [])])
+    }
+
+
+def test_breaks_are_compared_one_by_one() -> None:
+    listed = {"devices.py": ["fastapi", "web.py"], "admin/items.py": ["_page: 4"]}
+    now = {"devices.py": ["fastapi"], "admin/items.py": ["_page: 3"]}
+    assert _left_out(now, listed) == {"admin/items.py": ["_page: 3"]}
+    assert _left_out(listed, now) == {
+        "devices.py": ["web.py"],
+        "admin/items.py": ["_page: 4"],
+    }
 
 
 def test_every_rule_has_its_breaks_listed() -> None:
@@ -490,6 +519,8 @@ KNOWN = {
         ("db.py", "from inventory_tng import settings, models", []),
         ("core/db.py", "from . import db\nfrom .. import settings", []),
         ("ledger.py", "from inventory_tng import settings", []),
+        # Above inventory_tng, so none of the app's.
+        ("core/db.py", "from ... import ledger", []),
     ],
 )
 def test_core_importing_a_feature_is_found(
@@ -597,6 +628,7 @@ def test_another_features_routes_imported_by_routes_is_found(
         ("admin/__init__.py", '"""Pages."""\nSECTIONS = []', ["Assign"]),
         ("web/__init__.py", '"""Shared."""', []),
         ("web/__init__.py", "", []),
+        ("web/__init__.py", "0", ["Expr"]),
         ("web/formatting.py", "X = 1", []),
     ],
 )
@@ -620,10 +652,11 @@ def test_an_init_not_empty_is_found(path: str, source: str, breaks: list[str]) -
         ("manage.py", "from inventory_tng.catalogue import command", []),
         # Today's command.py, what every command shares.
         ("ledger.py", "from inventory_tng.command import run_command", []),
+        ("ledger.py", "from inventory_tng.dev import command", []),
     ],
 )
 def test_a_command_imported_outside_manage_is_found(
     path: str, source: str, breaks: list[str]
 ) -> None:
-    known = {*KNOWN, "command.py"}
+    known = {*KNOWN, "command.py", "dev/__init__.py", "dev/command.py"}
     assert command_imported_outside_manage(ast.parse(source), path, known) == breaks

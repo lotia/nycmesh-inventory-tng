@@ -18,9 +18,9 @@ structure below on 2026-11-17.
   `routes.py` for HTML pages, `api.py` for JSON, `schemas.py`, `paths.py`
   and `command.py`. URLs do not change.
 - **`web/`** holds what every server-rendered page shares; **`core/`**
-  holds plumbing: settings, db, history, logs, telemetry, masking, mail,
-  phrases and local_time. Core means plumbing, not business rules.
-  **`dev/`** holds developer tools, such as local_env, stacks,
+  holds plumbing, such as settings, db, history, logs, telemetry,
+  masking, mail, phrases, local_time and local_env. Core means plumbing,
+  not business rules. **`dev/`** holds developer tools, such as stacks,
   dev_database and seed.
 - **No service layer and no repositories.** A route file does routing
   only: decorated handlers (`@router.get`, `@router.post`), one router per
@@ -48,7 +48,7 @@ short test. `core/` is the name FastAPI's full-stack template uses;
 ## Consequences
 
 - Older decision records keep the paths of their time. The table below
-  gives each old path's new home.
+  gives each old path's new home, a row added with each move.
 - `models.py` and the templates folder stay whole for now (Ali,
   2026-11-17; inventory-tng-5q07).
 
