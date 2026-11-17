@@ -71,10 +71,10 @@ async function leave(page: Page, ...saves: unknown[][]) {
   return { volunteerId, fromId, toId };
 }
 
-/** Saves the cart, and what it sent, once the page lists it saved: the
+/** Records the cart, and its answer, once the page lists it saved: the
  * answer reaches the test before the page has used it, and the entry it
  * changes moves those below it, which a tap meant for one may then miss. */
-async function save(page: Page) {
+async function recorded(page: Page) {
   const saving = page.waitForResponse(
     (response) =>
       response.url().endsWith("/api/transactions") &&
@@ -82,11 +82,17 @@ async function save(page: Page) {
   );
   await page.getByRole("button", { name: "Record" }).click();
   const response = await saving;
-  expect(response.status()).toBe(201);
   const saved = (await response.json()).transaction_id as number;
   await expect(
     page.getByText(`Recorded (transaction ${saved}).`),
   ).toBeVisible();
+  return response;
+}
+
+/** Saves the cart anew, and what it sent. */
+async function save(page: Page) {
+  const response = await recorded(page);
+  expect(response.status()).toBe(201);
   return response.request().postDataJSON();
 }
 
@@ -268,12 +274,9 @@ test("a save an older build's tab saved meanwhile is saved once, under its key; 
   await page.goto("/scan");
 
   const saved = await leaveSaved(page, itemId);
-  const replayed = answered(page, 200);
-  await page.getByRole("button", { name: "Record" }).click();
-  expect(await (await replayed).json()).toEqual({ transaction_id: saved });
-  await expect(
-    page.getByText(`Recorded (transaction ${saved}).`),
-  ).toBeVisible();
+  const replayed = await recorded(page);
+  expect(replayed.status()).toBe(200);
+  expect(await replayed.json()).toEqual({ transaction_id: saved });
 
   const first = await leaveSaved(page, itemId);
   await page.getByLabel(/^Loose/).fill("3");
@@ -424,22 +427,13 @@ test("a cart this build filled, which its tab recorded as a newer build took it 
     },
   });
   expect(first.status()).toBe(201);
-  const recorded = (await first.json()).transaction_id as number;
+  const saved = (await first.json()).transaction_id as number;
   await page.reload();
   await expect(page.getByText(PUT_BACK)).toBeVisible();
-  const replayed = page.waitForResponse(
-    (response) =>
-      response.url().endsWith("/api/transactions") &&
-      response.request().method() === "POST",
-  );
-  await page.getByRole("button", { name: "Record" }).click();
-  const response = await replayed;
+  const response = await recorded(page);
   expect(response.request().postDataJSON().key).toBe(key);
   expect(response.status()).toBe(200);
-  expect(await response.json()).toEqual({ transaction_id: recorded });
-  await expect(
-    page.getByText(`Recorded (transaction ${recorded}).`),
-  ).toBeVisible();
+  expect(await response.json()).toEqual({ transaction_id: saved });
 });
 
 test("a double tap on a line's Discard discards that line only; one that could not read a line stays, saying so, until its own Discard", async ({

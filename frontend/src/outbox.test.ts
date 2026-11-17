@@ -64,12 +64,18 @@ const store = (...entries: unknown[]) => storeBy(BUILD, ...entries);
 /** Kept as another tab of this build keeps them: stored, and the storage
  * event a browser fires in this one, with what was stored before. */
 function storeElsewhere(...entries: unknown[]) {
+  storedElsewhere(...entries)();
+}
+
+/** Stores `entries` as another tab would; the event of it, to send later. */
+function storedElsewhere(...entries: unknown[]): () => void {
   const oldValue = localStorage.getItem(STORAGE_KEY);
   store(...entries);
   const newValue = localStorage.getItem(STORAGE_KEY);
-  window.dispatchEvent(
-    new StorageEvent("storage", { key: STORAGE_KEY, oldValue, newValue }),
-  );
+  return () =>
+    window.dispatchEvent(
+      new StorageEvent("storage", { key: STORAGE_KEY, oldValue, newValue }),
+    );
 }
 
 /** Kept as builds before v4 kept them: a list, under an older key. */
@@ -1656,14 +1662,13 @@ describe("listening", () => {
     store(waiting, refused);
     const outbox = new Outbox(answering(() => saved()).api);
     const stop = outbox.listen();
-    const oldValue = localStorage.getItem(STORAGE_KEY);
-    store({ ...waiting, reason: { code: "must_upgrade" } }, refused);
-    const newValue = localStorage.getItem(STORAGE_KEY);
+    const heard = storedElsewhere(
+      { ...waiting, reason: { code: "must_upgrade" } },
+      refused,
+    );
     // This tab writes, reading the hold, before the storage event comes.
     outbox.dismiss(refused);
-    window.dispatchEvent(
-      new StorageEvent("storage", { key: STORAGE_KEY, oldValue, newValue }),
-    );
+    heard();
     expect(outbox.builds.newer.value).toBe("too_old");
     stop();
   });

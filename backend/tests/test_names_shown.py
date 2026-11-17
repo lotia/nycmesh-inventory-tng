@@ -3,7 +3,6 @@
 inventory-tng-ist.3). Every page showing them so is
 test_query_counts.test_every_page_names_items_and_packages_as_shown."""
 
-import itertools
 import uuid
 from datetime import UTC, datetime
 from decimal import Decimal
@@ -25,33 +24,23 @@ from helpers.sign_in import text
 NB, THIN = "\u00a0", "\u202f"
 
 
-# Tags as uuid4 may draw them: digits, then every run of one to three hex
-# letters, as a unit may be spelt (1111111f, 111111ff, 10000daf).
-DRAWS = [
-    digits[: 8 - len(letters)] + letters
-    for size in range(1, 4)
-    for letters in map("".join, itertools.product("abcdef", repeat=size))
-    for digits in ("11111111", "10000000")
-]
-
-
 @pytest.mark.helper
 def test_a_tag_is_shown_as_typed(monkeypatch: pytest.MonkeyPatch) -> None:
     """A tag drawn as 374691ff was shown as 374 691 ff, a number and its
     unit, so a test looking for a name it made with one did not find it,
-    now and then (inventory-tng-65u8). No draw in DRAWS is, in names
-    shaped as tests make them."""
-    for drawn in DRAWS:
-        monkeypatch.setattr(uuid, "uuid4", lambda d=drawn: uuid.UUID(d.ljust(32, "0")))
-        mark = tag()
-        for name in (
-            f"LiteBeam {mark}",
-            f"Cable 2 {mark}",
-            f"Box {mark} 10,000ft",
-            f"Cap {mark} 10uF 50V",
-            f"Sized {mark} 007",
-        ):
-            assert mark in units.shown_name(name), (drawn, name)
+    now and then (inventory-tng-65u8). Made of letters only, it is shown
+    as typed, in names shaped as tests make them."""
+    monkeypatch.setattr(uuid, "uuid4", lambda: uuid.UUID("374691ff".ljust(32, "0")))
+    mark = tag()
+    assert not any(character.isdigit() for character in mark)
+    for name in (
+        f"LiteBeam {mark}",
+        f"Cable 2 {mark}",
+        f"Box {mark} 10,000ft",
+        f"Cap {mark} 10uF 50V",
+        f"Sized {mark} 007",
+    ):
+        assert mark in units.shown_name(name), name
 
 
 @pytest.fixture

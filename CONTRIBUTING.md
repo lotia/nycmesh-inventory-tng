@@ -201,15 +201,14 @@ container: `mise run compose -- exec app python -m inventory_tng.seed`.
 ### Migrations
 
 Until a test deployment holds people's data, a change may edit an existing
-migration instead of adding one, so the schema's history stays short
-(decision 0016). After a pull
-that does, your local database no longer matches its migrations: rebuild
-it, losing its data, with `mise run reset-dev-database -- <its name>`. It
-drops only this checkout's database, which you name to confirm, then makes
-and migrates it again, empty. Never rebuild with `mise run compose -- down
+migration instead of adding one, so the schema's history stays short; after
+that, never: add a new one (decision 0016). After a pull that edits one,
+your local database no longer matches its migrations: rebuild it, losing
+its data, with `mise run reset-dev-database -- <its name>`. It drops only
+this checkout's database, which you name to confirm, then makes and
+migrates it again, empty. Never rebuild with `mise run compose -- down
 --volumes`: that removes the stack's volume, with every database in it,
-and in `inventory-tng` every checkout's that shares it. Once a test
-deployment holds people's data, a migration is never edited: add a new one.
+and in `inventory-tng` every checkout's that shares it.
 
 You can keep your data instead when the edited migration and every one
 after it only rewrite rows and have downgrades that do nothing. In

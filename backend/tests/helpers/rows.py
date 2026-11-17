@@ -78,12 +78,15 @@ def history(
     return list(session.scalars(query.order_by(CatalogueHistory.id)))
 
 
+DIGITS_AS_LETTERS = str.maketrans("0123456789", "ghijklmnop")
+
+
 def tag() -> str:
     """For unique names: rows committed by one test never clash with
-    another's. It starts with a letter, so each number in it is within a
-    word, and a name is shown with it as typed (units.shown_name), never as
-    a number and its unit (374691ff as 374 691 ff)."""
-    return f"t{uuid.uuid4().hex[:8]}"
+    another's. Letters only, as the browser tests' unique() in own.ts, so
+    no part of it is read as a number and its unit (374691ff shown as
+    374 691 ff, units.shown_name)."""
+    return uuid.uuid4().hex[:8].translate(DIGITS_AS_LETTERS)
 
 
 def setting_up(session: Session) -> Session:
