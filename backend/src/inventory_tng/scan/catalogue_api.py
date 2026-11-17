@@ -16,7 +16,6 @@ from typing import Annotated
 
 import structlog
 from fastapi import APIRouter, Query
-from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from inventory_tng import labels
@@ -24,21 +23,13 @@ from inventory_tng.core.db import SnapshotSession
 from inventory_tng.devices.guards import RegisteredDevice
 from inventory_tng.devices.schemas import DeviceRefusedReply
 from inventory_tng.models import (
-    CURRENT_ALIAS,
-    Category,
     Item,
-    ItemAlias,
-    ItemPackage,
-    Label,
-    LedgerTransaction,
-    Location,
-    OpenPackage,
     ScanSettings,
-    Volunteer,
     held,
     reading_rules,
 )
 from inventory_tng.open_packages import tracks_opened
+from inventory_tng.scan import queries
 from inventory_tng.scan.catalogue_schemas import (
     Catalogue,
     ItemEntry,
@@ -54,7 +45,6 @@ from inventory_tng.scan.catalogue_schemas import (
     VolunteerEntry,
 )
 from inventory_tng.stock import balance
-from inventory_tng.stock.balance import takeable
 
 log = structlog.get_logger(__name__)
 
@@ -67,25 +57,14 @@ MOST_KEYS = 100
 
 
 def catalogue(session: Session) -> Catalogue:
-    volunteers = session.scalars(
-        select(Volunteer)
-        # A merged volunteer is retired too (ck_volunteer_merged_is_retired).
-        .where(Volunteer.retired_at.is_(None))
-        .order_by(Volunteer.name)
-    )
-    locations = session.scalars(
-        select(Location).where(Location.retired_at.is_(None)).order_by(Location.name)
-    )
+    volunteers = queries.current_volunteers(session)
+    locations = queries.current_places(session)
     sealed = balance.sealed_places(session)
     # A retired item stays while it has stock, so what is left can be taken;
     # the rest are gone, named only.
     items: list[tuple[Item, str]] = []
     gone: list[Item] = []
-    for item, category, offered in session.execute(
-        select(Item, Category.name, takeable())
-        .join(Category, Category.id == Item.category_id)
-        .order_by(Item.name, Item.id)
-    ):
+    for item, category, offered in queries.items_offered(session):
         if offered:
             items.append((item, category))
         else:
@@ -96,11 +75,7 @@ def catalogue(session: Session) -> Catalogue:
     # Packages by their item, to name: an item no longer offered has them
     # all named; one offered, those it no longer offers.
     named: dict[int, list[RetiredPackage]] = {}
-    for package, item_tracks in session.execute(
-        select(ItemPackage, Item.track_opened)
-        .join(Item, Item.id == ItemPackage.item_id)
-        .order_by(ItemPackage.size)
-    ):
+    for package, item_tracks in queries.packages_with_tracking(session):
         # Retired, one with some sealed left may still be taken
         # (takeable_package).
         offered = package.retired_at is None or package.id in sealed
@@ -129,13 +104,9 @@ def catalogue(session: Session) -> Catalogue:
             )
         )
     aliases: dict[int, list[str]] = {}
-    for item_id, alias in session.execute(
-        select(ItemAlias.item_id, ItemAlias.name)
-        .where(CURRENT_ALIAS)
-        .order_by(ItemAlias.id)
-    ):
+    for item_id, alias in queries.current_aliases(session):
         aliases.setdefault(item_id, []).append(alias)
-    found = session.scalars(select(Label).where(Label.revoked_at.is_(None)))
+    found = queries.labels_in_use(session)
     places = [LocationEntry.model_validate(x) for x in locations]
     # Each category folded once, not once an item in it.
     categories = {category: held(category) for _, category in items}
@@ -204,13 +175,7 @@ def with_saved(session: Session, keys: Sequence[uuid.UUID]) -> Catalogue:
 def saved_of(session: Session, keys: Sequence[uuid.UUID]) -> set[uuid.UUID]:
     if not keys:
         return set()
-    return set(
-        session.scalars(
-            select(LedgerTransaction.idempotency_key).where(
-                LedgerTransaction.idempotency_key.in_(list(keys))
-            )
-        )
-    )
+    return queries.saved_keys(session, list(keys))
 
 
 def open_to_take(session: Session, item_ids: set[int]) -> list[OpenPackageEntry]:
@@ -218,16 +183,7 @@ def open_to_take(session: Session, item_ids: set[int]) -> list[OpenPackageEntry]
     not reported used up, with what is left on each where it is, oldest
     first. One whose records say nothing is left is sent too, at that: it
     is where a volunteer says it is used up."""
-    found = session.execute(
-        select(OpenPackage, ItemPackage.name_shown, ItemPackage.short_below)
-        .join(ItemPackage, ItemPackage.id == OpenPackage.package_id)
-        .where(
-            OpenPackage.closed_at.is_(None),
-            OpenPackage.reported_at.is_(None),
-            OpenPackage.item_id.in_(item_ids),
-        )
-        .order_by(OpenPackage.opened_at, OpenPackage.id)
-    ).all()
+    found = queries.open_not_reported(session, item_ids)
     left = balance.left_on(session, [row for row, *_ in found])
     return [
         OpenPackageEntry(
