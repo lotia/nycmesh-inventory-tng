@@ -24,11 +24,7 @@ from inventory_tng.admin.common import (
     RULES,
     SECTION_ITEMS,
     admin_page,
-    chosen,
-    form_version,
-    name_problem,
     now,
-    quantity,
     retirement,
     text_form,
     undo_retire,
@@ -65,6 +61,7 @@ from inventory_tng.names import nameless
 from inventory_tng.pages import NOTICES, not_found, redirect
 from inventory_tng.reading_rules import NOT_A_UNIT, chosen_rule, read_alike_words
 from inventory_tng.stock import queries as stock_queries
+from inventory_tng.web.forms import chosen, form_version, name_problem, quantity
 
 log = structlog.get_logger(__name__)
 meter = metrics.get_meter(__name__)

@@ -13,16 +13,7 @@ from sqlalchemy.orm import Session
 
 from inventory_tng import items
 from inventory_tng.accounts import name_up_to
-from inventory_tng.admin.common import (
-    ABOVE_ZERO,
-    NAME_MAX,
-    RULES,
-    TOO_BIG,
-    TYPE_A_NUMBER,
-    ZERO_OR_MORE,
-    at_most_places,
-    quantity,
-)
+from inventory_tng.admin.common import RULES
 from inventory_tng.admin.items import (
     IS_RETIRED,
     ITEMS,
@@ -40,6 +31,15 @@ from inventory_tng.models import (
     LedgerTransaction,
     Location,
     Movement,
+)
+from inventory_tng.web.forms import (
+    ABOVE_ZERO,
+    NAME_MAX,
+    TOO_BIG,
+    TYPE_A_NUMBER,
+    ZERO_OR_MORE,
+    at_most_places,
+    quantity,
 )
 
 from helpers.items import NOW, new_item

@@ -16,7 +16,7 @@ from sqlalchemy.orm import Session
 from structlog.testing import capture_logs
 
 from inventory_tng import items, locations
-from inventory_tng.admin.common import ABOVE_ZERO, RULES, TYPE_A_NUMBER, WHOLE_UNITS
+from inventory_tng.admin.common import RULES
 from inventory_tng.admin.counts import (
     ADJUSTMENTS,
     COUNT_KIND,
@@ -52,6 +52,7 @@ from inventory_tng.models import (
     Movement,
 )
 from inventory_tng.pages import retired_holding
+from inventory_tng.web.forms import ABOVE_ZERO, TYPE_A_NUMBER, WHOLE_UNITS
 
 from helpers.concurrency import Committed
 from helpers.markup import button, forms, hidden_fields, links, options, read, text

@@ -20,9 +20,6 @@ from inventory_tng.admin.common import (
     RULES,
     SECTION_VOLUNTEERS,
     admin_page,
-    chosen,
-    form_version,
-    name_problem,
     now,
     retirement,
     rule_words,
@@ -35,6 +32,7 @@ from inventory_tng.core.phrases import Words, gettext, lazy_gettext
 from inventory_tng.models import Location, Volunteer
 from inventory_tng.pages import NOTICES, not_found, redirect
 from inventory_tng.volunteers import queries, volunteers
+from inventory_tng.web.forms import chosen, form_version, name_problem
 
 log = structlog.get_logger(__name__)
 

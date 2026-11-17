@@ -19,10 +19,7 @@ from inventory_tng.admin.common import (
     RULES,
     SECTION_LOCATIONS,
     admin_page,
-    chosen,
     current_rows,
-    form_version,
-    name_problem,
     now,
     retirement,
     rule_words,
@@ -38,6 +35,7 @@ from inventory_tng.models import STORE_KINDS, Label, Location
 from inventory_tng.pages import not_found, redirect
 from inventory_tng.places import queries
 from inventory_tng.volunteers import queries as volunteers_queries
+from inventory_tng.web.forms import chosen, form_version, name_problem
 
 log = structlog.get_logger(__name__)
 

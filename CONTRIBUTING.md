@@ -397,7 +397,7 @@ function, holding the row's lock, refuses a row changed since
 (`changed_since_shown`, `db.unchanged`), so a save never quietly undoes
 another administrator's. Its `seen` argument is required; pass `None` only
 where nothing was shown, as a command. A page parses what its form sent
-with `admin/common.form_version` and shows a refusal as `RULES[CHANGED]`'s
+with `web/forms.form_version` and shows a refusal as `RULES[CHANGED]`'s
 alert, which `admin_page` answers 409. An administrator's own account is
 not versioned: only they edit it.
 

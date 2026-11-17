@@ -28,14 +28,17 @@ structure below on 2026-11-17.
   module, included by name in `app.py`, never discovered. A handler reads
   the request, calls `forms.py`, `queries.py` and the rules, then renders,
   returns or redirects. Queries are plain functions taking a `Session`;
-  a trivial `session.get` may stay in a handler.
+  a trivial `session.get` may stay in a handler. Forms are plain
+  functions too, given the form's fields as a mapping of text or the
+  values its `Form()` parameters read: the handler reads the request.
 - **One entry point for operator commands**, `python -m
   inventory_tng.manage <command>`, from a fixed table of each feature's
   `command.py`.
 - **Imports go one way**, held by `backend/tests/test_import_directions.py`:
-  core imports no feature; rules and queries import neither FastAPI nor
-  `web/`, but for `web/formatting.py`, which itself imports neither
-  (inventory-tng-atmx.2); route files run no queries (`select`,
+  core imports no feature; rules, queries and forms import neither
+  FastAPI nor `web/`, but for `web/formatting.py` and `web/forms.py`,
+  which themselves import neither (inventory-tng-atmx.2,
+  inventory-tng-atmx.7); route files run no queries (`select`,
   `session.execute`, `session.scalar` or `scalars`); no feature's routes
   import another feature's routes, linking through its `paths.py`
   instead; package `__init__.py` files stay empty; and only the entry
@@ -110,3 +113,4 @@ short test. `core/` is the name FastAPI's full-stack template uses;
 | `admin/volunteers.py`: its queries | `volunteers/queries.py` |
 | `admin/locations.py`: its volunteers' names | `volunteers/queries.py`: `volunteer_names` |
 | `health.py`: its query | `core/db.py`: `ping` |
+| `admin/common.py`: how a form is checked | `web/forms.py` |

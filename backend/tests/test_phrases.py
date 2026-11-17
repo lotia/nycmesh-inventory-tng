@@ -71,6 +71,7 @@ from inventory_tng.models import (
 )
 from inventory_tng.pages import retired_holding, templates
 from inventory_tng.resets import RESET_NOTICE
+from inventory_tng.web import forms as web_forms
 
 from helpers import markup
 from helpers.pages import NOT_ENGLISH, PAGES, Built, built, path
@@ -144,8 +145,8 @@ SAID_WITH_VALUES: list[Callable[[], Words]] = [
     lambda: accounts.name_up_to(9),
     lambda: accounts.password_problem("", "") or "",
     lambda: accounts.password_problem("." * 1000, "") or "",
-    lambda: common.up_to(9),
-    lambda: common.at_most_places(3),
+    lambda: web_forms.up_to(9),
+    lambda: web_forms.at_most_places(3),
     lambda: common.revoke_title(NOT_ENGLISH),
     *(
         lambda said=said: said(NOT_ENGLISH, NOT_ENGLISH)

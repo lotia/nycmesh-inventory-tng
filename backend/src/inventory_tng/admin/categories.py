@@ -16,8 +16,6 @@ from inventory_tng.admin.common import (
     RULES,
     SECTION_CATEGORIES,
     admin_page,
-    form_version,
-    name_problem,
     now,
     retirement,
     undo_retire,
@@ -29,6 +27,7 @@ from inventory_tng.core.db import DbSession, refusal
 from inventory_tng.core.phrases import Words, lazy_gettext
 from inventory_tng.models import Category
 from inventory_tng.pages import not_found, redirect
+from inventory_tng.web.forms import form_version, name_problem
 
 log = structlog.get_logger(__name__)
 

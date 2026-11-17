@@ -3606,7 +3606,7 @@ msgstr ""
 msgid "That isn't your password."
 msgstr ""
 
-#: src/inventory_tng/admin/common.py
+#: src/inventory_tng/web/forms.py
 msgid "That number is too big."
 msgstr ""
 
@@ -3819,7 +3819,7 @@ msgstr ""
 msgid "This form is out of date: try again."
 msgstr ""
 
-#: src/inventory_tng/admin/common.py
+#: src/inventory_tng/web/forms.py
 msgid "This item is counted in whole units."
 msgstr ""
 
@@ -3899,7 +3899,7 @@ msgstr ""
 msgid "Two adjustments"
 msgstr ""
 
-#: src/inventory_tng/admin/common.py
+#: src/inventory_tng/web/forms.py
 msgid "Type a number, such as 12 or 0.5."
 msgstr ""
 
@@ -3943,7 +3943,7 @@ msgstr ""
 msgid "Until %(until)s"
 msgstr ""
 
-#: src/inventory_tng/admin/common.py
+#: src/inventory_tng/web/forms.py
 #, python-format
 msgid "Up to %(max)d characters."
 msgstr ""
@@ -3952,7 +3952,7 @@ msgstr ""
 msgid "Usable in the stores"
 msgstr ""
 
-#: src/inventory_tng/admin/common.py
+#: src/inventory_tng/web/forms.py
 msgid "Use 0 or more."
 msgstr ""
 
@@ -3961,7 +3961,7 @@ msgstr ""
 msgid "Use 1 to %(max)d letters, digits, dots, dashes or underscores."
 msgstr ""
 
-#: src/inventory_tng/admin/common.py
+#: src/inventory_tng/web/forms.py
 msgid "Use a number above 0."
 msgstr ""
 
@@ -3975,7 +3975,7 @@ msgstr ""
 msgid "Use at most %(max)d characters."
 msgstr ""
 
-#: src/inventory_tng/admin/common.py
+#: src/inventory_tng/web/forms.py
 #, python-format
 msgid "Use at most %(places)d decimal places."
 msgstr ""

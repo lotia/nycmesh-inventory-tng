@@ -1187,7 +1187,7 @@ OVER_RECORDED_SETTLED = ("corrected", "checked", "counted")
 # inventory-tng-zgy): counted where it left, where it arrived, at both ends,
 # or put right another way, said in words of the administrator's.
 OVER_RECORDED_REASONS = ("left", "arrived", "both", "other")
-# Those words, at most as long as a name (admin.common.NAME_MAX).
+# Those words, at most as long as a name (web.forms.NAME_MAX).
 OVER_RECORDED_WORDS_MAX = 200
 
 

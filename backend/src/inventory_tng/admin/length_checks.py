@@ -27,8 +27,6 @@ from inventory_tng.admin.common import (
     TICK_OPEN_PACKAGES,
     admin_page,
     now,
-    quantity,
-    row_id,
 )
 from inventory_tng.admin.listing import AskedView, Sort, Sorting, View, arranged
 from inventory_tng.admin.needs_action import (
@@ -51,6 +49,7 @@ from inventory_tng.models import (
 )
 from inventory_tng.pages import NOTICES, not_found, redirect
 from inventory_tng.stock import queries
+from inventory_tng.web.forms import quantity, row_id
 
 log = structlog.get_logger(__name__)
 

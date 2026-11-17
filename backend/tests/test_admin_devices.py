@@ -10,7 +10,6 @@ from httpx2 import Response
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from inventory_tng.admin.common import NAME_MAX, up_to
 from inventory_tng.admin.devices import (
     AFTER_FROM,
     BULK_REVOKE,
@@ -24,6 +23,7 @@ from inventory_tng.admin.devices import (
 from inventory_tng.core.phrases import compiled, speaking
 from inventory_tng.devices import devices
 from inventory_tng.models import Device, RegistrationCode, SiteSettings
+from inventory_tng.web.forms import NAME_MAX, up_to
 
 from helpers.devices import new_device
 from helpers.markup import (

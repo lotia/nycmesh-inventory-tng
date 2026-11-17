@@ -22,8 +22,6 @@ from inventory_tng.admin.common import (
     RULES,
     SECTION_SETTINGS,
     admin_page,
-    form_version,
-    name_problem,
     now,
     text_form,
 )
@@ -47,6 +45,7 @@ from inventory_tng.models import (
 )
 from inventory_tng.pages import NOTICES, not_found, redirect
 from inventory_tng.site_settings import queries
+from inventory_tng.web.forms import form_version, name_problem
 
 log = structlog.get_logger(__name__)
 

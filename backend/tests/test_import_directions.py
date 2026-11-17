@@ -26,7 +26,7 @@ from helpers.source import SOURCE, modules
 CORE_MAY_IMPORT = {"models.py"}
 # What every server-rendered page shares, until it moves into web/.
 WEB = {"pages.py"}
-# Rules: each table's owner (db.protection), any queries.py, and these,
+# Rules: each table's owner (db.protection), any of PLAIN, and these,
 # which hold rules or queries but own no table.
 RULES = {
     "ledger.py",
@@ -38,7 +38,10 @@ RULES = {
 }
 # What of web/ rules may import: it loads neither FastAPI nor the templates,
 # and is held to the rules' own rule to stay so.
-RULES_MAY_IMPORT = {"web/formatting.py"}
+RULES_MAY_IMPORT = {"web/formatting.py", "web/forms.py"}
+# A feature's modules held to the rules' rule too, whatever their folder: its
+# queries, and how its forms are read and checked, which handlers call.
+PLAIN = {"queries.py", "forms.py"}
 # Folders that are not features.
 NOT_FEATURES = {"core", "dev", "web"}
 # Until its modules move into their features' packages, each module in
@@ -168,7 +171,7 @@ def is_rules(path: str) -> bool:
         path in OWNERS
         or path in RULES
         or path in RULES_MAY_IMPORT
-        or Path(path).name == "queries.py"
+        or Path(path).name in PLAIN
     )
 
 
@@ -365,6 +368,7 @@ KNOWN = {
     "catalogue/queries.py",
     "catalogue/routes.py",
     "catalogue/command.py",
+    "catalogue/forms.py",
     "core/__init__.py",
     "core/db.py",
     "core/settings.py",
@@ -377,6 +381,7 @@ KNOWN = {
     "stock/ledger.py",
     "web/__init__.py",
     "web/formatting.py",
+    "web/forms.py",
 }
 
 
@@ -415,6 +420,10 @@ def test_core_importing_a_feature_is_found(
         # What of web/ rules may import is held to their rule itself.
         ("web/formatting.py", "from fastapi import Request", ["fastapi"]),
         ("web/formatting.py", "from inventory_tng import pages", ["pages.py"]),
+        # A feature's forms are held to it too (PLAIN).
+        ("catalogue/forms.py", "from fastapi import Form", ["fastapi"]),
+        ("catalogue/forms.py", "from inventory_tng import pages", ["pages.py"]),
+        ("catalogue/forms.py", "from inventory_tng.web.forms import x", []),
     ],
 )
 def test_rules_importing_fastapi_or_web_is_found(
