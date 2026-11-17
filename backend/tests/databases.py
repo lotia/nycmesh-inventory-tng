@@ -18,10 +18,10 @@ from alembic.config import Config
 from sqlalchemy import Connection, Engine, make_url, text
 from sqlalchemy.exc import OperationalError
 
-from inventory_tng import dev_database
 from inventory_tng.core.db import LOCK_TIMEOUT, make_engine
 from inventory_tng.core.local_env import setting
-from inventory_tng.dev_database import OWNER, as_superuser, create, server_url
+from inventory_tng.dev import dev_database
+from inventory_tng.dev.dev_database import OWNER, as_superuser, create, server_url
 
 log = structlog.get_logger(__name__)
 

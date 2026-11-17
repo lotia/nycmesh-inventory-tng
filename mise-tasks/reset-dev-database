@@ -8,5 +8,5 @@ cd "$(dirname "$0")/../backend"
 # Its ports checked first, as every task that needs the server does
 # (CONTRIBUTING.md, Local settings).
 mise run start-database
-uv run python -m inventory_tng.dev_database drop "$@"
+uv run python -m inventory_tng.dev.dev_database drop "$@"
 mise run dev-database

@@ -35,7 +35,7 @@ function setting(key: string): string {
 }
 
 // This checkout's port for Vite, which mise run setup chooses (CONTRIBUTING.md,
-// Local settings), else 5173, its default in backend stacks.py.
+// Local settings), else 5173, its default in backend dev/stacks.py.
 const DEFAULT_ORIGIN = `http://localhost:${setting("INVENTORY_VITE_PORT") || "5173"}`;
 const url = new URL(setting("VITE_DEV_SERVER") || DEFAULT_ORIGIN);
 // Only the origin, as the backend keeps it.

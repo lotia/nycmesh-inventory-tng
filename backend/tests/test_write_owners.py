@@ -64,7 +64,7 @@ ALLOWED = {
     SOURCE / "accounts.py": ("_remove_sign_in",),
     SOURCE / "ledger.py": ("insert_transaction",),
     SOURCE / "reading_rules.py": ("delete",),
-    SOURCE / "seed.py": ("run",),
+    SOURCE / "dev" / "seed.py": ("run",),
 }
 # The tables a write needs no lock for, written out, so none loses its
 # lock by a slip in its declaration: only added to, or changed on every

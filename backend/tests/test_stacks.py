@@ -16,10 +16,10 @@ from pathlib import Path
 
 import pytest
 
-from inventory_tng import stacks
 from inventory_tng.core import local_env
 from inventory_tng.core.local_env import CLONE
-from inventory_tng.stacks import NEW_PORTS, PORTS, PUBLISHED, SHARED
+from inventory_tng.dev import stacks
+from inventory_tng.dev.stacks import NEW_PORTS, PORTS, PUBLISHED, SHARED
 
 EXAMPLE = "\n".join(
     ["COMPOSE_PROJECT_NAME=inventory-tng", "INVENTORY_DB_NAME=inventory"]
@@ -228,11 +228,11 @@ def test_it_prints_a_new_env(
 def test_it_runs_as_a_module(
     monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
 ) -> None:
-    """As the task scripts run it: python -m inventory_tng.stacks."""
+    """As the task scripts run it: python -m inventory_tng.dev.stacks."""
     monkeypatch.setattr(sys, "argv", ["stacks", "stale"])
     monkeypatch.setattr(sys, "stdin", io.StringIO("[]"))
     with pytest.warns(RuntimeWarning, match="found in sys.modules"):
-        runpy.run_module("inventory_tng.stacks", run_name="__main__")
+        runpy.run_module("inventory_tng.dev.stacks", run_name="__main__")
     assert capsys.readouterr().out == ""
 
 

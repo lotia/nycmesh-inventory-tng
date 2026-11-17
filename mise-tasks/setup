@@ -25,14 +25,14 @@ if [[ ! -f .env ]]; then
   # A compose stack of this checkout's own, with its database, and ports no
   # other stack of this repository claims and nothing listens on
   # (CONTRIBUTING.md, Local settings).
-  (cd backend && uv run --quiet --frozen python -m inventory_tng.stacks new-env) >.env.new
+  (cd backend && uv run --quiet --frozen python -m inventory_tng.dev.stacks new-env) >.env.new
   mv .env.new .env
   echo "Made .env from .env.example, with a compose stack and database of its own:" \
     "$(grep '^COMPOSE_PROJECT_NAME=' .env)"
 elif $new_ports; then
   # Only its port settings, each free or this checkout's stack's
   # (CONTRIBUTING.md, Local settings); every other line stays.
-  (cd backend && uv run --quiet --frozen python -m inventory_tng.stacks new-ports)
+  (cd backend && uv run --quiet --frozen python -m inventory_tng.dev.stacks new-ports)
 fi
 # The key development seals authenticators' TOTP keys with (DEPLOYMENT.md,
 # TOTP keys), readable by you alone. Made again if empty, as a run that

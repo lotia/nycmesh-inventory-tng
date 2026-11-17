@@ -196,7 +196,7 @@ Sign-in codes become optional, so `dev` signs in with the password alone.
 Run again, it changes only `dev`'s password: to the one you give, or to a
 new one if `dev` has none. It refuses a database with other administrators, and
 needs `APP_ENV=development`, as `.env.example` sets, also in the app
-container: `mise run compose -- exec app python -m inventory_tng.seed`.
+container: `mise run compose -- exec app python -m inventory_tng.dev.seed`.
 
 ### Migrations
 
@@ -1110,8 +1110,8 @@ its own database, not the server's limit, and a test that fails for either
 limit says which. Long before a leak reaches that limit, a test that ends
 with a connection it took from any pool and kept errors at its teardown,
 named by `keeps_its_connections` in conftest.py. Each checkout's development
-database allows 30 (`dev_database.py`): one app, and a migration or seed
-beside it, so it cannot starve the tests beside it.
+database allows 30 (`dev/dev_database.py`): one app, and a migration or
+seed beside it, so it cannot starve the tests beside it.
 
 ### Measuring the catalogue
 

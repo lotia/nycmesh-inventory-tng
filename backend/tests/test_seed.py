@@ -9,7 +9,8 @@ import pytest
 from sqlalchemy import Engine, delete, func, select
 from sqlalchemy.orm import Session
 
-from inventory_tng import accounts, seed
+from inventory_tng import accounts
+from inventory_tng.dev import seed
 from inventory_tng.ledger import expected
 from inventory_tng.models import Admin, AdminPassword, Item, Location, Volunteer
 
@@ -110,7 +111,7 @@ def test_it_runs_as_a_module(
         pytest.warns(RuntimeWarning, match="found in sys.modules"),
         pytest.raises(SystemExit) as done,
     ):
-        runpy.run_module("inventory_tng.seed", run_name="__main__")
+        runpy.run_module("inventory_tng.dev.seed", run_name="__main__")
     assert done.value.code == 0
     assert SIGN_IN + PASSWORD in capsys.readouterr().out
 

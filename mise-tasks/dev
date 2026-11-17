@@ -12,7 +12,7 @@ backend() { uv run --quiet --frozen --project "$clone/backend" python -m "$@"; }
 mise run ports-free -- --here INVENTORY_APP_PORT INVENTORY_VITE_PORT
 
 read -r app_port vite_port < <(
-  backend inventory_tng.stacks port INVENTORY_APP_PORT INVENTORY_VITE_PORT
+  backend inventory_tng.dev.stacks port INVENTORY_APP_PORT INVENTORY_VITE_PORT
 )
 # Vite's address, read as the backend reads it (the shell, then .env), else
 # INVENTORY_VITE_PORT's, as in frontend/vite.config.ts. Both servers get it

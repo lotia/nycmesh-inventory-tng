@@ -4,8 +4,8 @@ held to its connection limit, or dropped, named to confirm. Migrating it
 is alembic's, after (mise run dev-database, reset-dev-database). Only with
 APP_ENV=development.
 
-    uv run python -m inventory_tng.dev_database make
-    uv run python -m inventory_tng.dev_database drop NAME
+    uv run python -m inventory_tng.dev.dev_database make
+    uv run python -m inventory_tng.dev.dev_database drop NAME
 """
 
 import argparse
@@ -127,7 +127,7 @@ def drop(url: str) -> None:
 
 
 def main(argv: Sequence[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(prog="python -m inventory_tng.dev_database")
+    parser = argparse.ArgumentParser(prog="python -m inventory_tng.dev.dev_database")
     commands = parser.add_subparsers(dest="command", required=True)
     commands.add_parser("make", help="make this checkout's database if missing")
     dropping = commands.add_parser("drop", help="drop this checkout's database")

@@ -70,3 +70,6 @@ short test. `core/` is the name FastAPI's full-stack template uses;
 | `settings.py` | `core/settings.py` |
 | `telemetry.py` | `core/telemetry.py` |
 | `time_zones.py` | `core/time_zones.py` |
+| `dev_database.py` | `dev/dev_database.py` |
+| `seed.py` | `dev/seed.py` |
+| `stacks.py` | `dev/stacks.py` |

@@ -29,7 +29,8 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from inventory_tng import __main__ as server
-from inventory_tng import accounts, devices, seed, totp_keys, volunteers
+from inventory_tng import accounts, devices, totp_keys, volunteers
+from inventory_tng.dev import seed
 from inventory_tng.models import Admin, AdminPassword, Item, Label, Volunteer
 
 from databases import migrated_engine, new_database

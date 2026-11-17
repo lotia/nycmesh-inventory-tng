@@ -6,16 +6,16 @@ that the ports they need are free, or this checkout's stack's, and `mise run
 setup -- --new-ports` gives an existing `.env` free ones. Each command but
 stale asks compose itself, through mise-tasks/compose:
 
-    uv run python -m inventory_tng.stacks new-env
-    uv run python -m inventory_tng.stacks ports-free [--here] KEY...
-    uv run python -m inventory_tng.stacks new-ports
-    uv run python -m inventory_tng.stacks port KEY...
+    uv run python -m inventory_tng.dev.stacks new-env
+    uv run python -m inventory_tng.dev.stacks ports-free [--here] KEY...
+    uv run python -m inventory_tng.dev.stacks new-ports
+    uv run python -m inventory_tng.dev.stacks port KEY...
 
 stale reads compose's list of projects from standard input, so that compose
 failing fails the list (mise-tasks/list-stale-stacks):
 
     mise run compose -- ls --all --format json |
-      uv run python -m inventory_tng.stacks stale
+      uv run python -m inventory_tng.dev.stacks stale
 """
 
 import argparse
@@ -301,7 +301,7 @@ def stale(projects: Iterable[Project], current: str) -> list[tuple[str, Path]]:
 
 def main(argv: Sequence[str] | None = None) -> None:
     parser = argparse.ArgumentParser(
-        prog="python -m inventory_tng.stacks",
+        prog="python -m inventory_tng.dev.stacks",
         description="Each checkout's compose stack, for mise-tasks/.",
     )
     commands = parser.add_subparsers(dest="command", required=True)

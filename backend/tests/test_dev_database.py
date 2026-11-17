@@ -13,13 +13,13 @@ from sqlalchemy import make_url, text
 from sqlalchemy.exc import OperationalError, ProgrammingError
 from structlog.testing import capture_logs
 
-from inventory_tng import dev_database
 from inventory_tng.core.db import (
     CANNOT_CONNECT_TO_MIGRATE,
     connect_to_migrate,
     make_engine,
 )
-from inventory_tng.dev_database import CONNECTION_LIMIT, OWNER
+from inventory_tng.dev import dev_database
+from inventory_tng.dev.dev_database import CONNECTION_LIMIT, OWNER
 
 from databases import APP, as_role, database_name, superuser_url
 
@@ -83,7 +83,7 @@ def test_dropped_only_when_named_to_confirm(
         pytest.warns(RuntimeWarning, match="found in sys.modules"),
         pytest.raises(SystemExit) as refused,
     ):
-        runpy.run_module("inventory_tng.dev_database", run_name="__main__")
+        runpy.run_module("inventory_tng.dev.dev_database", run_name="__main__")
     assert refused.value.code == 1
     assert f"is {name}, not inventory: nothing was dropped" in capsys.readouterr().err
     assert facts(url) == made

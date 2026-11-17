@@ -1,7 +1,7 @@
 """A development database to work in: an administrator, some catalogue rows
 and stock. How it behaves: CONTRIBUTING.md, Some data to work with.
 
-    uv run python -m inventory_tng.seed [--password PASSWORD]
+    uv run python -m inventory_tng.dev.seed [--password PASSWORD]
 """
 
 import argparse
@@ -61,7 +61,7 @@ STOCK = {
 
 
 def main(argv: Sequence[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(prog="python -m inventory_tng.seed")
+    parser = argparse.ArgumentParser(prog="python -m inventory_tng.dev.seed")
     parser.add_argument("--password", help="the administrator's; else one is made")
     args = parser.parse_args(argv)
     return run_command(run, args, development_only=True)
