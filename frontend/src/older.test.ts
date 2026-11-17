@@ -36,20 +36,18 @@ const RESIZED = say(RESIZED_PHRASE);
 /** A batch as an older build kept it: a move of cable, waiting, with
  * every field v3 kept. */
 function saveOf(fields: Record<string, unknown> = {}, body = {}) {
-  return olderSave({
-    body: moveBody({
-      key: KEY,
-      lines: [{ item_id: 101, quantity: "2" }],
-      ...body,
-    }),
-    what: "Move: 1 item from Hub to Van",
-    queuedAt: 1_700_000_000_000,
-    waitingFor: null,
-    note: null,
-    transactionId: null,
-    failures: 0,
-    ...fields,
-  });
+  return olderSave(
+    moveBody({ key: KEY, lines: [{ item_id: 101, quantity: "2" }], ...body }),
+    {
+      what: "Move: 1 item from Hub to Van",
+      queuedAt: 1_700_000_000_000,
+      waitingFor: null,
+      note: null,
+      transactionId: null,
+      failures: 0,
+      ...fields,
+    },
+  );
 }
 
 /** The only save kept, a move of cable but for `body` and `fields`, as

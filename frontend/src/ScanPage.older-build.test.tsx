@@ -109,18 +109,16 @@ describe("what an older build left", () => {
   /** A move of two boxes of radios and some cable, waiting under v3. */
   function leaveSave(fields = {}) {
     keep("inventory.outbox.v3", [
-      olderSave({
-        body: moveBody({
+      olderSave(
+        moveBody({
           key: KEY,
           lines: [
             { item_id: 100, quantity: "8", package_id: 1000 },
             { item_id: 101, quantity: "3", open_package_key: KEY },
           ],
         }),
-        what: "Move: 2 items from Hub to Van",
-        queuedAt: AT,
-        ...fields,
-      }),
+        { what: "Move: 2 items from Hub to Van", queuedAt: AT, ...fields },
+      ),
     ]);
   }
 
@@ -243,11 +241,10 @@ describe("what an older build left", () => {
 
   test("each kind, and what the catalogue no longer has, are told plainly", async () => {
     const save = (key: string, body: object, fields = {}) =>
-      olderSave({
-        body: { key, volunteer_id: 99, lines: [], ...body },
-        queuedAt: null,
-        ...fields,
-      });
+      olderSave(
+        { key, volunteer_id: 99, lines: [], ...body },
+        { queuedAt: null, ...fields },
+      );
     keep("inventory.outbox.v3", [
       save("a", { kind: "report", from_location_id: 10, used_up: [KEY] }),
       save("b", {
@@ -300,11 +297,9 @@ describe("what an older build left", () => {
   test("a save of no kind this build knows is something saved", async () => {
     keep("inventory.outbox.v3", [
       olderSave({
-        body: {
-          key: KEY,
-          kind: "teleport",
-          lines: [{ item_id: 102, quantity: "1" }],
-        },
+        key: KEY,
+        kind: "teleport",
+        lines: [{ item_id: 102, quantity: "1" }],
       }),
     ]);
     open();
@@ -1075,7 +1070,7 @@ describe("what an older build left", () => {
     keep(
       "inventory.outbox.v3",
       saves.map(([key, queuedAt, lines]) =>
-        olderSave({ body: moveBody({ key, lines }), queuedAt }),
+        olderSave(moveBody({ key, lines }), { queuedAt }),
       ),
     );
   }

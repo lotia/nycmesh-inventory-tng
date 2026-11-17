@@ -267,12 +267,12 @@ describe("a newer build", () => {
 
   test("once it is out, what an older build left is not put in the empty cart, which would hold the reload back", async () => {
     keep("inventory.outbox.v3", [
-      olderSave({
-        body: moveBody({
+      olderSave(
+        moveBody({
           lines: [{ item_id: 100, quantity: "4", package_id: 1000 }],
         }),
-        queuedAt: 1_700_000_000_000,
-      }),
+        { queuedAt: 1_700_000_000_000 },
+      ),
     ]);
     openMine();
     newerTab();

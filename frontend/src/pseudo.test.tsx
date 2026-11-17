@@ -15,7 +15,7 @@ import { suggest } from "./combobox";
 import { say, speak } from "./i18n";
 import { messages as pseudo } from "./locales/pseudo.po";
 import { OpenPackageCard } from "./OpenPackageCard";
-import { Outbox } from "./outbox";
+import { type Entry, Outbox, type Reason, type Recorded } from "./outbox";
 import { RegisterPage } from "./RegisterPage";
 import { guardRetire } from "./retire";
 import { Scanner } from "./Scanner";
@@ -172,8 +172,8 @@ async function loaded(): Promise<Outbox> {
 }
 
 /** A batch as the outbox keeps it, under the `n`th key, of `fields`. */
-function entry(n: number, fields: Record<string, unknown> = {}) {
-  const entry = outboxEntry({
+function entry(n: number, fields: Partial<Entry> = {}): Entry {
+  return outboxEntry({
     body: moveBody({
       key: `00000000-0000-4000-8000-${String(n).padStart(12, "0")}`,
       install_number: null,
@@ -183,8 +183,8 @@ function entry(n: number, fields: Record<string, unknown> = {}) {
       ],
     }),
     summary: { from: "Κέντρο", to: "Βαν" },
+    ...fields,
   });
-  return { ...entry, ...fields };
 }
 
 /** Saves and a cart an older build left: a refused save kept at a time
@@ -192,8 +192,9 @@ function entry(n: number, fields: Record<string, unknown> = {}) {
  * not known when it is null. */
 function leaveOlder(at: number | null) {
   keep("inventory.outbox.v3", [
-    olderSave({
-      body: moveBody({
+    olderSave(
+      moveBody({
+        key: KEY,
         to_location_id: 99,
         install_number: 5,
         lines: [
@@ -205,13 +206,15 @@ function leaveOlder(at: number | null) {
         ],
         used_up: [KEY],
       }),
-      what: "Ραδιόφωνο",
-      queuedAt: null,
-      state: "refused",
-      reason: { code: "key_reused" },
-    }),
-    olderSave({
-      body: {
+      {
+        what: "Ραδιόφωνο",
+        queuedAt: null,
+        state: "refused",
+        reason: { code: "key_reused" },
+      },
+    ),
+    olderSave(
+      {
         key: OTHER_KEY,
         kind: "report",
         volunteer_id: 2,
@@ -219,9 +222,8 @@ function leaveOlder(at: number | null) {
         to_location_id: null,
         lines: null,
       },
-      what: "Ραδιόφωνο",
-      queuedAt: at,
-    }),
+      { what: "Ραδιόφωνο", queuedAt: at },
+    ),
   ]);
   keep("inventory.cart.v1", {
     ...freshCart(),
@@ -363,7 +365,7 @@ const COVERED: Record<string, () => Promise<HTMLElement[]>> = {
   },
   "the outbox's list, each reason": async () => {
     vi.spyOn(navigator, "onLine", "get").mockReturnValue(false);
-    const recorded = {
+    const recorded: Recorded = {
       by: "elsewhere",
       transactionId: 9,
       batch: {
@@ -375,7 +377,7 @@ const COVERED: Record<string, () => Promise<HTMLElement[]>> = {
         ],
       },
     };
-    const reasons = [
+    const reasons: (Reason | null)[] = [
       null,
       { code: "no_answer" },
       { code: "unavailable" },
