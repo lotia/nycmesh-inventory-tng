@@ -20,7 +20,7 @@ import { decimal } from "./quantity";
 
 /** How to read the length printed along an open package of an item in a
  * length (any unit but each), in the words the count page uses
- * (pages.PRINTED_LENGTH, which a backend test keeps the same;
+ * (web.formatting.PRINTED_LENGTH, which a backend test keeps the same;
  * inventory-tng-pg7). */
 export const PRINTED_LENGTH = msg`Read the length printed on the cable where it leaves the spool. If it counts up from the start, what's left is the package size minus the mark.`;
 

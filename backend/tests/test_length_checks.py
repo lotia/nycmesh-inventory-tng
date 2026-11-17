@@ -12,7 +12,7 @@ from fastapi.testclient import TestClient
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
-from inventory_tng import ledger, open_packages, pages
+from inventory_tng import ledger, open_packages
 from inventory_tng.admin import length_checks
 from inventory_tng.core.local_env import CLONE
 from inventory_tng.ledger import Entry, Form
@@ -23,6 +23,7 @@ from inventory_tng.models import (
     LedgerTransaction,
     OpenPackage,
 )
+from inventory_tng.web import formatting
 
 from helpers.markup import links, read, text
 from helpers.queries import counting
@@ -66,7 +67,7 @@ def test_the_check_page_hints_at_the_printed_length(
     made = spools.opened()
     registered_client.post(URL, json=report(spools, length(made, "250")))
     page = text(admin_client.get(LENGTHS))
-    assert str(pages.PRINTED_LENGTH) in page
+    assert str(formatting.PRINTED_LENGTH) in page
     assert f'aria-describedby="hint-{made.id}"' in page
 
 
@@ -452,7 +453,7 @@ def test_the_count_page_hints_at_the_printed_length_of_items_in_length(
     made = spools.opened()
     page = text(admin_client.get(f"/admin/counts/{store}"))
     # Each open package's, and under one nobody recorded (inventory-tng-lby).
-    assert page.count(str(pages.PRINTED_LENGTH)) == 3
+    assert page.count(str(formatting.PRINTED_LENGTH)) == 3
     assert f'aria-describedby="hint-opened_{made.id}"' in page
     assert 'aria-describedby="hint-found_left"' in page
     # Beside a box of plugs, counted each: only the spool's option is one
@@ -475,14 +476,14 @@ def test_the_count_page_hints_at_the_printed_length_of_items_in_length(
     spools.cable.unit = "each"
     session.flush()
     page = text(admin_client.get(f"/admin/counts/{store}"))
-    assert str(pages.PRINTED_LENGTH) not in page
+    assert str(formatting.PRINTED_LENGTH) not in page
     assert "hint-found_left" not in page
 
 
 @pytest.mark.clone
 def test_the_scan_page_hints_in_the_same_words() -> None:
     catalogue = (CLONE / "frontend" / "src" / "locales" / "en.po").read_text()
-    assert f'msgid "{pages.PRINTED_LENGTH}"' in catalogue
+    assert f'msgid "{formatting.PRINTED_LENGTH}"' in catalogue
 
 
 def test_set_moves_it_by_what_it_was_off_so_cuts_since_stay(

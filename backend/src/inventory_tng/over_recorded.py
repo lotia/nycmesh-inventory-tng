@@ -46,7 +46,7 @@ from inventory_tng.models import (
     OpenPackage,
     OverRecorded,
 )
-from inventory_tng.pages import amount
+from inventory_tng.web.formatting import amount
 
 log = structlog.get_logger(__name__)
 meter = metrics.get_meter(__name__)

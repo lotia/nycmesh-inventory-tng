@@ -29,6 +29,9 @@ WEB = {"pages.py"}
 # Rules: each table's owner (db.protection), any queries.py, and these,
 # which hold rules but own no table.
 RULES = {"ledger.py", "names.py", "scan_settings.py", "unit_readings.py", "units.py"}
+# What of web/ rules may import: it loads neither FastAPI nor the templates,
+# and is held to the rules' own rule to stay so.
+RULES_MAY_IMPORT = {"web/formatting.py"}
 # Folders that are not features.
 NOT_FEATURES = {"core", "dev", "web"}
 # Until its modules move into their features' packages, each module in
@@ -55,10 +58,8 @@ BREAKS: dict[str, dict[str, list[str]]] = {
     "core_imports_a_feature": {},
     "rules_import_fastapi_or_web": {
         "devices.py": ["fastapi", "web/browser.py"],
-        "labels.py": ["pages.py"],
         "ledger.py": ["fastapi"],
         "once.py": ["fastapi", "pages.py", "starlette"],
-        "over_recorded.py": ["pages.py"],
     },
     "routes_run_queries": {
         "admin/admins.py": ["_list_page: 2"],
@@ -274,7 +275,12 @@ def is_web(path: str) -> bool:
 
 
 def is_rules(path: str) -> bool:
-    return path in OWNERS or path in RULES or Path(path).name == "queries.py"
+    return (
+        path in OWNERS
+        or path in RULES
+        or path in RULES_MAY_IMPORT
+        or Path(path).name == "queries.py"
+    )
 
 
 def _called(node: ast.AST) -> str | None:
@@ -327,7 +333,11 @@ def rules_import_fastapi_or_web(
 ) -> list[str]:
     if not is_rules(path):
         return []
-    found = [module for module in imported(tree, path, known) if is_web(module)]
+    found = [
+        module
+        for module in imported(tree, path, known)
+        if is_web(module) and module not in RULES_MAY_IMPORT
+    ]
     for node in ast.walk(tree):
         if isinstance(node, ast.Import):
             names = [alias.name for alias in node.names]
@@ -508,19 +518,14 @@ def test_core_importing_a_feature_is_found(
         ("ledger.py", "from fastapi import Request", ["fastapi"]),
         ("ledger.py", "def f():\n    import starlette.requests", ["starlette"]),
         ("catalogue/queries.py", "from inventory_tng import pages", ["pages.py"]),
-        (
-            "catalogue/queries.py",
-            "from ..web.formatting import x",
-            ["web/formatting.py"],
-        ),
-        (
-            "ledger.py",
-            "from inventory_tng.web import formatting",
-            ["web/formatting.py"],
-        ),
+        ("catalogue/queries.py", "from ..web.formatting import x", []),
+        ("ledger.py", "from inventory_tng.web import formatting", []),
         ("ledger.py", "from inventory_tng.core import db", []),
         # Neither rules nor queries.
         ("catalogue/routes.py", "from fastapi import APIRouter", []),
+        # What of web/ rules may import is held to their rule itself.
+        ("web/formatting.py", "from fastapi import Request", ["fastapi"]),
+        ("web/formatting.py", "from inventory_tng import pages", ["pages.py"]),
     ],
 )
 def test_rules_importing_fastapi_or_web_is_found(

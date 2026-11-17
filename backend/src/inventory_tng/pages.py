@@ -2,7 +2,6 @@
 page or a redirect is sent."""
 
 from collections.abc import Callable, Mapping
-from decimal import Decimal
 from pathlib import Path
 from typing import Any, NamedTuple, NoReturn, cast
 from urllib.parse import urlencode
@@ -19,6 +18,7 @@ from starlette.types import Scope
 from inventory_tng.core.db import Gone
 from inventory_tng.core.local_time import show, show_day
 from inventory_tng.core.phrases import BRAND, install, lazy_gettext, ngettext, number
+from inventory_tng.web.formatting import amount, printed_length
 
 templates = Jinja2Templates(directory=Path(__file__).parent / "templates")
 install(templates.env)
@@ -45,12 +45,8 @@ def csp_nonce(request: Request) -> str | None:
 cast(dict[str, Any], templates.env.globals)["csp_nonce"] = csp_nonce
 
 
-def amount(value: Decimal | None) -> str:
-    """12.500 as "12.5", 3.000 as "3": as people write quantities."""
-    return "" if value is None else format(value.normalize(), "f")
-
-
 templates.env.filters["amount"] = amount
+templates.env.filters["printed_length"] = printed_length
 
 
 def retired_holding(places: int) -> str:
@@ -60,25 +56,6 @@ def retired_holding(places: int) -> str:
         "%(num)d retired places hold stock",
         places,
     )
-
-
-# One wording, wherever what is on an open package is typed: the count
-# page, the length checks and the scan page (frontend/src/OpenPackageCard.tsx),
-# which a test keeps the same (docs/decisions/0020, 2026-11-12;
-# inventory-tng-pg7).
-PRINTED_LENGTH = lazy_gettext(
-    "Read the length printed on the cable where it leaves the spool. If it "
-    "counts up from the start, what's left is the package size minus the mark."
-)
-
-
-def printed_length(unit: str) -> str:
-    """How to read the length printed on an open package of an item in
-    `unit`, if it is a length (any but each, models.UNITS); else nothing."""
-    return str(PRINTED_LENGTH) if unit != "each" else ""
-
-
-templates.env.filters["printed_length"] = printed_length
 
 
 class Badge(NamedTuple):

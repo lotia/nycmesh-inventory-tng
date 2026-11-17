@@ -2752,7 +2752,7 @@ msgid ""
 " answer otherwise."
 msgstr ""
 
-#: src/inventory_tng/pages.py
+#: src/inventory_tng/web/formatting.py
 msgid ""
 "Read the length printed on the cable where it leaves the spool. If it "
 "counts up from the start, what's left is the package size minus the mark."

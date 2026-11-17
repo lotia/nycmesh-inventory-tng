@@ -33,12 +33,13 @@ structure below on 2026-11-17.
   `command.py`.
 - **Imports go one way**, held by `backend/tests/test_import_directions.py`:
   core imports no feature; rules and queries import neither FastAPI nor
-  `web/`; route files run no queries (`select`, `session.execute`,
-  `session.scalar` or `scalars`); no feature's routes import another
-  feature's routes, linking through its `paths.py` instead; package
-  `__init__.py` files stay empty; and only the entry point imports a
-  feature's `command.py`. The breaks found when the test was written are
-  listed in it and may only shrink.
+  `web/`, but for `web/formatting.py`, which itself imports neither
+  (inventory-tng-atmx.2); route files run no queries (`select`,
+  `session.execute`, `session.scalar` or `scalars`); no feature's routes
+  import another feature's routes, linking through its `paths.py`
+  instead; package `__init__.py` files stay empty; and only the entry
+  point imports a feature's `command.py`. The breaks found when the test
+  was written are listed in it and may only shrink.
 
 We rejected a central routes file wired with `add_api_route`, which is not
 how FastAPI apps are usually read, and import-linter, as the rules fit a
@@ -73,4 +74,5 @@ short test. `core/` is the name FastAPI's full-stack template uses;
 | `dev_database.py` | `dev/dev_database.py` |
 | `seed.py` | `dev/seed.py` |
 | `stacks.py` | `dev/stacks.py` |
+| `pages.py`: `amount`, `printed_length` | `web/formatting.py` |
 | `web.py` | `web/browser.py` |

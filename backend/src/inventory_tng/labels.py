@@ -21,7 +21,7 @@ from inventory_tng.core.db import get_locked, locked_row
 from inventory_tng.core.phrases import gettext, lazy_gettext
 from inventory_tng.ledger import takeable, takeable_package
 from inventory_tng.models import Item, ItemPackage, Label, Location
-from inventory_tng.pages import amount
+from inventory_tng.web.formatting import amount
 
 log = structlog.get_logger(__name__)
 meter = metrics.get_meter(__name__)
