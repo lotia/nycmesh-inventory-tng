@@ -13,7 +13,6 @@ from typing import Annotated
 import structlog
 from fastapi import APIRouter, Depends, Form, Request
 from fastapi.responses import HTMLResponse, Response
-from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from inventory_tng import items, models, reading_rules, units
@@ -34,10 +33,11 @@ from inventory_tng.admin.listing import (
     tidied,
 )
 from inventory_tng.admins.guards import AdminSignedIn, SignedIn
+from inventory_tng.catalogue import queries
 from inventory_tng.core.db import DbSession, refusal
 from inventory_tng.core.local_time import site_zone
 from inventory_tng.core.phrases import Words, gettext, lazy_gettext
-from inventory_tng.models import INTEGER_MAX, Admin, ReadingRule, whole
+from inventory_tng.models import INTEGER_MAX, ReadingRule, whole
 from inventory_tng.pages import NOTICES, not_found, redirect
 from inventory_tng.reading_rules import (
     NOT_A_UNIT,
@@ -165,12 +165,9 @@ def list_readings(
     settled = SETTLED_BY.get(by)
     filters = {"by": by if settled is not None else "", "unit": unit}
     view = View.read(READINGS, SORTING, asked, filters=filters)
-    query = select(ReadingRule, Admin.username).outerjoin(
-        Admin, Admin.id == ReadingRule.decided_by_admin_id
+    found = queries.rules_with_deciders(
+        session, *(() if settled is None else (settled,))
     )
-    if settled is not None:
-        query = query.where(settled)
-    found = session.execute(query).all()
     rows, view = arranged(
         (
             _row(rule, name)

@@ -71,7 +71,6 @@ BREAKS: dict[str, dict[str, list[str]]] = {
         "admin/home.py": ["home: 2"],
         "admin/labels.py": ["<module>: 1", "list_labels: 2"],
         "admin/locations.py": ["_list_page: 4", "_location_page: 2"],
-        "admin/reading_rules.py": ["list_readings: 2"],
         "admin/settings.py": ["_page: 2"],
         "admin/volunteers.py": ["_list_page: 4", "_volunteer_page: 2"],
         "health.py": ["healthz: 1"],

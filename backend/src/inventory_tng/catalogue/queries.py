@@ -1,13 +1,13 @@
-"""What the catalogue's pages read (admin/categories.py, admin/items.py):
-plain functions taking a Session, each named for what it returns
-(docs/decisions/0023)."""
+"""What the catalogue's pages read (admin/categories.py, admin/items.py,
+admin/reading_rules.py): plain functions taking a Session, each named for
+what it returns (docs/decisions/0023)."""
 
 from collections.abc import Sequence
 
-from sqlalchemy import func, select
+from sqlalchemy import ColumnElement, Row, func, select
 from sqlalchemy.orm import Session
 
-from inventory_tng.models import Category, Item, ItemPackage
+from inventory_tng.models import Admin, Category, Item, ItemPackage, ReadingRule
 
 # Each item's category's name, for a select of items to sort by.
 category_name = (
@@ -46,4 +46,17 @@ def packages_of_item(session: Session, item_id: int) -> Sequence[ItemPackage]:
         select(ItemPackage)
         .where(ItemPackage.item_id == item_id)
         .order_by(ItemPackage.retired_at.is_not(None), ItemPackage.size)
+    ).all()
+
+
+def rules_with_deciders(
+    session: Session, *where: ColumnElement[bool]
+) -> Sequence[Row[ReadingRule, str]]:
+    """The reading rules `where` picks, each with the username of the
+    administrator who settled it, None for one the import settled (an
+    outer join, which the row's type does not say)."""
+    return session.execute(
+        select(ReadingRule, Admin.username)
+        .outerjoin(Admin, Admin.id == ReadingRule.decided_by_admin_id)
+        .where(*where)
     ).all()
