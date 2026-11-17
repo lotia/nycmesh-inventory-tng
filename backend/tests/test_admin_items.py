@@ -665,8 +665,8 @@ def test_a_search_forgives_typos_best_first(
 def test_suggestions_come_from_the_filter_the_list_shows(
     admin_client: TestClient, session: Session, radios: Category
 ) -> None:
-    beam = new_item(session, radios, f"LiteBeam {uuid.uuid4().hex[:6]}")
-    old = new_item(session, radios, f"LiteBeam {uuid.uuid4().hex[:6]}")
+    beam = new_item(session, radios, f"LiteBeam {tag()}")
+    old = new_item(session, radios, f"LiteBeam {tag()}")
     admin_client.post(f"{ITEMS}/{old.id}/retire")
     current = admin_client.get(f"{ITEMS}/suggest", params={"q": "litebem"}).json()
     names = [each["name"] for each in current]

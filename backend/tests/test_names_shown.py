@@ -3,6 +3,7 @@
 inventory-tng-ist.3). Every page showing them so is
 test_query_counts.test_every_page_names_items_and_packages_as_shown."""
 
+import uuid
 from datetime import UTC, datetime
 from decimal import Decimal
 
@@ -21,6 +22,18 @@ from helpers.rows import shown as version
 from helpers.sign_in import text
 
 NB, THIN = "\u00a0", "\u202f"
+
+
+@pytest.mark.helper
+@pytest.mark.parametrize("drawn", ["374691ff", "12345678"])
+def test_a_tag_is_shown_as_typed(monkeypatch: pytest.MonkeyPatch, drawn: str) -> None:
+    """A tag drawn as 374691ff was shown as 374 691 ff, a number and its
+    unit, so a test looking for a name it made with one did not find it,
+    now and then (inventory-tng-65u8)."""
+    monkeypatch.setattr(uuid, "uuid4", lambda: uuid.UUID(drawn.ljust(32, "0")))
+    mark = tag()
+    for name in (f"LiteBeam {mark}", f"Cable 2 {mark}", f"Box {mark} 10,000ft"):
+        assert mark in units.shown_name(name)
 
 
 @pytest.fixture

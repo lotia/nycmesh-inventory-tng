@@ -80,8 +80,10 @@ def history(
 
 def tag() -> str:
     """For unique names: rows committed by one test never clash with
-    another's."""
-    return uuid.uuid4().hex[:8]
+    another's. It starts with a letter, so no part of it reads as a number
+    with a unit (374691ff as 374 691 ff) and is shown otherwise than typed
+    (units.shown_name)."""
+    return f"t{uuid.uuid4().hex[:8]}"
 
 
 def setting_up(session: Session) -> Session:
