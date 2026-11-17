@@ -68,7 +68,7 @@ def packages_with_minimum(session: Session) -> Sequence[ItemPackage]:
     ).all()
 
 
-def items_to_reorder_by(session: Session, item_ids: Collection[int]) -> Sequence[Item]:
+def items_to_reorder(session: Session, item_ids: Collection[int]) -> Sequence[Item]:
     """Current items with a reorder level, or of `item_ids`, by name."""
     return session.scalars(
         select(Item)
@@ -194,7 +194,9 @@ def countable_place(session: Session, location_id: int) -> Location | None:
     )
 
 
-def packages_of(session: Session, item_ids: Collection[int]) -> Sequence[ItemPackage]:
+def packages_of_items(
+    session: Session, item_ids: Collection[int]
+) -> Sequence[ItemPackage]:
     """Every package of the items of `item_ids`."""
     return session.scalars(
         select(ItemPackage).where(ItemPackage.item_id.in_(item_ids))

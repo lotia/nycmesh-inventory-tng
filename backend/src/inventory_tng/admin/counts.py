@@ -491,7 +491,7 @@ def _forms(
     puts neither of its ends right (docs/decisions/0020)."""
     found = expected_forms(session, place_id, as_of, item_ids)
     packages = {
-        package.id: package for package in queries.packages_of(session, item_ids)
+        package.id: package for package in queries.packages_of_items(session, item_ids)
     }
     opened = {row.id: row for row in queries.open_at(session, place_id, item_ids)}
     held: dict[int, dict[Form, Decimal]] = {}

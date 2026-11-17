@@ -73,8 +73,11 @@ def rules_with_deciders(
 
 def current_count(
     session: Session, model: type[Item | Category | Location | Volunteer]
-) -> int | None:
+) -> int:
     """How many current rows a catalogue table holds."""
-    return session.scalar(
-        select(func.count()).select_from(model).where(model.retired_at.is_(None))
+    return (
+        session.scalar(
+            select(func.count()).select_from(model).where(model.retired_at.is_(None))
+        )
+        or 0
     )

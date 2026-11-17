@@ -292,9 +292,7 @@ def reorder(
     across the stores, or with a package's sealed below its minimum."""
     view = View.read(REORDER, REORDER_SORTING, asked)
     packages = queries.packages_with_minimum(session)
-    items = queries.items_to_reorder_by(
-        session, [package.item_id for package in packages]
-    )
+    items = queries.items_to_reorder(session, [package.item_id for package in packages])
     usable: dict[int, Decimal] = {}
     sealed: dict[int, dict[int, Decimal]] = {}
     short: set[int] = set()
