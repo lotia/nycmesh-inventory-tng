@@ -21,6 +21,7 @@ from inventory_tng.models import Admin, RegistrationCode, ResetLink
 from inventory_tng.once import SENT_AGAIN
 
 from helpers.mail import NO_MAIL, SentMail
+from helpers.markup import read
 from helpers.rows import tag
 from helpers.sign_in import (
     TIME_STEP,
@@ -115,7 +116,8 @@ def test_recovery_codes_are_made_once(
     # The codes shown the first time still work.
     (ada,) = session.scalars(select(Admin)).all()
     assert accounts.recovery_codes_left(session, ada.id) == accounts.RECOVERY_CODES
-    assert re.findall(r"<li>[A-Z0-9-]+</li>", made.text)
+    codes = [item.text for item in read(made.text).all("li")]
+    assert [code for code in codes if re.fullmatch(r"[A-Z0-9-]+", code)]
 
 
 def link_count(session: Session, admin: Admin) -> int:

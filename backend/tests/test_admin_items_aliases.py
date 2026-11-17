@@ -24,6 +24,7 @@ from inventory_tng.db import attempt
 from inventory_tng.models import CURRENT_ALIAS, Category, Item, ItemAlias
 
 from helpers.items import NOW, items_named, new_item
+from helpers.markup import links, read
 from helpers.rows import add, history, item_fields, shown
 from helpers.sign_in import text
 from helpers.stock import retire
@@ -446,8 +447,6 @@ def test_close_names_include_close_aliases(
         "category_id": str(radios.id),
         "unit": "each",
     }
-    asked = text(admin_client.post(ITEMS, data=form))
-    assert (
-        f'<a href="{ITEMS}/{tough.id}">ToughCable</a> (alias Tuff cable outdoor).'
-        in asked
-    )
+    asked = read(admin_client.post(ITEMS, data=form).text)
+    assert ("ToughCable", f"{ITEMS}/{tough.id}") in links(asked)
+    assert "ToughCable (alias Tuff cable outdoor)." in asked.text

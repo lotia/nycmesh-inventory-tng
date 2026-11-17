@@ -22,6 +22,7 @@ from inventory_tng.models import Category, Item, ItemPackage, ReadingRule
 from inventory_tng.reading_rules import NAMED, both
 
 from helpers.items import new_item
+from helpers.markup import read
 from helpers.rows import add, named, shown
 from helpers.sign_in import text
 
@@ -39,7 +40,7 @@ def test_a_name_is_saved_as_typed_and_its_units_said_under_it(
     page = text(admin_client.get(f"{ITEMS}/{item.id}"))
     assert "Read as 305m · length.\n  Saved as typed." in page
     assert "Read as 10\u03bcF · capacitance." in page
-    assert "<summary>Not right?</summary>" in page
+    assert read(page).all("summary", "Not right?")
     assert 'name="unit:m" value="none"' in page
     assert session.scalars(select(ReadingRule)).all() == []
 
@@ -60,7 +61,7 @@ def test_a_spelling_nothing_settles_is_asked_once(
     assert asked.status_code == 400
     page = text(asked)
     assert str(ASK_UNIT) in page
-    assert "<legend>“10g” is new. Is it a unit?</legend>" in page
+    assert read(asked.text).all("legend", "“10g” is new. Is it a unit?")
     assert "10Gbps · data rate" in page
     assert "10g · grams" in page
     assert "Not a unit: keep “10g”" in page

@@ -72,6 +72,7 @@ from inventory_tng.phrases import (
 )
 from inventory_tng.resets import RESET_NOTICE
 
+from helpers import markup
 from helpers.pages import NOT_ENGLISH, PAGES, Built, built, path
 
 # Each letter accented, so English left out of the catalogue shows plain.
@@ -906,8 +907,8 @@ def test_every_kind_of_lapsed_has_words(lapsed: str) -> None:
         "{{ filters(listing) }}{{ empty(listing, 2, '') }}",
         listing=listing(lapsed=lapsed, show=lapsed, narrowed=False, search=""),
     )
-    assert re.findall(r"<a [^>]*>([^<]*)</a>", shown)[1].strip()
-    assert re.search(r"<td[^>]*>\s*(\w[^<]*)", shown)
+    assert markup.links(shown)[1][0]
+    assert any(re.match(r"\w", cell.text) for cell in markup.read(shown).all("td"))
 
 
 def test_the_walk_reads_the_words_an_attribute_says() -> None:

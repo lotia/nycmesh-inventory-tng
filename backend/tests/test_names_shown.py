@@ -17,6 +17,7 @@ from inventory_tng.admin.items import ITEMS, TAKEN_FIELDS
 from inventory_tng.models import Category, Item, ItemPackage
 from inventory_tng.reading_rules import NAMED, both
 
+from helpers.markup import read
 from helpers.rows import add, named, tag
 from helpers.rows import shown as version
 from helpers.sign_in import text
@@ -107,8 +108,9 @@ def test_the_form_edits_the_name_as_typed_and_says_how_it_is_shown(
     item = named(session, Item, typed)
     assert item.name_shown == shown
     page = text(admin_client.get(f"{ITEMS}/{item.id}"))
+    # Exact markup on purpose: the thin and no-break spaces as sent.
     assert f"<h1>{shown}</h1>" in page
-    assert f'<input name="name" value="{typed}"' in page
+    assert read(page).one("input", name="name").attrs["value"] == typed
     assert f"Shown as {shown}." in page
     # A package and an alias, added on its page, alike.
     path = f"{ITEMS}/{item.id}"
@@ -117,6 +119,7 @@ def test_the_form_edits_the_name_as_typed_and_says_how_it_is_shown(
     )
     admin_client.post(f"{path}/aliases", data={"alias_name": f"Spool {mark} 305M"})
     page = text(admin_client.get(path))
+    # Exact markup on purpose: the no-break space as sent.
     assert f"<td>Spool {mark} 305{NB}M</td>" in page
     assert f"Reel 1000{NB}ft" in page
     assert 'value="Reel 1,000ft"' in page
@@ -187,6 +190,7 @@ def test_close_and_taken_names_are_named_as_shown(
     asked = text(
         admin_client.post(ITEMS, data=form | {"name": f"Spool {mark} 1,500ft"})
     )
+    # Exact markup on purpose: the no-break space as sent.
     assert f">Spool {mark} 1000{NB}ft</a>" in asked
     asked = text(admin_client.post(ITEMS, data=form | {"name": f"Drum {mark} 2,500ft"}))
     assert f"(alias Drum {mark} 2000{NB}ft)" in asked

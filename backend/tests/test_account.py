@@ -22,6 +22,7 @@ from inventory_tng.models import (
 from inventory_tng.sign_in import NAME_TAKEN
 
 from helpers.mail import SentMail
+from helpers.markup import links, read
 from helpers.sign_in import (
     PASSWORD,
     RECOVERY_CODE,
@@ -75,7 +76,12 @@ def test_the_page_shows_the_account(
     # Times in the site's zone, New York's by default.
     assert re.search(r"\d{4}-\d\d-\d\d \d\d:\d\d E[SD]T", page)
     # It starts with links, each to a section on the page (docs/decisions/0019).
-    jumps = re.findall(r'<li><a href="#([\w-]+)">', page)
+    jumps = [
+        href.removeprefix("#")
+        for item in read(page).all("li")
+        for _, href in links(item)
+        if href.startswith("#")
+    ]
     assert jumps == [
         "email",
         "password",
@@ -84,7 +90,7 @@ def test_the_page_shows_the_account(
         "sessions",
     ]
     for section in jumps:
-        assert f'<section id="{section}">' in page
+        assert read(page).one("section", id=section)
 
 
 def test_viewing_it_needs_signing_in(

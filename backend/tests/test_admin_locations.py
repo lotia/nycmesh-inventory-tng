@@ -10,6 +10,7 @@ from inventory_tng.admin.common import PICK_A_ZONE, RULES
 from inventory_tng.admin.locations import LOCATIONS, PICK_WHAT, PICK_WHERE, TAKEN
 from inventory_tng.models import Location, Volunteer
 
+from helpers.markup import options
 from helpers.rows import add, history, named, shown, tag
 from helpers.sign_in import text
 from helpers.stock import Place, write
@@ -199,7 +200,7 @@ def test_a_zone_these_rules_dropped_stays_through_a_rename(
     )
     session.expire(store)
     page = admin_client.get(f"{LOCATIONS}/{store.id}").text
-    assert "<option selected>Gone/Away</option>" in page
+    assert (None, "Gone/Away", True) in options(page)
     form = {"name": "Renamed", "time_zone": "Gone/Away", "version": shown(store)}
     assert admin_client.post(f"{LOCATIONS}/{store.id}", data=form).status_code == 303
     assert (store.name, store.time_zone) == ("Renamed", "Gone/Away")

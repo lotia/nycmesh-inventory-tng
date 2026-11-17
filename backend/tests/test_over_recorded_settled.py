@@ -25,6 +25,7 @@ from inventory_tng.local_time import show, show_day, site_zone
 from inventory_tng.models import LedgerTransaction, Movement, OverRecorded
 from inventory_tng.phrases import compiled, speaking
 
+from helpers.markup import links, read, sorted_columns
 from helpers.rows import tag
 from helpers.sign_in import new_admin
 from helpers.stock import Place, Spools, ada_id, count_at, cut, raised, retire, write
@@ -92,10 +93,9 @@ def test_a_correction_is_listed_with_when_who_and_where(
     ]
     assert f'href="/admin/stock?by=item#item-{place.item.id}"' in page
     for spot in (place.store, place.van):
-        link = f'<a href="{COUNTS}/{spot.id}?item={place.item.id}">{spot.name}</a>'
-        assert link in page
+        assert (spot.name, f"{COUNTS}/{spot.id}?item={place.item.id}") in links(page)
     # Read only: nothing to send.
-    assert "<form" not in page.split("<main", 1)[1]
+    assert not read(page).one("main").all("form")
 
 
 def test_a_place_that_cannot_be_counted_is_not_linked(
@@ -137,6 +137,7 @@ def test_each_reason_marked_checked_says_why(
         (HOW["checked"], REASONS["arrived"]),
         (HOW["checked"], REASONS["left"]),
     ]
+    # Exact markup on purpose: what was typed is escaped, never a tag.
     assert "<b>hand</b>" not in page
 
 
@@ -364,11 +365,17 @@ def test_nothing_settled_says_so(admin_client: TestClient, session: Session) -> 
     assert settled_rows(admin_client) == [["Nothing settled yet."]]
 
 
-def views_of(page: str, label: str) -> str:
-    """A nav's words and links, as one line."""
-    nav = re.search(rf'<nav aria-label="{label}"[^>]*>(.*?)</nav>', page, re.DOTALL)
-    assert nav is not None, label
-    return " ".join(nav.group(1).split())
+def views_of(page: str, label: str) -> list[tuple[str, str, str | None]]:
+    """What a nav holds, in order: each part's tag (text for words between
+    them), words and link."""
+    nav = read(page).one("nav", aria_label=label)
+    return [
+        ("text", part.strip(), None)
+        if isinstance(part, str)
+        else (part.tag, part.text, part.attrs.get("href"))
+        for part in nav.children
+        if not isinstance(part, str) or part.strip()
+    ]
 
 
 @pytest.mark.parametrize(
@@ -386,13 +393,13 @@ def test_the_stock_views_link_to_those_waiting_and_settled_always(
     """Even with none waiting."""
     page = admin_client.get(path).text
     nav = views_of(page, "Stock views")
-    assert f'<a href="{WAITING}">{recorded_more_view(0)}</a>' in nav
-    assert f'<a href="{SETTLED}">{SETTLED_VIEW}</a>' in nav
+    assert ("a", recorded_more_view(0), WAITING) in nav
+    assert ("a", SETTLED_VIEW, SETTLED) in nav
     place = Place(session)
     moved(session, place)
     moved(session, place)
     nav = views_of(admin_client.get(path).text, "Stock views")
-    assert f'<a href="{WAITING}">{recorded_more_view(2)}</a>' in nav
+    assert ("a", recorded_more_view(2), WAITING) in nav
 
 
 def test_waiting_and_settled_link_to_each_other_keeping_the_item(
@@ -403,24 +410,20 @@ def test_waiting_and_settled_link_to_each_other_keeping_the_item(
     moved(session, other)
     label = str(over_recorded_page.TITLE)
     nav = views_of(admin_client.get(WAITING).text, label)
-    assert nav == (
-        f'<strong>{waiting_view(2)}</strong> <a href="{SETTLED}">{SETTLED_VIEW}</a>'
-    )
+    assert nav == [("strong", waiting_view(2), None), ("a", SETTLED_VIEW, SETTLED)]
     nav = views_of(admin_client.get(SETTLED).text, label)
-    assert nav == (
-        f'<a href="{WAITING}">{waiting_view(2)}</a> <strong>{SETTLED_VIEW}</strong>'
-    )
+    assert nav == [("a", waiting_view(2), WAITING), ("strong", SETTLED_VIEW, None)]
     only = f"?item={place.item.id}"
     nav = views_of(admin_client.get(f"{WAITING}{only}").text, label)
-    assert nav == (
-        f"<strong>{waiting_view(1)}</strong> "
-        f'<a href="{SETTLED}{only}">{SETTLED_VIEW}</a>'
-    )
+    assert nav == [
+        ("strong", waiting_view(1), None),
+        ("a", SETTLED_VIEW, f"{SETTLED}{only}"),
+    ]
     nav = views_of(admin_client.get(f"{SETTLED}{only}").text, label)
-    assert nav == (
-        f'<a href="{WAITING}{only}">{waiting_view(1)}</a> '
-        f"<strong>{SETTLED_VIEW}</strong>"
-    )
+    assert nav == [
+        ("a", waiting_view(1), f"{WAITING}{only}"),
+        ("strong", SETTLED_VIEW, None),
+    ]
     # None waiting, still linked.
     for check in session.scalars(select(OverRecorded)):
         over_recorded.mark_checked(
@@ -428,7 +431,7 @@ def test_waiting_and_settled_link_to_each_other_keeping_the_item(
         )
     session.flush()
     nav = views_of(admin_client.get(SETTLED).text, label)
-    assert f'<a href="{WAITING}">{waiting_view(0)}</a>' in nav
+    assert ("a", waiting_view(0), WAITING) in nav
 
 
 def test_settled_by_another_administrator_names_them(
@@ -610,8 +613,9 @@ def test_every_column_sorts_either_way(
         last = [row[cell].lower() for row in shown(f"&sort={column}&order=desc")]
         assert last == first[::-1], column
     page = admin_client.get(f"{SETTLED}?sort=item").text
-    assert '<th aria-sort="ascending"><a href="' in page
-    assert f'href="{SETTLED}?sort=item&amp;order=desc"' in page
+    assert sorted_columns(page) == [
+        ("ascending", "Item", f"{SETTLED}?sort=item&order=desc")
+    ]
     assert f'href="{SETTLED}?sort=why"' in page
     # A sort not offered is newest first.
     assert shown("&sort=whom") == newest
@@ -652,9 +656,9 @@ def test_rows_per_page_25_50_100_or_all(
     only = f"{SETTLED}?item={place.item.id}"
     page = admin_client.get(only).text
     assert len(rows_of(page)) == 26
-    assert f'<a href="{only}&amp;per=25">25</a>' in page
-    assert '<a href="' + f'{only}" aria-current="page">50</a>' in page
-    assert f'<a href="{only}&amp;per=all">All</a>' in page
+    assert ("25", f"{only}&per=25") in links(page)
+    assert read(page).one("a", "50", aria_current="page").attrs["href"] == only
+    assert ("All", f"{only}&per=all") in links(page)
     page = admin_client.get(f"{only}&per=25").text
     assert len(rows_of(page)) == 25
     assert "Page 1 of 2" in page
@@ -695,12 +699,12 @@ def test_those_waiting_sort_by_each_heading_and_come_in_pages(
     where = sorted(names, key=lambda n: places[names.index(n)].store.name.lower())
     assert items("&sort=where") == where
     page = admin_client.get(WAITING).text
-    assert f'<a href="{WAITING}?sort=amount">Recorded more</a>' in page
-    assert f'<a href="{WAITING}?per=25">25</a>' in page
+    assert ("Recorded more", f"{WAITING}?sort=amount") in links(page)
+    assert ("25", f"{WAITING}?per=25") in links(page)
     only = f"{WAITING}?item={places[0].item.id}"
     sorted_only = admin_client.get(f"{only}&sort=amount").text
     assert f'href="{only}&amp;sort=amount&amp;order=desc"' in sorted_only
-    assert f'<a href="{WAITING}?sort=amount">Show all</a>' in sorted_only
+    assert ("Show all", f"{WAITING}?sort=amount") in links(sorted_only)
     for _ in range(25):
         moved(session, places[0])
     assert len(rows_of(admin_client.get(f"{only}&per=25").text)) == 25

@@ -21,6 +21,7 @@ from inventory_tng.models import ACTIVITY_KINDS, Admin, AdminSession, SignInSett
 from inventory_tng.settings import RateLimits
 
 from helpers.mail import NO_MAIL, SentMail
+from helpers.markup import button, forms, links, read, sorted_columns
 from helpers.sign_in import (
     admin_named,
     confirmed_long_ago,
@@ -181,14 +182,14 @@ def test_resetting_another_asks_to_confirm_first(
     ben, _ = new_admin(session, "ben")
     path = f"{ADMINS}/{ben.id}"
     page = admin_client.get(path).text
-    assert f'<form method="get" action="{path}/reset">' in page
+    assert ("get", f"{path}/reset") in forms(page)
     asked = admin_client.get(f"{path}/reset")
     assert asked.status_code == 200
     words = " ".join(text(asked).split())
     assert "Resetting ben's sign-in signs them out everywhere" in words
     assert "can't be undone" in words
-    assert '<button class="danger">Reset their sign-in</button>' in asked.text
-    assert f'<a href="{path}">Keep it as it is</a>' in asked.text
+    assert "danger" in button(asked.text, "Reset their sign-in").classes
+    assert ("Keep it as it is", path) in links(asked.text)
     assert 'name="once"' in asked.text
     assert accounts.has_password(session, ben.id)  # Only its button resets.
     me = admin_named(session, "ada")
@@ -663,10 +664,9 @@ def test_administrators_sort_by_each_heading_and_show_25_50_100_or_all(
     with_totp = sorted((a.username for a in rows if a.id in using), key=str.lower)
     assert listed(sort="authenticator")[: len(with_totp)] == with_totp
     page = admin_client.get(ADMINS).text
-    assert (
-        f'<th aria-sort="ascending"><a href="{ADMINS}?sort=name&amp;order=desc">'
-        "Administrator"
-    ) in page
-    assert f'<a href="{ADMINS}?sort=authenticator">Authenticator</a>' in page
-    assert f'<a href="{ADMINS}" aria-current="page">50</a>' in page
+    assert sorted_columns(page) == [
+        ("ascending", "Administrator", f"{ADMINS}?sort=name&order=desc")
+    ]
+    assert ("Authenticator", f"{ADMINS}?sort=authenticator") in links(page)
+    assert read(page).one("a", "50", aria_current="page").attrs["href"] == ADMINS
     assert len(listed(per="25")) == len(rows)

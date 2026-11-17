@@ -24,6 +24,7 @@ from inventory_tng.models import (
     OpenPackage,
 )
 
+from helpers.markup import links, read
 from helpers.queries import counting
 from helpers.rows import add, tag
 from helpers.sign_in import text
@@ -169,10 +170,9 @@ def test_needs_your_action_lists_lengths_to_check(
     assert "Needs your action (2)" in home
     assert str(length_checks.KINDS[0].title) in home
     assert str(length_checks.KINDS[1].title) in home
-    assert (
-        f"{spools.cable.name}: 1 \N{MULTIPLICATION SIGN} Spool</a>, 5 m below zero"
-        in home
-    )
+    spool = f"{spools.cable.name}: 1 \N{MULTIPLICATION SIGN} Spool"
+    assert spool in [words for words, _ in links(home)]
+    assert f"{spool}, 5 m below zero" in read(home).text
     page = text(admin_client.get(f"{LENGTHS}?item={spools.cable.id}"))
     assert f"Only {spools.cable.name}." in page
     assert "said 250 m is on it" in page
@@ -344,10 +344,11 @@ def test_each_kind_has_its_page(
     only = f"?item={spools.cable.id}"
     said = text(admin_client.get(f"{LENGTHS}/reported{only}"))
     assert "said 250 m is on it" in said
+    # As text on purpose: nowhere in the main part, its attributes included.
     assert str(length_checks.KINDS[1].title) not in said.split("<main", 1)[1]
     gone = text(admin_client.get(f"{LENGTHS}/below-zero{only}"))
     assert "said 250 m" not in gone
-    assert f'href="{LENGTHS}/below-zero">Show all' in gone
+    assert ("Show all", f"{LENGTHS}/below-zero") in links(gone)
     assert admin_client.get(f"{LENGTHS}/nothing").status_code == 404
 
 
@@ -468,8 +469,10 @@ def test_the_count_page_hints_at_the_printed_length_of_items_in_length(
     )
     box = add(session, ItemPackage(item_id=plugs.id, name="Box", size=Decimal(100)))
     page = admin_client.get(f"/admin/counts/{store}").text
-    assert f'<option value="{spools.spool.id}"  data-hinted>' in page
-    assert f'<option value="{box.id}" >' in page
+    spool = read(page).all("option", value=str(spools.spool.id))
+    assert any("data-hinted" in choice.attrs for choice in spool)
+    boxes = read(page).all("option", value=str(box.id))
+    assert any(choice.attrs.keys() == {"value"} for choice in boxes)
     # Counted each, as the plugs are: none.
     spools.cable.unit = "each"
     session.flush()
@@ -725,11 +728,9 @@ def test_those_to_check_sort_and_come_in_pages(
     reported = f"{LENGTHS}/reported"
     assert listed(reported, sort="shows") == [second.id, first.id]
     page = admin_client.get(reported, params={"item": str(spools.cable.id)}).text
-    assert (
-        f'<a href="{reported}?item={spools.cable.id}&amp;sort=shows">What it shows'
-        in page
-    )
-    assert f'<a href="{reported}">Show all</a>' in page
+    by_shows = f"{reported}?item={spools.cable.id}&sort=shows"
+    assert ("What it shows, and why", by_shows) in links(page)
+    assert ("Show all", reported) in links(page)
     assert len(listed(per="25")) == 2
 
 

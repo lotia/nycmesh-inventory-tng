@@ -1043,7 +1043,10 @@ only the owner may do, such as `TRUNCATE`, takes `owner_session` or
 `owner_engine`. Write tests in pytest style. `tests/conftest.py` holds
 fixtures, hooks and what only they use; what tests share besides is in
 `tests/helpers/`, which they import from, never from conftest.py or from
-one another.
+one another. A test reads a page's HTML with `tests/helpers/markup.py`
+(a link's words and address, a button's class), not by matching its tags
+as text, unless the exact markup is the point, such as escaping or a
+no-break space, and says so.
 
 Write a rule of more than one condition as a function of plain values,
 such as a map of each place's parent, that returns the rule broken or

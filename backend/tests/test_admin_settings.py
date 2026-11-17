@@ -1,7 +1,5 @@
 """The settings page: how the scan page behaves (admin/settings.py)."""
 
-import html
-import re
 from collections.abc import Callable
 
 import pytest
@@ -20,6 +18,7 @@ from inventory_tng.models import (
 )
 
 from helpers.mail import SentMail
+from helpers.markup import hidden, options
 from helpers.rows import history, shown
 from helpers.sign_in import confirmed_long_ago, new_admin, sign_in_with, text, with_code
 
@@ -146,12 +145,7 @@ def test_sign_in_settings_go_on_through_the_confirm_page(
     asked = admin_client.post(f"{SETTINGS}/sign-in", data=form)
     assert asked.status_code == 403
     assert 'autocomplete="new-password"' not in asked.text  # Nothing to retype.
-    carried = {
-        name: html.unescape(value)
-        for name, value in re.findall(
-            r'<input type="hidden" name="([^"]*)" value="([^"]*)">', asked.text
-        )
-    }
+    carried = dict(hidden(asked.text))
     assert carried == form
     done = admin_client.post(f"{SETTINGS}/sign-in", data=with_code(session, **carried))
     assert (
@@ -163,7 +157,7 @@ def test_sign_in_settings_go_on_through_the_confirm_page(
 
 def test_the_time_zone(admin_client: TestClient, session: Session) -> None:
     page = admin_client.get(SETTINGS).text
-    assert "<option selected>America/New_York</option>" in page
+    assert (None, "America/New_York", True) in options(page)
     site = session.get_one(SiteSettings, 1)
     form = {"time_zone": "Europe/London", "site_version": shown(site)}
     done = admin_client.post(f"{SETTINGS}/site", data=form)
@@ -206,4 +200,4 @@ def test_a_zone_set_elsewhere_still_shows(
 ) -> None:
     session.get_one(SiteSettings, 1).time_zone = "UTC"
     session.flush()
-    assert "<option selected>UTC</option>" in admin_client.get(SETTINGS).text
+    assert (None, "UTC", True) in options(admin_client.get(SETTINGS).text)

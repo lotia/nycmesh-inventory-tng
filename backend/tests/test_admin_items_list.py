@@ -12,6 +12,7 @@ from inventory_tng.admin.listing import PER_PAGE
 from inventory_tng.models import Category, Item
 
 from helpers.items import items_named, new_item
+from helpers.markup import hidden, links, read, sorted_columns
 from helpers.rows import add, tag
 from helpers.sign_in import text
 
@@ -30,7 +31,7 @@ def test_a_search_forgives_typos_best_first(
     )
     said = " ".join(page.split())
     assert f"{len(shown)} of {total} items, matching “litebeam”" in said
-    assert 'href="/admin/items">Clear search</a>' in page
+    assert ("Clear search", "/admin/items") in links(page)
     # A typo still finds it.
     misspelt = items_named(text(admin_client.get(ITEMS, params={"q": "litebeem"})))
     assert "LiteBeam 5AC" in misspelt
@@ -91,10 +92,10 @@ def test_current_retired_and_all(
         page = text(admin_client.get(ITEMS, params={"show": show}))
         assert {kept.name, gone.name} & set(items_named(page)) == expected
         chosen = show or "current"
-        link = f'href="{ITEMS}{"?show=" + show if show else ""}" aria-current="page"'
-        assert link in page, chosen
-    assert '<span class="tag">Retired</span>' in text(
-        admin_client.get(ITEMS, params={"show": "all"})
+        link = f"{ITEMS}{'?show=' + show if show else ''}"
+        assert read(page).all("a", href=link, aria_current="page"), chosen
+    assert read(admin_client.get(ITEMS, params={"show": "all"}).text).all(
+        "span", "Retired", class_="tag"
     )
 
 
@@ -157,17 +158,26 @@ def test_items_sort_by_each_heading_either_way(
     assert order(sort="part", order="desc") == ["Charlie", "Bravo", "Alpha"]
     assert order(sort="nonsense", order="up") == ["Alpha", "Bravo", "Charlie"]
     page = admin_client.get(ITEMS).text
-    assert (
-        '<th aria-sort="ascending"><a href="/admin/items?sort=name&amp;order=desc">Item'
-        in page
-    )
-    assert '<a href="/admin/items?sort=category">Category</a>' in page
+    assert sorted_columns(page) == [
+        (
+            "ascending",
+            "Item",
+            "/admin/items?sort=name&order=desc",
+        )
+    ]
+    assert ("Category", "/admin/items?sort=category") in links(page)
     page = admin_client.get(ITEMS, params={"sort": "category"}).text
-    assert (
-        '<th class="hidden sm:table-cell" aria-sort="ascending">'
-        '<a href="/admin/items?sort=category&amp;order=desc">Category'
-    ) in page
-    assert '<a href="/admin/items?sort=name">Item</a>' in page
+    assert sorted_columns(page) == [
+        (
+            "ascending",
+            "Category",
+            "/admin/items?sort=category&order=desc",
+        )
+    ]
+    # Its column is shown only on a wider screen.
+    heading = read(page).one("th", aria_sort="ascending")
+    assert {"hidden", "sm:table-cell"} <= set(heading.classes)
+    assert ("Item", "/admin/items?sort=name") in links(page)
 
 
 def test_items_show_25_50_100_or_all(
@@ -179,8 +189,9 @@ def test_items_show_25_50_100_or_all(
     query = {"q": f"Sized {mark}"}
     page = admin_client.get(ITEMS, params=query).text
     assert len(items_named(page)) == 30
-    assert f'<a href="{ITEMS}?q=Sized+{mark}&amp;per=25">25</a>' in page
-    assert f'<a href="{ITEMS}?q=Sized+{mark}" aria-current="page">50</a>' in page
+    assert ("25", f"{ITEMS}?q=Sized+{mark}&per=25") in links(page)
+    fifty = read(page).one("a", "50", aria_current="page")
+    assert fifty.attrs["href"] == f"{ITEMS}?q=Sized+{mark}"
     page = text(admin_client.get(ITEMS, params=query | {"per": "25"}))
     assert len(items_named(page)) == 25
     assert "Page 1 of 2" in page
@@ -188,14 +199,11 @@ def test_items_show_25_50_100_or_all(
     assert len(items_named(second)) == 5
     every = admin_client.get(ITEMS, params=query | {"per": "all"}).text
     assert len(items_named(every)) == 30
-    assert '" aria-current="page">All</a>' in every
+    assert read(every).one("a", "All", aria_current="page")
     assert "Page 1 of" not in every
     # A size not offered is 50; a new search keeps the size.
     assert len(items_named(text(admin_client.get(ITEMS, params={"per": "7"})))) <= 50
-    assert (
-        '<input type="hidden" name="per" value="25">'
-        in admin_client.get(ITEMS, params={"per": "25"}).text
-    )
+    assert ("per", "25") in hidden(admin_client.get(ITEMS, params={"per": "25"}).text)
 
 
 def test_items_filter_by_category(
@@ -207,8 +215,9 @@ def test_items_filter_by_category(
     new_item(session, radios, f"Filtered {mark} radio")
     page = text(admin_client.get(ITEMS, params={"category": str(antennas.id)}))
     assert items_named(page) == [kept.name]
-    assert f'<option value="{antennas.id}" selected>' in page
-    assert f'<a href="{ITEMS}">Clear</a>' in page
+    offered = read(page).all("option", value=str(antennas.id))
+    assert any("selected" in choice.attrs for choice in offered)
+    assert ("Clear", ITEMS) in links(page)
     # Kept by a search, a sort and the pages; the search box's suggestions
     # come from it too.
     found = admin_client.get(
@@ -244,15 +253,15 @@ def test_a_search_sorted_by_a_heading_goes_back_to_best_match(
     best = admin_client.get(ITEMS, params=query).text
     assert items_named(html.unescape(best))[0] == f"LiteBeam {mark}"
     assert "aria-sort" not in best
-    assert '" aria-current="page">Best match</a>' in best
+    assert read(best).one("a", "Best match", aria_current="page")
     by_name = admin_client.get(ITEMS, params=query | {"sort": "name"}).text
     assert items_named(html.unescape(by_name)) == sorted(
         items_named(html.unescape(by_name)), key=str.lower
     )
     assert items_named(html.unescape(by_name))[0] == f"Aaa LiteBeem {mark}"
-    assert f'<a href="{ITEMS}?q=LiteBeam+{mark}">Best match</a>' in by_name
+    assert ("Best match", f"{ITEMS}?q=LiteBeam+{mark}") in links(by_name)
     # A new search from the box is best match first again: no sort sent.
-    assert 'name="sort"' not in by_name.split('role="search"', 1)[1].split("</form>")[0]
+    assert not read(by_name).one("form", role="search").all("*", name="sort")
     # Without a search, no Best match.
     assert "Best match" not in admin_client.get(ITEMS).text
 

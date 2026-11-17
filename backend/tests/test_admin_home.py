@@ -12,9 +12,10 @@ from inventory_tng.models import Location
 from inventory_tng.pages import retired_holding
 
 from helpers.mail import SentMail
+from helpers.markup import links, read
 from helpers.rows import add, tag
 from helpers.sign_in import new_admin, sign_in_with, text
-from helpers.stock import badge_html, retire, stocked, write
+from helpers.stock import badge, badge_of, retire, stocked, write
 
 
 def test_a_lone_administrator_is_told(admin_client: TestClient) -> None:
@@ -63,10 +64,9 @@ def test_retired_places_holding_stock_are_told_and_counted_in_the_navigation(
     page = text(admin_client.get("/admin"))
     assert retired_holding(2) in page
     for retired in (place.van, shelf):
-        assert (
-            f'<a href="{COUNTS}/{retired.id}">Start counting {retired.name}</a>' in page
-        )
-    assert badge_html(2) in page
+        start = (f"Start counting {retired.name}", f"{COUNTS}/{retired.id}")
+        assert start in links(page)
+    assert badge(page) == badge_of(2)
 
 
 def test_the_navigation_marks_the_section_a_page_is_in(
@@ -75,10 +75,19 @@ def test_the_navigation_marks_the_section_a_page_is_in(
     """Its own page as the page, one inside it as within it, and Home only
     on itself (docs/decisions/0019)."""
     home = text(admin_client.get("/admin"))
-    assert '<a href="/admin" aria-current="page">Home</a>' in home
-    assert 'href="/admin/items" aria-current' not in home
+    assert ("Home", "/admin", "page") in current(home)
+    assert "/admin/items" not in [href for _, href, _ in current(home)]
     items = text(admin_client.get("/admin/items"))
-    assert '<a href="/admin/items" aria-current="page">Items' in items
-    assert '<a href="/admin" aria-current' not in items
+    assert ("Items", "/admin/items", "page") in current(items)
+    assert "/admin" not in [href for _, href, _ in current(items)]
     stock = text(admin_client.get("/admin/stock/reorder"))
-    assert '<a href="/admin/stock" aria-current="true">Stock' in stock
+    assert ("Stock", "/admin/stock", "true") in current(stock)
+
+
+def current(page: str) -> list[tuple[str, str | None, str | None]]:
+    """Each link marked as where the page is: its words, address and how."""
+    return [
+        (link.text, link.attrs.get("href"), link.attrs.get("aria-current"))
+        for link in read(page).all("a")
+        if "aria-current" in link.attrs
+    ]

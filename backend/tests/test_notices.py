@@ -14,6 +14,7 @@ from inventory_tng import pages
 from inventory_tng.admin.volunteers import BRING_THEM_BACK
 from inventory_tng.models import Admin, Category, Item, Label, Location, Volunteer
 
+from helpers.markup import read
 from helpers.rows import add, tag
 from helpers.sign_in import text
 
@@ -25,17 +26,13 @@ pytestmark = pytest.mark.usefixtures("admin_client")
 def said_in(page: str) -> str:
     """Where the page says its notice: the id of the section it sits in, or
     "top" under the title. The page says it once."""
-    (status,) = re.finditer(r'<p role="status">', page)
-    opened = [
-        match
-        for match in re.finditer(r"<section([^>]*)>", page)
-        if match.start() < status.start()
-    ]
-    closed = page.rfind("</section>", 0, status.start())
-    if not opened or closed > opened[-1].start():
+    read_page = read(page)
+    assert len(read_page.all("p", role="status")) == 1
+    # Outer sections come before those inside them: the last is the nearest.
+    around = [s for s in read_page.all("section") if s.all("p", role="status")]
+    if not around:
         return "top"
-    named = re.search(r'\bid="([a-z-]+)"', opened[-1].group(1))
-    return named.group(1) if named else "unnamed"
+    return around[-1].attrs.get("id") or "unnamed"
 
 
 @pytest.mark.parametrize(
@@ -137,15 +134,15 @@ def test_a_retire_is_undone_from_its_notice(
     assert retired.status_code == 303
     landed = retired.headers["location"]
     assert landed == f"{path}?undo={retiring.id}&notice=retired"
-    undo = (
-        f'<form method="post" action="{path}/{retiring.id}/restore">'
-        f"<button>{words}</button></form>"
+    undo = read(admin_client.get(landed).text).one(
+        "form", action=f"{path}/{retiring.id}/restore"
     )
-    assert undo in text(admin_client.get(landed))
+    assert undo.attrs["method"] == "post"
+    assert [(b.text, b.classes) for b in undo.all("button")] == [(words, [])]
     assert admin_client.post(f"{path}/{retiring.id}/restore").status_code == 303
     # Back already: the notice says what was done, and offers nothing more.
     page = text(admin_client.get(landed))
-    assert '<p role="status">Retired.</p>' in page
+    assert read(page).all("p", "Retired.", role="status")
     assert "/restore" not in page
 
 

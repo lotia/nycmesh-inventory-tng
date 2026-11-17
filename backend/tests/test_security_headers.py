@@ -213,6 +213,7 @@ def test_the_api_docs_load_swagger_with_a_nonce_in_development(
     assert f"'nonce-{nonce}'" in policy["script-src"]
     assert security_headers.SWAGGER_CDN in policy["script-src"]
     assert security_headers.SWAGGER_CDN in policy["style-src"]
+    # Exact markup on purpose: under the policy, no script runs without a nonce.
     assert "<script>" not in response.text
     assert nonce not in client.get(security_headers.DOCS).text
 

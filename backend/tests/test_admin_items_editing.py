@@ -2,7 +2,6 @@
 one, its name and the names it clashes with, close names asked about
 first, and retiring and bringing one back."""
 
-import re
 import uuid
 from decimal import Decimal
 
@@ -44,6 +43,7 @@ from inventory_tng.models import (
 )
 
 from helpers.items import NOW, new_item
+from helpers.markup import hidden, links, read
 from helpers.rows import add, history, named, shown
 from helpers.sign_in import text
 
@@ -248,9 +248,8 @@ def test_a_number_and_its_unit_are_judged_as_search_reads_them(
     form = {"category_id": str(radios.id), "unit": "each"}
     asking = admin_client.post(ITEMS, data=form | {"name": asked})
     assert asking.status_code == 400
-    assert f"<legend>\u201c{legend}\u201d is new. Is it a unit?</legend>" in text(
-        asking
-    )
+    question = f"\u201c{legend}\u201d is new. Is it a unit?"
+    assert read(asking.text).all("legend", question)
     add(session, Item(name="Cap 1000 uF", category_id=radios.id))
     refusing = admin_client.post(ITEMS, data=form | {"name": refused})
     assert refusing.status_code == 400
@@ -339,7 +338,7 @@ def test_the_unit_is_fixed_once_stock_has_moved(
     add(session, Movement(transaction_id=batch.id, item_id=item.id, quantity=1))
     page = text(admin_client.get(f"{ITEMS}/{item.id}"))
     assert "fixed, as stock has moved in it" in page
-    assert '<input type="hidden" name="unit" value="each">' in page
+    assert ("unit", "each") in hidden(page)
     form = {"name": item.name, "category_id": str(radios.id), "unit": "m"}
     form |= {"version": shown(item)}
     refused = admin_client.post(f"{ITEMS}/{item.id}", data=form)
@@ -497,14 +496,12 @@ def test_a_name_close_to_others_asks_first(
     asked = admin_client.post(ITEMS, data=form)
     assert asked.status_code == 200
     page = text(asked)
-    found = re.search(r'<p class="warning" role="status">(.*?)</p>', page, re.DOTALL)
-    assert found is not None
-    said = found[1]
-    assert f'<a href="{ITEMS}/{gen1.id}">LiteBeam 5AC Gen1</a>' in said
-    assert (
-        f'<a href="{ITEMS}/{old.id}">LiteBeam 5AC Gen0</a> <span class="tag">Retired'
-        in said
-    )
+    warning = read(asked.text).one("p", class_="warning", role="status")
+    said = warning.text
+    assert ("LiteBeam 5AC Gen1", f"{ITEMS}/{gen1.id}") in links(warning)
+    assert ("LiteBeam 5AC Gen0", f"{ITEMS}/{old.id}") in links(warning)
+    assert "LiteBeam 5AC Gen0 Retired" in said
+    assert warning.one("span", class_="tag").text.startswith("Retired")
     assert "Patch cable" not in said
     assert "A different item? Add it again." in said
     assert 'value="LiteBeam 5AC Gen2"' in page
@@ -524,8 +521,8 @@ def test_a_name_holding_another_items_asks_too(
     """ "mast" is close to "Mast, telescopic", though most of it is new."""
     mast = new_item(session, radios, "mast")
     form = {"name": "Mast, telescopic", "category_id": str(radios.id), "unit": "each"}
-    asked = text(admin_client.post(ITEMS, data=form))
-    assert f'<a href="{ITEMS}/{mast.id}">mast</a>' in asked
+    asked = admin_client.post(ITEMS, data=form).text
+    assert ("mast", f"{ITEMS}/{mast.id}") in links(asked)
 
 
 def test_other_refusals_come_before_the_question(

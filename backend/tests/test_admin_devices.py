@@ -26,6 +26,7 @@ from inventory_tng.models import Device, RegistrationCode, SiteSettings
 from inventory_tng.phrases import compiled, speaking
 
 from helpers.devices import new_device
+from helpers.markup import button, forms, hidden, links, options, read
 from helpers.rows import history
 from helpers.sign_in import confirmed_long_ago, once, text
 
@@ -44,7 +45,7 @@ def test_making_a_code_shows_it_once(
     assert made.headers["cache-control"] == "no-store"
     page = text(made)
     assert "Shown only now." in page
-    assert "<svg" in page
+    assert read(made.text).all("svg")
     assert f"/register?code={phrase}" in page
     # Ready to print: one sheet, with where to type the phrase.
     assert page.count('class="print-sheet"') == 1
@@ -109,13 +110,13 @@ def test_a_code_is_revoked_after_a_confirmation(
     make_code(admin_client)
     code = session.scalars(select(RegistrationCode)).one()
     path = f"{CODES}/{code.id}"
-    assert f'<form method="get" action="{path}/revoke">' in admin_client.get(path).text
+    assert ("get", f"{path}/revoke") in forms(admin_client.get(path).text)
     asked = admin_client.get(f"{path}/revoke")
     assert asked.status_code == 200
     words = " ".join(text(asked).split())
     assert "Once revoked, Open day registers no more devices" in words
-    assert '<button class="danger">Revoke</button>' in asked.text
-    assert f'<a href="{path}">Keep it</a>' in asked.text
+    assert "danger" in button(asked.text, "Revoke").classes
+    assert ("Keep it", path) in links(asked.text)
     assert code.revoked_at is None  # Only its button revokes.
     admin_client.post(f"{path}/revoke")
     assert admin_client.get(f"{path}/revoke").status_code == 404
@@ -253,9 +254,11 @@ def test_each_device_has_a_page_reached_from_both_lists(
     admin_client: TestClient, session: Session
 ) -> None:
     device, _ = new_device(session)
-    link = f'<a href="{DEVICES}/{device.id}">{device.name}</a>'
-    assert link in admin_client.get(DEVICE_LIST).text
-    assert link in admin_client.get(f"{CODES}/{device.registration_code_id}").text
+    link = (device.name, f"{DEVICES}/{device.id}")
+    assert link in links(admin_client.get(DEVICE_LIST).text)
+    assert link in links(
+        admin_client.get(f"{CODES}/{device.registration_code_id}").text
+    )
     page = text(admin_client.get(f"{DEVICES}/{device.id}"))
     assert f'href="{CODES}/{device.registration_code_id}"' in page
     assert "Revoke this device" in page
@@ -291,18 +294,18 @@ def test_a_device_is_revoked_after_a_confirmation(
 ) -> None:
     device, _ = new_device(session)
     path = f"{DEVICES}/{device.id}"
-    asked = text(admin_client.get(f"{path}/revoke"))
-    assert '<button class="danger">Revoke</button>' in asked
-    assert f'<a href="{path}">Keep it</a>' in asked
+    asked = admin_client.get(f"{path}/revoke").text
+    assert "danger" in button(asked, "Revoke").classes
+    assert ("Keep it", path) in links(asked)
     assert device.revoked_at is None
     admin_client.post(f"{path}/revoke")
     session.refresh(device)
     assert device.revoked_at is not None
     # Revoked: read only, and not asked about again.
     page = text(admin_client.get(path))
-    assert '<span class="tag">Revoked</span>' in page
+    assert read(page).all("span", "Revoked", class_="tag")
     assert "Revoke this device" not in page
-    assert '<button class="primary">Save</button>' not in page
+    assert not read(page).all("button", "Save")
     assert admin_client.get(f"{path}/revoke").status_code == 404
     refused = admin_client.post(
         path, data={"label": "Lost", "version": str(device.edit_version)}
@@ -387,22 +390,27 @@ def test_devices_come_in_pages_of_the_size_asked(
     assert "Page 1 of 2" in page
     # Revoke selected reaches this page's alone, and says so.
     assert "Every current one on this page is selected" in page
-    assert "</a> to revoke those on the other pages too." in page
-    shown = admin_client.get(DEVICE_LIST, params=window | {"per": "25"}).text
-    assert re.search(rf'<a href="{DEVICE_LIST}\?[^"]*per=all">Show All</a>', shown)
+    shown = read(admin_client.get(DEVICE_LIST, params=window | {"per": "25"}).text)
+    (offer,) = [
+        p
+        for p in shown.all("p")
+        if p.text.endswith("Show All to revoke those on the other pages too.")
+    ]
+    show_all = offer.one("a", "Show All").attrs["href"] or ""
+    assert re.fullmatch(rf"{DEVICE_LIST}\?.*per=all", show_all)
     second = text(
         admin_client.get(DEVICE_LIST, params=window | {"per": "25", "page": "2"})
     )
     assert listed_ids(second) == [made[0].id]
     # Revoking from a page keeps its page and size.
-    assert '<input type="hidden" name="per" value="25">' in second
-    assert '<input type="hidden" name="page" value="2">' in second
+    assert ("per", "25") in hidden(second)
+    assert ("page", "2") in hidden(second)
     every = text(admin_client.get(DEVICE_LIST, params=window | {"per": "all"}))
     assert len(listed_ids(every)) == 26
     assert "Every current one listed is selected" in every
     assert "other pages" not in every
     # Clear drops the filter, not the size.
-    assert f'<a href="{DEVICE_LIST}?per=all">Clear</a>' in every
+    assert ("Clear", f"{DEVICE_LIST}?per=all") in links(every)
 
 
 def test_a_revoke_keeps_the_window_and_sort(
@@ -488,16 +496,17 @@ def test_codes_sort_filter_by_state_and_come_in_pages(
     assert listed(state="lost") == listed()
     assert listed(state="usable") == listed()
     page = admin_client.get(DEVICES, params={"state": "expired"}).text
-    assert '<option value="open">Open</option>' in page
-    assert '<option value="expired" selected>Expired</option>' in page
-    assert f'<a href="{DEVICES}">Clear</a>' in page
-    assert f'<a href="{DEVICES}?state=expired&amp;sort=until">Until</a>' in page
+    assert ("open", "Open", False) in options(page)
+    assert ("expired", "Expired", True) in options(page)
+    assert ("Clear", DEVICES) in links(page)
+    assert ("Until", f"{DEVICES}?state=expired&sort=until") in links(page)
     for number in range(26):
         devices.create_code(
             session, max_uses=1, lifetime=timedelta(days=1), label=f"More {number}"
         )
     session.commit()
     paged = text(admin_client.get(DEVICES, params={"per": "25"}))
-    assert len(re.findall(rf'<td><a href="{CODES}/\d+">', paged)) == 25
+    codes = [href for cell in read(paged).all("td") for _, href in links(cell)]
+    assert len([c for c in codes if re.fullmatch(rf"{CODES}/\d+", c)]) == 25
     assert "Page 1 of 2" in paged
     assert len(listed(per="all")) == 30

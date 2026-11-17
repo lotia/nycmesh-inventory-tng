@@ -31,6 +31,7 @@ from inventory_tng.models import (
 from inventory_tng.pages import retired_holding
 
 from helpers.concurrency import Committed
+from helpers.markup import read
 from helpers.rows import add, tag
 from helpers.sign_in import admin_named
 
@@ -155,13 +156,22 @@ def adjustment_form(
     } | fields
 
 
-def badge_html(places: int) -> str:
-    """The badge beside Counts: how many retired places hold stock, its
-    words read in place of the number."""
-    return (
-        f'Counts <span class="badge"><span aria-hidden="true">{places}</span>'
-        f'<span class="sr-only">: {retired_holding(places)}</span></span>'
-    )
+def badge(page: str) -> tuple[str, str] | None:
+    """The badge beside Counts, if any: the number shown, and the words a
+    screen reader reads in its place."""
+    for link in read(page).all("a"):
+        for shown in link.all("span", class_="badge"):
+            if link.text.startswith("Counts "):
+                return (
+                    shown.one("span", aria_hidden="true").text,
+                    shown.one("span", class_="sr-only").text,
+                )
+    return None
+
+
+def badge_of(places: int) -> tuple[str, str]:
+    """The badge saying how many retired places hold stock."""
+    return str(places), f": {retired_holding(places)}"
 
 
 def at_retired_van(session: Session) -> Place:

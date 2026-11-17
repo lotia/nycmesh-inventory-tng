@@ -19,6 +19,7 @@ from inventory_tng.db import RuleBroken
 from inventory_tng.ledger import Entry, Form
 from inventory_tng.models import Admin, CatalogueHistory, Location, OverRecorded
 
+from helpers.markup import read
 from helpers.over_recorded import (
     PAGE,
     adjustments,
@@ -219,7 +220,7 @@ def test_refused_by_another_rule_it_says_that_rule(
     assert "Bring back" not in page
     assert "Mark checked" in page
     # Asking why there too, as the row does (inventory-tng-zgy).
-    assert response.text.count("<legend>Why it is right as it is</legend>") == 2
+    assert len(read(response.text).all("legend", "Why it is right as it is")) == 2
 
 
 def test_bringing_the_place_back_lets_it_be_corrected(
@@ -361,6 +362,7 @@ def checked_from_alert(
 
 
 def problem_of(check: OverRecorded) -> str:
+    # Exact markup on purpose: the id each reason's aria-describedby names.
     return f'<span class="problem" id="reason-{check.id}-problem">'
 
 

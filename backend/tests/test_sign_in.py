@@ -39,6 +39,7 @@ from inventory_tng.models import (
 from inventory_tng.pages import retired_holding
 from inventory_tng.settings import RateLimits
 
+from helpers.markup import read
 from helpers.sign_in import (
     PASSWORD,
     RECOVERY_CODE,
@@ -210,7 +211,7 @@ def test_signing_in_with_all_three(client: TestClient, session: Session) -> None
     assert "SameSite=lax" in cookie
     page = client.get(sign_in.HOME)
     assert page.status_code == 200
-    assert "<strong>ada</strong>" in page.text
+    assert read(page.text).all("strong", "ada")
 
 
 def test_every_refusal_says_the_same(client: TestClient, session: Session) -> None:

@@ -24,6 +24,7 @@ from inventory_tng.models import (
 )
 
 from helpers.concurrency import Committed
+from helpers.markup import links
 from helpers.over_recorded import (
     PAGE,
     admin_id,
@@ -186,9 +187,8 @@ def test_counting_its_place_from_the_row_counts_the_sealed_spool_and_closes_it(
         {arrived_field(spools, opened_into(session, check)): "305"},
     )
     link = f"{COUNTS}/{spools.store.id}?item={spools.cable.id}"
-    assert (
-        f'<a href="{link}">' in admin_client.get(f"{PAGE}?item={spools.cable.id}").text
-    )
+    listed = links(admin_client.get(f"{PAGE}?item={spools.cable.id}").text)
+    assert link in [href for _, href in listed]
     page = admin_client.get(link).text
     assert sealed_line(page, spools) == "0"
     assert f'name="counted_{spools.cable.id}"' not in page

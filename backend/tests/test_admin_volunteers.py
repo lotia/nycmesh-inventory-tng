@@ -22,6 +22,7 @@ from inventory_tng.models import (
     Volunteer,
 )
 
+from helpers.markup import button, forms, hidden, links, options
 from helpers.rows import add, history, named, shown, tag
 from helpers.sign_in import text
 
@@ -148,14 +149,14 @@ def test_merging_asks_to_confirm_first(
     ada = add(session, Volunteer(name="Ada"))
     dup = add(session, Volunteer(name="Ada Lovelace"))
     path = f"{VOLUNTEERS}/{dup.id}"
-    assert f'<form method="get" action="{path}/merge"' in admin_client.get(path).text
+    assert ("get", f"{path}/merge") in forms(admin_client.get(path).text)
     asked = admin_client.get(f"{path}/merge", params={"into_id": str(ada.id)})
     assert asked.status_code == 200
     words = " ".join(text(asked).split())
     assert "Ada Lovelace is retired as a duplicate of Ada" in words
-    assert f'<input type="hidden" name="into_id" value="{ada.id}">' in asked.text
-    assert '<button class="danger">Merge</button>' in asked.text
-    assert f'<a href="{path}">Keep them apart</a>' in asked.text
+    assert ("into_id", str(ada.id)) in hidden(asked.text)
+    assert "danger" in button(asked.text, "Merge").classes
+    assert ("Keep them apart", path) in links(asked.text)
     assert dup.retired_at is None  # Only its button merges.
     for into in ("", str(dup.id), "999999"):
         refused = admin_client.get(f"{path}/merge", params={"into_id": into})
@@ -188,8 +189,8 @@ def test_merging_into_one_retired_since_the_page_asked_is_refused(
     riley = add(session, Volunteer(name="Riley"))
     path = f"{VOLUNTEERS}/{sam.id}"
     into = {"into_id": str(riley.id)}
-    offered = f'<option value="{riley.id}">Riley</option>'
-    assert offered in admin_client.get(path).text
+    offered = (str(riley.id), "Riley", False)
+    assert offered in options(admin_client.get(path).text)
     assert admin_client.get(f"{path}/merge", params=into).status_code == 200
     assert admin_client.post(f"{VOLUNTEERS}/{riley.id}/retire").status_code == 303
     assert str(PICK_INTO) in text(admin_client.get(f"{path}/merge", params=into))
@@ -197,7 +198,7 @@ def test_merging_into_one_retired_since_the_page_asked_is_refused(
     refused = admin_client.post(f"{path}/merge", data=into)
     assert refused.status_code == 400
     assert str(PICK_INTO) in text(refused)
-    assert offered not in refused.text
+    assert offered not in options(refused.text)
     assert (sam.merged_into_id, sam.retired_at) == (None, None)
     assert history(session, "volunteer") == before
 
@@ -287,9 +288,9 @@ def test_volunteers_are_found_by_a_name_typed_roughly(
         "hint": "",
         "href": f"{VOLUNTEERS}?pick={sam.id}",
     }
-    page = text(admin_client.get(VOLUNTEERS, params={"q": "okonkow"}))
-    assert f'<a href="{VOLUNTEERS}/{sam.id}">{sam.name}</a>' in page
-    assert ">Bo</a>" not in page
+    found = links(admin_client.get(VOLUNTEERS, params={"q": "okonkow"}).text)
+    assert (sam.name, f"{VOLUNTEERS}/{sam.id}") in found
+    assert "Bo" not in [words for words, _ in found]
 
 
 def volunteers_named(page: str) -> list[str]:
@@ -321,9 +322,9 @@ def test_volunteers_sort_filter_and_show_25_50_100_or_all(
     assert listed(holds="no", sort="name") == ["Alpha", "Charlie"]
     assert listed(holds="maybe", sort="name") == ["Alpha", "Bravo", "Charlie"]
     page = admin_client.get(VOLUNTEERS, params={"holds": "yes"}).text
-    assert '<option value="yes" selected>Holds stock</option>' in page
-    assert f'<a href="{VOLUNTEERS}">Clear</a>' in page
-    assert f'<a href="{VOLUNTEERS}?holds=yes&amp;sort=holds">Holds stock</a>' in page
+    assert ("yes", "Holds stock", True) in options(page)
+    assert ("Clear", VOLUNTEERS) in links(page)
+    assert ("Holds stock", f"{VOLUNTEERS}?holds=yes&sort=holds") in links(page)
     other = tag()
     for number in range(27):
         add(session, Volunteer(name=f"Sized {other} {number:03}"))

@@ -22,6 +22,7 @@ from inventory_tng.models import (
 )
 
 from helpers.concurrency import Committed
+from helpers.markup import read
 from helpers.over_recorded import (
     PAGE,
     admin_id,
@@ -140,7 +141,7 @@ def test_marking_one_checked_offers_each_reason(
     """Ali, 2026-11-15 (inventory-tng-zgy)."""
     raised(registered_client, place, bags)
     page = admin_client.get(PAGE).text
-    assert "<legend>Why it is right as it is</legend>" in page
+    assert read(page).all("legend", "Why it is right as it is")
     for value, words in over_recorded.CHECKED_REASONS.items():
         assert f'value="{value}" required> {words}</label>' in page
 
@@ -164,6 +165,7 @@ def test_marking_one_checked_asks_why(
         response = mark_checked(admin_client, session, **form)
     assert response.status_code == 400
     (check,) = checks(session)
+    # Exact markup on purpose: the id each reason's aria-describedby names.
     assert (
         f'<span class="problem" id="reason-{check.id}-problem">'
         f"{over_recorded_page.SAY_WHY}</span>" in response.text
@@ -238,6 +240,7 @@ def test_words_for_another_reason_are_asked_about(
         )
     assert response.status_code == 400
     (check,) = checks(session)
+    # Exact markup on purpose: the id each reason's aria-describedby names.
     assert (
         f'<span class="problem" id="reason-{check.id}-problem">'
         f"{over_recorded_page.WORDS_FOR_ANOTHER}</span>" in response.text

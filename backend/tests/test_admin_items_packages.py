@@ -22,6 +22,7 @@ from inventory_tng.db import RuleBroken, attempt
 from inventory_tng.models import Category, Item, ItemPackage, Label
 
 from helpers.items import NOW, new_item
+from helpers.markup import read
 from helpers.rows import add, history, shown
 from helpers.sign_in import text
 from helpers.stock import Spools, retire
@@ -242,7 +243,8 @@ def test_items_ticked_are_set_together_and_packages_keep_their_own(
         False,
     )
     assert own.track_opened is False
-    assert '<span class="tag">Opened followed</span>' in text(admin_client.get(ITEMS))
+    listed = read(admin_client.get(ITEMS).text)
+    assert listed.all("span", "Opened followed", class_="tag")
     # Ticked again, or kept: nothing to change, and it says so.
     again = admin_client.post(
         f"{ITEMS}/tracking?q=cable&pick={cable.id}",

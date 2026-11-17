@@ -22,6 +22,7 @@ from inventory_tng.local_time import show_day, site_zone
 from inventory_tng.models import LedgerTransaction, Movement, OpenPackage, OverRecorded
 
 from helpers.concurrency import Committed
+from helpers.markup import links
 from helpers.over_recorded import (
     PAGE,
     admin_id,
@@ -223,9 +224,8 @@ def test_its_open_package_closed_then_its_sealed_spool_counted_closes_it(
     assert open_id is not None
     close(admin_client, spools, open_id)
     link = f"{COUNTS}/{spools.store.id}?item={spools.cable.id}"
-    assert (
-        f'<a href="{link}">' in admin_client.get(f"{PAGE}?item={spools.cable.id}").text
-    )
+    listed = links(admin_client.get(f"{PAGE}?item={spools.cable.id}").text)
+    assert link in [href for _, href in listed]
     form = count_form_at(admin_client, spools.store.id)
     with capture_logs() as logs:
         done = admin_client.post(link, data=form | {sealed_field(spools): "1"})

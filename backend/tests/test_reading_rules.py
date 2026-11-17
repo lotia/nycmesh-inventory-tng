@@ -32,6 +32,7 @@ from inventory_tng.models import reading_rules as reading_rules_held
 from inventory_tng.reading_rules import LIKELY, NAMED, both, near
 
 from helpers.concurrency import Committed
+from helpers.markup import links, options
 from helpers.queries import counting
 from helpers.rows import (
     add,
@@ -394,7 +395,7 @@ def test_the_rules_page_lists_changes_and_deletes_them(
     new_item(session, radios, "Box 10G")
     (rule,) = reading_rules.decide(session, {"G": units.Rule(None)}, None)
     listed = text(admin_client.get(READINGS))
-    assert f'<a href="{READINGS}/{rule.id}">G</a>' in listed
+    assert ("G", f"{READINGS}/{rule.id}") in links(listed)
     assert "Not a unit" in listed
     assert "The import" in listed
     page = text(admin_client.get(f"{READINGS}/{rule.id}"))
@@ -508,7 +509,7 @@ def test_the_seeding_page_proposes_and_accepts_readings(
     page = text(admin_client.get(SEED))
     assert "“G”" in page
     assert near("sfp+, uplink") in page
-    assert '<option value="">Choose…</option>' in page
+    assert ("", "Choose…", False) in options(page)
     assert "Mbps · data rate" in page
     assert "m · meters" in page
     form = {"reading:G": "g", "reading:M": ""}
@@ -547,7 +548,7 @@ def test_the_seeding_page_reviews_one_by_one(
     assert "1 of 2." in page
     assert "“G”" in page
     assert "“M”" not in page
-    assert f'href="{SEED}?one=1&at=1">Skip</a>' in page
+    assert ("Skip", f"{SEED}?one=1&at=1") in links(page)
     skipped = text(admin_client.get(f"{SEED}?one=1&at=1"))
     assert "2 of 2." in skipped
     assert "“M”" in skipped
@@ -626,9 +627,10 @@ def test_the_rules_page_sorts_filters_and_finds_a_unit(
     empty = text(admin_client.get(READINGS, params={"unit": "zz"}))
     assert "None is in the filter." in empty
     page = admin_client.get(READINGS, params={"by": "admin", "per": "25"}).text
-    assert '<option value="admin" selected>' in page
-    assert f'<a href="{READINGS}?per=25">Clear</a>' in page
-    assert f'<a href="{READINGS}?by=admin&amp;sort=when&amp;per=25">When</a>' in page
+    chosen = [value for value, _, selected in options(page) if selected]
+    assert "admin" in chosen
+    assert ("Clear", f"{READINGS}?per=25") in links(page)
+    assert ("When", f"{READINGS}?by=admin&sort=when&per=25") in links(page)
     # Whatever their case, as people sort them.
     reading_rules.decide(session, {"h": units.Rule(None)}, None)
     assert listed() == ["G", "h", "MF"]

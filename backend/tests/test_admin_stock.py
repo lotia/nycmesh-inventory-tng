@@ -10,6 +10,7 @@ from inventory_tng.admin.counts import COUNTS
 from inventory_tng.admin.stock import NEEDS_COUNTING, REORDER, STOCK
 from inventory_tng.models import Item, Location
 
+from helpers.markup import links, options, read, sorted_columns
 from helpers.rows import add, tag
 from helpers.sign_in import text
 from helpers.stock import Place, at_retired_van, received, retire, stocked, write
@@ -140,9 +141,14 @@ def test_a_retired_place_short_is_offered_for_a_count(
     retire(session, place.van)
     write(session, place, from_location_id=place.van.id, to_location_id=place.store.id)
     page = needs_counting_page(admin_client)
-    van = page[page.index(f"<h2>{place.van.name}</h2>") :].split("</section>")[0]
-    assert f'href="{COUNTS}/{place.van.id}"' in van
-    assert f"Start counting {place.van.name}</a> (retired)" in van
+    (van,) = [
+        section
+        for section in read(page).all("section")
+        if section.all("h2", place.van.name)
+    ]
+    start = f"Start counting {place.van.name}"
+    assert (start, f"{COUNTS}/{place.van.id}") in links(van)
+    assert f"{start} (retired)" in van.text
 
 
 def test_the_stock_page_warns_of_stock_at_a_retired_place(
@@ -152,13 +158,13 @@ def test_the_stock_page_warns_of_stock_at_a_retired_place(
     place = at_retired_van(session)
     page = text(admin_client.get(STOCK))
     assert "1 retired place holds" in page
-    assert (
-        f'<a href="{COUNTS}/{place.van.id}">Start counting {place.van.name}</a>' in page
-    )
-    assert f"<h2>{place.van.name} (retired)</h2>" in page
+    start = f"Start counting {place.van.name}"
+    assert (start, f"{COUNTS}/{place.van.id}") in links(page)
+    assert read(page).all("h2", f"{place.van.name} (retired)")
     by_item = text(admin_client.get(STOCK, params={"by": "item"}))
     assert "1 retired place holds" in by_item
-    assert f"{place.van.name} (retired)</td>" in by_item
+    cells = read(by_item).all("td")
+    assert any(cell.text.endswith(f"{place.van.name} (retired)") for cell in cells)
 
 
 def test_the_stock_page_counts_the_places_short(
@@ -220,24 +226,25 @@ def test_stock_sorts_within_each_group_and_filters(
     assert amounts(by="item", sort="quantity", order="desc") == ["7", "3", "2"]
     assert amounts(by="item", sort="place", order="desc") == ["7", "3", "2"]
     page = admin_client.get(STOCK, params={"by": "item"}).text
-    assert (
-        f'<th aria-sort="ascending"><a href="{STOCK}?by=item&amp;sort=place&amp;'
-        'order=desc">Place'
-    ) in page
-    assert f'<a href="{STOCK}?by=item&amp;sort=quantity">How much</a>' in page
+    # Sorted alike in each group's table.
+    assert set(sorted_columns(page)) == {
+        ("ascending", "Place", f"{STOCK}?by=item&sort=place&order=desc")
+    }
+    assert ("How much", f"{STOCK}?by=item&sort=quantity") in links(page)
     # Filtered: the items a search finds, and one place.
     assert amounts(q="cable") == ["7"]
     assert amounts(place=str(place.van.id)) == ["3"]
     assert amounts(by="item", place=str(place.store.id)) == ["7", "2"]
     assert amounts(place="x") == ["7", "2", "3"]
     filtered = text(admin_client.get(STOCK, params={"place": str(place.van.id)}))
-    assert f'<option value="{place.van.id}" selected>' in filtered
-    assert f'<a href="{STOCK}">Clear</a>' in filtered
+    chosen = [value for value, _, selected in options(filtered) if selected]
+    assert str(place.van.id) in chosen
+    assert ("Clear", STOCK) in links(filtered)
     nothing = text(admin_client.get(STOCK, params={"q": "zzzqqqxxx"}))
     assert "None is in the filter." in nothing
     # A search that folds to nothing, such as a lone accent, is none.
     accent = text(admin_client.get(STOCK, params={"q": "\u0301"}))
-    assert f'<a href="{STOCK}">Clear</a>' not in accent
+    assert ("Clear", STOCK) not in links(accent)
 
 
 def test_stock_pages_count_groups_and_never_split_one(
@@ -273,13 +280,12 @@ def test_stock_pages_count_groups_and_never_split_one(
 
 def size_row(page: str) -> tuple[str, str]:
     """The page-size row's name and the words before its sizes."""
-    found = re.search(
-        r'<nav aria-label="([^"]+)" class="filters">\s*<span>([^<]+)</span>\s*'
-        r'<a href="[^"]*per=25"',
-        page,
-    )
-    assert found, "no page-size row"
-    return found[1], found[2]
+    (row,) = [
+        nav
+        for nav in read(page).all("nav", class_="filters")
+        if any(href.endswith("per=25") for _, href in links(nav))
+    ]
+    return row.attrs["aria-label"] or "", row.all("span")[0].text
 
 
 def test_stock_size_rows_say_they_count_places_or_items(
@@ -334,8 +340,8 @@ def test_reorder_sorts_by_each_heading_and_shows_25_50_100_or_all(
     assert listed(sort="reorder_at", order="desc") == [cable, radio]
     assert listed(per="all") == [cable, radio]
     page = admin_client.get(REORDER).text
-    assert f'<a href="{REORDER}?sort=usable">Usable in the stores</a>' in page
-    assert f'<a href="{REORDER}?per=25">25</a>' in page
+    assert ("Usable in the stores", f"{REORDER}?sort=usable") in links(page)
+    assert ("25", f"{REORDER}?per=25") in links(page)
 
 
 def test_needs_counting_sorts_within_each_place_and_pages_places(
@@ -359,7 +365,7 @@ def test_needs_counting_sorts_within_each_place_and_pages_places(
     assert amounts(sort="quantity", order="desc") == ["-3", "-5"]
     assert amounts(sort="item", order="desc") == ["-3", "-5"]
     page = admin_client.get(NEEDS_COUNTING, params={"per": "25"}).text
-    assert f'<a href="{NEEDS_COUNTING}?sort=quantity&amp;per=25">How much</a>' in page
+    assert ("How much", f"{NEEDS_COUNTING}?sort=quantity&per=25") in links(page)
 
 
 def test_a_filter_leaves_the_whole_stocks_figures_whole(

@@ -20,6 +20,8 @@ from inventory_tng.bundle import (
 )
 from inventory_tng.settings import FrontendConfig
 
+from helpers.markup import read
+
 # The shape `vite build` writes: two entries sharing a chunk that carries the
 # stylesheets, a chunk only the scan page imports, and the shared stylesheet,
 # an entry of its own that the shared chunk also names.
@@ -148,8 +150,11 @@ def test_server_rendered_pages_load_the_shared_stylesheet_and_script(
     pages: TestClient, make_app_without_database: Callable[..., FastAPI]
 ) -> None:
     page = pages.get("/admin/sign-in").text
-    assert '<link rel="stylesheet" href="/static/assets/styles-BXvLJlQA.css">' in page
-    assert '<script type="module" src="/static/assets/admin-Hq3sV8kD.js">' in page
+    styles = "/static/assets/styles-BXvLJlQA.css"
+    assert read(page).all("link", rel="stylesheet", href=styles)
+    assert read(page).all(
+        "script", type="module", src="/static/assets/admin-Hq3sV8kD.js"
+    )
     # Without a build, a plain page.
     with TestClient(make_app_without_database()) as unbuilt:
         plain = unbuilt.get("/admin/sign-in").text
@@ -179,11 +184,10 @@ def test_each_page_loads_its_entry(pages: TestClient, path: str, script: str) ->
     assert response.status_code == 200
     assert response.headers["content-type"].startswith("text/html")
     assert response.headers["cache-control"] == "no-cache"
-    assert f'<script type="module" src="/static/{script}">' in response.text
-    assert '<link rel="stylesheet" href="/static/assets/shared-qHQdyY8N.css">' in (
-        response.text
-    )
-    assert '<div id="app"></div>' in response.text
+    page = read(response.text)
+    assert page.all("script", type="module", src=f"/static/{script}")
+    assert page.all("link", rel="stylesheet", href="/static/assets/shared-qHQdyY8N.css")
+    assert page.one("div", id="app").children == []
 
 
 @pytest.mark.parametrize("path", PAGES)
@@ -191,7 +195,7 @@ def test_volunteers_pages_have_the_band_and_nothing_of_an_administrators(
     pages: TestClient, path: str
 ) -> None:
     page = pages.get(path).text
-    assert f'<a class="brand" href="{SCAN}">' in page
+    assert read(page).all("a", class_="brand", href=SCAN)
     assert "Sign out" not in page
     assert 'aria-label="Sections"' not in page
 

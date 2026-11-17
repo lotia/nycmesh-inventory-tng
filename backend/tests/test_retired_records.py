@@ -23,6 +23,7 @@ from inventory_tng.models import (
     Volunteer,
 )
 
+from helpers.markup import read
 from helpers.rows import add, shown, tag
 from helpers.sign_in import text
 
@@ -53,21 +54,27 @@ def test_a_retired_records_page_says_when_and_by_whom_and_is_read_only(
     admin_client: TestClient, session: Session, path: str, kind: str
 ) -> None:
     row = made(session, kind)
-    page = text(admin_client.get(f"{path}/{row.id}"))
-    assert '<span class="tag">Retired</span>' not in page
-    assert '<button class="primary">Save' in page or "Rename</button>" in page
+    page = read(admin_client.get(f"{path}/{row.id}").text)
+    assert not page.all("span", "Retired", class_="tag")
+    assert any(
+        b.text.startswith("Save") for b in page.all("button", class_="primary")
+    ) or any(b.text.endswith("Rename") for b in page.all("button"))
     assert admin_client.post(f"{path}/{row.id}/retire").status_code == 303
 
-    page = text(admin_client.get(f"{path}/{row.id}"))
-    said = re.search(r'<span class="tag">Retired</span> on (.+?) by (\w+)\.', page)
+    page = read(admin_client.get(f"{path}/{row.id}").text)
+    assert page.one("span", "Retired", class_="tag")
+    said = re.search(r"\bRetired on (.+?) by (\w+)\.", page.text)
     assert said is not None
     # In the site's zone, New York's by default.
     assert re.fullmatch(r"\d{4}-\d\d-\d\d \d\d:\d\d E[SD]T", said.group(1))
     assert said.group(2) == "ada"
     # Read only: its fields are disabled, with no Save and no Retire, and
     # bringing it back is its one button.
-    assert re.search(r"<fieldset class=\"contents\" disabled>|required disabled>", page)
-    buttons = re.findall(r"<button[^>]*>([^<]*)", page)
+    fieldsets = page.all("fieldset", class_="contents")
+    assert any("disabled" in f.attrs for f in fieldsets) or any(
+        {"required", "disabled"} <= field.attrs.keys() for field in page.all("*")
+    )
+    buttons = [b.text for b in page.all("button")]
     assert [b for b in buttons if b not in ("Menu", "Sign out")] == [
         BRING_THEM_BACK if kind == "volunteer" else "Bring it back"
     ]
@@ -133,7 +140,8 @@ def test_a_retired_administrators_page_says_who_retired_them(
     ben.retired_at = datetime.now(UTC)
     session.flush()
     page = text(admin_client.get(f"/admin/admins/{ben.id}"))
-    assert re.search(r'<span class="tag">Retired</span> on [^<]+ by ada\.', page)
+    assert read(page).one("span", "Retired", class_="tag")
+    assert re.search(r"\bRetired on .+ by ada\.", read(page).text)
     assert "They can't sign in." in page
 
 

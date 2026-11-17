@@ -14,6 +14,7 @@ from inventory_tng.admin import over_recorded as over_recorded_page
 from inventory_tng.ledger import Form
 from inventory_tng.models import ItemPackage, LedgerTransaction, Movement
 
+from helpers.markup import read
 from helpers.over_recorded import (
     PAGE,
     adjustments,
@@ -43,7 +44,12 @@ def test_one_moved_whole_from_an_open_package_asks_for_its_count(
     )
     assert "Count in the package" in page
     assert 'value="305"' in page
-    assert f'<p class="hint" id="count-{check.id}-was" hidden>Was 305 m</p>' in page
+    was = read(page).one("p", id=f"count-{check.id}-was")
+    assert (was.text, was.classes, "hidden" in was.attrs) == (
+        "Was 305 m",
+        ["hint"],
+        True,
+    )
     assert "Confirm count" in page
     assert "/checked" not in page
     assert "/correct" not in page
@@ -142,7 +148,12 @@ def test_a_count_not_a_number_is_asked_again(
         assert problem in page
         assert f'value="{typed}"' in page
         # Edited, what it held shows under it.
-        assert f'<p class="hint" id="count-{check.id}-was">Was 305 m</p>' in page
+        was = read(page).one("p", id=f"count-{check.id}-was")
+        assert (was.text, was.classes, "hidden" in was.attrs) == (
+            "Was 305 m",
+            ["hint"],
+            False,
+        )
     assert checks(session)[0].settled_at is None
     assert adjustments(session) == []
 

@@ -26,6 +26,7 @@ from inventory_tng.models import (
     OpenPackage,
 )
 
+from helpers.markup import button, links, read
 from helpers.package_forms import forms, taken
 from helpers.rows import add, tag
 from helpers.sign_in import text
@@ -243,11 +244,9 @@ def test_needs_your_action_until_each_report_is_answered(
     made = reported(session, spools)
     home = text(admin_client.get("/admin"))
     assert "Needs your action (1)" in home
-    assert (
-        f'<a href="{USED_UP}?item={spools.cable.id}">{spools.cable.name}: 1 \N{MULTIPLICATION SIGN} Spool</a>'
-        in home
-    )
-    assert f'<a href="{USED_UP}">All 1</a>' in home
+    spool = f"{spools.cable.name}: 1 \N{MULTIPLICATION SIGN} Spool"
+    assert (spool, f"{USED_UP}?item={spools.cable.id}") in links(home)
+    assert ("All 1", USED_UP) in links(home)
     page = text(admin_client.get(USED_UP))
     assert f'name="open_package" value="{made.id}"' in page
     done = admin_client.post(f"{USED_UP}/{made.id}/confirm")
@@ -295,11 +294,16 @@ def test_needs_your_action_lists_each_item_and_what_is_below_zero(
     session.flush()
     home = text(admin_client.get("/admin"))
     assert "Needs your action (3)" in home
-    assert (
-        f"{spools.cable.name}: 2 \N{MULTIPLICATION SIGN} Spool</a>, 7 m below zero"
-        in home
+    spool = f"{spools.cable.name}: 2 \N{MULTIPLICATION SIGN} Spool"
+    assert spool in [words for words, _ in links(home)]
+    assert f"{spool}, 7 m below zero" in read(home).text
+    # The other's line is its link alone.
+    other_spool = f"{other.cable.name}: 1 \N{MULTIPLICATION SIGN} Spool"
+    lines = read(home).all("li")
+    assert any(
+        [words for words, _ in links(line)] == [line.text] == [other_spool]
+        for line in lines
     )
-    assert f"{other.cable.name}: 1 \N{MULTIPLICATION SIGN} Spool</a></li>" in home
     only = f"{USED_UP}?item={other.cable.id}"
     page = text(admin_client.get(only))
     assert f"Only {other.cable.name}." in page
@@ -402,7 +406,7 @@ def test_an_open_package_is_closed_from_its_items_page(
     # Asked first: it writes off what it shows.
     asked = text(admin_client.get(path))
     assert "it shows\n-5 m" in asked or "it shows -5 m" in " ".join(asked.split())
-    assert '<button class="danger">Close as used up</button>' in asked
+    assert "danger" in button(asked, "Close as used up").classes
     done = admin_client.post(path)
     assert done.headers["location"] == (
         f"{page}?notice=open_package_closed&section=open-packages#open-packages"
@@ -514,10 +518,8 @@ def test_those_reported_used_up_sort_and_come_in_pages(
     assert listed(sort="package", order="desc") == [earlier.id, later.id]
     assert listed(per="all") == [earlier.id, later.id]
     page = admin_client.get(USED_UP, params={"item": str(spools.cable.id)}).text
-    assert (
-        f'<a href="{USED_UP}?item={spools.cable.id}&amp;sort=shows">Shows</a>' in page
-    )
-    assert f'<a href="{USED_UP}?item={spools.cable.id}&amp;per=25">25</a>' in page
+    assert ("Shows", f"{USED_UP}?item={spools.cable.id}&sort=shows") in links(page)
+    assert ("25", f"{USED_UP}?item={spools.cable.id}&per=25") in links(page)
 
 
 def test_an_answer_comes_back_to_the_used_up_list_as_it_was(

@@ -15,6 +15,7 @@ from inventory_tng.admin.items import SHORTER_THAN_WHOLE
 from inventory_tng.ledger import Entry, Form
 from inventory_tng.models import Item, ItemPackage
 
+from helpers.markup import read
 from helpers.package_forms import BOX, FRESH, GONE, OPEN, SPOOL
 from helpers.sign_in import text
 from helpers.stock import Spools
@@ -73,7 +74,7 @@ def test_stock_and_reorder_pages_show_forms(
     session.flush()
     page = text(admin_client.get("/admin/stock"))
     for line in ("1 sealed Spool", "short end: 10 m", "usable: 305 m"):
-        assert f'<span class="hint block">{line}</span>' in page
+        assert read(page).all("span", line, class_="hint block")
     reorder = " ".join(text(admin_client.get("/admin/stock/reorder")).split())
     assert spools.cable.name in reorder
     assert "1 sealed Spool, of 2 to keep" in reorder

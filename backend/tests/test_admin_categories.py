@@ -13,6 +13,7 @@ from inventory_tng.admin.categories import CATEGORIES, TAKEN
 from inventory_tng.admin.common import RULES
 from inventory_tng.models import Admin, Category, Item
 
+from helpers.markup import links, read
 from helpers.rows import add, history, named, shown
 from helpers.sign_in import text
 
@@ -133,7 +134,8 @@ def test_a_page_shown_again_after_a_refusal_still_links_right(
     assert refused.status_code == 400
     page = refused.text
     assert f'action="{CATEGORIES}/{radios.id}/name"' in page
-    assert f'<p class="back"><a href="{CATEGORIES}">' in page
+    back = read(page).one("p", class_="back")
+    assert [href for _, href in links(back)] == [CATEGORIES]
 
 
 def test_categories_sort_by_name_or_items_and_show_25_50_100_or_all(
@@ -163,4 +165,4 @@ def test_categories_sort_by_name_or_items_and_show_25_50_100_or_all(
     )
     assert len(listed(per="all")) == 33
     page = admin_client.get(CATEGORIES).text
-    assert f'<a href="{CATEGORIES}?sort=items">Items</a>' in page
+    assert ("Items", f"{CATEGORIES}?sort=items") in links(page)

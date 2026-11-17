@@ -21,6 +21,7 @@ from inventory_tng.ledger import expected
 from inventory_tng.local_time import show_day, site_zone
 from inventory_tng.models import ItemPackage, LedgerTransaction, Movement
 
+from helpers.markup import read
 from helpers.over_recorded import (
     PAGE,
     admin_id,
@@ -90,7 +91,7 @@ def test_a_count_after_it_puts_that_end_right_and_says_what_is_left(
     )
     assert f"Correct {place.store.name}<span" in page
     link = f"{COUNTS}/{place.store.id}?item={place.item.id}"
-    assert f'<a href="{link}">Count {place.store.name}<span' in page
+    assert counts_with_words(page, link, f"Count {place.store.name}")
     assert "Mark checked" in page
     # Still waiting under "Needs your action".
     assert str(over_recorded_page.TITLE) in text(admin_client.get("/admin"))
@@ -491,7 +492,7 @@ def test_an_openings_sealed_count_puts_its_end_right_and_names_its_forms(
     correct = "open spool" if tracked else f"loose {cable}"
     assert f"Correct {correct}<span" in page
     link = f"{COUNTS}/{spools.store.id}?item={spools.cable.id}"
-    assert f'<a href="{link}">Count {spools.store.name}<span' in page
+    assert counts_with_words(page, link, f"Count {spools.store.name}")
 
 
 @pytest.mark.parametrize("tracked", [True, False])
@@ -562,4 +563,13 @@ def test_an_opening_with_one_end_counted_corrects_the_other_only(
         305,
         None,
         into.open_package_id,
+    )
+
+
+def counts_with_words(page: str, link: str, words: str) -> bool:
+    """Whether a link to the count says these words, and what it counts
+    only to a screen reader."""
+    return any(
+        count.text.startswith(f"{words} ") and count.all("span", class_="sr-only")
+        for count in read(page).all("a", href=link)
     )

@@ -54,13 +54,15 @@ from inventory_tng.pages import retired_holding
 from inventory_tng.phrases import compiled, speaking
 
 from helpers.concurrency import Committed
+from helpers.markup import button, forms, links, options, read
 from helpers.rows import item_fields, shown, violates
 from helpers.sign_in import new_admin, sign_in_with, text
 from helpers.stock import (
     Place,
     adjustment_form,
     at_retired_van,
-    badge_html,
+    badge,
+    badge_of,
     committed_place,
     count_at,
     count_form,
@@ -353,10 +355,8 @@ def test_reasons_can_be_added_renamed_retired_and_brought_back(
     assert given.name == "Donated"
     admin_client.post(path, data=form | {"action": "retire"})
     assert given.retired_at is not None
-    assert (
-        "Donated"
-        not in text(admin_client.get(COUNTS)).split("Why")[1].split("</select>")[0]
-    )
+    why = read(admin_client.get(COUNTS).text).one("select", name="reason_id")
+    assert "Donated" not in [words for _, words, _ in options(why)]
     admin_client.post(path, data=form | {"action": "restore"})
     assert given.retired_at is None
     taken = admin_client.post(f"{SETTINGS}/reasons", data={"name": "damaged"})
@@ -668,7 +668,7 @@ def signals(client: TestClient, place: Place) -> dict[str, bool]:
     stock = text(client.get(STOCK))
     return {
         "home": f'href="{COUNTS}/{place.van.id}"' in text(client.get("/admin")),
-        "badge": badge_html(1) in stock,
+        "badge": badge(stock) == badge_of(1),
         "stock": retired_holding(1) in stock,
         "counts": f"{place.van.name} (retired)" in text(client.get(COUNTS)),
         "form": client.get(f"{COUNTS}/{place.van.id}").status_code == 200,
@@ -827,8 +827,8 @@ def test_the_counts_page_says_its_links_start_a_task(admin_client: TestClient) -
     """Only the button that changes the records promises a change
     (docs/decisions/0019)."""
     page = text(admin_client.get(COUNTS))
-    assert "<button>Start a count</button>" in page
-    assert '<button class="primary">Record it</button>' in page
+    assert button(page, "Start a count").classes == []
+    assert button(page, "Record it").classes == ["primary"]
     assert "Count it" not in page
 
 
@@ -842,10 +842,10 @@ def test_a_count_can_show_one_item(admin_client: TestClient, session: Session) -
     page = admin_client.get(f"{path}?item={place.cable.id}")
     assert f'name="counted_{place.cable.id}"' in page.text
     assert f'name="counted_{place.item.id}"' not in page.text
-    assert f'<form method="post" action="{path}?item={place.cable.id}">' in page.text
+    assert ("post", f"{path}?item={place.cable.id}") in forms(page.text)
     words = text(page)
     assert f"Only {place.cable.name}. Only these are counted" in words
-    assert f'<a href="{path}">Show all</a>' in page.text
+    assert ("Show all", path) in links(page.text)
     # Nothing else of it to add at the foot.
     assert "Something else here" not in words
 
@@ -869,7 +869,7 @@ def test_a_count_can_show_the_items_a_search_finds(
     page = admin_client.get(f"{path}?q=litebeem")
     assert f'name="counted_{place.item.id}"' in page.text
     assert f'name="counted_{place.cable.id}"' not in page.text
-    assert f'<form method="post" action="{path}?q=litebeem">' in page.text
+    assert ("post", f"{path}?q=litebeem") in forms(page.text)
     assert "Only items matching “litebeem”." in text(page)
     nothing = admin_client.get(f"{path}?q=zzzzzzzz")
     assert "Nothing here matches." in text(nothing)
@@ -1019,9 +1019,9 @@ def test_counts_sort_filter_and_come_in_pages(
     assert listed(admin=str(bob.id), kind="adjustment") == ["Found"]
     assert listed(place="x", kind="audit", admin="") == listed()
     page = admin_client.get(COUNTS, params={"admin": str(bob.id)}).text
-    assert f'<option value="{bob.id}" selected>bob</option>' in page
-    assert f'<option value="{shelf.id}">Aa shelf</option>' in page
-    assert f'<a href="{COUNTS}">Clear</a>' in page
+    assert (str(bob.id), "bob", True) in options(page)
+    assert (str(shelf.id), "Aa shelf", False) in options(page)
+    assert ("Clear", COUNTS) in links(page)
     assert "None is in the filter." in text(
         admin_client.get(COUNTS, params={"place": str(INTEGER_MAX)})
     )
