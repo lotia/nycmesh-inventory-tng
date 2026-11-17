@@ -24,8 +24,7 @@ log = structlog.get_logger(__name__)
 # apart from Lost or stolen, so cable used is told from cable lost.
 USED_UP = "Used up"
 
-
-# The reason a count gives for an open package not there (0020).
+# The reason a count gives for an open package not there (docs/decisions/0020).
 LOST = "Lost or stolen"
 
 

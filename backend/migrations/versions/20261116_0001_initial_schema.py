@@ -4,7 +4,7 @@ the rows the app starts with
 The tables are made from models.py, whose CHECKs and indexes hold the rules
 one row can show; the rest are the app's. The owner makes them, and the
 app's login (DEPLOYMENT.md, Database roles) is given SELECT, INSERT, UPDATE
-and DELETE on each by default, never TRUNCATE. GRANTS then takes some back:
+and DELETE on each by default, never TRUNCATE. Some is then taken back:
 
 - History, the ledger and activity are only read and added to, so each is
   its own history.
@@ -38,68 +38,53 @@ depends_on: str | Sequence[str] | None = None
 
 APP_ROLE = "inventory_app"
 DEFAULT_PRIVILEGES = "ALTER DEFAULT PRIVILEGES IN SCHEMA public"
-# The privileges taken back from what the app's login is given by default,
-# and the columns it may update where UPDATE is taken back.
-GRANTS: dict[str, tuple[str, tuple[str, ...]]] = {
-    "activity": ("UPDATE, DELETE", ()),
-    "catalogue_history": ("UPDATE, DELETE", ()),
-    "ledger_transaction": ("UPDATE, DELETE", ()),
-    "movement": ("UPDATE, DELETE", ()),
-    "over_recorded": ("DELETE", ()),
-    "scan_settings": ("DELETE", ()),
-    "sign_in_settings": ("DELETE", ()),
-    "site_settings": ("DELETE", ()),
-    "label": ("UPDATE", ("revoked_at",)),
+# What is taken back from the app's login, by the docstring's three cases.
+READ_AND_ADD = ("activity", "catalogue_history", "ledger_transaction", "movement")
+SETTINGS = ("scan_settings", "sign_in_settings", "site_settings")
+NEVER_DELETED = ("over_recorded", *SETTINGS)
+# The only columns the app's login may update in each.
+UPDATED_ONLY = {
+    "label": ("revoked_at",),
     "item_package": (
-        "UPDATE",
-        (
-            "name",
-            "size",
-            "retired_at",
-            "track_opened",
-            "short_below",
-            "minimum_sealed",
-            "edit_version",
-            "search_text",
-            "folded_with",
-            "name_key",
-            "unit_key",
-            "name_shown",
-        ),
+        "name",
+        "size",
+        "retired_at",
+        "track_opened",
+        "short_below",
+        "minimum_sealed",
+        "edit_version",
+        "search_text",
+        "folded_with",
+        "name_key",
+        "unit_key",
+        "name_shown",
     ),
     "location": (
-        "UPDATE",
-        (
-            "name",
-            "parent_id",
-            "retired_at",
-            "edit_version",
-            "time_zone",
-            "search_text",
-            "folded_with",
-        ),
+        "name",
+        "parent_id",
+        "retired_at",
+        "edit_version",
+        "time_zone",
+        "search_text",
+        "folded_with",
     ),
     "open_package": (
-        "UPDATE",
-        (
-            "location_id",
-            "reported_at",
-            "reported_by_volunteer_id",
-            "closed_at",
-            "closed_by_admin_id",
-            "length_reported_at",
-            "length_reported_by_volunteer_id",
-            "length_reported",
-            "length_reported_in_id",
-            "below_zero_at",
-        ),
+        "location_id",
+        "reported_at",
+        "reported_by_volunteer_id",
+        "closed_at",
+        "closed_by_admin_id",
+        "length_reported_at",
+        "length_reported_by_volunteer_id",
+        "length_reported",
+        "length_reported_in_id",
+        "below_zero_at",
     ),
-    "item_alias": ("UPDATE", ("retired_at", "unit_key", "name_shown")),
+    "item_alias": ("retired_at", "unit_key", "name_shown"),
 }
-# names.name_key_sql's, written out, so the CHECKs keep the rule they were
-# made with when names.py changes; by code point, as ruff refuses the
-# look-alikes themselves.
-# names._LOOK_ALIKE's code points, by the ASCII character each is read as.
+# names.name_key_sql, written out so the CHECKs keep the rule they were made
+# with when names.py changes. names._LOOK_ALIKE by code point, as ruff
+# refuses the look-alikes themselves, keyed by the ASCII each is read as.
 LOOK_ALIKE = {
     " ": (0x00A0, 0x1680, *range(0x2000, 0x200B), 0x202F, 0x205F, 0x3000),
     "'": (0x00B4, 0x02BC, *range(0x2018, 0x201C), 0x2032, 0x2035, 0xFF07),
@@ -116,7 +101,9 @@ NAME_KEY = (
     'lower(regexp_replace(translate(name COLLATE "C",'
     f" '{LOOK_ALIKES}', '{PLAIN}'), {IGNORED}, '', 'g'))"
 )
-SETTINGS = ("scan_settings", "sign_in_settings", "site_settings")
+# Written out, not imported, so the migration stays as made. seeded finds
+# those the app gives itself by name (adjustment_reasons.USED_UP and LOST,
+# over_recorded.REASON).
 REASONS = (
     "Damaged",
     "Lost or stolen",
@@ -125,40 +112,6 @@ REASONS = (
     "Records were wrong",
     "Used up",
     "Recorded more than moved",
-)
-# Newest first, so each goes before the tables it refers to.
-TABLES = (
-    "over_recorded",
-    "movement",
-    "vendor_price",
-    "open_package",
-    "label",
-    "vendor_offer",
-    "ledger_transaction",
-    "item_package",
-    "item_alias",
-    "reset_link",
-    "recovery_code",
-    "reading_rule",
-    "location",
-    "item",
-    "device",
-    "authenticator",
-    "admin_session",
-    "admin_password",
-    "activity",
-    "volunteer",
-    "vendor",
-    "site_settings",
-    "sign_in_settings",
-    "sent_form",
-    "scan_settings",
-    "registration_code",
-    "rate_limit",
-    "category",
-    "catalogue_history",
-    "admin",
-    "adjustment_reason",
 )
 
 
@@ -1637,10 +1590,11 @@ def upgrade() -> None:
         unique=False,
     )
 
-    for table, (revoked, columns) in GRANTS.items():
-        op.execute(f"REVOKE {revoked} ON {table} FROM {APP_ROLE}")
-        if columns:
-            op.execute(f"GRANT UPDATE ({', '.join(columns)}) ON {table} TO {APP_ROLE}")
+    op.execute(f"REVOKE UPDATE, DELETE ON {', '.join(READ_AND_ADD)} FROM {APP_ROLE}")
+    op.execute(f"REVOKE DELETE ON {', '.join(NEVER_DELETED)} FROM {APP_ROLE}")
+    for table, columns in UPDATED_ONLY.items():
+        op.execute(f"REVOKE UPDATE ON {table} FROM {APP_ROLE}")
+        op.execute(f"GRANT UPDATE ({', '.join(columns)}) ON {table} TO {APP_ROLE}")
     for table in SETTINGS:
         op.execute(f"INSERT INTO {table} DEFAULT VALUES")
     reasons = sa.table("adjustment_reason", sa.column("name", sa.Text))
@@ -1648,8 +1602,15 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
-    for table in TABLES:
-        op.drop_table(table)
+    # Every table but Alembic's, in one statement, so their order does not
+    # matter.
+    tables = op.get_bind().scalar(
+        sa.text(
+            "SELECT string_agg(quote_ident(tablename), ', ') FROM pg_tables"
+            " WHERE schemaname = current_schema() AND tablename <> 'alembic_version'"
+        )
+    )
+    op.execute(f"DROP TABLE {tables}")
     op.execute(
         f"{DEFAULT_PRIVILEGES} REVOKE SELECT, INSERT, UPDATE, DELETE ON TABLES"
         f" FROM {APP_ROLE}"

@@ -221,9 +221,9 @@ uv run alembic downgrade <revision> && uv run alembic upgrade head
 Migrations run as the owner, and every table they create gives the app
 `SELECT`, `INSERT`, `UPDATE` and `DELETE` (the initial migration's default
 privileges). A migration that creates a table the app must not change
-revokes what it must not do there, as the initial migration's `GRANTS`
-does for history, the ledger, columns set only as a row is made, and
-deleting a settings row.
+revokes what it must not do there, as the initial migration does for
+history, the ledger, columns set only as a row is made, and deleting a
+settings row.
 `tests/test_database_role.py` lists those columns, so a new column the app
 cannot change fails there until listed. What a migration writes is not in
 the history. Migrations create no trigger, function or view: the rules are
