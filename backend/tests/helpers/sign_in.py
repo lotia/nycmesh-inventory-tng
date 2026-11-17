@@ -14,7 +14,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from inventory_tng import accounts, totp_keys
-from inventory_tng.admins import guards, sign_in_routes
+from inventory_tng.admins import guards
 from inventory_tng.models import (
     CONFIRM_IDLE_MINUTES,
     Admin,
@@ -138,7 +138,6 @@ def app_clock() -> Generator[datetime]:
     at = datetime.now(UTC)
     with pytest.MonkeyPatch.context() as patch:
         patch.setattr(guards, "_now", lambda: at)
-        patch.setattr(sign_in_routes, "_now", lambda: at)
         yield at
 
 

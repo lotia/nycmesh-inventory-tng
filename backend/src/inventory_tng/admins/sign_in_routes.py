@@ -2,6 +2,9 @@
 administrator's setup, signing in and out, a new authenticator, and
 confirming a sensitive action. What every administrator page depends on is
 in admins/guards.py; the rules are in accounts.py.
+
+The clock is guards._now, called through its module, so a test that holds
+it there holds it for these pages too.
 """
 
 from collections.abc import Mapping
@@ -13,6 +16,7 @@ from fastapi.responses import HTMLResponse, Response
 from sqlalchemy.exc import IntegrityError
 
 from inventory_tng import accounts
+from inventory_tng.admins import guards
 from inventory_tng.admins.guards import (
     ACCOUNT,
     ACCOUNT_TITLE,
@@ -35,7 +39,6 @@ from inventory_tng.admins.guards import (
     _confirm,
     _confirm_page,
     _local,
-    _now,
     _refused,
     _status,
     changed,
@@ -191,7 +194,7 @@ def setup(
             status_code=429 if limited else 400,
         )
     values["token"] = token
-    now = _now()
+    now = guards._now()
     problems = {
         field: problem
         for field, problem in (
@@ -312,7 +315,7 @@ def sign_in(
             code,
             address=rate_key(request),
             user_agent=request.headers.get("user-agent"),
-            now=_now(),
+            now=guards._now(),
             keys=keys,
             limits=request.app.state.settings.rate_limits,
         )
@@ -345,7 +348,7 @@ def sign_in(
 
 @router.post(SIGN_OUT)
 def sign_out(signed: AnySignedIn, session: DbSession) -> Response:
-    accounts.end_session(signed.row, _now())
+    accounts.end_session(signed.row, guards._now())
     session.commit()
     return signed_out()
 
@@ -441,7 +444,7 @@ def new_authenticator(
     admin_id = signed.admin.id
     name = authenticator_name.strip()
     key = key if accounts.is_totp_key(key) else accounts.new_totp_key()
-    now = _now()
+    now = guards._now()
     # One at a time per administrator, so a second click cannot add the
     # same name twice, or make a second set of recovery codes: the gate
     # (confirmed) holds their row.

@@ -273,10 +273,9 @@ def test_a_sign_in_held_up_past_a_time_step_still_signs_in(
     held at the code's moment (app_clock; inventory-tng-tuie). The app's
     own window is tested on its clock below (accepted_step)."""
     _, key = new_admin(session)
-    for module in (guards, sign_in_routes):
-        monkeypatch.setattr(
-            module, "_now", lambda: datetime.now(UTC) + timedelta(minutes=1)
-        )
+    monkeypatch.setattr(
+        guards, "_now", lambda: datetime.now(UTC) + timedelta(minutes=1)
+    )
     assert sign_in_with(client, key=key).status_code == 303
 
 
@@ -285,10 +284,9 @@ def test_forms_held_up_past_a_time_step_still_take_their_codes(
     client: TestClient, session: Session, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     """So do setup, a new authenticator and confirming (inventory-tng-1101)."""
-    for module in (guards, sign_in_routes):
-        monkeypatch.setattr(
-            module, "_now", lambda: datetime.now(UTC) + timedelta(minutes=1)
-        )
+    monkeypatch.setattr(
+        guards, "_now", lambda: datetime.now(UTC) + timedelta(minutes=1)
+    )
     key = hidden_key(client.get(guards.SETUP))
     with app_clock() as at:
         form = setup_form(key, code=code(key, at))
