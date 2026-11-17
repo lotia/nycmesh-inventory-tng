@@ -34,7 +34,7 @@ from inventory_tng.history import LEDGER
 from inventory_tng.logs import configure_structlog
 from inventory_tng.mail import get_mailer
 from inventory_tng.models import RateLimit
-from inventory_tng.settings import FrontendConfig, LogConfig, Settings
+from inventory_tng.settings import FrontendConfig, LogConfig, RateLimits, Settings
 
 from databases import (
     NO_DATABASE,
@@ -575,6 +575,7 @@ def _app(
     setup_token: str | None = None,
     recovery_token: str | None = None,
     mailer: SentMail | None = None,
+    rate_limits: RateLimits | None = None,
     reached: list[str] | None = None,
 ) -> FastAPI:
     """`reached` collects the pools of any connection the app tries to make,
@@ -586,6 +587,7 @@ def _app(
         recovery_token=recovery_token,
         logging=logging or LogConfig(),
         frontend=frontend or FrontendConfig(),
+        rate_limits=rate_limits or RateLimits(),
     )
     if mailer is not None:
         settings = dataclasses.replace(settings, mail=SITE_MAIL)
@@ -622,6 +624,7 @@ def make_app(database_url: str, session: Session) -> Callable[..., FastAPI]:
         setup_token: str | None = None,
         recovery_token: str | None = None,
         mailer: SentMail | None = None,
+        rate_limits: RateLimits | None = None,
         own_sessions: bool = False,
         on: Session | None = None,
     ) -> FastAPI:
@@ -633,6 +636,7 @@ def make_app(database_url: str, session: Session) -> Callable[..., FastAPI]:
             setup_token=setup_token,
             recovery_token=recovery_token,
             mailer=mailer,
+            rate_limits=rate_limits,
         )
         # Each request with a session of its own, as in production, on the
         # database as committed (the `committed` fixture cleans up).

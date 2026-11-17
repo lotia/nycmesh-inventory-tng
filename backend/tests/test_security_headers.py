@@ -3,7 +3,6 @@ enforced Content-Security-Policy and where its violations are reported,
 nosniff, the Referrer-Policy and the Permissions-Policy (security_headers.py,
 docs/decisions/0010; inventory-tng-e0y)."""
 
-import dataclasses
 import json
 import re
 import subprocess
@@ -18,7 +17,7 @@ from fastapi.testclient import TestClient
 from httpx2 import Response
 from structlog.testing import capture_logs
 
-from inventory_tng import once, security_headers, sign_in
+from inventory_tng import security_headers, sign_in
 from inventory_tng.bundle import MANIFEST
 from inventory_tng.local_env import CLONE
 from inventory_tng.settings import FrontendConfig, RateLimits
@@ -397,7 +396,7 @@ def test_a_report_too_large_is_refused(reports: TestClient) -> None:
     assert refusals(logs) == ["too_large"]
 
 
-def test_a_batch_counts_only_so_many(reports: TestClient) -> None:
+def test_a_batch_counts_only_so_many() -> None:
     many = [REPORTING_API[0]] * (security_headers.MOST_REPORTS + 5)
     assert len(security_headers.violated(many)) == security_headers.MOST_REPORTS
 
@@ -411,23 +410,10 @@ def test_reports_count_against_their_address(reports: TestClient) -> None:
 
 
 def test_the_limit_on_reports_is_a_setting(
-    make_app_without_database: Callable[..., FastAPI],
     make_client_without_database: Callable[..., TestClient],
 ) -> None:
     """RATE_LIMIT_CSP_REPORTS, read as each report comes."""
-    app = make_app_without_database()
-    app.state.settings = dataclasses.replace(
-        app.state.settings, rate_limits=RateLimits(csp_reports=3)
-    )
-    client = make_client_without_database(app)
+    client = make_client_without_database(rate_limits=RateLimits(csp_reports=3))
     for _ in range(3):
         assert send(client, REPORT_URI, "application/csp-report").status_code == 204
     assert send(client, REPORT_URI, "application/csp-report").status_code == 429
-
-
-@pytest.mark.clone
-def test_the_page_script_names_the_field_a_form_sent_once_carries() -> None:
-    """frontend/src/once.ts, which stops a second sending of such a form,
-    finds it by this field."""
-    source = (CLONE / "frontend" / "src" / "once.ts").read_text()
-    assert f'export const ONCE_FIELD = "{once.FIELD}";' in source

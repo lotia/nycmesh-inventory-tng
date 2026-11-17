@@ -1,7 +1,6 @@
 """Administrators signing in (docs/decisions/0012): setup, the one sign-in
 form, sessions, a new authenticator and confirming sensitive actions."""
 
-import dataclasses
 import html
 import itertools
 import math
@@ -439,24 +438,12 @@ def test_every_attempt_counts_against_its_address(
     assert sign_in_with(client, key=key).status_code == 429
 
 
-def limited_to(
-    make_app: Callable[..., FastAPI],
-    make_client: Callable[..., TestClient],
-    limits: RateLimits,
-) -> TestClient:
-    """A client of an app whose settings set these rate limits."""
-    app = make_app()
-    app.state.settings = dataclasses.replace(app.state.settings, rate_limits=limits)
-    return make_client(app)
-
-
 def test_the_limit_per_address_is_a_setting(
-    make_app: Callable[..., FastAPI],
     make_client: Callable[..., TestClient],
     session: Session,
 ) -> None:
     _, key = new_admin(session)
-    client = limited_to(make_app, make_client, RateLimits(per_address=3))
+    client = make_client(rate_limits=RateLimits(per_address=3))
     for _ in range(3):
         sign_in_with(client, "nobody")
     assert sign_in_with(client, key=key).status_code == 429
@@ -732,12 +719,11 @@ def test_a_rate_limited_confirmation_says_so(
 
 
 def test_the_limit_per_account_is_a_setting(
-    make_app: Callable[..., FastAPI],
     make_client: Callable[..., TestClient],
     session: Session,
 ) -> None:
     """The code typed to sign in counts, then two wrong ones."""
-    client = limited_to(make_app, make_client, RateLimits(per_account=3))
+    client = make_client(rate_limits=RateLimits(per_account=3))
     signed_in_row(client, session)
     for _ in range(2):
         client.post(sign_in.CONFIRM, data={sign_in.CONFIRM_FIELD: "nope"})

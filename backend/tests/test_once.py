@@ -5,6 +5,7 @@ import re
 from collections.abc import Callable
 from datetime import UTC, datetime
 
+import pytest
 from fastapi.testclient import TestClient
 from httpx2 import Response
 from sqlalchemy import func, select
@@ -15,6 +16,7 @@ from inventory_tng import accounts, once
 from inventory_tng.account import ACCOUNT
 from inventory_tng.admin.admins import ADMINS
 from inventory_tng.admin.devices import CODES, DEVICES
+from inventory_tng.local_env import CLONE
 from inventory_tng.models import Admin, RegistrationCode, ResetLink
 from inventory_tng.once import SENT_AGAIN
 
@@ -168,3 +170,11 @@ def test_a_form_sent_once_carries_its_page(admin_client: TestClient) -> None:
     """For the page saying it was sent before to link back: browsers send
     no Referer here."""
     assert f'name="back" value="{ACCOUNT}"' in admin_client.get(ACCOUNT).text
+
+
+@pytest.mark.clone
+def test_the_page_script_names_the_field_a_form_sent_once_carries() -> None:
+    """frontend/src/once.ts, which stops a second sending of such a form,
+    finds it by this field."""
+    source = (CLONE / "frontend" / "src" / "once.ts").read_text()
+    assert f'export const ONCE_FIELD = "{once.FIELD}";' in source
