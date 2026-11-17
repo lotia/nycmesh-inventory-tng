@@ -9,8 +9,7 @@ from typing import Annotated, Any, cast
 import structlog
 from fastapi import APIRouter, Depends, Form, Query, Request
 from fastapi.responses import JSONResponse, Response
-from sqlalchemy import ColumnElement, exists, func, select
-from sqlalchemy.orm import aliased
+from sqlalchemy import ColumnElement, func
 
 from inventory_tng.accounts import qr_svg
 from inventory_tng.admin.common import (
@@ -27,7 +26,7 @@ from inventory_tng.admins.guards import AdminSignedIn
 from inventory_tng.core.db import DbSession
 from inventory_tng.core.local_time import site_zone
 from inventory_tng.core.phrases import gettext, lazy, lazy_gettext, ngettext
-from inventory_tng.labels import labels
+from inventory_tng.labels import labels, queries
 from inventory_tng.models import (
     INTEGER_MAX,
     Item,
@@ -82,9 +81,6 @@ NOTICES.update(
 )
 
 
-# The place around a place, which a label's search reads too.
-_parent = aliased(Location)
-
 # What a label is called in a list: its place's name, or its item's.
 _NAME = func.coalesce(Location.name, Item.name)
 
@@ -112,14 +108,10 @@ SEARCHED = Searched(
         Item.search_text,
         ItemPackage.search_text,
         Location.search_text,
-        _parent.search_text,
+        queries.parent.search_text,
     ),
     _NAME,
-    query=select(Label)
-    .outerjoin(Item, Item.id == Label.item_id)
-    .outerjoin(ItemPackage, ItemPackage.id == Label.package_id)
-    .outerjoin(Location, Location.id == Label.location_id)
-    .outerjoin(_parent, _parent.id == Location.parent_id),
+    query=queries.with_what_they_name,
     whole=Label.code,
     current=labels.scanned(),
     lapsed="inactive",
@@ -170,11 +162,7 @@ def list_labels(
 ) -> Response:
     listing = listed.find(session)
     # The item filter offers the items that have labels.
-    labelled = session.execute(
-        select(Item.id, Item.name_shown)
-        .where(exists().where(Label.item_id == Item.id))
-        .order_by(func.lower(Item.name_shown), Item.id)
-    ).all()
+    labelled = queries.items_labelled(session)
     return admin_page(
         request,
         signed,
