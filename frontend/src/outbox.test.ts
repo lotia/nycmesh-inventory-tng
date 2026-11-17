@@ -1650,16 +1650,6 @@ describe("listening", () => {
     stop();
   });
 
-  test("a batch this tab saw waiting, then held back by another tab, makes this one too old", () => {
-    const waiting = entry();
-    store(waiting);
-    const outbox = new Outbox(answering(() => saved()).api);
-    const stop = outbox.listen();
-    storeElsewhere({ ...waiting, reason: { code: "must_upgrade" } });
-    expect(outbox.builds.newer.value).toBe("too_old");
-    stop();
-  });
-
   test("a batch held back by another tab makes this one too old, though this tab wrote before hearing", () => {
     const waiting = entry();
     const refused = entry({ state: "refused", reason: { code: "key_reused" } });

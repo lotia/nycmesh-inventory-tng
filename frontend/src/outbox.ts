@@ -552,8 +552,7 @@ export class Outbox {
 
   /** What storage holds, oldest first. */
   private read(): Entry[] {
-    const kept = v.safeParse(Kept, readStored(this.storage, STORAGE_KEY));
-    return kept.success ? parsed(kept.output.entries) : [];
+    return keptEntries(readStored(this.storage, STORAGE_KEY));
   }
 
   /** Change what is kept, from what storage holds now. False if the browser
@@ -1045,16 +1044,13 @@ export class Outbox {
 
   /** The batches of this build `stored` holds back as too old, by batchId. */
   private heldIn(stored: string | null): string[] {
-    const kept = v.safeParse(Kept, parseStored(stored));
-    return kept.success
-      ? parsed(kept.output.entries)
-          .filter(
-            (each) =>
-              each.build === this.builds.build &&
-              each.reason?.code === "must_upgrade",
-          )
-          .map((each) => batchId(each.body))
-      : [];
+    return keptEntries(parseStored(stored))
+      .filter(
+        (each) =>
+          each.build === this.builds.build &&
+          each.reason?.code === "must_upgrade",
+      )
+      .map((each) => batchId(each.body));
   }
 
   /** Send when the browser comes back online or the page is shown again,
@@ -1077,8 +1073,7 @@ export class Outbox {
       // Only one held back by this write, which the event names as it was
       // before and after: one held before this tab loaded, kept until
       // sent, may be from before a rollback, and a reload would never
-      // clear it (as stale stamps, Builds.listen). Not by what this tab
-      // last read, which its own writes may have read the hold into.
+      // clear it (as stale stamps, Builds.listen).
       const before = new Set(this.heldIn(event.oldValue));
       if (this.heldIn(event.newValue).some((id) => !before.has(id))) {
         this.builds.learn("too_old");
@@ -1148,6 +1143,13 @@ function oldestFirst(extra: Entry[], rest: Entry[]): Entry[] {
   return extra.length === 0
     ? rest
     : [...extra, ...rest].sort((a, b) => a.queuedAt - b.queuedAt);
+}
+
+/** The entries of what STORAGE_KEY holds, parsed (readStored), oldest
+ * first; none if it is not Kept. */
+function keptEntries(stored: unknown): Entry[] {
+  const kept = v.safeParse(Kept, stored);
+  return kept.success ? parsed(kept.output.entries) : [];
 }
 
 /** Stored entries, minus any that cannot be read: one bad entry loses one
