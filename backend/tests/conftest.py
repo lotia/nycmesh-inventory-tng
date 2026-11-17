@@ -56,7 +56,7 @@ from helpers.mail import SITE_MAIL, SentMail
 from helpers.pools import checked_out
 from helpers.rows import add, setting_up
 from helpers.sign_in import TOTP_KEY, TOTP_KEYS, new_admin, sign_in_with
-from helpers.stock import Place
+from helpers.stock import Place, Spools
 
 # structlog's lines go through the standard library, where caplog sees them.
 configure_structlog()
@@ -750,3 +750,8 @@ def bags(session: Session, place: Place) -> ItemPackage:
 @pytest.fixture
 def radios(session: Session) -> Category:
     return add(session, Category(name="Radios"))
+
+
+@pytest.fixture
+def spools(session: Session) -> Spools:
+    return Spools(session)
