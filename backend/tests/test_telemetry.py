@@ -42,7 +42,7 @@ from inventory_tng.core.masking import MASK, Masker
 from inventory_tng.core.settings import RateLimits, Settings
 from inventory_tng.core.telemetry import Telemetry, enabled
 from inventory_tng.devices import devices
-from inventory_tng.devices.devices import RegisteredDevice
+from inventory_tng.devices.guards import RegisteredDevice
 from inventory_tng.models import (
     Category,
     Device,

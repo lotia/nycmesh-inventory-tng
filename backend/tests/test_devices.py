@@ -19,7 +19,8 @@ from inventory_tng.core.db import Database, get_locked
 from inventory_tng.core.logs import configure_logging
 from inventory_tng.core.settings import LogConfig, Settings
 from inventory_tng.devices import devices
-from inventory_tng.devices.devices import COOKIE, RegisteredDevice, RegistrationRejected
+from inventory_tng.devices.devices import COOKIE, RegistrationRejected
+from inventory_tng.devices.guards import RegisteredDevice
 from inventory_tng.models import CatalogueHistory, Device, RegistrationCode
 
 from helpers.concurrency import Committed

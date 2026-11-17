@@ -64,7 +64,6 @@ type Check = Callable[[ast.Module, str, Collection[str]], list[str]]
 BREAKS: dict[str, dict[str, list[str]]] = {
     "core_imports_a_feature": {},
     "rules_import_fastapi_or_web": {
-        "devices/devices.py": ["fastapi"],
         "once.py": ["fastapi", "pages.py", "starlette"],
     },
     "routes_run_queries": {

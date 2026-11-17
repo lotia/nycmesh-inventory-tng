@@ -24,25 +24,20 @@ from dataclasses import dataclass, replace
 from datetime import UTC, datetime, timedelta
 from importlib import resources
 from ipaddress import IPv4Address, IPv6Address, ip_address
-from typing import Annotated, Literal, NoReturn
+from typing import Literal, NoReturn
 
 import structlog
-from fastapi import Depends, Request
-from fastapi.security import APIKeyCookie
 from limits import RateLimitItemPerMinute
 from opentelemetry import metrics
 from sqlalchemy import ColumnElement, Select, select
 from sqlalchemy.orm import Session
 
-from inventory_tng.core import request_logging
 from inventory_tng.core.db import (
-    DbSession,
     Seen,
     enforce,
     exists_where,
     get_locked,
     locked,
-    record_last_seen,
     unchanged,
 )
 from inventory_tng.core.rate_limits import limiter, refund
@@ -79,11 +74,6 @@ revoked = meter.create_counter(
     "inventory.devices.revoked",
     unit="{device}",
     description="Devices revoked by an administrator, by how: one, or in bulk",
-)
-refused = meter.create_counter(
-    "inventory.devices.refused",
-    unit="{request}",
-    description="Requests refused for want of a registered device, by reason",
 )
 
 
@@ -360,47 +350,6 @@ class DeviceRefused(Exception):
     def __init__(self, reason: Refusal) -> None:
         super().__init__(reason)
         self.reason: Refusal = reason
-
-
-# The device cookie, as the API's schema declares it, so /api/docs and the
-# schema say which routes need it (openapi-typescript's types do not).
-# Missing, it is None: the refusal is current_device's own (DeviceRefused,
-# its metric and log).
-device_cookie = APIKeyCookie(
-    name=COOKIE,
-    scheme_name="device",
-    description="Set by POST /api/devices when a device registers with a code. "
-    "A browser sends its own: Authorize on /api/docs cannot set a cookie.",
-    auto_error=False,
-)
-
-
-def current_device(
-    request: Request,
-    session: DbSession,
-    token: Annotated[str | None, Depends(device_cookie)],
-) -> Device:
-    """The registered device making this request, or DeviceRefused. Reads the
-    row every time: the cookie alone is never enough, or revoking a device
-    would not stop it. Puts device_id on the request's log lines."""
-    device = (
-        session.scalar(select(Device).where(Device.token_hash == digest(token)))
-        if token
-        else None
-    )
-    if device is None or device.revoked_at is not None:
-        reason: Refusal = "unregistered" if device is None else "revoked"
-        refused.add(1, {"reason": reason})
-        log.info("device refused", reason=reason, device_id=device and device.id)
-        raise DeviceRefused(reason)
-    request_logging.bind(device_id=device.id)
-    now = datetime.now(UTC)
-    if device.last_seen_at <= now - LAST_SEEN_EVERY:
-        record_last_seen(request.app.state.db, Device, device.id, now)
-    return device
-
-
-RegisteredDevice = Annotated[Device, Depends(current_device)]
 
 
 # The page a registration code's link and QR code open (bundle.PAGES).

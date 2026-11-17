@@ -79,7 +79,7 @@ def test_a_refused_batch_names_every_kind_of_problem(schema: dict[str, Any]) -> 
 
 
 def test_routes_that_need_a_registered_device_say_so(schema: dict[str, Any]) -> None:
-    """The device cookie is declared as an API key (devices.device_cookie),
+    """The device cookie is declared as an API key (devices/guards.py),
     on exactly the routes that refuse an unregistered device (403), so
     /api/docs and other clients see which need it."""
     scheme = schema["components"]["securitySchemes"]["device"]
