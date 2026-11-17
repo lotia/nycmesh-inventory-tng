@@ -111,6 +111,7 @@ describe("what an older build left", () => {
     keep("inventory.outbox.v3", [
       olderSave({
         body: moveBody({
+          key: KEY,
           lines: [
             { item_id: 100, quantity: "8", package_id: 1000 },
             { item_id: 101, quantity: "3", open_package_key: KEY },
@@ -1493,7 +1494,7 @@ describe("what an older build left", () => {
     const record = vi.spyOn(telemetry, "record");
     record.mockClear();
     const move = (lines: Body["lines"]) =>
-      moveBody({ install_number: null, lines });
+      moveBody({ key: KEY, install_number: null, lines });
     const refused = (n: number) =>
       outboxEntry({
         queuedAt: AT + n,

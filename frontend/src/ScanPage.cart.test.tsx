@@ -55,7 +55,7 @@ import {
 import { MOST_SECONDS_TO_SAVE, telemetry } from "./telemetry";
 import { CATALOGUE, WITH_CAFE } from "./test-catalogue";
 import { answering, deferred, json, saved } from "./test-fetch";
-import { moveBody, outboxEntry, storeOutbox } from "./test-saves";
+import { KEY, moveBody, outboxEntry, storeOutbox } from "./test-saves";
 import {
   expectBold,
   expectRefusal,
@@ -735,9 +735,14 @@ describe("filling and saving a cart", () => {
     // Saved, then queued again under its key by a tab of an older build,
     // changed, and refused as the key was used.
     const batch = (quantity: string) =>
-      moveBody({ lines: [{ item_id: 101, quantity }] });
+      moveBody({ key: KEY, lines: [{ item_id: 101, quantity }] });
     storeOutbox([
-      outboxEntry({ body: batch("1"), state: "saved", transactionId: 41 }),
+      outboxEntry({
+        body: batch("1"),
+        summary: { from: "Hub", to: "Van" },
+        state: "saved",
+        transactionId: 41,
+      }),
       outboxEntry({
         body: batch("2"),
         summary: { from: "Hub", to: "Shelf" },
