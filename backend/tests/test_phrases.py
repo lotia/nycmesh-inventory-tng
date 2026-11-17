@@ -4,8 +4,7 @@ docs/decisions/0022), in Python and in the templates."""
 import importlib
 import pkgutil
 import re
-from collections.abc import Callable
-from dataclasses import dataclass
+from collections.abc import Callable, Iterator
 from datetime import UTC, datetime
 from decimal import Decimal
 from io import StringIO
@@ -49,14 +48,10 @@ from inventory_tng.models import (
     AdminSession,
     Authenticator,
     Category,
-    Device,
     Item,
-    ItemAlias,
     ItemPackage,
     Label,
     Location,
-    OpenPackage,
-    ReadingRule,
     SignInSettings,
     Volunteer,
 )
@@ -77,19 +72,7 @@ from inventory_tng.phrases import (
 )
 from inventory_tng.resets import RESET_NOTICE
 
-from helpers.devices import new_device
-from helpers.rows import add
-from helpers.sign_in import new_admin
-from helpers.stock import (
-    Spools,
-    ada_id,
-    cut,
-    length,
-    raised,
-    report,
-    retire,
-    write,
-)
+from helpers.pages import NOT_ENGLISH, PAGES, Built, built, path
 
 # Each letter accented, so English left out of the catalogue shows plain.
 ACCENTS = str.maketrans(
@@ -130,7 +113,7 @@ def pseudo_locale() -> Translations:
 
 
 PSEUDO = pseudo_locale()
-SHELF = SimpleNamespace(id=7, name="Ωμέγα")
+SHELF = SimpleNamespace(id=7, name=NOT_ENGLISH)
 
 # What has moved into the catalogue, each as it is shown. Each part of
 # moving the words (inventory-tng-oic) adds what it moved, until every
@@ -718,101 +701,6 @@ def test_what_has_moved_says_nothing_in_plain_english(part: str) -> None:
     assert words_shown(shown).strip()
 
 
-@dataclass
-class World:
-    """What the pages walked below show: spools of cable in a store, one
-    opened, with a label and an alias; an area in the store; a volunteer
-    holding stock; a retired item, category and place; and stock to put
-    right, as test_query_counts.everything makes it: an item to reorder,
-    less than none at a place, open packages cut below zero, said to show
-    the wrong length and said used up, and a line recorded with more than
-    was moved, and another one corrected."""
-
-    spools: Spools
-    opened: OpenPackage
-    area: Location
-    custody: Location
-    retired_item: Item
-    retired_category: Category
-    retired_place: Location
-    label: Label
-    other: Volunteer
-    merged: Volunteer
-    device: Device
-    rule: ReadingRule
-    other_admin: Admin
-    retired_admin: Admin
-
-
-def world(session: Session) -> World:
-    spools = Spools(session)
-    opened = spools.opened()
-    cable = spools.cable
-    # An alias is never changed: named not in English as it is made.
-    add(session, ItemAlias(item_id=cable.id, name=f"{NAME} ἄλλο"))
-    label = add(session, Label(item_id=cable.id, package_id=spools.spool.id))
-    area = add(session, Location(name="Shelf", kind="area", parent_id=spools.store.id))
-    custody = add(
-        session,
-        Location(
-            name="Custody",
-            kind="custody",
-            volunteer_id=spools.place.volunteer.id,
-        ),
-    )
-    retired_category = add(session, Category(name="Old"))
-    retired_item = add(session, Item(name="Old", category_id=retired_category.id))
-    retired_place = add(session, Location(name="Old", kind="store"))
-    retire(session, retired_item, retired_category, retired_place)
-    admin_id = ada_id(session)
-    stock_to_put_right(spools, admin_id)
-    other = add(session, Volunteer(name="Other"))
-    merged = add(
-        session,
-        Volunteer(name="Merged", merged_into_id=other.id, retired_at=datetime.now(UTC)),
-    )
-    device, _ = new_device(session)
-    revoked, _ = new_device(session)
-    revoked.revoked_at = datetime.now(UTC)
-    rule = add(session, ReadingRule(token="P", decided_by_admin_id=admin_id))
-    # A unit after a number no rule settles, for the readings to propose.
-    add(session, Item(name=f"{NAME} 10g", category_id=cable.category_id))
-    other_admin, _ = new_admin(session, "grace", email="grace@example.org")
-    retired_admin, _ = new_admin(session, "hopper", totp=False)
-    retired_admin.retired_at = datetime.now(UTC)
-    return World(
-        spools,
-        opened,
-        area,
-        custody,
-        retired_item,
-        retired_category,
-        retired_place,
-        label,
-        other,
-        merged,
-        device,
-        rule,
-        other_admin,
-        retired_admin,
-    )
-
-
-def stock_to_put_right(spools: Spools, admin_id: int) -> None:
-    session = spools.session
-    spools.cable.minimum = Decimal(10_000)
-    spools.spool.minimum_sealed = 99
-    write(session, spools.place, lines=[cut(spools.opened(), "400")])
-    write(session, spools.place, **report(spools, length(spools.opened(), "250")))
-    # Radios the store never had moved out: less than none there.
-    write(session, spools.place)
-    used_up = report(spools) | {"lengths": None, "used_up": [str(spools.opened().key)]}
-    write(session, spools.place, **used_up)
-    raised(session, write(session, spools.place))
-    check = raised(session, write(session, spools.place))
-    over_recorded.correct(session, check.id, over_recorded.seen(check), admin_id)
-
-
 def not_english(session: Session) -> None:
     """Every name the pages show, made not English, so that what is left in
     English on a page is a word not said through the catalogue."""
@@ -853,95 +741,34 @@ def is_a_symbol(word: str) -> bool:
     return reading is not None and reading.shown == word
 
 
-# Every page whose words have all moved, by a path in a World.
-PAGES: dict[str, Callable[[World], str]] = {
-    "items": lambda w: "/admin/items",
-    "items, retired": lambda w: "/admin/items?show=retired",
-    "items, searched": lambda w: f"/admin/items?q={NAME}",
-    "an item": lambda w: f"/admin/items/{w.spools.cable.id}",
-    "a retired item": lambda w: f"/admin/items/{w.retired_item.id}",
-    "an open package to close": lambda w: (
-        f"/admin/items/{w.spools.cable.id}/open-packages/{w.opened.id}/close"
-    ),
-    "categories": lambda w: "/admin/categories",
-    "a category": lambda w: f"/admin/categories/{w.spools.cable.category_id}",
-    "a retired category": lambda w: f"/admin/categories/{w.retired_category.id}",
-    "locations": lambda w: "/admin/locations",
-    "a store": lambda w: f"/admin/locations/{w.spools.store.id}",
-    "an area": lambda w: f"/admin/locations/{w.area.id}",
-    "a volunteer's custody": lambda w: f"/admin/locations/{w.custody.id}",
-    "a retired place": lambda w: f"/admin/locations/{w.retired_place.id}",
-    "stock by place": lambda w: "/admin/stock",
-    "stock by item": lambda w: "/admin/stock?by=item",
-    "stock, filtered to nothing": lambda w: "/admin/stock?q=qqqq",
-    "reorder": lambda w: "/admin/stock/reorder",
-    "needs counting": lambda w: "/admin/stock/needs-counting",
-    "used up": lambda w: "/admin/stock/used-up",
-    "length checks": lambda w: "/admin/stock/length-checks",
-    **{
-        f"length checks, {kind.path}": lambda w, kind=kind: kind.path
-        for kind in length_checks.KINDS
-    },
-    "recorded more than moved": lambda w: "/admin/stock/recorded-more",
-    "recorded more than moved, settled": lambda w: "/admin/stock/recorded-more/settled",
-    "counts": lambda w: "/admin/counts",
-    "a count": lambda w: f"/admin/counts/{w.spools.store.id}",
-    "a count of one item": lambda w: (
-        f"/admin/counts/{w.spools.store.id}?item={w.spools.cable.id}&q={NAME}"
-    ),
-    "labels": lambda w: "/admin/labels",
-    "labels, inactive": lambda w: "/admin/labels?show=inactive",
-    "labels to print": lambda w: f"/admin/labels/print?label={w.label.id}",
-    "a label to revoke": lambda w: f"/admin/labels/{w.label.id}/revoke",
-    "volunteers": lambda w: "/admin/volunteers",
-    "volunteers, searched": lambda w: f"/admin/volunteers?q={NAME}",
-    "a volunteer": lambda w: f"/admin/volunteers/{w.spools.place.volunteer.id}",
-    "a volunteer merged": lambda w: f"/admin/volunteers/{w.merged.id}",
-    "a volunteer to merge": lambda w: (
-        f"/admin/volunteers/{w.spools.place.volunteer.id}/merge?into_id={w.other.id}"
-    ),
-    "devices": lambda w: "/admin/devices",
-    "devices, all": lambda w: "/admin/devices/all?state=all",
-    "a device": lambda w: f"/admin/devices/{w.device.id}",
-    "a device to revoke": lambda w: f"/admin/devices/{w.device.id}/revoke",
-    "a code": lambda w: f"/admin/devices/codes/{w.device.registration_code_id}",
-    "a code to revoke": lambda w: (
-        f"/admin/devices/codes/{w.device.registration_code_id}/revoke"
-    ),
-    "unit readings": lambda w: "/admin/unit-readings",
-    "a unit reading": lambda w: f"/admin/unit-readings/{w.rule.id}",
-    "unit readings to settle": lambda w: "/admin/unit-readings/seed",
-    "unit readings to settle, one by one": lambda w: "/admin/unit-readings/seed?one=1",
-    "settings": lambda w: "/admin/settings",
-    "home": lambda w: "/admin",
-    "administrators": lambda w: "/admin/admins",
-    "an administrator": lambda w: f"/admin/admins/{w.other_admin.id}",
-    "a retired administrator": lambda w: f"/admin/admins/{w.retired_admin.id}",
-    "an administrator to reset": lambda w: f"/admin/admins/{w.other_admin.id}/reset",
-    "your account": lambda w: "/admin/account",
-    "a new authenticator": lambda w: "/admin/authenticators/new",
-}
-# Every page one signed out sees, whose words have all moved.
-SIGNED_OUT = ["/admin/sign-in", "/admin/forgot", "/admin/reset?token=none"]
+# Every page whose words have all moved, by name: signed in, and signed out.
+WORDED = {name: where for page in PAGES.values() for name, where in page.worded.items()}
+SIGNED_OUT = [where for page in PAGES.values() for where in page.signed_out]
 
 
-@pytest.mark.parametrize("page", PAGES)
+@pytest.fixture(scope="module")
+def world(migrated_template: str) -> Iterator[Built]:
+    with built(migrated_template, 0, not_english) as world:
+        yield world
+
+
+@pytest.mark.parametrize("page", WORDED)
 def test_a_page_whose_words_have_moved_says_none_in_plain_english(
-    page: str, admin_client: TestClient, session: Session
+    page: str, world: Built, make_client: Callable[..., TestClient]
 ) -> None:
-    where = PAGES[page](world(session))
-    not_english(session)
-    with speaking(PSEUDO):
-        response = admin_client.get(where)
-    assert response.status_code == 200, where
-    left = {
-        word
-        for word in english(response.text)
-        if not is_a_symbol(word)
-        # A new authenticator's key, in groups of four to type.
-        and not re.fullmatch("[A-Z2-7]{4}", word)
-    }
-    assert left - data_words(session) == set()
+    with world.visit(make_client) as (client, session):
+        where = path(WORDED[page], world.world)
+        with speaking(PSEUDO):
+            response = client.get(where)
+        assert response.status_code == 200, where
+        left = {
+            word
+            for word in english(response.text)
+            if not is_a_symbol(word)
+            # A new authenticator's key, in groups of four to type.
+            and not re.fullmatch("[A-Z2-7]{4}", word)
+        }
+        assert left - data_words(session) == set()
 
 
 @pytest.mark.parametrize("where", SIGNED_OUT)

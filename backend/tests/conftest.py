@@ -24,7 +24,6 @@ from inventory_tng import accounts, db, devices, local_env
 from inventory_tng.app import create_app
 from inventory_tng.database_role import refusals
 from inventory_tng.db import (
-    DATABASE_INFO,
     Database,
     make_database,
     make_engine,
@@ -54,7 +53,7 @@ from helpers.concurrency import LOCK_TIMEOUT, Committed, delete_made, newest_ids
 from helpers.devices import new_device
 from helpers.mail import SITE_MAIL, SentMail
 from helpers.pools import checked_out
-from helpers.rows import add, setting_up
+from helpers.rows import add, rolled_back
 from helpers.sign_in import TOTP_KEY, TOTP_KEYS, new_admin, sign_in_with
 from helpers.stock import Place, Spools
 
@@ -338,32 +337,20 @@ def alembic_config(owner_engine: Engine) -> Iterator[Config]:
         transaction.rollback()
 
 
-def _rolled_back(engine: Engine, database: Database | None = None) -> Iterator[Session]:
-    """A session rolled back after the test; knowing `database`, for writes
-    in a transaction of their own on its side pool (db.database_of)."""
-    with engine.connect() as connection:
-        transaction = connection.begin()
-        with Session(
-            bind=connection,
-            join_transaction_mode="create_savepoint",
-            info={DATABASE_INFO: database} if database else {},
-        ) as session:
-            yield setting_up(session)
-        transaction.rollback()
-
-
 @pytest.fixture
 def session(database: Database) -> Iterator[Session]:
     """A session whose work is rolled back after the test, even if the code
     under test commits."""
-    yield from _rolled_back(database.engine, database)
+    with rolled_back(database.engine, database) as session:
+        yield session
 
 
 @pytest.fixture
 def owner_session(owner_engine: Engine) -> Iterator[Session]:
     """As `session`, logged in as the owner: for what only the owner may do,
     such as TRUNCATE."""
-    yield from _rolled_back(owner_engine)
+    with rolled_back(owner_engine) as session:
+        yield session
 
 
 @functools.cache

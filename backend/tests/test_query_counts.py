@@ -4,426 +4,98 @@ every page names items and packages as shown (inventory-tng-ist.3)."""
 
 import json
 import re
-from collections.abc import Callable
-from dataclasses import dataclass, field
-from datetime import timedelta
-from decimal import Decimal
-from functools import cached_property
+from collections.abc import Callable, Iterator
 
 import pytest
 from fastapi import FastAPI
 from fastapi.routing import iter_route_contexts
 from fastapi.testclient import TestClient
-from sqlalchemy import func, select
-from sqlalchemy.orm import Session
+from sqlalchemy import select
 
-from inventory_tng import accounts, devices, over_recorded
-from inventory_tng.admin.length_checks import KINDS
 from inventory_tng.db import lock_catalogue
-from inventory_tng.models import (
-    Admin,
-    Authenticator,
-    Item,
-    ItemPackage,
-    Label,
-    Location,
-    Movement,
-    OverRecorded,
-    ReadingRule,
-    Volunteer,
-)
+from inventory_tng.models import Item, ItemPackage
 
-from helpers.devices import ADDRESS, new_device
+from helpers.pages import CATALOGUE, PAGES, Built, Path, built, path
 from helpers.queries import counting
-from helpers.rows import add, tag
-from helpers.sign_in import admin_named, new_admin, sealed
-from helpers.stock import Spools, cut, length, received, report, write
 
-CATALOGUE = "/api/catalogue"
-
-
-@dataclass
-class World:
-    """What every page reads from: a place with spools of cable (Spools);
-    the labels made since, for the page that prints them; and a
-    registration code, once a device is registered with it."""
-
-    session: Session
-    labels: list[int] = field(default_factory=list)
-    code_id: int = 0
-    phrase: str = ""
-
-    @cached_property
-    def spools(self) -> Spools:
-        return Spools(self.session)
+# A world with one of what each page lists, and one with eleven, each built
+# once for the module.
+ONE = 1
+ELEVEN = 11
 
 
-def everything(world: World) -> None:
-    """One more of all that the list pages show: a category, items, places,
-    a volunteer, sealed spools, an item to reorder, one short at a place,
-    an open package cut below zero, one said to show the wrong length, one
-    said used up, one moved whole and checked there, and labels for a package and a place."""
-    session = world.session
-    spools = Spools(session)
-    spools.cable.minimum = Decimal(10_000)
-    spools.spool.minimum_sealed = 99
-    write(session, spools.place, lines=[cut(spools.opened(), "400")])
-    write(session, spools.place, **report(spools, length(spools.opened(), "250")))
-    # Moved whole to the van, then said to show the wrong length there: a
-    # place more for the length checks to read.
-    van = spools.opened()
-    write(session, spools.place, lines=[cut(van, "305") | {"whole": True}])
-    at_van = report(spools, length(van, "250")) | {"from_location_id": spools.van.id}
-    write(session, spools.place, **at_van)
-    # Radios the store never had moved out: less than none there.
-    write(session, spools.place)
-    used_up = report(spools) | {"lengths": None, "used_up": [str(spools.opened().key)]}
-    write(session, spools.place, **used_up)
-    over_recorded_line(world)
-    for label in (
-        Label(item_id=spools.cable.id, package_id=spools.spool.id),
-        Label(location_id=spools.store.id),
+@pytest.fixture(scope="module")
+def worlds(migrated_template: str) -> Iterator[dict[int, Built]]:
+    with (
+        built(migrated_template, ONE) as one,
+        built(migrated_template, ELEVEN) as eleven,
     ):
-        world.labels.append(add(session, label).id)
-
-
-def reading_rule(world: World) -> None:
-    """A reading rule more, settled by an administrator."""
-    session = world.session
-    settled = session.scalar(select(func.count()).select_from(ReadingRule))
-    admin_id = session.scalars(select(Admin.id)).first()
-    rule = ReadingRule(token=f"{settled}P", decided_by_admin_id=admin_id)
-    add(session, rule)
-
-
-def unsettled_unit(world: World) -> None:
-    """An item more whose name has a unit after a number no rule or word
-    near it settles."""
-    session = world.session
-    spools = world.spools
-    count = session.scalar(select(func.count()).select_from(Item))
-    add(session, Item(name=f"Box {count}0g", category_id=spools.cable.category_id))
-
-
-def over_recorded_line(world: World) -> None:
-    """A line more recorded with more than was moved (over_recorded.py)."""
-    transaction = write(world.session, world.spools.place)
-    movement_id = world.session.scalar(
-        select(Movement.id).where(Movement.transaction_id == transaction.id)
-    )
-    assert movement_id is not None
-    over_recorded.raise_checks(world.session, {movement_id: Decimal(1)})
-
-
-def over_recorded_settled(world: World) -> None:
-    """A line more recorded with more than was moved, corrected: its two
-    places, each linked to its count, and who corrected it."""
-    over_recorded_line(world)
-    session = world.session
-    check = session.scalars(
-        select(OverRecorded).order_by(OverRecorded.id.desc())
-    ).first()
-    assert check is not None
-    admin_id = session.scalars(select(Admin.id)).first()
-    assert admin_id is not None
-    over_recorded.correct(session, check.id, over_recorded.seen(check), admin_id)
-
-
-def item_parts(world: World) -> None:
-    """One more package of the world's cable, its label, an open package of
-    it, and some of it at a place more."""
-    spools = world.spools
-    cable = spools.cable
-    box = add(
-        world.session, ItemPackage(item_id=cable.id, name=f"Box {tag()}", size=10)
-    )
-    add(world.session, Label(item_id=cable.id, package_id=box.id))
-    spools.opened()
-    van = add(world.session, Location(name=f"Van {tag()}", kind="vehicle"))
-    write(
-        world.session,
-        spools.place,
-        to_location_id=van.id,
-        lines=[{"item_id": cable.id, "quantity": "1"}],
-    )
-
-
-def item_in_category(world: World) -> None:
-    category_id = world.spools.cable.category_id
-    add(world.session, Item(name=f"Radio {tag()}", category_id=category_id))
-
-
-def in_store(world: World) -> None:
-    """An area more in the world's store. A place has one current label."""
-    store = world.spools.store
-    area = add(
-        world.session,
-        Location(name=f"Shelf {tag()}", kind="area", parent_id=store.id),
-    )
-    add(world.session, Label(location_id=area.id))
-
-
-def item_in_store(world: World) -> None:
-    """An item more held at the world's store, to count there."""
-    item = add(
-        world.session,
-        Item(name=f"Radio {tag()}", category_id=world.spools.cable.category_id),
-    )
-    received(world.session, world.spools.place, [{"item_id": item.id, "quantity": "1"}])
-
-
-def volunteer(world: World) -> None:
-    """Another volunteer, whom the world's could be merged into."""
-    add(world.session, Volunteer(name=f"Volunteer {tag()}"))
-
-
-def new_device_in(world: World) -> None:
-    new_device(world.session)
-
-
-def device_of_code(world: World) -> None:
-    """A device more registered with the world's code."""
-    if not world.code_id:
-        code, world.phrase = devices.create_code(
-            world.session, max_uses=50, lifetime=timedelta(days=1)
-        )
-        world.code_id = code.id
-    devices.register(world.session, world.phrase, ADDRESS)
-
-
-def admin(world: World) -> None:
-    new_admin(world.session, f"admin-{tag()}", totp=False)
-
-
-def authenticator(world: World) -> None:
-    """Another authenticator of the administrator signed in (admin_client)."""
-    ada = admin_named(world.session, "ada")
-    key = accounts.new_totp_key()
-    add(world.session, sealed(Authenticator(admin_id=ada.id, name=tag()), key))
-
-
-More = Callable[[World], object]
-Path = str | Callable[[World], str]
-
-# Every page that lists rows, by its route: how to add one more of what it
-# lists to a world, then where to find it there, each way if several, if
-# not at the route itself.
-PAGES: dict[str, tuple[More, *tuple[Path, ...]]] = {
-    CATALOGUE: (everything,),
-    "/admin": (everything,),
-    "/admin/account": (authenticator,),
-    "/admin/items": (
-        everything,
-        "/admin/items",
-        # Sorted by a heading, all on one page, and filtered.
-        "/admin/items?sort=category&order=desc&per=all",
-        lambda w: (
-            f"/admin/items?q=Cable&sort=part&category={w.spools.cable.category_id}"
-        ),
-    ),
-    "/admin/items/suggest": (everything, "/admin/items/suggest?q=Cable"),
-    "/admin/items/{item_id}": (
-        item_parts,
-        lambda w: f"/admin/items/{w.spools.cable.id}",
-    ),
-    "/admin/categories": (
-        everything,
-        "/admin/categories",
-        "/admin/categories?sort=items&order=desc&per=25",
-    ),
-    "/admin/categories/{category_id}": (
-        item_in_category,
-        lambda w: f"/admin/categories/{w.spools.cable.category_id}",
-    ),
-    "/admin/locations": (everything,),
-    "/admin/locations/{location_id}": (
-        in_store,
-        lambda w: f"/admin/locations/{w.spools.store.id}",
-    ),
-    "/admin/labels": (
-        everything,
-        "/admin/labels",
-        "/admin/labels?sort=made&per=all&kind=place",
-        lambda w: f"/admin/labels?q=Cable&sort=code&item={w.spools.cable.id}",
-    ),
-    "/admin/labels/suggest": (everything, "/admin/labels/suggest?q=Cable"),
-    "/admin/labels/print": (
-        everything,
-        lambda w: "/admin/labels/print?" + "&".join(f"label={i}" for i in w.labels),
-    ),
-    "/admin/volunteers": (
-        everything,
-        "/admin/volunteers",
-        "/admin/volunteers?sort=holds&per=all&holds=no",
-    ),
-    "/admin/volunteers/suggest": (everything, "/admin/volunteers/suggest?q=Volunteer"),
-    # Their custody is one place, or none: the others, to merge into, grow.
-    "/admin/volunteers/{volunteer_id}": (
-        volunteer,
-        lambda w: f"/admin/volunteers/{w.spools.place.volunteer.id}",
-    ),
-    "/admin/stock": (
-        everything,
-        "/admin/stock",
-        "/admin/stock?by=item",
-        # Sorted within groups, a page of groups, and filtered.
-        "/admin/stock?by=item&sort=quantity&order=desc&per=25",
-        lambda w: f"/admin/stock?q=Cable&place={w.spools.store.id}&per=all",
-    ),
-    "/admin/stock/reorder": (
-        everything,
-        "/admin/stock/reorder",
-        "/admin/stock/reorder?sort=usable&per=all",
-    ),
-    "/admin/stock/needs-counting": (
-        everything,
-        "/admin/stock/needs-counting",
-        "/admin/stock/needs-counting?sort=quantity&per=25",
-    ),
-    "/admin/stock/used-up": (
-        everything,
-        "/admin/stock/used-up",
-        "/admin/stock/used-up?sort=shows&per=all",
-    ),
-    "/admin/stock/length-checks": (
-        everything,
-        "/admin/stock/length-checks",
-        "/admin/stock/length-checks?sort=package&order=desc&per=25",
-    ),
-    "/admin/stock/recorded-more": (
-        over_recorded_line,
-        "/admin/stock/recorded-more",
-        "/admin/stock/recorded-more?sort=amount&per=all",
-    ),
-    "/admin/stock/recorded-more/settled": (
-        over_recorded_settled,
-        "/admin/stock/recorded-more/settled",
-        "/admin/stock/recorded-more/settled?sort=how&per=all",
-        "/admin/stock/recorded-more/settled?sort=why&order=desc&per=25",
-    ),
-    "/admin/stock/length-checks/{which}": (everything, *(k.path for k in KINDS)),
-    "/admin/counts": (
-        everything,
-        "/admin/counts",
-        "/admin/counts?sort=where&per=all&kind=count",
-        lambda w: f"/admin/counts?place={w.spools.store.id}&sort=by&order=desc",
-    ),
-    "/admin/unit-readings": (
-        reading_rule,
-        "/admin/unit-readings",
-        "/admin/unit-readings?sort=read_as&per=all&by=admin&unit=p",
-    ),
-    "/admin/unit-readings/seed": (unsettled_unit,),
-    "/admin/counts/{location_id:int}": (
-        item_in_store,
-        lambda w: f"/admin/counts/{w.spools.store.id}",
-        # Only the items a search finds.
-        lambda w: f"/admin/counts/{w.spools.store.id}?q=Radio",
-    ),
-    "/admin/devices": (
-        new_device_in,
-        "/admin/devices",
-        "/admin/devices?sort=used&per=all&state=used+up",
-    ),
-    "/admin/devices/all": (
-        new_device_in,
-        "/admin/devices/all",
-        "/admin/devices/all?sort=used&order=asc&per=all",
-    ),
-    "/admin/devices/codes/{code_id}": (
-        device_of_code,
-        lambda w: f"/admin/devices/codes/{w.code_id}",
-    ),
-    "/admin/admins": (
-        admin,
-        "/admin/admins",
-        "/admin/admins?sort=authenticator&order=asc&per=25",
-    ),
-}
-
-# GET routes under /admin that list nothing that grows, and why.
-EXEMPT = {
-    "/admin/sign-in": "a form",
-    "/admin/confirm": "a form",
-    "/admin/authenticators/new": "a form",
-    "/admin/forgot": "a form",
-    "/admin/reset": "a form",
-    "/admin/settings": "one row of each setting",
-    "/admin/counts/place": "a redirect to the place picked",
-    "/admin/labels/{label_id}/revoke": "a confirmation of one row",
-    "/admin/volunteers/{volunteer_id}/merge": "a confirmation of one row",
-    "/admin/items/{item_id}/open-packages/{open_id}/close": (
-        "a confirmation of one row"
-    ),
-    "/admin/devices/codes/{code_id}/revoke": "a confirmation of one row",
-    "/admin/devices/{device_id:int}": "one device",
-    "/admin/devices/{device_id:int}/revoke": "a confirmation of one row",
-    "/admin/admins/{admin_id}": "one administrator",
-    "/admin/unit-readings/{rule_id:int}": "one reading rule",
-    "/admin/admins/{admin_id}/reset": "a confirmation of one row",
-}
+        yield {ONE: one, ELEVEN: eleven}
 
 
 def test_every_admin_page_is_measured(
     make_app_without_database: Callable[..., FastAPI],
 ) -> None:
+    """By both sweeps, here and test_phrases, or each says why not."""
     pages = {
         route.path
         for route in iter_route_contexts(make_app_without_database().routes)
         if "GET" in (route.methods or ()) and (route.path or "").startswith("/admin")
     }
     assert pages, "no admin pages found: the routes are read wrongly"
-    unmeasured = pages - PAGES.keys() - EXEMPT.keys()
-    assert not unmeasured, f"add these to PAGES, or to EXEMPT with why: {unmeasured}"
-    assert not PAGES.keys() & EXEMPT.keys()
-    gone = (PAGES.keys() | EXEMPT.keys()) - pages - {CATALOGUE}
+    unmeasured = pages - PAGES.keys()
+    assert not unmeasured, f"add these to helpers.pages.PAGES: {unmeasured}"
+    gone = PAGES.keys() - pages - {CATALOGUE}
     assert not gone, f"no such pages: {gone}"
+    for route, page in PAGES.items():
+        assert bool(page.more) != bool(page.uncounted), (
+            f"{route}: give what it lists (more), or why it lists nothing that "
+            "grows (uncounted), not both"
+        )
+        worded = bool(page.worded or page.signed_out)
+        assert worded != bool(page.unworded), (
+            f"{route}: give where its words are read (worded, signed_out), or "
+            "why they aren't (unworded), not both"
+        )
 
 
 CASES = [
     pytest.param(
         route,
-        more,
         where,
         # A route's second way and on, by a function, by its number.
         id=where if isinstance(where, str) else f"{route}{f' {n}' if n else ''}",
     )
-    for route, (more, *paths) in sorted(PAGES.items())
-    for n, where in enumerate(paths or [route])
+    for route, page in sorted(PAGES.items())
+    if page.more
+    for n, where in enumerate(page.counted or [route])
 ]
 
 
-@pytest.mark.parametrize(("route", "more", "where"), CASES)
+@pytest.mark.parametrize(("route", "where"), CASES)
 def test_a_page_reads_alike_for_one_row_or_eleven(
     route: str,
-    more: More,
     where: Path,
-    request: pytest.FixtureRequest,
-    session: Session,
+    worlds: dict[int, Built],
+    make_client: Callable[..., TestClient],
 ) -> None:
-    client: TestClient = request.getfixturevalue(
-        "registered_client" if route == CATALOGUE else "admin_client"
-    )
-    world = World(session)
-    more(world)
-
-    def read() -> tuple[int, int]:
-        """The statements the page sent, and how long it is."""
-        path = where if isinstance(where, str) else where(world)
-        # As a request's own session would start: nothing loaded.
-        session.flush()
-        session.expire_all()
-        with counting(session) as sent:
-            response = client.get(path)
-        assert response.status_code == 200, (path, response.status_code)
+    def read(times: int) -> tuple[int, int]:
+        """The statements the page sent, and how long it is, in the world
+        with `times` of what it lists."""
+        world = worlds[times]
+        with world.visit(make_client, device=route == CATALOGUE) as (client, session):
+            url = path(where, world.world)
+            # Warmed first: what a first request reads once, such as settings.
+            client.get(url)
+            # As a request's own session would start: nothing loaded.
+            session.expire_all()
+            with counting(session) as sent:
+                response = client.get(url)
+        assert response.status_code == 200, (url, response.status_code)
         return len(sent), len(response.content)
 
-    # Warmed first: what a first request reads once, such as settings.
-    read()
-    one, shorter = read()
-    for _ in range(10):
-        more(world)
-    eleven, longer = read()
+    one, shorter = read(ONE)
+    eleven, longer = read(ELEVEN)
     # Else what it adds is not what the page lists.
     assert longer > shorter, f"{route} shows nothing more"
     assert eleven == one, f"{route}: {one} statements for one row, {eleven} for eleven"
@@ -451,30 +123,29 @@ NAMES_NO_ITEM = {
 NAMES_AS_TYPED = {"/admin/unit-readings/seed"}
 
 
-@pytest.mark.parametrize(("route", "more", "where"), CASES)
+@pytest.mark.parametrize(("route", "where"), CASES)
 def test_every_page_names_items_and_packages_as_shown(
     route: str,
-    more: More,
     where: Path,
-    request: pytest.FixtureRequest,
-    session: Session,
+    worlds: dict[int, Built],
+    make_client: Callable[..., TestClient],
 ) -> None:
     """Each name ending in `1,000ft`, as typed, is read as `1000 ft` with a
     no-break space (models.KeyedName.name_shown), on every page and the
     scan page's catalogue; only a form's field holds it as typed (Ali,
     2026-11-15, inventory-tng-ist.3)."""
-    client: TestClient = request.getfixturevalue(
-        "registered_client" if route == CATALOGUE else "admin_client"
-    )
-    world = World(session)
-    more(world)
-    lock_catalogue(session)
-    for row in [*session.scalars(select(Item)), *session.scalars(select(ItemPackage))]:
-        row.name = f"{row.name} 1,000ft"
-    session.flush()
-    path = where if isinstance(where, str) else where(world)
-    response = client.get(path)
-    assert response.status_code == 200, path
+    world = worlds[ONE]
+    with world.visit(make_client, device=route == CATALOGUE) as (client, session):
+        lock_catalogue(session)
+        for row in [
+            *session.scalars(select(Item)),
+            *session.scalars(select(ItemPackage)),
+        ]:
+            row.name = f"{row.name} 1,000ft"
+        session.flush()
+        url = path(where, world.world)
+        response = client.get(url)
+    assert response.status_code == 200, url
     if response.headers["content-type"].startswith("application/json"):
         reply = response.json()
         # What is searched holds names as typed, matched, never shown.
@@ -488,6 +159,6 @@ def test_every_page_names_items_and_packages_as_shown(
         page = re.sub(r'<div class="hint">.*?</div>', "", page, flags=re.DOTALL)
     if route in NAMES_AS_TYPED:
         return
-    assert "1,000ft" not in page, path
+    assert "1,000ft" not in page, url
     if route not in NAMES_NO_ITEM:
-        assert "1000\u00a0ft" in page, path
+        assert "1000\u00a0ft" in page, url

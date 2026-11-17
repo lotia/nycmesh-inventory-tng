@@ -7,13 +7,15 @@ from contextlib import contextmanager
 from typing import Any
 
 import pytest
-from sqlalchemy import exc, select
+from sqlalchemy import Engine, exc, select
 from sqlalchemy.orm import Session
 
 from inventory_tng import items
 from inventory_tng.db import (
+    DATABASE_INFO,
     UNGUARDED_INFO,
     Base,
+    Database,
     Flag,
     RuleBroken,
     describe_error,
@@ -96,6 +98,22 @@ def setting_up(session: Session) -> Session:
     as the app's requests use it (helpers.apps.as_the_app)."""
     session.info[UNGUARDED_INFO] = "a test's own rows"
     return session
+
+
+@contextmanager
+def rolled_back(engine: Engine, database: Database | None = None) -> Generator[Session]:
+    """A test's own session (setting_up), rolled back after, even if the
+    code under test commits; knowing `database`, for writes in a transaction
+    of their own on its side pool (db.database_of)."""
+    with engine.connect() as connection:
+        transaction = connection.begin()
+        with Session(
+            bind=connection,
+            join_transaction_mode="create_savepoint",
+            info={DATABASE_INFO: database} if database else {},
+        ) as session:
+            yield setting_up(session)
+        transaction.rollback()
 
 
 def flagged_columns(flag: Flag) -> dict[str, set[str]]:
