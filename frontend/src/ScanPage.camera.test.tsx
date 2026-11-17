@@ -1,9 +1,9 @@
 import { fireEvent, screen } from "@testing-library/preact";
-import { describe, expect, test, vi } from "vitest";
+import { beforeEach, describe, expect, test, vi } from "vitest";
 import { freshCart, storeCart } from "./cart";
 import { say } from "./i18n";
 import { STORAGE_KEY as OUTBOX_KEY, Outbox } from "./outbox";
-import { DONE, POINT } from "./Scanner";
+import { DONE, POINT, READ_EVERY_MS } from "./Scanner";
 import {
   COULD_NOT_LOAD,
   DISMISS,
@@ -35,9 +35,14 @@ import {
 vi.mock("./camera", () => ({ openCamera: vi.fn() }));
 
 describe("scanning labels with the camera", () => {
-  /** Shows the camera these labels: it reads them within a moment. */
-  function scan(...codes: string[]) {
+  // The camera's clock, stopped: scan lets a read's time pass (test-setup.ts
+  // starts it again).
+  beforeEach(() => vi.useFakeTimers({ shouldAdvanceTime: true }));
+
+  /** Shows the camera these labels, and lets the next read take them. */
+  async function scan(...codes: string[]) {
     camera.state.inView = codes;
+    await vi.advanceTimersByTimeAsync(READ_EVERY_MS);
   }
 
   async function opened(api = server().api) {
@@ -56,7 +61,7 @@ describe("scanning labels with the camera", () => {
     pick(say(YOUR_NAME), "1");
     fireEvent.click(screen.getByLabelText(say(KIND_WORDS.open)));
     pick(say(WHERE), "12");
-    scan("K7QX2M");
+    await scan("K7QX2M");
     await screen.findByText("Added a Spool: Cat6 cable.");
   }
 
@@ -64,10 +69,10 @@ describe("scanning labels with the camera", () => {
     const vibrate = vi.fn();
     Object.assign(navigator, { vibrate });
     await opened();
-    scan("B3ZT9W");
+    await scan("B3ZT9W");
     await screen.findByText("Added one: LiteBeam 5AC.");
     expect(vibrate).toHaveBeenCalled();
-    scan("K7QX2M");
+    await scan("K7QX2M");
     await screen.findByText("Added a Spool: Cat6 cable.");
     expect(screen.queryByText(say(NOTHING_IN_CART))).toBeNull();
   });
@@ -77,7 +82,7 @@ describe("scanning labels with the camera", () => {
     fireEvent.click(screen.getByLabelText(say(KIND_WORDS.open)));
     // The radio's box is sealed at the hub, not the van.
     pick(say(WHERE), "12");
-    scan("B3ZT9W");
+    await scan("B3ZT9W");
     await screen.findByText(
       "LiteBeam 5AC: type how many of which package to open.",
     );
@@ -161,7 +166,7 @@ describe("scanning labels with the camera", () => {
     save();
     await screen.findByText("Recorded (transaction 77).");
     await vi.waitFor(() => expect(asked).toBe(2));
-    await new Promise((done) => setTimeout(done, 0));
+    await vi.advanceTimersByTimeAsync(0);
     expect(screen.queryByText(say(COULD_NOT_LOAD))).toBeNull();
     expect(screen.getByLabelText(say(YOUR_NAME))).toBeDefined();
   });
@@ -243,14 +248,14 @@ describe("scanning labels with the camera", () => {
     await opened(answering(() => json(loose, 200)).api);
     fireEvent.click(screen.getByLabelText(say(KIND_WORDS.open)));
     pick(say(WHERE), "10");
-    scan("B3ZT9W");
+    await scan("B3ZT9W");
     await screen.findByText("LiteBeam 5AC comes in no package to open.");
     expect(screen.getByText(say(NOTHING_IN_CART))).toBeDefined();
   });
 
   test("a place's label asks from or to, the empty side first", async () => {
     await opened();
-    scan("S4HELF");
+    await scan("S4HELF");
     await screen.findByText("Hub › Shelf A: from here, or to here?");
     screen.getByRole("group", { name: "Hub › Shelf A" });
     const sides = screen
@@ -265,7 +270,7 @@ describe("scanning labels with the camera", () => {
   test("a place's label sets the only side a kind has, at once", async () => {
     storeCart({ ...freshCart(), kind: "receipt" });
     await opened();
-    scan("S4HELF");
+    await scan("S4HELF");
     await screen.findByText("Hub › Shelf A: to here.");
     expect(selected(say(TO))).toBe("11");
     expect(screen.queryByRole("button", { name: say(FROM) })).toBeNull();
@@ -274,7 +279,7 @@ describe("scanning labels with the camera", () => {
   test("for an install, a place's label is where it comes from", async () => {
     storeCart({ ...freshCart(), kind: "install" });
     await opened();
-    scan("S4HELF");
+    await scan("S4HELF");
     await screen.findByText("Hub › Shelf A: from here.");
     expect(selected(say(FROM))).toBe("11");
   });
@@ -282,25 +287,25 @@ describe("scanning labels with the camera", () => {
   test("opening, a place's label is where", async () => {
     storeCart({ ...freshCart(), kind: "open" });
     await opened();
-    scan("S4HELF");
+    await scan("S4HELF");
     await screen.findByText("Hub › Shelf A: here.");
     expect(selected(say(WHERE))).toBe("11");
   });
 
   test("an item read next puts a place's question away", async () => {
     await opened();
-    scan("S4HELF");
+    await scan("S4HELF");
     await screen.findByRole("button", { name: say(FROM) });
-    scan("B3ZT9W");
+    await scan("B3ZT9W");
     await screen.findByText("Added one: LiteBeam 5AC.");
     expect(screen.queryByRole("button", { name: say(FROM) })).toBeNull();
   });
 
   test("a stray code leaves a place's question to answer", async () => {
     await opened();
-    scan("S4HELF");
+    await scan("S4HELF");
     await screen.findByRole("button", { name: say(FROM) });
-    scan("NOT-OURS");
+    await scan("NOT-OURS");
     await screen.findByText("That label isn't in the inventory (NOT-OURS).");
     screen.getByRole("button", { name: say(FROM) });
   });
@@ -316,7 +321,7 @@ describe("scanning labels with the camera", () => {
 
   test("an unknown label says so, and Done closes the camera", async () => {
     await opened();
-    scan("OLD-FORM");
+    await scan("OLD-FORM");
     await screen.findByText("That label isn't in the inventory (OLD-FORM).");
     fireEvent.click(screen.getByRole("button", { name: say(DONE) }));
     screen.getByRole("button", { name: say(SCAN_WITH_CAMERA) });

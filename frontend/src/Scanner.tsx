@@ -23,7 +23,7 @@ export const NOT_ALLOWED = msg`The camera isn't allowed for this page. Allow it 
 export const NO_CAMERA = msg`No camera could be opened. Find items in the list instead.`;
 
 /** How often the camera's picture is read, in milliseconds. */
-const READ_EVERY_MS = 200;
+export const READ_EVERY_MS = 200;
 
 export function Scanner({
   onCode,

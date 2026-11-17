@@ -1,9 +1,24 @@
 import { fireEvent, render, screen } from "@testing-library/preact";
-import { expect, test, vi } from "vitest";
+import { beforeEach, expect, test, vi } from "vitest";
 import { DecoderUnavailable, type Session } from "./camera";
 import { say } from "./i18n";
-import { DONE, POINT, Scanner, TORCH, TORCH_FAILED } from "./Scanner";
+import {
+  DONE,
+  POINT,
+  READ_EVERY_MS,
+  Scanner,
+  TORCH,
+  TORCH_FAILED,
+} from "./Scanner";
 import { fakeCamera as camera } from "./test-camera";
+
+// The camera's clock, stopped: each test lets as many reads' time pass as
+// it needs (test-setup.ts starts it again). Waiting still lets time pass,
+// so a read a test did not let pass still comes, only later.
+beforeEach(() => vi.useFakeTimers({ shouldAdvanceTime: true }));
+
+/** Lets `reads` reads' time pass, and what they did be done. */
+const pass = (reads = 1) => vi.advanceTimersByTimeAsync(reads * READ_EVERY_MS);
 
 /** A read that answers only when `finish` is called. */
 function slowRead() {
@@ -23,9 +38,10 @@ test("a label in view is taken once, and said what it did", async () => {
   render(<Scanner open={open} onCode={onCode} onDone={() => {}} />);
   await screen.findByText(say(POINT));
   state.inView = ["B3ZT9W"];
+  await pass();
   await screen.findByText("Read B3ZT9W.");
   // Still in view a moment later: not taken again.
-  await new Promise((resolve) => setTimeout(resolve, 450));
+  await pass(2);
   expect(onCode).toHaveBeenCalledTimes(1);
 });
 
@@ -90,7 +106,7 @@ test("a camera closed before it opened is stopped when it does", async () => {
   );
   unmount();
   // Closed, and only then does the camera open.
-  await new Promise((resolve) => setTimeout(resolve, 20));
+  await pass();
   opened(await open());
   await vi.waitFor(() => expect(state.stopped).toBe(true));
 });
@@ -107,6 +123,8 @@ test("a frame that cannot be read yet is skipped", async () => {
       onDone={() => {}}
     />,
   );
+  await screen.findByText(say(POINT));
+  await pass(2);
   await screen.findByText("Read K7QX2M.");
 });
 
@@ -120,7 +138,8 @@ test("a slow read is waited for, not piled on", async () => {
     />,
   );
   await screen.findByText(say(POINT));
-  await new Promise((resolve) => setTimeout(resolve, 650));
+  // Three reads' time, the first still reading: no second is begun.
+  await pass(3);
   expect(read).toHaveBeenCalledTimes(1);
   finish(["B3ZT9W"]);
   await screen.findByText("Read B3ZT9W.");
@@ -152,10 +171,12 @@ test("a label read as the camera closes is not taken", async () => {
     <Scanner open={camera({ read }).open} onCode={onCode} onDone={() => {}} />,
   );
   await screen.findByText(say(POINT));
-  await new Promise((resolve) => setTimeout(resolve, 250));
+  await pass();
+  expect(read).toHaveBeenCalledTimes(1);
+  // Closed once Preact runs the effects' cleanup, a frame later.
   unmount();
-  await new Promise((resolve) => setTimeout(resolve, 20));
+  await pass();
   finish(["B3ZT9W"]);
-  await new Promise((resolve) => setTimeout(resolve, 20));
+  await pass();
   expect(onCode).not.toHaveBeenCalled();
 });
