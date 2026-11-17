@@ -134,15 +134,14 @@ def content_security_policy(
 ) -> str:
     """The policy for a response: with Vite's dev server (development only),
     and the nonce of what it adds; or for the API's docs page."""
-    dev = [] if dev_server is None else [dev_server]
+    dev = [dev_server] if dev_server else []
     # Vite reloads over a websocket at its own address.
     reloads = [dev_server.replace("http", "ws", 1)] if dev_server else []
     allowed = [f"'nonce-{nonce}'"] if nonce else []
-    swagger = [SWAGGER_CDN] if docs else []
     sources = {
         "default-src": ["'self'", *dev],
-        "script-src": ["'self'", "'wasm-unsafe-eval'", *dev, *swagger],
-        "style-src": ["'self'", *dev, *swagger],
+        "script-src": ["'self'", "'wasm-unsafe-eval'", *dev],
+        "style-src": ["'self'", *dev],
         "img-src": ["'self'", *dev],
         "connect-src": ["'self'", *dev, *reloads],
         "object-src": ["'none'"],
@@ -152,11 +151,15 @@ def content_security_policy(
         "report-uri": [REPORTS],
         "report-to": [REPORT_GROUP],
     }
-    # The docs page's own script; Vite's styles.
-    sources["script-src" if docs else "style-src"] += allowed
     if docs:
-        # Swagger UI's stylesheet draws some icons from data: URLs.
+        # Swagger UI from its CDN, started by the page's own script; its
+        # stylesheet draws some icons from data: URLs.
+        sources["script-src"] += [SWAGGER_CDN, *allowed]
+        sources["style-src"] += [SWAGGER_CDN]
         sources["img-src"] += ["data:", SWAGGER_FAVICON]
+    else:
+        # Vite's styles.
+        sources["style-src"] += allowed
     return "; ".join(" ".join([name, *values]) for name, values in sources.items())
 
 
@@ -171,25 +174,28 @@ class SecurityHeaders:
         self.app = app
         self.dev_server = dev_server
         self.docs = docs
-
-    async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
-        if scope["type"] != "http":
-            await self.app(scope, receive, send)
-            return
-        docs = self.docs and scope["path"] == DOCS
-        nonce = None
-        if self.dev_server is not None or docs:
-            nonce = secrets.token_urlsafe(NONCE_BYTES)
-            scope.setdefault("state", {})[NONCE] = nonce
-        headers = {
-            "Content-Security-Policy": content_security_policy(
-                dev_server=self.dev_server, nonce=nonce, docs=docs
-            ),
+        # Every response's, but for a nonce'd policy where one is needed.
+        self.headers = {
+            "Content-Security-Policy": content_security_policy(),
             "Reporting-Endpoints": f'{REPORT_GROUP}="{REPORTS}"',
             "X-Content-Type-Options": "nosniff",
             "Referrer-Policy": REFERRER_POLICY,
             "Permissions-Policy": PERMISSIONS,
         }
+
+    async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
+        if scope["type"] != "http":
+            await self.app(scope, receive, send)
+            return
+        headers = self.headers
+        docs = self.docs and scope["path"] == DOCS
+        if self.dev_server is not None or docs:
+            nonce = secrets.token_urlsafe(NONCE_BYTES)
+            scope.setdefault("state", {})[NONCE] = nonce
+            policy = content_security_policy(
+                dev_server=self.dev_server, nonce=nonce, docs=docs
+            )
+            headers = headers | {"Content-Security-Policy": policy}
 
         async def send_with_headers(message: Message) -> None:
             if message["type"] == "http.response.start":

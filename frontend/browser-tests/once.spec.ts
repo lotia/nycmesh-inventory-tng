@@ -23,10 +23,9 @@ test("a double-click sends the form once, and shows the code", async ({
 }) => {
   let posts = 0;
   page.on("request", (request) => {
-    // The form's, not a report the browser sends of itself, such as
-    // WebKit's of the policy (policy.ts).
-    const api = new URL(request.url()).pathname.startsWith("/api/");
-    if (request.method() === "POST" && !api) posts += 1;
+    // The form's, not a report WebKit sends of the policy (policy.ts).
+    const report = new URL(request.url()).pathname === "/api/csp-reports";
+    if (request.method() === "POST" && !report) posts += 1;
   });
   // Asked to confirm, the confirm form is sent next: once too.
   const asked = await makeCode(page, "Double-click", doubleClick);
