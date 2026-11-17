@@ -17,7 +17,6 @@ from inventory_tng import (
     catalogue,
     devices,
     health,
-    ledger,
     page_builds,
     page_telemetry,
     pages,
@@ -32,6 +31,7 @@ from inventory_tng.core.phrases import BRAND
 from inventory_tng.core.request_logging import RequestLogging
 from inventory_tng.core.settings import Settings
 from inventory_tng.cross_site import CrossSiteRefusal
+from inventory_tng.scan import batch_api
 from inventory_tng.totp_keys import TotpKeys
 
 log = structlog.get_logger(__name__)
@@ -108,7 +108,7 @@ def create_app(
     )
     app.include_router(health.router, prefix=API)
     app.include_router(devices.router, prefix=API)
-    app.include_router(ledger.router, prefix=API)
+    app.include_router(batch_api.router, prefix=API)
     app.include_router(catalogue.router, prefix=API)
     app.include_router(page_telemetry.router, prefix=API)
     app.include_router(security_headers.router)
@@ -122,7 +122,7 @@ def create_app(
     bundle.install(app, settings)
     db.install(app)
     devices.install(app)
-    ledger.install(app)
+    batch_api.install(app)
     page_builds.install(app)
     page_telemetry.install(app)
     guards.install(app)

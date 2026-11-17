@@ -80,3 +80,4 @@ short test. `core/` is the name FastAPI's full-stack template uses;
 | `admins.py` | `admins/command.py` |
 | `sign_in.py`: what every administrator page depends on | `admins/guards.py` |
 | `sign_in.py`: the sign-in pages | `admins/sign_in_routes.py` |
+| `ledger.py`: the batch endpoint, `save_batch` | `scan/batch_api.py` |
