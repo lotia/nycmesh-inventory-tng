@@ -1015,8 +1015,8 @@ def test_a_count_is_said_as_a_plural() -> None:
 def test_a_lists_numbers_are_written_as_the_locale_writes_them() -> None:
     """Its sizes, pages and matches, grouped as German groups digits
     (inventory-tng-r9ex); its links keep plain digits (admin/listing.py)."""
-    view = SimpleNamespace(**vars(VIEW) | {"sizes": [1000, None], "page": 1000})
-    view.pages = 2000
+    grown = {"sizes": [1000, None], "page": 1000, "pages": 2000}
+    view = SimpleNamespace(**vars(VIEW) | grown)
     with speaking(compiled(Catalog(locale="de"))):
         shown = words_shown(
             from_macros(LISTING_PARTS, view=view, listing=listing(found=1500))
