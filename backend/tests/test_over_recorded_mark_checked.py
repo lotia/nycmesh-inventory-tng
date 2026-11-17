@@ -24,7 +24,6 @@ from inventory_tng.models import (
 from helpers.concurrency import Committed
 from helpers.over_recorded import (
     PAGE,
-    URL,
     admin_id,
     checked_forms,
     checks,
@@ -36,7 +35,7 @@ from helpers.over_recorded import (
     recorded_then_changed,
 )
 from helpers.sign_in import text
-from helpers.stock import Place, Spools, cut, write
+from helpers.stock import URL, Place, Spools, cut, write
 
 # The administrators' page.
 

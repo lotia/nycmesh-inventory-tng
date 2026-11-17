@@ -26,10 +26,10 @@ from inventory_tng.models import (
     OpenPackage,
 )
 
-from helpers.package_forms import URL, forms, taken
+from helpers.package_forms import forms, taken
 from helpers.rows import add, tag
 from helpers.sign_in import text
-from helpers.stock import Spools
+from helpers.stock import URL, Spools
 
 # Volunteers report an open package used up (8i4.133.5).
 

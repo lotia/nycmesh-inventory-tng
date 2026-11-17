@@ -13,9 +13,9 @@ from structlog.testing import capture_logs
 from inventory_tng import ledger, open_packages
 from inventory_tng.models import Admin, OpenPackage
 
-from helpers.package_forms import URL, forms, sealed_line, taken
+from helpers.package_forms import forms, sealed_line, taken
 from helpers.rows import add, tag
-from helpers.stock import Spools
+from helpers.stock import URL, Spools
 
 # Opening on the scan page.
 

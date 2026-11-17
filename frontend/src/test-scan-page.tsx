@@ -15,14 +15,15 @@ import { answering, json, saved } from "./test-fetch";
 export const camera = fakeCamera();
 vi.mocked(openCamera).mockImplementation(camera.open);
 
+export const isCatalogue = (request: Request) =>
+  new URL(request.url).pathname === "/api/catalogue";
+
 /** An API with the test catalogue, saving batches as transaction 77. */
 export function server(
   save: () => Response | Promise<Response> = () => saved(),
 ) {
   return answering((request) =>
-    new URL(request.url).pathname === "/api/catalogue"
-      ? json(CATALOGUE, 200)
-      : save(),
+    isCatalogue(request) ? json(CATALOGUE, 200) : save(),
   );
 }
 
@@ -65,9 +66,6 @@ export const pick = (label: string, value: string) =>
 
 export const selected = (label: string) =>
   (screen.getByLabelText(label) as HTMLSelectElement).value;
-
-export const isCatalogue = (request: Request) =>
-  new URL(request.url).pathname === "/api/catalogue";
 
 export const saves = (sent: Request[]) =>
   sent.filter((request) => request.url.endsWith("/api/transactions"));

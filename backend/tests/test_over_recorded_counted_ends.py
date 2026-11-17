@@ -23,7 +23,6 @@ from inventory_tng.models import ItemPackage, LedgerTransaction, Movement
 
 from helpers.over_recorded import (
     PAGE,
-    URL,
     admin_id,
     arrived_field,
     checks,
@@ -37,6 +36,7 @@ from helpers.over_recorded import (
 )
 from helpers.sign_in import text
 from helpers.stock import (
+    URL,
     Place,
     Spools,
     count_at,

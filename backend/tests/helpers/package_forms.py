@@ -35,9 +35,6 @@ def forms(
     return {(place, package, opened): amount for place, package, opened, amount in rows}
 
 
-URL = "/api/transactions"
-
-
 def sealed_line(spools: Spools, quantity: str) -> dict[str, object]:
     return {
         "item_id": spools.cable.id,

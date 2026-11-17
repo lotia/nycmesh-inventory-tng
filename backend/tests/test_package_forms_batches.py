@@ -11,9 +11,9 @@ from sqlalchemy.orm import Session
 from inventory_tng.ledger import BodyRefusedReply, SizeProblem
 from inventory_tng.models import ItemPackage
 
-from helpers.package_forms import URL, forms, sealed_line
+from helpers.package_forms import forms, sealed_line
 from helpers.rows import add, tag
-from helpers.stock import Spools
+from helpers.stock import URL, Spools
 
 # The scan page's batches (POST /api/transactions): sealed packages stay
 # sealed.

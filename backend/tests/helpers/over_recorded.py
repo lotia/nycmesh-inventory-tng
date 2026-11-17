@@ -23,10 +23,7 @@ from inventory_tng.models import (
 
 from helpers.rows import tag
 from helpers.sign_in import new_admin
-from helpers.stock import Place, Spools, cut, length, received, retire
-
-URL = "/api/transactions"
-
+from helpers.stock import URL, Place, Spools, cut, length, received, retire
 
 PAGE = "/admin/stock/recorded-more"
 
@@ -58,6 +55,7 @@ def recorded_then_changed(
 
 
 def admin_id(session: Session) -> int:
+    """A new administrator's id; stock.ada_id is admin_client's."""
     admin, _ = new_admin(session, f"ada-{tag()}", totp=False)
     return admin.id
 

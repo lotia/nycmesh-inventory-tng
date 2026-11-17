@@ -34,6 +34,9 @@ from helpers.concurrency import Committed
 from helpers.rows import add, tag
 from helpers.sign_in import admin_named
 
+# Where the scan page sends its batches.
+URL = "/api/transactions"
+
 
 class Place:
     """The rows a batch needs, made in one session."""

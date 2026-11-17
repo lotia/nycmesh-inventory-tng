@@ -24,7 +24,6 @@ from inventory_tng.models import LedgerTransaction, Movement, OpenPackage, OverR
 from helpers.concurrency import Committed
 from helpers.over_recorded import (
     PAGE,
-    URL,
     admin_id,
     checks,
     correct,
@@ -38,7 +37,7 @@ from helpers.over_recorded import (
     sealed_field,
     text_of,
 )
-from helpers.stock import Spools, ada_id, count_at, count_form_at, cut
+from helpers.stock import URL, Spools, ada_id, count_at, count_form_at, cut
 
 # An opening's open package closed since (Confirm used up, Close, a count
 # whose lines were all withheld): Correct writes the sealed end alone, as
