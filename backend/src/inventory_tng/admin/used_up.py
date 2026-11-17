@@ -11,7 +11,6 @@ import structlog
 from fastapi import APIRouter, Depends, Form, Request
 from fastapi.responses import Response
 from opentelemetry import metrics
-from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from inventory_tng import ledger, open_packages
@@ -36,6 +35,7 @@ from inventory_tng.core.local_time import site_zone
 from inventory_tng.core.phrases import gettext, lazy_gettext
 from inventory_tng.models import OpenPackage
 from inventory_tng.pages import NOTICES, not_found, redirect
+from inventory_tng.stock import queries
 
 log = structlog.get_logger(__name__)
 meter = metrics.get_meter(__name__)
@@ -157,9 +157,7 @@ def _answer(
     if do not in DONE:
         return not_found()
     answer: Doing = "confirm" if do == "confirm" else "clear"
-    rows = session.scalars(
-        select(OpenPackage).where(OpenPackage.id.in_(list(ids)), *REPORTED)
-    ).all()
+    rows = queries.open_with_ids(session, list(ids), *REPORTED)
     ledger.lock_places(session, (row.location_id for row in rows))
     changed = 0
     closed: list[open_packages.Closed | None] = []

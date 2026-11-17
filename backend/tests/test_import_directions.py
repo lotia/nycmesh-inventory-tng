@@ -82,7 +82,6 @@ BREAKS: dict[str, dict[str, list[str]]] = {
         "admin/over_recorded.py": ["answer: 2"],
         "admin/reading_rules.py": ["list_readings: 2"],
         "admin/settings.py": ["_page: 2"],
-        "admin/used_up.py": ["_answer: 2"],
         "admin/volunteers.py": ["_list_page: 4", "_volunteer_page: 2"],
         "health.py": ["healthz: 1"],
         "scan/catalogue_api.py": ["catalogue: 12", "open_to_take: 2", "saved_of: 2"],
