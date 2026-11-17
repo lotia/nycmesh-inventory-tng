@@ -78,12 +78,6 @@ BREAKS: dict[str, dict[str, list[str]]] = {
             "_item_page: 2",
         ],
         "admin/labels.py": ["<module>: 1", "list_labels: 2"],
-        "admin/length_checks.py": [
-            "_answer: 2",
-            "_checks_page: 4",
-            "answer_ticked: 2",
-            "recent_cuts: 3",
-        ],
         "admin/locations.py": ["_list_page: 4", "_location_page: 2"],
         "admin/over_recorded.py": ["answer: 2"],
         "admin/reading_rules.py": ["list_readings: 2"],

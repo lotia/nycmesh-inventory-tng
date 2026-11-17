@@ -6,7 +6,7 @@ from collections.abc import Collection, Sequence
 from decimal import Decimal
 from typing import Any
 
-from sqlalchemy import ColumnElement, Row, Select, any_, func, or_, select
+from sqlalchemy import ColumnElement, Row, Select, any_, func, or_, select, true
 from sqlalchemy.orm import Session
 
 from inventory_tng import open_packages
@@ -20,6 +20,7 @@ from inventory_tng.models import (
     Location,
     Movement,
     OpenPackage,
+    Volunteer,
 )
 from inventory_tng.stock.balance import balance, by_form, countable
 
@@ -231,3 +232,67 @@ def units_of(session: Session, item_ids: Collection[int]) -> dict[int, str]:
     return dict(
         session.execute(select(Item.id, Item.unit).where(Item.id.in_(item_ids))).all()
     )
+
+
+def recent_cuts(
+    session: Session, open_ids: Collection[int], recent: int
+) -> Sequence[Row[*tuple[Any, ...]]]:
+    """What was last taken from each of `open_ids`' open packages, by
+    package then newest first, `recent` of each, never a move of it whole:
+    each with the package's id, the transaction's id, when, how much, its
+    kind and its volunteer's name, if a volunteer made it."""
+    newest = (
+        select(
+            LedgerTransaction.id,
+            LedgerTransaction.created_at,
+            Movement.quantity,
+            LedgerTransaction.kind,
+            Volunteer.name,
+        )
+        .join(LedgerTransaction, LedgerTransaction.id == Movement.transaction_id)
+        .outerjoin(Volunteer, Volunteer.id == LedgerTransaction.volunteer_id)
+        .where(
+            Movement.from_open_package_id == OpenPackage.id,
+            # Not a move of it whole, which names it on both sides.
+            Movement.to_open_package_id.is_distinct_from(OpenPackage.id),
+        )
+        .order_by(LedgerTransaction.id.desc())
+        .limit(recent)
+        .lateral()
+    )
+    return session.execute(
+        select(OpenPackage.id, *newest.c)
+        .join(newest, true())
+        .where(OpenPackage.id.in_(open_ids))
+        .order_by(OpenPackage.id, newest.c.id.desc())
+    ).all()
+
+
+def latest_transaction_id(session: Session) -> int:
+    """The ledger's latest transaction's id, 0 if none."""
+    return session.scalar(select(func.max(LedgerTransaction.id))) or 0
+
+
+def volunteers_with_ids(
+    session: Session, ids: Collection[int | None]
+) -> Sequence[Volunteer]:
+    """The volunteers of `ids`."""
+    return session.scalars(select(Volunteer).where(Volunteer.id.in_(ids))).all()
+
+
+def places_of_open(session: Session, open_ids: Collection[int]) -> set[int]:
+    """The places of `open_ids`' open packages."""
+    return set(
+        session.scalars(
+            select(OpenPackage.location_id).where(OpenPackage.id.in_(open_ids))
+        )
+    )
+
+
+def open_with_ids(
+    session: Session, open_ids: Collection[int], *where: ColumnElement[bool]
+) -> Sequence[OpenPackage]:
+    """The open packages of `open_ids` that `where` picks."""
+    return session.scalars(
+        select(OpenPackage).where(OpenPackage.id.in_(open_ids), *where)
+    ).all()

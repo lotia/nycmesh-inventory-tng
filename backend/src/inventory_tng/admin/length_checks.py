@@ -18,7 +18,7 @@ import structlog
 from babel.support import LazyProxy
 from fastapi import APIRouter, Depends, Form, Request
 from fastapi.responses import Response
-from sqlalchemy import ColumnElement, and_, func, or_, select, true
+from sqlalchemy import ColumnElement, and_, or_
 from sqlalchemy.orm import Session
 
 from inventory_tng import ledger, open_packages, over_recorded
@@ -46,13 +46,11 @@ from inventory_tng.core.phrases import Words, lazy_gettext
 from inventory_tng.models import (
     INTEGER_MAX,
     Item,
-    LedgerTransaction,
-    Movement,
     OpenPackage,
-    Volunteer,
     whole,
 )
 from inventory_tng.pages import NOTICES, not_found, redirect
+from inventory_tng.stock import queries
 
 log = structlog.get_logger(__name__)
 
@@ -171,31 +169,7 @@ def recent_cuts(session: Session, open_ids: Collection[int]) -> dict[int, list[C
     cuts: dict[int, list[Cut]] = {open_id: [] for open_id in open_ids}
     if not cuts:
         return cuts
-    newest = (
-        select(
-            LedgerTransaction.id,
-            LedgerTransaction.created_at,
-            Movement.quantity,
-            LedgerTransaction.kind,
-            Volunteer.name,
-        )
-        .join(LedgerTransaction, LedgerTransaction.id == Movement.transaction_id)
-        .outerjoin(Volunteer, Volunteer.id == LedgerTransaction.volunteer_id)
-        .where(
-            Movement.from_open_package_id == OpenPackage.id,
-            # Not a move of it whole, which names it on both sides.
-            Movement.to_open_package_id.is_distinct_from(OpenPackage.id),
-        )
-        .order_by(LedgerTransaction.id.desc())
-        .limit(RECENT)
-        .lateral()
-    )
-    for open_id, _, *cut in session.execute(
-        select(OpenPackage.id, *newest.c)
-        .join(newest, true())
-        .where(OpenPackage.id.in_(list(cuts)))
-        .order_by(OpenPackage.id, newest.c.id.desc())
-    ):
+    for open_id, _, *cut in queries.recent_cuts(session, list(cuts), RECENT):
         cuts[open_id].append(Cut(*cut))
     return cuts
 
@@ -231,16 +205,14 @@ def _checks_page(
 ) -> Response:
     # Read first: a count or adjustment since is added to what the page
     # showed when it is set (_set).
-    moment = session.scalar(select(func.max(LedgerTransaction.id))) or 0
+    moment = queries.latest_transaction_id(session)
     found, view = arranged(open_packages.shown(session, *of_only(where, only)), view)
     # Only the page's own cuts and reporters.
     cuts = recent_cuts(session, [each.row.id for each in found])
     reporters = {each.row.length_reported_by_volunteer_id for each in found}
     volunteers: dict[int | None, str] = {
         volunteer.id: volunteer.name
-        for volunteer in session.scalars(
-            select(Volunteer).where(Volunteer.id.in_(reporters))
-        )
+        for volunteer in queries.volunteers_with_ids(session, reporters)
     }
     checked = [
         Checked(
@@ -404,8 +376,7 @@ def _answer(
     """Set or leave each of `answers` still as seen, and say so. Their
     places locked first, by id, as saves take places: only here, never as
     the page is shown."""
-    named = OpenPackage.id.in_([each.open_id for each in answers])
-    places = set(session.scalars(select(OpenPackage.location_id).where(named)))
+    places = queries.places_of_open(session, [each.open_id for each in answers])
     ledger.lock_places(session, places)
     set_, left_, below, closed = 0, 0, 0, 0
     for each in sorted(answers):
@@ -509,9 +480,7 @@ def answer_ticked(
     back = _back(view, page)
     if not ticked:
         return redirect(back.link(), notice="length_none")
-    rows = session.scalars(
-        select(OpenPackage).where(OpenPackage.id.in_(list(ticked)), *CHECKED)
-    ).all()
+    rows = queries.open_with_ids(session, list(ticked), *CHECKED)
     answers: list[Answer] = []
     unsaid = 0
     for row in rows:
