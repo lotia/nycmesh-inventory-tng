@@ -30,13 +30,13 @@ import {
 } from "./ScanPage";
 import { answering, deferred, json, saved, TOO_OLD } from "./test-fetch";
 import {
-  fillMove,
-  leaveInOutbox,
-  open,
-  ready,
-  save,
-  server,
-} from "./test-scan-page";
+  keep,
+  moveBody,
+  olderSave,
+  outboxEntry,
+  storeOutbox,
+} from "./test-saves";
+import { fillMove, open, ready, save, server } from "./test-scan-page";
 
 // The camera, faked: it sees whatever a test puts in `inView`.
 vi.mock("./camera", () => ({ openCamera: vi.fn() }));
@@ -253,7 +253,8 @@ describe("a newer build", () => {
 
   test("too old, a newer build's save waiting here is not counted, as that build sends it", async () => {
     // Saved by a build after MINE.
-    leaveInOutbox("2026-11-12T11:00:00.000Z", "waiting", 1);
+    const newer = "2026-11-12T11:00:00.000Z";
+    storeOutbox([outboxEntry({ build: newer })], newer);
     const { api } = server(() => Promise.reject(new TypeError("offline")));
     const { outbox } = openMine(api);
     await ready();
@@ -265,23 +266,14 @@ describe("a newer build", () => {
   });
 
   test("once it is out, what an older build left is not put in the empty cart, which would hold the reload back", async () => {
-    localStorage.setItem(
-      "inventory.outbox.v3",
-      JSON.stringify([
-        {
-          body: {
-            key: "0b7c6a51-9a3d-4d39-8f3e-1d1f2c4b5a61",
-            kind: "move",
-            volunteer_id: 1,
-            from_location_id: 10,
-            to_location_id: 12,
-            lines: [{ item_id: 100, quantity: "4", package_id: 1000 }],
-          },
-          queuedAt: 1_700_000_000_000,
-          state: "waiting",
-        },
-      ]),
-    );
+    keep("inventory.outbox.v3", [
+      olderSave({
+        body: moveBody({
+          lines: [{ item_id: 100, quantity: "4", package_id: 1000 }],
+        }),
+        queuedAt: 1_700_000_000_000,
+      }),
+    ]);
     openMine();
     newerTab();
     await ready();

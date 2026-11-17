@@ -1,7 +1,7 @@
 import { v4 as uuid } from "uuid";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import openapi from "./api/openapi.json";
-import { BUILD, Builds, HEADER, MUST_UPGRADE } from "./build";
+import { Builds, HEADER, MUST_UPGRADE } from "./build";
 import { say, speak } from "./i18n";
 import { messages as pseudo } from "./locales/pseudo.po";
 import {
@@ -12,7 +12,6 @@ import {
   Kept,
   NOT_ACCEPTED,
   NOT_RECORDED,
-  newEntry,
   noteOf,
   ON_LINE,
   Outbox,
@@ -30,6 +29,7 @@ import {
 } from "./outbox";
 import { telemetry } from "./telemetry";
 import { answering, deferred, json, saved, TOO_OLD } from "./test-fetch";
+import { keep, outboxEntry, storeOutbox } from "./test-saves";
 import { refusing } from "./test-storage";
 
 function draft(fields: Partial<Draft> = {}): Draft {
@@ -46,20 +46,17 @@ function draft(fields: Partial<Draft> = {}): Draft {
 /** A batch's summary, told apart from others' by the place it names. */
 const named = (from: string): Summary => ({ from, to: null });
 
-/** An entry as storage might hold it. */
+/** An entry as storage might hold it: draft(), under a key of its own. */
 function entry(fields: Partial<Entry> = {}): Entry {
-  return {
-    ...newEntry({ ...draft(), key: uuid() }, named("a"), BUILD, 1),
+  return outboxEntry({
+    body: { ...draft(), key: uuid() },
+    summary: named("a"),
     ...fields,
-  };
+  });
 }
 
-/** Kept as this build keeps them, stamped by `build`. */
-function storeBy(build: string, ...entries: unknown[]) {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify({ build, entries }));
-}
-
-const store = (...entries: unknown[]) => storeBy(BUILD, ...entries);
+/** Kept as this build keeps them. */
+const store = (...entries: unknown[]) => storeOutbox(entries);
 
 /** Kept as another tab of this build keeps them: stored, and the storage
  * event a browser fires in this one, with what was stored before. */
@@ -76,11 +73,6 @@ function storedElsewhere(...entries: unknown[]): () => void {
     window.dispatchEvent(
       new StorageEvent("storage", { key: STORAGE_KEY, oldValue, newValue }),
     );
-}
-
-/** Kept as builds before v4 kept them: a list, under an older key. */
-function storeOlder(key: string, ...entries: unknown[]) {
-  localStorage.setItem(key, JSON.stringify(entries));
 }
 
 /** Storage that reads but refuses every write. */
@@ -1261,8 +1253,8 @@ describe("storage", () => {
 
   test("an older build's keys are neither read, sent, nor written", async () => {
     const older = entry();
-    storeOlder("inventory.outbox.v3", older);
-    storeOlder("inventory.outbox.v1", entry({ state: "saved" }));
+    keep("inventory.outbox.v3", [older]);
+    keep("inventory.outbox.v1", [entry({ state: "saved" })]);
     const keys = ["inventory.outbox.v3", "inventory.outbox.v1"];
     const before = keys.map((key) => localStorage.getItem(key));
     const { api, sent } = answering(() => saved());
@@ -1289,7 +1281,7 @@ describe("storage", () => {
 
   test("this key, written by a newer build of the same key, is read", () => {
     const theirs = entry();
-    storeBy("2999-01-01T00:00:00.000Z", theirs);
+    storeOutbox([theirs], "2999-01-01T00:00:00.000Z");
     expect(new Outbox(answering(() => saved()).api).entries.value).toEqual([
       theirs,
     ]);
@@ -1697,7 +1689,7 @@ describe("listening", () => {
   test("an older build's tab's batch does not show here", () => {
     const outbox = new Outbox(answering(() => saved()).api);
     const stop = outbox.listen();
-    storeOlder("inventory.outbox.v3", entry());
+    keep("inventory.outbox.v3", [entry()]);
     window.dispatchEvent(
       new StorageEvent("storage", { key: "inventory.outbox.v3" }),
     );

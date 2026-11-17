@@ -9,19 +9,27 @@
 import { signal } from "@preact/signals";
 import { fireEvent, render, screen } from "@testing-library/preact";
 import { afterEach, expect, test, vi } from "vitest";
-import { BUILD } from "./build";
 import { DecoderUnavailable } from "./camera";
 import { type Catalogue, freshCart, type Item, storeCart } from "./cart";
 import { suggest } from "./combobox";
 import { say, speak } from "./i18n";
 import { messages as pseudo } from "./locales/pseudo.po";
 import { OpenPackageCard } from "./OpenPackageCard";
-import { STORAGE_KEY as OUTBOX_KEY, Outbox } from "./outbox";
+import { Outbox } from "./outbox";
 import { RegisterPage } from "./RegisterPage";
 import { guardRetire } from "./retire";
 import { Scanner } from "./Scanner";
 import { HELD, ScanPage } from "./ScanPage";
 import { answering, deferred, json } from "./test-fetch";
+import {
+  KEY,
+  keep,
+  moveBody,
+  OTHER_KEY,
+  olderSave,
+  outboxEntry,
+  storeOutbox,
+} from "./test-saves";
 
 afterEach(() => {
   vi.restoreAllMocks();
@@ -34,8 +42,6 @@ afterEach(() => {
  * (inventory-tng-ist.2). */
 const DATA = new Set(["each"]);
 
-const KEY = "0b7c6a51-9a3d-4d39-8f3e-1d1f2c4b5a61";
-const OTHER_KEY = "6f1e2d3c-4b5a-4968-8776-5a4b3c2d1e0f";
 const OPEN_KEY = "11111111-1111-4111-8111-111111111111";
 
 const radio: Item = {
@@ -167,95 +173,73 @@ async function loaded(): Promise<Outbox> {
 
 /** A batch as the outbox keeps it, under the `n`th key, of `fields`. */
 function entry(n: number, fields: Record<string, unknown> = {}) {
-  return {
-    body: {
+  const entry = outboxEntry({
+    body: moveBody({
       key: `00000000-0000-4000-8000-${String(n).padStart(12, "0")}`,
-      kind: "move",
-      volunteer_id: 1,
-      from_location_id: 10,
-      to_location_id: 12,
       install_number: null,
       lines: [
         { item_id: 100, quantity: "8", package_id: 1000, package_size: "4" },
         { item_id: 101, quantity: "3", open_package_key: OPEN_KEY },
       ],
-    },
+    }),
     summary: { from: "Κέντρο", to: "Βαν" },
-    queuedAt: 1,
-    build: BUILD,
-    state: "waiting",
-    waitingFor: null,
-    reason: null,
-    transactionId: null,
-    failures: 0,
-    ...fields,
-  };
+  });
+  return { ...entry, ...fields };
 }
 
 /** Saves and a cart an older build left: a refused save kept at a time
  * not known, and a waiting save and the cart kept at `at`, or at a time
  * not known when it is null. */
 function leaveOlder(at: number | null) {
-  localStorage.setItem(
-    "inventory.outbox.v3",
-    JSON.stringify([
-      {
-        body: {
-          key: KEY,
-          kind: "move",
-          volunteer_id: 1,
-          from_location_id: 10,
-          to_location_id: 99,
-          install_number: 5,
-          lines: [
-            { item_id: 100, quantity: "8", package_id: 1000 },
-            { item_id: 100, quantity: "2", package_id: 1003 },
-            { item_id: 101, quantity: "3", open_package_key: KEY },
-            { item_id: 103, quantity: "4", package_id: 1004 },
-            { item_id: 101, quantity: "x" },
-          ],
-          used_up: [KEY],
-        },
-        what: "Ραδιόφωνο",
-        queuedAt: null,
-        state: "refused",
-        reason: { code: "key_reused" },
-      },
-      {
-        body: {
-          key: OTHER_KEY,
-          kind: "report",
-          volunteer_id: 2,
-          from_location_id: 10,
-          to_location_id: null,
-          lines: null,
-        },
-        what: "Ραδιόφωνο",
-        queuedAt: at,
-        state: "waiting",
-      },
-    ]),
-  );
-  localStorage.setItem(
-    "inventory.cart.v1",
-    JSON.stringify({
-      ...freshCart(),
-      // A kind no build knows.
-      kind: "lost",
-      volunteerId: 2,
-      fromId: 10,
-      lines: [
-        {
-          itemId: 101,
-          packages: { 1001: "1" },
-          loose: "2",
-          open: { [KEY]: { amount: "3", usedUp: true } },
-        },
-        { itemId: 98, packages: { 1: "1" }, loose: "" },
-      ],
-      usedAt: at,
+  keep("inventory.outbox.v3", [
+    olderSave({
+      body: moveBody({
+        to_location_id: 99,
+        install_number: 5,
+        lines: [
+          { item_id: 100, quantity: "8", package_id: 1000 },
+          { item_id: 100, quantity: "2", package_id: 1003 },
+          { item_id: 101, quantity: "3", open_package_key: KEY },
+          { item_id: 103, quantity: "4", package_id: 1004 },
+          { item_id: 101, quantity: "x" },
+        ],
+        used_up: [KEY],
+      }),
+      what: "Ραδιόφωνο",
+      queuedAt: null,
+      state: "refused",
+      reason: { code: "key_reused" },
     }),
-  );
+    olderSave({
+      body: {
+        key: OTHER_KEY,
+        kind: "report",
+        volunteer_id: 2,
+        from_location_id: 10,
+        to_location_id: null,
+        lines: null,
+      },
+      what: "Ραδιόφωνο",
+      queuedAt: at,
+    }),
+  ]);
+  keep("inventory.cart.v1", {
+    ...freshCart(),
+    // A kind no build knows.
+    kind: "lost",
+    volunteerId: 2,
+    fromId: 10,
+    lines: [
+      {
+        itemId: 101,
+        packages: { 1001: "1" },
+        loose: "2",
+        open: { [KEY]: { amount: "3", usedUp: true } },
+      },
+      { itemId: 98, packages: { 1: "1" }, loose: "" },
+    ],
+    usedAt: at,
+  });
 }
 
 /** Each part covered: what renders it, and the elements it says. */
@@ -370,13 +354,7 @@ const COVERED: Record<string, () => Promise<HTMLElement[]>> = {
     return [document.body];
   },
   "the scan page, too old, a save held": async () => {
-    localStorage.setItem(
-      OUTBOX_KEY,
-      JSON.stringify({
-        build: BUILD,
-        entries: [entry(0, { reason: { code: "must_upgrade" } }), entry(1)],
-      }),
-    );
+    storeOutbox([entry(0, { reason: { code: "must_upgrade" } }), entry(1)]);
     const outbox = await loaded();
     outbox.builds.learn("too_old");
     await screen.findByRole("alert");
@@ -452,7 +430,7 @@ const COVERED: Record<string, () => Promise<HTMLElement[]>> = {
       }),
       entry(15, { state: "saved", transactionId: 7 }),
     ];
-    localStorage.setItem(OUTBOX_KEY, JSON.stringify({ build: BUILD, entries }));
+    storeOutbox(entries);
     storeCart({
       ...freshCart(),
       volunteerId: 1,

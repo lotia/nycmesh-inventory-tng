@@ -6,7 +6,6 @@ import {
   within,
 } from "@testing-library/preact";
 import { describe, expect, test, vi } from "vitest";
-import { BUILD } from "./build";
 import {
   addOne,
   STORAGE_KEY as CART_KEY,
@@ -17,6 +16,7 @@ import {
 import { say } from "./i18n";
 import { ITEM_RETIRED, RESCAN as RESCAN_PHRASE } from "./older";
 import {
+  type Body,
   KEY_REUSED,
   MAKE_CHANGES,
   STORAGE_KEY as OUTBOX_KEY,
@@ -54,11 +54,18 @@ import { telemetry } from "./telemetry";
 import { CATALOGUE } from "./test-catalogue";
 import { answering, deferred, json, saved, TOO_OLD } from "./test-fetch";
 import {
+  KEY,
+  keep,
+  moveBody,
+  olderSave,
+  outboxEntry,
+  storeOutbox,
+} from "./test-saves";
+import {
   expectBold,
   expectRefusal,
   fillMove,
   isCatalogue,
-  leaveInOutbox,
   open,
   ready,
   save,
@@ -92,7 +99,6 @@ describe("what an older build left", () => {
   const NOT_DISCARDED = say(NOT_DISCARDED_PHRASE);
   const NOT_REMOVED = say(NOT_REMOVED_PHRASE);
   const RESCAN = say(RESCAN_PHRASE);
-  const KEY = "0b7c6a51-9a3d-4d39-8f3e-1d1f2c4b5a61";
   const AT = 1_700_000_000_000;
   const OLDER = "2026-11-12T09:00:00.000Z";
   const at = new Date(AT).toLocaleString([], {
@@ -102,28 +108,19 @@ describe("what an older build left", () => {
 
   /** A move of two boxes of radios and some cable, waiting under v3. */
   function leaveSave(fields = {}) {
-    localStorage.setItem(
-      "inventory.outbox.v3",
-      JSON.stringify([
-        {
-          body: {
-            key: KEY,
-            kind: "move",
-            volunteer_id: 1,
-            from_location_id: 10,
-            to_location_id: 12,
-            lines: [
-              { item_id: 100, quantity: "8", package_id: 1000 },
-              { item_id: 101, quantity: "3", open_package_key: KEY },
-            ],
-          },
-          what: "Move: 2 items from Hub to Van",
-          queuedAt: AT,
-          state: "waiting",
-          ...fields,
-        },
-      ]),
-    );
+    keep("inventory.outbox.v3", [
+      olderSave({
+        body: moveBody({
+          lines: [
+            { item_id: 100, quantity: "8", package_id: 1000 },
+            { item_id: 101, quantity: "3", open_package_key: KEY },
+          ],
+        }),
+        what: "Move: 2 items from Hub to Van",
+        queuedAt: AT,
+        ...fields,
+      }),
+    ]);
   }
 
   /** A cart filled for an install, under v1, with a line no build wrote:
@@ -244,41 +241,34 @@ describe("what an older build left", () => {
   });
 
   test("each kind, and what the catalogue no longer has, are told plainly", async () => {
-    const save = (key: string, body: object, fields = {}) => ({
-      body: { key, volunteer_id: 99, lines: [], ...body },
-      queuedAt: null,
-      state: "waiting",
-      ...fields,
-    });
-    localStorage.setItem(
-      "inventory.outbox.v3",
-      JSON.stringify([
-        save("a", { kind: "report", from_location_id: 10, used_up: [KEY] }),
-        save("b", {
-          kind: "open",
-          from_location_id: 10,
-          to_location_id: 10,
-          lines: [{ item_id: 101, quantity: "305", package_id: 1001 }],
-          // Not whole, so listed, not put in the cart.
-          used_up: [KEY],
-        }),
-        save("c", {
-          kind: "receipt",
-          to_location_id: 98,
-          lines: [
-            { item_id: 100, quantity: "4", package_id: 1000 },
-            { item_id: 100, quantity: "3" },
-            { item_id: 101, quantity: "0" },
-            { item_id: 999, quantity: "1" },
-          ],
-        }),
-        save(
-          "d",
-          { kind: "install", install_number: 77 },
-          { state: "refused" },
-        ),
-      ]),
-    );
+    const save = (key: string, body: object, fields = {}) =>
+      olderSave({
+        body: { key, volunteer_id: 99, lines: [], ...body },
+        queuedAt: null,
+        ...fields,
+      });
+    keep("inventory.outbox.v3", [
+      save("a", { kind: "report", from_location_id: 10, used_up: [KEY] }),
+      save("b", {
+        kind: "open",
+        from_location_id: 10,
+        to_location_id: 10,
+        lines: [{ item_id: 101, quantity: "305", package_id: 1001 }],
+        // Not whole, so listed, not put in the cart.
+        used_up: [KEY],
+      }),
+      save("c", {
+        kind: "receipt",
+        to_location_id: 98,
+        lines: [
+          { item_id: 100, quantity: "4", package_id: 1000 },
+          { item_id: 100, quantity: "3" },
+          { item_id: 101, quantity: "0" },
+          { item_id: 999, quantity: "1" },
+        ],
+      }),
+      save("d", { kind: "install", install_number: 77 }, { state: "refused" }),
+    ]);
     open();
     await ready();
     const [report, opening, receipt, install] =
@@ -307,19 +297,15 @@ describe("what an older build left", () => {
   });
 
   test("a save of no kind this build knows is something saved", async () => {
-    localStorage.setItem(
-      "inventory.outbox.v3",
-      JSON.stringify([
-        {
-          body: {
-            key: KEY,
-            kind: "teleport",
-            lines: [{ item_id: 102, quantity: "1" }],
-          },
-          state: "waiting",
+    keep("inventory.outbox.v3", [
+      olderSave({
+        body: {
+          key: KEY,
+          kind: "teleport",
+          lines: [{ item_id: 102, quantity: "1" }],
         },
-      ]),
-    );
+      }),
+    ]);
     open();
     await ready();
     within(listing()).getByText(say(SOMETHING));
@@ -450,7 +436,7 @@ describe("what an older build left", () => {
   });
 
   test("one an older build left under this build's key, held back as too old, goes back in the empty cart, and this tab is not too old", async () => {
-    leaveInOutbox(OLDER, "waiting", AT);
+    storeOutbox([outboxEntry({ build: OLDER, queuedAt: AT })], OLDER);
     // A server whose oldest build is after OLDER.
     const { api } = server(() => json(TOO_OLD, 409));
     const outbox = open(api);
@@ -475,16 +461,16 @@ describe("what an older build left", () => {
     // A cart with lines takes none without a tap.
     fillMove();
     expect(screen.queryByText(HEADING)).toBeNull();
-    leaveInOutbox(OLDER, "too_old", AT);
+    storeOutbox(
+      [outboxEntry({ build: OLDER, state: "too_old", queuedAt: AT })],
+      OLDER,
+    );
     window.dispatchEvent(new StorageEvent("storage", { key: OUTBOX_KEY }));
     await vi.waitFor(() =>
       within(listing()).getByText(`Kept on this device ${at}, not sent.`),
     );
     // Put back in the cart there.
-    localStorage.setItem(
-      OUTBOX_KEY,
-      JSON.stringify({ build: BUILD, entries: [] }),
-    );
+    storeOutbox([]);
     window.dispatchEvent(new StorageEvent("storage", { key: OUTBOX_KEY }));
     await vi.waitFor(() => expect(screen.queryByText(HEADING)).toBeNull());
   });
@@ -1082,22 +1068,13 @@ describe("what an older build left", () => {
   });
 
   /** Moves from the hub to the van under v3, each queued at its time. */
-  function leaveMoves(...saves: [key: string, at: number, lines: object[]][]) {
-    localStorage.setItem(
+  function leaveMoves(
+    ...saves: [key: string, at: number, lines: Body["lines"]][]
+  ) {
+    keep(
       "inventory.outbox.v3",
-      JSON.stringify(
-        saves.map(([key, queuedAt, lines]) => ({
-          body: {
-            key,
-            kind: "move",
-            volunteer_id: 1,
-            from_location_id: 10,
-            to_location_id: 12,
-            lines,
-          },
-          queuedAt,
-          state: "waiting",
-        })),
+      saves.map(([key, queuedAt, lines]) =>
+        olderSave({ body: moveBody({ key, lines }), queuedAt }),
       ),
     );
   }
@@ -1423,7 +1400,7 @@ describe("what an older build left", () => {
    * refused, once `held` lets it: its entry, once it shows what was
    * recorded. `meanwhile` is done after Record, before the refusal. */
   async function differing(
-    first: object[],
+    first: Body["lines"],
     boxes: string,
     meanwhile?: () => void,
   ) {
@@ -1515,38 +1492,24 @@ describe("what an older build left", () => {
   test("two saves under one key recorded elsewhere each put their difference in the cart by itself, under a key of its own, recorded once (inventory-tng-3iy)", async () => {
     const record = vi.spyOn(telemetry, "record");
     record.mockClear();
-    const move = (lines: object[]) => ({
-      key: KEY,
-      kind: "move",
-      volunteer_id: 1,
-      from_location_id: 10,
-      to_location_id: 12,
-      install_number: null,
-      lines,
-    });
-    const refused = (n: number) => ({
-      queuedAt: AT + n,
-      build: BUILD,
-      waitingFor: null,
-      failures: 0,
-      // Put back from what was recorded, then changed.
-      body: { ...move([boxed(n)]), changed_from: [boxed(1)] },
-      summary: { from: "Hub", to: "Van" },
-      state: "refused",
-      reason: {
-        code: "recorded_elsewhere",
-        recorded: {
-          by: "elsewhere",
-          transactionId: 1,
-          batch: move([boxed(1)]),
+    const move = (lines: Body["lines"]) =>
+      moveBody({ install_number: null, lines });
+    const refused = (n: number) =>
+      outboxEntry({
+        queuedAt: AT + n,
+        // Put back from what was recorded, then changed.
+        body: { ...move([boxed(n)]), changed_from: [boxed(1)] },
+        state: "refused",
+        reason: {
+          code: "recorded_elsewhere",
+          recorded: {
+            by: "elsewhere",
+            transactionId: 1,
+            batch: move([boxed(1)]),
+          },
         },
-      },
-      transactionId: null,
-    });
-    localStorage.setItem(
-      OUTBOX_KEY,
-      JSON.stringify({ build: BUILD, entries: [refused(2), refused(3)] }),
-    );
+      });
+    storeOutbox([refused(2), refused(3)]);
     const written = new Map([[KEY, linesOf({ lines: [boxed(1)] })]]);
     const { api, sent } = ledger(written);
     open(api);

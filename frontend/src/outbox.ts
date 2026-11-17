@@ -1190,7 +1190,7 @@ function keysNamed(body: Body): string[] {
 }
 
 /** A batch as first kept by `build`: waiting, and not yet tried. */
-export function newEntry(
+function newEntry(
   body: Body,
   summary: Summary,
   build: string,

@@ -6,7 +6,7 @@ import { expect, vi } from "vitest";
 import { openCamera } from "./camera";
 import { STORAGE_KEY as CART_KEY } from "./cart";
 import { say } from "./i18n";
-import { STORAGE_KEY as OUTBOX_KEY, Outbox } from "./outbox";
+import { Outbox } from "./outbox";
 import { FIND, FROM, RECORD, ScanPage, TO, YOUR_NAME } from "./ScanPage";
 import { fakeCamera } from "./test-camera";
 import { CATALOGUE } from "./test-catalogue";
@@ -99,38 +99,3 @@ export const storedCart = () =>
 /** A batch key, as the page makes them. */
 export const UUID =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
-
-/** A move of two boxes of radios that `build` saved, queued at `queuedAt`,
- * left under this build's outbox key. */
-export function leaveInOutbox(
-  build: string,
-  state: "waiting" | "too_old",
-  queuedAt: number,
-) {
-  localStorage.setItem(
-    OUTBOX_KEY,
-    JSON.stringify({
-      build,
-      entries: [
-        {
-          body: {
-            key: "0b7c6a51-9a3d-4d39-8f3e-1d1f2c4b5a61",
-            kind: "move",
-            volunteer_id: 1,
-            from_location_id: 10,
-            to_location_id: 12,
-            lines: [{ item_id: 100, quantity: "8", package_id: 1000 }],
-          },
-          summary: { from: "Hub", to: "Van" },
-          queuedAt,
-          build,
-          state,
-          waitingFor: null,
-          reason: null,
-          transactionId: null,
-          failures: 0,
-        },
-      ],
-    }),
-  );
-}

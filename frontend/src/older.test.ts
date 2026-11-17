@@ -25,6 +25,7 @@ import {
 } from "./older";
 import { KEY_REUSED, noteOf, SOME_NOT_RECORDED } from "./outbox";
 import { CATALOGUE } from "./test-catalogue";
+import { KEY, keep, moveBody, OTHER_KEY, olderSave } from "./test-saves";
 import { refusing } from "./test-storage";
 
 /** In Ali's words (inventory-tng-0su), without "Sorry." (inventory-tng-93z). */
@@ -32,34 +33,19 @@ const ITEM_RETIRED = say(ITEM_RETIRED_PHRASE);
 const RESCAN = say(RESCAN_PHRASE);
 const RESIZED = say(RESIZED_PHRASE);
 
-const KEY = "0b7c6a51-9a3d-4d39-8f3e-1d1f2c4b5a61";
-const OTHER = "6f1e2d3c-4b5a-4968-8776-5a4b3c2d1e0f";
-
-/** A batch as an older build kept it: a move of cable, waiting. */
+/** A batch as an older build kept it: a move of cable, waiting, with
+ * every field v3 kept. */
 function saveOf(fields: Record<string, unknown> = {}, body = {}) {
-  return {
-    body: {
-      key: KEY,
-      kind: "move",
-      volunteer_id: 1,
-      from_location_id: 10,
-      to_location_id: 12,
-      lines: [{ item_id: 101, quantity: "2" }],
-      ...body,
-    },
+  return olderSave({
+    body: moveBody({ lines: [{ item_id: 101, quantity: "2" }], ...body }),
     what: "Move: 1 item from Hub to Van",
     queuedAt: 1_700_000_000_000,
-    state: "waiting",
     waitingFor: null,
     note: null,
     transactionId: null,
     failures: 0,
     ...fields,
-  };
-}
-
-function keep(key: string, value: unknown) {
-  localStorage.setItem(key, JSON.stringify(value));
+  });
 }
 
 /** The only save kept, a move of cable but for `body` and `fields`, as
@@ -96,14 +82,14 @@ describe("reading what older builds left", () => {
   test("saves waiting or refused are listed; saved ones are not", () => {
     keep("inventory.outbox.v3", [
       saveOf(),
-      saveOf({ state: "refused", note: "Not saved." }, { key: OTHER }),
+      saveOf({ state: "refused", note: "Not saved." }, { key: OTHER_KEY }),
       saveOf({ state: "saved" }, { key: "c" }),
     ]);
     expect(listed()).toEqual([
       { key: "inventory.outbox.v3", batch: KEY, refused: null },
       {
         key: "inventory.outbox.v3",
-        batch: OTHER,
+        batch: OTHER_KEY,
         refused: { code: "refused", note: { bold: ["Not saved."], plain: [] } },
       },
     ]);
@@ -124,7 +110,7 @@ describe("reading what older builds left", () => {
             { quantity: "1" },
             { item_id: 101, quantity: "1.5", colour: "blue" },
           ],
-          used_up: [OTHER],
+          used_up: [OTHER_KEY],
         },
       ),
       "not a save",
@@ -168,7 +154,7 @@ describe("reading what older builds left", () => {
   });
 
   test("of v1 to v3, only the newest held is read, as each took over the one before", () => {
-    keep("inventory.outbox.v1", [saveOf({}, { key: OTHER })]);
+    keep("inventory.outbox.v1", [saveOf({}, { key: OTHER_KEY })]);
     keep("inventory.outbox.v2", [saveOf()]);
     expect(listed().map((each) => each.key)).toEqual(["inventory.outbox.v2"]);
   });
@@ -176,10 +162,10 @@ describe("reading what older builds left", () => {
   test("v4's saves, kept with their summaries in words, are listed as an older build's (inventory-tng-ar8)", () => {
     keep("inventory.outbox.v4", {
       build: "2026-11-12T10:00:00.000Z",
-      entries: [saveOf({}, { key: OTHER })],
+      entries: [saveOf({}, { key: OTHER_KEY })],
     });
     expect(listed()).toEqual([
-      { key: "inventory.outbox.v4", batch: OTHER, refused: null },
+      { key: "inventory.outbox.v4", batch: OTHER_KEY, refused: null },
     ]);
   });
 
@@ -188,14 +174,14 @@ describe("reading what older builds left", () => {
     keep("inventory.outbox.v5", {
       build,
       entries: [
-        saveOf({ state: "too_old", build }, { key: OTHER }),
+        saveOf({ state: "too_old", build }, { key: OTHER_KEY }),
         saveOf({ build }, { key: "c" }),
         saveOf({ state: "refused", note: "Not saved.", build }, { key: "d" }),
         saveOf({ state: "saved", build }, { key: "e" }),
       ],
     });
     expect(listed()).toEqual([
-      { key: "inventory.outbox.v5", batch: OTHER, refused: null },
+      { key: "inventory.outbox.v5", batch: OTHER_KEY, refused: null },
     ]);
   });
 
@@ -252,7 +238,10 @@ describe("tidying on load", () => {
   test("of v1 to v3, those whose every save a newer one holds go", () => {
     keep("inventory.outbox.v1", [saveOf()]);
     keep("inventory.outbox.v2", [saveOf({ state: "saved" })]);
-    keep("inventory.outbox.v3", [saveOf({}, { key: OTHER }), "not a batch"]);
+    keep("inventory.outbox.v3", [
+      saveOf({}, { key: OTHER_KEY }),
+      "not a batch",
+    ]);
     tidyOlder();
     expect(localStorage.getItem("inventory.outbox.v1")).toBeNull();
     // Only saved ones, which v3 never took: nothing to lose either.
@@ -261,8 +250,8 @@ describe("tidying on load", () => {
   });
 
   test("a save an older tab kept after a newer one took over stays, unlisted", () => {
-    // v2 took over v1 only while it held nothing: OTHER came after.
-    const v1 = JSON.stringify([saveOf(), saveOf({}, { key: OTHER })]);
+    // v2 took over v1 only while it held nothing: OTHER_KEY came after.
+    const v1 = JSON.stringify([saveOf(), saveOf({}, { key: OTHER_KEY })]);
     localStorage.setItem("inventory.outbox.v1", v1);
     keep("inventory.outbox.v2", [saveOf()]);
     tidyOlder();
@@ -298,7 +287,7 @@ describe("removing one", () => {
       other: true,
       entries: [
         saveOf(),
-        saveOf({}, { key: OTHER }),
+        saveOf({}, { key: OTHER_KEY }),
         saveOf({ state: "saved" }, { key: "c" }),
       ],
     };
@@ -324,7 +313,7 @@ describe("removing one", () => {
 
   test("one held back under this build's key goes from it, which stays with the rest", () => {
     const build = "2026-11-12T10:00:00.000Z";
-    const waiting = saveOf({ build }, { key: OTHER });
+    const waiting = saveOf({ build }, { key: OTHER_KEY });
     keep("inventory.outbox.v5", {
       build,
       entries: [saveOf({ state: "too_old", build }), waiting],
@@ -381,7 +370,7 @@ describe("removing one", () => {
   });
 
   test("a browser that will not keep the change says so", () => {
-    keep("inventory.outbox.v3", [saveOf(), saveOf({}, { key: OTHER })]);
+    keep("inventory.outbox.v3", [saveOf(), saveOf({}, { key: OTHER_KEY })]);
     expect(removeOlder(readOlder()[0] as Older, refusing("setItem"))).toBe(
       "not_kept",
     );
@@ -402,7 +391,7 @@ describe("a browser that will not let it at storage", () => {
     keep("inventory.outbox.v1", [saveOf()]);
     keep("inventory.outbox.v3", [
       saveOf({ state: "saved" }),
-      saveOf({}, { key: OTHER }),
+      saveOf({}, { key: OTHER_KEY }),
     ]);
     keep("inventory.cart.v1", {
       ...freshCart(),
@@ -572,10 +561,10 @@ describe("as a cart", () => {
           {},
           {
             lines: [
-              { item_id: 101, quantity: "5", open_package_key: OTHER },
+              { item_id: 101, quantity: "5", open_package_key: OTHER_KEY },
               { item_id: "cable", quantity: "1" },
             ],
-            lengths: [{ open_package_key: OTHER, left: "10" }],
+            lengths: [{ open_package_key: OTHER_KEY, left: "10" }],
           },
         ),
       ),
@@ -600,7 +589,7 @@ describe("as a cart", () => {
             lines: [
               { item_id: 101, quantity: "lots" },
               { item_id: 101, quantity: 0.30000000000000004 },
-              { item_id: 999, quantity: "2", open_package_key: OTHER },
+              { item_id: 999, quantity: "2", open_package_key: OTHER_KEY },
             ],
           },
         ),
@@ -806,7 +795,7 @@ describe("as a cart", () => {
                 item_id: 101,
                 quantity: "305",
                 package_id: 1001,
-                open_package_key: OTHER,
+                open_package_key: OTHER_KEY,
               },
             ],
           },
@@ -847,7 +836,7 @@ describe("as a cart", () => {
           loose: "2",
           open: {
             [KEY]: { amount: "3", whole: false },
-            [OTHER]: { amount: "", whole: false },
+            [OTHER_KEY]: { amount: "", whole: false },
           },
           picked: 4,
         },
@@ -856,7 +845,7 @@ describe("as a cart", () => {
           itemId: 102,
           packages: {},
           loose: "",
-          open: { [KEY]: "odd", [OTHER]: { amount: 3 } },
+          open: { [KEY]: "odd", [OTHER_KEY]: { amount: 3 } },
         },
         { itemId: 100, packages: { 1000: 7 }, loose: "1" },
         { packages: {} },
@@ -909,11 +898,11 @@ describe("line by line", () => {
     only({
       lines: [
         { item_id: 100, quantity: "4", package_id: 1004 },
-        { item_id: 101, quantity: "12", open_package_key: OTHER },
+        { item_id: 101, quantity: "12", open_package_key: OTHER_KEY },
         { item_id: 100, quantity: "4", package_id: 1000, package_size: 2 },
         { item_id: 100, quantity: "8", package_id: 1000 },
       ],
-      used_up: [OTHER],
+      used_up: [OTHER_KEY],
     });
 
   test("each line is listed in the order kept, what cannot go back with why", () => {
@@ -948,12 +937,12 @@ describe("line by line", () => {
       {
         lines: [
           { item_id: 100, quantity: "4", package_id: 1004 },
-          { item_id: 101, quantity: "12", open_package_key: OTHER },
+          { item_id: 101, quantity: "12", open_package_key: OTHER_KEY },
           { item_id: 100, quantity: "8", package_id: 1000, package_size: 4 },
           { item_id: 999, quantity: "5" },
           { item_id: "unreadable" },
         ],
-        used_up: [OTHER],
+        used_up: [OTHER_KEY],
       },
     );
     // Numbered by item, as a 422 names its lines; one gone, with how much
@@ -988,7 +977,7 @@ describe("line by line", () => {
           itemId: 101,
           packages: {},
           loose: "",
-          open: { [OTHER]: { now: "9" } },
+          open: { [OTHER_KEY]: { now: "9" } },
         },
       ],
     });
@@ -1060,8 +1049,8 @@ describe("line by line", () => {
     const { gaps } = toCart(
       only({
         lines: [
-          { item_id: 103, quantity: "2", open_package_key: OTHER },
-          { item_id: 101, quantity: "3", open_package_key: OTHER },
+          { item_id: 103, quantity: "2", open_package_key: OTHER_KEY },
+          { item_id: 101, quantity: "3", open_package_key: OTHER_KEY },
           { item_id: 101, quantity: "4", open_package_key: KEY },
         ],
       }),
@@ -1087,7 +1076,7 @@ describe("line by line", () => {
   test.each([
     ["a package no longer offered", { package_id: 1004 }],
     ["a package resized since", { package_id: 1000, package_size: 2 }],
-    ["a take from an open package", { open_package_key: OTHER }],
+    ["a take from an open package", { open_package_key: OTHER_KEY }],
   ])("one holding only %s has nothing to put back", (_name, line) => {
     const { cart, parts } = toCart(
       only({ lines: [{ item_id: 100, quantity: "4", ...line }] }),
@@ -1118,7 +1107,7 @@ describe("line by line", () => {
 
   test("among others, kept as v4 keeps them, only its line goes; and a report of a save whose lines are lost", () => {
     const build = "2026-11-12T10:00:00.000Z";
-    const other = saveOf({ build }, { key: OTHER });
+    const other = saveOf({ build }, { key: OTHER_KEY });
     keep("inventory.outbox.v3", {
       build,
       entries: [
@@ -1145,12 +1134,15 @@ describe("line by line", () => {
       ],
     });
     keep("inventory.outbox.v3", [
-      saveOf({}, { lines: "many", used_up: [KEY, OTHER] }),
+      saveOf({}, { lines: "many", used_up: [KEY, OTHER_KEY] }),
     ]);
     const lost = readOlder()[0] as Older;
     const [report] = toCart(lost, CATALOGUE).parts;
     expect(dropPart(lost, report?.drop ?? [], CATALOGUE)).toBe("done");
-    expect(stored()[0].body).toMatchObject({ lines: "many", used_up: [OTHER] });
+    expect(stored()[0].body).toMatchObject({
+      lines: "many",
+      used_up: [OTHER_KEY],
+    });
   });
 
   test("of an older cart's line, what it said of one open package goes, the rest kept", () => {
@@ -1158,7 +1150,7 @@ describe("line by line", () => {
       itemId: 101,
       packages: { 1001: "1" },
       loose: "",
-      open: { [KEY]: { amount: "3" }, [OTHER]: { usedUp: true } },
+      open: { [KEY]: { amount: "3" }, [OTHER_KEY]: { usedUp: true } },
     };
     keep("inventory.cart.v1", { ...freshCart(), lines: [line] });
     const older = readOlder()[0] as Older;
@@ -1167,7 +1159,7 @@ describe("line by line", () => {
     );
     expect(dropPart(older, taken?.drop ?? [], CATALOGUE)).toBe("done");
     expect(stored("inventory.cart.v1").lines).toEqual([
-      { ...line, open: { [OTHER]: { usedUp: true } } },
+      { ...line, open: { [OTHER_KEY]: { usedUp: true } } },
     ]);
   });
 
@@ -1324,10 +1316,10 @@ describe("put back without a tap", () => {
     ["a line unread", { lines: [{ item_id: 101, quantity: "lots" }] }],
     ["its lines unread", { lines: "many" }],
     ["nothing to put back", { lines: [] }],
-    ["a report", { used_up: [OTHER] }],
+    ["a report", { used_up: [OTHER_KEY] }],
     [
       "a take from an open package",
-      { lines: [{ item_id: 101, quantity: "2", open_package_key: OTHER }] },
+      { lines: [{ item_id: 101, quantity: "2", open_package_key: OTHER_KEY }] },
     ],
     [
       "a package resized",

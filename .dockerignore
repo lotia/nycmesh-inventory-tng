@@ -20,6 +20,7 @@ frontend/**/*.test.ts
 frontend/**/*.test.tsx
 frontend/biome.json
 frontend/src/test-*.ts
+frontend/src/test-*.tsx
 frontend/src/**/*.typecheck.ts
 # The generator runs on a contributor's machine; its output is committed.
 frontend/tools/

@@ -6,7 +6,6 @@ import {
   within,
 } from "@testing-library/preact";
 import { describe, expect, type MockInstance, test, vi } from "vitest";
-import { BUILD } from "./build";
 import {
   STORAGE_KEY as CART_KEY,
   freshCart,
@@ -56,6 +55,7 @@ import {
 import { MOST_SECONDS_TO_SAVE, telemetry } from "./telemetry";
 import { CATALOGUE, WITH_CAFE } from "./test-catalogue";
 import { answering, deferred, json, saved } from "./test-fetch";
+import { moveBody, outboxEntry, storeOutbox } from "./test-saves";
 import {
   expectBold,
   expectRefusal,
@@ -734,45 +734,17 @@ describe("filling and saving a cart", () => {
   test("two batches under one key are listed each with its own lines, and dismissed alone (inventory-tng-suo)", async () => {
     // Saved, then queued again under its key by a tab of an older build,
     // changed, and refused as the key was used.
-    const key = "0b7c6a51-9a3d-4d39-8f3e-1d1f2c4b5a61";
-    const batch = (quantity: string) => ({
-      key,
-      kind: "move",
-      volunteer_id: 1,
-      from_location_id: 10,
-      to_location_id: 12,
-      lines: [{ item_id: 101, quantity }],
-    });
-    const kept = {
-      queuedAt: 1,
-      build: BUILD,
-      waitingFor: null,
-      failures: 0,
-    };
-    localStorage.setItem(
-      OUTBOX_KEY,
-      JSON.stringify({
-        build: BUILD,
-        entries: [
-          {
-            ...kept,
-            body: batch("1"),
-            summary: { from: "Hub", to: "Van" },
-            state: "saved",
-            reason: null,
-            transactionId: 41,
-          },
-          {
-            ...kept,
-            body: batch("2"),
-            summary: { from: "Hub", to: "Shelf" },
-            state: "refused",
-            reason: { code: "key_reused" },
-            transactionId: null,
-          },
-        ],
+    const batch = (quantity: string) =>
+      moveBody({ lines: [{ item_id: 101, quantity }] });
+    storeOutbox([
+      outboxEntry({ body: batch("1"), state: "saved", transactionId: 41 }),
+      outboxEntry({
+        body: batch("2"),
+        summary: { from: "Hub", to: "Shelf" },
+        state: "refused",
+        reason: { code: "key_reused" },
       }),
-    );
+    ]);
     const outbox = open();
     await ready();
     const row = (what: string) =>
