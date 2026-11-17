@@ -41,7 +41,7 @@ import {
 import { Builds, HEADER, MUST_UPGRADE } from "./build";
 import { say } from "./i18n";
 import { NOT_REGISTERED } from "./registration";
-import { onStoredChange, readStored, writeStored } from "./stored";
+import { onStoredChange, parseStored, readStored, writeStored } from "./stored";
 import { telemetry } from "./telemetry";
 
 /** Versioned: a build that changes what is kept takes a new key, as a tab
@@ -1043,6 +1043,20 @@ export class Outbox {
     }
   }
 
+  /** The batches of this build `stored` holds back as too old, by batchId. */
+  private heldIn(stored: string | null): string[] {
+    const kept = v.safeParse(Kept, parseStored(stored));
+    return kept.success
+      ? parsed(kept.output.entries)
+          .filter(
+            (each) =>
+              each.build === this.builds.build &&
+              each.reason?.code === "must_upgrade",
+          )
+          .map((each) => batchId(each.body))
+      : [];
+  }
+
   /** Send when the browser comes back online or the page is shown again,
    * and follow other tabs' changes. Returns what stops listening. */
   listen(target: Window = window): () => void {
@@ -1052,33 +1066,24 @@ export class Outbox {
         send();
       }
     };
-    const follow = () => {
+    const follow = (event: StorageEvent) => {
       // Each saved one, less those storage still holds (show).
       for (const entry of this.entries.value) {
         if (entry.state === "saved") {
           this.forgottenElsewhere.set(batchId(entry.body), entry);
         }
       }
-      const entries = this.read();
       // Another tab of this build held one back: this tab is too old too.
-      // Only one held back since this tab last read storage: one held
-      // before it loaded, kept until sent, may be from before a rollback,
-      // and a reload would never clear it (as stale stamps, Builds.listen).
-      const held = (each: Entry) => each.reason?.code === "must_upgrade";
-      const heldBefore = new Set(
-        this.entries.value.filter(held).map((each) => batchId(each.body)),
-      );
-      if (
-        entries.some(
-          (each) =>
-            each.build === this.builds.build &&
-            held(each) &&
-            !heldBefore.has(batchId(each.body)),
-        )
-      ) {
+      // Only one held back by this write, which the event names as it was
+      // before and after: one held before this tab loaded, kept until
+      // sent, may be from before a rollback, and a reload would never
+      // clear it (as stale stamps, Builds.listen). Not by what this tab
+      // last read, which its own writes may have read the hold into.
+      const before = new Set(this.heldIn(event.oldValue));
+      if (this.heldIn(event.newValue).some((id) => !before.has(id))) {
         this.builds.learn("too_old");
       }
-      this.show(entries);
+      this.show(this.read());
     };
     const stopFollowing = onStoredChange([STORAGE_KEY], follow);
     target.addEventListener("online", send);

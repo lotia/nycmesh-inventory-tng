@@ -61,6 +61,17 @@ function storeBy(build: string, ...entries: unknown[]) {
 
 const store = (...entries: unknown[]) => storeBy(BUILD, ...entries);
 
+/** Kept as another tab of this build keeps them: stored, and the storage
+ * event a browser fires in this one, with what was stored before. */
+function storeElsewhere(...entries: unknown[]) {
+  const oldValue = localStorage.getItem(STORAGE_KEY);
+  store(...entries);
+  const newValue = localStorage.getItem(STORAGE_KEY);
+  window.dispatchEvent(
+    new StorageEvent("storage", { key: STORAGE_KEY, oldValue, newValue }),
+  );
+}
+
 /** Kept as builds before v4 kept them: a list, under an older key. */
 function storeOlder(key: string, ...entries: unknown[]) {
   localStorage.setItem(key, JSON.stringify(entries));
@@ -1632,11 +1643,9 @@ describe("listening", () => {
     const stop = outbox.listen();
     const held = { reason: { code: "must_upgrade" as const } };
     // An older build's tab, sharing the key, is too old, not this one.
-    store(entry({ ...held, build: "2026-11-12T09:00:00.000Z" }));
-    window.dispatchEvent(new StorageEvent("storage", { key: STORAGE_KEY }));
+    storeElsewhere(entry({ ...held, build: "2026-11-12T09:00:00.000Z" }));
     expect(outbox.builds.newer.value).toBeNull();
-    store(entry(held));
-    window.dispatchEvent(new StorageEvent("storage", { key: STORAGE_KEY }));
+    storeElsewhere(entry(held));
     expect(outbox.builds.newer.value).toBe("too_old");
     stop();
   });
@@ -1646,24 +1655,43 @@ describe("listening", () => {
     store(waiting);
     const outbox = new Outbox(answering(() => saved()).api);
     const stop = outbox.listen();
-    store({ ...waiting, reason: { code: "must_upgrade" } });
-    window.dispatchEvent(new StorageEvent("storage", { key: STORAGE_KEY }));
+    storeElsewhere({ ...waiting, reason: { code: "must_upgrade" } });
+    expect(outbox.builds.newer.value).toBe("too_old");
+    stop();
+  });
+
+  test("a batch held back by another tab makes this one too old, though this tab wrote before hearing", () => {
+    const waiting = entry();
+    const refused = entry({ state: "refused", reason: { code: "key_reused" } });
+    store(waiting, refused);
+    const outbox = new Outbox(answering(() => saved()).api);
+    const stop = outbox.listen();
+    const oldValue = localStorage.getItem(STORAGE_KEY);
+    store({ ...waiting, reason: { code: "must_upgrade" } }, refused);
+    const newValue = localStorage.getItem(STORAGE_KEY);
+    // This tab writes, reading the hold, before the storage event comes.
+    outbox.dismiss(refused);
+    window.dispatchEvent(
+      new StorageEvent("storage", { key: STORAGE_KEY, oldValue, newValue }),
+    );
     expect(outbox.builds.newer.value).toBe("too_old");
     stop();
   });
 
   test("a batch held back before this tab loaded does not make it too old", async () => {
-    // Held back while this build was too old; the build is current again
-    // (rolled back), and this tab was loaded since.
-    const stale = entry({ reason: { code: "must_upgrade" } });
-    store(stale);
+    // A tab held back while this build was too old...
+    const held = new Outbox(answering(() => json(TOO_OLD, 409)).api);
+    held.queue(draft(), named("held"));
+    await vi.waitFor(() => expect(held.builds.newer.value).toBe("too_old"));
+    const [stale] = stored() as Entry[];
+    expect(stale?.reason).toEqual({ code: "must_upgrade" });
+    // ...then the build is current again (rolled back), and this tab is
+    // loaded since.
     const { api, sent } = answering(() => saved());
     const outbox = new Outbox(api);
     const stop = outbox.listen();
     // Another tab writes, the stale one still kept.
-    const fresh = entry();
-    store(stale, fresh);
-    window.dispatchEvent(new StorageEvent("storage", { key: STORAGE_KEY }));
+    storeElsewhere(stale, entry());
     expect(outbox.builds.newer.value).toBeNull();
     await outbox.send();
     expect(sent).toHaveLength(2);
