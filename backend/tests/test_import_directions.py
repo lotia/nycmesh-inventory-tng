@@ -104,7 +104,7 @@ BREAKS: dict[str, dict[str, list[str]]] = {
         "admin/stock.py": ["_holdings: 2", "reorder: 5", "stock: 4"],
         "admin/used_up.py": ["_answer: 2"],
         "admin/volunteers.py": ["_list_page: 4", "_volunteer_page: 2"],
-        "catalogue.py": ["catalogue: 12", "open_to_take: 2", "saved_of: 2"],
+        "scan/catalogue_api.py": ["catalogue: 12", "open_to_take: 2", "saved_of: 2"],
         "health.py": ["healthz: 1"],
     },
     "routes_import_another_features_routes": {

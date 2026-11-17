@@ -18,7 +18,6 @@ from inventory_tng.admin.items import ITEMS
 from inventory_tng.admin.labels import PICK_LABELS, PRINT
 from inventory_tng.admin.listing import PER_PAGE
 from inventory_tng.admin.locations import LOCATIONS
-from inventory_tng.catalogue import catalogue
 from inventory_tng.labels import INACTIVE_WORDS, Inactive, package_label, place_words
 from inventory_tng.models import (
     Category,
@@ -28,6 +27,7 @@ from inventory_tng.models import (
     Location,
     Volunteer,
 )
+from inventory_tng.scan.catalogue_api import catalogue
 
 from helpers.markup import (
     button,

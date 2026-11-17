@@ -16,7 +16,6 @@ from fastapi.testclient import TestClient
 from sqlalchemy import Connection, Engine, event, text
 from sqlalchemy.orm import Session
 
-from inventory_tng import catalogue
 from inventory_tng.app import create_app
 from inventory_tng.core.db import make_engine
 from inventory_tng.core.settings import Settings
@@ -28,6 +27,7 @@ from inventory_tng.models import (
     Location,
     Volunteer,
 )
+from inventory_tng.scan import catalogue_api
 
 from databases import OWNER, as_role
 from helpers.devices import new_device
@@ -217,7 +217,7 @@ def _plans(engine: Engine, session: Session, keys: list[uuid.UUID]) -> list[str]
 
     event.listen(engine, "before_cursor_execute", keep)
     try:
-        catalogue.with_saved(session, keys)
+        catalogue_api.with_saved(session, keys)
     finally:
         event.remove(engine, "before_cursor_execute", keep)
     plans = []
@@ -249,7 +249,7 @@ def test_measure_the_catalogue(filled: Engine, own_database: str) -> None:
                     "SELECT idempotency_key FROM ledger_transaction"
                     " ORDER BY id DESC LIMIT :n"
                 ),
-                {"n": catalogue.MOST_KEYS},
+                {"n": catalogue_api.MOST_KEYS},
             )
         )
     print(

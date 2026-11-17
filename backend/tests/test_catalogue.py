@@ -11,7 +11,7 @@ from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
 from structlog.testing import capture_logs
 
-from inventory_tng import catalogue, items
+from inventory_tng import items
 from inventory_tng.core.db import get_snapshot
 from inventory_tng.ledger import LOOSE, Entry
 from inventory_tng.models import (
@@ -22,6 +22,7 @@ from inventory_tng.models import (
     Location,
     Volunteer,
 )
+from inventory_tng.scan import catalogue_api
 
 from helpers.rows import add, tag
 from helpers.stock import Place, Spools, retire, write
@@ -385,7 +386,7 @@ def test_says_which_batches_asked_about_are_saved(
     reply = registered_client.get(URL, params={"key": [str(saved), str(waiting)]})
     assert reply.json()["saved"] == [str(saved)]
     assert registered_client.get(URL).json()["saved"] == []
-    too_many = [str(uuid.uuid4()) for _ in range(catalogue.MOST_KEYS + 1)]
+    too_many = [str(uuid.uuid4()) for _ in range(catalogue_api.MOST_KEYS + 1)]
     assert registered_client.get(URL, params={"key": too_many}).status_code == 422
 
 

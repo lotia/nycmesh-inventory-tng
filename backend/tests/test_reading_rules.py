@@ -22,7 +22,6 @@ from inventory_tng.admin.reading_rules import (
     SEED,
 )
 from inventory_tng.admins import guards
-from inventory_tng.catalogue import catalogue
 from inventory_tng.core.db import lock_catalogue
 from inventory_tng.models import (
     Admin,
@@ -35,6 +34,7 @@ from inventory_tng.models import (
 )
 from inventory_tng.models import reading_rules as reading_rules_held
 from inventory_tng.reading_rules import LIKELY, NAMED, both, near
+from inventory_tng.scan.catalogue_api import catalogue
 
 from helpers.concurrency import Committed
 from helpers.items import new_item

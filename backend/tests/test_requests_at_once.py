@@ -41,7 +41,6 @@ from inventory_tng import (
     units,
     volunteers,
 )
-from inventory_tng import catalogue as scan_catalogue
 from inventory_tng.admin.admins import ADMINS
 from inventory_tng.admin.volunteers import VOLUNTEERS
 from inventory_tng.admins import guards
@@ -81,6 +80,7 @@ from inventory_tng.models import (
     SignInSettings,
     Volunteer,
 )
+from inventory_tng.scan import catalogue_api as scan_catalogue
 from inventory_tng.scan.batch_schemas import Batch
 
 from helpers.concurrency import Committed, Worker, delete_made, made, newest_ids

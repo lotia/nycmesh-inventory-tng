@@ -86,3 +86,4 @@ short test. `core/` is the name FastAPI's full-stack template uses;
 | `devices.py` | `devices/devices.py` |
 | `devices.py`: the registration endpoint, `register_device` | `devices/api.py` |
 | `devices.py`: the request and reply schemas | `devices/schemas.py` |
+| `catalogue.py` | `scan/catalogue_api.py` |

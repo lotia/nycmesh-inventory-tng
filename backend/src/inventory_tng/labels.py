@@ -60,7 +60,7 @@ INACTIVE_WORDS: dict[Inactive, LazyProxy] = {
 
 @dataclass(frozen=True)
 class Sent:
-    """The ids the scan page's catalogue holds (catalogue.catalogue)."""
+    """The ids the scan page's catalogue holds (scan/catalogue_api.catalogue)."""
 
     items: AbstractSet[int]
     packages: AbstractSet[int]

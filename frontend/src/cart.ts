@@ -45,7 +45,7 @@ const MAX_ID = 2 ** 31 - 1;
 const MAX_AMOUNT = 10 ** 12;
 /** Lines in a batch (batch_schemas.MAX_LINES): a cart line may be several. */
 const MAX_LINES = 500;
-/** Batch keys a catalogue is asked about (catalogue.py, MOST_KEYS). */
+/** Batch keys a catalogue is asked about (scan/catalogue_api.py, MOST_KEYS). */
 export const MAX_KEYS_ASKED = 100;
 
 export type Catalogue = Schemas["Catalogue"];
@@ -1036,8 +1036,8 @@ function packageLine(
 /** A batch in the outbox, as offered and sealedCounts read it. */
 type Pending = Pick<Entry, "state" | "body" | "queuedAt">;
 
-/** The batch keys a catalogue is asked about (catalogue.py, MOST_KEYS):
- * its outbox's saved ones, then those waiting, oldest first. */
+/** The batch keys a catalogue is asked about (scan/catalogue_api.py,
+ * MOST_KEYS): its outbox's saved ones, then those waiting, oldest first. */
 export function keysToAsk(outbox: readonly Pending[]): string[] {
   const of = (state: string) =>
     outbox.filter((each) => each.state === state).map((each) => each.body.key);
@@ -1110,7 +1110,8 @@ export function sealedCounts(
       ) {
         continue;
       }
-      // Rounded up, as the catalogue counts a part of one (catalogue.py).
+      // Rounded up, as the catalogue counts a part of one
+      // (scan/catalogue_api.py).
       const n = Math.ceil(quantity / size);
       add(packageId, body.from_location_id, -n);
       if (body.kind !== "open") {
