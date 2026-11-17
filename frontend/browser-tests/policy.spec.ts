@@ -91,11 +91,16 @@ test("a <select> is refused nothing, and keeps its ellipsis", async ({
   await expect
     .poll(() => reports.length)
     .toBe(browserName === "webkit" ? 1 : 0);
+  // Caught: this test's own, made on purpose, and nothing else.
+  await expect
+    .poll(() => violations)
+    .toEqual([expect.stringMatching(/^style-src-attr refused inline \(P\) /)]);
+  violations.length = 0;
   // Refused, WebKit's style takes the select's text-overflow with it.
   // Not hiding the caret, which Playwright does by a <style> of its own.
   const drawn = (id: string) =>
     page.locator(`#${id}`).screenshot({ caret: "initial" });
   expect((await drawn("ellipsis")).equals(await drawn("clip"))).toBe(false);
-  // Caught: this test's own, made on purpose.
+  // WebKit refuses a <style> Playwright adds to take a screenshot anyway.
   violations.length = 0;
 });
