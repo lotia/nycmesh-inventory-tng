@@ -25,8 +25,8 @@ from helpers.sign_in import text
 NB, THIN = "\u00a0", "\u202f"
 
 
-# Draws ending in each run of hex letters a unit may be spelt with, after
-# digits (1f, 10ff, 1daf), the digits one number or grouped by thousands.
+# Tags as uuid4 may draw them: digits, then every run of one to three hex
+# letters, as a unit may be spelt (1111111f, 111111ff, 10000daf).
 DRAWS = [
     digits[: 8 - len(letters)] + letters
     for size in range(1, 4)
@@ -39,8 +39,8 @@ DRAWS = [
 def test_a_tag_is_shown_as_typed(monkeypatch: pytest.MonkeyPatch) -> None:
     """A tag drawn as 374691ff was shown as 374 691 ff, a number and its
     unit, so a test looking for a name it made with one did not find it,
-    now and then (inventory-tng-65u8). None of DRAWS is, in names shaped
-    as tests make them."""
+    now and then (inventory-tng-65u8). No draw in DRAWS is, in names
+    shaped as tests make them."""
     for drawn in DRAWS:
         monkeypatch.setattr(uuid, "uuid4", lambda d=drawn: uuid.UUID(d.ljust(32, "0")))
         mark = tag()
