@@ -164,12 +164,15 @@ class RateLimits:
     link, each counted apart (RATE_LIMIT_PER_ADDRESS). For one
     administrator, in 15 minutes: codes, or the password where it stands
     in for one, at signing in and to confirm (RATE_LIMIT_PER_ACCOUNT).
-    And how many reports of themselves the pages may send from one
-    address in a minute (page_telemetry.py, RATE_LIMIT_PAGE_REPORTS)."""
+    And how many reports may come from one address in a minute: of
+    themselves, from the pages (page_telemetry.py,
+    RATE_LIMIT_PAGE_REPORTS), and of what the policy refused, from
+    browsers (security_headers.py, RATE_LIMIT_CSP_REPORTS)."""
 
     per_address: int = 10
     per_account: int = 10
     page_reports: int = 30
+    csp_reports: int = 30
 
     @classmethod
     def from_environ(cls, environ: Mapping[str, str] = os.environ) -> Self:
@@ -185,6 +188,13 @@ class RateLimits:
                 environ,
                 "RATE_LIMIT_PAGE_REPORTS",
                 default.page_reports,
+                "reports",
+                MAX_ATTEMPTS,
+            ),
+            csp_reports=_whole_number(
+                environ,
+                "RATE_LIMIT_CSP_REPORTS",
+                default.csp_reports,
                 "reports",
                 MAX_ATTEMPTS,
             ),

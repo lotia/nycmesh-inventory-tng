@@ -22,8 +22,8 @@ import type { Schemas } from "./api/client";
 
 export const PATH = "/api/telemetry";
 export const FLUSH_AT = 10;
-/** How many of each kind a page sends an hour: 60 in all, under the
- * server's limit (RATE_LIMIT_PAGE_REPORTS). */
+/** How many of each kind a page sends an hour, PER_HOUR_IN_ALL in all,
+ * under the server's limit (RATE_LIMIT_PAGE_REPORTS). */
 export const PER_HOUR: Record<Event["kind"], number> = {
   web_vital: 10,
   error: 10,

@@ -61,9 +61,6 @@ SWAGGER_FAVICON = "https://fastapi.tiangolo.com"
 NONCE = "csp_nonce"
 NONCE_BYTES = 16
 
-# A page's violations come a few at a time, and each is one request in
-# browsers that use report-uri.
-REPORTS_ALLOWED = RateLimitItemPerMinute(30)
 # What browsers send reports as: report-uri's, the Reporting API's, and
 # plain JSON, which older browsers used.
 REPORT_TYPES = frozenset(
@@ -272,7 +269,10 @@ async def _body(request: Request) -> bytes | None:
 async def report(request: Request) -> Response:
     """Count what a browser reports its policy refused."""
     limiter: MovingWindowRateLimiter = request.app.state.page_reports
-    if not limiter.hit(REPORTS_ALLOWED, "csp", rate_key(request)):
+    # A page's violations come a few at a time, and each is one request in
+    # browsers that use report-uri.
+    allowed = RateLimitItemPerMinute(request.app.state.settings.rate_limits.csp_reports)
+    if not limiter.hit(allowed, "csp", rate_key(request)):
         log.info("policy report refused", reason="rate_limited")
         body = RateLimitedReply(reason="rate_limited").model_dump()
         return JSONResponse(body, status_code=429)

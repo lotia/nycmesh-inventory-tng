@@ -57,6 +57,10 @@ keys, below).
   themselves from one address in a minute; settings.py's default unless set
   (`RateLimits`). Raise it where many pages share one address, such as
   behind one network's NAT.
+- `RATE_LIMIT_CSP_REPORTS`: reports of what the content security policy
+  refused that browsers send from one address in a minute; settings.py's
+  default unless set (`RateLimits`). Raise it with
+  `RATE_LIMIT_PAGE_REPORTS`, for the same reason.
 - `LOG_FORMAT`: `json` for a log collector; the default is `console`.
 - `LOG_LEVEL`, `LOG_LEVELS`: `INFO` by default.
 - `LOG_CLIENT_ADDRESS`: `false` when the proxy logs client addresses itself.

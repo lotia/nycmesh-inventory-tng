@@ -235,8 +235,9 @@ def record(event: AnyEvent) -> None:
 async def report(report: Report, request: Request) -> Response:
     """Record what a page reports about itself."""
     reports: MovingWindowRateLimiter = request.app.state.page_reports
-    # A page flushes at ten events and sends 60 an hour at most (telemetry.ts,
-    # PER_HOUR); a few pages open at once on one network share an address.
+    # A page flushes at FLUSH_AT events and sends PER_HOUR_IN_ALL an hour at
+    # most (telemetry.ts); a few pages open at once on one network share an
+    # address.
     allowed = RateLimitItemPerMinute(
         request.app.state.settings.rate_limits.page_reports
     )

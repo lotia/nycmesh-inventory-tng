@@ -93,7 +93,9 @@ def test_refuses_an_unclear_client_address_setting() -> None:
 
 def test_rate_limits_are_their_defaults_unless_set() -> None:
     limits = Settings.from_environ({"DATABASE_URL": URL}).rate_limits
-    assert limits == RateLimits(per_address=10, per_account=10, page_reports=30)
+    assert limits == RateLimits(
+        per_address=10, per_account=10, page_reports=30, csp_reports=30
+    )
 
 
 def test_reads_rate_limits() -> None:
@@ -102,14 +104,22 @@ def test_reads_rate_limits() -> None:
         "RATE_LIMIT_PER_ADDRESS": " 500 ",
         "RATE_LIMIT_PER_ACCOUNT": "40",
         "RATE_LIMIT_PAGE_REPORTS": "5",
+        "RATE_LIMIT_CSP_REPORTS": "7",
     }
     limits = Settings.from_environ(environ).rate_limits
-    assert limits == RateLimits(per_address=500, per_account=40, page_reports=5)
+    assert limits == RateLimits(
+        per_address=500, per_account=40, page_reports=5, csp_reports=7
+    )
 
 
 @pytest.mark.parametrize(
     "name",
-    ["RATE_LIMIT_PER_ADDRESS", "RATE_LIMIT_PER_ACCOUNT", "RATE_LIMIT_PAGE_REPORTS"],
+    [
+        "RATE_LIMIT_PER_ADDRESS",
+        "RATE_LIMIT_PER_ACCOUNT",
+        "RATE_LIMIT_PAGE_REPORTS",
+        "RATE_LIMIT_CSP_REPORTS",
+    ],
 )
 @pytest.mark.parametrize("value", ["0", "-1", "ten", "1.5", "\uff11", "1000001"])
 def test_refuses_a_rate_limit_that_is_no_count(name: str, value: str) -> None:

@@ -19,8 +19,8 @@ RETRY = {"kind": "outbox_retry", "reason": "unavailable"}
 
 
 @pytest.fixture
-def client(make_client: Callable[..., TestClient]) -> TestClient:
-    return make_client()
+def client(make_client_without_database: Callable[..., TestClient]) -> TestClient:
+    return make_client_without_database()
 
 
 def test_a_report_is_taken_with_nothing_in_reply(client: TestClient) -> None:
@@ -85,14 +85,15 @@ def test_reports_count_against_their_address(client: TestClient) -> None:
 
 
 def test_the_limit_on_reports_is_a_setting(
-    make_app: Callable[..., FastAPI], make_client: Callable[..., TestClient]
+    make_app_without_database: Callable[..., FastAPI],
+    make_client_without_database: Callable[..., TestClient],
 ) -> None:
     """RATE_LIMIT_PAGE_REPORTS, read as each report comes."""
-    app = make_app()
+    app = make_app_without_database()
     app.state.settings = dataclasses.replace(
         app.state.settings, rate_limits=RateLimits(page_reports=3)
     )
-    client = make_client(app)
+    client = make_client_without_database(app)
     for _ in range(3):
         assert client.post(PATH, json={"events": [RETRY]}).status_code == 204
     assert client.post(PATH, json={"events": [RETRY]}).status_code == 429
