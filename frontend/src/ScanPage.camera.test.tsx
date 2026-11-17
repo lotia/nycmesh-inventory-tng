@@ -3,7 +3,7 @@ import { beforeEach, describe, expect, test, vi } from "vitest";
 import { freshCart, storeCart } from "./cart";
 import { say } from "./i18n";
 import { STORAGE_KEY as OUTBOX_KEY, Outbox } from "./outbox";
-import { DONE, POINT, READ_EVERY_MS } from "./Scanner";
+import { DONE, POINT } from "./Scanner";
 import {
   COULD_NOT_LOAD,
   DISMISS,
@@ -17,6 +17,7 @@ import {
   WHERE,
   YOUR_NAME,
 } from "./ScanPage";
+import { pass } from "./test-camera";
 import { CATALOGUE } from "./test-catalogue";
 import { answering, deferred, json, saved } from "./test-fetch";
 import {
@@ -42,7 +43,7 @@ describe("scanning labels with the camera", () => {
   /** Shows the camera these labels, and lets the next read take them. */
   async function scan(...codes: string[]) {
     camera.state.inView = codes;
-    await vi.advanceTimersByTimeAsync(READ_EVERY_MS);
+    await pass();
   }
 
   async function opened(api = server().api) {

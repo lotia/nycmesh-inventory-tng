@@ -2,24 +2,14 @@ import { act, fireEvent, render, screen } from "@testing-library/preact";
 import { beforeEach, expect, test, vi } from "vitest";
 import { DecoderUnavailable, type Session } from "./camera";
 import { say } from "./i18n";
-import {
-  DONE,
-  POINT,
-  READ_EVERY_MS,
-  Scanner,
-  TORCH,
-  TORCH_FAILED,
-} from "./Scanner";
-import { fakeCamera as camera } from "./test-camera";
+import { DONE, POINT, Scanner, TORCH, TORCH_FAILED } from "./Scanner";
+import { fakeCamera as camera, pass } from "./test-camera";
 
 // The camera's clock, faked: each test lets as many reads' time pass as it
 // needs (test-setup.ts makes it real again). The fake clock also keeps up
 // with real time, so a read a test did not let pass still comes, only later.
 // Unmounts go in act: outside it, Preact closes the camera a frame later.
 beforeEach(() => vi.useFakeTimers({ shouldAdvanceTime: true }));
-
-/** Lets `reads` reads' time pass, and what they did be done. */
-const pass = (reads = 1) => vi.advanceTimersByTimeAsync(reads * READ_EVERY_MS);
 
 /** A read that answers only when `finish` is called. */
 function slowRead() {
