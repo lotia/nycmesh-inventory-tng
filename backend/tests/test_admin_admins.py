@@ -21,7 +21,7 @@ from inventory_tng.models import ACTIVITY_KINDS, Admin, AdminSession, SignInSett
 from inventory_tng.settings import RateLimits
 
 from helpers.mail import NO_MAIL, SentMail
-from helpers.markup import button, forms, links, read, row_links, sorted_columns
+from helpers.markup import button, forms, links, read, row_links, sorted_columns, text
 from helpers.sign_in import (
     admin_named,
     confirmed_long_ago,
@@ -29,7 +29,7 @@ from helpers.sign_in import (
     once,
     reset_link,
     sign_in_with,
-    text,
+    token_of,
     with_code,
 )
 
@@ -40,10 +40,6 @@ def link_on(page: str) -> str:
     match = re.search(r'class="key">(\S+)<', page)
     assert match is not None
     return match.group(1)
-
-
-def token_of(link: str) -> str:
-    return link.split("token=")[1]
 
 
 def assert_sign_in_was_reset(

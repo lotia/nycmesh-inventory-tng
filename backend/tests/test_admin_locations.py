@@ -10,9 +10,8 @@ from inventory_tng.admin.common import PICK_A_ZONE, RULES
 from inventory_tng.admin.locations import LOCATIONS, PICK_WHAT, PICK_WHERE, TAKEN
 from inventory_tng.models import Location, Volunteer
 
-from helpers.markup import options
+from helpers.markup import options, text
 from helpers.rows import add, history, named, shown, tag
-from helpers.sign_in import text
 from helpers.stock import Place, write
 
 

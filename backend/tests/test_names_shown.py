@@ -17,10 +17,9 @@ from inventory_tng.admin.items import ITEMS, TAKEN_FIELDS
 from inventory_tng.models import Category, Item, ItemPackage
 from inventory_tng.reading_rules import NAMED, both
 
-from helpers.markup import read
+from helpers.markup import read, text
 from helpers.rows import add, named, tag
 from helpers.rows import shown as version
-from helpers.sign_in import text
 
 NB, THIN = "\u00a0", "\u202f"
 

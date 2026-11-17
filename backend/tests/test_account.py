@@ -22,7 +22,7 @@ from inventory_tng.models import (
 from inventory_tng.sign_in import NAME_TAKEN
 
 from helpers.mail import SentMail
-from helpers.markup import links, read
+from helpers.markup import links, read, text
 from helpers.sign_in import (
     PASSWORD,
     RECOVERY_CODE,
@@ -38,7 +38,6 @@ from helpers.sign_in import (
     policy,
     reset_link,
     sign_in_with,
-    text,
 )
 
 ACCOUNT = sign_in.ACCOUNT

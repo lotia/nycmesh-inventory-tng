@@ -12,9 +12,9 @@ from inventory_tng.models import Location
 from inventory_tng.pages import retired_holding
 
 from helpers.mail import SentMail
-from helpers.markup import links, read
+from helpers.markup import links, read, text
 from helpers.rows import add, tag
-from helpers.sign_in import new_admin, sign_in_with, text
+from helpers.sign_in import new_admin, sign_in_with
 from helpers.stock import badge, badge_of, retire, stocked, write
 
 

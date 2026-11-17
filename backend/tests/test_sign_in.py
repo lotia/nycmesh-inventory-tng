@@ -39,7 +39,7 @@ from inventory_tng.models import (
 from inventory_tng.pages import retired_holding
 from inventory_tng.settings import RateLimits
 
-from helpers.markup import read
+from helpers.markup import read, text
 from helpers.sign_in import (
     PASSWORD,
     RECOVERY_CODE,
@@ -52,7 +52,6 @@ from helpers.sign_in import (
     opened,
     policy,
     sign_in_with,
-    text,
 )
 from helpers.stock import at_retired_van
 

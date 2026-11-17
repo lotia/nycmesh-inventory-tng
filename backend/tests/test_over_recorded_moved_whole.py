@@ -14,7 +14,7 @@ from inventory_tng.admin import over_recorded as over_recorded_page
 from inventory_tng.ledger import Form
 from inventory_tng.models import ItemPackage, LedgerTransaction, Movement
 
-from helpers.markup import read
+from helpers.markup import read, text
 from helpers.over_recorded import (
     PAGE,
     adjustments,
@@ -24,7 +24,7 @@ from helpers.over_recorded import (
     raised,
 )
 from helpers.rows import tag
-from helpers.sign_in import new_admin, text
+from helpers.sign_in import new_admin
 from helpers.stock import Place, Spools
 
 

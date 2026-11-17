@@ -21,7 +21,7 @@ from inventory_tng.models import Admin, RegistrationCode, ResetLink
 from inventory_tng.once import SENT_AGAIN
 
 from helpers.mail import NO_MAIL, SentMail
-from helpers.markup import read
+from helpers.markup import read, text
 from helpers.rows import tag
 from helpers.sign_in import (
     TIME_STEP,
@@ -29,7 +29,6 @@ from helpers.sign_in import (
     code,
     new_admin,
     sign_in_with,
-    text,
     with_code,
 )
 

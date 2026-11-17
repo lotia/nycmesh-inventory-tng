@@ -23,7 +23,7 @@ from inventory_tng.models import (
     Volunteer,
 )
 
-from helpers.over_recorded import admin_id, bagged, checks, recorded_then_changed
+from helpers.over_recorded import bagged, checks, new_admin_id, recorded_then_changed
 from helpers.rows import add, tag
 from helpers.stock import URL, Place, Spools, cut
 
@@ -149,7 +149,7 @@ def test_said_again_while_waiting_it_says_the_newest_and_settled_stays(
     (check,) = checks(session)
     assert check.quantity == 3
     over_recorded.mark_checked(
-        session, check.id, over_recorded.seen(check), admin_id(session), "both"
+        session, check.id, over_recorded.seen(check), new_admin_id(session), "both"
     )
     less("1")
     (check,) = checks(session)
@@ -304,7 +304,7 @@ def test_the_reply_to_another_client_leaves_out_nothing_it_holds(
     ledger.record_adjustment(
         session,
         key,
-        admin_id(session),
+        new_admin_id(session),
         place.store.id,
         place.item.id,
         Decimal(1),

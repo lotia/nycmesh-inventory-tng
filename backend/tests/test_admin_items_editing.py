@@ -43,9 +43,8 @@ from inventory_tng.models import (
 )
 
 from helpers.items import NOW, new_item
-from helpers.markup import hidden_fields, links, read
+from helpers.markup import hidden_fields, links, read, text
 from helpers.rows import add, history, named, shown
-from helpers.sign_in import text
 
 
 def test_adding_an_item(

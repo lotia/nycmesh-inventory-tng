@@ -13,8 +13,7 @@ from inventory_tng import pages
 from inventory_tng.admin.items import ITEMS
 from inventory_tng.bundle import SCAN
 
-from helpers.markup import read
-from helpers.sign_in import text
+from helpers.markup import read, text
 
 
 @pytest.mark.parametrize("method", ["GET", "HEAD"])

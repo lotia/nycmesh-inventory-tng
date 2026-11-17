@@ -25,8 +25,8 @@ from inventory_tng.models import (
     fold,
 )
 
+from helpers.markup import text as page_text
 from helpers.rows import add, tag
-from helpers.sign_in import text as page_text
 
 
 def test_fold_spells_in_ascii_what_decomposing_would_miss() -> None:

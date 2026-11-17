@@ -11,9 +11,9 @@ from sqlalchemy.orm import Session
 from inventory_tng.ledger import BodyRefusedReply, SizeProblem
 from inventory_tng.models import ItemPackage
 
-from helpers.package_forms import forms, sealed_line
+from helpers.package_forms import quantities_by_form
 from helpers.rows import add, tag
-from helpers.stock import URL, Spools
+from helpers.stock import URL, Spools, sealed_line
 
 # The scan page's batches (POST /api/transactions): sealed packages stay
 # sealed.
@@ -27,7 +27,7 @@ def test_sealed_packages_saved_arrive_sealed(
     batch = spools.place.batch(lines=lines)
     assert registered_client.post(URL, json=batch).status_code == 201
     assert registered_client.post(URL, json=batch).status_code == 200
-    assert forms(session, spools.cable) == {
+    assert quantities_by_form(session, spools.cable) == {
         (store, spool, None): 305,
         (store, None, None): -5,
         (van, spool, None): 305,
@@ -42,7 +42,7 @@ def test_sealed_packages_saved_arrive_sealed(
         lines=[sealed_line(spools, "305")],
     )
     assert registered_client.post(URL, json=receipt).status_code == 201
-    assert forms(session, spools.cable)[(store, spool, None)] == 610
+    assert quantities_by_form(session, spools.cable)[(store, spool, None)] == 610
 
 
 def test_a_batch_saved_before_packages_were_kept_sealed_saves_loose(
@@ -52,7 +52,7 @@ def test_a_batch_saved_before_packages_were_kept_sealed_saves_loose(
     lines = [{"item_id": spools.cable.id, "quantity": "305"}]
     response = registered_client.post(URL, json=spools.place.batch(lines=lines))
     assert response.status_code == 201
-    assert forms(session, spools.cable)[(spools.van.id, None, None)] == 305
+    assert quantities_by_form(session, spools.cable)[(spools.van.id, None, None)] == 305
 
 
 def test_a_line_sent_in_a_size_its_package_no_longer_has_is_refused(
@@ -78,7 +78,9 @@ def test_a_line_sent_in_a_size_its_package_no_longer_has_is_refused(
         assert [(p["loc"][1:], p["type"]) for p in response.json()["detail"]] == [
             (["lines", 0, "package_size"], "package_resized")
         ]
-    assert (spools.van.id, box.id, None) not in forms(session, spools.cable)
+    assert (spools.van.id, box.id, None) not in quantities_by_form(
+        session, spools.cable
+    )
     # Its rules read in the size it was counted in: a part of a unit is
     # still said, and an opening is not too many packages in the new size.
     radios = add(

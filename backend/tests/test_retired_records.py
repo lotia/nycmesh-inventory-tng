@@ -23,9 +23,8 @@ from inventory_tng.models import (
     Volunteer,
 )
 
-from helpers.markup import read
+from helpers.markup import read, text
 from helpers.rows import add, shown, tag
-from helpers.sign_in import text
 
 KINDS = [
     ("/admin/items", "item"),

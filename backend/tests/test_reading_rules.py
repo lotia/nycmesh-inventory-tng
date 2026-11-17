@@ -37,7 +37,7 @@ from inventory_tng.reading_rules import LIKELY, NAMED, both, near
 
 from helpers.concurrency import Committed
 from helpers.items import new_item
-from helpers.markup import links, options, read, row_links
+from helpers.markup import links, options, read, row_links, text
 from helpers.queries import counting
 from helpers.rows import (
     add,
@@ -49,7 +49,6 @@ from helpers.rows import (
     shown,
     violates,
 )
-from helpers.sign_in import text
 
 GBPS = units.Rule("Gbit/s")
 

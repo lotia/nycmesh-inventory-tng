@@ -37,9 +37,9 @@ from helpers.markup import (
     options,
     read,
     sorted_columns,
+    text,
 )
 from helpers.rows import add, history, tag
-from helpers.sign_in import text
 from helpers.stock import stocked, write
 
 

@@ -22,9 +22,8 @@ from inventory_tng.db import RuleBroken, attempt
 from inventory_tng.models import Category, Item, ItemPackage, Label
 
 from helpers.items import NOW, new_item
-from helpers.markup import read
+from helpers.markup import read, text
 from helpers.rows import add, history, shown
-from helpers.sign_in import text
 from helpers.stock import Spools, retire
 
 

@@ -27,12 +27,12 @@ from helpers.concurrency import Committed
 from helpers.markup import links
 from helpers.over_recorded import (
     PAGE,
-    admin_id,
     arrived_field,
     checks,
     correct_check,
     count_ids,
     moved_whole,
+    new_admin_id,
     opened_into,
     opening_raised,
     reason_adjustments,
@@ -328,7 +328,7 @@ def committed_check(
     )
     assert movement_id is not None
     over_recorded.raise_checks(setup, {movement_id: Decimal(1)})
-    admin = admin_id(setup)
+    admin = new_admin_id(setup)
     setup.commit()
     (check,) = checks(setup)
     return place, check, admin, moved

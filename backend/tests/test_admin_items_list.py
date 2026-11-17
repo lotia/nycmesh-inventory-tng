@@ -10,9 +10,8 @@ from inventory_tng.admin.listing import PER_PAGE
 from inventory_tng.models import Category, Item
 
 from helpers.items import items_named, new_item
-from helpers.markup import hidden_fields, links, read, sorted_columns
+from helpers.markup import hidden_fields, links, read, sorted_columns, text
 from helpers.rows import add, tag
-from helpers.sign_in import text
 
 
 def test_a_search_forgives_typos_best_first(

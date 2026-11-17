@@ -9,9 +9,14 @@ from __future__ import annotations
 
 import re
 from collections.abc import Iterator
+from html import unescape
+from typing import TYPE_CHECKING
 
 from bs4 import BeautifulSoup, NavigableString, Tag
 from lxml.html import defs
+
+if TYPE_CHECKING:
+    from httpx2 import Response
 
 # Elements that start a line, so their words never run into their
 # neighbours': lxml's block elements but del and ins, which a browser shows
@@ -37,6 +42,11 @@ _SPACES = re.compile(r"[ \t\n\r\f]+")
 class Unescaped(str):
     """A page with its escaping undone, for finding its words. Read as HTML,
     its escaping would be undone twice: a quote in a value would end it."""
+
+
+def text(response: Response) -> Unescaped:
+    """The page as read, with Jinja's escaping undone."""
+    return Unescaped(unescape(response.text))
 
 
 def _words(tag: Tag, *, spoken: bool) -> Iterator[str]:

@@ -28,8 +28,8 @@ from inventory_tng.models import (
     Volunteer,
 )
 
+from helpers.markup import text
 from helpers.rows import add, shown
-from helpers.sign_in import text
 
 
 class Form(NamedTuple):

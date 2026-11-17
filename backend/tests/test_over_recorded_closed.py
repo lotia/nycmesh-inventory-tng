@@ -25,12 +25,12 @@ from helpers.concurrency import Committed
 from helpers.markup import links
 from helpers.over_recorded import (
     PAGE,
-    admin_id,
     checks,
     correct,
     correct_check,
     count_ids,
     moved_whole,
+    new_admin_id,
     opened_into,
     opening_raised,
     reason_adjustments,
@@ -192,7 +192,7 @@ def test_a_correct_waits_for_a_close_of_its_open_package_then_skips_it(
     )
     assert movement_id is not None
     over_recorded.raise_checks(setup, {movement_id: Decimal(305)})
-    admin = admin_id(setup)
+    admin = new_admin_id(setup)
     setup.commit()
     (check,) = checks(setup)
     first, second = own_committed.session(), own_committed.session()
@@ -394,7 +394,7 @@ def sealed_counted_check(
     )
     assert movement_id is not None
     over_recorded.raise_checks(setup, {movement_id: Decimal(305)})
-    admin = admin_id(setup)
+    admin = new_admin_id(setup)
     as_of = ledger.moment(setup, spools.store.id)
     count = ledger.record_count(
         setup,

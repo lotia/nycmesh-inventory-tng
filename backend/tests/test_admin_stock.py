@@ -10,9 +10,16 @@ from inventory_tng.admin.counts import COUNTS
 from inventory_tng.admin.stock import NEEDS_COUNTING, REORDER, STOCK
 from inventory_tng.models import Item, Location
 
-from helpers.markup import Element, links, options, read, row_links, sorted_columns
+from helpers.markup import (
+    Element,
+    links,
+    options,
+    read,
+    row_links,
+    sorted_columns,
+    text,
+)
 from helpers.rows import add, tag
-from helpers.sign_in import text
 from helpers.stock import Place, at_retired_van, received, retire, stocked, write
 
 

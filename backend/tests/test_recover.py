@@ -15,8 +15,9 @@ from inventory_tng.resets import RECOVER, REFUSED
 from inventory_tng.settings import RateLimits, Settings, SettingsError
 
 from helpers.mail import NO_MAIL, SentMail
+from helpers.markup import text
 from helpers.rows import history
-from helpers.sign_in import new_admin, sign_in_with, text
+from helpers.sign_in import new_admin, sign_in_with
 
 TOKEN = "the operator's recovery token, long enough"
 NEW_PASSWORD = "a long passphrase of their own"

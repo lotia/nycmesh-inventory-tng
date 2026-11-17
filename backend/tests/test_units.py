@@ -18,8 +18,8 @@ from inventory_tng.admin.items import ITEMS
 from inventory_tng.models import Category, Item, fold, folds, held, unit_key
 from inventory_tng.units import KINDS, PREFIXES, UNITS, Reading, read, respell
 
+from helpers.markup import text as page_text
 from helpers.rows import add, tag
-from helpers.sign_in import text as page_text
 
 UCUM = Path(__file__).parent / "ucum_codes.tsv"
 VECTORS = units.TABLE.with_name("units-vectors.json")

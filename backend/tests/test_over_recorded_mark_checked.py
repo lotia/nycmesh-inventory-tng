@@ -22,20 +22,19 @@ from inventory_tng.models import (
 )
 
 from helpers.concurrency import Committed
-from helpers.markup import read
+from helpers.markup import read, text
 from helpers.over_recorded import (
     PAGE,
-    admin_id,
     checked_forms,
     checks,
     correct,
     from_emptied_store,
     mark_checked,
     moved_whole,
+    new_admin_id,
     raised,
     recorded_then_changed,
 )
-from helpers.sign_in import text
 from helpers.stock import URL, Place, Spools, cut, write
 
 # The administrators' page.
@@ -316,7 +315,7 @@ def test_the_database_keeps_reasons_only_as_mark_checked_gives_them(
     way, and only for it."""
     raised(registered_client, place, bags)
     (check,) = checks(session)
-    admin = admin_id(session)
+    admin = new_admin_id(session)
 
     def settle() -> None:
         check.settled_at = func.now()
@@ -441,7 +440,7 @@ def test_one_answered_meanwhile_waits_then_is_refused(own_committed: Committed) 
     )
     assert movement_id is not None
     over_recorded.raise_checks(setup, {movement_id: Decimal(1)})
-    admin = admin_id(setup)
+    admin = new_admin_id(setup)
     setup.commit()
     (check,) = checks(setup)
     first, second = own_committed.session(), own_committed.session()

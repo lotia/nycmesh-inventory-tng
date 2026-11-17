@@ -15,9 +15,8 @@ from inventory_tng.admin.items import SHORTER_THAN_WHOLE
 from inventory_tng.ledger import Entry, Form
 from inventory_tng.models import Item, ItemPackage
 
-from helpers.markup import read
+from helpers.markup import read, text
 from helpers.package_forms import BOX, FRESH, GONE, OPEN, SPOOL
-from helpers.sign_in import text
 from helpers.stock import Spools
 
 # Stock by form, short ends, minimum sealed and reorder (8i4.133.7).

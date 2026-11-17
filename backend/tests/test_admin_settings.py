@@ -18,9 +18,9 @@ from inventory_tng.models import (
 )
 
 from helpers.mail import SentMail
-from helpers.markup import hidden_fields, options
+from helpers.markup import hidden_fields, options, text
 from helpers.rows import history, shown
-from helpers.sign_in import confirmed_long_ago, new_admin, sign_in_with, text, with_code
+from helpers.sign_in import confirmed_long_ago, new_admin, sign_in_with, with_code
 
 
 def test_shows_and_changes_the_name_check(

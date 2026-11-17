@@ -38,8 +38,8 @@ from helpers.package_forms import (
     SEALED,
     SEALED_BOX,
     SPOOL,
-    forms,
-    opened,
+    open_form,
+    quantities_by_form,
 )
 from helpers.rows import add, breaks, tag, violates
 from helpers.stock import Spools
@@ -101,15 +101,15 @@ def test_a_package_tracks_opened_as_set_on_it_else_as_its_item(
         (line(610, SEALED, SEALED), "move", (STORE, VAN)),
         (line(610, LOOSE, SEALED), "receipt", (None, STORE)),
         (line(305, SEALED), "install", (STORE, None)),
-        (line(20, opened(OPEN)), "move", (STORE, VAN)),
-        (line(20, opened(OPEN)), "install", (STORE, None)),
-        (line(120, opened(OPEN), opened(OPEN)), "move", (STORE, VAN)),
-        (line(305, SEALED, opened(FRESH)), "open", (STORE, STORE)),
+        (line(20, open_form(OPEN)), "move", (STORE, VAN)),
+        (line(20, open_form(OPEN)), "install", (STORE, None)),
+        (line(120, open_form(OPEN), open_form(OPEN)), "move", (STORE, VAN)),
+        (line(305, SEALED, open_form(FRESH)), "open", (STORE, STORE)),
         (line(200, SEALED_BOX), "open", (STORE, STORE)),
-        (line(3, LOOSE, opened(OPEN)), "count", (None, STORE)),
-        (line(5, opened(OPEN)), "count", (STORE, None)),
+        (line(3, LOOSE, open_form(OPEN)), "count", (None, STORE)),
+        (line(5, open_form(OPEN)), "count", (STORE, None)),
         (line(50, Form(package_id=OLD), Form(package_id=OLD)), "move", (STORE, VAN)),
-        (line(7, LOOSE, opened(FRESH)), "count", (None, STORE)),
+        (line(7, LOOSE, open_form(FRESH)), "count", (None, STORE)),
     ],
 )
 def test_lines_keeping_the_rules(
@@ -123,7 +123,7 @@ def test_lines_keeping_the_rules(
     [
         (line(305, SEALED), "receipt", (None, STORE), "movement_form_outside"),
         (
-            line(5, LOOSE, opened(OPEN)),
+            line(5, LOOSE, open_form(OPEN)),
             "install",
             (STORE, None),
             "movement_form_outside",
@@ -141,21 +141,21 @@ def test_lines_keeping_the_rules(
             "movement_package_of_item",
         ),
         (line(300, SEALED, SEALED), "move", (STORE, VAN), "movement_whole_packages"),
-        (line(5, opened(99)), "move", (STORE, VAN), "movement_open_package_of_item"),
+        (line(5, open_form(99)), "move", (STORE, VAN), "movement_open_package_of_item"),
         (
-            line(5, opened(ELSEWHERE)),
+            line(5, open_form(ELSEWHERE)),
             "move",
             (STORE, VAN),
             "movement_open_package_of_item",
         ),
         (
-            line(5, opened(GONE)),
+            line(5, open_form(GONE)),
             "install",
             (STORE, None),
             "movement_open_package_closed",
         ),
         (
-            line(5, opened(FRESH)),
+            line(5, open_form(FRESH)),
             "install",
             (STORE, None),
             "movement_open_package_unopened",
@@ -166,9 +166,9 @@ def test_lines_keeping_the_rules(
             (None, STORE),
             "receipt_retired_package",
         ),
-        (line(5, opened(OPEN)), "move", (VAN, STORE), "movement_open_package_place"),
+        (line(5, open_form(OPEN)), "move", (VAN, STORE), "movement_open_package_place"),
         (
-            line(5, LOOSE, opened(OPEN)),
+            line(5, LOOSE, open_form(OPEN)),
             "count",
             (None, VAN),
             "movement_open_package_place",
@@ -176,28 +176,33 @@ def test_lines_keeping_the_rules(
         (line(305, LOOSE, SEALED), "move", (STORE, VAN), "movement_form_change"),
         (line(305, SEALED), "move", (STORE, VAN), "movement_form_change"),
         (
-            line(5, opened(OPEN), opened(OPEN)),
+            line(5, open_form(OPEN), open_form(OPEN)),
             "move",
             (STORE, VAN),
             "movement_open_package_whole",
         ),
         (line(5), "open", (STORE, STORE), "opening_from_sealed"),
-        (line(5, opened(OPEN)), "open", (STORE, STORE), "opening_from_sealed"),
+        (line(5, open_form(OPEN)), "open", (STORE, STORE), "opening_from_sealed"),
         (line(305, SEALED, SEALED), "open", (STORE, STORE), "opening_from_sealed"),
         (line(305, SEALED), "open", (STORE, STORE), "opening_follows_setting"),
         (
-            line(100, SEALED_BOX, opened(FRESH)),
+            line(100, SEALED_BOX, open_form(FRESH)),
             "open",
             (STORE, STORE),
             "opening_follows_setting",
         ),
         (
-            line(305, SEALED, opened(OPEN)),
+            line(305, SEALED, open_form(OPEN)),
             "open",
             (STORE, STORE),
             "open_package_opened_once",
         ),
-        (line(610, SEALED, opened(FRESH)), "open", (STORE, STORE), "open_package_full"),
+        (
+            line(610, SEALED, open_form(FRESH)),
+            "open",
+            (STORE, STORE),
+            "open_package_full",
+        ),
     ],
 )
 def test_each_rule_a_line_can_break(
@@ -225,15 +230,15 @@ def test_stock_is_held_in_forms_and_totals_sum_them(
     session: Session, spools: Spools
 ) -> None:
     store, van, spool = spools.store.id, spools.van.id, spools.spool.id
-    assert forms(session, spools.cable) == {(store, spool, None): 610}
+    assert quantities_by_form(session, spools.cable) == {(store, spool, None): 610}
     made = spools.opened()
-    assert forms(session, spools.cable) == {
+    assert quantities_by_form(session, spools.cable) == {
         (store, spool, None): 305,
         (store, None, made.id): 305,
     }
     # A cut: from the open spool, loose in the van.
     spools.move(Entry(spools.cable.id, Decimal(20), Form(open_package_id=made.id)))
-    assert forms(session, spools.cable) == {
+    assert quantities_by_form(session, spools.cable) == {
         (store, spool, None): 305,
         (store, None, made.id): 285,
         (van, None, None): 20,
@@ -243,7 +248,7 @@ def test_stock_is_held_in_forms_and_totals_sum_them(
     whole = Form(open_package_id=made.id)
     spools.move(Entry(spools.cable.id, Decimal(285), whole, whole))
     assert made.location_id == van
-    assert forms(session, spools.cable)[(van, None, made.id)] == 285
+    assert quantities_by_form(session, spools.cable)[(van, None, made.id)] == 285
     assert totals(session, spools.cable) == {store: 305, van: 305}
 
 
@@ -252,7 +257,7 @@ def test_an_untracked_package_opens_into_loose_units(session: Session) -> None:
     store = spools.store.id
     here = {"kind": "open", "from_location_id": store, "to_location_id": store}
     spools.write(here, Entry(spools.cable.id, Decimal(305), spools.sealed))
-    assert forms(session, spools.cable) == {
+    assert quantities_by_form(session, spools.cable) == {
         (store, spools.spool.id, None): 305,
         (store, None, None): 305,
     }

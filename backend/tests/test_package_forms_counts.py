@@ -14,19 +14,19 @@ from inventory_tng.admin import counts
 from inventory_tng.ledger import LOOSE, Entry, Form
 from inventory_tng.models import AdjustmentReason, Admin, LedgerTransaction, OpenPackage
 
-from helpers.package_forms import CABLE, OPEN, SEALED, forms, opened
+from helpers.markup import text
+from helpers.package_forms import CABLE, OPEN, SEALED, open_form, quantities_by_form
 from helpers.rows import add, breaks, tag
-from helpers.sign_in import text
 from helpers.stock import Spools
 
 # Counting by form (8i4.133.8).
 
 
 def test_a_count_by_form_finds_and_loses_form_by_form() -> None:
-    then = {(CABLE, SEALED): Decimal(610), (CABLE, opened(OPEN)): Decimal(120)}
+    then = {(CABLE, SEALED): Decimal(610), (CABLE, open_form(OPEN)): Decimal(120)}
     counted = [
         (CABLE, SEALED, Decimal(305)),
-        (CABLE, opened(OPEN), Decimal(120)),
+        (CABLE, open_form(OPEN), Decimal(120)),
         (CABLE, LOOSE, Decimal(40)),
     ]
     found, lost = ledger.count_corrections(counted, then)
@@ -51,7 +51,7 @@ def test_record_count_by_form(session: Session, spools: Spools) -> None:
         session, uuid.uuid4(), counter(session), store, [], as_of, by_form=lines
     )
     assert (done.differed, done.moved) == (True, {})
-    assert forms(session, spools.cable) == {
+    assert quantities_by_form(session, spools.cable) == {
         (store, None, made.id): 250,
         (store, None, None): 20,
     }
@@ -122,7 +122,7 @@ def test_the_count_page_counts_forms_finds_and_closes(
     assert done.status_code == 303, text(done)
     session.refresh(two)
     assert two.closed_at is not None
-    held = forms(session, spools.cable)
+    held = quantities_by_form(session, spools.cable)
     assert held[(store, None, one.id)] == 300
     assert held[(store, None, None)] == 7
     found = session.scalars(
@@ -153,7 +153,7 @@ def test_the_count_page_counts_sealed_and_says_whats_wrong(
     )
     assert done.status_code == 303
     # Its loose line, left as the records had it, is counted as it was.
-    assert forms(session, spools.cable) == {
+    assert quantities_by_form(session, spools.cable) == {
         (store, spool, None): 305,
         (store, None, None): 5,
     }
@@ -214,7 +214,7 @@ def test_an_open_package_found_where_its_item_was_counted_by_total(
         "found_left": "40",
     }
     assert admin_client.post(f"{COUNTS}/{van}", data=form).status_code == 303
-    held = forms(session, spools.cable)
+    held = quantities_by_form(session, spools.cable)
     assert held[(van, None, None)] == 10
     assert sorted(
         amount for (place, _, opened), amount in held.items() if place == van and opened

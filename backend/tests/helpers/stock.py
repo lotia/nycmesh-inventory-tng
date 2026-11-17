@@ -104,7 +104,8 @@ def raised(
     transaction: LedgerTransaction | None,
     more: Decimal = Decimal(1),
 ) -> OverRecorded:
-    """`more` recorded than moved of the transaction's line."""
+    """`more` recorded than moved of the transaction's line, raised
+    directly; over_recorded.raised goes through the API."""
     assert transaction is not None
     movement_id = session.scalars(
         select(Movement.id).where(Movement.transaction_id == transaction.id)
@@ -195,10 +196,7 @@ class Spools:
             session, ItemPackage(item_id=self.cable.id, name="Spool", size=305)
         )
         self.store, self.van = self.place.store, self.place.van
-        self.write(
-            {"kind": "receipt", "to_location_id": self.store.id},
-            Entry(self.cable.id, Decimal(610), LOOSE, self.sealed),
-        )
+        self.receive(uuid.uuid4(), spools=2)
 
     @property
     def sealed(self) -> Form:
@@ -256,12 +254,23 @@ def report(spools: Spools, *lengths: dict[str, str]) -> dict[str, object]:
     )
 
 
-def cut(made: OpenPackage, quantity: str) -> dict[str, str]:
-    """A batch's line taking `quantity` from an open package, cut loose."""
+def cut(made: OpenPackage, quantity: str, **fields: object) -> dict[str, object]:
+    """A batch's line taking `quantity` from an open package, cut loose
+    unless `fields` say otherwise."""
     return {
         "item_id": str(made.item_id),
         "quantity": quantity,
         "open_package_key": str(made.key),
+    } | fields
+
+
+def sealed_line(spools: Spools, quantity: str) -> dict[str, object]:
+    """A batch's line of `quantity` of the cable in sealed spools."""
+    return {
+        "item_id": spools.cable.id,
+        "quantity": quantity,
+        "package_id": spools.spool.id,
+        "package_size": "305",
     }
 
 

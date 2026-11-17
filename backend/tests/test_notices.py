@@ -14,9 +14,8 @@ from inventory_tng import pages
 from inventory_tng.admin.volunteers import BRING_THEM_BACK
 from inventory_tng.models import Admin, Category, Item, Label, Location, Volunteer
 
-from helpers.markup import read
+from helpers.markup import read, text
 from helpers.rows import add, tag
-from helpers.sign_in import text
 
 TEMPLATES = Path(pages.__file__).parent / "templates"
 

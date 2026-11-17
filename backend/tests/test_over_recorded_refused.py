@@ -19,7 +19,7 @@ from inventory_tng.db import RuleBroken
 from inventory_tng.ledger import Entry, Form
 from inventory_tng.models import Admin, CatalogueHistory, Location, OverRecorded
 
-from helpers.markup import read
+from helpers.markup import read, text
 from helpers.over_recorded import (
     PAGE,
     adjustments,
@@ -33,7 +33,6 @@ from helpers.over_recorded import (
     recorded_then_changed,
 )
 from helpers.rows import add, tag
-from helpers.sign_in import text
 from helpers.stock import Place, Spools, received, retire, write
 
 # Refused by a rule (inventory-tng-axb).

@@ -2,7 +2,6 @@
 
 import base64
 import contextlib
-import html
 import uuid
 from collections.abc import Generator
 from datetime import UTC, datetime, timedelta
@@ -25,8 +24,6 @@ from inventory_tng.models import (
     SignInSettings,
 )
 from inventory_tng.totp_keys import TotpKeys
-
-from helpers.markup import Unescaped
 
 # A recovery code as the page shows it, in groups.
 _GROUP = f"[A-Z0-9]{{{accounts.RECOVERY_CODE_GROUP}}}"
@@ -167,11 +164,6 @@ def sign_in_with(
         return client.post(sign_in.SIGN_IN, data=data | {"code": typed})
 
 
-def text(response: Response) -> Unescaped:
-    """The page as read, with Jinja's escaping undone."""
-    return Unescaped(html.unescape(response.text))
-
-
 def reset_link(
     session: Session,
     admin: Admin,
@@ -188,6 +180,11 @@ def reset_link(
         made_by_id=made_by.id if made_by else None,
         recovery_token_hash=b"token" if kind == "recovery" else None,
     )
+
+
+def token_of(link: str) -> str:
+    """The token a reset link carries."""
+    return link.split("token=")[1]
 
 
 def other_session(

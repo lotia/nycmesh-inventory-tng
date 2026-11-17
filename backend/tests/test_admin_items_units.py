@@ -22,9 +22,8 @@ from inventory_tng.models import Category, Item, ItemPackage, ReadingRule
 from inventory_tng.reading_rules import NAMED, both
 
 from helpers.items import new_item
-from helpers.markup import read
+from helpers.markup import read, text
 from helpers.rows import add, named, shown
-from helpers.sign_in import text
 
 
 def test_a_name_is_saved_as_typed_and_its_units_said_under_it(

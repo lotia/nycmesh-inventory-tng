@@ -125,19 +125,16 @@ describe("what an older build left", () => {
   /** A cart filled for an install, under v1, with a line no build wrote:
    * not whole, so it waits for the volunteer. */
   function leaveCart(fields = {}) {
-    localStorage.setItem(
-      "inventory.cart.v1",
-      JSON.stringify({
-        ...freshCart(),
-        kind: "install",
-        volunteerId: 2,
-        fromId: 12,
-        installNumber: "456",
-        lines: [{ itemId: 101, packages: {}, loose: "12.5" }, { loose: 1 }],
-        usedAt: AT,
-        ...fields,
-      }),
-    );
+    keep("inventory.cart.v1", {
+      ...freshCart(),
+      kind: "install",
+      volunteerId: 2,
+      fromId: 12,
+      installNumber: "456",
+      lines: [{ itemId: 101, packages: {}, loose: "12.5" }, { loose: 1 }],
+      usedAt: AT,
+      ...fields,
+    });
   }
 
   const listing = () =>
@@ -212,17 +209,14 @@ describe("what an older build left", () => {
     const [kept] = JSON.parse(
       localStorage.getItem("inventory.outbox.v3") ?? "[]",
     );
-    localStorage.setItem(
-      "inventory.outbox.v3",
-      JSON.stringify([
-        kept,
-        {
-          ...kept,
-          body: { ...kept.body, key: "other" },
-          queuedAt: afternoon,
-        },
-      ]),
-    );
+    keep("inventory.outbox.v3", [
+      kept,
+      {
+        ...kept,
+        body: { ...kept.body, key: "other" },
+        queuedAt: afternoon,
+      },
+    ]);
     leaveCart({ usedAt: afternoon });
     open();
     await ready();
@@ -330,13 +324,10 @@ describe("what an older build left", () => {
     const [first] = JSON.parse(
       localStorage.getItem("inventory.outbox.v3") ?? "",
     );
-    localStorage.setItem(
-      "inventory.outbox.v3",
-      JSON.stringify([
-        first,
-        { ...first, body: { ...first.body, key: "other" } },
-      ]),
-    );
+    keep("inventory.outbox.v3", [
+      first,
+      { ...first, body: { ...first.body, key: "other" } },
+    ]);
     open();
     await ready();
     const setItem = vi.spyOn(localStorage, "setItem").mockImplementation(() => {
@@ -357,13 +348,10 @@ describe("what an older build left", () => {
     const [first] = JSON.parse(
       localStorage.getItem("inventory.outbox.v3") ?? "",
     );
-    localStorage.setItem(
-      "inventory.outbox.v3",
-      JSON.stringify([
-        first,
-        { ...first, body: { ...first.body, key: "other" } },
-      ]),
-    );
+    keep("inventory.outbox.v3", [
+      first,
+      { ...first, body: { ...first.body, key: "other" } },
+    ]);
     open();
     await ready();
     const real = localStorage.setItem.bind(localStorage);
@@ -413,18 +401,15 @@ describe("what an older build left", () => {
   });
 
   test("a cart's line with nothing readable in it is not told", async () => {
-    localStorage.setItem(
-      "inventory.cart.v1",
-      JSON.stringify({
-        ...freshCart(),
-        lines: [
-          { itemId: 100, packages: { 1000: "some" }, loose: "lots" },
-          { itemId: 101, packages: {}, loose: "2" },
-          // Not whole, so listed, not put in the cart.
-          { loose: 1 },
-        ],
-      }),
-    );
+    keep("inventory.cart.v1", {
+      ...freshCart(),
+      lines: [
+        { itemId: 100, packages: { 1000: "some" }, loose: "lots" },
+        { itemId: 101, packages: {}, loose: "2" },
+        // Not whole, so listed, not put in the cart.
+        { loose: 1 },
+      ],
+    });
     open();
     await ready();
     expect(within(listing()).queryByText(/LiteBeam/)).toBeNull();
@@ -744,10 +729,7 @@ describe("what an older build left", () => {
     const [first] = JSON.parse(
       localStorage.getItem("inventory.outbox.v3") ?? "",
     );
-    localStorage.setItem(
-      "inventory.outbox.v3",
-      JSON.stringify([{ ...first, state: "refused", note: "No." }]),
-    );
+    keep("inventory.outbox.v3", [{ ...first, state: "refused", note: "No." }]);
     fireEvent.click(discardOf("Cat6 cable: 3 m from an open package"));
     expect(within(listing()).queryByText(NOT_DISCARDED)).toBeNull();
     expect(
@@ -841,7 +823,7 @@ describe("what an older build left", () => {
     // Sent, but the storage event not yet heard.
     const sent = JSON.parse(localStorage.getItem("inventory.outbox.v3") ?? "");
     sent[0].state = "saved";
-    localStorage.setItem("inventory.outbox.v3", JSON.stringify(sent));
+    keep("inventory.outbox.v3", sent);
     fireEvent.click(button);
     expect(screen.queryByText(HEADING)).toBeNull();
     expect(screen.getByText(say(NOTHING_IN_CART))).not.toBeNull();
@@ -862,7 +844,7 @@ describe("what an older build left", () => {
     const words =
       "Not saved: its key was already used for a different batch. Please report this.";
     kept[0] = { ...kept[0], state: "refused", note: words };
-    localStorage.setItem("inventory.outbox.v3", JSON.stringify(kept));
+    keep("inventory.outbox.v3", kept);
     fireEvent.click(button);
     screen.getByText(say(NOTHING_IN_CART));
     expect(localStorage.getItem(CART_KEY)).toBeNull();
@@ -889,7 +871,7 @@ describe("what an older build left", () => {
     // Refused there, but the storage event not yet heard.
     const kept = JSON.parse(localStorage.getItem("inventory.outbox.v3") ?? "");
     kept[0] = { ...kept[0], state: "refused", note: "No." };
-    localStorage.setItem("inventory.outbox.v3", JSON.stringify(kept));
+    keep("inventory.outbox.v3", kept);
     fireEvent.click(button);
     screen.getByText(say(NOTHING_IN_CART));
     expect(within(listing()).getByText(say(CHANGED_ELSEWHERE)).tagName).toBe(
@@ -934,7 +916,7 @@ describe("what an older build left", () => {
         localStorage.getItem("inventory.outbox.v3") ?? "",
       );
       kept[0] = { ...kept[0], body: { ...kept[0].body, lines } };
-      localStorage.setItem("inventory.outbox.v3", JSON.stringify(kept));
+      keep("inventory.outbox.v3", kept);
       fireEvent.click(button);
       screen.getByText(say(NOTHING_IN_CART));
       expect(
@@ -960,7 +942,7 @@ describe("what an older build left", () => {
     // Refused there, the storage event not yet heard.
     const kept = JSON.parse(localStorage.getItem("inventory.outbox.v3") ?? "");
     kept[0] = { ...kept[0], state: "refused", note: "No." };
-    localStorage.setItem("inventory.outbox.v3", JSON.stringify(kept));
+    keep("inventory.outbox.v3", kept);
     fireEvent.click(lastDiscard());
     expect(
       within(listing()).getByText(say(CHANGED_NOT_DISCARDED)).tagName,
@@ -984,7 +966,7 @@ describe("what an older build left", () => {
     fireEvent.click(lastDiscard());
     const kept = JSON.parse(localStorage.getItem("inventory.cart.v1") ?? "");
     const changed = { ...kept, installNumber: "789" };
-    localStorage.setItem("inventory.cart.v1", JSON.stringify(changed));
+    keep("inventory.cart.v1", changed);
     fireEvent.click(lastDiscard());
     within(listing()).getByText(say(CHANGED_NOT_DISCARDED));
     expect(JSON.parse(localStorage.getItem("inventory.cart.v1") ?? "")).toEqual(
@@ -1039,7 +1021,7 @@ describe("what an older build left", () => {
   test("nothing is removed without the volunteer acting, but empty keys", async () => {
     leaveSave();
     const left = localStorage.getItem("inventory.outbox.v3");
-    localStorage.setItem("inventory.cart.v1", JSON.stringify(freshCart()));
+    keep("inventory.cart.v1", freshCart());
     open();
     await ready();
     expect(localStorage.getItem("inventory.cart.v1")).toBeNull();
@@ -1112,17 +1094,14 @@ describe("what an older build left", () => {
   });
 
   test("an older cart's count of a package no longer offered is told when put back", async () => {
-    localStorage.setItem(
-      "inventory.cart.v1",
-      JSON.stringify({
-        ...freshCart(),
-        volunteerId: 1,
-        fromId: 10,
-        toId: 12,
-        lines: [{ itemId: 100, packages: { 1000: "1", 1004: "2" }, loose: "" }],
-        usedAt: AT,
-      }),
-    );
+    keep("inventory.cart.v1", {
+      ...freshCart(),
+      volunteerId: 1,
+      fromId: 10,
+      toId: 12,
+      lines: [{ itemId: 100, packages: { 1000: "1", 1004: "2" }, loose: "" }],
+      usedAt: AT,
+    });
     open();
     await ready();
     within(listing()).getByText(noted(RETIRED));
@@ -1152,14 +1131,11 @@ describe("what an older build left", () => {
       AT,
       [{ item_id: 100, quantity: "8", package_id: 1004 }, radios(1)],
     ]);
-    localStorage.setItem(
-      "inventory.cart.v1",
-      JSON.stringify({
-        ...freshCart(),
-        lines: [{ itemId: 100, packages: { 1004: "3", 1009: "1" }, loose: "" }],
-        usedAt: AT,
-      }),
-    );
+    keep("inventory.cart.v1", {
+      ...freshCart(),
+      lines: [{ itemId: 100, packages: { 1004: "3", 1009: "1" }, loose: "" }],
+      usedAt: AT,
+    });
     const { api } = answering((request) =>
       isCatalogue(request) ? json(named, 200) : saved(),
     );
@@ -1316,7 +1292,7 @@ describe("what an older build left", () => {
     cleanup();
     // This tab, opened before the other tab's send was refused.
     const kept = JSON.parse(refused);
-    localStorage.setItem(OUTBOX_KEY, JSON.stringify({ ...kept, entries: [] }));
+    keep(OUTBOX_KEY, { ...kept, entries: [] });
     const { api, sent } = server();
     open(api);
     await ready();

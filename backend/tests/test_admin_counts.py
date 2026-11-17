@@ -54,9 +54,9 @@ from inventory_tng.pages import retired_holding
 from inventory_tng.phrases import compiled, speaking
 
 from helpers.concurrency import Committed
-from helpers.markup import button, forms, hidden_fields, links, options, read
+from helpers.markup import button, forms, hidden_fields, links, options, read, text
 from helpers.rows import item_fields, shown, violates
-from helpers.sign_in import new_admin, sign_in_with, text
+from helpers.sign_in import new_admin, sign_in_with
 from helpers.stock import (
     Place,
     adjustment_form,

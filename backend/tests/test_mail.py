@@ -27,13 +27,14 @@ from inventory_tng.resets import ASKED, RESET_NOTICE
 from inventory_tng.settings import MailConfig, Settings, SettingsError
 
 from helpers.mail import NO_MAIL, SITE_MAIL, FailingMail, SentMail
+from helpers.markup import text
 from helpers.sign_in import (
     TOTP_KEYS,
     new_admin,
     policy,
     reset_link,
     sign_in_with,
-    text,
+    token_of,
 )
 
 NEW_PASSWORD = "a brand new long passphrase"
@@ -66,10 +67,6 @@ def the_link(sent: SentMail) -> str:
     match = re.search(r"https://\S+", message.body)
     assert match is not None
     return match.group(0)
-
-
-def token_of(link: str) -> str:
-    return link.split("token=")[1]
 
 
 # Settings

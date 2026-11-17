@@ -13,9 +13,9 @@ from structlog.testing import capture_logs
 from inventory_tng import ledger, open_packages
 from inventory_tng.models import Admin, OpenPackage
 
-from helpers.package_forms import forms, sealed_line, taken
+from helpers.package_forms import quantities_by_form
 from helpers.rows import add, tag
-from helpers.stock import URL, Spools
+from helpers.stock import URL, Spools, cut, sealed_line
 
 # Opening on the scan page.
 
@@ -45,7 +45,7 @@ def test_a_package_opened_and_followed_is_made_once(
     ).one()
     store, spool = spools.store.id, spools.spool.id
     assert (made.package_id, made.location_id) == (spool, store)
-    assert forms(session, spools.cable) == {
+    assert quantities_by_form(session, spools.cable) == {
         (store, spool, None): 305,
         (store, None, made.id): 305,
     }
@@ -81,7 +81,7 @@ def test_a_package_its_item_does_not_follow_opens_loose(
     batch = opening(spools, opened_line(spools, quantity="610"))
     assert registered_client.post(URL, json=batch).status_code == 201
     store = spools.store.id
-    assert forms(session, spools.cable) == {(store, None, None): 610}
+    assert quantities_by_form(session, spools.cable) == {(store, None, None): 610}
 
 
 def test_an_opening_without_a_key_makes_one_from_the_batch(
@@ -124,7 +124,7 @@ def test_packages_the_page_thought_loose_open_one_each(
     ).all()
     assert len(made) == 2
     store = spools.store.id
-    assert forms(session, spools.cable) == {
+    assert quantities_by_form(session, spools.cable) == {
         (store, None, made[0].id): 305,
         (store, None, made[1].id): 305,
     }
@@ -151,7 +151,9 @@ def test_an_opening_written_loose_is_found_after_tracking_is_turned_on(
     spools.cable.track_opened = True
     session.flush()
     assert registered_client.post(URL, json=batch).status_code == 200
-    assert forms(session, spools.cable) == {(spools.store.id, None, None): 610}
+    assert quantities_by_form(session, spools.cable) == {
+        (spools.store.id, None, None): 610
+    }
 
 
 def test_an_opening_of_more_packages_than_lines_is_refused(
@@ -229,7 +231,7 @@ def test_packages_the_page_thought_followed_open_loose_together(
     assert registered_client.post(URL, json=batch).status_code == 201
     assert registered_client.post(URL, json=batch).status_code == 200
     store = spools.store.id
-    assert forms(session, spools.cable) == {(store, None, None): 610}
+    assert quantities_by_form(session, spools.cable) == {(store, None, None): 610}
 
 
 # Cutting from an open package, and moving one whole, on the scan page.
@@ -240,25 +242,25 @@ def test_cut_from_an_open_package_or_moved_whole_by_its_key(
 ) -> None:
     made = spools.opened()
     store, van = spools.store.id, spools.van.id
-    cut = spools.place.batch(lines=[taken(made, "20")])
-    assert registered_client.post(URL, json=cut).status_code == 201
-    assert registered_client.post(URL, json=cut).status_code == 200
-    assert forms(session, spools.cable)[(store, None, made.id)] == 285
-    assert forms(session, spools.cable)[(van, None, None)] == 20
-    whole = spools.place.batch(lines=[taken(made, "285", whole=True)])
+    cutting = spools.place.batch(lines=[cut(made, "20")])
+    assert registered_client.post(URL, json=cutting).status_code == 201
+    assert registered_client.post(URL, json=cutting).status_code == 200
+    assert quantities_by_form(session, spools.cable)[(store, None, made.id)] == 285
+    assert quantities_by_form(session, spools.cable)[(van, None, None)] == 20
+    whole = spools.place.batch(lines=[cut(made, "285", whole=True)])
     assert registered_client.post(URL, json=whole).status_code == 201
     session.refresh(made)
     assert made.location_id == van
-    assert forms(session, spools.cable)[(van, None, made.id)] == 285
+    assert quantities_by_form(session, spools.cable)[(van, None, made.id)] == 285
     # Cut at an install, from the van.
     install = spools.place.batch(
         kind="install",
         from_location_id=van,
         to_location_id=None,
-        lines=[taken(made, "30")],
+        lines=[cut(made, "30")],
     )
     assert registered_client.post(URL, json=install).status_code == 201
-    assert forms(session, spools.cable)[(van, None, made.id)] == 255
+    assert quantities_by_form(session, spools.cable)[(van, None, made.id)] == 255
 
 
 def test_taking_from_an_open_package_is_refused_saying_why(
@@ -272,15 +274,15 @@ def test_taking_from_an_open_package_is_refused_saying_why(
         assert response.status_code == 422
         return [(p["loc"][1:], p["type"]) for p in response.json()["detail"]]
 
-    unknown = taken(made, "1", open_package_key=str(uuid.uuid4()))
+    unknown = cut(made, "1", open_package_key=str(uuid.uuid4()))
     assert refused(spools.place.batch(lines=[unknown])) == [
         (["lines", 0, "open_package_key"], "not_found")
     ]
-    assert refused(spools.place.batch(lines=[taken(made, "5", whole=True)])) == [
+    assert refused(spools.place.batch(lines=[cut(made, "5", whole=True)])) == [
         (["lines", 0, "quantity"], "open_package_whole")
     ]
     elsewhere = spools.place.batch(
-        from_location_id=van, to_location_id=spools.store.id, lines=[taken(made, "1")]
+        from_location_id=van, to_location_id=spools.store.id, lines=[cut(made, "1")]
     )
     assert refused(elsewhere) == [
         (["lines", 0, "open_package_key"], "open_package_elsewhere")
@@ -288,7 +290,7 @@ def test_taking_from_an_open_package_is_refused_saying_why(
     closer = add(session, Admin(username=f"closer-{tag()}"))
     made.closed_at, made.closed_by_admin_id = datetime.now(UTC), closer.id
     session.flush()
-    assert refused(spools.place.batch(lines=[taken(made, "1")])) == [
+    assert refused(spools.place.batch(lines=[cut(made, "1")])) == [
         (["lines", 0, "open_package_key"], "open_package_closed")
     ]
 
@@ -300,18 +302,18 @@ def test_a_line_taken_from_an_open_package_that_cannot_be_is_refused(
     store = spools.store.id
     for batch in (
         spools.place.batch(
-            lines=[taken(made, "1", package_id=spools.spool.id, package_size="305")]
+            lines=[cut(made, "1", package_id=spools.spool.id, package_size="305")]
         ),
         spools.place.batch(
             kind="receipt",
             from_location_id=None,
             to_location_id=store,
-            lines=[taken(made, "1")],
+            lines=[cut(made, "1")],
         ),
         spools.place.batch(
             kind="install",
             to_location_id=None,
-            lines=[taken(made, "1", whole=True)],
+            lines=[cut(made, "1", whole=True)],
         ),
         spools.place.batch(
             lines=[{"item_id": made.item_id, "quantity": "1", "whole": True}]
@@ -324,7 +326,7 @@ def test_an_open_package_named_on_two_lines_is_refused_as_twice(
     registered_client: TestClient, spools: Spools
 ) -> None:
     made = spools.opened()
-    both = spools.place.batch(lines=[taken(made, "305", whole=True), taken(made, "20")])
+    both = spools.place.batch(lines=[cut(made, "305", whole=True), cut(made, "20")])
     response = registered_client.post(URL, json=both)
     assert response.status_code == 422
     assert [(p["loc"][1:], p["type"]) for p in response.json()["detail"]] == [

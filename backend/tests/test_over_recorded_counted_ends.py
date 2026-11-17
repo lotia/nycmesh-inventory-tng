@@ -21,21 +21,20 @@ from inventory_tng.ledger import expected
 from inventory_tng.local_time import show_day, site_zone
 from inventory_tng.models import ItemPackage, LedgerTransaction, Movement
 
-from helpers.markup import read
+from helpers.markup import read, text
 from helpers.over_recorded import (
     PAGE,
-    admin_id,
     arrived_field,
     checks,
     count_ids,
     moved_whole,
+    new_admin_id,
     opened_into,
     opening_raised,
     raised,
     recorded_then_changed,
     text_of,
 )
-from helpers.sign_in import text
 from helpers.stock import (
     URL,
     Place,
@@ -187,7 +186,7 @@ def test_only_a_count_as_of_its_movement_or_after_puts_an_end_right(
     radios_raised(registered_client, place)
     (check,) = checks(session)
     moved = session.get_one(Movement, check.movement_id).transaction_id
-    admin = admin_id(session)
+    admin = new_admin_id(session)
     # The movement's own transaction, as the count's: any will do here.
     written = [ledger.Written(moved, "count", 1)]
     at_van = partial(
@@ -307,7 +306,9 @@ def test_one_moved_whole_is_closed_by_setting_its_length_where_it_arrived(
     answer = length_checks.Answer(
         made.id, open_packages.check_seen(made), Decimal(300), Decimal(305), moment
     )
-    assert length_checks._set(session, admin_id(session), answer, [spools.van.id]) == (
+    assert length_checks._set(
+        session, new_admin_id(session), answer, [spools.van.id]
+    ) == (
         True,
         False,
         1,
@@ -330,7 +331,9 @@ def test_only_a_report_after_the_batch_that_moved_it_whole_puts_it_right(
     answer = length_checks.Answer(
         made.id, open_packages.check_seen(made), made.length_reported, as_of=moved
     )
-    assert length_checks._set(session, admin_id(session), answer, [spools.van.id]) == (
+    assert length_checks._set(
+        session, new_admin_id(session), answer, [spools.van.id]
+    ) == (
         True,
         False,
         0,
@@ -350,7 +353,9 @@ def test_only_a_report_after_the_batch_that_moved_it_whole_puts_it_right(
         made.length_reported,
         as_of=made.length_reported_in_id,
     )
-    assert length_checks._set(session, admin_id(session), answer, [spools.van.id]) == (
+    assert length_checks._set(
+        session, new_admin_id(session), answer, [spools.van.id]
+    ) == (
         True,
         False,
         1,
@@ -382,7 +387,7 @@ def test_the_database_keeps_counted_ends_only_as_counts_give_them(
     radios_raised(registered_client, place)
     (check,) = checks(session)
     moved = session.get_one(Movement, check.movement_id).transaction_id
-    admin = admin_id(session)
+    admin = new_admin_id(session)
 
     def settle() -> None:
         if how is not None:

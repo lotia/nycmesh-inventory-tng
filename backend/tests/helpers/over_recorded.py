@@ -23,7 +23,16 @@ from inventory_tng.models import (
 
 from helpers.rows import tag
 from helpers.sign_in import new_admin
-from helpers.stock import URL, Place, Spools, cut, length, received, retire
+from helpers.stock import (
+    URL,
+    Place,
+    Spools,
+    cut,
+    length,
+    received,
+    retire,
+    sealed_line,
+)
 
 PAGE = "/admin/stock/recorded-more"
 
@@ -54,14 +63,16 @@ def recorded_then_changed(
     return response.json()
 
 
-def admin_id(session: Session) -> int:
+def new_admin_id(session: Session) -> int:
     """A new administrator's id; stock.ada_id is admin_client's."""
     admin, _ = new_admin(session, f"ada-{tag()}", totp=False)
     return admin.id
 
 
 def raised(client: TestClient, place: Place, bags: ItemPackage) -> None:
-    """Two bags recorded, then one: one bag waits."""
+    """Two bags recorded, then one: one bag waits. Through the API, as a
+    page sends it; stock.raised raises a check on a written transaction
+    directly."""
     first = place.batch(lines=[bagged(bags, 2)])
     recorded_then_changed(client, first, lines=[bagged(bags, 1)])
 
@@ -165,12 +176,7 @@ def opening_raised(client: TestClient, spools: Spools) -> OverRecorded:
     """Both sealed spools in the store recorded opened, then one: one
     waits, sealed where it left, open (tracked) or loose where it
     arrived."""
-    line = {
-        "item_id": spools.cable.id,
-        "quantity": "305",
-        "package_id": spools.spool.id,
-        "package_size": "305",
-    }
+    line = sealed_line(spools, "305")
     # A page sends a line for each tracked one opened, under its own key;
     # one line of them all for loose units.
     lines = (

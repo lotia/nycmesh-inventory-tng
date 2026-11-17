@@ -35,9 +35,10 @@ from helpers.markup import (
     options,
     read,
     row_links,
+    text,
 )
 from helpers.rows import history
-from helpers.sign_in import confirmed_long_ago, once, text
+from helpers.sign_in import confirmed_long_ago, once
 
 
 def make_code(client: TestClient, **form: str) -> tuple[Response, str]:

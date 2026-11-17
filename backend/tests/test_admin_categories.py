@@ -12,9 +12,8 @@ from inventory_tng.admin.categories import CATEGORIES, TAKEN
 from inventory_tng.admin.common import RULES
 from inventory_tng.models import Admin, Category, Item
 
-from helpers.markup import links, read, row_links
+from helpers.markup import links, read, row_links, text
 from helpers.rows import add, history, named, shown
-from helpers.sign_in import text
 
 pytestmark = pytest.mark.usefixtures("admin_client")
 

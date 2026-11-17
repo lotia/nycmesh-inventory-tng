@@ -26,6 +26,7 @@ from inventory_tng.models import LedgerTransaction, Movement, OverRecorded
 from inventory_tng.phrases import compiled, speaking
 
 from helpers.markup import Element, links, read, sorted_columns
+from helpers.over_recorded import PAGE
 from helpers.rows import tag
 from helpers.sign_in import new_admin
 from helpers.stock import Place, Spools, ada_id, count_at, cut, raised, retire, write
@@ -37,8 +38,7 @@ TWO = str(over_recorded.TWO_ADJUSTMENTS)
 SEALED_ONLY = over_recorded.end_only(over_recorded.sealed("Spool"))
 OPEN_SPOOL = over_recorded.opened("Spool")
 
-WAITING = "/admin/stock/recorded-more"
-SETTLED = f"{WAITING}/settled"
+SETTLED = f"{PAGE}/settled"
 
 
 def moved(session: Session, place: Place) -> OverRecorded:
@@ -140,7 +140,7 @@ def test_each_reason_marked_checked_says_why(
     assert "<b>hand</b>" not in page
 
 
-def moved_whole(session: Session) -> tuple[Spools, OverRecorded]:
+def whole_recorded_more(session: Session) -> tuple[Spools, OverRecorded]:
     """A spool's open package moved whole from the store to the van, one
     metre recorded more."""
     spools = Spools(session)
@@ -165,7 +165,7 @@ def test_a_count_of_one_moved_whole_says_if_it_was_confirmed(
 ) -> None:
     """Confirm count settles one as checked with no reason, or as
     corrected: told apart by what is kept."""
-    spools, check = moved_whole(session)
+    spools, check = whole_recorded_more(session)
     over_recorded.confirm_count(
         session, check.id, seen(check), ada_id(session), Decimal(count)
     )
@@ -392,13 +392,13 @@ def test_the_stock_views_link_to_those_waiting_and_settled_always(
     """Even with none waiting."""
     page = admin_client.get(path).text
     nav = views_of(page, "Stock views")
-    assert ("a", recorded_more_view(0), WAITING) in nav
+    assert ("a", recorded_more_view(0), PAGE) in nav
     assert ("a", SETTLED_VIEW, SETTLED) in nav
     place = Place(session)
     moved(session, place)
     moved(session, place)
     nav = views_of(admin_client.get(path).text, "Stock views")
-    assert ("a", recorded_more_view(2), WAITING) in nav
+    assert ("a", recorded_more_view(2), PAGE) in nav
 
 
 def test_waiting_and_settled_link_to_each_other_keeping_the_item(
@@ -408,19 +408,19 @@ def test_waiting_and_settled_link_to_each_other_keeping_the_item(
     moved(session, place)
     moved(session, other)
     label = str(over_recorded_page.TITLE)
-    nav = views_of(admin_client.get(WAITING).text, label)
+    nav = views_of(admin_client.get(PAGE).text, label)
     assert nav == [("strong", waiting_view(2), None), ("a", SETTLED_VIEW, SETTLED)]
     nav = views_of(admin_client.get(SETTLED).text, label)
-    assert nav == [("a", waiting_view(2), WAITING), ("strong", SETTLED_VIEW, None)]
+    assert nav == [("a", waiting_view(2), PAGE), ("strong", SETTLED_VIEW, None)]
     only = f"?item={place.item.id}"
-    nav = views_of(admin_client.get(f"{WAITING}{only}").text, label)
+    nav = views_of(admin_client.get(f"{PAGE}{only}").text, label)
     assert nav == [
         ("strong", waiting_view(1), None),
         ("a", SETTLED_VIEW, f"{SETTLED}{only}"),
     ]
     nav = views_of(admin_client.get(f"{SETTLED}{only}").text, label)
     assert nav == [
-        ("a", waiting_view(1), f"{WAITING}{only}"),
+        ("a", waiting_view(1), f"{PAGE}{only}"),
         ("strong", SETTLED_VIEW, None),
     ]
     # None waiting, still linked.
@@ -430,7 +430,7 @@ def test_waiting_and_settled_link_to_each_other_keeping_the_item(
         )
     session.flush()
     nav = views_of(admin_client.get(SETTLED).text, label)
-    assert ("a", waiting_view(0), WAITING) in nav
+    assert ("a", waiting_view(0), PAGE) in nav
 
 
 def test_settled_by_another_administrator_names_them(
@@ -534,7 +534,7 @@ def test_one_end_only_counted_names_that_end(
     install = write(session, place, kind="install", to_location_id=None)
     used = raised(session, install)
     count_at(admin_client, place.store.id, {f"counted_{place.item.id}": "0"})
-    spools, check = moved_whole(session)
+    spools, check = whole_recorded_more(session)
     movement = session.get_one(Movement, check.movement_id)
     count_at(
         admin_client, spools.van.id, {f"opened_{movement.to_open_package_id}": "1"}
@@ -682,7 +682,7 @@ def test_those_waiting_sort_by_each_heading_and_come_in_pages(
     mine = {place.item.name_shown for place in places}
 
     def items(query: str = "") -> list[str]:
-        rows = rows_of(admin_client.get(f"{WAITING}?per=all{query}").text)
+        rows = rows_of(admin_client.get(f"{PAGE}?per=all{query}").text)
         return [row[0] for row in rows if row[0] in mine]
 
     by_name = sorted(mine, key=str.lower)
@@ -697,13 +697,13 @@ def test_those_waiting_sort_by_each_heading_and_come_in_pages(
     assert items("&sort=transaction&order=asc") == names
     where = sorted(names, key=lambda n: places[names.index(n)].store.name.lower())
     assert items("&sort=where") == where
-    page = read(admin_client.get(WAITING).text)
-    assert ("Recorded more", f"{WAITING}?sort=amount") in links(page)
-    assert ("25", f"{WAITING}?per=25") in links(page)
-    only = f"{WAITING}?item={places[0].item.id}"
+    page = read(admin_client.get(PAGE).text)
+    assert ("Recorded more", f"{PAGE}?sort=amount") in links(page)
+    assert ("25", f"{PAGE}?per=25") in links(page)
+    only = f"{PAGE}?item={places[0].item.id}"
     sorted_only = admin_client.get(f"{only}&sort=amount").text
     assert f'href="{only}&amp;sort=amount&amp;order=desc"' in sorted_only
-    assert ("Show all", f"{WAITING}?sort=amount") in links(sorted_only)
+    assert ("Show all", f"{PAGE}?sort=amount") in links(sorted_only)
     for _ in range(25):
         moved(session, places[0])
     assert len(rows_of(admin_client.get(f"{only}&per=25").text)) == 25
@@ -722,20 +722,20 @@ def test_an_answer_comes_back_to_those_waiting_as_they_were(
     view = f"item={place.item.id}&sort=amount&order=desc&per=25&page=2"
     # Drawn, the page is 1 of 1: a page past the end shows the last.
     shown = view.removesuffix("&page=2").replace("&", "&amp;")
-    page = admin_client.get(f"{WAITING}?{view}").text
-    assert f'action="{WAITING}/{check.id}/checked?{shown}"' in page
-    assert f'action="{WAITING}/{check.id}/correct?{shown}"' in page
+    page = admin_client.get(f"{PAGE}?{view}").text
+    assert f'action="{PAGE}/{check.id}/checked?{shown}"' in page
+    assert f'action="{PAGE}/{check.id}/correct?{shown}"' in page
     asked = admin_client.post(
-        f"{WAITING}/{check.id}/checked?{view}", data={"seen": seen(check)}
+        f"{PAGE}/{check.id}/checked?{view}", data={"seen": seen(check)}
     )
     assert asked.status_code == 400
-    assert f'action="{WAITING}/{check.id}/checked?{shown}"' in asked.text
+    assert f'action="{PAGE}/{check.id}/checked?{shown}"' in asked.text
     assert 'aria-sort="descending"' in asked.text
     done = admin_client.post(
-        f"{WAITING}/{check.id}/checked?{view}",
+        f"{PAGE}/{check.id}/checked?{view}",
         data={"seen": seen(check), "reason": "both"},
     )
     back = done.headers["location"]
-    assert back == f"{WAITING}?{view}&notice=over_recorded_checked"
+    assert back == f"{PAGE}?{view}&notice=over_recorded_checked"
     # Page 2 of 25 a page is past the end: the last page, the first.
-    assert f'action="{WAITING}/{other.id}/checked?' in admin_client.get(back).text
+    assert f'action="{PAGE}/{other.id}/checked?' in admin_client.get(back).text

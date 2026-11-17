@@ -24,9 +24,8 @@ from inventory_tng.db import attempt
 from inventory_tng.models import CURRENT_ALIAS, Category, Item, ItemAlias
 
 from helpers.items import NOW, items_named, new_item
-from helpers.markup import links, read
+from helpers.markup import links, read, text
 from helpers.rows import add, history, item_fields, shown
-from helpers.sign_in import text
 from helpers.stock import retire
 
 

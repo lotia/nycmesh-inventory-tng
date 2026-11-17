@@ -25,11 +25,10 @@ from inventory_tng.models import (
     OpenPackage,
 )
 
-from helpers.markup import button, links, read
-from helpers.package_forms import forms, taken
+from helpers.markup import button, links, read, text
+from helpers.package_forms import quantities_by_form
 from helpers.rows import add, tag
-from helpers.sign_in import text
-from helpers.stock import URL, Spools
+from helpers.stock import URL, Spools, cut
 
 # Volunteers report an open package used up (8i4.133.5).
 
@@ -38,9 +37,9 @@ def test_a_cut_reports_its_open_package_used_up_and_it_is_offered_no_more(
     registered_client: TestClient, session: Session, spools: Spools
 ) -> None:
     made = spools.opened()
-    cut = spools.place.batch(lines=[taken(made, "305")], used_up=[str(made.key)])
-    assert registered_client.post(URL, json=cut).status_code == 201
-    assert registered_client.post(URL, json=cut).status_code == 200
+    batch = spools.place.batch(lines=[cut(made, "305")], used_up=[str(made.key)])
+    assert registered_client.post(URL, json=batch).status_code == 201
+    assert registered_client.post(URL, json=batch).status_code == 200
     session.refresh(made)
     assert made.reported_by_volunteer_id == spools.place.volunteer.id
     assert made.reported_at is not None
@@ -65,7 +64,7 @@ def report_of(spools: Spools, *keys: object) -> dict[str, object]:
 
 
 # The reports sent first and again, of two open packages, a key nobody
-# made, and (cut) whether the batch is a cut from the first, else a report.
+# made, and (cutting) whether the batch is a cut from the first, else a report.
 
 
 REPORTS_CHANGED = {
@@ -78,14 +77,14 @@ REPORTS_CHANGED = {
 
 
 @pytest.mark.parametrize(
-    ("first", "again", "cut"), REPORTS_CHANGED.values(), ids=list(REPORTS_CHANGED)
+    ("first", "again", "cutting"), REPORTS_CHANGED.values(), ids=list(REPORTS_CHANGED)
 )
 def test_a_batch_sent_again_with_other_reports_is_refused(
-    registered_client: TestClient, spools: Spools, first: str, again: str, cut: bool
+    registered_client: TestClient, spools: Spools, first: str, again: str, cutting: bool
 ) -> None:
     one = spools.opened()
     keys = {"1": one.key, "2": spools.opened().key, "x": uuid.uuid4()}
-    batch = spools.place.batch(lines=[taken(one, "5")]) if cut else report_of(spools)
+    batch = spools.place.batch(lines=[cut(one, "5")]) if cutting else report_of(spools)
 
     def reporting(marks: str) -> dict[str, object]:
         return batch | {"used_up": [str(keys[mark]) for mark in marks]}
@@ -210,7 +209,7 @@ def test_a_report_names_what_is_where_it_is_said_and_not_moving(
         used_up=[key],
     )
     assert refused(elsewhere) == [(["used_up", 0], "open_package_elsewhere")]
-    moving = spools.place.batch(lines=[taken(made, "305", whole=True)], used_up=[key])
+    moving = spools.place.batch(lines=[cut(made, "305", whole=True)], used_up=[key])
     assert refused(moving) == [(["used_up", 0], "moved_whole")]
     receipt = spools.place.batch(
         kind="receipt",
@@ -253,7 +252,9 @@ def test_needs_your_action_until_each_report_is_answered(
     session.refresh(made)
     assert made.closed_at is not None
     # What it still showed, 5 m, is written off as used up: it shows nothing.
-    assert (spools.store.id, None, made.id) not in forms(session, spools.cable)
+    assert (spools.store.id, None, made.id) not in quantities_by_form(
+        session, spools.cable
+    )
     adjustment = session.scalars(
         select(LedgerTransaction).where(
             LedgerTransaction.kind == "adjustment",
@@ -416,7 +417,9 @@ def test_an_open_package_is_closed_from_its_items_page(
     assert admin_client.get(path).status_code == 404
     session.refresh(made)
     assert made.closed_at is not None
-    assert (spools.store.id, None, made.id) not in forms(session, spools.cable)
+    assert (spools.store.id, None, made.id) not in quantities_by_form(
+        session, spools.cable
+    )
     other = f"/admin/items/{spools.place.item.id}/open-packages/{made.id}/close"
     assert admin_client.post(other).status_code == 404
 
