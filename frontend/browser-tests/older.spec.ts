@@ -6,7 +6,7 @@
  * test's own (own.ts).
  */
 import { expect, type Locator, type Page } from "@playwright/test";
-import { ownCable } from "./own";
+import { ownCable, record } from "./own";
 import { test } from "./policy";
 
 const HEADING = "Checked out items. Add to cart or discard before sending";
@@ -71,27 +71,9 @@ async function leave(page: Page, ...saves: unknown[][]) {
   return { volunteerId, fromId, toId };
 }
 
-/** Records the cart, and its answer, once the page lists it saved: the
- * answer reaches the test before the page has used it, and the entry it
- * changes moves those below it, which a tap meant for one may then miss. */
-async function recorded(page: Page) {
-  const saving = page.waitForResponse(
-    (response) =>
-      response.url().endsWith("/api/transactions") &&
-      response.request().method() === "POST",
-  );
-  await page.getByRole("button", { name: "Record" }).click();
-  const response = await saving;
-  const saved = (await response.json()).transaction_id as number;
-  await expect(
-    page.getByText(`Recorded (transaction ${saved}).`),
-  ).toBeVisible();
-  return response;
-}
-
 /** Saves the cart anew, and what it sent. */
 async function save(page: Page) {
-  const response = await recorded(page);
+  const response = await record(page);
   expect(response.status()).toBe(201);
   return response.request().postDataJSON();
 }
@@ -274,7 +256,7 @@ test("a save an older build's tab saved meanwhile is saved once, under its key; 
   await page.goto("/scan");
 
   const saved = await leaveSaved(page, itemId);
-  const replayed = await recorded(page);
+  const replayed = await record(page);
   expect(replayed.status()).toBe(200);
   expect(await replayed.json()).toEqual({ transaction_id: saved });
 
@@ -430,7 +412,7 @@ test("a cart this build filled, which its tab recorded as a newer build took it 
   const saved = (await first.json()).transaction_id as number;
   await page.reload();
   await expect(page.getByText(PUT_BACK)).toBeVisible();
-  const response = await recorded(page);
+  const response = await record(page);
   expect(response.request().postDataJSON().key).toBe(key);
   expect(response.status()).toBe(200);
   expect(await response.json()).toEqual({ transaction_id: saved });

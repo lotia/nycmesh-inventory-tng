@@ -22,12 +22,12 @@ from inventory_tng.admin.devices import (
     revoke_many_title,
     uses_problem,
 )
-from inventory_tng.models import AdminSession, Device, RegistrationCode, SiteSettings
+from inventory_tng.models import Device, RegistrationCode, SiteSettings
 from inventory_tng.phrases import compiled, speaking
 
 from helpers.devices import new_device
 from helpers.rows import history
-from helpers.sign_in import once, text
+from helpers.sign_in import confirmed_ago, once, text
 
 
 def make_code(client: TestClient, **form: str) -> tuple[Response, str]:
@@ -125,10 +125,7 @@ def test_a_code_is_revoked_after_a_confirmation(
 def test_changes_here_ask_for_a_fresh_code(
     admin_client: TestClient, session: Session
 ) -> None:
-    for row in session.scalars(select(AdminSession)):
-        row.confirmed_at = datetime.now(UTC) - timedelta(hours=2)
-        row.last_sensitive_at = None
-    session.flush()
+    confirmed_ago(session, hours=2)
     asked, _ = make_code(admin_client)
     assert asked.status_code == 403
     assert "needs a fresh" in text(asked)

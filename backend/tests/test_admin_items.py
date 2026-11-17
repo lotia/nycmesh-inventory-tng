@@ -321,16 +321,6 @@ def test_a_clash_gone_meanwhile_is_said_in_general(
     assert str(TAKEN) in text(refused)
 
 
-def test_searching(
-    admin_client: TestClient, session: Session, radios: Category
-) -> None:
-    new_item(session, radios, "LiteBeam 5AC")
-    new_item(session, radios, "Patch cable")
-    page = text(admin_client.get(ITEMS, params={"q": "litebeem"}))
-    assert "LiteBeam 5AC" in page
-    assert "Patch cable" not in page
-
-
 def test_editing_every_field(
     admin_client: TestClient, session: Session, radios: Category
 ) -> None:
@@ -529,6 +519,8 @@ def test_retiring_and_bringing_back(
     assert taken.status_code == 400
     assert f"{TAKEN_FIELDS['name'](item.name)} {IS_RETIRED}" in text(taken)
     assert admin_client.post(f"{ITEMS}/{item.id}/restore").status_code == 303
+    session.refresh(item)
+    assert item.retired_at is None
 
 
 def test_unknown_items_and_others_packages_are_not_found(
@@ -601,17 +593,6 @@ def test_an_item_comes_back_only_into_a_current_category(
     assert item.retired_at is not None
 
 
-def test_bringing_an_item_back(
-    admin_client: TestClient, session: Session, radios: Category
-) -> None:
-    item = new_item(session, radios)
-    admin_client.post(f"{ITEMS}/{item.id}/retire")
-    done = admin_client.post(f"{ITEMS}/{item.id}/restore")
-    assert done.status_code == 303
-    session.refresh(item)
-    assert item.retired_at is None
-
-
 def test_an_edit_with_a_problem_changes_nothing(
     admin_client: TestClient, session: Session, radios: Category
 ) -> None:
@@ -660,6 +641,10 @@ def test_a_search_forgives_typos_best_first(
     said = " ".join(page.split())
     assert f"{len(shown)} of {total} items, matching “litebeam”" in said
     assert 'href="/admin/items">Clear search</a>' in page
+    # A typo still finds it.
+    misspelt = items_named(text(admin_client.get(ITEMS, params={"q": "litebeem"})))
+    assert "LiteBeam 5AC" in misspelt
+    assert "Patch cable" not in misspelt
 
 
 def test_suggestions_come_from_the_filter_the_list_shows(

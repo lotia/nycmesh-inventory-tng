@@ -62,6 +62,7 @@ from helpers.stock import (
     at_retired_van,
     badge_html,
     committed_place,
+    count_form,
     received,
     retire,
     stocked,
@@ -73,19 +74,6 @@ def key_on(response: Response) -> str:
     match = re.search(r'name="key" value="([0-9a-f-]{36})"', response.text)
     assert match is not None
     return match.group(1)
-
-
-def count_form(client: TestClient, path: str) -> dict[str, str]:
-    """The count page's hidden fields, as it was shown: its key, and the
-    place's latest ledger entry then."""
-    return count_form_of(client.get(path))
-
-
-def count_form_of(page: Response) -> dict[str, str]:
-    found = re.findall(
-        r'type="hidden" name="(key|as_of|items)" value="([^"]*)"', page.text
-    )
-    return dict(found)
 
 
 def counts_written(session: Session) -> list[LedgerTransaction]:
@@ -121,7 +109,7 @@ def test_a_count_puts_the_records_right(
     assert 'value="5"' in admin_client.get(path).text
     done = admin_client.post(
         path,
-        data=count_form(admin_client, path)
+        data=count_form(admin_client.get(path))
         | {
             f"counted_{place.item.id}": "3",
             "extra_item_id": str(place.cable.id),
@@ -155,7 +143,8 @@ def test_a_count_that_matches_is_still_recorded(
     place = stocked(session)
     path = f"{COUNTS}/{place.store.id}"
     done = admin_client.post(
-        path, data=count_form(admin_client, path) | {f"counted_{place.item.id}": "5"}
+        path,
+        data=count_form(admin_client.get(path)) | {f"counted_{place.item.id}": "5"},
     )
     assert (
         done.headers["location"] == f"{COUNTS}?notice=counted_same&section=count#count"
@@ -176,7 +165,7 @@ def test_a_count_sent_twice_is_written_once(
 ) -> None:
     place = stocked(session)
     path = f"{COUNTS}/{place.store.id}"
-    form = count_form(admin_client, path) | {f"counted_{place.item.id}": "2"}
+    form = count_form(admin_client.get(path)) | {f"counted_{place.item.id}": "2"}
     admin_client.post(path, data=form)
     admin_client.post(path, data=form)
     assert len(counts_written(session)) == 1
@@ -188,7 +177,7 @@ def test_a_count_refuses_what_is_not_a_quantity(
 ) -> None:
     place = stocked(session)
     path = f"{COUNTS}/{place.store.id}"
-    shown = count_form(admin_client, path)
+    shown = count_form(admin_client.get(path))
     for typed, problem in (("lots", TYPE_A_NUMBER), ("1.5", WHOLE_UNITS)):
         refused = admin_client.post(
             path, data=shown | {f"counted_{place.item.id}": typed}
@@ -265,7 +254,7 @@ def test_a_count_naming_an_item_twice_is_refused(
     and the page says why, and the same key saves the count put right."""
     place = stocked(session)
     path = f"{COUNTS}/{place.store.id}"
-    shown = count_form(admin_client, path) | {f"counted_{place.item.id}": "3"}
+    shown = count_form(admin_client.get(path)) | {f"counted_{place.item.id}": "3"}
     with capture_logs() as logs:
         refused = admin_client.post(path, data=shown | fields(place))
     assert refused.status_code == 400
@@ -399,7 +388,7 @@ def test_a_save_during_a_count_still_applies(
     place = stocked(session)
     with_cable(session, place)
     path = f"{COUNTS}/{place.store.id}"
-    shown = count_form(admin_client, path)
+    shown = count_form(admin_client.get(path))
     write(session, place)  # Three radios to the van.
     done = admin_client.post(
         path,
@@ -422,7 +411,7 @@ def test_an_item_that_moved_while_counted_is_counted_again(
     place = stocked(session)
     with_cable(session, place)
     path = f"{COUNTS}/{place.store.id}"
-    shown = count_form(admin_client, path)
+    shown = count_form(admin_client.get(path))
     write(session, place)  # Three radios to the van.
     asked = admin_client.post(
         path,
@@ -438,7 +427,7 @@ def test_an_item_that_moved_while_counted_is_counted_again(
         place.item.id: Decimal(2),
         place.cable.id: Decimal(18),
     }
-    again = count_form_of(asked)
+    again = count_form(asked)
     assert again["key"] != shown["key"]
     assert again["as_of"] != shown["as_of"]
     done = admin_client.post(path, data=again | {f"counted_{place.item.id}": "1"})
@@ -452,14 +441,14 @@ def test_a_recount_sent_back_with_a_problem_asks_for_its_items_only(
     place = stocked(session)
     with_cable(session, place)
     path = f"{COUNTS}/{place.store.id}"
-    shown = count_form(admin_client, path)
+    shown = count_form(admin_client.get(path))
     write(session, place)  # Three radios to the van.
     asked = admin_client.post(
         path,
         data=shown
         | {f"counted_{place.item.id}": "5", f"counted_{place.cable.id}": "18"},
     )
-    again = count_form_of(asked)
+    again = count_form(asked)
     refused = admin_client.post(
         path, data=again | {f"counted_{place.item.id}": "x", "counted_bad": "1"}
     )
@@ -475,10 +464,10 @@ def test_a_recount_sent_back_leaves_out_an_item_there_is_not(
 ) -> None:
     place = stocked(session)
     path = f"{COUNTS}/{place.store.id}"
-    shown = count_form(admin_client, path)
+    shown = count_form(admin_client.get(path))
     write(session, place)  # Three radios to the van.
     asked = admin_client.post(path, data=shown | {f"counted_{place.item.id}": "5"})
-    again = count_form_of(asked)
+    again = count_form(asked)
     again["items"] += f" {INTEGER_MAX}"
     refused = admin_client.post(path, data=again | {f"counted_{place.item.id}": "x"})
     assert refused.status_code == 400
@@ -491,7 +480,7 @@ def test_a_count_whose_every_line_moved_writes_nothing(
 ) -> None:
     place = stocked(session)
     path = f"{COUNTS}/{place.store.id}"
-    shown = count_form(admin_client, path)
+    shown = count_form(admin_client.get(path))
     write(session, place)  # Three radios to the van.
     asked = admin_client.post(path, data=shown | {f"counted_{place.item.id}": "5"})
     assert asked.status_code == 409
@@ -504,7 +493,7 @@ def test_a_count_needs_the_moment_it_was_shown(
 ) -> None:
     place = stocked(session)
     path = f"{COUNTS}/{place.store.id}"
-    shown = count_form(admin_client, path)
+    shown = count_form(admin_client.get(path))
     for as_of in ("", "²", "-1", str(2**31)):
         refused = admin_client.post(
             path, data=shown | {"as_of": as_of, f"counted_{place.item.id}": "5"}
@@ -521,7 +510,7 @@ def test_a_count_shown_again_for_a_problem_keeps_its_moment(
     place = stocked(session)
     with_cable(session, place)
     path = f"{COUNTS}/{place.store.id}"
-    shown = count_form(admin_client, path)
+    shown = count_form(admin_client.get(path))
     write(session, place, lines=[{"item_id": place.item.id, "quantity": "5"}])
     refused = admin_client.post(
         path,
@@ -529,7 +518,7 @@ def test_a_count_shown_again_for_a_problem_keeps_its_moment(
         | {f"counted_{place.item.id}": "5", f"counted_{place.cable.id}": "x"},
     )
     assert refused.status_code == 400
-    assert count_form_of(refused)["as_of"] == shown["as_of"]
+    assert count_form(refused)["as_of"] == shown["as_of"]
     # Every radio has gone since, but the radios' line is still there.
     assert f'name="counted_{place.item.id}" inputmode="decimal" value="5"' in (
         refused.text
@@ -543,7 +532,7 @@ def test_a_count_sent_again_after_a_later_move_is_not_asked_again(
     second send ask for the radios again."""
     place = stocked(session)
     path = f"{COUNTS}/{place.store.id}"
-    form = count_form(admin_client, path) | {f"counted_{place.item.id}": "4"}
+    form = count_form(admin_client.get(path)) | {f"counted_{place.item.id}": "4"}
     assert admin_client.post(path, data=form).status_code == 303
     write(session, place)  # Three radios to the van.
     again = admin_client.post(path, data=form)
@@ -647,7 +636,7 @@ def test_a_unit_changed_to_each_as_the_page_writes_is_said_and_nothing_is_writte
     assert sign_in_with(client, key=totp).status_code == 303
     if kind == "count":
         path = f"{COUNTS}/{place.store.id}"
-        form = count_form(client, path) | {
+        form = count_form(client.get(path)) | {
             "extra_item_id": str(place.cable.id),
             "extra_quantity": "1.5",
         }
@@ -699,7 +688,7 @@ def test_a_retired_place_counted_to_nothing_clears_every_signal(
     path = f"{COUNTS}/{place.van.id}"
     shown = admin_client.get(path)
     assert "is retired, but the records say something" in text(shown)
-    form = count_form_of(shown) | {f"counted_{place.item.id}": "0"}
+    form = count_form(shown) | {f"counted_{place.item.id}": "0"}
     done = admin_client.post(path, data=form)
     assert done.headers["location"] == f"{COUNTS}?notice=counted&section=count#count"
     assert expected(session, place.van.id) == {}
@@ -765,7 +754,7 @@ def test_a_key_written_at_another_place_lets_no_other_place_through(
     place = stocked(session)
     retire(session, place.van)
     path = f"{COUNTS}/{place.store.id}"
-    form = count_form(admin_client, path) | {f"counted_{place.item.id}": "5"}
+    form = count_form(admin_client.get(path)) | {f"counted_{place.item.id}": "5"}
     assert admin_client.post(path, data=form).status_code == 303
     elsewhere = admin_client.post(f"{COUNTS}/{place.van.id}", data=form)
     assert elsewhere.status_code == 404
@@ -834,7 +823,8 @@ def test_a_count_shows_in_the_zone_of_its_place(
     session.flush()
     path = f"{COUNTS}/{place.store.id}"
     admin_client.post(
-        path, data=count_form(admin_client, path) | {f"counted_{place.item.id}": "5"}
+        path,
+        data=count_form(admin_client.get(path)) | {f"counted_{place.item.id}": "5"},
     )
     (counted,) = counts_written(session)
     assert counted.time_zone == "America/Chicago"
@@ -908,7 +898,8 @@ def test_a_count_of_one_item_leaves_the_others_as_they_are(
     with_cable(session, place)
     path = f"{COUNTS}/{place.store.id}?item={place.cable.id}"
     done = admin_client.post(
-        path, data=count_form(admin_client, path) | {f"counted_{place.cable.id}": "18"}
+        path,
+        data=count_form(admin_client.get(path)) | {f"counted_{place.cable.id}": "18"},
     )
     assert done.headers["location"] == f"{COUNTS}?notice=counted&section=count#count"
     assert expected(session, place.store.id) == {
@@ -924,7 +915,8 @@ def test_a_count_sent_back_keeps_its_filter(
     with_cable(session, place)
     path = f"{COUNTS}/{place.store.id}?item={place.cable.id}&q=cable"
     refused = admin_client.post(
-        path, data=count_form(admin_client, path) | {f"counted_{place.cable.id}": "x"}
+        path,
+        data=count_form(admin_client.get(path)) | {f"counted_{place.cable.id}": "x"},
     )
     assert refused.status_code == 400
     assert f'name="counted_{place.cable.id}" inputmode="decimal" value="x"' in (
@@ -941,7 +933,7 @@ def test_a_recount_keeps_its_filter(admin_client: TestClient, session: Session) 
     place = stocked(session)
     with_cable(session, place)
     path = f"{COUNTS}/{place.store.id}?q=litebeam"
-    shown = count_form(admin_client, path)
+    shown = count_form(admin_client.get(path))
     write(session, place)  # Three radios to the van.
     asked = admin_client.post(path, data=shown | {f"counted_{place.item.id}": "5"})
     assert asked.status_code == 409
@@ -956,7 +948,7 @@ def test_a_recount_shows_each_item_it_asks_for_though_the_search_no_longer_finds
     out of sight with its line unwritten."""
     place = stocked(session)
     path = f"{COUNTS}/{place.store.id}?q=litebeam"
-    shown = count_form(admin_client, path)
+    shown = count_form(admin_client.get(path))
     write(session, place)  # Three radios to the van.
     place.item.search_text = "renamed"
     session.commit()

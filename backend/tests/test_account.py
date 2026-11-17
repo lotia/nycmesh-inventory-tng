@@ -2,7 +2,7 @@
 
 import re
 from collections.abc import Callable
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, datetime
 
 import pytest
 from fastapi.testclient import TestClient
@@ -30,6 +30,7 @@ from helpers.sign_in import (
     app_clock,
     code,
     codes_with_left,
+    confirmed_ago,
     new_admin,
     once,
     other_session,
@@ -64,14 +65,6 @@ def this_row(session: Session) -> AdminSession:
     ).one()
 
 
-def close_window(session: Session) -> None:
-    for row in session.scalars(select(AdminSession)):
-        row.confirmed_at = row.last_sensitive_at = datetime.now(UTC) - timedelta(
-            hours=2
-        )
-    session.flush()
-
-
 def test_the_page_shows_the_account(
     client: TestClient,
     ada: tuple[Admin, str],
@@ -81,14 +74,7 @@ def test_the_page_shows_the_account(
     assert "(this one)" in page
     # Times in the site's zone, New York's by default.
     assert re.search(r"\d{4}-\d\d-\d\d \d\d:\d\d E[SD]T", page)
-
-
-def test_the_page_starts_with_links_to_each_section(
-    client: TestClient,
-    ada: tuple[Admin, str],
-) -> None:
-    """Each leads to a section on the page (docs/decisions/0019)."""
-    page = text(client.get(ACCOUNT))
+    # It starts with links, each to a section on the page (docs/decisions/0019).
     jumps = re.findall(r'<li><a href="#([\w-]+)">', page)
     assert jumps == [
         "email",
@@ -435,7 +421,7 @@ def test_a_late_form_asks_for_a_code_and_keeps_what_was_typed(
     ada: tuple[Admin, str],
 ) -> None:
     admin, key = ada
-    close_window(session)
+    confirmed_ago(session, hours=2)
     asked = client.post(f"{ACCOUNT}/email", data={"email": "ada@example.org"})
     assert asked.status_code == 403
     page = text(asked)
@@ -464,7 +450,7 @@ def test_a_late_password_form_never_writes_the_password_into_the_page(
     session: Session,
     ada: tuple[Admin, str],
 ) -> None:
-    close_window(session)
+    confirmed_ago(session, hours=2)
     form = {"password": NEW_PASSWORD, "password_again": NEW_PASSWORD}
     asked = client.post(f"{ACCOUNT}/password", data=form)
     assert asked.status_code == 403
@@ -491,7 +477,7 @@ def test_a_late_form_never_carries_a_secret_into_the_page(
     (inventory-tng-2qy6). Logged with the admin's id, not the field's
     name, which the browser chose."""
     admin, _ = ada
-    close_window(session)
+    confirmed_ago(session, hours=2)
     form = {"email": "ada@example.org", name: "hunter2"}
     with capture_logs() as logs:
         refused = client.post(f"{ACCOUNT}/email", data=form)
@@ -525,7 +511,7 @@ def test_a_late_new_authenticator_keeps_its_key(
 ) -> None:
     """The QR code already scanned stays good: its key comes back."""
     new_key = accounts.new_totp_key()
-    close_window(session)
+    confirmed_ago(session, hours=2)
     _, key = ada
     with app_clock() as at:
         form = {
@@ -547,7 +533,7 @@ def test_viewing_the_account_never_asks(
     session: Session,
     ada: tuple[Admin, str],
 ) -> None:
-    close_window(session)
+    confirmed_ago(session, hours=2)
     assert client.get(ACCOUNT).status_code == 200
 
 

@@ -53,6 +53,8 @@ from helpers.stock import (
     Place,
     Spools,
     ada_id,
+    count_at,
+    count_form,
     cut,
     length,
     received,
@@ -1529,27 +1531,6 @@ def test_a_place_brought_back_since_its_alert_draws_no_alert(
 # A count of an end puts it right (Ali, 2026-11-15, inventory-tng-qs8).
 
 
-def count_form_at(client: TestClient, place_id: int) -> dict[str, str]:
-    """A place's count form's hidden fields, as shown now: its key, and the
-    place's latest ledger entry then."""
-    page = client.get(f"{COUNTS}/{place_id}")
-    return dict(
-        re.findall(r'type="hidden" name="(key|as_of|items)" value="([^"]*)"', page.text)
-    )
-
-
-def count_at(
-    client: TestClient,
-    place_id: int,
-    lines: dict[str, str],
-    shown: dict[str, str] | None = None,
-) -> Response:
-    """A count of a place sent with `lines`, from its form as shown now, or
-    as `shown`."""
-    form = shown if shown is not None else count_form_at(client, place_id)
-    return client.post(f"{COUNTS}/{place_id}", data=form | lines)
-
-
 def radios_raised(client: TestClient, place: Place) -> None:
     """Three radios recorded moved from the store to the van, then one: two
     wait, loose at each end."""
@@ -1620,7 +1601,7 @@ def test_the_count_its_link_opens_counts_the_item_and_closes_it(
     count_at(admin_client, place.van.id, {f"counted_{place.item.id}": "1"})
     link = f"{COUNTS}/{place.store.id}?item={place.item.id}"
     assert f'name="counted_{place.cable.id}"' not in admin_client.get(link).text
-    form = count_form_at(admin_client, place.store.id)
+    form = count_form(admin_client.get(f"{COUNTS}/{place.store.id}"))
     done = admin_client.post(link, data=form | {f"counted_{place.item.id}": "2"})
     assert done.status_code == 303
     (check,) = checks(session)
@@ -1659,7 +1640,7 @@ def test_both_ends_counted_it_closes_as_counted_once(
 ) -> None:
     radios_raised(registered_client, place)
     count_at(admin_client, place.van.id, {f"counted_{place.item.id}": "1"})
-    shown = count_form_at(admin_client, place.store.id)
+    shown = count_form(admin_client.get(f"{COUNTS}/{place.store.id}"))
     with capture_logs() as logs:
         count_at(admin_client, place.store.id, {f"counted_{place.item.id}": "2"}, shown)
     at_van, at_store = count_ids(session)
@@ -1687,7 +1668,7 @@ def test_a_count_shown_before_it_moved_puts_nothing_right(
 ) -> None:
     """As of a moment before the move, it does not know of the move: the
     item moved since, so it is asked again, and nothing is put right."""
-    shown = count_form_at(admin_client, place.van.id)
+    shown = count_form(admin_client.get(f"{COUNTS}/{place.van.id}"))
     radios_raised(registered_client, place)
     count_at(admin_client, place.van.id, {f"counted_{place.item.id}": "1"}, shown)
     (check,) = checks(session)
@@ -2293,7 +2274,7 @@ def test_counting_its_place_from_the_row_counts_the_sealed_spool_and_closes_it(
     page = admin_client.get(link).text
     assert sealed_line(page, spools) == "0"
     assert f'name="counted_{spools.cable.id}"' not in page
-    form = count_form_at(admin_client, spools.store.id)
+    form = count_form(admin_client.get(f"{COUNTS}/{spools.store.id}"))
     done = admin_client.post(link, data=form | {sealed_field(spools): "1"})
     assert done.status_code == 303
     (check,) = checks(session)
@@ -2610,7 +2591,7 @@ def test_its_open_package_closed_on_a_count_whose_lines_were_withheld(
             OpenPackage.item_id == spools.cable.id, OpenPackage.id != open_id
         )
     )
-    shown = count_form_at(admin_client, spools.store.id)
+    shown = count_form(admin_client.get(f"{COUNTS}/{spools.store.id}"))
     spools.move(Entry(spools.cable.id, Decimal(5), Form(open_package_id=other.id)))
     session.commit()
     done = count_at(
@@ -2703,7 +2684,7 @@ def test_its_open_package_closed_then_its_sealed_spool_counted_closes_it(
     assert (
         f'<a href="{link}">' in admin_client.get(f"{PAGE}?item={spools.cable.id}").text
     )
-    form = count_form_at(admin_client, spools.store.id)
+    form = count_form(admin_client.get(f"{COUNTS}/{spools.store.id}"))
     with capture_logs() as logs:
         done = admin_client.post(link, data=form | {sealed_field(spools): "1"})
     assert done.status_code == 303

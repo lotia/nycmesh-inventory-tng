@@ -1,16 +1,20 @@
 """Stock to move: the rows a batch needs, batches written, and the forms
 and signs of the pages that put stock right."""
 
+import re
 import uuid
 from collections.abc import Mapping
 from datetime import UTC, datetime
 from decimal import Decimal
 from typing import Any, Protocol
 
+from fastapi.testclient import TestClient
+from httpx2 import Response
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from inventory_tng import open_packages, over_recorded
+from inventory_tng.admin.counts import COUNTS
 from inventory_tng.ledger import LOOSE, Batch, Entry, Form, insert_transaction, record
 from inventory_tng.models import (
     AdjustmentReason,
@@ -247,3 +251,24 @@ def cut(made: OpenPackage, quantity: str) -> dict[str, str]:
         "quantity": quantity,
         "open_package_key": str(made.key),
     }
+
+
+def count_form(page: Response) -> dict[str, str]:
+    """A count page's hidden fields, as it was shown: its key, the place's
+    latest ledger entry then, and the items it showed."""
+    return dict(
+        re.findall(r'type="hidden" name="(key|as_of|items)" value="([^"]*)"', page.text)
+    )
+
+
+def count_at(
+    client: TestClient,
+    place_id: int,
+    lines: dict[str, str],
+    shown: dict[str, str] | None = None,
+) -> Response:
+    """A count of a place sent with `lines`, from its form as shown now, or
+    as `shown`."""
+    path = f"{COUNTS}/{place_id}"
+    form = shown if shown is not None else count_form(client.get(path))
+    return client.post(path, data=form | lines)

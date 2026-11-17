@@ -192,3 +192,12 @@ def other_session(
 ) -> AdminSession:
     """Another session of theirs, as if signed in elsewhere."""
     return accounts.start_session(session, admin.id, user_agent, datetime.now(UTC))[0]
+
+
+def confirmed_ago(session: Session, *, hours: int) -> None:
+    """Every session's code typed `hours` ago, with nothing sensitive done
+    since, as confirming leaves it."""
+    for row in session.scalars(select(AdminSession)):
+        row.confirmed_at = datetime.now(UTC) - timedelta(hours=hours)
+        row.last_sensitive_at = None
+    session.flush()

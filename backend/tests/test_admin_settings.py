@@ -3,11 +3,9 @@
 import html
 import re
 from collections.abc import Callable
-from datetime import UTC, datetime, timedelta
 
 import pytest
 from fastapi.testclient import TestClient
-from sqlalchemy import select
 from sqlalchemy.orm import Session
 from structlog.testing import capture_logs
 
@@ -16,7 +14,6 @@ from inventory_tng.admin.common import PICK_A_ZONE
 from inventory_tng.admin.settings import SETTINGS, whole_minutes
 from inventory_tng.models import (
     NAME_CHECK_MINUTES,
-    AdminSession,
     ScanSettings,
     SignInSettings,
     SiteSettings,
@@ -24,7 +21,7 @@ from inventory_tng.models import (
 
 from helpers.mail import SentMail
 from helpers.rows import history, shown
-from helpers.sign_in import new_admin, sign_in_with, text, with_code
+from helpers.sign_in import confirmed_ago, new_admin, sign_in_with, text, with_code
 
 
 def test_shows_and_changes_the_name_check(
@@ -129,17 +126,10 @@ def test_sign_in_settings_refuse_what_cannot_be(
     assert session.get_one(SignInSettings, 1).totp_policy == "required"
 
 
-def _confirmed_long_ago(session: Session) -> None:
-    for row in session.scalars(select(AdminSession)):
-        row.confirmed_at = datetime.now(UTC) - timedelta(hours=2)
-        row.last_sensitive_at = None
-    session.flush()
-
-
 def test_sign_in_settings_ask_for_a_fresh_code(
     admin_client: TestClient, session: Session
 ) -> None:
-    _confirmed_long_ago(session)
+    confirmed_ago(session, hours=2)
     asked = admin_client.post(f"{SETTINGS}/sign-in", data=SIGN_IN_FORM)
     assert asked.status_code == 403
     assert session.get_one(SignInSettings, 1).totp_policy == "required"
@@ -150,7 +140,7 @@ def test_sign_in_settings_go_on_through_the_confirm_page(
 ) -> None:
     """Only a password typed is asked for again: the settings' own fields
     are carried, though the log masker masks their values (inventory-tng-pem)."""
-    _confirmed_long_ago(session)
+    confirmed_ago(session, hours=2)
     version = shown(session.get_one(SignInSettings, 1))
     form = SIGN_IN_FORM | {"sign_in_version": version}
     asked = admin_client.post(f"{SETTINGS}/sign-in", data=form)

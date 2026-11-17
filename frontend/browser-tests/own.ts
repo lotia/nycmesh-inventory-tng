@@ -1,10 +1,16 @@
 /**
  * Rows a test makes for itself, through the administrator pages, so that
  * what it changes no other test reads: tests run at once, in each browser,
- * against one database (playwright.config.ts).
+ * against one database (playwright.config.ts). And `record`, which saves
+ * the scan page's cart.
  */
 import { randomUUID } from "node:crypto";
-import { expect, type Locator, type Page } from "@playwright/test";
+import {
+  expect,
+  type Locator,
+  type Page,
+  type Response,
+} from "@playwright/test";
 import { assertNone, test as base, watch } from "./policy";
 import { prepared } from "./prepared";
 
@@ -115,6 +121,27 @@ export async function invite(
   const link = (await made.textContent()) ?? "";
   expect(link).toContain("/admin/reset?token=");
   return { username, link };
+}
+
+/**
+ * Records the scan page's cart, and gives its answer once the page lists it
+ * saved: the answer reaches the test before the page has used it, and the
+ * entry it changes moves those below it, which a tap meant for one may then
+ * miss.
+ */
+export async function record(page: Page): Promise<Response> {
+  const saving = page.waitForResponse(
+    (response) =>
+      response.url().endsWith("/api/transactions") &&
+      response.request().method() === "POST",
+  );
+  await page.getByRole("button", { name: "Record" }).click();
+  const response = await saving;
+  const saved = (await response.json()).transaction_id as number;
+  await expect(
+    page.getByText(`Recorded (transaction ${saved}).`),
+  ).toBeVisible();
+  return response;
 }
 
 /**
