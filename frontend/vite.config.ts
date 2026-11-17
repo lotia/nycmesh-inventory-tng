@@ -103,7 +103,7 @@ export default defineConfig({
       include: ["src/**/*.{ts,tsx}"],
       exclude: [
         // Test helpers, not the app.
-        "src/test-*.ts",
+        "src/test-*.{ts,tsx}",
         // Generated from the backend's schema (npm run api).
         "src/api/**",
         // Pages' entries: wiring that runs only in a browser.
