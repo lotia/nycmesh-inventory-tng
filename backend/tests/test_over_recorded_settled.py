@@ -188,18 +188,8 @@ def test_a_count_at_each_end_says_where_and_when(
 ) -> None:
     place = Place(session)
     moved(session, place)
-    assert (
-        count_at(
-            admin_client, place.van.id, {f"counted_{place.item.id}": "1"}
-        ).status_code
-        == 303
-    )
-    assert (
-        count_at(
-            admin_client, place.store.id, {f"counted_{place.item.id}": "2"}
-        ).status_code
-        == 303
-    )
+    count_at(admin_client, place.van.id, {f"counted_{place.item.id}": "1"})
+    count_at(admin_client, place.store.id, {f"counted_{place.item.id}": "2"})
     session.expire_all()
     check = session.scalars(select(OverRecorded)).one()
     assert check.settled_how == "counted"
@@ -221,12 +211,7 @@ def test_corrected_after_one_end_counted_names_the_other(
 ) -> None:
     place = Place(session)
     moved(session, place)
-    assert (
-        count_at(
-            admin_client, place.van.id, {f"counted_{place.item.id}": "1"}
-        ).status_code
-        == 303
-    )
+    count_at(admin_client, place.van.id, {f"counted_{place.item.id}": "1"})
     session.expire_all()
     check = session.scalars(select(OverRecorded)).one()
     over_recorded.correct(session, check.id, seen(check), ada_id(session))
@@ -325,7 +310,7 @@ def test_an_openings_ends_counted_name_their_forms(
     spools, check = opening(session)
     movement = session.get_one(Movement, check.movement_id)
     open_id = movement.to_open_package_id
-    done = count_at(
+    count_at(
         admin_client,
         spools.store.id,
         {
@@ -333,7 +318,6 @@ def test_an_openings_ends_counted_name_their_forms(
             f"opened_{open_id}": "305",
         },
     )
-    assert done.status_code == 303
     session.expire_all()
     check = session.get_one(OverRecorded, check.id)
     assert check.settled_how == "counted"
@@ -475,12 +459,11 @@ def test_an_openings_sealed_end_counted_then_closed_says_so(
     spools, check = opening(session)
     movement = session.get_one(Movement, check.movement_id)
     assert movement.to_open_package_id is not None
-    done = count_at(
+    count_at(
         admin_client,
         spools.store.id,
         {f"sealed_{spools.cable.id}_{spools.spool.id}": "1"},
     )
-    assert done.status_code == 303
     at = datetime(2026, 11, 20, 15, tzinfo=UTC)
     closed = open_packages.close(
         session, movement.to_open_package_id, ada_id(session), at
@@ -515,12 +498,11 @@ def test_both_ends_right_then_closed_names_the_count_and_the_close(
     spools, check = opening(session)
     movement = session.get_one(Movement, check.movement_id)
     assert movement.to_open_package_id is not None
-    done = count_at(
+    count_at(
         admin_client,
         spools.store.id,
         {f"sealed_{spools.cable.id}_{spools.spool.id}": "1"},
     )
-    assert done.status_code == 303
     at = datetime(2026, 11, 20, 15, tzinfo=UTC)
     with monkeypatch.context() as patched:
         patched.setattr(over_recorded, "open_package_closed", lambda *_: 0)
@@ -558,18 +540,12 @@ def test_one_end_only_counted_names_that_end(
     place = Place(session)
     install = write(session, place, kind="install", to_location_id=None)
     used = raised(session, install)
-    assert (
-        count_at(
-            admin_client, place.store.id, {f"counted_{place.item.id}": "0"}
-        ).status_code
-        == 303
-    )
+    count_at(admin_client, place.store.id, {f"counted_{place.item.id}": "0"})
     spools, check = moved_whole(session)
     movement = session.get_one(Movement, check.movement_id)
-    done = count_at(
+    count_at(
         admin_client, spools.van.id, {f"opened_{movement.to_open_package_id}": "1"}
     )
-    assert done.status_code == 303
     session.expire_all()
     zone = site_zone(session)
 

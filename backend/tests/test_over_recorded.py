@@ -1559,8 +1559,7 @@ def test_a_count_after_it_puts_that_end_right_and_says_what_is_left(
 ) -> None:
     radios_raised(registered_client, place)
     with capture_logs() as logs:
-        done = count_at(admin_client, place.van.id, {f"counted_{place.item.id}": "1"})
-    assert done.status_code == 303
+        count_at(admin_client, place.van.id, {f"counted_{place.item.id}": "1"})
     (counted,) = count_ids(session)
     (check,) = checks(session)
     assert (check.left_count_id, check.arrived_count_id) == (None, counted)
@@ -1670,7 +1669,9 @@ def test_a_count_shown_before_it_moved_puts_nothing_right(
     item moved since, so it is asked again, and nothing is put right."""
     shown = count_form(admin_client.get(f"{COUNTS}/{place.van.id}"))
     radios_raised(registered_client, place)
-    count_at(admin_client, place.van.id, {f"counted_{place.item.id}": "1"}, shown)
+    count_at(
+        admin_client, place.van.id, {f"counted_{place.item.id}": "1"}, shown, status=409
+    )
     (check,) = checks(session)
     assert (check.left_count_id, check.arrived_count_id) == (None, None)
 
@@ -1947,10 +1948,7 @@ def test_a_total_count_of_an_opening_puts_nothing_right(
     form (inventory-tng-dd8)."""
     spools = Spools(session, tracked=False)
     opening_raised(registered_client, spools)
-    done = count_at(
-        admin_client, spools.store.id, {f"counted_{spools.cable.id}": "610"}
-    )
-    assert done.status_code == 303
+    count_at(admin_client, spools.store.id, {f"counted_{spools.cable.id}": "610"})
     (check,) = checks(session)
     assert (check.left_count_id, check.arrived_count_id) == (None, None)
     assert check.settled_at is None
@@ -2196,12 +2194,11 @@ def test_its_open_package_not_closed_by_the_count_puts_no_end_right(
     check = opening_raised(registered_client, spools)
     open_id = opened_into(session, check).open_package_id
     monkeypatch.setattr(open_packages, "close", lambda *_, **__: None)
-    done = count_at(
+    count_at(
         admin_client,
         spools.store.id,
         {f"opened_{open_id}": "", f"state_{open_id}": "missing"},
     )
-    assert done.status_code == 303
     (check,) = checks(session)
     assert (check.left_count_id, check.arrived_count_id) == (None, None)
 
@@ -2594,7 +2591,7 @@ def test_its_open_package_closed_on_a_count_whose_lines_were_withheld(
     shown = count_form(admin_client.get(f"{COUNTS}/{spools.store.id}"))
     spools.move(Entry(spools.cable.id, Decimal(5), Form(open_package_id=other.id)))
     session.commit()
-    done = count_at(
+    count_at(
         admin_client,
         spools.store.id,
         {
@@ -2603,8 +2600,8 @@ def test_its_open_package_closed_on_a_count_whose_lines_were_withheld(
             f"state_{open_id}": "missing",
         },
         shown,
+        status=409,
     )
-    assert done.status_code == 409
     assert count_ids(session) == []
     (check,) = checks(session)
     assert (check.left_count_id, check.arrived_count_id) == (None, None)
@@ -2707,8 +2704,7 @@ def test_a_moves_open_package_closed_then_its_place_counted_puts_nothing_right(
     spools = Spools(session)
     made = moved_whole(registered_client, spools)
     closed_from_its_item(admin_client, spools, made.id)
-    done = count_at(admin_client, spools.van.id, {f"loose_{spools.cable.id}": "0"})
-    assert done.status_code == 303
+    count_at(admin_client, spools.van.id, {f"loose_{spools.cable.id}": "0"})
     assert count_ids(session) != []
     (check,) = checks(session)
     assert check.settled_at is None
@@ -2739,12 +2735,11 @@ def closed_on_a_count(admin_client: TestClient, spools: Spools, open_id: int) ->
     """Said used up on a later count of its place: the close settles it
     before the count's own rows (over_recorded.counted), which then leave
     it be."""
-    done = count_at(
+    count_at(
         admin_client,
         spools.store.id,
         {f"opened_{open_id}": "", f"state_{open_id}": "used_up"},
     )
-    assert done.status_code == 303
 
 
 @pytest.mark.parametrize(

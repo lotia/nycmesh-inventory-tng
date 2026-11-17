@@ -266,9 +266,13 @@ def count_at(
     place_id: int,
     lines: dict[str, str],
     shown: dict[str, str] | None = None,
+    *,
+    status: int = 303,
 ) -> Response:
     """A count of a place sent with `lines`, from its form as shown now, or
-    as `shown`."""
+    as `shown`, answered with `status`: saved, unless said otherwise."""
     path = f"{COUNTS}/{place_id}"
     form = shown if shown is not None else count_form(client.get(path))
-    return client.post(path, data=form | lines)
+    response = client.post(path, data=form | lines)
+    assert response.status_code == status
+    return response

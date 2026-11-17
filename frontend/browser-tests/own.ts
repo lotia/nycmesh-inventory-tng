@@ -137,6 +137,8 @@ export async function record(page: Page): Promise<Response> {
   );
   await page.getByRole("button", { name: "Record" }).click();
   const response = await saving;
+  // Refused, it has no transaction to wait for: said now, not timed out.
+  expect(response.ok()).toBe(true);
   const saved = (await response.json()).transaction_id as number;
   await expect(
     page.getByText(`Recorded (transaction ${saved}).`),
