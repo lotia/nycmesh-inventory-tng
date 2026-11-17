@@ -18,7 +18,7 @@ from starlette.types import Scope
 
 from inventory_tng.db import Gone
 from inventory_tng.local_time import show, show_day
-from inventory_tng.phrases import BRAND, install, lazy_gettext, ngettext
+from inventory_tng.phrases import BRAND, install, lazy_gettext, ngettext, number
 
 templates = Jinja2Templates(directory=Path(__file__).parent / "templates")
 install(templates.env)
@@ -28,6 +28,8 @@ cast(dict[str, Any], templates.env.globals)["BRAND"] = BRAND
 # (docs/decisions/0013); {{ moment | day(zone) }}, its day alone ("14 Nov").
 templates.env.filters["when"] = show
 templates.env.filters["day"] = show_day
+# {{ size | number }}: a number as the active locale writes it ("1,000").
+templates.env.filters["number"] = number
 
 
 def amount(value: Decimal | None) -> str:

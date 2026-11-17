@@ -8,12 +8,14 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from decimal import Decimal
+from io import StringIO
 from types import SimpleNamespace
 from typing import get_args
 from zoneinfo import ZoneInfo, available_timezones
 
 import pytest
 from babel.messages.catalog import Catalog, Message
+from babel.messages.pofile import read_po
 from babel.support import LazyProxy, Translations
 from fastapi.testclient import TestClient
 from sqlalchemy import select
@@ -1023,6 +1025,14 @@ def test_a_lists_numbers_are_written_as_the_locale_writes_them() -> None:
     assert "Page 1.000 of 2.000" in shown
     assert "1.500 of 3, matching" in shown
     assert number(1000) == "1,000"
+
+
+def test_a_language_babel_does_not_know_writes_numbers_as_english() -> None:
+    """A pseudo-locale's code, such as en_XA, names no locale Babel knows:
+    its numbers read as English's, so its pages still show."""
+    header = 'msgid ""\nmsgstr ""\n"Language: en_XA\\n"\n'
+    with speaking(compiled(read_po(StringIO(header)))):
+        assert number(1000) == "1,000"
 
 
 def test_a_lists_all_is_said_in_the_locale() -> None:

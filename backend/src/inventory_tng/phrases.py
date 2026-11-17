@@ -17,6 +17,7 @@ from contextlib import contextmanager
 from io import BytesIO
 from pathlib import Path
 
+from babel import localedata
 from babel.messages.catalog import Catalog
 from babel.messages.mofile import write_mo
 from babel.messages.pofile import read_po
@@ -80,8 +81,11 @@ def ngettext(singular: str, plural: str, num: int, **values: object) -> str:
 
 def number(value: int) -> str:
     """`value` as the active locale writes it, such as 1,000 in English and
-    1.000 in German: its catalogue's language, English if it names none."""
-    return format_decimal(value, locale=_active.info().get("language") or "en")
+    1.000 in German: its catalogue's language, English if it names none
+    Babel knows (a pseudo-locale's, such as en_XA)."""
+    language = _active.info().get("language")
+    known = language if language and localedata.exists(language) else "en"
+    return format_decimal(value, locale=known)
 
 
 # A phrase as code holds it: said already, or a lazy one said when shown.
@@ -112,10 +116,9 @@ def in_query(phrase: Words) -> BindParameter[str]:
 
 def install(environment: Environment) -> None:
     """Give `environment` Jinja's i18n extension, reading the active
-    catalogue, and the `number` filter: newstyle, so a message's values are escaped and filled as in
+    catalogue: newstyle, so a message's values are escaped and filled as in
     Python, and trimmed, so a message's lines read as one."""
     environment.add_extension("jinja2.ext.i18n")
-    environment.filters["number"] = number
     environment.policies["ext.i18n.trimmed"] = True
     # The extension adds this method, which the type checker cannot see.
     environment.install_gettext_callables(  # ty: ignore[unresolved-attribute]
