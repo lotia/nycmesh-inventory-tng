@@ -361,8 +361,8 @@ def test_a_repeated_item_names_each_of_its_lines(
 
 
 def test_a_transaction_has_movements(session: Session, place: Place) -> None:
-    """All but a count, which may find what the records say (migration
-    0009)."""
+    """All but a count, which may find what the records say (the initial
+    migration)."""
     header = {"kind": "receipt", "to_location_id": place.store.id}
     with breaks(session, "ledger_transaction_lines"):
         insert_transaction(session, uuid.uuid4(), header, [])

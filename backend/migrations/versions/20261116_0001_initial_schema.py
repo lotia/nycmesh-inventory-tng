@@ -96,7 +96,9 @@ GRANTS: dict[str, tuple[str, tuple[str, ...]]] = {
     ),
     "item_alias": ("UPDATE", ("retired_at", "unit_key", "name_shown")),
 }
-# names.name_key_sql's, written out: migrations do not import the app.
+# names.name_key_sql's, written out, so the CHECKs keep the rule they were
+# made with when names.py changes; by code point, as ruff refuses the
+# look-alikes themselves.
 # names._LOOK_ALIKE's code points, by the ASCII character each is read as.
 LOOK_ALIKE = {
     " ": (0x00A0, 0x1680, *range(0x2000, 0x200B), 0x202F, 0x205F, 0x3000),
@@ -292,7 +294,6 @@ def upgrade() -> None:
         "category",
         [sa.literal_column("lower(name)")],
         unique=True,
-        postgresql_where=None,
     )
     op.create_table(
         "rate_limit",

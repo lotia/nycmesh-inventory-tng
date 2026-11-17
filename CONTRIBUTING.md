@@ -295,7 +295,8 @@ has the rule: one pattern and one table of look-alikes
 (`name_key_sql`), and a test checks both agree on every character. To
 change the rule, change `names.py` and add a migration that writes the
 CHECKs out again (items', packages' and aliases') and refills every key,
-naming by id any rows that would then clash.
+naming by id any rows that would then clash. The initial migration's
+`NAME_KEY` shows how to write them out by code point.
 
 Every name an administrator types is stored in canonical spelling
 (`models.canonical`, decision 0021): NFC, with `µ` as `μ` and `℃` and `℉`
