@@ -71,7 +71,9 @@ async function leave(page: Page, ...saves: unknown[][]) {
   return { volunteerId, fromId, toId };
 }
 
-/** Saves the cart, and what it sent. */
+/** Saves the cart, and what it sent, once the page lists it saved: the
+ * answer reaches the test before the page has used it, and the entry it
+ * changes moves those below it, which a tap meant for one may then miss. */
 async function save(page: Page) {
   const saving = page.waitForResponse(
     (response) =>
@@ -81,6 +83,10 @@ async function save(page: Page) {
   await page.getByRole("button", { name: "Record" }).click();
   const response = await saving;
   expect(response.status()).toBe(201);
+  const saved = (await response.json()).transaction_id as number;
+  await expect(
+    page.getByText(`Recorded (transaction ${saved}).`),
+  ).toBeVisible();
   return response.request().postDataJSON();
 }
 
