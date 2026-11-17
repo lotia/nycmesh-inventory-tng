@@ -693,7 +693,7 @@ msgstr ""
 msgid "A whole number of packages, or blank."
 msgstr ""
 
-#: src/inventory_tng/admin/counts.py
+#: src/inventory_tng/stock/forms.py
 msgid "A whole number of packages."
 msgstr ""
 
@@ -1534,7 +1534,7 @@ msgstr ""
 msgid "Found or written off"
 msgstr ""
 
-#: src/inventory_tng/admin/counts.py
+#: src/inventory_tng/stock/forms.py
 msgid "Found or written off?"
 msgstr ""
 
@@ -1627,11 +1627,11 @@ msgstr ""
 msgid "How much"
 msgstr ""
 
-#: src/inventory_tng/admin/counts.py
+#: src/inventory_tng/stock/forms.py
 msgid "How much is left on it."
 msgstr ""
 
-#: src/inventory_tng/admin/counts.py
+#: src/inventory_tng/stock/forms.py
 msgid "How much."
 msgstr ""
 
@@ -2073,15 +2073,15 @@ msgstr ""
 msgid "No current administrator has that username."
 msgstr ""
 
-#: src/inventory_tng/admin/counts.py
+#: src/inventory_tng/stock/forms.py
 msgid "No such item."
 msgstr ""
 
-#: src/inventory_tng/admin/counts.py
+#: src/inventory_tng/stock/forms.py
 msgid "No such open package here."
 msgstr ""
 
-#: src/inventory_tng/admin/counts.py
+#: src/inventory_tng/stock/forms.py
 msgid "No such package."
 msgstr ""
 
@@ -2585,11 +2585,11 @@ msgstr ""
 msgid "Pick a current label to print."
 msgstr ""
 
-#: src/inventory_tng/admin/counts.py
+#: src/inventory_tng/stock/forms.py
 msgid "Pick a place."
 msgstr ""
 
-#: src/inventory_tng/admin/counts.py
+#: src/inventory_tng/stock/forms.py
 msgid "Pick a reason."
 msgstr ""
 
@@ -2601,7 +2601,7 @@ msgstr ""
 msgid "Pick a zone from the list."
 msgstr ""
 
-#: src/inventory_tng/admin/counts.py
+#: src/inventory_tng/stock/forms.py
 msgid "Pick an item."
 msgstr ""
 
@@ -3590,7 +3590,7 @@ msgstr ""
 msgid "That is its name already."
 msgstr ""
 
-#: src/inventory_tng/admin/counts.py
+#: src/inventory_tng/stock/forms.py
 msgid "That is more than the inventory can count."
 msgstr ""
 
@@ -3815,7 +3815,7 @@ msgstr ""
 msgid "This changes something that matters, so it needs a fresh password."
 msgstr ""
 
-#: src/inventory_tng/admin/counts.py
+#: src/inventory_tng/stock/forms.py
 msgid "This form is out of date: try again."
 msgstr ""
 
@@ -3823,7 +3823,7 @@ msgstr ""
 msgid "This item is counted in whole units."
 msgstr ""
 
-#: src/inventory_tng/admin/counts.py
+#: src/inventory_tng/stock/forms.py
 msgid "This item is on the form more than once."
 msgstr ""
 

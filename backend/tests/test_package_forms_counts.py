@@ -10,9 +10,9 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from inventory_tng import ledger
-from inventory_tng.admin import counts
 from inventory_tng.ledger import LOOSE, Entry, Form
 from inventory_tng.models import AdjustmentReason, Admin, LedgerTransaction, OpenPackage
+from inventory_tng.stock import forms as stock_forms
 
 from helpers.markup import text
 from helpers.package_forms import CABLE, OPEN, SEALED, open_form, quantities_by_form
@@ -172,13 +172,13 @@ def test_the_count_page_counts_sealed_and_says_whats_wrong(
     response = admin_client.post(f"{COUNTS}/{store}", data=bad)
     # Refused whole; what the page shows a field for is said by it.
     assert response.status_code == 400
-    assert str(counts.WHOLE_PACKAGES) in text(response)
+    assert str(stock_forms.WHOLE_PACKAGES) in text(response)
     left = base | {
         "key": str(uuid.uuid4()),
         "found_package_id": str(spool),
         "found_left": "",
     }
-    assert str(counts.HOW_MUCH_LEFT) in text(
+    assert str(stock_forms.HOW_MUCH_LEFT) in text(
         admin_client.post(f"{COUNTS}/{store}", data=left)
     )
 

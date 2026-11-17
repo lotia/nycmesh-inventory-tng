@@ -16,19 +16,7 @@ from sqlalchemy.orm import Session
 from structlog.testing import capture_logs
 
 from inventory_tng import items, locations
-from inventory_tng.admin.counts import (
-    ADJUSTMENTS,
-    COUNT_KIND,
-    COUNTS,
-    FOUND_OR_OFF,
-    ON_THE_FORM_TWICE,
-    OUT_OF_DATE,
-    PICK_A_PLACE,
-    PICK_A_REASON,
-    PICK_AN_ITEM,
-    lines,
-    named_twice,
-)
+from inventory_tng.admin.counts import ADJUSTMENTS, COUNT_KIND, COUNTS
 from inventory_tng.admin.settings import REASON_TAKEN, SETTINGS
 from inventory_tng.admin.stock import STOCK
 from inventory_tng.core.db import RuleBroken
@@ -51,6 +39,16 @@ from inventory_tng.models import (
     Movement,
 )
 from inventory_tng.pages import retired_holding
+from inventory_tng.stock.forms import (
+    FOUND_OR_OFF,
+    ON_THE_FORM_TWICE,
+    OUT_OF_DATE,
+    PICK_A_PLACE,
+    PICK_A_REASON,
+    PICK_AN_ITEM,
+    lines,
+    named_twice,
+)
 from inventory_tng.web.forms import ABOVE_ZERO, RULES, TYPE_A_NUMBER, WHOLE_UNITS
 
 from helpers.concurrency import Committed
