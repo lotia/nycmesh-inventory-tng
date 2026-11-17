@@ -7,7 +7,6 @@ from typing import Annotated
 import structlog
 from fastapi import APIRouter, Form, Request
 from fastapi.responses import HTMLResponse, Response
-from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from inventory_tng import categories
@@ -25,9 +24,10 @@ from inventory_tng.admin.common import (
 )
 from inventory_tng.admin.listing import AskedView, Sort, Sorting, View, arranged
 from inventory_tng.admins.guards import AdminSignedIn, SignedIn
+from inventory_tng.catalogue import queries
 from inventory_tng.core.db import DbSession, refusal
 from inventory_tng.core.phrases import Words, lazy_gettext
-from inventory_tng.models import Category, Item
+from inventory_tng.models import Category
 from inventory_tng.pages import not_found, redirect
 
 log = structlog.get_logger(__name__)
@@ -39,16 +39,6 @@ TAKEN = lazy_gettext(
     "There is already a category by that name, perhaps a retired one: "
     "bring that back instead."
 )
-
-
-def _items(session: Session) -> dict[int, int]:
-    """How many current items each category has."""
-    rows = session.execute(
-        select(Item.category_id, func.count())
-        .where(Item.retired_at.is_(None))
-        .group_by(Item.category_id)
-    )
-    return {category_id: count for category_id, count in rows}
 
 
 # How the categories list sorts, each row a category and how many current
@@ -73,8 +63,8 @@ def _list_page(
     view: View | None = None,
     undo: str | None = None,
 ) -> HTMLResponse:
-    rows = session.scalars(select(Category).order_by(func.lower(Category.name))).all()
-    items = _items(session)
+    rows = queries.categories_by_name(session)
+    items = queries.current_items_by_category(session)
     current, view = arranged(
         ((c, items.get(c.id, 0)) for c in rows if c.retired_at is None),
         view or View.read(CATEGORIES, SORTING),
@@ -106,11 +96,7 @@ def _category_page(
     problem: Words | None = None,
     alert: Words | None = None,
 ) -> HTMLResponse:
-    items = session.scalars(
-        select(Item)
-        .where(Item.category_id == category.id, Item.retired_at.is_(None))
-        .order_by(func.lower(Item.name))
-    ).all()
+    items = queries.current_items_of(session, category.id)
     return admin_page(
         request,
         signed,
