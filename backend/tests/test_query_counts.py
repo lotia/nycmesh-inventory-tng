@@ -9,7 +9,6 @@ from collections.abc import Callable, Iterator
 import pytest
 from fastapi import FastAPI
 from fastapi.routing import iter_route_contexts
-from fastapi.testclient import TestClient
 from sqlalchemy import select
 
 from inventory_tng.db import lock_catalogue
@@ -20,17 +19,18 @@ from helpers.queries import counting
 
 # A world with one of what each page lists, and one with eleven, each built
 # once for the module.
-ONE = 1
-ELEVEN = 11
 
 
 @pytest.fixture(scope="module")
-def worlds(migrated_template: str) -> Iterator[dict[int, Built]]:
-    with (
-        built(migrated_template, ONE) as one,
-        built(migrated_template, ELEVEN) as eleven,
-    ):
-        yield {ONE: one, ELEVEN: eleven}
+def one(migrated_template: str) -> Iterator[Built]:
+    with built(migrated_template, 1) as world:
+        yield world
+
+
+@pytest.fixture(scope="module")
+def eleven(migrated_template: str) -> Iterator[Built]:
+    with built(migrated_template, 11) as world:
+        yield world
 
 
 def test_every_admin_page_is_measured(
@@ -83,14 +83,12 @@ CASES = [
 def test_a_page_reads_alike_for_one_row_or_eleven(
     route: str,
     where: Path,
-    worlds: dict[int, Built],
-    make_client: Callable[..., TestClient],
+    one: Built,
+    eleven: Built,
 ) -> None:
-    def read(times: int) -> tuple[int, int]:
-        """The statements the page sent, and how long it is, in the world
-        with `times` of what it lists."""
-        world = worlds[times]
-        with world.visit(make_client, device=route == CATALOGUE) as (client, session):
+    def read(world: Built) -> tuple[int, int]:
+        """The statements the page sent, and how long it is, in `world`."""
+        with world.visit(device=route == CATALOGUE) as (client, session):
             url = path(where, world.world)
             # Warmed first: what a first request reads once, such as settings.
             warmed = client.get(url)
@@ -103,11 +101,11 @@ def test_a_page_reads_alike_for_one_row_or_eleven(
         assert response.status_code == 200, (url, response.status_code)
         return len(sent), len(response.content)
 
-    one, shorter = read(ONE)
-    eleven, longer = read(ELEVEN)
+    few, shorter = read(one)
+    many, longer = read(eleven)
     # Else what it adds is not what the page lists.
     assert longer > shorter, f"{route} shows nothing more"
-    assert eleven == one, f"{route}: {one} statements for one row, {eleven} for eleven"
+    assert many == few, f"{route}: {few} statements for one row, {many} for eleven"
 
 
 # Pages that name no item or package, and why the one that does names them
@@ -136,15 +134,13 @@ NAMES_AS_TYPED = {"/admin/unit-readings/seed"}
 def test_every_page_names_items_and_packages_as_shown(
     route: str,
     where: Path,
-    worlds: dict[int, Built],
-    make_client: Callable[..., TestClient],
+    one: Built,
 ) -> None:
     """Each name ending in `1,000ft`, as typed, is read as `1000 ft` with a
     no-break space (models.KeyedName.name_shown), on every page and the
     scan page's catalogue; only a form's field holds it as typed (Ali,
     2026-11-15, inventory-tng-ist.3)."""
-    world = worlds[ONE]
-    with world.visit(make_client, device=route == CATALOGUE) as (client, session):
+    with one.visit(device=route == CATALOGUE) as (client, session):
         lock_catalogue(session)
         for row in [
             *session.scalars(select(Item)),
@@ -152,7 +148,7 @@ def test_every_page_names_items_and_packages_as_shown(
         ]:
             row.name = f"{row.name} 1,000ft"
         session.flush()
-        url = path(where, world.world)
+        url = path(where, one.world)
         response = client.get(url)
     assert response.status_code == 200, url
     if response.headers["content-type"].startswith("application/json"):

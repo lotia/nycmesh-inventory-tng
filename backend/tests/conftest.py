@@ -2,7 +2,6 @@
 server and dropped when the run ends. Each test's writes are rolled back."""
 
 import contextlib
-import dataclasses
 import functools
 import logging
 import os
@@ -21,7 +20,6 @@ from sqlalchemy.engine.interfaces import DBAPIConnection
 from sqlalchemy.orm import Session
 
 from inventory_tng import accounts, db, devices, local_env
-from inventory_tng.app import create_app
 from inventory_tng.database_role import refusals
 from inventory_tng.db import (
     Database,
@@ -31,9 +29,8 @@ from inventory_tng.db import (
 )
 from inventory_tng.history import LEDGER
 from inventory_tng.logs import configure_structlog
-from inventory_tng.mail import get_mailer
 from inventory_tng.models import Category, ItemPackage, RateLimit
-from inventory_tng.settings import FrontendConfig, LogConfig, RateLimits, Settings
+from inventory_tng.settings import FrontendConfig, LogConfig, RateLimits
 
 from databases import (
     NO_DATABASE,
@@ -46,15 +43,15 @@ from databases import (
     new_database,
     refused_connection,
 )
-from helpers.apps import on_session
+from helpers.apps import new_app, on_session
 from helpers.categories import marked_against_its_needs, needs_database
 from helpers.clone_files import text_files
 from helpers.concurrency import LOCK_TIMEOUT, Committed, delete_made, newest_ids
 from helpers.devices import new_device
-from helpers.mail import SITE_MAIL, SentMail
+from helpers.mail import SentMail
 from helpers.pools import checked_out
 from helpers.rows import add, rolled_back
-from helpers.sign_in import TOTP_KEY, TOTP_KEYS, new_admin, sign_in_with
+from helpers.sign_in import TOTP_KEY, new_admin, sign_in_with
 from helpers.stock import Place, Spools
 
 # structlog's lines go through the standard library, where caplog sees them.
@@ -554,40 +551,6 @@ def committed(
     delete_made(owner_engine, before)
 
 
-def _app(
-    database_url: str,
-    logging: LogConfig | None = None,
-    frontend: FrontendConfig | None = None,
-    *,
-    development: bool = False,
-    setup_token: str | None = None,
-    recovery_token: str | None = None,
-    mailer: SentMail | None = None,
-    rate_limits: RateLimits | None = None,
-    reached: list[str] | None = None,
-) -> FastAPI:
-    """`reached` collects the pools of any connection the app tries to make,
-    for an app that is to have none (make_app_without_database)."""
-    settings = Settings(
-        database_url=database_url,
-        development=development,
-        setup_token=setup_token,
-        recovery_token=recovery_token,
-        logging=logging or LogConfig(),
-        frontend=frontend or FrontendConfig(),
-        rate_limits=rate_limits or RateLimits(),
-    )
-    if mailer is not None:
-        settings = dataclasses.replace(settings, mail=SITE_MAIL)
-    # Its login is checked once, by `engine`, if it has a database at all.
-    app = create_app(settings, totp_keys=TOTP_KEYS, startup_checks=False)
-    app.dependency_overrides[get_mailer] = lambda: mailer
-    if reached is not None:
-        for name, pool in app.state.db.pools.items():
-            event.listen(pool, "do_connect", lambda *_, name=name: reached.append(name))
-    return app
-
-
 @pytest.fixture
 def make_app_without_database() -> Iterator[Callable[..., FastAPI]]:
     """Apps with no database behind them (NO_DATABASE), and no test session
@@ -595,14 +558,14 @@ def make_app_without_database() -> Iterator[Callable[..., FastAPI]]:
     database fails the test, whatever its request answered (a 503). make_app's
     settings, without `own_sessions` and `on`."""
     reached: list[str] = []
-    yield functools.partial(_app, NO_DATABASE, reached=reached)
+    yield functools.partial(new_app, NO_DATABASE, reached=reached)
     assert reached == [], f"requests reached for the database, on {reached}"
 
 
 @pytest.fixture
 def make_app(database_url: str, session: Session) -> Callable[..., FastAPI]:
-    """Apps on the test database, or the one at `url`, whose requests use
-    the test's session, or the one given `on`."""
+    """Apps on the test database, whose requests use the test's session, or
+    the one given `on`."""
 
     def make(
         logging: LogConfig | None = None,
@@ -615,10 +578,9 @@ def make_app(database_url: str, session: Session) -> Callable[..., FastAPI]:
         rate_limits: RateLimits | None = None,
         own_sessions: bool = False,
         on: Session | None = None,
-        url: str | None = None,
     ) -> FastAPI:
-        app = _app(
-            url or database_url,
+        app = new_app(
+            database_url,
             logging,
             frontend,
             development=development,

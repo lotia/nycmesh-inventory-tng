@@ -1,10 +1,13 @@
 """What an app under test is given."""
 
+import dataclasses
 from collections.abc import Callable, Generator, Iterator
 from contextlib import contextmanager
 from typing import Any
 
+from fastapi import FastAPI
 from fastapi.testclient import TestClient
+from sqlalchemy import event
 from sqlalchemy.orm import Session
 
 from inventory_tng.app import create_app
@@ -17,9 +20,12 @@ from inventory_tng.db import (
     get_snapshot,
     release_hold,
 )
-from inventory_tng.settings import LogConfig, Settings
+from inventory_tng.mail import get_mailer
+from inventory_tng.settings import FrontendConfig, LogConfig, RateLimits, Settings
 
 from databases import NO_DATABASE
+from helpers.mail import SITE_MAIL, SentMail
+from helpers.sign_in import TOTP_KEYS
 
 
 @contextmanager
@@ -85,3 +91,37 @@ def out_of_reach(logging: LogConfig | None = None) -> TestClient:
     started: started, the app would refuse it (database_role.check)."""
     settings = Settings(database_url=NO_DATABASE, logging=logging or LogConfig())
     return TestClient(create_app(settings))
+
+
+def new_app(
+    database_url: str,
+    logging: LogConfig | None = None,
+    frontend: FrontendConfig | None = None,
+    *,
+    development: bool = False,
+    setup_token: str | None = None,
+    recovery_token: str | None = None,
+    mailer: SentMail | None = None,
+    rate_limits: RateLimits | None = None,
+    reached: list[str] | None = None,
+) -> FastAPI:
+    """An app as tests make it (conftest's make_app). `reached` collects the pools of any connection the app tries to make,
+    for an app that is to have none (make_app_without_database)."""
+    settings = Settings(
+        database_url=database_url,
+        development=development,
+        setup_token=setup_token,
+        recovery_token=recovery_token,
+        logging=logging or LogConfig(),
+        frontend=frontend or FrontendConfig(),
+        rate_limits=rate_limits or RateLimits(),
+    )
+    if mailer is not None:
+        settings = dataclasses.replace(settings, mail=SITE_MAIL)
+    # Its login is checked once, by `engine`, if it has a database at all.
+    app = create_app(settings, totp_keys=TOTP_KEYS, startup_checks=False)
+    app.dependency_overrides[get_mailer] = lambda: mailer
+    if reached is not None:
+        for name, pool in app.state.db.pools.items():
+            event.listen(pool, "do_connect", lambda *_, name=name: reached.append(name))
+    return app

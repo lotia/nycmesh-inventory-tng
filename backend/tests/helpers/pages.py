@@ -8,6 +8,7 @@ from dataclasses import dataclass, field
 from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 
+from fastapi import FastAPI
 from fastapi.testclient import TestClient
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
@@ -31,9 +32,10 @@ from inventory_tng.models import (
 )
 
 from databases import new_database
+from helpers.apps import new_app, on_session
 from helpers.devices import ADDRESS, new_device
 from helpers.rows import add, rolled_back, setting_up, tag
-from helpers.sign_in import admin_named, new_admin, sealed
+from helpers.sign_in import new_admin, sealed
 from helpers.stock import (
     Spools,
     cut,
@@ -66,6 +68,7 @@ class World:
     a device is registered with it."""
 
     session: Session
+    ada_id: int
     spools: Spools
     opened: OpenPackage
     area: Location
@@ -109,7 +112,7 @@ def base(session: Session) -> World:
     retired_item = add(session, Item(name="Old", category_id=retired_category.id))
     retired_place = add(session, Location(name="Old", kind="store"))
     retire(session, retired_item, retired_category, retired_place)
-    stock_to_put_right(spools, ada.id)
+    stock_to_put_right(spools)
     other = add(session, Volunteer(name="Other"))
     merged = add(
         session,
@@ -124,8 +127,9 @@ def base(session: Session) -> World:
     other_admin, _ = new_admin(session, "grace", email="grace@example.org")
     retired_admin, _ = new_admin(session, "hopper", totp=False)
     retired_admin.retired_at = datetime.now(UTC)
-    return World(
+    world = World(
         session,
+        ada.id,
         spools,
         opened,
         area,
@@ -143,9 +147,14 @@ def base(session: Session) -> World:
         admin_cookie,
         device_cookie,
     )
+    over_recorded_line(world)
+    over_recorded_settled(world)
+    return world
 
 
-def stock_to_put_right(spools: Spools, admin_id: int) -> None:
+def stock_to_put_right(spools: Spools) -> None:
+    """An item to reorder, an open package cut below zero, one said to show
+    the wrong length, less than none at a place, and one said used up."""
     session = spools.session
     spools.cable.minimum = Decimal(10_000)
     spools.spool.minimum_sealed = 99
@@ -155,32 +164,22 @@ def stock_to_put_right(spools: Spools, admin_id: int) -> None:
     write(session, spools.place)
     used_up = report(spools) | {"lengths": None, "used_up": [str(spools.opened().key)]}
     write(session, spools.place, **used_up)
-    raised(session, write(session, spools.place))
-    check = raised(session, write(session, spools.place))
-    over_recorded.correct(session, check.id, over_recorded.seen(check), admin_id)
 
 
 def everything(world: World) -> None:
     """One more of all that the list pages show: a category, items, places,
-    a volunteer, sealed spools, an item to reorder, one short at a place,
-    an open package cut below zero, one said to show the wrong length, one
-    said used up, one moved whole and checked there, and labels for a package and a place."""
+    a volunteer, sealed spools, stock to put right (stock_to_put_right), one
+    moved whole and said to show the wrong length there, a line recorded
+    with more than was moved, and labels for a package and a place."""
     session = world.session
     spools = Spools(session)
-    spools.cable.minimum = Decimal(10_000)
-    spools.spool.minimum_sealed = 99
-    write(session, spools.place, lines=[cut(spools.opened(), "400")])
-    write(session, spools.place, **report(spools, length(spools.opened(), "250")))
+    stock_to_put_right(spools)
     # Moved whole to the van, then said to show the wrong length there: a
     # place more for the length checks to read.
     van = spools.opened()
     write(session, spools.place, lines=[cut(van, "305") | {"whole": True}])
     at_van = report(spools, length(van, "250")) | {"from_location_id": spools.van.id}
     write(session, spools.place, **at_van)
-    # Radios the store never had moved out: less than none there.
-    write(session, spools.place)
-    used_up = report(spools) | {"lengths": None, "used_up": [str(spools.opened().key)]}
-    write(session, spools.place, **used_up)
     over_recorded_line(world)
     for label in (
         Label(item_id=spools.cable.id, package_id=spools.spool.id),
@@ -193,8 +192,7 @@ def reading_rule(world: World) -> None:
     """A reading rule more, settled by an administrator."""
     session = world.session
     settled = session.scalar(select(func.count()).select_from(ReadingRule))
-    admin_id = session.scalars(select(Admin.id)).first()
-    rule = ReadingRule(token=f"{settled}P", decided_by_admin_id=admin_id)
+    rule = ReadingRule(token=f"{settled}P", decided_by_admin_id=world.ada_id)
     add(session, rule)
 
 
@@ -218,9 +216,8 @@ def over_recorded_settled(world: World) -> None:
     places, each linked to its count, and who corrected it."""
     session = world.session
     check = raised(session, write(session, world.spools.place))
-    admin_id = session.scalars(select(Admin.id)).first()
-    assert admin_id is not None
-    over_recorded.correct(session, check.id, over_recorded.seen(check), admin_id)
+    seen = over_recorded.seen(check)
+    over_recorded.correct(session, check.id, seen, world.ada_id)
 
 
 def item_parts(world: World) -> None:
@@ -291,9 +288,9 @@ def admin(world: World) -> None:
 
 def authenticator(world: World) -> None:
     """Another authenticator of the administrator signed in, Ada."""
-    ada = admin_named(world.session, "ada")
     key = accounts.new_totp_key()
-    add(world.session, sealed(Authenticator(admin_id=ada.id, name=tag()), key))
+    authenticator = Authenticator(admin_id=world.ada_id, name=tag())
+    add(world.session, sealed(authenticator, key))
 
 
 More = Callable[[World], object]
@@ -627,38 +624,38 @@ def path(where: Path, world: World) -> str:
 def build(session: Session, times: int) -> World:
     """The base world, then `times` more of what each counted page lists."""
     world = base(session)
-    mores = dict.fromkeys(page.more for page in PAGES.values() if page.more)
+    mores = dict.fromkeys(more for page in PAGES.values() if (more := page.more))
     for _ in range(times):
         for more in mores:
-            assert more is not None
             more(world)
     return world
 
 
 @dataclass
 class Built:
-    """A world built and committed in its own database, at `url`."""
+    """A world built and committed in its own database, and one app on it
+    with its client, for the module."""
 
-    url: str
     database: Database
     world: World
+    app: FastAPI
+    client: TestClient
 
     @contextmanager
-    def visit(
-        self, make_client: Callable[..., TestClient], *, device: bool = False
-    ) -> Generator[tuple[TestClient, Session]]:
-        """A client signed in as Ada, or as the registered device, whose
-        requests go on a session of the world's database, rolled back after:
-        whatever a page writes is not left for the next test. The app is on
-        that database too, for what it writes in a transaction of its own,
-        such as when Ada was last seen (db.record_last_seen)."""
+    def visit(self, *, device: bool = False) -> Generator[tuple[TestClient, Session]]:
+        """The client signed in as Ada, or as the registered device, its
+        requests on a session of the world's database rolled back after:
+        whatever a page writes is not left for the next test. What the app
+        writes in a transaction of its own, such as when Ada was last seen
+        (db.record_last_seen), goes to the world's database too."""
         with rolled_back(self.database.engine, self.database) as session:
-            client = make_client(on=session, url=self.url)
+            self.app.dependency_overrides |= on_session(session)
+            self.client.cookies.clear()
             if device:
-                client.cookies.set(devices.COOKIE, self.world.device_cookie)
+                self.client.cookies.set(devices.COOKIE, self.world.device_cookie)
             else:
-                client.cookies.set(sign_in.COOKIE, self.world.admin_cookie)
-            yield client, session
+                self.client.cookies.set(sign_in.COOKIE, self.world.admin_cookie)
+            yield self.client, session
 
 
 @contextmanager
@@ -679,6 +676,12 @@ def built(
                 world = build(setting_up(session), times)
                 then(session)
                 session.commit()
-            yield Built(url, database, world)
+            app = new_app(url)
+            # Over https, as production is, for the Secure cookies, not
+            # following redirects (conftest's make_client).
+            with TestClient(
+                app, base_url="https://testserver", follow_redirects=False
+            ) as client:
+                yield Built(database, world, app, client)
         finally:
             database.dispose()

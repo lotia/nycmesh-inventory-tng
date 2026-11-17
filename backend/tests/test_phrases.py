@@ -115,11 +115,6 @@ def pseudo_locale() -> Translations:
 PSEUDO = pseudo_locale()
 SHELF = SimpleNamespace(id=7, name=NOT_ENGLISH)
 
-# What has moved into the catalogue, each as it is shown. Each part of
-# moving the words (inventory-tng-oic) adds what it moved, until every
-# page is here.
-NAME = SHELF.name
-
 
 def named_phrases() -> list[LazyProxy]:
     """Every phrase the server's Python names as a constant, alone or in a
@@ -150,51 +145,57 @@ SAID_WITH_VALUES: list[Callable[[], Words]] = [
     lambda: accounts.password_problem("." * 1000, "") or "",
     lambda: common.up_to(9),
     lambda: common.at_most_places(3),
-    lambda: common.revoke_title(NAME),
-    *(lambda said=said: said(NAME, NAME) for said in activity.WORDS.values()),
-    *(lambda said=said: said(NAME) for said in admin_items.TAKEN_FIELDS.values()),
-    *(lambda said=said: said(NAME) for said in admin_items.ALIAS_TAKEN.values()),
-    lambda: admin_items.read_as_one(NAME),
-    *(lambda said=said: said(1, NAME) for said in reading_rules.NAMED.values()),
-    lambda: reading_rules.both(NAME, NAME),
-    lambda: reading_rules.near(NAME),
-    lambda: admin_reading_rules.reading_title(NAME),
-    lambda: admin_volunteers.merge_title(NAME, NAME),
-    lambda: admin_admins.link_title(NAME),
-    lambda: admin_admins.reset_title(NAME),
+    lambda: common.revoke_title(NOT_ENGLISH),
+    *(
+        lambda said=said: said(NOT_ENGLISH, NOT_ENGLISH)
+        for said in activity.WORDS.values()
+    ),
+    *(
+        lambda said=said: said(NOT_ENGLISH)
+        for said in admin_items.TAKEN_FIELDS.values()
+    ),
+    *(lambda said=said: said(NOT_ENGLISH) for said in admin_items.ALIAS_TAKEN.values()),
+    lambda: admin_items.read_as_one(NOT_ENGLISH),
+    *(lambda said=said: said(1, NOT_ENGLISH) for said in reading_rules.NAMED.values()),
+    lambda: reading_rules.both(NOT_ENGLISH, NOT_ENGLISH),
+    lambda: reading_rules.near(NOT_ENGLISH),
+    lambda: admin_reading_rules.reading_title(NOT_ENGLISH),
+    lambda: admin_volunteers.merge_title(NOT_ENGLISH, NOT_ENGLISH),
+    lambda: admin_admins.link_title(NOT_ENGLISH),
+    lambda: admin_admins.reset_title(NOT_ENGLISH),
     lambda: admin_devices.uses_problem(9),
     lambda: admin_devices.days_problem(9),
     lambda: admin_devices.revoke_many_title(1),
     lambda: admin_devices.revoke_many_title(3),
     *(lambda said=said: said(1, 9) for said in admin_settings.WHOLE.values()),
     lambda: admin_settings.whole_minutes(1, 9),
-    lambda: used_up.close_title(NAME),
-    lambda: counts.count_title(NAME),
+    lambda: used_up.close_title(NOT_ENGLISH),
+    lambda: counts.count_title(NOT_ENGLISH),
     lambda: counts.moved_meanwhile(0),
     lambda: counts.moved_meanwhile(1),
     lambda: counts.moved_meanwhile(3),
-    lambda: counts.sealed_how_many(NAME),
-    lambda: counts.opened_left(NAME, "2026-11-15"),
+    lambda: counts.sealed_how_many(NOT_ENGLISH),
+    lambda: counts.opened_left(NOT_ENGLISH, "2026-11-15"),
     lambda: stock.recorded_more_view(2),
-    lambda: admin_over_recorded.place_brought_back(NAME),
-    lambda: admin_over_recorded.not_changed(NAME),
+    lambda: admin_over_recorded.place_brought_back(NOT_ENGLISH),
+    lambda: admin_over_recorded.not_changed(NOT_ENGLISH),
     lambda: admin_over_recorded.waiting_view(2),
     *(
-        lambda said=said: said(NAME, NAME)
+        lambda said=said: said(NOT_ENGLISH, NOT_ENGLISH)
         for said in admin_over_recorded.RETIRED_EMPTY.values()
     ),
-    lambda: over_recorded.times(2, NAME),
-    lambda: over_recorded.from_an_open_package(NAME),
-    lambda: over_recorded.sealed(NAME),
-    lambda: over_recorded.opened(NAME),
-    lambda: over_recorded.loose(NAME),
-    lambda: over_recorded.held_words(NAME),
-    lambda: over_recorded.adjusted_at(NAME),
-    lambda: over_recorded.end_only(NAME),
-    lambda: over_recorded.closed_on_day(NAME, NAME),
-    lambda: over_recorded.counted_on(NAME, NAME),
-    lambda: labels.package_label(NAME, NAME, NAME),
-    lambda: labels.place_words(NAME, NAME),
+    lambda: over_recorded.times(2, NOT_ENGLISH),
+    lambda: over_recorded.from_an_open_package(NOT_ENGLISH),
+    lambda: over_recorded.sealed(NOT_ENGLISH),
+    lambda: over_recorded.opened(NOT_ENGLISH),
+    lambda: over_recorded.loose(NOT_ENGLISH),
+    lambda: over_recorded.held_words(NOT_ENGLISH),
+    lambda: over_recorded.adjusted_at(NOT_ENGLISH),
+    lambda: over_recorded.end_only(NOT_ENGLISH),
+    lambda: over_recorded.closed_on_day(NOT_ENGLISH, NOT_ENGLISH),
+    lambda: over_recorded.counted_on(NOT_ENGLISH, NOT_ENGLISH),
+    lambda: labels.package_label(NOT_ENGLISH, NOT_ENGLISH, NOT_ENGLISH),
+    lambda: labels.place_words(NOT_ENGLISH, NOT_ENGLISH),
     *(lambda said=said: said("") for said in units.NAMES.values()),
 ]
 
@@ -202,9 +203,9 @@ SAID_WITH_VALUES: list[Callable[[], Words]] = [
 def all_mail() -> list[mail.Message]:
     """Every mail, each branch of it, with values that are not English."""
     return [
-        mail.reset_link(NAME, 1, NAME),
+        mail.reset_link(NOT_ENGLISH, 1, NOT_ENGLISH),
         *(
-            build(NAME, 1)
+            build(NOT_ENGLISH, 1)
             for build in (
                 mail.reset_link_made,
                 mail.invited,
@@ -224,7 +225,7 @@ def all_mail() -> list[mail.Message]:
                 mail.recovery_code_used(9),
                 mail.authenticators_changed(added=True),
                 mail.authenticators_changed(added=False),
-                mail.activity(NAME),
+                mail.activity(NOT_ENGLISH),
                 *(
                     mail.sign_in_settings_changed(
                         SignInSettings(
@@ -303,10 +304,12 @@ SIGNED_IN = {
         scope={},
         app=SimpleNamespace(state=SimpleNamespace(bundle=SimpleNamespace(tags=link))),
     ),
-    "admin": SimpleNamespace(username=NAME),
-    "sections": [("/admin/stock", NAME, SimpleNamespace(count=2, words=NAME))],
-    "title": NAME,
-    "back_link": ("/admin", NAME),
+    "admin": SimpleNamespace(username=NOT_ENGLISH),
+    "sections": [
+        ("/admin/stock", NOT_ENGLISH, SimpleNamespace(count=2, words=NOT_ENGLISH))
+    ],
+    "title": NOT_ENGLISH,
+    "back_link": ("/admin", NOT_ENGLISH),
 }
 
 
@@ -325,10 +328,10 @@ VIEW = SimpleNamespace(
     best_match_link=link,
     by=None,
     here="/here",
-    unfiltered_fields=lambda: [("q", NAME)],
+    unfiltered_fields=lambda: [("q", NOT_ENGLISH)],
     filters=True,
     unfiltered_link=link,
-    fields=lambda *_: [("q", NAME)],
+    fields=lambda *_: [("q", NOT_ENGLISH)],
     filtered=lambda name: "",
     pages=3,
     page=2,
@@ -342,7 +345,7 @@ def listing(**differs: object) -> SimpleNamespace:
         **{
             "here": "/here",
             "view": VIEW,
-            "search": NAME,
+            "search": NOT_ENGLISH,
             "suggest_address": "/here/suggest",
             "lapsed": "retired",
             "link": link,
@@ -365,7 +368,7 @@ LISTING_PARTS = """{% from "_listing.html" import sort_heading, sizes, filter_fo
 {% call(total, lapsed) summary(listing) %}{{ total }}{% endcall %}
 {{ empty(listing, 2, "") }}{{ pager(view) }}"""
 FORMS = SimpleNamespace(
-    sealed=[(NAME, Decimal(2), Decimal(3))],
+    sealed=[(NOT_ENGLISH, Decimal(2), Decimal(3))],
     open=[Decimal(1)],
     loose=Decimal(2),
     short_ends=[Decimal(1)],
@@ -374,7 +377,7 @@ FORMS = SimpleNamespace(
 # A zone whose name has no letters, as a time shows it.
 ZONE = ZoneInfo("Etc/GMT-3")
 DAY = datetime(2026, 11, 15, tzinfo=UTC)
-PLACE = SimpleNamespace(id=1, name=NAME, retired_at=DAY)
+PLACE = SimpleNamespace(id=1, name=NOT_ENGLISH, retired_at=DAY)
 RETIRED_PARTS = """{% from "_retired_record.html" import retired_record, retire_section
   with context %}{% from "_retired.html" import retired %}
 {% for person in [true, false] %}
@@ -387,24 +390,27 @@ def retired_parts() -> str:
     row = SimpleNamespace(retired_at=DAY)
     return " ".join(
         from_macros(RETIRED_PARTS, row=row, here="/here", zone=ZONE, retired_by=by)
-        for by in (NAME, None)
+        for by in (NOT_ENGLISH, None)
     )
 
 
-READING = SimpleNamespace(called=NAME, kind_words=NAME)
+READING = SimpleNamespace(called=NOT_ENGLISH, kind_words=NOT_ENGLISH)
 
 
 def unit_read(**differs: object) -> SimpleNamespace:
     """A unit in a name, as units.found_in reads it (_units_read.html)."""
     return SimpleNamespace(
         **{
-            "key": NAME,
-            "typed": NAME,
+            "key": NOT_ENGLISH,
+            "typed": NOT_ENGLISH,
             "asks": False,
-            "offered": [READING, SimpleNamespace(called=NAME, kind_words=NAME)],
-            "shown": lambda reading: NAME,
+            "offered": [
+                READING,
+                SimpleNamespace(called=NOT_ENGLISH, kind_words=NOT_ENGLISH),
+            ],
+            "shown": lambda reading: NOT_ENGLISH,
             "read": READING,
-            "clue": [NAME, NAME],
+            "clue": [NOT_ENGLISH, NOT_ENGLISH],
             "rule": SimpleNamespace(respell=True),
         }
         | differs
@@ -422,8 +428,8 @@ def units_read() -> str:
     return render(
         "_units_read.html",
         units_read=lambda typed: each,
-        shown_as=lambda typed, sent: NAME,
-        typed=NAME,
+        shown_as=lambda typed, sent: NOT_ENGLISH,
+        typed=NOT_ENGLISH,
         sent={},
         not_a_unit="",
     )
@@ -435,11 +441,11 @@ def recorded(**differs: object) -> SimpleNamespace:
     return SimpleNamespace(
         **{
             "row": SimpleNamespace(id=1),
-            "item": NAME,
+            "item": NOT_ENGLISH,
             "item_id": 1,
-            "amount": NAME,
-            "from_place": NAME,
-            "to_place": NAME,
+            "amount": NOT_ENGLISH,
+            "from_place": NOT_ENGLISH,
+            "to_place": NOT_ENGLISH,
             "transaction_id": 1,
             "recorded_at": DAY,
             "moved_whole": None,
@@ -453,17 +459,22 @@ def recorded(**differs: object) -> SimpleNamespace:
 def recorded_more() -> str:
     """over_recorded.html, a row of each kind, and a refusal."""
     one = {
-        "counted": NAME,
+        "counted": NOT_ENGLISH,
         "on": DAY,
-        "still": NAME,
-        "correct": NAME,
+        "still": NOT_ENGLISH,
+        "correct": NOT_ENGLISH,
         "place_id": 1,
-        "place": NAME,
+        "place": NOT_ENGLISH,
         "countable": True,
     }
-    both = {"left": NAME, "left_on": DAY, "arrived": NAME, "arrived_on": DAY}
+    both = {
+        "left": NOT_ENGLISH,
+        "left_on": DAY,
+        "arrived": NOT_ENGLISH,
+        "arrived_on": DAY,
+    }
     waiting = [
-        recorded(moved_whole=SimpleNamespace(count="1", words=NAME)),
+        recorded(moved_whole=SimpleNamespace(count="1", words=NOT_ENGLISH)),
         *(
             recorded(one_counted=SimpleNamespace(**one, how=how))
             for how in ("counted", "closed")
@@ -475,7 +486,7 @@ def recorded_more() -> str:
         recorded(from_place=None),
         recorded(to_place=None),
     ]
-    refused = SimpleNamespace(shown=waiting[1], words=NAME, place=PLACE, at=None)
+    refused = SimpleNamespace(shown=waiting[1], words=NOT_ENGLISH, place=PLACE, at=None)
     shown = signed_in(
         "over_recorded.html",
         view=VIEW,
@@ -483,10 +494,10 @@ def recorded_more() -> str:
         refused=refused,
         values={},
         problems={},
-        reasons={"a": NAME},
+        reasons={"a": NOT_ENGLISH},
         waiting=waiting,
         seen=link,
-        only=SimpleNamespace(name_shown=NAME),
+        only=SimpleNamespace(name_shown=NOT_ENGLISH),
         zone=ZONE,
     )
     # A day's month, as strftime names it until the dates are said in the
@@ -497,12 +508,12 @@ def recorded_more() -> str:
 def count_page() -> str:
     """count.html for a retired place, a recount of an item counted by
     its forms and of one in loose units, and the fields for more."""
-    item = SimpleNamespace(id=1, name_shown=NAME, unit=NAME)
-    package = SimpleNamespace(id=1, name_shown=NAME)
+    item = SimpleNamespace(id=1, name_shown=NOT_ENGLISH, unit=NOT_ENGLISH)
+    package = SimpleNamespace(id=1, name_shown=NOT_ENGLISH)
     return signed_in(
         "count.html",
         place=PLACE,
-        shown=SimpleNamespace(only=item, search=NAME, query=link),
+        shown=SimpleNamespace(only=item, search=NOT_ENGLISH, query=link),
         items=[1],
         rows=[
             (item, Decimal(1)),
@@ -511,7 +522,7 @@ def count_page() -> str:
         forms={
             1: [
                 SimpleNamespace(
-                    field="open_1", words=NAME, amount=Decimal(1), open_id=1
+                    field="open_1", words=NOT_ENGLISH, amount=Decimal(1), open_id=1
                 )
             ]
         },
@@ -519,7 +530,7 @@ def count_page() -> str:
         values={},
         problems={},
         others=[item],
-        found_packages=[(package, NAME, NAME)],
+        found_packages=[(package, NOT_ENGLISH, NOT_ENGLISH)],
     )
 
 
@@ -529,9 +540,9 @@ def counts_page() -> str:
         transaction=SimpleNamespace(kind="count", created_at=DAY, time_zone=ZONE),
         lines=[],
         found=True,
-        place=NAME,
-        admin=NAME,
-        reason=NAME,
+        place=NOT_ENGLISH,
+        admin=NOT_ENGLISH,
+        reason=NOT_ENGLISH,
     )
     return signed_in(
         "counts.html",
@@ -549,6 +560,9 @@ def counts_page() -> str:
     )
 
 
+# What has moved into the catalogue, each as it is shown. Each part of
+# moving the words (inventory-tng-oic) adds what it moved, until every
+# page is here.
 COVERED: dict[str, Callable[[], str]] = {
     "every phrase named as a constant": lambda: " ".join(
         str(phrase) for phrase in named_phrases()
@@ -570,13 +584,13 @@ COVERED: dict[str, Callable[[], str]] = {
         tags=SimpleNamespace(styles=[], preloads=[], scripts=[]),
     ),
     "error.html, admin_base.html and _masthead.html": lambda: signed_in(
-        "error.html", words=NAME
+        "error.html", words=NOT_ENGLISH
     ),
     "_listing.html, narrowed by a search": lambda: from_macros(
         LISTING_PARTS, view=VIEW, listing=listing()
     ),
     "_listing.html, narrowed by a pick": lambda: from_macros(
-        LISTING_PARTS, view=VIEW, listing=listing(picked=NAME, lapsed="inactive")
+        LISTING_PARTS, view=VIEW, listing=listing(picked=NOT_ENGLISH, lapsed="inactive")
     ),
     "_listing.html, not narrowed": lambda: from_macros(
         LISTING_PARTS, view=VIEW, listing=listing(narrowed=False, search="")
@@ -589,11 +603,15 @@ COVERED: dict[str, Callable[[], str]] = {
     "_forms.html": lambda: from_macros(
         '{% from "_forms.html" import forms_lines %}{{ forms_lines(f, unit) }}',
         f=FORMS,
-        unit=NAME,
+        unit=NOT_ENGLISH,
     ),
     "_retired_record.html and _retired.html": retired_parts,
     "_notice.html": lambda: render(
-        "_notice.html", notice=NAME, notice_section=None, section_id=None, undo="/"
+        "_notice.html",
+        notice=NOT_ENGLISH,
+        notice_section=None,
+        section_id=None,
+        undo="/",
     ),
     "_shown_once.html": lambda: render("_shown_once.html"),
     "_code_field.html": lambda: " ".join(
@@ -608,16 +626,18 @@ COVERED: dict[str, Callable[[], str]] = {
         "_item_name.html",
         values={},
         problems={},
-        default=NAME,
-        again=NAME,
+        default=NOT_ENGLISH,
+        again=NOT_ENGLISH,
         units_read=lambda typed: [],
         shown_as=lambda typed, sent: "",
         similar=[
             SimpleNamespace(
-                item=SimpleNamespace(id=1, name_shown=NAME, retired_at=1), alias=NAME
+                item=SimpleNamespace(id=1, name_shown=NOT_ENGLISH, retired_at=1),
+                alias=NOT_ENGLISH,
             ),
             SimpleNamespace(
-                item=SimpleNamespace(id=2, name_shown=NAME, retired_at=None), alias=None
+                item=SimpleNamespace(id=2, name_shown=NOT_ENGLISH, retired_at=None),
+                alias=None,
             ),
         ],
     ),
@@ -626,16 +646,16 @@ COVERED: dict[str, Callable[[], str]] = {
     "counts.html, a count listed": counts_page,
     "code_made.html": lambda: signed_in(
         "code_made.html",
-        code=SimpleNamespace(max_uses=2, expires_at=DAY, label=NAME),
+        code=SimpleNamespace(max_uses=2, expires_at=DAY, label=NOT_ENGLISH),
         qr="",
-        phrase=NAME,
+        phrase=NOT_ENGLISH,
         link="/",
-        register=NAME,
+        register=NOT_ENGLISH,
         zone=ZONE,
     ),
     "device_revoke.html": lambda: signed_in(
         "device_revoke.html",
-        devices=[SimpleNamespace(id=1, name=NAME)],
+        devices=[SimpleNamespace(id=1, name=NOT_ENGLISH)],
         filter={},
         keep="/",
         here="/",
@@ -645,7 +665,7 @@ COVERED: dict[str, Callable[[], str]] = {
         for name, context in (
             (
                 "recover.html",
-                {"values": SimpleNamespace(username=NAME), "problems": {}},
+                {"values": SimpleNamespace(username=NOT_ENGLISH), "problems": {}},
             ),
             ("setup.html", {"off": True}),
             ("setup.html", {"values": {}, "problems": {}, "totp_optional": True}),
@@ -678,7 +698,7 @@ COVERED: dict[str, Callable[[], str]] = {
                     {
                         "brought_back": True,
                         "kind": kind,
-                        "other": SimpleNamespace(username=NAME),
+                        "other": SimpleNamespace(username=NOT_ENGLISH),
                     },
                 )
                 for kind in ("reset", "invite")
@@ -709,11 +729,11 @@ def not_english(session: Session) -> None:
     for model in (Item, ItemPackage, Category, Location, Volunteer, AdjustmentReason):
         for row in session.scalars(select(model)):
             if re.search("[A-Za-z]{2,}", row.name):
-                row.name = f"{NAME} {row.id}"
+                row.name = f"{NOT_ENGLISH} {row.id}"
     for authenticator in session.scalars(select(Authenticator)):
-        authenticator.name = NAME
+        authenticator.name = NOT_ENGLISH
     for signed_in in session.scalars(select(AdminSession)):
-        signed_in.user_agent = NAME
+        signed_in.user_agent = NOT_ENGLISH
     for admin in session.scalars(select(Admin)):
         # ASCII, as a username is: one letter, so no word.
         admin.username = f"a{admin.id:04d}"
@@ -754,9 +774,9 @@ def world(migrated_template: str) -> Iterator[Built]:
 
 @pytest.mark.parametrize("page", WORDED)
 def test_a_page_whose_words_have_moved_says_none_in_plain_english(
-    page: str, world: Built, make_client: Callable[..., TestClient]
+    page: str, world: Built
 ) -> None:
-    with world.visit(make_client) as (client, session):
+    with world.visit() as (client, session):
         where = path(WORDED[page], world.world)
         with speaking(PSEUDO):
             response = client.get(where)
