@@ -3,8 +3,8 @@
  * script shows them (frontend/src/buttons.ts), and what they act on is
  * still shown: a code or labels to print by hand, a link to copy by hand
  * (inventory-tng-vxxc, inventory-tng-f8kw). Hidden by the `hidden`
- * attribute the script would remove, not by a style. No script runs, so the policy watch (policy.ts)
- * sees nothing here.
+ * attribute the script would remove, not by a style. No script runs, so
+ * the policy watch (policy.ts) sees nothing here.
  */
 import { expect, type Page } from "@playwright/test";
 import { makeCode } from "./codes";
@@ -44,7 +44,12 @@ test("a label page offers no Print, and shows the labels", async ({ page }) => {
   // On screen, the labels are a table of codes and names.
   const label = page.getByRole("row").filter({ hasText: prepared().labelled });
   await expect(label).toBeVisible();
-  await expect(label.locator(".key")).not.toBeEmpty();
+  const code = label.locator(".key");
+  await expect(code).not.toBeEmpty();
+  // The print sheet, hidden on screen, carries the same code and its QR.
+  const sheet = page.locator(".print-label");
+  await expect(sheet.locator(".qr svg")).toHaveCount(1);
+  await expect(sheet.locator(".key")).toHaveText(await code.innerText());
   await expect(page.getByLabel("US Letter")).toBeVisible();
 });
 
