@@ -1,13 +1,22 @@
 """What the catalogue's pages read (admin/categories.py, admin/items.py,
-admin/reading_rules.py): plain functions taking a Session, each named for
-what it returns (docs/decisions/0023)."""
+admin/reading_rules.py, and admin/home.py's counts of its tables): plain
+functions taking a Session, each named for what it returns
+(docs/decisions/0023)."""
 
 from collections.abc import Sequence
 
 from sqlalchemy import ColumnElement, Row, func, select
 from sqlalchemy.orm import Session
 
-from inventory_tng.models import Admin, Category, Item, ItemPackage, ReadingRule
+from inventory_tng.models import (
+    Admin,
+    Category,
+    Item,
+    ItemPackage,
+    Location,
+    ReadingRule,
+    Volunteer,
+)
 
 # Each item's category's name, for a select of items to sort by.
 category_name = (
@@ -60,3 +69,12 @@ def rules_with_deciders(
         .outerjoin(Admin, Admin.id == ReadingRule.decided_by_admin_id)
         .where(*where)
     ).all()
+
+
+def current_count(
+    session: Session, model: type[Item | Category | Location | Volunteer]
+) -> int | None:
+    """How many current rows a catalogue table holds."""
+    return session.scalar(
+        select(func.count()).select_from(model).where(model.retired_at.is_(None))
+    )

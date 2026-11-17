@@ -7,7 +7,6 @@ from typing import NamedTuple
 
 from fastapi import APIRouter, Request
 from fastapi.responses import Response
-from sqlalchemy import func, select
 
 from inventory_tng import accounts, activity
 from inventory_tng.admin import needs_action
@@ -18,6 +17,7 @@ from inventory_tng.admin.items import ITEMS
 from inventory_tng.admin.locations import LOCATIONS
 from inventory_tng.admin.volunteers import VOLUNTEERS
 from inventory_tng.admins.guards import ACCOUNT, HOME, AdminSignedIn
+from inventory_tng.catalogue import queries as catalogue_queries
 from inventory_tng.core.db import DbSession
 from inventory_tng.core.local_time import site_zone
 from inventory_tng.core.phrases import Words, lazy_gettext
@@ -58,9 +58,7 @@ COUNTED = {
 @router.get(HOME)
 def home(request: Request, signed: AdminSignedIn, session: DbSession) -> Response:
     current = {
-        path: session.scalar(
-            select(func.count()).select_from(model).where(model.retired_at.is_(None))
-        )
+        path: catalogue_queries.current_count(session, model)
         for path, model in COUNTED.items()
     }
     # While it is so, every administrator is told.
