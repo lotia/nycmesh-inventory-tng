@@ -35,8 +35,8 @@ import {
 vi.mock("./camera", () => ({ openCamera: vi.fn() }));
 
 describe("scanning labels with the camera", () => {
-  // The camera's clock, stopped: scan lets a read's time pass (test-setup.ts
-  // starts it again).
+  // The camera's clock, faked: scan lets a read's time pass (test-setup.ts
+  // makes it real again).
   beforeEach(() => vi.useFakeTimers({ shouldAdvanceTime: true }));
 
   /** Shows the camera these labels, and lets the next read take them. */

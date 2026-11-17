@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from "@testing-library/preact";
+import { act, fireEvent, render, screen } from "@testing-library/preact";
 import { beforeEach, expect, test, vi } from "vitest";
 import { DecoderUnavailable, type Session } from "./camera";
 import { say } from "./i18n";
@@ -12,9 +12,10 @@ import {
 } from "./Scanner";
 import { fakeCamera as camera } from "./test-camera";
 
-// The camera's clock, stopped: each test lets as many reads' time pass as
-// it needs (test-setup.ts starts it again). Waiting still lets time pass,
-// so a read a test did not let pass still comes, only later.
+// The camera's clock, faked: each test lets as many reads' time pass as it
+// needs (test-setup.ts makes it real again). The fake clock also keeps up
+// with real time, so a read a test did not let pass still comes, only later.
+// Unmounts go in act: outside it, Preact closes the camera a frame later.
 beforeEach(() => vi.useFakeTimers({ shouldAdvanceTime: true }));
 
 /** Lets `reads` reads' time pass, and what they did be done. */
@@ -54,7 +55,7 @@ test("Done stops the camera", async () => {
   await screen.findByText(say(POINT));
   fireEvent.click(screen.getByRole("button", { name: say(DONE) }));
   expect(onDone).toHaveBeenCalled();
-  unmount();
+  act(unmount);
   await vi.waitFor(() => expect(state.stopped).toBe(true));
 });
 
@@ -95,7 +96,8 @@ test("a camera refused, or none, says so and leaves the lists", async () => {
 });
 
 test("a camera closed before it opened is stopped when it does", async () => {
-  const { state, open } = camera();
+  const read = vi.fn(async () => []);
+  const { state, open } = camera({ read });
   let opened: (session: Session) => void = () => {};
   const late = () =>
     new Promise<Session>((resolve) => {
@@ -104,11 +106,13 @@ test("a camera closed before it opened is stopped when it does", async () => {
   const { unmount } = render(
     <Scanner open={late} onCode={() => ""} onDone={() => {}} />,
   );
-  unmount();
   // Closed, and only then does the camera open.
-  await pass();
+  act(unmount);
   opened(await open());
   await vi.waitFor(() => expect(state.stopped).toBe(true));
+  // Nor is it read.
+  await pass();
+  expect(read).not.toHaveBeenCalled();
 });
 
 test("a frame that cannot be read yet is skipped", async () => {
@@ -173,9 +177,7 @@ test("a label read as the camera closes is not taken", async () => {
   await screen.findByText(say(POINT));
   await pass();
   expect(read).toHaveBeenCalledTimes(1);
-  // Closed once Preact runs the effects' cleanup, a frame later.
-  unmount();
-  await pass();
+  act(unmount);
   finish(["B3ZT9W"]);
   await pass();
   expect(onCode).not.toHaveBeenCalled();

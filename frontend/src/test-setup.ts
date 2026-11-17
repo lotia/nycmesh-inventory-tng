@@ -1,4 +1,4 @@
-import { cleanup } from "@testing-library/preact";
+import { act, cleanup } from "@testing-library/preact";
 import { afterEach, vi } from "vitest";
 import { speak } from "./i18n";
 import { messages as english } from "./locales/en.po";
@@ -6,7 +6,8 @@ import { messages as english } from "./locales/en.po";
 // Vitest's globals are off, so Testing Library cannot clean up by itself:
 // without this, each test's page stays in the document for the next.
 afterEach(() => {
-  cleanup();
+  // In act, so each page's effects are cleaned up in its own test.
+  act(cleanup);
   // A test that opens a page at an address must not leave it to the next.
   window.history.replaceState(null, "", "/");
   // Nor its cart, or its outbox.
