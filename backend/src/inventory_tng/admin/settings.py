@@ -13,7 +13,6 @@ import structlog
 from babel.support import LazyProxy
 from fastapi import APIRouter, Depends, Form, Request
 from fastapi.responses import HTMLResponse, Response
-from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from inventory_tng import accounts, activity, adjustment_reasons, scan_settings
@@ -41,13 +40,13 @@ from inventory_tng.models import (
     NAME_CHECK_MINUTES,
     SESSION_DAYS,
     TOTP_POLICIES,
-    AdjustmentReason,
     ScanSettings,
     SignInSettings,
     SiteSettings,
     whole,
 )
 from inventory_tng.pages import NOTICES, not_found, redirect
+from inventory_tng.site_settings import queries
 
 log = structlog.get_logger(__name__)
 
@@ -151,11 +150,7 @@ def _page(
     scan = session.get_one(ScanSettings, 1)
     sign_in = accounts.sign_in_settings(session)
     site = session.get_one(SiteSettings, 1)
-    reasons = session.scalars(
-        select(AdjustmentReason).order_by(
-            AdjustmentReason.retired_at.is_not(None), AdjustmentReason.id
-        )
-    ).all()
+    reasons = queries.reasons_current_first(session)
     return admin_page(
         request,
         signed,
