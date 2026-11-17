@@ -828,8 +828,8 @@ def test_a_comma_after_a_lone_nought_is_read_again(alembic_config: Config) -> No
     (inventory-tng-vw0f), and a unit's word is shown as a symbol is
     (inventory-tng-tze), and a number grouped by spaces before its unit
     shown whole and as typed, its breaking spaces no-break
-    (inventory-tng-t78, inventory-tng-mz31); names kept as typed; names that would then be one
-    named by id first."""
+    (inventory-tng-t78, inventory-tng-mz31); names kept as typed; names
+    that would then be one named by id first."""
     command.downgrade(alembic_config, "0047")
     connection = alembic_config.attributes["connection"]
     category_id = connection.scalar(

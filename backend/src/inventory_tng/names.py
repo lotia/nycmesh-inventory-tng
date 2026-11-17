@@ -64,8 +64,8 @@ SPACES = "".join(map(chr, _LOOK_ALIKE[" "]))
 # Each breaking space as the shown name makes it inside a number grouped
 # by spaces, so the number never breaks across a line (Ali, 2026-11-16,
 # inventory-tng-mz31): thin, hair, punctuation, six-per-em and medium
-# mathematical narrow no-break; the space, en and em quads to four- and
-# five-per-em, ideographic and Ogham no-break. The no-break ones (no-break,
+# mathematical narrow no-break; the space, en and em quads and spaces,
+# three- and four-per-em, ideographic and Ogham no-break. The no-break ones (no-break,
 # narrow no-break, figure) are kept.
 NO_BREAK = str.maketrans(
     {

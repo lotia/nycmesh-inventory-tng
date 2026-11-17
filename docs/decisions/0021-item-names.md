@@ -654,7 +654,7 @@ such a number: the space (U+0020) becomes a no-break space (U+00A0), as
 before; thin (U+2009), hair (U+200A), punctuation (U+2008), six-per-em
 (U+2006) and medium mathematical (U+205F) spaces become narrow no-break
 spaces (U+202F), as close to their width as a no-break space comes; en
-and em quads to four- and five-per-em spaces (U+2000 to U+2005),
+and em quads, en, em, three- and four-per-em spaces (U+2000 to U+2005),
 ideographic (U+3000) and Ogham (U+1680) spaces become no-break spaces.
 No-break (U+00A0), narrow no-break (U+202F) and figure (U+2007) spaces
 stay as typed. The space before the unit is a no-break space, as before.
