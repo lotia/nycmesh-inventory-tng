@@ -1,7 +1,6 @@
 """Stock to move: the rows a batch needs, batches written, and the forms
 and signs of the pages that put stock right."""
 
-import re
 import uuid
 from collections.abc import Mapping
 from datetime import UTC, datetime
@@ -31,7 +30,7 @@ from inventory_tng.models import (
 from inventory_tng.pages import retired_holding
 
 from helpers.concurrency import Committed
-from helpers.markup import Element, read
+from helpers.markup import Element, hidden_fields, read
 from helpers.rows import add, tag
 from helpers.sign_in import admin_named
 
@@ -269,9 +268,11 @@ def cut(made: OpenPackage, quantity: str) -> dict[str, str]:
 def count_form(page: Response) -> dict[str, str]:
     """A count page's hidden fields, as it was shown: its key, the place's
     latest ledger entry then, and the items it showed."""
-    return dict(
-        re.findall(r'type="hidden" name="(key|as_of|items)" value="([^"]*)"', page.text)
-    )
+    return {
+        name: value
+        for name, value in hidden_fields(page.text)
+        if name in {"key", "as_of", "items"}
+    }
 
 
 def count_form_at(client: TestClient, place_id: int) -> dict[str, str]:

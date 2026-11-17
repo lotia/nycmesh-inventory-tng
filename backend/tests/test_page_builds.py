@@ -13,9 +13,8 @@ from inventory_tng import page_builds
 from inventory_tng.bundle import BUILD_ID
 from inventory_tng.page_builds import HEADER, is_too_old
 
-from helpers.stock import Place
+from helpers.stock import URL, Place
 
-URL = "/api/transactions"
 OLDEST = "2026-11-12T10:00:00.000Z"
 SERVERS = "2026-11-12T12:00:00.000Z"
 

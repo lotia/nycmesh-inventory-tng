@@ -16,6 +16,7 @@ from sqlalchemy.orm import Session
 
 from inventory_tng import accounts, sign_in, totp_keys
 from inventory_tng.models import (
+    CONFIRM_IDLE_MINUTES,
     Admin,
     AdminPassword,
     AdminSession,
@@ -199,8 +200,9 @@ def other_session(
 def confirmed_long_ago(session: Session) -> None:
     """Every session's code typed longer ago than confirm_idle_minutes can
     be, with nothing sensitive done since, as confirming leaves it: the
-    window has closed."""
+    window has closed, whatever the setting."""
+    longest = timedelta(minutes=CONFIRM_IDLE_MINUTES[1] + 1)
     for row in session.scalars(select(AdminSession)):
-        row.confirmed_at = datetime.now(UTC) - timedelta(hours=2)
+        row.confirmed_at = datetime.now(UTC) - longest
         row.last_sensitive_at = None
     session.flush()

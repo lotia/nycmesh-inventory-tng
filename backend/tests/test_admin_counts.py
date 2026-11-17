@@ -54,7 +54,7 @@ from inventory_tng.pages import retired_holding
 from inventory_tng.phrases import compiled, speaking
 
 from helpers.concurrency import Committed
-from helpers.markup import button, forms, links, options, read
+from helpers.markup import button, forms, hidden_fields, links, options, read
 from helpers.rows import item_fields, shown, violates
 from helpers.sign_in import new_admin, sign_in_with, text
 from helpers.stock import (
@@ -74,9 +74,7 @@ from helpers.stock import (
 
 
 def key_on(response: Response) -> str:
-    match = re.search(r'name="key" value="([0-9a-f-]{36})"', response.text)
-    assert match is not None
-    return match.group(1)
+    return dict(hidden_fields(response.text))["key"]
 
 
 def counts_written(session: Session) -> list[LedgerTransaction]:

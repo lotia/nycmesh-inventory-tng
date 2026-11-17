@@ -28,9 +28,8 @@ from helpers.markup import links, read
 from helpers.queries import counting
 from helpers.rows import add, tag
 from helpers.sign_in import text
-from helpers.stock import Spools, cut, length, report
+from helpers.stock import URL, Spools, cut, length, report
 
-URL = "/api/transactions"
 LENGTHS = "/admin/stock/length-checks"
 
 

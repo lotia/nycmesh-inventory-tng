@@ -44,9 +44,7 @@ from inventory_tng.models import (
 )
 
 from helpers.rows import add, breaks, item_fields, named, refused, tag, violates
-from helpers.stock import Place, received, retire, stocked, write
-
-URL = "/api/transactions"
+from helpers.stock import URL, Place, received, retire, stocked, write
 
 
 @pytest.fixture

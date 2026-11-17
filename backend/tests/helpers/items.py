@@ -1,5 +1,5 @@
-"""What the tests of items on the administrators' pages share
-(tests/test_admin_items_*.py)."""
+"""What the tests of items share: those of the administrators' item
+pages (tests/test_admin_items_*.py) and of reading rules."""
 
 from datetime import UTC, datetime
 

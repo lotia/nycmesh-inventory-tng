@@ -36,6 +36,7 @@ from inventory_tng.models import reading_rules as reading_rules_held
 from inventory_tng.reading_rules import LIKELY, NAMED, both, near
 
 from helpers.concurrency import Committed
+from helpers.items import new_item
 from helpers.markup import links, options, read, row_links
 from helpers.queries import counting
 from helpers.rows import (
@@ -51,10 +52,6 @@ from helpers.rows import (
 from helpers.sign_in import text
 
 GBPS = units.Rule("Gbit/s")
-
-
-def new_item(session: Session, category: Category, name: str) -> Item:
-    return add(session, Item(name=name, category_id=category.id))
 
 
 def test_the_rules_are_read_once_until_written_or_rolled_back(
