@@ -178,6 +178,30 @@ def test_merging_needs_a_current_other_volunteer(
         assert str(PICK_INTO) in text(refused)
 
 
+def test_merging_into_one_retired_since_the_page_asked_is_refused(
+    admin_client: TestClient, session: Session
+) -> None:
+    """The page asks while Riley is current; a second tab retires Riley
+    before Merge is pressed. The test for both at the same moment is
+    test_a_merge_and_a_retire_of_its_target_not_both."""
+    sam = add(session, Volunteer(name="Sam"))
+    riley = add(session, Volunteer(name="Riley"))
+    path = f"{VOLUNTEERS}/{sam.id}"
+    offered = f'<option value="{riley.id}">Riley</option>'
+    assert offered in admin_client.get(path).text
+    asked = admin_client.get(f"{path}/merge", params={"into_id": str(riley.id)})
+    assert asked.status_code == 200
+    assert admin_client.post(f"{VOLUNTEERS}/{riley.id}/retire").status_code == 303
+    before = history(session, "volunteer")
+    refused = admin_client.post(f"{path}/merge", data={"into_id": str(riley.id)})
+    assert refused.status_code == 400
+    assert str(PICK_INTO) in text(refused)
+    assert offered not in refused.text
+    assert (sam.merged_into_id, sam.retired_at) == (None, None)
+    assert riley.retired_at is not None
+    assert history(session, "volunteer") == before
+
+
 def test_bringing_back_one_whose_name_is_taken_says_so(
     admin_client: TestClient, session: Session
 ) -> None:
