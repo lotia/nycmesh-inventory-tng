@@ -6,6 +6,8 @@ docs/decisions/0010; inventory-tng-e0y)."""
 import dataclasses
 import json
 import re
+import subprocess
+import sys
 from collections.abc import Callable, Iterator, MutableMapping
 from pathlib import Path
 from typing import Any
@@ -16,7 +18,7 @@ from fastapi.testclient import TestClient
 from httpx2 import Response
 from structlog.testing import capture_logs
 
-from inventory_tng import once, security_headers
+from inventory_tng import once, security_headers, sign_in
 from inventory_tng.bundle import MANIFEST
 from inventory_tng.local_env import CLONE
 from inventory_tng.settings import FrontendConfig, RateLimits
@@ -113,6 +115,14 @@ def test_a_signed_in_page_is_protected(admin_client: TestClient) -> None:
     assert_protected(response)
 
 
+def test_a_refused_secret_field_is_protected(admin_client: TestClient) -> None:
+    """The confirm page's refusal of a secret field (inventory-tng-2qy6)."""
+    form = {"email": "ada@example.org", "api_token": "hunter2"}
+    response = admin_client.post(f"{sign_in.ACCOUNT}/email", data=form)
+    assert response.status_code == 400
+    assert_protected(response)
+
+
 def test_a_refused_cross_site_request_is_protected(built: TestClient) -> None:
     response = built.post("/admin/sign-in", headers={"Sec-Fetch-Site": "cross-site"})
     assert response.status_code == 403
@@ -201,6 +211,19 @@ def test_no_api_docs_outside_development(built: TestClient) -> None:
     assert response.status_code == 404
     assert_protected(response)
     assert built.get("/api/schema").status_code == 200
+
+
+def test_the_pages_render_without_this_module() -> None:
+    """The pages' templates read the nonce through pages.py alone, so a
+    page renders wherever pages.templates is used, the app or not."""
+    script = (
+        "import sys; from starlette.requests import Request;"
+        " from inventory_tng.pages import templates;"
+        " request = Request({'type': 'http', 'headers': []});"
+        " templates.get_template('_csp_nonce.html').render(request=request);"
+        " assert 'inventory_tng.security_headers' not in sys.modules"
+    )
+    subprocess.run([sys.executable, "-c", script], check=True)
 
 
 @pytest.mark.clone
@@ -327,6 +350,10 @@ def test_a_report_is_counted_by_directive_and_nothing_it_says_is_kept(
         b"[]",
         b'{"csp-report": "x"}',
         b'[{"type": "deprecation"}]',
+        # A report that names no directive is no report of one.
+        b'{"csp-report": {}}',
+        b'{"csp-report": {"violated-directive": " "}}',
+        b'[{"type": "csp-violation", "body": {}}]',
         # Nested deeper than the parser goes, well inside MOST_BYTES.
         b"[" * 10_000 + b"]" * 10_000,
         b"[" * 20_000,
@@ -341,6 +368,7 @@ def test_what_is_no_report_is_refused(reports: TestClient, body: bytes) -> None:
         )
     assert response.status_code == 400
     assert refusals(logs) == ["not_a_report"]
+    assert_protected(response)
 
 
 @pytest.mark.parametrize(
@@ -357,6 +385,7 @@ def test_a_report_of_another_type_is_refused(
         )
     assert response.status_code == 415
     assert refusals(logs) == ["not_a_report_type"]
+    assert_protected(response)
 
 
 def test_a_report_too_large_is_refused(reports: TestClient) -> None:

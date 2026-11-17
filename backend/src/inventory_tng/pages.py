@@ -31,6 +31,19 @@ templates.env.filters["day"] = show_day
 # {{ size | number }}: a number as the active locale writes it ("1,000").
 templates.env.filters["number"] = number
 
+# Where a response's Content-Security-Policy nonce is kept, in the
+# request's state (security_headers.py).
+NONCE = "csp_nonce"
+
+
+def csp_nonce(request: Request) -> str | None:
+    """This response's nonce; None where the policy needs none, as outside
+    development."""
+    return request.scope.get("state", {}).get(NONCE)
+
+
+cast(dict[str, Any], templates.env.globals)["csp_nonce"] = csp_nonce
+
 
 def amount(value: Decimal | None) -> str:
     """12.500 as "12.5", 3.000 as "3": as people write quantities."""

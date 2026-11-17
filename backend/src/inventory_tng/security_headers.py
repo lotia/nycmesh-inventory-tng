@@ -10,7 +10,7 @@ stylesheet (CONTRIBUTING.md, Styles). The decoder's WebAssembly needs
 'wasm-unsafe-eval'. In development, Vite's dev server serves the scripts and
 styles, reloads them over a websocket, and adds each stylesheet as a
 <style>, which the policy allows by a nonce made for each response
-(csp_nonce, which the pages put where Vite's client reads it). So does the
+(pages.csp_nonce, which the pages put where Vite's client reads it). So does the
 API's docs page, FastAPI's, for the one inline script that starts Swagger UI,
 which comes from its CDN: in development only, as the CDN's script would run
 as this origin's, a signed-in administrator's requests included.
@@ -24,7 +24,6 @@ held. Reports count against their address as the pages' telemetry does
 import json
 import secrets
 from collections.abc import Iterable
-from typing import Any, cast
 
 import structlog
 from fastapi import APIRouter, Request, Response
@@ -36,7 +35,7 @@ from starlette.types import ASGIApp, Message, Receive, Scope, Send
 
 from inventory_tng import page_telemetry
 from inventory_tng.devices import RateLimitedReply
-from inventory_tng.pages import templates
+from inventory_tng.pages import NONCE, csp_nonce
 from inventory_tng.phrases import BRAND
 
 log = structlog.get_logger(__name__)
@@ -55,8 +54,6 @@ DOCS = "/api/docs"
 SWAGGER_CDN = "https://cdn.jsdelivr.net/npm/swagger-ui-dist@5/"
 SWAGGER_FAVICON = "https://fastapi.tiangolo.com"
 
-# Where the response's nonce is kept, in the request's state.
-NONCE = "csp_nonce"
 NONCE_BYTES = 16
 
 # What browsers send reports as: report-uri's, the Reporting API's, and
@@ -200,16 +197,6 @@ class SecurityHeaders:
         await self.app(scope, receive, send_with_headers)
 
 
-def csp_nonce(request: Request) -> str | None:
-    """This response's nonce; None where the policy needs none, as outside
-    development."""
-    return request.scope.get("state", {}).get(NONCE)
-
-
-# Jinja types its globals by its own defaults' types; any value will do.
-cast(dict[str, Any], templates.env.globals)["csp_nonce"] = csp_nonce
-
-
 # The API's docs page, which app.py adds in development only.
 docs_router = APIRouter()
 
@@ -229,7 +216,7 @@ def docs(request: Request) -> HTMLResponse:
 def violated(report: object) -> list[str]:
     """Each violation's directive, from report-uri's one report or the
     Reporting API's list (its csp-violation reports, MOST_REPORTS at most);
-    "other" for one not in DIRECTIVES."""
+    "other" for one not in DIRECTIVES. One that names none is left out."""
     found: Iterable[object]
     if isinstance(report, dict) and isinstance(body := report.get("csp-report"), dict):
         # Older browsers name the whole directive, sources and all.
@@ -249,6 +236,7 @@ def violated(report: object) -> list[str]:
     return [
         name if isinstance(name, str) and name in DIRECTIVES else OTHER
         for name in found
+        if name is not None
     ]
 
 
