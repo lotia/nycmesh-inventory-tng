@@ -305,3 +305,11 @@ def unit_moved(session: Session, movement_id: int) -> str:
         .join(Movement, Movement.item_id == Item.id)
         .where(Movement.id == movement_id)
     ).one()
+
+
+def item_total(session: Session, item_id: int) -> Decimal:
+    """How much of an item there is, everywhere together."""
+    total = session.scalar(
+        select(func.sum(balance.c.quantity)).where(balance.c.item_id == item_id)
+    )
+    return Decimal(total or 0)

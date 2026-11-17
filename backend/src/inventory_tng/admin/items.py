@@ -62,7 +62,7 @@ from inventory_tng.models import reading_rules as rules_held
 from inventory_tng.names import nameless
 from inventory_tng.pages import NOTICES, not_found, redirect
 from inventory_tng.reading_rules import NOT_A_UNIT, chosen_rule, read_alike_words
-from inventory_tng.stock.balance import balance
+from inventory_tng.stock import queries as stock_queries
 
 log = structlog.get_logger(__name__)
 meter = metrics.get_meter(__name__)
@@ -438,14 +438,6 @@ def _list_page(
     )
 
 
-def _in_stock(session: Session, item_id: int) -> Decimal:
-    """How much of it there is, everywhere together."""
-    total = session.scalar(
-        select(func.sum(balance.c.quantity)).where(balance.c.item_id == item_id)
-    )
-    return Decimal(total or 0)
-
-
 def _moved(session: Session, item_id: int) -> bool:
     return exists_where(session, Movement.item_id == item_id)
 
@@ -487,7 +479,7 @@ def _item_page(
             "categories": [c for c in _categories(session) if c.retired_at is None],
             "units": UNITS,
             "unit_fixed": _moved(session, item.id),
-            "in_stock": _in_stock(session, item.id),
+            "in_stock": stock_queries.item_total(session, item.id),
             "labels": labels.current_of(session, Label.item_id == item.id),
             "open_packages": open_packages.shown(
                 session, OpenPackage.item_id == item.id
