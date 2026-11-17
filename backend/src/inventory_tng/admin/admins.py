@@ -14,7 +14,6 @@ from typing import Annotated
 import structlog
 from fastapi import APIRouter, Form, Request
 from fastapi.responses import HTMLResponse, Response
-from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from inventory_tng import accounts, activity
@@ -28,6 +27,7 @@ from inventory_tng.admin.common import (
     site_link,
 )
 from inventory_tng.admin.listing import AskedView, Sort, Sorting, View, arranged
+from inventory_tng.admins import queries
 from inventory_tng.admins.guards import (
     CONFIRM_FIELD,
     RESET,
@@ -101,7 +101,7 @@ def _list_page(
     problems: Mapping[str, Words] | None = None,
     values: Mapping[str, str] | None = None,
 ) -> HTMLResponse:
-    admins = session.scalars(select(Admin).order_by(func.lower(Admin.username))).all()
+    admins = queries.admins_by_username(session)
     with_totp = accounts.admins_using_totp(session)
     rows, view = arranged(
         ((a, a.id in with_totp) for a in admins if a.retired_at is None),

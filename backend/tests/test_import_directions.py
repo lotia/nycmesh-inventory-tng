@@ -67,7 +67,6 @@ BREAKS: dict[str, dict[str, list[str]]] = {
         "once.py": ["fastapi", "pages.py", "starlette"],
     },
     "routes_run_queries": {
-        "admin/admins.py": ["_list_page: 2"],
         "admin/categories.py": ["_category_page: 2", "_items: 2", "_list_page: 2"],
         "admin/devices.py": ["_list_page: 4", "device_list: 1"],
         "admin/home.py": ["home: 2"],
