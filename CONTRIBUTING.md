@@ -848,6 +848,9 @@ On the server (`backend/src/inventory_tng/phrases.py`):
   `str()` it only where a str must go, such as a response body, JSON or
   `isinstance` checks. A query takes it as `in_query(phrase)`, said when
   the query runs, so a list sorted by words sorts by those shown.
+- A number people read is written as the locale writes it, digits
+  grouped: `{{ size | number }}` in a template, `number(size)` in Python.
+  A number in a link stays plain digits.
 - Values are always filled, so a per cent sign in a message is `%%`; a
   test refuses a lone one.
 - The app's name is `phrases.BRAND`, the same in every language: a

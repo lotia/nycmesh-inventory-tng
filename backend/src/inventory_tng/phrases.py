@@ -8,7 +8,8 @@ or one made with values, as a function that calls `ngettext` or `gettext`
 with them. A template says its words in `{% trans %}`. Either way a message
 formats its values as `%(name)s`, always, so a literal per cent is `%%`.
 A context (`pgettext`) only where the same English means two things, from
-the fixed list in CONTRIBUTING.md (Phrases).
+the fixed list in CONTRIBUTING.md (Phrases). A number people read is
+written as the locale writes it (`number`, a template's `| number`).
 """
 
 from collections.abc import Callable, Generator
@@ -19,6 +20,7 @@ from pathlib import Path
 from babel.messages.catalog import Catalog
 from babel.messages.mofile import write_mo
 from babel.messages.pofile import read_po
+from babel.numbers import format_decimal
 from babel.support import LazyProxy, Translations
 from jinja2 import Environment
 from sqlalchemy import BindParameter, String, bindparam
@@ -76,6 +78,12 @@ def ngettext(singular: str, plural: str, num: int, **values: object) -> str:
     return _active.ngettext(singular, plural, num) % ({"num": num} | values)
 
 
+def number(value: int) -> str:
+    """`value` as the active locale writes it, such as 1,000 in English and
+    1.000 in German: its catalogue's language, English if it names none."""
+    return format_decimal(value, locale=_active.info().get("language") or "en")
+
+
 # A phrase as code holds it: said already, or a lazy one said when shown.
 Words = str | LazyProxy
 
@@ -104,9 +112,10 @@ def in_query(phrase: Words) -> BindParameter[str]:
 
 def install(environment: Environment) -> None:
     """Give `environment` Jinja's i18n extension, reading the active
-    catalogue: newstyle, so a message's values are escaped and filled as in
+    catalogue, and the `number` filter: newstyle, so a message's values are escaped and filled as in
     Python, and trimmed, so a message's lines read as one."""
     environment.add_extension("jinja2.ext.i18n")
+    environment.filters["number"] = number
     environment.policies["ext.i18n.trimmed"] = True
     # The extension adds this method, which the type checker cannot see.
     environment.install_gettext_callables(  # ty: ignore[unresolved-attribute]

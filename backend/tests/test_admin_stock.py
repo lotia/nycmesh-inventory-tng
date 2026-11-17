@@ -293,6 +293,15 @@ def test_stock_size_rows_say_they_count_places_or_items(
     assert size_row(by_item) == ("Items shown", "Items shown:")
 
 
+def test_needs_counting_size_row_says_it_counts_places(
+    admin_client: TestClient,
+) -> None:
+    """As Stock's By place: a place's lines are never split (Ali,
+    2026-11-16, inventory-tng-r9ex)."""
+    page = text(admin_client.get(NEEDS_COUNTING))
+    assert size_row(page) == ("Places shown", "Places shown:")
+
+
 def test_other_lists_size_rows_still_say_show(admin_client: TestClient) -> None:
     assert size_row(text(admin_client.get(REORDER))) == ("Rows", "Show")
 

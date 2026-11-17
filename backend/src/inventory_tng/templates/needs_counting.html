@@ -7,7 +7,7 @@
 {{ views(_("Stock views"), stock_views, "needs-counting") }}
 <p class="hint">{% trans %}Places that show less than nothing of an item: the records are
 wrong there until someone counts it.{% endtrans %}</p>
-{{ sizes(view) }}
+{{ sizes(view, _("Places shown"), _("Places shown:")) }}
 {% for group in places %}
 <section>
   <h2>{{ group.heading.name }}</h2>

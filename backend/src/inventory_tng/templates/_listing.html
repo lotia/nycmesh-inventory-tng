@@ -14,12 +14,13 @@ arrow. `class` is the cell's. -#}
 {#- How many rows a page shows, the one shown marked; while searching,
 "Best match" puts the closest first again once a heading sorted them.
 A grouped list, whose page size counts groups, says so: `name` replaces
-the row's name ("Rows") and `words` its words ("Show"). -#}
+the row's name ("Rows") and `words` its words ("Show"). Sizes are numbers
+as the locale writes them; their links keep plain digits. -#}
 {% macro sizes(view, name=none, words=none) -%}
 <nav aria-label="{{ name or _("Rows") }}" class="filters">
   <span>{{ words or _("Show") }}</span>
   {% for size in view.sizes %}
-  <a href="{{ view.size_link(size) }}"{% if view.per_page == size %} aria-current="page"{% endif %}>{{ size or _("All") }}</a>
+  <a href="{{ view.size_link(size) }}"{% if view.per_page == size %} aria-current="page"{% endif %}>{{ size | number if size else _("All") }}</a>
   {%- if not loop.last %} <span aria-hidden="true">·</span>{% endif %}
   {% endfor %}
   {% if view.searching %}<span aria-hidden="true">·</span>
@@ -79,10 +80,10 @@ are shown, such as "3 items" or "1 retired item". -#}
   {%- if listing.narrowed %}
   {%- if listing.picked or listing.search %}
   {#- Translators: counted is how many there are, such as "12 items". #}
-  {%- trans found=listing.found, counted=counted, search=listing.picked or listing.search %}{{ found }} of {{ counted }}, matching “{{ search }}”.{% endtrans %}
+  {%- trans found=listing.found | number, counted=counted, search=listing.picked or listing.search %}{{ found }} of {{ counted }}, matching “{{ search }}”.{% endtrans %}
   {%- else %}
   {#- Translators: counted is how many there are, such as "12 items". #}
-  {%- trans found=listing.found, counted=counted %}{{ found }} of {{ counted }}.{% endtrans %}
+  {%- trans found=listing.found | number, counted=counted %}{{ found }} of {{ counted }}.{% endtrans %}
   {%- endif %} <a href="{{ listing.link(search='') }}">{% trans %}Clear search{% endtrans %}</a>
   {%- else %}{{ counted }}{% endif -%}
 </p>
@@ -116,7 +117,7 @@ clear them; otherwise the call's body. -#}
 {% if view.pages > 1 %}
 <nav aria-label="{% trans %}Pages{% endtrans %}" class="actions">
   {% if view.page > 1 %}<a href="{{ view.link(page=view.page - 1) }}" rel="prev"><span aria-hidden="true">‹&nbsp;</span>{% trans %}Previous{% endtrans %}</a>{% endif %}
-  <span>{% trans page=view.page, pages=view.pages %}Page {{ page }} of {{ pages }}{% endtrans %}</span>
+  <span>{% trans page=view.page | number, pages=view.pages | number %}Page {{ page }} of {{ pages }}{% endtrans %}</span>
   {% if view.page < view.pages %}<a href="{{ view.link(page=view.page + 1) }}" rel="next">{% trans %}Next{% endtrans %}<span aria-hidden="true">&nbsp;›</span></a>{% endif %}
 </nav>
 {% endif %}

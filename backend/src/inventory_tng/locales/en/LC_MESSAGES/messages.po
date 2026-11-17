@@ -2645,10 +2645,12 @@ msgstr ""
 msgid "Place retired"
 msgstr ""
 
+#: src/inventory_tng/templates/needs_counting.html
 #: src/inventory_tng/templates/stock.html
 msgid "Places shown"
 msgstr ""
 
+#: src/inventory_tng/templates/needs_counting.html
 #: src/inventory_tng/templates/stock.html
 msgid "Places shown:"
 msgstr ""

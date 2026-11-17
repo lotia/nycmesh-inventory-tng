@@ -68,6 +68,7 @@ from inventory_tng.phrases import (
     lazy_gettext,
     lazy_pgettext,
     ngettext,
+    number,
     pgettext,
     read,
     speaking,
@@ -1007,6 +1008,27 @@ def test_a_count_is_said_as_a_plural() -> None:
     assert counts <= plurals
     left = [id for id in plurals if id.startswith("%(count)s left")]
     assert len(left) == 2
+
+
+def test_a_lists_numbers_are_written_as_the_locale_writes_them() -> None:
+    """Its sizes, pages and matches, grouped as German groups digits
+    (inventory-tng-r9ex); its links keep plain digits (admin/listing.py)."""
+    view = SimpleNamespace(**vars(VIEW) | {"sizes": [1000, None], "page": 1000})
+    view.pages = 2000
+    with speaking(compiled(Catalog(locale="de"))):
+        shown = words_shown(
+            from_macros(LISTING_PARTS, view=view, listing=listing(found=1500))
+        )
+    assert "Show 1.000 · All" in shown
+    assert "Page 1.000 of 2.000" in shown
+    assert "1.500 of 3, matching" in shown
+    assert number(1000) == "1,000"
+
+
+def test_a_lists_all_is_said_in_the_locale() -> None:
+    with speaking(PSEUDO):
+        shown = words_shown(from_macros(LISTING_PARTS, view=VIEW, listing=listing()))
+    assert f"{accented('Show')} 25 · {accented('All')}" in shown
 
 
 def test_cut_kinds_tell_translators_they_are_kinds_of_save() -> None:
