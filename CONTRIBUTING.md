@@ -1081,9 +1081,10 @@ production: a route that changes a row it did not lock fails its test
 
 `tests/test_query_counts.py` loads each administrator's page, and the scan
 page's catalogue, with one row of what it lists and with eleven, and fails
-if the second sends more statements: a page reading row by row. With one
-row, it then adds one more by the page's own `more` and fails if the page
-doesn't grow. A new GET route under `/admin` fails there until it has an entry in
+if the second sends more statements: a page reading row by row. It also
+fails unless the page, past its masthead, is longer with eleven, and grows
+when the page's own `more` adds one row to the first. A new GET route
+under `/admin` fails there until it has an entry in
 `tests/helpers/pages.py`'s `PAGES`, saying how to add one more of what it
 lists (`more`) or why it lists nothing that grows (`uncounted`), and where
 `test_phrases.py` reads its words or why it doesn't. Both read worlds built

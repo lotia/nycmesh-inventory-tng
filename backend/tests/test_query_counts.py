@@ -89,8 +89,8 @@ def test_a_page_reads_alike_for_one_row_or_eleven(
     one: Built,
     eleven: Built,
 ) -> None:
-    def read(client: TestClient, session: Session, url: str) -> tuple[int, bytes]:
-        """The statements the page sent, and the page."""
+    def read(client: TestClient, session: Session, url: str) -> tuple[int, str]:
+        """The statements the page sent, and what it lists (listed)."""
         # Warmed first: what a first request reads once, such as settings.
         warmed = client.get(url)
         assert warmed.status_code == 200, (url, warmed.status_code)
@@ -100,7 +100,7 @@ def test_a_page_reads_alike_for_one_row_or_eleven(
         with counting(session) as sent:
             response = client.get(url)
         assert response.status_code == 200, (url, response.status_code)
-        return len(sent), response.content
+        return len(sent), listed(response.text)
 
     with one.visit(device=route == CATALOGUE) as (client, session):
         few, shown = read(client, session, path(where, one.world))
@@ -113,12 +113,20 @@ def test_a_page_reads_alike_for_one_row_or_eleven(
         url = path(where, world)
         grown = client.get(url)
     assert grown.status_code == 200, (url, grown.status_code)
-    assert len(grown.content) > len(shown), (
+    assert len(listed(grown.text)) > len(shown), (
         f"{route}: what its more adds is not shown at {url}"
     )
     with eleven.visit(device=route == CATALOGUE) as (client, session):
-        many, _ = read(client, session, path(where, eleven.world))
+        many, longer = read(client, session, path(where, eleven.world))
+    # Else the eleven-row world is not built of what the page lists.
+    assert len(longer) > len(shown), f"{route} shows no more for eleven rows"
     assert many == few, f"{route}: {few} statements for one row, {many} for eleven"
+
+
+def listed(page: str) -> str:
+    """A page without its masthead, whose badges count what other pages
+    list (_masthead.html)."""
+    return re.sub(r'<header class="masthead">.*?</header>', "", page, flags=re.DOTALL)
 
 
 # Pages that name no item or package, and why the one that does names them
