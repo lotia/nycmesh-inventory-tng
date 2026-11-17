@@ -392,8 +392,10 @@ the compressed copy (fiddly header code ServeStatic already gets right).
   address, and the select lost an author's `text-overflow`. So
   `style-src-attr` allows `'unsafe-hashes'` and that text's SHA-256 hash,
   made with `hashlib` in `security_headers.py` and checked against the text
-  by a test; a browser test proves a select is refused nothing and keeps
-  its ellipsis. `'unsafe-hashes'` allows a style attribute only if its
+  by a test. A browser test showed, in Playwright 1.64.1's WebKit, which
+  has the bug, that with it a select is refused nothing and keeps its
+  ellipsis; Playwright 1.65's WebKit has the fix, so the tests now run
+  without the bug. `'unsafe-hashes'` allows a style attribute only if its
   exact text hashes to a listed hash, so a page's own
   `style="text-overflow:inherit"` is allowed too, which is harmless: it
   only passes on the parent's value. Remove the exception once the Safari

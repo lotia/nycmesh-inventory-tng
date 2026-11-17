@@ -11,36 +11,19 @@ import { type BrowserContext, test as base, expect } from "@playwright/test";
 type Violation = { directive: string; blocked: string; target: string };
 
 /**
- * WebKit refuses its own inline style for every <select>, saying so as a
- * violation of style-src-attr by the select: not the page's. A style
- * attribute the page gives a select is still caught in Chromium, and
- * refused in any template by a backend test.
- */
-function webkitsOwn(violation: Violation, browserName: string): boolean {
-  return (
-    browserName === "webkit" &&
-    violation.directive === "style-src-attr" &&
-    violation.target === "SELECT"
-  );
-}
-
-/**
  * Collects what the policy refuses in `context`'s pages, as each one's
  * securitypolicyviolation events say. A context a test opens itself is
  * watched with this too.
  */
 export async function watch(context: BrowserContext): Promise<string[]> {
   const found: string[] = [];
-  const browserName = context.browser()?.browserType().name() ?? "";
   await context.exposeBinding(
     "policyViolated",
     ({ page }, violation: Violation) => {
-      if (!webkitsOwn(violation, browserName)) {
-        const { directive, blocked, target } = violation;
-        found.push(
-          `${directive} refused ${blocked} (${target}) on ${page.url()}`,
-        );
-      }
+      const { directive, blocked, target } = violation;
+      found.push(
+        `${directive} refused ${blocked} (${target}) on ${page.url()}`,
+      );
     },
   );
   await context.addInitScript(() => {

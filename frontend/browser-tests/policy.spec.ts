@@ -49,10 +49,10 @@ test("a <select> is refused nothing, and keeps its ellipsis", async ({
   // The scan page has selects of its own too.
   await page.goto("/scan");
   // What the policy refuses, by id, until a style attribute of ours is:
-  // WebKit 27.2 refuses its own style for a <select> as each is made
-  // (bug 327212), unless the policy allows it by its hash
-  // (security_headers.py). A page's own attribute of the same text is
-  // allowed with it.
+  // Safari 27.2 refuses its own style for a <select> as each is made
+  // (WebKit bug 327212, fixed in Playwright 1.65's WebKit), unless the
+  // policy allows it by its hash (security_headers.py). A page's own
+  // attribute of the same text is allowed with it.
   const refused = await page.evaluate(
     () =>
       new Promise<string[]>((resolve) => {

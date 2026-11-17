@@ -174,13 +174,13 @@ services:
   # reaches the app on the host through the tests' connection
   # (playwright.config.ts, exposeNetwork).
   webkit:
-    image: mcr.microsoft.com/playwright:v1.64.1-noble
+    image: mcr.microsoft.com/playwright:v1.65.1-noble
     profiles: [webkit]
     # Podman's exec bug: without this, rootless Podman's health checks and
     # exec fail under crun 1.31 and later (CONTRIBUTING.md, Podman's exec bug;
     # https://github.com/podman-container-tools/podman/issues/30245).
     oom_score_adj: 200
-    command: [npx, -y, playwright@1.64.1, run-server, --port, "3000", --host, "0.0.0.0"]
+    command: [npx, -y, playwright@1.65.1, run-server, --port, "3000", --host, "0.0.0.0"]
     init: true
     ipc: host
     ports:
