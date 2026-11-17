@@ -517,7 +517,8 @@ def test_the_seeding_page_proposes_and_accepts_readings(
     assert near("sfp+, uplink") in page
     assert ("", "Choose…", False) in options(seeding.text)
     # Each proposed reading chosen already, to accept as it is.
-    assert ("Gbit/s", "Gbps · data rate", True) in options(seeding.text)
+    g = read(seeding.text).one("select", name="reading:G")
+    assert ("Gbit/s", "Gbps · data rate", True) in options(g)
     assert ("Review one by one", f"{SEED}?one=1") in links(seeding.text)
     assert "Mbps · data rate" in page
     assert "m · meters" in page

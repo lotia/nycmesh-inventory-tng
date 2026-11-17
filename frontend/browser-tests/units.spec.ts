@@ -23,7 +23,8 @@ const UNITS: Record<string, [string, string]> = {
   chromium: CHROMIUM,
   webkit: ["M", "Mbps"],
 };
-const unitOf = (info: TestInfo) => UNITS[info.project.name] ?? CHROMIUM;
+const unitOf = (info: TestInfo): [string, string] =>
+  UNITS[info.project.name] ?? CHROMIUM;
 
 /** Its unit's reading rule deleted, if there is one. */
 async function forget(page: Page, unit: string): Promise<void> {

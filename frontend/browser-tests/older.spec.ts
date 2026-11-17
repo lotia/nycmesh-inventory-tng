@@ -18,7 +18,6 @@ const listingOf = (page: Page) =>
     has: page.getByRole("heading", { name: HEADING }),
   });
 
-/** The scan page's ids for a name and two places, by what it offers. */
 /** The Discard of the listed line that says `words`. */
 const lineDiscard = (listing: Locator, words: string) =>
   listing
@@ -27,6 +26,7 @@ const lineDiscard = (listing: Locator, words: string) =>
     .last()
     .getByRole("button", { name: "Discard" });
 
+/** The scan page's ids for a name and two places, by what it offers. */
 async function choices(page: Page) {
   const value = async (label: string, option: string) =>
     Number(
@@ -138,80 +138,86 @@ test("a save's package retired since is named, never offered, and goes by its li
   const cable = await ownCable(page, "Retired cable");
   const itemPage = page.url();
   const itemId = Number(new URL(itemPage).pathname.split("/").at(-1));
-  const box = "Box of 305 m";
-  const retireBox = page.getByRole("button", { name: `Retire ${box}` });
-  const packageId = Number(
-    (
-      (await page.locator("form", { has: retireBox }).getAttribute("action")) ??
-      ""
-    )
-      .split("/")
-      .at(-2),
-  );
-  await retireBox.click();
-  await expect(
-    page.getByRole("button", { name: `Bring it back ${box}` }),
-  ).toBeVisible();
-  await page.goto("/scan");
-  await leave(page, [
-    { item_id: itemId, quantity: "610", package_id: packageId },
-    { item_id: itemId, quantity: "3" },
-  ]);
-  await page.reload();
-
-  // The package, retired with none left: named from the catalogue
-  // (retired_packages), in bold, without "Sorry."
   const listing = listingOf(page);
-  await expect(listing.getByText(`${cable}: 2 × ${box}`)).toBeVisible();
-  const note = listing.locator(".alert", {
-    hasText: "This item has been retired.",
+  // A step each, so a failure says which half; the item's half needs the
+  // package's done, so it runs only once that passes.
+  await test.step("the package, retired with none left", async () => {
+    const box = "Box of 305 m";
+    const retireBox = page.getByRole("button", { name: `Retire ${box}` });
+    const packageId = Number(
+      (
+        (await page
+          .locator("form", { has: retireBox })
+          .getAttribute("action")) ?? ""
+      )
+        .split("/")
+        .at(-2),
+    );
+    await retireBox.click();
+    await expect(
+      page.getByRole("button", { name: `Bring it back ${box}` }),
+    ).toBeVisible();
+    await page.goto("/scan");
+    await leave(page, [
+      { item_id: itemId, quantity: "610", package_id: packageId },
+      { item_id: itemId, quantity: "3" },
+    ]);
+    await page.reload();
+
+    // Named from the catalogue (retired_packages), in bold, without "Sorry."
+    await expect(listing.getByText(`${cable}: 2 × ${box}`)).toBeVisible();
+    const note = listing.locator(".alert", {
+      hasText: "This item has been retired.",
+    });
+    await expect(note.locator("strong")).toHaveText(
+      "This item has been retired.",
+    );
+    await lineDiscard(listing, `${cable}: 2 × ${box}`).click();
+    // What is left goes back whole, without a tap; the box is not offered.
+    await expect(listing).toHaveCount(0);
+    await expect(page.getByText(PUT_BACK)).toBeVisible();
+    // Its only count, the box not offered.
+    await expect(page.getByLabel("How many m")).toHaveValue("3");
+    await expect(page.getByLabel(new RegExp(`^${box}`))).toHaveCount(0);
+    // Discarded, not saved: a save would leave the item stock, and the
+    // item's half needs it retired with none left.
+    await page.getByRole("button", { name: "Discard cart" }).click();
+    await page.getByRole("button", { name: "Discard", exact: true }).click();
+    await expect(page.getByText("Nothing in the cart yet.")).toBeVisible();
   });
-  await expect(note.locator("strong")).toHaveText(
-    "This item has been retired.",
-  );
-  await lineDiscard(listing, `${cable}: 2 × ${box}`).click();
-  // What is left goes back whole, without a tap; the box is not offered.
-  await expect(listing).toHaveCount(0);
-  await expect(page.getByText(PUT_BACK)).toBeVisible();
-  // Its only count, the box not offered.
-  await expect(page.getByLabel("How many m")).toHaveValue("3");
-  await expect(page.getByLabel(new RegExp(`^${box}`))).toHaveCount(0);
-  // Discarded, not saved: a retired item with stock left is still offered.
-  await page.getByRole("button", { name: "Discard cart" }).click();
-  await page.getByRole("button", { name: "Discard", exact: true }).click();
-  await expect(page.getByText("Nothing in the cart yet.")).toBeVisible();
 
-  // Then the item, retired with none left.
-  await page.goto(itemPage);
-  await page.getByRole("button", { name: "Retire", exact: true }).click();
-  await expect(page.getByRole("status")).toContainText("Retired.");
-  await page.goto("/scan");
-  await leave(
-    page,
-    [{ item_id: itemId, quantity: "2" }],
-    [{ item_id: itemId, quantity: "3" }],
-  );
-  await page.reload();
+  await test.step("then the item, retired with none left", async () => {
+    await page.goto(itemPage);
+    await page.getByRole("button", { name: "Retire", exact: true }).click();
+    await expect(page.getByRole("status")).toContainText("Retired.");
+    await page.goto("/scan");
+    await leave(
+      page,
+      [{ item_id: itemId, quantity: "2" }],
+      [{ item_id: itemId, quantity: "3" }],
+    );
+    await page.reload();
 
-  await expect(listing.getByText("Item retired")).toHaveCount(2);
-  await expect(listing.getByText(`${cable}: 2 m`)).toBeVisible();
-  await expect(
-    listing.getByRole("button", { name: "Cannot Add to Cart" }).first(),
-  ).toBeDisabled();
-  await expect(page.getByText(PUT_BACK)).toHaveCount(0);
-  // The line's own Discard, without asking: the save goes with its only
-  // line.
-  await lineDiscard(listing, `${cable}: 2 m`).click();
-  await expect(listing.getByText(`${cable}: 2 m`)).toHaveCount(0);
-  await expect(listing.getByText(`${cable}: 3 m`)).toBeVisible();
-  // The save's own asks first.
-  await listing.getByRole("button", { name: "Discard" }).last().click();
-  await expect(listing.getByText("Confirm discard")).toBeVisible();
-  await listing.getByRole("button", { name: "Discard" }).last().click();
-  await expect(listing).toHaveCount(0);
-  expect(
-    await page.evaluate(() => localStorage.getItem("inventory.outbox.v3")),
-  ).toBeNull();
+    await expect(listing.getByText("Item retired")).toHaveCount(2);
+    await expect(listing.getByText(`${cable}: 2 m`)).toBeVisible();
+    await expect(
+      listing.getByRole("button", { name: "Cannot Add to Cart" }).first(),
+    ).toBeDisabled();
+    await expect(page.getByText(PUT_BACK)).toHaveCount(0);
+    // The line's own Discard, without asking: the save goes with its only
+    // line.
+    await lineDiscard(listing, `${cable}: 2 m`).click();
+    await expect(listing.getByText(`${cable}: 2 m`)).toHaveCount(0);
+    await expect(listing.getByText(`${cable}: 3 m`)).toBeVisible();
+    // The save's own asks first.
+    await listing.getByRole("button", { name: "Discard" }).last().click();
+    await expect(listing.getByText("Confirm discard")).toBeVisible();
+    await listing.getByRole("button", { name: "Discard" }).last().click();
+    await expect(listing).toHaveCount(0);
+    expect(
+      await page.evaluate(() => localStorage.getItem("inventory.outbox.v3")),
+    ).toBeNull();
+  });
 });
 
 /** One left, which the older build's tab then saves, as its request in

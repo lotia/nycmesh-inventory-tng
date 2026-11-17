@@ -1865,7 +1865,8 @@ describe("what an older build left", () => {
       AT,
       [{ item_id: 103, quantity: "4", package_id: 1003 }, radios(1)],
     ]);
-    open();
+    const { api, sent } = server();
+    const outbox = open(api);
     await ready();
     const retired = within(listing())
       .getByText(/NanoStation M5: 2 × Pair/)
@@ -1885,9 +1886,15 @@ describe("what an older build left", () => {
     fireEvent.click(
       within(retired).getByRole("button", { name: say(DISCARD) }),
     );
-    // The rest, whole now, goes in the empty cart without a tap.
+    // The rest, whole now, goes in the empty cart without a tap, and is
+    // saved as it is, without the line discarded.
     await screen.findByText(ADDED_BACK);
     expect(boxes()).toBe("1");
+    save();
+    await vi.waitFor(() => expect(saves(sent)).toHaveLength(1));
+    expect(outbox.entries.value[0]?.body.lines).toEqual([
+      { item_id: 100, package_id: 1000, package_size: "4", quantity: "4" },
+    ]);
   });
 
   test("an item retired since, the whole save discarded, goes", async () => {

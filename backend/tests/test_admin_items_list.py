@@ -260,6 +260,7 @@ def test_a_search_sorted_by_a_heading_goes_back_to_best_match(
     assert named == sorted(named, key=str.lower)
     assert named[0] == f"Aaa LiteBeem {mark}"
     assert ("Best match", f"{ITEMS}?q=LiteBeam+{mark}") in links(by_name)
+    assert not by_name.all("a", "Best match", aria_current="page")
     # A new search from the box is best match first again: no sort sent.
     assert not read(by_name).one("form", role="search").all("*", name="sort")
     # Without a search, no Best match.
