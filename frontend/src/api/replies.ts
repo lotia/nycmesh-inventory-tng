@@ -23,7 +23,7 @@ export const DeviceRefusedReply = v.object({
 });
 
 /** A line of the transaction recorded under a batch's key, as a batch
- * sends one (backend ledger.RecordedLine). */
+ * sends one (backend scan/batch_schemas.RecordedLine). */
 export const RecordedLine = v.object({
   item_id: id,
   quantity: v.string(),

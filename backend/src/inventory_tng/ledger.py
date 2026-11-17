@@ -17,8 +17,8 @@ Two choices that keep a volunteer's work from being lost:
   readers follow a merged volunteer forward. The one exception: a retired
   item is never received (docs/decisions/0003), so a receipt of one is
   refused, and the outbox says so. A save at a retired place is logged and
-  counted, and the place shows as holding stock (retired_holding_stock)
-  until an administrator counts it.
+  counted (scan/batch_api.py), and the place shows as holding stock
+  (balance.retired_holding_stock) until an administrator counts it.
 - The server's clock decides when a batch happened, not the phone's: a batch
   resent from the outbox is recorded when it arrives. created_at is the
   database's now(), and nothing sent sets it.
@@ -1163,7 +1163,8 @@ def corrected(
     admin_id: int, location_id: int, written: Iterable[Written], withheld_lines: int = 0
 ) -> None:
     """Measure and log a count or an adjustment once committed, as
-    save_batch does, so a failed commit and its retry count once."""
+    save_batch (scan/batch_api.py) does, so a failed commit and its retry
+    count once."""
     for transaction in written:
         counted.add(1, {"kind": transaction.kind})
         log.info(
