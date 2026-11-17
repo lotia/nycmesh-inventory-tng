@@ -33,7 +33,7 @@ from inventory_tng.db import (
 from inventory_tng.history import LEDGER
 from inventory_tng.logs import configure_structlog
 from inventory_tng.mail import get_mailer
-from inventory_tng.models import RateLimit
+from inventory_tng.models import ItemPackage, RateLimit
 from inventory_tng.settings import FrontendConfig, LogConfig, RateLimits, Settings
 
 from databases import (
@@ -54,8 +54,9 @@ from helpers.concurrency import LOCK_TIMEOUT, Committed, delete_made, newest_ids
 from helpers.devices import new_device
 from helpers.mail import SITE_MAIL, SentMail
 from helpers.pools import checked_out
-from helpers.rows import setting_up
+from helpers.rows import add, setting_up
 from helpers.sign_in import TOTP_KEY, TOTP_KEYS, new_admin, sign_in_with
+from helpers.stock import Place
 
 # structlog's lines go through the standard library, where caplog sees them.
 configure_structlog()
@@ -733,3 +734,14 @@ def database_error(engine: Engine) -> Iterator[exc.DBAPIError]:
         with pytest.raises(exc.DBAPIError) as raised:
             connection.execute(text(QUOTING_QUERY))
         yield raised.value
+
+
+@pytest.fixture
+def place(session: Session) -> Place:
+    return Place(session)
+
+
+@pytest.fixture
+def bags(session: Session, place: Place) -> ItemPackage:
+    """Bags of 50 of the place's cable."""
+    return add(session, ItemPackage(item_id=place.cable.id, name="Bag of 50", size=50))

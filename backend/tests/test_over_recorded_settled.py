@@ -27,16 +27,7 @@ from inventory_tng.phrases import compiled, speaking
 
 from helpers.rows import tag
 from helpers.sign_in import new_admin
-from helpers.stock import (
-    Place,
-    Spools,
-    ada_id,
-    count_at,
-    cut,
-    raised,
-    retire,
-    write,
-)
+from helpers.stock import Place, Spools, ada_id, count_at, cut, raised, retire, write
 
 # As the list says each, in English.
 HOW = {how: str(words) for how, words in over_recorded.SETTLED_HOW.items()}
