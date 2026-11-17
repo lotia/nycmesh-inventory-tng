@@ -261,6 +261,11 @@ def count_form(page: Response) -> dict[str, str]:
     )
 
 
+def count_form_at(client: TestClient, place_id: int) -> dict[str, str]:
+    """A place's count form's hidden fields, as shown now."""
+    return count_form(client.get(f"{COUNTS}/{place_id}"))
+
+
 def count_at(
     client: TestClient,
     place_id: int,
@@ -271,8 +276,7 @@ def count_at(
 ) -> Response:
     """A count of a place sent with `lines`, from its form as shown now, or
     as `shown`, answered with `status`: saved, unless said otherwise."""
-    path = f"{COUNTS}/{place_id}"
-    form = shown if shown is not None else count_form(client.get(path))
-    response = client.post(path, data=form | lines)
+    form = shown if shown is not None else count_form_at(client, place_id)
+    response = client.post(f"{COUNTS}/{place_id}", data=form | lines)
     assert response.status_code == status
     return response

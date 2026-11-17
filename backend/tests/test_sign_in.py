@@ -46,7 +46,7 @@ from helpers.sign_in import (
     TOTP_KEYS,
     app_clock,
     code,
-    confirmed_ago,
+    confirmed_long_ago,
     new_admin,
     opened,
     policy,
@@ -296,7 +296,7 @@ def test_forms_held_up_past_a_time_step_still_take_their_codes(
             "code": code(new_key, at),
         }
         assert client.post(sign_in.NEW_AUTHENTICATOR, data=form).status_code == 303
-    confirmed_ago(session, hours=2)
+    confirmed_long_ago(session)
     with app_clock() as at:
         confirm = {
             sign_in.CONFIRM_FIELD: code(key, at + TIME_STEP),
@@ -540,7 +540,7 @@ def test_a_sensitive_page_asks_for_a_code_then_carries_on(
     # Signing in counts as confirming, so it goes straight through...
     assert client.get(sign_in.NEW_AUTHENTICATOR).status_code == 200
     # ...until the window closes. That does not sign anyone out.
-    confirmed_ago(session, hours=2)
+    confirmed_long_ago(session)
     asked = client.get(sign_in.NEW_AUTHENTICATOR)
     assert asked.headers["location"] == (
         "/admin/confirm?next=/admin/authenticators/new"
@@ -572,7 +572,7 @@ def test_a_form_asked_to_confirm_shows_the_navigations_badge(
     badge is read as the form is held up (sign_in.ConfirmHere)."""
     signed_in_row(client, session)
     at_retired_van(session)
-    confirmed_ago(session, hours=2)
+    confirmed_long_ago(session)
     held = client.post(sign_in.NEW_AUTHENTICATOR, data={"authenticator_name": "x"})
     assert held.status_code == 403
     assert f": {retired_holding(1)}" in text(held)
@@ -585,7 +585,7 @@ def test_without_totp_the_password_confirms(
     new_admin(session, totp=False)
     sign_in_with(client)
     row = session.scalars(select(AdminSession)).one()
-    confirmed_ago(session, hours=2)
+    confirmed_long_ago(session)
     assert "Your password" in client.get(sign_in.CONFIRM).text
     wrong = client.post(sign_in.CONFIRM, data={sign_in.CONFIRM_FIELD: "nope"})
     assert alert(wrong) == sign_in.NOT_YOUR_PASSWORD

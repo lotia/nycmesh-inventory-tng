@@ -23,7 +23,7 @@ from inventory_tng.settings import RateLimits
 from helpers.mail import NO_MAIL, SentMail
 from helpers.sign_in import (
     admin_named,
-    confirmed_ago,
+    confirmed_long_ago,
     new_admin,
     once,
     reset_link,
@@ -353,7 +353,7 @@ def test_an_invite_not_taken_up_may_always_go(
 def test_changes_here_ask_for_a_fresh_code(
     admin_client: TestClient, session: Session
 ) -> None:
-    confirmed_ago(session, hours=2)
+    confirmed_long_ago(session)
     asked = admin_client.post(ADMINS, data=once(username="grace"))
     assert asked.status_code == 403
     assert (

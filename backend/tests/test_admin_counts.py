@@ -62,6 +62,7 @@ from helpers.stock import (
     at_retired_van,
     badge_html,
     committed_place,
+    count_at,
     count_form,
     received,
     retire,
@@ -105,12 +106,11 @@ def test_a_count_puts_the_records_right(
     admin_client: TestClient, session: Session
 ) -> None:
     place = stocked(session)
-    path = f"{COUNTS}/{place.store.id}"
-    assert 'value="5"' in admin_client.get(path).text
-    done = admin_client.post(
-        path,
-        data=count_form(admin_client.get(path))
-        | {
+    assert 'value="5"' in admin_client.get(f"{COUNTS}/{place.store.id}").text
+    done = count_at(
+        admin_client,
+        place.store.id,
+        {
             f"counted_{place.item.id}": "3",
             "extra_item_id": str(place.cable.id),
             "extra_quantity": "10.5",
@@ -141,11 +141,7 @@ def test_a_count_that_matches_is_still_recorded(
     admin_client: TestClient, session: Session
 ) -> None:
     place = stocked(session)
-    path = f"{COUNTS}/{place.store.id}"
-    done = admin_client.post(
-        path,
-        data=count_form(admin_client.get(path)) | {f"counted_{place.item.id}": "5"},
-    )
+    done = count_at(admin_client, place.store.id, {f"counted_{place.item.id}": "5"})
     assert (
         done.headers["location"] == f"{COUNTS}?notice=counted_same&section=count#count"
     )
@@ -821,11 +817,7 @@ def test_a_count_shows_in_the_zone_of_its_place(
     place = stocked(session)
     place.store.time_zone = "America/Chicago"
     session.flush()
-    path = f"{COUNTS}/{place.store.id}"
-    admin_client.post(
-        path,
-        data=count_form(admin_client.get(path)) | {f"counted_{place.item.id}": "5"},
-    )
+    count_at(admin_client, place.store.id, {f"counted_{place.item.id}": "5"})
     (counted,) = counts_written(session)
     assert counted.time_zone == "America/Chicago"
     assert show(counted.created_at, "America/Chicago") in text(admin_client.get(COUNTS))

@@ -8,6 +8,10 @@ import { expect, type Page } from "@playwright/test";
 import { ownCable, record } from "./own";
 import { test } from "./policy";
 
+/** The seed's volunteer and shelf, as the scan page names them. */
+const SAM = "Sam Example";
+const SHELF = "Supernode 1 › Shelf A";
+
 /** Picks `cable` on the scan page, from a search for it. */
 async function pick(page: Page, cable: string): Promise<void> {
   await page.getByLabel(/Find an item/).fill(cable);
@@ -16,22 +20,20 @@ async function pick(page: Page, cable: string): Promise<void> {
 
 /** Fills in a move of `cable` from the shelf to the van, by Sam. */
 async function fillMove(page: Page, cable: string): Promise<void> {
-  await page.getByLabel("Your name").selectOption({ label: "Sam Example" });
+  await page.getByLabel("Your name").selectOption({ label: SAM });
   await page.getByLabel("Moving stock").check();
-  await page
-    .getByLabel("From", { exact: true })
-    .selectOption({ label: "Supernode 1 › Shelf A" });
+  await page.getByLabel("From", { exact: true }).selectOption({ label: SHELF });
   await page.getByLabel("To", { exact: true }).selectOption({ label: "Van" });
   await pick(page, cable);
 }
 
 /** Fills in an opening of `cable` on the shelf, by Sam. */
 async function fillOpening(page: Page, cable: string): Promise<void> {
-  await page.getByLabel("Your name").selectOption({ label: "Sam Example" });
+  await page.getByLabel("Your name").selectOption({ label: SAM });
   await page.getByLabel("Opening packages").check();
   await page
     .getByLabel("Where", { exact: true })
-    .selectOption({ label: "Supernode 1 › Shelf A" });
+    .selectOption({ label: SHELF });
   await pick(page, cable);
 }
 
@@ -122,9 +124,7 @@ test("a package opened on the scan page is saved as an opening", async ({
   ]);
   // Said to be used up by its button, alone: a report (8i4.133.5).
   await page.goto("/scan");
-  await page
-    .getByLabel("From", { exact: true })
-    .selectOption({ label: "Supernode 1 › Shelf A" });
+  await page.getByLabel("From", { exact: true }).selectOption({ label: SHELF });
   await pick(page, cable);
   await page.getByLabel(/^Box of 305\sm/).fill("");
   await page.getByLabel(/^Loose/).fill("");
@@ -144,11 +144,9 @@ test("opening, an item fills its package sealed where it is opened", async ({
   const cable = await ownCable(page);
   // A box received at the shelf, so one is sealed there.
   await page.goto("/scan");
-  await page.getByLabel("Your name").selectOption({ label: "Sam Example" });
+  await page.getByLabel("Your name").selectOption({ label: SAM });
   await page.getByLabel("Receiving stock").check();
-  await page
-    .getByLabel("To", { exact: true })
-    .selectOption({ label: "Supernode 1 › Shelf A" });
+  await page.getByLabel("To", { exact: true }).selectOption({ label: SHELF });
   await pick(page, cable);
   await page.getByLabel(/^Box of 305\sm/).fill("1");
   await page.getByLabel(/^Loose/).fill("");
@@ -163,7 +161,7 @@ test("opening, an item fills its package sealed where it is opened", async ({
   await pick(page, cable);
   await expect(box).toHaveValue("");
   // Picking the place fills a line not typed into (inventory-tng-prp).
-  await where.selectOption({ label: "Supernode 1 › Shelf A" });
+  await where.selectOption({ label: SHELF });
   await expect(box).toHaveValue("1");
   // With no place, its one package, then none where none is sealed.
   await page.getByRole("button", { name: "Remove" }).click();

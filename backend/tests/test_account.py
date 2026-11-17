@@ -30,7 +30,7 @@ from helpers.sign_in import (
     app_clock,
     code,
     codes_with_left,
-    confirmed_ago,
+    confirmed_long_ago,
     new_admin,
     once,
     other_session,
@@ -421,7 +421,7 @@ def test_a_late_form_asks_for_a_code_and_keeps_what_was_typed(
     ada: tuple[Admin, str],
 ) -> None:
     admin, key = ada
-    confirmed_ago(session, hours=2)
+    confirmed_long_ago(session)
     asked = client.post(f"{ACCOUNT}/email", data={"email": "ada@example.org"})
     assert asked.status_code == 403
     page = text(asked)
@@ -450,7 +450,7 @@ def test_a_late_password_form_never_writes_the_password_into_the_page(
     session: Session,
     ada: tuple[Admin, str],
 ) -> None:
-    confirmed_ago(session, hours=2)
+    confirmed_long_ago(session)
     form = {"password": NEW_PASSWORD, "password_again": NEW_PASSWORD}
     asked = client.post(f"{ACCOUNT}/password", data=form)
     assert asked.status_code == 403
@@ -477,7 +477,7 @@ def test_a_late_form_never_carries_a_secret_into_the_page(
     (inventory-tng-2qy6). Logged with the admin's id, not the field's
     name, which the browser chose."""
     admin, _ = ada
-    confirmed_ago(session, hours=2)
+    confirmed_long_ago(session)
     form = {"email": "ada@example.org", name: "hunter2"}
     with capture_logs() as logs:
         refused = client.post(f"{ACCOUNT}/email", data=form)
@@ -511,7 +511,7 @@ def test_a_late_new_authenticator_keeps_its_key(
 ) -> None:
     """The QR code already scanned stays good: its key comes back."""
     new_key = accounts.new_totp_key()
-    confirmed_ago(session, hours=2)
+    confirmed_long_ago(session)
     _, key = ada
     with app_clock() as at:
         form = {
@@ -533,7 +533,7 @@ def test_viewing_the_account_never_asks(
     session: Session,
     ada: tuple[Admin, str],
 ) -> None:
-    confirmed_ago(session, hours=2)
+    confirmed_long_ago(session)
     assert client.get(ACCOUNT).status_code == 200
 
 

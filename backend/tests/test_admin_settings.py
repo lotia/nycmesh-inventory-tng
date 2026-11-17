@@ -21,7 +21,7 @@ from inventory_tng.models import (
 
 from helpers.mail import SentMail
 from helpers.rows import history, shown
-from helpers.sign_in import confirmed_ago, new_admin, sign_in_with, text, with_code
+from helpers.sign_in import confirmed_long_ago, new_admin, sign_in_with, text, with_code
 
 
 def test_shows_and_changes_the_name_check(
@@ -129,7 +129,7 @@ def test_sign_in_settings_refuse_what_cannot_be(
 def test_sign_in_settings_ask_for_a_fresh_code(
     admin_client: TestClient, session: Session
 ) -> None:
-    confirmed_ago(session, hours=2)
+    confirmed_long_ago(session)
     asked = admin_client.post(f"{SETTINGS}/sign-in", data=SIGN_IN_FORM)
     assert asked.status_code == 403
     assert session.get_one(SignInSettings, 1).totp_policy == "required"
@@ -140,7 +140,7 @@ def test_sign_in_settings_go_on_through_the_confirm_page(
 ) -> None:
     """Only a password typed is asked for again: the settings' own fields
     are carried, though the log masker masks their values (inventory-tng-pem)."""
-    confirmed_ago(session, hours=2)
+    confirmed_long_ago(session)
     version = shown(session.get_one(SignInSettings, 1))
     form = SIGN_IN_FORM | {"sign_in_version": version}
     asked = admin_client.post(f"{SETTINGS}/sign-in", data=form)
