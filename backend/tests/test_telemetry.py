@@ -25,7 +25,6 @@ from structlog.testing import capture_logs
 
 from inventory_tng import (
     accounts,
-    labels,
     ledger,
     open_packages,
     over_recorded,
@@ -43,6 +42,7 @@ from inventory_tng.core.settings import RateLimits, Settings
 from inventory_tng.core.telemetry import Telemetry, enabled
 from inventory_tng.devices import devices
 from inventory_tng.devices.guards import RegisteredDevice
+from inventory_tng.labels import labels
 from inventory_tng.models import (
     Category,
     Device,

@@ -243,11 +243,11 @@ fails on one. The app may only add to the history.
 
 Each catalogue table is written only by its own module: `categories.py`,
 `items.py` (items and their packages), `locations.py`, `volunteers.py` and
-`labels.py`. Admin pages and the seed call those modules' functions, one
-per kind of change, which take the catalogue lock, lock and read what the
-rules need, and refuse a change that breaks one by raising `db.RuleBroken`
-with the rule's name. `db.attempt` returns that name, and
-`admin/common.py`'s `RULES` says it in words. A page reads rows with
+`labels/labels.py`. Admin pages and the seed call those modules'
+functions, one per kind of change, which take the catalogue lock, lock
+and read what the rules need, and refuse a change that breaks one by
+raising `db.RuleBroken` with the rule's name. `db.attempt` returns that
+name, and `admin/common.py`'s `RULES` says it in words. A page reads rows with
 `session.get` and leaves locking to those functions. The ledger is
 written only by `ledger.insert_transaction`, which saves, counts and
 adjustments all call, and which checks its rules the same way.

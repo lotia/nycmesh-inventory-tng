@@ -15,7 +15,7 @@ from opentelemetry import metrics
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
-from inventory_tng import items, labels, open_packages, reading_rules, units
+from inventory_tng import items, open_packages, reading_rules, units
 from inventory_tng.admin.categories import CATEGORIES
 from inventory_tng.admin.common import (
     ADMIN,
@@ -46,6 +46,7 @@ from inventory_tng.catalogue import queries
 from inventory_tng.core.db import DbSession, exists_where, refusal
 from inventory_tng.core.local_time import site_zone
 from inventory_tng.core.phrases import Words, gettext, lazy_gettext
+from inventory_tng.labels import labels
 from inventory_tng.models import (
     INTEGER_MAX,
     UNITS,

@@ -13,7 +13,7 @@ from fastapi.responses import HTMLResponse, Response
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
-from inventory_tng import labels, locations
+from inventory_tng import locations
 from inventory_tng.admin.common import (
     ADMIN,
     ALERTS,
@@ -34,6 +34,7 @@ from inventory_tng.core.db import DbSession, attempt
 from inventory_tng.core.local_time import zone_at
 from inventory_tng.core.phrases import Words, lazy_gettext
 from inventory_tng.core.time_zones import zones
+from inventory_tng.labels import labels
 from inventory_tng.models import STORE_KINDS, Label, Location, Volunteer
 from inventory_tng.pages import not_found, redirect
 

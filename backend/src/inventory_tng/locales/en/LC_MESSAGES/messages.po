@@ -304,7 +304,7 @@ msgstr ""
 msgid "%(item)s, transaction %(transaction)s"
 msgstr ""
 
-#: src/inventory_tng/labels.py
+#: src/inventory_tng/labels/labels.py
 #, python-format
 msgid "%(item)s: %(package)s of %(size)s"
 msgstr ""
@@ -427,7 +427,7 @@ msgid ""
 "one as empty, and record it found there."
 msgstr ""
 
-#: src/inventory_tng/labels.py
+#: src/inventory_tng/labels/labels.py
 #, python-format
 msgid "%(place)s, in %(parent)s"
 msgstr ""
@@ -1772,7 +1772,7 @@ msgstr ""
 msgid "Item labels"
 msgstr ""
 
-#: src/inventory_tng/labels.py
+#: src/inventory_tng/labels/labels.py
 msgid "Item retired"
 msgstr ""
 
@@ -2493,7 +2493,7 @@ msgstr ""
 msgid "Package brought back."
 msgstr ""
 
-#: src/inventory_tng/labels.py
+#: src/inventory_tng/labels/labels.py
 msgid "Package retired"
 msgstr ""
 
@@ -2641,7 +2641,7 @@ msgstr ""
 msgid "Place labels"
 msgstr ""
 
-#: src/inventory_tng/labels.py
+#: src/inventory_tng/labels/labels.py
 msgid "Place retired"
 msgstr ""
 
@@ -3081,7 +3081,7 @@ msgstr ""
 msgid "Revoke this device"
 msgstr ""
 
-#: src/inventory_tng/admin/devices.py src/inventory_tng/labels.py
+#: src/inventory_tng/admin/devices.py src/inventory_tng/labels/labels.py
 #: src/inventory_tng/templates/code.html
 #: src/inventory_tng/templates/device_list.html
 msgid "Revoked"

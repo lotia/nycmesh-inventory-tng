@@ -12,7 +12,6 @@ from fastapi.responses import JSONResponse, Response
 from sqlalchemy import ColumnElement, exists, func, select
 from sqlalchemy.orm import aliased
 
-from inventory_tng import labels
 from inventory_tng.accounts import qr_svg
 from inventory_tng.admin.common import (
     LABELS,
@@ -28,6 +27,7 @@ from inventory_tng.admins.guards import AdminSignedIn
 from inventory_tng.core.db import DbSession
 from inventory_tng.core.local_time import site_zone
 from inventory_tng.core.phrases import gettext, lazy, lazy_gettext, ngettext
+from inventory_tng.labels import labels
 from inventory_tng.models import (
     INTEGER_MAX,
     Item,

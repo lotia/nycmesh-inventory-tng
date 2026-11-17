@@ -955,7 +955,7 @@ class Label(Base):
         CheckConstraint(
             "package_id IS NULL OR item_id IS NOT NULL", name="package_needs_item"
         ),
-        protection(owner="labels.py", lock="catalogue", history=True),
+        protection(owner="labels/labels.py", lock="catalogue", history=True),
     )
 
     id: Mapped[IntId]

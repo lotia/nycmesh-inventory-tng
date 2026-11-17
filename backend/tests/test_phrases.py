@@ -24,7 +24,6 @@ import inventory_tng
 from inventory_tng import (
     accounts,
     activity,
-    labels,
     over_recorded,
     reading_rules,
     units,
@@ -54,6 +53,7 @@ from inventory_tng.core.phrases import (
     read,
     speaking,
 )
+from inventory_tng.labels import labels
 from inventory_tng.models import (
     TRANSACTION_KINDS,
     UNITS,
