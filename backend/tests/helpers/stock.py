@@ -31,7 +31,7 @@ from inventory_tng.models import (
 from inventory_tng.pages import retired_holding
 
 from helpers.concurrency import Committed
-from helpers.markup import read
+from helpers.markup import Element, read
 from helpers.rows import add, tag
 from helpers.sign_in import admin_named
 
@@ -156,12 +156,12 @@ def adjustment_form(
     } | fields
 
 
-def badge(page: str) -> tuple[str, str] | None:
+def badge(page: str | Element) -> tuple[str, str] | None:
     """The badge beside Counts, if any: the number shown, and the words a
     screen reader reads in its place."""
     for link in read(page).all("a"):
-        for shown in link.all("span", class_="badge"):
-            if link.text.startswith("Counts "):
+        if link.text.startswith("Counts "):
+            for shown in link.all("span", class_="badge"):
                 return (
                     shown.one("span", aria_hidden="true").text,
                     shown.one("span", class_="sr-only").text,

@@ -26,7 +26,16 @@ from inventory_tng.models import Device, RegistrationCode, SiteSettings
 from inventory_tng.phrases import compiled, speaking
 
 from helpers.devices import new_device
-from helpers.markup import button, forms, hidden, links, options, read, row_links
+from helpers.markup import (
+    Element,
+    button,
+    forms,
+    hidden_fields,
+    links,
+    options,
+    read,
+    row_links,
+)
 from helpers.rows import history
 from helpers.sign_in import confirmed_long_ago, once, text
 
@@ -294,7 +303,7 @@ def test_a_device_is_revoked_after_a_confirmation(
 ) -> None:
     device, _ = new_device(session)
     path = f"{DEVICES}/{device.id}"
-    asked = admin_client.get(f"{path}/revoke").text
+    asked = read(admin_client.get(f"{path}/revoke").text)
     assert "danger" in button(asked, "Revoke").classes
     assert ("Keep it", path) in links(asked)
     assert device.revoked_at is None
@@ -313,16 +322,12 @@ def test_a_device_is_revoked_after_a_confirmation(
     assert refused.status_code == 409
 
 
-def listed_ids(page: str) -> list[int]:
+def listed_ids(page: str | Element) -> list[int]:
     """The devices a list shows, in its order."""
     return [
         int(found[1])
-        for a in read(page).all("a")
-        if (
-            found := re.fullmatch(
-                rf"{re.escape(DEVICES)}/(\d+)", a.attrs.get("href", "")
-            )
-        )
+        for _, href in links(page)
+        if (found := re.fullmatch(rf"{re.escape(DEVICES)}/(\d+)", href))
     ]
 
 
@@ -406,15 +411,15 @@ def test_devices_come_in_pages_of_the_size_asked(
         for p in shown.all("p")
         if p.text.endswith("Show All to revoke those on the other pages too.")
     ]
-    show_all = offer.one("a", "Show All").attrs["href"] or ""
+    show_all = offer.one("a", "Show All").attrs["href"]
     assert re.fullmatch(rf"{DEVICE_LIST}\?.*per=all", show_all)
-    second = admin_client.get(
-        DEVICE_LIST, params=window | {"per": "25", "page": "2"}
-    ).text
+    second = read(
+        admin_client.get(DEVICE_LIST, params=window | {"per": "25", "page": "2"}).text
+    )
     assert listed_ids(second) == [made[0].id]
     # Revoking from a page keeps its page and size.
-    assert ("per", "25") in hidden(second)
-    assert ("page", "2") in hidden(second)
+    assert ("per", "25") in hidden_fields(second)
+    assert ("page", "2") in hidden_fields(second)
     every = admin_client.get(DEVICE_LIST, params=window | {"per": "all"}).text
     assert len(listed_ids(every)) == 26
     assert "Every current one listed is selected" in every
@@ -505,7 +510,7 @@ def test_codes_sort_filter_by_state_and_come_in_pages(
     assert listed(state="revoked") == ["Delta"]
     assert listed(state="lost") == listed()
     assert listed(state="usable") == listed()
-    page = admin_client.get(DEVICES, params={"state": "expired"}).text
+    page = read(admin_client.get(DEVICES, params={"state": "expired"}).text)
     assert ("open", "Open", False) in options(page)
     assert ("expired", "Expired", True) in options(page)
     assert ("Clear", DEVICES) in links(page)
@@ -516,7 +521,6 @@ def test_codes_sort_filter_by_state_and_come_in_pages(
         )
     session.commit()
     paged = admin_client.get(DEVICES, params={"per": "25"}).text
-    codes = [href for cell in read(paged).all("td") for _, href in links(cell)]
-    assert len([c for c in codes if re.fullmatch(rf"{CODES}/\d+", c)]) == 25
+    assert len(row_links(paged, CODES)) == 25
     assert "Page 1 of 2" in paged
     assert len(listed(per="all")) == 30

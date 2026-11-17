@@ -663,7 +663,7 @@ def test_administrators_sort_by_each_heading_and_show_25_50_100_or_all(
     )
     with_totp = sorted((a.username for a in rows if a.id in using), key=str.lower)
     assert listed(sort="authenticator")[: len(with_totp)] == with_totp
-    page = admin_client.get(ADMINS).text
+    page = read(admin_client.get(ADMINS).text)
     assert sorted_columns(page) == [
         ("ascending", "Administrator", f"{ADMINS}?sort=name&order=desc")
     ]

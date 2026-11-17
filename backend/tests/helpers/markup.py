@@ -61,7 +61,8 @@ def _words(tag: Tag, *, spoken: bool) -> Iterator[str]:
 
 class Element(Tag):
     """An element of a read page. Its attributes are plain strings, a class
-    too (read as words with `classes`)."""
+    too (read as words with `classes`). Its `text` is its own, not bs4's
+    get_text."""
 
     # Read with multi_valued_attributes=None, so never a list of values.
     attrs: dict[str, str]  # ty: ignore[invalid-attribute-override]
@@ -85,8 +86,9 @@ class Element(Tag):
 
     def all(self, tag: str, text: str | None = None, **attrs: str) -> list[Element]:
         """Each element of the tag (any, for "*") within this one, in the
-        page's order, with these words and attributes: `class_` holds those
-        classes, and `aria_sort` means aria-sort."""
+        page's order, with these words and attributes. `class_` holds those
+        classes; in other names `_` stands for `-` (`aria_sort` means
+        aria-sort)."""
         wanted = {
             name.rstrip("_").replace("_", "-"): value for name, value in attrs.items()
         }
@@ -96,7 +98,7 @@ class Element(Tag):
             for found in self.find_all(None if tag == "*" else tag)
             if isinstance(found, Element)
             and classes <= set(found.classes)
-            and all(found.attrs.get(name) == value for name, value in wanted.items())
+            and wanted.items() <= found.attrs.items()
             and (text is None or found.text == text)
         ]
 
@@ -145,7 +147,7 @@ def forms(page: str | Element) -> list[tuple[str, str]]:
     ]
 
 
-def hidden(page: str | Element) -> list[tuple[str, str]]:
+def hidden_fields(page: str | Element) -> list[tuple[str, str]]:
     """Each hidden field's name and value, in the page's order."""
     return [
         (i.attrs.get("name", ""), i.attrs.get("value", ""))

@@ -62,7 +62,7 @@ def test_retired_places_holding_stock_are_told_and_counted_in_the_navigation(
     write(session, place)
     write(session, place, from_location_id=shelf.id)
     home = admin_client.get("/admin")
-    page = home.text
+    page = read(home.text)
     assert retired_holding(2) in text(home)
     for retired in (place.van, shelf):
         start = (f"Start counting {retired.name}", f"{COUNTS}/{retired.id}")

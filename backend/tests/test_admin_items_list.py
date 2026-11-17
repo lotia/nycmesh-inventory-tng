@@ -10,7 +10,7 @@ from inventory_tng.admin.listing import PER_PAGE
 from inventory_tng.models import Category, Item
 
 from helpers.items import items_named, new_item
-from helpers.markup import hidden, links, read, sorted_columns
+from helpers.markup import hidden_fields, links, read, sorted_columns
 from helpers.rows import add, tag
 from helpers.sign_in import text
 
@@ -89,7 +89,7 @@ def test_current_retired_and_all(
         ("retired", {"Gone"}),
         ("all", {"Kept", "Gone"}),
     ):
-        page = admin_client.get(ITEMS, params={"show": show}).text
+        page = read(admin_client.get(ITEMS, params={"show": show}).text)
         assert {kept.name, gone.name} & set(items_named(page)) == expected
         chosen = show or "current"
         link = f"{ITEMS}{'?show=' + show if show else ''}"
@@ -156,7 +156,7 @@ def test_items_sort_by_each_heading_either_way(
     assert order(sort="part") == ["Alpha", "Bravo", "Charlie"]
     assert order(sort="part", order="desc") == ["Charlie", "Bravo", "Alpha"]
     assert order(sort="nonsense", order="up") == ["Alpha", "Bravo", "Charlie"]
-    page = admin_client.get(ITEMS).text
+    page = read(admin_client.get(ITEMS).text)
     assert sorted_columns(page) == [
         (
             "ascending",
@@ -165,7 +165,7 @@ def test_items_sort_by_each_heading_either_way(
         )
     ]
     assert ("Category", "/admin/items?sort=category") in links(page)
-    page = admin_client.get(ITEMS, params={"sort": "category"}).text
+    page = read(admin_client.get(ITEMS, params={"sort": "category"}).text)
     assert sorted_columns(page) == [
         (
             "ascending",
@@ -186,7 +186,7 @@ def test_items_show_25_50_100_or_all(
     for number in range(30):
         new_item(session, radios, f"Sized {mark} {number:03}")
     query = {"q": f"Sized {mark}"}
-    page = admin_client.get(ITEMS, params=query).text
+    page = read(admin_client.get(ITEMS, params=query).text)
     assert len(items_named(page)) == 30
     assert ("25", f"{ITEMS}?q=Sized+{mark}&per=25") in links(page)
     fifty = read(page).one("a", "50", aria_current="page")
@@ -202,7 +202,9 @@ def test_items_show_25_50_100_or_all(
     assert "Page 1 of" not in every
     # A size not offered is 50; a new search keeps the size.
     assert len(items_named(admin_client.get(ITEMS, params={"per": "7"}).text)) <= 50
-    assert ("per", "25") in hidden(admin_client.get(ITEMS, params={"per": "25"}).text)
+    assert ("per", "25") in hidden_fields(
+        admin_client.get(ITEMS, params={"per": "25"}).text
+    )
 
 
 def test_items_filter_by_category(
@@ -212,7 +214,7 @@ def test_items_filter_by_category(
     antennas = add(session, Category(name=f"Antennas {mark}"))
     kept = new_item(session, antennas, f"Filtered {mark} dish")
     new_item(session, radios, f"Filtered {mark} radio")
-    page = admin_client.get(ITEMS, params={"category": str(antennas.id)}).text
+    page = read(admin_client.get(ITEMS, params={"category": str(antennas.id)}).text)
     assert items_named(page) == [kept.name]
     offered = read(page).all("option", value=str(antennas.id))
     assert any("selected" in choice.attrs for choice in offered)
@@ -253,7 +255,7 @@ def test_a_search_sorted_by_a_heading_goes_back_to_best_match(
     assert items_named(best)[0] == f"LiteBeam {mark}"
     assert "aria-sort" not in best
     assert read(best).one("a", "Best match", aria_current="page")
-    by_name = admin_client.get(ITEMS, params=query | {"sort": "name"}).text
+    by_name = read(admin_client.get(ITEMS, params=query | {"sort": "name"}).text)
     named = items_named(by_name)
     assert named == sorted(named, key=str.lower)
     assert named[0] == f"Aaa LiteBeem {mark}"

@@ -29,7 +29,15 @@ from inventory_tng.models import (
     Volunteer,
 )
 
-from helpers.markup import button, forms, hidden, links, options, read, sorted_columns
+from helpers.markup import (
+    button,
+    forms,
+    hidden_fields,
+    links,
+    options,
+    read,
+    sorted_columns,
+)
 from helpers.rows import add, history, tag
 from helpers.sign_in import text
 from helpers.stock import stocked, write
@@ -201,9 +209,9 @@ def test_revoking_asks_to_confirm_first(
     assert asked.one("span", label.code, class_="key")
     assert f"{label.code}, names Cat6 cable." in asked.text
     assert "can't be undone" in words
-    assert ("post", confirm) in forms(page.text)
-    assert "danger" in button(page.text, "Revoke").classes
-    assert ("Keep it", LABELS) in links(page.text)
+    assert ("post", confirm) in forms(asked)
+    assert "danger" in button(asked, "Revoke").classes
+    assert ("Keep it", LABELS) in links(asked)
     session.refresh(label)
     assert label.revoked_at is None  # Only its button revokes.
     admin_client.post(confirm)
@@ -367,8 +375,9 @@ def test_labels_list_current_inactive_and_all(
         page = admin_client.get(LABELS, params={"show": show}).text
         assert {kept.code, gone.code} & set(codes_listed(page)) == expected, show
     every = admin_client.get(LABELS, params={"show": "all"})
-    assert ("Inactive", f"{LABELS}?show=inactive") in links(every.text)
-    assert not [words for words, _ in links(every.text) if words.endswith("Retired")]
+    every_link = links(every.text)
+    assert ("Inactive", f"{LABELS}?show=inactive") in every_link
+    assert not [words for words, _ in every_link if words.endswith("Retired")]
     assert "The scan page doesn't read a label tagged here." in text(every)
     assert "doesn't read a label tagged" not in text(admin_client.get(LABELS))
 
@@ -420,9 +429,9 @@ def test_printing_refused_goes_back_to_the_list_as_it_was(
     admin_client: TestClient, session: Session, cable: Item
 ) -> None:
     add(session, Label(item_id=cable.id))
-    page = admin_client.get(LABELS, params={"q": "cat6", "show": "all"}).text
-    assert ("q", "cat6") in hidden(page)
-    assert ("show", "all") in hidden(page)
+    page = read(admin_client.get(LABELS, params={"q": "cat6", "show": "all"}).text)
+    assert ("q", "cat6") in hidden_fields(page)
+    assert ("show", "all") in hidden_fields(page)
     sent = admin_client.get(PRINT, params={"q": "cat6", "show": "all", "page": "2"})
     assert (
         sent.headers["location"]
@@ -460,7 +469,7 @@ def test_labels_sort_by_each_heading_either_way(
     assert order(sort="code", order="desc") == sorted(
         [alpha.code, bravo.code], reverse=True
     )
-    page = admin_client.get(LABELS).text
+    page = read(admin_client.get(LABELS).text)
     assert sorted_columns(page) == [
         (
             "ascending",
@@ -512,11 +521,11 @@ def test_labels_filter_by_kind_and_item(
     assert listed(kind="place", item=str(cable.id)) == set()
     # A kind not offered, or an item not a number, is no filter.
     assert listed(kind="box", item="x") >= mine
-    page = admin_client.get(LABELS, params={"item": str(cable.id)}).text
+    page = read(admin_client.get(LABELS, params={"item": str(cable.id)}).text)
     assert (str(cable.id), "Cat6 cable", True) in options(page)
     assert ("Clear", LABELS) in links(page)
     # Printing keeps the filter, to come back to.
-    assert "item" in dict(hidden(page))
+    assert "item" in dict(hidden_fields(page))
     sent = admin_client.get(PRINT, params={"item": str(cable.id), "per": "25"})
     assert sent.headers["location"] == (
         f"{LABELS}?item={cable.id}&per=25&notice=pick_labels"

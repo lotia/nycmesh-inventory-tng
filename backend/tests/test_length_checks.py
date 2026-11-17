@@ -468,10 +468,10 @@ def test_the_count_page_hints_at_the_printed_length_of_items_in_length(
         ),
     )
     box = add(session, ItemPackage(item_id=plugs.id, name="Box", size=Decimal(100)))
-    page = admin_client.get(f"/admin/counts/{store}").text
-    spool = read(page).all("option", value=str(spools.spool.id))
+    page = read(admin_client.get(f"/admin/counts/{store}").text)
+    spool = page.all("option", value=str(spools.spool.id))
     assert any("data-hinted" in choice.attrs for choice in spool)
-    boxes = read(page).all("option", value=str(box.id))
+    boxes = page.all("option", value=str(box.id))
     assert any(choice.attrs.keys() == {"value"} for choice in boxes)
     # Counted each, as the plugs are: none.
     spools.cable.unit = "each"
@@ -728,7 +728,7 @@ def test_those_to_check_sort_and_come_in_pages(
     assert listed(sort="package") == [first.id, second.id]
     reported = f"{LENGTHS}/reported"
     assert listed(reported, sort="shows") == [second.id, first.id]
-    page = admin_client.get(reported, params={"item": str(spools.cable.id)}).text
+    page = read(admin_client.get(reported, params={"item": str(spools.cable.id)}).text)
     by_shows = f"{reported}?item={spools.cable.id}&sort=shows"
     assert ("What it shows, and why", by_shows) in links(page)
     assert ("Show all", reported) in links(page)
@@ -763,7 +763,8 @@ def test_an_answer_comes_back_to_the_checks_as_they_were(
     assert left.headers["location"] == f"{reported}?{view}&notice=length_left"
     # Page 2 of 25 a page is past the end: the last page, the first.
     page = admin_client.get(left.headers["location"]).text
-    assert re.findall(r'name="open_package" value="(\d+) ', page)
+    ticks = read(page).all("input", name="open_package")
+    assert [t for t in ticks if re.match(r"\d+ ", t.attrs["value"])]
     bad = admin_client.post(
         f"{LENGTHS}/{second.id}/set?{view}",
         data=set_form(session, second, "x") | {"page": reported},

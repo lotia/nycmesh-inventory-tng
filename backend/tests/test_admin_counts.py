@@ -1025,7 +1025,7 @@ def test_counts_sort_filter_and_come_in_pages(
     assert listed(admin=str(bob.id)) == ["Count", "Found"]
     assert listed(admin=str(bob.id), kind="adjustment") == ["Found"]
     assert listed(place="x", kind="audit", admin="") == listed()
-    page = admin_client.get(COUNTS, params={"admin": str(bob.id)}).text
+    page = read(admin_client.get(COUNTS, params={"admin": str(bob.id)}).text)
     assert (str(bob.id), "bob", True) in options(page)
     assert (str(shelf.id), "Aa shelf", False) in options(page)
     assert ("Clear", COUNTS) in links(page)

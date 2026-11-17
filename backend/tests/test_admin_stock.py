@@ -229,7 +229,7 @@ def test_stock_sorts_within_each_group_and_filters(
     assert amounts(by="item") == ["7", "2", "3"]
     assert amounts(by="item", sort="quantity", order="desc") == ["7", "3", "2"]
     assert amounts(by="item", sort="place", order="desc") == ["7", "3", "2"]
-    page = admin_client.get(STOCK, params={"by": "item"}).text
+    page = read(admin_client.get(STOCK, params={"by": "item"}).text)
     # Sorted alike in each group's table.
     assert set(sorted_columns(page)) == {
         ("ascending", "Place", f"{STOCK}?by=item&sort=place&order=desc")
@@ -240,7 +240,7 @@ def test_stock_sorts_within_each_group_and_filters(
     assert amounts(place=str(place.van.id)) == ["3"]
     assert amounts(by="item", place=str(place.store.id)) == ["7", "2"]
     assert amounts(place="x") == ["7", "2", "3"]
-    filtered = admin_client.get(STOCK, params={"place": str(place.van.id)}).text
+    filtered = read(admin_client.get(STOCK, params={"place": str(place.van.id)}).text)
     chosen = [value for value, _, selected in options(filtered) if selected]
     assert str(place.van.id) in chosen
     assert ("Clear", STOCK) in links(filtered)
@@ -347,7 +347,7 @@ def test_reorder_sorts_by_each_heading_and_shows_25_50_100_or_all(
     assert listed(sort="reorder_at") == [radio, cable]
     assert listed(sort="reorder_at", order="desc") == [cable, radio]
     assert listed(per="all") == [cable, radio]
-    page = admin_client.get(REORDER).text
+    page = read(admin_client.get(REORDER).text)
     assert ("Usable in the stores", f"{REORDER}?sort=usable") in links(page)
     assert ("25", f"{REORDER}?per=25") in links(page)
 

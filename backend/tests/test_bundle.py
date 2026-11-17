@@ -149,12 +149,10 @@ def test_the_shared_stylesheet_is_its_own_entry(dist: Path) -> None:
 def test_server_rendered_pages_load_the_shared_stylesheet_and_script(
     pages: TestClient, make_app_without_database: Callable[..., FastAPI]
 ) -> None:
-    page = pages.get("/admin/sign-in").text
+    page = read(pages.get("/admin/sign-in").text)
     styles = "/static/assets/styles-BXvLJlQA.css"
-    assert read(page).all("link", rel="stylesheet", href=styles)
-    assert read(page).all(
-        "script", type="module", src="/static/assets/admin-Hq3sV8kD.js"
-    )
+    assert page.all("link", rel="stylesheet", href=styles)
+    assert page.all("script", type="module", src="/static/assets/admin-Hq3sV8kD.js")
     # Without a build, a plain page.
     with TestClient(make_app_without_database()) as unbuilt:
         plain = unbuilt.get("/admin/sign-in").text

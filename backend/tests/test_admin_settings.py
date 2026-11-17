@@ -18,7 +18,7 @@ from inventory_tng.models import (
 )
 
 from helpers.mail import SentMail
-from helpers.markup import hidden, options
+from helpers.markup import hidden_fields, options
 from helpers.rows import history, shown
 from helpers.sign_in import confirmed_long_ago, new_admin, sign_in_with, text, with_code
 
@@ -145,7 +145,7 @@ def test_sign_in_settings_go_on_through_the_confirm_page(
     asked = admin_client.post(f"{SETTINGS}/sign-in", data=form)
     assert asked.status_code == 403
     assert 'autocomplete="new-password"' not in asked.text  # Nothing to retype.
-    carried = dict(hidden(asked.text))
+    carried = dict(hidden_fields(asked.text))
     assert carried == form
     done = admin_client.post(f"{SETTINGS}/sign-in", data=with_code(session, **carried))
     assert (

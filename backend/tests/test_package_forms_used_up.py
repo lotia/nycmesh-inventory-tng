@@ -2,7 +2,6 @@
 report one, a batch sent again is compared with the reports it sent, and
 administrators confirm or clear reports, or close one directly."""
 
-import re
 import uuid
 from datetime import UTC, datetime
 from decimal import Decimal
@@ -247,8 +246,8 @@ def test_needs_your_action_until_each_report_is_answered(
     spool = f"{spools.cable.name}: 1 \N{MULTIPLICATION SIGN} Spool"
     assert (spool, f"{USED_UP}?item={spools.cable.id}") in links(home)
     assert ("All 1", USED_UP) in links(home)
-    page = text(admin_client.get(USED_UP))
-    assert f'name="open_package" value="{made.id}"' in page
+    page = admin_client.get(USED_UP).text
+    assert read(page).all("input", name="open_package", value=str(made.id))
     done = admin_client.post(f"{USED_UP}/{made.id}/confirm")
     assert done.headers["location"] == f"{USED_UP}?notice=used_up_confirmed"
     session.refresh(made)
@@ -518,7 +517,7 @@ def test_those_reported_used_up_sort_and_come_in_pages(
     assert listed(sort="package") == [earlier.id, later.id]
     assert listed(sort="package", order="desc") == [earlier.id, later.id]
     assert listed(per="all") == [earlier.id, later.id]
-    page = admin_client.get(USED_UP, params={"item": str(spools.cable.id)}).text
+    page = read(admin_client.get(USED_UP, params={"item": str(spools.cable.id)}).text)
     assert ("Shows", f"{USED_UP}?item={spools.cable.id}&sort=shows") in links(page)
     assert ("25", f"{USED_UP}?item={spools.cable.id}&per=25") in links(page)
 
@@ -542,7 +541,8 @@ def test_an_answer_comes_back_to_the_used_up_list_as_it_was(
     assert back == f"{USED_UP}?{view}&notice=used_up_cleared"
     # Page 2 of 25 a page is past the end: the last page, the first.
     page = admin_client.get(back).text
-    assert re.findall(r'name="open_package" value="(\d+)"', page)
+    ticks = read(page).all("input", name="open_package")
+    assert [t for t in ticks if t.attrs["value"].isdigit()]
     ticked = admin_client.post(
         f"{USED_UP}?{view}", data={"open_package": [str(two.id)], "do": "confirm"}
     )

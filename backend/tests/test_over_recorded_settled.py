@@ -55,7 +55,7 @@ def seen(check: OverRecorded) -> str:
     return over_recorded.seen(check)
 
 
-def rows_of(page: str) -> list[list[str]]:
+def rows_of(page: str | Element) -> list[list[str]]:
     """The first table's rows, each cell's words."""
     table = read(page).all("table")[0]
     return [
@@ -90,10 +90,11 @@ def test_a_correction_is_listed_with_when_who_and_where(
         ]
     ]
     assert f'href="/admin/stock?by=item#item-{place.item.id}"' in page
+    shown = read(page)
     for spot in (place.store, place.van):
-        assert (spot.name, f"{COUNTS}/{spot.id}?item={place.item.id}") in links(page)
+        assert (spot.name, f"{COUNTS}/{spot.id}?item={place.item.id}") in links(shown)
     # Read only: nothing to send.
-    assert not read(page).one("main").all("form")
+    assert not shown.one("main").all("form")
 
 
 def test_a_place_that_cannot_be_counted_is_not_linked(
@@ -652,7 +653,7 @@ def test_rows_per_page_25_50_100_or_all(
         over_recorded.mark_checked(session, check.id, seen(check), admin, "both")
         session.flush()
     only = f"{SETTLED}?item={place.item.id}"
-    page = admin_client.get(only).text
+    page = read(admin_client.get(only).text)
     assert len(rows_of(page)) == 26
     assert ("25", f"{only}&per=25") in links(page)
     assert read(page).one("a", "50", aria_current="page").attrs["href"] == only
@@ -696,7 +697,7 @@ def test_those_waiting_sort_by_each_heading_and_come_in_pages(
     assert items("&sort=transaction&order=asc") == names
     where = sorted(names, key=lambda n: places[names.index(n)].store.name.lower())
     assert items("&sort=where") == where
-    page = admin_client.get(WAITING).text
+    page = read(admin_client.get(WAITING).text)
     assert ("Recorded more", f"{WAITING}?sort=amount") in links(page)
     assert ("25", f"{WAITING}?per=25") in links(page)
     only = f"{WAITING}?item={places[0].item.id}"

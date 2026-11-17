@@ -21,7 +21,7 @@ from inventory_tng.models import (
     Volunteer,
 )
 
-from helpers.markup import button, forms, hidden, links, options, row_links
+from helpers.markup import button, forms, hidden_fields, links, options, read, row_links
 from helpers.rows import add, history, named, shown, tag
 from helpers.sign_in import text
 
@@ -153,9 +153,10 @@ def test_merging_asks_to_confirm_first(
     assert asked.status_code == 200
     words = " ".join(text(asked).split())
     assert "Ada Lovelace is retired as a duplicate of Ada" in words
-    assert ("into_id", str(ada.id)) in hidden(asked.text)
-    assert "danger" in button(asked.text, "Merge").classes
-    assert ("Keep them apart", path) in links(asked.text)
+    shown = read(asked.text)
+    assert ("into_id", str(ada.id)) in hidden_fields(shown)
+    assert "danger" in button(shown, "Merge").classes
+    assert ("Keep them apart", path) in links(shown)
     assert dup.retired_at is None  # Only its button merges.
     for into in ("", str(dup.id), "999999"):
         refused = admin_client.get(f"{path}/merge", params={"into_id": into})
@@ -320,7 +321,7 @@ def test_volunteers_sort_filter_and_show_25_50_100_or_all(
     assert listed(holds="yes") == ["Bravo"]
     assert listed(holds="no", sort="name") == ["Alpha", "Charlie"]
     assert listed(holds="maybe", sort="name") == ["Alpha", "Bravo", "Charlie"]
-    page = admin_client.get(VOLUNTEERS, params={"holds": "yes"}).text
+    page = read(admin_client.get(VOLUNTEERS, params={"holds": "yes"}).text)
     assert ("yes", "Holds stock", True) in options(page)
     assert ("Clear", VOLUNTEERS) in links(page)
     assert ("Holds stock", f"{VOLUNTEERS}?holds=yes&sort=holds") in links(page)
