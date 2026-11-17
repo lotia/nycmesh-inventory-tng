@@ -21,8 +21,8 @@ from inventory_tng import models
 
 from helpers.source import SOURCE, modules
 
-# Core is plumbing, not business rules: core/. What it may import
-# besides core: the models, kept whole (0023).
+# core/ is plumbing, not business rules. Of the app outside core, it may
+# import only the models, kept whole (0023).
 CORE_MAY_IMPORT = {"models.py"}
 # What every server-rendered page shares, until it moves into web/.
 WEB = {"pages.py", "web.py"}

@@ -48,8 +48,8 @@ short test. `core/` is the name FastAPI's full-stack template uses;
 ## Consequences
 
 - Older decision records keep the paths of their time. The table below
-  gives each old path's new home, under `backend/src/inventory_tng/`, a
-  row added with each move.
+  gives each old path's new home, both under `backend/src/inventory_tng/`;
+  a row is added with each move.
 - `models.py` and the templates folder stay whole for now (Ali,
   2026-11-17; inventory-tng-5q07).
 
