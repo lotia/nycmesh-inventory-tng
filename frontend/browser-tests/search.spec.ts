@@ -77,7 +77,8 @@ test("a search reads units after a number alike, on both sides", async ({
   page,
 }) => {
   // The unit tests check each spelling on both sides (units-vectors.json):
-  // this shows only that each side's search uses that shared reading.
+  // this shows that each side's search uses that shared reading, and that
+  // the scan page shows the name spaced and finds it as copied from a page.
   const what = "Cable 100 feet, PoE 48 VDC";
   const words = "Cable 100\u00a0feet, PoE 48\u00a0VDC";
   const name = await ownCable(page, what, words);
@@ -85,10 +86,17 @@ test("a search reads units after a number alike, on both sides", async ({
   // Neither form whole: each group as typed or respelt (Ali, 2026-11-15).
   const typed = name.replace(what, "100 ft 48 V");
   await page.goto("/scan");
-  await page.getByLabel(/Find an item/).fill(typed);
-  await expect(
-    page.getByRole("button", { name: shown, exact: true }),
-  ).toBeVisible();
+  const find = page.getByLabel(/Find an item/);
+  const found = page.getByRole("button", { name: shown, exact: true });
+  for (const each of [typed, shown]) {
+    // Emptied first, so what is found is found by this search.
+    await find.fill("");
+    await expect(found).toBeHidden();
+    await find.fill(each);
+    await expect(found).toBeVisible();
+    // A role's name is matched with its spaces evened out; its text is not.
+    expect(await found.textContent()).toBe(shown);
+  }
   await page.goto(`/admin/items?q=${encodeURIComponent(typed)}`);
   await expect(
     page.getByRole("table").getByRole("link", { name: shown, exact: true }),
