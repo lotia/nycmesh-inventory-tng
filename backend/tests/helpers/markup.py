@@ -1,25 +1,30 @@
 """Readers of a page's HTML, so a test checks what the page offers (a link's
-words and address, a button's class) and not how its tags are spelt."""
+words and address, a button's class) and not how its tags are spelt. The
+page is read by BeautifulSoup with lxml's parser, as a browser would."""
 
 from __future__ import annotations
 
 import re
-from dataclasses import dataclass, field
-from html.parser import HTMLParser
+from collections.abc import Iterator
 
-# Elements that never have an end tag.
-_VOID = frozenset(
-    {"area", "base", "br", "col", "embed", "hr", "img", "input", "link", "meta"}
-    | {"source", "track", "wbr"}
-)
-# An element of the key ends one still open of these, as a browser reads it.
-_ENDS = {
-    "li": {"li"},
-    "option": {"option"},
-    "p": {"p"},
-    "td": {"td", "th"},
-    "th": {"td", "th"},
-    "tr": {"tr", "td", "th"},
+from bs4 import BeautifulSoup, NavigableString, Tag
+from lxml.html import defs
+
+# Elements that start a line, so their words never run into their
+# neighbours': lxml's block elements, HTML5's sections, and a line break.
+_BREAKS = defs.block_tags | {
+    "article",
+    "aside",
+    "br",
+    "details",
+    "figcaption",
+    "figure",
+    "footer",
+    "header",
+    "main",
+    "nav",
+    "section",
+    "summary",
 }
 # Spaces and line breaks HTML runs together; a no-break space is not one.
 _SPACES = re.compile(r"[ \t\n\r\f]+")
@@ -30,37 +35,48 @@ class Unescaped(str):
     its escaping would be undone twice: a quote in a value would end it."""
 
 
-@dataclass
-class Element:
-    tag: str
-    attrs: dict[str, str | None]
-    children: list[Element | str] = field(default_factory=list)
+def _words(tag: Tag, *, spoken: bool) -> Iterator[str]:
+    """Its words, leaving out script, style and comments; spoken, also
+    what is hidden from a screen reader (aria-hidden, or hidden)."""
+    for child in tag.contents:
+        if isinstance(child, Tag):
+            if spoken and (
+                child.get("aria-hidden") == "true" or "hidden" in child.attrs
+            ):
+                continue
+            gap = " " if child.name in _BREAKS else ""
+            yield gap
+            yield from _words(child, spoken=spoken)
+            yield gap
+        elif (
+            isinstance(child, NavigableString)
+            and type(child) in Tag.MAIN_CONTENT_STRING_TYPES
+        ):
+            yield child
+
+
+class Element(Tag):
+    """An element of a read page. Its attributes are plain strings, a class
+    too (read as words with `classes`)."""
+
+    # Read with multi_valued_attributes=None, so never a list of values.
+    attrs: dict[str, str]  # ty: ignore[invalid-attribute-override]
 
     @property
     def text(self) -> str:
-        """Its words as shown, spaces run together and no-break spaces kept."""
-        return _SPACES.sub(" ", "".join(self._words(spoken=False))).strip()
+        """Its words as a browser lays them out, screen-reader-only ones
+        included: spaces run together, no-break spaces kept."""
+        return _SPACES.sub(" ", "".join(_words(self, spoken=False))).strip()
 
     @property
     def spoken(self) -> str:
         """Its words as a screen reader reads them, without what is hidden
-        from it (aria-hidden), such as an arrow."""
-        return _SPACES.sub(" ", "".join(self._words(spoken=True))).strip()
-
-    def _words(self, *, spoken: bool) -> list[str]:
-        return [
-            part
-            for child in self.children
-            if isinstance(child, str)
-            or not (spoken and child.attrs.get("aria-hidden") == "true")
-            for part in (
-                [child] if isinstance(child, str) else child._words(spoken=spoken)
-            )
-        ]
+        from it, such as an arrow."""
+        return _SPACES.sub(" ", "".join(_words(self, spoken=True))).strip()
 
     @property
     def classes(self) -> list[str]:
-        return str(self.attrs.get("class") or "").split()
+        return self.attrs.get("class", "").split()
 
     def all(self, tag: str, text: str | None = None, **attrs: str) -> list[Element]:
         """Each element of the tag (any, for "*") within this one, in the
@@ -69,56 +85,21 @@ class Element:
         wanted = {
             name.rstrip("_").replace("_", "-"): value for name, value in attrs.items()
         }
-        found = []
-        for child in self.children:
-            if isinstance(child, str):
-                continue
-            if (
-                tag in ("*", child.tag)
-                and (text is None or child.text == text)
-                and all(
-                    set(value.split()) <= set(child.classes)
-                    if name == "class"
-                    else child.attrs.get(name) == value
-                    for name, value in wanted.items()
-                )
-            ):
-                found.append(child)
-            found.extend(child.all(tag, text, **attrs))
-        return found
+        classes = set(wanted.pop("class", "").split())
+        return [
+            found
+            for found in self.find_all(None if tag == "*" else tag)
+            if isinstance(found, Element)
+            and classes <= set(found.classes)
+            and all(found.attrs.get(name) == value for name, value in wanted.items())
+            and (text is None or found.text == text)
+        ]
 
     def one(self, tag: str, text: str | None = None, **attrs: str) -> Element:
         """The only element `all` finds."""
         found = self.all(tag, text, **attrs)
         assert len(found) == 1, f"{len(found)} <{tag}> with {text=} {attrs}"
         return found[0]
-
-
-class _Reader(HTMLParser):
-    def __init__(self) -> None:
-        super().__init__(convert_charrefs=True)
-        self.page = Element("page", {})
-        self.open = [self.page]
-
-    def handle_starttag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
-        if self.open[-1].tag in _ENDS.get(tag, ()):
-            self.open.pop()
-        element = Element(tag, dict(attrs))
-        self.open[-1].children.append(element)
-        if tag not in _VOID:
-            self.open.append(element)
-
-    def handle_startendtag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
-        self.open[-1].children.append(Element(tag, dict(attrs)))
-
-    def handle_endtag(self, tag: str) -> None:
-        for depth in range(len(self.open) - 1, 0, -1):
-            if self.open[depth].tag == tag:
-                del self.open[depth:]
-                return
-
-    def handle_data(self, data: str) -> None:
-        self.open[-1].children.append(data)
 
 
 def read(page: str | Element) -> Element:
@@ -128,21 +109,33 @@ def read(page: str | Element) -> Element:
         return page
     if isinstance(page, Unescaped):
         raise TypeError("read the response's text, not text(response)")
-    reader = _Reader()
-    reader.feed(page)
-    reader.close()
-    return reader.page
+    html = BeautifulSoup(
+        page, "lxml", element_classes={Tag: Element}, multi_valued_attributes=None
+    ).html
+    assert isinstance(html, Element), "not a page"
+    return html
 
 
 def links(page: str | Element) -> list[tuple[str, str]]:
     """Each link's words and address, in the page's order."""
-    return [(a.text, a.attrs.get("href") or "") for a in read(page).all("a")]
+    return [(a.text, a.attrs.get("href", "")) for a in read(page).all("a")]
+
+
+def row_links(page: str | Element, path: str) -> list[str]:
+    """The words of each link in a table's cells to one of the records at
+    `path` (path/id), in the page's order: the names a list shows."""
+    return [
+        a.text
+        for td in read(page).all("td")
+        for a in td.all("a")
+        if re.fullmatch(rf"{re.escape(path)}/\d+", a.attrs.get("href", ""))
+    ]
 
 
 def forms(page: str | Element) -> list[tuple[str, str]]:
     """Each form's method and address, in the page's order."""
     return [
-        (f.attrs.get("method") or "", f.attrs.get("action") or "")
+        (f.attrs.get("method", ""), f.attrs.get("action", ""))
         for f in read(page).all("form")
     ]
 
@@ -150,16 +143,16 @@ def forms(page: str | Element) -> list[tuple[str, str]]:
 def hidden(page: str | Element) -> list[tuple[str, str]]:
     """Each hidden field's name and value, in the page's order."""
     return [
-        (i.attrs.get("name") or "", i.attrs.get("value") or "")
+        (i.attrs.get("name", ""), i.attrs.get("value", ""))
         for i in read(page).all("input", type="hidden")
     ]
 
 
-def sorted_columns(page: str | Element) -> list[tuple[str | None, str, str]]:
+def sorted_columns(page: str | Element) -> list[tuple[str, str, str]]:
     """Each heading a list is sorted by (one a table): which way (its
     aria-sort), its link's words as spoken, and where that link goes."""
     return [
-        (th.attrs["aria-sort"], link.spoken, link.attrs.get("href") or "")
+        (th.attrs["aria-sort"], link.spoken, link.attrs.get("href", ""))
         for th in read(page).all("th")
         if "aria-sort" in th.attrs
         for link in [th.one("a")]

@@ -141,9 +141,16 @@ def test_marking_one_checked_offers_each_reason(
     """Ali, 2026-11-15 (inventory-tng-zgy)."""
     raised(registered_client, place, bags)
     page = admin_client.get(PAGE).text
-    assert read(page).all("legend", "Why it is right as it is")
-    for value, words in over_recorded.CHECKED_REASONS.items():
-        assert f'value="{value}" required> {words}</label>' in page
+    shown = read(page)
+    assert shown.all("legend", "Why it is right as it is")
+    offered = {
+        (radio.attrs["value"], label.text)
+        for label in shown.all("label")
+        for radio in label.all("input", type="radio", name="reason")
+        if "required" in radio.attrs
+    }
+    reasons = over_recorded.CHECKED_REASONS.items()
+    assert {(value, str(words)) for value, words in reasons} <= offered
 
 
 @pytest.mark.parametrize(

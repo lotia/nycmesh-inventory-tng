@@ -89,9 +89,9 @@ def test_a_count_after_it_puts_that_end_right_and_says_what_is_left(
         f"{place.van.name} counted {day}. {place.store.name} still to put right."
         in text_of(page)
     )
-    assert f"Correct {place.store.name}<span" in page
+    assert says(page, f"Correct {place.store.name}", "button")
     link = f"{COUNTS}/{place.store.id}?item={place.item.id}"
-    assert counts_with_words(page, link, f"Count {place.store.name}")
+    assert says(page, f"Count {place.store.name}", "a", href=link)
     assert "Mark checked" in page
     # Still waiting under "Needs your action".
     assert str(over_recorded_page.TITLE) in text(admin_client.get("/admin"))
@@ -132,7 +132,7 @@ def test_a_place_that_cannot_be_counted_is_not_offered_for_counting(
     count_at(admin_client, place.van.id, {f"counted_{place.item.id}": "1"})
     retire(session, place.store)
     page = admin_client.get(f"{PAGE}?item={place.item.id}").text
-    assert f"Correct {place.store.name}<span" in page
+    assert says(page, f"Correct {place.store.name}", "button")
     assert f"{COUNTS}/{place.store.id}" not in page
 
 
@@ -461,7 +461,7 @@ def test_an_openings_one_end_wording_keeps_a_name_cased_within(
     )
     page = admin_client.get(f"{PAGE}?item={spools.cable.id}").text
     assert "Open SFP+ module still to put right." in text_of(page)
-    assert "Correct open SFP+ module<span" in page
+    assert says(page, "Correct open SFP+ module", "button")
 
 
 @pytest.mark.parametrize("tracked", [True, False])
@@ -490,9 +490,9 @@ def test_an_openings_sealed_count_puts_its_end_right_and_names_its_forms(
     page = admin_client.get(f"{PAGE}?item={spools.cable.id}").text
     assert f"Sealed spool counted {day}. {still} still to put right." in text_of(page)
     correct = "open spool" if tracked else f"loose {cable}"
-    assert f"Correct {correct}<span" in page
+    assert says(page, f"Correct {correct}", "button")
     link = f"{COUNTS}/{spools.store.id}?item={spools.cable.id}"
-    assert counts_with_words(page, link, f"Count {spools.store.name}")
+    assert says(page, f"Count {spools.store.name}", "a", href=link)
 
 
 @pytest.mark.parametrize("tracked", [True, False])
@@ -566,10 +566,11 @@ def test_an_opening_with_one_end_counted_corrects_the_other_only(
     )
 
 
-def counts_with_words(page: str, link: str, words: str) -> bool:
-    """Whether a link to the count says these words, and what it counts
-    only to a screen reader."""
+def says(page: str, words: str, tag: str, **attrs: str) -> bool:
+    """Whether a link or button shows these words, and what it is for only
+    to a screen reader."""
     return any(
-        count.text.startswith(f"{words} ") and count.all("span", class_="sr-only")
-        for count in read(page).all("a", href=link)
+        "".join(found.find_all(string=True, recursive=False)).strip() == words
+        and found.all("span", class_="sr-only")
+        for found in read(page).all(tag, **attrs)
     )

@@ -719,7 +719,8 @@ def test_those_to_check_sort_and_come_in_pages(
 
     def listed(path: str = LENGTHS, **query: str) -> list[int]:
         page = admin_client.get(path, params=query).text
-        return [int(n) for n in re.findall(r'name="open_package" value="(\d+) ', page)]
+        ticks = read(page).all("input", name="open_package")
+        return [int(tick.attrs["value"].split(" ")[0]) for tick in ticks]
 
     assert listed() == [first.id, second.id]
     assert listed(sort="shows") == [second.id, first.id]

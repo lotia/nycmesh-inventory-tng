@@ -507,7 +507,8 @@ def test_those_reported_used_up_sort_and_come_in_pages(
 
     def listed(**query: str) -> list[int]:
         page = admin_client.get(USED_UP, params=query).text
-        return [int(n) for n in re.findall(r'name="open_package" value="(\d+)"', page)]
+        ticks = read(page).all("input", name="open_package")
+        return [int(tick.attrs["value"]) for tick in ticks]
 
     assert listed() == [earlier.id, later.id]
     assert listed(sort="reported", order="desc") == [later.id, earlier.id]

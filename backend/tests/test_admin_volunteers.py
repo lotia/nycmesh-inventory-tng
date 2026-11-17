@@ -1,6 +1,5 @@
 """Volunteers, holding stock and merging duplicates (admin/volunteers.py)."""
 
-import re
 import uuid
 from datetime import UTC, datetime
 
@@ -22,7 +21,7 @@ from inventory_tng.models import (
     Volunteer,
 )
 
-from helpers.markup import button, forms, hidden, links, options
+from helpers.markup import button, forms, hidden, links, options, row_links
 from helpers.rows import add, history, named, shown, tag
 from helpers.sign_in import text
 
@@ -295,7 +294,7 @@ def test_volunteers_are_found_by_a_name_typed_roughly(
 
 def volunteers_named(page: str) -> list[str]:
     """The volunteers the list shows, in its order."""
-    return re.findall(r'<td><a href="/admin/volunteers/\d+">([^<]+)</a>', page)
+    return row_links(page, VOLUNTEERS)
 
 
 def test_volunteers_sort_filter_and_show_25_50_100_or_all(
@@ -311,7 +310,7 @@ def test_volunteers_sort_filter_and_show_25_50_100_or_all(
 
     def listed(**query: str) -> list[str]:
         params = {"q": f"Sorted {mark}", "per": "all"} | query
-        page = text(admin_client.get(VOLUNTEERS, params=params))
+        page = admin_client.get(VOLUNTEERS, params=params).text
         return [n.rsplit(" ", 1)[1] for n in volunteers_named(page)]
 
     assert listed(sort="name") == ["Alpha", "Bravo", "Charlie"]
@@ -330,9 +329,9 @@ def test_volunteers_sort_filter_and_show_25_50_100_or_all(
         add(session, Volunteer(name=f"Sized {other} {number:03}"))
     sized = {"q": f"Sized {other}"}
     assert len(volunteers_named(admin_client.get(VOLUNTEERS, params=sized).text)) == 27
-    small = text(admin_client.get(VOLUNTEERS, params=sized | {"per": "25"}))
-    assert len(volunteers_named(small)) == 25
-    assert "Page 1 of 2" in small
+    small = admin_client.get(VOLUNTEERS, params=sized | {"per": "25"})
+    assert len(volunteers_named(small.text)) == 25
+    assert "Page 1 of 2" in text(small)
     # Suggestions come from the filter.
     offered = admin_client.get(
         f"{VOLUNTEERS}/suggest", params={"q": f"Sorted {mark}", "holds": "yes"}

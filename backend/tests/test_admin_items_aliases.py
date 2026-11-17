@@ -65,7 +65,7 @@ def test_an_alias_is_searched_and_its_removal_frees_it(
         "Cap",
         "10uF",
     ]
-    found = items_named(text(admin_client.get(ITEMS, params={"q": "toughcable"})))
+    found = items_named(admin_client.get(ITEMS, params={"q": "toughcable"}).text)
     assert found == ["Cat6 cable, outdoor"]
     items.remove_alias(session, tough, NOW)
     assert item.search_text.split()[3:] == ["Cap", "10", "mF", "Cap", "10uF"]
@@ -316,7 +316,7 @@ def test_a_rename_keeps_the_old_name_as_an_alias(
     assert str(RENAMED) in page
     session.refresh(item)
     assert item.name == "LiteBeam 5AC Gen1"
-    found = items_named(text(admin_client.get(ITEMS, params={"q": "litebeam 5ac"})))
+    found = items_named(admin_client.get(ITEMS, params={"q": "litebeam 5ac"}).text)
     assert found == ["LiteBeam 5AC Gen1"]
     # Respelt only: the same name, so no alias.
     assert save("litebeam 5ac gen1").headers["location"] == (

@@ -1,6 +1,5 @@
 """Categories, and the pattern every catalogue page follows (admin/)."""
 
-import re
 from collections.abc import Callable
 
 import pytest
@@ -13,7 +12,7 @@ from inventory_tng.admin.categories import CATEGORIES, TAKEN
 from inventory_tng.admin.common import RULES
 from inventory_tng.models import Admin, Category, Item
 
-from helpers.markup import links, read
+from helpers.markup import links, read, row_links
 from helpers.rows import add, history, named, shown
 from helpers.sign_in import text
 
@@ -151,7 +150,7 @@ def test_categories_sort_by_name_or_items_and_show_25_50_100_or_all(
 
     def listed(**query: str) -> list[str]:
         page = admin_client.get(CATEGORIES, params=query).text
-        return re.findall(r'<td><a href="/admin/categories/\d+">([^<]+)</a>', page)
+        return row_links(page, CATEGORIES)
 
     assert listed() == ["alpha", "Bravo", "Charlie"]
     assert listed(sort="name", order="desc") == ["Charlie", "Bravo", "alpha"]

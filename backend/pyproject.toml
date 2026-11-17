@@ -41,7 +41,9 @@ build-backend = "uv_build"
 coverage = ["diff-cover>=11.0"]
 dev = [
     { include-group = "coverage" },
+    "beautifulsoup4>=4.15",
     "httpx2>=2.16",
+    "lxml>=6.1",
     "pathspec>=1.1",
     "pytest>=9.2",
     "pytest-cov>=7.1",

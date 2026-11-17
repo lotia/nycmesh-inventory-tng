@@ -26,7 +26,7 @@ from inventory_tng.models import Device, RegistrationCode, SiteSettings
 from inventory_tng.phrases import compiled, speaking
 
 from helpers.devices import new_device
-from helpers.markup import button, forms, hidden, links, options, read
+from helpers.markup import button, forms, hidden, links, options, read, row_links
 from helpers.rows import history
 from helpers.sign_in import confirmed_long_ago, once, text
 
@@ -315,7 +315,11 @@ def test_a_device_is_revoked_after_a_confirmation(
 
 def listed_ids(page: str) -> list[int]:
     """The devices a list shows, in its order."""
-    return [int(found) for found in re.findall(rf'href="{DEVICES}/(\d+)"', page)]
+    return [
+        int(found[1])
+        for _, href in links(page)
+        if (found := re.fullmatch(rf"{DEVICES}/(\d+)", href))
+    ]
 
 
 def test_devices_are_listed_between_two_times(
@@ -328,8 +332,9 @@ def test_devices_are_listed_between_two_times(
     last = device_at(session, datetime(2026, 11, 5, 15, 30, 59, tzinfo=UTC))
     after = device_at(session, datetime(2026, 11, 5, 15, 31, tzinfo=UTC))
     window = {"since": "2026-11-05T09:00", "until": "2026-11-05T10:30"}
-    page = text(admin_client.get(DEVICE_LIST, params=window))
-    shown = listed_ids(page)
+    listed = admin_client.get(DEVICE_LIST, params=window)
+    page = text(listed)
+    shown = listed_ids(listed.text)
     assert first.id in shown
     assert last.id in shown
     assert before.id not in shown
@@ -355,7 +360,7 @@ def test_devices_are_sorted_by_registered_or_last_used(
 
     def order(sort: str, way: str = "") -> list[int]:
         asked = window | {"sort": sort, "order": way}
-        page = text(admin_client.get(DEVICE_LIST, params=asked))
+        page = admin_client.get(DEVICE_LIST, params=asked).text
         return [i for i in listed_ids(page) if i in (early.id, late.id)]
 
     assert order("") == [late.id, early.id]
@@ -381,11 +386,12 @@ def test_devices_come_in_pages_of_the_size_asked(
     start = datetime(2026, 11, 7, 12, tzinfo=UTC)
     made = [device_at(session, start + timedelta(minutes=n)) for n in range(26)]
     window = {"since": "2026-11-07T07:00", "until": "2026-11-07T08:00"}
-    page = text(admin_client.get(DEVICE_LIST, params=window))
-    assert len(listed_ids(page)) == 26
-    assert "26 listed." in page
-    page = text(admin_client.get(DEVICE_LIST, params=window | {"per": "25"}))
-    assert listed_ids(page) == [d.id for d in reversed(made)][:25]
+    listed = admin_client.get(DEVICE_LIST, params=window)
+    assert len(listed_ids(listed.text)) == 26
+    assert "26 listed." in text(listed)
+    listed = admin_client.get(DEVICE_LIST, params=window | {"per": "25"})
+    page = text(listed)
+    assert listed_ids(listed.text) == [d.id for d in reversed(made)][:25]
     assert "26 listed." in page
     assert "Page 1 of 2" in page
     # Revoke selected reaches this page's alone, and says so.
@@ -447,7 +453,7 @@ def test_an_end_at_the_last_minute_there_is_lists_without_an_end(
     device = device_at(session, datetime(2026, 11, 5, 12, tzinfo=UTC))
     listed = admin_client.get(DEVICE_LIST, params={"until": "9999-12-31T23:59"})
     assert listed.status_code == 200
-    assert device.id in listed_ids(text(listed))
+    assert device.id in listed_ids(listed.text)
 
 
 def test_codes_sort_filter_by_state_and_come_in_pages(
@@ -476,7 +482,7 @@ def test_codes_sort_filter_by_state_and_come_in_pages(
 
     def listed(**query: str) -> list[str]:
         page = admin_client.get(DEVICES, params=query).text
-        return re.findall(rf'<td><a href="{CODES}/\d+">([^<]+)</a>', page)
+        return row_links(page, CODES)
 
     assert listed() == ["Bravo", "Alpha", "Charlie", "Delta"]
     assert listed(sort="code") == ["Alpha", "Bravo", "Charlie", "Delta"]

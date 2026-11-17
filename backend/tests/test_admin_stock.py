@@ -10,7 +10,7 @@ from inventory_tng.admin.counts import COUNTS
 from inventory_tng.admin.stock import NEEDS_COUNTING, REORDER, STOCK
 from inventory_tng.models import Item, Location
 
-from helpers.markup import links, options, read, sorted_columns
+from helpers.markup import Element, links, options, read, row_links, sorted_columns
 from helpers.rows import add, tag
 from helpers.sign_in import text
 from helpers.stock import Place, at_retired_van, received, retire, stocked, write
@@ -190,7 +190,11 @@ def test_the_stock_page_counts_the_places_short(
 
 def amounts_shown(page: str) -> list[str]:
     """Each row's amount, in the page's order."""
-    return re.findall(r"<td>(-?\d+) (?:each|m)", page)
+    return [
+        found[1]
+        for cell in read(page).all("td")
+        if (found := re.match(r"(-?\d+) (?:each|m)", cell.text))
+    ]
 
 
 def test_stock_sorts_within_each_group_and_filters(
@@ -210,7 +214,7 @@ def test_stock_sorts_within_each_group_and_filters(
     write(session, place)  # Three radios to the van.
 
     def amounts(**query: str) -> list[str]:
-        return amounts_shown(text(admin_client.get(STOCK, params=query)))
+        return amounts_shown(admin_client.get(STOCK, params=query).text)
 
     # The store's cable, then its radios; then the van's radios.
     assert amounts() == ["2", "2", "3"]
@@ -266,16 +270,16 @@ def test_stock_pages_count_groups_and_never_split_one(
                 {"item_id": place.cable.id, "quantity": "1"},
             ],
         )
-    first = text(admin_client.get(STOCK, params={"per": "25"}))
-    assert len(amounts_shown(first)) == 50
-    assert "Page 1 of 2" in first
-    second = text(admin_client.get(STOCK, params={"per": "25", "page": "2"}))
+    first = admin_client.get(STOCK, params={"per": "25"})
+    assert len(amounts_shown(first.text)) == 50
+    assert "Page 1 of 2" in text(first)
+    second = admin_client.get(STOCK, params={"per": "25", "page": "2"}).text
     assert len(amounts_shown(second)) == 2
-    assert len(amounts_shown(text(admin_client.get(STOCK)))) == 52
+    assert len(amounts_shown(admin_client.get(STOCK).text)) == 52
     # By item: two groups, each with every place, on one page.
-    by_item = text(admin_client.get(STOCK, params={"by": "item", "per": "25"}))
-    assert len(amounts_shown(by_item)) == 52
-    assert "Page 1 of" not in by_item
+    by_item = admin_client.get(STOCK, params={"by": "item", "per": "25"})
+    assert len(amounts_shown(by_item.text)) == 52
+    assert "Page 1 of" not in text(by_item)
 
 
 def size_row(page: str) -> tuple[str, str]:
@@ -286,9 +290,10 @@ def size_row(page: str) -> tuple[str, str]:
         if any(href.endswith("per=25") for _, href in links(nav))
     ]
     # The words come first in the row, before its sizes.
-    first = next(part for part in row.children if not isinstance(part, str))
-    assert first.tag == "span"
-    return row.attrs["aria-label"] or "", first.text
+    first = row.find(True, recursive=False)
+    assert isinstance(first, Element)
+    assert first.name == "span"
+    return row.attrs["aria-label"], first.text
 
 
 def test_stock_size_rows_say_they_count_places_or_items(
@@ -327,10 +332,10 @@ def test_reorder_sorts_by_each_heading_and_shows_25_50_100_or_all(
     session.flush()
 
     def listed(**query: str) -> list[str]:
-        page = text(admin_client.get(REORDER, params=query))
+        page = admin_client.get(REORDER, params=query).text
         return [
             name
-            for name in re.findall(r'<a href="/admin/items/\d+">([^<]+)</a>', page)
+            for name in row_links(page, "/admin/items")
             if name in (place.item.name, place.cable.name)
         ]
 
@@ -361,7 +366,7 @@ def test_needs_counting_sorts_within_each_place_and_pages_places(
     )
 
     def amounts(**query: str) -> list[str]:
-        return amounts_shown(text(admin_client.get(NEEDS_COUNTING, params=query)))
+        return amounts_shown(admin_client.get(NEEDS_COUNTING, params=query).text)
 
     # The store's cable, then its radios.
     assert amounts() == ["-5", "-3"]

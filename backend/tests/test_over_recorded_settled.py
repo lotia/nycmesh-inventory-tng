@@ -3,7 +3,6 @@ first, saying how each was settled, why, by whom and when, and the links
 between it, those waiting and the stock pages (Ali, 2026-11-15,
 inventory-tng-73p)."""
 
-import re
 from collections.abc import Callable
 from datetime import UTC, datetime, timedelta
 from decimal import Decimal
@@ -25,7 +24,7 @@ from inventory_tng.local_time import show, show_day, site_zone
 from inventory_tng.models import LedgerTransaction, Movement, OverRecorded
 from inventory_tng.phrases import compiled, speaking
 
-from helpers.markup import links, read, sorted_columns
+from helpers.markup import Element, links, read, sorted_columns
 from helpers.rows import tag
 from helpers.sign_in import new_admin
 from helpers.stock import Place, Spools, ada_id, count_at, cut, raised, retire, write
@@ -56,12 +55,10 @@ def seen(check: OverRecorded) -> str:
 
 
 def rows_of(page: str) -> list[list[str]]:
-    """The settled table's rows, each cell's words, tags taken out."""
-    body = page.split("<table>", 1)[1].split("</table>", 1)[0]
+    """The first table's rows, each cell's words."""
+    table = read(page).all("table")[0]
     return [
-        [" ".join(re.sub(r"<[^>]+>", " ", cell).split()) for cell in cells]
-        for row in re.findall(r"<tr>(.*?)</tr>", body, re.DOTALL)
-        if (cells := re.findall(r"<td[^>]*>(.*?)</td>", row, re.DOTALL))
+        cells for row in table.all("tr") if (cells := [c.text for c in row.all("td")])
     ]
 
 
@@ -131,7 +128,7 @@ def test_each_reason_marked_checked_says_why(
     assert found == [
         (
             HOW["checked"],
-            f"{REASONS['other']} Moved back by &lt;b&gt;hand&lt;/b&gt; &amp; told Alex",
+            f"{REASONS['other']} {words}",
         ),
         (HOW["checked"], REASONS["both"]),
         (HOW["checked"], REASONS["arrived"]),
@@ -370,11 +367,11 @@ def views_of(page: str, label: str) -> list[tuple[str, str, str | None]]:
     them), words and link."""
     nav = read(page).one("nav", aria_label=label)
     return [
-        ("text", part.strip(), None)
-        if isinstance(part, str)
-        else (part.tag, part.text, part.attrs.get("href"))
-        for part in nav.children
-        if not isinstance(part, str) or part.strip()
+        (part.name, part.text, part.attrs.get("href"))
+        if isinstance(part, Element)
+        else ("text", str(part).strip(), None)
+        for part in nav.contents
+        if isinstance(part, Element) or str(part).strip()
     ]
 
 

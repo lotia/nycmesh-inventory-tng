@@ -1043,10 +1043,10 @@ only the owner may do, such as `TRUNCATE`, takes `owner_session` or
 `owner_engine`. Write tests in pytest style. `tests/conftest.py` holds
 fixtures, hooks and what only they use; what tests share besides is in
 `tests/helpers/`, which they import from, never from conftest.py or from
-one another. A test reads a page's HTML with `tests/helpers/markup.py`
-(a link's words and address, a button's class), not by matching its tags
-as text, unless the exact markup is the point, such as escaping or a
-no-break space, and says so.
+one another. A test reads a page's HTML with `tests/helpers/markup.py`,
+which parses it with BeautifulSoup and lxml (a link's words and address,
+a button's class), not by matching its tags as text, unless the exact
+markup is the point, such as escaping or a no-break space, and says so.
 
 Write a rule of more than one condition as a function of plain values,
 such as a map of each place's parent, that returns the rule broken or
@@ -1158,11 +1158,12 @@ after it.
 - **Python packages**: `uv lock --upgrade` in `backend/` moves everything in
   `uv.lock`, or `uv lock --upgrade-package <name>` one. `pyproject.toml` gives
   each dependency a floor at a minor version only, such as `fastapi>=0.162`:
-  `uv.lock` pins what is installed, and is always committed. `uv add` writes
-  a patch too (`>=0.162.0`); trim it, as a test checks. Two exceptions: a
-  `0.0.z` package keeps its patch, there being no minor to name, and a series
-  released only as betas, such as OpenTelemetry's instrumentation, floors at
-  the minor's first beta (`>=0.66b0`).
+  `uv.lock` pins what is installed, and is always committed. `uv add` (or
+  `uv add --dev` for one only tests and tools use, which the image leaves
+  out) writes a patch too (`>=0.162.0`); trim it, as a test checks. Two
+  exceptions: a `0.0.z` package keeps its patch, there being no minor to
+  name, and a series released only as betas, such as OpenTelemetry's
+  instrumentation, floors at the minor's first beta (`>=0.66b0`).
   A new anyascii, or a Python with a newer Unicode, fails
   `tests/test_fold_reference.py`, with the difference: the file's first
   line names both versions. If you take it, run

@@ -995,9 +995,16 @@ def test_counts_sort_filter_and_come_in_pages(
     )
     session.commit()
 
+    def kinds(page: str, words: str = "Count|Damaged|Found") -> list[str]:
+        """Each row's kind, from its first words, in the page's order."""
+        return [
+            found[1]
+            for cell in read(page).all("td")
+            if (found := re.match(rf"({words}):", cell.text))
+        ]
+
     def listed(**query: str) -> list[str]:
-        page = " ".join(text(admin_client.get(COUNTS, params=query)).split())
-        return re.findall(r"<td> (Count|Damaged|Found):", page)
+        return kinds(admin_client.get(COUNTS, params=query).text)
 
     assert listed() == ["Count", "Found", "Damaged"]
     assert listed(sort="when", order="asc") == ["Damaged", "Found", "Count"]
@@ -1007,8 +1014,8 @@ def test_counts_sort_filter_and_come_in_pages(
     catalogue = Catalog()
     catalogue.add(str(COUNT_KIND), "Inventur")
     with speaking(compiled(catalogue)):
-        page = " ".join(text(admin_client.get(COUNTS, params={"sort": "what"})).split())
-    said = re.findall(r"<td> (Inventur|Damaged|Found):", page)
+        page = admin_client.get(COUNTS, params={"sort": "what"}).text
+    said = kinds(page, "Inventur|Damaged|Found")
     assert said == ["Damaged", "Found", "Inventur"]
     assert listed(sort="where") == ["Found", "Count", "Damaged"]
     assert listed(sort="by") == ["Damaged", "Count", "Found"]

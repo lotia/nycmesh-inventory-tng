@@ -4,7 +4,6 @@ reading_rules.py, models.ReadingRule; docs/decisions/0021, 2026-11-15,
 inventory-tng-c0c.4), and names unique once their units are read
 (models.KeyedName.unit_key)."""
 
-import re
 from collections.abc import Callable
 
 import pytest
@@ -32,7 +31,7 @@ from inventory_tng.models import reading_rules as reading_rules_held
 from inventory_tng.reading_rules import LIKELY, NAMED, both, near
 
 from helpers.concurrency import Committed
-from helpers.markup import links, options
+from helpers.markup import links, options, row_links
 from helpers.queries import counting
 from helpers.rows import (
     add,
@@ -611,7 +610,7 @@ def test_the_rules_page_sorts_filters_and_finds_a_unit(
 
     def listed(**query: str) -> list[str]:
         page = admin_client.get(READINGS, params=query).text
-        return re.findall(rf'<td><a href="{READINGS}/\d+">([^<]+)</a>', page)
+        return row_links(page, READINGS)
 
     assert listed() == ["G", "MF"]
     assert listed(sort="unit", order="desc") == ["MF", "G"]

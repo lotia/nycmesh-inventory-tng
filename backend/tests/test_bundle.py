@@ -187,7 +187,7 @@ def test_each_page_loads_its_entry(pages: TestClient, path: str, script: str) ->
     page = read(response.text)
     assert page.all("script", type="module", src=f"/static/{script}")
     assert page.all("link", rel="stylesheet", href="/static/assets/shared-qHQdyY8N.css")
-    assert page.one("div", id="app").children == []
+    assert page.one("div", id="app").contents == []
 
 
 @pytest.mark.parametrize("path", PAGES)

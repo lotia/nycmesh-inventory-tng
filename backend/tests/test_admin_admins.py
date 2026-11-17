@@ -21,7 +21,7 @@ from inventory_tng.models import ACTIVITY_KINDS, Admin, AdminSession, SignInSett
 from inventory_tng.settings import RateLimits
 
 from helpers.mail import NO_MAIL, SentMail
-from helpers.markup import button, forms, links, read, sorted_columns
+from helpers.markup import button, forms, links, read, row_links, sorted_columns
 from helpers.sign_in import (
     admin_named,
     confirmed_long_ago,
@@ -651,7 +651,7 @@ def test_administrators_sort_by_each_heading_and_show_25_50_100_or_all(
 
     def listed(**query: str) -> list[str]:
         page = admin_client.get(ADMINS, params=query).text
-        return re.findall(r'<td><a href="/admin/admins/\d+">([^<]+)</a>', page)
+        return row_links(page, ADMINS)
 
     by_name = sorted((a.username for a in rows), key=str.lower)
     assert listed() == by_name

@@ -1,8 +1,6 @@
 """The items list (admin/items.py): search and suggestions, current and
 retired, pages, sorting and filtering."""
 
-import html
-
 from fastapi.testclient import TestClient
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
@@ -24,7 +22,7 @@ def test_a_search_forgives_typos_best_first(
         new_item(session, radios, name)
     found = admin_client.get(ITEMS, params={"q": "litebeam"})
     page = text(found)
-    shown = items_named(page)
+    shown = items_named(found.text)
     assert shown[0] == "LiteBeam 5AC"
     assert "Patch cable" not in shown
     total = session.scalar(
@@ -34,7 +32,7 @@ def test_a_search_forgives_typos_best_first(
     assert f"{len(shown)} of {total} items, matching “litebeam”" in said
     assert ("Clear search", "/admin/items") in links(found.text)
     # A typo still finds it.
-    misspelt = items_named(text(admin_client.get(ITEMS, params={"q": "litebeem"})))
+    misspelt = items_named(admin_client.get(ITEMS, params={"q": "litebeem"}).text)
     assert "LiteBeam 5AC" in misspelt
     assert "Patch cable" not in misspelt
 
@@ -74,8 +72,9 @@ def test_picking_a_suggestion_narrows_the_list_to_it(
 ) -> None:
     beam = new_item(session, radios, "LiteBeam 5AC")
     new_item(session, radios, "LiteBeam M5")
-    page = text(admin_client.get(ITEMS, params={"pick": str(beam.id)}))
-    assert items_named(page) == ["LiteBeam 5AC"]
+    picked = admin_client.get(ITEMS, params={"pick": str(beam.id)})
+    assert items_named(picked.text) == ["LiteBeam 5AC"]
+    page = text(picked)
     assert "matching “LiteBeam 5AC”" in " ".join(page.split())
 
 
@@ -105,14 +104,11 @@ def test_pages_of_fifty(
 ) -> None:
     for number in range(PER_PAGE + 5):
         new_item(session, radios, f"Paged {number:03}")
-    first = text(admin_client.get(ITEMS, params={"q": "Paged"}))
-    assert len(items_named(first)) == PER_PAGE
-    assert "Page 1 of 2" in first
-    assert (
-        f'href="{ITEMS}?q=Paged&amp;page=2"'
-        in admin_client.get(ITEMS, params={"q": "Paged"}).text
-    )
-    second = text(admin_client.get(ITEMS, params={"q": "Paged", "page": "2"}))
+    first = admin_client.get(ITEMS, params={"q": "Paged"})
+    assert len(items_named(first.text)) == PER_PAGE
+    assert "Page 1 of 2" in text(first)
+    assert f'href="{ITEMS}?q=Paged&amp;page=2"' in first.text
+    second = admin_client.get(ITEMS, params={"q": "Paged", "page": "2"}).text
     assert len(items_named(second)) == 5
     # A page past the end, or none, is the last or the first.
     assert "Page 2 of 2" in text(
@@ -146,7 +142,7 @@ def test_items_sort_by_each_heading_either_way(
         )
 
     def order(**query: str) -> list[str]:
-        page = text(admin_client.get(ITEMS, params={"per": "all"} | query))
+        page = admin_client.get(ITEMS, params={"per": "all"} | query).text
         return [n.rsplit(" ", 1)[1] for n in items_named(page) if mark in n]
 
     assert order() == ["Alpha", "Bravo", "Charlie"]
@@ -193,17 +189,17 @@ def test_items_show_25_50_100_or_all(
     assert ("25", f"{ITEMS}?q=Sized+{mark}&per=25") in links(page)
     fifty = read(page).one("a", "50", aria_current="page")
     assert fifty.attrs["href"] == f"{ITEMS}?q=Sized+{mark}"
-    page = text(admin_client.get(ITEMS, params=query | {"per": "25"}))
-    assert len(items_named(page)) == 25
-    assert "Page 1 of 2" in page
-    second = text(admin_client.get(ITEMS, params=query | {"per": "25", "page": "2"}))
+    sized = admin_client.get(ITEMS, params=query | {"per": "25"})
+    assert len(items_named(sized.text)) == 25
+    assert "Page 1 of 2" in text(sized)
+    second = admin_client.get(ITEMS, params=query | {"per": "25", "page": "2"}).text
     assert len(items_named(second)) == 5
     every = admin_client.get(ITEMS, params=query | {"per": "all"}).text
     assert len(items_named(every)) == 30
     assert read(every).one("a", "All", aria_current="page")
     assert "Page 1 of" not in every
     # A size not offered is 50; a new search keeps the size.
-    assert len(items_named(text(admin_client.get(ITEMS, params={"per": "7"})))) <= 50
+    assert len(items_named(admin_client.get(ITEMS, params={"per": "7"}).text)) <= 50
     assert ("per", "25") in hidden(admin_client.get(ITEMS, params={"per": "25"}).text)
 
 
@@ -224,7 +220,7 @@ def test_items_filter_by_category(
     found = admin_client.get(
         ITEMS, params={"category": str(antennas.id), "q": f"Filtered {mark}"}
     ).text
-    assert [kept.name] == items_named(html.unescape(found))
+    assert [kept.name] == items_named(found)
     assert f"sort=name&amp;order=desc&amp;category={antennas.id}" not in found
     assert f"category={antennas.id}&amp;sort=name" in found
     assert f'data-suggest="{ITEMS}/suggest?category={antennas.id}"' in found
@@ -252,14 +248,12 @@ def test_a_search_sorted_by_a_heading_goes_back_to_best_match(
         new_item(session, radios, f"{name} {mark}")
     query = {"q": f"LiteBeam {mark}"}
     best = admin_client.get(ITEMS, params=query).text
-    assert items_named(html.unescape(best))[0] == f"LiteBeam {mark}"
+    assert items_named(best)[0] == f"LiteBeam {mark}"
     assert "aria-sort" not in best
     assert read(best).one("a", "Best match", aria_current="page")
     by_name = admin_client.get(ITEMS, params=query | {"sort": "name"}).text
-    assert items_named(html.unescape(by_name)) == sorted(
-        items_named(html.unescape(by_name)), key=str.lower
-    )
-    assert items_named(html.unescape(by_name))[0] == f"Aaa LiteBeem {mark}"
+    assert items_named(by_name) == sorted(items_named(by_name), key=str.lower)
+    assert items_named(by_name)[0] == f"Aaa LiteBeem {mark}"
     assert ("Best match", f"{ITEMS}?q=LiteBeam+{mark}") in links(by_name)
     # A new search from the box is best match first again: no sort sent.
     assert not read(by_name).one("form", role="search").all("*", name="sort")

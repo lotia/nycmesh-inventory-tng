@@ -1,7 +1,6 @@
 """Labels: made from an item's or a place's page, found, reprinted and
 revoked from the labels page (admin/labels.py)."""
 
-import re
 from datetime import UTC, datetime
 from decimal import Decimal
 from urllib.parse import parse_qs, urlsplit
@@ -351,7 +350,7 @@ def test_finding_labels_by_package_or_the_place_around(
 
 def codes_listed(page: str) -> list[str]:
     """The codes the labels list shows, in its order."""
-    return re.findall(r'<td class="key">([A-Z0-9]+)</td>', page)
+    return [cell.text for cell in read(page).all("td", class_="key")]
 
 
 def test_labels_list_current_inactive_and_all(
@@ -365,7 +364,7 @@ def test_labels_list_current_inactive_and_all(
         ("all", {kept.code, gone.code}),
         ("retired", {kept.code}),  # Not a filter here: the plain list.
     ):
-        page = text(admin_client.get(LABELS, params={"show": show}))
+        page = admin_client.get(LABELS, params={"show": show}).text
         assert {kept.code, gone.code} & set(codes_listed(page)) == expected, show
     every = admin_client.get(LABELS, params={"show": "all"})
     assert ("Inactive", f"{LABELS}?show=inactive") in links(every.text)
@@ -387,7 +386,7 @@ def test_label_suggestions_name_it_and_narrow_the_list(
             "href": f"{LABELS}?pick={on_reel.id}",
         }
     ]
-    page = text(admin_client.get(LABELS, params={"pick": str(on_reel.id)}))
+    page = admin_client.get(LABELS, params={"pick": str(on_reel.id)}).text
     assert codes_listed(page) == [on_reel.code]
     assert loose.code not in page
     reel_words = package_label("Cat6 cable", "Reel", "305 m")
@@ -408,11 +407,12 @@ def test_labels_come_in_pages_of_fifty_each_printed_from_its_own(
             Location(name=f"Paged {number:03}", kind="area", parent_id=hub.id),
         )
         add(session, Label(location_id=area.id))
-    first = text(admin_client.get(LABELS, params={"q": "Paged"}))
-    assert len(codes_listed(first)) == PER_PAGE
+    shown = admin_client.get(LABELS, params={"q": "Paged"})
+    first = text(shown)
+    assert len(codes_listed(shown.text)) == PER_PAGE
     assert first.count('form="print-labels"') == PER_PAGE + 2  # And copies, Print.
     assert "Page 1 of 2" in first
-    second = text(admin_client.get(LABELS, params={"q": "Paged", "page": "2"}))
+    second = admin_client.get(LABELS, params={"q": "Paged", "page": "2"}).text
     assert len(codes_listed(second)) == 5
 
 
@@ -450,7 +450,7 @@ def test_labels_sort_by_each_heading_either_way(
 
     def order(**query: str) -> list[str]:
         params = {"q": f"Sorted {mark}", "per": "all"} | query
-        return codes_listed(text(admin_client.get(LABELS, params=params)))
+        return codes_listed(admin_client.get(LABELS, params=params).text)
 
     assert order(sort="names") == [alpha.code, bravo.code]
     assert order(sort="names", order="desc") == [bravo.code, alpha.code]
@@ -482,9 +482,10 @@ def test_labels_show_25_50_100_or_all(
         )
         add(session, Label(location_id=area.id))
     query = {"q": f"Sized {mark}"}
-    assert len(codes_listed(text(admin_client.get(LABELS, params=query)))) == 30
-    sized = text(admin_client.get(LABELS, params=query | {"per": "25"}))
-    assert len(codes_listed(sized)) == 25
+    assert len(codes_listed(admin_client.get(LABELS, params=query).text)) == 30
+    shown = admin_client.get(LABELS, params=query | {"per": "25"})
+    sized = text(shown)
+    assert len(codes_listed(shown.text)) == 25
     assert "Page 1 of 2" in sized
     every = admin_client.get(LABELS, params=query | {"per": "all"}).text
     assert len(codes_listed(every)) == 30
@@ -501,7 +502,7 @@ def test_labels_filter_by_kind_and_item(
     on_other = add(session, Label(item_id=other.id))
 
     def listed(**query: str) -> set[str]:
-        page = text(admin_client.get(LABELS, params={"per": "all"} | query))
+        page = admin_client.get(LABELS, params={"per": "all"} | query).text
         return set(codes_listed(page))
 
     mine = {on_cable.code, on_shelf.code, on_other.code}
