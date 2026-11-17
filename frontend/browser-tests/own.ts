@@ -87,38 +87,49 @@ export async function ownCable(
 }
 
 /**
+ * Invites a new administrator from `page`'s session, confirming with its
+ * password if asked, and leaves the page showing their link. Their
+ * username and the link.
+ */
+export async function invite(
+  page: Page,
+): Promise<{ username: string; link: string }> {
+  const username = `admin-${randomUUID().slice(0, 8)}`;
+  await page.goto("/admin/admins");
+  await page.getByLabel("Username").fill(username);
+  const asked = page.getByLabel("Your password");
+  const shared = prepared().password;
+  if (await asked.isVisible()) {
+    await asked.fill(shared);
+  }
+  await page.getByRole("button", { name: "Invite" }).click();
+  // Or asked once it is sent, as the code's time ran out meanwhile.
+  const made = page.locator(".key");
+  const confirm = page.getByRole("button", { name: "Confirm" });
+  await expect(made.or(confirm)).toBeVisible();
+  if (await confirm.isVisible()) {
+    await asked.fill(shared);
+    await confirm.click();
+  }
+  const link = (await made.textContent()) ?? "";
+  expect(link).toContain("/admin/reset?token=");
+  return { username, link };
+}
+
+/**
  * A test with `ownAdmin`: a new administrator, invited from the session
- * every test shares (confirming with its password if asked), signed in in a
- * browser of their own, closed after. Nothing was confirmed in their
- * session since signing in, as no other test, nor another run of this one,
- * uses it. Their page, at their home page, and their password. Signing
- * in and using a link are rate limited by address, which the tests' server
- * sets high enough for tests repeated (--repeat-each, browser_database.py).
+ * every test shares (`invite`), signed in in a browser of their own, closed
+ * after. Nothing was confirmed in their session since signing in, as no
+ * other test, nor another run of this one, uses it. Their page, at their
+ * home page, and their password. Signing in and using a link are rate
+ * limited by address, which the tests' server sets high enough for tests
+ * repeated (--repeat-each, browser_database.py).
  */
 export const test = base.extend<{
   ownAdmin: { page: Page; password: string };
 }>({
   ownAdmin: async ({ page, browser }, use) => {
-    const username = `admin-${randomUUID().slice(0, 8)}`;
-    await page.goto("/admin/admins");
-    await page.getByLabel("Username").fill(username);
-    const asked = page.getByLabel("Your password");
-    const shared = prepared().password;
-    if (await asked.isVisible()) {
-      await asked.fill(shared);
-    }
-    await page.getByRole("button", { name: "Invite" }).click();
-    // Or asked once it is sent, as the code's time ran out meanwhile.
-    const made = page.locator(".key");
-    const confirm = page.getByRole("button", { name: "Confirm" });
-    await expect(made.or(confirm)).toBeVisible();
-    if (await confirm.isVisible()) {
-      await asked.fill(shared);
-      await confirm.click();
-    }
-    const link = (await made.textContent()) ?? "";
-    expect(link).toContain("/admin/reset?token=");
-
+    const { username, link } = await invite(page);
     const context = await browser.newContext({
       // Not the shared session, which a new context otherwise starts with.
       storageState: { cookies: [], origins: [] },
