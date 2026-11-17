@@ -61,18 +61,22 @@ LOOK_ALIKES = {
 # Every space (Zs) but the space itself, each read as the space: units
 # and items read any of them as one (inventory-tng-vw0f).
 SPACES = "".join(map(chr, _LOOK_ALIKE[" "]))
+# Between a number and its unit in a name as shown, and between thousands
+# in a number of five digits or more, as the SI Brochure writes them (Ali,
+# 2026-11-15, inventory-tng-ist.3): neither breaks a line.
+NO_BREAK_SPACE = "\u00a0"
+THIN_NO_BREAK_SPACE = "\u202f"
 # Each breaking space as the shown name makes it inside a number grouped
 # by spaces, so the number never breaks across a line (Ali, 2026-11-16,
 # inventory-tng-mz31): thin, hair, punctuation, six-per-em and medium
-# mathematical narrow no-break; the space, en and em quads and spaces,
-# three- and four-per-em, ideographic and Ogham no-break. The no-break ones (no-break,
-# narrow no-break, figure) are kept.
+# mathematical spaces narrow no-break, the others no-break. The no-break
+# ones (no-break, figure, narrow no-break) are kept.
+_NARROW = "\u2009\u200a\u2008\u2006\u205f"
 NO_BREAK = str.maketrans(
     {
-        **dict.fromkeys(map(chr, (0x2006, 0x2008, 0x2009, 0x200A, 0x205F)), "\u202f"),
-        **dict.fromkeys(
-            map(chr, (0x0020, 0x1680, *range(0x2000, 0x2006), 0x3000)), "\u00a0"
-        ),
+        space: THIN_NO_BREAK_SPACE if space in _NARROW else NO_BREAK_SPACE
+        for space in " " + SPACES
+        if space not in (NO_BREAK_SPACE, "\u2007", THIN_NO_BREAK_SPACE)
     }
 )
 _FROM = "".join(LOOK_ALIKES)

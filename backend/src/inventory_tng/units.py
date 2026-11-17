@@ -925,11 +925,6 @@ def _spelt(name: str, spelt: Mapping[Found, str]) -> str:
     return _applied(name, [(f.start, f.end, s) for f, s in spelt.items()])
 
 
-# Between a number and its unit in a name as shown, and between thousands
-# in a number of five digits or more, as the SI Brochure writes them (Ali,
-# 2026-11-15, inventory-tng-ist.3): neither breaks a line.
-NO_BREAK_SPACE = "\u00a0"
-THIN_NO_BREAK_SPACE = "\u202f"
 # A number as a name may type it before a unit: a sign, its whole part, plain
 # or grouped by commas in thousands as US conventions write them, and any
 # decimal part. Another use of commas (`1,2,3`, `0,500`) is left as typed.
@@ -949,7 +944,7 @@ def _shown_number(number: str) -> str:
     if len(whole) >= 5:
         head = len(whole) % 3 or 3
         thousands = [whole[i : i + 3] for i in range(head, len(whole), 3)]
-        whole = THIN_NO_BREAK_SPACE.join([whole[:head], *thousands])
+        whole = names.THIN_NO_BREAK_SPACE.join([whole[:head], *thousands])
     return sign + whole + fraction
 
 
@@ -998,7 +993,7 @@ def shown_name(name: str, rules: Rules | None = None) -> str:
         if (read(token) if found is None else found.read) is None:
             continue
         typed = name[match.start(2) : match.end(2)]
-        edits.append((start, match.end(), shown + NO_BREAK_SPACE + typed))
+        edits.append((start, match.end(), shown + names.NO_BREAK_SPACE + typed))
     return _applied(name, edits)
 
 
