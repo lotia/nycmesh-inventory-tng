@@ -33,7 +33,7 @@ from inventory_tng.db import (
 from inventory_tng.history import LEDGER
 from inventory_tng.logs import configure_structlog
 from inventory_tng.mail import get_mailer
-from inventory_tng.models import ItemPackage, RateLimit
+from inventory_tng.models import Category, ItemPackage, RateLimit
 from inventory_tng.settings import FrontendConfig, LogConfig, RateLimits, Settings
 
 from databases import (
@@ -745,3 +745,8 @@ def place(session: Session) -> Place:
 def bags(session: Session, place: Place) -> ItemPackage:
     """Bags of 50 of the place's cable."""
     return add(session, ItemPackage(item_id=place.cable.id, name="Bag of 50", size=50))
+
+
+@pytest.fixture
+def radios(session: Session) -> Category:
+    return add(session, Category(name="Radios"))

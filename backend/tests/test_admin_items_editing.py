@@ -1,0 +1,618 @@
+"""Items on the administrators' pages (admin/items.py): adding and editing
+one, its name and the names it clashes with, close names asked about
+first, and retiring and bringing one back."""
+
+import re
+import uuid
+from decimal import Decimal
+
+import pytest
+from fastapi.testclient import TestClient
+from markupsafe import escape
+from sqlalchemy import select
+from sqlalchemy.orm import Session
+
+from inventory_tng import items
+from inventory_tng.accounts import name_up_to
+from inventory_tng.admin.common import (
+    ABOVE_ZERO,
+    NAME_MAX,
+    RULES,
+    TOO_BIG,
+    TYPE_A_NUMBER,
+    ZERO_OR_MORE,
+    at_most_places,
+    quantity,
+)
+from inventory_tng.admin.items import (
+    IS_RETIRED,
+    ITEMS,
+    NO_LETTERS,
+    PICK_A_CATEGORY,
+    PICK_A_UNIT,
+    TAKEN,
+    TAKEN_FIELDS,
+)
+from inventory_tng.local_time import DEFAULT_ZONE
+from inventory_tng.models import (
+    Category,
+    Item,
+    ItemPackage,
+    LedgerTransaction,
+    Location,
+    Movement,
+)
+
+from helpers.items import NOW, new_item
+from helpers.rows import add, history, named, shown
+from helpers.sign_in import text
+
+
+def test_adding_an_item(
+    admin_client: TestClient, session: Session, radios: Category
+) -> None:
+    done = admin_client.post(
+        ITEMS,
+        data={
+            "name": "LiteBeam 5AC",
+            "category_id": str(radios.id),
+            "unit": "each",
+            "manufacturer": "Ubiquiti",
+            "part_number": "LBE-5AC",
+        },
+    )
+    item = named(session, Item, "LiteBeam 5AC")
+    assert done.headers["location"] == f"{ITEMS}/{item.id}?notice=added"
+    assert (item.manufacturer, item.part_number) == ("Ubiquiti", "LBE-5AC")
+    assert (history(session, "item", item.id)[0].actor or "").startswith("admin:")
+    assert "LiteBeam 5AC" in text(admin_client.get(ITEMS))
+
+
+def test_an_item_name_needs_more_than_punctuation(
+    admin_client: TestClient, radios: Category
+) -> None:
+    """Punctuation alone would be one name with every other such."""
+    form = {"category_id": str(radios.id), "unit": "each"}
+    refused = admin_client.post(ITEMS, data=form | {"name": "- ?"})
+    assert refused.status_code == 400
+    assert str(NO_LETTERS) in text(refused)
+    assert admin_client.post(ITEMS, data=form | {"name": "Câble ½"}).status_code == 303
+    assert admin_client.post(ITEMS, data=form | {"name": "1234"}).status_code == 303
+
+
+def test_a_name_of_signs_beyond_ascii_needs_a_letter_or_digit(
+    admin_client: TestClient, session: Session, radios: Category
+) -> None:
+    """A key keeps an en dash, but a name needs a letter or a digit, an
+    item's and a package's alike."""
+    form = {"category_id": str(radios.id), "unit": "each"}
+    item = new_item(session, radios, "Probe")
+    path = f"{ITEMS}/{item.id}/packages"
+    for name in ("\u2013", "\u201c \u2014 \u201d", "\u00b1\u00b0"):
+        refused = admin_client.post(ITEMS, data=form | {"name": name})
+        assert refused.status_code == 400
+        assert str(NO_LETTERS) in text(refused)
+        refused = admin_client.post(path, data={"package_name": name, "size": "1"})
+        assert refused.status_code == 400
+        assert str(NO_LETTERS) in text(refused)
+    assert (
+        admin_client.post(
+            path, data={"package_name": "\u00b2", "size": "1"}
+        ).status_code
+        == 303
+    )
+
+
+def test_an_item_needs_a_name_and_a_current_category(
+    admin_client: TestClient, session: Session, radios: Category
+) -> None:
+    radios.retired_at = radios.created_at
+    session.flush()
+    refused = admin_client.post(
+        ITEMS, data={"name": "", "category_id": str(radios.id), "unit": "each"}
+    )
+    assert refused.status_code == 400
+    page = text(refused)
+    assert name_up_to(NAME_MAX) in page
+    assert str(PICK_A_CATEGORY) in page
+    assert "Add a" in page  # No current categories: add one first.
+
+
+def test_names_and_part_numbers_are_unique_naming_the_other(
+    admin_client: TestClient, session: Session, radios: Category
+) -> None:
+    """Said beside the field another item has, naming that item."""
+    add(
+        session,
+        Item(
+            name="Lite-Beam 5AC",
+            category_id=radios.id,
+            manufacturer="Ubiquiti",
+            part_number="LBE",
+        ),
+    )
+    for form, field, words in (
+        (
+            {"name": "litebeam 5ac"},
+            "name",
+            TAKEN_FIELDS["name"]("Lite-Beam 5AC"),
+        ),
+        (
+            {"name": "Other", "manufacturer": "ubiquiti", "part_number": "lbe"},
+            "part_number",
+            TAKEN_FIELDS["part_number"]("Lite-Beam 5AC"),
+        ),
+    ):
+        refused = admin_client.post(
+            ITEMS, data={"category_id": str(radios.id), "unit": "each"} | form
+        )
+        assert refused.status_code == 400
+        assert f'id="{field}-problem">{words}</span>' in refused.text
+
+
+def test_a_name_pasted_with_look_alikes_clashes_naming_the_other(
+    admin_client: TestClient, session: Session, radios: Category
+) -> None:
+    """A non-breaking space, a curly quote or an en dash is read as the
+    plain one, so the name clashes with the one typed plainly, which the
+    form names; a name is kept as typed."""
+    form = {"category_id": str(radios.id), "unit": "each"}
+    for kept, pasted in (
+        ("Tough cable", "Tough\u00a0Cable"),
+        ("Ubiquiti's dish", "Ubiquiti\u2019s dish"),
+        ("Patch\u2014cord", "Patch-cord"),
+    ):
+        assert admin_client.post(ITEMS, data=form | {"name": kept}).status_code == 303
+        refused = admin_client.post(ITEMS, data=form | {"name": pasted})
+        assert refused.status_code == 400
+        taken = escape(TAKEN_FIELDS["name"](kept))
+        assert f'id="name-problem">{taken}</span>' in refused.text
+    assert named(session, Item, "Patch\u2014cord").name_key == "patchcord"
+
+
+def test_a_saved_item_is_refused_what_another_has_its_own_respelt(
+    admin_client: TestClient, session: Session, radios: Category
+) -> None:
+    """Respelling its own name is no clash; another's old code is, and a
+    retired holder is said to be."""
+    item = new_item(session, radios, "LiteBeam")
+    other = add(
+        session,
+        Item(name="Omni", category_id=radios.id, old_code="NYCM-1", retired_at=NOW),
+    )
+    form = {
+        "name": "Lite Beam",
+        "category_id": str(radios.id),
+        "unit": "each",
+        "version": str(item.edit_version),
+    }
+    path = f"{ITEMS}/{item.id}"
+    refused = admin_client.post(path, data=form | {"old_code": "NYCM-1"})
+    assert refused.status_code == 400
+    taken = TAKEN_FIELDS["old_code"](other.name)
+    assert f'id="old_code-problem">{taken} {IS_RETIRED}</span>' in refused.text
+    assert admin_client.post(path, data=form).status_code == 303
+    session.refresh(item)
+    assert item.name == "Lite Beam"
+
+
+def test_a_name_is_checked_and_saved_in_canonical_spelling(
+    admin_client: TestClient, session: Session, radios: Category
+) -> None:
+    """Typed with the micro sign, a name is compared and stored with μ
+    (docs/decisions/0021, 2026-11-14): another's in that spelling is taken,
+    naming it, and its own respelt so is no change asked about."""
+    form = {"category_id": str(radios.id), "unit": "each"}
+    assert (
+        admin_client.post(ITEMS, data=form | {"name": "Cap 10\u00b5F"}).status_code
+        == 303
+    )
+    item = named(session, Item, "Cap 10\u03bcF")
+    refused = admin_client.post(ITEMS, data=form | {"name": "cap 10\u00b5f"})
+    assert refused.status_code == 400
+    assert TAKEN_FIELDS["name"]("Cap 10\u00a0\u03bcF") in refused.text
+    path = f"{ITEMS}/{item.id}"
+    edit = form | {"version": str(item.edit_version)}
+    saved = admin_client.post(path, data=edit | {"name": "Cap 10\u00b5F"})
+    assert saved.status_code == 303
+    # Close names, asked about, then sent again as the form sends them.
+    add(session, Item(name="Cap 10\u03bcF 50V", category_id=radios.id))
+    asked = admin_client.post(ITEMS, data=form | {"name": "Cap 10\u00b5F 5OV"})
+    assert "A different item?" in text(asked)
+    again = {"name": "Cap 10\u00b5F 5OV", "different": "Cap 10\u00b5F 5OV"}
+    assert admin_client.post(ITEMS, data=form | again).status_code == 303
+    named(session, Item, "Cap 10\u03bcF 5OV")
+
+
+@pytest.mark.parametrize(
+    ("asked", "legend", "refused"),
+    [
+        # Ali, 2026-11-16 (inventory-tng-t78, inventory-tng-uxo6).
+        ("Box 1 000 M", "1 000M", "Cap 1 000 \u03bcF"),
+        # inventory-tng-vw0f.
+        ("Box 1000\u00a0M", "1000M", "Cap 1000\u00a0\u03bcF"),
+    ],
+)
+def test_a_number_and_its_unit_are_judged_as_search_reads_them(
+    admin_client: TestClient,
+    session: Session,
+    radios: Category,
+    asked: str,
+    legend: str,
+    refused: str,
+) -> None:
+    """The form reads a number grouped by spaces before a unit as one
+    number, and finds a unit after a number and a no-break space as after
+    a plain one, as search does: so asks about `M` after it, and refuses a
+    name reading alike with another's, naming it."""
+    form = {"category_id": str(radios.id), "unit": "each"}
+    asking = admin_client.post(ITEMS, data=form | {"name": asked})
+    assert asking.status_code == 400
+    assert f"<legend>\u201c{legend}\u201d is new. Is it a unit?</legend>" in text(
+        asking
+    )
+    add(session, Item(name="Cap 1000 uF", category_id=radios.id))
+    refusing = admin_client.post(ITEMS, data=form | {"name": refused})
+    assert refusing.status_code == 400
+    assert TAKEN_FIELDS["name"]("Cap 1000\u00a0uF") in refusing.text
+
+
+def test_a_package_name_is_checked_in_canonical_spelling(
+    admin_client: TestClient, session: Session, radios: Category
+) -> None:
+    """As stored: \u2103 alone is stored \u00b0C, which has a letter."""
+    item = new_item(session, radios, "Probe")
+    path = f"{ITEMS}/{item.id}/packages"
+    added = admin_client.post(path, data={"package_name": "\u2103", "size": "1"})
+    assert added.status_code == 303
+    package = named(session, ItemPackage, "\u00b0C")
+    resent = admin_client.post(
+        f"{path}/{package.id}",
+        data={
+            "package_name": "\u2103",
+            "size": "1",
+            "package_version": shown(package),
+        },
+    )
+    assert resent.status_code == 303
+
+
+def test_a_clash_gone_meanwhile_is_said_in_general(
+    admin_client: TestClient,
+    session: Session,
+    radios: Category,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The other item renamed between the refusal and the look for it."""
+    new_item(session, radios, "LiteBeam")
+    monkeypatch.setattr(items, "taken_by", lambda *_: None)
+    form = {"name": "litebeam", "category_id": str(radios.id), "unit": "each"}
+    refused = admin_client.post(ITEMS, data=form)
+    assert str(TAKEN) in text(refused)
+
+
+def test_editing_every_field(
+    admin_client: TestClient, session: Session, radios: Category
+) -> None:
+    item = new_item(session, radios)
+    cables = add(session, Category(name="Cables"))
+    form = {
+        "name": "Cat6 cable",
+        "category_id": str(cables.id),
+        "unit": "m",
+        "manufacturer": "",
+        "part_number": "",
+        "old_code": "NYCM-0042",
+        "minimum": "305",
+        "notes": "Outdoor",
+        "ordering_notes": "Buy by the reel",
+        "version": shown(item),
+    }
+    done = admin_client.post(f"{ITEMS}/{item.id}", data=form)
+    # Renamed: its old name kept as an alias.
+    assert done.headers["location"] == (
+        f"{ITEMS}/{item.id}?notice=renamed&section=aliases#aliases"
+    )
+    assert (item.name, item.category_id, item.unit) == ("Cat6 cable", cables.id, "m")
+    assert (item.old_code, item.minimum, item.manufacturer) == (
+        "NYCM-0042",
+        Decimal(305),
+        None,
+    )
+    assert 'value="305"' in admin_client.get(f"{ITEMS}/{item.id}").text
+
+
+def test_the_unit_is_fixed_once_stock_has_moved(
+    admin_client: TestClient, session: Session, radios: Category
+) -> None:
+    item = new_item(session, radios)
+    store = add(session, Location(name="Hub", kind="store"))
+    batch = add(
+        session,
+        LedgerTransaction(
+            time_zone=DEFAULT_ZONE,
+            idempotency_key=uuid.uuid4(),
+            kind="receipt",
+            to_location_id=store.id,
+        ),
+    )
+    add(session, Movement(transaction_id=batch.id, item_id=item.id, quantity=1))
+    page = text(admin_client.get(f"{ITEMS}/{item.id}"))
+    assert "fixed, as stock has moved in it" in page
+    assert '<input type="hidden" name="unit" value="each">' in page
+    form = {"name": item.name, "category_id": str(radios.id), "unit": "m"}
+    form |= {"version": shown(item)}
+    refused = admin_client.post(f"{ITEMS}/{item.id}", data=form)
+    assert refused.status_code == 400
+    assert str(RULES["item_unit_fixed"]) in text(refused)
+    assert item.unit == "each"
+    # The form sends the fixed unit back as it is, so the rest still saves.
+    kept = admin_client.post(f"{ITEMS}/{item.id}", data=form | {"unit": "each"})
+    assert kept.status_code == 303
+    # A form without a unit is refused, rather than keeping the one stored.
+    unitless = admin_client.post(f"{ITEMS}/{item.id}", data=form | {"unit": ""})
+    assert str(PICK_A_UNIT) in text(unitless)
+    negative = admin_client.post(f"{ITEMS}/{item.id}", data=form | {"minimum": "-1"})
+    assert negative.status_code == 400
+
+
+def test_retiring_and_bringing_back(
+    admin_client: TestClient, session: Session, radios: Category
+) -> None:
+    item = new_item(session, radios)
+    admin_client.post(f"{ITEMS}/{item.id}/retire")
+    assert item.retired_at is not None
+    assert "Retired" in text(admin_client.get(ITEMS, params={"show": "retired"}))
+    # Its name stays its own while it is retired, so it can come back.
+    taken = admin_client.post(
+        ITEMS, data={"name": item.name, "category_id": str(radios.id), "unit": "each"}
+    )
+    assert taken.status_code == 400
+    assert f"{TAKEN_FIELDS['name'](item.name)} {IS_RETIRED}" in text(taken)
+    assert admin_client.post(f"{ITEMS}/{item.id}/restore").status_code == 303
+    session.refresh(item)
+    assert item.retired_at is None
+
+
+def test_unknown_items_and_others_packages_are_not_found(
+    admin_client: TestClient, session: Session, radios: Category
+) -> None:
+    item = new_item(session, radios)
+    other = new_item(session, radios, "Other")
+    theirs = add(session, ItemPackage(item_id=other.id, name="Box", size=4))
+    assert admin_client.get(f"{ITEMS}/999999").status_code == 404
+    assert admin_client.post(f"{ITEMS}/999999", data={}).status_code == 404
+    assert admin_client.post(f"{ITEMS}/999999/packages").status_code == 404
+    assert admin_client.post(f"{ITEMS}/999999/retire").status_code == 404
+    assert admin_client.post(f"{ITEMS}/999999/restore").status_code == 404
+    # A current item is not brought back.
+    assert admin_client.post(f"{ITEMS}/{item.id}/restore").status_code == 404
+    path = f"{ITEMS}/{item.id}/packages/{theirs.id}"
+    for action in ("/retire", "/restore", ""):
+        assert admin_client.post(f"{path}{action}").status_code == 404
+
+
+@pytest.mark.parametrize(
+    ("typed", "positive", "parsed"),
+    [
+        ("", True, None),
+        (" 2.5 ", True, Decimal("2.5")),
+        ("0", False, Decimal(0)),
+        ("0", True, ABOVE_ZERO),
+        ("-1", False, ZERO_OR_MORE),
+        ("1.2345", False, at_most_places(3)),
+        ("NaN", False, TOO_BIG),
+        ("1e12", False, TOO_BIG),
+        ("lots", False, TYPE_A_NUMBER),
+    ],
+)
+def test_quantities_typed(typed: str, positive: bool, parsed: object) -> None:
+    assert quantity(typed, positive=positive) == parsed
+
+
+def test_a_retired_item_says_what_is_left(
+    admin_client: TestClient, session: Session, radios: Category
+) -> None:
+    item = new_item(session, radios)
+    store = add(session, Location(name="Hub", kind="store"))
+    batch = add(
+        session,
+        LedgerTransaction(
+            time_zone=DEFAULT_ZONE,
+            idempotency_key=uuid.uuid4(),
+            kind="receipt",
+            to_location_id=store.id,
+        ),
+    )
+    add(session, Movement(transaction_id=batch.id, item_id=item.id, quantity=3))
+    admin_client.post(f"{ITEMS}/{item.id}/retire")
+    page = text(admin_client.get(f"{ITEMS}/{item.id}"))
+    assert "can't be received" in page
+    assert "take the 3 each left, until it runs out" in page
+
+
+def test_an_item_comes_back_only_into_a_current_category(
+    admin_client: TestClient, session: Session, radios: Category
+) -> None:
+    item = new_item(session, radios)
+    admin_client.post(f"{ITEMS}/{item.id}/retire")
+    radios.retired_at = radios.created_at
+    session.flush()
+    refused = admin_client.post(f"{ITEMS}/{item.id}/restore")
+    assert refused.status_code == 400
+    assert "Its category is retired" in text(refused)
+    assert item.retired_at is not None
+
+
+def test_an_edit_with_a_problem_changes_nothing(
+    admin_client: TestClient, session: Session, radios: Category
+) -> None:
+    item = new_item(session, radios)
+    refused = admin_client.post(
+        f"{ITEMS}/{item.id}",
+        data={"name": "", "category_id": str(radios.id), "unit": "each"},
+    )
+    assert refused.status_code == 400
+    session.refresh(item)
+    assert item.name == "LiteBeam"
+
+
+def test_changes_are_logged_by_id(
+    admin_client: TestClient, session: Session, radios: Category
+) -> None:
+    from structlog.testing import capture_logs
+
+    with capture_logs() as logs:
+        admin_client.post(
+            ITEMS,
+            data={"name": "Radio X", "category_id": str(radios.id), "unit": "each"},
+        )
+    (line,) = [line for line in logs if line["event"] == "item added"]
+    assert line["item_id"] == named(session, Item, "Radio X").id
+    assert "Radio X" not in str(line)
+
+
+def test_taken_by_skips_the_item_itself(session: Session, radios: Category) -> None:
+    item = add(
+        session,
+        Item(name="LiteBeam", category_id=radios.id, old_code="NYCM-1"),
+    )
+    asked = items.Fields.new(name="Lite beam", category_id=radios.id, old_code="NYCM-1")
+    # Its own name and old code are no clash with itself.
+    assert items.taken_by(session, asked, item.id) is None
+    assert items.taken_by(session, asked) == ("name", item)
+
+
+def test_a_name_close_to_others_asks_first(
+    admin_client: TestClient, session: Session, radios: Category
+) -> None:
+    """Similar items are listed, retired ones too, and the form sent again
+    adds it: a close name may be a different item (docs/decisions/0021)."""
+    gen1 = new_item(session, radios, "LiteBeam 5AC Gen1")
+    old = add(
+        session, Item(name="LiteBeam 5AC Gen0", category_id=radios.id, retired_at=NOW)
+    )
+    new_item(session, radios, "Patch cable")
+    form = {"name": "LiteBeam 5AC Gen2", "category_id": str(radios.id), "unit": "each"}
+    asked = admin_client.post(ITEMS, data=form)
+    assert asked.status_code == 200
+    page = text(asked)
+    found = re.search(r'<p class="warning" role="status">(.*?)</p>', page, re.DOTALL)
+    assert found is not None
+    said = found[1]
+    assert f'<a href="{ITEMS}/{gen1.id}">LiteBeam 5AC Gen1</a>' in said
+    assert (
+        f'<a href="{ITEMS}/{old.id}">LiteBeam 5AC Gen0</a> <span class="tag">Retired'
+        in said
+    )
+    assert "Patch cable" not in said
+    assert "A different item? Add it again." in said
+    assert 'value="LiteBeam 5AC Gen2"' in page
+    assert session.scalar(select(Item).where(Item.name == form["name"])) is None
+    assert f'name="different" value="{form["name"]}"' in asked.text
+    # Changed after the question: asked about again.
+    gen3 = form | {"name": "LiteBeam 5AC Gen3", "different": form["name"]}
+    assert "A different item?" in text(admin_client.post(ITEMS, data=gen3))
+    added = admin_client.post(ITEMS, data=form | {"different": form["name"]})
+    assert added.status_code == 303
+    named(session, Item, "LiteBeam 5AC Gen2")
+
+
+def test_a_name_holding_another_items_asks_too(
+    admin_client: TestClient, session: Session, radios: Category
+) -> None:
+    """ "mast" is close to "Mast, telescopic", though most of it is new."""
+    mast = new_item(session, radios, "mast")
+    form = {"name": "Mast, telescopic", "category_id": str(radios.id), "unit": "each"}
+    asked = text(admin_client.post(ITEMS, data=form))
+    assert f'<a href="{ITEMS}/{mast.id}">mast</a>' in asked
+
+
+def test_other_refusals_come_before_the_question(
+    admin_client: TestClient, session: Session, radios: Category
+) -> None:
+    """A retired category is said first, rather than asking, then refusing."""
+    new_item(session, radios, "LiteBeam 5AC Gen1")
+    radios.retired_at = NOW
+    session.flush()
+    form = {"name": "LiteBeam 5AC Gen2", "category_id": str(radios.id), "unit": "each"}
+    refused = admin_client.post(ITEMS, data=form)
+    assert refused.status_code == 400
+    assert "A different item?" not in text(refused)
+
+
+def test_renaming_close_to_another_asks_first(
+    admin_client: TestClient, session: Session, radios: Category
+) -> None:
+    """Only a new name asks; saving the other fields does not."""
+    new_item(session, radios, "LiteBeam 5AC Gen1")
+    item = new_item(session, radios, "Radio")
+    form = {
+        "name": "Radio",
+        "category_id": str(radios.id),
+        "unit": "each",
+        "version": str(item.edit_version),
+        "notes": "On the shelf",
+    }
+    path = f"{ITEMS}/{item.id}"
+    assert admin_client.post(path, data=form).status_code == 303
+    form["version"] = str(item.edit_version)
+    asked = admin_client.post(path, data=form | {"name": "LiteBeam 5AC Gen2"})
+    assert "A different item? Save it again." in text(asked)
+    session.refresh(item)
+    assert item.name == "Radio"
+    form |= {"name": "LiteBeam 5AC Gen2", "different": "LiteBeam 5AC Gen2"}
+    assert admin_client.post(path, data=form).status_code == 303
+    session.refresh(item)
+    assert item.name == "LiteBeam 5AC Gen2"
+    # Respelling its own name is the same name: nothing is asked.
+    form = {k: v for k, v in form.items() if k != "different"}
+    form |= {"name": "Litebeam-5AC-Gen2", "version": str(item.edit_version)}
+    assert admin_client.post(path, data=form).status_code == 303
+
+
+def test_the_add_form_says_how_to_name_an_item(
+    admin_client: TestClient, radios: Category
+) -> None:
+    page = " ".join(text(admin_client.get(ITEMS)).split())
+    assert "what it is, then what tells it apart from the items nearest it" in page
+    assert "the maker goes in Manufacturer" in page
+
+
+def test_a_name_asked_about_saves_however_it_was_spaced(
+    admin_client: TestClient, session: Session, radios: Category
+) -> None:
+    """Sent again with spaces around it, as typed, it is the name asked
+    about, so it saves rather than asking again."""
+    new_item(session, radios, "LiteBeam 5AC Gen1")
+    form = {"name": "LiteBeam 5AC Gen2 ", "category_id": str(radios.id), "unit": "each"}
+    asked = admin_client.post(ITEMS, data=form)
+    assert 'name="different" value="LiteBeam 5AC Gen2"' in asked.text
+    again = admin_client.post(ITEMS, data=form | {"different": "LiteBeam 5AC Gen2"})
+    assert again.status_code == 303
+
+
+def test_a_name_asked_about_stays_answered_through_another_refusal(
+    admin_client: TestClient, session: Session, radios: Category
+) -> None:
+    """Refused for its part number after the question, the form keeps the
+    answer, so fixing the part number saves it."""
+    new_item(session, radios, "LiteBeam 5AC Gen1")
+    add(
+        session,
+        Item(name="Omni", category_id=radios.id, manufacturer="U", part_number="P"),
+    )
+    form = {
+        "name": "LiteBeam 5AC Gen2",
+        "category_id": str(radios.id),
+        "unit": "each",
+        "manufacturer": "U",
+        "part_number": "P",
+        "different": "LiteBeam 5AC Gen2",
+    }
+    refused = admin_client.post(ITEMS, data=form)
+    assert refused.status_code == 400
+    assert 'name="different" value="LiteBeam 5AC Gen2"' in refused.text
+    assert "A different item?" not in text(refused)
+    added = admin_client.post(ITEMS, data=form | {"part_number": "Q"})
+    assert added.status_code == 303
