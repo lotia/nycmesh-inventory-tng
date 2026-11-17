@@ -80,9 +80,9 @@ def history(
 
 def tag() -> str:
     """For unique names: rows committed by one test never clash with
-    another's. It starts with a letter, so no part of it reads as a number
-    with a unit (374691ff as 374 691 ff) and is shown otherwise than typed
-    (units.shown_name)."""
+    another's. It starts with a letter, so each number in it is within a
+    word, and a name is shown with it as typed (units.shown_name), never as
+    a number and its unit (374691ff as 374 691 ff)."""
     return f"t{uuid.uuid4().hex[:8]}"
 
 
