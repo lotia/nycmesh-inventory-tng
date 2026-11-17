@@ -23,6 +23,7 @@ from inventory_tng.models import (
     LedgerTransaction,
     OpenPackage,
 )
+from inventory_tng.stock import balance
 from inventory_tng.web import formatting
 
 from helpers.markup import links, read, text
@@ -34,7 +35,7 @@ LENGTHS = "/admin/stock/length-checks"
 
 
 def left_on(session: Session, made: OpenPackage) -> Decimal:
-    return ledger.left_on(session, [made])[made.id]
+    return balance.left_on(session, [made])[made.id]
 
 
 def seen(session: Session, made: OpenPackage) -> str:

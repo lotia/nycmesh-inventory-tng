@@ -70,7 +70,6 @@ from inventory_tng.ledger import (
     Form,
     ItemLines,
     corrected,
-    countable,
     expected,
     expected_forms,
     hold,
@@ -79,8 +78,6 @@ from inventory_tng.ledger import (
     record_adjustment,
     record_count,
     repeated,
-    retired_holding_stock_count,
-    takeable,
 )
 from inventory_tng.models import (
     INTEGER_MAX,
@@ -103,6 +100,7 @@ from inventory_tng.pages import (
     redirect,
     retired_holding,
 )
+from inventory_tng.stock.balance import countable, retired_holding_stock_count, takeable
 
 log = structlog.get_logger(__name__)
 
@@ -173,7 +171,7 @@ TextForm = Annotated[dict[str, str], Depends(text_form)]
 
 def badge(session: Session) -> Badge | None:
     """Beside Counts: how many retired places hold stock, to count
-    (ledger.retired_holding_stock)."""
+    (balance.retired_holding_stock)."""
     many = retired_holding_stock_count(session)
     return Badge(many, retired_holding(many)) if many else None
 
@@ -185,7 +183,7 @@ def _items(session: Session) -> list[Item]:
 
 
 def _places(session: Session) -> list[Location]:
-    """Where can be counted or adjusted (ledger.countable)."""
+    """Where can be counted or adjusted (balance.countable)."""
     return by_name(session, Location, countable())
 
 

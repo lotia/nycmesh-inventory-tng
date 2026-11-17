@@ -36,12 +36,6 @@ from inventory_tng.admin.listing import (
 from inventory_tng.admins.guards import AdminSignedIn
 from inventory_tng.core.db import DbSession
 from inventory_tng.core.phrases import Words, gettext, lazy_gettext
-from inventory_tng.ledger import (
-    SHORT,
-    balance,
-    by_form,
-    retired_places_holding_stock,
-)
 from inventory_tng.models import (
     INTEGER_MAX,
     STORE_KINDS,
@@ -51,6 +45,12 @@ from inventory_tng.models import (
     whole,
 )
 from inventory_tng.pages import templates
+from inventory_tng.stock.balance import (
+    SHORT,
+    balance,
+    by_form,
+    retired_places_holding_stock,
+)
 
 log = structlog.get_logger(__name__)
 
@@ -324,7 +324,7 @@ def reorder(
         .order_by(func.lower(Item.name))
     ).all()
     # The stores' ids as an array, so only their balances are summed, as
-    # ledger.in_stores does.
+    # in_stores (stock/balance.py) does.
     stores = func.array(
         select(Location.id)
         .where(Location.kind.in_(STORE_KINDS), Location.retired_at.is_(None))

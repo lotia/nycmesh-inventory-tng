@@ -22,10 +22,9 @@ from pydantic import BaseModel, ConfigDict
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from inventory_tng import labels, ledger
+from inventory_tng import labels
 from inventory_tng.core.db import SnapshotSession
 from inventory_tng.devices import DeviceRefusedReply, RegisteredDevice
-from inventory_tng.ledger import takeable
 from inventory_tng.models import (
     CURRENT_ALIAS,
     Category,
@@ -42,6 +41,8 @@ from inventory_tng.models import (
     reading_rules,
 )
 from inventory_tng.open_packages import tracks_opened
+from inventory_tng.stock import balance
+from inventory_tng.stock.balance import takeable
 
 log = structlog.get_logger(__name__)
 
@@ -209,7 +210,7 @@ def catalogue(session: Session) -> Catalogue:
     locations = session.scalars(
         select(Location).where(Location.retired_at.is_(None)).order_by(Location.name)
     )
-    sealed = ledger.sealed_places(session)
+    sealed = balance.sealed_places(session)
     # A retired item stays while it has stock, so what is left can be taken;
     # the rest are gone, named only.
     items: list[tuple[Item, str]] = []
@@ -361,7 +362,7 @@ def open_to_take(session: Session, item_ids: set[int]) -> list[OpenPackageEntry]
         )
         .order_by(OpenPackage.opened_at, OpenPackage.id)
     ).all()
-    left = ledger.left_on(session, [row for row, *_ in found])
+    left = balance.left_on(session, [row for row, *_ in found])
     return [
         OpenPackageEntry(
             id=row.id,

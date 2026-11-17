@@ -64,6 +64,7 @@ from inventory_tng.models import (
     canonical,
 )
 from inventory_tng.pages import NOTICES, not_found, redirect
+from inventory_tng.stock import balance
 
 log = structlog.get_logger(__name__)
 
@@ -407,7 +408,7 @@ def _refused_again(
     at = row_id(marker)
     if at is None or at not in over_recorded.places_of(session, check_id):
         return None
-    if exists_where(session, Location.id == at, ledger.countable()):
+    if exists_where(session, Location.id == at, balance.countable()):
         return None
     return _refusal(session, check_id, "checked", "location_countable", at)
 

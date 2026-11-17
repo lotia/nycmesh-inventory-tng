@@ -45,7 +45,6 @@ from inventory_tng.admins.guards import AdminSignedIn, SignedIn
 from inventory_tng.core.db import DbSession, exists_where, refusal
 from inventory_tng.core.local_time import site_zone
 from inventory_tng.core.phrases import Words, gettext, lazy_gettext
-from inventory_tng.ledger import balance
 from inventory_tng.models import (
     INTEGER_MAX,
     UNITS,
@@ -63,6 +62,7 @@ from inventory_tng.models import reading_rules as rules_held
 from inventory_tng.names import nameless
 from inventory_tng.pages import NOTICES, not_found, redirect
 from inventory_tng.reading_rules import NOT_A_UNIT, chosen_rule, read_alike_words
+from inventory_tng.stock.balance import balance
 
 log = structlog.get_logger(__name__)
 meter = metrics.get_meter(__name__)

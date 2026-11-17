@@ -1,5 +1,5 @@
-{#- Retired places that hold stock (ledger.retired_places_holding_stock),
-each to count; gone once each is counted to nothing. -#}
+{#- Retired places that hold stock (retired_places_holding_stock, in
+stock/balance.py), each to count; gone once each is counted to nothing. -#}
 {% if retired_places %}
 <div class="warning">
   <p>{% trans count=retired_places | length %}{{ count }} retired place holds

@@ -27,8 +27,15 @@ CORE_MAY_IMPORT = {"models.py"}
 # What every server-rendered page shares, until it moves into web/.
 WEB = {"pages.py"}
 # Rules: each table's owner (db.protection), any queries.py, and these,
-# which hold rules but own no table.
-RULES = {"ledger.py", "names.py", "scan_settings.py", "unit_readings.py", "units.py"}
+# which hold rules or queries but own no table.
+RULES = {
+    "ledger.py",
+    "names.py",
+    "scan_settings.py",
+    "stock/balance.py",
+    "unit_readings.py",
+    "units.py",
+}
 # What of web/ rules may import: it loads neither FastAPI nor the templates,
 # and is held to the rules' own rule to stay so.
 RULES_MAY_IMPORT = {"web/formatting.py"}

@@ -1,6 +1,6 @@
 """Open packages (docs/decisions/0020): a package opened at a place and
 followed until used up, for an item that tracks its opened packages. What
-is left on one is its balance in the ledger (ledger.by_form); this module
+is left on one is its balance in the ledger (balance.by_form); this module
 makes them, and the rows say where each is, who reported it used up, and
 which administrator closed it.
 """
@@ -27,6 +27,7 @@ from inventory_tng.models import (
     OpenPackage,
     Volunteer,
 )
+from inventory_tng.stock import balance
 
 log = structlog.get_logger(__name__)
 meter = metrics.get_meter(__name__)
@@ -291,7 +292,7 @@ def close(
         return None
     if reported and row.reported_at is None:
         return None
-    left = ledger.left_on(session, [row])[row.id]
+    left = balance.left_on(session, [row])[row.id]
     if left != 0:
         ledger.record_adjustment(
             session,
@@ -367,7 +368,7 @@ def shown(session: Session, *where: ColumnElement[bool]) -> list[Shown]:
         .where(OpenPackage.closed_at.is_(None), *where)
         .order_by(OpenPackage.reported_at, OpenPackage.opened_at, OpenPackage.id)
     ).all()
-    left = ledger.left_on(session, [row for row, *_ in rows])
+    left = balance.left_on(session, [row for row, *_ in rows])
     return [
         Shown(row, item, package, unit, place, left[row.id], by)
         for row, item, package, unit, place, by in rows
@@ -451,15 +452,15 @@ def forms_of(
     session: Session, where: ColumnElement[bool]
 ) -> dict[tuple[int, int], Forms]:
     """Stock by item and place, form by form, of the balances `where`
-    picks (on ledger.by_form): those of nothing left are left out."""
+    picks (on balance.by_form): those of nothing left are left out."""
     rows = session.execute(
         select(
-            ledger.by_form.c.item_id,
-            ledger.by_form.c.location_id,
-            ledger.by_form.c.package_id,
-            ledger.by_form.c.open_package_id,
-            ledger.by_form.c.quantity,
-        ).where(where, ledger.by_form.c.quantity != 0)
+            balance.by_form.c.item_id,
+            balance.by_form.c.location_id,
+            balance.by_form.c.package_id,
+            balance.by_form.c.open_package_id,
+            balance.by_form.c.quantity,
+        ).where(where, balance.by_form.c.quantity != 0)
     ).all()
     item_ids = {row[0] for row in rows}
     packages = {

@@ -18,7 +18,6 @@ from inventory_tng.ledger import (
     Form,
     OpenFacts,
     PackageFacts,
-    balance,
     form_breaks,
     insert_transaction,
     moment,
@@ -26,6 +25,7 @@ from inventory_tng.ledger import (
 )
 from inventory_tng.models import Admin, Item, ItemPackage, LedgerTransaction
 from inventory_tng.open_packages import tracks_opened
+from inventory_tng.stock.balance import balance
 
 from helpers.package_forms import (
     BOX,

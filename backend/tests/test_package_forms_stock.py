@@ -6,14 +6,16 @@ from decimal import Decimal
 
 import pytest
 from fastapi.testclient import TestClient
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from inventory_tng import ledger, open_packages
+from inventory_tng import open_packages
 from inventory_tng.admin import items as items_page
 from inventory_tng.admin import stock
 from inventory_tng.admin.items import SHORTER_THAN_WHOLE
 from inventory_tng.ledger import Entry, Form
 from inventory_tng.models import Item, ItemPackage
+from inventory_tng.stock import balance
 
 from helpers.markup import read, text
 from helpers.package_forms import BOX, FRESH, GONE, OPEN, SPOOL
@@ -61,6 +63,18 @@ def test_reorder_on_usable_stock_and_sealed_minimums() -> None:
     assert (
         stock.reorder_rows([cable], {1: Decimal(400)}, {}, [], set())[0].item is cable
     )
+
+
+def test_in_stores_sums_an_items_stock_across_the_stores(
+    session: Session, spools: Spools
+) -> None:
+    """Whatever its form, and whether any store holds less than nothing; not
+    what is elsewhere, as in the van."""
+    cable = spools.cable.id
+    query = balance.in_stores(select(Item.id).where(Item.id == cable))
+    assert session.execute(query).all() == [(cable, 610, False)]
+    spools.move(Entry(cable, Decimal(700)))
+    assert session.execute(query).all() == [(cable, -90, True)]
 
 
 def test_stock_and_reorder_pages_show_forms(
@@ -131,7 +145,7 @@ def test_a_place_holding_forms_that_net_to_nothing_holds_stock(
     """A sealed spool there, and as much taken loose: not empty."""
     store = spools.store.id
     spools.move(Entry(spools.cable.id, Decimal(610)))  # Loose, though sealed.
-    assert ledger.holds_stock(session, store)
+    assert balance.holds_stock(session, store)
     page = text(admin_client.get("/admin/stock"))
     assert "count it" in page
 

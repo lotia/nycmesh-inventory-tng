@@ -11,7 +11,7 @@ from fastapi.testclient import TestClient
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from inventory_tng import adjustment_reasons, ledger, open_packages
+from inventory_tng import adjustment_reasons, open_packages
 from inventory_tng.admin import needs_action, used_up
 from inventory_tng.ledger import (
     Entry,
@@ -24,6 +24,7 @@ from inventory_tng.models import (
     LedgerTransaction,
     OpenPackage,
 )
+from inventory_tng.stock import balance
 
 from helpers.markup import button, links, read, text
 from helpers.package_forms import quantities_by_form
@@ -480,7 +481,7 @@ def test_a_confirm_after_a_clear_closes_nothing(
     when = datetime.now(UTC)
     assert open_packages.close(session, made.id, closer.id, when, reported=True) is None
     assert made.closed_at is None
-    assert ledger.left_on(session, []) == {}
+    assert balance.left_on(session, []) == {}
 
 
 def test_whats_left_is_where_it_is_now(session: Session, spools: Spools) -> None:
@@ -488,7 +489,7 @@ def test_whats_left_is_where_it_is_now(session: Session, spools: Spools) -> None
     made = spools.opened()
     whole = Form(open_package_id=made.id)
     spools.move(Entry(spools.cable.id, Decimal(305), whole, whole))
-    assert ledger.left_on(session, [made]) == {made.id: 305}
+    assert balance.left_on(session, [made]) == {made.id: 305}
 
 
 def test_those_reported_used_up_sort_and_come_in_pages(

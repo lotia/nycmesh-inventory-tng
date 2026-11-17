@@ -46,6 +46,7 @@ from inventory_tng.models import (
     OpenPackage,
     OverRecorded,
 )
+from inventory_tng.stock import balance
 from inventory_tng.web.formatting import amount
 
 log = structlog.get_logger(__name__)
@@ -186,7 +187,7 @@ class OneCounted(NamedTuple):
     since, inventory-tng-nyl) and when, the end still to put right, as a
     sentence starts with each, and as its Correct button names it; and the
     place to count, by id and name, and whether it may be counted
-    (ledger.countable). A move's ends are its places; an opening's, both
+    (balance.countable). A move's ends are its places; an opening's, both
     at one place, its forms: "Sealed spool" where it left, "Open spool" or
     "Loose cat6 cable" where it arrived, the names as within() shows them
     (Ali, 2026-11-15, inventory-tng-r5z)."""
@@ -358,14 +359,14 @@ def _checks(*columns: SQLColumnExpression[Any]) -> Select:
 
 
 def _countable(session: Session, place_ids: Collection[int | None]) -> set[int]:
-    """Which of these places may be counted (ledger.countable): one query,
+    """Which of these places may be counted (balance.countable): one query,
     however many, or none for none."""
     ids = {each for each in place_ids if each is not None}
     if not ids:
         return set()
     return set(
         session.scalars(
-            select(Location.id).where(Location.id.in_(ids), ledger.countable())
+            select(Location.id).where(Location.id.in_(ids), balance.countable())
         )
     )
 
@@ -480,7 +481,7 @@ def shown(session: Session, *where: ColumnElement[bool]) -> list[Shown]:
 
 class Spot(NamedTuple):
     """One of a settled check's places: by id and name, and whether it may
-    be counted (ledger.countable), for a link to count its item there."""
+    be counted (balance.countable), for a link to count its item there."""
 
     id: int
     name: str
