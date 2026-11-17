@@ -19,13 +19,14 @@ from sqlalchemy.orm import Session
 from starlette.datastructures import Headers
 from structlog.testing import capture_logs
 
-from inventory_tng import accounts, sign_in
+from inventory_tng import accounts
 from inventory_tng.accounts import (
     NOT_AN_EMAIL,
     PASSWORDS_DIFFER,
     password_problem,
     username_problem,
 )
+from inventory_tng.admins import guards, sign_in_routes
 from inventory_tng.core.masking import Masker
 from inventory_tng.core.settings import RateLimits
 from inventory_tng.cross_site import cross_site
@@ -93,10 +94,10 @@ def setup_form(key: str, **fields: str) -> dict[str, str]:
 def test_setup_makes_the_first_admin_signed_in_with_recovery_codes(
     client: TestClient, session: Session
 ) -> None:
-    key = hidden_key(client.get(sign_in.SETUP))
+    key = hidden_key(client.get(guards.SETUP))
     with app_clock() as at:
         form = setup_form(key, code=code(key, at))
-        response = client.post(sign_in.SETUP, data=form)
+        response = client.post(guards.SETUP, data=form)
     assert response.status_code == 200
     codes = re.findall(RECOVERY_CODE, response.text)
     assert len(codes) == accounts.RECOVERY_CODES
@@ -106,31 +107,31 @@ def test_setup_makes_the_first_admin_signed_in_with_recovery_codes(
     (authenticator,) = session.scalars(select(Authenticator)).all()
     assert opened(authenticator) == key
     # Signed in: the cookie opens the administrator pages.
-    assert client.get(sign_in.HOME).status_code == 200
+    assert client.get(guards.HOME).status_code == 200
     # And setup is gone for good.
-    assert client.get(sign_in.SETUP).status_code == 404
-    assert client.post(sign_in.SETUP, data=setup_form(key)).status_code == 404
+    assert client.get(guards.SETUP).status_code == 404
+    assert client.post(guards.SETUP, data=setup_form(key)).status_code == 404
 
 
 def test_setup_is_off_without_a_token(
     make_app: Callable[..., FastAPI],
 ) -> None:
     with TestClient(make_app()) as client:
-        assert "Setup is off" in client.get(sign_in.SETUP).text
-        refused = client.post(sign_in.SETUP, data=setup_form("A" * 32))
+        assert "Setup is off" in client.get(guards.SETUP).text
+        refused = client.post(guards.SETUP, data=setup_form("A" * 32))
         assert refused.status_code == 403
 
 
 def test_setup_refuses_a_wrong_token_then_too_many(client: TestClient) -> None:
-    key = hidden_key(client.get(sign_in.SETUP))
-    wrong = client.post(sign_in.SETUP, data=setup_form(key, token="x" * 40))
+    key = hidden_key(client.get(guards.SETUP))
+    wrong = client.post(guards.SETUP, data=setup_form(key, token="x" * 40))
     assert wrong.status_code == 400
-    assert str(sign_in.NOT_THE_TOKEN) in text(wrong)
+    assert str(sign_in_routes.NOT_THE_TOKEN) in text(wrong)
     # The form keeps the key, so the app need not be set up again.
     assert hidden_key(wrong) == key
     for _ in range(9):
-        client.post(sign_in.SETUP, data=setup_form(key, token="x" * 40))
-    limited = client.post(sign_in.SETUP, data=setup_form(key))
+        client.post(guards.SETUP, data=setup_form(key, token="x" * 40))
+    limited = client.post(guards.SETUP, data=setup_form(key))
     assert limited.status_code == 429
 
 
@@ -144,18 +145,18 @@ def test_setup_refuses_a_wrong_token_then_too_many(client: TestClient) -> None:
         ),
         ({"password_again": PASSWORD + "!"}, PASSWORDS_DIFFER),
         ({"email": "not an address"}, NOT_AN_EMAIL),
-        ({"code": "000000"}, sign_in.code_mismatch()),
-        ({"code": ""}, sign_in.code_mismatch()),
+        ({"code": "000000"}, sign_in_routes.code_mismatch()),
+        ({"code": ""}, sign_in_routes.code_mismatch()),
     ],
 )
 def test_setup_says_what_is_wrong(
     client: TestClient, session: Session, fields: dict[str, str], problem: str
 ) -> None:
-    key = hidden_key(client.get(sign_in.SETUP))
+    key = hidden_key(client.get(guards.SETUP))
     form = setup_form(key, **fields)
     if form["code"] == "000000" and code(key) == "000000":
         form["code"] = "111111"
-    response = client.post(sign_in.SETUP, data=form)
+    response = client.post(guards.SETUP, data=form)
     assert response.status_code == 400
     assert str(problem) in text(response)
     assert hidden_key(response) == key
@@ -166,12 +167,12 @@ def test_setup_without_totp_while_it_is_optional(
     client: TestClient, session: Session
 ) -> None:
     policy(session, "optional")
-    key = hidden_key(client.get(sign_in.SETUP))
-    response = client.post(sign_in.SETUP, data=setup_form(key, code=""))
+    key = hidden_key(client.get(guards.SETUP))
+    response = client.post(guards.SETUP, data=setup_form(key, code=""))
     assert response.status_code == 303
-    assert response.headers["location"] == sign_in.HOME
+    assert response.headers["location"] == guards.HOME
     assert session.scalars(select(Authenticator)).first() is None
-    assert client.get(sign_in.HOME).status_code == 200
+    assert client.get(guards.HOME).status_code == 200
 
 
 def test_setup_refuses_once_any_admin_exists_even_retired(
@@ -180,7 +181,7 @@ def test_setup_refuses_once_any_admin_exists_even_retired(
     admin, _ = new_admin(session)
     admin.retired_at = NOW
     session.flush()
-    assert client.get(sign_in.SETUP).status_code == 404
+    assert client.get(guards.SETUP).status_code == 404
     with pytest.raises(accounts.TokenRefused):
         accounts.create_first_admin(
             session,
@@ -208,7 +209,7 @@ def test_signing_in_with_all_three(client: TestClient, session: Session) -> None
     assert "HttpOnly" in cookie
     assert "Secure" in cookie
     assert "SameSite=lax" in cookie
-    page = client.get(sign_in.HOME)
+    page = client.get(guards.HOME)
     assert page.status_code == 200
     assert read(page.text).all("strong", "ada")
 
@@ -222,8 +223,10 @@ def test_every_refusal_says_the_same(client: TestClient, session: Session) -> No
         sign_in_with(client),
     ]
     assert {response.status_code for response in refusals} == {400}
-    assert {alert(response) for response in refusals} == {str(sign_in.DID_NOT_MATCH)}
-    assert sign_in.COOKIE not in client.cookies
+    assert {alert(response) for response in refusals} == {
+        str(sign_in_routes.DID_NOT_MATCH)
+    }
+    assert guards.COOKIE not in client.cookies
 
 
 def test_an_unknown_name_is_checked_against_a_password_all_the_same(
@@ -270,9 +273,10 @@ def test_a_sign_in_held_up_past_a_time_step_still_signs_in(
     held at the code's moment (app_clock; inventory-tng-tuie). The app's
     own window is tested on its clock below (accepted_step)."""
     _, key = new_admin(session)
-    monkeypatch.setattr(
-        sign_in, "_now", lambda: datetime.now(UTC) + timedelta(minutes=1)
-    )
+    for module in (guards, sign_in_routes):
+        monkeypatch.setattr(
+            module, "_now", lambda: datetime.now(UTC) + timedelta(minutes=1)
+        )
     assert sign_in_with(client, key=key).status_code == 303
 
 
@@ -281,13 +285,14 @@ def test_forms_held_up_past_a_time_step_still_take_their_codes(
     client: TestClient, session: Session, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     """So do setup, a new authenticator and confirming (inventory-tng-1101)."""
-    monkeypatch.setattr(
-        sign_in, "_now", lambda: datetime.now(UTC) + timedelta(minutes=1)
-    )
-    key = hidden_key(client.get(sign_in.SETUP))
+    for module in (guards, sign_in_routes):
+        monkeypatch.setattr(
+            module, "_now", lambda: datetime.now(UTC) + timedelta(minutes=1)
+        )
+    key = hidden_key(client.get(guards.SETUP))
     with app_clock() as at:
         form = setup_form(key, code=code(key, at))
-        assert client.post(sign_in.SETUP, data=form).status_code == 200
+        assert client.post(guards.SETUP, data=form).status_code == 200
     new_key = accounts.new_totp_key()
     with app_clock() as at:
         form = {
@@ -295,14 +300,14 @@ def test_forms_held_up_past_a_time_step_still_take_their_codes(
             "key": new_key,
             "code": code(new_key, at),
         }
-        assert client.post(sign_in.NEW_AUTHENTICATOR, data=form).status_code == 303
+        assert client.post(guards.NEW_AUTHENTICATOR, data=form).status_code == 303
     confirmed_long_ago(session)
     with app_clock() as at:
         confirm = {
-            sign_in.CONFIRM_FIELD: code(key, at + TIME_STEP),
-            "next": sign_in.HOME,
+            guards.CONFIRM_FIELD: code(key, at + TIME_STEP),
+            "next": guards.HOME,
         }
-        assert client.post(sign_in.CONFIRM, data=confirm).status_code == 303
+        assert client.post(guards.CONFIRM, data=confirm).status_code == 303
 
 
 def second_factor(session: Session, admin_id: int, typed: str) -> str | None:
@@ -372,7 +377,7 @@ def test_without_totp_the_password_is_enough(
     policy(session, "optional")
     new_admin(session, totp=False)
     assert sign_in_with(client).status_code == 303
-    assert client.get(sign_in.HOME).status_code == 200
+    assert client.get(guards.HOME).status_code == 200
 
 
 def test_required_totp_sends_an_admin_without_it_to_set_it_up(
@@ -380,18 +385,18 @@ def test_required_totp_sends_an_admin_without_it_to_set_it_up(
 ) -> None:
     new_admin(session, totp=False)
     assert sign_in_with(client).status_code == 303
-    home = client.get(sign_in.HOME)
-    assert home.headers["location"] == sign_in.NEW_AUTHENTICATOR
-    form = client.get(sign_in.NEW_AUTHENTICATOR)
+    home = client.get(guards.HOME)
+    assert home.headers["location"] == guards.NEW_AUTHENTICATOR
+    form = client.get(guards.NEW_AUTHENTICATOR)
     assert "needs an authenticator app" in form.text
     key = hidden_key(form)
     with app_clock() as at:
         saved = client.post(
-            sign_in.NEW_AUTHENTICATOR,
+            guards.NEW_AUTHENTICATOR,
             data={"authenticator_name": "Phone", "key": key, "code": code(key, at)},
         )
-    assert str(sign_in.RECOVERY_CODES_TITLE) in saved.text
-    assert client.get(sign_in.HOME).status_code == 200
+    assert str(guards.RECOVERY_CODES_TITLE) in saved.text
+    assert client.get(guards.HOME).status_code == 200
 
 
 def from_many_addresses(
@@ -424,7 +429,7 @@ def test_wrong_codes_after_a_right_password_are_limited(
         sign_in_with(next(clients), code=wrong)
     limited = sign_in_with(next(clients), key=key)
     assert limited.status_code == 429
-    assert str(sign_in.TOO_MANY) in alert(limited)
+    assert str(guards.TOO_MANY) in alert(limited)
 
 
 def test_every_attempt_counts_against_its_address(
@@ -454,7 +459,7 @@ def test_sign_in_only_goes_on_to_this_site(
 ) -> None:
     _, key = new_admin(session)
     response = sign_in_with(client, key=key, next=target)
-    assert response.headers["location"] == sign_in.HOME
+    assert response.headers["location"] == guards.HOME
 
 
 def test_a_page_sends_someone_signed_out_to_sign_in_and_back(
@@ -472,18 +477,18 @@ def signed_in_row(client: TestClient, session: Session) -> AdminSession:
 
 def test_signing_out_ends_the_session(client: TestClient, session: Session) -> None:
     row = signed_in_row(client, session)
-    cookie = client.cookies[sign_in.COOKIE]
-    assert client.post(sign_in.SIGN_OUT).headers["location"] == sign_in.SIGN_IN
+    cookie = client.cookies[guards.COOKIE]
+    assert client.post(guards.SIGN_OUT).headers["location"] == guards.SIGN_IN
     assert row.ended_at is not None
-    client.cookies.set(sign_in.COOKIE, cookie)
-    assert client.get(sign_in.HOME).status_code == 303
+    client.cookies.set(guards.COOKIE, cookie)
+    assert client.get(guards.HOME).status_code == 303
 
 
 def test_a_session_ends_when_it_expires(client: TestClient, session: Session) -> None:
     row = signed_in_row(client, session)
     row.expires_at = datetime.now(UTC) - timedelta(seconds=1)
     session.flush()
-    assert client.get(sign_in.HOME).status_code == 303
+    assert client.get(guards.HOME).status_code == 303
 
 
 def test_a_retired_admin_is_signed_out_and_cannot_sign_in(
@@ -492,7 +497,7 @@ def test_a_retired_admin_is_signed_out_and_cannot_sign_in(
     row = signed_in_row(client, session)
     session.get_one(Admin, row.admin_id).retired_at = datetime.now(UTC)
     session.flush()
-    assert client.get(sign_in.HOME).status_code == 303
+    assert client.get(guards.HOME).status_code == 303
     assert sign_in_with(client).status_code == 400
 
 
@@ -538,42 +543,42 @@ def test_a_sensitive_page_asks_for_a_code_then_carries_on(
     authenticator = session.scalars(select(Authenticator)).one()
     key = opened(authenticator)
     # Signing in counts as confirming, so it goes straight through...
-    assert client.get(sign_in.NEW_AUTHENTICATOR).status_code == 200
+    assert client.get(guards.NEW_AUTHENTICATOR).status_code == 200
     # ...until the window closes. That does not sign anyone out.
     confirmed_long_ago(session)
-    asked = client.get(sign_in.NEW_AUTHENTICATOR)
+    asked = client.get(guards.NEW_AUTHENTICATOR)
     assert asked.headers["location"] == (
         "/admin/confirm?next=/admin/authenticators/new"
     )
-    assert client.get(sign_in.HOME).status_code == 200
+    assert client.get(guards.HOME).status_code == 200
     assert (
         "authenticator, or a recovery code"
         in client.get(asked.headers["location"]).text
     )
     # A wrong code is refused; the next step's code goes on.
     wrong = client.post(
-        sign_in.CONFIRM, data={sign_in.CONFIRM_FIELD: "12345", "next": "/x"}
+        guards.CONFIRM, data={guards.CONFIRM_FIELD: "12345", "next": "/x"}
     )
     assert wrong.status_code == 400
     with app_clock() as at:
         later = code(key, at + TIME_STEP)
         done = client.post(
-            sign_in.CONFIRM,
-            data={sign_in.CONFIRM_FIELD: later, "next": sign_in.NEW_AUTHENTICATOR},
+            guards.CONFIRM,
+            data={guards.CONFIRM_FIELD: later, "next": guards.NEW_AUTHENTICATOR},
         )
-    assert done.headers["location"] == sign_in.NEW_AUTHENTICATOR
-    assert client.get(sign_in.NEW_AUTHENTICATOR).status_code == 200
+    assert done.headers["location"] == guards.NEW_AUTHENTICATOR
+    assert client.get(guards.NEW_AUTHENTICATOR).status_code == 200
 
 
 def test_a_form_asked_to_confirm_shows_the_navigations_badge(
     client: TestClient, session: Session
 ) -> None:
     """The page is drawn once the request's session has closed, so its
-    badge is read as the form is held up (sign_in.ConfirmHere)."""
+    badge is read as the form is held up (guards.ConfirmHere)."""
     signed_in_row(client, session)
     at_retired_van(session)
     confirmed_long_ago(session)
-    held = client.post(sign_in.NEW_AUTHENTICATOR, data={"authenticator_name": "x"})
+    held = client.post(guards.NEW_AUTHENTICATOR, data={"authenticator_name": "x"})
     assert held.status_code == 403
     assert f": {retired_holding(1)}" in text(held)
 
@@ -586,11 +591,11 @@ def test_without_totp_the_password_confirms(
     sign_in_with(client)
     row = session.scalars(select(AdminSession)).one()
     confirmed_long_ago(session)
-    assert "Your password" in client.get(sign_in.CONFIRM).text
-    wrong = client.post(sign_in.CONFIRM, data={sign_in.CONFIRM_FIELD: "nope"})
-    assert alert(wrong) == sign_in.NOT_YOUR_PASSWORD
+    assert "Your password" in client.get(guards.CONFIRM).text
+    wrong = client.post(guards.CONFIRM, data={guards.CONFIRM_FIELD: "nope"})
+    assert alert(wrong) == guards.NOT_YOUR_PASSWORD
     assert (
-        client.post(sign_in.CONFIRM, data={sign_in.CONFIRM_FIELD: PASSWORD}).status_code
+        client.post(guards.CONFIRM, data={guards.CONFIRM_FIELD: PASSWORD}).status_code
         == 303
     )
     assert row.confirmed_at is not None
@@ -601,20 +606,33 @@ def test_a_second_authenticator_needs_its_own_name(
     client: TestClient, session: Session
 ) -> None:
     signed_in_row(client, session)
-    key = hidden_key(client.get(sign_in.NEW_AUTHENTICATOR))
+    key = hidden_key(client.get(guards.NEW_AUTHENTICATOR))
     taken = client.post(
-        sign_in.NEW_AUTHENTICATOR,
+        guards.NEW_AUTHENTICATOR,
         data={"authenticator_name": "phone", "key": key, "code": code(key)},
     )
-    assert str(sign_in.NAME_TAKEN) in text(taken)
+    assert str(guards.NAME_TAKEN) in text(taken)
     with app_clock() as at:
         added = client.post(
-            sign_in.NEW_AUTHENTICATOR,
+            guards.NEW_AUTHENTICATOR,
             data={"authenticator_name": "Laptop", "key": key, "code": code(key, at)},
         )
     # Not the first, so no new recovery codes.
-    assert added.headers["location"] == sign_in.HOME
+    assert added.headers["location"] == guards.HOME
     assert len(session.scalars(select(Authenticator)).all()) == 2
+
+
+def test_a_new_authenticator_needs_a_name(client: TestClient, session: Session) -> None:
+    signed_in_row(client, session)
+    key = hidden_key(client.get(guards.NEW_AUTHENTICATOR))
+    with app_clock() as at:
+        blank = client.post(
+            guards.NEW_AUTHENTICATOR,
+            data={"authenticator_name": " ", "key": key, "code": code(key, at)},
+        )
+    assert blank.status_code == 400
+    assert accounts.name_up_to(accounts.AUTHENTICATOR_NAME_MAX) in text(blank)
+    assert len(session.scalars(select(Authenticator)).all()) == 1
 
 
 def test_a_name_taken_meanwhile_is_refused_by_its_index(
@@ -623,14 +641,14 @@ def test_a_name_taken_meanwhile_is_refused_by_its_index(
     """Free when looked at, taken by the time it is added."""
     signed_in_row(client, session)
     monkeypatch.setattr(accounts, "authenticator_named", lambda *_: False)
-    key = hidden_key(client.get(sign_in.NEW_AUTHENTICATOR))
+    key = hidden_key(client.get(guards.NEW_AUTHENTICATOR))
     with app_clock() as at:
         taken = client.post(
-            sign_in.NEW_AUTHENTICATOR,
+            guards.NEW_AUTHENTICATOR,
             data={"authenticator_name": "phone", "key": key, "code": code(key, at)},
         )
     assert taken.status_code == 400
-    assert str(sign_in.NAME_TAKEN) in text(taken)
+    assert str(guards.NAME_TAKEN) in text(taken)
     assert len(session.scalars(select(Authenticator)).all()) == 1
 
 
@@ -660,12 +678,12 @@ def test_cross_site_requests(
 def test_a_cross_site_sign_in_is_refused(client: TestClient, session: Session) -> None:
     _, key = new_admin(session)
     response = client.post(
-        sign_in.SIGN_IN,
+        guards.SIGN_IN,
         data={"username": "ada", "password": PASSWORD, "code": code(key)},
         headers={"sec-fetch-site": "cross-site"},
     )
     assert response.status_code == 403
-    assert sign_in.COOKIE not in client.cookies
+    assert guards.COOKIE not in client.cookies
 
 
 def test_signing_in_logs_ids_the_masker_keeps(
@@ -686,20 +704,20 @@ def test_losing_the_race_to_set_up_shows_not_found(
 ) -> None:
     """Someone else finished first while this one waited for the lock, which
     create_first_admin refuses (test_setup_refuses_once_any_admin_exists)."""
-    key = hidden_key(client.get(sign_in.SETUP))
+    key = hidden_key(client.get(guards.SETUP))
 
     def lost(*_args: object, **_kwargs: object) -> NoReturn:
         raise accounts.TokenRefused("closed")
 
     monkeypatch.setattr(accounts, "create_first_admin", lost)
-    assert client.post(sign_in.SETUP, data=setup_form(key)).status_code == 404
+    assert client.post(guards.SETUP, data=setup_form(key)).status_code == 404
 
 
 def test_viewing_a_sensitive_page_keeps_nothing_open(
     client: TestClient, session: Session
 ) -> None:
     row = signed_in_row(client, session)
-    client.get(sign_in.NEW_AUTHENTICATOR)
+    client.get(guards.NEW_AUTHENTICATOR)
     assert row.last_sensitive_at is None
 
 
@@ -708,10 +726,10 @@ def test_a_rate_limited_confirmation_says_so(
 ) -> None:
     signed_in_row(client, session)
     for _ in range(10):
-        client.post(sign_in.CONFIRM, data={sign_in.CONFIRM_FIELD: "nope"})
-    limited = client.post(sign_in.CONFIRM, data={sign_in.CONFIRM_FIELD: "nope"})
+        client.post(guards.CONFIRM, data={guards.CONFIRM_FIELD: "nope"})
+    limited = client.post(guards.CONFIRM, data={guards.CONFIRM_FIELD: "nope"})
     assert limited.status_code == 429
-    assert str(sign_in.TOO_MANY) in alert(limited)
+    assert str(guards.TOO_MANY) in alert(limited)
 
 
 def test_the_limit_per_account_is_a_setting(
@@ -722,8 +740,8 @@ def test_the_limit_per_account_is_a_setting(
     client = make_client(rate_limits=RateLimits(per_account=3))
     signed_in_row(client, session)
     for _ in range(2):
-        client.post(sign_in.CONFIRM, data={sign_in.CONFIRM_FIELD: "nope"})
-    limited = client.post(sign_in.CONFIRM, data={sign_in.CONFIRM_FIELD: "nope"})
+        client.post(guards.CONFIRM, data={guards.CONFIRM_FIELD: "nope"})
+    limited = client.post(guards.CONFIRM, data={guards.CONFIRM_FIELD: "nope"})
     assert limited.status_code == 429
 
 
@@ -743,13 +761,13 @@ def test_a_session_unseen_a_while_is_marked_seen(
     """On the side pool, in a transaction of its own (db.record_last_seen)."""
     seen: list[tuple[object, int]] = []
     monkeypatch.setattr(
-        sign_in,
+        guards,
         "record_last_seen",
         lambda database, _model, row_id, _now: seen.append((database, row_id)),
     )
     (row,) = session.scalars(select(AdminSession)).all()
     row.last_seen_at = datetime.now(UTC) - accounts.SEEN_EVERY - timedelta(seconds=1)
     session.flush()
-    admin_client.get(sign_in.HOME)
+    admin_client.get(guards.HOME)
     app = admin_client.app
     assert seen == [(app.state.db, row.id)]  # ty: ignore[unresolved-attribute]

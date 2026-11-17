@@ -30,11 +30,11 @@ from inventory_tng.admin.common import (
     undo_retire,
 )
 from inventory_tng.admin.listing import AskedView, Listing, Searched, Sort, Sorting
+from inventory_tng.admins.guards import AdminSignedIn, SignedIn
 from inventory_tng.core.db import DbSession, attempt
 from inventory_tng.core.phrases import Words, gettext, lazy_gettext
 from inventory_tng.models import Location, Volunteer
 from inventory_tng.pages import NOTICES, not_found, redirect
-from inventory_tng.sign_in import AdminSignedIn, SignedIn
 
 log = structlog.get_logger(__name__)
 

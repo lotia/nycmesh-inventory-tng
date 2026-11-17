@@ -23,8 +23,8 @@ from inventory_tng import (
     pages,
     resets,
     security_headers,
-    sign_in,
 )
+from inventory_tng.admins import guards, sign_in_routes
 from inventory_tng.core import database_role, db
 from inventory_tng.core.db import Database, make_database
 from inventory_tng.core.mail import SmtpMailer
@@ -87,7 +87,7 @@ def create_app(
     app.state.settings = settings
     # mail.get_mailer hands it to routes.
     app.state.mailer = SmtpMailer(settings.mail) if settings.mail else None
-    errors = pages.ErrorPages(api=API, scan=bundle.SCAN, admin=sign_in.HOME)
+    errors = pages.ErrorPages(api=API, scan=bundle.SCAN, admin=guards.HOME)
     errors.install(app)
     app.add_middleware(CrossSiteRefusal)
     app.add_middleware(
@@ -115,7 +115,7 @@ def create_app(
     if settings.development:
         app.include_router(security_headers.docs_router)
     app.include_router(bundle.router)
-    app.include_router(sign_in.router)
+    app.include_router(sign_in_routes.router)
     app.include_router(account.router)
     app.include_router(admin.router)
     app.include_router(resets.router)
@@ -125,7 +125,7 @@ def create_app(
     ledger.install(app)
     page_builds.install(app)
     page_telemetry.install(app)
-    sign_in.install(app)
+    guards.install(app)
     return app
 
 

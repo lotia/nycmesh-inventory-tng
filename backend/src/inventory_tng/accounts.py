@@ -1,5 +1,6 @@
 """Administrators' accounts: passwords, TOTP, recovery codes, sessions and
-the first administrator (docs/decisions/0012). The pages are in sign_in.py.
+the first administrator (docs/decisions/0012). The pages are in
+admins/sign_in_routes.py.
 
 Only established calls here (AGENTS.md rule 3): argon2-cffi hashes and
 checks passwords, pyotp makes TOTP keys and checks codes, totp_keys seals

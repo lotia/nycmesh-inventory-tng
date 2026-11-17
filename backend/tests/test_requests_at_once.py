@@ -39,13 +39,13 @@ from inventory_tng import (
     locations,
     open_packages,
     reading_rules,
-    sign_in,
     units,
     volunteers,
 )
 from inventory_tng import catalogue as scan_catalogue
 from inventory_tng.admin.admins import ADMINS
 from inventory_tng.admin.volunteers import VOLUNTEERS
+from inventory_tng.admins import guards
 from inventory_tng.core import mail
 from inventory_tng.core.db import (
     Base,
@@ -183,9 +183,9 @@ def gate_blocked(committed: Committed, session_id: int, now: datetime) -> Worker
 
 def signed(
     session: Session, admin_id: int, session_id: int, *, uses_totp: bool
-) -> sign_in.SignedIn:
+) -> guards.SignedIn:
     """What a request knew of them before the gate, as signed_in reads it."""
-    return sign_in.SignedIn(
+    return guards.SignedIn(
         admin=session.get_one(Admin, admin_id),
         row=session.get_one(AdminSession, session_id),
         settings=session.get_one(SignInSettings, 1),
@@ -270,7 +270,7 @@ def test_a_sign_in_under_way_waits_for_an_emailed_link_used(
 def test_a_form_under_way_waits_for_a_reset_then_is_turned_away(
     committed: Committed, admins: Admins
 ) -> None:
-    """Every sensitive form passes this gate (sign_in.confirmed): changing
+    """Every sensitive form passes this gate (guards.confirmed): changing
     the password, adding an authenticator, making recovery codes, or any
     administrator page's change. Turned away, it changes nothing."""
     ada, ben, _ = admins
@@ -503,7 +503,7 @@ def test_the_gate_reads_again_whether_they_use_totp(
     adding = setting_up_totp(committed, carol_id)
     form = committed.session()
     before = signed(form, carol_id, session_id, uses_totp=False)
-    worker = committed.blocked(form, lambda: sign_in._hold(form, before).uses_totp)
+    worker = committed.blocked(form, lambda: guards._hold(form, before).uses_totp)
     adding.commit()
     assert worker.finished().result is True
 
@@ -547,14 +547,14 @@ def test_the_gate_turns_away_a_session_that_ran_out_while_it_waited(
     now = datetime.now(UTC)
     session_id = started(committed, ben, now)
     clock = [now]
-    monkeypatch.setattr(sign_in, "_now", lambda: clock[0])
+    monkeypatch.setattr(guards, "_now", lambda: clock[0])
     holding = gate_held(committed, ada)
     form = committed.session()
     before = signed(form, ben, session_id, uses_totp=True)
-    worker = committed.blocked(form, lambda: sign_in._hold(form, before))
+    worker = committed.blocked(form, lambda: guards._hold(form, before))
     clock[0] = before.row.expires_at + timedelta(seconds=1)
     holding.commit()
-    assert isinstance(worker.finished().error, sign_in.Redirect)
+    assert isinstance(worker.finished().error, guards.Redirect)
 
 
 @pytest.mark.concurrency
@@ -624,14 +624,14 @@ def test_a_gated_form_commits_once_and_its_work_after_the_reply_is_free(
 
     @app.post("/admin/commits-once")
     def once(
-        _: sign_in.ConfirmedAdmin, session: DbSession, tasks: BackgroundTasks
+        _: guards.ConfirmedAdmin, session: DbSession, tasks: BackgroundTasks
     ) -> Response:
         session.commit()
         tasks.add_task(commit_more, session)
         return Response()
 
     @app.post("/admin/commits-twice")
-    def twice(_: sign_in.ConfirmedAdmin, session: DbSession) -> Response:
+    def twice(_: guards.ConfirmedAdmin, session: DbSession) -> Response:
         session.commit()
         commit_more(session)
         return Response()
@@ -640,7 +640,7 @@ def test_a_gated_form_commits_once_and_its_work_after_the_reply_is_free(
     # The app answers its own errors: the second commit raised, so 500.
     assert admin_client.post("/admin/commits-twice").status_code == 500
     # The hold ended with that request: later ones commit as they like.
-    assert admin_client.post(sign_in.SIGN_OUT).status_code == 303
+    assert admin_client.post(guards.SIGN_OUT).status_code == 303
 
 
 @pytest.fixture
@@ -685,7 +685,7 @@ def needing_a_code(committed: Committed, ben: int, session_id: int) -> str:
 def posting(committed: Committed, client: TestClient, form: dict[str, str]) -> Worker:
     """A password change posted, once it waits for a lock."""
     return committed.blocked(
-        None, lambda: client.post(f"{sign_in.ACCOUNT}/password", data=form)
+        None, lambda: client.post(f"{guards.ACCOUNT}/password", data=form)
     )
 
 
@@ -696,7 +696,7 @@ PASSWORD_FORM = {"password": NEW_PASSWORD, "password_again": NEW_PASSWORD}
 def test_a_sensitive_form_posted_during_a_reset_is_sent_to_sign_in(
     committed: Committed, admins: Admins, real_client: tuple[TestClient, SentMail]
 ) -> None:
-    """Through the whole app: the gate (sign_in.confirmed) waits for the
+    """Through the whole app: the gate (guards.confirmed) waits for the
     reset, then turns the form away, and nothing it asked for is done."""
     client, _ = real_client
     ada, ben, key = admins
@@ -705,7 +705,7 @@ def test_a_sensitive_form_posted_during_a_reset_is_sent_to_sign_in(
     worker = posting(committed, client, PASSWORD_FORM)
     reset.commit()
     answer = cast(Answer, worker.finished().result)
-    assert answer.headers["location"] == sign_in.SIGN_IN
+    assert answer.headers["location"] == guards.SIGN_IN
     assert not accounts.has_password(committed.session(), ben)
 
 
@@ -722,12 +722,12 @@ def test_a_recovery_code_used_on_a_form_turned_away_is_still_told(
     # Ada's row only: Ben's code goes through, then the gate waits on it.
     ending = committed.session()
     accounts.lock_admin(ending, ada)
-    form = PASSWORD_FORM | {sign_in.CONFIRM_FIELD: recovery}
+    form = PASSWORD_FORM | {guards.CONFIRM_FIELD: recovery}
     worker = posting(committed, client, form)
     accounts.end_sessions(ending, ben, datetime.now(UTC))
     ending.commit()
     answer = cast(Answer, worker.finished().result)
-    assert answer.headers["location"] == sign_in.SIGN_IN
+    assert answer.headers["location"] == guards.SIGN_IN
     assert accounts.recovery_codes_left(committed.session(), ben) == 9
     assert [m.kind for m in sent] == ["recovery_code_used"]
 
@@ -774,7 +774,7 @@ def test_the_hold_ends_with_the_route_on_the_apps_own_sessions(
 
     @app.post("/admin/commits-then-after")
     def route(
-        _: sign_in.ConfirmedAdmin, session: DbSession, tasks: BackgroundTasks
+        _: guards.ConfirmedAdmin, session: DbSession, tasks: BackgroundTasks
     ) -> Response:
         session.commit()
         tasks.add_task(commit_after, session)
@@ -803,7 +803,7 @@ def test_a_form_refused_without_a_commit_lets_go_of_its_lock_before_mail(
     app = cast(FastAPI, client.app)
 
     @app.post("/admin/refused-with-mail")
-    def refused(signed: sign_in.ConfirmedAdmin, notify: Notify) -> Response:
+    def refused(signed: guards.ConfirmedAdmin, notify: Notify) -> Response:
         notify.tell(signed.admin.email, signed.admin.id, mail.recovery_code_used(9))
         return Response(status_code=400)
 
@@ -833,7 +833,7 @@ def test_a_form_that_waited_is_asked_for_a_code_if_the_window_shrank(
     try:
         answer = cast(Answer, worker.finished().result)
         assert answer.status_code == 403
-        assert sign_in.CONFIRM_FIELD in answer.text
+        assert guards.CONFIRM_FIELD in answer.text
     finally:
         restoring = committed.session()
         restoring.get_one(SignInSettings, 1).confirm_idle_minutes = was

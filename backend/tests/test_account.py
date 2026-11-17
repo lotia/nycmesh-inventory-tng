@@ -10,8 +10,10 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 from structlog.testing import capture_logs
 
-from inventory_tng import accounts, sign_in
+from inventory_tng import accounts
 from inventory_tng.account import CODES_NEED_TOTP, EMAIL_TAKEN
+from inventory_tng.admins import guards
+from inventory_tng.admins.guards import NAME_TAKEN
 from inventory_tng.core import mail
 from inventory_tng.models import (
     Admin,
@@ -20,7 +22,6 @@ from inventory_tng.models import (
     Authenticator,
     ResetLink,
 )
-from inventory_tng.sign_in import NAME_TAKEN
 
 from helpers.mail import SentMail
 from helpers.markup import links, read, text
@@ -41,7 +42,7 @@ from helpers.sign_in import (
     sign_in_with,
 )
 
-ACCOUNT = sign_in.ACCOUNT
+ACCOUNT = guards.ACCOUNT
 NEW_PASSWORD = "a different long passphrase"
 
 
@@ -101,7 +102,7 @@ def test_viewing_it_needs_signing_in(
         make_client_without_database()
         .get(ACCOUNT)
         .headers["location"]
-        .startswith(sign_in.SIGN_IN)
+        .startswith(guards.SIGN_IN)
     )
 
 
@@ -198,7 +199,7 @@ def test_recovery_codes_need_an_authenticator(
     policy(session, "optional")
     admin, _ = new_admin(session, totp=False)
     sign_in_with(client)
-    form = once(**{sign_in.CONFIRM_FIELD: PASSWORD})
+    form = once(**{guards.CONFIRM_FIELD: PASSWORD})
     refused = client.post(f"{ACCOUNT}/recovery-codes", data=form)
     # Sent from a page shown before its last authenticator went: refused,
     # with nothing made, and said by the authenticators, as the page now has
@@ -285,7 +286,7 @@ def test_new_recovery_codes(
     assert asked.status_code == 403
     assert "or a recovery code" not in text(asked)
     with app_clock() as at:
-        form = once(**{sign_in.CONFIRM_FIELD: code(ada[1], at + TIME_STEP)})
+        form = once(**{guards.CONFIRM_FIELD: code(ada[1], at + TIME_STEP)})
         made = client.post(f"{ACCOUNT}/recovery-codes", data=form)
     codes = re.findall(RECOVERY_CODE, made.text)
     assert len(codes) == accounts.RECOVERY_CODES
@@ -303,12 +304,12 @@ def test_a_recovery_code_does_not_make_new_ones(
     assert key is not None
     first, second, *_ = accounts.make_recovery_codes(session, ada.id, datetime.now(UTC))
     sign_in_with(client, code=first)
-    form = once(**{sign_in.CONFIRM_FIELD: second})
+    form = once(**{guards.CONFIRM_FIELD: second})
     refused = client.post(f"{ACCOUNT}/recovery-codes", data=form)
     assert refused.status_code == 400
     assert accounts.recovery_codes_left(session, ada.id) == accounts.RECOVERY_CODES - 1
     with app_clock() as at:
-        form = once(**{sign_in.CONFIRM_FIELD: code(key, at + TIME_STEP)})
+        form = once(**{guards.CONFIRM_FIELD: code(key, at + TIME_STEP)})
         made = client.post(f"{ACCOUNT}/recovery-codes", data=form)
     assert made.status_code == 200
     assert "recovery_codes_made" in [m.kind for m in sent_mail]
@@ -353,7 +354,7 @@ def test_the_owner_is_told_when_an_authenticator_comes_or_goes(
             "key": new_key,
             "code": code(new_key, at),
         }
-        assert client.post(sign_in.NEW_AUTHENTICATOR, data=form).status_code == 303
+        assert client.post(guards.NEW_AUTHENTICATOR, data=form).status_code == 303
     laptop = session.scalars(
         select(Authenticator).where(Authenticator.name == "Laptop")
     ).one()
@@ -392,7 +393,7 @@ def test_ending_another_session_and_this_one(
     )
     assert other.ended_at is not None
     out = client.post(f"{ACCOUNT}/sessions/{mine.id}/end")
-    assert out.headers["location"] == sign_in.SIGN_IN
+    assert out.headers["location"] == guards.SIGN_IN
     assert client.get(ACCOUNT).status_code == 303
 
 
@@ -438,7 +439,7 @@ def test_a_late_form_asks_for_a_code_and_keeps_what_was_typed(
     # A wrong code asks again, still carrying it.
     wrong = client.post(
         f"{ACCOUNT}/email",
-        data={"email": "ada@example.org", sign_in.CONFIRM_FIELD: "nope"},
+        data={"email": "ada@example.org", guards.CONFIRM_FIELD: "nope"},
     )
     assert wrong.status_code == 400
     assert 'value="ada@example.org"' in text(wrong)
@@ -446,7 +447,7 @@ def test_a_late_form_asks_for_a_code_and_keeps_what_was_typed(
         later = code(key, at + TIME_STEP)
         done = client.post(
             f"{ACCOUNT}/email",
-            data={"email": "ada@example.org", sign_in.CONFIRM_FIELD: later},
+            data={"email": "ada@example.org", guards.CONFIRM_FIELD: later},
         )
     assert done.headers["location"] == f"{ACCOUNT}?notice=email&section=email#email"
     assert admin.email == "ada@example.org"
@@ -504,7 +505,7 @@ def test_a_form_with_a_secret_field_is_refused_while_the_window_is_open(
 ) -> None:
     """Refused whether or not a code is asked for, so any test of a form
     that gains a secret field, not only a late one, fails until the field
-    joins sign_in.RETYPED."""
+    joins guards.RETYPED."""
     admin, _ = ada
     form = {"email": "ada@example.org", name: "hunter2"}
     assert client.post(f"{ACCOUNT}/email", data=form).status_code == 400
@@ -526,11 +527,11 @@ def test_a_late_new_authenticator_keeps_its_key(
             "key": new_key,
             "code": code(new_key, at),
         }
-        asked = client.post(sign_in.NEW_AUTHENTICATOR, data=form)
+        asked = client.post(guards.NEW_AUTHENTICATOR, data=form)
         assert f'value="{new_key}"' in asked.text
-        later = {sign_in.CONFIRM_FIELD: code(key, at + TIME_STEP)}
-        done = client.post(sign_in.NEW_AUTHENTICATOR, data=form | later)
-    assert done.headers["location"] == sign_in.HOME
+        later = {guards.CONFIRM_FIELD: code(key, at + TIME_STEP)}
+        done = client.post(guards.NEW_AUTHENTICATOR, data=form | later)
+    assert done.headers["location"] == guards.HOME
     names = {a.name for a in session.scalars(select(Authenticator))}
     assert names == {"Phone", "Laptop"}
 

@@ -15,8 +15,9 @@ structure below on 2026-11-17.
 - **Package by feature**, such as `catalogue/`, `stock/` or `devices/`.
   Every feature names its files by the same roles: `<thing>.py` for a
   table's rules and writes (its owner, 0016), `queries.py`, `forms.py`,
-  `routes.py` for HTML pages, `api.py` for JSON, `schemas.py`, `paths.py`
-  and `command.py`. URLs do not change.
+  `routes.py` for HTML pages (`<page>_routes.py` where a feature has
+  several, as `admins/sign_in_routes.py`), `api.py` for JSON,
+  `schemas.py`, `paths.py` and `command.py`. URLs do not change.
 - **`web/`** holds what every server-rendered page shares; **`core/`**
   holds plumbing, such as settings, db, history, logs, telemetry,
   masking, mail, phrases, local_time and local_env. Core means plumbing,
@@ -77,3 +78,5 @@ short test. `core/` is the name FastAPI's full-stack template uses;
 | `pages.py`: `amount`, `printed_length` | `web/formatting.py` |
 | `web.py` | `web/browser.py` |
 | `admins.py` | `admins/command.py` |
+| `sign_in.py`: what every administrator page depends on | `admins/guards.py` |
+| `sign_in.py`: the sign-in pages | `admins/sign_in_routes.py` |

@@ -13,7 +13,8 @@ from httpx2 import Response
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from inventory_tng import accounts, sign_in, totp_keys
+from inventory_tng import accounts, totp_keys
+from inventory_tng.admins import guards, sign_in_routes
 from inventory_tng.models import (
     CONFIRM_IDLE_MINUTES,
     Admin,
@@ -55,12 +56,12 @@ def admin_named(session: Session, username: str) -> Admin:
 
 
 def with_code(session: Session, by: str = "ada", **form: str) -> dict[str, str]:
-    """A form that may ask for a code (sign_in.ConfirmedAccountChange), with
+    """A form that may ask for a code (guards.ConfirmedAccountChange), with
     one: the first of new recovery codes made for `by`, so each form gets
     one never used. Sent once, as once() is."""
     admin = admin_named(session, by)
     first = accounts.make_recovery_codes(session, admin.id, datetime.now(UTC))[0]
-    return once(**form) | {sign_in.CONFIRM_FIELD: first}
+    return once(**form) | {guards.CONFIRM_FIELD: first}
 
 
 def new_admin(
@@ -127,7 +128,7 @@ TIME_STEP = timedelta(seconds=accounts.TOTP_INTERVAL)
 
 @contextlib.contextmanager
 def app_clock() -> Generator[datetime]:
-    """Hold the clock that checks codes (sign_in._now) at this moment, for
+    """Hold the clock that checks codes (guards._now) at this moment, for
     the block and every thread, and give that moment: code(key, at) is the
     code shown now, code(key, at + TIME_STEP) the next one.
 
@@ -136,7 +137,8 @@ def app_clock() -> Generator[datetime]:
     (inventory-tng-tuie)."""
     at = datetime.now(UTC)
     with pytest.MonkeyPatch.context() as patch:
-        patch.setattr(sign_in, "_now", lambda: at)
+        patch.setattr(guards, "_now", lambda: at)
+        patch.setattr(sign_in_routes, "_now", lambda: at)
         yield at
 
 
@@ -157,11 +159,11 @@ def sign_in_with(
     the next one, as the one now is spent."""
     data = {"username": username, "password": password} | form
     if key == _NO_KEY:
-        return client.post(sign_in.SIGN_IN, data=data)
+        return client.post(guards.SIGN_IN, data=data)
     assert "code" not in form, "a key or a code, not both"
     with app_clock() as at:
         typed = code(key, at + TIME_STEP if later else at)
-        return client.post(sign_in.SIGN_IN, data=data | {"code": typed})
+        return client.post(guards.SIGN_IN, data=data | {"code": typed})
 
 
 def reset_link(

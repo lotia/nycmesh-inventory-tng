@@ -12,7 +12,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 from structlog.testing import capture_logs
 
-from inventory_tng import items, names, reading_rules, sign_in, units
+from inventory_tng import items, names, reading_rules, units
 from inventory_tng.admin.items import ITEMS, PACKAGE_TAKEN, SEARCHED, TAKEN_FIELDS
 from inventory_tng.admin.listing import folded
 from inventory_tng.admin.reading_rules import (
@@ -21,6 +21,7 @@ from inventory_tng.admin.reading_rules import (
     READINGS_ACCEPTED,
     SEED,
 )
+from inventory_tng.admins import guards
 from inventory_tng.catalogue import catalogue
 from inventory_tng.core.db import lock_catalogue
 from inventory_tng.models import (
@@ -459,7 +460,7 @@ def test_a_rule_change_reading_names_alike_names_them(
 def test_rules_are_for_administrators(make_client: Callable[..., TestClient]) -> None:
     answer = make_client().get(READINGS)
     assert answer.status_code == 303
-    assert answer.headers["location"].startswith(sign_in.SIGN_IN)
+    assert answer.headers["location"].startswith(guards.SIGN_IN)
 
 
 def test_proposals_read_the_words_near_each_unit() -> None:

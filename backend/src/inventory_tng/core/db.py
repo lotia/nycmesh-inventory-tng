@@ -397,7 +397,7 @@ def by_name[M: Base](
     )
 
 
-# Where a gated request (sign_in.confirmed) keeps the transaction its lock
+# Where a gated request (guards.confirmed) keeps the transaction its lock
 # lives in, until release_hold.
 GATE_INFO = "gate"
 

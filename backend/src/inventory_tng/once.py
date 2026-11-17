@@ -29,8 +29,8 @@ from inventory_tng.core.phrases import lazy_gettext
 from inventory_tng.models import SentForm
 from inventory_tng.pages import page, templates
 
-if TYPE_CHECKING:  # sign_in imports this module.
-    from inventory_tng.sign_in import SignedIn
+if TYPE_CHECKING:  # admins.guards imports this module.
+    from inventory_tng.admins.guards import SignedIn
 
 log = structlog.get_logger(__name__)
 
@@ -40,7 +40,7 @@ OnceKey = Annotated[str, Form(alias=FIELD)]
 
 # What was made, for the log and the page: a fixed list. "change": what a
 # form that showed nothing made, or what one sent again is answered with
-# before its route says more (sign_in.ConfirmedAccountChange).
+# before its route says more (guards.ConfirmedAccountChange).
 Made = Literal["registration_code", "recovery_codes", "link", "change"]
 # What the page says of each but "change", which sent_again.html words.
 SENT_AGAIN: dict[Made, LazyProxy] = {

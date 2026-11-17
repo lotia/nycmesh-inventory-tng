@@ -27,7 +27,6 @@ from inventory_tng import (
     labels,
     over_recorded,
     reading_rules,
-    sign_in,
     units,
 )
 from inventory_tng.admin import admins as admin_admins
@@ -39,6 +38,7 @@ from inventory_tng.admin import reading_rules as admin_reading_rules
 from inventory_tng.admin import settings as admin_settings
 from inventory_tng.admin import volunteers as admin_volunteers
 from inventory_tng.admin.listing import Lapsed
+from inventory_tng.admins import guards
 from inventory_tng.core import mail
 from inventory_tng.core.phrases import (
     BRAND,
@@ -689,7 +689,7 @@ COVERED: dict[str, Callable[[], str]] = {
             *(
                 (
                     "confirm.html",
-                    {"uses_totp": totp, "retype": list(sign_in.RETYPED.items())},
+                    {"uses_totp": totp, "retype": list(guards.RETYPED.items())},
                 )
                 for totp in (True, False)
             ),

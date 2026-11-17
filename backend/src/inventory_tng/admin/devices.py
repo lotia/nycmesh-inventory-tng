@@ -1,6 +1,6 @@
 """Registration codes and the devices they registered (docs/decisions/0009),
 from the browser. Making or revoking a code, and revoking a device, are
-sensitive: they ask for a fresh code (sign_in.ConfirmedAdmin).
+sensitive: they ask for a fresh code (guards.ConfirmedAdmin).
 
 A code's phrase is shown once, as it is made, with the link and QR code that
 open the registration page with it filled in; only its hash is kept.
@@ -40,6 +40,7 @@ from inventory_tng.admin.listing import (
     count,
     ordered,
 )
+from inventory_tng.admins.guards import AdminSignedIn, ConfirmedAdmin, SignedIn, changed
 from inventory_tng.core.db import DbSession, attempt
 from inventory_tng.core.local_time import parse_local, site_zone
 from inventory_tng.core.phrases import (
@@ -52,7 +53,6 @@ from inventory_tng.core.phrases import (
 from inventory_tng.models import Device, RegistrationCode, whole
 from inventory_tng.once import OnceKey, sent_before
 from inventory_tng.pages import NOTICES, not_found, redirect
-from inventory_tng.sign_in import AdminSignedIn, ConfirmedAdmin, SignedIn, changed
 
 log = structlog.get_logger(__name__)
 

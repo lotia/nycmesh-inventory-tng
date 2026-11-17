@@ -1,7 +1,7 @@
 """Administrators' pages for the catalogue, places, volunteers and devices
-(inventory-tng-8i4.14): server-rendered forms, signed in (sign_in.py), each
-change recorded in the history as the administrator who made it, and logged
-by id.
+(inventory-tng-8i4.14): server-rendered forms, signed in
+(admins/guards.py), each change recorded in the history as the
+administrator who made it, and logged by id.
 
 Every catalogue page follows one pattern: a list with a form to add, a page
 per row to change it, retire it (nothing is deleted) and bring it back. A

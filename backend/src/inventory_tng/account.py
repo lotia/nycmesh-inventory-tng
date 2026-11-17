@@ -1,6 +1,6 @@
 """An administrator's own account page (docs/decisions/0012): email,
 password, authenticators, recovery codes and sessions. Viewing it is not
-sensitive; every change is (sign_in.ConfirmedAdmin), and is recorded as
+sensitive; every change is (guards.ConfirmedAdmin), and is recorded as
 theirs (db.set_actor). The rules are in accounts.py.
 """
 
@@ -13,15 +13,7 @@ from fastapi.responses import HTMLResponse, Response
 from sqlalchemy.orm import Session
 
 from inventory_tng import accounts
-from inventory_tng.core import mail
-from inventory_tng.core.db import DbSession, unique
-from inventory_tng.core.local_time import site_zone
-from inventory_tng.core.mail import Notify
-from inventory_tng.core.phrases import Words, lazy_gettext
-from inventory_tng.models import running_low
-from inventory_tng.once import OnceKey, sent_before
-from inventory_tng.pages import NOTICES, not_found, page, redirect
-from inventory_tng.sign_in import (
+from inventory_tng.admins.guards import (
     ACCOUNT,
     ACCOUNT_TITLE,
     CONFIRM_FIELD,
@@ -34,6 +26,14 @@ from inventory_tng.sign_in import (
     changed,
     signed_out,
 )
+from inventory_tng.core import mail
+from inventory_tng.core.db import DbSession, unique
+from inventory_tng.core.local_time import site_zone
+from inventory_tng.core.mail import Notify
+from inventory_tng.core.phrases import Words, lazy_gettext
+from inventory_tng.models import running_low
+from inventory_tng.once import OnceKey, sent_before
+from inventory_tng.pages import NOTICES, not_found, page, redirect
 
 router = APIRouter(include_in_schema=False)
 

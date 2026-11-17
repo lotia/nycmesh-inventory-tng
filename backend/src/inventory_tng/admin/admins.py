@@ -1,7 +1,7 @@
 """Administrators (docs/decisions/0012): the list and what changed lately,
 inviting one, resetting one's sign-in with a link, retiring, and bringing
 back. Each asks for a code typed within the sign-in settings'
-account_change_minutes (sign_in.ConfirmedAccountChange), and is told to
+account_change_minutes (guards.ConfirmedAccountChange), and is told to
 every administrator (activity.py).
 
 A link is shown once, to pass on however the administrator likes; only its
@@ -28,14 +28,7 @@ from inventory_tng.admin.common import (
     site_link,
 )
 from inventory_tng.admin.listing import AskedView, Sort, Sorting, View, arranged
-from inventory_tng.core.db import DbSession, attempt
-from inventory_tng.core.local_time import site_zone
-from inventory_tng.core.mail import Notify
-from inventory_tng.core.phrases import Words, gettext, lazy_gettext
-from inventory_tng.models import Admin
-from inventory_tng.once import OnceKey, sent_before
-from inventory_tng.pages import NOTICES, not_found, redirect
-from inventory_tng.sign_in import (
+from inventory_tng.admins.guards import (
     CONFIRM_FIELD,
     RESET,
     AdminSignedIn,
@@ -43,6 +36,13 @@ from inventory_tng.sign_in import (
     SignedIn,
     changed,
 )
+from inventory_tng.core.db import DbSession, attempt
+from inventory_tng.core.local_time import site_zone
+from inventory_tng.core.mail import Notify
+from inventory_tng.core.phrases import Words, gettext, lazy_gettext
+from inventory_tng.models import Admin
+from inventory_tng.once import OnceKey, sent_before
+from inventory_tng.pages import NOTICES, not_found, redirect
 
 log = structlog.get_logger(__name__)
 

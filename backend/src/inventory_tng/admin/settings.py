@@ -28,6 +28,7 @@ from inventory_tng.admin.common import (
     now,
     text_form,
 )
+from inventory_tng.admins.guards import AdminSignedIn, ConfirmedAdmin, SignedIn, changed
 from inventory_tng.core import mail
 from inventory_tng.core.db import DbSession, RuleBroken, refusal, settings_row
 from inventory_tng.core.mail import Notify
@@ -47,7 +48,6 @@ from inventory_tng.models import (
     whole,
 )
 from inventory_tng.pages import NOTICES, not_found, redirect
-from inventory_tng.sign_in import AdminSignedIn, ConfirmedAdmin, SignedIn, changed
 
 log = structlog.get_logger(__name__)
 

@@ -24,6 +24,7 @@ from inventory_tng.admin.common import (
 from inventory_tng.admin.items import ITEMS
 from inventory_tng.admin.listing import AskedView, Listing, Searched, Sort, Sorting
 from inventory_tng.admin.locations import LOCATIONS
+from inventory_tng.admins.guards import AdminSignedIn
 from inventory_tng.core.db import DbSession
 from inventory_tng.core.local_time import site_zone
 from inventory_tng.core.phrases import gettext, lazy, lazy_gettext, ngettext
@@ -36,7 +37,6 @@ from inventory_tng.models import (
     whole,
 )
 from inventory_tng.pages import NOTICES, not_found, redirect, templates
-from inventory_tng.sign_in import AdminSignedIn
 
 log = structlog.get_logger(__name__)
 

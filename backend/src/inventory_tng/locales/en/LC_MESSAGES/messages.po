@@ -1223,7 +1223,7 @@ msgstr ""
 msgid "Confirm count"
 msgstr ""
 
-#: src/inventory_tng/sign_in.py
+#: src/inventory_tng/admins/guards.py
 msgid "Confirm it's you"
 msgstr ""
 
@@ -2546,13 +2546,13 @@ msgid ""
 "password."
 msgstr ""
 
-#: src/inventory_tng/sign_in.py src/inventory_tng/templates/account.html
+#: src/inventory_tng/admins/guards.py src/inventory_tng/templates/account.html
 #: src/inventory_tng/templates/setup.html
 #: src/inventory_tng/templates/sign_in.html
 msgid "Password"
 msgstr ""
 
-#: src/inventory_tng/sign_in.py src/inventory_tng/templates/setup.html
+#: src/inventory_tng/admins/guards.py src/inventory_tng/templates/setup.html
 msgid "Password again"
 msgstr ""
 
@@ -3282,7 +3282,8 @@ msgstr ""
 msgid "Set to <span data-follows=\"%(field)s\" data-unit=\"%(unit)s\">it</span>"
 msgstr ""
 
-#: src/inventory_tng/sign_in.py src/inventory_tng/templates/setup.html
+#: src/inventory_tng/admins/sign_in_routes.py
+#: src/inventory_tng/templates/setup.html
 msgid "Set up"
 msgstr ""
 
@@ -3290,7 +3291,7 @@ msgstr ""
 msgid "Set up a new authenticator when you next sign in."
 msgstr ""
 
-#: src/inventory_tng/sign_in.py
+#: src/inventory_tng/admins/sign_in_routes.py
 msgid "Set up an authenticator"
 msgstr ""
 
@@ -3374,7 +3375,8 @@ msgstr ""
 msgid "Shows the wrong length"
 msgstr ""
 
-#: src/inventory_tng/sign_in.py src/inventory_tng/templates/sign_in.html
+#: src/inventory_tng/admins/sign_in_routes.py
+#: src/inventory_tng/templates/sign_in.html
 msgid "Sign in"
 msgstr ""
 
@@ -3533,14 +3535,14 @@ msgstr ""
 msgid "That can't be done at this address."
 msgstr ""
 
-#: src/inventory_tng/sign_in.py
+#: src/inventory_tng/admins/sign_in_routes.py
 #, python-format
 msgid ""
 "That code didn't match. Check the app shows %(issuer)s, and type the code"
 " it shows now."
 msgstr ""
 
-#: src/inventory_tng/sign_in.py
+#: src/inventory_tng/admins/guards.py
 msgid ""
 "That didn't match. Each code works once: if you just used it, wait for "
 "the next."
@@ -3596,11 +3598,11 @@ msgstr ""
 msgid "That isn't the recovery token."
 msgstr ""
 
-#: src/inventory_tng/sign_in.py
+#: src/inventory_tng/admins/sign_in_routes.py
 msgid "That isn't the setup token."
 msgstr ""
 
-#: src/inventory_tng/sign_in.py
+#: src/inventory_tng/admins/guards.py
 msgid "That isn't your password."
 msgstr ""
 
@@ -3626,7 +3628,7 @@ msgstr ""
 msgid "That token was used already: ask for a new one."
 msgstr ""
 
-#: src/inventory_tng/sign_in.py
+#: src/inventory_tng/admins/sign_in_routes.py
 msgid "That username, password or code didn't match."
 msgstr ""
 
@@ -3636,7 +3638,7 @@ msgid ""
 "code from your authenticator."
 msgstr ""
 
-#: src/inventory_tng/sign_in.py
+#: src/inventory_tng/admins/sign_in_routes.py
 msgid ""
 "That was your last recovery code. Make new ones now, with a code from "
 "your authenticator (lost your phone? set up a new one first): without "
@@ -3869,7 +3871,7 @@ msgstr ""
 msgid "Times are shown in"
 msgstr ""
 
-#: src/inventory_tng/sign_in.py
+#: src/inventory_tng/admins/guards.py
 msgid "Too many tries. Wait a few minutes, then try again."
 msgstr ""
 
@@ -4154,7 +4156,7 @@ msgstr ""
 msgid "You"
 msgstr ""
 
-#: src/inventory_tng/sign_in.py
+#: src/inventory_tng/admins/guards.py
 msgid "You already have one by that name."
 msgstr ""
 
@@ -4190,7 +4192,7 @@ msgid ""
 "authenticator</a> to need a code as well."
 msgstr ""
 
-#: src/inventory_tng/sign_in.py
+#: src/inventory_tng/admins/sign_in_routes.py
 msgid ""
 "You signed in with a recovery code, and few are left: make new ones now, "
 "with a code from your authenticator. Lost your phone? Set up a new "
@@ -4244,7 +4246,8 @@ msgstr ""
 msgid "Your %(brand)s sign-in was reset"
 msgstr ""
 
-#: src/inventory_tng/sign_in.py src/inventory_tng/templates/_masthead.html
+#: src/inventory_tng/admins/guards.py
+#: src/inventory_tng/templates/_masthead.html
 #: src/inventory_tng/templates/admin_home.html
 msgid "Your account"
 msgstr ""
@@ -4283,7 +4286,7 @@ msgid ""
 "this link was made."
 msgstr ""
 
-#: src/inventory_tng/sign_in.py
+#: src/inventory_tng/admins/guards.py
 msgid "Your recovery codes"
 msgstr ""
 

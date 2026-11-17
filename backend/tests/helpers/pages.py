@@ -15,8 +15,9 @@ from fastapi.testclient import TestClient
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
-from inventory_tng import accounts, devices, over_recorded, sign_in
+from inventory_tng import accounts, devices, over_recorded
 from inventory_tng.admin.length_checks import KINDS
+from inventory_tng.admins import guards
 from inventory_tng.core.db import DATABASE_INFO, Database, make_database
 from inventory_tng.models import (
     Admin,
@@ -673,7 +674,7 @@ class Built:
             if device:
                 self.client.cookies.set(devices.COOKIE, self.world.device_cookie)
             else:
-                self.client.cookies.set(sign_in.COOKIE, self.world.admin_cookie)
+                self.client.cookies.set(guards.COOKIE, self.world.admin_cookie)
             yield self.client, session
 
 

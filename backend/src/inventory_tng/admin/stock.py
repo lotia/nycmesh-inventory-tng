@@ -33,6 +33,7 @@ from inventory_tng.admin.listing import (
     in_order,
     paged,
 )
+from inventory_tng.admins.guards import AdminSignedIn
 from inventory_tng.core.db import DbSession
 from inventory_tng.core.phrases import Words, gettext, lazy_gettext
 from inventory_tng.ledger import (
@@ -50,7 +51,6 @@ from inventory_tng.models import (
     whole,
 )
 from inventory_tng.pages import templates
-from inventory_tng.sign_in import AdminSignedIn
 
 log = structlog.get_logger(__name__)
 
