@@ -30,7 +30,7 @@ from inventory_tng.core.phrases import BRAND
 from inventory_tng.core.request_logging import RequestLogging
 from inventory_tng.core.settings import Settings
 from inventory_tng.cross_site import CrossSiteRefusal
-from inventory_tng.devices import devices
+from inventory_tng.devices import api as devices_api
 from inventory_tng.scan import batch_api
 from inventory_tng.totp_keys import TotpKeys
 
@@ -107,7 +107,7 @@ def create_app(
         docs=settings.development,
     )
     app.include_router(health.router, prefix=API)
-    app.include_router(devices.router, prefix=API)
+    app.include_router(devices_api.router, prefix=API)
     app.include_router(batch_api.router, prefix=API)
     app.include_router(catalogue.router, prefix=API)
     app.include_router(page_telemetry.router, prefix=API)
@@ -121,7 +121,7 @@ def create_app(
     app.include_router(resets.router)
     bundle.install(app, settings)
     db.install(app)
-    devices.install(app)
+    devices_api.install(app)
     batch_api.install(app)
     page_builds.install(app)
     page_telemetry.install(app)
