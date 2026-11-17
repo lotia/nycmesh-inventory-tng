@@ -17,7 +17,7 @@ from sqlalchemy.orm import Session
 from inventory_tng.db import lock_catalogue
 from inventory_tng.models import Item, ItemPackage
 
-from helpers.pages import CATALOGUE, PAGES, Built, More, Path, built, path
+from helpers.pages import CATALOGUE, PAGES, Built, More, Page, Path, built, path
 from helpers.queries import counting
 
 # A world with one of what each page lists, and one with eleven, each built
@@ -71,18 +71,23 @@ def test_every_admin_page_is_measured(
     assert set(names) >= SHOW_NO_ITEM, "SHOW_NO_ITEM names a place not worded"
 
 
-def case(route: str, n: int, where: Path) -> object:
-    # A route's second way and on, by a function, by its number.
-    name = where if isinstance(where, str) else f"{route}{f' {n}' if n else ''}"
-    return pytest.param(route, where, id=name)
+def ways(route: str, page: Page) -> tuple[Path, ...]:
+    """Each way a page is counted: none without a more."""
+    if not page.more:
+        return ()
+    return page.counted or (route,)
 
 
 # Each counted page, each way it is counted.
 CASES = [
-    case(route, n, where)
+    pytest.param(
+        route,
+        where,
+        # A route's second way and on, by a function, by its number.
+        id=where if isinstance(where, str) else f"{route}{f' {n}' if n else ''}",
+    )
     for route, page in sorted(PAGES.items())
-    if page.more
-    for n, where in enumerate(page.counted or [route])
+    for n, where in enumerate(ways(route, page))
 ]
 
 
@@ -192,8 +197,7 @@ NAMED = CASES + [
     pytest.param(route, where, id=name)
     for route, page in sorted(PAGES.items())
     for name, where in page.worded.items()
-    if name not in SHOW_NO_ITEM
-    and where not in (page.counted or [route] if page.more else [])
+    if name not in SHOW_NO_ITEM and where not in ways(route, page)
 ]
 
 
