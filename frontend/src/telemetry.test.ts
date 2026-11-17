@@ -126,10 +126,10 @@ describe("reporting", () => {
 
   test("each kind's share is as decided", () => {
     // The build events (out_of_date, older_storage) were added beside
-    // scan_to_save's 20 and web_vital's 10, not taken from them: a busy hub
+    // scan_to_save's and web_vital's shares, not taken from them: a busy hub
     // tablet saves many, and a page loaded three times an hour reports each.
-    // cart_discarded's four were added the same way; difference_added's two
-    // were taken from scan_to_save (Ali, inventory-tng-0gg).
+    // cart_discarded's share was added the same way; difference_added's was
+    // taken from scan_to_save's (Ali, inventory-tng-0gg).
     expect(PER_HOUR.scan_to_save).toBe(18);
     expect(PER_HOUR.difference_added).toBe(2);
     expect(PER_HOUR.web_vital).toBe(10);

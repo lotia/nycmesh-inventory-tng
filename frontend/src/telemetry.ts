@@ -10,11 +10,11 @@
  * into metrics. Nothing names a volunteer, an item or a place, and an error
  * sends only that one happened.
  *
- * Events wait in memory and go together: when ten are waiting, and when the
- * page is hidden or left, by sendBeacon, which outlives the page. Each kind
- * has its own budget an hour (PER_HOUR), so a loop of errors cannot flood
- * the server, retries while offline cannot crowd out the rest, and a scan
- * page left open all day still reports.
+ * Events wait in memory and go together: when FLUSH_AT are waiting, and
+ * when the page is hidden or left, by sendBeacon, which outlives the page.
+ * Each kind has its own budget an hour (PER_HOUR), so a loop of errors
+ * cannot flood the server, retries while offline cannot crowd out the
+ * rest, and a scan page left open all day still reports.
  * Nothing is sent until start(), which only the pages' entry points call.
  */
 import { onCLS, onINP, onLCP } from "web-vitals";
@@ -28,15 +28,16 @@ export const PER_HOUR: Record<Event["kind"], number> = {
   web_vital: 10,
   error: 10,
   outbox_retry: 10,
-  // Two taken for difference_added (Ali, inventory-tng-0gg, 2026-11-15).
+  // Less what was taken for difference_added (Ali, inventory-tng-0gg,
+  // 2026-11-15).
   scan_to_save: 18,
   // Once a tab, or twice, then too old (build.ts); once a load for each
   // of saves and a cart an older build left, and once for each put back in
   // the cart, by a tap or not, discarded, or a line of one discarded
-  // (older.ts): past four, the hour's rest are not counted.
+  // (older.ts): past its share, the hour's rest are not counted.
   out_of_date: 2,
   older_storage: 4,
-  // A volunteer starting again; more than four an hour is no new news.
+  // A volunteer starting again; more than its share an hour is no new news.
   cart_discarded: 4,
   // Rare: a cart recorded in two tabs, changed in one.
   difference_added: 2,
