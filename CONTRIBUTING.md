@@ -219,10 +219,11 @@ uv run alembic downgrade <revision> && uv run alembic upgrade head
 ```
 
 Migrations run as the owner, and every table they create gives the app
-`SELECT`, `INSERT`, `UPDATE` and `DELETE` (migration 0001). A migration
-that creates a table the app must not change revokes what it must not do
-there, as 0002 does for history and for columns set only as a row is
-made, 0004 for the ledger, and 0005 to 0007 for deleting a settings row.
+`SELECT`, `INSERT`, `UPDATE` and `DELETE` (the initial migration's default
+privileges). A migration that creates a table the app must not change
+revokes what it must not do there, as the initial migration's `GRANTS`
+does for history, the ledger, columns set only as a row is made, and
+deleting a settings row.
 `tests/test_database_role.py` lists those columns, so a new column the app
 cannot change fails there until listed. What a migration writes is not in
 the history. Migrations create no trigger, function or view: the rules are
@@ -294,7 +295,7 @@ has the rule: one pattern and one table of look-alikes
 (`name_key_sql`), and a test checks both agree on every character. To
 change the rule, change `names.py` and add a migration that writes the
 CHECKs out again (items', packages' and aliases') and refills every key,
-naming by id any rows that would then clash, as 0040 does.
+naming by id any rows that would then clash.
 
 Every name an administrator types is stored in canonical spelling
 (`models.canonical`, decision 0021): NFC, with `µ` as `μ` and `℃` and `℉`
@@ -325,7 +326,7 @@ holding the whole search and one only close. The table is
 `backend/src/inventory_tng/units.py`. After changing it, or what search
 keeps, raise its `VERSION`, write the scan page's copy and the fold
 reference again, and add a migration that folds every row again with
-`models.held`, as 0039 does, with `FOLDS_UNITS` the new version, folding
+`models.held`, with `FOLDS_UNITS` the new version, folding
 an item's current aliases after its fields, as `Item.refold` does, and
 `name_folded` of items and aliases with `models.fold`:
 

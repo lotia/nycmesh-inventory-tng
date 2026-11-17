@@ -95,3 +95,12 @@ rules rely on; and taking history's row before a flush from the locked,
 loaded object rather than reading it, which saved one read per table per
 flush but tied history to the lock record and recorded values PostgreSQL
 never stored (5.0004 in a numeric(12,3)).
+
+## Amendment: one initial migration (2026-11-17)
+
+Ali, 2026-11-17: migrations squashed into one initial migration; units
+version reset to 1. Nothing whose data matters was deployed, so the
+migrations were collapsed early rather than just before production
+(inventory-tng-rioz). Migrations these records cite by number are those
+before the squash. They may still be rewritten until a test deployment
+holds people's data.

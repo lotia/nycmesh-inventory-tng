@@ -29,15 +29,11 @@ USED_UP = "Used up"
 LOST = "Lost or stolen"
 
 
-def used_up(session: Session) -> AdjustmentReason:
-    """The Used up reason, current, as migration 0026 seeds it; made again
-    if an administrator renamed it, and brought back if retired."""
-    return seeded(session, USED_UP)
-
-
 def seeded(session: Session, name: str) -> AdjustmentReason:
-    """A reason the app gives itself, current: made again if an
-    administrator renamed it, and brought back if retired."""
+    """A reason the app gives itself (USED_UP, LOST,
+    over_recorded.REASON), current. The initial migration makes each, so
+    it is found; made again only if an administrator renamed it, and
+    brought back if retired."""
     named = select(AdjustmentReason).where(
         func.lower(AdjustmentReason.name) == name.lower()
     )

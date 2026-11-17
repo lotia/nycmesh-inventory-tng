@@ -1389,17 +1389,17 @@ def test_an_open_package_is_closed_from_its_items_page(
 def test_the_used_up_reason_is_there_whatever_administrators_did(
     session: Session,
 ) -> None:
-    """Seeded by migration 0026; brought back if retired; made again if
-    renamed away."""
-    reason = adjustment_reasons.used_up(session)
+    """Seeded by the initial migration; brought back if retired; made again
+    if renamed away."""
+    reason = adjustment_reasons.seeded(session, adjustment_reasons.USED_UP)
     assert reason.name == "Used up"
     reason.retired_at = datetime.now(UTC)
     session.flush()
-    assert adjustment_reasons.used_up(session) is reason
+    assert adjustment_reasons.seeded(session, adjustment_reasons.USED_UP) is reason
     assert reason.retired_at is None
     reason.name = "Spent"
     session.flush()
-    again = adjustment_reasons.used_up(session)
+    again = adjustment_reasons.seeded(session, adjustment_reasons.USED_UP)
     assert (again.name, again.id != reason.id) == ("Used up", True)
 
 

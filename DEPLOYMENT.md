@@ -23,8 +23,7 @@ There is no production container image or Helm chart yet
 ## Settings
 
 Set these in the environment. Only `DATABASE_URL` and `TOTP_KEYS_DIR` are
-required, and for migrations only `MIGRATION_DATABASE_URL` (but see TOTP
-keys, below).
+required, and for migrations only `MIGRATION_DATABASE_URL`.
 
 - `DATABASE_URL`: `postgresql://user:password@host:port/database`, logging
   in as the app's role (Database roles, below).
@@ -376,8 +375,7 @@ per version, named `1`, `2` and so on, each holding a key. The highest
 version seals; every version present opens.
 
 Make a key and put it in a Secret, mounted as a folder into the app's pods
-only, and into the migration's while it first upgrades past migration 0016,
-which seals the keys a database already holds:
+only:
 
 ```sh
 uv run python -m inventory_tng.totp_keys new > 1

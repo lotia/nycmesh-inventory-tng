@@ -693,3 +693,11 @@ alike load nothing. The seeding page then proposes what is left.
 The sheet import (inventory-tng-8i4.17), not yet written, calls these for
 its dry run and before it writes; until then the command reads names from
 a text file, one a line.
+
+## Amendment: one initial migration (2026-11-17)
+
+Ali, 2026-11-17: migrations squashed into one initial migration; units
+version reset to 1. The migrations cited above, and units versions 2 to 7,
+are history (inventory-tng-rioz): with no rows to refold, the initial
+schema is units version 1, and the next change to the table raises it to 2
+with a migration declaring `FOLDS_UNITS = 2`.

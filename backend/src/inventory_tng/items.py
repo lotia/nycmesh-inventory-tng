@@ -3,7 +3,7 @@ item_package tables, and their rules. A current item is in a current
 category (categories.retire is the other side), and an item's unit is
 fixed once stock has moved in it, as the ledger's quantities are in that
 unit; a package's size, once it has moved, been opened or labelled. The
-app may not move a package to another item (migration 0002), so its
+app may not move a package to another item (the initial migration), so its
 labels always name its item, and a package's name is its own among its
 item's, retired ones too, so one can always be brought back. A retired
 item is read only until it is brought back (docs/decisions/0019). An
@@ -636,8 +636,8 @@ def reread(session: Session, tokens: Iterable[str]) -> None:
     enforce(READ_ALIKE, when=bool(_read_alike(session, rows, keys)))
     items_, packages, _ = rows
     changing = {row: key for row, key in keys.items() if key != row.unit_key}
-    # Set apart first, as migration 0043 does: unique indexes check row by
-    # row, so two names trading keys would clash halfway.
+    # Set apart first: unique indexes check row by row, so two names
+    # trading keys would clash halfway.
     for row in changing:
         row.unit_key = f"#{row.id}"
     session.flush()

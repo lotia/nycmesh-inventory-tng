@@ -62,7 +62,8 @@ without a deployment.
   once in place of a code. Making new ones voids the old. Each is 20
   characters, about 98 bits, so the SHA-256 kept of it cannot be guessed
   back from a stolen database, as a shorter code's could. The ten-character
-  codes made at first were voided (migration 0008).
+  codes made at first were voided (migration 0008, since squashed into
+  the initial migration: Ali, 2026-11-17).
 - **Making new recovery codes needs a code from an authenticator, each
   time**, never a recovery code, and the owner is mailed: new codes void
   the old, so one who signed in with a stolen recovery code cannot lock

@@ -1,5 +1,5 @@
-"""The database's rules for administrators and signing in (migration 0006,
-docs/decisions/0012)."""
+"""The database's rules for administrators and signing in (the initial
+migration, docs/decisions/0012)."""
 
 from datetime import UTC, datetime, timedelta
 

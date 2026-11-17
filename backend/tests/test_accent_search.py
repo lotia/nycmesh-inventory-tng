@@ -6,10 +6,7 @@ import importlib.metadata
 import unicodedata
 
 import pytest
-from alembic import command
-from alembic.config import Config
 from fastapi.testclient import TestClient
-from sqlalchemy import text
 from sqlalchemy.orm import Session
 
 from inventory_tng import items, models
@@ -132,43 +129,3 @@ def test_close_names_are_found_whatever_their_accents(session: Session) -> None:
     assert items.Close(accented) in items.similar(session, "Cable plat", 0)
     plain = add(session, Item(name="Patch lead", category_id=cables.id))
     assert items.Close(plain) in items.similar(session, "Pätch lead", 0)
-
-
-def test_rows_there_are_are_folded_by_the_migration(alembic_config: Config) -> None:
-    command.downgrade(alembic_config, "0031")
-    connection = alembic_config.attributes["connection"]
-    category_id = connection.scalar(
-        text("INSERT INTO category (name) VALUES ('Câbles') RETURNING id")
-    )
-    item_id = connection.scalar(
-        text(
-            "INSERT INTO item (name, category_id, manufacturer)"
-            " VALUES ('Câble', :c, 'Ærø µ') RETURNING id"
-        ),
-        {"c": category_id},
-    )
-    connection.execute(
-        text("INSERT INTO item_package (item_id, name, size) VALUES (:i, 'Bobïne', 1)"),
-        {"i": item_id},
-    )
-    connection.execute(text("INSERT INTO volunteer (name) VALUES ('Zoë')"))
-    connection.execute(
-        text("INSERT INTO location (name, kind) VALUES ('Łódź', 'store')")
-    )
-    command.upgrade(alembic_config, "head")
-    assert connection.execute(
-        text("SELECT search_text, name_folded FROM item WHERE id = :i"), {"i": item_id}
-    ).one() == ("Cable Aero m  ", "Cable")
-    for table, spelt in (
-        ("item_package", "Bobine"),
-        ("volunteer", "Zoe"),
-        ("location", "Lodz"),
-    ):
-        assert (
-            spelt in connection.scalars(text(f"SELECT search_text FROM {table}")).all()
-        ), table
-    # 0033 records what folded them, every row.
-    for table in ("item", "item_package", "volunteer", "location"):
-        assert set(
-            connection.scalars(text(f"SELECT DISTINCT folded_with FROM {table}"))
-        ) == {FOLDED_WITH}, table

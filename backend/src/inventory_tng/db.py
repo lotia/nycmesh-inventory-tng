@@ -357,7 +357,7 @@ Sessions = Annotated[SessionFactory, Depends(get_session_factory)]
 
 # Who makes a session's changes, for history (history.py): ids, never
 # names, so history holds no personal data through it. Also
-# catalogue_history's check constraint (models.py, migration 0003).
+# catalogue_history's check constraint (models.py).
 # system:<name> is anything that is not a person, such as the command line.
 CLI_ACTOR = "system:cli"
 ACTOR_PATTERN = "(admin|volunteer):[0-9]+|system:[a-z_]+"

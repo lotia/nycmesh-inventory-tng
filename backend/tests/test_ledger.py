@@ -495,7 +495,7 @@ CHANGES = pytest.mark.parametrize(
 def test_the_app_may_not_change_the_ledger(
     session: Session, written: LedgerTransaction, change: Callable[..., Any]
 ) -> None:
-    """Its login lacks the privileges (migrations 0001 and 0004)."""
+    """Its login lacks the privileges (the initial migration)."""
     with refused(session):
         session.execute(change(written))
 

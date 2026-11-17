@@ -296,8 +296,7 @@ class Settings:
 def migration_settings(environ: Mapping[str, str] = os.environ) -> Settings:
     """What migrations need, and only that: MIGRATION_DATABASE_URL, the
     owner's login (DEPLOYMENT.md, Database roles), and how to log. A
-    migration Job is given none of the app's other settings (migration 0016
-    reads TOTP_KEYS_DIR itself, DEPLOYMENT.md, TOTP keys)."""
+    migration Job is given none of the app's other settings."""
     name = "MIGRATION_DATABASE_URL"
     return Settings(
         database_url=_database_url(environ.get(name, ""), name),

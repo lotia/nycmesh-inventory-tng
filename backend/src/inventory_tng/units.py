@@ -46,18 +46,10 @@ from inventory_tng.phrases import gettext, lazy_gettext
 # Raise it whenever a change to the table reads any text otherwise, or
 # search keeps it otherwise (models.held): rows record what folded them
 # (models.FOLDED_WITH), so those folded before can be folded again, and a
-# test fails until it is raised. 2: each field kept as typed too, and "in"
-# no unit (Ali, 2026-11-15). 3: search reads units as the forms do, by
-# the words near them, the profile and products (Ali, 2026-11-15,
-# inventory-tng-c0c.3). 4: search reads VDC and VAC as volts, and a
-# number before a unit without its thousands separators (Ali, 2026-11-15,
-# inventory-tng-ist.1). 5: search reads a comma after a lone nought as a
-# decimal point, `0,500 m` as `0.500 m` (Ali, 2026-11-15, inventory-tng-4i1).
-# 6: the forms judge a number grouped by spaces as search reads it, one
-# number, its sign with it, so unit keys read so (inventory-tng-uxo6).
-# 7: search and the forms find a unit after a number and any space as
-# after a plain one, so unit keys read so (inventory-tng-vw0f).
-VERSION = 7
+# test fails until it is raised. Reset to 1 when the migrations became one
+# initial migration (Ali, 2026-11-17); the versions before are in
+# docs/decisions/0021.
+VERSION = 1
 
 # The most groups (groups) a search is matched by, each alone; one with more
 # is matched whole only (Ali, 2026-11-15, inventory-tng-ist.1).

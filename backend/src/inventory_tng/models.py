@@ -341,10 +341,9 @@ FOLDED_WITH = (
 class Searchable:
     """A row a search finds: `search_text`, what it is found by (SEARCHED,
     its name unless a model says more), spaced, each field as held() keeps
-    it, and
-    `folded_with`, what folded it (FOLDED_WITH). Kept by the app as each row
-    is added or changed (_refold), never by PostgreSQL (docs/decisions/0016);
-    migrations 0032, 0033, 0036 and 0039 filled the rows there were."""
+    it, and `folded_with`, what folded it (FOLDED_WITH). Kept by the app as
+    each row is added or changed (_refold), never by PostgreSQL
+    (docs/decisions/0016)."""
 
     SEARCHED: ClassVar[tuple[str, ...]] = ("name",)
     # Whether reading rules read its units (an item's, a package's), as
@@ -618,7 +617,8 @@ class ItemAlias(KeyedName, Base):
     (docs/decisions/0021, 2026-11-14 and 2026-11-15).
     Its key is unique among current aliases here; among items' names too,
     which items.py checks holding the catalogue lock. Removed, it is
-    retired, freeing the name; never changed otherwise (migration 0038)."""
+    retired, freeing the name; never changed otherwise (the initial
+    migration)."""
 
     __tablename__ = "item_alias"
     __table_args__ = (
@@ -972,7 +972,7 @@ class Label(Base):
 class CatalogueHistory(Base):
     """Every change to the tables above (history.py). A retired record's
     page reads who retired it (admin/common.retired_by). The app may only add
-    to it (migration 0002)."""
+    to it (the initial migration)."""
 
     __tablename__ = "catalogue_history"
     __table_args__ = (
@@ -1068,8 +1068,8 @@ class LedgerTransaction(Base):
     coming in, an install going out. Its movements are written with it, all or
     none, and neither is ever changed or deleted: a mistake is fixed by a
     count or an adjustment. The app's login may only read and add to it
-    (migration 0004), and ledger.insert_transaction, which writes it, checks
-    its rules."""
+    (the initial migration), and ledger.insert_transaction, which writes it,
+    checks its rules."""
 
     __tablename__ = "ledger_transaction"
     __table_args__ = (
@@ -1538,8 +1538,8 @@ class SiteSettings(Versioned, Base):
 
 class AdjustmentReason(CanonicalName, Versioned, Base):
     """Why stock was written off or found outside a count. Administrators
-    extend the list (adjustment_reasons.py); its first entries come with its
-    migration."""
+    extend the list (adjustment_reasons.py); its first entries come with the
+    initial migration."""
 
     __tablename__ = "adjustment_reason"
     __table_args__ = (

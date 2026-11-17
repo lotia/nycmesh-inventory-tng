@@ -1273,15 +1273,17 @@ def test_the_used_up_reason_made_twice_at_once_is_made_once(
     own_committed: Committed,
 ) -> None:
     """Renamed away, two closes at once each make it: the second waits on
-    the first's name, then finds it (adjustment_reasons.used_up)."""
+    the first's name, then finds it (adjustment_reasons.seeded)."""
     setup = own_committed.session()
-    seeded = adjustment_reasons.used_up(setup)
+    seeded = adjustment_reasons.seeded(setup, adjustment_reasons.USED_UP)
     seeded.name = "Spent"
     setup.commit()
     one, two = own_committed.session(), own_committed.session()
-    first = adjustment_reasons.used_up(one)
+    first = adjustment_reasons.seeded(one, adjustment_reasons.USED_UP)
     one.flush()
-    worker = own_committed.blocked(two, lambda: adjustment_reasons.used_up(two).id)
+    worker = own_committed.blocked(
+        two, lambda: adjustment_reasons.seeded(two, adjustment_reasons.USED_UP).id
+    )
     one.commit()
     assert worker.finished().result == first.id
     two.rollback()

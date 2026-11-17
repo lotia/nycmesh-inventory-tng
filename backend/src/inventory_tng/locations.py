@@ -4,8 +4,8 @@ or another area; a volunteer holding stock has a custody location.
 
 A rule of more than one condition is a function of plain values,
 returning the name of the rule a change would break, or None. The app may
-not change a location's kind or volunteer (migration 0002), so no rule need
-keep a place with areas one that can have them."""
+not change a location's kind or volunteer (the initial migration), so no
+rule need keep a place with areas one that can have them."""
 
 from collections.abc import Mapping
 from dataclasses import dataclass

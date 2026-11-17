@@ -117,24 +117,25 @@ TRUNCATABLE = text(
 def test_the_app_may_truncate_no_table(
     session: Session, owner_session: Session
 ) -> None:
-    """Migration 0001 never grants it; the owner, who may, finds the tables."""
+    """The initial migration never grants it; the owner, who may, finds the
+    tables."""
     assert session.scalars(TRUNCATABLE).all() == []
     assert {*APPEND_ONLY, *KEPT, "item"} <= set(owner_session.scalars(TRUNCATABLE))
 
 
 @pytest.mark.parametrize("table", KEPT)
 def test_the_app_may_not_delete_a_settings_row(session: Session, table: str) -> None:
-    """Their one row is changed, never deleted (migrations 0005 to 0007)."""
+    """Their one row is changed, never deleted (the initial migration)."""
     with refused(session):
         session.execute(text(f"DELETE FROM {table}"))
 
 
-# Columns the app may not change once a row is made (migration 0002), so the
-# rules that rely on them need no check: a label's code and what it names, a
-# package's item, a place's kind and volunteer, an open package's key and
-# what it was opened from (migration 0024), and all of an item's alias but
-# whether it is retired (migration 0038). Every other column of every
-# other table is the app's to change, but in the tables it only adds to.
+# Columns the app may not change once a row is made (the initial
+# migration), so the rules that rely on them need no check: a label's code
+# and what it names, a package's item, a place's kind and volunteer, an open
+# package's key and what it was opened from, and all of an item's alias but
+# whether it is retired. Every other column of every other table is the
+# app's to change, but in the tables it only adds to.
 FIXED = {
     "label": {"id", "created_at", "code", "item_id", "package_id", "location_id"},
     "item_package": {"id", "created_at", "item_id"},

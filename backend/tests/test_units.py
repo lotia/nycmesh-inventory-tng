@@ -130,13 +130,14 @@ def test_the_scan_pages_table_is_current() -> None:
 
 def test_the_newest_unit_table_has_a_migration_folding_again() -> None:
     """Rows folded with an older table are folded again on deploy, by a
-    migration such as 0036 naming units.VERSION in FOLDS_UNITS."""
+    migration naming units.VERSION in FOLDS_UNITS. None names one while
+    the version is the initial schema's, 1."""
     named = re.findall(
         r"^FOLDS_UNITS = (\d+)$",
         "\n".join(m.read_text(encoding="utf-8") for m in MIGRATIONS.glob("*.py")),
         re.MULTILINE,
     )
-    assert max(map(int, named)) == units.VERSION, (
+    assert max(map(int, named), default=1) == units.VERSION, (
         "Add a migration folding again the rows folded with an older table"
     )
 

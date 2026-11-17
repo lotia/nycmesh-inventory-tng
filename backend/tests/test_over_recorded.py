@@ -2430,7 +2430,6 @@ def committed_check(
     assert movement_id is not None
     over_recorded.raise_checks(setup, {movement_id: Decimal(1)})
     admin = admin_id(setup)
-    adjustment_reasons.seeded(setup, over_recorded.REASON)
     setup.commit()
     (check,) = checks(setup)
     return place, check, admin, moved
@@ -2670,7 +2669,6 @@ def test_a_correct_waits_for_a_close_of_its_open_package_then_skips_it(
     assert movement_id is not None
     over_recorded.raise_checks(setup, {movement_id: Decimal(305)})
     admin = admin_id(setup)
-    adjustment_reasons.seeded(setup, over_recorded.REASON)
     setup.commit()
     (check,) = checks(setup)
     first, second = own_committed.session(), own_committed.session()
@@ -2876,7 +2874,6 @@ def sealed_counted_check(
     assert movement_id is not None
     over_recorded.raise_checks(setup, {movement_id: Decimal(305)})
     admin = admin_id(setup)
-    adjustment_reasons.seeded(setup, over_recorded.REASON)
     as_of = ledger.moment(setup, spools.store.id)
     count = ledger.record_count(
         setup,

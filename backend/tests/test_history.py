@@ -478,7 +478,7 @@ def test_the_actor_lasts_for_the_session(session: Session) -> None:
     ids=["update", "delete"],
 )
 def test_the_app_may_not_rewrite_history(session: Session, rewrite: Executable) -> None:
-    """Its login lacks the privileges (migration 0002)."""
+    """Its login lacks the privileges (the initial migration)."""
     add(session, Category(name="Kept"))
     with refused(session):
         session.execute(rewrite)

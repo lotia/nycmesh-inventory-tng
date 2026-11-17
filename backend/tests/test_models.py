@@ -1,6 +1,6 @@
-"""The catalogue's rules: the database's own (models.py, migration 0002),
-each failing write checked by the constraint it names, which is what
-describe_error() logs; and the app's, each refused through its domain
+"""The catalogue's rules: the database's own (models.py, the initial
+migration), each failing write checked by the constraint it names, which
+is what describe_error() logs; and the app's, each refused through its domain
 function by the rule's name (db.RuleBroken), whose every case
 test_catalogue_rules.py tests without a database."""
 
@@ -243,7 +243,7 @@ def _sample() -> list[str]:
 def test_names_are_keyed_alike_by_the_app_and_the_database(session: Session) -> None:
     """names.name_key, which the app writes, and names.name_key_sql, which
     the CHECK constraints hold it to, agree on every character, as each
-    migrated CHECK does (migration 0040 writes it out); Python has no
+    migrated CHECK does (the initial migration writes it out); Python has no
     [[:punct:]], so the pattern names code points. names.LOOK_ALIKES, listed
     by hand so PostgreSQL reads the same list, holds every space Unicode
     has (Zs), so none tells two names apart."""
