@@ -12,7 +12,7 @@ import structlog
 from fastapi import APIRouter, Depends, Form, Request
 from fastapi.responses import HTMLResponse, JSONResponse, Response
 from opentelemetry import metrics
-from sqlalchemy import func, select
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from inventory_tng import items, labels, open_packages, reading_rules, units
@@ -42,6 +42,7 @@ from inventory_tng.admin.listing import (
 )
 from inventory_tng.admin.reading_rules import READINGS
 from inventory_tng.admins.guards import AdminSignedIn, SignedIn
+from inventory_tng.catalogue import queries
 from inventory_tng.core.db import DbSession, exists_where, refusal
 from inventory_tng.core.local_time import site_zone
 from inventory_tng.core.phrases import Words, gettext, lazy_gettext
@@ -308,11 +309,6 @@ def _tracking_changed(
 TextForm = Annotated[dict[str, str], Depends(text_form)]
 
 
-def _categories(session: Session) -> list[Category]:
-    """Every category, by name: the current ones are offered."""
-    return list(session.scalars(select(Category).order_by(func.lower(Category.name))))
-
-
 @dataclass(frozen=True)
 class _Shown:
     """An item as its list's suggestions name it."""
@@ -331,13 +327,7 @@ SORTING = Sorting(
     "name",
     {
         "name": Sort.of(func.lower(Item.name)),
-        "category": Sort.of(
-            func.lower(
-                select(Category.name)
-                .where(Category.id == Item.category_id)
-                .scalar_subquery()
-            )
-        ),
+        "category": Sort.of(func.lower(queries.category_name)),
         "unit": Sort.of(Item.unit),
         "part": Sort.of(func.lower(Item.manufacturer), func.lower(Item.part_number)),
     },
@@ -414,7 +404,7 @@ def _list_page(
     similar: Sequence[items.Close] = (),
 ) -> HTMLResponse:
     listing = (listing or SEARCHED.read()).find(session)
-    categories = _categories(session)
+    categories = queries.categories_by_name(session)
     return admin_page(
         request,
         signed,
@@ -454,11 +444,7 @@ def _item_page(
     similar: Sequence[items.Close] = (),
     undo: str | None = None,
 ) -> HTMLResponse:
-    packages = session.scalars(
-        select(ItemPackage)
-        .where(ItemPackage.item_id == item.id)
-        .order_by(ItemPackage.retired_at.is_not(None), ItemPackage.size)
-    ).all()
+    packages = queries.packages_of_item(session, item.id)
     return admin_page(
         request,
         signed,
@@ -476,7 +462,9 @@ def _item_page(
                 session, [each.id for each in packages if each.retired_at is None]
             ),
             "undo": undo,
-            "categories": [c for c in _categories(session) if c.retired_at is None],
+            "categories": [
+                c for c in queries.categories_by_name(session) if c.retired_at is None
+            ],
             "units": UNITS,
             "unit_fixed": _moved(session, item.id),
             "in_stock": stock_queries.item_total(session, item.id),
@@ -634,7 +622,7 @@ def suggest_items(
     session: DbSession, signed: AdminSignedIn, listing: Listed
 ) -> JSONResponse:
     """What the search box offers as one types (_listing.html)."""
-    names = {c.id: c.name for c in _categories(session)}
+    names = {c.id: c.name for c in queries.categories_by_name(session)}
     offered = listing.suggest(session, lambda item: names.get(item.category_id, ""))
     return JSONResponse(offered, headers={"Cache-Control": "no-store"})
 

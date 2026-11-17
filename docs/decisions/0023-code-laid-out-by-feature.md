@@ -98,3 +98,4 @@ short test. `core/` is the name FastAPI's full-stack template uses;
 | `scan/catalogue_api.py`: its queries | `scan/queries.py` |
 | `admin/admins.py`: its query | `admins/queries.py` |
 | `admin/categories.py`: its queries | `catalogue/queries.py` |
+| `admin/items.py`: its other queries | `catalogue/queries.py` |

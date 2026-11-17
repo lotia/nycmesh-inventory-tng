@@ -1,12 +1,18 @@
-"""What the catalogue's pages read (admin/categories.py): plain functions
-taking a Session, each named for what it returns (docs/decisions/0023)."""
+"""What the catalogue's pages read (admin/categories.py, admin/items.py):
+plain functions taking a Session, each named for what it returns
+(docs/decisions/0023)."""
 
 from collections.abc import Sequence
 
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
-from inventory_tng.models import Category, Item
+from inventory_tng.models import Category, Item, ItemPackage
+
+# Each item's category's name, for a select of items to sort by.
+category_name = (
+    select(Category.name).where(Category.id == Item.category_id).scalar_subquery()
+)
 
 
 def current_items_by_category(session: Session) -> dict[int, int]:
@@ -30,4 +36,14 @@ def current_items_of(session: Session, category_id: int) -> Sequence[Item]:
         select(Item)
         .where(Item.category_id == category_id, Item.retired_at.is_(None))
         .order_by(func.lower(Item.name))
+    ).all()
+
+
+def packages_of_item(session: Session, item_id: int) -> Sequence[ItemPackage]:
+    """An item's packages, retired too, the current ones first, then by
+    size."""
+    return session.scalars(
+        select(ItemPackage)
+        .where(ItemPackage.item_id == item_id)
+        .order_by(ItemPackage.retired_at.is_not(None), ItemPackage.size)
     ).all()
