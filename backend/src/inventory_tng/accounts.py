@@ -1501,8 +1501,9 @@ def restore_admin(
 
 
 # The operator's break-glass (docs/decisions/0018), from python -m
-# inventory_tng.admins: no administrator acts, so none needs to sign in.
-# Their links are made by nobody (made_by_id NULL), so last an hour.
+# inventory_tng.admins.command: no administrator acts, so none needs to
+# sign in. Their links are made by nobody (made_by_id NULL), so last an
+# hour.
 
 
 # In the history and the logs as the one who did it.

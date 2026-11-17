@@ -1,5 +1,5 @@
 """The operator's break-glass (accounts.lock_down, let_in, invite_by_operator,
-retire_authenticators; python -m inventory_tng.admins and totp_keys):
+retire_authenticators; python -m inventory_tng.admins.command and totp_keys):
 docs/decisions/0018."""
 
 import asyncio
@@ -14,7 +14,8 @@ from fastapi.testclient import TestClient
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from inventory_tng import accounts, activity, admins, devices, sign_in, totp_keys
+from inventory_tng import accounts, activity, devices, sign_in, totp_keys
+from inventory_tng.admins import command
 from inventory_tng.core import mail
 from inventory_tng.core.mail import Notifier
 from inventory_tng.core.settings import RateLimits
@@ -192,19 +193,19 @@ def test_the_commands_run_as_operator_commands(
     monkeypatch.setenv("DATABASE_URL", own_database)
     monkeypatch.delenv("MAIL_HOST", raising=False)
     site = "https://inventory.example.org"
-    assert admins.main(["invite", "grace", "--base-url", site]) == 0
+    assert command.main(["invite", "grace", "--base-url", site]) == 0
     assert (
         capsys.readouterr()
         .out.splitlines()[-1]
         .startswith(f"{site}{sign_in.RESET}?token=")
     )
-    assert admins.main(["invite", "grace", "--base-url", site]) == 1
-    assert admins.main(["let-in", "grace"]) == 1
+    assert command.main(["invite", "grace", "--base-url", site]) == 1
+    assert command.main(["let-in", "grace"]) == 1
     assert "Give --base-url" in capsys.readouterr().err
-    assert admins.main(["lockdown", "--expect", "2"]) == 1
-    assert admins.main(["lockdown", "--expect", "1"]) == 0
+    assert command.main(["lockdown", "--expect", "2"]) == 1
+    assert command.main(["lockdown", "--expect", "1"]) == 0
     assert capsys.readouterr().out.splitlines()[-1] == "Retired 1 administrators."
-    assert admins.main(["let-in", "grace", "--base-url", site]) == 0
+    assert command.main(["let-in", "grace", "--base-url", site]) == 0
     assert totp_keys.main(["retire-authenticators", "--all"]) == 0
     assert capsys.readouterr().out.splitlines()[-1] == "Retired 0 authenticators."
 
@@ -225,7 +226,7 @@ def test_admins_runs_as_a_module(
         pytest.warns(RuntimeWarning, match="found in sys.modules"),
         pytest.raises(SystemExit) as done,
     ):
-        runpy.run_module("inventory_tng.admins", run_name="__main__")
+        runpy.run_module("inventory_tng.admins.command", run_name="__main__")
     assert done.value.code == 0
     assert "lockdown" in capsys.readouterr().out
 

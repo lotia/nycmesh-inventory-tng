@@ -344,9 +344,9 @@ cannot be trusted to put it right: one of them could undo it. Lock every
 administrator out, then let one trusted person back in:
 
 ```sh
-kubectl exec deploy/inventory -- python -m inventory_tng.admins \
+kubectl exec deploy/inventory -- python -m inventory_tng.admins.command \
   lockdown --expect 3
-kubectl exec deploy/inventory -- python -m inventory_tng.admins \
+kubectl exec deploy/inventory -- python -m inventory_tng.admins.command \
   let-in ada
 ```
 

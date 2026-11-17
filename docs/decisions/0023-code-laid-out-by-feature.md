@@ -76,3 +76,4 @@ short test. `core/` is the name FastAPI's full-stack template uses;
 | `stacks.py` | `dev/stacks.py` |
 | `pages.py`: `amount`, `printed_length` | `web/formatting.py` |
 | `web.py` | `web/browser.py` |
+| `admins.py` | `admins/command.py` |

@@ -2,9 +2,9 @@
 trusted or nobody can sign in to them (DEPLOYMENT.md, Break-glass;
 docs/decisions/0018). Run where the app runs, with its settings:
 
-    python -m inventory_tng.admins lockdown --expect 3
-    python -m inventory_tng.admins let-in USERNAME
-    python -m inventory_tng.admins invite USERNAME [--email ADDRESS]
+    python -m inventory_tng.admins.command lockdown --expect 3
+    python -m inventory_tng.admins.command let-in USERNAME
+    python -m inventory_tng.admins.command invite USERNAME [--email ADDRESS]
 
 `lockdown` retires every current administrator and revokes every
 registration code; --expect is how many administrators you believe are
@@ -30,7 +30,7 @@ from inventory_tng.sign_in import reset_url
 
 
 def main(argv: Sequence[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(prog="python -m inventory_tng.admins")
+    parser = argparse.ArgumentParser(prog="python -m inventory_tng.admins.command")
     commands = parser.add_subparsers(dest="command", required=True)
     lockdown = commands.add_parser(
         "lockdown", help="retire every administrator, revoke every code"
