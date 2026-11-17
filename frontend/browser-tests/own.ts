@@ -111,6 +111,7 @@ export async function invite(
     await asked.fill(shared);
     await confirm.click();
   }
+  await expect(made).toBeVisible();
   const link = (await made.textContent()) ?? "";
   expect(link).toContain("/admin/reset?token=");
   return { username, link };

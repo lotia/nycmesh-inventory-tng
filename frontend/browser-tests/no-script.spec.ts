@@ -2,7 +2,9 @@
  * Without scripts, the buttons that need them stay hidden, as the page's
  * script shows them (frontend/src/buttons.ts), and what they act on is
  * still shown: a code to print by hand, a link to copy by hand
- * (inventory-tng-vxxc, in place of the manual test inventory-tng-f8kw).
+ * (inventory-tng-vxxc). Hidden by the `hidden` attribute the script would
+ * remove, not by a style. No script runs, so the policy watch (policy.ts)
+ * sees nothing here.
  */
 import { expect } from "@playwright/test";
 import { makeCode } from "./codes";
@@ -20,6 +22,7 @@ test("a code's page offers no Print, and shows the code", async ({ page }) => {
     includeHidden: true,
   });
   await expect(print).toBeAttached();
+  await expect(print).toHaveAttribute("hidden");
   await expect(print).toBeHidden();
   // The first of each is the screen's; the print sheet has its own.
   await expect(page.locator(".qr svg").first()).toBeVisible();
@@ -38,6 +41,7 @@ test("a made link's page offers no Copy the link, and shows the link", async ({
     includeHidden: true,
   });
   await expect(copy).toBeAttached();
+  await expect(copy).toHaveAttribute("hidden");
   await expect(copy).toBeHidden();
   const shown = page.locator("#link");
   await expect(shown).toBeVisible();
