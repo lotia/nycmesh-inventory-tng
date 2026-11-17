@@ -2,8 +2,8 @@ from pathlib import Path
 
 import pytest
 
-from inventory_tng import settings
-from inventory_tng.settings import (
+from inventory_tng.core import settings
+from inventory_tng.core.settings import (
     FrontendConfig,
     RateLimits,
     Settings,

@@ -26,7 +26,7 @@ import structlog
 from sqlalchemy import Table, event, insert, select
 from sqlalchemy.orm import Session, UOWTransaction
 
-from inventory_tng.db import (
+from inventory_tng.core.db import (
     Action,
     Base,
     current_actor,

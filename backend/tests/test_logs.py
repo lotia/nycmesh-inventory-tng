@@ -5,8 +5,8 @@ import os
 import pytest
 import structlog
 
-from inventory_tng.logs import configure_logging
-from inventory_tng.settings import LogConfig, Settings, SettingsError
+from inventory_tng.core.logs import configure_logging
+from inventory_tng.core.settings import LogConfig, Settings, SettingsError
 
 
 def configure(**environ: str) -> None:

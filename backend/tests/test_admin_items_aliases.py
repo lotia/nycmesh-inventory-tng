@@ -20,7 +20,7 @@ from inventory_tng.admin.items import (
     TAKEN,
     TAKEN_FIELDS,
 )
-from inventory_tng.db import attempt
+from inventory_tng.core.db import attempt
 from inventory_tng.models import CURRENT_ALIAS, Category, Item, ItemAlias
 
 from helpers.items import NOW, items_named, new_item

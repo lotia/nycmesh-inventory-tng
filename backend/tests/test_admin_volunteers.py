@@ -11,7 +11,7 @@ from sqlalchemy.orm import Session
 from inventory_tng.accounts import NOT_AN_EMAIL, name_up_to
 from inventory_tng.admin.common import NAME_MAX, RULES
 from inventory_tng.admin.volunteers import PICK_INTO, STILL_HOLD, TAKEN, VOLUNTEERS
-from inventory_tng.local_time import DEFAULT_ZONE
+from inventory_tng.core.local_time import DEFAULT_ZONE
 from inventory_tng.models import (
     Category,
     Item,

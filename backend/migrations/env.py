@@ -8,10 +8,10 @@ from sqlalchemy import Connection
 
 # Imported for its mapped classes, so autogenerate sees every table.
 from inventory_tng import models  # noqa: F401
-from inventory_tng.db import Base, connect_to_migrate, make_engine
-from inventory_tng.local_env import load_local_env
-from inventory_tng.logs import configure_logging
-from inventory_tng.settings import migration_settings
+from inventory_tng.core.db import Base, connect_to_migrate, make_engine
+from inventory_tng.core.local_env import load_local_env
+from inventory_tng.core.logs import configure_logging
+from inventory_tng.core.settings import migration_settings
 
 if context.is_offline_mode():
     raise SystemExit("Offline (--sql) migrations are not supported.")

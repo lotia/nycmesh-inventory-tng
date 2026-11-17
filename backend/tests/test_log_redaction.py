@@ -11,11 +11,11 @@ from opentelemetry.sdk._logs.export import InMemoryLogRecordExporter
 from opentelemetry.sdk.metrics.export import InMemoryMetricReader
 from structlog.testing import capture_logs
 
-from inventory_tng.logs import configure_logging
-from inventory_tng.masking import MASK, REDACTION_FIELD, Masker
+from inventory_tng.core.logs import configure_logging
+from inventory_tng.core.masking import MASK, REDACTION_FIELD, Masker
+from inventory_tng.core.settings import Redaction, SettingsError
+from inventory_tng.core.telemetry import StructlogBridge, Telemetry
 from inventory_tng.server import create_server
-from inventory_tng.settings import Redaction, SettingsError
-from inventory_tng.telemetry import StructlogBridge, Telemetry
 
 from helpers.settings import settings
 

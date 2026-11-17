@@ -16,7 +16,7 @@ from fastapi.responses import HTMLResponse, Response
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from inventory_tng import accounts, activity, adjustment_reasons, mail, scan_settings
+from inventory_tng import accounts, activity, adjustment_reasons, scan_settings
 from inventory_tng.admin.common import (
     ADMIN,
     CHANGED,
@@ -28,8 +28,11 @@ from inventory_tng.admin.common import (
     now,
     text_form,
 )
-from inventory_tng.db import DbSession, RuleBroken, refusal, settings_row
-from inventory_tng.mail import Notify
+from inventory_tng.core import mail
+from inventory_tng.core.db import DbSession, RuleBroken, refusal, settings_row
+from inventory_tng.core.mail import Notify
+from inventory_tng.core.phrases import Words, gettext, lazy_gettext
+from inventory_tng.core.time_zones import zones
 from inventory_tng.models import (
     ACCOUNT_CHANGE_MINUTES,
     CONFIRM_HOURS,
@@ -44,9 +47,7 @@ from inventory_tng.models import (
     whole,
 )
 from inventory_tng.pages import NOTICES, not_found, redirect
-from inventory_tng.phrases import Words, gettext, lazy_gettext
 from inventory_tng.sign_in import AdminSignedIn, ConfirmedAdmin, SignedIn, changed
-from inventory_tng.time_zones import zones
 
 log = structlog.get_logger(__name__)
 

@@ -12,7 +12,7 @@ from sqlalchemy import Select, select
 from sqlalchemy.orm import Session
 
 from inventory_tng import locations
-from inventory_tng.db import (
+from inventory_tng.core.db import (
     Gone,
     Seen,
     enforce,

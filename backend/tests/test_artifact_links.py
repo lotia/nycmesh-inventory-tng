@@ -9,7 +9,7 @@ from pathlib import Path
 
 import pytest
 
-from inventory_tng.local_env import CLONE
+from inventory_tng.core.local_env import CLONE
 
 pytestmark = pytest.mark.clone
 

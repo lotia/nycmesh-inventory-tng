@@ -17,7 +17,7 @@ from sqlalchemy.orm import Session
 
 from inventory_tng import accounts, devices, over_recorded, sign_in
 from inventory_tng.admin.length_checks import KINDS
-from inventory_tng.db import DATABASE_INFO, Database, make_database
+from inventory_tng.core.db import DATABASE_INFO, Database, make_database
 from inventory_tng.models import (
     Admin,
     Authenticator,

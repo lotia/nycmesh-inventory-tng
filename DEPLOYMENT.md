@@ -53,12 +53,12 @@ required, and for migrations only `MIGRATION_DATABASE_URL`.
   production: they are raised for the browser tests, which sign in and
   confirm many times over.
 - `RATE_LIMIT_PAGE_REPORTS`: reports the scan and register pages send of
-  themselves from one address in a minute; settings.py's default unless set
-  (`RateLimits`). Raise it where many pages share one address, such as
-  behind one network's NAT.
+  themselves from one address in a minute; `core/settings.py`'s default
+  unless set (`RateLimits`). Raise it where many pages share one address,
+  such as behind one network's NAT.
 - `RATE_LIMIT_CSP_REPORTS`: reports of what the content security policy
-  refused that browsers send from one address in a minute; settings.py's
-  default unless set (`RateLimits`). Raise it with
+  refused that browsers send from one address in a minute;
+  `core/settings.py`'s default unless set (`RateLimits`). Raise it with
   `RATE_LIMIT_PAGE_REPORTS`, for the same reason.
 - `LOG_FORMAT`: `json` for a log collector; the default is `console`.
 - `LOG_LEVEL`, `LOG_LEVELS`: `INFO` by default.

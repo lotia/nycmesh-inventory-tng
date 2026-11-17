@@ -13,9 +13,9 @@ import sys
 import structlog
 from structlog.typing import EventDict, Processor
 
-from inventory_tng import request_logging
-from inventory_tng.masking import Masker
-from inventory_tng.settings import Settings
+from inventory_tng.core import request_logging
+from inventory_tng.core.masking import Masker
+from inventory_tng.core.settings import Settings
 
 log = structlog.get_logger(__name__)
 

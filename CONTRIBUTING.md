@@ -256,7 +256,7 @@ PostgreSQL cannot check it, the model's own `@validates`, as
 `SiteSettings` checks the site's time zone.
 
 Each model declares who writes its table, holding what, and whether it has
-history, with `db.protection`; `db.py` gives the rules, which the flush and
+history, with `db.protection`; `core/db.py` gives the rules, which the flush and
 `tests/test_write_owners.py` enforce. An owner is a domain module, never a
 page's, as `adjustment_reasons.py` is; a settings row, made by its
 migration, has none, and `scan_settings.change` is its one writer.
@@ -381,7 +381,7 @@ and loads the operator's corrected file as rules by no administrator.
 
 Lock rows with `db.locked` (a select) or `db.get_locked` (`Session.get`),
 never `with_for_update` itself: they also read the rows again as locked,
-which a plain locking read does not do for a row already loaded. `db.py`
+which a plain locking read does not do for a row already loaded. `core/db.py`
 says why; `tests/test_locking.py` fails on `with_for_update` anywhere else.
 Catalogue rows are locked with `db.locked_row` or `db.relock`, which take
 the catalogue lock first; `locked_row`'s docstring gives the order every
@@ -829,7 +829,7 @@ The words people read go through a catalogue on each side
 and Lingui's on the scan page. Each message's id is its English. The
 operator commands' words are not in it yet (inventory-tng-8f4).
 
-On the server (`backend/src/inventory_tng/phrases.py`):
+On the server (`backend/src/inventory_tng/core/phrases.py`):
 
 - In a template, put the words in `{% trans %}`, with each value named:
   `{% trans name=place.name %}Start counting {{ name }}{% endtrans %}`. A

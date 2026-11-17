@@ -12,9 +12,9 @@ from limits import RateLimitItemPerMinute
 from sqlalchemy import Engine, exc, func, select
 from sqlalchemy.orm import Session
 
-from inventory_tng.db import Database, make_database, make_engine
+from inventory_tng.core.db import Database, make_database, make_engine
+from inventory_tng.core.rate_limits import PostgresStorage, limiter, refund
 from inventory_tng.models import RateLimit
-from inventory_tng.rate_limits import PostgresStorage, limiter, refund
 
 TEN = RateLimitItemPerMinute(10)
 

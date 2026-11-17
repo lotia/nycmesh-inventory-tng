@@ -14,7 +14,7 @@ from httpx2 import Response
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from inventory_tng.db import lock_catalogue
+from inventory_tng.core.db import lock_catalogue
 from inventory_tng.models import Item, ItemPackage
 
 from helpers.pages import CATALOGUE, PAGES, Built, More, Page, Path, built, path

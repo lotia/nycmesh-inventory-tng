@@ -6,7 +6,7 @@ from datetime import datetime
 
 from sqlalchemy.orm import Session
 
-from inventory_tng.db import Seen, enforce, exists_where, lock_catalogue, relock
+from inventory_tng.core.db import Seen, enforce, exists_where, lock_catalogue, relock
 from inventory_tng.models import Category, Item
 
 

@@ -2,7 +2,7 @@
 
 The task scripts read a setting as the backend does, with:
 
-    uv run python -m inventory_tng.local_env KEY [--file PATH]
+    uv run python -m inventory_tng.core.local_env KEY [--file PATH]
 """
 
 import argparse
@@ -13,8 +13,8 @@ from pathlib import Path
 from dotenv import load_dotenv
 from dotenv.main import DotEnv
 
-# backend/src/inventory_tng/ -> the repository root, in a clone.
-CLONE = Path(__file__).resolve().parents[3]
+# backend/src/inventory_tng/core/ -> the repository root, in a clone.
+CLONE = Path(__file__).resolve().parents[4]
 ENV_FILE = CLONE / ".env"
 
 
@@ -46,7 +46,7 @@ def setting(key: str, path: Path | None = None) -> str:
 
 def main(argv: Sequence[str] | None = None) -> None:
     parser = argparse.ArgumentParser(
-        prog="python -m inventory_tng.local_env",
+        prog="python -m inventory_tng.core.local_env",
         description="Print a setting as the backend reads it, for mise-tasks/.",
     )
     parser.add_argument("key")

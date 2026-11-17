@@ -18,7 +18,8 @@ from sqlalchemy.orm import Session
 
 from inventory_tng import catalogue, devices
 from inventory_tng.app import create_app
-from inventory_tng.db import make_engine
+from inventory_tng.core.db import make_engine
+from inventory_tng.core.settings import Settings
 from inventory_tng.models import (
     Category,
     Item,
@@ -26,7 +27,6 @@ from inventory_tng.models import (
     Location,
     Volunteer,
 )
-from inventory_tng.settings import Settings
 
 from databases import OWNER, as_role
 from helpers.devices import new_device

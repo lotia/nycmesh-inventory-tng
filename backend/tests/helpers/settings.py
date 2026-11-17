@@ -1,6 +1,6 @@
 """Settings read from an environment a test gives."""
 
-from inventory_tng.settings import Settings
+from inventory_tng.core.settings import Settings
 
 
 def settings(**environ: str) -> Settings:

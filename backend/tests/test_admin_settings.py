@@ -7,9 +7,10 @@ from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
 from structlog.testing import capture_logs
 
-from inventory_tng import activity, mail
+from inventory_tng import activity
 from inventory_tng.admin.common import PICK_A_ZONE
 from inventory_tng.admin.settings import SETTINGS, whole_minutes
+from inventory_tng.core import mail
 from inventory_tng.models import (
     NAME_CHECK_MINUTES,
     ScanSettings,

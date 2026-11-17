@@ -42,11 +42,11 @@ from opentelemetry.sdk.trace.sampling import DEFAULT_OFF
 from opentelemetry.trace import Link, Status
 from opentelemetry.util.types import AnyValue
 
-from inventory_tng import request_logging
-from inventory_tng.db import Database
-from inventory_tng.logs import ADDED_FIELDS
-from inventory_tng.masking import Masker, mask_query
-from inventory_tng.settings import HourlyWarning, Redaction
+from inventory_tng.core import request_logging
+from inventory_tng.core.db import Database
+from inventory_tng.core.logs import ADDED_FIELDS
+from inventory_tng.core.masking import Masker, mask_query
+from inventory_tng.core.settings import HourlyWarning, Redaction
 
 SERVICE_NAME = "inventory-tng"
 

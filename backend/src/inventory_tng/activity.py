@@ -17,10 +17,10 @@ from opentelemetry import metrics
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from inventory_tng import mail
-from inventory_tng.mail import Notifier, Told
+from inventory_tng.core import mail
+from inventory_tng.core.mail import Notifier, Told
+from inventory_tng.core.phrases import gettext, lazy_gettext
 from inventory_tng.models import Activity, ActivityKind, Admin
-from inventory_tng.phrases import gettext, lazy_gettext
 
 log = structlog.get_logger(__name__)
 meter = metrics.get_meter(__name__)

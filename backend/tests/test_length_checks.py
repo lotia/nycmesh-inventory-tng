@@ -14,8 +14,8 @@ from sqlalchemy.orm import Session
 
 from inventory_tng import ledger, open_packages, pages
 from inventory_tng.admin import length_checks
+from inventory_tng.core.local_env import CLONE
 from inventory_tng.ledger import Entry, Form
-from inventory_tng.local_env import CLONE
 from inventory_tng.models import (
     Admin,
     Item,

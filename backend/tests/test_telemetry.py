@@ -25,11 +25,9 @@ from structlog.testing import capture_logs
 
 from inventory_tng import (
     accounts,
-    db,
     devices,
     labels,
     ledger,
-    mail,
     open_packages,
     over_recorded,
     page_builds,
@@ -39,9 +37,12 @@ from inventory_tng import (
 from inventory_tng.admin.categories import CATEGORIES
 from inventory_tng.admin.counts import ADJUSTMENTS, COUNTS
 from inventory_tng.app import create_app
-from inventory_tng.db import NoSession, RuleBroken
+from inventory_tng.core import db, mail
+from inventory_tng.core.db import NoSession, RuleBroken
+from inventory_tng.core.masking import MASK, Masker
+from inventory_tng.core.settings import RateLimits, Settings
+from inventory_tng.core.telemetry import Telemetry, enabled
 from inventory_tng.devices import RegisteredDevice
-from inventory_tng.masking import MASK, Masker
 from inventory_tng.models import (
     Category,
     Device,
@@ -51,8 +52,6 @@ from inventory_tng.models import (
     OpenPackage,
     OverRecorded,
 )
-from inventory_tng.settings import RateLimits, Settings
-from inventory_tng.telemetry import Telemetry, enabled
 
 from helpers.apps import on_session
 from helpers.devices import new_device

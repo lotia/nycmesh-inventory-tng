@@ -18,7 +18,7 @@ from sqlalchemy import ColumnElement, exc, select
 from sqlalchemy.orm import Session
 
 from inventory_tng import adjustment_reasons, ledger, over_recorded
-from inventory_tng.db import enforce, get_locked, locked
+from inventory_tng.core.db import enforce, get_locked, locked
 from inventory_tng.models import (
     Item,
     ItemPackage,

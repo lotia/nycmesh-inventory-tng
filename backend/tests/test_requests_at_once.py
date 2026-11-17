@@ -37,7 +37,6 @@ from inventory_tng import (
     devices,
     items,
     locations,
-    mail,
     open_packages,
     reading_rules,
     sign_in,
@@ -47,7 +46,8 @@ from inventory_tng import (
 from inventory_tng import catalogue as scan_catalogue
 from inventory_tng.admin.admins import ADMINS
 from inventory_tng.admin.volunteers import VOLUNTEERS
-from inventory_tng.db import (
+from inventory_tng.core import mail
+from inventory_tng.core.db import (
     Base,
     DbSession,
     RuleBroken,
@@ -57,6 +57,8 @@ from inventory_tng.db import (
     locked_row,
     release_hold,
 )
+from inventory_tng.core.mail import Message, Notify
+from inventory_tng.core.settings import RateLimits
 from inventory_tng.ledger import (
     Batch,
     BatchRefused,
@@ -67,7 +69,6 @@ from inventory_tng.ledger import (
     insert_transaction,
     record,
 )
-from inventory_tng.mail import Message, Notify
 from inventory_tng.models import (
     Admin,
     AdminPassword,
@@ -81,7 +82,6 @@ from inventory_tng.models import (
     SignInSettings,
     Volunteer,
 )
-from inventory_tng.settings import RateLimits
 
 from helpers.concurrency import Committed, Worker, delete_made, made, newest_ids
 from helpers.devices import new_device

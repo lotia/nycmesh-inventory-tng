@@ -25,7 +25,6 @@ from inventory_tng import (
     accounts,
     activity,
     labels,
-    mail,
     over_recorded,
     reading_rules,
     sign_in,
@@ -40,6 +39,21 @@ from inventory_tng.admin import reading_rules as admin_reading_rules
 from inventory_tng.admin import settings as admin_settings
 from inventory_tng.admin import volunteers as admin_volunteers
 from inventory_tng.admin.listing import Lapsed
+from inventory_tng.core import mail
+from inventory_tng.core.phrases import (
+    BRAND,
+    ENGLISH_PO,
+    Words,
+    compiled,
+    gettext,
+    lazy_gettext,
+    lazy_pgettext,
+    ngettext,
+    number,
+    pgettext,
+    read,
+    speaking,
+)
 from inventory_tng.models import (
     TRANSACTION_KINDS,
     UNITS,
@@ -56,20 +70,6 @@ from inventory_tng.models import (
     Volunteer,
 )
 from inventory_tng.pages import retired_holding, templates
-from inventory_tng.phrases import (
-    BRAND,
-    ENGLISH_PO,
-    Words,
-    compiled,
-    gettext,
-    lazy_gettext,
-    lazy_pgettext,
-    ngettext,
-    number,
-    pgettext,
-    read,
-    speaking,
-)
 from inventory_tng.resets import RESET_NOTICE
 
 from helpers import markup

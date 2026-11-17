@@ -16,7 +16,7 @@ from sqlalchemy import delete, exc, literal_column, select, text, update
 from sqlalchemy.orm import Session
 
 from inventory_tng import categories, items, labels, locations, volunteers
-from inventory_tng.db import ACTOR_INFO, Base, refusal, set_actor
+from inventory_tng.core.db import ACTOR_INFO, Base, refusal, set_actor
 from inventory_tng.models import (
     LABEL_ALPHABET,
     LABEL_LENGTH,

@@ -23,7 +23,7 @@ from sqlalchemy.orm import DeclarativeBase, Mapped, Session, mapped_column
 from structlog.testing import capture_logs
 
 from inventory_tng import accounts
-from inventory_tng.db import (
+from inventory_tng.core.db import (
     CATALOGUE,
     LOCKS_INFO,
     Action,

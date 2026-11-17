@@ -12,9 +12,9 @@ from pathlib import Path
 
 import uvicorn
 
-from inventory_tng.local_env import load_local_env
-from inventory_tng.logs import configure_logging
-from inventory_tng.settings import Settings
+from inventory_tng.core.local_env import load_local_env
+from inventory_tng.core.logs import configure_logging
+from inventory_tng.core.settings import Settings
 
 PACKAGE = Path(__file__).parent
 

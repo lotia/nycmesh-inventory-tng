@@ -23,7 +23,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from inventory_tng import labels, ledger
-from inventory_tng.db import SnapshotSession
+from inventory_tng.core.db import SnapshotSession
 from inventory_tng.devices import DeviceRefusedReply, RegisteredDevice
 from inventory_tng.ledger import takeable
 from inventory_tng.models import (

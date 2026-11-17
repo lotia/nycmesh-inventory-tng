@@ -12,7 +12,7 @@ from sqlalchemy.orm import Session
 from structlog.testing import capture_logs
 
 from inventory_tng.app import create_app
-from inventory_tng.database_role import (
+from inventory_tng.core.database_role import (
     APPEND_ONLY,
     FORBIDDEN,
     KEPT,
@@ -22,8 +22,8 @@ from inventory_tng.database_role import (
     named,
     refusals,
 )
-from inventory_tng.db import Base, make_engine
-from inventory_tng.settings import Settings
+from inventory_tng.core.db import Base, make_engine
+from inventory_tng.core.settings import Settings
 
 from databases import NO_DATABASE, OWNER, as_role, superuser_url
 from helpers.rows import refused

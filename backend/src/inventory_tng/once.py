@@ -24,10 +24,10 @@ from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.orm import Session
 from starlette.exceptions import HTTPException
 
-from inventory_tng.db import exists_where
+from inventory_tng.core.db import exists_where
+from inventory_tng.core.phrases import lazy_gettext
 from inventory_tng.models import SentForm
 from inventory_tng.pages import page, templates
-from inventory_tng.phrases import lazy_gettext
 
 if TYPE_CHECKING:  # sign_in imports this module.
     from inventory_tng.sign_in import SignedIn

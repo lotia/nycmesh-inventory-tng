@@ -15,8 +15,8 @@ from collections.abc import Sequence
 import structlog
 from sqlalchemy.orm import Session
 
-from inventory_tng.command import run_command
-from inventory_tng.db import CLI_ACTOR, Seen, set_actor, settings_row
+from inventory_tng.core.command import run_command
+from inventory_tng.core.db import CLI_ACTOR, Seen, set_actor, settings_row
 from inventory_tng.models import NAME_CHECK_MINUTES, ScanSettings, whole
 
 log = structlog.get_logger(__name__)

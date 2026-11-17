@@ -11,7 +11,7 @@ from urllib.parse import urlsplit
 from sqlalchemy import make_url
 from sqlalchemy.exc import ArgumentError
 
-from inventory_tng.local_env import CLONE
+from inventory_tng.core.local_env import CLONE
 
 LEVELS = ("DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL")
 ENVIRONMENTS = ("development", "production")

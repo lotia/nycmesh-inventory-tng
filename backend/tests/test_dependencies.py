@@ -7,7 +7,7 @@ import tomllib
 from packaging.requirements import Requirement
 from packaging.version import Version
 
-from inventory_tng.local_env import CLONE
+from inventory_tng.core.local_env import CLONE
 
 PYPROJECT = CLONE / "backend" / "pyproject.toml"
 

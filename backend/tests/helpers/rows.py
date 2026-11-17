@@ -11,7 +11,7 @@ from sqlalchemy import Engine, exc, select
 from sqlalchemy.orm import Session
 
 from inventory_tng import items
-from inventory_tng.db import (
+from inventory_tng.core.db import (
     DATABASE_INFO,
     UNGUARDED_INFO,
     Base,

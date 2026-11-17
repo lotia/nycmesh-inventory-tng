@@ -24,7 +24,7 @@ from pydantic import BaseModel, ValidationError
 from sqlalchemy import exc
 from structlog.typing import EventDict, ExcInfo
 
-from inventory_tng.settings import HourlyWarning, Redaction, Settings
+from inventory_tng.core.settings import HourlyWarning, Redaction, Settings
 
 log = structlog.get_logger(__name__)
 

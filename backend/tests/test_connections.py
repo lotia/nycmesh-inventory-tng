@@ -22,9 +22,9 @@ from sqlalchemy import Engine, exc, text
 from sqlalchemy.orm import Session
 from structlog.testing import capture_logs
 
-from inventory_tng import db
 from inventory_tng.app import create_app
-from inventory_tng.db import (
+from inventory_tng.core import db
+from inventory_tng.core.db import (
     LOCK_TIMEOUT,
     Database,
     DbSession,
@@ -33,10 +33,10 @@ from inventory_tng.db import (
 )
 
 # Imported before conftest replaces it in every test.
-from inventory_tng.db import pool_order_broken as logs_pool_order_broken
+from inventory_tng.core.db import pool_order_broken as logs_pool_order_broken
+from inventory_tng.core.rate_limits import limiter
+from inventory_tng.core.settings import Settings
 from inventory_tng.models import Device
-from inventory_tng.rate_limits import limiter
-from inventory_tng.settings import Settings
 
 from helpers.pools import checked_out, small_database
 

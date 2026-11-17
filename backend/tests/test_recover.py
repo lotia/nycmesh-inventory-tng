@@ -10,9 +10,9 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from inventory_tng import accounts, sign_in
+from inventory_tng.core.settings import RateLimits, Settings, SettingsError
 from inventory_tng.models import ResetLink
 from inventory_tng.resets import RECOVER, REFUSED
-from inventory_tng.settings import RateLimits, Settings, SettingsError
 
 from helpers.mail import NO_MAIL, SentMail
 from helpers.markup import text

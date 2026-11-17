@@ -19,18 +19,19 @@ from sqlalchemy import Engine, TextClause, delete, event, exc, make_url, text
 from sqlalchemy.engine.interfaces import DBAPIConnection
 from sqlalchemy.orm import Session
 
-from inventory_tng import accounts, db, devices, local_env
-from inventory_tng.database_role import refusals
-from inventory_tng.db import (
+from inventory_tng import accounts, devices
+from inventory_tng.core import db, local_env
+from inventory_tng.core.database_role import refusals
+from inventory_tng.core.db import (
     Database,
     make_database,
     make_engine,
     run_outside_transaction,
 )
-from inventory_tng.history import LEDGER
-from inventory_tng.logs import configure_structlog
+from inventory_tng.core.history import LEDGER
+from inventory_tng.core.logs import configure_structlog
+from inventory_tng.core.settings import FrontendConfig, LogConfig, RateLimits
 from inventory_tng.models import Category, ItemPackage, RateLimit
-from inventory_tng.settings import FrontendConfig, LogConfig, RateLimits
 
 from databases import (
     NO_DATABASE,
@@ -85,7 +86,7 @@ def no_settings_from_the_shell(
     Session-scoped, so it runs before every module-scoped fixture too."""
     with pytest.MonkeyPatch.context() as monkeypatch:
         monkeypatch.setattr(
-            "inventory_tng.settings.CLONE_DIST",
+            "inventory_tng.core.settings.CLONE_DIST",
             tmp_path_factory.getbasetemp() / "no-build",
         )
         for name in list(os.environ):

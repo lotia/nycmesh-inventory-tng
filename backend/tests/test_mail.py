@@ -15,7 +15,9 @@ from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
 from structlog.testing import capture_logs
 
-from inventory_tng import accounts, mail, sign_in
+from inventory_tng import accounts, sign_in
+from inventory_tng.core import mail
+from inventory_tng.core.settings import MailConfig, Settings, SettingsError
 from inventory_tng.models import (
     TOTP_POLICIES,
     Admin,
@@ -24,7 +26,6 @@ from inventory_tng.models import (
     SignInSettings,
 )
 from inventory_tng.resets import ASKED, RESET_NOTICE
-from inventory_tng.settings import MailConfig, Settings, SettingsError
 
 from helpers.mail import NO_MAIL, SITE_MAIL, FailingMail, SentMail
 from helpers.markup import text

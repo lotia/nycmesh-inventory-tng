@@ -11,7 +11,7 @@ from sqlalchemy import event
 from sqlalchemy.orm import Session
 
 from inventory_tng.app import create_app
-from inventory_tng.db import (
+from inventory_tng.core.db import (
     LOCKS_INFO,
     UNGUARDED_INFO,
     DbSession,
@@ -20,8 +20,8 @@ from inventory_tng.db import (
     get_snapshot,
     release_hold,
 )
-from inventory_tng.mail import get_mailer
-from inventory_tng.settings import FrontendConfig, LogConfig, RateLimits, Settings
+from inventory_tng.core.mail import get_mailer
+from inventory_tng.core.settings import FrontendConfig, LogConfig, RateLimits, Settings
 
 from databases import NO_DATABASE
 from helpers.mail import SITE_MAIL, SentMail

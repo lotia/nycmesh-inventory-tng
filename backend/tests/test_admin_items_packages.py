@@ -18,7 +18,7 @@ from inventory_tng.admin.items import (
     PACKAGE_TAKEN,
     SHORTER_THAN_WHOLE,
 )
-from inventory_tng.db import RuleBroken, attempt
+from inventory_tng.core.db import RuleBroken, attempt
 from inventory_tng.models import Category, Item, ItemPackage, Label
 
 from helpers.items import NOW, new_item

@@ -14,7 +14,7 @@ from starlette.datastructures import Headers
 from starlette.responses import PlainTextResponse
 from starlette.types import ASGIApp, Receive, Scope, Send
 
-from inventory_tng.phrases import lazy_gettext
+from inventory_tng.core.phrases import lazy_gettext
 
 log = structlog.get_logger(__name__)
 REFUSED = lazy_gettext("Refused: this came from another site's page.")

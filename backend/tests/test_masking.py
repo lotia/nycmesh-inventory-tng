@@ -7,10 +7,10 @@ import structlog
 from pydantic import BaseModel, ValidationError
 from sqlalchemy import exc
 
-from inventory_tng.logs import configure_logging
-from inventory_tng.masking import MASK, Masker, scrub_database_message
+from inventory_tng.core.logs import configure_logging
+from inventory_tng.core.masking import MASK, Masker, scrub_database_message
+from inventory_tng.core.settings import SettingsError
 from inventory_tng.server import create_server
-from inventory_tng.settings import SettingsError
 
 from helpers.settings import settings
 

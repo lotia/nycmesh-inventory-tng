@@ -43,14 +43,17 @@ from sqlalchemy.orm import Session
 from starlette.concurrency import run_in_threadpool
 from starlette.exceptions import HTTPException
 
-from inventory_tng import accounts, mail, masking, once, request_logging
-from inventory_tng.db import (
+from inventory_tng import accounts, once
+from inventory_tng.core import mail, masking, request_logging
+from inventory_tng.core.db import (
     DbSession,
     hold_until_commit,
     record_last_seen,
     set_actor,
 )
-from inventory_tng.mail import Notify
+from inventory_tng.core.mail import Notify
+from inventory_tng.core.phrases import Words, gettext, lazy_gettext
+from inventory_tng.core.settings import RateLimits
 from inventory_tng.models import Admin, AdminSession, SignInSettings, running_low
 from inventory_tng.pages import (
     NOTICES,
@@ -61,8 +64,6 @@ from inventory_tng.pages import (
     sections,
     templates,
 )
-from inventory_tng.phrases import Words, gettext, lazy_gettext
-from inventory_tng.settings import RateLimits
 from inventory_tng.totp_keys import TotpKeys
 from inventory_tng.web import rate_key, set_private_cookie
 

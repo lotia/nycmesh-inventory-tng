@@ -14,7 +14,7 @@ from datetime import datetime
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from inventory_tng.db import (
+from inventory_tng.core.db import (
     Seen,
     enforce,
     exists_where,

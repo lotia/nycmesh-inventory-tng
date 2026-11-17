@@ -11,8 +11,9 @@ from sqlalchemy import Engine, text
 from sqlalchemy.orm import Session
 from structlog.testing import capture_logs
 
-from inventory_tng import local_time, registration_codes
-from inventory_tng.local_time import (
+from inventory_tng import registration_codes
+from inventory_tng.core import local_time
+from inventory_tng.core.local_time import (
     DEFAULT_ZONE,
     local,
     parse_local,
@@ -20,8 +21,8 @@ from inventory_tng.local_time import (
     show_day,
     site_zone,
 )
+from inventory_tng.core.time_zones import is_time_zone, known_zones
 from inventory_tng.models import SiteSettings
-from inventory_tng.time_zones import is_time_zone, known_zones
 
 from helpers.rows import breaks, history, violates
 

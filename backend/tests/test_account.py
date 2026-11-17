@@ -10,8 +10,9 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 from structlog.testing import capture_logs
 
-from inventory_tng import accounts, mail, sign_in
+from inventory_tng import accounts, sign_in
 from inventory_tng.account import CODES_NEED_TOTP, EMAIL_TAKEN
+from inventory_tng.core import mail
 from inventory_tng.models import (
     Admin,
     AdminPassword,

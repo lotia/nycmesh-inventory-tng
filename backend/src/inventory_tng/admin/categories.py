@@ -24,10 +24,10 @@ from inventory_tng.admin.common import (
     undo_retire,
 )
 from inventory_tng.admin.listing import AskedView, Sort, Sorting, View, arranged
-from inventory_tng.db import DbSession, refusal
+from inventory_tng.core.db import DbSession, refusal
+from inventory_tng.core.phrases import Words, lazy_gettext
 from inventory_tng.models import Category, Item
 from inventory_tng.pages import not_found, redirect
-from inventory_tng.phrases import Words, lazy_gettext
 from inventory_tng.sign_in import AdminSignedIn, SignedIn
 
 log = structlog.get_logger(__name__)

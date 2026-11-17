@@ -6,8 +6,8 @@ from structlog.contextvars import merge_contextvars
 from structlog.testing import capture_logs
 
 from inventory_tng.app import create_app
-from inventory_tng.request_logging import request_id
-from inventory_tng.settings import LogConfig, Settings
+from inventory_tng.core.request_logging import request_id
+from inventory_tng.core.settings import LogConfig, Settings
 
 from helpers.apps import out_of_reach
 

@@ -17,7 +17,8 @@ from sqlalchemy import select, union_all
 from sqlalchemy.orm import Session
 
 from inventory_tng import items, units
-from inventory_tng.db import Seen, enforce, lock_catalogue, locked, relock
+from inventory_tng.core.db import Seen, enforce, lock_catalogue, locked, relock
+from inventory_tng.core.phrases import gettext, lazy_gettext
 from inventory_tng.models import (
     CURRENT_ALIAS,
     Item,
@@ -25,7 +26,6 @@ from inventory_tng.models import (
     ItemPackage,
     ReadingRule,
 )
-from inventory_tng.phrases import gettext, lazy_gettext
 
 # Refused: a reading no unit has, or a rule respelling no unit.
 NOT_A_READING = "reading_rule_reading"

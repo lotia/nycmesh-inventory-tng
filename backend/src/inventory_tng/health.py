@@ -4,7 +4,7 @@ from fastapi import APIRouter, Request
 from pydantic import BaseModel, Field
 from sqlalchemy import text
 
-from inventory_tng.db import DbSession
+from inventory_tng.core.db import DbSession
 
 router = APIRouter()
 

@@ -2,8 +2,8 @@
 
 from fastapi import BackgroundTasks
 
-from inventory_tng.mail import Message, Notifier
-from inventory_tng.settings import MailConfig
+from inventory_tng.core.mail import Message, Notifier
+from inventory_tng.core.settings import MailConfig
 
 # Mail as a site sets it up, for apps given a mailer. Links start here.
 SITE_MAIL = MailConfig(

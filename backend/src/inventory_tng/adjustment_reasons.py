@@ -10,7 +10,7 @@ import structlog
 from sqlalchemy import exc, func, select
 from sqlalchemy.orm import Session
 
-from inventory_tng.db import Seen, get_locked, unchanged
+from inventory_tng.core.db import Seen, get_locked, unchanged
 from inventory_tng.models import AdjustmentReason
 
 log = structlog.get_logger(__name__)

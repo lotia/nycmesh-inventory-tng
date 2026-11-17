@@ -47,7 +47,7 @@ from sqlalchemy.dialects.postgresql import distinct_on
 from sqlalchemy.orm import Session
 
 from inventory_tng import units
-from inventory_tng.db import (
+from inventory_tng.core.db import (
     Seen,
     enforce,
     exists_where,

@@ -15,8 +15,6 @@ from inventory_tng import (
     admin,
     bundle,
     catalogue,
-    database_role,
-    db,
     devices,
     health,
     ledger,
@@ -27,12 +25,13 @@ from inventory_tng import (
     security_headers,
     sign_in,
 )
+from inventory_tng.core import database_role, db
+from inventory_tng.core.db import Database, make_database
+from inventory_tng.core.mail import SmtpMailer
+from inventory_tng.core.phrases import BRAND
+from inventory_tng.core.request_logging import RequestLogging
+from inventory_tng.core.settings import Settings
 from inventory_tng.cross_site import CrossSiteRefusal
-from inventory_tng.db import Database, make_database
-from inventory_tng.mail import SmtpMailer
-from inventory_tng.phrases import BRAND
-from inventory_tng.request_logging import RequestLogging
-from inventory_tng.settings import Settings
 from inventory_tng.totp_keys import TotpKeys
 
 log = structlog.get_logger(__name__)

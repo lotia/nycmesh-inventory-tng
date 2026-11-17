@@ -31,7 +31,7 @@ from collections.abc import Iterable, Sequence
 from functools import cache
 from pathlib import Path
 
-from inventory_tng.local_env import CLONE, ENV_FILE, local_env_values, setting
+from inventory_tng.core.local_env import CLONE, ENV_FILE, local_env_values, setting
 
 # compose.yaml's name: the project of every checkout whose .env names none,
 # as each did before it had a stack of its own. Never stale: more than one

@@ -13,7 +13,7 @@ from structlog.testing import capture_logs
 from inventory_tng import over_recorded
 from inventory_tng.admin import over_recorded as over_recorded_page
 from inventory_tng.admin.common import up_to
-from inventory_tng.db import RuleBroken, attempt
+from inventory_tng.core.db import RuleBroken, attempt
 from inventory_tng.models import (
     OVER_RECORDED_REASONS,
     ItemPackage,

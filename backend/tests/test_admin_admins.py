@@ -14,11 +14,12 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 from structlog.testing import capture_logs
 
-from inventory_tng import accounts, activity, mail, sign_in
+from inventory_tng import accounts, activity, sign_in
 from inventory_tng.accounts import NOT_AN_EMAIL, qr_svg, username_problem
 from inventory_tng.admin.admins import ADMINS, OWN_RESET, OWN_RETIRE, TAKEN
+from inventory_tng.core import mail
+from inventory_tng.core.settings import RateLimits
 from inventory_tng.models import ACTIVITY_KINDS, Admin, AdminSession, SignInSettings
-from inventory_tng.settings import RateLimits
 
 from helpers.mail import NO_MAIL, SentMail
 from helpers.markup import button, forms, links, read, row_links, sorted_columns, text

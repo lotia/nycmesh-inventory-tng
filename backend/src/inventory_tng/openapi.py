@@ -10,8 +10,8 @@ from pathlib import Path
 from typing import Any
 
 from inventory_tng.app import create_app
-from inventory_tng.local_env import CLONE
-from inventory_tng.settings import Settings
+from inventory_tng.core.local_env import CLONE
+from inventory_tng.core.settings import Settings
 
 SCHEMA = CLONE / "frontend" / "src" / "api" / "openapi.json"
 # Never connected to: building the app makes an engine, which connects only

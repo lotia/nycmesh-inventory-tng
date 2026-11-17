@@ -33,11 +33,11 @@ from cryptography.exceptions import InvalidTag
 from cryptography.hazmat.primitives.ciphers.aead import AESGCM
 from sqlalchemy.orm import Session
 
-from inventory_tng.local_env import CLONE
-from inventory_tng.settings import SettingsError, is_development
+from inventory_tng.core.local_env import CLONE
+from inventory_tng.core.settings import SettingsError, is_development
 
 if TYPE_CHECKING:  # Imported by the command, which needs no mail for `new`.
-    from inventory_tng.mail import Notifier
+    from inventory_tng.core.mail import Notifier
 
 DEVELOPMENT_DIR = CLONE / ".local" / "totp-keys"
 KEY_BITS = 256
@@ -178,7 +178,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         print(new_key())
         return 0
     # Imported here: `new` needs no database or settings.
-    from inventory_tng.command import run_command, run_command_telling
+    from inventory_tng.core.command import run_command, run_command_telling
 
     if args.command == "reseal":
         return run_command(_reseal, args)

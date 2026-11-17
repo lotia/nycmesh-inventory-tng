@@ -18,9 +18,9 @@ from sqlalchemy import text
 from structlog.testing import capture_logs
 
 from inventory_tng.app import create_app
-from inventory_tng.masking import MASK
-from inventory_tng.settings import LogConfig, Redaction, Settings, SettingsError
-from inventory_tng.telemetry import (
+from inventory_tng.core.masking import MASK
+from inventory_tng.core.settings import LogConfig, Redaction, Settings, SettingsError
+from inventory_tng.core.telemetry import (
     KEPT_ATTRIBUTES,
     KEPT_EVENT_ATTRIBUTES,
     REDACTION_MARK,

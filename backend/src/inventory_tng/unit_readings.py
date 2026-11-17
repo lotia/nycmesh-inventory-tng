@@ -35,8 +35,8 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from inventory_tng import items, models, reading_rules, units
-from inventory_tng.command import run_command, set_up
-from inventory_tng.db import CLI_ACTOR, lock_catalogue, refusal, set_actor
+from inventory_tng.core.command import run_command, set_up
+from inventory_tng.core.db import CLI_ACTOR, lock_catalogue, refusal, set_actor
 from inventory_tng.models import ReadingRule
 
 log = structlog.get_logger(__name__)

@@ -10,7 +10,7 @@ import pytest
 from sqlalchemy import make_url, text
 from sqlalchemy.exc import OperationalError
 
-from inventory_tng.db import make_engine
+from inventory_tng.core.db import make_engine
 from inventory_tng.dev_database import as_superuser
 
 from databases import (

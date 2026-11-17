@@ -27,7 +27,7 @@ from inventory_tng.admin.items import ITEMS
 from inventory_tng.admin.locations import LOCATIONS
 from inventory_tng.admin.settings import SETTINGS
 from inventory_tng.admin.volunteers import VOLUNTEERS
-from inventory_tng.db import (
+from inventory_tng.core.db import (
     Base,
     get_locked,
     locked,
@@ -49,7 +49,7 @@ from helpers.source import SOURCE, offending, outside
 
 # The only code that may lock with with_for_update: the wrappers' bodies.
 WRAPPERS = ("locked", "get_locked")
-DB = SOURCE / "db.py"
+DB = SOURCE / "core" / "db.py"
 # A row lock written in SQL: FOR UPDATE, FOR NO KEY UPDATE, FOR SHARE,
 # FOR KEY SHARE.
 SQL_LOCK = re.compile(

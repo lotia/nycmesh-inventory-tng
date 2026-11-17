@@ -16,8 +16,9 @@ from pathlib import Path
 
 import pytest
 
-from inventory_tng import local_env, stacks
-from inventory_tng.local_env import CLONE
+from inventory_tng import stacks
+from inventory_tng.core import local_env
+from inventory_tng.core.local_env import CLONE
 from inventory_tng.stacks import NEW_PORTS, PORTS, PUBLISHED, SHARED
 
 EXAMPLE = "\n".join(

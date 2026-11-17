@@ -14,9 +14,9 @@ from structlog.testing import capture_logs
 
 from inventory_tng import accounts, totp_keys
 from inventory_tng.app import check_totp_keys
-from inventory_tng.db import Database
+from inventory_tng.core.db import Database
+from inventory_tng.core.settings import SettingsError
 from inventory_tng.models import Authenticator
-from inventory_tng.settings import SettingsError
 from inventory_tng.totp_keys import TotpKeys, TotpKeysError, Unreadable, keys_dir
 
 from helpers.sign_in import TOTP_KEYS, code, new_admin, raw_key

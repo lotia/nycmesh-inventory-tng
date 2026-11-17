@@ -18,7 +18,7 @@ from inventory_tng.bundle import (
     Bundle,
     Tags,
 )
-from inventory_tng.settings import FrontendConfig
+from inventory_tng.core.settings import FrontendConfig
 
 from helpers.markup import read
 

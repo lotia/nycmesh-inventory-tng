@@ -16,7 +16,7 @@ from inventory_tng.admin.items import ITEMS
 from inventory_tng.admin.locations import LOCATIONS
 from inventory_tng.admin.settings import SETTINGS
 from inventory_tng.admin.volunteers import VOLUNTEERS
-from inventory_tng.db import Base
+from inventory_tng.core.db import Base
 from inventory_tng.models import (
     AdjustmentReason,
     Category,

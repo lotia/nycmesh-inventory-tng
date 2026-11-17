@@ -32,7 +32,7 @@ from inventory_tng.admin.items import (
     TAKEN,
     TAKEN_FIELDS,
 )
-from inventory_tng.local_time import DEFAULT_ZONE
+from inventory_tng.core.local_time import DEFAULT_ZONE
 from inventory_tng.models import (
     Category,
     Item,

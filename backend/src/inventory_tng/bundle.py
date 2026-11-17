@@ -21,9 +21,9 @@ from fastapi.responses import PlainTextResponse, RedirectResponse, Response
 from servestatic import ServeStaticASGI
 from starlette.types import ASGIApp
 
+from inventory_tng.core.phrases import lazy_gettext
+from inventory_tng.core.settings import FrontendConfig, Settings
 from inventory_tng.pages import templates
-from inventory_tng.phrases import lazy_gettext
-from inventory_tng.settings import FrontendConfig, Settings
 
 log = structlog.get_logger(__name__)
 

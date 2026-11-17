@@ -24,8 +24,8 @@ from inventory_tng import (
     locations,
     volunteers,
 )
-from inventory_tng.command import run_command
-from inventory_tng.db import CLI_ACTOR, exists_where, set_actor, settings_row
+from inventory_tng.core.command import run_command
+from inventory_tng.core.db import CLI_ACTOR, exists_where, set_actor, settings_row
 from inventory_tng.ledger import Batch, record
 from inventory_tng.models import Admin, Location, SignInSettings
 

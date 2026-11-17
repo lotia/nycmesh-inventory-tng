@@ -12,14 +12,15 @@ from fastapi import APIRouter, Form, Request
 from fastapi.responses import HTMLResponse, Response
 from sqlalchemy.orm import Session
 
-from inventory_tng import accounts, mail
-from inventory_tng.db import DbSession, unique
-from inventory_tng.local_time import site_zone
-from inventory_tng.mail import Notify
+from inventory_tng import accounts
+from inventory_tng.core import mail
+from inventory_tng.core.db import DbSession, unique
+from inventory_tng.core.local_time import site_zone
+from inventory_tng.core.mail import Notify
+from inventory_tng.core.phrases import Words, lazy_gettext
 from inventory_tng.models import running_low
 from inventory_tng.once import OnceKey, sent_before
 from inventory_tng.pages import NOTICES, not_found, page, redirect
-from inventory_tng.phrases import Words, lazy_gettext
 from inventory_tng.sign_in import (
     ACCOUNT,
     ACCOUNT_TITLE,

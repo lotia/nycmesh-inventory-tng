@@ -16,9 +16,9 @@ from sqlalchemy.orm import Session, object_session
 from starlette.exceptions import HTTPException
 from starlette.types import Scope
 
-from inventory_tng.db import Gone
-from inventory_tng.local_time import show, show_day
-from inventory_tng.phrases import BRAND, install, lazy_gettext, ngettext, number
+from inventory_tng.core.db import Gone
+from inventory_tng.core.local_time import show, show_day
+from inventory_tng.core.phrases import BRAND, install, lazy_gettext, ngettext, number
 
 templates = Jinja2Templates(directory=Path(__file__).parent / "templates")
 install(templates.env)

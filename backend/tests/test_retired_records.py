@@ -13,7 +13,7 @@ from sqlalchemy.orm import Session
 from inventory_tng import categories
 from inventory_tng.admin.common import RETIRED, RULES, retired_by
 from inventory_tng.admin.volunteers import BRING_THEM_BACK
-from inventory_tng.db import set_actor
+from inventory_tng.core.db import set_actor
 from inventory_tng.models import (
     Admin,
     Category,

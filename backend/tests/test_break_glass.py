@@ -14,10 +14,11 @@ from fastapi.testclient import TestClient
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from inventory_tng import accounts, activity, admins, devices, mail, sign_in, totp_keys
-from inventory_tng.mail import Notifier
+from inventory_tng import accounts, activity, admins, devices, sign_in, totp_keys
+from inventory_tng.core import mail
+from inventory_tng.core.mail import Notifier
+from inventory_tng.core.settings import RateLimits
 from inventory_tng.models import Admin, Authenticator, RegistrationCode, ResetLink
-from inventory_tng.settings import RateLimits
 
 from helpers.mail import NO_MAIL, SentMail
 from helpers.sign_in import (

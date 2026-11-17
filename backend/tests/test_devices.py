@@ -15,11 +15,11 @@ from sqlalchemy import Engine, select, update
 from sqlalchemy.orm import Session
 
 from inventory_tng import devices, registration_codes
-from inventory_tng.db import Database, get_locked
+from inventory_tng.core.db import Database, get_locked
+from inventory_tng.core.logs import configure_logging
+from inventory_tng.core.settings import LogConfig, Settings
 from inventory_tng.devices import COOKIE, RegisteredDevice, RegistrationRejected
-from inventory_tng.logs import configure_logging
 from inventory_tng.models import CatalogueHistory, Device, RegistrationCode
-from inventory_tng.settings import LogConfig, Settings
 
 from helpers.concurrency import Committed
 from helpers.devices import ADDRESS, new_device

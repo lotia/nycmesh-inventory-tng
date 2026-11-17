@@ -17,12 +17,13 @@ from fastapi import APIRouter, Form, Request
 from fastapi.responses import HTMLResponse, Response
 from sqlalchemy.orm import Session
 
-from inventory_tng import accounts, mail
-from inventory_tng.db import DbSession, SessionFactory, Sessions
-from inventory_tng.mail import Notify
+from inventory_tng import accounts
+from inventory_tng.core import mail
+from inventory_tng.core.db import DbSession, SessionFactory, Sessions
+from inventory_tng.core.mail import Notify
+from inventory_tng.core.phrases import Words, lazy_gettext
 from inventory_tng.models import ResetLink
 from inventory_tng.pages import NOTICES, not_found, page, redirect
-from inventory_tng.phrases import Words, lazy_gettext
 from inventory_tng.sign_in import FORGOT, RESET, SIGN_IN, TOO_MANY, reset_url
 from inventory_tng.web import rate_key
 

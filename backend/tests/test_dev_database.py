@@ -14,7 +14,7 @@ from sqlalchemy.exc import OperationalError, ProgrammingError
 from structlog.testing import capture_logs
 
 from inventory_tng import dev_database
-from inventory_tng.db import (
+from inventory_tng.core.db import (
     CANNOT_CONNECT_TO_MIGRATE,
     connect_to_migrate,
     make_engine,

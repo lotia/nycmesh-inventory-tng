@@ -13,7 +13,7 @@ from sqlalchemy.orm import Session
 
 from inventory_tng import ledger, open_packages, over_recorded
 from inventory_tng.admin.counts import COUNTS
-from inventory_tng.db import RuleBroken
+from inventory_tng.core.db import RuleBroken
 from inventory_tng.ledger import Form, expected
 from inventory_tng.models import (
     LedgerTransaction,

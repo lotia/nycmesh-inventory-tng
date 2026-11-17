@@ -28,9 +28,9 @@ from opentelemetry import metrics
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from inventory_tng.core.phrases import BRAND, Words, gettext, lazy_gettext, ngettext
+from inventory_tng.core.settings import MailConfig
 from inventory_tng.models import Admin, SignInSettings, running_low
-from inventory_tng.phrases import BRAND, Words, gettext, lazy_gettext, ngettext
-from inventory_tng.settings import MailConfig
 
 log = structlog.get_logger(__name__)
 meter = metrics.get_meter(__name__)

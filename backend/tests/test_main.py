@@ -2,8 +2,9 @@ from pathlib import Path
 
 import pytest
 
-from inventory_tng import __main__, local_env
-from inventory_tng.settings import SettingsError
+from inventory_tng import __main__
+from inventory_tng.core import local_env
+from inventory_tng.core.settings import SettingsError
 
 
 @pytest.fixture

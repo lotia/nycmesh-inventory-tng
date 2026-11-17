@@ -22,8 +22,8 @@ from sqlalchemy import Executable, delete, exc, text, update
 from sqlalchemy.orm import Session
 
 from inventory_tng import devices
-from inventory_tng.db import Base, Flag, set_actor
-from inventory_tng.history import (
+from inventory_tng.core.db import Base, Flag, set_actor
+from inventory_tng.core.history import (
     Change,
     change,
     has_history,
@@ -230,9 +230,9 @@ def test_the_flagged_columns_are_on_tables_with_history(
 # function, each because history would record nothing of it anyway.
 ALLOWED = {
     # Sets last_seen_at alone, which is not history ("not_a_change").
-    SOURCE / "db.py": ("record_last_seen",),
+    SOURCE / "core" / "db.py": ("record_last_seen",),
     # Writes catalogue_history itself.
-    SOURCE / "history.py": ("_after_flush",),
+    SOURCE / "core" / "history.py": ("_after_flush",),
 }
 
 

@@ -11,7 +11,7 @@ from pathlib import Path
 
 import pytest
 
-from inventory_tng.local_env import CLONE
+from inventory_tng.core.local_env import CLONE
 
 from helpers.clone_files import text_files
 

@@ -26,8 +26,9 @@ from inventory_tng.accounts import (
     password_problem,
     username_problem,
 )
+from inventory_tng.core.masking import Masker
+from inventory_tng.core.settings import RateLimits
 from inventory_tng.cross_site import cross_site
-from inventory_tng.masking import Masker
 from inventory_tng.models import (
     LABEL_ALPHABET,
     Admin,
@@ -37,7 +38,6 @@ from inventory_tng.models import (
     SignInSettings,
 )
 from inventory_tng.pages import retired_holding
-from inventory_tng.settings import RateLimits
 
 from helpers.markup import read, text
 from helpers.sign_in import (

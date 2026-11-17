@@ -22,7 +22,7 @@ from inventory_tng.admin.reading_rules import (
     SEED,
 )
 from inventory_tng.catalogue import catalogue
-from inventory_tng.db import lock_catalogue
+from inventory_tng.core.db import lock_catalogue
 from inventory_tng.models import (
     Admin,
     Category,

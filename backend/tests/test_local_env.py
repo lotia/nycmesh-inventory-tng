@@ -5,7 +5,7 @@ from pathlib import Path
 
 import pytest
 
-from inventory_tng import local_env
+from inventory_tng.core import local_env
 
 
 def test_the_shell_wins_over_the_file(
@@ -70,7 +70,7 @@ def test_a_setting_comes_from_the_shell_then_the_file(
 def test_it_runs_as_a_module(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
-    """As the task scripts run it: python -m inventory_tng.local_env."""
+    """As the task scripts run it: python -m inventory_tng.core.local_env."""
     env = tmp_path / ".env"
     env.write_text("INVENTORY_TEST_ONLY_SETTING=from the file\n")
     monkeypatch.delenv("INVENTORY_TEST_ONLY_SETTING", raising=False)
@@ -78,5 +78,5 @@ def test_it_runs_as_a_module(
         sys, "argv", ["local_env", "INVENTORY_TEST_ONLY_SETTING", "--file", str(env)]
     )
     with pytest.warns(RuntimeWarning, match="found in sys.modules"):
-        runpy.run_module("inventory_tng.local_env", run_name="__main__")
+        runpy.run_module("inventory_tng.core.local_env", run_name="__main__")
     assert capsys.readouterr().out == "from the file\n"

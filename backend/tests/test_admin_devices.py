@@ -22,8 +22,8 @@ from inventory_tng.admin.devices import (
     revoke_many_title,
     uses_problem,
 )
+from inventory_tng.core.phrases import compiled, speaking
 from inventory_tng.models import Device, RegistrationCode, SiteSettings
-from inventory_tng.phrases import compiled, speaking
 
 from helpers.devices import new_device
 from helpers.markup import (

@@ -13,11 +13,11 @@ import structlog
 from fastapi import BackgroundTasks
 from sqlalchemy.orm import Session
 
-from inventory_tng.db import make_database
-from inventory_tng.local_env import load_local_env
-from inventory_tng.logs import configure_logging
-from inventory_tng.mail import Notifier, SmtpMailer
-from inventory_tng.settings import Settings
+from inventory_tng.core.db import make_database
+from inventory_tng.core.local_env import load_local_env
+from inventory_tng.core.logs import configure_logging
+from inventory_tng.core.mail import Notifier, SmtpMailer
+from inventory_tng.core.settings import Settings
 
 log = structlog.get_logger(__name__)
 

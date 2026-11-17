@@ -7,7 +7,7 @@ from pathlib import Path
 
 from pathspec import GitIgnoreSpec
 
-from inventory_tng.local_env import CLONE
+from inventory_tng.core.local_env import CLONE
 
 # Version control's own stores, which no .gitignore can name.
 NOT_OURS = {".git", ".jj"}

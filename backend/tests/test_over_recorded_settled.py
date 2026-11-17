@@ -21,9 +21,9 @@ from inventory_tng.admin.common import SETTLED_VIEW
 from inventory_tng.admin.counts import COUNTS
 from inventory_tng.admin.over_recorded import waiting_view
 from inventory_tng.admin.stock import recorded_more_view
-from inventory_tng.local_time import show, show_day, site_zone
+from inventory_tng.core.local_time import show, show_day, site_zone
+from inventory_tng.core.phrases import compiled, speaking
 from inventory_tng.models import LedgerTransaction, Movement, OverRecorded
-from inventory_tng.phrases import compiled, speaking
 
 from helpers.markup import Element, links, read, sorted_columns
 from helpers.over_recorded import PAGE

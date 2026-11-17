@@ -40,8 +40,8 @@ from typing import Any
 from babel.support import LazyProxy
 
 from inventory_tng import names
-from inventory_tng.local_env import CLONE
-from inventory_tng.phrases import gettext, lazy_gettext
+from inventory_tng.core.local_env import CLONE
+from inventory_tng.core.phrases import gettext, lazy_gettext
 
 # Raise it whenever a change to the table reads any text otherwise, or
 # search keeps it otherwise (models.held): rows record what folded them

@@ -53,7 +53,7 @@ from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.orm import Session
 
 from inventory_tng import open_packages, over_recorded, page_builds
-from inventory_tng.db import (
+from inventory_tng.core.db import (
     DbSession,
     RuleBroken,
     by_name,
@@ -63,8 +63,8 @@ from inventory_tng.db import (
     locked,
     set_actor,
 )
+from inventory_tng.core.local_time import zone_at
 from inventory_tng.devices import DeviceRefusedReply, RegisteredDevice
-from inventory_tng.local_time import zone_at
 from inventory_tng.models import (
     INTEGER_MAX,
     STORE_KINDS,

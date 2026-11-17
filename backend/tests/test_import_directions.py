@@ -6,7 +6,7 @@ ledger).
 
 Today's breaks are listed in BREAKS, which may only shrink: a new break
 fails, and so does one fixed but still listed. Rules naming folders that do
-not exist yet (core/, web/, a feature's package, routes.py, queries.py,
+not exist yet (web/, a feature's package, routes.py, queries.py,
 command.py, manage.py) apply as they appear.
 """
 
@@ -21,26 +21,8 @@ from inventory_tng import models
 
 from helpers.source import SOURCE, modules
 
-# Core is plumbing, not business rules: core/, and until they move there,
-# these modules at the top of the package.
-CORE = {
-    "command.py",
-    "database_role.py",
-    "db.py",
-    "history.py",
-    "local_env.py",
-    "local_time.py",
-    "logs.py",
-    "mail.py",
-    "masking.py",
-    "phrases.py",
-    "rate_limits.py",
-    "request_logging.py",
-    "settings.py",
-    "telemetry.py",
-    "time_zones.py",
-}
-# What core may import besides core: the models, kept whole (0023).
+# Core is plumbing, not business rules: core/. What it may import
+# besides core: the models, kept whole (0023).
 CORE_MAY_IMPORT = {"models.py"}
 # What every server-rendered page shares, until it moves into web/.
 WEB = {"pages.py", "web.py"}
@@ -284,7 +266,7 @@ def imported(tree: ast.Module, path: str, known: Collection[str]) -> list[str]:
 
 
 def is_core(path: str) -> bool:
-    return path in CORE or path.startswith("core/")
+    return path.startswith("core/")
 
 
 def is_web(path: str) -> bool:
@@ -486,12 +468,11 @@ KNOWN = {
     "catalogue/command.py",
     "core/__init__.py",
     "core/db.py",
-    "db.py",
+    "core/settings.py",
     "ledger.py",
     "manage.py",
     "models.py",
     "pages.py",
-    "settings.py",
     "stock/__init__.py",
     "stock/api.py",
     "stock/ledger.py",
@@ -503,13 +484,14 @@ KNOWN = {
 @pytest.mark.parametrize(
     ("path", "source", "breaks"),
     [
-        ("db.py", "from inventory_tng import ledger", ["ledger.py"]),
-        ("db.py", "def f():\n    from . import ledger", ["ledger.py"]),
+        ("core/db.py", "from inventory_tng import ledger", ["ledger.py"]),
+        ("core/db.py", "def f():\n    from .. import ledger", ["ledger.py"]),
         ("core/db.py", "from ..catalogue.items import x", ["catalogue/items.py"]),
         ("core/db.py", "import inventory_tng.stock.ledger", ["stock/ledger.py"]),
-        ("db.py", "from inventory_tng import settings, models", []),
-        ("core/db.py", "from . import db\nfrom .. import settings", []),
-        ("ledger.py", "from inventory_tng import settings", []),
+        ("core/db.py", "from inventory_tng import models", []),
+        ("core/db.py", "from inventory_tng.core import settings", []),
+        ("core/db.py", "from . import db, settings", []),
+        ("ledger.py", "from inventory_tng.core import settings", []),
         # Above inventory_tng, so none of the app's.
         ("core/db.py", "from ... import ledger", []),
     ],
@@ -536,7 +518,7 @@ def test_core_importing_a_feature_is_found(
             "from inventory_tng.web import formatting",
             ["web/formatting.py"],
         ),
-        ("ledger.py", "from inventory_tng import db", []),
+        ("ledger.py", "from inventory_tng.core import db", []),
         # Neither rules nor queries.
         ("catalogue/routes.py", "from fastapi import APIRouter", []),
     ],
@@ -641,13 +623,13 @@ def test_an_init_not_empty_is_found(path: str, source: str, breaks: list[str]) -
             ["catalogue/command.py"],
         ),
         ("manage.py", "from inventory_tng.catalogue import command", []),
-        # Today's command.py, what every command shares.
-        ("ledger.py", "from inventory_tng.command import run_command", []),
+        # core/command.py, what every command shares.
+        ("ledger.py", "from inventory_tng.core.command import run_command", []),
         ("ledger.py", "from inventory_tng.dev import command", []),
     ],
 )
 def test_a_command_imported_outside_manage_is_found(
     path: str, source: str, breaks: list[str]
 ) -> None:
-    known = {*KNOWN, "command.py", "dev/__init__.py", "dev/command.py"}
+    known = {*KNOWN, "core/command.py", "dev/__init__.py", "dev/command.py"}
     assert command_imported_outside_manage(ast.parse(source), path, known) == breaks

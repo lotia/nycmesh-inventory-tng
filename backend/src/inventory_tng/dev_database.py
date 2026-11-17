@@ -17,10 +17,10 @@ import structlog
 from sqlalchemy import URL, Connection, make_url, text
 from sqlalchemy.exc import ProgrammingError
 
-from inventory_tng.command import set_up
-from inventory_tng.db import make_engine
-from inventory_tng.local_env import CLONE
-from inventory_tng.settings import migration_settings
+from inventory_tng.core.command import set_up
+from inventory_tng.core.db import make_engine
+from inventory_tng.core.local_env import CLONE
+from inventory_tng.core.settings import migration_settings
 
 log = structlog.get_logger(__name__)
 

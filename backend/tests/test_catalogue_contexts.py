@@ -6,8 +6,8 @@ from pathlib import Path
 
 import pytest
 
-from inventory_tng.local_env import CLONE
-from inventory_tng.phrases import ENGLISH_PO, read
+from inventory_tng.core.local_env import CLONE
+from inventory_tng.core.phrases import ENGLISH_PO, read
 
 pytestmark = pytest.mark.clone
 

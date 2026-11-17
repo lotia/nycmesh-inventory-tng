@@ -21,8 +21,8 @@ from structlog.testing import capture_logs
 
 from inventory_tng import security_headers, sign_in
 from inventory_tng.bundle import MANIFEST
-from inventory_tng.local_env import CLONE
-from inventory_tng.settings import FrontendConfig, RateLimits
+from inventory_tng.core.local_env import CLONE
+from inventory_tng.core.settings import FrontendConfig, RateLimits
 
 # A build with every entry the pages load, and one file to serve.
 MANIFEST_ENTRIES = {

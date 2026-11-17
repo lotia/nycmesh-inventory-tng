@@ -74,20 +74,17 @@ from sqlalchemy.orm import (
 
 # Imported for its flush listeners: whatever can write these tables records
 # their history.
-from inventory_tng import (
-    history,  # noqa: F401
-    names,
-    units,
-)
-from inventory_tng.db import (
+from inventory_tng import names, units
+from inventory_tng.core import history  # noqa: F401
+from inventory_tng.core.db import (
     ACTOR_PATTERN,
     READ_AGAIN_ONCE_LOCKED,
     Base,
     enforce,
     protection,
 )
-from inventory_tng.phrases import gettext
-from inventory_tng.time_zones import is_time_zone
+from inventory_tng.core.phrases import gettext
+from inventory_tng.core.time_zones import is_time_zone
 
 QUANTITY = Numeric(12, 3)
 # The largest PostgreSQL integer: what an id or other integer column holds.
@@ -981,7 +978,7 @@ class CatalogueHistory(Base):
         CheckConstraint(f"actor ~ '^({ACTOR_PATTERN})$'", name="actor"),
         # A row's history, such as who retired it (admin/common.retired_by).
         Index("ix_catalogue_history_table_name_row_id", "table_name", "row_id"),
-        protection(owner="history.py", lock=None, history=False),
+        protection(owner="core/history.py", lock=None, history=False),
     )
 
     # bigint: one row per change to any table above.
@@ -1598,7 +1595,7 @@ class RateLimit(Base):
     __tablename__ = "rate_limit"
     __table_args__ = (
         Index("ix_rate_limit_expires_at", "expires_at"),
-        protection(owner="rate_limits.py", lock=None, history=False),
+        protection(owner="core/rate_limits.py", lock=None, history=False),
     )
 
     key: Mapped[str] = mapped_column(Text, primary_key=True)

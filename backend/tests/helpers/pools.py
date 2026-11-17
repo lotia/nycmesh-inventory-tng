@@ -8,7 +8,7 @@ from contextlib import contextmanager
 from sqlalchemy import event
 from sqlalchemy.pool import ConnectionPoolEntry, Pool
 
-from inventory_tng.db import Database, make_database
+from inventory_tng.core.db import Database, make_database
 
 # Every pool's connections checked out and not yet given back, kept by the
 # events below, which count without a query.
