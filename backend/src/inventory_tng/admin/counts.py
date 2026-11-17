@@ -37,7 +37,7 @@ from urllib.parse import urlencode
 import structlog
 from fastapi import APIRouter, Depends, Request
 from fastapi.responses import HTMLResponse, Response
-from sqlalchemy import ColumnElement, Select, case, func, select
+from sqlalchemy import ColumnElement, case, func
 from sqlalchemy.orm import Session
 
 from inventory_tng import open_packages, over_recorded
@@ -57,8 +57,7 @@ from inventory_tng.admin.common import (
     text_form,
 )
 from inventory_tng.admin.items import SEARCHED
-from inventory_tng.admin.listing import UNASKED, AskedView, Sort, Sorting, View, ordered
-from inventory_tng.admin.listing import count as how_many
+from inventory_tng.admin.listing import UNASKED, AskedView, Sort, Sorting, View, order
 from inventory_tng.admin.needs_action import OnlyItem
 from inventory_tng.admin.settings import SETTINGS
 from inventory_tng.admins.guards import AdminSignedIn, SignedIn
@@ -87,7 +86,6 @@ from inventory_tng.models import (
     ItemPackage,
     LedgerTransaction,
     Location,
-    Movement,
     OpenPackage,
     whole,
 )
@@ -100,6 +98,7 @@ from inventory_tng.pages import (
     redirect,
     retired_holding,
 )
+from inventory_tng.stock import queries
 from inventory_tng.stock.balance import countable, retired_holding_stock_count, takeable
 
 log = structlog.get_logger(__name__)
@@ -187,12 +186,6 @@ def _places(session: Session) -> list[Location]:
     return by_name(session, Location, countable())
 
 
-# The place a count or an adjustment was at.
-_place = func.coalesce(
-    LedgerTransaction.to_location_id, LedgerTransaction.from_location_id
-)
-# What the list of counts and adjustments may be filtered to, by kind.
-KINDS = ("count", "adjustment")
 # Translators: a count, as a kind of save, before what it saved.
 COUNT_KIND = lazy_gettext("Count")
 # How it sorts: newest first, as it always has, or by a heading; What by
@@ -214,17 +207,6 @@ SORTING = Sorting(
 )
 
 
-def _done(*where: ColumnElement[bool]) -> Select:
-    """The counts and adjustments `where` picks, with who, where and why."""
-    return (
-        select(LedgerTransaction, Admin.username, Location.name, AdjustmentReason.name)
-        .join(Admin, Admin.id == LedgerTransaction.admin_id)
-        .join(Location, Location.id == _place)
-        .outerjoin(AdjustmentReason, AdjustmentReason.id == LedgerTransaction.reason_id)
-        .where(LedgerTransaction.kind.in_(KINDS), *where)
-    )
-
-
 def _view(
     asked: AskedView,
     place: str = "",
@@ -237,7 +219,7 @@ def _view(
     admin_id = whole(admin, 1, INTEGER_MAX)
     filters = {
         "place": str(place_id or ""),
-        "kind": kind if kind in KINDS else "",
+        "kind": kind if kind in queries.KINDS else "",
         "admin": str(admin_id or ""),
     }
     return View.read(COUNTS, SORTING, asked, filters=filters)
@@ -246,22 +228,25 @@ def _view(
 def _recent(session: Session, view: View) -> tuple[list[dict[str, Any]], View]:
     """The counts and adjustments the view picks, in its order, one page
     of them, with their lines; and the view counted."""
-    where = []
+    where: list[ColumnElement[bool]] = []
     if place := view.filtered("place"):
-        where.append(_place == int(place))
+        where.append(queries.count_place == int(place))
     if kind := view.filtered("kind"):
         where.append(LedgerTransaction.kind == kind)
     if admin := view.filtered("admin"):
         where.append(LedgerTransaction.admin_id == int(admin))
-    query = _done(*where)
-    view = view.counted(how_many(session, query))
-    rows = session.execute(ordered(query, view, LedgerTransaction.id)).all()
+    view = view.counted(queries.counts_and_adjustments_found(session, *where))
+    rows = queries.counts_and_adjustments(
+        session,
+        *where,
+        order=order(view, LedgerTransaction.id),
+        limit=view.per_page,
+        offset=view.offset,
+    )
     log.debug("counts listed", found=view.found, sort=view.by, page=view.page)
     lines: dict[int, list[tuple[Item, Decimal]]] = {}
-    for transaction_id, item, amount in session.execute(
-        select(Movement.transaction_id, Item, Movement.quantity)
-        .join(Item, Item.id == Movement.item_id)
-        .where(Movement.transaction_id.in_([row[0].id for row in rows]))
+    for transaction_id, item, amount in queries.count_lines(
+        session, [row[0].id for row in rows]
     ):
         lines.setdefault(transaction_id, []).append((item, amount))
     return [
@@ -288,7 +273,6 @@ def _counts_page(
 ) -> HTMLResponse:
     recent, view = _recent(session, view or _view(UNASKED))
     # The filters offer where and by whom there are any.
-    done = select(LedgerTransaction).where(LedgerTransaction.kind.in_(KINDS))
     return admin_page(
         request,
         signed,
@@ -302,18 +286,10 @@ def _counts_page(
             "reasons": current_rows(session, AdjustmentReason),
             "recent": recent,
             "view": view,
-            "kinds": KINDS,
+            "kinds": queries.KINDS,
             "count_kind": COUNT_KIND,
-            "counted_places": session.execute(
-                select(Location.id, Location.name)
-                .where(Location.id.in_(done.with_only_columns(_place)))
-                .order_by(func.lower(Location.name), Location.id)
-            ).all(),
-            "counters": session.execute(
-                select(Admin.id, Admin.username)
-                .where(Admin.id.in_(done.with_only_columns(LedgerTransaction.admin_id)))
-                .order_by(func.lower(Admin.username), Admin.id)
-            ).all(),
+            "counted_places": queries.places_counted(session),
+            "counters": queries.counters(session),
             "key": uuid.uuid4(),
             "problems": problems,
             "values": values,
@@ -351,12 +327,11 @@ class Shown(NamedTuple):
         """The items shown, of any at all; None for every one."""
         if not self.search:
             return None if self.only is None else {self.only.id}
-        query = select(Item.id).where(
-            SEARCHED.matching(self.search, SEARCHED.rules(session))
+        return queries.item_ids_matching(
+            session,
+            SEARCHED.matching(self.search, SEARCHED.rules(session)),
+            None if self.only is None else self.only.id,
         )
-        if self.only is not None:
-            query = query.where(Item.id == self.only.id)
-        return set(session.scalars(query))
 
     def query(self) -> str:
         """The query string that shows the count so, for links and the
@@ -420,7 +395,7 @@ def _count_page(
     if missing := was.keys() - named.keys():
         # What the records had then but cannot be counted now, or what the
         # form's items, sent back, name that is no item at all.
-        missed = session.scalars(select(Item).where(Item.id.in_(missing)))
+        missed = queries.items_with_ids(session, missing)
         named |= {item.id: item for item in missed}
     rows = sorted(
         (
@@ -469,9 +444,7 @@ def count_form(
     location_id: int,
     shown: ShownItems,
 ) -> Response:
-    place = session.scalar(
-        select(Location).where(Location.id == location_id, countable())
-    )
+    place = queries.countable_place(session, location_id)
     if place is None:
         return not_found()
     return _count_page(
@@ -518,21 +491,9 @@ def _forms(
     puts neither of its ends right (docs/decisions/0020)."""
     found = expected_forms(session, place_id, as_of, item_ids)
     packages = {
-        package.id: package
-        for package in session.scalars(
-            select(ItemPackage).where(ItemPackage.item_id.in_(item_ids))
-        )
+        package.id: package for package in queries.packages_of(session, item_ids)
     }
-    opened = {
-        row.id: row
-        for row in session.scalars(
-            select(OpenPackage).where(
-                OpenPackage.location_id == place_id,
-                OpenPackage.closed_at.is_(None),
-                OpenPackage.item_id.in_(item_ids),
-            )
-        )
-    }
+    opened = {row.id: row for row in queries.open_at(session, place_id, item_ids)}
     held: dict[int, dict[Form, Decimal]] = {}
     for (item_id, form), amount in found.items():
         # One closed since is not counted: its row is gone from the place.
@@ -591,15 +552,9 @@ def _forms(
 def _followed(session: Session) -> list[tuple[ItemPackage, str, str]]:
     """Current packages of current items followed once opened, with their
     item's name and unit: what an open package nobody recorded may be."""
-    rows = session.execute(
-        select(ItemPackage, Item.name_shown, Item.unit, Item.track_opened)
-        .join(Item, Item.id == ItemPackage.item_id)
-        .where(ItemPackage.retired_at.is_(None), Item.retired_at.is_(None))
-        .order_by(func.lower(Item.name), ItemPackage.size)
-    )
     return [
         (package, name, unit)
-        for package, name, unit, item_tracks in rows
+        for package, name, unit, item_tracks in queries.current_packages(session)
         if tracks_opened(item_tracks, package.track_opened)
     ]
 
@@ -670,10 +625,7 @@ def _by_form(
         if field.startswith(LOOSE_FIELD)
         and (item_id := row_id(field.removeprefix(LOOSE_FIELD))) is not None
     ]
-    items = {
-        item.id: item
-        for item in session.scalars(select(Item).where(Item.id.in_(item_ids)))
-    }
+    items = {item.id: item for item in queries.items_with_ids(session, item_ids)}
     for field, typed in form.items():
         state = form.get(f"{STATE}{field.removeprefix(OPENED)}", "here")
         # A blank line is not counted, but one said used up or not here is
@@ -746,13 +698,7 @@ def _counted(
 ) -> tuple[ItemLines, dict[str, Words]]:
     """What was typed, as lines of an item and an amount, and what is wrong
     with it."""
-    units = dict(
-        session.execute(
-            select(Item.id, Item.unit).where(
-                Item.id.in_([item_id for _, item_id, _ in found if item_id])
-            )
-        ).all()
-    )
+    units = queries.units_of(session, [item_id for _, item_id, _ in found if item_id])
     counted: list[tuple[int, Decimal]] = []
     problems: dict[str, Words] = {}
     for field, item_id, typed in found:

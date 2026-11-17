@@ -90,3 +90,4 @@ short test. `core/` is the name FastAPI's full-stack template uses;
 | `catalogue.py` | `scan/catalogue_api.py` |
 | `catalogue.py`: the reply schemas | `scan/catalogue_schemas.py` |
 | `admin/stock.py`: its queries | `stock/queries.py` |
+| `admin/counts.py`: its queries | `stock/queries.py` |

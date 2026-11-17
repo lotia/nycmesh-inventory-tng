@@ -69,18 +69,6 @@ BREAKS: dict[str, dict[str, list[str]]] = {
     "routes_run_queries": {
         "admin/admins.py": ["_list_page: 2"],
         "admin/categories.py": ["_category_page: 2", "_items: 2", "_list_page: 2"],
-        "admin/counts.py": [
-            "Shown: 2",
-            "_by_form: 2",
-            "_count_page: 2",
-            "_counted: 2",
-            "_counts_page: 5",
-            "_done: 1",
-            "_followed: 2",
-            "_forms: 4",
-            "_recent: 3",
-            "count_form: 2",
-        ],
         "admin/devices.py": ["_list_page: 4", "device_list: 1"],
         "admin/home.py": ["home: 2"],
         "admin/items.py": [
