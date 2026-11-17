@@ -28,13 +28,13 @@ export const PER_HOUR: Record<Event["kind"], number> = {
   web_vital: 10,
   error: 10,
   outbox_retry: 10,
-  // Less what was taken for difference_added (Ali, inventory-tng-0gg,
+  // Gave part of its share to difference_added (Ali, inventory-tng-0gg,
   // 2026-11-15).
   scan_to_save: 18,
   // Once a tab, or twice, then too old (build.ts); once a load for each
   // of saves and a cart an older build left, and once for each put back in
   // the cart, by a tap or not, discarded, or a line of one discarded
-  // (older.ts): past its share, the hour's rest are not counted.
+  // (older.ts): past each one's share, the hour's rest are not counted.
   out_of_date: 2,
   older_storage: 4,
   // A volunteer starting again; more than its share an hour is no new news.
