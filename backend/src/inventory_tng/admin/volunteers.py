@@ -10,7 +10,7 @@ from typing import Annotated
 import structlog
 from fastapi import APIRouter, Depends, Form, Request
 from fastapi.responses import HTMLResponse, JSONResponse, Response
-from sqlalchemy import exists, func, not_, select
+from sqlalchemy import exists, func, not_
 from sqlalchemy.orm import Session
 
 from inventory_tng.accounts import email_problem
@@ -34,7 +34,7 @@ from inventory_tng.core.db import DbSession, attempt
 from inventory_tng.core.phrases import Words, gettext, lazy_gettext
 from inventory_tng.models import Location, Volunteer
 from inventory_tng.pages import NOTICES, not_found, redirect
-from inventory_tng.volunteers import volunteers
+from inventory_tng.volunteers import queries, volunteers
 
 log = structlog.get_logger(__name__)
 
@@ -121,17 +121,9 @@ def _list_page(
 ) -> HTMLResponse:
     listing = (listing or SEARCHED.read()).find(session)
     shown = [v.id for v in listing.rows]
-    holders = set(
-        session.scalars(select(Volunteer.id).where(Volunteer.id.in_(shown), HOLDS))
-    )
+    holders = queries.ids_where(session, shown, HOLDS)
     merged_into = {v.merged_into_id for v in listing.rows} - {None}
-    names = (
-        session.execute(
-            select(Volunteer.id, Volunteer.name).where(Volunteer.id.in_(merged_into))
-        )
-        if merged_into
-        else ()
-    )
+    names = queries.volunteer_names(session, merged_into) if merged_into else {}
     return admin_page(
         request,
         signed,
@@ -143,7 +135,7 @@ def _list_page(
             "here": VOLUNTEERS,
             "listing": listing,
             "holders": holders,
-            "names": {ident: name for ident, name in names},
+            "names": names,
             "problems": problems,
             "values": values,
         },
@@ -161,11 +153,7 @@ def _volunteer_page(
     values: Mapping[str, str] | None = None,
     alert: Words | None = None,
 ) -> HTMLResponse:
-    others = session.scalars(
-        select(Volunteer)
-        .where(Volunteer.retired_at.is_(None), Volunteer.id != volunteer.id)
-        .order_by(func.lower(Volunteer.name))
-    ).all()
+    others = queries.current_others(session, volunteer.id)
     merged_into = (
         session.get(Volunteer, volunteer.merged_into_id)
         if volunteer.merged_into_id

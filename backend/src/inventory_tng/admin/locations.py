@@ -37,6 +37,7 @@ from inventory_tng.labels import labels
 from inventory_tng.models import STORE_KINDS, Label, Location
 from inventory_tng.pages import not_found, redirect
 from inventory_tng.places import queries
+from inventory_tng.volunteers import queries as volunteers_queries
 
 log = structlog.get_logger(__name__)
 
@@ -94,7 +95,9 @@ def _list_page(
 ) -> HTMLResponse:
     current = current_rows(session, Location)
     custody = [loc for loc in current if loc.kind == "custody"]
-    volunteers = queries.volunteer_names(session, [loc.volunteer_id for loc in custody])
+    volunteers = volunteers_queries.volunteer_names(
+        session, [loc.volunteer_id for loc in custody]
+    )
     return admin_page(
         request,
         signed,
