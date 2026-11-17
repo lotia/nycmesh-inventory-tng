@@ -1,6 +1,6 @@
 """The app's own source, read with Python's ast module by tests that check
-how it is written (test_locking.py, test_history.py, test_write_owners.py).
-Nothing of it runs in the app."""
+how it is written (test_locking.py, test_history.py, test_write_owners.py,
+test_import_directions.py). Nothing of it runs in the app."""
 
 import ast
 import re
