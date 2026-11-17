@@ -3,6 +3,8 @@ enforced Content-Security-Policy and where its violations are reported,
 nosniff, the Referrer-Policy and the Permissions-Policy (security_headers.py,
 docs/decisions/0010; inventory-tng-e0y)."""
 
+import base64
+import hashlib
 import json
 import re
 import subprocess
@@ -35,6 +37,7 @@ ENFORCED = {
     "default-src": ["'self'"],
     "script-src": ["'self'", "'wasm-unsafe-eval'"],
     "style-src": ["'self'"],
+    "style-src-attr": ["'unsafe-hashes'", security_headers.WEBKIT_SELECT_HASH],
     "img-src": ["'self'"],
     "connect-src": ["'self'"],
     "object-src": ["'none'"],
@@ -149,6 +152,20 @@ def test_a_failure_page_is_protected(failing: TestClient) -> None:
 def test_no_page_needs_a_nonce_outside_development(built: TestClient) -> None:
     for path in ("/scan", "/admin/sign-in"):
         assert "csp-nonce" not in built.get(path).text
+
+
+def test_the_one_style_attribute_allowed_is_webkits_for_a_select(
+    built: TestClient,
+) -> None:
+    """WebKit bug 327212: Safari 27.2 checks a <select>'s own style against
+    the page's policy. Its hash, checked here against the text, allows that
+    style alone (docs/decisions/0010)."""
+    unsafe_hashes, allowed = directives(built.get("/scan"))["style-src-attr"]
+    assert unsafe_hashes == "'unsafe-hashes'"
+    hashed = re.fullmatch(r"'sha256-([A-Za-z0-9+/=]+)'", allowed)
+    assert hashed
+    digest = hashlib.sha256(b"text-overflow:inherit").digest()
+    assert base64.b64decode(hashed.group(1)) == digest
 
 
 @pytest.fixture

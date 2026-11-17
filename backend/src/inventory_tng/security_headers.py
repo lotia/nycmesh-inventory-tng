@@ -7,10 +7,12 @@ The policy allows scripts, styles, images and requests from this origin
 only. No page has an inline script, a <style> or a style attribute: what a
 page does is a file Vite builds, and its look a class in the shared
 stylesheet (CONTRIBUTING.md, Styles). The decoder's WebAssembly needs
-'wasm-unsafe-eval'. In development, Vite's dev server serves the scripts and
-styles, reloads them over a websocket, and adds each stylesheet as a
-<style>, which the policy allows by a nonce made for each response
-(pages.csp_nonce, which the pages put where Vite's client reads it). So does the
+'wasm-unsafe-eval'. One style attribute is allowed, by its hash: the one
+WebKit gives each <select> and wrongly checks (WEBKIT_SELECT_STYLE). In
+development, Vite's dev server serves the scripts and styles, reloads them
+over a websocket, and adds each stylesheet as a <style>, which the policy
+allows by a nonce made for each response (pages.csp_nonce, which the pages
+put where Vite's client reads it). So does the
 API's docs page, FastAPI's, for the one inline script that starts Swagger UI,
 which comes from its CDN: in development only, as the CDN's script would run
 as this origin's, a signed-in administrator's requests included.
@@ -21,6 +23,8 @@ held. Reports count against their address as the pages' telemetry does
 (page_telemetry.py).
 """
 
+import base64
+import hashlib
 import json
 import secrets
 from collections.abc import Iterable
@@ -55,6 +59,18 @@ SWAGGER_CDN = "https://cdn.jsdelivr.net/npm/swagger-ui-dist@5/"
 SWAGGER_FAVICON = "https://fastapi.tiangolo.com"
 
 NONCE_BYTES = 16
+
+# The style WebKit gives each <select>'s own inner element (WebKit bug
+# 327212, Safari 27.2), which its policy check wrongly takes for the
+# page's. Allowed by its hash, so Safari reports nothing and the select's
+# text-overflow works; remove once supported Safari ships the fix
+# (docs/decisions/0010).
+WEBKIT_SELECT_STYLE = "text-overflow:inherit"
+WEBKIT_SELECT_HASH = (
+    "'sha256-"
+    + base64.b64encode(hashlib.sha256(WEBKIT_SELECT_STYLE.encode()).digest()).decode()
+    + "'"
+)
 
 # What browsers send reports as: report-uri's, the Reporting API's, and
 # plain JSON, which older browsers used.
@@ -134,6 +150,7 @@ def content_security_policy(
         "default-src": ["'self'", *dev],
         "script-src": ["'self'", "'wasm-unsafe-eval'", *dev],
         "style-src": ["'self'", *dev],
+        "style-src-attr": ["'unsafe-hashes'", WEBKIT_SELECT_HASH],
         "img-src": ["'self'", *dev],
         "connect-src": ["'self'", *dev, *reloads],
         "object-src": ["'none'"],

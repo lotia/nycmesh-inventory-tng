@@ -371,7 +371,11 @@ the compressed copy (fiddly header code ServeStatic already gets right).
   names (`report-uri`, and `report-to` for browsers with the Reporting API,
   which sends only over HTTPS), counted in `inventory.csp.violations` by
   the directive violated, from a fixed list or "other", and rate limited by
-  address as the pages' telemetry is. Nothing else a report says is kept
+  address as the pages' telemetry is. A report that names no violated
+  directive is refused and not counted, with a log line giving only the
+  reason: browsers always name it, and counting such a request as "other"
+  would show violations that never happened (Ali, 2026-11-17,
+  inventory-tng-e0y). Nothing else a report says is kept
   or logged: it names pages, addresses and what the page held. We rejected
   sending no reports. Beside it, every response says `nosniff`, sends no
   `Referer` (`Referrer-Policy: no-referrer`, as the administrator pages
@@ -379,5 +383,25 @@ the compressed copy (fiddly header code ServeStatic already gets right).
   and the app needs no referrer from its own pages), and allows the camera
   to this origin only, denying every other feature a page could ask for
   (`Permissions-Policy`).
+- **The policy allows one style attribute, WebKit's own for a `<select>`**
+  (Ali, 2026-11-17, inventory-tng-y6af). Safari 27.2 gives each select's
+  inner element `style="text-overflow:inherit"` and wrongly checks it
+  against the page's policy (WebKit bug 327212, a regression from WebKit
+  321159@main): without the exception, every page with a select sent a
+  `style-src-attr` report, which the server counted, logged and limited by
+  address, and the select lost an author's `text-overflow`. So
+  `style-src-attr` allows `'unsafe-hashes'` and that text's SHA-256 hash,
+  made with `hashlib` in `security_headers.py` and checked against the text
+  by a test; a browser test proves a select is refused nothing and keeps
+  its ellipsis. `'unsafe-hashes'` allows a style attribute only if its
+  exact text hashes to a listed hash, so a page's own
+  `style="text-overflow:inherit"` is allowed too, which is harmless: it
+  only passes on the parent's value. Remove the exception once the Safari
+  versions we support ship the fix, WebKit 324283@main (in Safari
+  Technology Preview 256; no stable release named yet). We rejected
+  sending `'report-sample'` and not counting reports whose sample is that
+  text (server code, and samples are free text to keep out of logs),
+  dropping every `style-src-attr` report (it hides real ones), and counting
+  them (one report per select on each Safari 27.2 page).
 - Testing the camera on a phone in development needs HTTPS for the dev
   server, or a tunnel.
