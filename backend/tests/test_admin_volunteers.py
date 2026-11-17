@@ -182,8 +182,8 @@ def test_merging_into_one_retired_since_the_page_asked_is_refused(
     admin_client: TestClient, session: Session
 ) -> None:
     """The page asks while Riley is current; a second tab retires Riley
-    before Merge is pressed. The test for both at the same moment is
-    test_a_merge_and_a_retire_of_its_target_not_both."""
+    before Merge is pressed. Both at the same moment is
+    test_requests_at_once.py's."""
     sam = add(session, Volunteer(name="Sam"))
     riley = add(session, Volunteer(name="Riley"))
     path = f"{VOLUNTEERS}/{sam.id}"
@@ -192,6 +192,8 @@ def test_merging_into_one_retired_since_the_page_asked_is_refused(
     asked = admin_client.get(f"{path}/merge", params={"into_id": str(riley.id)})
     assert asked.status_code == 200
     assert admin_client.post(f"{VOLUNTEERS}/{riley.id}/retire").status_code == 303
+    asked_again = admin_client.get(f"{path}/merge", params={"into_id": str(riley.id)})
+    assert str(PICK_INTO) in text(asked_again)
     before = history(session, "volunteer")
     refused = admin_client.post(f"{path}/merge", data={"into_id": str(riley.id)})
     assert refused.status_code == 400
