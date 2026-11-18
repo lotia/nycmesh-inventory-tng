@@ -1,3 +1,4 @@
+/** What the scan page's lists say in notes and alerts, and asking before a discard. */
 import { msg } from "@lingui/core/macro";
 import { Fragment } from "preact";
 import { say } from "./i18n";

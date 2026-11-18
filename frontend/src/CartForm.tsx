@@ -1,3 +1,4 @@
+/** The cart being filled: who, what is happening, where, the items, then Record. */
 import type { MessageDescriptor } from "@lingui/core";
 import { msg } from "@lingui/core/macro";
 import { type Signal, useSignal } from "@preact/signals";

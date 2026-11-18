@@ -1,3 +1,4 @@
+/** Loading the scan page's catalogue, and what came of it (Loaded). */
 import { type Api, check } from "./api/client";
 import { Catalogue as CatalogueReply, DeviceRefusedReply } from "./api/replies";
 import { type Catalogue, keysToAsk } from "./cart";

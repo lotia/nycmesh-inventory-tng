@@ -1,3 +1,4 @@
+/** The carts this device has saved: waiting, sending, held, refused or recorded. */
 import { msg } from "@lingui/core/macro";
 import { useSignal } from "@preact/signals";
 import { useEffect, useMemo } from "preact/hooks";

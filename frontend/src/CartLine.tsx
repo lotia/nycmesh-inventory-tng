@@ -1,3 +1,4 @@
+/** One line of the cart: its item, how much of it, and the package it opens. */
 import { msg } from "@lingui/core/macro";
 import { Fragment } from "preact";
 import {

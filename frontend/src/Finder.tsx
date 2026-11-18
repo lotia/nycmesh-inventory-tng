@@ -1,3 +1,4 @@
+/** The scan page's search box: find an item by its words, or type or scan its code. */
 import { msg } from "@lingui/core/macro";
 import type { Signal } from "@preact/signals";
 import { type Catalogue, RETIRED, search } from "./cart";

@@ -1,3 +1,4 @@
+/** What older builds left on this browser, listed to add to the cart or discard. */
 import type { MessageDescriptor } from "@lingui/core";
 import { msg } from "@lingui/core/macro";
 import { useSignal } from "@preact/signals";
