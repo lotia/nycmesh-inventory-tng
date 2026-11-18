@@ -3,8 +3,8 @@ the first administrator (docs/decisions/0012). The pages are in
 admins/sign_in_routes.py.
 
 Only established calls here (AGENTS.md rule 3): argon2-cffi hashes and
-checks passwords, pyotp makes TOTP keys and checks codes, totp_keys seals
-them with cryptography's AES-GCM, `secrets` makes tokens, and
+checks passwords, totp_codes makes TOTP keys and checks codes with pyotp,
+totp_keys seals them with cryptography's AES-GCM, `secrets` makes tokens, and
 devices.digest (hashlib's SHA-256) hashes tokens and recovery codes for the
 database. Comparing the setup token is secrets.compare_digest.
 """
@@ -16,7 +16,6 @@ from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from typing import Literal, NoReturn
 
-import pyotp
 import structlog
 from argon2 import PasswordHasher
 from argon2.exceptions import InvalidHashError, VerificationError
@@ -26,12 +25,18 @@ from sqlalchemy import ColumnElement, exists, func, or_, select, text, update
 from sqlalchemy.orm import Session
 
 from inventory_tng.admins import activity, mail_messages
+from inventory_tng.admins.totp_codes import (
+    TOTP_INTERVAL,
+    accepted_step,
+    grouped,
+    totp_code,
+)
 from inventory_tng.admins.totp_keys import TotpKeys, Unreadable
 from inventory_tng.core.db_errors import unique
 from inventory_tng.core.db_locking import get_locked, locked
 from inventory_tng.core.db_sessions import exists_where, set_actor
 from inventory_tng.core.mail import Notifier
-from inventory_tng.core.phrases import BRAND, Words, gettext, lazy_gettext
+from inventory_tng.core.phrases import Words, gettext, lazy_gettext
 from inventory_tng.core.rate_limits import limiter
 from inventory_tng.core.settings import RateLimits
 from inventory_tng.devices import devices
@@ -68,14 +73,9 @@ RECOVERY_CODES = 10
 RECOVERY_CODE_LENGTH = 20
 RECOVERY_CODE_GROUP = 5
 # What a code field takes, and the most a code typed may be: a recovery code
-# shown with its separators, and a few stray spaces. TOTP-only fields take a
-# six-digit code, also with room for spaces.
+# shown with its separators, and a few stray spaces. TOTP-only fields take
+# TOTP_FIELD_MAX (totp_codes).
 CODE_FIELD_MAX = RECOVERY_CODE_LENGTH + RECOVERY_CODE_LENGTH // RECOVERY_CODE_GROUP + 4
-TOTP_FIELD_MAX = 8
-TOTP_CODE = re.compile(r"\d{6}")
-TOTP_INTERVAL = pyotp.TOTP(pyotp.random_base32()).interval
-# What authenticator apps show beside the account.
-ISSUER = BRAND
 # How often a session's last use is written: often enough for the account
 # page's list, not on every request.
 SEEN_EVERY = timedelta(minutes=5)
@@ -190,59 +190,6 @@ def password_problem(password: str, again: str) -> Words | None:
         return gettext("Use at most %(max)d characters.", max=PASSWORD_MAX)
     if password != again:
         return PASSWORDS_DIFFER
-    return None
-
-
-# TOTP
-
-
-def new_totp_key() -> str:
-    return pyotp.random_base32()
-
-
-def is_totp_key(key: str) -> bool:
-    """A key as new_totp_key() makes them, sent back by a form."""
-    return re.fullmatch(r"[A-Z2-7]{32}", key) is not None
-
-
-def totp_link(key: str, username: str) -> str:
-    """The otpauth:// link an authenticator app reads from the QR code."""
-    return pyotp.TOTP(key).provisioning_uri(name=username, issuer_name=ISSUER)
-
-
-def grouped(text: str, size: int, separator: str) -> str:
-    """ "ABCD EFGH ...": easier to read out and type than one long run."""
-    return separator.join(text[i : i + size] for i in range(0, len(text), size))
-
-
-def key_for_typing(key: str) -> str:
-    """For apps that cannot scan."""
-    return grouped(key, 4, " ")
-
-
-def _totp_code(typed: str) -> str | None:
-    """The six digits, if that is what was typed, spaces aside; else it may
-    be a recovery code."""
-    code = re.sub(r"\s", "", typed)
-    return code if TOTP_CODE.fullmatch(code) else None
-
-
-def accepted_step(
-    key: str, typed: str, last_step: int | None, now: datetime
-) -> int | None:
-    """The time step `typed` is the code for, within one step either side of
-    now and later than last_step; None if none."""
-    code = _totp_code(typed)
-    if code is None:
-        return None
-    totp = pyotp.TOTP(key)
-    for offset in (-1, 0, 1):
-        at = now + timedelta(seconds=offset * totp.interval)
-        step = totp.timecode(at)
-        if last_step is not None and step <= last_step:
-            continue
-        if totp.verify(code, for_time=at):
-            return step
     return None
 
 
@@ -475,7 +422,7 @@ def check_second_factor(
         if step is not None:
             authenticator.last_step = step
             return "totp"
-    if not recovery or _totp_code(typed) is not None or len(typed) > CODE_FIELD_MAX:
+    if not recovery or totp_code(typed) is not None or len(typed) > CODE_FIELD_MAX:
         return None
     used = session.scalar(
         locked(

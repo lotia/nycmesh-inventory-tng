@@ -30,7 +30,7 @@ from sqlalchemy import Engine, delete, select, text
 from sqlalchemy.exc import IntegrityError, OperationalError
 from sqlalchemy.orm import Session
 
-from inventory_tng.admins import accounts, guards, mail_messages, paths
+from inventory_tng.admins import accounts, guards, mail_messages, paths, totp_codes
 from inventory_tng.admins.paths import ADMINS
 from inventory_tng.catalogue import categories, items, reading_rules, units
 from inventory_tng.core.db_errors import RuleBroken
@@ -441,7 +441,7 @@ def setting_up_totp(committed: Committed, admin_id: int) -> Session:
     session = committed.session()
     accounts.lock_admin(session, admin_id)
     accounts.add_authenticator(
-        session, TOTP_KEYS, admin_id, "Phone", accounts.new_totp_key(), 0
+        session, TOTP_KEYS, admin_id, "Phone", totp_codes.new_totp_key(), 0
     )
     return session
 

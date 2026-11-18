@@ -19,6 +19,7 @@ from inventory_tng.admins import (
     mail_messages,
     paths,
     sign_in_routes,
+    totp_codes,
     totp_keys_command,
 )
 from inventory_tng.core.mail import Notifier
@@ -276,7 +277,7 @@ def test_setting_up_again_keeps_the_printed_codes(
     accounts.retire_authenticators(session, TOTP_KEYS, NOW, every=True, notify=NO_MAIL)
     client = make_client()
     sign_in_with(client, code=left[0])
-    new_key = accounts.new_totp_key()
+    new_key = totp_codes.new_totp_key()
     with app_clock() as at:
         form = {
             "authenticator_name": "Laptop",
@@ -300,7 +301,7 @@ def test_let_in_clears_the_ask_to_set_up_again(session: Session) -> None:
 def test_one_with_a_readable_authenticator_left_is_not_asked(session: Session) -> None:
     ada, _ = new_admin(session)
     accounts.add_authenticator(
-        session, TOTP_KEYS, ada.id, "Spare", accounts.new_totp_key(), 0
+        session, TOTP_KEYS, ada.id, "Spare", totp_codes.new_totp_key(), 0
     )
     lost = session.scalars(
         select(Authenticator).where(Authenticator.name == "Phone")

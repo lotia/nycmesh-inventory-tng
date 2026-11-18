@@ -159,6 +159,13 @@ short test. `core/` is the name FastAPI's full-stack template uses;
   test was split alike: the tests of reset links went to
   `admins/test_reset_routes.py`, and those of which action sends a notice
   to the tests of that action's routes.
+- On 2026-11-18 an authenticator's TOTP key and the checking of its
+  codes left `admins/accounts.py` for `admins/totp_codes.py`
+  (inventory-tng-u3fp.9), apart from `admins/totp_keys.py`, which seals
+  those keys at rest. Its test of a code's time window moved alike. The
+  username, email and password checks stayed in `admins/accounts.py`:
+  in `admins/forms.py`, which imports `admins/accounts.py`, the
+  operator's invitation there would import them back, a cycle.
 - Older decision records keep the paths of their time. The tables below
   give each old path's new home; a later move adds its rows.
 
@@ -203,7 +210,7 @@ queries to its `queries.py`.
 | `admin/used_up.py` | `stock/used_up_routes.py` |
 | `admin/volunteers.py` | `volunteers/routes.py` |
 | `admins.py` | `admins/admins_command.py` |
-| `admins/accounts.py` | itself, but for `qr_svg`: `web/qr_codes.py`; `name_up_to`: `web/forms.py` |
+| `admins/accounts.py` | itself, but for `qr_svg`: `web/qr_codes.py`; `name_up_to`: `web/forms.py`; `new_totp_key`, `is_totp_key`, `totp_link`, `grouped`, `key_for_typing`, `accepted_step`, `ISSUER`, `TOTP_FIELD_MAX`, `TOTP_CODE`, `TOTP_INTERVAL`, with `_totp_code` as `totp_code`: `admins/totp_codes.py` |
 | `catalogue.py` | `scan/catalogue_api.py`; the reply schemas: `scan/catalogue_schemas.py`; its queries: `scan/queries.py` |
 | `catalogue/command.py` | `catalogue/unit_readings_command.py` |
 | `catalogue/names.py` | `catalogue/name_keys.py` |
@@ -370,6 +377,7 @@ Later renamed:
 
 | Old path | New path |
 | --- | --- |
+| `admins/test_sign_in_routes.py` | itself; the test of a code's time window: `admins/test_totp_codes.py` |
 | `core/test_connections.py` | `core/test_db_sessions.py` |
 | `core/test_mail.py` | itself, its settings and sending; the words of the mails: `admins/test_mail_messages.py`; the reset links: `admins/test_reset_routes.py`; a notice of a recovery code used: `admins/test_sign_in_routes.py`; the notices of a password changed: `admins/test_account_routes.py` |
 | `models/test_fold_reference.py` | `models/test_search_text_fold_reference.py` |

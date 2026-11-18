@@ -13,7 +13,7 @@ from httpx2 import Response
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from inventory_tng.admins import accounts, guards, paths, totp_keys
+from inventory_tng.admins import accounts, guards, paths, totp_codes, totp_keys
 from inventory_tng.admins.totp_keys import TotpKeys
 from inventory_tng.models.admins import (
     Admin,
@@ -79,7 +79,7 @@ def new_admin(
     )
     key = None
     if totp:
-        key = accounts.new_totp_key()
+        key = totp_codes.new_totp_key()
         session.add(sealed(Authenticator(admin_id=admin.id, name="Phone"), key))
     session.flush()
     return admin, key
@@ -122,7 +122,7 @@ def policy(session: Session, value: str) -> None:
 
 
 # How long an authenticator shows each code.
-TIME_STEP = timedelta(seconds=accounts.TOTP_INTERVAL)
+TIME_STEP = timedelta(seconds=totp_codes.TOTP_INTERVAL)
 
 
 @contextlib.contextmanager

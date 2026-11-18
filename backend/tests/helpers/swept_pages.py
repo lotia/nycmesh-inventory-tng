@@ -15,7 +15,7 @@ from fastapi.testclient import TestClient
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
-from inventory_tng.admins import accounts, guards
+from inventory_tng.admins import accounts, guards, totp_codes
 from inventory_tng.core.db_sessions import DATABASE_INFO, Database, make_database
 from inventory_tng.devices import devices
 from inventory_tng.models.admins import Admin, Authenticator
@@ -300,7 +300,7 @@ def admin(world: World) -> None:
 
 def authenticator(world: World) -> None:
     """Another authenticator of the administrator signed in, Ada."""
-    key = accounts.new_totp_key()
+    key = totp_codes.new_totp_key()
     authenticator = Authenticator(admin_id=world.ada_id, name=tag())
     add(world.session, sealed(authenticator, key))
 
