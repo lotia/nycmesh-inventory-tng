@@ -14,6 +14,14 @@ PACKAGES = {
 } | {Path(Path(devtools.__file__).parent.name)}
 
 
+def holds_files(folder: Path) -> bool:
+    """False for a folder left holding only bytecode, as one is after its
+    tests move away, since the version control ignores __pycache__."""
+    return any(
+        path.is_file() for path in folder.rglob("*") if "__pycache__" not in path.parts
+    )
+
+
 def test_every_folder_mirrors_a_package_or_says_what_it_holds() -> None:
     unexplained = sorted(
         str(relative)
@@ -22,5 +30,6 @@ def test_every_folder_mirrors_a_package_or_says_what_it_holds() -> None:
         and "__pycache__" not in folder.parts
         and (relative := folder.relative_to(TESTS)) not in PACKAGES
         and not (folder / "README.md").is_file()
+        and holds_files(folder)
     )
     assert unexplained == []

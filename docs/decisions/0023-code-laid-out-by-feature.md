@@ -279,8 +279,8 @@ Later renamed:
 | --- | --- |
 | `admin/once.ts` | `admin/single-use-forms.ts`, with `ONCE_FIELD` as `SINGLE_USE_FIELD` |
 
-In `backend/tests/`, these tests moved whole into the folder of what
-they test (Amendment: names, below) and kept their names:
+In `backend/tests/`, these tests moved whole into the folders the
+Amendment: names, below, gives them, and kept their names:
 
 | Folder | Old paths |
 | --- | --- |

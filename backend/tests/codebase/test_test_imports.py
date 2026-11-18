@@ -48,7 +48,7 @@ def test_imports_of_what_only_pytest_loads_are_found(
 
 def test_no_test_imports_conftest_or_another_test() -> None:
     offending = {
-        path.name: shared
+        str(path.relative_to(TESTS)): shared
         for path in TESTS.rglob("*.py")
         if (shared := shared_from(path.read_text()))
     }

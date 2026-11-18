@@ -923,9 +923,10 @@ not English; add a part for a new component, or for a state of one that
 says something no part shows. On the server, every phrase named as a
 constant, alone or in a table such as `NOTICES`, is covered already; add
 a phrase said with values to `SAID_WITH_VALUES`, a page to its entry in
-`tests/helpers/swept_pages.py`'s `PAGES`, as `worded`, which fetches it signed in
-with every name in the database not English, or as `signed_out`, and a
-template no page there shows, or a branch of one, to `COVERED`.
+`tests/helpers/swept_pages.py`'s `PAGES`, as `worded`, which fetches it
+signed in with every name in the database not English, or as
+`signed_out`, and a template no page there shows, or a branch of one, to
+`COVERED`.
 
 ## Running the checks
 
@@ -1097,17 +1098,17 @@ production: a route that changes a row it did not lock fails its test
 (`tests/helpers/apps.py`).
 
 `tests/across/test_query_counts.py` loads each administrator's page, and
-the scan page's catalogue, with one row of what it lists and with eleven, and fails
-if the second sends more statements: a page reading row by row. It also
-fails unless the page, past its masthead, is longer with eleven, and grows
-when the page's own `more` adds one row to the first. A new GET route
-under `/admin` fails there until it has an entry in
-`tests/helpers/swept_pages.py`'s `PAGES`, saying how to add one more of what it
-lists (`more`) or why it lists nothing that grows (`uncounted`), and where
-`test_phrases.py` reads its words or why it doesn't. Both read worlds built
-once a module, each in a database of its own, each test in a transaction
-rolled back after it. `tests/helpers/query_counts.py` counts a request's
-statements for a test of its own.
+the scan page's catalogue, with one row of what it lists and with eleven,
+and fails if the second sends more statements: a page reading row by row.
+It also fails unless the page, past its masthead, is longer with eleven,
+and grows when the page's own `more` adds one row to the first. A new GET
+route under `/admin` fails there until it has an entry in
+`tests/helpers/swept_pages.py`'s `PAGES`, saying how to add one more of
+what it lists (`more`) or why it lists nothing that grows (`uncounted`),
+and where `test_phrases.py` reads its words or why it doesn't. Both read
+worlds built once a module, each in a database of its own, each test in a
+transaction rolled back after it. `tests/helpers/query_counts.py` counts a
+request's statements for a test of its own.
 
 ### Where tests go
 
