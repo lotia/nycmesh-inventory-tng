@@ -110,7 +110,7 @@ const movedBy = (body: Body) =>
  * it holds less of than both; added what it holds more of than both.
  * Moved by another kind, or between other places, every line differs:
  * none moved as recorded. The server keeps what was taken off so
- * (ledger._more_written).
+ * (scan/batch.py, _more_written).
  */
 export function differences(recorded: Body, mine: Body): Difference[] {
   const from = mine.changed_from;

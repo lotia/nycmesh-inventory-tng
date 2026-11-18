@@ -79,7 +79,10 @@ decided the structure below on 2026-11-17.
   - no feature's routes import another feature's routes; they link
     through its `paths.py`;
   - nothing of the app imports `backend/devtools/`, which no image ships
-    (inventory-tng-wzlr).
+    (inventory-tng-wzlr);
+  - nothing in `stock/` imports `scan/`: a volunteer's batch
+    (`scan/batch.py`) writes through the ledger, so imports run from scan
+    to stock (Ali, 2026-11-18, inventory-tng-h657.4).
 
   The breaks found when the test was written are listed in it and may
   only shrink. On 2026-11-17 Ali dropped two rules that caught no real
@@ -130,7 +133,7 @@ and kept their names:
 | `labels/` | `labels.py` |
 | `places/` | `locations.py` |
 | `scan/` | `bundle.py`, `page_builds.py` |
-| `stock/` | `adjustment_reasons.py`, `open_packages.py`, `over_recorded.py`, `admin/needs_action.py` |
+| `stock/` | `adjustment_reasons.py`, `over_recorded.py`, `admin/needs_action.py` |
 | `volunteers/` | `volunteers.py` |
 | `web/` | `once.py`, `security_headers.py`, `admin/listing.py` |
 
@@ -164,8 +167,9 @@ queries to its `queries.py`.
 | `dev_database.py` | `backend/devtools/database.py`, outside `src/`; `seed` is one of its subcommands |
 | `devices.py` | `devices/devices.py`; `register_device`: `devices/api.py`; the request and reply schemas: `devices/schemas.py`; what every route needing a device depends on: `devices/guards.py`; `REGISTER_PATH`: `devices/paths.py` |
 | `health.py` | `core/health.py`; its query: `core/db.py`, as `ping` |
-| `ledger.py` | `stock/ledger.py`, with `_each_once` as `each_once`; `moment`, `expected`, `expected_forms`, `left_at`, `corrected_since`: `stock/moments.py`, with `_flows`, `_form_flows`, `_at_place` as `flows`, `form_flows`, `at_place`; `record_count`, `count_open_package`, `record_adjustment`, the rest of counts and adjustments and their metrics: `stock/counts.py`; the balance queries: `stock/balance.py`; `save_batch`: `scan/batch_api.py`; the batch request and reply schemas: `scan/batch_schemas.py` |
+| `ledger.py` | `stock/ledger.py`, with `_each_once`, `_hold_forms` as `each_once`, `hold_forms`; `record`, with openings into open packages, the problems of a batch by line, the replay of a batch sent again, `BatchRefused`, `KeyReused`, `Recorded`, `retired_sides` and their metrics: `scan/batch.py`; `moment`, `expected`, `expected_forms`, `left_at`, `corrected_since`: `stock/moments.py`, with `_flows`, `_form_flows`, `_at_place` as `flows`, `form_flows`, `at_place`; `record_count`, `count_open_package`, `record_adjustment`, the rest of counts and adjustments and their metrics: `stock/counts.py`; the balance queries: `stock/balance.py`; `save_batch`: `scan/batch_api.py`; the batch request and reply schemas: `scan/batch_schemas.py`, but for `Line.entry`: `scan/batch.py`, as `entry_of` |
 | `models.py` | `models/`: each table in its feature's module; the column types, `whole`, the columns and constraints most tables have, and `Versioned`: `models/base.py`; canonical names, name keys and search folding (`CanonicalName`, `KeyedName`, `Searchable`, `fold` and the rest): `models/names.py`; `_refold`: `models/catalogue.py`; `_reference`, `_one_of`, `_between`, `_unique_name`, `_unique_current_name`, `_name_key_check`: each without its `_` |
+| `open_packages.py` | `stock/open_packages.py`; `tracks_opened`: `stock/ledger.py` |
 | `openapi.py` | `backend/devtools/write_api_schema.py`, outside `src/` |
 | `page_telemetry.py` | `scan/page_telemetry.py`; `over_limit`: `web/browser.py` |
 | `pages.py` | `web/pages.py`; `amount`, `printed_length`: `web/formatting.py`; `Badge`, `retired_holding`, `sections`: `web/navigation.py` |

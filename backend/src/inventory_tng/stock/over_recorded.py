@@ -26,7 +26,6 @@ from sqlalchemy import (
     and_,
     case,
     func,
-    or_,
     select,
 )
 from sqlalchemy.dialects.postgresql import insert
@@ -44,13 +43,8 @@ from inventory_tng.models.stock import (
     OpenPackage,
     OverRecorded,
 )
-from inventory_tng.stock import adjustment_reasons, balance, ledger
+from inventory_tng.stock import adjustment_reasons, balance, counts, ledger, moments
 from inventory_tng.web.formatting import amount
-
-# Lazy while the ledger's batch imports this module (through
-# open_packages): counts imports names from the ledger, not yet defined
-# while it loads. Bound at first use.
-lazy from inventory_tng.stock import counts
 
 log = structlog.get_logger(__name__)
 meter = metrics.get_meter(__name__)
@@ -1089,10 +1083,7 @@ def counted(
             WAITING,
             Movement.item_id.in_({item_id for item_id, _ in [*put_right, *emptied]}),
             LedgerTransaction.id <= as_of,
-            or_(
-                LedgerTransaction.from_location_id == place_id,
-                LedgerTransaction.to_location_id == place_id,
-            ),
+            moments.at_place(place_id),
         )
         .order_by(OverRecorded.id)
     )

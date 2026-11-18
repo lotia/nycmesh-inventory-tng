@@ -41,7 +41,7 @@ from inventory_tng.scan.catalogue_schemas import (
     VolunteerEntry,
 )
 from inventory_tng.stock import balance
-from inventory_tng.stock.open_packages import tracks_opened
+from inventory_tng.stock.ledger import tracks_opened
 
 log = structlog.get_logger(__name__)
 

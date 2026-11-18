@@ -195,7 +195,7 @@ class ItemPackage(KeyedName, Searchable, Versioned, Base):
     # In the item's unit.
     size: Mapped[Decimal] = mapped_column(QUANTITY)
     # NULL: as the item's track_opened says; else this package's own
-    # (open_packages.tracks_opened).
+    # (ledger.tracks_opened).
     track_opened: Mapped[bool | None]
     # Too short to use, in the item's unit: an open package with less left
     # is a short end (docs/decisions/0020). NULL: none is.

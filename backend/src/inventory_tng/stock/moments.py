@@ -41,7 +41,7 @@ def left_at(session: Session, open_id: int, as_of: int) -> Decimal:
     `as_of`, wherever it was, carried forward by the counts and adjustments
     of it since, which put right what it showed: all that went into it less
     all that left it. A save holds the open packages it names before it
-    draws its id (ledger._hold_forms), so none naming it commits later with a
+    draws its id (ledger.hold_forms), so none naming it commits later with a
     lower one."""
     return _into_open(session, open_id, or_(LedgerTransaction.id <= as_of, _CORRECTS))
 

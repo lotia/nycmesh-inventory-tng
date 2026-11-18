@@ -8,6 +8,7 @@ inside functions count, as do relative ones.
 | routes_run_queries | a module of routes making or running a query |
 | core_imports_a_feature | core importing any of the app but core and models |
 | routes_import_another_features_routes | links between features not through paths.py |
+| stock_imports_scan | stock importing scan/, which imports stock |
 | app_imports_devtools | any of the app importing backend/devtools/, which no image ships |
 
 Today's breaks are listed in BREAKS, which may only shrink: a new break
@@ -41,6 +42,7 @@ RULES = {
     "catalogue/names.py",
     "catalogue/unit_readings.py",
     "catalogue/units.py",
+    "scan/batch.py",
     "site_settings/scan_settings.py",
     "stock/balance.py",
     "stock/counts.py",
@@ -179,6 +181,14 @@ def routes_import_another_features_routes(path: str, app: App) -> set[str]:
     }
 
 
+def stock_imports_scan(path: str, app: App) -> set[str]:
+    """A volunteer's batch (scan/batch.py) writes through the ledger, so
+    stock imports nothing of scan/."""
+    if not path.startswith("stock/"):
+        return set()
+    return {module for module in imports(path, app) if module.startswith("scan/")}
+
+
 def app_imports_devtools(path: str, app: App) -> set[str]:
     """The developer's tools sit outside src/, so the app cannot need them."""
     return {"devtools"} & imports(path, app)
@@ -191,6 +201,7 @@ CHECKS: dict[str, Check] = {
         routes_run_queries,
         core_imports_a_feature,
         routes_import_another_features_routes,
+        stock_imports_scan,
         app_imports_devtools,
     )
 }
@@ -222,6 +233,8 @@ APP = {
     "catalogue/paths.py": "",
     "catalogue/queries.py": "",
     "catalogue/routes.py": ROUTER,
+    "scan/batch.py": "",
+    "scan/batch_schemas.py": "",
     "stock/api.py": ROUTER,
     "stock/ledger.py": "",
     "web/formatting.py": "",
@@ -274,6 +287,16 @@ APP = {
                 "from inventory_tng.catalogue.queries import x"
             ),
             {"catalogue/routes.py"},
+        ),
+        (
+            "stock_imports_scan",
+            "stock/ledger.py",
+            (
+                "def f():\n    from ..scan import batch_schemas\n"
+                "from inventory_tng.scan.batch import record\n"
+                "from inventory_tng.stock import balance"
+            ),
+            {"scan/batch_schemas.py", "scan/batch.py"},
         ),
         (
             "app_imports_devtools",

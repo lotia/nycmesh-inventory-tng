@@ -22,11 +22,13 @@ from inventory_tng.models.catalogue import Item, ItemPackage
 from inventory_tng.models.places import Location
 from inventory_tng.models.stock import LedgerTransaction, OpenPackage
 from inventory_tng.models.volunteers import Volunteer
-from inventory_tng.stock import adjustment_reasons, balance, ledger, over_recorded
-
-# Lazy while the ledger's batch imports this module: counts imports names
-# from the ledger, not yet defined while it loads. Bound at first use.
-lazy from inventory_tng.stock import counts
+from inventory_tng.stock import (
+    adjustment_reasons,
+    balance,
+    counts,
+    ledger,
+    over_recorded,
+)
 
 log = structlog.get_logger(__name__)
 meter = metrics.get_meter(__name__)
@@ -72,13 +74,6 @@ def measure_checks_settled(how: CheckSettled, count: int) -> None:
         checks_settled.add(count, {"how": how})
 
 
-def tracks_opened(item: bool, package: bool | None) -> bool:
-    """Whether opening a package makes an open package, followed until used
-    up (docs/decisions/0020, Amendment): the package's own setting, if it
-    has one, else its item's."""
-    return item if package is None else package
-
-
 def make(
     session: Session, key: uuid.UUID, package_id: int, location_id: int
 ) -> OpenPackage:
@@ -100,7 +95,7 @@ def make(
                 of=ItemPackage,
             )
         ).one_or_none()
-        tracked = row is not None and tracks_opened(row[1], row[0].track_opened)
+        tracked = row is not None and ledger.tracks_opened(row[1], row[0].track_opened)
         enforce("open_package_untracked", when=not tracked)
         assert row is not None
         package = row[0]

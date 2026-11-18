@@ -1,5 +1,5 @@
 """The batch endpoint, POST /api/transactions: where the scan page sends
-a volunteer's batch, for the ledger's rules (ledger.record) to write
+a volunteer's batch, for its rules (batch.record) to write
 (docs/decisions/0003), and the replies to one refused."""
 
 import structlog
@@ -11,6 +11,7 @@ from inventory_tng.core.db import DbSession, set_actor
 from inventory_tng.devices.guards import RegisteredDevice
 from inventory_tng.devices.schemas import DeviceRefusedReply
 from inventory_tng.scan import page_builds
+from inventory_tng.scan.batch import BatchRefused, KeyReused, record
 from inventory_tng.scan.batch_schemas import (
     Batch,
     BatchProblem,
@@ -21,7 +22,6 @@ from inventory_tng.scan.batch_schemas import (
 )
 from inventory_tng.scan.page_builds import BuildTooOldReply
 from inventory_tng.stock import open_packages, over_recorded
-from inventory_tng.stock.ledger import BatchRefused, KeyReused, record
 
 log = structlog.get_logger(__name__)
 meter = metrics.get_meter(__name__)

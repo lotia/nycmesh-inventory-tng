@@ -25,9 +25,9 @@ from inventory_tng.stock.ledger import (
     PackageFacts,
     form_breaks,
     insert_transaction,
+    tracks_opened,
 )
 from inventory_tng.stock.moments import moment
-from inventory_tng.stock.open_packages import tracks_opened
 
 from helpers.package_forms import (
     BOX,

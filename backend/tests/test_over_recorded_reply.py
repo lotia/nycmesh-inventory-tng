@@ -20,8 +20,9 @@ from inventory_tng.models.stock import (
     OpenPackage,
 )
 from inventory_tng.models.volunteers import Volunteer
+from inventory_tng.scan.batch import _more_written
 from inventory_tng.stock import counts, over_recorded
-from inventory_tng.stock.ledger import Entry, Form, _more_written
+from inventory_tng.stock.ledger import Entry, Form
 
 from helpers.over_recorded import bagged, checks, new_admin_id, recorded_then_changed
 from helpers.rows import add, tag

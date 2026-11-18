@@ -43,7 +43,7 @@ class OpenPackage(Base):
     """A package opened at a place and followed until used up: what is left
     on it is its balance in the ledger, where movements name it
     (docs/decisions/0020). Made only for a package whose item tracks opened
-    ones (items.tracks_opened). A volunteer reports it used up; an
+    ones (ledger.tracks_opened). A volunteer reports it used up; an
     administrator closes it, with an adjustment of what it still showed."""
 
     __tablename__ = "open_package"

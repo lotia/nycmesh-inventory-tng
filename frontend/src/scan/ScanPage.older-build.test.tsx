@@ -1193,7 +1193,7 @@ describe("what an older build left", () => {
       ]),
     );
 
-  /** The batch endpoint as the ledger answers a key (stock/ledger.py, _replay):
+  /** The batch endpoint as the ledger answers a key (scan/batch.py, _replay):
    * the same lines again are the first transaction, others are refused.
    * `written` holds the lines saved under each key, in order. */
   function ledger(written: Map<string, string>) {

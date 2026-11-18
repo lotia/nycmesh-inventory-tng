@@ -1,10 +1,8 @@
 """What the batch endpoint (scan/batch_api.py) takes and answers: a
 volunteer's batch and its lines, the problems of one refused, and the
-transaction recorded under a key reused (docs/decisions/0003).
-
-The ledger's rules (stock/ledger.py) read a Batch, and a Line becomes the
-ledger's Entry, so each module imports the other as a module object and
-reads its names only once both are loaded.
+transaction recorded under a key reused (docs/decisions/0003). The batch's
+rules (scan/batch.py) read a Batch; this imports nothing of them, nor of
+the ledger.
 """
 
 import uuid
@@ -15,7 +13,6 @@ from pydantic import BaseModel, Field, ValidationInfo, field_validator, model_va
 from pydantic_core import PydanticCustomError
 
 from inventory_tng.models.base import INTEGER_MAX
-from inventory_tng.stock import ledger
 
 # What a volunteer records. Counts and adjustments are an administrator's
 # (inventory-tng-8i4.14). Whether each kind has a from side and a to side; the
@@ -105,31 +102,6 @@ class Line(BaseModel):
                 "package_size is only allowed with package_id",
             )
         return size
-
-    def entry(self, kind: str, opened: int | None = None) -> ledger.Entry:
-        """As the ledger writes it: sealed on each side the kind has, loose
-        outside. An opening's leaves sealed and arrives as the open package
-        `opened`, or loose."""
-        sealed = ledger.Form(package_id=self.package_id)
-        if kind == "open":
-            arrives = ledger.Form(open_package_id=opened) if opened else ledger.LOOSE
-            return ledger.Entry(self.item_id, self.quantity, sealed, arrives)
-        if opened is not None:
-            # Taken from an open package: cut loose, or moved whole.
-            taken = ledger.Form(open_package_id=opened)
-            return ledger.Entry(
-                self.item_id,
-                self.quantity,
-                taken,
-                taken if self.whole else ledger.LOOSE,
-            )
-        has_from, has_to = SIDES[kind]
-        return ledger.Entry(
-            self.item_id,
-            self.quantity,
-            sealed if has_from else ledger.LOOSE,
-            sealed if has_to else ledger.LOOSE,
-        )
 
 
 class LengthReport(BaseModel):

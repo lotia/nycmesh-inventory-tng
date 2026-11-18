@@ -314,8 +314,8 @@ export function batchWords(
  * so a later batch in the outbox can name it before the server has seen
  * it; others become loose units, one line of all of them. Each key is made
  * from the cart's (`batchKey`), as the server makes those of a line sent
- * without one (ledger._opening_keys), so the same cart recorded again, by
- * any tab, is the same batch, which the server takes once.
+ * without one (scan/batch.py, _opening_keys), so the same cart recorded
+ * again, by any tab, is the same batch, which the server takes once.
  */
 function openings(
   item: Item,

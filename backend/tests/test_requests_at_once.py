@@ -56,18 +56,11 @@ from inventory_tng.models.volunteers import Volunteer
 from inventory_tng.models.web import SentForm
 from inventory_tng.places import locations
 from inventory_tng.scan import catalogue_api as scan_catalogue
+from inventory_tng.scan.batch import BatchRefused, KeyReused, Recorded, record
 from inventory_tng.scan.batch_schemas import Batch
 from inventory_tng.scan.catalogue_schemas import Catalogue
 from inventory_tng.stock import adjustment_reasons, open_packages
-from inventory_tng.stock.ledger import (
-    BatchRefused,
-    Entry,
-    Form,
-    KeyReused,
-    Recorded,
-    insert_transaction,
-    record,
-)
+from inventory_tng.stock.ledger import Entry, Form, insert_transaction
 from inventory_tng.volunteers import volunteers
 from inventory_tng.volunteers.paths import VOLUNTEERS
 
@@ -1140,7 +1133,7 @@ def test_a_unit_changed_while_stock_moves_waits_then_is_refused(
 def test_a_cut_and_a_whole_move_of_one_open_package_go_one_at_a_time(
     own_committed: Committed, swapped: bool, refused: str
 ) -> None:
-    """Each holds the open package FOR NO KEY UPDATE (ledger._hold_forms)
+    """Each holds the open package FOR NO KEY UPDATE (ledger.hold_forms)
     until it commits: the second waits, then reads it afresh. A move of all
     that was left, second, is refused, as some was cut meanwhile; a cut,
     second, as the package is in the van now (docs/decisions/0020). On a
@@ -1168,7 +1161,7 @@ def test_a_cut_and_a_whole_move_of_one_open_package_go_one_at_a_time(
 def test_a_package_resized_while_it_moves_waits_then_is_refused(
     own_committed: Committed,
 ) -> None:
-    """A save holds its packages FOR KEY SHARE (ledger._hold_forms) until it
+    """A save holds its packages FOR KEY SHARE (ledger.hold_forms) until it
     commits, and resizing one holds it FOR UPDATE: the resize waits, then
     is refused, as some of it has moved in the old size. On a database of
     its own, as it writes the ledger."""
@@ -1198,7 +1191,7 @@ def test_a_batch_of_a_package_resized_meanwhile_waits_then_is_refused(
 ) -> None:
     """The outbox's race (inventory-tng-5f7): a batch built from a catalogue
     before a package nobody had used was resized, saved as the resize
-    commits. It waits for the package's lock (ledger._hold_forms), then
+    commits. It waits for the package's lock (ledger.hold_forms), then
     finds the size it was sent with gone and is refused, rather than saved
     as twice as many boxes. On a database of its own, as it may write the
     ledger."""
@@ -1282,7 +1275,7 @@ def test_a_whole_move_sent_twice_at_once_is_written_once(
     own_committed: Committed,
 ) -> None:
     """The second waits on the open package's lock, then finds the first
-    written, rather than refusing it as somewhere else now (ledger.record)."""
+    written, rather than refusing it as somewhere else now (batch.record)."""
     setup = own_committed.session()
     spools = Spools(setup)
     made = spools.opened()
@@ -1358,7 +1351,7 @@ def test_a_batch_sent_twice_at_once_is_written_once(
 ) -> None:
     """Neither finds its key written, so both reach the insert: the second
     waits on the first's key, then writes nothing and finds the first's
-    (ledger.record), which the route answers 200 with. On a database of its
+    (batch.record), which the route answers 200 with. On a database of its
     own, as it writes the ledger."""
     place = committed_place(own_committed)
     batch = Batch.model_validate(place.batch())

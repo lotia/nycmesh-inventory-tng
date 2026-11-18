@@ -22,8 +22,8 @@ from inventory_tng.models.admins import Admin
 from inventory_tng.models.places import Location
 from inventory_tng.models.site_settings import SignInSettings
 from inventory_tng.places import locations
+from inventory_tng.scan.batch import record
 from inventory_tng.scan.batch_schemas import Batch
-from inventory_tng.stock.ledger import record
 from inventory_tng.volunteers import volunteers
 
 log = structlog.get_logger(__name__)
