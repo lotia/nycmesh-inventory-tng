@@ -6,6 +6,18 @@ import {
   within,
 } from "@testing-library/preact";
 import { describe, expect, type MockInstance, test, vi } from "vitest";
+import {
+  CHANGED_BEFORE_DISCARD,
+  DISCARD_CART,
+  FROM,
+  NOT_KEEPING as NOT_KEEPING_PHRASE,
+  NOT_SENT,
+  NOTHING_IN_CART,
+  SENDING_WHAT,
+  TO,
+  WHERE,
+  YOUR_NAME,
+} from "./CartForm";
 import { REMOVE } from "./CartLine";
 import {
   STORAGE_KEY as CART_KEY,
@@ -38,18 +50,6 @@ import {
   PROBLEMS,
   SOME_NOT_RECORDED,
 } from "./outbox";
-import {
-  CHANGED_BEFORE_DISCARD,
-  DISCARD_CART,
-  FROM,
-  NOT_KEEPING as NOT_KEEPING_PHRASE,
-  NOT_SENT,
-  NOTHING_IN_CART,
-  SENDING_WHAT,
-  TO,
-  WHERE,
-  YOUR_NAME,
-} from "./ScanPage";
 import { MOST_SECONDS_TO_SAVE, telemetry } from "./telemetry";
 import { CATALOGUE, WITH_CAFE } from "./test-catalogue";
 import { answering, deferred, json, saved } from "./test-fetch";

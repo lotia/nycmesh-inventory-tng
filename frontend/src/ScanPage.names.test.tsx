@@ -1,8 +1,8 @@
 import { fireEvent, screen } from "@testing-library/preact";
 import { describe, expect, test, vi } from "vitest";
+import { NOT_ME, THATS_ME, YOUR_NAME } from "./CartForm";
 import { freshCart, storeCart } from "./cart";
 import { say } from "./i18n";
-import { NOT_ME, THATS_ME, YOUR_NAME } from "./ScanPage";
 import { CATALOGUE } from "./test-catalogue";
 import { answering, json } from "./test-fetch";
 import {
@@ -88,6 +88,16 @@ describe("whose name it is", () => {
     fireEvent.click(screen.getByRole("button", { name: say(NOT_ME) }));
     expect(selected(say(YOUR_NAME))).toBe("");
     expect(document.activeElement).toBe(screen.getByLabelText(say(YOUR_NAME)));
+    expect(screen.queryByText(/Recording as/)).toBeNull();
+  });
+
+  test("picking no name in the list clears it", async () => {
+    open();
+    await ready();
+    pick(say(YOUR_NAME), "1");
+    expect(screen.getByText(/Recording as/)).toBeDefined();
+    pick(say(YOUR_NAME), "");
+    expect(selected(say(YOUR_NAME))).toBe("");
     expect(screen.queryByText(/Recording as/)).toBeNull();
   });
 

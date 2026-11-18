@@ -11,7 +11,7 @@ msgstr ""
 msgid "Enter the phrase you were given."
 msgstr ""
 
-#: src/ScanPage.tsx
+#: src/CartForm.tsx
 msgid "That's me"
 msgstr ""
 
@@ -72,7 +72,7 @@ msgstr ""
 msgid "Loading the catalogue…"
 msgstr ""
 
-#: src/ScanPage.tsx
+#: src/CartForm.tsx
 msgid "The cart was changed in another tab. Check it, then record it again."
 msgstr ""
 
@@ -133,11 +133,11 @@ msgstr ""
 msgid "Open package said used up"
 msgstr ""
 
-#: src/ScanPage.tsx
+#: src/CartForm.tsx
 msgid "Sending: {what}. A new cart is ready."
 msgstr ""
 
-#: src/ScanPage.tsx
+#: src/CartForm.tsx
 msgid "Scan with the camera"
 msgstr ""
 
@@ -157,11 +157,11 @@ msgstr ""
 msgid "Suggestions"
 msgstr ""
 
-#: src/ScanPage.tsx
+#: src/CartForm.tsx
 msgid "Recording as {name}."
 msgstr ""
 
-#: src/ScanPage.tsx
+#: src/CartForm.tsx
 msgid "Added back to cart. Review before Record."
 msgstr ""
 
@@ -189,11 +189,11 @@ msgstr ""
 msgid "Open package said used up, new"
 msgstr ""
 
-#: src/ScanPage.tsx
+#: src/CartForm.tsx
 msgid "Cart"
 msgstr ""
 
-#: src/ScanPage.tsx
+#: src/CartForm.tsx
 msgid "{item}: type how many of which package to open."
 msgstr ""
 
@@ -205,11 +205,11 @@ msgstr ""
 msgid "{package} ({size} {unit}), retired: taking only"
 msgstr ""
 
-#: src/ScanPage.tsx
+#: src/CartForm.tsx
 msgid "Pick a place"
 msgstr ""
 
-#: src/ScanPage.tsx
+#: src/CartForm.tsx
 msgid "Added a {package}: {item}."
 msgstr ""
 
@@ -217,7 +217,7 @@ msgstr ""
 msgid "After this cut"
 msgstr ""
 
-#: src/ScanPage.tsx
+#: src/CartForm.tsx
 msgctxt "place"
 msgid "To"
 msgstr ""
@@ -286,7 +286,7 @@ msgstr ""
 msgid "Done"
 msgstr ""
 
-#: src/ScanPage.tsx
+#: src/CartForm.tsx
 msgid "Pick your name"
 msgstr ""
 
@@ -302,7 +302,7 @@ msgstr ""
 msgid "The torch wouldn't switch."
 msgstr ""
 
-#: src/ScanPage.tsx
+#: src/CartForm.tsx
 msgid "{place}: from here."
 msgstr ""
 
@@ -370,7 +370,7 @@ msgstr ""
 msgid "This browser's registration was withdrawn."
 msgstr ""
 
-#: src/ScanPage.tsx
+#: src/CartForm.tsx
 msgid "That label isn't in the inventory ({code})."
 msgstr ""
 
@@ -475,7 +475,7 @@ msgstr ""
 msgid "A cart: something"
 msgstr ""
 
-#: src/ScanPage.tsx
+#: src/CartForm.tsx
 msgid "{place}: to here."
 msgstr ""
 
@@ -511,7 +511,7 @@ msgstr ""
 msgid "a place no longer in the catalogue"
 msgstr ""
 
-#: src/ScanPage.tsx
+#: src/CartForm.tsx
 msgid "Added one: {item}."
 msgstr ""
 
@@ -519,7 +519,7 @@ msgstr ""
 msgid "Couldn't load the catalogue."
 msgstr ""
 
-#: src/ScanPage.tsx
+#: src/CartForm.tsx
 msgid "{place}: from here, or to here?"
 msgstr ""
 
@@ -551,7 +551,7 @@ msgstr ""
 msgid "What is on an open package, {n}: {why}"
 msgstr ""
 
-#: src/ScanPage.tsx
+#: src/CartForm.tsx
 msgid "{item} comes in no package to open."
 msgstr ""
 
@@ -563,7 +563,7 @@ msgstr ""
 msgid "A package counted here is no longer used. Remove the line and add it again."
 msgstr ""
 
-#: src/ScanPage.tsx
+#: src/CartForm.tsx
 msgid "Discard cart"
 msgstr ""
 
@@ -583,7 +583,7 @@ msgstr ""
 msgid "That open package is at another place now"
 msgstr ""
 
-#: src/ScanPage.tsx
+#: src/CartForm.tsx
 msgid "Nothing in the cart yet."
 msgstr ""
 
@@ -603,7 +603,7 @@ msgstr ""
 msgid "Your cut uses up the {name}, so it's ticked. Untick it if any is left. An administrator confirms."
 msgstr ""
 
-#: src/ScanPage.tsx
+#: src/CartForm.tsx
 msgid "Change"
 msgstr ""
 
@@ -657,7 +657,7 @@ msgstr ""
 msgid "Kept on this device, not sent."
 msgstr ""
 
-#: src/ScanPage.tsx
+#: src/CartForm.tsx
 msgid "Your name"
 msgstr ""
 
@@ -678,7 +678,7 @@ msgstr ""
 msgid "What's on the {name} after this cut ({unit}), if you can tell"
 msgstr ""
 
-#: src/ScanPage.tsx
+#: src/CartForm.tsx
 msgid "Not me"
 msgstr ""
 
@@ -690,7 +690,7 @@ msgstr ""
 msgid "Receiving stock"
 msgstr ""
 
-#: src/ScanPage.tsx
+#: src/CartForm.tsx
 msgid "This browser wouldn't keep the cart, so it wasn't sent. Free some space or leave private browsing, then try again."
 msgstr ""
 
@@ -742,7 +742,7 @@ msgstr ""
 msgid "Unable to discard. Clear your site data to remove."
 msgstr ""
 
-#: src/ScanPage.tsx
+#: src/CartForm.tsx
 msgid "The cart was changed in another tab. Check it, then discard it again."
 msgstr ""
 
@@ -754,11 +754,11 @@ msgstr ""
 msgid "Not recorded: its key was already used for a different batch. Please report this."
 msgstr ""
 
-#: src/ScanPage.tsx
+#: src/CartForm.tsx
 msgid "MeshDB install number (if you know it)"
 msgstr ""
 
-#: src/ScanPage.tsx
+#: src/CartForm.tsx
 msgctxt "place"
 msgid "From"
 msgstr ""
@@ -795,7 +795,7 @@ msgstr ""
 msgid "This item was changed in another tab. Check it before discarding."
 msgstr ""
 
-#: src/ScanPage.tsx
+#: src/CartForm.tsx
 msgid "{place}: here."
 msgstr ""
 
@@ -855,7 +855,7 @@ msgstr ""
 msgid "A cart: opening packages"
 msgstr ""
 
-#: src/ScanPage.tsx
+#: src/CartForm.tsx
 msgid "Record"
 msgstr ""
 
@@ -867,11 +867,11 @@ msgstr ""
 msgid "The package size has changed to {size} since this item was added. Enter the count again."
 msgstr ""
 
-#: src/ScanPage.tsx
+#: src/CartForm.tsx
 msgid "This browser isn't keeping the cart, so a reload will empty it. Free some space or leave private browsing."
 msgstr ""
 
-#: src/ScanPage.tsx
+#: src/CartForm.tsx
 msgid "Are you {name}? This phone hasn't been used for a while."
 msgstr ""
 
@@ -928,7 +928,7 @@ msgstr ""
 msgid "Counted in whole units."
 msgstr ""
 
-#: src/ScanPage.tsx
+#: src/CartForm.tsx
 msgid "Where"
 msgstr ""
 
@@ -940,7 +940,7 @@ msgstr ""
 msgid "Register it to send this batch."
 msgstr ""
 
-#: src/ScanPage.tsx
+#: src/CartForm.tsx
 msgid "This item wasn't automatically removed. Record the cart and try to remove."
 msgstr ""
 
@@ -948,7 +948,7 @@ msgstr ""
 msgid "This device is offline. Sending when it's back."
 msgstr ""
 
-#: src/ScanPage.tsx
+#: src/CartForm.tsx
 msgid "What is happening"
 msgstr ""
 

@@ -1,16 +1,9 @@
 import { fireEvent, render, screen, within } from "@testing-library/preact";
 import { describe, expect, test, vi } from "vitest";
+import { FROM, NO_NAME_PICKED, PICK_A_PLACE, YOUR_NAME } from "./CartForm";
 import { say } from "./i18n";
 import { Outbox } from "./outbox";
-import {
-  COULD_NOT_LOAD,
-  FROM,
-  NO_NAME_PICKED,
-  PICK_A_PLACE,
-  ScanPage,
-  TRY_AGAIN,
-  YOUR_NAME,
-} from "./ScanPage";
+import { COULD_NOT_LOAD, ScanPage, TRY_AGAIN } from "./ScanPage";
 import { CATALOGUE } from "./test-catalogue";
 import { answering, deferred, json, saved } from "./test-fetch";
 import { expectBold, isCatalogue, open, ready } from "./test-scan-page";

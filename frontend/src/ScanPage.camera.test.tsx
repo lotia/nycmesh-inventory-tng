@@ -1,5 +1,13 @@
 import { fireEvent, screen } from "@testing-library/preact";
 import { beforeEach, describe, expect, test, vi } from "vitest";
+import {
+  FROM,
+  NOTHING_IN_CART,
+  SCAN_WITH_CAMERA,
+  TO,
+  WHERE,
+  YOUR_NAME,
+} from "./CartForm";
 import { REMOVE } from "./CartLine";
 import { freshCart, KIND_WORDS, storeCart } from "./cart";
 import { FIND } from "./Finder";
@@ -7,15 +15,7 @@ import { say } from "./i18n";
 import { DISMISS } from "./OutboxList";
 import { STORAGE_KEY as OUTBOX_KEY, Outbox } from "./outbox";
 import { DONE, POINT } from "./Scanner";
-import {
-  COULD_NOT_LOAD,
-  FROM,
-  NOTHING_IN_CART,
-  SCAN_WITH_CAMERA,
-  TO,
-  WHERE,
-  YOUR_NAME,
-} from "./ScanPage";
+import { COULD_NOT_LOAD } from "./ScanPage";
 import { pass } from "./test-camera";
 import { CATALOGUE } from "./test-catalogue";
 import { answering, deferred, json, saved } from "./test-fetch";

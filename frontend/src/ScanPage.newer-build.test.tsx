@@ -14,16 +14,13 @@ import {
   UPDATED as UPDATED_PHRASE,
   UPGRADE,
 } from "./build";
+import { ADDED_BACK as ADDED_BACK_PHRASE, NOTHING_IN_CART } from "./CartForm";
 import { addOne, STORAGE_KEY as CART_KEY, freshCart, storeCart } from "./cart";
 import { say } from "./i18n";
 import { ADD_TO_CART, CHECKED_OUT } from "./OlderList";
 import { CARTS_FROM_DEVICE, DISMISS, HELD, SENDING } from "./OutboxList";
 import { Outbox } from "./outbox";
-import {
-  ADDED_BACK as ADDED_BACK_PHRASE,
-  NOTHING_IN_CART,
-  ScanPage,
-} from "./ScanPage";
+import { ScanPage } from "./ScanPage";
 import { answering, deferred, json, saved, TOO_OLD } from "./test-fetch";
 import {
   keep,

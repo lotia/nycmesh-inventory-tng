@@ -6,6 +6,16 @@ import {
   within,
 } from "@testing-library/preact";
 import { describe, expect, test, vi } from "vitest";
+import {
+  ADDED_BACK as ADDED_BACK_PHRASE,
+  DISCARD_CART,
+  FROM,
+  INSTALL_NUMBER,
+  NOT_REMOVED as NOT_REMOVED_PHRASE,
+  NOTHING_IN_CART,
+  TO,
+  YOUR_NAME,
+} from "./CartForm";
 import { REMOVE } from "./CartLine";
 import {
   addOne,
@@ -39,16 +49,6 @@ import {
   SOME_NOT_RECORDED,
 } from "./outbox";
 import { ADD_DIFFERENCE, IN_CART } from "./recorded";
-import {
-  ADDED_BACK as ADDED_BACK_PHRASE,
-  DISCARD_CART,
-  FROM,
-  INSTALL_NUMBER,
-  NOT_REMOVED as NOT_REMOVED_PHRASE,
-  NOTHING_IN_CART,
-  TO,
-  YOUR_NAME,
-} from "./ScanPage";
 import { telemetry } from "./telemetry";
 import { CATALOGUE } from "./test-catalogue";
 import { answering, deferred, json, saved, TOO_OLD } from "./test-fetch";

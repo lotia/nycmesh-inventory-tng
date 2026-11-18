@@ -3,12 +3,13 @@
  * importing this module makes `camera` the fake that mock opens. */
 import { fireEvent, render, screen } from "@testing-library/preact";
 import { expect, vi } from "vitest";
+import { FROM, RECORD, TO, YOUR_NAME } from "./CartForm";
 import { openCamera } from "./camera";
 import { STORAGE_KEY as CART_KEY } from "./cart";
 import { FIND } from "./Finder";
 import { say } from "./i18n";
 import { Outbox } from "./outbox";
-import { FROM, RECORD, ScanPage, TO, YOUR_NAME } from "./ScanPage";
+import { ScanPage } from "./ScanPage";
 import { fakeCamera } from "./test-camera";
 import { CATALOGUE } from "./test-catalogue";
 import { answering, json, saved } from "./test-fetch";

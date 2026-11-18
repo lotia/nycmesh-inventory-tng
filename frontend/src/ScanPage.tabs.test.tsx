@@ -1,8 +1,8 @@
 import { fireEvent, screen } from "@testing-library/preact";
 import { describe, expect, test, vi } from "vitest";
+import { NOTHING_IN_CART, TO, YOUR_NAME } from "./CartForm";
 import { STORAGE_KEY as CART_KEY, freshCart, storeCart } from "./cart";
 import { say } from "./i18n";
-import { NOTHING_IN_CART, TO, YOUR_NAME } from "./ScanPage";
 import { CATALOGUE } from "./test-catalogue";
 import { answering, json, saved } from "./test-fetch";
 import {
