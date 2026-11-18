@@ -1,6 +1,7 @@
 """The devices' JSON endpoint, POST /api/devices: where a browser
 registers with a code (devices.register), and the replies to a refused
-device or code."""
+code and, on every endpoint, to a refused device (devices/guards.py's
+DeviceRefusedReply)."""
 
 from fastapi import APIRouter, FastAPI, Request, Response
 from fastapi.responses import JSONResponse

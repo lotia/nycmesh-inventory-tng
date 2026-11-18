@@ -16,6 +16,8 @@ locks on other keys' rows that another count could be waiting on.
 
 refund() is ours, not the library's: it takes back the newest attempt
 counted against a key, for one that turned out not to be a guess.
+RateLimitedReply is the JSON reply to a request any rate limit refused,
+these or one kept in a process's memory, as the pages' reports are.
 """
 
 from collections.abc import Generator

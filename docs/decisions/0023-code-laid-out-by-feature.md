@@ -18,13 +18,14 @@ decided the structure below on 2026-11-17.
   Every feature names its files by the same roles: `<thing>.py` for a
   table's rules and writes (its owner, 0016); one each of `queries.py`,
   `forms.py`, `paths.py` and `guards.py`, the last for what every route
-  needing a sign-in or a device depends on; and, named for the page,
-  endpoint or command each serves, `<page>_routes.py` for HTML pages,
-  `<thing>_api.py` for JSON, `<thing>_schemas.py` and
-  `<command>_command.py`, as `admins/sign_in_routes.py`,
-  `scan/batch_api.py` or `admins/totp_keys_command.py` (Amendment,
-  2026-11-18, replacing `routes.py`, `api.py`, `schemas.py` and
-  `command.py` while a feature had only one). URLs do not change.
+  needing a sign-in or a device depends on, and the reply it refuses
+  with; and, named for the page, endpoint or command each serves,
+  `<page>_routes.py` for HTML pages, `<thing>_api.py` for JSON,
+  `<thing>_schemas.py` and `<command>_command.py`, as
+  `admins/sign_in_routes.py`, `scan/batch_api.py` or
+  `admins/totp_keys_command.py` (Amendment, 2026-11-18, replacing
+  `routes.py`, `api.py`, `schemas.py` and `command.py` while a feature
+  had only one). URLs do not change.
 - **The top of `inventory_tng`** holds only the entry points (`app.py`,
   `server.py`, `__main__.py` and `manage.py`), `models/` and
   `templates/`, beside folders of data such as `locales/`.
