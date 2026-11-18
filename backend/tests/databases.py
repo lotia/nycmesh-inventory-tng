@@ -50,7 +50,7 @@ TEST_DATABASE = re.compile(r"test_(\d+)_[0-9a-f]{8}")
 # database, not a run: a process that leaks connections is refused at its
 # own database's limit, with a clear message (refused_connection), long
 # before it could fill the server.
-TEST_CONNECTION_LIMIT = 40
+TEST_CONNECTION_LIMIT = 42
 # The server's max_connections, as a role or the superuser finds it full.
 FULL = (
     "the server's max_connections (compose.yaml). Are too many runs, or apps,"

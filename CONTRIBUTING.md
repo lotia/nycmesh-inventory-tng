@@ -1116,8 +1116,9 @@ at once, all processes together; one process, and one database, held at
 most about 21; a dev app up to 20, as does the browser tests' server. So a
 checkout's checks and its app fit with room to spare, and so would three
 checkouts sharing `inventory-tng` (Local settings). Each test database
-allows 40 (`tests/databases.py`), so a process that leaks connections is
-refused at its own database, not the server's limit, and a test that fails
+allows twice the most measured on one (`TEST_CONNECTION_LIMIT` in
+`tests/databases.py`), so a process that leaks connections is refused at
+its own database, not the server's limit, and a test that fails
 for either limit says which. Long before a leak reaches that limit, a test
 that ends with a connection it took from any pool and kept errors at its
 teardown, named by `keeps_its_connections` in conftest.py. Each checkout's
