@@ -271,12 +271,13 @@ you" counts every report in one line, which hides what is waiting.
   changes until the save, and offline it counts only this phone's cuts.
 - **Several open packages at a place** are a card each, fewest left
   first, so volunteers use up the nearly empty ones before starting
-  fuller ones, short ends among them; ties go by open package id, so
-  the same records always show the same order (Ali, 2026-11-18,
-  replacing most left first). The stock page uses the same rule. One
-  showing nothing or less is last, greyed, flagged "Shows nothing left",
-  so the next volunteer can report it. Ordered by **Now**, so no card
-  moves while a cut is typed.
+  fuller ones; ties go by open package id, so the same records always
+  show the same order (Ali, 2026-11-18, replacing most left first). The
+  stock page uses the same rule. Short ends follow the usable ones, in
+  the same order, since none is long enough to use (Ali, 2026-11-18).
+  One showing nothing or less is last, greyed, flagged "Shows nothing
+  left", so the next volunteer can report it. Ordered by **Now**, so no
+  card moves while a cut is typed.
 - **One checkbox, one wording**: "Nothing usable left on it", whatever is
   typed, in the card whose legend names the package.
 - **It ticks itself** when a cut leaves a short end, uses up what the

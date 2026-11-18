@@ -350,6 +350,31 @@ describe("filling and saving a cart", () => {
     expect(within(cards[2] as HTMLElement).getByText("20 m")).toBeDefined();
   });
 
+  test("several open packages: short ends after the usable ones, before one showing nothing", async () => {
+    // Ali, 2026-11-18, inventory-tng-qskv.
+    await cableWith(
+      spool({ id: 6, key: "22222222-2222-4222-8222-222222222222", left: "0" }),
+      spool({
+        id: 9,
+        key: "33333333-3333-4333-8333-333333333333",
+        left: "10.000",
+        short_below: "15.000",
+      }),
+      spool({ short_below: "15.000" }),
+      spool({
+        id: 7,
+        key: "44444444-4444-4444-8444-444444444444",
+        left: "40.000",
+        short_below: "15.000",
+      }),
+    );
+    expect(
+      screen
+        .getAllByRole("group", { name: /^Spool open/ })
+        .map((card) => within(card).getAllByText(/ m$/)[0]?.textContent),
+    ).toEqual(["Now: 40 m", "Now: 120 m", "Now: 10 m", "Now: 0 m"]);
+  });
+
   test("an open package is named by its package, though the catalogue has it no more", async () => {
     // A retired spool with none sealed left is not among the cable's
     // packages, but its open one is still taken from (inventory-tng-4w4).

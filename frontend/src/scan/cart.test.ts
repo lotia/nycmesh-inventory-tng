@@ -553,6 +553,35 @@ describe("turning a cart into a batch", () => {
     ]);
   });
 
+  test("an item's short ends at a place follow its usable open packages, fewest left first, ties by id", () => {
+    // Too short to use, so after those a cut can come from (Ali,
+    // 2026-11-18, inventory-tng-qskv); those showing nothing stay last.
+    const at = (id: number, left: number, short_below: string | null) => ({
+      id,
+      key: `open-${id}`,
+      item_id: 101,
+      package_id: 1001,
+      package_name: "Spool",
+      location_id: 10,
+      opened_at: "2026-11-03T10:00:00Z",
+      left,
+      short_below,
+    });
+    const all = [
+      at(1, 0, "15.000"),
+      at(2, 12000, "15.000"),
+      at(3, 120000, "15.000"),
+      at(4, 5000, "15.000"),
+      at(5, 15000, "15.000"),
+      at(6, 12000, "15.000"),
+      at(7, 5000, null),
+      at(0, 5000, "15.000"),
+    ];
+    expect(offeredAt(all, 101, 10).map((each) => each.id)).toEqual([
+      7, 5, 3, 4, 0, 2, 6, 1,
+    ]);
+  });
+
   test("an opening waiting of a package the catalogue has no more is named 'package'", () => {
     const opening: Draft = {
       kind: "open",

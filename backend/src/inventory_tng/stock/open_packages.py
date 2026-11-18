@@ -407,8 +407,8 @@ class Forms:
 def is_short_end(left: Decimal, short_below: Decimal | None) -> bool:
     """Whether an open package with `left` on it is a short end: some
     left, but less than its package's too-short-to-use length. Less than
-    nothing is the records', not a short end. The scan page judges a cut
-    by the same length (frontend/src/scan/offered.ts, afterCut)."""
+    nothing is the records', not a short end. The scan page tells one the
+    same way (frontend/src/scan/offered.ts, isShortEnd)."""
     return short_below is not None and 0 < left < short_below
 
 
@@ -416,7 +416,8 @@ def fewest_left_first(opened: tuple[int, Decimal]) -> tuple[bool, Decimal, int]:
     """How an item's open packages at a place are listed, an open package
     id and what is left on it: fewest left first, those showing nothing or
     less last, ties by id (docs/decisions/0020). The scan page lists its
-    cards the same way (frontend/src/scan/offered.ts, offeredAt)."""
+    cards the same way, short ends after usable ones
+    (frontend/src/scan/offered.ts, offeredAt)."""
     open_id, left = opened
     return (left <= 0, left, open_id)
 

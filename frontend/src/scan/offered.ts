@@ -194,27 +194,41 @@ export function offered(
 }
 
 /** offered's open packages of an item at a place, as the stock page lists
- * them (open_packages.fewest_left_first): fewest left first, those
- * showing nothing, or less, last, ties by id (docs/decisions/0020). One
- * opened on this phone that the catalogue does not show yet has no id
- * here (0), so it follows those that have one, in the order it was
- * opened. By what is on each now, never after a cut being typed. */
+ * them (open_packages.fewest_left_first): fewest left first, ties by id,
+ * then short ends (isShortEnd) the same way, then those showing nothing,
+ * or less (docs/decisions/0020). One opened on this phone that the
+ * catalogue does not show yet has no id here (0), so it follows those
+ * that have one, in the order it was opened. By what is on each now,
+ * never after a cut being typed. */
 export function offeredAt(
   all: readonly Offered[],
   itemId: number,
   placeId: number | null,
 ): Offered[] {
-  const nothing = (each: Offered) => Number(each.left <= 0);
+  // Usable, then short ends, then those showing nothing or less.
+  const last = (each: Offered) =>
+    each.left <= 0 ? 2 : Number(isShortEnd(each.left, each.short_below));
   const unsaved = (each: Offered) => Number(each.id === 0);
   return all
     .filter((each) => each.item_id === itemId && each.location_id === placeId)
     .sort(
       (a, b) =>
-        nothing(a) - nothing(b) ||
+        last(a) - last(b) ||
         a.left - b.left ||
         unsaved(a) - unsaved(b) ||
         a.id - b.id,
     );
+}
+
+/** Whether an open package with `left` (thousandths) on it is a short
+ * end: some left, but less than its package's too-short-to-use length
+ * (open_packages.is_short_end). */
+export function isShortEnd(
+  left: number,
+  shortBelow: Offered["short_below"],
+): boolean {
+  const below = shortBelow === null ? null : thousandths(shortBelow);
+  return below !== null && 0 < left && left < below;
 }
 
 /** Why a cut leaves nothing usable on an open package. */
@@ -234,10 +248,10 @@ export function afterCut(
   if (after === 0) {
     return { after, ending: "used" };
   }
-  const shortBelow =
-    open.short_below === null ? null : thousandths(open.short_below);
-  const short = shortBelow !== null && after < shortBelow;
-  return { after, ending: short ? "short" : null };
+  return {
+    after,
+    ending: isShortEnd(after, open.short_below) ? "short" : null,
+  };
 }
 
 export type Taken = NonNullable<Line["open"]>[string];
