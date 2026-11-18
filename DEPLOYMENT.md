@@ -282,8 +282,8 @@ by downgrading.
 Some things only the operator can do, with a command run where the app
 runs, with its settings. On Kubernetes, that means `kubectl exec` into the
 app's Deployment (`inventory` below; docs/decisions/0018); from a checkout,
-`uv run python -m …` in `backend/`. Every one is a command of
-`inventory_tng.manage`, which lists them all, and each says what it takes:
+`uv run python -m inventory_tng.manage …` in `backend/`. It lists every
+command, and each says what it takes:
 
 ```sh
 kubectl exec deploy/inventory -- python -m inventory_tng.manage

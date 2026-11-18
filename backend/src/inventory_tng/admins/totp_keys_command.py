@@ -10,14 +10,13 @@ TOTP keys):
 import argparse
 from collections.abc import Sequence
 from datetime import UTC, datetime
-from typing import TYPE_CHECKING
 
 from sqlalchemy.orm import Session
 
+from inventory_tng.admins import accounts
 from inventory_tng.admins.totp_keys import TotpKeys, new_key
-
-if TYPE_CHECKING:  # Imported by the command, which needs no mail for `new`.
-    from inventory_tng.core.mail import Notifier
+from inventory_tng.core.command import run_command, run_command_telling
+from inventory_tng.core.mail import Notifier
 
 
 def parse(
@@ -48,26 +47,21 @@ def main(argv: Sequence[str] | None = None, prog: str | None = None) -> int:
     if args.command == "new":
         print(new_key())
         return 0
-    # Imported here: `new` needs no database or settings.
-    from inventory_tng.core.command import run_command, run_command_telling
-
     if args.command == "reseal":
         return run_command(_reseal, args)
     return run_command_telling(_retire, args)
 
 
 def _reseal(session: Session, _args: argparse.Namespace) -> int:
-    from inventory_tng.admins.accounts import reseal_authenticators
-
-    resealed, unreadable = reseal_authenticators(session, TotpKeys.from_environ())
+    resealed, unreadable = accounts.reseal_authenticators(
+        session, TotpKeys.from_environ()
+    )
     print(f"Resealed {resealed}; {unreadable} could not be read.")
     return 1 if unreadable else 0
 
 
 def _retire(session: Session, args: argparse.Namespace, notify: Notifier) -> int:
-    from inventory_tng.admins.accounts import retire_authenticators
-
-    retired, stranded = retire_authenticators(
+    retired, stranded = accounts.retire_authenticators(
         session,
         TotpKeys.from_environ(),
         datetime.now(UTC),
