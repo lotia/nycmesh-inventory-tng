@@ -13,11 +13,11 @@ from inventory_tng.admins import (
     account_routes,
     accounts,
     admins_routes,
-    guards,
     home_routes,
     reset_routes,
     sign_in_routes,
 )
+from inventory_tng.admins.guards import install_admin_answers
 from inventory_tng.admins.paths import HOME
 from inventory_tng.admins.totp_keys import TotpKeys
 from inventory_tng.catalogue import (
@@ -33,6 +33,7 @@ from inventory_tng.core.phrases import BRAND
 from inventory_tng.core.request_logging import RequestLogging
 from inventory_tng.core.settings import Settings
 from inventory_tng.devices import devices_routes, registration_api
+from inventory_tng.devices.guards import install_device_refused
 from inventory_tng.labels import labels_routes
 from inventory_tng.places import locations_routes
 from inventory_tng.scan import (
@@ -155,10 +156,11 @@ def create_app(
     bundle.install(app, settings)
     db.install(app)
     registration_api.install(app)
+    install_device_refused(app)
     batch_api.install(app)
     page_builds.install(app)
     page_telemetry_api.install(app)
-    guards.install(app)
+    install_admin_answers(app)
     return app
 
 

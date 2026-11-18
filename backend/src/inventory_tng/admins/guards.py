@@ -516,7 +516,10 @@ def _confirm_page(
     )
 
 
-def install(app: FastAPI) -> None:
+def install_admin_answers(app: FastAPI) -> None:
+    """The answers a Need gives before its route runs: a redirect, a form's
+    answer, or the form shown again asking for a code."""
+
     @app.exception_handler(Redirect)
     def redirected(_request: Request, error: Redirect) -> Response:
         return redirect(error.location)

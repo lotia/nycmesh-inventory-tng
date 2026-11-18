@@ -1,7 +1,6 @@
 """The devices' JSON endpoint, POST /api/devices: where a browser
-registers with a code (devices.register), and the replies to a refused
-code and, on every endpoint, to a refused device (devices/guards.py's
-DeviceRefusedReply)."""
+registers with a code (devices.register), and its replies to a refused
+code."""
 
 from fastapi import APIRouter, FastAPI, Request, Response
 from fastapi.responses import JSONResponse
@@ -11,11 +10,9 @@ from inventory_tng.core.rate_limits import RateLimitedReply
 from inventory_tng.devices.devices import (
     COOKIE,
     COOKIE_MAX_AGE,
-    DeviceRefused,
     RegistrationRejected,
     register,
 )
-from inventory_tng.devices.guards import DeviceRefusedReply
 from inventory_tng.devices.registration_schemas import (
     CodeRefusedReply,
     Registered,
@@ -50,13 +47,7 @@ def register_device(
 
 
 def install(app: FastAPI) -> None:
-    """The responses for a refused device or code, which pages and the scan
-    page can show."""
-
-    @app.exception_handler(DeviceRefused)
-    def device_refused(_request: Request, error: DeviceRefused) -> JSONResponse:
-        body = DeviceRefusedReply(reason=error.reason)
-        return JSONResponse(body.model_dump(), status_code=403)
+    """The responses for a refused code, which the register page can show."""
 
     @app.exception_handler(RegistrationRejected)
     def registration_rejected(

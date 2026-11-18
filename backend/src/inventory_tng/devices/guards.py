@@ -1,14 +1,15 @@
 """What every route that needs a registered device depends on
-(docs/decisions/0009): the device cookie, and the device it names. The
-rules are in devices.py; registration_api.py installs the reply to a
-refused device, DeviceRefusedReply, which the endpoints needing one declare.
+(docs/decisions/0009): the device cookie, and the device it names; and
+the reply to a refused device, DeviceRefusedReply, which the endpoints
+needing one declare. The rules are in devices.py.
 """
 
 from datetime import UTC, datetime
 from typing import Annotated
 
 import structlog
-from fastapi import Depends, Request
+from fastapi import Depends, FastAPI, Request
+from fastapi.responses import JSONResponse
 from fastapi.security import APIKeyCookie
 from opentelemetry import metrics
 from pydantic import BaseModel
@@ -78,3 +79,12 @@ def current_device(
 
 
 RegisteredDevice = Annotated[Device, Depends(current_device)]
+
+
+def install_device_refused(app: FastAPI) -> None:
+    """The reply to a refused device, which the scan page can show."""
+
+    @app.exception_handler(DeviceRefused)
+    def device_refused(_request: Request, error: DeviceRefused) -> JSONResponse:
+        body = DeviceRefusedReply(reason=error.reason)
+        return JSONResponse(body.model_dump(), status_code=403)
