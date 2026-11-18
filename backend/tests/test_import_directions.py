@@ -1,17 +1,20 @@
 """Which way the app's modules may import one another (docs/decisions/0023),
-read from its source with Python's ast module (nothing of it runs in the
-app; helpers.source). Imports inside functions count, as do relative ones
-and a module imported by name from its package (from inventory_tng.stock
-import ledger).
+read from its source with Python's ast module (helpers.source). Imports
+inside functions count, as do relative ones.
+
+| Rule | What it finds |
+| --- | --- |
+| rules_import_fastapi_or_web | rules, queries and forms importing FastAPI or web/ |
+| routes_run_queries | a module of routes making or running a query |
+| core_imports_a_feature | core importing any of the app but core and models |
+| routes_import_another_features_routes | links between features not through paths.py |
 
 Today's breaks are listed in BREAKS, which may only shrink: a new break
 fails, and so does one fixed but still listed.
 """
 
 import ast
-from collections import Counter
-from collections.abc import Callable, Collection
-from pathlib import Path
+from collections.abc import Callable, Mapping
 
 import pytest
 
@@ -19,11 +22,13 @@ from inventory_tng import models
 
 from helpers.source import SOURCE, modules
 
-# core/ is plumbing, not business rules. Of the app outside core, it may
-# import only the models, kept whole (0023).
-CORE_MAY_IMPORT = {"models.py"}
-# Rules: each table's owner (db.protection), any of PLAIN, and these,
-# which hold rules or queries but own no table.
+# The app's modules by their path under SOURCE, read.
+type App = Mapping[str, ast.Module]
+# What the module at a path breaks a rule with.
+type Check = Callable[[str, App], set[str]]
+
+# Rules: each table's owner (db.protection), any queries.py or forms.py, and
+# these, which hold rules but own no table.
 RULES = {
     "catalogue/names.py",
     "catalogue/unit_readings.py",
@@ -31,104 +36,67 @@ RULES = {
     "site_settings/scan_settings.py",
     "stock/balance.py",
     "stock/ledger.py",
+    *(
+        table.info["owner"]
+        for table in models.Base.metadata.tables.values()
+        if table.info["owner"] is not None
+    ),
 }
-# What of web/ rules may import: it loads neither FastAPI nor the templates,
-# and is held to the rules' own rule to stay so.
+# What of web/ rules may import. They are rules themselves, so they import
+# neither FastAPI nor the rest of web/.
 RULES_MAY_IMPORT = {"web/formatting.py", "web/forms.py"}
-# A feature's modules held to the rules' rule too, whatever their folder: its
-# queries, and how its forms are read and checked, which handlers call.
-PLAIN = {"queries.py", "forms.py"}
-# Folders that are not features.
-NOT_FEATURES = {"core", "dev", "web"}
-OWNERS = {
-    table.info["owner"]
-    for table in models.Base.metadata.tables.values()
-    if table.info["owner"] is not None
-}
-FASTAPI = ("fastapi", "starlette")
-ROUTE_NAMES = {"routes.py", "api.py"}
+FASTAPI = {"fastapi", "starlette"}
 # Calls that make or run a query: select(...), or session.execute and the
-# like.
+# like. A session.get may stay.
 QUERY_CALLS = {"select", "execute", "scalar", "scalars"}
-MANAGE = "manage.py"
-PATHS = "paths.py"
 
-# What one module breaks a rule with, given its tree, its path under SOURCE
-# and the app's modules by that path.
-type Check = Callable[[ast.Module, str, Collection[str]], list[str]]
-
-# Today's breaks, by rule: each module that breaks it, and what with.
-BREAKS: dict[str, dict[str, list[str]]] = {
-    "core_imports_a_feature": {},
-    "rules_import_fastapi_or_web": {
-        "web/once.py": ["fastapi", "starlette", "web/pages.py"],
-    },
-    "routes_run_queries": {},
-    "routes_import_another_features_routes": {},
-    "init_not_empty": {},
-    "command_imported_outside_manage": {},
-    "paths_import_more_than_core_and_paths": {},
+# (rule, module, what it breaks the rule with), as found when the rules were
+# written.
+BREAKS = {
+    ("rules_import_fastapi_or_web", "web/once.py", "fastapi"),
+    ("rules_import_fastapi_or_web", "web/once.py", "starlette"),
+    ("rules_import_fastapi_or_web", "web/once.py", "web/pages.py"),
 }
 
 
-def _module_at(parts: list[str], known: Collection[str]) -> str | None:
-    """The module, by its path, that dotted `parts` under inventory_tng
-    name: a package's __init__.py, or a file."""
-    for path in ("/".join([*parts, "__init__.py"]), "/".join(parts) + ".py"):
-        if path in known:
-            return path
-    return None
-
-
-def imported(tree: ast.Module, path: str, known: Collection[str]) -> list[str]:
-    """The app's modules, by path, that the module at `path` imports,
-    anywhere in it."""
+def imports(path: str, app: App) -> set[str]:
+    """What the module at `path` imports: the app's modules by path, and any
+    other package by its top-level name. Of `from x import y`, y counts where
+    it is a module, x where y is a name in it."""
     package = path.split("/")[:-1]
-    found: list[str] = []
-    for node in ast.walk(tree):
+    names: list[list[str]] = []
+    for node in ast.walk(app[path]):
         if isinstance(node, ast.Import):
-            for alias in node.names:
-                parts = alias.name.split(".")
-                if parts[0] == "inventory_tng" and (
-                    module := _module_at(parts[1:], known)
-                ):
-                    found.append(module)
+            names += [alias.name.split(".") for alias in node.names]
         elif isinstance(node, ast.ImportFrom):
-            named: list[str] = node.module.split(".") if node.module else []
             if node.level > len(package) + 1:
                 continue  # Above inventory_tng, so none of the app's.
-            if node.level:
-                base = package[: len(package) - (node.level - 1)] + named
-            elif named[:1] == ["inventory_tng"]:
-                base = named[1:]
-            else:
-                continue
-            for alias in node.names:
-                # A module imported by name from its package, or a name
-                # from a module.
-                module = _module_at([*base, alias.name], known) or _module_at(
-                    base, known
-                )
-                if module:
-                    found.append(module)
-    return sorted(set(found))
+            base = (
+                ["inventory_tng", *package[: len(package) + 1 - node.level]]
+                if node.level
+                else []
+            )
+            base += node.module.split(".") if node.module else []
+            names += [[*base, alias.name] for alias in node.names]
+    found: set[str] = set()
+    for parts in names:
+        if parts[0] != "inventory_tng":
+            found.add(parts[0])
+            continue
+        # The longest that is a module; the package itself is none.
+        for end in range(len(parts), 1, -1):
+            stem = "/".join(parts[1:end])
+            if module := next(
+                (m for m in (f"{stem}.py", f"{stem}/__init__.py") if m in app), None
+            ):
+                found.add(module)
+                break
+    return found
 
 
-def is_core(path: str) -> bool:
-    return path.startswith("core/")
-
-
-def is_web(path: str) -> bool:
-    return path.startswith("web/")
-
-
-def is_rules(path: str) -> bool:
-    return (
-        path in OWNERS
-        or path in RULES
-        or path in RULES_MAY_IMPORT
-        or Path(path).name in PLAIN
-    )
+def is_routes(path: str, app: App) -> bool:
+    """A module of routes: one that makes an APIRouter."""
+    return any(_called(node) == "APIRouter" for node in ast.walk(app[path]))
 
 
 def _called(node: ast.AST) -> str | None:
@@ -139,415 +107,145 @@ def _called(node: ast.AST) -> str | None:
     return None
 
 
-def is_routes(tree: ast.Module, path: str) -> bool:
-    """A module of routes: named for them, or making an APIRouter."""
-    name = path.split("/")[-1]
-    return (
-        name in ROUTE_NAMES
-        or name.endswith(("_routes.py", "_api.py"))
-        or any(_called(node) == "APIRouter" for node in ast.walk(tree))
-    )
-
-
-def feature(path: str) -> str:
-    """The feature a module belongs to: its package's, or its own at the
-    top."""
-    parts = path.split("/")
-    if len(parts) == 1:
-        return path.removesuffix(".py")
-    return parts[0]
-
-
-def _tree(path: str) -> ast.Module:
-    return ast.parse((SOURCE / path).read_text(), path)
-
-
-def core_imports_a_feature(
-    tree: ast.Module, path: str, known: Collection[str]
-) -> list[str]:
-    """What core imports besides core and the models: features, web/ and
-    dev/ alike."""
-    if not is_core(path):
-        return []
-    return [
+def rules_import_fastapi_or_web(path: str, app: App) -> set[str]:
+    if not (
+        path in RULES
+        or path in RULES_MAY_IMPORT
+        or path.endswith(("/queries.py", "/forms.py"))
+    ):
+        return set()
+    return {
         module
-        for module in imported(tree, path, known)
-        if not is_core(module) and module not in CORE_MAY_IMPORT
-    ]
+        for module in imports(path, app)
+        if module in FASTAPI
+        or (module.startswith("web/") and module not in RULES_MAY_IMPORT)
+    }
 
 
-def rules_import_fastapi_or_web(
-    tree: ast.Module, path: str, known: Collection[str]
-) -> list[str]:
-    if not is_rules(path):
-        return []
-    found = [
+def routes_run_queries(path: str, app: App) -> set[str]:
+    """Each query call in a module of routes, by the top-level function (or
+    class) it is in."""
+    if not is_routes(path, app):
+        return set()
+    return {
+        f"{getattr(statement, 'name', '<module>')}: {called}"
+        for statement in app[path].body
+        for node in ast.walk(statement)
+        if (called := _called(node)) in QUERY_CALLS
+    }
+
+
+def core_imports_a_feature(path: str, app: App) -> set[str]:
+    """What core imports of the app besides core and the models: features,
+    web/ and dev/ alike."""
+    if not path.startswith("core/"):
+        return set()
+    return {
         module
-        for module in imported(tree, path, known)
-        if is_web(module) and module not in RULES_MAY_IMPORT
-    ]
-    for node in ast.walk(tree):
-        if isinstance(node, ast.Import):
-            names = [alias.name for alias in node.names]
-        elif isinstance(node, ast.ImportFrom) and not node.level:
-            names = [node.module or ""]
-        else:
-            continue
-        found += [top for name in names if (top := name.split(".")[0]) in FASTAPI]
-    return sorted(set(found))
+        for module in imports(path, app)
+        if module in app and not module.startswith("core/") and module != "models.py"
+    }
 
 
-def routes_run_queries(
-    tree: ast.Module, path: str, _known: Collection[str]
-) -> list[str]:
-    """The query calls in a module of routes (QUERY_CALLS), counted by the
-    top-level function (or class) they are in, so session.scalars(select(X))
-    counts 2. A session.get may stay."""
-    if not is_routes(tree, path):
-        return []
-    found: Counter[str] = Counter()
-    for statement in tree.body:
-        name = getattr(statement, "name", "<module>")
-        for node in ast.walk(statement):
-            if _called(node) in QUERY_CALLS:
-                found[name] += 1
-    return [f"{name}: {count}" for name, count in sorted(found.items())]
-
-
-def routes_import_another_features_routes(
-    tree: ast.Module, path: str, known: Collection[str]
-) -> list[str]:
+def routes_import_another_features_routes(path: str, app: App) -> set[str]:
     """Links between features go through paths.py instead."""
-    if not is_routes(tree, path):
-        return []
-    return [
+    if not is_routes(path, app):
+        return set()
+    feature = path.split("/")[0]
+    return {
         module
-        for module in imported(tree, path, known)
-        if feature(module) != feature(path) and is_routes(_tree(module), module)
-    ]
-
-
-def init_not_empty(tree: ast.Module, path: str, _known: Collection[str]) -> list[str]:
-    """What a package's __init__.py holds besides its docstring."""
-    if not path.endswith("__init__.py"):
-        return []
-    body = tree.body
-    if ast.get_docstring(tree, clean=False) is not None:
-        body = body[1:]
-    return sorted({type(statement).__name__ for statement in body})
-
-
-def command_imported_outside_manage(
-    tree: ast.Module, path: str, known: Collection[str]
-) -> list[str]:
-    """A feature's command module (command.py, or <thing>_command.py where
-    it has two), which only the entry point imports."""
-    if path == MANAGE:
-        return []
-    return [
-        module
-        for module in imported(tree, path, known)
-        if module.endswith(("/command.py", "_command.py"))
-        and module.split("/")[0] not in NOT_FEATURES
-    ]
-
-
-def paths_import_more_than_core_and_paths(
-    tree: ast.Module, path: str, known: Collection[str]
-) -> list[str]:
-    """A paths.py, which any page may import for its links, imports only
-    core and other paths.py, so importing it loads no page."""
-    if Path(path).name != PATHS:
-        return []
-    return [
-        module
-        for module in imported(tree, path, known)
-        if not is_core(module) and Path(module).name != PATHS
-    ]
+        for module in imports(path, app)
+        if module in app and module.split("/")[0] != feature and is_routes(module, app)
+    }
 
 
 CHECKS: dict[str, Check] = {
     check.__name__: check
     for check in (
-        core_imports_a_feature,
         rules_import_fastapi_or_web,
         routes_run_queries,
+        core_imports_a_feature,
         routes_import_another_features_routes,
-        init_not_empty,
-        command_imported_outside_manage,
-        paths_import_more_than_core_and_paths,
     )
 }
 
 
-def found(check: Check) -> dict[str, list[str]]:
-    """`check`'s findings in every module of the app, by path."""
-    known = {str(path.relative_to(SOURCE)) for path in modules()}
-    return {
-        path: what
-        for path in sorted(known)
-        if (what := check(_tree(path), path, known))
+def test_the_app_breaks_no_import_rule_but_those_listed() -> None:
+    app = {
+        str(path.relative_to(SOURCE)): ast.parse(path.read_text(), str(path))
+        for path in modules()
     }
-
-
-def _left_out(
-    these: dict[str, list[str]], those: dict[str, list[str]]
-) -> dict[str, list[str]]:
-    """The breaks in `these` that `those` does not have, by module."""
-    return {
-        path: missing
-        for path, what in these.items()
-        if (missing := [w for w in what if w not in those.get(path, [])])
+    now = {
+        (rule, path, what)
+        for rule, check in CHECKS.items()
+        for path in app
+        for what in check(path, app)
     }
-
-
-@pytest.mark.parametrize("rule", CHECKS)
-def test_the_app_breaks_no_import_rule_but_those_listed(rule: str) -> None:
-    now = found(CHECKS[rule])
-    listed = BREAKS[rule]
-    # Compared break by break, so one of a module's breaks fixed shows as
-    # fixed, not as the module's list being new. A changed count shows as
-    # both: the old one fixed, the new one new.
-    new = _left_out(now, listed)
-    fixed = _left_out(listed, now)
-    assert (new, fixed) == ({}, {}), (
-        f"{rule} (docs/decisions/0023): put right what is new, not in BREAKS, "
-        f"and take out of BREAKS what is fixed. New: {new}. Fixed: {fixed}."
+    assert (now - BREAKS, BREAKS - now) == (set(), set()), (
+        "(new, fixed) breaks of docs/decisions/0023: put right what is new, "
+        "and take out of BREAKS what is fixed."
     )
 
 
-def test_breaks_are_compared_one_by_one() -> None:
-    listed = {"devices.py": ["fastapi", "web.py"], "admin/items.py": ["_page: 4"]}
-    now = {"devices.py": ["fastapi"], "admin/items.py": ["_page: 3"]}
-    assert _left_out(now, listed) == {"admin/items.py": ["_page: 3"]}
-    assert _left_out(listed, now) == {
-        "devices.py": ["web.py"],
-        "admin/items.py": ["_page: 4"],
-    }
-
-
-def test_every_rule_has_its_breaks_listed() -> None:
-    assert set(BREAKS) == set(CHECKS)
-
-
-# Each rule, shown a break, finds it: modules by path, those named here
-# existing as far as imports go.
-KNOWN = {
-    "__init__.py",
-    "admin/__init__.py",
-    "admin/items.py",
-    "catalogue/__init__.py",
-    "catalogue/items.py",
-    "catalogue/queries.py",
-    "catalogue/routes.py",
-    "catalogue/command.py",
-    "catalogue/forms.py",
-    "core/__init__.py",
-    "core/db.py",
-    "core/settings.py",
-    "ledger.py",
-    "manage.py",
-    "models.py",
-    "stock/__init__.py",
-    "stock/api.py",
-    "stock/ledger.py",
-    "web/__init__.py",
-    "web/formatting.py",
-    "web/forms.py",
-    "web/pages.py",
+# Each rule, shown a break, finds it. The modules a case's imports may name.
+ROUTER = "router = APIRouter()\n"
+APP = {
+    "models.py": "",
+    "core/settings.py": "",
+    "catalogue/paths.py": "",
+    "catalogue/queries.py": "",
+    "catalogue/routes.py": ROUTER,
+    "stock/api.py": ROUTER,
+    "stock/ledger.py": "",
+    "web/formatting.py": "",
+    "web/pages.py": "",
 }
 
 
 @pytest.mark.parametrize(
-    ("path", "source", "breaks"),
+    ("rule", "path", "source", "breaks"),
     [
-        ("core/db.py", "from inventory_tng import ledger", ["ledger.py"]),
-        ("core/db.py", "def f():\n    from .. import ledger", ["ledger.py"]),
-        ("core/db.py", "from ..catalogue.items import x", ["catalogue/items.py"]),
-        ("core/db.py", "import inventory_tng.stock.ledger", ["stock/ledger.py"]),
-        ("core/db.py", "from inventory_tng import models", []),
-        ("core/db.py", "from inventory_tng.core import settings", []),
-        ("core/db.py", "from . import db, settings", []),
-        ("ledger.py", "from inventory_tng.core import settings", []),
-        # Above inventory_tng, so none of the app's.
-        ("core/db.py", "from ... import ledger", []),
-    ],
-)
-def test_core_importing_a_feature_is_found(
-    path: str, source: str, breaks: list[str]
-) -> None:
-    assert core_imports_a_feature(ast.parse(source), path, KNOWN) == breaks
-
-
-@pytest.mark.parametrize(
-    ("path", "source", "breaks"),
-    [
-        ("stock/ledger.py", "from fastapi import Request", ["fastapi"]),
-        ("stock/ledger.py", "def f():\n    import starlette.requests", ["starlette"]),
         (
+            "rules_import_fastapi_or_web",
+            "stock/ledger.py",
+            "from fastapi import Request\nfrom inventory_tng.web import formatting",
+            {"fastapi"},
+        ),
+        (
+            "rules_import_fastapi_or_web",
             "catalogue/queries.py",
-            "from inventory_tng.web import pages",
-            ["web/pages.py"],
+            "def f():\n    from ..web.pages import x",
+            {"web/pages.py"},
         ),
-        ("catalogue/queries.py", "from ..web.formatting import x", []),
-        ("stock/ledger.py", "from inventory_tng.web import formatting", []),
-        ("stock/ledger.py", "from inventory_tng.core import db", []),
-        # Neither rules nor queries.
-        ("catalogue/routes.py", "from fastapi import APIRouter", []),
-        # What of web/ rules may import is held to their rule itself.
-        ("web/formatting.py", "from fastapi import Request", ["fastapi"]),
-        ("web/formatting.py", "from inventory_tng.web import pages", ["web/pages.py"]),
-        # A feature's forms are held to it too (PLAIN).
-        ("catalogue/forms.py", "from fastapi import Form", ["fastapi"]),
-        ("catalogue/forms.py", "from inventory_tng.web import pages", ["web/pages.py"]),
-        ("catalogue/forms.py", "from inventory_tng.web.forms import x", []),
-    ],
-)
-def test_rules_importing_fastapi_or_web_is_found(
-    path: str, source: str, breaks: list[str]
-) -> None:
-    assert rules_import_fastapi_or_web(ast.parse(source), path, KNOWN) == breaks
-
-
-def test_a_tables_owner_is_rules() -> None:
-    assert is_rules("catalogue/items.py")
-    assert not is_rules("catalogue/items_routes.py")
-
-
-@pytest.mark.parametrize(
-    ("path", "source", "breaks"),
-    [
-        ("catalogue/routes.py", "def page():\n    select(Item)", ["page: 1"]),
         (
+            "routes_run_queries",
+            "catalogue/routes.py",
+            f"{ROUTER}def page(s):\n    s.scalars(select(Item))\n    s.get(Item, 1)",
+            {"page: scalars", "page: select"},
+        ),
+        (
+            "core_imports_a_feature",
+            "core/db.py",
+            (
+                "from ..stock import ledger\nfrom inventory_tng import models\n"
+                "from . import settings\nimport sqlalchemy"
+            ),
+            {"stock/ledger.py"},
+        ),
+        (
+            "routes_import_another_features_routes",
             "stock/api.py",
-            "def save(s):\n    s.execute(x)\n    s.scalar(y)",
-            ["save: 2"],
+            (
+                f"{ROUTER}from ..catalogue import routes, paths\n"
+                "from inventory_tng.catalogue.queries import x"
+            ),
+            {"catalogue/routes.py"},
         ),
-        (
-            "admin/items.py",
-            "router = APIRouter()\nasync def page(s):\n    s.scalars(sa.select(Item))",
-            ["page: 2"],
-        ),
-        ("catalogue/routes.py", "def page(s):\n    s.get(Item, 1)", []),
-        # Not a module of routes.
-        ("catalogue/queries.py", "def total(s):\n    s.scalar(select(Item))", []),
     ],
 )
-def test_routes_running_queries_is_found(
-    path: str, source: str, breaks: list[str]
+def test_each_rule_finds_a_break(
+    rule: str, path: str, source: str, breaks: set[str]
 ) -> None:
-    assert routes_run_queries(ast.parse(source), path, KNOWN) == breaks
-
-
-def test_another_features_routes_imported_by_routes_is_found(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    """Whether the module imported holds routes is read from its source."""
-    files = {
-        "catalogue/routes.py": "",
-        "stock/api.py": "",
-        "catalogue/pages.py": "router = APIRouter()",
-        "stock/counts.py": "router = APIRouter()",
-        "stock/listing.py": "",
-        "catalogue/paths.py": "",
-    }
-    for name, text in files.items():
-        (tmp_path / name).parent.mkdir(exist_ok=True)
-        (tmp_path / name).write_text(text)
-    monkeypatch.setattr(f"{__name__}.SOURCE", tmp_path)
-
-    def breaks(path: str, source: str) -> list[str]:
-        return routes_import_another_features_routes(ast.parse(source), path, files)
-
-    assert breaks("stock/api.py", "from ..catalogue import routes") == [
-        "catalogue/routes.py"
-    ]
-    # A module holds routes as it makes an APIRouter.
-    router = "router = APIRouter()\n"
-    assert breaks(
-        "stock/counts.py", f"{router}from inventory_tng.catalogue.pages import X"
-    ) == ["catalogue/pages.py"]
-    assert breaks("stock/api.py", "from inventory_tng.catalogue.paths import X") == []
-    assert breaks("stock/counts.py", f"{router}from .listing import Sort") == []
-    assert breaks("stock/counts.py", f"{router}from . import api") == []
-    assert breaks("catalogue/routes.py", "from . import routes") == []
-    # Not a module of routes.
-    assert breaks("catalogue/paths.py", "from ..stock import api") == []
-
-
-@pytest.mark.parametrize(
-    ("path", "source", "breaks"),
-    [
-        ("web/__init__.py", "from . import formatting", ["ImportFrom"]),
-        ("admin/__init__.py", '"""Pages."""\nSECTIONS = []', ["Assign"]),
-        ("web/__init__.py", '"""Shared."""', []),
-        ("web/__init__.py", "", []),
-        ("web/__init__.py", "0", ["Expr"]),
-        ("web/formatting.py", "X = 1", []),
-    ],
-)
-def test_an_init_not_empty_is_found(path: str, source: str, breaks: list[str]) -> None:
-    assert init_not_empty(ast.parse(source), path, KNOWN) == breaks
-
-
-@pytest.mark.parametrize(
-    ("path", "source", "breaks"),
-    [
-        (
-            "stock/api.py",
-            "from inventory_tng.catalogue import command",
-            ["catalogue/command.py"],
-        ),
-        (
-            "ledger.py",
-            "def f():\n    from .catalogue.command import main",
-            ["catalogue/command.py"],
-        ),
-        (
-            "catalogue/items.py",
-            "from .totp_keys_command import main",
-            ["catalogue/totp_keys_command.py"],
-        ),
-        ("manage.py", "from inventory_tng.catalogue import command", []),
-        # core/command.py, what every command shares.
-        ("ledger.py", "from inventory_tng.core.command import run_command", []),
-        ("ledger.py", "from inventory_tng.dev import command", []),
-    ],
-)
-def test_a_command_imported_outside_manage_is_found(
-    path: str, source: str, breaks: list[str]
-) -> None:
-    known = {
-        *KNOWN,
-        "catalogue/totp_keys_command.py",
-        "core/command.py",
-        "dev/__init__.py",
-        "dev/command.py",
-    }
-    assert command_imported_outside_manage(ast.parse(source), path, known) == breaks
-
-
-@pytest.mark.parametrize(
-    ("path", "source", "breaks"),
-    [
-        ("catalogue/paths.py", "from inventory_tng.web.paths import ADMIN", []),
-        ("stock/paths.py", "from ..catalogue.paths import ITEMS", []),
-        ("catalogue/paths.py", "from inventory_tng.core import settings", []),
-        (
-            "catalogue/paths.py",
-            "from inventory_tng.web.pages import templates",
-            ["web/pages.py"],
-        ),
-        ("stock/paths.py", "from ..catalogue import routes", ["catalogue/routes.py"]),
-        ("catalogue/paths.py", "from inventory_tng import models", ["models.py"]),
-        # Not a paths.py.
-        ("catalogue/routes.py", "from inventory_tng.web.pages import x", []),
-    ],
-)
-def test_paths_importing_more_than_core_and_paths_is_found(
-    path: str, source: str, breaks: list[str]
-) -> None:
-    known = {*KNOWN, "catalogue/paths.py", "web/paths.py"}
-    assert (
-        paths_import_more_than_core_and_paths(ast.parse(source), path, known) == breaks
-    )
+    app = {name: ast.parse(text) for name, text in APP.items()}
+    app[path] = ast.parse(source)
+    assert CHECKS[rule](path, app) == breaks

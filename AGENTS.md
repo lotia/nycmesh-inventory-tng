@@ -71,3 +71,4 @@ task needs it.
 | Working on | Read |
 | --- | --- |
 | beads commands in depth | `.agents/skills/beads/SKILL.md` |
+| where code goes, and which way imports go | `docs/decisions/0023-code-laid-out-by-feature.md` |

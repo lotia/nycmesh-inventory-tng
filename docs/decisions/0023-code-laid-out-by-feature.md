@@ -47,17 +47,18 @@ structure below on 2026-11-17.
   `core/local_env.py` and `catalogue/units.py` are not operator commands
   and keep their own `python -m` paths (inventory-tng-atmx.9).
 - **Imports go one way**, held by `backend/tests/test_import_directions.py`:
-  core imports no feature; rules, queries and forms import neither
-  FastAPI nor `web/`, but for `web/formatting.py` and `web/forms.py`,
-  which themselves import neither (inventory-tng-atmx.2,
-  inventory-tng-atmx.7); route files run no queries (`select`,
-  `session.execute`, `session.scalar` or `scalars`); no feature's routes
-  import another feature's routes, linking through its `paths.py`
-  instead; a `paths.py` imports only core and other `paths.py`, such as
-  `web/paths.py`, which holds the administrator pages' prefix
-  (inventory-tng-atmx.10); package `__init__.py` files stay empty; and
-  only the entry point imports a feature's `command.py`. The breaks found
-  when the test was written are listed in it and may only shrink.
+  rules, queries and forms import neither FastAPI nor `web/`, but for
+  `web/formatting.py` and `web/forms.py`, which themselves import neither
+  (inventory-tng-atmx.2, inventory-tng-atmx.7); route files run no queries
+  (`select`, `session.execute`, `session.scalar` or `scalars`); core
+  imports no feature, nor `dev/` or `web/`; and no feature's routes import
+  another feature's routes, linking through its `paths.py` instead. The
+  breaks found when the test was written are listed in it and may only
+  shrink. Ali kept only these rules on 2026-11-17 (inventory-tng-atmx.16),
+  dropping two that caught no real harm: package `__init__.py` files stay
+  empty, and only the entry point imports a feature's `command.py`. A third,
+  that a `paths.py` imports only core and other `paths.py`, went with them:
+  a cycle through `paths.py` fails loudly at import anyway.
 
 We rejected a central routes file wired with `add_api_route`, which is not
 how FastAPI apps are usually read, and import-linter, as the rules fit a
