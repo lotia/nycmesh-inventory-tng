@@ -14,7 +14,6 @@ from opentelemetry import metrics
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
-from inventory_tng import open_packages
 from inventory_tng.admin.common import (
     ADMIN,
     SECTION_ITEMS,
@@ -54,6 +53,7 @@ from inventory_tng.models import (
 )
 from inventory_tng.models import reading_rules as rules_held
 from inventory_tng.pages import NOTICES, not_found, redirect
+from inventory_tng.stock import open_packages
 from inventory_tng.stock import queries as stock_queries
 from inventory_tng.web.forms import ALERTS, RETIRED, RULES, form_version
 

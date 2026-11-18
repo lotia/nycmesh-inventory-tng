@@ -17,7 +17,6 @@ from opentelemetry import metrics
 from sqlalchemy import ColumnElement, exc, select
 from sqlalchemy.orm import Session
 
-from inventory_tng import adjustment_reasons, ledger, over_recorded
 from inventory_tng.core.db import enforce, get_locked, locked
 from inventory_tng.models import (
     Item,
@@ -27,7 +26,7 @@ from inventory_tng.models import (
     OpenPackage,
     Volunteer,
 )
-from inventory_tng.stock import balance
+from inventory_tng.stock import adjustment_reasons, balance, ledger, over_recorded
 
 log = structlog.get_logger(__name__)
 meter = metrics.get_meter(__name__)
@@ -143,7 +142,7 @@ def report(
     longer offered to take from, until an administrator confirms or clears
     it (docs/decisions/0020). One reported already, or closed, is left as
     it is. The ids of those it reported. Locked as a save's open packages
-    are (ledger.py's lock order), after its places and items."""
+    are (stock/ledger.py's lock order), after its places and items."""
     rows = session.scalars(
         locked(
             select(OpenPackage)
@@ -175,7 +174,7 @@ def report_length(
     administrator to check: a report, never an adjustment (0003). A later
     report replaces one not yet checked; one of a package closed is left,
     as nobody would check it. Whether it was kept. Call it holding the
-    row, as a save holds its open packages (ledger.py's lock order)."""
+    row, as a save holds its open packages (stock/ledger.py's lock order)."""
     if row.closed_at is not None:
         return False
     row.length_reported_at = transaction.created_at
@@ -277,7 +276,7 @@ def close(
     there with the reason Lost or stolen (`reason`). An opening into it
     waiting as recorded more than moved, its sealed end counted, closes as
     counted (over_recorded.open_package_closed). Its place is locked first,
-    then it, then those, as a save's are (ledger.py). RuleBroken as
+    then it, then those, as a save's are (stock/ledger.py). RuleBroken as
     ledger.record_adjustment refuses."""
     found = session.get(OpenPackage, open_id)
     if found is None:

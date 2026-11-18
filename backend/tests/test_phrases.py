@@ -21,7 +21,6 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 import inventory_tng
-from inventory_tng import over_recorded
 from inventory_tng.admin import common, counts, length_checks, stock, used_up
 from inventory_tng.admin import devices as admin_devices
 from inventory_tng.admin import over_recorded as admin_over_recorded
@@ -66,6 +65,7 @@ from inventory_tng.models import (
 )
 from inventory_tng.pages import retired_holding, templates
 from inventory_tng.site_settings import forms as settings_forms
+from inventory_tng.stock import over_recorded
 from inventory_tng.volunteers import routes as admin_volunteers
 from inventory_tng.web import forms as web_forms
 

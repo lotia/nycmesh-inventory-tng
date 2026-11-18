@@ -37,7 +37,6 @@ from sqlalchemy import ColumnElement, case, func, insert, or_, select
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.orm import Session
 
-from inventory_tng import open_packages
 from inventory_tng.core.db import RuleBroken, enforce, exists_where, get_locked, locked
 from inventory_tng.core.local_time import zone_at
 from inventory_tng.models import (
@@ -50,6 +49,7 @@ from inventory_tng.models import (
     Volunteer,
 )
 from inventory_tng.scan import batch_schemas
+from inventory_tng.stock import open_packages
 from inventory_tng.stock.balance import balance, by_form, countable, left_on
 
 log = structlog.get_logger(__name__)
@@ -435,7 +435,7 @@ class KeyReused(Exception):
     transaction under it, as a batch (None if no volunteer's batch wrote
     it); `over`, by movement, how much more of it was recorded than this
     batch sends, of what it took off since it was put back (_more_written),
-    for an administrator to correct (over_recorded.py)."""
+    for an administrator to correct (stock/over_recorded.py)."""
 
     def __init__(
         self, recorded: batch_schemas.RecordedBatch | None, over: Mapping[int, Decimal]
@@ -503,7 +503,7 @@ def record(
     keyed = _keyed(session, {*used_up, *length_keys})
     reports = {key: keyed[key] for key in used_up if key in keyed}
     measured = {key: keyed[key] for key in length_keys if key in keyed}
-    # Those reported too, with the lines', in one order (ledger.py's).
+    # Those reported too, with the lines', in one order (stock/ledger.py's).
     packages, opens, rows = _hold_forms(
         session, lines, also={*reports.values(), *measured.values()}
     )
@@ -705,9 +705,9 @@ def _as_opened(
 # 4. Its packages, FOR KEY SHARE, by id: their item, size and whether
 #    tracked opened, which a change to one waits for (catalogue/items.py).
 # 5. Its open packages, FOR NO KEY UPDATE, by id: where each is and whether
-#    closed, which a report or close waits for (open_packages.py), and what
-#    is left on it, which another line on it waits for; and so a whole move
-#    changes where it is.
+#    closed, which a report or close waits for (stock/open_packages.py), and
+#    what is left on it, which another line on it waits for; and so a whole
+#    move changes where it is.
 # 6. A receipt's items, FOR NO KEY UPDATE, by id (_receive), to lower what
 #    is on order, which KEY SHARE does not wait for.
 

@@ -11,8 +11,10 @@ import pytest
 from sqlalchemy import exc, select
 from sqlalchemy.orm import Session
 
-from inventory_tng import open_packages
-from inventory_tng.ledger import (
+from inventory_tng.models import Admin, Item, ItemPackage, LedgerTransaction
+from inventory_tng.stock import open_packages
+from inventory_tng.stock.balance import balance
+from inventory_tng.stock.ledger import (
     LOOSE,
     Entry,
     Form,
@@ -23,9 +25,7 @@ from inventory_tng.ledger import (
     moment,
     record_count,
 )
-from inventory_tng.models import Admin, Item, ItemPackage, LedgerTransaction
-from inventory_tng.open_packages import tracks_opened
-from inventory_tng.stock.balance import balance
+from inventory_tng.stock.open_packages import tracks_opened
 
 from helpers.package_forms import (
     BOX,

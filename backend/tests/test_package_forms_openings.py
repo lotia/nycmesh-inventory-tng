@@ -10,9 +10,9 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 from structlog.testing import capture_logs
 
-from inventory_tng import open_packages
 from inventory_tng.models import Admin, OpenPackage
 from inventory_tng.scan import batch_schemas
+from inventory_tng.stock import open_packages
 
 from helpers.package_forms import quantities_by_form
 from helpers.rows import add, tag

@@ -21,7 +21,6 @@ from fastapi.responses import Response
 from sqlalchemy import ColumnElement, and_, or_
 from sqlalchemy.orm import Session
 
-from inventory_tng import ledger, open_packages, over_recorded
 from inventory_tng.admin.common import (
     SECTION_STOCK,
     TICK_OPEN_PACKAGES,
@@ -48,7 +47,7 @@ from inventory_tng.models import (
     whole,
 )
 from inventory_tng.pages import NOTICES, not_found, redirect
-from inventory_tng.stock import forms, queries
+from inventory_tng.stock import forms, ledger, open_packages, over_recorded, queries
 
 log = structlog.get_logger(__name__)
 
@@ -301,7 +300,7 @@ def _set(
         if not open_packages.settle_check(session, open_id, seen):
             raise RuleBroken("length_unchanged")
         # Moved since its place was locked: its place is not, so nothing
-        # more is locked holding it (ledger.py's lock order).
+        # more is locked holding it (stock/ledger.py's lock order).
         if row.location_id not in places:
             raise RuleBroken("length_unchanged")
         # Read holding its place: a count or adjustment of it meanwhile is

@@ -7,8 +7,8 @@
  * (older.toCart); what was taken from an open package, or said of one,
  * cannot, as the open package may have changed since. What it holds less
  * of was recorded, and only an administrator can correct the ledger
- * (docs/decisions/0003): the server keeps that for one (over_recorded.py),
- * as it refused the save.
+ * (docs/decisions/0003): the server keeps that for one
+ * (stock/over_recorded.py), as it refused the save.
  */
 import type { MessageDescriptor } from "@lingui/core";
 import { msg } from "@lingui/core/macro";

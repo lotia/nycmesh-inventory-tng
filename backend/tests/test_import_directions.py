@@ -32,7 +32,7 @@ RULES = {
     "catalogue/names.py",
     "catalogue/unit_readings.py",
     "catalogue/units.py",
-    "ledger.py",
+    "stock/ledger.py",
     "scan_settings.py",
     "stock/balance.py",
 }
@@ -408,12 +408,12 @@ def test_core_importing_a_feature_is_found(
 @pytest.mark.parametrize(
     ("path", "source", "breaks"),
     [
-        ("ledger.py", "from fastapi import Request", ["fastapi"]),
-        ("ledger.py", "def f():\n    import starlette.requests", ["starlette"]),
+        ("stock/ledger.py", "from fastapi import Request", ["fastapi"]),
+        ("stock/ledger.py", "def f():\n    import starlette.requests", ["starlette"]),
         ("catalogue/queries.py", "from inventory_tng import pages", ["pages.py"]),
         ("catalogue/queries.py", "from ..web.formatting import x", []),
-        ("ledger.py", "from inventory_tng.web import formatting", []),
-        ("ledger.py", "from inventory_tng.core import db", []),
+        ("stock/ledger.py", "from inventory_tng.web import formatting", []),
+        ("stock/ledger.py", "from inventory_tng.core import db", []),
         # Neither rules nor queries.
         ("catalogue/routes.py", "from fastapi import APIRouter", []),
         # What of web/ rules may import is held to their rule itself.

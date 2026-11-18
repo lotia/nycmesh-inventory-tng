@@ -2,7 +2,7 @@
 at each place, in each form stock is in there (docs/decisions/0020), and
 what it makes of places, items and packages, such as which retired ones
 still hold stock. Queries only: they lock nothing and refuse nothing,
-which the ledger's rules (ledger.py) do.
+which the ledger's rules (stock/ledger.py) do.
 """
 
 from collections.abc import Sequence

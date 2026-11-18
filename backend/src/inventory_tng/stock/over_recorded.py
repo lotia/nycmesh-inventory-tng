@@ -32,7 +32,6 @@ from sqlalchemy import (
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.orm import Session, aliased
 
-from inventory_tng import adjustment_reasons, ledger
 from inventory_tng.core.db import RuleBroken, get_locked, locked
 from inventory_tng.core.local_time import show_day
 from inventory_tng.core.phrases import gettext, in_query, lazy_gettext
@@ -46,7 +45,7 @@ from inventory_tng.models import (
     OpenPackage,
     OverRecorded,
 )
-from inventory_tng.stock import balance
+from inventory_tng.stock import adjustment_reasons, balance, ledger
 from inventory_tng.web.formatting import amount
 
 log = structlog.get_logger(__name__)
@@ -1154,7 +1153,7 @@ def open_package_closed(
     close is none. How many closed.
 
     Call it in the close's transaction, after its place and open package
-    (ledger.py's order), holding the rows it closes by id. One taken by
+    (stock/ledger.py's order), holding the rows it closes by id. One taken by
     another is left out, not waited for: all else that holds one holds its
     opening's place first, which the close holds too unless the open
     package moved whole since, and Correct may then wait on the open

@@ -13,7 +13,7 @@ from fastapi import APIRouter, Depends, Form, Request
 from fastapi.responses import HTMLResponse, Response
 from sqlalchemy.orm import Session
 
-from inventory_tng import adjustment_reasons, scan_settings
+from inventory_tng import scan_settings
 from inventory_tng.admin.common import (
     ADMIN,
     SECTION_SETTINGS,
@@ -37,6 +37,7 @@ from inventory_tng.models import (
 )
 from inventory_tng.pages import NOTICES, not_found, redirect
 from inventory_tng.site_settings import forms, queries
+from inventory_tng.stock import adjustment_reasons
 from inventory_tng.web.forms import CHANGED, RULES, form_version, name_problem
 
 log = structlog.get_logger(__name__)

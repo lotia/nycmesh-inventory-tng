@@ -62,7 +62,7 @@ OWNERS: dict[str, str | None] = {t.name: t.info["owner"] for t in TABLES.values(
 # its token again (docs/decisions/0021, 2026-11-15).
 ALLOWED = {
     SOURCE / "admins" / "accounts.py": ("_remove_sign_in",),
-    SOURCE / "ledger.py": ("insert_transaction",),
+    SOURCE / "stock" / "ledger.py": ("insert_transaction",),
     SOURCE / "catalogue" / "reading_rules.py": ("delete",),
     SOURCE / "dev" / "seed.py": ("run",),
 }
@@ -154,9 +154,9 @@ def test_no_model_has_a_relationship() -> None:
         ("catalogue/items.py", "ItemPackage(item_id=1)", False),
         ("catalogue/items.py", "Label(item_id=1)", True),
         # The ledger: only ALLOWED's insert_transaction, in no module.
-        ("ledger.py", "Movement(item_id=1)", True),
+        ("stock/ledger.py", "Movement(item_id=1)", True),
         (
-            "ledger.py",
+            "stock/ledger.py",
             "from sqlalchemy import insert\ninsert(LedgerTransaction)",
             True,
         ),
@@ -168,7 +168,7 @@ def test_no_model_has_a_relationship() -> None:
             True,
         ),
         ("admin/settings.py", "AdjustmentReason(name='x')", True),
-        ("adjustment_reasons.py", "AdjustmentReason(name='x')", False),
+        ("stock/adjustment_reasons.py", "AdjustmentReason(name='x')", False),
         # Not a write.
         ("catalogue/items_routes.py", "select(Item).where(Item.name == 'x')", False),
     ],

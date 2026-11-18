@@ -29,7 +29,7 @@ msgid ""
 " you typed %(typed)s"
 msgstr ""
 
-#: src/inventory_tng/over_recorded.py
+#: src/inventory_tng/stock/over_recorded.py
 #, python-format
 msgid "%(amount)s from an open package"
 msgstr ""
@@ -249,17 +249,17 @@ msgid ""
 msgstr ""
 
 #. Translators: a place or a form, then the day it was counted ("14 Nov").
-#: src/inventory_tng/over_recorded.py
+#: src/inventory_tng/stock/over_recorded.py
 #, python-format
 msgid "%(end)s %(day)s"
 msgstr ""
 
-#: src/inventory_tng/over_recorded.py
+#: src/inventory_tng/stock/over_recorded.py
 #, python-format
 msgid "%(end)s closed %(day)s"
 msgstr ""
 
-#: src/inventory_tng/over_recorded.py
+#: src/inventory_tng/stock/over_recorded.py
 #, python-format
 msgid "%(end)s only"
 msgstr ""
@@ -357,7 +357,7 @@ msgid_plural "%(num)d retired places hold stock"
 msgstr[0] ""
 msgstr[1] ""
 
-#: src/inventory_tng/over_recorded.py
+#: src/inventory_tng/stock/over_recorded.py
 #, python-format
 msgid "%(num)s × %(package)s"
 msgstr ""
@@ -758,7 +758,7 @@ msgstr ""
 msgid "Added."
 msgstr ""
 
-#: src/inventory_tng/over_recorded.py
+#: src/inventory_tng/stock/over_recorded.py
 #, python-format
 msgid "Adjusted at %(place)s"
 msgstr ""
@@ -1147,7 +1147,7 @@ msgid ""
 "email is told."
 msgstr ""
 
-#: src/inventory_tng/over_recorded.py
+#: src/inventory_tng/stock/over_recorded.py
 msgid "Checked"
 msgstr ""
 
@@ -1264,7 +1264,7 @@ msgstr ""
 msgid "Correct %(end)s"
 msgstr ""
 
-#: src/inventory_tng/over_recorded.py
+#: src/inventory_tng/stock/over_recorded.py
 msgid "Corrected"
 msgstr ""
 
@@ -1291,11 +1291,11 @@ msgstr ""
 msgid "Count a place"
 msgstr ""
 
-#: src/inventory_tng/over_recorded.py
+#: src/inventory_tng/stock/over_recorded.py
 msgid "Count confirmed"
 msgstr ""
 
-#: src/inventory_tng/over_recorded.py
+#: src/inventory_tng/stock/over_recorded.py
 msgid "Count corrected"
 msgstr ""
 
@@ -1315,7 +1315,8 @@ msgstr ""
 msgid "Count in the package"
 msgstr ""
 
-#: src/inventory_tng/over_recorded.py src/inventory_tng/templates/count.html
+#: src/inventory_tng/stock/over_recorded.py
+#: src/inventory_tng/templates/count.html
 msgid "Counted"
 msgstr ""
 
@@ -1323,15 +1324,15 @@ msgstr ""
 msgid "Counted and adjusted"
 msgstr ""
 
-#: src/inventory_tng/over_recorded.py
+#: src/inventory_tng/stock/over_recorded.py
 msgid "Counted both ends"
 msgstr ""
 
-#: src/inventory_tng/over_recorded.py
+#: src/inventory_tng/stock/over_recorded.py
 msgid "Counted where it arrived"
 msgstr ""
 
-#: src/inventory_tng/over_recorded.py
+#: src/inventory_tng/stock/over_recorded.py
 msgid "Counted where it left"
 msgstr ""
 
@@ -1565,7 +1566,7 @@ msgid ""
 "inventory, <a href=\"%(home)s\">its administrator pages</a>."
 msgstr ""
 
-#: src/inventory_tng/over_recorded.py
+#: src/inventory_tng/stock/over_recorded.py
 #, python-format
 msgid "Held %(amount)s"
 msgstr ""
@@ -1913,7 +1914,7 @@ msgstr ""
 msgid "Loose"
 msgstr ""
 
-#: src/inventory_tng/over_recorded.py
+#: src/inventory_tng/stock/over_recorded.py
 #, python-format
 msgid "Loose %(item)s"
 msgstr ""
@@ -2066,7 +2067,7 @@ msgstr ""
 msgid "Next"
 msgstr ""
 
-#: src/inventory_tng/over_recorded.py
+#: src/inventory_tng/stock/over_recorded.py
 msgid "No adjustment"
 msgstr ""
 
@@ -2419,7 +2420,7 @@ msgctxt "state"
 msgid "Open"
 msgstr ""
 
-#: src/inventory_tng/over_recorded.py
+#: src/inventory_tng/stock/over_recorded.py
 #, python-format
 msgid "Open %(package)s"
 msgstr ""
@@ -2723,7 +2724,7 @@ msgid "Put right another way"
 msgstr ""
 
 #. Translators: followed by the administrator's own words.
-#: src/inventory_tng/over_recorded.py
+#: src/inventory_tng/stock/over_recorded.py
 msgid "Put right another way:"
 msgstr ""
 
@@ -3236,7 +3237,7 @@ msgstr ""
 msgid "Scan this with your phone's camera."
 msgstr ""
 
-#: src/inventory_tng/over_recorded.py
+#: src/inventory_tng/stock/over_recorded.py
 #, python-format
 msgid "Sealed %(package)s"
 msgstr ""
@@ -3896,7 +3897,7 @@ msgstr ""
 msgid "Transaction"
 msgstr ""
 
-#: src/inventory_tng/over_recorded.py
+#: src/inventory_tng/stock/over_recorded.py
 msgid "Two adjustments"
 msgstr ""
 

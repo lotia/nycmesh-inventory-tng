@@ -15,7 +15,6 @@ from fastapi.testclient import TestClient
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
-from inventory_tng import over_recorded
 from inventory_tng.admin.length_checks import KINDS
 from inventory_tng.admins import accounts, guards
 from inventory_tng.core.db import DATABASE_INFO, Database, make_database
@@ -34,6 +33,7 @@ from inventory_tng.models import (
     ReadingRule,
     Volunteer,
 )
+from inventory_tng.stock import over_recorded
 
 from databases import new_database
 from helpers.apps import new_app, on_session
@@ -219,7 +219,8 @@ def unsettled_unit(world: World) -> None:
 
 
 def over_recorded_line(world: World) -> None:
-    """A line more recorded with more than was moved (over_recorded.py)."""
+    """A line more recorded with more than was moved
+    (stock/over_recorded.py)."""
     raise_check(world.session, write(world.session, world.spools.place))
 
 

@@ -7,11 +7,10 @@ from fastapi import APIRouter, Depends, FastAPI, Request, Response
 from fastapi.responses import JSONResponse
 from opentelemetry import metrics
 
-from inventory_tng import open_packages, over_recorded, page_builds
+from inventory_tng import page_builds
 from inventory_tng.core.db import DbSession, set_actor
 from inventory_tng.devices.guards import RegisteredDevice
 from inventory_tng.devices.schemas import DeviceRefusedReply
-from inventory_tng.ledger import BatchRefused, KeyReused, record
 from inventory_tng.page_builds import BuildTooOldReply
 from inventory_tng.scan.batch_schemas import (
     Batch,
@@ -21,6 +20,8 @@ from inventory_tng.scan.batch_schemas import (
     KeyReusedReply,
     Saved,
 )
+from inventory_tng.stock import open_packages, over_recorded
+from inventory_tng.stock.ledger import BatchRefused, KeyReused, record
 
 log = structlog.get_logger(__name__)
 meter = metrics.get_meter(__name__)

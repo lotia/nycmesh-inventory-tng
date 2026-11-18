@@ -1026,7 +1026,7 @@ def locked_row[M: Base](session: Session, model: type[M], ident: object) -> M | 
     FOR UPDATE waits for any write under way that refers to the row, such
     as a save holding its places or its items, so what the change then
     reads of them is settled. Saves, counts and adjustments never take the
-    catalogue lock; the order they hold rows in is ledger.py's, above
+    catalogue lock; the order they hold rows in is stock/ledger.py's, above
     _hold_places. A change that locks two rows a save also refers to takes
     them in the save's order, or the two could deadlock
     (inventory-tng-8i4.58, 8i4.69, 8i4.78)."""

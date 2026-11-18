@@ -6,9 +6,9 @@ from decimal import Decimal
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from inventory_tng.ledger import Form
 from inventory_tng.models import Item
 from inventory_tng.stock.balance import by_form
+from inventory_tng.stock.ledger import Form
 
 CABLE, OTHER = 1, 2
 SPOOL, BOX = 10, 11

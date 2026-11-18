@@ -754,7 +754,7 @@ class OpenPackage(Base):
             name="length_reported_by",
         ),
         CheckConstraint("length_reported >= 0", name="length_reported"),
-        protection(owner="open_packages.py", lock="row", history=True),
+        protection(owner="stock/open_packages.py", lock="row", history=True),
     )
 
     id: Mapped[IntId]
@@ -1199,7 +1199,7 @@ class OverRecorded(Base):
     movement; a later such batch says how much again while it waits. Settled
     when an administrator corrects it, with adjustments, or marks it checked,
     saying why it is right as it is, or when a count after it has put right
-    each of its ends (over_recorded.py)."""
+    each of its ends (stock/over_recorded.py)."""
 
     __tablename__ = "over_recorded"
     __table_args__ = (
@@ -1238,8 +1238,8 @@ class OverRecorded(Base):
             name="counted",
         ),
         # Raised by one statement, which a check settled leaves as it is;
-        # settled holding its row (over_recorded.py).
-        protection(owner="over_recorded.py", lock=None, history=False),
+        # settled holding its row (stock/over_recorded.py).
+        protection(owner="stock/over_recorded.py", lock=None, history=False),
     )
 
     id: Mapped[IntId]
@@ -1536,13 +1536,13 @@ class SiteSettings(Versioned, Base):
 
 class AdjustmentReason(CanonicalName, Versioned, Base):
     """Why stock was written off or found outside a count. Administrators
-    extend the list (adjustment_reasons.py); its first entries come with the
-    initial migration."""
+    extend the list (stock/adjustment_reasons.py); its first entries come
+    with the initial migration."""
 
     __tablename__ = "adjustment_reason"
     __table_args__ = (
         _unique_current_name("adjustment_reason"),
-        protection(owner="adjustment_reasons.py", lock="row", history=True),
+        protection(owner="stock/adjustment_reasons.py", lock="row", history=True),
     )
 
     id: Mapped[IntId]

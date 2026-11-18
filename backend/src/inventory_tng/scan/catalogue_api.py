@@ -28,7 +28,6 @@ from inventory_tng.models import (
     held,
     reading_rules,
 )
-from inventory_tng.open_packages import tracks_opened
 from inventory_tng.scan import queries
 from inventory_tng.scan.catalogue_schemas import (
     Catalogue,
@@ -45,6 +44,7 @@ from inventory_tng.scan.catalogue_schemas import (
     VolunteerEntry,
 )
 from inventory_tng.stock import balance
+from inventory_tng.stock.open_packages import tracks_opened
 
 log = structlog.get_logger(__name__)
 

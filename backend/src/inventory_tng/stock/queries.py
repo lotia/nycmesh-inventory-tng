@@ -9,7 +9,6 @@ from typing import Any
 from sqlalchemy import ColumnElement, Row, Select, any_, func, or_, select, true
 from sqlalchemy.orm import Session
 
-from inventory_tng import open_packages
 from inventory_tng.models import (
     STORE_KINDS,
     AdjustmentReason,
@@ -22,6 +21,7 @@ from inventory_tng.models import (
     OpenPackage,
     Volunteer,
 )
+from inventory_tng.stock import open_packages
 from inventory_tng.stock.balance import balance, by_form, countable
 
 

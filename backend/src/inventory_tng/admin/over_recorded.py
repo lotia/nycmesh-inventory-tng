@@ -1,4 +1,4 @@
-"""Lines recorded with more than was moved (over_recorded.py,
+"""Lines recorded with more than was moved (stock/over_recorded.py,
 inventory-tng-0gg): "Needs your action" on the home page leads here, for
 one item or all. Correct writes adjustments that undo the difference on
 each side of its transaction, with the reason Recorded more than moved;
@@ -20,7 +20,6 @@ from fastapi import APIRouter, Depends, Form, Request
 from fastapi.responses import Response
 from sqlalchemy.orm import Session
 
-from inventory_tng import ledger, over_recorded
 from inventory_tng.admin.common import SECTION_STOCK, SETTLED_VIEW, admin_page
 from inventory_tng.admin.counts import COUNTS
 from inventory_tng.admin.listing import (
@@ -55,7 +54,7 @@ from inventory_tng.models import (
 from inventory_tng.pages import NOTICES, not_found, redirect
 from inventory_tng.places import locations
 from inventory_tng.places.routes import changeable
-from inventory_tng.stock import balance
+from inventory_tng.stock import balance, ledger, over_recorded
 from inventory_tng.stock.forms import confirmed_count, why_problem
 from inventory_tng.web.forms import row_id, rule_words
 

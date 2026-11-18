@@ -260,7 +260,7 @@ PostgreSQL cannot check it, the model's own `@validates`, as
 Each model declares who writes its table, holding what, and whether it has
 history, with `db.protection`; `core/db.py` gives the rules, which the flush and
 `tests/test_write_owners.py` enforce. An owner is a domain module, never a
-page's, as `adjustment_reasons.py` is; a settings row, made by its
+page's, as `stock/adjustment_reasons.py` is; a settings row, made by its
 migration, has none, and `scan_settings.change` is its one writer.
 `items.Fields` names every column an item's save sets, each required, so
 none is blanked by being left out. The ledger takes lines, not a mapping by
@@ -547,10 +547,10 @@ recorded; while the cart has lines, "Add these to cart" waits, which
 takes only an empty cart. Never what was
 taken from or said of an open package. Under a line it holds less of, it
 says an administrator will correct it: the server, refusing it, keeps
-that difference (`over_recorded.py`), and the administrators' home page lists
-it under "Needs your action" as "Recorded more than moved" until one
-corrects it, with adjustments that undo it on each side, or marks it
-checked; an open package moved whole, now where it arrived, has its
+that difference (`stock/over_recorded.py`), and the administrators' home
+page lists it under "Needs your action" as "Recorded more than moved"
+until one corrects it, with adjustments that undo it on each side, or
+marks it checked; an open package moved whole, now where it arrived, has its
 count there confirmed, or corrected by an adjustment, instead. From a
 server that says nothing of what it recorded, that heading goes over the
 save's lines. Such a save never goes in a

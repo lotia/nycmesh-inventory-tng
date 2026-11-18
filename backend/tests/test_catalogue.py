@@ -13,7 +13,6 @@ from structlog.testing import capture_logs
 
 from inventory_tng.catalogue import items
 from inventory_tng.core.db import get_snapshot
-from inventory_tng.ledger import LOOSE, Entry
 from inventory_tng.models import (
     Category,
     Item,
@@ -23,6 +22,7 @@ from inventory_tng.models import (
     Volunteer,
 )
 from inventory_tng.scan import catalogue_api
+from inventory_tng.stock.ledger import LOOSE, Entry
 
 from helpers.rows import add, tag
 from helpers.stock import Place, Spools, retire, write

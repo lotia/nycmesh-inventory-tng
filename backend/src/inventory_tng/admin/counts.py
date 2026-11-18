@@ -40,7 +40,6 @@ from fastapi.responses import HTMLResponse, Response
 from sqlalchemy import ColumnElement, case, func
 from sqlalchemy.orm import Session
 
-from inventory_tng import open_packages, over_recorded
 from inventory_tng.admin import needs_action
 from inventory_tng.admin.common import (
     ADMIN,
@@ -57,19 +56,6 @@ from inventory_tng.admins.guards import AdminSignedIn, SignedIn
 from inventory_tng.catalogue.items_routes import SEARCHED
 from inventory_tng.core.db import DbSession, by_name, refusal
 from inventory_tng.core.phrases import Words, gettext, in_query, lazy_gettext, ngettext
-from inventory_tng.ledger import (
-    LOOSE,
-    Counted,
-    Form,
-    corrected,
-    expected,
-    expected_forms,
-    hold,
-    lock_place,
-    moment,
-    record_adjustment,
-    record_count,
-)
 from inventory_tng.models import (
     INTEGER_MAX,
     AdjustmentReason,
@@ -82,7 +68,6 @@ from inventory_tng.models import (
     whole,
 )
 from inventory_tng.once import form_key
-from inventory_tng.open_packages import tracks_opened
 from inventory_tng.pages import (
     NOTICES,
     Badge,
@@ -90,7 +75,7 @@ from inventory_tng.pages import (
     redirect,
     retired_holding,
 )
-from inventory_tng.stock import queries
+from inventory_tng.stock import open_packages, over_recorded, queries
 from inventory_tng.stock.balance import countable, retired_holding_stock_count, takeable
 from inventory_tng.stock.forms import (
     CLOSED_MEANWHILE,
@@ -104,6 +89,20 @@ from inventory_tng.stock.forms import (
     lines,
     named_twice,
 )
+from inventory_tng.stock.ledger import (
+    LOOSE,
+    Counted,
+    Form,
+    corrected,
+    expected,
+    expected_forms,
+    hold,
+    lock_place,
+    moment,
+    record_adjustment,
+    record_count,
+)
+from inventory_tng.stock.open_packages import tracks_opened
 from inventory_tng.web.forms import RULES, row_id
 
 log = structlog.get_logger(__name__)
@@ -608,7 +607,7 @@ def count(
     def put_right() -> Counted:
         nonlocal settled
         # The place, then the items, as every count and save takes them
-        # (ledger.py), before a package found is held.
+        # (stock/ledger.py), before a package found is held.
         lock_place(session, place.id)
         if forms.found is not None:
             hold(session, {"to_location_id": place.id}, [forms.found[0].item_id])

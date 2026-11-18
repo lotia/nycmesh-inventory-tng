@@ -2,7 +2,7 @@
 volunteer's batch and its lines, the problems of one refused, and the
 transaction recorded under a key reused (docs/decisions/0003).
 
-The ledger's rules (ledger.py) read a Batch, and a Line becomes the
+The ledger's rules (stock/ledger.py) read a Batch, and a Line becomes the
 ledger's Entry, so each module imports the other as a module object and
 reads its names only once both are loaded.
 """
@@ -14,8 +14,8 @@ from typing import Annotated, Literal
 from pydantic import BaseModel, Field, ValidationInfo, field_validator, model_validator
 from pydantic_core import PydanticCustomError
 
-from inventory_tng import ledger
 from inventory_tng.models import INTEGER_MAX
+from inventory_tng.stock import ledger
 
 # What a volunteer records. Counts and adjustments are an administrator's
 # (inventory-tng-8i4.14). Whether each kind has a from side and a to side; the
