@@ -8,7 +8,7 @@ from sqlalchemy.orm import Session
 from structlog.testing import capture_logs
 
 from inventory_tng import activity
-from inventory_tng.admin.settings import SETTINGS, whole_minutes
+from inventory_tng.admin.settings import SETTINGS
 from inventory_tng.core import mail
 from inventory_tng.models import (
     NAME_CHECK_MINUTES,
@@ -16,6 +16,7 @@ from inventory_tng.models import (
     SignInSettings,
     SiteSettings,
 )
+from inventory_tng.site_settings.forms import whole_minutes
 from inventory_tng.web.forms import PICK_A_ZONE
 
 from helpers.mail import SentMail

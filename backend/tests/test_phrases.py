@@ -33,7 +33,6 @@ from inventory_tng.admin import common, counts, length_checks, stock, used_up
 from inventory_tng.admin import devices as admin_devices
 from inventory_tng.admin import over_recorded as admin_over_recorded
 from inventory_tng.admin import reading_rules as admin_reading_rules
-from inventory_tng.admin import settings as admin_settings
 from inventory_tng.admin import volunteers as admin_volunteers
 from inventory_tng.admin.listing import Lapsed
 from inventory_tng.admins import guards
@@ -72,6 +71,7 @@ from inventory_tng.models import (
 )
 from inventory_tng.pages import retired_holding, templates
 from inventory_tng.resets import RESET_NOTICE
+from inventory_tng.site_settings import forms as settings_forms
 from inventory_tng.web import forms as web_forms
 
 from helpers import markup
@@ -173,8 +173,8 @@ SAID_WITH_VALUES: list[Callable[[], Words]] = [
     lambda: devices_forms.days_problem(9),
     lambda: admin_devices.revoke_many_title(1),
     lambda: admin_devices.revoke_many_title(3),
-    *(lambda said=said: said(1, 9) for said in admin_settings.WHOLE.values()),
-    lambda: admin_settings.whole_minutes(1, 9),
+    *(lambda said=said: said(1, 9) for said in settings_forms.WHOLE.values()),
+    lambda: settings_forms.whole_minutes(1, 9),
     lambda: used_up.close_title(NOT_ENGLISH),
     lambda: counts.count_title(NOT_ENGLISH),
     lambda: counts.moved_meanwhile(0),

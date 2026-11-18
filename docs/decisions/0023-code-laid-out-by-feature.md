@@ -122,3 +122,4 @@ short test. `core/` is the name FastAPI's full-stack template uses;
 | `admin/length_checks.py`: how its forms are read | `stock/forms.py` |
 | `admin/reading_rules.py`: how its forms are read, and their problems in words | `catalogue/forms.py` |
 | `admin/volunteers.py`: how its forms are read, and their problems in words | `volunteers/forms.py` |
+| `admin/settings.py`: how its forms are read, and their problems in words | `site_settings/forms.py` |

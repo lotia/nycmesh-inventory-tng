@@ -17,7 +17,7 @@ from structlog.testing import capture_logs
 
 from inventory_tng import items, locations
 from inventory_tng.admin.counts import ADJUSTMENTS, COUNT_KIND, COUNTS
-from inventory_tng.admin.settings import REASON_TAKEN, SETTINGS
+from inventory_tng.admin.settings import SETTINGS
 from inventory_tng.admin.stock import STOCK
 from inventory_tng.core.db import RuleBroken
 from inventory_tng.core.local_time import DEFAULT_ZONE, show
@@ -39,6 +39,7 @@ from inventory_tng.models import (
     Movement,
 )
 from inventory_tng.pages import retired_holding
+from inventory_tng.site_settings.forms import REASON_TAKEN
 from inventory_tng.stock.forms import (
     FOUND_OR_OFF,
     ON_THE_FORM_TWICE,

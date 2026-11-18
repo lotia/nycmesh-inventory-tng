@@ -614,7 +614,7 @@ msgid ""
 "and stays revoked: it would have to register again with a new code."
 msgstr ""
 
-#: src/inventory_tng/admin/settings.py
+#: src/inventory_tng/site_settings/forms.py
 msgid "A code for a sensitive change lasts"
 msgstr ""
 
@@ -684,7 +684,7 @@ msgstr ""
 msgid "A volunteer's custody: change it with the volunteer."
 msgstr ""
 
-#: src/inventory_tng/admin/settings.py
+#: src/inventory_tng/site_settings/forms.py
 #, python-format
 msgid "A whole number of minutes, from %(low)d to %(high)d."
 msgstr ""
@@ -1709,7 +1709,7 @@ msgid "Invited"
 msgstr ""
 
 #. Translators: before a box for a number of minutes.
-#: src/inventory_tng/admin/settings.py
+#: src/inventory_tng/site_settings/forms.py
 msgid ""
 "Inviting, resetting, retiring or bringing back an administrator needs a "
 "code typed within"
@@ -2921,7 +2921,7 @@ msgstr ""
 msgid "Required of every administrator"
 msgstr ""
 
-#: src/inventory_tng/admin/settings.py
+#: src/inventory_tng/site_settings/forms.py
 msgid "Required or optional?"
 msgstr ""
 
@@ -3265,7 +3265,7 @@ msgstr ""
 msgid "Send the link"
 msgstr ""
 
-#: src/inventory_tng/admin/settings.py
+#: src/inventory_tng/site_settings/forms.py
 msgid "Sessions last"
 msgstr ""
 
@@ -3753,7 +3753,7 @@ msgid ""
 "that back instead."
 msgstr ""
 
-#: src/inventory_tng/admin/settings.py
+#: src/inventory_tng/site_settings/forms.py
 msgid "There is already a reason by that name."
 msgstr ""
 
@@ -4124,17 +4124,17 @@ msgid ""
 " was removed too: ask them to let you back in."
 msgstr ""
 
-#: src/inventory_tng/admin/settings.py
+#: src/inventory_tng/site_settings/forms.py
 #, python-format
 msgid "Whole days, from %(low)d to %(high)d."
 msgstr ""
 
-#: src/inventory_tng/admin/settings.py
+#: src/inventory_tng/site_settings/forms.py
 #, python-format
 msgid "Whole hours, from %(low)d to %(high)d."
 msgstr ""
 
-#: src/inventory_tng/admin/settings.py
+#: src/inventory_tng/site_settings/forms.py
 #, python-format
 msgid "Whole minutes, from %(low)d to %(high)d."
 msgstr ""
@@ -4383,7 +4383,7 @@ msgstr ""
 msgid "data rate"
 msgstr ""
 
-#: src/inventory_tng/admin/settings.py
+#: src/inventory_tng/site_settings/forms.py
 msgid "days, used or not; from the next sign-in"
 msgstr ""
 
@@ -4462,7 +4462,7 @@ msgstr ""
 msgid "holds stock"
 msgstr ""
 
-#: src/inventory_tng/admin/settings.py
+#: src/inventory_tng/site_settings/forms.py
 msgid "hours"
 msgstr ""
 
@@ -4536,7 +4536,7 @@ msgstr ""
 msgid "miles"
 msgstr ""
 
-#: src/inventory_tng/admin/settings.py
+#: src/inventory_tng/site_settings/forms.py
 msgid "minutes"
 msgstr ""
 
@@ -4545,7 +4545,7 @@ msgid "minutes a phone sits unused; 0 never asks"
 msgstr ""
 
 #. Translators: after a box for a number of minutes.
-#: src/inventory_tng/admin/settings.py
+#: src/inventory_tng/site_settings/forms.py
 msgid ""
 "minutes, and only while the code above lasts; 0 asks each time, and an "
 "authenticator gives a new code only every 30 seconds"
@@ -4776,7 +4776,7 @@ msgstr ""
 msgid "“%(typed)s” is not read as a unit."
 msgstr ""
 
-#: src/inventory_tng/admin/settings.py
+#: src/inventory_tng/site_settings/forms.py
 msgid "…or until unused for"
 msgstr ""
 

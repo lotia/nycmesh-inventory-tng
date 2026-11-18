@@ -6,11 +6,9 @@ Sign-in settings are sensitive: changing them asks for a fresh code, and
 every administrator with an address is told, since one who could weaken
 them could otherwise do it unseen."""
 
-from collections.abc import Callable
-from typing import Annotated, NamedTuple
+from typing import Annotated
 
 import structlog
-from babel.support import LazyProxy
 from fastapi import APIRouter, Depends, Form, Request
 from fastapi.responses import HTMLResponse, Response
 from sqlalchemy.orm import Session
@@ -27,22 +25,17 @@ from inventory_tng.admins.guards import AdminSignedIn, ConfirmedAdmin, SignedIn,
 from inventory_tng.core import mail
 from inventory_tng.core.db import DbSession, RuleBroken, refusal, settings_row
 from inventory_tng.core.mail import Notify
-from inventory_tng.core.phrases import Words, gettext, lazy_gettext
+from inventory_tng.core.phrases import Words, lazy_gettext
 from inventory_tng.core.time_zones import zones
 from inventory_tng.models import (
-    ACCOUNT_CHANGE_MINUTES,
-    CONFIRM_HOURS,
-    CONFIRM_IDLE_MINUTES,
     NAME_CHECK_MINUTES,
-    SESSION_DAYS,
     TOTP_POLICIES,
     ScanSettings,
     SignInSettings,
     SiteSettings,
-    whole,
 )
 from inventory_tng.pages import NOTICES, not_found, redirect
-from inventory_tng.site_settings import queries
+from inventory_tng.site_settings import forms, queries
 from inventory_tng.web.forms import CHANGED, RULES, form_version, name_problem
 
 log = structlog.get_logger(__name__)
@@ -60,78 +53,6 @@ NOTICES.update(
         "reason_retired": REASON_RETIRED,
         "site_saved": SITE_SAVED,
     }
-)
-REASON_TAKEN = lazy_gettext("There is already a reason by that name.")
-REQUIRED_OR_OPTIONAL = lazy_gettext("Required or optional?")
-# A whole number refused, by its unit, from the lowest to the highest.
-WHOLE: dict[str, Callable[[int, int], str]] = {
-    "days": lambda low, high: gettext(
-        "Whole days, from %(low)d to %(high)d.", low=low, high=high
-    ),
-    "hours": lambda low, high: gettext(
-        "Whole hours, from %(low)d to %(high)d.", low=low, high=high
-    ),
-    "minutes": lambda low, high: gettext(
-        "Whole minutes, from %(low)d to %(high)d.", low=low, high=high
-    ),
-}
-
-
-def whole_minutes(low: int, high: int) -> str:
-    return gettext(
-        "A whole number of minutes, from %(low)d to %(high)d.", low=low, high=high
-    )
-
-
-class Number(NamedTuple):
-    """One of the sign-in settings' whole numbers, as the page asks for it."""
-
-    field: str
-    low: int
-    high: int
-    unit: str
-    label: LazyProxy
-    hint: LazyProxy
-
-
-# Their ranges are the model's, which its check constraints hold.
-NUMBERS = (
-    Number(
-        "session_days",
-        *SESSION_DAYS,
-        "days",
-        lazy_gettext("Sessions last"),
-        lazy_gettext("days, used or not; from the next sign-in"),
-    ),
-    Number(
-        "confirm_hours",
-        *CONFIRM_HOURS,
-        "hours",
-        lazy_gettext("A code for a sensitive change lasts"),
-        lazy_gettext("hours"),
-    ),
-    Number(
-        "confirm_idle_minutes",
-        *CONFIRM_IDLE_MINUTES,
-        "minutes",
-        lazy_gettext("…or until unused for"),
-        lazy_gettext("minutes"),
-    ),
-    Number(
-        "account_change_minutes",
-        *ACCOUNT_CHANGE_MINUTES,
-        "minutes",
-        # Translators: before a box for a number of minutes.
-        lazy_gettext(
-            "Inviting, resetting, retiring or bringing back an administrator "
-            "needs a code typed within"
-        ),
-        # Translators: after a box for a number of minutes.
-        lazy_gettext(
-            "minutes, and only while the code above lasts; 0 asks each time, "
-            "and an authenticator gives a new code only every 30 seconds"
-        ),
-    ),
 )
 
 
@@ -165,12 +86,12 @@ def _page(
                 "sign_in_version": str(sign_in.edit_version),
                 "site_version": str(site.edit_version),
             }
-            | {n.field: str(getattr(sign_in, n.field)) for n in NUMBERS}
+            | {n.field: str(getattr(sign_in, n.field)) for n in forms.NUMBERS}
             | (values or {}),
             # A zone set outside this page, such as US/Eastern, still shows.
             "zones": zones(site.time_zone),
             "policies": TOTP_POLICIES,
-            "numbers": NUMBERS,
+            "numbers": forms.NUMBERS,
             "name_check_min": NAME_CHECK_MINUTES[0],
             "name_check_max": NAME_CHECK_MINUTES[1],
             "reasons": reasons,
@@ -198,15 +119,13 @@ def save_scan_settings(
     name_check_minutes: Annotated[str, Form()] = "",
     scan_version: Annotated[str, Form()] = "",
 ) -> Response:
-    minutes = whole(name_check_minutes, *NAME_CHECK_MINUTES)
-    if minutes is None:
-        low, high = NAME_CHECK_MINUTES
-        problem = whole_minutes(low, high)
+    minutes = forms.scan_minutes(name_check_minutes)
+    if isinstance(minutes, str):
         return _page(
             request,
             session,
             signed,
-            problems={"name_check_minutes": problem},
+            problems={"name_check_minutes": minutes},
             values={
                 "name_check_minutes": name_check_minutes,
                 "scan_version": scan_version,
@@ -238,7 +157,7 @@ def add_reason(
             session, lambda: adjustment_reasons.add(session, name), "unique"
         )
     if added is None:
-        problems = {"reason": problem or REASON_TAKEN}
+        problems = {"reason": problem or forms.REASON_TAKEN}
         return _page(request, session, signed, problems=problems)
     session.commit()
     log.info("adjustment reason added", adjustment_reason_id=added.id)
@@ -275,7 +194,7 @@ def change_reason(
         _, broken = refusal(session, change, "unique", CHANGED)
         if broken == CHANGED:
             return _changed(request, session, signed)
-        problem = broken and REASON_TAKEN
+        problem = broken and forms.REASON_TAKEN
     if problem is not None:
         return _page(
             request,
@@ -297,15 +216,7 @@ def save_sign_in_settings(
     notify: Notify,
     form: Annotated[dict[str, str], Depends(text_form)],
 ) -> Response:
-    problems: dict[str, Words] = {}
-    policy = form.get("totp_policy", "")
-    if policy not in TOTP_POLICIES:
-        problems["totp_policy"] = REQUIRED_OR_OPTIONAL
-    chosen: dict[str, object] = {"totp_policy": policy}
-    for n in NUMBERS:
-        chosen[n.field] = whole(form.get(n.field, ""), n.low, n.high)
-        if chosen[n.field] is None:
-            problems[n.field] = WHOLE[n.unit](n.low, n.high)
+    chosen, problems = forms.sign_in_fields(form)
     if problems:
         return _page(request, session, signed, problems=problems, values=form)
     try:
