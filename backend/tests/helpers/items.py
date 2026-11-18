@@ -21,13 +21,15 @@ def new_item(session: Session, category: Category, name: str = "LiteBeam") -> It
 def same_size_twins(
     session: Session, item: Item, size: Decimal = Decimal(10)
 ) -> tuple[ItemPackage, ItemPackage]:
-    """Two of the item's packages of one size, by id. The first is named
-    after the second and changed after it was added, so PostgreSQL reads
-    it last by name or on disk: a list with no tie order shows them the
-    wrong way round."""
-    first = add(session, ItemPackage(item_id=item.id, name="Twin B", size=size))
+    """Two of the item's packages of one size, by id. The first is renamed
+    after the second is added, to a name after the second's, so
+    PostgreSQL reads it last on disk and by every index: a list with no
+    tie order shows them the wrong way round. A rename changes indexed
+    columns, so the row is rewritten in every index too (no HOT update),
+    which a change to another column would not do."""
+    first = add(session, ItemPackage(item_id=item.id, name="Twin", size=size))
     second = add(session, ItemPackage(item_id=item.id, name="Twin A", size=size))
-    first.short_below = Decimal(1)
+    first.name = "Twin B"
     session.flush()
     return first, second
 

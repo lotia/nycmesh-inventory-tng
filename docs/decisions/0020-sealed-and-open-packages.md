@@ -141,8 +141,9 @@ deployed, so the migrations may be rewritten (0016).
   package id, so the same records always show the same order (Ali,
   2026-11-18). The reorder page lists those low on sealed the same way,
   so the two pages agree (Ali, 2026-11-18). The item page, the scan
-  page and the count page list an item's packages smallest first, ties
-  by package id, for the same reason (Ali, 2026-11-18).
+  page and the count page's choice of package for an open one nobody
+  recorded list an item's packages smallest first, ties by package id,
+  for the same reason (Ali, 2026-11-18).
 - **Reorder** compares usable stock in stores with the item's reorder
   point.
 - **Minimum sealed**: a package may set an optional minimum of sealed
