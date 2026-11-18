@@ -8,7 +8,7 @@ Mail is sent after the reply (Starlette's background tasks), so how long a
 reply takes never shows whether mail went out; the one exception is the
 notice of a recovery code used to confirm a form, sent as soon as that use
 is kept, as the form may yet end in an error whose page sends nothing
-after it (guards._confirm). A failure is logged and
+after it (admins/guards._confirm). A failure is logged and
 counted, never shown on a page. Logs carry ids and the kind of mail, never
 addresses or links.
 """
@@ -167,7 +167,7 @@ class Notifier:
     def tell_now(self, to: str | None, admin_id: int, build: Told) -> None:
         """As tell, but before the reply: for the one notice whose cause is
         already kept while the reply may yet be an error page, which sends
-        nothing after it (guards._confirm). The reply then waits for the
+        nothing after it (admins/guards._confirm). The reply then waits for the
         provider."""
         if self.mailer is not None and to:
             deliver(self.mailer, build(to, admin_id))

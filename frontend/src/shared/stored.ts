@@ -58,7 +58,7 @@ export function removeStored(storage: Storage, key: string): boolean {
 
 /** `key`'s older versions, oldest first: a key ending in `.v3` has `.v1`
  * and `.v2`; one with no version has none. Where older builds kept what
- * this build lists to put back or discard (older.ts). */
+ * this build lists to put back or discard (scan/older.ts). */
 export function olderKeys(key: string): string[] {
   const [, name, version] = /^(.*\.v)(\d+)$/.exec(key) ?? [];
   return Array.from(

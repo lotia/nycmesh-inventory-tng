@@ -29,7 +29,7 @@ log = structlog.get_logger(__name__)
 SUPERUSER = "inventory"
 OWNER = "inventory_owner"
 # Connections a development database takes at most, as the roles log in:
-# an app's pools (db.py, 20) and a migration or seed beside it, so it
+# an app's pools (core/db.py, 20) and a migration or seed beside it, so it
 # cannot starve the tests beside it (CONTRIBUTING.md, Connections).
 CONNECTION_LIMIT = 30
 # The roles, made if missing (roles.sql says who else runs it).

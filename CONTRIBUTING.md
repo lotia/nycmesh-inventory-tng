@@ -450,7 +450,7 @@ key with a version (`frontend/src/shared/outbox.ts`, `scan/cart.ts`),
 stamped with the build that wrote them. A change to what is kept, or to a
 value a field may take, takes a new key, as a tab of the build before, open
 during a deploy, drops what it cannot read from what it writes back;
-`outbox.test.ts` lists both for the outbox's key. The one exception is an
+`shared/outbox.test.ts` lists both for the outbox's key. The one exception is an
 optional field whose loss leaves the entry as the build before would have
 kept it, which that test lists apart. Builds that keep the same shape share
 a key, so each batch is kept with the build that queued it, and is sent as
@@ -460,7 +460,7 @@ says as what it is made from, with its places named as when it was queued
 (`outbox.Summary`), never in words: the page makes the words as it shows
 them (`noteOf`, `batch.batchWords`), so they follow the language spoken and
 can change without a new key. Only older keys hold words, which
-`older.ts` reads for their code and shows as kept.
+`scan/older.ts` reads for their code and shows as kept.
 
 A build reads and writes only its own keys. A tab of an older build sends
 its own batches and lets the volunteer record the cart, saying nothing of
@@ -662,7 +662,7 @@ utilities. When you style a page:
   (`role="alert"`, or `class="alert"` for notes shown with a list), in
   bold as a whole, with no "Sorry.", and the counts the page wrote in it
   in bold italic, never the numbers of a name or of words an older build
-  kept (`AlertWords` in `Notes.tsx`). A refusal's problems, after "Not
+  kept (`AlertWords` in `scan/Notes.tsx`). A refusal's problems, after "Not
   recorded.", are not bold. A status that reports no problem is plain,
   but a save held for an upgrade is in a caution box like the upgrade
   banner's (`CAUTION_BOX`), with no `role="alert"`.
@@ -944,6 +944,12 @@ core and at most 8: `uv run pytest -n auto --maxprocesses=8 --cov`. Each
 process makes databases of its own, which takes a moment, so past 8 a run
 is slower, and running a few tests is quicker without `-n`.
 Connections, below, says how many runs fit at once.
+
+The backend's code is in `backend/src/inventory_tng/`, grouped by
+feature, each feature's files named by their role: `web/` holds what
+every page shares, `core/` plumbing and `dev/` developer tools.
+`tests/test_import_directions.py` refuses an import the other way, such
+as `core/` importing a feature (docs/decisions/0023).
 
 For the frontend:
 

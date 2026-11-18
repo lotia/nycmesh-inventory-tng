@@ -1,23 +1,24 @@
 /**
  * What older builds of the scan page left on this browser, under keys of
- * their own (build.ts): saves not sent, and a cart with lines; and saves an
- * older build left under this build's own outbox key, once the server held
- * them back as from a build too old (outbox.ts, state too_old). This build
- * never sends them as they were. It lists each for the volunteer, read only
- * in the parts every version kept: the kind, who, the places, the items
- * and how much of each, and when. The scan page puts one that goes back
- * whole (goesBackWhole) in an empty cart itself; the volunteer adds each
- * other to the cart, to check, fill in what this build needs and save
- * again, or discards it, or a line of it that cannot go back (dropPart).
- * Nothing else is removed, but keys with nothing to lose (tidyOlder).
+ * their own (shared/build.ts): saves not sent, and a cart with lines; and
+ * saves an older build left under this build's own outbox key, once the
+ * server held them back as from a build too old (shared/outbox.ts, state
+ * too_old). This build never sends them as they were. It lists each for the
+ * volunteer, read only in the parts every version kept: the kind, who, the
+ * places, the items and how much of each, and when. The scan page puts one
+ * that goes back whole (goesBackWhole) in an empty cart itself; the
+ * volunteer adds each other to the cart, to check, fill in what this build
+ * needs and save again, or discards it, or a line of it that cannot go back
+ * (dropPart). Nothing else is removed, but keys with nothing to lose
+ * (tidyOlder).
  *
- * Each version's shape is in the history of outbox.ts and cart.ts. Every
- * batch kept its key, kind, volunteer_id, places, install_number and lines
- * of item_id and quantity (a number in v1, then a decimal), with
- * queuedAt and state; its summary in words (what) to v4, then what that
- * is made from (outbox.Summary); and why it was refused: note, in words,
- * to v3, then reason, a code (outbox.Reason); package_id came in v1, open
- * packages later.
+ * Each version's shape is in the history of shared/outbox.ts and cart.ts.
+ * Every batch kept its key, kind, volunteer_id, places, install_number and
+ * lines of item_id and quantity (a number in v1, then a decimal), with
+ * queuedAt and state; its summary in words (what) to v4, then what that is
+ * made from (outbox.Summary); and why it was refused: note, in words, to v3,
+ * then reason, a code (outbox.Reason); package_id came in v1, open packages
+ * later.
  * Every cart kept its kind, volunteerId, places, installNumber, usedAt and
  * lines of itemId, packages (counts by package id) and loose; from v2, the
  * key it is to be recorded under (batchKey), of a save an older build left
@@ -294,7 +295,7 @@ function refusedOf(reason: Reason | null, note: string | null): Refused {
  * line in the words this list uses (toCart's parts), named from
  * `catalogue`, retired items too: for the volunteer to compare with what
  * was recorded. Each item's numbered by its place in the batch, as a
- * 422's "Line n" names it (outbox.ts, problems); a report is not (Ali,
+ * 422's "Line n" names it (shared/outbox.ts, problems); a report is not (Ali,
  * inventory-tng-93z).
  */
 export function linesSaid(entry: unknown, catalogue: Catalogue): string[] {

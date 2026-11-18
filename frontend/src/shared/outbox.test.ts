@@ -1109,7 +1109,7 @@ describe("builds", () => {
       waitingFor: null,
       reason: null,
     });
-    // Listed with what older builds left (older.ts), not here, and never
+    // Listed with what older builds left (scan/older.ts), not here, and never
     // sent again.
     expect(outbox.shown().map((each) => each.summary.from)).toEqual(["mine"]);
     await outbox.send();
@@ -1588,7 +1588,7 @@ describe("listening", () => {
     const stop = outbox.listen();
     store(refused);
     window.dispatchEvent(new StorageEvent("storage", { key: STORAGE_KEY }));
-    // Still counted (offered.ts, unseen), and its sibling still listed.
+    // Still counted (scan/offered.ts, unseen), and its sibling still listed.
     expect(outbox.entries.value).toEqual([saved, refused]);
     expect(outbox.shown()).toEqual([refused]);
     outbox.forgetShown([saved.body.key]);

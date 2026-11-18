@@ -57,7 +57,7 @@ export function storeOutbox(entries: unknown[], build = BUILD) {
 
 /** A save of `body` in the list builds before v4 kept, with only what this
  * build needs to read one: the body, waiting. Older builds kept more
- * (queuedAt, what, install_number and others, older.ts says which): a test
+ * (queuedAt, what, install_number and others, scan/older.ts says which): a test
  * adds those its own data holds. Any field given replaces the default or is
  * added. */
 export function olderSave(body: object, fields: Record<string, unknown> = {}) {

@@ -26,7 +26,7 @@ import { onStoredChange, readStored, writeStored } from "../shared/stored";
 import { sealedKey } from "./offered";
 import { indexOf } from "./search";
 
-/** Versioned as the outbox's is (outbox.ts): each build reads its own.
+/** Versioned as the outbox's is (shared/outbox.ts): each build reads its own.
  * v2's is stamped with the build that wrote it, may keep a batch key
  * (batchKey: made with its first line since inventory-tng-e2d; a build
  * before kept one only from a save put back), and keeps the size each
@@ -86,7 +86,7 @@ const CartSchema = v.object({
    * check goes by (askWho). */
   usedAt: v.optional(v.number(), 0),
   /** When its first line went in, in milliseconds since 1970; 0 while
-   * empty: how long a batch took from then to saving (telemetry.ts). */
+   * empty: how long a batch took from then to saving (shared/telemetry.ts). */
   startedAt: v.optional(v.number(), 0),
   /** New with every change to what the cart holds: how a tab tells whether
    * another tab has changed it since (CartStore). */
@@ -98,7 +98,7 @@ const CartSchema = v.object({
   /** The lines, as a batch sends them, the cart held when put back under
    * its key (older.ts, toCart), kept with the key: what a volunteer then
    * takes off, and another tab recorded under the key meanwhile, is kept
-   * for an administrator (outbox.ts, changed_from; inventory-tng-0gg). A
+   * for an administrator (shared/outbox.ts, changed_from; inventory-tng-0gg). A
    * build before drops it from what it writes back: then nothing is kept. */
   changedFrom: v.exactOptional(v.array(BatchLine)),
 });
@@ -165,7 +165,7 @@ export function loadCart(storage: Storage = localStorage): Cart {
 }
 
 /** False if the browser would not keep it. Stamped with this build, so a
- * tab of an older one learns a newer one is out (build.ts). */
+ * tab of an older one learns a newer one is out (shared/build.ts). */
 export function storeCart(
   cart: Cart,
   storage: Storage = localStorage,

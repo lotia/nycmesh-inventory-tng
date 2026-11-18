@@ -14,13 +14,13 @@
  * writes its own key only: a tab of an older build sends its own batches
  * before it asks for a reload (build.ts), and what an older build left
  * under an older key is listed for the volunteer to put back in the cart or
- * discard (older.ts). Builds that keep the same shape share a key, so each
- * batch names the build that queued it, and is sent as that build's: one
- * the server holds back as from a build too old (409 build_too_old) is
+ * discard (scan/older.ts). Builds that keep the same shape share a key, so
+ * each batch names the build that queued it, and is sent as that build's:
+ * one the server holds back as from a build too old (409 build_too_old) is
  * listed with what older builds left, unless it is this tab's own, or a
  * newer build's, when the tab is too old. A cart is sent under its own key
- * (cart.ts, batchKey), made with its first line, or that of a save an older
- * build left that filled it: if another tab recorded it first, a tab that
+ * (scan/cart.ts, batchKey), made with its first line, or that of a save an
+ * older build left that filled it: if another tab recorded it first, a tab that
  * took it over or one that had not heard, the server takes it once.
  */
 import type { MessageDescriptor } from "@lingui/core";
@@ -58,16 +58,17 @@ export const RETRY_MS = 30_000;
 export const REPORT_AFTER = 5;
 /** Saved batches kept on show, newest first, so a volunteer can check.
  * An older one, or one dismissed, is forgotten only once a catalogue shows
- * it (forgetShown), as the scan page counts it until then (offered.ts,
+ * it (forgetShown), as the scan page counts it until then (scan/offered.ts,
  * unseen). */
 const SAVED_KEPT = 10;
 /** Saved batches kept at most, shown by a catalogue or not, so storage
  * never fills when no catalogue is read: half the keys a catalogue is
- * asked about (offered.ts, MAX_KEYS_ASKED), leaving room for those waiting. */
+ * asked about (scan/offered.ts, MAX_KEYS_ASKED), leaving room for those
+ * waiting. */
 export const SAVED_MOST = 50;
 
 /** On the list: all but the saved batches dismissed, and those too old,
- * which older.ts lists. */
+ * which scan/older.ts lists. */
 const onList = (entry: Entry) =>
   entry.dismissed !== true && entry.state !== "too_old";
 
@@ -121,7 +122,7 @@ export const BatchBody = v.object({
     ),
   ),
   /** The lines its cart held when put back under its key, before the
-   * volunteer changed it (cart.ts, changedFrom), or those of the batch
+   * volunteer changed it (scan/cart.ts, changedFrom), or those of the batch
    * queued here first under it (Outbox.queue): what it holds less of than
    * these, and than was recorded under the key, the volunteer took off,
    * which the server keeps for an administrator as it refuses it
@@ -296,7 +297,7 @@ export function recordedHeading(recorded: Recorded): string {
 }
 
 /** The heading over what a recorded_elsewhere holds otherwise than was
- * recorded (recorded.ts), or, with nothing known of what was recorded,
+ * recorded (scan/recorded.ts), or, with nothing known of what was recorded,
  * over its lines (Ali, inventory-tng-0gg, 2026-11-15, 1). What it held is
  * recorded, but not the changes since, so it never goes in a cart whole
  * again, which would record it twice (Ali, inventory-tng-wyq, question c,
@@ -383,7 +384,7 @@ function problemSaid({ names, kind }: Problem): Said {
 /** What a batch's summary is made from besides its body, so two batches
  * can be told apart: its places' names as the catalogue gave them when it
  * was queued, as a place may leave the catalogue. Worded as it is shown
- * (batch.ts, batchWords), in the language spoken when it is shown
+ * (scan/batch.ts, batchWords), in the language spoken when it is shown
  * (inventory-tng-ar8). */
 export const Summary = v.object({
   from: v.nullable(v.string()),
@@ -401,7 +402,7 @@ export const Entry = v.object({
   /** The build that queued it, named when it is sent (build.HEADER). */
   build: v.string(),
   /** too_old: held back by the server as from a build too old, and listed
-   * with what older builds left (older.ts), to put back in the cart. */
+   * with what older builds left (scan/older.ts), to put back in the cart. */
   state: v.picklist(["waiting", "saved", "refused", "too_old"]),
   /** While waiting: what it waits for. */
   waitingFor: v.nullable(v.picklist(["network", "registration"])),
@@ -413,9 +414,9 @@ export const Entry = v.object({
   failures: whole,
   /** Saved, and dismissed: off the list, kept until a catalogue shows it. */
   dismissed: v.exactOptional(v.literal(true)),
-  /** Sent under its cart's key (cart.ts, batchKey), which another tab may
+  /** Sent under its cart's key (scan/cart.ts, batchKey), which another tab may
    * have recorded first: a tab of an older build, whose save or cart this
-   * took over (older.ts), or one that had not heard it was recorded. Named
+   * took over (scan/older.ts), or one that had not heard it was recorded. Named
    * for the save put back, which first had one, as kept since v4. */
   putBack: v.exactOptional(v.literal(true)),
 });
@@ -489,7 +490,7 @@ export function lineNumbers(
 }
 
 /** A 422's problems, as kept. A line of the cart may be sent as several,
- * one for each package and one loose (batch.ts, toBatch), so a line is
+ * one for each package and one loose (scan/batch.ts, toBatch), so a line is
  * named as the cart's: by its item's place in it. */
 function problems(
   detail: v.InferOutput<typeof ValidationFailed>["detail"],
@@ -602,8 +603,8 @@ export class Outbox {
   /**
    * Forget the saved batches a catalogue shows (`saved`, its keys) that are
    * dismissed or older than the newest SAVED_KEPT on show. Until then the
-   * scan page still counts them (offered.ts, unseen), so an opening or a cut
-   * saved while the catalogue could not be read again is never lost.
+   * scan page still counts them (scan/offered.ts, unseen), so an opening or
+   * a cut saved while the catalogue could not be read again is never lost.
    */
   forgetShown(saved: readonly string[]): void {
     const inCatalogue = new Set(saved);
@@ -640,7 +641,7 @@ export class Outbox {
 
   /**
    * Give this batch its key, keep it, and start sending it. The key is
-   * `key`, its cart's (cart.ts, batchKey), so the server takes the cart
+   * `key`, its cart's (scan/cart.ts, batchKey), so the server takes the cart
    * once, whichever tab sends it first; or, for a cart an earlier build
    * kept without one, made here. Either way it is kept with the batch for
    * every attempt. Says what became of it (Queued); not_kept means the
@@ -651,7 +652,7 @@ export class Outbox {
    * not kept so, or filled again by a tab that had not heard. The same
    * again, waiting or saved, or listed recorded elsewhere under that key,
    * is not queued twice: listed twice, its difference would go in the
-   * cart twice, under two keys (recorded.ts). Another batch, while
+   * cart twice, under two keys (scan/recorded.ts). Another batch, while
    * the server may hold that key (one under it waits, was saved, or was
    * refused for it), is not recorded, as the server would refuse it (409
    * key_reused): it is listed so, under a key of its own, never sent, so
@@ -971,7 +972,7 @@ export class Outbox {
             !this.builds.isNewer(entry.build)
           ) {
             // An older build's, kept under this key: too old itself, not
-            // this tab. Listed with what older builds left (older.ts).
+            // this tab. Listed with what older builds left (scan/older.ts).
             this.settle(entry.body, {
               state: "too_old",
               waitingFor: null,
@@ -980,7 +981,7 @@ export class Outbox {
             return "next";
           }
           // This tab's own, or a newer one's: this tab is too old. Kept,
-          // waiting: a newer build of the page lists it (older.ts).
+          // waiting: a newer build of the page lists it (scan/older.ts).
           this.builds.learn("too_old");
           this.settle(entry.body, {
             waitingFor: null,

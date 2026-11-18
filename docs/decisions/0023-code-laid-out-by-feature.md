@@ -16,9 +16,15 @@ structure below on 2026-11-17.
   Every feature names its files by the same roles: `<thing>.py` for a
   table's rules and writes (its owner, 0016), `queries.py`, `forms.py`,
   `routes.py` for HTML pages (`<page>_routes.py` where a feature has
-  several, as `admins/sign_in_routes.py`), `api.py` for JSON,
-  `schemas.py`, `paths.py` and `command.py` (`<thing>_command.py` where a
-  feature has two, as `admins/totp_keys_command.py`). URLs do not change.
+  several, as `admins/sign_in_routes.py`), `api.py` for JSON and
+  `schemas.py` (`<thing>_api.py` and `<thing>_schemas.py` where it has
+  several, as `scan/batch_api.py`), `paths.py`, `guards.py` for what
+  every route needing a sign-in or a device depends on, and `command.py`
+  (`<thing>_command.py` where a feature has two, as
+  `admins/totp_keys_command.py`). URLs do not change.
+- **The top of `inventory_tng`** holds only the entry points (`app.py`,
+  `server.py`, `__main__.py`, `manage.py` and `openapi.py`) and
+  `models.py`.
 - **`web/`** holds what every server-rendered page shares; **`core/`**
   holds plumbing, such as settings, db, history, logs, telemetry,
   masking, mail, phrases, local_time and local_env. Core means plumbing,
@@ -37,6 +43,8 @@ structure below on 2026-11-17.
   a trivial `session.get` may stay in a handler. Forms are plain
   functions too, given the form's fields as a mapping of text or the
   values its `Form()` parameters read: the handler reads the request.
+  Plumbing with an endpoint of its own keeps it beside it, as
+  `core/health.py` and `scan/page_telemetry.py` do.
 - **One entry point for operator commands**, `python -m
   inventory_tng.manage <command>` (`manage.py`), built with argparse (Ali,
   2026-11-17, inventory-tng-icnp): a fixed table of each command's name,
@@ -44,8 +52,9 @@ structure below on 2026-11-17.
   name, never discovered. It imports only the command chosen and calls
   its `main(argv, prog=...)`; with no command it lists them all. Each
   command sets up its own process (0007). Developer tools in `dev/`,
-  `core/local_env.py` and `catalogue/units.py` are not operator commands
-  and keep their own `python -m` paths (inventory-tng-atmx.9).
+  `core/local_env.py`, `catalogue/units.py` and `openapi.py` are not
+  operator commands and keep their own `python -m` paths
+  (inventory-tng-atmx.9).
 - **Imports go one way**, held by `backend/tests/test_import_directions.py`:
   - rules, queries and forms import neither FastAPI nor `web/`, but for
     `web/formatting.py` and `web/forms.py`, which import neither

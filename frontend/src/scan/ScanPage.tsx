@@ -46,7 +46,7 @@ export function ScanPage({
 }) {
   const loaded = useSignal<Loaded>({ state: "loading" });
   // Whether the cart holds no lines: until it does, a newer build is not
-  // loaded, as it would not read this build's cart (build.ts).
+  // loaded, as it would not read this build's cart (shared/build.ts).
   const cartEmpty = useMemo(() => signal(storedCartEmpty()), []);
   // The cart's batch key, while the cart is shown (CartForm): a save's
   // difference put in it is said to be there until it is recorded.
@@ -83,7 +83,7 @@ export function ScanPage({
       loadedAt.current = Date.now();
     }
     if (result.state === "ready") {
-      // Shown now: what it shows need not be kept (outbox.ts).
+      // Shown now: what it shows need not be kept (shared/outbox.ts).
       outbox.forgetShown(result.catalogue.saved);
     }
   }
@@ -139,7 +139,7 @@ export function ScanPage({
     [shown, entries],
   );
   // A save the server held back as from an older build too old, here or
-  // in another tab, is listed with what older builds left (outbox.ts).
+  // in another tab, is listed with what older builds left (shared/outbox.ts).
   const tooOld = entries
     .filter((each) => each.state === "too_old")
     .map((each) => each.body.key)
@@ -242,7 +242,7 @@ export function ScanPage({
 }
 
 /**
- * Asks for a reload once a newer build is out (build.ts). While this tab
+ * Asks for a reload once a newer build is out (shared/build.ts). While this tab
  * can still save, only once the cart is saved or emptied and nothing waits
  * to send, as the newer build reads neither; until then it says nothing.
  * Too old, at once, saying what this tab holds is kept: the newer build

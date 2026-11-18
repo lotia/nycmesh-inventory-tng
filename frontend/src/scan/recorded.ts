@@ -1,6 +1,6 @@
 /**
  * A save refused because another tab recorded its cart first, under the
- * same key, as it was then (outbox.ts, reason recorded_elsewhere): what
+ * same key, as it was then (shared/outbox.ts, reason recorded_elsewhere): what
  * that tab recorded, as the server said (outbox.Recorded), and what this
  * save holds otherwise, line by line, in words (Ali, inventory-tng-0gg).
  * What it holds more of, or new, goes in an empty cart, under a new key
