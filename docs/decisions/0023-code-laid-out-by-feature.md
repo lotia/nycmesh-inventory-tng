@@ -144,3 +144,4 @@ short test. `core/` is the name FastAPI's full-stack template uses;
 | `admin/reading_rules.py` | `catalogue/reading_rules_routes.py` |
 | `locations.py` | `places/locations.py` |
 | `admin/locations.py` | `places/routes.py` |
+| `admin/volunteers.py` | `volunteers/routes.py` |

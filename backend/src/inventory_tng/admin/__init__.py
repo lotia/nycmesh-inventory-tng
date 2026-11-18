@@ -22,7 +22,6 @@ from inventory_tng.admin import (
     settings,
     stock,
     used_up,
-    volunteers,
 )
 from inventory_tng.admins import home_routes
 from inventory_tng.admins import routes as admins_routes
@@ -32,6 +31,7 @@ from inventory_tng.catalogue import (
     reading_rules_routes,
 )
 from inventory_tng.places import routes as places_routes
+from inventory_tng.volunteers import routes as volunteers_routes
 
 # The sections, in the order the navigation shows them, and their badges.
 pages.SECTIONS[:] = (
@@ -39,7 +39,7 @@ pages.SECTIONS[:] = (
     (categories_routes.CATEGORIES, common.SECTION_CATEGORIES),
     (places_routes.LOCATIONS, common.SECTION_LOCATIONS),
     (labels.LABELS, common.SECTION_LABELS),
-    (volunteers.VOLUNTEERS, common.SECTION_VOLUNTEERS),
+    (volunteers_routes.VOLUNTEERS, common.SECTION_VOLUNTEERS),
     (stock.STOCK, common.SECTION_STOCK),
     (counts.COUNTS, common.SECTION_COUNTS),
     (devices.DEVICES, common.SECTION_DEVICES),
@@ -55,7 +55,7 @@ for module in (
     categories_routes,
     places_routes,
     labels,
-    volunteers,
+    volunteers_routes,
     stock,
     used_up,
     length_checks,

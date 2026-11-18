@@ -1075,9 +1075,9 @@ msgstr ""
 msgid "Bring it back to change anything here."
 msgstr ""
 
-#: src/inventory_tng/admin/volunteers.py
 #: src/inventory_tng/templates/_retired_record.html
 #: src/inventory_tng/templates/admin.html
+#: src/inventory_tng/volunteers/routes.py
 msgid "Bring them back"
 msgstr ""
 
@@ -1967,7 +1967,7 @@ msgstr ""
 msgid "Merge"
 msgstr ""
 
-#: src/inventory_tng/admin/volunteers.py
+#: src/inventory_tng/volunteers/routes.py
 #, python-format
 msgid "Merge %(name)s into %(into)s?"
 msgstr ""
@@ -1976,7 +1976,7 @@ msgstr ""
 msgid "Merge into"
 msgstr ""
 
-#: src/inventory_tng/admin/volunteers.py
+#: src/inventory_tng/volunteers/routes.py
 msgid "Merged. Their past records now count as the other's."
 msgstr ""
 
@@ -3772,7 +3772,7 @@ msgstr ""
 msgid "These moved while you counted, so count them again."
 msgstr ""
 
-#: src/inventory_tng/admin/volunteers.py
+#: src/inventory_tng/volunteers/routes.py
 msgid "They can hold stock now."
 msgstr ""
 
@@ -3800,7 +3800,7 @@ msgstr ""
 msgid "They gave an email address."
 msgstr ""
 
-#: src/inventory_tng/admin/volunteers.py
+#: src/inventory_tng/volunteers/routes.py
 msgid "They no longer hold stock."
 msgstr ""
 

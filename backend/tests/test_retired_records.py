@@ -11,7 +11,6 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from inventory_tng.admin.common import retired_by
-from inventory_tng.admin.volunteers import BRING_THEM_BACK
 from inventory_tng.catalogue import categories
 from inventory_tng.core.db import set_actor
 from inventory_tng.models import (
@@ -22,6 +21,7 @@ from inventory_tng.models import (
     Location,
     Volunteer,
 )
+from inventory_tng.volunteers.routes import BRING_THEM_BACK
 from inventory_tng.web.forms import RETIRED, RULES
 
 from helpers.markup import read, text

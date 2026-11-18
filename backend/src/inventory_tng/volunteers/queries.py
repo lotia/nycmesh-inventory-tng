@@ -1,4 +1,4 @@
-"""What the volunteers pages read (admin/volunteers.py), and the places
+"""What the volunteers pages read (volunteers/routes.py), and the places
 page's names of custody places' volunteers (places/routes.py): plain
 functions taking a Session, each named for what it returns
 (docs/decisions/0023)."""

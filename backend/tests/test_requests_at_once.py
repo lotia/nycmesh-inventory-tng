@@ -31,7 +31,6 @@ from sqlalchemy.exc import IntegrityError, OperationalError
 from sqlalchemy.orm import Session
 
 from inventory_tng import adjustment_reasons, open_packages
-from inventory_tng.admin.volunteers import VOLUNTEERS
 from inventory_tng.admins import accounts, guards
 from inventory_tng.admins.routes import ADMINS
 from inventory_tng.catalogue import categories, items, reading_rules, units
@@ -76,6 +75,7 @@ from inventory_tng.scan import catalogue_api as scan_catalogue
 from inventory_tng.scan.batch_schemas import Batch
 from inventory_tng.scan.catalogue_schemas import Catalogue
 from inventory_tng.volunteers import volunteers
+from inventory_tng.volunteers.routes import VOLUNTEERS
 
 from helpers.concurrency import Committed, Worker, delete_made, made, newest_ids
 from helpers.devices import new_device

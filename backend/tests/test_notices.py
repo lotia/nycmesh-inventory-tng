@@ -11,8 +11,8 @@ from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
 
 from inventory_tng import pages
-from inventory_tng.admin.volunteers import BRING_THEM_BACK
 from inventory_tng.models import Admin, Category, Item, Label, Location, Volunteer
+from inventory_tng.volunteers.routes import BRING_THEM_BACK
 
 from helpers.markup import read, text
 from helpers.rows import add, tag

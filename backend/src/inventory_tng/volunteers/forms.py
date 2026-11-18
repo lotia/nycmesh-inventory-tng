@@ -1,6 +1,6 @@
 """How the volunteers pages' forms are read and checked: a volunteer's
 name and email, and who a duplicate is merged into, and what is wrong, in
-words. The handlers in admin/volunteers.py read the request and pass the
+words. The handlers in volunteers/routes.py read the request and pass the
 form's fields."""
 
 from sqlalchemy.orm import Session
