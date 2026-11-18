@@ -121,7 +121,7 @@ SHELF = SimpleNamespace(id=7, name=NOT_ENGLISH)
 
 def named_phrases() -> list[LazyProxy]:
     """Every phrase the server's Python names as a constant, alone or in a
-    table (a dict, tuple or list, such as NOTICES), in every module."""
+    table (a dict, tuple or list, such as pages._NOTICES), in every module."""
     found: list[LazyProxy] = []
 
     def gather(value: object, depth: int) -> None:
