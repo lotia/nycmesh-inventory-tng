@@ -29,12 +29,12 @@ WEB = {"pages.py"}
 # Rules: each table's owner (db.protection), any of PLAIN, and these,
 # which hold rules or queries but own no table.
 RULES = {
+    "catalogue/names.py",
+    "catalogue/unit_readings.py",
+    "catalogue/units.py",
     "ledger.py",
-    "names.py",
     "scan_settings.py",
     "stock/balance.py",
-    "unit_readings.py",
-    "units.py",
 }
 # What of web/ rules may import: it loads neither FastAPI nor the templates,
 # and is held to the rules' own rule to stay so.
@@ -433,7 +433,7 @@ def test_rules_importing_fastapi_or_web_is_found(
 
 
 def test_a_tables_owner_is_rules() -> None:
-    assert is_rules("items.py")
+    assert is_rules("catalogue/items.py")
     assert not is_rules("admin/items.py")
 
 

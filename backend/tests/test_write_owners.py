@@ -63,7 +63,7 @@ OWNERS: dict[str, str | None] = {t.name: t.info["owner"] for t in TABLES.values(
 ALLOWED = {
     SOURCE / "admins" / "accounts.py": ("_remove_sign_in",),
     SOURCE / "ledger.py": ("insert_transaction",),
-    SOURCE / "reading_rules.py": ("delete",),
+    SOURCE / "catalogue" / "reading_rules.py": ("delete",),
     SOURCE / "dev" / "seed.py": ("run",),
 }
 # The tables a write needs no lock for, written out, so none loses its
@@ -149,10 +149,10 @@ def test_no_model_has_a_relationship() -> None:
     [
         ("admin/items.py", "Item(name='x')", True),
         ("admin/items.py", "session.delete(row)", True),
-        ("items.py", "session.delete(row)", True),
-        ("items.py", "Item(name='x')", False),
-        ("items.py", "ItemPackage(item_id=1)", False),
-        ("items.py", "Label(item_id=1)", True),
+        ("catalogue/items.py", "session.delete(row)", True),
+        ("catalogue/items.py", "Item(name='x')", False),
+        ("catalogue/items.py", "ItemPackage(item_id=1)", False),
+        ("catalogue/items.py", "Label(item_id=1)", True),
         # The ledger: only ALLOWED's insert_transaction, in no module.
         ("ledger.py", "Movement(item_id=1)", True),
         (

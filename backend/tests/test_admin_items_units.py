@@ -10,16 +10,16 @@ from markupsafe import escape
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
-from inventory_tng import items
 from inventory_tng.admin.items import ITEMS
+from inventory_tng.catalogue import items
 from inventory_tng.catalogue.forms import (
     ASK_UNIT,
     READ_AS_ONE,
     TAKEN_FIELDS,
     read_as_one,
 )
+from inventory_tng.catalogue.reading_rules import NAMED, both
 from inventory_tng.models import Category, Item, ItemPackage, ReadingRule
-from inventory_tng.reading_rules import NAMED, both
 
 from helpers.items import new_item
 from helpers.markup import read, text

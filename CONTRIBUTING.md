@@ -241,9 +241,10 @@ fails on one. The app may only add to the history.
 
 ### The catalogue's rules
 
-Each catalogue table is written only by its own module: `categories.py`,
-`items.py` (items and their packages), `locations.py`,
-`volunteers/volunteers.py` and `labels/labels.py`. Admin pages and the
+Each catalogue table is written only by its own module:
+`catalogue/categories.py`, `catalogue/items.py` (items and their
+packages), `locations.py`, `volunteers/volunteers.py` and
+`labels/labels.py`. Admin pages and the
 seed call those modules' functions, one per kind of change, which take
 the catalogue lock, lock and read what the rules need, and refuse a
 change that breaks one by raising `db.RuleBroken` with the rule's name.
@@ -277,10 +278,11 @@ inventory-tng-g6u).
 
 An item's aliases (`item_alias`) share its name's namespace: no item's
 name is an alias, nor any alias an item's name or another alias, retired
-items' too. A unique index keeps aliases apart; `items.py` checks names
-against aliases, holding the catalogue lock. A removed alias is retired,
-freeing its name. Renaming an item keeps its old name as an alias, and
-renaming it to one of its own aliases swaps the two (`items.save`).
+items' too. A unique index keeps aliases apart; `catalogue/items.py`
+checks names against aliases, holding the catalogue lock. A removed
+alias is retired, freeing its name. Renaming an item keeps its old
+name as an alias, and renaming it to one of its own aliases swaps the
+two (`items.save`).
 
 Each such row keeps its key in `name_key`, which the app writes as the
 name is set (`models.KeyedName`), a CHECK constraint holds to the name,
@@ -290,13 +292,14 @@ which the app writes as the session flushes (`models.unit_key`), unique
 as `name_key` is, with no CHECK, as the units are the app's. A unit is
 judged by its number as search reads it (`units._searched`), sign and all,
 so `Cap 1 000 μF` and `Cap 1000 uF` are one too, and found after any
-space, as search reads every space as a plain one. `backend/src/inventory_tng/names.py`
-has the rule: one pattern and one table of look-alikes
+space, as search reads every space as a plain one.
+`backend/src/inventory_tng/catalogue/names.py` has the rule: one pattern
+and one table of look-alikes
 (`LOOK_ALIKES`), read by Python (`name_key`) and PostgreSQL
 (`name_key_sql`), and a test checks both agree on every character. To
-change the rule, change `names.py` and add a migration that writes the
-CHECKs out again (items', packages' and aliases') and refills every key,
-naming by id any rows that would then clash. The initial migration's
+change the rule, change `catalogue/names.py` and add a migration that
+writes the CHECKs out again (items', packages' and aliases') and
+refills every key, naming by id any rows that would then clash. The initial migration's
 `NAME_KEY` shows how to write them out by code point.
 
 Every name an administrator types is stored in canonical spelling
@@ -325,8 +328,8 @@ groups too, each number with its unit or other word, as typed or respelt
 (`units.groups`, `units.ts`'s `groups`), so `100 ft 48 V` finds `100 feet
 48 VDC`; the items list ranks a row holding every group between one
 holding the whole search and one only close. The table is
-`backend/src/inventory_tng/units.py`. After changing it, or what search
-keeps, raise its `VERSION`, write the scan page's copy and the fold
+`backend/src/inventory_tng/catalogue/units.py`. After changing it, or
+what search keeps, raise its `VERSION`, write the scan page's copy and the fold
 reference again, and add a migration that folds every row again with
 `models.held`, with `FOLDS_UNITS` the new version, folding
 an item's current aliases after its fields, as `Item.refold` does, and
@@ -340,9 +343,10 @@ mise run regenerate-fold-reference
 `frontend/src/units-vectors.json` holds what both sides must make of some
 text; both test against it.
 
-A reading rule (`models.ReadingRule`, written only by `reading_rules.py`)
-settles how a unit as typed after a number, case kept (`M`, `g`), is read,
-or that it is no unit, on both sides: the catalogue sends the rules. Each
+A reading rule (`models.ReadingRule`, written only by
+`catalogue/reading_rules.py`) settles how a unit as typed after a
+number, case kept (`M`, `g`), is read, or that it is no unit, on both
+sides: the catalogue sends the rules. Each
 change to one reads every name with that unit after a number again
 (`items.reread`), refused where two names would then read alike.
 Read them with `models.reading_rules`, which reads them once a
@@ -374,8 +378,8 @@ unit needs its name in words and, if a name spells it otherwise than its
 symbol, that spelling: `units.NAMES` and `units.SHOWN`. The seeding page
 (Unit readings, then Propose) proposes rules from every name, by the words
 near each unit in the names they settle. The import's readings file
-(`unit_readings.py`, an operator command, DEPLOYMENT.md) proposes from the
-names an import brings with the same function (`reading_rules.propose`),
+(`catalogue/unit_readings.py`, an operator command, DEPLOYMENT.md)
+proposes from the names an import brings with the same function (`reading_rules.propose`),
 and loads the operator's corrected file as rules by no administrator.
 
 ### Locking a row

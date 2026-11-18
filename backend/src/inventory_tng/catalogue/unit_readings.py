@@ -5,9 +5,10 @@ keeps, then loaded into the reading_rule table, the first rules a new
 database has. The sheet import (inventory-tng-8i4.17) calls `propose`
 for its dry run and `load` before it writes a name; from the command line:
 
-    uv run python -m inventory_tng.unit_readings propose NAMES --file readings.tsv
+    uv run python -m inventory_tng.catalogue.unit_readings \\
+        propose NAMES --file readings.tsv
     kubectl exec -i deploy/inventory -- \\
-        python -m inventory_tng.unit_readings load - < readings.tsv
+        python -m inventory_tng.catalogue.unit_readings load - < readings.tsv
 
 `propose` reads names, one a line, and needs no database: it writes the
 file, keeping each row, correction and respell the file already has, so a
@@ -34,7 +35,8 @@ import structlog
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from inventory_tng import items, models, reading_rules, units
+from inventory_tng import models
+from inventory_tng.catalogue import items, reading_rules, units
 from inventory_tng.core.command import run_command, set_up
 from inventory_tng.core.db import CLI_ACTOR, lock_catalogue, refusal, set_actor
 from inventory_tng.models import ReadingRule
@@ -263,7 +265,7 @@ def _said(rule: units.Rule) -> str:
 
 def parse(argv: Sequence[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(
-        prog="python -m inventory_tng.unit_readings",
+        prog="python -m inventory_tng.catalogue.unit_readings",
         description="The import's readings file: how each unit typed after a "
         "number in its names is read.",
     )

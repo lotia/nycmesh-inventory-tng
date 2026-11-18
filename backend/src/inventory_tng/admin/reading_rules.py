@@ -15,7 +15,7 @@ from fastapi import APIRouter, Depends, Form, Request
 from fastapi.responses import HTMLResponse, Response
 from sqlalchemy.orm import Session
 
-from inventory_tng import items, models, reading_rules, units
+from inventory_tng import models
 from inventory_tng.admin.common import ADMIN, admin_page, text_form
 from inventory_tng.admin.listing import (
     AskedView,
@@ -26,19 +26,19 @@ from inventory_tng.admin.listing import (
     tidied,
 )
 from inventory_tng.admins.guards import AdminSignedIn, SignedIn
-from inventory_tng.catalogue import queries
+from inventory_tng.catalogue import items, queries, reading_rules, units
 from inventory_tng.catalogue.forms import CHOOSE, CHOOSE_ONE, PROPOSED, seed_choices
-from inventory_tng.core.db import DbSession, refusal
-from inventory_tng.core.local_time import site_zone
-from inventory_tng.core.phrases import Words, gettext, lazy_gettext
-from inventory_tng.models import INTEGER_MAX, ReadingRule, whole
-from inventory_tng.pages import NOTICES, not_found, redirect
-from inventory_tng.reading_rules import (
+from inventory_tng.catalogue.reading_rules import (
     NOT_A_UNIT,
     chosen_rule,
     offered,
     read_alike_words,
 )
+from inventory_tng.core.db import DbSession, refusal
+from inventory_tng.core.local_time import site_zone
+from inventory_tng.core.phrases import Words, gettext, lazy_gettext
+from inventory_tng.models import INTEGER_MAX, ReadingRule, whole
+from inventory_tng.pages import NOTICES, not_found, redirect
 from inventory_tng.web.forms import ALERTS, RULES, form_version
 
 log = structlog.get_logger(__name__)

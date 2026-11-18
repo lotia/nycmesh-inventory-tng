@@ -21,7 +21,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 import inventory_tng
-from inventory_tng import over_recorded, reading_rules, units
+from inventory_tng import over_recorded
 from inventory_tng.admin import common, counts, length_checks, stock, used_up
 from inventory_tng.admin import devices as admin_devices
 from inventory_tng.admin import over_recorded as admin_over_recorded
@@ -32,6 +32,7 @@ from inventory_tng.admins import accounts, activity, guards
 from inventory_tng.admins import routes as admin_admins
 from inventory_tng.admins.reset_routes import RESET_NOTICE
 from inventory_tng.catalogue import forms as catalogue_forms
+from inventory_tng.catalogue import reading_rules, units
 from inventory_tng.core import mail
 from inventory_tng.core.phrases import (
     BRAND,

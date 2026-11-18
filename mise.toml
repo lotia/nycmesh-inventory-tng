@@ -90,10 +90,10 @@ dir = "backend"
 run = "uv run python -m tests.helpers.fold_reference"
 
 [tasks.regenerate-units]
-description = "Write frontend/src/units.json, the scan page's unit table, again after a change to backend units.py (CONTRIBUTING.md)"
+description = "Write frontend/src/units.json, the scan page's unit table, again after a change to backend catalogue/units.py (CONTRIBUTING.md)"
 dir = "backend"
 run = [
-    "uv run python -m inventory_tng.units",
+    "uv run python -m inventory_tng.catalogue.units",
     "cd ../frontend && npx biome format --write src/units.json",
 ]
 

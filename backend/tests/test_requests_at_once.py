@@ -30,18 +30,11 @@ from sqlalchemy import Engine, delete, select, text
 from sqlalchemy.exc import IntegrityError, OperationalError
 from sqlalchemy.orm import Session
 
-from inventory_tng import (
-    adjustment_reasons,
-    categories,
-    items,
-    locations,
-    open_packages,
-    reading_rules,
-    units,
-)
+from inventory_tng import adjustment_reasons, locations, open_packages
 from inventory_tng.admin.volunteers import VOLUNTEERS
 from inventory_tng.admins import accounts, guards
 from inventory_tng.admins.routes import ADMINS
+from inventory_tng.catalogue import categories, items, reading_rules, units
 from inventory_tng.core import mail
 from inventory_tng.core.db import (
     Base,

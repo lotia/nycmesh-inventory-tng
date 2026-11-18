@@ -16,7 +16,7 @@ from functools import reduce
 from sqlalchemy import select, union_all
 from sqlalchemy.orm import Session
 
-from inventory_tng import items, units
+from inventory_tng.catalogue import items, units
 from inventory_tng.core.db import Seen, enforce, lock_catalogue, locked, relock
 from inventory_tng.core.phrases import gettext, lazy_gettext
 from inventory_tng.models import (

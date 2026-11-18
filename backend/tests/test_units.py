@@ -13,10 +13,10 @@ import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
 
-from inventory_tng import items, units
 from inventory_tng.admin.items import ITEMS
+from inventory_tng.catalogue import items, units
+from inventory_tng.catalogue.units import KINDS, PREFIXES, UNITS, Reading, read, respell
 from inventory_tng.models import Category, Item, fold, folds, held, unit_key
-from inventory_tng.units import KINDS, PREFIXES, UNITS, Reading, read, respell
 
 from helpers.markup import text as page_text
 from helpers.rows import add, tag
@@ -146,7 +146,7 @@ def test_writes_the_table(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> No
     # As the task runs it, here to another file.
     monkeypatch.setattr(sys, "argv", ["units", str(tmp_path / "units.json")])
     with pytest.warns(RuntimeWarning, match="found in sys.modules"):
-        runpy.run_module("inventory_tng.units", run_name="__main__")
+        runpy.run_module("inventory_tng.catalogue.units", run_name="__main__")
     written = (tmp_path / "units.json").read_text(encoding="utf-8")
     assert json.loads(written) == units.table()
 

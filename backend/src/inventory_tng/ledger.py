@@ -703,7 +703,7 @@ def _as_opened(
 # 3. Its volunteer, device and administrator, FOR KEY SHARE, as the
 #    transaction's foreign keys take them.
 # 4. Its packages, FOR KEY SHARE, by id: their item, size and whether
-#    tracked opened, which a change to one waits for (items.py).
+#    tracked opened, which a change to one waits for (catalogue/items.py).
 # 5. Its open packages, FOR NO KEY UPDATE, by id: where each is and whether
 #    closed, which a report or close waits for (open_packages.py), and what
 #    is left on it, which another line on it waits for; and so a whole move

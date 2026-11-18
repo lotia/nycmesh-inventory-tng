@@ -11,8 +11,9 @@ from httpx2 import Response
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from inventory_tng import items, open_packages
+from inventory_tng import open_packages
 from inventory_tng.admin.items import ITEMS, PACKAGE_RETIRED
+from inventory_tng.catalogue import items
 from inventory_tng.catalogue.forms import PACKAGE_TAKEN, SHORTER_THAN_WHOLE
 from inventory_tng.core.db import RuleBroken, attempt
 from inventory_tng.models import Category, Item, ItemPackage, Label

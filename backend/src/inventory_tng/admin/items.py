@@ -14,7 +14,7 @@ from opentelemetry import metrics
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
-from inventory_tng import items, open_packages, reading_rules, units
+from inventory_tng import open_packages
 from inventory_tng.admin.categories import CATEGORIES
 from inventory_tng.admin.common import (
     ADMIN,
@@ -34,7 +34,8 @@ from inventory_tng.admin.listing import (
 )
 from inventory_tng.admin.reading_rules import READINGS
 from inventory_tng.admins.guards import AdminSignedIn, SignedIn
-from inventory_tng.catalogue import forms, queries
+from inventory_tng.catalogue import forms, items, queries, reading_rules, units
+from inventory_tng.catalogue.reading_rules import NOT_A_UNIT
 from inventory_tng.core.db import DbSession, exists_where, refusal
 from inventory_tng.core.local_time import site_zone
 from inventory_tng.core.phrases import Words, lazy_gettext
@@ -53,7 +54,6 @@ from inventory_tng.models import (
 )
 from inventory_tng.models import reading_rules as rules_held
 from inventory_tng.pages import NOTICES, not_found, redirect
-from inventory_tng.reading_rules import NOT_A_UNIT
 from inventory_tng.stock import queries as stock_queries
 from inventory_tng.web.forms import ALERTS, RETIRED, RULES, form_version
 

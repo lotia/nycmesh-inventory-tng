@@ -12,7 +12,9 @@ from decimal import Decimal
 import structlog
 from sqlalchemy.orm import Session
 
-from inventory_tng import items, reading_rules, units
+from inventory_tng.catalogue import items, reading_rules, units
+from inventory_tng.catalogue.names import nameless
+from inventory_tng.catalogue.reading_rules import chosen_rule, read_alike_words
 from inventory_tng.core.phrases import Words, gettext, lazy_gettext
 from inventory_tng.models import (
     INTEGER_MAX,
@@ -24,8 +26,6 @@ from inventory_tng.models import (
     whole,
 )
 from inventory_tng.models import reading_rules as rules_held
-from inventory_tng.names import nameless
-from inventory_tng.reading_rules import chosen_rule, read_alike_words
 from inventory_tng.web.forms import chosen, name_problem, quantity
 
 log = structlog.get_logger(__name__)

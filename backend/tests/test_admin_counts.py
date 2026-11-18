@@ -15,10 +15,11 @@ from sqlalchemy import text as sql_text
 from sqlalchemy.orm import Session
 from structlog.testing import capture_logs
 
-from inventory_tng import items, locations
+from inventory_tng import locations
 from inventory_tng.admin.counts import ADJUSTMENTS, COUNT_KIND, COUNTS
 from inventory_tng.admin.settings import SETTINGS
 from inventory_tng.admin.stock import STOCK
+from inventory_tng.catalogue import items
 from inventory_tng.core.db import RuleBroken
 from inventory_tng.core.local_time import DEFAULT_ZONE, show
 from inventory_tng.core.phrases import compiled, speaking

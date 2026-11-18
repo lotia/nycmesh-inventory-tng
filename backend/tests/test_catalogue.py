@@ -11,7 +11,7 @@ from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
 from structlog.testing import capture_logs
 
-from inventory_tng import items
+from inventory_tng.catalogue import items
 from inventory_tng.core.db import get_snapshot
 from inventory_tng.ledger import LOOSE, Entry
 from inventory_tng.models import (

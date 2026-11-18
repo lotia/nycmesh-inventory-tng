@@ -17,7 +17,7 @@ Conventions, on every table with history:
 - Names are unique, ignoring case: among current rows, or all of them,
   retired ones too, as each table says. An item's and a package's are
   compared by their key, which ignores spaces and punctuation too, but a
-  decimal point between digits (names.py, KeyedName).
+  decimal point between digits (catalogue/names.py, KeyedName).
 
 A rule about one row's own values is a check constraint, which raises a
 check violation (SQLSTATE 23514) named for the rule, as describe_error()
@@ -72,7 +72,7 @@ from sqlalchemy.orm import (
     validates,
 )
 
-from inventory_tng import names, units
+from inventory_tng.catalogue import names, units
 
 # Imported for its flush listeners: whatever can write these tables records
 # their history.
@@ -459,7 +459,7 @@ class Category(CanonicalName, Versioned, Base):
         # Retired ones too, so one can always be brought back
         # (docs/decisions/0019).
         _unique_name("category"),
-        protection(owner="categories.py", lock="catalogue", history=True),
+        protection(owner="catalogue/categories.py", lock="catalogue", history=True),
     )
 
     id: Mapped[IntId]
@@ -502,7 +502,7 @@ class Item(KeyedName, Searchable, Versioned, Base):
         CheckConstraint(_one_of("unit", UNITS), name="unit"),
         CheckConstraint("minimum >= 0", name="minimum"),
         CheckConstraint("on_order >= 0", name="on_order"),
-        protection(owner="items.py", lock="catalogue", history=True),
+        protection(owner="catalogue/items.py", lock="catalogue", history=True),
     )
 
     id: Mapped[IntId]
@@ -587,7 +587,7 @@ class ItemPackage(KeyedName, Searchable, Versioned, Base):
         # A whole one is never a short end.
         CheckConstraint("short_below < size", name="short_below_under_size"),
         CheckConstraint("minimum_sealed >= 0", name="minimum_sealed"),
-        protection(owner="items.py", lock="catalogue", history=True),
+        protection(owner="catalogue/items.py", lock="catalogue", history=True),
     )
 
     id: Mapped[IntId]
@@ -614,7 +614,7 @@ class ItemAlias(KeyedName, Base):
     item's own name is (Item.refold), and taken as names are
     (docs/decisions/0021, 2026-11-14 and 2026-11-15).
     Its key is unique among current aliases here; among items' names too,
-    which items.py checks holding the catalogue lock. Removed, it is
+    which catalogue/items.py checks holding the catalogue lock. Removed, it is
     retired, freeing the name; never changed otherwise (the initial
     migration)."""
 
@@ -633,7 +633,7 @@ class ItemAlias(KeyedName, Base):
             postgresql_where=text("retired_at IS NULL"),
         ),
         _name_key_check(),
-        protection(owner="items.py", lock="catalogue", history=True),
+        protection(owner="catalogue/items.py", lock="catalogue", history=True),
     )
 
     id: Mapped[IntId]
@@ -674,7 +674,7 @@ class ReadingRule(Versioned, Base):
     __table_args__ = (
         Index("uq_reading_rule_token", "token", unique=True),
         CheckConstraint("reading IS NOT NULL OR NOT respell", name="respell_a_unit"),
-        protection(owner="reading_rules.py", lock="catalogue", history=True),
+        protection(owner="catalogue/reading_rules.py", lock="catalogue", history=True),
     )
 
     id: Mapped[IntId]

@@ -83,7 +83,7 @@ UPDATED_ONLY = {
     "item_alias": ("retired_at", "unit_key", "name_shown"),
 }
 # names.name_key_sql, written out so the CHECKs keep the rule they were made
-# with when names.py changes. names._LOOK_ALIKE by code point, as ruff
+# with when catalogue/names.py changes. names._LOOK_ALIKE by code point, as ruff
 # refuses the look-alikes themselves, keyed by the ASCII each is read as.
 LOOK_ALIKE = {
     " ": (0x00A0, 0x1680, *range(0x2000, 0x200B), 0x202F, 0x205F, 0x3000),

@@ -133,3 +133,9 @@ short test. `core/` is the name FastAPI's full-stack template uses;
 | `resets.py` | `admins/reset_routes.py` |
 | `admin/admins.py` | `admins/routes.py` |
 | `admin/home.py` | `admins/home_routes.py` |
+| `categories.py` | `catalogue/categories.py` |
+| `items.py` | `catalogue/items.py` |
+| `names.py` | `catalogue/names.py` |
+| `reading_rules.py` | `catalogue/reading_rules.py` |
+| `unit_readings.py` | `catalogue/unit_readings.py` |
+| `units.py` | `catalogue/units.py` |

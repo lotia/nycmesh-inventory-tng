@@ -11,7 +11,7 @@ a sign no word is (`μF`, `°C`, `kΩ`) is read, so a Greek word is folded as
 any other.
 
 The scan page reads the same table (frontend/src/units.json, which `uv run
-python -m inventory_tng.units` writes) the same way (frontend/src/units.ts),
+python -m inventory_tng.catalogue.units` writes) the same way (frontend/src/units.ts),
 and both are tested against frontend/src/units-vectors.json.
 
 An item's or a package's name is stored as typed on its form, its units
@@ -39,7 +39,7 @@ from typing import Any
 
 from babel.support import LazyProxy
 
-from inventory_tng import names
+from inventory_tng.catalogue import names
 from inventory_tng.core.local_env import CLONE
 from inventory_tng.core.phrases import gettext, lazy_gettext
 

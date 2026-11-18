@@ -484,7 +484,8 @@ readings file from the names, one a line, with a proposed reading for
 each unit and the evidence for it:
 
 ```sh
-uv run python -m inventory_tng.unit_readings propose names.txt --file readings.tsv
+uv run python -m inventory_tng.catalogue.unit_readings \
+  propose names.txt --file readings.tsv
 ```
 
 Correct it once: in each row, leave `correction` empty to take `proposed`,
@@ -497,8 +498,8 @@ says so in `why`, and is still loaded unless deleted. Then load it, before
 the import writes any name:
 
 ```sh
-kubectl exec -i deploy/inventory -- python -m inventory_tng.unit_readings \
-  load - < readings.tsv
+kubectl exec -i deploy/inventory -- \
+  python -m inventory_tng.catalogue.unit_readings load - < readings.tsv
 ```
 
 It writes a rule for each unit, by no administrator, and says what it did,

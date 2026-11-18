@@ -9,7 +9,6 @@ from fastapi import APIRouter, Form, Request
 from fastapi.responses import HTMLResponse, Response
 from sqlalchemy.orm import Session
 
-from inventory_tng import categories
 from inventory_tng.admin.common import (
     ADMIN,
     SECTION_CATEGORIES,
@@ -20,7 +19,7 @@ from inventory_tng.admin.common import (
 )
 from inventory_tng.admin.listing import AskedView, Sort, Sorting, View, arranged
 from inventory_tng.admins.guards import AdminSignedIn, SignedIn
-from inventory_tng.catalogue import queries
+from inventory_tng.catalogue import categories, queries
 from inventory_tng.catalogue.forms import CATEGORY_TAKEN
 from inventory_tng.core.db import DbSession, refusal
 from inventory_tng.core.phrases import Words

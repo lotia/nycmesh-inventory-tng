@@ -14,7 +14,7 @@ from sqlalchemy import delete, insert, select, text, update
 from sqlalchemy.orm import Session
 from structlog.testing import capture_logs
 
-from inventory_tng import items
+from inventory_tng.catalogue import items
 from inventory_tng.core.db import set_actor
 from inventory_tng.core.history import LEDGER
 from inventory_tng.core.local_time import DEFAULT_ZONE, zone_at

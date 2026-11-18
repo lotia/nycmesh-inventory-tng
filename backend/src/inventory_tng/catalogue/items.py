@@ -46,7 +46,8 @@ from sqlalchemy import (
 from sqlalchemy.dialects.postgresql import distinct_on
 from sqlalchemy.orm import Session
 
-from inventory_tng import units
+from inventory_tng.catalogue import units
+from inventory_tng.catalogue.names import SPACES, name_key
 from inventory_tng.core.db import (
     Seen,
     enforce,
@@ -72,7 +73,6 @@ from inventory_tng.models import (
     reading_rules,
     unit_key,
 )
-from inventory_tng.names import SPACES, name_key
 
 
 def _in_current_category(session: Session, category_id: int) -> None:

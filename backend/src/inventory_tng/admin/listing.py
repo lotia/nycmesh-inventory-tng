@@ -39,7 +39,7 @@ from sqlalchemy import (
 )
 from sqlalchemy.orm import Session
 
-from inventory_tng import units
+from inventory_tng.catalogue import units
 from inventory_tng.models import (
     INTEGER_MAX,
     folds,

@@ -11,9 +11,9 @@ from markupsafe import escape
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from inventory_tng import items
 from inventory_tng.admin.items import ITEMS
 from inventory_tng.admins.accounts import name_up_to
+from inventory_tng.catalogue import items
 from inventory_tng.catalogue.forms import (
     IS_RETIRED,
     NO_LETTERS,

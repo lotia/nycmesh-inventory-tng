@@ -12,11 +12,11 @@ from fastapi.testclient import TestClient
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from inventory_tng import items, reading_rules, units
 from inventory_tng.admin.items import ITEMS
+from inventory_tng.catalogue import items, reading_rules, units
 from inventory_tng.catalogue.forms import TAKEN_FIELDS
+from inventory_tng.catalogue.reading_rules import NAMED, both
 from inventory_tng.models import Category, Item, ItemPackage
-from inventory_tng.reading_rules import NAMED, both
 
 from helpers.markup import read, text
 from helpers.rows import add, named, tag

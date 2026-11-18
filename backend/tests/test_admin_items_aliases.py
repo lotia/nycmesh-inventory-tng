@@ -10,8 +10,8 @@ from httpx2 import Response
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from inventory_tng import items
 from inventory_tng.admin.items import ITEMS, RENAMED
+from inventory_tng.catalogue import items
 from inventory_tng.catalogue.forms import (
     ALIAS_ITS_OWN,
     ALIAS_TAKEN,

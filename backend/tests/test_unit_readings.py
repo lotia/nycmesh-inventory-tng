@@ -13,7 +13,8 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 from structlog.testing import capture_logs
 
-from inventory_tng import models, reading_rules, unit_readings, units
+from inventory_tng import models
+from inventory_tng.catalogue import reading_rules, unit_readings, units
 from inventory_tng.models import Category, Item, ReadingRule, unit_key
 
 from helpers.rows import add, history, rule_of
@@ -311,7 +312,7 @@ def test_unit_readings_runs_as_a_module(
         pytest.warns(RuntimeWarning, match="found in sys.modules"),
         pytest.raises(SystemExit) as done,
     ):
-        runpy.run_module("inventory_tng.unit_readings", run_name="__main__")
+        runpy.run_module("inventory_tng.catalogue.unit_readings", run_name="__main__")
     assert done.value.code == 0
     assert "propose" in capsys.readouterr().out
 
