@@ -4,12 +4,11 @@ import { msg } from "@lingui/core/macro";
 import { type Signal, useSignal } from "@preact/signals";
 import type { TargetedSubmitEvent } from "preact";
 import { useEffect, useMemo, useRef } from "preact/hooks";
+import { type Batch, batchWords, toBatch } from "./batch";
 import { CartLine } from "./CartLine";
 import {
   addOne,
   askWho,
-  type Batch,
-  batchWords,
   type Cart,
   CartStore,
   type Catalogue,
@@ -20,7 +19,6 @@ import {
   placed,
   SIDES,
   type Side,
-  toBatch,
   withLine,
   withLineChanged,
 } from "./cart";

@@ -89,11 +89,11 @@ msgstr ""
 msgid "Shows nothing left"
 msgstr ""
 
-#: src/cart.ts
+#: src/batch.ts
 msgid "That is too much for one batch: record some, then the rest."
 msgstr ""
 
-#: src/cart.ts
+#: src/batch.ts
 msgid "({packages} said used up)"
 msgstr ""
 
@@ -141,7 +141,7 @@ msgstr ""
 msgid "Scan with the camera"
 msgstr ""
 
-#: src/cart.ts
+#: src/batch.ts
 msgid "Pick where it comes from."
 msgstr ""
 
@@ -165,11 +165,11 @@ msgstr ""
 msgid "Added back to cart. Review before Record."
 msgstr ""
 
-#: src/cart.ts
+#: src/batch.ts
 msgid "Pick where it goes."
 msgstr ""
 
-#: src/cart.ts
+#: src/batch.ts
 msgid "Move: {items} from {from} to {to}"
 msgstr ""
 
@@ -177,7 +177,7 @@ msgstr ""
 msgid "Loose units"
 msgstr ""
 
-#: src/cart.ts
+#: src/batch.ts
 msgid "Receipt: {items} to {to}"
 msgstr ""
 
@@ -197,7 +197,7 @@ msgstr ""
 msgid "{item}: type how many of which package to open."
 msgstr ""
 
-#: src/cart.ts
+#: src/batch.ts
 msgid "Install: {items} from {from} for install {number}"
 msgstr ""
 
@@ -254,7 +254,7 @@ msgstr ""
 msgid "Go back"
 msgstr ""
 
-#: src/cart.ts
+#: src/batch.ts
 msgid "What's on it: {packages} at {from}"
 msgstr ""
 
@@ -294,7 +294,7 @@ msgstr ""
 msgid "Add it to the cart, fix that, then record it."
 msgstr ""
 
-#: src/cart.ts
+#: src/batch.ts
 msgid "From and to must be different places."
 msgstr ""
 
@@ -330,7 +330,7 @@ msgstr ""
 msgid "Register this device"
 msgstr ""
 
-#: src/cart.ts
+#: src/batch.ts
 msgid "(what is on {packages} said)"
 msgstr ""
 
@@ -346,15 +346,15 @@ msgstr ""
 msgid "Added on {when} but not sent"
 msgstr ""
 
-#: src/cart.ts
+#: src/batch.ts
 msgid "That install number is out of range."
 msgstr ""
 
-#: src/cart.ts
+#: src/batch.ts
 msgid "{name}: Open whole packages: leave loose empty."
 msgstr ""
 
-#: src/cart.ts
+#: src/batch.ts
 msgid "{name}: Nothing is taken from an open package here."
 msgstr ""
 
@@ -403,7 +403,7 @@ msgstr ""
 msgid "Recorded in another tab in transaction {transaction}"
 msgstr ""
 
-#: src/cart.ts
+#: src/batch.ts
 msgid "Add something to the cart."
 msgstr ""
 
@@ -435,7 +435,7 @@ msgstr ""
 msgid "Enter how much from the open package, up to 3 decimals."
 msgstr ""
 
-#: src/cart.ts
+#: src/batch.ts
 msgid "{name}, {package}: retired: taking only, so it can't be received."
 msgstr ""
 
@@ -459,7 +459,7 @@ msgstr ""
 msgid "Something"
 msgstr ""
 
-#: src/cart.ts
+#: src/batch.ts
 msgid "{name}: That is more than the inventory can count."
 msgstr ""
 
@@ -495,7 +495,7 @@ msgstr ""
 msgid "Kept on this device {when}, not sent."
 msgstr ""
 
-#: src/cart.ts
+#: src/batch.ts
 msgid "Used up: {packages} at {from}"
 msgstr ""
 
@@ -523,7 +523,7 @@ msgstr ""
 msgid "{place}: from here, or to here?"
 msgstr ""
 
-#: src/cart.ts
+#: src/batch.ts
 msgid "An item"
 msgstr ""
 
@@ -543,7 +543,7 @@ msgstr ""
 msgid "All of it, moved still open"
 msgstr ""
 
-#: src/cart.ts
+#: src/batch.ts
 msgid "{count, plural, one {# item} other {# items}}"
 msgstr ""
 
@@ -612,7 +612,7 @@ msgctxt "state"
 msgid "open"
 msgstr ""
 
-#: src/cart.ts
+#: src/batch.ts
 msgid "{name}: enter the count"
 msgstr ""
 
@@ -633,7 +633,7 @@ msgstr ""
 msgid "Can't add these items. Please rescan."
 msgstr ""
 
-#: src/cart.ts
+#: src/batch.ts
 msgid "{name}: enter what is on the open package, in whole units, or leave it blank."
 msgstr ""
 
@@ -641,7 +641,7 @@ msgstr ""
 msgid "No answer from the inventory. Trying again shortly."
 msgstr ""
 
-#: src/cart.ts
+#: src/batch.ts
 msgid "{name}: enter what is on the open package, up to 3 decimals, or leave it blank."
 msgstr ""
 
@@ -730,7 +730,7 @@ msgstr ""
 msgid "Add these to cart"
 msgstr ""
 
-#: src/cart.ts
+#: src/batch.ts
 msgid "{name}: retired: taking only, so it can't be received."
 msgstr ""
 
@@ -783,7 +783,7 @@ msgstr ""
 msgid "<0>Register this browser</0> to send what is waiting."
 msgstr ""
 
-#: src/cart.ts
+#: src/batch.ts
 msgid "Pick your name."
 msgstr ""
 
@@ -799,7 +799,7 @@ msgstr ""
 msgid "{place}: here."
 msgstr ""
 
-#: src/cart.ts
+#: src/batch.ts
 msgid "An item in the cart is no longer in the catalogue. Remove it."
 msgstr ""
 
@@ -811,7 +811,7 @@ msgstr ""
 msgid "The label reader didn't load. Check the connection, then press Done and try again."
 msgstr ""
 
-#: src/cart.ts
+#: src/batch.ts
 msgid "An install number is digits only."
 msgstr ""
 
@@ -831,7 +831,7 @@ msgstr ""
 msgid "Enter the loose amount in {unit}, up to 3 decimals."
 msgstr ""
 
-#: src/cart.ts
+#: src/batch.ts
 msgid "Opening: {items} at {from}"
 msgstr ""
 
@@ -887,7 +887,7 @@ msgstr ""
 msgid "This {name} will be unusable after this cut, so it's ticked. Untick it if you'll keep the short end."
 msgstr ""
 
-#: src/cart.ts
+#: src/batch.ts
 msgid "{count, plural, one {# open package} other {# open packages}}"
 msgstr ""
 
@@ -895,7 +895,7 @@ msgstr ""
 msgid "Starting the camera…"
 msgstr ""
 
-#: src/cart.ts
+#: src/batch.ts
 msgid "Install: {items} from {from}"
 msgstr ""
 

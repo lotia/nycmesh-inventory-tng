@@ -1,5 +1,6 @@
 import { describe, expect, test } from "vitest";
-import { addOne, freshCart, type Item, toBatch } from "./cart";
+import { toBatch } from "./batch";
+import { addOne, freshCart, type Item } from "./cart";
 import { say } from "./i18n";
 import {
   compared,

@@ -383,7 +383,7 @@ function problemSaid({ names, kind }: Problem): Said {
 /** What a batch's summary is made from besides its body, so two batches
  * can be told apart: its places' names as the catalogue gave them when it
  * was queued, as a place may leave the catalogue. Worded as it is shown
- * (cart.ts, batchWords), in the language spoken when it is shown
+ * (batch.ts, batchWords), in the language spoken when it is shown
  * (inventory-tng-ar8). */
 export const Summary = v.object({
   from: v.nullable(v.string()),
@@ -489,7 +489,7 @@ export function lineNumbers(
 }
 
 /** A 422's problems, as kept. A line of the cart may be sent as several,
- * one for each package and one loose (cart.ts, toBatch), so a line is
+ * one for each package and one loose (batch.ts, toBatch), so a line is
  * named as the cart's: by its item's place in it. */
 function problems(
   detail: v.InferOutput<typeof ValidationFailed>["detail"],

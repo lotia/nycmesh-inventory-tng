@@ -458,7 +458,7 @@ build's, whichever tab sends it. Why a batch was refused, or waits, is
 kept as a code with its data (`outbox.Reason`), and what a batch's summary
 says as what it is made from, with its places named as when it was queued
 (`outbox.Summary`), never in words: the page makes the words as it shows
-them (`noteOf`, `cart.batchWords`), so they follow the language spoken and
+them (`noteOf`, `batch.batchWords`), so they follow the language spoken and
 can change without a new key. Only older keys hold words, which
 `older.ts` reads for their code and shows as kept.
 
@@ -572,7 +572,7 @@ takes it only if nothing holds the key after all, and the one refused
 Either way the page says nothing is sending and counts no save: the list
 shows what became of it. An opening's open packages take keys made from
 the cart's, so the same opening recorded again is the same batch
-(`cart.openings`).
+(`batch.openings`).
 
 A refused save in the outbox's list lists its lines, in the words of the
 older list, each item numbered as the refusal's "Line n" names it. While

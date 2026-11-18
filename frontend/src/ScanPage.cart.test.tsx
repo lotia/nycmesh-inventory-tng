@@ -6,6 +6,7 @@ import {
   within,
 } from "@testing-library/preact";
 import { describe, expect, type MockInstance, test, vi } from "vitest";
+import { ITEMS, MOVE, PICK_FROM, PICK_TO, PICK_YOUR_NAME } from "./batch";
 import {
   CHANGED_BEFORE_DISCARD,
   DISCARD_CART,
@@ -22,12 +23,7 @@ import { REMOVE } from "./CartLine";
 import {
   STORAGE_KEY as CART_KEY,
   freshCart,
-  ITEMS,
   KIND_WORDS,
-  MOVE,
-  PICK_FROM,
-  PICK_TO,
-  PICK_YOUR_NAME,
   storeCart,
 } from "./cart";
 import { FIND } from "./Finder";
@@ -819,7 +815,7 @@ describe("filling and saving a cart", () => {
   });
 
   test("a cart's problem puts in italic the counts the page wrote, even where a name is the same number", async () => {
-    // The cart names what it quotes (cart.ts, toBatch), so the page's "3"
+    // The cart names what it quotes (batch.ts, toBatch), so the page's "3"
     // is not taken for the name "3" (inventory-tng-wyq).
     const named = {
       ...CATALOGUE,

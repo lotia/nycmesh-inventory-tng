@@ -28,6 +28,7 @@ import { msg } from "@lingui/core/macro";
 import { type Signal, signal } from "@preact/signals";
 import * as v from "valibot";
 import { id } from "./api/replies";
+import { toBatch } from "./batch";
 import {
   STORAGE_KEY as CART_KEY,
   type Cart,
@@ -39,7 +40,6 @@ import {
   type Kind,
   type Line,
   reconcile,
-  toBatch,
 } from "./cart";
 import { say } from "./i18n";
 import {

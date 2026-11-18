@@ -2,7 +2,8 @@
 import { msg } from "@lingui/core/macro";
 import { useSignal } from "@preact/signals";
 import { useEffect, useMemo } from "preact/hooks";
-import { batchWords, type Catalogue } from "./cart";
+import { batchWords } from "./batch";
+import type { Catalogue } from "./cart";
 import { say, sayParts } from "./i18n";
 import {
   AlertWords,
