@@ -36,7 +36,6 @@ import {
   holdsSome,
   ITEM_SAYS,
   type Item,
-  indexOf,
   type Kind,
   type Line,
   reconcile,
@@ -56,6 +55,7 @@ import {
   type Said,
 } from "./outbox";
 import { count, decimal, thousandths } from "./quantity";
+import { indexOf } from "./search";
 import {
   hasStored,
   olderKeys,

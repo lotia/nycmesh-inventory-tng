@@ -3,7 +3,7 @@ import type { MessageDescriptor } from "@lingui/core";
 import { msg } from "@lingui/core/macro";
 import { useSignal } from "@preact/signals";
 import { useEffect, useMemo, useRef } from "preact/hooks";
-import { type Catalogue, indexOf, KIND_WORDS, type Kind } from "./cart";
+import { type Catalogue, KIND_WORDS, type Kind } from "./cart";
 import { say } from "./i18n";
 import {
   AlertWords,
@@ -22,6 +22,7 @@ import {
   withRetired,
 } from "./older";
 import { MAKE_CHANGES } from "./outbox";
+import { indexOf } from "./search";
 import { type Event as Reported, telemetry } from "./telemetry";
 
 /** An older build's cart, filled for each kind (olderKind). */

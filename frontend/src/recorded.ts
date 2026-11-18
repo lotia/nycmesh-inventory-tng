@@ -13,7 +13,7 @@
 import type { MessageDescriptor } from "@lingui/core";
 import { msg } from "@lingui/core/macro";
 import { v5 as uuidFrom } from "uuid";
-import { type Catalogue, ITEM_SAYS, type Item, indexOf } from "./cart";
+import { type Catalogue, ITEM_SAYS, type Item } from "./cart";
 import { say, sayParts } from "./i18n";
 import {
   FROM_OPEN,
@@ -35,6 +35,7 @@ import {
   type Said,
 } from "./outbox";
 import { decimal, thousandths } from "./quantity";
+import { indexOf } from "./search";
 
 type Line = Body["lines"][number];
 

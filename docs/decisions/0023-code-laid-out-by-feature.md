@@ -216,6 +216,8 @@ The frontend's moves, both under `frontend/src/`, sorted the same way:
 
 | Old path | New path |
 | --- | --- |
+| `cart.test.ts`: its tests of search (`finding`) | `search.test.ts` |
+| `cart.ts`: `search` and `bares`, with the lookups worked out once per catalogue that search reads (`indexOf`, `Named`) | `search.ts` |
 | `ScanPage.tsx`: `CartForm`, with `Place`, `PlaceSides` and `CHECK_EVERY_MS` | `CartForm.tsx` |
 | `ScanPage.tsx`: `CartLine` | `CartLine.tsx` |
 | `ScanPage.tsx`: `Finder` | `Finder.tsx` |

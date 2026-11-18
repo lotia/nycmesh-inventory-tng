@@ -14,7 +14,6 @@ import {
   CartStore,
   type Catalogue,
   freshCart,
-  indexOf,
   KIND_WORDS,
   type Kind,
   offered,
@@ -60,6 +59,7 @@ import {
 } from "./outbox";
 import { differenceOf } from "./recorded";
 import { Scanner } from "./Scanner";
+import { indexOf } from "./search";
 import { MOST_SECONDS_TO_SAVE, telemetry } from "./telemetry";
 
 /** How often an open page checks whether to ask whose name it is, and

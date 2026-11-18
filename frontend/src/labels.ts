@@ -2,14 +2,8 @@
  * What a label scanned with the camera names (docs/decisions/0015): its QR
  * code holds the label's code alone, as a scanner gun types it.
  */
-import {
-  type Cart,
-  type Catalogue,
-  indexOf,
-  type Named,
-  SIDES,
-  type Side,
-} from "./cart";
+import { type Cart, type Catalogue, SIDES, type Side } from "./cart";
+import { indexOf, type Named } from "./search";
 
 export type Scanned = Named | { kind: "unknown"; code: string };
 
