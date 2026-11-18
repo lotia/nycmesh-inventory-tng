@@ -137,8 +137,10 @@ deployed, so the migrations may be rewritten (0016).
   1,165 m. An item's open packages and short ends at a place are each
   listed by the scan page's rule: fewest left first (Ali, 2026-11-18).
   Its sealed packages are listed largest package size first, ties by
-  package id, so the same records always show the same order; the
-  reorder page lists those low on sealed the same way (Ali, 2026-11-18).
+  package id, so the same records always show the same order (Ali,
+  2026-11-18). The reorder page lists those low on sealed the same way,
+  so the two pages agree (chosen when that was built, 2026-11-18, for
+  Ali to confirm).
 - **Reorder** compares usable stock in stores with the item's reorder
   point.
 - **Minimum sealed**: a package may set an optional minimum of sealed

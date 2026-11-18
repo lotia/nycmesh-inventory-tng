@@ -71,14 +71,19 @@ def test_an_items_sealed_packages_are_ordered_largest_first() -> None:
         drum: open_packages.PackageSize("Drum", Decimal(305), None),
         SPOOL: open_packages.PackageSize("Spool", Decimal(305), None),
     }
-    rows = [(package_id, None, Decimal(610)) for package_id in packages]
+    rows = [
+        (BOX, None, Decimal(200)),
+        (pack, None, Decimal(300)),
+        (drum, None, Decimal(610)),
+        (SPOOL, None, Decimal(915)),
+    ]
     for arrived in (rows, rows[::-1], rows[1:] + rows[:1]):
         forms = open_packages.split(arrived, packages, {})
-        assert [name for name, _, _ in forms.sealed] == [
-            "Spool",
-            "Drum",
-            "Pack",
-            "Box",
+        assert forms.sealed == [
+            ("Spool", 3, Decimal(915)),
+            ("Drum", 2, Decimal(610)),
+            ("Pack", 3, Decimal(300)),
+            ("Box", 2, Decimal(200)),
         ]
 
 
