@@ -1,12 +1,13 @@
 """How the counts pages' forms are read and checked: a place's count, its
 lines by item and by form, and an adjustment, and what is wrong, in
 words, beside the field it is about; and those of lines recorded with
-more than was moved. The handlers in admin/counts.py and
-admin/over_recorded.py read the request and pass the form's fields."""
+more than was moved, and of lengths to check. The handlers in
+admin/counts.py, admin/over_recorded.py and admin/length_checks.py read
+the request and pass the form's fields."""
 
 import uuid
 from collections.abc import Collection, Mapping, Sequence
-from decimal import Decimal
+from decimal import Decimal, InvalidOperation
 from typing import NamedTuple
 
 from sqlalchemy.orm import Session
@@ -295,3 +296,31 @@ def why_problem(reason: str, words: str) -> Words | None:
     if len(words) > OVER_RECORDED_WORDS_MAX:
         return up_to(OVER_RECORDED_WORDS_MAX)
     return None
+
+
+def length(session: Session, item_id: int, typed: str) -> Decimal | str | None:
+    """What is on an open package of an item, as typed to set its length,
+    in the item's unit, or what is wrong with it."""
+    unit = session.get_one(Item, item_id).unit
+    return quantity(typed, positive=False, unit=unit)
+
+
+def showed(typed: str) -> Decimal | None:
+    """What a package showed on the page, as it sent it back, below zero
+    too; None if it sent none it could have."""
+    try:
+        found = Decimal(typed)
+    except InvalidOperation:
+        return None
+    return found if found.is_finite() else None
+
+
+def ticked(boxes: Sequence[str]) -> dict[int, str]:
+    """The open packages ticked, each box's id and what was seen of its
+    check, "id seen", by id."""
+    return {
+        open_id: seen
+        for each in boxes
+        for typed, _, seen in [each.partition(" ")]
+        if (open_id := row_id(typed)) is not None
+    }

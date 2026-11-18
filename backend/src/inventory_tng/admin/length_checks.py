@@ -11,7 +11,7 @@ import uuid
 from collections.abc import Collection, Sequence
 from dataclasses import replace
 from datetime import datetime
-from decimal import Decimal, InvalidOperation
+from decimal import Decimal
 from typing import Annotated, NamedTuple
 
 import structlog
@@ -48,8 +48,7 @@ from inventory_tng.models import (
     whole,
 )
 from inventory_tng.pages import NOTICES, not_found, redirect
-from inventory_tng.stock import queries
-from inventory_tng.web.forms import quantity, row_id
+from inventory_tng.stock import forms, queries
 
 log = structlog.get_logger(__name__)
 
@@ -332,16 +331,6 @@ def _set(
     return broken is None, below, closed
 
 
-def _showed(typed: str) -> Decimal | None:
-    """What a package showed on the page, as it sent it back, below zero
-    too; None if it sent none it could have."""
-    try:
-        found = Decimal(typed)
-    except InvalidOperation:
-        return None
-    return found if found.is_finite() else None
-
-
 def _back(view: View, sent: str) -> View:
     """The page an answer came from, to go back to, this one or a kind's
     (`sent`), as it was: its item, sort, page size and page."""
@@ -420,8 +409,7 @@ def set_one(
     if row is None:
         return not_found()
     back = _back(view, page)
-    unit = session.get_one(Item, row.item_id).unit
-    length = quantity(left, positive=False, unit=unit)
+    length = forms.length(session, row.item_id, left)
     if not isinstance(length, Decimal):
         return redirect(back.link(), notice="length_bad")
     # The volunteer's figure, as the box is filled, is set against what it
@@ -429,7 +417,7 @@ def set_one(
     if row.length_reported_in_id is not None and length == row.length_reported:
         answer = Answer(open_id, seen, length, as_of=row.length_reported_in_id)
     else:
-        shown, moment = _showed(showed), whole(as_of, 0, INTEGER_MAX)
+        shown, moment = forms.showed(showed), whole(as_of, 0, INTEGER_MAX)
         if shown is None or moment is None:
             log.info(
                 "length not set: the form said not what it showed",
@@ -470,12 +458,7 @@ def answer_ticked(
     what was seen of its check, "id seen"."""
     if do not in ("set", "leave"):
         return not_found()
-    ticked = {
-        open_id: seen
-        for each in open_package
-        for typed, _, seen in [each.partition(" ")]
-        if (open_id := row_id(typed)) is not None
-    }
+    ticked = forms.ticked(open_package)
     back = _back(view, page)
     if not ticked:
         return redirect(back.link(), notice="length_none")
