@@ -14,7 +14,6 @@ from sqlalchemy.orm import Session
 
 from inventory_tng.admins import accounts
 from inventory_tng.admins.guards import (
-    ACCOUNT,
     ACCOUNT_TITLE,
     CONFIRM_FIELD,
     NAME_TAKEN,
@@ -26,6 +25,7 @@ from inventory_tng.admins.guards import (
     changed,
     signed_out,
 )
+from inventory_tng.admins.paths import ACCOUNT
 from inventory_tng.core import mail
 from inventory_tng.core.db import DbSession, unique
 from inventory_tng.core.local_time import site_zone

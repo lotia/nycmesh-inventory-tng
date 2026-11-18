@@ -26,9 +26,16 @@ from inventory_tng.core.phrases import (
     ngettext,
 )
 from inventory_tng.devices import devices, forms, queries
+from inventory_tng.devices.paths import (
+    BULK_REVOKE,
+    CODES,
+    DEVICE,
+    DEVICE_LIST,
+    DEVICES,
+    REGISTER_PATH,
+)
 from inventory_tng.models import Device, RegistrationCode
 from inventory_tng.web.admin import (
-    ADMIN,
     SECTION_DEVICES,
     admin_page,
     now,
@@ -51,9 +58,6 @@ from inventory_tng.web.pages import NOTICES, not_found, redirect
 log = structlog.get_logger(__name__)
 
 router = APIRouter(include_in_schema=False)
-
-DEVICES = f"{ADMIN}/devices"
-CODES = f"{DEVICES}/codes"
 
 State = Literal["open", "expired", "used up", "revoked"]
 
@@ -195,7 +199,7 @@ def make_code(
         label=label or None,
     )
     changed(signed, session)
-    link = site_link(request, devices.REGISTER_PATH, code=phrase)
+    link = site_link(request, REGISTER_PATH, code=phrase)
     return admin_page(
         request,
         signed,
@@ -206,7 +210,7 @@ def make_code(
             "code": code,
             "phrase": phrase,
             "link": link,
-            "register": site_link(request, devices.REGISTER_PATH),
+            "register": site_link(request, REGISTER_PATH),
             "qr": qr_svg(link),
             "zone": site_zone(session),
         },
@@ -265,12 +269,6 @@ def revoke_code(signed: ConfirmedAdmin, session: DbSession, code_id: int) -> Res
         return not_found()
     changed(signed, session)
     return redirect(f"{CODES}/{code_id}", notice="code_revoked")
-
-
-# A device's own page (inventory-tng-8i4.60.13): what is known of it, its
-# name, and revoking it alone, after a confirmation. `:int`, so the list's
-# own paths under DEVICES are never taken for a device's.
-DEVICE = f"{DEVICES}/{{device_id:int}}"
 
 
 def _device_page(
@@ -376,10 +374,6 @@ def revoke_device(
 # Every device, filtered, and revoking many at once (inventory-tng-ph9): after
 # a compromise, the devices registered since, with codes the compromised
 # administrators made, are the ones to look at.
-
-DEVICE_LIST = f"{DEVICES}/all"
-# Not under DEVICE_LIST: {DEVICES}/{device_id}/revoke would take it.
-BULK_REVOKE = f"{DEVICES}/revoke"
 
 DEVICES_REVOKED = lazy_gettext("Revoked: they can't save anything now.")
 NOTICES["devices_revoked"] = DEVICES_REVOKED

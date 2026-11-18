@@ -16,9 +16,8 @@ from sqlalchemy.orm import Session
 
 from inventory_tng.admins.guards import AdminSignedIn, SignedIn
 from inventory_tng.catalogue import forms, items, queries, reading_rules, units
-from inventory_tng.catalogue.categories_routes import CATEGORIES
+from inventory_tng.catalogue.paths import CATEGORIES, ITEMS, READINGS
 from inventory_tng.catalogue.reading_rules import NOT_A_UNIT
-from inventory_tng.catalogue.reading_rules_routes import READINGS
 from inventory_tng.core.db import DbSession, exists_where, refusal
 from inventory_tng.core.local_time import site_zone
 from inventory_tng.core.phrases import Words, lazy_gettext
@@ -39,7 +38,6 @@ from inventory_tng.models import reading_rules as rules_held
 from inventory_tng.stock import open_packages
 from inventory_tng.stock import queries as stock_queries
 from inventory_tng.web.admin import (
-    ADMIN,
     SECTION_ITEMS,
     admin_page,
     now,
@@ -62,7 +60,6 @@ meter = metrics.get_meter(__name__)
 
 router = APIRouter(include_in_schema=False)
 
-ITEMS = f"{ADMIN}/items"
 # Refused by _change_or_note, as a rule would be, to ask about close names.
 CLOSE = "close_names"
 # The rules a change to an item may break, besides "unique", and the field

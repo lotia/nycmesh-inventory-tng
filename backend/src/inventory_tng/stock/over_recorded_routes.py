@@ -35,7 +35,6 @@ from inventory_tng.models import (
 from inventory_tng.places import locations
 from inventory_tng.places.routes import changeable
 from inventory_tng.stock import balance, ledger, over_recorded
-from inventory_tng.stock.counts_routes import COUNTS
 from inventory_tng.stock.forms import confirmed_count, why_problem
 from inventory_tng.stock.needs_action import (
     ItemWaiting,
@@ -44,8 +43,8 @@ from inventory_tng.stock.needs_action import (
     query,
     query_string,
 )
-from inventory_tng.stock.stock_routes import RECORDED_MORE as OVER_RECORDED
-from inventory_tng.stock.stock_routes import RECORDED_MORE_SETTLED, STOCK
+from inventory_tng.stock.paths import COUNTS, RECORDED_MORE_SETTLED, STOCK
+from inventory_tng.stock.paths import RECORDED_MORE as OVER_RECORDED
 from inventory_tng.web.admin import SECTION_STOCK, SETTLED_VIEW, admin_page
 from inventory_tng.web.forms import row_id, rule_words
 from inventory_tng.web.listing import (

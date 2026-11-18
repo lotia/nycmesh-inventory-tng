@@ -7,9 +7,9 @@ from fastapi.testclient import TestClient
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from inventory_tng.admins import guards
-from inventory_tng.catalogue.categories_routes import CATEGORIES
+from inventory_tng.admins import paths
 from inventory_tng.catalogue.forms import CATEGORY_TAKEN
+from inventory_tng.catalogue.paths import CATEGORIES
 from inventory_tng.models import Admin, Category, Item
 from inventory_tng.web.forms import RULES
 
@@ -22,7 +22,7 @@ pytestmark = pytest.mark.usefixtures("admin_client")
 def test_the_pages_need_signing_in(make_client: Callable[..., TestClient]) -> None:
     answer = make_client().get(CATEGORIES)
     assert answer.status_code == 303
-    assert answer.headers["location"].startswith(guards.SIGN_IN)
+    assert answer.headers["location"].startswith(paths.SIGN_IN)
 
 
 def test_the_home_page_leads_here(admin_client: TestClient) -> None:

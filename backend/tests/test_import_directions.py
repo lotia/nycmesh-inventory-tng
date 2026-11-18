@@ -54,6 +54,7 @@ ROUTE_NAMES = {"routes.py", "api.py"}
 # like.
 QUERY_CALLS = {"select", "execute", "scalar", "scalars"}
 MANAGE = "manage.py"
+PATHS = "paths.py"
 
 # What one module breaks a rule with, given its tree, its path under SOURCE
 # and the app's modules by that path.
@@ -84,27 +85,16 @@ BREAKS: dict[str, dict[str, list[str]]] = {
             "stock/used_up_routes.py",
             "volunteers/routes.py",
         ],
-        "admins/home_routes.py": [
-            "catalogue/categories_routes.py",
-            "catalogue/items_routes.py",
-            "places/routes.py",
-            "stock/counts_routes.py",
-            "volunteers/routes.py",
-        ],
-        "labels/routes.py": ["catalogue/items_routes.py", "places/routes.py"],
-        "stock/counts_routes.py": [
-            "catalogue/items_routes.py",
-            "site_settings/routes.py",
-        ],
+        "stock/counts_routes.py": ["catalogue/items_routes.py"],
         "stock/over_recorded_routes.py": ["places/routes.py"],
         "stock/stock_routes.py": ["catalogue/items_routes.py"],
-        "stock/used_up_routes.py": ["catalogue/items_routes.py"],
         "web/security_headers.py": ["scan/page_telemetry.py"],
     },
     "init_not_empty": {
         "admin/__init__.py": ["Assign", "For", "ImportFrom"],
     },
     "command_imported_outside_manage": {},
+    "paths_import_more_than_core_and_paths": {},
 }
 
 
@@ -289,6 +279,20 @@ def command_imported_outside_manage(
     ]
 
 
+def paths_import_more_than_core_and_paths(
+    tree: ast.Module, path: str, known: Collection[str]
+) -> list[str]:
+    """A paths.py, which any page may import for its links, imports only
+    core and other paths.py, so importing it loads no page."""
+    if Path(path).name != PATHS:
+        return []
+    return [
+        module
+        for module in imported(tree, path, known)
+        if not is_core(module) and Path(module).name != PATHS
+    ]
+
+
 CHECKS: dict[str, Check] = {
     check.__name__: check
     for check in (
@@ -298,6 +302,7 @@ CHECKS: dict[str, Check] = {
         routes_import_another_features_routes,
         init_not_empty,
         command_imported_outside_manage,
+        paths_import_more_than_core_and_paths,
     )
 }
 
@@ -546,3 +551,29 @@ def test_a_command_imported_outside_manage_is_found(
         "dev/command.py",
     }
     assert command_imported_outside_manage(ast.parse(source), path, known) == breaks
+
+
+@pytest.mark.parametrize(
+    ("path", "source", "breaks"),
+    [
+        ("catalogue/paths.py", "from inventory_tng.web.paths import ADMIN", []),
+        ("stock/paths.py", "from ..catalogue.paths import ITEMS", []),
+        ("catalogue/paths.py", "from inventory_tng.core import settings", []),
+        (
+            "catalogue/paths.py",
+            "from inventory_tng.web.pages import templates",
+            ["web/pages.py"],
+        ),
+        ("stock/paths.py", "from ..catalogue import routes", ["catalogue/routes.py"]),
+        ("catalogue/paths.py", "from inventory_tng import models", ["models.py"]),
+        # Not a paths.py.
+        ("catalogue/routes.py", "from inventory_tng.web.pages import x", []),
+    ],
+)
+def test_paths_importing_more_than_core_and_paths_is_found(
+    path: str, source: str, breaks: list[str]
+) -> None:
+    known = {*KNOWN, "catalogue/paths.py", "web/paths.py"}
+    assert (
+        paths_import_more_than_core_and_paths(ast.parse(source), path, known) == breaks
+    )

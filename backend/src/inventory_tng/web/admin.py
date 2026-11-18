@@ -27,10 +27,6 @@ from inventory_tng.models import (
 from inventory_tng.web.forms import NAME_MAX, row_id
 from inventory_tng.web.pages import NOTICES, page, templates
 
-ADMIN = "/admin"
-ADMINS = f"{ADMIN}/admins"
-LABELS = f"{ADMIN}/labels"
-
 _globals = cast(dict[str, Any], templates.env.globals)
 _globals["name_max"] = NAME_MAX
 

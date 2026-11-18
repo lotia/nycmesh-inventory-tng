@@ -19,7 +19,7 @@ from fastapi.testclient import TestClient
 from httpx2 import Response
 from structlog.testing import capture_logs
 
-from inventory_tng.admins import guards
+from inventory_tng.admins import paths
 from inventory_tng.core.local_env import CLONE
 from inventory_tng.core.settings import FrontendConfig, RateLimits
 from inventory_tng.scan.bundle import MANIFEST
@@ -121,7 +121,7 @@ def test_a_signed_in_page_is_protected(admin_client: TestClient) -> None:
 def test_a_refused_secret_field_is_protected(admin_client: TestClient) -> None:
     """The confirm page's refusal of a secret field (inventory-tng-2qy6)."""
     form = {"email": "ada@example.org", "api_token": "hunter2"}
-    response = admin_client.post(f"{guards.ACCOUNT}/email", data=form)
+    response = admin_client.post(f"{paths.ACCOUNT}/email", data=form)
     assert response.status_code == 400
     assert_protected(response)
 

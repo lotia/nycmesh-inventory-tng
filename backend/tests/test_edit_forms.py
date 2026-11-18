@@ -10,8 +10,7 @@ import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
 
-from inventory_tng.catalogue.categories_routes import CATEGORIES
-from inventory_tng.catalogue.items_routes import ITEMS
+from inventory_tng.catalogue.paths import CATEGORIES, ITEMS
 from inventory_tng.core.db import Base
 from inventory_tng.models import (
     AdjustmentReason,
@@ -23,9 +22,9 @@ from inventory_tng.models import (
     SiteSettings,
     Volunteer,
 )
-from inventory_tng.places.routes import LOCATIONS
-from inventory_tng.site_settings.routes import SETTINGS
-from inventory_tng.volunteers.routes import VOLUNTEERS
+from inventory_tng.places.paths import LOCATIONS
+from inventory_tng.site_settings.paths import SETTINGS
+from inventory_tng.volunteers.paths import VOLUNTEERS
 from inventory_tng.web.forms import CHANGED, RULES
 
 from helpers.markup import text

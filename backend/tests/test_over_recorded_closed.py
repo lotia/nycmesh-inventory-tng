@@ -18,8 +18,8 @@ from inventory_tng.core.db import RuleBroken
 from inventory_tng.core.local_time import show_day, site_zone
 from inventory_tng.models import LedgerTransaction, Movement, OpenPackage, OverRecorded
 from inventory_tng.stock import ledger, open_packages, over_recorded
-from inventory_tng.stock.counts_routes import COUNTS
 from inventory_tng.stock.ledger import Entry, Form
+from inventory_tng.stock.paths import COUNTS
 
 from helpers.concurrency import Committed
 from helpers.markup import links

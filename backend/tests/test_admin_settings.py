@@ -16,7 +16,7 @@ from inventory_tng.models import (
     SiteSettings,
 )
 from inventory_tng.site_settings.forms import whole_minutes
-from inventory_tng.site_settings.routes import SETTINGS
+from inventory_tng.site_settings.paths import SETTINGS
 from inventory_tng.web.forms import PICK_A_ZONE
 
 from helpers.mail import SentMail

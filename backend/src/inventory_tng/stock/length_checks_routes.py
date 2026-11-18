@@ -38,7 +38,7 @@ from inventory_tng.stock.needs_action import (
     of_only,
     query,
 )
-from inventory_tng.stock.stock_routes import STOCK
+from inventory_tng.stock.paths import LENGTHS, STOCK
 from inventory_tng.stock.used_up_routes import BY_PACKAGE, BY_SHOWS
 from inventory_tng.web.admin import (
     SECTION_STOCK,
@@ -52,8 +52,6 @@ from inventory_tng.web.pages import NOTICES, not_found, redirect
 log = structlog.get_logger(__name__)
 
 router = APIRouter(include_in_schema=False)
-
-LENGTHS = f"{STOCK}/length-checks"
 
 LENGTH_SET = lazy_gettext(
     "Set: a count of each writes the difference from what it showed then; "

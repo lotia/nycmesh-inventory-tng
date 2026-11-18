@@ -20,19 +20,18 @@ from inventory_tng.admins import accounts, activity, queries
 from inventory_tng.admins.forms import OWN_RESET, OWN_RETIRE, TAKEN, invite_problems
 from inventory_tng.admins.guards import (
     CONFIRM_FIELD,
-    RESET,
     AdminSignedIn,
     ConfirmedAccountChange,
     SignedIn,
     changed,
 )
+from inventory_tng.admins.paths import ADMINS, RESET
 from inventory_tng.core.db import DbSession, attempt
 from inventory_tng.core.local_time import site_zone
 from inventory_tng.core.mail import Notify
 from inventory_tng.core.phrases import Words, gettext, lazy_gettext
 from inventory_tng.models import Admin
 from inventory_tng.web.admin import (
-    ADMINS,
     SECTION_ADMINS,
     admin_page,
     now,

@@ -21,7 +21,7 @@ from inventory_tng.catalogue.forms import (
     TAKEN,
     TAKEN_FIELDS,
 )
-from inventory_tng.catalogue.items_routes import ITEMS
+from inventory_tng.catalogue.paths import ITEMS
 from inventory_tng.core.local_time import DEFAULT_ZONE
 from inventory_tng.models import (
     Category,

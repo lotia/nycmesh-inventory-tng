@@ -17,7 +17,7 @@ from inventory_tng.catalogue.forms import (
     TAKEN_FIELDS,
     read_as_one,
 )
-from inventory_tng.catalogue.items_routes import ITEMS
+from inventory_tng.catalogue.paths import ITEMS
 from inventory_tng.catalogue.reading_rules import NAMED, both
 from inventory_tng.models import Category, Item, ItemPackage, ReadingRule
 

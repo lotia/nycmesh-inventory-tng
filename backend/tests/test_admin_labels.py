@@ -12,7 +12,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from inventory_tng.admins.accounts import qr_svg
-from inventory_tng.catalogue.items_routes import ITEMS
+from inventory_tng.catalogue.paths import ITEMS
 from inventory_tng.labels import labels
 from inventory_tng.labels.labels import (
     INACTIVE_WORDS,
@@ -20,7 +20,8 @@ from inventory_tng.labels.labels import (
     package_label,
     place_words,
 )
-from inventory_tng.labels.routes import PICK_LABELS, PRINT
+from inventory_tng.labels.paths import LABELS, PRINT
+from inventory_tng.labels.routes import PICK_LABELS
 from inventory_tng.models import (
     Category,
     Item,
@@ -29,9 +30,8 @@ from inventory_tng.models import (
     Location,
     Volunteer,
 )
-from inventory_tng.places.routes import LOCATIONS
+from inventory_tng.places.paths import LOCATIONS
 from inventory_tng.scan.catalogue_api import catalogue
-from inventory_tng.web.admin import LABELS
 from inventory_tng.web.listing import PER_PAGE
 
 from helpers.markup import (

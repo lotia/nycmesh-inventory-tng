@@ -30,8 +30,8 @@ from inventory_tng.models import (
 )
 from inventory_tng.places import locations
 from inventory_tng.site_settings.forms import REASON_TAKEN
-from inventory_tng.site_settings.routes import SETTINGS
-from inventory_tng.stock.counts_routes import ADJUSTMENTS, COUNT_KIND, COUNTS
+from inventory_tng.site_settings.paths import SETTINGS
+from inventory_tng.stock.counts_routes import COUNT_KIND
 from inventory_tng.stock.forms import (
     FOUND_OR_OFF,
     ON_THE_FORM_TWICE,
@@ -49,7 +49,7 @@ from inventory_tng.stock.ledger import (
     record_adjustment,
     record_count,
 )
-from inventory_tng.stock.stock_routes import STOCK
+from inventory_tng.stock.paths import ADJUSTMENTS, COUNTS, STOCK
 from inventory_tng.web.forms import ABOVE_ZERO, RULES, TYPE_A_NUMBER, WHOLE_UNITS
 from inventory_tng.web.pages import retired_holding
 

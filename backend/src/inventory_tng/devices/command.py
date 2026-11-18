@@ -23,6 +23,7 @@ from inventory_tng.core.command import run_command
 from inventory_tng.core.db import CLI_ACTOR, set_actor
 from inventory_tng.core.local_time import show, site_zone
 from inventory_tng.devices import devices
+from inventory_tng.devices.paths import REGISTER_PATH
 
 
 def main(argv: Sequence[str] | None = None, prog: str | None = None) -> int:
@@ -75,7 +76,7 @@ def run(session: Session, args: argparse.Namespace) -> int:
             print(f"Code {code.id}, until {show(code.expires_at, site_zone(session))}")
             print(f"Phrase: {phrase}")
             if args.base_url:
-                link = args.base_url.rstrip("/") + devices.REGISTER_PATH
+                link = args.base_url.rstrip("/") + REGISTER_PATH
                 link += "?" + urlencode({"code": phrase})
                 print(f"Link: {link}")
                 segno.make(link).terminal(compact=True)

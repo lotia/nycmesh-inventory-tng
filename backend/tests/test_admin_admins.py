@@ -14,7 +14,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 from structlog.testing import capture_logs
 
-from inventory_tng.admins import accounts, activity, guards
+from inventory_tng.admins import accounts, activity, guards, paths
 from inventory_tng.admins.accounts import NOT_AN_EMAIL, qr_svg, username_problem
 from inventory_tng.admins.forms import OWN_RESET, OWN_RETIRE, TAKEN
 from inventory_tng.admins.routes import ADMINS
@@ -60,9 +60,9 @@ def assert_sign_in_was_reset(
         "password": NEW_PASSWORD,
         "password_again": NEW_PASSWORD,
     }
-    assert theirs.post(guards.RESET, data=form).status_code == 303
+    assert theirs.post(paths.RESET, data=form).status_code == 303
     assert sign_in_with(theirs, admin.username, NEW_PASSWORD).status_code == 303
-    assert theirs.get(guards.HOME).headers["location"] == guards.NEW_AUTHENTICATOR
+    assert theirs.get(paths.HOME).headers["location"] == paths.NEW_AUTHENTICATOR
 
 
 def test_inviting_an_administrator(
@@ -76,7 +76,7 @@ def test_inviting_an_administrator(
     assert made.status_code == 200
     assert made.headers["cache-control"] == "no-store"
     link = link_on(made.text)
-    assert f"{guards.RESET}?token=" in link
+    assert f"{paths.RESET}?token=" in link
     grace = admin_named(session, "grace")
     assert not accounts.has_password(session, grace.id)
     assert "No password yet: they choose one with the link" in text(
@@ -90,9 +90,9 @@ def test_inviting_an_administrator(
         "password": NEW_PASSWORD,
         "password_again": NEW_PASSWORD,
     }
-    assert theirs.post(guards.RESET, data=form).status_code == 303
+    assert theirs.post(paths.RESET, data=form).status_code == 303
     assert sign_in_with(theirs, "grace", NEW_PASSWORD).status_code == 303
-    assert theirs.get(guards.HOME).headers["location"] == guards.NEW_AUTHENTICATOR
+    assert theirs.get(paths.HOME).headers["location"] == paths.NEW_AUTHENTICATOR
     # Told they were invited; not warned that their first password "changed".
     assert [m.kind for m in sent_mail] == ["invited"]
     assert sent_mail[0] == mail.invited("grace@example.org", grace.id)
@@ -154,12 +154,12 @@ def test_resetting_another_admins_sign_in(
     accounts.make_recovery_codes(session, ben.id, datetime.now(UTC))
     theirs = make_client(client.app, address="192.0.2.71")
     assert sign_in_with(theirs, "ben", key=ben_key).status_code == 303
-    assert theirs.get(guards.HOME).status_code == 200
+    assert theirs.get(paths.HOME).status_code == 200
     emailed = accounts.emailed_reset(session, "ben", datetime.now(UTC))
     assert emailed is not None
     made = client.post(f"{ADMINS}/{ben.id}/reset", data=with_code(session))
     assert [m.kind for m in sent_mail] == ["reset_link_made"]
-    assert theirs.get(guards.HOME).headers["location"].startswith(guards.SIGN_IN)
+    assert theirs.get(paths.HOME).headers["location"].startswith(paths.SIGN_IN)
     now = datetime.now(UTC)
     assert accounts.current_sessions(session, ben.id, now) == []
     assert accounts.find_reset_link(session, emailed.token, now) is None
@@ -510,13 +510,13 @@ def test_since_you_last_signed_in(
     carol, _ = new_admin(session, "carol")
     theirs = make_client(address="192.0.2.80")
     assert sign_in_with(theirs, "ben", key=ben_key).status_code == 303
-    assert "Since you last signed in" not in text(theirs.get(guards.HOME))
+    assert "Since you last signed in" not in text(theirs.get(paths.HOME))
     now = datetime.now(UTC)
     accounts.retire_admin(session, carol.id, ada.id, now, NO_MAIL)
     accounts.restore_admin(session, carol.id, ben.id, now, NO_MAIL)
     later = make_client(address="192.0.2.81")
     assert sign_in_with(later, "ben", key=ben_key, later=True).status_code == 303
-    home = text(later.get(guards.HOME))
+    home = text(later.get(paths.HOME))
     assert "Since you last signed in" in home
     assert "ada retired carol" in home
     assert "ben brought back carol" not in home
@@ -614,7 +614,7 @@ def test_the_first_change_after_signing_in_asks_for_a_code(
     me = admin_named(session, "ada")
     first = accounts.make_recovery_codes(session, me.id, datetime.now(UTC))[0]
     confirmed = admin_client.post(
-        guards.CONFIRM, data={guards.CONFIRM_FIELD: first, "next": ADMINS}
+        paths.CONFIRM, data={guards.CONFIRM_FIELD: first, "next": ADMINS}
     )
     assert confirmed.status_code == 303
     asked = admin_client.post(f"{ADMINS}/{ben.id}/retire", data=once())

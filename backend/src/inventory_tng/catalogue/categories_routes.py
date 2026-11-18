@@ -12,11 +12,11 @@ from sqlalchemy.orm import Session
 from inventory_tng.admins.guards import AdminSignedIn, SignedIn
 from inventory_tng.catalogue import categories, queries
 from inventory_tng.catalogue.forms import CATEGORY_TAKEN
+from inventory_tng.catalogue.paths import CATEGORIES
 from inventory_tng.core.db import DbSession, refusal
 from inventory_tng.core.phrases import Words
 from inventory_tng.models import Category
 from inventory_tng.web.admin import (
-    ADMIN,
     SECTION_CATEGORIES,
     admin_page,
     now,
@@ -30,8 +30,6 @@ from inventory_tng.web.pages import not_found, redirect
 log = structlog.get_logger(__name__)
 
 router = APIRouter(include_in_schema=False)
-
-CATEGORIES = f"{ADMIN}/categories"
 
 
 # How the categories list sorts, each row a category and how many current

@@ -18,7 +18,8 @@ from fastapi.responses import HTMLResponse, Response
 from sqlalchemy.orm import Session
 
 from inventory_tng.admins import accounts
-from inventory_tng.admins.guards import FORGOT, RESET, SIGN_IN, TOO_MANY, reset_url
+from inventory_tng.admins.guards import TOO_MANY
+from inventory_tng.admins.paths import FORGOT, RECOVER, RESET, SIGN_IN, reset_url
 from inventory_tng.core import mail
 from inventory_tng.core.db import DbSession, SessionFactory, Sessions
 from inventory_tng.core.mail import Notify
@@ -37,7 +38,6 @@ ASKED = lazy_gettext(
 RESET_NOTICE = lazy_gettext("Your account is reset: sign in.")
 NOTICES["reset"] = RESET_NOTICE
 
-RECOVER = "/recover"
 REFUSED = {
     "bad_token": ("token", lazy_gettext("That isn't the recovery token.")),
     "used": ("token", lazy_gettext("That token was used already: ask for a new one.")),

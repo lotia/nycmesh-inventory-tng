@@ -16,7 +16,7 @@ from inventory_tng.admins import (
     accounts,
     activity,
     command,
-    guards,
+    paths,
     sign_in_routes,
     totp_keys_command,
 )
@@ -103,11 +103,11 @@ def test_let_in_brings_one_back_with_a_link_that_resets_everything(
     assert [(m.to, m.kind) for m in sent_mail] == [("ada@example.org", "let_in")]
     form = {"token": token, "password": NEW_PASSWORD, "password_again": NEW_PASSWORD}
     client = make_client()
-    assert client.post(guards.RESET, data=form).status_code == 303
+    assert client.post(paths.RESET, data=form).status_code == 303
     # The old authenticator is gone: in with the password, then set one up.
     assert sign_in_with(client, "ada", key=key).status_code == 400
     assert sign_in_with(client, "ada", NEW_PASSWORD).status_code == 303
-    assert client.get(guards.HOME).headers["location"] == guards.NEW_AUTHENTICATOR
+    assert client.get(paths.HOME).headers["location"] == paths.NEW_AUTHENTICATOR
 
 
 def test_let_in_works_without_a_lockdown(session: Session) -> None:
@@ -204,7 +204,7 @@ def test_the_commands_run_as_operator_commands(
     assert (
         capsys.readouterr()
         .out.splitlines()[-1]
-        .startswith(f"{site}{guards.RESET}?token=")
+        .startswith(f"{site}{paths.RESET}?token=")
     )
     assert command.main(["invite", "grace", "--base-url", site]) == 1
     assert command.main(["let-in", "grace"]) == 1
@@ -262,7 +262,7 @@ def test_retiring_authenticators_asks_each_to_set_one_up_again(
     policy(session, "optional")
     client = make_client()
     assert sign_in_with(client, code=left[0]).status_code == 303
-    assert client.get(guards.HOME).headers["location"] == guards.NEW_AUTHENTICATOR
+    assert client.get(paths.HOME).headers["location"] == paths.NEW_AUTHENTICATOR
     # The last code used, not set up: the password alone does not get in.
     assert sign_in_with(make_client(address="192.0.2.95")).status_code == 400
 
@@ -282,7 +282,7 @@ def test_setting_up_again_keeps_the_printed_codes(
             "key": new_key,
             "code": code(new_key, at),
         }
-        assert client.post(guards.NEW_AUTHENTICATOR, data=form).status_code == 303
+        assert client.post(paths.NEW_AUTHENTICATOR, data=form).status_code == 303
     assert not ada.must_set_up_totp
     assert accounts.recovery_codes_left(session, ada.id) == 2
 

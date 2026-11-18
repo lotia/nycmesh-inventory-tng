@@ -14,7 +14,7 @@ from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
 
 from inventory_tng.catalogue import items, units
-from inventory_tng.catalogue.items_routes import ITEMS
+from inventory_tng.catalogue.paths import ITEMS
 from inventory_tng.catalogue.units import KINDS, PREFIXES, UNITS, Reading, read, respell
 from inventory_tng.models import Category, Item, fold, folds, held, unit_key
 

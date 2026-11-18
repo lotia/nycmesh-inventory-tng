@@ -19,6 +19,7 @@ from inventory_tng import models
 from inventory_tng.admins.guards import AdminSignedIn, SignedIn
 from inventory_tng.catalogue import items, queries, reading_rules, units
 from inventory_tng.catalogue.forms import CHOOSE, CHOOSE_ONE, PROPOSED, seed_choices
+from inventory_tng.catalogue.paths import READINGS, SEED
 from inventory_tng.catalogue.reading_rules import (
     NOT_A_UNIT,
     chosen_rule,
@@ -29,7 +30,7 @@ from inventory_tng.core.db import DbSession, refusal
 from inventory_tng.core.local_time import site_zone
 from inventory_tng.core.phrases import Words, gettext, lazy_gettext
 from inventory_tng.models import INTEGER_MAX, ReadingRule, whole
-from inventory_tng.web.admin import ADMIN, admin_page, text_form
+from inventory_tng.web.admin import admin_page, text_form
 from inventory_tng.web.forms import ALERTS, RULES, form_version
 from inventory_tng.web.listing import (
     AskedView,
@@ -44,9 +45,6 @@ from inventory_tng.web.pages import NOTICES, not_found, redirect
 log = structlog.get_logger(__name__)
 
 router = APIRouter(include_in_schema=False)
-
-READINGS = f"{ADMIN}/unit-readings"
-SEED = f"{READINGS}/seed"
 
 READING_SAVED = lazy_gettext("Saved. Every name with it is read so now.")
 READING_DELETED = lazy_gettext(

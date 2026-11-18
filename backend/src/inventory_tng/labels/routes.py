@@ -13,11 +13,12 @@ from sqlalchemy import ColumnElement, func
 
 from inventory_tng.admins.accounts import qr_svg
 from inventory_tng.admins.guards import AdminSignedIn
-from inventory_tng.catalogue.items_routes import ITEMS
+from inventory_tng.catalogue.paths import ITEMS
 from inventory_tng.core.db import DbSession
 from inventory_tng.core.local_time import site_zone
 from inventory_tng.core.phrases import gettext, lazy, lazy_gettext, ngettext
 from inventory_tng.labels import labels, queries
+from inventory_tng.labels.paths import LABELS, PRINT
 from inventory_tng.models import (
     INTEGER_MAX,
     Item,
@@ -26,14 +27,8 @@ from inventory_tng.models import (
     Location,
     whole,
 )
-from inventory_tng.places.routes import LOCATIONS
-from inventory_tng.web.admin import (
-    LABELS,
-    SECTION_LABELS,
-    admin_page,
-    now,
-    revoke_title,
-)
+from inventory_tng.places.paths import LOCATIONS
+from inventory_tng.web.admin import SECTION_LABELS, admin_page, now, revoke_title
 from inventory_tng.web.listing import AskedView, Listing, Searched, Sort, Sorting
 from inventory_tng.web.pages import NOTICES, not_found, redirect, templates
 
@@ -46,7 +41,6 @@ _globals["max_copies"] = labels.MAX_COPIES
 
 router = APIRouter(include_in_schema=False)
 
-PRINT = f"{LABELS}/print"
 PER_PAGE = 12  # Three across, four down: styles.css.
 
 LABEL_REVOKED = lazy_gettext(

@@ -21,9 +21,9 @@ from inventory_tng.labels import labels
 from inventory_tng.models import STORE_KINDS, Label, Location
 from inventory_tng.places import locations, queries
 from inventory_tng.places.forms import KINDS, TAKEN, new_place, place_change
+from inventory_tng.places.paths import LOCATIONS
 from inventory_tng.volunteers import queries as volunteers_queries
 from inventory_tng.web.admin import (
-    ADMIN,
     SECTION_LOCATIONS,
     admin_page,
     current_rows,
@@ -38,7 +38,6 @@ log = structlog.get_logger(__name__)
 
 router = APIRouter(include_in_schema=False)
 
-LOCATIONS = f"{ADMIN}/locations"
 CUSTODY = lazy_gettext("Volunteer's custody")
 
 

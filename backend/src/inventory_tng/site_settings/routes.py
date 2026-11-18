@@ -29,22 +29,15 @@ from inventory_tng.models import (
     SiteSettings,
 )
 from inventory_tng.site_settings import forms, queries, scan_settings
+from inventory_tng.site_settings.paths import SETTINGS
 from inventory_tng.stock import adjustment_reasons
-from inventory_tng.web.admin import (
-    ADMIN,
-    SECTION_SETTINGS,
-    admin_page,
-    now,
-    text_form,
-)
+from inventory_tng.web.admin import SECTION_SETTINGS, admin_page, now, text_form
 from inventory_tng.web.forms import CHANGED, RULES, form_version, name_problem
 from inventory_tng.web.pages import NOTICES, not_found, redirect
 
 log = structlog.get_logger(__name__)
 
 router = APIRouter(include_in_schema=False)
-
-SETTINGS = f"{ADMIN}/settings"
 
 SETTINGS_SAVED = lazy_gettext("Saved. Open scan pages pick it up within ten minutes.")
 REASON_RETIRED = lazy_gettext("Retired: it is no longer offered.")

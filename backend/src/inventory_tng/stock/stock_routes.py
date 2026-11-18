@@ -16,19 +16,22 @@ from sqlalchemy import ColumnElement, true
 from sqlalchemy.orm import Session
 
 from inventory_tng.admins.guards import AdminSignedIn
-from inventory_tng.catalogue.items_routes import ITEMS, SEARCHED
+from inventory_tng.catalogue.items_routes import SEARCHED
+from inventory_tng.catalogue.paths import ITEMS
 from inventory_tng.core.db import DbSession
 from inventory_tng.core.phrases import Words, gettext, lazy_gettext
 from inventory_tng.models import INTEGER_MAX, Item, ItemPackage, Location, whole
 from inventory_tng.stock import open_packages, over_recorded, queries
 from inventory_tng.stock.balance import SHORT, retired_places_holding_stock
-from inventory_tng.stock.counts_routes import COUNTS
-from inventory_tng.web.admin import (
-    ADMIN,
-    SECTION_STOCK,
-    SETTLED_VIEW,
-    admin_page,
+from inventory_tng.stock.paths import (
+    COUNTS,
+    NEEDS_COUNTING,
+    RECORDED_MORE,
+    RECORDED_MORE_SETTLED,
+    REORDER,
+    STOCK,
 )
+from inventory_tng.web.admin import SECTION_STOCK, SETTLED_VIEW, admin_page
 from inventory_tng.web.listing import (
     AskedView,
     Sort,
@@ -43,15 +46,6 @@ from inventory_tng.web.pages import templates
 log = structlog.get_logger(__name__)
 
 router = APIRouter(include_in_schema=False)
-
-STOCK = f"{ADMIN}/stock"
-REORDER = f"{STOCK}/reorder"
-NEEDS_COUNTING = f"{STOCK}/needs-counting"
-
-# Lines recorded with more than was moved (stock/over_recorded_routes.py):
-# those waiting, and those settled.
-RECORDED_MORE = f"{STOCK}/recorded-more"
-RECORDED_MORE_SETTLED = f"{RECORDED_MORE}/settled"
 
 _globals = cast(dict[str, Any], templates.env.globals)
 _globals["needs_counting_path"] = NEEDS_COUNTING

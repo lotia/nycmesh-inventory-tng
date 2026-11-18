@@ -48,9 +48,11 @@ structure below on 2026-11-17.
   inventory-tng-atmx.7); route files run no queries (`select`,
   `session.execute`, `session.scalar` or `scalars`); no feature's routes
   import another feature's routes, linking through its `paths.py`
-  instead; package `__init__.py` files stay empty; and only the entry
-  point imports a feature's `command.py`. The breaks found when the test
-  was written are listed in it and may only shrink.
+  instead; a `paths.py` imports only core and other `paths.py`, such as
+  `web/paths.py`, which holds the administrator pages' `/admin`
+  (inventory-tng-atmx.10); package `__init__.py` files stay empty; and
+  only the entry point imports a feature's `command.py`. The breaks found
+  when the test was written are listed in it and may only shrink.
 
 We rejected a central routes file wired with `add_api_route`, which is not
 how FastAPI apps are usually read, and import-linter, as the rules fit a
@@ -119,11 +121,16 @@ short test. `core/` is the name FastAPI's full-stack template uses;
 | `admin/volunteers.py`: how its forms are read, and their problems in words | `volunteers/forms.py` |
 | `admin/volunteers.py`: its queries | `volunteers/queries.py` |
 | `admins.py` | `admins/command.py` |
+| `admins/guards.py`: the sign-in pages' paths, and `reset_url` | `admins/paths.py` |
+| `admins/reset_routes.py`: `RECOVER` | `admins/paths.py` |
 | `admins/sign_in_routes.py`: how its forms are checked, and their problems in words | `admins/forms.py` |
 | `admins/totp_keys.py`: its command | `admins/totp_keys_command.py` |
 | `bundle.py` | `scan/bundle.py` |
 | `catalogue.py` | `scan/catalogue_api.py` |
 | `catalogue.py`: the reply schemas | `scan/catalogue_schemas.py` |
+| `catalogue/categories_routes.py`: `CATEGORIES` | `catalogue/paths.py` |
+| `catalogue/items_routes.py`: `ITEMS` | `catalogue/paths.py` |
+| `catalogue/reading_rules_routes.py`: its paths | `catalogue/paths.py` |
 | `catalogue/unit_readings.py`: its command | `catalogue/command.py` |
 | `categories.py` | `catalogue/categories.py` |
 | `command.py` | `core/command.py` |
@@ -135,11 +142,14 @@ short test. `core/` is the name FastAPI's full-stack template uses;
 | `devices.py`: the registration endpoint, `register_device` | `devices/api.py` |
 | `devices.py`: the request and reply schemas | `devices/schemas.py` |
 | `devices.py`: what every route needing a device depends on | `devices/guards.py` |
+| `devices/devices.py`: `REGISTER_PATH` | `devices/paths.py` |
+| `devices/routes.py`: its paths | `devices/paths.py` |
 | `health.py` | `core/health.py` |
 | `health.py`: its query | `core/db.py`: `ping` |
 | `history.py` | `core/history.py` |
 | `items.py` | `catalogue/items.py` |
 | `labels.py` | `labels/labels.py` |
+| `labels/routes.py`: `PRINT` | `labels/paths.py` |
 | `ledger.py` | `stock/ledger.py` |
 | `ledger.py`: the balance queries | `stock/balance.py` |
 | `ledger.py`: the batch endpoint, `save_batch` | `scan/batch_api.py` |
@@ -159,6 +169,7 @@ short test. `core/` is the name FastAPI's full-stack template uses;
 | `pages.py` | `web/pages.py` |
 | `pages.py`: `amount`, `printed_length` | `web/formatting.py` |
 | `phrases.py` | `core/phrases.py` |
+| `places/routes.py`: `LOCATIONS` | `places/paths.py` |
 | `rate_limits.py` | `core/rate_limits.py` |
 | `reading_rules.py` | `catalogue/reading_rules.py` |
 | `registration_codes.py` | `devices/command.py` |
@@ -171,12 +182,18 @@ short test. `core/` is the name FastAPI's full-stack template uses;
 | `settings.py` | `core/settings.py` |
 | `sign_in.py`: the sign-in pages | `admins/sign_in_routes.py` |
 | `sign_in.py`: what every administrator page depends on | `admins/guards.py` |
+| `site_settings/routes.py`: `SETTINGS` | `site_settings/paths.py` |
 | `site_settings/scan_settings.py`: its command | `site_settings/command.py` |
 | `stacks.py` | `dev/stacks.py` |
+| `stock/counts_routes.py`, `stock/length_checks_routes.py`, `stock/stock_routes.py`, `stock/used_up_routes.py`: their paths | `stock/paths.py` |
 | `telemetry.py` | `core/telemetry.py` |
 | `time_zones.py` | `core/time_zones.py` |
 | `totp_keys.py` | `admins/totp_keys.py` |
 | `unit_readings.py` | `catalogue/unit_readings.py` |
 | `units.py` | `catalogue/units.py` |
 | `volunteers.py` | `volunteers/volunteers.py` |
+| `volunteers/routes.py`: `VOLUNTEERS` | `volunteers/paths.py` |
 | `web.py` | `web/browser.py` |
+| `web/admin.py`: `ADMINS` | `admins/paths.py` |
+| `web/admin.py`: `ADMIN` | `web/paths.py` |
+| `web/admin.py`: `LABELS` | `labels/paths.py` |

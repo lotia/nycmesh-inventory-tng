@@ -15,7 +15,7 @@ from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
 from structlog.testing import capture_logs
 
-from inventory_tng.admins import accounts, guards
+from inventory_tng.admins import accounts, paths
 from inventory_tng.admins.reset_routes import ASKED, RESET_NOTICE
 from inventory_tng.core import mail
 from inventory_tng.core.settings import MailConfig, Settings, SettingsError
@@ -58,7 +58,7 @@ def with_email(session: Session) -> tuple[Admin, str | None]:
 
 
 def ask(client: TestClient, username: str = "ada", **headers: str) -> str:
-    response = client.post(guards.FORGOT, data={"username": username}, headers=headers)
+    response = client.post(paths.FORGOT, data={"username": username}, headers=headers)
     assert response.status_code == 200
     return text(response)
 
@@ -242,20 +242,20 @@ def test_an_emailed_link_resets_the_password(
     signed_in = session.query(AdminSession).one()
     assert str(ASKED) in ask(client)
     link = the_link(sent_mail)
-    assert link.startswith(f"{SITE_MAIL.site_url}{guards.RESET}?token=")
+    assert link.startswith(f"{SITE_MAIL.site_url}{paths.RESET}?token=")
     assert sent_mail[0].to == "ada@example.org"
 
     form = client.get(link.removeprefix(SITE_MAIL.site_url))
     assert form.status_code == 200
     done = client.post(
-        guards.RESET,
+        paths.RESET,
         data={
             "token": token_of(link),
             "password": NEW_PASSWORD,
             "password_again": NEW_PASSWORD,
         },
     )
-    assert done.headers["location"] == f"{guards.SIGN_IN}?notice=reset"
+    assert done.headers["location"] == f"{paths.SIGN_IN}?notice=reset"
     assert str(RESET_NOTICE) in text(client.get(done.headers["location"]))
     assert signed_in.ended_at is not None
     assert accounts.check_password(session, admin.id, NEW_PASSWORD)
@@ -286,9 +286,9 @@ def test_a_link_works_once(
     ask(client)
     token = token_of(the_link(sent_mail))
     form = {"token": token, "password": NEW_PASSWORD, "password_again": NEW_PASSWORD}
-    assert client.post(guards.RESET, data=form).status_code == 303
-    assert client.post(guards.RESET, data=form).status_code == 404
-    assert "doesn't work any more" in text(client.get(f"{guards.RESET}?token={token}"))
+    assert client.post(paths.RESET, data=form).status_code == 303
+    assert client.post(paths.RESET, data=form).status_code == 404
+    assert "doesn't work any more" in text(client.get(f"{paths.RESET}?token={token}"))
 
 
 def test_a_newer_link_voids_the_older(
@@ -298,8 +298,8 @@ def test_a_newer_link_voids_the_older(
     ask(client)
     ask(client)
     older, newer = (token_of(re.findall(r"https://\S+", m.body)[0]) for m in sent_mail)
-    assert client.get(f"{guards.RESET}?token={older}").status_code == 404
-    assert client.get(f"{guards.RESET}?token={newer}").status_code == 200
+    assert client.get(f"{paths.RESET}?token={older}").status_code == 404
+    assert client.get(f"{paths.RESET}?token={newer}").status_code == 200
 
 
 def test_an_expired_link_does_not_work(
@@ -312,7 +312,7 @@ def test_an_expired_link_does_not_work(
     assert link.expires_at - link.created_at <= timedelta(hours=1, seconds=5)
     link.expires_at = datetime.now(UTC) - timedelta(seconds=1)
     session.flush()
-    assert client.get(f"{guards.RESET}?token={token}").status_code == 404
+    assert client.get(f"{paths.RESET}?token={token}").status_code == 404
 
 
 def test_the_link_never_comes_from_the_requests_host(
@@ -332,8 +332,8 @@ def test_a_short_password_is_refused_and_the_link_kept(
     ask(client)
     token = token_of(the_link(sent_mail))
     short = {"token": token, "password": "short", "password_again": "short"}
-    assert client.post(guards.RESET, data=short).status_code == 400
-    assert client.get(f"{guards.RESET}?token={token}").status_code == 200
+    assert client.post(paths.RESET, data=short).status_code == 400
+    assert client.get(f"{paths.RESET}?token={token}").status_code == 200
 
 
 def test_asking_is_rate_limited(
@@ -342,7 +342,7 @@ def test_asking_is_rate_limited(
     with_email(session)
     for _ in range(10):
         ask(client, "nobody")
-    limited = client.post(guards.FORGOT, data={"username": "ada"})
+    limited = client.post(paths.FORGOT, data={"username": "ada"})
     assert limited.status_code == 429
     assert sent_mail == []
 
@@ -351,9 +351,9 @@ def test_without_mail_there_is_no_emailed_reset(
     make_app: Callable[..., FastAPI], session: Session
 ) -> None:
     with TestClient(make_app(), base_url="https://testserver") as client:
-        assert "Forgot your password?" not in text(client.get(guards.SIGN_IN))
-        assert "isn't set up here" in text(client.get(guards.FORGOT))
-        refused = client.post(guards.FORGOT, data={"username": "ada"})
+        assert "Forgot your password?" not in text(client.get(paths.SIGN_IN))
+        assert "isn't set up here" in text(client.get(paths.FORGOT))
+        refused = client.post(paths.FORGOT, data={"username": "ada"})
         assert refused.status_code == 404
 
 
@@ -361,7 +361,7 @@ def test_the_sign_in_page_offers_it_with_mail(
     make_client_without_database: Callable[..., TestClient], sent_mail: SentMail
 ) -> None:
     client = make_client_without_database(mailer=sent_mail)
-    assert "Forgot your password?" in text(client.get(guards.SIGN_IN))
+    assert "Forgot your password?" in text(client.get(paths.SIGN_IN))
 
 
 # Notices
@@ -409,7 +409,7 @@ def test_a_password_changed_on_the_account_page_is_told(
     _, key = with_email(session)
     sign_in_with(client, key=key)
     form = {"password": NEW_PASSWORD, "password_again": NEW_PASSWORD}
-    client.post(f"{guards.ACCOUNT}/password", data=form)
+    client.post(f"{paths.ACCOUNT}/password", data=form)
     assert [m.kind for m in sent_mail] == ["password_changed"]
 
 
@@ -419,7 +419,7 @@ def test_no_address_no_notice(
     _, key = new_admin(session)
     sign_in_with(client, key=key)
     form = {"password": NEW_PASSWORD, "password_again": NEW_PASSWORD}
-    client.post(f"{guards.ACCOUNT}/password", data=form)
+    client.post(f"{paths.ACCOUNT}/password", data=form)
     assert sent_mail == []
 
 
@@ -444,7 +444,7 @@ def test_a_made_link_sets_a_password_and_tells_the_owner(
     admin, _ = with_email(session)
     token = made_link(session, admin)
     form = {"token": token, "password": NEW_PASSWORD, "password_again": NEW_PASSWORD}
-    assert client.post(guards.RESET, data=form).status_code == 303
+    assert client.post(paths.RESET, data=form).status_code == 303
     assert accounts.check_password(session, admin.id, NEW_PASSWORD)
     assert not accounts.uses_totp(session, admin.id)
     assert [m.kind for m in sent_mail] == ["password_changed"]
@@ -456,9 +456,9 @@ def test_a_made_link_asks_for_an_authenticator_only_while_required(
     admin, _ = with_email(session)
     token = made_link(session, admin)
     asked = "Set up a new authenticator"
-    assert asked in text(client.get(f"{guards.RESET}?token={token}"))
+    assert asked in text(client.get(f"{paths.RESET}?token={token}"))
     policy(session, "optional")
-    assert asked not in text(client.get(f"{guards.RESET}?token={token}"))
+    assert asked not in text(client.get(f"{paths.RESET}?token={token}"))
 
 
 def test_an_authenticator_added_after_a_reset_goes_when_its_link_is_used(
@@ -470,7 +470,7 @@ def test_an_authenticator_added_after_a_reset_goes_when_its_link_is_used(
     token = made_link(session, admin)
     accounts.add_authenticator(session, TOTP_KEYS, admin.id, "thief", "KEY", 0)
     form = {"token": token, "password": NEW_PASSWORD, "password_again": NEW_PASSWORD}
-    assert client.post(guards.RESET, data=form).status_code == 303
+    assert client.post(paths.RESET, data=form).status_code == 303
     assert not accounts.uses_totp(session, admin.id)
 
 
@@ -482,7 +482,7 @@ def test_asking_by_mail_never_undoes_a_reset_another_made(
     token = made_link(session, admin)
     ask(client)
     assert sent_mail == []
-    assert client.get(f"{guards.RESET}?token={token}").status_code == 200
+    assert client.get(f"{paths.RESET}?token={token}").status_code == 200
     # One asked for just as the reset was made, so not voided by it, fails.
     emailed = reset_link(session, admin)
     assert accounts.find_reset_link(session, emailed, datetime.now(UTC)) is None
@@ -545,6 +545,6 @@ def test_using_reset_links_is_rate_limited(
     token = token_of(the_link(sent_mail))
     short = {"token": token, "password": "short", "password_again": "short"}
     for _ in range(10):
-        client.post(guards.RESET, data=short)
-    limited = client.post(guards.RESET, data=short)
+        client.post(paths.RESET, data=short)
+    limited = client.post(paths.RESET, data=short)
     assert limited.status_code == 429

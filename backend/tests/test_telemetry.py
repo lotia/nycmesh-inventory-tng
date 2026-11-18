@@ -25,7 +25,7 @@ from structlog.testing import capture_logs
 
 from inventory_tng.admins import accounts
 from inventory_tng.app import create_app
-from inventory_tng.catalogue.categories_routes import CATEGORIES
+from inventory_tng.catalogue.paths import CATEGORIES
 from inventory_tng.core import db, mail
 from inventory_tng.core.db import NoSession, RuleBroken
 from inventory_tng.core.masking import MASK, Masker
@@ -45,7 +45,7 @@ from inventory_tng.models import (
 )
 from inventory_tng.scan import page_builds, page_telemetry
 from inventory_tng.stock import ledger, open_packages, over_recorded
-from inventory_tng.stock.counts_routes import ADJUSTMENTS, COUNTS
+from inventory_tng.stock.paths import ADJUSTMENTS, COUNTS
 from inventory_tng.web import security_headers
 
 from helpers.apps import on_session

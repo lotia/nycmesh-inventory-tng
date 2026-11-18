@@ -13,7 +13,7 @@ from httpx2 import Response
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from inventory_tng.admins import accounts, guards, totp_keys
+from inventory_tng.admins import accounts, guards, paths, totp_keys
 from inventory_tng.admins.totp_keys import TotpKeys
 from inventory_tng.models import (
     CONFIRM_IDLE_MINUTES,
@@ -157,11 +157,11 @@ def sign_in_with(
     the next one, as the one now is spent."""
     data = {"username": username, "password": password} | form
     if key == _NO_KEY:
-        return client.post(guards.SIGN_IN, data=data)
+        return client.post(paths.SIGN_IN, data=data)
     assert "code" not in form, "a key or a code, not both"
     with app_clock() as at:
         typed = code(key, at + TIME_STEP if later else at)
-        return client.post(guards.SIGN_IN, data=data | {"code": typed})
+        return client.post(paths.SIGN_IN, data=data | {"code": typed})
 
 
 def reset_link(

@@ -19,7 +19,7 @@ from inventory_tng.models import (
     Volunteer,
 )
 from inventory_tng.volunteers.forms import PICK_INTO, STILL_HOLD, TAKEN
-from inventory_tng.volunteers.routes import VOLUNTEERS
+from inventory_tng.volunteers.paths import VOLUNTEERS
 from inventory_tng.web.forms import NAME_MAX, RULES
 
 from helpers.markup import (

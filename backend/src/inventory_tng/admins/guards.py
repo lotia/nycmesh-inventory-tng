@@ -31,7 +31,7 @@ from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import Annotated, Any, cast
-from urllib.parse import quote, urlencode
+from urllib.parse import quote
 
 import structlog
 from babel.support import LazyProxy
@@ -42,6 +42,17 @@ from starlette.concurrency import run_in_threadpool
 from starlette.exceptions import HTTPException
 
 from inventory_tng.admins import accounts
+from inventory_tng.admins.paths import (
+    ACCOUNT,
+    CONFIRM,
+    FORGOT,
+    HOME,
+    NEW_AUTHENTICATOR,
+    RESET,
+    SETUP,
+    SIGN_IN,
+    SIGN_OUT,
+)
 from inventory_tng.admins.totp_keys import TotpKeys
 from inventory_tng.core import mail, masking, request_logging
 from inventory_tng.core.db import (
@@ -60,21 +71,6 @@ from inventory_tng.web.pages import Badge, page, redirect, sections, templates
 log = structlog.get_logger(__name__)
 
 COOKIE = "inventory_admin"
-HOME = "/admin"
-SETUP = "/setup"
-SIGN_IN = "/admin/sign-in"
-SIGN_OUT = "/admin/sign-out"
-CONFIRM = "/admin/confirm"
-NEW_AUTHENTICATOR = "/admin/authenticators/new"
-ACCOUNT = "/admin/account"
-FORGOT = "/admin/forgot"
-RESET = "/admin/reset"
-
-
-def reset_url(site: str, token: str) -> str:
-    """A reset link, under `site`, such as SITE_URL."""
-    return f"{site.rstrip('/')}{RESET}?{urlencode({'token': token})}"
-
 
 # What the templates link to and limit, from here, so neither drifts.
 # Jinja types its globals by its own defaults' types; any value will do.

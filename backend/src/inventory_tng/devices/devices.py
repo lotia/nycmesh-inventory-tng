@@ -350,7 +350,3 @@ class DeviceRefused(Exception):
     def __init__(self, reason: Refusal) -> None:
         super().__init__(reason)
         self.reason: Refusal = reason
-
-
-# The page a registration code's link and QR code open (bundle.PAGES).
-REGISTER_PATH = "/register"

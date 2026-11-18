@@ -25,8 +25,8 @@ from inventory_tng.volunteers.forms import (
     merging,
     volunteer_problems,
 )
+from inventory_tng.volunteers.paths import VOLUNTEERS
 from inventory_tng.web.admin import (
-    ADMIN,
     SECTION_VOLUNTEERS,
     admin_page,
     now,
@@ -41,7 +41,6 @@ log = structlog.get_logger(__name__)
 
 router = APIRouter(include_in_schema=False)
 
-VOLUNTEERS = f"{ADMIN}/volunteers"
 BRING_THEM_BACK = lazy_gettext("Bring them back")
 
 MERGED = lazy_gettext("Merged. Their past records now count as the other's.")

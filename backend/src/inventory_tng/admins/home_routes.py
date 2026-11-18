@@ -9,20 +9,20 @@ from fastapi import APIRouter, Request
 from fastapi.responses import Response
 
 from inventory_tng.admins import accounts, activity
-from inventory_tng.admins.guards import ACCOUNT, HOME, AdminSignedIn
+from inventory_tng.admins.guards import AdminSignedIn
+from inventory_tng.admins.paths import ACCOUNT, ADMINS, HOME
 from inventory_tng.catalogue import queries as catalogue_queries
-from inventory_tng.catalogue.categories_routes import CATEGORIES
-from inventory_tng.catalogue.items_routes import ITEMS
+from inventory_tng.catalogue.paths import CATEGORIES, ITEMS
 from inventory_tng.core.db import DbSession
 from inventory_tng.core.local_time import site_zone
 from inventory_tng.core.phrases import Words, lazy_gettext
 from inventory_tng.models import Category, Item, Location, Volunteer
-from inventory_tng.places.routes import LOCATIONS
+from inventory_tng.places.paths import LOCATIONS
 from inventory_tng.stock import needs_action
 from inventory_tng.stock.balance import retired_places_holding_stock
-from inventory_tng.stock.counts_routes import COUNTS
-from inventory_tng.volunteers.routes import VOLUNTEERS
-from inventory_tng.web.admin import ADMINS, admin_page
+from inventory_tng.stock.paths import COUNTS
+from inventory_tng.volunteers.paths import VOLUNTEERS
+from inventory_tng.web.admin import admin_page
 
 router = APIRouter(include_in_schema=False)
 

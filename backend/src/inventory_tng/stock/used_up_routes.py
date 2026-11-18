@@ -14,7 +14,7 @@ from opentelemetry import metrics
 from sqlalchemy.orm import Session
 
 from inventory_tng.admins.guards import AdminSignedIn, SignedIn
-from inventory_tng.catalogue.items_routes import ITEMS
+from inventory_tng.catalogue.paths import ITEMS
 from inventory_tng.core.db import DbSession, attempt
 from inventory_tng.core.local_time import site_zone
 from inventory_tng.core.phrases import gettext, lazy_gettext
@@ -26,7 +26,7 @@ from inventory_tng.stock.needs_action import (
     of_only,
     query,
 )
-from inventory_tng.stock.stock_routes import STOCK
+from inventory_tng.stock.paths import CLOSE, STOCK, USED_UP
 from inventory_tng.web.admin import (
     SECTION_STOCK,
     TICK_OPEN_PACKAGES,
@@ -40,8 +40,6 @@ log = structlog.get_logger(__name__)
 meter = metrics.get_meter(__name__)
 
 router = APIRouter(include_in_schema=False)
-
-USED_UP = f"{STOCK}/used-up"
 
 USED_UP_CONFIRMED = lazy_gettext("Closed: what they showed is written off as used up.")
 USED_UP_CLEARED = lazy_gettext("Offered again: not used up.")
@@ -214,9 +212,6 @@ def answer_one(
     if session.get(OpenPackage, open_id) is None:
         return not_found()
     return _answer(session, signed, [open_id], do, view)
-
-
-CLOSE = f"{ITEMS}/{{item_id}}/open-packages/{{open_id}}/close"
 
 
 def _closable(session: Session, item_id: int, open_id: int) -> OpenPackage | None:

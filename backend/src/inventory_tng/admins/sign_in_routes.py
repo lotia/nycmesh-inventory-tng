@@ -22,18 +22,11 @@ from inventory_tng.admins.forms import (
     setup_problems,
 )
 from inventory_tng.admins.guards import (
-    ACCOUNT,
     ACCOUNT_TITLE,
-    CONFIRM,
     COOKIE,
-    HOME,
     NAME_TAKEN,
-    NEW_AUTHENTICATOR,
     RECOVERY_CODES_TITLE,
     SENSITIVE,
-    SETUP,
-    SIGN_IN,
-    SIGN_OUT,
     TOO_MANY,
     AnySignedIn,
     ConfirmedAny,
@@ -47,6 +40,15 @@ from inventory_tng.admins.guards import (
     _status,
     changed,
     signed_out,
+)
+from inventory_tng.admins.paths import (
+    ACCOUNT,
+    CONFIRM,
+    HOME,
+    NEW_AUTHENTICATOR,
+    SETUP,
+    SIGN_IN,
+    SIGN_OUT,
 )
 from inventory_tng.core import mail, request_logging
 from inventory_tng.core.db import DbSession

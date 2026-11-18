@@ -30,7 +30,7 @@ from sqlalchemy import Engine, delete, select, text
 from sqlalchemy.exc import IntegrityError, OperationalError
 from sqlalchemy.orm import Session
 
-from inventory_tng.admins import accounts, guards
+from inventory_tng.admins import accounts, guards, paths
 from inventory_tng.admins.routes import ADMINS
 from inventory_tng.catalogue import categories, items, reading_rules, units
 from inventory_tng.core import mail
@@ -75,7 +75,7 @@ from inventory_tng.stock.ledger import (
     record,
 )
 from inventory_tng.volunteers import volunteers
-from inventory_tng.volunteers.routes import VOLUNTEERS
+from inventory_tng.volunteers.paths import VOLUNTEERS
 
 from helpers.concurrency import Committed, Worker, delete_made, made, newest_ids
 from helpers.devices import new_device
@@ -634,7 +634,7 @@ def test_a_gated_form_commits_once_and_its_work_after_the_reply_is_free(
     # The app answers its own errors: the second commit raised, so 500.
     assert admin_client.post("/admin/commits-twice").status_code == 500
     # The hold ended with that request: later ones commit as they like.
-    assert admin_client.post(guards.SIGN_OUT).status_code == 303
+    assert admin_client.post(paths.SIGN_OUT).status_code == 303
 
 
 @pytest.fixture
@@ -679,7 +679,7 @@ def needing_a_code(committed: Committed, ben: int, session_id: int) -> str:
 def posting(committed: Committed, client: TestClient, form: dict[str, str]) -> Worker:
     """A password change posted, once it waits for a lock."""
     return committed.blocked(
-        None, lambda: client.post(f"{guards.ACCOUNT}/password", data=form)
+        None, lambda: client.post(f"{paths.ACCOUNT}/password", data=form)
     )
 
 
@@ -699,7 +699,7 @@ def test_a_sensitive_form_posted_during_a_reset_is_sent_to_sign_in(
     worker = posting(committed, client, PASSWORD_FORM)
     reset.commit()
     answer = cast(Answer, worker.finished().result)
-    assert answer.headers["location"] == guards.SIGN_IN
+    assert answer.headers["location"] == paths.SIGN_IN
     assert not accounts.has_password(committed.session(), ben)
 
 
@@ -721,7 +721,7 @@ def test_a_recovery_code_used_on_a_form_turned_away_is_still_told(
     accounts.end_sessions(ending, ben, datetime.now(UTC))
     ending.commit()
     answer = cast(Answer, worker.finished().result)
-    assert answer.headers["location"] == guards.SIGN_IN
+    assert answer.headers["location"] == paths.SIGN_IN
     assert accounts.recovery_codes_left(committed.session(), ben) == 9
     assert [m.kind for m in sent] == ["recovery_code_used"]
 

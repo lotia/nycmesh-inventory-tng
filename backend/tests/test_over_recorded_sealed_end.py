@@ -20,8 +20,8 @@ from inventory_tng.models import (
     OverRecorded,
 )
 from inventory_tng.stock import ledger, open_packages, over_recorded
-from inventory_tng.stock.counts_routes import COUNTS
 from inventory_tng.stock.ledger import Form, expected
+from inventory_tng.stock.paths import COUNTS
 
 from helpers.concurrency import Committed
 from helpers.markup import links

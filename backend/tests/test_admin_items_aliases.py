@@ -18,7 +18,8 @@ from inventory_tng.catalogue.forms import (
     TAKEN,
     TAKEN_FIELDS,
 )
-from inventory_tng.catalogue.items_routes import ITEMS, RENAMED
+from inventory_tng.catalogue.items_routes import RENAMED
+from inventory_tng.catalogue.paths import ITEMS
 from inventory_tng.core.db import attempt
 from inventory_tng.models import CURRENT_ALIAS, Category, Item, ItemAlias
 

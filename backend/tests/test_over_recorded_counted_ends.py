@@ -22,8 +22,8 @@ from inventory_tng.stock import (
     over_recorded,
     over_recorded_routes,
 )
-from inventory_tng.stock.counts_routes import COUNTS
 from inventory_tng.stock.ledger import expected
+from inventory_tng.stock.paths import COUNTS
 
 from helpers.markup import read, text
 from helpers.over_recorded import (

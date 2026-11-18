@@ -16,6 +16,7 @@ from inventory_tng.admins import account_routes
 # isort: split
 from inventory_tng import admin
 from inventory_tng.admins import accounts, guards, reset_routes, sign_in_routes
+from inventory_tng.admins.paths import HOME
 from inventory_tng.admins.totp_keys import TotpKeys
 from inventory_tng.core import database_role, db, health
 from inventory_tng.core.cross_site import CrossSiteRefusal
@@ -87,7 +88,7 @@ def create_app(
     app.state.settings = settings
     # mail.get_mailer hands it to routes.
     app.state.mailer = SmtpMailer(settings.mail) if settings.mail else None
-    errors = pages.ErrorPages(api=API, scan=bundle.SCAN, admin=guards.HOME)
+    errors = pages.ErrorPages(api=API, scan=bundle.SCAN, admin=HOME)
     errors.install(app)
     app.add_middleware(CrossSiteRefusal)
     app.add_middleware(

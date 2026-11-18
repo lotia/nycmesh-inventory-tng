@@ -9,8 +9,9 @@ from fastapi.testclient import TestClient
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from inventory_tng.admins import accounts, guards
-from inventory_tng.admins.reset_routes import RECOVER, REFUSED
+from inventory_tng.admins import accounts, paths
+from inventory_tng.admins.paths import RECOVER
+from inventory_tng.admins.reset_routes import REFUSED
 from inventory_tng.core.settings import RateLimits, Settings, SettingsError
 from inventory_tng.models import ResetLink
 
@@ -36,16 +37,16 @@ def test_a_locked_out_administrator_gets_back_in(
     made = client.post(RECOVER, data={"token": TOKEN, "username": "ADA"})
     assert made.status_code == 303
     link = made.headers["location"]
-    assert link.startswith(f"{guards.RESET}?token=")
+    assert link.startswith(f"{paths.RESET}?token=")
     token = link.split("token=")[1]
     form = {"token": token, "password": NEW_PASSWORD, "password_again": NEW_PASSWORD}
-    assert client.post(guards.RESET, data=form).status_code == 303
+    assert client.post(paths.RESET, data=form).status_code == 303
     assert accounts.check_password(session, ada.id, NEW_PASSWORD)
     assert theirs.ended_at is not None
     assert not accounts.uses_totp(session, ada.id)
     # Signing in asks for a new authenticator, as TOTP is required.
     assert sign_in_with(client, "ada", NEW_PASSWORD).status_code == 303
-    assert client.get(guards.HOME).headers["location"] == guards.NEW_AUTHENTICATOR
+    assert client.get(paths.HOME).headers["location"] == paths.NEW_AUTHENTICATOR
     assert "recovery_link_made" in [m.kind for m in sent_mail]
     made_row = history(session, "reset_link")[0]
     assert made_row.actor == "system:recovery"

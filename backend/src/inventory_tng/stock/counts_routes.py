@@ -55,7 +55,7 @@ from inventory_tng.models import (
     OpenPackage,
     whole,
 )
-from inventory_tng.site_settings.routes import SETTINGS
+from inventory_tng.site_settings.paths import SETTINGS
 from inventory_tng.stock import needs_action, open_packages, over_recorded, queries
 from inventory_tng.stock.balance import countable, retired_holding_stock_count, takeable
 from inventory_tng.stock.forms import (
@@ -85,8 +85,8 @@ from inventory_tng.stock.ledger import (
 )
 from inventory_tng.stock.needs_action import OnlyItem
 from inventory_tng.stock.open_packages import tracks_opened
+from inventory_tng.stock.paths import ADJUSTMENTS, COUNTS
 from inventory_tng.web.admin import (
-    ADMIN,
     SECTION_COUNTS,
     admin_page,
     current_rows,
@@ -108,8 +108,6 @@ log = structlog.get_logger(__name__)
 
 router = APIRouter(include_in_schema=False)
 
-COUNTS = f"{ADMIN}/counts"
-ADJUSTMENTS = f"{COUNTS}/adjustments"
 # The ledger rules a race can break past the page's checks (module
 # docstring).
 WHOLE = "movement_whole_units"

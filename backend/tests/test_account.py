@@ -10,7 +10,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 from structlog.testing import capture_logs
 
-from inventory_tng.admins import accounts, guards
+from inventory_tng.admins import accounts, guards, paths
 from inventory_tng.admins.account_routes import CODES_NEED_TOTP, EMAIL_TAKEN
 from inventory_tng.admins.guards import NAME_TAKEN
 from inventory_tng.core import mail
@@ -41,7 +41,7 @@ from helpers.sign_in import (
     sign_in_with,
 )
 
-ACCOUNT = guards.ACCOUNT
+ACCOUNT = paths.ACCOUNT
 NEW_PASSWORD = "a different long passphrase"
 
 
@@ -101,7 +101,7 @@ def test_viewing_it_needs_signing_in(
         make_client_without_database()
         .get(ACCOUNT)
         .headers["location"]
-        .startswith(guards.SIGN_IN)
+        .startswith(paths.SIGN_IN)
     )
 
 
@@ -353,7 +353,7 @@ def test_the_owner_is_told_when_an_authenticator_comes_or_goes(
             "key": new_key,
             "code": code(new_key, at),
         }
-        assert client.post(guards.NEW_AUTHENTICATOR, data=form).status_code == 303
+        assert client.post(paths.NEW_AUTHENTICATOR, data=form).status_code == 303
     laptop = session.scalars(
         select(Authenticator).where(Authenticator.name == "Laptop")
     ).one()
@@ -392,7 +392,7 @@ def test_ending_another_session_and_this_one(
     )
     assert other.ended_at is not None
     out = client.post(f"{ACCOUNT}/sessions/{mine.id}/end")
-    assert out.headers["location"] == guards.SIGN_IN
+    assert out.headers["location"] == paths.SIGN_IN
     assert client.get(ACCOUNT).status_code == 303
 
 
@@ -526,11 +526,11 @@ def test_a_late_new_authenticator_keeps_its_key(
             "key": new_key,
             "code": code(new_key, at),
         }
-        asked = client.post(guards.NEW_AUTHENTICATOR, data=form)
+        asked = client.post(paths.NEW_AUTHENTICATOR, data=form)
         assert f'value="{new_key}"' in asked.text
         later = {guards.CONFIRM_FIELD: code(key, at + TIME_STEP)}
-        done = client.post(guards.NEW_AUTHENTICATOR, data=form | later)
-    assert done.headers["location"] == guards.HOME
+        done = client.post(paths.NEW_AUTHENTICATOR, data=form | later)
+    assert done.headers["location"] == paths.HOME
     names = {a.name for a in session.scalars(select(Authenticator))}
     assert names == {"Phone", "Laptop"}
 

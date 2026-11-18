@@ -7,8 +7,7 @@ from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
 
 from inventory_tng.models import Item, Location
-from inventory_tng.stock.counts_routes import COUNTS
-from inventory_tng.stock.stock_routes import NEEDS_COUNTING, REORDER, STOCK
+from inventory_tng.stock.paths import COUNTS, NEEDS_COUNTING, REORDER, STOCK
 
 from helpers.markup import (
     Element,
