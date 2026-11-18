@@ -11,7 +11,7 @@ from pathlib import Path
 
 import pytest
 
-from inventory_tng import page_builds
+from inventory_tng.scan import page_builds
 
 from helpers import batch_schema, committed
 from helpers.batch_schema import (

@@ -35,7 +35,7 @@ ASSETS = STATIC + "assets/"
 MANIFEST = Path(".vite") / "manifest.json"
 # Beside it, which build this is (frontend/vite.config.ts, BUILD): when it
 # was made, in UTC, to the millisecond, so a later build sorts after an
-# earlier one as text (page_builds.py).
+# earlier one as text (scan/page_builds.py).
 BUILD_FILE = Path(".vite") / "build.json"
 BUILD_ID = re.compile(r"\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d\.\d{3}Z")
 # Each page and the entry in frontend/vite.config.ts that it loads.

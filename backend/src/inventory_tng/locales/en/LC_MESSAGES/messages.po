@@ -2843,7 +2843,7 @@ msgstr ""
 msgid "Refused: this came from another site's page."
 msgstr ""
 
-#: src/inventory_tng/bundle.py
+#: src/inventory_tng/scan/bundle.py
 msgid "Register this device"
 msgstr ""
 
@@ -3216,7 +3216,7 @@ msgstr ""
 msgid "Say why it is right as it is."
 msgstr ""
 
-#: src/inventory_tng/bundle.py
+#: src/inventory_tng/scan/bundle.py
 msgid "Scan"
 msgstr ""
 
@@ -3703,7 +3703,7 @@ msgstr ""
 msgid "The scan page doesn't read a label tagged here."
 msgstr ""
 
-#: src/inventory_tng/bundle.py
+#: src/inventory_tng/scan/bundle.py
 msgid "The scan page is not built yet."
 msgstr ""
 

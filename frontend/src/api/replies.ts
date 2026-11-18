@@ -60,7 +60,7 @@ export const KeyReusedReply = v.object({
 });
 
 /** A batch from a build of the page older than the server takes: kept,
- * not refused (backend page_builds.py). The one reply checked loosely, by
+ * not refused (backend scan/page_builds.py). The one reply checked loosely, by
  * its reason alone (Ali, 2026-11-12, inventory-tng-op6): only a page older
  * than the server reads it, so a later server may add, drop or rename its
  * other fields without that page failing to recognise it and sending the

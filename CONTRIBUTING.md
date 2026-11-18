@@ -475,7 +475,7 @@ it never needs to be required. The same goes for any change that makes
 the endpoint accept less: a narrower limit, a value dropped from a kind's
 list, null no longer taken, or fields it does not name refused. That later
 change also sets `OLDEST_BUILD` in
-`backend/src/inventory_tng/page_builds.py` to the id of the build the
+`backend/src/inventory_tng/scan/page_builds.py` to the id of the build the
 earlier deploy served (DEPLOYMENT.md, Tightening what a batch accepts). A
 batch whose `X-Inventory-Build` header names a build before that is then
 answered 409 `build_too_old` and kept on the phone, where a 422 would have
@@ -604,7 +604,7 @@ volunteers did with it, a cart discarded, and what a save another tab
 recorded first added put in the cart, through
 `frontend/src/telemetry.ts`, to `POST /api/telemetry`, which turns them into
 `inventory.*` metrics (docs/decisions/0006). Its schema, in
-`backend/src/inventory_tng/page_telemetry.py`, lists all a page may send:
+`backend/src/inventory_tng/scan/page_telemetry.py`, lists all a page may send:
 something new to report starts there.
 
 #### On a phone

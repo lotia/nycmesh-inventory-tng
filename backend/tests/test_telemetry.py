@@ -23,7 +23,7 @@ from sqlalchemy import exc, select
 from sqlalchemy.orm import Session
 from structlog.testing import capture_logs
 
-from inventory_tng import page_builds, page_telemetry, security_headers
+from inventory_tng import security_headers
 from inventory_tng.admins import accounts
 from inventory_tng.app import create_app
 from inventory_tng.catalogue.categories_routes import CATEGORIES
@@ -44,6 +44,7 @@ from inventory_tng.models import (
     OpenPackage,
     OverRecorded,
 )
+from inventory_tng.scan import page_builds, page_telemetry
 from inventory_tng.stock import ledger, open_packages, over_recorded
 from inventory_tng.stock.counts_routes import ADJUSTMENTS, COUNTS
 

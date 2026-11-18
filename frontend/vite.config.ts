@@ -16,7 +16,7 @@ import tailwindcss from "@tailwindcss/vite";
 import { defineConfig } from "vitest/config";
 
 // Each page's entry: what the build bundles. admin.ts is the server-rendered
-// pages' script (backend bundle.py).
+// pages' script (backend scan/bundle.py).
 const pages = ["src/scan.tsx", "src/register.tsx", "src/admin.ts"];
 // This build's id: when it was made, in UTC, so a later build's sorts after
 // (backend bundle.BUILD_ID). The pages stamp it on what they keep and send
@@ -58,7 +58,7 @@ export default defineConfig({
     {
       name: "build-id",
       apply: "build",
-      // Beside the manifest, which only the backend reads (bundle.py).
+      // Beside the manifest, which only the backend reads (scan/bundle.py).
       generateBundle() {
         this.emitFile({
           type: "asset",

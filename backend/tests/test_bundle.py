@@ -9,7 +9,8 @@ from fastapi.testclient import TestClient
 from httpx2 import Response
 from servestatic.compress import Compressor
 
-from inventory_tng.bundle import (
+from inventory_tng.core.settings import FrontendConfig
+from inventory_tng.scan.bundle import (
     BUILD_FILE,
     MANIFEST,
     PAGES,
@@ -18,7 +19,6 @@ from inventory_tng.bundle import (
     Bundle,
     Tags,
 )
-from inventory_tng.core.settings import FrontendConfig
 
 from helpers.markup import read
 

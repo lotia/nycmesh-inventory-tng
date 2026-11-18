@@ -1,5 +1,5 @@
 """POST /api/telemetry: what the scan and register pages report about
-themselves (page_telemetry.py, frontend/src/telemetry.ts)."""
+themselves (scan/page_telemetry.py, frontend/src/telemetry.ts)."""
 
 import re
 from collections.abc import Callable
@@ -8,9 +8,9 @@ import pytest
 from fastapi.testclient import TestClient
 from structlog.testing import capture_logs
 
-from inventory_tng import page_telemetry
 from inventory_tng.core.local_env import CLONE
 from inventory_tng.core.settings import RateLimits
+from inventory_tng.scan import page_telemetry
 
 PATH = "/api/telemetry"
 RETRY = {"kind": "outbox_retry", "reason": "unavailable"}

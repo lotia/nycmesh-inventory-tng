@@ -14,15 +14,7 @@ from fastapi import FastAPI
 from inventory_tng.admins import account_routes
 
 # isort: split
-from inventory_tng import (
-    admin,
-    bundle,
-    health,
-    page_builds,
-    page_telemetry,
-    pages,
-    security_headers,
-)
+from inventory_tng import admin, health, pages, security_headers
 from inventory_tng.admins import accounts, guards, reset_routes, sign_in_routes
 from inventory_tng.admins.totp_keys import TotpKeys
 from inventory_tng.core import database_role, db
@@ -33,7 +25,13 @@ from inventory_tng.core.request_logging import RequestLogging
 from inventory_tng.core.settings import Settings
 from inventory_tng.cross_site import CrossSiteRefusal
 from inventory_tng.devices import api as devices_api
-from inventory_tng.scan import batch_api, catalogue_api
+from inventory_tng.scan import (
+    batch_api,
+    bundle,
+    catalogue_api,
+    page_builds,
+    page_telemetry,
+)
 
 log = structlog.get_logger(__name__)
 

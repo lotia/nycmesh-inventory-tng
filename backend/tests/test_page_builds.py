@@ -1,5 +1,5 @@
 """Which build of the scan page sent a batch, and a build too old held back,
-not refused (page_builds.py)."""
+not refused (scan/page_builds.py)."""
 
 from typing import cast
 
@@ -9,9 +9,9 @@ from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
 from structlog.testing import capture_logs
 
-from inventory_tng import page_builds
-from inventory_tng.bundle import BUILD_ID
-from inventory_tng.page_builds import HEADER, is_too_old
+from inventory_tng.scan import page_builds
+from inventory_tng.scan.bundle import BUILD_ID
+from inventory_tng.scan.page_builds import HEADER, is_too_old
 
 from helpers.stock import URL, Place
 

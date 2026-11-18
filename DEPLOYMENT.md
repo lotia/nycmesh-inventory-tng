@@ -218,7 +218,7 @@ accepting what the build before sends, and the second accepts less
 2. Read that deploy's build id: `build` in `GET /api/healthz`'s reply, or
    `build=` in the app's `frontend` log line at startup.
 3. In the change that accepts less, set `OLDEST_BUILD` in
-   `backend/src/inventory_tng/page_builds.py` to that id, then write
+   `backend/src/inventory_tng/scan/page_builds.py` to that id, then write
    `backend/tests/batch_schema.json` again (CONTRIBUTING.md, The scan page).
 4. Deploy that change.
 

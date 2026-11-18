@@ -20,7 +20,7 @@ as this origin's, a signed-in administrator's requests included.
 A violation is counted by its directive, from a fixed list, and nothing else
 a report says is kept or logged: it names pages, addresses and what the page
 held. Reports count against their address as the pages' telemetry does
-(page_telemetry.py).
+(scan/page_telemetry.py).
 """
 
 import base64
@@ -37,10 +37,10 @@ from opentelemetry import metrics
 from starlette.datastructures import MutableHeaders
 from starlette.types import ASGIApp, Message, Receive, Scope, Send
 
-from inventory_tng import page_telemetry
 from inventory_tng.core.phrases import BRAND
 from inventory_tng.devices.schemas import RateLimitedReply
 from inventory_tng.pages import NONCE, csp_nonce
+from inventory_tng.scan import page_telemetry
 
 log = structlog.get_logger(__name__)
 meter = metrics.get_meter(__name__)

@@ -24,7 +24,8 @@ import sys
 from pathlib import Path
 from typing import Any, Literal, cast
 
-from inventory_tng import openapi, page_builds
+from inventory_tng import openapi
+from inventory_tng.scan import page_builds
 
 from . import committed
 
@@ -39,7 +40,7 @@ CHECKLIST = (
     "what the build before sends, and accept less only in a later deploy, "
     "after the one whose page sends what the new rule wants is live in "
     "production. That later change sets OLDEST_BUILD in "
-    "backend/src/inventory_tng/page_builds.py to the build of the deploy "
+    "backend/src/inventory_tng/scan/page_builds.py to the build of the deploy "
     "before it: follow DEPLOYMENT.md, Tightening what a batch accepts."
 )
 

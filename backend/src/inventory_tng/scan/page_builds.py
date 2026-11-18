@@ -26,7 +26,7 @@ from fastapi.responses import JSONResponse
 from opentelemetry import metrics
 from pydantic import BaseModel, Field
 
-from inventory_tng.bundle import BUILD_ID
+from inventory_tng.scan.bundle import BUILD_ID
 
 log = structlog.get_logger(__name__)
 meter = metrics.get_meter(__name__)

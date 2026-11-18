@@ -96,7 +96,7 @@ BREAKS: dict[str, dict[str, list[str]]] = {
             "volunteers/routes.py",
         ],
         "labels/routes.py": ["catalogue/items_routes.py", "places/routes.py"],
-        "security_headers.py": ["page_telemetry.py"],
+        "security_headers.py": ["scan/page_telemetry.py"],
         "stock/counts_routes.py": [
             "catalogue/items_routes.py",
             "site_settings/routes.py",
