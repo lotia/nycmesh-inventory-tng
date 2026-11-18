@@ -47,19 +47,20 @@ structure below on 2026-11-17.
   `core/local_env.py` and `catalogue/units.py` are not operator commands
   and keep their own `python -m` paths (inventory-tng-atmx.9).
 - **Imports go one way**, held by `backend/tests/test_import_directions.py`:
-  rules, queries and forms import neither FastAPI nor `web/`, but for
-  `web/formatting.py` and `web/forms.py`, which themselves import neither
-  (inventory-tng-atmx.2, inventory-tng-atmx.7); route files run no queries
-  (`select`, `session.execute`, `session.scalar` or `scalars`); core
-  imports no feature, nor `dev/` or `web/`; and no feature's routes import
-  another feature's routes, linking through its `paths.py` instead. The
-  breaks found when the test was written are listed in it and may only
-  shrink. On 2026-11-17 Ali kept these four and dropped two that caught no
-  real harm: package `__init__.py` files stay empty, and only the entry point
-  imports a feature's `command.py` (inventory-tng-atmx.16). The same change
-  dropped a third, which his list did not name: that a `paths.py` imports
-  only core and other `paths.py`, as a cycle through `paths.py` fails
-  loudly at import anyway.
+  - rules, queries and forms import neither FastAPI nor `web/`, but for
+    `web/formatting.py` and `web/forms.py`, which import neither
+    themselves (inventory-tng-atmx.2, inventory-tng-atmx.7);
+  - route files run no queries (`select`, `execute`, `scalar`, `scalars`);
+  - core imports nothing of the app but core and `models.py`;
+  - no feature's routes import another feature's routes; they link
+    through its `paths.py`.
+
+  The breaks found when the test was written are listed in it and may
+  only shrink. On 2026-11-17 Ali dropped two rules that caught no real
+  harm, package `__init__.py` files staying empty and only the entry point
+  importing a `command.py`, and the same change dropped a third, that a
+  `paths.py` imports only core and other `paths.py`, as a cycle through
+  one fails at import anyway (inventory-tng-atmx.16).
 
 We rejected a central routes file wired with `add_api_route`, which is not
 how FastAPI apps are usually read, and import-linter, as the rules fit a

@@ -15,6 +15,7 @@ fails, and so does one fixed but still listed.
 
 import ast
 from collections.abc import Callable, Mapping
+from importlib.util import resolve_name
 
 import pytest
 
@@ -65,35 +66,39 @@ def imports(path: str, app: App) -> set[str]:
     """What the module at `path` imports: the app's modules by path, and any
     other package by its top-level name. Of `from x import y`, y counts where
     it is a module, x where y is a name in it."""
-    package = path.split("/")[:-1]
-    names: list[list[str]] = []
+    package = ".".join(["inventory_tng", *path.split("/")[:-1]])
+    names: list[str] = []
     for node in ast.walk(app[path]):
         if isinstance(node, ast.Import):
-            names += [alias.name.split(".") for alias in node.names]
+            names += [alias.name for alias in node.names]
         elif isinstance(node, ast.ImportFrom):
-            if node.level > len(package) + 1:
-                continue  # Above inventory_tng, so none of the app's.
-            base = (
-                ["inventory_tng", *package[: len(package) + 1 - node.level]]
-                if node.level
-                else []
-            )
-            base += node.module.split(".") if node.module else []
-            names += [[*base, alias.name] for alias in node.names]
-    found: set[str] = set()
-    for parts in names:
-        if parts[0] != "inventory_tng":
-            found.add(parts[0])
-            continue
-        # The longest that is a module; the package itself is none.
-        for end in range(len(parts), 1, -1):
-            stem = "/".join(parts[1:end])
-            if module := next(
-                (m for m in (f"{stem}.py", f"{stem}/__init__.py") if m in app), None
-            ):
-                found.add(module)
-                break
-    return found
+            base = resolve_name("." * node.level + (node.module or ""), package)
+            names += [f"{base}.{alias.name}" for alias in node.names]
+    return {module for name in names if (module := _module(name, app))}
+
+
+def _module(name: str, app: App) -> str | None:
+    """The app's module a dotted name is in, by path (the longest that is
+    one; the package itself is none), or another package's top-level name."""
+    top, *parts = name.split(".")
+    if top != "inventory_tng":
+        return top
+    while parts:
+        stem = "/".join(parts)
+        for path in (f"{stem}.py", f"{stem}/__init__.py"):
+            if path in app:
+                return path
+        parts.pop()
+    return None
+
+
+def is_rules(path: str) -> bool:
+    """A module of rules, held to rules_import_fastapi_or_web."""
+    return (
+        path in RULES
+        or path in RULES_MAY_IMPORT
+        or path.split("/")[-1] in {"queries.py", "forms.py"}
+    )
 
 
 def is_routes(path: str, app: App) -> bool:
@@ -118,11 +123,7 @@ def _called(node: ast.AST) -> str | None:
 
 
 def rules_import_fastapi_or_web(path: str, app: App) -> set[str]:
-    if not (
-        path in RULES
-        or path in RULES_MAY_IMPORT
-        or path.split("/")[-1] in {"queries.py", "forms.py"}
-    ):
+    if not is_rules(path):
         return set()
     return {
         module
