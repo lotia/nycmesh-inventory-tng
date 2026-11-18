@@ -11,9 +11,15 @@ test alone; and the browser tests. It writes, under .local/test-report/,
 report.md, and a table of each suite's tests: seconds, what it covers,
 what it alone covers, which is what removing it would lose, and the group
 of tests that cover exactly the same. Each run's output is in its .log.
+
+A backend fixture shared by a module or the session is set up within
+whichever of its tests runs first, so it counts as that test's, and which
+test that is changes from run to run. Frontend tests sharing a full name
+run together, so each covers what they cover together.
 """
 
 import hashlib
+import itertools
 import json
 import os
 import re
@@ -28,6 +34,7 @@ from collections.abc import Collection, Hashable, Iterable, Mapping, Sequence
 from concurrent.futures import ThreadPoolExecutor
 from contextlib import closing
 from dataclasses import dataclass, field
+from operator import itemgetter
 from pathlib import Path
 from xml.etree import ElementTree
 
@@ -151,14 +158,12 @@ def backend_contexts(data_file: Path) -> tuple[dict, dict, dict]:
         """):
             covers[test], own[test] = arcs, alone
         digests: dict[str, list[str]] = defaultdict(list)
-        test, digest = None, hashlib.sha256()
         rows = db.execute("SELECT * FROM covered ORDER BY 1, 2, 3, 4")
-        for row in [*rows, (None,)]:
-            if row[0] != test:
-                if test is not None:
-                    digests[digest.hexdigest()].append(test)
-                test, digest = row[0], hashlib.sha256()
-            digest.update(repr(row[1:]).encode())
+        for test, arcs in itertools.groupby(rows, key=itemgetter(0)):
+            digest = hashlib.sha256()
+            for row in arcs:
+                digest.update(repr(row[1:]).encode())
+            digests[digest.hexdigest()].append(test)
     return covers, own, numbered(digests.values())
 
 
@@ -182,26 +187,43 @@ def measure_backend() -> Suite:
         COVERAGE_CORE="ctrace",
         COVERAGE_FILE=str(data),
     )
-    suite.covers, suite.own, suite.same = backend_contexts(data)
+    covers, own, same = backend_contexts(data)
+    # A test skipped after its setup has a context, but is no test here.
+    if covers and not covers.keys() & suite.seconds.keys():
+        sys.exit(f"No test in {junit} matches a coverage context in {data}")
+    suite.covers, suite.own, suite.same = (
+        {test: n for test, n in each.items() if test in suite.seconds}
+        for each in (covers, own, same)
+    )
     return suite
 
 
-def vitest_tests(report: Mapping) -> dict[tuple[str, str], float]:
-    """Each test Vitest's JSON report says passed, by its file and full
-    name (its describes' titles and its own, as --testNamePattern reads
-    them), and its seconds."""
-    return {
-        (file["name"], " > ".join([*test["ancestorTitles"], test["title"]])): (
-            test["duration"] / 1000
+def vitest_tests(report: Mapping) -> list[tuple[str, str, float]]:
+    """Each test Vitest's JSON report says passed: its file, its full name
+    (its describes' titles and its own, as --testNamePattern reads them),
+    which more than one test may have, and its seconds."""
+    return [
+        (
+            file["name"],
+            " > ".join([*test["ancestorTitles"], test["title"]]),
+            test["duration"] / 1000,
         )
         for file in report["testResults"]
         for test in file["assertionResults"]
         if test["status"] == "passed"
-    }
+    ]
 
 
-def frontend_id(file: str, name: str) -> str:
-    return f"{Path(file).relative_to(FRONTEND)} > {name}"
+def frontend_ids(tests: Iterable[tuple[str, str, float]]) -> list[str]:
+    """Each test's id: its file and full name, and, for the second test
+    and on with that name, its number among them."""
+    seen: Counter[tuple[str, str]] = Counter()
+    ids = []
+    for file, name, _ in tests:
+        seen[file, name] += 1
+        again = f" ({seen[file, name]})" if seen[file, name] > 1 else ""
+        ids.append(f"{Path(file).relative_to(FRONTEND)} > {name}{again}")
+    return ids
 
 
 def covered(coverage_map: Mapping) -> set[tuple[str, str, str, int]]:
@@ -219,9 +241,10 @@ def covered(coverage_map: Mapping) -> set[tuple[str, str, str, int]]:
     return keys
 
 
-def alone(file: str, name: str) -> set[tuple[str, str, str, int]]:
+def alone(number: int, file: str, name: str) -> set[tuple[str, str, str, int]]:
     """What the frontend's test covers, run alone: by its exact full name,
-    as a regular expression, in its file."""
+    as a regular expression, in its file; its output in its own log,
+    numbered."""
     pattern = "^" + REGEX_SPECIAL.sub(r"\\\g<0>", name) + "$"
     with tempfile.TemporaryDirectory() as directory:
         output = Path(directory) / "report.json"
@@ -235,7 +258,7 @@ def alone(file: str, name: str) -> set[tuple[str, str, str, int]]:
                 file,
             ],
             FRONTEND,
-            "frontend-alone.log",
+            f"frontend-alone/{number}.log",
         )
         report = json.loads(output.read_text())
     if not report["numPassedTests"]:
@@ -257,30 +280,38 @@ def measure_frontend() -> Suite:
         "frontend.log",
     )
     tests = vitest_tests(json.loads(report.read_text()))
-    suite = Suite("Frontend", wall, {frontend_id(*t): s for t, s in tests.items()})
+    ids = frontend_ids(tests)
+    suite = Suite("Frontend", wall, {i: t[2] for i, t in zip(ids, tests, strict=True)})
     total = json.loads((totals / "coverage-summary.json").read_text())["total"]
     suite.coverage = (
         f"{total['lines']['pct']}% of lines, {total['branches']['pct']}% of branches"
     )
     log.info("measuring each test's coverage", suite="frontend", tests=len(tests))
+    names = list(dict.fromkeys((file, name) for file, name, _ in tests))
+    (OUT / "frontend-alone").mkdir()
     with ThreadPoolExecutor(os.cpu_count()) as pool:
-        each = pool.map(lambda test: alone(*test), tests)
-        suite.covers, suite.own, suite.same = own_and_same(
-            dict(zip((frontend_id(*t) for t in tests), each, strict=True))
-        )
+        each = pool.map(lambda n: alone(n[0], *n[1]), enumerate(names, 1))
+        by_name = dict(zip(names, each, strict=True))
+    suite.covers, suite.own, suite.same = own_and_same(
+        {i: by_name[t[:2]] for i, t in zip(ids, tests, strict=True)}
+    )
     return suite
 
 
-def playwright_tests(suite: Mapping) -> dict[str, float]:
-    """Each test in Playwright's JSON report, by its file, title and
-    project, and its seconds over its tries."""
+def playwright_tests(suite: Mapping, titles: Sequence[str] = ()) -> dict[str, float]:
+    """Each test Playwright's JSON report did not skip, by its suites'
+    titles (its file's, then its describes'), its own and its project, and
+    its seconds over its tries."""
     seconds = {}
     for spec in suite.get("specs", []):
         for test in spec["tests"]:
-            name = f"{spec['file']} > {spec['title']} ({test['projectName']})"
-            seconds[name] = sum(r["duration"] for r in test["results"]) / 1000
+            if test["status"] != "skipped":
+                name = " > ".join([*titles, spec["title"]])
+                seconds[f"{name} ({test['projectName']})"] = (
+                    sum(r["duration"] for r in test["results"]) / 1000
+                )
     for inner in suite.get("suites", []):
-        seconds |= playwright_tests(inner)
+        seconds |= playwright_tests(inner, [*titles, inner["title"]])
     return seconds
 
 

@@ -24,51 +24,77 @@ JUNIT = """<testsuites><testsuite>
 <skipped/></testcase>
 </testsuite></testsuites>"""
 # Each backend test's arcs, by its context; the first test's split between
-# its setup and its call, and an arc no test ran but the import.
+# its setup and its call, a test skipped after its setup, and an arc no test
+# ran but the import.
 CONTEXTS = {
     "tests/test_a.py::test_one|setup": {(1, 2)},
     "tests/test_a.py::test_one|run": {(2, 3)},
     "tests/test_a.py::test_two[x]|run": {(1, 2), (2, 3)},
     "tests/sub/test_b.py::test_three|run": {(1, 2), (5, 6)},
+    "tests/sub/test_b.py::test_skipped|setup": {(7, 8)},
     "": {(9, 10)},
 }
 # The frontend's tests: each one's seconds, and the statements and ways of
-# the one branch it covers alone.
+# the one branch it covers alone. Two tests share the second name.
 VITEST = {
     "sums > adds (1+1)": (0.012, {"0"}, {0}),
     "sums > adds again": (0.003, {"0"}, {0}),
     "subtracts": (0.002, {"0", "1"}, set()),
 }
+TWICE = "sums > adds again"
+# A file's suite, and one of its describes; two tests share a title in two
+# describes, and one was skipped.
 PLAYWRIGHT = {
     "config": {"projects": [{"name": "sign-in"}, {"name": "chromium"}]},
     "suites": [
         {
+            "title": "sign-in.setup.ts",
             "specs": [
                 {
-                    "file": "sign-in.setup.ts",
                     "title": "signs in",
                     "tests": [
-                        {"projectName": "sign-in", "results": [{"duration": 900}]}
+                        {
+                            "projectName": "sign-in",
+                            "status": "expected",
+                            "results": [{"duration": 900}],
+                        }
+                    ],
+                }
+            ],
+        },
+        {
+            "title": "menu.spec.ts",
+            "specs": [
+                {
+                    "title": "opens",
+                    "tests": [
+                        {
+                            "projectName": "chromium",
+                            "status": "flaky",
+                            "results": [{"duration": 1000}, {"duration": 500}],
+                        },
+                        {"projectName": "webkit", "status": "skipped", "results": []},
                     ],
                 }
             ],
             "suites": [
                 {
+                    "title": "dark",
                     "specs": [
                         {
-                            "file": "menu.spec.ts",
                             "title": "opens",
                             "tests": [
                                 {
                                     "projectName": "chromium",
-                                    "results": [{"duration": 1000}, {"duration": 500}],
+                                    "status": "expected",
+                                    "results": [{"duration": 250}],
                                 }
                             ],
                         }
-                    ]
+                    ],
                 }
             ],
-        }
+        },
     ],
 }
 
@@ -96,13 +122,13 @@ def visuite_report(frontend: Path, names: list[str], output: Path) -> None:
             "status": "passed",
             "duration": VITEST[n][0] * 1000,
         }
-        for n in names
+        for n in [*names, *[TWICE] * (TWICE in names)]
     ]
     skipped = {"ancestorTitles": [], "title": "skips", "status": "skipped"}
     output.write_text(
         json.dumps(
             {
-                "numPassedTests": len(names),
+                "numPassedTests": len(results),
                 "testResults": [
                     {"name": file, "assertionResults": [*results, skipped]}
                 ],
@@ -190,8 +216,9 @@ def test_backend_tests_by_their_node_ids_from_coverage_contexts(
     covers, own, same = suite_report.backend_contexts(tmp_path / "data")
     # A test's setup counts as its own; the import, as no test's.
     one, two, three = "tests/test_a.py::test_one", "tests/test_a.py::test_two[x]", "tests/sub/test_b.py::test_three"  # fmt: skip
-    assert covers == {one: 2, two: 2, three: 2}
-    assert own == {one: 0, two: 0, three: 1}
+    skipped = "tests/sub/test_b.py::test_skipped"
+    assert covers == {one: 2, two: 2, three: 2, skipped: 1}
+    assert own == {one: 0, two: 0, three: 1, skipped: 1}
     assert same == {one: 1, two: 1}
 
 
@@ -205,11 +232,20 @@ def test_a_failed_run_stops_the_report_naming_its_output(
     assert suite_report.run(["true"], clone, "passed.log") >= 0
 
 
+def test_backend_tests_matching_no_coverage_context_stop_the_report(
+    clone: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(suite_report, "backend_tests", lambda _: {"other": 1.0})
+    suite_report.OUT.mkdir(parents=True)
+    with pytest.raises(SystemExit, match="matches a coverage context"):
+        suite_report.measure_backend()
+
+
 def test_a_frontend_test_not_found_alone_stops_the_report(clone: Path) -> None:
     file = str(clone / "frontend" / "src" / "a.test.ts")
-    suite_report.OUT.mkdir(parents=True)
+    (suite_report.OUT / "frontend-alone").mkdir(parents=True)
     with pytest.raises(SystemExit, match="Found no test named 'adds' in "):
-        suite_report.alone(file, "adds")
+        suite_report.alone(1, file, "adds")
 
 
 def test_the_report_and_each_suites_tests(clone: Path) -> None:
@@ -219,23 +255,27 @@ def test_the_report_and_each_suites_tests(clone: Path) -> None:
     report = (out / "report.md").read_text()
     assert "| Backend | 4 | 0.0 s | 5 s | 99.42% of lines and branches |" in report
     assert (
-        "| Frontend | 3 | 0.0 s | 0 s | 100% of lines, 99.22% of branches |" in report
+        "| Frontend | 4 | 0.0 s | 0 s | 100% of lines, 99.22% of branches |" in report
     )
-    assert "| Browser | 2 | 0.0 s | 2 s | not measured |" in report
+    assert "| Browser | 3 | 0.0 s | 3 s | not measured |" in report
     assert "| `tests/sub/test_b.py::test_three` | 3.00 |" in report
     assert "3 of 4 tests cover nothing no other test does. 2 tests, in 1" in report
-    assert "2 of 3 tests cover nothing no other test does. 2 tests, in 1" in report
-    assert "| 1 | 2 | 2 | `src/a.test.ts > sums > adds (1+1)` |" in report
+    assert "3 of 4 tests cover nothing no other test does. 3 tests, in 1" in report
+    assert "| 1 | 3 | 2 | `src/a.test.ts > sums > adds (1+1)` |" in report
     assert "| `backend/tests/sub/test_b.py` | 3 |" in report
     assert "| `menu.spec.ts > opens (chromium)` | 1.50 |" in report
+    assert "| `menu.spec.ts > dark > opens (chromium)` | 0.25 |" in report
     assert (out / "frontend.tsv").read_text().splitlines() == [
         "test\tseconds\tcovers\tcovers alone\tsame as group",
         "src/a.test.ts > subtracts\t0.002\t2\t1\t",
         "src/a.test.ts > sums > adds (1+1)\t0.012\t2\t0\t1",
         "src/a.test.ts > sums > adds again\t0.003\t2\t0\t1",
+        "src/a.test.ts > sums > adds again (2)\t0.003\t2\t0\t1",
     ]
     assert (
         "tests/sub/test_b.py::test_four\t0.500\t\t\t\n"
         in (out / "backend.tsv").read_text()
     )
     assert (out / "backend-contexts.log").read_text() == "ran in backend\n"
+    # Each name run alone once, its output in a log of its own.
+    assert len(list((out / "frontend-alone").iterdir())) == 3
