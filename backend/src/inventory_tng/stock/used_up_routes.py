@@ -30,7 +30,7 @@ from inventory_tng.stock.paths import CLOSE, STOCK, USED_UP
 from inventory_tng.web.admin import TICK_OPEN_PACKAGES, admin_page, now
 from inventory_tng.web.listing import AskedView, Sort, Sorting, View, arranged
 from inventory_tng.web.navigation import SECTION_STOCK
-from inventory_tng.web.pages import NOTICES, not_found, redirect
+from inventory_tng.web.pages import add_notices, not_found, redirect
 
 log = structlog.get_logger(__name__)
 meter = metrics.get_meter(__name__)
@@ -44,7 +44,7 @@ USED_UP_UNCHANGED = lazy_gettext(
     "Nothing changed: it was answered meanwhile, moved, or its place can't be "
     "adjusted until counted."
 )
-NOTICES.update(
+add_notices(
     {
         "used_up_confirmed": USED_UP_CONFIRMED,
         "used_up_cleared": USED_UP_CLEARED,

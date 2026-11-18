@@ -11,7 +11,11 @@ from sqlalchemy.orm import Session
 from structlog.testing import capture_logs
 
 from inventory_tng.admins import accounts, guards, paths
-from inventory_tng.admins.account_routes import CODES_NEED_TOTP, EMAIL_TAKEN
+from inventory_tng.admins.account_routes import (
+    AUTHENTICATOR_RENAMED,
+    CODES_NEED_TOTP,
+    EMAIL_TAKEN,
+)
 from inventory_tng.admins.guards import NAME_TAKEN
 from inventory_tng.core import mail
 from inventory_tng.models import (
@@ -170,8 +174,13 @@ def test_renaming_an_authenticator(
 ) -> None:
     (authenticator,) = accounts.authenticators(session, ada[0].id)
     path = f"{ACCOUNT}/authenticators/{authenticator.id}/name"
-    assert client.post(path, data={"authenticator_name": "Pixel"}).status_code == 303
+    renamed = client.post(path, data={"authenticator_name": "Pixel"})
+    assert renamed.status_code == 303
     assert authenticator.name == "Pixel"
+    # Its own words, not the item page's about an alias (inventory-tng-80j6).
+    page = read(client.get(renamed.headers["location"]).text)
+    (said,) = page.all("p", role="status")
+    assert said.text == str(AUTHENTICATOR_RENAMED)
     blank = client.post(path, data={"authenticator_name": " "})
     assert blank.status_code == 400
 

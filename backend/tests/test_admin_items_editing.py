@@ -309,7 +309,7 @@ def test_editing_every_field(
     done = admin_client.post(f"{ITEMS}/{item.id}", data=form)
     # Renamed: its old name kept as an alias.
     assert done.headers["location"] == (
-        f"{ITEMS}/{item.id}?notice=renamed&section=aliases#aliases"
+        f"{ITEMS}/{item.id}?notice=item_renamed&section=aliases#aliases"
     )
     assert (item.name, item.category_id, item.unit) == ("Cat6 cable", cables.id, "m")
     assert (item.old_code, item.minimum, item.manufacturer) == (

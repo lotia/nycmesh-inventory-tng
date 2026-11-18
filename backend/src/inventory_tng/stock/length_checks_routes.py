@@ -43,7 +43,7 @@ from inventory_tng.stock.used_up_routes import BY_PACKAGE, BY_SHOWS
 from inventory_tng.web.admin import TICK_OPEN_PACKAGES, admin_page, now
 from inventory_tng.web.listing import AskedView, Sort, Sorting, View, arranged
 from inventory_tng.web.navigation import SECTION_STOCK
-from inventory_tng.web.pages import NOTICES, not_found, redirect
+from inventory_tng.web.pages import add_notices, not_found, redirect
 
 log = structlog.get_logger(__name__)
 
@@ -66,7 +66,7 @@ LENGTH_RELOAD = lazy_gettext(
 LENGTH_NONE_SAID = lazy_gettext(
     "Nobody said what is on those: type what is on each, and set it on its own."
 )
-NOTICES.update(
+add_notices(
     {
         "length_set": LENGTH_SET,
         "length_left": LENGTH_LEFT,

@@ -56,7 +56,7 @@ from inventory_tng.web.listing import (
 )
 from inventory_tng.web.listing import order as order_of
 from inventory_tng.web.navigation import SECTION_STOCK
-from inventory_tng.web.pages import NOTICES, not_found, redirect
+from inventory_tng.web.pages import add_notices, not_found, redirect
 
 log = structlog.get_logger(__name__)
 
@@ -77,7 +77,7 @@ UNCHANGED = lazy_gettext(
     "Not changed: someone answered or changed it meanwhile. Reload to see it as it is."
 )
 BROUGHT_BACK = lazy_gettext("Brought back. Correct it now.")
-NOTICES.update(
+add_notices(
     {
         "over_recorded_corrected": CORRECTED,
         "over_recorded_checked": MARKED_CHECKED,

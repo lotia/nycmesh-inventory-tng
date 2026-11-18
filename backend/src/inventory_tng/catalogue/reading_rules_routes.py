@@ -40,7 +40,7 @@ from inventory_tng.web.listing import (
     arranged,
     tidied,
 )
-from inventory_tng.web.pages import NOTICES, not_found, redirect
+from inventory_tng.web.pages import add_notices, not_found, redirect
 
 log = structlog.get_logger(__name__)
 
@@ -51,7 +51,7 @@ READING_DELETED = lazy_gettext(
     "Deleted. Names with it are read by the unit table again."
 )
 READINGS_ACCEPTED = lazy_gettext("Accepted. Every name with them is read so now.")
-NOTICES.update(
+add_notices(
     {
         "reading_saved": READING_SAVED,
         "reading_deleted": READING_DELETED,

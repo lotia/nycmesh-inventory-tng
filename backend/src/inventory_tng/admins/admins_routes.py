@@ -36,7 +36,7 @@ from inventory_tng.web.forms import rule_words
 from inventory_tng.web.listing import AskedView, Sort, Sorting, View, arranged
 from inventory_tng.web.navigation import SECTION_ADMINS
 from inventory_tng.web.once import OnceKey, sent_before
-from inventory_tng.web.pages import NOTICES, not_found, redirect
+from inventory_tng.web.pages import add_notices, not_found, redirect
 
 log = structlog.get_logger(__name__)
 
@@ -46,7 +46,7 @@ ADMIN_RETIRED = lazy_gettext(
     "Retired: they can no longer sign in, and their password, authenticators "
     "and recovery codes are removed."
 )
-NOTICES["admin_retired"] = ADMIN_RETIRED
+add_notices({"admin_retired": ADMIN_RETIRED})
 
 
 def link_title(username: str) -> str:

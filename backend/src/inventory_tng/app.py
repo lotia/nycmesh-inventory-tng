@@ -9,12 +9,8 @@ from contextlib import asynccontextmanager
 import structlog
 from fastapi import FastAPI
 
-# Before catalogue/items_routes.py: both name a notice "renamed", and the
-# module imported last has its words said on both pages (inventory-tng-80j6).
-from inventory_tng.admins import account_routes
-
-# isort: split
 from inventory_tng.admins import (
+    account_routes,
     accounts,
     admins_routes,
     guards,

@@ -34,7 +34,7 @@ from inventory_tng.stock import adjustment_reasons
 from inventory_tng.web.admin import admin_page, now, text_form
 from inventory_tng.web.forms import CHANGED, RULES, form_version, name_problem
 from inventory_tng.web.navigation import SECTION_SETTINGS
-from inventory_tng.web.pages import NOTICES, not_found, redirect
+from inventory_tng.web.pages import add_notices, not_found, redirect
 
 log = structlog.get_logger(__name__)
 
@@ -43,7 +43,7 @@ router = APIRouter(include_in_schema=False)
 SETTINGS_SAVED = lazy_gettext("Saved. Open scan pages pick it up within ten minutes.")
 REASON_RETIRED = lazy_gettext("Retired: it is no longer offered.")
 SITE_SAVED = lazy_gettext("Saved: times are shown in the new zone.")
-NOTICES.update(
+add_notices(
     {
         "settings_saved": SETTINGS_SAVED,
         "reason_retired": REASON_RETIRED,

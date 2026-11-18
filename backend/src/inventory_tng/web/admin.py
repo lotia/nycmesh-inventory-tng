@@ -36,7 +36,7 @@ from inventory_tng.models import (
     Volunteer,
 )
 from inventory_tng.web.forms import NAME_MAX, row_id
-from inventory_tng.web.pages import NOTICES, page, templates
+from inventory_tng.web.pages import add_notices, page, templates
 
 _globals = cast(dict[str, Any], templates.env.globals)
 _globals["name_max"] = NAME_MAX
@@ -52,7 +52,7 @@ ADDED = lazy_gettext("Added.")
 SAVED = lazy_gettext("Saved.")
 RETIRED_NOTICE = lazy_gettext("Retired.")
 RESTORED = lazy_gettext("Brought back.")
-NOTICES.update(
+add_notices(
     {
         "added": ADDED,
         "saved": SAVED,

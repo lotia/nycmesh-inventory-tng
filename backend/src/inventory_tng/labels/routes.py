@@ -31,7 +31,7 @@ from inventory_tng.places.paths import LOCATIONS
 from inventory_tng.web.admin import admin_page, now, revoke_title
 from inventory_tng.web.listing import AskedView, Listing, Searched, Sort, Sorting
 from inventory_tng.web.navigation import SECTION_LABELS
-from inventory_tng.web.pages import NOTICES, not_found, redirect, templates
+from inventory_tng.web.pages import add_notices, not_found, redirect, templates
 
 log = structlog.get_logger(__name__)
 
@@ -66,7 +66,7 @@ def _copies() -> str:
 TOO_MANY = lazy(_too_many)
 COPIES = lazy(_copies)
 PRINT_TITLE = lazy_gettext("Print labels")
-NOTICES.update(
+add_notices(
     {
         "label_revoked": LABEL_REVOKED,
         "pick_labels": PICK_LABELS,

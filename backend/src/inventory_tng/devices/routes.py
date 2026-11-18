@@ -48,7 +48,7 @@ from inventory_tng.web.listing import (
 from inventory_tng.web.listing import order as order_of
 from inventory_tng.web.navigation import SECTION_DEVICES
 from inventory_tng.web.once import OnceKey, sent_before
-from inventory_tng.web.pages import NOTICES, not_found, redirect
+from inventory_tng.web.pages import add_notices, not_found, redirect
 
 log = structlog.get_logger(__name__)
 
@@ -61,7 +61,7 @@ CODE_REVOKED = lazy_gettext(
     "any that look wrong."
 )
 DEVICE_REVOKED = lazy_gettext("Revoked: it can't save anything now.")
-NOTICES.update({"code_revoked": CODE_REVOKED, "device_revoked": DEVICE_REVOKED})
+add_notices({"code_revoked": CODE_REVOKED, "device_revoked": DEVICE_REVOKED})
 NEW_CODE_TITLE = lazy_gettext("A new registration code")
 REGISTERED_DEVICES = lazy_gettext("Registered devices")
 
@@ -371,7 +371,7 @@ def revoke_device(
 # administrators made, are the ones to look at.
 
 DEVICES_REVOKED = lazy_gettext("Revoked: they can't save anything now.")
-NOTICES["devices_revoked"] = DEVICES_REVOKED
+add_notices({"devices_revoked": DEVICES_REVOKED})
 
 
 # How the devices list sorts: newest registered first, or by a heading,

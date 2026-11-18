@@ -26,7 +26,7 @@ from inventory_tng.core.mail import Notify
 from inventory_tng.core.phrases import Words, lazy_gettext
 from inventory_tng.models import ResetLink
 from inventory_tng.web.browser import rate_key
-from inventory_tng.web.pages import NOTICES, not_found, page, redirect
+from inventory_tng.web.pages import add_notices, not_found, page, redirect
 
 router = APIRouter(include_in_schema=False)
 
@@ -36,7 +36,7 @@ ASKED = lazy_gettext(
     "administrator to reset your sign-in."
 )
 RESET_NOTICE = lazy_gettext("Your account is reset: sign in.")
-NOTICES["reset"] = RESET_NOTICE
+add_notices({"reset": RESET_NOTICE})
 
 REFUSED = {
     "bad_token": ("token", lazy_gettext("That isn't the recovery token.")),

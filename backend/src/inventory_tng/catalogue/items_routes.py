@@ -43,7 +43,7 @@ from inventory_tng.web.listing import (
     Listing,
 )
 from inventory_tng.web.navigation import SECTION_ITEMS
-from inventory_tng.web.pages import NOTICES, not_found, redirect
+from inventory_tng.web.pages import add_notices, not_found, redirect
 
 log = structlog.get_logger(__name__)
 meter = metrics.get_meter(__name__)
@@ -142,7 +142,7 @@ RENAMED = lazy_gettext(
     "remove it below if it shouldn't be."
 )
 ALIAS_REMOVED = lazy_gettext("Alias removed.")
-NOTICES.update(
+add_notices(
     {
         "package_added": PACKAGE_ADDED,
         "package_retired": PACKAGE_RETIRED,
@@ -155,7 +155,7 @@ NOTICES.update(
         "tracking_none": TRACKING_NONE,
         "tracking_same": TRACKING_SAME,
         "alias_added": ALIAS_ADDED,
-        "renamed": RENAMED,
+        "item_renamed": RENAMED,
         "alias_removed": ALIAS_REMOVED,
     }
 )
@@ -484,7 +484,7 @@ def save_item(
     if renamed.swapped is not None:
         swapped = renamed.swapped.id
         log.info("alias removed", item_id=item_id, item_alias_id=swapped, by=how)
-    return redirect(f"{ITEMS}/{item_id}", notice="renamed", section="aliases")
+    return redirect(f"{ITEMS}/{item_id}", notice="item_renamed", section="aliases")
 
 
 @router.post(f"{ITEMS}/{{item_id}}/retire")

@@ -296,7 +296,7 @@ def test_a_rename_keeps_the_old_name_as_an_alias(
     with capture_logs() as logs:
         done = save("LiteBeam 5AC Gen1")
     assert done.headers["location"] == (
-        f"{ITEMS}/{item.id}?notice=renamed&section=aliases#aliases"
+        f"{ITEMS}/{item.id}?notice=item_renamed&section=aliases#aliases"
     )
     (alias,) = items.aliases(session, item.id)
     assert alias.name == "LiteBeam 5AC"

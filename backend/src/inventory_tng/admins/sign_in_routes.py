@@ -56,7 +56,7 @@ from inventory_tng.core.mail import Notify
 from inventory_tng.core.phrases import Words, lazy_gettext
 from inventory_tng.models import Admin, AdminSession, running_low
 from inventory_tng.web.browser import rate_key, set_private_cookie
-from inventory_tng.web.pages import NOTICES, not_found, page, redirect
+from inventory_tng.web.pages import add_notices, not_found, page, redirect
 
 router = APIRouter(include_in_schema=False)
 
@@ -86,7 +86,7 @@ CODES_NONE = lazy_gettext(
     "them, a lost phone locks you out until another administrator resets your "
     "sign-in."
 )
-NOTICES.update({"codes_low": CODES_LOW, "codes_none": CODES_NONE})
+add_notices({"codes_low": CODES_LOW, "codes_none": CODES_NONE})
 
 
 # The first administrator

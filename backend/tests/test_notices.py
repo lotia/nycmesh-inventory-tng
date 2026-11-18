@@ -98,6 +98,15 @@ def test_the_redirect_goes_to_the_section() -> None:
         pages.redirect("/admin/settings", notice="saved", section="Sign In")
 
 
+def test_a_notice_key_another_module_added_is_refused() -> None:
+    """Else whichever module was imported last would speak for both pages
+    (inventory-tng-80j6); nothing of a refused call is added."""
+    with pytest.raises(ValueError, match="notice already added: saved"):
+        pages.add_notices({"saved": "Kept.", "never_added": "Never."})
+    assert pages.NOTICES["saved"] != "Kept."
+    assert "never_added" not in pages.NOTICES
+
+
 def test_the_notice_sections_are_the_sections_pages_say_notices_by() -> None:
     """Both ways: no notice is sent where no page says it, and no page
     waits for a section no redirect may name."""

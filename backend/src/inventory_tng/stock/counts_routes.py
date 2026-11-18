@@ -91,7 +91,7 @@ from inventory_tng.web.forms import RULES, row_id
 from inventory_tng.web.listing import UNASKED, AskedView, Sort, Sorting, View, order
 from inventory_tng.web.navigation import SECTION_COUNTS
 from inventory_tng.web.once import form_key
-from inventory_tng.web.pages import NOTICES, not_found, redirect
+from inventory_tng.web.pages import add_notices, not_found, redirect
 
 log = structlog.get_logger(__name__)
 
@@ -131,7 +131,7 @@ def moved_meanwhile(saved: int) -> str:
 COUNTED_NOTICE = lazy_gettext("Counted. The records now match what you found.")
 COUNTED_SAME = lazy_gettext("Counted: everything was as the records say.")
 ADJUSTED = lazy_gettext("Recorded.")
-NOTICES.update(
+add_notices(
     {
         "counted": COUNTED_NOTICE,
         "counted_same": COUNTED_SAME,

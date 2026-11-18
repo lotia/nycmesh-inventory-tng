@@ -30,7 +30,7 @@ from inventory_tng.web.admin import admin_page, now, retirement, undo_retire
 from inventory_tng.web.forms import ALERTS, RULES, form_version, rule_words
 from inventory_tng.web.listing import AskedView, Listing, Searched, Sort, Sorting
 from inventory_tng.web.navigation import SECTION_VOLUNTEERS
-from inventory_tng.web.pages import NOTICES, not_found, redirect
+from inventory_tng.web.pages import add_notices, not_found, redirect
 
 log = structlog.get_logger(__name__)
 
@@ -41,7 +41,7 @@ BRING_THEM_BACK = lazy_gettext("Bring them back")
 MERGED = lazy_gettext("Merged. Their past records now count as the other's.")
 CUSTODY_ON = lazy_gettext("They can hold stock now.")
 CUSTODY_OFF = lazy_gettext("They no longer hold stock.")
-NOTICES.update(
+add_notices(
     {
         "volunteer_merged": MERGED,
         "custody_on": CUSTODY_ON,
