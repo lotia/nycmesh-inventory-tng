@@ -2,7 +2,6 @@
 docs/decisions/0023). It dispatches as manage does
 (inventory_tng.core.entry_point): test_manage.py tests what the two share."""
 
-import runpy
 import subprocess
 import sys
 
@@ -10,6 +9,8 @@ import pytest
 
 from devtools.__main__ import COMMANDS, main
 from inventory_tng.core.local_env import CLONE
+
+from helpers.python_m import run_as_python_m
 
 
 @pytest.mark.parametrize("name", COMMANDS)
@@ -26,12 +27,7 @@ def test_with_no_command_it_lists_every_one(
     monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
 ) -> None:
     monkeypatch.setattr(sys, "argv", ["devtools"])
-    # A fresh copy, as python -m runs: runpy warns if the module is
-    # already imported, here or by an earlier test.
-    monkeypatch.delitem(sys.modules, "devtools.__main__", raising=False)
-    with pytest.raises(SystemExit) as done:
-        runpy.run_module("devtools", run_name="__main__")
-    assert done.value.code == 0
+    assert run_as_python_m(monkeypatch, "devtools.__main__") == 0
     out = capsys.readouterr().out
     for name, (_, line) in COMMANDS.items():
         assert f"  {name}" in out

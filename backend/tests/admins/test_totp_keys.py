@@ -2,7 +2,6 @@
 docs/decisions/0017): a copy of the database alone cannot make codes."""
 
 import base64
-import runpy
 import sys
 from datetime import UTC, datetime
 from pathlib import Path
@@ -19,6 +18,7 @@ from inventory_tng.core.db_sessions import Database
 from inventory_tng.core.settings import SettingsError
 from inventory_tng.models.admins import Authenticator
 
+from helpers.python_m import run_as_python_m
 from helpers.sign_in import TOTP_KEYS, code, new_admin, raw_key
 
 KEY = "JBSWY3DPEHPK3PXP"
@@ -110,12 +110,7 @@ def test_new_prints_a_key_that_loads(
 ) -> None:
     """As DEPLOYMENT.md runs it: python -m inventory_tng.manage totp-keys new."""
     monkeypatch.setattr(sys, "argv", ["manage", "totp-keys", "new"])
-    # A fresh copy, as python -m runs: runpy warns if the module is
-    # already imported, here or by an earlier test.
-    monkeypatch.delitem(sys.modules, "inventory_tng.manage", raising=False)
-    with pytest.raises(SystemExit) as done:
-        runpy.run_module("inventory_tng.manage", run_name="__main__")
-    assert done.value.code == 0
+    assert run_as_python_m(monkeypatch, "inventory_tng.manage") == 0
     printed = capsys.readouterr().out.strip()
     assert TotpKeys.load(keys_in(tmp_path, **{"1": printed})).newest == 1
 

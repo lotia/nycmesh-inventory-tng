@@ -1,13 +1,14 @@
 """The operator's one entry point, python -m inventory_tng.manage
 (manage.py; docs/decisions/0023)."""
 
-import runpy
 import subprocess
 import sys
 
 import pytest
 
 from inventory_tng import manage
+
+from helpers.python_m import run_as_python_m
 
 
 @pytest.mark.parametrize("name", manage.COMMANDS)
@@ -30,12 +31,7 @@ def test_with_no_command_it_lists_every_one(
 ) -> None:
     """As DEPLOYMENT.md runs it."""
     monkeypatch.setattr(sys, "argv", argv)
-    # A fresh copy, as python -m runs: runpy warns if the module is
-    # already imported, here or by an earlier test.
-    monkeypatch.delitem(sys.modules, "inventory_tng.manage", raising=False)
-    with pytest.raises(SystemExit) as done:
-        runpy.run_module("inventory_tng.manage", run_name="__main__")
-    assert done.value.code == 0
+    assert run_as_python_m(monkeypatch, "inventory_tng.manage") == 0
     out = capsys.readouterr().out
     for name, (_, line) in manage.COMMANDS.items():
         assert f"  {name}" in out
