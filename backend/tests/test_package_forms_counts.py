@@ -2,9 +2,12 @@
 form, and the count page counts sealed and open packages, finding and
 closing them."""
 
+import re
 import uuid
+from collections.abc import Collection
 from decimal import Decimal
 
+import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -12,7 +15,7 @@ from sqlalchemy.orm import Session
 from inventory_tng.models.admins import Admin
 from inventory_tng.models.catalogue import Category, ItemPackage
 from inventory_tng.models.stock import AdjustmentReason, LedgerTransaction, OpenPackage
-from inventory_tng.stock import counts, moments, queries
+from inventory_tng.stock import counts, counts_routes, moments, queries
 from inventory_tng.stock import forms as stock_forms
 from inventory_tng.stock.ledger import LOOSE, Entry, Form
 
@@ -297,3 +300,41 @@ def test_current_packages_come_by_item_then_smallest_ties_by_id(
         if package.item_id == item.id
     ]
     assert listed == [small, first, second]
+
+
+def test_the_count_form_lists_sealed_smallest_first_ties_by_id(
+    admin_client: TestClient,
+    session: Session,
+    spools: Spools,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    store, cable = spools.store.id, spools.cable.id
+    first, second = same_size_twins(session, spools.cable, Decimal(610))
+    small = add(session, ItemPackage(item_id=cable, name="Small", size=Decimal(100)))
+    for package in (first, second, small):
+        spools.write(
+            {"kind": "receipt", "to_location_id": store},
+            Entry(cable, package.size, LOOSE, Form(package_id=package.id)),
+        )
+    made = spools.opened()
+
+    # The records' forms arrive by package id; reversed, so the form's
+    # order is its own, not theirs.
+    def reversed_forms(
+        session: Session, place_id: int, as_of: int, items: Collection[int]
+    ) -> dict[tuple[int, Form], Decimal]:
+        found = moments.expected_forms(session, place_id, as_of, items)
+        return dict(reversed(found.items()))
+
+    monkeypatch.setattr(counts_routes, "expected_forms", reversed_forms)
+    page = text(admin_client.get(f"{COUNTS}/{store}"))
+    asked = re.findall(rf'name="((?:sealed_{cable}_|loose_{cable}|opened_)\d*)"', page)
+    # Sealed smallest first, ties by id; then open ones; then loose.
+    assert asked == [
+        f"sealed_{cable}_{small.id}",
+        f"sealed_{cable}_{spools.spool.id}",
+        f"sealed_{cable}_{first.id}",
+        f"sealed_{cable}_{second.id}",
+        f"opened_{made.id}",
+        f"loose_{cable}",
+    ]

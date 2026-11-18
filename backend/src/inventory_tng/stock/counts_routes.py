@@ -469,12 +469,16 @@ def _forms(
             continue
         each = rows.setdefault(item_id, [])
 
-        # Sealed by package, then open ones oldest first, then loose.
-        def order(pair: tuple[Form, Decimal]) -> tuple[int, int]:
+        # Sealed smallest package first, ties by package id, as the item
+        # and scan pages list packages; then open ones oldest first; then
+        # loose.
+        def order(pair: tuple[Form, Decimal]) -> tuple[int, Decimal, int]:
             form = pair[0]
             if form.package_id is not None:
-                return 0, form.package_id
-            return (1, form.open_package_id) if form.open_package_id else (2, 0)
+                return 0, packages[form.package_id].size, form.package_id
+            if form.open_package_id is not None:
+                return 1, Decimal(0), form.open_package_id
+            return 2, Decimal(0), 0
 
         for form, amount in sorted(forms.items(), key=order):
             if form.package_id is not None:

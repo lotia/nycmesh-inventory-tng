@@ -8,8 +8,9 @@ amended 2026-11-11 (tracking opened packages is a setting; bulk actions)
 length; "Needs your action") · amended 2026-11-14 (recorded more than
 moved; those settled listed, 2026-11-15) · amended 2026-11-18 (an item's
 open packages listed fewest left first, short ends after the usable ones
-on the scan page; its sealed packages largest first; packages of one
-size by id)
+on the scan page; its sealed packages largest first on the stock pages,
+smallest first on the item, scan and count pages; packages of one size
+by id)
 
 ## Context
 
@@ -141,9 +142,10 @@ deployed, so the migrations may be rewritten (0016).
   package id, so the same records always show the same order (Ali,
   2026-11-18). The reorder page lists those low on sealed the same way,
   so the two pages agree (Ali, 2026-11-18). The item page, the scan
-  page and the count page's choice of package for an open one nobody
-  recorded list an item's packages smallest first, ties by package id,
-  for the same reason (Ali, 2026-11-18).
+  page, the count form's sealed packages and the count page's choice of
+  package for an open one nobody recorded list an item's packages
+  smallest first, ties by package id, for the same reason (Ali,
+  2026-11-18).
 - **Reorder** compares usable stock in stores with the item's reorder
   point.
 - **Minimum sealed**: a package may set an optional minimum of sealed
@@ -154,7 +156,10 @@ deployed, so the migrations may be rewritten (0016).
 
 - **A count asks for each form**: how many sealed packages of each size,
   what is left on each open package, and how much is loose. Each form is
-  corrected on its own, as items are today.
+  corrected on its own, as items are today. The form asks for an item's
+  sealed packages smallest size first, ties by package id, as the item
+  and scan pages list them, then its open packages oldest first, then
+  loose (Ali, 2026-11-18).
 - **A count may find an open package nobody recorded**, adding one with
   what is on it, and may close one that is not there, recording the loss
   (Ali, 2026-11-11). A count is an administrator's, so it closes packages,
