@@ -16,14 +16,13 @@ from typing import Annotated, Literal
 import structlog
 from fastapi import APIRouter, FastAPI, Request, Response
 from fastapi.responses import JSONResponse
-from limits import RateLimitItemPerMinute
 from limits.storage import MemoryStorage
 from limits.strategies import MovingWindowRateLimiter
 from opentelemetry import metrics
 from pydantic import BaseModel, ConfigDict, Field
 
 from inventory_tng.devices.schemas import RateLimitedReply
-from inventory_tng.web.browser import rate_key
+from inventory_tng.web.browser import over_limit
 
 log = structlog.get_logger(__name__)
 meter = metrics.get_meter(__name__)
@@ -221,14 +220,6 @@ def record(event: AnyEvent) -> None:
             differences_added.add(1, {"how": event.how})
         case _:  # ScanToSave, the last kind left.
             scan_to_save.record(event.seconds)
-
-
-def over_limit(request: Request, per_minute: int, kind: str) -> bool:
-    """Whether a report of this kind from this address is more than
-    per_minute allows, counted in this process's reports (install)."""
-    reports: MovingWindowRateLimiter = request.app.state.page_reports
-    allowed = RateLimitItemPerMinute(per_minute)
-    return not reports.hit(allowed, kind, rate_key(request))
 
 
 # Async: it works in memory only, so it holds no thread a request for the

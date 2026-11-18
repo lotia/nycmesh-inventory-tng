@@ -4,18 +4,17 @@ change it. A retired item with stock left may still be taken, never
 received (docs/decisions/0003)."""
 
 from collections.abc import Callable, Mapping, Sequence
-from dataclasses import dataclass
 from typing import Annotated, Literal
 
 import structlog
 from fastapi import APIRouter, Depends, Form, Request
 from fastapi.responses import HTMLResponse, JSONResponse, Response
 from opentelemetry import metrics
-from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from inventory_tng.admins.guards import AdminSignedIn, SignedIn
 from inventory_tng.catalogue import forms, items, queries, reading_rules, units
+from inventory_tng.catalogue.items_listing import SEARCHED
 from inventory_tng.catalogue.paths import CATEGORIES, ITEMS, READINGS
 from inventory_tng.catalogue.reading_rules import NOT_A_UNIT
 from inventory_tng.core.db import DbSession, exists_where, refusal
@@ -49,9 +48,6 @@ from inventory_tng.web.forms import ALERTS, RETIRED, RULES, form_version
 from inventory_tng.web.listing import (
     AskedView,
     Listing,
-    Searched,
-    Sort,
-    Sorting,
 )
 from inventory_tng.web.pages import NOTICES, not_found, redirect
 
@@ -192,35 +188,6 @@ def _tracking_changed(
 
 
 TextForm = Annotated[dict[str, str], Depends(text_form)]
-
-
-@dataclass(frozen=True)
-class _Shown:
-    """An item as its list's suggestions name it."""
-
-    name: str
-
-
-def _as_shown(_session: Session, rows: Sequence[Item]) -> list[_Shown]:
-    """Each item by its name as shown (KeyedName.name_shown)."""
-    return [_Shown(row.name_shown) for row in rows]
-
-
-# How the items list sorts: by name first, as it always has, or by a
-# heading (Ali, 2026-11-15, inventory-tng-qwb).
-SORTING = Sorting(
-    "name",
-    {
-        "name": Sort.of(func.lower(Item.name)),
-        "category": Sort.of(func.lower(queries.category_name)),
-        "unit": Sort.of(Item.unit),
-        "part": Sort.of(func.lower(Item.manufacturer), func.lower(Item.part_number)),
-    },
-)
-# How the items list finds an item: by anything a volunteer might type.
-SEARCHED = Searched(
-    ITEMS, Item, Item.search_text, Item.name, shown=_as_shown, sorting=SORTING
-)
 
 
 def _listed(

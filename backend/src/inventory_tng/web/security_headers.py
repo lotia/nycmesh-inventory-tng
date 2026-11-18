@@ -39,7 +39,7 @@ from starlette.types import ASGIApp, Message, Receive, Scope, Send
 
 from inventory_tng.core.phrases import BRAND
 from inventory_tng.devices.schemas import RateLimitedReply
-from inventory_tng.scan import page_telemetry
+from inventory_tng.web.browser import over_limit
 from inventory_tng.web.pages import NONCE, csp_nonce
 
 log = structlog.get_logger(__name__)
@@ -274,7 +274,7 @@ async def report(request: Request) -> Response:
     # A page's violations come a few at a time, and each is one request in
     # browsers that use report-uri.
     limit = request.app.state.settings.rate_limits.csp_reports
-    if page_telemetry.over_limit(request, limit, "csp"):
+    if over_limit(request, limit, "csp"):
         log.info("policy report refused", reason="rate_limited")
         body = RateLimitedReply(reason="rate_limited").model_dump()
         return JSONResponse(body, status_code=429)

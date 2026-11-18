@@ -41,7 +41,7 @@ from sqlalchemy import ColumnElement, case, func
 from sqlalchemy.orm import Session
 
 from inventory_tng.admins.guards import AdminSignedIn, SignedIn
-from inventory_tng.catalogue.items_routes import SEARCHED
+from inventory_tng.catalogue.items_listing import SEARCHED
 from inventory_tng.core.db import DbSession, by_name, refusal
 from inventory_tng.core.phrases import Words, gettext, in_query, lazy_gettext, ngettext
 from inventory_tng.models import (

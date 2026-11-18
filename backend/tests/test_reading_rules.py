@@ -15,7 +15,7 @@ from structlog.testing import capture_logs
 from inventory_tng.admins import paths
 from inventory_tng.catalogue import items, names, reading_rules, units
 from inventory_tng.catalogue.forms import CHOOSE_ONE, PACKAGE_TAKEN, TAKEN_FIELDS
-from inventory_tng.catalogue.items_routes import SEARCHED
+from inventory_tng.catalogue.items_listing import SEARCHED
 from inventory_tng.catalogue.paths import ITEMS, READINGS, SEED
 from inventory_tng.catalogue.reading_rules import LIKELY, NAMED, both, near
 from inventory_tng.catalogue.reading_rules_routes import READINGS_ACCEPTED

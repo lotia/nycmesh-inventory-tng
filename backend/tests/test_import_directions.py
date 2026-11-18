@@ -85,10 +85,6 @@ BREAKS: dict[str, dict[str, list[str]]] = {
             "stock/used_up_routes.py",
             "volunteers/routes.py",
         ],
-        "stock/counts_routes.py": ["catalogue/items_routes.py"],
-        "stock/over_recorded_routes.py": ["places/routes.py"],
-        "stock/stock_routes.py": ["catalogue/items_routes.py"],
-        "web/security_headers.py": ["scan/page_telemetry.py"],
     },
     "init_not_empty": {
         "admin/__init__.py": ["Assign", "For", "ImportFrom"],

@@ -22,6 +22,7 @@ from inventory_tng.models import STORE_KINDS, Label, Location
 from inventory_tng.places import locations, queries
 from inventory_tng.places.forms import KINDS, TAKEN, new_place, place_change
 from inventory_tng.places.paths import LOCATIONS
+from inventory_tng.places.queries import changeable
 from inventory_tng.volunteers import queries as volunteers_queries
 from inventory_tng.web.admin import (
     SECTION_LOCATIONS,
@@ -179,13 +180,6 @@ def location(
     if found is None:
         return not_found()
     return _location_page(request, session, signed, found)
-
-
-def changeable(session: Session, location_id: int) -> Location | None:
-    """A location this page changes, or Recorded more than moved brings
-    back: not a volunteer's custody, whose kind never changes."""
-    found = session.get(Location, location_id)
-    return None if found is None or found.kind == "custody" else found
 
 
 @router.post(f"{LOCATIONS}/{{location_id}}")

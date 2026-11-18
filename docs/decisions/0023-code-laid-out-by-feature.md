@@ -130,6 +130,7 @@ short test. `core/` is the name FastAPI's full-stack template uses;
 | `catalogue.py`: the reply schemas | `scan/catalogue_schemas.py` |
 | `catalogue/categories_routes.py`: `CATEGORIES` | `catalogue/paths.py` |
 | `catalogue/items_routes.py`: `ITEMS` | `catalogue/paths.py` |
+| `catalogue/items_routes.py`: how its list sorts and finds an item (`SORTING`, `SEARCHED`) | `catalogue/items_listing.py` |
 | `catalogue/reading_rules_routes.py`: its paths | `catalogue/paths.py` |
 | `catalogue/unit_readings.py`: its command | `catalogue/command.py` |
 | `categories.py` | `catalogue/categories.py` |
@@ -170,12 +171,14 @@ short test. `core/` is the name FastAPI's full-stack template uses;
 | `pages.py`: `amount`, `printed_length` | `web/formatting.py` |
 | `phrases.py` | `core/phrases.py` |
 | `places/routes.py`: `LOCATIONS` | `places/paths.py` |
+| `places/routes.py`: `changeable` | `places/queries.py` |
 | `rate_limits.py` | `core/rate_limits.py` |
 | `reading_rules.py` | `catalogue/reading_rules.py` |
 | `registration_codes.py` | `devices/command.py` |
 | `request_logging.py` | `core/request_logging.py` |
 | `resets.py` | `admins/reset_routes.py` |
 | `scan/catalogue_api.py`: its queries | `scan/queries.py` |
+| `scan/page_telemetry.py`: `over_limit` | `web/browser.py` |
 | `scan_settings.py` | `site_settings/scan_settings.py` |
 | `security_headers.py` | `web/security_headers.py` |
 | `seed.py` | `dev/seed.py` |

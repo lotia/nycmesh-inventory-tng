@@ -11,7 +11,7 @@ from sqlalchemy.orm import Session
 
 from inventory_tng import models
 from inventory_tng.catalogue import items
-from inventory_tng.catalogue.items_routes import SEARCHED
+from inventory_tng.catalogue.items_listing import SEARCHED
 from inventory_tng.catalogue.paths import ITEMS
 from inventory_tng.labels.paths import LABELS
 from inventory_tng.models import (

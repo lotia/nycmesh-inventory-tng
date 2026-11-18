@@ -16,7 +16,7 @@ from sqlalchemy import ColumnElement, true
 from sqlalchemy.orm import Session
 
 from inventory_tng.admins.guards import AdminSignedIn
-from inventory_tng.catalogue.items_routes import SEARCHED
+from inventory_tng.catalogue.items_listing import SEARCHED
 from inventory_tng.catalogue.paths import ITEMS
 from inventory_tng.core.db import DbSession
 from inventory_tng.core.phrases import Words, gettext, lazy_gettext

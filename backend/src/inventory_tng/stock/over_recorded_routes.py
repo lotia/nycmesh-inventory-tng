@@ -33,7 +33,7 @@ from inventory_tng.models import (
     canonical,
 )
 from inventory_tng.places import locations
-from inventory_tng.places.routes import changeable
+from inventory_tng.places.queries import changeable
 from inventory_tng.stock import balance, ledger, over_recorded
 from inventory_tng.stock.forms import confirmed_count, why_problem
 from inventory_tng.stock.needs_action import (

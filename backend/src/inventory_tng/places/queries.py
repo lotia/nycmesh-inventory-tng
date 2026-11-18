@@ -25,3 +25,10 @@ def current_areas_of(session: Session, location_id: int) -> Sequence[Location]:
         .where(Location.parent_id == location_id, Location.retired_at.is_(None))
         .order_by(func.lower(Location.name))
     ).all()
+
+
+def changeable(session: Session, location_id: int) -> Location | None:
+    """A location this page changes, or Recorded more than moved brings
+    back: not a volunteer's custody, whose kind never changes."""
+    found = session.get(Location, location_id)
+    return None if found is None or found.kind == "custody" else found
