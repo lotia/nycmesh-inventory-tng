@@ -54,8 +54,9 @@ from inventory_tng.models import (
     canonical,
 )
 from inventory_tng.pages import NOTICES, not_found, redirect
-from inventory_tng.stock import balance, queries
-from inventory_tng.web.forms import TYPE_A_NUMBER, quantity, row_id, rule_words, up_to
+from inventory_tng.stock import balance
+from inventory_tng.stock.forms import confirmed_count, why_problem
+from inventory_tng.web.forms import row_id, rule_words
 
 log = structlog.get_logger(__name__)
 
@@ -63,14 +64,6 @@ router = APIRouter(include_in_schema=False)
 
 TITLE = lazy_gettext("Recorded more than moved")
 SETTLED_TITLE = lazy_gettext("Recorded more than moved, settled")
-# Mark checked with no reason, or put right another way with no words.
-SAY_WHY = lazy_gettext("Say why it is right as it is.")
-# Words typed with a reason other than another way: asked, never dropped
-# (Ali, 2026-11-15, inventory-tng-zgy).
-WORDS_FOR_ANOTHER = lazy_gettext(
-    "You wrote why, but picked another reason. Pick Put right another way "
-    "to keep your words, or clear them."
-)
 # As "Needs your action" lists it (needs_action.py): its own rows, not open
 # packages, so no open packages' where.
 KIND = Kind(TITLE, OVER_RECORDED, ())
@@ -489,8 +482,7 @@ def answer(
         return not_found()
     count = None
     if do == "count":
-        unit = queries.unit_moved(session, check.movement_id)
-        count = quantity(typed, positive=False, unit=unit, required=TYPE_A_NUMBER)
+        count = confirmed_count(session, check.movement_id, typed)
         if not isinstance(count, Decimal):
             field = f"count-{check_id}"
             log.debug("over recorded count refused", over_recorded_id=check_id)
@@ -506,7 +498,7 @@ def answer(
     words = None
     if do == "checked":
         stripped = canonical(typed_words.strip())
-        problem = _why_problem(reason, stripped)
+        problem = why_problem(reason, stripped)
         if problem is not None:
             # Never the words: free text.
             log.debug("over recorded checked refused", over_recorded_id=check_id)
@@ -522,7 +514,7 @@ def answer(
                 refused=_refused_again(session, check_id, marker),
                 checking=check_id,
             )
-        # Only another way has words: _why_problem refuses them otherwise.
+        # Only another way has words: why_problem refuses them otherwise.
         words = stripped or None
     ledger.lock_places(session, over_recorded.places_of(session, check_id))
     admin_id = signed.admin.id
@@ -573,18 +565,3 @@ def answer(
             else "over_recorded_confirmed"
         )
     return redirect(view.link(), notice=notice)
-
-
-def _why_problem(reason: str, words: str) -> Words | None:
-    """What is wrong with why one is marked checked, `words` stripped: no
-    reason picked, put right another way with no words or too many, or
-    words with another reason."""
-    if reason not in over_recorded.CHECKED_REASONS:
-        return SAY_WHY
-    if reason != "other":
-        return WORDS_FOR_ANOTHER if words else None
-    if not words:
-        return SAY_WHY
-    if len(words) > OVER_RECORDED_WORDS_MAX:
-        return up_to(OVER_RECORDED_WORDS_MAX)
-    return None

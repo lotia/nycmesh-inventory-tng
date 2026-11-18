@@ -17,6 +17,7 @@ from inventory_tng.admin import over_recorded as over_recorded_page
 from inventory_tng.core.db import RuleBroken
 from inventory_tng.ledger import Entry, Form
 from inventory_tng.models import Admin, CatalogueHistory, Location, OverRecorded
+from inventory_tng.stock import forms as stock_forms
 from inventory_tng.web.forms import RULES, up_to
 
 from helpers.markup import read, text
@@ -368,8 +369,8 @@ def problem_of(check: OverRecorded) -> str:
 @pytest.mark.parametrize(
     ("form", "problem"),
     [
-        ({}, over_recorded_page.SAY_WHY),
-        ({"reason": "both", "words": "typed"}, over_recorded_page.WORDS_FOR_ANOTHER),
+        ({}, stock_forms.SAY_WHY),
+        ({"reason": "both", "words": "typed"}, stock_forms.WORDS_FOR_ANOTHER),
         ({"reason": "other", "words": "x" * 201}, up_to(200)),
     ],
 )
@@ -417,7 +418,7 @@ def test_mark_checked_refused_from_a_counts_alert_draws_it_again(
         "count can't be corrected there." in page
     )
     assert f"Bring back {spools.van.name}" in page
-    assert str(over_recorded_page.SAY_WHY) in page
+    assert str(stock_forms.SAY_WHY) in page
 
 
 def test_a_marker_not_of_a_refusal_draws_no_alert(
@@ -469,4 +470,4 @@ def test_a_place_brought_back_since_its_alert_draws_no_alert(
     assert response.status_code == 400
     assert 'role="alert"' not in response.text
     assert "Bring back" not in response.text
-    assert str(over_recorded_page.SAY_WHY) in response.text
+    assert str(stock_forms.SAY_WHY) in response.text

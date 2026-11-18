@@ -3209,7 +3209,7 @@ msgstr ""
 msgid "Say below whether it is a unit."
 msgstr ""
 
-#: src/inventory_tng/admin/over_recorded.py
+#: src/inventory_tng/stock/forms.py
 msgid "Say why it is right as it is."
 msgstr ""
 
@@ -4204,7 +4204,7 @@ msgstr ""
 msgid "You were invited to administer %(brand)s"
 msgstr ""
 
-#: src/inventory_tng/admin/over_recorded.py
+#: src/inventory_tng/stock/forms.py
 msgid ""
 "You wrote why, but picked another reason. Pick Put right another way to "
 "keep your words, or clear them."

@@ -1,7 +1,8 @@
 """How the counts pages' forms are read and checked: a place's count, its
 lines by item and by form, and an adjustment, and what is wrong, in
-words, beside the field it is about. The handlers in admin/counts.py read
-the request and pass the form's fields."""
+words, beside the field it is about; and those of lines recorded with
+more than was moved. The handlers in admin/counts.py and
+admin/over_recorded.py read the request and pass the form's fields."""
 
 import uuid
 from collections.abc import Collection, Mapping, Sequence
@@ -10,11 +11,13 @@ from typing import NamedTuple
 
 from sqlalchemy.orm import Session
 
+from inventory_tng import over_recorded
 from inventory_tng.adjustment_reasons import LOST, USED_UP
 from inventory_tng.core.phrases import Words, lazy_gettext
 from inventory_tng.ledger import LOOSE, Form, ItemLines, repeated
 from inventory_tng.models import (
     INTEGER_MAX,
+    OVER_RECORDED_WORDS_MAX,
     AdjustmentReason,
     Item,
     ItemPackage,
@@ -23,7 +26,15 @@ from inventory_tng.models import (
     whole,
 )
 from inventory_tng.stock import queries
-from inventory_tng.web.forms import QUANTITY_MAX, RULES, chosen, quantity, row_id
+from inventory_tng.web.forms import (
+    QUANTITY_MAX,
+    RULES,
+    TYPE_A_NUMBER,
+    chosen,
+    quantity,
+    row_id,
+    up_to,
+)
 
 # The count form's fields of items: counted, by item, and one chosen at
 # the foot.
@@ -250,3 +261,37 @@ def adjustment(
     ):
         return None, problems
     return Adjustment(place, item, amount, direction, reason, key), problems
+
+
+# Mark checked with no reason, or put right another way with no words.
+SAY_WHY = lazy_gettext("Say why it is right as it is.")
+# Words typed with a reason other than another way: asked, never dropped
+# (Ali, 2026-11-15, inventory-tng-zgy).
+WORDS_FOR_ANOTHER = lazy_gettext(
+    "You wrote why, but picked another reason. Pick Put right another way "
+    "to keep your words, or clear them."
+)
+
+
+def confirmed_count(
+    session: Session, movement_id: int, typed: str
+) -> Decimal | str | None:
+    """The count typed to confirm an open package moved whole by a ledger
+    line, in its item's unit, or what is wrong with it."""
+    unit = queries.unit_moved(session, movement_id)
+    return quantity(typed, positive=False, unit=unit, required=TYPE_A_NUMBER)
+
+
+def why_problem(reason: str, words: str) -> Words | None:
+    """What is wrong with why one is marked checked, `words` stripped: no
+    reason picked, put right another way with no words or too many, or
+    words with another reason."""
+    if reason not in over_recorded.CHECKED_REASONS:
+        return SAY_WHY
+    if reason != "other":
+        return WORDS_FOR_ANOTHER if words else None
+    if not words:
+        return SAY_WHY
+    if len(words) > OVER_RECORDED_WORDS_MAX:
+        return up_to(OVER_RECORDED_WORDS_MAX)
+    return None
