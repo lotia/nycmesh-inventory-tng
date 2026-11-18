@@ -74,9 +74,9 @@ def main(argv: list[str]) -> int:
                 "LOG_LEVEL": "WARNING",
                 # Rate limits high enough for runs repeated (--repeat-each):
                 # every test's browser has this machine's address, each
-                # ownAdmin (frontend/browser-tests/own-rows.ts) signs in and uses
-                # a link from it, and the shared administrator confirms for
-                # every test (docs/decisions/0012, Amendment).
+                # ownAdmin (frontend/browser-tests/own-rows.ts) signs in
+                # and uses a link from it, and the shared administrator
+                # confirms for every test (docs/decisions/0012, Amendment).
                 "RATE_LIMIT_PER_ADDRESS": "10000",
                 "RATE_LIMIT_PER_ACCOUNT": "10000",
             }

@@ -1,8 +1,8 @@
 /**
  * Scanning labels with the camera (inventory-tng-8i4.13.7): open until Done,
  * each label read once while it stays in view (label-codes.ts, Repeats),
- * with a word on what it did. A refused or missing camera says so; the lists below
- * still work.
+ * with a word on what it did. A refused or missing camera says so; the
+ * lists below still work.
  */
 import type { MessageDescriptor } from "@lingui/core";
 import { msg } from "@lingui/core/macro";

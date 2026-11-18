@@ -660,10 +660,10 @@ export class Outbox {
    * cart twice, under two keys (scan/recorded-elsewhere.ts). Another
    * batch, while the server may hold that key (one under it waits, was
    * saved, or was refused for it), is not recorded, as the server would
-   * refuse it (409 key_reused): it is listed so, under a key of its own, never sent, so
-   * one key names one batch and no answer to the first settles it. One
-   * refused for what it held (422) holds no key: it takes a key of its
-   * own, and this batch goes under the cart's.
+   * refuse it (409 key_reused): it is listed so, under a key of its own,
+   * never sent, so one key names one batch and no answer to the first
+   * settles it. One refused for what it held (422) holds no key: it
+   * takes a key of its own, and this batch goes under the cart's.
    */
   queue(draft: Draft, summary: Summary, key?: string): Queued {
     const entry = newEntry(
