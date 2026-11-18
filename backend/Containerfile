@@ -49,8 +49,8 @@ RUN servestatic /tmp/dist /app/static --compress --no-zstd \
 FROM deps
 
 # The project is installed editable, so a bind-mounted src/ is what runs.
-# Compose mounts migrations/ too. Bytecode was compiled with the dependencies:
-# compiling here would do the whole virtualenv again.
+# Compose mounts migrations/ and devtools/ too. Bytecode was compiled with the
+# dependencies: compiling here would do the whole virtualenv again.
 COPY backend/src ./src
 RUN --mount=type=cache,target=/root/.cache/uv \
     UV_COMPILE_BYTECODE=0 uv sync --locked --no-dev

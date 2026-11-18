@@ -23,7 +23,8 @@ decided the structure below on 2026-11-17.
   `scan/batch_api.py` or `admins/totp_keys_command.py`. URLs do not
   change.
 - **The top of `inventory_tng`** holds only the entry points (`app.py`,
-  `server.py`, `__main__.py` and `manage.py`) and `models/`.
+  `server.py`, `__main__.py` and `manage.py`), `models/` and
+  `templates/`, beside folders of data such as `locales/`.
 - **`models/`** holds the mapped classes, a module per feature named for
   it, with what they share in `base.py` and `names.py`. Its `__init__.py`
   imports every module, so `Base.metadata`, Alembic and the guards see
@@ -119,6 +120,13 @@ short test. `core/` is the name FastAPI's full-stack template uses;
   kept its name; the commands of `core/local_env.py` and
   `catalogue/units.py` became `setting.py` and `write_unit_table.py`,
   with `units.TABLE` as `write_unit_table.TABLE`.
+- On 2026-11-18, as Ali decided (inventory-tng-h657.4), `stock/ledger.py`
+  was split into its core, the one writer, and three parts that call it:
+  its reads (`stock/moments.py`), counts and adjustments
+  (`stock/counts.py`) and a volunteer's batch (`scan/batch.py`). The
+  ledger no longer imports `scan/batch_schemas.py` (inventory-tng-4jxw)
+  or `stock/open_packages.py`. The `ledger.py` row below gives each
+  name's home.
 - Older decision records keep the paths of their time. The tables below
   give each old path's new home; a later move adds its rows.
 

@@ -1,9 +1,9 @@
 -- The two login roles (DEPLOYMENT.md, Database roles), with development's
 -- passwords, each its own name. Compose's db service runs it on a new
 -- volume (compose.yaml, configs), and backend/devtools/database.py's
--- create before making any database, a test run's or a checkout's. Roles belong to the whole
--- server, so it makes them only if missing, and two runs at once may both
--- try.
+-- create before making any database, a test run's or a checkout's. Roles
+-- belong to the whole server, so it makes them only if missing, and two
+-- runs at once may both try.
 DO $$
 DECLARE
     role text;
