@@ -660,7 +660,7 @@ msgstr ""
 msgid "A name needs at least one letter or number."
 msgstr ""
 
-#: src/inventory_tng/admin/devices.py
+#: src/inventory_tng/devices/routes.py
 msgid "A new registration code"
 msgstr ""
 
@@ -1452,7 +1452,7 @@ msgstr ""
 msgid "Everything is kept in UTC; this only changes how times read."
 msgstr ""
 
-#: src/inventory_tng/admin/devices.py
+#: src/inventory_tng/devices/routes.py
 msgid "Expired"
 msgstr ""
 
@@ -2415,7 +2415,7 @@ msgstr ""
 msgid "Only with them beside you: any camera in view can read it."
 msgstr ""
 
-#: src/inventory_tng/admin/devices.py
+#: src/inventory_tng/devices/routes.py
 msgctxt "state"
 msgid "Open"
 msgstr ""
@@ -2858,7 +2858,7 @@ msgstr ""
 msgid "Registered"
 msgstr ""
 
-#: src/inventory_tng/admin/devices.py
+#: src/inventory_tng/devices/routes.py
 msgid "Registered devices"
 msgstr ""
 
@@ -3069,7 +3069,7 @@ msgid_plural "Revoke %(num)d"
 msgstr[0] ""
 msgstr[1] ""
 
-#: src/inventory_tng/admin/devices.py
+#: src/inventory_tng/devices/routes.py
 #, python-format
 msgid "Revoke %(num)d device?"
 msgid_plural "Revoke %(num)d devices?"
@@ -3084,17 +3084,17 @@ msgstr ""
 msgid "Revoke this device"
 msgstr ""
 
-#: src/inventory_tng/admin/devices.py src/inventory_tng/labels/labels.py
+#: src/inventory_tng/devices/routes.py src/inventory_tng/labels/labels.py
 #: src/inventory_tng/templates/code.html
 #: src/inventory_tng/templates/device_list.html
 msgid "Revoked"
 msgstr ""
 
-#: src/inventory_tng/admin/devices.py
+#: src/inventory_tng/devices/routes.py
 msgid "Revoked: it can't save anything now."
 msgstr ""
 
-#: src/inventory_tng/admin/devices.py
+#: src/inventory_tng/devices/routes.py
 msgid ""
 "Revoked: it registers nothing more. Its devices stay registered; revoke "
 "any that look wrong."
@@ -3106,7 +3106,7 @@ msgid ""
 "Making labels for it again makes a new code."
 msgstr ""
 
-#: src/inventory_tng/admin/devices.py
+#: src/inventory_tng/devices/routes.py
 msgid "Revoked: they can't save anything now."
 msgstr ""
 
@@ -3987,7 +3987,7 @@ msgstr ""
 msgid "Used"
 msgstr ""
 
-#: src/inventory_tng/admin/devices.py
+#: src/inventory_tng/devices/routes.py
 msgid "Used up"
 msgstr ""
 

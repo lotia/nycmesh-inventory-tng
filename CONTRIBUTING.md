@@ -718,7 +718,7 @@ over plain http.
 Pages that record anything need a registered device (docs/decisions/0009).
 Make a registration code on the Devices page, signed in, and enter its
 phrase at <http://127.0.0.1:8000/register>, or scan its QR code with a phone.
-`uv run python -m inventory_tng.registration_codes` does the same from the
+`uv run python -m inventory_tng.devices.command` does the same from the
 command line.
 
 ### Mail

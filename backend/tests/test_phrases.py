@@ -22,7 +22,6 @@ from sqlalchemy.orm import Session
 
 import inventory_tng
 from inventory_tng.admin import common
-from inventory_tng.admin import devices as admin_devices
 from inventory_tng.admin.listing import Lapsed
 from inventory_tng.admins import accounts, activity, guards
 from inventory_tng.admins import routes as admin_admins
@@ -46,6 +45,7 @@ from inventory_tng.core.phrases import (
     speaking,
 )
 from inventory_tng.devices import forms as devices_forms
+from inventory_tng.devices import routes as admin_devices
 from inventory_tng.labels import labels
 from inventory_tng.models import (
     TRANSACTION_KINDS,

@@ -11,7 +11,6 @@ from sqlalchemy import Engine, text
 from sqlalchemy.orm import Session
 from structlog.testing import capture_logs
 
-from inventory_tng import registration_codes
 from inventory_tng.core import local_time
 from inventory_tng.core.local_time import (
     DEFAULT_ZONE,
@@ -22,6 +21,7 @@ from inventory_tng.core.local_time import (
     site_zone,
 )
 from inventory_tng.core.time_zones import is_time_zone, known_zones
+from inventory_tng.devices import command
 from inventory_tng.models import SiteSettings
 
 from helpers.rows import breaks, history, violates
@@ -124,7 +124,7 @@ def test_the_command_line_shows_local_times(
     session: Session, capsys: pytest.CaptureFixture[str]
 ) -> None:
     args = Namespace(command="create", uses=1, days=1.0, label=None, base_url=None)
-    registration_codes.run(session, args)
+    command.run(session, args)
     first = capsys.readouterr().out.splitlines()[0]
     assert first.endswith(("EST", "EDT"))
 

@@ -72,13 +72,13 @@ BREAKS: dict[str, dict[str, list[str]]] = {
     "routes_run_queries": {},
     "routes_import_another_features_routes": {
         "admin/__init__.py": [
-            "admin/devices.py",
             "admin/settings.py",
             "admins/home_routes.py",
             "admins/routes.py",
             "catalogue/categories_routes.py",
             "catalogue/items_routes.py",
             "catalogue/reading_rules_routes.py",
+            "devices/routes.py",
             "labels/routes.py",
             "places/routes.py",
             "stock/counts_routes.py",

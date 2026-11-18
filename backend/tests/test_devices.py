@@ -14,11 +14,10 @@ from fastapi.testclient import TestClient
 from sqlalchemy import Engine, select, update
 from sqlalchemy.orm import Session
 
-from inventory_tng import registration_codes
 from inventory_tng.core.db import Database, get_locked
 from inventory_tng.core.logs import configure_logging
 from inventory_tng.core.settings import LogConfig, Settings
-from inventory_tng.devices import devices
+from inventory_tng.devices import command, devices
 from inventory_tng.devices.devices import COOKIE, RegistrationRejected
 from inventory_tng.devices.guards import RegisteredDevice
 from inventory_tng.models import CatalogueHistory, Device, RegistrationCode
@@ -309,14 +308,14 @@ def test_the_command_line_refuses_codes_that_could_never_register(
     bad: list[str],
 ) -> None:
     with pytest.raises(SystemExit):
-        registration_codes.main(["create", *bad])
+        command.main(["create", *bad])
 
 
 def test_the_command_line_says_when_a_code_does_not_exist(
     database_url: str, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     monkeypatch.setenv("DATABASE_URL", database_url)
-    assert registration_codes.main(["devices", "999999"]) == 1
+    assert command.main(["devices", "999999"]) == 1
 
 
 def test_the_command_line_makes_a_code_that_registers(
@@ -329,7 +328,7 @@ def test_the_command_line_makes_a_code_that_registers(
     session has rolled back and let go of the code."""
     monkeypatch.setenv("DATABASE_URL", database_url)
     assert (
-        registration_codes.main(
+        command.main(
             ["create", "--uses", "1", "--base-url", "https://inventory.example/"]
         )
         == 0

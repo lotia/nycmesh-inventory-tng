@@ -156,3 +156,5 @@ short test. `core/` is the name FastAPI's full-stack template uses;
 | `admin/over_recorded.py` | `stock/over_recorded_routes.py` |
 | `admin/used_up.py` | `stock/used_up_routes.py` |
 | `admin/needs_action.py` | `stock/needs_action.py` |
+| `admin/devices.py` | `devices/routes.py` |
+| `registration_codes.py` | `devices/command.py` |

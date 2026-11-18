@@ -1,4 +1,4 @@
-"""What the devices pages read (admin/devices.py): plain functions taking
+"""What the devices pages read (devices/routes.py): plain functions taking
 a Session, each named for what it returns (docs/decisions/0023)."""
 
 from collections.abc import Collection, Sequence

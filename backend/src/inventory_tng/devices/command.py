@@ -1,10 +1,10 @@
 """Registration codes and devices, from the command line: the operator's
-fallback, as administrators use the Devices page (admin/devices.py):
+fallback, as administrators use the Devices page (devices/routes.py):
 
-    uv run python -m inventory_tng.registration_codes create --uses 1 --days 1
-    uv run python -m inventory_tng.registration_codes revoke CODE_ID
-    uv run python -m inventory_tng.registration_codes devices CODE_ID
-    uv run python -m inventory_tng.registration_codes revoke-device DEVICE_ID
+    uv run python -m inventory_tng.devices.command create --uses 1 --days 1
+    uv run python -m inventory_tng.devices.command revoke CODE_ID
+    uv run python -m inventory_tng.devices.command devices CODE_ID
+    uv run python -m inventory_tng.devices.command revoke-device DEVICE_ID
 
 `create` prints the phrase, the only time it is shown. With --base-url it also
 prints the link and its QR code, for a phone's camera.
@@ -26,7 +26,7 @@ from inventory_tng.devices import devices
 
 
 def main(argv: Sequence[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(prog="python -m inventory_tng.registration_codes")
+    parser = argparse.ArgumentParser(prog="python -m inventory_tng.devices.command")
     commands = parser.add_subparsers(dest="command", required=True)
     create = commands.add_parser("create", help="a new code, printed once")
     create.add_argument(

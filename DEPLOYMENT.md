@@ -460,7 +460,7 @@ If no administrator can, the operator can make one (Operator commands,
 above):
 
 ```sh
-kubectl exec deploy/inventory -- python -m inventory_tng.registration_codes \
+kubectl exec deploy/inventory -- python -m inventory_tng.devices.command \
   create --uses 5 --days 1 --base-url https://<your host>
 ```
 
