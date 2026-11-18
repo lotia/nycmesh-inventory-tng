@@ -9,18 +9,17 @@ from decimal import Decimal
 from sqlalchemy import Row, select
 from sqlalchemy.orm import Session
 
-from inventory_tng.models import (
+from inventory_tng.models.catalogue import (
     CURRENT_ALIAS,
     Category,
     Item,
     ItemAlias,
     ItemPackage,
-    Label,
-    LedgerTransaction,
-    Location,
-    OpenPackage,
-    Volunteer,
 )
+from inventory_tng.models.labels import Label
+from inventory_tng.models.places import Location
+from inventory_tng.models.stock import LedgerTransaction, OpenPackage
+from inventory_tng.models.volunteers import Volunteer
 from inventory_tng.stock.balance import takeable
 
 

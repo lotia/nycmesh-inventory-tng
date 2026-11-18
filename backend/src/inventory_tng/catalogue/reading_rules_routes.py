@@ -1,5 +1,5 @@
 """Unit readings: the reading rules administrators have settled, how a
-number and its unit as typed are read (models.ReadingRule,
+number and its unit as typed are read (models.catalogue.ReadingRule,
 docs/decisions/0021, 2026-11-15), listed, changed and deleted. A change
 reads every name with that unit after a number again, and is refused, naming them, if
 two names would then read alike. And the seeding page, which proposes
@@ -15,7 +15,6 @@ from fastapi import APIRouter, Depends, Form, Request
 from fastapi.responses import HTMLResponse, Response
 from sqlalchemy.orm import Session
 
-from inventory_tng import models
 from inventory_tng.admins.guards import AdminSignedIn, SignedIn
 from inventory_tng.catalogue import items, queries, reading_rules, units
 from inventory_tng.catalogue.forms import CHOOSE, CHOOSE_ONE, PROPOSED, seed_choices
@@ -29,7 +28,9 @@ from inventory_tng.catalogue.reading_rules import (
 from inventory_tng.core.db import DbSession, refusal
 from inventory_tng.core.local_time import site_zone
 from inventory_tng.core.phrases import Words, gettext, lazy_gettext
-from inventory_tng.models import INTEGER_MAX, ReadingRule, whole
+from inventory_tng.models import catalogue as catalogue_models
+from inventory_tng.models.base import INTEGER_MAX, whole
+from inventory_tng.models.catalogue import ReadingRule
 from inventory_tng.web.admin import admin_page, text_form
 from inventory_tng.web.forms import ALERTS, RULES, form_version
 from inventory_tng.web.listing import (
@@ -203,7 +204,7 @@ def _refused(
     if broken != items.READ_ALIKE:
         return _rule_page(request, session, signed, rule, alert=RULES[broken])
     # What the change would have read, the savepoint undone.
-    rules = {**models.reading_rules(session)}
+    rules = {**catalogue_models.reading_rules(session)}
     if change is None:
         rules.pop(rule.token, None)
     else:
@@ -312,7 +313,7 @@ def _seed_page(
 def _proposals(session: Session) -> list[reading_rules.Proposal]:
     """What the seeding page proposes, from every name, by the rules held."""
     names = reading_rules.names(session)
-    return reading_rules.propose(names, models.reading_rules(session))
+    return reading_rules.propose(names, catalogue_models.reading_rules(session))
 
 
 @router.get(SEED)
@@ -340,7 +341,7 @@ def accept(
     is not chosen, or if names would then read alike. One settled since is
     left as it is."""
     one, at = bool(form.get("one")), whole(form.get("at", ""), 0, INTEGER_MAX) or 0
-    rules = models.reading_rules(session)
+    rules = catalogue_models.reading_rules(session)
     made = _proposals(session)
     chosen, unchosen = seed_choices(form, made)
     if unchosen:

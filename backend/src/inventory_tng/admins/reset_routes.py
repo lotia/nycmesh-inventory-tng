@@ -24,7 +24,7 @@ from inventory_tng.core import mail
 from inventory_tng.core.db import DbSession, SessionFactory, Sessions
 from inventory_tng.core.mail import Notify
 from inventory_tng.core.phrases import Words, lazy_gettext
-from inventory_tng.models import ResetLink
+from inventory_tng.models.admins import ResetLink
 from inventory_tng.web.browser import rate_key
 from inventory_tng.web.pages import add_notices, not_found, page, redirect
 

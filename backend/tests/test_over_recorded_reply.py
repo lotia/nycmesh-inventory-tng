@@ -11,15 +11,15 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 from structlog.testing import capture_logs
 
-from inventory_tng.models import (
+from inventory_tng.models.catalogue import ItemPackage
+from inventory_tng.models.places import Location
+from inventory_tng.models.stock import (
     AdjustmentReason,
-    ItemPackage,
     LedgerTransaction,
-    Location,
     Movement,
     OpenPackage,
-    Volunteer,
 )
+from inventory_tng.models.volunteers import Volunteer
 from inventory_tng.stock import ledger, over_recorded
 from inventory_tng.stock.ledger import Entry, Form, _more_written
 

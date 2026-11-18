@@ -19,14 +19,10 @@ from inventory_tng.core.local_time import site_zone
 from inventory_tng.core.phrases import gettext, lazy, lazy_gettext, ngettext
 from inventory_tng.labels import labels, queries
 from inventory_tng.labels.paths import LABELS, PRINT
-from inventory_tng.models import (
-    INTEGER_MAX,
-    Item,
-    ItemPackage,
-    Label,
-    Location,
-    whole,
-)
+from inventory_tng.models.base import INTEGER_MAX, whole
+from inventory_tng.models.catalogue import Item, ItemPackage
+from inventory_tng.models.labels import Label
+from inventory_tng.models.places import Location
 from inventory_tng.places.paths import LOCATIONS
 from inventory_tng.web.admin import admin_page, now, revoke_title
 from inventory_tng.web.listing import AskedView, Listing, Searched, Sort, Sorting

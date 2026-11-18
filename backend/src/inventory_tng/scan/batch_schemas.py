@@ -14,7 +14,7 @@ from typing import Annotated, Literal
 from pydantic import BaseModel, Field, ValidationInfo, field_validator, model_validator
 from pydantic_core import PydanticCustomError
 
-from inventory_tng.models import INTEGER_MAX
+from inventory_tng.models.base import INTEGER_MAX
 from inventory_tng.stock import ledger
 
 # What a volunteer records. Counts and adjustments are an administrator's

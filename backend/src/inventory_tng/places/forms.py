@@ -6,7 +6,7 @@ the form's fields."""
 from sqlalchemy.orm import Session
 
 from inventory_tng.core.phrases import Words, lazy_gettext
-from inventory_tng.models import Location
+from inventory_tng.models.places import Location
 from inventory_tng.web.forms import chosen, name_problem
 
 # What an administrator makes here; custody comes with a volunteer.

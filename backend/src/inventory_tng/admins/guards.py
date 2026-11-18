@@ -64,7 +64,8 @@ from inventory_tng.core.db import (
 from inventory_tng.core.mail import Notify
 from inventory_tng.core.phrases import Words, lazy_gettext
 from inventory_tng.core.settings import RateLimits
-from inventory_tng.models import Admin, AdminSession, SignInSettings
+from inventory_tng.models.admins import Admin, AdminSession
+from inventory_tng.models.site_settings import SignInSettings
 from inventory_tng.web import once
 from inventory_tng.web.navigation import Badge, sections
 from inventory_tng.web.pages import page, redirect, templates

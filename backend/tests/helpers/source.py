@@ -9,13 +9,16 @@ from pathlib import Path
 from typing import Literal, NamedTuple
 
 import inventory_tng
-from inventory_tng import models
+
+# Imported for its mapped classes, so Base has every model.
+from inventory_tng import models  # noqa: F401
+from inventory_tng.core.db import Base
 
 SOURCE = Path(inventory_tng.__file__).parent
 # Each model's class name, and its table's name.
 MODELS = {
     mapper.class_.__name__: mapper.class_.__tablename__
-    for mapper in models.Base.registry.mappers
+    for mapper in Base.registry.mappers
 }
 
 # What a check finds in a module, given its path: the lines that break its
@@ -191,6 +194,6 @@ def writes(tree: ast.AST) -> list[Write]:
             found += [
                 Write(node.lineno, table, "statement")
                 for table in SQL_WRITE.findall(node.value)
-                if table in models.Base.metadata.tables
+                if table in Base.metadata.tables
             ]
     return sorted(set(found), key=lambda w: (w.line, w.table or "", w.how))

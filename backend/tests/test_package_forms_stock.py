@@ -10,7 +10,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from inventory_tng.catalogue.forms import SHORTER_THAN_WHOLE, WHOLE_PACKAGES
-from inventory_tng.models import Item, ItemPackage
+from inventory_tng.models.catalogue import Item, ItemPackage
 from inventory_tng.stock import balance, open_packages, stock_routes
 from inventory_tng.stock.ledger import Entry, Form
 

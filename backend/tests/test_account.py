@@ -18,7 +18,7 @@ from inventory_tng.admins.account_routes import (
 )
 from inventory_tng.admins.guards import NAME_TAKEN
 from inventory_tng.core import mail
-from inventory_tng.models import (
+from inventory_tng.models.admins import (
     Admin,
     AdminPassword,
     AdminSession,
@@ -558,7 +558,7 @@ def test_the_account_uses_the_site_zone(
     session: Session,
     ada: tuple[Admin, str],
 ) -> None:
-    from inventory_tng.models import SiteSettings
+    from inventory_tng.models.site_settings import SiteSettings
 
     session.get_one(SiteSettings, 1).time_zone = "Europe/London"
     session.flush()

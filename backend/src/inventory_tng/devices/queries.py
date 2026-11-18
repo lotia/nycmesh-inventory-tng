@@ -8,7 +8,7 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from inventory_tng.devices.devices import DeviceFilter, find_devices
-from inventory_tng.models import Device, RegistrationCode
+from inventory_tng.models.devices import Device, RegistrationCode
 
 
 def codes_newest_first(session: Session) -> Sequence[RegistrationCode]:

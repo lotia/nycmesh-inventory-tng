@@ -9,14 +9,14 @@ from typing import NamedTuple
 from babel.support import LazyProxy
 
 from inventory_tng.core.phrases import Words, gettext, lazy_gettext
-from inventory_tng.models import (
+from inventory_tng.models.base import whole
+from inventory_tng.models.site_settings import (
     ACCOUNT_CHANGE_MINUTES,
     CONFIRM_HOURS,
     CONFIRM_IDLE_MINUTES,
     NAME_CHECK_MINUTES,
     SESSION_DAYS,
     TOTP_POLICIES,
-    whole,
 )
 
 REASON_TAKEN = lazy_gettext("There is already a reason by that name.")

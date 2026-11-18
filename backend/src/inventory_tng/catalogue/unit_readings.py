@@ -30,10 +30,11 @@ import structlog
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from inventory_tng import models
 from inventory_tng.catalogue import items, reading_rules, units
 from inventory_tng.core.db import lock_catalogue, refusal
-from inventory_tng.models import ReadingRule
+from inventory_tng.models import catalogue as catalogue_models
+from inventory_tng.models import names as name_models
+from inventory_tng.models.catalogue import ReadingRule
 
 log = structlog.get_logger(__name__)
 
@@ -138,7 +139,7 @@ def propose(names: Iterable[str], path: Path) -> Proposed:
         kept = {row["unit"]: row for row in earlier}
         if len(kept) < len(earlier):
             raise ValueError("a unit has more than one row; keep one")
-    canonical = [models.canonical(name) for name in names]
+    canonical = [name_models.canonical(name) for name in names]
     rows = {
         unit: {**row, "why": NOT_PROPOSED, "names": "0"} for unit, row in kept.items()
     }
@@ -240,7 +241,7 @@ def load(session: Session, rules: dict[str, units.Rule]) -> Loaded | list[str]:
     )
     if written is None:
         words = reading_rules.read_alike_words(
-            session, loading, {**models.reading_rules(session), **loading}
+            session, loading, {**catalogue_models.reading_rules(session), **loading}
         )
         log.info("unit readings refused", read_alike=len(words))
         return words

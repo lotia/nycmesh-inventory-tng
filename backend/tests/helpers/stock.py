@@ -12,18 +12,16 @@ from httpx2 import Response
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from inventory_tng.models import (
+from inventory_tng.models.catalogue import Category, Item, ItemPackage
+from inventory_tng.models.places import Location
+from inventory_tng.models.stock import (
     AdjustmentReason,
-    Category,
-    Item,
-    ItemPackage,
     LedgerTransaction,
-    Location,
     Movement,
     OpenPackage,
     OverRecorded,
-    Volunteer,
 )
+from inventory_tng.models.volunteers import Volunteer
 from inventory_tng.scan.batch_schemas import Batch
 from inventory_tng.stock import open_packages, over_recorded
 from inventory_tng.stock.ledger import LOOSE, Entry, Form, insert_transaction, record

@@ -9,7 +9,8 @@ from fastapi.testclient import TestClient
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from inventory_tng.models import AdjustmentReason, Admin, LedgerTransaction, OpenPackage
+from inventory_tng.models.admins import Admin
+from inventory_tng.models.stock import AdjustmentReason, LedgerTransaction, OpenPackage
 from inventory_tng.stock import forms as stock_forms
 from inventory_tng.stock import ledger
 from inventory_tng.stock.ledger import LOOSE, Entry, Form

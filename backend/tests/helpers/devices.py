@@ -5,7 +5,7 @@ from datetime import timedelta
 from sqlalchemy.orm import Session
 
 from inventory_tng.devices import devices
-from inventory_tng.models import Device
+from inventory_tng.models.devices import Device
 
 ADDRESS = "192.0.2.10"
 

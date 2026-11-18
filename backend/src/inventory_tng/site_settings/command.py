@@ -16,7 +16,8 @@ from sqlalchemy.orm import Session
 
 from inventory_tng.core.command import run_command
 from inventory_tng.core.db import CLI_ACTOR, set_actor
-from inventory_tng.models import NAME_CHECK_MINUTES, ScanSettings, whole
+from inventory_tng.models.base import whole
+from inventory_tng.models.site_settings import NAME_CHECK_MINUTES, ScanSettings
 from inventory_tng.site_settings import scan_settings
 
 log = structlog.get_logger(__name__)

@@ -1,6 +1,6 @@
 """Edit forms: a save sent from a form shown before another save of the
 same row is refused, and shows the row as it is now, rather than putting
-back what the form showed (inventory-tng-8i4.123, models.Versioned)."""
+back what the form showed (inventory-tng-8i4.123, models.base.Versioned)."""
 
 from collections.abc import Callable
 from decimal import Decimal
@@ -12,16 +12,15 @@ from sqlalchemy.orm import Session
 
 from inventory_tng.catalogue.paths import CATEGORIES, ITEMS
 from inventory_tng.core.db import Base
-from inventory_tng.models import (
-    AdjustmentReason,
-    Category,
-    Item,
-    Location,
+from inventory_tng.models.catalogue import Category, Item
+from inventory_tng.models.places import Location
+from inventory_tng.models.site_settings import (
     ScanSettings,
     SignInSettings,
     SiteSettings,
-    Volunteer,
 )
+from inventory_tng.models.stock import AdjustmentReason
+from inventory_tng.models.volunteers import Volunteer
 from inventory_tng.places.paths import LOCATIONS
 from inventory_tng.site_settings.paths import SETTINGS
 from inventory_tng.volunteers.paths import VOLUNTEERS

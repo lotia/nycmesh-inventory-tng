@@ -9,7 +9,7 @@ from sqlalchemy.orm import Session
 
 from inventory_tng.catalogue import queries
 from inventory_tng.catalogue.paths import ITEMS
-from inventory_tng.models import Item
+from inventory_tng.models.catalogue import Item
 from inventory_tng.web.listing import Searched, Sort, Sorting
 
 

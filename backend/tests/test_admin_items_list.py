@@ -6,7 +6,7 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from inventory_tng.catalogue.paths import ITEMS
-from inventory_tng.models import Category, Item
+from inventory_tng.models.catalogue import Category, Item
 from inventory_tng.web.listing import PER_PAGE
 
 from helpers.items import items_named, new_item

@@ -22,12 +22,9 @@ from inventory_tng.core.db import SnapshotSession
 from inventory_tng.devices.guards import RegisteredDevice
 from inventory_tng.devices.schemas import DeviceRefusedReply
 from inventory_tng.labels import labels
-from inventory_tng.models import (
-    Item,
-    ScanSettings,
-    held,
-    reading_rules,
-)
+from inventory_tng.models.catalogue import Item, reading_rules
+from inventory_tng.models.names import held
+from inventory_tng.models.site_settings import ScanSettings
 from inventory_tng.scan import queries
 from inventory_tng.scan.catalogue_schemas import (
     Catalogue,

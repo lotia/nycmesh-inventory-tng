@@ -54,7 +54,7 @@ from inventory_tng.core import mail, request_logging
 from inventory_tng.core.db import DbSession
 from inventory_tng.core.mail import Notify
 from inventory_tng.core.phrases import Words, lazy_gettext
-from inventory_tng.models import Admin, AdminSession, running_low
+from inventory_tng.models.admins import Admin, AdminSession, running_low
 from inventory_tng.web.browser import rate_key, set_private_cookie
 from inventory_tng.web.pages import add_notices, not_found, page, redirect
 

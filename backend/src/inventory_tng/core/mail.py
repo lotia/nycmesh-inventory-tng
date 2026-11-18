@@ -30,7 +30,8 @@ from sqlalchemy.orm import Session
 
 from inventory_tng.core.phrases import BRAND, Words, gettext, lazy_gettext, ngettext
 from inventory_tng.core.settings import MailConfig
-from inventory_tng.models import Admin, SignInSettings, running_low
+from inventory_tng.models.admins import Admin, running_low
+from inventory_tng.models.site_settings import SignInSettings
 
 log = structlog.get_logger(__name__)
 meter = metrics.get_meter(__name__)
@@ -224,8 +225,8 @@ LAST_CODE = lazy_gettext(
     "That was your last one: make new ones from your account page now, with a "
     "code from your authenticator."
 )
-# The sign-in settings' TOTP policies (models.TOTP_POLICIES), as the mail
-# says them.
+# The sign-in settings' TOTP policies (models.site_settings.TOTP_POLICIES), as
+# the mail says them.
 TOTP_POLICY_WORDS = {
     # Translators: as in "TOTP is now required".
     "required": lazy_gettext("required"),

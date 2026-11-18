@@ -6,7 +6,7 @@ from collections.abc import Sequence
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from inventory_tng.models import AdjustmentReason
+from inventory_tng.models.stock import AdjustmentReason
 
 
 def reasons_current_first(session: Session) -> Sequence[AdjustmentReason]:

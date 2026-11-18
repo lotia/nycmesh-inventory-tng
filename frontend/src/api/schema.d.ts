@@ -563,10 +563,10 @@ export interface components {
     };
     /**
      * ReadingRuleEntry
-     * @description A reading rule (models.ReadingRule): a unit as typed after a number
-     *     (units.rule_key), and what it reads as, by its symbol as searches spell
-     *     it (str(units.Reading)), or null: no unit. The page reads units by them
-     *     before its table, as the server does (units.respell).
+     * @description A reading rule (models.catalogue.ReadingRule): a unit as typed after a
+     *     number (units.rule_key), and what it reads as, by its symbol as searches
+     *     spell it (str(units.Reading)), or null: no unit. The page reads units by
+     *     them before its table, as the server does (units.respell).
      */
     ReadingRuleEntry: {
       /** Token */
@@ -705,7 +705,8 @@ export interface components {
     };
     /**
      * Settings
-     * @description How the page behaves, as administrators set it (models.ScanSettings).
+     * @description How the page behaves, as administrators set it
+     *     (models.site_settings.ScanSettings).
      */
     Settings: {
       /** Name Check Minutes */

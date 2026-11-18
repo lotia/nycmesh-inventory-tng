@@ -11,7 +11,8 @@ from sqlalchemy.orm import Session
 from inventory_tng.admins.accounts import name_up_to
 from inventory_tng.core.db import Base
 from inventory_tng.core.phrases import Words, gettext, lazy_gettext
-from inventory_tng.models import INTEGER_MAX, canonical, whole
+from inventory_tng.models.base import INTEGER_MAX, whole
+from inventory_tng.models.names import canonical
 from inventory_tng.stock.ledger import whole_enough
 
 NAME_MAX = 200
@@ -92,8 +93,8 @@ def rule_words(broken: str, unique: Words | None = None) -> Words:
 
 
 def form_version(typed: str) -> int:
-    """The version of its row an edit form showed (models.Versioned), or 0,
-    which no row has, so a form sent without one is refused as changed."""
+    """The version of its row an edit form showed (models.base.Versioned), or
+    0, which no row has, so a form sent without one is refused as changed."""
     return whole(typed, 0, INTEGER_MAX) or 0
 
 
@@ -126,7 +127,7 @@ def at_most_places(places: int) -> str:
 
 def name_problem(name: str) -> str | None:
     """What is wrong with a name, stripped: blank, or too long."""
-    # As stored (models.CanonicalName): °C for ℃ is a character longer.
+    # As stored (models.names.CanonicalName): °C for ℃ is a character longer.
     if not 1 <= len(canonical(name)) <= NAME_MAX:
         return name_up_to(NAME_MAX)
     return None
@@ -136,7 +137,7 @@ TYPE_A_NUMBER = lazy_gettext("Type a number, such as 12 or 0.5.")
 TOO_BIG = lazy_gettext("That number is too big.")
 ABOVE_ZERO = lazy_gettext("Use a number above 0.")
 ZERO_OR_MORE = lazy_gettext("Use 0 or more.")
-QUANTITY_PLACES = 3  # numeric(12,3), as models.QUANTITY keeps them.
+QUANTITY_PLACES = 3  # numeric(12,3), as models.base.QUANTITY keeps them.
 QUANTITY_MAX = Decimal("999999999.999")
 
 

@@ -1314,7 +1314,7 @@
         "type": "object",
         "required": ["token", "reading"],
         "title": "ReadingRuleEntry",
-        "description": "A reading rule (models.ReadingRule): a unit as typed after a number\n(units.rule_key), and what it reads as, by its symbol as searches spell\nit (str(units.Reading)), or null: no unit. The page reads units by them\nbefore its table, as the server does (units.respell)."
+        "description": "A reading rule (models.catalogue.ReadingRule): a unit as typed after a\nnumber (units.rule_key), and what it reads as, by its symbol as searches\nspell it (str(units.Reading)), or null: no unit. The page reads units by\nthem before its table, as the server does (units.respell)."
       },
       "RecordedBatch": {
         "properties": {
@@ -1665,7 +1665,7 @@
         "type": "object",
         "required": ["name_check_minutes"],
         "title": "Settings",
-        "description": "How the page behaves, as administrators set it (models.ScanSettings)."
+        "description": "How the page behaves, as administrators set it\n(models.site_settings.ScanSettings)."
       },
       "SizeProblem": {
         "properties": {

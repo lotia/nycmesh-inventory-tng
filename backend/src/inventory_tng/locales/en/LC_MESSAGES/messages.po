@@ -1206,7 +1206,7 @@ msgstr ""
 msgid "Code"
 msgstr ""
 
-#: src/inventory_tng/models.py
+#: src/inventory_tng/models/devices.py
 #, python-format
 msgid "Code %(number)s"
 msgstr ""
@@ -1380,7 +1380,7 @@ msgstr ""
 msgid "Device"
 msgstr ""
 
-#: src/inventory_tng/models.py
+#: src/inventory_tng/models/devices.py
 #, python-format
 msgid "Device %(number)s"
 msgstr ""

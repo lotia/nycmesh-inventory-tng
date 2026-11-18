@@ -34,10 +34,9 @@ from inventory_tng.core.telemetry import Telemetry, enabled
 from inventory_tng.devices import devices
 from inventory_tng.devices.guards import RegisteredDevice
 from inventory_tng.labels import labels
-from inventory_tng.models import (
-    Category,
-    Device,
-    ItemPackage,
+from inventory_tng.models.catalogue import Category, ItemPackage
+from inventory_tng.models.devices import Device
+from inventory_tng.models.stock import (
     LedgerTransaction,
     Movement,
     OpenPackage,

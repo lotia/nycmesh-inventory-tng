@@ -43,21 +43,13 @@ from inventory_tng.core.phrases import (
 from inventory_tng.devices import forms as devices_forms
 from inventory_tng.devices import routes as devices_routes
 from inventory_tng.labels import labels
-from inventory_tng.models import (
-    TRANSACTION_KINDS,
-    UNITS,
-    AdjustmentReason,
-    Admin,
-    AdminSession,
-    Authenticator,
-    Category,
-    Item,
-    ItemPackage,
-    Label,
-    Location,
-    SignInSettings,
-    Volunteer,
-)
+from inventory_tng.models.admins import Admin, AdminSession, Authenticator
+from inventory_tng.models.catalogue import UNITS, Category, Item, ItemPackage
+from inventory_tng.models.labels import Label
+from inventory_tng.models.places import Location
+from inventory_tng.models.site_settings import SignInSettings
+from inventory_tng.models.stock import TRANSACTION_KINDS, AdjustmentReason
+from inventory_tng.models.volunteers import Volunteer
 from inventory_tng.site_settings import forms as settings_forms
 from inventory_tng.stock import (
     counts_routes,
@@ -756,8 +748,8 @@ ZONES = {
 
 def data_words(session: Session) -> set[str]:
     """What a page shows that is the same in every language: unit keys
-    (models.UNITS), time zones and their abbreviations, and labels' codes.
-    A unit's symbol too (is_a_symbol)."""
+    (models.catalogue.UNITS), time zones and their abbreviations, and labels'
+    codes. A unit's symbol too (is_a_symbol)."""
     return {*UNITS, *ZONES, *set(session.scalars(select(Label.code)))}
 
 

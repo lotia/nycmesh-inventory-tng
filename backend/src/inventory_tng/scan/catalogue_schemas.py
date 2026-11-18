@@ -33,8 +33,8 @@ class SealedAt(BaseModel):
 
 class PackageEntry(Entry):
     id: int
-    # As the app shows it (models.KeyedName.name_shown), as are items' and
-    # retired ones' names here: searched by search_text, which holds it as
+    # As the app shows it (models.names.KeyedName.name_shown), as are items'
+    # and retired ones' names here: searched by search_text, which holds it as
     # typed.
     name: str
     # In the item's unit.
@@ -89,12 +89,12 @@ class ItemEntry(BaseModel):
     manufacturer: str | None
     part_number: str | None
     old_code: str | None
-    # Its details and category, as searches keep them (models.held):
+    # Its details and category, as searches keep them (models.names.held):
     # matched, never shown (0021). The category is folded here, as it is
     # read, on purpose: categories keep no folded column for so few names.
     search_text: str
-    # Its current aliases (models.ItemAlias), as spelt: other names it is
-    # found by, matched, never shown. Its search_text holds them folded.
+    # Its current aliases (models.catalogue.ItemAlias), as spelt: other names
+    # it is found by, matched, never shown. Its search_text holds them folded.
     aliases: list[str]
     packages: list[PackageEntry]
     # Retired, but with stock left: it may be taken, never received.
@@ -122,16 +122,17 @@ class LabelEntry(Entry):
 
 
 class Settings(Entry):
-    """How the page behaves, as administrators set it (models.ScanSettings)."""
+    """How the page behaves, as administrators set it
+    (models.site_settings.ScanSettings)."""
 
     name_check_minutes: int
 
 
 class ReadingRuleEntry(BaseModel):
-    """A reading rule (models.ReadingRule): a unit as typed after a number
-    (units.rule_key), and what it reads as, by its symbol as searches spell
-    it (str(units.Reading)), or null: no unit. The page reads units by them
-    before its table, as the server does (units.respell)."""
+    """A reading rule (models.catalogue.ReadingRule): a unit as typed after a
+    number (units.rule_key), and what it reads as, by its symbol as searches
+    spell it (str(units.Reading)), or null: no unit. The page reads units by
+    them before its table, as the server does (units.respell)."""
 
     token: str
     reading: str | None

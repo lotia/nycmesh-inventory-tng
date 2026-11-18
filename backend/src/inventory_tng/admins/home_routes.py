@@ -16,7 +16,9 @@ from inventory_tng.catalogue.paths import CATEGORIES, ITEMS
 from inventory_tng.core.db import DbSession
 from inventory_tng.core.local_time import site_zone
 from inventory_tng.core.phrases import Words, lazy_gettext
-from inventory_tng.models import Category, Item, Location, Volunteer
+from inventory_tng.models.catalogue import Category, Item
+from inventory_tng.models.places import Location
+from inventory_tng.models.volunteers import Volunteer
 from inventory_tng.places.paths import LOCATIONS
 from inventory_tng.stock import needs_action
 from inventory_tng.stock.balance import retired_places_holding_stock

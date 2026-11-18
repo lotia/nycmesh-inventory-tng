@@ -24,5 +24,6 @@ PRINTED_LENGTH = lazy_gettext(
 
 def printed_length(unit: str) -> str:
     """How to read the length printed on an open package of an item in
-    `unit`, if it is a length (any but each, models.UNITS); else nothing."""
+    `unit`, if it is a length (any but each, models.catalogue.UNITS); else
+    nothing."""
     return str(PRINTED_LENGTH) if unit != "each" else ""

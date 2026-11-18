@@ -7,7 +7,7 @@ from datetime import datetime
 from sqlalchemy.orm import Session
 
 from inventory_tng.core.db import Seen, enforce, exists_where, lock_catalogue, relock
-from inventory_tng.models import Category, Item
+from inventory_tng.models.catalogue import Category, Item
 
 
 def add(session: Session, name: str) -> Category:

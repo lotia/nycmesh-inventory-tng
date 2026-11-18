@@ -10,7 +10,8 @@ from sqlalchemy.orm import Session
 from inventory_tng.admins import paths
 from inventory_tng.catalogue.forms import CATEGORY_TAKEN
 from inventory_tng.catalogue.paths import CATEGORIES
-from inventory_tng.models import Admin, Category, Item
+from inventory_tng.models.admins import Admin
+from inventory_tng.models.catalogue import Category, Item
 from inventory_tng.web.forms import RULES
 
 from helpers.markup import links, read, row_links, text
@@ -44,7 +45,7 @@ def test_adding_a_category_is_recorded_as_the_admin(
     assert "Radios" in page
 
 
-# The last as stored: ℃ is stored °C (models.canonical).
+# The last as stored: ℃ is stored °C (models.names.canonical).
 @pytest.mark.parametrize("name", ["", "x" * 201, "x" * 199 + "\u2103"])
 def test_a_name_must_be_given_and_not_too_long(
     admin_client: TestClient, name: str

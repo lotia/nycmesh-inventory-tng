@@ -32,7 +32,10 @@ from inventory_tng import __main__ as server
 from inventory_tng.admins import accounts, totp_keys
 from inventory_tng.dev import seed
 from inventory_tng.devices import devices
-from inventory_tng.models import Admin, AdminPassword, Item, Label, Volunteer
+from inventory_tng.models.admins import Admin, AdminPassword
+from inventory_tng.models.catalogue import Item
+from inventory_tng.models.labels import Label
+from inventory_tng.models.volunteers import Volunteer
 from inventory_tng.volunteers import volunteers
 
 from databases import migrated_engine, new_database

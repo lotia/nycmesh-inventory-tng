@@ -20,7 +20,8 @@ from inventory_tng.core.settings import LogConfig, Settings
 from inventory_tng.devices import command, devices
 from inventory_tng.devices.devices import COOKIE, RegistrationRejected
 from inventory_tng.devices.guards import RegisteredDevice
-from inventory_tng.models import CatalogueHistory, Device, RegistrationCode
+from inventory_tng.models.core import CatalogueHistory
+from inventory_tng.models.devices import Device, RegistrationCode
 
 from helpers.concurrency import Committed
 from helpers.devices import ADDRESS, new_device

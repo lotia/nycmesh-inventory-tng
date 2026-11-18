@@ -24,7 +24,12 @@ decided the structure below on 2026-11-17.
   change.
 - **The top of `inventory_tng`** holds only the entry points (`app.py`,
   `server.py`, `__main__.py`, `manage.py` and `openapi.py`) and
-  `models.py`.
+  `models/`.
+- **`models/`** holds the mapped classes, a module per feature named for
+  it, with what they share in `base.py` and `names.py`. Its `__init__.py`
+  imports every module, so `Base.metadata`, Alembic and the guards see
+  every table (Ali, 2026-11-18, inventory-tng-h657.1). It re-exports
+  nothing: an import names the module a model is in.
 - **`web/`** holds what every server-rendered page shares; **`core/`**
   holds plumbing, such as settings, db, history, logs, telemetry and mail.
   Core means plumbing, not business rules. **`dev/`** holds developer
@@ -55,7 +60,7 @@ decided the structure below on 2026-11-17.
     `web/formatting.py` and `web/forms.py`, which import neither
     themselves (inventory-tng-atmx.2, inventory-tng-atmx.7);
   - route files run no queries (`select`, `execute`, `scalar`, `scalars`);
-  - core imports nothing of the app but core and `models.py`;
+  - core imports nothing of the app but core and `models/`;
   - no feature's routes import another feature's routes; they link
     through its `paths.py`.
 
@@ -86,8 +91,9 @@ short test. `core/` is the name FastAPI's full-stack template uses;
 
 ## Consequences
 
-- `models.py` and the templates folder stay whole for now (Ali,
-  2026-11-17; inventory-tng-5q07).
+- The templates folder stays whole for now (Ali, 2026-11-17;
+  inventory-tng-5q07). `models.py` was split into `models/` on 2026-11-18
+  (inventory-tng-h657.1).
 - Older decision records keep the paths of their time. The tables below
   give each old path's new home; a later move adds its rows.
 
@@ -137,6 +143,7 @@ queries to its `queries.py`.
 | `devices.py` | `devices/devices.py`; `register_device`: `devices/api.py`; the request and reply schemas: `devices/schemas.py`; what every route needing a device depends on: `devices/guards.py`; `REGISTER_PATH`: `devices/paths.py` |
 | `health.py` | `core/health.py`; its query: `core/db.py`, as `ping` |
 | `ledger.py` | `stock/ledger.py`; the balance queries: `stock/balance.py`; `save_batch`: `scan/batch_api.py`; the batch request and reply schemas: `scan/batch_schemas.py` |
+| `models.py` | `models/`: each table in its feature's module; the column types, `whole`, the columns and constraints most tables have, and `Versioned`: `models/base.py`; canonical names, name keys and search folding (`CanonicalName`, `KeyedName`, `Searchable`, `fold` and the rest): `models/names.py`; `_refold`: `models/catalogue.py`; `_reference`, `_one_of`, `_between`, `_unique_name`, `_unique_current_name`, `_name_key_check`: each without its `_` |
 | `page_telemetry.py` | `scan/page_telemetry.py`; `over_limit`: `web/browser.py` |
 | `pages.py` | `web/pages.py`; `amount`, `printed_length`: `web/formatting.py`; `Badge`, `retired_holding`, `sections`: `web/navigation.py` |
 | `registration_codes.py` | `devices/command.py` |

@@ -16,7 +16,8 @@ from sqlalchemy.orm import Session
 from inventory_tng.admins.guards import AdminSignedIn, SignedIn
 from inventory_tng.core.db import DbSession, attempt
 from inventory_tng.core.phrases import Words, gettext, lazy_gettext
-from inventory_tng.models import Location, Volunteer
+from inventory_tng.models.places import Location
+from inventory_tng.models.volunteers import Volunteer
 from inventory_tng.volunteers import queries, volunteers
 from inventory_tng.volunteers.forms import (
     PICK_INTO,

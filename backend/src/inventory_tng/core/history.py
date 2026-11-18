@@ -11,7 +11,7 @@ statement that writes to a table with history in the app.
 
 Only the rows the session was given to add, change or delete are seen, not
 any the flush changes by itself, as a relationship() would: no model has
-one (tests/test_write_owners.py). models.py imports this module, so any
+one (tests/test_write_owners.py). models/base.py imports this module, so any
 session that can write these tables has the listeners.
 """
 

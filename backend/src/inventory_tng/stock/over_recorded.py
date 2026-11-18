@@ -35,12 +35,11 @@ from sqlalchemy.orm import Session, aliased
 from inventory_tng.core.db import RuleBroken, get_locked, locked
 from inventory_tng.core.local_time import show_day
 from inventory_tng.core.phrases import gettext, in_query, lazy_gettext
-from inventory_tng.models import (
-    Admin,
-    Item,
-    ItemPackage,
+from inventory_tng.models.admins import Admin
+from inventory_tng.models.catalogue import Item, ItemPackage
+from inventory_tng.models.places import Location
+from inventory_tng.models.stock import (
     LedgerTransaction,
-    Location,
     Movement,
     OpenPackage,
     OverRecorded,
@@ -57,8 +56,8 @@ REASON = "Recorded more than moved"
 Settled = Literal["corrected", "checked", "counted"]
 
 # Why one marked checked is right as it is, as the page says each
-# (models.OVER_RECORDED_REASONS; Ali, 2026-11-15, inventory-tng-zgy). Mark
-# checked is the only way of settling one that writes nothing, so a bare
+# (models.stock.OVER_RECORDED_REASONS; Ali, 2026-11-15, inventory-tng-zgy).
+# Mark checked is the only way of settling one that writes nothing, so a bare
 # one could mean fixed elsewhere, nothing fixed, or one end fixed.
 CHECKED_REASONS = {
     "left": lazy_gettext("Counted where it left"),

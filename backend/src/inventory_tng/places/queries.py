@@ -6,7 +6,7 @@ from collections.abc import Sequence
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
-from inventory_tng.models import Location
+from inventory_tng.models.places import Location
 
 
 def retired_places(session: Session) -> Sequence[Location]:

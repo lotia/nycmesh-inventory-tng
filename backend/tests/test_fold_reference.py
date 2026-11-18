@@ -1,4 +1,4 @@
-"""models.fold spells the sample in tests/fold_reference.tsv as it did
+"""models.names.fold spells the sample in tests/fold_reference.tsv as it did
 when the file was written, so a release of anyascii, or a Python with a
 newer Unicode, that spells something otherwise fails here, not in
 searches that stop matching rows folded the old way
@@ -8,7 +8,7 @@ from pathlib import Path
 
 import pytest
 
-from inventory_tng.models import FOLDED_WITH
+from inventory_tng.models.names import FOLDED_WITH
 
 from helpers import committed, fold_reference
 from helpers.fold_reference import COMMANDS, REFERENCE, characters, main, reference

@@ -27,14 +27,11 @@ from inventory_tng.admins.guards import SignedIn
 from inventory_tng.core.db import Base, by_name
 from inventory_tng.core.local_time import site_zone
 from inventory_tng.core.phrases import Words, gettext, lazy_gettext
-from inventory_tng.models import (
-    Admin,
-    CatalogueHistory,
-    Category,
-    Item,
-    Location,
-    Volunteer,
-)
+from inventory_tng.models.admins import Admin
+from inventory_tng.models.catalogue import Category, Item
+from inventory_tng.models.core import CatalogueHistory
+from inventory_tng.models.places import Location
+from inventory_tng.models.volunteers import Volunteer
 from inventory_tng.web.forms import NAME_MAX, row_id
 from inventory_tng.web.pages import add_notices, page, templates
 

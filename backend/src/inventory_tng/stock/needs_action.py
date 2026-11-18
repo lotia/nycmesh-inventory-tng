@@ -15,7 +15,8 @@ from sqlalchemy import ColumnElement
 from sqlalchemy.orm import Session
 
 from inventory_tng.core.db import DbSession
-from inventory_tng.models import Item, OpenPackage
+from inventory_tng.models.catalogue import Item
+from inventory_tng.models.stock import OpenPackage
 from inventory_tng.stock import open_packages
 from inventory_tng.stock.over_recorded import times
 from inventory_tng.web.forms import row_id

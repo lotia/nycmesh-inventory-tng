@@ -6,7 +6,7 @@ from collections.abc import Sequence
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
-from inventory_tng.models import Admin
+from inventory_tng.models.admins import Admin
 
 
 def admins_by_username(session: Session) -> Sequence[Admin]:

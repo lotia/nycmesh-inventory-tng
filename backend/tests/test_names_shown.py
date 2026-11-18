@@ -1,5 +1,5 @@
 """Names are kept as typed and shown with each number and unit spaced
-(models.KeyedName.name_shown, units.shown_name; Ali, 2026-11-15,
+(models.names.KeyedName.name_shown, units.shown_name; Ali, 2026-11-15,
 inventory-tng-ist.3). Every page showing them so is
 test_query_counts.test_every_page_names_items_and_packages_as_shown."""
 
@@ -16,7 +16,7 @@ from inventory_tng.catalogue import items, reading_rules, units
 from inventory_tng.catalogue.forms import TAKEN_FIELDS
 from inventory_tng.catalogue.paths import ITEMS
 from inventory_tng.catalogue.reading_rules import NAMED, both
-from inventory_tng.models import Category, Item, ItemPackage
+from inventory_tng.models.catalogue import Category, Item, ItemPackage
 
 from helpers.markup import read, text
 from helpers.rows import add, named, tag

@@ -13,7 +13,10 @@ from sqlalchemy.orm import Session
 from structlog.testing import capture_logs
 
 from inventory_tng.core.db import RuleBroken
-from inventory_tng.models import Admin, CatalogueHistory, Location, OverRecorded
+from inventory_tng.models.admins import Admin
+from inventory_tng.models.core import CatalogueHistory
+from inventory_tng.models.places import Location
+from inventory_tng.models.stock import OverRecorded
 from inventory_tng.places import locations
 from inventory_tng.stock import forms as stock_forms
 from inventory_tng.stock import over_recorded, over_recorded_routes

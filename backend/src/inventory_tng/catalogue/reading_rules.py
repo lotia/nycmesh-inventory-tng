@@ -1,11 +1,11 @@
 """Reading rules: how a unit, as typed after a number, is read, settled by
-an administrator (models.ReadingRule, docs/decisions/0021, 2026-11-15):
-every write to the reading_rule table. Each change reads every name with
-that unit after a number again (items.reread), and is refused if two names
-would then read alike (items.READ_ALIKE), holding the catalogue lock, as
-every name's write does. The seeding page proposes rules from every name
-there is (propose), by the words near each unit (units.CLUES), as the
-import's readings file does from the names it brings (unit_readings)."""
+an administrator (models.catalogue.ReadingRule, docs/decisions/0021,
+2026-11-15): every write to the reading_rule table. Each change reads every
+name with that unit after a number again (items.reread), and is refused if two
+names would then read alike (items.READ_ALIKE), holding the catalogue lock, as
+every name's write does. The seeding page proposes rules from every name there
+is (propose), by the words near each unit (units.CLUES), as the import's
+readings file does from the names it brings (unit_readings)."""
 
 from collections import Counter
 from collections.abc import Callable, Iterable, Mapping, Sequence
@@ -19,7 +19,7 @@ from sqlalchemy.orm import Session
 from inventory_tng.catalogue import items, units
 from inventory_tng.core.db import Seen, enforce, lock_catalogue, locked, relock
 from inventory_tng.core.phrases import gettext, lazy_gettext
-from inventory_tng.models import (
+from inventory_tng.models.catalogue import (
     CURRENT_ALIAS,
     Item,
     ItemAlias,

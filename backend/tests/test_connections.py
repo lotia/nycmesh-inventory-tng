@@ -36,7 +36,7 @@ from inventory_tng.core.db import (
 from inventory_tng.core.db import pool_order_broken as logs_pool_order_broken
 from inventory_tng.core.rate_limits import limiter
 from inventory_tng.core.settings import Settings
-from inventory_tng.models import Device
+from inventory_tng.models.devices import Device
 
 from helpers.pools import checked_out, small_database
 

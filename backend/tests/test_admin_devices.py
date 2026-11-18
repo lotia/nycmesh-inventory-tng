@@ -15,7 +15,8 @@ from inventory_tng.devices import devices
 from inventory_tng.devices.forms import AFTER_FROM, days_problem, uses_problem
 from inventory_tng.devices.paths import BULK_REVOKE, CODES, DEVICE_LIST, DEVICES
 from inventory_tng.devices.routes import revoke_many_title
-from inventory_tng.models import Device, RegistrationCode, SiteSettings
+from inventory_tng.models.devices import Device, RegistrationCode
+from inventory_tng.models.site_settings import SiteSettings
 from inventory_tng.web.forms import NAME_MAX, up_to
 
 from helpers.devices import new_device

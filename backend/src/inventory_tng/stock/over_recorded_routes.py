@@ -24,14 +24,10 @@ from inventory_tng.admins.guards import AdminSignedIn
 from inventory_tng.core.db import DbSession, Gone, attempt, exists_where
 from inventory_tng.core.local_time import site_zone
 from inventory_tng.core.phrases import Words, gettext, lazy_gettext
-from inventory_tng.models import (
-    OVER_RECORDED_WORDS_MAX,
-    Item,
-    Location,
-    Movement,
-    OverRecorded,
-    canonical,
-)
+from inventory_tng.models.catalogue import Item
+from inventory_tng.models.names import canonical
+from inventory_tng.models.places import Location
+from inventory_tng.models.stock import OVER_RECORDED_WORDS_MAX, Movement, OverRecorded
 from inventory_tng.places import locations
 from inventory_tng.places.queries import changeable
 from inventory_tng.stock import balance, ledger, over_recorded

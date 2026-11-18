@@ -12,9 +12,10 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 from structlog.testing import capture_logs
 
-from inventory_tng import models
 from inventory_tng.catalogue import command, reading_rules, unit_readings, units
-from inventory_tng.models import Category, Item, ReadingRule, unit_key
+from inventory_tng.models import catalogue as catalogue_models
+from inventory_tng.models.catalogue import Category, Item, ReadingRule
+from inventory_tng.models.names import unit_key
 
 from helpers.rows import add, history, rule_of
 from helpers.sign_in import new_admin
@@ -112,7 +113,7 @@ def test_the_round_trip_dry_run_correct_dry_run_again_load(
     ]
     (line,) = [line for line in logs if line["event"] == "unit readings loaded"]
     assert sorted(line["reading_rule_ids"]) == sorted([g.id, m.id])
-    rules = models.reading_rules(session)
+    rules = catalogue_models.reading_rules(session)
     assert unit_key("Box 10g", rules) == unit_key("Box 10 Gbps")
     (found,) = units.found_in("Tape 3M", rules)
     assert found.read is None

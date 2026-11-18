@@ -21,19 +21,12 @@ from inventory_tng.core.db import DbSession, exists_where, refusal
 from inventory_tng.core.local_time import site_zone
 from inventory_tng.core.phrases import Words, lazy_gettext
 from inventory_tng.labels import labels
-from inventory_tng.models import (
-    INTEGER_MAX,
-    UNITS,
-    Item,
-    ItemAlias,
-    ItemPackage,
-    Label,
-    Movement,
-    OpenPackage,
-    canonical,
-    whole,
-)
-from inventory_tng.models import reading_rules as rules_held
+from inventory_tng.models.base import INTEGER_MAX, whole
+from inventory_tng.models.catalogue import UNITS, Item, ItemAlias, ItemPackage
+from inventory_tng.models.catalogue import reading_rules as rules_held
+from inventory_tng.models.labels import Label
+from inventory_tng.models.names import canonical
+from inventory_tng.models.stock import Movement, OpenPackage
 from inventory_tng.stock import open_packages
 from inventory_tng.stock import queries as stock_queries
 from inventory_tng.web.admin import admin_page, now, retirement, text_form, undo_retire
@@ -524,7 +517,7 @@ def _package(session: Session, item_id: int, package_id: int) -> ItemPackage | N
     return package if package is not None and package.item_id == item_id else None
 
 
-# A size at or below its too-short length (models.ItemPackage).
+# A size at or below its too-short length (models.catalogue.ItemPackage).
 SHORT_UNDER_SIZE = "ck_item_package_short_below_under_size"
 
 

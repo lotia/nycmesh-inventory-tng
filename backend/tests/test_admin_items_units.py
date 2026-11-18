@@ -19,7 +19,7 @@ from inventory_tng.catalogue.forms import (
 )
 from inventory_tng.catalogue.paths import ITEMS
 from inventory_tng.catalogue.reading_rules import NAMED, both
-from inventory_tng.models import Category, Item, ItemPackage, ReadingRule
+from inventory_tng.models.catalogue import Category, Item, ItemPackage, ReadingRule
 
 from helpers.items import new_item
 from helpers.markup import read, text

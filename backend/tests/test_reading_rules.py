@@ -1,8 +1,8 @@
 """Reading rules: how a unit, as typed after a number, is read, settled by
 an administrator, before the unit table (catalogue/reading_rules.py,
-catalogue/reading_rules_routes.py, models.ReadingRule;
+catalogue/reading_rules_routes.py, models.catalogue.ReadingRule;
 docs/decisions/0021, 2026-11-15, inventory-tng-c0c.4), and names unique once their units are read
-(models.KeyedName.unit_key)."""
+(models.names.KeyedName.unit_key)."""
 
 from collections.abc import Callable
 
@@ -20,16 +20,16 @@ from inventory_tng.catalogue.paths import ITEMS, READINGS, SEED
 from inventory_tng.catalogue.reading_rules import LIKELY, NAMED, both, near
 from inventory_tng.catalogue.reading_rules_routes import READINGS_ACCEPTED
 from inventory_tng.core.db import lock_catalogue
-from inventory_tng.models import (
-    Admin,
+from inventory_tng.models.admins import Admin
+from inventory_tng.models.catalogue import (
     Category,
     Item,
     ItemAlias,
     ItemPackage,
     ReadingRule,
-    unit_key,
 )
-from inventory_tng.models import reading_rules as reading_rules_held
+from inventory_tng.models.catalogue import reading_rules as reading_rules_held
+from inventory_tng.models.names import unit_key
 from inventory_tng.scan.catalogue_api import catalogue
 from inventory_tng.web.listing import folded
 
@@ -54,8 +54,8 @@ GBPS = units.Rule("Gbit/s")
 def test_the_rules_are_read_once_until_written_or_rolled_back(
     session: Session,
 ) -> None:
-    """models.reading_rules keeps what it read for the transaction, read
-    again after a rule is written or a savepoint rolled back."""
+    """models.catalogue.reading_rules keeps what it read for the transaction,
+    read again after a rule is written or a savepoint rolled back."""
     held = reading_rules_held(session)
     assert reading_rules_held(session) is held
     with session.begin_nested() as savepoint:

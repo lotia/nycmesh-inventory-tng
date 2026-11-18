@@ -21,15 +21,9 @@ from sqlalchemy import (
 from sqlalchemy.orm import Session
 
 from inventory_tng.core.db import by_name, exists_where
-from inventory_tng.models import (
-    STORE_KINDS,
-    Item,
-    ItemPackage,
-    LedgerTransaction,
-    Location,
-    Movement,
-    OpenPackage,
-)
+from inventory_tng.models.catalogue import Item, ItemPackage
+from inventory_tng.models.places import STORE_KINDS, Location
+from inventory_tng.models.stock import LedgerTransaction, Movement, OpenPackage
 
 
 def _sides() -> Subquery:

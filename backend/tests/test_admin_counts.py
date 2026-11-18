@@ -19,15 +19,11 @@ from inventory_tng.catalogue import items
 from inventory_tng.core.db import RuleBroken
 from inventory_tng.core.local_time import DEFAULT_ZONE, show
 from inventory_tng.core.phrases import compiled, speaking
-from inventory_tng.models import (
-    INTEGER_MAX,
-    AdjustmentReason,
-    Admin,
-    Item,
-    LedgerTransaction,
-    Location,
-    Movement,
-)
+from inventory_tng.models.admins import Admin
+from inventory_tng.models.base import INTEGER_MAX
+from inventory_tng.models.catalogue import Item
+from inventory_tng.models.places import Location
+from inventory_tng.models.stock import AdjustmentReason, LedgerTransaction, Movement
 from inventory_tng.places import locations
 from inventory_tng.site_settings.forms import REASON_TAKEN
 from inventory_tng.site_settings.paths import SETTINGS

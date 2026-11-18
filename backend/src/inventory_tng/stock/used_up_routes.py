@@ -18,7 +18,7 @@ from inventory_tng.catalogue.paths import ITEMS
 from inventory_tng.core.db import DbSession, attempt
 from inventory_tng.core.local_time import site_zone
 from inventory_tng.core.phrases import gettext, lazy_gettext
-from inventory_tng.models import OpenPackage
+from inventory_tng.models.stock import OpenPackage
 from inventory_tng.stock import ledger, open_packages, queries
 from inventory_tng.stock.needs_action import (
     Kind,

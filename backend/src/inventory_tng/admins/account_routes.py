@@ -31,7 +31,7 @@ from inventory_tng.core.db import DbSession, unique
 from inventory_tng.core.local_time import site_zone
 from inventory_tng.core.mail import Notify
 from inventory_tng.core.phrases import Words, lazy_gettext
-from inventory_tng.models import running_low
+from inventory_tng.models.admins import running_low
 from inventory_tng.web.once import OnceKey, sent_before
 from inventory_tng.web.pages import add_notices, not_found, page, redirect
 

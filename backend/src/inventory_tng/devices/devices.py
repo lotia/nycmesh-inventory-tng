@@ -41,7 +41,7 @@ from inventory_tng.core.db import (
     unchanged,
 )
 from inventory_tng.core.rate_limits import limiter, refund
-from inventory_tng.models import Device, RegistrationCode
+from inventory_tng.models.devices import Device, RegistrationCode
 
 log = structlog.get_logger(__name__)
 meter = metrics.get_meter(__name__)

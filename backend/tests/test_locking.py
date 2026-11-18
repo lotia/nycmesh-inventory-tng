@@ -28,15 +28,11 @@ from inventory_tng.core.db import (
     locked,
 )
 from inventory_tng.devices import devices
-from inventory_tng.models import (
-    AdjustmentReason,
-    Category,
-    Item,
-    ItemPackage,
-    Location,
-    RegistrationCode,
-    Volunteer,
-)
+from inventory_tng.models.catalogue import Category, Item, ItemPackage
+from inventory_tng.models.devices import RegistrationCode
+from inventory_tng.models.places import Location
+from inventory_tng.models.stock import AdjustmentReason
+from inventory_tng.models.volunteers import Volunteer
 from inventory_tng.places.paths import LOCATIONS
 from inventory_tng.site_settings.paths import SETTINGS
 from inventory_tng.volunteers.paths import VOLUNTEERS

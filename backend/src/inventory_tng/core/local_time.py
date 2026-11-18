@@ -14,7 +14,8 @@ import structlog
 from sqlalchemy import func, literal, select
 from sqlalchemy.orm import Session
 
-from inventory_tng.models import Location, SiteSettings
+from inventory_tng.models.places import Location
+from inventory_tng.models.site_settings import SiteSettings
 
 log = structlog.get_logger(__name__)
 

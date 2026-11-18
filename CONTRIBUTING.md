@@ -284,10 +284,10 @@ name as an alias, and renaming it to one of its own aliases swaps the
 two (`items.save`).
 
 Each such row keeps its key in `name_key`, which the app writes as the
-name is set (`models.KeyedName`), a CHECK constraint holds to the name,
+name is set (`models.names.KeyedName`), a CHECK constraint holds to the name,
 and a plain unique index compares. Names that read alike once their units
 are read are one too (`10 uF` and `10μF`): each row keeps `unit_key`,
-which the app writes as the session flushes (`models.unit_key`), unique
+which the app writes as the session flushes (`models.names.unit_key`), unique
 as `name_key` is, with no CHECK, as the units are the app's. A unit is
 judged by its number as search reads it (`units._searched`), sign and all,
 so `Cap 1 000 μF` and `Cap 1000 uF` are one too, and found after any
@@ -302,7 +302,7 @@ clash. The initial migration's `NAME_KEY` shows how to write them out by
 code point.
 
 Every name an administrator types is stored in canonical spelling
-(`models.canonical`, decision 0021): NFC, with `µ` as `μ` and `℃` and `℉`
+(`models.names.canonical`, decision 0021): NFC, with `µ` as `μ` and `℃` and `℉`
 as `°C` and `°F`, case kept. A form checks and compares a name in that
 spelling.
 
@@ -321,18 +321,18 @@ Searches read a unit right after a number in one spelling, on the server
 and the scan page alike (decision 0021): `10 µF` is `10uF`, and so is a
 unit alone spelt with `°`, `μ`, `µ` or `Ω`: `μF` is `uF`. Each searched
 field is kept, and each search matched, both as typed and so respelt,
-where the two differ (`models.folds` and `models.held`, `search.bares` on the
-scan page), so `feet` still finds `100 feet`. A search is matched in
-groups too, each number with its unit or other word, as typed or respelt
-(`units.groups`, `units.ts`'s `groups`), so `100 ft 48 V` finds `100 feet
-48 VDC`; the items list ranks a row holding every group between one
-holding the whole search and one only close. The table is
-`backend/src/inventory_tng/catalogue/units.py`. After changing it, or
-what search keeps, raise its `VERSION`, write the scan page's copy and
-the fold reference again, and add a migration that folds every row again with
-`models.held`, with `FOLDS_UNITS` the new version, folding
-an item's current aliases after its fields, as `Item.refold` does, and
-`name_folded` of items and aliases with `models.fold`:
+where the two differ (`models.names.folds` and `models.names.held`,
+`search.bares` on the scan page), so `feet` still finds `100 feet`. A search is
+matched in groups too, each number with its unit or other word, as typed or
+respelt (`units.groups`, `units.ts`'s `groups`), so `100 ft 48 V` finds `100
+feet 48 VDC`; the items list ranks a row holding every group between one holding
+the whole search and one only close. The table is
+`backend/src/inventory_tng/catalogue/units.py`. After changing it, or what
+search keeps, raise its `VERSION`, write the scan page's copy and the fold
+reference again, and add a migration that folds every row again with
+`models.names.held`, with `FOLDS_UNITS` the new version, folding an item's
+current aliases after its fields, as `Item.refold` does, and `name_folded` of
+items and aliases with `models.names.fold`:
 
 ```sh
 mise run regenerate-units           # frontend/src/units.json
@@ -342,13 +342,13 @@ mise run regenerate-fold-reference
 `frontend/src/units-vectors.json` holds what both sides must make of some
 text; both test against it.
 
-A reading rule (`models.ReadingRule`, written only by
+A reading rule (`models.catalogue.ReadingRule`, written only by
 `catalogue/reading_rules.py`) settles how a unit as typed after a
 number, case kept (`M`, `g`), is read, or that it is no unit, on both
 sides: the catalogue sends the rules. Each
 change to one reads every name with that unit after a number again
 (`items.reread`), refused where two names would then read alike.
-Read them with `models.reading_rules`, which reads them once a
+Read them with `models.catalogue.reading_rules`, which reads them once a
 transaction, and again after one is written or a savepoint rolled back;
 a form's answers, not yet kept, are read on top of them (`Typed.rules`
 in `catalogue/forms.py`). Administrators see and correct them on the Unit
@@ -394,7 +394,7 @@ the catalogue lock first; `locked_row`'s docstring gives the order every
 change takes its locks in. A row is changed or deleted only once this
 transaction has locked it.
 
-A row an edit form shows is `models.Versioned`: every update adds one to
+A row an edit form shows is `models.base.Versioned`: every update adds one to
 its `edit_version`, but one only to columns no form shows (flagged
 `not_a_change` or `row_lock_only`, as an item's `search_text`, which its
 aliases change). The form sends back the one it showed, and the domain

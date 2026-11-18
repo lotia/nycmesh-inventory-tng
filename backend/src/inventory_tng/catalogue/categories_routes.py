@@ -15,7 +15,7 @@ from inventory_tng.catalogue.forms import CATEGORY_TAKEN
 from inventory_tng.catalogue.paths import CATEGORIES
 from inventory_tng.core.db import DbSession, refusal
 from inventory_tng.core.phrases import Words
-from inventory_tng.models import Category
+from inventory_tng.models.catalogue import Category
 from inventory_tng.web.admin import admin_page, now, retirement, undo_retire
 from inventory_tng.web.forms import ALERTS, RULES, form_version, name_problem
 from inventory_tng.web.listing import AskedView, Sort, Sorting, View, arranged

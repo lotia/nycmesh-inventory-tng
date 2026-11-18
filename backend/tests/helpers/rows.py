@@ -21,7 +21,8 @@ from inventory_tng.core.db import (
     describe_error,
     flagged,
 )
-from inventory_tng.models import CatalogueHistory, Item, ReadingRule
+from inventory_tng.models.catalogue import Item, ReadingRule
+from inventory_tng.models.core import CatalogueHistory
 
 
 @contextmanager
@@ -135,7 +136,7 @@ def item_fields(item: Item, **changes: object) -> items.Fields:
 
 def shown(row: Base) -> str:
     """The version of a row its edit form shows and sends back
-    (models.Versioned): the row as it is now."""
+    (models.base.Versioned): the row as it is now."""
     return str(getattr(row, "edit_version"))  # noqa: B009
 
 

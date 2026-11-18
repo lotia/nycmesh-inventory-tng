@@ -8,18 +8,17 @@ labels always name its item, and a package's name is its own among its
 item's, retired ones too, so one can always be brought back. A retired
 item is read only until it is brought back (docs/decisions/0019). An
 item's name, its manufacturer and part number together, and its old code
-are each its own, retired items' too (models.Item); taken_by says which
-another item has. An item's aliases (models.ItemAlias) share its names'
-keys: no name is another item's or any item's alias, nor an alias any
-item's name or another alias, checked here holding the catalogue lock, as
-every write to either takes it (docs/decisions/0021, 2026-11-14). A
-rename keeps the old name as an alias, and renaming an item to its own
-alias swaps the two (2026-11-15). similar finds items whose names or
-aliases are close, to ask whether a new name is a different item
-(docs/decisions/0021).
+are each its own, retired items' too (models.catalogue.Item); taken_by says
+which another item has. An item's aliases (models.catalogue.ItemAlias) share
+its names' keys: no name is another item's or any item's alias, nor an alias
+any item's name or another alias, checked here holding the catalogue lock, as
+every write to either takes it (docs/decisions/0021, 2026-11-14). A rename
+keeps the old name as an alias, and renaming an item to its own alias swaps the
+two (2026-11-15). similar finds items whose names or aliases are close, to ask
+whether a new name is a different item (docs/decisions/0021).
 
 Names, packages' and aliases' too, are compared by their unit keys as
-well (models.unit_key), so names that read alike once their units are
+well (models.names.unit_key), so names that read alike once their units are
 read are one: `10 uF` and `10μF`. A reading rule changed reads every name
 with it again (reread), refused if two would then read alike
 (2026-11-15)."""
@@ -57,22 +56,18 @@ from inventory_tng.core.db import (
     relock,
     require_current,
 )
-from inventory_tng.models import (
+from inventory_tng.models.catalogue import (
     CURRENT_ALIAS,
     Category,
     Item,
     ItemAlias,
     ItemPackage,
-    Label,
-    Movement,
-    OpenPackage,
     current_aliases,
-    fold,
-    fuzzy,
-    in_ascii,
     reading_rules,
-    unit_key,
 )
+from inventory_tng.models.labels import Label
+from inventory_tng.models.names import fold, fuzzy, in_ascii, unit_key
+from inventory_tng.models.stock import Movement, OpenPackage
 
 
 def _in_current_category(session: Session, category_id: int) -> None:
@@ -233,9 +228,9 @@ def similar(session: Session, name: str, item_id: int) -> list[Close]:
     """Items other than `item_id`, the one named `name` now, whose names or
     current aliases are close to it, closest first, retired ones too, each
     once, by its name where that is as close as its closest alias: as
-    search finds them (models.fuzzy), or with a name found in `name`, as
+    search finds them (models.names.fuzzy), or with a name found in `name`, as
     "mast" is in "Mast, telescopic"; accents aside, as search's
-    (models.fold)."""
+    (models.names.fold)."""
     folded = fold(name)
 
     def close(
@@ -340,7 +335,7 @@ def _own_alias(session: Session, item_id: int, keys: Keys) -> ItemAlias | None:
 
 def _aliased(session: Session, item: Item, name: str) -> ItemAlias:
     """`name` written as the item's alias; the flush refolds the item to
-    find it by it (models._refold)."""
+    find it by it (models.catalogue._refold)."""
     alias = ItemAlias(item_id=item.id, name=name)
     session.add(alias)
     session.flush()

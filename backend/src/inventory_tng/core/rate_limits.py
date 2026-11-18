@@ -29,7 +29,7 @@ from sqlalchemy import Connection, Engine, delete, exc, func, select, text
 from sqlalchemy.orm import Session
 
 from inventory_tng.core.db import PoolTimeout, database_of
-from inventory_tng.models import RateLimit
+from inventory_tng.models.core import RateLimit
 
 log = structlog.get_logger(__name__)
 

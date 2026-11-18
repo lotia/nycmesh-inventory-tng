@@ -5,7 +5,7 @@ from datetime import UTC, datetime
 
 from sqlalchemy.orm import Session
 
-from inventory_tng.models import Category, Item
+from inventory_tng.models.catalogue import Category, Item
 
 from helpers.markup import Element, row_links
 from helpers.rows import add

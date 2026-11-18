@@ -8,15 +8,10 @@ from collections.abc import Sequence
 from sqlalchemy import ColumnElement, Row, func, select
 from sqlalchemy.orm import Session
 
-from inventory_tng.models import (
-    Admin,
-    Category,
-    Item,
-    ItemPackage,
-    Location,
-    ReadingRule,
-    Volunteer,
-)
+from inventory_tng.models.admins import Admin
+from inventory_tng.models.catalogue import Category, Item, ItemPackage, ReadingRule
+from inventory_tng.models.places import Location
+from inventory_tng.models.volunteers import Volunteer
 
 # Each item's category's name, for a select of items to sort by.
 category_name = (

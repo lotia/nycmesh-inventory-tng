@@ -17,7 +17,7 @@ from inventory_tng.admins.totp_keys import TotpKeys, TotpKeysError, Unreadable, 
 from inventory_tng.app import check_totp_keys
 from inventory_tng.core.db import Database
 from inventory_tng.core.settings import SettingsError
-from inventory_tng.models import Authenticator
+from inventory_tng.models.admins import Authenticator
 
 from helpers.sign_in import TOTP_KEYS, code, new_admin, raw_key
 

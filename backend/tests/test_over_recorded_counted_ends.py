@@ -14,7 +14,8 @@ from structlog.testing import capture_logs
 
 from inventory_tng.core.db import attempt
 from inventory_tng.core.local_time import show_day, site_zone
-from inventory_tng.models import ItemPackage, LedgerTransaction, Movement
+from inventory_tng.models.catalogue import ItemPackage
+from inventory_tng.models.stock import LedgerTransaction, Movement
 from inventory_tng.stock import (
     ledger,
     length_checks_routes,

@@ -10,9 +10,9 @@ from httpx2 import Response
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from inventory_tng.models import (
+from inventory_tng.models.catalogue import ItemPackage
+from inventory_tng.models.stock import (
     AdjustmentReason,
-    ItemPackage,
     LedgerTransaction,
     Movement,
     OpenPackage,

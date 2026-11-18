@@ -23,14 +23,9 @@ from inventory_tng.catalogue.forms import (
 )
 from inventory_tng.catalogue.paths import ITEMS
 from inventory_tng.core.local_time import DEFAULT_ZONE
-from inventory_tng.models import (
-    Category,
-    Item,
-    ItemPackage,
-    LedgerTransaction,
-    Location,
-    Movement,
-)
+from inventory_tng.models.catalogue import Category, Item, ItemPackage
+from inventory_tng.models.places import Location
+from inventory_tng.models.stock import LedgerTransaction, Movement
 from inventory_tng.web.forms import (
     ABOVE_ZERO,
     NAME_MAX,

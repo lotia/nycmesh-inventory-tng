@@ -20,7 +20,8 @@ from inventory_tng.admins.forms import OWN_RESET, OWN_RETIRE, TAKEN
 from inventory_tng.admins.paths import ADMINS
 from inventory_tng.core import mail
 from inventory_tng.core.settings import RateLimits
-from inventory_tng.models import ACTIVITY_KINDS, Admin, AdminSession, SignInSettings
+from inventory_tng.models.admins import ACTIVITY_KINDS, Admin, AdminSession
+from inventory_tng.models.site_settings import SignInSettings
 
 from helpers.mail import NO_MAIL, SentMail
 from helpers.markup import button, forms, links, read, row_links, sorted_columns, text

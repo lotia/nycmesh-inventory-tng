@@ -25,12 +25,9 @@ from inventory_tng.admins.guards import AdminSignedIn, SignedIn
 from inventory_tng.core.db import DbSession, RuleBroken, attempt
 from inventory_tng.core.local_time import site_zone
 from inventory_tng.core.phrases import Words, lazy_gettext
-from inventory_tng.models import (
-    INTEGER_MAX,
-    Item,
-    OpenPackage,
-    whole,
-)
+from inventory_tng.models.base import INTEGER_MAX, whole
+from inventory_tng.models.catalogue import Item
+from inventory_tng.models.stock import OpenPackage
 from inventory_tng.stock import forms, ledger, open_packages, over_recorded, queries
 from inventory_tng.stock.needs_action import (
     Kind,
@@ -110,7 +107,7 @@ KINDS = (
 RECENT = 5
 
 
-# A cut's transaction kind (models.TRANSACTION_KINDS), in words, where no
+# A cut's transaction kind (models.stock.TRANSACTION_KINDS), in words, where no
 # volunteer made it: the kind of save that took some of an open package.
 CUT_KINDS = {
     # Translators: a kind of save, a noun.

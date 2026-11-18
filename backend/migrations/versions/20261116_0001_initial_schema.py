@@ -1,7 +1,7 @@
 """initial schema: every table, what the app's login may do to each, and
 the rows the app starts with
 
-The tables are made from models.py, whose CHECKs and indexes hold the rules
+The tables are made from models/, whose CHECKs and indexes hold the rules
 one row can show; the rest are the app's. The owner makes them, and the
 app's login (DEPLOYMENT.md, Database roles) is given SELECT, INSERT, UPDATE
 and DELETE on each by default, never TRUNCATE. Some is then taken back:

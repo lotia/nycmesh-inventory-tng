@@ -37,7 +37,7 @@ from inventory_tng.core.rate_limits import limiter
 from inventory_tng.core.settings import RateLimits
 from inventory_tng.devices import devices
 from inventory_tng.devices.devices import digest
-from inventory_tng.models import (
+from inventory_tng.models.admins import (
     Admin,
     AdminPassword,
     AdminSession,
@@ -45,9 +45,9 @@ from inventory_tng.models import (
     RecoveryCode,
     ResetKind,
     ResetLink,
-    SignInSettings,
-    mint_code,
 )
+from inventory_tng.models.labels import mint_code
+from inventory_tng.models.site_settings import SignInSettings
 
 log = structlog.get_logger(__name__)
 meter = metrics.get_meter(__name__)

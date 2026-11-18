@@ -22,7 +22,7 @@ from inventory_tng.core.local_time import (
 )
 from inventory_tng.core.time_zones import is_time_zone, known_zones
 from inventory_tng.devices import command
-from inventory_tng.models import SiteSettings
+from inventory_tng.models.site_settings import SiteSettings
 
 from helpers.rows import breaks, history, violates
 

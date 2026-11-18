@@ -13,7 +13,7 @@ from inventory_tng.admins import accounts, paths
 from inventory_tng.admins.paths import RECOVER
 from inventory_tng.admins.reset_routes import REFUSED
 from inventory_tng.core.settings import RateLimits, Settings, SettingsError
-from inventory_tng.models import ResetLink
+from inventory_tng.models.admins import ResetLink
 
 from helpers.mail import NO_MAIL, SentMail
 from helpers.markup import text

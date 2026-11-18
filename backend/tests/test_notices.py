@@ -10,7 +10,11 @@ import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
 
-from inventory_tng.models import Admin, Category, Item, Label, Location, Volunteer
+from inventory_tng.models.admins import Admin
+from inventory_tng.models.catalogue import Category, Item
+from inventory_tng.models.labels import Label
+from inventory_tng.models.places import Location
+from inventory_tng.models.volunteers import Volunteer
 from inventory_tng.volunteers.routes import BRING_THEM_BACK
 from inventory_tng.web import pages
 

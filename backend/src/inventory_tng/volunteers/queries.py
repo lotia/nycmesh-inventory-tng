@@ -8,7 +8,7 @@ from collections.abc import Collection, Sequence
 from sqlalchemy import ColumnElement, func, select
 from sqlalchemy.orm import Session
 
-from inventory_tng.models import Volunteer
+from inventory_tng.models.volunteers import Volunteer
 
 
 def volunteer_names(

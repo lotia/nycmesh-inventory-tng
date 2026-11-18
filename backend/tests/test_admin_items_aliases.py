@@ -21,7 +21,7 @@ from inventory_tng.catalogue.forms import (
 from inventory_tng.catalogue.items_routes import RENAMED
 from inventory_tng.catalogue.paths import ITEMS
 from inventory_tng.core.db import attempt
-from inventory_tng.models import CURRENT_ALIAS, Category, Item, ItemAlias
+from inventory_tng.models.catalogue import CURRENT_ALIAS, Category, Item, ItemAlias
 
 from helpers.items import NOW, items_named, new_item
 from helpers.markup import links, read, text
@@ -48,7 +48,7 @@ def test_an_alias_is_searched_and_its_removal_frees_it(
     admin_client: TestClient, session: Session, radios: Category
 ) -> None:
     """Stored canonical and keyed as names are; in the item's search text,
-    each folded alone, as typed and respelt (models.held), until removed
+    each folded alone, as typed and respelt (models.names.held), until removed
     (retired), which frees the name."""
     item = new_item(session, radios, "Cat6 cable, outdoor")
     tough, capacitor = aliased(session, item, "ToughCable", "Cap 10 µF")

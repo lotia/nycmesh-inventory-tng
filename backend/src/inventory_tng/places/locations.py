@@ -22,7 +22,8 @@ from inventory_tng.core.db import (
     relock,
     require_current,
 )
-from inventory_tng.models import STORE_KINDS, Location, Volunteer
+from inventory_tng.models.places import STORE_KINDS, Location
+from inventory_tng.models.volunteers import Volunteer
 from inventory_tng.stock.balance import holds_stock
 
 

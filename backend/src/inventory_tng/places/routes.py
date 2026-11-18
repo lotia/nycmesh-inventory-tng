@@ -18,7 +18,8 @@ from inventory_tng.core.local_time import zone_at
 from inventory_tng.core.phrases import Words, lazy_gettext
 from inventory_tng.core.time_zones import zones
 from inventory_tng.labels import labels
-from inventory_tng.models import STORE_KINDS, Label, Location
+from inventory_tng.models.labels import Label
+from inventory_tng.models.places import STORE_KINDS, Location
 from inventory_tng.places import locations, queries
 from inventory_tng.places.forms import KINDS, TAKEN, new_place, place_change
 from inventory_tng.places.paths import LOCATIONS

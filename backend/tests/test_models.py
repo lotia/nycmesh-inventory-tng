@@ -1,4 +1,4 @@
-"""The catalogue's rules: the database's own (models.py, the initial
+"""The catalogue's rules: the database's own (models/, the initial
 migration), each failing write checked by the constraint it names, which
 is what describe_error() logs; and the app's, each refused through its domain
 function by the rule's name (db.RuleBroken), whose every case
@@ -19,23 +19,19 @@ from inventory_tng.catalogue import categories, items
 from inventory_tng.catalogue.names import LOOK_ALIKES, name_key, name_key_sql
 from inventory_tng.core.db import ACTOR_INFO, Base, refusal, set_actor
 from inventory_tng.labels import labels
-from inventory_tng.models import (
+from inventory_tng.models.catalogue import Category, Item, ItemPackage
+from inventory_tng.models.core import CatalogueHistory
+from inventory_tng.models.labels import (
     LABEL_ALPHABET,
     LABEL_LENGTH,
-    AdjustmentReason,
-    CatalogueHistory,
-    Category,
-    Item,
-    ItemPackage,
     Label,
-    Location,
-    Volunteer,
-    canonical,
-    fold,
-    fuzzy,
     mint_code,
     mint_label_code,
 )
+from inventory_tng.models.names import canonical, fold, fuzzy
+from inventory_tng.models.places import Location
+from inventory_tng.models.stock import AdjustmentReason
+from inventory_tng.models.volunteers import Volunteer
 from inventory_tng.places import locations
 from inventory_tng.volunteers import volunteers
 

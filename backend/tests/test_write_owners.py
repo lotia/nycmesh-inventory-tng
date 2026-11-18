@@ -42,7 +42,9 @@ from inventory_tng.core.db import (
     missing_lock,
     settings_row,
 )
-from inventory_tng.models import Admin, AdminPassword, Category, Item, SiteSettings
+from inventory_tng.models.admins import Admin, AdminPassword
+from inventory_tng.models.catalogue import Category, Item
+from inventory_tng.models.site_settings import SiteSettings
 
 from helpers.rows import setting_up, tag
 from helpers.source import SOURCE, offending, writes

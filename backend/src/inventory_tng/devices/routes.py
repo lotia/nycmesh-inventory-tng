@@ -34,7 +34,7 @@ from inventory_tng.devices.paths import (
     DEVICES,
     REGISTER_PATH,
 )
-from inventory_tng.models import Device, RegistrationCode
+from inventory_tng.models.devices import Device, RegistrationCode
 from inventory_tng.web.admin import admin_page, now, revoke_title, site_link
 from inventory_tng.web.forms import RULES, form_version
 from inventory_tng.web.listing import (

@@ -18,20 +18,19 @@ from sqlalchemy.orm import Session
 from inventory_tng.admins import accounts, guards
 from inventory_tng.core.db import DATABASE_INFO, Database, make_database
 from inventory_tng.devices import devices
-from inventory_tng.models import (
-    Admin,
-    Authenticator,
+from inventory_tng.models.admins import Admin, Authenticator
+from inventory_tng.models.catalogue import (
     Category,
-    Device,
     Item,
     ItemAlias,
     ItemPackage,
-    Label,
-    Location,
-    OpenPackage,
     ReadingRule,
-    Volunteer,
 )
+from inventory_tng.models.devices import Device
+from inventory_tng.models.labels import Label
+from inventory_tng.models.places import Location
+from inventory_tng.models.stock import OpenPackage
+from inventory_tng.models.volunteers import Volunteer
 from inventory_tng.stock import over_recorded
 from inventory_tng.stock.length_checks_routes import KINDS
 

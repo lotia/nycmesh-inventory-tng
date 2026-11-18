@@ -12,14 +12,10 @@ from sqlalchemy.orm import Session
 
 from inventory_tng.catalogue import categories
 from inventory_tng.core.db import set_actor
-from inventory_tng.models import (
-    Admin,
-    Category,
-    Item,
-    ItemPackage,
-    Location,
-    Volunteer,
-)
+from inventory_tng.models.admins import Admin
+from inventory_tng.models.catalogue import Category, Item, ItemPackage
+from inventory_tng.models.places import Location
+from inventory_tng.models.volunteers import Volunteer
 from inventory_tng.volunteers.routes import BRING_THEM_BACK
 from inventory_tng.web.admin import retired_by
 from inventory_tng.web.forms import RETIRED, RULES

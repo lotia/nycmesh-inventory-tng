@@ -9,7 +9,7 @@ import pytest
 from sqlalchemy import func, select
 from sqlalchemy.dialects import postgresql
 
-from inventory_tng.models import Item
+from inventory_tng.models.catalogue import Item
 from inventory_tng.web.listing import (
     PER_PAGE,
     Asked,

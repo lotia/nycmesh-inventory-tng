@@ -11,9 +11,9 @@ from sqlalchemy.orm import Session
 from structlog.testing import capture_logs
 
 from inventory_tng.core.db import RuleBroken, attempt
-from inventory_tng.models import (
+from inventory_tng.models.catalogue import ItemPackage
+from inventory_tng.models.stock import (
     OVER_RECORDED_REASONS,
-    ItemPackage,
     LedgerTransaction,
     Movement,
 )
@@ -193,7 +193,7 @@ def test_put_right_another_way_keeps_the_words_as_typed(
     place: Place,
     bags: ItemPackage,
 ) -> None:
-    """In canonical spelling (models.canonical), never logged."""
+    """In canonical spelling (models.names.canonical), never logged."""
     one_bag_waits(registered_client, place, bags)
     words = "Moved back by hand, 10µF"
     with capture_logs() as logs:

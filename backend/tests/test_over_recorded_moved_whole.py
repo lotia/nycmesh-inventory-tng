@@ -9,7 +9,8 @@ from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
 from structlog.testing import capture_logs
 
-from inventory_tng.models import ItemPackage, LedgerTransaction, Movement
+from inventory_tng.models.catalogue import ItemPackage
+from inventory_tng.models.stock import LedgerTransaction, Movement
 from inventory_tng.stock import (
     adjustment_reasons,
     ledger,

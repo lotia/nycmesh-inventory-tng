@@ -18,15 +18,11 @@ from inventory_tng.catalogue import items
 from inventory_tng.core.db import set_actor
 from inventory_tng.core.history import LEDGER
 from inventory_tng.core.local_time import DEFAULT_ZONE, zone_at
-from inventory_tng.models import (
-    AdjustmentReason,
-    Admin,
-    CatalogueHistory,
-    Item,
-    LedgerTransaction,
-    Location,
-    Movement,
-)
+from inventory_tng.models.admins import Admin
+from inventory_tng.models.catalogue import Item
+from inventory_tng.models.core import CatalogueHistory
+from inventory_tng.models.places import Location
+from inventory_tng.models.stock import AdjustmentReason, LedgerTransaction, Movement
 from inventory_tng.scan.batch_schemas import BodyRefusedReply
 from inventory_tng.stock.balance import balance, countable, retired_places_holding_stock
 from inventory_tng.stock.ledger import (

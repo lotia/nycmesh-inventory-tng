@@ -16,7 +16,8 @@ from sqlalchemy.orm import Session
 from inventory_tng.catalogue import items, units
 from inventory_tng.catalogue.paths import ITEMS
 from inventory_tng.catalogue.units import KINDS, PREFIXES, UNITS, Reading, read, respell
-from inventory_tng.models import Category, Item, fold, folds, held, unit_key
+from inventory_tng.models.catalogue import Category, Item
+from inventory_tng.models.names import fold, folds, held, unit_key
 
 from helpers.markup import text as page_text
 from helpers.rows import add, tag

@@ -6,7 +6,8 @@ from decimal import Decimal
 from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
 
-from inventory_tng.models import Item, Location
+from inventory_tng.models.catalogue import Item
+from inventory_tng.models.places import Location
 from inventory_tng.stock.paths import COUNTS, NEEDS_COUNTING, REORDER, STOCK
 
 from helpers.markup import (

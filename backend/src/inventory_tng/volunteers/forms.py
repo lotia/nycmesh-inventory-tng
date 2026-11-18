@@ -7,7 +7,7 @@ from sqlalchemy.orm import Session
 
 from inventory_tng.admins.accounts import email_problem
 from inventory_tng.core.phrases import Words, lazy_gettext
-from inventory_tng.models import Volunteer
+from inventory_tng.models.volunteers import Volunteer
 from inventory_tng.web.forms import chosen, name_problem
 
 TAKEN = lazy_gettext("Another current volunteer already has that name or email.")

@@ -20,7 +20,9 @@ from inventory_tng.catalogue.items_listing import SEARCHED
 from inventory_tng.catalogue.paths import ITEMS
 from inventory_tng.core.db import DbSession
 from inventory_tng.core.phrases import Words, gettext, lazy_gettext
-from inventory_tng.models import INTEGER_MAX, Item, ItemPackage, Location, whole
+from inventory_tng.models.base import INTEGER_MAX, whole
+from inventory_tng.models.catalogue import Item, ItemPackage
+from inventory_tng.models.places import Location
 from inventory_tng.stock import open_packages, over_recorded, queries
 from inventory_tng.stock.balance import SHORT, retired_places_holding_stock
 from inventory_tng.stock.paths import (

@@ -18,14 +18,10 @@ from sqlalchemy import ColumnElement, exc, select
 from sqlalchemy.orm import Session
 
 from inventory_tng.core.db import enforce, get_locked, locked
-from inventory_tng.models import (
-    Item,
-    ItemPackage,
-    LedgerTransaction,
-    Location,
-    OpenPackage,
-    Volunteer,
-)
+from inventory_tng.models.catalogue import Item, ItemPackage
+from inventory_tng.models.places import Location
+from inventory_tng.models.stock import LedgerTransaction, OpenPackage
+from inventory_tng.models.volunteers import Volunteer
 from inventory_tng.stock import adjustment_reasons, balance, ledger, over_recorded
 
 log = structlog.get_logger(__name__)

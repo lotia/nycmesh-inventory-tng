@@ -8,14 +8,14 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from inventory_tng.admins import accounts
-from inventory_tng.models import (
+from inventory_tng.models.admins import (
     Admin,
     AdminPassword,
     Authenticator,
     RecoveryCode,
     ResetLink,
-    SignInSettings,
 )
+from inventory_tng.models.site_settings import SignInSettings
 
 from helpers.rows import add, flagged_columns, history, violates
 

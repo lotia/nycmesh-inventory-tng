@@ -22,14 +22,10 @@ from inventory_tng.labels.labels import (
 )
 from inventory_tng.labels.paths import LABELS, PRINT
 from inventory_tng.labels.routes import PICK_LABELS
-from inventory_tng.models import (
-    Category,
-    Item,
-    ItemPackage,
-    Label,
-    Location,
-    Volunteer,
-)
+from inventory_tng.models.catalogue import Category, Item, ItemPackage
+from inventory_tng.models.labels import Label
+from inventory_tng.models.places import Location
+from inventory_tng.models.volunteers import Volunteer
 from inventory_tng.places.paths import LOCATIONS
 from inventory_tng.scan.catalogue_api import catalogue
 from inventory_tng.web.listing import PER_PAGE

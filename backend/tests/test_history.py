@@ -29,13 +29,9 @@ from inventory_tng.core.history import (
     json_value,
 )
 from inventory_tng.devices import devices
-from inventory_tng.models import (
-    Admin,
-    AdminPassword,
-    CatalogueHistory,
-    Category,
-    Item,
-)
+from inventory_tng.models.admins import Admin, AdminPassword
+from inventory_tng.models.catalogue import Category, Item
+from inventory_tng.models.core import CatalogueHistory
 
 from helpers.rows import add, flagged_columns, history, refused
 from helpers.source import SOURCE, How, Write, offending, outside, writes
@@ -186,16 +182,16 @@ VERSIONED = (
                 # Resealing (admins/totp_keys.py) changes nothing anyone did.
                 "authenticator": {"last_step", "sealed_key", "key_version"},
             }
-            # Each edit form's row's (models.Versioned), which moves with
+            # Each edit form's row's (models.base.Versioned), which moves with
             # every change, and each searched row's folded text
-            # (models.Searchable), which moves with what is searched.
+            # (models.names.Searchable), which moves with what is searched.
             | {table: {"edit_version"} for table in VERSIONED}
             | {
                 table: {"edit_version", "search_text", "folded_with"}
                 for table in ("item", "item_package", "volunteer", "location")
             }
-            # And each name's unit key and name as shown (models.KeyedName),
-            # which a reading rule moves.
+            # And each name's unit key and name as shown
+            # (models.names.KeyedName), which a reading rule moves.
             | {
                 "item": {
                     "edit_version",

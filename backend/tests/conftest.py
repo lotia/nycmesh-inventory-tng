@@ -32,7 +32,8 @@ from inventory_tng.core.history import LEDGER
 from inventory_tng.core.logs import configure_structlog
 from inventory_tng.core.settings import FrontendConfig, LogConfig, RateLimits
 from inventory_tng.devices import devices
-from inventory_tng.models import Category, ItemPackage, RateLimit
+from inventory_tng.models.catalogue import Category, ItemPackage
+from inventory_tng.models.core import RateLimit
 
 from databases import (
     NO_DATABASE,
@@ -357,7 +358,7 @@ def _fingerprint_query(engine: Engine) -> TextClause:
     """One query for every table's fingerprint (PostgreSQL's md5 of all its
     rows, in order), built once per run, as the schema doesn't change
     between tests. Every table in it, alembic_version too, not only the
-    models'. Without a row's edit_version (models.Versioned), which a row
+    models'. Without a row's edit_version (models.base.Versioned), which a row
     changed and put back still moves on."""
     with engine.connect() as connection:
         tables = connection.scalars(

@@ -1,4 +1,4 @@
-"""What models.fold made of a wide sample of text, kept in
+"""What models.names.fold made of a wide sample of text, kept in
 tests/fold_reference.tsv, so a release of anyascii, or a Python with a
 newer Unicode, that spells something otherwise fails test_fold_reference
 with the difference, rather than leaving rows folded the old way
@@ -17,7 +17,7 @@ import sys
 import unicodedata
 from pathlib import Path
 
-from inventory_tng.models import FOLDED_WITH, fold
+from inventory_tng.models.names import FOLDED_WITH, fold
 
 from . import committed
 
@@ -114,7 +114,7 @@ def reference() -> str:
     and Python's Unicode's (FOLDED_WITH): which characters there are, and
     what NFKC makes of them."""
     lines = [
-        f"# models.fold, with {FOLDED_WITH}: each input, its code point, what "
+        f"# models.names.fold, with {FOLDED_WITH}: each input, its code point, what "
         + f"it folds to (∅: nothing). Written by {COMMANDS}."
     ]
     lines += [

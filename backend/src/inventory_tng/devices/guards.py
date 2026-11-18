@@ -21,7 +21,7 @@ from inventory_tng.devices.devices import (
     Refusal,
     digest,
 )
-from inventory_tng.models import Device
+from inventory_tng.models.devices import Device
 
 log = structlog.get_logger(__name__)
 meter = metrics.get_meter(__name__)

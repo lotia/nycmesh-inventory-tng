@@ -30,14 +30,9 @@ from inventory_tng.admins.accounts import (
 from inventory_tng.core.cross_site import cross_site
 from inventory_tng.core.masking import Masker
 from inventory_tng.core.settings import RateLimits
-from inventory_tng.models import (
-    LABEL_ALPHABET,
-    Admin,
-    AdminSession,
-    Authenticator,
-    RecoveryCode,
-    SignInSettings,
-)
+from inventory_tng.models.admins import Admin, AdminSession, Authenticator, RecoveryCode
+from inventory_tng.models.labels import LABEL_ALPHABET
+from inventory_tng.models.site_settings import SignInSettings
 from inventory_tng.web.navigation import retired_holding
 
 from helpers.markup import read, text

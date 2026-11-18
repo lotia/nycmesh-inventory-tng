@@ -9,21 +9,16 @@ import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
 
-from inventory_tng import models
 from inventory_tng.catalogue import items
 from inventory_tng.catalogue.items_listing import SEARCHED
 from inventory_tng.catalogue.paths import ITEMS
 from inventory_tng.labels.paths import LABELS
-from inventory_tng.models import (
-    FOLDED_WITH,
-    Category,
-    Item,
-    ItemPackage,
-    Label,
-    Location,
-    Volunteer,
-    fold,
-)
+from inventory_tng.models import catalogue as catalogue_models
+from inventory_tng.models.catalogue import Category, Item, ItemPackage
+from inventory_tng.models.labels import Label
+from inventory_tng.models.names import FOLDED_WITH, fold
+from inventory_tng.models.places import Location
+from inventory_tng.models.volunteers import Volunteer
 from inventory_tng.volunteers.paths import VOLUNTEERS
 from inventory_tng.web.listing import SEARCH_MAX, folded
 
@@ -80,7 +75,9 @@ def test_a_change_to_nothing_searched_folds_nothing(
     item = add(session, Item(name="Câble", category_id=cables.id))
     session.expire(item)
     folds: list[str] = []
-    monkeypatch.setattr(models, "fold", lambda text: folds.append(text) or text)
+    monkeypatch.setattr(
+        catalogue_models, "fold", lambda text: folds.append(text) or text
+    )
     item.notes = "By the door"
     session.flush()
     assert folds == []

@@ -16,7 +16,7 @@ from sqlalchemy.orm import Session
 
 from inventory_tng.core.local_time import show, show_day, site_zone
 from inventory_tng.core.phrases import compiled, speaking
-from inventory_tng.models import LedgerTransaction, Movement, OverRecorded
+from inventory_tng.models.stock import LedgerTransaction, Movement, OverRecorded
 from inventory_tng.stock import open_packages, over_recorded, over_recorded_routes
 from inventory_tng.stock.over_recorded_routes import waiting_view
 from inventory_tng.stock.paths import COUNTS

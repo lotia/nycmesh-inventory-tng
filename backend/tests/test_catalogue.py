@@ -13,14 +13,10 @@ from structlog.testing import capture_logs
 
 from inventory_tng.catalogue import items
 from inventory_tng.core.db import get_snapshot
-from inventory_tng.models import (
-    Category,
-    Item,
-    ItemPackage,
-    Label,
-    Location,
-    Volunteer,
-)
+from inventory_tng.models.catalogue import Category, Item, ItemPackage
+from inventory_tng.models.labels import Label
+from inventory_tng.models.places import Location
+from inventory_tng.models.volunteers import Volunteer
 from inventory_tng.scan import catalogue_api
 from inventory_tng.stock.ledger import LOOSE, Entry
 
@@ -216,7 +212,7 @@ def test_an_item_is_found_by_its_current_aliases(
     registered_client: TestClient, session: Session
 ) -> None:
     """Sent as spelt, for the page to match; in its folded text too, as
-    typed and respelt (models.held)."""
+    typed and respelt (models.names.held)."""
     mark = tag()
     category = add(session, Category(name=f"Cables {mark}"))
     item = add(session, Item(name=f"Cat6 cable {mark}", category_id=category.id))

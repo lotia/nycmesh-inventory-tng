@@ -21,7 +21,7 @@ from inventory_tng.core.db import DbSession, RuleBroken, refusal, settings_row
 from inventory_tng.core.mail import Notify
 from inventory_tng.core.phrases import Words, lazy_gettext
 from inventory_tng.core.time_zones import zones
-from inventory_tng.models import (
+from inventory_tng.models.site_settings import (
     NAME_CHECK_MINUTES,
     TOTP_POLICIES,
     ScanSettings,
@@ -76,7 +76,7 @@ def _page(
                 "name_check_minutes": str(scan.name_check_minutes),
                 "totp_policy": sign_in.totp_policy,
                 "time_zone": site.time_zone,
-                # What each form was shown at (models.Versioned), named as
+                # What each form was shown at (models.base.Versioned), named as
                 # its form sends it, so one shown again keeps the one sent.
                 "scan_version": str(scan.edit_version),
                 "sign_in_version": str(sign_in.edit_version),

@@ -5,8 +5,8 @@ and shown on the administrators page ("Recent changes") and on the home
 page ("Since you last signed in"), so those without an address hear of it
 too. Kept for good, as the ledger is.
 
-A new kind of activity is a name in models.ActivityKind, its words in WORDS
-and its migration's check: nothing else here changes."""
+A new kind of activity is a name in models.admins.ActivityKind, its words in
+WORDS and its migration's check: nothing else here changes."""
 
 from collections.abc import Callable, Iterable, Mapping
 from dataclasses import dataclass
@@ -20,7 +20,7 @@ from sqlalchemy.orm import Session
 from inventory_tng.core import mail
 from inventory_tng.core.mail import Notifier, Told
 from inventory_tng.core.phrases import gettext, lazy_gettext
-from inventory_tng.models import Activity, ActivityKind, Admin
+from inventory_tng.models.admins import Activity, ActivityKind, Admin
 
 log = structlog.get_logger(__name__)
 meter = metrics.get_meter(__name__)

@@ -10,7 +10,7 @@ from sqlalchemy.orm import Session
 from inventory_tng.core.local_time import parse_local, site_zone
 from inventory_tng.core.phrases import Words, gettext, lazy_gettext
 from inventory_tng.devices import devices
-from inventory_tng.models import whole
+from inventory_tng.models.base import whole
 from inventory_tng.web.forms import NAME_MAX, up_to
 
 MAX_USES = 500

@@ -20,13 +20,9 @@ from inventory_tng.app import create_app
 from inventory_tng.core.db import make_engine
 from inventory_tng.core.settings import Settings
 from inventory_tng.devices import devices
-from inventory_tng.models import (
-    Category,
-    Item,
-    ItemPackage,
-    Location,
-    Volunteer,
-)
+from inventory_tng.models.catalogue import Category, Item, ItemPackage
+from inventory_tng.models.places import Location
+from inventory_tng.models.volunteers import Volunteer
 from inventory_tng.scan import catalogue_api
 
 from databases import OWNER, as_role

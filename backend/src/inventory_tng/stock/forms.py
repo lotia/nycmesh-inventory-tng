@@ -14,15 +14,13 @@ from typing import NamedTuple
 from sqlalchemy.orm import Session
 
 from inventory_tng.core.phrases import Words, lazy_gettext
-from inventory_tng.models import (
-    INTEGER_MAX,
+from inventory_tng.models.base import INTEGER_MAX, whole
+from inventory_tng.models.catalogue import Item, ItemPackage
+from inventory_tng.models.places import Location
+from inventory_tng.models.stock import (
     OVER_RECORDED_WORDS_MAX,
     AdjustmentReason,
-    Item,
-    ItemPackage,
-    Location,
     OpenPackage,
-    whole,
 )
 from inventory_tng.stock import over_recorded, queries
 from inventory_tng.stock.adjustment_reasons import LOST, USED_UP

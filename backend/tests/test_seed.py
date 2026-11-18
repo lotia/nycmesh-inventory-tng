@@ -11,7 +11,10 @@ from sqlalchemy.orm import Session
 
 from inventory_tng.admins import accounts
 from inventory_tng.dev import seed
-from inventory_tng.models import Admin, AdminPassword, Item, Location, Volunteer
+from inventory_tng.models.admins import Admin, AdminPassword
+from inventory_tng.models.catalogue import Item
+from inventory_tng.models.places import Location
+from inventory_tng.models.volunteers import Volunteer
 from inventory_tng.stock.ledger import expected
 
 from databases import NO_DATABASE

@@ -9,7 +9,7 @@ from structlog.testing import capture_logs
 
 from inventory_tng.admins import activity
 from inventory_tng.core import mail
-from inventory_tng.models import (
+from inventory_tng.models.site_settings import (
     NAME_CHECK_MINUTES,
     ScanSettings,
     SignInSettings,

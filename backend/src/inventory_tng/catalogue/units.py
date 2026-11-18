@@ -19,13 +19,13 @@ respelt by their symbols only where a reading rule says so (spell, Ali,
 2026-11-15): case is read loosely only where one reading is a likely
 size, and the form asks where two are.
 
-A reading rule (models.ReadingRule, inventory-tng-c0c.4) settles how a
-unit as typed after a number (`M`, `G`) is read, or that it is no unit:
-looked up before the table, wherever a unit after a number is read, by
-search here and on the scan page, and by the forms, always first. Where
-none is and a unit may be several kinds, the words near it in a name
-decide (CLUES), then the profile (PROFILE, LIKELY), on both sides alike
-(Ali, 2026-11-15, inventory-tng-c0c.3).
+A reading rule (models.catalogue.ReadingRule, inventory-tng-c0c.4) settles how
+a unit as typed after a number (`M`, `G`) is read, or that it is no unit:
+looked up before the table, wherever a unit after a number is read, by search
+here and on the scan page, and by the forms, always first. Where none is and a
+unit may be several kinds, the words near it in a name decide (CLUES), then the
+profile (PROFILE, LIKELY), on both sides alike (Ali, 2026-11-15,
+inventory-tng-c0c.3).
 """
 
 import json
@@ -44,8 +44,8 @@ from inventory_tng.core.local_env import CLONE
 from inventory_tng.core.phrases import gettext, lazy_gettext
 
 # Raise it whenever a change to the table reads any text otherwise, or
-# search keeps it otherwise (models.held): rows record what folded them
-# (models.FOLDED_WITH), so those folded before can be folded again, and a
+# search keeps it otherwise (models.names.held): rows record what folded them
+# (models.names.FOLDED_WITH), so those folded before can be folded again, and a
 # test fails until it is raised. Reset to 1 when the migrations became one
 # initial migration (Ali, 2026-11-17); the versions before are in
 # docs/decisions/0021.
@@ -207,7 +207,7 @@ UNITS: tuple[Unit, ...] = (
 # Each unit's name, given its prefix's (or ""), in US spelling, as the app
 # follows US conventions (Ali, 2026-11-15, inventory-tng-g6u); and its
 # symbol in a name where that is not its symbol here: as the SI Brochure
-# writes it, in the spelling models.canonical keeps (docs/decisions/0021,
+# writes it, in the spelling models.names.canonical keeps (docs/decisions/0021,
 # 2026-11-14).
 NAMES: dict[str, Callable[[str], str]] = {
     # Translators: prefix is an SI prefix in English, such as kilo, or none.
@@ -392,7 +392,7 @@ def read(token: str) -> Reading | None:
 
 @dataclass(frozen=True)
 class Rule:
-    """A reading rule's verdict (models.ReadingRule): the reading, as
+    """A reading rule's verdict (models.catalogue.ReadingRule): the reading, as
     str(Reading), or None, no unit; and whether a name typed with it spells
     it by its symbol."""
 
@@ -822,8 +822,8 @@ def found_in(name: str, rules: Rules | None = None) -> list[Found]:
     """What may be units in `name`, right after a number: each token some
     unit spells, in any case (readings), whether or not one is plausible,
     and each a reading rule names, but in a product's name (PRODUCTS), each
-    read as _found says. `name` is in canonical spelling (models.canonical),
-    so `℃` is `°C`."""
+    read as _found says. `name` is in canonical spelling
+    (models.names.canonical), so `℃` is `°C`."""
     return [
         found
         for match, searched in _after_a_number(name)
@@ -897,7 +897,8 @@ def read_as(name: str, rules: Rules | None = None) -> str:
     """`name` with each unit after a number that is read, by its rule or
     the table (found_in), spelt by its symbol (str(Reading)) joined to its
     number, the rest as it is: so names that read alike are spelt alike,
-    `10 µF`, `10 uF` and `10μF` all `10uF` (models.KeyedName.unit_key)."""
+    `10 µF`, `10 uF` and `10μF` all `10uF`
+    (models.names.KeyedName.unit_key)."""
     return _spelt(name, {f: str(f.read) for f in found_in(name, rules) if f.read})
 
 
@@ -965,7 +966,7 @@ def shown_name(name: str, rules: Rules | None = None) -> str:
     `2100 ft`, its breaking spaces no-break so it never breaks across a
     line, a narrow one narrow (Ali, 2026-11-16, inventory-tng-t78,
     inventory-tng-mz31: names.NO_BREAK). `name` is as saved
-    (models.canonical, spell)."""
+    (models.names.canonical, spell)."""
     edits = []
     for match, searched in _after_a_number(name):
         token = match[2]

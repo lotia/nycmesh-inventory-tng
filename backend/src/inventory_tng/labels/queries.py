@@ -7,7 +7,9 @@ from collections.abc import Sequence
 from sqlalchemy import Row, exists, func, select
 from sqlalchemy.orm import Session, aliased
 
-from inventory_tng.models import Item, ItemPackage, Label, Location
+from inventory_tng.models.catalogue import Item, ItemPackage
+from inventory_tng.models.labels import Label
+from inventory_tng.models.places import Location
 
 # The place around a place, which a label's search reads too.
 parent = aliased(Location)

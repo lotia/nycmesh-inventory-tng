@@ -15,15 +15,14 @@ from sqlalchemy.orm import Session
 
 from inventory_tng.admins import accounts, guards, paths, totp_keys
 from inventory_tng.admins.totp_keys import TotpKeys
-from inventory_tng.models import (
-    CONFIRM_IDLE_MINUTES,
+from inventory_tng.models.admins import (
     Admin,
     AdminPassword,
     AdminSession,
     Authenticator,
     ResetKind,
-    SignInSettings,
 )
+from inventory_tng.models.site_settings import CONFIRM_IDLE_MINUTES, SignInSettings
 
 # A recovery code as the page shows it, in groups.
 _GROUP = f"[A-Z0-9]{{{accounts.RECOVERY_CODE_GROUP}}}"

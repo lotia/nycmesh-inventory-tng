@@ -2,8 +2,8 @@
 {% from "_table.html" import table %}
 {% from "_listing.html" import filter_form, sizes, sort_heading, pager, unfiltered_or %}
 {#- The reading rules: how a unit, as typed after a number, is read
-(models.ReadingRule, docs/decisions/0021), each changed or deleted on its
-own page. -#}
+(models.catalogue.ReadingRule, docs/decisions/0021), each changed or deleted on
+its own page. -#}
 {% block main %}
 <p>{% trans %}How a unit, as typed after a number in a name, is read where the words
   near it do not say: by searches, here and on the scan page, and by the

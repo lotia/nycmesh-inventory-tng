@@ -15,7 +15,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from inventory_tng.core.db import lock_catalogue
-from inventory_tng.models import Item, ItemPackage
+from inventory_tng.models.catalogue import Item, ItemPackage
 
 from helpers.pages import CATALOGUE, PAGES, Built, More, Page, Path, built, path
 from helpers.queries import counting
@@ -107,7 +107,7 @@ def test_a_page_reads_alike_for_one_row_or_eleven(
     def read(client: TestClient, session: Session, url: str) -> tuple[int, str]:
         """The statements the page sent, and what it lists (listed)."""
         # Warmed first: what is read once and kept, such as the reading
-        # rules (models.RULES_INFO).
+        # rules (models.catalogue.RULES_INFO).
         ok(client, url)
         # As a request's own session would start: nothing loaded.
         session.flush()
@@ -208,7 +208,7 @@ def test_every_page_names_items_and_packages_as_shown(
     one: Built,
 ) -> None:
     """Each name ending in `1,000ft`, as typed, is read as `1000 ft` with a
-    no-break space (models.KeyedName.name_shown), on every page and the
+    no-break space (models.names.KeyedName.name_shown), on every page and the
     scan page's catalogue; only a form's field holds it as typed (Ali,
     2026-11-15, inventory-tng-ist.3)."""
     with one.visit(device=route == CATALOGUE) as (client, session):

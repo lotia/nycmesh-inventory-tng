@@ -19,13 +19,8 @@ from inventory_tng.admins import accounts, paths
 from inventory_tng.admins.reset_routes import ASKED, RESET_NOTICE
 from inventory_tng.core import mail
 from inventory_tng.core.settings import MailConfig, Settings, SettingsError
-from inventory_tng.models import (
-    TOTP_POLICIES,
-    Admin,
-    AdminSession,
-    ResetLink,
-    SignInSettings,
-)
+from inventory_tng.models.admins import Admin, AdminSession, ResetLink
+from inventory_tng.models.site_settings import TOTP_POLICIES, SignInSettings
 
 from helpers.mail import NO_MAIL, SITE_MAIL, FailingMail, SentMail
 from helpers.markup import text

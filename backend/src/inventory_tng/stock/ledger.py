@@ -39,15 +39,10 @@ from sqlalchemy.orm import Session
 
 from inventory_tng.core.db import RuleBroken, enforce, exists_where, get_locked, locked
 from inventory_tng.core.local_time import zone_at
-from inventory_tng.models import (
-    Item,
-    ItemPackage,
-    LedgerTransaction,
-    Location,
-    Movement,
-    OpenPackage,
-    Volunteer,
-)
+from inventory_tng.models.catalogue import Item, ItemPackage
+from inventory_tng.models.places import Location
+from inventory_tng.models.stock import LedgerTransaction, Movement, OpenPackage
+from inventory_tng.models.volunteers import Volunteer
 from inventory_tng.scan import batch_schemas
 from inventory_tng.stock import open_packages
 from inventory_tng.stock.balance import balance, by_form, countable, left_on

@@ -24,7 +24,8 @@ from inventory_tng.core import mail
 from inventory_tng.core.mail import Notifier
 from inventory_tng.core.settings import RateLimits
 from inventory_tng.devices import devices
-from inventory_tng.models import Admin, Authenticator, RegistrationCode, ResetLink
+from inventory_tng.models.admins import Admin, Authenticator, ResetLink
+from inventory_tng.models.devices import RegistrationCode
 
 from helpers.mail import NO_MAIL, SentMail
 from helpers.sign_in import (

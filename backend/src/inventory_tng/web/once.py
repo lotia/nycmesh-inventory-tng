@@ -26,7 +26,7 @@ from starlette.exceptions import HTTPException
 
 from inventory_tng.core.db import exists_where
 from inventory_tng.core.phrases import lazy_gettext
-from inventory_tng.models import SentForm
+from inventory_tng.models.web import SentForm
 from inventory_tng.web.pages import page, templates
 
 if TYPE_CHECKING:  # admins.guards imports this module.

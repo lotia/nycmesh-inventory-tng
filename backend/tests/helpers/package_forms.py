@@ -6,7 +6,7 @@ from decimal import Decimal
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from inventory_tng.models import Item
+from inventory_tng.models.catalogue import Item
 from inventory_tng.stock.balance import by_form
 from inventory_tng.stock.ledger import Form
 

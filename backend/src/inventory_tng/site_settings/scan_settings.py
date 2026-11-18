@@ -9,7 +9,7 @@ every ten minutes. Changes are history.
 from sqlalchemy.orm import Session
 
 from inventory_tng.core.db import Seen, settings_row
-from inventory_tng.models import ScanSettings
+from inventory_tng.models.site_settings import ScanSettings
 
 
 def change(session: Session, name_check_minutes: int, *, seen: Seen) -> ScanSettings:

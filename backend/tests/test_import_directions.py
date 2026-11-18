@@ -19,7 +19,9 @@ from importlib.util import resolve_name
 
 import pytest
 
-from inventory_tng import models
+# Imported for its mapped classes, so Base has every table.
+from inventory_tng import models  # noqa: F401
+from inventory_tng.core.db import Base
 
 from helpers.source import SOURCE, modules
 
@@ -39,7 +41,7 @@ RULES = {
     "stock/ledger.py",
     *(
         table.info["owner"]
-        for table in models.Base.metadata.tables.values()
+        for table in Base.metadata.tables.values()
         if table.info["owner"] is not None
     ),
 }
@@ -154,7 +156,7 @@ def core_imports_a_feature(path: str, app: App) -> set[str]:
     return {
         module
         for module in imports(path, app)
-        if module in app and not module.startswith("core/") and module != "models.py"
+        if module in app and not module.startswith(("core/", "models/"))
     }
 
 
@@ -201,7 +203,8 @@ def test_the_app_breaks_no_import_rule_but_those_listed() -> None:
 # Each rule, shown a break, finds it. The modules a case's imports may name.
 ROUTER = "router = APIRouter()\n"
 APP = {
-    "models.py": "",
+    "models/__init__.py": "",
+    "models/places.py": "",
     "core/settings.py": "",
     "catalogue/paths.py": "",
     "catalogue/queries.py": "",
@@ -245,6 +248,7 @@ APP = {
             "core/db.py",
             (
                 "from ..stock import ledger\nfrom inventory_tng import models\n"
+                "from inventory_tng.models.places import Location\n"
                 "from . import settings\nimport sqlalchemy"
             ),
             {"stock/ledger.py"},

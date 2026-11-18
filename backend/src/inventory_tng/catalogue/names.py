@@ -6,7 +6,7 @@ is always punctuation, so "1,000 ft" and "1000 ft" clash (US number
 conventions: 0021, 2026-11-12).
 
 Each such row keeps its key in `name_key`, written by the app as the name is
-set (models.KeyedName), and unique in an index of its own. A CHECK
+set (models.names.KeyedName), and unique in an index of its own. A CHECK
 constraint holds it to the name in PostgreSQL (name_key_sql), a declaration
 within docs/decisions/0016, so a key written wrong, by SQL or a bug, is
 refused. So the rule is said twice, in Python and in SQL, from one pattern

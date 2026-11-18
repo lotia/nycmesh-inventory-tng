@@ -11,7 +11,9 @@ import pytest
 from sqlalchemy import exc, select
 from sqlalchemy.orm import Session
 
-from inventory_tng.models import Admin, Item, ItemPackage, LedgerTransaction
+from inventory_tng.models.admins import Admin
+from inventory_tng.models.catalogue import Item, ItemPackage
+from inventory_tng.models.stock import LedgerTransaction
 from inventory_tng.stock import open_packages
 from inventory_tng.stock.balance import balance
 from inventory_tng.stock.ledger import (

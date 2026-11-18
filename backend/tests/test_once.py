@@ -16,7 +16,8 @@ from inventory_tng.admins import accounts
 from inventory_tng.admins.paths import ACCOUNT, ADMINS
 from inventory_tng.core.local_env import CLONE
 from inventory_tng.devices.paths import CODES, DEVICES
-from inventory_tng.models import Admin, RegistrationCode, ResetLink
+from inventory_tng.models.admins import Admin, ResetLink
+from inventory_tng.models.devices import RegistrationCode
 from inventory_tng.web import once
 from inventory_tng.web.once import SENT_AGAIN
 

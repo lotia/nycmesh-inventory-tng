@@ -358,7 +358,7 @@ Sessions = Annotated[SessionFactory, Depends(get_session_factory)]
 
 # Who makes a session's changes, for history (history.py): ids, never
 # names, so history holds no personal data through it. Also
-# catalogue_history's check constraint (models.py).
+# catalogue_history's check constraint (models/core.py).
 # system:<name> is anything that is not a person, such as the command line.
 CLI_ACTOR = "system:cli"
 ACTOR_PATTERN = "(admin|volunteer):[0-9]+|system:[a-z_]+"
@@ -476,7 +476,7 @@ def settings_row[M: Base](session: Session, model: type[M], *, seen: Seen) -> M:
     return row
 
 
-# The version of a row (models.Versioned) an edit form showed; None for a
+# The version of a row (models.base.Versioned) an edit form showed; None for a
 # change with no form, such as a command's, which means to replace what is
 # there. Required, so no caller leaves it out by mistake.
 type Seen = int | None
@@ -490,7 +490,7 @@ stale = metrics.get_meter(__name__).create_counter(
 
 def unchanged(row: Base, seen: Seen) -> None:
     """RuleBroken (changed_since_shown) unless the row, as locked, is at
-    the version a form showed (models.Versioned): another save since would
+    the version a form showed (models.base.Versioned): another save since would
     otherwise be undone, unseen (inventory-tng-8i4.123)."""
     if seen is not None and getattr(row, "edit_version") != seen:  # noqa: B009
         table = type(row).__tablename__
@@ -720,8 +720,8 @@ CATALOGUE_LOCK = 0x696E76656E746F72  # Any fixed key; "inventor" in ASCII.
 
 
 # What a session keeps in session.info of the catalogue, read as it was
-# then (models.reading_rules): forgotten as the catalogue lock is taken, so
-# what is read under it is what any write before it committed.
+# then (models.catalogue.reading_rules): forgotten as the catalogue lock is
+# taken, so what is read under it is what any write before it committed.
 READ_AGAIN_ONCE_LOCKED: set[str] = set()
 
 
@@ -980,7 +980,7 @@ def _next_version(
     session: Session, context: UOWTransaction, _instances: object
 ) -> None:
     """One more on the version of each row changed that has one
-    (models.Versioned), in the UPDATE itself. After flush_writes has found
+    (models.base.Versioned), in the UPDATE itself. After flush_writes has found
     what changed, so the guard and history see the version as no change of
     their own. Not for a change only to row_lock_only or not_a_change
     columns, which no edit form sets (a receipt lowering item.on_order, an

@@ -47,19 +47,13 @@ from inventory_tng.core.db import (
 from inventory_tng.core.mail import Message, Notify
 from inventory_tng.core.settings import RateLimits
 from inventory_tng.devices import devices
-from inventory_tng.models import (
-    Admin,
-    AdminPassword,
-    AdminSession,
-    Category,
-    Item,
-    ItemPackage,
-    LedgerTransaction,
-    Location,
-    SentForm,
-    SignInSettings,
-    Volunteer,
-)
+from inventory_tng.models.admins import Admin, AdminPassword, AdminSession
+from inventory_tng.models.catalogue import Category, Item, ItemPackage
+from inventory_tng.models.places import Location
+from inventory_tng.models.site_settings import SignInSettings
+from inventory_tng.models.stock import LedgerTransaction
+from inventory_tng.models.volunteers import Volunteer
+from inventory_tng.models.web import SentForm
 from inventory_tng.places import locations
 from inventory_tng.scan import catalogue_api as scan_catalogue
 from inventory_tng.scan.batch_schemas import Batch
