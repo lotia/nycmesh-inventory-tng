@@ -20,7 +20,7 @@ from inventory_tng.core.local_time import show, show_day
 from inventory_tng.core.phrases import BRAND, install, lazy_gettext, ngettext, number
 from inventory_tng.web.formatting import amount, printed_length
 
-templates = Jinja2Templates(directory=Path(__file__).parent / "templates")
+templates = Jinja2Templates(directory=Path(__file__).parent.parent / "templates")
 install(templates.env)
 # The app's name, the same in every language (phrases.BRAND).
 cast(dict[str, Any], templates.env.globals)["BRAND"] = BRAND
@@ -32,7 +32,7 @@ templates.env.filters["day"] = show_day
 templates.env.filters["number"] = number
 
 # Where a response's Content-Security-Policy nonce is kept, in the
-# request's state (security_headers.py).
+# request's state (web/security_headers.py).
 NONCE = "csp_nonce"
 
 

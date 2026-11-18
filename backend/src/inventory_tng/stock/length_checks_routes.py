@@ -21,13 +21,6 @@ from fastapi.responses import Response
 from sqlalchemy import ColumnElement, and_, or_
 from sqlalchemy.orm import Session
 
-from inventory_tng.admin.common import (
-    SECTION_STOCK,
-    TICK_OPEN_PACKAGES,
-    admin_page,
-    now,
-)
-from inventory_tng.admin.listing import AskedView, Sort, Sorting, View, arranged
 from inventory_tng.admins.guards import AdminSignedIn, SignedIn
 from inventory_tng.core.db import DbSession, RuleBroken, attempt
 from inventory_tng.core.local_time import site_zone
@@ -38,7 +31,6 @@ from inventory_tng.models import (
     OpenPackage,
     whole,
 )
-from inventory_tng.pages import NOTICES, not_found, redirect
 from inventory_tng.stock import forms, ledger, open_packages, over_recorded, queries
 from inventory_tng.stock.needs_action import (
     Kind,
@@ -48,6 +40,14 @@ from inventory_tng.stock.needs_action import (
 )
 from inventory_tng.stock.stock_routes import STOCK
 from inventory_tng.stock.used_up_routes import BY_PACKAGE, BY_SHOWS
+from inventory_tng.web.admin import (
+    SECTION_STOCK,
+    TICK_OPEN_PACKAGES,
+    admin_page,
+    now,
+)
+from inventory_tng.web.listing import AskedView, Sort, Sorting, View, arranged
+from inventory_tng.web.pages import NOTICES, not_found, redirect
 
 log = structlog.get_logger(__name__)
 

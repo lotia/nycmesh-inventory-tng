@@ -8,7 +8,6 @@ from typing import NamedTuple
 from fastapi import APIRouter, Request
 from fastapi.responses import Response
 
-from inventory_tng.admin.common import ADMINS, admin_page
 from inventory_tng.admins import accounts, activity
 from inventory_tng.admins.guards import ACCOUNT, HOME, AdminSignedIn
 from inventory_tng.catalogue import queries as catalogue_queries
@@ -23,6 +22,7 @@ from inventory_tng.stock import needs_action
 from inventory_tng.stock.balance import retired_places_holding_stock
 from inventory_tng.stock.counts_routes import COUNTS
 from inventory_tng.volunteers.routes import VOLUNTEERS
+from inventory_tng.web.admin import ADMINS, admin_page
 
 router = APIRouter(include_in_schema=False)
 

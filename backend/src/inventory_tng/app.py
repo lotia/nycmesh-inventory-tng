@@ -14,7 +14,7 @@ from fastapi import FastAPI
 from inventory_tng.admins import account_routes
 
 # isort: split
-from inventory_tng import admin, health, pages, security_headers
+from inventory_tng import admin, health
 from inventory_tng.admins import accounts, guards, reset_routes, sign_in_routes
 from inventory_tng.admins.totp_keys import TotpKeys
 from inventory_tng.core import database_role, db
@@ -32,6 +32,7 @@ from inventory_tng.scan import (
     page_builds,
     page_telemetry,
 )
+from inventory_tng.web import pages, security_headers
 
 log = structlog.get_logger(__name__)
 

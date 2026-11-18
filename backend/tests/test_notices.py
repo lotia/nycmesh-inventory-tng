@@ -10,14 +10,14 @@ import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
 
-from inventory_tng import pages
 from inventory_tng.models import Admin, Category, Item, Label, Location, Volunteer
 from inventory_tng.volunteers.routes import BRING_THEM_BACK
+from inventory_tng.web import pages
 
 from helpers.markup import read, text
 from helpers.rows import add, tag
 
-TEMPLATES = Path(pages.__file__).parent / "templates"
+TEMPLATES = Path(pages.__file__).parent.parent / "templates"
 
 pytestmark = pytest.mark.usefixtures("admin_client")
 

@@ -1,7 +1,7 @@
 /**
  * A list's search box, suggesting as one types (docs/decisions/0019): an
  * ARIA combobox with a listbox of the closest records, from the address
- * in its `data-suggest` (backend admin/listing.py). Arrows move through
+ * in its `data-suggest` (backend web/listing.py). Arrows move through
  * them, Enter or a tap goes to the one picked, Escape closes them. Enter
  * with none picked sends the form, which lists every close match, as it
  * does without this script.

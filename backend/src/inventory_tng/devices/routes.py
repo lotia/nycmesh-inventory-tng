@@ -15,23 +15,6 @@ from fastapi import APIRouter, Form, Request
 from fastapi.responses import HTMLResponse, Response
 from sqlalchemy.orm import Session
 
-from inventory_tng.admin.common import (
-    ADMIN,
-    SECTION_DEVICES,
-    admin_page,
-    now,
-    revoke_title,
-    site_link,
-)
-from inventory_tng.admin.listing import (
-    Asked,
-    AskedView,
-    Sort,
-    Sorting,
-    View,
-    arranged,
-)
-from inventory_tng.admin.listing import order as order_of
 from inventory_tng.admins.accounts import qr_svg
 from inventory_tng.admins.guards import AdminSignedIn, ConfirmedAdmin, SignedIn, changed
 from inventory_tng.core.db import DbSession, attempt
@@ -44,9 +27,26 @@ from inventory_tng.core.phrases import (
 )
 from inventory_tng.devices import devices, forms, queries
 from inventory_tng.models import Device, RegistrationCode
-from inventory_tng.once import OnceKey, sent_before
-from inventory_tng.pages import NOTICES, not_found, redirect
+from inventory_tng.web.admin import (
+    ADMIN,
+    SECTION_DEVICES,
+    admin_page,
+    now,
+    revoke_title,
+    site_link,
+)
 from inventory_tng.web.forms import RULES, form_version
+from inventory_tng.web.listing import (
+    Asked,
+    AskedView,
+    Sort,
+    Sorting,
+    View,
+    arranged,
+)
+from inventory_tng.web.listing import order as order_of
+from inventory_tng.web.once import OnceKey, sent_before
+from inventory_tng.web.pages import NOTICES, not_found, redirect
 
 log = structlog.get_logger(__name__)
 

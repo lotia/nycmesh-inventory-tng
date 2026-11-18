@@ -969,7 +969,7 @@ class Label(Base):
 
 class CatalogueHistory(Base):
     """Every change to the tables above (history.py). A retired record's
-    page reads who retired it (admin/common.retired_by). The app may only add
+    page reads who retired it (web/admin.retired_by). The app may only add
     to it (the initial migration)."""
 
     __tablename__ = "catalogue_history"
@@ -977,7 +977,7 @@ class CatalogueHistory(Base):
         CheckConstraint("action IN ('insert', 'update', 'delete')", name="action"),
         # Ids, never names, whoever sets it (db.set_actor checks it first).
         CheckConstraint(f"actor ~ '^({ACTOR_PATTERN})$'", name="actor"),
-        # A row's history, such as who retired it (admin/common.retired_by).
+        # A row's history, such as who retired it (web/admin.retired_by).
         Index("ix_catalogue_history_table_name_row_id", "table_name", "row_id"),
         protection(owner="core/history.py", lock=None, history=False),
     )
@@ -1555,11 +1555,11 @@ class AdjustmentReason(CanonicalName, Versioned, Base):
 
 class SentForm(Base):
     """A form that makes something shown only once, by the key it was shown
-    with (once.py), so sending it again makes nothing. Only ever added to,
+    with (web/once.py), so sending it again makes nothing. Only ever added to,
     so it is its own history, as the ledger is."""
 
     __tablename__ = "sent_form"
-    __table_args__ = (protection(owner="once.py", lock=None, history=False),)
+    __table_args__ = (protection(owner="web/once.py", lock=None, history=False),)
 
     id: Mapped[IntId]
     created_at: Mapped[CreatedAt]

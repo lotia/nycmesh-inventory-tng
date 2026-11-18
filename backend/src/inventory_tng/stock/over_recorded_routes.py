@@ -20,15 +20,6 @@ from fastapi import APIRouter, Depends, Form, Request
 from fastapi.responses import Response
 from sqlalchemy.orm import Session
 
-from inventory_tng.admin.common import SECTION_STOCK, SETTLED_VIEW, admin_page
-from inventory_tng.admin.listing import (
-    AskedView,
-    Sort,
-    Sorting,
-    View,
-    arranged,
-)
-from inventory_tng.admin.listing import order as order_of
 from inventory_tng.admins.guards import AdminSignedIn
 from inventory_tng.core.db import DbSession, Gone, attempt, exists_where
 from inventory_tng.core.local_time import site_zone
@@ -41,7 +32,6 @@ from inventory_tng.models import (
     OverRecorded,
     canonical,
 )
-from inventory_tng.pages import NOTICES, not_found, redirect
 from inventory_tng.places import locations
 from inventory_tng.places.routes import changeable
 from inventory_tng.stock import balance, ledger, over_recorded
@@ -56,7 +46,17 @@ from inventory_tng.stock.needs_action import (
 )
 from inventory_tng.stock.stock_routes import RECORDED_MORE as OVER_RECORDED
 from inventory_tng.stock.stock_routes import RECORDED_MORE_SETTLED, STOCK
+from inventory_tng.web.admin import SECTION_STOCK, SETTLED_VIEW, admin_page
 from inventory_tng.web.forms import row_id, rule_words
+from inventory_tng.web.listing import (
+    AskedView,
+    Sort,
+    Sorting,
+    View,
+    arranged,
+)
+from inventory_tng.web.listing import order as order_of
+from inventory_tng.web.pages import NOTICES, not_found, redirect
 
 log = structlog.get_logger(__name__)
 

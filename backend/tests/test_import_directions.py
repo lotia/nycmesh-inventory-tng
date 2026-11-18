@@ -24,8 +24,6 @@ from helpers.source import SOURCE, modules
 # core/ is plumbing, not business rules. Of the app outside core, it may
 # import only the models, kept whole (0023).
 CORE_MAY_IMPORT = {"models.py"}
-# What every server-rendered page shares, until it moves into web/.
-WEB = {"pages.py"}
 # Rules: each table's owner (db.protection), any of PLAIN, and these,
 # which hold rules or queries but own no table.
 RULES = {
@@ -67,7 +65,7 @@ type Check = Callable[[ast.Module, str, Collection[str]], list[str]]
 BREAKS: dict[str, dict[str, list[str]]] = {
     "core_imports_a_feature": {},
     "rules_import_fastapi_or_web": {
-        "once.py": ["fastapi", "pages.py", "starlette"],
+        "web/once.py": ["fastapi", "starlette", "web/pages.py"],
     },
     "routes_run_queries": {},
     "routes_import_another_features_routes": {
@@ -96,7 +94,6 @@ BREAKS: dict[str, dict[str, list[str]]] = {
             "volunteers/routes.py",
         ],
         "labels/routes.py": ["catalogue/items_routes.py", "places/routes.py"],
-        "security_headers.py": ["scan/page_telemetry.py"],
         "stock/counts_routes.py": [
             "catalogue/items_routes.py",
             "site_settings/routes.py",
@@ -104,6 +101,7 @@ BREAKS: dict[str, dict[str, list[str]]] = {
         "stock/over_recorded_routes.py": ["places/routes.py"],
         "stock/stock_routes.py": ["catalogue/items_routes.py"],
         "stock/used_up_routes.py": ["catalogue/items_routes.py"],
+        "web/security_headers.py": ["scan/page_telemetry.py"],
     },
     "init_not_empty": {
         "admin/__init__.py": ["Assign", "For", "ImportFrom"],
@@ -160,7 +158,7 @@ def is_core(path: str) -> bool:
 
 
 def is_web(path: str) -> bool:
-    return path in WEB or path.startswith("web/")
+    return path.startswith("web/")
 
 
 def is_rules(path: str) -> bool:
@@ -372,13 +370,13 @@ KNOWN = {
     "ledger.py",
     "manage.py",
     "models.py",
-    "pages.py",
     "stock/__init__.py",
     "stock/api.py",
     "stock/ledger.py",
     "web/__init__.py",
     "web/formatting.py",
     "web/forms.py",
+    "web/pages.py",
 }
 
 
@@ -408,7 +406,11 @@ def test_core_importing_a_feature_is_found(
     [
         ("stock/ledger.py", "from fastapi import Request", ["fastapi"]),
         ("stock/ledger.py", "def f():\n    import starlette.requests", ["starlette"]),
-        ("catalogue/queries.py", "from inventory_tng import pages", ["pages.py"]),
+        (
+            "catalogue/queries.py",
+            "from inventory_tng.web import pages",
+            ["web/pages.py"],
+        ),
         ("catalogue/queries.py", "from ..web.formatting import x", []),
         ("stock/ledger.py", "from inventory_tng.web import formatting", []),
         ("stock/ledger.py", "from inventory_tng.core import db", []),
@@ -416,10 +418,10 @@ def test_core_importing_a_feature_is_found(
         ("catalogue/routes.py", "from fastapi import APIRouter", []),
         # What of web/ rules may import is held to their rule itself.
         ("web/formatting.py", "from fastapi import Request", ["fastapi"]),
-        ("web/formatting.py", "from inventory_tng import pages", ["pages.py"]),
+        ("web/formatting.py", "from inventory_tng.web import pages", ["web/pages.py"]),
         # A feature's forms are held to it too (PLAIN).
         ("catalogue/forms.py", "from fastapi import Form", ["fastapi"]),
-        ("catalogue/forms.py", "from inventory_tng import pages", ["pages.py"]),
+        ("catalogue/forms.py", "from inventory_tng.web import pages", ["web/pages.py"]),
         ("catalogue/forms.py", "from inventory_tng.web.forms import x", []),
     ],
 )

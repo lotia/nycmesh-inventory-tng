@@ -13,20 +13,12 @@ from fastapi.responses import Response
 from opentelemetry import metrics
 from sqlalchemy.orm import Session
 
-from inventory_tng.admin.common import (
-    SECTION_STOCK,
-    TICK_OPEN_PACKAGES,
-    admin_page,
-    now,
-)
-from inventory_tng.admin.listing import AskedView, Sort, Sorting, View, arranged
 from inventory_tng.admins.guards import AdminSignedIn, SignedIn
 from inventory_tng.catalogue.items_routes import ITEMS
 from inventory_tng.core.db import DbSession, attempt
 from inventory_tng.core.local_time import site_zone
 from inventory_tng.core.phrases import gettext, lazy_gettext
 from inventory_tng.models import OpenPackage
-from inventory_tng.pages import NOTICES, not_found, redirect
 from inventory_tng.stock import ledger, open_packages, queries
 from inventory_tng.stock.needs_action import (
     Kind,
@@ -35,6 +27,14 @@ from inventory_tng.stock.needs_action import (
     query,
 )
 from inventory_tng.stock.stock_routes import STOCK
+from inventory_tng.web.admin import (
+    SECTION_STOCK,
+    TICK_OPEN_PACKAGES,
+    admin_page,
+    now,
+)
+from inventory_tng.web.listing import AskedView, Sort, Sorting, View, arranged
+from inventory_tng.web.pages import NOTICES, not_found, redirect
 
 log = structlog.get_logger(__name__)
 meter = metrics.get_meter(__name__)

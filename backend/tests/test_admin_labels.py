@@ -11,8 +11,6 @@ from fastapi.testclient import TestClient
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from inventory_tng.admin.common import LABELS
-from inventory_tng.admin.listing import PER_PAGE
 from inventory_tng.admins.accounts import qr_svg
 from inventory_tng.catalogue.items_routes import ITEMS
 from inventory_tng.labels import labels
@@ -33,6 +31,8 @@ from inventory_tng.models import (
 )
 from inventory_tng.places.routes import LOCATIONS
 from inventory_tng.scan.catalogue_api import catalogue
+from inventory_tng.web.admin import LABELS
+from inventory_tng.web.listing import PER_PAGE
 
 from helpers.markup import (
     button,

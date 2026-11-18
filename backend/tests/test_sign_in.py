@@ -38,7 +38,7 @@ from inventory_tng.models import (
     RecoveryCode,
     SignInSettings,
 )
-from inventory_tng.pages import retired_holding
+from inventory_tng.web.pages import retired_holding
 
 from helpers.markup import read, text
 from helpers.sign_in import (

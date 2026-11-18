@@ -23,7 +23,7 @@ from starlette.types import ASGIApp
 
 from inventory_tng.core.phrases import lazy_gettext
 from inventory_tng.core.settings import FrontendConfig, Settings
-from inventory_tng.pages import templates
+from inventory_tng.web.pages import templates
 
 log = structlog.get_logger(__name__)
 

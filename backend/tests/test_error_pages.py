@@ -9,9 +9,9 @@ import pytest
 from fastapi import FastAPI, HTTPException
 from fastapi.testclient import TestClient
 
-from inventory_tng import pages
 from inventory_tng.catalogue.items_routes import ITEMS
 from inventory_tng.scan.bundle import SCAN
+from inventory_tng.web import pages
 
 from helpers.markup import read, text
 

@@ -16,15 +16,6 @@ from fastapi import APIRouter, Form, Request
 from fastapi.responses import HTMLResponse, Response
 from sqlalchemy.orm import Session
 
-from inventory_tng.admin.common import (
-    ADMINS,
-    SECTION_ADMINS,
-    admin_page,
-    now,
-    retirement,
-    site_link,
-)
-from inventory_tng.admin.listing import AskedView, Sort, Sorting, View, arranged
 from inventory_tng.admins import accounts, activity, queries
 from inventory_tng.admins.forms import OWN_RESET, OWN_RETIRE, TAKEN, invite_problems
 from inventory_tng.admins.guards import (
@@ -40,9 +31,18 @@ from inventory_tng.core.local_time import site_zone
 from inventory_tng.core.mail import Notify
 from inventory_tng.core.phrases import Words, gettext, lazy_gettext
 from inventory_tng.models import Admin
-from inventory_tng.once import OnceKey, sent_before
-from inventory_tng.pages import NOTICES, not_found, redirect
+from inventory_tng.web.admin import (
+    ADMINS,
+    SECTION_ADMINS,
+    admin_page,
+    now,
+    retirement,
+    site_link,
+)
 from inventory_tng.web.forms import rule_words
+from inventory_tng.web.listing import AskedView, Sort, Sorting, View, arranged
+from inventory_tng.web.once import OnceKey, sent_before
+from inventory_tng.web.pages import NOTICES, not_found, redirect
 
 log = structlog.get_logger(__name__)
 

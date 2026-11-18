@@ -672,7 +672,7 @@ utilities. When you style a page:
   its title. A retire form has `data-retire`, so a page with changes not
   yet saved asks before it retires.
 - A list page reads a `View` from its query string (`View.read` in
-  `admin/listing.py`): its route takes `asked: AskedView`, the sort, order,
+  `web/listing.py`): its route takes `asked: AskedView`, the sort, order,
   page size and page as asked; a `Sorting` of the columns it sorts by, each
   a SQL expression (`Sort.of`) or, for rows built in Python, a key
   (`Sort.keyed`), its first one the page's own order; and its filters, as
@@ -686,7 +686,7 @@ utilities. When you style a page:
   (`view.query_string`), and its route reads the same `View` (a
   dependency) to go back to the list as it was, with `view.link()`.
 - A list that grows past a screen, as items and volunteers do, is a
-  `Listing` (`admin/listing.py`), with a `View` of its own: search that
+  `Listing` (`web/listing.py`), with a `View` of its own: search that
   forgives typos, with suggestions from its own `/suggest`; and "Current ·
   Retired · All". `Searched.read` takes the page's filters and what they
   pick.
@@ -694,7 +694,7 @@ utilities. When you style a page:
   `frontend/src/admin.ts`; each still works without it. No template has
   an inline script, a `<style>` or a `style` attribute: the
   Content-Security-Policy refuses them (docs/decisions/0010,
-  `security_headers.py`). Give an element a class, or a `data-` attribute
+  `web/security_headers.py`). Give an element a class, or a `data-` attribute
   that `admin.ts` acts on, as the Print button's `data-print`.
 - A page that prints a QR code puts a `.printable` in its `main`: the
   `print_controls` macro (`_print_controls.html`: the paper and a Print

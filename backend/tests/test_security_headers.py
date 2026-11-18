@@ -1,7 +1,7 @@
 """The headers every response carries for the browser's protection: an
 enforced Content-Security-Policy and where its violations are reported,
-nosniff, the Referrer-Policy and the Permissions-Policy (security_headers.py,
-docs/decisions/0010; inventory-tng-e0y)."""
+nosniff, the Referrer-Policy and the Permissions-Policy
+(web/security_headers.py, docs/decisions/0010; inventory-tng-e0y)."""
 
 import base64
 import hashlib
@@ -19,11 +19,11 @@ from fastapi.testclient import TestClient
 from httpx2 import Response
 from structlog.testing import capture_logs
 
-from inventory_tng import security_headers
 from inventory_tng.admins import guards
 from inventory_tng.core.local_env import CLONE
 from inventory_tng.core.settings import FrontendConfig, RateLimits
 from inventory_tng.scan.bundle import MANIFEST
+from inventory_tng.web import security_headers
 
 # A build with every entry the pages load, and one file to serve.
 MANIFEST_ENTRIES = {
@@ -230,14 +230,14 @@ def test_no_api_docs_outside_development(built: TestClient) -> None:
 
 
 def test_the_pages_render_without_this_module() -> None:
-    """The pages' templates read the nonce through pages.py alone, so a
+    """The pages' templates read the nonce through web/pages.py alone, so a
     page renders wherever pages.templates is used, the app or not."""
     script = (
         "import sys; from starlette.requests import Request;"
-        " from inventory_tng.pages import templates;"
+        " from inventory_tng.web.pages import templates;"
         " request = Request({'type': 'http', 'headers': []});"
         " templates.get_template('_csp_nonce.html').render(request=request);"
-        " assert 'inventory_tng.security_headers' not in sys.modules"
+        " assert 'inventory_tng.web.security_headers' not in sys.modules"
     )
     subprocess.run([sys.executable, "-c", script], check=True)
 

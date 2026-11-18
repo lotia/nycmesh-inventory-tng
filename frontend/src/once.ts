@@ -1,5 +1,5 @@
 /**
- * A form that makes something shown once (backend once.py) is sent once: a
+ * A form that makes something shown once (backend web/once.py) is sent once: a
  * double-click would show only the second answer, "Already sent". The flag
  * stops it; disabling the buttons shows it, once the form's data is taken,
  * so a named button still sends its value. Back to a kept page, its spent

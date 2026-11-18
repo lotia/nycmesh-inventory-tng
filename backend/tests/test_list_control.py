@@ -1,4 +1,4 @@
-"""The list control (admin/listing.py View, Ali, 2026-11-15,
+"""The list control (web/listing.py View, Ali, 2026-11-15,
 inventory-tng-qwb): a view read forgivingly from the query string, its
 links, and its order and page applied to a select or to rows built in
 Python."""
@@ -9,7 +9,8 @@ import pytest
 from sqlalchemy import func, select
 from sqlalchemy.dialects import postgresql
 
-from inventory_tng.admin.listing import (
+from inventory_tng.models import Item
+from inventory_tng.web.listing import (
     PER_PAGE,
     Asked,
     Sort,
@@ -18,7 +19,6 @@ from inventory_tng.admin.listing import (
     arranged,
     ordered,
 )
-from inventory_tng.models import Item
 
 SQL = Sorting(
     "name",

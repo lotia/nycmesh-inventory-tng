@@ -16,15 +16,6 @@ from fastapi.responses import HTMLResponse, Response
 from sqlalchemy.orm import Session
 
 from inventory_tng import models
-from inventory_tng.admin.common import ADMIN, admin_page, text_form
-from inventory_tng.admin.listing import (
-    AskedView,
-    Sort,
-    Sorting,
-    View,
-    arranged,
-    tidied,
-)
 from inventory_tng.admins.guards import AdminSignedIn, SignedIn
 from inventory_tng.catalogue import items, queries, reading_rules, units
 from inventory_tng.catalogue.forms import CHOOSE, CHOOSE_ONE, PROPOSED, seed_choices
@@ -38,8 +29,17 @@ from inventory_tng.core.db import DbSession, refusal
 from inventory_tng.core.local_time import site_zone
 from inventory_tng.core.phrases import Words, gettext, lazy_gettext
 from inventory_tng.models import INTEGER_MAX, ReadingRule, whole
-from inventory_tng.pages import NOTICES, not_found, redirect
+from inventory_tng.web.admin import ADMIN, admin_page, text_form
 from inventory_tng.web.forms import ALERTS, RULES, form_version
+from inventory_tng.web.listing import (
+    AskedView,
+    Sort,
+    Sorting,
+    View,
+    arranged,
+    tidied,
+)
+from inventory_tng.web.pages import NOTICES, not_found, redirect
 
 log = structlog.get_logger(__name__)
 

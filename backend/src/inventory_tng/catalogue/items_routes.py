@@ -14,22 +14,6 @@ from opentelemetry import metrics
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
-from inventory_tng.admin.common import (
-    ADMIN,
-    SECTION_ITEMS,
-    admin_page,
-    now,
-    retirement,
-    text_form,
-    undo_retire,
-)
-from inventory_tng.admin.listing import (
-    AskedView,
-    Listing,
-    Searched,
-    Sort,
-    Sorting,
-)
 from inventory_tng.admins.guards import AdminSignedIn, SignedIn
 from inventory_tng.catalogue import forms, items, queries, reading_rules, units
 from inventory_tng.catalogue.categories_routes import CATEGORIES
@@ -52,10 +36,26 @@ from inventory_tng.models import (
     whole,
 )
 from inventory_tng.models import reading_rules as rules_held
-from inventory_tng.pages import NOTICES, not_found, redirect
 from inventory_tng.stock import open_packages
 from inventory_tng.stock import queries as stock_queries
+from inventory_tng.web.admin import (
+    ADMIN,
+    SECTION_ITEMS,
+    admin_page,
+    now,
+    retirement,
+    text_form,
+    undo_retire,
+)
 from inventory_tng.web.forms import ALERTS, RETIRED, RULES, form_version
+from inventory_tng.web.listing import (
+    AskedView,
+    Listing,
+    Searched,
+    Sort,
+    Sorting,
+)
+from inventory_tng.web.pages import NOTICES, not_found, redirect
 
 log = structlog.get_logger(__name__)
 meter = metrics.get_meter(__name__)

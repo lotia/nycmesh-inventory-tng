@@ -1,5 +1,5 @@
 """A form that makes something shown only once, sent again, as Back then
-Forward offers, makes nothing new (once.py, inventory-tng-8i4.74)."""
+Forward offers, makes nothing new (web/once.py, inventory-tng-8i4.74)."""
 
 import re
 from collections.abc import Callable
@@ -12,14 +12,14 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 from structlog.testing import capture_logs
 
-from inventory_tng import once
 from inventory_tng.admins import accounts
 from inventory_tng.admins.account_routes import ACCOUNT
 from inventory_tng.admins.routes import ADMINS
 from inventory_tng.core.local_env import CLONE
 from inventory_tng.devices.routes import CODES, DEVICES
 from inventory_tng.models import Admin, RegistrationCode, ResetLink
-from inventory_tng.once import SENT_AGAIN
+from inventory_tng.web import once
+from inventory_tng.web.once import SENT_AGAIN
 
 from helpers.mail import NO_MAIL, SentMail
 from helpers.markup import read, text

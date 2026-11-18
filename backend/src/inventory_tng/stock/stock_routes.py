@@ -15,13 +15,21 @@ from fastapi.responses import Response
 from sqlalchemy import ColumnElement, true
 from sqlalchemy.orm import Session
 
-from inventory_tng.admin.common import (
+from inventory_tng.admins.guards import AdminSignedIn
+from inventory_tng.catalogue.items_routes import ITEMS, SEARCHED
+from inventory_tng.core.db import DbSession
+from inventory_tng.core.phrases import Words, gettext, lazy_gettext
+from inventory_tng.models import INTEGER_MAX, Item, ItemPackage, Location, whole
+from inventory_tng.stock import open_packages, over_recorded, queries
+from inventory_tng.stock.balance import SHORT, retired_places_holding_stock
+from inventory_tng.stock.counts_routes import COUNTS
+from inventory_tng.web.admin import (
     ADMIN,
     SECTION_STOCK,
     SETTLED_VIEW,
     admin_page,
 )
-from inventory_tng.admin.listing import (
+from inventory_tng.web.listing import (
     AskedView,
     Sort,
     Sorting,
@@ -30,15 +38,7 @@ from inventory_tng.admin.listing import (
     in_order,
     paged,
 )
-from inventory_tng.admins.guards import AdminSignedIn
-from inventory_tng.catalogue.items_routes import ITEMS, SEARCHED
-from inventory_tng.core.db import DbSession
-from inventory_tng.core.phrases import Words, gettext, lazy_gettext
-from inventory_tng.models import INTEGER_MAX, Item, ItemPackage, Location, whole
-from inventory_tng.pages import templates
-from inventory_tng.stock import open_packages, over_recorded, queries
-from inventory_tng.stock.balance import SHORT, retired_places_holding_stock
-from inventory_tng.stock.counts_routes import COUNTS
+from inventory_tng.web.pages import templates
 
 log = structlog.get_logger(__name__)
 

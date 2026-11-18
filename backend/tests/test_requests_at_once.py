@@ -1487,7 +1487,7 @@ def test_a_form_refused_after_its_key_is_spent_can_be_sent_again(
 ) -> None:
     """A taken username is found after the key is spent: refused without a
     commit, nothing is kept, so the same form, put right, goes through
-    (once.py, inventory-tng-8i4.74)."""
+    (web/once.py, inventory-tng-8i4.74)."""
     client, _ = real_client
     changes_open(committed, signed_in_as_ben(committed, client, admins[2]))
     key = str(uuid.uuid4())

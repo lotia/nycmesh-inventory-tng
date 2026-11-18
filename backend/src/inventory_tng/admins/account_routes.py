@@ -32,8 +32,8 @@ from inventory_tng.core.local_time import site_zone
 from inventory_tng.core.mail import Notify
 from inventory_tng.core.phrases import Words, lazy_gettext
 from inventory_tng.models import running_low
-from inventory_tng.once import OnceKey, sent_before
-from inventory_tng.pages import NOTICES, not_found, page, redirect
+from inventory_tng.web.once import OnceKey, sent_before
+from inventory_tng.web.pages import NOTICES, not_found, page, redirect
 
 router = APIRouter(include_in_schema=False)
 

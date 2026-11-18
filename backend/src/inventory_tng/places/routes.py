@@ -12,7 +12,17 @@ from fastapi import APIRouter, Form, Request
 from fastapi.responses import HTMLResponse, Response
 from sqlalchemy.orm import Session
 
-from inventory_tng.admin.common import (
+from inventory_tng.admins.guards import AdminSignedIn, SignedIn
+from inventory_tng.core.db import DbSession, attempt
+from inventory_tng.core.local_time import zone_at
+from inventory_tng.core.phrases import Words, lazy_gettext
+from inventory_tng.core.time_zones import zones
+from inventory_tng.labels import labels
+from inventory_tng.models import STORE_KINDS, Label, Location
+from inventory_tng.places import locations, queries
+from inventory_tng.places.forms import KINDS, TAKEN, new_place, place_change
+from inventory_tng.volunteers import queries as volunteers_queries
+from inventory_tng.web.admin import (
     ADMIN,
     SECTION_LOCATIONS,
     admin_page,
@@ -21,18 +31,8 @@ from inventory_tng.admin.common import (
     retirement,
     undo_retire,
 )
-from inventory_tng.admins.guards import AdminSignedIn, SignedIn
-from inventory_tng.core.db import DbSession, attempt
-from inventory_tng.core.local_time import zone_at
-from inventory_tng.core.phrases import Words, lazy_gettext
-from inventory_tng.core.time_zones import zones
-from inventory_tng.labels import labels
-from inventory_tng.models import STORE_KINDS, Label, Location
-from inventory_tng.pages import not_found, redirect
-from inventory_tng.places import locations, queries
-from inventory_tng.places.forms import KINDS, TAKEN, new_place, place_change
-from inventory_tng.volunteers import queries as volunteers_queries
 from inventory_tng.web.forms import ALERTS, RULES, form_version, rule_words
+from inventory_tng.web.pages import not_found, redirect
 
 log = structlog.get_logger(__name__)
 

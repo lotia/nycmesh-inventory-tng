@@ -28,7 +28,6 @@ from inventory_tng.models import (
     Location,
     Movement,
 )
-from inventory_tng.pages import retired_holding
 from inventory_tng.places import locations
 from inventory_tng.site_settings.forms import REASON_TAKEN
 from inventory_tng.site_settings.routes import SETTINGS
@@ -52,6 +51,7 @@ from inventory_tng.stock.ledger import (
 )
 from inventory_tng.stock.stock_routes import STOCK
 from inventory_tng.web.forms import ABOVE_ZERO, RULES, TYPE_A_NUMBER, WHOLE_UNITS
+from inventory_tng.web.pages import retired_holding
 
 from helpers.concurrency import Committed
 from helpers.markup import button, forms, hidden_fields, links, options, read, text

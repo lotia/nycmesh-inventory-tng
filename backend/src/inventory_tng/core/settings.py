@@ -167,7 +167,7 @@ class RateLimits:
     And how many reports may come from one address in a minute: of
     themselves, from the pages (scan/page_telemetry.py,
     RATE_LIMIT_PAGE_REPORTS), and of what the policy refused, from
-    browsers (security_headers.py, RATE_LIMIT_CSP_REPORTS)."""
+    browsers (web/security_headers.py, RATE_LIMIT_CSP_REPORTS)."""
 
     per_address: int = 10
     per_account: int = 10

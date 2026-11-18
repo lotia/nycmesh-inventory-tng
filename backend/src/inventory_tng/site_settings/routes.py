@@ -14,13 +14,6 @@ from fastapi import APIRouter, Depends, Form, Request
 from fastapi.responses import HTMLResponse, Response
 from sqlalchemy.orm import Session
 
-from inventory_tng.admin.common import (
-    ADMIN,
-    SECTION_SETTINGS,
-    admin_page,
-    now,
-    text_form,
-)
 from inventory_tng.admins import accounts, activity
 from inventory_tng.admins.guards import AdminSignedIn, ConfirmedAdmin, SignedIn, changed
 from inventory_tng.core import mail
@@ -35,10 +28,17 @@ from inventory_tng.models import (
     SignInSettings,
     SiteSettings,
 )
-from inventory_tng.pages import NOTICES, not_found, redirect
 from inventory_tng.site_settings import forms, queries, scan_settings
 from inventory_tng.stock import adjustment_reasons
+from inventory_tng.web.admin import (
+    ADMIN,
+    SECTION_SETTINGS,
+    admin_page,
+    now,
+    text_form,
+)
 from inventory_tng.web.forms import CHANGED, RULES, form_version, name_problem
+from inventory_tng.web.pages import NOTICES, not_found, redirect
 
 log = structlog.get_logger(__name__)
 

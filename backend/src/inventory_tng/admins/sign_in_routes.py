@@ -53,8 +53,8 @@ from inventory_tng.core.db import DbSession
 from inventory_tng.core.mail import Notify
 from inventory_tng.core.phrases import Words, lazy_gettext
 from inventory_tng.models import Admin, AdminSession, running_low
-from inventory_tng.pages import NOTICES, not_found, page, redirect
 from inventory_tng.web.browser import rate_key, set_private_cookie
+from inventory_tng.web.pages import NOTICES, not_found, page, redirect
 
 router = APIRouter(include_in_schema=False)
 

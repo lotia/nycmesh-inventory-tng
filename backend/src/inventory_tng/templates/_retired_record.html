@@ -2,7 +2,7 @@
 `here`, `zone` and `retired_by`. A person is "them", anything else "it". -#}
 
 {#- At the top of a retired record's page: its tag, when and by whom it was
-retired (admin/common.retired_by), the call's body, what that means, and
+retired (web/admin.retired_by), the call's body, what that means, and
 its one action, bringing it back, unless `restore` is false, for a page
 whose own form does that. -#}
 {% macro retired_record(row, person=false, restore=true) -%}

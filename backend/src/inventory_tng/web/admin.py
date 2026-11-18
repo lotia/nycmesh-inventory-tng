@@ -24,8 +24,8 @@ from inventory_tng.models import (
     Location,
     Volunteer,
 )
-from inventory_tng.pages import NOTICES, page, templates
 from inventory_tng.web.forms import NAME_MAX, row_id
+from inventory_tng.web.pages import NOTICES, page, templates
 
 ADMIN = "/admin"
 ADMINS = f"{ADMIN}/admins"

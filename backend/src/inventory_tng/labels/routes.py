@@ -11,14 +11,6 @@ from fastapi import APIRouter, Depends, Form, Query, Request
 from fastapi.responses import JSONResponse, Response
 from sqlalchemy import ColumnElement, func
 
-from inventory_tng.admin.common import (
-    LABELS,
-    SECTION_LABELS,
-    admin_page,
-    now,
-    revoke_title,
-)
-from inventory_tng.admin.listing import AskedView, Listing, Searched, Sort, Sorting
 from inventory_tng.admins.accounts import qr_svg
 from inventory_tng.admins.guards import AdminSignedIn
 from inventory_tng.catalogue.items_routes import ITEMS
@@ -34,8 +26,16 @@ from inventory_tng.models import (
     Location,
     whole,
 )
-from inventory_tng.pages import NOTICES, not_found, redirect, templates
 from inventory_tng.places.routes import LOCATIONS
+from inventory_tng.web.admin import (
+    LABELS,
+    SECTION_LABELS,
+    admin_page,
+    now,
+    revoke_title,
+)
+from inventory_tng.web.listing import AskedView, Listing, Searched, Sort, Sorting
+from inventory_tng.web.pages import NOTICES, not_found, redirect, templates
 
 log = structlog.get_logger(__name__)
 

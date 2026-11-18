@@ -350,7 +350,7 @@ msgid_plural "%(num)d minutes"
 msgstr[0] ""
 msgstr[1] ""
 
-#: src/inventory_tng/pages.py
+#: src/inventory_tng/web/pages.py
 #, python-format
 msgid "%(num)d retired place holds stock"
 msgid_plural "%(num)d retired places hold stock"
@@ -754,7 +754,7 @@ msgstr ""
 msgid "Added"
 msgstr ""
 
-#: src/inventory_tng/admin/common.py
+#: src/inventory_tng/web/admin.py
 msgid "Added."
 msgstr ""
 
@@ -771,7 +771,7 @@ msgstr ""
 msgid "Administrator"
 msgstr ""
 
-#: src/inventory_tng/admin/common.py
+#: src/inventory_tng/web/admin.py
 msgid "Administrators"
 msgstr ""
 
@@ -817,7 +817,7 @@ msgstr[1] ""
 msgid "All labels"
 msgstr ""
 
-#: src/inventory_tng/once.py
+#: src/inventory_tng/web/once.py
 msgid "Already sent"
 msgstr ""
 
@@ -1085,7 +1085,7 @@ msgstr ""
 msgid "Bring them back to change anything here."
 msgstr ""
 
-#: src/inventory_tng/admin/common.py
+#: src/inventory_tng/web/admin.py
 msgid "Brought back."
 msgstr ""
 
@@ -1120,7 +1120,7 @@ msgstr ""
 msgid "Can't scan? Type this key instead:"
 msgstr ""
 
-#: src/inventory_tng/admin/common.py
+#: src/inventory_tng/web/admin.py
 msgid "Categories"
 msgstr ""
 
@@ -1344,7 +1344,7 @@ msgstr ""
 msgid "Counted: everything was as the records say."
 msgstr ""
 
-#: src/inventory_tng/admin/common.py src/inventory_tng/templates/counts.html
+#: src/inventory_tng/templates/counts.html src/inventory_tng/web/admin.py
 msgid "Counts"
 msgstr ""
 
@@ -1385,7 +1385,7 @@ msgstr ""
 msgid "Device %(number)s"
 msgstr ""
 
-#: src/inventory_tng/admin/common.py
+#: src/inventory_tng/web/admin.py
 msgid "Devices"
 msgstr ""
 
@@ -1778,9 +1778,8 @@ msgstr ""
 msgid "Item retired"
 msgstr ""
 
-#: src/inventory_tng/admin/common.py
 #: src/inventory_tng/templates/categories.html
-#: src/inventory_tng/templates/category.html
+#: src/inventory_tng/templates/category.html src/inventory_tng/web/admin.py
 msgid "Items"
 msgstr ""
 
@@ -1856,7 +1855,7 @@ msgstr ""
 msgid "Keep them apart"
 msgstr ""
 
-#: src/inventory_tng/admin/common.py src/inventory_tng/templates/_labels.html
+#: src/inventory_tng/templates/_labels.html src/inventory_tng/web/admin.py
 msgid "Labels"
 msgstr ""
 
@@ -1895,7 +1894,7 @@ msgstr ""
 msgid "Let them hold stock"
 msgstr ""
 
-#: src/inventory_tng/admin/common.py
+#: src/inventory_tng/web/admin.py
 msgid "Locations"
 msgstr ""
 
@@ -2198,11 +2197,11 @@ msgid ""
 "as it is."
 msgstr ""
 
-#: src/inventory_tng/pages.py
+#: src/inventory_tng/web/pages.py
 msgid "Not found"
 msgstr ""
 
-#: src/inventory_tng/pages.py
+#: src/inventory_tng/web/pages.py
 msgid "Not here"
 msgstr ""
 
@@ -3024,7 +3023,7 @@ msgstr ""
 msgid "Retired"
 msgstr ""
 
-#: src/inventory_tng/admin/common.py
+#: src/inventory_tng/web/admin.py
 msgid "Retired."
 msgstr ""
 
@@ -3057,7 +3056,7 @@ msgstr ""
 msgid "Revoke"
 msgstr ""
 
-#: src/inventory_tng/admin/common.py
+#: src/inventory_tng/web/admin.py
 #, python-format
 msgid "Revoke %(name)s?"
 msgstr ""
@@ -3184,7 +3183,7 @@ msgstr ""
 msgid "Saved, it reads “%(key)s” after a number so in every name."
 msgstr ""
 
-#: src/inventory_tng/admin/common.py
+#: src/inventory_tng/web/admin.py
 msgid "Saved."
 msgstr ""
 
@@ -3314,8 +3313,8 @@ msgstr ""
 msgid "Set<span class=\"sr-only\"> for %(package)s</span>"
 msgstr ""
 
-#: src/inventory_tng/admin/common.py
 #: src/inventory_tng/templates/over_recorded_settled.html
+#: src/inventory_tng/web/admin.py
 msgid "Settled"
 msgstr ""
 
@@ -3431,7 +3430,7 @@ msgstr ""
 msgid "Since you last signed in"
 msgstr ""
 
-#: src/inventory_tng/admin/common.py
+#: src/inventory_tng/web/admin.py
 msgid "Site settings"
 msgstr ""
 
@@ -3480,7 +3479,7 @@ msgstr ""
 msgid "Something else here"
 msgstr ""
 
-#: src/inventory_tng/pages.py
+#: src/inventory_tng/web/pages.py
 msgid "Something went wrong"
 msgstr ""
 
@@ -3498,7 +3497,7 @@ msgstr ""
 msgid "State"
 msgstr ""
 
-#: src/inventory_tng/admin/common.py
+#: src/inventory_tng/web/admin.py
 msgid "Stock"
 msgstr ""
 
@@ -3534,7 +3533,7 @@ msgstr ""
 msgid "That breaks one of the inventory's rules."
 msgstr ""
 
-#: src/inventory_tng/pages.py
+#: src/inventory_tng/web/pages.py
 msgid "That can't be done at this address."
 msgstr ""
 
@@ -3551,7 +3550,7 @@ msgid ""
 "the next."
 msgstr ""
 
-#: src/inventory_tng/pages.py
+#: src/inventory_tng/web/pages.py
 msgid "That didn't work"
 msgstr ""
 
@@ -3559,20 +3558,20 @@ msgstr ""
 msgid "That doesn't look like an email address."
 msgstr ""
 
-#: src/inventory_tng/once.py
+#: src/inventory_tng/web/once.py
 msgid ""
 "That form was already sent, and made a registration code, shown then. "
 "Nothing new was made. It can't be shown again: Back and Forward don't "
 "keep it."
 msgstr ""
 
-#: src/inventory_tng/once.py
+#: src/inventory_tng/web/once.py
 msgid ""
 "That form was already sent, and made a sign-in link, shown then. Nothing "
 "new was made. It can't be shown again: Back and Forward don't keep it."
 msgstr ""
 
-#: src/inventory_tng/once.py
+#: src/inventory_tng/web/once.py
 msgid ""
 "That form was already sent, and made recovery codes, shown then. Nothing "
 "new was made. It can't be shown again: Back and Forward don't keep it."
@@ -3669,13 +3668,13 @@ msgstr ""
 msgid "The import"
 msgstr ""
 
-#: src/inventory_tng/pages.py
+#: src/inventory_tng/web/pages.py
 msgid ""
 "The inventory could not do that. Try again; if it happens again, tell "
 "whoever looks after it."
 msgstr ""
 
-#: src/inventory_tng/pages.py
+#: src/inventory_tng/web/pages.py
 msgid "The inventory could not take that as it was sent. Go back and try again."
 msgstr ""
 
@@ -3760,7 +3759,7 @@ msgstr ""
 msgid "There is already a reason by that name."
 msgstr ""
 
-#: src/inventory_tng/pages.py
+#: src/inventory_tng/web/pages.py
 msgid "There is nothing here. The link may be old, or mistyped."
 msgstr ""
 
@@ -3861,7 +3860,7 @@ msgstr ""
 msgid "Tick the items to change first."
 msgstr ""
 
-#: src/inventory_tng/admin/common.py
+#: src/inventory_tng/web/admin.py
 msgid "Tick the open packages first."
 msgstr ""
 
@@ -4014,7 +4013,7 @@ msgstr ""
 msgid "Volunteer's custody"
 msgstr ""
 
-#: src/inventory_tng/admin/common.py
+#: src/inventory_tng/web/admin.py
 msgid "Volunteers"
 msgstr ""
 
@@ -4700,7 +4699,7 @@ msgstr ""
 msgid "the one likely reading"
 msgstr ""
 
-#: src/inventory_tng/admin/common.py
+#: src/inventory_tng/web/admin.py
 msgid "the operator"
 msgstr ""
 

@@ -9,7 +9,13 @@ from fastapi import APIRouter, Form, Request
 from fastapi.responses import HTMLResponse, Response
 from sqlalchemy.orm import Session
 
-from inventory_tng.admin.common import (
+from inventory_tng.admins.guards import AdminSignedIn, SignedIn
+from inventory_tng.catalogue import categories, queries
+from inventory_tng.catalogue.forms import CATEGORY_TAKEN
+from inventory_tng.core.db import DbSession, refusal
+from inventory_tng.core.phrases import Words
+from inventory_tng.models import Category
+from inventory_tng.web.admin import (
     ADMIN,
     SECTION_CATEGORIES,
     admin_page,
@@ -17,15 +23,9 @@ from inventory_tng.admin.common import (
     retirement,
     undo_retire,
 )
-from inventory_tng.admin.listing import AskedView, Sort, Sorting, View, arranged
-from inventory_tng.admins.guards import AdminSignedIn, SignedIn
-from inventory_tng.catalogue import categories, queries
-from inventory_tng.catalogue.forms import CATEGORY_TAKEN
-from inventory_tng.core.db import DbSession, refusal
-from inventory_tng.core.phrases import Words
-from inventory_tng.models import Category
-from inventory_tng.pages import not_found, redirect
 from inventory_tng.web.forms import ALERTS, RULES, form_version, name_problem
+from inventory_tng.web.listing import AskedView, Sort, Sorting, View, arranged
+from inventory_tng.web.pages import not_found, redirect
 
 log = structlog.get_logger(__name__)
 

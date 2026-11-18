@@ -21,8 +21,6 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 import inventory_tng
-from inventory_tng.admin import common
-from inventory_tng.admin.listing import Lapsed
 from inventory_tng.admins import accounts, activity, guards
 from inventory_tng.admins import routes as admin_admins
 from inventory_tng.admins.reset_routes import RESET_NOTICE
@@ -62,7 +60,6 @@ from inventory_tng.models import (
     SignInSettings,
     Volunteer,
 )
-from inventory_tng.pages import retired_holding, templates
 from inventory_tng.site_settings import forms as settings_forms
 from inventory_tng.stock import (
     counts_routes,
@@ -73,7 +70,10 @@ from inventory_tng.stock import (
 )
 from inventory_tng.stock import over_recorded_routes as admin_over_recorded
 from inventory_tng.volunteers import routes as admin_volunteers
+from inventory_tng.web import admin as web_admin
 from inventory_tng.web import forms as web_forms
+from inventory_tng.web.listing import Lapsed
+from inventory_tng.web.pages import retired_holding, templates
 
 from helpers import markup
 from helpers.pages import NOT_ENGLISH, PAGES, Built, built, path
@@ -149,7 +149,7 @@ SAID_WITH_VALUES: list[Callable[[], Words]] = [
     lambda: accounts.password_problem("." * 1000, "") or "",
     lambda: web_forms.up_to(9),
     lambda: web_forms.at_most_places(3),
-    lambda: common.revoke_title(NOT_ENGLISH),
+    lambda: web_admin.revoke_title(NOT_ENGLISH),
     *(
         lambda said=said: said(NOT_ENGLISH, NOT_ENGLISH)
         for said in activity.WORDS.values()
@@ -347,7 +347,7 @@ VIEW = SimpleNamespace(
 
 
 def listing(**differs: object) -> SimpleNamespace:
-    """A long list with search (admin/listing.py), as _listing.html reads it."""
+    """A long list with search (web/listing.py), as _listing.html reads it."""
     return SimpleNamespace(
         **{
             "here": "/here",
@@ -868,7 +868,7 @@ def test_a_count_is_said_as_a_plural() -> None:
 
 def test_a_lists_numbers_are_written_as_the_locale_writes_them() -> None:
     """Its sizes, pages and matches, grouped as German groups digits
-    (inventory-tng-r9ex); its links keep plain digits (admin/listing.py)."""
+    (inventory-tng-r9ex); its links keep plain digits (web/listing.py)."""
     grown = {"sizes": [1000, None], "page": 1000, "pages": 2000}
     view = SimpleNamespace(**vars(VIEW) | grown)
     with speaking(compiled(Catalog(locale="de"))):

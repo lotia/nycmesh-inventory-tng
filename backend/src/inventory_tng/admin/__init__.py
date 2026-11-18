@@ -11,8 +11,6 @@ refused form still links where it should.
 
 from fastapi import APIRouter
 
-from inventory_tng import pages
-from inventory_tng.admin import common
 from inventory_tng.admins import home_routes
 from inventory_tng.admins import routes as admins_routes
 from inventory_tng.catalogue import (
@@ -32,19 +30,21 @@ from inventory_tng.stock import (
     used_up_routes,
 )
 from inventory_tng.volunteers import routes as volunteers_routes
+from inventory_tng.web import admin as web_admin
+from inventory_tng.web import pages
 
 # The sections, in the order the navigation shows them, and their badges.
 pages.SECTIONS[:] = (
-    (items_routes.ITEMS, common.SECTION_ITEMS),
-    (categories_routes.CATEGORIES, common.SECTION_CATEGORIES),
-    (places_routes.LOCATIONS, common.SECTION_LOCATIONS),
-    (labels_routes.LABELS, common.SECTION_LABELS),
-    (volunteers_routes.VOLUNTEERS, common.SECTION_VOLUNTEERS),
-    (stock_routes.STOCK, common.SECTION_STOCK),
-    (counts_routes.COUNTS, common.SECTION_COUNTS),
-    (devices_routes.DEVICES, common.SECTION_DEVICES),
-    (admins_routes.ADMINS, common.SECTION_ADMINS),
-    (site_settings_routes.SETTINGS, common.SECTION_SETTINGS),
+    (items_routes.ITEMS, web_admin.SECTION_ITEMS),
+    (categories_routes.CATEGORIES, web_admin.SECTION_CATEGORIES),
+    (places_routes.LOCATIONS, web_admin.SECTION_LOCATIONS),
+    (labels_routes.LABELS, web_admin.SECTION_LABELS),
+    (volunteers_routes.VOLUNTEERS, web_admin.SECTION_VOLUNTEERS),
+    (stock_routes.STOCK, web_admin.SECTION_STOCK),
+    (counts_routes.COUNTS, web_admin.SECTION_COUNTS),
+    (devices_routes.DEVICES, web_admin.SECTION_DEVICES),
+    (admins_routes.ADMINS, web_admin.SECTION_ADMINS),
+    (site_settings_routes.SETTINGS, web_admin.SECTION_SETTINGS),
 )
 pages.BADGES[counts_routes.COUNTS] = counts_routes.badge
 

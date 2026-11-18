@@ -5,9 +5,9 @@ from fastapi.testclient import TestClient
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
-from inventory_tng.admin.listing import PER_PAGE
 from inventory_tng.catalogue.items_routes import ITEMS
 from inventory_tng.models import Category, Item
+from inventory_tng.web.listing import PER_PAGE
 
 from helpers.items import items_named, new_item
 from helpers.markup import hidden_fields, links, read, sorted_columns, text

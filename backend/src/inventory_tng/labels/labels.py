@@ -113,7 +113,7 @@ class Named:
 
     @property
     def name(self) -> str:
-        """What a list calls it (admin/listing.py)."""
+        """What a list calls it (web/listing.py)."""
         return self.words
 
 

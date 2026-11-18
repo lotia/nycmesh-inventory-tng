@@ -46,7 +46,7 @@ TOTP_KEYS = TotpKeys({1: base64.b64decode(TOTP_KEY)})
 
 def once(**form: str) -> dict[str, str]:
     """A form that makes something shown once, with the new key its page
-    gives it (once.py)."""
+    gives it (web/once.py)."""
     return {"once": str(uuid.uuid4())} | form
 
 

@@ -163,3 +163,8 @@ short test. `core/` is the name FastAPI's full-stack template uses;
 | `bundle.py` | `scan/bundle.py` |
 | `page_builds.py` | `scan/page_builds.py` |
 | `page_telemetry.py` | `scan/page_telemetry.py` |
+| `pages.py` | `web/pages.py` |
+| `admin/common.py` | `web/admin.py` |
+| `admin/listing.py` | `web/listing.py` |
+| `once.py` | `web/once.py` |
+| `security_headers.py` | `web/security_headers.py` |

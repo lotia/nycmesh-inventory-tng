@@ -12,7 +12,6 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 from structlog.testing import capture_logs
 
-from inventory_tng.admin.listing import folded
 from inventory_tng.admins import guards
 from inventory_tng.catalogue import items, names, reading_rules, units
 from inventory_tng.catalogue.forms import CHOOSE_ONE, PACKAGE_TAKEN, TAKEN_FIELDS
@@ -35,6 +34,7 @@ from inventory_tng.models import (
 )
 from inventory_tng.models import reading_rules as reading_rules_held
 from inventory_tng.scan.catalogue_api import catalogue
+from inventory_tng.web.listing import folded
 
 from helpers.concurrency import Committed
 from helpers.items import new_item

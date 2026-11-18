@@ -13,20 +13,10 @@ from fastapi.responses import HTMLResponse, JSONResponse, Response
 from sqlalchemy import exists, func, not_
 from sqlalchemy.orm import Session
 
-from inventory_tng.admin.common import (
-    ADMIN,
-    SECTION_VOLUNTEERS,
-    admin_page,
-    now,
-    retirement,
-    undo_retire,
-)
-from inventory_tng.admin.listing import AskedView, Listing, Searched, Sort, Sorting
 from inventory_tng.admins.guards import AdminSignedIn, SignedIn
 from inventory_tng.core.db import DbSession, attempt
 from inventory_tng.core.phrases import Words, gettext, lazy_gettext
 from inventory_tng.models import Location, Volunteer
-from inventory_tng.pages import NOTICES, not_found, redirect
 from inventory_tng.volunteers import queries, volunteers
 from inventory_tng.volunteers.forms import (
     PICK_INTO,
@@ -35,7 +25,17 @@ from inventory_tng.volunteers.forms import (
     merging,
     volunteer_problems,
 )
+from inventory_tng.web.admin import (
+    ADMIN,
+    SECTION_VOLUNTEERS,
+    admin_page,
+    now,
+    retirement,
+    undo_retire,
+)
 from inventory_tng.web.forms import ALERTS, RULES, form_version, rule_words
+from inventory_tng.web.listing import AskedView, Listing, Searched, Sort, Sorting
+from inventory_tng.web.pages import NOTICES, not_found, redirect
 
 log = structlog.get_logger(__name__)
 
