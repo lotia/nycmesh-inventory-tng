@@ -49,15 +49,27 @@ def test_an_unknown_command_is_refused(capsys: pytest.CaptureFixture[str]) -> No
     assert "invalid choice: 'lockdown'" in capsys.readouterr().err
 
 
-# Which commands' modules a fresh interpreter has imported after one's help.
+def test_arguments_without_a_command_are_refused(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    """Not the list of commands and success, as if they had run."""
+    with pytest.raises(SystemExit) as done:
+        manage.main(["--", "admins", "lockdown", "--expect", "3"])
+    assert done.value.code == 2
+    assert "required: command" in capsys.readouterr().err
+
+
+# What a fresh interpreter has imported of the app, once manage is
+# imported and again after one command's help.
 IMPORTED = """
-import sys
+import contextlib, io, sys
+def ours():
+    return sorted(m for m in sys.modules if m.startswith("inventory_tng."))
 from inventory_tng import manage
-try:
+print(*ours())
+with contextlib.redirect_stdout(io.StringIO()), contextlib.suppress(SystemExit):
     manage.main(["scan-settings", "--help"])
-except SystemExit:
-    pass
-print(*(m for m, _ in manage.COMMANDS.values() if m in sys.modules), file=sys.stderr)
+print(*(m for m, _ in manage.COMMANDS.values() if m in sys.modules))
 """
 
 
@@ -66,4 +78,7 @@ def test_it_imports_only_the_command_chosen() -> None:
     shown = subprocess.run(
         [sys.executable, "-c", IMPORTED], capture_output=True, text=True, check=True
     )
-    assert shown.stderr.split() == ["inventory_tng.site_settings.command"]
+    assert shown.stdout.splitlines() == [
+        "inventory_tng.manage",
+        "inventory_tng.site_settings.command",
+    ]

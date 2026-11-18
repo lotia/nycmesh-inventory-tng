@@ -54,7 +54,6 @@ def _parser() -> argparse.ArgumentParser:
     )
     parser.add_argument(
         "command",
-        nargs="?",
         choices=COMMANDS,
         metavar="command",
         help="one of those below",
@@ -64,12 +63,12 @@ def _parser() -> argparse.ArgumentParser:
 
 def main(argv: Sequence[str] | None = None) -> int:
     argv = sys.argv[1:] if argv is None else list(argv)
-    # Only the name is read here: the rest is the command's.
     parser = _parser()
-    name = parser.parse_args(argv[:1]).command
-    if name is None:
+    if not argv:
         parser.print_help()
         return 0
+    # Only the name is read here: the rest is the command's.
+    name = parser.parse_args(argv[:1]).command
     module = importlib.import_module(COMMANDS[name][0])
     return module.main(argv[1:], prog=f"{PROG} {name}")
 
