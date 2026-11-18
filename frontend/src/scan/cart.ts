@@ -18,11 +18,11 @@ import { v4 as uuid } from "uuid";
 import * as v from "valibot";
 import type { Schemas } from "../api/client";
 import { id } from "../api/replies";
-import { BUILD } from "../build";
-import { say, sayParts } from "../i18n";
-import { BatchKey, BatchLine, type Said } from "../outbox";
-import { count, decimal, thousandths } from "../quantity";
-import { onStoredChange, readStored, writeStored } from "../stored";
+import { BUILD } from "../shared/build";
+import { say, sayParts } from "../shared/i18n";
+import { BatchKey, BatchLine, type Said } from "../shared/outbox";
+import { count, decimal, thousandths } from "../shared/quantity";
+import { onStoredChange, readStored, writeStored } from "../shared/stored";
 import { sealedKey } from "./offered";
 import { indexOf } from "./search";
 

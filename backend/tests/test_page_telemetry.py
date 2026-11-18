@@ -1,5 +1,5 @@
 """POST /api/telemetry: what the scan and register pages report about
-themselves (scan/page_telemetry.py, frontend/src/telemetry.ts)."""
+themselves (scan/page_telemetry.py, frontend/src/shared/telemetry.ts)."""
 
 import re
 from collections.abc import Callable
@@ -94,10 +94,10 @@ def test_the_limit_on_reports_is_a_setting(
 
 @pytest.mark.clone
 def test_the_page_clamps_scan_to_save_to_what_is_taken() -> None:
-    """frontend/src/telemetry.ts clamps it to the bound the schema has, which
-    the generated client types cannot carry: a value past it would have the
-    whole report refused."""
-    source = (CLONE / "frontend" / "src" / "telemetry.ts").read_text()
+    """frontend/src/shared/telemetry.ts clamps it to the bound the schema
+    has, which the generated client types cannot carry: a value past it
+    would have the whole report refused."""
+    source = (CLONE / "frontend" / "src" / "shared" / "telemetry.ts").read_text()
     clamp = re.search(r"MOST_SECONDS_TO_SAVE = ([\d_]+);", source)
     assert clamp is not None
     (bound,) = (

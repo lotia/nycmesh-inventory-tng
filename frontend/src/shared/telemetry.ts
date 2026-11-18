@@ -18,7 +18,7 @@
  * Nothing is sent until start(), which only the pages' entry points call.
  */
 import { onCLS, onINP, onLCP } from "web-vitals";
-import type { Schemas } from "./api/client";
+import type { Schemas } from "../api/client";
 
 export const PATH = "/api/telemetry";
 export const FLUSH_AT = 10;

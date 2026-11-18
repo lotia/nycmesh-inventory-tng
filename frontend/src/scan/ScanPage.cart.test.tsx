@@ -6,8 +6,8 @@ import {
   within,
 } from "@testing-library/preact";
 import { describe, expect, type MockInstance, test, vi } from "vitest";
-import { say, speak } from "../i18n";
 import { messages as pseudo } from "../locales/pseudo.po";
+import { say, speak } from "../shared/i18n";
 import {
   NO_ANSWER,
   NOT_RECORDED,
@@ -15,8 +15,8 @@ import {
   STORAGE_KEY as OUTBOX_KEY,
   PROBLEMS,
   SOME_NOT_RECORDED,
-} from "../outbox";
-import { MOST_SECONDS_TO_SAVE, telemetry } from "../telemetry";
+} from "../shared/outbox";
+import { MOST_SECONDS_TO_SAVE, telemetry } from "../shared/telemetry";
 import { CATALOGUE, WITH_CAFE } from "../testing/catalogue";
 import { answering, deferred, json, saved } from "../testing/fetch";
 import { KEY, moveBody, outboxEntry, storeOutbox } from "../testing/saves";

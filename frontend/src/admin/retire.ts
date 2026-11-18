@@ -4,7 +4,7 @@
  * or go back. A retire form says it is one with `data-retire`.
  */
 import { msg } from "@lingui/core/macro";
-import { say } from "../i18n";
+import { say } from "../shared/i18n";
 
 export const UNSAVED_CHANGES = msg`This page has changes you haven't saved. Retiring now loses them.`;
 export const GO_BACK = msg`Go back`;

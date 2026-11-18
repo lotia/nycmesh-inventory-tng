@@ -217,6 +217,7 @@ The frontend's moves, both under `frontend/src/`, sorted the same way:
 | Old path | New path |
 | --- | --- |
 | `batch.ts` | `scan/batch.ts` |
+| `build.ts`, with its tests | `shared/build.ts` |
 | `buttons.ts`, with its tests | `admin/buttons.ts` |
 | `camera.ts` | `scan/camera.ts` |
 | `cart.test.ts`: its tests of search (`finding`) | `search.test.ts` |
@@ -229,18 +230,24 @@ The frontend's moves, both under `frontend/src/`, sorted the same way:
 | `catalogue.ts` | `scan/catalogue.ts` |
 | `combobox.ts`, with its tests | `admin/combobox.ts` |
 | `decoder.ts`, with its tests | `scan/decoder.ts` |
+| `Field.tsx` | `shared/Field.tsx` |
 | `Finder.tsx` | `scan/Finder.tsx` |
 | `hints.ts`, with its tests | `admin/hints.ts` |
+| `i18n.ts`, with its tests | `shared/i18n.ts` |
 | `labels.ts`, with its tests | `scan/labels.ts` |
+| `mount.tsx`, with its tests | `shared/mount.tsx` |
 | `Notes.tsx` | `scan/Notes.tsx` |
 | `offered.ts` | `scan/offered.ts` |
 | `older.ts`, with its tests | `scan/older.ts` |
 | `OlderList.tsx` | `scan/OlderList.tsx` |
 | `once.ts`, with its tests | `admin/once.ts` |
 | `OpenPackageCard.tsx`, with its tests | `scan/OpenPackageCard.tsx` |
+| `outbox.ts`, with its tests | `shared/outbox.ts` |
 | `OutboxList.tsx` | `scan/OutboxList.tsx` |
+| `quantity.ts`, with its tests | `shared/quantity.ts` |
 | `recorded.ts`, with its tests | `scan/recorded.ts` |
 | `RegisterPage.tsx`, with its tests | `register/RegisterPage.tsx` |
+| `registration.ts`, with its tests | `shared/registration.ts` |
 | `retire.ts`, with its tests | `admin/retire.ts` |
 | `Scanner.tsx`, with its tests | `scan/Scanner.tsx` |
 | `ScanPage.tsx`, with its tests | `scan/ScanPage.tsx` |
@@ -253,6 +260,8 @@ The frontend's moves, both under `frontend/src/`, sorted the same way:
 | `ScanPage.tsx`: `OlderList`, with the words it says of each (`olderSaid`, `olderKind`, `olderWhere`, `olderWhen`) and its telemetry (`heldIn`, `recordOlder`) | `OlderList.tsx` |
 | `ScanPage.tsx`: `OutboxList`, with `RecordedElsewhere`, `useOnline` and `AddDifference` | `OutboxList.tsx` |
 | `search.ts`, with its tests | `scan/search.ts` |
+| `stored.ts`, with its tests | `shared/stored.ts` |
+| `telemetry.ts`, with its tests | `shared/telemetry.ts` |
 | `test-camera.ts` | `testing/camera.ts` |
 | `test-catalogue.ts` | `testing/catalogue.ts` |
 | `test-fetch.ts` | `testing/fetch.ts` |

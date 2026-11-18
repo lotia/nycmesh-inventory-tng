@@ -7,7 +7,7 @@
  */
 import { i18n, type MessageDescriptor } from "@lingui/core";
 import { signal } from "@preact/signals";
-import { messages } from "./locales/en.po";
+import { messages } from "../locales/en.po";
 
 /** Counts each change of locale or catalogue: a component that says
  * anything reads it, through `say`, so it renders again on each. */

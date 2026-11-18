@@ -446,15 +446,15 @@ A new build is picked up without restarting the backend when
 in its `frontend` log line at startup: `source=build` or `source=dev_server`.
 
 The scan page's outbox and cart are kept in `localStorage`, each under a
-key with a version (`frontend/src/outbox.ts`, `scan/cart.ts`), stamped with the
-build that wrote them. A change to what is kept, or to a value a field may
-take, takes a new key, as a tab of the build before, open during a deploy,
-drops what it cannot read from what it writes back; `outbox.test.ts` lists
-both for the outbox's key. The one exception is an optional field whose
-loss leaves the entry as the build before would have kept it, which that
-test lists apart. Builds that keep the same shape share a key, so
-each batch is kept with the build that queued it, and is sent as that
-build's, whichever tab sends it. Why a batch was refused, or waits, is
+key with a version (`frontend/src/shared/outbox.ts`, `scan/cart.ts`),
+stamped with the build that wrote them. A change to what is kept, or to a
+value a field may take, takes a new key, as a tab of the build before, open
+during a deploy, drops what it cannot read from what it writes back;
+`outbox.test.ts` lists both for the outbox's key. The one exception is an
+optional field whose loss leaves the entry as the build before would have
+kept it, which that test lists apart. Builds that keep the same shape share
+a key, so each batch is kept with the build that queued it, and is sent as
+that build's, whichever tab sends it. Why a batch was refused, or waits, is
 kept as a code with its data (`outbox.Reason`), and what a batch's summary
 says as what it is made from, with its places named as when it was queued
 (`outbox.Summary`), never in words: the page makes the words as it shows
@@ -466,7 +466,7 @@ A build reads and writes only its own keys. A tab of an older build sends
 its own batches and lets the volunteer record the cart, saying nothing of
 the newer build until then, and then asks for an upgrade, a reload; once
 the server holds its batches back as too old, it asks at once
-(`frontend/src/build.ts`, docs/decisions/0010).
+(`frontend/src/shared/build.ts`, docs/decisions/0010).
 
 So the server keeps taking what the build before sends. Expand, then
 contract: a field the batch endpoint will require is added as optional,
@@ -603,8 +603,8 @@ how long a batch took from its first line to Record, a tab learning that a
 newer build is out, what an older build left in storage and what
 volunteers did with it, a cart discarded, and what a save another tab
 recorded first added put in the cart, through
-`frontend/src/telemetry.ts`, to `POST /api/telemetry`, which turns them into
-`inventory.*` metrics (docs/decisions/0006). Its schema, in
+`frontend/src/shared/telemetry.ts`, to `POST /api/telemetry`, which turns
+them into `inventory.*` metrics (docs/decisions/0006). Its schema, in
 `backend/src/inventory_tng/scan/page_telemetry.py`, lists all a page may send:
 something new to report starts there.
 
@@ -649,7 +649,7 @@ to a template shows there only after
 Administrator pages put their content in `<main class="admin page-width">`;
 the scan and registration pages in `<main class="volunteer page-width">`,
 with a label above its text box or list as `Field`
-(`frontend/src/Field.tsx`). Both
+(`frontend/src/shared/Field.tsx`). Both
 space their forms by gap, and a component styles what only it shows with
 utilities. When you style a page:
 
@@ -866,7 +866,7 @@ On the server (`backend/src/inventory_tng/core/phrases.py`):
   Mail says such a message with `mail.branded`, which fills it in; a
   template writes `{{ BRAND }}`.
 
-On the scan page (`frontend/src/i18n.ts`):
+On the scan page (`frontend/src/shared/i18n.ts`):
 
 - Name a phrase with Lingui's `msg` macro, exported where it is used:
   ``export const REGISTERED = msg`This browser is registered.`;``. A plural

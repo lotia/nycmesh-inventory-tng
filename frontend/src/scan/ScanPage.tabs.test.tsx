@@ -1,6 +1,6 @@
 import { fireEvent, screen } from "@testing-library/preact";
 import { describe, expect, test, vi } from "vitest";
-import { say } from "../i18n";
+import { say } from "../shared/i18n";
 import { CATALOGUE } from "../testing/catalogue";
 import { answering, json, saved } from "../testing/fetch";
 import {

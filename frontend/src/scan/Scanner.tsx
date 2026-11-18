@@ -8,7 +8,7 @@ import type { MessageDescriptor } from "@lingui/core";
 import { msg } from "@lingui/core/macro";
 import { useSignal } from "@preact/signals";
 import { useEffect, useRef } from "preact/hooks";
-import { say } from "../i18n";
+import { say } from "../shared/i18n";
 import { DecoderUnavailable, openCamera, type Session } from "./camera";
 import { Repeats } from "./labels";
 

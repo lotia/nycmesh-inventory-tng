@@ -1,8 +1,8 @@
 /** Registering this browser with a phrase (docs/decisions/0009). */
 import type { MessageDescriptor } from "@lingui/core";
 import { msg } from "@lingui/core/macro";
-import { type Api, check, type Schemas } from "./api/client";
-import { CodeRefusedReply, RateLimitedReply, Registered } from "./api/replies";
+import { type Api, check, type Schemas } from "../api/client";
+import { CodeRefusedReply, RateLimitedReply, Registered } from "../api/replies";
 
 type Rejection =
   | Schemas["CodeRefusedReply"]["reason"]

@@ -13,9 +13,9 @@ import {
   MUST_UPGRADE as MUST_UPGRADE_PHRASE,
   UPDATED as UPDATED_PHRASE,
   UPGRADE,
-} from "../build";
-import { say } from "../i18n";
-import { Outbox } from "../outbox";
+} from "../shared/build";
+import { say } from "../shared/i18n";
+import { Outbox } from "../shared/outbox";
 import { answering, deferred, json, saved, TOO_OLD } from "../testing/fetch";
 import {
   keep,

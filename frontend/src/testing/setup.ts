@@ -1,7 +1,7 @@
 import { act, cleanup } from "@testing-library/preact";
 import { afterEach, vi } from "vitest";
-import { speak } from "../i18n";
 import { messages as english } from "../locales/en.po";
+import { speak } from "../shared/i18n";
 
 // Vitest's globals are off, so Testing Library cannot clean up by itself:
 // without this, each test's page stays in the document for the next.

@@ -1,6 +1,6 @@
 import type { ComponentChild } from "preact";
 import { render } from "preact";
-import "./styles.css";
+import "../styles.css";
 
 /** Render a page into the element the backend's template leaves for it. */
 export function mount(page: ComponentChild): void {

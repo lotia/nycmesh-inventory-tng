@@ -1,5 +1,5 @@
 """What the scan and register pages report about themselves: POST
-/api/telemetry (docs/decisions/0006; frontend/src/telemetry.ts).
+/api/telemetry (docs/decisions/0006; frontend/src/shared/telemetry.ts).
 
 The schema is the list of what may be sent: closed sets of names and
 clamped numbers, nothing free. Each event becomes a metric; an error says

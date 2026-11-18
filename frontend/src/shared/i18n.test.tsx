@@ -1,13 +1,13 @@
 import { i18n } from "@lingui/core";
 import { render, screen } from "@testing-library/preact";
 import { expect, test } from "vitest";
+import { messages as english } from "../locales/en.po";
+import { messages as pseudo } from "../locales/pseudo.po";
+import { BATCHES_WAITING, REGISTERED } from "../register/RegisterPage";
+import { ADDED_ONE } from "../scan/CartForm";
+import { ITEM_SAYS } from "../scan/cart";
+import { REGISTER_IT } from "../scan/ScanPage";
 import { say, sayParts, speak } from "./i18n";
-import { messages as english } from "./locales/en.po";
-import { messages as pseudo } from "./locales/pseudo.po";
-import { BATCHES_WAITING, REGISTERED } from "./register/RegisterPage";
-import { ADDED_ONE } from "./scan/CartForm";
-import { ITEM_SAYS } from "./scan/cart";
-import { REGISTER_IT } from "./scan/ScanPage";
 
 test("the page speaks English, from its catalogue", () => {
   expect(i18n.locale).toBe("en");

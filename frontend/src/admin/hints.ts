@@ -1,4 +1,4 @@
-import { decimal, thousandths } from "../quantity";
+import { decimal, thousandths } from "../shared/quantity";
 
 /**
  * Words that follow a field as it is filled in, each still right without

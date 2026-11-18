@@ -6,15 +6,15 @@ import {
   within,
 } from "@testing-library/preact";
 import { describe, expect, test, vi } from "vitest";
-import { say } from "../i18n";
+import { say } from "../shared/i18n";
 import {
   type Body,
   KEY_REUSED,
   MAKE_CHANGES,
   STORAGE_KEY as OUTBOX_KEY,
   SOME_NOT_RECORDED,
-} from "../outbox";
-import { telemetry } from "../telemetry";
+} from "../shared/outbox";
+import { telemetry } from "../shared/telemetry";
 import { CATALOGUE } from "../testing/catalogue";
 import { answering, deferred, json, saved, TOO_OLD } from "../testing/fetch";
 import {

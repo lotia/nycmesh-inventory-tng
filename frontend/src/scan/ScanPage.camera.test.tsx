@@ -1,7 +1,7 @@
 import { fireEvent, screen } from "@testing-library/preact";
 import { beforeEach, describe, expect, test, vi } from "vitest";
-import { say } from "../i18n";
-import { STORAGE_KEY as OUTBOX_KEY, Outbox } from "../outbox";
+import { say } from "../shared/i18n";
+import { STORAGE_KEY as OUTBOX_KEY, Outbox } from "../shared/outbox";
 import { pass } from "../testing/camera";
 import { CATALOGUE } from "../testing/catalogue";
 import { answering, deferred, json, saved } from "../testing/fetch";

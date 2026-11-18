@@ -1,6 +1,6 @@
 import { describe, expect, test } from "vitest";
-import { say } from "../i18n";
-import { KEY_REUSED, noteOf, SOME_NOT_RECORDED } from "../outbox";
+import { say } from "../shared/i18n";
+import { KEY_REUSED, noteOf, SOME_NOT_RECORDED } from "../shared/outbox";
 import { CATALOGUE } from "../testing/catalogue";
 import { KEY, keep, moveBody, OTHER_KEY, olderSave } from "../testing/saves";
 import { refusing } from "../testing/storage";

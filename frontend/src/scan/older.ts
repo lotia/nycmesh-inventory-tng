@@ -28,7 +28,7 @@ import { msg } from "@lingui/core/macro";
 import { type Signal, signal } from "@preact/signals";
 import * as v from "valibot";
 import { id } from "../api/replies";
-import { say } from "../i18n";
+import { say } from "../shared/i18n";
 import {
   BatchKey,
   fromOpen,
@@ -40,8 +40,8 @@ import {
   Reason,
   type ReportKind,
   type Said,
-} from "../outbox";
-import { count, decimal, thousandths } from "../quantity";
+} from "../shared/outbox";
+import { count, decimal, thousandths } from "../shared/quantity";
 import {
   hasStored,
   olderKeys,
@@ -49,7 +49,7 @@ import {
   readStored,
   removeStored,
   writeStored,
-} from "../stored";
+} from "../shared/stored";
 import { toBatch } from "./batch";
 import {
   STORAGE_KEY as CART_KEY,

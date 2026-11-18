@@ -6,9 +6,9 @@
  */
 import { msg } from "@lingui/core/macro";
 import { useId } from "preact/hooks";
-import { Field } from "../Field";
-import { say } from "../i18n";
-import { decimal } from "../quantity";
+import { Field } from "../shared/Field";
+import { say } from "../shared/i18n";
+import { decimal } from "../shared/quantity";
 import type { Item } from "./cart";
 import {
   cutOf,

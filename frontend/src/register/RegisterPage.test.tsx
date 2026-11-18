@@ -1,9 +1,9 @@
 import { fireEvent, render, screen } from "@testing-library/preact";
 import { expect, test, vi } from "vitest";
-import { BUILD } from "../build";
-import { say } from "../i18n";
-import { Outbox, STORAGE_KEY } from "../outbox";
-import { REFUSALS } from "../registration";
+import { BUILD } from "../shared/build";
+import { say } from "../shared/i18n";
+import { Outbox, STORAGE_KEY } from "../shared/outbox";
+import { REFUSALS } from "../shared/registration";
 import { answering, deferred, json } from "../testing/fetch";
 import {
   BATCHES_WAITING,

@@ -1,7 +1,7 @@
 import { fireEvent, render, screen, within } from "@testing-library/preact";
 import { describe, expect, test, vi } from "vitest";
-import { say } from "../i18n";
-import { Outbox } from "../outbox";
+import { say } from "../shared/i18n";
+import { Outbox } from "../shared/outbox";
 import { CATALOGUE } from "../testing/catalogue";
 import { answering, deferred, json, saved } from "../testing/fetch";
 import { expectBold, isCatalogue, open, ready } from "../testing/scan-page";

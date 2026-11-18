@@ -11,9 +11,7 @@ import { fireEvent, render, screen } from "@testing-library/preact";
 import { afterEach, expect, test, vi } from "vitest";
 import { suggest } from "./admin/combobox";
 import { guardRetire } from "./admin/retire";
-import { say, speak } from "./i18n";
 import { messages as pseudo } from "./locales/pseudo.po";
-import { type Entry, Outbox, type Reason, type Recorded } from "./outbox";
 import { RegisterPage } from "./register/RegisterPage";
 import { DecoderUnavailable } from "./scan/camera";
 import { type Catalogue, freshCart, type Item, storeCart } from "./scan/cart";
@@ -21,6 +19,13 @@ import { OpenPackageCard } from "./scan/OpenPackageCard";
 import { HELD } from "./scan/OutboxList";
 import { Scanner } from "./scan/Scanner";
 import { ScanPage } from "./scan/ScanPage";
+import { say, speak } from "./shared/i18n";
+import {
+  type Entry,
+  Outbox,
+  type Reason,
+  type Recorded,
+} from "./shared/outbox";
 import { answering, deferred, json } from "./testing/fetch";
 import {
   KEY,

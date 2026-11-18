@@ -2,16 +2,16 @@ import { msg } from "@lingui/core/macro";
 import { signal, useSignal } from "@preact/signals";
 import { useEffect, useMemo, useRef } from "preact/hooks";
 import { type Api, makeApi } from "../api/client";
-import { MUST_UPGRADE, UPDATED, UPGRADE } from "../build";
-import { say, sayParts } from "../i18n";
+import { MUST_UPGRADE, UPDATED, UPGRADE } from "../shared/build";
+import { say, sayParts } from "../shared/i18n";
 import {
   STORAGE_KEY as OUTBOX_KEY,
   type Outbox,
   sharedOutbox,
-} from "../outbox";
-import { NOT_REGISTERED } from "../registration";
-import { onStoredChange } from "../stored";
-import { telemetry } from "../telemetry";
+} from "../shared/outbox";
+import { NOT_REGISTERED } from "../shared/registration";
+import { onStoredChange } from "../shared/stored";
+import { telemetry } from "../shared/telemetry";
 import { CartForm, CHECK_EVERY_MS } from "./CartForm";
 import { STORAGE_KEY as CART_KEY, loadCart } from "./cart";
 import { type Loaded, loadCatalogue } from "./catalogue";

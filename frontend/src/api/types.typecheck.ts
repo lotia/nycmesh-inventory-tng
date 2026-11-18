@@ -4,7 +4,7 @@
  * that the generated types reach TypeScript and refuse what the API would.
  */
 import type * as v from "valibot";
-import type { BatchBody } from "../outbox";
+import type { BatchBody } from "../shared/outbox";
 import { makeApi, type Schemas } from "./client";
 import type * as replies_ from "./replies";
 

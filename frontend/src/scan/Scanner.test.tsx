@@ -1,6 +1,6 @@
 import { act, fireEvent, render, screen } from "@testing-library/preact";
 import { beforeEach, expect, test, vi } from "vitest";
-import { say } from "../i18n";
+import { say } from "../shared/i18n";
 import { fakeCamera as camera, pass } from "../testing/camera";
 import { DecoderUnavailable, type Session } from "./camera";
 import { DONE, POINT, Scanner, TORCH, TORCH_FAILED } from "./Scanner";

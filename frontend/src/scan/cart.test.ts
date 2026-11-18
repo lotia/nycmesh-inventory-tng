@@ -1,8 +1,8 @@
 import { describe, expect, test } from "vitest";
-import { BUILD } from "../build";
-import { say, speak } from "../i18n";
 import { messages as pseudo } from "../locales/pseudo.po";
-import type { Body, Draft, Said } from "../outbox";
+import { BUILD } from "../shared/build";
+import { say, speak } from "../shared/i18n";
+import type { Body, Draft, Said } from "../shared/outbox";
 import {
   ADD_SOMETHING,
   batchWords,

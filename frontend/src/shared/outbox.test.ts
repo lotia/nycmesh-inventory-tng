@@ -1,9 +1,12 @@
 import { v4 as uuid } from "uuid";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
-import openapi from "./api/openapi.json";
+import openapi from "../api/openapi.json";
+import { messages as pseudo } from "../locales/pseudo.po";
+import { answering, deferred, json, saved, TOO_OLD } from "../testing/fetch";
+import { keep, outboxEntry, storeOutbox } from "../testing/saves";
+import { refusing } from "../testing/storage";
 import { Builds, HEADER, MUST_UPGRADE } from "./build";
 import { say, speak } from "./i18n";
-import { messages as pseudo } from "./locales/pseudo.po";
 import {
   batchId,
   type Draft,
@@ -28,9 +31,6 @@ import {
   wordsOf,
 } from "./outbox";
 import { telemetry } from "./telemetry";
-import { answering, deferred, json, saved, TOO_OLD } from "./testing/fetch";
-import { keep, outboxEntry, storeOutbox } from "./testing/saves";
-import { refusing } from "./testing/storage";
 
 function draft(fields: Partial<Draft> = {}): Draft {
   return {

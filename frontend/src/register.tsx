@@ -1,6 +1,6 @@
-import { mount } from "./mount";
 import { RegisterPage } from "./register/RegisterPage";
-import { telemetry } from "./telemetry";
+import { mount } from "./shared/mount";
+import { telemetry } from "./shared/telemetry";
 
 telemetry.start("register");
 

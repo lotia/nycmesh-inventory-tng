@@ -28,7 +28,7 @@ import { msg } from "@lingui/core/macro";
 import { signal } from "@preact/signals";
 import { v4 as uuid } from "uuid";
 import * as v from "valibot";
-import { type Api, check, makeApi, type Schemas } from "./api/client";
+import { type Api, check, makeApi, type Schemas } from "../api/client";
 import {
   BuildTooOldReply,
   DeviceRefusedReply,
@@ -37,7 +37,7 @@ import {
   type RecordedBatch,
   Saved,
   ValidationFailed,
-} from "./api/replies";
+} from "../api/replies";
 import { Builds, HEADER, MUST_UPGRADE } from "./build";
 import { say } from "./i18n";
 import { NOT_REGISTERED } from "./registration";

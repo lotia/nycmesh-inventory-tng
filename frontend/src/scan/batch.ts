@@ -1,9 +1,9 @@
 /** The cart as a batch to record, or what is still to do, and a batch in words. */
 import { msg } from "@lingui/core/macro";
 import { v4 as uuid, v5 as uuidFrom } from "uuid";
-import { say, sayParts } from "../i18n";
-import type { Draft, Said, Summary } from "../outbox";
-import { count, decimal, thousandths } from "../quantity";
+import { say, sayParts } from "../shared/i18n";
+import type { Draft, Said, Summary } from "../shared/outbox";
+import { count, decimal, thousandths } from "../shared/quantity";
 import {
   type Cart,
   type Catalogue,

@@ -1,7 +1,7 @@
 /** Open packages offered to a cart, and the batches the catalogue has not seen. */
 
-import { type Draft, type Entry, fromOpen } from "../outbox";
-import { sent, thousandths } from "../quantity";
+import { type Draft, type Entry, fromOpen } from "../shared/outbox";
+import { sent, thousandths } from "../shared/quantity";
 import type { Catalogue, Line } from "./cart";
 import { indexOf } from "./search";
 

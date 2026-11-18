@@ -1,6 +1,6 @@
 import { describe, expect, test } from "vitest";
+import { refusing } from "../testing/storage";
 import { hasStored, olderKeys, removeStored } from "./stored";
-import { refusing } from "./testing/storage";
 
 describe("olderKeys", () => {
   test("names each older version, oldest first", () => {

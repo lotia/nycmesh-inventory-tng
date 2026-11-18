@@ -2,7 +2,7 @@
 import { msg } from "@lingui/core/macro";
 import { useSignal } from "@preact/signals";
 import { useEffect, useMemo } from "preact/hooks";
-import { say, sayParts } from "../i18n";
+import { say, sayParts } from "../shared/i18n";
 import {
   type Body,
   batchId,
@@ -13,7 +13,7 @@ import {
   type Recorded,
   recordedHeading,
   wordsOf,
-} from "../outbox";
+} from "../shared/outbox";
 import { batchWords } from "./batch";
 import type { Catalogue } from "./cart";
 import {

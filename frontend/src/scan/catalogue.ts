@@ -4,7 +4,7 @@ import {
   Catalogue as CatalogueReply,
   DeviceRefusedReply,
 } from "../api/replies";
-import type { Outbox } from "../outbox";
+import type { Outbox } from "../shared/outbox";
 import type { Catalogue } from "./cart";
 import { keysToAsk } from "./offered";
 

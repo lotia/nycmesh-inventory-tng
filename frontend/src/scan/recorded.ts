@@ -13,7 +13,7 @@
 import type { MessageDescriptor } from "@lingui/core";
 import { msg } from "@lingui/core/macro";
 import { v5 as uuidFrom } from "uuid";
-import { say, sayParts } from "../i18n";
+import { say, sayParts } from "../shared/i18n";
 import {
   type Body,
   batchId,
@@ -24,8 +24,8 @@ import {
   type Recorded,
   type ReportKind,
   type Said,
-} from "../outbox";
-import { decimal, thousandths } from "../quantity";
+} from "../shared/outbox";
+import { decimal, thousandths } from "../shared/quantity";
 import { type Catalogue, ITEM_SAYS, type Item } from "./cart";
 import {
   FROM_OPEN,

@@ -20,7 +20,7 @@ import { defineConfig } from "vitest/config";
 const pages = ["src/scan.tsx", "src/register.tsx", "src/admin.ts"];
 // This build's id: when it was made, in UTC, so a later build's sorts after
 // (backend bundle.BUILD_ID). The pages stamp it on what they keep and send
-// it with each batch (src/build.ts); the backend reads it from dist.
+// it with each batch (src/shared/build.ts); the backend reads it from dist.
 const BUILD = new Date().toISOString();
 /**
  * A setting as the backend reads it: from the shell, else from the

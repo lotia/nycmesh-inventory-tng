@@ -1,5 +1,5 @@
 import { describe, expect, test } from "vitest";
-import { type Body, type Recorded, wordsOf } from "../outbox";
+import { type Body, type Recorded, wordsOf } from "../shared/outbox";
 import { CATALOGUE } from "../testing/catalogue";
 import { freshCart } from "./cart";
 import { asSave, toCart } from "./older";

@@ -4,8 +4,8 @@ import { msg } from "@lingui/core/macro";
 import { type Signal, useSignal } from "@preact/signals";
 import type { TargetedSubmitEvent } from "preact";
 import { useEffect, useMemo, useRef } from "preact/hooks";
-import { Field } from "../Field";
-import { say, sayParts } from "../i18n";
+import { Field } from "../shared/Field";
+import { say, sayParts } from "../shared/i18n";
 import {
   type Body,
   batchId,
@@ -13,8 +13,8 @@ import {
   type Outbox,
   type Said,
   wordsOf,
-} from "../outbox";
-import { MOST_SECONDS_TO_SAVE, telemetry } from "../telemetry";
+} from "../shared/outbox";
+import { MOST_SECONDS_TO_SAVE, telemetry } from "../shared/telemetry";
 import { type Batch, batchWords, toBatch } from "./batch";
 import { CartLine } from "./CartLine";
 import {

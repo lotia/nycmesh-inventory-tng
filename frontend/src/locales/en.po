@@ -15,11 +15,11 @@ msgstr "Enter the phrase you were given."
 msgid "That's me"
 msgstr "That's me"
 
-#: src/outbox.ts
+#: src/shared/outbox.ts
 msgid "What is on an open package"
 msgstr "What is on an open package"
 
-#: src/outbox.ts
+#: src/shared/outbox.ts
 msgid "{tries, plural, one {The inventory keeps failing on this batch ({status}, # try). It is kept and tried again; please report this.} other {The inventory keeps failing on this batch ({status}, # tries). It is kept and tried again; please report this.}}"
 msgstr "{tries, plural, one {The inventory keeps failing on this batch ({status}, # try). It is kept and tried again; please report this.} other {The inventory keeps failing on this batch ({status}, # tries). It is kept and tried again; please report this.}}"
 
@@ -31,7 +31,7 @@ msgstr "Item retired"
 msgid "This page has changes you haven't saved. Retiring now loses them."
 msgstr "This page has changes you haven't saved. Retiring now loses them."
 
-#: src/outbox.ts
+#: src/shared/outbox.ts
 msgid "This package is retired: what is left may be taken, never received"
 msgstr "This package is retired: what is left may be taken, never received"
 
@@ -40,7 +40,7 @@ msgstr "This package is retired: what is left may be taken, never received"
 msgid "{name}: {what}"
 msgstr "{name}: {what}"
 
-#: src/registration.ts
+#: src/shared/registration.ts
 msgid "This browser isn't registered yet."
 msgstr "This browser isn't registered yet."
 
@@ -97,15 +97,15 @@ msgstr "That is too much for one batch: record some, then the rest."
 msgid "({packages} said used up)"
 msgstr "({packages} said used up)"
 
-#: src/outbox.ts
+#: src/shared/outbox.ts
 msgid "Line {n}: {why}"
 msgstr "Line {n}: {why}"
 
-#: src/outbox.ts
+#: src/shared/outbox.ts
 msgid "This item is retired: what is left may be taken, never received"
 msgstr "This item is retired: what is left may be taken, never received"
 
-#: src/registration.ts
+#: src/shared/registration.ts
 msgid "That phrase has expired. Ask for a new one."
 msgstr "That phrase has expired. Ask for a new one."
 
@@ -117,7 +117,7 @@ msgstr "Add to cart"
 msgid "Checked out items. Add to cart or discard before sending"
 msgstr "Checked out items. Add to cart or discard before sending"
 
-#: src/outbox.ts
+#: src/shared/outbox.ts
 msgid "Not recorded."
 msgstr "Not recorded."
 
@@ -129,7 +129,7 @@ msgstr "{name}: {amount}, new"
 msgid "That one was changed in another tab. Check it again."
 msgstr "That one was changed in another tab. Check it again."
 
-#: src/outbox.ts
+#: src/shared/outbox.ts
 msgid "Open package said used up"
 msgstr "Open package said used up"
 
@@ -149,7 +149,7 @@ msgstr "Pick where it comes from."
 msgid "opened {date}"
 msgstr "opened {date}"
 
-#: src/outbox.ts
+#: src/shared/outbox.ts
 msgid "Not accepted"
 msgstr "Not accepted"
 
@@ -226,7 +226,7 @@ msgstr "To"
 msgid "Discard"
 msgstr "Discard"
 
-#: src/outbox.ts
+#: src/shared/outbox.ts
 msgid "This package's size changed since the page loaded: load the page again, and count it again"
 msgstr "This package's size changed since the page loaded: load the page again, and count it again"
 
@@ -234,7 +234,7 @@ msgstr "This package's size changed since the page loaded: load the page again, 
 msgid "Now"
 msgstr "Now"
 
-#: src/outbox.ts
+#: src/shared/outbox.ts
 msgid "Whole packages only"
 msgstr "Whole packages only"
 
@@ -262,7 +262,7 @@ msgstr "What's on it: {packages} at {from}"
 msgid "The inventory can't answer just now. Try again in a minute."
 msgstr "The inventory can't answer just now. Try again in a minute."
 
-#: src/outbox.ts
+#: src/shared/outbox.ts
 msgid "Open package said used up, {n}: {why}"
 msgstr "Open package said used up, {n}: {why}"
 
@@ -278,7 +278,7 @@ msgstr "Cut or take from the {name} opened {date} ({unit})"
 msgid "Saying what is on open packages"
 msgstr "Saying what is on open packages"
 
-#: src/outbox.ts
+#: src/shared/outbox.ts
 msgid "The inventory can't record this just now. Trying again shortly."
 msgstr "The inventory can't record this just now. Trying again shortly."
 
@@ -318,7 +318,7 @@ msgstr "Nothing usable left on it"
 msgid "{name}: {amount} more"
 msgstr "{name}: {amount} more"
 
-#: src/registration.ts
+#: src/shared/registration.ts
 msgid "That phrase has been withdrawn. Ask for a new one."
 msgstr "That phrase has been withdrawn. Ask for a new one."
 
@@ -334,7 +334,7 @@ msgstr "Register this device"
 msgid "(what is on {packages} said)"
 msgstr "(what is on {packages} said)"
 
-#: src/outbox.ts
+#: src/shared/outbox.ts
 msgid "Already recorded from this tab in transaction {transaction}"
 msgstr "Already recorded from this tab in transaction {transaction}"
 
@@ -362,11 +362,11 @@ msgstr "{name}: Nothing is taken from an open package here."
 msgid "Added but not sent"
 msgstr "Added but not sent"
 
-#: src/registration.ts
+#: src/shared/registration.ts
 msgid "That phrase has registered all the devices it may. Ask for a new one."
 msgstr "That phrase has registered all the devices it may. Ask for a new one."
 
-#: src/registration.ts
+#: src/shared/registration.ts
 msgid "This browser's registration was withdrawn."
 msgstr "This browser's registration was withdrawn."
 
@@ -399,7 +399,7 @@ msgstr "What is on an open package, new"
 msgid "Could not read previously added items, scan them again."
 msgstr "Could not read previously added items, scan them again."
 
-#: src/outbox.ts
+#: src/shared/outbox.ts
 msgid "Recorded in another tab in transaction {transaction}"
 msgstr "Recorded in another tab in transaction {transaction}"
 
@@ -407,15 +407,15 @@ msgstr "Recorded in another tab in transaction {transaction}"
 msgid "Add something to the cart."
 msgstr "Add something to the cart."
 
-#: src/registration.ts
+#: src/shared/registration.ts
 msgid "Too many tries from here. Wait a minute, then try again."
 msgstr "Too many tries from here. Wait a minute, then try again."
 
-#: src/outbox.ts
+#: src/shared/outbox.ts
 msgid "A loose line says a package's size: load the page again, and count it again"
 msgstr "A loose line says a package's size: load the page again, and count it again"
 
-#: src/outbox.ts
+#: src/shared/outbox.ts
 msgid "There is no such row"
 msgstr "There is no such row"
 
@@ -499,7 +499,7 @@ msgstr "Kept on this device {when}, not sent."
 msgid "Used up: {packages} at {from}"
 msgstr "Used up: {packages} at {from}"
 
-#: src/build.ts
+#: src/shared/build.ts
 msgid "Upgrade"
 msgstr "Upgrade"
 
@@ -527,15 +527,15 @@ msgstr "{place}: from here, or to here?"
 msgid "An item"
 msgstr "An item"
 
-#: src/outbox.ts
+#: src/shared/outbox.ts
 msgid "Moving an open package whole takes all that is left on it, which changed: load the page again"
 msgstr "Moving an open package whole takes all that is left on it, which changed: load the page again"
 
-#: src/outbox.ts
+#: src/shared/outbox.ts
 msgid "A line of a package says the size it was counted in: load the page again, and count it again"
 msgstr "A line of a package says the size it was counted in: load the page again, and count it again"
 
-#: src/build.ts
+#: src/shared/build.ts
 msgid "The scanner has been updated. You must upgrade. Your data will be kept but may need some changes before sending."
 msgstr "The scanner has been updated. You must upgrade. Your data will be kept but may need some changes before sending."
 
@@ -547,7 +547,7 @@ msgstr "All of it, moved still open"
 msgid "{count, plural, one {# item} other {# items}}"
 msgstr "{count, plural, one {# item} other {# items}}"
 
-#: src/outbox.ts
+#: src/shared/outbox.ts
 msgid "What is on an open package, {n}: {why}"
 msgstr "What is on an open package, {n}: {why}"
 
@@ -567,7 +567,7 @@ msgstr "A package counted here is no longer used. Remove the line and add it aga
 msgid "Discard cart"
 msgstr "Discard cart"
 
-#: src/outbox.ts
+#: src/shared/outbox.ts
 msgid "Open one package a line: it is followed until used up"
 msgstr "Open one package a line: it is followed until used up"
 
@@ -579,7 +579,7 @@ msgstr "Now:"
 msgid "Registration phrase"
 msgstr "Registration phrase"
 
-#: src/outbox.ts
+#: src/shared/outbox.ts
 msgid "That open package is at another place now"
 msgstr "That open package is at another place now"
 
@@ -595,7 +595,7 @@ msgstr "A cart: receiving stock"
 msgid "Cannot Add to Cart"
 msgstr "Cannot Add to Cart"
 
-#: src/outbox.ts
+#: src/shared/outbox.ts
 msgid "That open package was closed as used up: take from another"
 msgstr "That open package was closed as used up: take from another"
 
@@ -625,7 +625,7 @@ msgstr "to {place}"
 msgid "Torch"
 msgstr "Torch"
 
-#: src/outbox.ts
+#: src/shared/outbox.ts
 msgid "This item is counted in whole units"
 msgstr "This item is counted in whole units"
 
@@ -637,7 +637,7 @@ msgstr "Can't add these items. Please rescan."
 msgid "{name}: enter what is on the open package, in whole units, or leave it blank."
 msgstr "{name}: enter what is on the open package, in whole units, or leave it blank."
 
-#: src/outbox.ts
+#: src/shared/outbox.ts
 msgid "No answer from the inventory. Trying again shortly."
 msgstr "No answer from the inventory. Trying again shortly."
 
@@ -649,7 +649,7 @@ msgstr "{name}: enter what is on the open package, up to 3 decimals, or leave it
 msgid "<0>Register it</0>, then come back."
 msgstr "<0>Register it</0>, then come back."
 
-#: src/outbox.ts
+#: src/shared/outbox.ts
 msgid "The inventory's rules refuse this as sent: it changed since the page loaded. Load the page again, and do it again"
 msgstr "The inventory's rules refuse this as sent: it changed since the page loaded. Load the page again, and do it again"
 
@@ -702,7 +702,7 @@ msgstr "{count, plural, one {Could not read # previously added item, scan it aga
 msgid "No camera could be opened. Find items in the list instead."
 msgstr "No camera could be opened. Find items in the list instead."
 
-#: src/registration.ts
+#: src/shared/registration.ts
 msgid "That phrase isn't one we know. Check it word by word against the one you were given."
 msgstr "That phrase isn't one we know. Check it word by word against the one you were given."
 
@@ -722,7 +722,7 @@ msgstr "Keep it"
 msgid "Camera"
 msgstr "Camera"
 
-#: src/build.ts
+#: src/shared/build.ts
 msgid "The scanner has been updated."
 msgstr "The scanner has been updated."
 
@@ -750,7 +750,7 @@ msgstr "The cart was changed in another tab. Check it, then discard it again."
 msgid "Remove"
 msgstr "Remove"
 
-#: src/outbox.ts
+#: src/shared/outbox.ts
 msgid "Not recorded: its key was already used for a different batch. Please report this."
 msgstr "Not recorded: its key was already used for a different batch. Please report this."
 
@@ -819,7 +819,7 @@ msgstr "An install number is digits only."
 msgid "The camera isn't allowed for this page. Allow it in the browser's settings, or find items in the list."
 msgstr "The camera isn't allowed for this page. Allow it in the browser's settings, or find items in the list."
 
-#: src/outbox.ts
+#: src/shared/outbox.ts
 msgid "The inventory answered unexpectedly ({status}). Trying again shortly."
 msgstr "The inventory answered unexpectedly ({status}). Trying again shortly."
 
@@ -875,7 +875,7 @@ msgstr "This browser isn't keeping the cart, so a reload will empty it. Free som
 msgid "Are you {name}? This phone hasn't been used for a while."
 msgstr "Are you {name}? This phone hasn't been used for a while."
 
-#: src/outbox.ts
+#: src/shared/outbox.ts
 msgid "This item, in this package or loose, is on another line too: put it on one line"
 msgstr "This item, in this package or loose, is on another line too: put it on one line"
 
@@ -903,7 +903,7 @@ msgstr "Install: {items} from {from}"
 msgid "{amount} loose"
 msgstr "{amount} loose"
 
-#: src/outbox.ts
+#: src/shared/outbox.ts
 msgid "Some items were not recorded. Details below."
 msgstr "Some items were not recorded. Details below."
 
@@ -920,7 +920,7 @@ msgstr "for install {number}"
 msgid "Your cut uses up the {name}, so it's ticked. Untick it if cable is left. An administrator confirms."
 msgstr "Your cut uses up the {name}, so it's ticked. Untick it if cable is left. An administrator confirms."
 
-#: src/outbox.ts
+#: src/shared/outbox.ts
 msgid "Not recorded. Make any changes and record again."
 msgstr "Not recorded. Make any changes and record again."
 
@@ -932,11 +932,11 @@ msgstr "Counted in whole units."
 msgid "Where"
 msgstr "Where"
 
-#: src/outbox.ts
+#: src/shared/outbox.ts
 msgid "That open package moves whole, still open: it is not used up"
 msgstr "That open package moves whole, still open: it is not used up"
 
-#: src/outbox.ts
+#: src/shared/outbox.ts
 msgid "Register it to send this batch."
 msgstr "Register it to send this batch."
 
@@ -944,7 +944,7 @@ msgstr "Register it to send this batch."
 msgid "This item wasn't automatically removed. Record the cart and try to remove."
 msgstr "This item wasn't automatically removed. Record the cart and try to remove."
 
-#: src/outbox.ts
+#: src/shared/outbox.ts
 msgid "This device is offline. Sending when it's back."
 msgstr "This device is offline. Sending when it's back."
 

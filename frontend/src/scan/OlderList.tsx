@@ -3,9 +3,9 @@ import type { MessageDescriptor } from "@lingui/core";
 import { msg } from "@lingui/core/macro";
 import { useSignal } from "@preact/signals";
 import { useEffect, useMemo, useRef } from "preact/hooks";
-import { say } from "../i18n";
-import { MAKE_CHANGES } from "../outbox";
-import { type Event as Reported, telemetry } from "../telemetry";
+import { say } from "../shared/i18n";
+import { MAKE_CHANGES } from "../shared/outbox";
+import { type Event as Reported, telemetry } from "../shared/telemetry";
 import { type Catalogue, KIND_WORDS, type Kind } from "./cart";
 import {
   AlertWords,

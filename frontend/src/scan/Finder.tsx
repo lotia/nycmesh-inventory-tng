@@ -1,8 +1,8 @@
 /** The scan page's search box: find an item by its words, or type or scan its code. */
 import { msg } from "@lingui/core/macro";
 import type { Signal } from "@preact/signals";
-import { Field } from "../Field";
-import { say } from "../i18n";
+import { Field } from "../shared/Field";
+import { say } from "../shared/i18n";
 import { type Catalogue, RETIRED } from "./cart";
 import { readLabel, type Scanned } from "./labels";
 import { search } from "./search";
