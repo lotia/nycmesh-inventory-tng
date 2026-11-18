@@ -193,10 +193,11 @@ export function offered(
   return [...byKey.values()];
 }
 
-/** offered's open packages of an item at a place, as the stock page lists
- * them (open_packages.fewest_left_first): fewest left first, ties by id,
- * then short ends (isShortEnd) the same way, then those showing nothing,
- * or less (docs/decisions/0020). One opened on this phone that the
+/** offered's open packages of an item at a place: usable ones fewest left
+ * first, ties by id, as the stock page lists them
+ * (open_packages.fewest_left_first), then short ends (isShortEnd), which
+ * the stock page shows on a line of their own, the same way, then those
+ * showing nothing, or less (docs/decisions/0020). One opened on this phone that the
  * catalogue does not show yet has no id here (0), so it follows those
  * that have one, in the order it was opened. By what is on each now,
  * never after a cut being typed. */
