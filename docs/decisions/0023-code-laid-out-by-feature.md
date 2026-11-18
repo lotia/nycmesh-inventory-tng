@@ -69,9 +69,11 @@ structure below on 2026-11-17.
   `locales/` and the unit tables stay at the top. No barrel files. Tests
   sit beside their modules. Imports go one way, held by Biome's
   `noRestrictedImports` in `frontend/biome.json`: `shared/` imports no
-  page's folder, a page's folder imports no other page's, and only tests
-  import `testing/`. Tests may import any folder, as some check every
-  page's words together (inventory-tng-atmx.14).
+  page's folder, a page's folder imports no other page's, neither
+  imports an entry, and only tests import `testing/`. The patterns match
+  a folder's name anywhere in the path, so a path such as
+  `./../scan/cart` is refused too. Tests may import any folder, as some
+  check every page's words together (inventory-tng-atmx.14).
 
 We rejected a central routes file wired with `add_api_route`, which is not
 how FastAPI apps are usually read, and import-linter, as the rules fit a
