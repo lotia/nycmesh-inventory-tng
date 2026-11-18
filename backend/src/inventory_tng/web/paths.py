@@ -1,4 +1,4 @@
-"""Where the administrator pages are, under which most features' pages'
-paths (each feature's paths.py) are."""
+"""The prefix the administrator pages' paths, in each feature's paths.py,
+start with."""
 
 ADMIN = "/admin"

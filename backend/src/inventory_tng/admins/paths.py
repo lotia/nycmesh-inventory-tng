@@ -5,15 +5,15 @@ from urllib.parse import urlencode
 
 from inventory_tng.web.paths import ADMIN
 
-HOME = "/admin"
+HOME = ADMIN
 SETUP = "/setup"
-SIGN_IN = "/admin/sign-in"
-SIGN_OUT = "/admin/sign-out"
-CONFIRM = "/admin/confirm"
-NEW_AUTHENTICATOR = "/admin/authenticators/new"
-ACCOUNT = "/admin/account"
-FORGOT = "/admin/forgot"
-RESET = "/admin/reset"
+SIGN_IN = f"{ADMIN}/sign-in"
+SIGN_OUT = f"{ADMIN}/sign-out"
+CONFIRM = f"{ADMIN}/confirm"
+NEW_AUTHENTICATOR = f"{ADMIN}/authenticators/new"
+ACCOUNT = f"{ADMIN}/account"
+FORGOT = f"{ADMIN}/forgot"
+RESET = f"{ADMIN}/reset"
 ADMINS = f"{ADMIN}/admins"
 RECOVER = "/recover"
 

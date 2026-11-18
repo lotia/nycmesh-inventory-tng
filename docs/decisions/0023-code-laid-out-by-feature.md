@@ -26,10 +26,9 @@ structure below on 2026-11-17.
   dev_database and seed.
 - **The administrators' navigation** is `web/navigation.py`: every
   section, in order, and its badge, listed by name, set by nothing at
-  import (inventory-tng-atmx.10). Being in `web/`, it may import
-  features, and imports only their `paths.py` and what a badge counts
-  with: `web/pages.py` imports it, so a page's routes, which import
-  `web/pages.py`, would make a cycle.
+  import (inventory-tng-atmx.10). It imports features' `paths.py` and
+  what a badge counts with, never their routes: those import
+  `web/pages.py`, which imports it, so that would be a cycle.
 - **No service layer and no repositories.** A route file does routing
   only: decorated handlers (`@router.get`, `@router.post`), one router per
   module, included by name in `app.py`, never discovered. A handler reads
@@ -55,7 +54,7 @@ structure below on 2026-11-17.
   `session.execute`, `session.scalar` or `scalars`); no feature's routes
   import another feature's routes, linking through its `paths.py`
   instead; a `paths.py` imports only core and other `paths.py`, such as
-  `web/paths.py`, which holds the administrator pages' `/admin`
+  `web/paths.py`, which holds the administrator pages' prefix
   (inventory-tng-atmx.10); package `__init__.py` files stay empty; and
   only the entry point imports a feature's `command.py`. The breaks found
   when the test was written are listed in it and may only shrink.
@@ -137,10 +136,8 @@ short test. `core/` is the name FastAPI's full-stack template uses;
 | `bundle.py` | `scan/bundle.py` |
 | `catalogue.py` | `scan/catalogue_api.py` |
 | `catalogue.py`: the reply schemas | `scan/catalogue_schemas.py` |
-| `catalogue/categories_routes.py`: `CATEGORIES` | `catalogue/paths.py` |
-| `catalogue/items_routes.py`: `ITEMS` | `catalogue/paths.py` |
+| `catalogue/categories_routes.py`, `catalogue/items_routes.py`, `catalogue/reading_rules_routes.py`: their paths | `catalogue/paths.py` |
 | `catalogue/items_routes.py`: how its list sorts and finds an item (`SORTING`, `SEARCHED`) | `catalogue/items_listing.py` |
-| `catalogue/reading_rules_routes.py`: its paths | `catalogue/paths.py` |
 | `catalogue/unit_readings.py`: its command | `catalogue/command.py` |
 | `categories.py` | `catalogue/categories.py` |
 | `command.py` | `core/command.py` |
@@ -152,8 +149,7 @@ short test. `core/` is the name FastAPI's full-stack template uses;
 | `devices.py`: the registration endpoint, `register_device` | `devices/api.py` |
 | `devices.py`: the request and reply schemas | `devices/schemas.py` |
 | `devices.py`: what every route needing a device depends on | `devices/guards.py` |
-| `devices/devices.py`: `REGISTER_PATH` | `devices/paths.py` |
-| `devices/routes.py`: its paths | `devices/paths.py` |
+| `devices/devices.py`: `REGISTER_PATH`, and `devices/routes.py`: its paths | `devices/paths.py` |
 | `health.py` | `core/health.py` |
 | `health.py`: its query | `core/db.py`: `ping` |
 | `history.py` | `core/history.py` |
