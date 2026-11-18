@@ -49,13 +49,18 @@ BACKEND = CLONE / "backend"
 FRONTEND = CLONE / "frontend"
 # As mise run check-backend runs them, but the floor: this measures, and
 # reports whatever it finds.
-PYTEST = ["uv", "run", "pytest", "-n", "auto", "--maxprocesses=8", "--cov"]
-PYTEST += ["--cov-fail-under=0", "-q"]
+PYTEST = [
+    *("uv", "run", "pytest", "-n", "auto", "--maxprocesses=8"),
+    *("--cov", "--cov-fail-under=0", "-q"),
+]
 # Vitest's coverage, with no floors and none raised (vite.config.ts).
-VITEST = ["npx", "vitest", "run", "--coverage", "--reporter=json"]
-VITEST += ["--coverage.thresholds.autoUpdate=false"] + [
-    f"--coverage.thresholds.{kind}=0"
-    for kind in ("statements", "branches", "functions", "lines")
+VITEST = [
+    *("npx", "vitest", "run", "--coverage", "--reporter=json"),
+    "--coverage.thresholds.autoUpdate=false",
+    *(
+        f"--coverage.thresholds.{kind}=0"
+        for kind in ("statements", "branches", "functions", "lines")
+    ),
 ]
 # How many rows each list in report.md shows; the tables have them all.
 SHOWN = 15
@@ -226,7 +231,7 @@ def frontend_ids(tests: Iterable[tuple[str, str, float]]) -> list[str]:
     return ids
 
 
-def covered(coverage_map: Mapping) -> set[tuple[str, str, str, int]]:
+def covered(coverage_map: Mapping) -> frozenset[tuple[str, str, str, int]]:
     """Each statement, and each way of each branch, that a run of Vitest
     ran, from its JSON report's coverage."""
     keys = set()
@@ -238,27 +243,39 @@ def covered(coverage_map: Mapping) -> set[tuple[str, str, str, int]]:
             for way, count in enumerate(counts)
             if count
         }
-    return keys
+    # Frozen, so own_and_same's grouping keeps it rather than a copy.
+    return frozenset(keys)
 
 
-def alone(number: int, file: str, name: str) -> set[tuple[str, str, str, int]]:
+def vitest(log_name: str, directory: Path, output: Path, *more: str) -> float:
+    """Run Vitest with coverage, its JSON report into output and its
+    coverage's summary into directory; its seconds."""
+    return run(
+        [
+            *VITEST,
+            "--coverage.reporter=json-summary",
+            f"--coverage.reportsDirectory={directory}",
+            f"--outputFile={output}",
+            *more,
+        ],
+        FRONTEND,
+        log_name,
+    )
+
+
+def alone(number: int, file: str, name: str) -> frozenset[tuple[str, str, str, int]]:
     """What the frontend's test covers, run alone: by its exact full name,
     as a regular expression, in its file; its output in its own log,
     numbered."""
     pattern = "^" + REGEX_SPECIAL.sub(r"\\\g<0>", name) + "$"
     with tempfile.TemporaryDirectory() as directory:
         output = Path(directory) / "report.json"
-        run(
-            [
-                *VITEST,
-                "--coverage.reporter=json-summary",
-                f"--coverage.reportsDirectory={directory}",
-                f"--outputFile={output}",
-                f"--testNamePattern={pattern}",
-                file,
-            ],
-            FRONTEND,
+        vitest(
             f"frontend-alone/{number}.log",
+            Path(directory),
+            output,
+            f"--testNamePattern={pattern}",
+            file,
         )
         report = json.loads(output.read_text())
     if not report["numPassedTests"]:
@@ -269,16 +286,7 @@ def alone(number: int, file: str, name: str) -> set[tuple[str, str, str, int]]:
 def measure_frontend() -> Suite:
     log.info("measuring suite", suite="frontend")
     report, totals = OUT / "frontend.json", OUT / "frontend-coverage"
-    wall = run(
-        [
-            *VITEST,
-            "--coverage.reporter=json-summary",
-            f"--coverage.reportsDirectory={totals}",
-            f"--outputFile={report}",
-        ],
-        FRONTEND,
-        "frontend.log",
-    )
+    wall = vitest("frontend.log", totals, report)
     tests = vitest_tests(json.loads(report.read_text()))
     ids = frontend_ids(tests)
     suite = Suite("Frontend", wall, {i: t[2] for i, t in zip(ids, tests, strict=True)})
@@ -325,8 +333,7 @@ def measure_browser() -> Suite:
         "browser.log",
         PLAYWRIGHT_JSON_OUTPUT_FILE=str(report),
     )
-    tests = playwright_tests({"suites": json.loads(report.read_text())["suites"]})
-    return Suite("Browser", wall, tests)
+    return Suite("Browser", wall, playwright_tests(json.loads(report.read_text())))
 
 
 def file_lines() -> dict[str, int]:

@@ -45,7 +45,6 @@ TWICE = "sums > adds again"
 # A file's suite, and one of its describes; two tests share a title in two
 # describes, and one was skipped.
 PLAYWRIGHT = {
-    "config": {"projects": [{"name": "sign-in"}, {"name": "chromium"}]},
     "suites": [
         {
             "title": "sign-in.setup.ts",
@@ -107,7 +106,7 @@ def contexts_data(path: Path) -> None:
     data.write()
 
 
-def visuite_report(frontend: Path, names: list[str], output: Path) -> None:
+def vitest_report(frontend: Path, names: list[str], output: Path) -> None:
     """Vitest's JSON report of the tests named, their coverage together."""
     file = str(frontend / "src" / "a.test.ts")
     # How many of them ran each statement and each way, as Vitest counts.
@@ -150,7 +149,7 @@ def fake_run(
         Path(options["--cov-report"].removeprefix("json:")).write_text(
             json.dumps(totals)
         )
-    if "--cov-context" in command[-2]:
+    if "--cov-context" in options:
         contexts_data(Path(env["COVERAGE_FILE"]))
     if "--outputFile" in options:
         directory = Path(options["--coverage.reportsDirectory"])
@@ -159,7 +158,7 @@ def fake_run(
         (directory / "coverage-summary.json").write_text(json.dumps(summary))
         pattern = options.get("--testNamePattern", "")
         names = [n for n in VITEST if re.search(pattern, n)]
-        visuite_report(cwd, names, Path(options["--outputFile"]))
+        vitest_report(cwd, names, Path(options["--outputFile"]))
     if "PLAYWRIGHT_JSON_OUTPUT_FILE" in env:
         Path(env["PLAYWRIGHT_JSON_OUTPUT_FILE"]).write_text(json.dumps(PLAYWRIGHT))
     return subprocess.CompletedProcess(command, 0)
@@ -169,12 +168,13 @@ def fake_run(
 def clone(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
     """A clone of its own, with a test file on each side, every command
     answered by fake_run."""
-    for name in ("backend", "frontend/src", "frontend/browser-tests"):
-        (tmp_path / name).mkdir(parents=True)
-    (tmp_path / "backend" / "tests" / "sub").mkdir(parents=True)
-    (tmp_path / "backend" / "tests" / "sub" / "test_b.py").write_text("a\nb\nc\n")
-    (tmp_path / "frontend" / "src" / "a.test.ts").write_text("a\n")
-    (tmp_path / "frontend" / "browser-tests" / "menu.spec.ts").write_text("a\nb\n")
+    for name, text in (
+        ("backend/tests/sub/test_b.py", "a\nb\nc\n"),
+        ("frontend/src/a.test.ts", "a\n"),
+        ("frontend/browser-tests/menu.spec.ts", "a\nb\n"),
+    ):
+        (tmp_path / name).parent.mkdir(parents=True)
+        (tmp_path / name).write_text(text)
     monkeypatch.setattr(local_env, "CLONE", tmp_path)
     monkeypatch.setattr(suite_report, "CLONE", tmp_path)
     monkeypatch.setattr(suite_report, "OUT", tmp_path / ".local" / "test-report")
@@ -223,13 +223,12 @@ def test_backend_tests_by_their_node_ids_from_coverage_contexts(
 
 
 def test_a_failed_run_stops_the_report_naming_its_output(
-    clone: Path, monkeypatch: pytest.MonkeyPatch
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    monkeypatch.undo()
-    monkeypatch.setattr(suite_report, "OUT", clone)
-    with pytest.raises(SystemExit, match=str(clone / "failed.log")):
-        suite_report.run(["false"], clone, "failed.log")
-    assert suite_report.run(["true"], clone, "passed.log") >= 0
+    monkeypatch.setattr(suite_report, "OUT", tmp_path)
+    with pytest.raises(SystemExit, match=str(tmp_path / "failed.log")):
+        suite_report.run(["false"], tmp_path, "failed.log")
+    assert suite_report.run(["true"], tmp_path, "passed.log") >= 0
 
 
 def test_backend_tests_matching_no_coverage_context_stop_the_report(
