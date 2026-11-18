@@ -16,7 +16,6 @@ import structlog
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from inventory_tng import locations
 from inventory_tng.admins import accounts
 from inventory_tng.catalogue import categories, items
 from inventory_tng.core.command import run_command
@@ -24,6 +23,7 @@ from inventory_tng.core.db import CLI_ACTOR, exists_where, set_actor, settings_r
 from inventory_tng.labels import labels
 from inventory_tng.ledger import record
 from inventory_tng.models import Admin, Location, SignInSettings
+from inventory_tng.places import locations
 from inventory_tng.scan.batch_schemas import Batch
 from inventory_tng.volunteers import volunteers
 

@@ -243,7 +243,7 @@ fails on one. The app may only add to the history.
 
 Each catalogue table is written only by its own module:
 `catalogue/categories.py`, `catalogue/items.py` (items and their
-packages), `locations.py`, `volunteers/volunteers.py` and
+packages), `places/locations.py`, `volunteers/volunteers.py` and
 `labels/labels.py`. Admin pages and the
 seed call those modules' functions, one per kind of change, which take
 the catalogue lock, lock and read what the rules need, and refuse a

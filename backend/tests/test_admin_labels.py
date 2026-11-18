@@ -14,7 +14,6 @@ from sqlalchemy.orm import Session
 from inventory_tng.admin.common import LABELS
 from inventory_tng.admin.labels import PICK_LABELS, PRINT
 from inventory_tng.admin.listing import PER_PAGE
-from inventory_tng.admin.locations import LOCATIONS
 from inventory_tng.admins.accounts import qr_svg
 from inventory_tng.catalogue.items_routes import ITEMS
 from inventory_tng.labels import labels
@@ -32,6 +31,7 @@ from inventory_tng.models import (
     Location,
     Volunteer,
 )
+from inventory_tng.places.routes import LOCATIONS
 from inventory_tng.scan.catalogue_api import catalogue
 
 from helpers.markup import (

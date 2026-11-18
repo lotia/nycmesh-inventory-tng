@@ -11,7 +11,6 @@ from fastapi.responses import Response
 from inventory_tng.admin import needs_action
 from inventory_tng.admin.common import ADMINS, admin_page
 from inventory_tng.admin.counts import COUNTS
-from inventory_tng.admin.locations import LOCATIONS
 from inventory_tng.admin.volunteers import VOLUNTEERS
 from inventory_tng.admins import accounts, activity
 from inventory_tng.admins.guards import ACCOUNT, HOME, AdminSignedIn
@@ -22,6 +21,7 @@ from inventory_tng.core.db import DbSession
 from inventory_tng.core.local_time import site_zone
 from inventory_tng.core.phrases import Words, lazy_gettext
 from inventory_tng.models import Category, Item, Location, Volunteer
+from inventory_tng.places.routes import LOCATIONS
 from inventory_tng.stock.balance import retired_places_holding_stock
 
 router = APIRouter(include_in_schema=False)

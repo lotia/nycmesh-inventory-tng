@@ -1,4 +1,4 @@
-"""What the places pages read (admin/locations.py): plain functions taking
+"""What the places pages read (places/routes.py): plain functions taking
 a Session, each named for what it returns (docs/decisions/0023)."""
 
 from collections.abc import Sequence

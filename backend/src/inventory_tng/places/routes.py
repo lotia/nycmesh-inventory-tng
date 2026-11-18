@@ -1,7 +1,7 @@
 """Locations: stores, the areas inside them, and vehicles
 (docs/decisions/0003). A volunteer's custody is a location too, made and
 retired with the volunteer, so it is shown here but changed there. The tree's
-rules are locations.py's; this page says them in words."""
+rules are places/locations.py's; this page says them in words."""
 
 from collections.abc import Mapping
 from dataclasses import dataclass, field
@@ -12,7 +12,6 @@ from fastapi import APIRouter, Form, Request
 from fastapi.responses import HTMLResponse, Response
 from sqlalchemy.orm import Session
 
-from inventory_tng import locations
 from inventory_tng.admin.common import (
     ADMIN,
     SECTION_LOCATIONS,
@@ -30,7 +29,7 @@ from inventory_tng.core.time_zones import zones
 from inventory_tng.labels import labels
 from inventory_tng.models import STORE_KINDS, Label, Location
 from inventory_tng.pages import not_found, redirect
-from inventory_tng.places import queries
+from inventory_tng.places import locations, queries
 from inventory_tng.places.forms import KINDS, TAKEN, new_place, place_change
 from inventory_tng.volunteers import queries as volunteers_queries
 from inventory_tng.web.forms import ALERTS, RULES, form_version, rule_words

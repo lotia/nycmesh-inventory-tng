@@ -30,7 +30,7 @@ from sqlalchemy import Engine, delete, select, text
 from sqlalchemy.exc import IntegrityError, OperationalError
 from sqlalchemy.orm import Session
 
-from inventory_tng import adjustment_reasons, locations, open_packages
+from inventory_tng import adjustment_reasons, open_packages
 from inventory_tng.admin.volunteers import VOLUNTEERS
 from inventory_tng.admins import accounts, guards
 from inventory_tng.admins.routes import ADMINS
@@ -71,6 +71,7 @@ from inventory_tng.models import (
     SignInSettings,
     Volunteer,
 )
+from inventory_tng.places import locations
 from inventory_tng.scan import catalogue_api as scan_catalogue
 from inventory_tng.scan.batch_schemas import Batch
 from inventory_tng.scan.catalogue_schemas import Catalogue

@@ -905,7 +905,7 @@ class Location(CanonicalName, Searchable, Versioned, Base):
             "(kind = 'custody') = (volunteer_id IS NOT NULL)",
             name="custody_has_volunteer",
         ),
-        protection(owner="locations.py", lock="catalogue", history=True),
+        protection(owner="places/locations.py", lock="catalogue", history=True),
     )
 
     id: Mapped[IntId]

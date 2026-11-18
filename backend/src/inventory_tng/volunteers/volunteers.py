@@ -11,7 +11,6 @@ from datetime import datetime
 from sqlalchemy import Select, select
 from sqlalchemy.orm import Session
 
-from inventory_tng import locations
 from inventory_tng.core.db import (
     Gone,
     Seen,
@@ -23,6 +22,7 @@ from inventory_tng.core.db import (
     require_current,
 )
 from inventory_tng.models import Location, Volunteer
+from inventory_tng.places import locations
 
 
 def leaving(*, others_merged_in: bool, holds_custody: bool) -> str | None:

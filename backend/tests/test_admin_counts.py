@@ -15,7 +15,6 @@ from sqlalchemy import text as sql_text
 from sqlalchemy.orm import Session
 from structlog.testing import capture_logs
 
-from inventory_tng import locations
 from inventory_tng.admin.counts import ADJUSTMENTS, COUNT_KIND, COUNTS
 from inventory_tng.admin.settings import SETTINGS
 from inventory_tng.admin.stock import STOCK
@@ -40,6 +39,7 @@ from inventory_tng.models import (
     Movement,
 )
 from inventory_tng.pages import retired_holding
+from inventory_tng.places import locations
 from inventory_tng.site_settings.forms import REASON_TAKEN
 from inventory_tng.stock.forms import (
     FOUND_OR_OFF,

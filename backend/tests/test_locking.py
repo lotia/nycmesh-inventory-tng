@@ -21,7 +21,6 @@ from fastapi.testclient import TestClient
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from inventory_tng.admin.locations import LOCATIONS
 from inventory_tng.admin.settings import SETTINGS
 from inventory_tng.admin.volunteers import VOLUNTEERS
 from inventory_tng.catalogue.categories_routes import CATEGORIES
@@ -41,6 +40,7 @@ from inventory_tng.models import (
     RegistrationCode,
     Volunteer,
 )
+from inventory_tng.places.routes import LOCATIONS
 
 from helpers.concurrency import Committed, made
 from helpers.rows import shown

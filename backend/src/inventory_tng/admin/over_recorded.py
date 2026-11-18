@@ -20,7 +20,7 @@ from fastapi import APIRouter, Depends, Form, Request
 from fastapi.responses import Response
 from sqlalchemy.orm import Session
 
-from inventory_tng import ledger, locations, over_recorded
+from inventory_tng import ledger, over_recorded
 from inventory_tng.admin.common import SECTION_STOCK, SETTLED_VIEW, admin_page
 from inventory_tng.admin.counts import COUNTS
 from inventory_tng.admin.listing import (
@@ -31,7 +31,6 @@ from inventory_tng.admin.listing import (
     arranged,
 )
 from inventory_tng.admin.listing import order as order_of
-from inventory_tng.admin.locations import changeable
 from inventory_tng.admin.needs_action import (
     ItemWaiting,
     Kind,
@@ -54,6 +53,8 @@ from inventory_tng.models import (
     canonical,
 )
 from inventory_tng.pages import NOTICES, not_found, redirect
+from inventory_tng.places import locations
+from inventory_tng.places.routes import changeable
 from inventory_tng.stock import balance
 from inventory_tng.stock.forms import confirmed_count, why_problem
 from inventory_tng.web.forms import row_id, rule_words

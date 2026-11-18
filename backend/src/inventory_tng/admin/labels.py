@@ -19,7 +19,6 @@ from inventory_tng.admin.common import (
     revoke_title,
 )
 from inventory_tng.admin.listing import AskedView, Listing, Searched, Sort, Sorting
-from inventory_tng.admin.locations import LOCATIONS
 from inventory_tng.admins.accounts import qr_svg
 from inventory_tng.admins.guards import AdminSignedIn
 from inventory_tng.catalogue.items_routes import ITEMS
@@ -36,6 +35,7 @@ from inventory_tng.models import (
     whole,
 )
 from inventory_tng.pages import NOTICES, not_found, redirect, templates
+from inventory_tng.places.routes import LOCATIONS
 
 log = structlog.get_logger(__name__)
 

@@ -15,7 +15,6 @@ import pytest
 from sqlalchemy import delete, exc, literal_column, select, text, update
 from sqlalchemy.orm import Session
 
-from inventory_tng import locations
 from inventory_tng.catalogue import categories, items
 from inventory_tng.catalogue.names import LOOK_ALIKES, name_key, name_key_sql
 from inventory_tng.core.db import ACTOR_INFO, Base, refusal, set_actor
@@ -37,6 +36,7 @@ from inventory_tng.models import (
     mint_code,
     mint_label_code,
 )
+from inventory_tng.places import locations
 from inventory_tng.volunteers import volunteers
 
 from helpers.rows import add, breaks, item_fields, violates

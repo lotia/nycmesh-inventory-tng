@@ -1,6 +1,6 @@
 """How the places pages' forms are read and checked: a place's name, what
 it is, and where it is, and what is wrong, in words, beside the field it
-is about. The handlers in admin/locations.py read the request and pass
+is about. The handlers in places/routes.py read the request and pass
 the form's fields."""
 
 from sqlalchemy.orm import Session

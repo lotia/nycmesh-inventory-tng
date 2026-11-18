@@ -18,7 +18,6 @@ from inventory_tng.admin import (
     devices,
     labels,
     length_checks,
-    locations,
     over_recorded,
     settings,
     stock,
@@ -32,12 +31,13 @@ from inventory_tng.catalogue import (
     items_routes,
     reading_rules_routes,
 )
+from inventory_tng.places import routes as places_routes
 
 # The sections, in the order the navigation shows them, and their badges.
 pages.SECTIONS[:] = (
     (items_routes.ITEMS, common.SECTION_ITEMS),
     (categories_routes.CATEGORIES, common.SECTION_CATEGORIES),
-    (locations.LOCATIONS, common.SECTION_LOCATIONS),
+    (places_routes.LOCATIONS, common.SECTION_LOCATIONS),
     (labels.LABELS, common.SECTION_LABELS),
     (volunteers.VOLUNTEERS, common.SECTION_VOLUNTEERS),
     (stock.STOCK, common.SECTION_STOCK),
@@ -53,7 +53,7 @@ for module in (
     home_routes,
     items_routes,
     categories_routes,
-    locations,
+    places_routes,
     labels,
     volunteers,
     stock,

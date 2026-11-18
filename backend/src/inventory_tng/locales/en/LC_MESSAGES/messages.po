@@ -4008,7 +4008,7 @@ msgstr ""
 msgid "Volunteer"
 msgstr ""
 
-#: src/inventory_tng/admin/locations.py
+#: src/inventory_tng/places/routes.py
 msgid "Volunteer's custody"
 msgstr ""
 
