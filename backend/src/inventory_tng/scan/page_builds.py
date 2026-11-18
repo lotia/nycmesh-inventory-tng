@@ -1,11 +1,11 @@
 """Which build of the scan page sent a batch, and whether this server still
 takes batches from it (docs/decisions/0010, 2026-11-12).
 
-Each build of the pages has an id: when it was made (frontend_bundle.BUILD_ID). The
-scan page sends with each batch, in HEADER, the build that queued it, and
-the batch endpoint's reply carries this server's, so a tab of an older
-build learns that a newer one is out, sends what it holds, and asks for a
-reload.
+Each build of the pages has an id: when it was made
+(frontend_bundle.BUILD_ID). The scan page sends with each batch, in
+HEADER, the build that queued it, and the batch endpoint's reply carries
+this server's, so a tab of an older build learns that a newer one is out,
+sends what it holds, and asks for a reload.
 
 A field the server comes to require is added first and required only in a
 later deploy, as is any other way of accepting less of a batch
