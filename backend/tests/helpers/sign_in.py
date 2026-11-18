@@ -23,6 +23,7 @@ from inventory_tng.models.admins import (
     ResetKind,
 )
 from inventory_tng.models.site_settings import CONFIRM_IDLE_MINUTES, SignInSettings
+from inventory_tng.web.single_use_forms import FIELD
 
 # A recovery code as the page shows it, in groups.
 _GROUP = f"[A-Z0-9]{{{accounts.RECOVERY_CODE_GROUP}}}"
@@ -46,7 +47,7 @@ TOTP_KEYS = TotpKeys({1: base64.b64decode(TOTP_KEY)})
 def single_use(**form: str) -> dict[str, str]:
     """A form that makes something shown once, with the new key its page
     gives it (web/single_use_forms.py)."""
-    return {"single_use": str(uuid.uuid4())} | form
+    return {FIELD: str(uuid.uuid4())} | form
 
 
 def admin_named(session: Session, username: str) -> Admin:

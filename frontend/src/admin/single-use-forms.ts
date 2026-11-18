@@ -2,8 +2,8 @@
  * A form that makes something shown once (backend web/single_use_forms.py) is
  * sent once: a double-click would show only the second answer, "Already
  * sent". The flag stops it; disabling the buttons shows it, once the form's
- * data is taken, so a named button still sends its value. Back to a kept page, its spent
- * key is useless, so the page is fetched again.
+ * data is taken, so a named button still sends its value. Back to a kept
+ * page, its spent key is useless, so the page is fetched again.
  */
 
 /** The field such a form carries its key in (backend single_use_forms.FIELD). */

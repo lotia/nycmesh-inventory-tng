@@ -41,7 +41,7 @@ CANT_SHOW = "Back and Forward can't show this page again"
 def key_on(page: Response, action: str) -> str:
     """The key of the form on the page that is sent to `action`."""
     match = re.search(
-        rf'action="{re.escape(action)}"[^>]*>\s*<input type="hidden" name="single_use" '
+        rf'action="{re.escape(action)}"[^>]*>\s*<input type="hidden" name="{FIELD}" '
         r'value="([0-9a-f-]+)" autocomplete="off">',
         page.text,
     )
@@ -52,7 +52,7 @@ def key_on(page: Response, action: str) -> str:
 def sent_twice(
     client: TestClient, page: str, action: str, **form: str
 ) -> tuple[Response, Response]:
-    form["single_use"] = key_on(client.get(page), action)
+    form[FIELD] = key_on(client.get(page), action)
     return client.post(action, data=form), client.post(action, data=form)
 
 
@@ -63,7 +63,7 @@ def sent_twice_with_codes(
     with a new one of Ada's."""
     key = key_on(client.get(page), action)
     made, again = (
-        client.post(action, data=with_code(session) | {"single_use": key}) for _ in "12"
+        client.post(action, data=with_code(session) | {FIELD: key}) for _ in "12"
     )
     return made, again
 
@@ -129,8 +129,10 @@ def test_recovery_codes_sent_again_past_the_guard_make_none(
     session: Session,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """Two sendings at once: the guard finds the key unspent, and another
-    sending spends it before the route does, which then makes nothing."""
+    """A key spent between the guard's look (is_spent) and the route's
+    spending, as another sending at once would: the route makes nothing.
+    The other sending is stood in for by spending the key in this one's
+    transaction; test_requests_at_once holds two transactions."""
 
     def spent_meanwhile(session: Session, typed: object) -> bool:
         key = form_key(typed)
@@ -140,16 +142,15 @@ def test_recovery_codes_sent_again_past_the_guard_make_none(
 
     monkeypatch.setattr(guards, "is_spent", spent_meanwhile)
     client = make_client()
-    _, key = new_admin(session)
+    ada, key = new_admin(session)
     sign_in_with(client, key=key)
     action = f"{ACCOUNT}/recovery-codes"
-    form = {"single_use": key_on(client.get(ACCOUNT), action)}
+    form = {FIELD: key_on(client.get(ACCOUNT), action)}
     with app_clock() as at:
         form["confirm_code"] = code(key, at + TIME_STEP)
         again = client.post(action, data=form)
     assert_sent_again(again, ACCOUNT)
     assert str(SENT_AGAIN["recovery_codes"]) in text(again)
-    (ada,) = session.scalars(select(Admin)).all()
     assert accounts.recovery_codes_left(session, ada.id) == 0
 
 

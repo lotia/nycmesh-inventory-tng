@@ -255,12 +255,6 @@ their names:
 | `shared/` | `build.ts`, `Field.tsx`, `i18n.ts`, `mount.tsx`, `outbox.ts`, `quantity.ts`, `registration.ts`, `stored.ts`, `telemetry.ts` |
 | `testing/` | `test-camera.ts`, `test-catalogue.ts`, `test-fetch.ts`, `test-saves.ts`, `test-scan-page.tsx`, `test-setup.ts`, `test-storage.ts`, each without its `test-` |
 
-Later renamed:
-
-| Old path | New path |
-| --- | --- |
-| `admin/once.ts` | `admin/single-use-forms.ts`, with `ONCE_FIELD` as `SINGLE_USE_FIELD` |
-
 Parts of `cart.ts` and `ScanPage.tsx` were split out first:
 
 | Old path | New path |
@@ -277,6 +271,12 @@ Parts of `cart.ts` and `ScanPage.tsx` were split out first:
 | `ScanPage.tsx`: `NoteSaid`, `AlertWords`, `Counted`, `ConfirmDiscard`, `keyedByWords`, `RULED_LIST`, `CAUTION_BOX` | `scan/Notes.tsx` |
 | `ScanPage.tsx`: `OlderList`, with the words it says of each (`olderSaid`, `olderKind`, `olderWhere`, `olderWhen`) and its telemetry (`heldIn`, `recordOlder`) | `scan/OlderList.tsx` |
 | `ScanPage.tsx`: `OutboxList`, with `RecordedElsewhere`, `useOnline` and `AddDifference` | `scan/OutboxList.tsx` |
+
+Later renamed:
+
+| Old path | New path |
+| --- | --- |
+| `admin/once.ts` | `admin/single-use-forms.ts`, with `ONCE_FIELD` as `SINGLE_USE_FIELD` |
 
 ## Amendment: names (2026-11-18)
 

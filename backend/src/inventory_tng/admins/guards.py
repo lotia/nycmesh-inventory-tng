@@ -18,7 +18,7 @@ An administrator page takes one of:
 
 Each is a Need. A single-use form (single_use_forms.sent_before) sent again
 while a code would be asked for is answered so before one is spent
-(sent_forms.is_spent).
+(is_spent, from core/sent_forms.py).
 
 A form through any of these (or ConfirmedAny) also holds every
 administrator's lock (accounts.lock_admins) until it commits, so it runs
@@ -337,8 +337,8 @@ async def _confirmed(
     if not was_open and await run_in_threadpool(
         is_spent, session, form.get(single_use_forms.FIELD)
     ):
-        # The page the form was on (single_use_forms.single_use_field): browsers send no
-        # Referer here (security_headers.REFERRER_POLICY).
+        # The page the form was on (single_use_forms.single_use_field):
+        # browsers send no Referer here (security_headers.REFERRER_POLICY).
         back = _local(str(form.get(single_use_forms.BACK, "")))
         raise Answered(single_use_forms.sent_again(request, signed, need.made, back))
     if not was_open:
