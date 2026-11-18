@@ -6,9 +6,9 @@ clamped numbers, nothing free. Each event becomes a metric; an error says
 only that one happened, and on which page. Open to any browser, since the
 register page reports before its device is registered, so every report
 counts against its address first: in this process's memory, not the
-database's shared limits (rate_limits.py), which guard signing in and
-registering. A page's numbers are not worth a connection, and a flood of
-them must not hold one up from those.
+database's shared limits (core/rate_limits.py), which guard signing in
+and registering. A page's numbers are not worth a connection, and a flood
+of them must not hold one up from those.
 """
 
 from typing import Annotated, Literal

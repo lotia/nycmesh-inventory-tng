@@ -1,6 +1,6 @@
 /**
  * Every test fails on a Content-Security-Policy violation (backend
- * security_headers.py), in any page it opens: so every page the tests
+ * web/security_headers.py), in any page it opens: so every page the tests
  * reach, the crawl's all, is checked in each browser. The watch is a
  * script, so a test run without scripts is not watched. Tests import `test`
  * from here, or from own.ts, which extends it, never Playwright's own

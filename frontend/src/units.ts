@@ -1,10 +1,10 @@
 /**
  * Units read right after a number, as the server reads them
- * (backend/src/inventory_tng/units.py, docs/decisions/0021, 2026-11-14):
- * the same table, which the server writes to units.json, read the same
- * way, so a search spells "10 µF", "10μF" and "10uf" all "10uF" here as
- * there, and the reading rules the catalogue sends first (units.Rule),
- * as the server does, and the words near a unit and the profile as it
+ * (backend/src/inventory_tng/catalogue/units.py, docs/decisions/0021,
+ * 2026-11-14): the same table, which the server writes to units.json,
+ * read the same way, so a search spells "10 µF", "10μF" and "10uf" all
+ * "10uF" here as there, and the reading rules the catalogue sends first
+ * (units.Rule), as the server does, and the words near a unit and the profile as it
  * does too. units-vectors.json holds what both must make of some text.
  */
 import table from "./units.json";

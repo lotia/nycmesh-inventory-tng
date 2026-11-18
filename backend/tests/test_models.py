@@ -120,7 +120,7 @@ def test_item_names_are_unique_ignoring_case_spaces_and_punctuation(
     new_item("LiteBeam 5AC Gen2")
     # Only ASCII's letters are lowered, and only its spaces and punctuation
     # ignored, and their look-alikes, whatever the database's locale
-    # (names.py).
+    # (catalogue/names.py).
     new_item("CÂBLE")
     new_item("Tough\u00b1cable")
 

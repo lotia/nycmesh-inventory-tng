@@ -1,6 +1,6 @@
 /**
  * Which build of the pages this is, and whether a newer one is out
- * (backend page_builds.py; docs/decisions/0010, 2026-11-12).
+ * (backend scan/page_builds.py; docs/decisions/0010, 2026-11-12).
  *
  * A build's id is when it was made, in UTC (vite.config.ts), so a newer
  * build's sorts after. Each build keeps the outbox and the cart under keys

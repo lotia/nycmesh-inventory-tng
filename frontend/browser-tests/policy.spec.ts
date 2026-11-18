@@ -1,5 +1,5 @@
 /**
- * The Content-Security-Policy (backend security_headers.py,
+ * The Content-Security-Policy (backend web/security_headers.py,
  * inventory-tng-e0y): what it refuses fails a test, and what the pages
  * need, it allows.
  */
@@ -50,7 +50,7 @@ test("a <select> is refused nothing, and keeps its ellipsis", async ({
   await page.goto("/scan");
   // Safari 27.2 refuses its own style for a <select> as each is made
   // (WebKit bug 327212, fixed in Playwright 1.65's WebKit), unless the
-  // policy allows it by its hash (security_headers.py). A page's own
+  // policy allows it by its hash (web/security_headers.py). A page's own
   // attribute of the same text is allowed with it.
   await page.evaluate(() => {
     // Two selects, cut short by an ellipsis or not, set by script, which

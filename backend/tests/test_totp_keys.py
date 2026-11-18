@@ -1,5 +1,5 @@
-"""Authenticators' keys sealed at rest (totp_keys.py, docs/decisions/0017):
-a copy of the database alone cannot make codes."""
+"""Authenticators' keys sealed at rest (admins/totp_keys.py,
+docs/decisions/0017): a copy of the database alone cannot make codes."""
 
 import base64
 import runpy

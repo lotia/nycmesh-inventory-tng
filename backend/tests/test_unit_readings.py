@@ -1,4 +1,4 @@
-"""The import's readings file (unit_readings.py; docs/decisions/0021,
+"""The import's readings file (catalogue/unit_readings.py; docs/decisions/0021,
 inventory-tng-c0c.5): a dry run proposes how each unit after a number in
 the names is read, the operator corrects the file once, later dry runs
 keep the corrections, and loading it writes the first reading rules."""

@@ -1,4 +1,4 @@
-# UCUM's codes (case sensitive) for the prefixes and units inventory_tng.units uses: kind, code, name, and a prefix's power of ten or whether a unit is metric (takes prefixes).
+# UCUM's codes (case sensitive) for the prefixes and units inventory_tng.catalogue.units uses: kind, code, name, and a prefix's power of ten or whether a unit is metric (takes prefixes).
 # From ucum-essence.xml, UCUM version 2.2, revision date 2024-06-17 (https://github.com/ucum-org/ucum, https://ucum.org/ucum). Written by hand from it: add a row when the table uses another code.
 prefix	Y	yotta	24
 prefix	Z	zetta	21

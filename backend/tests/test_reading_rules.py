@@ -1,7 +1,7 @@
 """Reading rules: how a unit, as typed after a number, is read, settled by
-an administrator, before the unit table (reading_rules.py, admin/
-reading_rules.py, models.ReadingRule; docs/decisions/0021, 2026-11-15,
-inventory-tng-c0c.4), and names unique once their units are read
+an administrator, before the unit table (catalogue/reading_rules.py,
+catalogue/reading_rules_routes.py, models.ReadingRule;
+docs/decisions/0021, 2026-11-15, inventory-tng-c0c.4), and names unique once their units are read
 (models.KeyedName.unit_key)."""
 
 from collections.abc import Callable

@@ -42,8 +42,8 @@ from databases import migrated_engine, new_database
 # The other administrator's username.
 OTHER_ADMIN = "browser-other"
 RUN_FILES = ("prepared.json", "camera.y4m", "admin.json", "totp-keys/1")
-# The run's own TOTP key (totp_keys.py), as a clone may have none in
-# .local/totp-keys: CI runs no `mise run setup`.
+# The run's own TOTP key (admins/totp_keys.py), as a clone may have none
+# in .local/totp-keys: CI runs no `mise run setup`.
 TOTP_KEYS = "totp-keys"
 
 

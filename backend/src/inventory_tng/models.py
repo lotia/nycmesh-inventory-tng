@@ -968,7 +968,7 @@ class Label(Base):
 
 
 class CatalogueHistory(Base):
-    """Every change to the tables above (history.py). A retired record's
+    """Every change to the tables above (core/history.py). A retired record's
     page reads who retired it (web/admin.retired_by). The app may only add
     to it (the initial migration)."""
 
@@ -1591,9 +1591,9 @@ class Activity(Base):
 
 class RateLimit(Base):
     """Attempts counted against one rate limit's key, such as sign-in from
-    one address (rate_limits.py): the times of those still inside its window,
-    at most its limit, and when the newest leaves it, after which the row is
-    deleted. Shared by every instance of the app."""
+    one address (core/rate_limits.py): the times of those still inside its
+    window, at most its limit, and when the newest leaves it, after which
+    the row is deleted. Shared by every instance of the app."""
 
     __tablename__ = "rate_limit"
     __table_args__ = (

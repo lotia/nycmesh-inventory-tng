@@ -49,7 +49,7 @@ def create_app(
     (app.state.totp_keys); without them, read from TOTP_KEYS_DIR as the app
     starts, not as it is built, so building one for its schema needs none.
     `startup_checks=False` skips what startup reads from the database: the
-    check of its login (database_role.py) and of the authenticators' keys.
+    check of its login (core/database_role.py) and of the authenticators' keys.
     For tests, which check the login they use once, and test those apart."""
     settings = settings or Settings.from_environ()
     database = make_database(settings.database_url)

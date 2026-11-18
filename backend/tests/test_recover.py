@@ -1,5 +1,5 @@
-"""The recovery token (resets.py, docs/decisions/0012): a locked-out
-administrator gets back in with a settings change and a browser."""
+"""The recovery token (admins/reset_routes.py, docs/decisions/0012): a
+locked-out administrator gets back in with a settings change and a browser."""
 
 from collections.abc import Callable
 from datetime import UTC, datetime
