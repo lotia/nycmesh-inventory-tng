@@ -165,7 +165,7 @@ class RateLimits:
     administrator, in 15 minutes: codes, or the password where it stands
     in for one, at signing in and to confirm (RATE_LIMIT_PER_ACCOUNT).
     And how many reports may come from one address in a minute: of
-    themselves, from the pages (scan/page_telemetry.py,
+    themselves, from the pages (scan/page_telemetry_api.py,
     RATE_LIMIT_PAGE_REPORTS), and of what the policy refused, from
     browsers (web/security_headers.py, RATE_LIMIT_CSP_REPORTS)."""
 

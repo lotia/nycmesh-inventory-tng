@@ -1,4 +1,4 @@
-"""Locations: stores, areas and vehicles (places/routes.py)."""
+"""Locations: stores, areas and vehicles (places/locations_routes.py)."""
 
 import re
 

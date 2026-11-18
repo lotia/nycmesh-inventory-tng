@@ -1,4 +1,5 @@
-"""The settings page: how the scan page behaves (site_settings/routes.py)."""
+"""The settings page: how the scan page behaves
+(site_settings/site_settings_routes.py)."""
 
 from collections.abc import Callable
 

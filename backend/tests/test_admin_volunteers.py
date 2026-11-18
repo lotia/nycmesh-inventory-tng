@@ -1,4 +1,5 @@
-"""Volunteers, holding stock and merging duplicates (volunteers/routes.py)."""
+"""Volunteers, holding stock and merging duplicates
+(volunteers/volunteers_routes.py)."""
 
 import uuid
 from datetime import UTC, datetime

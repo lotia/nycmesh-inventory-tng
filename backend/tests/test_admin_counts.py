@@ -1,5 +1,5 @@
 """Counts and adjustments (stock/counts_routes.py), and their reasons
-(site_settings/routes.py)."""
+(site_settings/site_settings_routes.py)."""
 
 import re
 import uuid

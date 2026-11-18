@@ -42,7 +42,7 @@ from inventory_tng.models.stock import (
     OpenPackage,
     OverRecorded,
 )
-from inventory_tng.scan import page_builds, page_telemetry
+from inventory_tng.scan import page_builds, page_telemetry_api
 from inventory_tng.stock import counts, ledger, moments, open_packages, over_recorded
 from inventory_tng.stock.paths import ADJUSTMENTS, COUNTS
 from inventory_tng.web import security_headers
@@ -823,8 +823,8 @@ def test_records_what_the_pages_report(rolled_back: Recorded) -> None:
         if (name := metric.name).startswith("inventory.page.web_vital.")
     }
     assert bounds == {
-        "inventory.page.web_vital.duration": {page_telemetry.VITAL_SECONDS},
-        "inventory.page.web_vital.layout_shift": {page_telemetry.LAYOUT_SHIFTS},
+        "inventory.page.web_vital.duration": {page_telemetry_api.VITAL_SECONDS},
+        "inventory.page.web_vital.layout_shift": {page_telemetry_api.LAYOUT_SHIFTS},
     }
 
 

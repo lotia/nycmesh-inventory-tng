@@ -1,4 +1,5 @@
-"""Registration codes and devices from the browser (devices/routes.py)."""
+"""Registration codes and devices from the browser
+(devices/devices_routes.py)."""
 
 import re
 from collections.abc import Callable
@@ -12,9 +13,9 @@ from sqlalchemy.orm import Session
 
 from inventory_tng.core.phrases import compiled, speaking
 from inventory_tng.devices import devices
+from inventory_tng.devices.devices_routes import revoke_many_title
 from inventory_tng.devices.forms import AFTER_FROM, days_problem, uses_problem
 from inventory_tng.devices.paths import BULK_REVOKE, CODES, DEVICE_LIST, DEVICES
-from inventory_tng.devices.routes import revoke_many_title
 from inventory_tng.models.devices import Device, RegistrationCode
 from inventory_tng.models.site_settings import SiteSettings
 from inventory_tng.web.forms import NAME_MAX, up_to

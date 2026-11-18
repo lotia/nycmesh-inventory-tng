@@ -1,5 +1,5 @@
 """POST /api/telemetry: what the scan and register pages report about
-themselves (scan/page_telemetry.py, frontend/src/shared/telemetry.ts)."""
+themselves (scan/page_telemetry_api.py, frontend/src/shared/telemetry.ts)."""
 
 import re
 from collections.abc import Callable
@@ -10,7 +10,7 @@ from structlog.testing import capture_logs
 
 from inventory_tng.core.local_env import CLONE
 from inventory_tng.core.settings import RateLimits
-from inventory_tng.scan import page_telemetry
+from inventory_tng.scan import page_telemetry_api
 
 PATH = "/api/telemetry"
 RETRY = {"kind": "outbox_retry", "reason": "unavailable"}
@@ -31,7 +31,7 @@ def test_a_report_is_taken_with_nothing_in_reply(client: TestClient) -> None:
     "events",
     [
         [],
-        [RETRY] * (page_telemetry.MOST_EVENTS + 1),
+        [RETRY] * (page_telemetry_api.MOST_EVENTS + 1),
         [{"kind": "page_view"}],
         [RETRY | {"url": "https://example.org/"}],
         [{"kind": "error", "page": "scan", "source": "error", "message": "x"}],
@@ -102,7 +102,7 @@ def test_the_page_clamps_scan_to_save_to_what_is_taken() -> None:
     assert clamp is not None
     (bound,) = (
         meta.le
-        for meta in page_telemetry.ScanToSave.model_fields["seconds"].metadata
+        for meta in page_telemetry_api.ScanToSave.model_fields["seconds"].metadata
         if hasattr(meta, "le")
     )
     assert int(clamp.group(1).replace("_", "")) == bound

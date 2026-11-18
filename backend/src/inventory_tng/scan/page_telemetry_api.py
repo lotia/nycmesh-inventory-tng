@@ -21,7 +21,7 @@ from limits.strategies import MovingWindowRateLimiter
 from opentelemetry import metrics
 from pydantic import BaseModel, ConfigDict, Field
 
-from inventory_tng.devices.schemas import RateLimitedReply
+from inventory_tng.core.rate_limits import RateLimitedReply
 from inventory_tng.web.browser import over_limit
 
 log = structlog.get_logger(__name__)

@@ -20,11 +20,13 @@ counted against a key, for one that turned out not to be a guess.
 
 from collections.abc import Generator
 from contextlib import contextmanager
+from typing import Literal
 
 import structlog
 from limits import RateLimitItem
 from limits.storage import MovingWindowSupport, Storage
 from limits.strategies import MovingWindowRateLimiter
+from pydantic import BaseModel
 from sqlalchemy import Connection, Engine, delete, exc, func, select, text
 from sqlalchemy.orm import Session
 
@@ -143,6 +145,12 @@ def refund(session: Session, item: RateLimitItem, *identifiers: str) -> None:
     once cannot all pass the limit before any is counted, and refunded, so
     a good one never uses it up (inventory-tng-8i4.126)."""
     _storage(session).refund(item.key_for(*identifiers))
+
+
+# The JSON reply to a request refused by a rate limit, which the endpoints
+# with one declare.
+class RateLimitedReply(BaseModel):
+    reason: Literal["rate_limited"]
 
 
 def limiter(session: Session) -> MovingWindowRateLimiter:

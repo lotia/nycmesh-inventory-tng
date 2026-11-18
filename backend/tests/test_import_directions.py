@@ -232,10 +232,10 @@ APP = {
     "core/settings.py": "",
     "catalogue/paths.py": "",
     "catalogue/queries.py": "",
-    "catalogue/routes.py": ROUTER,
+    "catalogue/items_routes.py": ROUTER,
     "scan/batch.py": "",
     "scan/batch_schemas.py": "",
-    "stock/api.py": ROUTER,
+    "stock/counts_api.py": ROUTER,
     "stock/ledger.py": "",
     "web/formatting.py": "",
     "web/pages.py": "",
@@ -259,14 +259,14 @@ APP = {
         ),
         (
             "routes_run_queries",
-            "catalogue/routes.py",
+            "catalogue/items_routes.py",
             f"{ROUTER}def page(s):\n    s.scalars(select(Item))\n    s.get(Item, 1)",
             {"page: scalars", "page: select"},
         ),
         (
             "routes_run_queries",
             "catalogue/listing.py",
-            "from .routes import router\n@router.get('/')\ndef page(s):\n    s.execute(x)",
+            "from .items_routes import router\n@router.get('/')\ndef page(s):\n    s.execute(x)",
             {"page: execute"},
         ),
         (
@@ -281,12 +281,12 @@ APP = {
         ),
         (
             "routes_import_another_features_routes",
-            "stock/api.py",
+            "stock/counts_api.py",
             (
-                f"{ROUTER}from ..catalogue import routes, paths\n"
+                f"{ROUTER}from ..catalogue import items_routes, paths\n"
                 "from inventory_tng.catalogue.queries import x"
             ),
-            {"catalogue/routes.py"},
+            {"catalogue/items_routes.py"},
         ),
         (
             "stock_imports_scan",

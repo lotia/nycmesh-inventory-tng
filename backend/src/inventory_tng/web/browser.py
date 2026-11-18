@@ -22,7 +22,7 @@ def rate_key(request: Request) -> str:
 def over_limit(request: Request, per_minute: int, kind: str) -> bool:
     """Whether a report of this kind from this address is more than
     per_minute allows, counted in this process's reports
-    (scan/page_telemetry.py's install)."""
+    (scan/page_telemetry_api.py's install)."""
     reports: MovingWindowRateLimiter = request.app.state.page_reports
     allowed = RateLimitItemPerMinute(per_minute)
     return not reports.hit(allowed, kind, rate_key(request))

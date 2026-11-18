@@ -6,6 +6,7 @@ from fastapi import APIRouter, FastAPI, Request, Response
 from fastapi.responses import JSONResponse
 
 from inventory_tng.core.db import DbSession
+from inventory_tng.core.rate_limits import RateLimitedReply
 from inventory_tng.devices.devices import (
     COOKIE,
     COOKIE_MAX_AGE,
@@ -13,10 +14,9 @@ from inventory_tng.devices.devices import (
     RegistrationRejected,
     register,
 )
-from inventory_tng.devices.schemas import (
+from inventory_tng.devices.guards import DeviceRefusedReply
+from inventory_tng.devices.registration_schemas import (
     CodeRefusedReply,
-    DeviceRefusedReply,
-    RateLimitedReply,
     Registered,
     Registration,
 )

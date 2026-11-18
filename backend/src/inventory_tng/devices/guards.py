@@ -1,6 +1,7 @@
 """What every route that needs a registered device depends on
 (docs/decisions/0009): the device cookie, and the device it names. The
-rules are in devices.py; the replies to a refused device are in api.py.
+rules are in devices.py; registration_api.py installs the reply to a
+refused device, DeviceRefusedReply, which the endpoints needing one declare.
 """
 
 from datetime import UTC, datetime
@@ -10,6 +11,7 @@ import structlog
 from fastapi import Depends, Request
 from fastapi.security import APIKeyCookie
 from opentelemetry import metrics
+from pydantic import BaseModel
 from sqlalchemy import select
 
 from inventory_tng.core import request_logging
@@ -31,6 +33,10 @@ refused = meter.create_counter(
     unit="{request}",
     description="Requests refused for want of a registered device, by reason",
 )
+
+
+class DeviceRefusedReply(BaseModel):
+    reason: Refusal
 
 
 # The device cookie, as the API's schema declares it, so /api/docs and the

@@ -32,18 +32,17 @@ from inventory_tng.core.mail import SmtpMailer
 from inventory_tng.core.phrases import BRAND
 from inventory_tng.core.request_logging import RequestLogging
 from inventory_tng.core.settings import Settings
-from inventory_tng.devices import api as devices_api
-from inventory_tng.devices import routes as devices_routes
-from inventory_tng.labels import routes as labels_routes
-from inventory_tng.places import routes as places_routes
+from inventory_tng.devices import devices_routes, registration_api
+from inventory_tng.labels import labels_routes
+from inventory_tng.places import locations_routes
 from inventory_tng.scan import (
     batch_api,
     bundle,
     catalogue_api,
     page_builds,
-    page_telemetry,
+    page_telemetry_api,
 )
-from inventory_tng.site_settings import routes as site_settings_routes
+from inventory_tng.site_settings import site_settings_routes
 from inventory_tng.stock import (
     counts_routes,
     length_checks_routes,
@@ -51,7 +50,7 @@ from inventory_tng.stock import (
     stock_routes,
     used_up_routes,
 )
-from inventory_tng.volunteers import routes as volunteers_routes
+from inventory_tng.volunteers import volunteers_routes
 from inventory_tng.web import pages, security_headers
 
 log = structlog.get_logger(__name__)
@@ -127,10 +126,10 @@ def create_app(
         docs=settings.development,
     )
     app.include_router(health.router, prefix=API)
-    app.include_router(devices_api.router, prefix=API)
+    app.include_router(registration_api.router, prefix=API)
     app.include_router(batch_api.router, prefix=API)
     app.include_router(catalogue_api.router, prefix=API)
-    app.include_router(page_telemetry.router, prefix=API)
+    app.include_router(page_telemetry_api.router, prefix=API)
     app.include_router(security_headers.router)
     if settings.development:
         app.include_router(security_headers.docs_router)
@@ -140,7 +139,7 @@ def create_app(
     app.include_router(home_routes.router)
     app.include_router(items_routes.router)
     app.include_router(categories_routes.router)
-    app.include_router(places_routes.router)
+    app.include_router(locations_routes.router)
     app.include_router(labels_routes.router)
     app.include_router(volunteers_routes.router)
     app.include_router(stock_routes.router)
@@ -155,10 +154,10 @@ def create_app(
     app.include_router(reset_routes.router)
     bundle.install(app, settings)
     db.install(app)
-    devices_api.install(app)
+    registration_api.install(app)
     batch_api.install(app)
     page_builds.install(app)
-    page_telemetry.install(app)
+    page_telemetry_api.install(app)
     guards.install(app)
     return app
 

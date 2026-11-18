@@ -1,4 +1,4 @@
-"""What the administrators' pages read (routes.py): plain functions
+"""What the administrators' pages read (admins_routes.py): plain functions
 taking a Session, each named for what it returns (docs/decisions/0023)."""
 
 from collections.abc import Sequence

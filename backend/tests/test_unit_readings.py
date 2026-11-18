@@ -12,7 +12,12 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 from structlog.testing import capture_logs
 
-from inventory_tng.catalogue import command, reading_rules, unit_readings, units
+from inventory_tng.catalogue import (
+    reading_rules,
+    unit_readings,
+    unit_readings_command,
+    units,
+)
 from inventory_tng.models import catalogue as catalogue_models
 from inventory_tng.models.catalogue import Category, Item, ReadingRule
 from inventory_tng.models.names import unit_key
@@ -47,7 +52,9 @@ def corrected(path: Path, respell: str = "", **corrections: str) -> None:
 
 
 def run_load(session: Session, path: Path) -> int:
-    return command.run_load(session, command.parse(["load", str(path)]))
+    return unit_readings_command.run_load(
+        session, unit_readings_command.parse(["load", str(path)])
+    )
 
 
 def test_a_dry_run_proposes_as_the_seeding_page_does(tmp_path: Path) -> None:
@@ -245,8 +252,8 @@ def test_a_file_not_of_these_columns_is_refused(
     path = tmp_path / "readings.tsv"
     path.write_text("unit\treading\ng\tg\n", encoding="utf-8")
     assert run_load(session, path) == 1
-    args = command.parse(["propose", str(path), "--file", str(path)])
-    assert command.run_propose(args) == 1
+    args = unit_readings_command.parse(["propose", str(path), "--file", str(path)])
+    assert unit_readings_command.run_propose(args) == 1
     err = capsys.readouterr().err.splitlines()
     assert (
         err == [f"{path}: its columns must be: {' '.join(unit_readings.COLUMNS)}"] * 2
@@ -286,22 +293,24 @@ def test_the_commands_run_as_operator_commands(
     path = tmp_path / "readings.tsv"
     stdin = io.TextIOWrapper(io.BytesIO("\n".join(NAMES).encode()))
     monkeypatch.setattr(sys, "stdin", stdin)
-    assert command.main(["propose", "-", "--file", str(path)]) == 0
+    assert unit_readings_command.main(["propose", "-", "--file", str(path)]) == 0
     assert capsys.readouterr().out.splitlines()[-1] == (
         f"Wrote {path}: 2 units, 0 corrected, 1 to choose, 0 no longer proposed."
     )
     corrected(path, g="Gbit/s")
     stdin = io.TextIOWrapper(io.BytesIO(path.read_bytes()))
     monkeypatch.setattr(sys, "stdin", stdin)
-    assert command.main(["load", "-"]) == 0
+    assert unit_readings_command.main(["load", "-"]) == 0
     assert capsys.readouterr().out.splitlines()[-1].startswith("Loaded 2 rules")
 
 
 def test_propose_refuses_outside_its_settings(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
-    monkeypatch.setattr(command, "set_up", lambda: None)
-    assert command.main(["propose", "-", "--file", str(tmp_path / "r")]) == 1
+    monkeypatch.setattr(unit_readings_command, "set_up", lambda: None)
+    assert (
+        unit_readings_command.main(["propose", "-", "--file", str(tmp_path / "r")]) == 1
+    )
 
 
 def test_names_not_in_utf_8_are_refused(
@@ -309,8 +318,10 @@ def test_names_not_in_utf_8_are_refused(
 ) -> None:
     names = tmp_path / "names.txt"
     names.write_bytes("Câble 3M\n".encode("latin-1"))
-    args = command.parse(["propose", str(names), "--file", str(tmp_path / "r")])
-    assert command.run_propose(args) == 1
+    args = unit_readings_command.parse(
+        ["propose", str(names), "--file", str(tmp_path / "r")]
+    )
+    assert unit_readings_command.run_propose(args) == 1
     assert capsys.readouterr().err.startswith(f"{names}: 'utf-8' codec")
 
 
@@ -322,6 +333,9 @@ def test_names_from_a_standard_input_already_text(
     monkeypatch.setattr(sys, "stdin", io.StringIO("\n".join(NAMES)))
     path = tmp_path / "readings.tsv"
     assert (
-        command.run_propose(command.parse(["propose", "-", "--file", str(path)])) == 0
+        unit_readings_command.run_propose(
+            unit_readings_command.parse(["propose", "-", "--file", str(path)])
+        )
+        == 0
     )
     assert sorted(rows_of(path)) == ["M", "g"]

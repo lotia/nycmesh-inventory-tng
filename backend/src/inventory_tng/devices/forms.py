@@ -1,7 +1,7 @@
 """How the devices pages' forms are read and checked: a new registration
 code, a device's name, and the filter that chooses devices, and what is
 wrong, in words, beside the field it is about. The handlers in
-devices/routes.py read the request and pass the form's fields."""
+devices/devices_routes.py read the request and pass the form's fields."""
 
 from datetime import timedelta
 

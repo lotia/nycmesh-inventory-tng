@@ -1217,7 +1217,7 @@ def recover(
     return link
 
 
-# Other administrators (routes.py)
+# Other administrators (admins_routes.py)
 
 # A link one administrator makes for another, which they pass on themselves.
 # Mail and the administrator pages say "within a day": change them with it.

@@ -40,8 +40,8 @@ from inventory_tng.core.phrases import (
     read,
     speaking,
 )
+from inventory_tng.devices import devices_routes
 from inventory_tng.devices import forms as devices_forms
-from inventory_tng.devices import routes as devices_routes
 from inventory_tng.labels import labels
 from inventory_tng.models.admins import Admin, AdminSession, Authenticator
 from inventory_tng.models.catalogue import UNITS, Category, Item, ItemPackage
@@ -59,7 +59,7 @@ from inventory_tng.stock import (
     stock_routes,
     used_up_routes,
 )
-from inventory_tng.volunteers import routes as volunteers_routes
+from inventory_tng.volunteers import volunteers_routes
 from inventory_tng.web import admin as web_admin
 from inventory_tng.web import forms as web_forms
 from inventory_tng.web.listing import Lapsed

@@ -1,7 +1,7 @@
-"""What the volunteers pages read (volunteers/routes.py), and the places
-page's names of custody places' volunteers (places/routes.py): plain
-functions taking a Session, each named for what it returns
-(docs/decisions/0023)."""
+"""What the volunteers pages read (volunteers/volunteers_routes.py), and
+the places page's names of custody places' volunteers
+(places/locations_routes.py): plain functions taking a Session, each
+named for what it returns (docs/decisions/0023)."""
 
 from collections.abc import Collection, Sequence
 

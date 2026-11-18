@@ -610,8 +610,8 @@ volunteers did with it, a cart discarded, and what a save another tab
 recorded first added put in the cart, through
 `frontend/src/shared/telemetry.ts`, to `POST /api/telemetry`, which turns
 them into `inventory.*` metrics (docs/decisions/0006). Its schema, in
-`backend/src/inventory_tng/scan/page_telemetry.py`, lists all a page may send:
-something new to report starts there.
+`backend/src/inventory_tng/scan/page_telemetry_api.py`, lists all a page
+may send: something new to report starts there.
 
 #### On a phone
 

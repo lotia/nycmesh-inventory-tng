@@ -1,6 +1,6 @@
-"""What the labels page reads (labels/routes.py): plain functions taking a
-Session, each named for what it returns, and the select its list searches
-(docs/decisions/0023)."""
+"""What the labels page reads (labels/labels_routes.py): plain functions
+taking a Session, each named for what it returns, and the select its list
+searches (docs/decisions/0023)."""
 
 from collections.abc import Sequence
 

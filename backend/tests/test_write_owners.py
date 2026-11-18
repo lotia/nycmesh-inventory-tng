@@ -161,13 +161,13 @@ def test_no_model_has_a_relationship() -> None:
             True,
         ),
         ("stock/counts_routes.py", "text('INSERT INTO movement VALUES (1)')", True),
-        ("site_settings/routes.py", "SiteSettings(id=2)", True),
+        ("site_settings/site_settings_routes.py", "SiteSettings(id=2)", True),
         (
-            "site_settings/routes.py",
+            "site_settings/site_settings_routes.py",
             "from sqlalchemy import delete\ndelete(ScanSettings)",
             True,
         ),
-        ("site_settings/routes.py", "AdjustmentReason(name='x')", True),
+        ("site_settings/site_settings_routes.py", "AdjustmentReason(name='x')", True),
         ("stock/adjustment_reasons.py", "AdjustmentReason(name='x')", False),
         # Not a write.
         ("catalogue/items_routes.py", "select(Item).where(Item.name == 'x')", False),

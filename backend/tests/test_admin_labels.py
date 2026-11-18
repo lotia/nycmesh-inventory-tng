@@ -1,5 +1,5 @@
 """Labels: made from an item's or a place's page, found, reprinted and
-revoked from the labels page (labels/routes.py)."""
+revoked from the labels page (labels/labels_routes.py)."""
 
 from datetime import UTC, datetime
 from decimal import Decimal
@@ -20,8 +20,8 @@ from inventory_tng.labels.labels import (
     package_label,
     place_words,
 )
+from inventory_tng.labels.labels_routes import PICK_LABELS
 from inventory_tng.labels.paths import LABELS, PRINT
-from inventory_tng.labels.routes import PICK_LABELS
 from inventory_tng.models.catalogue import Category, Item, ItemPackage
 from inventory_tng.models.labels import Label
 from inventory_tng.models.places import Location

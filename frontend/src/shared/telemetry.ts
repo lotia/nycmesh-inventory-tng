@@ -49,7 +49,7 @@ export const PER_HOUR_IN_ALL = Object.values(PER_HOUR).reduce(
   0,
 );
 export const HOUR_MS = 3_600_000;
-/** The longest scan_to_save the backend takes (page_telemetry.ScanToSave):
+/** The longest scan_to_save the backend takes (page_telemetry_api.ScanToSave):
  * an event outside its bounds would have the whole report refused. */
 export const MOST_SECONDS_TO_SAVE = 86_400;
 

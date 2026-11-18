@@ -21,11 +21,11 @@ COMMANDS: Commands = {
         "lock every administrator out, let one back in, or invite one",
     ),
     "registration-codes": (
-        "inventory_tng.devices.command",
+        "inventory_tng.devices.registration_codes_command",
         "make or revoke a registration code, or list or revoke its devices",
     ),
     "scan-settings": (
-        "inventory_tng.site_settings.command",
+        "inventory_tng.site_settings.scan_settings_command",
         "show or change the scan page's settings",
     ),
     "totp-keys": (
@@ -33,7 +33,7 @@ COMMANDS: Commands = {
         "make a TOTP key, reseal with the newest, or retire authenticators",
     ),
     "unit-readings": (
-        "inventory_tng.catalogue.command",
+        "inventory_tng.catalogue.unit_readings_command",
         "propose or load how units in the imported names are read",
     ),
 }

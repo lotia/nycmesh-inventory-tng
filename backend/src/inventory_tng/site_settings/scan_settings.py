@@ -1,6 +1,7 @@
 """How the scan page behaves: every write to the scan_settings table, by
-the Site settings page (site_settings/routes.py) and from the command line,
-the operator's fallback (site_settings/command.py).
+the Site settings page (site_settings/site_settings_routes.py) and from
+the command line, the operator's fallback
+(site_settings/scan_settings_command.py).
 
 The page reads them with the catalogue, which an open page fetches again
 every ten minutes. Changes are history.

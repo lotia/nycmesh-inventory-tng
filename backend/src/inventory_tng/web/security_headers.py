@@ -20,7 +20,7 @@ as this origin's, a signed-in administrator's requests included.
 A violation is counted by its directive, from a fixed list, and nothing else
 a report says is kept or logged: it names pages, addresses and what the page
 held. Reports count against their address as the pages' telemetry does
-(scan/page_telemetry.py).
+(scan/page_telemetry_api.py).
 """
 
 import base64
@@ -38,7 +38,7 @@ from starlette.datastructures import MutableHeaders
 from starlette.types import ASGIApp, Message, Receive, Scope, Send
 
 from inventory_tng.core.phrases import BRAND
-from inventory_tng.devices.schemas import RateLimitedReply
+from inventory_tng.core.rate_limits import RateLimitedReply
 from inventory_tng.web.browser import over_limit
 from inventory_tng.web.pages import NONCE, csp_nonce
 
@@ -267,7 +267,7 @@ async def _body(request: Request) -> bytes | None:
     return bytes(body)
 
 
-# Async: it works in memory only, as page_telemetry.report does.
+# Async: it works in memory only, as page_telemetry_api.report does.
 @router.post(REPORTS, status_code=204, include_in_schema=False)
 async def report(request: Request) -> Response:
     """Count what a browser reports its policy refused."""

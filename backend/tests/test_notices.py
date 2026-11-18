@@ -14,7 +14,7 @@ from inventory_tng.models.catalogue import Category, Item
 from inventory_tng.models.labels import Label
 from inventory_tng.models.places import Location
 from inventory_tng.models.volunteers import Volunteer
-from inventory_tng.volunteers.routes import BRING_THEM_BACK
+from inventory_tng.volunteers.volunteers_routes import BRING_THEM_BACK
 from inventory_tng.web import pages
 
 from helpers.markup import read, text

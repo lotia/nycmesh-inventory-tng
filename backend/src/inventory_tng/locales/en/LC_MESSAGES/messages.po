@@ -660,7 +660,7 @@ msgstr ""
 msgid "A name needs at least one letter or number."
 msgstr ""
 
-#: src/inventory_tng/devices/routes.py
+#: src/inventory_tng/devices/devices_routes.py
 msgid "A new registration code"
 msgstr ""
 
@@ -1077,7 +1077,7 @@ msgstr ""
 
 #: src/inventory_tng/templates/_retired_record.html
 #: src/inventory_tng/templates/admins/admin.html
-#: src/inventory_tng/volunteers/routes.py
+#: src/inventory_tng/volunteers/volunteers_routes.py
 msgid "Bring them back"
 msgstr ""
 
@@ -1454,7 +1454,7 @@ msgstr ""
 msgid "Everything is kept in UTC; this only changes how times read."
 msgstr ""
 
-#: src/inventory_tng/devices/routes.py
+#: src/inventory_tng/devices/devices_routes.py
 msgid "Expired"
 msgstr ""
 
@@ -1971,7 +1971,7 @@ msgstr ""
 msgid "Merge"
 msgstr ""
 
-#: src/inventory_tng/volunteers/routes.py
+#: src/inventory_tng/volunteers/volunteers_routes.py
 #, python-format
 msgid "Merge %(name)s into %(into)s?"
 msgstr ""
@@ -1980,7 +1980,7 @@ msgstr ""
 msgid "Merge into"
 msgstr ""
 
-#: src/inventory_tng/volunteers/routes.py
+#: src/inventory_tng/volunteers/volunteers_routes.py
 msgid "Merged. Their past records now count as the other's."
 msgstr ""
 
@@ -2418,7 +2418,7 @@ msgstr ""
 msgid "Only with them beside you: any camera in view can read it."
 msgstr ""
 
-#: src/inventory_tng/devices/routes.py
+#: src/inventory_tng/devices/devices_routes.py
 msgctxt "state"
 msgid "Open"
 msgstr ""
@@ -2590,7 +2590,7 @@ msgstr ""
 msgid "Pick a category."
 msgstr ""
 
-#: src/inventory_tng/labels/routes.py
+#: src/inventory_tng/labels/labels_routes.py
 msgid "Pick a current label to print."
 msgstr ""
 
@@ -2684,7 +2684,7 @@ msgstr ""
 msgid "Print %(code)s"
 msgstr ""
 
-#: src/inventory_tng/labels/routes.py
+#: src/inventory_tng/labels/labels_routes.py
 #, python-format
 msgid "Print from 1 to %(max)d copies of each."
 msgstr ""
@@ -2699,7 +2699,8 @@ msgid ""
 " paper sizes, pick the same one there."
 msgstr ""
 
-#: src/inventory_tng/labels/routes.py src/inventory_tng/templates/_labels.html
+#: src/inventory_tng/labels/labels_routes.py
+#: src/inventory_tng/templates/_labels.html
 msgid "Print labels"
 msgstr ""
 
@@ -2711,7 +2712,7 @@ msgstr ""
 msgid "Print them"
 msgstr ""
 
-#: src/inventory_tng/labels/routes.py
+#: src/inventory_tng/labels/labels_routes.py
 #, python-format
 msgid "Print up to %(num)d label at once."
 msgid_plural "Print up to %(num)d labels at once."
@@ -2865,7 +2866,7 @@ msgstr ""
 msgid "Registered"
 msgstr ""
 
-#: src/inventory_tng/devices/routes.py
+#: src/inventory_tng/devices/devices_routes.py
 msgid "Registered devices"
 msgstr ""
 
@@ -3037,7 +3038,7 @@ msgstr ""
 msgid "Retired."
 msgstr ""
 
-#: src/inventory_tng/site_settings/routes.py
+#: src/inventory_tng/site_settings/site_settings_routes.py
 msgid "Retired: it is no longer offered."
 msgstr ""
 
@@ -3078,7 +3079,7 @@ msgid_plural "Revoke %(num)d"
 msgstr[0] ""
 msgstr[1] ""
 
-#: src/inventory_tng/devices/routes.py
+#: src/inventory_tng/devices/devices_routes.py
 #, python-format
 msgid "Revoke %(num)d device?"
 msgid_plural "Revoke %(num)d devices?"
@@ -3093,29 +3094,30 @@ msgstr ""
 msgid "Revoke this device"
 msgstr ""
 
-#: src/inventory_tng/devices/routes.py src/inventory_tng/labels/labels.py
+#: src/inventory_tng/devices/devices_routes.py
+#: src/inventory_tng/labels/labels.py
 #: src/inventory_tng/templates/devices/code.html
 #: src/inventory_tng/templates/devices/device_list.html
 msgid "Revoked"
 msgstr ""
 
-#: src/inventory_tng/devices/routes.py
+#: src/inventory_tng/devices/devices_routes.py
 msgid "Revoked: it can't save anything now."
 msgstr ""
 
-#: src/inventory_tng/devices/routes.py
+#: src/inventory_tng/devices/devices_routes.py
 msgid ""
 "Revoked: it registers nothing more. Its devices stay registered; revoke "
 "any that look wrong."
 msgstr ""
 
-#: src/inventory_tng/labels/routes.py
+#: src/inventory_tng/labels/labels_routes.py
 msgid ""
 "Revoked: its copies now scan as a label the inventory doesn't have. "
 "Making labels for it again makes a new code."
 msgstr ""
 
-#: src/inventory_tng/devices/routes.py
+#: src/inventory_tng/devices/devices_routes.py
 msgid "Revoked: they can't save anything now."
 msgstr ""
 
@@ -3201,7 +3203,7 @@ msgstr ""
 msgid "Saved. Every name with it is read so now."
 msgstr ""
 
-#: src/inventory_tng/site_settings/routes.py
+#: src/inventory_tng/site_settings/site_settings_routes.py
 msgid "Saved. Open scan pages pick it up within ten minutes."
 msgstr ""
 
@@ -3209,7 +3211,7 @@ msgstr ""
 msgid "Saved: how its opened packages are followed."
 msgstr ""
 
-#: src/inventory_tng/site_settings/routes.py
+#: src/inventory_tng/site_settings/site_settings_routes.py
 msgid "Saved: times are shown in the new zone."
 msgstr ""
 
@@ -3783,7 +3785,7 @@ msgstr ""
 msgid "These moved while you counted, so count them again."
 msgstr ""
 
-#: src/inventory_tng/volunteers/routes.py
+#: src/inventory_tng/volunteers/volunteers_routes.py
 msgid "They can hold stock now."
 msgstr ""
 
@@ -3811,7 +3813,7 @@ msgstr ""
 msgid "They gave an email address."
 msgstr ""
 
-#: src/inventory_tng/volunteers/routes.py
+#: src/inventory_tng/volunteers/volunteers_routes.py
 msgid "They no longer hold stock."
 msgstr ""
 
@@ -3997,7 +3999,7 @@ msgstr ""
 msgid "Used"
 msgstr ""
 
-#: src/inventory_tng/devices/routes.py
+#: src/inventory_tng/devices/devices_routes.py
 msgid "Used up"
 msgstr ""
 
@@ -4020,7 +4022,7 @@ msgstr ""
 msgid "Volunteer"
 msgstr ""
 
-#: src/inventory_tng/places/routes.py
+#: src/inventory_tng/places/locations_routes.py
 msgid "Volunteer's custody"
 msgstr ""
 

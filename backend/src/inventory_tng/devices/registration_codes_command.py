@@ -1,5 +1,5 @@
 """Registration codes and devices, from the command line: the operator's
-fallback, as administrators use the Devices page (devices/routes.py):
+fallback, as administrators use the Devices page (devices/devices_routes.py):
 
     uv run python -m inventory_tng.manage registration-codes create --uses 1 --days 1
     uv run python -m inventory_tng.manage registration-codes revoke CODE_ID

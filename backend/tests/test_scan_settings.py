@@ -7,13 +7,13 @@ from structlog.testing import capture_logs
 
 from inventory_tng.models.core import CatalogueHistory
 from inventory_tng.models.site_settings import ScanSettings
-from inventory_tng.site_settings import command
+from inventory_tng.site_settings import scan_settings_command
 
 from helpers.rows import violates
 
 
 def run(session: Session, *argv: str) -> int:
-    return command.run(session, command.parse(argv))
+    return scan_settings_command.run(session, scan_settings_command.parse(argv))
 
 
 def test_the_migration_makes_the_one_row_with_its_default(session: Session) -> None:
@@ -67,7 +67,7 @@ def test_a_change_is_history_with_who_made_it(session: Session) -> None:
 )
 def test_the_command_refuses_nothing_to_set_or_out_of_range(argv: list[str]) -> None:
     with pytest.raises(SystemExit):
-        command.parse(argv)
+        scan_settings_command.parse(argv)
 
 
 @pytest.mark.parametrize("minutes", [-5, 24 * 60 + 1])
@@ -85,7 +85,7 @@ def test_show_runs_as_an_operator_command(
 ) -> None:
     """Through kubectl exec, as DEPLOYMENT.md says; its own database."""
     monkeypatch.setenv("DATABASE_URL", own_database)
-    assert command.main(["show"]) == 0
+    assert scan_settings_command.main(["show"]) == 0
     # After its log lines, which go to standard output too.
     assert capsys.readouterr().out.splitlines()[-1] == (
         "name check: asks after 15 minutes unused"

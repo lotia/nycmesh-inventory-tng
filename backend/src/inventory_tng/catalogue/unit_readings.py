@@ -4,7 +4,7 @@ import brings is read, proposed in a file the operator corrects once and
 keeps, then loaded into the reading_rule table, the first rules a new
 database has. The sheet import (inventory-tng-8i4.17) calls `propose`
 for its dry run and `load` before it writes a name, as does the command
-line (catalogue/command.py).
+line (catalogue/unit_readings_command.py).
 
 `propose` reads names, one a line, and needs no database: it writes the
 file, keeping each row, correction and respell the file already has, so a
