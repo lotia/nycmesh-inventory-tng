@@ -333,11 +333,9 @@ def main(argv: Sequence[str], prog: str) -> int:
         if problems:
             print(*problems, sep="\n", file=sys.stderr)
             return 1
-        return 0
-    if args.command == "port":
+    elif args.command == "port":
         print(*map(port, args.keys))
-        return 0
-    if args.command == "new-ports":
+    elif args.command == "new-ports":
         env, changed = new_ports(
             ENV_FILE.read_text(), local_env_values(), other_stacks("--all"), own_ports()
         )
@@ -346,12 +344,11 @@ def main(argv: Sequence[str], prog: str) -> int:
             print(f"{key}: {was or 'unset'} -> {now}")
         if not changed:
             print("Each port in .env was free already.")
-        return 0
-    if args.command == "new-env":
+    elif args.command == "new-env":
         example = (CLONE / ".env.example").read_text()
         # With no runtime running, compose knows of no other stack.
         print(new_env(example, CLONE, compose_json("ls", "--all")), end="")
-        return 0
-    for name, checkout in stale(json.load(sys.stdin), this_stack()):
-        print(name, checkout)
+    else:
+        for name, checkout in stale(json.load(sys.stdin), this_stack()):
+            print(name, checkout)
     return 0

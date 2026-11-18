@@ -13,11 +13,10 @@ docs/decisions/0007), as `totp-keys new` runs before settings can be read.
 import sys
 from collections.abc import Sequence
 
-from inventory_tng.core.entry_point import dispatch
+from inventory_tng.core.entry_point import Commands, dispatch
 
 PROG = "python -m inventory_tng.manage"
-# Each command's name, its module, and a line on what it does.
-COMMANDS = {
+COMMANDS: Commands = {
     "admins": (
         "inventory_tng.admins.admins_command",
         "lock every administrator out, let one back in, or invite one",
@@ -43,7 +42,7 @@ COMMANDS = {
 
 def main(argv: Sequence[str] | None = None) -> int:
     return dispatch(
-        sys.argv[1:] if argv is None else list(argv),
+        argv,
         prog=PROG,
         description="The operator's commands (DEPLOYMENT.md, Operator commands).",
         commands=COMMANDS,

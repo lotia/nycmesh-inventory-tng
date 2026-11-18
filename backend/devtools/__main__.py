@@ -11,11 +11,10 @@ imported, as the operator's commands are (inventory_tng.core.entry_point).
 import sys
 from collections.abc import Sequence
 
-from inventory_tng.core.entry_point import dispatch
+from inventory_tng.core.entry_point import Commands, dispatch
 
 PROG = "python -m devtools"
-# Each command's name, its module, and a line on what it does.
-COMMANDS = {
+COMMANDS: Commands = {
     "database": (
         "devtools.database",
         "make, seed or drop this checkout's development database",
@@ -45,7 +44,7 @@ COMMANDS = {
 
 def main(argv: Sequence[str] | None = None) -> int:
     return dispatch(
-        sys.argv[1:] if argv is None else list(argv),
+        argv,
         prog=PROG,
         description="The developer's commands (CONTRIBUTING.md).",
         commands=COMMANDS,

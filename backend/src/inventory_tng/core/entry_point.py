@@ -9,6 +9,7 @@ exit status.
 
 import argparse
 import importlib
+import sys
 from collections.abc import Mapping, Sequence
 
 # Each command's name: its module, and a line on what it does.
@@ -37,8 +38,10 @@ def _parser(prog: str, description: str, commands: Commands) -> argparse.Argumen
 
 
 def dispatch(
-    argv: Sequence[str], *, prog: str, description: str, commands: Commands
+    argv: Sequence[str] | None, *, prog: str, description: str, commands: Commands
 ) -> int:
+    """Runs the command `argv` names, the process's own arguments if None."""
+    argv = sys.argv[1:] if argv is None else list(argv)
     parser = _parser(prog, description, commands)
     if not argv:
         parser.print_help()

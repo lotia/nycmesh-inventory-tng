@@ -5,13 +5,11 @@ docs/decisions/0023), which dispatches as manage does
 import runpy
 import subprocess
 import sys
-from pathlib import Path
 
 import pytest
 
 from devtools.__main__ import COMMANDS, main
-
-BACKEND = Path(__file__).resolve().parents[1]
+from inventory_tng.core.local_env import CLONE
 
 
 @pytest.mark.parametrize("name", COMMANDS)
@@ -69,7 +67,7 @@ def test_it_imports_only_the_command_chosen() -> None:
         capture_output=True,
         text=True,
         check=True,
-        cwd=BACKEND,
+        cwd=CLONE / "backend",
     )
     assert shown.stdout.splitlines() == [
         "devtools.__main__",

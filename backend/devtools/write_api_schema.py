@@ -6,12 +6,10 @@ write-api-schema` (CONTRIBUTING.md, The scan page).
 fails while the committed copy says something the code does not.
 """
 
-import argparse
-import json
 from collections.abc import Sequence
-from pathlib import Path
 from typing import Any
 
+from devtools import json_file
 from inventory_tng.app import create_app
 from inventory_tng.core.local_env import CLONE
 from inventory_tng.core.settings import Settings
@@ -27,14 +25,6 @@ def schema() -> dict[str, Any]:
 
 
 def main(argv: Sequence[str], prog: str) -> int:
-    parser = argparse.ArgumentParser(
-        prog=prog,
-        description=__doc__,
-        formatter_class=argparse.RawDescriptionHelpFormatter,
+    return json_file.write(
+        argv, prog=prog, description=__doc__, default=SCHEMA, content=schema
     )
-    parser.add_argument("path", nargs="?", type=Path, default=SCHEMA)
-    path = parser.parse_args(argv).path
-    text = json.dumps(schema(), indent=2, ensure_ascii=False) + "\n"
-    path.write_text(text, encoding="utf-8")
-    print(f"Wrote {path}")
-    return 0
