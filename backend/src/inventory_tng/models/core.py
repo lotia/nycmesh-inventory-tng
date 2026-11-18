@@ -18,9 +18,10 @@ from inventory_tng.core.db import ACTOR_PATTERN, Base, protection
 
 
 class CatalogueHistory(Base):
-    """Every change to a table with history (db.protection; core/history.py). A retired record's
-    page reads who retired it (web/admin.retired_by). The app may only add
-    to it (the initial migration)."""
+    """Every change to a table with history (db.protection;
+    core/history.py). A retired record's page reads who retired it
+    (web/admin.retired_by). The app may only add to it (the initial
+    migration)."""
 
     __tablename__ = "catalogue_history"
     __table_args__ = (

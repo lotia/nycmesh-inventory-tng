@@ -86,8 +86,9 @@ export function indexOf(catalogue: Catalogue): Index {
       catalogue.items.map((item) => [
         item.id,
         // Each field bare alone, as typed and respelt, as the server keeps
-        // each (models.held), so no field's number reads the next's start
-        // as a unit; the server's text, kept so already, only in lower case.
+        // each (models.names.held), so no field's number reads the next's
+        // start as a unit; the server's text, kept so already, only in lower
+        // case.
         [
           ...[
             item.name,
@@ -143,7 +144,7 @@ export function search(catalogue: Catalogue, text: string, limit = 20): Item[] {
 
 /** `text` bare as typed, its units as they are, then bare with each unit
  * right after a number spelt as the server spells it (`respell`) if that
- * differs, as the server keeps and matches it (models.folds): so "feet",
+ * differs, as the server keeps and matches it (models.names.folds): so "feet",
  * "48 v" in "48 vdc" and a half-typed "10 μ" find what they did before
  * units were read; `rules`, the reading rules, read first. Bare is in
  * lower case, decomposed by compatibility, and without combining marks:

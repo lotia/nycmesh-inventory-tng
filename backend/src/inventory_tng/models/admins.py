@@ -44,9 +44,10 @@ def running_low(left: int) -> bool:
 # invite or a reset is made by another administrator (made_by_id), or by
 # the operator's commands (NULL; accounts.let_in, invite_by_operator). Every
 # one sets a password.
-# Using a reset or recovery one removes the authenticators too: a reset removed them when it was made
-# already, and again catches any added from a session cut off meanwhile
-# (inventory-tng-8i4.50.4 closes that properly; then reset can go).
+# Using a reset or recovery one removes the authenticators too: a reset
+# removed them when it was made already, and again catches any added from
+# a session cut off meanwhile (inventory-tng-8i4.50.4 closes that
+# properly; then reset can go).
 ResetKind = Literal["invite", "emailed", "reset", "recovery"]
 RESET_KINDS: tuple[ResetKind, ...] = get_args(ResetKind)
 MADE_BY_ADMIN: tuple[ResetKind, ...] = ("invite", "reset")
