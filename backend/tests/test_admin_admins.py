@@ -16,8 +16,9 @@ from structlog.testing import capture_logs
 
 from inventory_tng import accounts, activity
 from inventory_tng.accounts import NOT_AN_EMAIL, qr_svg, username_problem
-from inventory_tng.admin.admins import ADMINS, OWN_RESET, OWN_RETIRE, TAKEN
+from inventory_tng.admin.admins import ADMINS
 from inventory_tng.admins import guards
+from inventory_tng.admins.forms import OWN_RESET, OWN_RETIRE, TAKEN
 from inventory_tng.core import mail
 from inventory_tng.core.settings import RateLimits
 from inventory_tng.models import ACTIVITY_KINDS, Admin, AdminSession, SignInSettings

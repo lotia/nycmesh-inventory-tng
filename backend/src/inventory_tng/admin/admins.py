@@ -27,6 +27,7 @@ from inventory_tng.admin.common import (
 )
 from inventory_tng.admin.listing import AskedView, Sort, Sorting, View, arranged
 from inventory_tng.admins import queries
+from inventory_tng.admins.forms import OWN_RESET, OWN_RETIRE, TAKEN, invite_problems
 from inventory_tng.admins.guards import (
     CONFIRM_FIELD,
     RESET,
@@ -47,10 +48,6 @@ from inventory_tng.web.forms import rule_words
 log = structlog.get_logger(__name__)
 
 router = APIRouter(include_in_schema=False)
-
-TAKEN = lazy_gettext("Another administrator already has that username or email.")
-OWN_RESET = lazy_gettext("Change your own on your account page.")
-OWN_RETIRE = lazy_gettext("Another administrator must retire you.")
 
 ADMIN_RETIRED = lazy_gettext(
     "Retired: they can no longer sign in, and their password, authenticators "
@@ -219,11 +216,7 @@ def invite(
     once: OnceKey = "",
 ) -> Response:
     username, email = username.strip(), email.strip()
-    problems = {}
-    if problem := accounts.username_problem(username):
-        problems["username"] = problem
-    if problem := accounts.email_problem(email):
-        problems["email"] = problem
+    problems = invite_problems(username, email)
     invited: list[tuple[Admin, str]] = []
 
     def make() -> None:

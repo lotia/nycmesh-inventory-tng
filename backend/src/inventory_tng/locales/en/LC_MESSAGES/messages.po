@@ -911,7 +911,7 @@ msgstr ""
 msgid "An open package was closed meanwhile: count what is on it as loose."
 msgstr ""
 
-#: src/inventory_tng/admin/admins.py
+#: src/inventory_tng/admins/forms.py
 msgid "Another administrator already has that username or email."
 msgstr ""
 
@@ -944,7 +944,7 @@ msgid ""
 "%(brand)s, at once."
 msgstr ""
 
-#: src/inventory_tng/admin/admins.py
+#: src/inventory_tng/admins/forms.py
 msgid "Another administrator must retire you."
 msgstr ""
 
@@ -1133,7 +1133,7 @@ msgstr ""
 msgid "Change password"
 msgstr ""
 
-#: src/inventory_tng/admin/admins.py
+#: src/inventory_tng/admins/forms.py
 msgid "Change your own on your account page."
 msgstr ""
 
