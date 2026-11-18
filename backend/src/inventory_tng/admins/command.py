@@ -2,9 +2,9 @@
 trusted or nobody can sign in to them (DEPLOYMENT.md, Break-glass;
 docs/decisions/0018). Run where the app runs, with its settings:
 
-    python -m inventory_tng.admins.command lockdown --expect 3
-    python -m inventory_tng.admins.command let-in USERNAME
-    python -m inventory_tng.admins.command invite USERNAME [--email ADDRESS]
+    python -m inventory_tng.manage admins lockdown --expect 3
+    python -m inventory_tng.manage admins let-in USERNAME
+    python -m inventory_tng.manage admins invite USERNAME [--email ADDRESS]
 
 `lockdown` retires every current administrator and revokes every
 registration code; --expect is how many administrators you believe are
@@ -29,8 +29,8 @@ from inventory_tng.core.mail import Notifier
 from inventory_tng.core.settings import Settings
 
 
-def main(argv: Sequence[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(prog="python -m inventory_tng.admins.command")
+def main(argv: Sequence[str] | None = None, prog: str | None = None) -> int:
+    parser = argparse.ArgumentParser(prog=prog)
     commands = parser.add_subparsers(dest="command", required=True)
     lockdown = commands.add_parser(
         "lockdown", help="retire every administrator, revoke every code"
@@ -80,7 +80,3 @@ def run(session: Session, args: argparse.Namespace, notify: Notifier) -> int:
     done(f"A link for {admin.username}, once, within the hour:")
     done(reset_url(site, token))
     return 0
-
-
-if __name__ == "__main__":
-    sys.exit(main())

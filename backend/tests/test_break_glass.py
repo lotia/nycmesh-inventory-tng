@@ -1,10 +1,8 @@
 """The operator's break-glass (accounts.lock_down, let_in, invite_by_operator,
-retire_authenticators; python -m inventory_tng.admins.command and totp_keys):
+retire_authenticators; python -m inventory_tng.manage admins and totp-keys):
 docs/decisions/0018."""
 
 import asyncio
-import runpy
-import sys
 from collections.abc import Callable
 from datetime import UTC, datetime, timedelta
 
@@ -20,7 +18,7 @@ from inventory_tng.admins import (
     command,
     guards,
     sign_in_routes,
-    totp_keys,
+    totp_keys_command,
 )
 from inventory_tng.core import mail
 from inventory_tng.core.mail import Notifier
@@ -215,7 +213,7 @@ def test_the_commands_run_as_operator_commands(
     assert command.main(["lockdown", "--expect", "1"]) == 0
     assert capsys.readouterr().out.splitlines()[-1] == "Retired 1 administrators."
     assert command.main(["let-in", "grace", "--base-url", site]) == 0
-    assert totp_keys.main(["retire-authenticators", "--all"]) == 0
+    assert totp_keys_command.main(["retire-authenticators", "--all"]) == 0
     assert capsys.readouterr().out.splitlines()[-1] == "Retired 0 authenticators."
 
 
@@ -227,19 +225,6 @@ def test_the_operator_invites_without_mail(session: Session) -> None:
     assert grace.retired_at is None
 
 
-def test_admins_runs_as_a_module(
-    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
-) -> None:
-    monkeypatch.setattr(sys, "argv", ["admins", "--help"])
-    with (
-        pytest.warns(RuntimeWarning, match="found in sys.modules"),
-        pytest.raises(SystemExit) as done,
-    ):
-        runpy.run_module("inventory_tng.admins.command", run_name="__main__")
-    assert done.value.code == 0
-    assert "lockdown" in capsys.readouterr().out
-
-
 def test_retiring_authenticators_names_who_must_be_let_in(
     own_database: str,
     monkeypatch: pytest.MonkeyPatch,
@@ -249,7 +234,7 @@ def test_retiring_authenticators_names_who_must_be_let_in(
     monkeypatch.setattr(
         accounts, "retire_authenticators", lambda *_, **__: (2, ["ada", "ben"])
     )
-    assert totp_keys.main(["retire-authenticators", "--unreadable"]) == 0
+    assert totp_keys_command.main(["retire-authenticators", "--unreadable"]) == 0
     assert capsys.readouterr().out.splitlines()[-1] == (
         "No second factor left, so let them in: ada, ben."
     )

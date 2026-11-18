@@ -12,7 +12,7 @@ from sqlalchemy import select, text
 from sqlalchemy.orm import Session
 from structlog.testing import capture_logs
 
-from inventory_tng.admins import accounts, totp_keys
+from inventory_tng.admins import accounts, totp_keys, totp_keys_command
 from inventory_tng.admins.totp_keys import TotpKeys, TotpKeysError, Unreadable, keys_dir
 from inventory_tng.app import check_totp_keys
 from inventory_tng.core.db import Database
@@ -108,13 +108,13 @@ def test_new_prints_a_key_that_loads(
     monkeypatch: pytest.MonkeyPatch,
     capsys: pytest.CaptureFixture[str],
 ) -> None:
-    """As DEPLOYMENT.md runs it: python -m inventory_tng.admins.totp_keys new."""
-    monkeypatch.setattr(sys, "argv", ["totp_keys", "new"])
+    """As DEPLOYMENT.md runs it: python -m inventory_tng.manage totp-keys new."""
+    monkeypatch.setattr(sys, "argv", ["manage", "totp-keys", "new"])
     with (
         pytest.warns(RuntimeWarning, match="found in sys.modules"),
         pytest.raises(SystemExit) as done,
     ):
-        runpy.run_module("inventory_tng.admins.totp_keys", run_name="__main__")
+        runpy.run_module("inventory_tng.manage", run_name="__main__")
     assert done.value.code == 0
     printed = capsys.readouterr().out.strip()
     assert TotpKeys.load(keys_in(tmp_path, **{"1": printed})).newest == 1
@@ -215,7 +215,7 @@ def test_reseal_runs_as_an_operator_command(
     """Through kubectl exec, as DEPLOYMENT.md's rotation says; its own
     database, as it commits."""
     monkeypatch.setenv("DATABASE_URL", own_database)
-    assert totp_keys.main(["reseal"]) == 0
+    assert totp_keys_command.main(["reseal"]) == 0
     # After its log lines, which go to standard output too.
     assert (
         capsys.readouterr().out.splitlines()[-1] == "Resealed 0; 0 could not be read."

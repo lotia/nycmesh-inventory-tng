@@ -3,12 +3,8 @@ inventory-tng-c0c.5): how each unit typed after a number in the names an
 import brings is read, proposed in a file the operator corrects once and
 keeps, then loaded into the reading_rule table, the first rules a new
 database has. The sheet import (inventory-tng-8i4.17) calls `propose`
-for its dry run and `load` before it writes a name; from the command line:
-
-    uv run python -m inventory_tng.catalogue.unit_readings \\
-        propose NAMES --file readings.tsv
-    kubectl exec -i deploy/inventory -- \\
-        python -m inventory_tng.catalogue.unit_readings load - < readings.tsv
+for its dry run and `load` before it writes a name, as does the command
+line (catalogue/command.py).
 
 `propose` reads names, one a line, and needs no database: it writes the
 file, keeping each row, correction and respell the file already has, so a
@@ -21,7 +17,6 @@ import.
 The file is UTF-8, tab-separated, one unit a row, sorted by unit, after
 comment lines (#) saying what each column holds (HEADER)."""
 
-import argparse
 import csv
 import io
 import sys
@@ -37,8 +32,7 @@ from sqlalchemy.orm import Session
 
 from inventory_tng import models
 from inventory_tng.catalogue import items, reading_rules, units
-from inventory_tng.core.command import run_command, set_up
-from inventory_tng.core.db import CLI_ACTOR, lock_catalogue, refusal, set_actor
+from inventory_tng.core.db import lock_catalogue, refusal
 from inventory_tng.models import ReadingRule
 
 log = structlog.get_logger(__name__)
@@ -139,7 +133,7 @@ def propose(names: Iterable[str], path: Path) -> Proposed:
     ValueError if the file there is not a readings file, or has a unit twice."""
     kept = {}
     if path.exists():
-        with _text(path) as text:
+        with open_text(path) as text:
             earlier = read(text)
         kept = {row["unit"]: row for row in earlier}
         if len(kept) < len(earlier):
@@ -258,39 +252,7 @@ def load(session: Session, rules: dict[str, units.Rule]) -> Loaded | list[str]:
     return Loaded(written, len(loading) - len(written), kept, was)
 
 
-def _said(rule: units.Rule) -> str:
-    said = rule.reading or reading_rules.NOT_A_UNIT
-    return f"{said}, respelt" if rule.respell else said
-
-
-def parse(argv: Sequence[str] | None = None) -> argparse.Namespace:
-    parser = argparse.ArgumentParser(
-        prog="python -m inventory_tng.catalogue.unit_readings",
-        description="The import's readings file: how each unit typed after a "
-        "number in its names is read.",
-    )
-    commands = parser.add_subparsers(dest="command", required=True)
-    proposing = commands.add_parser(
-        "propose",
-        help="write the readings file for names (a dry run; no database)",
-    )
-    proposing.add_argument(
-        "names", type=Path, help="a UTF-8 text file of names, one a line, or -"
-    )
-    proposing.add_argument(
-        "--file",
-        type=Path,
-        required=True,
-        help="the readings file, written; corrections it has are kept",
-    )
-    loading = commands.add_parser(
-        "load", help="write a rule for each unit the readings file reads"
-    )
-    loading.add_argument("file", type=Path, help="the readings file, or -")
-    return parser.parse_args(argv)
-
-
-def _text(path: Path) -> AbstractContextManager[TextIO]:
+def open_text(path: Path) -> AbstractContextManager[TextIO]:
     """The file at `path` to read, or standard input, left open, for -: as
     UTF-8 whatever the locale, a byte order mark dropped."""
     if str(path) == "-":
@@ -298,73 +260,3 @@ def _text(path: Path) -> AbstractContextManager[TextIO]:
             sys.stdin.reconfigure(encoding="utf-8-sig")
         return nullcontext(sys.stdin)
     return path.open(encoding="utf-8-sig", newline="")
-
-
-def main(argv: Sequence[str] | None = None) -> int:
-    args = parse(argv)
-    if args.command == "propose":
-        if set_up() is None:
-            return 1
-        return run_propose(args)
-    return run_command(run_load, args)
-
-
-def run_propose(args: argparse.Namespace) -> int:
-    try:
-        with _text(args.names) as text:
-            names = [name for line in text if (name := line.strip())]
-    except ValueError as error:
-        print(f"{args.names}: {error}", file=sys.stderr)
-        return 1
-    try:
-        done = propose(names, args.file)
-    except ValueError as error:
-        print(f"{args.file}: {error}", file=sys.stderr)
-        return 1
-    print(
-        f"Wrote {args.file}: {done.rows} units, {done.corrected} corrected, "
-        f"{done.to_choose} to choose, {done.not_proposed} no longer proposed."
-    )
-    return 0
-
-
-def run_load(session: Session, args: argparse.Namespace) -> int:
-    try:
-        with _text(args.file) as text:
-            rows = read(text)
-    except ValueError as error:
-        print(f"{args.file}: {error}", file=sys.stderr)
-        return 1
-    rules, problems = chosen(rows)
-    if problems:
-        log.info("unit readings refused", problems=len(problems))
-        print(f"{args.file}: nothing loaded.", *problems, sep="\n", file=sys.stderr)
-        return 1
-    set_actor(session, CLI_ACTOR)
-    done = load(session, rules)
-    if isinstance(done, list):
-        print(
-            "Nothing loaded: these names would read alike; rename one of each first.",
-            *done,
-            sep="\n",
-            file=sys.stderr,
-        )
-        return 1
-    for row in done.written:
-        before = done.was.get(row.token)
-        was = f" (was {_said(before)}, by an earlier load)" if before else ""
-        print(f"{row.token}: {_said(row.rule)}{was}")
-    for row, rule in done.kept:
-        print(
-            f"{row.token}: kept {_said(row.rule)}, set by an administrator; "
-            f"the file says {_said(rule)}"
-        )
-    print(
-        f"Loaded {len(done.written)} rules; {done.same} already so; "
-        f"{len(done.kept)} kept as an administrator set them."
-    )
-    return 0
-
-
-if __name__ == "__main__":
-    raise SystemExit(main())

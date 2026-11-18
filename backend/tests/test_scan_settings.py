@@ -6,13 +6,13 @@ from sqlalchemy.orm import Session
 from structlog.testing import capture_logs
 
 from inventory_tng.models import CatalogueHistory, ScanSettings
-from inventory_tng.site_settings import scan_settings
+from inventory_tng.site_settings import command
 
 from helpers.rows import violates
 
 
 def run(session: Session, *argv: str) -> int:
-    return scan_settings.run(session, scan_settings.parse(argv))
+    return command.run(session, command.parse(argv))
 
 
 def test_the_migration_makes_the_one_row_with_its_default(session: Session) -> None:
@@ -66,7 +66,7 @@ def test_a_change_is_history_with_who_made_it(session: Session) -> None:
 )
 def test_the_command_refuses_nothing_to_set_or_out_of_range(argv: list[str]) -> None:
     with pytest.raises(SystemExit):
-        scan_settings.parse(argv)
+        command.parse(argv)
 
 
 @pytest.mark.parametrize("minutes", [-5, 24 * 60 + 1])
@@ -75,3 +75,17 @@ def test_the_database_keeps_one_row_in_range(session: Session, minutes: int) -> 
         session.add(ScanSettings(id=2))
     with violates(session, "ck_scan_settings_name_check_minutes"):
         session.get_one(ScanSettings, 1).name_check_minutes = minutes
+
+
+def test_show_runs_as_an_operator_command(
+    own_database: str,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    """Through kubectl exec, as DEPLOYMENT.md says; its own database."""
+    monkeypatch.setenv("DATABASE_URL", own_database)
+    assert command.main(["show"]) == 0
+    # After its log lines, which go to standard output too.
+    assert capsys.readouterr().out.splitlines()[-1] == (
+        "name check: asks after 15 minutes unused"
+    )

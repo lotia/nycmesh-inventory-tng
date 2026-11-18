@@ -17,7 +17,8 @@ structure below on 2026-11-17.
   table's rules and writes (its owner, 0016), `queries.py`, `forms.py`,
   `routes.py` for HTML pages (`<page>_routes.py` where a feature has
   several, as `admins/sign_in_routes.py`), `api.py` for JSON,
-  `schemas.py`, `paths.py` and `command.py`. URLs do not change.
+  `schemas.py`, `paths.py` and `command.py` (`<thing>_command.py` where a
+  feature has two, as `admins/totp_keys_command.py`). URLs do not change.
 - **`web/`** holds what every server-rendered page shares; **`core/`**
   holds plumbing, such as settings, db, history, logs, telemetry,
   masking, mail, phrases, local_time and local_env. Core means plumbing,
@@ -32,8 +33,14 @@ structure below on 2026-11-17.
   functions too, given the form's fields as a mapping of text or the
   values its `Form()` parameters read: the handler reads the request.
 - **One entry point for operator commands**, `python -m
-  inventory_tng.manage <command>`, from a fixed table of each feature's
-  `command.py`.
+  inventory_tng.manage <command>` (`manage.py`), built with argparse (Ali,
+  2026-11-17, inventory-tng-icnp): a fixed table of each command's name,
+  its feature's command module and a line on what it does, listed by
+  name, never discovered. It imports only the command chosen and calls
+  its `main(argv, prog=...)`; with no command it lists them all. Each
+  command sets up its own process (0007). Developer tools in `dev/`,
+  `core/local_env.py` and `catalogue/units.py` are not operator commands
+  and keep their own `python -m` paths (inventory-tng-atmx.9).
 - **Imports go one way**, held by `backend/tests/test_import_directions.py`:
   core imports no feature; rules, queries and forms import neither
   FastAPI nor `web/`, but for `web/formatting.py` and `web/forms.py`,
@@ -113,9 +120,11 @@ short test. `core/` is the name FastAPI's full-stack template uses;
 | `admin/volunteers.py`: its queries | `volunteers/queries.py` |
 | `admins.py` | `admins/command.py` |
 | `admins/sign_in_routes.py`: how its forms are checked, and their problems in words | `admins/forms.py` |
+| `admins/totp_keys.py`: its command | `admins/totp_keys_command.py` |
 | `bundle.py` | `scan/bundle.py` |
 | `catalogue.py` | `scan/catalogue_api.py` |
 | `catalogue.py`: the reply schemas | `scan/catalogue_schemas.py` |
+| `catalogue/unit_readings.py`: its command | `catalogue/command.py` |
 | `categories.py` | `catalogue/categories.py` |
 | `command.py` | `core/command.py` |
 | `cross_site.py` | `core/cross_site.py` |
@@ -162,6 +171,7 @@ short test. `core/` is the name FastAPI's full-stack template uses;
 | `settings.py` | `core/settings.py` |
 | `sign_in.py`: the sign-in pages | `admins/sign_in_routes.py` |
 | `sign_in.py`: what every administrator page depends on | `admins/guards.py` |
+| `site_settings/scan_settings.py`: its command | `site_settings/command.py` |
 | `stacks.py` | `dev/stacks.py` |
 | `telemetry.py` | `core/telemetry.py` |
 | `time_zones.py` | `core/time_zones.py` |

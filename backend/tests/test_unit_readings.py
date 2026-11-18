@@ -4,7 +4,6 @@ the names is read, the operator corrects the file once, later dry runs
 keep the corrections, and loading it writes the first reading rules."""
 
 import io
-import runpy
 import sys
 from pathlib import Path
 
@@ -14,7 +13,7 @@ from sqlalchemy.orm import Session
 from structlog.testing import capture_logs
 
 from inventory_tng import models
-from inventory_tng.catalogue import reading_rules, unit_readings, units
+from inventory_tng.catalogue import command, reading_rules, unit_readings, units
 from inventory_tng.models import Category, Item, ReadingRule, unit_key
 
 from helpers.rows import add, history, rule_of
@@ -47,7 +46,7 @@ def corrected(path: Path, respell: str = "", **corrections: str) -> None:
 
 
 def run_load(session: Session, path: Path) -> int:
-    return unit_readings.run_load(session, unit_readings.parse(["load", str(path)]))
+    return command.run_load(session, command.parse(["load", str(path)]))
 
 
 def test_a_dry_run_proposes_as_the_seeding_page_does(tmp_path: Path) -> None:
@@ -245,8 +244,8 @@ def test_a_file_not_of_these_columns_is_refused(
     path = tmp_path / "readings.tsv"
     path.write_text("unit\treading\ng\tg\n", encoding="utf-8")
     assert run_load(session, path) == 1
-    args = unit_readings.parse(["propose", str(path), "--file", str(path)])
-    assert unit_readings.run_propose(args) == 1
+    args = command.parse(["propose", str(path), "--file", str(path)])
+    assert command.run_propose(args) == 1
     err = capsys.readouterr().err.splitlines()
     assert (
         err == [f"{path}: its columns must be: {' '.join(unit_readings.COLUMNS)}"] * 2
@@ -286,35 +285,22 @@ def test_the_commands_run_as_operator_commands(
     path = tmp_path / "readings.tsv"
     stdin = io.TextIOWrapper(io.BytesIO("\n".join(NAMES).encode()))
     monkeypatch.setattr(sys, "stdin", stdin)
-    assert unit_readings.main(["propose", "-", "--file", str(path)]) == 0
+    assert command.main(["propose", "-", "--file", str(path)]) == 0
     assert capsys.readouterr().out.splitlines()[-1] == (
         f"Wrote {path}: 2 units, 0 corrected, 1 to choose, 0 no longer proposed."
     )
     corrected(path, g="Gbit/s")
     stdin = io.TextIOWrapper(io.BytesIO(path.read_bytes()))
     monkeypatch.setattr(sys, "stdin", stdin)
-    assert unit_readings.main(["load", "-"]) == 0
+    assert command.main(["load", "-"]) == 0
     assert capsys.readouterr().out.splitlines()[-1].startswith("Loaded 2 rules")
 
 
 def test_propose_refuses_outside_its_settings(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
-    monkeypatch.setattr(unit_readings, "set_up", lambda: None)
-    assert unit_readings.main(["propose", "-", "--file", str(tmp_path / "r")]) == 1
-
-
-def test_unit_readings_runs_as_a_module(
-    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
-) -> None:
-    monkeypatch.setattr(sys, "argv", ["unit_readings", "--help"])
-    with (
-        pytest.warns(RuntimeWarning, match="found in sys.modules"),
-        pytest.raises(SystemExit) as done,
-    ):
-        runpy.run_module("inventory_tng.catalogue.unit_readings", run_name="__main__")
-    assert done.value.code == 0
-    assert "propose" in capsys.readouterr().out
+    monkeypatch.setattr(command, "set_up", lambda: None)
+    assert command.main(["propose", "-", "--file", str(tmp_path / "r")]) == 1
 
 
 def test_names_not_in_utf_8_are_refused(
@@ -322,8 +308,8 @@ def test_names_not_in_utf_8_are_refused(
 ) -> None:
     names = tmp_path / "names.txt"
     names.write_bytes("Câble 3M\n".encode("latin-1"))
-    args = unit_readings.parse(["propose", str(names), "--file", str(tmp_path / "r")])
-    assert unit_readings.run_propose(args) == 1
+    args = command.parse(["propose", str(names), "--file", str(tmp_path / "r")])
+    assert command.run_propose(args) == 1
     assert capsys.readouterr().err.startswith(f"{names}: 'utf-8' codec")
 
 
@@ -335,9 +321,6 @@ def test_names_from_a_standard_input_already_text(
     monkeypatch.setattr(sys, "stdin", io.StringIO("\n".join(NAMES)))
     path = tmp_path / "readings.tsv"
     assert (
-        unit_readings.run_propose(
-            unit_readings.parse(["propose", "-", "--file", str(path)])
-        )
-        == 0
+        command.run_propose(command.parse(["propose", "-", "--file", str(path)])) == 0
     )
     assert sorted(rows_of(path)) == ["M", "g"]

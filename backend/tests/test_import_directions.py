@@ -5,8 +5,7 @@ and a module imported by name from its package (from inventory_tng.stock
 import ledger).
 
 Today's breaks are listed in BREAKS, which may only shrink: a new break
-fails, and so does one fixed but still listed. A rule naming a module that
-does not exist yet (manage.py) applies as it appears.
+fails, and so does one fixed but still listed.
 """
 
 import ast
@@ -278,13 +277,15 @@ def init_not_empty(tree: ast.Module, path: str, _known: Collection[str]) -> list
 def command_imported_outside_manage(
     tree: ast.Module, path: str, known: Collection[str]
 ) -> list[str]:
-    """A feature's command.py, which only the entry point imports."""
+    """A feature's command module (command.py, or <thing>_command.py where
+    it has two), which only the entry point imports."""
     if path == MANAGE:
         return []
     return [
         module
         for module in imported(tree, path, known)
-        if module.endswith("/command.py") and module.split("/")[0] not in NOT_FEATURES
+        if module.endswith(("/command.py", "_command.py"))
+        and module.split("/")[0] not in NOT_FEATURES
     ]
 
 
@@ -523,6 +524,11 @@ def test_an_init_not_empty_is_found(path: str, source: str, breaks: list[str]) -
             "def f():\n    from .catalogue.command import main",
             ["catalogue/command.py"],
         ),
+        (
+            "catalogue/items.py",
+            "from .totp_keys_command import main",
+            ["catalogue/totp_keys_command.py"],
+        ),
         ("manage.py", "from inventory_tng.catalogue import command", []),
         # core/command.py, what every command shares.
         ("ledger.py", "from inventory_tng.core.command import run_command", []),
@@ -532,5 +538,11 @@ def test_an_init_not_empty_is_found(path: str, source: str, breaks: list[str]) -
 def test_a_command_imported_outside_manage_is_found(
     path: str, source: str, breaks: list[str]
 ) -> None:
-    known = {*KNOWN, "core/command.py", "dev/__init__.py", "dev/command.py"}
+    known = {
+        *KNOWN,
+        "catalogue/totp_keys_command.py",
+        "core/command.py",
+        "dev/__init__.py",
+        "dev/command.py",
+    }
     assert command_imported_outside_manage(ast.parse(source), path, known) == breaks

@@ -282,10 +282,12 @@ by downgrading.
 Some things only the operator can do, with a command run where the app
 runs, with its settings. On Kubernetes, that means `kubectl exec` into the
 app's Deployment (`inventory` below; docs/decisions/0018); from a checkout,
-`uv run python -m …` in `backend/`:
+`uv run python -m …` in `backend/`. Every one is a command of
+`inventory_tng.manage`, which lists them all, and each says what it takes:
 
 ```sh
-kubectl exec deploy/inventory -- python -m inventory_tng.<command> --help
+kubectl exec deploy/inventory -- python -m inventory_tng.manage
+kubectl exec deploy/inventory -- python -m inventory_tng.manage <command> --help
 ```
 
 They are:
@@ -344,9 +346,9 @@ cannot be trusted to put it right: one of them could undo it. Lock every
 administrator out, then let one trusted person back in:
 
 ```sh
-kubectl exec deploy/inventory -- python -m inventory_tng.admins.command \
+kubectl exec deploy/inventory -- python -m inventory_tng.manage admins \
   lockdown --expect 3
-kubectl exec deploy/inventory -- python -m inventory_tng.admins.command \
+kubectl exec deploy/inventory -- python -m inventory_tng.manage admins \
   let-in ada
 ```
 
@@ -378,7 +380,7 @@ Make a key and put it in a Secret, mounted as a folder into the app's pods
 only:
 
 ```sh
-uv run python -m inventory_tng.admins.totp_keys new > 1
+uv run python -m inventory_tng.manage totp-keys new > 1
 kubectl create secret generic inventory-totp-keys --from-file=1
 ```
 
@@ -390,7 +392,7 @@ starting line lists the versions it has, `sealing_key_versions`), then seal
 every authenticator with it:
 
 ```sh
-kubectl exec deploy/inventory -- python -m inventory_tng.admins.totp_keys reseal
+kubectl exec deploy/inventory -- python -m inventory_tng.manage totp-keys reseal
 ```
 
 It says how many it resealed and how many it could not read. Once none is
@@ -403,7 +405,7 @@ app starts with whatever versions are present, and logs at startup how
 many it cannot read. Retire them:
 
 ```sh
-kubectl exec deploy/inventory -- python -m inventory_tng.admins.totp_keys \
+kubectl exec deploy/inventory -- python -m inventory_tng.manage totp-keys \
   retire-authenticators --unreadable
 ```
 
@@ -460,8 +462,9 @@ If no administrator can, the operator can make one (Operator commands,
 above):
 
 ```sh
-kubectl exec deploy/inventory -- python -m inventory_tng.devices.command \
-  create --uses 5 --days 1 --base-url https://<your host>
+kubectl exec deploy/inventory -- \
+  python -m inventory_tng.manage registration-codes create \
+  --uses 5 --days 1 --base-url https://<your host>
 ```
 
 ## Scan page settings
@@ -472,7 +475,7 @@ can, the operator can (Operator commands, above):
 
 ```sh
 kubectl exec deploy/inventory -- \
-  python -m inventory_tng.site_settings.scan_settings set --name-check-minutes 20
+  python -m inventory_tng.manage scan-settings set --name-check-minutes 20
 ```
 
 ## Unit readings
@@ -484,7 +487,7 @@ readings file from the names, one a line, with a proposed reading for
 each unit and the evidence for it:
 
 ```sh
-uv run python -m inventory_tng.catalogue.unit_readings \
+uv run python -m inventory_tng.manage unit-readings \
   propose names.txt --file readings.tsv
 ```
 
@@ -499,7 +502,7 @@ the import writes any name:
 
 ```sh
 kubectl exec -i deploy/inventory -- \
-  python -m inventory_tng.catalogue.unit_readings load - < readings.tsv
+  python -m inventory_tng.manage unit-readings load - < readings.tsv
 ```
 
 It writes a rule for each unit, by no administrator, and says what it did,
