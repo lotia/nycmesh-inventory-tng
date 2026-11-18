@@ -61,16 +61,46 @@ def test_an_items_open_packages_are_ordered_fewest_left_first() -> None:
     assert forms.open == [Decimal(40), Decimal(40), Decimal(120), Decimal(-8)]
 
 
+def test_an_items_sealed_packages_are_ordered_largest_first() -> None:
+    """Largest package size first, ties by package id (Ali, 2026-11-18,
+    inventory-tng-7mby), whatever order the balances arrive in."""
+    drum, pack = 12, 9
+    packages = {
+        BOX: open_packages.PackageSize("Box", Decimal(100), None),
+        pack: open_packages.PackageSize("Pack", Decimal(100), None),
+        drum: open_packages.PackageSize("Drum", Decimal(305), None),
+        SPOOL: open_packages.PackageSize("Spool", Decimal(305), None),
+    }
+    rows = [(package_id, None, Decimal(610)) for package_id in packages]
+    for arrived in (rows, rows[::-1], rows[1:] + rows[:1]):
+        forms = open_packages.split(arrived, packages, {})
+        assert [name for name, _, _ in forms.sealed] == [
+            "Spool",
+            "Drum",
+            "Pack",
+            "Box",
+        ]
+
+
 def test_reorder_on_usable_stock_and_sealed_minimums() -> None:
     cable = Item(id=1, name="Cable", minimum=Decimal(400))
     rope = Item(id=2, name="Rope", minimum=None)
     spool = ItemPackage(
-        id=10, item_id=1, name="Spool", name_shown="Spool", minimum_sealed=3
+        id=10,
+        item_id=1,
+        name="Spool",
+        name_shown="Spool",
+        size=Decimal(305),
+        minimum_sealed=3,
     )
-    coil = ItemPackage(id=11, item_id=2, name="Coil", minimum_sealed=1)
+    coil = ItemPackage(
+        id=11, item_id=2, name="Coil", size=Decimal(50), minimum_sealed=1
+    )
     usable = {1: Decimal(500), 2: Decimal(50)}
     sealed = {1: {10: Decimal(2)}, 2: {11: Decimal(1)}}
-    loose = ItemPackage(id=12, item_id=1, name="Box", minimum_sealed=None)
+    loose = ItemPackage(
+        id=12, item_id=1, name="Box", size=Decimal(100), minimum_sealed=None
+    )
     (row,) = stock_routes.reorder_rows(
         [cable, rope], usable, sealed, [spool, coil, loose], {1}
     )
@@ -80,6 +110,26 @@ def test_reorder_on_usable_stock_and_sealed_minimums() -> None:
         stock_routes.reorder_rows([cable], {1: Decimal(400)}, {}, [], set())[0].item
         is cable
     )
+
+
+def test_the_reorder_page_lists_low_sealed_packages_largest_first() -> None:
+    """As the stock page lists sealed packages (inventory-tng-7mby),
+    whatever order the packages arrive in."""
+    cable = Item(id=1, name="Cable", minimum=None)
+    sizes = {9: Decimal(100), 11: Decimal(100), 12: Decimal(305), 10: Decimal(305)}
+    packages = [
+        ItemPackage(
+            id=package_id,
+            item_id=1,
+            name_shown=f"P{package_id}",
+            size=size,
+            minimum_sealed=1,
+        )
+        for package_id, size in sizes.items()
+    ]
+    for arrived in (packages, packages[::-1], packages[1:] + packages[:1]):
+        (row,) = stock_routes.reorder_rows([cable], {}, {}, arrived, set())
+        assert [name for name, _, _ in row.low_sealed] == ["P10", "P12", "P9", "P11"]
 
 
 def test_in_stores_sums_an_items_stock_across_the_stores(

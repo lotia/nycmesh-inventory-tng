@@ -421,6 +421,12 @@ def fewest_left_first(opened: tuple[int, Decimal]) -> tuple[bool, Decimal, int]:
     return (left <= 0, left, open_id)
 
 
+def largest_first(package_id: int, size: Decimal) -> tuple[Decimal, int]:
+    """How an item's sealed packages are listed, by package id and size:
+    largest size first, ties by id (Ali, 2026-11-18, docs/decisions/0020)."""
+    return (-size, package_id)
+
+
 class PackageSize(NamedTuple):
     name: str
     size: Decimal
@@ -434,20 +440,26 @@ def split(
 ) -> Forms:
     """An item's balances at a place, each of a package (sealed), an open
     package, or neither (loose), as Forms: `packages` by id, and each open
-    package's package by its id, to tell a short end. Open packages and
-    short ends are listed fewest_left_first, whatever order `rows` come in."""
+    package's package by its id, to tell a short end. Sealed packages are
+    listed largest_first, and open packages and short ends
+    fewest_left_first, whatever order `rows` come in."""
     forms = Forms()
+    sealed: list[tuple[int, Decimal]] = []
     opened: list[tuple[int, Decimal]] = []
     for package_id, open_id, amount in rows:
         if package_id is not None:
-            package = packages[package_id]
-            count = amount / package.size
-            forms.sealed.append((package.name, count, amount))
-            forms.sealed_by_package[package_id] = count
+            sealed.append((package_id, amount))
         elif open_id is not None:
             opened.append((open_id, amount))
         else:
             forms.loose += amount
+    for package_id, amount in sorted(
+        sealed, key=lambda each: largest_first(each[0], packages[each[0]].size)
+    ):
+        package = packages[package_id]
+        count = amount / package.size
+        forms.sealed.append((package.name, count, amount))
+        forms.sealed_by_package[package_id] = count
     for open_id, amount in sorted(opened, key=fewest_left_first):
         short = packages[opened_from[open_id]].short_below
         short_end = is_short_end(amount, short)

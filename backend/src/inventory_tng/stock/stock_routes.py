@@ -242,9 +242,12 @@ def reorder_rows(
     """The items to reorder: usable stock at or below the item's reorder
     point, or a package's sealed below its minimum. `usable` and `sealed`
     (by item, then package) are in the stores; `short`, items less than
-    nothing somewhere there."""
+    nothing somewhere there. Low packages are listed as the stock page
+    lists sealed ones (open_packages.largest_first)."""
     minimums: dict[int, list[ItemPackage]] = {}
-    for package in packages:
+    for package in sorted(
+        packages, key=lambda each: open_packages.largest_first(each.id, each.size)
+    ):
         if package.minimum_sealed is not None and package.retired_at is None:
             minimums.setdefault(package.item_id, []).append(package)
     rows = []

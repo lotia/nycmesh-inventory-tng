@@ -7,7 +7,8 @@ amended 2026-11-11 (tracking opened packages is a setting; bulk actions)
 · amended 2026-11-12 (an open package on the scan page; correcting its
 length; "Needs your action") · amended 2026-11-14 (recorded more than
 moved; those settled listed, 2026-11-15) · amended 2026-11-18 (an item's
-open packages listed fewest left first)
+open packages listed fewest left first; its sealed packages largest
+first)
 
 ## Context
 
@@ -135,6 +136,9 @@ deployed, so the migrations may be rewritten (0016).
   305 m · open: 45 m, 120 m · loose: 85 m · short ends: 12 m · usable
   1,165 m. An item's open packages and short ends at a place are each
   listed by the scan page's rule: fewest left first (Ali, 2026-11-18).
+  Its sealed packages are listed largest package size first, ties by
+  package id, so the same records always show the same order; the
+  reorder page lists those low on sealed the same way (Ali, 2026-11-18).
 - **Reorder** compares usable stock in stores with the item's reorder
   point.
 - **Minimum sealed**: a package may set an optional minimum of sealed
