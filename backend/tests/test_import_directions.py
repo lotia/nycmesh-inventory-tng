@@ -17,6 +17,7 @@ sits at the top is shared.
 
 import ast
 import re
+from collections import defaultdict
 from collections.abc import Callable, Mapping
 from importlib.util import resolve_name
 from pathlib import Path
@@ -26,7 +27,7 @@ import pytest
 # Has every table: helpers.source imports every model.
 from inventory_tng.core.db import Base
 
-from helpers.source import SOURCE, modules
+from helpers.source import SOURCE, TEMPLATES, modules
 
 # The app's modules by their path under SOURCE, read.
 type App = Mapping[str, ast.Module]
@@ -275,7 +276,6 @@ def test_each_rule_finds_a_break(
     assert CHECKS[rule](path, app) == breaks
 
 
-TEMPLATES = SOURCE / "templates"
 # A template named in Python, or in a template's include, extends or import,
 # in either quote Jinja takes.
 TEMPLATE_NAME = re.compile(r"""["']((?:[a-z0-9_]+/)*[a-z0-9_]+\.(?:html|svg))["']""")
@@ -286,7 +286,9 @@ NOT_FEATURES = {"core", "dev", "models", "web"}
 
 def feature_of(path: Path) -> str:
     """The folder under templates/, or the package, that `path` is in; a
-    template at the top gives its own name."""
+    template at the top counts as web/'s, as it is shared."""
+    if path.parent == TEMPLATES:
+        return "web"
     return path.relative_to(
         TEMPLATES if path.is_relative_to(TEMPLATES) else SOURCE
     ).parts[0]
@@ -300,15 +302,17 @@ def test_a_features_templates_are_used_by_that_feature_alone() -> None:
     folders = {path.name for path in TEMPLATES.iterdir() if path.is_dir()}
     features = {path.parent.name for path in SOURCE.glob("*/__init__.py")}
     top = {path.name for path in TEMPLATES.iterdir() if path.is_file()}
-    users: dict[str, set[str]] = {name: set() for name in top}
+    users: defaultdict[str, set[str]] = defaultdict(set)
     elsewhere = set()
     for user in [*modules(), *TEMPLATES.rglob("*.html")]:
+        feature = feature_of(user)
         for name in TEMPLATE_NAME.findall(user.read_text()):
-            if "/" in name and feature_of(user) != name.split("/")[0]:
+            folder, slash, _ = name.partition("/")
+            if slash and folder != feature:
                 elsewhere.add((str(user.relative_to(SOURCE)), name))
-            users.setdefault(name, set()).add(feature_of(user))
+            users[name].add(feature)
     one_feature = {
-        name for name in top if len(users[name]) < 2 and not users[name] & {"web", *top}
+        name for name in top if len(users[name]) < 2 and "web" not in users[name]
     }
     assert (folders - (features - NOT_FEATURES), elsewhere, one_feature) == (
         set(),

@@ -4,7 +4,6 @@ the whole page, under its title."""
 
 import re
 from datetime import UTC, datetime
-from pathlib import Path
 
 import pytest
 from fastapi.testclient import TestClient
@@ -20,8 +19,7 @@ from inventory_tng.web import pages
 
 from helpers.markup import read, text
 from helpers.rows import add, tag
-
-TEMPLATES = Path(pages.__file__).parent.parent / "templates"
+from helpers.source import TEMPLATES
 
 pytestmark = pytest.mark.usefixtures("admin_client")
 

@@ -20,10 +20,11 @@ from httpx2 import Response
 from structlog.testing import capture_logs
 
 from inventory_tng.admins import paths
-from inventory_tng.core.local_env import CLONE
 from inventory_tng.core.settings import FrontendConfig, RateLimits
 from inventory_tng.scan.bundle import MANIFEST
 from inventory_tng.web import security_headers
+
+from helpers.source import TEMPLATES
 
 # A build with every entry the pages load, and one file to serve.
 MANIFEST_ENTRIES = {
@@ -242,7 +243,6 @@ def test_the_pages_render_without_this_module() -> None:
     subprocess.run([sys.executable, "-c", script], check=True)
 
 
-@pytest.mark.clone
 def test_no_template_has_inline_script_or_style() -> None:
     """The policy refuses them: a page's script is a file Vite builds
     (frontend/src/admin.ts), its look a class in the shared stylesheet."""
@@ -250,10 +250,9 @@ def test_no_template_has_inline_script_or_style() -> None:
         r"<script(?![^>]*\bsrc=)[^>]*>|<style\b|\sstyle=|\son[a-z]+=|javascript:",
         re.IGNORECASE,
     )
-    templates = CLONE / "backend" / "src" / "inventory_tng" / "templates"
     found = {
-        str(path.relative_to(templates)): match.group(0)
-        for path in templates.rglob("*")
+        str(path.relative_to(TEMPLATES)): match.group(0)
+        for path in TEMPLATES.rglob("*")
         if path.is_file()
         for match in [inline.search(path.read_text())]
         if match

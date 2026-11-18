@@ -1,6 +1,7 @@
 """The app's own source, read with Python's ast module by tests that check
 how it is written (test_locking.py, test_history.py, test_write_owners.py,
-test_import_directions.py). Nothing of it runs in the app."""
+test_import_directions.py), and its templates' folder. Nothing of it runs
+in the app."""
 
 import ast
 import re
@@ -15,6 +16,7 @@ from inventory_tng import models  # noqa: F401
 from inventory_tng.core.db import Base
 
 SOURCE = Path(inventory_tng.__file__).parent
+TEMPLATES = SOURCE / "templates"
 # Each model's class name, and its table's name.
 MODELS = {
     mapper.class_.__name__: mapper.class_.__tablename__
