@@ -84,6 +84,12 @@ run = [
     "uv run pytest tests/measure_catalogue.py -p no:randomly -p no:cacheprovider -q -s",
 ]
 
+[tasks.test-report]
+description = "Measure the three test suites: times, coverage, what each test alone covers, file sizes (CONTRIBUTING.md, Measuring the tests)"
+dir = "backend"
+depends = ["setup-browsers", "start-database"]
+run = "uv run python -m inventory_tng.dev.suite_report"
+
 [tasks.regenerate-fold-reference]
 description = "Write tests/fold_reference.tsv again, after a release of anyascii, or a Python with a newer Unicode, changes how it folds (CONTRIBUTING.md)"
 dir = "backend"

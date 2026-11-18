@@ -1111,19 +1111,18 @@ statements for a test of its own.
 
 Each checkout's tests, apps and browser tests use its own stack's
 PostgreSQL, which allows 400 connections (`compose.yaml`), less 3 kept for
-the superuser. A whole test run, measured over 8 processes, holds under 60
-at once, all processes together; one process held at most about 24, and
-one database under 20; a dev app
-up to 20, as does the browser tests' server. So a checkout's checks and its
-app fit with room to spare, and so would three checkouts sharing
-`inventory-tng` (Local settings). Each test database allows 40
-(`tests/databases.py`), so a process that leaks connections is refused at
-its own database, not the server's limit, and a test that fails for either
-limit says which. Long before a leak reaches that limit, a test that ends
-with a connection it took from any pool and kept errors at its teardown,
-named by `keeps_its_connections` in conftest.py. Each checkout's development
-database allows 30 (`dev/dev_database.py`): one app, and a migration or
-seed beside it, so it cannot starve the tests beside it.
+the superuser. A whole test run, measured over 8 processes, holds about 60
+at once, all processes together; one process, and one database, held at
+most about 21; a dev app up to 20, as does the browser tests' server. So a
+checkout's checks and its app fit with room to spare, and so would three
+checkouts sharing `inventory-tng` (Local settings). Each test database
+allows 40 (`tests/databases.py`), so a process that leaks connections is
+refused at its own database, not the server's limit, and a test that fails
+for either limit says which. Long before a leak reaches that limit, a test
+that ends with a connection it took from any pool and kept errors at its
+teardown, named by `keeps_its_connections` in conftest.py. Each checkout's
+development database allows 30 (`dev/dev_database.py`): one app, and a
+migration or seed beside it, so it cannot starve the tests beside it.
 
 ### Measuring the catalogue
 
@@ -1136,6 +1135,21 @@ years of 40 a day unless told otherwise), prints the plan of each ledger
 query the scan page's catalogue makes, as run (`EXPLAIN (ANALYZE,
 BUFFERS)`), and times `GET /api/catalogue`. It is not one of the checks:
 run it after changing those queries (inventory-tng-kcz).
+
+### Measuring the tests
+
+```sh
+mise run test-report         # about five minutes
+```
+
+It runs each suite, the backend's twice and each frontend test alone, and
+writes `.local/test-report/report.md`: each suite's tests, time and
+coverage, its slowest tests, how many tests cover nothing that no other
+test does, the groups of tests that cover exactly the same, and the
+longest test files. Beside it, a table per suite gives each test's
+seconds, what it covers, what it alone covers (what removing it would
+lose) and its group. Use it to find tests to merge or speed up; the
+module's docstring (`dev/suite_report.py`) says how each part is measured.
 
 ### Coverage
 
