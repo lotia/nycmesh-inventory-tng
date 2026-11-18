@@ -40,5 +40,4 @@ from inventory_tng.models import (  # noqa: F401
     site_settings,
     stock,
     volunteers,
-    web,
 )

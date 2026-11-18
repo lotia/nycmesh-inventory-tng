@@ -32,8 +32,8 @@ from inventory_tng.core.local_time import site_zone
 from inventory_tng.core.mail import Notify
 from inventory_tng.core.phrases import Words, lazy_gettext
 from inventory_tng.models.admins import running_low
-from inventory_tng.web.once import OnceKey, sent_before
 from inventory_tng.web.pages import add_notices, not_found, page, redirect
+from inventory_tng.web.single_use_forms import SingleUseKey, sent_before
 
 router = APIRouter(include_in_schema=False)
 
@@ -236,7 +236,7 @@ def new_recovery_codes(
     signed: ConfirmedByAuthenticator,
     session: DbSession,
     notify: Notify,
-    once: OnceKey = "",
+    single_use: SingleUseKey = "",
 ) -> Response:
     """With a code from an authenticator each time (ConfirmedByAuthenticator),
     and told to the owner: new codes void the old."""
@@ -245,7 +245,9 @@ def new_recovery_codes(
         # took the recovery codes section with it: said by the authenticators.
         problem = CODES_NEED_TOTP
         return _refused(request, session, signed, "authenticators", problem)
-    if again := sent_before(request, session, signed, once, "recovery_codes", ACCOUNT):
+    if again := sent_before(
+        request, session, signed, single_use, "recovery_codes", ACCOUNT
+    ):
         return again
     codes = accounts.make_recovery_codes(session, signed.admin.id, _now())
     changed(signed, session)

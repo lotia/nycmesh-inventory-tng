@@ -8,7 +8,7 @@ for them to choose a new password. Every administrator is told.{% endtrans %}{% 
 {% trans %}As changing another administrator matters, it needs your code: you haven't
 typed one recently.{% endtrans %}{% endif %}</p>
 {% call confirm(here, _("Reset their sign-in"), keep, _("Keep it as it is")) %}
-  {{ once_field() }}
+  {{ single_use_field() }}
   {% if code_needed %}{% include "admins/_code_field.html" %}{% endif %}
 {% endcall %}
 {% endblock %}

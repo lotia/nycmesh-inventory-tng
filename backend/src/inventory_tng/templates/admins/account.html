@@ -92,7 +92,7 @@
   your authenticator, not a recovery code.{% pluralize %}{{ count }} left. Making new ones voids the old,
   and asks for a code from your authenticator, not a recovery code.{% endtrans %}{% endif %}</p>
   <form method="post" action="{{ paths.account }}/recovery-codes">
-    {{ once_field() }}
+    {{ single_use_field() }}
     {% with code_totp = true, totp_only = true %}{% include "admins/_code_field.html" %}{% endwith %}
     <div class="actions"><button>{% trans %}Make new recovery codes{% endtrans %}</button></div>
   </form>

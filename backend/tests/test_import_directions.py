@@ -11,10 +11,9 @@ inside functions count, as do relative ones.
 | stock_imports_scan | stock importing scan/, which imports stock |
 | app_imports_devtools | any of the app importing backend/devtools/, which no image ships |
 
-Today's breaks are listed in BREAKS, which may only shrink: a new break
-fails, and so does one fixed but still listed. The last test holds where
-templates sit: a feature's folder is used by that feature alone, and what
-sits at the top is shared.
+The app breaks none of them. The last test holds where templates sit: a
+feature's folder is used by that feature alone, and what sits at the top
+is shared.
 """
 
 import ast
@@ -63,14 +62,6 @@ ROUTE_DECORATORS = {"get", "post", "put", "patch", "delete", "api_route", "webso
 # Calls that make or run a query: select(...), or session.execute and the
 # like. A session.get may stay.
 QUERY_CALLS = {"select", "execute", "scalar", "scalars"}
-
-# (rule, module, what it breaks the rule with), as found when the rules were
-# written.
-BREAKS = {
-    ("rules_import_fastapi_or_web", "web/once.py", "fastapi"),
-    ("rules_import_fastapi_or_web", "web/once.py", "starlette"),
-    ("rules_import_fastapi_or_web", "web/once.py", "web/pages.py"),
-}
 
 
 def imports(path: str, app: App) -> set[str]:
@@ -207,21 +198,18 @@ CHECKS: dict[str, Check] = {
 }
 
 
-def test_the_app_breaks_no_import_rule_but_those_listed() -> None:
+def test_the_app_breaks_no_import_rule() -> None:
     app = {
         str(path.relative_to(SOURCE)): ast.parse(path.read_text(), str(path))
         for path in modules()
     }
-    now = {
+    breaks = {
         (rule, path, what)
         for rule, check in CHECKS.items()
         for path in app
         for what in check(path, app)
     }
-    assert (now - BREAKS, BREAKS - now) == (set(), set()), (
-        "(new, fixed) breaks of docs/decisions/0023: put right what is new, "
-        "and take out of BREAKS what is fixed."
-    )
+    assert breaks == set(), "breaks of docs/decisions/0023: put them right"
 
 
 # Each rule, shown a break, finds it. The modules a case's imports may name.

@@ -43,6 +43,7 @@ from inventory_tng.admins.guards import AdminSignedIn, SignedIn
 from inventory_tng.catalogue.items_listing import SEARCHED
 from inventory_tng.core.db import DbSession, by_name, refusal
 from inventory_tng.core.phrases import Words, gettext, in_query, lazy_gettext, ngettext
+from inventory_tng.core.sent_forms import form_key
 from inventory_tng.models.admins import Admin
 from inventory_tng.models.base import INTEGER_MAX, whole
 from inventory_tng.models.catalogue import Item, ItemPackage
@@ -78,7 +79,6 @@ from inventory_tng.web.admin_pages import admin_page, current_rows, now, text_fo
 from inventory_tng.web.forms import RULES, row_id
 from inventory_tng.web.listing import UNASKED, AskedView, Sort, Sorting, View, order
 from inventory_tng.web.navigation import SECTION_COUNTS
-from inventory_tng.web.once import form_key
 from inventory_tng.web.pages import add_notices, not_found, redirect
 
 log = structlog.get_logger(__name__)

@@ -3,11 +3,11 @@ codes, a sign-in link (inventory-tng-8i4.74).
 
 Such a page is the form's own answer, never kept (pages.page), so Back then
 Forward offers to send the form again. Each form carries a key made when it
-was shown ({{ once_field() }}), and its route asks sent_before() first: sent
-again, the key is found spent and nothing is made, rather than a second
-secret that voids the first. A double-click is stopped before that, in the
-browser (frontend/src/admin/once.ts): it would show only the second answer,
-and the first's secret never.
+was shown ({{ single_use_field() }}), and its route asks sent_before() first:
+sent again, the key is found spent (core/sent_forms.py) and nothing is made,
+rather than a second secret that voids the first. A double-click is stopped
+before that, in the browser (frontend/src/admin/single-use-forms.ts): it
+would show only the second answer, and the first's secret never.
 """
 
 import uuid
@@ -20,13 +20,11 @@ from fastapi.responses import HTMLResponse
 from jinja2 import pass_context
 from jinja2.runtime import Context
 from markupsafe import Markup
-from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.orm import Session
 from starlette.exceptions import HTTPException
 
-from inventory_tng.core.db import exists_where
 from inventory_tng.core.phrases import lazy_gettext
-from inventory_tng.models.web import SentForm
+from inventory_tng.core.sent_forms import form_key, spend
 from inventory_tng.web.pages import page, templates
 
 if TYPE_CHECKING:  # admins.guards imports this module.
@@ -34,9 +32,9 @@ if TYPE_CHECKING:  # admins.guards imports this module.
 
 log = structlog.get_logger(__name__)
 
-FIELD = "once"
-# A route's parameter for the key: name it `once`.
-OnceKey = Annotated[str, Form(alias=FIELD)]
+FIELD = "single_use"
+# A route's parameter for the key: name it `single_use`.
+SingleUseKey = Annotated[str, Form(alias=FIELD)]
 
 # What was made, for the log and the page: a fixed list. "change": what a
 # form that showed nothing made, or what one sent again is answered with
@@ -70,27 +68,17 @@ BACK = "back"
 
 
 @pass_context
-def once_field(context: Context) -> Markup:
-    """The hidden field with a new key, for a form to send once, and the
-    page it is on (BACK). Never filled in by the browser, which may
-    otherwise put back a spent key when the form's page is shown again."""
+def single_use_field(context: Context) -> Markup:
+    """The hidden field with a new key, for a single-use form, and the page
+    it is on (BACK). Never filled in by the browser, which may otherwise put
+    back a spent key when the form's page is shown again."""
     return Markup(
         '<input type="hidden" name="{}" value="{}" autocomplete="off">'
         '<input type="hidden" name="{}" value="{}">'
     ).format(FIELD, uuid.uuid4(), BACK, context["request"].url.path)
 
 
-cast(dict[str, Any], templates.env.globals)["once_field"] = once_field
-
-
-def form_key(typed: object) -> uuid.UUID | None:
-    """A form's key, as its page made it, or None if it isn't one."""
-    if not isinstance(typed, str):
-        return None
-    try:
-        return uuid.UUID(typed)
-    except ValueError:
-        return None
+cast(dict[str, Any], templates.env.globals)["single_use_field"] = single_use_field
 
 
 def sent_before(
@@ -110,22 +98,9 @@ def sent_before(
     if key is None:
         log.info("form key missing", made=made, admin_id=signed.admin.id)
         raise HTTPException(status_code=400)
-    added = session.execute(
-        insert(SentForm)
-        .values(key=key)
-        .on_conflict_do_nothing(index_elements=["key"])
-        .returning(SentForm.key)
-    )
-    if added.first() is not None:
+    if spend(session, key):
         return None
     return sent_again(request, signed, made, back)
-
-
-def spent(session: Session, typed: object) -> bool:
-    """Whether the form with this key was sent before, without spending it:
-    so one sent again is answered before a code is spent on it."""
-    key = form_key(typed)
-    return key is not None and exists_where(session, SentForm.key == key)
 
 
 def sent_again(

@@ -33,11 +33,13 @@ from helpers.markup import (
     text,
 )
 from helpers.rows import history
-from helpers.sign_in import confirmed_long_ago, once
+from helpers.sign_in import confirmed_long_ago, single_use
 
 
 def make_code(client: TestClient, **form: str) -> tuple[Response, str]:
-    made = client.post(CODES, data=once(uses="2", days="1", label="Open day") | form)
+    made = client.post(
+        CODES, data=single_use(uses="2", days="1", label="Open day") | form
+    )
     match = re.search(r'class="key">([a-z-]+)<', made.text)
     return made, match.group(1) if match else ""
 
@@ -183,7 +185,7 @@ def test_revoking_the_ticked_ones_asks_first(
     b = device_at(session, datetime(2026, 11, 5, 13, tzinfo=UTC))
     kept = device_at(session, datetime(2026, 11, 5, 14, tzinfo=UTC))
     old = device_at(session, datetime(2026, 11, 1, 12, tzinfo=UTC))
-    form = once(since="2026-11-03T00:00", code="", state="current")
+    form = single_use(since="2026-11-03T00:00", code="", state="current")
     ticked = form | {"device": [str(a.id), str(b.id), str(old.id)]}
     asked = admin_client.post(BULK_REVOKE, data=ticked)
     assert revoke_many_title(2) in text(asked)
@@ -207,7 +209,7 @@ def test_one_device_is_asked_about_in_the_singular(
     admin_client: TestClient, session: Session
 ) -> None:
     a = device_at(session, datetime(2026, 11, 5, 12, tzinfo=UTC))
-    asked = admin_client.post(BULK_REVOKE, data=once(device=str(a.id)))
+    asked = admin_client.post(BULK_REVOKE, data=single_use(device=str(a.id)))
     assert revoke_many_title(1) in text(asked)
 
 
@@ -245,7 +247,7 @@ def test_a_bulk_revoke_is_sent_once(admin_client: TestClient, session: Session) 
     """Its key spent, the same form names a device still current: refused."""
     a = device_at(session, datetime(2026, 11, 5, 12, tzinfo=UTC))
     b = device_at(session, datetime(2026, 11, 5, 13, tzinfo=UTC))
-    form = once(sure="yes")
+    form = single_use(sure="yes")
     assert (
         admin_client.post(BULK_REVOKE, data=form | {"device": str(a.id)}).status_code
         == 303
@@ -428,7 +430,7 @@ def test_a_revoke_keeps_the_window_and_sort(
     admin_client: TestClient, session: Session
 ) -> None:
     device = device_at(session, datetime(2026, 11, 5, 12, tzinfo=UTC))
-    form = once(
+    form = single_use(
         since="2026-11-05T06:00",
         until="2026-11-05T08:00",
         code="",

@@ -49,11 +49,11 @@ from inventory_tng.core.settings import RateLimits
 from inventory_tng.devices import devices
 from inventory_tng.models.admins import Admin, AdminPassword, AdminSession
 from inventory_tng.models.catalogue import Category, Item, ItemPackage
+from inventory_tng.models.core import SentForm
 from inventory_tng.models.places import Location
 from inventory_tng.models.site_settings import SignInSettings
 from inventory_tng.models.stock import LedgerTransaction
 from inventory_tng.models.volunteers import Volunteer
-from inventory_tng.models.web import SentForm
 from inventory_tng.places import locations
 from inventory_tng.scan import catalogue_api
 from inventory_tng.scan.batch import BatchRefused, KeyReused, Recorded, record
@@ -1465,7 +1465,7 @@ def changes_open(committed: Committed, session_id: int) -> None:
 
 
 def inviting(client: TestClient, key: str, username: str) -> Answer:
-    return client.post(ADMINS, data={"once": key, "username": username})
+    return client.post(ADMINS, data={"single_use": key, "username": username})
 
 
 @pytest.mark.end_to_end
@@ -1474,7 +1474,7 @@ def test_a_form_refused_after_its_key_is_spent_can_be_sent_again(
 ) -> None:
     """A taken username is found after the key is spent: refused without a
     commit, nothing is kept, so the same form, put right, goes through
-    (web/once.py, inventory-tng-8i4.74)."""
+    (web/single_use_forms.py, inventory-tng-8i4.74)."""
     client, _ = real_client
     changes_open(committed, signed_in_as_ben(committed, client, admins[2]))
     key = str(uuid.uuid4())

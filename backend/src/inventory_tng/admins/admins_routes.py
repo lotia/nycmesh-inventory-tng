@@ -35,9 +35,9 @@ from inventory_tng.web.admin_pages import admin_page, now, retirement, site_link
 from inventory_tng.web.forms import rule_words
 from inventory_tng.web.listing import AskedView, Sort, Sorting, View, arranged
 from inventory_tng.web.navigation import SECTION_ADMINS
-from inventory_tng.web.once import OnceKey, sent_before
 from inventory_tng.web.pages import add_notices, not_found, redirect
 from inventory_tng.web.qr_codes import qr_svg
+from inventory_tng.web.single_use_forms import SingleUseKey, sent_before
 
 log = structlog.get_logger(__name__)
 
@@ -207,7 +207,7 @@ def invite(
     notify: Notify,
     username: Annotated[str, Form()] = "",
     email: Annotated[str, Form()] = "",
-    once: OnceKey = "",
+    single_use: SingleUseKey = "",
 ) -> Response:
     username, email = username.strip(), email.strip()
     problems = invite_problems(username, email)
@@ -219,7 +219,7 @@ def invite(
         )
 
     if not problems and (
-        again := sent_before(request, session, signed, once, "link", ADMINS)
+        again := sent_before(request, session, signed, single_use, "link", ADMINS)
     ):
         return again
     try:
@@ -276,10 +276,10 @@ def reset(
     session: DbSession,
     notify: Notify,
     admin_id: int,
-    once: OnceKey = "",
+    single_use: SingleUseKey = "",
 ) -> Response:
     if again := sent_before(
-        request, session, signed, once, "link", f"{ADMINS}/{admin_id}"
+        request, session, signed, single_use, "link", f"{ADMINS}/{admin_id}"
     ):
         return again
     try:
@@ -299,10 +299,10 @@ def retire(
     session: DbSession,
     notify: Notify,
     admin_id: int,
-    once: OnceKey = "",
+    single_use: SingleUseKey = "",
 ) -> Response:
     if again := sent_before(
-        request, session, signed, once, "change", f"{ADMINS}/{admin_id}"
+        request, session, signed, single_use, "change", f"{ADMINS}/{admin_id}"
     ):
         return again
     try:
@@ -320,10 +320,10 @@ def restore(
     session: DbSession,
     notify: Notify,
     admin_id: int,
-    once: OnceKey = "",
+    single_use: SingleUseKey = "",
 ) -> Response:
     if again := sent_before(
-        request, session, signed, once, "link", f"{ADMINS}/{admin_id}"
+        request, session, signed, single_use, "link", f"{ADMINS}/{admin_id}"
     ):
         return again
     try:

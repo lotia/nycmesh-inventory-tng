@@ -1,13 +1,13 @@
 /**
- * A form that makes something shown once (backend web/once.py) is sent once: a
- * double-click would show only the second answer, "Already sent". The flag
- * stops it; disabling the buttons shows it, once the form's data is taken,
- * so a named button still sends its value. Back to a kept page, its spent
+ * A form that makes something shown once (backend web/single_use_forms.py) is
+ * sent once: a double-click would show only the second answer, "Already
+ * sent". The flag stops it; disabling the buttons shows it, once the form's
+ * data is taken, so a named button still sends its value. Back to a kept page, its spent
  * key is useless, so the page is fetched again.
  */
 
-/** The field such a form carries its key in (backend once.FIELD). */
-export const ONCE_FIELD = "once";
+/** The field such a form carries its key in (backend single_use_forms.FIELD). */
+export const SINGLE_USE_FIELD = "single_use";
 
 export function sendOnce(window: Window): void {
   // On the window, after the document's listeners, such as the retire
@@ -17,7 +17,7 @@ export function sendOnce(window: Window): void {
     if (
       event.defaultPrevented ||
       !(form instanceof HTMLFormElement) ||
-      !form.querySelector(`input[name="${ONCE_FIELD}"]`)
+      !form.querySelector(`input[name="${SINGLE_USE_FIELD}"]`)
     ) {
       return;
     }

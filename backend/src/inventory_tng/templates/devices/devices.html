@@ -9,7 +9,7 @@ someone remote. Making one asks for a fresh code.{% endtrans %}</p>
 <section>
   <h2>{% trans %}Make a registration code{% endtrans %}</h2>
   <form method="post" action="{{ codes_path }}">
-    {{ once_field() }}
+    {{ single_use_field() }}
     <label>{% trans %}What it's for{% endtrans %} <span class="hint">{% trans %}optional, such as "Hub open day"{% endtrans %}</span>
       <input name="label" value="{{ values.get('label', '') }}" maxlength="{{ name_max }}">
       {% with name = "label" %}{% include "_field_problem.html" %}{% endwith %}

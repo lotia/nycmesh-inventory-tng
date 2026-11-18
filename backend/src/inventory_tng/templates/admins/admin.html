@@ -31,7 +31,7 @@
   a link to pass on, which works once, within a day, for them to choose a
   password.{% endtrans %}</p>
   <form method="post" action="{{ here }}/restore">
-    {{ once_field() }}
+    {{ single_use_field() }}
     {% if code_needed %}{% include "admins/_code_field.html" %}{% endif %}
     <div class="actions"><button>{% trans %}Bring them back{% endtrans %}</button></div>
   </form>
@@ -43,7 +43,7 @@
   authenticators and recovery codes are removed. You can bring them back
   later.{% endtrans %}</p>
   <form method="post" action="{{ here }}/retire">
-    {{ once_field() }}
+    {{ single_use_field() }}
     {% if code_needed %}{% include "admins/_code_field.html" %}{% endif %}
     <div class="actions"><button>{% trans %}Retire{% endtrans %}</button></div>
   </form>

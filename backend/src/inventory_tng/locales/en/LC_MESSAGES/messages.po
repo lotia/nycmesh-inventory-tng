@@ -817,7 +817,7 @@ msgstr[1] ""
 msgid "All labels"
 msgstr ""
 
-#: src/inventory_tng/web/once.py
+#: src/inventory_tng/web/single_use_forms.py
 msgid "Already sent"
 msgstr ""
 
@@ -3570,20 +3570,20 @@ msgstr ""
 msgid "That doesn't look like an email address."
 msgstr ""
 
-#: src/inventory_tng/web/once.py
+#: src/inventory_tng/web/single_use_forms.py
 msgid ""
 "That form was already sent, and made a registration code, shown then. "
 "Nothing new was made. It can't be shown again: Back and Forward don't "
 "keep it."
 msgstr ""
 
-#: src/inventory_tng/web/once.py
+#: src/inventory_tng/web/single_use_forms.py
 msgid ""
 "That form was already sent, and made a sign-in link, shown then. Nothing "
 "new was made. It can't be shown again: Back and Forward don't keep it."
 msgstr ""
 
-#: src/inventory_tng/web/once.py
+#: src/inventory_tng/web/single_use_forms.py
 msgid ""
 "That form was already sent, and made recovery codes, shown then. Nothing "
 "new was made. It can't be shown again: Back and Forward don't keep it."

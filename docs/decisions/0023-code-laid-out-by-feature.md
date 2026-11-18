@@ -87,12 +87,13 @@ decided the structure below on 2026-11-17.
     (`scan/batch.py`) writes through the ledger, so imports run from scan
     to stock (Ali, 2026-11-18, inventory-tng-h657.4).
 
-  The breaks found when the test was written are listed in it and may
-  only shrink. On 2026-11-17 Ali dropped two rules that caught no real
-  harm, package `__init__.py` files staying empty and only the entry point
-  importing a command; the same change dropped a third, that a `paths.py`
-  imports only core and other `paths.py`, as a cycle through one fails at
-  import anyway (inventory-tng-atmx.16).
+  The app breaks none of them: the breaks found when the test was written,
+  all in `web/once.py`, went when it was split (inventory-tng-h657.3). On
+  2026-11-17 Ali dropped two rules that caught no real harm, package
+  `__init__.py` files staying empty and only the entry point importing a
+  command; the same change dropped a third, that a `paths.py` imports only
+  core and other `paths.py`, as a cycle through one fails at import anyway
+  (inventory-tng-atmx.16).
 
 - **The frontend**, `frontend/src/`, is grouped by page (Ali, 2026-11-17,
   inventory-tng-x5jz): `scan/`, `register/` and `admin/` hold what one
@@ -137,6 +138,12 @@ short test. `core/` is the name FastAPI's full-stack template uses;
 - On 2026-11-18 the other files and names the amendment's decision named
   were renamed or moved (inventory-tng-u3fp.3), each in the tables below,
   and callers stopped importing modules under an alias.
+- On 2026-11-18 `web/once.py` was split in two (inventory-tng-h657.3):
+  `core/sent_forms.py`, the `sent_form` table's owner, which imports
+  neither FastAPI nor `web/`, and `web/single_use_forms.py`, the form
+  field, the template global and the page saying a form was sent again.
+  "Once" became "single-use" in their names and in the form field's,
+  which is `single_use`.
 - Older decision records keep the paths of their time. The tables below
   give each old path's new home; a later move adds its rows.
 
@@ -197,6 +204,7 @@ queries to its `queries.py`.
 | `ledger.py` | `stock/ledger.py`, with `_each_once`, `_hold_forms` as `each_once`, `hold_forms`; `record`, with openings into open packages, the problems of a batch by line, the replay of a batch sent again, `BatchRefused`, `KeyReused`, `Recorded`, `retired_sides` and their metrics: `scan/batch.py`; `moment`, `expected`, `expected_forms`, `left_at`, `corrected_since`: `stock/moments.py`, with `_flows`, `_form_flows`, `_at_place` as `flows`, `form_flows`, `at_place`; `record_count`, `count_open_package`, `record_adjustment`, the rest of counts and adjustments and their metrics: `stock/counts.py`; the balance queries: `stock/balance.py`; `save_batch`: `scan/batch_api.py`; the batch request and reply schemas: `scan/batch_schemas.py`, but for `Line.entry`: `scan/batch.py`, as `entry_of` |
 | `models.py` | `models/`: each table in its feature's module; the column types, `whole`, the columns and constraints most tables have, and `Versioned`: `models/base.py`; canonical names, name keys and search folding (`CanonicalName`, `KeyedName`, `Searchable`, `fold` and the rest): `models/names.py`; `_refold`: `models/catalogue.py`; `_reference`, `_one_of`, `_between`, `_unique_name`, `_unique_current_name`, `_name_key_check`: each without its `_` |
 | `models/catalogue.py` | itself, with `reading_rules` as `reading_rules_held` |
+| `models/web.py` | `models/core.py` |
 | `open_packages.py` | `stock/open_packages.py`; `tracks_opened`: `stock/ledger.py` |
 | `openapi.py` | `backend/devtools/write_api_schema.py` |
 | `page_telemetry.py` | `scan/page_telemetry.py`; `over_limit`: `web/browser.py` |
@@ -219,6 +227,7 @@ queries to its `queries.py`.
 | `volunteers/routes.py` | `volunteers/volunteers_routes.py` |
 | `web.py` | `web/browser.py` |
 | `web/admin.py` | `web/admin_pages.py`; `SETTLED_VIEW`: `stock/over_recorded_routes.py`; `TICK_OPEN_PACKAGES`: `stock/forms.py` |
+| `web/once.py` | `web/single_use_forms.py`, with `OnceKey` and `once_field` as `SingleUseKey` and `single_use_field`; `form_key`, `spent` as `is_spent`, and spending a key, as `spend`: `core/sent_forms.py` |
 
 In `backend/src/inventory_tng/templates/`, these templates moved whole
 into their feature's folder and kept their names:
@@ -245,6 +254,12 @@ their names:
 | `scan/` | `camera.ts`, `cart.ts`, `decoder.ts`, `labels.ts`, `older.ts`, `OpenPackageCard.tsx`, `recorded.ts`, `Scanner.tsx`, `ScanPage.tsx` |
 | `shared/` | `build.ts`, `Field.tsx`, `i18n.ts`, `mount.tsx`, `outbox.ts`, `quantity.ts`, `registration.ts`, `stored.ts`, `telemetry.ts` |
 | `testing/` | `test-camera.ts`, `test-catalogue.ts`, `test-fetch.ts`, `test-saves.ts`, `test-scan-page.tsx`, `test-setup.ts`, `test-storage.ts`, each without its `test-` |
+
+Later renamed:
+
+| Old path | New path |
+| --- | --- |
+| `admin/once.ts` | `admin/single-use-forms.ts`, with `ONCE_FIELD` as `SINGLE_USE_FIELD` |
 
 Parts of `cart.ts` and `ScanPage.tsx` were split out first:
 

@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, expect, test, vi } from "vitest";
-import { ONCE_FIELD, sendOnce } from "./once";
+import { SINGLE_USE_FIELD, sendOnce } from "./single-use-forms";
 
 sendOnce(window);
 
@@ -15,8 +15,8 @@ beforeEach(() => {
   // After sendOnce's, as the browser would send it on.
   window.addEventListener("submit", record);
   document.body.innerHTML = `
-    <form id="once">
-      <input type="hidden" name="${ONCE_FIELD}" value="k">
+    <form id="single-use">
+      <input type="hidden" name="${SINGLE_USE_FIELD}" value="k">
       <input name="label">
       <button name="go" value="yes">Make</button>
       <input type="submit" value="Also">
@@ -35,13 +35,13 @@ const form = (id: string) => document.getElementById(id) as HTMLFormElement;
 
 test("a form shown once is sent once, its buttons then disabled", () => {
   vi.useFakeTimers();
-  form("once").requestSubmit();
+  form("single-use").requestSubmit();
   // Not before its data is taken, so a named button still sends its value.
-  expect(form("once").querySelector("button")?.disabled).toBe(false);
+  expect(form("single-use").querySelector("button")?.disabled).toBe(false);
   vi.runAllTimers();
-  form("once").requestSubmit();
+  form("single-use").requestSubmit();
   expect(sent).toEqual([false, true]);
-  const disabled = [...form("once").elements].map(
+  const disabled = [...form("single-use").elements].map(
     (control) => (control as HTMLButtonElement).disabled,
   );
   expect(disabled).toEqual([false, false, true, true, false]);
@@ -56,9 +56,9 @@ test("any other form is sent as often as asked", () => {
 test("a form another listener stopped is not marked sent", () => {
   const stop = (event: Event) => event.preventDefault();
   document.addEventListener("submit", stop);
-  form("once").requestSubmit();
+  form("single-use").requestSubmit();
   document.removeEventListener("submit", stop);
-  expect(form("once").dataset.sent).toBeUndefined();
+  expect(form("single-use").dataset.sent).toBeUndefined();
 });
 
 /** A pageshow event; happy-dom's PageTransitionEvent has no persisted. */
@@ -72,7 +72,7 @@ test("back to a kept page with a form sent, the page is fetched again", () => {
     .mockImplementation(() => {});
   window.dispatchEvent(shown(true));
   expect(reload).not.toHaveBeenCalled();
-  form("once").dataset.sent = "yes";
+  form("single-use").dataset.sent = "yes";
   window.dispatchEvent(shown(false));
   expect(reload).not.toHaveBeenCalled();
   window.dispatchEvent(shown(true));

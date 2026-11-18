@@ -231,7 +231,7 @@ def adjustment(
     session: Session, form: Mapping[str, str], key: uuid.UUID | None
 ) -> tuple[Adjustment | None, dict[str, Words]]:
     """The adjustment the form asks for, unless something is wrong, and
-    what is: a form without its `key` (once.form_key) is out of date."""
+    what is: a form without its `key` (sent_forms.form_key) is out of date."""
     problems: dict[str, Words] = {}
     location_id = row_id(form.get("location_id", ""))
     place = session.get(Location, location_id) if location_id is not None else None

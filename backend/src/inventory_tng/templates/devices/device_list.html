@@ -29,7 +29,7 @@ registered while it lasted, then revoke the ones that look wrong.{% endtrans %}<
 {% endcall %}
 
 <form method="post" action="{{ revoke }}">
-  {{ once_field() }}
+  {{ single_use_field() }}
   {% for name, value in view.fields() %}
   <input type="hidden" name="{{ name }}" value="{{ value }}">
   {% endfor %}

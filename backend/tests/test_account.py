@@ -38,11 +38,11 @@ from helpers.sign_in import (
     codes_with_left,
     confirmed_long_ago,
     new_admin,
-    once,
     other_session,
     policy,
     reset_link,
     sign_in_with,
+    single_use,
 )
 
 ACCOUNT = paths.ACCOUNT
@@ -207,7 +207,7 @@ def test_recovery_codes_need_an_authenticator(
     policy(session, "optional")
     admin, _ = new_admin(session, totp=False)
     sign_in_with(client)
-    form = once(**{guards.CONFIRM_FIELD: PASSWORD})
+    form = single_use(**{guards.CONFIRM_FIELD: PASSWORD})
     refused = client.post(f"{ACCOUNT}/recovery-codes", data=form)
     # Sent from a page shown before its last authenticator went: refused,
     # with nothing made, and said by the authenticators, as the page now has
@@ -290,11 +290,11 @@ def test_new_recovery_codes(
 ) -> None:
     """With a code from the authenticator, each time, even with the window
     open."""
-    asked = client.post(f"{ACCOUNT}/recovery-codes", data=once())
+    asked = client.post(f"{ACCOUNT}/recovery-codes", data=single_use())
     assert asked.status_code == 403
     assert "or a recovery code" not in text(asked)
     with app_clock() as at:
-        form = once(**{guards.CONFIRM_FIELD: code(ada[1], at + TIME_STEP)})
+        form = single_use(**{guards.CONFIRM_FIELD: code(ada[1], at + TIME_STEP)})
         made = client.post(f"{ACCOUNT}/recovery-codes", data=form)
     codes = re.findall(RECOVERY_CODE, made.text)
     assert len(codes) == accounts.RECOVERY_CODES
@@ -312,12 +312,12 @@ def test_a_recovery_code_does_not_make_new_ones(
     assert key is not None
     first, second, *_ = accounts.make_recovery_codes(session, ada.id, datetime.now(UTC))
     sign_in_with(client, code=first)
-    form = once(**{guards.CONFIRM_FIELD: second})
+    form = single_use(**{guards.CONFIRM_FIELD: second})
     refused = client.post(f"{ACCOUNT}/recovery-codes", data=form)
     assert refused.status_code == 400
     assert accounts.recovery_codes_left(session, ada.id) == accounts.RECOVERY_CODES - 1
     with app_clock() as at:
-        form = once(**{guards.CONFIRM_FIELD: code(key, at + TIME_STEP)})
+        form = single_use(**{guards.CONFIRM_FIELD: code(key, at + TIME_STEP)})
         made = client.post(f"{ACCOUNT}/recovery-codes", data=form)
     assert made.status_code == 200
     assert "recovery_codes_made" in [m.kind for m in sent_mail]

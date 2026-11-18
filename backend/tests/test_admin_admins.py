@@ -30,9 +30,9 @@ from helpers.sign_in import (
     admin_named,
     confirmed_long_ago,
     new_admin,
-    once,
     reset_link,
     sign_in_with,
+    single_use,
     token_of,
     with_code,
 )
@@ -190,7 +190,7 @@ def test_resetting_another_asks_to_confirm_first(
     assert "can't be undone" in words
     assert "danger" in button(asked.text, "Reset their sign-in").classes
     assert ("Keep it as it is", path) in links(asked.text)
-    assert 'name="once"' in asked.text
+    assert 'name="single_use"' in asked.text
     assert accounts.has_password(session, ben.id)  # Only its button resets.
     me = admin_named(session, "ada")
     own = admin_client.get(f"{ADMINS}/{me.id}/reset")
@@ -355,7 +355,7 @@ def test_changes_here_ask_for_a_fresh_code(
     admin_client: TestClient, session: Session
 ) -> None:
     confirmed_long_ago(session)
-    asked = admin_client.post(ADMINS, data=once(username="grace"))
+    asked = admin_client.post(ADMINS, data=single_use(username="grace"))
     assert asked.status_code == 403
     assert (
         session.scalars(select(Admin).where(Admin.username == "grace")).first() is None
@@ -424,7 +424,7 @@ def test_changing_another_needs_a_recent_code(
     code_typed_ago(session, 29)
     page = text(admin_client.get(f"{ADMINS}/{ben.id}"))
     assert 'name="confirm_code"' not in page
-    retire = admin_client.post(f"{ADMINS}/{ben.id}/retire", data=once())
+    retire = admin_client.post(f"{ADMINS}/{ben.id}/retire", data=single_use())
     assert retire.status_code == 303
     assert ben.retired_at is not None
     code_typed_ago(session, 31)
@@ -437,12 +437,12 @@ def test_changing_another_needs_a_recent_code(
         asked.split()
     )
     for action in ("reset", "retire"):
-        asked = admin_client.post(f"{ADMINS}/{carol.id}/{action}", data=once())
+        asked = admin_client.post(f"{ADMINS}/{carol.id}/{action}", data=single_use())
         assert asked.status_code == 403
         assert 'name="confirm_code"' in asked.text
-    asked = admin_client.post(f"{ADMINS}/{ben.id}/restore", data=once())
+    asked = admin_client.post(f"{ADMINS}/{ben.id}/restore", data=single_use())
     assert asked.status_code == 403
-    asked = admin_client.post(ADMINS, data=once(username="grace"))
+    asked = admin_client.post(ADMINS, data=single_use(username="grace"))
     assert asked.status_code == 403
     assert accounts.has_password(session, carol.id)
     assert carol.retired_at is None
@@ -456,7 +456,7 @@ def test_at_0_minutes_each_change_asks_for_a_code(
     ben, _ = new_admin(session, "ben")
     code_typed_ago(session, 0)
     assert 'name="confirm_code"' in text(admin_client.get(ADMINS))
-    asked = admin_client.post(f"{ADMINS}/{ben.id}/retire", data=once())
+    asked = admin_client.post(f"{ADMINS}/{ben.id}/retire", data=single_use())
     assert asked.status_code == 403
     assert ben.retired_at is None
 
@@ -469,11 +469,11 @@ def test_a_code_typed_on_one_change_covers_the_next(
     code_typed_ago(session, 31)
     form = with_code(session)
     assert admin_client.post(f"{ADMINS}/{ben.id}/retire", data=form).status_code == 303
-    again = admin_client.post(f"{ADMINS}/{carol.id}/retire", data=once())
+    again = admin_client.post(f"{ADMINS}/{carol.id}/retire", data=single_use())
     assert again.status_code == 303
     assert carol.retired_at is not None
     # And an invite, within the window, needs none.
-    invited = admin_client.post(ADMINS, data=once(username="grace"))
+    invited = admin_client.post(ADMINS, data=single_use(username="grace"))
     assert invited.status_code == 200
 
 
@@ -557,7 +557,7 @@ def test_a_key_spent_by_another_form_does_not_skip_the_code(
     form = with_code(session)
     assert admin_client.post(f"{ADMINS}/{ben.id}/reset", data=form).status_code == 200
     taken = admin_client.post(
-        f"{ADMINS}/{carol.id}/retire", data={"once": form["once"]}
+        f"{ADMINS}/{carol.id}/retire", data={"single_use": form["single_use"]}
     )
     assert taken.status_code == 409
     assert carol.retired_at is None
@@ -593,7 +593,8 @@ def test_a_change_sent_again_once_its_code_lapsed_spends_none(
     code_typed_ago(session, 31)
     me = admin_named(session, "ada")
     left = accounts.recovery_codes_left(session, me.id)
-    # The page it was on, as its form carries it (once.once_field).
+    # The page it was on, as its form carries it
+    # (single_use_forms.single_use_field).
     again = admin_client.post(
         f"{ADMINS}/{ben.id}/retire", data=form | {"back": f"{ADMINS}/{ben.id}"}
     )
@@ -611,7 +612,7 @@ def test_the_first_change_after_signing_in_asks_for_a_code(
     ben, _ = new_admin(session, "ben")
     carol, _ = new_admin(session, "carol")
     assert 'name="confirm_code"' in text(admin_client.get(f"{ADMINS}/{ben.id}"))
-    asked = admin_client.post(f"{ADMINS}/{ben.id}/retire", data=once())
+    asked = admin_client.post(f"{ADMINS}/{ben.id}/retire", data=single_use())
     assert asked.status_code == 403
     me = admin_named(session, "ada")
     first = accounts.make_recovery_codes(session, me.id, datetime.now(UTC))[0]
@@ -619,11 +620,11 @@ def test_the_first_change_after_signing_in_asks_for_a_code(
         paths.CONFIRM, data={guards.CONFIRM_FIELD: first, "next": ADMINS}
     )
     assert confirmed.status_code == 303
-    asked = admin_client.post(f"{ADMINS}/{ben.id}/retire", data=once())
+    asked = admin_client.post(f"{ADMINS}/{ben.id}/retire", data=single_use())
     assert asked.status_code == 403
     form = with_code(session)
     assert admin_client.post(f"{ADMINS}/{ben.id}/retire", data=form).status_code == 303
-    retire_carol = admin_client.post(f"{ADMINS}/{carol.id}/retire", data=once())
+    retire_carol = admin_client.post(f"{ADMINS}/{carol.id}/retire", data=single_use())
     assert retire_carol.status_code == 303
 
 

@@ -5,8 +5,8 @@
 import { copyButtons, printButtons } from "./admin/buttons";
 import { suggest } from "./admin/combobox";
 import { followPicks, followTyped, followWas } from "./admin/hints";
-import { sendOnce } from "./admin/once";
 import { guardRetire } from "./admin/retire";
+import { sendOnce } from "./admin/single-use-forms";
 
 guardRetire(document);
 sendOnce(window);

@@ -1,5 +1,7 @@
-"""Plumbing's tables: the history of changes, and rate limits."""
+"""Plumbing's tables: the history of changes, rate limits, and the keys of
+single-use forms sent."""
 
+import uuid
 from datetime import datetime
 
 from sqlalchemy import (
@@ -15,6 +17,7 @@ from sqlalchemy.dialects.postgresql import ARRAY, JSONB
 from sqlalchemy.orm import Mapped, mapped_column
 
 from inventory_tng.core.db import ACTOR_PATTERN, Base, protection
+from inventory_tng.models.base import CreatedAt, IntId
 
 
 class CatalogueHistory(Base):
@@ -63,3 +66,16 @@ class RateLimit(Base):
     key: Mapped[str] = mapped_column(Text, primary_key=True)
     hits: Mapped[list[datetime]] = mapped_column(ARRAY(DateTime(timezone=True)))
     expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+
+
+class SentForm(Base):
+    """A form that makes something shown only once, by the key it was shown
+    with (web/single_use_forms.py), so sending it again makes nothing. Only
+    ever added to, so it is its own history, as the ledger is."""
+
+    __tablename__ = "sent_form"
+    __table_args__ = (protection(owner="core/sent_forms.py", lock=None, history=False),)
+
+    id: Mapped[IntId]
+    created_at: Mapped[CreatedAt]
+    key: Mapped[uuid.UUID] = mapped_column(unique=True)

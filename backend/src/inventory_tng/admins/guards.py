@@ -16,8 +16,9 @@ An administrator page takes one of:
 - `ConfirmedByAuthenticator`: that, for making new recovery codes, with a
   code from an authenticator each time, never a recovery code.
 
-Each is a Need. A form sent once (once.sent_before) and sent again while a
-code would be asked for is answered so before one is spent (once.spent).
+Each is a Need. A single-use form (single_use_forms.sent_before) sent again
+while a code would be asked for is answered so before one is spent
+(sent_forms.is_spent).
 
 A form through any of these (or ConfirmedAny) also holds every
 administrator's lock (accounts.lock_admins) until it commits, so it runs
@@ -63,10 +64,11 @@ from inventory_tng.core.db import (
 )
 from inventory_tng.core.mail import Notify
 from inventory_tng.core.phrases import Words, lazy_gettext
+from inventory_tng.core.sent_forms import is_spent
 from inventory_tng.core.settings import RateLimits
 from inventory_tng.models.admins import Admin, AdminSession
 from inventory_tng.models.site_settings import SignInSettings
-from inventory_tng.web import once
+from inventory_tng.web import single_use_forms
 from inventory_tng.web.navigation import Badge, sections
 from inventory_tng.web.pages import page, redirect, templates
 
@@ -261,12 +263,12 @@ class Need:
     """What a form's confirmation needs: a code typed within `window`;
     whether a recovery code will do; whether a code typed for it opens the
     window for changes to other administrators; and what a form sent again
-    is said to have made (once.Made)."""
+    is said to have made (single_use_forms.Made)."""
 
     window: Callable[[AdminSession, SignInSettings, datetime], bool]
     recovery: bool
     account_change: bool
-    made: once.Made
+    made: single_use_forms.Made
 
 
 # Sensitive actions.
@@ -331,14 +333,14 @@ async def _confirmed(
     was_open = need.window(signed.row, signed.settings, _now())
     # A form sent again, as Back then Forward offers, while a code would be
     # asked for: said so before one is spent on it. Otherwise its route
-    # says so (once.sent_before).
+    # says so (single_use_forms.sent_before).
     if not was_open and await run_in_threadpool(
-        once.spent, session, form.get(once.FIELD)
+        is_spent, session, form.get(single_use_forms.FIELD)
     ):
-        # The page the form was on (once.once_field): browsers send no
+        # The page the form was on (single_use_forms.single_use_field): browsers send no
         # Referer here (security_headers.REFERRER_POLICY).
-        back = _local(str(form.get(once.BACK, "")))
-        raise Answered(once.sent_again(request, signed, need.made, back))
+        back = _local(str(form.get(single_use_forms.BACK, "")))
+        raise Answered(single_use_forms.sent_again(request, signed, need.made, back))
     if not was_open:
         typed = form.get(CONFIRM_FIELD)
         if not isinstance(typed, str):

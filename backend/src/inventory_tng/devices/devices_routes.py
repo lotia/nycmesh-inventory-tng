@@ -46,9 +46,9 @@ from inventory_tng.web.listing import (
 )
 from inventory_tng.web.listing import order as order_of
 from inventory_tng.web.navigation import SECTION_DEVICES
-from inventory_tng.web.once import OnceKey, sent_before
 from inventory_tng.web.pages import add_notices, not_found, redirect
 from inventory_tng.web.qr_codes import qr_svg
+from inventory_tng.web.single_use_forms import SingleUseKey, sent_before
 
 log = structlog.get_logger(__name__)
 
@@ -176,7 +176,7 @@ def make_code(
     uses: Annotated[str, Form()] = "1",
     days: Annotated[str, Form()] = "1",
     label: Annotated[str, Form()] = "",
-    once: OnceKey = "",
+    single_use: SingleUseKey = "",
 ) -> Response:
     form = {"uses": uses, "days": days, "label": label}
     label = label.strip()
@@ -184,7 +184,7 @@ def make_code(
     if problems or max_uses is None or lifetime is None:
         return _list_page(request, session, signed, problems=problems, values=form)
     if again := sent_before(
-        request, session, signed, once, "registration_code", DEVICES
+        request, session, signed, single_use, "registration_code", DEVICES
     ):
         return again
     code, phrase = devices.create_code(
@@ -462,7 +462,7 @@ def revoke_devices(
     per: Annotated[str, Form()] = "",
     page: Annotated[str, Form()] = "",
     sure: Annotated[str, Form()] = "",
-    once: OnceKey = "",
+    single_use: SingleUseKey = "",
 ) -> Response:
     """Asks first, saying how many, then revokes those selected that the
     filter still matches, once."""
@@ -483,10 +483,12 @@ def revoke_devices(
                 "keep": DEVICE_LIST,
                 "filter": query,
                 "devices": current,
-                "once": once,
+                "single_use": single_use,
             },
         )
-    if again := sent_before(request, session, signed, once, "change", DEVICE_LIST):
+    if again := sent_before(
+        request, session, signed, single_use, "change", DEVICE_LIST
+    ):
         return again
     devices.revoke_devices(session, chosen, [d.id for d in current], now())
     changed(signed, session)

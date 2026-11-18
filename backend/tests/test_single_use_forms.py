@@ -1,5 +1,6 @@
 """A form that makes something shown only once, sent again, as Back then
-Forward offers, makes nothing new (web/once.py, inventory-tng-8i4.74)."""
+Forward offers, makes nothing new (web/single_use_forms.py,
+inventory-tng-8i4.74)."""
 
 import re
 from collections.abc import Callable
@@ -12,14 +13,14 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 from structlog.testing import capture_logs
 
-from inventory_tng.admins import accounts
+from inventory_tng.admins import accounts, guards
 from inventory_tng.admins.paths import ACCOUNT, ADMINS
 from inventory_tng.core.local_env import CLONE
+from inventory_tng.core.sent_forms import form_key, spend
 from inventory_tng.devices.paths import CODES, DEVICES
 from inventory_tng.models.admins import Admin, ResetLink
 from inventory_tng.models.devices import RegistrationCode
-from inventory_tng.web import once
-from inventory_tng.web.once import SENT_AGAIN
+from inventory_tng.web.single_use_forms import FIELD, SENT_AGAIN
 
 from helpers.mail import NO_MAIL, SentMail
 from helpers.markup import read, text
@@ -40,7 +41,7 @@ CANT_SHOW = "Back and Forward can't show this page again"
 def key_on(page: Response, action: str) -> str:
     """The key of the form on the page that is sent to `action`."""
     match = re.search(
-        rf'action="{re.escape(action)}"[^>]*>\s*<input type="hidden" name="once" '
+        rf'action="{re.escape(action)}"[^>]*>\s*<input type="hidden" name="single_use" '
         r'value="([0-9a-f-]+)" autocomplete="off">',
         page.text,
     )
@@ -51,7 +52,7 @@ def key_on(page: Response, action: str) -> str:
 def sent_twice(
     client: TestClient, page: str, action: str, **form: str
 ) -> tuple[Response, Response]:
-    form["once"] = key_on(client.get(page), action)
+    form["single_use"] = key_on(client.get(page), action)
     return client.post(action, data=form), client.post(action, data=form)
 
 
@@ -62,7 +63,7 @@ def sent_twice_with_codes(
     with a new one of Ada's."""
     key = key_on(client.get(page), action)
     made, again = (
-        client.post(action, data=with_code(session) | {"once": key}) for _ in "12"
+        client.post(action, data=with_code(session) | {"single_use": key}) for _ in "12"
     )
     return made, again
 
@@ -108,7 +109,10 @@ def test_recovery_codes_are_made_once(
     referer = {"referer": f"https://testserver{ACCOUNT}"}
     with app_clock() as at:
         later = code(key, at + TIME_STEP)
-        form = {"once": key_on(client.get(ACCOUNT), action), "confirm_code": later}
+        form = {
+            "single_use": key_on(client.get(ACCOUNT), action),
+            "confirm_code": later,
+        }
         made = client.post(action, data=form, headers=referer)
         again = client.post(action, data=form, headers=referer)
     assert CANT_SHOW in text(made)
@@ -118,6 +122,35 @@ def test_recovery_codes_are_made_once(
     assert accounts.recovery_codes_left(session, ada.id) == accounts.RECOVERY_CODES
     codes = [item.text for item in read(made.text).all("li")]
     assert [code for code in codes if re.fullmatch(r"[A-Z0-9-]+", code)]
+
+
+def test_recovery_codes_sent_again_past_the_guard_make_none(
+    make_client: Callable[..., TestClient],
+    session: Session,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Two sendings at once: the guard finds the key unspent, and another
+    sending spends it before the route does, which then makes nothing."""
+
+    def spent_meanwhile(session: Session, typed: object) -> bool:
+        key = form_key(typed)
+        assert key is not None
+        spend(session, key)
+        return False
+
+    monkeypatch.setattr(guards, "is_spent", spent_meanwhile)
+    client = make_client()
+    _, key = new_admin(session)
+    sign_in_with(client, key=key)
+    action = f"{ACCOUNT}/recovery-codes"
+    form = {"single_use": key_on(client.get(ACCOUNT), action)}
+    with app_clock() as at:
+        form["confirm_code"] = code(key, at + TIME_STEP)
+        again = client.post(action, data=form)
+    assert_sent_again(again, ACCOUNT)
+    assert str(SENT_AGAIN["recovery_codes"]) in text(again)
+    (ada,) = session.scalars(select(Admin)).all()
+    assert accounts.recovery_codes_left(session, ada.id) == 0
 
 
 def link_count(session: Session, admin: Admin) -> int:
@@ -159,13 +192,13 @@ def test_bringing_back_and_inviting_are_sent_once(
 
 
 def test_a_form_without_its_key_is_a_bad_request(admin_client: TestClient) -> None:
-    refused = admin_client.post(CODES, data={"uses": "1", "once": "not a key"})
+    refused = admin_client.post(CODES, data={"uses": "1", "single_use": "not a key"})
     assert refused.status_code == 400
 
 
 def test_a_key_that_is_not_text_is_none() -> None:
     """As a form without the field gives (form.get)."""
-    assert once.form_key(None) is None
+    assert form_key(None) is None
 
 
 def test_a_form_sent_once_carries_its_page(admin_client: TestClient) -> None:
@@ -176,7 +209,7 @@ def test_a_form_sent_once_carries_its_page(admin_client: TestClient) -> None:
 
 @pytest.mark.clone
 def test_the_page_script_names_the_field_a_form_sent_once_carries() -> None:
-    """frontend/src/admin/once.ts, which stops a second sending of such a form,
-    finds it by this field."""
-    source = (CLONE / "frontend" / "src" / "admin" / "once.ts").read_text()
-    assert f'export const ONCE_FIELD = "{once.FIELD}";' in source
+    """frontend/src/admin/single-use-forms.ts, which stops a second sending
+    of such a form, finds it by this field."""
+    source = (CLONE / "frontend" / "src" / "admin" / "single-use-forms.ts").read_text()
+    assert f'export const SINGLE_USE_FIELD = "{FIELD}";' in source
