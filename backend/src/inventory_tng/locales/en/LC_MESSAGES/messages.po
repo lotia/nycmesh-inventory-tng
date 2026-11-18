@@ -962,7 +962,7 @@ msgid ""
 "manufacturer and part number, or that old code."
 msgstr ""
 
-#: src/inventory_tng/admin/locations.py
+#: src/inventory_tng/places/forms.py
 msgid "Another place beside it, perhaps a retired one, already has that name."
 msgstr ""
 
@@ -986,7 +986,7 @@ msgstr ""
 msgid "Anyone"
 msgstr ""
 
-#: src/inventory_tng/admin/locations.py
+#: src/inventory_tng/places/forms.py
 msgid "Area inside another"
 msgstr ""
 
@@ -2610,11 +2610,11 @@ msgstr ""
 msgid "Pick one"
 msgstr ""
 
-#: src/inventory_tng/admin/locations.py
+#: src/inventory_tng/places/forms.py
 msgid "Pick what it is."
 msgstr ""
 
-#: src/inventory_tng/admin/locations.py
+#: src/inventory_tng/places/forms.py
 msgid "Pick where it is."
 msgstr ""
 
@@ -3513,7 +3513,7 @@ msgstr ""
 msgid "Stop them holding stock first."
 msgstr ""
 
-#: src/inventory_tng/admin/locations.py
+#: src/inventory_tng/places/forms.py
 msgid "Store"
 msgstr ""
 
@@ -3999,7 +3999,7 @@ msgstr ""
 msgid "Username"
 msgstr ""
 
-#: src/inventory_tng/admin/locations.py
+#: src/inventory_tng/places/forms.py
 msgid "Vehicle"
 msgstr ""
 

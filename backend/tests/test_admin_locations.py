@@ -6,9 +6,11 @@ from fastapi.testclient import TestClient
 from sqlalchemy import update
 from sqlalchemy.orm import Session
 
-from inventory_tng.admin.locations import LOCATIONS, PICK_WHAT, PICK_WHERE, TAKEN
+from inventory_tng.accounts import name_up_to
+from inventory_tng.admin.locations import LOCATIONS
 from inventory_tng.models import Location, Volunteer
-from inventory_tng.web.forms import PICK_A_ZONE, RULES
+from inventory_tng.places.forms import PICK_WHAT, PICK_WHERE, TAKEN
+from inventory_tng.web.forms import NAME_MAX, PICK_A_ZONE, RULES
 
 from helpers.markup import options, text
 from helpers.rows import add, history, named, shown, tag
@@ -52,6 +54,9 @@ def test_a_place_needs_a_kind_and_an_area_keeps_a_place(
     refused = admin_client.post(LOCATIONS, data={"name": "Shelf", "kind": "cave"})
     assert refused.status_code == 400
     assert str(PICK_WHAT) in text(refused)
+    nameless = admin_client.post(LOCATIONS, data={"name": " ", "kind": "store"})
+    assert nameless.status_code == 400
+    assert name_up_to(NAME_MAX) in text(nameless)
     hub = place(session, "Hub", "store")
     shelf = place(session, "Shelf", "area", hub)
     form = {"name": "Shelf", "parent_id": "", "version": shown(shelf)}

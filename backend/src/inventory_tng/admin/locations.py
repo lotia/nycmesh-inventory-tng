@@ -31,33 +31,16 @@ from inventory_tng.labels import labels
 from inventory_tng.models import STORE_KINDS, Label, Location
 from inventory_tng.pages import not_found, redirect
 from inventory_tng.places import queries
+from inventory_tng.places.forms import KINDS, TAKEN, new_place, place_change
 from inventory_tng.volunteers import queries as volunteers_queries
-from inventory_tng.web.forms import (
-    ALERTS,
-    RULES,
-    chosen,
-    form_version,
-    name_problem,
-    rule_words,
-)
+from inventory_tng.web.forms import ALERTS, RULES, form_version, rule_words
 
 log = structlog.get_logger(__name__)
 
 router = APIRouter(include_in_schema=False)
 
 LOCATIONS = f"{ADMIN}/locations"
-# What an administrator makes here; custody comes with a volunteer.
-KINDS = {
-    "store": lazy_gettext("Store"),
-    "area": lazy_gettext("Area inside another"),
-    "vehicle": lazy_gettext("Vehicle"),
-}
 CUSTODY = lazy_gettext("Volunteer's custody")
-TAKEN = lazy_gettext(
-    "Another place beside it, perhaps a retired one, already has that name."
-)
-PICK_WHAT = lazy_gettext("Pick what it is.")
-PICK_WHERE = lazy_gettext("Pick where it is.")
 
 
 @dataclass
@@ -174,14 +157,7 @@ def add_location(
 ) -> Response:
     name = name.strip()
     form = {"name": name, "kind": kind, "parent_id": parent_id}
-    problems: dict[str, Words] = {}
-    if problem := name_problem(name):
-        problems["name"] = problem
-    if kind not in KINDS:
-        problems["kind"] = PICK_WHAT
-    parent = chosen(session, Location, parent_id) if kind == "area" else None
-    if kind == "area" and parent is None:
-        problems["parent_id"] = PICK_WHERE
+    parent, problems = new_place(session, name, kind, parent_id)
     location, broken = None, None
     if not problems:
         under = parent.id if parent else None
@@ -229,10 +205,8 @@ def save_location(
     if found is None:
         return not_found()
     name = name.strip()
-    problem, broken = name_problem(name), None
-    parent = chosen(session, Location, parent_id) if found.kind == "area" else None
-    if found.kind == "area" and parent is None:
-        problem = PICK_WHERE
+    broken = None
+    parent, problem = place_change(session, found, name, parent_id)
 
     if problem is None:
         under = parent.id if parent else None
