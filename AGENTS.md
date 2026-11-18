@@ -62,6 +62,12 @@ is, read [README.md](README.md).
     who decided and when, not as a choice's letter or a question's code.
     `backend/tests/test_artifact_links.py` refuses artifact links and such
     citations in the clone's files.
+12. **Every file and module is clearly named and does one thing.** Its
+    name says what it holds: a reader can guess the functions and classes
+    inside from the name, and nothing inside surprises them. When a module
+    grows a second job, split it into files named for each job rather than
+    widening the name. This is a judgement, not a check. Where code goes is
+    in `docs/decisions/0023-code-laid-out-by-feature.md`.
 
 ## More guidance
 
