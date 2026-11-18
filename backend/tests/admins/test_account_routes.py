@@ -591,26 +591,22 @@ def test_changing_the_email_voids_reset_links_and_tells_the_old_address(
     assert [(m.kind, m.to) for m in sent_mail] == [("email_changed", "old@example.org")]
 
 
-def test_a_password_changed_on_the_account_page_is_told(
-    make_client: Callable[..., TestClient], session: Session, sent_mail: SentMail
+@pytest.mark.parametrize(
+    ("email", "told"), [("ada@example.org", ["password_changed"]), (None, [])]
+)
+def test_a_password_changed_on_the_account_page_is_told_if_there_is_an_address(
+    make_client: Callable[..., TestClient],
+    session: Session,
+    sent_mail: SentMail,
+    email: str | None,
+    told: list[str],
 ) -> None:
     client = make_client(mailer=sent_mail)
-    _, key = new_admin(session, email="ada@example.org")
+    _, key = new_admin(session, email=email)
     sign_in_with(client, key=key)
     form = {"password": NEW_PASSWORD, "password_again": NEW_PASSWORD}
     client.post(f"{ACCOUNT}/password", data=form)
-    assert [m.kind for m in sent_mail] == ["password_changed"]
-
-
-def test_no_address_no_notice(
-    make_client: Callable[..., TestClient], session: Session, sent_mail: SentMail
-) -> None:
-    client = make_client(mailer=sent_mail)
-    _, key = new_admin(session)
-    sign_in_with(client, key=key)
-    form = {"password": NEW_PASSWORD, "password_again": NEW_PASSWORD}
-    client.post(f"{ACCOUNT}/password", data=form)
-    assert sent_mail == []
+    assert [m.kind for m in sent_mail] == told
 
 
 def test_changing_the_password_voids_reset_links(

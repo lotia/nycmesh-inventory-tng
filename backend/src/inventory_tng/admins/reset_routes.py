@@ -20,9 +20,8 @@ from sqlalchemy.orm import Session
 from inventory_tng.admins import accounts, mail_messages
 from inventory_tng.admins.guards import TOO_MANY
 from inventory_tng.admins.paths import FORGOT, RECOVER, RESET, SIGN_IN, reset_url
-from inventory_tng.core import mail
 from inventory_tng.core.db_sessions import DbSession, SessionFactory, Sessions
-from inventory_tng.core.mail import Notify
+from inventory_tng.core.mail import Mailer, Notify, deliver
 from inventory_tng.core.phrases import Words, lazy_gettext
 from inventory_tng.models.admins import ResetLink
 from inventory_tng.web.browser import rate_key
@@ -101,7 +100,7 @@ def forgot(
 
 
 def _email_reset(
-    sessions: SessionFactory, mailer: mail.Mailer, site_url: str, username: str
+    sessions: SessionFactory, mailer: Mailer, site_url: str, username: str
 ) -> None:
     """After the reply, in a session of its own."""
     with sessions() as session:
@@ -110,7 +109,7 @@ def _email_reset(
             return
         session.commit()
     link = reset_url(site_url, found.token)
-    mail.deliver(mailer, mail_messages.reset_link(found.email, found.admin_id, link))
+    deliver(mailer, mail_messages.reset_link(found.email, found.admin_id, link))
 
 
 def _reset_page(
