@@ -952,7 +952,7 @@ msgstr ""
 msgid "Another administrator uses that address."
 msgstr ""
 
-#: src/inventory_tng/admin/volunteers.py
+#: src/inventory_tng/volunteers/forms.py
 msgid "Another current volunteer already has that name or email."
 msgstr ""
 
@@ -2622,7 +2622,7 @@ msgstr ""
 msgid "Pick who they duplicate"
 msgstr ""
 
-#: src/inventory_tng/admin/volunteers.py
+#: src/inventory_tng/volunteers/forms.py
 msgid "Pick who they duplicate."
 msgstr ""
 
@@ -3803,7 +3803,7 @@ msgstr ""
 msgid "They no longer hold stock."
 msgstr ""
 
-#: src/inventory_tng/admin/volunteers.py
+#: src/inventory_tng/volunteers/forms.py
 msgid "They still hold stock: move it back to a store first."
 msgstr ""
 

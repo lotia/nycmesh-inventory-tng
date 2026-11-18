@@ -13,7 +13,6 @@ from fastapi.responses import HTMLResponse, JSONResponse, Response
 from sqlalchemy import exists, func, not_
 from sqlalchemy.orm import Session
 
-from inventory_tng.accounts import email_problem
 from inventory_tng.admin.common import (
     ADMIN,
     SECTION_VOLUNTEERS,
@@ -29,24 +28,21 @@ from inventory_tng.core.phrases import Words, gettext, lazy_gettext
 from inventory_tng.models import Location, Volunteer
 from inventory_tng.pages import NOTICES, not_found, redirect
 from inventory_tng.volunteers import queries, volunteers
-from inventory_tng.web.forms import (
-    ALERTS,
-    RULES,
-    chosen,
-    form_version,
-    name_problem,
-    rule_words,
+from inventory_tng.volunteers.forms import (
+    PICK_INTO,
+    STILL_HOLD,
+    TAKEN,
+    merging,
+    volunteer_problems,
 )
+from inventory_tng.web.forms import ALERTS, RULES, form_version, rule_words
 
 log = structlog.get_logger(__name__)
 
 router = APIRouter(include_in_schema=False)
 
 VOLUNTEERS = f"{ADMIN}/volunteers"
-TAKEN = lazy_gettext("Another current volunteer already has that name or email.")
-PICK_INTO = lazy_gettext("Pick who they duplicate.")
 BRING_THEM_BACK = lazy_gettext("Bring them back")
-STILL_HOLD = lazy_gettext("They still hold stock: move it back to a store first.")
 
 MERGED = lazy_gettext("Merged. Their past records now count as the other's.")
 CUSTODY_ON = lazy_gettext("They can hold stock now.")
@@ -194,15 +190,6 @@ def _refused(
     )
 
 
-def _checked(name: str, email: str) -> dict[str, Words]:
-    problems = {}
-    if problem := name_problem(name):
-        problems["name"] = problem
-    if problem := email_problem(email):
-        problems["email"] = problem
-    return problems
-
-
 @router.get(VOLUNTEERS)
 def list_volunteers(
     request: Request,
@@ -233,7 +220,7 @@ def add_volunteer(
     email: Annotated[str, Form()] = "",
 ) -> Response:
     name, email = name.strip(), email.strip()
-    problems = _checked(name, email)
+    problems = volunteer_problems(name, email)
     volunteer, broken = None, None
     if not problems:
         volunteer, broken = attempt(
@@ -273,7 +260,7 @@ def save_volunteer(
     if found is None:
         return not_found()
     name, email = name.strip(), email.strip()
-    problems = _checked(name, email)
+    problems = volunteer_problems(name, email)
     if not problems:
         seen = form_version(version)
         _, broken = attempt(
@@ -349,19 +336,6 @@ def retire_volunteer(
     return redirect(VOLUNTEERS, notice="retired", undo=str(volunteer_id))
 
 
-def _merging(
-    session: Session, volunteer_id: int, into_id: str
-) -> tuple[Volunteer | None, Volunteer | None]:
-    """The duplicate, if current, and who it is merged into, if another
-    current volunteer."""
-    found = session.get(Volunteer, volunteer_id)
-    # Before `into` is checked, so a retired one is not found whatever it is.
-    if found is None or found.retired_at is not None:
-        return None, None
-    into = chosen(session, Volunteer, into_id)
-    return found, (None if into is None or into.id == found.id else into)
-
-
 @router.get(f"{VOLUNTEERS}/{{volunteer_id}}/merge")
 def confirm_merge(
     request: Request,
@@ -371,7 +345,7 @@ def confirm_merge(
     into_id: str = "",
 ) -> Response:
     """Merging can't be undone as such: say what it does first."""
-    found, into = _merging(session, volunteer_id, into_id)
+    found, into = merging(session, volunteer_id, into_id)
     if found is None:
         return not_found()
     if into is None:
@@ -399,7 +373,7 @@ def merge_volunteer(
     into_id: Annotated[str, Form()] = "",
 ) -> Response:
     """This one is a duplicate of `into_id`: retired, pointing at it."""
-    found, into = _merging(session, volunteer_id, into_id)
+    found, into = merging(session, volunteer_id, into_id)
     if found is None:
         return not_found()
     if into is None:
