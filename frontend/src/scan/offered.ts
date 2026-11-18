@@ -196,8 +196,9 @@ export function offered(
 /** offered's open packages of an item at a place, as the stock page lists
  * them (open_packages.fewest_left_first): fewest left first, those
  * showing nothing, or less, last, ties by id (docs/decisions/0020). One
- * opened here has none yet (0) and will be given the next, so it follows
- * those saved, in the order it was opened. */
+ * opened on this phone that the catalogue does not show yet has no id
+ * here (0), so it follows those that have one, in the order it was
+ * opened. By what is on each now, never after a cut being typed. */
 export function offeredAt(
   all: readonly Offered[],
   itemId: number,

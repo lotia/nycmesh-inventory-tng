@@ -133,8 +133,8 @@ deployed, so the migrations may be rewritten (0016).
   on a line of its own, clearly labelled, loose units included, so a
   total never hides what it is made of, for example: 3 sealed spools of
   305 m · open: 45 m, 120 m · loose: 85 m · short ends: 12 m · usable
-  1,165 m. An item's open packages at a place are listed as on the scan
-  page: fewest left first (Ali, 2026-11-18).
+  1,165 m. An item's open packages and short ends at a place are each
+  listed by the scan page's rule: fewest left first (Ali, 2026-11-18).
 - **Reorder** compares usable stock in stores with the item's reorder
   point.
 - **Minimum sealed**: a package may set an optional minimum of sealed
@@ -265,11 +265,12 @@ you" counts every report in one line, which hides what is waiting.
   changes until the save, and offline it counts only this phone's cuts.
 - **Several open packages at a place** are a card each, fewest left
   first, so volunteers use up the nearly empty ones before starting
-  fuller ones, and in the same order as on the stock page; ties go by
-  open package id, so the same records always show the same order (Ali,
-  2026-11-18, replacing most left first). One showing nothing or less is
-  last, greyed, flagged "Shows nothing left", so the next volunteer can
-  report it.
+  fuller ones, short ends among them; ties go by open package id, so
+  the same records always show the same order (Ali, 2026-11-18,
+  replacing most left first). The stock page uses the same rule. One
+  showing nothing or less is last, greyed, flagged "Shows nothing left",
+  so the next volunteer can report it. Ordered by **Now**, so no card
+  moves while a cut is typed.
 - **One checkbox, one wording**: "Nothing usable left on it", whatever is
   typed, in the card whose legend names the package.
 - **It ticks itself** when a cut leaves a short end, uses up what the

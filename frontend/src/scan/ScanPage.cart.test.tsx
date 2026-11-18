@@ -337,6 +337,17 @@ describe("filling and saving a cart", () => {
     expect(
       within(cards[0] as HTMLElement).queryByText(say(SHOWS_NOTHING_LEFT)),
     ).toBeNull();
+    // Ordered by what is on each now, not after a cut being typed, so no
+    // card moves under the volunteer's thumb.
+    fireEvent.input(within(cards[2] as HTMLElement).getByLabelText(CUT), {
+      target: { value: "100" },
+    });
+    expect(
+      screen
+        .getAllByRole("group", { name: /^Spool open/ })
+        .map((card) => within(card).getAllByText(/ m$/)[0]?.textContent),
+    ).toEqual(["Now: 40 m", "Now: 40 m", "Now: 120 m", "Now: -4 m"]);
+    expect(within(cards[2] as HTMLElement).getByText("20 m")).toBeDefined();
   });
 
   test("an open package is named by its package, though the catalogue has it no more", async () => {
