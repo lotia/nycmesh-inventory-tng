@@ -1116,7 +1116,7 @@ statements for a test of its own.
 
 Each checkout's tests, apps and browser tests use its own stack's
 PostgreSQL, which allows 400 connections (`compose.yaml`), less 3 kept for
-the superuser. A whole test run, measured over 8 processes, holds about 60
+the superuser. A whole test run, measured over 8 processes, holds about 70
 at once, all processes together; one process, and one database, held at
 most about 21; a dev app up to 20, as does the browser tests' server. So a
 checkout's checks and its app fit with room to spare, and so would three
