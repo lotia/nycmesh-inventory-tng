@@ -345,15 +345,17 @@ def test_the_allowed_writes_are_only_in_their_own_functions(tmp_path: Path) -> N
 
 
 # Which flush listeners run first, in a fresh interpreter, where only the
-# module named has been imported. SQLAlchemy keeps no public list of a
-# class's listeners, so this reads its own.
+# module named has been imported. SQLAlchemy's public event API can say
+# whether a listener is registered (event.contains) but not in what order,
+# so this walks a session's dispatch, the listeners a flush calls.
 FLUSH_LISTENERS = """
 import importlib, sys
 from sqlalchemy.orm import Session
 importlib.import_module(sys.argv[1])
-for listener in Session.dispatch.before_flush._clslevel[Session]:
+for listener in Session().dispatch.before_flush:
     print(f"{listener.__module__}.{listener.__name__}")
 """
+CHECKED = ("inventory_tng.core.db_locking.", "inventory_tng.core.history.")
 
 
 @pytest.mark.parametrize(
@@ -370,8 +372,8 @@ def test_the_lock_guard_runs_before_history(entry: str) -> None:
         text=True,
         check=True,
     )
-    ours = [line for line in shown.stdout.splitlines() if not line.endswith("._refold")]
-    assert ours == [
+    checked = [line for line in shown.stdout.splitlines() if line.startswith(CHECKED)]
+    assert checked == [
         "inventory_tng.core.db_locking._written_under_lock",
         "inventory_tng.core.db_locking._next_version",
         "inventory_tng.core.history._before_flush",
