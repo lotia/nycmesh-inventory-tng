@@ -3,6 +3,7 @@ page or a redirect is sent."""
 
 from collections.abc import Mapping
 from pathlib import Path
+from types import MappingProxyType
 from typing import Any, NoReturn, cast
 from urllib.parse import urlencode
 
@@ -51,8 +52,9 @@ templates.env.filters["printed_length"] = printed_length
 
 # What a page says after a change, by the ?notice= it was sent back with
 # (redirect(..., notice=)). A fixed list: a link can only show one of these.
-# Each module adds its own with add_notices().
-NOTICES: dict[str, str | LazyProxy] = {}
+# Each module adds its own with add_notices(); this view can't be changed.
+_NOTICES: dict[str, str | LazyProxy] = {}
+NOTICES = MappingProxyType(_NOTICES)
 # Where on a page a notice is said: by the heading of the section with this
 # id (_notice.html), which the redirect also scrolls to; without one, under
 # the page's title. A fixed list, which a test checks against the templates'
@@ -83,10 +85,10 @@ def add_notices(notices: Mapping[str, str | LazyProxy]) -> None:
     """Adds a module's notices to NOTICES. A key another module has
     already added is refused: one key with two pages' words would have
     whichever module was imported last speak for both."""
-    taken = NOTICES.keys() & notices.keys()
+    taken = _NOTICES.keys() & notices.keys()
     if taken:
         raise ValueError(f"notice already added: {', '.join(sorted(taken))}")
-    NOTICES.update(notices)
+    _NOTICES.update(notices)
 
 
 def page(
