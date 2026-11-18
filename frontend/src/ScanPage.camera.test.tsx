@@ -1,13 +1,13 @@
 import { fireEvent, screen } from "@testing-library/preact";
 import { beforeEach, describe, expect, test, vi } from "vitest";
 import { freshCart, storeCart } from "./cart";
+import { FIND } from "./Finder";
 import { say } from "./i18n";
 import { STORAGE_KEY as OUTBOX_KEY, Outbox } from "./outbox";
 import { DONE, POINT } from "./Scanner";
 import {
   COULD_NOT_LOAD,
   DISMISS,
-  FIND,
   FROM,
   KIND_WORDS,
   NOTHING_IN_CART,

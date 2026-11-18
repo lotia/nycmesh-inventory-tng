@@ -423,7 +423,7 @@ msgstr "There is no such row"
 msgid "Read the length printed on the cable where it leaves the spool. If it counts up from the start, what's left is the package size minus the mark."
 msgstr "Read the length printed on the cable where it leaves the spool. If it counts up from the start, what's left is the package size minus the mark."
 
-#: src/ScanPage.tsx
+#: src/Finder.tsx
 msgid "Nothing matches “{typed}”."
 msgstr "Nothing matches “{typed}”."
 
@@ -710,7 +710,7 @@ msgstr "That phrase isn't one we know. Check it word by word against the one you
 msgid "This item has been retired."
 msgstr "This item has been retired."
 
-#: src/ScanPage.tsx
+#: src/Finder.tsx
 msgid "Find an item, or type or scan its code"
 msgstr "Find an item, or type or scan its code"
 

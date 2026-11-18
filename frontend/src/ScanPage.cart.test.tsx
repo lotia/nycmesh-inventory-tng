@@ -16,6 +16,7 @@ import {
   PICK_YOUR_NAME,
   storeCart,
 } from "./cart";
+import { FIND } from "./Finder";
 import { say, speak } from "./i18n";
 import { messages as pseudo } from "./locales/pseudo.po";
 import { CONFIRM_DISCARD, DISCARD, KEEP_IT } from "./Notes";
@@ -38,7 +39,6 @@ import {
   CHANGED_BEFORE_DISCARD,
   DISCARD_CART,
   DISMISS,
-  FIND,
   FROM,
   KIND_WORDS,
   NOT_KEEPING as NOT_KEEPING_PHRASE,

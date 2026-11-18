@@ -423,7 +423,7 @@ msgstr ""
 msgid "Read the length printed on the cable where it leaves the spool. If it counts up from the start, what's left is the package size minus the mark."
 msgstr ""
 
-#: src/ScanPage.tsx
+#: src/Finder.tsx
 msgid "Nothing matches “{typed}”."
 msgstr ""
 
@@ -710,7 +710,7 @@ msgstr ""
 msgid "This item has been retired."
 msgstr ""
 
-#: src/ScanPage.tsx
+#: src/Finder.tsx
 msgid "Find an item, or type or scan its code"
 msgstr ""
 
