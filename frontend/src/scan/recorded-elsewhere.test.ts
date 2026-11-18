@@ -9,7 +9,7 @@ import {
   differences,
   recordedLines,
   reportsAdded,
-} from "./recorded";
+} from "./recorded-elsewhere";
 
 const KEY = "0b7c6a51-9a3d-4d39-8f3e-1d1f2c4b5a61";
 const OPEN = "5d0c2f1e-7a7b-4f43-9c1a-2b3c4d5e6f70";

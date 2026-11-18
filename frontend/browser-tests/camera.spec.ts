@@ -4,7 +4,7 @@
  * the camera, the decoder from this origin and the cart, together.
  */
 import { expect } from "@playwright/test";
-import { test } from "./policy";
+import { test } from "./csp-violations";
 import { prepared } from "./prepared";
 
 test("a label shown to the camera adds its item to the cart", async ({

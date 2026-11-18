@@ -3,8 +3,8 @@
  * (inventory-tng-8i4.16), on US Letter or A4.
  */
 import { expect } from "@playwright/test";
+import { test } from "./csp-violations";
 import { printLabels } from "./labels";
-import { test } from "./policy";
 import { prepared } from "./prepared";
 
 /** How many pages a PDF has. */

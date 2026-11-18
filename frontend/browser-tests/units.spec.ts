@@ -3,7 +3,7 @@
  * item form, and the answer sent from the browser saves the item, read as
  * answered (docs/decisions/0021, Ali, 2026-11-15, inventory-tng-c0c.3).
  * Here for the page that asks, which no link leads to, so the crawl never
- * checks it against the policy (policy.ts). What is asked and offered,
+ * checks it against the policy (csp-violations.ts). What is asked and offered,
  * "Not right?", the reading rules' list and the seeding page the backend
  * tests check (test_items_routes_units.py, test_reading_rules.py).
  *
@@ -13,8 +13,8 @@
  * before left one (forget).
  */
 import { expect, type Page, type TestInfo } from "@playwright/test";
-import { addItem, unique } from "./own";
-import { test } from "./policy";
+import { test } from "./csp-violations";
+import { addItem, unique } from "./own-rows";
 
 /** A unit the form asks about with no word near it (a data rate, or
  * not), and the data rate it is read as. */

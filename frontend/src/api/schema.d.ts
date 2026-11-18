@@ -295,7 +295,8 @@ export interface components {
      * DifferenceAdded
      * @description What a save refused as another tab recorded its cart first holds
      *     more of, or new, put in the scan page's cart: by the page itself into
-     *     an empty cart, or by a volunteer's tap (frontend/src/scan/recorded.ts).
+     *     an empty cart, or by a volunteer's tap
+     *     (frontend/src/scan/recorded-elsewhere.ts).
      */
     DifferenceAdded: {
       /**

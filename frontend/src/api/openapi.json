@@ -735,7 +735,7 @@
         "type": "object",
         "required": ["kind", "how"],
         "title": "DifferenceAdded",
-        "description": "What a save refused as another tab recorded its cart first holds\nmore of, or new, put in the scan page's cart: by the page itself into\nan empty cart, or by a volunteer's tap (frontend/src/scan/recorded.ts)."
+        "description": "What a save refused as another tab recorded its cart first holds\nmore of, or new, put in the scan page's cart: by the page itself into\nan empty cart, or by a volunteer's tap\n(frontend/src/scan/recorded-elsewhere.ts)."
       },
       "HTTPValidationError": {
         "properties": {

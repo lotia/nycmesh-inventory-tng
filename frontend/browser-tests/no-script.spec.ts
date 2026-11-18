@@ -4,14 +4,14 @@
  * still shown: a code or labels to print by hand, a link to copy by hand
  * (inventory-tng-vxxc, inventory-tng-f8kw). Hidden by the `hidden`
  * attribute the script would remove, not by a style. No script runs, so
- * the policy watch (policy.ts) sees nothing here.
+ * the policy watch (csp-violations.ts) sees nothing here.
  */
 import { expect, type Page } from "@playwright/test";
-import { makeCode } from "./codes";
+import { test } from "./csp-violations";
 import { printLabels } from "./labels";
-import { invite } from "./own";
-import { test } from "./policy";
+import { invite } from "./own-rows";
 import { prepared } from "./prepared";
+import { makeCode } from "./registration-codes";
 
 test.use({ javaScriptEnabled: false });
 

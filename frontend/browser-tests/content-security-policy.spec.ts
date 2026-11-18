@@ -4,7 +4,7 @@
  * need, it allows.
  */
 import { expect } from "@playwright/test";
-import { test } from "./policy";
+import { test } from "./csp-violations";
 
 test("a violation is caught, so it would fail the test", async ({
   page,

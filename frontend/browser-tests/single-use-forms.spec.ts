@@ -4,8 +4,8 @@
  * "Already sent", and the code the first made would never be seen.
  */
 import { expect, type Locator } from "@playwright/test";
-import { makeCode } from "./codes";
-import { test } from "./policy";
+import { test } from "./csp-violations";
+import { makeCode } from "./registration-codes";
 
 /**
  * Clicked twice, a person's double-click apart: Playwright's dblclick fires

@@ -32,7 +32,7 @@ import {
   differenceOf,
   IN_CART,
   recordedLines,
-} from "./recorded";
+} from "./recorded-elsewhere";
 
 export const CARTS_FROM_DEVICE = msg`Carts from this device`;
 export const REGISTER_TO_SEND_WAITING = msg`<0>Register this browser</0> to send what is waiting.`;

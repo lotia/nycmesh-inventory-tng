@@ -121,7 +121,7 @@ msgstr ""
 msgid "Not recorded."
 msgstr ""
 
-#: src/scan/recorded.ts
+#: src/scan/recorded-elsewhere.ts
 msgid "{name}: {amount}, new"
 msgstr ""
 
@@ -185,7 +185,7 @@ msgstr ""
 msgid "Couldn't reach the inventory. Check your connection, then try again."
 msgstr ""
 
-#: src/scan/recorded.ts
+#: src/scan/recorded-elsewhere.ts
 msgid "Open package said used up, new"
 msgstr ""
 
@@ -306,7 +306,7 @@ msgstr ""
 msgid "{place}: from here."
 msgstr ""
 
-#: src/scan/recorded.ts
+#: src/scan/recorded-elsewhere.ts
 msgid "{name}: removed"
 msgstr ""
 
@@ -314,7 +314,7 @@ msgstr ""
 msgid "Nothing usable left on it"
 msgstr ""
 
-#: src/scan/recorded.ts
+#: src/scan/recorded-elsewhere.ts
 msgid "{name}: {amount} more"
 msgstr ""
 
@@ -391,7 +391,7 @@ msgstr ""
 msgid "How many"
 msgstr ""
 
-#: src/scan/recorded.ts
+#: src/scan/recorded-elsewhere.ts
 msgid "What is on an open package, new"
 msgstr ""
 
@@ -443,7 +443,7 @@ msgstr ""
 msgid "Your cut is more than the {name} shows, so it's ticked. It's recorded as you typed it, and an administrator will check the {name}."
 msgstr ""
 
-#: src/scan/recorded.ts
+#: src/scan/recorded-elsewhere.ts
 msgid "Recorded {was}, you changed it to {now}. An administrator will correct it."
 msgstr ""
 
@@ -670,7 +670,7 @@ msgstr ""
 msgid "Loose {unit}"
 msgstr ""
 
-#: src/scan/recorded.ts
+#: src/scan/recorded-elsewhere.ts
 msgid "Recorded {was}, you removed it. An administrator will correct it."
 msgstr ""
 
@@ -726,7 +726,7 @@ msgstr ""
 msgid "The scanner has been updated."
 msgstr ""
 
-#: src/scan/recorded.ts
+#: src/scan/recorded-elsewhere.ts
 msgid "Add these to cart"
 msgstr ""
 
@@ -823,7 +823,7 @@ msgstr ""
 msgid "The inventory answered unexpectedly ({status}). Trying again shortly."
 msgstr ""
 
-#: src/scan/recorded.ts
+#: src/scan/recorded-elsewhere.ts
 msgid "{name}: {amount} fewer"
 msgstr ""
 
@@ -839,7 +839,7 @@ msgstr ""
 msgid "retired: taking only"
 msgstr ""
 
-#: src/scan/recorded.ts
+#: src/scan/recorded-elsewhere.ts
 msgid "These are in your cart, waiting to be recorded."
 msgstr ""
 

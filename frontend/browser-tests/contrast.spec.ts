@@ -6,7 +6,7 @@
  * plainly.
  */
 import { expect, type Locator } from "@playwright/test";
-import { test } from "./policy";
+import { test } from "./csp-violations";
 
 /** An element's text against the nearest background behind it, and how
  * much anything around it fades it. */

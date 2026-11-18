@@ -35,7 +35,7 @@
   },
   "overrides": [
     {
-      "includes": ["browser-tests/**", "!browser-tests/policy.ts"],
+      "includes": ["browser-tests/**", "!browser-tests/csp-violations.ts"],
       "linter": {
         "rules": {
           "style": {
@@ -45,7 +45,7 @@
                 "paths": {
                   "@playwright/test": {
                     "importNames": ["test"],
-                    "message": "Import test from ./policy (or ./own), which fails a test on a Content-Security-Policy violation."
+                    "message": "Import test from ./csp-violations (or ./own-rows), which fails a test on a Content-Security-Policy violation."
                   }
                 }
               }

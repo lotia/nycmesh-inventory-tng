@@ -11,7 +11,7 @@ import {
   type Page,
   type Response,
 } from "@playwright/test";
-import { assertNone, test as base, watch } from "./policy";
+import { assertNone, test as base, watch } from "./csp-violations";
 import { prepared } from "./prepared";
 
 /**

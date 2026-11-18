@@ -99,7 +99,7 @@ export default defineConfig({
     },
     // The crawl reads every row there is, so it runs in each browser before
     // any test that changes one; those make rows of their own
-    // (browser-tests/own.ts).
+    // (browser-tests/own-rows.ts).
     ...browsers.map(({ name, use }) => ({
       name: `${name} crawl`,
       testMatch: CRAWL,

@@ -4,13 +4,13 @@ import { useEffect, useMemo, useRef } from "preact/hooks";
 import { type Api, makeApi } from "../api/client";
 import { MUST_UPGRADE, UPDATED, UPGRADE } from "../shared/build";
 import { say, sayParts } from "../shared/i18n";
+import { onStoredChange } from "../shared/local-storage";
 import {
   STORAGE_KEY as OUTBOX_KEY,
   type Outbox,
   sharedOutbox,
 } from "../shared/outbox";
 import { NOT_REGISTERED } from "../shared/registration";
-import { onStoredChange } from "../shared/stored";
 import { telemetry } from "../shared/telemetry";
 import { CartForm, CHECK_EVERY_MS } from "./CartForm";
 import { STORAGE_KEY as CART_KEY, loadCart } from "./cart";

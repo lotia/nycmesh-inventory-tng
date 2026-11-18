@@ -31,6 +31,14 @@ import * as v from "valibot";
 import { id } from "../api/replies";
 import { say } from "../shared/i18n";
 import {
+  hasStored,
+  olderKeys,
+  onStoredChange,
+  readStored,
+  removeStored,
+  writeStored,
+} from "../shared/local-storage";
+import {
   BatchKey,
   fromOpen,
   lineNumbers,
@@ -43,14 +51,6 @@ import {
   type Said,
 } from "../shared/outbox";
 import { count, decimal, thousandths } from "../shared/quantity";
-import {
-  hasStored,
-  olderKeys,
-  onStoredChange,
-  readStored,
-  removeStored,
-  writeStored,
-} from "../shared/stored";
 import { toBatch } from "./batch";
 import {
   STORAGE_KEY as CART_KEY,
@@ -243,7 +243,8 @@ function saveOf(key: string, save: v.InferOutput<typeof OldEntry>): Older {
 }
 
 /** A batch this build made, as listed, to put in the cart as a save put
- * back is (toCart), under its own key (recorded.ts, differenceOf). */
+ * back is (toCart), under its own key (recorded-elsewhere.ts,
+ * differenceOf). */
 export function asSave(body: unknown): Older {
   return saveOf(
     "",

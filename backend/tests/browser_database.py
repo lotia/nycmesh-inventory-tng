@@ -74,7 +74,7 @@ def main(argv: list[str]) -> int:
                 "LOG_LEVEL": "WARNING",
                 # Rate limits high enough for runs repeated (--repeat-each):
                 # every test's browser has this machine's address, each
-                # ownAdmin (frontend/browser-tests/own.ts) signs in and uses
+                # ownAdmin (frontend/browser-tests/own-rows.ts) signs in and uses
                 # a link from it, and the shared administrator confirms for
                 # every test (docs/decisions/0012, Amendment).
                 "RATE_LIMIT_PER_ADDRESS": "10000",
@@ -115,7 +115,7 @@ def prepare(url: str, video: Path) -> dict[str, str]:
         assert kept is not None  # The seed adds volunteers.
         duplicate = volunteers.add(session, f"{kept.name} (twice)", None)
         volunteers.merge(session, duplicate, kept.id, datetime.now(UTC))
-        # Another administrator, whose sign-in links.spec.ts resets.
+        # Another administrator, whose sign-in reset-links.spec.ts resets.
         other = Admin(username=OTHER_ADMIN)
         session.add(other)
         session.flush()

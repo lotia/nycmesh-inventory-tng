@@ -1,11 +1,11 @@
 /**
  * Retiring is one tap, undone from its notice; with changes not yet saved,
  * the page asks first (docs/decisions/0019). Each test retires a volunteer
- * of its own (own.ts), and brings them back.
+ * of its own (own-rows.ts), and brings them back.
  */
 import { expect } from "@playwright/test";
-import { ownVolunteer } from "./own";
-import { test } from "./policy";
+import { test } from "./csp-violations";
+import { ownVolunteer } from "./own-rows";
 
 test("a page with unsaved changes asks before retiring", async ({ page }) => {
   const was = await ownVolunteer(page);

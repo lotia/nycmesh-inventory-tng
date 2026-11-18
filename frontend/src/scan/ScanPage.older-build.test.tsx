@@ -73,7 +73,7 @@ import {
 } from "./OlderList";
 import { CARTS_FROM_DEVICE, DISMISS } from "./OutboxList";
 import { ITEM_RETIRED, RESCAN as RESCAN_PHRASE } from "./older";
-import { ADD_DIFFERENCE, IN_CART } from "./recorded";
+import { ADD_DIFFERENCE, IN_CART } from "./recorded-elsewhere";
 
 // The camera, faked: it sees whatever a test puts in `inView`.
 vi.mock("./camera", () => ({ openCamera: vi.fn() }));

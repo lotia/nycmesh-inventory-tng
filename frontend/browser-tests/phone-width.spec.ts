@@ -4,7 +4,7 @@
  * at 360 pixels wide, also with a long word in everything that shows text.
  */
 import { expect, type Page } from "@playwright/test";
-import { test } from "./policy";
+import { test } from "./csp-violations";
 
 /** How far past the screen's edge the page reaches, in pixels. */
 async function overflow(page: Page): Promise<number> {

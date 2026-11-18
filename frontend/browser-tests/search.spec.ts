@@ -5,8 +5,8 @@
  * both sides, as the unit tests' shared vectors say.
  */
 import { expect } from "@playwright/test";
-import { ownCable } from "./own";
-import { test } from "./policy";
+import { test } from "./csp-violations";
+import { ownCable } from "./own-rows";
 
 test("a suggestion picked with the keyboard narrows the list", async ({
   page,

@@ -121,7 +121,7 @@ msgstr "Checked out items. Add to cart or discard before sending"
 msgid "Not recorded."
 msgstr "Not recorded."
 
-#: src/scan/recorded.ts
+#: src/scan/recorded-elsewhere.ts
 msgid "{name}: {amount}, new"
 msgstr "{name}: {amount}, new"
 
@@ -185,7 +185,7 @@ msgstr "Receipt: {items} to {to}"
 msgid "Couldn't reach the inventory. Check your connection, then try again."
 msgstr "Couldn't reach the inventory. Check your connection, then try again."
 
-#: src/scan/recorded.ts
+#: src/scan/recorded-elsewhere.ts
 msgid "Open package said used up, new"
 msgstr "Open package said used up, new"
 
@@ -306,7 +306,7 @@ msgstr "The torch wouldn't switch."
 msgid "{place}: from here."
 msgstr "{place}: from here."
 
-#: src/scan/recorded.ts
+#: src/scan/recorded-elsewhere.ts
 msgid "{name}: removed"
 msgstr "{name}: removed"
 
@@ -314,7 +314,7 @@ msgstr "{name}: removed"
 msgid "Nothing usable left on it"
 msgstr "Nothing usable left on it"
 
-#: src/scan/recorded.ts
+#: src/scan/recorded-elsewhere.ts
 msgid "{name}: {amount} more"
 msgstr "{name}: {amount} more"
 
@@ -391,7 +391,7 @@ msgstr "Carts from this device"
 msgid "How many"
 msgstr "How many"
 
-#: src/scan/recorded.ts
+#: src/scan/recorded-elsewhere.ts
 msgid "What is on an open package, new"
 msgstr "What is on an open package, new"
 
@@ -443,7 +443,7 @@ msgstr "{name}, {package}: retired: taking only, so it can't be received."
 msgid "Your cut is more than the {name} shows, so it's ticked. It's recorded as you typed it, and an administrator will check the {name}."
 msgstr "Your cut is more than the {name} shows, so it's ticked. It's recorded as you typed it, and an administrator will check the {name}."
 
-#: src/scan/recorded.ts
+#: src/scan/recorded-elsewhere.ts
 msgid "Recorded {was}, you changed it to {now}. An administrator will correct it."
 msgstr "Recorded {was}, you changed it to {now}. An administrator will correct it."
 
@@ -670,7 +670,7 @@ msgstr "{where}, by {name}"
 msgid "Loose {unit}"
 msgstr "Loose {unit}"
 
-#: src/scan/recorded.ts
+#: src/scan/recorded-elsewhere.ts
 msgid "Recorded {was}, you removed it. An administrator will correct it."
 msgstr "Recorded {was}, you removed it. An administrator will correct it."
 
@@ -726,7 +726,7 @@ msgstr "Camera"
 msgid "The scanner has been updated."
 msgstr "The scanner has been updated."
 
-#: src/scan/recorded.ts
+#: src/scan/recorded-elsewhere.ts
 msgid "Add these to cart"
 msgstr "Add these to cart"
 
@@ -823,7 +823,7 @@ msgstr "The camera isn't allowed for this page. Allow it in the browser's settin
 msgid "The inventory answered unexpectedly ({status}). Trying again shortly."
 msgstr "The inventory answered unexpectedly ({status}). Trying again shortly."
 
-#: src/scan/recorded.ts
+#: src/scan/recorded-elsewhere.ts
 msgid "{name}: {amount} fewer"
 msgstr "{name}: {amount} fewer"
 
@@ -839,7 +839,7 @@ msgstr "Opening: {items} at {from}"
 msgid "retired: taking only"
 msgstr "retired: taking only"
 
-#: src/scan/recorded.ts
+#: src/scan/recorded-elsewhere.ts
 msgid "These are in your cart, waiting to be recorded."
 msgstr "These are in your cart, waiting to be recorded."
 

@@ -5,7 +5,7 @@
  * the backend tests check (test_items_routes_list.py).
  */
 import { expect } from "@playwright/test";
-import { test } from "./policy";
+import { test } from "./csp-violations";
 
 test.use({ javaScriptEnabled: false });
 

@@ -4,7 +4,7 @@ import type { Signal } from "@preact/signals";
 import { Field } from "../shared/Field";
 import { say } from "../shared/i18n";
 import { type Catalogue, RETIRED } from "./cart";
-import { readLabel, type Scanned } from "./labels";
+import { readLabel, type Scanned } from "./label-codes";
 import { search } from "./search";
 
 export const FIND = msg`Find an item, or type or scan its code`;

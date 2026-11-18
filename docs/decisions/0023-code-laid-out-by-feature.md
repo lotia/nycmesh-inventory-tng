@@ -278,6 +278,21 @@ Later renamed:
 | Old path | New path |
 | --- | --- |
 | `admin/once.ts` | `admin/single-use-forms.ts`, with `ONCE_FIELD` as `SINGLE_USE_FIELD` |
+| `scan/labels.ts` | `scan/label-codes.ts` |
+| `scan/recorded.ts` | `scan/recorded-elsewhere.ts` |
+| `shared/stored.ts` | `shared/local-storage.ts` |
+
+In `frontend/browser-tests/`, these were renamed:
+
+| Old path | New path |
+| --- | --- |
+| `codes.ts` | `registration-codes.ts` |
+| `links.spec.ts` | `reset-links.spec.ts` |
+| `older.spec.ts` | `older-builds.spec.ts` |
+| `once.spec.ts` | `single-use-forms.spec.ts` |
+| `own.ts` | `own-rows.ts` |
+| `policy.spec.ts` | `content-security-policy.spec.ts` |
+| `policy.ts` | `csp-violations.ts` |
 
 In `backend/tests/`, these tests moved whole into the folders the
 Amendment: names, below, gives them, and kept their names:

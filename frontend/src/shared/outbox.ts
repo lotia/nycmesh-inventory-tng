@@ -40,8 +40,13 @@ import {
 } from "../api/replies";
 import { Builds, HEADER, MUST_UPGRADE } from "./build";
 import { say } from "./i18n";
+import {
+  onStoredChange,
+  parseStored,
+  readStored,
+  writeStored,
+} from "./local-storage";
 import { NOT_REGISTERED } from "./registration";
-import { onStoredChange, parseStored, readStored, writeStored } from "./stored";
 import { telemetry } from "./telemetry";
 
 /** Versioned: a build that changes what is kept takes a new key, as a tab
@@ -297,11 +302,11 @@ export function recordedHeading(recorded: Recorded): string {
 }
 
 /** The heading over what a recorded_elsewhere holds otherwise than was
- * recorded (scan/recorded.ts), or, with nothing known of what was recorded,
- * over its lines (Ali, inventory-tng-0gg, 2026-11-15, 1). What it held is
- * recorded, but not the changes since, so it never goes in a cart whole
- * again, which would record it twice (Ali, inventory-tng-wyq, question c,
- * and inventory-tng-g0e, d). */
+ * recorded (scan/recorded-elsewhere.ts), or, with nothing known of what
+ * was recorded, over its lines (Ali, inventory-tng-0gg, 2026-11-15, 1).
+ * What it held is recorded, but not the changes since, so it never goes in
+ * a cart whole again, which would record it twice (Ali, inventory-tng-wyq,
+ * question c, and inventory-tng-g0e, d). */
 export const MAKE_CHANGES = msg`Not recorded. Make any changes and record again.`;
 
 /** A batch waiting after no_answer, while the browser is online. */
@@ -652,10 +657,10 @@ export class Outbox {
    * not kept so, or filled again by a tab that had not heard. The same
    * again, waiting or saved, or listed recorded elsewhere under that key,
    * is not queued twice: listed twice, its difference would go in the
-   * cart twice, under two keys (scan/recorded.ts). Another batch, while
-   * the server may hold that key (one under it waits, was saved, or was
-   * refused for it), is not recorded, as the server would refuse it (409
-   * key_reused): it is listed so, under a key of its own, never sent, so
+   * cart twice, under two keys (scan/recorded-elsewhere.ts). Another
+   * batch, while the server may hold that key (one under it waits, was
+   * saved, or was refused for it), is not recorded, as the server would
+   * refuse it (409 key_reused): it is listed so, under a key of its own, never sent, so
    * one key names one batch and no answer to the first settles it. One
    * refused for what it held (422) holds no key: it takes a key of its
    * own, and this batch goes under the cart's.

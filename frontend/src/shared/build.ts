@@ -15,7 +15,7 @@
  */
 import { msg } from "@lingui/core/macro";
 import { signal } from "@preact/signals";
-import { onStoredChange, parseStored, writeStored } from "./stored";
+import { onStoredChange, parseStored, writeStored } from "./local-storage";
 import { telemetry } from "./telemetry";
 
 declare const __BUILD__: string;

@@ -4,7 +4,7 @@
  * code shown only when asked for (inventory-tng-8i4.50.12).
  */
 import { expect } from "@playwright/test";
-import { test } from "./own";
+import { test } from "./own-rows";
 import { prepared } from "./prepared";
 
 test("resetting another administrator asks for the password, then shows the link to copy or scan", async ({

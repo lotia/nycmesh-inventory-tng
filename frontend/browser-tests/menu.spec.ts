@@ -4,7 +4,7 @@
  * only one shows.
  */
 import { expect, type Page } from "@playwright/test";
-import { test } from "./policy";
+import { test } from "./csp-violations";
 
 /** In the band at the top of the page, or the menu it opens, as shown now. */
 function shown(page: Page, role: "link" | "button", name: string) {

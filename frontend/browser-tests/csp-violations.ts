@@ -3,7 +3,7 @@
  * web/security_headers.py), in any page it opens: so every page the tests
  * reach, the crawl's all, is checked in each browser. The watch is a
  * script, so a test run without scripts is not watched. Tests import `test`
- * from here, or from own.ts, which extends it, never Playwright's own
+ * from here, or from own-rows.ts, which extends it, never Playwright's own
  * (biome.json).
  */
 import { type BrowserContext, test as base, expect } from "@playwright/test";

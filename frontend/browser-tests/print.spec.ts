@@ -3,8 +3,8 @@
  * the code, one to a page, on US Letter or A4.
  */
 import { expect, type Page } from "@playwright/test";
-import { makeCode } from "./codes";
-import { test } from "./policy";
+import { test } from "./csp-violations";
+import { makeCode } from "./registration-codes";
 
 const sheet = (page: Page) =>
   page.locator(".print-sheet").filter({ visible: true });

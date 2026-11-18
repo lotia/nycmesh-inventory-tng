@@ -4,7 +4,7 @@
  * test (prepared.ts, adminState).
  */
 import { expect } from "@playwright/test";
-import { test } from "./policy";
+import { test } from "./csp-violations";
 import { adminState, prepared } from "./prepared";
 
 test("sign in and register", async ({ page }) => {

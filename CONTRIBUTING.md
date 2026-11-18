@@ -541,9 +541,9 @@ recorded. Details below.", then what was recorded, headed as recorded in
 another tab or, where this browser's outbox holds it recorded, already
 recorded from this tab (`outbox.recordedHeading`), and, under "Not
 recorded. Make any changes and record again.", what the volunteer changed
-since the cart went back, line by line (`frontend/src/scan/recorded.ts`): a
-cart put back under its key keeps the
-lines it went back with (`changedFrom`), and Record sends them
+since the cart went back, line by line
+(`frontend/src/scan/recorded-elsewhere.ts`): a cart put back under its key
+keeps the lines it went back with (`changedFrom`), and Record sends them
 (`changed_from`), which the server compares with nothing else. Without
 them, as from a build before or a cart never put back, it changed
 nothing: what differs is the other tab's change. What it holds more of,
@@ -980,12 +980,13 @@ mise run check-browser           # builds, starts the app, runs them
 ```
 
 A test fails on any Content-Security-Policy violation in a page it opens:
-tests import `test` from `browser-tests/policy.ts`, or `own.ts`, which
-extends it, never from Playwright, which Biome refuses.
+tests import `test` from `browser-tests/csp-violations.ts`, or
+`own-rows.ts`, which extends it, never from Playwright, which Biome
+refuses.
 
 The tests run at once, in several workers, against that one database, so
 none may change rows another reads: a test that changes data first makes the
-rows it changes, such as an item to move (`frontend/browser-tests/own.ts`).
+rows it changes, such as an item to move (`frontend/browser-tests/own-rows.ts`).
 Every test shares one administrator's session, signed in once, so what
 another test confirmed in it holds: a test of what a session asks for first
 takes an administrator of its own (`ownAdmin`, there too). The crawl of

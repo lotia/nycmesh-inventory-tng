@@ -2,11 +2,11 @@
  * Packages on the scan page (docs/decisions/0020): a package counted is
  * saved as sealed packages of it, so stock keeps them sealed where they
  * arrive (inventory-tng-8i4.133.2). Each test has a cable of its own
- * (own.ts), so none sees another's open packages.
+ * (own-rows.ts), so none sees another's open packages.
  */
 import { expect, type Page } from "@playwright/test";
-import { ownCable, record } from "./own";
-import { test } from "./policy";
+import { test } from "./csp-violations";
+import { ownCable, record } from "./own-rows";
 
 /** The seed's volunteer and shelf, as the scan page names them. */
 const SAM = "Sam Example";

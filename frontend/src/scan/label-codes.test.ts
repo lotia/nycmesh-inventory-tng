@@ -1,7 +1,7 @@
 import { expect, test } from "vitest";
 import { CATALOGUE } from "../testing/catalogue";
 import { freshCart } from "./cart";
-import { placeSides, Repeats, readLabel } from "./labels";
+import { placeSides, Repeats, readLabel } from "./label-codes";
 
 test("a label names an item, a package of one, or a place", () => {
   expect(readLabel(CATALOGUE, "B3ZT9W")).toEqual({ kind: "item", itemId: 100 });

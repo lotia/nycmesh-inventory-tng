@@ -34,7 +34,7 @@ import {
   withLineChanged,
 } from "./cart";
 import { Finder } from "./Finder";
-import { placeSides, readLabel, type Scanned } from "./labels";
+import { placeSides, readLabel, type Scanned } from "./label-codes";
 import {
   AlertWords,
   CAUTION_BOX,
@@ -54,7 +54,7 @@ import {
   olderId,
   toCart,
 } from "./older";
-import { differenceOf } from "./recorded";
+import { differenceOf } from "./recorded-elsewhere";
 import { Scanner } from "./Scanner";
 import { indexOf } from "./search";
 
@@ -393,10 +393,10 @@ export function CartForm({
     return null;
   }
 
-  /** Put what a save recorded elsewhere adds (recorded.ts, differenceOf)
-   * in this cart, which must be empty, under the difference's own key,
-   * and mark the save so, offering it no more: by a tap, or `automatically`
-   * into an empty cart. Why not, if it was not. */
+  /** Put what a save recorded elsewhere adds (recorded-elsewhere.ts,
+   * differenceOf) in this cart, which must be empty, under the difference's
+   * own key, and mark the save so, offering it no more: by a tap, or
+   * `automatically` into an empty cart. Why not, if it was not. */
   function addDifference(
     entry: Entry,
     difference: Body,
