@@ -157,9 +157,8 @@ deployed, so the migrations may be rewritten (0016).
 - **A count asks for each form**: how many sealed packages of each size,
   what is left on each open package, and how much is loose. Each form is
   corrected on its own, as items are today. The form asks for an item's
-  sealed packages smallest size first, ties by package id, as the item
-  and scan pages list them, then its open packages oldest first, then
-  loose (Ali, 2026-11-18).
+  sealed packages first, in the order Stock gives above, then its open
+  packages oldest first, then loose (Ali, 2026-11-18).
 - **A count may find an open package nobody recorded**, adding one with
   what is on it, and may close one that is not there, recording the loss
   (Ali, 2026-11-11). A count is an administrator's, so it closes packages,

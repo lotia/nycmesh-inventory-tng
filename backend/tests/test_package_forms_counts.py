@@ -318,19 +318,19 @@ def test_the_count_form_lists_sealed_smallest_first_ties_by_id(
         )
     made = spools.opened()
 
-    # The records' forms arrive by package id; reversed, so the form's
-    # order is its own, not theirs.
-    def reversed_forms(
+    # The records' forms come in no set order; handed over by package id
+    # descending, so only the form's own tie-break puts the twins in order.
+    def descending_forms(
         session: Session, place_id: int, as_of: int, items: Collection[int]
     ) -> dict[tuple[int, Form], Decimal]:
         found = moments.expected_forms(session, place_id, as_of, items)
-        return dict(reversed(found.items()))
+        return dict(
+            sorted(found.items(), key=lambda pair: -(pair[0][1].package_id or 0))
+        )
 
-    monkeypatch.setattr(counts_routes, "expected_forms", reversed_forms)
+    monkeypatch.setattr(counts_routes, "expected_forms", descending_forms)
     page = text(admin_client.get(f"{COUNTS}/{store}"))
-    asked = re.findall(rf'name="((?:sealed_{cable}_|loose_{cable}|opened_)\d*)"', page)
-    # Sealed smallest first, ties by id; then open ones; then loose.
-    assert asked == [
+    expected = [
         f"sealed_{cable}_{small.id}",
         f"sealed_{cable}_{spools.spool.id}",
         f"sealed_{cable}_{first.id}",
@@ -338,3 +338,6 @@ def test_the_count_form_lists_sealed_smallest_first_ties_by_id(
         f"opened_{made.id}",
         f"loose_{cable}",
     ]
+    asked = [name for name in re.findall(r'name="([^"]+)"', page) if name in expected]
+    # Sealed smallest first, ties by id; then open ones; then loose.
+    assert asked == expected
