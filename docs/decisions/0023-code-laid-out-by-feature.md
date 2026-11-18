@@ -71,8 +71,9 @@ structure below on 2026-11-17.
   `noRestrictedImports` in `frontend/biome.json`: `shared/` imports no
   page's folder, a page's folder imports no other page's, neither
   imports an entry, and only tests import `testing/`. The patterns match
-  a folder's name anywhere in the path, so a path such as
-  `./../scan/cart` is refused too. Tests may import any folder, as some
+  a folder's name anywhere in a relative path, so a path such as
+  `./../scan/cart` is refused too, but not in a package's, such as
+  `source-map-support/register`. Tests may import any folder, as some
   check every page's words together (inventory-tng-atmx.14).
 
 We rejected a central routes file wired with `add_api_route`, which is not

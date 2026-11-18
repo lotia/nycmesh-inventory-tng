@@ -64,7 +64,7 @@
               "options": {
                 "patterns": [
                   {
-                    "group": ["**/testing", "**/testing/**"],
+                    "group": [".*/**/testing", ".*/**/testing/**"],
                     "message": "testing/ holds test helpers: only tests import it (docs/decisions/0023)."
                   }
                 ]
@@ -91,17 +91,17 @@
                 "patterns": [
                   {
                     "group": [
-                      "**/scan",
-                      "**/scan/**",
-                      "**/register",
-                      "**/register/**",
-                      "**/admin",
-                      "**/admin/**"
+                      ".*/**/scan",
+                      ".*/**/scan/**",
+                      ".*/**/register",
+                      ".*/**/register/**",
+                      ".*/**/admin",
+                      ".*/**/admin/**"
                     ],
                     "message": "A folder's module imports its own folder and shared/, never another page's folder or an entry (docs/decisions/0023)."
                   },
                   {
-                    "group": ["**/testing", "**/testing/**"],
+                    "group": [".*/**/testing", ".*/**/testing/**"],
                     "message": "testing/ holds test helpers: only tests import it (docs/decisions/0023)."
                   }
                 ]
