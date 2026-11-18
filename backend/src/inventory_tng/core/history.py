@@ -27,7 +27,8 @@ from sqlalchemy import Table, event, insert, select
 from sqlalchemy.orm import Session, UOWTransaction
 
 # Imported for its flush listeners, before this module's: the lock guard
-# refuses a write before history reads anything for it.
+# refuses a write before history reads anything for it
+# (tests/core/test_history.py checks the order).
 from inventory_tng.core import db_locking  # noqa: F401
 from inventory_tng.core.db_protection import Action, flagged, flush_writes, flushed_id
 from inventory_tng.core.db_sessions import Base, current_actor

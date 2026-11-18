@@ -9,12 +9,8 @@ from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 from opentelemetry import metrics
 from pydantic import BaseModel
-from sqlalchemy import (
-    exc,
-)
-from sqlalchemy.orm import (
-    Session,
-)
+from sqlalchemy import exc
+from sqlalchemy.orm import Session
 
 if TYPE_CHECKING:  # db_sessions imports this module.
     from inventory_tng.core.db_sessions import PoolName
@@ -24,7 +20,8 @@ log = structlog.get_logger(__name__)
 
 class PoolTimeout(exc.TimeoutError):
     """No connection from one of the app's pools, or no place for a
-    request's session, within Database.timeout: which (pool_timeouts)."""
+    request's session, within db_sessions.Database.timeout: which
+    (pool_timeouts)."""
 
     def __init__(self, pool: PoolName) -> None:
         super().__init__(f"no connection from the {pool} pool in time")
@@ -32,7 +29,8 @@ class PoolTimeout(exc.TimeoutError):
 
 
 class NoSession(PoolTimeout):
-    """No place for the request's session within Database.timeout."""
+    """No place for the request's session within
+    db_sessions.Database.timeout."""
 
     def __init__(self) -> None:
         super().__init__("requests")
@@ -69,10 +67,11 @@ def attempt[T](
     """Run `change` in a savepoint, with nothing of it kept if it breaks a
     rule: what it returned, and None; or None, and "unique" if it broke a
     unique index (as each table's index compares, such as an item's name
-    ignoring case, spaces and punctuation, retired items' too), the name of the check constraint it broke, or the rule a domain
-    function refused it by (RuleBroken), so a page can say why in its own
-    words. Any other failure is raised. Locks taken in `change` go with
-    the savepoint, however it failed (_savepoint_locks_released)."""
+    ignoring case, spaces and punctuation, retired items' too), the name of
+    the check constraint it broke, or the rule a domain function refused it
+    by (RuleBroken), so a page can say why in its own words. Any other
+    failure is raised. Locks taken in `change` go with the savepoint,
+    however it failed (db_locking._savepoint_locks_released)."""
     try:
         with session.begin_nested():
             done = change()
@@ -179,7 +178,8 @@ def install(app: FastAPI) -> None:
             # Too many requests at once for the request pool (NoSession), or
             # the limits pool busy. The request pool's own connections are
             # never waited for, as no more requests hold one than it has;
-            # the side pool's last seen is skipped (record_last_seen).
+            # the side pool's last seen is skipped
+            # (db_sessions.record_last_seen).
             pool = error.pool if isinstance(error, PoolTimeout) else "side"
             pool_timeouts.add(1, {"db.client.connection.pool.name": pool})
         log.warning("database unavailable", **describe_error(error))

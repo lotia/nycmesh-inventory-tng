@@ -6,13 +6,7 @@ from typing import TYPE_CHECKING, Any
 
 import structlog
 from opentelemetry import metrics
-from sqlalchemy import (
-    Select,
-    event,
-    func,
-    inspect,
-    select,
-)
+from sqlalchemy import Select, event, func, inspect, select
 from sqlalchemy.orm import (
     InstanceState,
     QueryContext,

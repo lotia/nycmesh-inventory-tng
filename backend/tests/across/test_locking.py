@@ -94,8 +94,8 @@ def test_every_locking_read_goes_through_db_locking() -> None:
     found = offending(lockings, {DB_LOCKING: WRAPPERS})
     assert found == {}, (
         "Lock rows with db_locking.locked (a select) or db_locking.get_locked"
-        " (Session.get), "
-        f"not with_for_update or FOR UPDATE in SQL (db_locking.py says why): {found}"
+        " (Session.get), not with_for_update or FOR UPDATE in SQL"
+        f" (db_locking.py says why): {found}"
     )
 
 

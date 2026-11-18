@@ -1,4 +1,5 @@
-"""The database: Base, the app's pools, one session per request, and who
+"""The database: Base, the app's pools, one session per request, which of
+its transactions may commit while a gated request holds its lock, and who
 makes a session's changes."""
 
 import re
@@ -28,10 +29,7 @@ from sqlalchemy import (
     update,
 )
 from sqlalchemy.engine.interfaces import DBAPIConnection
-from sqlalchemy.orm import (
-    DeclarativeBase,
-    Session,
-)
+from sqlalchemy.orm import DeclarativeBase, Session
 
 from inventory_tng.core.db_errors import (
     LOCK_NOT_AVAILABLE,
@@ -91,7 +89,7 @@ class Database:
     and either counts attempts on the limits pool, whose connections wait on
     nothing: each pool's connections wait only on those after it in POOLS
     (tests/conftest.py checks every test keeps to it). Waiting longer than
-    `timeout` for any answers 503 (install)."""
+    `timeout` for any answers 503 (db_errors.install)."""
 
     engine: Engine
     side: Engine

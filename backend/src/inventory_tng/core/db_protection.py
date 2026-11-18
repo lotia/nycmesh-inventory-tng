@@ -3,16 +3,8 @@
 import functools
 from typing import Literal, NamedTuple
 
-from sqlalchemy import (
-    Column,
-    Table,
-    inspect,
-)
-from sqlalchemy.orm import (
-    DeclarativeBase,
-    Session,
-    UOWTransaction,
-)
+from sqlalchemy import Column, Table, inspect
+from sqlalchemy.orm import DeclarativeBase, Session, UOWTransaction
 
 from inventory_tng.core.db_sessions import Base
 
@@ -25,7 +17,8 @@ from inventory_tng.core.db_sessions import Base
 #   That test reads the source for rows made, or any deleted, elsewhere.
 # - lock: what a write to it holds, which the guard checks as the session
 #   flushes. "row": a row changed or deleted was locked in this
-#   transaction (locked, get_locked, settings_row, relock), or added in it.
+#   transaction (db_locking's locked, get_locked, settings_row, relock), or
+#   added in it.
 #   "catalogue": that, and the catalogue lock for any write, but one to
 #   columns marked row_lock_only alone. None: no lock, for what is only
 #   added to or changes on every request.

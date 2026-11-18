@@ -12,6 +12,8 @@ leaves tests free to write with statements on purpose.
 """
 
 import ast
+import subprocess
+import sys
 from datetime import UTC, datetime, timedelta, timezone
 from decimal import Decimal
 from ipaddress import IPv4Address, IPv4Interface, IPv6Address
@@ -326,7 +328,7 @@ def test_only_statements_on_tables_with_history_count(line: str, found: bool) ->
 
 @pytest.mark.helper
 def test_the_allowed_writes_are_only_in_their_own_functions(tmp_path: Path) -> None:
-    db = tmp_path / "db.py"
+    db = tmp_path / "db_sessions.py"
     db.write_text(
         "from sqlalchemy import update\n"
         "def record_last_seen(model):\n"
@@ -340,6 +342,40 @@ def test_the_allowed_writes_are_only_in_their_own_functions(tmp_path: Path) -> N
     assert outside(db, statement_writes, {db: ("record_last_seen",)}) == [5, 7]
     # ...nor in another file of that name.
     assert outside(db, statement_writes, ALLOWED) == [3, 5, 7]
+
+
+# Which flush listeners run first, in a fresh interpreter, where only the
+# module named has been imported. SQLAlchemy keeps no public list of a
+# class's listeners, so this reads its own.
+FLUSH_LISTENERS = """
+import importlib, sys
+from sqlalchemy.orm import Session
+importlib.import_module(sys.argv[1])
+for listener in Session.dispatch.before_flush._clslevel[Session]:
+    print(f"{listener.__module__}.{listener.__name__}")
+"""
+
+
+@pytest.mark.parametrize(
+    "entry", ["inventory_tng.core.history", "inventory_tng.models.admins"]
+)
+def test_the_lock_guard_runs_before_history(entry: str) -> None:
+    """History reads a write only once the lock guard has let it through
+    and its edit version has moved: history.py imports db_locking first, so
+    however the app is entered, db_locking's listeners register before its
+    own (models.admins imports db_sessions before models.base)."""
+    shown = subprocess.run(
+        [sys.executable, "-c", FLUSH_LISTENERS, entry],
+        capture_output=True,
+        text=True,
+        check=True,
+    )
+    ours = [line for line in shown.stdout.splitlines() if not line.endswith("._refold")]
+    assert ours == [
+        "inventory_tng.core.db_locking._written_under_lock",
+        "inventory_tng.core.db_locking._next_version",
+        "inventory_tng.core.history._before_flush",
+    ]
 
 
 # On PostgreSQL.
