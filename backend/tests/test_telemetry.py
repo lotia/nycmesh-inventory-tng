@@ -24,7 +24,6 @@ from sqlalchemy.orm import Session
 from structlog.testing import capture_logs
 
 from inventory_tng import page_builds, page_telemetry, security_headers
-from inventory_tng.admin.counts import ADJUSTMENTS, COUNTS
 from inventory_tng.admins import accounts
 from inventory_tng.app import create_app
 from inventory_tng.catalogue.categories_routes import CATEGORIES
@@ -46,6 +45,7 @@ from inventory_tng.models import (
     OverRecorded,
 )
 from inventory_tng.stock import ledger, open_packages, over_recorded
+from inventory_tng.stock.counts_routes import ADJUSTMENTS, COUNTS
 
 from helpers.apps import on_session
 from helpers.devices import new_device

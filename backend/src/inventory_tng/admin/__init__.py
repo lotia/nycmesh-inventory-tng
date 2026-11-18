@@ -12,16 +12,7 @@ refused form still links where it should.
 from fastapi import APIRouter
 
 from inventory_tng import pages
-from inventory_tng.admin import (
-    common,
-    counts,
-    devices,
-    length_checks,
-    over_recorded,
-    settings,
-    stock,
-    used_up,
-)
+from inventory_tng.admin import common, devices, settings
 from inventory_tng.admins import home_routes
 from inventory_tng.admins import routes as admins_routes
 from inventory_tng.catalogue import (
@@ -31,6 +22,13 @@ from inventory_tng.catalogue import (
 )
 from inventory_tng.labels import routes as labels_routes
 from inventory_tng.places import routes as places_routes
+from inventory_tng.stock import (
+    counts_routes,
+    length_checks_routes,
+    over_recorded_routes,
+    stock_routes,
+    used_up_routes,
+)
 from inventory_tng.volunteers import routes as volunteers_routes
 
 # The sections, in the order the navigation shows them, and their badges.
@@ -40,13 +38,13 @@ pages.SECTIONS[:] = (
     (places_routes.LOCATIONS, common.SECTION_LOCATIONS),
     (labels_routes.LABELS, common.SECTION_LABELS),
     (volunteers_routes.VOLUNTEERS, common.SECTION_VOLUNTEERS),
-    (stock.STOCK, common.SECTION_STOCK),
-    (counts.COUNTS, common.SECTION_COUNTS),
+    (stock_routes.STOCK, common.SECTION_STOCK),
+    (counts_routes.COUNTS, common.SECTION_COUNTS),
     (devices.DEVICES, common.SECTION_DEVICES),
     (admins_routes.ADMINS, common.SECTION_ADMINS),
     (settings.SETTINGS, common.SECTION_SETTINGS),
 )
-pages.BADGES[counts.COUNTS] = counts.badge
+pages.BADGES[counts_routes.COUNTS] = counts_routes.badge
 
 router = APIRouter(include_in_schema=False)
 for module in (
@@ -56,12 +54,12 @@ for module in (
     places_routes,
     labels_routes,
     volunteers_routes,
-    stock,
-    used_up,
-    length_checks,
-    over_recorded,
+    stock_routes,
+    used_up_routes,
+    length_checks_routes,
+    over_recorded_routes,
     reading_rules_routes,
-    counts,
+    counts_routes,
     devices,
     admins_routes,
     settings,

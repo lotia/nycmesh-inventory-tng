@@ -28,14 +28,6 @@ from inventory_tng.admin.common import (
     now,
 )
 from inventory_tng.admin.listing import AskedView, Sort, Sorting, View, arranged
-from inventory_tng.admin.needs_action import (
-    Kind,
-    OnlyItem,
-    of_only,
-    query,
-)
-from inventory_tng.admin.stock import STOCK
-from inventory_tng.admin.used_up import BY_PACKAGE, BY_SHOWS
 from inventory_tng.admins.guards import AdminSignedIn, SignedIn
 from inventory_tng.core.db import DbSession, RuleBroken, attempt
 from inventory_tng.core.local_time import site_zone
@@ -48,6 +40,14 @@ from inventory_tng.models import (
 )
 from inventory_tng.pages import NOTICES, not_found, redirect
 from inventory_tng.stock import forms, ledger, open_packages, over_recorded, queries
+from inventory_tng.stock.needs_action import (
+    Kind,
+    OnlyItem,
+    of_only,
+    query,
+)
+from inventory_tng.stock.stock_routes import STOCK
+from inventory_tng.stock.used_up_routes import BY_PACKAGE, BY_SHOWS
 
 log = structlog.get_logger(__name__)
 
@@ -91,7 +91,7 @@ OPEN = OpenPackage.closed_at.is_(None)
 REPORTED = OpenPackage.length_reported_at.is_not(None)
 BELOW = OpenPackage.below_zero_at.is_not(None)
 # Gone below zero and reported used up: the confirm page shows its
-# shortfall already (used_up.py).
+# shortfall already (stock/used_up_routes.py).
 BELOW_ONLY = (BELOW, ~REPORTED, OpenPackage.reported_at.is_(None))
 CHECKED = (or_(REPORTED, and_(*BELOW_ONLY)), OPEN)
 

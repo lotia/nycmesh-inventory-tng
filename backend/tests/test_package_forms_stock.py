@@ -9,10 +9,9 @@ from fastapi.testclient import TestClient
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from inventory_tng.admin import stock
 from inventory_tng.catalogue.forms import SHORTER_THAN_WHOLE, WHOLE_PACKAGES
 from inventory_tng.models import Item, ItemPackage
-from inventory_tng.stock import balance, open_packages
+from inventory_tng.stock import balance, open_packages, stock_routes
 from inventory_tng.stock.ledger import Entry, Form
 
 from helpers.markup import read, text
@@ -53,13 +52,14 @@ def test_reorder_on_usable_stock_and_sealed_minimums() -> None:
     usable = {1: Decimal(500), 2: Decimal(50)}
     sealed = {1: {10: Decimal(2)}, 2: {11: Decimal(1)}}
     loose = ItemPackage(id=12, item_id=1, name="Box", minimum_sealed=None)
-    (row,) = stock.reorder_rows(
+    (row,) = stock_routes.reorder_rows(
         [cable, rope], usable, sealed, [spool, coil, loose], {1}
     )
     assert (row.item, row.in_stores, row.count_first) == (cable, 500, True)
     assert row.low_sealed == [("Spool", Decimal(2), 3)]
     assert (
-        stock.reorder_rows([cable], {1: Decimal(400)}, {}, [], set())[0].item is cable
+        stock_routes.reorder_rows([cable], {1: Decimal(400)}, {}, [], set())[0].item
+        is cable
     )
 
 

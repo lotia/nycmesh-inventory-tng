@@ -113,11 +113,17 @@ def needs_action(session: Session) -> list[Waiting]:
     """What waits for an administrator's decision, by kind, those with
     something waiting: shown on the home page until each is made."""
     # They import this.
-    from inventory_tng.admin import length_checks, over_recorded, used_up
+    from inventory_tng.stock import (
+        length_checks_routes,
+        over_recorded_routes,
+        used_up_routes,
+    )
 
-    kinds = [used_up.KIND, *length_checks.KINDS]
+    kinds = [used_up_routes.KIND, *length_checks_routes.KINDS]
     found = [found for kind in kinds if (found := waiting(session, kind)).items]
     # Lines, not open packages: its own rows.
-    if over := over_recorded.by_item(session):
-        found.append(Waiting(over_recorded.KIND, over, sum(o.count for o in over)))
+    if over := over_recorded_routes.by_item(session):
+        found.append(
+            Waiting(over_recorded_routes.KIND, over, sum(o.count for o in over))
+        )
     return found

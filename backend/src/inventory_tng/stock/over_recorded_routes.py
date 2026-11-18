@@ -21,7 +21,6 @@ from fastapi.responses import Response
 from sqlalchemy.orm import Session
 
 from inventory_tng.admin.common import SECTION_STOCK, SETTLED_VIEW, admin_page
-from inventory_tng.admin.counts import COUNTS
 from inventory_tng.admin.listing import (
     AskedView,
     Sort,
@@ -30,15 +29,6 @@ from inventory_tng.admin.listing import (
     arranged,
 )
 from inventory_tng.admin.listing import order as order_of
-from inventory_tng.admin.needs_action import (
-    ItemWaiting,
-    Kind,
-    OnlyItem,
-    query,
-    query_string,
-)
-from inventory_tng.admin.stock import RECORDED_MORE as OVER_RECORDED
-from inventory_tng.admin.stock import RECORDED_MORE_SETTLED, STOCK
 from inventory_tng.admins.guards import AdminSignedIn
 from inventory_tng.core.db import DbSession, Gone, attempt, exists_where
 from inventory_tng.core.local_time import site_zone
@@ -55,7 +45,17 @@ from inventory_tng.pages import NOTICES, not_found, redirect
 from inventory_tng.places import locations
 from inventory_tng.places.routes import changeable
 from inventory_tng.stock import balance, ledger, over_recorded
+from inventory_tng.stock.counts_routes import COUNTS
 from inventory_tng.stock.forms import confirmed_count, why_problem
+from inventory_tng.stock.needs_action import (
+    ItemWaiting,
+    Kind,
+    OnlyItem,
+    query,
+    query_string,
+)
+from inventory_tng.stock.stock_routes import RECORDED_MORE as OVER_RECORDED
+from inventory_tng.stock.stock_routes import RECORDED_MORE_SETTLED, STOCK
 from inventory_tng.web.forms import row_id, rule_words
 
 log = structlog.get_logger(__name__)
@@ -64,8 +64,8 @@ router = APIRouter(include_in_schema=False)
 
 TITLE = lazy_gettext("Recorded more than moved")
 SETTLED_TITLE = lazy_gettext("Recorded more than moved, settled")
-# As "Needs your action" lists it (needs_action.py): its own rows, not open
-# packages, so no open packages' where.
+# As "Needs your action" lists it (stock/needs_action.py): its own rows, not
+# open packages, so no open packages' where.
 KIND = Kind(TITLE, OVER_RECORDED, ())
 
 CORRECTED = lazy_gettext("Corrected.")

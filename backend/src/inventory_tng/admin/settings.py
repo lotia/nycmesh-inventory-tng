@@ -1,6 +1,7 @@
 """Settings administrators change: how signing in works
 (docs/decisions/0012), the site's time zone (0013), how the scan page
-behaves (0011), and the reasons an adjustment may give (admin/counts.py).
+behaves (0011), and the reasons an adjustment may give
+(stock/counts_routes.py).
 
 Sign-in settings are sensitive: changing them asks for a fresh code, and
 every administrator with an address is told, since one who could weaken

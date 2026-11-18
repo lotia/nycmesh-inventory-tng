@@ -8,7 +8,7 @@ there: usually nothing. Anything you find, take to a current place, count
 this one as empty, and record it found there.{% endtrans %}</p>
 {% endif %}
 {#- Which items: a search over their names, and the filter on, if any,
-with a way to show them all (admin/counts.py). #}
+with a way to show them all (stock/counts_routes.py). #}
 <form method="get" action="{{ here }}" role="search" class="actions">
   <label class="grow">{% trans %}Find items{% endtrans %}
     <input name="q" type="search" value="{{ shown.search }}" maxlength="200" autocomplete="off">

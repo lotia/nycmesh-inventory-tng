@@ -398,12 +398,12 @@ msgstr ""
 msgid "%(package)s of %(size)s"
 msgstr ""
 
-#: src/inventory_tng/admin/counts.py
+#: src/inventory_tng/stock/counts_routes.py
 #, python-format
 msgid "%(package)s, opened %(day)s: left"
 msgstr ""
 
-#: src/inventory_tng/admin/counts.py
+#: src/inventory_tng/stock/counts_routes.py
 #, python-format
 msgid "%(package)s, sealed: how many"
 msgstr ""
@@ -413,7 +413,7 @@ msgstr ""
 msgid "%(place)s (opened)"
 msgstr ""
 
-#: src/inventory_tng/admin/over_recorded.py
+#: src/inventory_tng/stock/over_recorded_routes.py
 #, python-format
 msgid "%(place)s brought back. Correct it now."
 msgstr ""
@@ -892,7 +892,7 @@ msgstr ""
 msgid "An item is on the count twice: count it once."
 msgstr ""
 
-#: src/inventory_tng/admin/counts.py
+#: src/inventory_tng/stock/counts_routes.py
 msgid ""
 "An item is on this form more than once. Each item is counted once, so it "
 "isn't clear which number is right: nothing was saved."
@@ -1089,7 +1089,7 @@ msgstr ""
 msgid "Brought back."
 msgstr ""
 
-#: src/inventory_tng/admin/over_recorded.py
+#: src/inventory_tng/stock/over_recorded_routes.py
 msgid "Brought back. Correct it now."
 msgstr ""
 
@@ -1108,11 +1108,11 @@ msgstr ""
 msgid "By"
 msgstr ""
 
-#: src/inventory_tng/admin/stock.py
+#: src/inventory_tng/stock/stock_routes.py
 msgid "By item"
 msgstr ""
 
-#: src/inventory_tng/admin/stock.py
+#: src/inventory_tng/stock/stock_routes.py
 msgid "By place"
 msgstr ""
 
@@ -1180,20 +1180,20 @@ msgstr ""
 msgid "Close it"
 msgstr ""
 
-#: src/inventory_tng/admin/used_up.py
+#: src/inventory_tng/stock/used_up_routes.py
 #, python-format
 msgid "Close this %(package)s as used up?"
 msgstr ""
 
-#: src/inventory_tng/admin/over_recorded.py
+#: src/inventory_tng/stock/over_recorded_routes.py
 msgid "Closed."
 msgstr ""
 
-#: src/inventory_tng/admin/used_up.py
+#: src/inventory_tng/stock/used_up_routes.py
 msgid "Closed: what it showed is written off as used up."
 msgstr ""
 
-#: src/inventory_tng/admin/used_up.py
+#: src/inventory_tng/stock/used_up_routes.py
 msgid "Closed: what they showed is written off as used up."
 msgstr ""
 
@@ -1235,7 +1235,7 @@ msgstr ""
 msgid "Confirm used up"
 msgstr ""
 
-#: src/inventory_tng/admin/over_recorded.py
+#: src/inventory_tng/stock/over_recorded_routes.py
 msgid "Confirmed."
 msgstr ""
 
@@ -1268,7 +1268,7 @@ msgstr ""
 msgid "Corrected"
 msgstr ""
 
-#: src/inventory_tng/admin/over_recorded.py
+#: src/inventory_tng/stock/over_recorded_routes.py
 msgid "Corrected."
 msgstr ""
 
@@ -1277,11 +1277,11 @@ msgid "Couldn't copy: select it and copy it by hand."
 msgstr ""
 
 #. Translators: a count, as a kind of save, before what it saved.
-#: src/inventory_tng/admin/counts.py
+#: src/inventory_tng/stock/counts_routes.py
 msgid "Count"
 msgstr ""
 
-#: src/inventory_tng/admin/counts.py
+#: src/inventory_tng/stock/counts_routes.py
 #: src/inventory_tng/templates/over_recorded.html
 #, python-format
 msgid "Count %(place)s"
@@ -1299,7 +1299,7 @@ msgstr ""
 msgid "Count corrected"
 msgstr ""
 
-#: src/inventory_tng/admin/over_recorded.py
+#: src/inventory_tng/stock/over_recorded_routes.py
 msgid "Count corrected."
 msgstr ""
 
@@ -1336,11 +1336,11 @@ msgstr ""
 msgid "Counted where it left"
 msgstr ""
 
-#: src/inventory_tng/admin/counts.py
+#: src/inventory_tng/stock/counts_routes.py
 msgid "Counted. The records now match what you found."
 msgstr ""
 
-#: src/inventory_tng/admin/counts.py
+#: src/inventory_tng/stock/counts_routes.py
 msgid "Counted: everything was as the records say."
 msgstr ""
 
@@ -1348,7 +1348,7 @@ msgstr ""
 msgid "Counts"
 msgstr ""
 
-#: src/inventory_tng/admin/counts.py
+#: src/inventory_tng/stock/counts_routes.py
 msgid "Counts and adjustments"
 msgstr ""
 
@@ -1879,7 +1879,7 @@ msgstr ""
 msgid "Leave the ones ticked"
 msgstr ""
 
-#: src/inventory_tng/admin/length_checks.py
+#: src/inventory_tng/stock/length_checks_routes.py
 msgid "Left as it shows."
 msgstr ""
 
@@ -1887,7 +1887,7 @@ msgstr ""
 msgid "Left on it"
 msgstr ""
 
-#: src/inventory_tng/admin/length_checks.py
+#: src/inventory_tng/stock/length_checks_routes.py
 msgid "Lengths to check"
 msgstr ""
 
@@ -1910,7 +1910,7 @@ msgid ""
 "your password and authenticators here. Each token works once."
 msgstr ""
 
-#: src/inventory_tng/admin/counts.py
+#: src/inventory_tng/stock/counts_routes.py
 msgid "Loose"
 msgstr ""
 
@@ -1955,7 +1955,7 @@ msgstr ""
 msgid "Mark checked"
 msgstr ""
 
-#: src/inventory_tng/admin/over_recorded.py
+#: src/inventory_tng/stock/over_recorded_routes.py
 msgid "Marked checked."
 msgstr ""
 
@@ -2024,7 +2024,7 @@ msgid ""
 "and an item's form asks about it where that leaves two readings."
 msgstr ""
 
-#: src/inventory_tng/admin/stock.py
+#: src/inventory_tng/stock/stock_routes.py
 msgid "Needs counting"
 msgstr ""
 
@@ -2105,7 +2105,7 @@ msgstr ""
 msgid "Nobody can pick it."
 msgstr ""
 
-#: src/inventory_tng/admin/length_checks.py
+#: src/inventory_tng/stock/length_checks_routes.py
 msgid "Nobody said what is on those: type what is on each, and set it on its own."
 msgstr ""
 
@@ -2166,33 +2166,33 @@ msgstr ""
 msgid "Not a unit: keep “%(typed)s”"
 msgstr ""
 
-#: src/inventory_tng/admin/over_recorded.py
+#: src/inventory_tng/stock/over_recorded_routes.py
 #, python-format
 msgid ""
 "Not changed: %(place)s is retired and holds nothing, so its count can't "
 "be corrected there."
 msgstr ""
 
-#: src/inventory_tng/admin/over_recorded.py
+#: src/inventory_tng/stock/over_recorded_routes.py
 #, python-format
 msgid ""
 "Not changed: %(place)s is retired and holds nothing, so the %(amount)s "
 "can't be found there again."
 msgstr ""
 
-#: src/inventory_tng/admin/over_recorded.py
+#: src/inventory_tng/stock/over_recorded_routes.py
 #, python-format
 msgid ""
 "Not changed: %(place)s is retired and holds nothing, so the %(amount)s "
 "can't be written off there."
 msgstr ""
 
-#: src/inventory_tng/admin/over_recorded.py
+#: src/inventory_tng/stock/over_recorded_routes.py
 #, python-format
 msgid "Not changed: %(why)s"
 msgstr ""
 
-#: src/inventory_tng/admin/over_recorded.py
+#: src/inventory_tng/stock/over_recorded_routes.py
 msgid ""
 "Not changed: someone answered or changed it meanwhile. Reload to see it "
 "as it is."
@@ -2246,13 +2246,13 @@ msgstr ""
 msgid "Notes"
 msgstr ""
 
-#: src/inventory_tng/admin/used_up.py
+#: src/inventory_tng/stock/used_up_routes.py
 msgid ""
 "Nothing changed: it was answered meanwhile, moved, or its place can't be "
 "adjusted until counted."
 msgstr ""
 
-#: src/inventory_tng/admin/length_checks.py
+#: src/inventory_tng/stock/length_checks_routes.py
 msgid ""
 "Nothing changed: it was checked meanwhile, or its place can't be counted."
 " Look again."
@@ -2320,7 +2320,7 @@ msgstr ""
 msgid "Of"
 msgstr ""
 
-#: src/inventory_tng/admin/used_up.py
+#: src/inventory_tng/stock/used_up_routes.py
 msgid "Offered again: not used up."
 msgstr ""
 
@@ -2800,22 +2800,22 @@ msgstr ""
 msgid "Recorded more"
 msgstr ""
 
-#: src/inventory_tng/admin/stock.py
+#: src/inventory_tng/stock/stock_routes.py
 #, python-format
 msgid "Recorded more (%(count)d)"
 msgstr ""
 
-#: src/inventory_tng/admin/over_recorded.py
+#: src/inventory_tng/stock/over_recorded_routes.py
 #: src/inventory_tng/templates/over_recorded.html
 #: src/inventory_tng/templates/over_recorded_settled.html
 msgid "Recorded more than moved"
 msgstr ""
 
-#: src/inventory_tng/admin/over_recorded.py
+#: src/inventory_tng/stock/over_recorded_routes.py
 msgid "Recorded more than moved, settled"
 msgstr ""
 
-#: src/inventory_tng/admin/counts.py
+#: src/inventory_tng/stock/counts_routes.py
 msgid "Recorded."
 msgstr ""
 
@@ -2902,7 +2902,7 @@ msgid ""
 "remove it below if it shouldn't be."
 msgstr ""
 
-#: src/inventory_tng/admin/stock.py
+#: src/inventory_tng/stock/stock_routes.py
 msgid "Reorder"
 msgstr ""
 
@@ -2915,7 +2915,8 @@ msgstr ""
 msgid "Reported"
 msgstr ""
 
-#: src/inventory_tng/admin/used_up.py src/inventory_tng/templates/item.html
+#: src/inventory_tng/stock/used_up_routes.py
+#: src/inventory_tng/templates/item.html
 msgid "Reported used up"
 msgstr ""
 
@@ -3162,7 +3163,7 @@ msgstr ""
 msgid "Saved"
 msgstr ""
 
-#: src/inventory_tng/admin/counts.py
+#: src/inventory_tng/stock/counts_routes.py
 #, python-format
 msgid "Saved %(num)d line. These moved while you counted, so count them again."
 msgid_plural "Saved %(num)d lines. These moved while you counted, so count them again."
@@ -3302,7 +3303,7 @@ msgstr ""
 msgid "Set up your authenticator again on %(brand)s"
 msgstr ""
 
-#: src/inventory_tng/admin/length_checks.py
+#: src/inventory_tng/stock/length_checks_routes.py
 msgid ""
 "Set: a count of each writes the difference from what it showed then; cuts"
 " since stay."
@@ -3373,7 +3374,7 @@ msgstr ""
 msgid "Shows %(left)s %(unit)s."
 msgstr ""
 
-#: src/inventory_tng/admin/length_checks.py
+#: src/inventory_tng/stock/length_checks_routes.py
 msgid "Shows the wrong length"
 msgstr ""
 
@@ -3769,7 +3770,7 @@ msgid ""
 " to register again with a new code."
 msgstr ""
 
-#: src/inventory_tng/admin/counts.py
+#: src/inventory_tng/stock/counts_routes.py
 msgid "These moved while you counted, so count them again."
 msgstr ""
 
@@ -3838,7 +3839,7 @@ msgid ""
 "server for a new recovery token."
 msgstr ""
 
-#: src/inventory_tng/admin/length_checks.py
+#: src/inventory_tng/stock/length_checks_routes.py
 msgid ""
 "This page is from before the last change to how lengths are set: load it "
 "again, then set it."
@@ -3905,7 +3906,7 @@ msgstr ""
 msgid "Type a number, such as 12 or 0.5."
 msgstr ""
 
-#: src/inventory_tng/admin/length_checks.py
+#: src/inventory_tng/stock/length_checks_routes.py
 msgid "Type what is on it: a number, 0 or more."
 msgstr ""
 
@@ -4024,7 +4025,7 @@ msgid ""
 " offers it again, for a box ticked by mistake."
 msgstr ""
 
-#: src/inventory_tng/admin/over_recorded.py
+#: src/inventory_tng/stock/over_recorded_routes.py
 #, python-format
 msgid "Waiting (%(count)d)"
 msgstr ""
@@ -4034,7 +4035,7 @@ msgstr ""
 msgid "Was %(words)s"
 msgstr ""
 
-#: src/inventory_tng/admin/length_checks.py
+#: src/inventory_tng/stock/length_checks_routes.py
 msgid "Went below zero"
 msgstr ""
 
@@ -4304,7 +4305,7 @@ msgid ""
 msgstr ""
 
 #. Translators: a kind of save, a noun.
-#: src/inventory_tng/admin/length_checks.py
+#: src/inventory_tng/stock/length_checks_routes.py
 msgid "adjustment"
 msgstr ""
 
@@ -4353,7 +4354,7 @@ msgid "capacitance"
 msgstr ""
 
 #. Translators: a kind of save, a noun.
-#: src/inventory_tng/admin/length_checks.py
+#: src/inventory_tng/stock/length_checks_routes.py
 msgid "count"
 msgstr ""
 
@@ -4482,7 +4483,7 @@ msgid "inches"
 msgstr ""
 
 #. Translators: a kind of save, a noun.
-#: src/inventory_tng/admin/length_checks.py
+#: src/inventory_tng/stock/length_checks_routes.py
 msgid "install"
 msgstr ""
 
@@ -4554,7 +4555,7 @@ msgid ""
 msgstr ""
 
 #. Translators: a kind of save, a noun.
-#: src/inventory_tng/admin/length_checks.py
+#: src/inventory_tng/stock/length_checks_routes.py
 msgid "move"
 msgstr ""
 
@@ -4572,7 +4573,7 @@ msgid "on %(when)s"
 msgstr ""
 
 #. Translators: a kind of save, a noun.
-#: src/inventory_tng/admin/length_checks.py
+#: src/inventory_tng/stock/length_checks_routes.py
 msgid "open"
 msgstr ""
 
@@ -4638,12 +4639,12 @@ msgid "power level"
 msgstr ""
 
 #. Translators: a kind of save, a noun.
-#: src/inventory_tng/admin/length_checks.py
+#: src/inventory_tng/stock/length_checks_routes.py
 msgid "receipt"
 msgstr ""
 
 #. Translators: a kind of save, a noun.
-#: src/inventory_tng/admin/length_checks.py
+#: src/inventory_tng/stock/length_checks_routes.py
 msgid "report"
 msgstr ""
 

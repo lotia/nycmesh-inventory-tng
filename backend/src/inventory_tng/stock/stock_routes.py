@@ -21,7 +21,6 @@ from inventory_tng.admin.common import (
     SETTLED_VIEW,
     admin_page,
 )
-from inventory_tng.admin.counts import COUNTS
 from inventory_tng.admin.listing import (
     AskedView,
     Sort,
@@ -39,6 +38,7 @@ from inventory_tng.models import INTEGER_MAX, Item, ItemPackage, Location, whole
 from inventory_tng.pages import templates
 from inventory_tng.stock import open_packages, over_recorded, queries
 from inventory_tng.stock.balance import SHORT, retired_places_holding_stock
+from inventory_tng.stock.counts_routes import COUNTS
 
 log = structlog.get_logger(__name__)
 
@@ -48,8 +48,8 @@ STOCK = f"{ADMIN}/stock"
 REORDER = f"{STOCK}/reorder"
 NEEDS_COUNTING = f"{STOCK}/needs-counting"
 
-# Lines recorded with more than was moved (admin/over_recorded.py): those
-# waiting, and those settled.
+# Lines recorded with more than was moved (stock/over_recorded_routes.py):
+# those waiting, and those settled.
 RECORDED_MORE = f"{STOCK}/recorded-more"
 RECORDED_MORE_SETTLED = f"{RECORDED_MORE}/settled"
 

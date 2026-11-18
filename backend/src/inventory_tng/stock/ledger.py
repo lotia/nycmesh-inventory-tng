@@ -1095,7 +1095,7 @@ def _problems(
     return list(dict.fromkeys(problems))
 
 
-# Counts and adjustments: an administrator's, from admin/counts.py
+# Counts and adjustments: an administrator's, from stock/counts_routes.py
 
 counted = meter.create_counter(
     "inventory.counts.recorded",

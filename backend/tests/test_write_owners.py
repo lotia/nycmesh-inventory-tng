@@ -160,7 +160,7 @@ def test_no_model_has_a_relationship() -> None:
             "from sqlalchemy import insert\ninsert(LedgerTransaction)",
             True,
         ),
-        ("admin/counts.py", "text('INSERT INTO movement VALUES (1)')", True),
+        ("stock/counts_routes.py", "text('INSERT INTO movement VALUES (1)')", True),
         ("admin/settings.py", "SiteSettings(id=2)", True),
         (
             "admin/settings.py",

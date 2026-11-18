@@ -11,7 +11,6 @@ from fastapi.testclient import TestClient
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from inventory_tng.admin import needs_action, used_up
 from inventory_tng.models import (
     AdjustmentReason,
     Admin,
@@ -19,7 +18,13 @@ from inventory_tng.models import (
     LedgerTransaction,
     OpenPackage,
 )
-from inventory_tng.stock import adjustment_reasons, balance, open_packages
+from inventory_tng.stock import (
+    adjustment_reasons,
+    balance,
+    needs_action,
+    open_packages,
+    used_up_routes,
+)
 from inventory_tng.stock.ledger import (
     Entry,
     Form,
@@ -337,7 +342,7 @@ def test_an_items_packages_are_counted_by_name(
     def line() -> needs_action.ItemWaiting:
         [found] = [
             each
-            for each in needs_action.by_item(session, *used_up.REPORTED)
+            for each in needs_action.by_item(session, *used_up_routes.REPORTED)
             if each.item_id == spools.cable.id
         ]
         return found

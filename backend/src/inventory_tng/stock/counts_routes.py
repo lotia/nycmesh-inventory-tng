@@ -40,7 +40,6 @@ from fastapi.responses import HTMLResponse, Response
 from sqlalchemy import ColumnElement, case, func
 from sqlalchemy.orm import Session
 
-from inventory_tng.admin import needs_action
 from inventory_tng.admin.common import (
     ADMIN,
     SECTION_COUNTS,
@@ -50,7 +49,6 @@ from inventory_tng.admin.common import (
     text_form,
 )
 from inventory_tng.admin.listing import UNASKED, AskedView, Sort, Sorting, View, order
-from inventory_tng.admin.needs_action import OnlyItem
 from inventory_tng.admin.settings import SETTINGS
 from inventory_tng.admins.guards import AdminSignedIn, SignedIn
 from inventory_tng.catalogue.items_routes import SEARCHED
@@ -75,7 +73,7 @@ from inventory_tng.pages import (
     redirect,
     retired_holding,
 )
-from inventory_tng.stock import open_packages, over_recorded, queries
+from inventory_tng.stock import needs_action, open_packages, over_recorded, queries
 from inventory_tng.stock.balance import countable, retired_holding_stock_count, takeable
 from inventory_tng.stock.forms import (
     CLOSED_MEANWHILE,
@@ -102,6 +100,7 @@ from inventory_tng.stock.ledger import (
     record_adjustment,
     record_count,
 )
+from inventory_tng.stock.needs_action import OnlyItem
 from inventory_tng.stock.open_packages import tracks_opened
 from inventory_tng.web.forms import RULES, row_id
 

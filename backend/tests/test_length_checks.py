@@ -12,7 +12,6 @@ from fastapi.testclient import TestClient
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
-from inventory_tng.admin import length_checks
 from inventory_tng.core.local_env import CLONE
 from inventory_tng.models import (
     Admin,
@@ -21,7 +20,7 @@ from inventory_tng.models import (
     LedgerTransaction,
     OpenPackage,
 )
-from inventory_tng.stock import balance, ledger, open_packages
+from inventory_tng.stock import balance, ledger, length_checks_routes, open_packages
 from inventory_tng.stock.ledger import Entry, Form
 from inventory_tng.web import formatting
 
@@ -167,8 +166,8 @@ def test_needs_your_action_lists_lengths_to_check(
     registered_client.post(URL, json=spools.place.batch(lines=[cut(below, "310")]))
     home = admin_client.get("/admin").text
     assert "Needs your action (2)" in home
-    assert str(length_checks.KINDS[0].title) in home
-    assert str(length_checks.KINDS[1].title) in home
+    assert str(length_checks_routes.KINDS[0].title) in home
+    assert str(length_checks_routes.KINDS[1].title) in home
     spool = f"{spools.cable.name}: 1 \N{MULTIPLICATION SIGN} Spool"
     assert spool in [words for words, _ in links(home)]
     assert f"{spool}, 5 m below zero" in read(home).text
@@ -274,7 +273,9 @@ def test_leave_it_and_what_is_refused(
     session.refresh(made)
     assert made.length_reported is None
     assert left_on(session, made) == 305
-    assert str(length_checks.KINDS[0].title) not in text(admin_client.get("/admin"))
+    assert str(length_checks_routes.KINDS[0].title) not in text(
+        admin_client.get("/admin")
+    )
 
 
 def test_bulk_set_passes_over_one_nobody_said_a_length_of(
@@ -344,7 +345,7 @@ def test_each_kind_has_its_page(
     said = text(admin_client.get(f"{LENGTHS}/reported{only}"))
     assert "said 250 m is on it" in said
     # As text on purpose: nowhere in the main part, its attributes included.
-    assert str(length_checks.KINDS[1].title) not in said.split("<main", 1)[1]
+    assert str(length_checks_routes.KINDS[1].title) not in said.split("<main", 1)[1]
     gone = admin_client.get(f"{LENGTHS}/below-zero{only}").text
     assert "said 250 m" not in gone
     assert ("Show all", f"{LENGTHS}/below-zero") in links(gone)
@@ -388,7 +389,7 @@ def test_one_reported_used_up_is_not_also_below_zero(
     assert registered_client.post(URL, json=over).status_code == 201
     home = text(admin_client.get("/admin"))
     assert "Needs your action (1)" in home
-    assert str(length_checks.KINDS[1].title) not in home
+    assert str(length_checks_routes.KINDS[1].title) not in home
 
 
 def test_answers_go_back_to_the_page_they_came_from(
@@ -636,8 +637,12 @@ def test_a_package_moved_from_the_places_locked_is_not_set(
     made = spools.opened()
     made.below_zero_at = made.opened_at
     session.flush()
-    answer = length_checks.Answer(made.id, seen(session, made), Decimal(1), as_of=0)
-    assert length_checks._set(session, admin.id, answer, [made.location_id + 1]) == (
+    answer = length_checks_routes.Answer(
+        made.id, seen(session, made), Decimal(1), as_of=0
+    )
+    assert length_checks_routes._set(
+        session, admin.id, answer, [made.location_id + 1]
+    ) == (
         False,
         False,
         0,
@@ -657,8 +662,8 @@ def test_a_set_whose_count_is_written_already_writes_nothing_more(
     checked = seen(session, made)
     key = uuid.uuid5(made.key, f"length {checked}")
     ledger.count_open_package(session, key, admin.id, made, Decimal(1), Decimal(305))
-    answer = length_checks.Answer(made.id, checked, Decimal(2), Decimal(305), 0)
-    assert length_checks._set(session, admin.id, answer, [made.location_id]) == (
+    answer = length_checks_routes.Answer(made.id, checked, Decimal(2), Decimal(305), 0)
+    assert length_checks_routes._set(session, admin.id, answer, [made.location_id]) == (
         True,
         False,
         0,
@@ -681,7 +686,7 @@ def test_recent_cuts_leave_out_a_move_of_it_whole(
     registered_client.post(URL, json=spools.place.batch(lines=[cut(made, "5")]))
     moved = cut(made, "300") | {"whole": True}
     registered_client.post(URL, json=spools.place.batch(lines=[moved]))
-    found = length_checks.recent_cuts(session, [made.id])[made.id]
+    found = length_checks_routes.recent_cuts(session, [made.id])[made.id]
     assert [each.quantity for each in found] == [5]
 
 

@@ -20,13 +20,6 @@ from inventory_tng.admin.common import (
     now,
 )
 from inventory_tng.admin.listing import AskedView, Sort, Sorting, View, arranged
-from inventory_tng.admin.needs_action import (
-    Kind,
-    OnlyItem,
-    of_only,
-    query,
-)
-from inventory_tng.admin.stock import STOCK
 from inventory_tng.admins.guards import AdminSignedIn, SignedIn
 from inventory_tng.catalogue.items_routes import ITEMS
 from inventory_tng.core.db import DbSession, attempt
@@ -35,6 +28,13 @@ from inventory_tng.core.phrases import gettext, lazy_gettext
 from inventory_tng.models import OpenPackage
 from inventory_tng.pages import NOTICES, not_found, redirect
 from inventory_tng.stock import ledger, open_packages, queries
+from inventory_tng.stock.needs_action import (
+    Kind,
+    OnlyItem,
+    of_only,
+    query,
+)
+from inventory_tng.stock.stock_routes import STOCK
 
 log = structlog.get_logger(__name__)
 meter = metrics.get_meter(__name__)
@@ -78,7 +78,7 @@ REPORTED = (OpenPackage.reported_at.is_not(None), OpenPackage.closed_at.is_(None
 
 
 TITLE = lazy_gettext("Reported used up")
-# As "Needs your action" lists it (needs_action.py).
+# As "Needs your action" lists it (stock/needs_action.py).
 KIND = Kind(TITLE, USED_UP, REPORTED)
 
 

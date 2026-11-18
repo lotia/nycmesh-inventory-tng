@@ -1,4 +1,4 @@
-"""Counts and adjustments (admin/counts.py), and their reasons
+"""Counts and adjustments (stock/counts_routes.py), and their reasons
 (admin/settings.py)."""
 
 import re
@@ -15,9 +15,7 @@ from sqlalchemy import text as sql_text
 from sqlalchemy.orm import Session
 from structlog.testing import capture_logs
 
-from inventory_tng.admin.counts import ADJUSTMENTS, COUNT_KIND, COUNTS
 from inventory_tng.admin.settings import SETTINGS
-from inventory_tng.admin.stock import STOCK
 from inventory_tng.catalogue import items
 from inventory_tng.core.db import RuleBroken
 from inventory_tng.core.local_time import DEFAULT_ZONE, show
@@ -34,6 +32,7 @@ from inventory_tng.models import (
 from inventory_tng.pages import retired_holding
 from inventory_tng.places import locations
 from inventory_tng.site_settings.forms import REASON_TAKEN
+from inventory_tng.stock.counts_routes import ADJUSTMENTS, COUNT_KIND, COUNTS
 from inventory_tng.stock.forms import (
     FOUND_OR_OFF,
     ON_THE_FORM_TWICE,
@@ -51,6 +50,7 @@ from inventory_tng.stock.ledger import (
     record_adjustment,
     record_count,
 )
+from inventory_tng.stock.stock_routes import STOCK
 from inventory_tng.web.forms import ABOVE_ZERO, RULES, TYPE_A_NUMBER, WHOLE_UNITS
 
 from helpers.concurrency import Committed

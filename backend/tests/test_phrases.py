@@ -21,9 +21,8 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 import inventory_tng
-from inventory_tng.admin import common, counts, length_checks, stock, used_up
+from inventory_tng.admin import common
 from inventory_tng.admin import devices as admin_devices
-from inventory_tng.admin import over_recorded as admin_over_recorded
 from inventory_tng.admin.listing import Lapsed
 from inventory_tng.admins import accounts, activity, guards
 from inventory_tng.admins import routes as admin_admins
@@ -65,7 +64,14 @@ from inventory_tng.models import (
 )
 from inventory_tng.pages import retired_holding, templates
 from inventory_tng.site_settings import forms as settings_forms
-from inventory_tng.stock import over_recorded
+from inventory_tng.stock import (
+    counts_routes,
+    length_checks_routes,
+    over_recorded,
+    stock_routes,
+    used_up_routes,
+)
+from inventory_tng.stock import over_recorded_routes as admin_over_recorded
 from inventory_tng.volunteers import routes as admin_volunteers
 from inventory_tng.web import forms as web_forms
 
@@ -170,14 +176,14 @@ SAID_WITH_VALUES: list[Callable[[], Words]] = [
     lambda: admin_devices.revoke_many_title(3),
     *(lambda said=said: said(1, 9) for said in settings_forms.WHOLE.values()),
     lambda: settings_forms.whole_minutes(1, 9),
-    lambda: used_up.close_title(NOT_ENGLISH),
-    lambda: counts.count_title(NOT_ENGLISH),
-    lambda: counts.moved_meanwhile(0),
-    lambda: counts.moved_meanwhile(1),
-    lambda: counts.moved_meanwhile(3),
-    lambda: counts.sealed_how_many(NOT_ENGLISH),
-    lambda: counts.opened_left(NOT_ENGLISH, "2026-11-15"),
-    lambda: stock.recorded_more_view(2),
+    lambda: used_up_routes.close_title(NOT_ENGLISH),
+    lambda: counts_routes.count_title(NOT_ENGLISH),
+    lambda: counts_routes.moved_meanwhile(0),
+    lambda: counts_routes.moved_meanwhile(1),
+    lambda: counts_routes.moved_meanwhile(3),
+    lambda: counts_routes.sealed_how_many(NOT_ENGLISH),
+    lambda: counts_routes.opened_left(NOT_ENGLISH, "2026-11-15"),
+    lambda: stock_routes.recorded_more_view(2),
     lambda: admin_over_recorded.place_brought_back(NOT_ENGLISH),
     lambda: admin_over_recorded.not_changed(NOT_ENGLISH),
     lambda: admin_over_recorded.waiting_view(2),
@@ -555,7 +561,7 @@ def counts_page() -> str:
         reasons=[],
         counted_places=[],
         kinds=["count", "adjustment"],
-        count_kind=counts.COUNT_KIND,
+        count_kind=counts_routes.COUNT_KIND,
         counters=[],
         recent=[entry],
     )
@@ -890,7 +896,7 @@ def test_a_lists_all_is_said_in_the_locale() -> None:
 
 
 def test_cut_kinds_tell_translators_they_are_kinds_of_save() -> None:
-    kinds = {str(kind) for kind in length_checks.CUT_KINDS.values()}
+    kinds = {str(kind) for kind in length_checks_routes.CUT_KINDS.values()}
     told = {
         m.id
         for m in read(ENGLISH_PO)
@@ -937,7 +943,7 @@ def test_no_message_has_a_lone_per_cent() -> None:
 
 
 def test_every_kind_of_save_has_words_for_a_cut() -> None:
-    assert length_checks.CUT_KINDS.keys() == set(TRANSACTION_KINDS)
+    assert length_checks_routes.CUT_KINDS.keys() == set(TRANSACTION_KINDS)
 
 
 def test_a_unit_name_with_a_prefix_tells_translators_what_it_is() -> None:

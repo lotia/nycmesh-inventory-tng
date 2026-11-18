@@ -12,13 +12,17 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 from structlog.testing import capture_logs
 
-from inventory_tng.admin import length_checks
-from inventory_tng.admin import over_recorded as over_recorded_page
-from inventory_tng.admin.counts import COUNTS
 from inventory_tng.core.db import attempt
 from inventory_tng.core.local_time import show_day, site_zone
 from inventory_tng.models import ItemPackage, LedgerTransaction, Movement
-from inventory_tng.stock import ledger, open_packages, over_recorded
+from inventory_tng.stock import (
+    ledger,
+    length_checks_routes,
+    open_packages,
+    over_recorded,
+)
+from inventory_tng.stock import over_recorded_routes as over_recorded_page
+from inventory_tng.stock.counts_routes import COUNTS
 from inventory_tng.stock.ledger import expected
 
 from helpers.markup import read, text
@@ -303,10 +307,10 @@ def test_one_moved_whole_is_closed_by_setting_its_length_where_it_arrived(
     session.flush()
     moment = session.scalar(select(func.max(LedgerTransaction.id)))
     assert moment is not None
-    answer = length_checks.Answer(
+    answer = length_checks_routes.Answer(
         made.id, open_packages.check_seen(made), Decimal(300), Decimal(305), moment
     )
-    assert length_checks._set(
+    assert length_checks_routes._set(
         session, new_admin_id(session), answer, [spools.van.id]
     ) == (
         True,
@@ -328,10 +332,10 @@ def test_only_a_report_after_the_batch_that_moved_it_whole_puts_it_right(
     (check,) = checks(session)
     moved = session.get_one(Movement, check.movement_id).transaction_id
     assert made.length_reported_in_id == moved
-    answer = length_checks.Answer(
+    answer = length_checks_routes.Answer(
         made.id, open_packages.check_seen(made), made.length_reported, as_of=moved
     )
-    assert length_checks._set(
+    assert length_checks_routes._set(
         session, new_admin_id(session), answer, [spools.van.id]
     ) == (
         True,
@@ -347,13 +351,13 @@ def test_only_a_report_after_the_batch_that_moved_it_whole_puts_it_right(
     session.refresh(made)
     assert made.length_reported_in_id is not None
     assert made.length_reported_in_id > moved
-    answer = length_checks.Answer(
+    answer = length_checks_routes.Answer(
         made.id,
         open_packages.check_seen(made),
         made.length_reported,
         as_of=made.length_reported_in_id,
     )
-    assert length_checks._set(
+    assert length_checks_routes._set(
         session, new_admin_id(session), answer, [spools.van.id]
     ) == (
         True,

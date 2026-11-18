@@ -10,7 +10,6 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 from structlog.testing import capture_logs
 
-from inventory_tng.admin import over_recorded as over_recorded_page
 from inventory_tng.core.db import RuleBroken, attempt
 from inventory_tng.models import (
     OVER_RECORDED_REASONS,
@@ -20,6 +19,7 @@ from inventory_tng.models import (
 )
 from inventory_tng.stock import forms as stock_forms
 from inventory_tng.stock import over_recorded
+from inventory_tng.stock import over_recorded_routes as over_recorded_page
 from inventory_tng.web.forms import up_to
 
 from helpers.concurrency import Committed
