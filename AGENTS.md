@@ -66,8 +66,9 @@ is, read [README.md](README.md).
     name says what it holds: a reader can guess the functions and classes
     inside from the name, and nothing inside surprises them. When a module
     grows a second job, split it into files named for each job rather than
-    widening the name. This is a judgement, not a check. Where code goes is
-    in `docs/decisions/0023-code-laid-out-by-feature.md`.
+    widening the name. This is a judgement, not a check. Where code goes,
+    and how files and tests are named, is in
+    `docs/decisions/0023-code-laid-out-by-feature.md`.
 
 ## More guidance
 

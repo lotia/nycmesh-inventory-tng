@@ -1,6 +1,7 @@
 # 0023 — Code laid out by feature
 
-**Status:** accepted · 2026-11-17
+**Status:** accepted · 2026-11-17 · amended 2026-11-18 (how files and
+tests are named)
 
 ## Context
 
@@ -15,13 +16,15 @@ decided the structure below on 2026-11-17.
 
 - **Package by feature**, such as `catalogue/`, `stock/` or `devices/`.
   Every feature names its files by the same roles: `<thing>.py` for a
-  table's rules and writes (its owner, 0016), `queries.py`, `forms.py`,
-  `routes.py` for HTML pages, `api.py` for JSON, `schemas.py`, `paths.py`,
-  `guards.py` for what every route needing a sign-in or a device depends
-  on, and `command.py`. Where a feature has several files of a role, each
-  is named for its page or thing, as `admins/sign_in_routes.py`,
-  `scan/batch_api.py` or `admins/totp_keys_command.py`. URLs do not
-  change.
+  table's rules and writes (its owner, 0016); one each of `queries.py`,
+  `forms.py`, `paths.py` and `guards.py`, for what every route needing a
+  sign-in or a device depends on; and, named for the page, endpoint or
+  command each serves, `<page>_routes.py` for HTML pages,
+  `<thing>_api.py` for JSON, `<thing>_schemas.py` and
+  `<command>_command.py`, as `admins/sign_in_routes.py`,
+  `scan/batch_api.py` or `admins/totp_keys_command.py` (Amendment,
+  2026-11-18, replacing `routes.py`, `api.py`, `schemas.py` and
+  `command.py` while a feature had only one). URLs do not change.
 - **The top of `inventory_tng`** holds only the entry points (`app.py`,
   `server.py`, `__main__.py` and `manage.py`), `models/` and
   `templates/`, beside folders of data such as `locales/`.
@@ -29,7 +32,8 @@ decided the structure below on 2026-11-17.
   it, with what they share in `base.py` and `names.py`. Its `__init__.py`
   imports every module, so `Base.metadata`, Alembic and the guards see
   every table (Ali, 2026-11-18, inventory-tng-h657.1). It re-exports
-  nothing: an import names the module a model is in.
+  nothing: an import names the module a model is in, and imports the
+  model's names from it, never the module (Amendment, 2026-11-18).
 - **`templates/`** has a folder per feature, named as its package, with
   the pages its routes render and the partials only its pages include.
   Layouts and partials more than one feature uses, and the pages `web/`
@@ -230,3 +234,55 @@ Parts of `cart.ts` and `ScanPage.tsx` were split out first:
 | `ScanPage.tsx`: `NoteSaid`, `AlertWords`, `Counted`, `ConfirmDiscard`, `keyedByWords`, `RULED_LIST`, `CAUTION_BOX` | `scan/Notes.tsx` |
 | `ScanPage.tsx`: `OlderList`, with the words it says of each (`olderSaid`, `olderKind`, `olderWhere`, `olderWhen`) and its telemetry (`heldIn`, `recordOlder`) | `scan/OlderList.tsx` |
 | `ScanPage.tsx`: `OutboxList`, with `RecordedElsewhere`, `useOnline` and `AddDifference` | `scan/OutboxList.tsx` |
+
+## Amendment: names (2026-11-18)
+
+Ali decided on 2026-11-18 how files, modules and tests are named
+(inventory-tng-u3fp), so that a name says what its file holds and can be
+searched for (AGENTS.md rule 12).
+
+- **A file serving one page, endpoint or command is named for it**, even
+  when it is its feature's only one: `<page>_routes.py`, `<thing>_api.py`,
+  `<thing>_schemas.py` and `<command>_command.py`, the last for its
+  command's name (`registration-codes` is `registration_codes_command.py`).
+  A name may repeat its folder, as `devices/devices_routes.py`. Each name
+  is then unique in the tree, stays the same when a second file of its
+  role arrives, and needs no alias where `app.py` or `manage.py` imports
+  it.
+- **A feature's role files keep their names**: `queries.py`, `forms.py`,
+  `paths.py` and `guards.py`, one of each per feature. Callers import
+  names from them (`from inventory_tng.stock.queries import item_total`),
+  never the module under an alias such as `stock_queries`.
+- **`models/<feature>.py` keeps its name.** Callers import a model's
+  names, never the module, so it never meets its feature's package of the
+  same name under aliases. A function in it is named so it cannot be read
+  as one of the feature's modules.
+- **Backend tests mirror the source tree**: a test of one module is
+  `test_<module>.py`, or `test_<module>_<aspect>.py`, in the folder of
+  the module's package, and a test about one feature sits in that
+  feature's folder. pytest runs in its importlib import mode. Helpers stay
+  importable as `helpers` through `pythonpath`, and are never named
+  `test_*`, which pytest would collect. Two folders hold tests no package
+  owns: `tests/across/`, properties of the whole running app, such as
+  requests at once, locking and the page sweeps; and `tests/codebase/`,
+  rules about the code, read from its files without running the app, such
+  as the import directions. Every folder under `backend/tests/` that names
+  no source package, such as these two and `helpers/`, holds a short
+  `README.md` saying what it holds, and a test checks it. Docs say only
+  that the tests mirror the source tree; they never list its folders,
+  which would drift.
+- **In the frontend**, components are PascalCase, named for the
+  component; other modules are kebab-case, named for what they hold, as
+  `testing/scan-page.tsx`. Tests sit beside them, as `<module>.test.ts` or
+  `<Component>.<aspect>.test.tsx`.
+
+We rejected prefixing the role files with their feature
+(`stock/stock_queries.py`) and suffixing the models' modules
+(`models/catalogue_tables.py`): there is one of each per feature, and the
+clashes came from importing modules, not from their names. We rejected
+flat test names after the module tested, as Ali pointed out that importlib
+mode, which lets the tests mirror the tree, is pytest's recommendation for
+new projects.
+
+Files renamed to these names, or split for doing two jobs, are moved in
+steps, each adding its rows to the tables above.
