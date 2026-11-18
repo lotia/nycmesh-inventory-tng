@@ -21,8 +21,9 @@ from inventory_tng.admin.common import (
 from inventory_tng.admin.listing import AskedView, Sort, Sorting, View, arranged
 from inventory_tng.admins.guards import AdminSignedIn, SignedIn
 from inventory_tng.catalogue import queries
+from inventory_tng.catalogue.forms import CATEGORY_TAKEN
 from inventory_tng.core.db import DbSession, refusal
-from inventory_tng.core.phrases import Words, lazy_gettext
+from inventory_tng.core.phrases import Words
 from inventory_tng.models import Category
 from inventory_tng.pages import not_found, redirect
 from inventory_tng.web.forms import ALERTS, RULES, form_version, name_problem
@@ -32,10 +33,6 @@ log = structlog.get_logger(__name__)
 router = APIRouter(include_in_schema=False)
 
 CATEGORIES = f"{ADMIN}/categories"
-TAKEN = lazy_gettext(
-    "There is already a category by that name, perhaps a retired one: "
-    "bring that back instead."
-)
 
 
 # How the categories list sorts, each row a category and how many current
@@ -136,7 +133,7 @@ def add_category(
     added = None
     if problem is None:
         added, _ = refusal(session, lambda: categories.add(session, name), "unique")
-        problem = None if added else TAKEN
+        problem = None if added else CATEGORY_TAKEN
     if added is None:
         return _list_page(request, session, signed, problem, name)
     session.commit()
@@ -178,7 +175,7 @@ def rename_category(
         )
         if broken in ALERTS:
             return _category_page(request, session, signed, found, alert=RULES[broken])
-        problem = broken and TAKEN
+        problem = broken and CATEGORY_TAKEN
     if problem is not None:
         return _category_page(request, session, signed, found, problem)
     session.commit()

@@ -125,3 +125,4 @@ short test. `core/` is the name FastAPI's full-stack template uses;
 | `admin/settings.py`: how its forms are read, and their problems in words | `site_settings/forms.py` |
 | `admin/admins.py`: how its forms are read, and their problems in words | `admins/forms.py` |
 | `admin/locations.py`: how its forms are read, and their problems in words | `places/forms.py` |
+| `admin/categories.py`: its problem in words (`TAKEN`, now `CATEGORY_TAKEN`) | `catalogue/forms.py` |

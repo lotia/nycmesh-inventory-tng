@@ -7,8 +7,9 @@ from fastapi.testclient import TestClient
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from inventory_tng.admin.categories import CATEGORIES, TAKEN
+from inventory_tng.admin.categories import CATEGORIES
 from inventory_tng.admins import guards
+from inventory_tng.catalogue.forms import CATEGORY_TAKEN
 from inventory_tng.models import Admin, Category, Item
 from inventory_tng.web.forms import RULES
 
@@ -59,7 +60,7 @@ def test_names_are_unique_ignoring_case(
     add(session, Category(name="Radios"))
     refused = admin_client.post(CATEGORIES, data={"name": "radios"})
     assert refused.status_code == 400
-    assert str(TAKEN) in text(refused)
+    assert str(CATEGORY_TAKEN) in text(refused)
 
 
 def test_renaming(admin_client: TestClient, session: Session) -> None:
@@ -104,7 +105,7 @@ def test_retiring_and_bringing_back(admin_client: TestClient, session: Session) 
     # Its name stays its own while it is retired, so it can come back.
     taken = admin_client.post(CATEGORIES, data={"name": "radios"})
     assert taken.status_code == 400
-    assert str(TAKEN) in text(taken)
+    assert str(CATEGORY_TAKEN) in text(taken)
     # Retired, it is read only.
     refused = admin_client.post(
         f"{path}/name", data={"name": "Old radios", "version": shown(radios)}

@@ -1,9 +1,9 @@
 """How the item pages' forms are read and checked: an item's or a
 package's name as it will be stored, the units in it to ask about, what
 to set, and what is wrong, in words, beside the field it is about; and
-the readings chosen on the unit readings pages. The handlers in
-admin/items.py and admin/reading_rules.py read the request and pass the
-form's fields."""
+the readings chosen on the unit readings pages, and a category's name
+taken. The handlers in admin/items.py, admin/reading_rules.py and
+admin/categories.py read the request and pass the form's fields."""
 
 from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass, field
@@ -353,3 +353,10 @@ def seed_choices(
         else:
             chosen[proposal.found.key] = rule
     return chosen, unchosen
+
+
+# A category's name another has.
+CATEGORY_TAKEN = lazy_gettext(
+    "There is already a category by that name, perhaps a retired one: "
+    "bring that back instead."
+)

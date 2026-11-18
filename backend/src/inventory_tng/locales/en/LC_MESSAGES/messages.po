@@ -3747,7 +3747,7 @@ msgid ""
 "invited from the administrator pages."
 msgstr ""
 
-#: src/inventory_tng/admin/categories.py
+#: src/inventory_tng/catalogue/forms.py
 msgid ""
 "There is already a category by that name, perhaps a retired one: bring "
 "that back instead."
