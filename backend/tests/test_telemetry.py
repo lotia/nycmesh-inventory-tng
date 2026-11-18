@@ -31,10 +31,10 @@ from inventory_tng import (
     page_telemetry,
     security_headers,
 )
-from inventory_tng.admin.categories import CATEGORIES
 from inventory_tng.admin.counts import ADJUSTMENTS, COUNTS
 from inventory_tng.admins import accounts
 from inventory_tng.app import create_app
+from inventory_tng.catalogue.categories_routes import CATEGORIES
 from inventory_tng.core import db, mail
 from inventory_tng.core.db import NoSession, RuleBroken
 from inventory_tng.core.masking import MASK, Masker

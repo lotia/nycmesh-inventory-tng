@@ -709,7 +709,7 @@ msgstr ""
 msgid "Accept all"
 msgstr ""
 
-#: src/inventory_tng/admin/reading_rules.py
+#: src/inventory_tng/catalogue/reading_rules_routes.py
 msgid "Accepted. Every name with them is read so now."
 msgstr ""
 
@@ -790,11 +790,11 @@ msgstr ""
 msgid "Alias"
 msgstr ""
 
-#: src/inventory_tng/admin/items.py
+#: src/inventory_tng/catalogue/items_routes.py
 msgid "Alias added."
 msgstr ""
 
-#: src/inventory_tng/admin/items.py
+#: src/inventory_tng/catalogue/items_routes.py
 msgid "Alias removed."
 msgstr ""
 
@@ -1004,7 +1004,7 @@ msgstr ""
 msgid "As read"
 msgstr ""
 
-#: src/inventory_tng/admin/reading_rules.py
+#: src/inventory_tng/catalogue/reading_rules_routes.py
 msgid "As typed"
 msgstr ""
 
@@ -1370,7 +1370,7 @@ msgstr ""
 msgid "Delete"
 msgstr ""
 
-#: src/inventory_tng/admin/reading_rules.py
+#: src/inventory_tng/catalogue/reading_rules_routes.py
 msgid "Deleted. Names with it are read by the unit table again."
 msgstr ""
 
@@ -2154,7 +2154,7 @@ msgstr ""
 msgid "None."
 msgstr ""
 
-#: src/inventory_tng/admin/reading_rules.py
+#: src/inventory_tng/catalogue/reading_rules_routes.py
 #: src/inventory_tng/templates/reading_rule.html
 #: src/inventory_tng/templates/reading_seed.html
 msgid "Not a unit"
@@ -2257,7 +2257,7 @@ msgid ""
 " Look again."
 msgstr ""
 
-#: src/inventory_tng/admin/items.py
+#: src/inventory_tng/catalogue/items_routes.py
 msgid "Nothing changed: those ticked were set so already, or are retired."
 msgstr ""
 
@@ -2486,11 +2486,11 @@ msgstr ""
 msgid "Package"
 msgstr ""
 
-#: src/inventory_tng/admin/items.py
+#: src/inventory_tng/catalogue/items_routes.py
 msgid "Package added."
 msgstr ""
 
-#: src/inventory_tng/admin/items.py
+#: src/inventory_tng/catalogue/items_routes.py
 msgid "Package brought back."
 msgstr ""
 
@@ -2498,11 +2498,11 @@ msgstr ""
 msgid "Package retired"
 msgstr ""
 
-#: src/inventory_tng/admin/items.py
+#: src/inventory_tng/catalogue/items_routes.py
 msgid "Package retired."
 msgstr ""
 
-#: src/inventory_tng/admin/items.py
+#: src/inventory_tng/catalogue/items_routes.py
 msgid "Package saved."
 msgstr ""
 
@@ -2714,7 +2714,7 @@ msgstr[1] ""
 msgid "Propose readings from every name"
 msgstr ""
 
-#: src/inventory_tng/admin/reading_rules.py
+#: src/inventory_tng/catalogue/reading_rules_routes.py
 msgid "Propose unit readings"
 msgstr ""
 
@@ -2764,7 +2764,7 @@ msgstr ""
 msgid "Read “%(key)s” as"
 msgstr ""
 
-#: src/inventory_tng/admin/reading_rules.py
+#: src/inventory_tng/catalogue/reading_rules_routes.py
 #, python-format
 msgid "Reading of %(token)s"
 msgstr ""
@@ -2895,7 +2895,7 @@ msgstr ""
 msgid "Renamed."
 msgstr ""
 
-#: src/inventory_tng/admin/items.py
+#: src/inventory_tng/catalogue/items_routes.py
 msgid ""
 "Renamed. The old name is kept as an alias so searches still find it; "
 "remove it below if it shouldn't be."
@@ -2980,7 +2980,7 @@ msgstr ""
 msgid "Respell it"
 msgstr ""
 
-#: src/inventory_tng/admin/reading_rules.py
+#: src/inventory_tng/catalogue/reading_rules_routes.py
 msgid "Respelt"
 msgstr ""
 
@@ -3186,7 +3186,7 @@ msgstr ""
 msgid "Saved."
 msgstr ""
 
-#: src/inventory_tng/admin/reading_rules.py
+#: src/inventory_tng/catalogue/reading_rules_routes.py
 msgid "Saved. Every name with it is read so now."
 msgstr ""
 
@@ -3194,7 +3194,7 @@ msgstr ""
 msgid "Saved. Open scan pages pick it up within ten minutes."
 msgstr ""
 
-#: src/inventory_tng/admin/items.py
+#: src/inventory_tng/catalogue/items_routes.py
 msgid "Saved: how its opened packages are followed."
 msgstr ""
 
@@ -3202,7 +3202,7 @@ msgstr ""
 msgid "Saved: times are shown in the new zone."
 msgstr ""
 
-#: src/inventory_tng/admin/items.py
+#: src/inventory_tng/catalogue/items_routes.py
 msgid "Saved: when an open one is a short end, and how many sealed to keep."
 msgstr ""
 
@@ -3662,7 +3662,7 @@ msgid ""
 "changed from this one. Password reset links now go to the new address."
 msgstr ""
 
-#: src/inventory_tng/admin/reading_rules.py
+#: src/inventory_tng/catalogue/reading_rules_routes.py
 #: src/inventory_tng/templates/reading_rules.html
 msgid "The import"
 msgstr ""
@@ -3718,13 +3718,13 @@ msgstr ""
 msgid "The two passwords are different."
 msgstr ""
 
-#: src/inventory_tng/admin/items.py
+#: src/inventory_tng/catalogue/items_routes.py
 msgid ""
 "Their opened packages are followed now, where a package does not say "
 "otherwise."
 msgstr ""
 
-#: src/inventory_tng/admin/items.py
+#: src/inventory_tng/catalogue/items_routes.py
 msgid ""
 "Their opened packages become loose units now, where a package does not "
 "say otherwise."
@@ -3855,7 +3855,7 @@ msgstr ""
 msgid "This signs you out everywhere."
 msgstr ""
 
-#: src/inventory_tng/admin/items.py
+#: src/inventory_tng/catalogue/items_routes.py
 msgid "Tick the items to change first."
 msgstr ""
 
@@ -3926,7 +3926,7 @@ msgstr ""
 msgid "Unit"
 msgstr ""
 
-#: src/inventory_tng/admin/reading_rules.py
+#: src/inventory_tng/catalogue/reading_rules_routes.py
 #: src/inventory_tng/templates/items.html
 msgid "Unit readings"
 msgstr ""

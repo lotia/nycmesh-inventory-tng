@@ -1,12 +1,12 @@
-"""The items list (admin/items.py): search and suggestions, current and
-retired, pages, sorting and filtering."""
+"""The items list (catalogue/items_routes.py): search and suggestions,
+current and retired, pages, sorting and filtering."""
 
 from fastapi.testclient import TestClient
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
-from inventory_tng.admin.items import ITEMS
 from inventory_tng.admin.listing import PER_PAGE
+from inventory_tng.catalogue.items_routes import ITEMS
 from inventory_tng.models import Category, Item
 
 from helpers.items import items_named, new_item

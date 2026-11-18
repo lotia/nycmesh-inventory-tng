@@ -535,7 +535,7 @@ class Item(KeyedName, Searchable, Versioned, Base):
     # folded (Searchable), and its name alone so, for close names
     # (items.similar), kept alike. ix_item_search makes
     # fuzzy() on search_text fast, as the items list searches it
-    # (admin/items.py).
+    # (catalogue/items_routes.py).
     SEARCHED = ("name", "manufacturer", "part_number", "old_code")
     READS_RULES = True
     name_folded: Mapped[str] = mapped_column(Text)

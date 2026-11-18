@@ -147,8 +147,8 @@ def test_no_model_has_a_relationship() -> None:
 @pytest.mark.parametrize(
     ("module", "code", "found"),
     [
-        ("admin/items.py", "Item(name='x')", True),
-        ("admin/items.py", "session.delete(row)", True),
+        ("catalogue/items_routes.py", "Item(name='x')", True),
+        ("catalogue/items_routes.py", "session.delete(row)", True),
         ("catalogue/items.py", "session.delete(row)", True),
         ("catalogue/items.py", "Item(name='x')", False),
         ("catalogue/items.py", "ItemPackage(item_id=1)", False),
@@ -170,7 +170,7 @@ def test_no_model_has_a_relationship() -> None:
         ("admin/settings.py", "AdjustmentReason(name='x')", True),
         ("adjustment_reasons.py", "AdjustmentReason(name='x')", False),
         # Not a write.
-        ("admin/items.py", "select(Item).where(Item.name == 'x')", False),
+        ("catalogue/items_routes.py", "select(Item).where(Item.name == 'x')", False),
     ],
 )
 def test_the_check_sees_each_way_of_writing(

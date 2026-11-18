@@ -23,7 +23,6 @@ from inventory_tng.admin.common import (
     admin_page,
 )
 from inventory_tng.admin.counts import COUNTS
-from inventory_tng.admin.items import ITEMS, SEARCHED
 from inventory_tng.admin.listing import (
     AskedView,
     Sort,
@@ -34,6 +33,7 @@ from inventory_tng.admin.listing import (
     paged,
 )
 from inventory_tng.admins.guards import AdminSignedIn
+from inventory_tng.catalogue.items_routes import ITEMS, SEARCHED
 from inventory_tng.core.db import DbSession
 from inventory_tng.core.phrases import Words, gettext, lazy_gettext
 from inventory_tng.models import INTEGER_MAX, Item, ItemPackage, Location, whole

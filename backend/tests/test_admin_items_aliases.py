@@ -1,5 +1,5 @@
-"""An item's aliases (admin/items.py): searched, one namespace with names,
-kept on a rename, and unchanged while the item is retired."""
+"""An item's aliases (catalogue/items_routes.py): searched, one namespace
+with names, kept on a rename, and unchanged while the item is retired."""
 
 from collections.abc import Callable
 from functools import partial
@@ -10,7 +10,6 @@ from httpx2 import Response
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from inventory_tng.admin.items import ITEMS, RENAMED
 from inventory_tng.catalogue import items
 from inventory_tng.catalogue.forms import (
     ALIAS_ITS_OWN,
@@ -19,6 +18,7 @@ from inventory_tng.catalogue.forms import (
     TAKEN,
     TAKEN_FIELDS,
 )
+from inventory_tng.catalogue.items_routes import ITEMS, RENAMED
 from inventory_tng.core.db import attempt
 from inventory_tng.models import CURRENT_ALIAS, Category, Item, ItemAlias
 

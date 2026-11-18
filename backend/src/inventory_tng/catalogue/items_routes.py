@@ -15,7 +15,6 @@ from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from inventory_tng import open_packages
-from inventory_tng.admin.categories import CATEGORIES
 from inventory_tng.admin.common import (
     ADMIN,
     SECTION_ITEMS,
@@ -32,10 +31,11 @@ from inventory_tng.admin.listing import (
     Sort,
     Sorting,
 )
-from inventory_tng.admin.reading_rules import READINGS
 from inventory_tng.admins.guards import AdminSignedIn, SignedIn
 from inventory_tng.catalogue import forms, items, queries, reading_rules, units
+from inventory_tng.catalogue.categories_routes import CATEGORIES
 from inventory_tng.catalogue.reading_rules import NOT_A_UNIT
+from inventory_tng.catalogue.reading_rules_routes import READINGS
 from inventory_tng.core.db import DbSession, exists_where, refusal
 from inventory_tng.core.local_time import site_zone
 from inventory_tng.core.phrases import Words, lazy_gettext

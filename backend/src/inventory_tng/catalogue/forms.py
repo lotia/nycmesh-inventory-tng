@@ -2,8 +2,8 @@
 package's name as it will be stored, the units in it to ask about, what
 to set, and what is wrong, in words, beside the field it is about; and
 the readings chosen on the unit readings pages, and a category's name
-taken. The handlers in admin/items.py, admin/reading_rules.py and
-admin/categories.py read the request and pass the form's fields."""
+taken. The handlers in items_routes.py, reading_rules_routes.py and
+categories_routes.py read the request and pass the form's fields."""
 
 from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass, field
@@ -211,7 +211,7 @@ def same_name(
     """Whether `item`'s new name asks nothing about close names."""
     # Its own name, or a respelling of it, its units' too, asks
     # nothing: it is the same; nor one of its aliases
-    # (admin/items.py's _change_or_note).
+    # (items_routes.py's _change_or_note).
     return items.Keys.of(session, fields.name, typed.rules).same(item) or confirmed(
         session, form, fields
     )

@@ -1,6 +1,6 @@
 """How the units in an item's or a package's name are read
-(admin/items.py, inventory-tng-c0c.3): said under the name, asked about
-where nothing settles them, and corrected with Not right?."""
+(catalogue/items_routes.py, inventory-tng-c0c.3): said under the name,
+asked about where nothing settles them, and corrected with Not right?."""
 
 from decimal import Decimal
 
@@ -10,7 +10,6 @@ from markupsafe import escape
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
-from inventory_tng.admin.items import ITEMS
 from inventory_tng.catalogue import items
 from inventory_tng.catalogue.forms import (
     ASK_UNIT,
@@ -18,6 +17,7 @@ from inventory_tng.catalogue.forms import (
     TAKEN_FIELDS,
     read_as_one,
 )
+from inventory_tng.catalogue.items_routes import ITEMS
 from inventory_tng.catalogue.reading_rules import NAMED, both
 from inventory_tng.models import Category, Item, ItemPackage, ReadingRule
 

@@ -13,16 +13,13 @@ from fastapi import APIRouter
 
 from inventory_tng import pages
 from inventory_tng.admin import (
-    categories,
     common,
     counts,
     devices,
-    items,
     labels,
     length_checks,
     locations,
     over_recorded,
-    reading_rules,
     settings,
     stock,
     used_up,
@@ -30,11 +27,16 @@ from inventory_tng.admin import (
 )
 from inventory_tng.admins import home_routes
 from inventory_tng.admins import routes as admins_routes
+from inventory_tng.catalogue import (
+    categories_routes,
+    items_routes,
+    reading_rules_routes,
+)
 
 # The sections, in the order the navigation shows them, and their badges.
 pages.SECTIONS[:] = (
-    (items.ITEMS, common.SECTION_ITEMS),
-    (categories.CATEGORIES, common.SECTION_CATEGORIES),
+    (items_routes.ITEMS, common.SECTION_ITEMS),
+    (categories_routes.CATEGORIES, common.SECTION_CATEGORIES),
     (locations.LOCATIONS, common.SECTION_LOCATIONS),
     (labels.LABELS, common.SECTION_LABELS),
     (volunteers.VOLUNTEERS, common.SECTION_VOLUNTEERS),
@@ -49,8 +51,8 @@ pages.BADGES[counts.COUNTS] = counts.badge
 router = APIRouter(include_in_schema=False)
 for module in (
     home_routes,
-    items,
-    categories,
+    items_routes,
+    categories_routes,
     locations,
     labels,
     volunteers,
@@ -58,7 +60,7 @@ for module in (
     used_up,
     length_checks,
     over_recorded,
-    reading_rules,
+    reading_rules_routes,
     counts,
     devices,
     admins_routes,

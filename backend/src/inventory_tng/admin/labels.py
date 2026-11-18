@@ -18,11 +18,11 @@ from inventory_tng.admin.common import (
     now,
     revoke_title,
 )
-from inventory_tng.admin.items import ITEMS
 from inventory_tng.admin.listing import AskedView, Listing, Searched, Sort, Sorting
 from inventory_tng.admin.locations import LOCATIONS
 from inventory_tng.admins.accounts import qr_svg
 from inventory_tng.admins.guards import AdminSignedIn
+from inventory_tng.catalogue.items_routes import ITEMS
 from inventory_tng.core.db import DbSession
 from inventory_tng.core.local_time import site_zone
 from inventory_tng.core.phrases import gettext, lazy, lazy_gettext, ngettext

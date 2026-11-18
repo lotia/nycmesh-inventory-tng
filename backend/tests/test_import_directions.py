@@ -72,39 +72,38 @@ BREAKS: dict[str, dict[str, list[str]]] = {
     "routes_run_queries": {},
     "routes_import_another_features_routes": {
         "admin/__init__.py": [
-            "admin/categories.py",
             "admin/counts.py",
             "admin/devices.py",
-            "admin/items.py",
             "admin/labels.py",
             "admin/length_checks.py",
             "admin/locations.py",
             "admin/over_recorded.py",
-            "admin/reading_rules.py",
             "admin/settings.py",
             "admin/stock.py",
             "admin/used_up.py",
             "admin/volunteers.py",
             "admins/home_routes.py",
             "admins/routes.py",
+            "catalogue/categories_routes.py",
+            "catalogue/items_routes.py",
+            "catalogue/reading_rules_routes.py",
         ],
-        "admin/counts.py": ["admin/items.py", "admin/settings.py"],
-        "admin/items.py": ["admin/categories.py", "admin/reading_rules.py"],
-        "admin/labels.py": ["admin/items.py", "admin/locations.py"],
+        "admin/counts.py": ["admin/settings.py", "catalogue/items_routes.py"],
+        "admin/labels.py": ["admin/locations.py", "catalogue/items_routes.py"],
         "admin/length_checks.py": ["admin/stock.py", "admin/used_up.py"],
         "admin/over_recorded.py": [
             "admin/counts.py",
             "admin/locations.py",
             "admin/stock.py",
         ],
-        "admin/stock.py": ["admin/counts.py", "admin/items.py"],
-        "admin/used_up.py": ["admin/items.py", "admin/stock.py"],
+        "admin/stock.py": ["admin/counts.py", "catalogue/items_routes.py"],
+        "admin/used_up.py": ["admin/stock.py", "catalogue/items_routes.py"],
         "admins/home_routes.py": [
-            "admin/categories.py",
             "admin/counts.py",
-            "admin/items.py",
             "admin/locations.py",
             "admin/volunteers.py",
+            "catalogue/categories_routes.py",
+            "catalogue/items_routes.py",
         ],
         "security_headers.py": ["page_telemetry.py"],
     },
@@ -434,7 +433,7 @@ def test_rules_importing_fastapi_or_web_is_found(
 
 def test_a_tables_owner_is_rules() -> None:
     assert is_rules("catalogue/items.py")
-    assert not is_rules("admin/items.py")
+    assert not is_rules("catalogue/items_routes.py")
 
 
 @pytest.mark.parametrize(

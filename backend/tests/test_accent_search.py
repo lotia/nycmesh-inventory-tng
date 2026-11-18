@@ -11,10 +11,10 @@ from sqlalchemy.orm import Session
 
 from inventory_tng import models
 from inventory_tng.admin.common import LABELS
-from inventory_tng.admin.items import ITEMS, SEARCHED
 from inventory_tng.admin.listing import SEARCH_MAX, folded
 from inventory_tng.admin.volunteers import VOLUNTEERS
 from inventory_tng.catalogue import items
+from inventory_tng.catalogue.items_routes import ITEMS, SEARCHED
 from inventory_tng.models import (
     FOLDED_WITH,
     Category,

@@ -20,7 +20,6 @@ from inventory_tng.admin.common import (
     admin_page,
     now,
 )
-from inventory_tng.admin.items import ITEMS
 from inventory_tng.admin.listing import AskedView, Sort, Sorting, View, arranged
 from inventory_tng.admin.needs_action import (
     Kind,
@@ -30,6 +29,7 @@ from inventory_tng.admin.needs_action import (
 )
 from inventory_tng.admin.stock import STOCK
 from inventory_tng.admins.guards import AdminSignedIn, SignedIn
+from inventory_tng.catalogue.items_routes import ITEMS
 from inventory_tng.core.db import DbSession, attempt
 from inventory_tng.core.local_time import site_zone
 from inventory_tng.core.phrases import gettext, lazy_gettext

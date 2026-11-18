@@ -12,13 +12,17 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 from structlog.testing import capture_logs
 
-from inventory_tng.admin.items import ITEMS, SEARCHED
 from inventory_tng.admin.listing import folded
-from inventory_tng.admin.reading_rules import READINGS, READINGS_ACCEPTED, SEED
 from inventory_tng.admins import guards
 from inventory_tng.catalogue import items, names, reading_rules, units
 from inventory_tng.catalogue.forms import CHOOSE_ONE, PACKAGE_TAKEN, TAKEN_FIELDS
+from inventory_tng.catalogue.items_routes import ITEMS, SEARCHED
 from inventory_tng.catalogue.reading_rules import LIKELY, NAMED, both, near
+from inventory_tng.catalogue.reading_rules_routes import (
+    READINGS,
+    READINGS_ACCEPTED,
+    SEED,
+)
 from inventory_tng.core.db import lock_catalogue
 from inventory_tng.models import (
     Admin,

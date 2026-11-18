@@ -1,6 +1,6 @@
-"""Items on the administrators' pages (admin/items.py): adding and editing
-one, its name and the names it clashes with, close names asked about
-first, and retiring and bringing one back."""
+"""Items on the administrators' pages (catalogue/items_routes.py): adding
+and editing one, its name and the names it clashes with, close names
+asked about first, and retiring and bringing one back."""
 
 import uuid
 from decimal import Decimal
@@ -11,7 +11,6 @@ from markupsafe import escape
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from inventory_tng.admin.items import ITEMS
 from inventory_tng.admins.accounts import name_up_to
 from inventory_tng.catalogue import items
 from inventory_tng.catalogue.forms import (
@@ -22,6 +21,7 @@ from inventory_tng.catalogue.forms import (
     TAKEN,
     TAKEN_FIELDS,
 )
+from inventory_tng.catalogue.items_routes import ITEMS
 from inventory_tng.core.local_time import DEFAULT_ZONE
 from inventory_tng.models import (
     Category,

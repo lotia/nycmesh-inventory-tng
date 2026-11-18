@@ -352,7 +352,7 @@ change to one reads every name with that unit after a number again
 Read them with `models.reading_rules`, which reads them once a
 transaction, and again after one is written or a savepoint rolled back;
 a form's answers, not yet kept, are read on top of them (`Typed.rules`
-in `admin/items.py`). Administrators see and correct them on the Unit
+in `catalogue/forms.py`). Administrators see and correct them on the Unit
 readings page, linked from Items.
 
 Search, the forms and the scan page read a unit after a number alike

@@ -139,3 +139,6 @@ short test. `core/` is the name FastAPI's full-stack template uses;
 | `reading_rules.py` | `catalogue/reading_rules.py` |
 | `unit_readings.py` | `catalogue/unit_readings.py` |
 | `units.py` | `catalogue/units.py` |
+| `admin/categories.py` | `catalogue/categories_routes.py` |
+| `admin/items.py` | `catalogue/items_routes.py` |
+| `admin/reading_rules.py` | `catalogue/reading_rules_routes.py` |

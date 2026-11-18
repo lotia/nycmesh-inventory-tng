@@ -1,6 +1,6 @@
-"""An item's packages (admin/items.py): adding, renaming and resizing them
-until they move, retiring and bringing them back, and whether opened ones
-are followed (docs/decisions/0020, Amendment)."""
+"""An item's packages (catalogue/items_routes.py): adding, renaming and
+resizing them until they move, retiring and bringing them back, and
+whether opened ones are followed (docs/decisions/0020, Amendment)."""
 
 import uuid
 from decimal import Decimal
@@ -12,9 +12,9 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from inventory_tng import open_packages
-from inventory_tng.admin.items import ITEMS, PACKAGE_RETIRED
 from inventory_tng.catalogue import items
 from inventory_tng.catalogue.forms import PACKAGE_TAKEN, SHORTER_THAN_WHOLE
+from inventory_tng.catalogue.items_routes import ITEMS, PACKAGE_RETIRED
 from inventory_tng.core.db import RuleBroken, attempt
 from inventory_tng.models import Category, Item, ItemPackage, Label
 

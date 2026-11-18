@@ -21,11 +21,11 @@ from fastapi.testclient import TestClient
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from inventory_tng.admin.categories import CATEGORIES
-from inventory_tng.admin.items import ITEMS
 from inventory_tng.admin.locations import LOCATIONS
 from inventory_tng.admin.settings import SETTINGS
 from inventory_tng.admin.volunteers import VOLUNTEERS
+from inventory_tng.catalogue.categories_routes import CATEGORIES
+from inventory_tng.catalogue.items_routes import ITEMS
 from inventory_tng.core.db import (
     Base,
     get_locked,
