@@ -945,11 +945,11 @@ process makes databases of its own, which takes a moment, so past 8 a run
 is slower, and running a few tests is quicker without `-n`.
 Connections, below, says how many runs fit at once.
 
-The backend's code is in `backend/src/inventory_tng/`, grouped by
-feature, each feature's files named by their role: `web/` holds what
-every page shares, `core/` plumbing and `dev/` developer tools.
-`tests/test_import_directions.py` refuses an import the other way, such
-as `core/` importing a feature (docs/decisions/0023).
+The backend's code is grouped by feature and the frontend's by page, as
+docs/decisions/0023 says, which also says where a new file goes.
+`tests/test_import_directions.py` and Biome (`frontend/biome.json`)
+refuse an import the wrong way, such as `core/` importing a feature or
+`shared/` importing a page's folder.
 
 For the frontend:
 
@@ -960,13 +960,6 @@ npm run typecheck                # types
 npm run lint                     # Biome: lint and formatting
 npm run coverage                 # Vitest, with coverage (npm test: without)
 ```
-
-The frontend's code is in `frontend/src/`, grouped by page: `scan/`,
-`register/` and `admin/` hold what one page uses, `shared/` what more than
-one does, and `testing/` the helpers only tests import. Each test sits
-beside its module. Biome refuses an import the other way, such as
-`shared/` importing a page's folder (`frontend/biome.json`,
-docs/decisions/0023).
 
 Those are unit tests: Vitest runs the frontend's in a page it simulates
 (happy-dom), with no layout. The browser tests, in
