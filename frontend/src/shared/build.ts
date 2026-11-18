@@ -34,7 +34,7 @@ export const MUST_UPGRADE = msg`The scanner has been updated. You must upgrade. 
 export const UPGRADE = msg`Upgrade`;
 /** The header a batch names its build in, and the reply the server's. */
 export const HEADER = "X-Inventory-Build";
-/** As the backend checks one (bundle.BUILD_ID). */
+/** As the backend checks one (frontend_bundle.BUILD_ID). */
 const ID = /^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d\.\d{3}Z$/;
 
 /** How a tab learned that a newer build is out: from another tab's stamp,

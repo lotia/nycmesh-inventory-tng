@@ -5,7 +5,7 @@ docs/decisions/0018, 0023), run where the app runs, with its settings:
     python -m inventory_tng.manage <command> --help
 
 Dispatched by core/entry_point.py, which the developer's tools share.
-Each command sets up the process itself (core/command.py,
+Each command sets up the process itself (core/operator_commands.py,
 docs/decisions/0007), as `totp-keys new` runs before settings can be read.
 """
 

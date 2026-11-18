@@ -9,7 +9,7 @@ from fastapi.testclient import TestClient
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from inventory_tng.admins.accounts import NOT_AN_EMAIL, name_up_to
+from inventory_tng.admins.accounts import NOT_AN_EMAIL
 from inventory_tng.core.local_time import DEFAULT_ZONE
 from inventory_tng.models.catalogue import Category, Item
 from inventory_tng.models.places import Location
@@ -17,7 +17,7 @@ from inventory_tng.models.stock import LedgerTransaction, Movement
 from inventory_tng.models.volunteers import Volunteer
 from inventory_tng.volunteers.forms import PICK_INTO, STILL_HOLD, TAKEN
 from inventory_tng.volunteers.paths import VOLUNTEERS
-from inventory_tng.web.forms import NAME_MAX, RULES
+from inventory_tng.web.forms import NAME_MAX, RULES, name_up_to
 
 from helpers.markup import (
     button,

@@ -12,5 +12,5 @@ DEVICE_LIST = f"{DEVICES}/all"
 # Not under DEVICE_LIST: {DEVICES}/{device_id}/revoke would take it.
 BULK_REVOKE = f"{DEVICES}/revoke"
 
-# The page a registration code's link and QR code open (bundle.PAGES).
+# The page a registration code's link and QR code open (frontend_bundle.PAGES).
 REGISTER_PATH = "/register"

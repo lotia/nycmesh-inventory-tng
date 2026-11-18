@@ -55,7 +55,7 @@ from inventory_tng.models.stock import LedgerTransaction
 from inventory_tng.models.volunteers import Volunteer
 from inventory_tng.models.web import SentForm
 from inventory_tng.places import locations
-from inventory_tng.scan import catalogue_api as scan_catalogue
+from inventory_tng.scan import catalogue_api
 from inventory_tng.scan.batch import BatchRefused, KeyReused, Recorded, record
 from inventory_tng.scan.batch_schemas import Batch
 from inventory_tng.scan.catalogue_schemas import Catalogue
@@ -1520,15 +1520,15 @@ def test_the_catalogue_reads_one_snapshot(
     # The device's read, as the route's request makes it first.
     reader.scalar(select(Location.id).limit(1))
     get_snapshot(reader)
-    to_take = scan_catalogue.open_to_take
+    to_take = catalogue_api.open_to_take
 
     def saving_meanwhile(session: Session, item_ids: set[int]) -> object:
         spools.receive(during)
         setup.commit()
         return to_take(session, item_ids)
 
-    monkeypatch.setattr(scan_catalogue, "open_to_take", saving_meanwhile)
-    reply = scan_catalogue.with_saved(reader, [before, during])
+    monkeypatch.setattr(catalogue_api, "open_to_take", saving_meanwhile)
+    reply = catalogue_api.with_saved(reader, [before, during])
     reader.rollback()
     assert reply.saved == [before]
     [cable] = [each for each in reply.items if each.id == spools.cable.id]
@@ -1554,7 +1554,7 @@ def test_the_catalogue_route_reads_one_snapshot(
     _, token = new_device(setup)
     setup.commit()
     seen: list[tuple[str | None, str | None]] = []
-    answer = scan_catalogue.with_saved
+    answer = catalogue_api.with_saved
 
     def isolation(session: Session, keys: list[uuid.UUID]) -> Catalogue:
         shown = session.execute(
@@ -1566,7 +1566,7 @@ def test_the_catalogue_route_reads_one_snapshot(
         seen.append(tuple(shown))
         return answer(session, keys)
 
-    monkeypatch.setattr(scan_catalogue, "with_saved", isolation)
+    monkeypatch.setattr(catalogue_api, "with_saved", isolation)
     client = make_client(own_sessions=True)
     client.cookies.set(devices.COOKIE, token)
     assert client.get("/api/catalogue").status_code == 200

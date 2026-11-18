@@ -18,7 +18,7 @@ from sqlalchemy import (
 )
 from sqlalchemy.orm import Mapped, mapped_column, validates
 
-from inventory_tng.catalogue import names, units
+from inventory_tng.catalogue import name_keys, units
 
 
 def holds(column: SQLColumnExpression[str], search: str) -> ColumnElement[bool]:
@@ -103,7 +103,7 @@ class CanonicalName:
 
 
 class KeyedName(CanonicalName):
-    """A row whose name is compared by its key (names.name_key), kept in
+    """A row whose name is compared by its key (name_keys.name_key), kept in
     `name_key` as the name is set and held to it by a CHECK constraint
     (name_key_check), so a unique index on it compares names so
     (docs/decisions/0021). And by `unit_key`, the key of the name with its
@@ -121,19 +121,19 @@ class KeyedName(CanonicalName):
     name_shown: Mapped[str] = mapped_column(Text, info={"not_a_change": True})
 
     def _named(self, name: str) -> None:
-        self.name_key = names.name_key(name)
+        self.name_key = name_keys.name_key(name)
 
 
 def unit_key(name: str, rules: units.Rules | None = None) -> str:
     """The key of `name` with each unit after a number spelt by what it
     reads as, its rule first (units.read_as): `10 µF`, `10 uF` and `10μF`
     alike, and `3M` as `3m` where a rule reads `M` so."""
-    return names.name_key(units.read_as(name, rules))
+    return name_keys.name_key(units.read_as(name, rules))
 
 
 def name_key_check() -> CheckConstraint:
     return CheckConstraint(
-        literal_column("name_key") == names.name_key_sql(literal_column("name")),
+        literal_column("name_key") == name_keys.name_key_sql(literal_column("name")),
         name="name_key",
     )
 

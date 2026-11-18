@@ -39,9 +39,13 @@ from inventory_tng.stock.needs_action import (
     query,
     query_string,
 )
-from inventory_tng.stock.paths import COUNTS, RECORDED_MORE_SETTLED, STOCK
-from inventory_tng.stock.paths import RECORDED_MORE as OVER_RECORDED
-from inventory_tng.web.admin import SETTLED_VIEW, admin_page
+from inventory_tng.stock.paths import (
+    COUNTS,
+    OVER_RECORDED,
+    OVER_RECORDED_SETTLED,
+    STOCK,
+)
+from inventory_tng.web.admin_pages import admin_page
 from inventory_tng.web.forms import row_id, rule_words
 from inventory_tng.web.listing import (
     AskedView,
@@ -60,6 +64,8 @@ router = APIRouter(include_in_schema=False)
 
 TITLE = lazy_gettext("Recorded more than moved")
 SETTLED_TITLE = lazy_gettext("Recorded more than moved, settled")
+# A view of those settled, beside those waiting (stock/_views.html).
+SETTLED_VIEW = lazy_gettext("Settled")
 # As "Needs your action" lists it (stock/needs_action.py): its own rows, not
 # open packages, so no open packages' where.
 KIND = Kind(TITLE, OVER_RECORDED, ())
@@ -199,7 +205,7 @@ def _views(waiting: int, only: Item | None) -> list[tuple[str, Words, str]]:
     kept = query_string(only)
     return [
         (f"{OVER_RECORDED}{kept}", waiting_view(waiting), "waiting"),
-        (f"{RECORDED_MORE_SETTLED}{kept}", SETTLED_VIEW, "settled"),
+        (f"{OVER_RECORDED_SETTLED}{kept}", SETTLED_VIEW, "settled"),
     ]
 
 
@@ -222,7 +228,7 @@ SETTLED_SORTING = Sorting(
 )
 
 
-@router.get(RECORDED_MORE_SETTLED)
+@router.get(OVER_RECORDED_SETTLED)
 def settled_page(
     request: Request,
     signed: AdminSignedIn,
@@ -234,7 +240,7 @@ def settled_page(
     all or one item's: how each was settled, why, by whom and when (Ali,
     2026-11-15, inventory-tng-73p). Read only."""
     where = [Movement.item_id == only.id] if only else []
-    view = View.read(RECORDED_MORE_SETTLED, SETTLED_SORTING, asked, kept=query(only))
+    view = View.read(OVER_RECORDED_SETTLED, SETTLED_SORTING, asked, kept=query(only))
     zone = site_zone(session)
     if view.by == "why":
         # Every one, newest first, worded, then sorted by its words: the
@@ -266,7 +272,7 @@ def settled_page(
         "stock/over_recorded_settled.html",
         {
             "title": SETTLED_TITLE,
-            "here": RECORDED_MORE_SETTLED,
+            "here": OVER_RECORDED_SETTLED,
             "back_link": (STOCK, SECTION_STOCK),
             "only": only,
             "recorded_views": _views(

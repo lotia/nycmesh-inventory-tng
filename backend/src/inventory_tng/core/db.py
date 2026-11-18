@@ -720,8 +720,9 @@ CATALOGUE_LOCK = 0x696E76656E746F72  # Any fixed key; "inventor" in ASCII.
 
 
 # What a session keeps in session.info of the catalogue, read as it was
-# then (models.catalogue.reading_rules): forgotten as the catalogue lock is
-# taken, so what is read under it is what any write before it committed.
+# then (models.catalogue.reading_rules_held): forgotten as the catalogue
+# lock is taken, so what is read under it is what any write before it
+# committed.
 READ_AGAIN_ONCE_LOCKED: set[str] = set()
 
 

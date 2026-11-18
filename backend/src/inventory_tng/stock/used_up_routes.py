@@ -20,6 +20,7 @@ from inventory_tng.core.local_time import site_zone
 from inventory_tng.core.phrases import gettext, lazy_gettext
 from inventory_tng.models.stock import OpenPackage
 from inventory_tng.stock import ledger, open_packages, queries
+from inventory_tng.stock.forms import TICK_OPEN_PACKAGES
 from inventory_tng.stock.needs_action import (
     Kind,
     OnlyItem,
@@ -27,7 +28,7 @@ from inventory_tng.stock.needs_action import (
     query,
 )
 from inventory_tng.stock.paths import CLOSE, STOCK, USED_UP
-from inventory_tng.web.admin import TICK_OPEN_PACKAGES, admin_page, now
+from inventory_tng.web.admin_pages import admin_page, now
 from inventory_tng.web.listing import AskedView, Sort, Sorting, View, arranged
 from inventory_tng.web.navigation import SECTION_STOCK
 from inventory_tng.web.pages import add_notices, not_found, redirect

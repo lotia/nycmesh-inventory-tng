@@ -56,6 +56,8 @@ HOW_MUCH = lazy_gettext("How much.")
 FOUND_OR_OFF = lazy_gettext("Found or written off?")
 PICK_A_REASON = lazy_gettext("Pick a reason.")
 OUT_OF_DATE = lazy_gettext("This form is out of date: try again.")
+# A form for open packages sent with none ticked.
+TICK_OPEN_PACKAGES = lazy_gettext("Tick the open packages first.")
 
 # The count form's fields of forms: sealed packages, by item and package;
 # an open package, by its id, and what became of it; loose units, by item;

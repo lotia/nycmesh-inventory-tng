@@ -84,7 +84,7 @@ def test_names_and_aliases_are_one_namespace(
 ) -> None:
     """No item's name is another's alias (its own swaps them: below); no
     alias is an item's name, retired items' too, or another current alias,
-    as names are compared (names.name_key)."""
+    as names are compared (name_keys.name_key)."""
     beam = new_item(session, radios, "LiteBeam 5AC Gen2")
     old = new_item(session, radios, "NanoBeam")
     retire(session, old)

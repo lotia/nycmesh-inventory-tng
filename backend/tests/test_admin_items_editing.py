@@ -11,7 +11,6 @@ from markupsafe import escape
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from inventory_tng.admins.accounts import name_up_to
 from inventory_tng.catalogue import items
 from inventory_tng.catalogue.forms import (
     IS_RETIRED,
@@ -34,6 +33,7 @@ from inventory_tng.web.forms import (
     TYPE_A_NUMBER,
     ZERO_OR_MORE,
     at_most_places,
+    name_up_to,
     quantity,
 )
 

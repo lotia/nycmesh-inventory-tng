@@ -291,15 +291,16 @@ class ReadingRule(Versioned, Base):
         return units.Rule(self.reading, self.respell)
 
 
-# The reading rules a transaction has read (reading_rules), kept until one
-# is written or a savepoint rolled back, so a request reads them once.
+# The reading rules a transaction has read (reading_rules_held), kept
+# until one is written or a savepoint rolled back, so a request reads them
+# once.
 RULES_INFO = "inventory.reading_rules"
 # Read before the catalogue lock, as a form's answers are, they are read
 # again under it: a rule changed meanwhile reads names otherwise.
 READ_AGAIN_ONCE_LOCKED.add(RULES_INFO)
 
 
-def reading_rules(session: Session) -> units.Rules:
+def reading_rules_held(session: Session) -> units.Rules:
     """Every reading rule, by its token: read once, and again after a write
     to them, a rollback or the transaction's end."""
     held = session.info.get(RULES_INFO)
@@ -366,7 +367,7 @@ def _refold(session: Session, _context: object, _instances: object) -> None:
     ]
     rules = None
     if keyed or any(row.READS_RULES for row in rows):
-        rules = reading_rules(session)
+        rules = reading_rules_held(session)
     for row in dict.fromkeys(rows):
         row.refold(rules)
     for row in keyed:

@@ -18,8 +18,8 @@ from inventory_tng.models.core import CatalogueHistory
 from inventory_tng.models.places import Location
 from inventory_tng.models.stock import OverRecorded
 from inventory_tng.places import locations
-from inventory_tng.stock import forms as stock_forms
 from inventory_tng.stock import over_recorded, over_recorded_routes
+from inventory_tng.stock.forms import SAY_WHY, WORDS_FOR_ANOTHER
 from inventory_tng.stock.ledger import Entry, Form
 from inventory_tng.web.forms import RULES, up_to
 
@@ -374,8 +374,8 @@ def problem_of(check: OverRecorded) -> str:
 @pytest.mark.parametrize(
     ("form", "problem"),
     [
-        ({}, stock_forms.SAY_WHY),
-        ({"reason": "both", "words": "typed"}, stock_forms.WORDS_FOR_ANOTHER),
+        ({}, SAY_WHY),
+        ({"reason": "both", "words": "typed"}, WORDS_FOR_ANOTHER),
         ({"reason": "other", "words": "x" * 201}, up_to(200)),
     ],
 )
@@ -423,7 +423,7 @@ def test_mark_checked_refused_from_a_counts_alert_draws_it_again(
         "count can't be corrected there." in page
     )
     assert f"Bring back {spools.van.name}" in page
-    assert str(stock_forms.SAY_WHY) in page
+    assert str(SAY_WHY) in page
 
 
 def test_a_marker_not_of_a_refusal_draws_no_alert(
@@ -475,4 +475,4 @@ def test_a_place_brought_back_since_its_alert_draws_no_alert(
     assert response.status_code == 400
     assert 'role="alert"' not in response.text
     assert "Bring back" not in response.text
-    assert str(stock_forms.SAY_WHY) in response.text
+    assert str(SAY_WHY) in response.text

@@ -24,8 +24,8 @@ from inventory_tng.places import locations, queries
 from inventory_tng.places.forms import KINDS, TAKEN, new_place, place_change
 from inventory_tng.places.paths import LOCATIONS
 from inventory_tng.places.queries import changeable
-from inventory_tng.volunteers import queries as volunteers_queries
-from inventory_tng.web.admin import (
+from inventory_tng.volunteers.queries import volunteer_names
+from inventory_tng.web.admin_pages import (
     admin_page,
     current_rows,
     now,
@@ -80,9 +80,7 @@ def _list_page(
 ) -> HTMLResponse:
     current = current_rows(session, Location)
     custody = [loc for loc in current if loc.kind == "custody"]
-    volunteers = volunteers_queries.volunteer_names(
-        session, [loc.volunteer_id for loc in custody]
-    )
+    volunteers = volunteer_names(session, [loc.volunteer_id for loc in custody])
     return admin_page(
         request,
         signed,

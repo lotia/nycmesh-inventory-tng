@@ -18,11 +18,10 @@ from inventory_tng.core.local_time import show, show_day, site_zone
 from inventory_tng.core.phrases import compiled, speaking
 from inventory_tng.models.stock import LedgerTransaction, Movement, OverRecorded
 from inventory_tng.stock import open_packages, over_recorded, over_recorded_routes
-from inventory_tng.stock.over_recorded_routes import waiting_view
+from inventory_tng.stock.over_recorded_routes import SETTLED_VIEW, waiting_view
 from inventory_tng.stock.paths import COUNTS
 from inventory_tng.stock.stock_routes import recorded_more_view
 from inventory_tng.web import listing
-from inventory_tng.web.admin import SETTLED_VIEW
 
 from helpers.markup import Element, links, read, sorted_columns
 from helpers.over_recorded import PAGE

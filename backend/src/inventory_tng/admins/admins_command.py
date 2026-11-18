@@ -24,8 +24,8 @@ from sqlalchemy.orm import Session
 
 from inventory_tng.admins import accounts
 from inventory_tng.admins.paths import reset_url
-from inventory_tng.core.command import run_command_telling
 from inventory_tng.core.mail import Notifier
+from inventory_tng.core.operator_commands import run_command_telling
 from inventory_tng.core.settings import Settings
 
 

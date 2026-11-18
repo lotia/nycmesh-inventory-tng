@@ -18,8 +18,12 @@ from inventory_tng.catalogue import (
     unit_readings_command,
     units,
 )
-from inventory_tng.models import catalogue as catalogue_models
-from inventory_tng.models.catalogue import Category, Item, ReadingRule
+from inventory_tng.models.catalogue import (
+    Category,
+    Item,
+    ReadingRule,
+    reading_rules_held,
+)
 from inventory_tng.models.names import unit_key
 
 from helpers.rows import add, history, rule_of
@@ -120,7 +124,7 @@ def test_the_round_trip_dry_run_correct_dry_run_again_load(
     ]
     (line,) = [line for line in logs if line["event"] == "unit readings loaded"]
     assert sorted(line["reading_rule_ids"]) == sorted([g.id, m.id])
-    rules = catalogue_models.reading_rules(session)
+    rules = reading_rules_held(session)
     assert unit_key("Box 10g", rules) == unit_key("Box 10 Gbps")
     (found,) = units.found_in("Tape 3M", rules)
     assert found.read is None

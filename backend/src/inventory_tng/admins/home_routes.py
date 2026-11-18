@@ -11,8 +11,8 @@ from fastapi.responses import Response
 from inventory_tng.admins import accounts, activity
 from inventory_tng.admins.guards import AdminSignedIn
 from inventory_tng.admins.paths import ACCOUNT, ADMINS, HOME
-from inventory_tng.catalogue import queries as catalogue_queries
 from inventory_tng.catalogue.paths import CATEGORIES, ITEMS
+from inventory_tng.catalogue.queries import current_count
 from inventory_tng.core.db import DbSession
 from inventory_tng.core.local_time import site_zone
 from inventory_tng.core.phrases import Words, lazy_gettext
@@ -24,7 +24,7 @@ from inventory_tng.stock import needs_action
 from inventory_tng.stock.balance import retired_places_holding_stock
 from inventory_tng.stock.paths import COUNTS
 from inventory_tng.volunteers.paths import VOLUNTEERS
-from inventory_tng.web.admin import admin_page
+from inventory_tng.web.admin_pages import admin_page
 
 router = APIRouter(include_in_schema=False)
 
@@ -59,10 +59,7 @@ COUNTED = {
 
 @router.get(HOME)
 def home(request: Request, signed: AdminSignedIn, session: DbSession) -> Response:
-    current = {
-        path: catalogue_queries.current_count(session, model)
-        for path, model in COUNTED.items()
-    }
+    current = {path: current_count(session, model) for path, model in COUNTED.items()}
     # While it is so, every administrator is told.
     warnings: list[Advice] = []
     if accounts.admins_who_can_sign_in(session) == 1:

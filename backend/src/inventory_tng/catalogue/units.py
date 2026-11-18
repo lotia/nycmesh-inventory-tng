@@ -36,7 +36,7 @@ from typing import Any
 
 from babel.support import LazyProxy
 
-from inventory_tng.catalogue import names
+from inventory_tng.catalogue import name_keys
 from inventory_tng.core.phrases import gettext, lazy_gettext
 
 # Raise it whenever a change to the table reads any text otherwise, or
@@ -258,7 +258,7 @@ def table() -> dict[str, Any]:
     unit's spellings, in the order they are tried, its kind and how a size
     in it is one in its kind's base; each kind's plausible sizes; and the
     profile, products and clues that decide a reading, and the spaces read
-    as the space (names.SPACES)."""
+    as the space (name_keys.SPACES)."""
     return {
         "version": VERSION,
         "prefixes": [
@@ -287,7 +287,7 @@ def table() -> dict[str, Any]:
         "bare_rates": BARE_RATES,
         "asked": sorted(ASKED),
         "products": sorted(PRODUCTS),
-        "spaces": names.SPACES,
+        "spaces": name_keys.SPACES,
         "clues": {kind: sorted(words) for kind, words in CLUES.items()},
         "groups_max": GROUPS_MAX,
     }
@@ -457,8 +457,8 @@ _NOUGHT = re.compile(r"(?:(?<![^\W_])[-\u2212])?(?<![^\W_])(?<![0-9][.,])0,[0-9]
 
 
 # Every space (Zs) but the space itself as the space, one character for
-# one, as decomposing (NFKD) reads most of them (names.SPACES).
-_PLAIN_SPACES = str.maketrans(dict.fromkeys(names.SPACES, " "))
+# one, as decomposing (NFKD) reads most of them (name_keys.SPACES).
+_PLAIN_SPACES = str.maketrans(dict.fromkeys(name_keys.SPACES, " "))
 
 # What _searched finds: the number as matched, and as search reads it.
 type Searched = tuple[re.Match[str], str]
@@ -931,7 +931,7 @@ def _shown_number(number: str) -> str:
     if len(whole) >= 5:
         head = len(whole) % 3 or 3
         thousands = [whole[i : i + 3] for i in range(head, len(whole), 3)]
-        whole = names.THIN_NO_BREAK_SPACE.join([whole[:head], *thousands])
+        whole = name_keys.THIN_NO_BREAK_SPACE.join([whole[:head], *thousands])
     return sign + whole + fraction
 
 
@@ -959,15 +959,15 @@ def shown_name(name: str, rules: Rules | None = None) -> str:
     a pack count and a size: `Cable 2 100 ft` is `Cable 2 100 ft`, never
     `2100 ft`, its breaking spaces no-break so it never breaks across a
     line, a narrow one narrow (Ali, 2026-11-16, inventory-tng-t78,
-    inventory-tng-mz31: names.NO_BREAK). `name` is as saved
+    inventory-tng-mz31: name_keys.NO_BREAK). `name` is as saved
     (models.names.canonical, spell)."""
     edits = []
     for match, searched in _after_a_number(name):
         token = match[2]
         if searched and " " in searched[0][0]:
             start = searched[0].start()
-            # Its breaking spaces no-break (names.NO_BREAK), the rest as typed.
-            shown = name[start : match.end(1)].translate(names.NO_BREAK)
+            # Its breaking spaces no-break (name_keys.NO_BREAK), the rest as typed.
+            shown = name[start : match.end(1)].translate(name_keys.NO_BREAK)
         else:
             number = _number(name, match.end(1))
             start, shown = match.end(1) - len(number), _shown_number(number)
@@ -980,5 +980,5 @@ def shown_name(name: str, rules: Rules | None = None) -> str:
         if (read(token) if found is None else found.read) is None:
             continue
         typed = name[match.start(2) : match.end(2)]
-        edits.append((start, match.end(), shown + names.NO_BREAK_SPACE + typed))
+        edits.append((start, match.end(), shown + name_keys.NO_BREAK_SPACE + typed))
     return _applied(name, edits)

@@ -24,8 +24,8 @@ from inventory_tng.catalogue.unit_readings import (
     propose,
     read,
 )
-from inventory_tng.core.command import run_command, set_up
 from inventory_tng.core.db import CLI_ACTOR, set_actor
+from inventory_tng.core.operator_commands import run_command, set_up
 
 log = structlog.get_logger(__name__)
 

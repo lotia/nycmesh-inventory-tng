@@ -21,7 +21,7 @@ from sqlalchemy.orm import Session
 from inventory_tng.core.db import SnapshotSession
 from inventory_tng.devices.guards import DeviceRefusedReply, RegisteredDevice
 from inventory_tng.labels import labels
-from inventory_tng.models.catalogue import Item, reading_rules
+from inventory_tng.models.catalogue import Item, reading_rules_held
 from inventory_tng.models.names import held
 from inventory_tng.models.site_settings import ScanSettings
 from inventory_tng.scan import queries
@@ -153,7 +153,7 @@ def catalogue(session: Session) -> Catalogue:
         ],
         reading_rules=[
             ReadingRuleEntry(token=token, reading=rule.reading)
-            for token, rule in sorted(reading_rules(session).items())
+            for token, rule in sorted(reading_rules_held(session).items())
         ],
     )
 

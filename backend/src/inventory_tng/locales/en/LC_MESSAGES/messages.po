@@ -754,7 +754,7 @@ msgstr ""
 msgid "Added"
 msgstr ""
 
-#: src/inventory_tng/web/admin.py
+#: src/inventory_tng/web/admin_pages.py
 msgid "Added."
 msgstr ""
 
@@ -1085,7 +1085,7 @@ msgstr ""
 msgid "Bring them back to change anything here."
 msgstr ""
 
-#: src/inventory_tng/web/admin.py
+#: src/inventory_tng/web/admin_pages.py
 msgid "Brought back."
 msgstr ""
 
@@ -1556,7 +1556,7 @@ msgstr ""
 msgid "From 1 to %(max)d devices."
 msgstr ""
 
-#: src/inventory_tng/admins/accounts.py
+#: src/inventory_tng/web/forms.py
 #, python-format
 msgid "Give it a name of up to %(max)d characters."
 msgstr ""
@@ -2851,7 +2851,7 @@ msgstr ""
 msgid "Refused: this came from another site's page."
 msgstr ""
 
-#: src/inventory_tng/scan/bundle.py
+#: src/inventory_tng/web/frontend_bundle.py
 msgid "Register this device"
 msgstr ""
 
@@ -3034,7 +3034,7 @@ msgstr ""
 msgid "Retired"
 msgstr ""
 
-#: src/inventory_tng/web/admin.py
+#: src/inventory_tng/web/admin_pages.py
 msgid "Retired."
 msgstr ""
 
@@ -3067,7 +3067,7 @@ msgstr ""
 msgid "Revoke"
 msgstr ""
 
-#: src/inventory_tng/web/admin.py
+#: src/inventory_tng/web/admin_pages.py
 #, python-format
 msgid "Revoke %(name)s?"
 msgstr ""
@@ -3195,7 +3195,7 @@ msgstr ""
 msgid "Saved, it reads “%(key)s” after a number so in every name."
 msgstr ""
 
-#: src/inventory_tng/web/admin.py
+#: src/inventory_tng/web/admin_pages.py
 msgid "Saved."
 msgstr ""
 
@@ -3227,7 +3227,7 @@ msgstr ""
 msgid "Say why it is right as it is."
 msgstr ""
 
-#: src/inventory_tng/scan/bundle.py
+#: src/inventory_tng/web/frontend_bundle.py
 msgid "Scan"
 msgstr ""
 
@@ -3325,8 +3325,8 @@ msgstr ""
 msgid "Set<span class=\"sr-only\"> for %(package)s</span>"
 msgstr ""
 
+#: src/inventory_tng/stock/over_recorded_routes.py
 #: src/inventory_tng/templates/stock/over_recorded_settled.html
-#: src/inventory_tng/web/admin.py
 msgid "Settled"
 msgstr ""
 
@@ -3714,7 +3714,7 @@ msgstr ""
 msgid "The scan page doesn't read a label tagged here."
 msgstr ""
 
-#: src/inventory_tng/scan/bundle.py
+#: src/inventory_tng/web/frontend_bundle.py
 msgid "The scan page is not built yet."
 msgstr ""
 
@@ -3856,7 +3856,7 @@ msgid ""
 "again, then set it."
 msgstr ""
 
-#: src/inventory_tng/templates/scan/page.html
+#: src/inventory_tng/templates/frontend_page.html
 msgid "This page needs JavaScript."
 msgstr ""
 
@@ -3872,7 +3872,7 @@ msgstr ""
 msgid "Tick the items to change first."
 msgstr ""
 
-#: src/inventory_tng/web/admin.py
+#: src/inventory_tng/stock/forms.py
 msgid "Tick the open packages first."
 msgstr ""
 
@@ -4713,7 +4713,7 @@ msgstr ""
 msgid "the one likely reading"
 msgstr ""
 
-#: src/inventory_tng/web/admin.py
+#: src/inventory_tng/web/admin_pages.py
 msgid "the operator"
 msgstr ""
 

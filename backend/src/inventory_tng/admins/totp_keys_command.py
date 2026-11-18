@@ -15,8 +15,8 @@ from sqlalchemy.orm import Session
 
 from inventory_tng.admins import accounts
 from inventory_tng.admins.totp_keys import TotpKeys, new_key
-from inventory_tng.core.command import run_command, run_command_telling
 from inventory_tng.core.mail import Notifier
+from inventory_tng.core.operator_commands import run_command, run_command_telling
 
 
 def parse(

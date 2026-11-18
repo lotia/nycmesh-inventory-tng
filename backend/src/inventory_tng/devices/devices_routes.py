@@ -15,7 +15,6 @@ from fastapi import APIRouter, Form, Request
 from fastapi.responses import HTMLResponse, Response
 from sqlalchemy.orm import Session
 
-from inventory_tng.admins.accounts import qr_svg
 from inventory_tng.admins.guards import AdminSignedIn, ConfirmedAdmin, SignedIn, changed
 from inventory_tng.core.db import DbSession, attempt
 from inventory_tng.core.local_time import site_zone
@@ -35,7 +34,7 @@ from inventory_tng.devices.paths import (
     REGISTER_PATH,
 )
 from inventory_tng.models.devices import Device, RegistrationCode
-from inventory_tng.web.admin import admin_page, now, revoke_title, site_link
+from inventory_tng.web.admin_pages import admin_page, now, revoke_title, site_link
 from inventory_tng.web.forms import RULES, form_version
 from inventory_tng.web.listing import (
     Asked,
@@ -49,6 +48,7 @@ from inventory_tng.web.listing import order as order_of
 from inventory_tng.web.navigation import SECTION_DEVICES
 from inventory_tng.web.once import OnceKey, sent_before
 from inventory_tng.web.pages import add_notices, not_found, redirect
+from inventory_tng.web.qr_codes import qr_svg
 
 log = structlog.get_logger(__name__)
 

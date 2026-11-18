@@ -15,7 +15,7 @@ from inventory_tng.models.admins import Admin
 from inventory_tng.models.catalogue import Category, ItemPackage
 from inventory_tng.models.stock import AdjustmentReason, LedgerTransaction, OpenPackage
 from inventory_tng.stock import counts, counts_routes, moments, queries
-from inventory_tng.stock import forms as stock_forms
+from inventory_tng.stock.forms import HOW_MUCH_LEFT, WHOLE_PACKAGES
 from inventory_tng.stock.ledger import LOOSE, Entry, Form
 
 from helpers.items import new_item, same_size_twins
@@ -177,15 +177,13 @@ def test_the_count_page_counts_sealed_and_says_whats_wrong(
     response = admin_client.post(f"{COUNTS}/{store}", data=bad)
     # Refused whole; what the page shows a field for is said by it.
     assert response.status_code == 400
-    assert str(stock_forms.WHOLE_PACKAGES) in text(response)
+    assert str(WHOLE_PACKAGES) in text(response)
     left = base | {
         "key": str(uuid.uuid4()),
         "found_package_id": str(spool),
         "found_left": "",
     }
-    assert str(stock_forms.HOW_MUCH_LEFT) in text(
-        admin_client.post(f"{COUNTS}/{store}", data=left)
-    )
+    assert str(HOW_MUCH_LEFT) in text(admin_client.post(f"{COUNTS}/{store}", data=left))
 
 
 def test_counting_by_form_asks_again_for_what_moved(

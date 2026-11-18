@@ -41,7 +41,7 @@ from sqlalchemy.orm import Session
 
 from inventory_tng.catalogue import units
 from inventory_tng.models.base import INTEGER_MAX, whole
-from inventory_tng.models.catalogue import reading_rules
+from inventory_tng.models.catalogue import reading_rules_held
 from inventory_tng.models.names import folds, fuzzy, holds, in_ascii_once
 
 log = structlog.get_logger(__name__)
@@ -455,7 +455,7 @@ class Searched[T]:
 
     def rules(self, session: Session) -> units.Rules | None:
         reads = getattr(self.model, "READS_RULES", False)
-        return reading_rules(session) if reads else None
+        return reading_rules_held(session) if reads else None
 
     def matching(
         self, search: str, rules: units.Rules | None = None

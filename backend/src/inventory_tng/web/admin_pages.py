@@ -38,12 +38,6 @@ from inventory_tng.web.pages import add_notices, page, templates
 _globals = cast(dict[str, Any], templates.env.globals)
 _globals["name_max"] = NAME_MAX
 
-# A view of those settled, beside those waiting (stock/_views.html).
-SETTLED_VIEW = lazy_gettext("Settled")
-
-# A form for open packages sent with none ticked.
-TICK_OPEN_PACKAGES = lazy_gettext("Tick the open packages first.")
-
 # What most changes say once done; a page adds its own where the words differ.
 ADDED = lazy_gettext("Added.")
 SAVED = lazy_gettext("Saved.")

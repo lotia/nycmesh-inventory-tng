@@ -13,7 +13,7 @@ from sqlalchemy.orm import Session
 from structlog.testing import capture_logs
 
 from inventory_tng.admins import paths
-from inventory_tng.catalogue import items, names, reading_rules, units
+from inventory_tng.catalogue import items, name_keys, reading_rules, units
 from inventory_tng.catalogue.forms import CHOOSE_ONE, PACKAGE_TAKEN, TAKEN_FIELDS
 from inventory_tng.catalogue.items_listing import SEARCHED
 from inventory_tng.catalogue.paths import ITEMS, READINGS, SEED
@@ -27,8 +27,8 @@ from inventory_tng.models.catalogue import (
     ItemAlias,
     ItemPackage,
     ReadingRule,
+    reading_rules_held,
 )
-from inventory_tng.models.catalogue import reading_rules as reading_rules_held
 from inventory_tng.models.names import unit_key
 from inventory_tng.scan.catalogue_api import catalogue
 from inventory_tng.web.listing import folded
@@ -54,8 +54,9 @@ GBPS = units.Rule("Gbit/s")
 def test_the_rules_are_read_once_until_written_or_rolled_back(
     session: Session,
 ) -> None:
-    """models.catalogue.reading_rules keeps what it read for the transaction,
-    read again after a rule is written or a savepoint rolled back."""
+    """models.catalogue.reading_rules_held keeps what it read for the
+    transaction, read again after a rule is written or a savepoint rolled
+    back."""
     held = reading_rules_held(session)
     assert reading_rules_held(session) is held
     with session.begin_nested() as savepoint:
@@ -132,7 +133,7 @@ def test_names_that_read_alike_are_one(session: Session, radios: Category) -> No
     namespace of names and aliases."""
     cap = new_item(session, radios, "Cap 10 uF")
     assert cap.unit_key == unit_key("Cap 10μF") == "cap10uf"
-    assert cap.name_key != names.name_key("Cap 10μF")
+    assert cap.name_key != name_keys.name_key("Cap 10μF")
     with violates(session, "uq_item_unit_key"):
         session.add(Item(name="Cap 10μF", category_id=radios.id))
     with violates(session, "uq_item_package_unit_key"):

@@ -18,9 +18,9 @@ import structlog
 from sqlalchemy import URL, Connection, make_url, text
 from sqlalchemy.exc import ProgrammingError
 
-from inventory_tng.core.command import run_command, set_up
 from inventory_tng.core.db import make_engine
 from inventory_tng.core.local_env import CLONE
+from inventory_tng.core.operator_commands import run_command, set_up
 from inventory_tng.core.settings import migration_settings
 
 log = structlog.get_logger(__name__)

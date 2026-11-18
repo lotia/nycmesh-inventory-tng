@@ -17,8 +17,8 @@ from inventory_tng.models.stock import (
     LedgerTransaction,
     Movement,
 )
-from inventory_tng.stock import forms as stock_forms
 from inventory_tng.stock import over_recorded, over_recorded_routes
+from inventory_tng.stock.forms import SAY_WHY, WORDS_FOR_ANOTHER
 from inventory_tng.web.forms import up_to
 
 from helpers.concurrency import Committed
@@ -174,7 +174,7 @@ def test_marking_one_checked_asks_why(
     # Exact markup on purpose: the id each reason's aria-describedby names.
     assert (
         f'<span class="problem" id="reason-{check.id}-problem">'
-        f"{stock_forms.SAY_WHY}</span>" in response.text
+        f"{SAY_WHY}</span>" in response.text
     )
     # Each reason, and the words, described by it, as the count is.
     assert response.text.count(f'aria-describedby="reason-{check.id}-problem"') == 5
@@ -249,7 +249,7 @@ def test_words_for_another_reason_are_asked_about(
     # Exact markup on purpose: the id each reason's aria-describedby names.
     assert (
         f'<span class="problem" id="reason-{check.id}-problem">'
-        f"{stock_forms.WORDS_FOR_ANOTHER}</span>" in response.text
+        f"{WORDS_FOR_ANOTHER}</span>" in response.text
     )
     assert response.text.count(f'aria-describedby="reason-{check.id}-problem"') == 5
     assert f'value="{reason}" checked' in response.text
@@ -394,7 +394,7 @@ def test_one_moved_whole_marked_checked_without_a_reason_is_asked_again_above(
     assert response.status_code == 400
     (check,) = checks(session)
     assert response.text.count(f'action="{PAGE}/{check.id}/checked"') == 1
-    assert str(stock_forms.SAY_WHY) in response.text
+    assert str(SAY_WHY) in response.text
     assert 'role="alert"' not in response.text
 
 

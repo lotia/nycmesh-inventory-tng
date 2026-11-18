@@ -1,7 +1,7 @@
 """Which build of the scan page sent a batch, and whether this server still
 takes batches from it (docs/decisions/0010, 2026-11-12).
 
-Each build of the pages has an id: when it was made (bundle.BUILD_ID). The
+Each build of the pages has an id: when it was made (frontend_bundle.BUILD_ID). The
 scan page sends with each batch, in HEADER, the build that queued it, and
 the batch endpoint's reply carries this server's, so a tab of an older
 build learns that a newer one is out, sends what it holds, and asks for a
@@ -26,7 +26,7 @@ from fastapi.responses import JSONResponse
 from opentelemetry import metrics
 from pydantic import BaseModel, Field
 
-from inventory_tng.scan.bundle import BUILD_ID
+from inventory_tng.web.frontend_bundle import BUILD_ID
 
 log = structlog.get_logger(__name__)
 meter = metrics.get_meter(__name__)

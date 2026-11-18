@@ -21,8 +21,8 @@ from structlog.testing import capture_logs
 
 from inventory_tng.admins import paths
 from inventory_tng.core.settings import FrontendConfig, RateLimits
-from inventory_tng.scan.bundle import MANIFEST
 from inventory_tng.web import security_headers
+from inventory_tng.web.frontend_bundle import MANIFEST
 
 from helpers.source import TEMPLATES
 

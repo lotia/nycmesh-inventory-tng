@@ -297,10 +297,10 @@ as `name_key` is, with no CHECK, as the units are the app's. A unit is
 judged by its number as search reads it (`units._searched`), sign and all,
 so `Cap 1 000 μF` and `Cap 1000 uF` are one too, and found after any
 space, as search reads every space as a plain one.
-`backend/src/inventory_tng/catalogue/names.py` has the rule: one pattern
+`backend/src/inventory_tng/catalogue/name_keys.py` has the rule: one pattern
 and one table of look-alikes (`LOOK_ALIKES`), read by Python (`name_key`)
 and PostgreSQL (`name_key_sql`), and a test checks both agree on every
-character. To change the rule, change `catalogue/names.py` and add a
+character. To change the rule, change `catalogue/name_keys.py` and add a
 migration that writes the CHECKs out again (items', packages' and
 aliases') and refills every key, naming by id any rows that would then
 clash. The initial migration's `NAME_KEY` shows how to write them out by
@@ -353,7 +353,7 @@ number, case kept (`M`, `g`), is read, or that it is no unit, on both
 sides: the catalogue sends the rules. Each
 change to one reads every name with that unit after a number again
 (`items.reread`), refused where two names would then read alike.
-Read them with `models.catalogue.reading_rules`, which reads them once a
+Read them with `models.catalogue.reading_rules_held`, which reads them once a
 transaction, and again after one is written or a savepoint rolled back;
 a form's answers, not yet kept, are read on top of them (`Typed.rules`
 in `catalogue/forms.py`). Administrators see and correct them on the Unit

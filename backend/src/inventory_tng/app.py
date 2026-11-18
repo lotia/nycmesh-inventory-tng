@@ -38,7 +38,6 @@ from inventory_tng.labels import labels_routes
 from inventory_tng.places import locations_routes
 from inventory_tng.scan import (
     batch_api,
-    bundle,
     catalogue_api,
     page_builds,
     page_telemetry_api,
@@ -52,7 +51,7 @@ from inventory_tng.stock import (
     used_up_routes,
 )
 from inventory_tng.volunteers import volunteers_routes
-from inventory_tng.web import pages, security_headers
+from inventory_tng.web import frontend_bundle, pages, security_headers
 
 log = structlog.get_logger(__name__)
 
@@ -107,7 +106,7 @@ def create_app(
     app.state.settings = settings
     # mail.get_mailer hands it to routes.
     app.state.mailer = SmtpMailer(settings.mail) if settings.mail else None
-    errors = pages.ErrorPages(api=API, scan=bundle.SCAN, admin=HOME)
+    errors = pages.ErrorPages(api=API, scan=frontend_bundle.SCAN, admin=HOME)
     errors.install(app)
     app.add_middleware(CrossSiteRefusal)
     app.add_middleware(
@@ -134,7 +133,7 @@ def create_app(
     app.include_router(security_headers.router)
     if settings.development:
         app.include_router(security_headers.docs_router)
-    app.include_router(bundle.router)
+    app.include_router(frontend_bundle.router)
     app.include_router(sign_in_routes.router)
     app.include_router(account_routes.router)
     app.include_router(home_routes.router)
@@ -153,7 +152,7 @@ def create_app(
     app.include_router(admins_routes.router)
     app.include_router(site_settings_routes.router)
     app.include_router(reset_routes.router)
-    bundle.install(app, settings)
+    frontend_bundle.install(app, settings)
     db.install(app)
     registration_api.install(app)
     install_device_refused(app)

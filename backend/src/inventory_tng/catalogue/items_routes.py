@@ -22,14 +22,25 @@ from inventory_tng.core.local_time import site_zone
 from inventory_tng.core.phrases import Words, lazy_gettext
 from inventory_tng.labels import labels
 from inventory_tng.models.base import INTEGER_MAX, whole
-from inventory_tng.models.catalogue import UNITS, Item, ItemAlias, ItemPackage
-from inventory_tng.models.catalogue import reading_rules as rules_held
+from inventory_tng.models.catalogue import (
+    UNITS,
+    Item,
+    ItemAlias,
+    ItemPackage,
+    reading_rules_held,
+)
 from inventory_tng.models.labels import Label
 from inventory_tng.models.names import canonical
 from inventory_tng.models.stock import Movement, OpenPackage
 from inventory_tng.stock import open_packages
-from inventory_tng.stock import queries as stock_queries
-from inventory_tng.web.admin import admin_page, now, retirement, text_form, undo_retire
+from inventory_tng.stock.queries import item_total
+from inventory_tng.web.admin_pages import (
+    admin_page,
+    now,
+    retirement,
+    text_form,
+    undo_retire,
+)
 from inventory_tng.web.forms import ALERTS, RETIRED, RULES, form_version
 from inventory_tng.web.listing import (
     AskedView,
@@ -207,7 +218,7 @@ def _name_field(session: Session, similar: Sequence[items.Close]) -> dict[str, o
     is shown where that is not as saved (units.shown_name, Ali,
     2026-11-15), read as the form sent answers it, as saving it would
     (inventory-tng-nbo)."""
-    rules = rules_held(session)
+    rules = reading_rules_held(session)
 
     def units_read(typed: str) -> list[units.Found]:
         # One per unit as typed, as one answer reads them all.
@@ -307,7 +318,7 @@ def _item_page(
             ],
             "units": UNITS,
             "unit_fixed": _moved(session, item.id),
-            "in_stock": stock_queries.item_total(session, item.id),
+            "in_stock": item_total(session, item.id),
             "labels": labels.current_of(session, Label.item_id == item.id),
             "open_packages": open_packages.shown(
                 session, OpenPackage.item_id == item.id

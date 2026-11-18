@@ -11,7 +11,6 @@ from fastapi.testclient import TestClient
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from inventory_tng.admins.accounts import qr_svg
 from inventory_tng.catalogue.paths import ITEMS
 from inventory_tng.labels import labels
 from inventory_tng.labels.labels import (
@@ -29,6 +28,7 @@ from inventory_tng.models.volunteers import Volunteer
 from inventory_tng.places.paths import LOCATIONS
 from inventory_tng.scan.catalogue_api import catalogue
 from inventory_tng.web.listing import PER_PAGE
+from inventory_tng.web.qr_codes import qr_svg
 
 from helpers.markup import (
     button,

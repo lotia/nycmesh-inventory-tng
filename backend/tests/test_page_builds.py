@@ -10,8 +10,8 @@ from sqlalchemy.orm import Session
 from structlog.testing import capture_logs
 
 from inventory_tng.scan import page_builds
-from inventory_tng.scan.bundle import BUILD_ID
 from inventory_tng.scan.page_builds import HEADER, is_too_old
+from inventory_tng.web.frontend_bundle import BUILD_ID
 
 from helpers.stock import URL, Place
 

@@ -31,7 +31,7 @@ from inventory_tng.models.site_settings import (
 from inventory_tng.site_settings import forms, queries, scan_settings
 from inventory_tng.site_settings.paths import SETTINGS
 from inventory_tng.stock import adjustment_reasons
-from inventory_tng.web.admin import admin_page, now, text_form
+from inventory_tng.web.admin_pages import admin_page, now, text_form
 from inventory_tng.web.forms import CHANGED, RULES, form_version, name_problem
 from inventory_tng.web.navigation import SECTION_SETTINGS
 from inventory_tng.web.pages import add_notices, not_found, redirect

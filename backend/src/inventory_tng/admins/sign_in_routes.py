@@ -57,6 +57,7 @@ from inventory_tng.core.phrases import Words, lazy_gettext
 from inventory_tng.models.admins import Admin, AdminSession, running_low
 from inventory_tng.web.browser import rate_key, set_private_cookie
 from inventory_tng.web.pages import add_notices, not_found, page, redirect
+from inventory_tng.web.qr_codes import qr_svg
 
 router = APIRouter(include_in_schema=False)
 
@@ -96,7 +97,7 @@ def _totp_context(key: str, username: str, *, optional: bool) -> dict[str, Any]:
     return {
         "key": key,
         "key_for_typing": accounts.key_for_typing(key),
-        "qr": accounts.qr_svg(accounts.totp_link(key, username or "administrator")),
+        "qr": qr_svg(accounts.totp_link(key, username or "administrator")),
         "totp_optional": optional,
     }
 

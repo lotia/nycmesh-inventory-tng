@@ -17,12 +17,10 @@ from datetime import UTC, datetime, timedelta
 from typing import Literal, NoReturn
 
 import pyotp
-import segno
 import structlog
 from argon2 import PasswordHasher
 from argon2.exceptions import InvalidHashError, VerificationError
 from limits import RateLimitItem, RateLimitItemPerHour, RateLimitItemPerMinute
-from markupsafe import Markup
 from opentelemetry import metrics
 from sqlalchemy import ColumnElement, exists, func, or_, select, text, update
 from sqlalchemy.orm import Session
@@ -48,6 +46,7 @@ from inventory_tng.models.admins import (
 )
 from inventory_tng.models.labels import mint_code
 from inventory_tng.models.site_settings import SignInSettings
+from inventory_tng.web.forms import name_up_to
 
 log = structlog.get_logger(__name__)
 meter = metrics.get_meter(__name__)
@@ -210,14 +209,6 @@ def totp_link(key: str, username: str) -> str:
     return pyotp.TOTP(key).provisioning_uri(name=username, issuer_name=ISSUER)
 
 
-def qr_svg(text: str, error: str = "m") -> Markup:
-    """A QR code's SVG, with a viewBox so the stylesheet can size it. Always
-    a full QR code: segno.make picks a Micro QR for a short text, which not
-    every reader reads (docs/decisions/0015)."""
-    code = segno.make_qr(text, error=error)
-    return Markup(code.svg_inline(scale=5, border=2, unit="px"))
-
-
 def grouped(text: str, size: int, separator: str) -> str:
     """ "ABCD EFGH ...": easier to read out and type than one long run."""
     return separator.join(text[i : i + size] for i in range(0, len(text), size))
@@ -306,11 +297,6 @@ def retire(authenticator: Authenticator, now: datetime) -> None:
     """Removed, its key wiped: every path that removes one comes here."""
     authenticator.sealed_key = authenticator.key_version = None
     authenticator.retired_at = now
-
-
-def name_up_to(limit: int) -> str:
-    """A name too long, refused: in characters."""
-    return gettext("Give it a name of up to %(max)d characters.", max=limit)
 
 
 def authenticator_name_problem(name: str) -> str | None:

@@ -20,7 +20,7 @@ from inventory_tng.core.db import ACTOR_PATTERN, Base, protection
 class CatalogueHistory(Base):
     """Every change to a table with history (db.protection;
     core/history.py). A retired record's page reads who retired it
-    (web/admin.retired_by). The app may only add to it (the initial
+    (web/admin_pages.retired_by). The app may only add to it (the initial
     migration)."""
 
     __tablename__ = "catalogue_history"
@@ -28,7 +28,7 @@ class CatalogueHistory(Base):
         CheckConstraint("action IN ('insert', 'update', 'delete')", name="action"),
         # Ids, never names, whoever sets it (db.set_actor checks it first).
         CheckConstraint(f"actor ~ '^({ACTOR_PATTERN})$'", name="actor"),
-        # A row's history, such as who retired it (web/admin.retired_by).
+        # A row's history, such as who retired it (web/admin_pages.retired_by).
         Index("ix_catalogue_history_table_name_row_id", "table_name", "row_id"),
         protection(owner="core/history.py", lock=None, history=False),
     )

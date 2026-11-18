@@ -46,7 +46,7 @@ from sqlalchemy.dialects.postgresql import distinct_on
 from sqlalchemy.orm import Session
 
 from inventory_tng.catalogue import units
-from inventory_tng.catalogue.names import SPACES, name_key
+from inventory_tng.catalogue.name_keys import SPACES, name_key
 from inventory_tng.core.db import (
     Seen,
     enforce,
@@ -63,7 +63,7 @@ from inventory_tng.models.catalogue import (
     ItemAlias,
     ItemPackage,
     current_aliases,
-    reading_rules,
+    reading_rules_held,
 )
 from inventory_tng.models.labels import Label
 from inventory_tng.models.names import fold, fuzzy, in_ascii, unit_key
@@ -144,7 +144,7 @@ class Keys:
     @classmethod
     def of(cls, session: Session, name: str, rules: units.Rules | None = None) -> Keys:
         """`name`'s keys, its units read by `rules`, else by those held."""
-        held = reading_rules(session) if rules is None else rules
+        held = reading_rules_held(session) if rules is None else rules
         return cls(name_key(name), unit_key(name, held))
 
     def same(self, row: Item | ItemAlias) -> bool:
@@ -625,7 +625,7 @@ def reread(session: Session, tokens: Iterable[str]) -> None:
     The rules are written first (reading_rules.py), holding the catalogue
     lock."""
     lock_catalogue(session)
-    rules = reading_rules(session)
+    rules = reading_rules_held(session)
     rows = _with_units(session, tokens, lock=True)
     keys = _keyed(rows, rules)
     enforce(READ_ALIKE, when=bool(_read_alike(session, rows, keys)))

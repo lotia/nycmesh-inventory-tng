@@ -16,7 +16,7 @@ from sqlalchemy import delete, exc, literal_column, select, text, update
 from sqlalchemy.orm import Session
 
 from inventory_tng.catalogue import categories, items
-from inventory_tng.catalogue.names import LOOK_ALIKES, name_key, name_key_sql
+from inventory_tng.catalogue.name_keys import LOOK_ALIKES, name_key, name_key_sql
 from inventory_tng.core.db import ACTOR_INFO, Base, refusal, set_actor
 from inventory_tng.labels import labels
 from inventory_tng.models.catalogue import Category, Item, ItemPackage
@@ -116,7 +116,7 @@ def test_item_names_are_unique_ignoring_case_spaces_and_punctuation(
     new_item("LiteBeam 5AC Gen2")
     # Only ASCII's letters are lowered, and only its spaces and punctuation
     # ignored, and their look-alikes, whatever the database's locale
-    # (catalogue/names.py).
+    # (catalogue/name_keys.py).
     new_item("CÂBLE")
     new_item("Tough\u00b1cable")
 
@@ -240,12 +240,12 @@ def _sample() -> list[str]:
 
 
 def test_names_are_keyed_alike_by_the_app_and_the_database(session: Session) -> None:
-    """names.name_key, which the app writes, and names.name_key_sql, which
-    the CHECK constraints hold it to, agree on every character, as each
-    migrated CHECK does (the initial migration writes it out); Python has no
-    [[:punct:]], so the pattern names code points. names.LOOK_ALIKES, listed
-    by hand so PostgreSQL reads the same list, holds every space Unicode
-    has (Zs), so none tells two names apart."""
+    """name_keys.name_key, which the app writes, and name_keys.name_key_sql,
+    which the CHECK constraints hold it to, agree on every character, as
+    each migrated CHECK does (the initial migration writes it out); Python
+    has no [[:punct:]], so the pattern names code points.
+    name_keys.LOOK_ALIKES, listed by hand so PostgreSQL reads the same list,
+    holds every space Unicode has (Zs), so none tells two names apart."""
     assert {name: name_key(name) for name in TRICKY_NAMES} == TRICKY_NAMES
     assert {chr(c) for c in range(0x110000) if unicodedata.category(chr(c)) == "Zs"} - {
         " "

@@ -17,7 +17,7 @@ from inventory_tng.models.catalogue import Category, Item, ItemPackage
 from inventory_tng.models.places import Location
 from inventory_tng.models.volunteers import Volunteer
 from inventory_tng.volunteers.volunteers_routes import BRING_THEM_BACK
-from inventory_tng.web.admin import retired_by
+from inventory_tng.web.admin_pages import retired_by
 from inventory_tng.web.forms import RETIRED, RULES
 
 from helpers.markup import read, text

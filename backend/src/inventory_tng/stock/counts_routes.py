@@ -74,7 +74,7 @@ from inventory_tng.stock.ledger import LOOSE, Form, hold, lock_place, tracks_ope
 from inventory_tng.stock.moments import expected, expected_forms, moment
 from inventory_tng.stock.needs_action import OnlyItem
 from inventory_tng.stock.paths import ADJUSTMENTS, COUNTS
-from inventory_tng.web.admin import admin_page, current_rows, now, text_form
+from inventory_tng.web.admin_pages import admin_page, current_rows, now, text_form
 from inventory_tng.web.forms import RULES, row_id
 from inventory_tng.web.listing import UNASKED, AskedView, Sort, Sorting, View, order
 from inventory_tng.web.navigation import SECTION_COUNTS

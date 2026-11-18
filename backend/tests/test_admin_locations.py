@@ -6,12 +6,11 @@ from fastapi.testclient import TestClient
 from sqlalchemy import update
 from sqlalchemy.orm import Session
 
-from inventory_tng.admins.accounts import name_up_to
 from inventory_tng.models.places import Location
 from inventory_tng.models.volunteers import Volunteer
 from inventory_tng.places.forms import PICK_WHAT, PICK_WHERE, TAKEN
 from inventory_tng.places.paths import LOCATIONS
-from inventory_tng.web.forms import NAME_MAX, PICK_A_ZONE, RULES
+from inventory_tng.web.forms import NAME_MAX, PICK_A_ZONE, RULES, name_up_to
 
 from helpers.markup import options, text
 from helpers.rows import add, history, named, shown, tag

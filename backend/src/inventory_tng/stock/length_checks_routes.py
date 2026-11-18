@@ -37,6 +37,7 @@ from inventory_tng.stock import (
     over_recorded,
     queries,
 )
+from inventory_tng.stock.forms import TICK_OPEN_PACKAGES
 from inventory_tng.stock.needs_action import (
     Kind,
     OnlyItem,
@@ -45,7 +46,7 @@ from inventory_tng.stock.needs_action import (
 )
 from inventory_tng.stock.paths import LENGTHS, STOCK
 from inventory_tng.stock.used_up_routes import BY_PACKAGE, BY_SHOWS
-from inventory_tng.web.admin import TICK_OPEN_PACKAGES, admin_page, now
+from inventory_tng.web.admin_pages import admin_page, now
 from inventory_tng.web.listing import AskedView, Sort, Sorting, View, arranged
 from inventory_tng.web.navigation import SECTION_STOCK
 from inventory_tng.web.pages import add_notices, not_found, redirect

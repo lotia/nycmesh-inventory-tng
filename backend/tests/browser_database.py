@@ -29,7 +29,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from devtools import seed
-from inventory_tng import __main__ as server
+from inventory_tng.__main__ import main as run_server
 from inventory_tng.admins import accounts, totp_keys
 from inventory_tng.devices import devices
 from inventory_tng.models.admins import Admin, AdminPassword
@@ -80,7 +80,7 @@ def main(argv: list[str]) -> int:
                 "RATE_LIMIT_PER_ADDRESS": "10000",
                 "RATE_LIMIT_PER_ACCOUNT": "10000",
             }
-            server.main(["--port", port])
+            run_server(["--port", port])
     finally:
         for name in RUN_FILES:
             (run / name).unlink(missing_ok=True)

@@ -10,7 +10,7 @@ from httpx2 import Response
 from servestatic.compress import Compressor
 
 from inventory_tng.core.settings import FrontendConfig
-from inventory_tng.scan.bundle import (
+from inventory_tng.web.frontend_bundle import (
     BUILD_FILE,
     MANIFEST,
     PAGES,

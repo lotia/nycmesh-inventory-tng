@@ -20,19 +20,20 @@ from starlette.datastructures import Headers
 from structlog.testing import capture_logs
 
 from inventory_tng.admins import accounts, guards, paths, sign_in_routes
-from inventory_tng.admins import forms as admins_forms
 from inventory_tng.admins.accounts import (
     NOT_AN_EMAIL,
     PASSWORDS_DIFFER,
     password_problem,
     username_problem,
 )
+from inventory_tng.admins.forms import NOT_THE_TOKEN, code_mismatch
 from inventory_tng.core.cross_site import cross_site
 from inventory_tng.core.masking import Masker
 from inventory_tng.core.settings import RateLimits
 from inventory_tng.models.admins import Admin, AdminSession, Authenticator, RecoveryCode
 from inventory_tng.models.labels import LABEL_ALPHABET
 from inventory_tng.models.site_settings import SignInSettings
+from inventory_tng.web.forms import name_up_to
 from inventory_tng.web.navigation import retired_holding
 
 from helpers.markup import read, text
@@ -121,7 +122,7 @@ def test_setup_refuses_a_wrong_token_then_too_many(client: TestClient) -> None:
     key = hidden_key(client.get(paths.SETUP))
     wrong = client.post(paths.SETUP, data=setup_form(key, token="x" * 40))
     assert wrong.status_code == 400
-    assert str(admins_forms.NOT_THE_TOKEN) in text(wrong)
+    assert str(NOT_THE_TOKEN) in text(wrong)
     # The form keeps the key, so the app need not be set up again.
     assert hidden_key(wrong) == key
     for _ in range(9):
@@ -140,8 +141,8 @@ def test_setup_refuses_a_wrong_token_then_too_many(client: TestClient) -> None:
         ),
         ({"password_again": PASSWORD + "!"}, PASSWORDS_DIFFER),
         ({"email": "not an address"}, NOT_AN_EMAIL),
-        ({"code": "000000"}, admins_forms.code_mismatch()),
-        ({"code": ""}, admins_forms.code_mismatch()),
+        ({"code": "000000"}, code_mismatch()),
+        ({"code": ""}, code_mismatch()),
     ],
 )
 def test_setup_says_what_is_wrong(
@@ -624,7 +625,7 @@ def test_a_new_authenticator_needs_a_name(client: TestClient, session: Session) 
             data={"authenticator_name": " ", "key": key, "code": code(key, at)},
         )
     assert blank.status_code == 400
-    assert accounts.name_up_to(accounts.AUTHENTICATOR_NAME_MAX) in text(blank)
+    assert name_up_to(accounts.AUTHENTICATOR_NAME_MAX) in text(blank)
     assert len(session.scalars(select(Authenticator)).all()) == 1
 
 

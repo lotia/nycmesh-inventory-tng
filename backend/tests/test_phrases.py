@@ -23,8 +23,8 @@ from sqlalchemy.orm import Session
 import inventory_tng
 from inventory_tng.admins import accounts, activity, admins_routes, guards
 from inventory_tng.admins.reset_routes import RESET_NOTICE
-from inventory_tng.catalogue import forms as catalogue_forms
 from inventory_tng.catalogue import reading_rules, reading_rules_routes, units
+from inventory_tng.catalogue.forms import ALIAS_TAKEN, TAKEN_FIELDS, read_as_one
 from inventory_tng.core import mail
 from inventory_tng.core.phrases import (
     BRAND,
@@ -41,7 +41,7 @@ from inventory_tng.core.phrases import (
     speaking,
 )
 from inventory_tng.devices import devices_routes
-from inventory_tng.devices import forms as devices_forms
+from inventory_tng.devices.forms import days_problem, uses_problem
 from inventory_tng.labels import labels
 from inventory_tng.models.admins import Admin, AdminSession, Authenticator
 from inventory_tng.models.catalogue import UNITS, Category, Item, ItemPackage
@@ -50,7 +50,7 @@ from inventory_tng.models.places import Location
 from inventory_tng.models.site_settings import SignInSettings
 from inventory_tng.models.stock import TRANSACTION_KINDS, AdjustmentReason
 from inventory_tng.models.volunteers import Volunteer
-from inventory_tng.site_settings import forms as settings_forms
+from inventory_tng.site_settings.forms import WHOLE, whole_minutes
 from inventory_tng.stock import (
     counts_routes,
     length_checks_routes,
@@ -60,8 +60,8 @@ from inventory_tng.stock import (
     used_up_routes,
 )
 from inventory_tng.volunteers import volunteers_routes
-from inventory_tng.web import admin as web_admin
-from inventory_tng.web import forms as web_forms
+from inventory_tng.web.admin_pages import revoke_title
+from inventory_tng.web.forms import at_most_places, name_up_to, up_to
 from inventory_tng.web.listing import Lapsed
 from inventory_tng.web.navigation import retired_holding
 from inventory_tng.web.pages import templates
@@ -135,25 +135,19 @@ def named_phrases() -> list[LazyProxy]:
 # Each phrase said with values, by its function, the values not English.
 SAID_WITH_VALUES: list[Callable[[], Words]] = [
     lambda: accounts.username_problem("!") or "",
-    lambda: accounts.name_up_to(9),
+    lambda: name_up_to(9),
     lambda: accounts.password_problem("", "") or "",
     lambda: accounts.password_problem("." * 1000, "") or "",
-    lambda: web_forms.up_to(9),
-    lambda: web_forms.at_most_places(3),
-    lambda: web_admin.revoke_title(NOT_ENGLISH),
+    lambda: up_to(9),
+    lambda: at_most_places(3),
+    lambda: revoke_title(NOT_ENGLISH),
     *(
         lambda said=said: said(NOT_ENGLISH, NOT_ENGLISH)
         for said in activity.WORDS.values()
     ),
-    *(
-        lambda said=said: said(NOT_ENGLISH)
-        for said in catalogue_forms.TAKEN_FIELDS.values()
-    ),
-    *(
-        lambda said=said: said(NOT_ENGLISH)
-        for said in catalogue_forms.ALIAS_TAKEN.values()
-    ),
-    lambda: catalogue_forms.read_as_one(NOT_ENGLISH),
+    *(lambda said=said: said(NOT_ENGLISH) for said in TAKEN_FIELDS.values()),
+    *(lambda said=said: said(NOT_ENGLISH) for said in ALIAS_TAKEN.values()),
+    lambda: read_as_one(NOT_ENGLISH),
     *(lambda said=said: said(1, NOT_ENGLISH) for said in reading_rules.NAMED.values()),
     lambda: reading_rules.both(NOT_ENGLISH, NOT_ENGLISH),
     lambda: reading_rules.near(NOT_ENGLISH),
@@ -161,12 +155,12 @@ SAID_WITH_VALUES: list[Callable[[], Words]] = [
     lambda: volunteers_routes.merge_title(NOT_ENGLISH, NOT_ENGLISH),
     lambda: admins_routes.link_title(NOT_ENGLISH),
     lambda: admins_routes.reset_title(NOT_ENGLISH),
-    lambda: devices_forms.uses_problem(9),
-    lambda: devices_forms.days_problem(9),
+    lambda: uses_problem(9),
+    lambda: days_problem(9),
     lambda: devices_routes.revoke_many_title(1),
     lambda: devices_routes.revoke_many_title(3),
-    *(lambda said=said: said(1, 9) for said in settings_forms.WHOLE.values()),
-    lambda: settings_forms.whole_minutes(1, 9),
+    *(lambda said=said: said(1, 9) for said in WHOLE.values()),
+    lambda: whole_minutes(1, 9),
     lambda: used_up_routes.close_title(NOT_ENGLISH),
     lambda: counts_routes.count_title(NOT_ENGLISH),
     lambda: counts_routes.moved_meanwhile(0),
@@ -577,8 +571,8 @@ COVERED: dict[str, Callable[[], str]] = {
         retired_places=[SHELF, SHELF],
         counts_path="/admin/counts",
     ),
-    "scan/page.html": lambda: signed_in(
-        "scan/page.html",
+    "frontend_page.html": lambda: signed_in(
+        "frontend_page.html",
         tags=SimpleNamespace(styles=[], preloads=[], scripts=[]),
     ),
     "error.html, admin_base.html and _masthead.html": lambda: signed_in(

@@ -27,7 +27,7 @@ from inventory_tng.volunteers.forms import (
     volunteer_problems,
 )
 from inventory_tng.volunteers.paths import VOLUNTEERS
-from inventory_tng.web.admin import admin_page, now, retirement, undo_retire
+from inventory_tng.web.admin_pages import admin_page, now, retirement, undo_retire
 from inventory_tng.web.forms import ALERTS, RULES, form_version, rule_words
 from inventory_tng.web.listing import AskedView, Listing, Searched, Sort, Sorting
 from inventory_tng.web.navigation import SECTION_VOLUNTEERS

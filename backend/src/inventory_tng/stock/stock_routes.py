@@ -25,15 +25,16 @@ from inventory_tng.models.catalogue import Item, ItemPackage
 from inventory_tng.models.places import Location
 from inventory_tng.stock import open_packages, over_recorded, queries
 from inventory_tng.stock.balance import SHORT, retired_places_holding_stock
+from inventory_tng.stock.over_recorded_routes import SETTLED_VIEW
 from inventory_tng.stock.paths import (
     COUNTS,
     NEEDS_COUNTING,
-    RECORDED_MORE,
-    RECORDED_MORE_SETTLED,
+    OVER_RECORDED,
+    OVER_RECORDED_SETTLED,
     REORDER,
     STOCK,
 )
-from inventory_tng.web.admin import SETTLED_VIEW, admin_page
+from inventory_tng.web.admin_pages import admin_page
 from inventory_tng.web.listing import (
     AskedView,
     Sort,
@@ -74,11 +75,11 @@ def stock_views(session: Session) -> list[tuple[str, Words, str]]:
         (REORDER, REORDER_TITLE, "reorder"),
         (NEEDS_COUNTING, NEEDS_COUNTING_TITLE, "needs-counting"),
         (
-            RECORDED_MORE,
+            OVER_RECORDED,
             recorded_more_view(over_recorded.how_many(session, over_recorded.WAITING)),
             "recorded-more",
         ),
-        (RECORDED_MORE_SETTLED, SETTLED_VIEW, "settled"),
+        (OVER_RECORDED_SETTLED, SETTLED_VIEW, "settled"),
     ]
 
 
