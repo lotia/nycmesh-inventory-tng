@@ -1,6 +1,6 @@
 """The developer's one entry point, python -m devtools (devtools/__main__.py;
-docs/decisions/0023), which dispatches as manage does
-(inventory_tng.core.entry_point)."""
+docs/decisions/0023). It dispatches as manage does
+(inventory_tng.core.entry_point): test_manage.py tests what the two share."""
 
 import runpy
 import subprocess
@@ -36,13 +36,6 @@ def test_with_no_command_it_lists_every_one(
     for name, (_, line) in COMMANDS.items():
         assert f"  {name}" in out
         assert line in out
-
-
-def test_an_unknown_command_is_refused(capsys: pytest.CaptureFixture[str]) -> None:
-    with pytest.raises(SystemExit) as done:
-        main(["seed"])
-    assert done.value.code == 2
-    assert "invalid choice: 'seed'" in capsys.readouterr().err
 
 
 # What a fresh interpreter has imported of the tools once the entry point

@@ -4,8 +4,7 @@ from backend/, or with it on PYTHONPATH, as the task scripts do:
     python -m devtools                  # every command, a line on each
     python -m devtools <command> --help
 
-Listed here by name, never discovered, and only the one chosen is
-imported, as the operator's commands are (inventory_tng.core.entry_point).
+Dispatched as the operator's commands are (inventory_tng.core.entry_point).
 """
 
 import sys

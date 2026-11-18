@@ -40,11 +40,6 @@ decided the structure below on 2026-11-17.
 - **`web/`** holds what every server-rendered page shares; **`core/`**
   holds plumbing, such as settings, db, history, logs, telemetry and mail.
   Core means plumbing, not business rules.
-- **Developer tools** live in `backend/devtools/`, beside `tests/` and
-  outside `src/`, so no image ships them (Ali, 2026-11-18,
-  inventory-tng-wzlr). A tool that writes a file the app or the frontend
-  reads belongs there; one that writes a reference file only tests read
-  stays in `tests/helpers/`.
 - **The administrators' navigation** is `web/navigation.py`: every
   section, in order, and its badge, listed by name, set by nothing at
   import (inventory-tng-atmx.10).
@@ -64,12 +59,15 @@ decided the structure below on 2026-11-17.
   and a line on what it does, never discovered. It imports only the
   command chosen; with no command it lists them all. Each command sets up
   its own process (0007).
-- **One entry point for developer tools**, `python -m devtools <command>`,
-  run from `backend/` (Ali, 2026-11-18, inventory-tng-wzlr): commands
-  `database`, `setting`, `stack`, `test-report`, `write-api-schema` and
-  `write-unit-table`, listed and dispatched as the operator's are, by the
-  same code (`core/entry_point.py`), so the two cannot drift. Modules in
-  `src/` that a tool uses, such as `core/local_env.py` and
+- **Developer tools** live in `backend/devtools/`, beside `tests/` and
+  outside `src/`, so no image ships them (Ali, 2026-11-18,
+  inventory-tng-wzlr). A tool that writes a file the app or the frontend
+  reads belongs there; one that writes a reference file only tests read
+  stays in `tests/helpers/`. They have one entry point, `python -m
+  devtools <command>`, run from `backend/`: its commands, in `COMMANDS` in
+  its `__main__.py`, are listed and dispatched as the operator's are, by
+  the same code (`core/entry_point.py`), so the two cannot drift. Modules
+  in `src/` that a tool uses, such as `core/local_env.py` and
   `catalogue/units.py`, have no `python -m` path of their own.
 - **Imports go one way**, held by `backend/tests/test_import_directions.py`:
   - rules, queries and forms import neither FastAPI nor `web/`, but for
@@ -79,8 +77,7 @@ decided the structure below on 2026-11-17.
   - core imports nothing of the app but core and `models/`;
   - no feature's routes import another feature's routes; they link
     through its `paths.py`;
-  - nothing of the app imports `backend/devtools/`, which no image ships
-    (inventory-tng-wzlr);
+  - nothing of the app imports `backend/devtools/` (inventory-tng-wzlr);
   - nothing in `stock/` imports `scan/`: a volunteer's batch
     (`scan/batch.py`) writes through the ledger, so imports run from scan
     to stock (Ali, 2026-11-18, inventory-tng-h657.4).
@@ -172,21 +169,21 @@ queries to its `queries.py`.
 | `admin/volunteers.py` | `volunteers/routes.py` |
 | `admins.py` | `admins/admins_command.py` |
 | `catalogue.py` | `scan/catalogue_api.py`; the reply schemas: `scan/catalogue_schemas.py`; its queries: `scan/queries.py` |
-| `dev_database.py` | `backend/devtools/database.py`, outside `src/`; `seed` is one of its subcommands |
+| `dev_database.py` | `backend/devtools/database.py`; `seed` is one of its subcommands |
 | `devices.py` | `devices/devices.py`; `register_device`: `devices/api.py`; the request and reply schemas: `devices/schemas.py`; what every route needing a device depends on: `devices/guards.py`; `REGISTER_PATH`: `devices/paths.py` |
 | `health.py` | `core/health.py`; its query: `core/db.py`, as `ping` |
 | `ledger.py` | `stock/ledger.py`, with `_each_once`, `_hold_forms` as `each_once`, `hold_forms`; `record`, with openings into open packages, the problems of a batch by line, the replay of a batch sent again, `BatchRefused`, `KeyReused`, `Recorded`, `retired_sides` and their metrics: `scan/batch.py`; `moment`, `expected`, `expected_forms`, `left_at`, `corrected_since`: `stock/moments.py`, with `_flows`, `_form_flows`, `_at_place` as `flows`, `form_flows`, `at_place`; `record_count`, `count_open_package`, `record_adjustment`, the rest of counts and adjustments and their metrics: `stock/counts.py`; the balance queries: `stock/balance.py`; `save_batch`: `scan/batch_api.py`; the batch request and reply schemas: `scan/batch_schemas.py`, but for `Line.entry`: `scan/batch.py`, as `entry_of` |
 | `models.py` | `models/`: each table in its feature's module; the column types, `whole`, the columns and constraints most tables have, and `Versioned`: `models/base.py`; canonical names, name keys and search folding (`CanonicalName`, `KeyedName`, `Searchable`, `fold` and the rest): `models/names.py`; `_refold`: `models/catalogue.py`; `_reference`, `_one_of`, `_between`, `_unique_name`, `_unique_current_name`, `_name_key_check`: each without its `_` |
 | `open_packages.py` | `stock/open_packages.py`; `tracks_opened`: `stock/ledger.py` |
-| `openapi.py` | `backend/devtools/write_api_schema.py`, outside `src/` |
+| `openapi.py` | `backend/devtools/write_api_schema.py` |
 | `page_telemetry.py` | `scan/page_telemetry.py`; `over_limit`: `web/browser.py` |
 | `pages.py` | `web/pages.py`; `amount`, `printed_length`: `web/formatting.py`; `Badge`, `retired_holding`, `sections`: `web/navigation.py` |
 | `registration_codes.py` | `devices/command.py` |
 | `resets.py` | `admins/reset_routes.py` |
 | `scan_settings.py` | `site_settings/scan_settings.py`; its command: `site_settings/command.py` |
-| `seed.py` | `backend/devtools/seed.py`, outside `src/` |
+| `seed.py` | `backend/devtools/seed.py` |
 | `sign_in.py` | the sign-in pages: `admins/sign_in_routes.py`; what every administrator page depends on: `admins/guards.py`; `reset_url`: `admins/paths.py` |
-| `stacks.py` | `backend/devtools/stack.py`, outside `src/`; its `stale` is `list-stale` |
+| `stacks.py` | `backend/devtools/stack.py`; its `stale` is `list-stale` |
 | `totp_keys.py` | `admins/totp_keys.py`; its command: `admins/totp_keys_command.py` |
 | `unit_readings.py` | `catalogue/unit_readings.py`; its command: `catalogue/command.py` |
 | `web.py` | `web/browser.py` |
