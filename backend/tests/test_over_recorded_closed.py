@@ -22,7 +22,7 @@ from inventory_tng.models.stock import (
     OpenPackage,
     OverRecorded,
 )
-from inventory_tng.stock import ledger, moments, open_packages, over_recorded
+from inventory_tng.stock import counts, ledger, moments, open_packages, over_recorded
 from inventory_tng.stock.ledger import Entry, Form
 from inventory_tng.stock.paths import COUNTS
 
@@ -401,7 +401,7 @@ def sealed_counted_check(
     over_recorded.raise_checks(setup, {movement_id: Decimal(305)})
     admin = new_admin_id(setup)
     as_of = moments.moment(setup, spools.store.id)
-    count = ledger.record_count(
+    count = counts.record_count(
         setup,
         uuid.uuid4(),
         admin,
@@ -492,7 +492,7 @@ def test_a_close_skips_one_a_count_holds_and_correct_then_closes_it_as_counted(
     assert place is not None
     sealed = Form(package_id=movement.from_package_id)
     as_of = moments.moment(first, place)
-    count = ledger.record_count(
+    count = counts.record_count(
         first,
         uuid.uuid4(),
         admin,

@@ -19,7 +19,7 @@ from inventory_tng.models.stock import (
     OpenPackage,
     OverRecorded,
 )
-from inventory_tng.stock import ledger, moments, open_packages, over_recorded
+from inventory_tng.stock import counts, moments, open_packages, over_recorded
 from inventory_tng.stock.ledger import Form
 from inventory_tng.stock.moments import expected
 from inventory_tng.stock.paths import COUNTS
@@ -341,7 +341,7 @@ def count_van(
     """The van, or `at`, counted as of `as_of`, as the count page does: how
     many it closed."""
     where = (at or place.van).id
-    counted = ledger.record_count(
+    counted = counts.record_count(
         session, uuid.uuid4(), admin, where, [(place.item.id, Decimal(2))], as_of
     )
     return over_recorded.counted(

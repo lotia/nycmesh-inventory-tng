@@ -43,6 +43,7 @@ RULES = {
     "catalogue/units.py",
     "site_settings/scan_settings.py",
     "stock/balance.py",
+    "stock/counts.py",
     "stock/ledger.py",
     "stock/moments.py",
     *(

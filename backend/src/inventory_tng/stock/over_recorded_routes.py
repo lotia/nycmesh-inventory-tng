@@ -30,7 +30,7 @@ from inventory_tng.models.places import Location
 from inventory_tng.models.stock import OVER_RECORDED_WORDS_MAX, Movement, OverRecorded
 from inventory_tng.places import locations
 from inventory_tng.places.queries import changeable
-from inventory_tng.stock import balance, ledger, over_recorded
+from inventory_tng.stock import balance, counts, ledger, over_recorded
 from inventory_tng.stock.forms import confirmed_count, why_problem
 from inventory_tng.stock.needs_action import (
     ItemWaiting,
@@ -347,7 +347,7 @@ def _refusal(
 ) -> dict[str, Any] | None:
     """What the page says of a correction or count refused by a rule, and
     offers under it: Mark checked, and, refused at a retired place that
-    holds nothing (ledger.NotCountable, `at`), Bring back that place, which
+    holds nothing (counts.NotCountable, `at`), Bring back that place, which
     the places page would (not a volunteer's custody, which comes back with
     them). The place as refused, whatever has changed since. None if it is
     settled meanwhile. Drawn again for Mark checked sent from it (`do`
@@ -514,10 +514,10 @@ def answer(
         words = stripped or None
     ledger.lock_places(session, over_recorded.places_of(session, check_id))
     admin_id = signed.admin.id
-    # The place that refused it (ledger.NotCountable), as it was then.
+    # The place that refused it (counts.NotCountable), as it was then.
     refused_at: int | None = None
 
-    def settle() -> tuple[over_recorded.Settled, list[ledger.Written]]:
+    def settle() -> tuple[over_recorded.Settled, list[counts.Written]]:
         nonlocal refused_at
         try:
             if do == "correct":
@@ -531,7 +531,7 @@ def answer(
                 )
             over_recorded.mark_checked(session, check_id, seen, admin_id, reason, words)
             return "checked", []
-        except ledger.NotCountable as broken:
+        except counts.NotCountable as broken:
             refused_at = broken.location_id
             raise
 
@@ -549,7 +549,7 @@ def answer(
             request, signed, session, only, view, values=values, refused=refused
         )
     how, written = settled
-    ledger.corrected(admin_id, 0, written)
+    counts.corrected(admin_id, 0, written)
     over_recorded.measure_settled(how, reason if do == "checked" else None)
     notice = f"over_recorded_{how}"
     if do == "count":

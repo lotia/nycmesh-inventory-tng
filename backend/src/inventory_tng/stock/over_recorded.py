@@ -47,6 +47,11 @@ from inventory_tng.models.stock import (
 from inventory_tng.stock import adjustment_reasons, balance, ledger
 from inventory_tng.web.formatting import amount
 
+# Lazy while the ledger's batch imports this module (through
+# open_packages): counts imports names from the ledger, not yet defined
+# while it loads. Bound at first use.
+lazy from inventory_tng.stock import counts
+
 log = structlog.get_logger(__name__)
 meter = metrics.get_meter(__name__)
 
@@ -902,7 +907,7 @@ def close(session: Session, check_id: int, seen_as: str, admin_id: int) -> None:
 
 def correct(
     session: Session, check_id: int, seen_as: str, admin_id: int
-) -> tuple[Settled, list[ledger.Written]]:
+) -> tuple[Settled, list[counts.Written]]:
     """Settle one, as corrected: an adjustment on each side its transaction
     has, but one a count put right (counted), undoes what was recorded more
     than moved, in the forms it moved in, with the reason REASON. Found
@@ -915,7 +920,7 @@ def correct(
     (places_of), locked first. Each under a key of the check's, so it is
     written once; with one end counted, a key of its own. How it was
     settled, and what was written. RuleBroken as waiting(), or as
-    ledger.record_adjustment."""
+    counts.record_adjustment."""
     row = waiting(session, check_id, seen_as)
     movement, transaction, closed = _read(session, row)
     if _right(row, movement, transaction, closed):
@@ -943,11 +948,11 @@ def correct(
             movement.to_open_package_id,
         ),
     )
-    written: list[ledger.Written] = []
+    written: list[counts.Written] = []
     for place, found, package_id, open_id in sides:
         if place is None:
             continue
-        written += ledger.record_adjustment(
+        written += counts.record_adjustment(
             session,
             _correction_key(transaction.idempotency_key, row, found=found),
             admin_id,
@@ -964,7 +969,7 @@ def correct(
 
 def confirm_count(
     session: Session, check_id: int, seen_as: str, admin_id: int, count: Decimal
-) -> tuple[Settled, list[ledger.Written]]:
+) -> tuple[Settled, list[counts.Written]]:
     """Settle one of an open package moved whole (Shown.moved_whole), given
     the count an administrator says it held when it moved: as it was, as
     checked, writing nothing; else as corrected, with an adjustment at the
@@ -972,7 +977,7 @@ def confirm_count(
     under a key of the check's. How it was settled, and what was written.
     Call it holding its places (places_of), locked first. RuleBroken as
     _settle, if it is not such a move (over_recorded_not_whole), or as
-    ledger.record_adjustment."""
+    counts.record_adjustment."""
     row = _settle(session, check_id, seen_as, admin_id, "checked")
     movement = session.get_one(Movement, row.movement_id)
     transaction = session.get_one(LedgerTransaction, movement.transaction_id)
@@ -989,7 +994,7 @@ def confirm_count(
         )
         return "checked", []
     row.settled_how = "corrected"
-    written = ledger.record_adjustment(
+    written = counts.record_adjustment(
         session,
         uuid.uuid5(transaction.idempotency_key, f"over recorded {row.id} count"),
         admin_id,
@@ -1037,14 +1042,14 @@ def counted(
     admin_id: int,
     place_id: int,
     as_of: int,
-    written: Sequence[ledger.Written],
+    written: Sequence[counts.Written],
     put_right: Collection[tuple[int, ledger.Form | None]],
     emptied: Collection[tuple[int, ledger.Form]] = (),
 ) -> int:
     """Put right the ends at a place of those waiting that a count there
     has, as of moment `as_of`, after their movement (Ali, 2026-11-15,
     inventory-tng-qs8): `put_right` is what it counted, each item by its
-    total (no form) or a form of it (ledger.Counted.put_right), and
+    total (no form) or a form of it (counts.Counted.put_right), and
     `written` its transactions, the first of which each end keeps. An end
     is put right by its item counted by its total, or by the form it is in
     at that end counted (docs/decisions/0020); an open package moved whole

@@ -29,6 +29,7 @@ from inventory_tng.models.base import INTEGER_MAX, whole
 from inventory_tng.models.catalogue import Item
 from inventory_tng.models.stock import OpenPackage
 from inventory_tng.stock import (
+    counts,
     forms,
     ledger,
     moments,
@@ -308,7 +309,7 @@ def _set(
             if showed is None
             else showed + moments.corrected_since(session, open_id, as_of)
         )
-        counted = ledger.count_open_package(session, key, admin_id, row, left, then)
+        counted = counts.count_open_package(session, key, admin_id, row, left, then)
         if counted is None:
             return False, 0
         # A report is as of its own batch, which may be the one that

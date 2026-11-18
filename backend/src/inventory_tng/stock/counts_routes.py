@@ -1,7 +1,6 @@
 """Counts and adjustments: the pages an administrator puts the records right
-with (docs/decisions/0003). The writing is the ledger's (ledger.record_count,
-ledger.record_adjustment); these pages check what was typed and say what is
-wrong.
+with (docs/decisions/0003). The writing is stock/counts.py's (record_count,
+record_adjustment); these pages check what was typed and say what is wrong.
 
 Each form carries a key made when it was shown, so sending it twice writes
 it once. A count also carries the place's latest ledger entry as it was
@@ -52,6 +51,12 @@ from inventory_tng.models.stock import AdjustmentReason, LedgerTransaction, Open
 from inventory_tng.site_settings.paths import SETTINGS
 from inventory_tng.stock import needs_action, open_packages, over_recorded, queries
 from inventory_tng.stock.balance import countable, takeable
+from inventory_tng.stock.counts import (
+    Counted,
+    corrected,
+    record_adjustment,
+    record_count,
+)
 from inventory_tng.stock.forms import (
     CLOSED_MEANWHILE,
     LOOSE_FIELD,
@@ -64,16 +69,7 @@ from inventory_tng.stock.forms import (
     lines,
     named_twice,
 )
-from inventory_tng.stock.ledger import (
-    LOOSE,
-    Counted,
-    Form,
-    corrected,
-    hold,
-    lock_place,
-    record_adjustment,
-    record_count,
-)
+from inventory_tng.stock.ledger import LOOSE, Form, hold, lock_place
 from inventory_tng.stock.moments import expected, expected_forms, moment
 from inventory_tng.stock.needs_action import OnlyItem
 from inventory_tng.stock.open_packages import tracks_opened

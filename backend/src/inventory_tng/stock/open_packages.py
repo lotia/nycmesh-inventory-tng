@@ -24,6 +24,10 @@ from inventory_tng.models.stock import LedgerTransaction, OpenPackage
 from inventory_tng.models.volunteers import Volunteer
 from inventory_tng.stock import adjustment_reasons, balance, ledger, over_recorded
 
+# Lazy while the ledger's batch imports this module: counts imports names
+# from the ledger, not yet defined while it loads. Bound at first use.
+lazy from inventory_tng.stock import counts
+
 log = structlog.get_logger(__name__)
 meter = metrics.get_meter(__name__)
 
@@ -273,7 +277,7 @@ def close(
     waiting as recorded more than moved, its sealed end counted, closes as
     counted (over_recorded.open_package_closed). Its place is locked first,
     then it, then those, as a save's are (stock/ledger.py). RuleBroken as
-    ledger.record_adjustment refuses."""
+    counts.record_adjustment refuses."""
     found = session.get(OpenPackage, open_id)
     if found is None:
         return None
@@ -289,7 +293,7 @@ def close(
         return None
     left = balance.left_on(session, [row])[row.id]
     if left != 0:
-        ledger.record_adjustment(
+        counts.record_adjustment(
             session,
             uuid.uuid5(row.key, "closed"),
             admin_id,

@@ -18,7 +18,7 @@ from inventory_tng.models.catalogue import Item, ItemPackage
 from inventory_tng.models.stock import LedgerTransaction, OpenPackage
 from inventory_tng.stock import (
     balance,
-    ledger,
+    counts,
     length_checks_routes,
     moments,
     open_packages,
@@ -302,7 +302,7 @@ def test_counting_an_open_package_twice_under_its_key_writes_once(
     made = spools.opened()
     counter = add(session, Admin(username=f"counter-{tag()}"))
     key = uuid.uuid4()
-    count = partial(ledger.count_open_package, session, key, counter.id, made)
+    count = partial(counts.count_open_package, session, key, counter.id, made)
     # What it shows already: nothing differs, nothing is written.
     assert count(Decimal(305), Decimal(305)) == (305, [])
     assert left_on(session, made) == 305
@@ -600,7 +600,7 @@ def test_a_count_since_the_report_is_not_taken_off_twice(
     made = spools.opened()
     registered_client.post(URL, json=report(spools, length(made, "250")))
     counter = add(session, Admin(username=f"counter-{tag()}"))
-    ledger.count_open_package(
+    counts.count_open_package(
         session, uuid.uuid4(), counter.id, made, Decimal(250), Decimal(305)
     )
     assert left_on(session, made) == 250
@@ -619,7 +619,7 @@ def test_a_count_since_the_page_is_not_taken_off_twice(
     made = spools.opened()
     form = set_form(session, made, "200")
     counter = add(session, Admin(username=f"counter-{tag()}"))
-    ledger.count_open_package(
+    counts.count_open_package(
         session, uuid.uuid4(), counter.id, made, Decimal(250), Decimal(305)
     )
     made.below_zero_at = made.opened_at  # A check to settle.
@@ -663,7 +663,7 @@ def test_a_set_whose_count_is_written_already_writes_nothing_more(
     session.flush()
     checked = seen(session, made)
     key = uuid.uuid5(made.key, f"length {checked}")
-    ledger.count_open_package(session, key, admin.id, made, Decimal(1), Decimal(305))
+    counts.count_open_package(session, key, admin.id, made, Decimal(1), Decimal(305))
     answer = length_checks_routes.Answer(made.id, checked, Decimal(2), Decimal(305), 0)
     assert length_checks_routes._set(session, admin.id, answer, [made.location_id]) == (
         True,

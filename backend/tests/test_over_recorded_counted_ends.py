@@ -17,7 +17,7 @@ from inventory_tng.core.local_time import show_day, site_zone
 from inventory_tng.models.catalogue import ItemPackage
 from inventory_tng.models.stock import LedgerTransaction, Movement
 from inventory_tng.stock import (
-    ledger,
+    counts,
     length_checks_routes,
     open_packages,
     over_recorded,
@@ -193,7 +193,7 @@ def test_only_a_count_as_of_its_movement_or_after_puts_an_end_right(
     moved = session.get_one(Movement, check.movement_id).transaction_id
     admin = new_admin_id(session)
     # The movement's own transaction, as the count's: any will do here.
-    written = [ledger.Written(moved, "count", 1)]
+    written = [counts.Written(moved, "count", 1)]
     at_van = partial(
         over_recorded.counted, session, admin, place.van.id, written=written
     )

@@ -13,7 +13,7 @@ from inventory_tng.models.catalogue import ItemPackage
 from inventory_tng.models.stock import LedgerTransaction, Movement
 from inventory_tng.stock import (
     adjustment_reasons,
-    ledger,
+    counts,
     over_recorded,
     over_recorded_routes,
 )
@@ -112,7 +112,7 @@ def test_its_count_corrected_under_a_key_written_already_says_so(
     key = uuid.uuid5(transaction.idempotency_key, f"over recorded {check.id} count")
     admin, _ = new_admin(session, f"ada-{tag()}", totp=False)
     reason = adjustment_reasons.seeded(session, over_recorded.REASON)
-    written = ledger.record_adjustment(
+    written = counts.record_adjustment(
         session,
         key,
         admin.id,

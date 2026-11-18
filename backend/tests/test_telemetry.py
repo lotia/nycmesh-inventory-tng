@@ -43,7 +43,7 @@ from inventory_tng.models.stock import (
     OverRecorded,
 )
 from inventory_tng.scan import page_builds, page_telemetry
-from inventory_tng.stock import ledger, moments, open_packages, over_recorded
+from inventory_tng.stock import counts, ledger, moments, open_packages, over_recorded
 from inventory_tng.stock.paths import ADJUSTMENTS, COUNTS
 from inventory_tng.web import security_headers
 
@@ -430,11 +430,11 @@ def test_counts_count_lines_withheld(rolled_back: Recorded, session: Session) ->
     as_of = received(session, place).id
     write(session, place)
     radios = [(place.item.id, Decimal(5))]
-    result = ledger.record_count(
+    result = counts.record_count(
         session, uuid.uuid4(), ada.id, place.store.id, radios, as_of
     )
     assert result.moved == {place.item.id: (Decimal(0), Decimal(3))}
-    ledger.corrected(ada.id, place.store.id, result.written, result.withheld)
+    counts.corrected(ada.id, place.store.id, result.written, result.withheld)
     assert counted(reader, "inventory.count.lines.withheld")[()] >= 1
 
 
@@ -488,7 +488,7 @@ def test_a_count_refused_after_its_first_transaction_records_nothing(
     moved, which fixes its unit, so a stand-in refuses it."""
     client, _, reader, _ = rolled_back
     place, count = counting(client, session)
-    real = ledger.insert_transaction
+    real = counts.insert_transaction
 
     def refusing_the_second(
         session: Session,
@@ -500,7 +500,7 @@ def test_a_count_refused_after_its_first_transaction_records_nothing(
             raise RuleBroken("movement_whole_units")
         return real(session, key, header, lines)
 
-    monkeypatch.setattr(ledger, "insert_transaction", refusing_the_second)
+    monkeypatch.setattr(counts, "insert_transaction", refusing_the_second)
     before = recorded_by_kind(reader)
     with capture_logs() as logs:
         refused = count()
@@ -1047,7 +1047,7 @@ def test_counts_lines_recorded_more_than_moved_closed_with_their_open_package(
     over_recorded.raise_checks(session, {movement_id: Decimal(305)})
     store = spools.store.id
     as_of = moments.moment(session, store)
-    count = ledger.record_count(
+    count = counts.record_count(
         session,
         uuid.uuid4(),
         admin.id,
@@ -1086,7 +1086,7 @@ def test_counts_lines_recorded_more_than_moved_closed_with_both_ends_right(
     over_recorded.raise_checks(session, {movement_id: Decimal(305)})
     store = spools.store.id
     as_of = moments.moment(session, store)
-    count = ledger.record_count(
+    count = counts.record_count(
         session,
         uuid.uuid4(),
         admin.id,

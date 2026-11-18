@@ -20,7 +20,7 @@ from inventory_tng.models.stock import (
     OpenPackage,
 )
 from inventory_tng.models.volunteers import Volunteer
-from inventory_tng.stock import ledger, over_recorded
+from inventory_tng.stock import counts, over_recorded
 from inventory_tng.stock.ledger import Entry, Form, _more_written
 
 from helpers.over_recorded import bagged, checks, new_admin_id, recorded_then_changed
@@ -301,7 +301,7 @@ def test_the_reply_to_another_client_leaves_out_nothing_it_holds(
     """A count's key reused by a batch: nothing a volunteer recorded."""
     key = uuid.uuid4()
     reason = add(session, AdjustmentReason(name=f"Reason {tag()}"))
-    ledger.record_adjustment(
+    counts.record_adjustment(
         session,
         key,
         new_admin_id(session),

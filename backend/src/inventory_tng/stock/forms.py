@@ -24,7 +24,8 @@ from inventory_tng.models.stock import (
 )
 from inventory_tng.stock import over_recorded, queries
 from inventory_tng.stock.adjustment_reasons import LOST, USED_UP
-from inventory_tng.stock.ledger import LOOSE, Form, ItemLines, repeated
+from inventory_tng.stock.counts import ItemLines
+from inventory_tng.stock.ledger import LOOSE, Form, repeated
 from inventory_tng.web.forms import (
     QUANTITY_MAX,
     RULES,

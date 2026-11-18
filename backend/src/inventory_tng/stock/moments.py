@@ -4,8 +4,7 @@ records said was at a place, or left in an open package, as of one.
 
 The ledger's core (stock/ledger.py) writes; these only read it, moment()
 holding its place's lock (lock_place) for the read alone. They import the
-core. The counts still in stock/ledger.py import these from inside their
-functions.
+core.
 """
 
 from collections.abc import Collection, Sequence

@@ -11,8 +11,8 @@ from sqlalchemy.orm import Session
 
 from inventory_tng.models.admins import Admin
 from inventory_tng.models.stock import AdjustmentReason, LedgerTransaction, OpenPackage
+from inventory_tng.stock import counts, moments
 from inventory_tng.stock import forms as stock_forms
-from inventory_tng.stock import ledger, moments
 from inventory_tng.stock.ledger import LOOSE, Entry, Form
 
 from helpers.markup import text
@@ -30,7 +30,7 @@ def test_a_count_by_form_finds_and_loses_form_by_form() -> None:
         (CABLE, open_form(OPEN), Decimal(120)),
         (CABLE, LOOSE, Decimal(40)),
     ]
-    found, lost = ledger.count_corrections(counted, then)
+    found, lost = counts.count_corrections(counted, then)
     assert found == [Entry(CABLE, Decimal(40), LOOSE, LOOSE)]
     assert lost == [Entry(CABLE, Decimal(305), SEALED, LOOSE)]
 
@@ -48,7 +48,7 @@ def test_record_count_by_form(session: Session, spools: Spools) -> None:
         (cable, Form(open_package_id=made.id), Decimal(250)),
         (cable, LOOSE, Decimal(20)),
     ]
-    done = ledger.record_count(
+    done = counts.record_count(
         session, uuid.uuid4(), counter(session), store, [], as_of, by_form=lines
     )
     assert (done.differed, done.moved) == (True, {})
@@ -57,7 +57,7 @@ def test_record_count_by_form(session: Session, spools: Spools) -> None:
         (store, None, None): 20,
     }
     with breaks(session, "movement_item_once"):
-        ledger.record_count(
+        counts.record_count(
             session,
             uuid.uuid4(),
             counter(session),
@@ -67,7 +67,7 @@ def test_record_count_by_form(session: Session, spools: Spools) -> None:
             by_form=lines[:1],
         )
     with breaks(session, "movement_item_once"):
-        ledger.record_count(
+        counts.record_count(
             session,
             uuid.uuid4(),
             counter(session),
@@ -84,7 +84,7 @@ def test_an_opening_while_counting_by_form_asks_again(
     store, cable = spools.store.id, spools.cable.id
     as_of = moments.moment(session, store)
     spools.opened()
-    done = ledger.record_count(
+    done = counts.record_count(
         session,
         uuid.uuid4(),
         counter(session),

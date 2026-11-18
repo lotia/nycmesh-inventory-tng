@@ -25,13 +25,12 @@ from inventory_tng.models.places import Location
 from inventory_tng.models.stock import AdjustmentReason, LedgerTransaction, Movement
 from inventory_tng.scan.batch_schemas import BodyRefusedReply
 from inventory_tng.stock.balance import balance, countable, retired_places_holding_stock
+from inventory_tng.stock.counts import record_adjustment, record_count
 from inventory_tng.stock.ledger import (
     insert_transaction,
     line_breaks,
     lines_break,
     on_order_after,
-    record_adjustment,
-    record_count,
     repeated,
     retired_sides,
     whole_enough,

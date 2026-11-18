@@ -27,6 +27,7 @@ from inventory_tng.models.stock import AdjustmentReason, LedgerTransaction, Move
 from inventory_tng.places import locations
 from inventory_tng.site_settings.forms import REASON_TAKEN
 from inventory_tng.site_settings.paths import SETTINGS
+from inventory_tng.stock.counts import record_adjustment, record_count
 from inventory_tng.stock.counts_routes import COUNT_KIND
 from inventory_tng.stock.forms import (
     FOUND_OR_OFF,
@@ -38,11 +39,7 @@ from inventory_tng.stock.forms import (
     lines,
     named_twice,
 )
-from inventory_tng.stock.ledger import (
-    lock_place,
-    record_adjustment,
-    record_count,
-)
+from inventory_tng.stock.ledger import lock_place
 from inventory_tng.stock.moments import expected, moment
 from inventory_tng.stock.paths import ADJUSTMENTS, COUNTS, STOCK
 from inventory_tng.web.forms import ABOVE_ZERO, RULES, TYPE_A_NUMBER, WHOLE_UNITS
