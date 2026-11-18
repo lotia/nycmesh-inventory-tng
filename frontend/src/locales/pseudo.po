@@ -60,11 +60,11 @@ msgstr ""
 msgid "What's on the {name} now ({unit}), if you can tell"
 msgstr ""
 
-#: src/ScanPage.tsx
+#: src/OutboxList.tsx
 msgid "Dismiss"
 msgstr ""
 
-#: src/ScanPage.tsx
+#: src/OutboxList.tsx
 msgid "Recorded (transaction {transaction})."
 msgstr ""
 
@@ -383,7 +383,7 @@ msgstr ""
 msgid "Confirm discard"
 msgstr ""
 
-#: src/ScanPage.tsx
+#: src/OutboxList.tsx
 msgid "Carts from this device"
 msgstr ""
 
@@ -734,7 +734,7 @@ msgstr ""
 msgid "{name}: retired: taking only, so it can't be received."
 msgstr ""
 
-#: src/ScanPage.tsx
+#: src/OutboxList.tsx
 msgid "Sending…"
 msgstr ""
 
@@ -779,7 +779,7 @@ msgstr ""
 msgid "{n}. {words}"
 msgstr ""
 
-#: src/ScanPage.tsx
+#: src/OutboxList.tsx
 msgid "<0>Register this browser</0> to send what is waiting."
 msgstr ""
 
@@ -787,7 +787,7 @@ msgstr ""
 msgid "Pick your name."
 msgstr ""
 
-#: src/ScanPage.tsx
+#: src/OutboxList.tsx
 msgid "Held until you upgrade."
 msgstr ""
 

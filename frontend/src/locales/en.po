@@ -60,11 +60,11 @@ msgstr "a removed package or item"
 msgid "What's on the {name} now ({unit}), if you can tell"
 msgstr "What's on the {name} now ({unit}), if you can tell"
 
-#: src/ScanPage.tsx
+#: src/OutboxList.tsx
 msgid "Dismiss"
 msgstr "Dismiss"
 
-#: src/ScanPage.tsx
+#: src/OutboxList.tsx
 msgid "Recorded (transaction {transaction})."
 msgstr "Recorded (transaction {transaction})."
 
@@ -383,7 +383,7 @@ msgstr "{count} × {package}"
 msgid "Confirm discard"
 msgstr "Confirm discard"
 
-#: src/ScanPage.tsx
+#: src/OutboxList.tsx
 msgid "Carts from this device"
 msgstr "Carts from this device"
 
@@ -734,7 +734,7 @@ msgstr "Add these to cart"
 msgid "{name}: retired: taking only, so it can't be received."
 msgstr "{name}: retired: taking only, so it can't be received."
 
-#: src/ScanPage.tsx
+#: src/OutboxList.tsx
 msgid "Sending…"
 msgstr "Sending…"
 
@@ -779,7 +779,7 @@ msgstr "{amount} {unit} in all"
 msgid "{n}. {words}"
 msgstr "{n}. {words}"
 
-#: src/ScanPage.tsx
+#: src/OutboxList.tsx
 msgid "<0>Register this browser</0> to send what is waiting."
 msgstr "<0>Register this browser</0> to send what is waiting."
 
@@ -787,7 +787,7 @@ msgstr "<0>Register this browser</0> to send what is waiting."
 msgid "Pick your name."
 msgstr "Pick your name."
 
-#: src/ScanPage.tsx
+#: src/OutboxList.tsx
 msgid "Held until you upgrade."
 msgstr "Held until you upgrade."
 

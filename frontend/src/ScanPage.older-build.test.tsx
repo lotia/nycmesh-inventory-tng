@@ -29,6 +29,7 @@ import {
   NOT_KEPT as NOT_KEPT_PHRASE,
   SOMETHING,
 } from "./OlderList";
+import { CARTS_FROM_DEVICE, DISMISS } from "./OutboxList";
 import { ITEM_RETIRED, RESCAN as RESCAN_PHRASE } from "./older";
 import {
   type Body,
@@ -40,9 +41,7 @@ import {
 import { ADD_DIFFERENCE, IN_CART } from "./recorded";
 import {
   ADDED_BACK as ADDED_BACK_PHRASE,
-  CARTS_FROM_DEVICE,
   DISCARD_CART,
-  DISMISS,
   FROM,
   INSTALL_NUMBER,
   NOT_REMOVED as NOT_REMOVED_PHRASE,

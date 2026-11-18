@@ -222,3 +222,4 @@ The frontend's moves, both under `frontend/src/`, sorted the same way:
 | `ScanPage.tsx`: `loadCatalogue` | `catalogue.ts` |
 | `ScanPage.tsx`: `NoteSaid`, `AlertWords`, `Counted`, `ConfirmDiscard`, `keyedByWords`, `RULED_LIST`, `CAUTION_BOX` | `Notes.tsx` |
 | `ScanPage.tsx`: `OlderList`, with the words it says of each (`olderSaid`, `olderKind`, `olderWhere`, `olderWhen`) and its telemetry (`heldIn`, `recordOlder`) | `OlderList.tsx` |
+| `ScanPage.tsx`: `OutboxList`, with `RecordedElsewhere`, `useOnline` and `AddDifference` | `OutboxList.tsx` |

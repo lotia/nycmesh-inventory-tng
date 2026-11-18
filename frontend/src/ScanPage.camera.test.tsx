@@ -4,11 +4,11 @@ import { REMOVE } from "./CartLine";
 import { freshCart, KIND_WORDS, storeCart } from "./cart";
 import { FIND } from "./Finder";
 import { say } from "./i18n";
+import { DISMISS } from "./OutboxList";
 import { STORAGE_KEY as OUTBOX_KEY, Outbox } from "./outbox";
 import { DONE, POINT } from "./Scanner";
 import {
   COULD_NOT_LOAD,
-  DISMISS,
   FROM,
   NOTHING_IN_CART,
   SCAN_WITH_CAMERA,

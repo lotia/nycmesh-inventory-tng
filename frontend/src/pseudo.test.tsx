@@ -15,11 +15,12 @@ import { suggest } from "./combobox";
 import { say, speak } from "./i18n";
 import { messages as pseudo } from "./locales/pseudo.po";
 import { OpenPackageCard } from "./OpenPackageCard";
+import { HELD } from "./OutboxList";
 import { type Entry, Outbox, type Reason, type Recorded } from "./outbox";
 import { RegisterPage } from "./RegisterPage";
 import { guardRetire } from "./retire";
 import { Scanner } from "./Scanner";
-import { HELD, ScanPage } from "./ScanPage";
+import { ScanPage } from "./ScanPage";
 import { answering, deferred, json } from "./test-fetch";
 import {
   KEY,

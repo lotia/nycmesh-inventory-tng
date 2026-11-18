@@ -29,6 +29,7 @@ import {
   SHOWS_NOTHING_LEFT,
   WRONG_LENGTH,
 } from "./OpenPackageCard";
+import { DISMISS } from "./OutboxList";
 import {
   NO_ANSWER,
   NOT_RECORDED,
@@ -40,7 +41,6 @@ import {
 import {
   CHANGED_BEFORE_DISCARD,
   DISCARD_CART,
-  DISMISS,
   FROM,
   NOT_KEEPING as NOT_KEEPING_PHRASE,
   NOT_SENT,
