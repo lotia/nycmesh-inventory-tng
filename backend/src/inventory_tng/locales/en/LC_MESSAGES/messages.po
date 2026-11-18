@@ -1151,11 +1151,11 @@ msgstr ""
 msgid "Checked"
 msgstr ""
 
-#: src/inventory_tng/admin/reading_rules.py
+#: src/inventory_tng/catalogue/forms.py
 msgid "Choose how to read each one marked “Choose…” first."
 msgstr ""
 
-#: src/inventory_tng/admin/reading_rules.py
+#: src/inventory_tng/catalogue/forms.py
 msgid "Choose one of the readings offered."
 msgstr ""
 

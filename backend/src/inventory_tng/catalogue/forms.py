@@ -1,7 +1,9 @@
 """How the item pages' forms are read and checked: an item's or a
 package's name as it will be stored, the units in it to ask about, what
-to set, and what is wrong, in words, beside the field it is about. The
-handlers in admin/items.py read the request and pass the form's fields."""
+to set, and what is wrong, in words, beside the field it is about; and
+the readings chosen on the unit readings pages. The handlers in
+admin/items.py and admin/reading_rules.py read the request and pass the
+form's fields."""
 
 from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass, field
@@ -10,7 +12,7 @@ from decimal import Decimal
 import structlog
 from sqlalchemy.orm import Session
 
-from inventory_tng import items, units
+from inventory_tng import items, reading_rules, units
 from inventory_tng.core.phrases import Words, gettext, lazy_gettext
 from inventory_tng.models import (
     INTEGER_MAX,
@@ -325,3 +327,29 @@ def alias_problem(
     if other.id == item.id:
         return ALIAS_ITS_OWN[whose]
     return _retired(other, ALIAS_TAKEN[whose](other.name_shown))
+
+
+# The seeding page's field for each token's reading: this, then the token.
+PROPOSED = "reading:"
+CHOOSE = lazy_gettext("Choose how to read each one marked “Choose…” first.")
+CHOOSE_ONE = lazy_gettext("Choose one of the readings offered.")
+
+
+def seed_choices(
+    form: Mapping[str, str], made: Sequence[reading_rules.Proposal]
+) -> tuple[dict[str, units.Rule], bool]:
+    """The readings the seeding page sent, of those it proposed (`made`),
+    by token, and whether any was left not chosen."""
+    proposals = {proposal.found.key: proposal for proposal in made}
+    chosen: dict[str, units.Rule] = {}
+    unchosen = False
+    for key, value in form.items():
+        proposal = proposals.get(key.removeprefix(PROPOSED))
+        if not key.startswith(PROPOSED) or proposal is None:
+            continue
+        rule = chosen_rule(value, proposal.found.offered)
+        if rule is None:
+            unchosen = True
+        else:
+            chosen[proposal.found.key] = rule
+    return chosen, unchosen

@@ -27,6 +27,7 @@ from inventory_tng.admin.listing import (
 )
 from inventory_tng.admins.guards import AdminSignedIn, SignedIn
 from inventory_tng.catalogue import queries
+from inventory_tng.catalogue.forms import CHOOSE, CHOOSE_ONE, PROPOSED, seed_choices
 from inventory_tng.core.db import DbSession, refusal
 from inventory_tng.core.local_time import site_zone
 from inventory_tng.core.phrases import Words, gettext, lazy_gettext
@@ -46,10 +47,6 @@ router = APIRouter(include_in_schema=False)
 
 READINGS = f"{ADMIN}/unit-readings"
 SEED = f"{READINGS}/seed"
-# The seeding page's field for each token's reading: this, then the token.
-PROPOSED = "reading:"
-CHOOSE = lazy_gettext("Choose how to read each one marked “Choose…” first.")
-CHOOSE_ONE = lazy_gettext("Choose one of the readings offered.")
 
 READING_SAVED = lazy_gettext("Saved. Every name with it is read so now.")
 READING_DELETED = lazy_gettext(
@@ -347,18 +344,7 @@ def accept(
     one, at = bool(form.get("one")), whole(form.get("at", ""), 0, INTEGER_MAX) or 0
     rules = models.reading_rules(session)
     made = _proposals(session)
-    proposals = {proposal.found.key: proposal for proposal in made}
-    chosen: dict[str, units.Rule] = {}
-    unchosen = False
-    for key, value in form.items():
-        proposal = proposals.get(key.removeprefix(PROPOSED))
-        if not key.startswith(PROPOSED) or proposal is None:
-            continue
-        rule = chosen_rule(value, proposal.found.offered)
-        if rule is None:
-            unchosen = True
-        else:
-            chosen[proposal.found.key] = rule
+    chosen, unchosen = seed_choices(form, made)
     if unchosen:
         return _seed_page(
             request,
