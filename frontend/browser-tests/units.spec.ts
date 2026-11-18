@@ -5,7 +5,7 @@
  * Here for the page that asks, which no link leads to, so the crawl never
  * checks it against the policy (policy.ts). What is asked and offered,
  * "Not right?", the reading rules' list and the seeding page the backend
- * tests check (test_admin_items_units.py, test_reading_rules.py).
+ * tests check (test_items_routes_units.py, test_reading_rules.py).
  *
  * Rules are kept by the unit as typed after a number, for every test at
  * once, so each browser's test reads a unit of its own (UNITS), which no

@@ -1,5 +1,5 @@
 """What the tests of items share: those of the administrators' item
-pages (tests/test_admin_items_*.py) and of reading rules."""
+pages (tests/catalogue/test_items_routes_*.py) and of reading rules."""
 
 from datetime import UTC, datetime
 from decimal import Decimal

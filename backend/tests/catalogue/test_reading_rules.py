@@ -36,7 +36,7 @@ from inventory_tng.web.listing import folded
 from helpers.concurrency import Committed
 from helpers.items import new_item
 from helpers.markup import links, options, read, row_links, text
-from helpers.queries import counting
+from helpers.query_counts import counting
 from helpers.rows import (
     add,
     breaks,

@@ -27,7 +27,7 @@ from inventory_tng.stock.ledger import Entry, Form
 from inventory_tng.web import formatting
 
 from helpers.markup import links, read, text
-from helpers.queries import counting
+from helpers.query_counts import counting
 from helpers.rows import add, tag
 from helpers.stock import URL, Spools, cut, length, report
 

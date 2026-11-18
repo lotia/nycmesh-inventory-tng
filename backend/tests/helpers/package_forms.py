@@ -1,5 +1,5 @@
 """What the tests of sealed and open packages share
-(tests/test_package_forms_*.py)."""
+(tests/stock/test_package_forms_*.py)."""
 
 from decimal import Decimal
 

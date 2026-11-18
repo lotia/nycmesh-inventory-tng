@@ -1,13 +1,13 @@
-"""The catalogue's rules of more than one condition, as functions of plain
-values: every way each can be broken, with no database. That each domain function calls its rules,
-under the catalogue lock, is test_models.py's and test_requests_at_once.py's
-to show, on PostgreSQL."""
+"""A location's rules of more than one condition (places/locations.py), as
+functions of plain values: every way each can be broken, with no database.
+That each domain function calls its rules, under the catalogue lock, is
+models/test_models.py's and across/test_requests_at_once.py's to show, on
+PostgreSQL."""
 
 import pytest
 
 from inventory_tng.places import locations
 from inventory_tng.places.locations import Parent
-from inventory_tng.volunteers import volunteers
 
 STORE, AREA, VAN = Parent("store", True), Parent("area", True), Parent("vehicle", True)
 
@@ -56,21 +56,3 @@ def test_the_tree_has_no_cycles(moving: int, under: int, broken: str | None) -> 
 def test_a_cycle_already_there_ends_the_walk() -> None:
     """Never made, but the walk must not go round it for ever."""
     assert locations.no_cycle({1: 2, 2: 1, 3: None}, 3, 1) is None
-
-
-@pytest.mark.parametrize(
-    ("merged_in", "custody", "broken"),
-    [
-        (False, False, None),
-        (True, False, "volunteer_merge_target"),
-        (False, True, "location_custody_volunteer"),
-        # Those merged in are named first, as the page says to move them.
-        (True, True, "volunteer_merge_target"),
-    ],
-)
-def test_a_volunteer_leaves_once_nothing_points_at_them(
-    merged_in: bool, custody: bool, broken: str | None
-) -> None:
-    assert (
-        volunteers.leaving(others_merged_in=merged_in, holds_custody=custody) == broken
-    )

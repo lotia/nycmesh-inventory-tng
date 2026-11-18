@@ -2,7 +2,7 @@
  * A list's headings and "Show 25 · 50 · 100 · All" work without
  * JavaScript, as links, and a heading's link is a tap target of 44 px
  * (docs/decisions/0019, Lists). Which rows each shows, and in what order,
- * the backend tests check (test_admin_items_list.py).
+ * the backend tests check (test_items_routes_list.py).
  */
 import { expect } from "@playwright/test";
 import { test } from "./policy";

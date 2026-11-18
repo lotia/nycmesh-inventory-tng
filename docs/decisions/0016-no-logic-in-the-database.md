@@ -80,7 +80,7 @@ lock's, and each table's protection was in four lists nothing tied together
   (`db.protection` in `__table_args__`): its owner module, the lock a write
   holds (`"catalogue"`, `"row"` or none) and whether it has history; and on
   a column, `secret`, `not_a_change` or `row_lock_only`. The guard, history
-  and `tests/test_write_owners.py` read `Base.metadata`.
+  and `tests/across/test_write_owners.py` read `Base.metadata`.
 - **One flush guard** replaces the catalogue lock's: every write to a table
   whose protection names a lock holds it; `db.py` gives the rules. The
   static test is kept for what the guard cannot see: where a row was made,

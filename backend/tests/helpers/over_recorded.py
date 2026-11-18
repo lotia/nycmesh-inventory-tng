@@ -1,5 +1,5 @@
 """What the tests of lines recorded with more than was moved share
-(tests/test_over_recorded_*.py)."""
+(tests/stock/test_over_recorded_*.py)."""
 
 import re
 import uuid

@@ -39,9 +39,9 @@ decided the structure below on 2026-11-17.
   the pages its routes render and the partials only its pages include.
   Layouts and partials more than one feature uses, and the pages `web/`
   renders, stay at the top (Ali, 2026-11-18, inventory-tng-h657.2). A
-  test in `backend/tests/test_import_directions.py` checks that only its
-  feature uses a feature's folder, and that what sits at the top is
-  shared.
+  test in `backend/tests/codebase/test_import_directions.py` checks that
+  only its feature uses a feature's folder, and that what sits at the top
+  is shared.
 - **`web/`** holds what every server-rendered page shares; **`core/`**
   holds plumbing, such as settings, db, history, logs, telemetry and mail.
   Core means plumbing, not business rules.
@@ -74,7 +74,8 @@ decided the structure below on 2026-11-17.
   the same code (`core/entry_point.py`), so the two cannot drift. Modules
   in `src/` that a tool uses, such as `core/local_env.py` and
   `catalogue/units.py`, have no `python -m` path of their own.
-- **Imports go one way**, held by `backend/tests/test_import_directions.py`:
+- **Imports go one way**, held by
+  `backend/tests/codebase/test_import_directions.py`:
   - rules, queries and forms import neither FastAPI nor `web/`, but for
     `web/formatting.py` and `web/forms.py`, which import neither
     themselves (inventory-tng-atmx.2, inventory-tng-atmx.7);
@@ -277,6 +278,61 @@ Later renamed:
 | Old path | New path |
 | --- | --- |
 | `admin/once.ts` | `admin/single-use-forms.ts`, with `ONCE_FIELD` as `SINGLE_USE_FIELD` |
+
+In `backend/tests/`, these tests moved whole into the folder of what
+they test (Amendment: names, below) and kept their names:
+
+| Folder | Old paths |
+| --- | --- |
+| `across/` | `test_edit_forms.py`, `test_locking.py`, `test_names_shown.py`, `test_notices.py`, `test_query_counts.py`, `test_requests_at_once.py`, `test_retired_records.py`, `test_write_owners.py` |
+| `admins/` | `test_break_glass.py`, `test_recover.py`, `test_totp_keys.py` |
+| `catalogue/` | `test_accent_search.py`, `test_reading_rules.py`, `test_unit_readings.py`, `test_units.py` |
+| `codebase/` | `test_artifact_links.py`, `test_compose_app.py`, `test_compose_task.py`, `test_contributing.py`, `test_dependencies.py`, `test_import_directions.py`, `test_podman_exec_oom.py`, `test_test_imports.py`, `test_webkit_container.py` |
+| `core/` | `test_connections.py`, `test_database_role.py`, `test_health.py`, `test_history.py`, `test_local_env.py`, `test_local_time.py`, `test_log_redaction.py`, `test_logs.py`, `test_mail.py`, `test_masking.py`, `test_phrases.py`, `test_rate_limits.py`, `test_request_logging.py`, `test_settings.py`, `test_telemetry.py`, `test_trace_redaction.py` |
+| `devices/` | `test_devices.py` |
+| `devtools/` | `test_seed.py`, `test_suite_report.py` |
+| `models/` | `test_fold_reference.py`, `test_migrations.py`, `test_models.py` |
+| `scan/` | `test_batch_schema.py`, `test_page_builds.py` |
+| `site_settings/` | `test_scan_settings.py` |
+| `stock/` | `test_ledger.py`, `test_length_checks.py`, `test_over_recorded_closed.py`, `test_over_recorded_counted_ends.py`, `test_over_recorded_mark_checked.py`, `test_over_recorded_moved_whole.py`, `test_over_recorded_refused.py`, `test_over_recorded_reply.py`, `test_over_recorded_sealed_end.py`, `test_over_recorded_settled.py`, `test_package_forms_batches.py`, `test_package_forms_counts.py`, `test_package_forms_openings.py`, `test_package_forms_rules.py`, `test_package_forms_stock.py`, `test_package_forms_used_up.py` |
+| `web/` | `test_error_pages.py`, `test_security_headers.py`, `test_single_use_forms.py` |
+
+These were renamed, or split, as they moved:
+
+| Old path | New path |
+| --- | --- |
+| `helpers/categories.py` | `helpers/suite_categories.py` |
+| `helpers/pages.py` | `helpers/swept_pages.py` |
+| `helpers/queries.py` | `helpers/query_counts.py` |
+| `test_account.py` | `admins/test_account_routes.py` |
+| `test_admin_admins.py` | `admins/test_admins_routes.py` |
+| `test_admin_categories.py` | `catalogue/test_categories_routes.py` |
+| `test_admin_counts.py` | `stock/test_counts_routes.py` |
+| `test_admin_devices.py` | `devices/test_devices_routes.py` |
+| `test_admin_home.py` | `admins/test_home_routes.py` |
+| `test_admin_items_aliases.py` | `catalogue/test_items_routes_aliases.py` |
+| `test_admin_items_editing.py` | `catalogue/test_items_routes_editing.py` |
+| `test_admin_items_list.py` | `catalogue/test_items_routes_list.py` |
+| `test_admin_items_packages.py` | `catalogue/test_items_routes_packages.py` |
+| `test_admin_items_units.py` | `catalogue/test_items_routes_units.py` |
+| `test_admin_labels.py` | `labels/test_labels_routes.py` |
+| `test_admin_locations.py` | `places/test_locations_routes.py` |
+| `test_admin_settings.py` | `site_settings/test_site_settings_routes.py` |
+| `test_admin_stock.py` | `stock/test_stock_routes.py` |
+| `test_admin_volunteers.py` | `volunteers/test_volunteers_routes.py` |
+| `test_bundle.py` | `web/test_frontend_bundle.py` |
+| `test_catalogue.py` | `scan/test_catalogue_api.py` |
+| `test_catalogue_contexts.py` | `codebase/test_phrase_contexts.py` |
+| `test_catalogue_rules.py` | `places/test_locations.py`, its locations' rules; `volunteers/test_volunteers.py`, its volunteer's |
+| `test_categories.py` | `test_suite_categories.py` |
+| `test_dev_database.py` | `devtools/test_database.py` |
+| `test_devtools.py` | `devtools/test_main.py` |
+| `test_list_control.py` | `web/test_listing.py` |
+| `test_openapi.py` | `devtools/test_write_api_schema.py` |
+| `test_page_telemetry.py` | `scan/test_page_telemetry_api.py` |
+| `test_sign_in.py` | `admins/test_sign_in_routes.py` |
+| `test_sign_in_models.py` | `models/test_admins.py` |
+| `test_stacks.py` | `devtools/test_stack.py` |
 
 ## Amendment: names (2026-11-18)
 

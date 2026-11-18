@@ -47,7 +47,6 @@ from databases import (
     refused_connection,
 )
 from helpers.apps import new_app, on_session
-from helpers.categories import marked_against_its_needs, needs_database
 from helpers.clone_files import text_files
 from helpers.concurrency import LOCK_TIMEOUT, Committed, delete_made, newest_ids
 from helpers.devices import new_device
@@ -56,6 +55,7 @@ from helpers.pools import checked_out
 from helpers.rows import add, rolled_back
 from helpers.sign_in import TOTP_KEY, new_admin, sign_in_with
 from helpers.stock import Place, Spools
+from helpers.suite_categories import marked_against_its_needs, needs_database
 
 # structlog's lines go through the standard library, where caplog sees them.
 configure_structlog()
@@ -84,7 +84,7 @@ def no_settings_from_the_shell(
 ) -> Iterator[None]:
     """A developer's OTEL_*, LOG_* and app settings must not reach the tests,
     nor this clone's frontend/dist: apps find no scan page build unless a
-    test gives one (test_bundle), as in CI's backend job, which has none.
+    test gives one (test_frontend_bundle), as in CI's backend job, which has none.
     Session-scoped, so it runs before every module-scoped fixture too."""
     with pytest.MonkeyPatch.context() as monkeypatch:
         monkeypatch.setattr(
@@ -410,7 +410,7 @@ def _unchanged(engine: Engine, what: str, module: pytest.Module) -> Generator[No
 def _modules_using_the_database(session: pytest.Session) -> frozenset[str]:
     """The modules with a test that takes database_url, found once a run:
     the run's database, which the module check reads, not any database
-    (helpers.categories.needs_database), as own_database's are not it."""
+    (helpers.suite_categories.needs_database), as own_database's are not it."""
     return frozenset(
         item.module.__name__
         for item in session.items

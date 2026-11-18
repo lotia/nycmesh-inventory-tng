@@ -2,7 +2,8 @@
 migration), each failing write checked by the constraint it names, which
 is what describe_error() logs; and the app's, each refused through its domain
 function by the rule's name (db.RuleBroken), whose every case
-test_catalogue_rules.py tests without a database."""
+places/test_locations.py and volunteers/test_volunteers.py test without a
+database."""
 
 import dataclasses
 import unicodedata

@@ -54,14 +54,14 @@ is, read [README.md](README.md).
 10. **Development workflows are mise tasks**, in `mise.toml` or as scripts
     in `mise-tasks/`, each named in CONTRIBUTING.md as `mise run <task>`.
     Compose runs through `mise run compose --`, never a runtime's own compose
-    command. `backend/tests/test_contributing.py` enforces both.
+    command. `backend/tests/codebase/test_contributing.py` enforces both.
 11. **Never refer to an artifact** (a claude.ai artifact link, its id, or
     words like "the questions page") in beads, docs, decision records or
     code comments, unless the person asks. Artifacts are tools to guide the
     work, deleted when it is done. Write the decision itself, in words, with
     who decided and when, not as a choice's letter or a question's code.
-    `backend/tests/test_artifact_links.py` refuses artifact links and such
-    citations in the clone's files.
+    `backend/tests/codebase/test_artifact_links.py` refuses artifact links
+    and such citations in the clone's files.
 12. **Every file and module is clearly named and does one thing.** Its
     name says what it holds: a reader can guess the functions and classes
     inside from the name, and nothing inside surprises them. When a module

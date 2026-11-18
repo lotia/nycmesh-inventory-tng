@@ -6,7 +6,7 @@ from pathlib import Path
 
 import pytest
 
-TESTS = Path(__file__).parent
+TESTS = Path(__file__).parents[1]
 
 
 def shared_from(source: str) -> set[str]:

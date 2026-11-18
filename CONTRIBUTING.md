@@ -229,10 +229,10 @@ privileges). A migration that creates a table the app must not change
 revokes what it must not do there, as the initial migration does for the
 tables the app only adds to, those it never deletes from, and columns set
 only as a row is made (`READ_AND_ADD`, `NEVER_DELETED` and `UPDATED_ONLY`).
-`tests/test_database_role.py` lists those columns, so a new column the app
-cannot change fails there until listed. What a migration writes is not in
-the history. Migrations create no trigger, function or view: the rules are
-the app's, and `tests/test_models.py` fails on one.
+`tests/core/test_database_role.py` lists those columns, so a new column
+the app cannot change fails there until listed. What a migration writes is
+not in the history. Migrations create no trigger, function or view: the
+rules are the app's, and `tests/models/test_models.py` fails on one.
 
 ### History
 
@@ -241,7 +241,7 @@ history (see [The catalogue's rules](#the-catalogues-rules)), is written
 to `catalogue_history` as the session flushes, with who did it
 (`db.set_actor`). So write those tables through the ORM: `session.add`,
 an object's attributes, `session.delete`. A statement
-such as `update(Item)` is never recorded, and `tests/test_history.py`
+such as `update(Item)` is never recorded, and `tests/core/test_history.py`
 fails on one. The app may only add to the history.
 
 ### The catalogue's rules
@@ -263,8 +263,8 @@ PostgreSQL cannot check it, the model's own `@validates`, as
 
 Each model declares who writes its table, holding what, and whether it has
 history, with `db.protection`; `core/db.py` gives the rules, which the flush and
-`tests/test_write_owners.py` enforce. An owner is a domain module, never a
-page's, as `stock/adjustment_reasons.py` is; a settings row, made by its
+`tests/across/test_write_owners.py` enforce. An owner is a domain module,
+never a page's, as `stock/adjustment_reasons.py` is; a settings row, made by its
 migration, has none, and `scan_settings.change` is its one writer.
 `items.Fields` names every column an item's save sets, each required, so
 none is blanked by being left out. The ledger takes lines, not a mapping by
@@ -320,7 +320,7 @@ grouped by spaces as typed, its breaking spaces no-break
 the session flushes and when a reading rule changes (`items.reread`). A
 page or reply that names one reads `name_shown`; only a form's field
 reads `name`.
-`tests/test_query_counts.py` checks every page for it.
+`tests/across/test_query_counts.py` checks every page for it.
 
 Searches read a unit right after a number in one spelling, on the server
 and the scan page alike (decision 0021): `10 µF` is `10uF`, and so is a
@@ -393,11 +393,11 @@ rules by no administrator.
 Lock rows with `db.locked` (a select) or `db.get_locked` (`Session.get`),
 never `with_for_update` itself: they also read the rows again as locked,
 which a plain locking read does not do for a row already loaded. `core/db.py`
-says why; `tests/test_locking.py` fails on `with_for_update` anywhere else.
-Catalogue rows are locked with `db.locked_row` or `db.relock`, which take
-the catalogue lock first; `locked_row`'s docstring gives the order every
-change takes its locks in. A row is changed or deleted only once this
-transaction has locked it.
+says why; `tests/across/test_locking.py` fails on `with_for_update`
+anywhere else. Catalogue rows are locked with `db.locked_row` or
+`db.relock`, which take the catalogue lock first; `locked_row`'s docstring
+gives the order every change takes its locks in. A row is changed or
+deleted only once this transaction has locked it.
 
 A row an edit form shows is `models.base.Versioned`: every update adds one to
 its `edit_version`, but one only to columns no form shows (flagged
@@ -491,8 +491,8 @@ listed with what older builds left, to put back in the cart. One naming
 no build, from another client of the API, gets the 422.
 
 `backend/tests/batch_schema.json` keeps what the endpoint's schema
-accepts, and `backend/tests/test_batch_schema.py` fails on a change that
-accepts less, naming each way. A change that only accepts more fails too,
+accepts, and `backend/tests/scan/test_batch_schema.py` fails on a change
+that accepts less, naming each way. A change that only accepts more fails too,
 until the file is written again, so the next change is measured against
 what was deployed: `mise run regenerate-batch-schema` (from `backend/`:
 `uv run python -m tests.helpers.batch_schema`, and `--check` only
@@ -917,13 +917,13 @@ mise run check-catalogues    # fails while either is not current
 
 Each side has a test that renders its words in a pseudo-locale, every
 letter accented, and fails on a word left in plain English:
-`backend/tests/test_phrases.py` and `frontend/src/pseudo.test.tsx`. On
+`backend/tests/core/test_phrases.py` and `frontend/src/pseudo.test.tsx`. On
 the scan page, every component is in its `COVERED`, with names that are
 not English; add a part for a new component, or for a state of one that
 says something no part shows. On the server, every phrase named as a
 constant, alone or in a table such as `NOTICES`, is covered already; add
 a phrase said with values to `SAID_WITH_VALUES`, a page to its entry in
-`tests/helpers/pages.py`'s `PAGES`, as `worded`, which fetches it signed in
+`tests/helpers/swept_pages.py`'s `PAGES`, as `worded`, which fetches it signed in
 with every name in the database not English, or as `signed_out`, and a
 template no page there shows, or a branch of one, to `COVERED`.
 
@@ -952,7 +952,7 @@ Connections, below, says how many runs fit at once.
 
 The backend's code is grouped by feature and the frontend's by page, as
 docs/decisions/0023 says, which also says where a new file goes.
-`tests/test_import_directions.py` and Biome (`frontend/biome.json`)
+`tests/codebase/test_import_directions.py` and Biome (`frontend/biome.json`)
 refuse an import the wrong way, such as `core/` importing a feature or
 `shared/` importing a page's folder.
 
@@ -969,11 +969,10 @@ npm run coverage                 # Vitest, with coverage (npm test: without)
 Those are unit tests: Vitest runs the frontend's in a page it simulates
 (happy-dom), with no layout. The browser tests, in
 `frontend/browser-tests/`, are another kind: Playwright drives a real
-browser engine against the whole app,
-built frontend and all, from a database of their own
-(`backend/tests/browser_database.py`), at a phone's width, with a fake
-camera in Chromium that shows a seeded label. They check what
-only a real browser can, such as that no page scrolls sideways:
+browser engine against the whole app, built frontend and all, from a
+database of their own (`backend/tests/browser_database.py`), at a phone's
+width, with a fake camera in Chromium that shows a seeded label. They check
+what only a real browser can, such as that no page scrolls sideways:
 
 ```sh
 mise run check-browser           # builds, starts the app, runs them
@@ -984,14 +983,13 @@ tests import `test` from `browser-tests/policy.ts`, or `own.ts`, which
 extends it, never from Playwright, which Biome refuses.
 
 The tests run at once, in several workers, against that one database, so
-none may change rows another reads: a test that changes data first makes
-the rows it changes, such as an item to move
-(`frontend/browser-tests/own.ts`).
+none may change rows another reads: a test that changes data first makes the
+rows it changes, such as an item to move (`frontend/browser-tests/own.ts`).
 Every test shares one administrator's session, signed in once, so what
-another test confirmed in it holds: a test of what a session asks for
-first takes an administrator of its own (`ownAdmin`, there too).
-The crawl of every page (`phone-width.spec.ts`), which reads them all,
-runs in each browser before any other test starts.
+another test confirmed in it holds: a test of what a session asks for first
+takes an administrator of its own (`ownAdmin`, there too). The crawl of
+every page (`phone-width.spec.ts`), which reads them all, runs in each
+browser before any other test starts.
 
 They run in Chromium; also in WebKit, Safari's engine, in CI and with
 `PLAYWRIGHT_WEBKIT=1`. `mise run setup-browsers` installs any that is
@@ -1046,29 +1044,28 @@ mise run check-toml     # taplo: lint and formatting (mise run fix-toml formats)
 mise run check-catalogues  # both sides' catalogues are current (Phrases)
 ```
 
-Each test run creates a database of its own on that server and drops it at
-the end; a run that was killed before it could is dropped by a later one.
-It makes the two roles first if the server lacks them. During the tests,
-`DATABASE_URL` and `MIGRATION_DATABASE_URL` point nowhere, so nothing
-reaches your own data: a test that needs the database takes the
-`database_url` fixture. A request test whose route reads no row, such as
-an error page or a page that sends someone signed out to sign in, takes
-`make_client_without_database` or
+Each test run creates a database of its own on that server and drops it at the
+end; a run that was killed before it could is dropped by a later one. It makes
+the two roles first if the server lacks them. During the tests, `DATABASE_URL`
+and `MIGRATION_DATABASE_URL` point nowhere, so nothing reaches your own data:
+a test that needs the database takes the `database_url` fixture. A request
+test whose route reads no row, such as an error page or a page that sends
+someone signed out to sign in, takes `make_client_without_database` or
 `make_app_without_database` instead, and runs without PostgreSQL: one whose
 request reaches for it fails. Tests log in as the app; one that needs what
 only the owner may do, such as `TRUNCATE`, takes `owner_session` or
 `owner_engine`. Write tests in pytest style. `tests/conftest.py` holds
 fixtures, hooks and what only they use; what tests share besides is in
-`tests/helpers/`, which they import from, never from conftest.py or from
-one another. A test reads a page's HTML with `tests/helpers/markup.py`,
-which parses it with BeautifulSoup and lxml (a link's words and address,
-a button's class), not by matching its tags as text, unless the exact
-markup is the point, such as escaping or a no-break space, and says so.
+`tests/helpers/`, which they import from, never from conftest.py or from one
+another. A test reads a page's HTML with `tests/helpers/markup.py`, which
+parses it with BeautifulSoup and lxml (a link's words and address, a button's
+class), not by matching its tags as text, unless the exact markup is the
+point, such as escaping or a no-break space, and says so.
 
 Write a rule of more than one condition as a function of plain values,
 such as a map of each place's parent, that returns the rule broken or
 nothing, and test every way it can be broken without the database
-(`tests/test_catalogue_rules.py`). Test on PostgreSQL what only it can
+(`tests/places/test_locations.py`). Test on PostgreSQL what only it can
 show: that the function making a change refuses it by the rule's name,
 once per rule; constraints, indexes and privileges; and, for each rule
 that reads other rows, two changes at once, the second waiting, then
@@ -1087,49 +1084,53 @@ ledger, takes `own_database`, a migrated database for it alone. A test, or
 a module through its module-scoped fixtures, that leaves any row added,
 changed or deleted fails, named by `leaves_the_database_as_it_was` in
 conftest.py.
-`tests/test_requests_at_once.py` and `tests/test_locking.py` hold tests of
-requests at the same time, on connections that really commit, marked by
-hand with what they are about (the first one's docstring), apart from what
-they need: `uv run pytest -m concurrency` runs only those, and
-`-m "not end_to_end"` skips the ones through the whole app. Both are
-`database` tests too, which a test checks.
+`tests/across/test_requests_at_once.py` and `tests/across/test_locking.py`
+hold tests of requests at the same time, on connections that really
+commit, marked by hand with what they are about (the first one's
+docstring), apart from what they need: `uv run pytest -m concurrency`
+runs only those, and `-m "not end_to_end"` skips the ones through the
+whole app. Both are `database` tests too, which a test checks.
 
 A test's own sessions write rows freely to set up what it tests, but the
 app's requests on them meet the lock guard (`db.protection`) as in
 production: a route that changes a row it did not lock fails its test
 (`tests/helpers/apps.py`).
 
-`tests/test_query_counts.py` loads each administrator's page, and the scan
-page's catalogue, with one row of what it lists and with eleven, and fails
+`tests/across/test_query_counts.py` loads each administrator's page, and
+the scan page's catalogue, with one row of what it lists and with eleven, and fails
 if the second sends more statements: a page reading row by row. It also
 fails unless the page, past its masthead, is longer with eleven, and grows
 when the page's own `more` adds one row to the first. A new GET route
 under `/admin` fails there until it has an entry in
-`tests/helpers/pages.py`'s `PAGES`, saying how to add one more of what it
+`tests/helpers/swept_pages.py`'s `PAGES`, saying how to add one more of what it
 lists (`more`) or why it lists nothing that grows (`uncounted`), and where
 `test_phrases.py` reads its words or why it doesn't. Both read worlds built
 once a module, each in a database of its own, each test in a transaction
-rolled back after it. `tests/helpers/queries.py` counts a request's
+rolled back after it. `tests/helpers/query_counts.py` counts a request's
 statements for a test of its own.
+
+### Where tests go
+
+`backend/tests/` mirrors the source tree. Any folder under it with no
+counterpart in the source has its own short `README.md` saying what it holds.
 
 ### Connections
 
 Each checkout's tests, apps and browser tests use its own stack's
 PostgreSQL, which allows 400 connections (`compose.yaml`), less 3 kept for
 the superuser. A whole test run, measured over 8 processes, holds about 70
-at once, all processes together; one process, and one database, held at
-most about 21; a dev app up to 20, as does the browser tests' server. So a
+at once, all processes together; one process, and one database, held at most
+about 21; a dev app up to 20, as does the browser tests' server. So a
 checkout's checks and its app fit with room to spare, and so would three
 checkouts sharing `inventory-tng` (Local settings). Each test database
 allows twice the most measured on one (`TEST_CONNECTION_LIMIT` in
-`tests/databases.py`), so a process that leaks connections is refused at
-its own database, not the server's limit, and a test that fails
-for either limit says which. Long before a leak reaches that limit, a test
-that ends with a connection it took from any pool and kept errors at its
-teardown, named by `keeps_its_connections` in conftest.py. Each checkout's
-development database allows 30 (`backend/devtools/database.py`): one
-app, and a migration or seed beside it, so it cannot starve the tests
-beside it.
+`tests/databases.py`), so a process that leaks connections is refused at its
+own database, not the server's limit, and a test that fails for either limit
+says which. Long before a leak reaches that limit, a test that ends with a
+connection it took from any pool and kept errors at its teardown, named by
+`keeps_its_connections` in conftest.py. Each checkout's development database
+allows 30 (`backend/devtools/database.py`): one app, and a migration or seed
+beside it, so it cannot starve the tests beside it.
 
 ### Measuring the catalogue
 
@@ -1151,13 +1152,12 @@ mise run test-report         # about five minutes
 
 It runs each suite, the backend's twice and each frontend test alone, and
 writes `.local/test-report/report.md`: each suite's tests, time and
-coverage, its slowest tests, how many tests cover nothing that no other
-test does, the groups of tests that cover exactly the same, and the
-longest test files. Beside it, a table per suite gives each test's
-seconds, what it covers, what it alone covers (what removing it would
-lose) and its group. Use it to find tests to merge or speed up; the
-module's docstring (`backend/devtools/suite_report.py`) says how each part
-is measured.
+coverage, its slowest tests, how many tests cover nothing that no other test
+does, the groups of tests that cover exactly the same, and the longest test
+files. Beside it, a table per suite gives each test's seconds, what it
+covers, what it alone covers (what removing it would lose) and its group.
+Use it to find tests to merge or speed up; the module's docstring
+(`backend/devtools/suite_report.py`) says how each part is measured.
 
 ### Coverage
 
@@ -1165,9 +1165,9 @@ is measured.
 
 - **the whole falls below its floor**: 94% of the backend's lines and
   branches, its developer tools among them (`fail_under` in
-  `backend/pyproject.toml`), and the frontend's
-  floors in `frontend/vite.config.ts`. Vitest raises those as coverage
-  rises: commit that change with yours.
+  `backend/pyproject.toml`), and the frontend's floors in
+  `frontend/vite.config.ts`. Vitest raises those as coverage rises: commit
+  that change with yours.
 - **any line you added or changed is not run by a test**, or a branch on it
   is taken only one way (`[tool.diff_cover]` in `backend/pyproject.toml`).
   `mise run check-changed-lines` compares with `origin/main`, so run it
@@ -1200,8 +1200,8 @@ after it.
   name, and a series released only as betas, such as OpenTelemetry's
   instrumentation, floors at the minor's first beta (`>=0.66b0`).
   A new anyascii, or a Python with a newer Unicode, fails
-  `tests/test_fold_reference.py`, with the difference: the file's first
-  line names both versions. If you take it, run
+  `tests/models/test_fold_reference.py`, with the difference: the file's
+  first line names both versions. If you take it, run
   `mise run regenerate-fold-reference` (from `backend/`:
   `uv run python -m tests.helpers.fold_reference`, and `--check` only
   compares). If a spelling changed, also add a migration that folds again

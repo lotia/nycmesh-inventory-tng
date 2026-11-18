@@ -17,8 +17,8 @@ from sqlalchemy.orm import Session
 from inventory_tng.core.db import lock_catalogue
 from inventory_tng.models.catalogue import Item, ItemPackage
 
-from helpers.pages import CATALOGUE, PAGES, Built, More, Page, Path, built, path
-from helpers.queries import counting
+from helpers.query_counts import counting
+from helpers.swept_pages import CATALOGUE, PAGES, Built, More, Page, Path, built, path
 
 # A world with one of what each page lists, and one with eleven, each built
 # once for the module. Each holds every page's more, so a page's own more is
@@ -48,7 +48,7 @@ def test_every_admin_page_is_measured(
     }
     assert pages, "no admin pages found: the routes are read wrongly"
     unmeasured = pages - PAGES.keys()
-    assert not unmeasured, f"add these to helpers.pages.PAGES: {unmeasured}"
+    assert not unmeasured, f"add these to helpers.swept_pages.PAGES: {unmeasured}"
     gone = PAGES.keys() - pages - {CATALOGUE}
     assert not gone, f"no such pages: {gone}"
     for route, page in PAGES.items():

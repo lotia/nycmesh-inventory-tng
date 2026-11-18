@@ -5,7 +5,7 @@ CONTRIBUTING.md, Running the checks."""
 
 import pytest
 
-from helpers.categories import marked_against_its_needs, needs_database
+from helpers.suite_categories import marked_against_its_needs, needs_database
 
 
 @pytest.mark.parametrize(

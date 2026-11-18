@@ -5,7 +5,7 @@ database. The rest is on PostgreSQL: rows written in the same transaction,
 as to_jsonb() wrote them before, and only ever added to.
 
 The app's source is read with Python's ast module (in the tests only, as
-tests/test_locking.py does) for statements that write to a table with
+tests/across/test_locking.py does) for statements that write to a table with
 history, which skip the flush and so its history. A check of the source
 rather than of statements as they run covers code no test reaches, and
 leaves tests free to write with statements on purpose.

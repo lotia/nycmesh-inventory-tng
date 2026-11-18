@@ -67,7 +67,7 @@ from inventory_tng.web.navigation import retired_holding
 from inventory_tng.web.pages import templates
 
 from helpers import markup
-from helpers.pages import NOT_ENGLISH, PAGES, Built, built, path
+from helpers.swept_pages import NOT_ENGLISH, PAGES, Built, built, path
 
 # Each letter accented, so English left out of the catalogue shows plain.
 ACCENTS = str.maketrans(

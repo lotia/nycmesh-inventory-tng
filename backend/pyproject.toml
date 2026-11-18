@@ -125,11 +125,14 @@ branch_coverage = true
 
 [tool.pytest]
 testpaths = ["tests"]
+# Test modules are imported by their path, so two folders may each hold a
+# test_<module>.py of one name (CONTRIBUTING.md, Where tests go).
+addopts = ["--import-mode=importlib"]
 # Where tests import helpers and databases from, and devtools (CONTRIBUTING.md).
 pythonpath = ["tests", "."]
 strict = true
 filterwarnings = ["error"]
-# What a test tests (tests/test_requests_at_once.py's docstring).
+# What a test tests (tests/across/test_requests_at_once.py's docstring).
 markers = [
     # What a test needs: database, worked out by tests/conftest.py, never
     # by hand; clone, by its module, and skipped in the image.
