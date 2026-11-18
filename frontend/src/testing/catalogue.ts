@@ -54,8 +54,7 @@ export const cable: Item = {
   retired_packages: [],
 };
 
-/** Accented, with its text folded as the server folds it
- * (models.search_text.fold). */
+/** Accented, its text folded as the server does (models.search_text.fold). */
 const cafe: Item = {
   ...cable,
   id: 102,

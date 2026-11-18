@@ -182,10 +182,9 @@ VERSIONED = (
                 # Resealing (admins/totp_keys.py) changes nothing anyone did.
                 "authenticator": {"last_step", "sealed_key", "key_version"},
             }
-            # Each edit form's row's (models.base.Versioned), which moves with
-            # every change, and each searched row's folded text
-            # (models.search_text.Searchable), which moves with what is
-            # searched.
+            # Each edit form's row's (models.base.Versioned), which moves
+            # with every change, and each searched row's folded text
+            # (models.search_text.Searchable), which moves with what is searched.
             | {table: {"edit_version"} for table in VERSIONED}
             | {
                 table: {"edit_version", "search_text", "folded_with"}
