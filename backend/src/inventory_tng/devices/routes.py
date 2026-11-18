@@ -129,7 +129,7 @@ def _list_page(
     return admin_page(
         request,
         signed,
-        "devices.html",
+        "devices/devices.html",
         {
             "title": SECTION_DEVICES,
             "here": DEVICES,
@@ -198,7 +198,7 @@ def make_code(
     return admin_page(
         request,
         signed,
-        "code_made.html",
+        "devices/code_made.html",
         {
             "title": NEW_CODE_TITLE,
             "back_link": (DEVICES, SECTION_DEVICES),
@@ -223,7 +223,7 @@ def code(
     return admin_page(
         request,
         signed,
-        "code.html",
+        "devices/code.html",
         {
             "title": found.name,
             "here": f"{CODES}/{found.id}",
@@ -248,7 +248,7 @@ def confirm_revoke_code(
     return admin_page(
         request,
         signed,
-        "code_revoke.html",
+        "devices/code_revoke.html",
         {
             "title": revoke_title(found.name),
             "here": f"{CODES}/{code_id}/revoke",
@@ -279,7 +279,7 @@ def _device_page(
     return admin_page(
         request,
         signed,
-        "device.html",
+        "devices/device.html",
         {
             "title": device.name,
             "here": f"{DEVICES}/{device.id}",
@@ -344,7 +344,7 @@ def revoke_device_page(
     return admin_page(
         request,
         signed,
-        "device_revoke_one.html",
+        "devices/device_revoke_one.html",
         {
             "title": revoke_title(device.name),
             "here": f"{DEVICES}/{device.id}/revoke",
@@ -428,7 +428,7 @@ def device_list(
     return admin_page(
         request,
         signed,
-        "device_list.html",
+        "devices/device_list.html",
         {
             "title": REGISTERED_DEVICES,
             "here": DEVICE_LIST,
@@ -476,7 +476,7 @@ def revoke_devices(
         return admin_page(
             request,
             signed,
-            "device_revoke.html",
+            "devices/device_revoke.html",
             {
                 "title": revoke_many_title(len(current)),
                 "here": BULK_REVOKE,

@@ -194,7 +194,7 @@ def waiting_view(waiting: int) -> str:
 
 
 def _views(waiting: int, only: Item | None) -> list[tuple[str, Words, str]]:
-    """The links between those waiting and those settled, for _views.html,
+    """The links between those waiting and those settled, for stock/_views.html,
     each of one item still if one (Ali, 2026-11-15, inventory-tng-73p)."""
     kept = query_string(only)
     return [
@@ -263,7 +263,7 @@ def settled_page(
     return admin_page(
         request,
         signed,
-        "over_recorded_settled.html",
+        "stock/over_recorded_settled.html",
         {
             "title": SETTLED_TITLE,
             "here": RECORDED_MORE_SETTLED,
@@ -317,7 +317,7 @@ def _page(
     return admin_page(
         request,
         signed,
-        "over_recorded.html",
+        "stock/over_recorded.html",
         {
             "title": TITLE,
             "here": OVER_RECORDED,

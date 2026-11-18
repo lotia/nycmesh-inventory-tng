@@ -32,7 +32,7 @@
   password.{% endtrans %}</p>
   <form method="post" action="{{ here }}/restore">
     {{ once_field() }}
-    {% if code_needed %}{% include "_code_field.html" %}{% endif %}
+    {% if code_needed %}{% include "admins/_code_field.html" %}{% endif %}
     <div class="actions"><button>{% trans %}Bring them back{% endtrans %}</button></div>
   </form>
 </section>
@@ -44,7 +44,7 @@
   later.{% endtrans %}</p>
   <form method="post" action="{{ here }}/retire">
     {{ once_field() }}
-    {% if code_needed %}{% include "_code_field.html" %}{% endif %}
+    {% if code_needed %}{% include "admins/_code_field.html" %}{% endif %}
     <div class="actions"><button>{% trans %}Retire{% endtrans %}</button></div>
   </form>
 </section>

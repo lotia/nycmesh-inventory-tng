@@ -171,7 +171,7 @@ def _page(title: LazyProxy, entry: str) -> Callable[[Request], Response]:
             return PlainTextResponse(str(NOT_BUILT), status_code=503)
         return templates.TemplateResponse(
             request,
-            "page.html",
+            "scan/page.html",
             {"title": title, "tags": page_tags, "brand_home": SCAN},
             # The page names this build's files, so it must not outlive it.
             headers={"Cache-Control": "no-cache"},

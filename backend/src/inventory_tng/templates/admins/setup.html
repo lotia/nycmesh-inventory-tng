@@ -20,7 +20,7 @@ invited from the administrator pages.{% endtrans %}</p>
     <input name="email" type="email" value="{{ values.get('email', '') }}" autocomplete="email">
     {% with name = "email" %}{% include "_field_problem.html" %}{% endwith %}
   </label>
-  <label>{% trans %}Password{% endtrans %} {% include "_password_hint.html" %}
+  <label>{% trans %}Password{% endtrans %} {% include "admins/_password_hint.html" %}
     <input name="password" type="password" autocomplete="new-password" minlength="{{ limits.password_min }}" required>
     {% with name = "password" %}{% include "_field_problem.html" %}{% endwith %}
   </label>
@@ -29,7 +29,7 @@ invited from the administrator pages.{% endtrans %}</p>
   </label>
   <fieldset>
     <legend>{% if totp_optional %}{% trans %}Authenticator (optional){% endtrans %}{% else %}{% trans %}Authenticator{% endtrans %}{% endif %}</legend>
-    {% include "_totp_fields.html" %}
+    {% include "admins/_totp_fields.html" %}
   </fieldset>
   <button class="primary">{% trans %}Set up{% endtrans %}</button>
 </form>

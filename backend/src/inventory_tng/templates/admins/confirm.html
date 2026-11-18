@@ -8,7 +8,7 @@ password.{% endtrans %}{% endif %}{% if retype %}
   {% for name, value in carried %}
   <input type="hidden" name="{{ name }}" value="{{ value }}">
   {% endfor %}
-  {% with code_totp = uses_totp, autofocus = true %}{% include "_code_field.html" %}{% endwith %}
+  {% with code_totp = uses_totp, autofocus = true %}{% include "admins/_code_field.html" %}{% endwith %}
   {% for name, label in retype %}
   <label>{{ label }}
     <input name="{{ name }}" type="password" autocomplete="new-password" required>

@@ -499,7 +499,7 @@ def _confirm_page(
     sent = {name for name, _ in carried}
     return page(
         request,
-        "confirm.html",
+        "admins/confirm.html",
         {
             "title": CONFIRM_TITLE,
             "uses_totp": signed.asks_code,

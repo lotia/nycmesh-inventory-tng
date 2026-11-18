@@ -120,7 +120,7 @@ def _list_page(
     return admin_page(
         request,
         signed,
-        "volunteers.html",
+        "volunteers/volunteers.html",
         {
             "title": SECTION_VOLUNTEERS,
             "undo": undo,
@@ -155,7 +155,7 @@ def _volunteer_page(
     return admin_page(
         request,
         signed,
-        "volunteer.html",
+        "volunteers/volunteer.html",
         {
             "title": volunteer.name,
             "here": f"{VOLUNTEERS}/{volunteer.id}",
@@ -348,7 +348,7 @@ def confirm_merge(
     return admin_page(
         request,
         signed,
-        "volunteer_merge.html",
+        "volunteers/volunteer_merge.html",
         {
             "title": merge_title(found.name, into.name),
             "here": f"{VOLUNTEERS}/{volunteer_id}/merge",

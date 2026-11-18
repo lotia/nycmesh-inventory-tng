@@ -215,7 +215,7 @@ def _checks_page(
     return admin_page(
         request,
         signed,
-        "length_checks.html",
+        "stock/length_checks.html",
         {
             "title": title,
             "here": LENGTHS,

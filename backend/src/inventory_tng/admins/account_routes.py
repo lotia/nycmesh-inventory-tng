@@ -83,7 +83,7 @@ def _account_page(
     left = accounts.recovery_codes_left(session, admin_id) if authenticators else 0
     return page(
         request,
-        "account.html",
+        "admins/account.html",
         {
             "title": ACCOUNT_TITLE,
             "admin": signed.admin,
@@ -252,7 +252,7 @@ def new_recovery_codes(
     notify.tell(signed.admin.email, signed.admin.id, mail.recovery_codes_made)
     return page(
         request,
-        "recovery_codes.html",
+        "admins/recovery_codes.html",
         {"title": RECOVERY_CODES_TITLE, "codes": codes, "admin": signed.admin},
     )
 

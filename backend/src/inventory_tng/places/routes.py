@@ -86,7 +86,7 @@ def _list_page(
     return admin_page(
         request,
         signed,
-        "locations.html",
+        "places/locations.html",
         {
             "title": SECTION_LOCATIONS,
             "undo": undo,
@@ -117,7 +117,7 @@ def _location_page(
     return admin_page(
         request,
         signed,
-        "location.html",
+        "places/location.html",
         {
             "title": location.name,
             "here": f"{LOCATIONS}/{location.id}",

@@ -10,12 +10,15 @@ inside functions count, as do relative ones.
 | routes_import_another_features_routes | links between features not through paths.py |
 
 Today's breaks are listed in BREAKS, which may only shrink: a new break
-fails, and so does one fixed but still listed.
+fails, and so does one fixed but still listed. The last test holds where
+templates sit: a feature's folder is used by that feature alone.
 """
 
 import ast
+import re
 from collections.abc import Callable, Mapping
 from importlib.util import resolve_name
+from pathlib import Path
 
 import pytest
 
@@ -269,3 +272,31 @@ def test_each_rule_finds_a_break(
     app = {name: ast.parse(text) for name, text in APP.items()}
     app[path] = ast.parse(source)
     assert CHECKS[rule](path, app) == breaks
+
+
+TEMPLATES = SOURCE / "templates"
+# A template named in Python, or in a template's include, extends or import.
+TEMPLATE_NAME = re.compile(r'"((?:[a-z_]+/)?[_a-z]+\.(?:html|svg))"')
+
+
+def feature_of(path: Path) -> str:
+    """The folder under templates/, or the package, that `path` is in; a
+    template at the top gives its own name."""
+    return path.relative_to(
+        TEMPLATES if path.is_relative_to(TEMPLATES) else SOURCE
+    ).parts[0]
+
+
+def test_a_features_templates_are_used_by_that_feature_alone() -> None:
+    """templates/ has a folder per feature, named as its package, used by
+    that feature's code and templates alone; what is shared is at the top
+    (docs/decisions/0023)."""
+    folders = {path.name for path in TEMPLATES.iterdir() if path.is_dir()}
+    features = {path.parent.name for path in SOURCE.glob("*/__init__.py")}
+    elsewhere = {
+        (str(user.relative_to(SOURCE)), name)
+        for user in [*modules(), *TEMPLATES.rglob("*.html")]
+        for name in TEMPLATE_NAME.findall(user.read_text())
+        if "/" in name and feature_of(user) != name.split("/")[0]
+    }
+    assert (folders - features, elsewhere) == (set(), set())

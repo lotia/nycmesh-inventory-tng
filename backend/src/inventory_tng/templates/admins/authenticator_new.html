@@ -5,7 +5,7 @@
 one up to carry on.{% endtrans %}</p>
 {% endif %}
 <form method="post" action="{{ paths.new_authenticator }}">
-  {% include "_totp_fields.html" %}
+  {% include "admins/_totp_fields.html" %}
   <button class="primary">{% trans %}Save{% endtrans %}</button>
 </form>
 {% endblock %}

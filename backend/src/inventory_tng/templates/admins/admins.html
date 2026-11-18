@@ -36,7 +36,7 @@
       <input name="email" type="email" value="{{ values.get('email', '') }}">
       {% with name = "email" %}{% include "_field_problem.html" %}{% endwith %}
     </label>
-    {% if code_needed %}{% include "_code_field.html" %}{% endif %}
+    {% if code_needed %}{% include "admins/_code_field.html" %}{% endif %}
     <button class="primary">{% trans %}Invite{% endtrans %}</button>
   </form>
 </section>
@@ -44,7 +44,7 @@
 {% if changes %}
 <section id="changes">
   <h2>{% trans %}Recent changes{% endtrans %}</h2>
-  {% include "_activity.html" %}
+  {% include "admins/_activity.html" %}
 </section>
 {% endif %}
 

@@ -237,7 +237,7 @@ def _counts_page(
     return admin_page(
         request,
         signed,
-        "counts.html",
+        "stock/counts.html",
         {
             "title": COUNTS_TITLE,
             "here": COUNTS,
@@ -370,7 +370,7 @@ def _count_page(
     return admin_page(
         request,
         signed,
-        "count.html",
+        "stock/count.html",
         {
             "title": count_title(place.name),
             "here": f"{COUNTS}/{place.id}",

@@ -101,7 +101,7 @@ def _list_page(
     return admin_page(
         request,
         signed,
-        "admins.html",
+        "admins/admins.html",
         {
             "title": SECTION_ADMINS,
             "here": ADMINS,
@@ -130,7 +130,7 @@ def _admin_page(
     return admin_page(
         request,
         signed,
-        "admin.html",
+        "admins/admin.html",
         {
             "title": other.username,
             "here": f"{ADMINS}/{other.id}",
@@ -160,7 +160,7 @@ def _link_page(
     return admin_page(
         request,
         signed,
-        "link_made.html",
+        "admins/link_made.html",
         {
             "title": link_title(other.username),
             "back_link": (ADMINS, SECTION_ADMINS),
@@ -257,7 +257,7 @@ def confirm_reset(
     return admin_page(
         request,
         signed,
-        "admin_reset.html",
+        "admins/admin_reset.html",
         {
             "title": reset_title(other.username),
             "here": f"{ADMINS}/{admin_id}/reset",

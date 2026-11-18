@@ -27,7 +27,7 @@
   <h2>{% trans %}Password{% endtrans %}</h2>
   {% with section_id="password" %}{% include "_notice.html" %}{% endwith %}
   <form method="post" action="{{ paths.account }}/password">
-    <label>{% trans %}New password{% endtrans %} {% include "_password_hint.html" %}
+    <label>{% trans %}New password{% endtrans %} {% include "admins/_password_hint.html" %}
       <input name="password" type="password" autocomplete="new-password" minlength="{{ limits.password_min }}" required>
       {% with name = "password" %}{% include "_field_problem.html" %}{% endwith %}
     </label>
@@ -93,7 +93,7 @@
   and asks for a code from your authenticator, not a recovery code.{% endtrans %}{% endif %}</p>
   <form method="post" action="{{ paths.account }}/recovery-codes">
     {{ once_field() }}
-    {% with code_totp = true, totp_only = true %}{% include "_code_field.html" %}{% endwith %}
+    {% with code_totp = true, totp_only = true %}{% include "admins/_code_field.html" %}{% endwith %}
     <div class="actions"><button>{% trans %}Make new recovery codes{% endtrans %}</button></div>
   </form>
 </section>

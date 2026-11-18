@@ -230,7 +230,7 @@ def test_every_page_names_items_and_packages_as_shown(
         page = json.dumps(reply, ensure_ascii=False)
     else:
         # A form's fields, and under a name's how its units typed are read
-        # (_units_read.html), as typed.
+        # (catalogue/_units_read.html), as typed.
         page = re.sub(r' value="[^"]*"', "", response.text)
         page = re.sub(r'<div class="hint">.*?</div>', "", page, flags=re.DOTALL)
     if route in NAMES_AS_TYPED:

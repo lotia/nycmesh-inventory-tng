@@ -65,7 +65,7 @@ def recorded_more_view(waiting: int) -> str:
 
 
 def stock_views(session: Session) -> list[tuple[str, Words, str]]:
-    """The stock pages' views, for the links between them (_views.html):
+    """The stock pages' views, for the links between them (stock/_views.html):
     by path, words and name. Recorded more says how many wait, even none
     (Ali, 2026-11-15, inventory-tng-73p)."""
     return [
@@ -197,7 +197,7 @@ def stock(
     return admin_page(
         request,
         signed,
-        "stock.html",
+        "stock/stock.html",
         {
             "title": SECTION_STOCK,
             "by": by,
@@ -305,7 +305,7 @@ def reorder(
     return admin_page(
         request,
         signed,
-        "reorder.html",
+        "stock/reorder.html",
         {
             "title": REORDER_TITLE,
             "stock_views": stock_views(session),
@@ -340,7 +340,7 @@ def needs_counting(
     return admin_page(
         request,
         signed,
-        "needs_counting.html",
+        "stock/needs_counting.html",
         {
             "title": NEEDS_COUNTING_TITLE,
             "stock_views": stock_views(session),

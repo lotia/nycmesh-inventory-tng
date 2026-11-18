@@ -117,7 +117,7 @@ def _setup_page(
     )
     return page(
         request,
-        "setup.html",
+        "admins/setup.html",
         {"title": SET_UP_TITLE, "values": values, "problems": problems or {}}
         | {"alert": alert}
         | totp,
@@ -126,7 +126,7 @@ def _setup_page(
 
 
 def _setup_off(request: Request) -> HTMLResponse:
-    return page(request, "setup.html", {"title": SET_UP_TITLE, "off": True}, 403)
+    return page(request, "admins/setup.html", {"title": SET_UP_TITLE, "off": True}, 403)
 
 
 def _totp_optional(session: DbSession) -> bool:
@@ -237,7 +237,7 @@ def _recovery_codes_page(
 ) -> HTMLResponse:
     return page(
         request,
-        "recovery_codes.html",
+        "admins/recovery_codes.html",
         {"title": RECOVERY_CODES_TITLE, "codes": codes, "admin": admin},
     )
 
@@ -255,7 +255,7 @@ def _sign_in_page(
 ) -> HTMLResponse:
     return page(
         request,
-        "sign_in.html",
+        "admins/sign_in.html",
         {
             "title": SIGN_IN_TITLE,
             "next": _local(next),
@@ -387,7 +387,7 @@ def _new_authenticator_page(
     )
     return page(
         request,
-        "authenticator_new.html",
+        "admins/authenticator_new.html",
         {
             "title": AUTHENTICATOR_TITLE,
             "admin": signed.admin,

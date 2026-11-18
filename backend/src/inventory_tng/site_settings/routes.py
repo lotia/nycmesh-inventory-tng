@@ -68,7 +68,7 @@ def _page(
     return admin_page(
         request,
         signed,
-        "settings.html",
+        "site_settings/settings.html",
         {
             "title": SECTION_SETTINGS,
             "here": SETTINGS,

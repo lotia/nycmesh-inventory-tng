@@ -124,7 +124,7 @@ def _rule_page(
     return admin_page(
         request,
         signed,
-        "reading_rule.html",
+        "catalogue/reading_rule.html",
         {
             "title": reading_title(rule.token),
             "here": f"{READINGS}/{rule.id}",
@@ -170,7 +170,7 @@ def list_readings(
     return admin_page(
         request,
         signed,
-        "reading_rules.html",
+        "catalogue/reading_rules.html",
         {
             "title": UNIT_READINGS,
             "here": READINGS,
@@ -291,7 +291,7 @@ def _seed_page(
     return admin_page(
         request,
         signed,
-        "reading_seed.html",
+        "catalogue/reading_seed.html",
         {
             "title": PROPOSE_TITLE,
             "here": SEED,

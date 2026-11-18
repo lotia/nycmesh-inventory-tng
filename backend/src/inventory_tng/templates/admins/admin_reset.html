@@ -9,6 +9,6 @@ for them to choose a new password. Every administrator is told.{% endtrans %}{% 
 typed one recently.{% endtrans %}{% endif %}</p>
 {% call confirm(here, _("Reset their sign-in"), keep, _("Keep it as it is")) %}
   {{ once_field() }}
-  {% if code_needed %}{% include "_code_field.html" %}{% endif %}
+  {% if code_needed %}{% include "admins/_code_field.html" %}{% endif %}
 {% endcall %}
 {% endblock %}

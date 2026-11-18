@@ -64,7 +64,7 @@ def _forgot_page(
 ) -> HTMLResponse:
     return page(
         request,
-        "forgot.html",
+        "admins/forgot.html",
         {
             "title": FORGOT_TITLE,
             "mail_on": request.app.state.settings.mail is not None,
@@ -125,7 +125,7 @@ def _reset_page(
     """The form for a usable link, or, as a 404, why it is not."""
     return page(
         request,
-        "reset.html",
+        "admins/reset.html",
         {
             "title": RESET_TITLE,
             "token": token,
@@ -191,7 +191,7 @@ def _recover_page(
 ) -> HTMLResponse:
     return page(
         request,
-        "recover.html",
+        "admins/recover.html",
         {
             "title": RECOVER_TITLE,
             "here": RECOVER,

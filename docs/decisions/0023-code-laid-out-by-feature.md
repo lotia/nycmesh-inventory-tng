@@ -30,6 +30,12 @@ decided the structure below on 2026-11-17.
   imports every module, so `Base.metadata`, Alembic and the guards see
   every table (Ali, 2026-11-18, inventory-tng-h657.1). It re-exports
   nothing: an import names the module a model is in.
+- **`templates/`** has a folder per feature, named as its package, with
+  the pages its routes render and the partials only its pages include.
+  Layouts and partials more than one feature uses, and the pages `web/`
+  renders, stay at the top (Ali, 2026-11-18, inventory-tng-h657.2). A
+  test in `backend/tests/test_import_directions.py` checks that only its
+  feature uses a feature's folder.
 - **`web/`** holds what every server-rendered page shares; **`core/`**
   holds plumbing, such as settings, db, history, logs, telemetry and mail.
   Core means plumbing, not business rules. **`dev/`** holds developer
@@ -91,9 +97,9 @@ short test. `core/` is the name FastAPI's full-stack template uses;
 
 ## Consequences
 
-- The templates folder stays whole for now (Ali, 2026-11-17;
-  inventory-tng-5q07). `models.py` was split into `models/` on 2026-11-18
-  (inventory-tng-h657.1).
+- On 2026-11-18, as Ali decided (inventory-tng-5q07), `models.py` was
+  split into `models/` (inventory-tng-h657.1) and the templates into a
+  folder per feature (inventory-tng-h657.2).
 - Older decision records keep the paths of their time. The tables below
   give each old path's new home; a later move adds its rows.
 
@@ -153,6 +159,21 @@ queries to its `queries.py`.
 | `totp_keys.py` | `admins/totp_keys.py`; its command: `admins/totp_keys_command.py` |
 | `unit_readings.py` | `catalogue/unit_readings.py`; its command: `catalogue/command.py` |
 | `web.py` | `web/browser.py` |
+
+In `backend/src/inventory_tng/templates/`, these templates moved whole
+into their feature's folder and kept their names:
+
+| Folder | Old paths |
+| --- | --- |
+| `admins/` | `account.html`, `_activity.html`, `admin.html`, `admin_home.html`, `admin_reset.html`, `admins.html`, `authenticator_new.html`, `_code_field.html`, `confirm.html`, `forgot.html`, `link_made.html`, `_password_hint.html`, `recover.html`, `recovery_codes.html`, `reset.html`, `setup.html`, `sign_in.html`, `_totp_fields.html` |
+| `catalogue/` | `categories.html`, `category.html`, `item.html`, `_item_name.html`, `items.html`, `reading_rule.html`, `reading_rules.html`, `reading_seed.html`, `_units_read.html` |
+| `devices/` | `code.html`, `code_made.html`, `code_revoke.html`, `device.html`, `device_list.html`, `device_revoke.html`, `device_revoke_one.html`, `devices.html` |
+| `labels/` | `label_revoke.html`, `labels.html`, `labels_print.html` |
+| `places/` | `location.html`, `locations.html` |
+| `scan/` | `page.html` |
+| `site_settings/` | `settings.html` |
+| `stock/` | `count.html`, `counts.html`, `_forms.html`, `length_checks.html`, `needs_counting.html`, `open_package_close.html`, `over_recorded.html`, `over_recorded_settled.html`, `reorder.html`, `_retired.html`, `stock.html`, `used_up.html`, `_views.html` |
+| `volunteers/` | `volunteer.html`, `volunteer_merge.html`, `volunteers.html` |
 
 In `frontend/src/`, these files moved whole, with their tests, and kept
 their names:

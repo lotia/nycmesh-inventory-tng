@@ -120,7 +120,7 @@ def used_up_page(
     return admin_page(
         request,
         signed,
-        "used_up.html",
+        "stock/used_up.html",
         {
             "title": TITLE,
             "here": USED_UP,
@@ -234,7 +234,7 @@ def confirm_close(
     return admin_page(
         request,
         signed,
-        "open_package_close.html",
+        "stock/open_package_close.html",
         {
             "title": close_title(each.package),
             "here": f"{ITEMS}/{item_id}/open-packages/{open_id}/close",

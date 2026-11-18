@@ -252,8 +252,9 @@ def test_no_template_has_inline_script_or_style() -> None:
     )
     templates = CLONE / "backend" / "src" / "inventory_tng" / "templates"
     found = {
-        path.name: match.group(0)
-        for path in templates.iterdir()
+        str(path.relative_to(templates)): match.group(0)
+        for path in templates.rglob("*")
+        if path.is_file()
         for match in [inline.search(path.read_text())]
         if match
     }

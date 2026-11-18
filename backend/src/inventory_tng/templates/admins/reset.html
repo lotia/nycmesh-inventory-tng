@@ -14,7 +14,7 @@ server for a new recovery token.{% endtrans %}</p>
   authenticators and recovery codes.{% endtrans %}{% endif %}{% if totp_required %}
   {% trans %}Set up a new authenticator when you next sign in.{% endtrans %}{% endif %}</p>
   {% endif %}
-  <label>{% trans %}New password{% endtrans %} {% include "_password_hint.html" %}
+  <label>{% trans %}New password{% endtrans %} {% include "admins/_password_hint.html" %}
     <input name="password" type="password" autocomplete="new-password" minlength="{{ limits.password_min }}" required autofocus>
     {% with name = "password" %}{% include "_field_problem.html" %}{% endwith %}
   </label>

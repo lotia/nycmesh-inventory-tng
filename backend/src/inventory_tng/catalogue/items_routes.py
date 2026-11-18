@@ -201,11 +201,12 @@ Listed = Annotated[Listing[Item], Depends(_listed)]
 
 
 def _name_field(session: Session, similar: Sequence[items.Close]) -> dict[str, object]:
-    """What _item_name.html and _units_read.html need besides the form's
-    values: units_read, what may be units in a name as typed, as the
-    reading rules read them, and shown_as, how a name typed is shown where
-    that is not as saved (units.shown_name, Ali, 2026-11-15), read as the
-    form sent answers it, as saving it would (inventory-tng-nbo)."""
+    """What catalogue/_item_name.html and catalogue/_units_read.html need
+    besides the form's values: units_read, what may be units in a name as
+    typed, as the reading rules read them, and shown_as, how a name typed
+    is shown where that is not as saved (units.shown_name, Ali,
+    2026-11-15), read as the form sent answers it, as saving it would
+    (inventory-tng-nbo)."""
     rules = rules_held(session)
 
     def units_read(typed: str) -> list[units.Found]:
@@ -247,7 +248,7 @@ def _list_page(
     return admin_page(
         request,
         signed,
-        "items.html",
+        "catalogue/items.html",
         {
             "title": SECTION_ITEMS,
             "undo": undo,
@@ -287,7 +288,7 @@ def _item_page(
     return admin_page(
         request,
         signed,
-        "item.html",
+        "catalogue/item.html",
         {
             "title": item.name_shown,
             "here": f"{ITEMS}/{item.id}",

@@ -157,7 +157,7 @@ def list_labels(
     return admin_page(
         request,
         signed,
-        "labels.html",
+        "labels/labels.html",
         {
             "title": SECTION_LABELS,
             "here": LABELS,
@@ -214,7 +214,7 @@ def print_labels(
     label: Annotated[list[int] | None, Query()] = None,
     copies: str = "1",
 ) -> Response:
-    # A refusal goes back to the list as it was, picked from (labels.html).
+    # A refusal goes back to the list as it was, picked from (labels/labels.html).
     back = listing.link()
     count = whole(copies, 1, labels.MAX_COPIES)
     if count is None:
@@ -228,7 +228,7 @@ def print_labels(
     return admin_page(
         request,
         signed,
-        "labels_print.html",
+        "labels/labels_print.html",
         {
             "title": PRINT_TITLE,
             "back_link": (LABELS, SECTION_LABELS),
@@ -254,7 +254,7 @@ def confirm_revoke(
     return admin_page(
         request,
         signed,
-        "label_revoke.html",
+        "labels/label_revoke.html",
         {
             "title": revoke_title(found.code),
             "here": f"{LABELS}/{label_id}/revoke",

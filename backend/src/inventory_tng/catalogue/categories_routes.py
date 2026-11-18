@@ -59,7 +59,7 @@ def _list_page(
     return admin_page(
         request,
         signed,
-        "categories.html",
+        "catalogue/categories.html",
         {
             "title": SECTION_CATEGORIES,
             "undo": undo,
@@ -86,7 +86,7 @@ def _category_page(
     return admin_page(
         request,
         signed,
-        "category.html",
+        "catalogue/category.html",
         {
             "title": category.name,
             "here": f"{CATEGORIES}/{category.id}",

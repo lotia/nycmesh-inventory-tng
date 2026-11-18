@@ -22,7 +22,7 @@
 {% if changes %}
 <section id="since">
   <h2>{% trans %}Since you last signed in{% endtrans %}</h2>
-  {% include "_activity.html" %}
+  {% include "admins/_activity.html" %}
   <p><a href="{{ admins_path }}#changes">{% trans %}Recent changes{% endtrans %}</a></p>
 </section>
 {% endif %}

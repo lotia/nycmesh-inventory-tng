@@ -377,7 +377,7 @@ ZONE = ZoneInfo("Etc/GMT-3")
 DAY = datetime(2026, 11, 15, tzinfo=UTC)
 PLACE = SimpleNamespace(id=1, name=NOT_ENGLISH, retired_at=DAY)
 RETIRED_PARTS = """{% from "_retired_record.html" import retired_record, retire_section
-  with context %}{% from "_retired.html" import retired %}
+  with context %}{% from "stock/_retired.html" import retired %}
 {% for person in [true, false] %}
 {% call retired_record(row, person=person) %}{% endcall %}
 {% call retire_section("", person=person) %}{% endcall %}
@@ -396,7 +396,7 @@ READING = SimpleNamespace(called=NOT_ENGLISH, kind_words=NOT_ENGLISH)
 
 
 def unit_read(**differs: object) -> SimpleNamespace:
-    """A unit in a name, as units.found_in reads it (_units_read.html)."""
+    """A unit in a name, as units.found_in reads it (catalogue/_units_read.html)."""
     return SimpleNamespace(
         **{
             "key": NOT_ENGLISH,
@@ -416,7 +416,7 @@ def unit_read(**differs: object) -> SimpleNamespace:
 
 
 def units_read() -> str:
-    """Each way _units_read.html says a unit was read, or asks."""
+    """Each way catalogue/_units_read.html says a unit was read, or asks."""
     each = [
         unit_read(asks=True),
         unit_read(),
@@ -424,7 +424,7 @@ def units_read() -> str:
         unit_read(read=None),
     ]
     return render(
-        "_units_read.html",
+        "catalogue/_units_read.html",
         units_read=lambda typed: each,
         shown_as=lambda typed, sent: NOT_ENGLISH,
         typed=NOT_ENGLISH,
@@ -434,7 +434,7 @@ def units_read() -> str:
 
 
 def recorded(**differs: object) -> SimpleNamespace:
-    """A line recorded with more than was moved, as over_recorded.html
+    """A line recorded with more than was moved, as stock/over_recorded.html
     shows it (over_recorded.Shown)."""
     return SimpleNamespace(
         **{
@@ -455,7 +455,7 @@ def recorded(**differs: object) -> SimpleNamespace:
 
 
 def recorded_more() -> str:
-    """over_recorded.html, a row of each kind, and a refusal."""
+    """stock/over_recorded.html, a row of each kind, and a refusal."""
     one = {
         "counted": NOT_ENGLISH,
         "on": DAY,
@@ -486,7 +486,7 @@ def recorded_more() -> str:
     ]
     refused = SimpleNamespace(shown=waiting[1], words=NOT_ENGLISH, place=PLACE, at=None)
     shown = signed_in(
-        "over_recorded.html",
+        "stock/over_recorded.html",
         view=VIEW,
         recorded_views=[],
         refused=refused,
@@ -504,12 +504,12 @@ def recorded_more() -> str:
 
 
 def count_page() -> str:
-    """count.html for a retired place, a recount of an item counted by
+    """stock/count.html for a retired place, a recount of an item counted by
     its forms and of one in loose units, and the fields for more."""
     item = SimpleNamespace(id=1, name_shown=NOT_ENGLISH, unit=NOT_ENGLISH)
     package = SimpleNamespace(id=1, name_shown=NOT_ENGLISH)
     return signed_in(
-        "count.html",
+        "stock/count.html",
         place=PLACE,
         shown=SimpleNamespace(only=item, search=NOT_ENGLISH, query=link),
         items=[1],
@@ -533,7 +533,7 @@ def count_page() -> str:
 
 
 def counts_page() -> str:
-    """counts.html, a count and an adjustment among those listed."""
+    """stock/counts.html, a count and an adjustment among those listed."""
     entry = SimpleNamespace(
         transaction=SimpleNamespace(kind="count", created_at=DAY, time_zone=ZONE),
         lines=[],
@@ -543,7 +543,7 @@ def counts_page() -> str:
         reason=NOT_ENGLISH,
     )
     return signed_in(
-        "counts.html",
+        "stock/counts.html",
         view=VIEW,
         places=[PLACE],
         values={},
@@ -577,8 +577,8 @@ COVERED: dict[str, Callable[[], str]] = {
         retired_places=[SHELF, SHELF],
         counts_path="/admin/counts",
     ),
-    "page.html": lambda: signed_in(
-        "page.html",
+    "scan/page.html": lambda: signed_in(
+        "scan/page.html",
         tags=SimpleNamespace(styles=[], preloads=[], scripts=[]),
     ),
     "error.html, admin_base.html and _masthead.html": lambda: signed_in(
@@ -598,12 +598,12 @@ COVERED: dict[str, Callable[[], str]] = {
         view=VIEW,
         listing=listing(narrowed=False, search="", show="current"),
     ),
-    "_forms.html": lambda: from_macros(
-        '{% from "_forms.html" import forms_lines %}{{ forms_lines(f, unit) }}',
+    "stock/_forms.html": lambda: from_macros(
+        '{% from "stock/_forms.html" import forms_lines %}{{ forms_lines(f, unit) }}',
         f=FORMS,
         unit=NOT_ENGLISH,
     ),
-    "_retired_record.html and _retired.html": retired_parts,
+    "_retired_record.html and stock/_retired.html": retired_parts,
     "_notice.html": lambda: render(
         "_notice.html",
         notice=NOT_ENGLISH,
@@ -612,16 +612,20 @@ COVERED: dict[str, Callable[[], str]] = {
         undo="/",
     ),
     "_shown_once.html": lambda: render("_shown_once.html"),
-    "_code_field.html": lambda: " ".join(
-        render("_code_field.html", code_totp=totp, totp_only=only, limits={})
+    "admins/_code_field.html": lambda: " ".join(
+        render("admins/_code_field.html", code_totp=totp, totp_only=only, limits={})
         for totp, only in ((True, True), (True, False), (False, False))
     ),
-    "_totp_fields.html": lambda: render(
-        "_totp_fields.html", values={}, problems={}, limits={}, totp_optional=True
+    "admins/_totp_fields.html": lambda: render(
+        "admins/_totp_fields.html",
+        values={},
+        problems={},
+        limits={},
+        totp_optional=True,
     ),
-    "_units_read.html": units_read,
-    "_item_name.html, with similar names": lambda: render(
-        "_item_name.html",
+    "catalogue/_units_read.html": units_read,
+    "catalogue/_item_name.html, with similar names": lambda: render(
+        "catalogue/_item_name.html",
         values={},
         problems={},
         default=NOT_ENGLISH,
@@ -639,11 +643,11 @@ COVERED: dict[str, Callable[[], str]] = {
             ),
         ],
     ),
-    "over_recorded.html, a row of each kind": recorded_more,
-    "count.html, a recount": count_page,
-    "counts.html, a count listed": counts_page,
-    "code_made.html": lambda: signed_in(
-        "code_made.html",
+    "stock/over_recorded.html, a row of each kind": recorded_more,
+    "stock/count.html, a recount": count_page,
+    "stock/counts.html, a count listed": counts_page,
+    "devices/code_made.html": lambda: signed_in(
+        "devices/code_made.html",
         code=SimpleNamespace(max_uses=2, expires_at=DAY, label=NOT_ENGLISH),
         qr="",
         phrase=NOT_ENGLISH,
@@ -651,8 +655,8 @@ COVERED: dict[str, Callable[[], str]] = {
         register=NOT_ENGLISH,
         zone=ZONE,
     ),
-    "device_revoke.html": lambda: signed_in(
-        "device_revoke.html",
+    "devices/device_revoke.html": lambda: signed_in(
+        "devices/device_revoke.html",
         devices=[SimpleNamespace(id=1, name=NOT_ENGLISH)],
         filter={},
         keep="/",
@@ -662,19 +666,22 @@ COVERED: dict[str, Callable[[], str]] = {
         signed_in(name, **context)
         for name, context in (
             (
-                "recover.html",
+                "admins/recover.html",
                 {"values": SimpleNamespace(username=NOT_ENGLISH), "problems": {}},
             ),
-            ("setup.html", {"off": True}),
-            ("setup.html", {"values": {}, "problems": {}, "totp_optional": True}),
-            ("recovery_codes.html", {"codes": [1]}),
+            ("admins/setup.html", {"off": True}),
             (
-                "authenticator_new.html",
+                "admins/setup.html",
+                {"values": {}, "problems": {}, "totp_optional": True},
+            ),
+            ("admins/recovery_codes.html", {"codes": [1]}),
+            (
+                "admins/authenticator_new.html",
                 {"required": True, "values": {}, "problems": {}},
             ),
             *(
                 (
-                    "reset.html",
+                    "admins/reset.html",
                     {
                         "link": SimpleNamespace(resets_authenticators=True, kind=kind),
                         "totp_required": True,
@@ -685,14 +692,14 @@ COVERED: dict[str, Callable[[], str]] = {
             ),
             *(
                 (
-                    "confirm.html",
+                    "admins/confirm.html",
                     {"uses_totp": totp, "retype": list(guards.RETYPED.items())},
                 )
                 for totp in (True, False)
             ),
             *(
                 (
-                    "link_made.html",
+                    "admins/link_made.html",
                     {
                         "brought_back": True,
                         "kind": kind,

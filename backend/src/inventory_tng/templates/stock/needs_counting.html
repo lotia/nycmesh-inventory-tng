@@ -1,8 +1,8 @@
 {% extends "admin_base.html" %}
-{% from "_views.html" import views %}
+{% from "stock/_views.html" import views %}
 {% from "_table.html" import table %}
 {% from "_listing.html" import sizes, sort_heading, pager %}
-{% from "_retired.html" import retired %}
+{% from "stock/_retired.html" import retired %}
 {% block main %}
 {{ views(_("Stock views"), stock_views, "needs-counting") }}
 <p class="hint">{% trans %}Places that show less than nothing of an item: the records are

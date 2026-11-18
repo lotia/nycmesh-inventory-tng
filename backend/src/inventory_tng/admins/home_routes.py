@@ -80,7 +80,7 @@ def home(request: Request, signed: AdminSignedIn, session: DbSession) -> Respons
     return admin_page(
         request,
         signed,
-        "admin_home.html",
+        "admins/admin_home.html",
         {
             "title": HOME_TITLE,
             "current": current,

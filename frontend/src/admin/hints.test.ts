@@ -106,7 +106,7 @@ test("what a field held shows once it is changed, and hides back", () => {
 });
 
 test("with nothing typed, the words the page sent", () => {
-  // The server says "it" in the page's language (length_checks.html).
+  // The server says "it" in the page's language (stock/length_checks.html).
   document.body.innerHTML = `
     <input id="n" value="3">
     <button>Régler sur <span data-follows="n">ça</span></button>`;

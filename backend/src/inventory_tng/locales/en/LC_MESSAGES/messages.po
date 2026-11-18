@@ -16,13 +16,13 @@ msgstr ""
 "Content-Transfer-Encoding: 8bit\n"
 "Generated-By: Babel 2.18.0\n"
 
-#: src/inventory_tng/templates/count.html
-#: src/inventory_tng/templates/stock.html
+#: src/inventory_tng/templates/stock/count.html
+#: src/inventory_tng/templates/stock/stock.html
 #, python-format
 msgid "%(amount)s %(unit)s in all"
 msgstr ""
 
-#: src/inventory_tng/templates/count.html
+#: src/inventory_tng/templates/stock/count.html
 #, python-format
 msgid ""
 "%(amount)s %(unit)s in all; while you counted, %(came)s in, %(went)s out;"
@@ -34,12 +34,12 @@ msgstr ""
 msgid "%(amount)s from an open package"
 msgstr ""
 
-#: src/inventory_tng/templates/reading_seed.html
+#: src/inventory_tng/templates/catalogue/reading_seed.html
 #, python-format
 msgid "%(at)s of %(total)s."
 msgstr ""
 
-#: src/inventory_tng/templates/code.html
+#: src/inventory_tng/templates/devices/code.html
 #, python-format
 msgid "%(before)s before revoking"
 msgstr ""
@@ -94,39 +94,39 @@ msgstr ""
 msgid "%(by)s retired the authenticators a lost or leaked key sealed"
 msgstr ""
 
-#: src/inventory_tng/templates/count.html
+#: src/inventory_tng/templates/stock/count.html
 #, python-format
 msgid "%(came)s in, %(went)s out; you typed %(typed)s"
 msgstr ""
 
 #. such as "2 copies of each: 6 labels, on 1 page."
-#: src/inventory_tng/templates/labels_print.html
+#: src/inventory_tng/templates/labels/labels_print.html
 #, python-format
 msgid "%(copies)s of each: %(labels)s, on %(pages)s."
 msgstr ""
 
-#: src/inventory_tng/templates/labels_print.html
+#: src/inventory_tng/templates/labels/labels_print.html
 #, python-format
 msgid "%(count)s copy"
 msgid_plural "%(count)s copies"
 msgstr[0] ""
 msgstr[1] ""
 
-#: src/inventory_tng/templates/labels.html
+#: src/inventory_tng/templates/labels/labels.html
 #, python-format
 msgid "%(count)s inactive label"
 msgid_plural "%(count)s inactive labels"
 msgstr[0] ""
 msgstr[1] ""
 
-#: src/inventory_tng/templates/items.html
+#: src/inventory_tng/templates/catalogue/items.html
 #, python-format
 msgid "%(count)s item"
 msgid_plural "%(count)s items"
 msgstr[0] ""
 msgstr[1] ""
 
-#: src/inventory_tng/templates/stock.html
+#: src/inventory_tng/templates/stock/stock.html
 #, python-format
 msgid ""
 "%(count)s item shows less than nothing somewhere: the records are wrong "
@@ -137,15 +137,15 @@ msgid_plural ""
 msgstr[0] ""
 msgstr[1] ""
 
-#: src/inventory_tng/templates/labels.html
-#: src/inventory_tng/templates/labels_print.html
+#: src/inventory_tng/templates/labels/labels.html
+#: src/inventory_tng/templates/labels/labels_print.html
 #, python-format
 msgid "%(count)s label"
 msgid_plural "%(count)s labels"
 msgstr[0] ""
 msgstr[1] ""
 
-#: src/inventory_tng/templates/account.html
+#: src/inventory_tng/templates/admins/account.html
 #, python-format
 msgid ""
 "%(count)s left. Making new ones voids the old, and asks for a code from "
@@ -156,7 +156,7 @@ msgid_plural ""
 msgstr[0] ""
 msgstr[1] ""
 
-#: src/inventory_tng/templates/account.html
+#: src/inventory_tng/templates/admins/account.html
 #, python-format
 msgid ""
 "%(count)s left: make new ones soon. Making new ones voids the old, and "
@@ -167,28 +167,28 @@ msgid_plural ""
 msgstr[0] ""
 msgstr[1] ""
 
-#: src/inventory_tng/templates/device_list.html
+#: src/inventory_tng/templates/devices/device_list.html
 #, python-format
 msgid "%(count)s listed."
 msgid_plural "%(count)s listed."
 msgstr[0] ""
 msgstr[1] ""
 
-#: src/inventory_tng/templates/reading_seed.html
+#: src/inventory_tng/templates/catalogue/reading_seed.html
 #, python-format
 msgid "%(count)s name"
 msgid_plural "%(count)s names"
 msgstr[0] ""
 msgstr[1] ""
 
-#: src/inventory_tng/templates/labels_print.html
+#: src/inventory_tng/templates/labels/labels_print.html
 #, python-format
 msgid "%(count)s page"
 msgid_plural "%(count)s pages"
 msgstr[0] ""
 msgstr[1] ""
 
-#: src/inventory_tng/templates/stock.html
+#: src/inventory_tng/templates/stock/stock.html
 #, python-format
 msgid ""
 "%(count)s place shows less than nothing somewhere: the records are wrong "
@@ -199,7 +199,7 @@ msgid_plural ""
 msgstr[0] ""
 msgstr[1] ""
 
-#: src/inventory_tng/templates/items.html
+#: src/inventory_tng/templates/catalogue/items.html
 #, python-format
 msgid "%(count)s retired item"
 msgid_plural "%(count)s retired items"
@@ -217,31 +217,31 @@ msgid_plural ""
 msgstr[0] ""
 msgstr[1] ""
 
-#: src/inventory_tng/templates/volunteers.html
+#: src/inventory_tng/templates/volunteers/volunteers.html
 #, python-format
 msgid "%(count)s retired volunteer"
 msgid_plural "%(count)s retired volunteers"
 msgstr[0] ""
 msgstr[1] ""
 
-#: src/inventory_tng/templates/volunteers.html
+#: src/inventory_tng/templates/volunteers/volunteers.html
 #, python-format
 msgid "%(count)s volunteer"
 msgid_plural "%(count)s volunteers"
 msgstr[0] ""
 msgstr[1] ""
 
-#: src/inventory_tng/templates/over_recorded.html
+#: src/inventory_tng/templates/stock/over_recorded.html
 #, python-format
 msgid "%(counted)s closed %(day)s. %(still)s still to put right."
 msgstr ""
 
-#: src/inventory_tng/templates/over_recorded.html
+#: src/inventory_tng/templates/stock/over_recorded.html
 #, python-format
 msgid "%(counted)s counted %(day)s. %(still)s still to put right."
 msgstr ""
 
-#: src/inventory_tng/templates/device_revoke_one.html
+#: src/inventory_tng/templates/devices/device_revoke_one.html
 #, python-format
 msgid ""
 "%(device)s can't save anything once revoked, and stays revoked: it would "
@@ -281,17 +281,17 @@ msgstr ""
 msgid "%(found)s of %(counted)s."
 msgstr ""
 
-#: src/inventory_tng/templates/count.html
+#: src/inventory_tng/templates/stock/count.html
 #, python-format
 msgid "%(item)s counted"
 msgstr ""
 
-#: src/inventory_tng/templates/count.html
+#: src/inventory_tng/templates/stock/count.html
 #, python-format
 msgid "%(item)s, %(form)s: is it here?"
 msgstr ""
 
-#: src/inventory_tng/templates/open_package_close.html
+#: src/inventory_tng/templates/stock/open_package_close.html
 #, python-format
 msgid ""
 "%(item)s, %(package)s, at %(place)s: it shows %(left)s %(unit)s. Closing "
@@ -299,7 +299,7 @@ msgid ""
 "It can't be opened again; a count puts right a mistake."
 msgstr ""
 
-#: src/inventory_tng/templates/over_recorded.html
+#: src/inventory_tng/templates/stock/over_recorded.html
 #, python-format
 msgid "%(item)s, transaction %(transaction)s"
 msgstr ""
@@ -309,7 +309,7 @@ msgstr ""
 msgid "%(item)s: %(package)s of %(size)s"
 msgstr ""
 
-#: src/inventory_tng/templates/volunteer_merge.html
+#: src/inventory_tng/templates/volunteers/volunteer_merge.html
 #, python-format
 msgid ""
 "%(name)s is retired as a duplicate of %(into)s: their past records count "
@@ -393,7 +393,7 @@ msgid ""
 "punctuation or how its units are spelt, as an alias."
 msgstr ""
 
-#: src/inventory_tng/templates/item.html
+#: src/inventory_tng/templates/catalogue/item.html
 #, python-format
 msgid "%(package)s of %(size)s"
 msgstr ""
@@ -408,7 +408,7 @@ msgstr ""
 msgid "%(package)s, sealed: how many"
 msgstr ""
 
-#: src/inventory_tng/templates/over_recorded_settled.html
+#: src/inventory_tng/templates/stock/over_recorded_settled.html
 #, python-format
 msgid "%(place)s (opened)"
 msgstr ""
@@ -418,7 +418,7 @@ msgstr ""
 msgid "%(place)s brought back. Correct it now."
 msgstr ""
 
-#: src/inventory_tng/templates/count.html
+#: src/inventory_tng/templates/stock/count.html
 #, python-format
 msgid ""
 "%(place)s is retired, but the records say something is here: a save "
@@ -498,64 +498,64 @@ msgstr ""
 msgid "%(prefix)swatts"
 msgstr ""
 
-#: src/inventory_tng/templates/_forms.html
+#: src/inventory_tng/templates/stock/_forms.html
 #, python-format
 msgid "%(sealed)s sealed %(package)s"
 msgstr ""
 
-#: src/inventory_tng/templates/reorder.html
+#: src/inventory_tng/templates/stock/reorder.html
 #, python-format
 msgid "%(sealed)s sealed %(package)s, of %(minimum)s to keep"
 msgstr ""
 
-#: src/inventory_tng/templates/code.html
+#: src/inventory_tng/templates/devices/code.html
 #, python-format
 msgid "%(state)s: %(uses)s of %(most)s used, until %(until)s."
 msgstr ""
 
-#: src/inventory_tng/templates/item.html
+#: src/inventory_tng/templates/catalogue/item.html
 #, python-format
 msgid "%(unit)s: fixed, as stock has moved in it"
 msgstr ""
 
-#: src/inventory_tng/templates/devices.html
+#: src/inventory_tng/templates/devices/devices.html
 #, python-format
 msgid "%(uses)s of %(most)s"
 msgstr ""
 
-#: src/inventory_tng/templates/item.html
-#: src/inventory_tng/templates/length_checks.html
-#: src/inventory_tng/templates/used_up.html
+#: src/inventory_tng/templates/catalogue/item.html
+#: src/inventory_tng/templates/stock/length_checks.html
+#: src/inventory_tng/templates/stock/used_up.html
 #, python-format
 msgid "%(what)s at %(place)s"
 msgstr ""
 
-#: src/inventory_tng/templates/device.html
+#: src/inventory_tng/templates/devices/device.html
 #, python-format
 msgid "%(when)s, with <a href=\"%(link)s\">code %(number)s</a>"
 msgstr ""
 
-#: src/inventory_tng/templates/length_checks.html
+#: src/inventory_tng/templates/stock/length_checks.html
 #, python-format
 msgid "%(who)s said %(said)s %(unit)s is on it, %(when)s."
 msgstr ""
 
-#: src/inventory_tng/templates/device_list.html
+#: src/inventory_tng/templates/devices/device_list.html
 #, python-format
 msgid "%(zone)s time, optional"
 msgstr ""
 
-#: src/inventory_tng/templates/_item_name.html
+#: src/inventory_tng/templates/catalogue/_item_name.html
 #, python-format
 msgid "(alias %(alias)s)"
 msgstr ""
 
-#: src/inventory_tng/templates/_retired.html
-#: src/inventory_tng/templates/items.html
+#: src/inventory_tng/templates/catalogue/items.html
+#: src/inventory_tng/templates/stock/_retired.html
 msgid "(retired)"
 msgstr ""
 
-#: src/inventory_tng/templates/account.html
+#: src/inventory_tng/templates/admins/account.html
 msgid "(this one)"
 msgstr ""
 
@@ -564,14 +564,14 @@ msgstr ""
 msgid "<a href=\"%(back)s\">Go back</a>, and make another there if you need one."
 msgstr ""
 
-#: src/inventory_tng/templates/admin_home.html
+#: src/inventory_tng/templates/admins/admin_home.html
 #, python-format
 msgid ""
 "<a href=\"%(link)s\">%(item)s: %(packages)s</a>, %(below)s %(unit)s below"
 " zero"
 msgstr ""
 
-#: src/inventory_tng/templates/account.html
+#: src/inventory_tng/templates/admins/account.html
 #, python-format
 msgid ""
 "<a href=\"%(link)s\">Add another<span class=\"sr-only\"> "
@@ -579,7 +579,7 @@ msgid ""
 "one."
 msgstr ""
 
-#: src/inventory_tng/templates/devices.html
+#: src/inventory_tng/templates/devices/devices.html
 #, python-format
 msgid ""
 "<a href=\"%(link)s\">All registered devices</a>: list them by when they "
@@ -591,7 +591,7 @@ msgstr ""
 msgid "<span class=\"sr-only\">Back to </span>%(place)s"
 msgstr ""
 
-#: src/inventory_tng/templates/admin.html
+#: src/inventory_tng/templates/admins/admin.html
 msgid ""
 "<span class=\"tag\">Invited</span> No password yet: they choose one with "
 "the link they were given."
@@ -607,7 +607,7 @@ msgstr ""
 msgid "<span class=\"tag\">Retired</span> on %(when)s."
 msgstr ""
 
-#: src/inventory_tng/templates/device.html
+#: src/inventory_tng/templates/devices/device.html
 #, python-format
 msgid ""
 "<span class=\"tag\">Revoked</span> on %(when)s. It can't save anything, "
@@ -622,7 +622,7 @@ msgstr ""
 msgid "A code's number."
 msgstr ""
 
-#: src/inventory_tng/templates/link_made.html
+#: src/inventory_tng/templates/admins/link_made.html
 msgid ""
 "A copied link stays in any clipboard history: once it is passed on, copy "
 "something else."
@@ -632,22 +632,22 @@ msgstr ""
 msgid "A date and time, such as 2026-11-02 13:05."
 msgstr ""
 
-#: src/inventory_tng/templates/items.html
+#: src/inventory_tng/templates/catalogue/items.html
 msgid "A different item? Add it again."
 msgstr ""
 
-#: src/inventory_tng/templates/item.html
+#: src/inventory_tng/templates/catalogue/item.html
 msgid "A different item? Save it again."
 msgstr ""
 
-#: src/inventory_tng/templates/volunteer.html
+#: src/inventory_tng/templates/volunteers/volunteer.html
 #, python-format
 msgid ""
 "A duplicate, merged into <a href=\"%(link)s\">%(name)s</a>: their past "
 "records count as theirs."
 msgstr ""
 
-#: src/inventory_tng/templates/volunteer.html
+#: src/inventory_tng/templates/volunteers/volunteer.html
 msgid "A duplicate?"
 msgstr ""
 
@@ -664,7 +664,7 @@ msgstr ""
 msgid "A new registration code"
 msgstr ""
 
-#: src/inventory_tng/templates/devices.html
+#: src/inventory_tng/templates/devices/devices.html
 msgid ""
 "A phone or computer must be registered before it can record anything. "
 "Make a code, then show its QR code in the room, or send its phrase to "
@@ -680,7 +680,7 @@ msgstr ""
 msgid "A time after the one it is from."
 msgstr ""
 
-#: src/inventory_tng/templates/location.html
+#: src/inventory_tng/templates/places/location.html
 msgid "A volunteer's custody: change it with the volunteer."
 msgstr ""
 
@@ -701,11 +701,11 @@ msgstr ""
 msgid "A4"
 msgstr ""
 
-#: src/inventory_tng/templates/reading_seed.html
+#: src/inventory_tng/templates/catalogue/reading_seed.html
 msgid "Accept"
 msgstr ""
 
-#: src/inventory_tng/templates/reading_seed.html
+#: src/inventory_tng/templates/catalogue/reading_seed.html
 msgid "Accept all"
 msgstr ""
 
@@ -713,32 +713,32 @@ msgstr ""
 msgid "Accepted. Every name with them is read so now."
 msgstr ""
 
-#: src/inventory_tng/templates/categories.html
-#: src/inventory_tng/templates/items.html
-#: src/inventory_tng/templates/locations.html
-#: src/inventory_tng/templates/settings.html
-#: src/inventory_tng/templates/volunteers.html
+#: src/inventory_tng/templates/catalogue/categories.html
+#: src/inventory_tng/templates/catalogue/items.html
+#: src/inventory_tng/templates/places/locations.html
+#: src/inventory_tng/templates/site_settings/settings.html
+#: src/inventory_tng/templates/volunteers/volunteers.html
 msgid "Add"
 msgstr ""
 
-#: src/inventory_tng/templates/items.html
+#: src/inventory_tng/templates/catalogue/items.html
 #, python-format
 msgid "Add a <a href=\"%(link)s\">category</a> first: every item has one."
 msgstr ""
 
-#: src/inventory_tng/templates/locations.html
+#: src/inventory_tng/templates/places/locations.html
 msgid "Add a location"
 msgstr ""
 
-#: src/inventory_tng/templates/volunteers.html
+#: src/inventory_tng/templates/volunteers/volunteers.html
 msgid "Add a volunteer"
 msgstr ""
 
-#: src/inventory_tng/templates/item.html
+#: src/inventory_tng/templates/catalogue/item.html
 msgid "Add alias"
 msgstr ""
 
-#: src/inventory_tng/templates/items.html
+#: src/inventory_tng/templates/catalogue/items.html
 msgid "Add an item"
 msgstr ""
 
@@ -746,11 +746,11 @@ msgstr ""
 msgid "Add one"
 msgstr ""
 
-#: src/inventory_tng/templates/item.html
+#: src/inventory_tng/templates/catalogue/item.html
 msgid "Add package"
 msgstr ""
 
-#: src/inventory_tng/templates/account.html
+#: src/inventory_tng/templates/admins/account.html
 msgid "Added"
 msgstr ""
 
@@ -763,11 +763,11 @@ msgstr ""
 msgid "Adjusted at %(place)s"
 msgstr ""
 
-#: src/inventory_tng/templates/counts.html
+#: src/inventory_tng/templates/stock/counts.html
 msgid "Adjustments"
 msgstr ""
 
-#: src/inventory_tng/templates/admins.html
+#: src/inventory_tng/templates/admins/admins.html
 msgid "Administrator"
 msgstr ""
 
@@ -775,18 +775,18 @@ msgstr ""
 msgid "Administrators"
 msgstr ""
 
-#: src/inventory_tng/templates/reading_rules.html
-#: src/inventory_tng/templates/reading_seed.html
+#: src/inventory_tng/templates/catalogue/reading_rules.html
+#: src/inventory_tng/templates/catalogue/reading_seed.html
 msgid "After a number"
 msgstr ""
 
-#: src/inventory_tng/templates/settings.html
+#: src/inventory_tng/templates/site_settings/settings.html
 msgid ""
 "After that long, the page asks \"Are you …?\" before the next save, so a "
 "shared phone isn't used under someone else's name."
 msgstr ""
 
-#: src/inventory_tng/templates/item.html
+#: src/inventory_tng/templates/catalogue/item.html
 msgid "Alias"
 msgstr ""
 
@@ -798,7 +798,7 @@ msgstr ""
 msgid "Alias removed."
 msgstr ""
 
-#: src/inventory_tng/templates/item.html
+#: src/inventory_tng/templates/catalogue/item.html
 msgid "Aliases"
 msgstr ""
 
@@ -806,7 +806,7 @@ msgstr ""
 msgid "All"
 msgstr ""
 
-#: src/inventory_tng/templates/admin_home.html
+#: src/inventory_tng/templates/admins/admin_home.html
 #, python-format
 msgid "All %(count)s"
 msgid_plural "All %(count)s"
@@ -821,11 +821,11 @@ msgstr ""
 msgid "Already sent"
 msgstr ""
 
-#: src/inventory_tng/templates/over_recorded_settled.html
+#: src/inventory_tng/templates/stock/over_recorded_settled.html
 msgid "Amount"
 msgstr ""
 
-#: src/inventory_tng/templates/reading_rules.html
+#: src/inventory_tng/templates/catalogue/reading_rules.html
 msgid "An administrator"
 msgstr ""
 
@@ -898,12 +898,12 @@ msgid ""
 "isn't clear which number is right: nothing was saved."
 msgstr ""
 
-#: src/inventory_tng/templates/over_recorded.html
+#: src/inventory_tng/templates/stock/over_recorded.html
 #, python-format
 msgid "An open package moved to %(place)s. Confirm or correct count."
 msgstr ""
 
-#: src/inventory_tng/templates/count.html
+#: src/inventory_tng/templates/stock/count.html
 msgid "An open package nobody recorded"
 msgstr ""
 
@@ -966,23 +966,23 @@ msgstr ""
 msgid "Another place beside it, perhaps a retired one, already has that name."
 msgstr ""
 
-#: src/inventory_tng/templates/over_recorded.html
+#: src/inventory_tng/templates/stock/over_recorded.html
 msgid ""
 "Another tab recorded these before a volunteer changed them, so the "
 "inventory shows more moved than was. Correct moves the extra back with an"
 " adjustment. Mark checked if you already fixed it."
 msgstr ""
 
-#: src/inventory_tng/templates/counts.html
-#: src/inventory_tng/templates/devices.html
-#: src/inventory_tng/templates/items.html
-#: src/inventory_tng/templates/labels.html
-#: src/inventory_tng/templates/stock.html
-#: src/inventory_tng/templates/volunteers.html
+#: src/inventory_tng/templates/catalogue/items.html
+#: src/inventory_tng/templates/devices/devices.html
+#: src/inventory_tng/templates/labels/labels.html
+#: src/inventory_tng/templates/stock/counts.html
+#: src/inventory_tng/templates/stock/stock.html
+#: src/inventory_tng/templates/volunteers/volunteers.html
 msgid "Any"
 msgstr ""
 
-#: src/inventory_tng/templates/reading_rules.html
+#: src/inventory_tng/templates/catalogue/reading_rules.html
 msgid "Anyone"
 msgstr ""
 
@@ -990,17 +990,17 @@ msgstr ""
 msgid "Area inside another"
 msgstr ""
 
-#: src/inventory_tng/templates/location.html
+#: src/inventory_tng/templates/places/location.html
 msgid "Areas inside"
 msgstr ""
 
-#: src/inventory_tng/templates/admin_reset.html
+#: src/inventory_tng/templates/admins/admin_reset.html
 msgid ""
 "As changing another administrator matters, it needs your code: you "
 "haven't typed one recently."
 msgstr ""
 
-#: src/inventory_tng/templates/_units_read.html
+#: src/inventory_tng/templates/catalogue/_units_read.html
 msgid "As read"
 msgstr ""
 
@@ -1008,24 +1008,24 @@ msgstr ""
 msgid "As typed"
 msgstr ""
 
-#: src/inventory_tng/templates/settings.html
+#: src/inventory_tng/templates/site_settings/settings.html
 msgid "Ask whose name it is after"
 msgstr ""
 
-#: src/inventory_tng/templates/admins.html
-#: src/inventory_tng/templates/setup.html
+#: src/inventory_tng/templates/admins/admins.html
+#: src/inventory_tng/templates/admins/setup.html
 msgid "Authenticator"
 msgstr ""
 
-#: src/inventory_tng/templates/setup.html
+#: src/inventory_tng/templates/admins/setup.html
 msgid "Authenticator (optional)"
 msgstr ""
 
-#: src/inventory_tng/templates/settings.html
+#: src/inventory_tng/templates/site_settings/settings.html
 msgid "Authenticator app (TOTP)"
 msgstr ""
 
-#: src/inventory_tng/templates/account.html
+#: src/inventory_tng/templates/admins/account.html
 msgid "Authenticators"
 msgstr ""
 
@@ -1033,7 +1033,7 @@ msgstr ""
 msgid "Back and Forward can't show this page again."
 msgstr ""
 
-#: src/inventory_tng/templates/forgot.html
+#: src/inventory_tng/templates/admins/forgot.html
 msgid "Back to sign in"
 msgstr ""
 
@@ -1041,33 +1041,33 @@ msgstr ""
 msgid "Best match"
 msgstr ""
 
-#: src/inventory_tng/templates/over_recorded.html
+#: src/inventory_tng/templates/stock/over_recorded.html
 #, python-format
 msgid ""
 "Both ends are right: %(left)s counted %(left_on)s, %(arrived)s closed "
 "%(arrived_on)s."
 msgstr ""
 
-#: src/inventory_tng/templates/over_recorded.html
+#: src/inventory_tng/templates/stock/over_recorded.html
 #, python-format
 msgid ""
 "Both ends are right: %(left)s counted %(left_on)s, %(arrived)s counted "
 "%(arrived_on)s."
 msgstr ""
 
-#: src/inventory_tng/templates/item.html
+#: src/inventory_tng/templates/catalogue/item.html
 msgid "Box"
 msgstr ""
 
-#: src/inventory_tng/templates/over_recorded.html
+#: src/inventory_tng/templates/stock/over_recorded.html
 #, python-format
 msgid "Bring back %(place)s"
 msgstr ""
 
 #: src/inventory_tng/templates/_notice.html
 #: src/inventory_tng/templates/_retired_record.html
-#: src/inventory_tng/templates/item.html
-#: src/inventory_tng/templates/settings.html
+#: src/inventory_tng/templates/catalogue/item.html
+#: src/inventory_tng/templates/site_settings/settings.html
 msgid "Bring it back"
 msgstr ""
 
@@ -1076,7 +1076,7 @@ msgid "Bring it back to change anything here."
 msgstr ""
 
 #: src/inventory_tng/templates/_retired_record.html
-#: src/inventory_tng/templates/admin.html
+#: src/inventory_tng/templates/admins/admin.html
 #: src/inventory_tng/volunteers/routes.py
 msgid "Bring them back"
 msgstr ""
@@ -1093,18 +1093,18 @@ msgstr ""
 msgid "Brought back. Correct it now."
 msgstr ""
 
-#: src/inventory_tng/templates/link_made.html
+#: src/inventory_tng/templates/admins/link_made.html
 msgid ""
 "Brought back. Retiring removed anything they signed in with, so they "
 "start again with this link."
 msgstr ""
 
-#: src/inventory_tng/templates/account.html
+#: src/inventory_tng/templates/admins/account.html
 msgid "Browser"
 msgstr ""
 
-#: src/inventory_tng/templates/counts.html
-#: src/inventory_tng/templates/over_recorded_settled.html
+#: src/inventory_tng/templates/stock/counts.html
+#: src/inventory_tng/templates/stock/over_recorded_settled.html
 msgid "By"
 msgstr ""
 
@@ -1116,7 +1116,7 @@ msgstr ""
 msgid "By place"
 msgstr ""
 
-#: src/inventory_tng/templates/_totp_fields.html
+#: src/inventory_tng/templates/admins/_totp_fields.html
 msgid "Can't scan? Type this key instead:"
 msgstr ""
 
@@ -1124,12 +1124,13 @@ msgstr ""
 msgid "Categories"
 msgstr ""
 
-#: src/inventory_tng/templates/categories.html
-#: src/inventory_tng/templates/item.html src/inventory_tng/templates/items.html
+#: src/inventory_tng/templates/catalogue/categories.html
+#: src/inventory_tng/templates/catalogue/item.html
+#: src/inventory_tng/templates/catalogue/items.html
 msgid "Category"
 msgstr ""
 
-#: src/inventory_tng/templates/account.html
+#: src/inventory_tng/templates/admins/account.html
 msgid "Change password"
 msgstr ""
 
@@ -1137,11 +1138,11 @@ msgstr ""
 msgid "Change your own on your account page."
 msgstr ""
 
-#: src/inventory_tng/templates/account.html
+#: src/inventory_tng/templates/admins/account.html
 msgid "Changing it signs you out everywhere else."
 msgstr ""
 
-#: src/inventory_tng/templates/settings.html
+#: src/inventory_tng/templates/site_settings/settings.html
 msgid ""
 "Changing these asks for a fresh code, and every administrator with an "
 "email is told."
@@ -1159,7 +1160,7 @@ msgstr ""
 msgid "Choose one of the readings offered."
 msgstr ""
 
-#: src/inventory_tng/templates/reading_seed.html
+#: src/inventory_tng/templates/catalogue/reading_seed.html
 msgid "Choose…"
 msgstr ""
 
@@ -1171,12 +1172,12 @@ msgstr ""
 msgid "Clear search"
 msgstr ""
 
-#: src/inventory_tng/templates/item.html
-#: src/inventory_tng/templates/open_package_close.html
+#: src/inventory_tng/templates/catalogue/item.html
+#: src/inventory_tng/templates/stock/open_package_close.html
 msgid "Close as used up"
 msgstr ""
 
-#: src/inventory_tng/templates/over_recorded.html
+#: src/inventory_tng/templates/stock/over_recorded.html
 msgid "Close it"
 msgstr ""
 
@@ -1198,11 +1199,11 @@ msgid "Closed: what they showed is written off as used up."
 msgstr ""
 
 #: src/inventory_tng/templates/_labels.html
-#: src/inventory_tng/templates/device_list.html
-#: src/inventory_tng/templates/devices.html
-#: src/inventory_tng/templates/labels.html
-#: src/inventory_tng/templates/labels_print.html
-#: src/inventory_tng/templates/sign_in.html
+#: src/inventory_tng/templates/admins/sign_in.html
+#: src/inventory_tng/templates/devices/device_list.html
+#: src/inventory_tng/templates/devices/devices.html
+#: src/inventory_tng/templates/labels/labels.html
+#: src/inventory_tng/templates/labels/labels_print.html
 msgid "Code"
 msgstr ""
 
@@ -1211,15 +1212,15 @@ msgstr ""
 msgid "Code %(number)s"
 msgstr ""
 
-#: src/inventory_tng/templates/devices.html
+#: src/inventory_tng/templates/devices/devices.html
 msgid "Codes"
 msgstr ""
 
-#: src/inventory_tng/templates/confirm.html
+#: src/inventory_tng/templates/admins/confirm.html
 msgid "Confirm"
 msgstr ""
 
-#: src/inventory_tng/templates/over_recorded.html
+#: src/inventory_tng/templates/stock/over_recorded.html
 msgid "Confirm count"
 msgstr ""
 
@@ -1227,11 +1228,11 @@ msgstr ""
 msgid "Confirm it's you"
 msgstr ""
 
-#: src/inventory_tng/templates/used_up.html
+#: src/inventory_tng/templates/stock/used_up.html
 msgid "Confirm the ones ticked"
 msgstr ""
 
-#: src/inventory_tng/templates/used_up.html
+#: src/inventory_tng/templates/stock/used_up.html
 msgid "Confirm used up"
 msgstr ""
 
@@ -1239,7 +1240,7 @@ msgstr ""
 msgid "Confirmed."
 msgstr ""
 
-#: src/inventory_tng/templates/link_made.html
+#: src/inventory_tng/templates/admins/link_made.html
 msgid "Copied."
 msgstr ""
 
@@ -1247,19 +1248,19 @@ msgstr ""
 msgid "Copies"
 msgstr ""
 
-#: src/inventory_tng/templates/labels.html
+#: src/inventory_tng/templates/labels/labels.html
 msgid "Copies of each"
 msgstr ""
 
-#: src/inventory_tng/templates/link_made.html
+#: src/inventory_tng/templates/admins/link_made.html
 msgid "Copy the link"
 msgstr ""
 
-#: src/inventory_tng/templates/over_recorded.html
+#: src/inventory_tng/templates/stock/over_recorded.html
 msgid "Correct"
 msgstr ""
 
-#: src/inventory_tng/templates/over_recorded.html
+#: src/inventory_tng/templates/stock/over_recorded.html
 #, python-format
 msgid "Correct %(end)s"
 msgstr ""
@@ -1272,7 +1273,7 @@ msgstr ""
 msgid "Corrected."
 msgstr ""
 
-#: src/inventory_tng/templates/link_made.html
+#: src/inventory_tng/templates/admins/link_made.html
 msgid "Couldn't copy: select it and copy it by hand."
 msgstr ""
 
@@ -1282,12 +1283,12 @@ msgid "Count"
 msgstr ""
 
 #: src/inventory_tng/stock/counts_routes.py
-#: src/inventory_tng/templates/over_recorded.html
+#: src/inventory_tng/templates/stock/over_recorded.html
 #, python-format
 msgid "Count %(place)s"
 msgstr ""
 
-#: src/inventory_tng/templates/counts.html
+#: src/inventory_tng/templates/stock/counts.html
 msgid "Count a place"
 msgstr ""
 
@@ -1303,7 +1304,7 @@ msgstr ""
 msgid "Count corrected."
 msgstr ""
 
-#: src/inventory_tng/templates/reorder.html
+#: src/inventory_tng/templates/stock/reorder.html
 #, python-format
 msgid ""
 "Count first: somewhere in the stores shows less than nothing of it, so "
@@ -1311,16 +1312,16 @@ msgid ""
 "href=\"%(link)s\">Needs counting</a>)."
 msgstr ""
 
-#: src/inventory_tng/templates/over_recorded.html
+#: src/inventory_tng/templates/stock/over_recorded.html
 msgid "Count in the package"
 msgstr ""
 
 #: src/inventory_tng/stock/over_recorded.py
-#: src/inventory_tng/templates/count.html
+#: src/inventory_tng/templates/stock/count.html
 msgid "Counted"
 msgstr ""
 
-#: src/inventory_tng/templates/counts.html
+#: src/inventory_tng/templates/stock/counts.html
 msgid "Counted and adjusted"
 msgstr ""
 
@@ -1344,7 +1345,8 @@ msgstr ""
 msgid "Counted: everything was as the records say."
 msgstr ""
 
-#: src/inventory_tng/templates/counts.html src/inventory_tng/web/navigation.py
+#: src/inventory_tng/templates/stock/counts.html
+#: src/inventory_tng/web/navigation.py
 msgid "Counts"
 msgstr ""
 
@@ -1356,18 +1358,18 @@ msgstr ""
 msgid "Current"
 msgstr ""
 
-#: src/inventory_tng/templates/labels_print.html
+#: src/inventory_tng/templates/labels/labels_print.html
 #, python-format
 msgid ""
 "Cut along the dashed lines, or print on full-sheet sticker paper. If the "
 "print dialog offers paper sizes, pick the same one there, at 100%% scale."
 msgstr ""
 
-#: src/inventory_tng/templates/devices.html
+#: src/inventory_tng/templates/devices/devices.html
 msgid "Days it lasts"
 msgstr ""
 
-#: src/inventory_tng/templates/reading_rule.html
+#: src/inventory_tng/templates/catalogue/reading_rule.html
 msgid "Delete"
 msgstr ""
 
@@ -1375,8 +1377,8 @@ msgstr ""
 msgid "Deleted. Names with it are read by the unit table again."
 msgstr ""
 
-#: src/inventory_tng/templates/code.html
-#: src/inventory_tng/templates/device_list.html
+#: src/inventory_tng/templates/devices/code.html
+#: src/inventory_tng/templates/devices/device_list.html
 msgid "Device"
 msgstr ""
 
@@ -1389,31 +1391,31 @@ msgstr ""
 msgid "Devices"
 msgstr ""
 
-#: src/inventory_tng/templates/devices.html
+#: src/inventory_tng/templates/devices/devices.html
 msgid "Devices it may register"
 msgstr ""
 
-#: src/inventory_tng/templates/code.html
+#: src/inventory_tng/templates/devices/code.html
 msgid "Devices it registered"
 msgstr ""
 
-#: src/inventory_tng/templates/items.html
+#: src/inventory_tng/templates/catalogue/items.html
 msgid "Don't"
 msgstr ""
 
-#: src/inventory_tng/templates/item.html
+#: src/inventory_tng/templates/catalogue/item.html
 msgid "Don't track"
 msgstr ""
 
-#: src/inventory_tng/templates/account.html
-#: src/inventory_tng/templates/admins.html
-#: src/inventory_tng/templates/setup.html
-#: src/inventory_tng/templates/volunteer.html
-#: src/inventory_tng/templates/volunteers.html
+#: src/inventory_tng/templates/admins/account.html
+#: src/inventory_tng/templates/admins/admins.html
+#: src/inventory_tng/templates/admins/setup.html
+#: src/inventory_tng/templates/volunteers/volunteer.html
+#: src/inventory_tng/templates/volunteers/volunteers.html
 msgid "Email"
 msgstr ""
 
-#: src/inventory_tng/templates/account.html
+#: src/inventory_tng/templates/admins/account.html
 #, python-format
 msgid "End<span class=\"sr-only\"> the session signed in %(when)s</span>"
 msgstr ""
@@ -1422,24 +1424,24 @@ msgstr ""
 msgid "Every copy carries the same code, made the first time."
 msgstr ""
 
-#: src/inventory_tng/templates/device_list.html
+#: src/inventory_tng/templates/devices/device_list.html
 msgid "Every current one listed is selected: clear any to keep."
 msgstr ""
 
-#: src/inventory_tng/templates/device_list.html
+#: src/inventory_tng/templates/devices/device_list.html
 #, python-format
 msgid ""
 "Every current one on this page is selected: clear any to keep. <a "
 "href=\"%(link)s\">Show All</a> to revoke those on the other pages too."
 msgstr ""
 
-#: src/inventory_tng/templates/device_list.html
+#: src/inventory_tng/templates/devices/device_list.html
 msgid ""
 "Every registered phone or computer. After a compromise, list those "
 "registered while it lasted, then revoke the ones that look wrong."
 msgstr ""
 
-#: src/inventory_tng/templates/reading_seed.html
+#: src/inventory_tng/templates/catalogue/reading_seed.html
 #, python-format
 msgid ""
 "Every unit after a number in the names saved that no rule or nearby word "
@@ -1448,7 +1450,7 @@ msgid ""
 "href=\"%(link)s\">reading rule</a>. Run it again after an import."
 msgstr ""
 
-#: src/inventory_tng/templates/settings.html
+#: src/inventory_tng/templates/site_settings/settings.html
 msgid "Everything is kept in UTC; this only changes how times read."
 msgstr ""
 
@@ -1460,79 +1462,79 @@ msgstr ""
 msgid "Filter"
 msgstr ""
 
-#: src/inventory_tng/templates/counts.html
+#: src/inventory_tng/templates/stock/counts.html
 msgid "Filter by administrator"
 msgstr ""
 
-#: src/inventory_tng/templates/items.html
+#: src/inventory_tng/templates/catalogue/items.html
 msgid "Filter by category"
 msgstr ""
 
-#: src/inventory_tng/templates/volunteers.html
+#: src/inventory_tng/templates/volunteers/volunteers.html
 msgid "Filter by holding stock"
 msgstr ""
 
-#: src/inventory_tng/templates/labels.html
+#: src/inventory_tng/templates/labels/labels.html
 msgid "Filter by item"
 msgstr ""
 
-#: src/inventory_tng/templates/counts.html
-#: src/inventory_tng/templates/labels.html
+#: src/inventory_tng/templates/labels/labels.html
+#: src/inventory_tng/templates/stock/counts.html
 msgid "Filter by kind"
 msgstr ""
 
-#: src/inventory_tng/templates/counts.html
-#: src/inventory_tng/templates/stock.html
+#: src/inventory_tng/templates/stock/counts.html
+#: src/inventory_tng/templates/stock/stock.html
 msgid "Filter by place"
 msgstr ""
 
-#: src/inventory_tng/templates/devices.html
+#: src/inventory_tng/templates/devices/devices.html
 msgid "Filter by state"
 msgstr ""
 
-#: src/inventory_tng/templates/reading_rules.html
+#: src/inventory_tng/templates/catalogue/reading_rules.html
 msgid "Filter by who settled it"
 msgstr ""
 
 #: src/inventory_tng/templates/_listing.html
-#: src/inventory_tng/templates/count.html
+#: src/inventory_tng/templates/stock/count.html
 msgid "Find"
 msgstr ""
 
-#: src/inventory_tng/templates/reading_rules.html
+#: src/inventory_tng/templates/catalogue/reading_rules.html
 msgid "Find a unit"
 msgstr ""
 
-#: src/inventory_tng/templates/count.html
-#: src/inventory_tng/templates/items.html
-#: src/inventory_tng/templates/stock.html
+#: src/inventory_tng/templates/catalogue/items.html
+#: src/inventory_tng/templates/stock/count.html
+#: src/inventory_tng/templates/stock/stock.html
 msgid "Find items"
 msgstr ""
 
-#: src/inventory_tng/templates/labels.html
+#: src/inventory_tng/templates/labels/labels.html
 msgid "Find labels"
 msgstr ""
 
-#: src/inventory_tng/templates/volunteers.html
+#: src/inventory_tng/templates/volunteers/volunteers.html
 msgid "Find volunteers"
 msgstr ""
 
-#: src/inventory_tng/templates/device.html
+#: src/inventory_tng/templates/devices/device.html
 msgid "First seen from"
 msgstr ""
 
-#: src/inventory_tng/templates/items.html
+#: src/inventory_tng/templates/catalogue/items.html
 msgid ""
 "For the items ticked on this page: whether a package of theirs, opened, "
 "is followed until used up. A package that says otherwise keeps its own."
 msgstr ""
 
 #: src/inventory_tng/admins/reset_routes.py
-#: src/inventory_tng/templates/sign_in.html
+#: src/inventory_tng/templates/admins/sign_in.html
 msgid "Forgot your password?"
 msgstr ""
 
-#: src/inventory_tng/templates/counts.html
+#: src/inventory_tng/templates/stock/counts.html
 msgid "Found or written off"
 msgstr ""
 
@@ -1540,7 +1542,7 @@ msgstr ""
 msgid "Found or written off?"
 msgstr ""
 
-#: src/inventory_tng/templates/code.html
+#: src/inventory_tng/templates/devices/code.html
 msgid "From"
 msgstr ""
 
@@ -1571,27 +1573,27 @@ msgstr ""
 msgid "Held %(amount)s"
 msgstr ""
 
-#: src/inventory_tng/templates/locations.html
+#: src/inventory_tng/templates/places/locations.html
 msgid "Held by volunteers"
 msgstr ""
 
-#: src/inventory_tng/templates/count.html
+#: src/inventory_tng/templates/stock/count.html
 msgid "Here"
 msgstr ""
 
-#: src/inventory_tng/templates/volunteer.html
+#: src/inventory_tng/templates/volunteers/volunteer.html
 msgid "Holding stock"
 msgstr ""
 
-#: src/inventory_tng/templates/item.html
+#: src/inventory_tng/templates/catalogue/item.html
 msgid "Holds"
 msgstr ""
 
-#: src/inventory_tng/templates/volunteers.html
+#: src/inventory_tng/templates/volunteers/volunteers.html
 msgid "Holds none"
 msgstr ""
 
-#: src/inventory_tng/templates/volunteers.html
+#: src/inventory_tng/templates/volunteers/volunteers.html
 msgid "Holds stock"
 msgstr ""
 
@@ -1599,18 +1601,18 @@ msgstr ""
 msgid "Home"
 msgstr ""
 
-#: src/inventory_tng/templates/over_recorded_settled.html
+#: src/inventory_tng/templates/stock/over_recorded_settled.html
 msgid "How"
 msgstr ""
 
-#: src/inventory_tng/templates/items.html
+#: src/inventory_tng/templates/catalogue/items.html
 #, python-format
 msgid ""
 "How a unit after a number in a name is read, as settled on the item "
 "forms: <a href=\"%(link)s\">see and correct them</a>."
 msgstr ""
 
-#: src/inventory_tng/templates/reading_rules.html
+#: src/inventory_tng/templates/catalogue/reading_rules.html
 msgid ""
 "How a unit, as typed after a number in a name, is read where the words "
 "near it do not say: by searches, here and on the scan page, and by the "
@@ -1622,10 +1624,10 @@ msgstr ""
 msgid "How many of the item's unit it holds."
 msgstr ""
 
-#: src/inventory_tng/templates/count.html
-#: src/inventory_tng/templates/counts.html
-#: src/inventory_tng/templates/needs_counting.html
-#: src/inventory_tng/templates/stock.html
+#: src/inventory_tng/templates/stock/count.html
+#: src/inventory_tng/templates/stock/counts.html
+#: src/inventory_tng/templates/stock/needs_counting.html
+#: src/inventory_tng/templates/stock/stock.html
 msgid "How much"
 msgstr ""
 
@@ -1637,7 +1639,7 @@ msgstr ""
 msgid "How much."
 msgstr ""
 
-#: src/inventory_tng/templates/recovery_codes.html
+#: src/inventory_tng/templates/admins/recovery_codes.html
 msgid "I've kept them: carry on"
 msgstr ""
 
@@ -1656,14 +1658,14 @@ msgstr ""
 msgid "If this was not agreed, check with the other administrators."
 msgstr ""
 
-#: src/inventory_tng/templates/recovery_codes.html
+#: src/inventory_tng/templates/admins/recovery_codes.html
 msgid ""
 "If you lose your authenticator, each of these codes signs you in once in "
 "place of a code. Print them or keep them in a password manager. "
 "<strong>They are not shown again.</strong>"
 msgstr ""
 
-#: src/inventory_tng/templates/reset.html
+#: src/inventory_tng/templates/admins/reset.html
 msgid "If you use an authenticator, signing in still asks for its code."
 msgstr ""
 
@@ -1671,13 +1673,13 @@ msgstr ""
 msgid "If you weren't expecting this, ignore this mail."
 msgstr ""
 
-#: src/inventory_tng/templates/forgot.html
+#: src/inventory_tng/templates/admins/forgot.html
 msgid ""
 "If your account has an email address, we'll send a link to choose a new "
 "password. If it doesn't, ask another administrator to reset your sign-in."
 msgstr ""
 
-#: src/inventory_tng/templates/reading_seed.html
+#: src/inventory_tng/templates/catalogue/reading_seed.html
 msgid "In"
 msgstr ""
 
@@ -1685,8 +1687,8 @@ msgstr ""
 msgid "Inactive"
 msgstr ""
 
-#: src/inventory_tng/templates/location.html
-#: src/inventory_tng/templates/locations.html
+#: src/inventory_tng/templates/places/location.html
+#: src/inventory_tng/templates/places/locations.html
 msgid "Inside"
 msgstr ""
 
@@ -1694,11 +1696,11 @@ msgstr ""
 msgid "Inventory"
 msgstr ""
 
-#: src/inventory_tng/templates/admins.html
+#: src/inventory_tng/templates/admins/admins.html
 msgid "Invite"
 msgstr ""
 
-#: src/inventory_tng/templates/admins.html
+#: src/inventory_tng/templates/admins/admins.html
 msgid "Invite an administrator"
 msgstr ""
 
@@ -1706,7 +1708,7 @@ msgstr ""
 msgid "Invite another"
 msgstr ""
 
-#: src/inventory_tng/templates/admins.html
+#: src/inventory_tng/templates/admins/admins.html
 msgid "Invited"
 msgstr ""
 
@@ -1721,24 +1723,24 @@ msgstr ""
 msgid "It already has a package by that name."
 msgstr ""
 
-#: src/inventory_tng/templates/item.html
+#: src/inventory_tng/templates/catalogue/item.html
 msgid ""
 "It can't be received any more, though volunteers can still take what is "
 "left."
 msgstr ""
 
-#: src/inventory_tng/templates/item.html
+#: src/inventory_tng/templates/catalogue/item.html
 msgid "It can't be received. None is left, so nobody can pick it."
 msgstr ""
 
-#: src/inventory_tng/templates/item.html
+#: src/inventory_tng/templates/catalogue/item.html
 #, python-format
 msgid ""
 "It can't be received. Volunteers can still take the %(left)s %(unit)s "
 "left, until it runs out."
 msgstr ""
 
-#: src/inventory_tng/templates/device.html
+#: src/inventory_tng/templates/devices/device.html
 msgid ""
 "It can't save anything once revoked, and stays revoked: it would have to "
 "register again with a new code. You'll be asked first."
@@ -1748,29 +1750,29 @@ msgstr ""
 msgid "It is retired."
 msgstr ""
 
-#: src/inventory_tng/templates/code_made.html
+#: src/inventory_tng/templates/devices/code_made.html
 #, python-format
 msgid "It registers up to %(count)s device, until %(until)s."
 msgid_plural "It registers up to %(count)s devices, until %(until)s."
 msgstr[0] ""
 msgstr[1] ""
 
-#: src/inventory_tng/templates/counts.html
+#: src/inventory_tng/templates/stock/counts.html
 msgid "It was"
 msgstr ""
 
-#: src/inventory_tng/templates/count.html
-#: src/inventory_tng/templates/counts.html
-#: src/inventory_tng/templates/items.html
-#: src/inventory_tng/templates/needs_counting.html
-#: src/inventory_tng/templates/over_recorded.html
-#: src/inventory_tng/templates/over_recorded_settled.html
-#: src/inventory_tng/templates/reorder.html
-#: src/inventory_tng/templates/stock.html
+#: src/inventory_tng/templates/catalogue/items.html
+#: src/inventory_tng/templates/stock/count.html
+#: src/inventory_tng/templates/stock/counts.html
+#: src/inventory_tng/templates/stock/needs_counting.html
+#: src/inventory_tng/templates/stock/over_recorded.html
+#: src/inventory_tng/templates/stock/over_recorded_settled.html
+#: src/inventory_tng/templates/stock/reorder.html
+#: src/inventory_tng/templates/stock/stock.html
 msgid "Item"
 msgstr ""
 
-#: src/inventory_tng/templates/labels.html
+#: src/inventory_tng/templates/labels/labels.html
 msgid "Item labels"
 msgstr ""
 
@@ -1778,21 +1780,21 @@ msgstr ""
 msgid "Item retired"
 msgstr ""
 
-#: src/inventory_tng/templates/categories.html
-#: src/inventory_tng/templates/category.html
+#: src/inventory_tng/templates/catalogue/categories.html
+#: src/inventory_tng/templates/catalogue/category.html
 #: src/inventory_tng/web/navigation.py
 msgid "Items"
 msgstr ""
 
-#: src/inventory_tng/templates/stock.html
+#: src/inventory_tng/templates/stock/stock.html
 msgid "Items shown"
 msgstr ""
 
-#: src/inventory_tng/templates/stock.html
+#: src/inventory_tng/templates/stock/stock.html
 msgid "Items shown:"
 msgstr ""
 
-#: src/inventory_tng/templates/reorder.html
+#: src/inventory_tng/templates/stock/reorder.html
 msgid ""
 "Items whose usable stock in the stores, across their areas, is at or "
 "below the level to reorder at (short ends are not usable), or with fewer "
@@ -1804,12 +1806,12 @@ msgstr ""
 msgid "Its category is retired: bring that back, or pick another, first."
 msgstr ""
 
-#: src/inventory_tng/templates/label_revoke.html
+#: src/inventory_tng/templates/labels/label_revoke.html
 #, python-format
 msgid "Its code, <span class=\"key\">%(code)s</span>, names %(names)s."
 msgstr ""
 
-#: src/inventory_tng/templates/location.html
+#: src/inventory_tng/templates/places/location.html
 #, python-format
 msgid "Its parent's (%(zone)s)"
 msgstr ""
@@ -1830,29 +1832,29 @@ msgstr ""
 msgid "Its unit is fixed, as stock has moved in it."
 msgstr ""
 
-#: src/inventory_tng/templates/code_revoke.html
-#: src/inventory_tng/templates/device_revoke_one.html
-#: src/inventory_tng/templates/label_revoke.html
+#: src/inventory_tng/templates/devices/code_revoke.html
+#: src/inventory_tng/templates/devices/device_revoke_one.html
+#: src/inventory_tng/templates/labels/label_revoke.html
 msgid "Keep it"
 msgstr ""
 
-#: src/inventory_tng/templates/admin_reset.html
+#: src/inventory_tng/templates/admins/admin_reset.html
 msgid "Keep it as it is"
 msgstr ""
 
-#: src/inventory_tng/templates/open_package_close.html
+#: src/inventory_tng/templates/stock/open_package_close.html
 msgid "Keep it open"
 msgstr ""
 
-#: src/inventory_tng/templates/item.html
+#: src/inventory_tng/templates/catalogue/item.html
 msgid "Keep sealed"
 msgstr ""
 
-#: src/inventory_tng/templates/device_revoke.html
+#: src/inventory_tng/templates/devices/device_revoke.html
 msgid "Keep them"
 msgstr ""
 
-#: src/inventory_tng/templates/volunteer_merge.html
+#: src/inventory_tng/templates/volunteers/volunteer_merge.html
 msgid "Keep them apart"
 msgstr ""
 
@@ -1864,18 +1866,18 @@ msgstr ""
 msgid "Larger than its too-short length, or change that first."
 msgstr ""
 
-#: src/inventory_tng/templates/account.html
-#: src/inventory_tng/templates/code.html
-#: src/inventory_tng/templates/device.html
-#: src/inventory_tng/templates/device_list.html
+#: src/inventory_tng/templates/admins/account.html
+#: src/inventory_tng/templates/devices/code.html
+#: src/inventory_tng/templates/devices/device.html
+#: src/inventory_tng/templates/devices/device_list.html
 msgid "Last used"
 msgstr ""
 
-#: src/inventory_tng/templates/length_checks.html
+#: src/inventory_tng/templates/stock/length_checks.html
 msgid "Leave it"
 msgstr ""
 
-#: src/inventory_tng/templates/length_checks.html
+#: src/inventory_tng/templates/stock/length_checks.html
 msgid "Leave the ones ticked"
 msgstr ""
 
@@ -1883,7 +1885,7 @@ msgstr ""
 msgid "Left as it shows."
 msgstr ""
 
-#: src/inventory_tng/templates/count.html
+#: src/inventory_tng/templates/stock/count.html
 msgid "Left on it"
 msgstr ""
 
@@ -1891,7 +1893,7 @@ msgstr ""
 msgid "Lengths to check"
 msgstr ""
 
-#: src/inventory_tng/templates/volunteer.html
+#: src/inventory_tng/templates/volunteers/volunteer.html
 msgid "Let them hold stock"
 msgstr ""
 
@@ -1899,11 +1901,11 @@ msgstr ""
 msgid "Locations"
 msgstr ""
 
-#: src/inventory_tng/templates/admin.html
+#: src/inventory_tng/templates/admins/admin.html
 msgid "Locked out, or a password or phone stolen?"
 msgstr ""
 
-#: src/inventory_tng/templates/recover.html
+#: src/inventory_tng/templates/admins/recover.html
 msgid ""
 "Locked out, with no other administrator to let you back in? Whoever runs "
 "the server can set a recovery token and give it to you. With it, reset "
@@ -1919,23 +1921,23 @@ msgstr ""
 msgid "Loose %(item)s"
 msgstr ""
 
-#: src/inventory_tng/templates/labels.html
+#: src/inventory_tng/templates/labels/labels.html
 msgid "Made"
 msgstr ""
 
-#: src/inventory_tng/templates/locations.html
+#: src/inventory_tng/templates/places/locations.html
 msgid "Made and retired with the volunteer."
 msgstr ""
 
-#: src/inventory_tng/templates/devices.html
+#: src/inventory_tng/templates/devices/devices.html
 msgid "Make a code"
 msgstr ""
 
-#: src/inventory_tng/templates/devices.html
+#: src/inventory_tng/templates/devices/devices.html
 msgid "Make a registration code"
 msgstr ""
 
-#: src/inventory_tng/templates/labels.html
+#: src/inventory_tng/templates/labels/labels.html
 #, python-format
 msgid ""
 "Make labels from an <a href=\"%(items)s\">item's</a> or a <a "
@@ -1943,15 +1945,16 @@ msgid ""
 " often as needed; pick some here to print them again."
 msgstr ""
 
-#: src/inventory_tng/templates/account.html
+#: src/inventory_tng/templates/admins/account.html
 msgid "Make new recovery codes"
 msgstr ""
 
-#: src/inventory_tng/templates/item.html src/inventory_tng/templates/items.html
+#: src/inventory_tng/templates/catalogue/item.html
+#: src/inventory_tng/templates/catalogue/items.html
 msgid "Manufacturer"
 msgstr ""
 
-#: src/inventory_tng/templates/over_recorded.html
+#: src/inventory_tng/templates/stock/over_recorded.html
 msgid "Mark checked"
 msgstr ""
 
@@ -1963,8 +1966,8 @@ msgstr ""
 msgid "Menu"
 msgstr ""
 
-#: src/inventory_tng/templates/volunteer.html
-#: src/inventory_tng/templates/volunteer_merge.html
+#: src/inventory_tng/templates/volunteers/volunteer.html
+#: src/inventory_tng/templates/volunteers/volunteer_merge.html
 msgid "Merge"
 msgstr ""
 
@@ -1973,7 +1976,7 @@ msgstr ""
 msgid "Merge %(name)s into %(into)s?"
 msgstr ""
 
-#: src/inventory_tng/templates/volunteer.html
+#: src/inventory_tng/templates/volunteers/volunteer.html
 msgid "Merge into"
 msgstr ""
 
@@ -1981,7 +1984,7 @@ msgstr ""
 msgid "Merged. Their past records now count as the other's."
 msgstr ""
 
-#: src/inventory_tng/templates/volunteer.html
+#: src/inventory_tng/templates/volunteers/volunteer.html
 msgid ""
 "Merging retires them, and their past records count as the other's. You'll"
 " be asked first."
@@ -1995,29 +1998,29 @@ msgstr ""
 msgid "Move what is here elsewhere, or count it, first."
 msgstr ""
 
-#: src/inventory_tng/templates/_item_name.html
-#: src/inventory_tng/templates/account.html
-#: src/inventory_tng/templates/category.html
-#: src/inventory_tng/templates/device.html
-#: src/inventory_tng/templates/item.html
-#: src/inventory_tng/templates/location.html
-#: src/inventory_tng/templates/locations.html
-#: src/inventory_tng/templates/volunteer.html
-#: src/inventory_tng/templates/volunteers.html
+#: src/inventory_tng/templates/admins/account.html
+#: src/inventory_tng/templates/catalogue/_item_name.html
+#: src/inventory_tng/templates/catalogue/category.html
+#: src/inventory_tng/templates/catalogue/item.html
+#: src/inventory_tng/templates/devices/device.html
+#: src/inventory_tng/templates/places/location.html
+#: src/inventory_tng/templates/places/locations.html
+#: src/inventory_tng/templates/volunteers/volunteer.html
+#: src/inventory_tng/templates/volunteers/volunteers.html
 msgid "Name"
 msgstr ""
 
-#: src/inventory_tng/templates/_totp_fields.html
+#: src/inventory_tng/templates/admins/_totp_fields.html
 msgid "Name for it"
 msgstr ""
 
 #: src/inventory_tng/templates/_labels.html
-#: src/inventory_tng/templates/labels.html
-#: src/inventory_tng/templates/labels_print.html
+#: src/inventory_tng/templates/labels/labels.html
+#: src/inventory_tng/templates/labels/labels_print.html
 msgid "Names"
 msgstr ""
 
-#: src/inventory_tng/templates/reading_rule.html
+#: src/inventory_tng/templates/catalogue/reading_rule.html
 #, python-format
 msgid ""
 "Names with “%(token)s” after a number are read by the unit table again, "
@@ -2028,26 +2031,26 @@ msgstr ""
 msgid "Needs counting"
 msgstr ""
 
-#: src/inventory_tng/templates/admin_home.html
+#: src/inventory_tng/templates/admins/admin_home.html
 #, python-format
 msgid "Needs your action (%(total)s)"
 msgstr ""
 
-#: src/inventory_tng/templates/categories.html
+#: src/inventory_tng/templates/catalogue/categories.html
 msgid "New category"
 msgstr ""
 
-#: src/inventory_tng/templates/account.html
-#: src/inventory_tng/templates/reset.html
+#: src/inventory_tng/templates/admins/account.html
+#: src/inventory_tng/templates/admins/reset.html
 msgid "New password"
 msgstr ""
 
-#: src/inventory_tng/templates/account.html
-#: src/inventory_tng/templates/reset.html
+#: src/inventory_tng/templates/admins/account.html
+#: src/inventory_tng/templates/admins/reset.html
 msgid "New password again"
 msgstr ""
 
-#: src/inventory_tng/templates/settings.html
+#: src/inventory_tng/templates/site_settings/settings.html
 msgid "New reason"
 msgstr ""
 
@@ -2087,21 +2090,21 @@ msgstr ""
 msgid "No such package."
 msgstr ""
 
-#: src/inventory_tng/templates/location.html
+#: src/inventory_tng/templates/places/location.html
 msgid ""
 "Nobody can pick it any more. Move what is here elsewhere, or count it, "
 "first."
 msgstr ""
 
-#: src/inventory_tng/templates/category.html
+#: src/inventory_tng/templates/catalogue/category.html
 msgid "Nobody can pick it for an item any more. Move or retire its items first."
 msgstr ""
 
-#: src/inventory_tng/templates/category.html
+#: src/inventory_tng/templates/catalogue/category.html
 msgid "Nobody can pick it for an item."
 msgstr ""
 
-#: src/inventory_tng/templates/location.html
+#: src/inventory_tng/templates/places/location.html
 msgid "Nobody can pick it."
 msgstr ""
 
@@ -2109,8 +2112,8 @@ msgstr ""
 msgid "Nobody said what is on those: type what is on each, and set it on its own."
 msgstr ""
 
-#: src/inventory_tng/templates/count.html
-#: src/inventory_tng/templates/length_checks.html
+#: src/inventory_tng/templates/stock/count.html
+#: src/inventory_tng/templates/stock/length_checks.html
 msgid "None"
 msgstr ""
 
@@ -2127,41 +2130,41 @@ msgstr ""
 msgid "None is retired."
 msgstr ""
 
-#: src/inventory_tng/templates/categories.html
-#: src/inventory_tng/templates/code.html
-#: src/inventory_tng/templates/counts.html
-#: src/inventory_tng/templates/devices.html
-#: src/inventory_tng/templates/locations.html
+#: src/inventory_tng/templates/catalogue/categories.html
+#: src/inventory_tng/templates/devices/code.html
+#: src/inventory_tng/templates/devices/devices.html
+#: src/inventory_tng/templates/places/locations.html
+#: src/inventory_tng/templates/stock/counts.html
 msgid "None yet."
 msgstr ""
 
-#: src/inventory_tng/templates/reading_rules.html
+#: src/inventory_tng/templates/catalogue/reading_rules.html
 #, python-format
 msgid "None yet: <a href=\"%(link)s\">propose them from the names</a>."
 msgstr ""
 
-#: src/inventory_tng/templates/items.html
-#: src/inventory_tng/templates/volunteers.html
+#: src/inventory_tng/templates/catalogue/items.html
+#: src/inventory_tng/templates/volunteers/volunteers.html
 msgid "None yet: add one below."
 msgstr ""
 
-#: src/inventory_tng/templates/labels.html
+#: src/inventory_tng/templates/labels/labels.html
 msgid "None yet: make one from an item's or a place's page."
 msgstr ""
 
-#: src/inventory_tng/templates/category.html
-#: src/inventory_tng/templates/device_list.html
-#: src/inventory_tng/templates/item.html
+#: src/inventory_tng/templates/catalogue/category.html
+#: src/inventory_tng/templates/catalogue/item.html
+#: src/inventory_tng/templates/devices/device_list.html
 msgid "None."
 msgstr ""
 
 #: src/inventory_tng/catalogue/reading_rules_routes.py
-#: src/inventory_tng/templates/reading_rule.html
-#: src/inventory_tng/templates/reading_seed.html
+#: src/inventory_tng/templates/catalogue/reading_rule.html
+#: src/inventory_tng/templates/catalogue/reading_seed.html
 msgid "Not a unit"
 msgstr ""
 
-#: src/inventory_tng/templates/_units_read.html
+#: src/inventory_tng/templates/catalogue/_units_read.html
 #, python-format
 msgid "Not a unit: keep “%(typed)s”"
 msgstr ""
@@ -2206,11 +2209,11 @@ msgstr ""
 msgid "Not here"
 msgstr ""
 
-#: src/inventory_tng/templates/count.html
+#: src/inventory_tng/templates/stock/count.html
 msgid "Not here: close it, lost"
 msgstr ""
 
-#: src/inventory_tng/templates/_units_read.html
+#: src/inventory_tng/templates/catalogue/_units_read.html
 msgid "Not right?"
 msgstr ""
 
@@ -2218,7 +2221,7 @@ msgstr ""
 msgid "Not saved: it's retired. Bring it back first to change it."
 msgstr ""
 
-#: src/inventory_tng/templates/reading_seed.html
+#: src/inventory_tng/templates/catalogue/reading_seed.html
 msgid ""
 "Not saved: read so, these names would read as one. Rename one of each, or"
 " read it otherwise."
@@ -2230,19 +2233,19 @@ msgid ""
 "is now: make your change again."
 msgstr ""
 
-#: src/inventory_tng/templates/reading_rule.html
+#: src/inventory_tng/templates/catalogue/reading_rule.html
 msgid "Not saved: these names would read as one. Rename one of each first."
 msgstr ""
 
-#: src/inventory_tng/templates/used_up.html
+#: src/inventory_tng/templates/stock/used_up.html
 msgid "Not used up"
 msgstr ""
 
-#: src/inventory_tng/templates/used_up.html
+#: src/inventory_tng/templates/stock/used_up.html
 msgid "Not used up, the ones ticked"
 msgstr ""
 
-#: src/inventory_tng/templates/item.html
+#: src/inventory_tng/templates/catalogue/item.html
 msgid "Notes"
 msgstr ""
 
@@ -2262,19 +2265,19 @@ msgstr ""
 msgid "Nothing changed: those ticked were set so already, or are retired."
 msgstr ""
 
-#: src/inventory_tng/templates/count.html
+#: src/inventory_tng/templates/stock/count.html
 msgid "Nothing else"
 msgstr ""
 
-#: src/inventory_tng/templates/count.html
+#: src/inventory_tng/templates/stock/count.html
 msgid "Nothing here matches."
 msgstr ""
 
-#: src/inventory_tng/templates/reorder.html
+#: src/inventory_tng/templates/stock/reorder.html
 msgid "Nothing is at or below its level."
 msgstr ""
 
-#: src/inventory_tng/templates/stock.html
+#: src/inventory_tng/templates/stock/stock.html
 msgid "Nothing is recorded anywhere yet."
 msgstr ""
 
@@ -2285,38 +2288,38 @@ msgid ""
 "search</a>."
 msgstr ""
 
-#: src/inventory_tng/templates/reading_seed.html
+#: src/inventory_tng/templates/catalogue/reading_seed.html
 msgid "Nothing says which: choose."
 msgstr ""
 
-#: src/inventory_tng/templates/over_recorded_settled.html
+#: src/inventory_tng/templates/stock/over_recorded_settled.html
 msgid "Nothing settled yet."
 msgstr ""
 
-#: src/inventory_tng/templates/needs_counting.html
+#: src/inventory_tng/templates/stock/needs_counting.html
 msgid "Nothing shows less than nothing."
 msgstr ""
 
-#: src/inventory_tng/templates/length_checks.html
+#: src/inventory_tng/templates/stock/length_checks.html
 msgid "Nothing to check."
 msgstr ""
 
-#: src/inventory_tng/templates/reading_seed.html
+#: src/inventory_tng/templates/catalogue/reading_seed.html
 msgid ""
 "Nothing to settle: every unit after a number in a name is read one way, "
 "or by a rule."
 msgstr ""
 
-#: src/inventory_tng/templates/over_recorded.html
-#: src/inventory_tng/templates/used_up.html
+#: src/inventory_tng/templates/stock/over_recorded.html
+#: src/inventory_tng/templates/stock/used_up.html
 msgid "Nothing waits."
 msgstr ""
 
-#: src/inventory_tng/templates/locations.html
+#: src/inventory_tng/templates/places/locations.html
 msgid "Nowhere"
 msgstr ""
 
-#: src/inventory_tng/templates/item.html
+#: src/inventory_tng/templates/catalogue/item.html
 msgid "Of"
 msgstr ""
 
@@ -2324,11 +2327,11 @@ msgstr ""
 msgid "Offered again: not used up."
 msgstr ""
 
-#: src/inventory_tng/templates/settings.html
+#: src/inventory_tng/templates/site_settings/settings.html
 msgid "Offered when stock is found or written off on the Counts page."
 msgstr ""
 
-#: src/inventory_tng/templates/item.html
+#: src/inventory_tng/templates/catalogue/item.html
 msgid "Old code"
 msgstr ""
 
@@ -2339,25 +2342,25 @@ msgstr ""
 msgid "On %(brand)s: %(words)s."
 msgstr ""
 
-#: src/inventory_tng/templates/account.html
+#: src/inventory_tng/templates/admins/account.html
 msgid "On this page"
 msgstr ""
 
-#: src/inventory_tng/templates/item.html
+#: src/inventory_tng/templates/catalogue/item.html
 msgid ""
 "On: a package opened is followed until used up, for spools and the like. "
 "Off: it becomes loose units, for boxes of small things. Each package "
 "below can say otherwise."
 msgstr ""
 
-#: src/inventory_tng/templates/code_revoke.html
+#: src/inventory_tng/templates/devices/code_revoke.html
 #, python-format
 msgid ""
 "Once revoked, %(code)s registers no more devices, and stays revoked: make"
 " a new code to register more. Devices it registered stay registered."
 msgstr ""
 
-#: src/inventory_tng/templates/item.html
+#: src/inventory_tng/templates/catalogue/item.html
 #, python-format
 msgid "One %(unit)s"
 msgstr ""
@@ -2372,11 +2375,11 @@ msgid ""
 "there first."
 msgstr ""
 
-#: src/inventory_tng/templates/item.html
+#: src/inventory_tng/templates/catalogue/item.html
 msgid "One unit"
 msgstr ""
 
-#: src/inventory_tng/templates/count.html
+#: src/inventory_tng/templates/stock/count.html
 #, python-format
 msgid ""
 "Only %(item)s matching “%(search)s”. Only these are counted; the rest "
@@ -2388,7 +2391,7 @@ msgstr ""
 msgid "Only %(item)s."
 msgstr ""
 
-#: src/inventory_tng/templates/count.html
+#: src/inventory_tng/templates/stock/count.html
 #, python-format
 msgid "Only %(item)s. Only these are counted; the rest stay as they are."
 msgstr ""
@@ -2404,14 +2407,14 @@ msgid_plural ""
 msgstr[0] ""
 msgstr[1] ""
 
-#: src/inventory_tng/templates/count.html
+#: src/inventory_tng/templates/stock/count.html
 #, python-format
 msgid ""
 "Only items matching “%(search)s”. Only these are counted; the rest stay "
 "as they are."
 msgstr ""
 
-#: src/inventory_tng/templates/link_made.html
+#: src/inventory_tng/templates/admins/link_made.html
 msgid "Only with them beside you: any camera in view can read it."
 msgstr ""
 
@@ -2425,53 +2428,53 @@ msgstr ""
 msgid "Open %(package)s"
 msgstr ""
 
-#: src/inventory_tng/templates/length_checks.html
-#: src/inventory_tng/templates/used_up.html
+#: src/inventory_tng/templates/stock/length_checks.html
+#: src/inventory_tng/templates/stock/used_up.html
 msgid "Open package"
 msgstr ""
 
-#: src/inventory_tng/templates/item.html
+#: src/inventory_tng/templates/catalogue/item.html
 msgid "Open packages"
 msgstr ""
 
-#: src/inventory_tng/templates/item.html
+#: src/inventory_tng/templates/catalogue/item.html
 msgid ""
 "Opened and followed until used up. Closing one writes off what it still "
 "shows, with the reason Used up; you'll be asked first."
 msgstr ""
 
-#: src/inventory_tng/templates/items.html
+#: src/inventory_tng/templates/catalogue/items.html
 msgid "Opened followed"
 msgstr ""
 
-#: src/inventory_tng/templates/item.html
+#: src/inventory_tng/templates/catalogue/item.html
 msgid "Opened ones followed"
 msgstr ""
 
-#: src/inventory_tng/templates/item.html
+#: src/inventory_tng/templates/catalogue/item.html
 msgid "Opened ones loose"
 msgstr ""
 
-#: src/inventory_tng/templates/settings.html
+#: src/inventory_tng/templates/site_settings/settings.html
 msgid "Optional: each administrator chooses"
 msgstr ""
 
-#: src/inventory_tng/templates/code_made.html
+#: src/inventory_tng/templates/devices/code_made.html
 #, python-format
 msgid ""
 "Or open <strong>%(register)s</strong> and type <span "
 "class=\"key\">%(phrase)s</span>"
 msgstr ""
 
-#: src/inventory_tng/templates/code_made.html
+#: src/inventory_tng/templates/devices/code_made.html
 msgid "Or type this phrase"
 msgstr ""
 
-#: src/inventory_tng/templates/item.html
+#: src/inventory_tng/templates/catalogue/item.html
 msgid "Ordering notes"
 msgstr ""
 
-#: src/inventory_tng/templates/item.html
+#: src/inventory_tng/templates/catalogue/item.html
 msgid ""
 "Other names it is found by, such as one it was known by. Each is taken, "
 "as a name is: no other item can have it."
@@ -2483,7 +2486,8 @@ msgid ""
 "current volunteer to merge into."
 msgstr ""
 
-#: src/inventory_tng/templates/count.html src/inventory_tng/templates/item.html
+#: src/inventory_tng/templates/catalogue/item.html
+#: src/inventory_tng/templates/stock/count.html
 msgid "Package"
 msgstr ""
 
@@ -2507,7 +2511,7 @@ msgstr ""
 msgid "Package saved."
 msgstr ""
 
-#: src/inventory_tng/templates/item.html
+#: src/inventory_tng/templates/catalogue/item.html
 msgid "Packages"
 msgstr ""
 
@@ -2524,15 +2528,16 @@ msgstr ""
 msgid "Paper"
 msgstr ""
 
-#: src/inventory_tng/templates/items.html
+#: src/inventory_tng/templates/catalogue/items.html
 msgid "Part"
 msgstr ""
 
-#: src/inventory_tng/templates/item.html src/inventory_tng/templates/items.html
+#: src/inventory_tng/templates/catalogue/item.html
+#: src/inventory_tng/templates/catalogue/items.html
 msgid "Part number"
 msgstr ""
 
-#: src/inventory_tng/templates/link_made.html
+#: src/inventory_tng/templates/admins/link_made.html
 #, python-format
 msgid ""
 "Pass this link on to %(name)s yourself, in person or in a message only "
@@ -2540,7 +2545,7 @@ msgid ""
 "password."
 msgstr ""
 
-#: src/inventory_tng/templates/link_made.html
+#: src/inventory_tng/templates/admins/link_made.html
 #, python-format
 msgid ""
 "Pass this link on to %(name)s yourself, in person or in a message only "
@@ -2548,33 +2553,35 @@ msgid ""
 "password."
 msgstr ""
 
-#: src/inventory_tng/admins/guards.py src/inventory_tng/templates/account.html
-#: src/inventory_tng/templates/setup.html
-#: src/inventory_tng/templates/sign_in.html
+#: src/inventory_tng/admins/guards.py
+#: src/inventory_tng/templates/admins/account.html
+#: src/inventory_tng/templates/admins/setup.html
+#: src/inventory_tng/templates/admins/sign_in.html
 msgid "Password"
 msgstr ""
 
-#: src/inventory_tng/admins/guards.py src/inventory_tng/templates/setup.html
+#: src/inventory_tng/admins/guards.py
+#: src/inventory_tng/templates/admins/setup.html
 msgid "Password again"
 msgstr ""
 
-#: src/inventory_tng/templates/_totp_fields.html
+#: src/inventory_tng/templates/admins/_totp_fields.html
 msgid "Phone"
 msgstr ""
 
-#: src/inventory_tng/templates/items.html
-#: src/inventory_tng/templates/length_checks.html
-#: src/inventory_tng/templates/used_up.html
+#: src/inventory_tng/templates/catalogue/items.html
+#: src/inventory_tng/templates/stock/length_checks.html
+#: src/inventory_tng/templates/stock/used_up.html
 msgid "Pick"
 msgstr ""
 
-#: src/inventory_tng/templates/items.html
+#: src/inventory_tng/templates/catalogue/items.html
 #, python-format
 msgid "Pick %(item)s"
 msgstr ""
 
-#: src/inventory_tng/templates/length_checks.html
-#: src/inventory_tng/templates/used_up.html
+#: src/inventory_tng/templates/stock/length_checks.html
+#: src/inventory_tng/templates/stock/used_up.html
 #, python-format
 msgid "Pick %(item)s, %(package)s, at %(place)s"
 msgstr ""
@@ -2607,8 +2614,8 @@ msgstr ""
 msgid "Pick an item."
 msgstr ""
 
-#: src/inventory_tng/templates/counts.html
-#: src/inventory_tng/templates/items.html
+#: src/inventory_tng/templates/catalogue/items.html
+#: src/inventory_tng/templates/stock/counts.html
 msgid "Pick one"
 msgstr ""
 
@@ -2620,7 +2627,7 @@ msgstr ""
 msgid "Pick where it is."
 msgstr ""
 
-#: src/inventory_tng/templates/volunteer.html
+#: src/inventory_tng/templates/volunteers/volunteer.html
 msgid "Pick who they duplicate"
 msgstr ""
 
@@ -2628,18 +2635,18 @@ msgstr ""
 msgid "Pick who they duplicate."
 msgstr ""
 
-#: src/inventory_tng/templates/labels.html
+#: src/inventory_tng/templates/labels/labels.html
 msgid ""
 "Picks on this page print; search to bring the ones you want onto one "
 "page. Revoking a code stops every copy of it scanning."
 msgstr ""
 
-#: src/inventory_tng/templates/counts.html
-#: src/inventory_tng/templates/stock.html
+#: src/inventory_tng/templates/stock/counts.html
+#: src/inventory_tng/templates/stock/stock.html
 msgid "Place"
 msgstr ""
 
-#: src/inventory_tng/templates/labels.html
+#: src/inventory_tng/templates/labels/labels.html
 msgid "Place labels"
 msgstr ""
 
@@ -2647,17 +2654,17 @@ msgstr ""
 msgid "Place retired"
 msgstr ""
 
-#: src/inventory_tng/templates/needs_counting.html
-#: src/inventory_tng/templates/stock.html
+#: src/inventory_tng/templates/stock/needs_counting.html
+#: src/inventory_tng/templates/stock/stock.html
 msgid "Places shown"
 msgstr ""
 
-#: src/inventory_tng/templates/needs_counting.html
-#: src/inventory_tng/templates/stock.html
+#: src/inventory_tng/templates/stock/needs_counting.html
+#: src/inventory_tng/templates/stock/stock.html
 msgid "Places shown:"
 msgstr ""
 
-#: src/inventory_tng/templates/needs_counting.html
+#: src/inventory_tng/templates/stock/needs_counting.html
 msgid ""
 "Places that show less than nothing of an item: the records are wrong "
 "there until someone counts it."
@@ -2668,11 +2675,11 @@ msgid "Previous"
 msgstr ""
 
 #: src/inventory_tng/templates/_print_controls.html
-#: src/inventory_tng/templates/labels.html
+#: src/inventory_tng/templates/labels/labels.html
 msgid "Print"
 msgstr ""
 
-#: src/inventory_tng/templates/labels.html
+#: src/inventory_tng/templates/labels/labels.html
 #, python-format
 msgid "Print %(code)s"
 msgstr ""
@@ -2682,11 +2689,11 @@ msgstr ""
 msgid "Print from 1 to %(max)d copies of each."
 msgstr ""
 
-#: src/inventory_tng/templates/code_made.html
+#: src/inventory_tng/templates/devices/code_made.html
 msgid "Print it"
 msgstr ""
 
-#: src/inventory_tng/templates/code_made.html
+#: src/inventory_tng/templates/devices/code_made.html
 msgid ""
 "Print it now: the phrase is never shown again. If the print dialog offers"
 " paper sizes, pick the same one there."
@@ -2696,11 +2703,11 @@ msgstr ""
 msgid "Print labels"
 msgstr ""
 
-#: src/inventory_tng/templates/labels.html
+#: src/inventory_tng/templates/labels/labels.html
 msgid "Print the ones picked"
 msgstr ""
 
-#: src/inventory_tng/templates/labels_print.html
+#: src/inventory_tng/templates/labels/labels_print.html
 msgid "Print them"
 msgstr ""
 
@@ -2711,7 +2718,7 @@ msgid_plural "Print up to %(num)d labels at once."
 msgstr[0] ""
 msgstr[1] ""
 
-#: src/inventory_tng/templates/reading_rules.html
+#: src/inventory_tng/templates/catalogue/reading_rules.html
 msgid "Propose readings from every name"
 msgstr ""
 
@@ -2719,7 +2726,7 @@ msgstr ""
 msgid "Propose unit readings"
 msgstr ""
 
-#: src/inventory_tng/templates/over_recorded.html
+#: src/inventory_tng/templates/stock/over_recorded.html
 msgid "Put right another way"
 msgstr ""
 
@@ -2728,17 +2735,17 @@ msgstr ""
 msgid "Put right another way:"
 msgstr ""
 
-#: src/inventory_tng/templates/reading_rules.html
-#: src/inventory_tng/templates/reading_seed.html
+#: src/inventory_tng/templates/catalogue/reading_rules.html
+#: src/inventory_tng/templates/catalogue/reading_seed.html
 msgid "Read as"
 msgstr ""
 
-#: src/inventory_tng/templates/_units_read.html
+#: src/inventory_tng/templates/catalogue/_units_read.html
 #, python-format
 msgid "Read as %(read)s · %(kind)s, by “%(clues)s”."
 msgstr ""
 
-#: src/inventory_tng/templates/_units_read.html
+#: src/inventory_tng/templates/catalogue/_units_read.html
 #, python-format
 msgid "Read as %(read)s · %(kind)s."
 msgstr ""
@@ -2760,7 +2767,7 @@ msgid ""
 "counts up from the start, what's left is the package size minus the mark."
 msgstr ""
 
-#: src/inventory_tng/templates/reading_seed.html
+#: src/inventory_tng/templates/catalogue/reading_seed.html
 #, python-format
 msgid "Read “%(key)s” as"
 msgstr ""
@@ -2770,33 +2777,33 @@ msgstr ""
 msgid "Reading of %(token)s"
 msgstr ""
 
-#: src/inventory_tng/templates/length_checks.html
+#: src/inventory_tng/templates/stock/length_checks.html
 #, python-format
 msgid "Really on it (%(unit)s)"
 msgstr ""
 
-#: src/inventory_tng/templates/settings.html
+#: src/inventory_tng/templates/site_settings/settings.html
 msgid "Reason"
 msgstr ""
 
-#: src/inventory_tng/templates/settings.html
+#: src/inventory_tng/templates/site_settings/settings.html
 msgid "Reasons for an adjustment"
 msgstr ""
 
-#: src/inventory_tng/templates/admin_home.html
-#: src/inventory_tng/templates/admins.html
+#: src/inventory_tng/templates/admins/admin_home.html
+#: src/inventory_tng/templates/admins/admins.html
 msgid "Recent changes"
 msgstr ""
 
-#: src/inventory_tng/templates/length_checks.html
+#: src/inventory_tng/templates/stock/length_checks.html
 msgid "Recent cuts"
 msgstr ""
 
-#: src/inventory_tng/templates/counts.html
+#: src/inventory_tng/templates/stock/counts.html
 msgid "Record it"
 msgstr ""
 
-#: src/inventory_tng/templates/over_recorded.html
+#: src/inventory_tng/templates/stock/over_recorded.html
 msgid "Recorded more"
 msgstr ""
 
@@ -2806,8 +2813,8 @@ msgid "Recorded more (%(count)d)"
 msgstr ""
 
 #: src/inventory_tng/stock/over_recorded_routes.py
-#: src/inventory_tng/templates/over_recorded.html
-#: src/inventory_tng/templates/over_recorded_settled.html
+#: src/inventory_tng/templates/stock/over_recorded.html
+#: src/inventory_tng/templates/stock/over_recorded_settled.html
 msgid "Recorded more than moved"
 msgstr ""
 
@@ -2819,7 +2826,7 @@ msgstr ""
 msgid "Recorded."
 msgstr ""
 
-#: src/inventory_tng/templates/count.html
+#: src/inventory_tng/templates/stock/count.html
 msgid "Records say"
 msgstr ""
 
@@ -2827,7 +2834,7 @@ msgstr ""
 msgid "Recover an account"
 msgstr ""
 
-#: src/inventory_tng/templates/account.html
+#: src/inventory_tng/templates/admins/account.html
 msgid "Recovery codes"
 msgstr ""
 
@@ -2835,7 +2842,7 @@ msgstr ""
 msgid "Recovery codes come with an authenticator."
 msgstr ""
 
-#: src/inventory_tng/templates/recover.html
+#: src/inventory_tng/templates/admins/recover.html
 msgid "Recovery token"
 msgstr ""
 
@@ -2847,14 +2854,14 @@ msgstr ""
 msgid "Register this device"
 msgstr ""
 
-#: src/inventory_tng/templates/code_made.html
+#: src/inventory_tng/templates/devices/code_made.html
 #, python-format
 msgid "Register your phone for %(brand)s"
 msgstr ""
 
-#: src/inventory_tng/templates/code.html
-#: src/inventory_tng/templates/device.html
-#: src/inventory_tng/templates/device_list.html
+#: src/inventory_tng/templates/devices/code.html
+#: src/inventory_tng/templates/devices/device.html
+#: src/inventory_tng/templates/devices/device_list.html
 msgid "Registered"
 msgstr ""
 
@@ -2862,17 +2869,17 @@ msgstr ""
 msgid "Registered devices"
 msgstr ""
 
-#: src/inventory_tng/templates/device_list.html
+#: src/inventory_tng/templates/devices/device_list.html
 msgid "Registered from"
 msgstr ""
 
-#: src/inventory_tng/templates/_units_read.html
+#: src/inventory_tng/templates/catalogue/_units_read.html
 #, python-format
 msgid "Remembered for “%(key)s” after a number in every name."
 msgstr ""
 
-#: src/inventory_tng/templates/account.html
-#: src/inventory_tng/templates/item.html
+#: src/inventory_tng/templates/admins/account.html
+#: src/inventory_tng/templates/catalogue/item.html
 msgid "Remove"
 msgstr ""
 
@@ -2880,15 +2887,15 @@ msgstr ""
 msgid "Removed."
 msgstr ""
 
-#: src/inventory_tng/templates/account.html
+#: src/inventory_tng/templates/admins/account.html
 msgid ""
 "Removing your only one turns TOTP off: your password alone will sign you "
 "in."
 msgstr ""
 
-#: src/inventory_tng/templates/account.html
-#: src/inventory_tng/templates/category.html
-#: src/inventory_tng/templates/settings.html
+#: src/inventory_tng/templates/admins/account.html
+#: src/inventory_tng/templates/catalogue/category.html
+#: src/inventory_tng/templates/site_settings/settings.html
 msgid "Rename"
 msgstr ""
 
@@ -2906,21 +2913,21 @@ msgstr ""
 msgid "Reorder"
 msgstr ""
 
-#: src/inventory_tng/templates/item.html
-#: src/inventory_tng/templates/reorder.html
+#: src/inventory_tng/templates/catalogue/item.html
+#: src/inventory_tng/templates/stock/reorder.html
 msgid "Reorder at"
 msgstr ""
 
-#: src/inventory_tng/templates/used_up.html
+#: src/inventory_tng/templates/stock/used_up.html
 msgid "Reported"
 msgstr ""
 
 #: src/inventory_tng/stock/used_up_routes.py
-#: src/inventory_tng/templates/item.html
+#: src/inventory_tng/templates/catalogue/item.html
 msgid "Reported used up"
 msgstr ""
 
-#: src/inventory_tng/templates/settings.html
+#: src/inventory_tng/templates/site_settings/settings.html
 msgid "Required of every administrator"
 msgstr ""
 
@@ -2928,7 +2935,7 @@ msgstr ""
 msgid "Required or optional?"
 msgstr ""
 
-#: src/inventory_tng/templates/reset.html
+#: src/inventory_tng/templates/admins/reset.html
 msgid "Reset"
 msgstr ""
 
@@ -2937,12 +2944,12 @@ msgstr ""
 msgid "Reset %(username)s's sign-in?"
 msgstr ""
 
-#: src/inventory_tng/templates/recover.html
+#: src/inventory_tng/templates/admins/recover.html
 msgid "Reset my account"
 msgstr ""
 
-#: src/inventory_tng/templates/admin.html
-#: src/inventory_tng/templates/admin_reset.html
+#: src/inventory_tng/templates/admins/admin.html
+#: src/inventory_tng/templates/admins/admin_reset.html
 msgid "Reset their sign-in"
 msgstr ""
 
@@ -2955,7 +2962,7 @@ msgstr ""
 msgid "Reset your account"
 msgstr ""
 
-#: src/inventory_tng/templates/admin_reset.html
+#: src/inventory_tng/templates/admins/admin_reset.html
 #, python-format
 msgid ""
 "Resetting %(name)s's sign-in signs them out everywhere at once: their "
@@ -2964,13 +2971,13 @@ msgid ""
 "them to choose a new password. Every administrator is told."
 msgstr ""
 
-#: src/inventory_tng/templates/forgot.html
+#: src/inventory_tng/templates/admins/forgot.html
 msgid ""
 "Resetting a password by email isn't set up here. Ask another "
 "administrator to reset your sign-in."
 msgstr ""
 
-#: src/inventory_tng/templates/admin.html
+#: src/inventory_tng/templates/admins/admin.html
 msgid ""
 "Resetting their sign-in signs them out everywhere at once, and gives you "
 "a link to pass on for them to choose a new password. You'll be asked "
@@ -2978,7 +2985,7 @@ msgid ""
 "typed one recently, and every administrator is told."
 msgstr ""
 
-#: src/inventory_tng/templates/reading_rule.html
+#: src/inventory_tng/templates/catalogue/reading_rule.html
 msgid "Respell it"
 msgstr ""
 
@@ -2987,40 +2994,42 @@ msgid "Respelt"
 msgstr ""
 
 #: src/inventory_tng/templates/_retired_record.html
-#: src/inventory_tng/templates/admin.html src/inventory_tng/templates/item.html
-#: src/inventory_tng/templates/settings.html
+#: src/inventory_tng/templates/admins/admin.html
+#: src/inventory_tng/templates/catalogue/item.html
+#: src/inventory_tng/templates/site_settings/settings.html
 msgid "Retire"
 msgstr ""
 
-#: src/inventory_tng/templates/admin.html
+#: src/inventory_tng/templates/admins/admin.html
 msgid "Retire them"
 msgstr ""
 
-#: src/inventory_tng/templates/category.html
+#: src/inventory_tng/templates/catalogue/category.html
 msgid "Retire this category"
 msgstr ""
 
-#: src/inventory_tng/templates/item.html
+#: src/inventory_tng/templates/catalogue/item.html
 msgid "Retire this item"
 msgstr ""
 
-#: src/inventory_tng/templates/location.html
+#: src/inventory_tng/templates/places/location.html
 msgid "Retire this location"
 msgstr ""
 
-#: src/inventory_tng/templates/volunteer.html
+#: src/inventory_tng/templates/volunteers/volunteer.html
 msgid "Retire this volunteer"
 msgstr ""
 
-#: src/inventory_tng/templates/_item_name.html
 #: src/inventory_tng/templates/_listing.html
-#: src/inventory_tng/templates/admins.html
-#: src/inventory_tng/templates/categories.html
-#: src/inventory_tng/templates/item.html src/inventory_tng/templates/items.html
-#: src/inventory_tng/templates/location.html
-#: src/inventory_tng/templates/locations.html
-#: src/inventory_tng/templates/settings.html
-#: src/inventory_tng/templates/volunteers.html
+#: src/inventory_tng/templates/admins/admins.html
+#: src/inventory_tng/templates/catalogue/_item_name.html
+#: src/inventory_tng/templates/catalogue/categories.html
+#: src/inventory_tng/templates/catalogue/item.html
+#: src/inventory_tng/templates/catalogue/items.html
+#: src/inventory_tng/templates/places/location.html
+#: src/inventory_tng/templates/places/locations.html
+#: src/inventory_tng/templates/site_settings/settings.html
+#: src/inventory_tng/templates/volunteers/volunteers.html
 msgid "Retired"
 msgstr ""
 
@@ -3038,22 +3047,22 @@ msgid ""
 "and recovery codes are removed."
 msgstr ""
 
-#: src/inventory_tng/templates/admin.html
+#: src/inventory_tng/templates/admins/admin.html
 msgid ""
 "Retiring removed anything they signed in with, so you get a link to pass "
 "on, which works once, within a day, for them to choose a password."
 msgstr ""
 
-#: src/inventory_tng/templates/reading_seed.html
+#: src/inventory_tng/templates/catalogue/reading_seed.html
 msgid "Review one by one"
 msgstr ""
 
-#: src/inventory_tng/templates/code.html
-#: src/inventory_tng/templates/code_revoke.html
-#: src/inventory_tng/templates/device.html
-#: src/inventory_tng/templates/device_revoke_one.html
-#: src/inventory_tng/templates/label_revoke.html
-#: src/inventory_tng/templates/labels.html
+#: src/inventory_tng/templates/devices/code.html
+#: src/inventory_tng/templates/devices/code_revoke.html
+#: src/inventory_tng/templates/devices/device.html
+#: src/inventory_tng/templates/devices/device_revoke_one.html
+#: src/inventory_tng/templates/labels/label_revoke.html
+#: src/inventory_tng/templates/labels/labels.html
 msgid "Revoke"
 msgstr ""
 
@@ -3062,7 +3071,7 @@ msgstr ""
 msgid "Revoke %(name)s?"
 msgstr ""
 
-#: src/inventory_tng/templates/device_revoke.html
+#: src/inventory_tng/templates/devices/device_revoke.html
 #, python-format
 msgid "Revoke %(num)d"
 msgid_plural "Revoke %(num)d"
@@ -3076,17 +3085,17 @@ msgid_plural "Revoke %(num)d devices?"
 msgstr[0] ""
 msgstr[1] ""
 
-#: src/inventory_tng/templates/device_list.html
+#: src/inventory_tng/templates/devices/device_list.html
 msgid "Revoke selected"
 msgstr ""
 
-#: src/inventory_tng/templates/device.html
+#: src/inventory_tng/templates/devices/device.html
 msgid "Revoke this device"
 msgstr ""
 
 #: src/inventory_tng/devices/routes.py src/inventory_tng/labels/labels.py
-#: src/inventory_tng/templates/code.html
-#: src/inventory_tng/templates/device_list.html
+#: src/inventory_tng/templates/devices/code.html
+#: src/inventory_tng/templates/devices/device_list.html
 msgid "Revoked"
 msgstr ""
 
@@ -3110,14 +3119,14 @@ msgstr ""
 msgid "Revoked: they can't save anything now."
 msgstr ""
 
-#: src/inventory_tng/templates/label_revoke.html
+#: src/inventory_tng/templates/labels/label_revoke.html
 msgid ""
 "Revoking it stops every printed copy scanning, wherever it is stuck. It "
 "can't be undone: labels made for it after get a new code, to print and "
 "stick on again."
 msgstr ""
 
-#: src/inventory_tng/templates/code.html
+#: src/inventory_tng/templates/devices/code.html
 msgid ""
 "Revoking stops new registrations. Devices it registered stay registered; "
 "revoke any that look wrong from its own page. You'll be asked first."
@@ -3127,39 +3136,39 @@ msgstr ""
 msgid "Rows"
 msgstr ""
 
-#: src/inventory_tng/templates/item.html
+#: src/inventory_tng/templates/catalogue/item.html
 msgid "Same as the item"
 msgstr ""
 
-#: src/inventory_tng/templates/authenticator_new.html
-#: src/inventory_tng/templates/device.html
-#: src/inventory_tng/templates/item.html
-#: src/inventory_tng/templates/location.html
-#: src/inventory_tng/templates/reading_rule.html
-#: src/inventory_tng/templates/settings.html
-#: src/inventory_tng/templates/volunteer.html
+#: src/inventory_tng/templates/admins/authenticator_new.html
+#: src/inventory_tng/templates/catalogue/item.html
+#: src/inventory_tng/templates/catalogue/reading_rule.html
+#: src/inventory_tng/templates/devices/device.html
+#: src/inventory_tng/templates/places/location.html
+#: src/inventory_tng/templates/site_settings/settings.html
+#: src/inventory_tng/templates/volunteers/volunteer.html
 msgid "Save"
 msgstr ""
 
-#: src/inventory_tng/templates/account.html
+#: src/inventory_tng/templates/admins/account.html
 msgid "Save email"
 msgstr ""
 
-#: src/inventory_tng/templates/count.html
+#: src/inventory_tng/templates/stock/count.html
 msgid "Save the count"
 msgstr ""
 
-#: src/inventory_tng/templates/item.html
+#: src/inventory_tng/templates/catalogue/item.html
 #, python-format
 msgid "Save<span class=\"sr-only\"> the name and size of %(package)s</span>"
 msgstr ""
 
-#: src/inventory_tng/templates/item.html
+#: src/inventory_tng/templates/catalogue/item.html
 #, python-format
 msgid "Save<span class=\"sr-only\"> the name of %(package)s</span>"
 msgstr ""
 
-#: src/inventory_tng/templates/reading_rules.html
+#: src/inventory_tng/templates/catalogue/reading_rules.html
 msgid "Saved"
 msgstr ""
 
@@ -3170,16 +3179,16 @@ msgid_plural "Saved %(num)d lines. These moved while you counted, so count them 
 msgstr[0] ""
 msgstr[1] ""
 
-#: src/inventory_tng/templates/_units_read.html
+#: src/inventory_tng/templates/catalogue/_units_read.html
 #, python-format
 msgid "Saved as %(read)s."
 msgstr ""
 
-#: src/inventory_tng/templates/_units_read.html
+#: src/inventory_tng/templates/catalogue/_units_read.html
 msgid "Saved as typed."
 msgstr ""
 
-#: src/inventory_tng/templates/_units_read.html
+#: src/inventory_tng/templates/catalogue/_units_read.html
 #, python-format
 msgid "Saved, it reads “%(key)s” after a number so in every name."
 msgstr ""
@@ -3220,21 +3229,21 @@ msgstr ""
 msgid "Scan"
 msgstr ""
 
-#: src/inventory_tng/templates/settings.html
+#: src/inventory_tng/templates/site_settings/settings.html
 msgid "Scan page"
 msgstr ""
 
-#: src/inventory_tng/templates/_totp_fields.html
+#: src/inventory_tng/templates/admins/_totp_fields.html
 msgid ""
 "Scan this with an authenticator app, such as Aegis, 2FAS, Google "
 "Authenticator or a password manager:"
 msgstr ""
 
-#: src/inventory_tng/templates/code_made.html
+#: src/inventory_tng/templates/devices/code_made.html
 msgid "Scan this with the phone's camera"
 msgstr ""
 
-#: src/inventory_tng/templates/code_made.html
+#: src/inventory_tng/templates/devices/code_made.html
 msgid "Scan this with your phone's camera."
 msgstr ""
 
@@ -3247,24 +3256,24 @@ msgstr ""
 msgid "Sections"
 msgstr ""
 
-#: src/inventory_tng/templates/reading_seed.html
+#: src/inventory_tng/templates/catalogue/reading_seed.html
 msgid "See them all"
 msgstr ""
 
-#: src/inventory_tng/templates/counts.html
+#: src/inventory_tng/templates/stock/counts.html
 msgid "See what the records say is there, and put right what isn't."
 msgstr ""
 
-#: src/inventory_tng/templates/device_list.html
+#: src/inventory_tng/templates/devices/device_list.html
 msgid "Select"
 msgstr ""
 
-#: src/inventory_tng/templates/device_list.html
+#: src/inventory_tng/templates/devices/device_list.html
 #, python-format
 msgid "Select %(device)s"
 msgstr ""
 
-#: src/inventory_tng/templates/forgot.html
+#: src/inventory_tng/templates/admins/forgot.html
 msgid "Send the link"
 msgstr ""
 
@@ -3272,25 +3281,25 @@ msgstr ""
 msgid "Sessions last"
 msgstr ""
 
-#: src/inventory_tng/templates/length_checks.html
+#: src/inventory_tng/templates/stock/length_checks.html
 msgid "Set it"
 msgstr ""
 
-#: src/inventory_tng/templates/length_checks.html
+#: src/inventory_tng/templates/stock/length_checks.html
 msgid "Set the ones ticked to what was said"
 msgstr ""
 
-#: src/inventory_tng/templates/length_checks.html
+#: src/inventory_tng/templates/stock/length_checks.html
 #, python-format
 msgid "Set to <span data-follows=\"%(field)s\" data-unit=\"%(unit)s\">it</span>"
 msgstr ""
 
 #: src/inventory_tng/admins/sign_in_routes.py
-#: src/inventory_tng/templates/setup.html
+#: src/inventory_tng/templates/admins/setup.html
 msgid "Set up"
 msgstr ""
 
-#: src/inventory_tng/templates/reset.html
+#: src/inventory_tng/templates/admins/reset.html
 msgid "Set up a new authenticator when you next sign in."
 msgstr ""
 
@@ -3309,28 +3318,28 @@ msgid ""
 " since stay."
 msgstr ""
 
-#: src/inventory_tng/templates/item.html
+#: src/inventory_tng/templates/catalogue/item.html
 #, python-format
 msgid "Set<span class=\"sr-only\"> for %(package)s</span>"
 msgstr ""
 
-#: src/inventory_tng/templates/over_recorded_settled.html
+#: src/inventory_tng/templates/stock/over_recorded_settled.html
 #: src/inventory_tng/web/admin.py
 msgid "Settled"
 msgstr ""
 
-#: src/inventory_tng/templates/reading_rules.html
+#: src/inventory_tng/templates/catalogue/reading_rules.html
 msgid "Settled by"
 msgstr ""
 
-#: src/inventory_tng/templates/setup.html
+#: src/inventory_tng/templates/admins/setup.html
 msgid ""
 "Setup is off. Whoever runs the server turns it on by setting "
 "<code>SETUP_TOKEN</code> in the deployment's settings, then gives you "
 "that token."
 msgstr ""
 
-#: src/inventory_tng/templates/setup.html
+#: src/inventory_tng/templates/admins/setup.html
 msgid "Setup token"
 msgstr ""
 
@@ -3342,34 +3351,34 @@ msgstr ""
 msgid "Show"
 msgstr ""
 
-#: src/inventory_tng/templates/link_made.html
+#: src/inventory_tng/templates/admins/link_made.html
 msgid "Show a QR code for their phone"
 msgstr ""
 
 #: src/inventory_tng/templates/_listing.html
-#: src/inventory_tng/templates/count.html
+#: src/inventory_tng/templates/stock/count.html
 msgid "Show all"
 msgstr ""
 
-#: src/inventory_tng/templates/device_list.html
+#: src/inventory_tng/templates/devices/device_list.html
 msgid "Showing"
 msgstr ""
 
-#: src/inventory_tng/templates/_units_read.html
+#: src/inventory_tng/templates/catalogue/_units_read.html
 #, python-format
 msgid "Shown as %(shown)s."
 msgstr ""
 
-#: src/inventory_tng/templates/code_made.html
-#: src/inventory_tng/templates/link_made.html
+#: src/inventory_tng/templates/admins/link_made.html
+#: src/inventory_tng/templates/devices/code_made.html
 msgid "Shown only now."
 msgstr ""
 
-#: src/inventory_tng/templates/used_up.html
+#: src/inventory_tng/templates/stock/used_up.html
 msgid "Shows"
 msgstr ""
 
-#: src/inventory_tng/templates/length_checks.html
+#: src/inventory_tng/templates/stock/length_checks.html
 #, python-format
 msgid "Shows %(left)s %(unit)s."
 msgstr ""
@@ -3379,7 +3388,7 @@ msgid "Shows the wrong length"
 msgstr ""
 
 #: src/inventory_tng/admins/sign_in_routes.py
-#: src/inventory_tng/templates/sign_in.html
+#: src/inventory_tng/templates/admins/sign_in.html
 msgid "Sign in"
 msgstr ""
 
@@ -3387,15 +3396,15 @@ msgstr ""
 msgid "Sign out"
 msgstr ""
 
-#: src/inventory_tng/templates/account.html
+#: src/inventory_tng/templates/admins/account.html
 msgid "Sign out everywhere else"
 msgstr ""
 
-#: src/inventory_tng/templates/account.html
+#: src/inventory_tng/templates/admins/account.html
 msgid "Sign out<span class=\"sr-only\"> here</span>"
 msgstr ""
 
-#: src/inventory_tng/templates/account.html
+#: src/inventory_tng/templates/admins/account.html
 msgid "Signed in"
 msgstr ""
 
@@ -3404,30 +3413,30 @@ msgstr ""
 msgid "Signed in as %(account)s"
 msgstr ""
 
-#: src/inventory_tng/templates/settings.html
+#: src/inventory_tng/templates/site_settings/settings.html
 msgid "Signing in"
 msgstr ""
 
-#: src/inventory_tng/templates/authenticator_new.html
+#: src/inventory_tng/templates/admins/authenticator_new.html
 msgid ""
 "Signing in here needs an authenticator app as well as your password. Set "
 "one up to carry on."
 msgstr ""
 
-#: src/inventory_tng/templates/admin.html
+#: src/inventory_tng/templates/admins/admin.html
 msgid "Signs in with a password and an authenticator."
 msgstr ""
 
-#: src/inventory_tng/templates/admin.html
+#: src/inventory_tng/templates/admins/admin.html
 msgid "Signs in with a password."
 msgstr ""
 
-#: src/inventory_tng/templates/_item_name.html
+#: src/inventory_tng/templates/catalogue/_item_name.html
 #, python-format
 msgid "Similar: %(items)s."
 msgstr ""
 
-#: src/inventory_tng/templates/admin_home.html
+#: src/inventory_tng/templates/admins/admin_home.html
 msgid "Since you last signed in"
 msgstr ""
 
@@ -3435,11 +3444,11 @@ msgstr ""
 msgid "Site settings"
 msgstr ""
 
-#: src/inventory_tng/templates/item.html
+#: src/inventory_tng/templates/catalogue/item.html
 msgid "Sizes it comes in, so one scan or pick counts the whole package."
 msgstr ""
 
-#: src/inventory_tng/templates/reading_seed.html
+#: src/inventory_tng/templates/catalogue/reading_seed.html
 msgid "Skip"
 msgstr ""
 
@@ -3457,7 +3466,7 @@ msgid ""
 "If it wasn't you, ignore this mail: your password stays as it is."
 msgstr ""
 
-#: src/inventory_tng/templates/length_checks.html
+#: src/inventory_tng/templates/stock/length_checks.html
 #, python-format
 msgid "Someone said %(said)s %(unit)s is on it, %(when)s."
 msgstr ""
@@ -3470,13 +3479,13 @@ msgid ""
 "within the hour."
 msgstr ""
 
-#: src/inventory_tng/templates/count.html
+#: src/inventory_tng/templates/stock/count.html
 msgid ""
 "Something came in or went out of each of these after you started, so it's"
 " not clear whether you counted it before or after. Count them again now."
 msgstr ""
 
-#: src/inventory_tng/templates/count.html
+#: src/inventory_tng/templates/stock/count.html
 msgid "Something else here"
 msgstr ""
 
@@ -3484,17 +3493,17 @@ msgstr ""
 msgid "Something went wrong"
 msgstr ""
 
-#: src/inventory_tng/templates/counts.html
+#: src/inventory_tng/templates/stock/counts.html
 msgid "Start a count"
 msgstr ""
 
 #: src/inventory_tng/templates/_retired_holding.html
-#: src/inventory_tng/templates/needs_counting.html
+#: src/inventory_tng/templates/stock/needs_counting.html
 #, python-format
 msgid "Start counting %(name)s"
 msgstr ""
 
-#: src/inventory_tng/templates/devices.html
+#: src/inventory_tng/templates/devices/devices.html
 msgid "State"
 msgstr ""
 
@@ -3502,13 +3511,13 @@ msgstr ""
 msgid "Stock"
 msgstr ""
 
-#: src/inventory_tng/templates/needs_counting.html
-#: src/inventory_tng/templates/reorder.html
-#: src/inventory_tng/templates/stock.html
+#: src/inventory_tng/templates/stock/needs_counting.html
+#: src/inventory_tng/templates/stock/reorder.html
+#: src/inventory_tng/templates/stock/stock.html
 msgid "Stock views"
 msgstr ""
 
-#: src/inventory_tng/templates/volunteer.html
+#: src/inventory_tng/templates/volunteers/volunteer.html
 msgid "Stop"
 msgstr ""
 
@@ -3653,7 +3662,7 @@ msgstr ""
 msgid "That would put it inside itself."
 msgstr ""
 
-#: src/inventory_tng/templates/_totp_fields.html
+#: src/inventory_tng/templates/admins/_totp_fields.html
 msgid "The 6-digit code it shows"
 msgstr ""
 
@@ -3665,7 +3674,7 @@ msgid ""
 msgstr ""
 
 #: src/inventory_tng/catalogue/reading_rules_routes.py
-#: src/inventory_tng/templates/reading_rules.html
+#: src/inventory_tng/templates/catalogue/reading_rules.html
 msgid "The import"
 msgstr ""
 
@@ -3691,15 +3700,15 @@ msgid ""
 " and your other sessions were signed out."
 msgstr ""
 
-#: src/inventory_tng/templates/count.html
+#: src/inventory_tng/templates/stock/count.html
 msgid "The records say nothing is here."
 msgstr ""
 
-#: src/inventory_tng/templates/volunteer.html
+#: src/inventory_tng/templates/volunteers/volunteer.html
 msgid "The scan page doesn't offer them."
 msgstr ""
 
-#: src/inventory_tng/templates/labels.html
+#: src/inventory_tng/templates/labels/labels.html
 msgid "The scan page doesn't read a label tagged here."
 msgstr ""
 
@@ -3707,11 +3716,11 @@ msgstr ""
 msgid "The scan page is not built yet."
 msgstr ""
 
-#: src/inventory_tng/templates/volunteer.html
+#: src/inventory_tng/templates/volunteers/volunteer.html
 msgid "The scan page stops offering them; their past records stay theirs."
 msgstr ""
 
-#: src/inventory_tng/templates/location.html
+#: src/inventory_tng/templates/places/location.html
 #, python-format
 msgid "The site's (%(zone)s)"
 msgstr ""
@@ -3732,19 +3741,19 @@ msgid ""
 "say otherwise."
 msgstr ""
 
-#: src/inventory_tng/templates/link_made.html
+#: src/inventory_tng/templates/admins/link_made.html
 msgid ""
 "Their sign-in is reset: they are signed out everywhere, and their "
 "password, authenticators and recovery codes no longer work."
 msgstr ""
 
-#: src/inventory_tng/templates/confirm.html
+#: src/inventory_tng/templates/admins/confirm.html
 msgid ""
 "Then type the passwords you gave again: passwords are never kept in a "
 "page."
 msgstr ""
 
-#: src/inventory_tng/templates/setup.html
+#: src/inventory_tng/templates/admins/setup.html
 msgid ""
 "There are no administrators yet. Make the first one: you. Later ones are "
 "invited from the administrator pages."
@@ -3764,7 +3773,7 @@ msgstr ""
 msgid "There is nothing here. The link may be old, or mistyped."
 msgstr ""
 
-#: src/inventory_tng/templates/device_revoke.html
+#: src/inventory_tng/templates/devices/device_revoke.html
 msgid ""
 "These can't save anything once revoked, and stay revoked: each would have"
 " to register again with a new code."
@@ -3778,27 +3787,27 @@ msgstr ""
 msgid "They can hold stock now."
 msgstr ""
 
-#: src/inventory_tng/templates/volunteer.html
+#: src/inventory_tng/templates/volunteers/volunteer.html
 msgid "They can hold stock: it shows as theirs, wherever they take it."
 msgstr ""
 
-#: src/inventory_tng/templates/admin.html
+#: src/inventory_tng/templates/admins/admin.html
 msgid ""
 "They can no longer sign in, and their password, authenticators and "
 "recovery codes are removed. You can bring them back later."
 msgstr ""
 
-#: src/inventory_tng/templates/admin.html
+#: src/inventory_tng/templates/admins/admin.html
 msgid "They can't sign in."
 msgstr ""
 
-#: src/inventory_tng/templates/volunteer.html
+#: src/inventory_tng/templates/volunteers/volunteer.html
 msgid ""
 "They don't hold stock: what they take goes straight to an install or "
 "another place."
 msgstr ""
 
-#: src/inventory_tng/templates/admin.html
+#: src/inventory_tng/templates/admins/admin.html
 msgid "They gave an email address."
 msgstr ""
 
@@ -3810,11 +3819,11 @@ msgstr ""
 msgid "They still hold stock: move it back to a store first."
 msgstr ""
 
-#: src/inventory_tng/templates/confirm.html
+#: src/inventory_tng/templates/admins/confirm.html
 msgid "This changes something that matters, so it needs a fresh code."
 msgstr ""
 
-#: src/inventory_tng/templates/confirm.html
+#: src/inventory_tng/templates/admins/confirm.html
 msgid "This changes something that matters, so it needs a fresh password."
 msgstr ""
 
@@ -3830,7 +3839,7 @@ msgstr ""
 msgid "This item is on the form more than once."
 msgstr ""
 
-#: src/inventory_tng/templates/reset.html
+#: src/inventory_tng/templates/admins/reset.html
 #, python-format
 msgid ""
 "This link doesn't work any more: it has been used, a newer one replaced "
@@ -3845,15 +3854,15 @@ msgid ""
 "again, then set it."
 msgstr ""
 
-#: src/inventory_tng/templates/page.html
+#: src/inventory_tng/templates/scan/page.html
 msgid "This page needs JavaScript."
 msgstr ""
 
-#: src/inventory_tng/templates/reset.html
+#: src/inventory_tng/templates/admins/reset.html
 msgid "This removes your authenticators and recovery codes."
 msgstr ""
 
-#: src/inventory_tng/templates/reset.html
+#: src/inventory_tng/templates/admins/reset.html
 msgid "This signs you out everywhere."
 msgstr ""
 
@@ -3865,12 +3874,12 @@ msgstr ""
 msgid "Tick the open packages first."
 msgstr ""
 
-#: src/inventory_tng/templates/location.html
-#: src/inventory_tng/templates/settings.html
+#: src/inventory_tng/templates/places/location.html
+#: src/inventory_tng/templates/site_settings/settings.html
 msgid "Time zone"
 msgstr ""
 
-#: src/inventory_tng/templates/settings.html
+#: src/inventory_tng/templates/site_settings/settings.html
 msgid "Times are shown in"
 msgstr ""
 
@@ -3878,23 +3887,23 @@ msgstr ""
 msgid "Too many tries. Wait a few minutes, then try again."
 msgstr ""
 
-#: src/inventory_tng/templates/item.html
+#: src/inventory_tng/templates/catalogue/item.html
 msgid "Too short to use"
 msgstr ""
 
-#: src/inventory_tng/templates/item.html
+#: src/inventory_tng/templates/catalogue/item.html
 msgid "Track"
 msgstr ""
 
-#: src/inventory_tng/templates/item.html
+#: src/inventory_tng/templates/catalogue/item.html
 msgid "Track each opened package"
 msgstr ""
 
-#: src/inventory_tng/templates/items.html
+#: src/inventory_tng/templates/catalogue/items.html
 msgid "Track opened packages"
 msgstr ""
 
-#: src/inventory_tng/templates/over_recorded.html
+#: src/inventory_tng/templates/stock/over_recorded.html
 msgid "Transaction"
 msgstr ""
 
@@ -3910,7 +3919,7 @@ msgstr ""
 msgid "Type what is on it: a number, 0 or more."
 msgstr ""
 
-#: src/inventory_tng/templates/count.html
+#: src/inventory_tng/templates/stock/count.html
 msgid ""
 "Type what is really there. Leave a line as it is if it's right, or blank "
 "if you didn't count it. Anything else here, add below."
@@ -3924,24 +3933,25 @@ msgstr ""
 msgid "US gallons"
 msgstr ""
 
-#: src/inventory_tng/templates/item.html src/inventory_tng/templates/items.html
+#: src/inventory_tng/templates/catalogue/item.html
+#: src/inventory_tng/templates/catalogue/items.html
 msgid "Unit"
 msgstr ""
 
 #: src/inventory_tng/catalogue/reading_rules_routes.py
-#: src/inventory_tng/templates/items.html
+#: src/inventory_tng/templates/catalogue/items.html
 msgid "Unit readings"
 msgstr ""
 
-#: src/inventory_tng/templates/account.html
+#: src/inventory_tng/templates/admins/account.html
 msgid "Unknown"
 msgstr ""
 
-#: src/inventory_tng/templates/devices.html
+#: src/inventory_tng/templates/devices/devices.html
 msgid "Until"
 msgstr ""
 
-#: src/inventory_tng/templates/code_made.html
+#: src/inventory_tng/templates/devices/code_made.html
 #, python-format
 msgid "Until %(until)s"
 msgstr ""
@@ -3951,7 +3961,7 @@ msgstr ""
 msgid "Up to %(max)d characters."
 msgstr ""
 
-#: src/inventory_tng/templates/reorder.html
+#: src/inventory_tng/templates/stock/reorder.html
 msgid "Usable in the stores"
 msgstr ""
 
@@ -3983,7 +3993,7 @@ msgstr ""
 msgid "Use at most %(places)d decimal places."
 msgstr ""
 
-#: src/inventory_tng/templates/devices.html
+#: src/inventory_tng/templates/devices/devices.html
 msgid "Used"
 msgstr ""
 
@@ -3991,14 +4001,14 @@ msgstr ""
 msgid "Used up"
 msgstr ""
 
-#: src/inventory_tng/templates/count.html
+#: src/inventory_tng/templates/stock/count.html
 msgid "Used up: close it"
 msgstr ""
 
-#: src/inventory_tng/templates/admins.html
-#: src/inventory_tng/templates/forgot.html
-#: src/inventory_tng/templates/setup.html
-#: src/inventory_tng/templates/sign_in.html
+#: src/inventory_tng/templates/admins/admins.html
+#: src/inventory_tng/templates/admins/forgot.html
+#: src/inventory_tng/templates/admins/setup.html
+#: src/inventory_tng/templates/admins/sign_in.html
 msgid "Username"
 msgstr ""
 
@@ -4006,7 +4016,7 @@ msgstr ""
 msgid "Vehicle"
 msgstr ""
 
-#: src/inventory_tng/templates/volunteers.html
+#: src/inventory_tng/templates/volunteers/volunteers.html
 msgid "Volunteer"
 msgstr ""
 
@@ -4018,7 +4028,7 @@ msgstr ""
 msgid "Volunteers"
 msgstr ""
 
-#: src/inventory_tng/templates/used_up.html
+#: src/inventory_tng/templates/stock/used_up.html
 msgid ""
 "Volunteers said these open packages are used up. Confirm one to close it:"
 " what it still shows is written off, with the reason Used up. Not used up"
@@ -4030,7 +4040,7 @@ msgstr ""
 msgid "Waiting (%(count)d)"
 msgstr ""
 
-#: src/inventory_tng/templates/over_recorded.html
+#: src/inventory_tng/templates/stock/over_recorded.html
 #, python-format
 msgid "Was %(words)s"
 msgstr ""
@@ -4039,28 +4049,28 @@ msgstr ""
 msgid "Went below zero"
 msgstr ""
 
-#: src/inventory_tng/templates/length_checks.html
+#: src/inventory_tng/templates/stock/length_checks.html
 #, python-format
 msgid "Went below zero %(when)s."
 msgstr ""
 
-#: src/inventory_tng/templates/counts.html
+#: src/inventory_tng/templates/stock/counts.html
 msgid "What"
 msgstr ""
 
-#: src/inventory_tng/templates/locations.html
+#: src/inventory_tng/templates/places/locations.html
 msgid "What it is"
 msgstr ""
 
-#: src/inventory_tng/templates/length_checks.html
+#: src/inventory_tng/templates/stock/length_checks.html
 msgid "What it shows, and why"
 msgstr ""
 
-#: src/inventory_tng/templates/devices.html
+#: src/inventory_tng/templates/devices/devices.html
 msgid "What it's for"
 msgstr ""
 
-#: src/inventory_tng/templates/length_checks.html
+#: src/inventory_tng/templates/stock/length_checks.html
 msgid ""
 "What these open packages show may be wrong: a volunteer said what is "
 "really on one, or a save took one below zero. Set it to what it really "
@@ -4068,27 +4078,27 @@ msgid ""
 "stays."
 msgstr ""
 
-#: src/inventory_tng/templates/counts.html
-#: src/inventory_tng/templates/reading_rules.html
+#: src/inventory_tng/templates/catalogue/reading_rules.html
+#: src/inventory_tng/templates/stock/counts.html
 msgid "When"
 msgstr ""
 
-#: src/inventory_tng/templates/item.html
+#: src/inventory_tng/templates/catalogue/item.html
 #, python-format
 msgid "When one of %(package)s is opened"
 msgstr ""
 
-#: src/inventory_tng/templates/counts.html
-#: src/inventory_tng/templates/over_recorded.html
-#: src/inventory_tng/templates/over_recorded_settled.html
+#: src/inventory_tng/templates/stock/counts.html
+#: src/inventory_tng/templates/stock/over_recorded.html
+#: src/inventory_tng/templates/stock/over_recorded_settled.html
 msgid "Where"
 msgstr ""
 
-#: src/inventory_tng/templates/account.html
+#: src/inventory_tng/templates/admins/account.html
 msgid "Where you're signed in"
 msgstr ""
 
-#: src/inventory_tng/templates/count.html
+#: src/inventory_tng/templates/stock/count.html
 msgid "While you counted"
 msgstr ""
 
@@ -4142,20 +4152,20 @@ msgstr ""
 msgid "Whole minutes, from %(low)d to %(high)d."
 msgstr ""
 
-#: src/inventory_tng/templates/counts.html
-#: src/inventory_tng/templates/over_recorded_settled.html
+#: src/inventory_tng/templates/stock/counts.html
+#: src/inventory_tng/templates/stock/over_recorded_settled.html
 msgid "Why"
 msgstr ""
 
-#: src/inventory_tng/templates/over_recorded.html
+#: src/inventory_tng/templates/stock/over_recorded.html
 msgid "Why it is right as it is"
 msgstr ""
 
-#: src/inventory_tng/templates/device_list.html
+#: src/inventory_tng/templates/devices/device_list.html
 msgid "With code"
 msgstr ""
 
-#: src/inventory_tng/templates/admins.html
+#: src/inventory_tng/templates/admins/admins.html
 msgid "You"
 msgstr ""
 
@@ -4176,19 +4186,19 @@ msgstr ""
 msgid "You can bring them back."
 msgstr ""
 
-#: src/inventory_tng/templates/_totp_fields.html
+#: src/inventory_tng/templates/admins/_totp_fields.html
 msgid ""
 "You can put the key into more than one app now, as a spare. It isn't "
 "shown again once saved."
 msgstr ""
 
-#: src/inventory_tng/templates/admins.html
+#: src/inventory_tng/templates/admins/admins.html
 msgid ""
 "You get a link to pass on. With it they choose a password, then set up an"
 " authenticator when they first sign in. It works once, within a day."
 msgstr ""
 
-#: src/inventory_tng/templates/account.html
+#: src/inventory_tng/templates/admins/account.html
 #, python-format
 msgid ""
 "You sign in with your password alone. <a href=\"%(link)s\">Set up an "
@@ -4251,7 +4261,7 @@ msgstr ""
 
 #: src/inventory_tng/admins/guards.py
 #: src/inventory_tng/templates/_masthead.html
-#: src/inventory_tng/templates/admin_home.html
+#: src/inventory_tng/templates/admins/admin_home.html
 msgid "Your account"
 msgstr ""
 
@@ -4263,7 +4273,7 @@ msgstr ""
 msgid "Your account is reset: sign in."
 msgstr ""
 
-#: src/inventory_tng/templates/_code_field.html
+#: src/inventory_tng/templates/admins/_code_field.html
 msgid "Your code"
 msgstr ""
 
@@ -4275,7 +4285,7 @@ msgstr ""
 msgid "Your other sessions have ended."
 msgstr ""
 
-#: src/inventory_tng/templates/_code_field.html
+#: src/inventory_tng/templates/admins/_code_field.html
 msgid "Your password"
 msgstr ""
 
@@ -4283,7 +4293,7 @@ msgstr ""
 msgid "Your password is changed. Your other sessions have ended."
 msgstr ""
 
-#: src/inventory_tng/templates/reset.html
+#: src/inventory_tng/templates/admins/reset.html
 msgid ""
 "Your password, authenticators and recovery codes stopped working when "
 "this link was made."
@@ -4293,11 +4303,11 @@ msgstr ""
 msgid "Your recovery codes"
 msgstr ""
 
-#: src/inventory_tng/templates/recover.html
+#: src/inventory_tng/templates/admins/recover.html
 msgid "Your username"
 msgstr ""
 
-#: src/inventory_tng/templates/reading_rule.html
+#: src/inventory_tng/templates/catalogue/reading_rule.html
 #, python-format
 msgid ""
 "a name typed with “%(token)s” after a number is saved with the unit's "
@@ -4314,37 +4324,37 @@ msgstr ""
 msgid "alias %(id)d (%(name)s)"
 msgstr ""
 
-#: src/inventory_tng/templates/device_list.html
+#: src/inventory_tng/templates/devices/device_list.html
 msgid "all"
 msgstr ""
 
-#: src/inventory_tng/templates/item.html
+#: src/inventory_tng/templates/catalogue/item.html
 msgid "as the item"
 msgstr ""
 
-#: src/inventory_tng/templates/counts.html
+#: src/inventory_tng/templates/stock/counts.html
 msgid "as the records said"
 msgstr ""
 
-#: src/inventory_tng/templates/volunteers.html
+#: src/inventory_tng/templates/volunteers/volunteers.html
 msgid "as they pick it on the scan page"
 msgstr ""
 
-#: src/inventory_tng/templates/code_made.html
+#: src/inventory_tng/templates/devices/code_made.html
 #, python-format
 msgid ""
 "at <a href=\"%(link)s\">the registration page</a>, in the browser the "
 "volunteer will use for the scan page."
 msgstr ""
 
-#: src/inventory_tng/templates/_password_hint.html
+#: src/inventory_tng/templates/admins/_password_hint.html
 #, python-format
 msgid "at least %(count)s character"
 msgid_plural "at least %(count)s characters"
 msgstr[0] ""
 msgstr[1] ""
 
-#: src/inventory_tng/templates/item.html
+#: src/inventory_tng/templates/catalogue/item.html
 #, python-format
 msgid "below, in %(unit)s; blank: none"
 msgstr ""
@@ -4358,11 +4368,11 @@ msgstr ""
 msgid "count"
 msgstr ""
 
-#: src/inventory_tng/templates/reorder.html
+#: src/inventory_tng/templates/stock/reorder.html
 msgid "count first"
 msgstr ""
 
-#: src/inventory_tng/templates/stock.html
+#: src/inventory_tng/templates/stock/stock.html
 msgid "count it"
 msgstr ""
 
@@ -4377,7 +4387,7 @@ msgstr ""
 msgid "current"
 msgstr ""
 
-#: src/inventory_tng/templates/device_list.html
+#: src/inventory_tng/templates/devices/device_list.html
 msgctxt "state"
 msgid "current"
 msgstr ""
@@ -4415,11 +4425,11 @@ msgstr ""
 msgid "feet"
 msgstr ""
 
-#: src/inventory_tng/templates/locations.html
+#: src/inventory_tng/templates/places/locations.html
 msgid "for an area only"
 msgstr ""
 
-#: src/inventory_tng/templates/counts.html
+#: src/inventory_tng/templates/stock/counts.html
 msgid "found there"
 msgstr ""
 
@@ -4427,31 +4437,31 @@ msgstr ""
 msgid "frequency"
 msgstr ""
 
-#: src/inventory_tng/templates/over_recorded.html
+#: src/inventory_tng/templates/stock/over_recorded.html
 #, python-format
 msgid "from %(from_place)s to %(to_place)s"
 msgstr ""
 
-#: src/inventory_tng/templates/over_recorded.html
-#: src/inventory_tng/templates/over_recorded_settled.html
+#: src/inventory_tng/templates/stock/over_recorded.html
+#: src/inventory_tng/templates/stock/over_recorded_settled.html
 #, python-format
 msgid "from %(place)s"
 msgstr ""
 
-#: src/inventory_tng/templates/recover.html
-#: src/inventory_tng/templates/setup.html
+#: src/inventory_tng/templates/admins/recover.html
+#: src/inventory_tng/templates/admins/setup.html
 msgid "from whoever runs the server"
 msgstr ""
 
-#: src/inventory_tng/templates/_code_field.html
+#: src/inventory_tng/templates/admins/_code_field.html
 msgid "from your authenticator"
 msgstr ""
 
-#: src/inventory_tng/templates/_code_field.html
+#: src/inventory_tng/templates/admins/_code_field.html
 msgid "from your authenticator, or a recovery code"
 msgstr ""
 
-#: src/inventory_tng/templates/sign_in.html
+#: src/inventory_tng/templates/admins/sign_in.html
 msgid ""
 "from your authenticator, or a recovery code; leave blank if you don't use"
 " one"
@@ -4461,7 +4471,7 @@ msgstr ""
 msgid "gain"
 msgstr ""
 
-#: src/inventory_tng/templates/volunteers.html
+#: src/inventory_tng/templates/volunteers/volunteers.html
 msgid "holds stock"
 msgstr ""
 
@@ -4469,12 +4479,12 @@ msgstr ""
 msgid "hours"
 msgstr ""
 
-#: src/inventory_tng/templates/item.html
+#: src/inventory_tng/templates/catalogue/item.html
 #, python-format
 msgid "in %(unit)s; fixed once some has moved, been opened or labelled"
 msgstr ""
 
-#: src/inventory_tng/templates/item.html
+#: src/inventory_tng/templates/catalogue/item.html
 msgid "in the stores; blank: no minimum"
 msgstr ""
 
@@ -4492,15 +4502,15 @@ msgstr ""
 msgid "item %(id)d (%(name)s)"
 msgstr ""
 
-#: src/inventory_tng/templates/device_list.html
+#: src/inventory_tng/templates/devices/device_list.html
 msgid "its number, optional"
 msgstr ""
 
-#: src/inventory_tng/templates/devices.html
+#: src/inventory_tng/templates/devices/devices.html
 msgid "keep it small"
 msgstr ""
 
-#: src/inventory_tng/templates/_totp_fields.html
+#: src/inventory_tng/templates/admins/_totp_fields.html
 msgid "leave blank to sign in with your password alone"
 msgstr ""
 
@@ -4508,16 +4518,16 @@ msgstr ""
 msgid "length"
 msgstr ""
 
-#: src/inventory_tng/templates/count.html
+#: src/inventory_tng/templates/stock/count.html
 msgid "less than nothing"
 msgstr ""
 
-#: src/inventory_tng/templates/_forms.html
+#: src/inventory_tng/templates/stock/_forms.html
 #, python-format
 msgid "loose: %(loose)s %(unit)s"
 msgstr ""
 
-#: src/inventory_tng/templates/labels.html
+#: src/inventory_tng/templates/labels/labels.html
 #, python-format
 msgid "made %(when)s"
 msgstr ""
@@ -4526,7 +4536,7 @@ msgstr ""
 msgid "mass"
 msgstr ""
 
-#: src/inventory_tng/templates/volunteers.html
+#: src/inventory_tng/templates/volunteers/volunteers.html
 #, python-format
 msgid "merged into %(name)s"
 msgstr ""
@@ -4543,7 +4553,7 @@ msgstr ""
 msgid "minutes"
 msgstr ""
 
-#: src/inventory_tng/templates/settings.html
+#: src/inventory_tng/templates/site_settings/settings.html
 msgid "minutes a phone sits unused; 0 never asks"
 msgstr ""
 
@@ -4559,15 +4569,15 @@ msgstr ""
 msgid "move"
 msgstr ""
 
-#: src/inventory_tng/templates/account.html
+#: src/inventory_tng/templates/admins/account.html
 msgid "never"
 msgstr ""
 
-#: src/inventory_tng/templates/device.html
+#: src/inventory_tng/templates/devices/device.html
 msgid "not known"
 msgstr ""
 
-#: src/inventory_tng/templates/labels.html
+#: src/inventory_tng/templates/labels/labels.html
 #, python-format
 msgid "on %(when)s"
 msgstr ""
@@ -4577,43 +4587,44 @@ msgstr ""
 msgid "open"
 msgstr ""
 
-#: src/inventory_tng/templates/devices.html
+#: src/inventory_tng/templates/devices/devices.html
 msgctxt "state"
 msgid "open"
 msgstr ""
 
-#: src/inventory_tng/templates/_forms.html
+#: src/inventory_tng/templates/stock/_forms.html
 #, python-format
 msgid "open: %(left)s %(unit)s left"
 msgstr ""
 
-#: src/inventory_tng/templates/item.html
+#: src/inventory_tng/templates/catalogue/item.html
 #, python-format
 msgid "opened %(when)s"
 msgstr ""
 
 #. Translators: as in "TOTP is now optional".
-#: src/inventory_tng/core/mail.py src/inventory_tng/templates/items.html
-#: src/inventory_tng/templates/volunteer.html
-#: src/inventory_tng/templates/volunteers.html
+#: src/inventory_tng/core/mail.py
+#: src/inventory_tng/templates/catalogue/items.html
+#: src/inventory_tng/templates/volunteers/volunteer.html
+#: src/inventory_tng/templates/volunteers/volunteers.html
 msgid "optional"
 msgstr ""
 
-#: src/inventory_tng/templates/devices.html
+#: src/inventory_tng/templates/devices/devices.html
 msgid "optional, such as \"Hub open day\""
 msgstr ""
 
-#: src/inventory_tng/templates/device.html
+#: src/inventory_tng/templates/devices/device.html
 #, python-format
 msgid "optional, such as \"Store tablet\"; without one, it is %(name)s"
 msgstr ""
 
-#: src/inventory_tng/templates/admins.html
+#: src/inventory_tng/templates/admins/admins.html
 msgid "optional: lets them reset their own password"
 msgstr ""
 
-#: src/inventory_tng/templates/account.html
-#: src/inventory_tng/templates/setup.html
+#: src/inventory_tng/templates/admins/account.html
+#: src/inventory_tng/templates/admins/setup.html
 msgid "optional: lets you reset your own password"
 msgstr ""
 
@@ -4657,29 +4668,29 @@ msgstr ""
 msgid "resistance"
 msgstr ""
 
-#: src/inventory_tng/templates/device_list.html
+#: src/inventory_tng/templates/devices/device_list.html
 msgid "revoked"
 msgstr ""
 
-#: src/inventory_tng/templates/item.html
+#: src/inventory_tng/templates/catalogue/item.html
 msgid "set on this package"
 msgstr ""
 
-#: src/inventory_tng/templates/_forms.html
+#: src/inventory_tng/templates/stock/_forms.html
 #, python-format
 msgid "short end: %(left)s %(unit)s"
 msgstr ""
 
-#: src/inventory_tng/templates/used_up.html
+#: src/inventory_tng/templates/stock/used_up.html
 #, python-format
 msgid "shows %(left)s %(unit)s; %(who)s, %(when)s"
 msgstr ""
 
-#: src/inventory_tng/templates/used_up.html
+#: src/inventory_tng/templates/stock/used_up.html
 msgid "someone"
 msgstr ""
 
-#: src/inventory_tng/templates/_totp_fields.html
+#: src/inventory_tng/templates/admins/_totp_fields.html
 msgid "such as the phone or app"
 msgstr ""
 
@@ -4687,11 +4698,11 @@ msgstr ""
 msgid "temperature"
 msgstr ""
 
-#: src/inventory_tng/templates/device_list.html
+#: src/inventory_tng/templates/devices/device_list.html
 msgid "that minute included, optional"
 msgstr ""
 
-#: src/inventory_tng/templates/counts.html
+#: src/inventory_tng/templates/stock/counts.html
 #, python-format
 msgid "the list is under <a href=\"%(link)s\">Site settings</a>"
 msgstr ""
@@ -4704,26 +4715,26 @@ msgstr ""
 msgid "the operator"
 msgstr ""
 
-#: src/inventory_tng/templates/item.html
+#: src/inventory_tng/templates/catalogue/item.html
 msgid "the sheet's NYCM- code"
 msgstr ""
 
-#: src/inventory_tng/templates/device_list.html
+#: src/inventory_tng/templates/devices/device_list.html
 msgid "to"
 msgstr ""
 
-#: src/inventory_tng/templates/over_recorded.html
-#: src/inventory_tng/templates/over_recorded_settled.html
+#: src/inventory_tng/templates/stock/over_recorded.html
+#: src/inventory_tng/templates/stock/over_recorded_settled.html
 #, python-format
 msgid "to %(place)s"
 msgstr ""
 
-#: src/inventory_tng/templates/item.html
+#: src/inventory_tng/templates/catalogue/item.html
 #, python-format
 msgid "total across stores, in %(unit)s; blank never reorders"
 msgstr ""
 
-#: src/inventory_tng/templates/_forms.html
+#: src/inventory_tng/templates/stock/_forms.html
 #, python-format
 msgid "usable: %(usable)s %(unit)s"
 msgstr ""
@@ -4736,22 +4747,22 @@ msgstr ""
 msgid "volume"
 msgstr ""
 
-#: src/inventory_tng/templates/items.html
+#: src/inventory_tng/templates/catalogue/items.html
 msgid "what it is counted in"
 msgstr ""
 
-#: src/inventory_tng/templates/_item_name.html
+#: src/inventory_tng/templates/catalogue/_item_name.html
 msgid ""
 "what it is, then what tells it apart from the items nearest it, such as "
 "LiteBeam 5AC Gen2, or Cat6 cable, outdoor, shielded; the maker goes in "
 "Manufacturer"
 msgstr ""
 
-#: src/inventory_tng/templates/location.html
+#: src/inventory_tng/templates/places/location.html
 msgid "what its times are shown in; times already recorded keep theirs"
 msgstr ""
 
-#: src/inventory_tng/templates/counts.html
+#: src/inventory_tng/templates/stock/counts.html
 msgid "written off from there"
 msgstr ""
 
@@ -4759,22 +4770,22 @@ msgstr ""
 msgid "yards"
 msgstr ""
 
-#: src/inventory_tng/templates/admins.html
-#: src/inventory_tng/templates/volunteers.html
+#: src/inventory_tng/templates/admins/admins.html
+#: src/inventory_tng/templates/volunteers/volunteers.html
 msgid "yes"
 msgstr ""
 
-#: src/inventory_tng/templates/reading_rule.html
+#: src/inventory_tng/templates/catalogue/reading_rule.html
 #, python-format
 msgid "“%(token)s” after a number is"
 msgstr ""
 
-#: src/inventory_tng/templates/_units_read.html
+#: src/inventory_tng/templates/catalogue/_units_read.html
 #, python-format
 msgid "“%(typed)s” is new. Is it a unit?"
 msgstr ""
 
-#: src/inventory_tng/templates/_units_read.html
+#: src/inventory_tng/templates/catalogue/_units_read.html
 #, python-format
 msgid "“%(typed)s” is not read as a unit."
 msgstr ""
