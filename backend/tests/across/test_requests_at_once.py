@@ -30,10 +30,9 @@ from sqlalchemy import Engine, delete, select, text
 from sqlalchemy.exc import IntegrityError, OperationalError
 from sqlalchemy.orm import Session
 
-from inventory_tng.admins import accounts, guards, paths
+from inventory_tng.admins import accounts, guards, mail_messages, paths
 from inventory_tng.admins.paths import ADMINS
 from inventory_tng.catalogue import categories, items, reading_rules, units
-from inventory_tng.core import mail
 from inventory_tng.core.db_errors import RuleBroken
 from inventory_tng.core.db_locking import locked, locked_row
 from inventory_tng.core.db_sessions import (
@@ -785,7 +784,9 @@ def test_a_form_refused_without_a_commit_lets_go_of_its_lock_before_mail(
 
     @app.post("/admin/refused-with-mail")
     def refused(signed: guards.ConfirmedAdmin, notify: Notify) -> Response:
-        notify.tell(signed.admin.email, signed.admin.id, mail.recovery_code_used(9))
+        notify.tell(
+            signed.admin.email, signed.admin.id, mail_messages.recovery_code_used(9)
+        )
         return Response(status_code=400)
 
     signed_in_as_ben(committed, client, key)

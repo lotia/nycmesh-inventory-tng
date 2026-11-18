@@ -23,7 +23,7 @@ from sqlalchemy import exc, select
 from sqlalchemy.orm import Session
 from structlog.testing import capture_logs
 
-from inventory_tng.admins import accounts
+from inventory_tng.admins import accounts, mail_messages
 from inventory_tng.app import create_app
 from inventory_tng.catalogue.paths import CATEGORIES
 from inventory_tng.core import db_sessions, mail
@@ -635,7 +635,7 @@ def test_counts_packages_opened_by_what_they_became(
 def test_counts_mail_sent_and_failed(recorded: Recorded) -> None:
     _, _, reader, _ = recorded
 
-    message = mail.password_changed("ada@example.org", 1)
+    message = mail_messages.password_changed("ada@example.org", 1)
     mail.deliver(SentMail(), message)
     mail.deliver(FailingMail(TimeoutError()), message)
     sent = counted(reader, "inventory.mail.sent")

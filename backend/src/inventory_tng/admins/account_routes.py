@@ -12,7 +12,7 @@ from fastapi import APIRouter, Form, Request
 from fastapi.responses import HTMLResponse, Response
 from sqlalchemy.orm import Session
 
-from inventory_tng.admins import accounts
+from inventory_tng.admins import accounts, mail_messages
 from inventory_tng.admins.guards import (
     ACCOUNT_TITLE,
     CONFIRM_FIELD,
@@ -26,7 +26,6 @@ from inventory_tng.admins.guards import (
     signed_out,
 )
 from inventory_tng.admins.paths import ACCOUNT
-from inventory_tng.core import mail
 from inventory_tng.core.db_errors import unique
 from inventory_tng.core.db_sessions import DbSession
 from inventory_tng.core.local_time import site_zone
@@ -160,7 +159,7 @@ def change_email(
     # Told at the old address, in case it was not them: someone with their
     # session could otherwise take resets over unseen.
     if old and old.lower() != email.lower():
-        notify.tell(old, admin.id, mail.email_changed)
+        notify.tell(old, admin.id, mail_messages.email_changed)
     return response
 
 
@@ -177,7 +176,7 @@ def change_password(
         return _refused(request, session, signed, "password", problem)
     accounts.change_password(session, signed.row, password, _now())
     response = _done(signed, session, "password", section="password")
-    notify.tell(signed.admin.email, signed.admin.id, mail.password_changed)
+    notify.tell(signed.admin.email, signed.admin.id, mail_messages.password_changed)
     return response
 
 
@@ -226,7 +225,9 @@ def remove_authenticator(
         return _refused(request, session, signed, "authenticators", problem)
     done = _done(signed, session, outcome, section="authenticators")
     notify.tell(
-        signed.admin.email, signed.admin.id, mail.authenticators_changed(added=False)
+        signed.admin.email,
+        signed.admin.id,
+        mail_messages.authenticators_changed(added=False),
     )
     return done
 
@@ -252,7 +253,7 @@ def new_recovery_codes(
         return again
     codes = accounts.make_recovery_codes(session, signed.admin.id, _now())
     changed(signed, session)
-    notify.tell(signed.admin.email, signed.admin.id, mail.recovery_codes_made)
+    notify.tell(signed.admin.email, signed.admin.id, mail_messages.recovery_codes_made)
     return page(
         request,
         "admins/recovery_codes.html",

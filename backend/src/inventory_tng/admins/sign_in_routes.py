@@ -15,7 +15,7 @@ from fastapi import APIRouter, Form, Request
 from fastapi.responses import HTMLResponse, Response
 from sqlalchemy.exc import IntegrityError
 
-from inventory_tng.admins import accounts, guards
+from inventory_tng.admins import accounts, guards, mail_messages
 from inventory_tng.admins.forms import (
     NOT_THE_TOKEN,
     authenticator_problems,
@@ -50,7 +50,7 @@ from inventory_tng.admins.paths import (
     SIGN_IN,
     SIGN_OUT,
 )
-from inventory_tng.core import mail, request_logging
+from inventory_tng.core import request_logging
 from inventory_tng.core.db_sessions import DbSession
 from inventory_tng.core.mail import Notify
 from inventory_tng.core.phrases import Words, lazy_gettext
@@ -312,7 +312,7 @@ def sign_in(
     target = _local(next)
     response = redirect(target)
     if (left := _codes_left(session, admin, factor)) is not None:
-        notify.tell(admin.email, admin.id, mail.recovery_code_used(left))
+        notify.tell(admin.email, admin.id, mail_messages.recovery_code_used(left))
         # Once, at this sign-in, so it is not lost among other pages: to the
         # account page, where new ones are made, unless a page was asked
         # for. Never shown before the sign-in is complete.
@@ -455,8 +455,10 @@ def new_authenticator(
     codes = accounts.make_recovery_codes(session, admin_id, now) if first else []
     changed(signed, session)
     if codes:
-        notify.tell(signed.admin.email, admin_id, mail.recovery_codes_made)
-    notify.tell(signed.admin.email, admin_id, mail.authenticators_changed(added=True))
+        notify.tell(signed.admin.email, admin_id, mail_messages.recovery_codes_made)
+    notify.tell(
+        signed.admin.email, admin_id, mail_messages.authenticators_changed(added=True)
+    )
     if codes:
         return _recovery_codes_page(request, signed.admin, codes)
     return redirect(HOME)

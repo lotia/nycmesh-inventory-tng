@@ -153,6 +153,11 @@ short test. `core/` is the name FastAPI's full-stack template uses;
   job (inventory-tng-u3fp.7): `core/db_sessions.py`, `core/db_locking.py`,
   `core/db_protection.py` and `core/db_errors.py`. No `core/db.py` is left.
   The test of the pools and sessions took the first one's name.
+- On 2026-11-18 `core/mail.py` was split in two (inventory-tng-u3fp.8):
+  `core/mail.py` keeps how mail is sent, and `admins/mail_messages.py`
+  holds what each mail says, as every mail is to administrators. Its
+  test was split alike, with the tests of reset links in
+  `admins/test_reset_routes.py`.
 - Older decision records keep the paths of their time. The tables below
   give each old path's new home; a later move adds its rows.
 
@@ -203,6 +208,7 @@ queries to its `queries.py`.
 | `catalogue/names.py` | `catalogue/name_keys.py` |
 | `core/command.py` | `core/operator_commands.py` |
 | `core/db.py` | `Base`, the pools, `Database`, sessions, the actor, `ping`, `exists_where`, `by_name`, `hold_until_commit`, `release_hold`, `run_outside_transaction`, `record_last_seen`: `core/db_sessions.py`; `locked`, `get_locked`, `settings_row`, `Seen`, `unchanged`, `lock_catalogue`, the lock guard, `_next_version`, `require_current`, `locked_row`, `relock`: `core/db_locking.py`; `protection`, `Lock`, `Flag`, `Action`, `flagged`, `Write`, `changed_columns`, `flushed_id`, `flush_writes`, with `_table` as `table_of`: `core/db_protection.py`; `PoolTimeout`, `NoSession`, `RuleBroken`, `Gone`, `enforce`, `attempt`, `refusal`, `unique`, `describe_error`, the SQLSTATEs, `UNAVAILABLE`, `install`: `core/db_errors.py` |
+| `core/mail.py` | itself, with `Message`, `Kind`, `Told`, `Mailer`, `SmtpMailer`, `get_mailer`, `Notifier`, `Notify`, `deliver`, `sent`, `TIMEOUT_SECONDS`; what each mail says (`branded`, the shared paragraphs, `TOTP_POLICY_WORDS`, the counts' plurals and a function per mail): `admins/mail_messages.py` |
 | `dev_database.py` | `backend/devtools/database.py`; `seed` is one of its subcommands |
 | `devices.py` | `devices/devices.py`; `register_device`: `devices/api.py`; the request and reply schemas: `devices/schemas.py`; what every route needing a device depends on: `devices/guards.py`; `REGISTER_PATH`: `devices/paths.py` |
 | `devices/api.py` | `devices/registration_api.py` |
@@ -364,6 +370,7 @@ Later renamed:
 | Old path | New path |
 | --- | --- |
 | `core/test_connections.py` | `core/test_db_sessions.py` |
+| `core/test_mail.py` | itself, its settings and sending; the notices: `admins/test_mail_messages.py`; the reset links: `admins/test_reset_routes.py` |
 | `models/test_fold_reference.py` | `models/test_search_text_fold_reference.py` |
 
 ## Amendment: names (2026-11-18)

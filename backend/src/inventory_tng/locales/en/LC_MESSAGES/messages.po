@@ -44,7 +44,7 @@ msgstr ""
 msgid "%(before)s before revoking"
 msgstr ""
 
-#: src/inventory_tng/core/mail.py
+#: src/inventory_tng/admins/mail_messages.py
 #, python-format
 msgid "%(brand)s's sign-in settings were changed"
 msgstr ""
@@ -322,28 +322,28 @@ msgstr ""
 msgid "%(name)s, your account"
 msgstr ""
 
-#: src/inventory_tng/core/mail.py
+#: src/inventory_tng/admins/mail_messages.py
 #, python-format
 msgid "%(num)d day"
 msgid_plural "%(num)d days"
 msgstr[0] ""
 msgstr[1] ""
 
-#: src/inventory_tng/core/mail.py
+#: src/inventory_tng/admins/mail_messages.py
 #, python-format
 msgid "%(num)d hour"
 msgid_plural "%(num)d hours"
 msgstr[0] ""
 msgstr[1] ""
 
-#: src/inventory_tng/core/mail.py
+#: src/inventory_tng/admins/mail_messages.py
 #, python-format
 msgid "%(num)d is left."
 msgid_plural "%(num)d are left."
 msgstr[0] ""
 msgstr[1] ""
 
-#: src/inventory_tng/core/mail.py
+#: src/inventory_tng/admins/mail_messages.py
 #, python-format
 msgid "%(num)d minute"
 msgid_plural "%(num)d minutes"
@@ -671,7 +671,7 @@ msgid ""
 "someone remote. Making one asks for a fresh code."
 msgstr ""
 
-#: src/inventory_tng/core/mail.py
+#: src/inventory_tng/admins/mail_messages.py
 #, python-format
 msgid "A recovery code was used on your %(brand)s account"
 msgstr ""
@@ -829,12 +829,12 @@ msgstr ""
 msgid "An administrator"
 msgstr ""
 
-#: src/inventory_tng/core/mail.py
+#: src/inventory_tng/admins/mail_messages.py
 #, python-format
 msgid "An administrator account on %(brand)s changed"
 msgstr ""
 
-#: src/inventory_tng/core/mail.py
+#: src/inventory_tng/admins/mail_messages.py
 #, python-format
 msgid ""
 "An administrator just changed how administrators sign in to %(brand)s. "
@@ -843,7 +843,7 @@ msgid ""
 "administrator needs a code typed each time."
 msgstr ""
 
-#: src/inventory_tng/core/mail.py
+#: src/inventory_tng/admins/mail_messages.py
 #, python-format
 msgid ""
 "An administrator just changed how administrators sign in to %(brand)s. "
@@ -852,7 +852,7 @@ msgid ""
 "administrator needs a code typed within %(minutes)s."
 msgstr ""
 
-#: src/inventory_tng/core/mail.py
+#: src/inventory_tng/admins/mail_messages.py
 #, python-format
 msgid ""
 "An administrator of %(brand)s just invited you to be one too, and will "
@@ -864,26 +864,26 @@ msgstr ""
 msgid "An area goes inside a store or another area."
 msgstr ""
 
-#: src/inventory_tng/core/mail.py
+#: src/inventory_tng/admins/mail_messages.py
 #, python-format
 msgid "An authenticator was added to your %(brand)s account"
 msgstr ""
 
-#: src/inventory_tng/core/mail.py
+#: src/inventory_tng/admins/mail_messages.py
 #, python-format
 msgid ""
 "An authenticator was just added to your administrator account on "
 "%(brand)s."
 msgstr ""
 
-#: src/inventory_tng/core/mail.py
+#: src/inventory_tng/admins/mail_messages.py
 #, python-format
 msgid ""
 "An authenticator was just removed from your administrator account on "
 "%(brand)s."
 msgstr ""
 
-#: src/inventory_tng/core/mail.py
+#: src/inventory_tng/admins/mail_messages.py
 #, python-format
 msgid "An authenticator was removed from your %(brand)s account"
 msgstr ""
@@ -915,7 +915,7 @@ msgstr ""
 msgid "Another administrator already has that username or email."
 msgstr ""
 
-#: src/inventory_tng/core/mail.py
+#: src/inventory_tng/admins/mail_messages.py
 #, python-format
 msgid ""
 "Another administrator just brought back your administrator account on "
@@ -924,7 +924,7 @@ msgid ""
 "once, within a day."
 msgstr ""
 
-#: src/inventory_tng/core/mail.py
+#: src/inventory_tng/admins/mail_messages.py
 #, python-format
 msgid ""
 "Another administrator just reset your sign-in on %(brand)s: you were "
@@ -933,7 +933,7 @@ msgid ""
 "password, which works once, within a day."
 msgstr ""
 
-#: src/inventory_tng/core/mail.py
+#: src/inventory_tng/admins/mail_messages.py
 #, python-format
 msgid ""
 "Another administrator just retired your administrator account on "
@@ -1643,7 +1643,7 @@ msgstr ""
 msgid "I've kept them: carry on"
 msgstr ""
 
-#: src/inventory_tng/core/mail.py
+#: src/inventory_tng/admins/mail_messages.py
 msgid "If it wasn't you, ask another administrator to reset your account at once."
 msgstr ""
 
@@ -1654,7 +1654,7 @@ msgid ""
 "administrator to reset your sign-in."
 msgstr ""
 
-#: src/inventory_tng/core/mail.py
+#: src/inventory_tng/admins/mail_messages.py
 msgid "If this was not agreed, check with the other administrators."
 msgstr ""
 
@@ -1669,7 +1669,7 @@ msgstr ""
 msgid "If you use an authenticator, signing in still asks for its code."
 msgstr ""
 
-#: src/inventory_tng/core/mail.py
+#: src/inventory_tng/admins/mail_messages.py
 msgid "If you weren't expecting this, ignore this mail."
 msgstr ""
 
@@ -2054,12 +2054,12 @@ msgstr ""
 msgid "New reason"
 msgstr ""
 
-#: src/inventory_tng/core/mail.py
+#: src/inventory_tng/admins/mail_messages.py
 #, python-format
 msgid "New recovery codes for your %(brand)s account"
 msgstr ""
 
-#: src/inventory_tng/core/mail.py
+#: src/inventory_tng/admins/mail_messages.py
 #, python-format
 msgid ""
 "New recovery codes were just made for your administrator account on "
@@ -2337,7 +2337,7 @@ msgstr ""
 
 #. Translators: %(words)s says what changed, such as "ada
 #. reset ben's sign-in".
-#: src/inventory_tng/core/mail.py
+#: src/inventory_tng/admins/mail_messages.py
 #, python-format
 msgid "On %(brand)s: %(words)s."
 msgstr ""
@@ -2367,7 +2367,7 @@ msgstr ""
 
 #. Translators: %(left)s is a sentence saying how many recovery
 #. codes are left, and what to do about it.
-#: src/inventory_tng/core/mail.py
+#: src/inventory_tng/admins/mail_messages.py
 #, python-format
 msgid ""
 "One of your recovery codes was just used on your administrator account on"
@@ -2396,7 +2396,7 @@ msgstr ""
 msgid "Only %(item)s. Only these are counted; the rest stay as they are."
 msgstr ""
 
-#: src/inventory_tng/core/mail.py
+#: src/inventory_tng/admins/mail_messages.py
 #, python-format
 msgid ""
 "Only %(num)d is left: make new ones from your account page soon, with a "
@@ -2954,7 +2954,7 @@ msgstr ""
 msgid "Reset their sign-in"
 msgstr ""
 
-#: src/inventory_tng/core/mail.py
+#: src/inventory_tng/admins/mail_messages.py
 #, python-format
 msgid "Reset your %(brand)s password"
 msgstr ""
@@ -3309,7 +3309,7 @@ msgstr ""
 msgid "Set up an authenticator"
 msgstr ""
 
-#: src/inventory_tng/core/mail.py
+#: src/inventory_tng/admins/mail_messages.py
 #, python-format
 msgid "Set up your authenticator again on %(brand)s"
 msgstr ""
@@ -3454,7 +3454,7 @@ msgstr ""
 msgid "Skip"
 msgstr ""
 
-#: src/inventory_tng/core/mail.py
+#: src/inventory_tng/admins/mail_messages.py
 #, python-format
 msgid ""
 "Someone asked to reset the password of your administrator account on "
@@ -3473,7 +3473,7 @@ msgstr ""
 msgid "Someone said %(said)s %(unit)s is on it, %(when)s."
 msgstr ""
 
-#: src/inventory_tng/core/mail.py
+#: src/inventory_tng/admins/mail_messages.py
 #, python-format
 msgid ""
 "Someone with the recovery token that whoever runs %(brand)s set just made"
@@ -3646,7 +3646,7 @@ msgstr ""
 msgid "That username, password or code didn't match."
 msgstr ""
 
-#: src/inventory_tng/core/mail.py
+#: src/inventory_tng/admins/mail_messages.py
 msgid ""
 "That was your last one: make new ones from your account page now, with a "
 "code from your authenticator."
@@ -3668,7 +3668,7 @@ msgstr ""
 msgid "The 6-digit code it shows"
 msgstr ""
 
-#: src/inventory_tng/core/mail.py
+#: src/inventory_tng/admins/mail_messages.py
 #, python-format
 msgid ""
 "The email address of your administrator account on %(brand)s was just "
@@ -3695,7 +3695,7 @@ msgstr ""
 msgid "The operator"
 msgstr ""
 
-#: src/inventory_tng/core/mail.py
+#: src/inventory_tng/admins/mail_messages.py
 #, python-format
 msgid ""
 "The password of your administrator account on %(brand)s was just changed,"
@@ -4104,7 +4104,7 @@ msgstr ""
 msgid "While you counted"
 msgstr ""
 
-#: src/inventory_tng/core/mail.py
+#: src/inventory_tng/admins/mail_messages.py
 #, python-format
 msgid ""
 "Whoever runs %(brand)s just invited you to be one of its administrators, "
@@ -4112,7 +4112,7 @@ msgid ""
 "within the hour."
 msgstr ""
 
-#: src/inventory_tng/core/mail.py
+#: src/inventory_tng/admins/mail_messages.py
 #, python-format
 msgid ""
 "Whoever runs %(brand)s just made a link that lets you back in to your "
@@ -4123,7 +4123,7 @@ msgid ""
 "If you weren't expecting this, tell whoever runs %(brand)s at once."
 msgstr ""
 
-#: src/inventory_tng/core/mail.py
+#: src/inventory_tng/admins/mail_messages.py
 #, python-format
 msgid ""
 "Whoever runs %(brand)s retired your authenticator, as the key it was kept"
@@ -4131,7 +4131,7 @@ msgid ""
 "and one of your recovery codes, then set up an authenticator again."
 msgstr ""
 
-#: src/inventory_tng/core/mail.py
+#: src/inventory_tng/admins/mail_messages.py
 #, python-format
 msgid ""
 "Whoever runs %(brand)s retired your authenticator, as the key it was kept"
@@ -4175,7 +4175,7 @@ msgstr ""
 msgid "You already have one by that name."
 msgstr ""
 
-#: src/inventory_tng/core/mail.py
+#: src/inventory_tng/admins/mail_messages.py
 #, python-format
 msgid "You are being let back in to %(brand)s"
 msgstr ""
@@ -4214,7 +4214,7 @@ msgid ""
 "authenticator first."
 msgstr ""
 
-#: src/inventory_tng/core/mail.py
+#: src/inventory_tng/admins/mail_messages.py
 #, python-format
 msgid "You were invited to administer %(brand)s"
 msgstr ""
@@ -4231,32 +4231,32 @@ msgid ""
 "you back in."
 msgstr ""
 
-#: src/inventory_tng/core/mail.py
+#: src/inventory_tng/admins/mail_messages.py
 #, python-format
 msgid "Your %(brand)s account is being recovered"
 msgstr ""
 
-#: src/inventory_tng/core/mail.py
+#: src/inventory_tng/admins/mail_messages.py
 #, python-format
 msgid "Your %(brand)s account was brought back"
 msgstr ""
 
-#: src/inventory_tng/core/mail.py
+#: src/inventory_tng/admins/mail_messages.py
 #, python-format
 msgid "Your %(brand)s account was retired"
 msgstr ""
 
-#: src/inventory_tng/core/mail.py
+#: src/inventory_tng/admins/mail_messages.py
 #, python-format
 msgid "Your %(brand)s email was changed"
 msgstr ""
 
-#: src/inventory_tng/core/mail.py
+#: src/inventory_tng/admins/mail_messages.py
 #, python-format
 msgid "Your %(brand)s password was changed"
 msgstr ""
 
-#: src/inventory_tng/core/mail.py
+#: src/inventory_tng/admins/mail_messages.py
 #, python-format
 msgid "Your %(brand)s sign-in was reset"
 msgstr ""
@@ -4605,7 +4605,7 @@ msgid "opened %(when)s"
 msgstr ""
 
 #. Translators: as in "TOTP is now optional".
-#: src/inventory_tng/core/mail.py
+#: src/inventory_tng/admins/mail_messages.py
 #: src/inventory_tng/templates/catalogue/items.html
 #: src/inventory_tng/templates/volunteers/volunteer.html
 #: src/inventory_tng/templates/volunteers/volunteers.html
@@ -4662,7 +4662,7 @@ msgid "report"
 msgstr ""
 
 #. Translators: as in "TOTP is now required".
-#: src/inventory_tng/core/mail.py
+#: src/inventory_tng/admins/mail_messages.py
 msgid "required"
 msgstr ""
 

@@ -872,8 +872,8 @@ On the server (`backend/src/inventory_tng/core/phrases.py`):
   test refuses a lone one.
 - The app's name is `phrases.BRAND`, the same in every language: a
   message takes it as a value, `%(brand)s`, never as words of its own.
-  Mail says such a message with `mail.branded`, which fills it in; a
-  template writes `{{ BRAND }}`.
+  Mail says such a message with `mail_messages.branded`, which fills it
+  in; a template writes `{{ BRAND }}`.
 
 On the scan page (`frontend/src/shared/i18n.ts`):
 

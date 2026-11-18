@@ -17,7 +17,7 @@ from opentelemetry import metrics
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from inventory_tng.core import mail
+from inventory_tng.admins import mail_messages
 from inventory_tng.core.mail import Notifier, Told
 from inventory_tng.core.phrases import gettext, lazy_gettext
 from inventory_tng.models.admins import Activity, ActivityKind, Admin
@@ -115,7 +115,7 @@ def record(
     if them is not None and target is not None:
         notify.tell(target.email, target.id, them)
     if not quiet:
-        told = others or mail.activity(words(session, row))
+        told = others or mail_messages.activity(words(session, row))
         notify.tell_admins(session, told, but=admin_id)
     return row
 

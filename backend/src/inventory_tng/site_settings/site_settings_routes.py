@@ -14,9 +14,8 @@ from fastapi import APIRouter, Depends, Form, Request
 from fastapi.responses import HTMLResponse, Response
 from sqlalchemy.orm import Session
 
-from inventory_tng.admins import accounts, activity
+from inventory_tng.admins import accounts, activity, mail_messages
 from inventory_tng.admins.guards import AdminSignedIn, ConfirmedAdmin, SignedIn, changed
-from inventory_tng.core import mail
 from inventory_tng.core.db_errors import RuleBroken, refusal
 from inventory_tng.core.db_locking import settings_row
 from inventory_tng.core.db_sessions import DbSession
@@ -234,7 +233,7 @@ def save_sign_in_settings(
         signed.admin.id,
         None,
         notify,
-        others=mail.sign_in_settings_changed(current),
+        others=mail_messages.sign_in_settings_changed(current),
     )
     changed(signed, session)
     log.info("sign-in settings changed", **chosen)

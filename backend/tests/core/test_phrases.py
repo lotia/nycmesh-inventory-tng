@@ -21,7 +21,13 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 import inventory_tng
-from inventory_tng.admins import accounts, activity, admins_routes, guards
+from inventory_tng.admins import (
+    accounts,
+    activity,
+    admins_routes,
+    guards,
+    mail_messages,
+)
 from inventory_tng.admins.reset_routes import RESET_NOTICE
 from inventory_tng.catalogue import reading_rules, reading_rules_routes, units
 from inventory_tng.catalogue.forms import ALIAS_TAKEN, TAKEN_FIELDS, read_as_one
@@ -195,31 +201,31 @@ SAID_WITH_VALUES: list[Callable[[], Words]] = [
 def all_mail() -> list[mail.Message]:
     """Every mail, each branch of it, with values that are not English."""
     return [
-        mail.reset_link(NOT_ENGLISH, 1, NOT_ENGLISH),
+        mail_messages.reset_link(NOT_ENGLISH, 1, NOT_ENGLISH),
         *(
             build(NOT_ENGLISH, 1)
             for build in (
-                mail.reset_link_made,
-                mail.invited,
-                mail.restored,
-                mail.recovery_link_made,
-                mail.invited_by_operator,
-                mail.let_in,
-                mail.password_changed,
-                mail.email_changed,
-                mail.authenticators_retired,
-                mail.left_without_a_factor,
-                mail.retired,
-                mail.recovery_codes_made,
-                mail.recovery_code_used(0),
-                mail.recovery_code_used(1),
-                mail.recovery_code_used(3),
-                mail.recovery_code_used(9),
-                mail.authenticators_changed(added=True),
-                mail.authenticators_changed(added=False),
-                mail.activity(NOT_ENGLISH),
+                mail_messages.reset_link_made,
+                mail_messages.invited,
+                mail_messages.restored,
+                mail_messages.recovery_link_made,
+                mail_messages.invited_by_operator,
+                mail_messages.let_in,
+                mail_messages.password_changed,
+                mail_messages.email_changed,
+                mail_messages.authenticators_retired,
+                mail_messages.left_without_a_factor,
+                mail_messages.retired,
+                mail_messages.recovery_codes_made,
+                mail_messages.recovery_code_used(0),
+                mail_messages.recovery_code_used(1),
+                mail_messages.recovery_code_used(3),
+                mail_messages.recovery_code_used(9),
+                mail_messages.authenticators_changed(added=True),
+                mail_messages.authenticators_changed(added=False),
+                mail_messages.activity(NOT_ENGLISH),
                 *(
-                    mail.sign_in_settings_changed(
+                    mail_messages.sign_in_settings_changed(
                         SignInSettings(
                             totp_policy=policy,
                             session_days=days,

@@ -42,7 +42,7 @@ from sqlalchemy.orm import Session
 from starlette.concurrency import run_in_threadpool
 from starlette.exceptions import HTTPException
 
-from inventory_tng.admins import accounts
+from inventory_tng.admins import accounts, mail_messages
 from inventory_tng.admins.paths import (
     ACCOUNT,
     CONFIRM,
@@ -55,7 +55,7 @@ from inventory_tng.admins.paths import (
     SIGN_OUT,
 )
 from inventory_tng.admins.totp_keys import TotpKeys
-from inventory_tng.core import mail, masking, request_logging
+from inventory_tng.core import masking, request_logging
 from inventory_tng.core.db_sessions import (
     DbSession,
     hold_until_commit,
@@ -419,7 +419,9 @@ def _confirm(
         # yet end in an error page, though the code is used up.
         if left is not None:
             notify.tell_now(
-                signed.admin.email, signed.admin.id, mail.recovery_code_used(left)
+                signed.admin.email,
+                signed.admin.id,
+                mail_messages.recovery_code_used(left),
             )
     return outcome
 

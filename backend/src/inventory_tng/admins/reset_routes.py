@@ -17,7 +17,7 @@ from fastapi import APIRouter, Form, Request
 from fastapi.responses import HTMLResponse, Response
 from sqlalchemy.orm import Session
 
-from inventory_tng.admins import accounts
+from inventory_tng.admins import accounts, mail_messages
 from inventory_tng.admins.guards import TOO_MANY
 from inventory_tng.admins.paths import FORGOT, RECOVER, RESET, SIGN_IN, reset_url
 from inventory_tng.core import mail
@@ -110,7 +110,7 @@ def _email_reset(
             return
         session.commit()
     link = reset_url(site_url, found.token)
-    mail.deliver(mailer, mail.reset_link(found.email, found.admin_id, link))
+    mail.deliver(mailer, mail_messages.reset_link(found.email, found.admin_id, link))
 
 
 def _reset_page(
@@ -177,7 +177,7 @@ def reset(
     session.commit()
     # An invite's link chooses the first password: nothing to warn about.
     if link.kind != "invite":
-        notify.tell(admin.email, admin.id, mail.password_changed)
+        notify.tell(admin.email, admin.id, mail_messages.password_changed)
     return redirect(SIGN_IN, notice="reset")
 
 

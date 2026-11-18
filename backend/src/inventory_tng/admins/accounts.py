@@ -25,9 +25,8 @@ from opentelemetry import metrics
 from sqlalchemy import ColumnElement, exists, func, or_, select, text, update
 from sqlalchemy.orm import Session
 
-from inventory_tng.admins import activity
+from inventory_tng.admins import activity, mail_messages
 from inventory_tng.admins.totp_keys import TotpKeys, Unreadable
-from inventory_tng.core import mail
 from inventory_tng.core.db_errors import unique
 from inventory_tng.core.db_locking import get_locked, locked
 from inventory_tng.core.db_sessions import exists_where, set_actor
@@ -1200,7 +1199,7 @@ def recover(
         None,
         admin.id,
         notify,
-        them=mail.recovery_link_made,
+        them=mail_messages.recovery_link_made,
     )
     return link
 
@@ -1298,7 +1297,7 @@ def reset_admin_sign_in(
         sessions_ended=ended,
     )
     # One who never chose a password is invited again instead.
-    them = mail.invited if kind == "invite" else mail.reset_link_made
+    them = mail_messages.invited if kind == "invite" else mail_messages.reset_link_made
     activity.record(session, "sign_in_reset", by_admin_id, admin.id, notify, them=them)
     return admin, token, kind
 
@@ -1345,7 +1344,11 @@ def invite(
         session, admin.id, now, kind="invite", made_by_id=made_by_id
     )
     log.info("administrator invited", admin_id=admin.id, made_by_id=made_by_id)
-    them = mail.invited if made_by_id is not None else mail.invited_by_operator
+    them = (
+        mail_messages.invited
+        if made_by_id is not None
+        else mail_messages.invited_by_operator
+    )
     activity.record(session, "invited", made_by_id, admin.id, notify, them=them)
     return admin, token
 
@@ -1456,7 +1459,7 @@ def retire_admin(
         sessions_ended=ended,
     )
     activity.record(
-        session, "retired", by_admin_id, admin.id, notify, them=mail.retired
+        session, "retired", by_admin_id, admin.id, notify, them=mail_messages.retired
     )
 
 
@@ -1485,7 +1488,7 @@ def restore_admin(
         "administrator restored", target_admin_id=admin_id, by_admin_id=by_admin_id
     )
     activity.record(
-        session, "restored", by_admin_id, admin.id, notify, them=mail.restored
+        session, "restored", by_admin_id, admin.id, notify, them=mail_messages.restored
     )
     return admin, token
 
@@ -1547,7 +1550,9 @@ def let_in(
     set_actor(session, OPERATOR_ACTOR)
     token, _, _ = _reissue(session, admin, None, now)
     log.warning("administrator let in", admin_id=admin.id)
-    activity.record(session, "let_in", None, admin.id, notify, them=mail.let_in)
+    activity.record(
+        session, "let_in", None, admin.id, notify, them=mail_messages.let_in
+    )
     return admin, token
 
 
@@ -1598,11 +1603,11 @@ def retire_authenticators(
         if has_recovery_codes(session, admin.id):
             admin.must_set_up_totp = True
             end_sessions(session, admin.id, now)
-            notify.tell(admin.email, admin.id, mail.authenticators_retired)
+            notify.tell(admin.email, admin.id, mail_messages.authenticators_retired)
         else:
             _remove_sign_in(session, admin.id, now)
             stranded.append(admin.username)
-            notify.tell(admin.email, admin.id, mail.left_without_a_factor)
+            notify.tell(admin.email, admin.id, mail_messages.left_without_a_factor)
     log.warning(
         "authenticators retired",
         retired=retired,

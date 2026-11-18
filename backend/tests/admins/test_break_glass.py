@@ -16,11 +16,11 @@ from inventory_tng.admins import (
     accounts,
     activity,
     admins_command,
+    mail_messages,
     paths,
     sign_in_routes,
     totp_keys_command,
 )
-from inventory_tng.core import mail
 from inventory_tng.core.mail import Notifier
 from inventory_tng.core.settings import RateLimits
 from inventory_tng.devices import devices
@@ -385,4 +385,6 @@ def test_bringing_back_and_a_recovery_link_tell_them_too(
 
 def test_a_mail_for_nobody_is_refused(session: Session) -> None:
     with pytest.raises(ValueError, match="needs them"):
-        activity.record(session, "locked_down", None, None, NO_MAIL, them=mail.let_in)
+        activity.record(
+            session, "locked_down", None, None, NO_MAIL, them=mail_messages.let_in
+        )

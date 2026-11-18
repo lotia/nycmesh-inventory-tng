@@ -14,11 +14,10 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 from structlog.testing import capture_logs
 
-from inventory_tng.admins import accounts, activity, guards, paths
+from inventory_tng.admins import accounts, activity, guards, mail_messages, paths
 from inventory_tng.admins.accounts import NOT_AN_EMAIL, username_problem
 from inventory_tng.admins.forms import OWN_RESET, OWN_RETIRE, TAKEN
 from inventory_tng.admins.paths import ADMINS
-from inventory_tng.core import mail
 from inventory_tng.core.settings import RateLimits
 from inventory_tng.models.admins import ACTIVITY_KINDS, Admin, AdminSession
 from inventory_tng.models.site_settings import SignInSettings
@@ -98,7 +97,7 @@ def test_inviting_an_administrator(
     assert theirs.get(paths.HOME).headers["location"] == paths.NEW_AUTHENTICATOR
     # Told they were invited; not warned that their first password "changed".
     assert [m.kind for m in sent_mail] == ["invited"]
-    assert sent_mail[0] == mail.invited("grace@example.org", grace.id)
+    assert sent_mail[0] == mail_messages.invited("grace@example.org", grace.id)
 
 
 def test_resetting_an_invite_replaces_its_link(

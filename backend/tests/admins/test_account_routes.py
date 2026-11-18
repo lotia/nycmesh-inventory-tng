@@ -10,14 +10,13 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 from structlog.testing import capture_logs
 
-from inventory_tng.admins import accounts, guards, paths
+from inventory_tng.admins import accounts, guards, mail_messages, paths
 from inventory_tng.admins.account_routes import (
     AUTHENTICATOR_RENAMED,
     CODES_NEED_TOTP,
     EMAIL_TAKEN,
 )
 from inventory_tng.admins.guards import NAME_TAKEN
-from inventory_tng.core import mail
 from inventory_tng.models.admins import (
     Admin,
     AdminPassword,
@@ -333,16 +332,16 @@ def test_signing_in_with_one_of_few_codes_left_goes_to_make_more(
     assert signed.headers["location"] == (
         f"{ACCOUNT}?notice=codes_low&section=recovery-codes#recovery-codes"
     )
-    assert mail.codes_running_low(3) in sent_mail[-1].body
+    assert mail_messages.codes_running_low(3) in sent_mail[-1].body
     assert sign_in_with(make_client(address="192.0.2.91"), code=codes[1])
     assert sign_in_with(
         make_client(mailer=sent_mail, address="192.0.2.92"), code=codes[2]
     )
-    assert mail.codes_running_low(1) in sent_mail[-1].body
+    assert mail_messages.codes_running_low(1) in sent_mail[-1].body
     other = make_client(mailer=sent_mail, address="192.0.2.90")
     last = sign_in_with(other, code=codes[3])
     assert "notice=codes_none" in last.headers["location"]
-    assert str(mail.LAST_CODE) in sent_mail[-1].body
+    assert str(mail_messages.LAST_CODE) in sent_mail[-1].body
     page = text(client.get(ACCOUNT + "?notice=codes_low&section=recovery-codes"))
     assert "few are left" in page
 
@@ -369,8 +368,12 @@ def test_the_owner_is_told_when_an_authenticator_comes_or_goes(
     client.post(f"{ACCOUNT}/authenticators/{laptop.id}/remove")
     told = [m for m in sent_mail if m.kind == "authenticators_changed"]
     assert told == [
-        mail.authenticators_changed(added=True)("ada@example.org", told[0].admin_id),
-        mail.authenticators_changed(added=False)("ada@example.org", told[0].admin_id),
+        mail_messages.authenticators_changed(added=True)(
+            "ada@example.org", told[0].admin_id
+        ),
+        mail_messages.authenticators_changed(added=False)(
+            "ada@example.org", told[0].admin_id
+        ),
     ]
     assert told[0].subject != told[1].subject
 
