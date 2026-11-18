@@ -115,7 +115,7 @@ def entry_of(line: batch_schemas.Line, kind: str, opened: int | None = None) -> 
     package `opened`, or loose."""
     sealed = Form(package_id=line.package_id)
     if kind == "open":
-        arrives = Form(open_package_id=opened) if opened else LOOSE
+        arrives = Form(open_package_id=opened) if opened is not None else LOOSE
         return Entry(line.item_id, line.quantity, sealed, arrives)
     if opened is not None:
         # Taken from an open package: cut loose, or moved whole.
