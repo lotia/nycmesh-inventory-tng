@@ -13,7 +13,7 @@ from sqlalchemy import (
     table,
 )
 
-from inventory_tng.core.db import describe_error
+from inventory_tng.core.db_errors import describe_error
 from inventory_tng.core.history import HISTORY_TABLE, LEDGER
 
 log = structlog.get_logger(__name__)

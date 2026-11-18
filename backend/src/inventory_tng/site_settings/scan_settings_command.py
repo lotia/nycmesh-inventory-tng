@@ -14,7 +14,7 @@ from collections.abc import Sequence
 import structlog
 from sqlalchemy.orm import Session
 
-from inventory_tng.core.db import CLI_ACTOR, set_actor
+from inventory_tng.core.db_sessions import CLI_ACTOR, set_actor
 from inventory_tng.core.operator_commands import run_command
 from inventory_tng.models.base import whole
 from inventory_tng.models.site_settings import NAME_CHECK_MINUTES, ScanSettings

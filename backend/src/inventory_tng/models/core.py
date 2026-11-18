@@ -16,12 +16,13 @@ from sqlalchemy import (
 from sqlalchemy.dialects.postgresql import ARRAY, JSONB
 from sqlalchemy.orm import Mapped, mapped_column
 
-from inventory_tng.core.db import ACTOR_PATTERN, Base, protection
+from inventory_tng.core.db_protection import protection
+from inventory_tng.core.db_sessions import ACTOR_PATTERN, Base
 from inventory_tng.models.base import CreatedAt, IntId
 
 
 class CatalogueHistory(Base):
-    """Every change to a table with history (db.protection;
+    """Every change to a table with history (db_protection.protection;
     core/history.py). A retired record's page reads who retired it
     (web/admin_pages.retired_by). The app may only add to it (the initial
     migration)."""
@@ -29,7 +30,8 @@ class CatalogueHistory(Base):
     __tablename__ = "catalogue_history"
     __table_args__ = (
         CheckConstraint("action IN ('insert', 'update', 'delete')", name="action"),
-        # Ids, never names, whoever sets it (db.set_actor checks it first).
+        # Ids, never names, whoever sets it (db_sessions.set_actor checks it
+        # first).
         CheckConstraint(f"actor ~ '^({ACTOR_PATTERN})$'", name="actor"),
         # A row's history, such as who retired it (web/admin_pages.retired_by).
         Index("ix_catalogue_history_table_name_row_id", "table_name", "row_id"),
@@ -41,7 +43,8 @@ class CatalogueHistory(Base):
     table_name: Mapped[str] = mapped_column(Text)
     row_id: Mapped[int]
     action: Mapped[str] = mapped_column(Text)
-    # From db.set_actor(), e.g. "admin:3"; NULL if the session named nobody.
+    # From db_sessions.set_actor(), e.g. "admin:3"; NULL if the session named
+    # nobody.
     actor: Mapped[str | None] = mapped_column(Text)
     at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()

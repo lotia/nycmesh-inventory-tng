@@ -21,7 +21,7 @@ from opentelemetry import metrics
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from inventory_tng.core.db import RuleBroken
+from inventory_tng.core.db_errors import RuleBroken
 from inventory_tng.models.catalogue import ItemPackage
 from inventory_tng.models.stock import LedgerTransaction, Movement, OpenPackage
 from inventory_tng.models.volunteers import Volunteer

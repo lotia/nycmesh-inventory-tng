@@ -752,7 +752,7 @@ def test_the_cookie_lasts_as_long_as_the_session(
 def test_a_session_unseen_a_while_is_marked_seen(
     admin_client: TestClient, session: Session, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """On the side pool, in a transaction of its own (db.record_last_seen)."""
+    """On the side pool, in a transaction of its own (db_sessions.record_last_seen)."""
     seen: list[tuple[object, int]] = []
     monkeypatch.setattr(
         guards,

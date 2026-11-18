@@ -13,7 +13,7 @@ import structlog
 from fastapi import BackgroundTasks
 from sqlalchemy.orm import Session
 
-from inventory_tng.core.db import make_database
+from inventory_tng.core.db_sessions import make_database
 from inventory_tng.core.local_env import load_local_env
 from inventory_tng.core.logs import configure_logging
 from inventory_tng.core.mail import Notifier, SmtpMailer

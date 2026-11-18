@@ -9,7 +9,7 @@ mapped class; migrations/env.py imports it, so autogenerate sees every
 table. A new module of models is imported here.
 
 Each table declares its protection, and each column any flag, as
-db.protection says.
+db_protection.protection says.
 
 Conventions, on every table with history:
 

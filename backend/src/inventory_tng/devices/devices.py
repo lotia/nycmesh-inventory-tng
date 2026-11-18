@@ -32,14 +32,9 @@ from opentelemetry import metrics
 from sqlalchemy import ColumnElement, Select, select
 from sqlalchemy.orm import Session
 
-from inventory_tng.core.db import (
-    Seen,
-    enforce,
-    exists_where,
-    get_locked,
-    locked,
-    unchanged,
-)
+from inventory_tng.core.db_errors import enforce
+from inventory_tng.core.db_locking import Seen, get_locked, locked, unchanged
+from inventory_tng.core.db_sessions import exists_where
 from inventory_tng.core.rate_limits import limiter, refund
 from inventory_tng.models.devices import Device, RegistrationCode
 

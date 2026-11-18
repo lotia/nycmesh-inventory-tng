@@ -8,7 +8,7 @@ import uuid
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.orm import Session
 
-from inventory_tng.core.db import exists_where
+from inventory_tng.core.db_sessions import exists_where
 from inventory_tng.models.core import SentForm
 
 

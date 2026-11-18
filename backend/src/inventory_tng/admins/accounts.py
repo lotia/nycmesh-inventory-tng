@@ -28,7 +28,9 @@ from sqlalchemy.orm import Session
 from inventory_tng.admins import activity
 from inventory_tng.admins.totp_keys import TotpKeys, Unreadable
 from inventory_tng.core import mail
-from inventory_tng.core.db import exists_where, get_locked, locked, set_actor, unique
+from inventory_tng.core.db_errors import unique
+from inventory_tng.core.db_locking import get_locked, locked
+from inventory_tng.core.db_sessions import exists_where, set_actor
 from inventory_tng.core.mail import Notifier
 from inventory_tng.core.phrases import BRAND, Words, gettext, lazy_gettext
 from inventory_tng.core.rate_limits import limiter
@@ -609,7 +611,7 @@ def find_session(
 ) -> tuple[AdminSession, Admin] | None:
     """The current session with this cookie, and its administrator, if
     current, in one query. Reads only: the caller records its use
-    (db.record_last_seen) once SEEN_EVERY has passed."""
+    (db_sessions.record_last_seen) once SEEN_EVERY has passed."""
     found = session.execute(
         select(AdminSession, Admin)
         .join(Admin, Admin.id == AdminSession.admin_id)

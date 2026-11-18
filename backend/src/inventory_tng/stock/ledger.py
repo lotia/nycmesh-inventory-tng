@@ -1,11 +1,11 @@
-"""The ledger's core (docs/decisions/0003): its rules, the order a save
-holds the rows it refers to in, and insert_transaction, the one function
-that writes it. A volunteer's batch (scan/batch.py), counts and adjustments
-(stock/counts.py) all reach it, and it refuses what breaks the ledger's
-rules (db.RuleBroken), as hold() finds them. The app's login may only read
-and add to the ledger (DEPLOYMENT.md, Database roles), and nothing here
-adds movements to a transaction already written, so a transaction never
-changes once written.
+"""The ledger's core (docs/decisions/0003): its rules, the order a save holds
+the rows it refers to in, and insert_transaction, the one function that writes
+it. A volunteer's batch (scan/batch.py), counts and adjustments
+(stock/counts.py) all reach it, and it refuses what breaks the ledger's rules
+(db_errors.RuleBroken), as hold() finds them. The app's login may only read and
+add to the ledger (DEPLOYMENT.md, Database roles), and nothing here adds
+movements to a transaction already written, so a transaction never changes once
+written.
 
 Two choices that keep a volunteer's work from being lost:
 
@@ -32,7 +32,9 @@ from sqlalchemy import func, insert, select
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.orm import Session
 
-from inventory_tng.core.db import enforce, exists_where, get_locked, locked
+from inventory_tng.core.db_errors import enforce
+from inventory_tng.core.db_locking import get_locked, locked
+from inventory_tng.core.db_sessions import exists_where
 from inventory_tng.core.local_time import zone_at
 from inventory_tng.models.catalogue import Item, ItemPackage
 from inventory_tng.models.places import Location
@@ -258,7 +260,7 @@ def lock_places(session: Session, location_ids: Iterable[int]) -> None:
 
 # A save, count or adjustment holds the rows it refers to until it ends, so
 # what it read of them holds when it is written, in this order, as every
-# change that locks rows a save refers to must (db.locked_row):
+# change that locks rows a save refers to must (db_locking.locked_row):
 #
 # 1. Its places, FOR KEY SHARE (_hold_places), before it has an id.
 # 2. Its items, FOR KEY SHARE, by id (hold): what the ledger's rules read

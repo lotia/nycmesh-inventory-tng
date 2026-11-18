@@ -1,7 +1,7 @@
-"""History: every row the app adds, changes or deletes through the ORM, in
-a table that has history (db.protection), is written to catalogue_history in
-the same transaction, with who did it (db.set_actor) and the row before and
-after.
+"""History: every row the app adds, changes or deletes through the ORM, in a
+table that has history (db_protection.protection), is written to
+catalogue_history in the same transaction, with who did it
+(db_sessions.set_actor) and the row before and after.
 
 What to record is decided by pure functions (change, json_value); the flush
 listeners below only read the rows and write what those return. A row
@@ -26,14 +26,11 @@ import structlog
 from sqlalchemy import Table, event, insert, select
 from sqlalchemy.orm import Session, UOWTransaction
 
-from inventory_tng.core.db import (
-    Action,
-    Base,
-    current_actor,
-    flagged,
-    flush_writes,
-    flushed_id,
-)
+# Imported for its flush listeners, before this module's: the lock guard
+# refuses a write before history reads anything for it.
+from inventory_tng.core import db_locking  # noqa: F401
+from inventory_tng.core.db_protection import Action, flagged, flush_writes, flushed_id
+from inventory_tng.core.db_sessions import Base, current_actor
 
 log = structlog.get_logger(__name__)
 
@@ -109,7 +106,7 @@ def change(table: Table, old: Row | None, new: Row | None) -> Change | None:
 # other than the one stored (5.0004 in a numeric(12,3)). What is read before
 # is not locked: where two requests may change a row at once, the app locks
 # it first, and the flush refuses a change to a row of a table that names a
-# lock unless it is (db.protection).
+# lock unless it is (db_protection.protection).
 
 _PENDING = "inventory.history"
 

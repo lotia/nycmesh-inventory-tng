@@ -15,7 +15,7 @@ from inventory_tng.catalogue import items, queries
 from inventory_tng.catalogue.forms import PACKAGE_TAKEN, SHORTER_THAN_WHOLE
 from inventory_tng.catalogue.items_routes import PACKAGE_RETIRED
 from inventory_tng.catalogue.paths import ITEMS
-from inventory_tng.core.db import RuleBroken, attempt
+from inventory_tng.core.db_errors import RuleBroken, attempt
 from inventory_tng.models.catalogue import Category, Item, ItemPackage
 from inventory_tng.models.labels import Label
 from inventory_tng.stock import open_packages

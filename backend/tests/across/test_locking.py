@@ -1,12 +1,13 @@
-"""Locking a row (db.locked, db.get_locked; inventory-tng-8i4.57): every
-locking read in the app goes through them, which read a row the session had
-already loaded again as locked (db.py says why).
+"""Locking a row (db_locking.locked, db_locking.get_locked;
+inventory-tng-8i4.57): every locking read in the app goes through them,
+which read a row the session had already loaded again as locked
+(db_locking.py says why).
 
 The first test reads the app's source with Python's ast module, in the test
-suite only (nothing of it runs in the app), and fails on with_for_update, or
-a lock written in SQL, anywhere but in db.py: Ruff's banned-api rule cannot,
-as it matches names written out (Select.with_for_update), not methods called
-on an object (query.with_for_update()).
+suite only (nothing of it runs in the app), and fails on with_for_update, or a
+lock written in SQL, anywhere but in db_locking.py: Ruff's banned-api rule
+cannot, as it matches names written out (Select.with_for_update), not methods
+called on an object (query.with_for_update()).
 """
 
 import ast
@@ -22,11 +23,8 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from inventory_tng.catalogue.paths import CATEGORIES, ITEMS
-from inventory_tng.core.db import (
-    Base,
-    get_locked,
-    locked,
-)
+from inventory_tng.core.db_locking import get_locked, locked
+from inventory_tng.core.db_sessions import Base
 from inventory_tng.devices import devices
 from inventory_tng.models.catalogue import Category, Item, ItemPackage
 from inventory_tng.models.devices import RegistrationCode
@@ -44,7 +42,7 @@ from helpers.source import SOURCE, offending, outside
 
 # The only code that may lock with with_for_update: the wrappers' bodies.
 WRAPPERS = ("locked", "get_locked")
-DB = SOURCE / "core" / "db.py"
+DB_LOCKING = SOURCE / "core" / "db_locking.py"
 # A row lock written in SQL: FOR UPDATE, FOR NO KEY UPDATE, FOR SHARE,
 # FOR KEY SHARE.
 SQL_LOCK = re.compile(
@@ -92,11 +90,12 @@ def lockings(tree: ast.AST, _path: Path | None = None) -> list[int]:
 
 
 @pytest.mark.helper
-def test_every_locking_read_goes_through_db() -> None:
-    found = offending(lockings, {DB: WRAPPERS})
+def test_every_locking_read_goes_through_db_locking() -> None:
+    found = offending(lockings, {DB_LOCKING: WRAPPERS})
     assert found == {}, (
-        "Lock rows with db.locked (a select) or db.get_locked (Session.get), "
-        f"not with_for_update or FOR UPDATE in SQL (db.py says why): {found}"
+        "Lock rows with db_locking.locked (a select) or db_locking.get_locked"
+        " (Session.get), "
+        f"not with_for_update or FOR UPDATE in SQL (db_locking.py says why): {found}"
     )
 
 
@@ -117,7 +116,7 @@ def test_the_check_sees_each_way_of_locking(tmp_path: Path) -> None:
         "session.refresh(row)\n"
         "text('SELECT 1')\n"
     )
-    assert outside(code, lockings, {DB: WRAPPERS}) == [1, 2, 3, 4, 5, 6]
+    assert outside(code, lockings, {DB_LOCKING: WRAPPERS}) == [1, 2, 3, 4, 5, 6]
 
 
 def changed(
@@ -174,15 +173,14 @@ def test_what_a_locking_read_returns_for_a_row_loaded_before_it(
 # Each site: what a future change would do (load the row in the request's
 # session before the route locks it) is done by the test, then another
 # connection changes the row and commits, then the route runs. Through
-# db.get_locked (or db.relock, which a catalogue page's domain function
-# takes) it sees the change; with a plain locking read it would act on the
-# row as first loaded, which these tests fail on. Sites whose outcome does
+# db_locking.get_locked (or db_locking.relock, which a catalogue page's domain
+# function takes) it sees the change; with a plain locking read it would act on
+# the row as first loaded, which these tests fail on. Sites whose outcome does
 # not depend on the row's earlier values have none: saving an item, a
-# volunteer, a location or a category's name (each writes what the form
-# says), adding a package and ending custody (they only need the row to be
-# there), and the recovery code a sign-in uses (PostgreSQL re-checks its
-# WHERE on the locked row). Merging locks as retiring does
-# (volunteers._lock), tested here.
+# volunteer, a location or a category's name (each writes what the form says),
+# adding a package and ending custody (they only need the row to be there), and
+# the recovery code a sign-in uses (PostgreSQL re-checks its WHERE on the
+# locked row). Merging locks as retiring does (volunteers._lock), tested here.
 
 
 @pytest.fixture

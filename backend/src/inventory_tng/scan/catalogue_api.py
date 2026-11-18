@@ -18,7 +18,7 @@ import structlog
 from fastapi import APIRouter, Query
 from sqlalchemy.orm import Session
 
-from inventory_tng.core.db import SnapshotSession
+from inventory_tng.core.db_sessions import SnapshotSession
 from inventory_tng.devices.guards import DeviceRefusedReply, RegisteredDevice
 from inventory_tng.labels import labels
 from inventory_tng.models.catalogue import Item, reading_rules_held
@@ -159,10 +159,10 @@ def catalogue(session: Session) -> Catalogue:
 
 
 def with_saved(session: Session, keys: Sequence[uuid.UUID]) -> Catalogue:
-    """The catalogue, and which of `keys` are saved batches, so that a batch
-    is in `saved` exactly when the stock shows it. On a session reading one
-    snapshot (db.SnapshotSession): a batch committed as it is read is in
-    neither (inventory-tng-19c)."""
+    """The catalogue, and which of `keys` are saved batches, so that a batch is
+    in `saved` exactly when the stock shows it. On a session reading one
+    snapshot (db_sessions.SnapshotSession): a batch committed as it is read is
+    in neither (inventory-tng-19c)."""
     reply = catalogue(session)
     reply.saved = sorted(saved_of(session, keys))
     return reply

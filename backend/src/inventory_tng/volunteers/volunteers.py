@@ -11,16 +11,15 @@ from datetime import datetime
 from sqlalchemy import Select, select
 from sqlalchemy.orm import Session
 
-from inventory_tng.core.db import (
-    Gone,
+from inventory_tng.core.db_errors import Gone, enforce
+from inventory_tng.core.db_locking import (
     Seen,
-    enforce,
-    exists_where,
     lock_catalogue,
     locked,
     relock,
     require_current,
 )
+from inventory_tng.core.db_sessions import exists_where
 from inventory_tng.models.places import Location
 from inventory_tng.models.volunteers import Volunteer
 from inventory_tng.places import locations
@@ -57,8 +56,9 @@ def _lock(
     seen: Seen = None,
 ) -> Location | None:
     """The catalogue lock, then their custody location, then them, each read
-    again as locked (db.locked_row says why in that order): their custody
-    location, if they have one. With `current` and `seen`, as db.relock."""
+    again as locked (db_locking.locked_row says why in that order): their
+    custody location, if they have one. With `current` and `seen`, as
+    db_locking.relock."""
     lock_catalogue(session)
     held = session.scalar(locked(_custody(volunteer.id)))
     relock(session, volunteer, current=current, seen=seen)

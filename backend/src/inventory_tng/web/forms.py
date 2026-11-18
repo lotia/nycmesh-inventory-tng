@@ -8,7 +8,7 @@ from decimal import Decimal, InvalidOperation
 
 from sqlalchemy.orm import Session
 
-from inventory_tng.core.db import Base
+from inventory_tng.core.db_sessions import Base
 from inventory_tng.core.phrases import Words, gettext, lazy_gettext
 from inventory_tng.models.base import INTEGER_MAX, whole
 from inventory_tng.models.names import canonical
@@ -18,9 +18,9 @@ NAME_MAX = 200
 
 WHOLE_UNITS = lazy_gettext("This item is counted in whole units.")
 PICK_A_ZONE = lazy_gettext("Pick a zone from the list.")
-# The rules domain functions check, by the name db.attempt gives one that a
-# change broke (db.RuleBroken's), in words. A page passes its own words for
-# "unique", which depend on what it is naming.
+# The rules domain functions check, by the name db_errors.attempt gives one
+# that a change broke (db_errors.RuleBroken's), in words. A page passes its own
+# words for "unique", which depend on what it is naming.
 RULES = {
     "location_area_parent": lazy_gettext(
         "An area goes inside a store or another area."
@@ -73,8 +73,9 @@ RULES = {
     ),
 }
 BREAKS_A_RULE = lazy_gettext("That breaks one of the inventory's rules.")
-# A save refused as its row changed since its form was shown (db.unchanged):
-# the page shows it again as it is now, with RULES' words as an alert.
+# A save refused as its row changed since its form was shown
+# (db_locking.unchanged): the page shows it again as it is now, with RULES'
+# words as an alert.
 CHANGED = "changed_since_shown"
 # A change to a retired row, which is read only until brought back
 # (docs/decisions/0019): said the same way.

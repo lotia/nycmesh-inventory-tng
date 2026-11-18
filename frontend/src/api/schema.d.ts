@@ -13,7 +13,7 @@ export interface paths {
     };
     /**
      * Healthz
-     * @description Answers once the database does. db.install() makes a failure a 503.
+     * @description Answers once the database does. db_errors.install() makes a failure a 503.
      */
     get: operations["healthz_api_healthz_get"];
     put?: never;

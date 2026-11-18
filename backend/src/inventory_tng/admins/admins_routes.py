@@ -26,7 +26,8 @@ from inventory_tng.admins.guards import (
     changed,
 )
 from inventory_tng.admins.paths import ADMINS, RESET
-from inventory_tng.core.db import DbSession, attempt
+from inventory_tng.core.db_errors import attempt
+from inventory_tng.core.db_sessions import DbSession
 from inventory_tng.core.local_time import site_zone
 from inventory_tng.core.mail import Notify
 from inventory_tng.core.phrases import Words, gettext, lazy_gettext

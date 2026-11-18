@@ -1,7 +1,7 @@
 """An administrator's own account page (docs/decisions/0012): email,
 password, authenticators, recovery codes and sessions. Viewing it is not
 sensitive; every change is (guards.ConfirmedAdmin), and is recorded as
-theirs (db.set_actor). The rules are in accounts.py.
+theirs (db_sessions.set_actor). The rules are in accounts.py.
 """
 
 from collections.abc import Mapping
@@ -27,7 +27,8 @@ from inventory_tng.admins.guards import (
 )
 from inventory_tng.admins.paths import ACCOUNT
 from inventory_tng.core import mail
-from inventory_tng.core.db import DbSession, unique
+from inventory_tng.core.db_errors import unique
+from inventory_tng.core.db_sessions import DbSession
 from inventory_tng.core.local_time import site_zone
 from inventory_tng.core.mail import Notify
 from inventory_tng.core.phrases import Words, lazy_gettext

@@ -11,7 +11,7 @@ from sqlalchemy import make_url, text
 from sqlalchemy.exc import OperationalError
 
 from devtools.database import as_superuser
-from inventory_tng.core.db import make_engine
+from inventory_tng.core.db_sessions import make_engine
 
 from databases import (
     NO_DATABASE,

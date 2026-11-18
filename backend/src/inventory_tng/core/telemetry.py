@@ -43,7 +43,7 @@ from opentelemetry.trace import Link, Status
 from opentelemetry.util.types import AnyValue
 
 from inventory_tng.core import request_logging
-from inventory_tng.core.db import Database
+from inventory_tng.core.db_sessions import Database
 from inventory_tng.core.logs import ADDED_FIELDS
 from inventory_tng.core.masking import Masker, mask_query
 from inventory_tng.core.settings import HourlyWarning, Redaction
@@ -344,7 +344,7 @@ def _opt_in_to_stable_names() -> None:
 def observe_pool(provider: MeterProvider, database: Database) -> None:
     # TODO(inventory-tng-8i4.34): remove once opentelemetry-instrumentation-sqlalchemy
     # supports SQLAlchemy 2.1.
-    # The app's pools (db.Database), by name.
+    # The app's pools (db_sessions.Database), by name.
     pools = database.pools
 
     def connections(_options: CallbackOptions) -> Iterable[Observation]:

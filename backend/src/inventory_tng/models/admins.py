@@ -19,7 +19,8 @@ from sqlalchemy import (
 )
 from sqlalchemy.orm import Mapped, mapped_column
 
-from inventory_tng.core.db import Base, protection
+from inventory_tng.core.db_protection import protection
+from inventory_tng.core.db_sessions import Base
 from inventory_tng.models.base import (
     CreatedAt,
     IntId,

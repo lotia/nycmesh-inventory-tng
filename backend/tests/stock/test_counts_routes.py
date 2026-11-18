@@ -16,7 +16,7 @@ from sqlalchemy.orm import Session
 from structlog.testing import capture_logs
 
 from inventory_tng.catalogue import items
-from inventory_tng.core.db import RuleBroken
+from inventory_tng.core.db_errors import RuleBroken
 from inventory_tng.core.local_time import DEFAULT_ZONE, show
 from inventory_tng.core.phrases import compiled, speaking
 from inventory_tng.models.admins import Admin

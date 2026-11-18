@@ -44,7 +44,7 @@ def test_healthz_is_503_and_warns_when_the_database_is_unreachable() -> None:
 
 
 class Refusal(Exception):
-    """A psycopg error, as far as db.install() looks at one."""
+    """A psycopg error, as far as db_errors.install() looks at one."""
 
     def __init__(self, sqlstate: str) -> None:
         super().__init__(sqlstate)

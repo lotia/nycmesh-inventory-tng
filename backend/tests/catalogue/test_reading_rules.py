@@ -19,7 +19,7 @@ from inventory_tng.catalogue.items_listing import SEARCHED
 from inventory_tng.catalogue.paths import ITEMS, READINGS, SEED
 from inventory_tng.catalogue.reading_rules import LIKELY, NAMED, both, near
 from inventory_tng.catalogue.reading_rules_routes import READINGS_ACCEPTED
-from inventory_tng.core.db import lock_catalogue
+from inventory_tng.core.db_locking import lock_catalogue
 from inventory_tng.models.admins import Admin
 from inventory_tng.models.catalogue import (
     Category,

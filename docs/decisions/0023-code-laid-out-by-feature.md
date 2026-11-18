@@ -149,6 +149,10 @@ short test. `core/` is the name FastAPI's full-stack template uses;
   `models/names.py` keeps how a name is stored and keyed, and
   `models/search_text.py` holds how text is folded, kept and matched for
   search. The test of the fold reference took the new module's name.
+- On 2026-11-18 `core/db.py` was split in four, each named `db_` and its
+  job (inventory-tng-u3fp.7): `core/db_sessions.py`, `core/db_locking.py`,
+  `core/db_protection.py` and `core/db_errors.py`. No `core/db.py` is left.
+  The test of the pools and sessions took the first one's name.
 - Older decision records keep the paths of their time. The tables below
   give each old path's new home; a later move adds its rows.
 
@@ -198,13 +202,14 @@ queries to its `queries.py`.
 | `catalogue/command.py` | `catalogue/unit_readings_command.py` |
 | `catalogue/names.py` | `catalogue/name_keys.py` |
 | `core/command.py` | `core/operator_commands.py` |
+| `core/db.py` | `Base`, the pools, `Database`, sessions, the actor, `ping`, `exists_where`, `by_name`, `hold_until_commit`, `release_hold`, `run_outside_transaction`, `record_last_seen`: `core/db_sessions.py`; `locked`, `get_locked`, `settings_row`, `Seen`, `unchanged`, `lock_catalogue`, the lock guard, `_next_version`, `require_current`, `locked_row`, `relock`: `core/db_locking.py`; `protection`, `Lock`, `Flag`, `Action`, `flagged`, `Write`, `changed_columns`, `flushed_id`, `flush_writes`, with `_table` as `table_of`: `core/db_protection.py`; `PoolTimeout`, `NoSession`, `RuleBroken`, `Gone`, `enforce`, `attempt`, `refusal`, `unique`, `describe_error`, the SQLSTATEs, `UNAVAILABLE`, `install`: `core/db_errors.py` |
 | `dev_database.py` | `backend/devtools/database.py`; `seed` is one of its subcommands |
 | `devices.py` | `devices/devices.py`; `register_device`: `devices/api.py`; the request and reply schemas: `devices/schemas.py`; what every route needing a device depends on: `devices/guards.py`; `REGISTER_PATH`: `devices/paths.py` |
 | `devices/api.py` | `devices/registration_api.py` |
 | `devices/command.py` | `devices/registration_codes_command.py` |
 | `devices/routes.py` | `devices/devices_routes.py` |
 | `devices/schemas.py` | `devices/registration_schemas.py`; `DeviceRefusedReply`: `devices/guards.py`; `RateLimitedReply`: `core/rate_limits.py` |
-| `health.py` | `core/health.py`; its query: `core/db.py`, as `ping` |
+| `health.py` | `core/health.py`; its query: `core/db_sessions.py`, as `ping` |
 | `labels/routes.py` | `labels/labels_routes.py` |
 | `ledger.py` | `stock/ledger.py`, with `_each_once`, `_hold_forms` as `each_once`, `hold_forms`; `record`, with openings into open packages, the problems of a batch by line, the replay of a batch sent again, `BatchRefused`, `KeyReused`, `Recorded`, `retired_sides` and their metrics: `scan/batch.py`; `moment`, `expected`, `expected_forms`, `left_at`, `corrected_since`: `stock/moments.py`, with `_flows`, `_form_flows`, `_at_place` as `flows`, `form_flows`, `at_place`; `record_count`, `count_open_package`, `record_adjustment`, the rest of counts and adjustments and their metrics: `stock/counts.py`; the balance queries: `stock/balance.py`; `save_batch`: `scan/batch_api.py`; the batch request and reply schemas: `scan/batch_schemas.py`, but for `Line.entry`: `scan/batch.py`, as `entry_of` |
 | `models.py` | `models/`: each table in its feature's module; the column types, `whole`, the columns and constraints most tables have, and `Versioned`: `models/base.py`; canonical names, name keys and search folding (`CanonicalName`, `KeyedName`, `Searchable`, `fold` and the rest): `models/names.py`; `_refold`: `models/catalogue.py`; `_reference`, `_one_of`, `_between`, `_unique_name`, `_unique_current_name`, `_name_key_check`: each without its `_` |
@@ -358,6 +363,7 @@ Later renamed:
 
 | Old path | New path |
 | --- | --- |
+| `core/test_connections.py` | `core/test_db_sessions.py` |
 | `models/test_fold_reference.py` | `models/test_search_text_fold_reference.py` |
 
 ## Amendment: names (2026-11-18)

@@ -14,7 +14,7 @@ from fastapi import Depends
 from sqlalchemy import ColumnElement
 from sqlalchemy.orm import Session
 
-from inventory_tng.core.db import DbSession
+from inventory_tng.core.db_sessions import DbSession
 from inventory_tng.models.catalogue import Item
 from inventory_tng.models.stock import OpenPackage
 from inventory_tng.stock import open_packages

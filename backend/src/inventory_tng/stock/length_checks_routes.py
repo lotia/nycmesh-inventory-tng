@@ -22,7 +22,8 @@ from sqlalchemy import ColumnElement, and_, or_
 from sqlalchemy.orm import Session
 
 from inventory_tng.admins.guards import AdminSignedIn, SignedIn
-from inventory_tng.core.db import DbSession, RuleBroken, attempt
+from inventory_tng.core.db_errors import RuleBroken, attempt
+from inventory_tng.core.db_sessions import DbSession
 from inventory_tng.core.local_time import site_zone
 from inventory_tng.core.phrases import Words, lazy_gettext
 from inventory_tng.models.base import INTEGER_MAX, whole

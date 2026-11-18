@@ -17,7 +17,7 @@ from opentelemetry import metrics
 from sqlalchemy import ColumnElement, and_, or_, select
 from sqlalchemy.orm import Session
 
-from inventory_tng.core.db import get_locked, locked_row
+from inventory_tng.core.db_locking import get_locked, locked_row
 from inventory_tng.core.phrases import gettext, lazy_gettext
 from inventory_tng.models.catalogue import Item, ItemPackage
 from inventory_tng.models.labels import Label

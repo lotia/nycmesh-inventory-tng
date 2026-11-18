@@ -31,7 +31,8 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from inventory_tng.catalogue import items, reading_rules, units
-from inventory_tng.core.db import lock_catalogue, refusal
+from inventory_tng.core.db_errors import refusal
+from inventory_tng.core.db_locking import lock_catalogue
 from inventory_tng.models.catalogue import ReadingRule, reading_rules_held
 from inventory_tng.models.names import canonical
 

@@ -14,7 +14,7 @@ from httpx2 import Response
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from inventory_tng.core.db import lock_catalogue
+from inventory_tng.core.db_locking import lock_catalogue
 from inventory_tng.models.catalogue import Item, ItemPackage
 
 from helpers.query_counts import counting

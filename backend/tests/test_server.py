@@ -7,7 +7,7 @@ from fastapi.testclient import TestClient
 
 from inventory_tng import server
 from inventory_tng.app import create_app
-from inventory_tng.core.db import make_engine
+from inventory_tng.core.db_sessions import make_engine
 from inventory_tng.core.settings import Redaction, Settings
 from inventory_tng.server import create_server, flush_when_stopped
 

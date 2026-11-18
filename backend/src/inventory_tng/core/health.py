@@ -3,7 +3,7 @@
 from fastapi import APIRouter, Request
 from pydantic import BaseModel, Field
 
-from inventory_tng.core.db import DbSession, ping
+from inventory_tng.core.db_sessions import DbSession, ping
 
 router = APIRouter()
 
@@ -21,6 +21,6 @@ class Health(BaseModel):
 
 @router.get(PATH)
 def healthz(session: DbSession, request: Request) -> Health:
-    """Answers once the database does. db.install() makes a failure a 503."""
+    """Answers once the database does. db_errors.install() makes a failure a 503."""
     ping(session)
     return Health(status="ok", build=request.app.state.bundle.build_id())

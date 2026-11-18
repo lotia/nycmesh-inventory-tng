@@ -12,7 +12,7 @@ from sqlalchemy.orm import Session
 from structlog.testing import capture_logs
 
 from inventory_tng.catalogue import items
-from inventory_tng.core.db import get_snapshot
+from inventory_tng.core.db_sessions import get_snapshot
 from inventory_tng.models.catalogue import Category, Item, ItemPackage
 from inventory_tng.models.labels import Label
 from inventory_tng.models.places import Location
@@ -388,7 +388,7 @@ def test_says_which_batches_asked_about_are_saved(
 
 
 def test_a_snapshot_is_never_asked_for_after_a_change(session: Session) -> None:
-    """Letting go what was read first would drop it (db.get_snapshot)."""
+    """Letting go what was read first would drop it (db_sessions.get_snapshot)."""
     session.add(Category(name=f"New {tag()}"))
     with pytest.raises(RuntimeError, match="after a change"):
         get_snapshot(session)

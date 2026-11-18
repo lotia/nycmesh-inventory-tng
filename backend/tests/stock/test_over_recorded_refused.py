@@ -12,7 +12,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 from structlog.testing import capture_logs
 
-from inventory_tng.core.db import RuleBroken
+from inventory_tng.core.db_errors import RuleBroken
 from inventory_tng.models.admins import Admin
 from inventory_tng.models.core import CatalogueHistory
 from inventory_tng.models.places import Location

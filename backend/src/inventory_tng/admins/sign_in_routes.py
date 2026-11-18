@@ -51,7 +51,7 @@ from inventory_tng.admins.paths import (
     SIGN_OUT,
 )
 from inventory_tng.core import mail, request_logging
-from inventory_tng.core.db import DbSession
+from inventory_tng.core.db_sessions import DbSession
 from inventory_tng.core.mail import Notify
 from inventory_tng.core.phrases import Words, lazy_gettext
 from inventory_tng.models.admins import Admin, AdminSession, running_low

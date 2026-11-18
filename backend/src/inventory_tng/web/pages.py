@@ -15,7 +15,7 @@ from fastapi.templating import Jinja2Templates
 from starlette.exceptions import HTTPException
 from starlette.types import Scope
 
-from inventory_tng.core.db import Gone
+from inventory_tng.core.db_errors import Gone
 from inventory_tng.core.local_time import show, show_day
 from inventory_tng.core.phrases import BRAND, install, lazy_gettext, number
 from inventory_tng.web.formatting import amount, printed_length

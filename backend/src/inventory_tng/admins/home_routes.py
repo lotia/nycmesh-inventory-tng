@@ -13,7 +13,7 @@ from inventory_tng.admins.guards import AdminSignedIn
 from inventory_tng.admins.paths import ACCOUNT, ADMINS, HOME
 from inventory_tng.catalogue.paths import CATEGORIES, ITEMS
 from inventory_tng.catalogue.queries import current_count
-from inventory_tng.core.db import DbSession
+from inventory_tng.core.db_sessions import DbSession
 from inventory_tng.core.local_time import site_zone
 from inventory_tng.core.phrases import Words, lazy_gettext
 from inventory_tng.models.catalogue import Category, Item

@@ -14,7 +14,8 @@ from fastapi.testclient import TestClient
 from sqlalchemy import Engine, select, update
 from sqlalchemy.orm import Session
 
-from inventory_tng.core.db import Database, get_locked
+from inventory_tng.core.db_locking import get_locked
+from inventory_tng.core.db_sessions import Database
 from inventory_tng.core.logs import configure_logging
 from inventory_tng.core.settings import LogConfig, Settings
 from inventory_tng.devices import devices, registration_codes_command

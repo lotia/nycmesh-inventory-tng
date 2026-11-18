@@ -15,7 +15,8 @@ from sqlalchemy.orm import Session
 
 from inventory_tng.admins.guards import AdminSignedIn, SignedIn
 from inventory_tng.catalogue.paths import ITEMS
-from inventory_tng.core.db import DbSession, attempt
+from inventory_tng.core.db_errors import attempt
+from inventory_tng.core.db_sessions import DbSession
 from inventory_tng.core.local_time import site_zone
 from inventory_tng.core.phrases import gettext, lazy_gettext
 from inventory_tng.models.stock import OpenPackage

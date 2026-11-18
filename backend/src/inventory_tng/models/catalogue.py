@@ -25,7 +25,9 @@ from sqlalchemy.orm import (
 )
 
 from inventory_tng.catalogue import units
-from inventory_tng.core.db import READ_AGAIN_ONCE_LOCKED, Base, protection
+from inventory_tng.core.db_locking import READ_AGAIN_ONCE_LOCKED
+from inventory_tng.core.db_protection import protection
+from inventory_tng.core.db_sessions import Base
 from inventory_tng.models.base import (
     MONEY,
     QUANTITY,
@@ -330,10 +332,10 @@ def _rules_forgotten(session: Session, transaction: SessionTransaction) -> None:
 
 
 # Every searchable row's, kept here as it reads items, aliases and reading
-# rules (search_text.Searchable, names.KeyedName).
-# First, so the lock guard and the history see the folded columns too. A
-# row changed in nothing searched is left alone, loading nothing, so a
-# change such as a receipt's to on_order stays only that (db.flush_writes).
+# rules (search_text.Searchable, names.KeyedName). First, so the lock guard and
+# the history see the folded columns too. A row changed in nothing searched is
+# left alone, loading nothing, so a change such as a receipt's to on_order
+# stays only that (db_protection.flush_writes).
 @event.listens_for(Session, "before_flush", insert=True)
 def _refold(session: Session, _context: object, _instances: object) -> None:
     changed = (*session.new, *session.dirty)

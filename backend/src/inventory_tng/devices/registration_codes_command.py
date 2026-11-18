@@ -19,7 +19,7 @@ from urllib.parse import urlencode
 import segno
 from sqlalchemy.orm import Session
 
-from inventory_tng.core.db import CLI_ACTOR, set_actor
+from inventory_tng.core.db_sessions import CLI_ACTOR, set_actor
 from inventory_tng.core.local_time import show, site_zone
 from inventory_tng.core.operator_commands import run_command
 from inventory_tng.devices import devices

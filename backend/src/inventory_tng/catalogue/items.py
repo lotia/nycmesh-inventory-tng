@@ -47,15 +47,15 @@ from sqlalchemy.orm import Session
 
 from inventory_tng.catalogue import units
 from inventory_tng.catalogue.name_keys import SPACES, name_key
-from inventory_tng.core.db import (
+from inventory_tng.core.db_errors import enforce
+from inventory_tng.core.db_locking import (
     Seen,
-    enforce,
-    exists_where,
     lock_catalogue,
     locked,
     relock,
     require_current,
 )
+from inventory_tng.core.db_sessions import exists_where
 from inventory_tng.models.catalogue import (
     CURRENT_ALIAS,
     Category,

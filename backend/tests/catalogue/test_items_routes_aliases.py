@@ -20,7 +20,7 @@ from inventory_tng.catalogue.forms import (
 )
 from inventory_tng.catalogue.items_routes import RENAMED
 from inventory_tng.catalogue.paths import ITEMS
-from inventory_tng.core.db import attempt
+from inventory_tng.core.db_errors import attempt
 from inventory_tng.models.catalogue import CURRENT_ALIAS, Category, Item, ItemAlias
 
 from helpers.items import NOW, items_named, new_item

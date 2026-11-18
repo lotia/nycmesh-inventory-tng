@@ -16,7 +16,7 @@ from pydantic import BaseModel
 from sqlalchemy import select
 
 from inventory_tng.core import request_logging
-from inventory_tng.core.db import DbSession, record_last_seen
+from inventory_tng.core.db_sessions import DbSession, record_last_seen
 from inventory_tng.devices.devices import (
     COOKIE,
     LAST_SEEN_EVERY,

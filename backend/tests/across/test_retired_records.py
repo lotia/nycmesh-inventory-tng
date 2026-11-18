@@ -11,7 +11,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from inventory_tng.catalogue import categories
-from inventory_tng.core.db import set_actor
+from inventory_tng.core.db_sessions import set_actor
 from inventory_tng.models.admins import Admin
 from inventory_tng.models.catalogue import Category, Item, ItemPackage
 from inventory_tng.models.places import Location

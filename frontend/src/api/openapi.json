@@ -8,7 +8,7 @@
     "/api/healthz": {
       "get": {
         "summary": "Healthz",
-        "description": "Answers once the database does. db.install() makes a failure a 503.",
+        "description": "Answers once the database does. db_errors.install() makes a failure a 503.",
         "operationId": "healthz_api_healthz_get",
         "responses": {
           "200": {

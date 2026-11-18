@@ -32,7 +32,8 @@ from pydantic import BaseModel
 from sqlalchemy import Connection, Engine, delete, exc, func, select, text
 from sqlalchemy.orm import Session
 
-from inventory_tng.core.db import PoolTimeout, database_of
+from inventory_tng.core.db_errors import PoolTimeout
+from inventory_tng.core.db_sessions import database_of
 from inventory_tng.models.core import RateLimit
 
 log = structlog.get_logger(__name__)
@@ -78,7 +79,7 @@ class PostgresStorage(Storage, MovingWindowSupport):
     @contextmanager
     def _connection(self) -> Generator[Connection]:
         """A connection from the limits pool; PoolTimeout if none comes in
-        time, so the 503 says which pool ran out (db.install)."""
+        time, so the 503 says which pool ran out (db_errors.install)."""
         try:
             connection = self.engine.connect()
         except exc.TimeoutError:
@@ -157,8 +158,8 @@ class RateLimitedReply(BaseModel):
 
 def limiter(session: Session) -> MovingWindowRateLimiter:
     """The rate limits, on the database `session` uses, in transactions of
-    their own, on its limits pool (db.Database.limits): counting never waits
-    on a pool the caller's own connection came from."""
+    their own, on its limits pool (db_sessions.Database.limits): counting never
+    waits on a pool the caller's own connection came from."""
     return MovingWindowRateLimiter(_storage(session))
 
 

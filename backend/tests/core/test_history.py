@@ -21,7 +21,8 @@ import pytest
 from sqlalchemy import Executable, delete, exc, text, update
 from sqlalchemy.orm import Session
 
-from inventory_tng.core.db import Base, Flag, set_actor
+from inventory_tng.core.db_protection import Flag
+from inventory_tng.core.db_sessions import Base, set_actor
 from inventory_tng.core.history import (
     Change,
     change,
@@ -117,7 +118,7 @@ def test_a_secret_changing_is_history_without_the_secret() -> None:
 # Which tables have history, and the columns named for them.
 
 # The tables with history, written out: no table loses its history by a
-# slip in its declaration (db.protection).
+# slip in its declaration (db_protection.protection).
 HISTORY_TABLES = {
     "category",
     "item",
@@ -226,7 +227,7 @@ def test_the_flagged_columns_are_on_tables_with_history(
 # function, each because history would record nothing of it anyway.
 ALLOWED = {
     # Sets last_seen_at alone, which is not history ("not_a_change").
-    SOURCE / "core" / "db.py": ("record_last_seen",),
+    SOURCE / "core" / "db_sessions.py": ("record_last_seen",),
     # Writes catalogue_history itself.
     SOURCE / "core" / "history.py": ("_after_flush",),
 }

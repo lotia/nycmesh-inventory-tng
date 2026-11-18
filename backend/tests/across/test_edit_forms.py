@@ -11,7 +11,7 @@ from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
 
 from inventory_tng.catalogue.paths import CATEGORIES, ITEMS
-from inventory_tng.core.db import Base
+from inventory_tng.core.db_sessions import Base
 from inventory_tng.models.catalogue import Category, Item
 from inventory_tng.models.places import Location
 from inventory_tng.models.site_settings import (
@@ -134,7 +134,7 @@ def test_a_form_without_its_version_is_refused(
 
 
 def test_each_change_moves_the_version_on(session: Session) -> None:
-    """In the update itself (db._next_version); a row added starts at 1."""
+    """In the update itself (db_locking._next_version); a row added starts at 1."""
     radios = add(session, Category(name="Radios"))
     assert radios.edit_version == 1
     radios.name = "Antennas"

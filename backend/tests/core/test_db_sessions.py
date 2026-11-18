@@ -23,17 +23,17 @@ from sqlalchemy.orm import Session
 from structlog.testing import capture_logs
 
 from inventory_tng.app import create_app
-from inventory_tng.core import db
-from inventory_tng.core.db import (
+from inventory_tng.core import db_sessions
+from inventory_tng.core.db_errors import PoolTimeout
+from inventory_tng.core.db_sessions import (
     LOCK_TIMEOUT,
     Database,
     DbSession,
-    PoolTimeout,
     make_database,
 )
 
 # Imported before conftest replaces it in every test.
-from inventory_tng.core.db import pool_order_broken as logs_pool_order_broken
+from inventory_tng.core.db_sessions import pool_order_broken as logs_pool_order_broken
 from inventory_tng.core.rate_limits import limiter
 from inventory_tng.core.settings import Settings
 from inventory_tng.models.devices import Device
@@ -47,7 +47,7 @@ def test_more_requests_than_threads_and_connections_do_not_stall(
     """Four threads and two connections for forty requests at once, on
     routes whose connection is held across threads: a dependency that reads
     first, then the route, then the check of the model it returns. Before
-    db.session_slot, threads waited for connections held by requests
+    db_sessions.session_slot, threads waited for connections held by requests
     waiting for threads, until the pool timed out: 503s after 10 seconds."""
     app = create_app(Settings(database_url=database_url))
     app.state.db.dispose()
@@ -81,7 +81,7 @@ def test_more_requests_than_threads_and_connections_do_not_stall(
             assert asyncio.run(at_once(path)) == [200] * 40, path
     finally:
         app.state.db.dispose()
-    assert time.monotonic() - started < db.POOL_TIMEOUT / 2
+    assert time.monotonic() - started < db_sessions.POOL_TIMEOUT / 2
 
 
 def test_a_connection_taken_is_counted_until_given_back(database_url: str) -> None:
@@ -130,7 +130,7 @@ def test_a_request_holding_its_connection_still_counts_and_is_seen(
     with small_database(database_url) as database, database.session() as request:
         request.execute(text("SELECT 1"))  # Holds the one connection.
         assert limiter(request).hit(RateLimitItemPerMinute(1), "test", "held")
-        db.record_last_seen(database, Device, -1, datetime.now(UTC))
+        db_sessions.record_last_seen(database, Device, -1, datetime.now(UTC))
 
 
 def test_connections_wait_for_a_lock_for_a_while_only(database: Database) -> None:
@@ -152,24 +152,24 @@ def test_last_seen_is_skipped_while_its_row_is_locked_too_long(
 
     monkeypatch.setattr(Session, "execute", refused(LockNotAvailable()))
     with capture_logs() as logs:
-        db.record_last_seen(database, Device, -1, datetime.now(UTC))
+        db_sessions.record_last_seen(database, Device, -1, datetime.now(UTC))
     assert [line["event"] for line in logs] == ["last seen not recorded"]
     monkeypatch.setattr(Session, "execute", refused(ConnectionFailure()))
     with pytest.raises(exc.OperationalError):
-        db.record_last_seen(database, Device, -1, datetime.now(UTC))
+        db_sessions.record_last_seen(database, Device, -1, datetime.now(UTC))
 
 
 def test_work_after_the_reply_uses_the_side_pool(database: Database) -> None:
-    """It holds no place among the requests (db.session_slot), so it must
-    not take the request pool's connections from those that do."""
+    """It holds no place among the requests (db_sessions.session_slot), so it
+    must not take the request pool's connections from those that do."""
     request = SimpleNamespace(app=SimpleNamespace(state=SimpleNamespace(db=database)))
-    with db.get_session_factory(cast(Request, request))() as session:
+    with db_sessions.get_session_factory(cast(Request, request))() as session:
         assert session.get_bind() is database.side
 
 
 def test_a_session_without_its_database_says_so(engine: Engine) -> None:
     with Session(engine) as session, pytest.raises(RuntimeError, match="Database"):
-        db.database_of(session)
+        db_sessions.database_of(session)
 
 
 def test_work_after_the_reply_counts_on_a_pool_it_does_not_hold(
@@ -199,12 +199,14 @@ def test_a_busy_limits_pool_says_so(database_url: str) -> None:
 
 
 def test_the_pool_order_is_watched(database_url: str) -> None:
-    """A take from a pool while the thread holds one from the same pool, or
-    a later one, is reported (db.pool_order_broken; conftest fails a test
-    on it): here, the side pool while holding the limits pool."""
+    """A take from a pool while the thread holds one from the same pool, or a
+    later one, is reported (db_sessions.pool_order_broken; conftest fails a
+    test on it): here, the side pool while holding the limits pool."""
     broken: list[tuple[str, list[str]]] = []
     with (
-        patch.object(db, "pool_order_broken", lambda p, h: broken.append((p, h))),
+        patch.object(
+            db_sessions, "pool_order_broken", lambda p, h: broken.append((p, h))
+        ),
         small_database(database_url, side=(1, 0)) as database,
         database.limits.connect(),
         database.side.connect(),

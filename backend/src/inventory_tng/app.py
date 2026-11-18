@@ -25,9 +25,9 @@ from inventory_tng.catalogue import (
     items_routes,
     reading_rules_routes,
 )
-from inventory_tng.core import database_role, db, health
+from inventory_tng.core import database_role, db_errors, health
 from inventory_tng.core.cross_site import CrossSiteRefusal
-from inventory_tng.core.db import Database, make_database
+from inventory_tng.core.db_sessions import Database, make_database
 from inventory_tng.core.mail import SmtpMailer
 from inventory_tng.core.phrases import BRAND
 from inventory_tng.core.request_logging import RequestLogging
@@ -100,7 +100,7 @@ def create_app(
         # own.
         docs_url=None,
         redoc_url=None,
-        responses=db.UNAVAILABLE,
+        responses=db_errors.UNAVAILABLE,
     )
     app.state.db = database
     app.state.settings = settings
@@ -153,7 +153,7 @@ def create_app(
     app.include_router(site_settings_routes.router)
     app.include_router(reset_routes.router)
     frontend_bundle.install(app, settings)
-    db.install(app)
+    db_errors.install(app)
     registration_api.install(app)
     install_device_refused(app)
     batch_api.install(app)

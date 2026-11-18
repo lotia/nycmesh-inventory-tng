@@ -14,14 +14,9 @@ from datetime import datetime
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from inventory_tng.core.db import (
-    Seen,
-    enforce,
-    exists_where,
-    lock_catalogue,
-    relock,
-    require_current,
-)
+from inventory_tng.core.db_errors import enforce
+from inventory_tng.core.db_locking import Seen, lock_catalogue, relock, require_current
+from inventory_tng.core.db_sessions import exists_where
 from inventory_tng.models.places import STORE_KINDS, Location
 from inventory_tng.models.volunteers import Volunteer
 from inventory_tng.stock.balance import holds_stock

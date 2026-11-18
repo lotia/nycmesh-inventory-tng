@@ -26,7 +26,7 @@ from pathlib import Path
 import pytest
 
 # Has every table: helpers.source imports every model.
-from inventory_tng.core.db import Base
+from inventory_tng.core.db_sessions import Base
 
 from helpers.source import SOURCE, TEMPLATES, modules
 
@@ -35,8 +35,8 @@ type App = Mapping[str, ast.Module]
 # What the module at a path breaks a rule with.
 type Check = Callable[[str, App], set[str]]
 
-# Rules: each table's owner (db.protection), any queries.py or forms.py, and
-# these, which hold rules but own no table.
+# Rules: each table's owner (db_protection.protection), any queries.py or
+# forms.py, and these, which hold rules but own no table.
 RULES = {
     "catalogue/name_keys.py",
     "catalogue/unit_readings.py",
@@ -259,7 +259,7 @@ APP = {
         ),
         (
             "core_imports_a_feature",
-            "core/db.py",
+            "core/db_sessions.py",
             (
                 "from ..stock import ledger\nfrom inventory_tng import models\n"
                 "from inventory_tng.models.places import Location\n"

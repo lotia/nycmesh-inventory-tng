@@ -19,7 +19,7 @@ from sqlalchemy import Connection, Engine, make_url, text
 from sqlalchemy.exc import OperationalError
 
 from devtools.database import OWNER, as_superuser, create, drop, server_url
-from inventory_tng.core.db import LOCK_TIMEOUT, make_engine
+from inventory_tng.core.db_sessions import LOCK_TIMEOUT, make_engine
 from inventory_tng.core.local_env import setting
 
 log = structlog.get_logger(__name__)

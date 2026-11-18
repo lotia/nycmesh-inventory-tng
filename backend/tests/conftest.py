@@ -20,9 +20,9 @@ from sqlalchemy.engine.interfaces import DBAPIConnection
 from sqlalchemy.orm import Session
 
 from inventory_tng.admins import accounts
-from inventory_tng.core import db, local_env
+from inventory_tng.core import db_sessions, local_env
 from inventory_tng.core.database_role import refusals
-from inventory_tng.core.db import (
+from inventory_tng.core.db_sessions import (
     Database,
     make_database,
     make_engine,
@@ -250,12 +250,13 @@ def pytest_runtest_makereport(
 def keeps_to_the_pool_order(
     request: pytest.FixtureRequest, monkeypatch: pytest.MonkeyPatch
 ) -> Iterator[None]:
-    """No test takes a connection out of the pools' order (db.Database),
-    which with enough at once would wait on itself, unless it is marked as
-    doing so on purpose, as a test of a busy pool does."""
+    """No test takes a connection out of the pools' order
+    (db_sessions.Database), which with enough at once would wait on itself,
+    unless it is marked as doing so on purpose, as a test of a busy pool
+    does."""
     broken: list[tuple[str, list[str]]] = []
     monkeypatch.setattr(
-        db, "pool_order_broken", lambda pool, held: broken.append((pool, held))
+        db_sessions, "pool_order_broken", lambda pool, held: broken.append((pool, held))
     )
     yield
     if request.node.get_closest_marker("breaks_pool_order") is None:

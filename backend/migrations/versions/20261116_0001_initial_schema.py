@@ -15,8 +15,8 @@ and DELETE on each by default, never TRUNCATE. Some is then taken back:
   what it was opened from, an alias's item and name.
 
 It also makes each settings table's one row, with its defaults
-(db.settings_row), and the adjustment reasons the app starts with, those
-it gives itself among them (adjustment_reasons.seeded).
+(db_locking.settings_row), and the adjustment reasons the app starts with,
+those it gives itself among them (adjustment_reasons.seeded).
 
 Ali, 2026-11-17: made as one migration from the many before it.
 

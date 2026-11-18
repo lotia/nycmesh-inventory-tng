@@ -20,7 +20,7 @@ from sqlalchemy import (
 )
 from sqlalchemy.orm import Session
 
-from inventory_tng.core.db import by_name, exists_where
+from inventory_tng.core.db_sessions import by_name, exists_where
 from inventory_tng.models.catalogue import Item, ItemPackage
 from inventory_tng.models.places import STORE_KINDS, Location
 from inventory_tng.models.stock import LedgerTransaction, Movement, OpenPackage

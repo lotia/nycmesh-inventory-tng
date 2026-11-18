@@ -26,8 +26,8 @@ from structlog.testing import capture_logs
 from inventory_tng.admins import accounts
 from inventory_tng.app import create_app
 from inventory_tng.catalogue.paths import CATEGORIES
-from inventory_tng.core import db, mail
-from inventory_tng.core.db import NoSession, RuleBroken
+from inventory_tng.core import db_sessions, mail
+from inventory_tng.core.db_errors import NoSession, RuleBroken
 from inventory_tng.core.masking import MASK, Masker
 from inventory_tng.core.settings import RateLimits, Settings
 from inventory_tng.core.telemetry import Telemetry, enabled
@@ -682,8 +682,8 @@ def test_counts_saves_refused_as_changed_since_shown(
 
 
 def test_counts_requests_that_found_no_free_connection(recorded: Recorded) -> None:
-    """A pool too small, or requests stuck holding theirs (db.POOL_TIMEOUT),
-    shows as a 503 and in this count."""
+    """A pool too small, or requests stuck holding theirs
+    (db_sessions.POOL_TIMEOUT), shows as a 503 and in this count."""
     client, _, reader, _ = recorded
 
     def no_connection() -> None:
@@ -729,7 +729,7 @@ def test_counts_last_seen_skipped_for_a_busy_side_pool(
         database.side.connect(),
         capture_logs() as logs,
     ):
-        db.record_last_seen(database, Device, -1, datetime.now(UTC))
+        db_sessions.record_last_seen(database, Device, -1, datetime.now(UTC))
     assert counted(reader, "db.client.connection.timeouts")[key] == before + 1
     assert [line["event"] for line in logs] == ["last seen not recorded"]
 

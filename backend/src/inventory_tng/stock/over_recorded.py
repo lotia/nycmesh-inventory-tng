@@ -31,7 +31,8 @@ from sqlalchemy import (
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.orm import Session, aliased
 
-from inventory_tng.core.db import RuleBroken, get_locked, locked
+from inventory_tng.core.db_errors import RuleBroken
+from inventory_tng.core.db_locking import get_locked, locked
 from inventory_tng.core.local_time import show_day
 from inventory_tng.core.phrases import gettext, in_query, lazy_gettext
 from inventory_tng.models.admins import Admin

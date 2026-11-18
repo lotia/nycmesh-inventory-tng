@@ -1,5 +1,5 @@
-"""Small databases (db.Database), for tests of what happens when a pool
-runs out: a few connections, and short waits; and every pool's connections
+"""Small databases (db_sessions.Database), for tests of what happens when a
+pool runs out: a few connections, and short waits; and every pool's connections
 checked out, for conftest's keeps_its_connections."""
 
 from collections.abc import Generator
@@ -8,7 +8,7 @@ from contextlib import contextmanager
 from sqlalchemy import event
 from sqlalchemy.pool import ConnectionPoolEntry, Pool
 
-from inventory_tng.core.db import Database, make_database
+from inventory_tng.core.db_sessions import Database, make_database
 
 # Every pool's connections checked out and not yet given back, kept by the
 # events below, which count without a query.

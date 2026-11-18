@@ -54,8 +54,8 @@ privilege, so neither binds it.
   history, and the app refuses a write made without its table's lock
   (Amendment).
 - Concurrency is the app's to get right: the lock order is written down once
-  for the catalogue (`db.locked_row`), once for the ledger (`ledger.py`) and
-  once for administrators (`accounts.lock_admins`).
+  for the catalogue (`db_locking.locked_row`), once for the ledger
+  (`ledger.py`) and once for administrators (`accounts.lock_admins`).
 - PostgreSQL features still in use, and what another database would need:
   - fuzzy search: `pg_trgm` and GIN indexes on `item.search_text` and
     `volunteer.search_text`, which the app keeps (0021; the largest cost);
@@ -77,14 +77,15 @@ lock's, and each table's protection was in four lists nothing tied together
 (inventory-tng-8i4.112).
 
 - **Each table declares its protection once**, on its model
-  (`db.protection` in `__table_args__`): its owner module, the lock a write
-  holds (`"catalogue"`, `"row"` or none) and whether it has history; and on
-  a column, `secret`, `not_a_change` or `row_lock_only`. The guard, history
-  and `tests/across/test_write_owners.py` read `Base.metadata`.
+  (`db_protection.protection` in `__table_args__`): its owner module, the
+  lock a write holds (`"catalogue"`, `"row"` or none) and whether it has
+  history; and on a column, `secret`, `not_a_change` or `row_lock_only`.
+  The guard, history and `tests/across/test_write_owners.py` read
+  `Base.metadata`.
 - **One flush guard** replaces the catalogue lock's: every write to a table
-  whose protection names a lock holds it; `db.py` gives the rules. The
-  static test is kept for what the guard cannot see: where a row was made,
-  and deletes.
+  whose protection names a lock holds it; `db_protection.py` gives the
+  rules. The static test is kept for what the guard cannot see: where a row
+  was made, and deletes.
 - **Single-row rules**: a check constraint where PostgreSQL can check it;
   else `@validates` on the model (the site's time zone). Rules that read
   other rows stay in domain functions.

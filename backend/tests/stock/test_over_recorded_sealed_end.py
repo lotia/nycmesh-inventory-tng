@@ -11,7 +11,7 @@ from fastapi.testclient import TestClient
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from inventory_tng.core.db import RuleBroken
+from inventory_tng.core.db_errors import RuleBroken
 from inventory_tng.models.places import Location
 from inventory_tng.models.stock import (
     LedgerTransaction,

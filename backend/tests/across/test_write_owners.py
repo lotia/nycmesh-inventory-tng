@@ -1,11 +1,12 @@
 """Who writes which table, and holding what: each model declares it
-(db.protection), and db.py says what each declaration means. The app's
-flush guard is tested here on PostgreSQL. It sees every write, by setting an
-attribute too, but not where a row was made: so the first test below reads
-the app's source with Python's ast module (nothing of it runs in the app;
-helpers.source.writes) and fails on a row made outside its owner, or one
-deleted outside the few functions allowed to. Statements on a table with
-history, such as update(Item), are refused everywhere by test_history.py.
+(db_protection.protection), and db_protection.py says what each declaration
+means. The app's flush guard is tested here on PostgreSQL. It sees every
+write, by setting an attribute too, but not where a row was made: so the
+first test below reads the app's source with Python's ast module (nothing
+of it runs in the app; helpers.source.writes) and fails on a row made
+outside its owner, or one deleted outside the few functions allowed to.
+Statements on a table with history, such as update(Item), are refused
+everywhere by test_history.py.
 """
 
 import ast
@@ -23,25 +24,18 @@ from sqlalchemy.orm import DeclarativeBase, Mapped, Session, mapped_column
 from structlog.testing import capture_logs
 
 from inventory_tng.admins import accounts
-from inventory_tng.core.db import (
+from inventory_tng.core.db_errors import Gone, attempt, enforce
+from inventory_tng.core.db_locking import (
     CATALOGUE,
     LOCKS_INFO,
-    Action,
-    Base,
-    DbSession,
-    Gone,
-    Lock,
-    Sessions,
-    attempt,
-    changed_columns,
-    enforce,
-    flagged,
     get_locked,
     lock_catalogue,
     locked,
     missing_lock,
     settings_row,
 )
+from inventory_tng.core.db_protection import Action, Lock, changed_columns, flagged
+from inventory_tng.core.db_sessions import Base, DbSession, Sessions
 from inventory_tng.models.admins import Admin, AdminPassword
 from inventory_tng.models.catalogue import Category, Item
 from inventory_tng.models.site_settings import SiteSettings
@@ -102,8 +96,8 @@ def test_rows_are_written_by_their_owners_only() -> None:
     found = offending(not_owned_writes, ALLOWED)
     assert found == {}, (
         "Write these tables through their owner's domain functions "
-        f"(db.protection's owner, test_write_owners.ALLOWED), which check the"
-        f" rules: {found}"
+        "(db_protection.protection's owner, test_write_owners.ALLOWED), which"
+        f" check the rules: {found}"
     )
 
 
@@ -116,8 +110,8 @@ def test_each_owner_is_a_domain_module() -> None:
 
 
 def test_every_table_declares_its_protection() -> None:
-    """So a new table cannot be forgotten (db.protection's types say the
-    rest). The catalogue's are made by a module of their own. A table with
+    """So a new table cannot be forgotten (db_protection.protection's types say
+    the rest). The catalogue's are made by a module of their own. A table with
     a lock has history, so test_history.py refuses a statement writing it,
     which the guard would not see."""
     for table in TABLES.values():
@@ -130,8 +124,8 @@ def test_every_table_declares_its_protection() -> None:
 
 
 def test_no_model_has_a_relationship() -> None:
-    """The guard and history see only the columns a session was given to
-    change (db.flush_writes), not rows a relationship() changes as it
+    """The guard and history see only the columns a session was given to change
+    (db_protection.flush_writes), not rows a relationship() changes as it
     flushes."""
     related = {
         mapper.class_.__name__
@@ -139,8 +133,8 @@ def test_no_model_has_a_relationship() -> None:
         if mapper.relationships
     }
     assert related == set(), (
-        "db.flush_writes and history.py see column changes only: write the"
-        f" foreign key instead of a relationship() on {related}"
+        "db_protection.flush_writes and history.py see column changes only:"
+        f" write the foreign key instead of a relationship() on {related}"
     )
 
 
@@ -361,7 +355,7 @@ def test_a_row_changed_without_its_lock_is_refused(fresh: Session) -> None:
     with pytest.raises(
         RuntimeError,
         match=r"site_settings update without the row lock: lock it in this"
-        r" transaction before changing it \(db.get_locked",
+        r" transaction before changing it \(db_locking.get_locked",
     ):
         fresh.flush()
 

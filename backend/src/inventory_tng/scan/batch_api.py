@@ -7,7 +7,7 @@ from fastapi import APIRouter, Depends, FastAPI, Request, Response
 from fastapi.responses import JSONResponse
 from opentelemetry import metrics
 
-from inventory_tng.core.db import DbSession, set_actor
+from inventory_tng.core.db_sessions import DbSession, set_actor
 from inventory_tng.devices.guards import DeviceRefusedReply, RegisteredDevice
 from inventory_tng.scan import page_builds
 from inventory_tng.scan.batch import BatchRefused, KeyReused, record

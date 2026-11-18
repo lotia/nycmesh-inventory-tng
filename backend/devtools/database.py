@@ -18,7 +18,7 @@ import structlog
 from sqlalchemy import URL, Connection, make_url, text
 from sqlalchemy.exc import ProgrammingError
 
-from inventory_tng.core.db import make_engine
+from inventory_tng.core.db_sessions import make_engine
 from inventory_tng.core.local_env import CLONE
 from inventory_tng.core.operator_commands import run_command, set_up
 from inventory_tng.core.settings import migration_settings
@@ -29,9 +29,9 @@ log = structlog.get_logger(__name__)
 # the app and migrations never log in as it.
 SUPERUSER = "inventory"
 OWNER = "inventory_owner"
-# Connections a development database takes at most, as the roles log in:
-# an app's pools (core/db.py, 20) and a migration or seed beside it, so it
-# cannot starve the tests beside it (CONTRIBUTING.md, Connections).
+# Connections a development database takes at most, as the roles log in: an
+# app's pools (core/db_sessions.py, 20) and a migration or seed beside it, so
+# it cannot starve the tests beside it (CONTRIBUTING.md, Connections).
 CONNECTION_LIMIT = 30
 # The roles, made if missing (roles.sql says who else runs it).
 ROLES_SQL = CLONE / "backend" / "migrations" / "roles.sql"

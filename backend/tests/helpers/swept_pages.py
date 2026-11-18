@@ -16,7 +16,7 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from inventory_tng.admins import accounts, guards
-from inventory_tng.core.db import DATABASE_INFO, Database, make_database
+from inventory_tng.core.db_sessions import DATABASE_INFO, Database, make_database
 from inventory_tng.devices import devices
 from inventory_tng.models.admins import Admin, Authenticator
 from inventory_tng.models.catalogue import (
@@ -663,8 +663,8 @@ class Built:
         requests on a session of the world's database rolled back after:
         whatever a page writes is not left for the next test. What the app
         writes in a transaction of its own would reach the world's database:
-        when Ada or the device was last seen (db.record_last_seen) is never
-        written, its wait made longer than any run."""
+        when Ada or the device was last seen (db_sessions.record_last_seen) is
+        never written, its wait made longer than any run."""
         with (
             patch.object(accounts, "SEEN_EVERY", UNSEEN),
             patch.object(devices, "LAST_SEEN_EVERY", UNSEEN),

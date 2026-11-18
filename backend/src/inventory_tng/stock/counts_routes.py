@@ -41,7 +41,8 @@ from sqlalchemy.orm import Session
 
 from inventory_tng.admins.guards import AdminSignedIn, SignedIn
 from inventory_tng.catalogue.items_listing import SEARCHED
-from inventory_tng.core.db import DbSession, by_name, refusal
+from inventory_tng.core.db_errors import refusal
+from inventory_tng.core.db_sessions import DbSession, by_name
 from inventory_tng.core.phrases import Words, gettext, in_query, lazy_gettext, ngettext
 from inventory_tng.core.sent_forms import form_key
 from inventory_tng.models.admins import Admin

@@ -80,13 +80,13 @@ def unique_current_name(table: str, *scope: str) -> Index:
 
 class Versioned:
     """A row an edit form shows. Each update the app makes adds one to its
-    edit_version (db._next_version); the form sends back the one it showed,
-    and a save of a row changed since is refused (db.unchanged), rather than
-    undoing that change (inventory-tng-8i4.123). Not SQLAlchemy's
-    version_id_col: that refuses a locking read of a row changed since the
-    session loaded it, which every domain function makes (db.relock), and
-    checks the version loaded in this request, not the one a form showed in
-    an earlier one."""
+    edit_version (db_locking._next_version); the form sends back the one it
+    showed, and a save of a row changed since is refused
+    (db_locking.unchanged), rather than undoing that change
+    (inventory-tng-8i4.123). Not SQLAlchemy's version_id_col: that refuses a
+    locking read of a row changed since the session loaded it, which every
+    domain function makes (db_locking.relock), and checks the version loaded in
+    this request, not the one a form showed in an earlier one."""
 
     edit_version: Mapped[int] = mapped_column(
         server_default=text("1"), info={"not_a_change": True}

@@ -3,7 +3,9 @@
 from sqlalchemy import CheckConstraint, Index, Text, text
 from sqlalchemy.orm import Mapped, mapped_column, validates
 
-from inventory_tng.core.db import Base, enforce, protection
+from inventory_tng.core.db_errors import enforce
+from inventory_tng.core.db_protection import protection
+from inventory_tng.core.db_sessions import Base
 from inventory_tng.core.time_zones import is_time_zone
 from inventory_tng.models.base import (
     CreatedAt,

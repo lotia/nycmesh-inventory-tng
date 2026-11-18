@@ -17,7 +17,8 @@ from sqlalchemy import select, union_all
 from sqlalchemy.orm import Session
 
 from inventory_tng.catalogue import items, units
-from inventory_tng.core.db import Seen, enforce, lock_catalogue, locked, relock
+from inventory_tng.core.db_errors import enforce
+from inventory_tng.core.db_locking import Seen, lock_catalogue, locked, relock
 from inventory_tng.core.phrases import gettext, lazy_gettext
 from inventory_tng.models.catalogue import (
     CURRENT_ALIAS,

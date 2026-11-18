@@ -25,7 +25,8 @@ from inventory_tng.catalogue.reading_rules import (
     offered,
     read_alike_words,
 )
-from inventory_tng.core.db import DbSession, refusal
+from inventory_tng.core.db_errors import refusal
+from inventory_tng.core.db_sessions import DbSession
 from inventory_tng.core.local_time import site_zone
 from inventory_tng.core.phrases import Words, gettext, lazy_gettext
 from inventory_tng.models.base import INTEGER_MAX, whole

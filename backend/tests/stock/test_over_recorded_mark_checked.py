@@ -10,7 +10,7 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 from structlog.testing import capture_logs
 
-from inventory_tng.core.db import RuleBroken, attempt
+from inventory_tng.core.db_errors import RuleBroken, attempt
 from inventory_tng.models.catalogue import ItemPackage
 from inventory_tng.models.stock import (
     OVER_RECORDED_REASONS,

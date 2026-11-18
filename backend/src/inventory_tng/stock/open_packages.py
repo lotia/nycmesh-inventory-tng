@@ -17,7 +17,8 @@ from opentelemetry import metrics
 from sqlalchemy import ColumnElement, exc, select
 from sqlalchemy.orm import Session
 
-from inventory_tng.core.db import enforce, get_locked, locked
+from inventory_tng.core.db_errors import enforce
+from inventory_tng.core.db_locking import get_locked, locked
 from inventory_tng.models.catalogue import Item, ItemPackage
 from inventory_tng.models.places import Location
 from inventory_tng.models.stock import LedgerTransaction, OpenPackage

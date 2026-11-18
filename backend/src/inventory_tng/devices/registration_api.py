@@ -5,7 +5,7 @@ code."""
 from fastapi import APIRouter, FastAPI, Request, Response
 from fastapi.responses import JSONResponse
 
-from inventory_tng.core.db import DbSession
+from inventory_tng.core.db_sessions import DbSession
 from inventory_tng.core.rate_limits import RateLimitedReply
 from inventory_tng.devices.devices import (
     COOKIE,

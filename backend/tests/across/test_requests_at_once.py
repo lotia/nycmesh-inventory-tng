@@ -34,14 +34,13 @@ from inventory_tng.admins import accounts, guards, paths
 from inventory_tng.admins.paths import ADMINS
 from inventory_tng.catalogue import categories, items, reading_rules, units
 from inventory_tng.core import mail
-from inventory_tng.core.db import (
+from inventory_tng.core.db_errors import RuleBroken
+from inventory_tng.core.db_locking import locked, locked_row
+from inventory_tng.core.db_sessions import (
     Base,
     DbSession,
-    RuleBroken,
     get_snapshot,
     hold_until_commit,
-    locked,
-    locked_row,
     release_hold,
 )
 from inventory_tng.core.mail import Message, Notify
@@ -741,8 +740,8 @@ def test_the_hold_ends_with_the_route_on_the_apps_own_sessions(
     admins: Admins,
     own_client: Callable[[SentMail], TestClient],
 ) -> None:
-    """As in production (db.get_session), not the test's stand-in: work
-    after the reply that commits on the request's session is not taken for
+    """As in production (db_sessions.get_session), not the test's stand-in:
+    work after the reply that commits on the request's session is not taken for
     the route committing twice."""
     _, _, key = admins
     client = own_client(SentMail())
@@ -776,8 +775,8 @@ def test_a_form_refused_without_a_commit_lets_go_of_its_lock_before_mail(
     """Through the whole app, with a session per request: a gated form takes
     every administrator's lock, queues mail for after the reply and returns
     with neither a commit nor a rollback, as a refusal may. The request's
-    session closes as the route returns (db.DbSession), so the mail goes
-    out with the lock already let go, not held while the provider
+    session closes as the route returns (db_sessions.DbSession), so the mail
+    goes out with the lock already let go, not held while the provider
     answers."""
     ada, _, key = admins
     sent = LockProbingMail(committed, ada)

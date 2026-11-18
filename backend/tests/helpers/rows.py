@@ -11,16 +11,10 @@ from sqlalchemy import Engine, exc, select
 from sqlalchemy.orm import Session
 
 from inventory_tng.catalogue import items
-from inventory_tng.core.db import (
-    DATABASE_INFO,
-    UNGUARDED_INFO,
-    Base,
-    Database,
-    Flag,
-    RuleBroken,
-    describe_error,
-    flagged,
-)
+from inventory_tng.core.db_errors import RuleBroken, describe_error
+from inventory_tng.core.db_locking import UNGUARDED_INFO
+from inventory_tng.core.db_protection import Flag, flagged
+from inventory_tng.core.db_sessions import DATABASE_INFO, Base, Database
 from inventory_tng.models.catalogue import Item, ReadingRule
 from inventory_tng.models.core import CatalogueHistory
 
@@ -39,8 +33,8 @@ def violates(session: Session, constraint: str) -> Generator[None]:
 @contextmanager
 def breaks(session: Session, rule: str) -> Generator[None]:
     """The block's domain function refuses the change by `rule`
-    (db.RuleBroken), and what the block did is rolled back to a savepoint,
-    so the test can go on."""
+    (db_errors.RuleBroken), and what the block did is rolled back to a
+    savepoint, so the test can go on."""
     with pytest.raises(RuleBroken) as raised, session.begin_nested():
         yield
     assert raised.value.rule == rule
@@ -95,8 +89,9 @@ def tag() -> str:
 def setting_up(session: Session) -> Session:
     """A test's own session, which writes rows directly to set up what it
     tests: the app refuses a write without the lock its table names
-    (db.protection), but not on this session (db.UNGUARDED_INFO), except
-    as the app's requests use it (helpers.apps.as_the_app)."""
+    (db_protection.protection), but not on this session
+    (db_locking.UNGUARDED_INFO), except as the app's requests use it
+    (helpers.apps.as_the_app)."""
     session.info[UNGUARDED_INFO] = "a test's own rows"
     return session
 
@@ -105,7 +100,7 @@ def setting_up(session: Session) -> Session:
 def rolled_back(engine: Engine, database: Database | None = None) -> Generator[Session]:
     """A test's own session (setting_up), rolled back after, even if the
     code under test commits; knowing `database`, for writes in a transaction
-    of their own on its side pool (db.database_of)."""
+    of their own on its side pool (db_sessions.database_of)."""
     with engine.connect() as connection:
         transaction = connection.begin()
         with Session(

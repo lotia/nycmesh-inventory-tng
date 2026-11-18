@@ -14,7 +14,7 @@ from structlog.testing import capture_logs
 from devtools import database
 from devtools.__main__ import main as run_devtools
 from devtools.database import CONNECTION_LIMIT, OWNER
-from inventory_tng.core.db import (
+from inventory_tng.core.db_sessions import (
     CANNOT_CONNECT_TO_MIGRATE,
     connect_to_migrate,
     make_engine,

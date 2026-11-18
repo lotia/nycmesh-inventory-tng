@@ -16,7 +16,8 @@ from sqlalchemy.orm import Session
 
 from inventory_tng.admins import accounts
 from inventory_tng.catalogue import categories, items
-from inventory_tng.core.db import CLI_ACTOR, exists_where, set_actor, settings_row
+from inventory_tng.core.db_locking import settings_row
+from inventory_tng.core.db_sessions import CLI_ACTOR, exists_where, set_actor
 from inventory_tng.labels import labels
 from inventory_tng.models.admins import Admin
 from inventory_tng.models.places import Location

@@ -21,7 +21,7 @@ from inventory_tng.admins import accounts
 from inventory_tng.admins.guards import TOO_MANY
 from inventory_tng.admins.paths import FORGOT, RECOVER, RESET, SIGN_IN, reset_url
 from inventory_tng.core import mail
-from inventory_tng.core.db import DbSession, SessionFactory, Sessions
+from inventory_tng.core.db_sessions import DbSession, SessionFactory, Sessions
 from inventory_tng.core.mail import Notify
 from inventory_tng.core.phrases import Words, lazy_gettext
 from inventory_tng.models.admins import ResetLink

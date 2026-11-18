@@ -16,7 +16,8 @@ from opentelemetry import metrics
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
-from inventory_tng.core.db import RuleBroken, enforce, exists_where
+from inventory_tng.core.db_errors import RuleBroken, enforce
+from inventory_tng.core.db_sessions import exists_where
 from inventory_tng.models.places import Location
 from inventory_tng.models.stock import LedgerTransaction, OpenPackage
 from inventory_tng.stock import moments

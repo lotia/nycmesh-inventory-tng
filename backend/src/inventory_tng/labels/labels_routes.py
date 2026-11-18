@@ -13,7 +13,7 @@ from sqlalchemy import ColumnElement, func
 
 from inventory_tng.admins.guards import AdminSignedIn
 from inventory_tng.catalogue.paths import ITEMS
-from inventory_tng.core.db import DbSession
+from inventory_tng.core.db_sessions import DbSession
 from inventory_tng.core.local_time import site_zone
 from inventory_tng.core.phrases import gettext, lazy, lazy_gettext, ngettext
 from inventory_tng.labels import labels, queries

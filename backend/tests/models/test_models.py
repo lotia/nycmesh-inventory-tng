@@ -1,7 +1,7 @@
 """The catalogue's rules: the database's own (models/, the initial
 migration), each failing write checked by the constraint it names, which
 is what describe_error() logs; and the app's, each refused through its domain
-function by the rule's name (db.RuleBroken), whose every case
+function by the rule's name (db_errors.RuleBroken), whose every case
 places/test_locations.py and volunteers/test_volunteers.py test without a
 database."""
 
@@ -18,7 +18,8 @@ from sqlalchemy.orm import Session
 
 from inventory_tng.catalogue import categories, items
 from inventory_tng.catalogue.name_keys import LOOK_ALIKES, name_key, name_key_sql
-from inventory_tng.core.db import ACTOR_INFO, Base, refusal, set_actor
+from inventory_tng.core.db_errors import refusal
+from inventory_tng.core.db_sessions import ACTOR_INFO, Base, set_actor
 from inventory_tng.labels import labels
 from inventory_tng.models.catalogue import Category, Item, ItemPackage
 from inventory_tng.models.core import CatalogueHistory
@@ -622,7 +623,7 @@ def test_no_logic_is_in_the_database(session: Session) -> None:
 
 
 def test_a_rule_a_change_does_not_expect_is_raised(session: Session) -> None:
-    """db.refusal: a check the page should have caught first, refused by
+    """db_errors.refusal: a check the page should have caught first, refused by
     the database, is a bug, raised rather than shown as a vague problem."""
     radios = add(session, Category(name="Radios refused"))
     bad = Item(name="Below nothing", category_id=radios.id, minimum=-1)

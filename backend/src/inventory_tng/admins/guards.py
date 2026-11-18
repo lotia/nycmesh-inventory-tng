@@ -20,11 +20,11 @@ Each is a Need. A single-use form (single_use_forms.sent_before) sent again
 while a code would be asked for is answered so before one is spent
 (is_spent, from core/sent_forms.py).
 
-A form through any of these (or ConfirmedAny) also holds every
-administrator's lock (accounts.lock_admins) until it commits, so it runs
-one at a time with the others and with resets, retires and restores
-(inventory-tng-8i4.50.4). It commits once, at most: a commit after that
-fails (db.hold_until_commit). Work after the reply opens its own session.
+A form through any of these (or ConfirmedAny) also holds every administrator's
+lock (accounts.lock_admins) until it commits, so it runs one at a time with the
+others and with resets, retires and restores (inventory-tng-8i4.50.4). It
+commits once, at most: a commit after that fails
+(db_sessions.hold_until_commit). Work after the reply opens its own session.
 """
 
 import dataclasses
@@ -56,7 +56,7 @@ from inventory_tng.admins.paths import (
 )
 from inventory_tng.admins.totp_keys import TotpKeys
 from inventory_tng.core import mail, masking, request_logging
-from inventory_tng.core.db import (
+from inventory_tng.core.db_sessions import (
     DbSession,
     hold_until_commit,
     record_last_seen,

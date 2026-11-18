@@ -236,40 +236,40 @@ rules are the app's, and `tests/models/test_models.py` fails on one.
 
 ### History
 
-Every row added, changed or deleted through the ORM, in a table with
-history (see [The catalogue's rules](#the-catalogues-rules)), is written
-to `catalogue_history` as the session flushes, with who did it
-(`db.set_actor`). So write those tables through the ORM: `session.add`,
-an object's attributes, `session.delete`. A statement
-such as `update(Item)` is never recorded, and `tests/core/test_history.py`
-fails on one. The app may only add to the history.
+Every row added, changed or deleted through the ORM, in a table with history
+(see [The catalogue's rules](#the-catalogues-rules)), is written to
+`catalogue_history` as the session flushes, with who did it
+(`db_sessions.set_actor`). So write those tables through the ORM:
+`session.add`, an object's attributes, `session.delete`. A statement such as
+`update(Item)` is never recorded, and `tests/core/test_history.py` fails on
+one. The app may only add to the history.
 
 ### The catalogue's rules
 
-Each catalogue table is written only by its own module, the owner its
-model names (`db.protection`, below), such as `catalogue/items.py` for
+Each catalogue table is written only by its own module, the owner its model
+names (`db_protection.protection`, below), such as `catalogue/items.py` for
 items and their packages. Admin pages and the seed call those modules'
-functions, one per kind of change, which take
-the catalogue lock, lock and read what the rules need, and refuse a
-change that breaks one by raising `db.RuleBroken` with the rule's name.
-`db.attempt` returns that name, and `web/forms.py`'s `RULES` says it
-in words. A page reads rows with
-`session.get` and leaves locking to those functions. The ledger is
+functions, one per kind of change, which take the catalogue lock, lock and
+read what the rules need, and refuse a change that breaks one by raising
+`db_errors.RuleBroken` with the rule's name. `db_errors.attempt` returns
+that name, and `web/forms.py`'s `RULES` says it in words. A page reads rows
+with `session.get` and leaves locking to those functions. The ledger is
 written only by `ledger.insert_transaction`, which saves, counts and
-adjustments all call, and which checks its rules the same way.
-A rule about one row's own values is a check constraint, or, where
-PostgreSQL cannot check it, the model's own `@validates`, as
-`SiteSettings` checks the site's time zone.
+adjustments all call, and which checks its rules the same way. A rule about
+one row's own values is a check constraint, or, where PostgreSQL cannot
+check it, the model's own `@validates`, as `SiteSettings` checks the site's
+time zone.
 
 Each model declares who writes its table, holding what, and whether it has
-history, with `db.protection`; `core/db.py` gives the rules, which the flush and
-`tests/across/test_write_owners.py` enforce. An owner is a domain module,
-never a page's, as `stock/adjustment_reasons.py` is; a settings row, made by its
-migration, has none, and `scan_settings.change` is its one writer.
-`items.Fields` names every column an item's save sets, each required, so
-none is blanked by being left out. The ledger takes lines, not a mapping by
-item, so none is lost: a transaction naming an item twice is refused
-(`movement_item_once`), and its movements' unique index says so too.
+history, with `db_protection.protection`; `core/db_protection.py` gives the
+rules, which the flush and `tests/across/test_write_owners.py` enforce. An
+owner is a domain module, never a page's, as `stock/adjustment_reasons.py`
+is; a settings row, made by its migration, has none, and
+`scan_settings.change` is its one writer. `items.Fields` names every column
+an item's save sets, each required, so none is blanked by being left out.
+The ledger takes lines, not a mapping by item, so none is lost: a
+transaction naming an item twice is refused (`movement_item_once`), and its
+movements' unique index says so too.
 
 Item and package names are unique ignoring case, spaces and punctuation,
 ASCII's only, with each look-alike space, quote or dash read as ASCII's
@@ -392,38 +392,40 @@ rules by no administrator.
 
 ### Locking a row
 
-Lock rows with `db.locked` (a select) or `db.get_locked` (`Session.get`),
-never `with_for_update` itself: they also read the rows again as locked,
-which a plain locking read does not do for a row already loaded. `core/db.py`
-says why; `tests/across/test_locking.py` fails on `with_for_update`
-anywhere else. Catalogue rows are locked with `db.locked_row` or
-`db.relock`, which take the catalogue lock first; `locked_row`'s docstring
-gives the order every change takes its locks in. A row is changed or
-deleted only once this transaction has locked it.
+Lock rows with `db_locking.locked` (a select) or `db_locking.get_locked`
+(`Session.get`), never `with_for_update` itself: they also read the rows
+again as locked, which a plain locking read does not do for a row already
+loaded. `core/db_locking.py` says why; `tests/across/test_locking.py` fails
+on `with_for_update` anywhere else. Catalogue rows are locked with
+`db_locking.locked_row` or `db_locking.relock`, which take the catalogue
+lock first; `locked_row`'s docstring gives the order every change takes its
+locks in. A row is changed or deleted only once this transaction has locked
+it.
 
-A row an edit form shows is `models.base.Versioned`: every update adds one to
-its `edit_version`, but one only to columns no form shows (flagged
+A row an edit form shows is `models.base.Versioned`: every update adds one
+to its `edit_version`, but one only to columns no form shows (flagged
 `not_a_change` or `row_lock_only`, as an item's `search_text`, which its
 aliases change). The form sends back the one it showed, and the domain
 function, holding the row's lock, refuses a row changed since
-(`changed_since_shown`, `db.unchanged`), so a save never quietly undoes
-another administrator's. Its `seen` argument is required; pass `None` only
-where nothing was shown, as a command. A page parses what its form sent
+(`changed_since_shown`, `db_locking.unchanged`), so a save never quietly
+undoes another administrator's. Its `seen` argument is required; pass `None`
+only where nothing was shown, as a command. A page parses what its form sent
 with `web/forms.form_version` and shows a refusal as `RULES[CHANGED]`'s
-alert, which `admin_page` answers 409. An administrator's own account is
-not versioned: only they edit it.
+alert, which `admin_page` answers 409. An administrator's own account is not
+versioned: only they edit it.
 
 A request's session comes from the app's request pool; a write in a
-transaction of its own, or work after the reply, takes the side pool, and
-an attempt counted against a rate limit the limits pool (`db.Database`). Take
-a connection only from a pool after the ones you hold: every test checks it,
-and one that breaks the order on purpose is marked `breaks_pool_order`.
+transaction of its own, or work after the reply, takes the side pool, and an
+attempt counted against a rate limit the limits pool
+(`db_sessions.Database`). Take a connection only from a pool after the ones
+you hold: every test checks it, and one that breaks the order on purpose is
+marked `breaks_pool_order`.
 
 ### Reads that must agree
 
 A route that only reads, and whose reads must agree with one another, as
 the catalogue's stock and the batches it says it shows must, takes
-`db.SnapshotSession`: the request's session, reading one snapshot
+`db_sessions.SnapshotSession`: the request's session, reading one snapshot
 (REPEATABLE READ, read only). A test's session cannot change its
 isolation, so a test of the snapshot takes sessions that commit
 (`own_committed`, or `make_client(own_sessions=True)`).
@@ -1096,7 +1098,7 @@ runs only those, and `-m "not end_to_end"` skips the ones through the
 whole app. Both are `database` tests too, which a test checks.
 
 A test's own sessions write rows freely to set up what it tests, but the
-app's requests on them meet the lock guard (`db.protection`) as in
+app's requests on them meet the lock guard (`db_protection.protection`) as in
 production: a route that changes a row it did not lock fails its test
 (`tests/helpers/apps.py`).
 

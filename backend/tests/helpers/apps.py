@@ -11,9 +11,8 @@ from sqlalchemy import event
 from sqlalchemy.orm import Session
 
 from inventory_tng.app import create_app
-from inventory_tng.core.db import (
-    LOCKS_INFO,
-    UNGUARDED_INFO,
+from inventory_tng.core.db_locking import LOCKS_INFO, UNGUARDED_INFO
+from inventory_tng.core.db_sessions import (
     DbSession,
     get_session,
     get_session_factory,
@@ -54,8 +53,9 @@ def as_the_app(session: Session) -> Generator[Session]:
 
 def sessions_of(session: Session) -> Callable[[], Iterator[Session]]:
     """An app's get_session for the test's own session, which outlives each
-    request, so it is not closed as the route returns (db.get_session); a
-    gated request's hold ends with the route, as its session would."""
+    request, so it is not closed as the route returns
+    (db_sessions.get_session); a gated request's hold ends with the route, as
+    its session would."""
 
     def request_session() -> Iterator[Session]:
         with as_the_app(session):
@@ -73,11 +73,11 @@ def _same(session: DbSession) -> Session:
 
 
 def on_session(session: Session) -> dict[Callable[..., Any], Callable[..., Any]]:
-    """An app's dependency overrides that put its requests, and the work
-    after each reply, on the test's session, so they roll back with it,
-    guarded as the app's own sessions are (as_the_app). A route reading one
-    snapshot (db.get_snapshot) reads the test's transaction, whose isolation
-    is set: a test of the snapshot itself takes sessions that commit."""
+    """An app's dependency overrides that put its requests, and the work after
+    each reply, on the test's session, so they roll back with it, guarded as
+    the app's own sessions are (as_the_app). A route reading one snapshot
+    (db_sessions.get_snapshot) reads the test's transaction, whose isolation is
+    set: a test of the snapshot itself takes sessions that commit."""
     return {
         get_session: sessions_of(session),
         get_snapshot: _same,
