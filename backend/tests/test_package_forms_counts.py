@@ -2,7 +2,6 @@
 form, and the count page counts sealed and open packages, finding and
 closing them."""
 
-import re
 import uuid
 from collections.abc import Collection
 from decimal import Decimal
@@ -20,7 +19,7 @@ from inventory_tng.stock import forms as stock_forms
 from inventory_tng.stock.ledger import LOOSE, Entry, Form
 
 from helpers.items import new_item, same_size_twins
-from helpers.markup import text
+from helpers.markup import read, text
 from helpers.package_forms import CABLE, OPEN, SEALED, open_form, quantities_by_form
 from helpers.rows import add, breaks, tag
 from helpers.stock import Spools
@@ -329,7 +328,7 @@ def test_the_count_form_lists_sealed_smallest_first_ties_by_id(
         )
 
     monkeypatch.setattr(counts_routes, "expected_forms", descending_forms)
-    page = text(admin_client.get(f"{COUNTS}/{store}"))
+    page = read(admin_client.get(f"{COUNTS}/{store}").text)
     expected = [
         f"sealed_{cable}_{small.id}",
         f"sealed_{cable}_{spools.spool.id}",
@@ -338,6 +337,7 @@ def test_the_count_form_lists_sealed_smallest_first_ties_by_id(
         f"opened_{made.id}",
         f"loose_{cable}",
     ]
-    asked = [name for name in re.findall(r'name="([^"]+)"', page) if name in expected]
+    names = (field.attrs.get("name") for field in page.all("input"))
+    asked = [name for name in names if name in expected]
     # Sealed smallest first, ties by id; then open ones; then loose.
     assert asked == expected

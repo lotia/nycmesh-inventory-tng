@@ -463,23 +463,22 @@ def _forms(
             held.setdefault(item_id, {}).setdefault(
                 Form(package_id=package_id), Decimal(0)
             )
+
+    # Sealed smallest package first, ties by package id, as the item and
+    # scan pages list packages; then open ones oldest first; then loose.
+    def order(pair: tuple[Form, Decimal]) -> tuple[int | Decimal, ...]:
+        form = pair[0]
+        if form.package_id is not None:
+            return 0, packages[form.package_id].size, form.package_id
+        if form.open_package_id is not None:
+            return 1, form.open_package_id
+        return (2,)
+
     rows: dict[int, list[FormRow]] = {}
     for item_id, forms in held.items():
         if set(forms) <= {LOOSE}:
             continue
         each = rows.setdefault(item_id, [])
-
-        # Sealed smallest package first, ties by package id, as the item
-        # and scan pages list packages; then open ones oldest first; then
-        # loose.
-        def order(pair: tuple[Form, Decimal]) -> tuple[int, Decimal, int]:
-            form = pair[0]
-            if form.package_id is not None:
-                return 0, packages[form.package_id].size, form.package_id
-            if form.open_package_id is not None:
-                return 1, Decimal(0), form.open_package_id
-            return 2, Decimal(0), 0
-
         for form, amount in sorted(forms.items(), key=order):
             if form.package_id is not None:
                 package = packages[form.package_id]
