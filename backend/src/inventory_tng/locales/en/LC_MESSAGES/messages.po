@@ -651,7 +651,7 @@ msgstr ""
 msgid "A duplicate?"
 msgstr ""
 
-#: src/inventory_tng/admin/admins.py
+#: src/inventory_tng/admins/routes.py
 #, python-format
 msgid "A link for %(username)s"
 msgstr ""
@@ -742,7 +742,7 @@ msgstr ""
 msgid "Add an item"
 msgstr ""
 
-#: src/inventory_tng/admin/home.py
+#: src/inventory_tng/admins/home_routes.py
 msgid "Add one"
 msgstr ""
 
@@ -948,7 +948,7 @@ msgstr ""
 msgid "Another administrator must retire you."
 msgstr ""
 
-#: src/inventory_tng/account.py
+#: src/inventory_tng/admins/account_routes.py
 msgid "Another administrator uses that address."
 msgstr ""
 
@@ -1526,7 +1526,8 @@ msgid ""
 "is followed until used up. A package that says otherwise keeps its own."
 msgstr ""
 
-#: src/inventory_tng/resets.py src/inventory_tng/templates/sign_in.html
+#: src/inventory_tng/admins/reset_routes.py
+#: src/inventory_tng/templates/sign_in.html
 msgid "Forgot your password?"
 msgstr ""
 
@@ -1643,7 +1644,7 @@ msgstr ""
 msgid "If it wasn't you, ask another administrator to reset your account at once."
 msgstr ""
 
-#: src/inventory_tng/resets.py
+#: src/inventory_tng/admins/reset_routes.py
 msgid ""
 "If that account has an email address, a link to reset its password is on "
 "its way. It works once, within the hour. If none comes, ask another "
@@ -1688,7 +1689,7 @@ msgstr ""
 msgid "Inside"
 msgstr ""
 
-#: src/inventory_tng/admin/home.py
+#: src/inventory_tng/admins/home_routes.py
 msgid "Inventory"
 msgstr ""
 
@@ -1700,7 +1701,7 @@ msgstr ""
 msgid "Invite an administrator"
 msgstr ""
 
-#: src/inventory_tng/admin/home.py
+#: src/inventory_tng/admins/home_routes.py
 msgid "Invite another"
 msgstr ""
 
@@ -2069,7 +2070,7 @@ msgstr ""
 msgid "No adjustment"
 msgstr ""
 
-#: src/inventory_tng/resets.py
+#: src/inventory_tng/admins/reset_routes.py
 msgid "No current administrator has that username."
 msgstr ""
 
@@ -2821,7 +2822,7 @@ msgstr ""
 msgid "Records say"
 msgstr ""
 
-#: src/inventory_tng/resets.py
+#: src/inventory_tng/admins/reset_routes.py
 msgid "Recover an account"
 msgstr ""
 
@@ -2829,7 +2830,7 @@ msgstr ""
 msgid "Recovery codes"
 msgstr ""
 
-#: src/inventory_tng/account.py
+#: src/inventory_tng/admins/account_routes.py
 msgid "Recovery codes come with an authenticator."
 msgstr ""
 
@@ -2874,7 +2875,7 @@ msgstr ""
 msgid "Remove"
 msgstr ""
 
-#: src/inventory_tng/account.py
+#: src/inventory_tng/admins/account_routes.py
 msgid "Removed."
 msgstr ""
 
@@ -2890,7 +2891,7 @@ msgstr ""
 msgid "Rename"
 msgstr ""
 
-#: src/inventory_tng/account.py
+#: src/inventory_tng/admins/account_routes.py
 msgid "Renamed."
 msgstr ""
 
@@ -2929,7 +2930,7 @@ msgstr ""
 msgid "Reset"
 msgstr ""
 
-#: src/inventory_tng/admin/admins.py
+#: src/inventory_tng/admins/routes.py
 #, python-format
 msgid "Reset %(username)s's sign-in?"
 msgstr ""
@@ -2948,7 +2949,7 @@ msgstr ""
 msgid "Reset your %(brand)s password"
 msgstr ""
 
-#: src/inventory_tng/resets.py
+#: src/inventory_tng/admins/reset_routes.py
 msgid "Reset your account"
 msgstr ""
 
@@ -3029,7 +3030,7 @@ msgstr ""
 msgid "Retired: it is no longer offered."
 msgstr ""
 
-#: src/inventory_tng/admin/admins.py
+#: src/inventory_tng/admins/routes.py
 msgid ""
 "Retired: they can no longer sign in, and their password, authenticators "
 "and recovery codes are removed."
@@ -3517,11 +3518,11 @@ msgstr ""
 msgid "Store"
 msgstr ""
 
-#: src/inventory_tng/account.py
+#: src/inventory_tng/admins/account_routes.py
 msgid "TOTP is off: your password alone signs you in."
 msgstr ""
 
-#: src/inventory_tng/account.py
+#: src/inventory_tng/admins/account_routes.py
 msgid ""
 "TOTP is required here, so your last authenticator stays. Add another "
 "first to replace it."
@@ -3594,7 +3595,7 @@ msgstr ""
 msgid "That is more than the inventory can count."
 msgstr ""
 
-#: src/inventory_tng/resets.py
+#: src/inventory_tng/admins/reset_routes.py
 msgid "That isn't the recovery token."
 msgstr ""
 
@@ -3620,11 +3621,11 @@ msgstr ""
 msgid "That place is retired and holds nothing: pick another."
 msgstr ""
 
-#: src/inventory_tng/account.py
+#: src/inventory_tng/admins/account_routes.py
 msgid "That session has ended."
 msgstr ""
 
-#: src/inventory_tng/resets.py
+#: src/inventory_tng/admins/reset_routes.py
 msgid "That token was used already: ask for a new one."
 msgstr ""
 
@@ -4210,7 +4211,7 @@ msgid ""
 "keep your words, or clear them."
 msgstr ""
 
-#: src/inventory_tng/admin/home.py
+#: src/inventory_tng/admins/home_routes.py
 msgid ""
 "You're the only administrator: if you were locked out, nobody could let "
 "you back in."
@@ -4252,11 +4253,11 @@ msgstr ""
 msgid "Your account"
 msgstr ""
 
-#: src/inventory_tng/admin/home.py
+#: src/inventory_tng/admins/home_routes.py
 msgid "Your account has no email address, so you can't reset your own password."
 msgstr ""
 
-#: src/inventory_tng/resets.py
+#: src/inventory_tng/admins/reset_routes.py
 msgid "Your account is reset: sign in."
 msgstr ""
 
@@ -4264,11 +4265,11 @@ msgstr ""
 msgid "Your code"
 msgstr ""
 
-#: src/inventory_tng/account.py
+#: src/inventory_tng/admins/account_routes.py
 msgid "Your email is changed."
 msgstr ""
 
-#: src/inventory_tng/account.py
+#: src/inventory_tng/admins/account_routes.py
 msgid "Your other sessions have ended."
 msgstr ""
 
@@ -4276,7 +4277,7 @@ msgstr ""
 msgid "Your password"
 msgstr ""
 
-#: src/inventory_tng/account.py
+#: src/inventory_tng/admins/account_routes.py
 msgid "Your password is changed. Your other sessions have ended."
 msgstr ""
 

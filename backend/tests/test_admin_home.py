@@ -1,5 +1,5 @@
-"""The administrators' home page, and its warnings (admin/home.py), and
-the navigation's badge."""
+"""The administrators' home page, and its warnings
+(admins/home_routes.py), and the navigation's badge."""
 
 from collections.abc import Callable
 
@@ -7,7 +7,7 @@ from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
 
 from inventory_tng.admin.counts import COUNTS
-from inventory_tng.admin.home import ALONE, NO_EMAIL
+from inventory_tng.admins.home_routes import ALONE, NO_EMAIL
 from inventory_tng.models import Location
 from inventory_tng.pages import retired_holding
 

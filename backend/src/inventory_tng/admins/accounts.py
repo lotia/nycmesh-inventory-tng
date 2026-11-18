@@ -596,7 +596,7 @@ def start_session(
 ) -> tuple[AdminSession, str]:
     """A new session, counted as just confirmed: both factors, or the
     password without TOTP, were just typed. It keeps when they last signed
-    in before, for "Since you last signed in" (admin/home.py)."""
+    in before, for "Since you last signed in" (home_routes.py)."""
     token, token_hash = _new_token()
     days = sign_in_settings(session).session_days
     before = session.scalar(
@@ -832,7 +832,7 @@ def create_first_admin(
     return FirstAdmin(admin, row, token, codes)
 
 
-# One's own account (account.py's page)
+# One's own account (account_routes.py)
 
 
 def change_password(
@@ -1217,7 +1217,7 @@ def recover(
     return link
 
 
-# Other administrators (admin/admins.py)
+# Other administrators (routes.py)
 
 # A link one administrator makes for another, which they pass on themselves.
 # Mail and the administrator pages say "within a day": change them with it.

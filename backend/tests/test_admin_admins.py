@@ -1,5 +1,5 @@
 """Administrators: inviting, resetting sign-in, retiring and bringing back
-(admin/admins.py)."""
+(admins/routes.py)."""
 
 import html
 import re
@@ -14,10 +14,10 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 from structlog.testing import capture_logs
 
-from inventory_tng.admin.admins import ADMINS
 from inventory_tng.admins import accounts, activity, guards
 from inventory_tng.admins.accounts import NOT_AN_EMAIL, qr_svg, username_problem
 from inventory_tng.admins.forms import OWN_RESET, OWN_RETIRE, TAKEN
+from inventory_tng.admins.routes import ADMINS
 from inventory_tng.core import mail
 from inventory_tng.core.settings import RateLimits
 from inventory_tng.models import ACTIVITY_KINDS, Admin, AdminSession, SignInSettings

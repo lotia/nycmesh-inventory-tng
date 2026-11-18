@@ -1,9 +1,8 @@
 """How the administrators pages' forms are read and checked: an
 invitation's username and email, setting up the first administrator, and
 a new authenticator, and what is wrong, in words, beside the field it is
-about or on the administrator's own page. The handlers in admin/admins.py
-and admins/sign_in_routes.py read the request and pass the form's
-fields."""
+about or on the administrator's own page. The handlers in routes.py
+and sign_in_routes.py read the request and pass the form's fields."""
 
 from inventory_tng.admins import accounts
 from inventory_tng.core.phrases import Words, gettext, lazy_gettext

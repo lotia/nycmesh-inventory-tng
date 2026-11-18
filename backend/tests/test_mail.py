@@ -16,6 +16,7 @@ from sqlalchemy.orm import Session
 from structlog.testing import capture_logs
 
 from inventory_tng.admins import accounts, guards
+from inventory_tng.admins.reset_routes import ASKED, RESET_NOTICE
 from inventory_tng.core import mail
 from inventory_tng.core.settings import MailConfig, Settings, SettingsError
 from inventory_tng.models import (
@@ -25,7 +26,6 @@ from inventory_tng.models import (
     ResetLink,
     SignInSettings,
 )
-from inventory_tng.resets import ASKED, RESET_NOTICE
 
 from helpers.mail import NO_MAIL, SITE_MAIL, FailingMail, SentMail
 from helpers.markup import text

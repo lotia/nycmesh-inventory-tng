@@ -39,9 +39,9 @@ from inventory_tng import (
     reading_rules,
     units,
 )
-from inventory_tng.admin.admins import ADMINS
 from inventory_tng.admin.volunteers import VOLUNTEERS
 from inventory_tng.admins import accounts, guards
+from inventory_tng.admins.routes import ADMINS
 from inventory_tng.core import mail
 from inventory_tng.core.db import (
     Base,

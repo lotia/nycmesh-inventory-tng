@@ -9,18 +9,21 @@ from contextlib import asynccontextmanager
 import structlog
 from fastapi import FastAPI
 
+# Before admin/: both name a notice "renamed", and the module imported last
+# has its words said on both pages (inventory-tng-80j6).
+from inventory_tng.admins import account_routes
+
+# isort: split
 from inventory_tng import (
-    account,
     admin,
     bundle,
     health,
     page_builds,
     page_telemetry,
     pages,
-    resets,
     security_headers,
 )
-from inventory_tng.admins import accounts, guards, sign_in_routes
+from inventory_tng.admins import accounts, guards, reset_routes, sign_in_routes
 from inventory_tng.admins.totp_keys import TotpKeys
 from inventory_tng.core import database_role, db
 from inventory_tng.core.db import Database, make_database
@@ -114,9 +117,9 @@ def create_app(
         app.include_router(security_headers.docs_router)
     app.include_router(bundle.router)
     app.include_router(sign_in_routes.router)
-    app.include_router(account.router)
+    app.include_router(account_routes.router)
     app.include_router(admin.router)
-    app.include_router(resets.router)
+    app.include_router(reset_routes.router)
     bundle.install(app, settings)
     db.install(app)
     devices_api.install(app)

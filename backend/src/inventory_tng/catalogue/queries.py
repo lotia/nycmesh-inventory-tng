@@ -1,7 +1,7 @@
 """What the catalogue's pages read (admin/categories.py, admin/items.py,
-admin/reading_rules.py, and admin/home.py's counts of its tables): plain
-functions taking a Session, each named for what it returns
-(docs/decisions/0023)."""
+admin/reading_rules.py, and admins/home_routes.py's counts of its
+tables): plain functions taking a Session, each named for what it
+returns (docs/decisions/0023)."""
 
 from collections.abc import Sequence
 

@@ -72,11 +72,9 @@ BREAKS: dict[str, dict[str, list[str]]] = {
     "routes_run_queries": {},
     "routes_import_another_features_routes": {
         "admin/__init__.py": [
-            "admin/admins.py",
             "admin/categories.py",
             "admin/counts.py",
             "admin/devices.py",
-            "admin/home.py",
             "admin/items.py",
             "admin/labels.py",
             "admin/length_checks.py",
@@ -87,15 +85,10 @@ BREAKS: dict[str, dict[str, list[str]]] = {
             "admin/stock.py",
             "admin/used_up.py",
             "admin/volunteers.py",
+            "admins/home_routes.py",
+            "admins/routes.py",
         ],
         "admin/counts.py": ["admin/items.py", "admin/settings.py"],
-        "admin/home.py": [
-            "admin/categories.py",
-            "admin/counts.py",
-            "admin/items.py",
-            "admin/locations.py",
-            "admin/volunteers.py",
-        ],
         "admin/items.py": ["admin/categories.py", "admin/reading_rules.py"],
         "admin/labels.py": ["admin/items.py", "admin/locations.py"],
         "admin/length_checks.py": ["admin/stock.py", "admin/used_up.py"],
@@ -106,6 +99,13 @@ BREAKS: dict[str, dict[str, list[str]]] = {
         ],
         "admin/stock.py": ["admin/counts.py", "admin/items.py"],
         "admin/used_up.py": ["admin/items.py", "admin/stock.py"],
+        "admins/home_routes.py": [
+            "admin/categories.py",
+            "admin/counts.py",
+            "admin/items.py",
+            "admin/locations.py",
+            "admin/volunteers.py",
+        ],
         "security_headers.py": ["page_telemetry.py"],
     },
     "init_not_empty": {
