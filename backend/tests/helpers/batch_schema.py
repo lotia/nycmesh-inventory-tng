@@ -24,7 +24,7 @@ import sys
 from pathlib import Path
 from typing import Any, Literal, cast
 
-from inventory_tng import openapi
+from devtools import write_api_schema
 from inventory_tng.scan import page_builds
 
 from . import committed
@@ -98,7 +98,7 @@ def canonical(node: object) -> str:
 
 def snapshot() -> Schema:
     """What the file keeps, as the code is now."""
-    schema = openapi.schema()
+    schema = write_api_schema.schema()
     models = schema["components"]["schemas"]
     operation = schema["paths"][URL]["post"]
     body = operation["requestBody"]["content"]["application/json"]["schema"]

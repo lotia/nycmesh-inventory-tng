@@ -1,10 +1,9 @@
 import os
-import runpy
-import sys
 from pathlib import Path
 
 import pytest
 
+from devtools.__main__ import main as run_devtools
 from inventory_tng.core import local_env
 
 
@@ -67,16 +66,13 @@ def test_a_setting_comes_from_the_shell_then_the_file(
     assert local_env.setting("INVENTORY_TEST_ONLY_ELSE", env) == ""
 
 
-def test_it_runs_as_a_module(
+def test_the_task_scripts_read_a_setting(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
-    """As the task scripts run it: python -m inventory_tng.core.local_env."""
+    """As they run it: python -m devtools setting."""
     env = tmp_path / ".env"
     env.write_text("INVENTORY_TEST_ONLY_SETTING=from the file\n")
     monkeypatch.delenv("INVENTORY_TEST_ONLY_SETTING", raising=False)
-    monkeypatch.setattr(
-        sys, "argv", ["local_env", "INVENTORY_TEST_ONLY_SETTING", "--file", str(env)]
-    )
-    with pytest.warns(RuntimeWarning, match="found in sys.modules"):
-        runpy.run_module("inventory_tng.core.local_env", run_name="__main__")
+    argv = ["setting", "INVENTORY_TEST_ONLY_SETTING", "--file", str(env)]
+    assert run_devtools(argv) == 0
     assert capsys.readouterr().out == "from the file\n"

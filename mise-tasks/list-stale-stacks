@@ -10,8 +10,9 @@ list=$root/.local/stale-stacks
 
 mkdir -p "$root/.local"
 "$here/compose" ls --all --format json |
-  uv run --quiet --frozen --project "$here/../backend" \
-    python -m inventory_tng.dev.stacks stale >"$list"
+  PYTHONPATH="$here/../backend" \
+    uv run --quiet --frozen --project "$here/../backend" \
+    python -m devtools stack list-stale >"$list"
 if [[ ! -s $list ]]; then
   echo "No stack's checkout is gone."
   exit

@@ -1,13 +1,9 @@
-"""The repository's `.env` file (CONTRIBUTING.md, Local settings).
-
-The task scripts read a setting as the backend does, with:
-
-    uv run python -m inventory_tng.core.local_env KEY [--file PATH]
+"""The repository's `.env` file (CONTRIBUTING.md, Local settings). The
+task scripts read a setting as the backend does with `python -m devtools
+setting KEY`.
 """
 
-import argparse
 import os
-from collections.abc import Sequence
 from pathlib import Path
 
 from dotenv import load_dotenv
@@ -42,18 +38,3 @@ def setting(key: str, path: Path | None = None) -> str:
     if key in os.environ:
         return os.environ[key]
     return local_env_values(path).get(key, "")
-
-
-def main(argv: Sequence[str] | None = None) -> None:
-    parser = argparse.ArgumentParser(
-        prog="python -m inventory_tng.core.local_env",
-        description="Print a setting as the backend reads it, for mise-tasks/.",
-    )
-    parser.add_argument("key")
-    parser.add_argument("--file", type=Path, help="a .env other than the clone's")
-    args = parser.parse_args(argv)
-    print(setting(args.key, args.file))
-
-
-if __name__ == "__main__":
-    main()

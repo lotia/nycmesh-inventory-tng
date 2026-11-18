@@ -184,6 +184,11 @@ The backend is `uv run python -m inventory_tng --reload`, in `backend/`.
 run command starts uvicorn itself; uvicorn's own logging flags are not used,
 the `LOG_*` settings are (Logging, below).
 
+The developer's tools are `uv run python -m devtools <command>`, in
+`backend/`, from `backend/devtools/`, which no image ships. With no command
+it lists them, and each command's `--help` says what it takes. The tasks
+below run them for you.
+
 ### Some data to work with
 
 ```sh
@@ -196,7 +201,7 @@ Sign-in codes become optional, so `dev` signs in with the password alone.
 Run again, it changes only `dev`'s password: to the one you give, or to a
 new one if `dev` has none. It refuses a database with other administrators, and
 needs `APP_ENV=development`, as `.env.example` sets, also in the app
-container: `mise run compose -- exec app python -m inventory_tng.dev.seed`.
+container: `mise run compose -- exec app python -m devtools database seed`.
 
 ### Migrations
 
@@ -629,9 +634,9 @@ change an endpoint, regenerate both, and commit `frontend/src/api/`:
 
 ```sh
 cd backend
-uv run python -m inventory_tng.openapi   # frontend/src/api/openapi.json
+uv run python -m devtools write-api-schema  # frontend/src/api/openapi.json
 cd ../frontend
-npm run api                              # frontend/src/api/schema.d.ts
+npm run api                                 # frontend/src/api/schema.d.ts
 ```
 
 A backend test fails while the schema is out of date, and CI fails while the
@@ -1122,8 +1127,9 @@ its own database, not the server's limit, and a test that fails
 for either limit says which. Long before a leak reaches that limit, a test
 that ends with a connection it took from any pool and kept errors at its
 teardown, named by `keeps_its_connections` in conftest.py. Each checkout's
-development database allows 30 (`dev/dev_database.py`): one app, and a
-migration or seed beside it, so it cannot starve the tests beside it.
+development database allows 30 (`backend/devtools/database.py`): one
+app, and a migration or seed beside it, so it cannot starve the tests
+beside it.
 
 ### Measuring the catalogue
 
@@ -1150,14 +1156,16 @@ test does, the groups of tests that cover exactly the same, and the
 longest test files. Beside it, a table per suite gives each test's
 seconds, what it covers, what it alone covers (what removing it would
 lose) and its group. Use it to find tests to merge or speed up; the
-module's docstring (`dev/suite_report.py`) says how each part is measured.
+module's docstring (`backend/devtools/suite_report.py`) says how each part
+is measured.
 
 ### Coverage
 
 `mise run check` and CI measure which code the tests run, and fail when:
 
 - **the whole falls below its floor**: 94% of the backend's lines and
-  branches (`fail_under` in `backend/pyproject.toml`), and the frontend's
+  branches, its developer tools among them (`fail_under` in
+  `backend/pyproject.toml`), and the frontend's
   floors in `frontend/vite.config.ts`. Vitest raises those as coverage
   rises: commit that change with yours.
 - **any line you added or changed is not run by a test**, or a branch on it

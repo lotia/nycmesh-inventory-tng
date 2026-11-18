@@ -10,8 +10,8 @@ case (Ali, 2026-11-12): `10µF`, `10 μF` and `10uf` are all `10uF`, and
 a sign no word is (`μF`, `°C`, `kΩ`) is read, so a Greek word is folded as
 any other.
 
-The scan page reads the same table (frontend/src/units.json, which `uv run
-python -m inventory_tng.catalogue.units` writes) the same way (frontend/src/units.ts),
+The scan page reads the same table (frontend/src/units.json, which `python
+-m devtools write-unit-table` writes) the same way (frontend/src/units.ts),
 and both are tested against frontend/src/units-vectors.json.
 
 An item's or a package's name is stored as typed on its form, its units
@@ -28,19 +28,15 @@ profile (PROFILE, LIKELY), on both sides alike (Ali, 2026-11-15,
 inventory-tng-c0c.3).
 """
 
-import json
 import re
-import sys
 import unicodedata
 from collections.abc import Callable, Iterator, Mapping
 from dataclasses import dataclass
-from pathlib import Path
 from typing import Any
 
 from babel.support import LazyProxy
 
 from inventory_tng.catalogue import names
-from inventory_tng.core.local_env import CLONE
 from inventory_tng.core.phrases import gettext, lazy_gettext
 
 # Raise it whenever a change to the table reads any text otherwise, or
@@ -54,8 +50,6 @@ VERSION = 1
 # The most groups (groups) a search is matched by, each alone; one with more
 # is matched whole only (Ali, 2026-11-15, inventory-tng-ist.1).
 GROUPS_MAX = 8
-
-TABLE = CLONE / "frontend" / "src" / "units.json"
 
 
 @dataclass(frozen=True)
@@ -988,15 +982,3 @@ def shown_name(name: str, rules: Rules | None = None) -> str:
         typed = name[match.start(2) : match.end(2)]
         edits.append((start, match.end(), shown + names.NO_BREAK_SPACE + typed))
     return _applied(name, edits)
-
-
-def main(path: Path = TABLE) -> None:
-    """Write units.json, which the scan page reads; the task then lays it
-    out as Biome does."""
-    text = json.dumps(table(), indent=2, ensure_ascii=False) + "\n"
-    path.write_text(text, encoding="utf-8")
-    print(f"Wrote {path}")
-
-
-if __name__ == "__main__":
-    main(*(Path(arg) for arg in sys.argv[1:2]))

@@ -1,16 +1,16 @@
-"""The seed command (seed.py). Each test that seeds has a database of its own
-(own_database), as the seed refuses a database that holds rows already."""
+"""The seed command (devtools/seed.py). Each test that seeds has a
+database of its own (own_database), as the seed refuses a database that
+holds rows already."""
 
-import runpy
-import sys
 from collections.abc import Iterator
 
 import pytest
 from sqlalchemy import Engine, delete, func, select
 from sqlalchemy.orm import Session
 
+from devtools import seed
+from devtools.__main__ import main as run_devtools
 from inventory_tng.admins import accounts
-from inventory_tng.dev import seed
 from inventory_tng.models.admins import Admin, AdminPassword
 from inventory_tng.models.catalogue import Item
 from inventory_tng.models.places import Location
@@ -45,13 +45,13 @@ def the_admin(session: Session) -> Admin | None:
 def test_it_seeds_once_and_again_changes_nothing(
     seeding: Session, capsys: pytest.CaptureFixture[str]
 ) -> None:
-    assert seed.main(["--password", PASSWORD]) == 0
+    assert run_devtools(["database", "seed", "--password", PASSWORD]) == 0
     assert SIGN_IN + PASSWORD in capsys.readouterr().out
     # A database seeded and then worked in: a later run changes nothing.
     accounts.sign_in_settings(seeding).totp_policy = "required"
     seeding.add(Volunteer(name="Someone new"))
     seeding.commit()
-    assert seed.main([]) == 0
+    assert run_devtools(["database", "seed"]) == 0
     assert "Seeded already" in capsys.readouterr().out
     seeding.expire_all()
     admin = the_admin(seeding)
@@ -68,7 +68,7 @@ def test_it_seeds_once_and_again_changes_nothing(
 def test_seeding_makes_codes_optional_and_a_password(
     seeding: Session, capsys: pytest.CaptureFixture[str]
 ) -> None:
-    assert seed.main([]) == 0
+    assert run_devtools(["database", "seed"]) == 0
     out = capsys.readouterr().out
     assert SIGN_IN in out
     assert "Sign-in codes are optional here" in out
@@ -76,8 +76,8 @@ def test_seeding_makes_codes_optional_and_a_password(
 
 
 def test_a_password_given_again_replaces_the_old(seeding: Session) -> None:
-    assert seed.main(["--password", "the first password"]) == 0
-    assert seed.main(["--password", "the second password"]) == 0
+    assert run_devtools(["database", "seed", "--password", "the first password"]) == 0
+    assert run_devtools(["database", "seed", "--password", "the second password"]) == 0
     admin = the_admin(seeding)
     assert admin is not None
     assert accounts.check_password(seeding, admin.id, "the second password")
@@ -86,11 +86,11 @@ def test_a_password_given_again_replaces_the_old(seeding: Session) -> None:
 def test_an_administrator_without_a_password_gets_one(
     seeding: Session, capsys: pytest.CaptureFixture[str]
 ) -> None:
-    assert seed.main([]) == 0
+    assert run_devtools(["database", "seed"]) == 0
     capsys.readouterr()
     seeding.execute(delete(AdminPassword))
     seeding.commit()
-    assert seed.main([]) == 0
+    assert run_devtools(["database", "seed"]) == 0
     assert SIGN_IN in capsys.readouterr().out
 
 
@@ -99,30 +99,15 @@ def test_it_refuses_a_database_someone_works_in(
 ) -> None:
     seeding.add(Admin(username="ada"))
     seeding.commit()
-    assert seed.main([]) == 1
+    assert run_devtools(["database", "seed"]) == 1
     assert "has administrators already" in capsys.readouterr().err
     assert seeding.scalars(select(Admin.username)).all() == ["ada"]
-
-
-def test_it_runs_as_a_module(
-    seeding: Session,
-    monkeypatch: pytest.MonkeyPatch,
-    capsys: pytest.CaptureFixture[str],
-) -> None:
-    monkeypatch.setattr(sys, "argv", ["seed", "--password", PASSWORD])
-    with (
-        pytest.warns(RuntimeWarning, match="found in sys.modules"),
-        pytest.raises(SystemExit) as done,
-    ):
-        runpy.run_module("inventory_tng.dev.seed", run_name="__main__")
-    assert done.value.code == 0
-    assert SIGN_IN + PASSWORD in capsys.readouterr().out
 
 
 def test_a_short_password_is_refused(
     seeding: Session, capsys: pytest.CaptureFixture[str]
 ) -> None:
-    assert seed.main(["--password", "short"]) == 1
+    assert run_devtools(["database", "seed", "--password", "short"]) == 1
     assert "characters" in capsys.readouterr().err
     assert the_admin(seeding) is None
 
@@ -136,5 +121,5 @@ def test_only_in_development(
 ) -> None:
     monkeypatch.setenv("DATABASE_URL", NO_DATABASE)
     monkeypatch.setenv("APP_ENV", "production")
-    assert seed.main([]) == 1
+    assert run_devtools(["database", "seed"]) == 1
     assert "Only with APP_ENV=development" in capsys.readouterr().err

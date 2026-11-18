@@ -1,11 +1,12 @@
 """This checkout's development database, on its compose stack's PostgreSQL
 server (CONTRIBUTING.md, Local settings): made if missing, the owner's and
-held to its connection limit, or dropped, named to confirm. Migrating it
-is alembic's, after (mise run dev-database, reset-dev-database). Only with
-APP_ENV=development.
+held to its connection limit, seeded (seed.py), or dropped, named to
+confirm. Migrating it is alembic's, between making and seeding (mise run
+dev-database, seed, reset-dev-database). Only with APP_ENV=development.
 
-    uv run python -m inventory_tng.dev.dev_database make
-    uv run python -m inventory_tng.dev.dev_database drop NAME
+    uv run python -m devtools database make
+    uv run python -m devtools database seed [--password PASSWORD]
+    uv run python -m devtools database drop NAME
 """
 
 import argparse
@@ -17,7 +18,8 @@ import structlog
 from sqlalchemy import URL, Connection, make_url, text
 from sqlalchemy.exc import ProgrammingError
 
-from inventory_tng.core.command import set_up
+from devtools import seed
+from inventory_tng.core.command import run_command, set_up
 from inventory_tng.core.db import make_engine
 from inventory_tng.core.local_env import CLONE
 from inventory_tng.core.settings import migration_settings
@@ -126,13 +128,21 @@ def drop(url: str) -> None:
         connection.execute(text(f"DROP DATABASE IF EXISTS {quoted} WITH (FORCE)"))
 
 
-def main(argv: Sequence[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(prog="python -m inventory_tng.dev.dev_database")
+def main(argv: Sequence[str], prog: str) -> int:
+    parser = argparse.ArgumentParser(
+        prog=prog, description="This checkout's development database."
+    )
     commands = parser.add_subparsers(dest="command", required=True)
     commands.add_parser("make", help="make this checkout's database if missing")
+    seeding = commands.add_parser(
+        "seed", help="give an empty database an administrator, a catalogue and stock"
+    )
+    seeding.add_argument("--password", help="the administrator's; else one is made")
     dropping = commands.add_parser("drop", help="drop this checkout's database")
     dropping.add_argument("name", help="this checkout's database's name, to confirm")
     args = parser.parse_args(argv)
+    if args.command == "seed":
+        return run_command(seed.run, args, development_only=True)
     settings = set_up(development_only=True)
     if settings is None:
         return 1
@@ -152,7 +162,3 @@ def main(argv: Sequence[str] | None = None) -> int:
         log.info("made development database", database=name)
     print(f"This checkout's database: {name}")
     return 0
-
-
-if __name__ == "__main__":
-    sys.exit(main())

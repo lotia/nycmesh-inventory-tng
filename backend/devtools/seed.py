@@ -1,14 +1,12 @@
 """A development database to work in: an administrator, some catalogue rows
 and stock. How it behaves: CONTRIBUTING.md, Some data to work with.
-
-    uv run python -m inventory_tng.dev.seed [--password PASSWORD]
+Run by `python -m devtools database seed` (database.py).
 """
 
 import argparse
 import secrets
 import sys
 import uuid
-from collections.abc import Sequence
 from datetime import UTC, datetime
 from decimal import Decimal
 
@@ -18,7 +16,6 @@ from sqlalchemy.orm import Session
 
 from inventory_tng.admins import accounts
 from inventory_tng.catalogue import categories, items
-from inventory_tng.core.command import run_command
 from inventory_tng.core.db import CLI_ACTOR, exists_where, set_actor, settings_row
 from inventory_tng.labels import labels
 from inventory_tng.models.admins import Admin
@@ -58,13 +55,6 @@ STOCK = {
     "Outdoor Cat6 cable": "305",
     "Pole mount": "4",
 }
-
-
-def main(argv: Sequence[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(prog="python -m inventory_tng.dev.seed")
-    parser.add_argument("--password", help="the administrator's; else one is made")
-    args = parser.parse_args(argv)
-    return run_command(run, args, development_only=True)
 
 
 def run(session: Session, args: argparse.Namespace) -> int:
@@ -147,7 +137,3 @@ def _catalogue(session: Session) -> None:
         ],
     )
     record(session, received, device_id=None)
-
-
-if __name__ == "__main__":
-    sys.exit(main())

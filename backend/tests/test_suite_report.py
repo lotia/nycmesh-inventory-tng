@@ -1,10 +1,9 @@
-"""mise run test-report (dev/suite_report.py), on suites' outputs made up
+"""mise run test-report (devtools/suite_report.py), on suites' outputs made up
 here: each command it runs is answered by a fake that writes what the real
 tool would, in a clone of its own."""
 
 import json
 import re
-import runpy
 import subprocess
 from pathlib import Path
 from typing import IO
@@ -12,8 +11,9 @@ from typing import IO
 import pytest
 from coverage import CoverageData
 
+from devtools import suite_report
+from devtools.__main__ import main as run_devtools
 from inventory_tng.core import local_env
-from inventory_tng.dev import suite_report
 
 JUNIT = """<testsuites><testsuite>
 <testcase classname="tests.test_a" name="test_one" time="1.5"/>
@@ -248,8 +248,7 @@ def test_a_frontend_test_not_found_alone_stops_the_report(clone: Path) -> None:
 
 
 def test_the_report_and_each_suites_tests(clone: Path) -> None:
-    with pytest.warns(RuntimeWarning, match="found in sys.modules"):
-        runpy.run_module("inventory_tng.dev.suite_report", run_name="__main__")
+    assert run_devtools(["test-report"]) == 0
     out = clone / ".local" / "test-report"
     report = (out / "report.md").read_text()
     assert "| Backend | 4 | 0.0 s | 5 s | 99.42% of lines and branches |" in report

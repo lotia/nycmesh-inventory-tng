@@ -28,9 +28,9 @@ import segno
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from devtools import seed
 from inventory_tng import __main__ as server
 from inventory_tng.admins import accounts, totp_keys
-from inventory_tng.dev import seed
 from inventory_tng.devices import devices
 from inventory_tng.models.admins import Admin, AdminPassword
 from inventory_tng.models.catalogue import Item

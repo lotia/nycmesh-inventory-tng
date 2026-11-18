@@ -79,6 +79,6 @@ def test_it_imports_only_the_command_chosen() -> None:
         [sys.executable, "-c", IMPORTED], capture_output=True, text=True, check=True
     )
     assert shown.stdout.splitlines() == [
-        "inventory_tng.manage",
+        "inventory_tng.core inventory_tng.core.entry_point inventory_tng.manage",
         "inventory_tng.site_settings.command",
     ]

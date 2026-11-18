@@ -77,6 +77,8 @@ export default defineConfig({
   webServer: {
     command: "uv run python tests/browser_database.py serve",
     cwd: "../backend",
+    // So it imports the seed from backend/devtools/ (CONTRIBUTING.md).
+    env: { PYTHONPATH: "." },
     // Its log lines, a traceback among them, with the tests'.
     stdout: "pipe",
     url: `${base}/api/healthz`,

@@ -13,8 +13,9 @@ root=${MISE_PROJECT_ROOT:-$clone}
 compose=${INVENTORY_COMPOSE:-}
 if [[ -z $compose && -f $root/.env ]]; then
   # Read as the backend reads its settings, quotes, comments and all.
-  compose=$(uv run --quiet --frozen --project "$clone/backend" \
-    python -m inventory_tng.core.local_env INVENTORY_COMPOSE --file "$root/.env")
+  compose=$(PYTHONPATH="$clone/backend" \
+    uv run --quiet --frozen --project "$clone/backend" \
+    python -m devtools setting INVENTORY_COMPOSE --file "$root/.env")
 fi
 if [[ -z $compose ]]; then
   if command -v podman >/dev/null; then

@@ -108,7 +108,7 @@ known-local-folder = ["databases", "helpers"]
 # The floors and how they are measured: CONTRIBUTING.md, Coverage.
 [tool.coverage.run]
 branch = true
-source = ["inventory_tng"]
+source = ["inventory_tng", "devtools"]
 
 [tool.coverage.report]
 fail_under = 94
@@ -125,8 +125,8 @@ branch_coverage = true
 
 [tool.pytest]
 testpaths = ["tests"]
-# Where tests import helpers and databases from.
-pythonpath = ["tests"]
+# Where tests import helpers and databases from, and devtools (CONTRIBUTING.md).
+pythonpath = ["tests", "."]
 strict = true
 filterwarnings = ["error"]
 # What a test tests (tests/test_requests_at_once.py's docstring).

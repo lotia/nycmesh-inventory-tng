@@ -5,14 +5,15 @@ docs/decisions/0018, 0023), run where the app runs, with its settings:
     python -m inventory_tng.manage <command> --help
 
 Commands are listed here by name, never discovered, and only the one
-chosen is imported. Each sets up the process itself (core/command.py,
+chosen is imported (core/entry_point.py, which the developer tools' entry
+point shares). Each sets up the process itself (core/command.py,
 docs/decisions/0007), as `totp-keys new` runs before settings can be read.
 """
 
-import argparse
-import importlib
 import sys
 from collections.abc import Sequence
+
+from inventory_tng.core.entry_point import dispatch
 
 PROG = "python -m inventory_tng.manage"
 # Each command's name, its module, and a line on what it does.
@@ -40,37 +41,13 @@ COMMANDS = {
 }
 
 
-def _parser() -> argparse.ArgumentParser:
-    width = max(map(len, COMMANDS))
-    listed = "\n".join(
-        f"  {name:<{width}}  {line}" for name, (_, line) in COMMANDS.items()
-    )
-    parser = argparse.ArgumentParser(
-        prog=PROG,
-        usage=f"{PROG} [-h] command [argument ...]",
-        description="The operator's commands (DEPLOYMENT.md, Operator commands).",
-        epilog=f"commands:\n{listed}\n\nEach command's own -h says what it takes.",
-        formatter_class=argparse.RawDescriptionHelpFormatter,
-    )
-    parser.add_argument(
-        "command",
-        choices=COMMANDS,
-        metavar="command",
-        help="one of those below",
-    )
-    return parser
-
-
 def main(argv: Sequence[str] | None = None) -> int:
-    argv = sys.argv[1:] if argv is None else list(argv)
-    parser = _parser()
-    if not argv:
-        parser.print_help()
-        return 0
-    # Only the name is read here: the rest is the command's.
-    name = parser.parse_args(argv[:1]).command
-    module = importlib.import_module(COMMANDS[name][0])
-    return module.main(argv[1:], prog=f"{PROG} {name}")
+    return dispatch(
+        sys.argv[1:] if argv is None else list(argv),
+        prog=PROG,
+        description="The operator's commands (DEPLOYMENT.md, Operator commands).",
+        commands=COMMANDS,
+    )
 
 
 if __name__ == "__main__":

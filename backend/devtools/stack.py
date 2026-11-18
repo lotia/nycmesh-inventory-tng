@@ -4,18 +4,18 @@ project name, database and free ports `mise run setup` writes into a new
 remove-stale-stacks` removes. The tasks that start something first check
 that the ports they need are free, or this checkout's stack's, and `mise run
 setup -- --new-ports` gives an existing `.env` free ones. Each command but
-stale asks compose itself, through mise-tasks/compose:
+list-stale asks compose itself, through mise-tasks/compose:
 
-    uv run python -m inventory_tng.dev.stacks new-env
-    uv run python -m inventory_tng.dev.stacks ports-free [--here] KEY...
-    uv run python -m inventory_tng.dev.stacks new-ports
-    uv run python -m inventory_tng.dev.stacks port KEY...
+    uv run python -m devtools stack new-env
+    uv run python -m devtools stack ports-free [--here] KEY...
+    uv run python -m devtools stack new-ports
+    uv run python -m devtools stack port KEY...
 
-stale reads compose's list of projects from standard input, so that compose
-failing fails the list (mise-tasks/list-stale-stacks):
+list-stale reads compose's list of projects from standard input, so that
+compose failing fails the list (mise-tasks/list-stale-stacks):
 
     mise run compose -- ls --all --format json |
-      uv run python -m inventory_tng.dev.stacks stale
+      uv run python -m devtools stack list-stale
 """
 
 import argparse
@@ -299,15 +299,15 @@ def stale(projects: Iterable[Project], current: str) -> list[tuple[str, Path]]:
     ]
 
 
-def main(argv: Sequence[str] | None = None) -> None:
+def main(argv: Sequence[str], prog: str) -> int:
     parser = argparse.ArgumentParser(
-        prog="python -m inventory_tng.dev.stacks",
+        prog=prog,
         description="Each checkout's compose stack, for mise-tasks/.",
     )
     commands = parser.add_subparsers(dest="command", required=True)
     commands.add_parser("new-env", help="print a new .env for this checkout")
     commands.add_parser(
-        "stale", help="print each stack whose checkout is gone, and where it was"
+        "list-stale", help="print each stack whose checkout is gone, and where it was"
     )
     free = commands.add_parser(
         "ports-free",
@@ -332,11 +332,11 @@ def main(argv: Sequence[str] | None = None) -> None:
         problems = ports_free(args.keys, here=args.here)
         if problems:
             print(*problems, sep="\n", file=sys.stderr)
-            raise SystemExit(1)
-        return
+            return 1
+        return 0
     if args.command == "port":
         print(*map(port, args.keys))
-        return
+        return 0
     if args.command == "new-ports":
         env, changed = new_ports(
             ENV_FILE.read_text(), local_env_values(), other_stacks("--all"), own_ports()
@@ -346,15 +346,12 @@ def main(argv: Sequence[str] | None = None) -> None:
             print(f"{key}: {was or 'unset'} -> {now}")
         if not changed:
             print("Each port in .env was free already.")
-        return
+        return 0
     if args.command == "new-env":
         example = (CLONE / ".env.example").read_text()
         # With no runtime running, compose knows of no other stack.
         print(new_env(example, CLONE, compose_json("ls", "--all")), end="")
-        return
+        return 0
     for name, checkout in stale(json.load(sys.stdin), this_stack()):
         print(name, checkout)
-
-
-if __name__ == "__main__":
-    main()
+    return 0

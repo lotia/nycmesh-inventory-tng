@@ -3,7 +3,6 @@
 
 import json
 import re
-import runpy
 import sys
 import unicodedata
 from pathlib import Path
@@ -13,6 +12,8 @@ import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
 
+from devtools.__main__ import main as run_devtools
+from devtools.write_unit_table import TABLE
 from inventory_tng.catalogue import items, units
 from inventory_tng.catalogue.paths import ITEMS
 from inventory_tng.catalogue.units import KINDS, PREFIXES, UNITS, Reading, read, respell
@@ -23,7 +24,7 @@ from helpers.markup import text as page_text
 from helpers.rows import add, tag
 
 UCUM = Path(__file__).parent / "ucum_codes.tsv"
-VECTORS = units.TABLE.with_name("units-vectors.json")
+VECTORS = TABLE.with_name("units-vectors.json")
 MIGRATIONS = Path(__file__).parent.parent / "migrations" / "versions"
 # The SI's newest prefixes (2022), which UCUM 2.2 has not.
 NEWER_THAN_UCUM = {"Q", "R", "r", "q"}
@@ -120,7 +121,7 @@ def test_a_unit_is_read_with_its_prefix_as_typed_if_it_can_be() -> None:
 def test_the_scan_pages_table_is_current() -> None:
     """The scan page reads units.json; a change to what reads a unit raises
     VERSION, as rows folded before are folded again."""
-    committed = json.loads(units.TABLE.read_text(encoding="utf-8"))
+    committed = json.loads(TABLE.read_text(encoding="utf-8"))
     if committed != units.table():
         assert committed["version"] != units.VERSION, (
             "The unit table changed: raise units.VERSION, fold the rows again "
@@ -143,11 +144,9 @@ def test_the_newest_unit_table_has_a_migration_folding_again() -> None:
     )
 
 
-def test_writes_the_table(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_writes_the_table(tmp_path: Path) -> None:
     # As the task runs it, here to another file.
-    monkeypatch.setattr(sys, "argv", ["units", str(tmp_path / "units.json")])
-    with pytest.warns(RuntimeWarning, match="found in sys.modules"):
-        runpy.run_module("inventory_tng.catalogue.units", run_name="__main__")
+    assert run_devtools(["write-unit-table", str(tmp_path / "units.json")]) == 0
     written = (tmp_path / "units.json").read_text(encoding="utf-8")
     assert json.loads(written) == units.table()
 

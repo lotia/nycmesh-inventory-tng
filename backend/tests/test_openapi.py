@@ -4,7 +4,8 @@ from typing import Any, get_args
 
 import pytest
 
-from inventory_tng import openapi
+from devtools import write_api_schema
+from devtools.__main__ import main as run_devtools
 from inventory_tng.devices import devices
 from inventory_tng.scan import batch_schemas
 
@@ -12,19 +13,20 @@ from inventory_tng.scan import batch_schemas
 @pytest.fixture(scope="module")
 def schema() -> dict[str, Any]:
     """Built once: each build makes a whole app."""
-    return openapi.schema()
+    return write_api_schema.schema()
 
 
 def test_the_committed_schema_is_current(schema: dict[str, Any]) -> None:
     """The frontend's types come from this file, so it must say what the code
     does. Compared parsed: Biome decides its layout."""
-    assert json.loads(openapi.SCHEMA.read_text(encoding="utf-8")) == schema, (
-        "Run `uv run python -m inventory_tng.openapi`, then `npm run api` in frontend/"
+    assert json.loads(write_api_schema.SCHEMA.read_text(encoding="utf-8")) == schema, (
+        "Run `uv run python -m devtools write-api-schema`, then `npm run api` in "
+        "frontend/"
     )
 
 
 def test_writes_the_schema(tmp_path: Path, schema: dict[str, Any]) -> None:
-    openapi.main(tmp_path / "openapi.json")
+    assert run_devtools(["write-api-schema", str(tmp_path / "openapi.json")]) == 0
     assert json.loads((tmp_path / "openapi.json").read_text()) == schema
 
 

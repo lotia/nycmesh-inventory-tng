@@ -18,10 +18,9 @@ from alembic.config import Config
 from sqlalchemy import Connection, Engine, make_url, text
 from sqlalchemy.exc import OperationalError
 
+from devtools.database import OWNER, as_superuser, create, drop, server_url
 from inventory_tng.core.db import LOCK_TIMEOUT, make_engine
 from inventory_tng.core.local_env import setting
-from inventory_tng.dev import dev_database
-from inventory_tng.dev.dev_database import OWNER, as_superuser, create, server_url
 
 log = structlog.get_logger(__name__)
 
@@ -125,7 +124,7 @@ def as_role(url: str, role: str) -> str:
 def create_database(template: str | None = None) -> str:
     """A database of its own, and the URL the app logs in to it with: empty,
     with no schema, or a copy of the database `template`. The roles are made
-    first, if missing (dev_database.ROLES_SQL)."""
+    first, if missing (devtools/database.py's ROLES_SQL)."""
     name = database_name(int(time.time()))
     try:
         with as_superuser(SERVER_URL) as connection:
@@ -144,7 +143,7 @@ def create_database(template: str | None = None) -> str:
 
 
 def drop_database(url: str) -> None:
-    dev_database.drop(url)
+    drop(url)
     log.info("dropped test database", database=make_url(url).database)
 
 

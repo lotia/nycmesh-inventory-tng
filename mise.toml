@@ -61,7 +61,7 @@ run = [
     "npm run build",
     # The server's port as compose publishes it: the shell's, else .env's.
     """
-    port=$(cd ../backend && uv run --quiet --frozen python -m inventory_tng.dev.stacks port INVENTORY_WEBKIT_PORT)
+    port=$(cd ../backend && uv run --quiet --frozen python -m devtools stack port INVENTORY_WEBKIT_PORT)
     PLAYWRIGHT_WEBKIT=1 PLAYWRIGHT_WEBKIT_SERVER="ws://127.0.0.1:${port}/" \
       npx playwright test --project=webkit
     """,
@@ -88,7 +88,7 @@ run = [
 description = "Measure the three test suites: times, coverage, what each test alone covers, file sizes (CONTRIBUTING.md, Measuring the tests)"
 dir = "backend"
 depends = ["setup-browsers", "start-database"]
-run = "uv run python -m inventory_tng.dev.suite_report"
+run = "uv run python -m devtools test-report"
 
 [tasks.regenerate-fold-reference]
 description = "Write tests/fold_reference.tsv again, after a release of anyascii, or a Python with a newer Unicode, changes how it folds (CONTRIBUTING.md)"
@@ -99,7 +99,7 @@ run = "uv run python -m tests.helpers.fold_reference"
 description = "Write frontend/src/units.json, the scan page's unit table, again after a change to backend catalogue/units.py (CONTRIBUTING.md)"
 dir = "backend"
 run = [
-    "uv run python -m inventory_tng.catalogue.units",
+    "uv run python -m devtools write-unit-table",
     "cd ../frontend && npx biome format --write src/units.json",
 ]
 
@@ -184,14 +184,14 @@ run = "taplo fmt"
 description = "Seed an empty development database (CONTRIBUTING.md); -- --password sets the administrator's"
 depends = ["dev-database"]
 dir = "backend"
-run = "uv run python -m inventory_tng.dev.seed"
+run = "uv run python -m devtools database seed"
 
 [tasks.dev-database]
 description = "This checkout's development database: the server started, the database made if missing, and migrated"
 dir = "backend"
 depends = ["start-database"]
 run = [
-    "uv run python -m inventory_tng.dev.dev_database make",
+    "uv run python -m devtools database make",
     "uv run alembic upgrade head",
 ]
 
@@ -206,7 +206,7 @@ run = "mise-tasks/compose up -d --wait db"
 [tasks.ports-free]
 description = "Stop, saying what holds it and what to do, unless each port named (-- [--here] INVENTORY_DB_PORT ...) is free or this checkout's stack's"
 dir = "backend"
-run = "uv run --quiet --frozen python -m inventory_tng.dev.stacks ports-free"
+run = "uv run --quiet --frozen python -m devtools stack ports-free"
 
 [tasks.dev-backend]
 description = "The backend on INVENTORY_APP_PORT, restarting when its Python changes (mise run dev runs it)"
@@ -216,7 +216,7 @@ depends = ["ports-free --here INVENTORY_APP_PORT"]
 env = { APP_ENV = "development" }
 run = """
 uv run python -m inventory_tng --reload \
-  --port "$(uv run --quiet --frozen python -m inventory_tng.dev.stacks port INVENTORY_APP_PORT)"
+  --port "$(uv run --quiet --frozen python -m devtools stack port INVENTORY_APP_PORT)"
 """
 
 [tasks.dev-vite]

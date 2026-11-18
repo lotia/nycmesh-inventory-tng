@@ -136,6 +136,8 @@ services:
     # container can change them. :z relabels them for SELinux.
     volumes:
       - ./backend/src:/app/src:ro,z
+      # The developer's commands (python -m devtools), never in an image.
+      - ./backend/devtools:/app/devtools:ro,z
       - ./backend/migrations:/app/migrations:ro,z
       - ./.local/totp-keys:/run/secrets/totp-keys:ro,z
     ports:

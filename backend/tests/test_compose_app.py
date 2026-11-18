@@ -7,8 +7,8 @@ import re
 
 import pytest
 
+from devtools.database import OWNER, ROLES_SQL
 from inventory_tng.core.local_env import CLONE
-from inventory_tng.dev.dev_database import OWNER, ROLES_SQL
 
 pytestmark = pytest.mark.clone
 
@@ -50,7 +50,7 @@ def test_the_database_has_only_its_named_volume() -> None:
 
 
 def test_the_database_init_scripts_are_the_roles_file_and_the_owners() -> None:
-    """The roles first, from the one file dev_database runs too, then the
+    """The roles first, from the one file devtools/database.py runs too, then the
     database the server makes, made the owner's."""
     text = (CLONE / "compose.yaml").read_text()
     db = service("db")

@@ -2,7 +2,7 @@
 covers that no other does (CONTRIBUTING.md, Measuring the tests). From the
 clone's root, with the database started:
 
-    mise run test-report
+    mise run test-report    # python -m devtools test-report, in backend/
 
 It runs the backend's tests twice, timed as mise run check-backend runs
 them, then with each test's coverage recorded apart (slower, and on
@@ -18,6 +18,7 @@ test that is changes from run to run. Frontend tests sharing a full name
 run together, so each covers what they cover together.
 """
 
+import argparse
 import hashlib
 import itertools
 import json
@@ -419,7 +420,12 @@ def write_tests(suite: Suite, path: Path) -> None:
     path.write_text(header + "".join(rows))
 
 
-def main() -> None:
+def main(argv: Sequence[str], prog: str) -> int:
+    argparse.ArgumentParser(
+        prog=prog,
+        description=__doc__,
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+    ).parse_args(argv)
     shutil.rmtree(OUT, ignore_errors=True)
     OUT.mkdir(parents=True)
     suites = [measure_backend(), measure_frontend(), measure_browser()]
@@ -429,7 +435,4 @@ def main() -> None:
         report(suites, file_lines(), time.strftime("%Y-%m-%d"))
     )
     log.info("wrote test report", path=str(OUT / "report.md"))
-
-
-if __name__ == "__main__":
-    main()
+    return 0

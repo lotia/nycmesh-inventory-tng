@@ -23,8 +23,7 @@ decided the structure below on 2026-11-17.
   `scan/batch_api.py` or `admins/totp_keys_command.py`. URLs do not
   change.
 - **The top of `inventory_tng`** holds only the entry points (`app.py`,
-  `server.py`, `__main__.py`, `manage.py` and `openapi.py`) and
-  `models/`.
+  `server.py`, `__main__.py` and `manage.py`) and `models/`.
 - **`models/`** holds the mapped classes, a module per feature named for
   it, with what they share in `base.py` and `names.py`. Its `__init__.py`
   imports every module, so `Base.metadata`, Alembic and the guards see
@@ -39,8 +38,12 @@ decided the structure below on 2026-11-17.
   shared.
 - **`web/`** holds what every server-rendered page shares; **`core/`**
   holds plumbing, such as settings, db, history, logs, telemetry and mail.
-  Core means plumbing, not business rules. **`dev/`** holds developer
-  tools.
+  Core means plumbing, not business rules.
+- **Developer tools** live in `backend/devtools/`, beside `tests/` and
+  outside `src/`, so no image ships them (Ali, 2026-11-18,
+  inventory-tng-wzlr). A tool that writes a file the app or the frontend
+  reads belongs there; one that writes a reference file only tests read
+  stays in `tests/helpers/`.
 - **The administrators' navigation** is `web/navigation.py`: every
   section, in order, and its badge, listed by name, set by nothing at
   import (inventory-tng-atmx.10).
@@ -59,9 +62,14 @@ decided the structure below on 2026-11-17.
   inventory-tng-icnp): a fixed table of each command's name, its module
   and a line on what it does, never discovered. It imports only the
   command chosen; with no command it lists them all. Each command sets up
-  its own process (0007). Developer tools, `core/local_env.py`,
-  `catalogue/units.py` and `openapi.py` are not operator commands and keep
-  their own `python -m` paths (inventory-tng-atmx.9).
+  its own process (0007).
+- **One entry point for developer tools**, `python -m devtools <command>`,
+  run from `backend/` (Ali, 2026-11-18, inventory-tng-wzlr): commands
+  `database`, `setting`, `stack`, `test-report`, `write-api-schema` and
+  `write-unit-table`, listed and dispatched as the operator's are, by the
+  same code (`core/entry_point.py`), so the two cannot drift. Modules in
+  `src/` that a tool uses, such as `core/local_env.py` and
+  `catalogue/units.py`, have no `python -m` path of their own.
 - **Imports go one way**, held by `backend/tests/test_import_directions.py`:
   - rules, queries and forms import neither FastAPI nor `web/`, but for
     `web/formatting.py` and `web/forms.py`, which import neither
@@ -101,6 +109,13 @@ short test. `core/` is the name FastAPI's full-stack template uses;
 - On 2026-11-18, as Ali decided (inventory-tng-5q07), `models.py` was
   split into `models/` (inventory-tng-h657.1) and the templates into a
   folder per feature (inventory-tng-h657.2).
+- On 2026-11-18 the developer tools left `src/` for `backend/devtools/`
+  (inventory-tng-wzlr): `dev/dev_database.py` became `database.py`, with
+  `seed` a subcommand of it; `dev/seed.py` and `dev/suite_report.py`
+  kept their names; `dev/stacks.py` became `stack.py`, its `stale` now
+  `list-stale`; `openapi.py` became `write_api_schema.py`; the commands
+  of `core/local_env.py` and `catalogue/units.py` became `setting.py` and
+  `write_unit_table.py`, with `units.TABLE` as `write_unit_table.TABLE`.
 - Older decision records keep the paths of their time. The tables below
   give each old path's new home; a later move adds its rows.
 
