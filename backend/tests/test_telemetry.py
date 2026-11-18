@@ -475,8 +475,8 @@ def test_counts_counts_and_adjustments_written_once(
     for _ in range(2):
         adjusted = client.post(ADJUSTMENTS, data=form, follow_redirects=False)
         assert adjusted.status_code == 303
-    counts, adjustments = recorded_by_kind(reader)
-    assert (counts - before[0], adjustments - before[1]) == (2, 1)
+    after = recorded_by_kind(reader)
+    assert (after[0] - before[0], after[1] - before[1]) == (2, 1)
 
 
 def test_a_count_refused_after_its_first_transaction_records_nothing(

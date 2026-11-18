@@ -1,4 +1,6 @@
-"""Counts and adjustments: an administrator's, from stock/counts_routes.py
+"""Counts and adjustments: an administrator's, from stock/counts_routes.py,
+a length check (stock/length_checks_routes.py), a package closed
+(open_packages.close) or a check settled (over_recorded)
 (docs/decisions/0003, 0020). They put the records right for what was
 found at a place, as of when its form was shown (moments.moment()), and
 write through the ledger's one writer (ledger.insert_transaction).
@@ -24,7 +26,7 @@ from inventory_tng.stock.ledger import (
     Entry,
     Form,
     Lines,
-    _each_once,
+    each_once,
     entries,
     insert_transaction,
     lock_place,
@@ -195,7 +197,7 @@ def record_count(
     unless the form was sent there before, so it gets its first answer;
     RuleBroken (movement_item_once) for an item counted on two lines, or
     both by total and by form."""
-    _each_once(entries(counted))
+    each_once(entries(counted))
     forms_counted = [(item_id, form) for item_id, form, _ in by_form]
     enforce("movement_item_once", when=bool(repeated(forms_counted)))
     enforce(

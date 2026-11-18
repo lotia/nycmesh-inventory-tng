@@ -712,7 +712,7 @@ def insert_transaction(
     enforce(
         "ledger_transaction_lines", when=not lines and kind not in ("count", "report")
     )
-    held = hold(session, header, _each_once(lines))
+    held = hold(session, header, each_once(lines))
     items = held.items
     for broken in lines_break(kind, items, lines):
         # An item that does not exist is the foreign key's to refuse.
@@ -776,7 +776,7 @@ def _place(header: Mapping[str, object], side: str) -> int | None:
     return place if isinstance(place, int) else None
 
 
-def _each_once(lines: Sequence[Entry]) -> list[int]:
+def each_once(lines: Sequence[Entry]) -> list[int]:
     """The lines' items, each in each form on one line, or RuleBroken
     (movement_item_once); and each open package on one line, as each line
     is checked against what was left on it before the transaction
