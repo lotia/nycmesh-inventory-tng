@@ -29,8 +29,9 @@ from inventory_tng.models.labels import (
     mint_code,
     mint_label_code,
 )
-from inventory_tng.models.names import canonical, fold, fuzzy
+from inventory_tng.models.names import canonical
 from inventory_tng.models.places import Location
+from inventory_tng.models.search_text import fold, fuzzy
 from inventory_tng.models.stock import AdjustmentReason
 from inventory_tng.models.volunteers import Volunteer
 from inventory_tng.places import locations

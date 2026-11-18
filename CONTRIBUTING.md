@@ -322,22 +322,21 @@ page or reply that names one reads `name_shown`; only a form's field
 reads `name`.
 `tests/across/test_query_counts.py` checks every page for it.
 
-Searches read a unit right after a number in one spelling, on the server
-and the scan page alike (decision 0021): `10 µF` is `10uF`, and so is a
-unit alone spelt with `°`, `μ`, `µ` or `Ω`: `μF` is `uF`. Each searched
-field is kept, and each search matched, both as typed and so respelt,
-where the two differ (`models.names.folds` and `models.names.held`,
-`search.bares` on the scan page), so `feet` still finds `100 feet`. A search is
-matched in groups too, each number with its unit or other word, as typed or
-respelt (`units.groups`, `units.ts`'s `groups`), so `100 ft 48 V` finds `100
-feet 48 VDC`; the items list ranks a row holding every group between one holding
-the whole search and one only close. The table is
-`backend/src/inventory_tng/catalogue/units.py`. After changing it, or what
-search keeps, raise its `VERSION`, write the scan page's copy and the fold
-reference again, and add a migration that folds every row again with
-`models.names.held`, with `FOLDS_UNITS` the new version, folding an item's
-current aliases after its fields, as `Item.refold` does, and `name_folded` of
-items and aliases with `models.names.fold`:
+Searches read a unit right after a number in one spelling, on the server and the
+scan page alike (decision 0021): `10 µF` is `10uF`, and so is a unit alone spelt
+with `°`, `μ`, `µ` or `Ω`: `μF` is `uF`. Each searched field is kept, and each
+search matched, both as typed and so respelt, where the two differ
+(`models.search_text.folds` and `models.search_text.held`, `search.bares` on the
+scan page), so `feet` still finds `100 feet`. A search is matched in groups too,
+each number with its unit or other word, as typed or respelt (`units.groups`,
+`units.ts`'s `groups`), so `100 ft 48 V` finds `100 feet 48 VDC`; the items list
+ranks a row holding every group between one holding the whole search and one
+only close. The table is `backend/src/inventory_tng/catalogue/units.py`. After
+changing it, or what search keeps, raise its `VERSION`, write the scan page's
+copy and the fold reference again, and add a migration that folds every row
+again with `models.search_text.held`, with `FOLDS_UNITS` the new version,
+folding an item's current aliases after its fields, as `Item.refold` does, and
+`name_folded` of items and aliases with `models.search_text.fold`:
 
 ```sh
 mise run regenerate-units           # frontend/src/units.json
@@ -1202,8 +1201,8 @@ after it.
   name, and a series released only as betas, such as OpenTelemetry's
   instrumentation, floors at the minor's first beta (`>=0.66b0`).
   A new anyascii, or a Python with a newer Unicode, fails
-  `tests/models/test_fold_reference.py`, with the difference: the file's
-  first line names both versions. If you take it, run
+  `tests/models/test_search_text_fold_reference.py`, with the difference:
+  the file's first line names both versions. If you take it, run
   `mise run regenerate-fold-reference` (from `backend/`:
   `uv run python -m tests.helpers.fold_reference`, and `--check` only
   compares). If a spelling changed, also add a migration that folds again

@@ -85,8 +85,8 @@ export function indexOf(catalogue: Catalogue): Index {
     haystacks: new Map(
       catalogue.items.map((item) => [
         item.id,
-        // Each field bare alone, as typed and respelt, as the server keeps
-        // each (models.names.held), so no field's number reads the next's
+        // Each field bare alone, as typed and respelt, as the server keeps each
+        // (models.search_text.held), so no field's number reads the next's
         // start as a unit; the server's text, kept so already, only in lower
         // case.
         [
@@ -142,15 +142,15 @@ export function search(catalogue: Catalogue, text: string, limit = 20): Item[] {
     .slice(0, limit);
 }
 
-/** `text` bare as typed, its units as they are, then bare with each unit
- * right after a number spelt as the server spells it (`respell`) if that
- * differs, as the server keeps and matches it (models.names.folds): so "feet",
- * "48 v" in "48 vdc" and a half-typed "10 μ" find what they did before
- * units were read; `rules`, the reading rules, read first. Bare is in
- * lower case, decomposed by compatibility, and without combining marks:
- * "é" is "e", fullwidth "ｃａｆｅ" is "cafe", "ﬁ" is "fi" and, respelt,
- * "10 µF" is "10uf"; "ł", "ø", "æ" and "ß", which do not decompose, stay
- * as they are, and so do Greek letters, but in units. */
+/** `text` bare as typed, its units as they are, then bare with each unit right
+ * after a number spelt as the server spells it (`respell`) if that differs, as
+ * the server keeps and matches it (models.search_text.folds): so "feet", "48 v"
+ * in "48 vdc" and a half-typed "10 μ" find what they did before units were
+ * read; `rules`, the reading rules, read first. Bare is in lower case,
+ * decomposed by compatibility, and without combining marks: "é" is "e",
+ * fullwidth "ｃａｆｅ" is "cafe", "ﬁ" is "fi" and, respelt, "10 µF" is "10uf"; "ł",
+ * "ø", "æ" and "ß", which do not decompose, stay as they are, and so do Greek
+ * letters, but in units. */
 export function bares(text: string, rules?: Rules): string[] {
   const decomposed = text.normalize("NFKD");
   const typed = unmarked(decomposed);

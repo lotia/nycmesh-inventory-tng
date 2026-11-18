@@ -66,7 +66,8 @@ from inventory_tng.models.catalogue import (
     reading_rules_held,
 )
 from inventory_tng.models.labels import Label
-from inventory_tng.models.names import fold, fuzzy, in_ascii, unit_key
+from inventory_tng.models.names import unit_key
+from inventory_tng.models.search_text import fold, fuzzy, in_ascii
 from inventory_tng.models.stock import Movement, OpenPackage
 
 
@@ -227,10 +228,10 @@ class Close:
 def similar(session: Session, name: str, item_id: int) -> list[Close]:
     """Items other than `item_id`, the one named `name` now, whose names or
     current aliases are close to it, closest first, retired ones too, each
-    once, by its name where that is as close as its closest alias: as
-    search finds them (models.names.fuzzy), or with a name found in `name`, as
+    once, by its name where that is as close as its closest alias: as search
+    finds them (models.search_text.fuzzy), or with a name found in `name`, as
     "mast" is in "Mast, telescopic"; accents aside, as search's
-    (models.names.fold)."""
+    (models.search_text.fold)."""
     folded = fold(name)
 
     def close(

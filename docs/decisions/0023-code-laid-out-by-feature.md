@@ -30,11 +30,11 @@ decided the structure below on 2026-11-17.
   `server.py`, `__main__.py` and `manage.py`), `models/` and
   `templates/`, beside folders of data such as `locales/`.
 - **`models/`** holds the mapped classes, a module per feature named for
-  it, with what they share in `base.py` and `names.py`. Its `__init__.py`
-  imports every module, so `Base.metadata`, Alembic and the guards see
-  every table (Ali, 2026-11-18, inventory-tng-h657.1). It re-exports
-  nothing: callers import a model's names from the module it is in, never
-  the module itself (Amendment, 2026-11-18).
+  it, with what they share in `base.py`, `names.py` and `search_text.py`.
+  Its `__init__.py` imports every module, so `Base.metadata`, Alembic and
+  the guards see every table (Ali, 2026-11-18, inventory-tng-h657.1). It
+  re-exports nothing: callers import a model's names from the module it is
+  in, never the module itself (Amendment, 2026-11-18).
 - **`templates/`** has a folder per feature, named as its package, with
   the pages its routes render and the partials only its pages include.
   Layouts and partials more than one feature uses, and the pages `web/`
@@ -145,6 +145,10 @@ short test. `core/` is the name FastAPI's full-stack template uses;
   field, the template global and the page saying a form was sent again.
   "Once" became "single-use" in their names and in the form field's,
   which is `single_use`.
+- On 2026-11-18 `models/names.py` was split in two (inventory-tng-u3fp.6):
+  `models/names.py` keeps how a name is stored and keyed, and
+  `models/search_text.py` holds how text is folded, kept and matched for
+  search. The test of the fold reference took the new module's name.
 - Older decision records keep the paths of their time. The tables below
   give each old path's new home; a later move adds its rows.
 
@@ -205,6 +209,7 @@ queries to its `queries.py`.
 | `ledger.py` | `stock/ledger.py`, with `_each_once`, `_hold_forms` as `each_once`, `hold_forms`; `record`, with openings into open packages, the problems of a batch by line, the replay of a batch sent again, `BatchRefused`, `KeyReused`, `Recorded`, `retired_sides` and their metrics: `scan/batch.py`; `moment`, `expected`, `expected_forms`, `left_at`, `corrected_since`: `stock/moments.py`, with `_flows`, `_form_flows`, `_at_place` as `flows`, `form_flows`, `at_place`; `record_count`, `count_open_package`, `record_adjustment`, the rest of counts and adjustments and their metrics: `stock/counts.py`; the balance queries: `stock/balance.py`; `save_batch`: `scan/batch_api.py`; the batch request and reply schemas: `scan/batch_schemas.py`, but for `Line.entry`: `scan/batch.py`, as `entry_of` |
 | `models.py` | `models/`: each table in its feature's module; the column types, `whole`, the columns and constraints most tables have, and `Versioned`: `models/base.py`; canonical names, name keys and search folding (`CanonicalName`, `KeyedName`, `Searchable`, `fold` and the rest): `models/names.py`; `_refold`: `models/catalogue.py`; `_reference`, `_one_of`, `_between`, `_unique_name`, `_unique_current_name`, `_name_key_check`: each without its `_` |
 | `models/catalogue.py` | itself, with `reading_rules` as `reading_rules_held` |
+| `models/names.py` | itself, with `canonical`, `CANONICAL_SIGNS`, `CanonicalName`, `KeyedName`, `unit_key`, `name_key_check`; `fold`, `folds`, `held`, `holds`, `in_ascii`, `in_ascii_once`, `fuzzy`, `Searchable`, `FOLDED_WITH`: `models/search_text.py` |
 | `models/web.py` | `models/core.py` |
 | `open_packages.py` | `stock/open_packages.py`; `tracks_opened`: `stock/ledger.py` |
 | `openapi.py` | `backend/devtools/write_api_schema.py` |
@@ -319,6 +324,7 @@ These were renamed, or split, as they moved:
 | `helpers/categories.py` | `helpers/suite_categories.py` |
 | `helpers/pages.py` | `helpers/swept_pages.py` |
 | `helpers/queries.py` | `helpers/query_counts.py` |
+| `models/test_fold_reference.py` | `models/test_search_text_fold_reference.py` |
 | `test_account.py` | `admins/test_account_routes.py` |
 | `test_admin_admins.py` | `admins/test_admins_routes.py` |
 | `test_admin_categories.py` | `catalogue/test_categories_routes.py` |

@@ -15,8 +15,8 @@ from inventory_tng.catalogue.paths import ITEMS
 from inventory_tng.labels.paths import LABELS
 from inventory_tng.models.catalogue import Category, Item, ItemPackage
 from inventory_tng.models.labels import Label
-from inventory_tng.models.names import FOLDED_WITH, fold
 from inventory_tng.models.places import Location
+from inventory_tng.models.search_text import FOLDED_WITH, fold
 from inventory_tng.models.volunteers import Volunteer
 from inventory_tng.volunteers.paths import VOLUNTEERS
 from inventory_tng.web.listing import SEARCH_MAX, folded

@@ -12,7 +12,8 @@ from inventory_tng.models.base import (
     reference,
     unique_current_name,
 )
-from inventory_tng.models.names import CanonicalName, Searchable
+from inventory_tng.models.names import CanonicalName
+from inventory_tng.models.search_text import Searchable
 
 
 class Volunteer(CanonicalName, Searchable, Versioned, Base):

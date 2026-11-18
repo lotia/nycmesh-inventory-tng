@@ -18,7 +18,8 @@ from inventory_tng.catalogue import items, units
 from inventory_tng.catalogue.paths import ITEMS
 from inventory_tng.catalogue.units import KINDS, PREFIXES, UNITS, Reading, read, respell
 from inventory_tng.models.catalogue import Category, Item
-from inventory_tng.models.names import fold, folds, held, unit_key
+from inventory_tng.models.names import unit_key
+from inventory_tng.models.search_text import fold, folds, held
 
 from helpers.markup import text as page_text
 from helpers.rows import add, tag

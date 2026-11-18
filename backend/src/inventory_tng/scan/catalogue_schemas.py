@@ -89,9 +89,10 @@ class ItemEntry(BaseModel):
     manufacturer: str | None
     part_number: str | None
     old_code: str | None
-    # Its details and category, as searches keep them (models.names.held):
-    # matched, never shown (0021). The category is folded here, as it is
-    # read, on purpose: categories keep no folded column for so few names.
+    # Its details and category, as searches keep them
+    # (models.search_text.held): matched, never shown (0021). The category is
+    # folded here, as it is read, on purpose: categories keep no folded column
+    # for so few names.
     search_text: str
     # Its current aliases (models.catalogue.ItemAlias), as spelt: other names
     # it is found by, matched, never shown. Its search_text holds them folded.

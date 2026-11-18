@@ -1,7 +1,8 @@
 """The catalogue, locations, volunteers and labels (inventory-tng-8i4.10),
 registered devices (inventory-tng-8i4.42), the ledger (inventory-tng-8i4.11)
 and administrators' sign-in (docs/decisions/0012), one module per feature
-that owns its tables, with what they share in base.py and names.py.
+that owns its tables, with what they share in base.py, names.py and
+search_text.py.
 
 This module imports every one, so importing any model registers every
 mapped class; migrations/env.py imports it, so autogenerate sees every

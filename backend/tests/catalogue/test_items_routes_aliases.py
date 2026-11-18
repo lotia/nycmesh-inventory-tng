@@ -47,8 +47,8 @@ def rename(session: Session, item: Item, name: str) -> items.Renamed | None:
 def test_an_alias_is_searched_and_its_removal_frees_it(
     admin_client: TestClient, session: Session, radios: Category
 ) -> None:
-    """Stored canonical and keyed as names are; in the item's search text,
-    each folded alone, as typed and respelt (models.names.held), until removed
+    """Stored canonical and keyed as names are; in the item's search text, each
+    folded alone, as typed and respelt (models.search_text.held), until removed
     (retired), which frees the name."""
     item = new_item(session, radios, "Cat6 cable, outdoor")
     tough, capacitor = aliased(session, item, "ToughCable", "Cap 10 µF")

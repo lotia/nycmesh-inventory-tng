@@ -213,7 +213,7 @@ def test_an_item_is_found_by_its_current_aliases(
     registered_client: TestClient, session: Session
 ) -> None:
     """Sent as spelt, for the page to match; in its folded text too, as
-    typed and respelt (models.names.held)."""
+    typed and respelt (models.search_text.held)."""
     mark = tag()
     category = add(session, Category(name=f"Cables {mark}"))
     item = add(session, Item(name=f"Cat6 cable {mark}", category_id=category.id))

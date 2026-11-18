@@ -41,12 +41,10 @@ from inventory_tng.models.base import (
 from inventory_tng.models.names import (
     CanonicalName,
     KeyedName,
-    Searchable,
-    fold,
-    held,
     name_key_check,
     unit_key,
 )
+from inventory_tng.models.search_text import Searchable, fold, held
 
 UNITS = ("each", "m", "ft")
 
@@ -332,7 +330,7 @@ def _rules_forgotten(session: Session, transaction: SessionTransaction) -> None:
 
 
 # Every searchable row's, kept here as it reads items, aliases and reading
-# rules (names.Searchable, names.KeyedName).
+# rules (search_text.Searchable, names.KeyedName).
 # First, so the lock guard and the history see the folded columns too. A
 # row changed in nothing searched is left alone, loading nothing, so a
 # change such as a receipt's to on_order stays only that (db.flush_writes).

@@ -42,7 +42,7 @@ from sqlalchemy.orm import Session
 from inventory_tng.catalogue import units
 from inventory_tng.models.base import INTEGER_MAX, whole
 from inventory_tng.models.catalogue import reading_rules_held
-from inventory_tng.models.names import folds, fuzzy, holds, in_ascii_once
+from inventory_tng.models.search_text import folds, fuzzy, holds, in_ascii_once
 
 log = structlog.get_logger(__name__)
 
@@ -336,16 +336,16 @@ def tidied(typed: str) -> str:
 
 
 def folded(search: str, rules: units.Rules | None = None) -> tuple[str, ...]:
-    """What was typed as what is searched is kept (models.names.folds): as
-    typed, and with its units respelt if that differs, by `rules` first, each
-    no longer than SEARCH_MAX, as folding may lengthen it."""
+    """What was typed as what is searched is kept (models.search_text.folds):
+    as typed, and with its units respelt if that differs, by `rules` first,
+    each no longer than SEARCH_MAX, as folding may lengthen it."""
     return tuple(form[:SEARCH_MAX] for form in folds(search, rules))
 
 
 def grouped(search: str, rules: units.Rules | None = None) -> list[tuple[str, ...]]:
     """What was typed in groups (units.groups), each folded as typed and
-    respelt, as folds() folds them (models.names.in_ascii_once), and no longer
-    than SEARCH_MAX; a group folding to nothing left out."""
+    respelt, as folds() folds them (models.search_text.in_ascii_once), and no
+    longer than SEARCH_MAX; a group folding to nothing left out."""
     found = []
     for group in units.groups(normalize("NFKD", search), rules):
         if forms := tuple(f[:SEARCH_MAX] for f in in_ascii_once(*group) if f.strip()):
@@ -390,7 +390,7 @@ def closeness(
 @dataclass(frozen=True)
 class Searched[T]:
     """How a list page, at `here`, finds its kind of record: the model, the
-    text a search reads, folded (models.names.held), such as an item's
+    text a search reads, folded (models.search_text.held), such as an item's
     search_text, its name, by which suggestions are sorted, and the
     headings its list sorts by (`sorting`). Optionally: the select of the model it reads,
     if joined to more; a column a search matches only whole, held in
@@ -398,7 +398,7 @@ class Searched[T]:
     those with no retired_at; what the filter between Current and All calls
     the rest; and each row as the page shows it, with a `name`, if not the
     row itself. Its search reads units by the reading rules where the
-    model's search_text does (models.names.Searchable.READS_RULES)."""
+    model's search_text does (models.search_text.Searchable.READS_RULES)."""
 
     here: str
     model: type[T]

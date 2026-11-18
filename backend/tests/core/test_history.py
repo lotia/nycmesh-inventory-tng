@@ -184,7 +184,8 @@ VERSIONED = (
             }
             # Each edit form's row's (models.base.Versioned), which moves with
             # every change, and each searched row's folded text
-            # (models.names.Searchable), which moves with what is searched.
+            # (models.search_text.Searchable), which moves with what is
+            # searched.
             | {table: {"edit_version"} for table in VERSIONED}
             | {
                 table: {"edit_version", "search_text", "folded_with"}

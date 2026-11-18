@@ -22,7 +22,7 @@ from inventory_tng.core.db import SnapshotSession
 from inventory_tng.devices.guards import DeviceRefusedReply, RegisteredDevice
 from inventory_tng.labels import labels
 from inventory_tng.models.catalogue import Item, reading_rules_held
-from inventory_tng.models.names import held
+from inventory_tng.models.search_text import held
 from inventory_tng.models.site_settings import ScanSettings
 from inventory_tng.scan import queries
 from inventory_tng.scan.catalogue_schemas import (

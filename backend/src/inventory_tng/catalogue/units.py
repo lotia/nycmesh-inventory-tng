@@ -39,11 +39,11 @@ from babel.support import LazyProxy
 from inventory_tng.catalogue import name_keys
 from inventory_tng.core.phrases import gettext, lazy_gettext
 
-# Raise it whenever a change to the table reads any text otherwise, or
-# search keeps it otherwise (models.names.held): rows record what folded them
-# (models.names.FOLDED_WITH), so those folded before can be folded again, and a
-# test fails until it is raised. Reset to 1 when the migrations became one
-# initial migration (Ali, 2026-11-17); the versions before are in
+# Raise it whenever a change to the table reads any text otherwise, or search
+# keeps it otherwise (models.search_text.held): rows record what folded them
+# (models.search_text.FOLDED_WITH), so those folded before can be folded again,
+# and a test fails until it is raised. Reset to 1 when the migrations became
+# one initial migration (Ali, 2026-11-17); the versions before are in
 # docs/decisions/0021.
 VERSION = 1
 
