@@ -110,8 +110,8 @@ def test_new_prints_a_key_that_loads(
 ) -> None:
     """As DEPLOYMENT.md runs it: python -m inventory_tng.manage totp-keys new."""
     monkeypatch.setattr(sys, "argv", ["manage", "totp-keys", "new"])
-    # A fresh copy, as python -m runs: runpy warns when the module is
-    # already imported, and whether it is depends on what ran before.
+    # A fresh copy, as python -m runs: runpy warns if the module is
+    # already imported, here or by an earlier test.
     monkeypatch.delitem(sys.modules, "inventory_tng.manage", raising=False)
     with pytest.raises(SystemExit) as done:
         runpy.run_module("inventory_tng.manage", run_name="__main__")

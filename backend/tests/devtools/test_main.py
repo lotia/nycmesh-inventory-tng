@@ -26,8 +26,8 @@ def test_with_no_command_it_lists_every_one(
     monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
 ) -> None:
     monkeypatch.setattr(sys, "argv", ["devtools"])
-    # A fresh copy, as python -m runs: runpy warns when the module is
-    # already imported, and whether it is depends on what ran before.
+    # A fresh copy, as python -m runs: runpy warns if the module is
+    # already imported, here or by an earlier test.
     monkeypatch.delitem(sys.modules, "devtools.__main__", raising=False)
     with pytest.raises(SystemExit) as done:
         runpy.run_module("devtools", run_name="__main__")
