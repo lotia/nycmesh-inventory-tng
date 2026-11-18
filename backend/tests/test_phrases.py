@@ -72,7 +72,8 @@ from inventory_tng.volunteers import routes as volunteers_routes
 from inventory_tng.web import admin as web_admin
 from inventory_tng.web import forms as web_forms
 from inventory_tng.web.listing import Lapsed
-from inventory_tng.web.pages import retired_holding, templates
+from inventory_tng.web.navigation import retired_holding
+from inventory_tng.web.pages import templates
 
 from helpers import markup
 from helpers.pages import NOT_ENGLISH, PAGES, Built, built, path

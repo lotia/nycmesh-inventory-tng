@@ -1,9 +1,9 @@
 """Server-rendered pages (docs/decisions/0002): their templates, and how a
 page or a redirect is sent."""
 
-from collections.abc import Callable, Mapping
+from collections.abc import Mapping
 from pathlib import Path
-from typing import Any, NamedTuple, NoReturn, cast
+from typing import Any, NoReturn, cast
 from urllib.parse import urlencode
 
 from babel.support import LazyProxy
@@ -11,14 +11,14 @@ from fastapi import FastAPI, Request
 from fastapi.exception_handlers import http_exception_handler
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse, Response
 from fastapi.templating import Jinja2Templates
-from sqlalchemy.orm import Session, object_session
 from starlette.exceptions import HTTPException
 from starlette.types import Scope
 
 from inventory_tng.core.db import Gone
 from inventory_tng.core.local_time import show, show_day
-from inventory_tng.core.phrases import BRAND, install, lazy_gettext, ngettext, number
+from inventory_tng.core.phrases import BRAND, install, lazy_gettext, number
 from inventory_tng.web.formatting import amount, printed_length
+from inventory_tng.web.navigation import sections
 
 templates = Jinja2Templates(directory=Path(__file__).parent.parent / "templates")
 install(templates.env)
@@ -47,41 +47,6 @@ cast(dict[str, Any], templates.env.globals)["csp_nonce"] = csp_nonce
 
 templates.env.filters["amount"] = amount
 templates.env.filters["printed_length"] = printed_length
-
-
-def retired_holding(places: int) -> str:
-    """How many retired places hold stock, in words."""
-    return ngettext(
-        "%(num)d retired place holds stock",
-        "%(num)d retired places hold stock",
-        places,
-    )
-
-
-class Badge(NamedTuple):
-    """A number beside a section in the navigation: how many things to put
-    right there, and what they are, for a screen reader."""
-
-    count: int
-    words: str
-
-
-# The administrator pages' sections, in the navigation's order, by path and
-# name, and the badge of any that has one, by path (admin/__init__.py).
-SECTIONS: list[tuple[str, str | LazyProxy]] = []
-BADGES: dict[str, Callable[[Session], Badge | None]] = {}
-
-
-def sections(admin: object) -> list[tuple[str, str | LazyProxy, Badge | None]]:
-    """The navigation, for a page drawn for `admin`: each section with its
-    badge, read in the session that loaded `admin`. With none open, no
-    badges."""
-    session = object_session(admin)
-
-    def badge(path: str) -> Badge | None:
-        return BADGES[path](session) if session and path in BADGES else None
-
-    return [(path, label, badge(path)) for path, label in SECTIONS]
 
 
 # What a page says after a change, by the ?notice= it was sent back with

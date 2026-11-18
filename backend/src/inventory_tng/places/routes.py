@@ -25,7 +25,6 @@ from inventory_tng.places.paths import LOCATIONS
 from inventory_tng.places.queries import changeable
 from inventory_tng.volunteers import queries as volunteers_queries
 from inventory_tng.web.admin import (
-    SECTION_LOCATIONS,
     admin_page,
     current_rows,
     now,
@@ -33,6 +32,7 @@ from inventory_tng.web.admin import (
     undo_retire,
 )
 from inventory_tng.web.forms import ALERTS, RULES, form_version, rule_words
+from inventory_tng.web.navigation import SECTION_LOCATIONS
 from inventory_tng.web.pages import not_found, redirect
 
 log = structlog.get_logger(__name__)

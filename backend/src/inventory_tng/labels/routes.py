@@ -28,8 +28,9 @@ from inventory_tng.models import (
     whole,
 )
 from inventory_tng.places.paths import LOCATIONS
-from inventory_tng.web.admin import SECTION_LABELS, admin_page, now, revoke_title
+from inventory_tng.web.admin import admin_page, now, revoke_title
 from inventory_tng.web.listing import AskedView, Listing, Searched, Sort, Sorting
+from inventory_tng.web.navigation import SECTION_LABELS
 from inventory_tng.web.pages import NOTICES, not_found, redirect, templates
 
 log = structlog.get_logger(__name__)

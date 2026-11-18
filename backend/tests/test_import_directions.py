@@ -40,9 +40,6 @@ RULES_MAY_IMPORT = {"web/formatting.py", "web/forms.py"}
 PLAIN = {"queries.py", "forms.py"}
 # Folders that are not features.
 NOT_FEATURES = {"core", "dev", "web"}
-# Until its modules move into their features' packages, each module in
-# admin/ is a feature of its own.
-SPLIT = "admin"
 OWNERS = {
     table.info["owner"]
     for table in models.Base.metadata.tables.values()
@@ -67,28 +64,8 @@ BREAKS: dict[str, dict[str, list[str]]] = {
         "web/once.py": ["fastapi", "starlette", "web/pages.py"],
     },
     "routes_run_queries": {},
-    "routes_import_another_features_routes": {
-        "admin/__init__.py": [
-            "admins/home_routes.py",
-            "admins/routes.py",
-            "catalogue/categories_routes.py",
-            "catalogue/items_routes.py",
-            "catalogue/reading_rules_routes.py",
-            "devices/routes.py",
-            "labels/routes.py",
-            "places/routes.py",
-            "site_settings/routes.py",
-            "stock/counts_routes.py",
-            "stock/length_checks_routes.py",
-            "stock/over_recorded_routes.py",
-            "stock/stock_routes.py",
-            "stock/used_up_routes.py",
-            "volunteers/routes.py",
-        ],
-    },
-    "init_not_empty": {
-        "admin/__init__.py": ["Assign", "For", "ImportFrom"],
-    },
+    "routes_import_another_features_routes": {},
+    "init_not_empty": {},
     "command_imported_outside_manage": {},
     "paths_import_more_than_core_and_paths": {},
 }
@@ -174,9 +151,9 @@ def is_routes(tree: ast.Module, path: str) -> bool:
 
 def feature(path: str) -> str:
     """The feature a module belongs to: its package's, or its own at the
-    top or in admin/."""
+    top."""
     parts = path.split("/")
-    if len(parts) == 1 or parts[0] == SPLIT:
+    if len(parts) == 1:
         return path.removesuffix(".py")
     return parts[0]
 
@@ -469,9 +446,9 @@ def test_another_features_routes_imported_by_routes_is_found(
     files = {
         "catalogue/routes.py": "",
         "stock/api.py": "",
-        "admin/items.py": "router = APIRouter()",
-        "admin/counts.py": "router = APIRouter()",
-        "admin/listing.py": "",
+        "catalogue/pages.py": "router = APIRouter()",
+        "stock/counts.py": "router = APIRouter()",
+        "stock/listing.py": "",
         "catalogue/paths.py": "",
     }
     for name, text in files.items():
@@ -485,13 +462,14 @@ def test_another_features_routes_imported_by_routes_is_found(
     assert breaks("stock/api.py", "from ..catalogue import routes") == [
         "catalogue/routes.py"
     ]
-    # admin/'s modules hold routes as they make an APIRouter.
+    # A module holds routes as it makes an APIRouter.
     router = "router = APIRouter()\n"
     assert breaks(
-        "admin/counts.py", f"{router}from inventory_tng.admin.items import X"
-    ) == ["admin/items.py"]
+        "stock/counts.py", f"{router}from inventory_tng.catalogue.pages import X"
+    ) == ["catalogue/pages.py"]
     assert breaks("stock/api.py", "from inventory_tng.catalogue.paths import X") == []
-    assert breaks("admin/counts.py", f"{router}from .listing import Sort") == []
+    assert breaks("stock/counts.py", f"{router}from .listing import Sort") == []
+    assert breaks("stock/counts.py", f"{router}from . import api") == []
     assert breaks("catalogue/routes.py", "from . import routes") == []
     # Not a module of routes.
     assert breaks("catalogue/paths.py", "from ..stock import api") == []

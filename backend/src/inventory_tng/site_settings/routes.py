@@ -31,8 +31,9 @@ from inventory_tng.models import (
 from inventory_tng.site_settings import forms, queries, scan_settings
 from inventory_tng.site_settings.paths import SETTINGS
 from inventory_tng.stock import adjustment_reasons
-from inventory_tng.web.admin import SECTION_SETTINGS, admin_page, now, text_form
+from inventory_tng.web.admin import admin_page, now, text_form
 from inventory_tng.web.forms import CHANGED, RULES, form_version, name_problem
+from inventory_tng.web.navigation import SECTION_SETTINGS
 from inventory_tng.web.pages import NOTICES, not_found, redirect
 
 log = structlog.get_logger(__name__)

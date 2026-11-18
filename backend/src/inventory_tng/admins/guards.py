@@ -66,7 +66,8 @@ from inventory_tng.core.phrases import Words, lazy_gettext
 from inventory_tng.core.settings import RateLimits
 from inventory_tng.models import Admin, AdminSession, SignInSettings
 from inventory_tng.web import once
-from inventory_tng.web.pages import Badge, page, redirect, sections, templates
+from inventory_tng.web.navigation import Badge, sections
+from inventory_tng.web.pages import page, redirect, templates
 
 log = structlog.get_logger(__name__)
 

@@ -51,7 +51,7 @@ from inventory_tng.stock.ledger import (
 )
 from inventory_tng.stock.paths import ADJUSTMENTS, COUNTS, STOCK
 from inventory_tng.web.forms import ABOVE_ZERO, RULES, TYPE_A_NUMBER, WHOLE_UNITS
-from inventory_tng.web.pages import retired_holding
+from inventory_tng.web.navigation import retired_holding
 
 from helpers.concurrency import Committed
 from helpers.markup import button, forms, hidden_fields, links, options, read, text

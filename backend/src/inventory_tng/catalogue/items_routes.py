@@ -36,19 +36,13 @@ from inventory_tng.models import (
 from inventory_tng.models import reading_rules as rules_held
 from inventory_tng.stock import open_packages
 from inventory_tng.stock import queries as stock_queries
-from inventory_tng.web.admin import (
-    SECTION_ITEMS,
-    admin_page,
-    now,
-    retirement,
-    text_form,
-    undo_retire,
-)
+from inventory_tng.web.admin import admin_page, now, retirement, text_form, undo_retire
 from inventory_tng.web.forms import ALERTS, RETIRED, RULES, form_version
 from inventory_tng.web.listing import (
     AskedView,
     Listing,
 )
+from inventory_tng.web.navigation import SECTION_ITEMS
 from inventory_tng.web.pages import NOTICES, not_found, redirect
 
 log = structlog.get_logger(__name__)

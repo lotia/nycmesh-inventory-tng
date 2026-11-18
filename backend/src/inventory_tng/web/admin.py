@@ -1,6 +1,17 @@
 """What the administrator pages share: how a page is sent and how a form
 is read. How a form is checked, and the catalogue's rules put into words,
-are web/forms.py's."""
+are web/forms.py's; their navigation is web/navigation.py's.
+
+Administrators' pages for the catalogue, places, volunteers and devices
+(inventory-tng-8i4.14): server-rendered forms, signed in
+(admins/guards.py), each change recorded in the history as the
+administrator who made it, and logged by id.
+
+Every catalogue page follows one pattern: a list with a form to add, a page
+per row to change it, retire it (nothing is deleted) and bring it back. A
+page passes its own paths to its templates, so a page shown again after a
+refused form still links where it should.
+"""
 
 from collections.abc import Mapping
 from datetime import UTC, datetime
@@ -29,19 +40,6 @@ from inventory_tng.web.pages import NOTICES, page, templates
 
 _globals = cast(dict[str, Any], templates.env.globals)
 _globals["name_max"] = NAME_MAX
-
-# The sections' names: in the navigation, in links back to them, and as
-# their pages' titles.
-SECTION_ITEMS = lazy_gettext("Items")
-SECTION_CATEGORIES = lazy_gettext("Categories")
-SECTION_LOCATIONS = lazy_gettext("Locations")
-SECTION_LABELS = lazy_gettext("Labels")
-SECTION_VOLUNTEERS = lazy_gettext("Volunteers")
-SECTION_STOCK = lazy_gettext("Stock")
-SECTION_COUNTS = lazy_gettext("Counts")
-SECTION_DEVICES = lazy_gettext("Devices")
-SECTION_ADMINS = lazy_gettext("Administrators")
-SECTION_SETTINGS = lazy_gettext("Site settings")
 
 # A view of those settled, beside those waiting (_views.html).
 SETTLED_VIEW = lazy_gettext("Settled")

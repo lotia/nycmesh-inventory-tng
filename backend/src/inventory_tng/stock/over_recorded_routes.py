@@ -45,7 +45,7 @@ from inventory_tng.stock.needs_action import (
 )
 from inventory_tng.stock.paths import COUNTS, RECORDED_MORE_SETTLED, STOCK
 from inventory_tng.stock.paths import RECORDED_MORE as OVER_RECORDED
-from inventory_tng.web.admin import SECTION_STOCK, SETTLED_VIEW, admin_page
+from inventory_tng.web.admin import SETTLED_VIEW, admin_page
 from inventory_tng.web.forms import row_id, rule_words
 from inventory_tng.web.listing import (
     AskedView,
@@ -55,6 +55,7 @@ from inventory_tng.web.listing import (
     arranged,
 )
 from inventory_tng.web.listing import order as order_of
+from inventory_tng.web.navigation import SECTION_STOCK
 from inventory_tng.web.pages import NOTICES, not_found, redirect
 
 log = structlog.get_logger(__name__)

@@ -31,7 +31,7 @@ from inventory_tng.stock.paths import (
     REORDER,
     STOCK,
 )
-from inventory_tng.web.admin import SECTION_STOCK, SETTLED_VIEW, admin_page
+from inventory_tng.web.admin import SETTLED_VIEW, admin_page
 from inventory_tng.web.listing import (
     AskedView,
     Sort,
@@ -41,6 +41,7 @@ from inventory_tng.web.listing import (
     in_order,
     paged,
 )
+from inventory_tng.web.navigation import SECTION_STOCK
 from inventory_tng.web.pages import templates
 
 log = structlog.get_logger(__name__)

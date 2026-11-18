@@ -24,6 +24,12 @@ structure below on 2026-11-17.
   masking, mail, phrases, local_time and local_env. Core means plumbing,
   not business rules. **`dev/`** holds developer tools, such as stacks,
   dev_database and seed.
+- **The administrators' navigation** is `web/navigation.py`: every
+  section, in order, and its badge, listed by name, set by nothing at
+  import (inventory-tng-atmx.10). Being in `web/`, it may import
+  features, and imports only their `paths.py` and what a badge counts
+  with: `web/pages.py` imports it, so a page's routes, which import
+  `web/pages.py`, would make a cycle.
 - **No service layer and no repositories.** A route file does routing
   only: decorated handlers (`@router.get`, `@router.post`), one router per
   module, included by name in `app.py`, never discovered. A handler reads
@@ -73,6 +79,9 @@ short test. `core/` is the name FastAPI's full-stack template uses;
 | `accounts.py` | `admins/accounts.py` |
 | `activity.py` | `admins/activity.py` |
 | `adjustment_reasons.py` | `stock/adjustment_reasons.py` |
+| `admin/__init__.py`: its docstring | `web/admin.py` |
+| `admin/__init__.py`: the navigation's sections and badges | `web/navigation.py` |
+| `admin/__init__.py`: the pages' routers, included in order | `app.py` |
 | `admin/admins.py` | `admins/routes.py` |
 | `admin/admins.py`: how its forms are read, and their problems in words | `admins/forms.py` |
 | `admin/admins.py`: its query | `admins/queries.py` |
@@ -189,6 +198,7 @@ short test. `core/` is the name FastAPI's full-stack template uses;
 | `site_settings/scan_settings.py`: its command | `site_settings/command.py` |
 | `stacks.py` | `dev/stacks.py` |
 | `stock/counts_routes.py`, `stock/length_checks_routes.py`, `stock/stock_routes.py`, `stock/used_up_routes.py`: their paths | `stock/paths.py` |
+| `stock/counts_routes.py`: `badge`, now `counts_badge` | `web/navigation.py` |
 | `telemetry.py` | `core/telemetry.py` |
 | `time_zones.py` | `core/time_zones.py` |
 | `totp_keys.py` | `admins/totp_keys.py` |
@@ -200,3 +210,5 @@ short test. `core/` is the name FastAPI's full-stack template uses;
 | `web/admin.py`: `ADMINS` | `admins/paths.py` |
 | `web/admin.py`: `ADMIN` | `web/paths.py` |
 | `web/admin.py`: `LABELS` | `labels/paths.py` |
+| `web/admin.py`: the sections' names (`SECTION_ITEMS` and the others) | `web/navigation.py` |
+| `web/pages.py`: `Badge`, `retired_holding`, `sections` | `web/navigation.py` |

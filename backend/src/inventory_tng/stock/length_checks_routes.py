@@ -40,13 +40,9 @@ from inventory_tng.stock.needs_action import (
 )
 from inventory_tng.stock.paths import LENGTHS, STOCK
 from inventory_tng.stock.used_up_routes import BY_PACKAGE, BY_SHOWS
-from inventory_tng.web.admin import (
-    SECTION_STOCK,
-    TICK_OPEN_PACKAGES,
-    admin_page,
-    now,
-)
+from inventory_tng.web.admin import TICK_OPEN_PACKAGES, admin_page, now
 from inventory_tng.web.listing import AskedView, Sort, Sorting, View, arranged
+from inventory_tng.web.navigation import SECTION_STOCK
 from inventory_tng.web.pages import NOTICES, not_found, redirect
 
 log = structlog.get_logger(__name__)

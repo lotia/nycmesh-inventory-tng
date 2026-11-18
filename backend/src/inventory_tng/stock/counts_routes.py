@@ -57,7 +57,7 @@ from inventory_tng.models import (
 )
 from inventory_tng.site_settings.paths import SETTINGS
 from inventory_tng.stock import needs_action, open_packages, over_recorded, queries
-from inventory_tng.stock.balance import countable, retired_holding_stock_count, takeable
+from inventory_tng.stock.balance import countable, takeable
 from inventory_tng.stock.forms import (
     CLOSED_MEANWHILE,
     LOOSE_FIELD,
@@ -86,23 +86,12 @@ from inventory_tng.stock.ledger import (
 from inventory_tng.stock.needs_action import OnlyItem
 from inventory_tng.stock.open_packages import tracks_opened
 from inventory_tng.stock.paths import ADJUSTMENTS, COUNTS
-from inventory_tng.web.admin import (
-    SECTION_COUNTS,
-    admin_page,
-    current_rows,
-    now,
-    text_form,
-)
+from inventory_tng.web.admin import admin_page, current_rows, now, text_form
 from inventory_tng.web.forms import RULES, row_id
 from inventory_tng.web.listing import UNASKED, AskedView, Sort, Sorting, View, order
+from inventory_tng.web.navigation import SECTION_COUNTS
 from inventory_tng.web.once import form_key
-from inventory_tng.web.pages import (
-    NOTICES,
-    Badge,
-    not_found,
-    redirect,
-    retired_holding,
-)
+from inventory_tng.web.pages import NOTICES, not_found, redirect
 
 log = structlog.get_logger(__name__)
 
@@ -151,13 +140,6 @@ NOTICES.update(
 )
 
 TextForm = Annotated[dict[str, str], Depends(text_form)]
-
-
-def badge(session: Session) -> Badge | None:
-    """Beside Counts: how many retired places hold stock, to count
-    (balance.retired_holding_stock)."""
-    many = retired_holding_stock_count(session)
-    return Badge(many, retired_holding(many)) if many else None
 
 
 def _items(session: Session) -> list[Item]:

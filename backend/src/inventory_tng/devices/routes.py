@@ -35,13 +35,7 @@ from inventory_tng.devices.paths import (
     REGISTER_PATH,
 )
 from inventory_tng.models import Device, RegistrationCode
-from inventory_tng.web.admin import (
-    SECTION_DEVICES,
-    admin_page,
-    now,
-    revoke_title,
-    site_link,
-)
+from inventory_tng.web.admin import admin_page, now, revoke_title, site_link
 from inventory_tng.web.forms import RULES, form_version
 from inventory_tng.web.listing import (
     Asked,
@@ -52,6 +46,7 @@ from inventory_tng.web.listing import (
     arranged,
 )
 from inventory_tng.web.listing import order as order_of
+from inventory_tng.web.navigation import SECTION_DEVICES
 from inventory_tng.web.once import OnceKey, sent_before
 from inventory_tng.web.pages import NOTICES, not_found, redirect
 

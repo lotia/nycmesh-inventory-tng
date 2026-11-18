@@ -28,7 +28,7 @@ from inventory_tng.scan.batch_schemas import Batch
 from inventory_tng.stock import open_packages, over_recorded
 from inventory_tng.stock.ledger import LOOSE, Entry, Form, insert_transaction, record
 from inventory_tng.stock.paths import COUNTS
-from inventory_tng.web.pages import retired_holding
+from inventory_tng.web.navigation import retired_holding
 
 from helpers.concurrency import Committed
 from helpers.markup import Element, hidden_fields, read

@@ -9,15 +9,26 @@ from contextlib import asynccontextmanager
 import structlog
 from fastapi import FastAPI
 
-# Before admin/: both name a notice "renamed", and the module imported last
-# has its words said on both pages (inventory-tng-80j6).
+# Before catalogue/items_routes.py: both name a notice "renamed", and the
+# module imported last has its words said on both pages (inventory-tng-80j6).
 from inventory_tng.admins import account_routes
 
 # isort: split
-from inventory_tng import admin
-from inventory_tng.admins import accounts, guards, reset_routes, sign_in_routes
+from inventory_tng.admins import (
+    accounts,
+    guards,
+    home_routes,
+    reset_routes,
+    sign_in_routes,
+)
+from inventory_tng.admins import routes as admins_routes
 from inventory_tng.admins.paths import HOME
 from inventory_tng.admins.totp_keys import TotpKeys
+from inventory_tng.catalogue import (
+    categories_routes,
+    items_routes,
+    reading_rules_routes,
+)
 from inventory_tng.core import database_role, db, health
 from inventory_tng.core.cross_site import CrossSiteRefusal
 from inventory_tng.core.db import Database, make_database
@@ -26,6 +37,9 @@ from inventory_tng.core.phrases import BRAND
 from inventory_tng.core.request_logging import RequestLogging
 from inventory_tng.core.settings import Settings
 from inventory_tng.devices import api as devices_api
+from inventory_tng.devices import routes as devices_routes
+from inventory_tng.labels import routes as labels_routes
+from inventory_tng.places import routes as places_routes
 from inventory_tng.scan import (
     batch_api,
     bundle,
@@ -33,6 +47,15 @@ from inventory_tng.scan import (
     page_builds,
     page_telemetry,
 )
+from inventory_tng.site_settings import routes as site_settings_routes
+from inventory_tng.stock import (
+    counts_routes,
+    length_checks_routes,
+    over_recorded_routes,
+    stock_routes,
+    used_up_routes,
+)
+from inventory_tng.volunteers import routes as volunteers_routes
 from inventory_tng.web import pages, security_headers
 
 log = structlog.get_logger(__name__)
@@ -118,7 +141,21 @@ def create_app(
     app.include_router(bundle.router)
     app.include_router(sign_in_routes.router)
     app.include_router(account_routes.router)
-    app.include_router(admin.router)
+    app.include_router(home_routes.router)
+    app.include_router(items_routes.router)
+    app.include_router(categories_routes.router)
+    app.include_router(places_routes.router)
+    app.include_router(labels_routes.router)
+    app.include_router(volunteers_routes.router)
+    app.include_router(stock_routes.router)
+    app.include_router(used_up_routes.router)
+    app.include_router(length_checks_routes.router)
+    app.include_router(over_recorded_routes.router)
+    app.include_router(reading_rules_routes.router)
+    app.include_router(counts_routes.router)
+    app.include_router(devices_routes.router)
+    app.include_router(admins_routes.router)
+    app.include_router(site_settings_routes.router)
     app.include_router(reset_routes.router)
     bundle.install(app, settings)
     db.install(app)

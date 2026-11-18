@@ -9,7 +9,7 @@ from sqlalchemy.orm import Session
 from inventory_tng.admins.home_routes import ALONE, NO_EMAIL
 from inventory_tng.models import Location
 from inventory_tng.stock.paths import COUNTS
-from inventory_tng.web.pages import retired_holding
+from inventory_tng.web.navigation import retired_holding
 
 from helpers.mail import SentMail
 from helpers.markup import links, read, text

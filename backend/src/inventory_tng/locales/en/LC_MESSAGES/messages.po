@@ -350,7 +350,7 @@ msgid_plural "%(num)d minutes"
 msgstr[0] ""
 msgstr[1] ""
 
-#: src/inventory_tng/web/pages.py
+#: src/inventory_tng/web/navigation.py
 #, python-format
 msgid "%(num)d retired place holds stock"
 msgid_plural "%(num)d retired places hold stock"
@@ -771,7 +771,7 @@ msgstr ""
 msgid "Administrator"
 msgstr ""
 
-#: src/inventory_tng/web/admin.py
+#: src/inventory_tng/web/navigation.py
 msgid "Administrators"
 msgstr ""
 
@@ -1120,7 +1120,7 @@ msgstr ""
 msgid "Can't scan? Type this key instead:"
 msgstr ""
 
-#: src/inventory_tng/web/admin.py
+#: src/inventory_tng/web/navigation.py
 msgid "Categories"
 msgstr ""
 
@@ -1344,7 +1344,7 @@ msgstr ""
 msgid "Counted: everything was as the records say."
 msgstr ""
 
-#: src/inventory_tng/templates/counts.html src/inventory_tng/web/admin.py
+#: src/inventory_tng/templates/counts.html src/inventory_tng/web/navigation.py
 msgid "Counts"
 msgstr ""
 
@@ -1385,7 +1385,7 @@ msgstr ""
 msgid "Device %(number)s"
 msgstr ""
 
-#: src/inventory_tng/web/admin.py
+#: src/inventory_tng/web/navigation.py
 msgid "Devices"
 msgstr ""
 
@@ -1779,7 +1779,8 @@ msgid "Item retired"
 msgstr ""
 
 #: src/inventory_tng/templates/categories.html
-#: src/inventory_tng/templates/category.html src/inventory_tng/web/admin.py
+#: src/inventory_tng/templates/category.html
+#: src/inventory_tng/web/navigation.py
 msgid "Items"
 msgstr ""
 
@@ -1855,7 +1856,7 @@ msgstr ""
 msgid "Keep them apart"
 msgstr ""
 
-#: src/inventory_tng/templates/_labels.html src/inventory_tng/web/admin.py
+#: src/inventory_tng/templates/_labels.html src/inventory_tng/web/navigation.py
 msgid "Labels"
 msgstr ""
 
@@ -1894,7 +1895,7 @@ msgstr ""
 msgid "Let them hold stock"
 msgstr ""
 
-#: src/inventory_tng/web/admin.py
+#: src/inventory_tng/web/navigation.py
 msgid "Locations"
 msgstr ""
 
@@ -3430,7 +3431,7 @@ msgstr ""
 msgid "Since you last signed in"
 msgstr ""
 
-#: src/inventory_tng/web/admin.py
+#: src/inventory_tng/web/navigation.py
 msgid "Site settings"
 msgstr ""
 
@@ -3497,7 +3498,7 @@ msgstr ""
 msgid "State"
 msgstr ""
 
-#: src/inventory_tng/web/admin.py
+#: src/inventory_tng/web/navigation.py
 msgid "Stock"
 msgstr ""
 
@@ -4013,7 +4014,7 @@ msgstr ""
 msgid "Volunteer's custody"
 msgstr ""
 
-#: src/inventory_tng/web/admin.py
+#: src/inventory_tng/web/navigation.py
 msgid "Volunteers"
 msgstr ""
 
