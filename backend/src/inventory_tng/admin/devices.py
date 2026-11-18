@@ -35,19 +35,18 @@ from inventory_tng.admin.listing import (
 from inventory_tng.admin.listing import order as order_of
 from inventory_tng.admins.guards import AdminSignedIn, ConfirmedAdmin, SignedIn, changed
 from inventory_tng.core.db import DbSession, attempt
-from inventory_tng.core.local_time import parse_local, site_zone
+from inventory_tng.core.local_time import site_zone
 from inventory_tng.core.phrases import (
     Words,
-    gettext,
     lazy_gettext,
     lazy_pgettext,
     ngettext,
 )
-from inventory_tng.devices import devices, queries
-from inventory_tng.models import Device, RegistrationCode, whole
+from inventory_tng.devices import devices, forms, queries
+from inventory_tng.models import Device, RegistrationCode
 from inventory_tng.once import OnceKey, sent_before
 from inventory_tng.pages import NOTICES, not_found, redirect
-from inventory_tng.web.forms import NAME_MAX, RULES, form_version, up_to
+from inventory_tng.web.forms import RULES, form_version
 
 log = structlog.get_logger(__name__)
 
@@ -55,8 +54,6 @@ router = APIRouter(include_in_schema=False)
 
 DEVICES = f"{ADMIN}/devices"
 CODES = f"{DEVICES}/codes"
-MAX_USES = 500
-MAX_DAYS = 90
 
 State = Literal["open", "expired", "used up", "revoked"]
 
@@ -68,14 +65,6 @@ DEVICE_REVOKED = lazy_gettext("Revoked: it can't save anything now.")
 NOTICES.update({"code_revoked": CODE_REVOKED, "device_revoked": DEVICE_REVOKED})
 NEW_CODE_TITLE = lazy_gettext("A new registration code")
 REGISTERED_DEVICES = lazy_gettext("Registered devices")
-
-
-def uses_problem(most: int) -> str:
-    return gettext("From 1 to %(max)d devices.", max=most)
-
-
-def days_problem(most: int) -> str:
-    return gettext("From 1 to %(max)d days.", max=most)
 
 
 def revoke_many_title(many: int) -> str:
@@ -152,8 +141,8 @@ def _list_page(
             "state_words": STATE_WORDS,
             "codes": rows,
             "zone": site_zone(session),
-            "max_uses": MAX_USES,
-            "max_days": MAX_DAYS,
+            "max_uses": forms.MAX_USES,
+            "max_days": forms.MAX_DAYS,
             "problems": problems,
             "values": values,
         },
@@ -192,15 +181,7 @@ def make_code(
 ) -> Response:
     form = {"uses": uses, "days": days, "label": label}
     label = label.strip()
-    problems = {}
-    max_uses, lifetime = whole(uses, 1, MAX_USES), whole(days, 1, MAX_DAYS)
-    if max_uses is None:
-        problems["uses"] = uses_problem(MAX_USES)
-    if lifetime is None:
-        problems["days"] = days_problem(MAX_DAYS)
-    # Any longer would not fit the printed page.
-    if len(label) > NAME_MAX:
-        problems["label"] = up_to(NAME_MAX)
+    max_uses, lifetime, problems = forms.code_settings(uses, days, label)
     if problems or max_uses is None or lifetime is None:
         return _list_page(request, session, signed, problems=problems, values=form)
     if again := sent_before(
@@ -343,8 +324,8 @@ def name_device(
     if device is None:
         return not_found()
     label = label.strip()
-    if len(label) > NAME_MAX:
-        problems = {"label": up_to(NAME_MAX)}
+    if (problem := forms.label_problem(label)) is not None:
+        problems = {"label": problem}
         values = {"label": label, "version": version}
         return _device_page(
             request, signed, session, device, problems=problems, values=values
@@ -399,15 +380,9 @@ def revoke_device(
 DEVICE_LIST = f"{DEVICES}/all"
 # Not under DEVICE_LIST: {DEVICES}/{device_id}/revoke would take it.
 BULK_REVOKE = f"{DEVICES}/revoke"
-STATES: dict[str, bool | None] = {"current": True, "revoked": False, "all": None}
 
 DEVICES_REVOKED = lazy_gettext("Revoked: they can't save anything now.")
 NOTICES["devices_revoked"] = DEVICES_REVOKED
-
-
-A_TIME = lazy_gettext("A date and time, such as 2026-11-02 13:05.")
-AFTER_FROM = lazy_gettext("A time after the one it is from.")
-A_CODE_NUMBER = lazy_gettext("A code's number.")
 
 
 # How the devices list sorts: newest registered first, or by a heading,
@@ -419,44 +394,6 @@ SORTING = Sorting(
         "used": Sort.of(Device.last_seen_at, first="desc"),
     },
 )
-
-
-def _chosen(
-    session: Session, since: str, until: str, code: str, shown: str
-) -> tuple[devices.DeviceFilter, dict[str, Words], dict[str, str]]:
-    """The filter a form or link chose, what was wrong with it, and the
-    filter as the page carries it, each field as typed (an unknown `shown`
-    is current). `until` takes in the whole minute it names."""
-    shown = shown if shown in STATES else "current"
-    zone = site_zone(session)
-    problems: dict[str, Words] = {}
-    start = end = None
-    if since.strip() and (start := parse_local(since, zone)) is None:
-        problems["since"] = A_TIME
-    if until.strip():
-        end = parse_local(until, zone)
-        if end is None:
-            problems["until"] = A_TIME
-        elif start is not None and end < start:
-            problems["until"] = AFTER_FROM
-        else:
-            # Whatever seconds were typed. At the last minute a datetime
-            # holds, no end at all.
-            try:
-                end = end.replace(second=0, microsecond=0) + timedelta(minutes=1)
-            except OverflowError:
-                end = None
-    code_id = whole(code, 1, 2**31 - 1) if code.strip() else None
-    if code.strip() and code_id is None:
-        problems["code"] = A_CODE_NUMBER
-    chosen = devices.DeviceFilter(
-        since=start, until=end, code_id=code_id, current=STATES[shown]
-    )
-    return (
-        chosen,
-        problems,
-        {"since": since, "until": until, "code": code, "state": shown},
-    )
 
 
 def _view(typed: dict[str, str], asked: Asked) -> View:
@@ -480,7 +417,7 @@ def device_list(
     code: str = "",
     state: str = "current",
 ) -> Response:
-    chosen, problems, typed = _chosen(session, since, until, code, state)
+    chosen, problems, typed = forms.device_filter(session, since, until, code, state)
     view = _view(typed, asked)
     found: list[Device] = []
     if not problems:
@@ -512,7 +449,7 @@ def device_list(
             "devices_path": DEVICES,
             "filter": typed,
             "view": view,
-            "states": list(STATES),
+            "states": list(forms.STATES),
             "devices": found,
             "zone": site_zone(session),
             "problems": problems or None,
@@ -540,7 +477,7 @@ def revoke_devices(
 ) -> Response:
     """Asks first, saying how many, then revokes those selected that the
     filter still matches, once."""
-    chosen, problems, typed = _chosen(session, since, until, code, state)
+    chosen, problems, typed = forms.device_filter(session, since, until, code, state)
     # The list as it was, to come back to.
     query = dict(_view(typed, Asked(sort, order, per, page)).fields())
     current = [] if problems else devices.current_among(session, chosen, device or [])

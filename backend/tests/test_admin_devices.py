@@ -11,17 +11,15 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from inventory_tng.admin.devices import (
-    AFTER_FROM,
     BULK_REVOKE,
     CODES,
     DEVICE_LIST,
     DEVICES,
-    days_problem,
     revoke_many_title,
-    uses_problem,
 )
 from inventory_tng.core.phrases import compiled, speaking
 from inventory_tng.devices import devices
+from inventory_tng.devices.forms import AFTER_FROM, days_problem, uses_problem
 from inventory_tng.models import Device, RegistrationCode, SiteSettings
 from inventory_tng.web.forms import NAME_MAX, up_to
 

@@ -53,6 +53,7 @@ from inventory_tng.core.phrases import (
     read,
     speaking,
 )
+from inventory_tng.devices import forms as devices_forms
 from inventory_tng.labels import labels
 from inventory_tng.models import (
     TRANSACTION_KINDS,
@@ -168,8 +169,8 @@ SAID_WITH_VALUES: list[Callable[[], Words]] = [
     lambda: admin_volunteers.merge_title(NOT_ENGLISH, NOT_ENGLISH),
     lambda: admin_admins.link_title(NOT_ENGLISH),
     lambda: admin_admins.reset_title(NOT_ENGLISH),
-    lambda: admin_devices.uses_problem(9),
-    lambda: admin_devices.days_problem(9),
+    lambda: devices_forms.uses_problem(9),
+    lambda: devices_forms.days_problem(9),
     lambda: admin_devices.revoke_many_title(1),
     lambda: admin_devices.revoke_many_title(3),
     *(lambda said=said: said(1, 9) for said in admin_settings.WHOLE.values()),

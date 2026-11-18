@@ -118,3 +118,4 @@ short test. `core/` is the name FastAPI's full-stack template uses;
 | `admin/common.py`: the rules put into words (`RULES`) | `web/forms.py` |
 | `admin/counts.py`: how its forms are read, and their problems in words | `stock/forms.py` |
 | `admin/over_recorded.py`: how its forms are read, and their problems in words | `stock/forms.py` |
+| `admin/devices.py`: how its forms are read, and their problems in words | `devices/forms.py` |

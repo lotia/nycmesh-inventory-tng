@@ -618,7 +618,7 @@ msgstr ""
 msgid "A code for a sensitive change lasts"
 msgstr ""
 
-#: src/inventory_tng/admin/devices.py
+#: src/inventory_tng/devices/forms.py
 msgid "A code's number."
 msgstr ""
 
@@ -628,7 +628,7 @@ msgid ""
 "something else."
 msgstr ""
 
-#: src/inventory_tng/admin/devices.py
+#: src/inventory_tng/devices/forms.py
 msgid "A date and time, such as 2026-11-02 13:05."
 msgstr ""
 
@@ -676,7 +676,7 @@ msgstr ""
 msgid "A recovery code was used on your %(brand)s account"
 msgstr ""
 
-#: src/inventory_tng/admin/devices.py
+#: src/inventory_tng/devices/forms.py
 msgid "A time after the one it is from."
 msgstr ""
 
@@ -1542,12 +1542,12 @@ msgstr ""
 msgid "From"
 msgstr ""
 
-#: src/inventory_tng/admin/devices.py
+#: src/inventory_tng/devices/forms.py
 #, python-format
 msgid "From 1 to %(max)d days."
 msgstr ""
 
-#: src/inventory_tng/admin/devices.py
+#: src/inventory_tng/devices/forms.py
 #, python-format
 msgid "From 1 to %(max)d devices."
 msgstr ""
