@@ -56,7 +56,8 @@ def test_an_items_open_packages_are_ordered_fewest_left_first() -> None:
     ]
     packages = {SPOOL: open_packages.PackageSize("Spool", Decimal(305), None)}
     rows = [(None, open_id, left) for open_id, left in opened]
-    forms = open_packages.split(rows, packages, dict.fromkeys([4, 5, 7, 9], SPOOL))
+    opened_from = {open_id: SPOOL for open_id, _ in opened}
+    forms = open_packages.split(rows, packages, opened_from)
     assert forms.open == [Decimal(40), Decimal(40), Decimal(120), Decimal(-8)]
 
 
@@ -115,8 +116,7 @@ def test_the_stock_page_lists_open_packages_fewest_left_first(
     """In a fixed order, so two loads of the same data read the same
     (inventory-tng-qskv), one showing less than nothing last."""
     spools.receive(uuid.uuid4(), spools=2)
-    cuts = (Decimal(185), Decimal(0), Decimal(300), Decimal(313))
-    for cut in cuts:
+    for cut in (Decimal(185), Decimal(0), Decimal(300), Decimal(313)):
         made = spools.opened()
         if cut:
             spools.move(Entry(spools.cable.id, cut, Form(open_package_id=made.id)))
