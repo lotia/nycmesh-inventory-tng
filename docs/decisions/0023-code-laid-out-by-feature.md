@@ -35,7 +35,8 @@ decided the structure below on 2026-11-17.
   Layouts and partials more than one feature uses, and the pages `web/`
   renders, stay at the top (Ali, 2026-11-18, inventory-tng-h657.2). A
   test in `backend/tests/test_import_directions.py` checks that only its
-  feature uses a feature's folder.
+  feature uses a feature's folder, and that what sits at the top is
+  shared.
 - **`web/`** holds what every server-rendered page shares; **`core/`**
   holds plumbing, such as settings, db, history, logs, telemetry and mail.
   Core means plumbing, not business rules. **`dev/`** holds developer

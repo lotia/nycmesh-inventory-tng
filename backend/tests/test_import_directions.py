@@ -11,7 +11,8 @@ inside functions count, as do relative ones.
 
 Today's breaks are listed in BREAKS, which may only shrink: a new break
 fails, and so does one fixed but still listed. The last test holds where
-templates sit: a feature's folder is used by that feature alone.
+templates sit: a feature's folder is used by that feature alone, and what
+sits at the top is shared.
 """
 
 import ast
@@ -275,8 +276,12 @@ def test_each_rule_finds_a_break(
 
 
 TEMPLATES = SOURCE / "templates"
-# A template named in Python, or in a template's include, extends or import.
-TEMPLATE_NAME = re.compile(r'"((?:[a-z_]+/)?[_a-z]+\.(?:html|svg))"')
+# A template named in Python, or in a template's include, extends or import,
+# in either quote Jinja takes.
+TEMPLATE_NAME = re.compile(r"""["']((?:[a-z0-9_]+/)*[a-z0-9_]+\.(?:html|svg))["']""")
+# Packages that are not features, so have no folder under templates/: the
+# pages web/ renders sit at the top.
+NOT_FEATURES = {"core", "dev", "models", "web"}
 
 
 def feature_of(path: Path) -> str:
@@ -289,14 +294,24 @@ def feature_of(path: Path) -> str:
 
 def test_a_features_templates_are_used_by_that_feature_alone() -> None:
     """templates/ has a folder per feature, named as its package, used by
-    that feature's code and templates alone; what is shared is at the top
+    that feature's code and templates alone; at the top, only what web/ or
+    another shared template uses, or more than one feature
     (docs/decisions/0023)."""
     folders = {path.name for path in TEMPLATES.iterdir() if path.is_dir()}
     features = {path.parent.name for path in SOURCE.glob("*/__init__.py")}
-    elsewhere = {
-        (str(user.relative_to(SOURCE)), name)
-        for user in [*modules(), *TEMPLATES.rglob("*.html")]
-        for name in TEMPLATE_NAME.findall(user.read_text())
-        if "/" in name and feature_of(user) != name.split("/")[0]
+    top = {path.name for path in TEMPLATES.iterdir() if path.is_file()}
+    users: dict[str, set[str]] = {name: set() for name in top}
+    elsewhere = set()
+    for user in [*modules(), *TEMPLATES.rglob("*.html")]:
+        for name in TEMPLATE_NAME.findall(user.read_text()):
+            if "/" in name and feature_of(user) != name.split("/")[0]:
+                elsewhere.add((str(user.relative_to(SOURCE)), name))
+            users.setdefault(name, set()).add(feature_of(user))
+    one_feature = {
+        name for name in top if len(users[name]) < 2 and not users[name] & {"web", *top}
     }
-    assert (folders - features, elsewhere) == (set(), set())
+    assert (folders - (features - NOT_FEATURES), elsewhere, one_feature) == (
+        set(),
+        set(),
+        set(),
+    )
