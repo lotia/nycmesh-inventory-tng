@@ -272,7 +272,7 @@ IMPORTS = (
         ("remove(Device)", ("device", "statement")),
         ("pg_insert(Admin)", ("admin", "statement")),
         ("sa.update(model)", (None, "statement")),
-        ("sa.insert(models.Movement)", ("movement", "statement")),
+        ("sa.insert(stock.Movement)", ("movement", "statement")),
         ("Item.__table__.delete()", ("item", "statement")),
         ("remove(LedgerTransaction.__table__)", ("ledger_transaction", "statement")),
         (
@@ -286,7 +286,7 @@ IMPORTS = (
         ("text('INSERT INTO movement VALUES (1)')", ("movement", "statement")),
         # Rows made and deleted through the ORM.
         ("Movement(item_id=1)", ("movement", "row")),
-        ("models.LedgerTransaction(kind='move')", ("ledger_transaction", "row")),
+        ("stock.LedgerTransaction(kind='move')", ("ledger_transaction", "row")),
         ("session.delete(row)", (None, "delete")),
         # Prose, reads, and what only shares a name.
         ("'update the item'", None),

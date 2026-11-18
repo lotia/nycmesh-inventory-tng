@@ -90,7 +90,7 @@ SQL_WRITE = re.compile(
 
 
 def _model(node: ast.expr | None) -> str | None:
-    """The table `node` names: Item, models.Item or Item.__table__."""
+    """The table `node` names: Item, stock.Movement or Item.__table__."""
     match node:
         case ast.Attribute(value=model, attr="__table__"):
             return _model(model)

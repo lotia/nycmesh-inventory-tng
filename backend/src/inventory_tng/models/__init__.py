@@ -19,7 +19,8 @@ Conventions, on every table with history:
 - Names are unique, ignoring case: among current rows, or all of them,
   retired ones too, as each table says. An item's and a package's are
   compared by their key, which ignores spaces and punctuation too, but a
-  decimal point between digits (catalogue/names.py; names.KeyedName).
+  decimal point between digits (catalogue/names.py; models/names.py,
+  KeyedName).
 
 A rule about one row's own values is a check constraint, which raises a
 check violation (SQLSTATE 23514) named for the rule, as describe_error()

@@ -19,8 +19,7 @@ from importlib.util import resolve_name
 
 import pytest
 
-# Imported for its mapped classes, so Base has every table.
-from inventory_tng import models  # noqa: F401
+# Has every table: helpers.source imports every model.
 from inventory_tng.core.db import Base
 
 from helpers.source import SOURCE, modules
