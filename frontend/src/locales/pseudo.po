@@ -173,7 +173,7 @@ msgstr ""
 msgid "Move: {items} from {from} to {to}"
 msgstr ""
 
-#: src/ScanPage.tsx
+#: src/CartLine.tsx
 msgid "Loose units"
 msgstr ""
 
@@ -201,7 +201,7 @@ msgstr ""
 msgid "Install: {items} from {from} for install {number}"
 msgstr ""
 
-#: src/ScanPage.tsx
+#: src/CartLine.tsx
 msgid "{package} ({size} {unit}), retired: taking only"
 msgstr ""
 
@@ -242,7 +242,7 @@ msgstr ""
 msgid "Moving stock"
 msgstr ""
 
-#: src/ScanPage.tsx
+#: src/CartLine.tsx
 msgid "No longer in the catalogue."
 msgstr ""
 
@@ -387,7 +387,7 @@ msgstr ""
 msgid "Carts from this device"
 msgstr ""
 
-#: src/ScanPage.tsx
+#: src/CartLine.tsx
 msgid "How many"
 msgstr ""
 
@@ -479,7 +479,7 @@ msgstr ""
 msgid "{place}: to here."
 msgstr ""
 
-#: src/ScanPage.tsx
+#: src/CartLine.tsx
 msgid "How many {unit}"
 msgstr ""
 
@@ -666,7 +666,7 @@ msgstr ""
 msgid "{where}, by {name}"
 msgstr ""
 
-#: src/ScanPage.tsx
+#: src/CartLine.tsx
 msgid "Loose {unit}"
 msgstr ""
 
@@ -746,7 +746,7 @@ msgstr ""
 msgid "The cart was changed in another tab. Check it, then discard it again."
 msgstr ""
 
-#: src/ScanPage.tsx
+#: src/CartLine.tsx
 msgid "Remove"
 msgstr ""
 
@@ -763,7 +763,7 @@ msgctxt "place"
 msgid "From"
 msgstr ""
 
-#: src/ScanPage.tsx
+#: src/CartLine.tsx
 msgid "{package} ({size} {unit})"
 msgstr ""
 
@@ -771,7 +771,7 @@ msgstr ""
 msgid "{amount} {unit} over"
 msgstr ""
 
-#: src/ScanPage.tsx
+#: src/CartLine.tsx
 msgid "{amount} {unit} in all"
 msgstr ""
 
@@ -863,7 +863,7 @@ msgstr ""
 msgid "The package size has changed since this item was added. Discard and re-add the new package size."
 msgstr ""
 
-#: src/ScanPage.tsx
+#: src/CartLine.tsx
 msgid "The package size has changed to {size} since this item was added. Enter the count again."
 msgstr ""
 

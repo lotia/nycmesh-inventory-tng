@@ -6,6 +6,7 @@ import {
   within,
 } from "@testing-library/preact";
 import { describe, expect, type MockInstance, test, vi } from "vitest";
+import { REMOVE } from "./CartLine";
 import {
   STORAGE_KEY as CART_KEY,
   freshCart,
@@ -44,7 +45,6 @@ import {
   NOT_KEEPING as NOT_KEEPING_PHRASE,
   NOT_SENT,
   NOTHING_IN_CART,
-  REMOVE,
   SENDING_WHAT,
   TO,
   WHERE,

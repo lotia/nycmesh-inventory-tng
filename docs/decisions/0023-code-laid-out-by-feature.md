@@ -216,6 +216,7 @@ The frontend's moves, both under `frontend/src/`, sorted the same way:
 
 | Old path | New path |
 | --- | --- |
+| `ScanPage.tsx`: `CartLine` | `CartLine.tsx` |
 | `ScanPage.tsx`: `Finder` | `Finder.tsx` |
 | `ScanPage.tsx`: `loadCatalogue` | `catalogue.ts` |
 | `ScanPage.tsx`: `NoteSaid`, `AlertWords`, `Counted`, `ConfirmDiscard`, `keyedByWords`, `RULED_LIST`, `CAUTION_BOX` | `Notes.tsx` |

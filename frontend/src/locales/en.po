@@ -173,7 +173,7 @@ msgstr "Pick where it goes."
 msgid "Move: {items} from {from} to {to}"
 msgstr "Move: {items} from {from} to {to}"
 
-#: src/ScanPage.tsx
+#: src/CartLine.tsx
 msgid "Loose units"
 msgstr "Loose units"
 
@@ -201,7 +201,7 @@ msgstr "{item}: type how many of which package to open."
 msgid "Install: {items} from {from} for install {number}"
 msgstr "Install: {items} from {from} for install {number}"
 
-#: src/ScanPage.tsx
+#: src/CartLine.tsx
 msgid "{package} ({size} {unit}), retired: taking only"
 msgstr "{package} ({size} {unit}), retired: taking only"
 
@@ -242,7 +242,7 @@ msgstr "Whole packages only"
 msgid "Moving stock"
 msgstr "Moving stock"
 
-#: src/ScanPage.tsx
+#: src/CartLine.tsx
 msgid "No longer in the catalogue."
 msgstr "No longer in the catalogue."
 
@@ -387,7 +387,7 @@ msgstr "Confirm discard"
 msgid "Carts from this device"
 msgstr "Carts from this device"
 
-#: src/ScanPage.tsx
+#: src/CartLine.tsx
 msgid "How many"
 msgstr "How many"
 
@@ -479,7 +479,7 @@ msgstr "A cart: something"
 msgid "{place}: to here."
 msgstr "{place}: to here."
 
-#: src/ScanPage.tsx
+#: src/CartLine.tsx
 msgid "How many {unit}"
 msgstr "How many {unit}"
 
@@ -666,7 +666,7 @@ msgstr "Your name"
 msgid "{where}, by {name}"
 msgstr "{where}, by {name}"
 
-#: src/ScanPage.tsx
+#: src/CartLine.tsx
 msgid "Loose {unit}"
 msgstr "Loose {unit}"
 
@@ -746,7 +746,7 @@ msgstr "Unable to discard. Clear your site data to remove."
 msgid "The cart was changed in another tab. Check it, then discard it again."
 msgstr "The cart was changed in another tab. Check it, then discard it again."
 
-#: src/ScanPage.tsx
+#: src/CartLine.tsx
 msgid "Remove"
 msgstr "Remove"
 
@@ -763,7 +763,7 @@ msgctxt "place"
 msgid "From"
 msgstr "From"
 
-#: src/ScanPage.tsx
+#: src/CartLine.tsx
 msgid "{package} ({size} {unit})"
 msgstr "{package} ({size} {unit})"
 
@@ -771,7 +771,7 @@ msgstr "{package} ({size} {unit})"
 msgid "{amount} {unit} over"
 msgstr "{amount} {unit} over"
 
-#: src/ScanPage.tsx
+#: src/CartLine.tsx
 msgid "{amount} {unit} in all"
 msgstr "{amount} {unit} in all"
 
@@ -863,7 +863,7 @@ msgstr "Record"
 msgid "The package size has changed since this item was added. Discard and re-add the new package size."
 msgstr "The package size has changed since this item was added. Discard and re-add the new package size."
 
-#: src/ScanPage.tsx
+#: src/CartLine.tsx
 msgid "The package size has changed to {size} since this item was added. Enter the count again."
 msgstr "The package size has changed to {size} since this item was added. Enter the count again."
 

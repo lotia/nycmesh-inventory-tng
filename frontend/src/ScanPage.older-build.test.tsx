@@ -6,6 +6,7 @@ import {
   within,
 } from "@testing-library/preact";
 import { describe, expect, test, vi } from "vitest";
+import { REMOVE } from "./CartLine";
 import {
   addOne,
   STORAGE_KEY as CART_KEY,
@@ -43,7 +44,6 @@ import {
   NOT_KEPT as NOT_KEPT_PHRASE,
   NOT_REMOVED as NOT_REMOVED_PHRASE,
   NOTHING_IN_CART,
-  REMOVE,
   SOMETHING,
   TO,
   YOUR_NAME,
