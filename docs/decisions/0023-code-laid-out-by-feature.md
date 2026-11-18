@@ -113,9 +113,8 @@ short test. `core/` is the name FastAPI's full-stack template uses;
 | `admin/volunteers.py`: its queries | `volunteers/queries.py` |
 | `admin/locations.py`: its volunteers' names | `volunteers/queries.py`: `volunteer_names` |
 | `health.py`: its query | `core/db.py`: `ping` |
-| `admin/common.py`: how a form is checked | `web/forms.py` |
+| `admin/common.py`: how a form is checked, and the rules put into words (`RULES`) | `web/forms.py` |
 | `admin/items.py`: how its forms are read, and their problems in words | `catalogue/forms.py` |
-| `admin/common.py`: the rules put into words (`RULES`) | `web/forms.py` |
 | `admin/counts.py`: how its forms are read, and their problems in words | `stock/forms.py` |
 | `admin/over_recorded.py`: how its forms are read, and their problems in words | `stock/forms.py` |
 | `admin/devices.py`: how its forms are read, and their problems in words | `devices/forms.py` |

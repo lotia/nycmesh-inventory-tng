@@ -36,6 +36,7 @@ WHOLE: dict[str, Callable[[int, int], str]] = {
 
 
 def whole_minutes(low: int, high: int) -> str:
+    """A number of minutes refused: from `low` to `high`."""
     return gettext(
         "A whole number of minutes, from %(low)d to %(high)d.", low=low, high=high
     )
@@ -98,8 +99,7 @@ def scan_minutes(typed: str) -> int | str:
     what is wrong with it as a str."""
     minutes = whole(typed, *NAME_CHECK_MINUTES)
     if minutes is None:
-        low, high = NAME_CHECK_MINUTES
-        return whole_minutes(low, high)
+        return whole_minutes(*NAME_CHECK_MINUTES)
     return minutes
 
 

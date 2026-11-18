@@ -16,6 +16,7 @@ STILL_HOLD = lazy_gettext("They still hold stock: move it back to a store first.
 
 
 def volunteer_problems(name: str, email: str) -> dict[str, Words]:
+    """What is wrong with a volunteer's name and email, stripped."""
     problems = {}
     if problem := name_problem(name):
         problems["name"] = problem

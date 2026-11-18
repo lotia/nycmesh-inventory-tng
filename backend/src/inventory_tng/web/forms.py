@@ -125,6 +125,7 @@ def at_most_places(places: int) -> str:
 
 
 def name_problem(name: str) -> str | None:
+    """What is wrong with a name, stripped: blank, or too long."""
     # As stored (models.CanonicalName): °C for ℃ is a character longer.
     if not 1 <= len(canonical(name)) <= NAME_MAX:
         return name_up_to(NAME_MAX)

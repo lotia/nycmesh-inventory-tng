@@ -23,10 +23,12 @@ A_CODE_NUMBER = lazy_gettext("A code's number.")
 
 
 def uses_problem(most: int) -> str:
+    """A code's most uses refused: from 1 to `most`."""
     return gettext("From 1 to %(max)d devices.", max=most)
 
 
 def days_problem(most: int) -> str:
+    """A code's days refused: from 1 to `most`."""
     return gettext("From 1 to %(max)d days.", max=most)
 
 
