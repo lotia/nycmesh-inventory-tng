@@ -53,6 +53,144 @@
           }
         }
       }
+    },
+    {
+      "includes": ["src/**", "!src/testing/**", "!**/*.test.*"],
+      "linter": {
+        "rules": {
+          "style": {
+            "noRestrictedImports": {
+              "level": "error",
+              "options": {
+                "patterns": [
+                  {
+                    "group": ["./testing/**", "../testing/**"],
+                    "message": "testing/ holds test helpers: only tests import it (docs/decisions/0023)."
+                  }
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "includes": ["src/shared/**", "!**/*.test.*"],
+      "linter": {
+        "rules": {
+          "style": {
+            "noRestrictedImports": {
+              "level": "error",
+              "options": {
+                "patterns": [
+                  {
+                    "group": [
+                      "../scan",
+                      "../scan/**",
+                      "../register",
+                      "../register/**",
+                      "../admin",
+                      "../admin/**"
+                    ],
+                    "message": "shared/ serves every page, so it imports no page's folder (docs/decisions/0023)."
+                  },
+                  {
+                    "group": ["./testing/**", "../testing/**"],
+                    "message": "testing/ holds test helpers: only tests import it (docs/decisions/0023)."
+                  }
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "includes": ["src/scan/**", "!**/*.test.*"],
+      "linter": {
+        "rules": {
+          "style": {
+            "noRestrictedImports": {
+              "level": "error",
+              "options": {
+                "patterns": [
+                  {
+                    "group": [
+                      "../register",
+                      "../register/**",
+                      "../admin",
+                      "../admin/**"
+                    ],
+                    "message": "A page's folder imports shared/, never another page's folder (docs/decisions/0023)."
+                  },
+                  {
+                    "group": ["./testing/**", "../testing/**"],
+                    "message": "testing/ holds test helpers: only tests import it (docs/decisions/0023)."
+                  }
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "includes": ["src/register/**", "!**/*.test.*"],
+      "linter": {
+        "rules": {
+          "style": {
+            "noRestrictedImports": {
+              "level": "error",
+              "options": {
+                "patterns": [
+                  {
+                    "group": [
+                      "../scan",
+                      "../scan/**",
+                      "../admin",
+                      "../admin/**"
+                    ],
+                    "message": "A page's folder imports shared/, never another page's folder (docs/decisions/0023)."
+                  },
+                  {
+                    "group": ["./testing/**", "../testing/**"],
+                    "message": "testing/ holds test helpers: only tests import it (docs/decisions/0023)."
+                  }
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "includes": ["src/admin/**", "!**/*.test.*"],
+      "linter": {
+        "rules": {
+          "style": {
+            "noRestrictedImports": {
+              "level": "error",
+              "options": {
+                "patterns": [
+                  {
+                    "group": [
+                      "../scan",
+                      "../scan/**",
+                      "../register",
+                      "../register/**"
+                    ],
+                    "message": "A page's folder imports shared/, never another page's folder (docs/decisions/0023)."
+                  },
+                  {
+                    "group": ["./testing/**", "../testing/**"],
+                    "message": "testing/ holds test helpers: only tests import it (docs/decisions/0023)."
+                  }
+                ]
+              }
+            }
+          }
+        }
+      }
     }
   ]
 }

@@ -62,6 +62,17 @@ structure below on 2026-11-17.
   `paths.py` imports only core and other `paths.py`, as a cycle through
   one fails at import anyway (inventory-tng-atmx.16).
 
+- **The frontend**, `frontend/src/`, is grouped by page (Ali, 2026-11-17,
+  inventory-tng-x5jz): `scan/`, `register/` and `admin/` hold what one
+  page uses, `shared/` what more than one does, and `testing/` the
+  helpers only tests import. The entries, `styles.css`, `api/`,
+  `locales/` and the unit tables stay at the top. No barrel files. Tests
+  sit beside their modules. Imports go one way, held by Biome's
+  `noRestrictedImports` in `frontend/biome.json`: `shared/` imports no
+  page's folder, a page's folder imports no other page's, and only tests
+  import `testing/`. Tests may import any folder, as some check every
+  page's words together (inventory-tng-atmx.14).
+
 We rejected a central routes file wired with `add_api_route`, which is not
 how FastAPI apps are usually read, and import-linter, as the rules fit a
 short test. `core/` is the name FastAPI's full-stack template uses;

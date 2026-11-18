@@ -955,6 +955,13 @@ npm run lint                     # Biome: lint and formatting
 npm run coverage                 # Vitest, with coverage (npm test: without)
 ```
 
+The frontend's code is in `frontend/src/`, grouped by page: `scan/`,
+`register/` and `admin/` hold what one page uses, `shared/` what more than
+one does, and `testing/` the helpers only tests import. Each test sits
+beside its module. Biome refuses an import the other way, such as
+`shared/` importing a page's folder (`frontend/biome.json`,
+docs/decisions/0023).
+
 Those are unit tests: Vitest runs the frontend's in a page it simulates
 (happy-dom), with no layout. The browser tests, in
 `frontend/browser-tests/`, are another kind: Playwright drives a real
