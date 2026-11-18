@@ -46,6 +46,8 @@ RULES = {
 # neither FastAPI nor the rest of web/.
 RULES_MAY_IMPORT = {"web/formatting.py", "web/forms.py"}
 FASTAPI = {"fastapi", "starlette"}
+# Decorators that add a route to a router: @router.get(...) and the like.
+ROUTE_DECORATORS = {"get", "post", "put", "patch", "delete", "api_route", "websocket"}
 # Calls that make or run a query: select(...), or session.execute and the
 # like. A session.get may stay.
 QUERY_CALLS = {"select", "execute", "scalar", "scalars"}
@@ -95,8 +97,16 @@ def imports(path: str, app: App) -> set[str]:
 
 
 def is_routes(path: str, app: App) -> bool:
-    """A module of routes: one that makes an APIRouter."""
-    return any(_called(node) == "APIRouter" for node in ast.walk(app[path]))
+    """A module of routes: one that makes an APIRouter or adds a route to
+    one, wherever it was made (@router.get(...), router.add_api_route(...))."""
+    for node in ast.walk(app[path]):
+        if _called(node) in {"APIRouter", "add_api_route"}:
+            return True
+        if isinstance(node, ast.FunctionDef | ast.AsyncFunctionDef) and any(
+            _called(decorator) in ROUTE_DECORATORS for decorator in node.decorator_list
+        ):
+            return True
+    return False
 
 
 def _called(node: ast.AST) -> str | None:
@@ -111,7 +121,7 @@ def rules_import_fastapi_or_web(path: str, app: App) -> set[str]:
     if not (
         path in RULES
         or path in RULES_MAY_IMPORT
-        or path.endswith(("/queries.py", "/forms.py"))
+        or path.split("/")[-1] in {"queries.py", "forms.py"}
     ):
         return set()
     return {
@@ -222,6 +232,12 @@ APP = {
             "catalogue/routes.py",
             f"{ROUTER}def page(s):\n    s.scalars(select(Item))\n    s.get(Item, 1)",
             {"page: scalars", "page: select"},
+        ),
+        (
+            "routes_run_queries",
+            "catalogue/listing.py",
+            "from .routes import router\n@router.get('/')\ndef page(s):\n    s.execute(x)",
+            {"page: execute"},
         ),
         (
             "core_imports_a_feature",

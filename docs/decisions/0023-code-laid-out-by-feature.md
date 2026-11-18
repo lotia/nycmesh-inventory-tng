@@ -54,11 +54,12 @@ structure below on 2026-11-17.
   imports no feature, nor `dev/` or `web/`; and no feature's routes import
   another feature's routes, linking through its `paths.py` instead. The
   breaks found when the test was written are listed in it and may only
-  shrink. Ali kept only these rules on 2026-11-17 (inventory-tng-atmx.16),
-  dropping two that caught no real harm: package `__init__.py` files stay
-  empty, and only the entry point imports a feature's `command.py`. A third,
-  that a `paths.py` imports only core and other `paths.py`, went with them:
-  a cycle through `paths.py` fails loudly at import anyway.
+  shrink. On 2026-11-17 Ali kept these four and dropped two that caught no
+  real harm: package `__init__.py` files stay empty, and only the entry point
+  imports a feature's `command.py` (inventory-tng-atmx.16). The same change
+  dropped a third, which his list did not name: that a `paths.py` imports
+  only core and other `paths.py`, as a cycle through `paths.py` fails
+  loudly at import anyway.
 
 We rejected a central routes file wired with `add_api_route`, which is not
 how FastAPI apps are usually read, and import-linter, as the rules fit a
