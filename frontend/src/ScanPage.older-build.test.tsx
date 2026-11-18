@@ -14,6 +14,7 @@ import {
   storeCart,
 } from "./cart";
 import { say } from "./i18n";
+import { CONFIRM_DISCARD, DISCARD, KEEP_IT } from "./Notes";
 import { ITEM_RETIRED, RESCAN as RESCAN_PHRASE } from "./older";
 import {
   type Body,
@@ -33,14 +34,11 @@ import {
   CHANGED_ELSEWHERE,
   CHANGED_NOT_DISCARDED,
   CHECKED_OUT,
-  CONFIRM_DISCARD,
-  DISCARD,
   DISCARD_CART,
   DISMISS,
   FIX_THEN_RECORD,
   FROM,
   INSTALL_NUMBER,
-  KEEP_IT,
   NOT_DISCARDED as NOT_DISCARDED_PHRASE,
   NOT_KEPT as NOT_KEPT_PHRASE,
   NOT_REMOVED as NOT_REMOVED_PHRASE,

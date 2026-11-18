@@ -18,6 +18,7 @@ import {
 } from "./cart";
 import { say, speak } from "./i18n";
 import { messages as pseudo } from "./locales/pseudo.po";
+import { CONFIRM_DISCARD, DISCARD, KEEP_IT } from "./Notes";
 import {
   ALL_OF_IT,
   NOTHING_USABLE,
@@ -35,13 +36,10 @@ import {
 } from "./outbox";
 import {
   CHANGED_BEFORE_DISCARD,
-  CONFIRM_DISCARD,
-  DISCARD,
   DISCARD_CART,
   DISMISS,
   FIND,
   FROM,
-  KEEP_IT,
   KIND_WORDS,
   NOT_KEEPING as NOT_KEEPING_PHRASE,
   NOT_SENT,

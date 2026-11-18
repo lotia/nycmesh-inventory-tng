@@ -41,6 +41,16 @@ import { type Loaded, loadCatalogue } from "./catalogue";
 import { Field } from "./Field";
 import { say, sayParts } from "./i18n";
 import { placeSides, readLabel, type Scanned } from "./labels";
+import {
+  AlertWords,
+  CAUTION_BOX,
+  ConfirmDiscard,
+  Counted,
+  DISCARD,
+  keyedByWords,
+  NoteSaid,
+  RULED_LIST,
+} from "./Notes";
 import { NOTHING_TAKEN, OpenPackageCard } from "./OpenPackageCard";
 import {
   asSave,
@@ -59,7 +69,6 @@ import {
   batchId,
   type Entry,
   MAKE_CHANGES,
-  type Note,
   noteOf,
   STORAGE_KEY as OUTBOX_KEY,
   type Outbox,
@@ -151,11 +160,8 @@ export const RECORD = msg`Record`;
 export const DISCARD_CART = msg`Discard cart`;
 export const CHECKED_OUT = msg`Checked out items. Add to cart or discard before sending`;
 export const RETIRED_ITEM = msg`Item retired`;
-export const DISCARD = msg`Discard`;
 export const CANNOT_ADD = msg`Cannot Add to Cart`;
 export const ADD_TO_CART = msg`Add to cart`;
-export const CONFIRM_DISCARD = msg`Confirm discard`;
-export const KEEP_IT = msg`Keep it`;
 export const SAYING_WHAT_IS_ON = msg`Saying what is on open packages`;
 export const SOMETHING = msg`Something`;
 export const A_CART_SOMETHING = msg`A cart: something`;
@@ -214,14 +220,6 @@ export const SENDING = msg`Sending…`;
  * inventory-tng-n7yv): the banner says what to do. */
 export const HELD = msg`Held until you upgrade.`;
 export const DISMISS = msg`Dismiss`;
-
-/** A list whose entries are ruled apart: the cart's lines, the outbox. */
-const RULED_LIST = "list-none p-0 *:border-t *:border-line *:py-3";
-
-/** A box that asks the volunteer to act, as the upgrade and the name check
- * do, or says a save is held for the upgrade. */
-const CAUTION_BOX =
-  "flex flex-col items-start gap-3 border-2 border-caution p-3";
 
 /** The volunteer's page: fill a cart, then Record it, through the outbox. */
 export function ScanPage({
@@ -1349,113 +1347,6 @@ function OlderList({
       </ul>
     </section>
   );
-}
-
-/**
- * Why something cannot go back, in the alert's style. Not role="alert": it
- * is there as the list is shown, and several at once, read out together,
- * would drown each other and the page.
- */
-function NoteSaid({
-  note,
-  then,
-}: {
-  /** Null for none: `then` alone. */
-  note: string | Note | null;
-  then?: string | undefined;
-}) {
-  return (
-    <p class="alert">
-      {note !== null && (
-        <AlertWords note={typeof note === "string" ? { bold: [note] } : note} />
-      )}
-      {then !== undefined && (
-        <>
-          {note !== null && " "}
-          <strong>{then}</strong>
-        </>
-      )}
-    </p>
-  );
-}
-
-/** Row 15's confirmation, asked before a discard. */
-function ConfirmDiscard({
-  onDiscard,
-  onKeep,
-  describedBy,
-}: {
-  onDiscard: () => void;
-  onKeep: () => void;
-  describedBy?: string;
-}) {
-  return (
-    <div class="flex flex-col items-start gap-3">
-      <div role="alert">{say(CONFIRM_DISCARD)}</div>
-      <div class="actions">
-        <button
-          type="button"
-          class="danger"
-          aria-describedby={describedBy}
-          onClick={onDiscard}
-        >
-          {say(DISCARD)}
-        </button>
-        <button type="button" onClick={onKeep}>
-          {say(KEEP_IT)}
-        </button>
-      </div>
-    </div>
-  );
-}
-
-/**
- * A failure or refusal note's words, in bold, the counts the page wrote
- * in it in bold italic, never a number of a name it quotes (Ali,
- * inventory-tng-93z); of a refusal, the problems after "Not recorded."
- * (Note.plain) not in bold, words an older build kept in them as they
- * are.
- */
-function AlertWords({ note: { bold, plain = [] } }: { note: Note }) {
-  return (
-    <>
-      <strong>
-        <Counted said={bold} />
-      </strong>
-      {plain.length > 0 && <Counted said={plain} />}
-    </>
-  );
-}
-
-/** `said`, each number standing alone in the page's own words in italic;
- * not digits joined to letters, such as LiteBeam 5AC's. */
-function Counted({ said }: { said: Said }) {
-  return (
-    <>
-      {said.map((part, at) => (
-        <Fragment key={at}>
-          {typeof part === "string"
-            ? part
-                .split(/\b(\d+(?:\.\d+)?)\b/)
-                .map((bit, nth) =>
-                  nth % 2 === 1 ? <em key={nth}>{bit}</em> : bit,
-                )
-            : part.quoted}
-        </Fragment>
-      ))}
-    </>
-  );
-}
-
-/** A key for each of `says` by what it says, numbered among those saying
- * the same, so that it stays with its words, not its place. */
-function keyedByWords(says: readonly string[]): string[] {
-  const seen = new Map<string, number>();
-  return says.map((words) => {
-    const nth = (seen.get(words) ?? 0) + 1;
-    seen.set(words, nth);
-    return `${words} ${nth}`;
-  });
 }
 
 /** Why one cannot go in the cart: it is not empty (row 17). */

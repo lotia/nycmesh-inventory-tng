@@ -222,7 +222,7 @@ msgctxt "place"
 msgid "To"
 msgstr ""
 
-#: src/ScanPage.tsx
+#: src/Notes.tsx
 msgid "Discard"
 msgstr ""
 
@@ -379,7 +379,7 @@ msgstr ""
 msgid "{count} × {package}"
 msgstr ""
 
-#: src/ScanPage.tsx
+#: src/Notes.tsx
 msgid "Confirm discard"
 msgstr ""
 
@@ -714,7 +714,7 @@ msgstr ""
 msgid "Find an item, or type or scan its code"
 msgstr ""
 
-#: src/ScanPage.tsx
+#: src/Notes.tsx
 msgid "Keep it"
 msgstr ""
 

@@ -222,7 +222,7 @@ msgctxt "place"
 msgid "To"
 msgstr "To"
 
-#: src/ScanPage.tsx
+#: src/Notes.tsx
 msgid "Discard"
 msgstr "Discard"
 
@@ -379,7 +379,7 @@ msgstr "That label isn't in the inventory ({code})."
 msgid "{count} × {package}"
 msgstr "{count} × {package}"
 
-#: src/ScanPage.tsx
+#: src/Notes.tsx
 msgid "Confirm discard"
 msgstr "Confirm discard"
 
@@ -714,7 +714,7 @@ msgstr "This item has been retired."
 msgid "Find an item, or type or scan its code"
 msgstr "Find an item, or type or scan its code"
 
-#: src/ScanPage.tsx
+#: src/Notes.tsx
 msgid "Keep it"
 msgstr "Keep it"
 

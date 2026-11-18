@@ -662,7 +662,7 @@ utilities. When you style a page:
   (`role="alert"`, or `class="alert"` for notes shown with a list), in
   bold as a whole, with no "Sorry.", and the counts the page wrote in it
   in bold italic, never the numbers of a name or of words an older build
-  kept (`AlertWords` in `ScanPage.tsx`). A refusal's problems, after "Not
+  kept (`AlertWords` in `Notes.tsx`). A refusal's problems, after "Not
   recorded.", are not bold. A status that reports no problem is plain,
   but a save held for an upgrade is in a caution box like the upgrade
   banner's (`CAUTION_BOX`), with no `role="alert"`.
