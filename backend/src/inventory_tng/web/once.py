@@ -6,8 +6,8 @@ Forward offers to send the form again. Each form carries a key made when it
 was shown ({{ once_field() }}), and its route asks sent_before() first: sent
 again, the key is found spent and nothing is made, rather than a second
 secret that voids the first. A double-click is stopped before that, in the
-browser (frontend/src/once.ts): it would show only the second answer, and the
-first's secret never.
+browser (frontend/src/admin/once.ts): it would show only the second answer,
+and the first's secret never.
 """
 
 import uuid

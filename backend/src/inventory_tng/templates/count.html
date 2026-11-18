@@ -106,7 +106,7 @@ if you didn't count it. Anything else here, add below.{% endtrans %}</p>
       <input name="found_left" inputmode="decimal" value="{{ values.get('found_left', '') }}"{% if found_hint %} aria-describedby="hint-found_left"{% endif %}>
       {% with name = "found_left" %}{% include "_field_problem.html" %}{% endwith %}
       {#- Any offered of an item in a length: shown, and, in the browser,
-      only while one is picked (frontend/src/hints.ts). #}
+      only while one is picked (frontend/src/admin/hints.ts). #}
       {% if found_hint %}<span class="hint block" id="hint-found_left" data-hint-for="found_package_id">{{ found_hint }}</span>{% endif %}
     </label>
   </fieldset>

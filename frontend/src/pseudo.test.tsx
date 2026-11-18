@@ -9,16 +9,16 @@
 import { signal } from "@preact/signals";
 import { fireEvent, render, screen } from "@testing-library/preact";
 import { afterEach, expect, test, vi } from "vitest";
+import { suggest } from "./admin/combobox";
+import { guardRetire } from "./admin/retire";
 import { DecoderUnavailable } from "./camera";
 import { type Catalogue, freshCart, type Item, storeCart } from "./cart";
-import { suggest } from "./combobox";
 import { say, speak } from "./i18n";
 import { messages as pseudo } from "./locales/pseudo.po";
 import { OpenPackageCard } from "./OpenPackageCard";
 import { HELD } from "./OutboxList";
 import { type Entry, Outbox, type Reason, type Recorded } from "./outbox";
 import { RegisterPage } from "./RegisterPage";
-import { guardRetire } from "./retire";
 import { Scanner } from "./Scanner";
 import { ScanPage } from "./ScanPage";
 import { answering, deferred, json } from "./testing/fetch";

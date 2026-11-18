@@ -7,7 +7,7 @@
  * does without this script.
  */
 import { msg } from "@lingui/core/macro";
-import { say } from "./i18n";
+import { say } from "../i18n";
 
 /** The list's name, for a screen reader. */
 export const SUGGESTIONS = msg`Suggestions`;

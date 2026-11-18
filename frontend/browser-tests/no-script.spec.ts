@@ -1,6 +1,6 @@
 /**
  * Without scripts, the buttons that need them stay hidden, as the page's
- * script shows them (frontend/src/buttons.ts), and what they act on is
+ * script shows them (frontend/src/admin/buttons.ts), and what they act on is
  * still shown: a code or labels to print by hand, a link to copy by hand
  * (inventory-tng-vxxc, inventory-tng-f8kw). Hidden by the `hidden`
  * attribute the script would remove, not by a style. No script runs, so

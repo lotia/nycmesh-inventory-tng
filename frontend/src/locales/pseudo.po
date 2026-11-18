@@ -27,7 +27,7 @@ msgstr ""
 msgid "Item retired"
 msgstr ""
 
-#: src/retire.ts
+#: src/admin/retire.ts
 msgid "This page has changes you haven't saved. Retiring now loses them."
 msgstr ""
 
@@ -44,7 +44,7 @@ msgstr ""
 msgid "This browser isn't registered yet."
 msgstr ""
 
-#: src/retire.ts
+#: src/admin/retire.ts
 msgid "Retire anyway"
 msgstr ""
 
@@ -153,7 +153,7 @@ msgstr ""
 msgid "Not accepted"
 msgstr ""
 
-#: src/combobox.ts
+#: src/admin/combobox.ts
 msgid "Suggestions"
 msgstr ""
 
@@ -250,7 +250,7 @@ msgstr ""
 msgid "Registering…"
 msgstr ""
 
-#: src/retire.ts
+#: src/admin/retire.ts
 msgid "Go back"
 msgstr ""
 

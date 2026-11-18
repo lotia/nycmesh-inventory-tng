@@ -216,10 +216,15 @@ The frontend's moves, both under `frontend/src/`, sorted the same way:
 
 | Old path | New path |
 | --- | --- |
+| `buttons.ts`, with its tests | `admin/buttons.ts` |
 | `cart.test.ts`: its tests of search (`finding`) | `search.test.ts` |
 | `cart.ts`: `toBatch`, with `Batch`, the server's limits (`MAX_ID`, `MAX_AMOUNT`, `MAX_LINES`), `openings`, `packageLine`, `withOffered` and the problems it says (`AN_ITEM` to `TOO_MUCH_FOR_ONE`); `batchWords`, with its words (`ITEMS` to `SAID_LENGTHS`) | `batch.ts` |
 | `cart.ts`: `offered` and `offeredAt`, the cuts of open packages (`afterCut`, `cutOf`, `usedUpOf`), the batches not yet seen (`unseen`, `keysToAsk`, `MAX_KEYS_ASKED`) and the packages sealed (`sealedCounts`, `sealedKey`) | `offered.ts` |
 | `cart.ts`: `search` and `bares`, with the lookups worked out once per catalogue that search reads (`indexOf`, `Named`) | `search.ts` |
+| `combobox.ts`, with its tests | `admin/combobox.ts` |
+| `hints.ts`, with its tests | `admin/hints.ts` |
+| `once.ts`, with its tests | `admin/once.ts` |
+| `retire.ts`, with its tests | `admin/retire.ts` |
 | `ScanPage.tsx`: `CartForm`, with `Place`, `PlaceSides` and `CHECK_EVERY_MS` | `CartForm.tsx` |
 | `ScanPage.tsx`: `CartLine` | `CartLine.tsx` |
 | `ScanPage.tsx`: `Finder` | `Finder.tsx` |

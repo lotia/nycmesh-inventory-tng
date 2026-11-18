@@ -14,7 +14,8 @@ yourself, in person or in a message only they read. It works once,
 within a day, and with it they choose a new password.{% endtrans %}{% endif %}</p>
 <p id="link" class="key">{{ link }}</p>
 {#- Copying needs the clipboard, so the button shows only where it can be
-used (frontend/src/buttons.ts); the link above can always be copied by hand. #}
+used (frontend/src/admin/buttons.ts); the link above can always be copied
+by hand. #}
 <p class="actions">
   <button type="button" data-copy="link" data-status="copied"
     data-copied="{{ _("Copied.") }}"

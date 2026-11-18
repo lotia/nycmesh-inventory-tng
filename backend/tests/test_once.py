@@ -176,7 +176,7 @@ def test_a_form_sent_once_carries_its_page(admin_client: TestClient) -> None:
 
 @pytest.mark.clone
 def test_the_page_script_names_the_field_a_form_sent_once_carries() -> None:
-    """frontend/src/once.ts, which stops a second sending of such a form,
+    """frontend/src/admin/once.ts, which stops a second sending of such a form,
     finds it by this field."""
-    source = (CLONE / "frontend" / "src" / "once.ts").read_text()
+    source = (CLONE / "frontend" / "src" / "admin" / "once.ts").read_text()
     assert f'export const ONCE_FIELD = "{once.FIELD}";' in source

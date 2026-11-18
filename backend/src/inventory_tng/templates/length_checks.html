@@ -41,8 +41,9 @@ stays.{% endtrans %}</p>
         <label>{% trans unit=shown.unit %}Really on it ({{ unit }}){% endtrans %}
           <input name="left" id="left-{{ row.id }}" inputmode="decimal" value="{{ row.length_reported | amount if row.length_reported is not none else '' }}"{% if hint %} aria-describedby="hint-{{ row.id }}"{% endif %}></label>
         {% if hint %}<p class="hint" id="hint-{{ row.id }}">{{ hint }}</p>{% endif %}
-        {#- "Set to 40 m", following the box in the browser (frontend/src/hints.ts);
-        "Set to it" without, as the box may be changed. #}
+        {#- "Set to 40 m", following the box in the browser
+        (frontend/src/admin/hints.ts); "Set to it" without, as the box may
+        be changed. #}
         <button>{% trans field="left-" ~ row.id, unit=shown.unit %}Set to <span data-follows="{{ field }}" data-unit="{{ unit }}">it</span>{% endtrans %}<span class="sr-only"> {{ which }}</span></button>
         <button formaction="{{ here }}/{{ row.id }}/leave{{ view.query_string }}">{% trans %}Leave it{% endtrans %}<span class="sr-only"> {{ which }}</span></button>
       </form>
