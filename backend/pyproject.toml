@@ -108,7 +108,7 @@ known-local-folder = ["databases", "helpers"]
 # The floors and how they are measured: CONTRIBUTING.md, Coverage.
 [tool.coverage.run]
 branch = true
-source = ["inventory_tng", "devtools"]
+source_pkgs = ["inventory_tng", "devtools"]
 
 [tool.coverage.report]
 fail_under = 94

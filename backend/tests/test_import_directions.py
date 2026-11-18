@@ -8,6 +8,7 @@ inside functions count, as do relative ones.
 | routes_run_queries | a module of routes making or running a query |
 | core_imports_a_feature | core importing any of the app but core and models |
 | routes_import_another_features_routes | links between features not through paths.py |
+| app_imports_devtools | any of the app importing backend/devtools/, which no image ships |
 
 Today's breaks are listed in BREAKS, which may only shrink: a new break
 fails, and so does one fixed but still listed. The last test holds where
@@ -153,8 +154,8 @@ def routes_run_queries(path: str, app: App) -> set[str]:
 
 
 def core_imports_a_feature(path: str, app: App) -> set[str]:
-    """What core imports of the app besides core and the models: features,
-    web/ and dev/ alike."""
+    """What core imports of the app besides core and the models: features
+    and web/ alike."""
     if not path.startswith("core/"):
         return set()
     return {
@@ -176,6 +177,11 @@ def routes_import_another_features_routes(path: str, app: App) -> set[str]:
     }
 
 
+def app_imports_devtools(path: str, app: App) -> set[str]:
+    """The developer's tools sit outside src/, so the app cannot need them."""
+    return {"devtools"} & imports(path, app)
+
+
 CHECKS: dict[str, Check] = {
     check.__name__: check
     for check in (
@@ -183,6 +189,7 @@ CHECKS: dict[str, Check] = {
         routes_run_queries,
         core_imports_a_feature,
         routes_import_another_features_routes,
+        app_imports_devtools,
     )
 }
 
@@ -266,6 +273,12 @@ APP = {
             ),
             {"catalogue/routes.py"},
         ),
+        (
+            "app_imports_devtools",
+            "web/pages.py",
+            "from devtools import seed\nimport devtools.stack\nimport json",
+            {"devtools"},
+        ),
     ],
 )
 def test_each_rule_finds_a_break(
@@ -281,7 +294,7 @@ def test_each_rule_finds_a_break(
 TEMPLATE_NAME = re.compile(r"""["']((?:[a-z0-9_]+/)*[a-z0-9_]+\.(?:html|svg))["']""")
 # Packages that are not features, so have no folder under templates/: the
 # pages web/ renders sit at the top.
-NOT_FEATURES = {"core", "dev", "models", "web"}
+NOT_FEATURES = {"core", "models", "web"}
 
 
 def feature_of(path: Path) -> str:

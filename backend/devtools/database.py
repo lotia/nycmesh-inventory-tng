@@ -18,7 +18,6 @@ import structlog
 from sqlalchemy import URL, Connection, make_url, text
 from sqlalchemy.exc import ProgrammingError
 
-from devtools import seed
 from inventory_tng.core.command import run_command, set_up
 from inventory_tng.core.db import make_engine
 from inventory_tng.core.local_env import CLONE
@@ -142,6 +141,10 @@ def main(argv: Sequence[str], prog: str) -> int:
     dropping.add_argument("name", help="this checkout's database's name, to confirm")
     args = parser.parse_args(argv)
     if args.command == "seed":
+        # Only here: the seed imports most of the app, which make and drop
+        # do not need.
+        from devtools import seed
+
         return run_command(seed.run, args, development_only=True)
     settings = set_up(development_only=True)
     if settings is None:

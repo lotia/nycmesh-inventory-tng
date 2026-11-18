@@ -48,16 +48,17 @@ def test_an_unknown_command_is_refused(capsys: pytest.CaptureFixture[str]) -> No
 
 
 # What a fresh interpreter has imported of the tools once the entry point
-# is, and again after one command's help.
+# is, and again after one command's help: not the seed, which database
+# imports only to seed.
 IMPORTED = """
 import contextlib, io, sys
-from devtools.__main__ import COMMANDS, main
+from devtools.__main__ import main
 def ours():
     return sorted(m for m in sys.modules if m.startswith("devtools."))
 print(*ours())
 with contextlib.redirect_stdout(io.StringIO()), contextlib.suppress(SystemExit):
-    main(["setting", "--help"])
-print(*(m for m, _ in COMMANDS.values() if m in sys.modules))
+    main(["database", "--help"])
+print(*ours())
 """
 
 
@@ -70,4 +71,7 @@ def test_it_imports_only_the_command_chosen() -> None:
         check=True,
         cwd=BACKEND,
     )
-    assert shown.stdout.splitlines() == ["devtools.__main__", "devtools.setting"]
+    assert shown.stdout.splitlines() == [
+        "devtools.__main__",
+        "devtools.__main__ devtools.database",
+    ]

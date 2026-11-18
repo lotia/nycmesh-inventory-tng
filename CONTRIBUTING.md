@@ -763,9 +763,9 @@ migrations and your editor still use it. The container migrates this
 checkout's database (`INVENTORY_DB_NAME`, which `mise run dev-database`
 makes) when it starts, then serves with `--reload`. Each checkout's stack
 has its own.
-Your `backend/src` and `backend/migrations` are mounted into it, so it picks
-up your edits. Pass `--build` again after changing dependencies or
-`frontend/`.
+Your `backend/src`, `backend/devtools` and `backend/migrations` are mounted
+into it, so it picks up your edits. Pass `--build` again after changing
+dependencies or `frontend/`.
 
 It takes only the settings `compose.yaml` lists under the app's
 `environment:`, each from your shell or `.env`. A setting the app gains goes

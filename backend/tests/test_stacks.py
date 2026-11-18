@@ -121,7 +121,7 @@ def test_a_new_env_has_a_stack_database_and_ports_of_its_own(tmp_path: Path) -> 
 @pytest.mark.usefixtures("nothing_listens")
 def test_ports_another_stack_claims_are_skipped(tmp_path: Path) -> None:
     """From its checkout's .env, else compose.yaml's defaults; only this
-    repository's stack."""
+    repository's stacks."""
     named = tmp_path / "named"
     named.mkdir()
     (named / ".env").write_text(

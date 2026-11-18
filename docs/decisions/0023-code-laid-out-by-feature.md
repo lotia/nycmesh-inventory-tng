@@ -77,7 +77,9 @@ decided the structure below on 2026-11-17.
   - route files run no queries (`select`, `execute`, `scalar`, `scalars`);
   - core imports nothing of the app but core and `models/`;
   - no feature's routes import another feature's routes; they link
-    through its `paths.py`.
+    through its `paths.py`;
+  - nothing of the app imports `backend/devtools/`, which no image ships
+    (inventory-tng-wzlr).
 
   The breaks found when the test was written are listed in it and may
   only shrink. On 2026-11-17 Ali dropped two rules that caught no real
@@ -110,12 +112,10 @@ short test. `core/` is the name FastAPI's full-stack template uses;
   split into `models/` (inventory-tng-h657.1) and the templates into a
   folder per feature (inventory-tng-h657.2).
 - On 2026-11-18 the developer tools left `src/` for `backend/devtools/`
-  (inventory-tng-wzlr): `dev/dev_database.py` became `database.py`, with
-  `seed` a subcommand of it; `dev/seed.py` and `dev/suite_report.py`
-  kept their names; `dev/stacks.py` became `stack.py`, its `stale` now
-  `list-stale`; `openapi.py` became `write_api_schema.py`; the commands
-  of `core/local_env.py` and `catalogue/units.py` became `setting.py` and
-  `write_unit_table.py`, with `units.TABLE` as `write_unit_table.TABLE`.
+  (inventory-tng-wzlr), each in the tables below. `dev/suite_report.py`
+  kept its name; the commands of `core/local_env.py` and
+  `catalogue/units.py` became `setting.py` and `write_unit_table.py`,
+  with `units.TABLE` as `write_unit_table.TABLE`.
 - Older decision records keep the paths of their time. The tables below
   give each old path's new home; a later move adds its rows.
 
@@ -127,7 +127,6 @@ and kept their names:
 | `admins/` | `accounts.py`, `activity.py` |
 | `catalogue/` | `categories.py`, `items.py`, `names.py`, `reading_rules.py`, `units.py` |
 | `core/` | `command.py`, `cross_site.py`, `database_role.py`, `db.py`, `history.py`, `local_env.py`, `local_time.py`, `logs.py`, `mail.py`, `masking.py`, `phrases.py`, `rate_limits.py`, `request_logging.py`, `settings.py`, `telemetry.py`, `time_zones.py` |
-| `dev/` | `dev_database.py`, `seed.py`, `stacks.py` |
 | `labels/` | `labels.py` |
 | `places/` | `locations.py` |
 | `scan/` | `bundle.py`, `page_builds.py` |
@@ -162,16 +161,20 @@ queries to its `queries.py`.
 | `admin/volunteers.py` | `volunteers/routes.py` |
 | `admins.py` | `admins/admins_command.py` |
 | `catalogue.py` | `scan/catalogue_api.py`; the reply schemas: `scan/catalogue_schemas.py`; its queries: `scan/queries.py` |
+| `dev_database.py` | `backend/devtools/database.py`, outside `src/`; `seed` is one of its subcommands |
 | `devices.py` | `devices/devices.py`; `register_device`: `devices/api.py`; the request and reply schemas: `devices/schemas.py`; what every route needing a device depends on: `devices/guards.py`; `REGISTER_PATH`: `devices/paths.py` |
 | `health.py` | `core/health.py`; its query: `core/db.py`, as `ping` |
 | `ledger.py` | `stock/ledger.py`; the balance queries: `stock/balance.py`; `save_batch`: `scan/batch_api.py`; the batch request and reply schemas: `scan/batch_schemas.py` |
 | `models.py` | `models/`: each table in its feature's module; the column types, `whole`, the columns and constraints most tables have, and `Versioned`: `models/base.py`; canonical names, name keys and search folding (`CanonicalName`, `KeyedName`, `Searchable`, `fold` and the rest): `models/names.py`; `_refold`: `models/catalogue.py`; `_reference`, `_one_of`, `_between`, `_unique_name`, `_unique_current_name`, `_name_key_check`: each without its `_` |
+| `openapi.py` | `backend/devtools/write_api_schema.py`, outside `src/` |
 | `page_telemetry.py` | `scan/page_telemetry.py`; `over_limit`: `web/browser.py` |
 | `pages.py` | `web/pages.py`; `amount`, `printed_length`: `web/formatting.py`; `Badge`, `retired_holding`, `sections`: `web/navigation.py` |
 | `registration_codes.py` | `devices/command.py` |
 | `resets.py` | `admins/reset_routes.py` |
 | `scan_settings.py` | `site_settings/scan_settings.py`; its command: `site_settings/command.py` |
+| `seed.py` | `backend/devtools/seed.py`, outside `src/` |
 | `sign_in.py` | the sign-in pages: `admins/sign_in_routes.py`; what every administrator page depends on: `admins/guards.py`; `reset_url`: `admins/paths.py` |
+| `stacks.py` | `backend/devtools/stack.py`, outside `src/`; its `stale` is `list-stale` |
 | `totp_keys.py` | `admins/totp_keys.py`; its command: `admins/totp_keys_command.py` |
 | `unit_readings.py` | `catalogue/unit_readings.py`; its command: `catalogue/command.py` |
 | `web.py` | `web/browser.py` |
