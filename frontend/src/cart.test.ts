@@ -13,12 +13,9 @@ import {
   ITEM_GONE,
   ITEMS,
   type Item,
-  keysToAsk,
   type Line,
   loadCart,
   MOVE,
-  offered,
-  offeredAt,
   openingPackage,
   PACKAGE_NO_LONGER_USED,
   PICK_FROM,
@@ -30,18 +27,17 @@ import {
   resized,
   SAME_PLACE,
   STORAGE_KEY,
-  sealedCounts,
   sealedHere,
   sized,
   storeCart,
   TOO_MUCH_FOR_ONE,
   toBatch,
-  unseen,
   WHOLE_UNITS,
   withLine,
 } from "./cart";
 import { say, speak } from "./i18n";
 import { messages as pseudo } from "./locales/pseudo.po";
+import { keysToAsk, offered, offeredAt, sealedCounts, unseen } from "./offered";
 import type { Body, Draft, Said } from "./outbox";
 
 /** A batch with a key, as the outbox keeps it. */

@@ -1,6 +1,5 @@
 import { fireEvent, render, screen } from "@testing-library/preact";
 import { describe, expect, test, vi } from "vitest";
-import { afterCut, cutOf, usedUpOf } from "./cart";
 import { say } from "./i18n";
 import {
   ALL_OF_IT,
@@ -8,6 +7,7 @@ import {
   OpenPackageCard,
   PRINTED_LENGTH,
 } from "./OpenPackageCard";
+import { afterCut, cutOf, usedUpOf } from "./offered";
 import { cable, radio } from "./test-catalogue";
 
 describe("an open package's card", () => {

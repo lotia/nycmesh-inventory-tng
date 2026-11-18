@@ -6,16 +6,16 @@
  */
 import { msg } from "@lingui/core/macro";
 import { useId } from "preact/hooks";
+import type { Item } from "./cart";
+import { Field } from "./Field";
+import { say } from "./i18n";
 import {
   cutOf,
   type Ending,
-  type Item,
   type Offered,
   type Taken,
   usedUpOf,
-} from "./cart";
-import { Field } from "./Field";
-import { say } from "./i18n";
+} from "./offered";
 import { decimal } from "./quantity";
 
 /** How to read the length printed along an open package of an item in a

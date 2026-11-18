@@ -1588,7 +1588,7 @@ describe("listening", () => {
     const stop = outbox.listen();
     store(refused);
     window.dispatchEvent(new StorageEvent("storage", { key: STORAGE_KEY }));
-    // Still counted (cart.ts, unseen), and its sibling still listed.
+    // Still counted (offered.ts, unseen), and its sibling still listed.
     expect(outbox.entries.value).toEqual([saved, refused]);
     expect(outbox.shown()).toEqual([refused]);
     outbox.forgetShown([saved.body.key]);

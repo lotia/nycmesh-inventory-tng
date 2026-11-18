@@ -4,12 +4,13 @@ import { useEffect, useMemo, useRef } from "preact/hooks";
 import { type Api, makeApi } from "./api/client";
 import { MUST_UPGRADE, UPDATED, UPGRADE } from "./build";
 import { CartForm, CHECK_EVERY_MS } from "./CartForm";
-import { STORAGE_KEY as CART_KEY, loadCart, unseen } from "./cart";
+import { STORAGE_KEY as CART_KEY, loadCart } from "./cart";
 import { type Loaded, loadCatalogue } from "./catalogue";
 import { say, sayParts } from "./i18n";
 import { CAUTION_BOX } from "./Notes";
 import { heldIn } from "./OlderList";
 import { type AddDifference, OutboxList } from "./OutboxList";
+import { unseen } from "./offered";
 import { OlderStore } from "./older";
 import { STORAGE_KEY as OUTBOX_KEY, type Outbox, sharedOutbox } from "./outbox";
 import { NOT_REGISTERED } from "./registration";
@@ -126,7 +127,7 @@ export function ScanPage({
     };
   }, [api]);
 
-  // The outbox's batches the catalogue does not show (cart.ts, unseen).
+  // The outbox's batches the catalogue does not show (offered.ts, unseen).
   const shown = loaded.value.state === "ready" ? loaded.value.catalogue : null;
   const entries = outbox.entries.value;
   const pending = useMemo(

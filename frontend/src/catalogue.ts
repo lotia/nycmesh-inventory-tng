@@ -1,7 +1,8 @@
 /** Loading the scan page's catalogue, and what came of it (Loaded). */
 import { type Api, check } from "./api/client";
 import { Catalogue as CatalogueReply, DeviceRefusedReply } from "./api/replies";
-import { type Catalogue, keysToAsk } from "./cart";
+import type { Catalogue } from "./cart";
+import { keysToAsk } from "./offered";
 import type { Outbox } from "./outbox";
 
 export type Loaded =
@@ -11,7 +12,7 @@ export type Loaded =
   | { state: "unavailable" };
 
 /** The catalogue, asked which of the outbox's batches it shows
- * (cart.ts, unseen). */
+ * (offered.ts, unseen). */
 export async function loadCatalogue(api: Api, outbox: Outbox): Promise<Loaded> {
   const key = keysToAsk(outbox.entries.value);
   const reply = await check(

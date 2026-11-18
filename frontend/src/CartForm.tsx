@@ -16,13 +16,10 @@ import {
   freshCart,
   KIND_WORDS,
   type Kind,
-  offered,
-  offeredAt,
   openingPackage,
   placed,
   SIDES,
   type Side,
-  sealedCounts,
   toBatch,
   withLine,
   withLineChanged,
@@ -40,6 +37,7 @@ import {
 } from "./Notes";
 import { type NotPut, OlderList, olderSaid, recordOlder } from "./OlderList";
 import type { AddDifference } from "./OutboxList";
+import { offered, offeredAt, sealedCounts } from "./offered";
 import {
   asSave,
   type Gaps,
@@ -111,7 +109,7 @@ export function CartForm({
   adder,
 }: {
   catalogue: Catalogue;
-  /** The outbox's batches it does not show (cart.ts, unseen). */
+  /** The outbox's batches it does not show (offered.ts, unseen). */
   pending: readonly Entry[];
   outbox: Outbox;
   /** Kept as the cart changes, here or in another tab (NewerBuild). */

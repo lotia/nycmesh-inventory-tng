@@ -58,12 +58,12 @@ export const RETRY_MS = 30_000;
 export const REPORT_AFTER = 5;
 /** Saved batches kept on show, newest first, so a volunteer can check.
  * An older one, or one dismissed, is forgotten only once a catalogue shows
- * it (forgetShown), as the scan page counts it until then (cart.ts,
+ * it (forgetShown), as the scan page counts it until then (offered.ts,
  * unseen). */
 const SAVED_KEPT = 10;
 /** Saved batches kept at most, shown by a catalogue or not, so storage
  * never fills when no catalogue is read: half the keys a catalogue is
- * asked about (cart.ts, MAX_KEYS_ASKED), leaving room for those waiting. */
+ * asked about (offered.ts, MAX_KEYS_ASKED), leaving room for those waiting. */
 export const SAVED_MOST = 50;
 
 /** On the list: all but the saved batches dismissed, and those too old,
@@ -602,7 +602,7 @@ export class Outbox {
   /**
    * Forget the saved batches a catalogue shows (`saved`, its keys) that are
    * dismissed or older than the newest SAVED_KEPT on show. Until then the
-   * scan page still counts them (cart.ts, unseen), so an opening or a cut
+   * scan page still counts them (offered.ts, unseen), so an opening or a cut
    * saved while the catalogue could not be read again is never lost.
    */
   forgetShown(saved: readonly string[]): void {
