@@ -6,9 +6,10 @@
  */
 import { msg } from "@lingui/core/macro";
 import { useId } from "preact/hooks";
+import { Field } from "../Field";
+import { say } from "../i18n";
+import { decimal } from "../quantity";
 import type { Item } from "./cart";
-import { Field } from "./Field";
-import { say } from "./i18n";
 import {
   cutOf,
   type Ending,
@@ -16,7 +17,6 @@ import {
   type Taken,
   usedUpOf,
 } from "./offered";
-import { decimal } from "./quantity";
 
 /** How to read the length printed along an open package of an item in a
  * length (any unit but each), in the words the count page uses

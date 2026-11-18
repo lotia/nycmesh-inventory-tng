@@ -1,21 +1,25 @@
 import { msg } from "@lingui/core/macro";
 import { signal, useSignal } from "@preact/signals";
 import { useEffect, useMemo, useRef } from "preact/hooks";
-import { type Api, makeApi } from "./api/client";
-import { MUST_UPGRADE, UPDATED, UPGRADE } from "./build";
+import { type Api, makeApi } from "../api/client";
+import { MUST_UPGRADE, UPDATED, UPGRADE } from "../build";
+import { say, sayParts } from "../i18n";
+import {
+  STORAGE_KEY as OUTBOX_KEY,
+  type Outbox,
+  sharedOutbox,
+} from "../outbox";
+import { NOT_REGISTERED } from "../registration";
+import { onStoredChange } from "../stored";
+import { telemetry } from "../telemetry";
 import { CartForm, CHECK_EVERY_MS } from "./CartForm";
 import { STORAGE_KEY as CART_KEY, loadCart } from "./cart";
 import { type Loaded, loadCatalogue } from "./catalogue";
-import { say, sayParts } from "./i18n";
 import { CAUTION_BOX } from "./Notes";
 import { heldIn } from "./OlderList";
 import { type AddDifference, OutboxList } from "./OutboxList";
 import { unseen } from "./offered";
 import { OlderStore } from "./older";
-import { STORAGE_KEY as OUTBOX_KEY, type Outbox, sharedOutbox } from "./outbox";
-import { NOT_REGISTERED } from "./registration";
-import { onStoredChange } from "./stored";
-import { telemetry } from "./telemetry";
 
 const API = makeApi();
 /** A page left open fetches the catalogue again once it is this old, so a

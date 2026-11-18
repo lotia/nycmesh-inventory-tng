@@ -1,4 +1,8 @@
 import { describe, expect, test } from "vitest";
+import { BUILD } from "../build";
+import { say, speak } from "../i18n";
+import { messages as pseudo } from "../locales/pseudo.po";
+import type { Body, Draft, Said } from "../outbox";
 import {
   ADD_SOMETHING,
   batchWords,
@@ -14,7 +18,6 @@ import {
   TOO_MUCH_FOR_ONE,
   toBatch,
 } from "./batch";
-import { BUILD } from "./build";
 import {
   addOne,
   askWho,
@@ -37,10 +40,7 @@ import {
   WHOLE_UNITS,
   withLine,
 } from "./cart";
-import { say, speak } from "./i18n";
-import { messages as pseudo } from "./locales/pseudo.po";
 import { keysToAsk, offered, offeredAt, sealedCounts, unseen } from "./offered";
-import type { Body, Draft, Said } from "./outbox";
 
 /** A batch with a key, as the outbox keeps it. */
 let keys = 0;
@@ -53,7 +53,7 @@ function keyed(draft: Draft): Body {
 }
 const SHOWN = "99999999-9999-4999-8999-999999999999";
 
-import { CATALOGUE, cable, radio } from "./testing/catalogue";
+import { CATALOGUE, cable, radio } from "../testing/catalogue";
 
 /** A batch's problems, or a quantity's, as text, each name the page quoted
  * in it (outbox.Said) in [brackets]. */

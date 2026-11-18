@@ -16,15 +16,15 @@ import { msg } from "@lingui/core/macro";
 import { type Signal, signal } from "@preact/signals";
 import { v4 as uuid } from "uuid";
 import * as v from "valibot";
-import type { Schemas } from "./api/client";
-import { id } from "./api/replies";
-import { BUILD } from "./build";
-import { say, sayParts } from "./i18n";
+import type { Schemas } from "../api/client";
+import { id } from "../api/replies";
+import { BUILD } from "../build";
+import { say, sayParts } from "../i18n";
+import { BatchKey, BatchLine, type Said } from "../outbox";
+import { count, decimal, thousandths } from "../quantity";
+import { onStoredChange, readStored, writeStored } from "../stored";
 import { sealedKey } from "./offered";
-import { BatchKey, BatchLine, type Said } from "./outbox";
-import { count, decimal, thousandths } from "./quantity";
 import { indexOf } from "./search";
-import { onStoredChange, readStored, writeStored } from "./stored";
 
 /** Versioned as the outbox's is (outbox.ts): each build reads its own.
  * v2's is stamped with the build that wrote it, may keep a batch key

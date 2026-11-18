@@ -1,6 +1,7 @@
 /** Searching the catalogue, units and all, and its lookups (indexOf). */
+
+import { groups, type Rules, respell } from "../units";
 import type { Catalogue, Item } from "./cart";
-import { groups, type Rules, respell } from "./units";
 
 /** Lookups worked out once per catalogue, not on every keystroke. */
 type Index = {

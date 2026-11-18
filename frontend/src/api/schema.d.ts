@@ -295,7 +295,7 @@ export interface components {
      * DifferenceAdded
      * @description What a save refused as another tab recorded its cart first holds
      *     more of, or new, put in the scan page's cart: by the page itself into
-     *     an empty cart, or by a volunteer's tap (frontend/src/recorded.ts).
+     *     an empty cart, or by a volunteer's tap (frontend/src/scan/recorded.ts).
      */
     DifferenceAdded: {
       /**
@@ -432,7 +432,7 @@ export interface components {
      * @description What an older build left under its own key, saves not sent or a cart
      *     with lines: a scan page found it as it loaded, a volunteer put one back
      *     in the cart, discarded it or discarded one line of it, or the page put
-     *     one back in an empty cart itself (frontend/src/older.ts).
+     *     one back in an empty cart itself (frontend/src/scan/older.ts).
      */
     OlderStorage: {
       /**

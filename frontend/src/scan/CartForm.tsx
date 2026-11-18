@@ -4,6 +4,17 @@ import { msg } from "@lingui/core/macro";
 import { type Signal, useSignal } from "@preact/signals";
 import type { TargetedSubmitEvent } from "preact";
 import { useEffect, useMemo, useRef } from "preact/hooks";
+import { Field } from "../Field";
+import { say, sayParts } from "../i18n";
+import {
+  type Body,
+  batchId,
+  type Entry,
+  type Outbox,
+  type Said,
+  wordsOf,
+} from "../outbox";
+import { MOST_SECONDS_TO_SAVE, telemetry } from "../telemetry";
 import { type Batch, batchWords, toBatch } from "./batch";
 import { CartLine } from "./CartLine";
 import {
@@ -22,9 +33,7 @@ import {
   withLine,
   withLineChanged,
 } from "./cart";
-import { Field } from "./Field";
 import { Finder } from "./Finder";
-import { say, sayParts } from "./i18n";
 import { placeSides, readLabel, type Scanned } from "./labels";
 import {
   AlertWords,
@@ -45,18 +54,9 @@ import {
   olderId,
   toCart,
 } from "./older";
-import {
-  type Body,
-  batchId,
-  type Entry,
-  type Outbox,
-  type Said,
-  wordsOf,
-} from "./outbox";
 import { differenceOf } from "./recorded";
 import { Scanner } from "./Scanner";
 import { indexOf } from "./search";
-import { MOST_SECONDS_TO_SAVE, telemetry } from "./telemetry";
 
 /** How often an open page checks whether to ask whose name it is, and
  * whether its catalogue is stale. */

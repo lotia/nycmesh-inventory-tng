@@ -446,7 +446,7 @@ A new build is picked up without restarting the backend when
 in its `frontend` log line at startup: `source=build` or `source=dev_server`.
 
 The scan page's outbox and cart are kept in `localStorage`, each under a
-key with a version (`frontend/src/outbox.ts`, `cart.ts`), stamped with the
+key with a version (`frontend/src/outbox.ts`, `scan/cart.ts`), stamped with the
 build that wrote them. A change to what is kept, or to a value a field may
 take, takes a new key, as a tab of the build before, open during a deploy,
 drops what it cannot read from what it writes back; `outbox.test.ts` lists
@@ -500,7 +500,7 @@ test cannot see them: tightening one takes the same care, by hand.
 
 A newer build reads the saves and the cart an older one left only in the
 parts every version kept, and removes an older key once nothing in it is
-left to list (`frontend/src/older.ts`). Into an empty cart, until it
+left to list (`frontend/src/scan/older.ts`). Into an empty cart, until it
 learns of a newer build, it puts, without a tap, the oldest save that goes
 back whole (nothing unread, nothing of an open package, no package
 resized, no item or package retired or gone, no refusal). It lists the
@@ -536,7 +536,7 @@ recorded. Details below.", then what was recorded, headed as recorded in
 another tab or, where this browser's outbox holds it recorded, already
 recorded from this tab (`outbox.recordedHeading`), and, under "Not
 recorded. Make any changes and record again.", what the volunteer changed
-since the cart went back, line by line (`frontend/src/recorded.ts`): a
+since the cart went back, line by line (`frontend/src/scan/recorded.ts`): a
 cart put back under its key keeps the
 lines it went back with (`changedFrom`), and Record sends them
 (`changed_from`), which the server compares with nothing else. Without
@@ -584,7 +584,7 @@ so the server refuses a count of a package resized since (`package_resized`)
 rather than counting it at the new size. Where the page's catalogue shows
 another size, the count is cleared and the line says so until a count of
 that package is typed or scanned again, even if its size changes back
-(`frontend/src/cart.ts`, `reconcile` and `sized`); a count of none of it
+(`frontend/src/scan/cart.ts`, `reconcile` and `sized`); a count of none of it
 is left as it is. Until then Record refuses the cart, as the rest without
 it would record less than was moved (`toBatch`). A count kept before the
 cart kept sizes is taken as counted at the size shown.

@@ -1,6 +1,9 @@
 /** The cart as a batch to record, or what is still to do, and a batch in words. */
 import { msg } from "@lingui/core/macro";
 import { v4 as uuid, v5 as uuidFrom } from "uuid";
+import { say, sayParts } from "../i18n";
+import type { Draft, Said, Summary } from "../outbox";
+import { count, decimal, thousandths } from "../quantity";
 import {
   type Cart,
   type Catalogue,
@@ -12,10 +15,7 @@ import {
   resized,
   SIDES,
 } from "./cart";
-import { say, sayParts } from "./i18n";
 import { type Offered, usedUpOf } from "./offered";
-import type { Draft, Said, Summary } from "./outbox";
-import { count, decimal, thousandths } from "./quantity";
 import { indexOf } from "./search";
 
 /** The server's limits (scan/batch_schemas.py), checked here too, so a

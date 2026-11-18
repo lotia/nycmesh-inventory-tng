@@ -27,7 +27,29 @@
 import { msg } from "@lingui/core/macro";
 import { type Signal, signal } from "@preact/signals";
 import * as v from "valibot";
-import { id } from "./api/replies";
+import { id } from "../api/replies";
+import { say } from "../i18n";
+import {
+  BatchKey,
+  fromOpen,
+  lineNumbers,
+  type Note,
+  noteOf,
+  STORAGE_KEY as OUTBOX_KEY,
+  REPORTS,
+  Reason,
+  type ReportKind,
+  type Said,
+} from "../outbox";
+import { count, decimal, thousandths } from "../quantity";
+import {
+  hasStored,
+  olderKeys,
+  onStoredChange,
+  readStored,
+  removeStored,
+  writeStored,
+} from "../stored";
 import { toBatch } from "./batch";
 import {
   STORAGE_KEY as CART_KEY,
@@ -41,29 +63,7 @@ import {
   type Line,
   reconcile,
 } from "./cart";
-import { say } from "./i18n";
-import {
-  BatchKey,
-  fromOpen,
-  lineNumbers,
-  type Note,
-  noteOf,
-  STORAGE_KEY as OUTBOX_KEY,
-  REPORTS,
-  Reason,
-  type ReportKind,
-  type Said,
-} from "./outbox";
-import { count, decimal, thousandths } from "./quantity";
 import { indexOf } from "./search";
-import {
-  hasStored,
-  olderKeys,
-  onStoredChange,
-  readStored,
-  removeStored,
-  writeStored,
-} from "./stored";
 
 /** The builds up to the one keeping v3 each took over the batches under
  * the key before theirs, and sent them, but left them there as they were:

@@ -1,5 +1,5 @@
 import { mount } from "./mount";
-import { ScanPage } from "./ScanPage";
+import { ScanPage } from "./scan/ScanPage";
 import { telemetry } from "./telemetry";
 
 telemetry.start("scan");

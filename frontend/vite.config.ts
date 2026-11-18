@@ -109,7 +109,7 @@ export default defineConfig({
         // Pages' entries: wiring that runs only in a browser.
         ...pages,
         // The camera itself: browser-tests/camera.spec.ts runs it, in Chromium.
-        "src/camera.ts",
+        "src/scan/camera.ts",
       ],
       reporter: ["text-summary", "cobertura"],
       // A point below what is reached, never lowered (autoUpdate).

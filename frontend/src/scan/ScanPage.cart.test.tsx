@@ -6,6 +6,36 @@ import {
   within,
 } from "@testing-library/preact";
 import { describe, expect, type MockInstance, test, vi } from "vitest";
+import { say, speak } from "../i18n";
+import { messages as pseudo } from "../locales/pseudo.po";
+import {
+  NO_ANSWER,
+  NOT_RECORDED,
+  OFFLINE,
+  STORAGE_KEY as OUTBOX_KEY,
+  PROBLEMS,
+  SOME_NOT_RECORDED,
+} from "../outbox";
+import { MOST_SECONDS_TO_SAVE, telemetry } from "../telemetry";
+import { CATALOGUE, WITH_CAFE } from "../testing/catalogue";
+import { answering, deferred, json, saved } from "../testing/fetch";
+import { KEY, moveBody, outboxEntry, storeOutbox } from "../testing/saves";
+import {
+  expectBold,
+  expectRefusal,
+  fillMove,
+  find,
+  isCatalogue,
+  open,
+  pick,
+  ready,
+  save,
+  saves,
+  selected,
+  server,
+  storedCart,
+  UUID,
+} from "../testing/scan-page";
 import { ITEMS, MOVE, PICK_FROM, PICK_TO, PICK_YOUR_NAME } from "./batch";
 import {
   CHANGED_BEFORE_DISCARD,
@@ -27,8 +57,6 @@ import {
   storeCart,
 } from "./cart";
 import { FIND } from "./Finder";
-import { say, speak } from "./i18n";
-import { messages as pseudo } from "./locales/pseudo.po";
 import { CONFIRM_DISCARD, DISCARD, KEEP_IT } from "./Notes";
 import {
   ALL_OF_IT,
@@ -38,34 +66,6 @@ import {
   WRONG_LENGTH,
 } from "./OpenPackageCard";
 import { DISMISS } from "./OutboxList";
-import {
-  NO_ANSWER,
-  NOT_RECORDED,
-  OFFLINE,
-  STORAGE_KEY as OUTBOX_KEY,
-  PROBLEMS,
-  SOME_NOT_RECORDED,
-} from "./outbox";
-import { MOST_SECONDS_TO_SAVE, telemetry } from "./telemetry";
-import { CATALOGUE, WITH_CAFE } from "./testing/catalogue";
-import { answering, deferred, json, saved } from "./testing/fetch";
-import { KEY, moveBody, outboxEntry, storeOutbox } from "./testing/saves";
-import {
-  expectBold,
-  expectRefusal,
-  fillMove,
-  find,
-  isCatalogue,
-  open,
-  pick,
-  ready,
-  save,
-  saves,
-  selected,
-  server,
-  storedCart,
-  UUID,
-} from "./testing/scan-page";
 
 // The camera, faked: it sees whatever a test puts in `inView`.
 vi.mock("./camera", () => ({ openCamera: vi.fn() }));

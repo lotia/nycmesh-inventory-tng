@@ -1,10 +1,8 @@
 import { fireEvent, screen } from "@testing-library/preact";
 import { describe, expect, test, vi } from "vitest";
-import { NOT_ME, THATS_ME, YOUR_NAME } from "./CartForm";
-import { freshCart, storeCart } from "./cart";
-import { say } from "./i18n";
-import { CATALOGUE } from "./testing/catalogue";
-import { answering, json } from "./testing/fetch";
+import { say } from "../i18n";
+import { CATALOGUE } from "../testing/catalogue";
+import { answering, json } from "../testing/fetch";
 import {
   fillMove,
   open,
@@ -14,7 +12,9 @@ import {
   saves,
   selected,
   server,
-} from "./testing/scan-page";
+} from "../testing/scan-page";
+import { NOT_ME, THATS_ME, YOUR_NAME } from "./CartForm";
+import { freshCart, storeCart } from "./cart";
 
 // The camera, faked: it sees whatever a test puts in `inView`.
 vi.mock("./camera", () => ({ openCamera: vi.fn() }));

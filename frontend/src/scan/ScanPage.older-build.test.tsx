@@ -6,6 +6,39 @@ import {
   within,
 } from "@testing-library/preact";
 import { describe, expect, test, vi } from "vitest";
+import { say } from "../i18n";
+import {
+  type Body,
+  KEY_REUSED,
+  MAKE_CHANGES,
+  STORAGE_KEY as OUTBOX_KEY,
+  SOME_NOT_RECORDED,
+} from "../outbox";
+import { telemetry } from "../telemetry";
+import { CATALOGUE } from "../testing/catalogue";
+import { answering, deferred, json, saved, TOO_OLD } from "../testing/fetch";
+import {
+  KEY,
+  keep,
+  moveBody,
+  olderSave,
+  outboxEntry,
+  storeOutbox,
+} from "../testing/saves";
+import {
+  expectBold,
+  expectRefusal,
+  fillMove,
+  isCatalogue,
+  open,
+  ready,
+  save,
+  saves,
+  selected,
+  server,
+  storedCart,
+  UUID,
+} from "../testing/scan-page";
 import {
   ADDED_BACK as ADDED_BACK_PHRASE,
   DISCARD_CART,
@@ -24,7 +57,6 @@ import {
   freshCart,
   storeCart,
 } from "./cart";
-import { say } from "./i18n";
 import { CONFIRM_DISCARD, DISCARD, KEEP_IT } from "./Notes";
 import {
   ADD_TO_CART,
@@ -41,39 +73,7 @@ import {
 } from "./OlderList";
 import { CARTS_FROM_DEVICE, DISMISS } from "./OutboxList";
 import { ITEM_RETIRED, RESCAN as RESCAN_PHRASE } from "./older";
-import {
-  type Body,
-  KEY_REUSED,
-  MAKE_CHANGES,
-  STORAGE_KEY as OUTBOX_KEY,
-  SOME_NOT_RECORDED,
-} from "./outbox";
 import { ADD_DIFFERENCE, IN_CART } from "./recorded";
-import { telemetry } from "./telemetry";
-import { CATALOGUE } from "./testing/catalogue";
-import { answering, deferred, json, saved, TOO_OLD } from "./testing/fetch";
-import {
-  KEY,
-  keep,
-  moveBody,
-  olderSave,
-  outboxEntry,
-  storeOutbox,
-} from "./testing/saves";
-import {
-  expectBold,
-  expectRefusal,
-  fillMove,
-  isCatalogue,
-  open,
-  ready,
-  save,
-  saves,
-  selected,
-  server,
-  storedCart,
-  UUID,
-} from "./testing/scan-page";
 
 // The camera, faked: it sees whatever a test puts in `inView`.
 vi.mock("./camera", () => ({ openCamera: vi.fn() }));

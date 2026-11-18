@@ -13,23 +13,23 @@ import {
   MUST_UPGRADE as MUST_UPGRADE_PHRASE,
   UPDATED as UPDATED_PHRASE,
   UPGRADE,
-} from "./build";
-import { ADDED_BACK as ADDED_BACK_PHRASE, NOTHING_IN_CART } from "./CartForm";
-import { addOne, STORAGE_KEY as CART_KEY, freshCart, storeCart } from "./cart";
-import { say } from "./i18n";
-import { ADD_TO_CART, CHECKED_OUT } from "./OlderList";
-import { CARTS_FROM_DEVICE, DISMISS, HELD, SENDING } from "./OutboxList";
-import { Outbox } from "./outbox";
-import { ScanPage } from "./ScanPage";
-import { answering, deferred, json, saved, TOO_OLD } from "./testing/fetch";
+} from "../build";
+import { say } from "../i18n";
+import { Outbox } from "../outbox";
+import { answering, deferred, json, saved, TOO_OLD } from "../testing/fetch";
 import {
   keep,
   moveBody,
   olderSave,
   outboxEntry,
   storeOutbox,
-} from "./testing/saves";
-import { fillMove, open, ready, save, server } from "./testing/scan-page";
+} from "../testing/saves";
+import { fillMove, open, ready, save, server } from "../testing/scan-page";
+import { ADDED_BACK as ADDED_BACK_PHRASE, NOTHING_IN_CART } from "./CartForm";
+import { addOne, STORAGE_KEY as CART_KEY, freshCart, storeCart } from "./cart";
+import { ADD_TO_CART, CHECKED_OUT } from "./OlderList";
+import { CARTS_FROM_DEVICE, DISMISS, HELD, SENDING } from "./OutboxList";
+import { ScanPage } from "./ScanPage";
 
 // The camera, faked: it sees whatever a test puts in `inView`.
 vi.mock("./camera", () => ({ openCamera: vi.fn() }));

@@ -2,19 +2,7 @@
 import { msg } from "@lingui/core/macro";
 import { useSignal } from "@preact/signals";
 import { useEffect, useMemo } from "preact/hooks";
-import { batchWords } from "./batch";
-import type { Catalogue } from "./cart";
-import { say, sayParts } from "./i18n";
-import {
-  AlertWords,
-  CAUTION_BOX,
-  Counted,
-  keyedByWords,
-  NoteSaid,
-  RULED_LIST,
-} from "./Notes";
-import { type NotPut, olderSaid } from "./OlderList";
-import { linesSaid } from "./older";
+import { say, sayParts } from "../i18n";
 import {
   type Body,
   batchId,
@@ -25,7 +13,19 @@ import {
   type Recorded,
   recordedHeading,
   wordsOf,
-} from "./outbox";
+} from "../outbox";
+import { batchWords } from "./batch";
+import type { Catalogue } from "./cart";
+import {
+  AlertWords,
+  CAUTION_BOX,
+  Counted,
+  keyedByWords,
+  NoteSaid,
+  RULED_LIST,
+} from "./Notes";
+import { type NotPut, olderSaid } from "./OlderList";
+import { linesSaid } from "./older";
 import {
   ADD_DIFFERENCE,
   changesShown,

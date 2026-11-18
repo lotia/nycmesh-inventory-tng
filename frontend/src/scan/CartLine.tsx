@@ -1,14 +1,14 @@
 /** One line of the cart: its item, how much of it, and the package it opens. */
 import { msg } from "@lingui/core/macro";
 import { Fragment } from "preact";
+import { Field } from "../Field";
+import { say } from "../i18n";
+import { wordsOf } from "../outbox";
+import { decimal, thousandths } from "../quantity";
 import { type Item, type Line, quantityOf, RETIRED, resized } from "./cart";
-import { Field } from "./Field";
-import { say } from "./i18n";
 import { AlertWords } from "./Notes";
 import { NOTHING_TAKEN, OpenPackageCard } from "./OpenPackageCard";
 import type { Offered } from "./offered";
-import { wordsOf } from "./outbox";
-import { decimal, thousandths } from "./quantity";
 
 export const LINE_GONE = msg`No longer in the catalogue.`;
 export const REMOVE = msg`Remove`;

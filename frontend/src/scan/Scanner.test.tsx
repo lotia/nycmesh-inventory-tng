@@ -1,9 +1,9 @@
 import { act, fireEvent, render, screen } from "@testing-library/preact";
 import { beforeEach, expect, test, vi } from "vitest";
+import { say } from "../i18n";
+import { fakeCamera as camera, pass } from "../testing/camera";
 import { DecoderUnavailable, type Session } from "./camera";
-import { say } from "./i18n";
 import { DONE, POINT, Scanner, TORCH, TORCH_FAILED } from "./Scanner";
-import { fakeCamera as camera, pass } from "./testing/camera";
 
 // The camera's clock, faked: each test lets as many reads' time pass as it
 // needs (testing/setup.ts makes it real again). The fake clock also keeps up

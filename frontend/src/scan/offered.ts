@@ -1,7 +1,8 @@
 /** Open packages offered to a cart, and the batches the catalogue has not seen. */
+
+import { type Draft, type Entry, fromOpen } from "../outbox";
+import { sent, thousandths } from "../quantity";
 import type { Catalogue, Line } from "./cart";
-import { type Draft, type Entry, fromOpen } from "./outbox";
-import { sent, thousandths } from "./quantity";
 import { indexOf } from "./search";
 
 /** Batch keys a catalogue is asked about (scan/catalogue_api.py, MOST_KEYS). */

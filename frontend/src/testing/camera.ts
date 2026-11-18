@@ -1,8 +1,8 @@
 /** A camera for the tests: it sees what is put in `state.inView`, unless
  * `read` or `torch` say otherwise. Never bundled. */
 import { vi } from "vitest";
-import type { Session } from "../camera";
-import { READ_EVERY_MS } from "../Scanner";
+import type { Session } from "../scan/camera";
+import { READ_EVERY_MS } from "../scan/Scanner";
 
 export function fakeCamera(overrides: Partial<Session> = {}) {
   const state = { inView: [] as string[], stopped: false };

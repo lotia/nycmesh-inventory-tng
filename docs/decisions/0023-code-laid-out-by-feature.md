@@ -216,15 +216,33 @@ The frontend's moves, both under `frontend/src/`, sorted the same way:
 
 | Old path | New path |
 | --- | --- |
+| `batch.ts` | `scan/batch.ts` |
 | `buttons.ts`, with its tests | `admin/buttons.ts` |
+| `camera.ts` | `scan/camera.ts` |
 | `cart.test.ts`: its tests of search (`finding`) | `search.test.ts` |
+| `cart.ts`, with its tests | `scan/cart.ts` |
 | `cart.ts`: `toBatch`, with `Batch`, the server's limits (`MAX_ID`, `MAX_AMOUNT`, `MAX_LINES`), `openings`, `packageLine`, `withOffered` and the problems it says (`AN_ITEM` to `TOO_MUCH_FOR_ONE`); `batchWords`, with its words (`ITEMS` to `SAID_LENGTHS`) | `batch.ts` |
 | `cart.ts`: `offered` and `offeredAt`, the cuts of open packages (`afterCut`, `cutOf`, `usedUpOf`), the batches not yet seen (`unseen`, `keysToAsk`, `MAX_KEYS_ASKED`) and the packages sealed (`sealedCounts`, `sealedKey`) | `offered.ts` |
 | `cart.ts`: `search` and `bares`, with the lookups worked out once per catalogue that search reads (`indexOf`, `Named`) | `search.ts` |
+| `CartForm.tsx` | `scan/CartForm.tsx` |
+| `CartLine.tsx` | `scan/CartLine.tsx` |
+| `catalogue.ts` | `scan/catalogue.ts` |
 | `combobox.ts`, with its tests | `admin/combobox.ts` |
+| `decoder.ts`, with its tests | `scan/decoder.ts` |
+| `Finder.tsx` | `scan/Finder.tsx` |
 | `hints.ts`, with its tests | `admin/hints.ts` |
+| `labels.ts`, with its tests | `scan/labels.ts` |
+| `Notes.tsx` | `scan/Notes.tsx` |
+| `offered.ts` | `scan/offered.ts` |
+| `older.ts`, with its tests | `scan/older.ts` |
+| `OlderList.tsx` | `scan/OlderList.tsx` |
 | `once.ts`, with its tests | `admin/once.ts` |
+| `OpenPackageCard.tsx`, with its tests | `scan/OpenPackageCard.tsx` |
+| `OutboxList.tsx` | `scan/OutboxList.tsx` |
+| `recorded.ts`, with its tests | `scan/recorded.ts` |
 | `retire.ts`, with its tests | `admin/retire.ts` |
+| `Scanner.tsx`, with its tests | `scan/Scanner.tsx` |
+| `ScanPage.tsx`, with its tests | `scan/ScanPage.tsx` |
 | `ScanPage.tsx`: `CartForm`, with `Place`, `PlaceSides` and `CHECK_EVERY_MS` | `CartForm.tsx` |
 | `ScanPage.tsx`: `CartLine` | `CartLine.tsx` |
 | `ScanPage.tsx`: `Finder` | `Finder.tsx` |
@@ -233,6 +251,7 @@ The frontend's moves, both under `frontend/src/`, sorted the same way:
 | `ScanPage.tsx`: `NoteSaid`, `AlertWords`, `Counted`, `ConfirmDiscard`, `keyedByWords`, `RULED_LIST`, `CAUTION_BOX` | `Notes.tsx` |
 | `ScanPage.tsx`: `OlderList`, with the words it says of each (`olderSaid`, `olderKind`, `olderWhere`, `olderWhen`) and its telemetry (`heldIn`, `recordOlder`) | `OlderList.tsx` |
 | `ScanPage.tsx`: `OutboxList`, with `RecordedElsewhere`, `useOnline` and `AddDifference` | `OutboxList.tsx` |
+| `search.ts`, with its tests | `scan/search.ts` |
 | `test-camera.ts` | `testing/camera.ts` |
 | `test-catalogue.ts` | `testing/catalogue.ts` |
 | `test-fetch.ts` | `testing/fetch.ts` |

@@ -1,5 +1,5 @@
 /**
- * Saves an older build of the scan page left on a phone (frontend/src/
+ * Saves an older build of the scan page left on a phone (frontend/src/scan/
  * older.ts, inventory-tng-kk1, inventory-tng-3c0): one that goes back whole
  * is put in the empty cart without a tap; the rest are listed in words, to
  * add to the cart and save again, on a phone's width. The cable is the

@@ -13,16 +13,7 @@
 import type { MessageDescriptor } from "@lingui/core";
 import { msg } from "@lingui/core/macro";
 import { v5 as uuidFrom } from "uuid";
-import { type Catalogue, ITEM_SAYS, type Item } from "./cart";
-import { say, sayParts } from "./i18n";
-import {
-  FROM_OPEN,
-  inUnit,
-  nameOf,
-  PACKAGES_OF,
-  RESCAN,
-  withRetired,
-} from "./older";
+import { say, sayParts } from "../i18n";
 import {
   type Body,
   batchId,
@@ -33,8 +24,17 @@ import {
   type Recorded,
   type ReportKind,
   type Said,
-} from "./outbox";
-import { decimal, thousandths } from "./quantity";
+} from "../outbox";
+import { decimal, thousandths } from "../quantity";
+import { type Catalogue, ITEM_SAYS, type Item } from "./cart";
+import {
+  FROM_OPEN,
+  inUnit,
+  nameOf,
+  PACKAGES_OF,
+  RESCAN,
+  withRetired,
+} from "./older";
 import { indexOf } from "./search";
 
 type Line = Body["lines"][number];

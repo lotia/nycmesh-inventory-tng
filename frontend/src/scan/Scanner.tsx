@@ -8,8 +8,8 @@ import type { MessageDescriptor } from "@lingui/core";
 import { msg } from "@lingui/core/macro";
 import { useSignal } from "@preact/signals";
 import { useEffect, useRef } from "preact/hooks";
+import { say } from "../i18n";
 import { DecoderUnavailable, openCamera, type Session } from "./camera";
-import { say } from "./i18n";
 import { Repeats } from "./labels";
 
 export const CAMERA = msg`Camera`;

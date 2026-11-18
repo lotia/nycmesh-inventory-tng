@@ -1,7 +1,11 @@
 import { describe, expect, test } from "vitest";
+import { say } from "../i18n";
+import { KEY_REUSED, noteOf, SOME_NOT_RECORDED } from "../outbox";
+import { CATALOGUE } from "../testing/catalogue";
+import { KEY, keep, moveBody, OTHER_KEY, olderSave } from "../testing/saves";
+import { refusing } from "../testing/storage";
 import { toBatch } from "./batch";
 import { addOne, freshCart, type Item } from "./cart";
-import { say } from "./i18n";
 import {
   compared,
   dropPart,
@@ -24,10 +28,6 @@ import {
   unreadWords,
   withRetired,
 } from "./older";
-import { KEY_REUSED, noteOf, SOME_NOT_RECORDED } from "./outbox";
-import { CATALOGUE } from "./testing/catalogue";
-import { KEY, keep, moveBody, OTHER_KEY, olderSave } from "./testing/saves";
-import { refusing } from "./testing/storage";
 
 /** In Ali's words (inventory-tng-0su), without "Sorry." (inventory-tng-93z). */
 const ITEM_RETIRED = say(ITEM_RETIRED_PHRASE);

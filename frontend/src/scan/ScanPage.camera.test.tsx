@@ -1,5 +1,21 @@
 import { fireEvent, screen } from "@testing-library/preact";
 import { beforeEach, describe, expect, test, vi } from "vitest";
+import { say } from "../i18n";
+import { STORAGE_KEY as OUTBOX_KEY, Outbox } from "../outbox";
+import { pass } from "../testing/camera";
+import { CATALOGUE } from "../testing/catalogue";
+import { answering, deferred, json, saved } from "../testing/fetch";
+import {
+  camera,
+  find,
+  isCatalogue,
+  open,
+  pick,
+  ready,
+  save,
+  selected,
+  server,
+} from "../testing/scan-page";
 import {
   FROM,
   NOTHING_IN_CART,
@@ -11,25 +27,9 @@ import {
 import { REMOVE } from "./CartLine";
 import { freshCart, KIND_WORDS, storeCart } from "./cart";
 import { FIND } from "./Finder";
-import { say } from "./i18n";
 import { DISMISS } from "./OutboxList";
-import { STORAGE_KEY as OUTBOX_KEY, Outbox } from "./outbox";
 import { DONE, POINT } from "./Scanner";
 import { COULD_NOT_LOAD } from "./ScanPage";
-import { pass } from "./testing/camera";
-import { CATALOGUE } from "./testing/catalogue";
-import { answering, deferred, json, saved } from "./testing/fetch";
-import {
-  camera,
-  find,
-  isCatalogue,
-  open,
-  pick,
-  ready,
-  save,
-  selected,
-  server,
-} from "./testing/scan-page";
 
 // The camera, faked: it sees whatever a test puts in `inView`.
 vi.mock("./camera", () => ({ openCamera: vi.fn() }));
