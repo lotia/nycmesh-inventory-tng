@@ -15,7 +15,7 @@ from sqlalchemy.orm import Session
 from inventory_tng.admins import (
     accounts,
     activity,
-    command,
+    admins_command,
     paths,
     sign_in_routes,
     totp_keys_command,
@@ -200,19 +200,19 @@ def test_the_commands_run_as_operator_commands(
     monkeypatch.setenv("DATABASE_URL", own_database)
     monkeypatch.delenv("MAIL_HOST", raising=False)
     site = "https://inventory.example.org"
-    assert command.main(["invite", "grace", "--base-url", site]) == 0
+    assert admins_command.main(["invite", "grace", "--base-url", site]) == 0
     assert (
         capsys.readouterr()
         .out.splitlines()[-1]
         .startswith(f"{site}{paths.RESET}?token=")
     )
-    assert command.main(["invite", "grace", "--base-url", site]) == 1
-    assert command.main(["let-in", "grace"]) == 1
+    assert admins_command.main(["invite", "grace", "--base-url", site]) == 1
+    assert admins_command.main(["let-in", "grace"]) == 1
     assert "Give --base-url" in capsys.readouterr().err
-    assert command.main(["lockdown", "--expect", "2"]) == 1
-    assert command.main(["lockdown", "--expect", "1"]) == 0
+    assert admins_command.main(["lockdown", "--expect", "2"]) == 1
+    assert admins_command.main(["lockdown", "--expect", "1"]) == 0
     assert capsys.readouterr().out.splitlines()[-1] == "Retired 1 administrators."
-    assert command.main(["let-in", "grace", "--base-url", site]) == 0
+    assert admins_command.main(["let-in", "grace", "--base-url", site]) == 0
     assert totp_keys_command.main(["retire-authenticators", "--all"]) == 0
     assert capsys.readouterr().out.splitlines()[-1] == "Retired 0 authenticators."
 

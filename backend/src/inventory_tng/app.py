@@ -16,12 +16,12 @@ from inventory_tng.admins import account_routes
 # isort: split
 from inventory_tng.admins import (
     accounts,
+    admins_routes,
     guards,
     home_routes,
     reset_routes,
     sign_in_routes,
 )
-from inventory_tng.admins import routes as admins_routes
 from inventory_tng.admins.paths import HOME
 from inventory_tng.admins.totp_keys import TotpKeys
 from inventory_tng.catalogue import (

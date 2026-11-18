@@ -18,7 +18,7 @@ PROG = "python -m inventory_tng.manage"
 # Each command's name, its module, and a line on what it does.
 COMMANDS = {
     "admins": (
-        "inventory_tng.admins.command",
+        "inventory_tng.admins.admins_command",
         "lock every administrator out, let one back in, or invite one",
     ),
     "registration-codes": (

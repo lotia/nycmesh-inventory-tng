@@ -1,5 +1,5 @@
 """Administrators: inviting, resetting sign-in, retiring and bringing back
-(admins/routes.py)."""
+(admins/admins_routes.py)."""
 
 import html
 import re

@@ -651,7 +651,7 @@ msgstr ""
 msgid "A duplicate?"
 msgstr ""
 
-#: src/inventory_tng/admins/routes.py
+#: src/inventory_tng/admins/admins_routes.py
 #, python-format
 msgid "A link for %(username)s"
 msgstr ""
@@ -2932,7 +2932,7 @@ msgstr ""
 msgid "Reset"
 msgstr ""
 
-#: src/inventory_tng/admins/routes.py
+#: src/inventory_tng/admins/admins_routes.py
 #, python-format
 msgid "Reset %(username)s's sign-in?"
 msgstr ""
@@ -3032,7 +3032,7 @@ msgstr ""
 msgid "Retired: it is no longer offered."
 msgstr ""
 
-#: src/inventory_tng/admins/routes.py
+#: src/inventory_tng/admins/admins_routes.py
 msgid ""
 "Retired: they can no longer sign in, and their password, authenticators "
 "and recovery codes are removed."

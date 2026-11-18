@@ -107,7 +107,7 @@ short test. `core/` is the name FastAPI's full-stack template uses;
 | `admin/__init__.py`: its docstring | `web/admin.py` |
 | `admin/__init__.py`: the navigation's sections and badges | `web/navigation.py` |
 | `admin/__init__.py`: the pages' routers, included in order | `app.py` |
-| `admin/admins.py` | `admins/routes.py` |
+| `admin/admins.py` | `admins/admins_routes.py` |
 | `admin/admins.py`: how its forms are read, and their problems in words | `admins/forms.py` |
 | `admin/admins.py`: its query | `admins/queries.py` |
 | `admin/categories.py` | `catalogue/categories_routes.py` |
@@ -154,7 +154,7 @@ short test. `core/` is the name FastAPI's full-stack template uses;
 | `admin/volunteers.py` | `volunteers/routes.py` |
 | `admin/volunteers.py`: how its forms are read, and their problems in words | `volunteers/forms.py` |
 | `admin/volunteers.py`: its queries | `volunteers/queries.py` |
-| `admins.py` | `admins/command.py` |
+| `admins.py` | `admins/admins_command.py` |
 | `admins/guards.py`: the sign-in pages' paths, and `reset_url` | `admins/paths.py` |
 | `admins/reset_routes.py`: `RECOVER` | `admins/paths.py` |
 | `admins/sign_in_routes.py`: how its forms are checked, and their problems in words | `admins/forms.py` |

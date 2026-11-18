@@ -21,8 +21,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 import inventory_tng
-from inventory_tng.admins import accounts, activity, guards
-from inventory_tng.admins import routes as admins_routes
+from inventory_tng.admins import accounts, activity, admins_routes, guards
 from inventory_tng.admins.reset_routes import RESET_NOTICE
 from inventory_tng.catalogue import forms as catalogue_forms
 from inventory_tng.catalogue import reading_rules, reading_rules_routes, units
