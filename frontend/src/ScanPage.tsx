@@ -3,8 +3,7 @@ import { msg } from "@lingui/core/macro";
 import { type Signal, signal, useSignal } from "@preact/signals";
 import { Fragment, type TargetedSubmitEvent } from "preact";
 import { useEffect, useMemo, useRef } from "preact/hooks";
-import { type Api, check, makeApi } from "./api/client";
-import { Catalogue as CatalogueReply, DeviceRefusedReply } from "./api/replies";
+import { type Api, makeApi } from "./api/client";
 import { MUST_UPGRADE, UPDATED, UPGRADE } from "./build";
 import {
   addOne,
@@ -19,7 +18,6 @@ import {
   type Item,
   indexOf,
   type Kind,
-  keysToAsk,
   type Line,
   loadCart,
   type Offered,
@@ -39,6 +37,7 @@ import {
   withLine,
   withLineChanged,
 } from "./cart";
+import { type Loaded, loadCatalogue } from "./catalogue";
 import { Field } from "./Field";
 import { say, sayParts } from "./i18n";
 import { placeSides, readLabel, type Scanned } from "./labels";
@@ -94,30 +93,6 @@ const CHECK_EVERY_MS = 60_000;
 /** A page left open fetches the catalogue again once it is this old, so a
  * hub tablet sees new items, volunteers and settings. */
 const CATALOGUE_FRESH_MS = 10 * 60_000;
-
-type Loaded =
-  | { state: "loading" }
-  | { state: "ready"; catalogue: Catalogue }
-  | { state: "unregistered"; reason: "unregistered" | "revoked" }
-  | { state: "unavailable" };
-
-/** The catalogue, asked which of the outbox's batches it shows
- * (cart.ts, unseen). */
-async function loadCatalogue(api: Api, outbox: Outbox): Promise<Loaded> {
-  const key = keysToAsk(outbox.entries.value);
-  const reply = await check(
-    api.GET("/api/catalogue", { params: { query: { key } } }),
-    { 200: CatalogueReply, 403: DeviceRefusedReply },
-  );
-  switch (reply.status) {
-    case 200:
-      return { state: "ready", catalogue: reply.body };
-    case 403:
-      return { state: "unregistered", reason: reply.body.reason };
-    default:
-      return { state: "unavailable" };
-  }
-}
 
 /** What a cart is filled for, in the words the page asks it in. */
 export const KIND_WORDS: Record<Kind, MessageDescriptor> = {

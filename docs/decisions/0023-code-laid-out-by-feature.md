@@ -211,3 +211,9 @@ short test. `core/` is the name FastAPI's full-stack template uses;
 | `web/admin.py`: `LABELS` | `labels/paths.py` |
 | `web/admin.py`: the sections' names (`SECTION_ITEMS` and the others) | `web/navigation.py` |
 | `web/pages.py`: `Badge`, `retired_holding`, `sections` | `web/navigation.py` |
+
+The frontend's moves, both under `frontend/src/`, sorted the same way:
+
+| Old path | New path |
+| --- | --- |
+| `ScanPage.tsx`: `loadCatalogue` | `catalogue.ts` |
