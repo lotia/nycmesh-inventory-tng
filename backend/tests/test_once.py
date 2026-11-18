@@ -13,8 +13,7 @@ from sqlalchemy.orm import Session
 from structlog.testing import capture_logs
 
 from inventory_tng.admins import accounts
-from inventory_tng.admins.account_routes import ACCOUNT
-from inventory_tng.admins.routes import ADMINS
+from inventory_tng.admins.paths import ACCOUNT, ADMINS
 from inventory_tng.core.local_env import CLONE
 from inventory_tng.devices.paths import CODES, DEVICES
 from inventory_tng.models import Admin, RegistrationCode, ResetLink
