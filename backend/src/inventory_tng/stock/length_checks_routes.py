@@ -28,7 +28,14 @@ from inventory_tng.core.phrases import Words, lazy_gettext
 from inventory_tng.models.base import INTEGER_MAX, whole
 from inventory_tng.models.catalogue import Item
 from inventory_tng.models.stock import OpenPackage
-from inventory_tng.stock import forms, ledger, open_packages, over_recorded, queries
+from inventory_tng.stock import (
+    forms,
+    ledger,
+    moments,
+    open_packages,
+    over_recorded,
+    queries,
+)
 from inventory_tng.stock.needs_action import (
     Kind,
     OnlyItem,
@@ -297,9 +304,9 @@ def _set(
         # Read holding its place: a count or adjustment of it meanwhile is
         # in, never taken off twice.
         then = (
-            ledger.left_at(session, open_id, as_of)
+            moments.left_at(session, open_id, as_of)
             if showed is None
-            else showed + ledger.corrected_since(session, open_id, as_of)
+            else showed + moments.corrected_since(session, open_id, as_of)
         )
         counted = ledger.count_open_package(session, key, admin_id, row, left, then)
         if counted is None:
@@ -333,7 +340,7 @@ class Answer(NamedTuple):
     """What to do with a check: set it to a length, or leave it (no
     length); what was seen of it; and, for a Set, what it is set against:
     what the package showed at the ledger transaction `as_of`, its report's
-    (ledger.left_at), or, from the page's own form (set_one), what the page
+    (moments.left_at), or, from the page's own form (set_one), what the page
     showed, `showed`, read just after `as_of`, the page's moment."""
 
     open_id: int

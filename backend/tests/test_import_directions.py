@@ -44,6 +44,7 @@ RULES = {
     "site_settings/scan_settings.py",
     "stock/balance.py",
     "stock/ledger.py",
+    "stock/moments.py",
     *(
         table.info["owner"]
         for table in Base.metadata.tables.values()

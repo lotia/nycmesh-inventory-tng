@@ -15,7 +15,7 @@ from inventory_tng.models.admins import Admin, AdminPassword
 from inventory_tng.models.catalogue import Item
 from inventory_tng.models.places import Location
 from inventory_tng.models.volunteers import Volunteer
-from inventory_tng.stock.ledger import expected
+from inventory_tng.stock.moments import expected
 
 from databases import NO_DATABASE
 from helpers.rows import setting_up

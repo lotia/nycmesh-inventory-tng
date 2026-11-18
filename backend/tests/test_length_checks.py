@@ -16,7 +16,13 @@ from inventory_tng.core.local_env import CLONE
 from inventory_tng.models.admins import Admin
 from inventory_tng.models.catalogue import Item, ItemPackage
 from inventory_tng.models.stock import LedgerTransaction, OpenPackage
-from inventory_tng.stock import balance, ledger, length_checks_routes, open_packages
+from inventory_tng.stock import (
+    balance,
+    ledger,
+    length_checks_routes,
+    moments,
+    open_packages,
+)
 from inventory_tng.stock.ledger import Entry, Form
 from inventory_tng.web import formatting
 
@@ -361,7 +367,7 @@ def test_a_count_leaves_a_check_to_be_answered_but_a_close_ends_it(
     store = spools.store.id
     count = {
         "key": str(uuid.uuid4()),
-        "as_of": str(ledger.moment(session, store)),
+        "as_of": str(moments.moment(session, store)),
         f"opened_{made.id}": "305",
     }
     assert admin_client.post(f"/admin/counts/{store}", data=count).status_code == 303
@@ -515,7 +521,7 @@ def test_set_moves_it_by_what_it_was_off_so_cuts_since_stay(
 
 
 def test_a_place_with_no_saves_is_at_nothing(session: Session, spools: Spools) -> None:
-    assert ledger.moment(session, spools.van.id) == 0
+    assert moments.moment(session, spools.van.id) == 0
 
 
 def test_the_page_locks_nothing(

@@ -43,7 +43,7 @@ from inventory_tng.models.stock import (
     OverRecorded,
 )
 from inventory_tng.scan import page_builds, page_telemetry
-from inventory_tng.stock import ledger, open_packages, over_recorded
+from inventory_tng.stock import ledger, moments, open_packages, over_recorded
 from inventory_tng.stock.paths import ADJUSTMENTS, COUNTS
 from inventory_tng.web import security_headers
 
@@ -454,7 +454,7 @@ def counting(
     place = stocked(session)
     form = {
         "key": str(uuid.uuid4()),
-        "as_of": str(ledger.moment(session, place.store.id)),
+        "as_of": str(moments.moment(session, place.store.id)),
         f"counted_{place.item.id}": "3",
         f"counted_{place.cable.id}": "1",
     }
@@ -507,7 +507,7 @@ def test_a_count_refused_after_its_first_transaction_records_nothing(
     assert refused.status_code == 400
     assert recorded_by_kind(reader) == before
     assert not [line for line in logs if line["event"] == "count recorded"]
-    assert ledger.expected(session, place.store.id) == {place.item.id: Decimal(5)}
+    assert moments.expected(session, place.store.id) == {place.item.id: Decimal(5)}
 
 
 def test_counts_batches_at_a_retired_place_by_side(
@@ -905,7 +905,7 @@ def test_counts_open_packages_closed_and_cleared(
     store = spools.store.id
     count = {
         "key": str(uuid.uuid4()),
-        "as_of": str(ledger.moment(session, store)),
+        "as_of": str(moments.moment(session, store)),
         f"opened_{four.id}": "",
         f"state_{four.id}": "missing",
     }
@@ -1046,7 +1046,7 @@ def test_counts_lines_recorded_more_than_moved_closed_with_their_open_package(
     assert movement_id is not None
     over_recorded.raise_checks(session, {movement_id: Decimal(305)})
     store = spools.store.id
-    as_of = ledger.moment(session, store)
+    as_of = moments.moment(session, store)
     count = ledger.record_count(
         session,
         uuid.uuid4(),
@@ -1085,7 +1085,7 @@ def test_counts_lines_recorded_more_than_moved_closed_with_both_ends_right(
     assert movement_id is not None
     over_recorded.raise_checks(session, {movement_id: Decimal(305)})
     store = spools.store.id
-    as_of = ledger.moment(session, store)
+    as_of = moments.moment(session, store)
     count = ledger.record_count(
         session,
         uuid.uuid4(),

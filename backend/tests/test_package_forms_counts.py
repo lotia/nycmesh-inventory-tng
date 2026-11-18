@@ -12,7 +12,7 @@ from sqlalchemy.orm import Session
 from inventory_tng.models.admins import Admin
 from inventory_tng.models.stock import AdjustmentReason, LedgerTransaction, OpenPackage
 from inventory_tng.stock import forms as stock_forms
-from inventory_tng.stock import ledger
+from inventory_tng.stock import ledger, moments
 from inventory_tng.stock.ledger import LOOSE, Entry, Form
 
 from helpers.markup import text
@@ -42,7 +42,7 @@ def counter(session: Session) -> int:
 def test_record_count_by_form(session: Session, spools: Spools) -> None:
     made = spools.opened()
     store, cable = spools.store.id, spools.cable.id
-    as_of = ledger.moment(session, store)
+    as_of = moments.moment(session, store)
     lines = [
         (cable, spools.sealed, Decimal(0)),
         (cable, Form(open_package_id=made.id), Decimal(250)),
@@ -63,7 +63,7 @@ def test_record_count_by_form(session: Session, spools: Spools) -> None:
             counter(session),
             store,
             [(cable, Decimal(1))],
-            ledger.moment(session, store),
+            moments.moment(session, store),
             by_form=lines[:1],
         )
     with breaks(session, "movement_item_once"):
@@ -73,7 +73,7 @@ def test_record_count_by_form(session: Session, spools: Spools) -> None:
             counter(session),
             store,
             [],
-            ledger.moment(session, store),
+            moments.moment(session, store),
             by_form=[lines[2], lines[2]],
         )
 
@@ -82,7 +82,7 @@ def test_an_opening_while_counting_by_form_asks_again(
     session: Session, spools: Spools
 ) -> None:
     store, cable = spools.store.id, spools.cable.id
-    as_of = ledger.moment(session, store)
+    as_of = moments.moment(session, store)
     spools.opened()
     done = ledger.record_count(
         session,
@@ -111,7 +111,7 @@ def test_the_count_page_counts_forms_finds_and_closes(
     assert f'name="state_{two.id}"' in page
     form = {
         "key": str(uuid.uuid4()),
-        "as_of": str(ledger.moment(session, store)),
+        "as_of": str(moments.moment(session, store)),
         f"opened_{one.id}": "300",
         f"opened_{two.id}": "305",
         f"state_{two.id}": "missing",
@@ -147,7 +147,7 @@ def test_the_count_page_counts_sealed_and_says_whats_wrong(
     spools.write({"kind": "receipt", "to_location_id": store}, Entry(cable, Decimal(5)))
     field = f"sealed_{cable}_{spool}"
     assert f'name="{field}"' in text(admin_client.get(f"{COUNTS}/{store}"))
-    as_of = str(ledger.moment(session, store))
+    as_of = str(moments.moment(session, store))
     base = {"as_of": as_of}
     done = admin_client.post(
         f"{COUNTS}/{store}", data=base | {"key": str(uuid.uuid4()), field: "1"}
@@ -190,7 +190,7 @@ def test_counting_by_form_asks_again_for_what_moved(
     store, cable, spool = spools.store.id, spools.cable.id, spools.spool.id
     form = {
         "key": str(uuid.uuid4()),
-        "as_of": str(ledger.moment(session, store)),
+        "as_of": str(moments.moment(session, store)),
         f"sealed_{cable}_{spool}": "2",
     }
     spools.opened()  # While it was counted.
@@ -209,7 +209,7 @@ def test_an_open_package_found_where_its_item_was_counted_by_total(
     spools.move(Entry(cable, Decimal(10)))  # Loose, alone, in the van.
     form = {
         "key": str(uuid.uuid4()),
-        "as_of": str(ledger.moment(session, van)),
+        "as_of": str(moments.moment(session, van)),
         f"counted_{cable}": "10",
         "found_package_id": str(spools.spool.id),
         "found_left": "40",
@@ -227,7 +227,7 @@ def test_open_packages_closed_by_a_count_and_refusals_said(
 ) -> None:
     store, cable, spool = spools.store.id, spools.cable.id, spools.spool.id
     one, two = spools.opened(), spools.opened()
-    as_of = str(ledger.moment(session, store))
+    as_of = str(moments.moment(session, store))
     # Not here, its left box cleared: closed all the same.
     gone = {
         "key": str(uuid.uuid4()),
@@ -253,7 +253,7 @@ def test_open_packages_closed_by_a_count_and_refusals_said(
     session.flush()
     untracked = {
         "key": str(uuid.uuid4()),
-        "as_of": str(ledger.moment(session, store)),
+        "as_of": str(moments.moment(session, store)),
         "found_package_id": str(spool),
         "found_left": "40",
     }
@@ -272,7 +272,7 @@ def test_an_open_package_found_while_its_item_moved_is_asked_again(
     key = uuid.uuid4()
     form = {
         "key": str(key),
-        "as_of": str(ledger.moment(session, van)),
+        "as_of": str(moments.moment(session, van)),
         f"counted_{cable}": "10",
         "found_package_id": str(spools.spool.id),
         "found_left": "40",

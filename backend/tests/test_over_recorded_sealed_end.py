@@ -19,8 +19,9 @@ from inventory_tng.models.stock import (
     OpenPackage,
     OverRecorded,
 )
-from inventory_tng.stock import ledger, open_packages, over_recorded
-from inventory_tng.stock.ledger import Form, expected
+from inventory_tng.stock import ledger, moments, open_packages, over_recorded
+from inventory_tng.stock.ledger import Form
+from inventory_tng.stock.moments import expected
 from inventory_tng.stock.paths import COUNTS
 
 from helpers.concurrency import Committed
@@ -88,10 +89,10 @@ def test_its_open_package_closed_on_a_count_puts_that_end_right_then_correct_wor
         None,
     )
     session.expire_all()
-    forms = ledger.expected_forms(
+    forms = moments.expected_forms(
         session,
         spools.store.id,
-        ledger.moment(session, spools.store.id),
+        moments.moment(session, spools.store.id),
         [spools.cable.id],
     )
     assert forms == {(spools.cable.id, spools.sealed): 305} | {
@@ -200,8 +201,8 @@ def test_counting_its_place_from_the_row_counts_the_sealed_spool_and_closes_it(
     session.expire_all()
     store = spools.store.id
     sealed = (spools.cable.id, spools.sealed)
-    found = ledger.expected_forms(
-        session, store, ledger.moment(session, store), [spools.cable.id]
+    found = moments.expected_forms(
+        session, store, moments.moment(session, store), [spools.cable.id]
     )
     assert found[sealed] == 305
 
@@ -288,8 +289,8 @@ def test_its_loose_only_place_counted_by_form_puts_each_form_right(
     (check,) = checks(session)
     assert check.settled_how == "counted"
     session.expire_all()
-    found = ledger.expected_forms(
-        session, store, ledger.moment(session, store), [spools.cable.id]
+    found = moments.expected_forms(
+        session, store, moments.moment(session, store), [spools.cable.id]
     )
     assert found == {
         (spools.cable.id, spools.sealed): 305,
@@ -308,7 +309,7 @@ def test_a_move_waiting_asks_no_sealed_line(
     spools = Spools(session)
     moved_whole(registered_client, spools)
     for place in (spools.store, spools.van):
-        moment = ledger.moment(session, place.id)
+        moment = moments.moment(session, place.id)
         assert over_recorded.openings_waiting(session, place.id, moment) == {}
     page = admin_client.get(f"{COUNTS}/{spools.van.id}").text
     assert sealed_line(page, spools) is None

@@ -39,12 +39,11 @@ from inventory_tng.stock.forms import (
     named_twice,
 )
 from inventory_tng.stock.ledger import (
-    expected,
     lock_place,
-    moment,
     record_adjustment,
     record_count,
 )
+from inventory_tng.stock.moments import expected, moment
 from inventory_tng.stock.paths import ADJUSTMENTS, COUNTS, STOCK
 from inventory_tng.web.forms import ABOVE_ZERO, RULES, TYPE_A_NUMBER, WHOLE_UNITS
 from inventory_tng.web.navigation import retired_holding

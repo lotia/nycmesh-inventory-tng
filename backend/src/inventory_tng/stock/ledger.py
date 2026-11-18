@@ -33,7 +33,7 @@ from typing import Literal, NamedTuple, cast
 
 import structlog
 from opentelemetry import metrics
-from sqlalchemy import ColumnElement, case, func, insert, or_, select
+from sqlalchemy import func, insert, select
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.orm import Session
 
@@ -45,7 +45,7 @@ from inventory_tng.models.stock import LedgerTransaction, Movement, OpenPackage
 from inventory_tng.models.volunteers import Volunteer
 from inventory_tng.scan import batch_schemas
 from inventory_tng.stock import open_packages
-from inventory_tng.stock.balance import balance, by_form, countable, left_on
+from inventory_tng.stock.balance import by_form, countable, left_on
 
 log = structlog.get_logger(__name__)
 meter = metrics.get_meter(__name__)
@@ -262,29 +262,6 @@ def _opening_breaks(
     return []
 
 
-def expected(
-    session: Session,
-    location_id: int,
-    *,
-    as_of: int | None = None,
-    items: Collection[int] | None = None,
-) -> dict[int, Decimal]:
-    """What the records say is at a place, by item: only what is not zero,
-    as balance says now; with as_of, what they said at that moment
-    (see moment()), of `items` only if given."""
-    if as_of is not None:
-        (flows,) = _flows(
-            session, location_id, LedgerTransaction.id <= as_of, items=items
-        )
-        return {
-            item: came - went for item, (came, went) in flows.items() if came != went
-        }
-    query = select(balance.c.item_id, balance.c.quantity).where(
-        balance.c.location_id == location_id, balance.c.quantity != 0
-    )
-    return {item_id: amount for item_id, amount in session.execute(query)}
-
-
 def lock_place(session: Session, location_id: int) -> None:
     """Wait for every save under way at a place, and hold up new ones until
     this transaction ends, so its ledger reads as one moment: every save
@@ -299,109 +276,6 @@ def lock_places(session: Session, location_ids: Iterable[int]) -> None:
     none waits on another the wrong way round."""
     for location_id in sorted(set(location_ids)):
         lock_place(session, location_id)
-
-
-def moment(session: Session, location_id: int) -> int:
-    """Now, at a place, as a count form shows it: its latest ledger
-    transaction, with no save there under way, so none can commit later
-    with a lower id. The lock is held only for the read."""
-    with session.begin_nested() as reading:
-        lock_place(session, location_id)
-        latest = session.scalar(
-            select(func.max(LedgerTransaction.id)).where(_at_place(location_id))
-        )
-        # Rolling back to the savepoint releases the lock.
-        reading.rollback()
-    return latest or 0
-
-
-# A ledger transaction that puts right what the records show.
-_CORRECTS = LedgerTransaction.kind.in_(("count", "adjustment"))
-
-
-def left_at(session: Session, open_id: int, as_of: int) -> Decimal:
-    """What an open package showed just after the ledger transaction
-    `as_of`, wherever it was, carried forward by the counts and adjustments
-    of it since, which put right what it showed: all that went into it less
-    all that left it. A save holds the open packages it names before it
-    draws its id (_hold_forms), so none naming it commits later with a
-    lower one."""
-    return _into_open(session, open_id, or_(LedgerTransaction.id <= as_of, _CORRECTS))
-
-
-def corrected_since(session: Session, open_id: int, after: int) -> Decimal:
-    """What the counts and adjustments of an open package after the ledger
-    transaction `after` put right of what it showed."""
-    return _into_open(session, open_id, LedgerTransaction.id > after, _CORRECTS)
-
-
-def _into_open(session: Session, open_id: int, *where: ColumnElement[bool]) -> Decimal:
-    """All that went into an open package less all that left it, in the
-    ledger transactions `where` picks."""
-    # A whole move names it on both sides: in and out, nothing changed.
-    signed = case(
-        (Movement.to_open_package_id == open_id, Movement.quantity), else_=0
-    ) - case((Movement.from_open_package_id == open_id, Movement.quantity), else_=0)
-    total = session.scalar(
-        select(func.coalesce(func.sum(signed), 0))
-        .select_from(Movement)
-        .join(LedgerTransaction, LedgerTransaction.id == Movement.transaction_id)
-        .where(
-            or_(
-                Movement.to_open_package_id == open_id,
-                Movement.from_open_package_id == open_id,
-            ),
-            *where,
-        )
-    )
-    return Decimal(total or 0)
-
-
-def _at_place(location_id: int) -> ColumnElement[bool]:
-    """A ledger transaction into or out of a place."""
-    return or_(
-        LedgerTransaction.to_location_id == location_id,
-        LedgerTransaction.from_location_id == location_id,
-    )
-
-
-def _flows(
-    session: Session,
-    location_id: int,
-    window: ColumnElement[bool],
-    *more: ColumnElement[bool],
-    items: Collection[int] | None = None,
-) -> list[dict[int, tuple[Decimal, Decimal]]]:
-    """For each window (which ledger transactions it takes), what came into
-    a place and what went out of it, by item: each item that moved there in
-    that window, of `items` only, if given. One query, however many."""
-    into = LedgerTransaction.to_location_id == location_id
-    out = LedgerTransaction.from_location_id == location_id
-    windows = (window, *more)
-    # An opening changes the form of stock at a place, not how much is there.
-    where = [_at_place(location_id), or_(*windows), LedgerTransaction.kind != "open"]
-    if items is not None:
-        where.append(Movement.item_id.in_(items))
-    rows = session.execute(
-        select(
-            Movement.item_id,
-            *(
-                func.sum(Movement.quantity).filter(each, side)
-                for each in windows
-                for side in (into, out)
-            ),
-        )
-        .join(LedgerTransaction, LedgerTransaction.id == Movement.transaction_id)
-        .where(*where)
-        .group_by(Movement.item_id)
-    )
-    flows: list[dict[int, tuple[Decimal, Decimal]]] = [{} for _ in windows]
-    for item_id, *sums in rows:
-        # A sum over no movements is NULL: the item did not move in that one.
-        for flow, came, went in zip(flows, sums[::2], sums[1::2], strict=True):
-            if came is not None or went is not None:
-                flow[item_id] = (came or Decimal(0), went or Decimal(0))
-    return flows
 
 
 replayed = meter.create_counter(
@@ -1168,9 +1042,13 @@ def corrected(
 def _first_sent(session: Session, location_id: int, *keys: uuid.UUID) -> int | None:
     """The first transaction at the place written under any of `keys`: a
     form sent before."""
+    # Until counts leave the core (stock/counts.py), they reach the reads
+    # from here: moments imports this module.
+    from inventory_tng.stock import moments
+
     return session.scalar(
         select(func.min(LedgerTransaction.id)).where(
-            LedgerTransaction.idempotency_key.in_(keys), _at_place(location_id)
+            LedgerTransaction.idempotency_key.in_(keys), moments.at_place(location_id)
         )
     )
 
@@ -1178,65 +1056,6 @@ def _first_sent(session: Session, location_id: int, *keys: uuid.UUID) -> int | N
 # A count's line of a form (docs/decisions/0020): an item, the form it is
 # in at the place, and how much was counted of it.
 FormLines = Sequence[tuple[int, Form, Decimal]]
-
-
-def _form_flows(
-    session: Session,
-    location_id: int,
-    windows: Sequence[ColumnElement[bool]],
-    items: Collection[int],
-) -> list[dict[tuple[int, Form], tuple[Decimal, Decimal]]]:
-    """_flows, by form too: for each window, what came into a place and
-    went out of it, by item and the form it was in there. Openings are
-    moves here, as they change forms."""
-    flows: list[dict[tuple[int, Form], tuple[Decimal, Decimal]]] = [{} for _ in windows]
-    if not items:
-        return flows
-    sides = (
-        (
-            True,
-            LedgerTransaction.to_location_id,
-            Movement.to_package_id,
-            Movement.to_open_package_id,
-        ),
-        (
-            False,
-            LedgerTransaction.from_location_id,
-            Movement.from_package_id,
-            Movement.from_open_package_id,
-        ),
-    )
-    for into, place, package, opened in sides:
-        rows = session.execute(
-            select(
-                Movement.item_id,
-                package,
-                opened,
-                *(func.sum(Movement.quantity).filter(each) for each in windows),
-            )
-            .join(LedgerTransaction, LedgerTransaction.id == Movement.transaction_id)
-            .where(place == location_id, or_(*windows), Movement.item_id.in_(items))
-            .group_by(Movement.item_id, package, opened)
-        )
-        for item_id, package_id, open_id, *sums in rows:
-            for flow, total in zip(flows, sums, strict=True):
-                if total is None:
-                    continue
-                form = (item_id, Form(package_id, open_id))
-                came, went = flow.get(form, (Decimal(0), Decimal(0)))
-                flow[form] = (came + total, went) if into else (came, went + total)
-    return flows
-
-
-def expected_forms(
-    session: Session, location_id: int, as_of: int, items: Collection[int]
-) -> dict[tuple[int, Form], Decimal]:
-    """What the records said was at a place at moment `as_of`, by item and
-    form, of `items`: only what was not zero."""
-    (flows,) = _form_flows(
-        session, location_id, (LedgerTransaction.id <= as_of,), items
-    )
-    return {form: came - went for form, (came, went) in flows.items() if came != went}
 
 
 def count_corrections(
@@ -1268,7 +1087,7 @@ def record_count(
 ) -> Counted:
     """Put the records right for what was counted at a place, as they stood
     when the form was shown: as of `as_of`, the place's latest ledger
-    transaction then, from moment() (docs/decisions/0003). Items not
+    transaction then, from moments.moment() (docs/decisions/0003). Items not
     counted are left as they are.
 
     An item that moved there since may have been counted before the move or
@@ -1289,6 +1108,9 @@ def record_count(
     unless the form was sent there before, so it gets its first answer;
     RuleBroken (movement_item_once) for an item counted on two lines, or
     both by total and by form."""
+    # As in _first_sent: moments imports this module.
+    from inventory_tng.stock import moments
+
     _each_once(entries(counted))
     forms_counted = [(item_id, form) for item_id, form, _ in by_form]
     enforce("movement_item_once", when=bool(repeated(forms_counted)))
@@ -1305,12 +1127,12 @@ def record_count(
         _require_countable(session, location_id)
     else:
         after &= LedgerTransaction.id < sent
-    moved, flows = _flows(
+    moved, flows = moments.flows(
         session, location_id, after, LedgerTransaction.id <= as_of, items=counted_at
     )
     then = {item_id: came - went for item_id, (came, went) in flows.items()}
     form_items = {item_id for item_id, _ in forms_counted}
-    form_moved, form_then = _form_flows(
+    form_moved, form_then = moments.form_flows(
         session, location_id, (after, LedgerTransaction.id <= as_of), form_items
     )
     for item_id, _ in form_moved:
