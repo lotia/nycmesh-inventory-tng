@@ -21,15 +21,15 @@ import { ADD_TO_CART, CHECKED_OUT } from "./OlderList";
 import { CARTS_FROM_DEVICE, DISMISS, HELD, SENDING } from "./OutboxList";
 import { Outbox } from "./outbox";
 import { ScanPage } from "./ScanPage";
-import { answering, deferred, json, saved, TOO_OLD } from "./test-fetch";
+import { answering, deferred, json, saved, TOO_OLD } from "./testing/fetch";
 import {
   keep,
   moveBody,
   olderSave,
   outboxEntry,
   storeOutbox,
-} from "./test-saves";
-import { fillMove, open, ready, save, server } from "./test-scan-page";
+} from "./testing/saves";
+import { fillMove, open, ready, save, server } from "./testing/scan-page";
 
 // The camera, faked: it sees whatever a test puts in `inView`.
 vi.mock("./camera", () => ({ openCamera: vi.fn() }));

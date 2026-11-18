@@ -228,3 +228,10 @@ The frontend's moves, both under `frontend/src/`, sorted the same way:
 | `ScanPage.tsx`: `NoteSaid`, `AlertWords`, `Counted`, `ConfirmDiscard`, `keyedByWords`, `RULED_LIST`, `CAUTION_BOX` | `Notes.tsx` |
 | `ScanPage.tsx`: `OlderList`, with the words it says of each (`olderSaid`, `olderKind`, `olderWhere`, `olderWhen`) and its telemetry (`heldIn`, `recordOlder`) | `OlderList.tsx` |
 | `ScanPage.tsx`: `OutboxList`, with `RecordedElsewhere`, `useOnline` and `AddDifference` | `OutboxList.tsx` |
+| `test-camera.ts` | `testing/camera.ts` |
+| `test-catalogue.ts` | `testing/catalogue.ts` |
+| `test-fetch.ts` | `testing/fetch.ts` |
+| `test-saves.ts` | `testing/saves.ts` |
+| `test-scan-page.tsx` | `testing/scan-page.tsx` |
+| `test-setup.ts` | `testing/setup.ts` |
+| `test-storage.ts` | `testing/storage.ts` |

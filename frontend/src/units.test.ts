@@ -1,6 +1,6 @@
 import { describe, expect, test } from "vitest";
 import { bares, search } from "./search";
-import { CATALOGUE, cable } from "./test-catalogue";
+import { CATALOGUE, cable } from "./testing/catalogue";
 import { groups, type Rules, read, respell } from "./units";
 import shared from "./units-vectors.json";
 

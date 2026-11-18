@@ -1,5 +1,5 @@
 /** A small catalogue for the tests. Never bundled. */
-import type { Catalogue, Item } from "./cart";
+import type { Catalogue, Item } from "../cart";
 
 export const radio: Item = {
   id: 100,

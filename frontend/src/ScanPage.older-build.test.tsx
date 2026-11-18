@@ -50,8 +50,8 @@ import {
 } from "./outbox";
 import { ADD_DIFFERENCE, IN_CART } from "./recorded";
 import { telemetry } from "./telemetry";
-import { CATALOGUE } from "./test-catalogue";
-import { answering, deferred, json, saved, TOO_OLD } from "./test-fetch";
+import { CATALOGUE } from "./testing/catalogue";
+import { answering, deferred, json, saved, TOO_OLD } from "./testing/fetch";
 import {
   KEY,
   keep,
@@ -59,7 +59,7 @@ import {
   olderSave,
   outboxEntry,
   storeOutbox,
-} from "./test-saves";
+} from "./testing/saves";
 import {
   expectBold,
   expectRefusal,
@@ -73,7 +73,7 @@ import {
   server,
   storedCart,
   UUID,
-} from "./test-scan-page";
+} from "./testing/scan-page";
 
 // The camera, faked: it sees whatever a test puts in `inView`.
 vi.mock("./camera", () => ({ openCamera: vi.fn() }));

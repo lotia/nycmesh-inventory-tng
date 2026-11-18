@@ -3,8 +3,8 @@ import { describe, expect, test, vi } from "vitest";
 import { NOTHING_IN_CART, TO, YOUR_NAME } from "./CartForm";
 import { STORAGE_KEY as CART_KEY, freshCart, storeCart } from "./cart";
 import { say } from "./i18n";
-import { CATALOGUE } from "./test-catalogue";
-import { answering, json, saved } from "./test-fetch";
+import { CATALOGUE } from "./testing/catalogue";
+import { answering, json, saved } from "./testing/fetch";
 import {
   expectBold,
   fillMove,
@@ -17,7 +17,7 @@ import {
   saves,
   selected,
   server,
-} from "./test-scan-page";
+} from "./testing/scan-page";
 
 // The camera, faked: it sees whatever a test puts in `inView`.
 vi.mock("./camera", () => ({ openCamera: vi.fn() }));

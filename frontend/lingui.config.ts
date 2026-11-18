@@ -23,7 +23,7 @@ export default defineConfig({
     {
       path: `${catalogues}/{locale}`,
       include: ["<rootDir>/src"],
-      exclude: ["**/*.test.*", "**/test-*"],
+      exclude: ["**/*.test.*", "**/testing/**"],
     },
   ],
   // Files only: a line moving does not change the catalogue.

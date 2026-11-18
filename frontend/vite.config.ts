@@ -93,7 +93,7 @@ export default defineConfig({
     // Unit tests only: browser-tests/ is Playwright's (playwright.config.ts).
     include: ["src/**/*.test.{ts,tsx}"],
     environment: "happy-dom",
-    setupFiles: ["src/test-setup.ts"],
+    setupFiles: ["src/testing/setup.ts"],
     // Files and tests in a random order, its seed printed, so none can
     // depend on another (CONTRIBUTING.md, Running the checks).
     sequence: { shuffle: true },
@@ -103,7 +103,7 @@ export default defineConfig({
       include: ["src/**/*.{ts,tsx}"],
       exclude: [
         // Test helpers, not the app.
-        "src/test-*.{ts,tsx}",
+        "src/testing/**",
         // Generated from the backend's schema (npm run api).
         "src/api/**",
         // Pages' entries: wiring that runs only in a browser.

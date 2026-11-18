@@ -28,9 +28,9 @@ import {
   wordsOf,
 } from "./outbox";
 import { telemetry } from "./telemetry";
-import { answering, deferred, json, saved, TOO_OLD } from "./test-fetch";
-import { keep, outboxEntry, storeOutbox } from "./test-saves";
-import { refusing } from "./test-storage";
+import { answering, deferred, json, saved, TOO_OLD } from "./testing/fetch";
+import { keep, outboxEntry, storeOutbox } from "./testing/saves";
+import { refusing } from "./testing/storage";
 
 function draft(fields: Partial<Draft> = {}): Draft {
   return {

@@ -1,6 +1,6 @@
 import { describe, expect, test } from "vitest";
 import { REFUSALS, register } from "./registration";
-import { answering, json } from "./test-fetch";
+import { answering, json } from "./testing/fetch";
 
 describe("register", () => {
   test("posts the phrase as JSON to /api/devices", async () => {

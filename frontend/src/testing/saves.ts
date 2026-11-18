@@ -4,8 +4,8 @@
  * plain move with every field filled; a test names only the fields its
  * own data changes.
  */
-import { BUILD } from "./build";
-import { type Body, type Entry, STORAGE_KEY as OUTBOX_KEY } from "./outbox";
+import { BUILD } from "../build";
+import { type Body, type Entry, STORAGE_KEY as OUTBOX_KEY } from "../outbox";
 
 /** The key a batch is kept under, unless a test gives it another. */
 export const KEY = "0b7c6a51-9a3d-4d39-8f3e-1d1f2c4b5a61";

@@ -21,7 +21,7 @@ import { RegisterPage } from "./RegisterPage";
 import { guardRetire } from "./retire";
 import { Scanner } from "./Scanner";
 import { ScanPage } from "./ScanPage";
-import { answering, deferred, json } from "./test-fetch";
+import { answering, deferred, json } from "./testing/fetch";
 import {
   KEY,
   keep,
@@ -30,7 +30,7 @@ import {
   olderSave,
   outboxEntry,
   storeOutbox,
-} from "./test-saves";
+} from "./testing/saves";
 
 afterEach(() => {
   vi.restoreAllMocks();

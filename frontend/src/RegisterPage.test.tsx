@@ -11,7 +11,7 @@ import {
   RegisterPage,
 } from "./RegisterPage";
 import { REFUSALS } from "./registration";
-import { answering, deferred, json } from "./test-fetch";
+import { answering, deferred, json } from "./testing/fetch";
 
 function openAt(path: string) {
   window.history.replaceState(null, "", path);

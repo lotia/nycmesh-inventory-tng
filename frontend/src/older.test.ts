@@ -25,9 +25,9 @@ import {
   withRetired,
 } from "./older";
 import { KEY_REUSED, noteOf, SOME_NOT_RECORDED } from "./outbox";
-import { CATALOGUE } from "./test-catalogue";
-import { KEY, keep, moveBody, OTHER_KEY, olderSave } from "./test-saves";
-import { refusing } from "./test-storage";
+import { CATALOGUE } from "./testing/catalogue";
+import { KEY, keep, moveBody, OTHER_KEY, olderSave } from "./testing/saves";
+import { refusing } from "./testing/storage";
 
 /** In Ali's words (inventory-tng-0su), without "Sorry." (inventory-tng-93z). */
 const ITEM_RETIRED = say(ITEM_RETIRED_PHRASE);

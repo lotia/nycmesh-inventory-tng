@@ -8,7 +8,7 @@ import {
   PRINTED_LENGTH,
 } from "./OpenPackageCard";
 import { afterCut, cutOf, usedUpOf } from "./offered";
-import { cable, radio } from "./test-catalogue";
+import { cable, radio } from "./testing/catalogue";
 
 describe("an open package's card", () => {
   const open = { left: 120_000, short_below: "15" };

@@ -53,7 +53,7 @@ function keyed(draft: Draft): Body {
 }
 const SHOWN = "99999999-9999-4999-8999-999999999999";
 
-import { CATALOGUE, cable, radio } from "./test-catalogue";
+import { CATALOGUE, cable, radio } from "./testing/catalogue";
 
 /** A batch's problems, or a quantity's, as text, each name the page quoted
  * in it (outbox.Said) in [brackets]. */

@@ -1,6 +1,6 @@
 import { describe, expect, test } from "vitest";
 import { indexOf, search } from "./search";
-import { CATALOGUE, cable, WITH_CAFE } from "./test-catalogue";
+import { CATALOGUE, cable, WITH_CAFE } from "./testing/catalogue";
 
 describe("finding", () => {
   test("search matches every word, anywhere in an item's details", () => {

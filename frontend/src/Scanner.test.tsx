@@ -3,10 +3,10 @@ import { beforeEach, expect, test, vi } from "vitest";
 import { DecoderUnavailable, type Session } from "./camera";
 import { say } from "./i18n";
 import { DONE, POINT, Scanner, TORCH, TORCH_FAILED } from "./Scanner";
-import { fakeCamera as camera, pass } from "./test-camera";
+import { fakeCamera as camera, pass } from "./testing/camera";
 
 // The camera's clock, faked: each test lets as many reads' time pass as it
-// needs (test-setup.ts makes it real again). The fake clock also keeps up
+// needs (testing/setup.ts makes it real again). The fake clock also keeps up
 // with real time, so a read a test did not let pass still comes, only later.
 // Unmounts go in act: outside it, Preact closes the camera a frame later.
 beforeEach(() => vi.useFakeTimers({ shouldAdvanceTime: true }));

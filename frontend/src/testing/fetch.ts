@@ -1,5 +1,5 @@
 /** Fakes for the API, shared by the tests. Never bundled. */
-import { makeApi } from "./api/client";
+import { makeApi } from "../api/client";
 
 /** A JSON reply with this status. */
 export const json = (body: unknown, status: number): Response =>

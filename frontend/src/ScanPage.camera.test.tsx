@@ -16,9 +16,9 @@ import { DISMISS } from "./OutboxList";
 import { STORAGE_KEY as OUTBOX_KEY, Outbox } from "./outbox";
 import { DONE, POINT } from "./Scanner";
 import { COULD_NOT_LOAD } from "./ScanPage";
-import { pass } from "./test-camera";
-import { CATALOGUE } from "./test-catalogue";
-import { answering, deferred, json, saved } from "./test-fetch";
+import { pass } from "./testing/camera";
+import { CATALOGUE } from "./testing/catalogue";
+import { answering, deferred, json, saved } from "./testing/fetch";
 import {
   camera,
   find,
@@ -29,13 +29,13 @@ import {
   save,
   selected,
   server,
-} from "./test-scan-page";
+} from "./testing/scan-page";
 
 // The camera, faked: it sees whatever a test puts in `inView`.
 vi.mock("./camera", () => ({ openCamera: vi.fn() }));
 
 describe("scanning labels with the camera", () => {
-  // The camera's clock, faked: scan lets a read's time pass (test-setup.ts
+  // The camera's clock, faked: scan lets a read's time pass (testing/setup.ts
   // makes it real again).
   beforeEach(() => vi.useFakeTimers({ shouldAdvanceTime: true }));
 
@@ -89,7 +89,7 @@ describe("scanning labels with the camera", () => {
   });
 
   test("opening, the last one sealed there opened, the next fills nothing", async () => {
-    // One spool sealed in the van (test-catalogue); opened, it waits in
+    // One spool sealed in the van (testing/catalogue.ts); opened, it waits in
     // the outbox, and the catalogue still says one is sealed there.
     const { api } = server(() =>
       Promise.reject(new TypeError("Failed to fetch")),
