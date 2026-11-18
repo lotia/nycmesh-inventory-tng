@@ -385,7 +385,7 @@ def current_actor(session: Session) -> str | None:
 
 def ping(session: Session) -> None:
     """Asks the database the least it can answer: raises if it does not
-    (health.py)."""
+    (core/health.py)."""
     session.execute(text("SELECT 1"))
 
 

@@ -2838,7 +2838,7 @@ msgstr ""
 msgid "Recovery token"
 msgstr ""
 
-#: src/inventory_tng/cross_site.py
+#: src/inventory_tng/core/cross_site.py
 msgid "Refused: this came from another site's page."
 msgstr ""
 
