@@ -1,6 +1,7 @@
 """Stock by form (8i4.133.7): short ends, minimum sealed and reorder on
 the stock pages, and a package's settings on its item's page."""
 
+import uuid
 from datetime import UTC, datetime
 from decimal import Decimal
 
@@ -35,11 +36,28 @@ def test_stock_splits_into_forms_and_short_ends_are_not_usable() -> None:
     ]
     forms = open_packages.split(rows, packages, {OPEN: SPOOL, GONE: SPOOL, FRESH: BOX})
     assert forms.sealed == [("Spool", Decimal(3), Decimal(915))]
-    assert (forms.open, forms.short_ends) == ([Decimal(120), Decimal(3)], [Decimal(12)])
+    assert (forms.open, forms.short_ends) == ([Decimal(3), Decimal(120)], [Decimal(12)])
     assert (forms.loose, forms.total, forms.usable) == (85, 1135, 1123)
     # Less than nothing left is the records', not a short end.
     below = open_packages.split([(None, OPEN, Decimal(-8))], packages, {OPEN: SPOOL})
     assert (below.open, below.short_ends) == ([Decimal(-8)], [])
+
+
+def test_an_items_open_packages_are_ordered_fewest_left_first() -> None:
+    """As on the scan page: fewest left first, ties by open package id, and
+    those showing nothing or less last (Ali, 2026-11-18, inventory-tng-qskv),
+    whatever order the balances arrive in."""
+    opened = [(9, Decimal(40)), (4, Decimal(-8)), (7, Decimal(40)), (5, Decimal(120))]
+    assert sorted(opened, key=open_packages.fewest_left_first) == [
+        (7, Decimal(40)),
+        (9, Decimal(40)),
+        (5, Decimal(120)),
+        (4, Decimal(-8)),
+    ]
+    packages = {SPOOL: open_packages.PackageSize("Spool", Decimal(305), None)}
+    rows = [(None, open_id, left) for open_id, left in opened]
+    forms = open_packages.split(rows, packages, dict.fromkeys([4, 5, 7, 9], SPOOL))
+    assert forms.open == [Decimal(40), Decimal(40), Decimal(120), Decimal(-8)]
 
 
 def test_reorder_on_usable_stock_and_sealed_minimums() -> None:
@@ -89,6 +107,32 @@ def test_stock_and_reorder_pages_show_forms(
     reorder = " ".join(text(admin_client.get("/admin/stock/reorder")).split())
     assert spools.cable.name in reorder
     assert "1 sealed Spool, of 2 to keep" in reorder
+
+
+def test_the_stock_page_lists_open_packages_fewest_left_first(
+    admin_client: TestClient, session: Session, spools: Spools
+) -> None:
+    """In a fixed order, so two loads of the same data read the same
+    (inventory-tng-qskv), one showing less than nothing last."""
+    spools.receive(uuid.uuid4(), spools=2)
+    cuts = (Decimal(185), Decimal(0), Decimal(300), Decimal(313))
+    for cut in cuts:
+        made = spools.opened()
+        if cut:
+            spools.move(Entry(spools.cable.id, cut, Form(open_package_id=made.id)))
+    session.flush()
+    page = read(admin_client.get("/admin/stock").text)
+    lines = [
+        each.text
+        for each in page.all("span", class_="hint block")
+        if each.text.startswith("open:")
+    ]
+    assert lines == [
+        "open: 5 m left",
+        "open: 120 m left",
+        "open: 305 m left",
+        "open: -8 m left",
+    ]
 
 
 def test_a_packages_settings_are_set_on_its_items_page(

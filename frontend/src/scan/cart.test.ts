@@ -517,6 +517,42 @@ describe("turning a cart into a batch", () => {
     ]);
   });
 
+  test("an item's open packages at a place: fewest left first, ties by id, those showing nothing last", () => {
+    // As on the stock page (Ali, 2026-11-18, inventory-tng-qskv). One
+    // opened on this phone has no id yet: the server gives it the next,
+    // so it follows those of the same length.
+    const at = (id: number, key: string, left: number) => ({
+      id,
+      key,
+      item_id: 101,
+      package_id: 1001,
+      package_name: "Spool",
+      location_id: 10,
+      opened_at: "2026-11-03T10:00:00Z",
+      left,
+      short_below: null,
+    });
+    const all = [
+      at(0, "waiting-a", 40000),
+      at(6, "below", -4000),
+      at(9, "nine", 40000),
+      at(5, "full", 120000),
+      at(8, "none", 0),
+      at(7, "seven", 40000),
+      at(0, "waiting-b", 40000),
+      { ...at(4, "elsewhere", 1000), location_id: 12 },
+    ];
+    expect(offeredAt(all, 101, 10).map((each) => each.key)).toEqual([
+      "seven",
+      "nine",
+      "waiting-a",
+      "waiting-b",
+      "full",
+      "below",
+      "none",
+    ]);
+  });
+
   test("an opening waiting of a package the catalogue has no more is named 'package'", () => {
     const opening: Draft = {
       kind: "open",

@@ -412,6 +412,15 @@ def is_short_end(left: Decimal, short_below: Decimal | None) -> bool:
     return short_below is not None and 0 < left < short_below
 
 
+def fewest_left_first(opened: tuple[int, Decimal]) -> tuple[bool, Decimal, int]:
+    """How an item's open packages at a place are listed, an open package
+    id and what is left on it: fewest left first, those showing nothing or
+    less last, ties by id (docs/decisions/0020). The scan page lists its
+    cards the same way (frontend/src/scan/offered.ts, offeredAt)."""
+    open_id, left = opened
+    return (left <= 0, left, open_id)
+
+
 class PackageSize(NamedTuple):
     name: str
     size: Decimal
@@ -425,8 +434,10 @@ def split(
 ) -> Forms:
     """An item's balances at a place, each of a package (sealed), an open
     package, or neither (loose), as Forms: `packages` by id, and each open
-    package's package by its id, to tell a short end."""
+    package's package by its id, to tell a short end. Open packages and
+    short ends are listed fewest_left_first, whatever order `rows` come in."""
     forms = Forms()
+    opened: list[tuple[int, Decimal]] = []
     for package_id, open_id, amount in rows:
         if package_id is not None:
             package = packages[package_id]
@@ -434,11 +445,13 @@ def split(
             forms.sealed.append((package.name, count, amount))
             forms.sealed_by_package[package_id] = count
         elif open_id is not None:
-            short = packages[opened_from[open_id]].short_below
-            short_end = is_short_end(amount, short)
-            (forms.short_ends if short_end else forms.open).append(amount)
+            opened.append((open_id, amount))
         else:
             forms.loose += amount
+    for open_id, amount in sorted(opened, key=fewest_left_first):
+        short = packages[opened_from[open_id]].short_below
+        short_end = is_short_end(amount, short)
+        (forms.short_ends if short_end else forms.open).append(amount)
     return forms
 
 

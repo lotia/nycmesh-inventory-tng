@@ -193,16 +193,27 @@ export function offered(
   return [...byKey.values()];
 }
 
-/** offered's open packages of an item at a place, most left first, so
- * those showing nothing, or less, come last (docs/decisions/0020). */
+/** offered's open packages of an item at a place, as the stock page lists
+ * them (open_packages.fewest_left_first): fewest left first, those
+ * showing nothing, or less, last, ties by id (docs/decisions/0020). One
+ * opened here has none yet (0) and will be given the next, so it follows
+ * those saved, in the order it was opened. */
 export function offeredAt(
   all: readonly Offered[],
   itemId: number,
   placeId: number | null,
 ): Offered[] {
+  const nothing = (each: Offered) => Number(each.left <= 0);
+  const unsaved = (each: Offered) => Number(each.id === 0);
   return all
     .filter((each) => each.item_id === itemId && each.location_id === placeId)
-    .sort((a, b) => b.left - a.left);
+    .sort(
+      (a, b) =>
+        nothing(a) - nothing(b) ||
+        a.left - b.left ||
+        unsaved(a) - unsaved(b) ||
+        a.id - b.id,
+    );
 }
 
 /** Why a cut leaves nothing usable on an open package. */

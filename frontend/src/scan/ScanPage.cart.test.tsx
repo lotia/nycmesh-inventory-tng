@@ -297,18 +297,42 @@ describe("filling and saving a cart", () => {
     );
   });
 
-  test("several open packages: most left first, one showing nothing last", async () => {
+  test("several open packages: fewest left first, ties by id, one showing nothing last", async () => {
+    // As on the stock page (Ali, 2026-11-18, inventory-tng-qskv).
     await cableWith(
-      spool({ key: "22222222-2222-4222-8222-222222222222", left: "-4.000" }),
-      spool({ key: "33333333-3333-4333-8333-333333333333", left: "40.000" }),
+      spool({
+        id: 6,
+        key: "22222222-2222-4222-8222-222222222222",
+        left: "-4.000",
+      }),
+      spool({
+        id: 9,
+        key: "33333333-3333-4333-8333-333333333333",
+        left: "40.000",
+        opened_at: "2026-11-05T10:00:00Z",
+      }),
       spool(),
+      spool({
+        id: 7,
+        key: "44444444-4444-4444-8444-444444444444",
+        left: "40.000",
+        opened_at: "2026-11-04T10:00:00Z",
+      }),
     );
     const cards = screen.getAllByRole("group", { name: /^Spool open/ });
     expect(
-      cards.map((card) => within(card).getAllByText(/ m$/)[0]?.textContent),
-    ).toEqual(["Now: 120 m", "Now: 40 m", "Now: -4 m"]);
+      cards.map((card) => [
+        within(card).getAllByText(/ m$/)[0]?.textContent,
+        /opened (\d{4}-\d\d-\d\d)/.exec(card.textContent ?? "")?.[1],
+      ]),
+    ).toEqual([
+      ["Now: 40 m", "2026-11-04"],
+      ["Now: 40 m", "2026-11-05"],
+      ["Now: 120 m", "2026-11-03"],
+      ["Now: -4 m", "2026-11-03"],
+    ]);
     expect(
-      within(cards[2] as HTMLElement).getByText(say(SHOWS_NOTHING_LEFT)),
+      within(cards[3] as HTMLElement).getByText(say(SHOWS_NOTHING_LEFT)),
     ).toBeDefined();
     expect(
       within(cards[0] as HTMLElement).queryByText(say(SHOWS_NOTHING_LEFT)),
