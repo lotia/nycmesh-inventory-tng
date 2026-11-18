@@ -17,6 +17,11 @@ from sqlalchemy.exc import IntegrityError
 
 from inventory_tng import accounts
 from inventory_tng.admins import guards
+from inventory_tng.admins.forms import (
+    NOT_THE_TOKEN,
+    authenticator_problems,
+    setup_problems,
+)
 from inventory_tng.admins.guards import (
     ACCOUNT,
     ACCOUNT_TITLE,
@@ -47,27 +52,17 @@ from inventory_tng.admins.guards import (
 from inventory_tng.core import mail, request_logging
 from inventory_tng.core.db import DbSession
 from inventory_tng.core.mail import Notify
-from inventory_tng.core.phrases import Words, gettext, lazy_gettext
+from inventory_tng.core.phrases import Words, lazy_gettext
 from inventory_tng.models import Admin, AdminSession, running_low
 from inventory_tng.pages import NOTICES, not_found, page, redirect
 from inventory_tng.web.browser import rate_key, set_private_cookie
 
 router = APIRouter(include_in_schema=False)
 
-NOT_THE_TOKEN = lazy_gettext("That isn't the setup token.")
 DID_NOT_MATCH = lazy_gettext("That username, password or code didn't match.")
 SET_UP_TITLE = lazy_gettext("Set up")
 SIGN_IN_TITLE = lazy_gettext("Sign in")
 AUTHENTICATOR_TITLE = lazy_gettext("Set up an authenticator")
-
-
-def code_mismatch() -> str:
-    """A new authenticator's code refused, naming the app as it shows us."""
-    return gettext(
-        "That code didn't match. Check the app shows %(issuer)s, and type the "
-        "code it shows now.",
-        issuer=accounts.ISSUER,
-    )
 
 
 def _set_cookie(
@@ -195,19 +190,11 @@ def setup(
         )
     values["token"] = token
     now = guards._now()
-    problems = {
-        field: problem
-        for field, problem in (
-            ("username", accounts.username_problem(username)),
-            ("email", accounts.email_problem(email)),
-            ("password", accounts.password_problem(password, password_again)),
-        )
-        if problem
-    }
+    problems = setup_problems(username, email, password, password_again)
     step = None
     if code.strip() or not optional:
         step = accounts.accepted_step(key, code, None, now)
-        problems |= _authenticator_problems(authenticator_name, step)
+        problems |= authenticator_problems(authenticator_name, step)
     if problems:
         return _setup_page(
             request,
@@ -242,17 +229,6 @@ def setup(
         response = redirect(HOME)
     _set_cookie(request, response, first.token, first.row)
     return response
-
-
-def _authenticator_problems(name: str, step: int | None) -> dict[str, Words]:
-    """A new authenticator's name, and the step its code was for: None if
-    the code did not match."""
-    problems = {}
-    if problem := accounts.authenticator_name_problem(name):
-        problems["authenticator_name"] = problem
-    if step is None:
-        problems["code"] = code_mismatch()
-    return problems
 
 
 def _recovery_codes_page(
@@ -449,7 +425,7 @@ def new_authenticator(
     # same name twice, or make a second set of recovery codes: the gate
     # (confirmed) holds their row.
     step = accounts.accepted_step(key, code, None, now)
-    problems = _authenticator_problems(name, step)
+    problems = authenticator_problems(name, step)
     # Checked here too, though the insert below would catch it, so a taken
     # name is told alongside a wrong code.
     if "authenticator_name" not in problems and accounts.authenticator_named(

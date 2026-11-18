@@ -3535,7 +3535,7 @@ msgstr ""
 msgid "That can't be done at this address."
 msgstr ""
 
-#: src/inventory_tng/admins/sign_in_routes.py
+#: src/inventory_tng/admins/forms.py
 #, python-format
 msgid ""
 "That code didn't match. Check the app shows %(issuer)s, and type the code"
@@ -3598,7 +3598,7 @@ msgstr ""
 msgid "That isn't the recovery token."
 msgstr ""
 
-#: src/inventory_tng/admins/sign_in_routes.py
+#: src/inventory_tng/admins/forms.py
 msgid "That isn't the setup token."
 msgstr ""
 

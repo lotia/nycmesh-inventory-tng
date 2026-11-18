@@ -26,6 +26,7 @@ from inventory_tng.accounts import (
     password_problem,
     username_problem,
 )
+from inventory_tng.admins import forms as admins_forms
 from inventory_tng.admins import guards, sign_in_routes
 from inventory_tng.core.masking import Masker
 from inventory_tng.core.settings import RateLimits
@@ -126,7 +127,7 @@ def test_setup_refuses_a_wrong_token_then_too_many(client: TestClient) -> None:
     key = hidden_key(client.get(guards.SETUP))
     wrong = client.post(guards.SETUP, data=setup_form(key, token="x" * 40))
     assert wrong.status_code == 400
-    assert str(sign_in_routes.NOT_THE_TOKEN) in text(wrong)
+    assert str(admins_forms.NOT_THE_TOKEN) in text(wrong)
     # The form keeps the key, so the app need not be set up again.
     assert hidden_key(wrong) == key
     for _ in range(9):
@@ -145,8 +146,8 @@ def test_setup_refuses_a_wrong_token_then_too_many(client: TestClient) -> None:
         ),
         ({"password_again": PASSWORD + "!"}, PASSWORDS_DIFFER),
         ({"email": "not an address"}, NOT_AN_EMAIL),
-        ({"code": "000000"}, sign_in_routes.code_mismatch()),
-        ({"code": ""}, sign_in_routes.code_mismatch()),
+        ({"code": "000000"}, admins_forms.code_mismatch()),
+        ({"code": ""}, admins_forms.code_mismatch()),
     ],
 )
 def test_setup_says_what_is_wrong(
