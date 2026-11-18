@@ -20,7 +20,7 @@ CANONICAL_SIGNS = str.maketrans({"\u00b5": "\u03bc", "\u2103": "°C", "\u2109": 
 def canonical(name: str) -> str:
     """`name` as it is stored: NFC, so the Ohm, Kelvin and Angstrom signs are
     Ω, K and Å, and without CANONICAL_SIGNS; case and every other character
-    as typed. fold() makes the same of either spelling."""
+    as typed. search_text.fold() makes the same of either spelling."""
     return unicodedata.normalize("NFC", name.translate(CANONICAL_SIGNS))
 
 

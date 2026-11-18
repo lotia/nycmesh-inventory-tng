@@ -324,7 +324,6 @@ These were renamed, or split, as they moved:
 | `helpers/categories.py` | `helpers/suite_categories.py` |
 | `helpers/pages.py` | `helpers/swept_pages.py` |
 | `helpers/queries.py` | `helpers/query_counts.py` |
-| `models/test_fold_reference.py` | `models/test_search_text_fold_reference.py` |
 | `test_account.py` | `admins/test_account_routes.py` |
 | `test_admin_admins.py` | `admins/test_admins_routes.py` |
 | `test_admin_categories.py` | `catalogue/test_categories_routes.py` |
@@ -354,6 +353,12 @@ These were renamed, or split, as they moved:
 | `test_sign_in.py` | `admins/test_sign_in_routes.py` |
 | `test_sign_in_models.py` | `models/test_admins.py` |
 | `test_stacks.py` | `devtools/test_stack.py` |
+
+Later renamed:
+
+| Old path | New path |
+| --- | --- |
+| `models/test_fold_reference.py` | `models/test_search_text_fold_reference.py` |
 
 ## Amendment: names (2026-11-18)
 

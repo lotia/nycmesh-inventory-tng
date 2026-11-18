@@ -114,8 +114,8 @@ def reference() -> str:
     and Python's Unicode's (FOLDED_WITH): which characters there are, and
     what NFKC makes of them."""
     lines = [
-        f"# models.search_text.fold, with {FOLDED_WITH}: each input, its code point, what "
-        + f"it folds to (∅: nothing). Written by {COMMANDS}."
+        f"# models.search_text.fold, with {FOLDED_WITH}: each input, its code "
+        + f"point, what it folds to (∅: nothing). Written by {COMMANDS}."
     ]
     lines += [
         f"{shown(each)}\tU+{ord(each):04X}\t{folded(each)}" for each in characters()

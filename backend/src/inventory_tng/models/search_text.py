@@ -59,7 +59,8 @@ def in_ascii_once(typed: str, respelt: str) -> tuple[str, ...]:
 
 
 def held(text: str, rules: units.Rules | None = None) -> str:
-    """What search_text keeps of `text`: each of its folds, spaced."""
+    """What a row's search_text column keeps of `text`: each of its folds,
+    spaced."""
     return " ".join(folds(text, rules))
 
 
