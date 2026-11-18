@@ -1,7 +1,7 @@
 import { fireEvent, screen } from "@testing-library/preact";
 import { beforeEach, describe, expect, test, vi } from "vitest";
 import { REMOVE } from "./CartLine";
-import { freshCart, storeCart } from "./cart";
+import { freshCart, KIND_WORDS, storeCart } from "./cart";
 import { FIND } from "./Finder";
 import { say } from "./i18n";
 import { STORAGE_KEY as OUTBOX_KEY, Outbox } from "./outbox";
@@ -10,7 +10,6 @@ import {
   COULD_NOT_LOAD,
   DISMISS,
   FROM,
-  KIND_WORDS,
   NOTHING_IN_CART,
   SCAN_WITH_CAMERA,
   TO,

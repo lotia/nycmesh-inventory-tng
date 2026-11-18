@@ -11,6 +11,7 @@
  * sending it. Emptied or discarded, it drops its key: what fills it next
  * is another batch.
  */
+import type { MessageDescriptor } from "@lingui/core";
 import { msg } from "@lingui/core/macro";
 import { type Signal, signal } from "@preact/signals";
 import { v4 as uuid, v5 as uuidFrom } from "uuid";
@@ -130,6 +131,14 @@ export const SIDES: Record<Kind, Record<Side, boolean>> = {
   install: { from: true, to: false },
   // At one place, picked as From; the batch names it on both sides.
   open: { from: true, to: false },
+};
+
+/** What a cart is filled for, in the words the page asks it in. */
+export const KIND_WORDS: Record<Kind, MessageDescriptor> = {
+  move: msg`Moving stock`,
+  receipt: msg`Receiving stock`,
+  install: msg`Taking it to an install`,
+  open: msg`Opening packages`,
 };
 
 /** A new, empty cart that keeps the last one's choices. */

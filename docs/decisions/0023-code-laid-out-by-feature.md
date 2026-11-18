@@ -218,5 +218,7 @@ The frontend's moves, both under `frontend/src/`, sorted the same way:
 | --- | --- |
 | `ScanPage.tsx`: `CartLine` | `CartLine.tsx` |
 | `ScanPage.tsx`: `Finder` | `Finder.tsx` |
+| `ScanPage.tsx`: `KIND_WORDS` | `cart.ts` |
 | `ScanPage.tsx`: `loadCatalogue` | `catalogue.ts` |
 | `ScanPage.tsx`: `NoteSaid`, `AlertWords`, `Counted`, `ConfirmDiscard`, `keyedByWords`, `RULED_LIST`, `CAUTION_BOX` | `Notes.tsx` |
+| `ScanPage.tsx`: `OlderList`, with the words it says of each (`olderSaid`, `olderKind`, `olderWhere`, `olderWhen`) and its telemetry (`heldIn`, `recordOlder`) | `OlderList.tsx` |

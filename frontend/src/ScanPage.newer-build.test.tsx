@@ -16,12 +16,11 @@ import {
 } from "./build";
 import { addOne, STORAGE_KEY as CART_KEY, freshCart, storeCart } from "./cart";
 import { say } from "./i18n";
+import { ADD_TO_CART, CHECKED_OUT } from "./OlderList";
 import { Outbox } from "./outbox";
 import {
-  ADD_TO_CART,
   ADDED_BACK as ADDED_BACK_PHRASE,
   CARTS_FROM_DEVICE,
-  CHECKED_OUT,
   DISMISS,
   HELD,
   NOTHING_IN_CART,

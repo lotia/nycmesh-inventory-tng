@@ -23,7 +23,7 @@ msgstr ""
 msgid "{tries, plural, one {The inventory keeps failing on this batch ({status}, # try). It is kept and tried again; please report this.} other {The inventory keeps failing on this batch ({status}, # tries). It is kept and tried again; please report this.}}"
 msgstr ""
 
-#: src/ScanPage.tsx
+#: src/OlderList.tsx
 msgid "Item retired"
 msgstr ""
 
@@ -76,12 +76,12 @@ msgstr ""
 msgid "The cart was changed in another tab. Check it, then record it again."
 msgstr ""
 
-#: src/ScanPage.tsx
+#: src/cart.ts
 msgid "Opening packages"
 msgstr ""
 
 #. A clause of where a save was for; clauses that apply follow in this order, joined by spaces: at or from, to, for install.
-#: src/ScanPage.tsx
+#: src/OlderList.tsx
 msgid "at {place}"
 msgstr ""
 
@@ -109,11 +109,11 @@ msgstr ""
 msgid "That phrase has expired. Ask for a new one."
 msgstr ""
 
-#: src/ScanPage.tsx
+#: src/OlderList.tsx
 msgid "Add to cart"
 msgstr ""
 
-#: src/ScanPage.tsx
+#: src/OlderList.tsx
 msgid "Checked out items. Add to cart or discard before sending"
 msgstr ""
 
@@ -125,7 +125,7 @@ msgstr ""
 msgid "{name}: {amount}, new"
 msgstr ""
 
-#: src/ScanPage.tsx
+#: src/OlderList.tsx
 msgid "That one was changed in another tab. Check it again."
 msgstr ""
 
@@ -238,7 +238,7 @@ msgstr ""
 msgid "Whole packages only"
 msgstr ""
 
-#: src/ScanPage.tsx
+#: src/cart.ts
 msgid "Moving stock"
 msgstr ""
 
@@ -274,7 +274,7 @@ msgstr ""
 msgid "Cut or take from the {name} opened {date} ({unit})"
 msgstr ""
 
-#: src/ScanPage.tsx
+#: src/OlderList.tsx
 msgid "Saying what is on open packages"
 msgstr ""
 
@@ -290,7 +290,7 @@ msgstr ""
 msgid "Pick your name"
 msgstr ""
 
-#: src/ScanPage.tsx
+#: src/OlderList.tsx
 msgid "Add it to the cart, fix that, then record it."
 msgstr ""
 
@@ -342,7 +342,7 @@ msgstr ""
 msgid "Register"
 msgstr ""
 
-#: src/ScanPage.tsx
+#: src/OlderList.tsx
 msgid "Added on {when} but not sent"
 msgstr ""
 
@@ -358,7 +358,7 @@ msgstr ""
 msgid "{name}: Nothing is taken from an open package here."
 msgstr ""
 
-#: src/ScanPage.tsx
+#: src/OlderList.tsx
 msgid "Added but not sent"
 msgstr ""
 
@@ -447,15 +447,15 @@ msgstr ""
 msgid "Recorded {was}, you changed it to {now}. An administrator will correct it."
 msgstr ""
 
-#: src/ScanPage.tsx
+#: src/OlderList.tsx
 msgid "That one was changed in another tab. Check it, then add it to the cart again."
 msgstr ""
 
-#: src/ScanPage.tsx
+#: src/OlderList.tsx
 msgid "A cart: moving stock"
 msgstr ""
 
-#: src/ScanPage.tsx
+#: src/OlderList.tsx
 msgid "Something"
 msgstr ""
 
@@ -471,7 +471,7 @@ msgstr ""
 msgid "Go to the scan page"
 msgstr ""
 
-#: src/ScanPage.tsx
+#: src/OlderList.tsx
 msgid "A cart: something"
 msgstr ""
 
@@ -491,7 +491,7 @@ msgstr ""
 msgid "Try again"
 msgstr ""
 
-#: src/ScanPage.tsx
+#: src/OlderList.tsx
 msgid "Kept on this device {when}, not sent."
 msgstr ""
 
@@ -503,11 +503,11 @@ msgstr ""
 msgid "Upgrade"
 msgstr ""
 
-#: src/ScanPage.tsx
+#: src/OlderList.tsx
 msgid "Record or discard the current cart before adding more items"
 msgstr ""
 
-#: src/ScanPage.tsx
+#: src/OlderList.tsx
 msgid "a place no longer in the catalogue"
 msgstr ""
 
@@ -587,11 +587,11 @@ msgstr ""
 msgid "Nothing in the cart yet."
 msgstr ""
 
-#: src/ScanPage.tsx
+#: src/OlderList.tsx
 msgid "A cart: receiving stock"
 msgstr ""
 
-#: src/ScanPage.tsx
+#: src/OlderList.tsx
 msgid "Cannot Add to Cart"
 msgstr ""
 
@@ -617,7 +617,7 @@ msgid "{name}: enter the count"
 msgstr ""
 
 #. A clause of where a save was for; clauses that apply follow in this order, joined by spaces: at or from, to, for install.
-#: src/ScanPage.tsx
+#: src/OlderList.tsx
 msgid "to {place}"
 msgstr ""
 
@@ -653,7 +653,7 @@ msgstr ""
 msgid "The inventory's rules refuse this as sent: it changed since the page loaded. Load the page again, and do it again"
 msgstr ""
 
-#: src/ScanPage.tsx
+#: src/OlderList.tsx
 msgid "Kept on this device, not sent."
 msgstr ""
 
@@ -662,7 +662,7 @@ msgid "Your name"
 msgstr ""
 
 #. The clauses saying where an older build's save was for, then the volunteer's name.
-#: src/ScanPage.tsx
+#: src/OlderList.tsx
 msgid "{where}, by {name}"
 msgstr ""
 
@@ -686,7 +686,7 @@ msgstr ""
 msgid "This browser is registered."
 msgstr ""
 
-#: src/ScanPage.tsx
+#: src/cart.ts
 msgid "Receiving stock"
 msgstr ""
 
@@ -738,7 +738,7 @@ msgstr ""
 msgid "Sending…"
 msgstr ""
 
-#: src/ScanPage.tsx
+#: src/OlderList.tsx
 msgid "Unable to discard. Clear your site data to remove."
 msgstr ""
 
@@ -791,7 +791,7 @@ msgstr ""
 msgid "Held until you upgrade."
 msgstr ""
 
-#: src/ScanPage.tsx
+#: src/OlderList.tsx
 msgid "This item was changed in another tab. Check it before discarding."
 msgstr ""
 
@@ -803,7 +803,7 @@ msgstr ""
 msgid "An item in the cart is no longer in the catalogue. Remove it."
 msgstr ""
 
-#: src/ScanPage.tsx
+#: src/cart.ts
 msgid "Taking it to an install"
 msgstr ""
 
@@ -843,15 +843,15 @@ msgstr ""
 msgid "These are in your cart, waiting to be recorded."
 msgstr ""
 
-#: src/ScanPage.tsx
+#: src/OlderList.tsx
 msgid "A cart: taking it to an install"
 msgstr ""
 
-#: src/ScanPage.tsx
+#: src/OlderList.tsx
 msgid "This browser can't keep the cart. Clear local data, reload the page and try again."
 msgstr ""
 
-#: src/ScanPage.tsx
+#: src/OlderList.tsx
 msgid "A cart: opening packages"
 msgstr ""
 
@@ -912,7 +912,7 @@ msgid "{amount} from an open package"
 msgstr ""
 
 #. A clause of where a save was for; clauses that apply follow in this order, joined by spaces: at or from, to, for install.
-#: src/ScanPage.tsx
+#: src/OlderList.tsx
 msgid "for install {number}"
 msgstr ""
 
@@ -953,6 +953,6 @@ msgid "What is happening"
 msgstr ""
 
 #. A clause of where a save was for; clauses that apply follow in this order, joined by spaces: at or from, to, for install.
-#: src/ScanPage.tsx
+#: src/OlderList.tsx
 msgid "from {place}"
 msgstr ""
