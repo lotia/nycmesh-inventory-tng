@@ -59,7 +59,7 @@ def _require_countable(session: Session, location_id: int) -> None:
 ItemLines = Sequence[tuple[int, Decimal]]
 
 
-counted = meter.create_counter(
+recorded = meter.create_counter(
     "inventory.counts.recorded",
     unit="{transaction}",
     description="Counts and adjustments written, by kind",
@@ -108,27 +108,30 @@ class Counted(NamedTuple):
     put_right: list[tuple[int, Form | None]]
 
 
-def corrected(
-    admin_id: int, location_id: int, written: Iterable[Written], withheld_lines: int = 0
-) -> None:
+def corrected(admin_id: int, written: Iterable[Written]) -> None:
     """Measure and log a count or an adjustment once committed, as
     save_batch (scan/batch_api.py) does, so a failed commit and its retry
     count once."""
     for transaction in written:
-        counted.add(1, {"kind": transaction.kind})
+        recorded.add(1, {"kind": transaction.kind})
         log.info(
             f"{transaction.kind} recorded",
             ledger_transaction_id=transaction.id,
             admin_id=admin_id,
             lines=transaction.lines,
         )
-    if withheld_lines:
-        withheld.add(withheld_lines)
+
+
+def lines_withheld(admin_id: int, location_id: int, lines: int) -> None:
+    """Measure and log a count's lines withheld (Counted.withheld) once
+    committed, as corrected() does its transactions."""
+    if lines:
+        withheld.add(lines)
         log.info(
             "count lines withheld",
             location_id=location_id,
             admin_id=admin_id,
-            lines=withheld_lines,
+            lines=lines,
         )
 
 

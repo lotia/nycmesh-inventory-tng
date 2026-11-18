@@ -434,7 +434,7 @@ def test_counts_count_lines_withheld(rolled_back: Recorded, session: Session) ->
         session, uuid.uuid4(), ada.id, place.store.id, radios, as_of
     )
     assert result.moved == {place.item.id: (Decimal(0), Decimal(3))}
-    counts.corrected(ada.id, place.store.id, result.written, result.withheld)
+    counts.lines_withheld(ada.id, place.store.id, result.withheld)
     assert counted(reader, "inventory.count.lines.withheld")[()] >= 1
 
 
@@ -468,15 +468,16 @@ def test_counts_counts_and_adjustments_written_once(
     """Each transaction once it is committed; sent again, none."""
     client, _, reader, _ = rolled_back
     place, count = counting(client, session)
-    before = recorded_by_kind(reader)
+    counts_before, adjustments_before = recorded_by_kind(reader)
     assert count().status_code == 303
     assert count().status_code == 303
     form = adjustment_form(session, place.store, place.item)
     for _ in range(2):
         adjusted = client.post(ADJUSTMENTS, data=form, follow_redirects=False)
         assert adjusted.status_code == 303
-    after = recorded_by_kind(reader)
-    assert (after[0] - before[0], after[1] - before[1]) == (2, 1)
+    counts_after, adjustments_after = recorded_by_kind(reader)
+    assert counts_after - counts_before == 2
+    assert adjustments_after - adjustments_before == 1
 
 
 def test_a_count_refused_after_its_first_transaction_records_nothing(

@@ -549,7 +549,7 @@ def answer(
             request, signed, session, only, view, values=values, refused=refused
         )
     how, written = settled
-    counts.corrected(admin_id, 0, written)
+    counts.corrected(admin_id, written)
     over_recorded.measure_settled(how, reason if do == "checked" else None)
     notice = f"over_recorded_{how}"
     if do == "count":

@@ -54,6 +54,7 @@ from inventory_tng.stock.balance import countable, takeable
 from inventory_tng.stock.counts import (
     Counted,
     corrected,
+    lines_withheld,
     record_adjustment,
     record_count,
 )
@@ -649,7 +650,8 @@ def count(
         )
     assert result is not None
     session.commit()
-    corrected(signed.admin.id, place.id, result.written, result.withheld)
+    corrected(signed.admin.id, result.written)
+    lines_withheld(signed.admin.id, place.id, result.withheld)
     open_packages.measure_closing("count", closed)
     over_recorded.measure_counted(settled)
     if not result.moved:
@@ -711,5 +713,5 @@ def adjust(
         )
     assert written is not None
     session.commit()
-    corrected(signed.admin.id, place.id, written)
+    corrected(signed.admin.id, written)
     return redirect(COUNTS, notice="adjusted", section="adjust")
