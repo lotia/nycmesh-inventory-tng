@@ -156,8 +156,9 @@ short test. `core/` is the name FastAPI's full-stack template uses;
 - On 2026-11-18 `core/mail.py` was split in two (inventory-tng-u3fp.8):
   `core/mail.py` keeps how mail is sent, and `admins/mail_messages.py`
   holds what each mail says, as every mail is to administrators. Its
-  test was split alike, with the tests of reset links in
-  `admins/test_reset_routes.py`.
+  test was split alike: the tests of reset links went to
+  `admins/test_reset_routes.py`, and those of which action sends a notice
+  to the tests of that action's routes.
 - Older decision records keep the paths of their time. The tables below
   give each old path's new home; a later move adds its rows.
 
@@ -370,7 +371,7 @@ Later renamed:
 | Old path | New path |
 | --- | --- |
 | `core/test_connections.py` | `core/test_db_sessions.py` |
-| `core/test_mail.py` | itself, its settings and sending; the notices: `admins/test_mail_messages.py`; the reset links: `admins/test_reset_routes.py` |
+| `core/test_mail.py` | itself, its settings and sending; the words of the mails: `admins/test_mail_messages.py`; the reset links: `admins/test_reset_routes.py`; a notice of a recovery code used: `admins/test_sign_in_routes.py`; the notices of a password changed: `admins/test_account_routes.py` |
 | `models/test_fold_reference.py` | `models/test_search_text_fold_reference.py` |
 
 ## Amendment: names (2026-11-18)

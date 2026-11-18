@@ -19,7 +19,7 @@ from sqlalchemy.orm import Session
 from starlette.datastructures import Headers
 from structlog.testing import capture_logs
 
-from inventory_tng.admins import accounts, guards, paths, sign_in_routes
+from inventory_tng.admins import accounts, guards, mail_messages, paths, sign_in_routes
 from inventory_tng.admins.accounts import (
     NOT_AN_EMAIL,
     PASSWORDS_DIFFER,
@@ -36,6 +36,7 @@ from inventory_tng.models.site_settings import SignInSettings
 from inventory_tng.web.forms import name_up_to
 from inventory_tng.web.navigation import retired_holding
 
+from helpers.mail import SentMail
 from helpers.markup import read, text
 from helpers.sign_in import (
     PASSWORD,
@@ -341,6 +342,18 @@ def test_a_recovery_code_signs_in_once(client: TestClient, session: Session) -> 
     client.cookies.clear()
     assert sign_in_with(client, code=codes[0]).status_code == 400
     assert sign_in_with(client, code=codes[1]).status_code == 303
+
+
+def test_a_recovery_code_used_is_told(
+    make_client: Callable[..., TestClient], session: Session, sent_mail: SentMail
+) -> None:
+    client = make_client(mailer=sent_mail)
+    admin, _ = new_admin(session, email="ada@example.org")
+    codes = accounts.make_recovery_codes(session, admin.id, datetime.now(UTC))
+    assert sign_in_with(client, code=codes[0]).status_code == 303
+    (message,) = sent_mail
+    assert message.kind == "recovery_code_used"
+    assert mail_messages.codes_left(9) in message.body
 
 
 def test_recovery_codes_are_long_and_easy_to_read(session: Session) -> None:
