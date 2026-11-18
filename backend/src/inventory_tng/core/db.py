@@ -410,7 +410,8 @@ GATE_INFO = "gate"
 
 
 # Locking a row (inventory-tng-8i4.57): lock with locked or get_locked,
-# never with_for_update itself (tests/across/test_locking.py fails on it elsewhere).
+# never with_for_update itself (tests/across/test_locking.py fails on it
+# elsewhere).
 #
 # SQLAlchemy keeps one object per row in a session (its identity map). A
 # query, even SELECT ... FOR UPDATE, that returns a row the session has
@@ -418,8 +419,8 @@ GATE_INFO = "gate"
 # attributes with what the locked row now holds, unless asked to with
 # populate_existing. So code that read a row, then locks it, would decide on
 # values from before the lock, which another request may have changed: a
-# lost update, or a check passed on old data (tests/across/test_locking.py shows
-# it with two sessions). SQLAlchemy's maintainer keeps populate_existing
+# lost update, or a check passed on old data (tests/across/test_locking.py
+# shows it with two sessions). SQLAlchemy's maintainer keeps populate_existing
 # something to ask for, as it overwrites changes not yet written
 # (https://groups.google.com/g/sqlalchemy/c/I2ftUVJcAuo); both wrappers run
 # a query, which first writes those (autoflush, on in every session here),
@@ -739,11 +740,11 @@ def lock_catalogue(session: Session) -> None:
 
 # Each table's protection, declared once on its model (protection()) and
 # read from Base.metadata by the guard below, by history.py and by
-# tests/across/test_write_owners.py (docs/decisions/0016). This is the one place
-# its rules are written down.
+# tests/across/test_write_owners.py (docs/decisions/0016). This is the one
+# place its rules are written down.
 # - owner: the one module that makes its rows, or None: made only by its
-#   migration, or by a function tests/across/test_write_owners.py allows. That test
-#   reads the source for rows made, or any deleted, elsewhere.
+#   migration, or by a function tests/across/test_write_owners.py allows.
+#   That test reads the source for rows made, or any deleted, elsewhere.
 # - lock: what a write to it holds, which the guard checks as the session
 #   flushes. "row": a row changed or deleted was locked in this
 #   transaction (locked, get_locked, settings_row, relock), or added in it.

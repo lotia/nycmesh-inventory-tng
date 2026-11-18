@@ -84,8 +84,9 @@ def no_settings_from_the_shell(
 ) -> Iterator[None]:
     """A developer's OTEL_*, LOG_* and app settings must not reach the tests,
     nor this clone's frontend/dist: apps find no scan page build unless a
-    test gives one (test_frontend_bundle), as in CI's backend job, which has none.
-    Session-scoped, so it runs before every module-scoped fixture too."""
+    test gives one (test_frontend_bundle), as in CI's backend job, which has
+    none. Session-scoped, so it runs before every module-scoped fixture
+    too."""
     with pytest.MonkeyPatch.context() as monkeypatch:
         monkeypatch.setattr(
             "inventory_tng.core.settings.CLONE_DIST",

@@ -6,13 +6,13 @@ after.
 What to record is decided by pure functions (change, json_value); the flush
 listeners below only read the rows and write what those return. A row
 written any other way, by a statement such as update(Item), a migration or
-SQL an operator types, is not recorded: tests/core/test_history.py fails on a
-statement that writes to a table with history in the app.
+SQL an operator types, is not recorded: tests/core/test_history.py fails
+on a statement that writes to a table with history in the app.
 
 Only the rows the session was given to add, change or delete are seen, not
 any the flush changes by itself, as a relationship() would: no model has
-one (tests/across/test_write_owners.py). models/base.py imports this module, so any
-session that can write these tables has the listeners.
+one (tests/across/test_write_owners.py). models/base.py imports this
+module, so any session that can write these tables has the listeners.
 """
 
 from collections.abc import Iterable, Mapping

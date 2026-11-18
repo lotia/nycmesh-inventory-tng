@@ -4,32 +4,26 @@ it holds (CONTRIBUTING.md, Where tests go)."""
 
 from pathlib import Path
 
-import devtools
-import inventory_tng
+from helpers.source import SOURCE
 
 TESTS = Path(__file__).parents[1]
-SOURCE = Path(inventory_tng.__file__).parent
 PACKAGES = {
     path.parent.relative_to(SOURCE) for path in SOURCE.glob("**/*/__init__.py")
-} | {Path(Path(devtools.__file__).parent.name)}
-
-
-def holds_files(folder: Path) -> bool:
-    """False for a folder left holding only bytecode, as one is after its
-    tests move away, since the version control ignores __pycache__."""
-    return any(
-        path.is_file() for path in folder.rglob("*") if "__pycache__" not in path.parts
-    )
+} | {Path("devtools")}
 
 
 def test_every_folder_mirrors_a_package_or_says_what_it_holds() -> None:
+    # A folder holding only bytecode, as one is after its tests move away
+    # (the version control ignores __pycache__), holds nothing of ours.
+    folders = {
+        folder
+        for path in TESTS.rglob("*")
+        if path.is_file() and "__pycache__" not in path.parts
+        for folder in path.relative_to(TESTS).parents[:-1]
+    }
     unexplained = sorted(
-        str(relative)
-        for folder in TESTS.rglob("*")
-        if folder.is_dir()
-        and "__pycache__" not in folder.parts
-        and (relative := folder.relative_to(TESTS)) not in PACKAGES
-        and not (folder / "README.md").is_file()
-        and holds_files(folder)
+        str(folder)
+        for folder in folders
+        if folder not in PACKAGES and not (TESTS / folder / "README.md").is_file()
     )
     assert unexplained == []
