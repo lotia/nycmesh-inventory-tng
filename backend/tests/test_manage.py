@@ -30,10 +30,10 @@ def test_with_no_command_it_lists_every_one(
 ) -> None:
     """As DEPLOYMENT.md runs it."""
     monkeypatch.setattr(sys, "argv", argv)
-    with (
-        pytest.warns(RuntimeWarning, match="found in sys.modules"),
-        pytest.raises(SystemExit) as done,
-    ):
+    # A fresh copy, as python -m runs: runpy warns when the module is
+    # already imported, and whether it is depends on what ran before.
+    monkeypatch.delitem(sys.modules, "inventory_tng.manage", raising=False)
+    with pytest.raises(SystemExit) as done:
         runpy.run_module("inventory_tng.manage", run_name="__main__")
     assert done.value.code == 0
     out = capsys.readouterr().out
