@@ -218,12 +218,13 @@ def current_packages(
     session: Session,
 ) -> Sequence[Row[ItemPackage, str, str, bool]]:
     """Current packages of current items, each with its item's name, unit
-    and whether it follows them once opened, by item name then size."""
+    and whether it follows them once opened, by item name, then smallest
+    first, ties by id."""
     return session.execute(
         select(ItemPackage, Item.name_shown, Item.unit, Item.track_opened)
         .join(Item, Item.id == ItemPackage.item_id)
         .where(ItemPackage.retired_at.is_(None), Item.retired_at.is_(None))
-        .order_by(func.lower(Item.name), ItemPackage.size)
+        .order_by(func.lower(Item.name), ItemPackage.size, ItemPackage.id)
     ).all()
 
 

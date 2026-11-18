@@ -51,12 +51,12 @@ def items_offered(session: Session) -> Sequence[Row[Item, str, bool]]:
 
 
 def packages_with_tracking(session: Session) -> Sequence[Row[ItemPackage, bool]]:
-    """Every package, by size, with whether its item follows packages once
-    opened."""
+    """Every package, smallest first, ties by id, with whether its item
+    follows packages once opened."""
     return session.execute(
         select(ItemPackage, Item.track_opened)
         .join(Item, Item.id == ItemPackage.item_id)
-        .order_by(ItemPackage.size)
+        .order_by(ItemPackage.size, ItemPackage.id)
     ).all()
 
 

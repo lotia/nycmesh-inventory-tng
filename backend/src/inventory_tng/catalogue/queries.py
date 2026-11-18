@@ -44,12 +44,12 @@ def current_items_of(session: Session, category_id: int) -> Sequence[Item]:
 
 
 def packages_of_item(session: Session, item_id: int) -> Sequence[ItemPackage]:
-    """An item's packages, retired too, the current ones first, then by
-    size."""
+    """An item's packages, retired too, the current ones first, then
+    smallest first, ties by id."""
     return session.scalars(
         select(ItemPackage)
         .where(ItemPackage.item_id == item_id)
-        .order_by(ItemPackage.retired_at.is_not(None), ItemPackage.size)
+        .order_by(ItemPackage.retired_at.is_not(None), ItemPackage.size, ItemPackage.id)
     ).all()
 
 

@@ -8,7 +8,8 @@ amended 2026-11-11 (tracking opened packages is a setting; bulk actions)
 length; "Needs your action") · amended 2026-11-14 (recorded more than
 moved; those settled listed, 2026-11-15) · amended 2026-11-18 (an item's
 open packages listed fewest left first, short ends after the usable ones
-on the scan page; its sealed packages largest first)
+on the scan page; its sealed packages largest first; packages of one
+size by id)
 
 ## Context
 
@@ -139,8 +140,9 @@ deployed, so the migrations may be rewritten (0016).
   Its sealed packages are listed largest package size first, ties by
   package id, so the same records always show the same order (Ali,
   2026-11-18). The reorder page lists those low on sealed the same way,
-  so the two pages agree (chosen when that was built, 2026-11-18, for
-  Ali to confirm).
+  so the two pages agree (Ali, 2026-11-18). The item page, the scan
+  page and the count page list an item's packages smallest first, ties
+  by package id, for the same reason (Ali, 2026-11-18).
 - **Reorder** compares usable stock in stores with the item's reorder
   point.
 - **Minimum sealed**: a package may set an optional minimum of sealed

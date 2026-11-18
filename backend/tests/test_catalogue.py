@@ -17,9 +17,10 @@ from inventory_tng.models.catalogue import Category, Item, ItemPackage
 from inventory_tng.models.labels import Label
 from inventory_tng.models.places import Location
 from inventory_tng.models.volunteers import Volunteer
-from inventory_tng.scan import catalogue_api
+from inventory_tng.scan import catalogue_api, queries
 from inventory_tng.stock.ledger import LOOSE, Entry
 
+from helpers.items import new_item, same_size_twins
 from helpers.rows import add, tag
 from helpers.stock import Place, Spools, retire, write
 
@@ -391,3 +392,17 @@ def test_a_snapshot_is_never_asked_for_after_a_change(session: Session) -> None:
     session.add(Category(name=f"New {tag()}"))
     with pytest.raises(RuntimeError, match="after a change"):
         get_snapshot(session)
+
+
+def test_packages_come_smallest_first_ties_by_id(
+    session: Session, radios: Category
+) -> None:
+    item = new_item(session, radios)
+    first, second = same_size_twins(session, item)
+    small = add(session, ItemPackage(item_id=item.id, name="Small", size=Decimal(2)))
+    listed = [
+        package
+        for package, _ in queries.packages_with_tracking(session)
+        if package.item_id == item.id
+    ]
+    assert listed == [small, first, second]

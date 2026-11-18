@@ -11,7 +11,7 @@ from httpx2 import Response
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from inventory_tng.catalogue import items
+from inventory_tng.catalogue import items, queries
 from inventory_tng.catalogue.forms import PACKAGE_TAKEN, SHORTER_THAN_WHOLE
 from inventory_tng.catalogue.items_routes import PACKAGE_RETIRED
 from inventory_tng.catalogue.paths import ITEMS
@@ -20,7 +20,7 @@ from inventory_tng.models.catalogue import Category, Item, ItemPackage
 from inventory_tng.models.labels import Label
 from inventory_tng.stock import open_packages
 
-from helpers.items import NOW, new_item
+from helpers.items import NOW, new_item, same_size_twins
 from helpers.markup import read, text
 from helpers.rows import add, history, shown
 from helpers.stock import Spools, retire
@@ -334,3 +334,14 @@ def test_a_too_short_length_refused_as_resized_meanwhile_says_so_beside_it(
     )
     assert refused.status_code == 400
     assert str(SHORTER_THAN_WHOLE) in text(refused)
+
+
+def test_packages_are_listed_current_first_then_smallest_ties_by_id(
+    session: Session, radios: Category
+) -> None:
+    item = new_item(session, radios)
+    old = add(session, ItemPackage(item_id=item.id, name="Old", size=1, retired_at=NOW))
+    first, second = same_size_twins(session, item)
+    small = add(session, ItemPackage(item_id=item.id, name="Small", size=Decimal(2)))
+    listed = queries.packages_of_item(session, item.id)
+    assert listed == [small, first, second, old]

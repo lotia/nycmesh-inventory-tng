@@ -10,11 +10,13 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from inventory_tng.models.admins import Admin
+from inventory_tng.models.catalogue import Category, ItemPackage
 from inventory_tng.models.stock import AdjustmentReason, LedgerTransaction, OpenPackage
-from inventory_tng.stock import counts, moments
+from inventory_tng.stock import counts, moments, queries
 from inventory_tng.stock import forms as stock_forms
 from inventory_tng.stock.ledger import LOOSE, Entry, Form
 
+from helpers.items import new_item, same_size_twins
 from helpers.markup import text
 from helpers.package_forms import CABLE, OPEN, SEALED, open_form, quantities_by_form
 from helpers.rows import add, breaks, tag
@@ -281,3 +283,17 @@ def test_an_open_package_found_while_its_item_moved_is_asked_again(
     assert admin_client.post(f"{COUNTS}/{van}", data=form).status_code == 409
     made = select(OpenPackage).where(OpenPackage.key == uuid.uuid5(key, "found"))
     assert session.scalars(made).first() is None
+
+
+def test_current_packages_come_by_item_then_smallest_ties_by_id(
+    session: Session, radios: Category
+) -> None:
+    item = new_item(session, radios, f"Cable {tag()}")
+    first, second = same_size_twins(session, item)
+    small = add(session, ItemPackage(item_id=item.id, name="Small", size=Decimal(2)))
+    listed = [
+        package
+        for package, *_ in queries.current_packages(session)
+        if package.item_id == item.id
+    ]
+    assert listed == [small, first, second]
