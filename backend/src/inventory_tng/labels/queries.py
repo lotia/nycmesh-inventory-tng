@@ -1,4 +1,4 @@
-"""What the labels page reads (admin/labels.py): plain functions taking a
+"""What the labels page reads (labels/routes.py): plain functions taking a
 Session, each named for what it returns, and the select its list searches
 (docs/decisions/0023)."""
 

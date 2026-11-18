@@ -16,7 +16,6 @@ from inventory_tng.admin import (
     common,
     counts,
     devices,
-    labels,
     length_checks,
     over_recorded,
     settings,
@@ -30,6 +29,7 @@ from inventory_tng.catalogue import (
     items_routes,
     reading_rules_routes,
 )
+from inventory_tng.labels import routes as labels_routes
 from inventory_tng.places import routes as places_routes
 from inventory_tng.volunteers import routes as volunteers_routes
 
@@ -38,7 +38,7 @@ pages.SECTIONS[:] = (
     (items_routes.ITEMS, common.SECTION_ITEMS),
     (categories_routes.CATEGORIES, common.SECTION_CATEGORIES),
     (places_routes.LOCATIONS, common.SECTION_LOCATIONS),
-    (labels.LABELS, common.SECTION_LABELS),
+    (labels_routes.LABELS, common.SECTION_LABELS),
     (volunteers_routes.VOLUNTEERS, common.SECTION_VOLUNTEERS),
     (stock.STOCK, common.SECTION_STOCK),
     (counts.COUNTS, common.SECTION_COUNTS),
@@ -54,7 +54,7 @@ for module in (
     items_routes,
     categories_routes,
     places_routes,
-    labels,
+    labels_routes,
     volunteers_routes,
     stock,
     used_up,

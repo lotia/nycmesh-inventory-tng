@@ -1,5 +1,5 @@
 """Labels: made from an item's or a place's page, found, reprinted and
-revoked from the labels page (admin/labels.py)."""
+revoked from the labels page (labels/routes.py)."""
 
 from datetime import UTC, datetime
 from decimal import Decimal
@@ -12,7 +12,6 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from inventory_tng.admin.common import LABELS
-from inventory_tng.admin.labels import PICK_LABELS, PRINT
 from inventory_tng.admin.listing import PER_PAGE
 from inventory_tng.admins.accounts import qr_svg
 from inventory_tng.catalogue.items_routes import ITEMS
@@ -23,6 +22,7 @@ from inventory_tng.labels.labels import (
     package_label,
     place_words,
 )
+from inventory_tng.labels.routes import PICK_LABELS, PRINT
 from inventory_tng.models import (
     Category,
     Item,

@@ -74,7 +74,6 @@ BREAKS: dict[str, dict[str, list[str]]] = {
         "admin/__init__.py": [
             "admin/counts.py",
             "admin/devices.py",
-            "admin/labels.py",
             "admin/length_checks.py",
             "admin/over_recorded.py",
             "admin/settings.py",
@@ -85,11 +84,11 @@ BREAKS: dict[str, dict[str, list[str]]] = {
             "catalogue/categories_routes.py",
             "catalogue/items_routes.py",
             "catalogue/reading_rules_routes.py",
+            "labels/routes.py",
             "places/routes.py",
             "volunteers/routes.py",
         ],
         "admin/counts.py": ["admin/settings.py", "catalogue/items_routes.py"],
-        "admin/labels.py": ["catalogue/items_routes.py", "places/routes.py"],
         "admin/length_checks.py": ["admin/stock.py", "admin/used_up.py"],
         "admin/over_recorded.py": [
             "admin/counts.py",
@@ -105,6 +104,7 @@ BREAKS: dict[str, dict[str, list[str]]] = {
             "places/routes.py",
             "volunteers/routes.py",
         ],
+        "labels/routes.py": ["catalogue/items_routes.py", "places/routes.py"],
         "security_headers.py": ["page_telemetry.py"],
     },
     "init_not_empty": {

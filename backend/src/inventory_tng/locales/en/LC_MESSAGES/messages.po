@@ -2582,7 +2582,7 @@ msgstr ""
 msgid "Pick a category."
 msgstr ""
 
-#: src/inventory_tng/admin/labels.py
+#: src/inventory_tng/labels/routes.py
 msgid "Pick a current label to print."
 msgstr ""
 
@@ -2676,7 +2676,7 @@ msgstr ""
 msgid "Print %(code)s"
 msgstr ""
 
-#: src/inventory_tng/admin/labels.py
+#: src/inventory_tng/labels/routes.py
 #, python-format
 msgid "Print from 1 to %(max)d copies of each."
 msgstr ""
@@ -2691,7 +2691,7 @@ msgid ""
 " paper sizes, pick the same one there."
 msgstr ""
 
-#: src/inventory_tng/admin/labels.py src/inventory_tng/templates/_labels.html
+#: src/inventory_tng/labels/routes.py src/inventory_tng/templates/_labels.html
 msgid "Print labels"
 msgstr ""
 
@@ -2703,7 +2703,7 @@ msgstr ""
 msgid "Print them"
 msgstr ""
 
-#: src/inventory_tng/admin/labels.py
+#: src/inventory_tng/labels/routes.py
 #, python-format
 msgid "Print up to %(num)d label at once."
 msgid_plural "Print up to %(num)d labels at once."
@@ -3098,7 +3098,7 @@ msgid ""
 "any that look wrong."
 msgstr ""
 
-#: src/inventory_tng/admin/labels.py
+#: src/inventory_tng/labels/routes.py
 msgid ""
 "Revoked: its copies now scan as a label the inventory doesn't have. "
 "Making labels for it again makes a new code."
