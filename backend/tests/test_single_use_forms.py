@@ -110,7 +110,7 @@ def test_recovery_codes_are_made_once(
     with app_clock() as at:
         later = code(key, at + TIME_STEP)
         form = {
-            "single_use": key_on(client.get(ACCOUNT), action),
+            FIELD: key_on(client.get(ACCOUNT), action),
             "confirm_code": later,
         }
         made = client.post(action, data=form, headers=referer)
@@ -193,7 +193,7 @@ def test_bringing_back_and_inviting_are_sent_once(
 
 
 def test_a_form_without_its_key_is_a_bad_request(admin_client: TestClient) -> None:
-    refused = admin_client.post(CODES, data={"uses": "1", "single_use": "not a key"})
+    refused = admin_client.post(CODES, data={"uses": "1", FIELD: "not a key"})
     assert refused.status_code == 400
 
 

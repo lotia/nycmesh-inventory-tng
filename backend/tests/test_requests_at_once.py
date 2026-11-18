@@ -63,6 +63,7 @@ from inventory_tng.stock import adjustment_reasons, open_packages
 from inventory_tng.stock.ledger import Entry, Form, insert_transaction
 from inventory_tng.volunteers import volunteers
 from inventory_tng.volunteers.paths import VOLUNTEERS
+from inventory_tng.web.single_use_forms import FIELD
 
 from helpers.concurrency import Committed, Worker, delete_made, made, newest_ids
 from helpers.devices import new_device
@@ -1465,7 +1466,7 @@ def changes_open(committed: Committed, session_id: int) -> None:
 
 
 def inviting(client: TestClient, key: str, username: str) -> Answer:
-    return client.post(ADMINS, data={"single_use": key, "username": username})
+    return client.post(ADMINS, data={FIELD: key, "username": username})
 
 
 @pytest.mark.end_to_end

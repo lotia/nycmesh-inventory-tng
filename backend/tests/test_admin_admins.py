@@ -23,6 +23,7 @@ from inventory_tng.core.settings import RateLimits
 from inventory_tng.models.admins import ACTIVITY_KINDS, Admin, AdminSession
 from inventory_tng.models.site_settings import SignInSettings
 from inventory_tng.web.qr_codes import qr_svg
+from inventory_tng.web.single_use_forms import FIELD
 
 from helpers.mail import NO_MAIL, SentMail
 from helpers.markup import button, forms, links, read, row_links, sorted_columns, text
@@ -556,9 +557,7 @@ def test_a_key_spent_by_another_form_does_not_skip_the_code(
     carol, _ = new_admin(session, "carol")
     form = with_code(session)
     assert admin_client.post(f"{ADMINS}/{ben.id}/reset", data=form).status_code == 200
-    taken = admin_client.post(
-        f"{ADMINS}/{carol.id}/retire", data={"single_use": form["single_use"]}
-    )
+    taken = admin_client.post(f"{ADMINS}/{carol.id}/retire", data={FIELD: form[FIELD]})
     assert taken.status_code == 409
     assert carol.retired_at is None
 

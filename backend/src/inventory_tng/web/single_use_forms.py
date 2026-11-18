@@ -91,9 +91,8 @@ def sent_before(
 ) -> HTMLResponse | None:
     """None if the form with this key is sent for the first time; else the
     page saying so, with a way `back`. The key is spent in the request's
-    transaction, so a form refused without a commit can be sent again, and
-    a second sending at once waits on the first, then finds it. A key that
-    isn't one is a bad request."""
+    transaction (spend), so a form refused without a commit can be sent
+    again. A key that isn't one is a bad request."""
     key = form_key(typed)
     if key is None:
         log.info("form key missing", made=made, admin_id=signed.admin.id)
