@@ -14,7 +14,7 @@ import { guardRetire } from "./admin/retire";
 import { say, speak } from "./i18n";
 import { messages as pseudo } from "./locales/pseudo.po";
 import { type Entry, Outbox, type Reason, type Recorded } from "./outbox";
-import { RegisterPage } from "./RegisterPage";
+import { RegisterPage } from "./register/RegisterPage";
 import { DecoderUnavailable } from "./scan/camera";
 import { type Catalogue, freshCart, type Item, storeCart } from "./scan/cart";
 import { OpenPackageCard } from "./scan/OpenPackageCard";

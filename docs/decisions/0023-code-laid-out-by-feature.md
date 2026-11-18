@@ -240,6 +240,7 @@ The frontend's moves, both under `frontend/src/`, sorted the same way:
 | `OpenPackageCard.tsx`, with its tests | `scan/OpenPackageCard.tsx` |
 | `OutboxList.tsx` | `scan/OutboxList.tsx` |
 | `recorded.ts`, with its tests | `scan/recorded.ts` |
+| `RegisterPage.tsx`, with its tests | `register/RegisterPage.tsx` |
 | `retire.ts`, with its tests | `admin/retire.ts` |
 | `Scanner.tsx`, with its tests | `scan/Scanner.tsx` |
 | `ScanPage.tsx`, with its tests | `scan/ScanPage.tsx` |

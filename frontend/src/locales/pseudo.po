@@ -7,7 +7,7 @@ msgstr ""
 "X-Generator: @lingui/cli\n"
 "Language: pseudo\n"
 
-#: src/RegisterPage.tsx
+#: src/register/RegisterPage.tsx
 msgid "Enter the phrase you were given."
 msgstr ""
 
@@ -181,7 +181,7 @@ msgstr ""
 msgid "Receipt: {items} to {to}"
 msgstr ""
 
-#: src/RegisterPage.tsx
+#: src/register/RegisterPage.tsx
 msgid "Couldn't reach the inventory. Check your connection, then try again."
 msgstr ""
 
@@ -246,7 +246,7 @@ msgstr ""
 msgid "No longer in the catalogue."
 msgstr ""
 
-#: src/RegisterPage.tsx
+#: src/register/RegisterPage.tsx
 msgid "Registering…"
 msgstr ""
 
@@ -258,7 +258,7 @@ msgstr ""
 msgid "What's on it: {packages} at {from}"
 msgstr ""
 
-#: src/RegisterPage.tsx
+#: src/register/RegisterPage.tsx
 msgid "The inventory can't answer just now. Try again in a minute."
 msgstr ""
 
@@ -326,7 +326,7 @@ msgstr ""
 msgid "Point the camera at a label."
 msgstr ""
 
-#: src/RegisterPage.tsx
+#: src/register/RegisterPage.tsx
 msgid "Register this device"
 msgstr ""
 
@@ -338,7 +338,7 @@ msgstr ""
 msgid "Already recorded from this tab in transaction {transaction}"
 msgstr ""
 
-#: src/RegisterPage.tsx
+#: src/register/RegisterPage.tsx
 msgid "Register"
 msgstr ""
 
@@ -463,11 +463,11 @@ msgstr ""
 msgid "{name}: That is more than the inventory can count."
 msgstr ""
 
-#: src/RegisterPage.tsx
+#: src/register/RegisterPage.tsx
 msgid "{count, plural, one {The batch waiting on this browser is being sent.} other {The # batches waiting on this browser are being sent.}}"
 msgstr ""
 
-#: src/RegisterPage.tsx
+#: src/register/RegisterPage.tsx
 msgid "Go to the scan page"
 msgstr ""
 
@@ -555,7 +555,7 @@ msgstr ""
 msgid "{item} comes in no package to open."
 msgstr ""
 
-#: src/RegisterPage.tsx
+#: src/register/RegisterPage.tsx
 msgid "Registering lets this browser record in the inventory. It covers only this browser, so use the same one for the scan page. If the QR code opened a browser you don't usually use, open the link in yours."
 msgstr ""
 
@@ -575,7 +575,7 @@ msgstr ""
 msgid "Now:"
 msgstr ""
 
-#: src/RegisterPage.tsx
+#: src/register/RegisterPage.tsx
 msgid "Registration phrase"
 msgstr ""
 
@@ -682,7 +682,7 @@ msgstr ""
 msgid "Not me"
 msgstr ""
 
-#: src/RegisterPage.tsx
+#: src/register/RegisterPage.tsx
 msgid "This browser is registered."
 msgstr ""
 

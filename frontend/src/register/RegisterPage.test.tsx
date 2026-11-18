@@ -1,8 +1,10 @@
 import { fireEvent, render, screen } from "@testing-library/preact";
 import { expect, test, vi } from "vitest";
-import { BUILD } from "./build";
-import { say } from "./i18n";
-import { Outbox, STORAGE_KEY } from "./outbox";
+import { BUILD } from "../build";
+import { say } from "../i18n";
+import { Outbox, STORAGE_KEY } from "../outbox";
+import { REFUSALS } from "../registration";
+import { answering, deferred, json } from "../testing/fetch";
 import {
   BATCHES_WAITING,
   PHRASE,
@@ -10,8 +12,6 @@ import {
   REGISTERING,
   RegisterPage,
 } from "./RegisterPage";
-import { REFUSALS } from "./registration";
-import { answering, deferred, json } from "./testing/fetch";
 
 function openAt(path: string) {
   window.history.replaceState(null, "", path);

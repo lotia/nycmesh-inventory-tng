@@ -7,7 +7,7 @@ msgstr ""
 "X-Generator: @lingui/cli\n"
 "Language: en\n"
 
-#: src/RegisterPage.tsx
+#: src/register/RegisterPage.tsx
 msgid "Enter the phrase you were given."
 msgstr "Enter the phrase you were given."
 
@@ -181,7 +181,7 @@ msgstr "Loose units"
 msgid "Receipt: {items} to {to}"
 msgstr "Receipt: {items} to {to}"
 
-#: src/RegisterPage.tsx
+#: src/register/RegisterPage.tsx
 msgid "Couldn't reach the inventory. Check your connection, then try again."
 msgstr "Couldn't reach the inventory. Check your connection, then try again."
 
@@ -246,7 +246,7 @@ msgstr "Moving stock"
 msgid "No longer in the catalogue."
 msgstr "No longer in the catalogue."
 
-#: src/RegisterPage.tsx
+#: src/register/RegisterPage.tsx
 msgid "Registering…"
 msgstr "Registering…"
 
@@ -258,7 +258,7 @@ msgstr "Go back"
 msgid "What's on it: {packages} at {from}"
 msgstr "What's on it: {packages} at {from}"
 
-#: src/RegisterPage.tsx
+#: src/register/RegisterPage.tsx
 msgid "The inventory can't answer just now. Try again in a minute."
 msgstr "The inventory can't answer just now. Try again in a minute."
 
@@ -326,7 +326,7 @@ msgstr "That phrase has been withdrawn. Ask for a new one."
 msgid "Point the camera at a label."
 msgstr "Point the camera at a label."
 
-#: src/RegisterPage.tsx
+#: src/register/RegisterPage.tsx
 msgid "Register this device"
 msgstr "Register this device"
 
@@ -338,7 +338,7 @@ msgstr "(what is on {packages} said)"
 msgid "Already recorded from this tab in transaction {transaction}"
 msgstr "Already recorded from this tab in transaction {transaction}"
 
-#: src/RegisterPage.tsx
+#: src/register/RegisterPage.tsx
 msgid "Register"
 msgstr "Register"
 
@@ -463,11 +463,11 @@ msgstr "Something"
 msgid "{name}: That is more than the inventory can count."
 msgstr "{name}: That is more than the inventory can count."
 
-#: src/RegisterPage.tsx
+#: src/register/RegisterPage.tsx
 msgid "{count, plural, one {The batch waiting on this browser is being sent.} other {The # batches waiting on this browser are being sent.}}"
 msgstr "{count, plural, one {The batch waiting on this browser is being sent.} other {The # batches waiting on this browser are being sent.}}"
 
-#: src/RegisterPage.tsx
+#: src/register/RegisterPage.tsx
 msgid "Go to the scan page"
 msgstr "Go to the scan page"
 
@@ -555,7 +555,7 @@ msgstr "What is on an open package, {n}: {why}"
 msgid "{item} comes in no package to open."
 msgstr "{item} comes in no package to open."
 
-#: src/RegisterPage.tsx
+#: src/register/RegisterPage.tsx
 msgid "Registering lets this browser record in the inventory. It covers only this browser, so use the same one for the scan page. If the QR code opened a browser you don't usually use, open the link in yours."
 msgstr "Registering lets this browser record in the inventory. It covers only this browser, so use the same one for the scan page. If the QR code opened a browser you don't usually use, open the link in yours."
 
@@ -575,7 +575,7 @@ msgstr "Open one package a line: it is followed until used up"
 msgid "Now:"
 msgstr "Now:"
 
-#: src/RegisterPage.tsx
+#: src/register/RegisterPage.tsx
 msgid "Registration phrase"
 msgstr "Registration phrase"
 
@@ -682,7 +682,7 @@ msgstr "What's on the {name} after this cut ({unit}), if you can tell"
 msgid "Not me"
 msgstr "Not me"
 
-#: src/RegisterPage.tsx
+#: src/register/RegisterPage.tsx
 msgid "This browser is registered."
 msgstr "This browser is registered."
 

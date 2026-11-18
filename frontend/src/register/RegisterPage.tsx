@@ -2,11 +2,11 @@ import type { MessageDescriptor } from "@lingui/core";
 import { msg } from "@lingui/core/macro";
 import { useSignal } from "@preact/signals";
 import type { ComponentChildren, TargetedSubmitEvent } from "preact";
-import { type Api, makeApi } from "./api/client";
-import { Field } from "./Field";
-import { say } from "./i18n";
-import { type Outbox, sharedOutbox } from "./outbox";
-import { type Outcome, REFUSALS, register } from "./registration";
+import { type Api, makeApi } from "../api/client";
+import { Field } from "../Field";
+import { say } from "../i18n";
+import { type Outbox, sharedOutbox } from "../outbox";
+import { type Outcome, REFUSALS, register } from "../registration";
 
 const CODE = "code";
 

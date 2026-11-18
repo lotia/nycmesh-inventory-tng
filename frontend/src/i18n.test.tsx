@@ -4,7 +4,7 @@ import { expect, test } from "vitest";
 import { say, sayParts, speak } from "./i18n";
 import { messages as english } from "./locales/en.po";
 import { messages as pseudo } from "./locales/pseudo.po";
-import { BATCHES_WAITING, REGISTERED } from "./RegisterPage";
+import { BATCHES_WAITING, REGISTERED } from "./register/RegisterPage";
 import { ADDED_ONE } from "./scan/CartForm";
 import { ITEM_SAYS } from "./scan/cart";
 import { REGISTER_IT } from "./scan/ScanPage";
