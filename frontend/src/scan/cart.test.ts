@@ -40,7 +40,14 @@ import {
   WHOLE_UNITS,
   withLine,
 } from "./cart";
-import { keysToAsk, offered, offeredAt, sealedCounts, unseen } from "./offered";
+import {
+  keysToAsk,
+  type Offered,
+  offered,
+  offeredAt,
+  sealedCounts,
+  unseen,
+} from "./offered";
 
 /** A batch with a key, as the outbox keeps it. */
 let keys = 0;
@@ -517,21 +524,30 @@ describe("turning a cart into a batch", () => {
     ]);
   });
 
+  /** Item 101's open spool `id` at place 10, `left` in thousandths. */
+  const openAt = (
+    id: number,
+    left: number,
+    fields: Partial<Offered> = {},
+  ): Offered => ({
+    id,
+    key: `open-${id}`,
+    item_id: 101,
+    package_id: 1001,
+    package_name: "Spool",
+    location_id: 10,
+    opened_at: "2026-11-03T10:00:00Z",
+    left,
+    short_below: null,
+    ...fields,
+  });
+
   test("an item's open packages at a place: fewest left first, ties by id, those showing nothing last", () => {
     // As on the stock page (Ali, 2026-11-18, inventory-tng-qskv). One
     // opened on this phone has no id yet: the server gives it the next,
     // so it follows those of the same length.
-    const at = (id: number, key: string, left: number) => ({
-      id,
-      key,
-      item_id: 101,
-      package_id: 1001,
-      package_name: "Spool",
-      location_id: 10,
-      opened_at: "2026-11-03T10:00:00Z",
-      left,
-      short_below: null,
-    });
+    const at = (id: number, key: string, left: number) =>
+      openAt(id, left, { key });
     const all = [
       at(0, "waiting-a", 40000),
       at(6, "below", -4000),
@@ -556,17 +572,8 @@ describe("turning a cart into a batch", () => {
   test("an item's short ends at a place follow its usable open packages, fewest left first, ties by id", () => {
     // Too short to use, so after those a cut can come from (Ali,
     // 2026-11-18, inventory-tng-qskv); those showing nothing stay last.
-    const at = (id: number, left: number, short_below: string | null) => ({
-      id,
-      key: `open-${id}`,
-      item_id: 101,
-      package_id: 1001,
-      package_name: "Spool",
-      location_id: 10,
-      opened_at: "2026-11-03T10:00:00Z",
-      left,
-      short_below,
-    });
+    const at = (id: number, left: number, short_below: string | null) =>
+      openAt(id, left, { short_below });
     const all = [
       at(1, 0, "15.000"),
       at(2, 12000, "15.000"),
@@ -786,17 +793,7 @@ describe("turning a cart into a batch", () => {
         },
       },
     ];
-    const here = {
-      id: 5,
-      key: shown,
-      item_id: 101,
-      package_id: 1001,
-      package_name: "Spool",
-      location_id: 10,
-      opened_at: "2026-11-03T10:00:00Z",
-      left: 120_000,
-      short_below: null,
-    };
+    const here = openAt(5, 120_000, { key: shown });
     // Offered elsewhere is not offered here.
     const elsewhere = { ...here, key: gone, location_id: 12 };
     const batch = toBatch(cart({ lines }), CATALOGUE, [here, elsewhere]);

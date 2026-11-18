@@ -197,24 +197,23 @@ export function offered(
  * first, ties by id, as the stock page lists them
  * (open_packages.fewest_left_first), then short ends (isShortEnd), which
  * the stock page shows on a line of their own, the same way, then those
- * showing nothing, or less (docs/decisions/0020). One opened on this phone that the
- * catalogue does not show yet has no id here (0), so it follows those
- * that have one, in the order it was opened. By what is on each now,
- * never after a cut being typed. */
+ * showing nothing, or less (docs/decisions/0020). One opened on this
+ * phone that the catalogue does not show yet has no id here (0), so it
+ * follows those that have one, in the order it was opened. By what is on
+ * each now, never after a cut being typed. */
 export function offeredAt(
   all: readonly Offered[],
   itemId: number,
   placeId: number | null,
 ): Offered[] {
-  // Usable, then short ends, then those showing nothing or less.
-  const last = (each: Offered) =>
+  const group = (each: Offered) =>
     each.left <= 0 ? 2 : Number(isShortEnd(each.left, each.short_below));
   const unsaved = (each: Offered) => Number(each.id === 0);
   return all
     .filter((each) => each.item_id === itemId && each.location_id === placeId)
     .sort(
       (a, b) =>
-        last(a) - last(b) ||
+        group(a) - group(b) ||
         a.left - b.left ||
         unsaved(a) - unsaved(b) ||
         a.id - b.id,
