@@ -1,5 +1,5 @@
-"""What every operator command shares (devices.command, scan_settings,
-totp_keys; docs/decisions/0018):
+"""What every operator command shares (devices.command,
+site_settings.scan_settings, totp_keys; docs/decisions/0018):
 the process is set up as the server sets itself up (docs/decisions/0007),
 then the command runs in one transaction, committed if it returns.
 """

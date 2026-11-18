@@ -1,4 +1,4 @@
-"""The settings page: how the scan page behaves (admin/settings.py)."""
+"""The settings page: how the scan page behaves (site_settings/routes.py)."""
 
 from collections.abc import Callable
 
@@ -7,7 +7,6 @@ from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
 from structlog.testing import capture_logs
 
-from inventory_tng.admin.settings import SETTINGS
 from inventory_tng.admins import activity
 from inventory_tng.core import mail
 from inventory_tng.models import (
@@ -17,6 +16,7 @@ from inventory_tng.models import (
     SiteSettings,
 )
 from inventory_tng.site_settings.forms import whole_minutes
+from inventory_tng.site_settings.routes import SETTINGS
 from inventory_tng.web.forms import PICK_A_ZONE
 
 from helpers.mail import SentMail

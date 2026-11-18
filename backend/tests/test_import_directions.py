@@ -33,7 +33,7 @@ RULES = {
     "catalogue/unit_readings.py",
     "catalogue/units.py",
     "stock/ledger.py",
-    "scan_settings.py",
+    "site_settings/scan_settings.py",
     "stock/balance.py",
 }
 # What of web/ rules may import: it loads neither FastAPI nor the templates,
@@ -72,7 +72,6 @@ BREAKS: dict[str, dict[str, list[str]]] = {
     "routes_run_queries": {},
     "routes_import_another_features_routes": {
         "admin/__init__.py": [
-            "admin/settings.py",
             "admins/home_routes.py",
             "admins/routes.py",
             "catalogue/categories_routes.py",
@@ -81,6 +80,7 @@ BREAKS: dict[str, dict[str, list[str]]] = {
             "devices/routes.py",
             "labels/routes.py",
             "places/routes.py",
+            "site_settings/routes.py",
             "stock/counts_routes.py",
             "stock/length_checks_routes.py",
             "stock/over_recorded_routes.py",
@@ -97,7 +97,10 @@ BREAKS: dict[str, dict[str, list[str]]] = {
         ],
         "labels/routes.py": ["catalogue/items_routes.py", "places/routes.py"],
         "security_headers.py": ["page_telemetry.py"],
-        "stock/counts_routes.py": ["admin/settings.py", "catalogue/items_routes.py"],
+        "stock/counts_routes.py": [
+            "catalogue/items_routes.py",
+            "site_settings/routes.py",
+        ],
         "stock/over_recorded_routes.py": ["places/routes.py"],
         "stock/stock_routes.py": ["catalogue/items_routes.py"],
         "stock/used_up_routes.py": ["catalogue/items_routes.py"],

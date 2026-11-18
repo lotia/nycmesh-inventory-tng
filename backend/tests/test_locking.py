@@ -21,7 +21,6 @@ from fastapi.testclient import TestClient
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from inventory_tng.admin.settings import SETTINGS
 from inventory_tng.catalogue.categories_routes import CATEGORIES
 from inventory_tng.catalogue.items_routes import ITEMS
 from inventory_tng.core.db import (
@@ -40,6 +39,7 @@ from inventory_tng.models import (
     Volunteer,
 )
 from inventory_tng.places.routes import LOCATIONS
+from inventory_tng.site_settings.routes import SETTINGS
 from inventory_tng.volunteers.routes import VOLUNTEERS
 
 from helpers.concurrency import Committed, made

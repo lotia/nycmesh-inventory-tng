@@ -1,5 +1,5 @@
-"""What the settings page reads (admin/settings.py): plain functions taking
-a Session, each named for what it returns (docs/decisions/0023)."""
+"""What the settings page reads (site_settings/routes.py): plain functions
+taking a Session, each named for what it returns (docs/decisions/0023)."""
 
 from collections.abc import Sequence
 

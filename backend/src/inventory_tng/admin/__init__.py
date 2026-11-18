@@ -12,7 +12,7 @@ refused form still links where it should.
 from fastapi import APIRouter
 
 from inventory_tng import pages
-from inventory_tng.admin import common, settings
+from inventory_tng.admin import common
 from inventory_tng.admins import home_routes
 from inventory_tng.admins import routes as admins_routes
 from inventory_tng.catalogue import (
@@ -23,6 +23,7 @@ from inventory_tng.catalogue import (
 from inventory_tng.devices import routes as devices_routes
 from inventory_tng.labels import routes as labels_routes
 from inventory_tng.places import routes as places_routes
+from inventory_tng.site_settings import routes as site_settings_routes
 from inventory_tng.stock import (
     counts_routes,
     length_checks_routes,
@@ -43,7 +44,7 @@ pages.SECTIONS[:] = (
     (counts_routes.COUNTS, common.SECTION_COUNTS),
     (devices_routes.DEVICES, common.SECTION_DEVICES),
     (admins_routes.ADMINS, common.SECTION_ADMINS),
-    (settings.SETTINGS, common.SECTION_SETTINGS),
+    (site_settings_routes.SETTINGS, common.SECTION_SETTINGS),
 )
 pages.BADGES[counts_routes.COUNTS] = counts_routes.badge
 
@@ -63,6 +64,6 @@ for module in (
     counts_routes,
     devices_routes,
     admins_routes,
-    settings,
+    site_settings_routes,
 ):
     router.include_router(module.router)

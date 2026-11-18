@@ -1,7 +1,7 @@
 """How the settings page's forms are read and checked: how long the scan
 page waits, the sign-in settings' policy and whole numbers, and an
 adjustment reason's name, and what is wrong, in words. The handlers in
-admin/settings.py read the request and pass the form's fields."""
+site_settings/routes.py read the request and pass the form's fields."""
 
 from collections.abc import Callable, Mapping
 from typing import NamedTuple

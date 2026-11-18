@@ -1268,8 +1268,9 @@ class OverRecorded(Base):
 
 class ScanSettings(Versioned, Base):
     """How the scan page behaves, which administrators set on the Site settings
-    page (admin/settings.py, through scan_settings.py). One row, id 1, made
-    by its migration. Changes are history like everything else."""
+    page (site_settings/routes.py, through site_settings/scan_settings.py).
+    One row, id 1, made by its migration. Changes are history like everything
+    else."""
 
     __tablename__ = "scan_settings"
     __table_args__ = (

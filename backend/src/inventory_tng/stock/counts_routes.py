@@ -49,7 +49,6 @@ from inventory_tng.admin.common import (
     text_form,
 )
 from inventory_tng.admin.listing import UNASKED, AskedView, Sort, Sorting, View, order
-from inventory_tng.admin.settings import SETTINGS
 from inventory_tng.admins.guards import AdminSignedIn, SignedIn
 from inventory_tng.catalogue.items_routes import SEARCHED
 from inventory_tng.core.db import DbSession, by_name, refusal
@@ -73,6 +72,7 @@ from inventory_tng.pages import (
     redirect,
     retired_holding,
 )
+from inventory_tng.site_settings.routes import SETTINGS
 from inventory_tng.stock import needs_action, open_packages, over_recorded, queries
 from inventory_tng.stock.balance import countable, retired_holding_stock_count, takeable
 from inventory_tng.stock.forms import (

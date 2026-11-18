@@ -5,8 +5,8 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 from structlog.testing import capture_logs
 
-from inventory_tng import scan_settings
 from inventory_tng.models import CatalogueHistory, ScanSettings
+from inventory_tng.site_settings import scan_settings
 
 from helpers.rows import violates
 

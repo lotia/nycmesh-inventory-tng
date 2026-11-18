@@ -1,9 +1,10 @@
 """How the scan page behaves: every write to the scan_settings table, by
-the Site settings page (admin/settings.py) and from the command line, the
-operator's fallback:
+the Site settings page (site_settings/routes.py) and from the command line,
+the operator's fallback:
 
-    uv run python -m inventory_tng.scan_settings show
-    uv run python -m inventory_tng.scan_settings set --name-check-minutes 20
+    uv run python -m inventory_tng.site_settings.scan_settings show
+    uv run python -m inventory_tng.site_settings.scan_settings set \
+        --name-check-minutes 20
 
 The page reads them with the catalogue, which an open page fetches again
 every ten minutes. Changes are history, as the command line (system:cli).
@@ -33,7 +34,9 @@ def minutes(text: str) -> int:
 
 
 def parse(argv: Sequence[str] | None = None) -> argparse.Namespace:
-    parser = argparse.ArgumentParser(prog="python -m inventory_tng.scan_settings")
+    parser = argparse.ArgumentParser(
+        prog="python -m inventory_tng.site_settings.scan_settings"
+    )
     commands = parser.add_subparsers(dest="command", required=True)
     commands.add_parser("show", help="the settings now")
     change = commands.add_parser("set", help="change one or more settings")

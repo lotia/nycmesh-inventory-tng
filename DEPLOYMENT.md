@@ -471,8 +471,8 @@ settings live in the database (docs/decisions/0011). If no administrator
 can, the operator can (Operator commands, above):
 
 ```sh
-kubectl exec deploy/inventory -- python -m inventory_tng.scan_settings \
-  set --name-check-minutes 20
+kubectl exec deploy/inventory -- \
+  python -m inventory_tng.site_settings.scan_settings set --name-check-minutes 20
 ```
 
 ## Unit readings
