@@ -20,8 +20,8 @@ from inventory_tng.stock import (
     length_checks_routes,
     open_packages,
     over_recorded,
+    over_recorded_routes,
 )
-from inventory_tng.stock import over_recorded_routes as over_recorded_page
 from inventory_tng.stock.counts_routes import COUNTS
 from inventory_tng.stock.ledger import expected
 
@@ -97,7 +97,7 @@ def test_a_count_after_it_puts_that_end_right_and_says_what_is_left(
     assert says(page, f"Count {place.store.name}", "a", href=link)
     assert "Mark checked" in page
     # Still waiting under "Needs your action".
-    assert str(over_recorded_page.TITLE) in text(admin_client.get("/admin"))
+    assert str(over_recorded_routes.TITLE) in text(admin_client.get("/admin"))
 
 
 def test_the_count_its_link_opens_counts_the_item_and_closes_it(
@@ -161,7 +161,7 @@ def test_both_ends_counted_it_closes_as_counted_once(
         check.arrived_count_id,
     ) == ("counted", closing.admin_id, closing.created_at, at_store, at_van)
     assert any(line["event"] == "over recorded counted" for line in logs)
-    assert str(over_recorded_page.TITLE) not in text(admin_client.get("/admin"))
+    assert str(over_recorded_routes.TITLE) not in text(admin_client.get("/admin"))
     # Sent again, as a second tap would: nothing more.
     count_at(admin_client, place.store.id, {f"counted_{place.item.id}": "2"}, shown)
     assert count_ids(session) == [at_van, at_store]

@@ -241,11 +241,10 @@ fails on one. The app may only add to the history.
 
 ### The catalogue's rules
 
-Each catalogue table is written only by its own module:
-`catalogue/categories.py`, `catalogue/items.py` (items and their
-packages), `places/locations.py`, `volunteers/volunteers.py` and
-`labels/labels.py`. Admin pages and the
-seed call those modules' functions, one per kind of change, which take
+Each catalogue table is written only by its own module, the owner its
+model names (`db.protection`, below), such as `catalogue/items.py` for
+items and their packages. Admin pages and the seed call those modules'
+functions, one per kind of change, which take
 the catalogue lock, lock and read what the rules need, and refuse a
 change that breaks one by raising `db.RuleBroken` with the rule's name.
 `db.attempt` returns that name, and `web/forms.py`'s `RULES` says it
@@ -294,13 +293,13 @@ judged by its number as search reads it (`units._searched`), sign and all,
 so `Cap 1 000 μF` and `Cap 1000 uF` are one too, and found after any
 space, as search reads every space as a plain one.
 `backend/src/inventory_tng/catalogue/names.py` has the rule: one pattern
-and one table of look-alikes
-(`LOOK_ALIKES`), read by Python (`name_key`) and PostgreSQL
-(`name_key_sql`), and a test checks both agree on every character. To
-change the rule, change `catalogue/names.py` and add a migration that
-writes the CHECKs out again (items', packages' and aliases') and
-refills every key, naming by id any rows that would then clash. The initial migration's
-`NAME_KEY` shows how to write them out by code point.
+and one table of look-alikes (`LOOK_ALIKES`), read by Python (`name_key`)
+and PostgreSQL (`name_key_sql`), and a test checks both agree on every
+character. To change the rule, change `catalogue/names.py` and add a
+migration that writes the CHECKs out again (items', packages' and
+aliases') and refills every key, naming by id any rows that would then
+clash. The initial migration's `NAME_KEY` shows how to write them out by
+code point.
 
 Every name an administrator types is stored in canonical spelling
 (`models.canonical`, decision 0021): NFC, with `µ` as `μ` and `℃` and `℉`
@@ -329,8 +328,8 @@ groups too, each number with its unit or other word, as typed or respelt
 48 VDC`; the items list ranks a row holding every group between one
 holding the whole search and one only close. The table is
 `backend/src/inventory_tng/catalogue/units.py`. After changing it, or
-what search keeps, raise its `VERSION`, write the scan page's copy and the fold
-reference again, and add a migration that folds every row again with
+what search keeps, raise its `VERSION`, write the scan page's copy and
+the fold reference again, and add a migration that folds every row again with
 `models.held`, with `FOLDS_UNITS` the new version, folding
 an item's current aliases after its fields, as `Item.refold` does, and
 `name_folded` of items and aliases with `models.fold`:
@@ -379,8 +378,9 @@ symbol, that spelling: `units.NAMES` and `units.SHOWN`. The seeding page
 (Unit readings, then Propose) proposes rules from every name, by the words
 near each unit in the names they settle. The import's readings file
 (`catalogue/unit_readings.py`, an operator command, DEPLOYMENT.md)
-proposes from the names an import brings with the same function (`reading_rules.propose`),
-and loads the operator's corrected file as rules by no administrator.
+proposes from the names an import brings with the same function
+(`reading_rules.propose`), and loads the operator's corrected file as
+rules by no administrator.
 
 ### Locking a row
 

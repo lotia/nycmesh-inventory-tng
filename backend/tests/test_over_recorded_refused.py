@@ -16,8 +16,7 @@ from inventory_tng.core.db import RuleBroken
 from inventory_tng.models import Admin, CatalogueHistory, Location, OverRecorded
 from inventory_tng.places import locations
 from inventory_tng.stock import forms as stock_forms
-from inventory_tng.stock import over_recorded
-from inventory_tng.stock import over_recorded_routes as over_recorded_page
+from inventory_tng.stock import over_recorded, over_recorded_routes
 from inventory_tng.stock.ledger import Entry, Form
 from inventory_tng.web.forms import RULES, up_to
 
@@ -55,7 +54,7 @@ def test_refused_at_a_retired_place_it_says_why_and_offers_a_fix(
     response = correct(admin_client, session)
     assert response.status_code == 409
     page = " ".join(text(response).split())
-    assert over_recorded_page.RETIRED_EMPTY["found"](place.store.name, "2") in page
+    assert over_recorded_routes.RETIRED_EMPTY["found"](place.store.name, "2") in page
     assert f"Bring back {place.store.name}" in page
     (check,) = checks(session)
     assert f'action="{PAGE}/{check.id}/bring-back"' in response.text
@@ -85,7 +84,9 @@ def test_refused_where_it_arrived_it_names_that_place(
     )
     retire(session, place.van)
     page = " ".join(text(correct(admin_client, session)).split())
-    assert over_recorded_page.RETIRED_EMPTY["written_off"](place.van.name, "2") in page
+    assert (
+        over_recorded_routes.RETIRED_EMPTY["written_off"](place.van.name, "2") in page
+    )
     assert f"Bring back {place.van.name}" in page
 
 
@@ -132,14 +133,14 @@ def refused_then(
 ) -> None:
     """`meanwhile` done by another administrator once a correction or count
     is refused, before the page says why (inventory-tng-k4l)."""
-    attempt = over_recorded_page.attempt
+    attempt = over_recorded_routes.attempt
 
     def then[T](at: Session, change: Callable[[], T]) -> tuple[T | None, str | None]:
         done = attempt(at, change)
         meanwhile()
         return done
 
-    monkeypatch.setattr(over_recorded_page, "attempt", then)
+    monkeypatch.setattr(over_recorded_routes, "attempt", then)
 
 
 def test_refused_at_a_place_brought_back_meanwhile_it_names_that_place(
@@ -155,7 +156,7 @@ def test_refused_at_a_place_brought_back_meanwhile_it_names_that_place(
     response = correct(admin_client, session)
     assert response.status_code == 409
     page = " ".join(text(response).split())
-    assert over_recorded_page.RETIRED_EMPTY["found"](place.store.name, "2") in page
+    assert over_recorded_routes.RETIRED_EMPTY["found"](place.store.name, "2") in page
     assert f"Bring back {place.store.name}" in page
 
 
@@ -217,7 +218,7 @@ def test_refused_by_another_rule_it_says_that_rule(
     response = correct(admin_client, session)
     assert response.status_code == 409
     page = " ".join(text(response).split())
-    assert over_recorded_page.not_changed(str(RULES["movement_whole_units"])) in page
+    assert over_recorded_routes.not_changed(str(RULES["movement_whole_units"])) in page
     assert "Bring back" not in page
     assert "Mark checked" in page
     # Asking why there too, as the row does (inventory-tng-zgy).
@@ -233,7 +234,7 @@ def test_bringing_the_place_back_lets_it_be_corrected(
     assert response.status_code == 303
     location = response.headers["location"]
     assert "over_recorded_brought_back" in location
-    assert over_recorded_page.place_brought_back(place.store.name) in text(
+    assert over_recorded_routes.place_brought_back(place.store.name) in text(
         admin_client.get(location)
     )
     session.expire_all()
@@ -390,7 +391,7 @@ def test_mark_checked_refused_from_an_alert_draws_the_alert_again(
     response = checked_from_alert(admin_client, session, place.store, **form)
     assert response.status_code == 400
     page = " ".join(text(response).split())
-    assert over_recorded_page.RETIRED_EMPTY["found"](place.store.name, "2") in page
+    assert over_recorded_routes.RETIRED_EMPTY["found"](place.store.name, "2") in page
     assert f"Bring back {place.store.name}" in page
     assert str(problem) in page
     (check,) = checks(session)

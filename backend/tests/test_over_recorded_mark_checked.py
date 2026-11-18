@@ -18,8 +18,7 @@ from inventory_tng.models import (
     Movement,
 )
 from inventory_tng.stock import forms as stock_forms
-from inventory_tng.stock import over_recorded
-from inventory_tng.stock import over_recorded_routes as over_recorded_page
+from inventory_tng.stock import over_recorded, over_recorded_routes
 from inventory_tng.web.forms import up_to
 
 from helpers.concurrency import Committed
@@ -49,7 +48,7 @@ def test_needs_your_action_lists_it(
 ) -> None:
     one_bag_waits(registered_client, place, bags)
     home = text(admin_client.get("/admin"))
-    assert str(over_recorded_page.TITLE) in home
+    assert str(over_recorded_routes.TITLE) in home
     assert f"{place.cable.name}: 1 \N{MULTIPLICATION SIGN} Bag of 50" in home
     page = text(admin_client.get(f"{PAGE}?item={place.cable.id}"))
     assert f"from {place.store.name} to {place.van.name}" in page
@@ -100,7 +99,7 @@ def test_correcting_one_undoes_it_on_each_side(
         "Not changed: someone answered or changed it meanwhile. Reload to see it "
         "as it is." in text(admin_client.get(again.headers["location"]))
     )
-    assert str(over_recorded_page.TITLE) not in text(admin_client.get("/admin"))
+    assert str(over_recorded_routes.TITLE) not in text(admin_client.get("/admin"))
 
 
 def test_marking_one_checked_writes_nothing(
@@ -113,7 +112,7 @@ def test_marking_one_checked_writes_nothing(
     one_bag_waits(registered_client, place, bags)
     response = mark_checked(admin_client, session, reason="arrived")
     assert "over_recorded_checked" in response.headers["location"]
-    assert str(over_recorded_page.MARKED_CHECKED) in text(
+    assert str(over_recorded_routes.MARKED_CHECKED) in text(
         admin_client.get(response.headers["location"])
     )
     (check,) = checks(session)

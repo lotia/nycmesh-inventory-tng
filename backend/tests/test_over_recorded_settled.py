@@ -17,8 +17,7 @@ from sqlalchemy.orm import Session
 from inventory_tng.core.local_time import show, show_day, site_zone
 from inventory_tng.core.phrases import compiled, speaking
 from inventory_tng.models import LedgerTransaction, Movement, OverRecorded
-from inventory_tng.stock import open_packages, over_recorded
-from inventory_tng.stock import over_recorded_routes as over_recorded_page
+from inventory_tng.stock import open_packages, over_recorded, over_recorded_routes
 from inventory_tng.stock.counts_routes import COUNTS
 from inventory_tng.stock.over_recorded_routes import waiting_view
 from inventory_tng.stock.stock_routes import recorded_more_view
@@ -416,7 +415,7 @@ def test_waiting_and_settled_link_to_each_other_keeping_the_item(
     place, other = Place(session), Place(session)
     moved(session, place)
     moved(session, other)
-    label = str(over_recorded_page.TITLE)
+    label = str(over_recorded_routes.TITLE)
     nav = views_of(admin_client.get(PAGE).text, label)
     assert nav == [("strong", waiting_view(2), None), ("a", SETTLED_VIEW, SETTLED)]
     nav = views_of(admin_client.get(SETTLED).text, label)

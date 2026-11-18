@@ -22,11 +22,10 @@ from sqlalchemy.orm import Session
 
 import inventory_tng
 from inventory_tng.admins import accounts, activity, guards
-from inventory_tng.admins import routes as admin_admins
+from inventory_tng.admins import routes as admins_routes
 from inventory_tng.admins.reset_routes import RESET_NOTICE
 from inventory_tng.catalogue import forms as catalogue_forms
-from inventory_tng.catalogue import reading_rules, units
-from inventory_tng.catalogue import reading_rules_routes as admin_reading_rules
+from inventory_tng.catalogue import reading_rules, reading_rules_routes, units
 from inventory_tng.core import mail
 from inventory_tng.core.phrases import (
     BRAND,
@@ -43,7 +42,7 @@ from inventory_tng.core.phrases import (
     speaking,
 )
 from inventory_tng.devices import forms as devices_forms
-from inventory_tng.devices import routes as admin_devices
+from inventory_tng.devices import routes as devices_routes
 from inventory_tng.labels import labels
 from inventory_tng.models import (
     TRANSACTION_KINDS,
@@ -65,11 +64,11 @@ from inventory_tng.stock import (
     counts_routes,
     length_checks_routes,
     over_recorded,
+    over_recorded_routes,
     stock_routes,
     used_up_routes,
 )
-from inventory_tng.stock import over_recorded_routes as admin_over_recorded
-from inventory_tng.volunteers import routes as admin_volunteers
+from inventory_tng.volunteers import routes as volunteers_routes
 from inventory_tng.web import admin as web_admin
 from inventory_tng.web import forms as web_forms
 from inventory_tng.web.listing import Lapsed
@@ -166,14 +165,14 @@ SAID_WITH_VALUES: list[Callable[[], Words]] = [
     *(lambda said=said: said(1, NOT_ENGLISH) for said in reading_rules.NAMED.values()),
     lambda: reading_rules.both(NOT_ENGLISH, NOT_ENGLISH),
     lambda: reading_rules.near(NOT_ENGLISH),
-    lambda: admin_reading_rules.reading_title(NOT_ENGLISH),
-    lambda: admin_volunteers.merge_title(NOT_ENGLISH, NOT_ENGLISH),
-    lambda: admin_admins.link_title(NOT_ENGLISH),
-    lambda: admin_admins.reset_title(NOT_ENGLISH),
+    lambda: reading_rules_routes.reading_title(NOT_ENGLISH),
+    lambda: volunteers_routes.merge_title(NOT_ENGLISH, NOT_ENGLISH),
+    lambda: admins_routes.link_title(NOT_ENGLISH),
+    lambda: admins_routes.reset_title(NOT_ENGLISH),
     lambda: devices_forms.uses_problem(9),
     lambda: devices_forms.days_problem(9),
-    lambda: admin_devices.revoke_many_title(1),
-    lambda: admin_devices.revoke_many_title(3),
+    lambda: devices_routes.revoke_many_title(1),
+    lambda: devices_routes.revoke_many_title(3),
     *(lambda said=said: said(1, 9) for said in settings_forms.WHOLE.values()),
     lambda: settings_forms.whole_minutes(1, 9),
     lambda: used_up_routes.close_title(NOT_ENGLISH),
@@ -184,12 +183,12 @@ SAID_WITH_VALUES: list[Callable[[], Words]] = [
     lambda: counts_routes.sealed_how_many(NOT_ENGLISH),
     lambda: counts_routes.opened_left(NOT_ENGLISH, "2026-11-15"),
     lambda: stock_routes.recorded_more_view(2),
-    lambda: admin_over_recorded.place_brought_back(NOT_ENGLISH),
-    lambda: admin_over_recorded.not_changed(NOT_ENGLISH),
-    lambda: admin_over_recorded.waiting_view(2),
+    lambda: over_recorded_routes.place_brought_back(NOT_ENGLISH),
+    lambda: over_recorded_routes.not_changed(NOT_ENGLISH),
+    lambda: over_recorded_routes.waiting_view(2),
     *(
         lambda said=said: said(NOT_ENGLISH, NOT_ENGLISH)
-        for said in admin_over_recorded.RETIRED_EMPTY.values()
+        for said in over_recorded_routes.RETIRED_EMPTY.values()
     ),
     lambda: over_recorded.times(2, NOT_ENGLISH),
     lambda: over_recorded.from_an_open_package(NOT_ENGLISH),

@@ -1,13 +1,12 @@
 """Which way the app's modules may import one another (docs/decisions/0023),
 read from its source with Python's ast module (nothing of it runs in the
 app; helpers.source). Imports inside functions count, as do relative ones
-and a module imported by name from its package (from inventory_tng import
-ledger).
+and a module imported by name from its package (from inventory_tng.stock
+import ledger).
 
 Today's breaks are listed in BREAKS, which may only shrink: a new break
-fails, and so does one fixed but still listed. Rules naming folders that do
-not exist yet (a feature's package, routes.py, queries.py, command.py,
-manage.py) apply as they appear.
+fails, and so does one fixed but still listed. A rule naming a module that
+does not exist yet (manage.py) applies as it appears.
 """
 
 import ast
@@ -30,9 +29,9 @@ RULES = {
     "catalogue/names.py",
     "catalogue/unit_readings.py",
     "catalogue/units.py",
-    "stock/ledger.py",
     "site_settings/scan_settings.py",
     "stock/balance.py",
+    "stock/ledger.py",
 }
 # What of web/ rules may import: it loads neither FastAPI nor the templates,
 # and is held to the rules' own rule to stay so.

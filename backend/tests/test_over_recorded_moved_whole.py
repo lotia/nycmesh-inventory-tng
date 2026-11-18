@@ -10,8 +10,12 @@ from sqlalchemy.orm import Session
 from structlog.testing import capture_logs
 
 from inventory_tng.models import ItemPackage, LedgerTransaction, Movement
-from inventory_tng.stock import adjustment_reasons, ledger, over_recorded
-from inventory_tng.stock import over_recorded_routes as over_recorded_page
+from inventory_tng.stock import (
+    adjustment_reasons,
+    ledger,
+    over_recorded,
+    over_recorded_routes,
+)
 from inventory_tng.stock.ledger import Form
 
 from helpers.markup import read, text
@@ -85,7 +89,7 @@ def test_its_count_corrected_adjusts_it_where_it_arrived(
         (spools.van.id, None, Decimal(125), made.id, None, over_recorded.REASON)
     ]
     assert any(line["event"] == "over recorded count corrected" for line in logs)
-    assert str(over_recorded_page.COUNT_CORRECTED) in text(
+    assert str(over_recorded_routes.COUNT_CORRECTED) in text(
         admin_client.get(response.headers["location"])
     )
     # Sent again, as a second tap would: nothing more.
