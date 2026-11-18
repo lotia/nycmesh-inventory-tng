@@ -121,7 +121,7 @@ const bareRates: Record<string, string> = table.bare_rates;
 const clues: Record<string, string[]> = table.clues;
 const kinds: Record<string, number[]> = table.kinds;
 const products = new Set(table.products);
-// Every space but the space itself (names.SPACES).
+// Every space but the space itself (name_keys.SPACES).
 const SPACES = new RegExp(`[${table.spaces}]`, "g");
 
 /** Each unit `token` spells in any case, a bare rate too, and whether it

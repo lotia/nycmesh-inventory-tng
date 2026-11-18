@@ -316,7 +316,7 @@ as `name_shown` holds it (decision 0021): each number and the unit or
 unit's word read after it spaced by a no-break space, thousands without
 commas and grouped by thin no-break spaces from five digits, but a number
 grouped by spaces as typed, its breaking spaces no-break
-(`names.NO_BREAK`, `units.shown_name`). The app writes it as
+(`name_keys.NO_BREAK`, `units.shown_name`). The app writes it as
 the session flushes and when a reading rule changes (`items.reread`). A
 page or reply that names one reads `name_shown`; only a form's field
 reads `name`.
