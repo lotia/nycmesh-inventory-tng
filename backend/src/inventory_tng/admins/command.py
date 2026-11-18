@@ -22,7 +22,7 @@ from datetime import UTC, datetime
 
 from sqlalchemy.orm import Session
 
-from inventory_tng import accounts
+from inventory_tng.admins import accounts
 from inventory_tng.admins.guards import reset_url
 from inventory_tng.core.command import run_command_telling
 from inventory_tng.core.mail import Notifier

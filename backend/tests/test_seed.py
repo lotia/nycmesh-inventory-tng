@@ -9,7 +9,7 @@ import pytest
 from sqlalchemy import Engine, delete, func, select
 from sqlalchemy.orm import Session
 
-from inventory_tng import accounts
+from inventory_tng.admins import accounts
 from inventory_tng.dev import seed
 from inventory_tng.ledger import expected
 from inventory_tng.models import Admin, AdminPassword, Item, Location, Volunteer

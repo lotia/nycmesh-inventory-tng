@@ -5,7 +5,7 @@ about or on the administrator's own page. The handlers in admin/admins.py
 and admins/sign_in_routes.py read the request and pass the form's
 fields."""
 
-from inventory_tng import accounts
+from inventory_tng.admins import accounts
 from inventory_tng.core.phrases import Words, gettext, lazy_gettext
 
 TAKEN = lazy_gettext("Another administrator already has that username or email.")

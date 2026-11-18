@@ -24,7 +24,6 @@ from sqlalchemy.orm import Session
 from structlog.testing import capture_logs
 
 from inventory_tng import (
-    accounts,
     ledger,
     open_packages,
     over_recorded,
@@ -34,6 +33,7 @@ from inventory_tng import (
 )
 from inventory_tng.admin.categories import CATEGORIES
 from inventory_tng.admin.counts import ADJUSTMENTS, COUNTS
+from inventory_tng.admins import accounts
 from inventory_tng.app import create_app
 from inventory_tng.core import db, mail
 from inventory_tng.core.db import NoSession, RuleBroken

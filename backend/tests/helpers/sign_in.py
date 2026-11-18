@@ -13,8 +13,8 @@ from httpx2 import Response
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from inventory_tng import accounts, totp_keys
-from inventory_tng.admins import guards
+from inventory_tng.admins import accounts, guards, totp_keys
+from inventory_tng.admins.totp_keys import TotpKeys
 from inventory_tng.models import (
     CONFIRM_IDLE_MINUTES,
     Admin,
@@ -24,7 +24,6 @@ from inventory_tng.models import (
     ResetKind,
     SignInSettings,
 )
-from inventory_tng.totp_keys import TotpKeys
 
 # A recovery code as the page shows it, in groups.
 _GROUP = f"[A-Z0-9]{{{accounts.RECOVERY_CODE_GROUP}}}"

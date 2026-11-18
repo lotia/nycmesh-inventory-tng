@@ -1,4 +1,4 @@
-{# What every administrator is told of (activity.py), newest first: `changes`, shown in `zone`. #}
+{# What every administrator is told of (admins/activity.py), newest first: `changes`, shown in `zone`. #}
 <ul>
   {% for change in changes %}
   <li>{{ change.at | when(zone) }}: {{ change.words }}</li>

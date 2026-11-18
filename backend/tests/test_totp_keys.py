@@ -12,12 +12,12 @@ from sqlalchemy import select, text
 from sqlalchemy.orm import Session
 from structlog.testing import capture_logs
 
-from inventory_tng import accounts, totp_keys
+from inventory_tng.admins import accounts, totp_keys
+from inventory_tng.admins.totp_keys import TotpKeys, TotpKeysError, Unreadable, keys_dir
 from inventory_tng.app import check_totp_keys
 from inventory_tng.core.db import Database
 from inventory_tng.core.settings import SettingsError
 from inventory_tng.models import Authenticator
-from inventory_tng.totp_keys import TotpKeys, TotpKeysError, Unreadable, keys_dir
 
 from helpers.sign_in import TOTP_KEYS, code, new_admin, raw_key
 
@@ -108,13 +108,13 @@ def test_new_prints_a_key_that_loads(
     monkeypatch: pytest.MonkeyPatch,
     capsys: pytest.CaptureFixture[str],
 ) -> None:
-    """As DEPLOYMENT.md runs it: python -m inventory_tng.totp_keys new."""
+    """As DEPLOYMENT.md runs it: python -m inventory_tng.admins.totp_keys new."""
     monkeypatch.setattr(sys, "argv", ["totp_keys", "new"])
     with (
         pytest.warns(RuntimeWarning, match="found in sys.modules"),
         pytest.raises(SystemExit) as done,
     ):
-        runpy.run_module("inventory_tng.totp_keys", run_name="__main__")
+        runpy.run_module("inventory_tng.admins.totp_keys", run_name="__main__")
     assert done.value.code == 0
     printed = capsys.readouterr().out.strip()
     assert TotpKeys.load(keys_in(tmp_path, **{"1": printed})).newest == 1

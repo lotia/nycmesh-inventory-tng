@@ -12,10 +12,11 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 from structlog.testing import capture_logs
 
-from inventory_tng import accounts, once
+from inventory_tng import once
 from inventory_tng.account import ACCOUNT
 from inventory_tng.admin.admins import ADMINS
 from inventory_tng.admin.devices import CODES, DEVICES
+from inventory_tng.admins import accounts
 from inventory_tng.core.local_env import CLONE
 from inventory_tng.models import Admin, RegistrationCode, ResetLink
 from inventory_tng.once import SENT_AGAIN

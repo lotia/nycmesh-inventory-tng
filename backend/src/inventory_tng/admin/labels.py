@@ -11,7 +11,6 @@ from fastapi import APIRouter, Depends, Form, Query, Request
 from fastapi.responses import JSONResponse, Response
 from sqlalchemy import ColumnElement, func
 
-from inventory_tng.accounts import qr_svg
 from inventory_tng.admin.common import (
     LABELS,
     SECTION_LABELS,
@@ -22,6 +21,7 @@ from inventory_tng.admin.common import (
 from inventory_tng.admin.items import ITEMS
 from inventory_tng.admin.listing import AskedView, Listing, Searched, Sort, Sorting
 from inventory_tng.admin.locations import LOCATIONS
+from inventory_tng.admins.accounts import qr_svg
 from inventory_tng.admins.guards import AdminSignedIn
 from inventory_tng.core.db import DbSession
 from inventory_tng.core.local_time import site_zone

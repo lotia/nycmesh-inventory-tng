@@ -22,7 +22,7 @@ from sqlalchemy import Engine, Text, exc, select, text
 from sqlalchemy.orm import DeclarativeBase, Mapped, Session, mapped_column
 from structlog.testing import capture_logs
 
-from inventory_tng import accounts
+from inventory_tng.admins import accounts
 from inventory_tng.core.db import (
     CATALOGUE,
     LOCKS_INFO,
@@ -61,7 +61,7 @@ OWNERS: dict[str, str | None] = {t.name: t.info["owner"] for t in TABLES.values(
 # rule is deleted, as an administrator undoes it, the unit table reading
 # its token again (docs/decisions/0021, 2026-11-15).
 ALLOWED = {
-    SOURCE / "accounts.py": ("_remove_sign_in",),
+    SOURCE / "admins" / "accounts.py": ("_remove_sign_in",),
     SOURCE / "ledger.py": ("insert_transaction",),
     SOURCE / "reading_rules.py": ("delete",),
     SOURCE / "dev" / "seed.py": ("run",),

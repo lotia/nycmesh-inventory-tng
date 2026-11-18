@@ -49,47 +49,47 @@ msgstr ""
 msgid "%(brand)s's sign-in settings were changed"
 msgstr ""
 
-#: src/inventory_tng/activity.py
+#: src/inventory_tng/admins/activity.py
 #, python-format
 msgid "%(by)s brought back %(admin)s"
 msgstr ""
 
-#: src/inventory_tng/activity.py
+#: src/inventory_tng/admins/activity.py
 #, python-format
 msgid "%(by)s changed the sign-in settings"
 msgstr ""
 
-#: src/inventory_tng/activity.py
+#: src/inventory_tng/admins/activity.py
 #, python-format
 msgid "%(by)s invited %(admin)s"
 msgstr ""
 
-#: src/inventory_tng/activity.py
+#: src/inventory_tng/admins/activity.py
 #, python-format
 msgid "%(by)s let %(admin)s back in"
 msgstr ""
 
-#: src/inventory_tng/activity.py
+#: src/inventory_tng/admins/activity.py
 #, python-format
 msgid "%(by)s made a link for %(admin)s with the recovery token"
 msgstr ""
 
-#: src/inventory_tng/activity.py
+#: src/inventory_tng/admins/activity.py
 #, python-format
 msgid "%(by)s reset %(admin)s's sign-in"
 msgstr ""
 
-#: src/inventory_tng/activity.py
+#: src/inventory_tng/admins/activity.py
 #, python-format
 msgid "%(by)s retired %(admin)s"
 msgstr ""
 
-#: src/inventory_tng/activity.py
+#: src/inventory_tng/admins/activity.py
 #, python-format
 msgid "%(by)s retired every administrator and revoked every registration code"
 msgstr ""
 
-#: src/inventory_tng/activity.py
+#: src/inventory_tng/admins/activity.py
 #, python-format
 msgid "%(by)s retired the authenticators a lost or leaked key sealed"
 msgstr ""
@@ -1552,7 +1552,7 @@ msgstr ""
 msgid "From 1 to %(max)d devices."
 msgstr ""
 
-#: src/inventory_tng/accounts.py
+#: src/inventory_tng/admins/accounts.py
 #, python-format
 msgid "Give it a name of up to %(max)d characters."
 msgstr ""
@@ -3552,7 +3552,7 @@ msgstr ""
 msgid "That didn't work"
 msgstr ""
 
-#: src/inventory_tng/accounts.py
+#: src/inventory_tng/admins/accounts.py
 msgid "That doesn't look like an email address."
 msgstr ""
 
@@ -3677,7 +3677,7 @@ msgid "The inventory could not take that as it was sent. Go back and try again."
 msgstr ""
 
 #. Translators: who did something, at the start of a sentence.
-#: src/inventory_tng/activity.py
+#: src/inventory_tng/admins/activity.py
 msgid "The operator"
 msgstr ""
 
@@ -3713,7 +3713,7 @@ msgstr ""
 msgid "The site's (%(zone)s)"
 msgstr ""
 
-#: src/inventory_tng/accounts.py
+#: src/inventory_tng/admins/accounts.py
 msgid "The two passwords are different."
 msgstr ""
 
@@ -3956,7 +3956,7 @@ msgstr ""
 msgid "Use 0 or more."
 msgstr ""
 
-#: src/inventory_tng/accounts.py
+#: src/inventory_tng/admins/accounts.py
 #, python-format
 msgid "Use 1 to %(max)d letters, digits, dots, dashes or underscores."
 msgstr ""
@@ -3965,12 +3965,12 @@ msgstr ""
 msgid "Use a number above 0."
 msgstr ""
 
-#: src/inventory_tng/accounts.py
+#: src/inventory_tng/admins/accounts.py
 #, python-format
 msgid "Use at least %(min)d characters. A few words make a good one."
 msgstr ""
 
-#: src/inventory_tng/accounts.py
+#: src/inventory_tng/admins/accounts.py
 #, python-format
 msgid "Use at most %(max)d characters."
 msgstr ""

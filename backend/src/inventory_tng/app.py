@@ -11,7 +11,6 @@ from fastapi import FastAPI
 
 from inventory_tng import (
     account,
-    accounts,
     admin,
     bundle,
     health,
@@ -21,7 +20,8 @@ from inventory_tng import (
     resets,
     security_headers,
 )
-from inventory_tng.admins import guards, sign_in_routes
+from inventory_tng.admins import accounts, guards, sign_in_routes
+from inventory_tng.admins.totp_keys import TotpKeys
 from inventory_tng.core import database_role, db
 from inventory_tng.core.db import Database, make_database
 from inventory_tng.core.mail import SmtpMailer
@@ -31,7 +31,6 @@ from inventory_tng.core.settings import Settings
 from inventory_tng.cross_site import CrossSiteRefusal
 from inventory_tng.devices import api as devices_api
 from inventory_tng.scan import batch_api, catalogue_api
-from inventory_tng.totp_keys import TotpKeys
 
 log = structlog.get_logger(__name__)
 

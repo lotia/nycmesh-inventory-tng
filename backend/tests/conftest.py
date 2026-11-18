@@ -19,7 +19,7 @@ from sqlalchemy import Engine, TextClause, delete, event, exc, make_url, text
 from sqlalchemy.engine.interfaces import DBAPIConnection
 from sqlalchemy.orm import Session
 
-from inventory_tng import accounts
+from inventory_tng.admins import accounts
 from inventory_tng.core import db, local_env
 from inventory_tng.core.database_role import refusals
 from inventory_tng.core.db import (

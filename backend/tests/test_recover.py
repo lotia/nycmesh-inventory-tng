@@ -9,8 +9,7 @@ from fastapi.testclient import TestClient
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from inventory_tng import accounts
-from inventory_tng.admins import guards
+from inventory_tng.admins import accounts, guards
 from inventory_tng.core.settings import RateLimits, Settings, SettingsError
 from inventory_tng.models import ResetLink
 from inventory_tng.resets import RECOVER, REFUSED

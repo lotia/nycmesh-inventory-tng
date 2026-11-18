@@ -8,8 +8,8 @@ from fastapi.testclient import TestClient
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from inventory_tng.accounts import NOT_AN_EMAIL, name_up_to
 from inventory_tng.admin.volunteers import VOLUNTEERS
+from inventory_tng.admins.accounts import NOT_AN_EMAIL, name_up_to
 from inventory_tng.core.local_time import DEFAULT_ZONE
 from inventory_tng.models import (
     Category,

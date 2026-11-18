@@ -15,8 +15,7 @@ from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
 from structlog.testing import capture_logs
 
-from inventory_tng import accounts
-from inventory_tng.admins import guards
+from inventory_tng.admins import accounts, guards
 from inventory_tng.core import mail
 from inventory_tng.core.settings import MailConfig, Settings, SettingsError
 from inventory_tng.models import (

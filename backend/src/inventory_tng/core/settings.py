@@ -159,7 +159,7 @@ class FrontendConfig:
 @dataclass(frozen=True)
 class RateLimits:
     """How many attempts the sign-in pages take before refusing more
-    (accounts.py). From one address, in a minute: signing in, setting up
+    (admins/accounts.py). From one address, in a minute: signing in, setting up
     the first administrator, recovery, and asking for or using a reset
     link, each counted apart (RATE_LIMIT_PER_ADDRESS). For one
     administrator, in 15 minutes: codes, or the password where it stands

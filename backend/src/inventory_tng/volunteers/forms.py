@@ -5,7 +5,7 @@ form's fields."""
 
 from sqlalchemy.orm import Session
 
-from inventory_tng.accounts import email_problem
+from inventory_tng.admins.accounts import email_problem
 from inventory_tng.core.phrases import Words, lazy_gettext
 from inventory_tng.models import Volunteer
 from inventory_tng.web.forms import chosen, name_problem

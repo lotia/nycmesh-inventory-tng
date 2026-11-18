@@ -27,7 +27,8 @@ from opentelemetry import metrics
 from sqlalchemy import ColumnElement, exists, func, or_, select, text, update
 from sqlalchemy.orm import Session
 
-from inventory_tng import activity
+from inventory_tng.admins import activity
+from inventory_tng.admins.totp_keys import TotpKeys, Unreadable
 from inventory_tng.core import mail
 from inventory_tng.core.db import exists_where, get_locked, locked, set_actor, unique
 from inventory_tng.core.mail import Notifier
@@ -47,7 +48,6 @@ from inventory_tng.models import (
     SignInSettings,
     mint_code,
 )
-from inventory_tng.totp_keys import TotpKeys, Unreadable
 
 log = structlog.get_logger(__name__)
 meter = metrics.get_meter(__name__)

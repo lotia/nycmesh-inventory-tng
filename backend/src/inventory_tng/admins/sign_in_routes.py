@@ -15,8 +15,7 @@ from fastapi import APIRouter, Form, Request
 from fastapi.responses import HTMLResponse, Response
 from sqlalchemy.exc import IntegrityError
 
-from inventory_tng import accounts
-from inventory_tng.admins import guards
+from inventory_tng.admins import accounts, guards
 from inventory_tng.admins.forms import (
     NOT_THE_TOKEN,
     authenticator_problems,

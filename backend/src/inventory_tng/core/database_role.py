@@ -19,7 +19,7 @@ from inventory_tng.core.history import HISTORY_TABLE, LEDGER
 log = structlog.get_logger(__name__)
 
 # Tables the app only adds to: the ledger, history (history.py) and what
-# administrators are told of (activity.py).
+# administrators are told of (admins/activity.py).
 APPEND_ONLY = (*LEDGER, HISTORY_TABLE, "activity")
 # The one-row settings tables, which every page reads: the app changes
 # their row, made by their migrations, but never deletes it.

@@ -159,7 +159,7 @@ TRANSACTION_KINDS = (
     "open",
     "report",
 )
-# What administrators are told of (activity.py): changes to who may sign
+# What administrators are told of (admins/activity.py): changes to who may sign
 # in. A new kind is added here, to activity.WORDS and to its migration's
 # check.
 ActivityKind = Literal[
@@ -184,7 +184,7 @@ LABEL_LENGTH = 10
 def mint_code(length: int) -> str:
     """A code `length` long in LABEL_ALPHABET, which is hard to misread, from
     the secrets module, so codes cannot be guessed from one another. Labels
-    use it, and administrators' recovery codes (accounts.py)."""
+    use it, and administrators' recovery codes (admins/accounts.py)."""
     return "".join(secrets.choice(LABEL_ALPHABET) for _ in range(length))
 
 
@@ -1304,7 +1304,7 @@ class Admin(Base):
             "email ~ '^[^@[:space:]]+@[^@[:space:]]+$' AND length(email) <= 254",
             name="email",
         ),
-        protection(owner="accounts.py", lock="row", history=True),
+        protection(owner="admins/accounts.py", lock="row", history=True),
     )
 
     id: Mapped[IntId]
@@ -1325,7 +1325,7 @@ class AdminPassword(Base):
     id. No row means they were invited and have not chosen one yet."""
 
     __tablename__ = "admin_password"
-    __table_args__ = (protection(owner="accounts.py", lock="row", history=True),)
+    __table_args__ = (protection(owner="admins/accounts.py", lock="row", history=True),)
 
     id: Mapped[int] = mapped_column(
         ForeignKey("admin.id", ondelete="RESTRICT"), primary_key=True
@@ -1339,7 +1339,7 @@ class AdminPassword(Base):
 
 class Authenticator(Base):
     """One TOTP app an administrator signs in with. Its key is sealed
-    (totp_keys.py) and wiped when it is removed. An administrator uses TOTP
+    (admins/totp_keys.py) and wiped when it is removed. An administrator uses TOTP
     if they have a current one."""
 
     __tablename__ = "authenticator"
@@ -1351,7 +1351,7 @@ class Authenticator(Base):
             name="key_until_retired",
         ),
         CheckConstraint("length(name) BETWEEN 1 AND 64", name="name"),
-        protection(owner="accounts.py", lock="row", history=True),
+        protection(owner="admins/accounts.py", lock="row", history=True),
     )
 
     id: Mapped[IntId]
@@ -1381,7 +1381,7 @@ class RecoveryCode(Base):
     is lost. Only its hash is kept."""
 
     __tablename__ = "recovery_code"
-    __table_args__ = (protection(owner="accounts.py", lock="row", history=True),)
+    __table_args__ = (protection(owner="admins/accounts.py", lock="row", history=True),)
 
     id: Mapped[IntId]
     created_at: Mapped[CreatedAt]
@@ -1399,7 +1399,7 @@ class AdminSession(Base):
     device's is (docs/decisions/0009)."""
 
     __tablename__ = "admin_session"
-    __table_args__ = (protection(owner="accounts.py", lock=None, history=False),)
+    __table_args__ = (protection(owner="admins/accounts.py", lock=None, history=False),)
 
     id: Mapped[IntId]
     created_at: Mapped[CreatedAt]
@@ -1444,7 +1444,7 @@ class ResetLink(Base):
             name="recovery",
         ),
         CheckConstraint("made_by_id <> admin_id", name="not_made_for_oneself"),
-        protection(owner="accounts.py", lock="row", history=True),
+        protection(owner="admins/accounts.py", lock="row", history=True),
     )
 
     id: Mapped[IntId]
@@ -1565,7 +1565,7 @@ class SentForm(Base):
 
 
 class Activity(Base):
-    """Something every administrator is told of (activity.py), such as an
+    """Something every administrator is told of (admins/activity.py), such as an
     administrator retired: shown on the administrators page and, since
     their last sign-in, on the home page. Only ever added to, so it is its
     own history, as the ledger is."""
@@ -1575,7 +1575,7 @@ class Activity(Base):
         CheckConstraint(_one_of("kind", ACTIVITY_KINDS), name="kind"),
         # "Since you last signed in" reads from a time on.
         Index("ix_activity_at", "at"),
-        protection(owner="activity.py", lock=None, history=False),
+        protection(owner="admins/activity.py", lock=None, history=False),
     )
 
     id: Mapped[IntId]

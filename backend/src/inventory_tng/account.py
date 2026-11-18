@@ -12,7 +12,7 @@ from fastapi import APIRouter, Form, Request
 from fastapi.responses import HTMLResponse, Response
 from sqlalchemy.orm import Session
 
-from inventory_tng import accounts
+from inventory_tng.admins import accounts
 from inventory_tng.admins.guards import (
     ACCOUNT,
     ACCOUNT_TITLE,

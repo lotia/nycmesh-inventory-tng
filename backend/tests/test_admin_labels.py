@@ -11,12 +11,12 @@ from fastapi.testclient import TestClient
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from inventory_tng.accounts import qr_svg
 from inventory_tng.admin.common import LABELS
 from inventory_tng.admin.items import ITEMS
 from inventory_tng.admin.labels import PICK_LABELS, PRINT
 from inventory_tng.admin.listing import PER_PAGE
 from inventory_tng.admin.locations import LOCATIONS
+from inventory_tng.admins.accounts import qr_svg
 from inventory_tng.labels import labels
 from inventory_tng.labels.labels import (
     INACTIVE_WORDS,

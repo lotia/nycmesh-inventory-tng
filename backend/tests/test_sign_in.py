@@ -19,15 +19,14 @@ from sqlalchemy.orm import Session
 from starlette.datastructures import Headers
 from structlog.testing import capture_logs
 
-from inventory_tng import accounts
-from inventory_tng.accounts import (
+from inventory_tng.admins import accounts, guards, sign_in_routes
+from inventory_tng.admins import forms as admins_forms
+from inventory_tng.admins.accounts import (
     NOT_AN_EMAIL,
     PASSWORDS_DIFFER,
     password_problem,
     username_problem,
 )
-from inventory_tng.admins import forms as admins_forms
-from inventory_tng.admins import guards, sign_in_routes
 from inventory_tng.core.masking import Masker
 from inventory_tng.core.settings import RateLimits
 from inventory_tng.cross_site import cross_site

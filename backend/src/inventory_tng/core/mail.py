@@ -557,7 +557,7 @@ def recovery_codes_made(to: str, admin_id: int) -> Message:
 
 
 def activity(words: str) -> Told:
-    """Told to every administrator (activity.py): one who could change who
+    """Told to every administrator (admins/activity.py): one who could change who
     may sign in could otherwise do it unseen."""
 
     def build(to: str, admin_id: int) -> Message:

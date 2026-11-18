@@ -8,7 +8,7 @@ from decimal import Decimal, InvalidOperation
 
 from sqlalchemy.orm import Session
 
-from inventory_tng.accounts import name_up_to
+from inventory_tng.admins.accounts import name_up_to
 from inventory_tng.core.db import Base
 from inventory_tng.core.phrases import Words, gettext, lazy_gettext
 from inventory_tng.ledger import whole_enough

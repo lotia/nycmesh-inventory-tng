@@ -13,11 +13,11 @@ import structlog
 from fastapi import FastAPI
 from sqlalchemy import make_url
 
+from inventory_tng.admins.totp_keys import TotpKeys
 from inventory_tng.app import create_app
 from inventory_tng.core.logs import configure_logging
 from inventory_tng.core.settings import Settings
 from inventory_tng.core.telemetry import Telemetry, enabled
-from inventory_tng.totp_keys import TotpKeys
 
 log = structlog.get_logger(__name__)
 

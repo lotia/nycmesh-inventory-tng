@@ -41,7 +41,9 @@ from sqlalchemy.orm import Session
 from starlette.concurrency import run_in_threadpool
 from starlette.exceptions import HTTPException
 
-from inventory_tng import accounts, once
+from inventory_tng import once
+from inventory_tng.admins import accounts
+from inventory_tng.admins.totp_keys import TotpKeys
 from inventory_tng.core import mail, masking, request_logging
 from inventory_tng.core.db import (
     DbSession,
@@ -54,7 +56,6 @@ from inventory_tng.core.phrases import Words, lazy_gettext
 from inventory_tng.core.settings import RateLimits
 from inventory_tng.models import Admin, AdminSession, SignInSettings
 from inventory_tng.pages import Badge, page, redirect, sections, templates
-from inventory_tng.totp_keys import TotpKeys
 
 log = structlog.get_logger(__name__)
 

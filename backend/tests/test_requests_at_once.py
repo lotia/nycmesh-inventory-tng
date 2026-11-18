@@ -31,7 +31,6 @@ from sqlalchemy.exc import IntegrityError, OperationalError
 from sqlalchemy.orm import Session
 
 from inventory_tng import (
-    accounts,
     adjustment_reasons,
     categories,
     items,
@@ -42,7 +41,7 @@ from inventory_tng import (
 )
 from inventory_tng.admin.admins import ADMINS
 from inventory_tng.admin.volunteers import VOLUNTEERS
-from inventory_tng.admins import guards
+from inventory_tng.admins import accounts, guards
 from inventory_tng.core import mail
 from inventory_tng.core.db import (
     Base,

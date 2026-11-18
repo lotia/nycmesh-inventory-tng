@@ -15,7 +15,6 @@ from fastapi import APIRouter, Form, Request
 from fastapi.responses import HTMLResponse, Response
 from sqlalchemy.orm import Session
 
-from inventory_tng.accounts import qr_svg
 from inventory_tng.admin.common import (
     ADMIN,
     SECTION_DEVICES,
@@ -33,6 +32,7 @@ from inventory_tng.admin.listing import (
     arranged,
 )
 from inventory_tng.admin.listing import order as order_of
+from inventory_tng.admins.accounts import qr_svg
 from inventory_tng.admins.guards import AdminSignedIn, ConfirmedAdmin, SignedIn, changed
 from inventory_tng.core.db import DbSession, attempt
 from inventory_tng.core.local_time import site_zone

@@ -16,7 +16,6 @@ from fastapi import APIRouter, Form, Request
 from fastapi.responses import HTMLResponse, Response
 from sqlalchemy.orm import Session
 
-from inventory_tng import accounts, activity
 from inventory_tng.admin.common import (
     ADMINS,
     SECTION_ADMINS,
@@ -26,7 +25,7 @@ from inventory_tng.admin.common import (
     site_link,
 )
 from inventory_tng.admin.listing import AskedView, Sort, Sorting, View, arranged
-from inventory_tng.admins import queries
+from inventory_tng.admins import accounts, activity, queries
 from inventory_tng.admins.forms import OWN_RESET, OWN_RETIRE, TAKEN, invite_problems
 from inventory_tng.admins.guards import (
     CONFIRM_FIELD,

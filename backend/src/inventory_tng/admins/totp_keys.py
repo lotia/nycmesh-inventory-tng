@@ -9,10 +9,10 @@ version seals; every version present opens. A Kubernetes Secret mounted as
 a directory has this shape. In development the directory defaults to the
 clone's .local/totp-keys, which `mise run setup` fills.
 
-    python -m inventory_tng.totp_keys new     # print a new key
-    python -m inventory_tng.totp_keys reseal  # seal every key with the newest
-    python -m inventory_tng.totp_keys retire-authenticators --unreadable
-    python -m inventory_tng.totp_keys retire-authenticators --all
+    python -m inventory_tng.admins.totp_keys new     # print a new key
+    python -m inventory_tng.admins.totp_keys reseal  # seal every key with the newest
+    python -m inventory_tng.admins.totp_keys retire-authenticators --unreadable
+    python -m inventory_tng.admins.totp_keys retire-authenticators --all
 
 DEPLOYMENT.md, TOTP keys, says how to rotate them and what to do if one is
 lost.
@@ -126,13 +126,13 @@ class TotpKeys:
             if len(key) * 8 != KEY_BITS:
                 raise TotpKeysError(
                     f"TOTP_KEYS_DIR's version {entry.name} is not a key "
-                    "`python -m inventory_tng.totp_keys new` made"
+                    "`python -m inventory_tng.admins.totp_keys new` made"
                 )
             keys[int(entry.name)] = key
         if not keys:
             raise TotpKeysError(
                 f"TOTP_KEYS_DIR {directory} holds no key: add one as a file "
-                "named 1, from `python -m inventory_tng.totp_keys new`"
+                "named 1, from `python -m inventory_tng.admins.totp_keys new`"
             )
         return cls(keys)
 
@@ -153,7 +153,7 @@ def keys_dir(environ: Mapping[str, str]) -> Path:
 
 def parse(argv: Sequence[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(
-        prog="python -m inventory_tng.totp_keys",
+        prog="python -m inventory_tng.admins.totp_keys",
         description="TOTP keys at rest (DEPLOYMENT.md, TOTP keys).",
     )
     commands = parser.add_subparsers(dest="command", required=True)
@@ -186,7 +186,7 @@ def main(argv: Sequence[str] | None = None) -> int:
 
 
 def _reseal(session: Session, _args: argparse.Namespace) -> int:
-    from inventory_tng.accounts import reseal_authenticators
+    from inventory_tng.admins.accounts import reseal_authenticators
 
     resealed, unreadable = reseal_authenticators(session, TotpKeys.from_environ())
     print(f"Resealed {resealed}; {unreadable} could not be read.")
@@ -194,7 +194,7 @@ def _reseal(session: Session, _args: argparse.Namespace) -> int:
 
 
 def _retire(session: Session, args: argparse.Namespace, notify: Notifier) -> int:
-    from inventory_tng.accounts import retire_authenticators
+    from inventory_tng.admins.accounts import retire_authenticators
 
     retired, stranded = retire_authenticators(
         session,
