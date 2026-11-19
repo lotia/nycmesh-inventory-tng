@@ -16,7 +16,10 @@ An administrator page takes one of:
 - `ConfirmedByAuthenticator`: that, for making new recovery codes, with a
   code from an authenticator each time, never a recovery code.
 
-Each is a Need. A single-use form (single_use_forms.sent_before) sent again
+A page that never reads the administrator lists `Depends(admin_signed_in)`
+in its route's dependencies instead of taking AdminSignedIn.
+
+Each confirmation is a Need. A single-use form (single_use_forms.sent_before) sent again
 while a code would be asked for is answered so before one is spent
 (is_spent, from core/sent_forms.py).
 
