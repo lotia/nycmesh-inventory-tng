@@ -13,7 +13,7 @@ from fastapi.responses import HTMLResponse, JSONResponse, Response
 from sqlalchemy import exists, func, not_
 from sqlalchemy.orm import Session
 
-from inventory_tng.admins.guards import AdminSignedIn, SignedIn, admin_signed_in
+from inventory_tng.admins.guards import AdminSignedIn, SignedIn
 from inventory_tng.core.db_errors import attempt
 from inventory_tng.core.db_sessions import DbSession
 from inventory_tng.core.phrases import Words, gettext, lazy_gettext
@@ -198,7 +198,7 @@ def list_volunteers(
     return _list_page(request, session, signed, listing=listing, undo=back)
 
 
-@router.get(f"{VOLUNTEERS}/suggest", dependencies=[Depends(admin_signed_in)])
+@router.get(f"{VOLUNTEERS}/suggest")
 def suggest_volunteers(session: DbSession, listing: Listed) -> JSONResponse:
     """What the search box offers as one types (_listing.html)."""
     offered = listing.suggest(session)

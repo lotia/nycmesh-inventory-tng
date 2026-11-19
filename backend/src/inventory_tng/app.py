@@ -7,7 +7,7 @@ from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 
 import structlog
-from fastapi import FastAPI
+from fastapi import Depends, FastAPI
 
 from inventory_tng.admins import (
     account_routes,
@@ -17,7 +17,7 @@ from inventory_tng.admins import (
     reset_routes,
     sign_in_routes,
 )
-from inventory_tng.admins.guards import install_admin_answers
+from inventory_tng.admins.guards import admin_signed_in, install_admin_answers
 from inventory_tng.admins.paths import HOME
 from inventory_tng.admins.sealed_totp_keys import TotpKeys
 from inventory_tng.catalogue import (
@@ -135,22 +135,28 @@ def create_app(
         app.include_router(security_headers.docs_router)
     app.include_router(frontend_bundle.router)
     app.include_router(sign_in_routes.router)
-    app.include_router(account_routes.router)
-    app.include_router(home_routes.router)
-    app.include_router(items_routes.router)
-    app.include_router(categories_routes.router)
-    app.include_router(locations_routes.router)
-    app.include_router(labels_routes.router)
-    app.include_router(volunteers_routes.router)
-    app.include_router(stock_routes.router)
-    app.include_router(used_up_routes.router)
-    app.include_router(length_checks_routes.router)
-    app.include_router(over_recorded_routes.router)
-    app.include_router(reading_rules_routes.router)
-    app.include_router(counts_routes.router)
-    app.include_router(devices_routes.router)
-    app.include_router(admins_routes.router)
-    app.include_router(site_settings_routes.router)
+    # Every administrator page but those one signed out or not yet set up
+    # with TOTP must reach (sign_in_routes, reset_routes). A route here is
+    # guarded whether or not it takes AdminSignedIn, resolved once a request.
+    for admin_pages in (
+        account_routes,
+        home_routes,
+        items_routes,
+        categories_routes,
+        locations_routes,
+        labels_routes,
+        volunteers_routes,
+        stock_routes,
+        used_up_routes,
+        length_checks_routes,
+        over_recorded_routes,
+        reading_rules_routes,
+        counts_routes,
+        devices_routes,
+        admins_routes,
+        site_settings_routes,
+    ):
+        app.include_router(admin_pages.router, dependencies=[Depends(admin_signed_in)])
     app.include_router(reset_routes.router)
     frontend_bundle.install(app, settings)
     db_errors.install(app)

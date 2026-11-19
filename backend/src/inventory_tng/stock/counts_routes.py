@@ -45,7 +45,7 @@ from fastapi.responses import HTMLResponse, Response
 from sqlalchemy import ColumnElement, case, func
 from sqlalchemy.orm import Session
 
-from inventory_tng.admins.guards import AdminSignedIn, SignedIn, admin_signed_in
+from inventory_tng.admins.guards import AdminSignedIn, SignedIn
 from inventory_tng.catalogue.items_listing import SEARCHED
 from inventory_tng.core.db_errors import refusal
 from inventory_tng.core.db_sessions import DbSession, SnapshotSession, by_name
@@ -276,7 +276,7 @@ def counts(
     return _counts_page(request, session, signed, view=view)
 
 
-@router.get(f"{COUNTS}/place", dependencies=[Depends(admin_signed_in)])
+@router.get(f"{COUNTS}/place")
 def choose_place(location_id: str = "") -> Response:
     """The "Count a place" form, sent as a GET, goes to that place's count."""
     if not location_id.isdigit():

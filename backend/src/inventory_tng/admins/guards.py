@@ -16,8 +16,9 @@ An administrator page takes one of:
 - `ConfirmedByAuthenticator`: that, for making new recovery codes, with a
   code from an authenticator each time, never a recovery code.
 
-A page that never reads the administrator lists `Depends(admin_signed_in)`
-in its route's dependencies instead of taking AdminSignedIn.
+Every administrator page is behind admin_signed_in already: app.py includes
+every administrator router but the sign-in and reset ones with it as a
+dependency. So a page that never reads the administrator takes none of these.
 
 Each confirmation is a Need. A single-use form (single_use_forms.sent_before) sent again
 while a code would be asked for is answered so before one is spent
