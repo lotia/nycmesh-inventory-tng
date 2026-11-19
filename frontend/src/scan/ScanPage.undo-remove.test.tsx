@@ -63,6 +63,11 @@ const removeButtons = () =>
   screen.getAllByRole("button", { name: say(REMOVE) });
 const removeAt = (at: number) =>
   fireEvent.click(removeButtons()[at] as Element);
+/** The cart changed in another tab, and this tab told. */
+function changedInAnotherTab() {
+  storeCart({ ...FILLED, revision: "theirs" });
+  window.dispatchEvent(new StorageEvent("storage", { key: CART_KEY }));
+}
 const undoButton = () => screen.queryByRole("button", { name: "Undo" });
 const removedEvents = (record: { mock: { calls: unknown[][] } }) =>
   record.mock.calls
@@ -129,13 +134,7 @@ describe("Undo after Remove (Ali, inventory-tng-5uy, 2026-11-13)", () => {
   });
 
   test.each<[string, () => void]>([
-    [
-      "the cart changed in another tab",
-      () => {
-        storeCart({ ...FILLED, revision: "theirs" });
-        window.dispatchEvent(new StorageEvent("storage", { key: CART_KEY }));
-      },
-    ],
+    ["the cart changed in another tab", changedInAnotherTab],
     [
       "Undo putting nothing back",
       () => {
@@ -184,13 +183,7 @@ describe("Undo after Remove (Ali, inventory-tng-5uy, 2026-11-13)", () => {
       },
     ],
     ["the cart recorded", save],
-    [
-      "the cart changed in another tab",
-      () => {
-        storeCart({ ...FILLED, revision: "theirs" });
-        window.dispatchEvent(new StorageEvent("storage", { key: CART_KEY }));
-      },
-    ],
+    ["the cart changed in another tab", changedInAnotherTab],
   ])("%s drops the Undo", async (_, change) => {
     const record = vi.spyOn(telemetry, "record");
     await opened();

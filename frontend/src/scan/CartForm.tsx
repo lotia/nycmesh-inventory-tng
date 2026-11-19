@@ -49,7 +49,7 @@ import {
   type OlderStore,
   olderId,
 } from "./older-builds";
-import { type Gaps, nameOf, toCart } from "./older-to-cart";
+import { type Gaps, nameOf, toCart, withRetired } from "./older-to-cart";
 import { differenceOf } from "./recorded-elsewhere";
 import { Scanner } from "./Scanner";
 import { indexOf } from "./search";
@@ -545,15 +545,6 @@ export function CartForm({
   // Undo, while the cart is as removing left it.
   const undoable =
     removed.value?.revision === cart.value.revision ? removed.value : null;
-  // Its item, named if the catalogue names it only as retired, as the
-  // older builds' lists do (older-to-cart.ts, toCart).
-  const removedItem =
-    undoable === null
-      ? undefined
-      : (items.get(undoable.line.itemId) ??
-        catalogue.retired_items.find(
-          (each) => each.id === undoable.line.itemId,
-        ));
   // Keyed by what each says, two saying the same apart.
   const problemKeys = keyedByWords(problems.value.map(wordsOf));
 
@@ -677,7 +668,17 @@ export function CartForm({
           {sayParts(
             REMOVED_UNDO,
             {
-              item: <strong>{nameOf(removedItem)}</strong>,
+              // Named even if the catalogue names it only as retired, as
+              // the older builds' lists do (withRetired).
+              item: (
+                <strong>
+                  {nameOf(
+                    indexOf(withRetired(catalogue)).items.get(
+                      undoable.line.itemId,
+                    ),
+                  )}
+                </strong>
+              ),
             },
             [
               (inside) => (
