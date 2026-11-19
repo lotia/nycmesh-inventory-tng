@@ -1,7 +1,6 @@
 """Administrators: inviting, resetting sign-in, retiring and bringing back
 (admins/admins_routes.py)."""
 
-import html
 from collections.abc import Callable
 from datetime import UTC, datetime, timedelta
 from typing import NoReturn
@@ -636,7 +635,7 @@ def test_a_link_page_offers_a_copy_and_a_qr_code(
     """Passed on by hand still: one click copies it, or a phone scans it."""
     ben, _ = new_admin(session, "ben")
     made = admin_client.post(f"{ADMINS}/{ben.id}/reset", data=with_code(session))
-    link = html.unescape(link_on(made.text))
+    link = link_on(made.text)
     assert 'data-copy="link"' in made.text
     assert str(qr_svg(link)) in made.text
 
