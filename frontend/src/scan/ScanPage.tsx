@@ -12,9 +12,10 @@ import {
 } from "../shared/outbox";
 import { NOT_REGISTERED } from "../shared/registration";
 import { telemetry } from "../shared/telemetry";
-import { CartForm, CHECK_EVERY_MS } from "./CartForm";
+import { CartForm } from "./CartForm";
 import { STORAGE_KEY as CART_KEY, loadCart } from "./cart";
 import { type Loaded, loadCatalogue } from "./catalogue";
+import { useEveryMinuteAndWhenShown } from "./every-minute-and-when-shown";
 import { CAUTION_BOX } from "./Notes";
 import { heldIn } from "./OlderList";
 import { type AddDifference, OutboxList } from "./OutboxList";
@@ -111,24 +112,11 @@ export function ScanPage({
   }
 
   // A page left open refreshes a stale catalogue.
-  useEffect(() => {
-    const refreshStale = () => {
-      const stale = Date.now() - loadedAt.current > CATALOGUE_FRESH_MS;
-      if (
-        document.visibilityState !== "visible" ||
-        !stale ||
-        loaded.value.state !== "ready"
-      ) {
-        return;
-      }
+  useEveryMinuteAndWhenShown(() => {
+    const stale = Date.now() - loadedAt.current > CATALOGUE_FRESH_MS;
+    if (stale && loaded.value.state === "ready") {
       refresh();
-    };
-    const timer = setInterval(refreshStale, CHECK_EVERY_MS);
-    document.addEventListener("visibilitychange", refreshStale);
-    return () => {
-      clearInterval(timer);
-      document.removeEventListener("visibilitychange", refreshStale);
-    };
+    }
   }, [api]);
 
   // The outbox's batches the catalogue does not show (unseen-batches.ts,

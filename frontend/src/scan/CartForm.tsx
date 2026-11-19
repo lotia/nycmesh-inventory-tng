@@ -28,6 +28,7 @@ import {
   withLine,
   withLineChanged,
 } from "./cart";
+import { useEveryMinuteAndWhenShown } from "./every-minute-and-when-shown";
 import { Finder } from "./Finder";
 import { readLabel, type Scanned } from "./label-codes";
 import {
@@ -52,10 +53,6 @@ import { differenceOf } from "./recorded-elsewhere";
 import { Scanner } from "./Scanner";
 import { indexOf } from "./search";
 import { sealedCounts } from "./unseen-batches";
-
-/** How often an open page checks whether to ask whose name it is, and
- * whether its catalogue is stale. */
-export const CHECK_EVERY_MS = 60_000;
 
 export const NOT_KEEPING = msg`This browser isn't keeping the cart, so a reload will empty it. Free some space or leave private browsing.`;
 /** What a label or a tap did, said under the camera. */
@@ -157,24 +154,10 @@ export function CartForm({
 
   // Asked when the page is shown again, and checked each minute, so a hub
   // tablet left on asks too. Never, when administrators set 0.
-  useEffect(() => {
-    if (catalogue.settings.name_check_minutes === 0) {
-      return;
+  useEveryMinuteAndWhenShown(() => {
+    if (askWho(cart.value, catalogue)) {
+      checkName.value = true;
     }
-    const maybeAsk = () => {
-      if (
-        document.visibilityState === "visible" &&
-        askWho(cart.value, catalogue)
-      ) {
-        checkName.value = true;
-      }
-    };
-    const timer = setInterval(maybeAsk, CHECK_EVERY_MS);
-    document.addEventListener("visibilitychange", maybeAsk);
-    return () => {
-      clearInterval(timer);
-      document.removeEventListener("visibilitychange", maybeAsk);
-    };
   }, [catalogue]);
 
   /** Say so if the browser would not keep the cart. */
