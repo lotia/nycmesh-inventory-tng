@@ -21,7 +21,7 @@ proposed reading to accept, all at once or one by one, or change first. Those no
 <p>{% trans %}Nothing to settle: every unit after a number in a name is read one way, or by a rule.{% endtrans %}</p>
 {% else %}
 {% if one %}
-<p>{% trans at=at + 1, total=total %}{{ at }} of {{ total }}.{% endtrans %} <a href="{{ here }}">{% trans %}See them all{% endtrans %}</a></p>
+<p>{% trans at=(at + 1) | number, total=total | number %}{{ at }} of {{ total }}.{% endtrans %} <a href="{{ here }}">{% trans %}See them all{% endtrans %}</a></p>
 {% else %}
 <p><a href="{{ here }}?one=1">{% trans %}Review one by one{% endtrans %}</a></p>
 {% endif %}

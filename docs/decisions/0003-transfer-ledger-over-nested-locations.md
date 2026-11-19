@@ -51,8 +51,9 @@ while. So we need more than one location from the start.
   whole count, keeping what was typed (amendment, 2026-11-18). A count asks
   for each form of an item separately, and may add or close an open package
   (0020). It also puts right the end at that place of a line recorded more
-  than moved (0020). A count names each item once: a form naming one twice is refused,
-  saying why, as it isn't clear which number is right (Ali, 2026-11-08). A
+  than moved (0020). A count names each item once: a form naming one twice
+  is refused, saying why, as it isn't clear which number is right (Ali,
+  2026-11-08). A
   place's count page can show one item, or those whose names match a search
   as the items list searches; then only those are counted, and the rest stay
   as they are (Ali, 2026-11-15). An
@@ -95,9 +96,10 @@ counts the place's transactions up to the moment again, and if there are
 more, it is refused whole. Which items that save moved cannot be told from
 the form, so unlike an item moved meanwhile (Ali, 2026-11-03) no line is
 saved: the form is shown again as the records are now, keeping what was
-typed, to check and save again. The form reads its moment and its figures
-on one snapshot, so a save committing as it is shown is in both or in
-neither.
+typed, to check and save again. The form, opened, reads its moment and
+its figures on one snapshot, so a save committing as it is shown is in
+both or in neither. Shown again after a send, it reads them apart, so a
+save committing just then may refuse it once more, keeping what was typed.
 
 We rejected carrying each line's figure shown (many fields, and it misses
 counts by form), comparing PostgreSQL's transaction snapshots (exact, but

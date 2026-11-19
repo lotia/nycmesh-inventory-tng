@@ -110,8 +110,10 @@ def _counts_written(say_plural: Callable[..., str]) -> Callable[..., str]:
 
     @pass_context
     def say(
-        context: Context, singular: str, plural: str, num: int, **values: object
+        context: Context, singular: str, plural: str, num: int, /, **values: object
     ) -> str:
+        # Positional only, as Jinja passes them: a template's values may
+        # take any name, plural or context too.
         written = number(num)
         values = {
             name: written if type(value) is int and value == num else value

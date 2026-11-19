@@ -943,6 +943,50 @@ def test_a_number_in_a_message_is_written_as_the_locale_writes_it() -> None:
         assert uses_problem(1000) == "From 1 to 1.000 devices."
 
 
+def test_the_home_and_seeding_pages_write_their_counts_as_the_locale_does() -> None:
+    """Needs your action's total, each section's count, and the seeding
+    page's place in its proposals (inventory-tng-1axu)."""
+    kind = SimpleNamespace(title=NOT_ENGLISH, path="/admin/stock/x")
+    home = signed_in(
+        "admins/admin_home.html",
+        warnings=[],
+        needs=[SimpleNamespace(kind=kind, items=[], total=1000)],
+        changes=[],
+        retired_places=[],
+        current={"/admin/stock": 2000},
+        paths=SimpleNamespace(account="/here"),
+    )
+    found = SimpleNamespace(key="g", offered=[])
+    proposal = SimpleNamespace(found=found, count=1, names=[], why="", proposed=None)
+    seeding = signed_in(
+        "catalogue/reading_seed.html",
+        proposals=[proposal],
+        field="unit_",
+        sent={},
+        not_a_unit="none",
+        one=True,
+        at=999,
+        total=2000,
+        here="/here",
+    )
+    assert "(1,000)" in home
+    assert ": 2,000" in home
+    assert "1,000 of 2,000." in seeding
+    assert 'name="at" value="999"' in seeding
+
+
+def test_a_plurals_values_may_take_any_name() -> None:
+    """Even plural and context, which Jinja passes ngettext by position."""
+    said = from_macros(
+        "{% trans count=n, plural=p, context=c %}{{ count }} {{ plural }} {{ context }}"
+        "{% pluralize %}{{ count }} {{ plural }}s {{ context }}{% endtrans %}",
+        n=1000,
+        p="box",
+        c="here",
+    )
+    assert said == "1,000 boxs here"
+
+
 def test_only_an_id_fills_a_messages_placeholder_as_plain_digits() -> None:
     """A number people read is filled as number() writes it, a string, so
     a message's only %d is an id, which stays plain digits as in a link."""

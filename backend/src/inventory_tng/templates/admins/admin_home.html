@@ -5,7 +5,7 @@
 {% endfor %}
 {% if needs %}
 <section id="needs-action">
-  <h2>{% trans total=needs | sum(attribute="total") %}Needs your action ({{ total }}){% endtrans %}</h2>
+  <h2>{% trans total=needs | sum(attribute="total") | number %}Needs your action ({{ total }}){% endtrans %}</h2>
   {% for found in needs %}{% set kind = found.kind %}
   <h3>{{ kind.title }}</h3>
   <ul>
@@ -29,7 +29,7 @@
 {% include "_retired_holding.html" %}
 <ul>
   {% for path, label, _ in sections %}
-  <li><a href="{{ path }}">{{ label }}</a>{% if current.get(path) is not none %}: {{ current[path] }}{% endif %}</li>
+  <li><a href="{{ path }}">{{ label }}</a>{% if current.get(path) is not none %}: {{ current[path] | number }}{% endif %}</li>
   {% endfor %}
   <li><a href="{{ paths.account }}">{% trans %}Your account{% endtrans %}</a></li>
 </ul>

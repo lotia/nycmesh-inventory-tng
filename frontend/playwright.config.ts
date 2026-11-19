@@ -26,7 +26,12 @@ process.env.BROWSER_CRAWL_RUN ??= join(
   `inventory-browser-${process.pid}-crawl`,
 );
 if (!process.env.BROWSER_PORT || !process.env.BROWSER_CRAWL_PORT) {
-  const [port, crawlPort] = freePorts(2);
+  // Three, so that two are left besides a port set already, which the
+  // system may hand out again while nothing listens on it.
+  const preset = [process.env.BROWSER_PORT, process.env.BROWSER_CRAWL_PORT];
+  const [port, crawlPort] = freePorts(3).filter(
+    (each) => !preset.includes(each),
+  );
   process.env.BROWSER_PORT ||= port;
   process.env.BROWSER_CRAWL_PORT ||= crawlPort;
 }
