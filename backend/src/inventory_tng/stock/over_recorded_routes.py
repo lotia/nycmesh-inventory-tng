@@ -564,8 +564,7 @@ def answer(
         return _page(
             request, signed, session, only, view, values=values, refused=refused
         )
-    how, written = settled
-    counts.corrected(admin_id, written)
+    how, _ = settled
     over_recorded.measure_settled(how, reason if do == "checked" else None)
     notice = f"over_recorded_{how}"
     if do == "count":

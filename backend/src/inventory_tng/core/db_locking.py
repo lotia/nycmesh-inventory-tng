@@ -23,6 +23,7 @@ from inventory_tng.core.db_protection import (
     flush_writes,
     table_of,
 )
+from inventory_tng.core.db_savepoints import innermost, savepoint_undone, within
 from inventory_tng.core.db_sessions import Base, exists_where
 
 if TYPE_CHECKING:
@@ -167,12 +168,8 @@ LOCKING = "inventory_locking"
 UNGUARDED_INFO = "inventory.unguarded"
 
 
-def _innermost(session: Session) -> SessionTransaction | None:
-    return session.get_nested_transaction() or session.get_transaction()
-
-
 def _hold(session: Session, key: object) -> None:
-    session.info.setdefault(LOCKS_INFO, {}).setdefault(key, _innermost(session))
+    session.info.setdefault(LOCKS_INFO, {}).setdefault(key, innermost(session))
 
 
 def _locked_as_read(
@@ -206,27 +203,18 @@ def _locks_released(session: Session, transaction: SessionTransaction) -> None:
         session.info.pop(LOCKS_INFO, None)
 
 
-def _within(taken: SessionTransaction | None, savepoint: SessionTransaction) -> bool:
-    while taken is not None and taken is not savepoint:
-        taken = taken.parent
-    return taken is savepoint
-
-
 @event.listens_for(Session, "after_soft_rollback")
 def _savepoint_locks_released(
     session: Session, transaction: SessionTransaction
 ) -> None:
     """Forget the locks taken in a savepoint rolled back, or in one
-    released into it. A flush that fails rolls back its own transaction
-    within the savepoint, which rolls back the savepoint: so the savepoint
-    is the nearest one around the transaction rolled back."""
-    while not transaction.nested and transaction.parent is not None:
-        transaction = transaction.parent
-    if not transaction.nested:
+    released into it (db_savepoints.savepoint_undone)."""
+    savepoint = savepoint_undone(transaction)
+    if savepoint is None:
         return
     held = session.info.get(LOCKS_INFO, {})
     for key, taken in list(held.items()):
-        if _within(taken, transaction):
+        if within(taken, savepoint):
             del held[key]
 
 

@@ -61,7 +61,6 @@ from inventory_tng.stock import needs_action, open_packages, over_recorded, quer
 from inventory_tng.stock.balance import countable, takeable
 from inventory_tng.stock.counts import (
     Counted,
-    corrected,
     lines_withheld,
     record_adjustment,
     record_count,
@@ -695,7 +694,6 @@ def count(
         )
     assert result is not None
     session.commit()
-    corrected(signed.admin.id, result.written)
     lines_withheld(signed.admin.id, place.id, result.withheld)
     open_packages.measure_closing("count", closed)
     over_recorded.measure_counted(settled)
@@ -758,5 +756,4 @@ def adjust(
         )
     assert written is not None
     session.commit()
-    corrected(signed.admin.id, written)
     return redirect(COUNTS, notice="adjusted", section="adjust")

@@ -7,7 +7,7 @@ write through the ledger's one writer (ledger.insert_transaction).
 """
 
 import uuid
-from collections.abc import Iterable, Mapping, Sequence
+from collections.abc import Mapping, Sequence
 from decimal import Decimal
 from typing import Literal, NamedTuple
 
@@ -17,6 +17,7 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from inventory_tng.core.db_errors import RuleBroken, enforce
+from inventory_tng.core.db_once_committed import once_committed
 from inventory_tng.core.db_sessions import exists_where
 from inventory_tng.models.places import Location
 from inventory_tng.models.stock import LedgerTransaction, OpenPackage
@@ -89,9 +90,16 @@ def _correct(
     lines: Lines,
 ) -> list[Written]:
     """A count's or an adjustment's transaction, as written: none if its
-    key is written already."""
+    key is written already. The one place either is written, so each is
+    measured and logged here, once committed (_recorded), whichever page
+    wrote it, and never twice (inventory-tng-vvp0)."""
     transaction = insert_transaction(session, key, {"kind": kind, **header}, lines)
-    return [] if transaction is None else [Written(transaction.id, kind, len(lines))]
+    if transaction is None:
+        return []
+    written = Written(transaction.id, kind, len(lines))
+    admin_id = header["admin_id"]
+    once_committed(session, lambda: _recorded(admin_id, written))
+    return [written]
 
 
 class Counted(NamedTuple):
@@ -109,23 +117,20 @@ class Counted(NamedTuple):
     put_right: list[tuple[int, Form | None]]
 
 
-def corrected(admin_id: int, written: Iterable[Written]) -> None:
-    """Measure and log a count or an adjustment once committed, as
-    save_batch (scan/batch_api.py) does, so a failed commit and its retry
-    count once."""
-    for transaction in written:
-        recorded.add(1, {"kind": transaction.kind})
-        log.info(
-            f"{transaction.kind} recorded",
-            ledger_transaction_id=transaction.id,
-            admin_id=admin_id,
-            lines=transaction.lines,
-        )
+def _recorded(admin_id: object, transaction: Written) -> None:
+    """Measure and log a count or an adjustment committed."""
+    recorded.add(1, {"kind": transaction.kind})
+    log.info(
+        f"{transaction.kind} recorded",
+        ledger_transaction_id=transaction.id,
+        admin_id=admin_id,
+        lines=transaction.lines,
+    )
 
 
 def lines_withheld(admin_id: int, location_id: int, lines: int) -> None:
-    """Measure and log a count's lines withheld (Counted.withheld) once
-    committed, as corrected() does its transactions."""
+    """Measure and log a count's lines withheld (Counted.withheld), called
+    once committed, so a failed commit and its retry count once."""
     if lines:
         withheld.add(lines)
         log.info(

@@ -19,7 +19,7 @@ from opentelemetry.sdk.metrics.export import (
     Metric,
     NumberDataPoint,
 )
-from sqlalchemy import exc, select
+from sqlalchemy import exc, func, select
 from sqlalchemy.orm import Session
 from structlog.testing import capture_logs
 
@@ -513,6 +513,129 @@ def test_a_count_refused_after_its_first_transaction_records_nothing(
     assert moments.expected(session, place.store.id) == {place.item.id: Decimal(5)}
 
 
+def corrections_written(session: Session) -> tuple[int, int]:
+    """Count and adjustment transactions in the ledger so far."""
+    rows = session.execute(
+        select(LedgerTransaction.kind, func.count())
+        .where(LedgerTransaction.kind.in_(("count", "adjustment")))
+        .group_by(LedgerTransaction.kind)
+    )
+    written = {kind: n for kind, n in rows}
+    return written.get("count", 0), written.get("adjustment", 0)
+
+
+@contextmanager
+def each_recorded_once(
+    reader: InMemoryMetricReader, session: Session, counts: int, adjustments: int
+) -> Generator[None]:
+    """The block writes `counts` counts and `adjustments` adjustments, and
+    inventory.counts.recorded adds exactly one for each, by its kind,
+    whichever path wrote it (inventory-tng-vvp0)."""
+    measured, written = recorded_by_kind(reader), corrections_written(session)
+    yield
+    expected = (counts, adjustments)
+    now = corrections_written(session)
+    assert tuple(a - b for a, b in zip(now, written, strict=True)) == expected
+    now = recorded_by_kind(reader)
+    assert tuple(a - b for a, b in zip(now, measured, strict=True)) == expected
+
+
+def test_counts_length_checks_set_as_counts(
+    rolled_back: Recorded, session: Session
+) -> None:
+    """A length set writes a count, recorded once, and once only however
+    often it is sent."""
+    client, _, reader, _ = rolled_back
+    spools = Spools(session)
+    reported = spools.opened()
+    _, token = new_device(session)
+    client.cookies.set(devices.COOKIE, token)
+    said = report(spools, length(reported, "250"))
+    assert client.post("/api/transactions", json=said).status_code == 201
+    client.cookies.clear()
+    _, key = new_admin(session)
+    sign_in_with(client, key=key)
+    session.refresh(reported)
+    ticked = f"{reported.id} {open_packages.check_seen(reported)}"
+    with each_recorded_once(reader, session, 1, 0):
+        for _ in range(2):
+            client.post(
+                "/admin/stock/length-checks",
+                data={"open_package": [ticked], "do": "set"},
+            )
+
+
+def test_counts_packages_closed_as_adjustments(
+    rolled_back: Recorded, session: Session
+) -> None:
+    """Closing a package that still shows some writes an adjustment,
+    recorded once: closed directly, confirmed used up, or sent again."""
+    client, _, reader, _ = rolled_back
+    _, key = new_admin(session)
+    sign_in_with(client, key=key)
+    spools = Spools(session)
+    direct, confirmed = spools.opened(), spools.opened()
+    open_packages.report(
+        session, [confirmed.id], spools.place.volunteer.id, datetime.now(UTC)
+    )
+    session.flush()
+    close = f"/admin/items/{spools.cable.id}/open-packages/{direct.id}/close"
+    with each_recorded_once(reader, session, 0, 1):
+        for _ in range(2):
+            client.post(close)
+    with each_recorded_once(reader, session, 0, 1):
+        for _ in range(2):
+            client.post(f"/admin/stock/used-up/{confirmed.id}/confirm")
+
+
+def test_counts_a_count_that_closes_a_package_missing(
+    rolled_back: Recorded, session: Session
+) -> None:
+    """A count saying an open package is not there: its count, and the
+    adjustment closing the package, each recorded once."""
+    client, _, reader, _ = rolled_back
+    _, key = new_admin(session)
+    sign_in_with(client, key=key)
+    spools = Spools(session)
+    missing = spools.opened()
+    store = spools.store.id
+    count = {
+        "key": str(uuid.uuid4()),
+        **moment_fields(session, store),
+        f"opened_{missing.id}": "",
+        f"state_{missing.id}": "missing",
+    }
+    with each_recorded_once(reader, session, 1, 1):
+        for _ in range(2):
+            client.post(f"{COUNTS}/{store}", data=count)
+
+
+def test_counts_lines_recorded_more_than_moved_corrected_as_adjustments(
+    rolled_back: Recorded, session: Session
+) -> None:
+    """Correcting a line recorded with more than was moved writes an
+    adjustment at each end, each recorded once."""
+    client, _, reader, _ = rolled_back
+    place = Place(session)
+    _, token = new_device(session)
+    client.cookies.set(devices.COOKIE, token)
+    first = place.batch()
+    assert client.post("/api/transactions", json=first).status_code == 201
+    changed = first | {
+        "lines": [{"item_id": place.item.id, "quantity": "1"}],
+        "changed_from": first["lines"],
+    }
+    assert client.post("/api/transactions", json=changed).status_code == 409
+    client.cookies.clear()
+    _, key = new_admin(session)
+    sign_in_with(client, key=key)
+    check = session.scalars(select(OverRecorded)).one()
+    page = f"/admin/stock/recorded-more/{check.id}/correct"
+    with each_recorded_once(reader, session, 0, 2):
+        for _ in range(2):
+            client.post(page, data={"seen": over_recorded.seen(check)})
+
+
 def test_counts_batches_at_a_retired_place_by_side(
     rolled_back: Recorded, session: Session
 ) -> None:
@@ -928,6 +1051,8 @@ def test_counts_length_checks_raised_and_settled(
     setting or leaving (inventory-tng-wy7), or by closing the package, so
     raised and settled match (inventory-tng-b1z)."""
     client, _, reader, _ = rolled_back
+    raised = counted(reader, "inventory.open_packages.length_checks.raised")
+    settled = counted(reader, "inventory.open_packages.length_checks.settled")
     spools = Spools(session)
     reported, cut_from, closing = spools.opened(), spools.opened(), spools.opened()
     _, token = new_device(session)
@@ -937,7 +1062,7 @@ def test_counts_length_checks_raised_and_settled(
     below = spools.place.batch(lines=[cut(cut_from, "310")])
     assert client.post("/api/transactions", json=below).status_code == 201
     client.cookies.clear()
-    assert counted(reader, "inventory.open_packages.length_checks.raised") == {
+    assert added(reader, "inventory.open_packages.length_checks.raised", raised) == {
         (("how", "volunteer"),): 2,
         (("how", "below_zero"),): 1,
     }
@@ -953,7 +1078,7 @@ def test_counts_length_checks_raised_and_settled(
         data={"seen": open_packages.check_seen(cut_from)},
     )
     client.post(f"/admin/items/{spools.cable.id}/open-packages/{closing.id}/close")
-    assert counted(reader, "inventory.open_packages.length_checks.settled") == {
+    assert added(reader, "inventory.open_packages.length_checks.settled", settled) == {
         (("how", "set"),): 1,
         (("how", "left"),): 1,
         (("how", "closed"),): 1,
