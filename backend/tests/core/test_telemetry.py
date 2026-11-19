@@ -953,22 +953,50 @@ def test_records_what_the_pages_report(rolled_back: Recorded) -> None:
     }
 
 
-def test_counts_policy_violations_by_directive(rolled_back: Recorded) -> None:
+SCRIPT_REPORT = {
+    "type": "csp-violation",
+    "body": {"effectiveDirective": "script-src-elem"},
+}
+
+
+@pytest.mark.parametrize(
+    ("report", "content_type", "found"),
+    [
+        # The Reporting API's list.
+        (
+            [
+                SCRIPT_REPORT,
+                {
+                    "type": "csp-violation",
+                    "body": {"effectiveDirective": "made-up-src"},
+                },
+            ],
+            "application/reports+json",
+            {"script-src-elem": 1, "other": 1},
+        ),
+        # report-uri's, from WebKit: one report of the Reporting API's shape.
+        (SCRIPT_REPORT, "application/csp-report", {"script-src-elem": 1}),
+        # report-uri's, from other browsers.
+        (
+            {"csp-report": {"effective-directive": "script-src-elem"}},
+            "application/csp-report",
+            {"script-src-elem": 1},
+        ),
+    ],
+)
+def test_counts_policy_violations_by_directive(
+    rolled_back: Recorded, report: object, content_type: str, found: dict[str, int]
+) -> None:
     client, _, reader, _ = rolled_back
     before = counted(reader, "inventory.csp.violations")
-    reports = [
-        {"type": "csp-violation", "body": {"effectiveDirective": "script-src-elem"}},
-        {"type": "csp-violation", "body": {"effectiveDirective": "made-up-src"}},
-    ]
     answer = client.post(
         security_headers.REPORTS,
-        json=reports,
-        headers={"Content-Type": "application/reports+json"},
+        json=report,
+        headers={"Content-Type": content_type},
     )
     assert answer.status_code == 204
     assert added(reader, "inventory.csp.violations", before) == {
-        (("directive", "script-src-elem"),): 1,
-        (("directive", "other"),): 1,
+        (("directive", directive),): count for directive, count in found.items()
     }
 
 

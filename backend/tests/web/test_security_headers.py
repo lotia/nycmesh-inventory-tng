@@ -262,7 +262,8 @@ def test_no_template_has_inline_script_or_style() -> None:
     assert found == {}
 
 
-# What browsers send: report-uri's one report, and the Reporting API's list.
+# What browsers send: report-uri's one report, WebKit's in the Reporting
+# API's shape, and the Reporting API's list.
 REPORT_URI = {
     "csp-report": {
         "document-uri": "https://inventory.example/scan",
@@ -271,6 +272,17 @@ REPORT_URI = {
         "violated-directive": "script-src-elem",
         "original-policy": "default-src 'self'",
     }
+}
+WEBKIT_REPORT_URI = {
+    "type": "csp-violation",
+    "url": "https://inventory.example/scan",
+    "body": {
+        "documentURL": "https://inventory.example/scan",
+        "effectiveDirective": "style-src-attr",
+        "blockedURL": "inline",
+        "disposition": "enforce",
+        "statusCode": 200,
+    },
 }
 REPORTING_API = [
     {
@@ -311,6 +323,7 @@ def send(client: TestClient, report: object, content_type: str) -> Response:
     ("report", "content_type", "found"),
     [
         (REPORT_URI, "application/csp-report", ["script-src-elem"]),
+        (WEBKIT_REPORT_URI, "application/csp-report", ["style-src-attr"]),
         (REPORTING_API, "application/reports+json", ["style-src-attr", "other"]),
         # Older browsers name the whole directive, sources and all.
         (
@@ -372,6 +385,9 @@ def test_a_report_is_counted_by_directive_and_nothing_it_says_is_kept(
         b'{"csp-report": {}}',
         b'{"csp-report": {"violated-directive": " "}}',
         b'[{"type": "csp-violation", "body": {}}]',
+        b'{"type": "csp-violation", "body": {}}',
+        b'{"type": "deprecation", "body": {"effectiveDirective": "img-src"}}',
+        b'{"type": "csp-violation", "body": "img-src"}',
         # Nested deeper than the parser goes, well inside MOST_BYTES.
         b"[" * 10_000 + b"]" * 10_000,
         b"[" * 20_000,

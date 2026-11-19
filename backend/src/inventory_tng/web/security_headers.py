@@ -72,8 +72,9 @@ WEBKIT_SELECT_HASH = (
     + "'"
 )
 
-# What browsers send reports as: report-uri's, the Reporting API's, and
-# plain JSON, which older browsers used.
+# What browsers send reports as: report-uri's (WebKit's in the Reporting
+# API's shape), the Reporting API's, and plain JSON, which older browsers
+# used.
 REPORT_TYPES = frozenset(
     {"application/csp-report", "application/reports+json", "application/json"}
 )
@@ -231,19 +232,22 @@ def docs(request: Request) -> HTMLResponse:
 
 
 def violated(report: object) -> list[str]:
-    """Each violation's directive, from report-uri's one report or the
-    Reporting API's list (its csp-violation reports, MOST_REPORTS at most);
-    "other" for one not in DIRECTIVES. One that names none is left out."""
+    """Each violation's directive, from report-uri's one report, the
+    Reporting API's list (its csp-violation reports, MOST_REPORTS at most),
+    or one report of the Reporting API's shape, which WebKit sends to
+    report-uri; "other" for one not in DIRECTIVES. One that names none is
+    left out."""
     found: Iterable[object]
     if isinstance(report, dict) and isinstance(body := report.get("csp-report"), dict):
         # Older browsers name the whole directive, sources and all.
         named = body.get("violated-directive")
         first = named.split()[0] if isinstance(named, str) and named.strip() else None
         found = [body.get("effective-directive") or first]
-    elif isinstance(report, list):
+    elif isinstance(report, list | dict):
+        entries = report if isinstance(report, list) else [report]
         found = (
             entry["body"].get("effectiveDirective")
-            for entry in report[:MOST_REPORTS]
+            for entry in entries[:MOST_REPORTS]
             if isinstance(entry, dict)
             and entry.get("type") == "csp-violation"
             and isinstance(entry.get("body"), dict)

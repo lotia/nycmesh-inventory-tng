@@ -97,10 +97,12 @@ test("a <select> is refused nothing, and keeps its ellipsis", async ({
   browserName,
   violations,
 }) => {
-  const reports: string[] = [];
+  // What the backend answers each report: 204, counted.
+  const answers: number[] = [];
   await page.route("**/api/csp-reports", async (route) => {
-    reports.push(route.request().postData() ?? "");
-    await route.fulfill({ status: 204 });
+    const response = await route.fetch();
+    answers.push(response.status());
+    await route.fulfill({ response });
   });
   // The scan page has selects of its own too.
   await page.goto("/scan");
@@ -131,11 +133,11 @@ test("a <select> is refused nothing, and keeps its ellipsis", async ({
     .poll(() => violations)
     .toEqual([expect.stringMatching(/^style-src-attr refused inline \(P\) /)]);
   violations.length = 0;
-  // WebKit reports ours alone; Chromium sends its reports by the Reporting
-  // API, over HTTPS only.
+  // WebKit reports ours alone, and the backend counts it; Chromium sends
+  // its reports by the Reporting API, over HTTPS only.
   await expect
-    .poll(() => reports.length)
-    .toBe(browserName === "webkit" ? 1 : 0);
+    .poll(() => answers)
+    .toEqual(browserName === "webkit" ? [204] : []);
   // Refused, WebKit's style takes the select's text-overflow with it.
   // Not hiding the caret, which Playwright does by a <style> of its own.
   const drawn = (id: string) =>
