@@ -7,20 +7,14 @@ plan of each statement that reads labels, as run, and how long each search
 takes on GET /admin/labels and its /suggest."""
 
 import os
-import statistics
-import time
-from collections.abc import Callable
 from functools import partial
-from typing import Any
 
 import pytest
 from fastapi.testclient import TestClient
-from measure_catalogue import LEDGER, RETIRE, run_ledger
-from sqlalchemy import Engine, event, func, text
+from sqlalchemy import Engine, func, text
 from sqlalchemy.orm import Session
 
 from inventory_tng.app import create_app
-from inventory_tng.core.db_sessions import make_engine
 from inventory_tng.core.settings import Settings
 from inventory_tng.labels.paths import LABELS
 from inventory_tng.models.catalogue import Category, Item, ItemPackage
@@ -28,9 +22,10 @@ from inventory_tng.models.labels import Label
 from inventory_tng.models.places import Location
 from inventory_tng.models.volunteers import Volunteer
 
-from databases import OWNER, as_role
+from helpers.measuring import plans, summary, timed
 from helpers.rows import setting_up
 from helpers.sign_in import TOTP_KEYS, new_admin, sign_in_with
+from helpers.years_of_saves import add_years_of_saves
 
 # The scale, from the shell: items, of which packaged ones have two
 # packages each, and places; each has a label, and REVOKED_EVERY'th one an
@@ -39,8 +34,6 @@ ITEMS = int(os.environ.get("MEASURE_ITEMS", "1500"))
 PACKAGED = ITEMS * 2 // 3
 STORES, AREAS, VANS, VOLUNTEERS = 5, 300, 60, 60
 REVOKED_EVERY = 4
-# Requests timed for each search, after one to warm up.
-TIMES = 20
 # What volunteers' administrators type: nothing, a word, a word mistyped, a
 # part number, words and a size, and a fragment of a code.
 SEARCHES = ("", "litebeam", "litebeem", "LBE-5AC", "cable 305", "7K3")
@@ -69,13 +62,7 @@ def filled(own_engine: Engine, own_database: str) -> str | None:
         _catalogue(session)
         _, key = new_admin(session)
         session.commit()
-    with own_engine.begin() as connection:
-        run_ledger(connection, LEDGER)
-    owner = make_engine(as_role(own_database, OWNER))
-    with owner.begin() as connection:
-        run_ledger(connection, RETIRE)
-        connection.execute(text("ANALYZE"))
-    owner.dispose()
+    add_years_of_saves(own_engine, own_database)
     return key
 
 
@@ -136,47 +123,6 @@ def _catalogue(session: Session) -> None:
     session.add_all(Volunteer(name=f"Volunteer {n}") for n in range(VOLUNTEERS))
 
 
-def _plans(engine: Engine, ask: Callable[[], object]) -> list[str]:
-    """The statements reading labels that `ask` sends, each with its plan
-    as run: EXPLAIN (ANALYZE, BUFFERS), with the parameters it was sent."""
-    sent: list[tuple[str, dict[str, Any]]] = []
-
-    def keep(
-        _connection: object,
-        _cursor: object,
-        statement: str,
-        parameters: dict[str, Any],
-        *_: object,
-    ) -> None:
-        if "FROM label" in statement:
-            sent.append((statement, parameters))
-
-    event.listen(engine, "before_cursor_execute", keep)
-    try:
-        ask()
-    finally:
-        event.remove(engine, "before_cursor_execute", keep)
-    plans = []
-    with engine.connect() as connection:
-        for statement, parameters in sent:
-            rows = connection.exec_driver_sql(
-                f"EXPLAIN (ANALYZE, BUFFERS) {statement}", parameters
-            )
-            plans.append(f"{statement}\n" + "\n".join(row[0] for row in rows))
-    return plans
-
-
-def _timed(client: TestClient, path: str, params: dict[str, str]) -> list[float]:
-    assert client.get(path, params=params).status_code == 200
-    took = []
-    for _ in range(TIMES):
-        start = time.perf_counter()
-        reply = client.get(path, params=params)
-        took.append((time.perf_counter() - start) * 1000)
-        assert reply.status_code == 200
-    return took
-
-
 def test_measure_the_labels(filled: str | None, own_database: str) -> None:
     app = create_app(
         Settings(database_url=own_database), totp_keys=TOTP_KEYS, startup_checks=False
@@ -196,14 +142,15 @@ def test_measure_the_labels(filled: str | None, own_database: str) -> None:
         for search in SEARCHES:
             for path in (LABELS, f"{LABELS}/suggest"):
                 params = {"q": search} if search else {}
-                plans = _plans(engine, partial(client.get, path, params=params))
-                # None if signed out, as the sign-in page answers instead.
-                assert plans or not search
-                for plan in plans:
-                    print(f"\n-- {path} q={search!r}\n{plan}")
-                took = _timed(client, path, params)
-                timings.append(
-                    f"GET {path} q={search!r}: median"
-                    f" {statistics.median(took):.0f} ms, slowest {max(took):.0f} ms"
+                sent = plans(
+                    engine,
+                    lambda statement: "FROM label" in statement,
+                    partial(client.get, path, params=params),
                 )
+                # None if signed out, as the sign-in page answers instead.
+                assert sent or not search
+                for plan in sent:
+                    print(f"\n-- {path} q={search!r}\n{plan}")
+                took, _ = timed(client, path, params)
+                timings.append(f"GET {path} q={search!r}: {summary(took)}")
     print("\n" + "\n".join(timings))
