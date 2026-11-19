@@ -15,7 +15,6 @@ import pytest
 from inventory_tng.core.local_env import CLONE
 
 TESTS = Path(__file__).parents[1]
-FRONTEND = CLONE / "frontend"
 # The readers themselves, and their tests, hold markup on purpose.
 EXEMPT = {Path("helpers/markup.py"), Path("test_markup.py")}
 # The comment that lets a check read markup as text, and its reason.
@@ -58,6 +57,7 @@ READS = re.compile(
 )
 # A line that is only a comment, which may name a read in prose.
 COMMENT = re.compile(r"\s*(?://|/\*|\*)")
+FRONTEND = CLONE / "frontend"
 FRONTEND_TESTS = (
     "src/**/*.test.ts",
     "src/**/*.test.tsx",
@@ -116,13 +116,10 @@ def strings(node: ast.expr) -> Iterator[tuple[int, str]]:
 def explained(comments: dict[int, str], alone: set[int], first: int, last: int) -> bool:
     """Whether an exact-markup comment is on a line from first to last, or
     on the lines of comments alone directly above first. `comments` holds
-    each line's comment, by line number from 1."""
-    lines = range(first, last + 1)
-    above = first - 1
-    while above in alone:
-        lines = range(above, last + 1)
-        above -= 1
-    return any(MARKER.search(comments.get(line, "")) for line in lines)
+    each line's comment, or the whole line, by line number from 1."""
+    while first - 1 in alone:
+        first -= 1
+    return any(MARKER.search(comments.get(line, "")) for line in range(first, last + 1))
 
 
 def markup_compared(source: str) -> list[tuple[int, str]]:
@@ -138,17 +135,16 @@ def markup_compared(source: str) -> list[tuple[int, str]]:
     alone = {
         number for number in comments if lines[number - 1].lstrip().startswith("#")
     }
-    found = set()
-    for statement in ast.walk(ast.parse(source)):
-        if not isinstance(statement, ast.stmt):
-            continue
-        for node in own_nodes(statement):
-            for operand in searched(node):
-                for line, text in strings(operand):
-                    if (match := MARKUP.search(text)) and not explained(
-                        comments, alone, statement.lineno, line
-                    ):
-                        found.add((line, match.group()))
+    statements = (n for n in ast.walk(ast.parse(source)) if isinstance(n, ast.stmt))
+    found = {
+        (line, match.group())
+        for statement in statements
+        for node in own_nodes(statement)
+        for operand in searched(node)
+        for line, text in strings(operand)
+        if (match := MARKUP.search(text))
+        and not explained(comments, alone, statement.lineno, line)
+    }
     return sorted(found)
 
 
@@ -219,34 +215,42 @@ def test_no_backend_test_compares_markup_as_text() -> None:
 
 
 @pytest.mark.parametrize(
-    ("source", "found"),
+    ("source", "read"),
     [
-        ("expect(form.innerHTML).toContain('<b>');", [(1, ".innerHTML")]),
-        ("const html = node.outerHTML;", [(1, ".outerHTML")]),
-        ("expect(node.innerHTML === '').toBe(true);", [(1, ".innerHTML")]),
-        ("const html = document.body.getHTML();", [(1, ".getHTML(")]),
-        ("expect(await page.content()).toContain('x');", [(1, ".content()")]),
-        ("expect(container).toMatchSnapshot();", [(1, ".toMatchSnapshot(")]),
-        ("expect(x).toMatchInlineSnapshot(`<p/>`);", [(1, ".toMatchInlineSnapshot(")]),
-        ("const html = await row.innerHTML();", [(1, ".innerHTML")]),
-        ("await row.evaluate((e) => e.outerHTML);", [(1, ".outerHTML")]),
-        ("expect(prettyDOM(container)).toContain('x');", [(1, "prettyDOM(")]),
-        ("// Never reads its .innerHTML, only the DOM.", []),
-        ("/**\n * Not its .outerHTML.\n */", []),
-        ("document.body.innerHTML = `<p>Hint</p>`;", []),
-        ("document.body.innerHTML += '<p>Hint</p>';", []),
-        ("// Exact markup on purpose: why.\nconst html = node.outerHTML;", []),
-        ("const html = node.outerHTML; // Exact markup on purpose: why.", []),
+        ("expect(form.innerHTML).toContain('<b>');", ".innerHTML"),
+        ("const html = node.outerHTML;", ".outerHTML"),
+        ("expect(node.innerHTML === '').toBe(true);", ".innerHTML"),
+        ("const html = document.body.getHTML();", ".getHTML("),
+        ("expect(await page.content()).toContain('x');", ".content()"),
+        ("expect(container).toMatchSnapshot();", ".toMatchSnapshot("),
+        ("expect(x).toMatchInlineSnapshot(`<p/>`);", ".toMatchInlineSnapshot("),
+        ("const html = await row.innerHTML();", ".innerHTML"),
+        ("await row.evaluate((e) => e.outerHTML);", ".outerHTML"),
+        ("expect(prettyDOM(container)).toContain('x');", "prettyDOM("),
         (
             "// Exact markup on purpose: why.\n\nconst html = node.outerHTML;",
-            [(3, ".outerHTML")],
+            ".outerHTML",
         ),
     ],
 )
-def test_frontend_markup_reads_are_found(
-    source: str, found: list[tuple[int, str]]
-) -> None:
-    assert markup_read(source) == found
+def test_frontend_markup_reads_are_found(source: str, read: str) -> None:
+    """Each read is on the source's last line."""
+    assert markup_read(source) == [(len(source.splitlines()), read)]
+
+
+@pytest.mark.parametrize(
+    "source",
+    [
+        "// Never reads its .innerHTML, only the DOM.",
+        "/**\n * Not its .outerHTML.\n */",
+        "document.body.innerHTML = `<p>Hint</p>`;",
+        "document.body.innerHTML += '<p>Hint</p>';",
+        "// Exact markup on purpose: why.\nconst html = node.outerHTML;",
+        "const html = node.outerHTML; // Exact markup on purpose: why.",
+    ],
+)
+def test_frontend_setup_prose_or_explained_reads_are_not_found(source: str) -> None:
+    assert markup_read(source) == []
 
 
 @pytest.mark.clone
