@@ -8,7 +8,7 @@ amended 2026-11-11 (tracking opened packages is a setting; bulk actions)
 length; "Needs your action") · amended 2026-11-14 (recorded more than
 moved; those settled listed, 2026-11-15) · amended 2026-11-18 (an item's
 open packages listed fewest left first, short ends after the usable ones
-on the scan page; its sealed packages largest first on the stock pages,
+on the scan page and flagged; its sealed packages largest first on the stock pages,
 smallest first on the item, scan and count pages; packages of one size
 by id)
 
@@ -281,10 +281,13 @@ you" counts every report in one line, which hides what is waiting.
   fuller ones; ties go by open package id, so the same records always
   show the same order (Ali, 2026-11-18, replacing most left first). The
   stock page uses the same rule. Short ends follow the usable ones, in
-  the same order, since none is long enough to use (Ali, 2026-11-18).
+  the same order, since none is long enough to use (Ali, 2026-11-18),
+  each flagged "Short end" so the order reads right (Ali, 2026-11-18).
   One showing nothing or less is last, greyed, flagged "Shows nothing
-  left", so the next volunteer can report it. Ordered by **Now**, so no
-  card moves while a cut is typed.
+  left", so the next volunteer can report it. A short end has something
+  left, so no card has both flags. Each flag is in the card's legend, so
+  read out with it. Ordered and flagged by **Now**, so no card moves or
+  changes flag while a cut is typed.
 - **One checkbox, one wording**: "Nothing usable left on it", whatever is
   typed, in the card whose legend names the package.
 - **It ticks itself** when a cut leaves a short end, uses up what the

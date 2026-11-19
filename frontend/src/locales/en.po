@@ -431,6 +431,10 @@ msgstr "Nothing matches “{typed}”."
 msgid "Scan"
 msgstr "Scan"
 
+#: src/scan/OpenPackageCard.tsx
+msgid "Short end"
+msgstr "Short end"
+
 #: src/scan/cart.ts
 msgid "Enter how much from the open package, up to 3 decimals."
 msgstr "Enter how much from the open package, up to 3 decimals."

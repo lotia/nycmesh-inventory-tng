@@ -2,7 +2,8 @@
  * An open package where a cart's item comes from, as a card of its own
  * (docs/decisions/0020, 2026-11-12): what it shows now and after the cut
  * typed, and whether nothing usable is left on it, which follows the cut
- * (usedUpOf) until the volunteer ticks or unticks it.
+ * (usedUpOf) until the volunteer ticks or unticks it. Flagged when it
+ * shows nothing left, or is a short end.
  */
 import { msg } from "@lingui/core/macro";
 import { useId } from "preact/hooks";
@@ -13,6 +14,7 @@ import type { Item } from "./cart";
 import {
   cutOf,
   type Ending,
+  isShortEnd,
   type Offered,
   type Taken,
   usedUpOf,
@@ -34,6 +36,9 @@ export const OVER = msg`Your cut is more than the {name} shows, so it's ticked. 
 export const OPEN = msg({ context: "state", message: "open" });
 export const OPENED = msg`opened {date}`;
 export const SHOWS_NOTHING_LEFT = msg`Shows nothing left`;
+/** The flag on a short end's card, by what is on it now (Ali,
+ * 2026-11-18, inventory-tng-j5c2). */
+export const SHORT_END = msg`Short end`;
 export const NOW = msg`Now`;
 /** NOW, for a screen reader, before what is on it now. */
 export const NOW_SAID = msg`Now:`;
@@ -97,6 +102,7 @@ export function OpenPackageCard({
   const cut = cutOf(open, taken);
   const usedUp = usedUpOf(open, taken);
   const empty = open.left <= 0;
+  const short = isShortEnd(open.left, open.short_below);
   const opened = open.opened_at.slice(0, 10);
   const note =
     cut?.ending != null && usedUp ? endingNote(cut.ending, name, unit) : "";
@@ -120,6 +126,7 @@ export function OpenPackageCard({
         {empty && (
           <strong class="text-sm uppercase">{say(SHOWS_NOTHING_LEFT)}</strong>
         )}
+        {short && <strong class="text-sm uppercase">{say(SHORT_END)}</strong>}
       </legend>
       <div class="grid grid-cols-2 gap-2">
         <div>

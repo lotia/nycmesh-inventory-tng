@@ -431,6 +431,10 @@ msgstr ""
 msgid "Scan"
 msgstr ""
 
+#: src/scan/OpenPackageCard.tsx
+msgid "Short end"
+msgstr ""
+
 #: src/scan/cart.ts
 msgid "Enter how much from the open package, up to 3 decimals."
 msgstr ""

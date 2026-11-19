@@ -62,6 +62,7 @@ import {
   ALL_OF_IT,
   NOTHING_USABLE,
   PRINTED_LENGTH,
+  SHORT_END,
   SHOWS_NOTHING_LEFT,
   WRONG_LENGTH,
 } from "./OpenPackageCard";
@@ -373,6 +374,38 @@ describe("filling and saving a cart", () => {
         .getAllByRole("group", { name: /^Spool open/ })
         .map((card) => within(card).getAllByText(/ m$/)[0]?.textContent),
     ).toEqual(["Now: 40 m", "Now: 120 m", "Now: 10 m", "Now: 0 m"]);
+  });
+
+  test("a short end's card is flagged, a usable one and one showing nothing are not", async () => {
+    // Ali, 2026-11-18, inventory-tng-j5c2.
+    await cableWith(
+      spool({ id: 6, key: "22222222-2222-4222-8222-222222222222", left: "0" }),
+      spool({
+        id: 9,
+        key: "33333333-3333-4333-8333-333333333333",
+        left: "10.000",
+        short_below: "15.000",
+      }),
+      spool({ short_below: "15.000" }),
+    );
+    const cards = screen.getAllByRole("group", { name: /^Spool open/ });
+    const flagged = cards.map(
+      (card) => within(card).queryByText(say(SHORT_END)) !== null,
+    );
+    expect(flagged).toEqual([false, true, false]);
+    // In the legend, so read out with the card, as "Shows nothing left" is.
+    expect(
+      screen.getByRole("group", {
+        name: `Spool open opened 2026-11-03 ${say(SHORT_END)}`,
+      }),
+    ).toBe(cards[1]);
+    // A cut typed on the usable one does not flag it: by Now, as the order.
+    fireEvent.input(within(cards[0] as HTMLElement).getByLabelText(CUT), {
+      target: { value: "110" },
+    });
+    expect(
+      within(cards[0] as HTMLElement).queryByText(say(SHORT_END)),
+    ).toBeNull();
   });
 
   test("an open package is named by its package, though the catalogue has it no more", async () => {

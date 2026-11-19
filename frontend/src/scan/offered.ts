@@ -116,8 +116,12 @@ export function offeredAt(
 
 /** Whether an open package with `left` (thousandths) on it is a short
  * end: some left, but less than its package's too-short-to-use length
- * (open_packages.is_short_end). */
-function isShortEnd(left: number, shortBelow: Offered["short_below"]): boolean {
+ * (open_packages.is_short_end). Never one showing nothing, so a card is
+ * flagged one or the other, not both. */
+export function isShortEnd(
+  left: number,
+  shortBelow: Offered["short_below"],
+): boolean {
   const below = shortBelow === null ? null : thousandths(shortBelow);
   return below !== null && 0 < left && left < below;
 }
