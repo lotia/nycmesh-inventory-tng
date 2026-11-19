@@ -904,6 +904,8 @@ def test_records_what_the_pages_report(rolled_back: Recorded) -> None:
             "action": "put_in_cart_automatically",
         },
         {"kind": "cart_discarded"},
+        {"kind": "line_removed"},
+        {"kind": "removal_undone"},
         {"kind": "difference_added", "how": "automatic"},
         {"kind": "difference_added", "how": "tap"},
     ]
@@ -935,6 +937,8 @@ def test_records_what_the_pages_report(rolled_back: Recorded) -> None:
     automatically = (("action", "put_in_cart_automatically"), ("held", "saves"))
     assert acted_on[automatically] >= 1
     assert counted(reader, "inventory.cart.discards")[()] >= 1
+    assert counted(reader, "inventory.cart.lines_removed")[()] >= 1
+    assert counted(reader, "inventory.cart.removals_undone")[()] >= 1
     added = counted(reader, "inventory.cart.differences_added")
     assert added[(("how", "automatic"),)] >= 1
     assert added[(("how", "tap"),)] >= 1

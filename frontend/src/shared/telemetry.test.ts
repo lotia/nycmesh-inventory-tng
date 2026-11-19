@@ -113,6 +113,8 @@ describe("reporting", () => {
       out_of_date: { kind: "out_of_date", learned: "server" },
       older_storage: { kind: "older_storage", held: "cart", action: "found" },
       cart_discarded: { kind: "cart_discarded" },
+      line_removed: { kind: "line_removed" },
+      removal_undone: { kind: "removal_undone" },
       difference_added: { kind: "difference_added", how: "tap" },
     };
     for (const event of Object.values(each)) {

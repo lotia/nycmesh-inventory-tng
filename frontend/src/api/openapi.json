@@ -1044,6 +1044,20 @@
         "required": ["item_id", "quantity"],
         "title": "Line"
       },
+      "LineRemoved": {
+        "properties": {
+          "kind": {
+            "type": "string",
+            "const": "line_removed",
+            "title": "Kind"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": ["kind"],
+        "title": "LineRemoved",
+        "description": "A volunteer removed a line from the scan page's cart."
+      },
       "LocationEntry": {
         "properties": {
           "id": {
@@ -1509,6 +1523,20 @@
         "required": ["code"],
         "title": "Registration"
       },
+      "RemovalUndone": {
+        "properties": {
+          "kind": {
+            "type": "string",
+            "const": "removal_undone",
+            "title": "Kind"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": ["kind"],
+        "title": "RemovalUndone",
+        "description": "A volunteer pressed Undo after removing a line from the scan page's\ncart, putting it back where it was."
+      },
       "Report": {
         "properties": {
           "events": {
@@ -1536,6 +1564,12 @@
                   "$ref": "#/components/schemas/CartDiscarded"
                 },
                 {
+                  "$ref": "#/components/schemas/LineRemoved"
+                },
+                {
+                  "$ref": "#/components/schemas/RemovalUndone"
+                },
+                {
                   "$ref": "#/components/schemas/DifferenceAdded"
                 }
               ],
@@ -1545,9 +1579,11 @@
                   "cart_discarded": "#/components/schemas/CartDiscarded",
                   "difference_added": "#/components/schemas/DifferenceAdded",
                   "error": "#/components/schemas/PageError",
+                  "line_removed": "#/components/schemas/LineRemoved",
                   "older_storage": "#/components/schemas/OlderStorage",
                   "out_of_date": "#/components/schemas/OutOfDate",
                   "outbox_retry": "#/components/schemas/OutboxRetry",
+                  "removal_undone": "#/components/schemas/RemovalUndone",
                   "scan_to_save": "#/components/schemas/ScanToSave",
                   "web_vital": "#/components/schemas/WebVital"
                 }

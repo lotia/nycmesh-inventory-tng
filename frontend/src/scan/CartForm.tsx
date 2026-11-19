@@ -23,6 +23,7 @@ import {
   openingPackage,
   placed,
   placeSides,
+  reconcile,
   SIDES,
   type Side,
   withLine,
@@ -48,10 +49,11 @@ import {
   type OlderStore,
   olderId,
 } from "./older-builds";
-import { type Gaps, toCart } from "./older-to-cart";
+import { type Gaps, nameOf, toCart } from "./older-to-cart";
 import { differenceOf } from "./recorded-elsewhere";
 import { Scanner } from "./Scanner";
 import { indexOf } from "./search";
+import { type Removed, removeLine, undone } from "./undo-remove";
 import { sealedCounts } from "./unseen-batches";
 
 export const NOT_KEEPING = msg`This browser isn't keeping the cart, so a reload will empty it. Free some space or leave private browsing.`;
@@ -80,6 +82,11 @@ export const TO = msg({ context: "place", message: "To" });
 export const INSTALL_NUMBER = msg`MeshDB install number (if you know it)`;
 export const CART = msg`Cart`;
 export const ADDED_BACK = msg`Added back to cart. Review before Record.`;
+/** Said after Remove: <0>Undo</0> is a button, which puts the line back. */
+export const REMOVED_UNDO = msg({
+  message: "Removed {item}. <0>Undo</0>",
+  comment: "After a line is removed from the cart; Undo puts it back.",
+});
 export const NOTHING_IN_CART = msg`Nothing in the cart yet.`;
 export const SCAN_WITH_CAMERA = msg`Scan with the camera`;
 export const SENDING_WHAT = msg`Sending: {what}. A new cart is ready.`;
@@ -130,6 +137,14 @@ export function CartForm({
   const discarding = useSignal<string | null>(null);
   // An older save just put back in the cart, and what it left to do again.
   const putBack = useSignal<Gaps | null>(null);
+  // The line last removed, while Undo may put it back (undo-remove.ts).
+  const removed = useSignal<Removed | null>(null);
+  // Where focus goes once the page has rendered: Remove's button is gone
+  // after Remove, and Undo's after Undo.
+  const focusNext = useRef<"undo" | "restored" | null>(null);
+  const undoButton = useRef<HTMLButtonElement>(null);
+  const restoredRemove = useRef<HTMLButtonElement>(null);
+  const restoredId = useRef<number | null>(null);
   // After a while unused, the phone may have changed hands: offer to
   // change the name, without stopping anyone saving.
   const checkName = useSignal(askWho(cart.value, catalogue));
@@ -169,8 +184,52 @@ export function CartForm({
     saved.value = null;
     putBack.value = null;
     discarding.value = null;
+    removed.value = null;
+    focusNext.current = null;
     kept(store.change(next));
   }
+
+  /** Take the line for this item out, offering Undo. */
+  function remove(itemId: number) {
+    const taken = removeLine(cart.value, itemId);
+    // Only a line shown is removed.
+    /* v8 ignore next */
+    if (taken === null) {
+      return;
+    }
+    change(taken.next);
+    removed.value = { ...taken.removed, revision: cart.value.revision };
+    focusNext.current = "undo";
+    telemetry.record({ kind: "line_removed" });
+  }
+
+  /** Put the line last removed back where it was, if the cart, here or
+   * in another tab, has not changed since. */
+  function undo() {
+    const offer = removed.value;
+    const current = store.forSaving();
+    if (offer === null || current?.revision !== offer.revision) {
+      removed.value = null;
+      return;
+    }
+    change(reconcile(undone(current, offer), catalogue));
+    restoredId.current = offer.line.itemId;
+    focusNext.current = "restored";
+    telemetry.record({ kind: "removal_undone" });
+  }
+
+  // Once its target is rendered, which may be a render after the cart's.
+  useEffect(() => {
+    const want = focusNext.current;
+    const target =
+      want === null
+        ? null
+        : (want === "undo" ? undoButton : restoredRemove).current;
+    if (target !== null) {
+      focusNext.current = null;
+      target.focus();
+    }
+  });
 
   function set(fields: Partial<Cart>) {
     change(placed(cart.value, { ...cart.value, ...fields }, catalogue, sealed));
@@ -472,6 +531,9 @@ export function CartForm({
     checkName.value = false;
     nameList.current?.focus();
   }
+  // Undo, while the cart is as removing left it.
+  const undoable =
+    removed.value?.revision === cart.value.revision ? removed.value : null;
   // Keyed by what each says, two saying the same apart.
   const problemKeys = keyedByWords(problems.value.map(wordsOf));
 
@@ -588,6 +650,23 @@ export function CartForm({
           )}
         </div>
       )}
+      {undoable !== null && (
+        <p role="status">
+          {sayParts(
+            REMOVED_UNDO,
+            {
+              item: <strong>{nameOf(items.get(undoable.line.itemId))}</strong>,
+            },
+            [
+              (inside) => (
+                <button type="button" ref={undoButton} onClick={undo}>
+                  {inside}
+                </button>
+              ),
+            ],
+          )}
+        </p>
+      )}
       {cart.value.lines.length === 0 ? (
         <p>{say(NOTHING_IN_CART)}</p>
       ) : (
@@ -613,12 +692,9 @@ export function CartForm({
                     })),
                   )
                 }
-                onRemove={() =>
-                  set({
-                    lines: cart.value.lines.filter(
-                      (each) => each.itemId !== line.itemId,
-                    ),
-                  })
+                onRemove={() => remove(line.itemId)}
+                removeRef={
+                  line.itemId === restoredId.current ? restoredRemove : null
                 }
               />
             );

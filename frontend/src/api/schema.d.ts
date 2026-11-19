@@ -417,6 +417,17 @@ export interface components {
        */
       whole?: boolean | null;
     };
+    /**
+     * LineRemoved
+     * @description A volunteer removed a line from the scan page's cart.
+     */
+    LineRemoved: {
+      /**
+       * @description discriminator enum property added by openapi-typescript
+       * @enum {string}
+       */
+      kind: "line_removed";
+    };
     /** LocationEntry */
     LocationEntry: {
       /** Id */
@@ -645,6 +656,18 @@ export interface components {
       /** Code */
       code: string;
     };
+    /**
+     * RemovalUndone
+     * @description A volunteer pressed Undo after removing a line from the scan page's
+     *     cart, putting it back where it was.
+     */
+    RemovalUndone: {
+      /**
+       * @description discriminator enum property added by openapi-typescript
+       * @enum {string}
+       */
+      kind: "removal_undone";
+    };
     /** Report */
     Report: {
       /** Events */
@@ -656,6 +679,8 @@ export interface components {
         | components["schemas"]["OutOfDate"]
         | components["schemas"]["OlderStorage"]
         | components["schemas"]["CartDiscarded"]
+        | components["schemas"]["LineRemoved"]
+        | components["schemas"]["RemovalUndone"]
         | components["schemas"]["DifferenceAdded"]
       )[];
     };

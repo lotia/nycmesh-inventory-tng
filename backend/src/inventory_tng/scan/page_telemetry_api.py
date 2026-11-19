@@ -99,6 +99,19 @@ class CartDiscarded(Strict):
     kind: Literal["cart_discarded"]
 
 
+class LineRemoved(Strict):
+    """A volunteer removed a line from the scan page's cart."""
+
+    kind: Literal["line_removed"]
+
+
+class RemovalUndone(Strict):
+    """A volunteer pressed Undo after removing a line from the scan page's
+    cart, putting it back where it was."""
+
+    kind: Literal["removal_undone"]
+
+
 class DifferenceAdded(Strict):
     """What a save refused as another tab recorded its cart first holds
     more of, or new, put in the scan page's cart: by the page itself into
@@ -117,6 +130,8 @@ AnyEvent = (
     | OutOfDate
     | OlderStorage
     | CartDiscarded
+    | LineRemoved
+    | RemovalUndone
     | DifferenceAdded
 )
 Event = Annotated[AnyEvent, Field(discriminator="kind")]
@@ -176,6 +191,17 @@ cart_discards = meter.create_counter(
     unit="{cart}",
     description="Carts a volunteer discarded on the scan page",
 )
+lines_removed = meter.create_counter(
+    "inventory.cart.lines_removed",
+    unit="{line}",
+    description="Lines a volunteer removed from the scan page's cart",
+)
+removals_undone = meter.create_counter(
+    "inventory.cart.removals_undone",
+    unit="{line}",
+    description="Lines removed from the scan page's cart that a volunteer put "
+    "back with Undo",
+)
 differences_added = meter.create_counter(
     "inventory.cart.differences_added",
     unit="{batch}",
@@ -217,6 +243,10 @@ def record(event: AnyEvent) -> None:
             older_acted_on.add(1, {"held": event.held, "action": event.action})
         case CartDiscarded():
             cart_discards.add(1)
+        case LineRemoved():
+            lines_removed.add(1)
+        case RemovalUndone():
+            removals_undone.add(1)
         case DifferenceAdded():
             differences_added.add(1, {"how": event.how})
         case _:  # ScanToSave, the last kind left.

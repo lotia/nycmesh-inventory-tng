@@ -843,6 +843,11 @@ msgstr ""
 msgid "retired: taking only"
 msgstr ""
 
+#. After a line is removed from the cart; Undo puts it back.
+#: src/scan/CartForm.tsx
+msgid "Removed {item}. <0>Undo</0>"
+msgstr ""
+
 #: src/scan/recorded-elsewhere.ts
 msgid "These are in your cart, waiting to be recorded."
 msgstr ""

@@ -322,6 +322,19 @@ const COVERED: Record<string, () => Promise<HTMLElement[]>> = {
     );
     return [document.body];
   },
+  "the scan page, a line removed, offering Undo": async () => {
+    storeCart({
+      ...freshCart(),
+      lines: [{ itemId: 100, packages: {}, loose: "1" }],
+    });
+    await loaded();
+    const [line] = screen.getAllByRole("listitem");
+    // Its one button, Remove.
+    fireEvent.click(
+      (line as HTMLElement).querySelectorAll("button")[0] as HTMLElement,
+    );
+    return [await screen.findByRole("status")];
+  },
   "the scan page, a cart sent": async () => {
     storeCart({
       ...freshCart(),

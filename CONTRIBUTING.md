@@ -604,6 +604,9 @@ sends, and the browser keeps the cart, which every change writes to
 storage as it happens (docs/decisions/0010). Discard cart asks first, then
 empties the cart as Record does, dropping its batch key and keeping who
 and where, unless another tab changed the cart meanwhile.
+Remove takes a line out at once and offers Undo, which puts it back where
+it was, until the cart changes again, here or in another tab. The offer is
+kept in the tab's memory, not with the cart, so a reload drops it.
 
 The scan page needs a registered device, and some catalogue rows to choose
 from. The camera works only over HTTPS or on `localhost`.
@@ -611,8 +614,9 @@ from. The camera works only over HTTPS or on `localhost`.
 Both pages report their errors, three Web Vitals, the outbox's retries,
 how long a batch took from its first line to Record, a tab learning that a
 newer build is out, what an older build left in storage and what
-volunteers did with it, a cart discarded, and what a save another tab
-recorded first added put in the cart, through
+volunteers did with it, a cart discarded, a cart's line removed and put
+back with Undo, and what a save another tab recorded first added put in
+the cart, through
 `frontend/src/shared/telemetry.ts`, to `POST /api/telemetry`, which turns
 them into `inventory.*` metrics (docs/decisions/0006). Its schema, in
 `backend/src/inventory_tng/scan/page_telemetry_api.py`, lists all a page

@@ -1461,6 +1461,13 @@ describe("a package resized while the cart counts it (inventory-tng-0qi)", () =>
     );
   });
 
+  test("a line new to the cart keeps the sizes it brings, as one put back by Undo does", () => {
+    const counted = boxes("2", { 1000: "4.000" });
+    expect(sized(cart(), counted, boxOf("8.000")).lines[0]?.sizes).toEqual({
+      1000: "4.000",
+    });
+  });
+
   test("a count kept before sizes were is taken as counted at the size shown", () => {
     const before = boxes("2");
     expect(sized(before, before, CATALOGUE).lines[0]?.sizes).toEqual({

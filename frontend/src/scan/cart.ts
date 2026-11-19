@@ -350,10 +350,12 @@ function recounted(line: Line, item: Item | undefined): Line {
 /**
  * `next`, changed from `before`, with the size each package was counted
  * at: a count typed or added now, at the size the catalogue shows; one
- * unchanged, at the size it had. One kept before sizes were (a cart an
- * older build left, put back) is taken as counted at the size shown now,
- * as it was read before; a count blank has none, but one cleared as
- * resized keeps its size until typed again (reconcile).
+ * unchanged, at the size it had, as is one of a line new to the cart that
+ * brings its sizes (a line put back by Undo, undo-remove.ts). One kept
+ * before sizes were (a cart an older build left, put back) is taken as
+ * counted at the size shown now, as it was read before; a count blank has
+ * none, but one cleared as resized keeps its size until typed again
+ * (reconcile).
  */
 export function sized(before: Cart, next: Cart, catalogue: Catalogue): Cart {
   const { items } = indexOf(catalogue);
@@ -362,13 +364,14 @@ export function sized(before: Cart, next: Cart, catalogue: Catalogue): Cart {
     ...next,
     lines: next.lines.map(({ sizes: kept, ...line }) => {
       const packs = items.get(line.itemId)?.packages ?? [];
+      const previous = was.get(line.itemId);
       const sizes: Record<string, string> = {};
       for (const [packageId, typed] of Object.entries(line.packages)) {
         const counted = kept?.[packageId];
         const pack = packs.find((each) => String(each.id) === packageId);
         if (
           counted !== undefined &&
-          was.get(line.itemId)?.packages[packageId] === typed
+          (previous === undefined || previous.packages[packageId] === typed)
         ) {
           sizes[packageId] = counted;
         } else if (typed !== "" && pack !== undefined) {

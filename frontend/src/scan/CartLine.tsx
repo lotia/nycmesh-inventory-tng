@@ -1,6 +1,6 @@
 /** One line of the cart: its item, how much of it, and the package it opens. */
 import { msg } from "@lingui/core/macro";
-import { Fragment } from "preact";
+import { Fragment, type Ref } from "preact";
 import { Field } from "../shared/Field";
 import { say, sayAmount } from "../shared/i18n";
 import { wordsOf } from "../shared/outbox-notes";
@@ -28,6 +28,7 @@ export function CartLine({
   moving,
   onChange,
   onRemove,
+  removeRef = null,
 }: {
   line: Line;
   item: Item | undefined;
@@ -37,12 +38,14 @@ export function CartLine({
   moving: boolean;
   onChange: (line: Line) => void;
   onRemove: () => void;
+  /** Given its Remove button, to focus (CartForm, after Undo). */
+  removeRef?: Ref<HTMLButtonElement>;
 }) {
   if (item === undefined) {
     return (
       <li>
         {say(LINE_GONE)}{" "}
-        <button type="button" onClick={onRemove}>
+        <button type="button" ref={removeRef} onClick={onRemove}>
           {say(REMOVE)}
         </button>
       </li>
@@ -139,7 +142,12 @@ export function CartLine({
               unit: item.unit,
             })}
       </div>
-      <button type="button" class="self-start" onClick={onRemove}>
+      <button
+        type="button"
+        class="self-start"
+        ref={removeRef}
+        onClick={onRemove}
+      >
         {say(REMOVE)}
       </button>
     </li>
