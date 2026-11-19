@@ -2,7 +2,8 @@
 unable to answer just now, which is a 503."""
 
 from collections.abc import Callable
-from typing import TYPE_CHECKING, Any, Literal, Self
+from dataclasses import dataclass
+from typing import TYPE_CHECKING, Any, Literal
 
 import structlog
 from fastapi import FastAPI, Request
@@ -61,53 +62,62 @@ def enforce(broken: str | None, *, when: bool = True) -> None:
         raise RuleBroken(broken)
 
 
-class Unique(str):
-    """attempt's "unique", equal to it, so a page compares it as any rule's
-    name, and naming the unique index broken, if the database said which
-    (unique_index)."""
+@dataclass(frozen=True)
+class Broken:
+    """The rule a change broke, by the name attempt() gives it, and the
+    unique index, if it broke one and the database said which."""
 
-    constraint: str | None
-
-    def __new__(cls, constraint: str | None) -> Self:
-        made = super().__new__(cls, "unique")
-        made.constraint = constraint
-        return made
+    rule: str
+    index: str | None = None
 
 
-def unique_index(broken: str | None) -> str | None:
-    """The unique index attempt() said `broken` was, if it said one."""
-    return broken.constraint if isinstance(broken, Unique) else None
-
-
-def attempt[T](
+def _attempted[T](
     session: Session, change: Callable[[], T]
-) -> tuple[T | None, str | None]:
-    """Run `change` in a savepoint, with nothing of it kept if it breaks a
-    rule: what it returned, and None; or None, and "unique" (a Unique,
-    naming the index) if it broke a unique index (as each table's index
-    compares, such as an item's name ignoring case, spaces and
-    punctuation, retired items' too), the name of
-    the check constraint it broke, or the rule a domain function refused it
-    by (RuleBroken), so a page can say why in its own words. Any other
-    failure is raised. Locks taken in `change` go with the savepoint,
-    however it failed (db_locking._savepoint_locks_released)."""
+) -> tuple[T | None, Broken | None]:
+    """attempt(), saying the unique index broken too."""
     try:
         with session.begin_nested():
             done = change()
             session.flush()
     except BaseException as error:
         if isinstance(error, RuleBroken):
-            return None, error.rule
+            return None, Broken(error.rule)
         if isinstance(error, exc.IntegrityError):
             sqlstate = getattr(error.orig, "sqlstate", None)
             constraint = describe_error(error).get("constraint")
             if sqlstate == UNIQUE_VIOLATION:
-                return None, Unique(constraint)
+                return None, Broken("unique", constraint)
             if sqlstate == CHECK_VIOLATION and constraint:
-                return None, constraint
+                return None, Broken(constraint)
         # Such as Gone, or any other failure: raised.
         raise
     return done, None
+
+
+def attempt[T](
+    session: Session, change: Callable[[], T]
+) -> tuple[T | None, str | None]:
+    """Run `change` in a savepoint, with nothing of it kept if it breaks a
+    rule: what it returned, and None; or None, and "unique" if it broke a
+    unique index (as each table's index compares, such as an item's name
+    ignoring case, spaces and punctuation, retired items' too), the name of
+    the check constraint it broke, or the rule a domain function refused it
+    by (RuleBroken), so a page can say why in its own words. Any other
+    failure is raised. Locks taken in `change` go with the savepoint,
+    however it failed (db_locking._savepoint_locks_released)."""
+    done, broken = _attempted(session, change)
+    return done, broken.rule if broken else None
+
+
+def refusal_naming_index[T](
+    session: Session, change: Callable[[], T], *expected: str
+) -> tuple[T | None, Broken | None]:
+    """refusal(), saying which unique index a "unique" refusal broke, for a
+    page whose words differ by index."""
+    done, broken = _attempted(session, change)
+    if broken is not None and broken.rule not in expected:
+        raise ValueError(f"refused by {broken.rule}, not {', '.join(expected)}")
+    return done, broken
 
 
 def refusal[T](
@@ -115,10 +125,8 @@ def refusal[T](
 ) -> tuple[T | None, str | None]:
     """attempt(), for a change only the `expected` rules may refuse. Any
     other rule broken is a bug, and raised."""
-    done, broken = attempt(session, change)
-    if broken is not None and broken not in expected:
-        raise ValueError(f"refused by {broken}, not {', '.join(expected)}")
-    return done, broken
+    done, broken = refusal_naming_index(session, change, *expected)
+    return done, broken.rule if broken else None
 
 
 def unique(session: Session, change: Callable[[], object]) -> bool:

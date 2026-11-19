@@ -15,7 +15,7 @@ from sqlalchemy.orm import Session
 from inventory_tng.catalogue import items, reading_rules, units
 from inventory_tng.catalogue.name_keys import nameless
 from inventory_tng.catalogue.reading_rules import chosen_rule, read_alike_words
-from inventory_tng.core.db_errors import unique_index
+from inventory_tng.core.db_errors import Broken
 from inventory_tng.core.phrases import Words, gettext, lazy_gettext
 from inventory_tng.models.base import INTEGER_MAX, whole
 from inventory_tng.models.catalogue import (
@@ -94,12 +94,12 @@ def taken(
     fields: items.Fields,
     typed: Typed,
     item_id: int | None,
-    broken: str,
+    broken: Broken,
 ) -> tuple[str, Words]:
     """The field another item already has, by the unique index or rule
-    `broken` that refused it, its name's units read as the form's answers
+    `broken` refused it by, its name's units read as the form's answers
     say too, and words naming that item."""
-    refused_by = unique_index(broken) or broken
+    refused_by = broken.index or broken.rule
     found = items.taken_by(session, fields, item_id, typed.rules, refused_by)
     field, other = found or ("name", None)
     # Beside the name, whose field "alias" is.

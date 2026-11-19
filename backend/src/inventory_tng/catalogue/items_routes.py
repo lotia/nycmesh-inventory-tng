@@ -17,7 +17,7 @@ from inventory_tng.catalogue import forms, items, queries, reading_rules, units
 from inventory_tng.catalogue.items_listing import SEARCHED
 from inventory_tng.catalogue.paths import CATEGORIES, ITEMS, READINGS
 from inventory_tng.catalogue.reading_rules import NOT_A_UNIT
-from inventory_tng.core.db_errors import refusal
+from inventory_tng.core.db_errors import refusal, refusal_naming_index
 from inventory_tng.core.db_sessions import DbSession, exists_where
 from inventory_tng.core.local_time import site_zone
 from inventory_tng.core.phrases import Words, lazy_gettext
@@ -111,7 +111,7 @@ def _change_or_note[T](
         return done
 
     try:
-        done, broken = refusal(
+        done, refused = refusal_naming_index(
             session,
             asking,
             "unique",
@@ -123,8 +123,9 @@ def _change_or_note[T](
     except _AskFirst:
         log.debug("close names asked about", item_id=item_id, found=len(asked or ()))
         return None, CLOSE
-    if broken in ("unique", items.NAME_IS_ALIAS):
-        field, words = forms.taken(session, fields, typed, item_id, broken)
+    broken = refused.rule if refused else None
+    if refused is not None and broken in ("unique", items.NAME_IS_ALIAS):
+        field, words = forms.taken(session, fields, typed, item_id, refused)
         problems[field] = words
     elif broken == items.READ_ALIKE:
         problems["name"] = forms.read_alike(session, typed)
