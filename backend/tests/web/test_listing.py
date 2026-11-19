@@ -122,6 +122,19 @@ def test_links_keep_the_rest_and_start_again_at_page_one() -> None:
     assert view.query_string == "?q=cable&category=4&sort=unit&per=25&page=3"
 
 
+def test_a_list_in_a_section_comes_back_to_it_from_every_link() -> None:
+    """Its anchor ends every link, after the sort, size and page, and is no
+    form's field."""
+    view = View.read(
+        "/item/7", SQL, Asked(sort="unit", per="25", page="3"), anchor="open"
+    ).counted(100)
+    assert view.link(page=4) == "/item/7?sort=unit&per=25&page=4#open"
+    assert view.size_link(None) == "/item/7?sort=unit&per=all#open"
+    assert view.sort_link("unit") == "/item/7?sort=unit&order=desc&per=25#open"
+    assert view.query_string == "?sort=unit&per=25&page=3"
+    assert view.fields() == [("sort", "unit"), ("per", "25"), ("page", "3")]
+
+
 def test_searching_is_best_match_first_until_a_heading_sorts() -> None:
     view = View.read("/list", SQL, searching=True)
     assert view.by is None

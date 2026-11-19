@@ -66,7 +66,8 @@ def test_open_packages_come_oldest_first_the_reported_before_the_rest(
 @pytest.mark.parametrize(
     ("sort", "order", "shown"),
     [
-        # Store before Van; within the store, oldest first, as listed.
+        # Store before Van; within the store, the reported used up first, as
+        # listed by default.
         ("package", "asc", (2, 1, 0)),
         ("package", "desc", (0, 2, 1)),
         ("left", "asc", (1, 2, 0)),
@@ -120,3 +121,14 @@ def test_a_heading_says_it_sorts_and_keeps_the_admin_at_the_section(
     assert sorted_columns(back) == [
         ("descending", HEADINGS[sort], f"{here}?sort={sort}#open-packages")
     ]
+
+
+def test_the_last_closed_leaves_its_notice_and_no_headings(
+    admin_client: TestClient, spools: Spools
+) -> None:
+    """Shown for its notice once none is open, the section sorts nothing."""
+    here = f"{ITEMS}/{spools.cable.id}"
+    params = {"notice": "open_package_closed", "section": "open-packages"}
+    page = read(admin_client.get(here, params=params).text)
+    section = page.one("section", id="open-packages")
+    assert section.all("th") == []

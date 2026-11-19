@@ -1,6 +1,5 @@
-"""How lists of open packages (open_packages.Shown) sort by a heading: on
-the reported used up and length check pages, and on an item's page
-(catalogue/items_routes.py)."""
+"""How lists of open packages (open_packages.Shown) sort, by a heading or
+in their own order."""
 
 from inventory_tng.web.listing import Sort
 

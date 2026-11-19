@@ -6,10 +6,11 @@ crawl) as
 
 with BROWSER_RUN, a folder, and BROWSER_PORT set, each server's own. It
 makes a database of its own (databases.py), migrated and seeded, with a
-registration code for the tests' device, and in BROWSER_RUN:
-prepared.json, what the tests need, camera.y4m, the QR code of the seed's
-labelled item for Chromium to show as its camera, and totp-keys, a key
-of the run's own to seal authenticators with. It then serves the built
+registration code for the tests' device and a box of the seed's cable
+opened, and in BROWSER_RUN: prepared.json, what the tests need,
+camera.y4m, the QR code of the seed's labelled item for Chromium to show
+as its camera, and totp-keys, a key of the run's own to seal
+authenticators with. It then serves the built
 frontend from that database on BROWSER_PORT until Playwright stops it, and
 drops the database and its files. A database a run leaves behind is dropped
 by a later run, as test databases are.
@@ -22,6 +23,7 @@ import os
 import secrets
 import signal
 import sys
+import uuid
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
@@ -34,9 +36,12 @@ from inventory_tng.__main__ import main as run_server
 from inventory_tng.admins import accounts, sealed_totp_keys
 from inventory_tng.devices import devices
 from inventory_tng.models.admins import Admin, AdminPassword
-from inventory_tng.models.catalogue import Item
+from inventory_tng.models.catalogue import Item, ItemPackage
 from inventory_tng.models.labels import Label
+from inventory_tng.models.places import Location
 from inventory_tng.models.volunteers import Volunteer
+from inventory_tng.scan.batch import record
+from inventory_tng.scan.batch_schemas import Batch
 from inventory_tng.volunteers import volunteers
 
 from databases import migrated_engine, new_database
@@ -116,6 +121,7 @@ def prepare(url: str, video: Path) -> dict[str, str]:
         assert kept is not None  # The seed adds volunteers.
         duplicate = volunteers.add(session, f"{kept.name} (twice)", None)
         volunteers.merge(session, duplicate, kept.id, datetime.now(UTC))
+        open_a_box(session, kept.id)
         # Another administrator, whose sign-in reset-links.spec.ts resets.
         other = Admin(username=OTHER_ADMIN)
         session.add(other)
@@ -134,6 +140,38 @@ def prepare(url: str, video: Path) -> dict[str, str]:
         "labelled": seed.LABELLED,
         "other": OTHER_ADMIN,
     }
+
+
+def open_a_box(session: Session, volunteer_id: int) -> None:
+    """One of the seed's boxes of cable opened on its shelf, so the crawl
+    (phone-width.spec.ts) sees lists of open packages, the cable's page's
+    among them."""
+    item, package, size = seed.PACKAGE
+    box = session.scalars(
+        select(ItemPackage)
+        .join(Item)
+        .where(Item.name == item, ItemPackage.name == package)
+    ).one()
+    shelf = session.scalars(select(Location).where(Location.name == "Shelf A")).one()
+    key = uuid.uuid4()
+    opening = {
+        "item_id": box.item_id,
+        "quantity": str(size),
+        "package_id": box.id,
+        "package_size": str(size),
+        "open_package_key": str(key),
+    }
+    batch = Batch.model_validate(
+        {
+            "key": key,
+            "kind": "open",
+            "volunteer_id": volunteer_id,
+            "from_location_id": shelf.id,
+            "to_location_id": shelf.id,
+            "lines": [opening],
+        }
+    )
+    record(session, batch, device_id=None)
 
 
 def write_camera_video(path: Path, text: str) -> None:

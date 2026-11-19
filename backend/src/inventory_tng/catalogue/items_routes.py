@@ -34,7 +34,7 @@ from inventory_tng.models.labels import Label
 from inventory_tng.models.names import canonical
 from inventory_tng.models.stock import Movement, OpenPackage
 from inventory_tng.stock import open_packages
-from inventory_tng.stock.open_packages_sorts import (
+from inventory_tng.stock.open_packages_listing import (
     BY_OPENED,
     BY_PACKAGE,
     BY_SHOWS,

@@ -183,9 +183,11 @@ None is left, so nobody can pick it.{% endtrans %}{% endif %}{% endcall %}
   <p class="hint">{% trans %}Opened and followed until used up. Closing one writes off
   what it still shows, with the reason Used up; you'll be asked first.{% endtrans %}</p>
   {% call table() %}
+    {% if open_packages %}
     <tr>{{ sort_heading(open_view, "package", _("Package and place")) }}
       {{- sort_heading(open_view, "left", _("What is left")) }}
       {{- sort_heading(open_view, "opened", _("When opened")) }}<th></th></tr>
+    {% endif %}
     {% for each in open_packages %}
     <tr>
       <td>{{ each.package }} · {{ each.place }}

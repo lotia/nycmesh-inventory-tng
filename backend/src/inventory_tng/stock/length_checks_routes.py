@@ -45,7 +45,7 @@ from inventory_tng.stock.needs_action import (
     of_only,
     query,
 )
-from inventory_tng.stock.open_packages_sorts import BY_PACKAGE, BY_SHOWS, OLDEST_FIRST
+from inventory_tng.stock.open_packages_listing import BY_PACKAGE, BY_SHOWS, OLDEST_FIRST
 from inventory_tng.stock.paths import LENGTHS, STOCK
 from inventory_tng.web.admin_pages import admin_page, now
 from inventory_tng.web.listing import AskedView, Sorting, View, arranged

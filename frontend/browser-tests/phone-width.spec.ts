@@ -132,6 +132,14 @@ test("every administrator page fits a phone", async ({ page }) => {
       asks,
     ).toBe(true);
   }
+  // And an item's open packages, each closed from its page
+  // (browser_database.py opens a box of cable).
+  expect(
+    [...widths.keys()].some((path) =>
+      /\/items\/\d+\/open-packages\//.test(path),
+    ),
+    "an item's open packages",
+  ).toBe(true);
   fits(widths);
 });
 
