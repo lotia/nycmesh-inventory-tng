@@ -8,13 +8,22 @@ import { execFileSync } from "node:child_process";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { defineConfig, type Project } from "@playwright/test";
-import { adminState, inRun } from "./browser-tests/prepared";
+import {
+  adminState,
+  baseOf,
+  inRun,
+  SERVERS,
+  serverEnv,
+} from "./browser-tests/prepared";
 
-// This run's folder (backend/tests/browser_database.py) and port, chosen
-// once, here in the main process, for the backend and the workers to inherit.
+// Each server's folder (backend/tests/browser_database.py) and port, chosen
+// once, here in the main process, for the backends and the workers to
+// inherit (browser-tests/prepared.ts).
 process.env.BROWSER_RUN ??= join(tmpdir(), `inventory-browser-${process.pid}`);
-process.env.BROWSER_PORT ??= freePort();
-const base = `http://127.0.0.1:${process.env.BROWSER_PORT}`;
+process.env.BROWSER_CRAWL_RUN ??= `${process.env.BROWSER_RUN}-crawl`;
+if (!process.env.BROWSER_PORT || !process.env.BROWSER_CRAWL_PORT) {
+  [process.env.BROWSER_PORT, process.env.BROWSER_CRAWL_PORT] = freePorts(2);
+}
 // The administrator's session, signed in once for every test.
 const signedIn = adminState();
 
@@ -72,23 +81,24 @@ const browsers: { name: string; use: NonNullable<Project["use"]> }[] = [
 
 export default defineConfig({
   testDir: "browser-tests",
-  // A database of its own, seeded, and the backend serving the build from it
-  // (backend/tests/browser_database.py).
-  webServer: {
+  // Each server a database of its own, seeded, and the backend serving the
+  // build from it (backend/tests/browser_database.py).
+  webServer: SERVERS.map((server) => ({
+    name: server,
     command: "uv run python tests/browser_database.py serve",
     cwd: "../backend",
     // So it imports the seed from backend/devtools/ (CONTRIBUTING.md).
-    env: { PYTHONPATH: "." },
+    env: { PYTHONPATH: ".", ...serverEnv(server) },
     // Its log lines, a traceback among them, with the tests'.
-    stdout: "pipe",
-    url: `${base}/api/healthz`,
+    stdout: "pipe" as const,
+    url: `${baseOf(server)}/api/healthz`,
     timeout: 60_000,
-    gracefulShutdown: { signal: "SIGTERM", timeout: 10_000 },
-  },
+    gracefulShutdown: { signal: "SIGTERM" as const, timeout: 10_000 },
+  })),
   forbidOnly: Boolean(process.env.CI),
   reporter: process.env.CI ? "github" : "list",
   use: {
-    baseURL: base,
+    baseURL: baseOf("shared"),
     ...phone,
   },
   projects: [
@@ -97,39 +107,46 @@ export default defineConfig({
       testMatch: /sign-in\.setup\.ts/,
       use: { browserName: "chromium", channel: "chromium" },
     },
-    // The crawl reads every row there is, so it runs in each browser before
-    // any test that changes one; those make rows of their own
-    // (browser-tests/own-rows.ts).
+    // The crawl reads every row there is, so it has a server of its own,
+    // whose rows no test changes (browser-tests/prepared.ts).
     ...browsers.map(({ name, use }) => ({
       name: `${name} crawl`,
       testMatch: CRAWL,
       dependencies: ["sign-in"],
-      use,
+      use: {
+        ...use,
+        baseURL: baseOf("crawl"),
+        storageState: adminState("crawl"),
+      },
     })),
     ...browsers.map(({ name, use }) => ({
       name,
       testIgnore: CRAWL,
-      dependencies: browsers.map((each) => `${each.name} crawl`),
+      dependencies: ["sign-in"],
       use,
     })),
   ],
 });
 
 /**
- * A port nothing listens on now, from the system. The config is read
- * synchronously, so another Node process asks for it.
+ * Ports nothing listens on now, from the system, all held open together so
+ * no two are the same. The config is read synchronously, so another Node
+ * process asks for them.
  */
-function freePort(): string {
+function freePorts(count: number): string[] {
   return execFileSync(
     process.execPath,
     [
       "-e",
-      `const s = require("node:net").createServer();
-       s.listen(0, "127.0.0.1", () => {
-         process.stdout.write(String(s.address().port));
-         s.close();
+      `const net = require("node:net");
+       const servers = Array.from({ length: ${count} }, () => net.createServer());
+       Promise.all(
+         servers.map((s) => new Promise((done) => s.listen(0, "127.0.0.1", done))),
+       ).then(() => {
+         process.stdout.write(servers.map((s) => s.address().port).join(" "));
+         for (const s of servers) s.close();
        });`,
     ],
     { encoding: "utf8" },
-  );
+  ).split(" ");
 }

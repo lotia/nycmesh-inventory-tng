@@ -1,22 +1,28 @@
 /**
- * Once for every test: signs in as the administrator the backend seeded,
- * and registers the browser as a device, then keeps both cookies for every
- * test (prepared.ts, adminState).
+ * Once for every test, at each server: signs in as the administrator the
+ * backend seeded, and registers the browser as a device, then keeps both
+ * cookies for every test there (prepared.ts, adminState).
  */
 import { expect } from "@playwright/test";
 import { test } from "./csp-violations";
-import { adminState, prepared } from "./prepared";
+import { adminState, baseOf, prepared, SERVERS } from "./prepared";
 
-test("sign in and register", async ({ page }) => {
-  const { username, password, phrase } = prepared();
-  await page.goto("/admin/sign-in");
-  await page.getByLabel("Username").fill(username);
-  await page.getByLabel("Password").fill(password);
-  await page.getByRole("button", { name: "Sign in" }).click();
-  // Signed in, with nothing more to do first: the home page.
-  await expect(page).toHaveURL(/\/admin$/);
-  await page.goto(`/register?code=${phrase}`);
-  await page.getByRole("button", { name: "Register" }).click();
-  await expect(page.getByText("This browser is registered.")).toBeVisible();
-  await page.context().storageState({ path: adminState() });
-});
+for (const server of SERVERS) {
+  test.describe(server, () => {
+    test.use({ baseURL: baseOf(server) });
+
+    test("sign in and register", async ({ page }) => {
+      const { username, password, phrase } = prepared(server);
+      await page.goto("/admin/sign-in");
+      await page.getByLabel("Username").fill(username);
+      await page.getByLabel("Password").fill(password);
+      await page.getByRole("button", { name: "Sign in" }).click();
+      // Signed in, with nothing more to do first: the home page.
+      await expect(page).toHaveURL(/\/admin$/);
+      await page.goto(`/register?code=${phrase}`);
+      await page.getByRole("button", { name: "Register" }).click();
+      await expect(page.getByText("This browser is registered.")).toBeVisible();
+      await page.context().storageState({ path: adminState(server) });
+    });
+  });
+}

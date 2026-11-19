@@ -63,7 +63,7 @@ run = [
     """
     port=$(cd ../backend && uv run --quiet --frozen python -m devtools stack port INVENTORY_WEBKIT_PORT)
     PLAYWRIGHT_WEBKIT=1 PLAYWRIGHT_WEBKIT_SERVER="ws://127.0.0.1:${port}/" \
-      npx playwright test --project=webkit
+      npx playwright test --project=webkit --project="webkit crawl"
     """,
 ]
 

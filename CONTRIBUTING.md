@@ -995,8 +995,9 @@ rows it changes, such as an item to move (`frontend/browser-tests/own-rows.ts`).
 Every test shares one administrator's session, signed in once, so what
 another test confirmed in it holds: a test of what a session asks for first
 takes an administrator of its own (`ownAdmin`, there too). The crawl of
-every page (`phone-width.spec.ts`), which reads them all, runs in each
-browser before any other test starts.
+every page (`phone-width.spec.ts`), which reads them all, has a server and
+database of its own, which no other test changes (`browser-tests/prepared.ts`),
+so it runs beside the other tests, and a run of other files skips it.
 
 They run in Chromium; also in WebKit, Safari's engine, in CI and with
 `PLAYWRIGHT_WEBKIT=1`. `mise run setup-browsers` installs any that is
@@ -1012,8 +1013,8 @@ mise run browser-webkit          # pulls the image (about 2 GB) the first time
 Only the browser runs in the container, from Playwright's server, published
 on `INVENTORY_WEBKIT_PORT` (3000); the tests and the app run here, and the
 browser reaches the app through the tests' connection.
-Playwright starts the backend itself, with a database of its own, on a port
-chosen for the run, so runs from two clones do not meet.
+Playwright starts the backend itself, twice, each with a database of its
+own, on ports chosen for the run, so runs from two clones do not meet.
 
 CI runs each of these checks as a job named for its task, on pushes to `main`
 and on pull requests, and builds the frontend. It calls each tool directly,
@@ -1127,9 +1128,9 @@ Each checkout's tests, apps and browser tests use its own stack's
 PostgreSQL, which allows 400 connections (`compose.yaml`), less 3 kept for
 the superuser. A whole test run, measured over 8 processes, holds about 70
 at once, all processes together; one process, and one database, held at most
-about 21; a dev app up to 20, as does the browser tests' server. So a
-checkout's checks and its app fit with room to spare, and so would three
-checkouts sharing `inventory-tng` (Local settings). Each test database
+about 21; a dev app up to 20, as does each of the browser tests' two
+servers. So a checkout's checks and its app fit with room to spare, and so
+would three checkouts sharing `inventory-tng` (Local settings). Each test database
 allows twice the most measured on one (`TEST_CONNECTION_LIMIT` in
 `tests/databases.py`), so a process that leaks connections is refused at its
 own database, not the server's limit, and a test that fails for either limit

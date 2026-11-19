@@ -1,7 +1,8 @@
 /**
- * The run's folder, BROWSER_RUN (backend/tests/browser_database.py), and
- * what the backend prepared there for the tests: read when a test runs, as
- * it is written once the backend starts.
+ * The run's servers (playwright.config.ts), each with its folder and port
+ * (backend/tests/browser_database.py), and what the backend prepared there
+ * for the tests: read when a test runs, as it is written once the backend
+ * starts.
  */
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
@@ -15,19 +16,55 @@ export type Prepared = {
   other: string;
 };
 
-/** A file in this run's folder. */
-export function inRun(name: string): string {
-  return join(process.env.BROWSER_RUN ?? "", name);
+/**
+ * Each server and its database: "shared" by every test but the crawl, and
+ * the "crawl"'s own (phone-width.spec.ts), which reads every row there is,
+ * so no test changes one under it.
+ */
+export const SERVERS = ["shared", "crawl"] as const;
+export type Server = (typeof SERVERS)[number];
+
+/** Where each server's folder and port are, set by playwright.config.ts. */
+const ENV: Record<Server, { run: string; port: string }> = {
+  shared: { run: "BROWSER_RUN", port: "BROWSER_PORT" },
+  crawl: { run: "BROWSER_CRAWL_RUN", port: "BROWSER_CRAWL_PORT" },
+};
+
+/** A server's folder and port, as the backend reads them. */
+export function serverEnv(server: Server): {
+  BROWSER_RUN: string;
+  BROWSER_PORT: string;
+} {
+  return {
+    BROWSER_RUN: process.env[ENV[server].run] ?? "",
+    BROWSER_PORT: process.env[ENV[server].port] ?? "",
+  };
 }
 
-/** The administrator's session, signed in once (sign-in.setup.ts). */
-export function adminState(): string {
-  return inRun("admin.json");
+/** A server's address. */
+export function baseOf(server: Server): string {
+  return `http://127.0.0.1:${serverEnv(server).BROWSER_PORT}`;
 }
 
-let read: Prepared | undefined;
+/** A file in a server's folder. */
+export function inRun(name: string, server: Server = "shared"): string {
+  return join(serverEnv(server).BROWSER_RUN, name);
+}
 
-export function prepared(): Prepared {
-  read ??= JSON.parse(readFileSync(inRun("prepared.json"), "utf8")) as Prepared;
-  return read;
+/** The administrator's session there, signed in once (sign-in.setup.ts). */
+export function adminState(server: Server = "shared"): string {
+  return inRun("admin.json", server);
+}
+
+const read = new Map<Server, Prepared>();
+
+export function prepared(server: Server = "shared"): Prepared {
+  let found = read.get(server);
+  if (found === undefined) {
+    found = JSON.parse(
+      readFileSync(inRun("prepared.json", server), "utf8"),
+    ) as Prepared;
+    read.set(server, found);
+  }
+  return found;
 }
