@@ -26,7 +26,7 @@ from inventory_tng.devices import devices
 from inventory_tng.devices.paths import REGISTER_PATH
 
 
-def main(argv: Sequence[str] | None = None, prog: str | None = None) -> int:
+def main(argv: Sequence[str], prog: str | None = None) -> int:
     parser = argparse.ArgumentParser(prog=prog)
     commands = parser.add_subparsers(dest="command", required=True)
     create = commands.add_parser("create", help="a new code, printed once")

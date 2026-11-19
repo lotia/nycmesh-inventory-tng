@@ -29,7 +29,7 @@ from inventory_tng.core.operator_commands import run_command_telling
 from inventory_tng.core.settings import Settings
 
 
-def main(argv: Sequence[str] | None = None, prog: str | None = None) -> int:
+def main(argv: Sequence[str], prog: str | None = None) -> int:
     parser = argparse.ArgumentParser(prog=prog)
     commands = parser.add_subparsers(dest="command", required=True)
     lockdown = commands.add_parser(

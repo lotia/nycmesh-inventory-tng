@@ -19,9 +19,7 @@ from inventory_tng.core.mail import Notifier
 from inventory_tng.core.operator_commands import run_command, run_command_telling
 
 
-def parse(
-    argv: Sequence[str] | None = None, prog: str | None = None
-) -> argparse.Namespace:
+def parse(argv: Sequence[str], prog: str | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         prog=prog,
         description="TOTP keys sealed at rest (DEPLOYMENT.md, TOTP keys).",
@@ -44,7 +42,7 @@ def parse(
     return parser.parse_args(argv)
 
 
-def main(argv: Sequence[str] | None = None, prog: str | None = None) -> int:
+def main(argv: Sequence[str], prog: str | None = None) -> int:
     args = parse(argv, prog)
     if args.command == "new":
         print(new_key())

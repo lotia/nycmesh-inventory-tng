@@ -35,9 +35,7 @@ def _said(rule: units.Rule) -> str:
     return f"{said}, respelt" if rule.respell else said
 
 
-def parse(
-    argv: Sequence[str] | None = None, prog: str | None = None
-) -> argparse.Namespace:
+def parse(argv: Sequence[str], prog: str | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         prog=prog,
         description="The import's readings file: how each unit typed after a "
@@ -64,7 +62,7 @@ def parse(
     return parser.parse_args(argv)
 
 
-def main(argv: Sequence[str] | None = None, prog: str | None = None) -> int:
+def main(argv: Sequence[str], prog: str | None = None) -> int:
     args = parse(argv, prog)
     if args.command == "propose":
         if set_up() is None:

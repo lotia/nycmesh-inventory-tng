@@ -474,7 +474,3 @@ clashes came from importing modules, not from their names. We rejected
 flat test names after the module tested, as Ali pointed out that importlib
 mode, which lets the tests mirror the tree, is pytest's recommendation for
 new projects.
-
-Until the steps of inventory-tng-u3fp land, some files, imports and
-tests do not follow these yet. Each step renames or splits files, or
-moves tests, and adds its rows to the tables above.

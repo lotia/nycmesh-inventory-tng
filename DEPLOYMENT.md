@@ -403,9 +403,9 @@ again.
 **If a key is lost or replaced.** The authenticators the old key sealed
 cannot be read again, and must be set up again: all of them, if no other
 version was ever used. A key is replaced when its version's file now holds
-another key. The app starts with
-whatever versions are present, opens every authenticator at startup, and
-logs how many it cannot read. Retire them:
+another key. The app starts with whatever versions are present, opens
+every authenticator at startup, and logs how many it cannot read. Retire
+them:
 
 ```sh
 kubectl exec deploy/inventory -- \

@@ -33,9 +33,7 @@ def minutes(text: str) -> int:
     return number
 
 
-def parse(
-    argv: Sequence[str] | None = None, prog: str | None = None
-) -> argparse.Namespace:
+def parse(argv: Sequence[str], prog: str | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(prog=prog)
     commands = parser.add_subparsers(dest="command", required=True)
     commands.add_parser("show", help="the settings now")
@@ -51,7 +49,7 @@ def parse(
     return args
 
 
-def main(argv: Sequence[str] | None = None, prog: str | None = None) -> int:
+def main(argv: Sequence[str], prog: str | None = None) -> int:
     args = parse(argv, prog)
     return run_command(run, args)
 
