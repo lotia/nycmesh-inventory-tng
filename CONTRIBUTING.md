@@ -1169,6 +1169,19 @@ query the scan page's catalogue makes, as run (`EXPLAIN (ANALYZE,
 BUFFERS)`), and times `GET /api/catalogue`. It is not one of the checks:
 run it after changing those queries (inventory-tng-kcz).
 
+### Measuring the labels list
+
+```sh
+mise run measure-labels      # MEASURE_ITEMS=3000 for more labels
+```
+
+It fills a database of its own with thousands of labels on items, packages
+and places, some revoked, and the catalogue's years of saves (both of that
+measurement's settings apply), prints the plan of each statement that reads
+labels as the labels list and its suggestions run it, and times each for a
+few typical searches. It is not one of the checks: run it after changing
+the labels list's search (inventory-tng-8i4.60.24).
+
 ### Measuring the tests
 
 ```sh

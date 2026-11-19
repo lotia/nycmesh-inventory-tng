@@ -84,6 +84,14 @@ run = [
     "uv run pytest tests/measure_catalogue.py -p no:randomly -p no:cacheprovider -q -s",
 ]
 
+[tasks.measure-labels]
+description = "Time the labels list's searches and suggestions against thousands of labels, with their queries' plans"
+dir = "backend"
+depends = ["start-database"]
+run = [
+    "uv run pytest tests/measure_labels.py -p no:randomly -p no:cacheprovider -q -s",
+]
+
 [tasks.test-report]
 description = "Measure the three test suites: times, coverage, what each test alone covers, file sizes (CONTRIBUTING.md, Measuring the tests)"
 dir = "backend"

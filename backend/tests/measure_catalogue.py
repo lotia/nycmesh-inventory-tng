@@ -47,11 +47,11 @@ def filled(own_engine: Engine, own_database: str) -> Engine:
         _catalogue(session)
         session.commit()
     with engine.begin() as connection:
-        _run(connection, LEDGER)
+        run_ledger(connection, LEDGER)
     # As the owner, who may retire rows outside the app and ANALYZE.
     owner = make_engine(as_role(own_database, OWNER))
     with owner.begin() as connection:
-        _run(connection, RETIRE)
+        run_ledger(connection, RETIRE)
         connection.execute(text("ANALYZE"))
     owner.dispose()
     return engine
@@ -185,7 +185,7 @@ UPDATE item_package SET retired_at = now() WHERE id IN (
 """
 
 
-def _run(connection: Connection, statements: str) -> None:
+def run_ledger(connection: Connection, statements: str) -> None:
     saves = YEARS * 365 * PER_DAY
     for statement in statements.split(";"):
         if statement.strip():
