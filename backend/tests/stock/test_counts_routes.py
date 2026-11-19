@@ -47,7 +47,17 @@ from inventory_tng.web.forms import ABOVE_ZERO, RULES, TYPE_A_NUMBER, WHOLE_UNIT
 from inventory_tng.web.navigation import retired_holding
 
 from helpers.concurrency import Committed, isolation_seen
-from helpers.markup import button, forms, hidden_fields, links, options, read, text
+from helpers.locales import ENGLISH, GERMAN
+from helpers.markup import (
+    box_values,
+    button,
+    forms,
+    hidden_fields,
+    links,
+    options,
+    read,
+    text,
+)
 from helpers.query_counts import counting
 from helpers.rows import item_fields, shown, violates
 from helpers.sign_in import new_admin, sign_in_with
@@ -104,11 +114,10 @@ def test_the_count_page_reads_an_amount_grouped_but_its_box_holds_it_plainly(
     place = Place(session)
     received(session, place, [{"item_id": place.cable.id, "quantity": "1234.5"}])
     field = f"counted_{place.cable.id}"
-    for locale, written in (("en", "1,234.5 m"), ("de", "1.234,5 m")):
-        with speaking(compiled(Catalog(locale=locale))):
+    for catalogue, written in ((ENGLISH, "1,234.5 m"), (GERMAN, "1.234,5 m")):
+        with speaking(catalogue):
             shown = admin_client.get(f"{COUNTS}/{place.store.id}")
-        boxes = read(shown.text).all("input", name=field)
-        assert [box.attrs.get("value") for box in boxes] == ["1234.5"]
+        assert box_values(shown.text, field) == ["1234.5"]
         assert written in text(shown)
 
 

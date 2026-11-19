@@ -281,8 +281,8 @@ you" counts every report in one line, which hides what is waiting.
   fuller ones; ties go by open package id, so the same records always
   show the same order (Ali, 2026-11-18, replacing most left first). The
   stock page uses the same rule. Short ends follow the usable ones, in
-  the same order, since none is long enough to use (Ali, 2026-11-18),
-  each flagged "Short end" so the order reads right (Ali, 2026-11-18).
+  the same order, since none is long enough to use, each flagged "Short
+  end" so the order reads right (Ali, 2026-11-18).
   One showing nothing or less is last, greyed, flagged "Shows nothing
   left", so the next volunteer can report it. A short end has something
   left, so no card has both flags. Each flag is in the card's legend, so

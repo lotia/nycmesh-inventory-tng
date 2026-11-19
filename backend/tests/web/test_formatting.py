@@ -4,12 +4,11 @@
 from decimal import Decimal
 
 import pytest
-from babel.messages.catalog import Catalog
 
-from inventory_tng.core.phrases import compiled, speaking
+from inventory_tng.core.phrases import speaking
 from inventory_tng.web.formatting import amount, plain_amount
 
-GERMAN = compiled(Catalog(locale="de"))
+from helpers.locales import GERMAN
 
 
 @pytest.mark.parametrize(

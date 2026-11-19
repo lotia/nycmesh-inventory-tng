@@ -165,6 +165,12 @@ def hidden_fields(page: str | Element) -> list[tuple[str, str]]:
     ]
 
 
+def box_values(page: str | Element, name: str) -> list[str | None]:
+    """The value of each box named `name`, in the page's order: None for
+    one that has none."""
+    return [box.attrs.get("value") for box in read(page).all("input", name=name)]
+
+
 def sorted_columns(page: str | Element) -> list[tuple[str, str, str]]:
     """Each heading a list is sorted by (one a table): which way (its
     aria-sort), its link's words as spoken, and where that link goes."""

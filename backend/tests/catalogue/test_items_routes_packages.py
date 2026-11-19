@@ -21,7 +21,7 @@ from inventory_tng.models.labels import Label
 from inventory_tng.stock import open_packages
 
 from helpers.items import NOW, new_item, same_size_twins
-from helpers.markup import read, text
+from helpers.markup import box_values, read, text
 from helpers.rows import add, history, shown
 from helpers.stock import Spools, retire
 
@@ -367,11 +367,8 @@ def test_an_items_amounts_read_grouped_but_its_boxes_hold_them_plainly(
     )
     shown = admin_client.get(f"{ITEMS}/{item.id}")
     page = read(shown.text)
-
-    def boxes(name: str) -> list[str | None]:
-        return [box.attrs.get("value") for box in page.all("input", name=name)]
-
-    assert boxes("minimum") == boxes("short_below") == ["1234.5"]
+    minimum, short_below = box_values(page, "minimum"), box_values(page, "short_below")
+    assert minimum == short_below == ["1234.5"]
     # The spool's, then an empty one to add a package.
-    assert boxes("size") == ["2000", ""]
+    assert box_values(page, "size") == ["2000", ""]
     assert "2,000 m" in text(shown)

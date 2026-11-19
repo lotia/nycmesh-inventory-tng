@@ -74,6 +74,7 @@ from inventory_tng.web.navigation import retired_holding
 from inventory_tng.web.pages import templates
 
 from helpers import markup
+from helpers.locales import GERMAN
 from helpers.swept_pages import NOT_ENGLISH, PAGES, Built, built, path
 
 # Each letter accented, so English left out of the catalogue shows plain.
@@ -115,7 +116,6 @@ def pseudo_locale() -> Translations:
 
 
 PSEUDO = pseudo_locale()
-GERMAN = compiled(Catalog(locale="de"))
 SHELF = SimpleNamespace(id=7, name=NOT_ENGLISH)
 
 
