@@ -46,7 +46,7 @@ from inventory_tng.stock.paths import ADJUSTMENTS, COUNTS, STOCK
 from inventory_tng.web.forms import ABOVE_ZERO, RULES, TYPE_A_NUMBER, WHOLE_UNITS
 from inventory_tng.web.navigation import retired_holding
 
-from helpers.concurrency import Committed
+from helpers.concurrency import Committed, isolation_seen
 from helpers.markup import button, forms, hidden_fields, links, options, read, text
 from helpers.query_counts import counting
 from helpers.rows import item_fields, shown, violates
@@ -476,15 +476,16 @@ def test_a_count_whose_every_line_moved_writes_nothing(
     assert counts_written(session) == []
 
 
+@pytest.mark.parametrize("field", ["as_of", "seen"])
 def test_a_count_needs_the_moment_it_was_shown(
-    admin_client: TestClient, session: Session
+    admin_client: TestClient, session: Session, field: str
 ) -> None:
     place = stocked(session)
     path = f"{COUNTS}/{place.store.id}"
     shown = count_form(admin_client.get(path))
-    for as_of in ("", "²", "-1", str(2**31)):
+    for sent in ("", "²", "-1", str(2**31)):
         refused = admin_client.post(
-            path, data=shown | {"as_of": as_of, f"counted_{place.item.id}": "5"}
+            path, data=shown | {field: sent, f"counted_{place.item.id}": "5"}
         )
         assert refused.status_code == 404
     assert counts_written(session) == []
@@ -537,20 +538,6 @@ def test_showing_a_count_form_locks_nothing(
     with counting(session) as sent:
         assert admin_client.get(f"{COUNTS}/{place.store.id}").status_code == 200
     assert not [each for each in sent if " FOR " in each]
-
-
-def test_a_count_needs_what_its_form_saw(
-    admin_client: TestClient, session: Session
-) -> None:
-    place = stocked(session)
-    path = f"{COUNTS}/{place.store.id}"
-    shown = count_form(admin_client.get(path))
-    for seen in ("", "²", "-1", str(2**31)):
-        refused = admin_client.post(
-            path, data=shown | {"seen": seen, f"counted_{place.item.id}": "5"}
-        )
-        assert refused.status_code == 404
-    assert counts_written(session) == []
 
 
 def test_a_count_of_a_place_changed_before_its_moment_is_shown_again(
@@ -755,20 +742,7 @@ def test_a_count_form_reads_its_moment_and_figures_on_one_snapshot(
     setup = committed.session()
     _, totp = new_admin(setup)
     setup.commit()
-    seen: list[tuple[str, str]] = []
-    read = counts_routes.moment
-
-    def isolation(session: Session, location_id: int) -> Moment:
-        shown = session.execute(
-            sql_text(
-                "SELECT current_setting('transaction_isolation'),"
-                " current_setting('transaction_read_only')"
-            )
-        ).one()
-        seen.append(tuple(shown))
-        return read(session, location_id)
-
-    monkeypatch.setattr(counts_routes, "moment", isolation)
+    seen = isolation_seen(monkeypatch, counts_routes, "moment")
     client = make_client(own_sessions=True)
     assert sign_in_with(client, key=totp).status_code == 303
     assert client.get(f"{COUNTS}/{place.store.id}").status_code == 200

@@ -43,14 +43,9 @@ def moment(session: Session, location_id: int) -> Moment:
 def seen_up_to(session: Session, location_id: int, as_of: int) -> int:
     """How many ledger transactions at a place there are up to `as_of`, as
     Moment.seen counts them."""
-    return (
-        session.scalar(
-            select(func.count()).where(
-                at_place(location_id), LedgerTransaction.id <= as_of
-            )
-        )
-        or 0
-    )
+    return session.execute(
+        select(func.count()).where(at_place(location_id), LedgerTransaction.id <= as_of)
+    ).scalar_one()
 
 
 # A ledger transaction that puts right what the records show.

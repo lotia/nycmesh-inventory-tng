@@ -400,18 +400,18 @@ def sealed_counted_check(
     assert movement_id is not None
     over_recorded.raise_checks(setup, {movement_id: Decimal(305)})
     admin = new_admin_id(setup)
-    as_of = moments.moment(setup, spools.store.id)
+    shown = moments.moment(setup, spools.store.id)
     count = counts.record_count(
         setup,
         uuid.uuid4(),
         admin,
         spools.store.id,
         [],
-        as_of,
+        shown,
         by_form=[(spools.cable.id, spools.sealed, Decimal(305))],
     )
     over_recorded.counted(
-        setup, admin, spools.store.id, as_of.as_of, count.written, count.put_right
+        setup, admin, spools.store.id, shown.as_of, count.written, count.put_right
     )
     if whole:
         held = Form(open_package_id=made.id)
@@ -491,20 +491,20 @@ def test_a_close_skips_one_a_count_holds_and_correct_then_closes_it_as_counted(
     place = first.get_one(LedgerTransaction, movement.transaction_id).from_location_id
     assert place is not None
     sealed = Form(package_id=movement.from_package_id)
-    as_of = moments.moment(first, place)
+    shown = moments.moment(first, place)
     count = counts.record_count(
         first,
         uuid.uuid4(),
         admin,
         place,
         [],
-        as_of,
+        shown,
         by_form=[(made.item_id, sealed, Decimal(305))],
     )
     assert count.written
     assert (
         over_recorded.counted(
-            first, admin, place, as_of.as_of, count.written, count.put_right
+            first, admin, place, shown.as_of, count.written, count.put_right
         )
         == 0
     )

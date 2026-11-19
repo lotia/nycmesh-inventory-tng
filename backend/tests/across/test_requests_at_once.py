@@ -62,14 +62,20 @@ from inventory_tng.places import locations
 from inventory_tng.scan import catalogue_api
 from inventory_tng.scan.batch import BatchRefused, KeyReused, Recorded, record
 from inventory_tng.scan.batch_schemas import Batch
-from inventory_tng.scan.catalogue_schemas import Catalogue
 from inventory_tng.stock import adjustment_reasons, open_packages
 from inventory_tng.stock.ledger import Entry, Form, insert_transaction
 from inventory_tng.volunteers import volunteers
 from inventory_tng.volunteers.paths import VOLUNTEERS
 from inventory_tng.web.single_use_forms import FIELD
 
-from helpers.concurrency import Committed, Worker, delete_made, made, newest_ids
+from helpers.concurrency import (
+    Committed,
+    Worker,
+    delete_made,
+    isolation_seen,
+    made,
+    newest_ids,
+)
 from helpers.devices import new_device
 from helpers.mail import NO_MAIL, SentMail
 from helpers.rows import item_fields, tag
@@ -1560,20 +1566,7 @@ def test_the_catalogue_route_reads_one_snapshot(
     setup = committed.session()
     _, token = new_device(setup)
     setup.commit()
-    seen: list[tuple[str | None, str | None]] = []
-    answer = catalogue_api.with_saved
-
-    def isolation(session: Session, keys: list[uuid.UUID]) -> Catalogue:
-        shown = session.execute(
-            text(
-                "SELECT current_setting('transaction_isolation'),"
-                " current_setting('transaction_read_only')"
-            )
-        ).one()
-        seen.append(tuple(shown))
-        return answer(session, keys)
-
-    monkeypatch.setattr(catalogue_api, "with_saved", isolation)
+    seen = isolation_seen(monkeypatch, catalogue_api, "with_saved")
     client = make_client(own_sessions=True)
     client.cookies.set(devices.COOKIE, token)
     assert client.get("/api/catalogue").status_code == 200

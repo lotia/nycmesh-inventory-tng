@@ -3,6 +3,7 @@
 import threading
 import time
 from collections.abc import Callable, Mapping
+from types import ModuleType
 
 import pytest
 from psycopg.errors import LockNotAvailable
@@ -124,3 +125,25 @@ def delete_made(
             f"cleanup waited {wait} for a lock another connection still holds:"
             " the test's rows are left behind"
         ) from error
+
+
+def isolation_seen(
+    monkeypatch: pytest.MonkeyPatch, module: ModuleType, name: str
+) -> list[tuple[str, str]]:
+    """Each call of `module.name`, whose first argument is a session: that
+    session's isolation level and whether it is read only, as read then."""
+    seen: list[tuple[str, str]] = []
+    read = getattr(module, name)
+
+    def recorded(session: Session, *args: object) -> object:
+        level, read_only = session.execute(
+            text(
+                "SELECT current_setting('transaction_isolation'),"
+                " current_setting('transaction_read_only')"
+            )
+        ).one()
+        seen.append((level, read_only))
+        return read(session, *args)
+
+    monkeypatch.setattr(module, name, recorded)
+    return seen

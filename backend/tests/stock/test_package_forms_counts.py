@@ -46,14 +46,14 @@ def counter(session: Session) -> int:
 def test_record_count_by_form(session: Session, spools: Spools) -> None:
     made = spools.opened()
     store, cable = spools.store.id, spools.cable.id
-    as_of = moments.moment(session, store)
+    shown = moments.moment(session, store)
     lines = [
         (cable, spools.sealed, Decimal(0)),
         (cable, Form(open_package_id=made.id), Decimal(250)),
         (cable, LOOSE, Decimal(20)),
     ]
     done = counts.record_count(
-        session, uuid.uuid4(), counter(session), store, [], as_of, by_form=lines
+        session, uuid.uuid4(), counter(session), store, [], shown, by_form=lines
     )
     assert (done.differed, done.moved) == (True, {})
     assert quantities_by_form(session, spools.cable) == {
@@ -86,7 +86,7 @@ def test_an_opening_while_counting_by_form_asks_again(
     session: Session, spools: Spools
 ) -> None:
     store, cable = spools.store.id, spools.cable.id
-    as_of = moments.moment(session, store)
+    shown = moments.moment(session, store)
     spools.opened()
     done = counts.record_count(
         session,
@@ -94,7 +94,7 @@ def test_an_opening_while_counting_by_form_asks_again(
         counter(session),
         store,
         [],
-        as_of,
+        shown,
         by_form=[(cable, spools.sealed, Decimal(610))],
     )
     assert cable in done.moved
