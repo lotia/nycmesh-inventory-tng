@@ -143,6 +143,7 @@ export function CartForm({
   // after Remove, and Undo's after Undo.
   const focusNext = useRef<"undo" | "restored" | null>(null);
   const undoButton = useRef<HTMLButtonElement>(null);
+  const cartHeading = useRef<HTMLHeadingElement>(null);
   const restoredRemove = useRef<HTMLButtonElement>(null);
   const restoredId = useRef<number | null>(null);
   // After a while unused, the phone may have changed hands: offer to
@@ -218,13 +219,23 @@ export function CartForm({
     telemetry.record({ kind: "removal_undone" });
   }
 
+  // Whether Undo has focus as this render begins. If the render drops the
+  // offer (the cart changed here or in another tab, or Undo put nothing
+  // back), focus goes to the Cart heading, not the page.
+  const undoFocused =
+    undoButton.current !== null &&
+    document.activeElement === undoButton.current;
   // Once its target is rendered, which may be a render after the cart's.
   useEffect(() => {
     const want = focusNext.current;
     const target =
-      want === null
-        ? null
-        : (want === "undo" ? undoButton : restoredRemove).current;
+      want === "undo"
+        ? undoButton.current
+        : want === "restored"
+          ? restoredRemove.current
+          : undoFocused && undoButton.current === null
+            ? cartHeading.current
+            : null;
     if (target !== null) {
       focusNext.current = null;
       target.focus();
@@ -534,6 +545,15 @@ export function CartForm({
   // Undo, while the cart is as removing left it.
   const undoable =
     removed.value?.revision === cart.value.revision ? removed.value : null;
+  // Its item, named if the catalogue names it only as retired, as the
+  // older builds' lists do (older-to-cart.ts, toCart).
+  const removedItem =
+    undoable === null
+      ? undefined
+      : (items.get(undoable.line.itemId) ??
+        catalogue.retired_items.find(
+          (each) => each.id === undoable.line.itemId,
+        ));
   // Keyed by what each says, two saying the same apart.
   const problemKeys = keyedByWords(problems.value.map(wordsOf));
 
@@ -637,7 +657,9 @@ export function CartForm({
         </Field>
       )}
 
-      <h2>{say(CART)}</h2>
+      <h2 ref={cartHeading} tabIndex={-1}>
+        {say(CART)}
+      </h2>
       {putBack.value !== null && (
         <div role="status">
           <p>{say(ADDED_BACK)}</p>
@@ -655,7 +677,7 @@ export function CartForm({
           {sayParts(
             REMOVED_UNDO,
             {
-              item: <strong>{nameOf(items.get(undoable.line.itemId))}</strong>,
+              item: <strong>{nameOf(removedItem)}</strong>,
             },
             [
               (inside) => (

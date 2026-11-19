@@ -12,7 +12,7 @@ import {
   server,
   storedCart,
 } from "../testing/scan-page";
-import { DISCARD_CART, YOUR_NAME } from "./CartForm";
+import { CART, DISCARD_CART, YOUR_NAME } from "./CartForm";
 import { REMOVE } from "./CartLine";
 import {
   STORAGE_KEY as CART_KEY,
@@ -116,6 +116,46 @@ describe("Undo after Remove (Ali, inventory-tng-5uy, 2026-11-13)", () => {
       `Removed ${say(NO_LONGER_IN_CATALOGUE)}. Undo`,
     );
   });
+
+  test("an item retired with none left is named as the catalogue names it", async () => {
+    await opened({
+      ...FILLED,
+      lines: [...FILLED.lines, { itemId: 103, packages: {}, loose: "1" }],
+    });
+    removeAt(3);
+    expect(screen.getByRole("status").textContent).toBe(
+      "Removed NanoStation M5. Undo",
+    );
+  });
+
+  test.each<[string, () => void]>([
+    [
+      "the cart changed in another tab",
+      () => {
+        storeCart({ ...FILLED, revision: "theirs" });
+        window.dispatchEvent(new StorageEvent("storage", { key: CART_KEY }));
+      },
+    ],
+    [
+      "Undo putting nothing back",
+      () => {
+        storeCart({ ...FILLED, revision: "theirs" });
+        fireEvent.click(undoButton() as Element);
+      },
+    ],
+  ])(
+    "%s while Undo has focus moves focus to the Cart heading",
+    async (_, drop) => {
+      await opened();
+      removeAt(1);
+      expect(document.activeElement).toBe(undoButton());
+      drop();
+      await vi.waitFor(() => expect(undoButton()).toBeNull());
+      expect(document.activeElement).toBe(
+        screen.getByRole("heading", { name: say(CART) }),
+      );
+    },
+  );
 
   test.each<[string, () => void]>([
     [
