@@ -85,7 +85,7 @@ with an adjustment. Mark checked if you already fixed it.{% endtrans %}</p>
       other end's next step. Both: nothing left to write, so Close it. #}
       {% set one = each.one_counted %}
       {% set both = each.both_right %}
-      {#- How an end was put right (over_recorded.OneCounted, BothRight):
+      {#- How an end was put right (over_recorded_queries.OneCounted, BothRight):
       "counted", or "closed", an opening's open package closed since. #}
       {% if one %}
       <p>{% if one.how == "closed" %}{% trans counted=one.counted, day=one.on | day(zone), still=one.still %}{{ counted }} closed {{ day }}. {{ still }} still to put right.{% endtrans %}

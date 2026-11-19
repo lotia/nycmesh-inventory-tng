@@ -60,7 +60,7 @@ from inventory_tng.site_settings.forms import WHOLE, whole_minutes
 from inventory_tng.stock import (
     counts_routes,
     length_checks_routes,
-    over_recorded,
+    over_recorded_queries,
     over_recorded_routes,
     stock_routes,
     used_up_routes,
@@ -182,16 +182,16 @@ SAID_WITH_VALUES: list[Callable[[], Words]] = [
         lambda said=said: said(NOT_ENGLISH, NOT_ENGLISH)
         for said in over_recorded_routes.RETIRED_EMPTY.values()
     ),
-    lambda: over_recorded.times(2, NOT_ENGLISH),
-    lambda: over_recorded.from_an_open_package(NOT_ENGLISH),
-    lambda: over_recorded.sealed(NOT_ENGLISH),
-    lambda: over_recorded.opened(NOT_ENGLISH),
-    lambda: over_recorded.loose(NOT_ENGLISH),
-    lambda: over_recorded.held_words(NOT_ENGLISH),
-    lambda: over_recorded.adjusted_at(NOT_ENGLISH),
-    lambda: over_recorded.end_only(NOT_ENGLISH),
-    lambda: over_recorded.closed_on_day(NOT_ENGLISH, NOT_ENGLISH),
-    lambda: over_recorded.counted_on(NOT_ENGLISH, NOT_ENGLISH),
+    lambda: over_recorded_queries.times(2, NOT_ENGLISH),
+    lambda: over_recorded_queries.from_an_open_package(NOT_ENGLISH),
+    lambda: over_recorded_queries.sealed(NOT_ENGLISH),
+    lambda: over_recorded_queries.opened(NOT_ENGLISH),
+    lambda: over_recorded_queries.loose(NOT_ENGLISH),
+    lambda: over_recorded_queries.held_words(NOT_ENGLISH),
+    lambda: over_recorded_queries.adjusted_at(NOT_ENGLISH),
+    lambda: over_recorded_queries.end_only(NOT_ENGLISH),
+    lambda: over_recorded_queries.closed_on_day(NOT_ENGLISH, NOT_ENGLISH),
+    lambda: over_recorded_queries.counted_on(NOT_ENGLISH, NOT_ENGLISH),
     lambda: labels.package_label(NOT_ENGLISH, NOT_ENGLISH, NOT_ENGLISH),
     lambda: labels.place_words(NOT_ENGLISH, NOT_ENGLISH),
     *(lambda said=said: said("") for said in units.NAMES.values()),
@@ -435,7 +435,7 @@ def units_read() -> str:
 
 def recorded(**differs: object) -> SimpleNamespace:
     """A line recorded with more than was moved, as stock/over_recorded.html
-    shows it (over_recorded.Shown)."""
+    shows it (over_recorded_queries.Shown)."""
     return SimpleNamespace(
         **{
             "row": SimpleNamespace(id=1),

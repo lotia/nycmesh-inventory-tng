@@ -21,6 +21,7 @@ from inventory_tng.stock import (
     length_checks_routes,
     open_packages,
     over_recorded,
+    over_recorded_queries,
     over_recorded_routes,
 )
 from inventory_tng.stock.moments import expected
@@ -453,7 +454,7 @@ def test_a_name_within_a_sentence_lowers_its_first_letter_before_lower_case(
     """Only where the rest of its first word is lower case already, so an
     acronym or a word cased within stays; a combining mark changes
     nothing (Ali, 2026-11-15, inventory-tng-r5z)."""
-    assert over_recorded.within(name) == shown
+    assert over_recorded_queries.within(name) == shown
 
 
 def test_an_openings_one_end_wording_keeps_a_name_cased_within(

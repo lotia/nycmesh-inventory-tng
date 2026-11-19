@@ -18,7 +18,7 @@ from inventory_tng.core.db_sessions import DbSession
 from inventory_tng.models.catalogue import Item
 from inventory_tng.models.stock import OpenPackage
 from inventory_tng.stock import open_packages
-from inventory_tng.stock.over_recorded import times
+from inventory_tng.stock.over_recorded_queries import times
 from inventory_tng.web.forms import row_id
 
 
@@ -28,7 +28,7 @@ class ItemWaiting(NamedTuple):
 
     item_id: int
     item: str
-    # How many of each package, by its name (over_recorded.times).
+    # How many of each package, by its name (over_recorded_queries.times).
     packages: str
     count: int
     # How far below zero those showing less than nothing are, together, in
@@ -45,7 +45,7 @@ def by_item(session: Session, *where: ColumnElement[bool]) -> list[ItemWaiting]:
     lines = []
     for item_id, found in grouped.items():
         # Each package as named, never a word made from its name
-        # (inventory-tng-b1z), each as over_recorded.times says it.
+        # (inventory-tng-b1z), each as over_recorded_queries.times says it.
         names = Counter(each.package for each in found)
         lines.append(
             ItemWaiting(

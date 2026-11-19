@@ -17,7 +17,12 @@ from sqlalchemy.orm import Session
 from inventory_tng.core.local_time import show, show_day, site_zone
 from inventory_tng.core.phrases import compiled, speaking
 from inventory_tng.models.stock import LedgerTransaction, Movement, OverRecorded
-from inventory_tng.stock import open_packages, over_recorded, over_recorded_routes
+from inventory_tng.stock import (
+    open_packages,
+    over_recorded,
+    over_recorded_queries,
+    over_recorded_routes,
+)
 from inventory_tng.stock.over_recorded_routes import SETTLED_VIEW, waiting_view
 from inventory_tng.stock.paths import COUNTS
 from inventory_tng.stock.stock_routes import recorded_more_view
@@ -39,11 +44,11 @@ from helpers.stock import (
 )
 
 # As the list says each, in English.
-HOW = {how: str(words) for how, words in over_recorded.SETTLED_HOW.items()}
+HOW = {how: str(words) for how, words in over_recorded_queries.SETTLED_HOW.items()}
 REASONS = {why: str(words) for why, words in over_recorded.CHECKED_REASONS.items()}
-TWO = str(over_recorded.TWO_ADJUSTMENTS)
-SEALED_ONLY = over_recorded.end_only(over_recorded.sealed("Spool"))
-OPEN_SPOOL = over_recorded.opened("Spool")
+TWO = str(over_recorded_queries.TWO_ADJUSTMENTS)
+SEALED_ONLY = over_recorded_queries.end_only(over_recorded_queries.sealed("Spool"))
+OPEN_SPOOL = over_recorded_queries.opened("Spool")
 
 SETTLED = f"{PAGE}/settled"
 
@@ -159,8 +164,8 @@ def whole_recorded_more(session: Session) -> tuple[Spools, OverRecorded]:
 @pytest.mark.parametrize(
     ("count", "how", "why"),
     [
-        ("305", HOW["confirmed"], lambda _: over_recorded.held_words("305 m")),
-        ("180", HOW["count corrected"], over_recorded.adjusted_at),
+        ("305", HOW["confirmed"], lambda _: over_recorded_queries.held_words("305 m")),
+        ("180", HOW["count corrected"], over_recorded_queries.adjusted_at),
     ],
 )
 def test_a_count_of_one_moved_whole_says_if_it_was_confirmed(
@@ -197,8 +202,8 @@ def test_a_count_at_each_end_says_where_and_when(
         HOW["counted"],
         ", ".join(
             (
-                over_recorded.counted_on(place.store.name, day),
-                over_recorded.counted_on(place.van.name, day),
+                over_recorded_queries.counted_on(place.store.name, day),
+                over_recorded_queries.counted_on(place.van.name, day),
             )
         ),
     )
@@ -215,7 +220,10 @@ def test_corrected_after_one_end_counted_names_the_other(
     over_recorded.correct(session, check.id, seen(check), ada_id(session))
     session.flush()
     ((*_, how, why, _),) = settled_rows(admin_client)
-    assert (how, why) == (HOW["corrected"], over_recorded.end_only(place.store.name))
+    assert (how, why) == (
+        HOW["corrected"],
+        over_recorded_queries.end_only(place.store.name),
+    )
 
 
 def opening(session: Session) -> tuple[Spools, OverRecorded]:
@@ -242,7 +250,7 @@ def test_an_opening_is_listed_at_its_place_opened(
         HOW["corrected"],
         TWO,
     )
-    assert amount == over_recorded.times(1, "Spool")
+    assert amount == over_recorded_queries.times(1, "Spool")
 
 
 def test_an_openings_open_package_closed_before_correct_names_the_sealed_end(
@@ -325,8 +333,12 @@ def test_an_openings_ends_counted_name_their_forms(
         HOW["counted"],
         ", ".join(
             (
-                over_recorded.counted_on(over_recorded.sealed("Spool"), day),
-                over_recorded.within(over_recorded.counted_on(OPEN_SPOOL, day)),
+                over_recorded_queries.counted_on(
+                    over_recorded_queries.sealed("Spool"), day
+                ),
+                over_recorded_queries.within(
+                    over_recorded_queries.counted_on(OPEN_SPOOL, day)
+                ),
             )
         ),
     )
@@ -482,8 +494,12 @@ def test_an_openings_sealed_end_counted_then_closed_says_so(
         HOW["counted"],
         ", ".join(
             (
-                over_recorded.counted_on(over_recorded.sealed("Spool"), sealed),
-                over_recorded.within(over_recorded.closed_on_day(OPEN_SPOOL, opened)),
+                over_recorded_queries.counted_on(
+                    over_recorded_queries.sealed("Spool"), sealed
+                ),
+                over_recorded_queries.within(
+                    over_recorded_queries.closed_on_day(OPEN_SPOOL, opened)
+                ),
             )
         ),
     )
@@ -524,8 +540,12 @@ def test_both_ends_right_then_closed_names_the_count_and_the_close(
         HOW["counted"],
         ", ".join(
             (
-                over_recorded.counted_on(over_recorded.sealed("Spool"), sealed),
-                over_recorded.within(over_recorded.closed_on_day(OPEN_SPOOL, opened)),
+                over_recorded_queries.counted_on(
+                    over_recorded_queries.sealed("Spool"), sealed
+                ),
+                over_recorded_queries.within(
+                    over_recorded_queries.closed_on_day(OPEN_SPOOL, opened)
+                ),
             )
         ),
         "ada",
@@ -561,14 +581,16 @@ def test_one_end_only_counted_names_that_end(
         (
             f"{spools.store.name} → {spools.van.name}",
             HOW["counted"],
-            over_recorded.counted_on(
+            over_recorded_queries.counted_on(
                 spools.van.name, counted_on(check.arrived_count_id)
             ),
         ),
         (
             f"from {place.store.name}",
             HOW["counted"],
-            over_recorded.counted_on(place.store.name, counted_on(used.left_count_id)),
+            over_recorded_queries.counted_on(
+                place.store.name, counted_on(used.left_count_id)
+            ),
         ),
     ]
 

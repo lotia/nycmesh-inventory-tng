@@ -35,8 +35,9 @@ type App = Mapping[str, ast.Module]
 # What the module at a path breaks a rule with.
 type Check = Callable[[str, App], set[str]]
 
-# Rules: each table's owner (db_protection.protection), any queries.py or
-# forms.py, and these, which hold rules but own no table.
+# Rules: each table's owner (db_protection.protection), any queries.py,
+# <thing>_queries.py or forms.py, and these, which hold rules but own no
+# table.
 RULES = {
     "admins/authenticator_totp.py",
     "catalogue/name_keys.py",
@@ -97,10 +98,12 @@ def _module(name: str, app: App) -> str | None:
 
 def is_rules(path: str) -> bool:
     """A module of rules, held to rules_import_fastapi_or_web."""
+    name = path.split("/")[-1]
     return (
         path in RULES
         or path in RULES_MAY_IMPORT
-        or path.split("/")[-1] in {"queries.py", "forms.py"}
+        or name in {"queries.py", "forms.py"}
+        or name.endswith("_queries.py")
     )
 
 
@@ -245,6 +248,12 @@ APP = {
             "catalogue/queries.py",
             "def f():\n    from ..web.pages import x",
             {"web/pages.py"},
+        ),
+        (
+            "rules_import_fastapi_or_web",
+            "stock/over_recorded_queries.py",
+            "from fastapi import Request\nfrom inventory_tng.web import formatting",
+            {"fastapi"},
         ),
         (
             "routes_run_queries",

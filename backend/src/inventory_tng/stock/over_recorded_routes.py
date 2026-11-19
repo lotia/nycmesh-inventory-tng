@@ -31,7 +31,13 @@ from inventory_tng.models.places import Location
 from inventory_tng.models.stock import OVER_RECORDED_WORDS_MAX, Movement, OverRecorded
 from inventory_tng.places import locations
 from inventory_tng.places.queries import changeable
-from inventory_tng.stock import balance, counts, ledger, over_recorded
+from inventory_tng.stock import (
+    balance,
+    counts,
+    ledger,
+    over_recorded,
+    over_recorded_queries,
+)
 from inventory_tng.stock.forms import confirmed_count, why_problem
 from inventory_tng.stock.needs_action import (
     ItemWaiting,
@@ -133,8 +139,8 @@ MEANWHILE = frozenset({"over_recorded_unchanged", "over_recorded_not_whole", "un
 def by_item(session: Session) -> list[ItemWaiting]:
     """Those waiting, one line per item, as "Needs your action" lists
     them: each amount, said once with how many."""
-    grouped: dict[int, list[over_recorded.Shown]] = {}
-    for each in over_recorded.shown(session):
+    grouped: dict[int, list[over_recorded_queries.Shown]] = {}
+    for each in over_recorded_queries.shown(session):
         grouped.setdefault(each.item_id, []).append(each)
     return [
         ItemWaiting(
@@ -210,7 +216,7 @@ def _views(waiting: int, only: Item | None) -> list[tuple[str, Words, str]]:
     ]
 
 
-def _why(each: over_recorded.WasSettled) -> str:
+def _why(each: over_recorded_queries.WasSettled) -> str:
     return each.why.lower()
 
 
@@ -222,7 +228,7 @@ SETTLED_SORTING = Sorting(
     {
         **{
             name: Sort.of(*by, first="desc" if name == "settled" else "asc")
-            for name, by in over_recorded.SETTLED_ORDER.items()
+            for name, by in over_recorded_queries.SETTLED_ORDER.items()
         },
         "why": Sort.keyed(_why),
     },
@@ -246,13 +252,15 @@ def settled_page(
     if view.by == "why":
         # Every one, newest first, worded, then sorted by its words: the
         # same few queries.
-        every = over_recorded.settled(session, zone, *where, limit=None)
+        every = over_recorded_queries.settled(session, zone, *where, limit=None)
         rows, view = arranged(every, view)
     else:
         view = view.counted(
-            over_recorded.how_many(session, over_recorded.SETTLED, *where)
+            over_recorded_queries.how_many(
+                session, over_recorded_queries.SETTLED, *where
+            )
         )
-        rows = over_recorded.settled(
+        rows = over_recorded_queries.settled(
             session,
             zone,
             *where,
@@ -277,7 +285,8 @@ def settled_page(
             "back_link": (STOCK, SECTION_STOCK),
             "only": only,
             "recorded_views": _views(
-                over_recorded.how_many(session, over_recorded.WAITING, *where), only
+                over_recorded_queries.how_many(session, over_recorded.WAITING, *where),
+                only,
             ),
             "rows": rows,
             "view": view,
@@ -311,7 +320,7 @@ def _page(
     from a refusal's alert draws that alert again, with the problem
     under it: 400, as any problem typed, not 409, as the refusal was."""
     where = [Movement.item_id == only.id] if only else []
-    waiting = over_recorded.shown(session, *where)
+    waiting = over_recorded_queries.shown(session, *where)
     asking = None
     if checking is not None:
         found = next((each for each in waiting if each.row.id == checking), None)
@@ -360,7 +369,7 @@ def _refusal(
     settled meanwhile. Drawn again for Mark checked sent from it (`do`
     "checked"), it says what its row offers: Confirm count for an open
     package moved whole, else Correct."""
-    found = over_recorded.shown(session, OverRecorded.id == check_id)
+    found = over_recorded_queries.shown(session, OverRecorded.id == check_id)
     if not found:
         return None
     (each,) = found

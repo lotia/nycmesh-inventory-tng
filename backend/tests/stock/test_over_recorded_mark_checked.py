@@ -17,7 +17,11 @@ from inventory_tng.models.stock import (
     LedgerTransaction,
     Movement,
 )
-from inventory_tng.stock import over_recorded, over_recorded_routes
+from inventory_tng.stock import (
+    over_recorded,
+    over_recorded_queries,
+    over_recorded_routes,
+)
 from inventory_tng.stock.forms import SAY_WHY, WORDS_FOR_ANOTHER
 from inventory_tng.web.forms import up_to
 
@@ -488,7 +492,7 @@ def test_a_cut_taken_down_is_listed_from_its_open_package(
     first = spools.place.batch(lines=[cut(made, "20")])
     recorded_then_changed(registered_client, first, lines=[cut(made, "15")])
     page = text(admin_client.get(PAGE))
-    assert over_recorded.from_an_open_package("5 m") in page
+    assert over_recorded_queries.from_an_open_package("5 m") in page
 
 
 def test_what_a_batch_was_changed_from_does_not_make_it_another(

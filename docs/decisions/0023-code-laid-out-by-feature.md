@@ -176,6 +176,14 @@ short test. `core/` is the name FastAPI's full-stack template uses;
   `admins/sealed_totp_keys_command.py`. The operator's command
   `totp-keys` became `sealed-totp-keys`. Their tests were renamed alike,
   with the command's tests in a file of their own.
+- On 2026-11-18 `stock/over_recorded.py` was split in two
+  (inventory-tng-u3fp.10): it keeps what changes a check, raising,
+  settling and counting one, and `stock/over_recorded_queries.py` holds
+  what the administrators' pages read and show of them. The queries
+  import the few names they share from `stock/over_recorded.py`, never
+  the other way. A module named `<thing>_queries.py` is held to the
+  import rules of a `queries.py`. The tests kept their names: each
+  drives the pages, and so both modules.
 - Older decision records keep the paths of their time. The tables below
   give each old path's new home; a later move adds its rows.
 
@@ -257,6 +265,7 @@ queries to its `queries.py`.
 | `site_settings/command.py` | `site_settings/scan_settings_command.py` |
 | `site_settings/routes.py` | `site_settings/site_settings_routes.py` |
 | `stacks.py` | `backend/devtools/stack.py`; its `stale` is `list-stale` |
+| `stock/over_recorded.py` | itself, with what changes a check: `raise_checks`, `seen`, `waiting`, `ends`, `places_of`, `mark_checked`, `close`, `correct`, `confirm_count`, `openings_waiting`, `counted`, `open_package_closed`, the metrics, `REASON`, `Settled`, `CHECKED_REASONS`, `WAITING`, `OPENED_INTO`, with `_correction_key` as `correction_key`; what the pages read and show: `Shown`, `OneCounted`, `BothRight`, `MovedWhole`, `Spot`, `WasSettled`, `within`, `times`, `amount_words` and the other words, `shown`, `how_many`, `settled`, `SETTLED`, `SETTLED_HOW`, `SETTLED_ORDER`, `TWO_ADJUSTMENTS`, `NO_ADJUSTMENT`, `FROM`, `TO`, `LEFT_COUNT`, `ARRIVED_COUNT`: `stock/over_recorded_queries.py` |
 | `stock/paths.py` | itself, with `RECORDED_MORE` and `RECORDED_MORE_SETTLED` as `OVER_RECORDED` and `OVER_RECORDED_SETTLED` |
 | `templates/scan/page.html` | `templates/frontend_page.html` |
 | `totp_keys.py` | `admins/sealed_totp_keys.py`; its command: `admins/sealed_totp_keys_command.py` |

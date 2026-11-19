@@ -29,7 +29,7 @@ msgid ""
 " you typed %(typed)s"
 msgstr ""
 
-#: src/inventory_tng/stock/over_recorded.py
+#: src/inventory_tng/stock/over_recorded_queries.py
 #, python-format
 msgid "%(amount)s from an open package"
 msgstr ""
@@ -249,17 +249,17 @@ msgid ""
 msgstr ""
 
 #. Translators: a place or a form, then the day it was counted ("14 Nov").
-#: src/inventory_tng/stock/over_recorded.py
+#: src/inventory_tng/stock/over_recorded_queries.py
 #, python-format
 msgid "%(end)s %(day)s"
 msgstr ""
 
-#: src/inventory_tng/stock/over_recorded.py
+#: src/inventory_tng/stock/over_recorded_queries.py
 #, python-format
 msgid "%(end)s closed %(day)s"
 msgstr ""
 
-#: src/inventory_tng/stock/over_recorded.py
+#: src/inventory_tng/stock/over_recorded_queries.py
 #, python-format
 msgid "%(end)s only"
 msgstr ""
@@ -357,7 +357,7 @@ msgid_plural "%(num)d retired places hold stock"
 msgstr[0] ""
 msgstr[1] ""
 
-#: src/inventory_tng/stock/over_recorded.py
+#: src/inventory_tng/stock/over_recorded_queries.py
 #, python-format
 msgid "%(num)s × %(package)s"
 msgstr ""
@@ -758,7 +758,7 @@ msgstr ""
 msgid "Added."
 msgstr ""
 
-#: src/inventory_tng/stock/over_recorded.py
+#: src/inventory_tng/stock/over_recorded_queries.py
 #, python-format
 msgid "Adjusted at %(place)s"
 msgstr ""
@@ -1148,7 +1148,7 @@ msgid ""
 "email is told."
 msgstr ""
 
-#: src/inventory_tng/stock/over_recorded.py
+#: src/inventory_tng/stock/over_recorded_queries.py
 msgid "Checked"
 msgstr ""
 
@@ -1265,7 +1265,7 @@ msgstr ""
 msgid "Correct %(end)s"
 msgstr ""
 
-#: src/inventory_tng/stock/over_recorded.py
+#: src/inventory_tng/stock/over_recorded_queries.py
 msgid "Corrected"
 msgstr ""
 
@@ -1292,11 +1292,11 @@ msgstr ""
 msgid "Count a place"
 msgstr ""
 
-#: src/inventory_tng/stock/over_recorded.py
+#: src/inventory_tng/stock/over_recorded_queries.py
 msgid "Count confirmed"
 msgstr ""
 
-#: src/inventory_tng/stock/over_recorded.py
+#: src/inventory_tng/stock/over_recorded_queries.py
 msgid "Count corrected"
 msgstr ""
 
@@ -1316,7 +1316,7 @@ msgstr ""
 msgid "Count in the package"
 msgstr ""
 
-#: src/inventory_tng/stock/over_recorded.py
+#: src/inventory_tng/stock/over_recorded_queries.py
 #: src/inventory_tng/templates/stock/count.html
 msgid "Counted"
 msgstr ""
@@ -1568,7 +1568,7 @@ msgid ""
 "inventory, <a href=\"%(home)s\">its administrator pages</a>."
 msgstr ""
 
-#: src/inventory_tng/stock/over_recorded.py
+#: src/inventory_tng/stock/over_recorded_queries.py
 #, python-format
 msgid "Held %(amount)s"
 msgstr ""
@@ -1916,7 +1916,7 @@ msgstr ""
 msgid "Loose"
 msgstr ""
 
-#: src/inventory_tng/stock/over_recorded.py
+#: src/inventory_tng/stock/over_recorded_queries.py
 #, python-format
 msgid "Loose %(item)s"
 msgstr ""
@@ -2070,7 +2070,7 @@ msgstr ""
 msgid "Next"
 msgstr ""
 
-#: src/inventory_tng/stock/over_recorded.py
+#: src/inventory_tng/stock/over_recorded_queries.py
 msgid "No adjustment"
 msgstr ""
 
@@ -2423,7 +2423,7 @@ msgctxt "state"
 msgid "Open"
 msgstr ""
 
-#: src/inventory_tng/stock/over_recorded.py
+#: src/inventory_tng/stock/over_recorded_queries.py
 #, python-format
 msgid "Open %(package)s"
 msgstr ""
@@ -3249,7 +3249,7 @@ msgstr ""
 msgid "Scan this with your phone's camera."
 msgstr ""
 
-#: src/inventory_tng/stock/over_recorded.py
+#: src/inventory_tng/stock/over_recorded_queries.py
 #, python-format
 msgid "Sealed %(package)s"
 msgstr ""
@@ -3909,7 +3909,7 @@ msgstr ""
 msgid "Transaction"
 msgstr ""
 
-#: src/inventory_tng/stock/over_recorded.py
+#: src/inventory_tng/stock/over_recorded_queries.py
 msgid "Two adjustments"
 msgstr ""
 
