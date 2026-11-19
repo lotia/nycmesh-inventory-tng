@@ -1,8 +1,10 @@
 """Stand-in mailers, and mail as a site sets it up."""
 
+from typing import override
+
 from fastapi import BackgroundTasks
 
-from inventory_tng.core.mail import Message, Notifier
+from inventory_tng.core.mail import Mailer, Message, Notifier
 from inventory_tng.core.settings import MailConfig
 
 # Mail as a site sets it up, for apps given a mailer. Links start here.
@@ -20,13 +22,14 @@ class SentMail(list[Message]):
         self.append(message)
 
 
-class FailingMail:
+class FailingMail(Mailer):
     """A stand-in mailer whose every send fails with `error`."""
 
     def __init__(self, error: Exception) -> None:
         self.error = error
 
-    def send(self, _message: Message) -> None:
+    @override
+    def send(self, message: Message) -> None:
         raise self.error
 
 

@@ -251,9 +251,8 @@ def test_bringing_one_back_starts_their_sign_in_again(
     assert_sign_in_was_reset(session, theirs, made, ben, ben_key)
 
 
-@pytest.mark.usefixtures("admin_client")
 def test_an_administrator_retired_meanwhile_retires_nobody(session: Session) -> None:
-    me = admin_named(session, "ada")
+    me, _ = new_admin(session)
     ben, _ = new_admin(session, "ben")
     carol, _ = new_admin(session, "carol")
     me.retired_at = datetime.now(UTC)

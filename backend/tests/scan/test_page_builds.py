@@ -29,10 +29,9 @@ def served(
 
 
 @pytest.fixture
-def oldest(monkeypatch: pytest.MonkeyPatch) -> str:
+def oldest(monkeypatch: pytest.MonkeyPatch) -> None:
     """A server that takes no batch from a build before OLDEST."""
     monkeypatch.setattr(page_builds, "OLDEST_BUILD", OLDEST)
-    return OLDEST
 
 
 @pytest.mark.parametrize(

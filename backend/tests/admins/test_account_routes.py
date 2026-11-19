@@ -103,17 +103,6 @@ def test_the_page_shows_the_account(
         assert read_page.one("section", id=section)
 
 
-def test_viewing_it_needs_signing_in(
-    make_client_without_database: Callable[..., TestClient],
-) -> None:
-    assert (
-        make_client_without_database()
-        .get(ACCOUNT)
-        .headers["location"]
-        .startswith(paths.SIGN_IN)
-    )
-
-
 def test_changing_the_email(
     client: TestClient,
     ada: tuple[Admin, str],

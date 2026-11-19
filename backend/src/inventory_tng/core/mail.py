@@ -77,8 +77,7 @@ Told = Callable[[str, int], Message]
 
 
 class Mailer(Protocol):
-    # Positional only: a mailer may name it as it likes, _message if unread.
-    def send(self, message: Message, /) -> None: ...
+    def send(self, message: Message) -> None: ...
 
 
 class SmtpMailer:
