@@ -3,8 +3,7 @@
  * script shows them (frontend/src/admin/buttons.ts), and what they act on is
  * still shown: a code or labels to print by hand, a link to copy by hand
  * (inventory-tng-vxxc, inventory-tng-f8kw). Hidden by the `hidden`
- * attribute the script would remove, not by a style. No script runs, so
- * the policy watch (csp-violations.ts) sees nothing here.
+ * attribute the script would remove, not by a style.
  */
 import { expect, type Page } from "@playwright/test";
 import { test } from "./csp-violations";

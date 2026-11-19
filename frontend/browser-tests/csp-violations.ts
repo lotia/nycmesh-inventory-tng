@@ -1,10 +1,9 @@
 /**
  * Every test fails on a Content-Security-Policy violation (backend
  * web/security_headers.py), in any page it opens: so every page the tests
- * reach, the crawl's all, is checked in each browser. The watch is a
- * script, so a test run without scripts is not watched. Tests import `test`
- * from here, or from own-rows.ts, which extends it, never Playwright's own
- * (biome.json).
+ * reach, the crawl's all, is checked in each browser, with scripts or
+ * without. Tests import `test` from here, or from own-rows.ts, which
+ * extends it, never Playwright's own (biome.json).
  */
 import {
   type BrowserContext,
@@ -26,11 +25,26 @@ type Watched = {
 
 /**
  * Collects what the policy refuses in `context`'s pages, as each one's
- * securitypolicyviolation events say. A context a test opens itself is
- * watched with this too, and checked with `assertNone`.
+ * securitypolicyviolation events say; in a context that runs no scripts,
+ * where no listener can be added, as the browser's console does. Not its
+ * reports: Chromium sends those by the Reporting API, over HTTPS only. A
+ * context a test opens itself is watched with this too, and checked with
+ * `assertNone`.
  */
-export async function watch(context: BrowserContext): Promise<string[]> {
+export async function watch(
+  context: BrowserContext,
+  javaScriptEnabled = true,
+): Promise<string[]> {
   const found: string[] = [];
+  if (!javaScriptEnabled) {
+    context.on("console", (message) => {
+      // Each browser's own words, which both say this.
+      if (/Content Security Policy/.test(message.text())) {
+        found.push(`${message.text()} on ${message.page()?.url()}`);
+      }
+    });
+    return found;
+  }
   await context.exposeBinding(
     "policyViolated",
     ({ page }, violation: Violation) => {
@@ -71,8 +85,9 @@ export async function watch(context: BrowserContext): Promise<string[]> {
  * action too, have reached the test. A page that is navigating is waited
  * for, and the document it loads asked; one that closed has nothing more
  * to give. A refusal the old document had not yet reported when it was
- * left is lost with it. Only a page's main frame is asked. Its pages must
- * run scripts: one that does not cannot be asked.
+ * left is lost with it. Only a page's main frame is asked. A page that
+ * runs no scripts is asked too, by Playwright's own: its console's
+ * messages come before the answer.
  */
 export async function settled(context: BrowserContext): Promise<void> {
   await Promise.all(context.pages().map(pageSettled));
@@ -98,26 +113,22 @@ async function pageSettled(page: Page): Promise<void> {
 
 /**
  * Fails after the test if a page of `context` violated the policy, once
- * its refusals have settled. Without scripts nothing is watched, and a page
- * cannot be asked.
+ * its refusals have settled.
  */
 export async function assertNone(
   context: BrowserContext,
   found: string[],
-  javaScriptEnabled: boolean,
 ): Promise<void> {
-  if (javaScriptEnabled) {
-    await settled(context);
-  }
+  await settled(context);
   expect(found, "Content-Security-Policy violations").toEqual([]);
 }
 
 export const test = base.extend<{ violations: string[] }>({
   violations: [
     async ({ context, javaScriptEnabled }, use) => {
-      const found = await watch(context);
+      const found = await watch(context, javaScriptEnabled);
       await use(found);
-      await assertNone(context, found, javaScriptEnabled);
+      await assertNone(context, found);
     },
     { auto: true },
   ],

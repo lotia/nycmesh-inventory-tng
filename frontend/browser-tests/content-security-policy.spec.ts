@@ -40,6 +40,33 @@ test("a violation made by a test's last action is caught too", async ({
   violations.length = 0;
 });
 
+test.describe("without scripts", () => {
+  test.use({ javaScriptEnabled: false });
+
+  test("a violation is caught, so it would fail the test", async ({
+    context,
+    page,
+    violations,
+  }) => {
+    // A page given an inline style, which the policy refuses.
+    await page.route("**/admin/items", async (route) => {
+      const response = await route.fetch();
+      const body = (await response.text()).replace(
+        "</body>",
+        '<p style="color: red">Injected</p></body>',
+      );
+      await route.fulfill({ response, body });
+    });
+    await page.goto("/admin/items");
+    // What the fixture waits for before it checks.
+    await settled(context);
+    expect(violations).toEqual([
+      expect.stringMatching(/Content Security Policy.* on .*\/admin\/items$/),
+    ]);
+    violations.length = 0;
+  });
+});
+
 test("a test whose last action starts a navigation is checked too", async ({
   page,
 }) => {
