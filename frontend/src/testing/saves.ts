@@ -83,11 +83,16 @@ export function olderMove(fields: Record<string, unknown> = {}, body = {}) {
   );
 }
 
+/** The first save an older build left, as read. */
+export function firstOlder(): Older {
+  return readOlder()[0] as Older;
+}
+
 /** The only save kept, a move of cable but for `body` and `fields`, as
  * read. */
 export function onlyOlder(body = {}, fields = {}): Older {
   keep("inventory.outbox.v3", [olderMove(fields, body)]);
-  return readOlder()[0] as Older;
+  return firstOlder();
 }
 
 /** A save of a box retired with none left, cable taken from an open

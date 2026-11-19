@@ -413,15 +413,14 @@ def is_short_end(left: Decimal, short_below: Decimal | None) -> bool:
     return short_below is not None and 0 < left < short_below
 
 
-def fewest_left_first(opened: tuple[int, Decimal]) -> tuple[bool, Decimal, int]:
-    """How an item's open packages at a place are listed, an open package
+def fewest_left_first(open_id: int, left: Decimal) -> tuple[bool, Decimal, int]:
+    """How an item's open packages at a place are listed, by open package
     id and what is left on it: fewest left first, those showing nothing or
     less last, ties by id (docs/decisions/0020). It does not set short
     ends apart: split lists them on their own. The scan page lists its
     cards the same way, but puts short ends after the usable ones and
     before those showing nothing (frontend/src/scan/offered.ts,
     offeredAt)."""
-    open_id, left = opened
     return (left <= 0, left, open_id)
 
 
@@ -464,7 +463,7 @@ def split(
         count = amount / package.size
         forms.sealed.append((package.name, count, amount))
         forms.sealed_by_package[package_id] = count
-    for open_id, amount in sorted(opened, key=fewest_left_first):
+    for open_id, amount in sorted(opened, key=lambda each: fewest_left_first(*each)):
         short = packages[opened_from[open_id]].short_below
         short_end = is_short_end(amount, short)
         (forms.short_ends if short_end else forms.open).append(amount)

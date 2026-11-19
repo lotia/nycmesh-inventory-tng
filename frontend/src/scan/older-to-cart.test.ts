@@ -2,11 +2,11 @@ import { describe, expect, test } from "vitest";
 import { say } from "../shared/i18n";
 import { CATALOGUE } from "../testing/catalogue";
 import {
+  firstOlder,
   KEY,
   keep,
   mixedOlder,
   OTHER_KEY,
-  olderMove,
   onlyOlder,
 } from "../testing/saves";
 import { toBatch } from "./batch";
@@ -36,7 +36,7 @@ function cartHolding(packages: Record<string, string>): Older {
     ...freshCart(),
     lines: [{ itemId: 100, packages, loose: "" }],
   });
-  return readOlder()[0] as Older;
+  return firstOlder();
 }
 
 const retirePackages = (item: Item): Item => ({
@@ -111,7 +111,7 @@ describe("as a cart", () => {
       lines: [{ itemId: 100, packages: {}, loose: "1" }],
       batchKey: KEY,
     });
-    expect(toCart(readOlder()[0] as Older, CATALOGUE).cart.batchKey).toBe(KEY);
+    expect(toCart(firstOlder(), CATALOGUE).cart.batchKey).toBe(KEY);
   });
 
   test.each([
@@ -223,7 +223,7 @@ describe("as a cart", () => {
         { itemId: 999, packages: { 9999: "1" }, loose: "" },
       ],
     });
-    const { cart, gaps } = toCart(readOlder()[0] as Older, CATALOGUE);
+    const { cart, gaps } = toCart(firstOlder(), CATALOGUE);
     expect(cart.lines).toEqual([
       { itemId: 100, packages: { 1000: "1" }, loose: "1", typed: true },
       { itemId: 999, packages: { 9999: "1" }, loose: "", typed: true },
@@ -244,7 +244,7 @@ describe("as a cart", () => {
     // was made at: 2 boxes of 2 are 4, not 2 boxes of today's 4.
     const resized = (lines: unknown[]) => {
       keep("inventory.cart.v1", { ...freshCart(), lines });
-      return toCart(readOlder()[0] as Older, CATALOGUE);
+      return toCart(firstOlder(), CATALOGUE);
     };
     const { cart, gaps, parts } = resized([
       {
@@ -262,7 +262,7 @@ describe("as a cart", () => {
       ["LiteBeam 5AC: 1", null],
       ["LiteBeam 5AC: 4", RESIZED],
     ]);
-    expect(goesBackWhole(readOlder()[0] as Older, CATALOGUE)).toBe(false);
+    expect(goesBackWhole(firstOlder(), CATALOGUE)).toBe(false);
     // A count unread is said as typed; one at today's size, or with no
     // size kept, goes back.
     expect(
@@ -399,7 +399,7 @@ describe("as a cart", () => {
         { packages: {} },
       ],
     });
-    const { cart, gaps } = toCart(readOlder()[0] as Older, CATALOGUE);
+    const { cart, gaps } = toCart(firstOlder(), CATALOGUE);
     expect(cart).toMatchObject({
       kind: "install",
       installNumber: "123",
@@ -428,7 +428,7 @@ describe("as a cart", () => {
           { itemId: 101, packages: {}, loose: "", open: { [KEY]: said } },
         ],
       });
-      const { cart, gaps } = toCart(readOlder()[0] as Older, CATALOGUE);
+      const { cart, gaps } = toCart(firstOlder(), CATALOGUE);
       expect(gaps).toEqual([`Cat6 cable: ${RESCAN}`]);
       // All it held left out, so not put back as an empty line.
       expect(cart.lines).toEqual([]);
@@ -487,7 +487,7 @@ describe("line by line", () => {
         },
       ],
     });
-    const { cart, parts } = toCart(readOlder()[0] as Older, CATALOGUE);
+    const { cart, parts } = toCart(firstOlder(), CATALOGUE);
     expect(parts.map(({ words, note }) => [words, note ?? undefined])).toEqual([
       ["LiteBeam 5AC: 1 × Box", undefined],
       ["LiteBeam 5AC: 2 × a removed package or item", ITEM_RETIRED],
@@ -662,13 +662,9 @@ describe("put back without a tap", () => {
 });
 
 test("an item retired with none left is named, with its packages, never offered", () => {
-  keep("inventory.outbox.v3", [
-    olderMove(
-      {},
-      { lines: [{ item_id: 103, quantity: "4", package_id: 1003 }] },
-    ),
-  ]);
-  const older = readOlder()[0] as Older;
+  const older = onlyOlder({
+    lines: [{ item_id: 103, quantity: "4", package_id: 1003 }],
+  });
   expect(toCart(older, withRetired(CATALOGUE)).cart.lines).toEqual([
     { itemId: 103, packages: { 1003: "2" }, loose: "", typed: true },
   ]);

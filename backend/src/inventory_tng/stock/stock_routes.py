@@ -252,12 +252,16 @@ def reorder_rows(
     (by item, then package) are in the stores; `short`, items less than
     nothing somewhere there. Low packages are listed as the stock page
     lists sealed ones (open_packages.largest_first)."""
+    kept = [
+        package
+        for package in packages
+        if package.minimum_sealed is not None and package.retired_at is None
+    ]
     minimums: dict[int, list[ItemPackage]] = {}
     for package in sorted(
-        packages, key=lambda each: open_packages.largest_first(each.id, each.size)
+        kept, key=lambda each: open_packages.largest_first(each.id, each.size)
     ):
-        if package.minimum_sealed is not None and package.retired_at is None:
-            minimums.setdefault(package.item_id, []).append(package)
+        minimums.setdefault(package.item_id, []).append(package)
     rows = []
     for item in items:
         in_stock = usable.get(item.id, Decimal(0))

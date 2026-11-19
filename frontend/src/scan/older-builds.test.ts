@@ -3,6 +3,7 @@ import { say } from "../shared/i18n";
 import { KEY_REUSED, noteOf, SOME_NOT_RECORDED } from "../shared/outbox-notes";
 import { CATALOGUE } from "../testing/catalogue";
 import {
+  firstOlder,
   KEY,
   keep,
   mixedOlder,
@@ -267,7 +268,7 @@ describe("removing one", () => {
       olderMove(),
       olderMove({ state: "saved" }, { key: "c" }),
     ]);
-    expect(removeOlder(readOlder()[0] as Older)).toBe("done");
+    expect(removeOlder(firstOlder())).toBe("done");
     expect(localStorage.getItem("inventory.outbox.v3")).toBeNull();
   });
 
@@ -289,7 +290,7 @@ describe("removing one", () => {
       build,
       entries: [olderMove({ state: "too_old", build })],
     });
-    expect(removeOlder(readOlder()[0] as Older)).toBe("done");
+    expect(removeOlder(firstOlder())).toBe("done");
     expect(
       JSON.parse(localStorage.getItem("inventory.outbox.v5") ?? ""),
     ).toEqual({ build, entries: [] });
@@ -334,9 +335,7 @@ describe("removing one", () => {
       olderMove(),
       olderMove({}, { key: OTHER_KEY }),
     ]);
-    expect(removeOlder(readOlder()[0] as Older, refusing("setItem"))).toBe(
-      "not_kept",
-    );
+    expect(removeOlder(firstOlder(), refusing("setItem"))).toBe("not_kept");
   });
 });
 
@@ -464,7 +463,7 @@ describe("line by line", () => {
       },
     ]);
     // The report too, by its place.
-    const again = readOlder()[0] as Older;
+    const again = firstOlder();
     const report = toCart(again, CATALOGUE).parts.at(-1);
     expect(dropPart(again, report?.drop ?? [], CATALOGUE)).toBe("done");
     expect(stored()[0].body.used_up).toEqual([]);
@@ -499,10 +498,7 @@ describe("line by line", () => {
         olderMove({}, { lines: [{ item_id: 101, quantity: "2" }] }),
       ],
     });
-    keep("inventory.outbox.v3", [
-      olderMove({}, { lines: "many", used_up: [KEY, OTHER_KEY] }),
-    ]);
-    const lost = readOlder()[0] as Older;
+    const lost = onlyOlder({ lines: "many", used_up: [KEY, OTHER_KEY] });
     const [report] = toCart(lost, CATALOGUE).parts;
     expect(dropPart(lost, report?.drop ?? [], CATALOGUE)).toBe("done");
     expect(stored()[0].body).toMatchObject({
@@ -519,7 +515,7 @@ describe("line by line", () => {
       open: { [KEY]: { amount: "3" }, [OTHER_KEY]: { usedUp: true } },
     };
     keep("inventory.cart.v1", { ...freshCart(), lines: [line] });
-    const older = readOlder()[0] as Older;
+    const older = firstOlder();
     const taken = toCart(older, CATALOGUE).parts.find(
       (part) => part.words === "Cat6 cable: 3 m from an open package",
     );
@@ -554,7 +550,7 @@ describe("line by line", () => {
       picked: 4,
     };
     keep("inventory.cart.v1", { ...freshCart(), lines: [line] });
-    const listedCart = readOlder()[0] as Older;
+    const listedCart = firstOlder();
     const [back, gone] = toCart(listedCart, CATALOGUE).parts;
     expect(gone?.note).toBe(say(ITEM_RETIRED));
     expect(dropPart(listedCart, gone?.drop ?? [], CATALOGUE)).toBe("done");
@@ -566,7 +562,7 @@ describe("line by line", () => {
       ...freshCart(),
       lines: [line, { itemId: 101, packages: {}, loose: "1" }],
     });
-    const two = readOlder()[0] as Older;
+    const two = firstOlder();
     const parts = toCart(two, CATALOGUE).parts;
     expect(back?.words).toBe("LiteBeam 5AC: 1 × Box, 3 loose");
     expect(dropPart(two, parts[0]?.drop ?? [], CATALOGUE)).toBe("done");
@@ -575,7 +571,7 @@ describe("line by line", () => {
       { ...line, packages: { 1004: "2" }, loose: "" },
       { itemId: 101, packages: {}, loose: "1" },
     ]);
-    const left = readOlder()[0] as Older;
+    const left = firstOlder();
     expect(
       dropPart(left, toCart(left, CATALOGUE).parts[0]?.drop ?? [], CATALOGUE),
     ).toBe("done");
@@ -596,7 +592,7 @@ describe("line by line", () => {
       ...freshCart(),
       lines: [{ itemId: 100, packages: { 1004: "2" }, loose: "" }],
     });
-    const cart = readOlder()[0] as Older;
+    const cart = firstOlder();
     expect(
       dropPart(cart, toCart(cart, CATALOGUE).parts[0]?.drop ?? [], CATALOGUE),
     ).toBe("done");
@@ -615,7 +611,7 @@ describe("line by line", () => {
       const [gone] = toCart(older, CATALOGUE).parts;
       expect(dropPart(older, gone?.drop ?? [], CATALOGUE)).toBe("done");
       expect(stored()[0].body.lines).toEqual(unread);
-      const left = readOlder()[0] as Older;
+      const left = firstOlder();
       expect(toCart(left, CATALOGUE)).toMatchObject({
         lost: unreadWords(1),
         parts: [],
@@ -624,10 +620,7 @@ describe("line by line", () => {
   );
 
   test("one whose lines are lost stays, saying so, once its last report is discarded", () => {
-    keep("inventory.outbox.v3", [
-      olderMove({}, { lines: "many", used_up: [KEY] }),
-    ]);
-    const older = readOlder()[0] as Older;
+    const older = onlyOlder({ lines: "many", used_up: [KEY] });
     const [report] = toCart(older, CATALOGUE).parts;
     expect(dropPart(older, report?.drop ?? [], CATALOGUE)).toBe("done");
     expect(stored()[0].body).toMatchObject({ lines: "many", used_up: [] });
@@ -644,7 +637,7 @@ describe("line by line", () => {
     const [retired] = toCart(older, named).parts;
     expect(retired?.words).toBe("NanoStation M5: 2 × Pair");
     expect(dropPart(older, retired?.drop ?? [], CATALOGUE)).toBe("done");
-    expect(goesBackWhole(readOlder()[0] as Older, CATALOGUE)).toBe(true);
+    expect(goesBackWhole(firstOlder(), CATALOGUE)).toBe(true);
   });
 
   test("one changed meanwhile, or a browser that will not keep the change, keeps it", () => {

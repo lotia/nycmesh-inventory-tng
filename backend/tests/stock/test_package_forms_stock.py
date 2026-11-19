@@ -48,7 +48,7 @@ def test_an_items_open_packages_are_ordered_fewest_left_first() -> None:
     those showing nothing or less last (Ali, 2026-11-18, inventory-tng-qskv),
     whatever order the balances arrive in."""
     opened = [(9, Decimal(40)), (4, Decimal(-8)), (7, Decimal(40)), (5, Decimal(120))]
-    assert sorted(opened, key=open_packages.fewest_left_first) == [
+    assert sorted(opened, key=lambda each: open_packages.fewest_left_first(*each)) == [
         (7, Decimal(40)),
         (9, Decimal(40)),
         (5, Decimal(120)),
