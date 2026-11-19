@@ -51,27 +51,17 @@ const PACKAGES_RETIRED = {
 };
 
 describe("as a cart", () => {
-  const only = (save: unknown) => {
-    keep("inventory.outbox.v3", [save]);
-    return readOlder()[0] as Older;
-  };
-
   test("a batch's lines go back by item: whole packages as packages, the rest loose", () => {
     const { cart, gaps } = toCart(
-      only(
-        olderMove(
-          {},
-          {
-            lines: [
-              { item_id: 100, quantity: "8.000", package_id: 1000 },
-              { item_id: 100, quantity: "1" },
-              // Not whole boxes of 4, so loose, for the cart to question.
-              { item_id: 100, quantity: "2", package_id: 1000 },
-              { item_id: 101, quantity: 3.5 },
-            ],
-          },
-        ),
-      ),
+      onlyOlder({
+        lines: [
+          { item_id: 100, quantity: "8.000", package_id: 1000 },
+          { item_id: 100, quantity: "1" },
+          // Not whole boxes of 4, so loose, for the cart to question.
+          { item_id: 100, quantity: "2", package_id: 1000 },
+          { item_id: 101, quantity: 3.5 },
+        ],
+      }),
       CATALOGUE,
     );
     expect(cart).toMatchObject({
@@ -89,11 +79,11 @@ describe("as a cart", () => {
   });
 
   test("a save's cart keeps its batch key, to be sent under; a cart's has none", () => {
-    expect(toCart(only(olderMove()), CATALOGUE).cart.batchKey).toBe(KEY);
+    expect(toCart(onlyOlder(), CATALOGUE).cart.batchKey).toBe(KEY);
     // A key no build made is not sent: the outbox gives a new one.
-    expect(
-      toCart(only(olderMove({}, { key: "c" })), CATALOGUE).cart,
-    ).not.toHaveProperty("batchKey");
+    expect(toCart(onlyOlder({ key: "c" }), CATALOGUE).cart).not.toHaveProperty(
+      "batchKey",
+    );
     keep("inventory.cart.v1", {
       ...freshCart(),
       lines: [{ itemId: 100, packages: {}, loose: "1" }],
@@ -103,15 +93,15 @@ describe("as a cart", () => {
   });
 
   test("one put back under its key keeps what it went back with, sent as what it was changed from; one without a key keeps none (inventory-tng-0gg)", () => {
-    const { cart } = toCart(only(olderMove()), CATALOGUE);
+    const { cart } = toCart(onlyOlder(), CATALOGUE);
     expect(cart.changedFrom).toEqual([{ item_id: 101, quantity: "2" }]);
     const batch = toBatch(addOne(cart, 101), CATALOGUE);
     expect(batch).toMatchObject({
       draft: { changed_from: [{ item_id: 101, quantity: "2" }] },
     });
-    expect(
-      toCart(only(olderMove({}, { key: "c" })), CATALOGUE).cart,
-    ).not.toHaveProperty("changedFrom");
+    expect(toCart(onlyOlder({ key: "c" }), CATALOGUE).cart).not.toHaveProperty(
+      "changedFrom",
+    );
   });
 
   test("a cart a save filled keeps that save's key, to be sent under", () => {
@@ -139,28 +129,23 @@ describe("as a cart", () => {
   ])(
     "a save refused for its key (%s) goes back without it, as the inventory holds it for another",
     (_name, why) => {
-      const refused = only(olderMove({ state: "refused", ...why }));
+      const refused = onlyOlder({}, { state: "refused", ...why });
       expect(toCart(refused, CATALOGUE).cart).not.toHaveProperty("batchKey");
       // Refused for anything else, the key never took it: kept.
-      const invalid = only(olderMove({ state: "refused", note: "Not saved." }));
+      const invalid = onlyOlder({}, { state: "refused", note: "Not saved." });
       expect(toCart(invalid, CATALOGUE).cart.batchKey).toBe(KEY);
     },
   );
 
   test("what the cart cannot hold is told, to do again", () => {
     const { cart, gaps } = toCart(
-      only(
-        olderMove(
-          {},
-          {
-            lines: [
-              { item_id: 101, quantity: "5", open_package_key: OTHER_KEY },
-              { item_id: "cable", quantity: "1" },
-            ],
-            lengths: [{ open_package_key: OTHER_KEY, left: "10" }],
-          },
-        ),
-      ),
+      onlyOlder({
+        lines: [
+          { item_id: 101, quantity: "5", open_package_key: OTHER_KEY },
+          { item_id: "cable", quantity: "1" },
+        ],
+        lengths: [{ open_package_key: OTHER_KEY, left: "10" }],
+      }),
       CATALOGUE,
     );
     // The take is not put back as its item's empty line.
@@ -175,18 +160,13 @@ describe("as a cart", () => {
 
   test("lines that cannot be read are counted, and an item gone kept", () => {
     const { cart, gaps } = toCart(
-      only(
-        olderMove(
-          {},
-          {
-            lines: [
-              { item_id: 101, quantity: "lots" },
-              { item_id: 101, quantity: 0.30000000000000004 },
-              { item_id: 999, quantity: "2", open_package_key: OTHER_KEY },
-            ],
-          },
-        ),
-      ),
+      onlyOlder({
+        lines: [
+          { item_id: 101, quantity: "lots" },
+          { item_id: 101, quantity: 0.30000000000000004 },
+          { item_id: 999, quantity: "2", open_package_key: OTHER_KEY },
+        ],
+      }),
       CATALOGUE,
     );
     // An unread line's item goes back, to count again; a take does not.
@@ -199,29 +179,24 @@ describe("as a cart", () => {
 
   test("a package no longer offered is neither counted loose nor dropped, but told", () => {
     const { cart, gaps } = toCart(
-      only(
-        olderMove(
-          {},
+      onlyOlder({
+        lines: [
+          // A box retired with none sealed left: 4 loose is not what
+          // was moved.
+          { item_id: 100, quantity: "4", package_id: 1004 },
+          { item_id: 100, quantity: "2", package_id: 1003 },
+          { item_id: 100, quantity: "8", package_id: 1000 },
+          // Resized since: said apart, each once for the save.
           {
-            lines: [
-              // A box retired with none sealed left: 4 loose is not what
-              // was moved.
-              { item_id: 100, quantity: "4", package_id: 1004 },
-              { item_id: 100, quantity: "2", package_id: 1003 },
-              { item_id: 100, quantity: "8", package_id: 1000 },
-              // Resized since: said apart, each once for the save.
-              {
-                item_id: 100,
-                quantity: "4",
-                package_id: 1000,
-                package_size: 2,
-              },
-              // An item gone is named apart (withRetired), as it was.
-              { item_id: 999, quantity: "2", package_id: 9999 },
-            ],
+            item_id: 100,
+            quantity: "4",
+            package_id: 1000,
+            package_size: 2,
           },
-        ),
-      ),
+          // An item gone is named apart (withRetired), as it was.
+          { item_id: 999, quantity: "2", package_id: 9999 },
+        ],
+      }),
       CATALOGUE,
     );
     expect(cart.lines).toEqual([
@@ -312,12 +287,7 @@ describe("as a cart", () => {
 
   test("a package retired with some left is still offered: counted, not told", () => {
     const { cart, gaps } = toCart(
-      only(
-        olderMove(
-          {},
-          { lines: [{ item_id: 100, quantity: "8", package_id: 1000 }] },
-        ),
-      ),
+      onlyOlder({ lines: [{ item_id: 100, quantity: "8", package_id: 1000 }] }),
       PACKAGES_RETIRED,
     );
     expect(cart.lines).toEqual([
@@ -327,40 +297,32 @@ describe("as a cart", () => {
   });
 
   test("lines that cannot be read even as a list are not counted", () => {
-    const { cart, gaps } = toCart(
-      only(olderMove({}, { lines: "many" })),
-      CATALOGUE,
-    );
+    const { cart, gaps } = toCart(onlyOlder({ lines: "many" }), CATALOGUE);
     expect(cart.lines).toEqual([]);
     expect(gaps).toEqual([say(LINES_LOST)]);
   });
 
   test("a package resized since is not counted again in today's size", () => {
     const { cart, gaps } = toCart(
-      only(
-        olderMove(
-          {},
+      onlyOlder({
+        lines: [
+          // Two boxes of 2, which hold 4 now: neither one box nor 4
+          // loose is what was moved.
           {
-            lines: [
-              // Two boxes of 2, which hold 4 now: neither one box nor 4
-              // loose is what was moved.
-              {
-                item_id: 100,
-                quantity: "4",
-                package_id: 1000,
-                package_size: "2",
-              },
-              // The size it was saved in is the size now.
-              {
-                item_id: 100,
-                quantity: "8",
-                package_id: 1000,
-                package_size: 4,
-              },
-            ],
+            item_id: 100,
+            quantity: "4",
+            package_id: 1000,
+            package_size: "2",
           },
-        ),
-      ),
+          // The size it was saved in is the size now.
+          {
+            item_id: 100,
+            quantity: "8",
+            package_id: 1000,
+            package_size: 4,
+          },
+        ],
+      }),
       CATALOGUE,
     );
     expect(cart.lines).toEqual([
@@ -371,29 +333,24 @@ describe("as a cart", () => {
 
   test("an opening's packages go back as packages to open", () => {
     const { cart } = toCart(
-      only(
-        olderMove(
-          {},
+      onlyOlder({
+        kind: "open",
+        to_location_id: 10,
+        lines: [
           {
-            kind: "open",
-            to_location_id: 10,
-            lines: [
-              {
-                item_id: 101,
-                quantity: "305",
-                package_id: 1001,
-                open_package_key: KEY,
-              },
-              {
-                item_id: 101,
-                quantity: "305",
-                package_id: 1001,
-                open_package_key: OTHER_KEY,
-              },
-            ],
+            item_id: 101,
+            quantity: "305",
+            package_id: 1001,
+            open_package_key: KEY,
           },
-        ),
-      ),
+          {
+            item_id: 101,
+            quantity: "305",
+            package_id: 1001,
+            open_package_key: OTHER_KEY,
+          },
+        ],
+      }),
       CATALOGUE,
     );
     expect(cart).toMatchObject({
@@ -404,12 +361,7 @@ describe("as a cart", () => {
 
   test("a report, or no kind, keeps the cart's; places and names gone from the catalogue are cleared", () => {
     const { cart } = toCart(
-      only(
-        olderMove(
-          {},
-          { kind: "report", volunteer_id: 99, from_location_id: 98 },
-        ),
-      ),
+      onlyOlder({ kind: "report", volunteer_id: 99, from_location_id: 98 }),
       CATALOGUE,
       { ...freshCart(), kind: "install", volunteerId: 2 },
     );

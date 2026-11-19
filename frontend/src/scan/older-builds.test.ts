@@ -26,14 +26,11 @@ import {
 } from "./older-builds";
 import {
   goesBackWhole,
-  ITEM_RETIRED as ITEM_RETIRED_PHRASE,
+  ITEM_RETIRED,
   toCart,
   unreadWords,
   withRetired,
 } from "./older-to-cart";
-
-/** In Ali's words (inventory-tng-0su), without "Sorry." (inventory-tng-93z). */
-const ITEM_RETIRED = say(ITEM_RETIRED_PHRASE);
 
 const listed = () =>
   readOlder().map(({ key, batch, refused }) => ({ key, batch, refused }));
@@ -374,14 +371,9 @@ describe("a browser that will not let it at storage", () => {
 });
 
 describe("as a cart", () => {
-  const only = (save: unknown) => {
-    keep("inventory.outbox.v3", [save]);
-    return readOlder()[0] as Older;
-  };
-
   test("why one was refused is read as a code, and said as kept, or from its code", () => {
     const refusedFor = (why: object) =>
-      only(olderMove({ state: "refused", ...why })).refused;
+      onlyOlder({}, { state: "refused", ...why }).refused;
     // Main's words: its key's, said as kept.
     const mainKey =
       "Not saved: its key was already used for a different batch. Please report this.";
@@ -564,7 +556,7 @@ describe("line by line", () => {
     keep("inventory.cart.v1", { ...freshCart(), lines: [line] });
     const listedCart = readOlder()[0] as Older;
     const [back, gone] = toCart(listedCart, CATALOGUE).parts;
-    expect(gone?.note).toBe(ITEM_RETIRED);
+    expect(gone?.note).toBe(say(ITEM_RETIRED));
     expect(dropPart(listedCart, gone?.drop ?? [], CATALOGUE)).toBe("done");
     // No field added that it never had: an older build still reads it.
     expect(stored("inventory.cart.v1").lines).toEqual([
