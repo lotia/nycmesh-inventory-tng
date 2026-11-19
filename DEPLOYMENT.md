@@ -47,10 +47,10 @@ required, and for migrations only `MIGRATION_DATABASE_URL`.
   address and scheme come from its headers.
 - `RATE_LIMIT_PER_ADDRESS`: attempts from one address in a minute at signing
   in, setup, recovery, and asking for or using a reset link, each counted
-  apart. `RATE_LIMIT_PER_ACCOUNT`: codes for one administrator in the
-  window `admins/accounts.py` gives it (`_per_account`), or their password
-  where it stands in for one, at signing in and to confirm. Each is
-  `core/settings.py`'s default unless set (`RateLimits`). Leave both unset
+  apart. `RATE_LIMIT_PER_ACCOUNT`: codes for one administrator in
+  `_per_account`'s window (`admins/accounts.py`), or their password where it
+  stands in for one, at signing in and to confirm. Both are
+  `core/settings.py`'s defaults unless set (`RateLimits`). Leave both unset
   in production: they are raised for the browser tests, which sign in and
   confirm many times over.
 - `RATE_LIMIT_PAGE_REPORTS`: reports the scan and register pages send of
@@ -185,16 +185,15 @@ against the same limit.
 
 Each process (one per pod, or each of `--workers`) holds connections to
 PostgreSQL in three pools, none of whose connections ever waits for another
-from a pool that waits on it: one for requests, which opens more under load;
-one for recording when a device or administrator was last seen and for work
-after the reply (such as a reset email); and one for attempts counted against
-a rate limit. Their sizes are constants at the top of `core/db_sessions.py`:
-`POOL` and `OVERFLOW` for requests, `SIDE_POOL` and `SIDE_OVERFLOW`, and
-`LIMITS_POOL` and `LIMITS_OVERFLOW`. Only as many requests as the request pool
-and its overflow use the database at once; the rest wait their turn, holding
-nothing, and one that waits `POOL_TIMEOUT` seconds answers 503, as does one
-that waits that long to count an attempt against a rate limit; one that waits
-that long to record when it was last seen goes on without. Each is counted as
+from a pool that waits on it, each sized by constants in `core/db_sessions.py`:
+requests (`POOL`, and `OVERFLOW` more under load); recording when a device or
+administrator was last seen, and work after the reply such as a reset email
+(`SIDE_POOL`, `SIDE_OVERFLOW`); and attempts counted against a rate limit
+(`LIMITS_POOL`, `LIMITS_OVERFLOW`). At most `POOL` + `OVERFLOW` requests use
+the database at once; the rest wait their turn, holding nothing. One that
+waits `POOL_TIMEOUT` seconds for a connection answers 503, as does one that
+waits that long to count an attempt against a rate limit; one that waits that
+long to record when it was last seen goes on without. Each is counted as
 `db.client.connection.timeouts`, by pool, and `db.client.connection.count` shows
 each pool's connections in use. An error logged as "connection taken out of pool
 order" is a bug that could let the pools wait on themselves: report it.
@@ -205,10 +204,10 @@ when it was last seen is skipped instead), and a migration stuck behind the
 running app's work fails rather than hold up every query after it, so run it
 again.
 
-Count the total before scaling: processes × the sum of those six constants,
-plus one for a migration, must stay under PostgreSQL's `max_connections`, less
-its `superuser_reserved_connections`, kept for superusers and CloudNativePG's
-own. `SHOW max_connections;` and `SHOW superuser_reserved_connections;` in
+Before scaling, check that processes × the sum of the six pool constants, plus
+one for a migration, stays under PostgreSQL's `max_connections` less its
+`superuser_reserved_connections` (kept for superusers and CloudNativePG's
+own). `SHOW max_connections;` and `SHOW superuser_reserved_connections;` in
 `psql` give both.
 
 ## Tightening what a batch accepts
