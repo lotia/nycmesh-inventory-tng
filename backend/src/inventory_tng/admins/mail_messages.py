@@ -54,28 +54,28 @@ def _invited() -> str:
 
 def codes_running_low(left: int) -> str:
     return ngettext(
-        "Only %(num)d is left: make new ones from your account page soon, with "
+        "Only %(num)s is left: make new ones from your account page soon, with "
         "a code from your authenticator.",
-        "Only %(num)d are left: make new ones from your account page soon, with "
+        "Only %(num)s are left: make new ones from your account page soon, with "
         "a code from your authenticator.",
         left,
     )
 
 
 def codes_left(left: int) -> str:
-    return ngettext("%(num)d is left.", "%(num)d are left.", left)
+    return ngettext("%(num)s is left.", "%(num)s are left.", left)
 
 
 def days(num: int) -> str:
-    return ngettext("%(num)d day", "%(num)d days", num)
+    return ngettext("%(num)s day", "%(num)s days", num)
 
 
 def hours(num: int) -> str:
-    return ngettext("%(num)d hour", "%(num)d hours", num)
+    return ngettext("%(num)s hour", "%(num)s hours", num)
 
 
 def minutes(num: int) -> str:
-    return ngettext("%(num)d minute", "%(num)d minutes", num)
+    return ngettext("%(num)s minute", "%(num)s minutes", num)
 
 
 def reset_link(to: str, admin_id: int, link: str) -> Message:

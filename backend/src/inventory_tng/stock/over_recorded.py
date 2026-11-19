@@ -34,7 +34,7 @@ from inventory_tng.models.stock import (
     OverRecorded,
 )
 from inventory_tng.stock import adjustment_reasons, counts, ledger, moments
-from inventory_tng.web.formatting import amount
+from inventory_tng.web.formatting import plain_amount
 
 log = structlog.get_logger(__name__)
 meter = metrics.get_meter(__name__)
@@ -125,7 +125,7 @@ def seen(row: OverRecorded) -> str:
     later batch may say another amount meanwhile, and a count may put one
     of its ends right, so Correct would write only the other."""
     ends = (("left", row.left_count_id), ("arrived", row.arrived_count_id))
-    return " ".join([amount(row.quantity), *(end for end, by in ends if by)])
+    return " ".join([plain_amount(row.quantity), *(end for end, by in ends if by)])
 
 
 # The open package an opening arrived in, outer-joined to say if it closed

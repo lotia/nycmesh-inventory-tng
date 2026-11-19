@@ -9,13 +9,16 @@ with them. A template says its words in `{% trans %}`. Either way a message
 formats its values as `%(name)s`, always, so a literal per cent is `%%`.
 A context (`pgettext`) only where the same English means two things, from
 the fixed list in CONTRIBUTING.md (Phrases). A number people read is
-written as the locale writes it (`number`, a template's `| number`).
+written as the locale writes it (`number`, a template's `| number`), a
+plural's count too.
 """
 
 from collections.abc import Callable, Generator
 from contextlib import contextmanager
+from decimal import Decimal
 from io import BytesIO
 from pathlib import Path
+from typing import Any, cast
 
 from babel import localedata
 from babel.messages.catalog import Catalog
@@ -23,7 +26,8 @@ from babel.messages.mofile import write_mo
 from babel.messages.pofile import read_po
 from babel.numbers import format_decimal
 from babel.support import LazyProxy, Translations
-from jinja2 import Environment
+from jinja2 import Environment, pass_context
+from jinja2.runtime import Context
 from sqlalchemy import BindParameter, String, bindparam
 
 # The app's name: a name, not a phrase, so the same in every language, and
@@ -77,17 +81,38 @@ def pgettext(context: str, message: str, **values: object) -> str:
 
 
 def ngettext(singular: str, plural: str, num: int, **values: object) -> str:
-    """The form for `num` in the active locale, with `%(num)d` filled."""
-    return _active.ngettext(singular, plural, num) % ({"num": num} | values)
+    """The form for `num` in the active locale, with `%(num)s` filled with
+    it as the locale writes it."""
+    return _active.ngettext(singular, plural, num) % ({"num": number(num)} | values)
 
 
-def number(value: int) -> str:
+def number(value: int | Decimal) -> str:
     """`value` as the active locale writes it, such as 1,000 in English and
     1.000 in German: its catalogue's language, English if it names none
-    Babel knows (a pseudo-locale's, such as en_XA)."""
+    Babel knows (a pseudo-locale's, such as en_XA). A decimal keeps every
+    digit it has, never rounded."""
     language = _active.info().get("language")
     known = language if language and localedata.exists(language) else "en"
-    return format_decimal(value, locale=known)
+    return format_decimal(value, locale=known, decimal_quantization=False)
+
+
+def _counts_written(say_plural: Callable[..., str]) -> Callable[..., str]:
+    """Jinja's ngettext, `say_plural`, writing the count as the locale does,
+    as `num` and under the name the template gave it (`{% trans
+    count=... %}`), while the form is still chosen by the number."""
+
+    @pass_context
+    def say(
+        context: Context, singular: str, plural: str, num: int, **values: object
+    ) -> str:
+        written = number(num)
+        values = {
+            name: written if type(value) is int and value == num else value
+            for name, value in values.items()
+        }
+        return say_plural(context, singular, plural, num, **({"num": written} | values))
+
+    return say
 
 
 # A phrase as code holds it: said already, or a lazy one said when shown.
@@ -132,3 +157,5 @@ def install(environment: Environment) -> None:
             context, singular, plural, num
         ),
     )
+    callables = cast(dict[str, Any], environment.globals)
+    callables["ngettext"] = _counts_written(callables["ngettext"])

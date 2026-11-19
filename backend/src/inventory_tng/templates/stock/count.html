@@ -46,7 +46,7 @@ if you didn't count it. Anything else here, add below.{% endtrans %}</p>
       <td>{{ row.amount | amount }}{% if not row.field.startswith("sealed_") %} {{ item.unit }}{% endif %}</td>
       {% if recount %}<td></td>{% endif %}
       {%- set hint = item.unit | printed_length if row.open_id else "" %}
-      <td><input name="{{ row.field }}" inputmode="decimal" value="{{ values.get(row.field, row.amount | amount if row.amount > 0 else '0') }}" aria-label="{{ item.name_shown }}, {{ row.words }}"{% if hint %} aria-describedby="hint-{{ row.field }}"{% endif %}>
+      <td><input name="{{ row.field }}" inputmode="decimal" value="{{ values.get(row.field, row.amount | plain_amount if row.amount > 0 else '0') }}" aria-label="{{ item.name_shown }}, {{ row.words }}"{% if hint %} aria-describedby="hint-{{ row.field }}"{% endif %}>
         {% if row.open_id %}
         <select name="state_{{ row.open_id }}" aria-label="{% trans item=item.name_shown, form=row.words %}{{ item }}, {{ form }}: is it here?{% endtrans %}">
           {% set state = values.get("state_" ~ row.open_id, "here") %}
@@ -67,7 +67,7 @@ if you didn't count it. Anything else here, add below.{% endtrans %}</p>
       {% if recount %}{% set typed, came, went = recount[item.id] %}
       <td>{% trans came=came | amount, went=went | amount, typed=typed | amount %}{{ came }} in, {{ went }} out; you typed {{ typed }}{% endtrans %}</td>
       {% endif %}
-      <td><input name="{{ field }}" inputmode="decimal" value="{{ values.get(field, amount | amount if amount > 0 else '0') }}" aria-label="{% trans item=item.name_shown %}{{ item }} counted{% endtrans %}">
+      <td><input name="{{ field }}" inputmode="decimal" value="{{ values.get(field, amount | plain_amount if amount > 0 else '0') }}" aria-label="{% trans item=item.name_shown %}{{ item }} counted{% endtrans %}">
         {% with name = field %}{% include "_field_problem.html" %}{% endwith %}</td>
     </tr>
     {% endif %}

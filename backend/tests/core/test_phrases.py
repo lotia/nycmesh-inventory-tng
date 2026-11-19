@@ -824,8 +824,8 @@ def test_a_lazy_phrase_is_said_in_the_locale_active_when_shown() -> None:
 def test_values_fill_their_placeholders_and_a_double_per_cent_is_one() -> None:
     assert gettext("%(n)s of %(m)s", n=1, m=2) == "1 of 2"
     assert gettext("Half: 50%%") == "Half: 50%"
-    assert ngettext("%(num)d box", "%(num)d boxes", 2) == "2 boxes"
-    assert ngettext("%(num)d %(what)s", "%(num)d %(what)ss", 1, what="box") == "1 box"
+    assert ngettext("%(num)s box", "%(num)s boxes", 2) == "2 boxes"
+    assert ngettext("%(num)s %(what)s", "%(num)s %(what)ss", 1, what="box") == "1 box"
     assert str(lazy_gettext("Half: 50%%")) == "Half: 50%"
 
 
@@ -858,7 +858,7 @@ def test_a_count_is_said_as_a_plural() -> None:
     counts = {
         "%(count)s listed.",
         "All %(count)s",
-        "Revoke %(num)d",
+        "Revoke %(num)s",
     }
     plurals = {m.id[0] for m in read(ENGLISH_PO) if isinstance(m.id, tuple)}
     assert counts <= plurals
@@ -887,6 +887,58 @@ def test_a_language_babel_does_not_know_writes_numbers_as_english() -> None:
     header = 'msgid ""\nmsgstr ""\n"Language: en_XA\\n"\n'
     with speaking(compiled(read_po(StringIO(header)))):
         assert number(1000) == "1,000"
+
+
+GERMAN = compiled(Catalog(locale="de"))
+
+
+def items_page(total: int) -> str:
+    """catalogue/items.html, its list summing up `total` items."""
+    return signed_in(
+        "catalogue/items.html",
+        listing=listing(total=total, narrowed=False, search="", show="current"),
+        all_categories=[],
+        category_names={},
+        categories=[],
+        units=[],
+        values={},
+        problems={},
+        here="/here",
+        units_read=lambda typed: [],
+        shown_as=lambda typed, sent: "",
+    )
+
+
+def test_a_count_is_written_as_the_locale_writes_it_its_form_chosen_by_number() -> None:
+    """A plural's count, in Python and in a template, whether named count
+    or num (inventory-tng-31q3)."""
+    revoke = {"filter": {}, "keep": "/", "here": "/"}
+    many = [SimpleNamespace(id=1, name=NOT_ENGLISH)] * 1000
+    hint = "admins/_password_hint.html"
+    assert retired_holding(1000) == "1,000 retired places hold stock"
+    assert retired_holding(1) == "1 retired place holds stock"
+    assert "1,000 items" in words_shown(items_page(1000))
+    assert "1 item" in words_shown(items_page(1))
+    assert "Revoke 1,000" in signed_in(
+        "devices/device_revoke.html", devices=many, **revoke
+    )
+    assert "at least 1 character<" in render(
+        hint, limits=SimpleNamespace(password_min=1)
+    )
+    with speaking(GERMAN):
+        assert retired_holding(1000) == "1.000 retired places hold stock"
+        assert "1.000 items" in words_shown(items_page(1000))
+        assert "at least 1.000 characters" in render(
+            hint, limits=SimpleNamespace(password_min=1000)
+        )
+        assert mail_messages.days(1000) == "1.000 days"
+
+
+def test_a_badge_counts_as_the_locale_writes_numbers() -> None:
+    badge = SimpleNamespace(count=1000, words=NOT_ENGLISH)
+    sections = [("/admin/stock", NOT_ENGLISH, badge)]
+    page = render("_masthead.html", **(SIGNED_IN | {"sections": sections}))
+    assert '<span aria-hidden="true">1,000</span>' in page
 
 
 def test_a_lists_all_is_said_in_the_locale() -> None:
@@ -931,7 +983,7 @@ def test_the_walk_reads_the_words_an_attribute_says() -> None:
 
 def test_a_lone_per_cent_is_found() -> None:
     assert lone_per_cents("Half: 50%") == ["%"]
-    assert lone_per_cents("%(num)d of 50%%") == []
+    assert lone_per_cents("%(num)s of 50%%") == []
 
 
 def test_no_message_has_a_lone_per_cent() -> None:

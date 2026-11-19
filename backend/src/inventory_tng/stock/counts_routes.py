@@ -123,8 +123,8 @@ def moved_meanwhile(saved: int) -> str:
     if not saved:
         return gettext("These moved while you counted, so count them again.")
     return ngettext(
-        "Saved %(num)d line. These moved while you counted, so count them again.",
-        "Saved %(num)d lines. These moved while you counted, so count them again.",
+        "Saved %(num)s line. These moved while you counted, so count them again.",
+        "Saved %(num)s lines. These moved while you counted, so count them again.",
         saved,
     )
 

@@ -36,8 +36,8 @@ SECTION_SETTINGS = lazy_gettext("Site settings")
 def retired_holding(places: int) -> str:
     """How many retired places hold stock, in words."""
     return ngettext(
-        "%(num)d retired place holds stock",
-        "%(num)d retired places hold stock",
+        "%(num)s retired place holds stock",
+        "%(num)s retired places hold stock",
         places,
     )
 

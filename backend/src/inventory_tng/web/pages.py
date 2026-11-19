@@ -18,7 +18,7 @@ from starlette.types import Scope
 from inventory_tng.core.db_errors import Gone
 from inventory_tng.core.local_time import show, show_day
 from inventory_tng.core.phrases import BRAND, install, lazy_gettext, number
-from inventory_tng.web.formatting import amount, printed_length
+from inventory_tng.web.formatting import amount, plain_amount, printed_length
 from inventory_tng.web.navigation import sections
 
 templates = Jinja2Templates(directory=Path(__file__).parent.parent / "templates")
@@ -46,7 +46,11 @@ def csp_nonce(request: Request) -> str | None:
 cast(dict[str, Any], templates.env.globals)["csp_nonce"] = csp_nonce
 
 
+# {{ quantity | amount }}: a quantity as people read it ("1,234.5"); a
+# form's box or hidden field takes {{ quantity | plain_amount }} ("1234.5"),
+# as the form reads it back.
 templates.env.filters["amount"] = amount
+templates.env.filters["plain_amount"] = plain_amount
 templates.env.filters["printed_length"] = printed_length
 
 

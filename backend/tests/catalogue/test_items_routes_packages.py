@@ -345,3 +345,33 @@ def test_packages_are_listed_current_first_then_smallest_ties_by_id(
     small = add(session, ItemPackage(item_id=item.id, name="Small", size=Decimal(2)))
     listed = queries.packages_of_item(session, item.id)
     assert listed == [small, first, second, old]
+
+
+def test_an_items_amounts_read_grouped_but_its_boxes_hold_them_plainly(
+    admin_client: TestClient, session: Session, radios: Category
+) -> None:
+    """Shown as the locale writes numbers; a box holds what its form reads
+    back (inventory-tng-31q3)."""
+    item = add(
+        session,
+        Item(name="Cable", category_id=radios.id, unit="m", minimum=Decimal("1234.5")),
+    )
+    add(
+        session,
+        ItemPackage(
+            item_id=item.id,
+            name="Spool",
+            size=Decimal("2000.000"),
+            short_below=Decimal("1234.500"),
+        ),
+    )
+    shown = admin_client.get(f"{ITEMS}/{item.id}")
+    page = read(shown.text)
+
+    def boxes(name: str) -> list[str | None]:
+        return [box.attrs.get("value") for box in page.all("input", name=name)]
+
+    assert boxes("minimum") == boxes("short_below") == ["1234.5"]
+    # The spool's, then an empty one to add a package.
+    assert boxes("size") == ["2000", ""]
+    assert "2,000 m" in text(shown)

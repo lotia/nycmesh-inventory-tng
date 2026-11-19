@@ -21,7 +21,7 @@ from sqlalchemy import (
 from sqlalchemy.orm import Session, aliased
 
 from inventory_tng.core.local_time import show_day
-from inventory_tng.core.phrases import gettext, in_query, lazy_gettext
+from inventory_tng.core.phrases import gettext, in_query, lazy_gettext, number
 from inventory_tng.models.admins import Admin
 from inventory_tng.models.catalogue import Item, ItemPackage
 from inventory_tng.models.places import Location
@@ -38,7 +38,7 @@ from inventory_tng.stock.over_recorded import (
     WAITING,
     correction_key,
 )
-from inventory_tng.web.formatting import amount
+from inventory_tng.web.formatting import amount, plain_amount
 
 # Where stock left, and where it arrived, and the counts that put each
 # right.
@@ -129,10 +129,12 @@ class Shown(NamedTuple):
     both_right: BothRight | None
 
 
-def times(num: object, package: str) -> str:
+def times(num: int | Decimal, package: str) -> str:
     """So many of a package: 2, a multiplication sign, "Spool 305 m"."""
     return gettext(
-        "%(num)s \N{MULTIPLICATION SIGN} %(package)s", num=num, package=package
+        "%(num)s \N{MULTIPLICATION SIGN} %(package)s",
+        num=number(num),
+        package=package,
     )
 
 
@@ -345,7 +347,7 @@ def shown(session: Session, *where: ColumnElement[bool]) -> list[Shown]:
                 at,
                 from_place,
                 to_place if kind != "open" else None,
-                MovedWhole(amount(held), amount_words(held, unit, None, None))
+                MovedWhole(plain_amount(held), amount_words(held, unit, None, None))
                 if whole
                 else None,
                 one,

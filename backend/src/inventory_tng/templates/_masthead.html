@@ -13,7 +13,7 @@ its own page, "true" on a page inside it (docs/decisions/0019). -#}
 {% macro sections_links() %}
 <a href="{{ paths.home }}"{{ current(paths.home, exact=true) }}>{% trans %}Home{% endtrans %}</a>
 {% for path, label, badge in sections %}<a href="{{ path }}"{{ current(path) }}>{{ label }}
-{%- if badge %} <span class="badge"><span aria-hidden="true">{{ badge.count }}</span><span class="sr-only">: {{ badge.words }}</span></span>{% endif -%}
+{%- if badge %} <span class="badge"><span aria-hidden="true">{{ badge.count | number }}</span><span class="sr-only">: {{ badge.words }}</span></span>{% endif -%}
 </a>{% endfor %}
 {% endmacro %}
 

@@ -4,11 +4,19 @@ neither FastAPI nor the templates, so rules may import it
 
 from decimal import Decimal
 
-from inventory_tng.core.phrases import lazy_gettext
+from inventory_tng.core.phrases import lazy_gettext, number
 
 
 def amount(value: Decimal | None) -> str:
-    """12.500 as "12.5", 3.000 as "3": as people write quantities."""
+    """A quantity people read: 1234.500 as "1,234.5" in English and
+    "1.234,5" in German, 3.000 as "3". Every digit it holds after the point
+    but trailing zeros, never rounded."""
+    return "" if value is None else number(value.normalize())
+
+
+def plain_amount(value: Decimal | None) -> str:
+    """A quantity a form posts back, in a box's value or a hidden field:
+    1234.500 as "1234.5", in every locale, as the forms read it."""
     return "" if value is None else format(value.normalize(), "f")
 
 

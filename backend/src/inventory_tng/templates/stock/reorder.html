@@ -17,7 +17,7 @@ item's page; an item with neither is never listed.{% endtrans %}</p>
   <tr>
     <td><a href="{{ items_path }}/{{ row.item.id }}">{{ row.item.name_shown }}</a></td>
     <td>{{ row.in_stores | amount }} {{ row.item.unit }}{% if row.count_first %} <strong>{% trans %}count first{% endtrans %}</strong>{% endif %}
-      {%- for name, count, minimum in row.low_sealed %}<span class="hint block">{% trans sealed=count | amount, package=name, minimum=minimum %}{{ sealed }} sealed {{ package }}, of {{ minimum }} to keep{% endtrans %}</span>{% endfor %}</td>
+      {%- for name, count, minimum in row.low_sealed %}<span class="hint block">{% trans sealed=count | amount, package=name, minimum=minimum | number %}{{ sealed }} sealed {{ package }}, of {{ minimum }} to keep{% endtrans %}</span>{% endfor %}</td>
     <td>{% if row.item.minimum is not none %}{{ row.item.minimum | amount }} {{ row.item.unit }}{% endif %}</td>
   </tr>
   {% else %}

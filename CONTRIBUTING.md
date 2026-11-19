@@ -860,8 +860,8 @@ On the server (`backend/src/inventory_tng/core/phrases.py`):
 - In Python, name a phrase as a constant, said when it is shown:
   `RESET_NOTICE = lazy_gettext("Your account is reset: sign in.")`. A
   phrase with values, or a plural, is a function that says it with
-  `gettext("To %(place)s", place=name)` or `ngettext("%(num)d place",
-  "%(num)d places", n)`, which fills `%(num)d` with `n`. A table that
+  `gettext("To %(place)s", place=name)` or `ngettext("%(num)s place",
+  "%(num)s places", n)`, which fills `%(num)s` with `n`. A table that
   holds such a phrase holds `lazy(function)`.
 - Code that passes a phrase on, such as a field's problem or a page's
   alert, types it `Words` and leaves it lazy: the template says it.
@@ -870,7 +870,10 @@ On the server (`backend/src/inventory_tng/core/phrases.py`):
   the query runs, so a list sorted by words sorts by those shown.
 - A number people read is written as the locale writes it, digits
   grouped: `{{ size | number }}` in a template, `number(size)` in Python.
-  A number in a link stays plain digits.
+  A plural's count is written so already, and its form still chosen by
+  the number. A quantity is `{{ left | amount }}`, every stored digit
+  kept. A number in a link stays plain digits, and one a form sends back,
+  in a box or a hidden field, is `{{ left | plain_amount }}`.
 - Values are always filled, so a per cent sign in a message is `%%`; a
   test refuses a lone one.
 - The app's name is `phrases.BRAND`, the same in every language: a

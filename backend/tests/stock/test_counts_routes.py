@@ -96,6 +96,22 @@ def test_the_reasons_come_seeded(session: Session) -> None:
     ]
 
 
+def test_the_count_page_reads_an_amount_grouped_but_its_box_holds_it_plainly(
+    admin_client: TestClient, session: Session
+) -> None:
+    """In English and in German: a box holds what the form reads back
+    (inventory-tng-31q3)."""
+    place = Place(session)
+    received(session, place, [{"item_id": place.cable.id, "quantity": "1234.5"}])
+    field = f"counted_{place.cable.id}"
+    for locale, written in (("en", "1,234.5 m"), ("de", "1.234,5 m")):
+        with speaking(compiled(Catalog(locale=locale))):
+            shown = admin_client.get(f"{COUNTS}/{place.store.id}")
+        boxes = read(shown.text).all("input", name=field)
+        assert [box.attrs.get("value") for box in boxes] == ["1234.5"]
+        assert written in text(shown)
+
+
 def test_a_count_puts_the_records_right(
     admin_client: TestClient, session: Session
 ) -> None:

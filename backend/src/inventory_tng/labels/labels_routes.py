@@ -49,8 +49,8 @@ PICK_LABELS = lazy_gettext("Pick a current label to print.")
 
 def _too_many() -> str:
     return ngettext(
-        "Print up to %(num)d label at once.",
-        "Print up to %(num)d labels at once.",
+        "Print up to %(num)s label at once.",
+        "Print up to %(num)s labels at once.",
         labels.MAX_LABELS,
     )
 

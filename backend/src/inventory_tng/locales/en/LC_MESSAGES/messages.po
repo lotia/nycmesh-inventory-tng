@@ -324,36 +324,36 @@ msgstr ""
 
 #: src/inventory_tng/admins/mail_messages.py
 #, python-format
-msgid "%(num)d day"
-msgid_plural "%(num)d days"
+msgid "%(num)s day"
+msgid_plural "%(num)s days"
 msgstr[0] ""
 msgstr[1] ""
 
 #: src/inventory_tng/admins/mail_messages.py
 #, python-format
-msgid "%(num)d hour"
-msgid_plural "%(num)d hours"
+msgid "%(num)s hour"
+msgid_plural "%(num)s hours"
 msgstr[0] ""
 msgstr[1] ""
 
 #: src/inventory_tng/admins/mail_messages.py
 #, python-format
-msgid "%(num)d is left."
-msgid_plural "%(num)d are left."
+msgid "%(num)s is left."
+msgid_plural "%(num)s are left."
 msgstr[0] ""
 msgstr[1] ""
 
 #: src/inventory_tng/admins/mail_messages.py
 #, python-format
-msgid "%(num)d minute"
-msgid_plural "%(num)d minutes"
+msgid "%(num)s minute"
+msgid_plural "%(num)s minutes"
 msgstr[0] ""
 msgstr[1] ""
 
 #: src/inventory_tng/web/navigation.py
 #, python-format
-msgid "%(num)d retired place holds stock"
-msgid_plural "%(num)d retired places hold stock"
+msgid "%(num)s retired place holds stock"
+msgid_plural "%(num)s retired places hold stock"
 msgstr[0] ""
 msgstr[1] ""
 
@@ -2406,10 +2406,10 @@ msgstr ""
 #: src/inventory_tng/admins/mail_messages.py
 #, python-format
 msgid ""
-"Only %(num)d is left: make new ones from your account page soon, with a "
+"Only %(num)s is left: make new ones from your account page soon, with a "
 "code from your authenticator."
 msgid_plural ""
-"Only %(num)d are left: make new ones from your account page soon, with a "
+"Only %(num)s are left: make new ones from your account page soon, with a "
 "code from your authenticator."
 msgstr[0] ""
 msgstr[1] ""
@@ -2725,8 +2725,8 @@ msgstr ""
 
 #: src/inventory_tng/labels/labels_routes.py
 #, python-format
-msgid "Print up to %(num)d label at once."
-msgid_plural "Print up to %(num)d labels at once."
+msgid "Print up to %(num)s label at once."
+msgid_plural "Print up to %(num)s labels at once."
 msgstr[0] ""
 msgstr[1] ""
 
@@ -3085,15 +3085,15 @@ msgstr ""
 
 #: src/inventory_tng/templates/devices/device_revoke.html
 #, python-format
-msgid "Revoke %(num)d"
-msgid_plural "Revoke %(num)d"
+msgid "Revoke %(num)s"
+msgid_plural "Revoke %(num)s"
 msgstr[0] ""
 msgstr[1] ""
 
 #: src/inventory_tng/devices/devices_routes.py
 #, python-format
-msgid "Revoke %(num)d device?"
-msgid_plural "Revoke %(num)d devices?"
+msgid "Revoke %(num)s device?"
+msgid_plural "Revoke %(num)s devices?"
 msgstr[0] ""
 msgstr[1] ""
 
@@ -3187,8 +3187,8 @@ msgstr ""
 
 #: src/inventory_tng/stock/counts_routes.py
 #, python-format
-msgid "Saved %(num)d line. These moved while you counted, so count them again."
-msgid_plural "Saved %(num)d lines. These moved while you counted, so count them again."
+msgid "Saved %(num)s line. These moved while you counted, so count them again."
+msgid_plural "Saved %(num)s lines. These moved while you counted, so count them again."
 msgstr[0] ""
 msgstr[1] ""
 

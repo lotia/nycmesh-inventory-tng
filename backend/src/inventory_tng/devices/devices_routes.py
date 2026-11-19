@@ -68,7 +68,7 @@ REGISTERED_DEVICES = lazy_gettext("Registered devices")
 
 
 def revoke_many_title(many: int) -> str:
-    return ngettext("Revoke %(num)d device?", "Revoke %(num)d devices?", many)
+    return ngettext("Revoke %(num)s device?", "Revoke %(num)s devices?", many)
 
 
 def state(code: RegistrationCode, at: datetime) -> State:
