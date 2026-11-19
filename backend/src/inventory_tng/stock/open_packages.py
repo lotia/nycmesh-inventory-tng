@@ -6,7 +6,7 @@ which administrator closed it.
 """
 
 import uuid
-from collections.abc import Collection, Iterable, Mapping
+from collections.abc import Collection, Iterable, Mapping, Sequence
 from dataclasses import dataclass, field
 from datetime import datetime
 from decimal import Decimal
@@ -343,10 +343,17 @@ class Shown(NamedTuple):
     place: str
     left: Decimal
     reported_by: str | None
+    # Whether it meets each of shown()'s `marks`, in their order.
+    marks: tuple[bool, ...] = ()
 
 
-def shown(session: Session, *where: ColumnElement[bool]) -> list[Shown]:
-    """Open packages not closed, `where` says which, oldest first."""
+def shown(
+    session: Session,
+    *where: ColumnElement[bool],
+    marks: Sequence[ColumnElement[bool]] = (),
+) -> list[Shown]:
+    """Open packages not closed, `where` says which, oldest first; each
+    with whether it meets each of `marks`, read in the same statement."""
     rows = session.execute(
         select(
             OpenPackage,
@@ -355,6 +362,7 @@ def shown(session: Session, *where: ColumnElement[bool]) -> list[Shown]:
             Item.unit,
             Location.name,
             Volunteer.name,
+            *marks,
         )
         .join(Item, Item.id == OpenPackage.item_id)
         .join(ItemPackage, ItemPackage.id == OpenPackage.package_id)
@@ -365,8 +373,8 @@ def shown(session: Session, *where: ColumnElement[bool]) -> list[Shown]:
     ).all()
     left = balance.left_on(session, [row for row, *_ in rows])
     return [
-        Shown(row, item, package, unit, place, left[row.id], by)
-        for row, item, package, unit, place, by in rows
+        Shown(row, item, package, unit, place, left[row.id], by, tuple(met))
+        for row, item, package, unit, place, by, *met in rows
     ]
 
 

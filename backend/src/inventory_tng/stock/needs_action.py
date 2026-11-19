@@ -4,14 +4,14 @@ open packages one line per item, linking to its page showing only that
 item. Each kind's page takes the item as `?item=` (OnlyItem)."""
 
 from collections import Counter, defaultdict
-from collections.abc import Sequence
+from collections.abc import Iterable, Sequence
 from decimal import Decimal
 from typing import Annotated, NamedTuple
 from urllib.parse import urlencode
 
 from babel.support import LazyProxy
 from fastapi import Depends
-from sqlalchemy import ColumnElement
+from sqlalchemy import ColumnElement, and_, or_
 from sqlalchemy.orm import Session
 
 from inventory_tng.core.db_sessions import DbSession
@@ -37,10 +37,10 @@ class ItemWaiting(NamedTuple):
     unit: str
 
 
-def by_item(session: Session, *where: ColumnElement[bool]) -> list[ItemWaiting]:
-    """The open packages `where` picks, one line per item, by its name."""
+def by_item(shown: Iterable[open_packages.Shown]) -> list[ItemWaiting]:
+    """Open packages, one line per item, by its name."""
     grouped: defaultdict[int, list[open_packages.Shown]] = defaultdict(list)
-    for each in open_packages.shown(session, *where):
+    for each in shown:
         grouped[each.row.item_id].append(each)
     lines = []
     for item_id, found in grouped.items():
@@ -75,12 +75,6 @@ class Waiting(NamedTuple):
     kind: Kind
     items: list[ItemWaiting]
     total: int
-
-
-def waiting(session: Session, kind: Kind) -> Waiting:
-    """What waits for a kind of decision."""
-    items = by_item(session, *kind.where)
-    return Waiting(kind, items, sum(line.count for line in items))
 
 
 def only_item(session: DbSession, item: str = "") -> Item | None:
@@ -121,7 +115,14 @@ def needs_action(session: Session) -> list[Waiting]:
     )
 
     kinds = [used_up_routes.KIND, *length_checks_routes.KINDS]
-    found = [found for kind in kinds if (found := waiting(session, kind)).items]
+    # Every kind's read at once (inventory-tng-hqk), each package marked
+    # with the kinds it waits for: it may wait for more than one.
+    picks = [and_(*kind.where) for kind in kinds]
+    shown = open_packages.shown(session, or_(*picks), marks=picks)
+    found = []
+    for n, kind in enumerate(kinds):
+        if items := by_item(each for each in shown if each.marks[n]):
+            found.append(Waiting(kind, items, sum(line.count for line in items)))
     # Lines, not open packages: its own rows.
     if over := over_recorded_routes.by_item(session):
         found.append(

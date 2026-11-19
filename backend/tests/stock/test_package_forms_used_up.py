@@ -338,7 +338,9 @@ def test_an_items_packages_are_counted_by_name(
     def line() -> needs_action.ItemWaiting:
         [found] = [
             each
-            for each in needs_action.by_item(session, *used_up_routes.REPORTED)
+            for each in needs_action.by_item(
+                open_packages.shown(session, *used_up_routes.REPORTED)
+            )
             if each.item_id == spools.cable.id
         ]
         return found

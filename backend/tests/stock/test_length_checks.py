@@ -394,6 +394,29 @@ def test_one_reported_used_up_is_not_also_below_zero(
     assert str(length_checks_routes.KINDS[1].title) not in home
 
 
+def test_needs_your_action_reads_the_waiting_open_packages_once(
+    admin_client: TestClient,
+    registered_client: TestClient,
+    session: Session,
+    spools: Spools,
+) -> None:
+    """Once for every kind, not once a kind (inventory-tng-hqk)."""
+    used_up, reported, below = spools.opened(), spools.opened(), spools.opened()
+    registered_client.post(
+        URL,
+        json=spools.place.batch(lines=[cut(used_up, "1")], used_up=[str(used_up.key)]),
+    )
+    registered_client.post(URL, json=report(spools, length(reported, "250")))
+    registered_client.post(URL, json=spools.place.batch(lines=[cut(below, "310")]))
+    with counting(session) as sent:
+        home = text(admin_client.get("/admin"))
+    assert "Needs your action (3)" in home
+    # open_packages.shown: the packages, then what is left on each.
+    packages = [each for each in sent if "FROM open_package JOIN item" in each]
+    left = [each for each in sent if "SELECT by_form.open_package_id" in each]
+    assert (len(packages), len(left)) == (1, 1)
+
+
 def test_answers_go_back_to_the_page_they_came_from(
     admin_client: TestClient,
     registered_client: TestClient,
