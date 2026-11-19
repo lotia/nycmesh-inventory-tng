@@ -1084,9 +1084,9 @@ def test_a_unit_name_with_a_prefix_tells_translators_what_it_is() -> None:
     ],
 )
 def test_rules_read_phrases_without_loading_jinja(module: str) -> None:
-    """Only templates need Jinja: phrases imports it where install() and
-    its count writer run, so rules reading phrases leave it unloaded. Run
-    in a fresh interpreter, which has loaded nothing else."""
+    """Only templates need Jinja (web/template_phrases.py), so rules reading
+    phrases leave it unloaded. Run in a fresh interpreter, which has loaded
+    nothing else."""
     shown = subprocess.run(
         [
             sys.executable,

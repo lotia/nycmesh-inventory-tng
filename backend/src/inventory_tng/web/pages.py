@@ -17,9 +17,10 @@ from starlette.types import Scope
 
 from inventory_tng.core.db_errors import Gone
 from inventory_tng.core.local_time import show, show_day
-from inventory_tng.core.phrases import BRAND, install, lazy_gettext, number
+from inventory_tng.core.phrases import BRAND, lazy_gettext, number
 from inventory_tng.web.formatting import amount, plain_amount, printed_length
 from inventory_tng.web.navigation import sections
+from inventory_tng.web.template_phrases import install
 
 templates = Jinja2Templates(directory=Path(__file__).parent.parent / "templates")
 install(templates.env)

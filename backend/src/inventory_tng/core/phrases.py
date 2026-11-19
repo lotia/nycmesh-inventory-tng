@@ -1,6 +1,6 @@
 """The words people read, through gettext (docs/decisions/0022): Babel's
 catalogue, read from its PO file as the app starts, for Python and for the
-templates alike, where Jinja's i18n extension reads it.
+templates alike, which web/template_phrases.py gives it to.
 
 Each phrase's English is its message id. Python names one as a constant,
 `lazy_gettext("...")`, said in the locale active when it is shown; a plural,
@@ -19,7 +19,6 @@ from decimal import Decimal
 from functools import cache
 from io import BytesIO
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, cast
 
 from babel import Locale, localedata
 from babel.messages.catalog import Catalog
@@ -28,10 +27,6 @@ from babel.messages.pofile import read_po
 from babel.numbers import format_decimal
 from babel.support import LazyProxy, Translations
 from sqlalchemy import BindParameter, String, bindparam
-
-if TYPE_CHECKING:  # Only templates need Jinja: rules read phrases without it.
-    from jinja2 import Environment
-    from jinja2.runtime import Context
 
 # The app's name: a name, not a phrase, so the same in every language, and
 # never in the catalogue. Messages take it as %(brand)s. Authenticator apps
@@ -58,6 +53,11 @@ def compiled(catalogue: Catalog) -> Translations:
 
 ENGLISH = compiled(read(ENGLISH_PO))
 _active = ENGLISH
+
+
+def active_catalogue() -> Translations:
+    """The catalogue said in now: English, unless `speaking` gives another."""
+    return _active
 
 
 @contextmanager
@@ -105,29 +105,6 @@ def _number_locale(language: str | None) -> Locale:
     return Locale.parse(language if language and localedata.exists(language) else "en")
 
 
-def _counts_written(say_plural: Callable[..., str]) -> Callable[..., str]:
-    """Jinja's ngettext, `say_plural`, writing the count as the locale does,
-    as `num` and under the name the template gave it (`{% trans
-    count=... %}`), while the form is still chosen by the number."""
-    # Here, not at the top: rules read phrases without loading Jinja.
-    from jinja2 import pass_context
-
-    @pass_context
-    def say(
-        context: Context, singular: str, plural: str, num: int, /, **values: object
-    ) -> str:
-        # Positional only, as Jinja passes them: a template's values may
-        # take any name, plural or context too.
-        written = number(num)
-        values = {
-            name: written if type(value) is int and value == num else value
-            for name, value in values.items()
-        }
-        return say_plural(context, singular, plural, num, **({"num": written} | values))
-
-    return say
-
-
 # A phrase as code holds it: said already, or a lazy one said when shown.
 Words = str | LazyProxy
 
@@ -152,25 +129,3 @@ def in_query(phrase: Words) -> BindParameter[str]:
     """`phrase` as a value in a query, such as words a list sorts by: said
     in the locale active when the query runs, not when it is written."""
     return bindparam(None, callable_=lambda: str(phrase), type_=String())
-
-
-def install(environment: Environment) -> None:
-    """Give `environment` Jinja's i18n extension, reading the active
-    catalogue: newstyle, so a message's values are escaped and filled as in
-    Python, and trimmed, so a message's lines read as one."""
-    environment.add_extension("jinja2.ext.i18n")
-    environment.policies["ext.i18n.trimmed"] = True
-    # The extension adds this method, which the type checker cannot see.
-    environment.install_gettext_callables(  # ty: ignore[unresolved-attribute]
-        lambda message: _active.gettext(message),
-        lambda singular, plural, num: _active.ngettext(singular, plural, num),
-        newstyle=True,
-        pgettext=lambda context, message: _active.pgettext(context, message),
-        npgettext=lambda context, singular, plural, num: _active.npgettext(
-            context, singular, plural, num
-        ),
-    )
-    # Wrapped after install: the count is written outside Jinja's newstyle
-    # wrapper, which still escapes and fills the values.
-    callables = cast(dict[str, Any], environment.globals)
-    callables["ngettext"] = _counts_written(callables["ngettext"])
