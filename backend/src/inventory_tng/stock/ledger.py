@@ -282,8 +282,9 @@ def _hold_places(
     session: Session, header: Mapping[str, object]
 ) -> tuple[dict[int, bool], frozenset[int]]:
     """A save's places, held before it has an id: a count (lock_place) then
-    waits for it whole, so none can draw an id, wait, and commit after a
-    count's moment that it falls inside. Those that exist, by id, and
+    waits for it whole, so one that drew an id inside a count's moment and
+    committed after it is found as the count is written
+    (counts.record_count). Those that exist, by id, and
     whether each is retired; and which are volunteers' custody."""
     rows = session.execute(
         locked(

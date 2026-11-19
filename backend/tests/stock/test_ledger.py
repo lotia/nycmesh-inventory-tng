@@ -35,6 +35,7 @@ from inventory_tng.stock.ledger import (
     repeated,
     whole_enough,
 )
+from inventory_tng.stock.moments import Moment
 
 from helpers.rows import add, breaks, item_fields, named, refused, tag, violates
 from helpers.stock import URL, Place, received, retire, stocked, write
@@ -390,7 +391,9 @@ def test_an_item_is_on_one_line_whoever_writes(session: Session, place: Place) -
         insert_transaction(session, uuid.uuid4(), header, twice)
     admin = add(session, Admin(username="ada"))
     with breaks(session, "movement_item_once"):
-        record_count(session, uuid.uuid4(), admin.id, place.store.id, twice, 0)
+        record_count(
+            session, uuid.uuid4(), admin.id, place.store.id, twice, Moment(0, 0)
+        )
     assert not session.scalars(select(LedgerTransaction)).all()
 
 

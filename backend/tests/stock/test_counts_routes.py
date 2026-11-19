@@ -40,13 +40,14 @@ from inventory_tng.stock.forms import (
     named_twice,
 )
 from inventory_tng.stock.ledger import lock_place
-from inventory_tng.stock.moments import expected, moment
+from inventory_tng.stock.moments import Moment, expected, moment
 from inventory_tng.stock.paths import ADJUSTMENTS, COUNTS, STOCK
 from inventory_tng.web.forms import ABOVE_ZERO, RULES, TYPE_A_NUMBER, WHOLE_UNITS
 from inventory_tng.web.navigation import retired_holding
 
 from helpers.concurrency import Committed
 from helpers.markup import button, forms, hidden_fields, links, options, read, text
+from helpers.query_counts import counting
 from helpers.rows import item_fields, shown, violates
 from helpers.sign_in import new_admin, sign_in_with
 from helpers.stock import (
@@ -526,6 +527,66 @@ def test_a_count_sent_again_after_a_later_move_is_not_asked_again(
     assert expected(session, place.store.id) == {place.item.id: Decimal(1)}
 
 
+def test_showing_a_count_form_locks_nothing(
+    admin_client: TestClient, session: Session
+) -> None:
+    """Its moment is read, not held (inventory-tng-0um): volunteers' saves
+    at the place go on while it is shown."""
+    place = stocked(session)
+    with counting(session) as sent:
+        assert admin_client.get(f"{COUNTS}/{place.store.id}").status_code == 200
+    assert not [each for each in sent if " FOR " in each]
+
+
+def test_a_count_needs_what_its_form_saw(
+    admin_client: TestClient, session: Session
+) -> None:
+    place = stocked(session)
+    path = f"{COUNTS}/{place.store.id}"
+    shown = count_form(admin_client.get(path))
+    for seen in ("", "²", "-1", str(2**31)):
+        refused = admin_client.post(
+            path, data=shown | {"seen": seen, f"counted_{place.item.id}": "5"}
+        )
+        assert refused.status_code == 404
+    assert counts_written(session) == []
+
+
+def test_a_count_of_a_place_changed_before_its_moment_is_shown_again(
+    admin_client: TestClient, session: Session
+) -> None:
+    """A save there older than the form's moment that it did not see (one
+    under way as it was shown, committed after, as
+    test_a_save_under_way_as_the_form_was_shown_refuses_the_count makes):
+    nothing is written, and the form is shown again as it is now, to count
+    again."""
+    place = stocked(session)
+    path = f"{COUNTS}/{place.store.id}"
+    shown = count_form(admin_client.get(path))
+    unseen = shown | {"seen": str(int(shown["seen"]) - 1)}
+    with capture_logs() as logs:
+        refused = admin_client.post(
+            path, data=unseen | {f"counted_{place.item.id}": "4"}
+        )
+    assert refused.status_code == 409
+    assert str(RULES["changed_since_shown"]) in text(refused)
+    assert counts_written(session) == []
+    again = count_form(refused)
+    assert again["key"] != shown["key"]
+    assert (again["as_of"], again["seen"]) == (shown["as_of"], shown["seen"])
+    assert f'name="counted_{place.item.id}" inputmode="decimal" value="5"' in (
+        refused.text
+    )
+    assert {
+        "event": "count refused by a rule",
+        "location_id": place.store.id,
+        "rule": "changed_since_shown",
+        "log_level": "info",
+    } in logs
+    done = admin_client.post(path, data=again | {f"counted_{place.item.id}": "4"})
+    assert done.headers["location"] == f"{COUNTS}?notice=counted&section=count#count"
+
+
 def receive(session: Session, place: Place) -> None:
     """Three radios received into the store. Committed tests may not write
     the ledger (APPEND_ONLY), so the caller rolls it back."""
@@ -533,18 +594,55 @@ def receive(session: Session, place: Place) -> None:
 
 
 @pytest.mark.concurrency
-def test_a_count_form_waits_for_a_save_under_way_at_the_place(
+def test_a_count_form_does_not_wait_for_a_save_under_way_at_the_place(
     committed: Committed,
 ) -> None:
-    """Its moment must not leave out a save that commits later with a lower
-    ledger id."""
+    """Its moment is read without the place's lock (inventory-tng-0um): a
+    save under way there is left out of it, not waited for."""
     place = committed_place(committed)
     saving = committed.session()
     receive(saving, place)
     counting = committed.session()
-    worker = committed.blocked(counting, lambda: moment(counting, place.store.id))
+    counting.execute(sql_text("SET LOCAL lock_timeout = '100ms'"))
+    assert moment(counting, place.store.id) == Moment(as_of=0, seen=0)
+    counting.rollback()
     saving.rollback()
-    assert worker.finished().error is None
+
+
+@pytest.mark.concurrency
+def test_a_save_under_way_as_the_form_was_shown_refuses_the_count(
+    own_committed: Committed,
+) -> None:
+    """A save that drew its id before a later one there, and commits after
+    the form was shown, is older than the form's moment but was not in it:
+    the count, holding the place, finds it and is refused, writing nothing."""
+    setup = own_committed.session()
+    place = Place(setup)
+    admin, _ = new_admin(setup)
+    setup.commit()
+    saving = own_committed.session()
+    early = received(saving, place)
+    later = own_committed.session()
+    late = received(later, place, [{"item_id": place.cable.id, "quantity": "20"}])
+    later.commit()
+    assert early.id < late.id
+    counting = own_committed.session()
+    shown = moment(counting, place.store.id)
+    assert shown == Moment(as_of=late.id, seen=1)
+    counting.rollback()
+    saving.commit()
+    with pytest.raises(RuleBroken) as refused:
+        record_count(
+            counting,
+            uuid.uuid4(),
+            admin.id,
+            place.store.id,
+            [(place.cable.id, Decimal(18))],
+            shown,
+        )
+    assert refused.value.rule == "changed_since_shown"
+    counting.rollback()
+    assert counts_written(counting) == []
 
 
 @pytest.mark.concurrency
@@ -721,6 +819,7 @@ def test_a_form_for_a_retired_place_holding_nothing_writes_nothing(
         data={
             "key": str(uuid.uuid4()),
             "as_of": "0",
+            "seen": "0",
             f"counted_{place.item.id}": "2",
         },
     )
@@ -775,7 +874,7 @@ def test_a_place_retired_as_it_is_counted_is_refused(
                 admin.id,
                 place.store.id,
                 [(place.item.id, Decimal(1))],
-                0,
+                Moment(0, 0),
             ),
         )
     else:

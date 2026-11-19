@@ -1,35 +1,56 @@
 """What the ledger says, as of a moment: a place's latest ledger
-transaction, read with no save there under way (moment()), and what the
-records said was at a place, or left in an open package, as of one.
+transaction and how many there it saw (moment()), and what the records
+said was at a place, or left in an open package, as of one.
 
-The ledger's core (stock/ledger.py) writes; these only read it, moment()
-holding its place's lock (lock_place) for the read alone. They import the
-core.
+The ledger's core (stock/ledger.py) writes; these only read it, taking no
+lock. They import the core.
 """
 
 from collections.abc import Collection, Sequence
 from decimal import Decimal
+from typing import NamedTuple
 
 from sqlalchemy import ColumnElement, case, func, or_, select
 from sqlalchemy.orm import Session
 
 from inventory_tng.models.stock import LedgerTransaction, Movement
 from inventory_tng.stock.balance import balance
-from inventory_tng.stock.ledger import Form, lock_place
+from inventory_tng.stock.ledger import Form
 
 
-def moment(session: Session, location_id: int) -> int:
+class Moment(NamedTuple):
     """Now, at a place, as a count form shows it: its latest ledger
-    transaction, with no save there under way, so none can commit later
-    with a lower id. The lock is held only for the read."""
-    with session.begin_nested() as reading:
-        lock_place(session, location_id)
-        latest = session.scalar(
-            select(func.max(LedgerTransaction.id)).where(at_place(location_id))
+    transaction, `as_of`, and how many of its ledger transactions up to that
+    one it saw, `seen`."""
+
+    as_of: int
+    seen: int
+
+
+def moment(session: Session, location_id: int) -> Moment:
+    """Now, at a place, read without its lock, so the form holds up no
+    save there (inventory-tng-0um). A save under way as it is read may
+    commit after it with a lower id, unseen: the count, holding the place,
+    finds it by seen_up_to and is refused (counts.record_count)."""
+    latest, seen = session.execute(
+        select(func.max(LedgerTransaction.id), func.count()).where(
+            at_place(location_id)
         )
-        # Rolling back to the savepoint releases the lock.
-        reading.rollback()
-    return latest or 0
+    ).one()
+    return Moment(latest or 0, seen)
+
+
+def seen_up_to(session: Session, location_id: int, as_of: int) -> int:
+    """How many ledger transactions at a place there are up to `as_of`, as
+    Moment.seen counts them."""
+    return (
+        session.scalar(
+            select(func.count()).where(
+                at_place(location_id), LedgerTransaction.id <= as_of
+            )
+        )
+        or 0
+    )
 
 
 # A ledger transaction that puts right what the records show.
@@ -130,7 +151,7 @@ def expected(
 ) -> dict[int, Decimal]:
     """What the records say is at a place, by item: only what is not zero,
     as balance says now; with as_of, what they said at that moment
-    (see moment()), of `items` only if given."""
+    (Moment.as_of), of `items` only if given."""
     if as_of is not None:
         (moved,) = flows(
             session, location_id, LedgerTransaction.id <= as_of, items=items

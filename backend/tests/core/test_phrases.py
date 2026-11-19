@@ -65,6 +65,7 @@ from inventory_tng.stock import (
     stock_routes,
     used_up_routes,
 )
+from inventory_tng.stock.moments import Moment
 from inventory_tng.volunteers import volunteers_routes
 from inventory_tng.web.admin_pages import revoke_title
 from inventory_tng.web.forms import at_most_places, name_up_to, up_to
@@ -512,6 +513,7 @@ def count_page() -> str:
         "stock/count.html",
         place=PLACE,
         shown=SimpleNamespace(only=item, search=NOT_ENGLISH, query=link),
+        moment=Moment(0, 0),
         items=[1],
         rows=[
             (item, Decimal(1)),

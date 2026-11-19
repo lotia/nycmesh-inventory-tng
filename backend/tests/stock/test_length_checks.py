@@ -29,7 +29,7 @@ from inventory_tng.web import formatting
 from helpers.markup import links, read, text
 from helpers.query_counts import counting
 from helpers.rows import add, tag
-from helpers.stock import URL, Spools, cut, length, report
+from helpers.stock import URL, Spools, cut, length, moment_fields, report
 
 LENGTHS = "/admin/stock/length-checks"
 
@@ -367,7 +367,7 @@ def test_a_count_leaves_a_check_to_be_answered_but_a_close_ends_it(
     store = spools.store.id
     count = {
         "key": str(uuid.uuid4()),
-        "as_of": str(moments.moment(session, store)),
+        **moment_fields(session, store),
         f"opened_{made.id}": "305",
     }
     assert admin_client.post(f"/admin/counts/{store}", data=count).status_code == 303
@@ -521,7 +521,7 @@ def test_set_moves_it_by_what_it_was_off_so_cuts_since_stay(
 
 
 def test_a_place_with_no_saves_is_at_nothing(session: Session, spools: Spools) -> None:
-    assert moments.moment(session, spools.van.id) == 0
+    assert moments.moment(session, spools.van.id) == moments.Moment(0, 0)
 
 
 def test_the_page_locks_nothing(

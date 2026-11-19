@@ -22,7 +22,7 @@ from helpers.items import new_item, same_size_twins
 from helpers.markup import read, text
 from helpers.package_forms import CABLE, OPEN, SEALED, open_form, quantities_by_form
 from helpers.rows import add, breaks, tag
-from helpers.stock import Spools
+from helpers.stock import Spools, moment_fields
 
 # Counting by form (8i4.133.8).
 
@@ -115,7 +115,7 @@ def test_the_count_page_counts_forms_finds_and_closes(
     assert f'name="state_{two.id}"' in page
     form = {
         "key": str(uuid.uuid4()),
-        "as_of": str(moments.moment(session, store)),
+        **moment_fields(session, store),
         f"opened_{one.id}": "300",
         f"opened_{two.id}": "305",
         f"state_{two.id}": "missing",
@@ -151,8 +151,7 @@ def test_the_count_page_counts_sealed_and_says_whats_wrong(
     spools.write({"kind": "receipt", "to_location_id": store}, Entry(cable, Decimal(5)))
     field = f"sealed_{cable}_{spool}"
     assert f'name="{field}"' in text(admin_client.get(f"{COUNTS}/{store}"))
-    as_of = str(moments.moment(session, store))
-    base = {"as_of": as_of}
+    base = moment_fields(session, store)
     done = admin_client.post(
         f"{COUNTS}/{store}", data=base | {"key": str(uuid.uuid4()), field: "1"}
     )
@@ -192,7 +191,7 @@ def test_counting_by_form_asks_again_for_what_moved(
     store, cable, spool = spools.store.id, spools.cable.id, spools.spool.id
     form = {
         "key": str(uuid.uuid4()),
-        "as_of": str(moments.moment(session, store)),
+        **moment_fields(session, store),
         f"sealed_{cable}_{spool}": "2",
     }
     spools.opened()  # While it was counted.
@@ -211,7 +210,7 @@ def test_an_open_package_found_where_its_item_was_counted_by_total(
     spools.move(Entry(cable, Decimal(10)))  # Loose, alone, in the van.
     form = {
         "key": str(uuid.uuid4()),
-        "as_of": str(moments.moment(session, van)),
+        **moment_fields(session, van),
         f"counted_{cable}": "10",
         "found_package_id": str(spools.spool.id),
         "found_left": "40",
@@ -229,24 +228,24 @@ def test_open_packages_closed_by_a_count_and_refusals_said(
 ) -> None:
     store, cable, spool = spools.store.id, spools.cable.id, spools.spool.id
     one, two = spools.opened(), spools.opened()
-    as_of = str(moments.moment(session, store))
+    at = moment_fields(session, store)
     # Not here, its left box cleared: closed all the same.
     gone = {
         "key": str(uuid.uuid4()),
-        "as_of": as_of,
+        **at,
         f"opened_{one.id}": "",
         f"state_{one.id}": "used_up",
     }
     assert admin_client.post(f"{COUNTS}/{store}", data=gone).status_code == 303
     session.refresh(one)
     assert one.closed_at is not None
-    closed = {"key": str(uuid.uuid4()), "as_of": as_of, f"opened_{one.id}": "5"}
+    closed = {"key": str(uuid.uuid4()), **at, f"opened_{one.id}": "5"}
     assert "was closed meanwhile" in text(
         admin_client.post(f"{COUNTS}/{store}", data=closed)
     )
     huge = {
         "key": str(uuid.uuid4()),
-        "as_of": as_of,
+        **at,
         f"sealed_{cable}_{spool}": "9999999",
     }
     # None sealed is here now, so no line shows it: refused whole.
@@ -255,7 +254,7 @@ def test_open_packages_closed_by_a_count_and_refusals_said(
     session.flush()
     untracked = {
         "key": str(uuid.uuid4()),
-        "as_of": str(moments.moment(session, store)),
+        **moment_fields(session, store),
         "found_package_id": str(spool),
         "found_left": "40",
     }
@@ -274,7 +273,7 @@ def test_an_open_package_found_while_its_item_moved_is_asked_again(
     key = uuid.uuid4()
     form = {
         "key": str(key),
-        "as_of": str(moments.moment(session, van)),
+        **moment_fields(session, van),
         f"counted_{cable}": "10",
         "found_package_id": str(spools.spool.id),
         "found_left": "40",

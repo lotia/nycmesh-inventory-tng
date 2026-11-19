@@ -411,7 +411,7 @@ def sealed_counted_check(
         by_form=[(spools.cable.id, spools.sealed, Decimal(305))],
     )
     over_recorded.counted(
-        setup, admin, spools.store.id, as_of, count.written, count.put_right
+        setup, admin, spools.store.id, as_of.as_of, count.written, count.put_right
     )
     if whole:
         held = Form(open_package_id=made.id)
@@ -504,7 +504,7 @@ def test_a_close_skips_one_a_count_holds_and_correct_then_closes_it_as_counted(
     assert count.written
     assert (
         over_recorded.counted(
-            first, admin, place, as_of, count.written, count.put_right
+            first, admin, place, as_of.as_of, count.written, count.put_right
         )
         == 0
     )

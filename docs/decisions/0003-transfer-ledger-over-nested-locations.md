@@ -43,9 +43,12 @@ while. So we need more than one location from the start.
   of a place writes what differs, found or lost, and a count that matches is
   written with no lines, so when a place was last counted is known. A count is
   true for the moment its form was shown, so moves saved while it is under way
-  still apply. An item that moved at the place meanwhile might have been counted
-  before or after the move, so its line is not saved; the page asks for it
-  again, and saves every other line (Ali, 2026-11-03). A count asks for each
+  still apply. Showing the form takes no lock, so it never holds up a save;
+  a save under way as it was shown, committed after, refuses the count, and
+  the form is shown again as it is now (inventory-tng-0um). An item that
+  moved at the place meanwhile might have been counted before or after the
+  move, so its line is not saved; the page asks for it again, and saves
+  every other line (Ali, 2026-11-03). A count asks for each
   form of an item separately, and may add or close an open package (0020). It
   also puts right the end at that place of a line recorded more than moved
   (0020). A count names each item once: a form naming one twice is refused,

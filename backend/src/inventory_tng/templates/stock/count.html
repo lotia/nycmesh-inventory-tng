@@ -29,7 +29,8 @@ if you didn't count it. Anything else here, add below.{% endtrans %}</p>
 {% endif %}
 <form method="post" action="{{ here }}{{ shown.query() }}">
   <input type="hidden" name="key" value="{{ key }}">
-  <input type="hidden" name="as_of" value="{{ as_of }}">
+  <input type="hidden" name="as_of" value="{{ moment.as_of }}">
+  <input type="hidden" name="seen" value="{{ moment.seen }}">
   {% if items %}<input type="hidden" name="items" value="{{ items | join(' ') }}">{% endif %}
   {% call table() %}
     <tr><th>{% trans %}Item{% endtrans %}</th><th>{% trans %}Records say{% endtrans %}</th>{% if recount %}<th>{% trans %}While you counted{% endtrans %}</th>{% endif %}<th>{% trans %}Counted{% endtrans %}</th></tr>

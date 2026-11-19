@@ -66,6 +66,7 @@ from helpers.stock import (
     count_form,
     cut,
     length,
+    moment_fields,
     received,
     report,
     retire,
@@ -427,11 +428,12 @@ def test_counts_count_lines_withheld(rolled_back: Recorded, session: Session) ->
     _, _, reader, _ = rolled_back
     ada, _ = new_admin(session)
     place = stocked(session)
-    as_of = received(session, place).id
+    received(session, place)
+    shown = moments.moment(session, place.store.id)
     write(session, place)
     radios = [(place.item.id, Decimal(5))]
     result = counts.record_count(
-        session, uuid.uuid4(), ada.id, place.store.id, radios, as_of
+        session, uuid.uuid4(), ada.id, place.store.id, radios, shown
     )
     assert result.moved == {place.item.id: (Decimal(0), Decimal(3))}
     counts.lines_withheld(ada.id, place.store.id, result.withheld)
@@ -454,7 +456,7 @@ def counting(
     place = stocked(session)
     form = {
         "key": str(uuid.uuid4()),
-        "as_of": str(moments.moment(session, place.store.id)),
+        **moment_fields(session, place.store.id),
         f"counted_{place.item.id}": "3",
         f"counted_{place.cable.id}": "1",
     }
@@ -906,7 +908,7 @@ def test_counts_open_packages_closed_and_cleared(
     store = spools.store.id
     count = {
         "key": str(uuid.uuid4()),
-        "as_of": str(moments.moment(session, store)),
+        **moment_fields(session, store),
         f"opened_{four.id}": "",
         f"state_{four.id}": "missing",
     }
@@ -1047,18 +1049,18 @@ def test_counts_lines_recorded_more_than_moved_closed_with_their_open_package(
     assert movement_id is not None
     over_recorded.raise_checks(session, {movement_id: Decimal(305)})
     store = spools.store.id
-    as_of = moments.moment(session, store)
+    shown = moments.moment(session, store)
     count = counts.record_count(
         session,
         uuid.uuid4(),
         admin.id,
         store,
         [],
-        as_of,
+        shown,
         by_form=[(spools.cable.id, spools.sealed, Decimal(305))],
     )
     over_recorded.counted(
-        session, admin.id, store, as_of, count.written, count.put_right
+        session, admin.id, store, shown.as_of, count.written, count.put_right
     )
     session.flush()
     settled = counted(reader, "inventory.over_recorded.settled")
@@ -1086,18 +1088,18 @@ def test_counts_lines_recorded_more_than_moved_closed_with_both_ends_right(
     assert movement_id is not None
     over_recorded.raise_checks(session, {movement_id: Decimal(305)})
     store = spools.store.id
-    as_of = moments.moment(session, store)
+    shown = moments.moment(session, store)
     count = counts.record_count(
         session,
         uuid.uuid4(),
         admin.id,
         store,
         [],
-        as_of,
+        shown,
         by_form=[(spools.cable.id, spools.sealed, Decimal(305))],
     )
     over_recorded.counted(
-        session, admin.id, store, as_of, count.written, count.put_right
+        session, admin.id, store, shown.as_of, count.written, count.put_right
     )
     monkeypatch.setattr(over_recorded, "open_package_closed", lambda *_: 0)
     assert open_packages.close(session, made.id, admin.id, datetime.now(UTC))

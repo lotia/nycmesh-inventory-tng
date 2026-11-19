@@ -4,8 +4,12 @@ record_adjustment); these pages check what was typed and say what is wrong.
 
 Each form carries a key made when it was shown, so sending it twice writes
 it once. A count also carries the place's latest ledger entry as it was
-shown: the count is true for that moment, so a save made at the place
-meanwhile still applies, and an item it moved comes back to count again.
+shown, and how many there it saw (moments.Moment): the count is true for
+that moment, so a save made at the place meanwhile still applies, and an
+item it moved comes back to count again. The moment is read without the
+place's lock, so showing the form holds up no save there; a save under way
+as it was shown, committed after with an id inside the moment, refuses the
+count (changed_since_shown), and the form is shown again as it is now.
 
 The pages check what was typed before writing, but an item's unit may
 change to each between that check and the write: the ledger then refuses
@@ -73,11 +77,11 @@ from inventory_tng.stock.forms import (
     named_twice,
 )
 from inventory_tng.stock.ledger import LOOSE, Form, hold, lock_place, tracks_opened
-from inventory_tng.stock.moments import expected, expected_forms, moment
+from inventory_tng.stock.moments import Moment, expected, expected_forms, moment
 from inventory_tng.stock.needs_action import OnlyItem
 from inventory_tng.stock.paths import ADJUSTMENTS, COUNTS
 from inventory_tng.web.admin_pages import admin_page, current_rows, now, text_form
-from inventory_tng.web.forms import RULES, row_id
+from inventory_tng.web.forms import CHANGED, RULES, row_id
 from inventory_tng.web.listing import UNASKED, AskedView, Sort, Sorting, View, order
 from inventory_tng.web.navigation import SECTION_COUNTS
 from inventory_tng.web.pages import add_notices, not_found, redirect
@@ -312,7 +316,7 @@ def _count_page(
     session: Session,
     signed: SignedIn,
     place: Location,
-    as_of: int,
+    at: Moment,
     *,
     shown: Shown,
     problems: Mapping[str, Words] | None = None,
@@ -322,12 +326,13 @@ def _count_page(
     alert: Words | None = None,
     status_code: int = 200,
 ) -> HTMLResponse:
-    """The count form, with the records as of `as_of`: of everything there,
+    """The count form, with the records as of `at`: of everything there,
     or a recount of `items` only, which the form carries. With `recount`, a
     recount of its items: what was typed for each and what came in and went
     out while it was counted. Of those, only the items `shown`, but a
     recount's every one."""
     items = items or (recount or {}).keys()
+    as_of = at.as_of
     was = expected(session, place.id, as_of=as_of, items=items or None)
     if items:
         was = {item_id: was.get(item_id, Decimal(0)) for item_id in items}
@@ -382,7 +387,7 @@ def _count_page(
             "items": sorted(items),
             "others": [item for item in listed if item.id not in was],
             "key": (values or {}).get("key") or uuid.uuid4(),
-            "as_of": as_of,
+            "moment": at,
             "shown": shown,
             "alert": alert,
             "problems": problems,
@@ -530,8 +535,10 @@ def count(
     key = form_key(form.get("key", ""))
     place = session.get(Location, location_id)
     as_of = whole(form.get("as_of", ""), 0, INTEGER_MAX)
-    if place is None or key is None or as_of is None:
+    seen = whole(form.get("seen", ""), 0, INTEGER_MAX)
+    if place is None or key is None or as_of is None or seen is None:
         return not_found()
+    at = Moment(as_of, seen)
     found = lines(form)
     sent_items = {
         item_id
@@ -556,7 +563,7 @@ def count(
             session,
             signed,
             place,
-            as_of,
+            at,
             problems=problems,
             values=form,
             alert=TWICE if repeats else problems.get(CLOSED_MEANWHILE),
@@ -596,7 +603,7 @@ def count(
                     signed.admin.id,
                     place.id,
                     totals,
-                    as_of,
+                    at,
                     by_form=[*lines, found],
                 )
                 if package.item_id in counted_now.moved:
@@ -604,7 +611,7 @@ def count(
                     finding.rollback()
         if forms.found is None or package.item_id in counted_now.moved:
             counted_now = record_count(
-                session, key, signed.admin.id, place.id, totals, as_of, by_form=lines
+                session, key, signed.admin.id, place.id, totals, at, by_form=lines
             )
         # Closed after the count: one not there, or used up, as said. Each
         # closed is at 0, as counted so, for an opening that arrived in it.
@@ -629,13 +636,34 @@ def count(
         return counted_now
 
     result, broken = refusal(
-        session, put_right, WHOLE, COUNTABLE, UNTRACKED, ONCE, CLOSED_MEANWHILE
+        session,
+        put_right,
+        WHOLE,
+        COUNTABLE,
+        UNTRACKED,
+        ONCE,
+        CLOSED_MEANWHILE,
+        CHANGED,
     )
     if broken is not None:
         log.info("count refused by a rule", location_id=place.id, rule=broken)
         if broken == COUNTABLE:
             # As for a place there is not, as the form's own page answers.
             return not_found()
+        if broken == CHANGED:
+            # What was typed may be of before that save or after it: the
+            # form as it is now, to count again.
+            return _count_page(
+                request,
+                session,
+                signed,
+                place,
+                moment(session, place.id),
+                alert=RULES[CHANGED],
+                items=sent_items,
+                shown=shown,
+                status_code=409,
+            )
         # Checked again, the units as they are now mark the lines it broke.
         _, problems = item_counts(session, found)
         return _count_page(
@@ -643,7 +671,7 @@ def count(
             session,
             signed,
             place,
-            as_of,
+            at,
             problems=problems,
             values=form,
             alert=None if problems else RULES[broken],
