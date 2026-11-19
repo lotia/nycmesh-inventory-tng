@@ -66,7 +66,7 @@ import {
   SHOWS_NOTHING_LEFT,
   WRONG_LENGTH,
 } from "./OpenPackageCard";
-import { DISMISS } from "./OutboxList";
+import { DISMISS, SENDING } from "./OutboxList";
 
 // The camera, faked: it sees whatever a test puts in `inView`.
 vi.mock("./camera", () => ({ openCamera: vi.fn() }));
@@ -861,6 +861,31 @@ describe("filling and saving a cart", () => {
     screen.getByText(first);
     expect(outbox.entries.value).toHaveLength(1);
     expect(outbox.entries.value[0]).not.toHaveProperty("dismissed");
+  });
+
+  test("a batch being sent keeps Dismiss's room, unseen, unfocusable and not read out, and shows it once saved (Ali, 2026-11-19, inventory-tng-2lad)", async () => {
+    const answer = deferred();
+    open(server(() => answer.promise).api);
+    await ready();
+    fillMove();
+    save();
+    const entry = screen
+      .getByText("Move: 1 item from Hub to Van")
+      .closest("li") as HTMLElement;
+    within(entry).getByText(say(SENDING));
+    const room = within(entry).getByText(say(DISMISS));
+    expect(room.tagName).toBe("BUTTON");
+    expect(room.classList).toContain("invisible");
+    expect(room.getAttribute("aria-hidden")).toBe("true");
+    expect(room.tabIndex).toBe(-1);
+    expect(
+      within(entry).queryByRole("button", { name: say(DISMISS) }),
+    ).toBeNull();
+    answer.resolve(saved());
+    await within(entry).findByText("Recorded (transaction 77).");
+    const dismiss = within(entry).getByRole("button", { name: say(DISMISS) });
+    expect(dismiss.classList).not.toContain("invisible");
+    expect(dismiss.tabIndex).toBe(0);
   });
 
   test("a batch queued is worded in the language spoken as it is shown, its places as named when queued (inventory-tng-ar8)", async () => {

@@ -125,9 +125,7 @@ export async function invite(
 
 /**
  * Records the scan page's cart, and gives its answer once the page lists it
- * saved: the answer reaches the test before the page has used it, and the
- * entry it changes moves those below it, which a tap meant for one may then
- * miss.
+ * saved: the answer reaches the test before the page has used it.
  */
 export async function record(page: Page): Promise<Response> {
   const saving = page.waitForResponse(

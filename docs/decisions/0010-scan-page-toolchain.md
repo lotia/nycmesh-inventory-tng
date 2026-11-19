@@ -321,7 +321,13 @@ the compressed copy (fiddly header code ServeStatic already gets right).
   and adding to a cart with lines, which may be of another kind or
   between other places. The page counts each add, by itself or by a tap,
   as a telemetry event of its own, two an hour taken from the times to
-  save (20 to 18).
+  save (20 to 18). No entry in the list changes height as its save
+  finishes, so a tap on Dismiss lands where it was aimed (Ali,
+  2026-11-19, inventory-tng-2lad): one being sent keeps Dismiss's room,
+  the button unseen, unfocusable and not read out, and once its
+  difference is recorded, "These are in your cart" is hidden in the same
+  way, not removed, keeping its room. We rejected
+  listing the newest last, which changes the order volunteers see.
   The page's words drop "save" (Ali, 2026-11-13, inventory-tng-wyq): the
   cart lives in the browser, written to storage as it changes, so what
   the browser holds is "kept", and what the inventory takes is

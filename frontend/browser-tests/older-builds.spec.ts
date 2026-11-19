@@ -301,11 +301,15 @@ test("a save an older build's tab saved meanwhile is saved once, under its key; 
   await expect(page.getByLabel(/^Loose/)).toHaveValue("1");
   await expect(entry.getByText(IN_CART)).toBeVisible();
   await expect(entry.getByRole("button", { name: ADD_THESE })).toHaveCount(0);
+  const before = await entry.boundingBox();
   const difference = await save(page);
   expect(difference.lines).toEqual([
     expect.objectContaining({ item_id: itemId, quantity: "1" }),
   ]);
-  await expect(entry.getByText(IN_CART)).toHaveCount(0);
+  // Recorded, its words are hidden, keeping their room, so Dismiss below
+  // them does not move (Ali, 2026-11-19, inventory-tng-2lad).
+  await expect(entry.getByText(IN_CART)).toBeHidden();
+  expect((await entry.boundingBox())?.height).toBe(before?.height);
   await entry.getByRole("button", { name: "Dismiss" }).click();
   await expect(page.getByText(NOT_RECORDED)).toHaveCount(0);
 });

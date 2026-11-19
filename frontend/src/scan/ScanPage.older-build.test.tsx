@@ -1443,7 +1443,9 @@ describe("what an older build left", () => {
     const key = storedCart().batchKey;
     expect(key).toMatch(UUID);
     expect(key).not.toBe(KEY);
-    within(entry).getByText(say(IN_CART));
+    expect(within(entry).getByText(say(IN_CART)).classList).not.toContain(
+      "invisible",
+    );
     expect(
       within(entry).queryByRole("button", { name: say(ADD_DIFFERENCE) }),
     ).toBeNull();
@@ -1454,7 +1456,11 @@ describe("what an older build left", () => {
     whole(entry, "LiteBeam 5AC: 1 × Box more");
     save();
     await screen.findByText("Recorded (transaction 2).");
-    expect(within(entry).queryByText(say(IN_CART))).toBeNull();
+    // Its words keep their room, so Dismiss does not move, unseen and not
+    // read out (Ali, 2026-11-19, inventory-tng-2lad).
+    const room = within(entry).getByText(say(IN_CART));
+    expect(room.classList).toContain("invisible");
+    expect(room.getAttribute("aria-hidden")).toBe("true");
     // Emptied, the cart does not take it again.
     expect(storedCart().lines).toEqual([]);
   });

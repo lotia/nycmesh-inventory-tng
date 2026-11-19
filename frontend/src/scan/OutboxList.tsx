@@ -188,7 +188,19 @@ export function OutboxList({
                   />
                 </p>
               )}
-              {entry.state !== "waiting" && (
+              {entry.state === "waiting" ? (
+                // Its room kept while it is sent, so the entry does not grow
+                // and move those below as it finishes (Ali, 2026-11-19,
+                // inventory-tng-2lad): not seen, focused or read out.
+                <button
+                  type="button"
+                  class="invisible"
+                  tabIndex={-1}
+                  aria-hidden="true"
+                >
+                  {say(DISMISS)}
+                </button>
+              ) : (
                 <button type="button" onClick={() => outbox.dismiss(entry)}>
                   {say(DISMISS)}
                 </button>
@@ -268,8 +280,16 @@ function RecordedElsewhere({
           {say(ADD_DIFFERENCE)}
         </button>
       )}
-      {difference !== null && added === true && cartKey === difference.key && (
-        <p>{say(IN_CART)}</p>
+      {difference !== null && added === true && (
+        // Recorded, its words stay, unseen and not read out, to keep their
+        // room, so Dismiss below does not move (Ali, 2026-11-19,
+        // inventory-tng-2lad).
+        <p
+          class={cartKey === difference.key ? undefined : "invisible"}
+          aria-hidden={cartKey === difference.key ? undefined : "true"}
+        >
+          {say(IN_CART)}
+        </p>
       )}
     </>
   );
