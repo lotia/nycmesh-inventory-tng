@@ -138,6 +138,9 @@ def create_app(
     # Every administrator page but those one signed out or not yet set up
     # with TOTP must reach (sign_in_routes, reset_routes). A route here is
     # guarded whether or not it takes AdminSignedIn, resolved once a request.
+    # A loop, not one parent APIRouter: making a router here would make
+    # app.py a module of routes to tests/codebase/test_import_directions.py,
+    # which may not import other features' routes.
     for admin_pages in (
         account_routes,
         home_routes,

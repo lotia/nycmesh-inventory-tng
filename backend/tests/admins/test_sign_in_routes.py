@@ -402,6 +402,19 @@ def test_required_totp_sends_an_admin_without_it_to_set_it_up(
     assert client.get(paths.HOME).status_code == 200
 
 
+def test_a_sensitive_form_sends_one_without_required_totp_to_set_it_up_first(
+    client: TestClient, session: Session
+) -> None:
+    """The guard on every administrator router (app.py) runs before the
+    form's confirmation, so no code is asked for, or spent, first."""
+    new_admin(session, totp=False)
+    assert sign_in_with(client).status_code == 303
+    confirmed_long_ago(session)
+    sent = client.post(f"{paths.ACCOUNT}/sessions/end-others")
+    assert sent.status_code == 303
+    assert sent.headers["location"] == paths.NEW_AUTHENTICATOR
+
+
 def from_many_addresses(
     make_client: Callable[..., TestClient], client: TestClient
 ) -> Iterator[TestClient]:
