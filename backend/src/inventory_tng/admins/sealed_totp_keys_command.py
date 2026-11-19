@@ -24,7 +24,7 @@ def parse(
 ) -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         prog=prog,
-        description="TOTP keys at rest (DEPLOYMENT.md, TOTP keys).",
+        description="TOTP keys sealed at rest (DEPLOYMENT.md, TOTP keys).",
     )
     commands = parser.add_subparsers(dest="command", required=True)
     commands.add_parser("new", help="print a new key, for a new version's file")

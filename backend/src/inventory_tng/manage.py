@@ -30,7 +30,7 @@ COMMANDS: Commands = {
     ),
     "sealed-totp-keys": (
         "inventory_tng.admins.sealed_totp_keys_command",
-        "make a TOTP key, reseal with the newest, or retire authenticators",
+        "make a sealing key, reseal with the newest, or retire authenticators",
     ),
     "unit-readings": (
         "inventory_tng.catalogue.unit_readings_command",
