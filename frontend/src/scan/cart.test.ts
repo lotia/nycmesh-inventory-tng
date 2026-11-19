@@ -57,6 +57,7 @@ function keyed(draft: Draft): Body {
 const SHOWN = "99999999-9999-4999-8999-999999999999";
 
 import { CATALOGUE, cable, radio } from "../testing/catalogue";
+import { refusing } from "../testing/storage";
 
 /** A batch's problems, or a quantity's, as text, each name the page quoted
  * in it (outbox-notes.Said) in [brackets]. */
@@ -1389,13 +1390,7 @@ describe("the cart store, shared by tabs", () => {
   });
 
   test("when the browser will not store it, this tab's cart is the one saved", () => {
-    const refusing = {
-      getItem: () => null,
-      setItem: () => {
-        throw new DOMException("full", "QuotaExceededError");
-      },
-    } as unknown as Storage;
-    const store = new CartStore(CATALOGUE, refusing);
+    const store = new CartStore(CATALOGUE, refusing("setItem"));
     expect(store.change(filled())).toBe(false);
     expect(store.forSaving()?.lines).toEqual(filled().lines);
   });

@@ -426,7 +426,11 @@ test("a cart this build filled, which its tab recorded as a newer build took it 
   expect(await response.json()).toEqual({ transaction_id: saved });
 });
 
-test("a double tap on a line's Discard discards that line only; one that could not read a line stays, saying so, until its own Discard", async ({
+// What only a real browser shows: a real double click, both its clicks
+// landing before the page settles, and the ignored taps taken again on a
+// real clock. The rest of how a line's Discard behaves is in
+// ScanPage.older-build.test.tsx (inventory-tng-vtda.1).
+test("a double tap on a line's Discard discards that line only, and focuses the entry; once settled, a tap is taken again", async ({
   page,
 }) => {
   const cable = await ownCable(page);
@@ -436,8 +440,7 @@ test("a double tap on a line's Discard discards that line only; one that could n
   await leave(page, [
     { item_id: itemId, quantity: "3", open_package_key: open },
     { item_id: itemId, quantity: "5", open_package_key: open },
-    // A line no build wrote.
-    { quantity: "1" },
+    { item_id: itemId, quantity: "7", open_package_key: open },
   ]);
   await page.reload();
 
@@ -451,7 +454,7 @@ test("a double tap on a line's Discard discards that line only; one that could n
   ).toBeVisible();
   // Focus on the entry's heading, not the line that moved up.
   await expect(listing.locator("#older-0")).toBeFocused();
-  // Once the taps are taken again, its last line goes, and it stays.
+  // Once the taps are taken again, the next line goes too, alone.
   await expect(async () => {
     await lineDiscard(listing, `${cable}: 5 m from an open package`).click();
     await expect(listing.getByText(`${cable}: 5 m`)).toHaveCount(0, {
@@ -459,18 +462,6 @@ test("a double tap on a line's Discard discards that line only; one that could n
     });
   }).toPass();
   await expect(
-    listing.getByText("Could not read 1 previously added item, scan it again."),
+    listing.getByText(`${cable}: 7 m from an open package`),
   ).toBeVisible();
-  await expect(listing.getByRole("button")).toHaveText(["Discard"]);
-  await expect(async () => {
-    await listing.getByRole("button", { name: "Discard" }).click();
-    await expect(listing.getByText("Confirm discard")).toBeVisible({
-      timeout: 1000,
-    });
-  }).toPass();
-  await listing.getByRole("button", { name: "Discard" }).click();
-  await expect(listing).toHaveCount(0);
-  expect(
-    await page.evaluate(() => localStorage.getItem("inventory.outbox.v3")),
-  ).toBeNull();
 });

@@ -36,6 +36,7 @@ import {
   storedCart,
   UUID,
 } from "../testing/scan-page";
+import { refusingWrites } from "../testing/storage";
 import { ITEMS, MOVE, PICK_FROM, PICK_TO, PICK_YOUR_NAME } from "./batch";
 import {
   CHANGED_BEFORE_DISCARD,
@@ -180,15 +181,7 @@ describe("filling and saving a cart", () => {
     const outbox = open();
     await ready();
     fillMove();
-    const real = localStorage.setItem.bind(localStorage);
-    const setItem = vi
-      .spyOn(localStorage, "setItem")
-      .mockImplementation((key, value) => {
-        if (key === OUTBOX_KEY) {
-          throw new DOMException("full", "QuotaExceededError");
-        }
-        real(key, value);
-      });
+    const setItem = refusingWrites(OUTBOX_KEY);
     save();
     setItem.mockRestore();
     screen.getByText(say(NOT_SENT));
@@ -199,15 +192,7 @@ describe("filling and saving a cart", () => {
   test("a cart the browser would not keep says so, until it keeps it again", async () => {
     open();
     await ready();
-    const real = localStorage.setItem.bind(localStorage);
-    const setItem = vi
-      .spyOn(localStorage, "setItem")
-      .mockImplementation((key, value) => {
-        if (key === CART_KEY) {
-          throw new DOMException("full", "QuotaExceededError");
-        }
-        real(key, value);
-      });
+    const setItem = refusingWrites(CART_KEY);
     const NOT_KEEPING = say(NOT_KEEPING_PHRASE);
     fillMove();
     expectBold(screen.getByText(NOT_KEEPING).closest("li"), NOT_KEEPING);

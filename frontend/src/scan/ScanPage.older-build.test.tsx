@@ -15,7 +15,14 @@ import {
 } from "../shared/outbox-notes";
 import { telemetry } from "../shared/telemetry";
 import { CATALOGUE } from "../testing/catalogue";
-import { answering, deferred, json, saved, TOO_OLD } from "../testing/fetch";
+import {
+  answering,
+  deferred,
+  json,
+  keyReused,
+  saved,
+  TOO_OLD,
+} from "../testing/fetch";
 import {
   KEY,
   keep,
@@ -38,6 +45,7 @@ import {
   storedCart,
   UUID,
 } from "../testing/scan-page";
+import { refusingWrites } from "../testing/storage";
 import {
   ADDED_BACK as ADDED_BACK_PHRASE,
   DISCARD_CART,
@@ -77,17 +85,6 @@ import { ADD_DIFFERENCE, IN_CART } from "./recorded-elsewhere";
 // The camera, faked: it sees whatever a test puts in `inView`.
 vi.mock("./camera", () => ({ openCamera: vi.fn() }));
 
-/** Storage refusing every write to `key`, until restored. */
-function refusingWrites(key: string) {
-  const real = localStorage.setItem.bind(localStorage);
-  return vi.spyOn(localStorage, "setItem").mockImplementation((at, value) => {
-    if (at === key) {
-      throw new DOMException("full", "QuotaExceededError");
-    }
-    real(at, value);
-  });
-}
-
 describe("what an older build left", () => {
   const HEADING = say(CHECKED_OUT);
   const ADDED_BACK = say(ADDED_BACK_PHRASE);
@@ -104,8 +101,9 @@ describe("what an older build left", () => {
     timeStyle: "short",
   });
 
-  /** A move of two boxes of radios and some cable, waiting under v3. */
-  function leaveSave(fields = {}) {
+  /** A move of two boxes of radios and some cable, waiting under v3, but
+   * for `fields`, and `body` in its body. */
+  function leaveSave(fields = {}, body = {}) {
     keep("inventory.outbox.v3", [
       olderSave(
         moveBody({
@@ -114,6 +112,7 @@ describe("what an older build left", () => {
             { item_id: 100, quantity: "8", package_id: 1000 },
             { item_id: 101, quantity: "3", open_package_key: KEY },
           ],
+          ...body,
         }),
         { what: "Move: 2 items from Hub to Van", queuedAt: AT, ...fields },
       ),
@@ -304,9 +303,7 @@ describe("what an older build left", () => {
     leaveSave();
     open();
     await ready();
-    const setItem = vi.spyOn(localStorage, "setItem").mockImplementation(() => {
-      throw new DOMException("full", "QuotaExceededError");
-    });
+    const setItem = refusingWrites();
     fireEvent.click(
       within(listing()).getByRole("button", { name: say(ADD_TO_CART) }),
     );
@@ -329,9 +326,7 @@ describe("what an older build left", () => {
     ]);
     open();
     await ready();
-    const setItem = vi.spyOn(localStorage, "setItem").mockImplementation(() => {
-      throw new DOMException("full", "QuotaExceededError");
-    });
+    const setItem = refusingWrites();
     const [save] = within(listing()).getAllByRole("listitem");
     fireEvent.click(lastDiscard(save as HTMLElement));
     fireEvent.click(lastDiscard(save as HTMLElement));
@@ -353,15 +348,7 @@ describe("what an older build left", () => {
     ]);
     open();
     await ready();
-    const real = localStorage.setItem.bind(localStorage);
-    const setItem = vi
-      .spyOn(localStorage, "setItem")
-      .mockImplementation((key, value) => {
-        if (key === "inventory.outbox.v3") {
-          throw new DOMException("full", "QuotaExceededError");
-        }
-        real(key, value);
-      });
+    const setItem = refusingWrites("inventory.outbox.v3");
     fireEvent.click(
       within(listing()).getAllByRole("button", {
         name: say(ADD_TO_CART),
@@ -518,16 +505,12 @@ describe("what an older build left", () => {
 
   test("one that only took from an open package has nothing to put back: its line, discarded, takes it", async () => {
     const record = vi.spyOn(telemetry, "record");
-    leaveSave({
-      body: {
-        key: KEY,
-        kind: "move",
-        volunteer_id: 1,
-        from_location_id: 10,
-        to_location_id: 12,
+    leaveSave(
+      {},
+      {
         lines: [{ item_id: 101, quantity: "3", open_package_key: KEY }],
       },
-    });
+    );
     open();
     await ready();
     within(listing()).getByText(noted(RESCAN));
@@ -580,19 +563,15 @@ describe("what an older build left", () => {
   });
 
   test("a line's Discard, once it has gone, does not become the next line's", async () => {
-    leaveSave({
-      body: {
-        key: KEY,
-        kind: "move",
-        volunteer_id: 1,
-        from_location_id: 10,
-        to_location_id: 12,
+    leaveSave(
+      {},
+      {
         lines: [
           { item_id: 101, quantity: "3", open_package_key: KEY },
           { item_id: 101, quantity: "5", open_package_key: KEY },
         ],
       },
-    });
+    );
     open();
     await ready();
     const first = discardOf("Cat6 cable: 3 m from an open package");
@@ -608,13 +587,9 @@ describe("what an older build left", () => {
 
   test("just after a line's Discard, taps on its entry's buttons are ignored, so a double tap discards one line", async () => {
     vi.useFakeTimers({ shouldAdvanceTime: true });
-    leaveSave({
-      body: {
-        key: KEY,
-        kind: "move",
-        volunteer_id: 1,
-        from_location_id: 10,
-        to_location_id: 12,
+    leaveSave(
+      {},
+      {
         lines: [
           { item_id: 101, quantity: "3", open_package_key: KEY },
           { item_id: 101, quantity: "5", open_package_key: KEY },
@@ -622,7 +597,7 @@ describe("what an older build left", () => {
           { item_id: 100, quantity: "8", package_id: 1000 },
         ],
       },
-    });
+    );
     open();
     await ready();
     fireEvent.click(discardOf("Cat6 cable: 3 m from an open package"));
@@ -672,19 +647,15 @@ describe("what an older build left", () => {
 
   test("one that could not read some lines stays, saying so, once its last line listed is discarded, until it is discarded itself", async () => {
     vi.useFakeTimers({ shouldAdvanceTime: true });
-    leaveSave({
-      body: {
-        key: KEY,
-        kind: "move",
-        volunteer_id: 1,
-        from_location_id: 10,
-        to_location_id: 12,
+    leaveSave(
+      {},
+      {
         lines: [
           { item_id: 101, quantity: "3", open_package_key: KEY },
           { item_id: "lots" },
         ],
       },
-    });
+    );
     open();
     await ready();
     const unread = "Could not read 1 previously added item, scan it again.";
@@ -712,9 +683,7 @@ describe("what an older build left", () => {
     leaveSave();
     open();
     await ready();
-    const setItem = vi.spyOn(localStorage, "setItem").mockImplementation(() => {
-      throw new DOMException("full", "QuotaExceededError");
-    });
+    const setItem = refusingWrites();
     fireEvent.click(discardOf("Cat6 cable: 3 m from an open package"));
     setItem.mockRestore();
     within(listing()).getByText(NOT_DISCARDED);
@@ -1194,9 +1163,15 @@ describe("what an older build left", () => {
     );
 
   /** The batch endpoint as the ledger answers a key (scan/batch.py, _replay):
-   * the same lines again are the first transaction, others are refused.
-   * `written` holds the lines saved under each key, in order. */
-  function ledger(written: Map<string, string>) {
+   * a new key is saved as the next transaction; the same lines again under
+   * a key are its transaction; others are refused, once `held` lets it,
+   * saying what was recorded only when `saying`, as a server since
+   * inventory-tng-0gg does. `written` holds the lines saved under each key,
+   * in order. */
+  function ledger(
+    written: Map<string, Body["lines"]>,
+    { saying = false, held = Promise.resolve() as Promise<unknown> } = {},
+  ) {
     return answering(async (request) => {
       if (isCatalogue(request)) {
         return json(CATALOGUE, 200);
@@ -1204,15 +1179,21 @@ describe("what an older build left", () => {
       const body = await request.clone().json();
       const first = written.get(body.key);
       if (first === undefined) {
-        written.set(body.key, linesOf(body));
+        written.set(body.key, body.lines);
         return saved(written.size);
       }
-      return first === linesOf(body)
-        ? json(
-            { transaction_id: [...written.keys()].indexOf(body.key) + 1 },
-            200,
-          )
-        : json({ reason: "key_reused" }, 409);
+      const transaction = [...written.keys()].indexOf(body.key) + 1;
+      if (linesOf({ lines: first }) === linesOf(body)) {
+        return json({ transaction_id: transaction }, 200);
+      }
+      await held;
+      if (!saying) {
+        return json({ reason: "key_reused" }, 409);
+      }
+      return keyReused(
+        first.map((line) => ({ ...line, quantity: `${line.quantity}.000` })),
+        { transaction_id: transaction },
+      );
     });
   }
 
@@ -1221,7 +1202,7 @@ describe("what an older build left", () => {
    * saved first. */
   async function putBackSavedFirst() {
     leaveMoves([KEY, AT, [radios(1)]]);
-    const written = new Map([[KEY, linesOf({ lines: [radios(1)] })]]);
+    const written = new Map([[KEY, [radios(1)]]]);
     const { api, sent } = ledger(written);
     const outbox = open(api);
     await ready();
@@ -1321,49 +1302,6 @@ describe("what an older build left", () => {
     within(entry).getByRole("button", { name: say(DISMISS) });
   });
 
-  /** The batch endpoint as a server since inventory-tng-0gg answers a
-   * key whose first batch held `first`: the same again is that
-   * transaction (1); another is refused, saying what was recorded, once
-   * `held` lets it. */
-  function recordingLedger(
-    first: { quantity: string }[],
-    held: Promise<unknown> = Promise.resolve(),
-  ) {
-    return answering(async (request) => {
-      if (isCatalogue(request)) {
-        return json(CATALOGUE, 200);
-      }
-      const body = await request.clone().json();
-      if (body.key !== KEY) {
-        return saved(2);
-      }
-      if (linesOf(body) === linesOf({ lines: first })) {
-        return json({ transaction_id: 1 }, 200);
-      }
-      await held;
-      const lines = first.map((line) => ({
-        package_id: null,
-        package_size: null,
-        open_package_key: null,
-        whole: null,
-        ...line,
-        quantity: `${line.quantity}.000`,
-      }));
-      const recorded = {
-        transaction_id: 1,
-        kind: "move",
-        volunteer_id: 1,
-        from_location_id: 10,
-        to_location_id: 12,
-        install_number: null,
-        lines,
-        used_up: [],
-        lengths: [],
-      };
-      return json({ reason: "key_reused", recorded }, 409);
-    });
-  }
-
   const RECORDED_HEADING = "Recorded in another tab in transaction 1";
 
   /** `first` put back without a tap, saved first by the older build's
@@ -1378,10 +1316,10 @@ describe("what an older build left", () => {
     leaveMoves([KEY, AT, first]);
     const refusal = deferred();
     open(
-      recordingLedger(
-        first as { quantity: string }[],
-        meanwhile === undefined ? undefined : refusal.promise,
-      ).api,
+      ledger(new Map([[KEY, first]]), {
+        saying: true,
+        held: meanwhile === undefined ? undefined : refusal.promise,
+      }).api,
     );
     await ready();
     await screen.findByText(ADDED_BACK);
@@ -1495,7 +1433,7 @@ describe("what an older build left", () => {
         },
       });
     storeOutbox([refused(2), refused(3)]);
-    const written = new Map([[KEY, linesOf({ lines: [boxed(1)] })]]);
+    const written = new Map([[KEY, [boxed(1)]]]);
     const { api, sent } = ledger(written);
     open(api);
     await ready();
@@ -1606,23 +1544,9 @@ describe("what an older build left", () => {
   test("a cart not put back, refused as a tab of a newer build recorded it changed, lists no changes of its own (inventory-tng-0gg review)", async () => {
     // That tab took the cart over and changed it: what differs is its
     // change, not this cart's, which nothing here could add back.
-    const { api } = answering(async (request) => {
-      if (isCatalogue(request)) {
-        return json(CATALOGUE, 200);
-      }
-      const recorded = {
-        transaction_id: 1,
-        kind: "move",
-        volunteer_id: 1,
-        from_location_id: 10,
-        to_location_id: 12,
-        install_number: null,
-        lines: [],
-        used_up: [],
-        lengths: [],
-      };
-      return json({ reason: "key_reused", recorded }, 409);
-    });
+    const { api } = answering((request) =>
+      isCatalogue(request) ? json(CATALOGUE, 200) : keyReused(),
+    );
     open(api);
     await ready();
     fillMove();
@@ -1645,7 +1569,7 @@ describe("what an older build left", () => {
     );
     // The older tab's request, in flight as this page loaded, saved it
     // whole, the cable taken from an open package included.
-    const written = new Map([[KEY, linesOf(first.body)]]);
+    const written = new Map([[KEY, first.body.lines]]);
     open(ledger(written).api);
     await ready();
     fireEvent.click(discardOf("Cat6 cable: 3 m from an open package"));
@@ -1694,7 +1618,7 @@ describe("what an older build left", () => {
     const key = JSON.parse(left).batchKey;
     // The older build's tab recorded it under its key, its request in
     // flight as this page loaded and took the cart over.
-    const written = new Map([[key, linesOf({ lines: [radios(1)] })]]);
+    const written = new Map([[key, [radios(1)]]]);
     const outbox = open(ledger(written).api);
     await ready();
     await screen.findByText(ADDED_BACK);
@@ -1747,7 +1671,7 @@ describe("what an older build left", () => {
     // As this build keeps it, once a newer build reads it.
     leaveSave({ state: "refused", reason: { code: "key_reused" } });
     // The ledger holds another batch under its key.
-    const written = new Map([[KEY, "another"]]);
+    const written = new Map([[KEY, []]]);
     const outbox = open(ledger(written).api);
     await ready();
     // Said from its code, in this build's words.
@@ -1790,15 +1714,7 @@ describe("what an older build left", () => {
 
   test("one the browser would not keep in the cart says so, and is not tried again", async () => {
     leaveMoves([KEY, AT, [radios(1)]]);
-    const real = localStorage.setItem.bind(localStorage);
-    const setItem = vi
-      .spyOn(localStorage, "setItem")
-      .mockImplementation((key, value) => {
-        if (key === CART_KEY) {
-          throw new DOMException("full", "QuotaExceededError");
-        }
-        real(key, value);
-      });
+    const setItem = refusingWrites(CART_KEY);
     open();
     await ready();
     await screen.findByText(NOT_KEPT);

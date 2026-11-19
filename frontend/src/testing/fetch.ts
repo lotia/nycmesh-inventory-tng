@@ -37,3 +37,37 @@ export function deferred() {
   });
   return { promise, resolve };
 }
+
+/** The batch endpoint refusing a batch under a key it holds for another
+ * (409 key_reused), saying what it recorded there: volunteer 1's move of
+ * `lines` from the hub (10) to the van (12), in transaction 1. Each line's
+ * forms default to none; any field of `recorded` given replaces its
+ * default. */
+export const keyReused = (
+  lines: object[] = [],
+  recorded: Record<string, unknown> = {},
+): Response =>
+  json(
+    {
+      reason: "key_reused",
+      recorded: {
+        transaction_id: 1,
+        kind: "move",
+        volunteer_id: 1,
+        from_location_id: 10,
+        to_location_id: 12,
+        install_number: null,
+        lines: lines.map((line) => ({
+          package_id: null,
+          package_size: null,
+          open_package_key: null,
+          whole: null,
+          ...line,
+        })),
+        used_up: [],
+        lengths: [],
+        ...recorded,
+      },
+    },
+    409,
+  );

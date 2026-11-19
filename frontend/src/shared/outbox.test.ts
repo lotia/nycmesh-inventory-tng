@@ -2,7 +2,14 @@ import { v4 as uuid } from "uuid";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import openapi from "../api/openapi.json";
 import { messages as pseudo } from "../locales/pseudo.po";
-import { answering, deferred, json, saved, TOO_OLD } from "../testing/fetch";
+import {
+  answering,
+  deferred,
+  json,
+  keyReused,
+  saved,
+  TOO_OLD,
+} from "../testing/fetch";
 import { keep, outboxEntry, storeOutbox } from "../testing/saves";
 import { refusing } from "../testing/storage";
 import { Builds, HEADER, MUST_UPGRADE } from "./build";
@@ -684,31 +691,14 @@ describe("refusals", () => {
 });
 
 describe("what another tab recorded (inventory-tng-0gg)", () => {
-  /** The server's 409 for a key whose transaction 41 held `lines`. */
+  /** The server's 409 for a key whose transaction 41, from location 1 to
+   * 2, held `lines`. */
   const recordedReply = (lines = [{ item_id: 5, quantity: "3.000" }]) =>
-    json(
-      {
-        reason: "key_reused",
-        recorded: {
-          transaction_id: 41,
-          kind: "move",
-          volunteer_id: 1,
-          from_location_id: 1,
-          to_location_id: 2,
-          install_number: null,
-          lines: lines.map((line) => ({
-            package_id: null,
-            package_size: null,
-            open_package_key: null,
-            whole: null,
-            ...line,
-          })),
-          used_up: [],
-          lengths: [],
-        },
-      },
-      409,
-    );
+    keyReused(lines, {
+      transaction_id: 41,
+      from_location_id: 1,
+      to_location_id: 2,
+    });
 
   const changed = () => draft({ lines: [{ item_id: 5, quantity: "4" }] });
 
