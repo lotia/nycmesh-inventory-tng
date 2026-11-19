@@ -11,7 +11,7 @@ from urllib.parse import urlencode
 
 from babel.support import LazyProxy
 from fastapi import Depends
-from sqlalchemy import ColumnElement, and_, or_
+from sqlalchemy import ColumnElement, and_
 from sqlalchemy.orm import Session
 
 from inventory_tng.core.db_sessions import DbSession
@@ -74,7 +74,11 @@ class Waiting(NamedTuple):
 
     kind: Kind
     items: list[ItemWaiting]
-    total: int
+
+    @property
+    def total(self) -> int:
+        """How many wait, every item's together."""
+        return sum(line.count for line in self.items)
 
 
 def only_item(session: DbSession, item: str = "") -> Item | None:
@@ -118,14 +122,12 @@ def needs_action(session: Session) -> list[Waiting]:
     # Every kind's read at once (inventory-tng-hqk), each package marked
     # with the kinds it waits for: it may wait for more than one.
     picks = [and_(*kind.where) for kind in kinds]
-    shown = open_packages.shown(session, or_(*picks), marks=picks)
+    marked = open_packages.marked(session, picks)
     found = []
     for n, kind in enumerate(kinds):
-        if items := by_item(each for each in shown if each.marks[n]):
-            found.append(Waiting(kind, items, sum(line.count for line in items)))
+        if items := by_item(each for each, met in marked if met[n]):
+            found.append(Waiting(kind, items))
     # Lines, not open packages: its own rows.
     if over := over_recorded_routes.by_item(session):
-        found.append(
-            Waiting(over_recorded_routes.KIND, over, sum(o.count for o in over))
-        )
+        found.append(Waiting(over_recorded_routes.KIND, over))
     return found

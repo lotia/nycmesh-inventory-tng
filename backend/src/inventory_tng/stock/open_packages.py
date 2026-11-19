@@ -14,7 +14,7 @@ from typing import Literal, NamedTuple
 
 import structlog
 from opentelemetry import metrics
-from sqlalchemy import ColumnElement, exc, select
+from sqlalchemy import ColumnElement, exc, or_, select
 from sqlalchemy.orm import Session
 
 from inventory_tng.core.db_errors import enforce
@@ -343,18 +343,28 @@ class Shown(NamedTuple):
     place: str
     left: Decimal
     reported_by: str | None
-    # Whether it meets each of shown()'s `marks`, in their order: None
-    # where SQL says NULL, which a where would not have met either.
-    marks: tuple[bool | None, ...] = ()
 
 
-def shown(
+def shown(session: Session, *where: ColumnElement[bool]) -> list[Shown]:
+    """Open packages not closed, `where` says which, oldest first."""
+    return [each for each, _ in _read(session, where, ())]
+
+
+def marked(
+    session: Session, marks: Sequence[ColumnElement[bool]]
+) -> list[tuple[Shown, tuple[bool | None, ...]]]:
+    """Open packages not closed that meet any of `marks`, oldest first,
+    each beside whether it meets each, in their order, read in the same
+    statement: None where SQL says NULL, which a where would not have met
+    either."""
+    return _read(session, (or_(*marks),), marks)
+
+
+def _read(
     session: Session,
-    *where: ColumnElement[bool],
-    marks: Sequence[ColumnElement[bool]] = (),
-) -> list[Shown]:
-    """Open packages not closed, `where` says which, oldest first; each
-    with whether it meets each of `marks`, read in the same statement."""
+    where: Iterable[ColumnElement[bool]],
+    marks: Sequence[ColumnElement[bool]],
+) -> list[tuple[Shown, tuple[bool | None, ...]]]:
     rows = session.execute(
         select(
             OpenPackage,
@@ -374,7 +384,7 @@ def shown(
     ).all()
     left = balance.left_on(session, [row for row, *_ in rows])
     return [
-        Shown(row, item, package, unit, place, left[row.id], by, tuple(met))
+        (Shown(row, item, package, unit, place, left[row.id], by), tuple(met))
         for row, item, package, unit, place, by, *met in rows
     ]
 
