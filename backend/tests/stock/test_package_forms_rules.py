@@ -12,7 +12,6 @@ import pytest
 from sqlalchemy import exc, select
 from sqlalchemy.orm import Session
 
-from inventory_tng.models.admins import Admin
 from inventory_tng.models.catalogue import Item, ItemPackage
 from inventory_tng.models.stock import LedgerTransaction
 from inventory_tng.stock import open_packages
@@ -45,6 +44,7 @@ from helpers.package_forms import (
     quantities_by_form,
 )
 from helpers.rows import add, breaks, tag, violates
+from helpers.sign_in import new_admin_id
 from helpers.stock import Spools
 
 STORE, VAN = 100, 101
@@ -386,8 +386,8 @@ def test_a_closed_open_package_is_refused_through_the_ledger(
     session: Session, spools: Spools
 ) -> None:
     made = spools.opened()
-    closer = add(session, Admin(username=f"closer-{tag()}"))
-    made.closed_at, made.closed_by_admin_id = datetime.now(UTC), closer.id
+    closer = new_admin_id(session)
+    made.closed_at, made.closed_by_admin_id = datetime.now(UTC), closer
     session.flush()
     with breaks(session, "movement_open_package_closed"):
         spools.move(Entry(spools.cable.id, Decimal(1), Form(open_package_id=made.id)))
@@ -474,11 +474,11 @@ def test_opening_a_package_is_no_move_to_a_count(
     written, not asked for again."""
     as_of = moment(session, spools.store.id)
     spools.opened()
-    counter = add(session, Admin(username=f"counter-{tag()}"))
+    counter = new_admin_id(session)
     counted = record_count(
         session,
         uuid.uuid4(),
-        counter.id,
+        counter,
         spools.store.id,
         [(spools.cable.id, Decimal(610))],
         as_of,

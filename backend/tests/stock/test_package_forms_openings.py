@@ -10,13 +10,12 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 from structlog.testing import capture_logs
 
-from inventory_tng.models.admins import Admin
 from inventory_tng.models.stock import OpenPackage
 from inventory_tng.scan import batch_schemas
 from inventory_tng.stock import open_packages
 
 from helpers.package_forms import quantities_by_form
-from helpers.rows import add, tag
+from helpers.sign_in import new_admin_id
 from helpers.stock import URL, Spools, cut, sealed_line
 
 # Opening on the scan page.
@@ -289,8 +288,8 @@ def test_taking_from_an_open_package_is_refused_saying_why(
     assert refused(elsewhere) == [
         (["lines", 0, "open_package_key"], "open_package_elsewhere")
     ]
-    closer = add(session, Admin(username=f"closer-{tag()}"))
-    made.closed_at, made.closed_by_admin_id = datetime.now(UTC), closer.id
+    closer = new_admin_id(session)
+    made.closed_at, made.closed_by_admin_id = datetime.now(UTC), closer
     session.flush()
     assert refused(spools.place.batch(lines=[cut(made, "1")])) == [
         (["lines", 0, "open_package_key"], "open_package_closed")

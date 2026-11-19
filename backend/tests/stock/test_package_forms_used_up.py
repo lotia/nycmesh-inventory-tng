@@ -11,7 +11,6 @@ from fastapi.testclient import TestClient
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from inventory_tng.models.admins import Admin
 from inventory_tng.models.catalogue import ItemPackage
 from inventory_tng.models.stock import AdjustmentReason, LedgerTransaction, OpenPackage
 from inventory_tng.stock import (
@@ -28,7 +27,8 @@ from inventory_tng.stock.ledger import (
 
 from helpers.markup import button, forms, links, read, text, words_on
 from helpers.package_forms import quantities_by_form
-from helpers.rows import add, tag
+from helpers.rows import add
+from helpers.sign_in import new_admin_id
 from helpers.stock import URL, Spools, cut
 
 # Volunteers report an open package used up (8i4.133.5).
@@ -448,12 +448,12 @@ def test_closing_or_clearing_twice_changes_nothing_more(
     admin_client: TestClient, session: Session, spools: Spools
 ) -> None:
     made = reported(session, spools)
-    closer = add(session, Admin(username=f"closer-{tag()}"))
-    assert open_packages.close(session, 999999, closer.id, datetime.now(UTC)) is None
+    closer = new_admin_id(session)
+    assert open_packages.close(session, 999999, closer, datetime.now(UTC)) is None
     assert open_packages.clear(session, made.id) is True
     assert open_packages.clear(session, made.id) is False
-    first = open_packages.close(session, made.id, closer.id, datetime.now(UTC))
-    again = open_packages.close(session, made.id, closer.id, datetime.now(UTC))
+    first = open_packages.close(session, made.id, closer, datetime.now(UTC))
+    again = open_packages.close(session, made.id, closer, datetime.now(UTC))
     assert (first, again) == (open_packages.Closed(False, 0), None)
     # Ticked when no longer reported: left as it is.
     done = admin_client.post(
@@ -467,10 +467,10 @@ def test_an_open_package_showing_nothing_closes_with_nothing_written_off(
 ) -> None:
     made = spools.opened()
     spools.move(Entry(spools.cable.id, Decimal(305), Form(open_package_id=made.id)))
-    closer = add(session, Admin(username=f"closer-{tag()}"))
-    assert open_packages.close(session, made.id, closer.id, datetime.now(UTC))
+    closer = new_admin_id(session)
+    assert open_packages.close(session, made.id, closer, datetime.now(UTC))
     assert not session.scalars(
-        select(LedgerTransaction).where(LedgerTransaction.admin_id == closer.id)
+        select(LedgerTransaction).where(LedgerTransaction.admin_id == closer)
     ).first()
 
 
@@ -479,9 +479,9 @@ def test_a_confirm_after_a_clear_closes_nothing(
 ) -> None:
     """Confirming checks the report still stands, once the package is locked."""
     made = spools.opened()
-    closer = add(session, Admin(username=f"closer-{tag()}"))
+    closer = new_admin_id(session)
     when = datetime.now(UTC)
-    assert open_packages.close(session, made.id, closer.id, when, reported=True) is None
+    assert open_packages.close(session, made.id, closer, when, reported=True) is None
     assert made.closed_at is None
     assert balance.left_on(session, []) == {}
 
