@@ -25,13 +25,10 @@ type Watched = {
 
 /**
  * Collects what the policy refuses in `context`'s pages, as each one's
- * securitypolicyviolation events say; in a context that runs no scripts,
- * where no listener can be added, as the browser's console does. There an
- * inline script is never run, so never refused: only styles and what a
- * page loads are checked (the backend's template test refuses inline
- * script). Not its reports: Chromium sends those by the Reporting API,
- * over HTTPS only. A context a test opens itself is watched with this too,
- * and checked with `assertNone`.
+ * securitypolicyviolation events say, or its console where no script can
+ * listen. Without scripts an inline script is never run, so never refused:
+ * the backend's template test refuses those. A context a test opens itself
+ * is watched with this too, and checked with `assertNone`.
  */
 export async function watch(
   context: BrowserContext,
