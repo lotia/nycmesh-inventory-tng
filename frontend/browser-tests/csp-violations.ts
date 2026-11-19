@@ -26,10 +26,12 @@ type Watched = {
 /**
  * Collects what the policy refuses in `context`'s pages, as each one's
  * securitypolicyviolation events say; in a context that runs no scripts,
- * where no listener can be added, as the browser's console does. Not its
- * reports: Chromium sends those by the Reporting API, over HTTPS only. A
- * context a test opens itself is watched with this too, and checked with
- * `assertNone`.
+ * where no listener can be added, as the browser's console does. There an
+ * inline script is never run, so never refused: only styles and what a
+ * page loads are checked (the backend's template test refuses inline
+ * script). Not its reports: Chromium sends those by the Reporting API,
+ * over HTTPS only. A context a test opens itself is watched with this too,
+ * and checked with `assertNone`.
  */
 export async function watch(
   context: BrowserContext,
@@ -38,7 +40,9 @@ export async function watch(
   const found: string[] = [];
   if (!javaScriptEnabled) {
     context.on("console", (message) => {
-      // Each browser's own words, which both say this.
+      // Chromium's "violates the following Content Security Policy
+      // directive" and WebKit's "directive of the Content Security Policy",
+      // for every kind of refusal.
       if (/Content Security Policy/.test(message.text())) {
         found.push(`${message.text()} on ${message.page()?.url()}`);
       }
