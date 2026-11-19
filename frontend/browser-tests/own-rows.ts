@@ -158,7 +158,7 @@ export async function record(page: Page): Promise<Response> {
 export const test = base.extend<{
   ownAdmin: { page: Page; password: string };
 }>({
-  ownAdmin: async ({ page, browser }, use) => {
+  ownAdmin: async ({ page, browser, javaScriptEnabled }, use) => {
     const { username, link } = await invite(page);
     const context = await browser.newContext({
       // Not the shared session, which a new context otherwise starts with.
@@ -176,8 +176,13 @@ export const test = base.extend<{
     await admin.getByRole("button", { name: "Sign in" }).click();
     await expect(admin).toHaveURL(/\/admin$/);
     await use({ page: admin, password });
-    await settled(context);
-    await context.close();
+    try {
+      if (javaScriptEnabled) {
+        await settled(context);
+      }
+    } finally {
+      await context.close();
+    }
     assertNone(violations);
   },
 });

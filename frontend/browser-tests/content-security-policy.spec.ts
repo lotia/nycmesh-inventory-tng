@@ -39,6 +39,16 @@ test("a violation made by a test's last action is caught too", async ({
   violations.length = 0;
 });
 
+test("a test whose last action starts a navigation is checked too", async ({
+  page,
+}) => {
+  await page.goto("/scan");
+  // The document is replaced while the fixture asks it for its refusals.
+  await page.evaluate(() => {
+    location.href = "/admin";
+  });
+});
+
 test("the scan page may compile the decoder's WebAssembly", async ({
   page,
 }) => {

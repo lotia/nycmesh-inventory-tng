@@ -6,7 +6,12 @@
  * from here, or from own-rows.ts, which extends it, never Playwright's own
  * (biome.json).
  */
-import { type BrowserContext, test as base, expect } from "@playwright/test";
+import {
+  type BrowserContext,
+  test as base,
+  expect,
+  type Page,
+} from "@playwright/test";
 
 /** What a page's securitypolicyviolation event says. */
 type Violation = { directive: string; blocked: string; target: string };
@@ -64,17 +69,31 @@ export async function watch(context: BrowserContext): Promise<string[]> {
 /**
  * Until the refusals made in `context`'s pages so far, by a test's last
  * action too, have reached the test. A page that is navigating is waited
- * for first. Its pages must run scripts: one that does not cannot be asked.
+ * for, and the document it loads asked; one that closed has nothing more
+ * to give. A refusal the old document had not yet reported when it was
+ * left is lost with it. Only a page's main frame is asked. Its pages must
+ * run scripts: one that does not cannot be asked.
  */
 export async function settled(context: BrowserContext): Promise<void> {
-  await Promise.all(
-    context.pages().map(async (page) => {
+  await Promise.all(context.pages().map(pageSettled));
+}
+
+async function pageSettled(page: Page): Promise<void> {
+  for (;;) {
+    try {
       await page.waitForLoadState();
       await page.evaluate(() =>
         (window as unknown as Partial<Watched>).policySettled?.(),
       );
-    }),
-  );
+      return;
+    } catch (error) {
+      if (page.isClosed()) return;
+      // A navigation replaced the document while it was asked.
+      if (!String(error).includes("Execution context was destroyed")) {
+        throw error;
+      }
+    }
+  }
 }
 
 /** Fails after the test if a page of its context violated the policy. */
