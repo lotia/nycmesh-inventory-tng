@@ -2,7 +2,7 @@
 worth of labels (inventory-tng-8i4.60.24): `mise run measure-labels`. Not a
 test: pytest collects it only when named, as that task does. It fills a
 database of its own with items, packages and places, a label for each and
-some revoked, and years of saves (measure_catalogue's), then prints the
+some revoked, and years of saves (helpers/years_of_saves.py), then prints the
 plan of each statement that reads labels, as run, and how long each search
 takes on GET /admin/labels and its /suggest."""
 

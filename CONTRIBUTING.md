@@ -1165,11 +1165,11 @@ beside it, so it cannot starve the tests beside it.
 mise run measure-catalogue   # MEASURE_YEARS=10 MEASURE_PER_DAY=80 for more
 ```
 
-It fills a database of its own with years of saves, sealed and open (five
-years of 40 a day unless told otherwise), prints the plan of each ledger
-query the scan page's catalogue makes, as run (`EXPLAIN (ANALYZE,
-BUFFERS)`), and times `GET /api/catalogue`. It is not one of the checks:
-run it after changing those queries (inventory-tng-kcz).
+It fills a database of its own with years of saves, sealed and open
+(`tests/helpers/years_of_saves.py`, as many as its settings say), prints
+the plan of each ledger query the scan page's catalogue makes, as run
+(`EXPLAIN (ANALYZE, BUFFERS)`), and times `GET /api/catalogue`. It is not
+one of the checks: run it after changing those queries (inventory-tng-kcz).
 
 ### Measuring the labels list
 
@@ -1178,7 +1178,7 @@ mise run measure-labels      # MEASURE_ITEMS=3000 for more labels
 ```
 
 It fills a database of its own with thousands of labels, some revoked, and
-the catalogue's years of saves (its settings apply), prints the plan of
+the same years of saves (their settings apply), prints the plan of
 each statement the labels list and its suggestions send, and times a few
 typical searches. It is not one of the checks: run it after changing the
 labels list's search (inventory-tng-8i4.60.24).
