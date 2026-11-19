@@ -8,9 +8,9 @@ amended 2026-11-11 (tracking opened packages is a setting; bulk actions)
 length; "Needs your action") · amended 2026-11-14 (recorded more than
 moved; those settled listed, 2026-11-15) · amended 2026-11-18 (an item's
 open packages listed fewest left first, short ends after the usable ones
-on the scan page and flagged; its sealed packages largest first on the stock pages,
-smallest first on the item, scan and count pages; packages of one size
-by id)
+on the scan page and flagged; its sealed packages largest first on the
+stock pages, smallest first on the item, scan and count pages; packages
+of one size by id)
 
 ## Context
 

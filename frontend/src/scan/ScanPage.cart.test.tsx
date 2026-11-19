@@ -379,7 +379,12 @@ describe("filling and saving a cart", () => {
   test("a short end's card is flagged, a usable one and one showing nothing are not", async () => {
     // Ali, 2026-11-18, inventory-tng-j5c2.
     await cableWith(
-      spool({ id: 6, key: "22222222-2222-4222-8222-222222222222", left: "0" }),
+      spool({
+        id: 6,
+        key: "22222222-2222-4222-8222-222222222222",
+        left: "0",
+        short_below: "15.000",
+      }),
       spool({
         id: 9,
         key: "33333333-3333-4333-8333-333333333333",
@@ -393,6 +398,8 @@ describe("filling and saving a cart", () => {
       (card) => within(card).queryByText(say(SHORT_END)) !== null,
     );
     expect(flagged).toEqual([false, true, false]);
+    // One showing nothing is never a short end too, whatever its package.
+    within(cards[2] as HTMLElement).getByText(say(SHOWS_NOTHING_LEFT));
     // In the legend, so read out with the card, as "Shows nothing left" is.
     expect(
       screen.getByRole("group", {
