@@ -47,10 +47,11 @@ required, and for migrations only `MIGRATION_DATABASE_URL`.
   address and scheme come from its headers.
 - `RATE_LIMIT_PER_ADDRESS`: attempts from one address in a minute at signing
   in, setup, recovery, and asking for or using a reset link, each counted
-  apart; 10 unless set. `RATE_LIMIT_PER_ACCOUNT`: codes for one
-  administrator in 15 minutes, or their password where it stands in for
-  one, at signing in and to confirm; 10 unless set. Leave both unset in
-  production: they are raised for the browser tests, which sign in and
+  apart. `RATE_LIMIT_PER_ACCOUNT`: codes for one administrator in the
+  window `admins/accounts.py` gives it (`_per_account`), or their password
+  where it stands in for one, at signing in and to confirm. Each is
+  `core/settings.py`'s default unless set (`RateLimits`). Leave both unset
+  in production: they are raised for the browser tests, which sign in and
   confirm many times over.
 - `RATE_LIMIT_PAGE_REPORTS`: reports the scan and register pages send of
   themselves from one address in a minute; `core/settings.py`'s default
@@ -122,8 +123,9 @@ client address, and errors without their messages (docs/decisions/0008). To
 see more of one for a while:
 
 1. Set `LOG_REDACTION_OFF_UNTIL` or `TRACE_REDACTION_OFF_UNTIL` to a time at
-   most `REDACTION_OFF_MAX_HOURS` (default 6) hours away, such as
-   `2026-11-07T18:00Z`, and restart. The app refuses a time further off.
+   most `REDACTION_OFF_MAX_HOURS` hours away (`core/settings.py`'s default
+   unless set), such as `2026-11-07T18:00Z`, and restart. The app refuses a
+   time further off.
 2. While it is off, each process's starting line is a warning saying until
    when, and each warns again hourly. Every log line carries
    `redaction=off`, or every span `inventory.redaction=off`. Secrets stay

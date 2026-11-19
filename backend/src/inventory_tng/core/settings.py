@@ -162,8 +162,9 @@ class RateLimits:
     (admins/accounts.py). From one address, in a minute: signing in, setting up
     the first administrator, recovery, and asking for or using a reset
     link, each counted apart (RATE_LIMIT_PER_ADDRESS). For one
-    administrator, in 15 minutes: codes, or the password where it stands
-    in for one, at signing in and to confirm (RATE_LIMIT_PER_ACCOUNT).
+    administrator, in admins/accounts.py's window (_per_account): codes, or
+    the password where it stands in for one, at signing in and to confirm
+    (RATE_LIMIT_PER_ACCOUNT).
     And how many reports may come from one address in a minute: of
     themselves, from the pages (scan/page_telemetry_api.py,
     RATE_LIMIT_PAGE_REPORTS), and of what the policy refused, from
