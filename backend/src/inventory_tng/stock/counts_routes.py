@@ -9,7 +9,9 @@ that moment, so a save made at the place meanwhile still applies, and an
 item it moved comes back to count again. The moment is read without the
 place's lock, so showing the form holds up no save there; a save under way
 as it was shown, committed after with an id inside the moment, refuses the
-count (changed_since_shown), and the form is shown again as it is now.
+count (changed_since_shown). Which items that save moved cannot be told, so
+the form is shown again as it is now, keeping what was typed, to be checked
+and sent again.
 
 The pages check what was typed before writing, but an item's unit may
 change to each between that check and the write: the ledger then refuses
@@ -46,7 +48,7 @@ from sqlalchemy.orm import Session
 from inventory_tng.admins.guards import AdminSignedIn, SignedIn
 from inventory_tng.catalogue.items_listing import SEARCHED
 from inventory_tng.core.db_errors import refusal
-from inventory_tng.core.db_sessions import DbSession, by_name
+from inventory_tng.core.db_sessions import DbSession, SnapshotSession, by_name
 from inventory_tng.core.phrases import Words, gettext, in_query, lazy_gettext, ngettext
 from inventory_tng.core.sent_forms import form_key
 from inventory_tng.models.admins import Admin
@@ -101,6 +103,13 @@ ONCE = "movement_item_once"
 TWICE = lazy_gettext(
     "An item is on this form more than once. Each item is counted once, so "
     "it isn't clear which number is right: nothing was saved."
+)
+# A count refused as a save under way when its form was shown committed
+# after (counts.record_count): what was typed is kept.
+SAVED_AS_SHOWN = lazy_gettext(
+    "Not saved: something here was saved just as you opened this count, so "
+    "the records may say otherwise now. What you typed is kept: check it "
+    "and save again."
 )
 COUNTS_TITLE = lazy_gettext("Counts and adjustments")
 
@@ -401,10 +410,13 @@ def _count_page(
 def count_form(
     request: Request,
     signed: AdminSignedIn,
-    session: DbSession,
+    session: SnapshotSession,
     location_id: int,
     shown: ShownItems,
 ) -> Response:
+    # One snapshot: the form's moment and every figure it shows, so it saw
+    # each save there up to its moment that it shows, and a count is
+    # refused only for one it did not (counts.record_count).
     place = queries.countable_place(session, location_id)
     if place is None:
         return not_found()
@@ -651,15 +663,17 @@ def count(
             # As for a place there is not, as the form's own page answers.
             return not_found()
         if broken == CHANGED:
-            # What was typed may be of before that save or after it: the
-            # form as it is now, to count again.
+            # What was typed may be of before that save or after it, of
+            # items it cannot tell: the form as it is now, with a new key,
+            # keeping what was typed, to check and send again.
             return _count_page(
                 request,
                 session,
                 signed,
                 place,
                 moment(session, place.id),
-                alert=RULES[CHANGED],
+                values={name: value for name, value in form.items() if name != "key"},
+                alert=SAVED_AS_SHOWN,
                 items=sent_items,
                 shown=shown,
                 status_code=409,

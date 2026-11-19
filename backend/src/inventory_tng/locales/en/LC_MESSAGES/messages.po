@@ -2233,6 +2233,13 @@ msgid ""
 "is now: make your change again."
 msgstr ""
 
+#: src/inventory_tng/stock/counts_routes.py
+msgid ""
+"Not saved: something here was saved just as you opened this count, so the"
+" records may say otherwise now. What you typed is kept: check it and save"
+" again."
+msgstr ""
+
 #: src/inventory_tng/templates/catalogue/reading_rule.html
 msgid "Not saved: these names would read as one. Rename one of each first."
 msgstr ""

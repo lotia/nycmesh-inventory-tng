@@ -192,7 +192,7 @@ def record_count(
 
     An item that moved there since may have been counted before the move or
     after it, so its line is not written: it comes back to count again. The
-    rest are written against the records as of `as_of`, so a move saved
+    rest are written against the records as of `shown.as_of`, so a move saved
     meanwhile still applies on top.
 
     Found more, or nothing differed, is a count into the place under the key;

@@ -4,7 +4,8 @@
 unregistered device is blocked), 2026-11-03 (counts, retired items),
 2026-11-06 (counting while stock moves), 2026-11-08 by 0016 (where the
 rules live, balance), 2026-11-09 (stock at a retired place), 2026-11-11
-by 0020 (sealed and open packages), 2026-11-15 (counting some items)
+by 0020 (sealed and open packages), 2026-11-15 (counting some items),
+2026-11-18 (a count form's moment read without a lock)
 
 ## Context
 
@@ -43,15 +44,14 @@ while. So we need more than one location from the start.
   of a place writes what differs, found or lost, and a count that matches is
   written with no lines, so when a place was last counted is known. A count is
   true for the moment its form was shown, so moves saved while it is under way
-  still apply. Showing the form takes no lock, so it never holds up a save;
-  a save under way as it was shown, committed after, refuses the count, and
-  the form is shown again as it is now (inventory-tng-0um). An item that
-  moved at the place meanwhile might have been counted before or after the
-  move, so its line is not saved; the page asks for it again, and saves
-  every other line (Ali, 2026-11-03). A count asks for each
-  form of an item separately, and may add or close an open package (0020). It
-  also puts right the end at that place of a line recorded more than moved
-  (0020). A count names each item once: a form naming one twice is refused,
+  still apply. An item that moved at the place meanwhile might have been
+  counted before or after the move, so its line is not saved; the page asks
+  for it again, and saves every other line (Ali, 2026-11-03). Showing the
+  form holds up no save; one under way then that commits after refuses the
+  whole count, keeping what was typed (amendment, 2026-11-18). A count asks
+  for each form of an item separately, and may add or close an open package
+  (0020). It also puts right the end at that place of a line recorded more
+  than moved (0020). A count names each item once: a form naming one twice is refused,
   saying why, as it isn't clear which number is right (Ali, 2026-11-08). A
   place's count page can show one item, or those whose names match a search
   as the items list searches; then only those are counted, and the rest stay
@@ -83,3 +83,23 @@ is or how it got there.
   wrong. Counting catches the error later.
 - There is one store today, which receives the sheet's opening counts. A
   second store, or a hub, is just another store location.
+
+## Amendment: a count form's moment, read without a lock (2026-11-18)
+
+Decided in implementing inventory-tng-0um on 2026-11-18, for Ali to
+confirm. Showing a count form took its place's lock for a moment, holding
+up volunteers' saves there. It now reads, with no lock, the place's latest
+ledger transaction and how many there it saw. A save under way then may
+commit after with an id inside that moment. The count, holding the place,
+counts the place's transactions up to the moment again, and if there are
+more, it is refused whole. Which items that save moved cannot be told from
+the form, so unlike an item moved meanwhile (Ali, 2026-11-03) no line is
+saved: the form is shown again as the records are now, keeping what was
+typed, to check and save again. The form reads its moment and its figures
+on one snapshot, so a save committing as it is shown is in both or in
+neither.
+
+We rejected carrying each line's figure shown (many fields, and it misses
+counts by form), comparing PostgreSQL's transaction snapshots (exact, but
+it ties the ledger to transaction ids' internals), and taking the lock
+without waiting (it still holds up saves).

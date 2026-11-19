@@ -27,8 +27,9 @@ from inventory_tng.models.stock import AdjustmentReason, LedgerTransaction, Move
 from inventory_tng.places import locations
 from inventory_tng.site_settings.forms import REASON_TAKEN
 from inventory_tng.site_settings.paths import SETTINGS
-from inventory_tng.stock.counts import record_adjustment, record_count
-from inventory_tng.stock.counts_routes import COUNT_KIND
+from inventory_tng.stock import counts_routes
+from inventory_tng.stock.counts import Counted, record_adjustment, record_count
+from inventory_tng.stock.counts_routes import COUNT_KIND, SAVED_AS_SHOWN
 from inventory_tng.stock.forms import (
     FOUND_OR_OFF,
     ON_THE_FORM_TWICE,
@@ -558,8 +559,8 @@ def test_a_count_of_a_place_changed_before_its_moment_is_shown_again(
     """A save there older than the form's moment that it did not see (one
     under way as it was shown, committed after, as
     test_a_save_under_way_as_the_form_was_shown_refuses_the_count makes):
-    nothing is written, and the form is shown again as it is now, to count
-    again."""
+    nothing is written, and the form is shown again as it is now, keeping
+    what was typed, to check and send again."""
     place = stocked(session)
     path = f"{COUNTS}/{place.store.id}"
     shown = count_form(admin_client.get(path))
@@ -569,12 +570,12 @@ def test_a_count_of_a_place_changed_before_its_moment_is_shown_again(
             path, data=unseen | {f"counted_{place.item.id}": "4"}
         )
     assert refused.status_code == 409
-    assert str(RULES["changed_since_shown"]) in text(refused)
+    assert str(SAVED_AS_SHOWN) in text(refused)
     assert counts_written(session) == []
     again = count_form(refused)
     assert again["key"] != shown["key"]
     assert (again["as_of"], again["seen"]) == (shown["as_of"], shown["seen"])
-    assert f'name="counted_{place.item.id}" inputmode="decimal" value="5"' in (
+    assert f'name="counted_{place.item.id}" inputmode="decimal" value="4"' in (
         refused.text
     )
     assert {
@@ -609,19 +610,47 @@ def test_a_count_form_does_not_wait_for_a_save_under_way_at_the_place(
     saving.rollback()
 
 
+def _into_store(place: Place) -> dict[str, object]:
+    return {
+        "kind": "receipt",
+        "from_location_id": None,
+        "to_location_id": place.store.id,
+    }
+
+
+def _into_van(place: Place) -> dict[str, object]:
+    return _into_store(place) | {"to_location_id": place.van.id}
+
+
+# A save under way as a count form of the store is shown, drawing its id
+# before a later save there that commits first: its fields (Place.batch's
+# default is a move out of the store), whether it commits, and whether the
+# count is refused.
+UNDER_WAY: dict[str, tuple[Callable[[Place], dict[str, object]], bool, bool]] = {
+    "into the place": (_into_store, True, True),
+    "out of the place": (lambda _: {}, True, True),
+    "at another place": (_into_van, True, False),
+    "rolled back": (_into_store, False, False),
+}
+
+
 @pytest.mark.concurrency
+@pytest.mark.parametrize("case", UNDER_WAY)
 def test_a_save_under_way_as_the_form_was_shown_refuses_the_count(
-    own_committed: Committed,
+    own_committed: Committed, case: str
 ) -> None:
-    """A save that drew its id before a later one there, and commits after
-    the form was shown, is older than the form's moment but was not in it:
-    the count, holding the place, finds it and is refused, writing nothing."""
+    """A save at the place that drew its id before a later one there, and
+    commits after the form was shown, is older than the form's moment but
+    was not in it: the count, holding the place, finds it and is refused,
+    writing nothing. One at another place, or one rolled back, leaving a
+    gap in the ids, refuses nothing."""
+    fields, commits, refuses = UNDER_WAY[case]
     setup = own_committed.session()
     place = Place(setup)
     admin, _ = new_admin(setup)
     setup.commit()
     saving = own_committed.session()
-    early = received(saving, place)
+    early = write(saving, place, **fields(place))
     later = own_committed.session()
     late = received(later, place, [{"item_id": place.cable.id, "quantity": "20"}])
     later.commit()
@@ -630,9 +659,13 @@ def test_a_save_under_way_as_the_form_was_shown_refuses_the_count(
     shown = moment(counting, place.store.id)
     assert shown == Moment(as_of=late.id, seen=1)
     counting.rollback()
-    saving.commit()
-    with pytest.raises(RuleBroken) as refused:
-        record_count(
+    if commits:
+        saving.commit()
+    else:
+        saving.rollback()
+
+    def count() -> Counted:
+        return record_count(
             counting,
             uuid.uuid4(),
             admin.id,
@@ -640,9 +673,17 @@ def test_a_save_under_way_as_the_form_was_shown_refuses_the_count(
             [(place.cable.id, Decimal(18))],
             shown,
         )
-    assert refused.value.rule == "changed_since_shown"
-    counting.rollback()
-    assert counts_written(counting) == []
+
+    if refuses:
+        with pytest.raises(RuleBroken) as refused:
+            count()
+        assert refused.value.rule == "changed_since_shown"
+        counting.rollback()
+        assert counts_written(counting) == []
+    else:
+        count()
+        assert len(counts_written(counting)) == 1
+        counting.rollback()
 
 
 @pytest.mark.concurrency
@@ -701,6 +742,39 @@ def test_leftovers_of_a_retired_item_can_be_written_off(
 
 
 @pytest.mark.concurrency
+@pytest.mark.end_to_end
+def test_a_count_form_reads_its_moment_and_figures_on_one_snapshot(
+    committed: Committed,
+    make_client: Callable[..., TestClient],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """On a session of its own, as in production: REPEATABLE READ, so a
+    save committing between its moment and its figures is in neither, and
+    a count of what it shows is not refused for one it did."""
+    place = committed_place(committed)
+    setup = committed.session()
+    _, totp = new_admin(setup)
+    setup.commit()
+    seen: list[tuple[str, str]] = []
+    read = counts_routes.moment
+
+    def isolation(session: Session, location_id: int) -> Moment:
+        shown = session.execute(
+            sql_text(
+                "SELECT current_setting('transaction_isolation'),"
+                " current_setting('transaction_read_only')"
+            )
+        ).one()
+        seen.append(tuple(shown))
+        return read(session, location_id)
+
+    monkeypatch.setattr(counts_routes, "moment", isolation)
+    client = make_client(own_sessions=True)
+    assert sign_in_with(client, key=totp).status_code == 303
+    assert client.get(f"{COUNTS}/{place.store.id}").status_code == 200
+    assert seen == [("repeatable read", "on")]
+
+
 @pytest.mark.end_to_end
 @pytest.mark.parametrize("kind", ["count", "adjustment"])
 def test_a_unit_changed_to_each_as_the_page_writes_is_said_and_nothing_is_written(
