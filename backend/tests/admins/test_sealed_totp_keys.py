@@ -216,13 +216,11 @@ def test_startup_and_the_command_find_a_key_replaced_under_its_version(
             admin_id = new_admin(session)[0].id
             bob, bob_key = new_admin(session, "bob")
             assert bob_key is not None
-            bobs = session.scalars(
-                select(Authenticator).where(Authenticator.admin_id == bob.id)
-            ).one()
-            bobs.key_version, bobs.sealed_key = replaced.seal(bob_key, bob.id)
-            authenticator_id = session.scalars(
-                select(Authenticator.id).where(Authenticator.admin_id == admin_id)
-            ).one()
+            of = {a.admin_id: a for a in session.scalars(select(Authenticator))}
+            of[bob.id].key_version, of[bob.id].sealed_key = replaced.seal(
+                bob_key, bob.id
+            )
+            authenticator_id = of[admin_id].id
             session.commit()
         with capture_logs() as logs:
             check_totp_keys(database, replaced)

@@ -330,9 +330,8 @@ def _opened(keys: TotpKeys, authenticator: Authenticator) -> str | None:
 
 
 def unreadable_authenticators(session: Session, keys: TotpKeys) -> int:
-    """How many current authenticators `keys` cannot open, found as
-    retire_authenticators finds them: their key version is gone, or its file
-    now holds another key. Each is opened, one AES-GCM decryption apiece."""
+    """How many current authenticators `keys` cannot open (_opened). Each is
+    opened, one AES-GCM decryption apiece."""
     current = session.scalars(select(Authenticator).where(CURRENT_TOTP))
     return sum(_opened(keys, authenticator) is None for authenticator in current)
 
