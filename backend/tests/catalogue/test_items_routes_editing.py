@@ -22,7 +22,12 @@ from inventory_tng.catalogue.forms import (
 )
 from inventory_tng.catalogue.paths import ITEMS
 from inventory_tng.core.local_time import DEFAULT_ZONE
-from inventory_tng.models.catalogue import Category, Item, ItemPackage
+from inventory_tng.models.catalogue import (
+    Category,
+    Item,
+    ItemPackage,
+    reading_rules_held,
+)
 from inventory_tng.models.places import Location
 from inventory_tng.models.stock import LedgerTransaction, Movement
 from inventory_tng.web.forms import (
@@ -39,6 +44,7 @@ from inventory_tng.web.forms import (
 
 from helpers.items import NOW, new_item
 from helpers.markup import hidden_fields, links, read, text
+from helpers.query_counts import counting
 from helpers.rows import add, history, named, shown
 
 
@@ -474,6 +480,28 @@ def test_taken_by_skips_the_item_itself(session: Session, radios: Category) -> N
     # Its own name and old code are no clash with itself.
     assert items.taken_by(session, asked, item.id) is None
     assert items.taken_by(session, asked) == ("name", item)
+
+
+def test_taken_by_looks_only_for_the_refusing_index_field(
+    session: Session, radios: Category
+) -> None:
+    """Named by the violated index, only its field's holder is looked for,
+    in one statement; an index it does not know looks for each field."""
+    named_alike = new_item(session, radios, "LiteBeam")
+    coded = add(session, Item(name="Omni", category_id=radios.id, old_code="NYCM-1"))
+    asked = items.Fields.new(name="Lite beam", category_id=radios.id, old_code="NYCM-1")
+    rules = reading_rules_held(session)
+    with counting(session) as sent:
+        found = items.taken_by(session, asked, None, rules, "uq_item_old_code")
+    assert found == ("old_code", coded)
+    assert len(sent) == 1
+    assert items.taken_by(session, asked, None, rules, "uq_other") == (
+        "name",
+        named_alike,
+    )
+    # The holder gone meanwhile: none, though another field is taken.
+    gone = items.Fields.new(name="Lite beam", category_id=radios.id, old_code="NYCM-2")
+    assert items.taken_by(session, gone, None, rules, "uq_item_old_code") is None
 
 
 def test_a_name_close_to_others_asks_first(

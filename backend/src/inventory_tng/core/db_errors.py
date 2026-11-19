@@ -2,7 +2,7 @@
 unable to answer just now, which is a 503."""
 
 from collections.abc import Callable
-from typing import TYPE_CHECKING, Any, Literal
+from typing import TYPE_CHECKING, Any, Literal, Self
 
 import structlog
 from fastapi import FastAPI, Request
@@ -61,13 +61,32 @@ def enforce(broken: str | None, *, when: bool = True) -> None:
         raise RuleBroken(broken)
 
 
+class Unique(str):
+    """attempt's "unique", equal to it, so a page compares it as any rule's
+    name, and naming the unique index broken, if the database said which
+    (unique_index)."""
+
+    constraint: str | None
+
+    def __new__(cls, constraint: str | None) -> Self:
+        made = super().__new__(cls, "unique")
+        made.constraint = constraint
+        return made
+
+
+def unique_index(broken: str | None) -> str | None:
+    """The unique index attempt() said `broken` was, if it said one."""
+    return broken.constraint if isinstance(broken, Unique) else None
+
+
 def attempt[T](
     session: Session, change: Callable[[], T]
 ) -> tuple[T | None, str | None]:
     """Run `change` in a savepoint, with nothing of it kept if it breaks a
-    rule: what it returned, and None; or None, and "unique" if it broke a
-    unique index (as each table's index compares, such as an item's name
-    ignoring case, spaces and punctuation, retired items' too), the name of
+    rule: what it returned, and None; or None, and "unique" (a Unique,
+    naming the index) if it broke a unique index (as each table's index
+    compares, such as an item's name ignoring case, spaces and
+    punctuation, retired items' too), the name of
     the check constraint it broke, or the rule a domain function refused it
     by (RuleBroken), so a page can say why in its own words. Any other
     failure is raised. Locks taken in `change` go with the savepoint,
@@ -81,9 +100,9 @@ def attempt[T](
             return None, error.rule
         if isinstance(error, exc.IntegrityError):
             sqlstate = getattr(error.orig, "sqlstate", None)
-            if sqlstate == UNIQUE_VIOLATION:
-                return None, "unique"
             constraint = describe_error(error).get("constraint")
+            if sqlstate == UNIQUE_VIOLATION:
+                return None, Unique(constraint)
             if sqlstate == CHECK_VIOLATION and constraint:
                 return None, constraint
         # Such as Gone, or any other failure: raised.

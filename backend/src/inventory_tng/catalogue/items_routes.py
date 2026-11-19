@@ -124,7 +124,7 @@ def _change_or_note[T](
         log.debug("close names asked about", item_id=item_id, found=len(asked or ()))
         return None, CLOSE
     if broken in ("unique", items.NAME_IS_ALIAS):
-        field, words = forms.taken(session, fields, typed, item_id)
+        field, words = forms.taken(session, fields, typed, item_id, broken)
         problems[field] = words
     elif broken == items.READ_ALIKE:
         problems["name"] = forms.read_alike(session, typed)

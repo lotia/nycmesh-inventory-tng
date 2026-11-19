@@ -15,6 +15,7 @@ from sqlalchemy.orm import Session
 from inventory_tng.catalogue import items, reading_rules, units
 from inventory_tng.catalogue.name_keys import nameless
 from inventory_tng.catalogue.reading_rules import chosen_rule, read_alike_words
+from inventory_tng.core.db_errors import unique_index
 from inventory_tng.core.phrases import Words, gettext, lazy_gettext
 from inventory_tng.models.base import INTEGER_MAX, whole
 from inventory_tng.models.catalogue import (
@@ -89,17 +90,23 @@ def _retired(other: Item, words: str) -> str:
 
 
 def taken(
-    session: Session, fields: items.Fields, typed: Typed, item_id: int | None
+    session: Session,
+    fields: items.Fields,
+    typed: Typed,
+    item_id: int | None,
+    broken: str,
 ) -> tuple[str, Words]:
-    """The field another item already has, its name's units read as the
-    form's answers say too, and words naming that item."""
-    found = items.taken_by(session, fields, item_id, typed.rules)
+    """The field another item already has, by the unique index or rule
+    `broken` that refused it, its name's units read as the form's answers
+    say too, and words naming that item."""
+    refused_by = unique_index(broken) or broken
+    found = items.taken_by(session, fields, item_id, typed.rules, refused_by)
     field, other = found or ("name", None)
     # Beside the name, whose field "alias" is.
     shown = "name" if field == "alias" else field
     log.debug(
         "item refused",
-        rule="unique",
+        rule=refused_by,
         field=field,
         item_id=item_id,
         other_item_id=other and other.id,

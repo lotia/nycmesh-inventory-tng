@@ -184,16 +184,29 @@ def _held_by(
     return None
 
 
+# The field of another item each of Item's unique indexes, or the alias
+# rule, refuses a change for (taken_by).
+FIELD_REFUSED_BY = {
+    "uq_item_name": "name",
+    "uq_item_unit_key": "name",
+    "uq_item_manufacturer_part_number": "part_number",
+    "uq_item_old_code": "old_code",
+    NAME_IS_ALIAS: "alias",
+}
+
+
 def taken_by(
     session: Session,
     fields: Fields,
     item_id: int | None = None,
     rules: units.Rules | None = None,
+    refused_by: str | None = None,
 ) -> tuple[str, Item] | None:
     """The field of `fields` another item than `item_id` already has, and
     that item, as the unique indexes compare them, its name's units read by
     `rules` (Keys.of), or "alias" and the other item whose alias the name
-    is: a unique violation says neither. None if none has, as when the
+    is. Given the index or rule that refused it (FIELD_REFUSED_BY), only that
+    field is looked for; else each in turn. None if none has, as when the
     other changed meanwhile."""
     keys = Keys.of(session, fields.name, rules)
     wanted: list[tuple[str, ColumnElement[bool]]] = [
@@ -209,6 +222,8 @@ def taken_by(
         wanted.append(("part_number", both))
     if fields.old_code is not None:
         wanted.append(("old_code", Item.old_code == fields.old_code))
+    if (field := FIELD_REFUSED_BY.get(refused_by or "")) is not None:
+        wanted = [(name, where) for name, where in wanted if name == field]
     return _held_by(session, wanted, item_id)
 
 
