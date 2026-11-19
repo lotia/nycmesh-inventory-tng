@@ -94,40 +94,58 @@ def test_arguments_without_a_command_are_refused(
     assert "required: command" in capsys.readouterr().err
 
 
-# For each entry point in turn, in one fresh interpreter: its package's
-# modules once it is imported, then which of its commands' modules, and of
-# the others named, one command's help imported.
+# In a fresh interpreter: the entry point's package's modules once it is
+# imported, then which of its commands' modules, and of the others named,
+# one command's help imported.
 IMPORTED = """
 import contextlib, importlib, io, sys
-for module, package, name, others in zip(*[iter(sys.argv[1:])] * 4):
-    entry = importlib.import_module(module)
-    print(*sorted(m for m in sys.modules if m.startswith(package)))
-    with contextlib.redirect_stdout(io.StringIO()), contextlib.suppress(SystemExit):
-        entry.main([name, "--help"])
-    watched = [m for m, _ in entry.COMMANDS.values()] + others.split()
-    print(*(m for m in watched if m in sys.modules))
+module, name, *others = sys.argv[1:]
+package = module.split(".")[0] + "."
+entry = importlib.import_module(module)
+print(*sorted(m for m in sys.modules if m.startswith(package)))
+with contextlib.redirect_stdout(io.StringIO()), contextlib.suppress(SystemExit):
+    entry.main([name, "--help"])
+watched = [m for m, _ in entry.COMMANDS.values()] + others
+print(*(m for m in watched if m in sys.modules))
 """
 
 
-def test_each_imports_only_the_command_chosen() -> None:
-    """In a fresh interpreter, as the other tests have imported them all.
-    The developer's database command imports the seed only to seed."""
+@pytest.mark.parametrize(
+    ("entry", "name", "others", "imported"),
+    [
+        pytest.param(
+            manage,
+            "scan-settings",
+            [],
+            [
+                [
+                    "inventory_tng.core",
+                    "inventory_tng.core.entry_point",
+                    "inventory_tng.manage",
+                ],
+                ["inventory_tng.site_settings.scan_settings_command"],
+            ],
+            id="manage",
+        ),
+        # The developer's database command imports the seed only to seed.
+        pytest.param(
+            devtools,
+            "database",
+            ["devtools.seed"],
+            [["devtools.__main__"], ["devtools.database"]],
+            id="devtools",
+        ),
+    ],
+)
+def test_it_imports_only_the_command_chosen(
+    entry: ModuleType, name: str, others: list[str], imported: list[list[str]]
+) -> None:
+    """In a fresh interpreter, as the other tests have imported them all."""
     shown = subprocess.run(
-        [
-            sys.executable,
-            "-c",
-            IMPORTED,
-            *("inventory_tng.manage", "inventory_tng.", "scan-settings", ""),
-            *("devtools.__main__", "devtools.", "database", "devtools.seed"),
-        ],
+        [sys.executable, "-c", IMPORTED, entry.__name__, name, *others],
         capture_output=True,
         text=True,
         check=True,
         cwd=BACKEND,
     )
-    assert shown.stdout.splitlines() == [
-        "inventory_tng.core inventory_tng.core.entry_point inventory_tng.manage",
-        "inventory_tng.site_settings.scan_settings_command",
-        "devtools.__main__",
-        "devtools.database",
-    ]
+    assert [line.split() for line in shown.stdout.splitlines()] == imported
