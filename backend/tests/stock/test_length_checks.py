@@ -347,7 +347,8 @@ def test_each_kind_has_its_page(
     only = f"?item={spools.cable.id}"
     said = text(admin_client.get(f"{LENGTHS}/reported{only}"))
     assert "said 250 m is on it" in said
-    # As text on purpose: nowhere in the main part, its attributes included.
+    # Exact markup on purpose: nowhere in the main part, its attributes
+    # included.
     assert str(length_checks_routes.KINDS[1].title) not in said.split("<main", 1)[1]
     gone = admin_client.get(f"{LENGTHS}/below-zero{only}").text
     assert "said 250 m" not in gone

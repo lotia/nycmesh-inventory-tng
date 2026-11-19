@@ -124,6 +124,7 @@ def test_the_notice_sections_are_the_sections_pages_say_notices_by() -> None:
     waits for a section no redirect may name."""
     shown = set()
     for template in TEMPLATES.rglob("*.html"):
+        # Exact markup on purpose: the templates' own source, not a page.
         shown |= set(re.findall(r'with section_id="([a-z-]+)"', template.read_text()))
     assert shown == pages.NOTICE_SECTIONS
 

@@ -240,6 +240,7 @@ def test_the_pages_render_without_this_module() -> None:
 def test_no_template_has_inline_script_or_style() -> None:
     """The policy refuses them: a page's script is a file Vite builds
     (frontend/src/admin.ts), its look a class in the shared stylesheet."""
+    # Exact markup on purpose: the templates' own source, not a page.
     inline = re.compile(
         r"<script(?![^>]*\bsrc=)[^>]*>|<style\b|\sstyle=|\son[a-z]+=|javascript:",
         re.IGNORECASE,
