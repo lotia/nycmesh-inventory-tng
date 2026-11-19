@@ -76,21 +76,18 @@ def test_dropped_only_when_named_to_confirm_then_made_again(
     made = facts(url)
     assert run_devtools(["database", "make"]) == 0
     assert facts(url) == made
-    again = f"To drop it and make it again, run: mise run reset-dev-database -- {name}"
-    assert run_devtools(["database", "drop"]) == 1
-    printed = capsys.readouterr()
-    assert printed.err == (
-        f"This checkout's database is {name}: nothing was dropped. {again}\n"
-    )
-    # Logged, as set_up configures logging: to stdout.
-    assert "development database drop refused" in printed.out
-    assert facts(url) == made
-    assert run_devtools(["database", "drop", "inventory"]) == 1
-    assert capsys.readouterr().err == (
-        f"This checkout's database is {name}, not inventory: nothing was"
-        f" dropped. {again}\n"
-    )
-    assert facts(url) == made
+    # No name, then a wrong one: each refused, naming the database.
+    for given, not_given in (([], ""), (["inventory"], ", not inventory")):
+        assert run_devtools(["database", "drop", *given]) == 1
+        printed = capsys.readouterr()
+        assert printed.err == (
+            f"This checkout's database is {name}{not_given}: nothing was dropped."
+            f" To drop it and make it again, run: mise run reset-dev-database"
+            f" -- {name}\n"
+        )
+        # Logged, as set_up configures logging: to stdout.
+        assert "development database drop refused" in printed.out
+        assert facts(url) == made
     assert run_devtools(["database", "drop", name]) == 0
     assert facts(url) is None
     # Made again, as reset-dev-database does after.
