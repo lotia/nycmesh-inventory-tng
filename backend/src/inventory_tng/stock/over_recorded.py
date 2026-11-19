@@ -8,8 +8,9 @@ each side, or marks it checked, as "Needs your action" on the home page
 asks. A count of its item at one of its ends, as of a moment after it,
 puts that end right; one counted at every end it has closes as counted
 (counted(); Ali, 2026-11-15, inventory-tng-qs8). Every write to the
-over_recorded table; what the pages read of it is in
-stock/over_recorded_queries.py."""
+over_recorded table, and what a save reads to make one (the places to
+lock, the openings a count asks after); what the over-recorded pages
+list and show is in stock/over_recorded_queries.py."""
 
 import uuid
 from collections.abc import Collection, Mapping, Sequence

@@ -181,9 +181,8 @@ short test. `core/` is the name FastAPI's full-stack template uses;
   settling and counting one, and `stock/over_recorded_queries.py` holds
   what the administrators' pages read and show of them. The queries
   import the few names they share from `stock/over_recorded.py`, never
-  the other way. A module named `<thing>_queries.py` is held to the
-  import rules of a `queries.py`. The tests kept their names: each
-  drives the pages, and so both modules.
+  the other way. The tests kept their names: each drives the pages, and
+  so both modules.
 - Older decision records keep the paths of their time. The tables below
   give each old path's new home; a later move adds its rows.
 
@@ -420,7 +419,11 @@ searched for (AGENTS.md rule 12).
 - **A feature's role files keep their names**: `queries.py`, `forms.py`,
   `paths.py` and `guards.py`, one of each per feature. Callers import
   names from them (`from inventory_tng.stock.queries import item_total`),
-  never the module under an alias such as `stock_queries`.
+  never the module under an alias such as `stock_queries`. Queries about
+  one thing that need a file of their own are named for it,
+  `<thing>_queries.py`, beside the feature's `queries.py` and held to its
+  import rules, as `stock/over_recorded_queries.py`
+  (inventory-tng-u3fp.10).
 - **`models/<feature>.py` keeps its name.** Callers import a model's
   names, never the module, so it never meets its feature's package of the
   same name under aliases. A function in it is named so it cannot be read
