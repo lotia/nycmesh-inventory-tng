@@ -6,7 +6,7 @@ dev-database, seed, reset-dev-database). Only with APP_ENV=development.
 
     uv run python -m devtools database make
     uv run python -m devtools database seed [--password PASSWORD]
-    uv run python -m devtools database drop NAME
+    uv run python -m devtools database drop [NAME]
 """
 
 import argparse
@@ -138,7 +138,10 @@ def main(argv: Sequence[str], prog: str) -> int:
     )
     seeding.add_argument("--password", help="the administrator's; else one is made")
     dropping = commands.add_parser("drop", help="drop this checkout's database")
-    dropping.add_argument("name", help="this checkout's database's name, to confirm")
+    # Optional, so that without it the refusal can say what the name is.
+    dropping.add_argument(
+        "name", nargs="?", help="this checkout's database's name, to confirm"
+    )
     args = parser.parse_args(argv)
     if args.command == "seed":
         # Only here: the seed imports most of the app, which make and drop
@@ -153,9 +156,11 @@ def main(argv: Sequence[str], prog: str) -> int:
     name = url.database
     if args.command == "drop":
         if args.name != name:
+            given = "" if args.name is None else f", not {args.name}"
             print(
-                f"This checkout's database is {name}, not {args.name}: nothing "
-                "was dropped.",
+                f"This checkout's database is {name}{given}: nothing was "
+                "dropped. To drop it and make it again, run: mise run "
+                f"reset-dev-database -- {name}",
                 file=sys.stderr,
             )
             return 1

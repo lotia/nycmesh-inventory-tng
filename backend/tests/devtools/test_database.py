@@ -67,7 +67,7 @@ def test_made_once_the_owners_and_held_to_its_limit(url: str) -> None:
         database.make(url.rsplit("/", 1)[0] + "/")
 
 
-def test_dropped_only_when_named_to_confirm(
+def test_dropped_only_when_named_to_confirm_then_made_again(
     url: str, capsys: pytest.CaptureFixture[str]
 ) -> None:
     name = make_url(url).database or ""
@@ -76,11 +76,23 @@ def test_dropped_only_when_named_to_confirm(
     made = facts(url)
     assert run_devtools(["database", "make"]) == 0
     assert facts(url) == made
+    again = f"To drop it and make it again, run: mise run reset-dev-database -- {name}"
+    assert run_devtools(["database", "drop"]) == 1
+    assert capsys.readouterr().err == (
+        f"This checkout's database is {name}: nothing was dropped. {again}\n"
+    )
+    assert facts(url) == made
     assert run_devtools(["database", "drop", "inventory"]) == 1
-    assert f"is {name}, not inventory: nothing was dropped" in capsys.readouterr().err
+    assert capsys.readouterr().err == (
+        f"This checkout's database is {name}, not inventory: nothing was"
+        f" dropped. {again}\n"
+    )
     assert facts(url) == made
     assert run_devtools(["database", "drop", name]) == 0
     assert facts(url) is None
+    # Made again, as reset-dev-database does after.
+    assert run_devtools(["database", "make"]) == 0
+    assert facts(url) not in (None, made)
 
 
 def test_only_in_development_and_on_one_database(
