@@ -2,18 +2,15 @@
 
 from datetime import UTC, datetime, timedelta
 
-from sqlalchemy.orm import Session
-
 from inventory_tng.admins import totp_codes
 
-from helpers.sign_in import code, new_admin
+from helpers.sign_in import code
 
 NOW = datetime(2026, 11, 2, 12, tzinfo=UTC)
 
 
-def test_a_code_a_step_either_side_is_accepted(session: Session) -> None:
-    _, key = new_admin(session)
-    assert key is not None
+def test_a_code_a_step_either_side_is_accepted() -> None:
+    key = totp_codes.new_totp_key()
     for offset in (-30, 30):
         typed = code(key, NOW + timedelta(seconds=offset))
         assert totp_codes.accepted_step(key, typed, None, NOW) is not None

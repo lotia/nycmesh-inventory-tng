@@ -163,9 +163,10 @@ short test. `core/` is the name FastAPI's full-stack template uses;
   codes left `admins/accounts.py` for `admins/totp_codes.py`
   (inventory-tng-u3fp.9), apart from `admins/totp_keys.py`, which seals
   those keys at rest. Its test of a code's time window moved alike. The
-  username, email and password checks stayed in `admins/accounts.py`:
-  in `admins/forms.py`, which imports `admins/accounts.py`, the
-  operator's invitation there would import them back, a cycle.
+  username, email and password checks stayed in `admins/accounts.py`.
+  Moved to `admins/forms.py`, which imports `admins/accounts.py`, they
+  would make a cycle: `admins/accounts.py`'s operator invitation checks
+  the username and email too.
 - Older decision records keep the paths of their time. The tables below
   give each old path's new home; a later move adds its rows.
 
