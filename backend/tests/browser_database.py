@@ -11,8 +11,8 @@ prepared.json, what the tests need, camera.y4m, the QR code of the seed's
 labelled item for Chromium to show as its camera, and totp-keys, a key
 of the run's own to seal authenticators with. It then serves the built
 frontend from that database on BROWSER_PORT until Playwright stops it, and
-drops the database and its files. A database a run leaves behind is dropped by a later run, as test
-databases are.
+drops the database and its files. A database a run leaves behind is dropped
+by a later run, as test databases are.
 """
 
 import argparse

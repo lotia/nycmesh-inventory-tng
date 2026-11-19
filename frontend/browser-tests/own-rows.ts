@@ -1,7 +1,7 @@
 /**
  * Rows a test makes for itself, so that what it changes no other test
- * reads: tests run at once, in each browser, against one database
- * (playwright.config.ts). Most through the administrator pages; saves of
+ * reads: tests run at once, in each browser, against one database, all
+ * but the crawl (playwright.config.ts). Most through the administrator pages; saves of
  * stock through the scan page's Record button (`record`).
  */
 import { randomUUID } from "node:crypto";

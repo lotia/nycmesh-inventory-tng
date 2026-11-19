@@ -20,9 +20,14 @@ import {
 // once, here in the main process, for the backends and the workers to
 // inherit (browser-tests/prepared.ts).
 process.env.BROWSER_RUN ??= join(tmpdir(), `inventory-browser-${process.pid}`);
-process.env.BROWSER_CRAWL_RUN ??= `${process.env.BROWSER_RUN}-crawl`;
+process.env.BROWSER_CRAWL_RUN ??= join(
+  tmpdir(),
+  `inventory-browser-${process.pid}-crawl`,
+);
 if (!process.env.BROWSER_PORT || !process.env.BROWSER_CRAWL_PORT) {
-  [process.env.BROWSER_PORT, process.env.BROWSER_CRAWL_PORT] = freePorts(2);
+  const [port, crawlPort] = freePorts(2);
+  process.env.BROWSER_PORT ||= port;
+  process.env.BROWSER_CRAWL_PORT ||= crawlPort;
 }
 // The administrator's session, signed in once for every test.
 const signedIn = adminState();

@@ -975,8 +975,8 @@ npm run coverage                 # Vitest, with coverage (npm test: without)
 Those are unit tests: Vitest runs the frontend's in a page it simulates
 (happy-dom), with no layout. The browser tests, in
 `frontend/browser-tests/`, are another kind: Playwright drives a real
-browser engine against the whole app, built frontend and all, from a
-database of their own (`backend/tests/browser_database.py`), at a phone's
+browser engine against the whole app, built frontend and all, from
+databases of their own (`backend/tests/browser_database.py`), at a phone's
 width, with a fake camera in Chromium that shows a seeded label. They check
 what only a real browser can, such as that no page scrolls sideways:
 
@@ -989,9 +989,10 @@ tests import `test` from `browser-tests/csp-violations.ts`, or
 `own-rows.ts`, which extends it, never from Playwright, which Biome
 refuses.
 
-The tests run at once, in several workers, against that one database, so
-none may change rows another reads: a test that changes data first makes the
-rows it changes, such as an item to move (`frontend/browser-tests/own-rows.ts`).
+The tests run at once, in several workers, all but the crawl (below)
+against one database, so none may change rows another reads: a test that
+changes data first makes the rows it changes, such as an item to move
+(`frontend/browser-tests/own-rows.ts`).
 Every test shares one administrator's session, signed in once, so what
 another test confirmed in it holds: a test of what a session asks for first
 takes an administrator of its own (`ownAdmin`, there too). The crawl of
@@ -1130,8 +1131,8 @@ the superuser. A whole test run, measured over 8 processes, holds about 70
 at once, all processes together; one process, and one database, held at most
 about 21; a dev app up to 20, as does each of the browser tests' two
 servers. So a checkout's checks and its app fit with room to spare, and so
-would three checkouts sharing `inventory-tng` (Local settings). Each test database
-allows twice the most measured on one (`TEST_CONNECTION_LIMIT` in
+would three checkouts sharing `inventory-tng` (Local settings). Each test
+database allows twice the most measured on one (`TEST_CONNECTION_LIMIT` in
 `tests/databases.py`), so a process that leaks connections is refused at its
 own database, not the server's limit, and a test that fails for either limit
 says which. Long before a leak reaches that limit, a test that ends with a
