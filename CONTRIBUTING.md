@@ -1078,7 +1078,10 @@ fixtures, hooks and what only they use; what tests share besides is in
 another. A test reads a page's HTML with `tests/helpers/markup.py`, which
 parses it with BeautifulSoup and lxml (a link's words and address, a button's
 class), not by matching its tags as text, unless the exact markup is the
-point, such as escaping or a no-break space, and says so.
+point, such as escaping or a no-break space, and says so. The frontend's
+tests read the page the same way: Testing Library's queries and the DOM
+(a class through `classList`), and the browser tests' locators, never its
+markup as text.
 
 Write a rule of more than one condition as a function of plain values,
 such as a map of each place's parent, that returns the rule broken or

@@ -241,6 +241,7 @@ describe("a newer build", () => {
       .closest("section") as HTMLElement;
     const note = within(list).getByText(say(SENDING));
     expect(note.tagName).toBe("SMALL");
+    // No class at all is the point: plain, not in any note's style.
     expect(note.className).toBe("");
   });
 

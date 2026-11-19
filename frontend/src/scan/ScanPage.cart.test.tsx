@@ -542,9 +542,9 @@ describe("filling and saving a cart", () => {
     fireEvent.click(screen.getByRole("button", { name: say(DISCARD_CART) }));
     // Row 15's pattern (Ali, inventory-tng-wyq).
     expect(screen.getByRole("alert").textContent).toBe(say(CONFIRM_DISCARD));
-    expect(screen.getByRole("button", { name: say(DISCARD) }).className).toBe(
-      "danger",
-    );
+    expect(
+      screen.getByRole("button", { name: say(DISCARD) }).classList,
+    ).toContain("danger");
     expect(
       screen.queryByRole("button", { name: say(DISCARD_CART) }),
     ).toBeNull();
@@ -810,7 +810,7 @@ describe("filling and saving a cart", () => {
     save();
     const note = await screen.findByText(
       (_, element) =>
-        element?.className === "alert" &&
+        element?.classList.contains("alert") === true &&
         element.textContent ===
           `Not recorded. Line 2: ${say(PROBLEMS.not_whole)}`,
     );
@@ -986,7 +986,7 @@ describe("filling and saving a cart", () => {
     // note in the list is there as the page loads (Ali, inventory-tng-93z).
     const note = await screen.findByText(say(NO_ANSWER));
     expect(note.tagName).toBe("STRONG");
-    expect(note.parentElement?.className).toBe("alert");
+    expect(note.parentElement?.classList).toContain("alert");
     expect(outbox.entries.value[0]).toMatchObject({
       state: "waiting",
       summary: { from: null, to: "Hub › Shelf A" },

@@ -145,7 +145,8 @@ describe("what an older build left", () => {
   const noted =
     (text: string) =>
     (_: string, element: Element | null): boolean =>
-      element?.className === "alert" && element.textContent === text;
+      element?.classList.contains("alert") === true &&
+      element.textContent === text;
 
   /** The Discard of a whole entry, `in` the listing's first by default,
    * after any of its lines' own; once tapped, the one confirming it. */
