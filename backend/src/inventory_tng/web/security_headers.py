@@ -232,18 +232,17 @@ def docs(request: Request) -> HTMLResponse:
 
 
 def violated(report: object) -> list[str]:
-    """Each violation's directive, from report-uri's one report, the
+    """Each violation's directive, "other" for one not in DIRECTIVES; one
+    that names none is left out. A report is report-uri's wrapped one, the
     Reporting API's list (its csp-violation reports, MOST_REPORTS at most),
-    or one report of the Reporting API's shape, which WebKit sends to
-    report-uri; "other" for one not in DIRECTIVES. One that names none is
-    left out."""
+    or one report of the list's shape, which WebKit sends to report-uri."""
     found: Iterable[object]
     if isinstance(report, dict) and isinstance(body := report.get("csp-report"), dict):
         # Older browsers name the whole directive, sources and all.
         named = body.get("violated-directive")
         first = named.split()[0] if isinstance(named, str) and named.strip() else None
         found = [body.get("effective-directive") or first]
-    elif isinstance(report, list | dict):
+    else:
         entries = report if isinstance(report, list) else [report]
         found = (
             entry["body"].get("effectiveDirective")
@@ -252,8 +251,6 @@ def violated(report: object) -> list[str]:
             and entry.get("type") == "csp-violation"
             and isinstance(entry.get("body"), dict)
         )
-    else:
-        return []
     return [
         name if isinstance(name, str) and name in DIRECTIVES else OTHER
         for name in found

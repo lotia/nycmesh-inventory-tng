@@ -24,6 +24,7 @@ from inventory_tng.core.settings import FrontendConfig, RateLimits
 from inventory_tng.web import security_headers
 from inventory_tng.web.frontend_bundle import MANIFEST
 
+from helpers.csp_reports import REPORT_URI, REPORTING_API, SHAPES
 from helpers.markup import read
 from helpers.source import TEMPLATES
 
@@ -262,45 +263,6 @@ def test_no_template_has_inline_script_or_style() -> None:
     assert found == {}
 
 
-# What browsers send: report-uri's one report, WebKit's in the Reporting
-# API's shape, and the Reporting API's list.
-REPORT_URI = {
-    "csp-report": {
-        "document-uri": "https://inventory.example/scan",
-        "blocked-uri": "https://elsewhere.example/x.js",
-        "effective-directive": "script-src-elem",
-        "violated-directive": "script-src-elem",
-        "original-policy": "default-src 'self'",
-    }
-}
-WEBKIT_REPORT_URI = {
-    "type": "csp-violation",
-    "url": "https://inventory.example/scan",
-    "body": {
-        "documentURL": "https://inventory.example/scan",
-        "effectiveDirective": "style-src-attr",
-        "blockedURL": "inline",
-        "disposition": "enforce",
-        "statusCode": 200,
-    },
-}
-REPORTING_API = [
-    {
-        "type": "csp-violation",
-        "url": "https://inventory.example/admin",
-        "user_agent": "Mozilla/5.0 (Phone)",
-        "body": {
-            "documentURL": "https://inventory.example/admin",
-            "blockedURL": "inline",
-            "effectiveDirective": "style-src-attr",
-            "sample": "color: red",
-        },
-    },
-    {"type": "deprecation", "body": {"id": "x"}},
-    {"type": "csp-violation", "body": {"effectiveDirective": "made-up-src"}},
-]
-
-
 def refusals(logs: list[MutableMapping[str, Any]]) -> list[object]:
     """Why the report endpoint said each refusal it logged was refused."""
     return [line["reason"] for line in logs if line["event"] == "policy report refused"]
@@ -322,9 +284,7 @@ def send(client: TestClient, report: object, content_type: str) -> Response:
 @pytest.mark.parametrize(
     ("report", "content_type", "found"),
     [
-        (REPORT_URI, "application/csp-report", ["script-src-elem"]),
-        (WEBKIT_REPORT_URI, "application/csp-report", ["style-src-attr"]),
-        (REPORTING_API, "application/reports+json", ["style-src-attr", "other"]),
+        *SHAPES,
         # Older browsers name the whole directive, sources and all.
         (
             {"csp-report": {"violated-directive": "img-src 'self'"}},
