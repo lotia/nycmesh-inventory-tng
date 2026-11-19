@@ -13,6 +13,7 @@ import {
   baseOf,
   inRun,
   SERVERS,
+  type Server,
   serverEnv,
 } from "./browser-tests/prepared";
 
@@ -29,9 +30,6 @@ if (!process.env.BROWSER_PORT || !process.env.BROWSER_CRAWL_PORT) {
   process.env.BROWSER_PORT ||= port;
   process.env.BROWSER_CRAWL_PORT ||= crawlPort;
 }
-// The administrator's session, signed in once for every test.
-const signedIn = adminState();
-
 // A phone's width, the narrowest the pages are made for.
 const phone = {
   viewport: { width: 360, height: 740 },
@@ -42,12 +40,17 @@ const webkit = Boolean(process.env.CI) || process.env.PLAYWRIGHT_WEBKIT === "1";
 const webkitServer = process.env.PLAYWRIGHT_WEBKIT_SERVER;
 // The pages that follow every link (phone-width.spec.ts).
 const CRAWL = /phone-width\.spec\.ts/;
-const browsers: { name: string; use: NonNullable<Project["use"]> }[] = [
+// Each browser, at a server, with the administrator's session signed in
+// there once (browser-tests/sign-in.setup.ts).
+const browsers = (
+  server: Server,
+): { name: string; use: NonNullable<Project["use"]> }[] => [
   {
     name: "chromium",
     use: {
       browserName: "chromium",
-      storageState: signedIn,
+      baseURL: baseOf(server),
+      storageState: adminState(server),
       // Full Chromium, headless: Playwright's lighter headless shell has
       // no camera, fake or not.
       channel: "chromium",
@@ -56,7 +59,7 @@ const browsers: { name: string; use: NonNullable<Project["use"]> }[] = [
         args: [
           "--use-fake-device-for-media-stream",
           // A label's QR code (browser_database.py).
-          `--use-file-for-fake-video-capture=${inRun("camera.y4m")}`,
+          `--use-file-for-fake-video-capture=${inRun("camera.y4m", server)}`,
         ],
       },
     },
@@ -67,7 +70,8 @@ const browsers: { name: string; use: NonNullable<Project["use"]> }[] = [
           name: "webkit",
           use: {
             browserName: "webkit" as const,
-            storageState: signedIn,
+            baseURL: baseOf(server),
+            storageState: adminState(server),
             // In the container, the app on this machine's 127.0.0.1 is
             // reached through this connection.
             ...(webkitServer
@@ -102,10 +106,7 @@ export default defineConfig({
   })),
   forbidOnly: Boolean(process.env.CI),
   reporter: process.env.CI ? "github" : "list",
-  use: {
-    baseURL: baseOf("shared"),
-    ...phone,
-  },
+  use: phone,
   projects: [
     {
       name: "sign-in",
@@ -114,17 +115,13 @@ export default defineConfig({
     },
     // The crawl reads every row there is, so it has a server of its own,
     // whose rows no test changes (browser-tests/prepared.ts).
-    ...browsers.map(({ name, use }) => ({
+    ...browsers("crawl").map(({ name, use }) => ({
       name: `${name} crawl`,
       testMatch: CRAWL,
       dependencies: ["sign-in"],
-      use: {
-        ...use,
-        baseURL: baseOf("crawl"),
-        storageState: adminState("crawl"),
-      },
+      use,
     })),
-    ...browsers.map(({ name, use }) => ({
+    ...browsers("shared").map(({ name, use }) => ({
       name,
       testIgnore: CRAWL,
       dependencies: ["sign-in"],

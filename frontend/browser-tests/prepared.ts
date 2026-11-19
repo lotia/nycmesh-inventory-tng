@@ -56,15 +56,11 @@ export function adminState(server: Server = "shared"): string {
   return inRun("admin.json", server);
 }
 
-const read = new Map<Server, Prepared>();
+const read: Partial<Record<Server, Prepared>> = {};
 
 export function prepared(server: Server = "shared"): Prepared {
-  let found = read.get(server);
-  if (found === undefined) {
-    found = JSON.parse(
-      readFileSync(inRun("prepared.json", server), "utf8"),
-    ) as Prepared;
-    read.set(server, found);
-  }
-  return found;
+  read[server] ??= JSON.parse(
+    readFileSync(inRun("prepared.json", server), "utf8"),
+  ) as Prepared;
+  return read[server];
 }
