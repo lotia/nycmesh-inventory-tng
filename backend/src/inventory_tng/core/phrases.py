@@ -19,7 +19,7 @@ from decimal import Decimal
 from functools import cache
 from io import BytesIO
 from pathlib import Path
-from typing import Any, cast
+from typing import TYPE_CHECKING, Any, cast
 
 from babel import Locale, localedata
 from babel.messages.catalog import Catalog
@@ -27,9 +27,11 @@ from babel.messages.mofile import write_mo
 from babel.messages.pofile import read_po
 from babel.numbers import format_decimal
 from babel.support import LazyProxy, Translations
-from jinja2 import Environment, pass_context
-from jinja2.runtime import Context
 from sqlalchemy import BindParameter, String, bindparam
+
+if TYPE_CHECKING:  # Only templates need Jinja: rules read phrases without it.
+    from jinja2 import Environment
+    from jinja2.runtime import Context
 
 # The app's name: a name, not a phrase, so the same in every language, and
 # never in the catalogue. Messages take it as %(brand)s. Authenticator apps
@@ -107,6 +109,8 @@ def _counts_written(say_plural: Callable[..., str]) -> Callable[..., str]:
     """Jinja's ngettext, `say_plural`, writing the count as the locale does,
     as `num` and under the name the template gave it (`{% trans
     count=... %}`), while the form is still chosen by the number."""
+    # Here, not at the top: rules read phrases without loading Jinja.
+    from jinja2 import pass_context
 
     @pass_context
     def say(

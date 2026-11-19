@@ -4,6 +4,8 @@ docs/decisions/0022), in Python and in the templates."""
 import importlib
 import pkgutil
 import re
+import subprocess
+import sys
 from collections.abc import Callable, Iterator
 from datetime import UTC, datetime
 from decimal import Decimal
@@ -1070,3 +1072,29 @@ def test_a_unit_name_with_a_prefix_tells_translators_what_it_is() -> None:
         if isinstance(m.id, str) and "%(prefix)s" in m.id and not m.auto_comments
     ]
     assert untold == []
+
+
+@pytest.mark.parametrize(
+    "module",
+    [
+        "inventory_tng.core.phrases",
+        "inventory_tng.web.formatting",
+        "inventory_tng.labels.labels",
+        "inventory_tng.stock.over_recorded",
+    ],
+)
+def test_rules_read_phrases_without_loading_jinja(module: str) -> None:
+    """Only templates need Jinja: phrases imports it where install() and
+    its count writer run, so rules reading phrases leave it unloaded. Run
+    in a fresh interpreter, which has loaded nothing else."""
+    shown = subprocess.run(
+        [
+            sys.executable,
+            "-c",
+            f"import sys, {module}; print('jinja2' in sys.modules)",
+        ],
+        capture_output=True,
+        text=True,
+        check=True,
+    )
+    assert shown.stdout.strip() == "False"
