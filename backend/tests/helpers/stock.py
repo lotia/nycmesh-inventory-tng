@@ -24,7 +24,7 @@ from inventory_tng.models.stock import (
 from inventory_tng.models.volunteers import Volunteer
 from inventory_tng.scan.batch import record
 from inventory_tng.scan.batch_schemas import Batch
-from inventory_tng.stock import moments, open_packages, over_recorded
+from inventory_tng.stock import open_packages, over_recorded
 from inventory_tng.stock.ledger import LOOSE, Entry, Form, insert_transaction
 from inventory_tng.stock.paths import COUNTS
 from inventory_tng.web.navigation import retired_holding
@@ -293,12 +293,6 @@ def count_form(page: Response) -> dict[str, str]:
         for name, value in hidden_fields(page.text)
         if name in {"key", "as_of", "seen", "items"}
     }
-
-
-def moment_fields(session: Session, place_id: int) -> dict[str, str]:
-    """A count form's moment of a place, now, as its hidden fields."""
-    at = moments.moment(session, place_id)
-    return {"as_of": str(at.as_of), "seen": str(at.seen)}
 
 
 def count_form_at(client: TestClient, place_id: int) -> dict[str, str]:

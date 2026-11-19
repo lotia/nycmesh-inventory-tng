@@ -24,8 +24,9 @@ from inventory_tng.scan.batch import _more_written
 from inventory_tng.stock import counts, over_recorded
 from inventory_tng.stock.ledger import Entry, Form
 
-from helpers.over_recorded import bagged, checks, new_admin_id, recorded_then_changed
+from helpers.over_recorded import bagged, checks, recorded_then_changed
 from helpers.rows import add, tag
+from helpers.sign_in import new_admin_id
 from helpers.stock import URL, Place, Spools, cut
 
 

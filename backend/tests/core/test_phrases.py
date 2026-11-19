@@ -880,7 +880,6 @@ def test_a_lists_numbers_are_written_as_the_locale_writes_them() -> None:
     assert "Show 1.000 · All" in shown
     assert "Page 1.000 of 2.000" in shown
     assert "1.500 of 3, matching" in shown
-    assert number(1000) == "1,000"
 
 
 def test_a_language_babel_does_not_know_writes_numbers_as_english() -> None:

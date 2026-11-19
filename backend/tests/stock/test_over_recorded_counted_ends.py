@@ -34,12 +34,12 @@ from helpers.over_recorded import (
     checks,
     count_ids,
     moved_whole,
-    new_admin_id,
     one_bag_waits,
     opened_into,
     opening_raised,
     recorded_then_changed,
 )
+from helpers.sign_in import new_admin_id
 from helpers.stock import (
     URL,
     Place,

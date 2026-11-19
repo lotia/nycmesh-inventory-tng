@@ -21,8 +21,6 @@ from inventory_tng.stock import ledger, over_recorded
 from inventory_tng.stock.ledger import Form
 
 from helpers.markup import Element, read
-from helpers.rows import tag
-from helpers.sign_in import new_admin
 from helpers.stock import (
     URL,
     Place,
@@ -61,12 +59,6 @@ def recorded_then_changed(
     response = client.post(URL, json=first | {"changed_from": first["lines"]} | changed)
     assert response.status_code == 409
     return response.json()
-
-
-def new_admin_id(session: Session) -> int:
-    """A new administrator's id; stock.ada_id is admin_client's."""
-    admin, _ = new_admin(session, f"ada-{tag()}", totp=False)
-    return admin.id
 
 
 def one_bag_waits(client: TestClient, place: Place, bags: ItemPackage) -> None:

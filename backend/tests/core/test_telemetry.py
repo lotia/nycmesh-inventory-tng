@@ -65,9 +65,9 @@ from helpers.stock import (
     Spools,
     adjustment_form,
     count_form,
+    count_form_at,
     cut,
     length,
-    moment_fields,
     received,
     report,
     retire,
@@ -455,9 +455,7 @@ def counting(
     _, key = new_admin(session)
     sign_in_with(client, key=key)
     place = stocked(session)
-    form = {
-        "key": str(uuid.uuid4()),
-        **moment_fields(session, place.store.id),
+    form = count_form_at(client, place.store.id) | {
         f"counted_{place.item.id}": "3",
         f"counted_{place.cable.id}": "1",
     }
@@ -600,9 +598,7 @@ def test_counts_a_count_that_closes_a_package_missing(
     spools = Spools(session)
     missing = spools.opened()
     store = spools.store.id
-    count = {
-        "key": str(uuid.uuid4()),
-        **moment_fields(session, store),
+    count = count_form_at(client, store) | {
         f"opened_{missing.id}": "",
         f"state_{missing.id}": "missing",
     }
@@ -1032,9 +1028,7 @@ def test_counts_open_packages_closed_and_cleared(
     client.post(f"/admin/items/{spools.cable.id}/open-packages/{three.id}/close")
     four = spools.opened()
     store = spools.store.id
-    count = {
-        "key": str(uuid.uuid4()),
-        **moment_fields(session, store),
+    count = count_form_at(client, store) | {
         f"opened_{four.id}": "",
         f"state_{four.id}": "missing",
     }

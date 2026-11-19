@@ -32,12 +32,12 @@ from helpers.over_recorded import (
     correct_check,
     count_ids,
     moved_whole,
-    new_admin_id,
     opened_into,
     opening_raised,
     reason_adjustments,
     sealed_field,
 )
+from helpers.sign_in import new_admin_id
 from helpers.stock import Place, Spools, count_at, count_form_at, write
 
 # An opening's sealed end can be counted though the records hold none of

@@ -35,13 +35,13 @@ from helpers.over_recorded import (
     correct_check,
     count_ids,
     moved_whole,
-    new_admin_id,
     opened_into,
     opening_raised,
     reason_adjustments,
     recorded_then_changed,
     sealed_field,
 )
+from helpers.sign_in import new_admin_id
 from helpers.stock import URL, Spools, ada_id, count_at, count_form_at, cut
 
 # An opening's open package closed since (Confirm used up, Close, a count

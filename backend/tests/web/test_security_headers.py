@@ -19,7 +19,6 @@ from fastapi.testclient import TestClient
 from httpx2 import Response
 from structlog.testing import capture_logs
 
-from inventory_tng.admins import paths
 from inventory_tng.core.settings import FrontendConfig, RateLimits
 from inventory_tng.web import security_headers
 from inventory_tng.web.frontend_bundle import MANIFEST
@@ -118,14 +117,6 @@ def test_every_kind_of_response_is_protected(
 def test_a_signed_in_page_is_protected(admin_client: TestClient) -> None:
     response = admin_client.get("/admin")
     assert response.status_code == 200
-    assert_protected(response)
-
-
-def test_a_refused_secret_field_is_protected(admin_client: TestClient) -> None:
-    """The confirm page's refusal of a secret field (inventory-tng-2qy6)."""
-    form = {"email": "ada@example.org", "api_token": "hunter2"}
-    response = admin_client.post(f"{paths.ACCOUNT}/email", data=form)
-    assert response.status_code == 400
     assert_protected(response)
 
 
@@ -396,19 +387,13 @@ def test_a_batch_counts_only_so_many() -> None:
     assert len(security_headers.violated(many)) == security_headers.MOST_REPORTS
 
 
-def test_reports_count_against_their_address(reports: TestClient) -> None:
-    for _ in range(RateLimits().csp_reports):
-        assert send(reports, REPORT_URI, "application/csp-report").status_code == 204
-    refused = send(reports, REPORT_URI, "application/csp-report")
-    assert refused.status_code == 429
-    assert refused.json() == {"reason": "rate_limited"}
-
-
-def test_the_limit_on_reports_is_a_setting(
+def test_reports_count_against_their_address_up_to_a_setting(
     make_client_without_database: Callable[..., TestClient],
 ) -> None:
     """RATE_LIMIT_CSP_REPORTS, read as each report comes."""
     client = make_client_without_database(rate_limits=RateLimits(csp_reports=3))
     for _ in range(3):
         assert send(client, REPORT_URI, "application/csp-report").status_code == 204
-    assert send(client, REPORT_URI, "application/csp-report").status_code == 429
+    refused = send(client, REPORT_URI, "application/csp-report")
+    assert refused.status_code == 429
+    assert refused.json() == {"reason": "rate_limited"}

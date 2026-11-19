@@ -36,10 +36,10 @@ from helpers.over_recorded import (
     from_emptied_store,
     mark_checked,
     moved_whole,
-    new_admin_id,
     one_bag_waits,
     recorded_then_changed,
 )
+from helpers.sign_in import new_admin_id
 from helpers.stock import URL, Place, Spools, cut, write
 
 # The administrators' page.

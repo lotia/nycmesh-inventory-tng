@@ -33,6 +33,7 @@ from inventory_tng.models.site_settings import CONFIRM_IDLE_MINUTES, SignInSetti
 from inventory_tng.web.single_use_forms import FIELD
 
 from helpers.markup import read
+from helpers.rows import tag
 
 # A recovery code as the page shows it, in groups.
 _GROUP = f"[A-Z0-9]{{{accounts.RECOVERY_CODE_GROUP}}}"
@@ -101,6 +102,12 @@ def new_admin(
         session.add(sealed(Authenticator(admin_id=admin.id, name="Phone"), key))
     session.flush()
     return admin, key
+
+
+def new_admin_id(session: Session) -> int:
+    """A new administrator's id; stock.ada_id is admin_client's."""
+    admin, _ = new_admin(session, f"ada-{tag()}", totp=False)
+    return admin.id
 
 
 def sealed(authenticator: Authenticator, key: str) -> Authenticator:

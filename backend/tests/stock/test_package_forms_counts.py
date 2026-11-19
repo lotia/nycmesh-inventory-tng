@@ -11,7 +11,6 @@ from fastapi.testclient import TestClient
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from inventory_tng.models.admins import Admin
 from inventory_tng.models.catalogue import Category, ItemPackage
 from inventory_tng.models.stock import AdjustmentReason, LedgerTransaction, OpenPackage
 from inventory_tng.stock import counts, counts_routes, moments, queries
@@ -22,7 +21,8 @@ from helpers.items import new_item, same_size_twins
 from helpers.markup import box_values, read, text
 from helpers.package_forms import CABLE, OPEN, SEALED, open_form, quantities_by_form
 from helpers.rows import add, breaks, tag
-from helpers.stock import Spools, moment_fields
+from helpers.sign_in import new_admin_id
+from helpers.stock import Spools, count_form, count_form_at
 
 # Counting by form (8i4.133.8).
 
@@ -39,10 +39,6 @@ def test_a_count_by_form_finds_and_loses_form_by_form() -> None:
     assert lost == [Entry(CABLE, Decimal(305), SEALED, LOOSE)]
 
 
-def counter(session: Session) -> int:
-    return add(session, Admin(username=f"counter-{tag()}")).id
-
-
 def test_record_count_by_form(session: Session, spools: Spools) -> None:
     made = spools.opened()
     store, cable = spools.store.id, spools.cable.id
@@ -53,7 +49,7 @@ def test_record_count_by_form(session: Session, spools: Spools) -> None:
         (cable, LOOSE, Decimal(20)),
     ]
     done = counts.record_count(
-        session, uuid.uuid4(), counter(session), store, [], shown, by_form=lines
+        session, uuid.uuid4(), new_admin_id(session), store, [], shown, by_form=lines
     )
     assert (done.differed, done.moved) == (True, {})
     assert quantities_by_form(session, spools.cable) == {
@@ -64,7 +60,7 @@ def test_record_count_by_form(session: Session, spools: Spools) -> None:
         counts.record_count(
             session,
             uuid.uuid4(),
-            counter(session),
+            new_admin_id(session),
             store,
             [(cable, Decimal(1))],
             moments.moment(session, store),
@@ -74,7 +70,7 @@ def test_record_count_by_form(session: Session, spools: Spools) -> None:
         counts.record_count(
             session,
             uuid.uuid4(),
-            counter(session),
+            new_admin_id(session),
             store,
             [],
             moments.moment(session, store),
@@ -91,7 +87,7 @@ def test_an_opening_while_counting_by_form_asks_again(
     done = counts.record_count(
         session,
         uuid.uuid4(),
-        counter(session),
+        new_admin_id(session),
         store,
         [],
         shown,
@@ -109,13 +105,12 @@ def test_the_count_page_counts_forms_finds_and_closes(
 ) -> None:
     store, cable = spools.store.id, spools.cable.id
     one, two = spools.opened(), spools.opened()
-    page = admin_client.get(f"{COUNTS}/{store}").text
+    shown = admin_client.get(f"{COUNTS}/{store}")
+    page = shown.text
     assert not box_values(page, f"sealed_{cable}_{spools.spool.id}")  # None sealed.
     assert box_values(page, f"opened_{one.id}")
     assert read(page).all("*", name=f"state_{two.id}")
-    form = {
-        "key": str(uuid.uuid4()),
-        **moment_fields(session, store),
+    form = count_form(shown) | {
         f"opened_{one.id}": "300",
         f"opened_{two.id}": "305",
         f"state_{two.id}": "missing",
@@ -150,11 +145,10 @@ def test_the_count_page_counts_sealed_and_says_whats_wrong(
     store, cable, spool = spools.store.id, spools.cable.id, spools.spool.id
     spools.write({"kind": "receipt", "to_location_id": store}, Entry(cable, Decimal(5)))
     field = f"sealed_{cable}_{spool}"
-    assert box_values(admin_client.get(f"{COUNTS}/{store}").text, field)
-    base = moment_fields(session, store)
-    done = admin_client.post(
-        f"{COUNTS}/{store}", data=base | {"key": str(uuid.uuid4()), field: "1"}
-    )
+    shown = admin_client.get(f"{COUNTS}/{store}")
+    assert box_values(shown.text, field)
+    base = count_form(shown)
+    done = admin_client.post(f"{COUNTS}/{store}", data=base | {field: "1"})
     assert done.status_code == 303
     # Its loose line, left as the records had it, is counted as it was.
     assert quantities_by_form(session, spools.cable) == {
@@ -186,14 +180,10 @@ def test_the_count_page_counts_sealed_and_says_whats_wrong(
 
 
 def test_counting_by_form_asks_again_for_what_moved(
-    admin_client: TestClient, session: Session, spools: Spools
+    admin_client: TestClient, spools: Spools
 ) -> None:
     store, cable, spool = spools.store.id, spools.cable.id, spools.spool.id
-    form = {
-        "key": str(uuid.uuid4()),
-        **moment_fields(session, store),
-        f"sealed_{cable}_{spool}": "2",
-    }
+    form = count_form_at(admin_client, store) | {f"sealed_{cable}_{spool}": "2"}
     spools.opened()  # While it was counted.
     again = admin_client.post(f"{COUNTS}/{store}", data=form)
     assert again.status_code == 409
@@ -207,9 +197,7 @@ def test_an_open_package_found_where_its_item_was_counted_by_total(
 ) -> None:
     van, cable = spools.van.id, spools.cable.id
     spools.move(Entry(cable, Decimal(10)))  # Loose, alone, in the van.
-    form = {
-        "key": str(uuid.uuid4()),
-        **moment_fields(session, van),
+    form = count_form_at(admin_client, van) | {
         f"counted_{cable}": "10",
         "found_package_id": str(spools.spool.id),
         "found_left": "40",
@@ -227,33 +215,22 @@ def test_open_packages_closed_by_a_count_and_refusals_said(
 ) -> None:
     store, cable, spool = spools.store.id, spools.cable.id, spools.spool.id
     one, two = spools.opened(), spools.opened()
-    at = moment_fields(session, store)
+    at = count_form_at(admin_client, store)
     # Not here, its left box cleared: closed all the same.
-    gone = {
-        "key": str(uuid.uuid4()),
-        **at,
-        f"opened_{one.id}": "",
-        f"state_{one.id}": "used_up",
-    }
+    gone = at | {f"opened_{one.id}": "", f"state_{one.id}": "used_up"}
     assert admin_client.post(f"{COUNTS}/{store}", data=gone).status_code == 303
     session.refresh(one)
     assert one.closed_at is not None
-    closed = {"key": str(uuid.uuid4()), **at, f"opened_{one.id}": "5"}
+    closed = at | {"key": str(uuid.uuid4()), f"opened_{one.id}": "5"}
     assert "was closed meanwhile" in text(
         admin_client.post(f"{COUNTS}/{store}", data=closed)
     )
-    huge = {
-        "key": str(uuid.uuid4()),
-        **at,
-        f"sealed_{cable}_{spool}": "9999999",
-    }
+    huge = at | {"key": str(uuid.uuid4()), f"sealed_{cable}_{spool}": "9999999"}
     # None sealed is here now, so no line shows it: refused whole.
     assert admin_client.post(f"{COUNTS}/{store}", data=huge).status_code == 400
     spools.cable.track_opened = False
     session.flush()
-    untracked = {
-        "key": str(uuid.uuid4()),
-        **moment_fields(session, store),
+    untracked = count_form_at(admin_client, store) | {
         "found_package_id": str(spool),
         "found_left": "40",
     }
@@ -269,16 +246,14 @@ def test_an_open_package_found_while_its_item_moved_is_asked_again(
     """Nothing of it is kept, the open package neither: found again then."""
     van, cable = spools.van.id, spools.cable.id
     spools.move(Entry(cable, Decimal(10)))
-    key = uuid.uuid4()
-    form = {
-        "key": str(key),
-        **moment_fields(session, van),
+    form = count_form_at(admin_client, van) | {
         f"counted_{cable}": "10",
         "found_package_id": str(spools.spool.id),
         "found_left": "40",
     }
     spools.move(Entry(cable, Decimal(5)))  # While it was counted.
     assert admin_client.post(f"{COUNTS}/{van}", data=form).status_code == 409
+    key = uuid.UUID(form["key"])
     made = select(OpenPackage).where(OpenPackage.key == uuid.uuid5(key, "found"))
     assert session.scalars(made).first() is None
 

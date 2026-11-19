@@ -13,7 +13,6 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from inventory_tng.core.local_env import CLONE
-from inventory_tng.models.admins import Admin
 from inventory_tng.models.catalogue import Item, ItemPackage
 from inventory_tng.models.stock import LedgerTransaction, OpenPackage
 from inventory_tng.stock import (
@@ -30,7 +29,8 @@ from inventory_tng.web import formatting
 from helpers.markup import box_values, forms, links, read, text, words_on
 from helpers.query_counts import counting
 from helpers.rows import add, tag
-from helpers.stock import URL, Spools, cut, length, moment_fields, report
+from helpers.sign_in import new_admin_id
+from helpers.stock import URL, Spools, count_form_at, cut, length, report
 
 LENGTHS = "/admin/stock/length-checks"
 
@@ -302,9 +302,9 @@ def test_counting_an_open_package_twice_under_its_key_writes_once(
     session: Session, spools: Spools
 ) -> None:
     made = spools.opened()
-    counter = add(session, Admin(username=f"counter-{tag()}"))
+    counter = new_admin_id(session)
     key = uuid.uuid4()
-    count = partial(counts.count_open_package, session, key, counter.id, made)
+    count = partial(counts.count_open_package, session, key, counter, made)
     # What it shows already: nothing differs, nothing is written.
     assert count(Decimal(305), Decimal(305)) == (305, [])
     assert left_on(session, made) == 305
@@ -366,16 +366,12 @@ def test_a_count_leaves_a_check_to_be_answered_but_a_close_ends_it(
     made = spools.opened()
     registered_client.post(URL, json=report(spools, length(made, "250")))
     store = spools.store.id
-    count = {
-        "key": str(uuid.uuid4()),
-        **moment_fields(session, store),
-        f"opened_{made.id}": "305",
-    }
+    count = count_form_at(admin_client, store) | {f"opened_{made.id}": "305"}
     assert admin_client.post(f"/admin/counts/{store}", data=count).status_code == 303
     session.refresh(made)
     assert made.length_reported == 250
-    closer = add(session, Admin(username=f"closer-{tag()}"))
-    open_packages.close(session, made.id, closer.id, made.opened_at)
+    closer = new_admin_id(session)
+    open_packages.close(session, made.id, closer, made.opened_at)
     session.flush()
     session.refresh(made)
     assert (made.length_reported, made.length_reported_in_id) == (None, None)
@@ -462,8 +458,8 @@ def test_a_length_of_an_item_counted_each_is_whole(
 
 def test_a_report_of_one_closed_is_not_kept(session: Session, spools: Spools) -> None:
     made = spools.opened()
-    closer = add(session, Admin(username=f"closer-{tag()}"))
-    open_packages.close(session, made.id, closer.id, made.opened_at)
+    closer = new_admin_id(session)
+    open_packages.close(session, made.id, closer, made.opened_at)
     session.flush()
     transaction = session.scalars(select(LedgerTransaction)).first()
     assert transaction is not None
@@ -630,9 +626,9 @@ def test_a_count_since_the_report_is_not_taken_off_twice(
     is set against what it showed after that count, not before it."""
     made = spools.opened()
     registered_client.post(URL, json=report(spools, length(made, "250")))
-    counter = add(session, Admin(username=f"counter-{tag()}"))
+    counter = new_admin_id(session)
     counts.count_open_package(
-        session, uuid.uuid4(), counter.id, made, Decimal(250), Decimal(305)
+        session, uuid.uuid4(), counter, made, Decimal(250), Decimal(305)
     )
     assert left_on(session, made) == 250
     done = admin_client.post(
@@ -649,9 +645,9 @@ def test_a_count_since_the_page_is_not_taken_off_twice(
     since put that right too, so it is added to what the page showed."""
     made = spools.opened()
     form = set_form(session, made, "200")
-    counter = add(session, Admin(username=f"counter-{tag()}"))
+    counter = new_admin_id(session)
     counts.count_open_package(
-        session, uuid.uuid4(), counter.id, made, Decimal(250), Decimal(305)
+        session, uuid.uuid4(), counter, made, Decimal(250), Decimal(305)
     )
     made.below_zero_at = made.opened_at  # A check to settle.
     session.flush()
@@ -666,7 +662,7 @@ def test_a_package_moved_from_the_places_locked_is_not_set(
     session: Session, spools: Spools
 ) -> None:
     """Its place is not locked: nothing more is locked holding it."""
-    admin = add(session, Admin(username=f"setter-{tag()}"))
+    setter = new_admin_id(session)
     made = spools.opened()
     made.below_zero_at = made.opened_at
     session.flush()
@@ -674,7 +670,7 @@ def test_a_package_moved_from_the_places_locked_is_not_set(
         made.id, seen(session, made), Decimal(1), as_of=0
     )
     assert length_checks_routes._set(
-        session, admin.id, answer, [made.location_id + 1]
+        session, setter, answer, [made.location_id + 1]
     ) == (
         False,
         False,
@@ -688,15 +684,15 @@ def test_a_set_whose_count_is_written_already_writes_nothing_more(
     session: Session, spools: Spools
 ) -> None:
     """Its count's key written before, as by an earlier send: set, once."""
-    admin = add(session, Admin(username=f"setter-{tag()}"))
+    setter = new_admin_id(session)
     made = spools.opened()
     made.below_zero_at = made.opened_at
     session.flush()
     checked = seen(session, made)
     key = uuid.uuid5(made.key, f"length {checked}")
-    counts.count_open_package(session, key, admin.id, made, Decimal(1), Decimal(305))
+    counts.count_open_package(session, key, setter, made, Decimal(1), Decimal(305))
     answer = length_checks_routes.Answer(made.id, checked, Decimal(2), Decimal(305), 0)
-    assert length_checks_routes._set(session, admin.id, answer, [made.location_id]) == (
+    assert length_checks_routes._set(session, setter, answer, [made.location_id]) == (
         True,
         False,
         0,
