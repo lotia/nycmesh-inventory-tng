@@ -847,7 +847,8 @@ The words people read go through a catalogue on each side
 and Lingui's on the scan page. Each message's id is its English. The
 operator commands' words are not in it yet (inventory-tng-8f4).
 
-On the server (`backend/src/inventory_tng/core/phrases.py`):
+On the server (`backend/src/inventory_tng/core/phrases.py`, which
+`web/template_phrases.py` gives the templates):
 
 - In a template, put the words in `{% trans %}`, with each value named:
   `{% trans name=place.name %}Start counting {{ name }}{% endtrans %}`. A

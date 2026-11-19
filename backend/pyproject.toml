@@ -63,7 +63,7 @@ required-version = ">=0.13"
 [tool.babel]
 mappings = [
     { method = "python", pattern = "**.py", keywords = "lazy_gettext lazy_pgettext:1c,2 branded", add_comments = "Translators:" },
-    # Newstyle, as phrases.install: a literal per cent is %% in the message.
+    # Newstyle, as web/template_phrases.install: a literal per cent is %% in the message.
     { method = "jinja2", pattern = "templates/**.html", trimmed = "true", newstyle_gettext = "true", silent = "false", add_comments = "Translators:" },
 ]
 
