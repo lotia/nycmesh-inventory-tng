@@ -1463,6 +1463,14 @@ describe("what an older build left", () => {
     expect(room.getAttribute("aria-hidden")).toBe("true");
     // Emptied, the cart does not take it again.
     expect(storedCart().lines).toEqual([]);
+    // Drawn again, recorded already, it keeps no room: it will not move.
+    cleanup();
+    open(server().api);
+    await ready();
+    const again = (await screen.findByText(RECORDED_HEADING)).closest(
+      "li",
+    ) as HTMLElement;
+    expect(within(again).queryByText(say(IN_CART))).toBeNull();
   });
 
   test("two saves under one key recorded elsewhere each put their difference in the cart by itself, under a key of its own, recorded once (inventory-tng-3iy)", async () => {

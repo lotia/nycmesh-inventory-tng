@@ -1,7 +1,7 @@
 /** The carts this device has saved: waiting, sending, held, refused or recorded. */
 import { msg } from "@lingui/core/macro";
 import { useSignal } from "@preact/signals";
-import { useEffect, useMemo } from "preact/hooks";
+import { useEffect, useMemo, useRef } from "preact/hooks";
 import { say, sayParts } from "../shared/i18n";
 import {
   type Body,
@@ -247,6 +247,12 @@ function RecordedElsewhere({
     }),
     [recorded, entry.body, catalogue],
   );
+  const inCart = difference !== null && cartKey === difference.key;
+  // Once shown, the in-cart words keep their room when recorded, so Dismiss
+  // below does not move (Ali, 2026-11-19, inventory-tng-2lad); one already
+  // recorded as it is first drawn needs none.
+  const shownInCart = useRef(false);
+  shownInCart.current ||= inCart;
   // Keyed by what each says, two saying the same apart.
   const wasKeys = keyedByWords(was.map(wordsOf));
   const changeKeys = keyedByWords(changes.map(({ words }) => wordsOf(words)));
@@ -280,13 +286,11 @@ function RecordedElsewhere({
           {say(ADD_DIFFERENCE)}
         </button>
       )}
-      {difference !== null && added === true && (
-        // Recorded, its words stay, unseen and not read out, to keep their
-        // room, so Dismiss below does not move (Ali, 2026-11-19,
-        // inventory-tng-2lad).
+      {added === true && shownInCart.current && (
+        // Recorded, unseen and not read out.
         <p
-          class={cartKey === difference.key ? undefined : "invisible"}
-          aria-hidden={cartKey === difference.key ? undefined : "true"}
+          class={inCart ? undefined : "invisible"}
+          aria-hidden={inCart ? undefined : "true"}
         >
           {say(IN_CART)}
         </p>

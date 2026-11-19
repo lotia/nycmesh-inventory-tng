@@ -39,6 +39,9 @@ test("a save's entry keeps its height, Dismiss's room kept unseen, as it is sent
     .first();
   await expect(entry.getByText("Sending…")).toBeVisible();
   await expect(entry.getByRole("button", { name: "Dismiss" })).toHaveCount(0);
+  // There, keeping its room, but unseen (visibility: hidden).
+  await expect(entry.getByText("Dismiss")).toHaveCount(1);
+  await expect(entry.getByText("Dismiss")).toBeHidden();
   const sending = await entry.boundingBox();
   release();
   await expect(
