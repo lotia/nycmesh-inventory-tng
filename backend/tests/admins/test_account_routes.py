@@ -35,7 +35,6 @@ from helpers.mail import SentMail
 from helpers.markup import links, read, text
 from helpers.sign_in import (
     PASSWORD,
-    RECOVERY_CODE,
     TIME_STEP,
     TOTP_KEYS,
     app_clock,
@@ -45,6 +44,7 @@ from helpers.sign_in import (
     new_admin,
     other_session,
     policy,
+    recovery_codes,
     reset_link,
     sign_in_with,
     single_use,
@@ -289,7 +289,7 @@ def test_new_recovery_codes(
     with app_clock() as at:
         form = single_use(**{guards.CONFIRM_FIELD: code(ada[1], at + TIME_STEP)})
         made = client.post(f"{ACCOUNT}/recovery-codes", data=form)
-    codes = re.findall(RECOVERY_CODE, made.text)
+    codes = recovery_codes(made.text)
     assert len(codes) == accounts.RECOVERY_CODES
     assert made.headers["cache-control"] == "no-store"
     assert accounts.recovery_codes_left(session, ada[0].id) == accounts.RECOVERY_CODES

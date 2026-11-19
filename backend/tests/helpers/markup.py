@@ -133,6 +133,13 @@ def read(page: str | Element) -> Element:
     return html
 
 
+def words_on(page: str | Element) -> str:
+    """The words a person reads on the page, or in a part of one already
+    read, as `Element.text` lays them out: character references read,
+    spaces run together, what is hidden left out."""
+    return read(page).text
+
+
 def links(page: str | Element) -> list[tuple[str, str]]:
     """Each link's words and address, in the page's order."""
     return [(a.text, a.attrs.get("href", "")) for a in read(page).all("a")]

@@ -39,14 +39,14 @@ CANT_SHOW = "Back and Forward can't show this page again"
 
 
 def key_on(page: Response, action: str) -> str:
-    """The key of the form on the page that is sent to `action`."""
-    match = re.search(
-        rf'action="{re.escape(action)}"[^>]*>\s*<input type="hidden" name="{FIELD}" '
-        r'value="([0-9a-f-]+)" autocomplete="off">',
-        page.text,
-    )
-    assert match is not None, action
-    return match.group(1)
+    """The key of the form on the page that is sent to `action`, its first
+    field, which a browser never fills in again from an earlier visit."""
+    form = read(page.text).one("form", action=action)
+    field = form.one("input", type="hidden", name=FIELD)
+    assert form.find("input") is field, action
+    assert field.attrs.get("autocomplete") == "off", action
+    assert re.fullmatch("[0-9a-f-]+", field.attrs["value"]), action
+    return field.attrs["value"]
 
 
 def sent_twice(

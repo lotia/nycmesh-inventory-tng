@@ -31,6 +31,7 @@ from helpers.markup import (
     read,
     row_links,
     text,
+    words_on,
 )
 from helpers.rows import history
 from helpers.sign_in import confirmed_long_ago, single_use
@@ -40,8 +41,8 @@ def make_code(client: TestClient, **form: str) -> tuple[Response, str]:
     made = client.post(
         CODES, data=single_use(uses="2", days="1", label="Open day") | form
     )
-    match = re.search(r'class="key">([a-z-]+)<', made.text)
-    return made, match.group(1) if match else ""
+    shown = read(made.text).all("*", class_="key")
+    return made, shown[0].text if shown else ""
 
 
 def test_making_a_code_shows_it_once(
@@ -120,7 +121,7 @@ def test_a_code_is_revoked_after_a_confirmation(
     assert ("get", f"{path}/revoke") in forms(admin_client.get(path).text)
     asked = admin_client.get(f"{path}/revoke")
     assert asked.status_code == 200
-    words = " ".join(text(asked).split())
+    words = words_on(asked.text)
     assert "Once revoked, Open day registers no more devices" in words
     assert "danger" in button(asked.text, "Revoke").classes
     assert ("Keep it", path) in links(asked.text)

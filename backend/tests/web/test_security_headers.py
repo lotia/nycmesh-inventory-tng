@@ -24,6 +24,7 @@ from inventory_tng.core.settings import FrontendConfig, RateLimits
 from inventory_tng.web import security_headers
 from inventory_tng.web.frontend_bundle import MANIFEST
 
+from helpers.markup import read
 from helpers.source import TEMPLATES
 
 # A build with every entry the pages load, and one file to serve.
@@ -184,7 +185,7 @@ def test_in_development_the_dev_server_and_its_styles_are_allowed(
     client reads from the page (frontend/vite.config.ts)."""
     response = dev.get(path)
     policy = directives(response)
-    (nonce,) = re.findall(r'<meta property="csp-nonce" nonce="([^"]+)">', response.text)
+    nonce = read(response.text).one("meta", property="csp-nonce").attrs["nonce"]
     for name in ("default-src", "script-src", "img-src"):
         assert policy[name] == [*ENFORCED[name], DEV_SERVER]
     assert policy["style-src"] == ["'self'", DEV_SERVER, f"'nonce-{nonce}'"]
@@ -211,7 +212,8 @@ def test_the_api_docs_load_swagger_with_a_nonce_in_development(
     assert response.status_code == 200
     assert response.headers["cache-control"] == "no-store"
     policy = directives(response)
-    (nonce,) = set(re.findall(r'<script nonce="([^"]+)">', response.text))
+    scripts = read(response.text).all("script")
+    (nonce,) = {script.attrs["nonce"] for script in scripts if "nonce" in script.attrs}
     assert f"'nonce-{nonce}'" in policy["script-src"]
     assert security_headers.SWAGGER_CDN in policy["script-src"]
     assert security_headers.SWAGGER_CDN in policy["style-src"]

@@ -43,7 +43,7 @@ from inventory_tng.web.forms import (
 )
 
 from helpers.items import NOW, new_item
-from helpers.markup import hidden_fields, links, read, text
+from helpers.markup import hidden_fields, links, read, text, words_on
 from helpers.query_counts import counting
 from helpers.rows import add, history, named, shown
 
@@ -592,7 +592,7 @@ def test_renaming_close_to_another_asks_first(
 
 @pytest.mark.usefixtures("radios")
 def test_the_add_form_says_how_to_name_an_item(admin_client: TestClient) -> None:
-    page = " ".join(text(admin_client.get(ITEMS)).split())
+    page = words_on(admin_client.get(ITEMS).text)
     assert "what it is, then what tells it apart from the items nearest it" in page
     assert "the maker goes in Manufacturer" in page
 

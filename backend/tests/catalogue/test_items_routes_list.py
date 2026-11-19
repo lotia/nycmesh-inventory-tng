@@ -10,7 +10,7 @@ from inventory_tng.models.catalogue import Category, Item
 from inventory_tng.web.listing import PER_PAGE
 
 from helpers.items import items_named, new_item
-from helpers.markup import hidden_fields, links, read, sorted_columns, text
+from helpers.markup import hidden_fields, links, read, sorted_columns, text, words_on
 from helpers.rows import add, tag
 
 
@@ -20,14 +20,13 @@ def test_a_search_forgives_typos_best_first(
     for name in ("LiteAP AC", "LiteBeam 5AC", "Patch cable", "NanoBeam"):
         new_item(session, radios, name)
     found = admin_client.get(ITEMS, params={"q": "litebeam"})
-    page = text(found)
     shown = items_named(found.text)
     assert shown[0] == "LiteBeam 5AC"
     assert "Patch cable" not in shown
     total = session.scalar(
         select(func.count()).select_from(Item).where(Item.retired_at.is_(None))
     )
-    said = " ".join(page.split())
+    said = words_on(found.text)
     assert f"{len(shown)} of {total} items, matching “litebeam”" in said
     assert ("Clear search", "/admin/items") in links(found.text)
     # A typo still finds it.
@@ -73,8 +72,7 @@ def test_picking_a_suggestion_narrows_the_list_to_it(
     new_item(session, radios, "LiteBeam M5")
     picked = admin_client.get(ITEMS, params={"pick": str(beam.id)})
     assert items_named(picked.text) == ["LiteBeam 5AC"]
-    page = text(picked)
-    assert "matching “LiteBeam 5AC”" in " ".join(page.split())
+    assert "matching “LiteBeam 5AC”" in words_on(picked.text)
 
 
 def test_current_retired_and_all(

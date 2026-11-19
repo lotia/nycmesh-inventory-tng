@@ -27,7 +27,7 @@ from inventory_tng.stock import (
 from inventory_tng.stock.moments import expected
 from inventory_tng.stock.paths import COUNTS
 
-from helpers.markup import read, text
+from helpers.markup import read, text, words_on
 from helpers.over_recorded import (
     PAGE,
     arrived_field,
@@ -39,7 +39,6 @@ from helpers.over_recorded import (
     opened_into,
     opening_raised,
     recorded_then_changed,
-    text_of,
 )
 from helpers.stock import (
     URL,
@@ -92,7 +91,7 @@ def test_a_count_after_it_puts_that_end_right_and_says_what_is_left(
     page = admin_client.get(f"{PAGE}?item={place.item.id}").text
     assert (
         f"{place.van.name} counted {day}. {place.store.name} still to put right."
-        in text_of(page)
+        in words_on(page)
     )
     assert says(page, f"Correct {place.store.name}", "button")
     link = f"{COUNTS}/{place.store.id}?item={place.item.id}"
@@ -246,7 +245,7 @@ def test_one_end_counted_correct_writes_the_other_end_only(
     before = over_recorded.seen(check)
     counted, other = (place.van, place.store) if at_van else (place.store, place.van)
     count_at(admin_client, counted.id, {f"counted_{place.item.id}": "1"})
-    page = text_of(admin_client.get(f"{PAGE}?item={place.item.id}").text)
+    page = words_on(admin_client.get(f"{PAGE}?item={place.item.id}").text)
     assert f"{counted.name} counted " in page
     assert f"{other.name} still to put right." in page
     # Seen before the count: it changed meanwhile.
@@ -471,7 +470,7 @@ def test_an_openings_one_end_wording_keeps_a_name_cased_within(
         {f"sealed_{spools.cable.id}_{spools.spool.id}": "1"},
     )
     page = admin_client.get(f"{PAGE}?item={spools.cable.id}").text
-    assert "Open SFP+ module still to put right." in text_of(page)
+    assert "Open SFP+ module still to put right." in words_on(page)
     assert says(page, "Correct open SFP+ module", "button")
 
 
@@ -499,7 +498,7 @@ def test_an_openings_sealed_count_puts_its_end_right_and_names_its_forms(
     cable = "c" + spools.cable.name[1:]
     still = "Open spool" if tracked else f"Loose {cable}"
     page = admin_client.get(f"{PAGE}?item={spools.cable.id}").text
-    assert f"Sealed spool counted {day}. {still} still to put right." in text_of(page)
+    assert f"Sealed spool counted {day}. {still} still to put right." in words_on(page)
     correct = "open spool" if tracked else f"loose {cable}"
     assert says(page, f"Correct {correct}", "button")
     link = f"{COUNTS}/{spools.store.id}?item={spools.cable.id}"
@@ -523,7 +522,7 @@ def test_an_openings_open_count_puts_the_other_end_right_and_both_close_it(
     assert (check.left_count_id, check.arrived_count_id) == (None, at_open)
     cable = "c" + spools.cable.name[1:]
     still = "Open spool counted" if tracked else f"Loose {cable} counted"
-    page = text_of(admin_client.get(f"{PAGE}?item={spools.cable.id}").text)
+    page = words_on(admin_client.get(f"{PAGE}?item={spools.cable.id}").text)
     assert still in page
     assert "Sealed spool still to put right." in page
     sealed = f"sealed_{spools.cable.id}_{spools.spool.id}"

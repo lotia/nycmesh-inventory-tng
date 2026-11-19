@@ -345,8 +345,8 @@ def test_enter_in_the_words_marks_checked(
     no other, so Enter in the words never corrects it."""
     one_bag_waits(registered_client, place, bags)
     (form,) = checked_forms(admin_client.get(PAGE).text)
-    assert "Correct" not in form
-    assert "formaction" not in form
+    assert "Correct" not in form.text
+    assert not [each for each in [form, *form.all("*")] if "formaction" in each.attrs]
 
 
 def test_enter_in_the_words_of_a_refusal_marks_checked(
@@ -358,7 +358,11 @@ def test_enter_in_the_words_of_a_refusal_marks_checked(
     assert response.status_code == 409
     forms = checked_forms(response.text)
     assert len(forms) == 2
-    assert not any("formaction" in form or "Bring back" in form for form in forms)
+    assert not any(
+        "Bring back" in form.text or "formaction" in each.attrs
+        for form in forms
+        for each in [form, *form.all("*")]
+    )
 
 
 @pytest.mark.parametrize("only", [False, True])

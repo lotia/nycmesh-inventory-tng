@@ -19,7 +19,7 @@ from inventory_tng.stock import (
 )
 from inventory_tng.stock.ledger import Form
 
-from helpers.markup import read, text
+from helpers.markup import read, text, words_on
 from helpers.over_recorded import (
     PAGE,
     adjustments,
@@ -181,7 +181,7 @@ def test_a_count_is_taken_only_for_an_open_package_moved_whole(
 
 
 def test_the_page_says_what_it_is_for(admin_client: TestClient) -> None:
-    page = " ".join(text(admin_client.get(PAGE)).split())
+    page = words_on(admin_client.get(PAGE).text)
     assert (
         "Another tab recorded these before a volunteer changed them, so the "
         "inventory shows more moved than was. Correct moves the extra back with "

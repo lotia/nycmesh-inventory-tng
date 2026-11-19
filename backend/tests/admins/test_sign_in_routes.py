@@ -1,7 +1,6 @@
 """Administrators signing in (docs/decisions/0012): setup, the one sign-in
 form, sessions, a new authenticator and confirming sensitive actions."""
 
-import html
 import itertools
 import math
 import re
@@ -44,10 +43,9 @@ from inventory_tng.web.forms import name_up_to
 from inventory_tng.web.navigation import retired_holding
 
 from helpers.mail import SentMail
-from helpers.markup import read, text
+from helpers.markup import hidden_fields, read, text
 from helpers.sign_in import (
     PASSWORD,
-    RECOVERY_CODE,
     TIME_STEP,
     TOTP_KEYS,
     app_clock,
@@ -56,6 +54,7 @@ from helpers.sign_in import (
     new_admin,
     opened,
     policy,
+    recovery_codes,
     sign_in_with,
 )
 from helpers.stock import at_retired_van
@@ -70,14 +69,15 @@ def client(make_client: Callable[..., TestClient]) -> TestClient:
 
 
 def alert(response: Response) -> str:
-    match = re.search(r'role="alert">([^<]*)<', response.text)
-    return html.unescape(match.group(1)) if match else ""
+    """The words of the page's first alert, if it has one."""
+    alerts = read(response.text).all("*", role="alert")
+    return alerts[0].text if alerts else ""
 
 
 def hidden_key(response: Response) -> str:
-    match = re.search(r'name="key" value="([A-Z2-7]{32})"', response.text)
-    assert match is not None
-    return match.group(1)
+    key = dict(hidden_fields(response.text))["key"]
+    assert re.fullmatch("[A-Z2-7]{32}", key)
+    return key
 
 
 # Setup
@@ -103,7 +103,7 @@ def test_setup_makes_the_first_admin_signed_in_with_recovery_codes(
         form = setup_form(key, code=code(key, at))
         response = client.post(paths.SETUP, data=form)
     assert response.status_code == 200
-    codes = re.findall(RECOVERY_CODE, response.text)
+    codes = recovery_codes(response.text)
     assert len(codes) == accounts.RECOVERY_CODES
     assert response.headers["cache-control"] == "no-store"
     admin = session.scalars(select(Admin)).one()

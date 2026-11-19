@@ -17,6 +17,7 @@ from sqlalchemy.orm import Session
 from inventory_tng.core.db_locking import lock_catalogue
 from inventory_tng.models.catalogue import Item, ItemPackage
 
+from helpers.markup import read
 from helpers.query_counts import counting
 from helpers.swept_pages import CATALOGUE, PAGES, Built, More, Page, Path, built, path
 
@@ -231,8 +232,13 @@ def test_every_page_names_items_and_packages_as_shown(
     else:
         # A form's fields, and under a name's how its units typed are read
         # (catalogue/_units_read.html), as typed.
-        page = re.sub(r' value="[^"]*"', "", response.text)
-        page = re.sub(r'<div class="hint">.*?</div>', "", page, flags=re.DOTALL)
+        shown = read(response.text)
+        for each in shown.all("*"):
+            each.attrs.pop("value", None)
+        for hint in shown.all("div"):
+            if hint.classes == ["hint"]:
+                hint.decompose()
+        page = str(shown)
     if route in NAMES_AS_TYPED:
         return
     assert "1,000ft" not in page, url

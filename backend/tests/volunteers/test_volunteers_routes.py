@@ -28,6 +28,7 @@ from helpers.markup import (
     read,
     row_links,
     text,
+    words_on,
 )
 from helpers.rows import add, history, named, shown, tag
 
@@ -157,7 +158,7 @@ def test_merging_asks_to_confirm_first(
     assert ("get", f"{path}/merge") in forms(admin_client.get(path).text)
     asked = admin_client.get(f"{path}/merge", params={"into_id": str(ada.id)})
     assert asked.status_code == 200
-    words = " ".join(text(asked).split())
+    words = words_on(asked.text)
     assert "Ada Lovelace is retired as a duplicate of Ada" in words
     shown = read(asked.text)
     assert ("into_id", str(ada.id)) in hidden_fields(shown)

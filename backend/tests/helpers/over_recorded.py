@@ -1,7 +1,6 @@
 """What the tests of lines recorded with more than was moved share
 (tests/stock/test_over_recorded_*.py)."""
 
-import re
 import uuid
 from typing import Any
 
@@ -21,6 +20,7 @@ from inventory_tng.models.stock import (
 from inventory_tng.stock import ledger, over_recorded
 from inventory_tng.stock.ledger import Form
 
+from helpers.markup import Element, read
 from helpers.rows import tag
 from helpers.sign_in import new_admin
 from helpers.stock import (
@@ -84,11 +84,13 @@ def mark_checked(client: TestClient, session: Session, **form: str) -> Response:
     return client.post(f"{PAGE}/{check.id}/checked", data=data)
 
 
-def checked_forms(page: str) -> list[str]:
+def checked_forms(page: str) -> list[Element]:
     """Each Mark checked form on `page`."""
-    return re.findall(
-        r'<form [^>]*action="[^"]*/checked[^>]*>.*?</form>', page, re.DOTALL
-    )
+    return [
+        form
+        for form in read(page).all("form")
+        if "/checked" in form.attrs.get("action", "")
+    ]
 
 
 def moved_whole(
@@ -165,11 +167,6 @@ def count_ids(session: Session) -> list[int]:
             .order_by(LedgerTransaction.id)
         )
     )
-
-
-def text_of(page: str) -> str:
-    """A page's words, tags taken out, spaces as one."""
-    return " ".join(re.sub(r"<[^>]+>", " ", page).split())
 
 
 def opening_raised(client: TestClient, spools: Spools) -> OverRecorded:

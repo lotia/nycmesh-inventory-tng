@@ -3,7 +3,7 @@ tests built on it can be trusted."""
 
 import pytest
 
-from helpers.markup import Unescaped, read, row_links
+from helpers.markup import Unescaped, read, row_links, words_on
 
 pytestmark = pytest.mark.helper
 
@@ -73,3 +73,9 @@ def test_all_matches_a_subset_of_classes_and_exact_attributes() -> None:
 def test_read_refuses_a_page_unescaped_already() -> None:
     with pytest.raises(TypeError):
         read(Unescaped("<p>12&quot; mast</p>"))
+
+
+def test_words_on_reads_a_pages_words_with_its_references_read() -> None:
+    page = "<html><body><h1>Ada &amp; Ben</h1><p hidden>gone</p>\n<p>12&quot;  mast</p>"
+    assert words_on(page) == 'Ada & Ben 12" mast'
+    assert words_on(read(page).one("h1")) == "Ada & Ben"

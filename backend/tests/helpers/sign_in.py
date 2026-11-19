@@ -2,6 +2,7 @@
 
 import base64
 import contextlib
+import re
 import uuid
 from collections.abc import Generator
 from datetime import UTC, datetime, timedelta
@@ -31,11 +32,22 @@ from inventory_tng.models.admins import (
 from inventory_tng.models.site_settings import CONFIRM_IDLE_MINUTES, SignInSettings
 from inventory_tng.web.single_use_forms import FIELD
 
+from helpers.markup import read
+
 # A recovery code as the page shows it, in groups.
 _GROUP = f"[A-Z0-9]{{{accounts.RECOVERY_CODE_GROUP}}}"
 _MORE = accounts.RECOVERY_CODE_LENGTH // accounts.RECOVERY_CODE_GROUP - 1
-RECOVERY_CODE = rf"<li>({_GROUP}(?:-{_GROUP}){{{_MORE}}})</li>"
+_RECOVERY_CODE = re.compile(rf"{_GROUP}(?:-{_GROUP}){{{_MORE}}}")
 PASSWORD = "correct horse battery staple"
+
+
+def recovery_codes(page: str) -> list[str]:
+    """The recovery codes `page` lists, each an item of its own."""
+    return [
+        item.text
+        for item in read(page).all("li")
+        if _RECOVERY_CODE.fullmatch(item.text)
+    ]
 
 
 def raw_key() -> bytes:

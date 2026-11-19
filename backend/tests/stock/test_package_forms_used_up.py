@@ -26,7 +26,7 @@ from inventory_tng.stock.ledger import (
     Form,
 )
 
-from helpers.markup import button, links, read, text
+from helpers.markup import button, links, read, text, words_on
 from helpers.package_forms import quantities_by_form
 from helpers.rows import add, tag
 from helpers.stock import URL, Spools, cut
@@ -408,7 +408,7 @@ def test_an_open_package_is_closed_from_its_items_page(
     path = f"{page}/open-packages/{made.id}/close"
     # Asked first: it writes off what it shows.
     asked = admin_client.get(path).text
-    assert "it shows\n-5 m" in asked or "it shows -5 m" in " ".join(asked.split())
+    assert "it shows -5 m" in words_on(asked)
     assert "danger" in button(asked, "Close as used up").classes
     done = admin_client.post(path)
     assert done.headers["location"] == (

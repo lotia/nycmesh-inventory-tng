@@ -39,6 +39,7 @@ from helpers.markup import (
     read,
     sorted_columns,
     text,
+    words_on,
 )
 from helpers.rows import add, history, tag
 from helpers.stock import stocked, write
@@ -169,7 +170,7 @@ def test_the_sheet_prints_each_copy_twelve_to_a_page(
     assert page.status_code == 200
     assert page.text.count('class="print-sheet label-sheet"') == 2  # 14 labels
     assert page.text.count('class="print-label"') == 14
-    assert "14 labels, on 2 pages" in " ".join(text(page).split())
+    assert "14 labels, on 2 pages" in words_on(page.text)
     # A full QR code of the bare code: segno would make a Micro QR of it.
     assert segno.make(item_label.code, error="q").is_micro
     assert str(qr_svg(item_label.code, "q")) in page.text
@@ -205,7 +206,7 @@ def test_revoking_asks_to_confirm_first(
     assert link.one("span", class_="sr-only").text == label.code
     page = admin_client.get(confirm)
     assert page.status_code == 200
-    words = " ".join(text(page).split())
+    words = words_on(page.text)
     asked = read(page.text)
     assert asked.one("span", label.code, class_="key")
     assert f"{label.code}, names Cat6 cable." in asked.text
@@ -326,7 +327,7 @@ def test_inactive_labels_say_why_and_agree_with_the_scan_page(
     assert sealed.code in current
     assert not any(label.code in current for label in rows.values())
     inactive = admin_client.get(LABELS, params={"show": "inactive"})
-    page = " ".join(text(inactive).split())
+    page = words_on(inactive.text)
     assert still_stocked.code not in page
     assert sealed.code not in page
     lines = read(inactive.text).all("tr")
@@ -400,7 +401,7 @@ def test_label_suggestions_name_it_and_narrow_the_list(
     assert codes_listed(page) == [on_reel.code]
     assert loose.code not in page
     reel_words = package_label("Cat6 cable", "Reel", "305 m")
-    assert f"matching “{reel_words}”" in " ".join(page.split())
+    assert f"matching “{reel_words}”" in words_on(page)
     revoked = admin_client.get(
         f"{LABELS}/suggest", params={"q": "reel", "show": "inactive"}
     )

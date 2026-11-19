@@ -57,6 +57,7 @@ from helpers.markup import (
     options,
     read,
     text,
+    words_on,
 )
 from helpers.query_counts import counting
 from helpers.rows import item_fields, shown, violates
@@ -305,7 +306,7 @@ def test_found_and_written_off(admin_client: TestClient, session: Session) -> No
     (written,) = counts_written(session)
     assert (written.kind, written.reason_id) == ("adjustment", int(form["reason_id"]))
     assert expected(session, place.store.id) == {place.item.id: Decimal(3)}
-    assert "Damaged: -2 each" in " ".join(text(admin_client.get(COUNTS)).split())
+    assert "Damaged: -2 each" in words_on(admin_client.get(COUNTS).text)
 
 
 @pytest.mark.parametrize(

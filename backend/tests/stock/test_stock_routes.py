@@ -18,6 +18,7 @@ from helpers.markup import (
     row_links,
     sorted_columns,
     text,
+    words_on,
 )
 from helpers.rows import add, tag
 from helpers.stock import Place, at_retired_van, received, retire, stocked, write
@@ -30,12 +31,9 @@ def test_nothing_yet(admin_client: TestClient) -> None:
 def test_by_place_and_by_item(admin_client: TestClient, session: Session) -> None:
     place = stocked(session)
     write(session, place)  # Three of them to the van.
-    by_place = text(admin_client.get(STOCK))
-    store_part = by_place[by_place.index(place.store.name) :]
-    # Whatever the indentation.
-    assert re.search(rf"{re.escape(place.item.name)}</td>\s*<td>2 each", store_part)
-    van_part = by_place[by_place.index(place.van.name) :]
-    assert "3 each" in van_part
+    by_place = admin_client.get(STOCK).text
+    assert shows(rows_under(by_place, place.store.name), place.item, 2)
+    assert shows(rows_under(by_place, place.van.name), place.item, 3)
     by_item = text(admin_client.get(STOCK, params={"by": "item"}))
     assert "5 each in all" in by_item
 
@@ -50,8 +48,27 @@ def test_less_than_nothing_asks_for_a_count(
     assert "less than nothing somewhere" in page
 
 
+def rows(part: Element) -> list[list[str]]:
+    """The words of each cell of each row in `part`."""
+    return [[cell.text for cell in row.all("td")] for row in part.all("tr")]
+
+
+def rows_under(page: str, heading: str) -> list[list[str]]:
+    """The rows of the section headed `heading`."""
+    (section,) = [s for s in read(page).all("section") if s.one("h2").text == heading]
+    return rows(section)
+
+
+def shows(rows: list[list[str]], item: Item, amount: int) -> bool:
+    """Whether a row has the item, with this much: the amount first in the
+    cell after its name."""
+    return any(
+        row[:1] == [item.name] and row[1].startswith(f"{amount} each") for row in rows
+    )
+
+
 def reorder_page(admin_client: TestClient) -> str:
-    return text(admin_client.get(REORDER))
+    return admin_client.get(REORDER).text
 
 
 def needs_counting_page(admin_client: TestClient) -> str:
@@ -60,8 +77,7 @@ def needs_counting_page(admin_client: TestClient) -> str:
 
 def reorder_shows(page: str, item: Item, amount: int) -> bool:
     """Whether the reorder list has the item, with this much in the stores."""
-    pattern = rf"{re.escape(item.name)}</a></td>\s*<td>{amount} each"
-    return re.search(pattern, page) is not None
+    return shows(rows(read(page)), item, amount)
 
 
 def test_reorder_lists_what_is_at_or_below_its_level(
@@ -180,9 +196,7 @@ def test_the_stock_page_counts_the_places_short(
     place = Place(session)
     write(session, place)  # The store is short three.
     write(session, place, lines=[{"item_id": place.cable.id, "quantity": "1"}])
-    assert re.search(
-        r"1 place shows\s+less than nothing", text(admin_client.get(STOCK))
-    )
+    assert "1 place shows less than nothing" in words_on(admin_client.get(STOCK).text)
     write(
         session,
         place,
@@ -190,9 +204,7 @@ def test_the_stock_page_counts_the_places_short(
         to_location_id=place.store.id,
         lines=[{"item_id": place.cable.id, "quantity": "5"}],
     )
-    assert re.search(
-        r"2 places show\s+less than nothing", text(admin_client.get(STOCK))
-    )
+    assert "2 places show less than nothing" in words_on(admin_client.get(STOCK).text)
 
 
 def amounts_shown(page: str) -> list[str]:
@@ -392,9 +404,9 @@ def test_a_filter_leaves_the_whole_stocks_figures_whole(
     write(session, place)  # Three of them to the van.
     write(session, place, lines=[{"item_id": place.cable.id, "quantity": "1"}])
     van = {"by": "item", "place": str(place.van.id)}
-    by_item = text(admin_client.get(STOCK, params=van))
+    by_item = words_on(admin_client.get(STOCK, params=van).text)
     assert "5 each in all" in by_item
     # The cable is short at the store, not at the van.
-    assert re.search(r"1 item shows\s+less than nothing", by_item)
-    at_van = text(admin_client.get(STOCK, params={"place": str(place.van.id)}))
-    assert re.search(r"1 place shows\s+less than nothing", at_van)
+    assert "1 item shows less than nothing" in by_item
+    at_van = admin_client.get(STOCK, params={"place": str(place.van.id)})
+    assert "1 place shows less than nothing" in words_on(at_van.text)

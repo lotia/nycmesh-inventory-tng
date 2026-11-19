@@ -18,6 +18,7 @@ import pytest
 from babel.messages.catalog import Catalog, Message
 from babel.messages.pofile import read_po
 from babel.support import LazyProxy, Translations
+from bs4 import NavigableString, Tag
 from fastapi.testclient import TestClient
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -86,10 +87,12 @@ ACCENTS = str.maketrans(
 )
 # A message's placeholders, and a literal per cent, kept as they are.
 PLACEHOLDER = re.compile(r"(%\(\w+\)[sd]|%%)")
+# Those, a tag and a character reference: what a translator keeps.
+KEPT = re.compile(rf"({PLACEHOLDER.pattern[1:-1]}|<[^>]*>|&\w+;)")
 
 
 def accented(message: str) -> str:
-    parts = PLACEHOLDER.split(message)
+    parts = KEPT.split(message)
     return "".join(
         part if index % 2 else part.translate(ACCENTS)
         for index, part in enumerate(parts)
@@ -271,27 +274,30 @@ def from_macros(source: str, **context: object) -> str:
 
 
 # Attributes whose words people read or hear.
-SAID_IN = re.compile(
-    r'\b(?:title|alt|placeholder|aria-label|aria-description)="([^"]*)"'
-)
+SAID_IN = ("title", "alt", "placeholder", "aria-label", "aria-description")
 
 
 def words_shown(html: str) -> str:
-    """`html`'s words people read or hear: its text and what its tags say
-    in attributes, but not its scripts."""
-    html = re.sub(r"<script.*?</script>", " ", html, flags=re.DOTALL)
-    words = re.sub(
-        r"<[^>]*>", lambda tag: " ".join(["", *SAID_IN.findall(tag[0]), ""]), html
-    )
-    return " ".join(words.split())
+    """`html`'s words people read or hear, hidden for now or not: its text
+    and what its tags say in attributes, but not its scripts or styles."""
+    said: list[str] = []
+    for node in markup.read(html).descendants:
+        if isinstance(node, markup.Element):
+            said += [node.attrs[name] for name in SAID_IN if name in node.attrs]
+        elif (
+            isinstance(node, NavigableString)
+            and type(node) in Tag.MAIN_CONTENT_STRING_TYPES
+        ):
+            said.append(node)
+    return " ".join(" ".join(said).split())
 
 
 def english(html: str) -> list[str]:
     """The words `html` shows in plain English: those with two letters of
-    the English alphabet in a row, not counting character references or
-    the app's name, the same in every language."""
+    the English alphabet in a row, not counting the app's name, the same in
+    every language."""
     shown = words_shown(html).replace(BRAND, "")
-    words = re.findall(r"[\w/+-]+", re.sub(r"&\w+;", " ", shown))
+    words = re.findall(r"[\w/+-]+", shown)
     return [word for word in words if re.search("[A-Za-z]{2,}", word)]
 
 

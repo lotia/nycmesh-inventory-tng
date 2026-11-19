@@ -23,7 +23,7 @@ from inventory_tng.stock.forms import SAY_WHY, WORDS_FOR_ANOTHER
 from inventory_tng.stock.ledger import Entry, Form
 from inventory_tng.web.forms import RULES, up_to
 
-from helpers.markup import read, text
+from helpers.markup import Element, box_values, hidden_fields, read, text, words_on
 from helpers.over_recorded import (
     PAGE,
     adjustments,
@@ -56,7 +56,7 @@ def test_refused_at_a_retired_place_it_says_why_and_offers_a_fix(
     place = from_emptied_store(registered_client, session)
     response = correct(admin_client, session)
     assert response.status_code == 409
-    page = " ".join(text(response).split())
+    page = words_on(response.text)
     assert over_recorded_routes.RETIRED_EMPTY["found"](place.store.name, "2") in page
     assert f"Bring back {place.store.name}" in page
     (check,) = checks(session)
@@ -86,7 +86,7 @@ def test_refused_where_it_arrived_it_names_that_place(
         to_location_id=place.store.id,
     )
     retire(session, place.van)
-    page = " ".join(text(correct(admin_client, session)).split())
+    page = words_on(correct(admin_client, session).text)
     assert (
         over_recorded_routes.RETIRED_EMPTY["written_off"](place.van.name, "2") in page
     )
@@ -120,7 +120,7 @@ def test_a_count_refused_where_it_arrived_names_that_place(
     spools = emptied_van(registered_client, session)
     check, response = counted(admin_client, session, "180")
     assert response.status_code == 409
-    page = " ".join(text(response).split())
+    page = words_on(response.text)
     assert (
         f"Not changed: {spools.van.name} is retired and holds nothing, so its "
         "count can't be corrected there." in page
@@ -158,7 +158,7 @@ def test_refused_at_a_place_brought_back_meanwhile_it_names_that_place(
     refused_then(monkeypatch, lambda: locations.restore(session, place.store))
     response = correct(admin_client, session)
     assert response.status_code == 409
-    page = " ".join(text(response).split())
+    page = words_on(response.text)
     assert over_recorded_routes.RETIRED_EMPTY["found"](place.store.name, "2") in page
     assert f"Bring back {place.store.name}" in page
 
@@ -174,7 +174,7 @@ def test_a_count_refused_at_a_place_brought_back_meanwhile_names_it(
     refused_then(monkeypatch, lambda: locations.restore(session, spools.van))
     _, response = counted(admin_client, session, "180")
     assert response.status_code == 409
-    page = " ".join(text(response).split())
+    page = words_on(response.text)
     assert (
         f"Not changed: {spools.van.name} is retired and holds nothing, so its "
         "count can't be corrected there." in page
@@ -220,7 +220,7 @@ def test_refused_by_another_rule_it_says_that_rule(
     monkeypatch.setattr(over_recorded, "correct", refused)
     response = correct(admin_client, session)
     assert response.status_code == 409
-    page = " ".join(text(response).split())
+    page = words_on(response.text)
     assert over_recorded_routes.not_changed(str(RULES["movement_whole_units"])) in page
     assert "Bring back" not in page
     assert "Mark checked" in page
@@ -350,7 +350,7 @@ def test_a_place_whose_own_place_is_retired_says_so(
     retire(session, shelf, place.store)
     response = bring_back(admin_client, session, shelf)
     assert response.status_code == 409
-    page = " ".join(text(response).split())
+    page = words_on(response.text)
     assert f"Not changed: {RULES['location_parent_current']}" in page
     session.expire_all()
     assert shelf.retired_at is not None
@@ -366,9 +366,17 @@ def checked_from_alert(
     return mark_checked(client, session, refused=str(at.id), **form)
 
 
-def problem_of(check: OverRecorded) -> str:
-    # Exact markup on purpose: the id each reason's aria-describedby names.
-    return f'<span class="problem" id="reason-{check.id}-problem">'
+def has_problem(form: Element, check: OverRecorded) -> bool:
+    """Whether `form` shows the problem of `check`'s reason, under the id
+    each reason's aria-describedby names."""
+    return bool(form.all("span", class_="problem", id=f"reason-{check.id}-problem"))
+
+
+def typed(form: Element) -> tuple[list[str], list[str | None]]:
+    """The reason chosen in `form`, and the words in its box."""
+    reasons = form.all("input", name="reason")
+    chosen = [reason.attrs["value"] for reason in reasons if "checked" in reason.attrs]
+    return chosen, box_values(form, "words")
 
 
 @pytest.mark.parametrize(
@@ -390,21 +398,23 @@ def test_mark_checked_refused_from_an_alert_draws_the_alert_again(
     typed kept there (Claude, 2026-11-15, left to Claude by Ali)."""
     place = from_emptied_store(registered_client, session)
     refusal = correct(admin_client, session)
-    assert f'name="refused" value="{place.store.id}"' in refusal.text
+    assert ("refused", str(place.store.id)) in hidden_fields(refusal.text)
     response = checked_from_alert(admin_client, session, place.store, **form)
     assert response.status_code == 400
-    page = " ".join(text(response).split())
+    page = words_on(response.text)
     assert over_recorded_routes.RETIRED_EMPTY["found"](place.store.name, "2") in page
     assert f"Bring back {place.store.name}" in page
     assert str(problem) in page
     (check,) = checks(session)
     alert, row = checked_forms(response.text)
-    assert problem_of(check) in alert
-    assert f'name="refused" value="{place.store.id}"' in alert
-    assert problem_of(check) not in row
+    assert has_problem(alert, check)
+    assert ("refused", str(place.store.id)) in hidden_fields(alert)
+    assert not has_problem(row, check)
     if form:
-        kept = (f'value="{form["reason"]}" checked', f'value="{form["words"]}"')
-        assert all(each in alert and each not in row for each in kept)
+        assert typed(alert) == ([form["reason"]], [form["words"]])
+        reasons, words = typed(row)
+        assert form["reason"] not in reasons
+        assert form["words"] not in words
     assert check.settled_at is None
 
 
@@ -417,7 +427,7 @@ def test_mark_checked_refused_from_a_counts_alert_draws_it_again(
     counted(admin_client, session, "180")
     response = checked_from_alert(admin_client, session, spools.van)
     assert response.status_code == 400
-    page = " ".join(text(response).split())
+    page = words_on(response.text)
     assert (
         f"Not changed: {spools.van.name} is retired and holds nothing, so its "
         "count can't be corrected there." in page
@@ -443,7 +453,7 @@ def test_a_marker_not_of_a_refusal_draws_no_alert(
         assert 'role="alert"' not in response.text
         assert "Bring back" not in response.text
         (row,) = checked_forms(response.text)
-        assert problem_of(check) in row
+        assert has_problem(row, check)
 
 
 def test_an_alert_drawn_again_keeps_only_one_item(

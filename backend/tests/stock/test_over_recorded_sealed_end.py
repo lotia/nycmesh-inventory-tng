@@ -2,7 +2,6 @@
 sealed, an open package closed on a count, and a correction and a count
 at once (Ali, 2026-11-15, inventory-tng-he9, inventory-tng-dd8)."""
 
-import re
 import uuid
 from decimal import Decimal
 
@@ -25,7 +24,7 @@ from inventory_tng.stock.moments import expected
 from inventory_tng.stock.paths import COUNTS
 
 from helpers.concurrency import Committed
-from helpers.markup import links
+from helpers.markup import box_values, links
 from helpers.over_recorded import (
     PAGE,
     arrived_field,
@@ -49,8 +48,7 @@ from helpers.stock import Place, Spools, count_at, count_form_at, write
 def sealed_line(page: str, spools: Spools) -> str | None:
     """The value a count page fills a line of sealed spools with, if it has
     one."""
-    found = re.search(rf'name="{sealed_field(spools)}"[^>]*value="([^"]*)"', page)
-    return found and found.group(1)
+    return next(iter(box_values(page, sealed_field(spools))), None)
 
 
 @pytest.mark.parametrize("state", ["missing", "used_up"])

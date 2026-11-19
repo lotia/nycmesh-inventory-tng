@@ -27,7 +27,7 @@ from inventory_tng.stock.ledger import Entry, Form
 from inventory_tng.stock.paths import COUNTS
 
 from helpers.concurrency import Committed
-from helpers.markup import links
+from helpers.markup import links, words_on
 from helpers.over_recorded import (
     PAGE,
     checks,
@@ -41,7 +41,6 @@ from helpers.over_recorded import (
     reason_adjustments,
     recorded_then_changed,
     sealed_field,
-    text_of,
 )
 from helpers.stock import URL, Spools, ada_id, count_at, count_form_at, cut
 
@@ -96,7 +95,9 @@ def test_its_open_package_closed_outside_a_count_correct_writes_the_sealed_end(
     assert on is not None
     day = show_day(on, site_zone(session))
     page = admin_client.get(f"{PAGE}?item={spools.cable.id}").text
-    assert f"Open spool closed {day}. Sealed spool still to put right." in text_of(page)
+    assert f"Open spool closed {day}. Sealed spool still to put right." in words_on(
+        page
+    )
     assert "Correct sealed spool<span" in page
     (check,) = checks(session)
     with capture_logs() as logs:
@@ -174,7 +175,7 @@ def test_a_cut_from_an_open_package_closed_since_is_still_refused(
     recorded_then_changed(registered_client, first, lines=[cut(made, "15")])
     closed_from_its_item(admin_client, spools, made.id)
     page = admin_client.get(f"{PAGE}?item={spools.cable.id}").text
-    assert " closed " not in text_of(page)
+    assert " closed " not in words_on(page)
     response = correct(admin_client, session)
     assert response.status_code == 409
     assert reason_adjustments(session, over_recorded.REASON) == []
@@ -258,7 +259,7 @@ def test_a_moves_open_package_closed_then_its_place_counted_puts_nothing_right(
     assert count_ids(session) != []
     (check,) = checks(session)
     assert check.settled_at is None
-    assert " closed " not in text_of(
+    assert " closed " not in words_on(
         admin_client.get(f"{PAGE}?item={spools.cable.id}").text
     )
 
@@ -572,7 +573,7 @@ def test_both_ends_right_it_says_so_and_offers_close_it(
         admin_client, registered_client, session, monkeypatch
     )
     page = admin_client.get(f"{PAGE}?item={spools.cable.id}").text
-    assert words in text_of(page)
+    assert words in words_on(page)
     assert f'action="{PAGE}/{check.id}/close?item={spools.cable.id}"' in page
     assert "Close it<span" in page
     assert f"{PAGE}/{check.id}/correct" not in page

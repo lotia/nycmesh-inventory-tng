@@ -2,7 +2,6 @@
 (admins/admins_routes.py)."""
 
 import html
-import re
 from collections.abc import Callable
 from datetime import UTC, datetime, timedelta
 from typing import NoReturn
@@ -25,7 +24,16 @@ from inventory_tng.web.qr_codes import qr_svg
 from inventory_tng.web.single_use_forms import FIELD
 
 from helpers.mail import NO_MAIL, SentMail
-from helpers.markup import button, forms, links, read, row_links, sorted_columns, text
+from helpers.markup import (
+    button,
+    forms,
+    links,
+    read,
+    row_links,
+    sorted_columns,
+    text,
+    words_on,
+)
 from helpers.sign_in import (
     admin_named,
     confirmed_long_ago,
@@ -41,9 +49,7 @@ NEW_PASSWORD = "a long passphrase of their own"
 
 
 def link_on(page: str) -> str:
-    match = re.search(r'class="key">(\S+)<', page)
-    assert match is not None
-    return match.group(1)
+    return read(page).one("*", class_="key").text
 
 
 def assert_sign_in_was_reset(
@@ -185,7 +191,7 @@ def test_resetting_another_asks_to_confirm_first(
     assert ("get", f"{path}/reset") in forms(page)
     asked = admin_client.get(f"{path}/reset")
     assert asked.status_code == 200
-    words = " ".join(text(asked).split())
+    words = words_on(asked.text)
     assert "Resetting ben's sign-in signs them out everywhere" in words
     assert "can't be undone" in words
     assert "danger" in button(asked.text, "Reset their sign-in").classes
