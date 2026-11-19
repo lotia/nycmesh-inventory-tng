@@ -7,8 +7,8 @@ keys in TOTP_KEYS_DIR: a directory holding one file per key version, named
 by its number (1, 2, ...), each holding a key the command's `new` printed
 (admins/sealed_totp_keys_command.py, which also reseals and retires). The
 highest version seals; every version present opens. A Kubernetes Secret
-mounted as a directory has this shape. In development the directory defaults to the
-clone's .local/totp-keys, which `mise run setup` fills.
+mounted as a directory has this shape. In development the directory
+defaults to the clone's .local/totp-keys, which `mise run setup` fills.
 
 DEPLOYMENT.md, TOTP keys, says how to rotate them and what to do if one is
 lost.

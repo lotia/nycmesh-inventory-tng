@@ -6,7 +6,8 @@ Only established calls here (AGENTS.md rule 3): argon2-cffi hashes and
 checks passwords, authenticator_totp makes TOTP keys and checks codes with
 pyotp, sealed_totp_keys seals them with cryptography's AES-GCM, `secrets`
 makes tokens, and devices.digest (hashlib's SHA-256) hashes tokens and
-recovery codes for the database. Comparing the setup token is secrets.compare_digest.
+recovery codes for the database. Comparing the setup token is
+secrets.compare_digest.
 """
 
 import re
