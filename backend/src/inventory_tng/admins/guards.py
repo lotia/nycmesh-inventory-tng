@@ -171,7 +171,7 @@ def _then(path: str, request: Request) -> str:
 
 def signed_in(request: Request, session: DbSession) -> SignedIn:
     """Signed in, TOTP or not. Only the pages that set TOTP up, confirm and
-    sign out take this; others take AdminSignedIn."""
+    sign out take this; others are behind admin_signed_in."""
     token = request.cookies.get(COOKIE)
     now = _now()
     found = accounts.find_session(session, token, now) if token else None
