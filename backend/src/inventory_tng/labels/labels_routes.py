@@ -11,7 +11,7 @@ from fastapi import APIRouter, Depends, Form, Query, Request
 from fastapi.responses import JSONResponse, Response
 from sqlalchemy import ColumnElement, func
 
-from inventory_tng.admins.guards import AdminSignedIn
+from inventory_tng.admins.guards import AdminSignedIn, admin_signed_in
 from inventory_tng.catalogue.paths import ITEMS
 from inventory_tng.core.db_sessions import DbSession
 from inventory_tng.core.local_time import site_zone
@@ -173,18 +173,15 @@ def list_labels(
     )
 
 
-@router.get(f"{LABELS}/suggest")
-def suggest_labels(
-    session: DbSession, signed: AdminSignedIn, listing: Listed
-) -> JSONResponse:
+@router.get(f"{LABELS}/suggest", dependencies=[Depends(admin_signed_in)])
+def suggest_labels(session: DbSession, listing: Listed) -> JSONResponse:
     """What the search box offers as one types (_listing.html)."""
     offered = listing.suggest(session, lambda label: label.code)
     return JSONResponse(offered, headers={"Cache-Control": "no-store"})
 
 
-@router.post(LABELS)
+@router.post(LABELS, dependencies=[Depends(admin_signed_in)])
 def make_labels(
-    signed: AdminSignedIn,
     session: DbSession,
     item_id: Annotated[int | None, Form()] = None,
     package_id: Annotated[int | None, Form()] = None,
@@ -266,8 +263,8 @@ def confirm_revoke(
     )
 
 
-@router.post(f"{LABELS}/{{label_id}}/revoke")
-def revoke_label(signed: AdminSignedIn, session: DbSession, label_id: int) -> Response:
+@router.post(f"{LABELS}/{{label_id}}/revoke", dependencies=[Depends(admin_signed_in)])
+def revoke_label(session: DbSession, label_id: int) -> Response:
     if not labels.revoke(session, label_id, now()):
         return not_found()
     session.commit()

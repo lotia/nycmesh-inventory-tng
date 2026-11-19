@@ -22,7 +22,7 @@ these or one kept in a process's memory, as the pages' reports are.
 
 from collections.abc import Generator
 from contextlib import contextmanager
-from typing import Literal
+from typing import Literal, override
 
 import structlog
 from limits import RateLimitItem
@@ -101,6 +101,7 @@ class PostgresStorage(Storage, MovingWindowSupport):
         log.debug("attempt counted", allowed=acquired, expired_removed=gone)
         return acquired
 
+    @override
     def get_moving_window(self, key: str, limit: int, expiry: int) -> tuple[float, int]:
         with self._connection() as connection:
             start, count = connection.execute(

@@ -186,7 +186,8 @@ def test_history_holds_no_secret(session: Session, admin: Admin, other: Admin) -
     assert changes[-1].new_row["id"] == admin.id
 
 
-def test_history_records_the_rest_of_each_row(session: Session, admin: Admin) -> None:
+@pytest.mark.usefixtures("admin")
+def test_history_records_the_rest_of_each_row(session: Session) -> None:
     session.get_one(SignInSettings, 1).totp_policy = "optional"
     session.flush()
     (added,) = history(session, "admin")

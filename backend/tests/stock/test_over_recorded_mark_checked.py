@@ -137,7 +137,6 @@ def test_marking_one_checked_writes_nothing(
 def test_marking_one_checked_offers_each_reason(
     admin_client: TestClient,
     registered_client: TestClient,
-    session: Session,
     place: Place,
     bags: ItemPackage,
 ) -> None:
@@ -339,7 +338,6 @@ def test_the_page_offers_the_reasons_the_database_keeps() -> None:
 def test_enter_in_the_words_marks_checked(
     admin_client: TestClient,
     registered_client: TestClient,
-    session: Session,
     place: Place,
     bags: ItemPackage,
 ) -> None:

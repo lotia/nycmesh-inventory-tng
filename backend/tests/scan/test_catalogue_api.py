@@ -234,7 +234,8 @@ def test_holds_the_scan_settings(registered_client: TestClient) -> None:
     assert registered_client.get(URL).json()["settings"] == {"name_check_minutes": 15}
 
 
-def test_lists_come_in_name_order(registered_client: TestClient, rows: Rows) -> None:
+@pytest.mark.usefixtures("rows")
+def test_lists_come_in_name_order(registered_client: TestClient) -> None:
     reply = registered_client.get(URL).json()
     for name in ("volunteers", "locations", "items"):
         names = [entry["name"] for entry in reply[name]]

@@ -338,7 +338,6 @@ def test_a_report_since_the_page_was_shown_is_not_settled_unseen(
 def test_each_kind_has_its_page(
     admin_client: TestClient,
     registered_client: TestClient,
-    session: Session,
     spools: Spools,
 ) -> None:
     reported, below = spools.opened(), spools.opened()
@@ -460,9 +459,7 @@ def test_a_length_of_an_item_counted_each_is_whole(
     assert done.headers["location"] == f"{LENGTHS}?notice=length_bad"
 
 
-def test_a_report_of_one_closed_is_not_kept(
-    registered_client: TestClient, session: Session, spools: Spools
-) -> None:
+def test_a_report_of_one_closed_is_not_kept(session: Session, spools: Spools) -> None:
     made = spools.opened()
     closer = add(session, Admin(username=f"closer-{tag()}"))
     open_packages.close(session, made.id, closer.id, made.opened_at)
@@ -743,7 +740,6 @@ def test_the_volunteers_figure_typed_is_set_against_the_report(
 def test_those_to_check_sort_and_come_in_pages(
     admin_client: TestClient,
     registered_client: TestClient,
-    session: Session,
     spools: Spools,
 ) -> None:
     """As listed unless a heading sorts them; in pages of 25, 50, 100 or

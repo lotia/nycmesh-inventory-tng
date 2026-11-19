@@ -75,9 +75,9 @@ def this_row(session: Session) -> AdminSession:
     ).one()
 
 
+@pytest.mark.usefixtures("ada")
 def test_the_page_shows_the_account(
     client: TestClient,
-    ada: tuple[Admin, str],
 ) -> None:
     page = client.get(ACCOUNT).text
     assert "Phone" in page
@@ -116,7 +116,6 @@ def test_viewing_it_needs_signing_in(
 
 def test_changing_the_email(
     client: TestClient,
-    session: Session,
     ada: tuple[Admin, str],
 ) -> None:
     admin, _ = ada
@@ -127,10 +126,10 @@ def test_changing_the_email(
     assert admin.email is None
 
 
+@pytest.mark.usefixtures("ada")
 def test_an_email_another_admin_uses_is_refused(
     client: TestClient,
     session: Session,
-    ada: tuple[Admin, str],
 ) -> None:
     session.add(Admin(username="ben", email="ben@example.org"))
     session.flush()
@@ -160,9 +159,9 @@ def test_changing_the_password_ends_the_other_sessions(
     assert stored.changed_at is not None
 
 
+@pytest.mark.usefixtures("ada")
 def test_a_short_password_is_refused(
     client: TestClient,
-    ada: tuple[Admin, str],
 ) -> None:
     form = {"password": "short", "password_again": "short"}
     refused = client.post(f"{ACCOUNT}/password", data=form)
@@ -222,10 +221,10 @@ def test_recovery_codes_need_an_authenticator(
     assert not accounts.has_recovery_codes(session, admin.id)
 
 
+@pytest.mark.usefixtures("ada")
 def test_another_admins_authenticator_is_not_found(
     client: TestClient,
     session: Session,
-    ada: tuple[Admin, str],
 ) -> None:
     ben, _ = new_admin(session, "ben")
     (theirs,) = accounts.authenticators(session, ben.id)
@@ -426,10 +425,10 @@ def test_signing_out_everywhere_else(
     assert this_row(session).ended_at is None
 
 
+@pytest.mark.usefixtures("ada")
 def test_another_admins_session_is_not_found(
     client: TestClient,
     session: Session,
-    ada: tuple[Admin, str],
 ) -> None:
     ben, _ = new_admin(session, "ben")
     theirs = other_session(session, ben)
@@ -470,10 +469,10 @@ def test_a_late_form_asks_for_a_code_and_keeps_what_was_typed(
     assert admin.email == "ada@example.org"
 
 
+@pytest.mark.usefixtures("ada")
 def test_a_late_password_form_never_writes_the_password_into_the_page(
     client: TestClient,
     session: Session,
-    ada: tuple[Admin, str],
 ) -> None:
     confirmed_long_ago(session)
     form = {"password": NEW_PASSWORD, "password_again": NEW_PASSWORD}
@@ -553,19 +552,19 @@ def test_a_late_new_authenticator_keeps_its_key(
     assert names == {"Phone", "Laptop"}
 
 
+@pytest.mark.usefixtures("ada")
 def test_viewing_the_account_never_asks(
     client: TestClient,
     session: Session,
-    ada: tuple[Admin, str],
 ) -> None:
     confirmed_long_ago(session)
     assert client.get(ACCOUNT).status_code == 200
 
 
+@pytest.mark.usefixtures("ada")
 def test_the_account_uses_the_site_zone(
     client: TestClient,
     session: Session,
-    ada: tuple[Admin, str],
 ) -> None:
     from inventory_tng.models.site_settings import SiteSettings
 

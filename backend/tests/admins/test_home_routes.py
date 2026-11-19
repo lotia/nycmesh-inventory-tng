@@ -27,9 +27,7 @@ def test_two_administrators_are_not(admin_client: TestClient, session: Session) 
     assert str(ALONE) not in text(admin_client.get("/admin"))
 
 
-def test_an_invite_not_taken_up_does_not_count(
-    admin_client: TestClient, session: Session
-) -> None:
+def test_an_invite_not_taken_up_does_not_count(admin_client: TestClient) -> None:
     """Grace has no password yet, so she could let nobody back in."""
     admin_client.post("/admin/admins", data={"username": "grace"})
     assert str(ALONE) in text(admin_client.get("/admin"))

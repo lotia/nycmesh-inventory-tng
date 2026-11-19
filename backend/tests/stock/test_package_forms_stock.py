@@ -249,7 +249,7 @@ def test_a_place_holding_forms_that_net_to_nothing_holds_stock(
 
 @pytest.mark.parametrize("amount", ["-2.000", "-0.500"])
 def test_an_open_package_showing_less_than_nothing_is_listed(
-    registered_client: TestClient, session: Session, spools: Spools, amount: str
+    registered_client: TestClient, spools: Spools, amount: str
 ) -> None:
     made = spools.opened()
     spools.move(

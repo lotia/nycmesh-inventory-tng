@@ -379,7 +379,7 @@ def test_newest_first_in_pages_of_one_item_or_all(
     assert {row[1] for row in [*rows_of(page), *second]} == {place.item.name_shown}
 
 
-def test_nothing_settled_says_so(admin_client: TestClient, session: Session) -> None:
+def test_nothing_settled_says_so(admin_client: TestClient) -> None:
     assert settled_rows(admin_client) == [["Nothing settled yet."]]
 
 

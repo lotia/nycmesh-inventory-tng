@@ -341,7 +341,7 @@ def test_a_port_another_checkout_claims_names_it_and_what_to_do(
 
 
 def test_a_port_nothing_of_ours_claims_is_held_by_something_else(
-    monkeypatch: pytest.MonkeyPatch, env_file: Path, listening: int, tmp_path: Path
+    monkeypatch: pytest.MonkeyPatch, env_file: Path, listening: int
 ) -> None:
     """Its own stack, though it claims the port, is not what holds it."""
     monkeypatch.setattr(stack, "PORTS", {**PORTS, "INVENTORY_VITE_PORT": listening})
@@ -355,9 +355,8 @@ def test_a_port_nothing_of_ours_claims_is_held_by_something_else(
     ]
 
 
-def test_new_ports_change_only_the_ports_that_need_it(
-    nothing_listens: None, tmp_path: Path
-) -> None:
+@pytest.mark.usefixtures("nothing_listens")
+def test_new_ports_change_only_the_ports_that_need_it(tmp_path: Path) -> None:
     """One this checkout's stack holds stays, though another claims it; one
     still free stays, though not the first free one; one another claims
     moves; one missing is added only if its default is taken; every other
@@ -467,9 +466,7 @@ def test_it_lets_a_start_go_on_when_its_ports_are_free(
 
 
 @pytest.mark.usefixtures("nothing_listens")
-def test_it_prints_a_port(
-    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str], env_file: Path
-) -> None:
+def test_it_prints_a_port(capsys: pytest.CaptureFixture[str], env_file: Path) -> None:
     env_file.write_text("INVENTORY_APP_PORT=8002\n")
     run_devtools(["stack", "port", "INVENTORY_APP_PORT"])
     assert capsys.readouterr().out == "8002\n"

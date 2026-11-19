@@ -5,11 +5,11 @@ left in a category nobody can pick."""
 from typing import Annotated
 
 import structlog
-from fastapi import APIRouter, Form, Request
+from fastapi import APIRouter, Depends, Form, Request
 from fastapi.responses import HTMLResponse, Response
 from sqlalchemy.orm import Session
 
-from inventory_tng.admins.guards import AdminSignedIn, SignedIn
+from inventory_tng.admins.guards import AdminSignedIn, SignedIn, admin_signed_in
 from inventory_tng.catalogue import categories, queries
 from inventory_tng.catalogue.forms import CATEGORY_TAKEN
 from inventory_tng.catalogue.paths import CATEGORIES
@@ -196,10 +196,10 @@ def retire_category(
     return redirect(CATEGORIES, notice="retired", undo=str(category_id))
 
 
-@router.post(f"{CATEGORIES}/{{category_id}}/restore")
-def restore_category(
-    request: Request, signed: AdminSignedIn, session: DbSession, category_id: int
-) -> Response:
+@router.post(
+    f"{CATEGORIES}/{{category_id}}/restore", dependencies=[Depends(admin_signed_in)]
+)
+def restore_category(session: DbSession, category_id: int) -> Response:
     found = session.get(Category, category_id)
     if found is None:
         return not_found()

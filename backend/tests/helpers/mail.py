@@ -26,7 +26,7 @@ class FailingMail:
     def __init__(self, error: Exception) -> None:
         self.error = error
 
-    def send(self, message: Message) -> None:
+    def send(self, _message: Message) -> None:
         raise self.error
 
 

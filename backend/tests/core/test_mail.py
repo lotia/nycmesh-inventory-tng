@@ -105,7 +105,7 @@ class FakeSMTP:
     calls: list[tuple[object, ...]]
     last: FakeSMTP
 
-    def __init__(self, host: str, port: int, **kwargs: object) -> None:
+    def __init__(self, host: str, port: int, **_: object) -> None:
         self.calls = [("connect", type(self).__name__, host, port)]
         self.messages: list[EmailMessage] = []
         FakeSMTP.last = self
@@ -116,10 +116,10 @@ class FakeSMTP:
     def __exit__(self, *_: object) -> None:
         self.calls.append(("quit",))
 
-    def starttls(self, **kwargs: object) -> None:
+    def starttls(self, **_: object) -> None:
         self.calls.append(("starttls",))
 
-    def login(self, user: str, password: str) -> None:
+    def login(self, user: str, _password: str) -> None:
         self.calls.append(("login", user))
 
     def send_message(self, message: EmailMessage) -> None:
@@ -192,7 +192,8 @@ def test_a_failed_send_is_logged_and_never_raises() -> None:
     assert "ada@example.org" not in str(logs)
 
 
-def test_a_message_has_a_date_and_an_id(fake_smtp: None) -> None:
+@pytest.mark.usefixtures("fake_smtp")
+def test_a_message_has_a_date_and_an_id() -> None:
     config = dataclasses.replace(SITE_MAIL, username=None)
     mail.SmtpMailer(config).send(MESSAGE)
     sent = FakeSMTP.last.messages[0]
@@ -200,10 +201,11 @@ def test_a_message_has_a_date_and_an_id(fake_smtp: None) -> None:
     assert sent["Message-ID"].endswith("@example.org>")
 
 
+@pytest.mark.usefixtures("fake_smtp")
 def test_a_failed_starttls_closes_the_connection(
-    fake_smtp: None, monkeypatch: pytest.MonkeyPatch
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    def refuse(self: FakeSMTP, **kwargs: object) -> None:
+    def refuse(_self: FakeSMTP, **_: object) -> None:
         raise smtplib.SMTPNotSupportedError
 
     monkeypatch.setattr(FakeSMTP, "starttls", refuse)

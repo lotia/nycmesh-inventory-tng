@@ -135,7 +135,7 @@ def save(
         location.time_zone = time_zone
 
 
-def rename_custody(session: Session, custody: Location, name: str) -> None:
+def rename_custody(custody: Location, name: str) -> None:
     """A custody location renamed with its volunteer. The caller holds the
     catalogue lock and the row (volunteers.save)."""
     custody.name = name

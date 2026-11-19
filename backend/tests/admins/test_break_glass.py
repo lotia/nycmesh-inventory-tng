@@ -320,7 +320,7 @@ ADA, BEN, GRACE = "ada@example.org", "ben@example.org", "g@example.org"
     ("act", "expected"),
     [
         (
-            lambda s, ada, ben, n: accounts.invite(s, "grace", GRACE, ada.id, NOW, n),
+            lambda s, ada, _ben, n: accounts.invite(s, "grace", GRACE, ada.id, NOW, n),
             [(ADA, "activity"), (BEN, "activity"), (GRACE, "invited")],
         ),
         (
@@ -335,11 +335,11 @@ ADA, BEN, GRACE = "ada@example.org", "ben@example.org", "g@example.org"
             [(ADA, "activity"), (BEN, "retired")],
         ),
         (
-            lambda s, ada, ben, n: accounts.let_in(s, "ben", NOW, n),
+            lambda s, _ada, _ben, n: accounts.let_in(s, "ben", NOW, n),
             [(ADA, "activity"), (BEN, "let_in")],
         ),
         (
-            lambda s, ada, ben, n: accounts.invite_by_operator(
+            lambda s, _ada, _ben, n: accounts.invite_by_operator(
                 s, "grace", GRACE, NOW, n
             ),
             [(ADA, "activity"), (BEN, "activity"), (GRACE, "invited_by_operator")],

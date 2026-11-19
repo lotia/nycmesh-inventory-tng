@@ -167,7 +167,7 @@ def test_asking_is_rate_limited(
 
 
 def test_without_mail_there_is_no_emailed_reset(
-    make_app: Callable[..., FastAPI], session: Session
+    make_app: Callable[..., FastAPI],
 ) -> None:
     with TestClient(make_app(), base_url="https://testserver") as client:
         assert "Forgot your password?" not in text(client.get(paths.SIGN_IN))

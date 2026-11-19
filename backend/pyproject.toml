@@ -88,6 +88,7 @@ options = "format REVISION_SCRIPT_FILENAME"
 [tool.ruff.lint]
 extend-select = [
     "ANN",  # every function is annotated
+    "ARG",  # unused arguments
     "B",    # likely bugs
     "FAST", # FastAPI
     "I",    # import order

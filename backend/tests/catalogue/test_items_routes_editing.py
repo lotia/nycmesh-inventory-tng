@@ -562,9 +562,8 @@ def test_renaming_close_to_another_asks_first(
     assert admin_client.post(path, data=form).status_code == 303
 
 
-def test_the_add_form_says_how_to_name_an_item(
-    admin_client: TestClient, radios: Category
-) -> None:
+@pytest.mark.usefixtures("radios")
+def test_the_add_form_says_how_to_name_an_item(admin_client: TestClient) -> None:
     page = " ".join(text(admin_client.get(ITEMS)).split())
     assert "what it is, then what tells it apart from the items nearest it" in page
     assert "the maker goes in Manufacturer" in page

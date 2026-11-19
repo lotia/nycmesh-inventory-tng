@@ -231,8 +231,9 @@ def test_a_failed_run_stops_the_report_naming_its_output(
     assert suite_report.run(["true"], tmp_path, "passed.log") >= 0
 
 
+@pytest.mark.usefixtures("clone")
 def test_backend_tests_matching_no_coverage_context_stop_the_report(
-    clone: Path, monkeypatch: pytest.MonkeyPatch
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     monkeypatch.setattr(suite_report, "backend_tests", lambda _: {"other": 1.0})
     suite_report.OUT.mkdir(parents=True)

@@ -408,7 +408,7 @@ def test_label_suggestions_name_it_and_narrow_the_list(
 
 
 def test_labels_come_in_pages_of_fifty_each_printed_from_its_own(
-    admin_client: TestClient, session: Session, cable: Item
+    admin_client: TestClient, session: Session
 ) -> None:
     hub = add(session, Location(name="Paged hub", kind="store"))
     for number in range(PER_PAGE + 5):

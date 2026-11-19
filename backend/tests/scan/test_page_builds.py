@@ -6,7 +6,6 @@ from typing import cast
 import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
-from sqlalchemy.orm import Session
 from structlog.testing import capture_logs
 
 from inventory_tng.scan import page_builds
@@ -47,9 +46,8 @@ def oldest(monkeypatch: pytest.MonkeyPatch) -> str:
         ("2026-11-12", True),
     ],
 )
-def test_too_old_is_before_the_oldest_build_taken(
-    oldest: str, build: str, too_old: bool
-) -> None:
+@pytest.mark.usefixtures("oldest")
+def test_too_old_is_before_the_oldest_build_taken(build: str, too_old: bool) -> None:
     assert is_too_old(build) is too_old
 
 
@@ -84,7 +82,7 @@ def test_without_a_build_a_reply_names_none(
 
 @pytest.mark.usefixtures("oldest")
 def test_a_batch_from_a_build_too_old_is_held_back_before_it_is_checked(
-    served: TestClient, place: Place, session: Session
+    served: TestClient, place: Place
 ) -> None:
     """A field the server now requires, missing from what an older build
     sends, is no 422 the page would refuse it for."""

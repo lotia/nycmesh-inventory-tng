@@ -91,7 +91,7 @@ def save(
     enforce("retired_read_only", when=volunteer.retired_at is not None)
     volunteer.name, volunteer.email = name, email
     if held is not None:
-        locations.rename_custody(session, held, name)
+        locations.rename_custody(held, name)
 
 
 def hold_stock(session: Session, volunteer: Volunteer) -> Location:

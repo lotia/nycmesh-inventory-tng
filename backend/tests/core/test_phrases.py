@@ -319,7 +319,7 @@ def signed_in(name: str, **context: object) -> str:
 
 
 VIEW = SimpleNamespace(
-    aria_sort=lambda column: "descending",
+    aria_sort=lambda _column: "descending",
     sort_link=link,
     sizes=[25, None],
     size_link=link,
@@ -332,7 +332,7 @@ VIEW = SimpleNamespace(
     filters=True,
     unfiltered_link=link,
     fields=lambda *_: [("q", NOT_ENGLISH)],
-    filtered=lambda name: "",
+    filtered=lambda _name: "",
     pages=3,
     page=2,
     link=link,
@@ -408,7 +408,7 @@ def unit_read(**differs: object) -> SimpleNamespace:
                 READING,
                 SimpleNamespace(called=NOT_ENGLISH, kind_words=NOT_ENGLISH),
             ],
-            "shown": lambda reading: NOT_ENGLISH,
+            "shown": lambda _reading: NOT_ENGLISH,
             "read": READING,
             "clue": [NOT_ENGLISH, NOT_ENGLISH],
             "rule": SimpleNamespace(respell=True),
@@ -427,8 +427,8 @@ def units_read() -> str:
     ]
     return render(
         "catalogue/_units_read.html",
-        units_read=lambda typed: each,
-        shown_as=lambda typed, sent: NOT_ENGLISH,
+        units_read=lambda _typed: each,
+        shown_as=lambda _typed, _sent: NOT_ENGLISH,
         typed=NOT_ENGLISH,
         sent={},
         not_a_unit="",
@@ -633,8 +633,8 @@ COVERED: dict[str, Callable[[], str]] = {
         problems={},
         default=NOT_ENGLISH,
         again=NOT_ENGLISH,
-        units_read=lambda typed: [],
-        shown_as=lambda typed, sent: "",
+        units_read=lambda _typed: [],
+        shown_as=lambda _typed, _sent: "",
         similar=[
             SimpleNamespace(
                 item=SimpleNamespace(id=1, name_shown=NOT_ENGLISH, retired_at=1),
@@ -902,8 +902,8 @@ def items_page(total: int) -> str:
         values={},
         problems={},
         here="/here",
-        units_read=lambda typed: [],
-        shown_as=lambda typed, sent: "",
+        units_read=lambda _typed: [],
+        shown_as=lambda _typed, _sent: "",
     )
 
 

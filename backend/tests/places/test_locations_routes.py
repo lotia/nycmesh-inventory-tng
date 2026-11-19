@@ -40,9 +40,7 @@ def test_adding_a_store_and_an_area_inside_it(
     assert page.index("Hub") < page.index("Shelf A")
 
 
-def test_an_area_needs_a_place_to_be(
-    admin_client: TestClient, session: Session
-) -> None:
+def test_an_area_needs_a_place_to_be(admin_client: TestClient) -> None:
     refused = admin_client.post(LOCATIONS, data={"name": "Shelf", "kind": "area"})
     assert refused.status_code == 400
     assert str(PICK_WHERE) in text(refused)

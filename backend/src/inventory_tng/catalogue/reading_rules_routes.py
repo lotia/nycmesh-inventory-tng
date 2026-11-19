@@ -113,7 +113,6 @@ SETTLED_BY = {
 
 def _rule_page(
     request: Request,
-    session: Session,
     signed: SignedIn,
     rule: ReadingRule,
     *,
@@ -188,7 +187,7 @@ def reading(
     found = session.get(ReadingRule, rule_id)
     if found is None:
         return not_found()
-    return _rule_page(request, session, signed, found)
+    return _rule_page(request, signed, found)
 
 
 def _refused(
@@ -202,7 +201,7 @@ def _refused(
     """The rule's page again, saying why a change to it was refused: names
     it would read alike, by id, or one of ALERTS."""
     if broken != items.READ_ALIKE:
-        return _rule_page(request, session, signed, rule, alert=RULES[broken])
+        return _rule_page(request, signed, rule, alert=RULES[broken])
     # What the change would have read, the savepoint undone.
     rules = {**reading_rules_held(session)}
     if change is None:
@@ -211,7 +210,7 @@ def _refused(
         rules[rule.token] = change
     words = read_alike_words(session, [rule.token], rules)
     log.debug("reading refused", reading_rule_id=rule.id, read_alike=len(words))
-    return _rule_page(request, session, signed, rule, read_alike=words)
+    return _rule_page(request, signed, rule, read_alike=words)
 
 
 @router.post(f"{READINGS}/{{rule_id:int}}")
@@ -230,7 +229,7 @@ def save_reading(
     offers = offered(found.token, found.rule)
     change = chosen_rule(reading, offers, respell=respell == "on")
     if change is None:
-        return _rule_page(request, session, signed, found, problem=CHOOSE_ONE)
+        return _rule_page(request, signed, found, problem=CHOOSE_ONE)
     seen = form_version(version)
     _, broken = refusal(
         session,

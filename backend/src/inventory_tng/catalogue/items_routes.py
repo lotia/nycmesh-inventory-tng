@@ -12,7 +12,7 @@ from fastapi.responses import HTMLResponse, JSONResponse, Response
 from opentelemetry import metrics
 from sqlalchemy.orm import Session
 
-from inventory_tng.admins.guards import AdminSignedIn, SignedIn
+from inventory_tng.admins.guards import AdminSignedIn, SignedIn, admin_signed_in
 from inventory_tng.catalogue import forms, items, queries, reading_rules, units
 from inventory_tng.catalogue.items_listing import SEARCHED
 from inventory_tng.catalogue.paths import CATEGORIES, ITEMS, READINGS
@@ -402,10 +402,8 @@ def list_items(
     return _list_page(request, session, signed, listing=listing, undo=back)
 
 
-@router.get(f"{ITEMS}/suggest")
-def suggest_items(
-    session: DbSession, signed: AdminSignedIn, listing: Listed
-) -> JSONResponse:
+@router.get(f"{ITEMS}/suggest", dependencies=[Depends(admin_signed_in)])
+def suggest_items(session: DbSession, listing: Listed) -> JSONResponse:
     """What the search box offers as one types (_listing.html)."""
     names = {c.id: c.name for c in queries.categories_by_name(session)}
     offered = listing.suggest(session, lambda item: names.get(item.category_id, ""))
@@ -437,9 +435,8 @@ def add_item(
 
 
 # Before the routes of one item, whose id would take "tracking".
-@router.post(f"{ITEMS}/tracking")
+@router.post(f"{ITEMS}/tracking", dependencies=[Depends(admin_signed_in)])
 def track_items(
-    signed: AdminSignedIn,
     session: DbSession,
     listing: Listed,
     item: Annotated[list[int], Form()] = [],  # noqa: B006  FastAPI copies it.
@@ -530,8 +527,8 @@ def save_item(
     return redirect(f"{ITEMS}/{item_id}", notice="item_renamed", section="aliases")
 
 
-@router.post(f"{ITEMS}/{{item_id}}/retire")
-def retire_item(signed: AdminSignedIn, session: DbSession, item_id: int) -> Response:
+@router.post(f"{ITEMS}/{{item_id}}/retire", dependencies=[Depends(admin_signed_in)])
+def retire_item(session: DbSession, item_id: int) -> Response:
     found = session.get(Item, item_id)
     if found is None:
         return not_found()

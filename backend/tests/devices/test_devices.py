@@ -282,7 +282,6 @@ def test_a_codes_devices_show_how_long_before_revocation_they_came(
 def test_last_seen_moves_at_most_hourly_even_when_nothing_is_saved(
     client: TestClient,
     engine: Engine,
-    session: Session,
     committed_cookie: tuple[int, str],
 ) -> None:
     device_id, token = committed_cookie
