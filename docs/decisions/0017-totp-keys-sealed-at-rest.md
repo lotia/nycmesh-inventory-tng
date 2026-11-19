@@ -27,9 +27,9 @@ backups are where a copy is likeliest to leak.
   Secret mounted into the app's pods only. The version sealed with is
   stored beside each key, so keys rotate: the newest seals, any present
   opens, and `reseal` moves every authenticator to the newest.
-- **A missing version locks no one out.** An authenticator that cannot be
-  read takes no code and is logged; its administrator signs in with a
-  recovery code or a reset link and enrols again.
+- **A missing or replaced version locks no one out.** An authenticator
+  that cannot be read takes no code and is logged; its administrator signs
+  in with a recovery code or a reset link and enrols again.
 
 We rejected encrypting in PostgreSQL (pgcrypto), which would put the key in
 queries and logs on the database server and is logic in the database

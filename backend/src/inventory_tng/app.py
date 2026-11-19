@@ -164,13 +164,10 @@ def create_app(
 
 
 def check_totp_keys(database: Database, keys: TotpKeys) -> None:
-    """Says at startup if any authenticator's key version is missing from
-    TOTP_KEYS_DIR: those take no code until their administrators enrol again
-    (DEPLOYMENT.md, TOTP keys)."""
+    """Says at startup if TOTP_KEYS_DIR cannot open any authenticator's key,
+    its version gone or its file replaced: those take no code until their
+    administrators enrol again (DEPLOYMENT.md, TOTP keys)."""
     with database.session() as session:
         unreadable = accounts.unreadable_authenticators(session, keys)
     if unreadable:
-        log.error(
-            "authenticators unreadable: their key versions are not in TOTP_KEYS_DIR",
-            count=unreadable,
-        )
+        log.error("authenticators unreadable with TOTP_KEYS_DIR", count=unreadable)

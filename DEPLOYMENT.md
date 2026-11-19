@@ -400,10 +400,11 @@ It says how many it resealed and how many it could not read. Once none is
 left on the old version, remove that version from the Secret and roll out
 again.
 
-**If a key is lost.** The authenticators it sealed cannot be read again, and
-must be set up again: all of them, if no other version was ever used. The
-app starts with whatever versions are present, and logs at startup how
-many it cannot read. Retire them:
+**If a key is lost**, or its version's file now holds another key. The
+authenticators it sealed cannot be read again, and must be set up again:
+all of them, if no other version was ever used. The app starts with
+whatever versions are present, opens every authenticator at startup, and
+logs how many it cannot read. Retire them:
 
 ```sh
 kubectl exec deploy/inventory -- \

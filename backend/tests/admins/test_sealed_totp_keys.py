@@ -18,10 +18,12 @@ from inventory_tng.admins.sealed_totp_keys import (
     keys_dir,
 )
 from inventory_tng.app import check_totp_keys
-from inventory_tng.core.db_sessions import Database
+from inventory_tng.core.db_sessions import Database, make_database
 from inventory_tng.core.settings import SettingsError
 from inventory_tng.models.admins import Authenticator
 
+from helpers.mail import NO_MAIL
+from helpers.rows import setting_up
 from helpers.sign_in import TOTP_KEYS, code, new_admin, raw_key
 
 KEY = "JBSWY3DPEHPK3PXP"
@@ -185,9 +187,37 @@ def test_startup_says_how_many_authenticators_are_unreadable(
         check_totp_keys(database, TOTP_KEYS)
     assert logs == [
         {
-            "event": "authenticators unreadable: their key versions are not in "
-            "TOTP_KEYS_DIR",
+            "event": "authenticators unreadable with TOTP_KEYS_DIR",
             "count": 2,
             "log_level": "error",
         }
     ]
+
+
+def test_startup_and_the_command_find_a_key_replaced_under_its_version(
+    own_database: str,
+) -> None:
+    """Version 1's file now holds another key, as after it was overwritten:
+    the version is there, but what it sealed does not open. Its own database,
+    as startup reads what is committed."""
+    database = make_database(own_database)
+    replaced = TotpKeys({1: raw_key()})
+    try:
+        with setting_up(database.session()) as session:
+            admin_id = new_admin(session)[0].id
+            session.commit()
+        with capture_logs() as logs:
+            check_totp_keys(database, replaced)
+        assert {
+            "event": "authenticators unreadable with TOTP_KEYS_DIR",
+            "count": 1,
+            "log_level": "error",
+        } in logs
+        with setting_up(database.session()) as session:
+            retired, _ = accounts.retire_authenticators(
+                session, replaced, datetime.now(UTC), every=False, notify=NO_MAIL
+            )
+            assert retired == 1
+            assert not accounts.uses_totp(session, admin_id)
+    finally:
+        database.dispose()

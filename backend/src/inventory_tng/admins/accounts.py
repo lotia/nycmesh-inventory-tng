@@ -308,8 +308,10 @@ def add_authenticator(
 
 def _opened(keys: TotpKeys, authenticator: Authenticator) -> str | None:
     """Its key, or None if it cannot be read (its key version is gone from
-    TOTP_KEYS_DIR): it then takes no code, and recovery codes and reset links
-    still let its administrator in (DEPLOYMENT.md, TOTP keys)."""
+    TOTP_KEYS_DIR, or that version's file holds another key): the one test of
+    unreadable, for sign-in, startup and the operator's command. It then takes
+    no code, and recovery codes and reset links still let its administrator
+    in (DEPLOYMENT.md, TOTP keys)."""
     # Current ones keep theirs.
     assert authenticator.sealed_key is not None
     assert authenticator.key_version is not None
@@ -328,15 +330,11 @@ def _opened(keys: TotpKeys, authenticator: Authenticator) -> str | None:
 
 
 def unreadable_authenticators(session: Session, keys: TotpKeys) -> int:
-    """Current authenticators sealed with a key version TOTP_KEYS_DIR lacks."""
-    return (
-        session.scalar(
-            select(func.count()).where(
-                CURRENT_TOTP, Authenticator.key_version.not_in(list(keys.keys))
-            )
-        )
-        or 0
-    )
+    """How many current authenticators `keys` cannot open, found as
+    retire_authenticators finds them: their key version is gone, or its file
+    now holds another key. Each is opened, one AES-GCM decryption apiece."""
+    current = session.scalars(select(Authenticator).where(CURRENT_TOTP))
+    return sum(_opened(keys, authenticator) is None for authenticator in current)
 
 
 def reseal_authenticators(session: Session, keys: TotpKeys) -> tuple[int, int]:
