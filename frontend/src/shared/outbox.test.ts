@@ -1579,7 +1579,8 @@ describe("listening", () => {
     const stop = outbox.listen();
     store(refused);
     window.dispatchEvent(new StorageEvent("storage", { key: STORAGE_KEY }));
-    // Still counted (scan/unseen-batches.ts, unseen), and its sibling still listed.
+    // Still counted (scan/unseen-batches.ts, unseen), and its sibling still
+    // listed.
     expect(outbox.entries.value).toEqual([saved, refused]);
     expect(outbox.shown()).toEqual([refused]);
     outbox.forgetShown([saved.body.key]);

@@ -34,7 +34,8 @@ export const PER_HOUR: Record<Event["kind"], number> = {
   // Once a tab, or twice, then too old (build.ts); once a load for each
   // of saves and a cart an older build left, and once for each put back in
   // the cart, by a tap or not, discarded, or a line of one discarded
-  // (scan/older-builds.ts): past each one's share, the hour's rest are not counted.
+  // (scan/older-builds.ts): past each one's share, the hour's rest are not
+  // counted.
   out_of_date: 2,
   older_storage: 4,
   // A volunteer starting again; more than its share an hour is no new news.

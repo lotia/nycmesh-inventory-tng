@@ -192,10 +192,12 @@ short test. `core/` is the name FastAPI's full-stack template uses;
   `scan/unseen-batches.ts`, the batches a catalogue has not seen. In each
   pair one module imports the other, never back, but for types:
   `nextWhole` and `linesSaid` stayed in `scan/older-builds.ts` for that.
-  Their tests were split alike; `scan/ScanPage.older-build.test.tsx`
-  drives the page, so stayed whole. `placeSides` and `Repeats` left
-  `scan/label-codes.ts`, and `browser-tests/labels.ts` became
-  `print-labels.ts` (inventory-tng-u3fp.12).
+  Their tests were split by the function each checks; those that drive
+  the outbox, its notes included, stayed in `shared/outbox.test.ts`, and
+  `scan/ScanPage.older-build.test.tsx` drives the page, so stayed whole.
+  `placeSides` and `Repeats` left `scan/label-codes.ts`, and
+  `browser-tests/labels.ts` became `print-labels.ts`
+  (inventory-tng-u3fp.12).
 - Older decision records keep the paths of their time. The tables below
   give each old path's new home; a later move adds its rows.
 
@@ -338,7 +340,7 @@ Later renamed or split:
 | `scan/label-codes.ts` | itself, with `readLabel` and `Scanned`; `placeSides`: `scan/cart.ts`; `Repeats`: `scan/repeated-reads.ts` |
 | `scan/labels.ts` | `scan/label-codes.ts` |
 | `scan/offered.ts` | itself, with `offered`, `offeredAt`, `isShortEnd`, `OpenPackage`, `Offered` and the cuts (`afterCut`, `cutOf`, `usedUpOf`, `Ending`, `Taken`); `keysToAsk`, `MAX_KEYS_ASKED`, `unseen`, `sealedCounts`, `sealedKey`, `Pending`, `refusedAsCounted`: `scan/unseen-batches.ts` |
-| `scan/older.ts` | `Older`, `Refused`, `readOlder`, `asSave`, `linesSaid`, `tidyOlder`, `compared`, `Now`, `Outcome`, `removeOlder`, `dropPart`, `Cut`, `nextWhole`, `olderId`, `OlderStore`: `scan/older-builds.ts`; `toCart`, `Gaps`, `goesBackWhole`, `lineWords`, `withRetired`, `nameOf`, `inUnit`, `saidOfOpen` and their words (`LINES_LOST` to `NO_LONGER_IN_CATALOGUE`): `scan/older-to-cart.ts` |
+| `scan/older.ts` | `Older`, `Refused`, `readOlder`, `asSave`, `linesSaid`, `tidyOlder`, `compared`, `Now`, `Outcome`, `removeOlder`, `dropPart`, `Cut`, `nextWhole`, `olderId`, `OlderStore`, `NUMBERED`: `scan/older-builds.ts`; `toCart`, `Gaps`, `goesBackWhole`, `lineWords`, `withRetired`, `nameOf`, `inUnit`, `saidOfOpen` and their words (`LINES_LOST` to `NO_LONGER_IN_CATALOGUE`): `scan/older-to-cart.ts` |
 | `scan/recorded.ts` | `scan/recorded-elsewhere.ts` |
 | `shared/outbox.ts` | itself, the queue; `Said`, `Note`, `wordsOf`, `noteOf`, `recordedHeading`, `PROBLEMS`, `ProblemKind` and each note's words (`KEY_REUSED` to `ON_LINE`): `shared/outbox-notes.ts` |
 | `shared/stored.ts` | `shared/local-storage.ts` |

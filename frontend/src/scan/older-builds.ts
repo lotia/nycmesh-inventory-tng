@@ -25,6 +25,7 @@
  * that filled it, or, since inventory-tng-e2d, made with its first line;
  * and each line's sizes, the size each package was counted at.
  */
+import { msg } from "@lingui/core/macro";
 import { type Signal, signal } from "@preact/signals";
 import * as v from "valibot";
 import { id } from "../api/replies";
@@ -47,7 +48,6 @@ import { type Note, noteOf, type Said } from "../shared/outbox-notes";
 import { STORAGE_KEY as CART_KEY, type Catalogue, holdsSome } from "./cart";
 import {
   goesBackWhole,
-  NUMBERED,
   saidOfOpen,
   toCart,
   withRetired,
@@ -277,6 +277,9 @@ function refusedOf(reason: Reason | null, note: string | null): Refused {
     );
   return { code: "refused", note: { bold: [NOT_SAVED], plain } };
 }
+
+/** A line of a batch refused, numbered as its problems name it. */
+const NUMBERED = msg`{n}. {words}`;
 
 /**
  * A batch of the outbox (outbox.Entry) the inventory refused, line by

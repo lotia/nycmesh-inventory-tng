@@ -775,7 +775,7 @@ msgstr "{amount} {unit} over"
 msgid "{amount} {unit} in all"
 msgstr "{amount} {unit} in all"
 
-#: src/scan/older-to-cart.ts
+#: src/scan/older-builds.ts
 msgid "{n}. {words}"
 msgstr "{n}. {words}"
 

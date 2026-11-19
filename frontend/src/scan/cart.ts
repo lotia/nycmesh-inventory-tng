@@ -101,10 +101,11 @@ const CartSchema = v.object({
    * until the cart is emptied. */
   batchKey: v.exactOptional(BatchKey),
   /** The lines, as a batch sends them, the cart held when put back under
-   * its key (older-to-cart.ts, toCart), kept with the key: what a volunteer then
-   * takes off, and another tab recorded under the key meanwhile, is kept
-   * for an administrator (shared/outbox.ts, changed_from; inventory-tng-0gg). A
-   * build before drops it from what it writes back: then nothing is kept. */
+   * its key (older-to-cart.ts, toCart), kept with the key: what a
+   * volunteer then takes off, and another tab recorded under the key
+   * meanwhile, is kept for an administrator (shared/outbox.ts,
+   * changed_from; inventory-tng-0gg). A build before drops it from what it
+   * writes back: then nothing is kept. */
   changedFrom: v.exactOptional(v.array(BatchLine)),
 });
 

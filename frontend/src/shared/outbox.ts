@@ -14,15 +14,16 @@
  * writes its own key only: a tab of an older build sends its own batches
  * before it asks for a reload (build.ts), and what an older build left
  * under an older key is listed for the volunteer to put back in the cart or
- * discard (scan/older-builds.ts). Builds that keep the same shape share a key, so
- * each batch names the build that queued it, and is sent as that build's:
- * one the server holds back as from a build too old (409 build_too_old) is
- * listed with what older builds left, unless it is this tab's own, or a
- * newer build's, when the tab is too old. A cart is sent under its own key
- * (scan/cart.ts, batchKey), made with its first line, or that of a save an
- * older build left that filled it: if another tab recorded it first, a tab that
- * took it over or one that had not heard, the server takes it once. What
- * the page says of each batch is in outbox-notes.ts.
+ * discard (scan/older-builds.ts). Builds that keep the same shape share a
+ * key, so each batch names the build that queued it, and is sent as that
+ * build's: one the server holds back as from a build too old (409
+ * build_too_old) is listed with what older builds left, unless it is this
+ * tab's own, or a newer build's, when the tab is too old. A cart is sent
+ * under its own key (scan/cart.ts, batchKey), made with its first line, or
+ * that of a save an older build left that filled it: if another tab
+ * recorded it first, a tab that took it over or one that had not heard, the
+ * server takes it once. What the page says of each batch is in
+ * outbox-notes.ts.
  */
 import { msg } from "@lingui/core/macro";
 import { signal } from "@preact/signals";

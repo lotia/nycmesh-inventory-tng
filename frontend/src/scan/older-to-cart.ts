@@ -52,8 +52,6 @@ export function unreadWords(count: number): string {
   return say(UNREAD, { count });
 }
 
-/** A line of a batch refused, numbered as its problems name it. */
-export const NUMBERED = msg`{n}. {words}`;
 /** Whole packages, counted. */
 export const PACKAGES_OF = msg({
   message: "{count} × {package}",
