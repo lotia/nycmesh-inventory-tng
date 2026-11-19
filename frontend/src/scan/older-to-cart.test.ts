@@ -463,6 +463,17 @@ describe("line by line", () => {
     );
   });
 
+  test("an older cart's package counts and amounts are written as the locale writes numbers", () => {
+    expect(
+      lineWords(
+        { itemId: 999, packages: { 5: "1500" }, loose: "1234.5" },
+        undefined,
+      ),
+    ).toBe(
+      "An item no longer in the catalogue: 1,500 × a removed package or item, 1,234.5 loose",
+    );
+  });
+
   test("an older cart's line is listed in its parts: what goes back, a package gone, and each open package", () => {
     keep("inventory.cart.v1", {
       ...freshCart(),

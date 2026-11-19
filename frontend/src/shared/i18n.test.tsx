@@ -77,6 +77,8 @@ test("a quantity is written as the locale writes a number, every thousandth kept
   expect(sayAmount(3000)).toBe("3");
   expect(sayAmount(-1_234_500)).toBe("-1,234.5");
   expect(sayNumber(1000)).toBe("1,000");
+  // The most the ledger holds (models/base.py QUANTITY), every digit kept.
+  expect(sayAmount(999_999_999_999)).toBe("999,999,999.999");
   speak("de", english);
   expect(sayAmount(1_234_500)).toBe("1.234,5");
   expect(sayAmount(1_234_567)).toBe("1.234,567");

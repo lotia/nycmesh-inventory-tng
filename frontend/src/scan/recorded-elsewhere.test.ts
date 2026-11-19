@@ -203,7 +203,8 @@ describe("what differs", () => {
     expect(line).toEqual([
       { quoted: "LiteBeam 5AC" },
       ": ",
-      "2 × ",
+      "2",
+      " × ",
       { quoted: "Box" },
     ]);
   });

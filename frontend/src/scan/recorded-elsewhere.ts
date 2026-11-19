@@ -205,7 +205,7 @@ class Namer {
       pack === null
         ? [this.inUnit(line, amount)]
         : sayParts(PACKAGES_OF, {
-            count: pack.n,
+            count: sayNumber(pack.n),
             package: { quoted: pack.name },
           });
     return fromOpen(line, kind) ? sayParts(FROM_OPEN, { amount: said }) : said;

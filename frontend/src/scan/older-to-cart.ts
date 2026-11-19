@@ -7,7 +7,7 @@
  */
 import { msg } from "@lingui/core/macro";
 import * as v from "valibot";
-import { say, sayAmount } from "../shared/i18n";
+import { say, sayAmount, sayNumber } from "../shared/i18n";
 import { BatchKey, fromOpen, REPORTS, type ReportKind } from "../shared/outbox";
 import { count, decimal, thousandths } from "../shared/quantity";
 import { toBatch } from "./batch";
@@ -225,7 +225,10 @@ export function toCart(
         leave(
           say(ITEM_RETIRED),
           gone !== undefined && size > 0 && amount % size === 0
-            ? say(PACKAGES_OF, { count: amount / size, package: gone.name })
+            ? say(PACKAGES_OF, {
+                count: sayNumber(amount / size),
+                package: gone.name,
+              })
             : by,
         );
         return;
@@ -374,7 +377,7 @@ export function lineWords(line: Line, item: Item | undefined): string | null {
   const parts = packages.flatMap((pack) => {
     const packs = count(line.packages[pack.id] ?? "") ?? 0;
     return packs > 0
-      ? [say(PACKAGES_OF, { count: packs, package: pack.name })]
+      ? [say(PACKAGES_OF, { count: sayNumber(packs), package: pack.name })]
       : [];
   });
   const loose = thousandths(line.loose) ?? 0;
