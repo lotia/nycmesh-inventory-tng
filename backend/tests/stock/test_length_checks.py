@@ -22,6 +22,7 @@ from inventory_tng.stock import (
     length_checks_routes,
     moments,
     open_packages,
+    used_up_routes,
 )
 from inventory_tng.stock.ledger import Entry, Form
 from inventory_tng.web import formatting
@@ -400,17 +401,24 @@ def test_needs_your_action_reads_the_waiting_open_packages_once(
     session: Session,
     spools: Spools,
 ) -> None:
-    """Once for every kind, not once a kind (inventory-tng-hqk)."""
+    """Once for every kind, not once a kind (inventory-tng-hqk); one in
+    two kinds is under each."""
     used_up, reported, below = spools.opened(), spools.opened(), spools.opened()
     registered_client.post(
         URL,
         json=spools.place.batch(lines=[cut(used_up, "1")], used_up=[str(used_up.key)]),
     )
-    registered_client.post(URL, json=report(spools, length(reported, "250")))
+    lengths = report(spools, length(reported, "250"), length(used_up, "200"))
+    registered_client.post(URL, json=lengths)
     registered_client.post(URL, json=spools.place.batch(lines=[cut(below, "310")]))
     with counting(session) as sent:
-        home = text(admin_client.get("/admin"))
-    assert "Needs your action (3)" in home
+        home = read(admin_client.get("/admin").text).text
+    assert "Needs your action (4)" in home
+    for kind, count in zip(
+        (used_up_routes.KIND, *length_checks_routes.KINDS), (1, 2, 1), strict=True
+    ):
+        spools_waiting = f"{spools.cable.name}: {count} \N{MULTIPLICATION SIGN} Spool"
+        assert f"{kind.title} {spools_waiting}" in home
     # open_packages.shown: the packages, then what is left on each.
     packages = [each for each in sent if "FROM open_package JOIN item" in each]
     left = [each for each in sent if "SELECT by_form.open_package_id" in each]

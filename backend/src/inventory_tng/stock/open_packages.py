@@ -343,8 +343,9 @@ class Shown(NamedTuple):
     place: str
     left: Decimal
     reported_by: str | None
-    # Whether it meets each of shown()'s `marks`, in their order.
-    marks: tuple[bool, ...] = ()
+    # Whether it meets each of shown()'s `marks`, in their order: None
+    # where SQL says NULL, which a where would not have met either.
+    marks: tuple[bool | None, ...] = ()
 
 
 def shown(
