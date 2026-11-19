@@ -115,6 +115,7 @@ def pseudo_locale() -> Translations:
 
 
 PSEUDO = pseudo_locale()
+GERMAN = compiled(Catalog(locale="de"))
 SHELF = SimpleNamespace(id=7, name=NOT_ENGLISH)
 
 
@@ -871,7 +872,7 @@ def test_a_lists_numbers_are_written_as_the_locale_writes_them() -> None:
     (inventory-tng-r9ex); its links keep plain digits (web/listing.py)."""
     grown = {"sizes": [1000, None], "page": 1000, "pages": 2000}
     view = SimpleNamespace(**vars(VIEW) | grown)
-    with speaking(compiled(Catalog(locale="de"))):
+    with speaking(GERMAN):
         shown = words_shown(
             from_macros(LISTING_PARTS, view=view, listing=listing(found=1500))
         )
@@ -887,9 +888,6 @@ def test_a_language_babel_does_not_know_writes_numbers_as_english() -> None:
     header = 'msgid ""\nmsgstr ""\n"Language: en_XA\\n"\n'
     with speaking(compiled(read_po(StringIO(header)))):
         assert number(1000) == "1,000"
-
-
-GERMAN = compiled(Catalog(locale="de"))
 
 
 def items_page(total: int) -> str:

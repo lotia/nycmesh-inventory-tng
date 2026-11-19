@@ -16,11 +16,12 @@ plural's count too.
 from collections.abc import Callable, Generator
 from contextlib import contextmanager
 from decimal import Decimal
+from functools import cache
 from io import BytesIO
 from pathlib import Path
 from typing import Any, cast
 
-from babel import localedata
+from babel import Locale, localedata
 from babel.messages.catalog import Catalog
 from babel.messages.mofile import write_mo
 from babel.messages.pofile import read_po
@@ -91,9 +92,15 @@ def number(value: int | Decimal) -> str:
     1.000 in German: its catalogue's language, English if it names none
     Babel knows (a pseudo-locale's, such as en_XA). A decimal keeps every
     digit it has, never rounded."""
-    language = _active.info().get("language")
-    known = language if language and localedata.exists(language) else "en"
-    return format_decimal(value, locale=known, decimal_quantization=False)
+    locale = _number_locale(_active.info().get("language"))
+    return format_decimal(value, locale=locale, decimal_quantization=False)
+
+
+@cache
+def _number_locale(language: str | None) -> Locale:
+    """The locale `number` writes in for a catalogue's `language`, parsed
+    once: English if Babel knows no such language."""
+    return Locale.parse(language if language and localedata.exists(language) else "en")
 
 
 def _counts_written(say_plural: Callable[..., str]) -> Callable[..., str]:
@@ -157,5 +164,7 @@ def install(environment: Environment) -> None:
             context, singular, plural, num
         ),
     )
+    # Wrapped after install: the count is written outside Jinja's newstyle
+    # wrapper, which still escapes and fills the values.
     callables = cast(dict[str, Any], environment.globals)
     callables["ngettext"] = _counts_written(callables["ngettext"])
