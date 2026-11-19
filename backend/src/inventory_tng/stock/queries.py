@@ -86,8 +86,8 @@ def forms_in_stores(
 ) -> dict[tuple[int, int], open_packages.Forms]:
     """Stock in the current stores, by item and place, form by form
     (open_packages.forms_of)."""
-    # The stores' ids as an array, so only their balances are summed, as
-    # in_stores (stock/balance.py) does.
+    # The stores' ids as an array: PostgreSQL pushes it down to the
+    # ledger's indexes, so only the stores' balances are summed.
     stores = func.array(
         select(Location.id)
         .where(Location.kind.in_(STORE_KINDS), Location.retired_at.is_(None))

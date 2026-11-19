@@ -22,7 +22,7 @@ from sqlalchemy.orm import Session
 
 from inventory_tng.core.db_sessions import by_name, exists_where
 from inventory_tng.models.catalogue import Item, ItemPackage
-from inventory_tng.models.places import STORE_KINDS, Location
+from inventory_tng.models.places import Location
 from inventory_tng.models.stock import LedgerTransaction, Movement, OpenPackage
 
 
@@ -71,29 +71,6 @@ by_form = _summed("by_form", "package_id", "open_package_id")
 # Less than nothing at a place: the records are wrong there until it is
 # counted (docs/decisions/0003).
 SHORT = balance.c.quantity < 0
-
-
-def in_stores(items: Select[int]) -> Select[int, Decimal, bool]:
-    """Each of `items`' stock across the current stores and their areas,
-    and whether any of it is SHORT there. The ids go to balance as arrays,
-    as in retired_in_stock, so only those balances are summed."""
-    places = func.array(
-        select(Location.id)
-        .where(Location.kind.in_(STORE_KINDS), Location.retired_at.is_(None))
-        .scalar_subquery()
-    )
-    return (
-        select(
-            balance.c.item_id,
-            func.sum(balance.c.quantity).label("total"),
-            func.bool_or(SHORT).label("short"),
-        )
-        .where(
-            balance.c.item_id == any_(func.array(items.scalar_subquery())),
-            balance.c.location_id == any_(places),
-        )
-        .group_by(balance.c.item_id)
-    )
 
 
 def _retired(model: type[Item | ItemPackage | Location]) -> ColumnElement[list[int]]:

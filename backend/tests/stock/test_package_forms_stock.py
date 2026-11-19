@@ -7,7 +7,6 @@ from decimal import Decimal
 
 import pytest
 from fastapi.testclient import TestClient
-from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from inventory_tng.catalogue.forms import SHORTER_THAN_WHOLE, WHOLE_PACKAGES
@@ -135,18 +134,6 @@ def test_the_reorder_page_lists_low_sealed_packages_largest_first() -> None:
     for arrived in (packages, packages[::-1], packages[1:] + packages[:1]):
         (row,) = stock_routes.reorder_rows([cable], {}, {}, arrived, set())
         assert [name for name, _, _ in row.low_sealed] == ["P10", "P12", "P9", "P11"]
-
-
-def test_in_stores_sums_an_items_stock_across_the_stores(
-    session: Session, spools: Spools
-) -> None:
-    """Whatever its form, and whether any store holds less than nothing; not
-    what is elsewhere, as in the van."""
-    cable = spools.cable.id
-    query = balance.in_stores(select(Item.id).where(Item.id == cable))
-    assert session.execute(query).all() == [(cable, 610, False)]
-    spools.move(Entry(cable, Decimal(700)))
-    assert session.execute(query).all() == [(cable, -90, True)]
 
 
 def test_stock_and_reorder_pages_show_forms(
