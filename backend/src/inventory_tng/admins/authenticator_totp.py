@@ -1,6 +1,6 @@
 """An authenticator's TOTP key and its codes: making a key, the link and
 the typed form an app reads it from, and checking a six-digit code.
-Sealing keys at rest is admins/totp_keys.py's job.
+Sealing keys at rest is admins/sealed_totp_keys.py's job.
 
 Only established calls here (AGENTS.md rule 3): pyotp makes TOTP keys and
 checks codes.

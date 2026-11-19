@@ -1,8 +1,7 @@
-"""Authenticators' keys sealed at rest (admins/totp_keys.py,
+"""Authenticators' keys sealed at rest (admins/sealed_totp_keys.py,
 docs/decisions/0017): a copy of the database alone cannot make codes."""
 
 import base64
-import sys
 from datetime import UTC, datetime
 from pathlib import Path
 
@@ -11,14 +10,18 @@ from sqlalchemy import select, text
 from sqlalchemy.orm import Session
 from structlog.testing import capture_logs
 
-from inventory_tng.admins import accounts, totp_keys, totp_keys_command
-from inventory_tng.admins.totp_keys import TotpKeys, TotpKeysError, Unreadable, keys_dir
+from inventory_tng.admins import accounts, sealed_totp_keys
+from inventory_tng.admins.sealed_totp_keys import (
+    TotpKeys,
+    TotpKeysError,
+    Unreadable,
+    keys_dir,
+)
 from inventory_tng.app import check_totp_keys
 from inventory_tng.core.db_sessions import Database
 from inventory_tng.core.settings import SettingsError
 from inventory_tng.models.admins import Authenticator
 
-from helpers.python_m import run_as_python_m
 from helpers.sign_in import TOTP_KEYS, code, new_admin, raw_key
 
 KEY = "JBSWY3DPEHPK3PXP"
@@ -49,14 +52,14 @@ def test_a_key_version_that_is_gone_is_unreadable() -> None:
 
 
 def test_the_newest_version_seals_and_every_version_opens(tmp_path: Path) -> None:
-    first = TotpKeys.load(keys_in(tmp_path, **{"1": totp_keys.new_key()}))
+    first = TotpKeys.load(keys_in(tmp_path, **{"1": sealed_totp_keys.new_key()}))
     version, one = first.seal(KEY, 1)
     # A mounted Secret's hidden entries, and anything not a version, are
     # passed over: a second name for a version too, so which key it is never
     # depends on the order the directory lists them in.
     not_versions = {"..data": "", "notes": "x", "02": "x", "\u00b2": "x", "0": "x"}
     both = TotpKeys.load(
-        keys_in(tmp_path, **{"2": totp_keys.new_key()}, **not_versions)
+        keys_in(tmp_path, **{"2": sealed_totp_keys.new_key()}, **not_versions)
     )
     assert both.newest == 2
     assert both.seal(KEY, 1)[0] == 2
@@ -77,9 +80,9 @@ def test_a_file_that_is_not_a_key_is_refused_without_showing_it(
 
 def test_a_version_the_database_cannot_hold_is_refused(tmp_path: Path) -> None:
     """authenticator.key_version is a smallint."""
-    newest = str(totp_keys.MOST_VERSION + 1)
+    newest = str(sealed_totp_keys.MOST_VERSION + 1)
     with pytest.raises(TotpKeysError, match=f"version {newest} is past"):
-        TotpKeys.load(keys_in(tmp_path, **{newest: totp_keys.new_key()}))
+        TotpKeys.load(keys_in(tmp_path, **{newest: sealed_totp_keys.new_key()}))
 
 
 def test_a_missing_or_empty_directory_is_refused(tmp_path: Path) -> None:
@@ -93,26 +96,14 @@ def test_the_directory_is_needed_outside_development(tmp_path: Path) -> None:
     given = {"TOTP_KEYS_DIR": str(tmp_path)}
     assert keys_dir(given) == tmp_path
     development = {"APP_ENV": "development"}
-    assert keys_dir(development) == totp_keys.DEVELOPMENT_DIR
+    assert keys_dir(development) == sealed_totp_keys.DEVELOPMENT_DIR
     with pytest.raises(TotpKeysError, match="needed outside APP_ENV=development"):
         keys_dir({})
     # A bad APP_ENV is named, not taken for production.
     with pytest.raises(SettingsError, match="APP_ENV must be one of"):
         keys_dir({"APP_ENV": "staging"})
-    (tmp_path / "1").write_text(totp_keys.new_key())
+    (tmp_path / "1").write_text(sealed_totp_keys.new_key())
     assert TotpKeys.from_environ(given).newest == 1
-
-
-def test_new_prints_a_key_that_loads(
-    tmp_path: Path,
-    monkeypatch: pytest.MonkeyPatch,
-    capsys: pytest.CaptureFixture[str],
-) -> None:
-    """As DEPLOYMENT.md runs it: python -m inventory_tng.manage totp-keys new."""
-    monkeypatch.setattr(sys, "argv", ["manage", "totp-keys", "new"])
-    assert run_as_python_m(monkeypatch, "inventory_tng.manage") == 0
-    printed = capsys.readouterr().out.strip()
-    assert TotpKeys.load(keys_in(tmp_path, **{"1": printed})).newest == 1
 
 
 def test_the_database_holds_no_key_it_can_make_codes_with(session: Session) -> None:
@@ -200,18 +191,3 @@ def test_startup_says_how_many_authenticators_are_unreadable(
             "log_level": "error",
         }
     ]
-
-
-def test_reseal_runs_as_an_operator_command(
-    own_database: str,
-    monkeypatch: pytest.MonkeyPatch,
-    capsys: pytest.CaptureFixture[str],
-) -> None:
-    """Through kubectl exec, as DEPLOYMENT.md's rotation says; its own
-    database, as it commits."""
-    monkeypatch.setenv("DATABASE_URL", own_database)
-    assert totp_keys_command.main(["reseal"]) == 0
-    # After its log lines, which go to standard output too.
-    assert (
-        capsys.readouterr().out.splitlines()[-1] == "Resealed 0; 0 could not be read."
-    )

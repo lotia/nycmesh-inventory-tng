@@ -19,7 +19,7 @@ from inventory_tng.admins import (
 )
 from inventory_tng.admins.guards import install_admin_answers
 from inventory_tng.admins.paths import HOME
-from inventory_tng.admins.totp_keys import TotpKeys
+from inventory_tng.admins.sealed_totp_keys import TotpKeys
 from inventory_tng.catalogue import (
     categories_routes,
     items_routes,

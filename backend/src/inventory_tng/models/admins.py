@@ -125,8 +125,8 @@ class AdminPassword(Base):
 
 class Authenticator(Base):
     """One TOTP app an administrator signs in with. Its key is sealed
-    (admins/totp_keys.py) and wiped when it is removed. An administrator uses TOTP
-    if they have a current one."""
+    (admins/sealed_totp_keys.py) and wiped when it is removed. An
+    administrator uses TOTP if they have a current one."""
 
     __tablename__ = "authenticator"
     __table_args__ = (
@@ -145,9 +145,10 @@ class Authenticator(Base):
     admin_id: Mapped[int] = reference("admin.id")
     # What the administrator calls it, such as "Pixel".
     name: Mapped[str] = mapped_column(Text)
-    # pyotp's base32 key, sealed for this administrator (totp_keys.TotpKeys),
-    # and the version of TOTP_KEYS_DIR's key it was sealed with. Resealing
-    # with a newer version changes nothing anyone did.
+    # pyotp's base32 key, sealed for this administrator
+    # (sealed_totp_keys.TotpKeys), and the version of TOTP_KEYS_DIR's key it
+    # was sealed with. Resealing with a newer version changes nothing anyone
+    # did.
     sealed_key: Mapped[bytes | None] = mapped_column(
         LargeBinary, info={"secret": True, "not_a_change": True}
     )

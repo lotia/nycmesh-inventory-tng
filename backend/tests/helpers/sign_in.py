@@ -13,8 +13,14 @@ from httpx2 import Response
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from inventory_tng.admins import accounts, guards, paths, totp_codes, totp_keys
-from inventory_tng.admins.totp_keys import TotpKeys
+from inventory_tng.admins import (
+    accounts,
+    authenticator_totp,
+    guards,
+    paths,
+    sealed_totp_keys,
+)
+from inventory_tng.admins.sealed_totp_keys import TotpKeys
 from inventory_tng.models.admins import (
     Admin,
     AdminPassword,
@@ -34,13 +40,13 @@ PASSWORD = "correct horse battery staple"
 
 def raw_key() -> bytes:
     """A new key, as TotpKeys holds one."""
-    return base64.b64decode(totp_keys.new_key())
+    return base64.b64decode(sealed_totp_keys.new_key())
 
 
 # What the tests seal authenticators' keys with: version 1, given to their
 # apps (conftest's make_app), and as text in TOTP_KEYS_DIR for the rest
 # (conftest's no_settings_from_the_shell), as new_key() writes it.
-TOTP_KEY = totp_keys.new_key()
+TOTP_KEY = sealed_totp_keys.new_key()
 TOTP_KEYS = TotpKeys({1: base64.b64decode(TOTP_KEY)})
 
 
@@ -79,7 +85,7 @@ def new_admin(
     )
     key = None
     if totp:
-        key = totp_codes.new_totp_key()
+        key = authenticator_totp.new_totp_key()
         session.add(sealed(Authenticator(admin_id=admin.id, name="Phone"), key))
     session.flush()
     return admin, key
@@ -122,7 +128,7 @@ def policy(session: Session, value: str) -> None:
 
 
 # How long an authenticator shows each code.
-TIME_STEP = timedelta(seconds=totp_codes.TOTP_INTERVAL)
+TIME_STEP = timedelta(seconds=authenticator_totp.TOTP_INTERVAL)
 
 
 @contextlib.contextmanager

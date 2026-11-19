@@ -21,11 +21,11 @@ from structlog.testing import capture_logs
 
 from inventory_tng.admins import (
     accounts,
+    authenticator_totp,
     guards,
     mail_messages,
     paths,
     sign_in_routes,
-    totp_codes,
 )
 from inventory_tng.admins.accounts import (
     NOT_AN_EMAIL,
@@ -275,7 +275,7 @@ def test_a_sign_in_held_up_past_a_time_step_still_signs_in(
     """The tests' sign-in does not depend on how long its request takes: a
     clock read a minute after the code was made, as on a busy machine, is
     held at the code's moment (app_clock; inventory-tng-tuie). The app's
-    own window is tested on its clock in test_totp_codes.py."""
+    own window is tested on its clock in test_authenticator_totp.py."""
     _, key = new_admin(session)
     monkeypatch.setattr(
         guards, "_now", lambda: datetime.now(UTC) + timedelta(minutes=1)
@@ -295,7 +295,7 @@ def test_forms_held_up_past_a_time_step_still_take_their_codes(
     with app_clock() as at:
         form = setup_form(key, code=code(key, at))
         assert client.post(paths.SETUP, data=form).status_code == 200
-    new_key = totp_codes.new_totp_key()
+    new_key = authenticator_totp.new_totp_key()
     with app_clock() as at:
         form = {
             "authenticator_name": "Laptop",

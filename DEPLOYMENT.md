@@ -380,7 +380,7 @@ Make a key and put it in a Secret, mounted as a folder into the app's pods
 only:
 
 ```sh
-uv run python -m inventory_tng.manage totp-keys new > 1
+uv run python -m inventory_tng.manage sealed-totp-keys new > 1
 kubectl create secret generic inventory-totp-keys --from-file=1
 ```
 
@@ -392,7 +392,8 @@ starting line lists the versions it has, `sealing_key_versions`), then seal
 every authenticator with it:
 
 ```sh
-kubectl exec deploy/inventory -- python -m inventory_tng.manage totp-keys reseal
+kubectl exec deploy/inventory -- \
+  python -m inventory_tng.manage sealed-totp-keys reseal
 ```
 
 It says how many it resealed and how many it could not read. Once none is
@@ -405,7 +406,8 @@ app starts with whatever versions are present, and logs at startup how
 many it cannot read. Retire them:
 
 ```sh
-kubectl exec deploy/inventory -- python -m inventory_tng.manage totp-keys \
+kubectl exec deploy/inventory -- \
+  python -m inventory_tng.manage sealed-totp-keys \
   retire-authenticators --unreadable
 ```
 

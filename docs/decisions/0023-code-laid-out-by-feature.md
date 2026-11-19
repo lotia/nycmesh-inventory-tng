@@ -23,7 +23,7 @@ decided the structure below on 2026-11-17.
   `<page>_routes.py` for HTML pages, `<thing>_api.py` for JSON,
   `<thing>_schemas.py` and `<command>_command.py`, as
   `admins/sign_in_routes.py`, `scan/batch_api.py` or
-  `admins/totp_keys_command.py` (Amendment, 2026-11-18, replacing
+  `admins/sealed_totp_keys_command.py` (Amendment, 2026-11-18, replacing
   `routes.py`, `api.py`, `schemas.py` and `command.py` while a feature
   had only one). URLs do not change.
 - **The top of `inventory_tng`** holds only the entry points (`app.py`,
@@ -167,6 +167,15 @@ short test. `core/` is the name FastAPI's full-stack template uses;
   Moved to `admins/forms.py`, which imports `admins/accounts.py`, they
   would make a cycle: `admins/accounts.py`'s operator invitation checks
   the username and email too.
+- Later on 2026-11-18 Ali renamed both TOTP modules for their jobs
+  (inventory-tng-u3fp.9), as a reader looking for TOTP keys opened the
+  one that seals them: `admins/totp_codes.py`, named above, became
+  `admins/authenticator_totp.py`, an authenticator's key, setup link and
+  code checks; `admins/totp_keys.py` became `admins/sealed_totp_keys.py`,
+  the keys sealed at rest, and its command
+  `admins/sealed_totp_keys_command.py`. The operator's command
+  `totp-keys` became `sealed-totp-keys`. Their tests were renamed alike,
+  with the command's tests in a file of their own.
 - Older decision records keep the paths of their time. The tables below
   give each old path's new home; a later move adds its rows.
 
@@ -211,7 +220,9 @@ queries to its `queries.py`.
 | `admin/used_up.py` | `stock/used_up_routes.py` |
 | `admin/volunteers.py` | `volunteers/routes.py` |
 | `admins.py` | `admins/admins_command.py` |
-| `admins/accounts.py` | itself, but for `qr_svg`: `web/qr_codes.py`; `name_up_to`: `web/forms.py`; `new_totp_key`, `is_totp_key`, `totp_link`, `grouped`, `key_for_typing`, `accepted_step`, `ISSUER`, `TOTP_FIELD_MAX`, `TOTP_CODE`, `TOTP_INTERVAL`, with `_totp_code` as `totp_code`: `admins/totp_codes.py` |
+| `admins/accounts.py` | itself, but for `qr_svg`: `web/qr_codes.py`; `name_up_to`: `web/forms.py`; `new_totp_key`, `is_totp_key`, `totp_link`, `grouped`, `key_for_typing`, `accepted_step`, `ISSUER`, `TOTP_FIELD_MAX`, `TOTP_CODE`, `TOTP_INTERVAL`, with `_totp_code` as `totp_code`: `admins/authenticator_totp.py` |
+| `admins/totp_keys.py` | `admins/sealed_totp_keys.py` |
+| `admins/totp_keys_command.py` | `admins/sealed_totp_keys_command.py` |
 | `catalogue.py` | `scan/catalogue_api.py`; the reply schemas: `scan/catalogue_schemas.py`; its queries: `scan/queries.py` |
 | `catalogue/command.py` | `catalogue/unit_readings_command.py` |
 | `catalogue/names.py` | `catalogue/name_keys.py` |
@@ -248,7 +259,7 @@ queries to its `queries.py`.
 | `stacks.py` | `backend/devtools/stack.py`; its `stale` is `list-stale` |
 | `stock/paths.py` | itself, with `RECORDED_MORE` and `RECORDED_MORE_SETTLED` as `OVER_RECORDED` and `OVER_RECORDED_SETTLED` |
 | `templates/scan/page.html` | `templates/frontend_page.html` |
-| `totp_keys.py` | `admins/totp_keys.py`; its command: `admins/totp_keys_command.py` |
+| `totp_keys.py` | `admins/sealed_totp_keys.py`; its command: `admins/sealed_totp_keys_command.py` |
 | `unit_readings.py` | `catalogue/unit_readings.py`; its command: `catalogue/command.py` |
 | `volunteers/routes.py` | `volunteers/volunteers_routes.py` |
 | `web.py` | `web/browser.py` |
@@ -325,7 +336,7 @@ Amendment: names, below, gives them, and kept their names:
 | Folder | Old paths |
 | --- | --- |
 | `across/` | `test_edit_forms.py`, `test_locking.py`, `test_names_shown.py`, `test_notices.py`, `test_query_counts.py`, `test_requests_at_once.py`, `test_retired_records.py`, `test_write_owners.py` |
-| `admins/` | `test_break_glass.py`, `test_recover.py`, `test_totp_keys.py` |
+| `admins/` | `test_break_glass.py`, `test_recover.py` |
 | `catalogue/` | `test_accent_search.py`, `test_reading_rules.py`, `test_unit_readings.py`, `test_units.py` |
 | `codebase/` | `test_artifact_links.py`, `test_compose_app.py`, `test_compose_task.py`, `test_contributing.py`, `test_dependencies.py`, `test_import_directions.py`, `test_podman_exec_oom.py`, `test_test_imports.py`, `test_webkit_container.py` |
 | `core/` | `test_connections.py`, `test_database_role.py`, `test_health.py`, `test_history.py`, `test_local_env.py`, `test_local_time.py`, `test_log_redaction.py`, `test_logs.py`, `test_mail.py`, `test_masking.py`, `test_phrases.py`, `test_rate_limits.py`, `test_request_logging.py`, `test_settings.py`, `test_telemetry.py`, `test_trace_redaction.py` |
@@ -373,12 +384,13 @@ These were renamed, or split, as they moved:
 | `test_sign_in.py` | `admins/test_sign_in_routes.py` |
 | `test_sign_in_models.py` | `models/test_admins.py` |
 | `test_stacks.py` | `devtools/test_stack.py` |
+| `test_totp_keys.py` | `admins/test_sealed_totp_keys.py`; the command's tests: `admins/test_sealed_totp_keys_command.py` |
 
 Later renamed:
 
 | Old path | New path |
 | --- | --- |
-| `admins/test_sign_in_routes.py` | itself; the test of a code's time window: `admins/test_totp_codes.py` |
+| `admins/test_sign_in_routes.py` | itself; the test of a code's time window: `admins/test_authenticator_totp.py` |
 | `core/test_connections.py` | `core/test_db_sessions.py` |
 | `core/test_mail.py` | itself, its settings and sending; the words of the mails: `admins/test_mail_messages.py`; the reset links: `admins/test_reset_routes.py`; a notice of a recovery code used: `admins/test_sign_in_routes.py`; the notices of a password changed: `admins/test_account_routes.py` |
 | `models/test_fold_reference.py` | `models/test_search_text_fold_reference.py` |

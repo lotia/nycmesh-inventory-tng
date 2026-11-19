@@ -13,7 +13,7 @@ import structlog
 from fastapi import FastAPI
 from sqlalchemy import make_url
 
-from inventory_tng.admins.totp_keys import TotpKeys
+from inventory_tng.admins.sealed_totp_keys import TotpKeys
 from inventory_tng.app import create_app
 from inventory_tng.core.logs import configure_logging
 from inventory_tng.core.settings import Settings

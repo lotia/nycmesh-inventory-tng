@@ -38,7 +38,7 @@ type Check = Callable[[str, App], set[str]]
 # Rules: each table's owner (db_protection.protection), any queries.py or
 # forms.py, and these, which hold rules but own no table.
 RULES = {
-    "admins/totp_codes.py",
+    "admins/authenticator_totp.py",
     "catalogue/name_keys.py",
     "catalogue/unit_readings.py",
     "catalogue/units.py",

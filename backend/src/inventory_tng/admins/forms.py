@@ -4,7 +4,7 @@ a new authenticator, and what is wrong, in words, beside the field it is
 about or on the administrator's own page. The handlers in admins_routes.py
 and sign_in_routes.py read the request and pass the form's fields."""
 
-from inventory_tng.admins import accounts, totp_codes
+from inventory_tng.admins import accounts, authenticator_totp
 from inventory_tng.core.phrases import Words, gettext, lazy_gettext
 
 TAKEN = lazy_gettext("Another administrator already has that username or email.")
@@ -30,7 +30,7 @@ def code_mismatch() -> str:
     return gettext(
         "That code didn't match. Check the app shows %(issuer)s, and type the "
         "code it shows now.",
-        issuer=totp_codes.ISSUER,
+        issuer=authenticator_totp.ISSUER,
     )
 
 

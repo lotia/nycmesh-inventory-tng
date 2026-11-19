@@ -15,7 +15,7 @@ from fastapi import APIRouter, Form, Request
 from fastapi.responses import HTMLResponse, Response
 from sqlalchemy.exc import IntegrityError
 
-from inventory_tng.admins import accounts, guards, mail_messages, totp_codes
+from inventory_tng.admins import accounts, authenticator_totp, guards, mail_messages
 from inventory_tng.admins.forms import (
     NOT_THE_TOKEN,
     authenticator_problems,
@@ -96,8 +96,8 @@ add_notices({"codes_low": CODES_LOW, "codes_none": CODES_NONE})
 def _totp_context(key: str, username: str, *, optional: bool) -> dict[str, Any]:
     return {
         "key": key,
-        "key_for_typing": totp_codes.key_for_typing(key),
-        "qr": qr_svg(totp_codes.totp_link(key, username or "administrator")),
+        "key_for_typing": authenticator_totp.key_for_typing(key),
+        "qr": qr_svg(authenticator_totp.totp_link(key, username or "administrator")),
         "totp_optional": optional,
     }
 
@@ -114,7 +114,9 @@ def _setup_page(
 ) -> HTMLResponse:
     values = values or {}
     totp = _totp_context(
-        key or totp_codes.new_totp_key(), values.get("username", ""), optional=optional
+        key or authenticator_totp.new_totp_key(),
+        values.get("username", ""),
+        optional=optional,
     )
     return page(
         request,
@@ -164,7 +166,11 @@ def setup(
         return _setup_off(request)
     username, email = username.strip(), email.strip()
     authenticator_name = authenticator_name.strip()
-    key = key if totp_codes.is_totp_key(key) else totp_codes.new_totp_key()
+    key = (
+        key
+        if authenticator_totp.is_totp_key(key)
+        else authenticator_totp.new_totp_key()
+    )
     values = {
         "username": username,
         "email": email,
@@ -195,7 +201,7 @@ def setup(
     problems = setup_problems(username, email, password, password_again)
     step = None
     if code.strip() or not optional:
-        step = totp_codes.accepted_step(key, code, None, now)
+        step = authenticator_totp.accepted_step(key, code, None, now)
         problems |= authenticator_problems(authenticator_name, step)
     if problems:
         return _setup_page(
@@ -384,7 +390,7 @@ def _new_authenticator_page(
     status_code: int = 200,
 ) -> HTMLResponse:
     totp = _totp_context(
-        key or totp_codes.new_totp_key(), signed.admin.username, optional=False
+        key or authenticator_totp.new_totp_key(), signed.admin.username, optional=False
     )
     return page(
         request,
@@ -421,12 +427,16 @@ def new_authenticator(
 ) -> Response:
     admin_id = signed.admin.id
     name = authenticator_name.strip()
-    key = key if totp_codes.is_totp_key(key) else totp_codes.new_totp_key()
+    key = (
+        key
+        if authenticator_totp.is_totp_key(key)
+        else authenticator_totp.new_totp_key()
+    )
     now = guards._now()
     # One at a time per administrator, so a second click cannot add the
     # same name twice, or make a second set of recovery codes: the gate
     # (confirmed) holds their row.
-    step = totp_codes.accepted_step(key, code, None, now)
+    step = authenticator_totp.accepted_step(key, code, None, now)
     problems = authenticator_problems(name, step)
     # Checked here too, though the insert below would catch it, so a taken
     # name is told alongside a wrong code.

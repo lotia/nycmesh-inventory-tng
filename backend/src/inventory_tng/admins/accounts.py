@@ -3,10 +3,10 @@ the first administrator (docs/decisions/0012). The pages are in
 admins/sign_in_routes.py.
 
 Only established calls here (AGENTS.md rule 3): argon2-cffi hashes and
-checks passwords, totp_codes makes TOTP keys and checks codes with pyotp,
-totp_keys seals them with cryptography's AES-GCM, `secrets` makes tokens, and
-devices.digest (hashlib's SHA-256) hashes tokens and recovery codes for the
-database. Comparing the setup token is secrets.compare_digest.
+checks passwords, authenticator_totp makes TOTP keys and checks codes with
+pyotp, sealed_totp_keys seals them with cryptography's AES-GCM, `secrets`
+makes tokens, and devices.digest (hashlib's SHA-256) hashes tokens and
+recovery codes for the database. Comparing the setup token is secrets.compare_digest.
 """
 
 import re
@@ -25,13 +25,13 @@ from sqlalchemy import ColumnElement, exists, func, or_, select, text, update
 from sqlalchemy.orm import Session
 
 from inventory_tng.admins import activity, mail_messages
-from inventory_tng.admins.totp_codes import (
+from inventory_tng.admins.authenticator_totp import (
     TOTP_INTERVAL,
     accepted_step,
     grouped,
     totp_code,
 )
-from inventory_tng.admins.totp_keys import TotpKeys, Unreadable
+from inventory_tng.admins.sealed_totp_keys import TotpKeys, Unreadable
 from inventory_tng.core.db_errors import unique
 from inventory_tng.core.db_locking import get_locked, locked
 from inventory_tng.core.db_sessions import exists_where, set_actor
@@ -74,7 +74,7 @@ RECOVERY_CODE_LENGTH = 20
 RECOVERY_CODE_GROUP = 5
 # What a code field takes, and the most a code typed may be: a recovery code
 # shown with its separators, and a few stray spaces. TOTP-only fields take
-# TOTP_FIELD_MAX (totp_codes).
+# TOTP_FIELD_MAX (authenticator_totp).
 CODE_FIELD_MAX = RECOVERY_CODE_LENGTH + RECOVERY_CODE_LENGTH // RECOVERY_CODE_GROUP + 4
 # How often a session's last use is written: often enough for the account
 # page's list, not on every request.

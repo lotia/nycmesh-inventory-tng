@@ -1,5 +1,5 @@
 """The operator's break-glass (accounts.lock_down, let_in, invite_by_operator,
-retire_authenticators; python -m inventory_tng.manage admins and totp-keys):
+retire_authenticators; python -m inventory_tng.manage admins and sealed-totp-keys):
 docs/decisions/0018."""
 
 import asyncio
@@ -16,11 +16,11 @@ from inventory_tng.admins import (
     accounts,
     activity,
     admins_command,
+    authenticator_totp,
     mail_messages,
     paths,
+    sealed_totp_keys_command,
     sign_in_routes,
-    totp_codes,
-    totp_keys_command,
 )
 from inventory_tng.core.mail import Notifier
 from inventory_tng.core.settings import RateLimits
@@ -215,7 +215,7 @@ def test_the_commands_run_as_operator_commands(
     assert admins_command.main(["lockdown", "--expect", "1"]) == 0
     assert capsys.readouterr().out.splitlines()[-1] == "Retired 1 administrators."
     assert admins_command.main(["let-in", "grace", "--base-url", site]) == 0
-    assert totp_keys_command.main(["retire-authenticators", "--all"]) == 0
+    assert sealed_totp_keys_command.main(["retire-authenticators", "--all"]) == 0
     assert capsys.readouterr().out.splitlines()[-1] == "Retired 0 authenticators."
 
 
@@ -236,7 +236,7 @@ def test_retiring_authenticators_names_who_must_be_let_in(
     monkeypatch.setattr(
         accounts, "retire_authenticators", lambda *_, **__: (2, ["ada", "ben"])
     )
-    assert totp_keys_command.main(["retire-authenticators", "--unreadable"]) == 0
+    assert sealed_totp_keys_command.main(["retire-authenticators", "--unreadable"]) == 0
     assert capsys.readouterr().out.splitlines()[-1] == (
         "No second factor left, so let them in: ada, ben."
     )
@@ -277,7 +277,7 @@ def test_setting_up_again_keeps_the_printed_codes(
     accounts.retire_authenticators(session, TOTP_KEYS, NOW, every=True, notify=NO_MAIL)
     client = make_client()
     sign_in_with(client, code=left[0])
-    new_key = totp_codes.new_totp_key()
+    new_key = authenticator_totp.new_totp_key()
     with app_clock() as at:
         form = {
             "authenticator_name": "Laptop",
@@ -301,7 +301,7 @@ def test_let_in_clears_the_ask_to_set_up_again(session: Session) -> None:
 def test_one_with_a_readable_authenticator_left_is_not_asked(session: Session) -> None:
     ada, _ = new_admin(session)
     accounts.add_authenticator(
-        session, TOTP_KEYS, ada.id, "Spare", totp_codes.new_totp_key(), 0
+        session, TOTP_KEYS, ada.id, "Spare", authenticator_totp.new_totp_key(), 0
     )
     lost = session.scalars(
         select(Authenticator).where(Authenticator.name == "Phone")

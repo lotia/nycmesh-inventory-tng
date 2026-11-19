@@ -5,9 +5,9 @@ Each authenticator's key is sealed with AES-GCM from the cryptography
 package, never anything written here (AGENTS.md rule 3), under one of the
 keys in TOTP_KEYS_DIR: a directory holding one file per key version, named
 by its number (1, 2, ...), each holding a key the command's `new` printed
-(admins/totp_keys_command.py, which also reseals and retires). The highest
-version seals; every version present opens. A Kubernetes Secret mounted as
-a directory has this shape. In development the directory defaults to the
+(admins/sealed_totp_keys_command.py, which also reseals and retires). The
+highest version seals; every version present opens. A Kubernetes Secret
+mounted as a directory has this shape. In development the directory defaults to the
 clone's .local/totp-keys, which `mise run setup` fills.
 
 DEPLOYMENT.md, TOTP keys, says how to rotate them and what to do if one is
@@ -114,13 +114,13 @@ class TotpKeys:
             if len(key) * 8 != KEY_BITS:
                 raise TotpKeysError(
                     f"TOTP_KEYS_DIR's version {entry.name} is not a key "
-                    "`python -m inventory_tng.manage totp-keys new` made"
+                    "`python -m inventory_tng.manage sealed-totp-keys new` made"
                 )
             keys[int(entry.name)] = key
         if not keys:
             raise TotpKeysError(
                 f"TOTP_KEYS_DIR {directory} holds no key: add one as a file "
-                "named 1, from `python -m inventory_tng.manage totp-keys new`"
+                "named 1, from `python -m inventory_tng.manage sealed-totp-keys new`"
             )
         return cls(keys)
 

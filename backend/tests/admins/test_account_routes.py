@@ -10,7 +10,13 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 from structlog.testing import capture_logs
 
-from inventory_tng.admins import accounts, guards, mail_messages, paths, totp_codes
+from inventory_tng.admins import (
+    accounts,
+    authenticator_totp,
+    guards,
+    mail_messages,
+    paths,
+)
 from inventory_tng.admins.account_routes import (
     AUTHENTICATOR_RENAMED,
     CODES_NEED_TOTP,
@@ -192,7 +198,7 @@ def test_an_authenticator_keeps_a_name_of_its_own(
     admin, _ = ada
     (first,) = accounts.authenticators(session, admin.id)
     accounts.add_authenticator(
-        session, TOTP_KEYS, admin.id, "Spare", totp_codes.new_totp_key(), 0
+        session, TOTP_KEYS, admin.id, "Spare", authenticator_totp.new_totp_key(), 0
     )
     path = f"{ACCOUNT}/authenticators/{first.id}/name"
     refused = client.post(path, data={"authenticator_name": "Spare"})
@@ -249,7 +255,7 @@ def test_removing_one_of_two_wipes_its_key(
 ) -> None:
     admin, _ = ada
     spare = accounts.add_authenticator(
-        session, TOTP_KEYS, admin.id, "Spare", totp_codes.new_totp_key(), 0
+        session, TOTP_KEYS, admin.id, "Spare", authenticator_totp.new_totp_key(), 0
     )
     done = client.post(f"{ACCOUNT}/authenticators/{spare.id}/remove")
     assert (
@@ -354,7 +360,7 @@ def test_the_owner_is_told_when_an_authenticator_comes_or_goes(
     client = make_client(mailer=sent_mail)
     _, key = new_admin(session, email="ada@example.org")
     sign_in_with(client, key=key)
-    new_key = totp_codes.new_totp_key()
+    new_key = authenticator_totp.new_totp_key()
     with app_clock() as at:
         form = {
             "authenticator_name": "Laptop",
@@ -529,7 +535,7 @@ def test_a_late_new_authenticator_keeps_its_key(
     ada: tuple[Admin, str],
 ) -> None:
     """The QR code already scanned stays good: its key comes back."""
-    new_key = totp_codes.new_totp_key()
+    new_key = authenticator_totp.new_totp_key()
     confirmed_long_ago(session)
     _, key = ada
     with app_clock() as at:

@@ -182,7 +182,7 @@ VERSIONED = (
             "not_a_change",
             {
                 "device": {"last_seen_at", "edit_version"},
-                # Resealing (admins/totp_keys.py) changes nothing anyone did.
+                # Resealing (admins/sealed_totp_keys.py) changes nothing anyone did.
                 "authenticator": {"last_step", "sealed_key", "key_version"},
             }
             # Each edit form's row's (models.base.Versioned), which moves

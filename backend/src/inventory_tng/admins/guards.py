@@ -42,7 +42,7 @@ from sqlalchemy.orm import Session
 from starlette.concurrency import run_in_threadpool
 from starlette.exceptions import HTTPException
 
-from inventory_tng.admins import accounts, mail_messages, totp_codes
+from inventory_tng.admins import accounts, authenticator_totp, mail_messages
 from inventory_tng.admins.paths import (
     ACCOUNT,
     CONFIRM,
@@ -54,7 +54,7 @@ from inventory_tng.admins.paths import (
     SIGN_IN,
     SIGN_OUT,
 )
-from inventory_tng.admins.totp_keys import TotpKeys
+from inventory_tng.admins.sealed_totp_keys import TotpKeys
 from inventory_tng.core import masking, request_logging
 from inventory_tng.core.db_sessions import (
     DbSession,
@@ -95,7 +95,7 @@ cast(dict[str, Any], templates.env.globals).update(
         "username_max": accounts.USERNAME_MAX,
         "authenticator_name_max": accounts.AUTHENTICATOR_NAME_MAX,
         "code_max": accounts.CODE_FIELD_MAX,
-        "totp_code_max": totp_codes.TOTP_FIELD_MAX,
+        "totp_code_max": authenticator_totp.TOTP_FIELD_MAX,
     },
 )
 
@@ -193,7 +193,7 @@ AnySignedIn = Annotated[SignedIn, Depends(signed_in)]
 
 
 def _totp_keys(request: Request) -> TotpKeys:
-    """What the app seals authenticators' keys with (totp_keys.py)."""
+    """What the app seals authenticators' keys with (sealed_totp_keys.py)."""
     return request.app.state.totp_keys
 
 

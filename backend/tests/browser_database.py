@@ -30,7 +30,7 @@ from sqlalchemy.orm import Session
 
 from devtools import seed
 from inventory_tng.__main__ import main as run_server
-from inventory_tng.admins import accounts, totp_keys
+from inventory_tng.admins import accounts, sealed_totp_keys
 from inventory_tng.devices import devices
 from inventory_tng.models.admins import Admin, AdminPassword
 from inventory_tng.models.catalogue import Item
@@ -45,8 +45,8 @@ from databases import migrated_engine, new_database
 # The other administrator's username.
 OTHER_ADMIN = "browser-other"
 RUN_FILES = ("prepared.json", "camera.y4m", "admin.json", "totp-keys/1")
-# The run's own TOTP key (admins/totp_keys.py), as a clone may have none
-# in .local/totp-keys: CI runs no `mise run setup`.
+# The run's own TOTP key (admins/sealed_totp_keys.py), as a clone may have
+# none in .local/totp-keys: CI runs no `mise run setup`.
 TOTP_KEYS = "totp-keys"
 
 
@@ -64,7 +64,7 @@ def main(argv: list[str]) -> int:
             prepared = prepare(url, run / "camera.y4m")
             (run / "prepared.json").write_text(json.dumps(prepared))
             (run / TOTP_KEYS).mkdir(exist_ok=True)
-            (run / TOTP_KEYS / "1").write_text(totp_keys.new_key())
+            (run / TOTP_KEYS / "1").write_text(sealed_totp_keys.new_key())
             os.environ |= {
                 "DATABASE_URL": url,
                 "APP_ENV": "development",

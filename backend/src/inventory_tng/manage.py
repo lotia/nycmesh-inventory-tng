@@ -6,7 +6,7 @@ docs/decisions/0018, 0023), run where the app runs, with its settings:
 
 Dispatched by core/entry_point.py, which the developer's tools share.
 Each command sets up the process itself (core/operator_commands.py,
-docs/decisions/0007), as `totp-keys new` runs before settings can be read.
+docs/decisions/0007), as `sealed-totp-keys new` runs before settings can be read.
 """
 
 import sys
@@ -28,8 +28,8 @@ COMMANDS: Commands = {
         "inventory_tng.site_settings.scan_settings_command",
         "show or change the scan page's settings",
     ),
-    "totp-keys": (
-        "inventory_tng.admins.totp_keys_command",
+    "sealed-totp-keys": (
+        "inventory_tng.admins.sealed_totp_keys_command",
         "make a TOTP key, reseal with the newest, or retire authenticators",
     ),
     "unit-readings": (

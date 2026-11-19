@@ -1,10 +1,10 @@
-"""TOTP keys from the command line (admins/totp_keys.py; DEPLOYMENT.md,
-TOTP keys):
+"""TOTP keys from the command line (admins/sealed_totp_keys.py;
+DEPLOYMENT.md, TOTP keys):
 
-    python -m inventory_tng.manage totp-keys new     # print a new key
-    python -m inventory_tng.manage totp-keys reseal  # seal every key with the newest
-    python -m inventory_tng.manage totp-keys retire-authenticators --unreadable
-    python -m inventory_tng.manage totp-keys retire-authenticators --all
+    python -m inventory_tng.manage sealed-totp-keys new     # print a new key
+    python -m inventory_tng.manage sealed-totp-keys reseal  # seal all with the newest
+    python -m inventory_tng.manage sealed-totp-keys retire-authenticators --unreadable
+    python -m inventory_tng.manage sealed-totp-keys retire-authenticators --all
 """
 
 import argparse
@@ -14,7 +14,7 @@ from datetime import UTC, datetime
 from sqlalchemy.orm import Session
 
 from inventory_tng.admins import accounts
-from inventory_tng.admins.totp_keys import TotpKeys, new_key
+from inventory_tng.admins.sealed_totp_keys import TotpKeys, new_key
 from inventory_tng.core.mail import Notifier
 from inventory_tng.core.operator_commands import run_command, run_command_telling
 
