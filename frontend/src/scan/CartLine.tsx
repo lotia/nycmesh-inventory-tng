@@ -2,9 +2,9 @@
 import { msg } from "@lingui/core/macro";
 import { Fragment } from "preact";
 import { Field } from "../shared/Field";
-import { say } from "../shared/i18n";
+import { say, sayAmount } from "../shared/i18n";
 import { wordsOf } from "../shared/outbox-notes";
-import { decimal, thousandths } from "../shared/quantity";
+import { thousandths } from "../shared/quantity";
 import { type Item, type Line, quantityOf, RETIRED, resized } from "./cart";
 import { AlertWords } from "./Notes";
 import { NOTHING_TAKEN, OpenPackageCard } from "./OpenPackageCard";
@@ -70,7 +70,7 @@ export function CartLine({
       {item.packages.map((pack) => {
         // The catalogue gives every size as a decimal, so never null.
         /* v8 ignore next */
-        const size = decimal(thousandths(pack.size) ?? 0);
+        const size = sayAmount(thousandths(pack.size) ?? 0);
         return (
           <Fragment key={pack.id}>
             {resized(line, pack) && (
@@ -134,7 +134,10 @@ export function CartLine({
       <div>
         {"problem" in quantity
           ? wordsOf(quantity.problem)
-          : say(IN_ALL, { amount: decimal(quantity.amount), unit: item.unit })}
+          : say(IN_ALL, {
+              amount: sayAmount(quantity.amount),
+              unit: item.unit,
+            })}
       </div>
       <button type="button" class="self-start" onClick={onRemove}>
         {say(REMOVE)}

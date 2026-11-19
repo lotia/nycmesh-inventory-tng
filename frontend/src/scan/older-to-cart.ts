@@ -7,7 +7,7 @@
  */
 import { msg } from "@lingui/core/macro";
 import * as v from "valibot";
-import { say } from "../shared/i18n";
+import { say, sayAmount } from "../shared/i18n";
 import { BatchKey, fromOpen, REPORTS, type ReportKind } from "../shared/outbox";
 import { count, decimal, thousandths } from "../shared/quantity";
 import { toBatch } from "./batch";
@@ -487,5 +487,5 @@ export function nameOf(item: { name: string } | undefined): string {
 export function inUnit(amount: number, item: Item | undefined): string {
   const unit =
     item === undefined || item.unit === "each" ? "" : ` ${item.unit}`;
-  return `${decimal(amount)}${unit}`;
+  return `${sayAmount(amount)}${unit}`;
 }

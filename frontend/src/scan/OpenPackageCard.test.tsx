@@ -1,6 +1,7 @@
 import { fireEvent, render, screen } from "@testing-library/preact";
 import { describe, expect, test, vi } from "vitest";
-import { say } from "../shared/i18n";
+import { messages as english } from "../locales/en.po";
+import { say, speak } from "../shared/i18n";
 import { cable, radio } from "../testing/catalogue";
 import {
   ALL_OF_IT,
@@ -132,4 +133,19 @@ test("moved whole, what is on it as typed now is said still", () => {
     whole: true,
     now: "3",
   });
+});
+
+test("what is on it is written as the locale writes numbers, a box takes it plain", () => {
+  // German's separators, read with the English words.
+  speak("de", english);
+  const onTake = vi.fn();
+  card(
+    cable,
+    { amount: "0.5", whole: false },
+    { left: 1_234_567, moving: true, onTake },
+  );
+  expect(document.body.textContent).toContain("1.234,567 m");
+  expect(document.body.textContent).toContain("1.234,067 m");
+  fireEvent.click(screen.getByLabelText(say(ALL_OF_IT)));
+  expect(onTake).toHaveBeenLastCalledWith({ amount: "1234.567", whole: true });
 });

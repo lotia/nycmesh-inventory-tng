@@ -894,6 +894,9 @@ On the scan page (`frontend/src/shared/i18n.ts`):
   it with `sayParts`, which puts each such value where the message places
   it and makes `<0>…</0>` with the function given for it:
   `sayParts(REGISTER_IT, {}, [(inside) => <a href="/register">{inside}</a>])`.
+- A quantity people read, in thousandths, is `sayAmount(left)`, written
+  as the locale writes a number with every thousandth kept, and any other
+  number is `sayNumber(n)`. One a box holds stays `decimal(left)`, plain.
 
 On either side, a sentence is one message, any link's markup inside it,
 never pieces glued together: `{name}: enter the count`, not the name and

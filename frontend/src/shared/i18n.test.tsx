@@ -7,7 +7,7 @@ import { BATCHES_WAITING, REGISTERED } from "../register/RegisterPage";
 import { ADDED_ONE } from "../scan/CartForm";
 import { ITEM_SAYS } from "../scan/cart";
 import { REGISTER_IT } from "../scan/ScanPage";
-import { say, sayParts, speak } from "./i18n";
+import { say, sayAmount, sayNumber, sayParts, speak } from "./i18n";
 
 test("the page speaks English, from its catalogue", () => {
   expect(i18n.locale).toBe("en");
@@ -68,4 +68,17 @@ test("words marked for no part given keep their place, unmarked", () => {
   expect(sayParts(REGISTER_IT, {}).join("")).toBe(
     "Register it, then come back.",
   );
+});
+
+test("a quantity is written as the locale writes a number, every thousandth kept", () => {
+  expect(sayAmount(1_234_500)).toBe("1,234.5");
+  expect(sayAmount(1_234_567)).toBe("1,234.567");
+  expect(sayAmount(1)).toBe("0.001");
+  expect(sayAmount(3000)).toBe("3");
+  expect(sayAmount(-1_234_500)).toBe("-1,234.5");
+  expect(sayNumber(1000)).toBe("1,000");
+  speak("de", english);
+  expect(sayAmount(1_234_500)).toBe("1.234,5");
+  expect(sayAmount(1_234_567)).toBe("1.234,567");
+  expect(sayNumber(1000)).toBe("1.000");
 });

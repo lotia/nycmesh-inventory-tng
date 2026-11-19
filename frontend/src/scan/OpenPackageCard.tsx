@@ -8,7 +8,7 @@
 import { msg } from "@lingui/core/macro";
 import { useId } from "preact/hooks";
 import { Field } from "../shared/Field";
-import { say } from "../shared/i18n";
+import { say, sayAmount } from "../shared/i18n";
 import { decimal } from "../shared/quantity";
 import type { Item } from "./cart";
 import {
@@ -73,8 +73,8 @@ function afterWords(after: number | undefined, unit: string): string {
     return "";
   }
   return after < 0
-    ? say(AMOUNT_OVER, { amount: decimal(-after), unit })
-    : `${decimal(after)} ${unit}`;
+    ? say(AMOUNT_OVER, { amount: sayAmount(-after), unit })
+    : `${sayAmount(after)} ${unit}`;
 }
 
 export function OpenPackageCard({
@@ -135,7 +135,7 @@ export function OpenPackageCard({
           <div class="hint">{say(NOW)}</div>
           <div id={nowId}>
             <span class="sr-only">{say(NOW_SAID)} </span>
-            {decimal(open.left)} {unit}
+            {sayAmount(open.left)} {unit}
           </div>
         </div>
         <div>

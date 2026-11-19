@@ -25,6 +25,36 @@ export function speak(name: string, catalogue: typeof messages): void {
 
 speak("en", messages);
 
+/** A number writer for each locale, made the first time it is needed. */
+const writers = new Map<string, Intl.NumberFormat>();
+
+/**
+ * `value` written as the active locale writes a number, grouped and with
+ * its decimal sign (1,234.5, or 1.234,5 in German), keeping every
+ * thousandth the ledger keeps, as the server's web/formatting.amount
+ * does. For words only: a box holds shared/quantity's plain `decimal`,
+ * which it reads back.
+ */
+export function sayNumber(value: number): string {
+  // Read so a component rendering this renders again on a change.
+  void changes.value;
+  // As Lingui writes a plural's #.
+  const locales = i18n.locales ?? i18n.locale;
+  const key = String(locales);
+  let writer = writers.get(key);
+  if (writer === undefined) {
+    writer = new Intl.NumberFormat(locales, { maximumFractionDigits: 3 });
+    writers.set(key, writer);
+  }
+  return writer.format(value);
+}
+
+/** `amount`, in thousandths (shared/quantity.ts), as `sayNumber` writes
+ * it: 1234500 as "1,234.5". */
+export function sayAmount(amount: number): string {
+  return sayNumber(amount / 1000);
+}
+
 /** Marks a value's place in a message as it is said: private-use
  * characters no phrase or catalogue holds. */
 const HOLE = /\uE000(\d+)\uE001/;

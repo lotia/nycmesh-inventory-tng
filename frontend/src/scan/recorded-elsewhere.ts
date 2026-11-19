@@ -13,7 +13,7 @@
 import type { MessageDescriptor } from "@lingui/core";
 import { msg } from "@lingui/core/macro";
 import { v5 as uuidFrom } from "uuid";
-import { say, sayParts } from "../shared/i18n";
+import { say, sayNumber, sayParts } from "../shared/i18n";
 import {
   type Body,
   batchId,
@@ -217,7 +217,7 @@ class Namer {
     const pack = this.packageOf(line, recorded);
     const size = pack === null ? null : recorded / pack.n;
     return size !== null && amount % size === 0
-      ? [String(amount / size)]
+      ? [sayNumber(amount / size)]
       : [this.inUnit(line, amount)];
   }
 

@@ -37,7 +37,8 @@ export function count(text: string): number | null {
   return WHOLE.test(trimmed) ? Number(trimmed) : null;
 }
 
-/** 12500 as "12.5", and 3000 as "3". */
+/** 12500 as "12.5", and 3000 as "3": plain, as the API and a box read
+ * it. Words people read write it with i18n's `sayAmount`. */
 export function decimal(amount: number): string {
   if (amount < 0) {
     return `-${decimal(-amount)}`;
