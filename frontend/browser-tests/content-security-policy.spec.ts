@@ -3,19 +3,24 @@
  * inventory-tng-e0y): what it refuses fails a test, and what the pages
  * need, it allows.
  */
-import { expect } from "@playwright/test";
+import { expect, type Page } from "@playwright/test";
 import { settled, test } from "./csp-violations";
+
+/** Adds an inline script to `page`, which the policy refuses. */
+async function injectInlineScript(page: Page): Promise<void> {
+  await page.evaluate(() => {
+    const inline = document.createElement("script");
+    inline.textContent = "document.title = 'injected';";
+    document.body.append(inline);
+  });
+}
 
 test("a violation is caught, so it would fail the test", async ({
   page,
   violations,
 }) => {
   await page.goto("/scan");
-  await page.evaluate(() => {
-    const inline = document.createElement("script");
-    inline.textContent = "document.title = 'injected';";
-    document.body.append(inline);
-  });
+  await injectInlineScript(page);
   await expect.poll(() => violations.join("\n")).toContain("script-src");
   await expect(page).not.toHaveTitle("injected");
   // Caught: this test's own, made on purpose.
@@ -28,11 +33,7 @@ test("a violation made by a test's last action is caught too", async ({
   violations,
 }) => {
   await page.goto("/scan");
-  await page.evaluate(() => {
-    const inline = document.createElement("script");
-    inline.textContent = "document.title = 'injected';";
-    document.body.append(inline);
-  });
+  await injectInlineScript(page);
   // What the fixture waits for before it checks: no poll, no other action.
   await settled(context);
   expect(violations.join("\n")).toContain("script-src");

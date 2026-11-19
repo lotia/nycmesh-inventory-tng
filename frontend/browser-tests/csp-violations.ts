@@ -27,7 +27,7 @@ type Watched = {
 /**
  * Collects what the policy refuses in `context`'s pages, as each one's
  * securitypolicyviolation events say. A context a test opens itself is
- * watched with this too, and checked once `settled`.
+ * watched with this too, and checked with `assertNone`.
  */
 export async function watch(context: BrowserContext): Promise<string[]> {
   const found: string[] = [];
@@ -96,8 +96,19 @@ async function pageSettled(page: Page): Promise<void> {
   }
 }
 
-/** Fails after the test if a page of its context violated the policy. */
-export function assertNone(found: string[]): void {
+/**
+ * Fails after the test if a page of `context` violated the policy, once
+ * its refusals have settled. Without scripts nothing is watched, and a page
+ * cannot be asked.
+ */
+export async function assertNone(
+  context: BrowserContext,
+  found: string[],
+  javaScriptEnabled: boolean,
+): Promise<void> {
+  if (javaScriptEnabled) {
+    await settled(context);
+  }
   expect(found, "Content-Security-Policy violations").toEqual([]);
 }
 
@@ -106,11 +117,7 @@ export const test = base.extend<{ violations: string[] }>({
     async ({ context, javaScriptEnabled }, use) => {
       const found = await watch(context);
       await use(found);
-      // Without scripts nothing is watched, and a page cannot be asked.
-      if (javaScriptEnabled) {
-        await settled(context);
-      }
-      assertNone(found);
+      await assertNone(context, found, javaScriptEnabled);
     },
     { auto: true },
   ],

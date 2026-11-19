@@ -11,7 +11,7 @@ import {
   type Page,
   type Response,
 } from "@playwright/test";
-import { assertNone, test as base, settled, watch } from "./csp-violations";
+import { assertNone, test as base, watch } from "./csp-violations";
 import { prepared } from "./prepared";
 
 /**
@@ -177,12 +177,9 @@ export const test = base.extend<{
     await expect(admin).toHaveURL(/\/admin$/);
     await use({ page: admin, password });
     try {
-      if (javaScriptEnabled) {
-        await settled(context);
-      }
+      await assertNone(context, violations, javaScriptEnabled);
     } finally {
       await context.close();
     }
-    assertNone(violations);
   },
 });
