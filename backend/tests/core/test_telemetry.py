@@ -869,76 +869,143 @@ def histogram_counts(
     }
 
 
-def test_records_what_the_pages_report(rolled_back: Recorded) -> None:
-    client, _, reader, _ = rolled_back
-    events = [
-        {
-            "kind": "web_vital",
-            "page": "scan",
-            "name": "LCP",
-            "value": 1200,
-            "rating": "good",
-        },
-        {
-            "kind": "web_vital",
-            "page": "scan",
-            "name": "CLS",
-            "value": 0.3,
-            "rating": "poor",
-        },
+LCP = {
+    "kind": "web_vital",
+    "page": "scan",
+    "name": "LCP",
+    "value": 1200,
+    "rating": "good",
+}
+CLS = {
+    "kind": "web_vital",
+    "page": "scan",
+    "name": "CLS",
+    "value": 0.3,
+    "rating": "poor",
+}
+
+# Each event a page reports, and the metric and attributes it is recorded
+# under, read as a counter's total or a histogram's number of values.
+PAGE_EVENTS = [
+    (
+        LCP,
+        histogram_counts,
+        "inventory.page.web_vital.duration",
+        (
+            ("browser.web_vital.name", "LCP"),
+            ("browser.web_vital.rating", "good"),
+            ("page", "scan"),
+        ),
+    ),
+    (
+        CLS,
+        histogram_counts,
+        "inventory.page.web_vital.layout_shift",
+        (("browser.web_vital.rating", "poor"), ("page", "scan")),
+    ),
+    (
         {"kind": "error", "page": "register", "source": "unhandledrejection"},
+        counted,
+        "inventory.page.errors",
+        (("page", "register"), ("source", "unhandledrejection")),
+    ),
+    (
         {"kind": "outbox_retry", "reason": "no_answer"},
+        counted,
+        "inventory.outbox.retries",
+        (("reason", "no_answer"),),
+    ),
+    (
         {"kind": "scan_to_save", "seconds": 42.5},
+        histogram_counts,
+        "inventory.scan.to_save.duration",
+        (),
+    ),
+    (
         {"kind": "out_of_date", "learned": "too_old"},
+        counted,
+        "inventory.page.out_of_date",
+        (("learned", "too_old"),),
+    ),
+    (
         {"kind": "older_storage", "held": "cart"},
+        counted,
+        "inventory.page.older_storage",
+        (("held", "cart"),),
+    ),
+    (
         {"kind": "older_storage", "held": "saves", "action": "put_in_cart"},
+        counted,
+        "inventory.page.older_acted_on",
+        (("action", "put_in_cart"), ("held", "saves")),
+    ),
+    (
         {"kind": "older_storage", "held": "cart", "action": "discarded"},
+        counted,
+        "inventory.page.older_acted_on",
+        (("action", "discarded"), ("held", "cart")),
+    ),
+    (
         {"kind": "older_storage", "held": "saves", "action": "line_discarded"},
+        counted,
+        "inventory.page.older_acted_on",
+        (("action", "line_discarded"), ("held", "saves")),
+    ),
+    (
         {
             "kind": "older_storage",
             "held": "saves",
             "action": "put_in_cart_automatically",
         },
-        {"kind": "cart_discarded"},
-        {"kind": "line_removed"},
-        {"kind": "removal_undone"},
+        counted,
+        "inventory.page.older_acted_on",
+        (("action", "put_in_cart_automatically"), ("held", "saves")),
+    ),
+    ({"kind": "cart_discarded"}, counted, "inventory.cart.discards", ()),
+    ({"kind": "line_removed"}, counted, "inventory.cart.lines_removed", ()),
+    ({"kind": "removal_undone"}, counted, "inventory.cart.removals_undone", ()),
+    (
         {"kind": "difference_added", "how": "automatic"},
+        counted,
+        "inventory.cart.differences_added",
+        (("how", "automatic"),),
+    ),
+    (
         {"kind": "difference_added", "how": "tap"},
-    ]
-    assert client.post("/api/telemetry", json={"events": events}).status_code == 204
-    durations = histogram_counts(reader, "inventory.page.web_vital.duration")
-    assert (
-        durations[
-            (
-                ("browser.web_vital.name", "LCP"),
-                ("browser.web_vital.rating", "good"),
-                ("page", "scan"),
-            )
-        ]
-        >= 1
-    )
-    shifts = histogram_counts(reader, "inventory.page.web_vital.layout_shift")
-    assert shifts[(("browser.web_vital.rating", "poor"), ("page", "scan"))] >= 1
-    errors = counted(reader, "inventory.page.errors")
-    assert errors[(("page", "register"), ("source", "unhandledrejection"))] >= 1
-    assert counted(reader, "inventory.outbox.retries")[(("reason", "no_answer"),)] >= 1
-    assert histogram_counts(reader, "inventory.scan.to_save.duration")[()] >= 1
-    out_of_date = counted(reader, "inventory.page.out_of_date")
-    assert out_of_date[(("learned", "too_old"),)] >= 1
-    assert counted(reader, "inventory.page.older_storage")[(("held", "cart"),)] >= 1
-    acted_on = counted(reader, "inventory.page.older_acted_on")
-    assert acted_on[(("action", "put_in_cart"), ("held", "saves"))] >= 1
-    assert acted_on[(("action", "discarded"), ("held", "cart"))] >= 1
-    assert acted_on[(("action", "line_discarded"), ("held", "saves"))] >= 1
-    automatically = (("action", "put_in_cart_automatically"), ("held", "saves"))
-    assert acted_on[automatically] >= 1
-    assert counted(reader, "inventory.cart.discards")[()] >= 1
-    assert counted(reader, "inventory.cart.lines_removed")[()] >= 1
-    assert counted(reader, "inventory.cart.removals_undone")[()] >= 1
-    added = counted(reader, "inventory.cart.differences_added")
-    assert added[(("how", "automatic"),)] >= 1
-    assert added[(("how", "tap"),)] >= 1
-    # Buckets that fit the values, not the SDK's own from 5 up.
+        counted,
+        "inventory.cart.differences_added",
+        (("how", "tap"),),
+    ),
+]
+
+
+@pytest.mark.parametrize(
+    ("event", "reading", "metric", "attributes"),
+    PAGE_EVENTS,
+    ids=[
+        "-".join(v for v in event.values() if isinstance(v, str))
+        for event, *_ in PAGE_EVENTS
+    ],
+)
+def test_records_each_event_a_page_reports(
+    rolled_back: Recorded,
+    event: dict[str, object],
+    reading: Callable[[InMemoryMetricReader, str], dict[tuple[object, ...], int]],
+    metric: str,
+    attributes: tuple[object, ...],
+) -> None:
+    client, _, reader, _ = rolled_back
+    before = reading(reader, metric).get(attributes, 0)
+    assert client.post("/api/telemetry", json={"events": [event]}).status_code == 204
+    assert reading(reader, metric)[attributes] == before + 1
+
+
+def test_web_vitals_are_recorded_in_buckets_that_fit_them(
+    rolled_back: Recorded,
+) -> None:
+    """Buckets that fit the values, not the SDK's own from 5 up."""
+    client, _, reader, _ = rolled_back
+    assert client.post("/api/telemetry", json={"events": [LCP, CLS]}).status_code == 204
     bounds = {
         name: {
             tuple(point.explicit_bounds)

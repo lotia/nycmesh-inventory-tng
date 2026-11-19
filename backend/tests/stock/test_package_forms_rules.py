@@ -4,6 +4,7 @@ insert_transaction and open_packages.make keep. The rules as pure
 functions first, then each through its write on PostgreSQL."""
 
 import uuid
+from collections.abc import Callable
 from datetime import UTC, datetime
 from decimal import Decimal
 
@@ -290,66 +291,106 @@ def test_an_open_package_is_made_once_per_key(session: Session, spools: Spools) 
         open_packages.make(session, uuid.uuid4(), 999999, store)
 
 
+def _open_here(spools: Spools, *lines: Entry) -> object:
+    store = spools.store.id
+    here = {"kind": "open", "from_location_id": store, "to_location_id": store}
+    return spools.write(here, *lines)
+
+
+def _of_another_item(spools: Spools, _opened: Form) -> object:
+    other = add(
+        spools.session,
+        ItemPackage(item_id=spools.place.item.id, name=f"Box {tag()}", size=10),
+    )
+    whole = Form(package_id=other.id)
+    return spools.move(Entry(spools.cable.id, Decimal(10), whole, whole))
+
+
+def _from_where_it_is_not(spools: Spools, opened: Form) -> object:
+    van_to_store = {
+        "kind": "move",
+        "from_location_id": spools.van.id,
+        "to_location_id": spools.store.id,
+    }
+    return spools.write(van_to_store, Entry(spools.cable.id, Decimal(1), opened))
+
+
+# Each rule the ledger refuses, and a write of the spools, one opened as
+# `opened`, that breaks it.
+LEDGER_BREAKS: list[tuple[str, Callable[[Spools, Form], object]]] = [
+    (
+        "movement_form_outside",
+        lambda spools, opened: spools.write(
+            {"kind": "receipt", "to_location_id": spools.store.id},
+            Entry(spools.cable.id, Decimal(1), opened),
+        ),
+    ),
+    (
+        "movement_whole_packages",
+        lambda spools, _: spools.move(
+            Entry(spools.cable.id, Decimal(300), spools.sealed, spools.sealed)
+        ),
+    ),
+    (
+        "movement_form_change",
+        lambda spools, _: spools.move(
+            Entry(spools.cable.id, Decimal(305), spools.sealed)
+        ),
+    ),
+    (
+        "movement_open_package_whole",
+        lambda spools, opened: spools.move(
+            Entry(spools.cable.id, Decimal(5), opened, opened)
+        ),
+    ),
+    (
+        "opening_follows_setting",
+        lambda spools, _: _open_here(
+            spools, Entry(spools.cable.id, Decimal(305), spools.sealed)
+        ),
+    ),
+    (
+        "open_package_opened_once",
+        lambda spools, opened: _open_here(
+            spools, Entry(spools.cable.id, Decimal(305), spools.sealed, opened)
+        ),
+    ),
+    (
+        "movement_item_once",
+        lambda spools, opened: spools.move(
+            Entry(spools.cable.id, Decimal(1), opened),
+            Entry(spools.cable.id, Decimal(2), opened),
+        ),
+    ),
+    ("movement_package_of_item", _of_another_item),
+    ("movement_open_package_place", _from_where_it_is_not),
+]
+
+
+@pytest.mark.parametrize(
+    ("rule", "write"), LEDGER_BREAKS, ids=[rule for rule, _ in LEDGER_BREAKS]
+)
 def test_each_rule_is_refused_through_the_ledger(
-    session: Session, spools: Spools
+    session: Session,
+    spools: Spools,
+    rule: str,
+    write: Callable[[Spools, Form], object],
 ) -> None:
     """Each by its name, before anything is written."""
-    cable, store = spools.cable.id, spools.store.id
+    opened = Form(open_package_id=spools.opened().id)
+    with breaks(session, rule):
+        write(spools, opened)
+
+
+def test_a_closed_open_package_is_refused_through_the_ledger(
+    session: Session, spools: Spools
+) -> None:
     made = spools.opened()
-    opened = Form(open_package_id=made.id)
-    here = {"kind": "open", "from_location_id": store, "to_location_id": store}
-    outside = {"kind": "receipt", "to_location_id": store}
-    cases = [
-        ("movement_form_outside", outside, Entry(cable, Decimal(1), opened)),
-        (
-            "movement_whole_packages",
-            None,
-            Entry(cable, Decimal(300), spools.sealed, spools.sealed),
-        ),
-        ("movement_form_change", None, Entry(cable, Decimal(305), spools.sealed)),
-        ("movement_open_package_whole", None, Entry(cable, Decimal(5), opened, opened)),
-        ("opening_follows_setting", here, Entry(cable, Decimal(305), spools.sealed)),
-        (
-            "open_package_opened_once",
-            here,
-            Entry(cable, Decimal(305), spools.sealed, opened),
-        ),
-        (
-            "movement_item_once",
-            None,
-            Entry(cable, Decimal(1), opened),
-            Entry(cable, Decimal(2), opened),
-        ),
-    ]
-    for rule, header, *lines in cases:
-        with breaks(session, rule):
-            if header is None:
-                spools.move(*lines)
-            else:
-                spools.write(header, *lines)
-    other = add(
-        session, ItemPackage(item_id=spools.place.item.id, name=f"Box {tag()}", size=10)
-    )
-    with breaks(session, "movement_package_of_item"):
-        spools.move(
-            Entry(
-                cable, Decimal(10), Form(package_id=other.id), Form(package_id=other.id)
-            )
-        )
-    with breaks(session, "movement_open_package_place"):
-        spools.write(
-            {
-                "kind": "move",
-                "from_location_id": spools.van.id,
-                "to_location_id": store,
-            },
-            Entry(cable, Decimal(1), opened),
-        )
     closer = add(session, Admin(username=f"closer-{tag()}"))
     made.closed_at, made.closed_by_admin_id = datetime.now(UTC), closer.id
     session.flush()
     with breaks(session, "movement_open_package_closed"):
-        spools.move(Entry(cable, Decimal(1), opened))
+        spools.move(Entry(spools.cable.id, Decimal(1), Form(open_package_id=made.id)))
 
 
 def test_a_fresh_open_package_must_be_full_and_of_its_package(

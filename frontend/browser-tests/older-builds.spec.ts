@@ -133,93 +133,99 @@ test("a save an older build left goes back in the cart, whole without a tap, and
   ).toBeNull();
 });
 
-test("a save's package retired since is named, never offered, and goes by its line's Discard; saves of an item retired since name it, and go by its line's Discard or their own", async ({
+test("a save's package retired since is named, never offered, and goes by its line's Discard", async ({
   page,
 }) => {
   const cable = await ownCable(page, "Retired cable");
-  const itemPage = page.url();
-  const itemId = Number(new URL(itemPage).pathname.split("/").at(-1));
+  const itemId = Number(new URL(page.url()).pathname.split("/").at(-1));
   const listing = listingOf(page);
-  // A step each, so a failure says which half; the item's half needs the
-  // package's done, so it runs only once that passes.
-  await test.step("the package, retired with none left", async () => {
-    const box = "Box of 305 m";
-    const retireBox = page.getByRole("button", { name: `Retire ${box}` });
-    const packageId = Number(
-      (
-        (await page
-          .locator("form", { has: retireBox })
-          .getAttribute("action")) ?? ""
-      )
-        .split("/")
-        .at(-2),
-    );
-    await retireBox.click();
-    await expect(
-      page.getByRole("button", { name: `Bring it back ${box}` }),
-    ).toBeVisible();
-    await page.goto("/scan");
-    await leave(page, [
-      { item_id: itemId, quantity: "610", package_id: packageId },
-      { item_id: itemId, quantity: "3" },
-    ]);
-    await page.reload();
+  const box = "Box of 305 m";
+  const retireBox = page.getByRole("button", { name: `Retire ${box}` });
+  const packageId = Number(
+    (
+      (await page.locator("form", { has: retireBox }).getAttribute("action")) ??
+      ""
+    )
+      .split("/")
+      .at(-2),
+  );
+  await retireBox.click();
+  await expect(
+    page.getByRole("button", { name: `Bring it back ${box}` }),
+  ).toBeVisible();
+  await page.goto("/scan");
+  await leave(page, [
+    { item_id: itemId, quantity: "610", package_id: packageId },
+    { item_id: itemId, quantity: "3" },
+  ]);
+  await page.reload();
 
-    // Named from the catalogue (retired_packages), in bold, without "Sorry."
-    await expect(listing.getByText(`${cable}: 2 × ${box}`)).toBeVisible();
-    const note = listing.locator(".alert", {
-      hasText: "This item has been retired.",
-    });
-    await expect(note.locator("strong")).toHaveText(
-      "This item has been retired.",
-    );
-    await lineDiscard(listing, `${cable}: 2 × ${box}`).click();
-    // What is left goes back whole, without a tap: its only count, the box
-    // not offered.
-    await expect(listing).toHaveCount(0);
-    await expect(page.getByText(PUT_BACK)).toBeVisible();
-    await expect(page.getByLabel("How many m")).toHaveValue("3");
-    await expect(page.getByLabel(new RegExp(`^${box}`))).toHaveCount(0);
-    // Discarded, not saved: a save would leave the item stock, and the
-    // item's half needs it retired with none left. What such a cart saves
-    // ScanPage.older-build.test.tsx checks.
-    await page.getByRole("button", { name: "Discard cart" }).click();
-    await page.getByRole("button", { name: "Discard", exact: true }).click();
-    await expect(page.getByText("Nothing in the cart yet.")).toBeVisible();
+  // Named from the catalogue (retired_packages), in bold, without "Sorry."
+  await expect(listing.getByText(`${cable}: 2 × ${box}`)).toBeVisible();
+  const note = listing.locator(".alert", {
+    hasText: "This item has been retired.",
   });
+  await expect(note.locator("strong")).toHaveText(
+    "This item has been retired.",
+  );
+  await lineDiscard(listing, `${cable}: 2 × ${box}`).click();
+  // What is left goes back whole, without a tap: its only count, the box
+  // not offered. What such a cart saves ScanPage.older-build.test.tsx
+  // checks.
+  await expect(listing).toHaveCount(0);
+  await expect(page.getByText(PUT_BACK)).toBeVisible();
+  await expect(page.getByLabel("How many m")).toHaveValue("3");
+  await expect(page.getByLabel(new RegExp(`^${box}`))).toHaveCount(0);
+});
 
-  await test.step("then the item, retired with none left", async () => {
-    await page.goto(itemPage);
-    await page.getByRole("button", { name: "Retire", exact: true }).click();
-    await expect(page.getByRole("status")).toContainText("Retired.");
-    await page.goto("/scan");
-    await leave(
-      page,
-      [{ item_id: itemId, quantity: "2" }],
-      [{ item_id: itemId, quantity: "3" }],
-    );
-    await page.reload();
+/** Two saves of a new cable, of 2 m and of 3 m, left on the scan page after
+ * the cable was retired with none left. The cable's name. */
+async function leaveOfRetiredItem(page: Page) {
+  const cable = await ownCable(page, "Retired cable");
+  const itemId = Number(new URL(page.url()).pathname.split("/").at(-1));
+  await page.getByRole("button", { name: "Retire", exact: true }).click();
+  await expect(page.getByRole("status")).toContainText("Retired.");
+  await page.goto("/scan");
+  await leave(
+    page,
+    [{ item_id: itemId, quantity: "2" }],
+    [{ item_id: itemId, quantity: "3" }],
+  );
+  await page.reload();
+  return cable;
+}
 
-    await expect(listing.getByText("Item retired")).toHaveCount(2);
-    await expect(listing.getByText(`${cable}: 2 m`)).toBeVisible();
-    await expect(
-      listing.getByRole("button", { name: "Cannot Add to Cart" }).first(),
-    ).toBeDisabled();
-    await expect(page.getByText(PUT_BACK)).toHaveCount(0);
-    // The line's own Discard, without asking: the save goes with its only
-    // line.
-    await lineDiscard(listing, `${cable}: 2 m`).click();
-    await expect(listing.getByText(`${cable}: 2 m`)).toHaveCount(0);
-    await expect(listing.getByText(`${cable}: 3 m`)).toBeVisible();
-    // The save's own asks first.
-    await listing.getByRole("button", { name: "Discard" }).last().click();
-    await expect(listing.getByText("Confirm discard")).toBeVisible();
-    await listing.getByRole("button", { name: "Discard" }).last().click();
-    await expect(listing).toHaveCount(0);
-    expect(
-      await page.evaluate(() => localStorage.getItem("inventory.outbox.v3")),
-    ).toBeNull();
-  });
+test("saves of an item retired since name it and are never offered", async ({
+  page,
+}) => {
+  const cable = await leaveOfRetiredItem(page);
+  const listing = listingOf(page);
+  await expect(listing.getByText("Item retired")).toHaveCount(2);
+  await expect(listing.getByText(`${cable}: 2 m`)).toBeVisible();
+  await expect(
+    listing.getByRole("button", { name: "Cannot Add to Cart" }).first(),
+  ).toBeDisabled();
+  await expect(page.getByText(PUT_BACK)).toHaveCount(0);
+});
+
+test("saves of an item retired since go by their line's Discard, or by their own once confirmed", async ({
+  page,
+}) => {
+  const cable = await leaveOfRetiredItem(page);
+  const listing = listingOf(page);
+  // The line's own Discard, without asking: the save goes with its only
+  // line.
+  await lineDiscard(listing, `${cable}: 2 m`).click();
+  await expect(listing.getByText(`${cable}: 2 m`)).toHaveCount(0);
+  await expect(listing.getByText(`${cable}: 3 m`)).toBeVisible();
+  // The save's own asks first.
+  await listing.getByRole("button", { name: "Discard" }).last().click();
+  await expect(listing.getByText("Confirm discard")).toBeVisible();
+  await listing.getByRole("button", { name: "Discard" }).last().click();
+  await expect(listing).toHaveCount(0);
+  expect(
+    await page.evaluate(() => localStorage.getItem("inventory.outbox.v3")),
+  ).toBeNull();
 });
 
 /** One left, which the older build's tab then saves, as its request in

@@ -665,6 +665,20 @@ NB, THIN = "\u00a0", "\u202f"
         ("Supply -12 Volts", f"Supply -12{NB}Volts"),
         ("Reel 0,500 metres", f"Reel 0,500{NB}metres"),
         ("Box 3 Feet", f"Box 3{NB}Feet"),
+    ],
+)
+def test_a_name_is_shown_with_each_number_and_unit_spaced(
+    name: str, shown: str
+) -> None:
+    """Each number and the unit read after it are spaced by a no-break space,
+    the unit as typed; thousands without commas, from five digits grouped by
+    thin no-break spaces (Ali, 2026-11-15, inventory-tng-ist.3)."""
+    assert units.shown_name(name) == shown
+
+
+@pytest.mark.parametrize(
+    ("name", "shown"),
+    [
         # A number grouped by spaces, whole and as typed, as it may be a pack
         # count and a size, its ordinary spaces no-break so it never breaks
         # across a line; judged as search reads it, one number (Ali,
@@ -694,6 +708,17 @@ NB, THIN = "\u00a0", "\u202f"
         (f"Box 1 000{NB}feet", f"Box 1{NB}000{NB}feet"),
         ("Cable 2\u2009100 ft", f"Cable 2{THIN}100{NB}ft"),
         ("Reel 1\u2009000 000 mm", f"Reel 1{THIN}000{NB}000{NB}mm"),
+    ],
+)
+def test_a_number_grouped_by_spaces_is_shown_whole_and_unbroken(
+    name: str, shown: str
+) -> None:
+    assert units.shown_name(name) == shown
+
+
+@pytest.mark.parametrize(
+    ("name", "shown"),
+    [
         # Products, units no rule or word settles, and tokens no unit, as
         # typed.
         ("Cat6a cable 5AC SFP+", "Cat6a cable 5AC SFP+"),
@@ -717,12 +742,11 @@ NB, THIN = "\u00a0", "\u202f"
         ("Box 3ft+", f"Box 3{NB}ft+"),
     ],
 )
-def test_a_name_is_shown_with_each_number_and_unit_spaced(
+def test_a_number_inside_a_code_or_product_name_is_left_as_typed(
     name: str, shown: str
 ) -> None:
-    """Each number and the unit read after it are spaced by a no-break space,
-    the unit as typed; thousands without commas, from five digits grouped by
-    thin no-break spaces (Ali, 2026-11-15, inventory-tng-ist.3)."""
+    """Only a number standing alone before its unit is spaced; one in
+    brackets or before a plus stands alone."""
     assert units.shown_name(name) == shown
 
 

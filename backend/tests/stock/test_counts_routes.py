@@ -4,6 +4,7 @@
 import re
 import uuid
 from collections.abc import Callable
+from dataclasses import dataclass
 from decimal import Decimal
 
 import pytest
@@ -1113,12 +1114,40 @@ def test_a_recount_shows_each_item_it_asks_for_though_the_search_no_longer_finds
     assert "Nothing here matches." not in text(asked)
 
 
-def test_counts_sort_filter_and_come_in_pages(
-    admin_client: TestClient, session: Session
-) -> None:
-    """Newest first unless a heading sorts them; filtered by place, kind and
-    administrator; in pages of 25, 50, 100 or all, not only the newest 30
-    (Ali, 2026-11-15, inventory-tng-qwb)."""
+# The counts list (Ali, 2026-11-15, inventory-tng-qwb): newest first unless
+# a heading sorts them; filtered by place, kind and administrator; in pages
+# of 25, 50, 100 or all, not only the newest 30.
+
+
+@dataclass
+class Listed:
+    """A store's Damaged by Ada, a shelf's Found by Bob, then the store's
+    Count by Bob: three rows the list sorts, filters and pages."""
+
+    session: Session
+    client: TestClient
+    place: Place
+    shelf: Location
+    ada: Admin
+    bob: Admin
+    found: int
+
+    def __call__(self, **query: str) -> list[str]:
+        """Each row's kind, as the list asked for by `query` shows it."""
+        return kinds(self.client.get(COUNTS, params=query).text)
+
+
+def kinds(page: str, words: str = "Count|Damaged|Found") -> list[str]:
+    """Each row's kind, from its first words, in the page's order."""
+    return [
+        found[1]
+        for cell in read(page).all("td")
+        if (found := re.match(rf"({words}):", cell.text))
+    ]
+
+
+@pytest.fixture
+def listed(admin_client: TestClient, session: Session) -> Listed:
     place = stocked(session)
     shelf = Location(name="Aa shelf", kind="store")
     session.add(shelf)
@@ -1157,59 +1186,71 @@ def test_counts_sort_filter_and_come_in_pages(
         as_of,
     )
     session.commit()
+    return Listed(session, admin_client, place, shelf, ada, bob, reasons["Found"])
 
-    def kinds(page: str, words: str = "Count|Damaged|Found") -> list[str]:
-        """Each row's kind, from its first words, in the page's order."""
-        return [
-            found[1]
-            for cell in read(page).all("td")
-            if (found := re.match(rf"({words}):", cell.text))
-        ]
 
-    def listed(**query: str) -> list[str]:
-        return kinds(admin_client.get(COUNTS, params=query).text)
-
+def test_counts_are_newest_first_and_sort_by_each_heading(listed: Listed) -> None:
     assert listed() == ["Count", "Found", "Damaged"]
     assert listed(sort="when", order="asc") == ["Damaged", "Found", "Count"]
     assert listed(sort="what") == ["Count", "Damaged", "Found"]
     assert listed(sort="what", order="desc") == ["Found", "Damaged", "Count"]
-    # What by its words in the language spoken, not English.
+    assert listed(sort="where") == ["Found", "Count", "Damaged"]
+    assert listed(sort="by") == ["Damaged", "Count", "Found"]
+
+
+def test_counts_sort_by_what_in_the_language_spoken(listed: Listed) -> None:
+    """By its words in the language spoken, not English."""
     catalogue = Catalog()
     catalogue.add(str(COUNT_KIND), "Inventur")
     with speaking(compiled(catalogue)):
-        page = admin_client.get(COUNTS, params={"sort": "what"}).text
-    said = kinds(page, "Inventur|Damaged|Found")
-    assert said == ["Damaged", "Found", "Inventur"]
-    assert listed(sort="where") == ["Found", "Count", "Damaged"]
-    assert listed(sort="by") == ["Damaged", "Count", "Found"]
-    assert listed(place=str(shelf.id)) == ["Found"]
+        page = listed.client.get(COUNTS, params={"sort": "what"}).text
+    assert kinds(page, "Inventur|Damaged|Found") == ["Damaged", "Found", "Inventur"]
+
+
+def test_counts_filter_by_place_kind_and_administrator(listed: Listed) -> None:
+    assert listed(place=str(listed.shelf.id)) == ["Found"]
     assert listed(kind="count") == ["Count"]
     assert listed(kind="adjustment") == ["Found", "Damaged"]
-    assert listed(admin=str(bob.id)) == ["Count", "Found"]
-    assert listed(admin=str(bob.id), kind="adjustment") == ["Found"]
+    assert listed(admin=str(listed.bob.id)) == ["Count", "Found"]
+    assert listed(admin=str(listed.bob.id), kind="adjustment") == ["Found"]
+
+
+def test_a_counts_filter_that_names_nothing_is_left_out(listed: Listed) -> None:
     assert listed(place="x", kind="audit", admin="") == listed()
-    page = read(admin_client.get(COUNTS, params={"admin": str(bob.id)}).text)
-    assert (str(bob.id), "bob", True) in options(page)
-    assert (str(shelf.id), "Aa shelf", False) in options(page)
+
+
+def test_the_counts_filter_shows_its_choices_and_a_way_to_clear_it(
+    listed: Listed,
+) -> None:
+    response = listed.client.get(COUNTS, params={"admin": str(listed.bob.id)})
+    page = read(response.text)
+    assert (str(listed.bob.id), "bob", True) in options(page)
+    assert (str(listed.shelf.id), "Aa shelf", False) in options(page)
     assert ("Clear", COUNTS) in links(page)
+
+
+def test_a_counts_filter_matching_nothing_says_so(listed: Listed) -> None:
     assert "None is in the filter." in text(
-        admin_client.get(COUNTS, params={"place": str(INTEGER_MAX)})
+        listed.client.get(COUNTS, params={"place": str(INTEGER_MAX)})
     )
+
+
+def test_counts_come_in_pages(listed: Listed) -> None:
     for _ in range(28):
         record_adjustment(
-            session,
+            listed.session,
             uuid.uuid4(),
-            ada.id,
-            shelf.id,
-            place.item.id,
+            listed.ada.id,
+            listed.shelf.id,
+            listed.place.item.id,
             Decimal(1),
             found=True,
-            reason_id=reasons["Found"],
+            reason_id=listed.found,
         )
-    session.commit()
+    listed.session.commit()
     assert len(listed()) == 31
     assert len(listed(per="25")) == 25
     assert len(listed(per="25", page="2")) == 6
     assert "Page 2 of 2" in text(
-        admin_client.get(COUNTS, params={"per": "25", "page": "2"})
+        listed.client.get(COUNTS, params={"per": "25", "page": "2"})
     )
