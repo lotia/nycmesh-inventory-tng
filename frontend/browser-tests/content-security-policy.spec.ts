@@ -4,7 +4,7 @@
  * need, it allows.
  */
 import { expect } from "@playwright/test";
-import { test } from "./csp-violations";
+import { settled, test } from "./csp-violations";
 
 test("a violation is caught, so it would fail the test", async ({
   page,
@@ -19,6 +19,23 @@ test("a violation is caught, so it would fail the test", async ({
   await expect.poll(() => violations.join("\n")).toContain("script-src");
   await expect(page).not.toHaveTitle("injected");
   // Caught: this test's own, made on purpose.
+  violations.length = 0;
+});
+
+test("a violation made by a test's last action is caught too", async ({
+  context,
+  page,
+  violations,
+}) => {
+  await page.goto("/scan");
+  await page.evaluate(() => {
+    const inline = document.createElement("script");
+    inline.textContent = "document.title = 'injected';";
+    document.body.append(inline);
+  });
+  // What the fixture waits for before it checks: no poll, no other action.
+  await settled(context);
+  expect(violations.join("\n")).toContain("script-src");
   violations.length = 0;
 });
 
@@ -37,6 +54,7 @@ test("the scan page may compile the decoder's WebAssembly", async ({
 });
 
 test("a <select> is refused nothing, and keeps its ellipsis", async ({
+  context,
   page,
   browserName,
   violations,
@@ -86,10 +104,8 @@ test("a <select> is refused nothing, and keeps its ellipsis", async ({
     page.locator(`#${id}`).screenshot({ caret: "initial" });
   expect((await drawn("ellipsis")).equals(await drawn("clip"))).toBe(false);
   // WebKit refuses a <style> Playwright adds to take a screenshot: that
-  // alone is let pass. Each refusal reaches the test a task after it
-  // happens, so one more task in the page brings in the last screenshot's
-  // before they are cleared, never after, when the fixture would fail.
-  await page.evaluate(() => new Promise((resolve) => setTimeout(resolve)));
+  // alone is let pass, once the last screenshot's has reached the test.
+  await settled(context);
   const screenshots = /^style-src-elem refused inline \(#document\) /;
   expect(violations.filter((found) => !screenshots.test(found))).toEqual([]);
   violations.length = 0;

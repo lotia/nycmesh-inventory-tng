@@ -11,7 +11,7 @@ import {
   type Page,
   type Response,
 } from "@playwright/test";
-import { assertNone, test as base, watch } from "./csp-violations";
+import { assertNone, test as base, settled, watch } from "./csp-violations";
 import { prepared } from "./prepared";
 
 /**
@@ -176,6 +176,7 @@ export const test = base.extend<{
     await admin.getByRole("button", { name: "Sign in" }).click();
     await expect(admin).toHaveURL(/\/admin$/);
     await use({ page: admin, password });
+    await settled(context);
     await context.close();
     assertNone(violations);
   },

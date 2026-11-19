@@ -11,10 +11,18 @@ import { type BrowserContext, test as base, expect } from "@playwright/test";
 /** What a page's securitypolicyviolation event says. */
 type Violation = { directive: string; blocked: string; target: string };
 
+/** What the watch adds to each page's window. */
+type Watched = {
+  /** Gives a refusal to the test, once it has it. */
+  policyViolated(violation: Violation): Promise<void>;
+  /** Once the refusals the page has made so far have reached the test. */
+  policySettled(): Promise<void>;
+};
+
 /**
  * Collects what the policy refuses in `context`'s pages, as each one's
  * securitypolicyviolation events say. A context a test opens itself is
- * watched with this too.
+ * watched with this too, and checked once `settled`.
  */
 export async function watch(context: BrowserContext): Promise<string[]> {
   const found: string[] = [];
@@ -28,22 +36,45 @@ export async function watch(context: BrowserContext): Promise<string[]> {
     },
   );
   await context.addInitScript(() => {
+    const watched = window as unknown as Watched;
+    const given: Promise<void>[] = [];
     document.addEventListener(
       "securitypolicyviolation",
       (event) => {
         const target = event.target as Node | null;
-        (
-          window as unknown as { policyViolated(violation: Violation): void }
-        ).policyViolated({
-          directive: event.effectiveDirective,
-          blocked: event.blockedURI,
-          target: target?.nodeName ?? "",
-        });
+        given.push(
+          watched.policyViolated({
+            directive: event.effectiveDirective,
+            blocked: event.blockedURI,
+            target: target?.nodeName ?? "",
+          }),
+        );
       },
       true,
     );
+    watched.policySettled = async () => {
+      // The browser fires the event a task after it refuses.
+      await new Promise((resolve) => setTimeout(resolve));
+      await Promise.all(given);
+    };
   });
   return found;
+}
+
+/**
+ * Until the refusals made in `context`'s pages so far, by a test's last
+ * action too, have reached the test. A page that is navigating is waited
+ * for first. Its pages must run scripts: one that does not cannot be asked.
+ */
+export async function settled(context: BrowserContext): Promise<void> {
+  await Promise.all(
+    context.pages().map(async (page) => {
+      await page.waitForLoadState();
+      await page.evaluate(() =>
+        (window as unknown as Partial<Watched>).policySettled?.(),
+      );
+    }),
+  );
 }
 
 /** Fails after the test if a page of its context violated the policy. */
@@ -53,9 +84,13 @@ export function assertNone(found: string[]): void {
 
 export const test = base.extend<{ violations: string[] }>({
   violations: [
-    async ({ context }, use) => {
+    async ({ context, javaScriptEnabled }, use) => {
       const found = await watch(context);
       await use(found);
+      // Without scripts nothing is watched, and a page cannot be asked.
+      if (javaScriptEnabled) {
+        await settled(context);
+      }
       assertNone(found);
     },
     { auto: true },
