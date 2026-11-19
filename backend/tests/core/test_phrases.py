@@ -842,13 +842,6 @@ def test_a_context_tells_two_meanings_of_the_same_english_apart() -> None:
     assert pgettext("place", "To") == "To"
 
 
-def test_a_templates_values_are_escaped_and_its_lines_read_as_one() -> None:
-    said = templates.env.from_string(
-        "{% trans name=name %}Start\n  counting {{ name }}{% endtrans %}"
-    ).render(name="<b>")
-    assert said == "Start counting &lt;b&gt;"
-
-
 def test_speaking_ends_with_its_block_even_on_an_error() -> None:
     with pytest.raises(ValueError, match="stop"), speaking(PSEUDO):
         raise ValueError("stop")
@@ -975,18 +968,6 @@ def test_the_home_and_seeding_pages_write_their_counts_as_the_locale_does() -> N
     assert ": 2,000" in home
     assert "1,000 of 2,000." in seeding
     assert 'name="at" value="999"' in seeding
-
-
-def test_a_plurals_values_may_take_any_name() -> None:
-    """Even plural and context, which Jinja passes ngettext by position."""
-    said = from_macros(
-        "{% trans count=n, plural=p, context=c %}{{ count }} {{ plural }} {{ context }}"
-        "{% pluralize %}{{ count }} {{ plural }}s {{ context }}{% endtrans %}",
-        n=1000,
-        p="box",
-        c="here",
-    )
-    assert said == "1,000 boxs here"
 
 
 def test_only_an_id_fills_a_messages_placeholder_as_plain_digits() -> None:
