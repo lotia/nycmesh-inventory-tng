@@ -183,27 +183,33 @@ against the same limit.
 
 ### Database connections
 
-Each process (one per pod, or each of `--workers`) holds at most 20 connections
-to PostgreSQL, in three pools, none of whose connections ever waits for another
-from a pool that waits on it: 15 for requests (10, and 5 more under load); 3 for
-recording when a device or administrator was last seen and for work after the
-reply (such as a reset email); and 2 for attempts counted against a rate limit.
-At most 15 requests use the database at once; the rest wait their turn, holding
-nothing, and one that waits 10 seconds answers 503, as does one that waits that
-long to count an attempt against a rate limit; one that waits that long to
-record when it was last seen goes on without. Each is counted as
+Each process (one per pod, or each of `--workers`) holds connections to
+PostgreSQL in three pools, none of whose connections ever waits for another
+from a pool that waits on it: one for requests, which opens more under load;
+one for recording when a device or administrator was last seen and for work
+after the reply (such as a reset email); and one for attempts counted against
+a rate limit. Their sizes are constants at the top of `core/db_sessions.py`:
+`POOL` and `OVERFLOW` for requests, `SIDE_POOL` and `SIDE_OVERFLOW`, and
+`LIMITS_POOL` and `LIMITS_OVERFLOW`. Only as many requests as the request pool
+and its overflow use the database at once; the rest wait their turn, holding
+nothing, and one that waits `POOL_TIMEOUT` seconds answers 503, as does one
+that waits that long to count an attempt against a rate limit; one that waits
+that long to record when it was last seen goes on without. Each is counted as
 `db.client.connection.timeouts`, by pool, and `db.client.connection.count` shows
 each pool's connections in use. An error logged as "connection taken out of pool
 order" is a bug that could let the pools wait on themselves: report it.
 
-Any connection, the migrations' and commands' too, waits at most 10 seconds
-for a lock: a request answers 503 (recording when it was last seen is
-skipped instead), and a migration stuck behind the running app's work fails
-rather than hold up every query after it, so run it again.
+Any connection, the migrations' and commands' too, waits at most
+`LOCK_TIMEOUT` (in the same file) for a lock: a request answers 503 (recording
+when it was last seen is skipped instead), and a migration stuck behind the
+running app's work fails rather than hold up every query after it, so run it
+again.
 
-Count the total before scaling: processes × 20, plus one for a migration,
-must stay under PostgreSQL's `max_connections` (100 by default, less 3 kept
-for superusers and CloudNativePG's own).
+Count the total before scaling: processes × the sum of those six constants,
+plus one for a migration, must stay under PostgreSQL's `max_connections`, less
+its `superuser_reserved_connections`, kept for superusers and CloudNativePG's
+own. `SHOW max_connections;` and `SHOW superuser_reserved_connections;` in
+`psql` give both.
 
 ## Tightening what a batch accepts
 
