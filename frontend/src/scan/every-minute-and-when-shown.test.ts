@@ -60,6 +60,22 @@ describe("useEveryMinuteAndWhenShown", () => {
     expect(second).toHaveBeenCalledTimes(1);
   });
 
+  test("starts again, once, when deps change", () => {
+    const check = vi.fn();
+    const { rerender } = renderHook(
+      ({ dep }) => useEveryMinuteAndWhenShown(check, [dep]),
+      { initialProps: { dep: 1 } },
+    );
+    vi.advanceTimersByTime(CHECK_EVERY_MS - 1);
+    rerender({ dep: 2 });
+    vi.advanceTimersByTime(CHECK_EVERY_MS - 1);
+    expect(check).not.toHaveBeenCalled();
+    vi.advanceTimersByTime(1);
+    expect(check).toHaveBeenCalledTimes(1);
+    show("visible");
+    expect(check).toHaveBeenCalledTimes(2);
+  });
+
   test("stops on unmount", () => {
     const check = vi.fn();
     const { unmount } = renderHook(() => useEveryMinuteAndWhenShown(check, []));
