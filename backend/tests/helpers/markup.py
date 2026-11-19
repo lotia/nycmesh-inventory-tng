@@ -145,6 +145,11 @@ def links(page: str | Element) -> list[tuple[str, str]]:
     return [(a.text, a.attrs.get("href", "")) for a in read(page).all("a")]
 
 
+def addresses(page: str | Element) -> list[str]:
+    """Each link's address, in the page's order."""
+    return [address for _, address in links(page)]
+
+
 def row_links(page: str | Element, path: str) -> list[str]:
     """The words of each link in a table's cells to one of the records at
     `path` (path/id), in the page's order: the names a list shows."""
@@ -186,6 +191,21 @@ def box_values(page: str | Element, name: str) -> list[str | None]:
     """The value of each box named `name`, in the page's order: None for
     one that has none."""
     return [box.attrs.get("value") for box in read(page).all("input", name=name)]
+
+
+def checked(page: str | Element, name: str) -> list[str | None]:
+    """The value of each box named `name` that is checked, in the page's
+    order: None for one that has none."""
+    return [
+        box.attrs.get("value")
+        for box in read(page).all("input", name=name)
+        if "checked" in box.attrs
+    ]
+
+
+def problem(page: str | Element, field: str) -> str:
+    """The words of the problem said under the field named `field`."""
+    return read(page).one("span", class_="problem", id=f"{field}-problem").text
 
 
 def sorted_columns(page: str | Element) -> list[tuple[str, str, str]]:

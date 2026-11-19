@@ -28,7 +28,15 @@ from inventory_tng.stock.paths import COUNTS
 from inventory_tng.stock.stock_routes import recorded_more_view
 from inventory_tng.web import listing
 
-from helpers.markup import Element, links, read, sorted_columns, table_rows
+from helpers.markup import (
+    Element,
+    addresses,
+    forms,
+    links,
+    read,
+    sorted_columns,
+    table_rows,
+)
 from helpers.over_recorded import PAGE
 from helpers.rows import tag
 from helpers.sign_in import new_admin
@@ -98,7 +106,7 @@ def test_a_correction_is_listed_with_when_who_and_where(
             "ada",
         ]
     ]
-    assert f'href="/admin/stock?by=item#item-{place.item.id}"' in page
+    assert f"/admin/stock?by=item#item-{place.item.id}" in addresses(page)
     shown = read(page)
     for spot in (place.store, place.van):
         assert (spot.name, f"{COUNTS}/{spot.id}?item={place.item.id}") in links(shown)
@@ -360,7 +368,7 @@ def test_newest_first_in_pages_of_one_item_or_all(
     assert [row[0] for row in first] == [times[3], times[2]]
     page = admin_client.get(f"{SETTLED}?page=2").text
     assert [row[0] for row in rows_of(page)] == [times[1], times[0]]
-    assert 'rel="prev"' in page
+    assert read(page).all("a", rel="prev")
     assert "Page 2 of 2" in page
     # A page past the last is the last; one not a number, the first.
     assert settled_rows(admin_client, f"{SETTLED}?page=9")[0][0] == times[1]
@@ -369,7 +377,7 @@ def test_newest_first_in_pages_of_one_item_or_all(
     only = f"{SETTLED}?item={place.item.id}"
     page = admin_client.get(only).text
     assert [row[0] for row in rows_of(page)] == [times[3], times[2]]
-    assert f'href="{SETTLED}?item={place.item.id}&amp;page=2"' in page
+    assert f"{SETTLED}?item={place.item.id}&page=2" in addresses(page)
     assert f"Only {place.item.name_shown}." in page
     second = rows_of(admin_client.get(f"{only}&page=2").text)
     assert [row[0] for row in second] == [times[0]]
@@ -641,7 +649,7 @@ def test_every_column_sorts_either_way(
     assert sorted_columns(page) == [
         ("ascending", "Item", f"{SETTLED}?sort=item&order=desc")
     ]
-    assert f'href="{SETTLED}?sort=why"' in page
+    assert f"{SETTLED}?sort=why" in addresses(page)
     # A sort not offered is newest first.
     assert shown("&sort=whom") == newest
 
@@ -687,7 +695,7 @@ def test_rows_per_page_25_50_100_or_all(
     page = admin_client.get(f"{only}&per=25").text
     assert len(rows_of(page)) == 25
     assert "Page 1 of 2" in page
-    assert f'href="{only}&amp;per=25&amp;page=2"' in page
+    assert f"{only}&per=25&page=2" in addresses(page)
     assert len(settled_rows(admin_client, f"{only}&per=25&page=2")) == 1
     # Sorted by Why, worded in Python, in pages too.
     assert len(settled_rows(admin_client, f"{only}&per=25&sort=why&page=2")) == 1
@@ -728,7 +736,7 @@ def test_those_waiting_sort_by_each_heading_and_come_in_pages(
     assert ("25", f"{PAGE}?per=25") in links(page)
     only = f"{PAGE}?item={places[0].item.id}"
     sorted_only = admin_client.get(f"{only}&sort=amount").text
-    assert f'href="{only}&amp;sort=amount&amp;order=desc"' in sorted_only
+    assert f"{only}&sort=amount&order=desc" in addresses(sorted_only)
     assert ("Show all", f"{PAGE}?sort=amount") in links(sorted_only)
     for _ in range(25):
         moved(session, places[0])
@@ -747,16 +755,16 @@ def test_an_answer_comes_back_to_those_waiting_as_they_were(
     check, other = moved(session, place), moved(session, place)
     view = f"item={place.item.id}&sort=amount&order=desc&per=25&page=2"
     # Drawn, the page is 1 of 1: a page past the end shows the last.
-    shown = view.removesuffix("&page=2").replace("&", "&amp;")
+    shown = view.removesuffix("&page=2")
     page = admin_client.get(f"{PAGE}?{view}").text
-    assert f'action="{PAGE}/{check.id}/checked?{shown}"' in page
-    assert f'action="{PAGE}/{check.id}/correct?{shown}"' in page
+    assert ("post", f"{PAGE}/{check.id}/checked?{shown}") in forms(page)
+    assert ("post", f"{PAGE}/{check.id}/correct?{shown}") in forms(page)
     asked = admin_client.post(
         f"{PAGE}/{check.id}/checked?{view}", data={"seen": seen(check)}
     )
     assert asked.status_code == 400
-    assert f'action="{PAGE}/{check.id}/checked?{shown}"' in asked.text
-    assert 'aria-sort="descending"' in asked.text
+    assert ("post", f"{PAGE}/{check.id}/checked?{shown}") in forms(asked.text)
+    assert [way for way, _, _ in sorted_columns(asked.text)] == ["descending"]
     done = admin_client.post(
         f"{PAGE}/{check.id}/checked?{view}",
         data={"seen": seen(check), "reason": "both"},
@@ -764,4 +772,5 @@ def test_an_answer_comes_back_to_those_waiting_as_they_were(
     back = done.headers["location"]
     assert back == f"{PAGE}?{view}&notice=over_recorded_checked"
     # Page 2 of 25 a page is past the end: the last page, the first.
-    assert f'action="{PAGE}/{other.id}/checked?' in admin_client.get(back).text
+    answers = [to for _, to in forms(admin_client.get(back).text)]
+    assert [to for to in answers if to.startswith(f"{PAGE}/{other.id}/checked?")]

@@ -49,6 +49,7 @@ from inventory_tng.web.navigation import retired_holding
 from helpers.concurrency import Committed, isolation_seen
 from helpers.locales import ENGLISH, GERMAN
 from helpers.markup import (
+    addresses,
     box_values,
     button,
     forms,
@@ -80,6 +81,12 @@ from helpers.stock import (
 
 def key_on(response: Response) -> str:
     return dict(hidden_fields(response.text))["key"]
+
+
+def counted_box(page: str, item_id: int) -> str | None:
+    """What the one box counting the item holds; it asks for a number."""
+    box = read(page).one("input", name=f"counted_{item_id}", inputmode="decimal")
+    return box.attrs.get("value")
 
 
 def counts_written(session: Session) -> list[LedgerTransaction]:
@@ -126,7 +133,8 @@ def test_a_count_puts_the_records_right(
     admin_client: TestClient, session: Session
 ) -> None:
     place = stocked(session)
-    assert 'value="5"' in admin_client.get(f"{COUNTS}/{place.store.id}").text
+    page = admin_client.get(f"{COUNTS}/{place.store.id}").text
+    assert counted_box(page, place.item.id) == "5"
     done = count_at(
         admin_client,
         place.store.id,
@@ -468,8 +476,8 @@ def test_a_recount_sent_back_with_a_problem_asks_for_its_items_only(
     )
     assert refused.status_code == 400
     page = refused.text
-    assert f'name="counted_{place.item.id}"' in page
-    assert f'name="counted_{place.cable.id}"' not in page
+    assert box_values(page, f"counted_{place.item.id}")
+    assert not box_values(page, f"counted_{place.cable.id}")
     assert "Count them again now." in text(refused)
 
 
@@ -485,8 +493,8 @@ def test_a_recount_sent_back_leaves_out_an_item_there_is_not(
     again["items"] += f" {INTEGER_MAX}"
     refused = admin_client.post(path, data=again | {f"counted_{place.item.id}": "x"})
     assert refused.status_code == 400
-    assert f'name="counted_{place.item.id}"' in refused.text
-    assert f'name="counted_{INTEGER_MAX}"' not in refused.text
+    assert box_values(refused.text, f"counted_{place.item.id}")
+    assert not box_values(refused.text, f"counted_{INTEGER_MAX}")
 
 
 def test_a_count_whose_every_line_moved_writes_nothing(
@@ -535,9 +543,7 @@ def test_a_count_shown_again_for_a_problem_keeps_its_moment(
     assert refused.status_code == 400
     assert count_form(refused)["as_of"] == shown["as_of"]
     # Every radio has gone since, but the radios' line is still there.
-    assert f'name="counted_{place.item.id}" inputmode="decimal" value="5"' in (
-        refused.text
-    )
+    assert counted_box(refused.text, place.item.id) == "5"
 
 
 def test_a_count_sent_again_after_a_later_move_is_not_asked_again(
@@ -588,9 +594,7 @@ def test_a_count_of_a_place_changed_before_its_moment_is_shown_again(
     again = count_form(refused)
     assert again["key"] != shown["key"]
     assert (again["as_of"], again["seen"]) == (shown["as_of"], shown["seen"])
-    assert f'name="counted_{place.item.id}" inputmode="decimal" value="4"' in (
-        refused.text
-    )
+    assert counted_box(refused.text, place.item.id) == "4"
     assert {
         "event": "count refused by a rule",
         "location_id": place.store.id,
@@ -829,7 +833,7 @@ def signals(client: TestClient, place: Place) -> dict[str, bool]:
     its page's own tests, so these only check that each clears."""
     stock = client.get(STOCK).text
     return {
-        "home": f'href="{COUNTS}/{place.van.id}"' in text(client.get("/admin")),
+        "home": f"{COUNTS}/{place.van.id}" in addresses(client.get("/admin").text),
         "badge": badge(stock) == badge_of(1),
         "stock": retired_holding(1) in stock,
         "counts": f"{place.van.name} (retired)" in text(client.get(COUNTS)),
@@ -1003,8 +1007,8 @@ def test_a_count_can_show_one_item(admin_client: TestClient, session: Session) -
     with_cable(session, place)
     path = f"{COUNTS}/{place.store.id}"
     page = admin_client.get(f"{path}?item={place.cable.id}")
-    assert f'name="counted_{place.cable.id}"' in page.text
-    assert f'name="counted_{place.item.id}"' not in page.text
+    assert box_values(page.text, f"counted_{place.cable.id}")
+    assert not box_values(page.text, f"counted_{place.item.id}")
     assert ("post", f"{path}?item={place.cable.id}") in forms(page.text)
     words = text(page)
     assert f"Only {place.cable.name}. Only these are counted" in words
@@ -1018,8 +1022,8 @@ def test_an_item_asked_for_is_shown_though_none_is_there(
 ) -> None:
     place = stocked(session)
     page = admin_client.get(f"{COUNTS}/{place.store.id}?item={place.cable.id}").text
-    assert f'name="counted_{place.cable.id}" inputmode="decimal" value="0"' in page
-    assert f'name="counted_{place.item.id}"' not in page
+    assert counted_box(page, place.cable.id) == "0"
+    assert not box_values(page, f"counted_{place.item.id}")
 
 
 def test_a_count_can_show_the_items_a_search_finds(
@@ -1030,8 +1034,8 @@ def test_a_count_can_show_the_items_a_search_finds(
     with_cable(session, place)
     path = f"{COUNTS}/{place.store.id}"
     page = admin_client.get(f"{path}?q=litebeem")
-    assert f'name="counted_{place.item.id}"' in page.text
-    assert f'name="counted_{place.cable.id}"' not in page.text
+    assert box_values(page.text, f"counted_{place.item.id}")
+    assert not box_values(page.text, f"counted_{place.cable.id}")
     assert ("post", f"{path}?q=litebeem") in forms(page.text)
     assert "Only items matching “litebeem”." in text(page)
     nothing = admin_client.get(f"{path}?q=zzzzzzzz")
@@ -1041,8 +1045,8 @@ def test_a_count_can_show_the_items_a_search_finds(
     # A search of nothing once folded, or an item there is not: all shown.
     for odd in ("?q=%CC%81", "?item=x", f"?item={INTEGER_MAX}"):
         every = admin_client.get(f"{path}{odd}").text
-        assert f'name="counted_{place.cable.id}"' in every, odd
-        assert f'name="counted_{place.item.id}"' in every, odd
+        assert box_values(every, f"counted_{place.cable.id}"), odd
+        assert box_values(every, f"counted_{place.item.id}"), odd
         assert "Show all" not in every, odd
 
 
@@ -1074,13 +1078,9 @@ def test_a_count_sent_back_keeps_its_filter(
         data=count_form(admin_client.get(path)) | {f"counted_{place.cable.id}": "x"},
     )
     assert refused.status_code == 400
-    assert f'name="counted_{place.cable.id}" inputmode="decimal" value="x"' in (
-        refused.text
-    )
-    assert f'name="counted_{place.item.id}"' not in refused.text
-    assert f'action="{COUNTS}/{place.store.id}?item={place.cable.id}&amp;q=cable"' in (
-        refused.text
-    )
+    assert counted_box(refused.text, place.cable.id) == "x"
+    assert not box_values(refused.text, f"counted_{place.item.id}")
+    assert ("post", path) in forms(refused.text)
     assert f"Only {place.cable.name} matching “cable”." in text(refused)
 
 
@@ -1092,7 +1092,7 @@ def test_a_recount_keeps_its_filter(admin_client: TestClient, session: Session) 
     write(session, place)  # Three radios to the van.
     asked = admin_client.post(path, data=shown | {f"counted_{place.item.id}": "5"})
     assert asked.status_code == 409
-    assert f'action="{path}"' in asked.text
+    assert ("post", path) in forms(asked.text)
     assert "Only items matching “litebeam”." in text(asked)
 
 
@@ -1109,7 +1109,7 @@ def test_a_recount_shows_each_item_it_asks_for_though_the_search_no_longer_finds
     session.commit()
     asked = admin_client.post(path, data=shown | {f"counted_{place.item.id}": "5"})
     assert asked.status_code == 409
-    assert f'name="counted_{place.item.id}"' in asked.text
+    assert box_values(asked.text, f"counted_{place.item.id}")
     assert "Nothing here matches." not in text(asked)
 
 

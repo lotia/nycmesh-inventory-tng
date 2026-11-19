@@ -195,7 +195,7 @@ def test_volunteers_pages_have_the_band_and_nothing_of_an_administrators(
     page = pages.get(path).text
     assert read(page).all("a", class_="brand", href=SCAN)
     assert "Sign out" not in page
-    assert 'aria-label="Sections"' not in page
+    assert not read(page).all("*", aria_label="Sections")
 
 
 @pytest.mark.parametrize(

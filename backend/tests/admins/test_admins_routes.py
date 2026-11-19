@@ -24,6 +24,8 @@ from inventory_tng.web.single_use_forms import FIELD
 
 from helpers.mail import NO_MAIL, SentMail
 from helpers.markup import (
+    addresses,
+    box_values,
     button,
     forms,
     links,
@@ -45,6 +47,11 @@ from helpers.sign_in import (
 )
 
 NEW_PASSWORD = "a long passphrase of their own"
+
+
+def code_boxes(page: str) -> int:
+    """How many boxes on the page ask for the administrator's code."""
+    return len(read(page).all("input", name="confirm_code"))
 
 
 def link_on(page: str) -> str:
@@ -195,7 +202,7 @@ def test_resetting_another_asks_to_confirm_first(
     assert "can't be undone" in words
     assert "danger" in button(asked.text, "Reset their sign-in").classes
     assert ("Keep it as it is", path) in links(asked.text)
-    assert 'name="single_use"' in asked.text
+    assert box_values(asked.text, "single_use")
     assert accounts.has_password(session, ben.id)  # Only its button resets.
     me = admin_named(session, "ada")
     own = admin_client.get(f"{ADMINS}/{me.id}/reset")
@@ -425,24 +432,21 @@ def test_changing_another_needs_a_recent_code(
     ben, _ = new_admin(session, "ben")
     carol, _ = new_admin(session, "carol")
     code_typed_ago(session, 29)
-    page = text(admin_client.get(f"{ADMINS}/{ben.id}"))
-    assert 'name="confirm_code"' not in page
+    assert code_boxes(admin_client.get(f"{ADMINS}/{ben.id}").text) == 0
     retire = admin_client.post(f"{ADMINS}/{ben.id}/retire", data=single_use())
     assert retire.status_code == 303
     assert ben.retired_at is not None
     code_typed_ago(session, 31)
-    page = text(admin_client.get(f"{ADMINS}/{carol.id}"))
-    assert page.count('name="confirm_code"') == 1  # Retiring; reset asks on its page.
-    assert "Your code" in page
-    asked = text(admin_client.get(f"{ADMINS}/{carol.id}/reset"))
-    assert 'name="confirm_code"' in asked
-    assert "it needs your code: you haven't typed one recently" in " ".join(
-        asked.split()
-    )
+    page = admin_client.get(f"{ADMINS}/{carol.id}").text
+    assert code_boxes(page) == 1  # Retiring; reset asks on its page.
+    assert "Your code" in words_on(page)
+    asked = admin_client.get(f"{ADMINS}/{carol.id}/reset").text
+    assert code_boxes(asked) == 1
+    assert "it needs your code: you haven't typed one recently" in words_on(asked)
     for action in ("reset", "retire"):
         asked = admin_client.post(f"{ADMINS}/{carol.id}/{action}", data=single_use())
         assert asked.status_code == 403
-        assert 'name="confirm_code"' in asked.text
+        assert code_boxes(asked.text) == 1
     asked = admin_client.post(f"{ADMINS}/{ben.id}/restore", data=single_use())
     assert asked.status_code == 403
     asked = admin_client.post(ADMINS, data=single_use(username="grace"))
@@ -458,7 +462,7 @@ def test_at_0_minutes_each_change_asks_for_a_code(
     session.get_one(SignInSettings, 1).account_change_minutes = 0
     ben, _ = new_admin(session, "ben")
     code_typed_ago(session, 0)
-    assert 'name="confirm_code"' in text(admin_client.get(ADMINS))
+    assert code_boxes(admin_client.get(ADMINS).text)
     asked = admin_client.post(f"{ADMINS}/{ben.id}/retire", data=single_use())
     assert asked.status_code == 403
     assert ben.retired_at is None
@@ -601,7 +605,7 @@ def test_a_change_sent_again_once_its_code_lapsed_spends_none(
     )
     assert again.status_code == 409
     assert "nothing was done again" in text(again)
-    assert f'href="{ADMINS}/{ben.id}"' in again.text
+    assert f"{ADMINS}/{ben.id}" in addresses(again.text)
     assert accounts.recovery_codes_left(session, me.id) == left
 
 
@@ -612,7 +616,7 @@ def test_the_first_change_after_signing_in_asks_for_a_code(
     count: a session stolen just after sign-in gets nothing without one."""
     ben, _ = new_admin(session, "ben")
     carol, _ = new_admin(session, "carol")
-    assert 'name="confirm_code"' in text(admin_client.get(f"{ADMINS}/{ben.id}"))
+    assert code_boxes(admin_client.get(f"{ADMINS}/{ben.id}").text)
     asked = admin_client.post(f"{ADMINS}/{ben.id}/retire", data=single_use())
     assert asked.status_code == 403
     me = admin_named(session, "ada")
@@ -636,7 +640,8 @@ def test_a_link_page_offers_a_copy_and_a_qr_code(
     ben, _ = new_admin(session, "ben")
     made = admin_client.post(f"{ADMINS}/{ben.id}/reset", data=with_code(session))
     link = link_on(made.text)
-    assert 'data-copy="link"' in made.text
+    assert read(made.text).all("*", data_copy="link")
+    # Exact markup on purpose: the page holds this very code, as drawn.
     assert str(qr_svg(link)) in made.text
 
 

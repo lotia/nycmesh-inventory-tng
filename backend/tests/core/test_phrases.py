@@ -973,7 +973,7 @@ def test_the_home_and_seeding_pages_write_their_counts_as_the_locale_does() -> N
     assert "(1,000)" in home
     assert ": 2,000" in home
     assert "1,000 of 2,000." in seeding
-    assert 'name="at" value="999"' in seeding
+    assert markup.box_values(seeding, "at") == ["999"]
 
 
 def test_only_an_id_fills_a_messages_placeholder_as_plain_digits() -> None:
@@ -992,7 +992,7 @@ def test_a_badge_counts_as_the_locale_writes_numbers() -> None:
     badge = SimpleNamespace(count=1000, words=NOT_ENGLISH)
     sections = [("/admin/stock", NOT_ENGLISH, badge)]
     page = render("_masthead.html", **(SIGNED_IN | {"sections": sections}))
-    assert '<span aria-hidden="true">1,000</span>' in page
+    assert markup.read(page).all("span", "1,000", aria_hidden="true")
 
 
 def test_a_lists_all_is_said_in_the_locale() -> None:

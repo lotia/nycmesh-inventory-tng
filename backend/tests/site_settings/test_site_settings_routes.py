@@ -20,7 +20,7 @@ from inventory_tng.site_settings.paths import SETTINGS
 from inventory_tng.web.forms import PICK_A_ZONE
 
 from helpers.mail import SentMail
-from helpers.markup import hidden_fields, options, text
+from helpers.markup import box_values, hidden_fields, options, read, text
 from helpers.rows import history, shown
 from helpers.sign_in import confirmed_long_ago, new_admin, sign_in_with, with_code
 
@@ -28,7 +28,8 @@ from helpers.sign_in import confirmed_long_ago, new_admin, sign_in_with, with_co
 def test_shows_and_changes_the_name_check(
     admin_client: TestClient, session: Session
 ) -> None:
-    assert 'value="15"' in admin_client.get(SETTINGS).text
+    page = admin_client.get(SETTINGS).text
+    assert box_values(page, "name_check_minutes") == ["15"]
     scan = session.get_one(ScanSettings, 1)
     form = {"name_check_minutes": "30", "scan_version": shown(scan)}
     done = admin_client.post(f"{SETTINGS}/scan", data=form)
@@ -146,7 +147,7 @@ def test_sign_in_settings_go_on_through_the_confirm_page(
     form = SIGN_IN_FORM | {"sign_in_version": version}
     asked = admin_client.post(f"{SETTINGS}/sign-in", data=form)
     assert asked.status_code == 403
-    assert 'autocomplete="new-password"' not in asked.text  # Nothing to retype.
+    assert not read(asked.text).all("input", autocomplete="new-password")  # None.
     carried = dict(hidden_fields(asked.text))
     assert carried == form
     done = admin_client.post(f"{SETTINGS}/sign-in", data=with_code(session, **carried))

@@ -18,7 +18,7 @@ from inventory_tng.catalogue.paths import ITEMS
 from inventory_tng.catalogue.reading_rules import NAMED, both
 from inventory_tng.models.catalogue import Category, Item, ItemPackage
 
-from helpers.markup import read, text
+from helpers.markup import addresses, box_values, read, text
 from helpers.rows import add, named, tag
 from helpers.rows import shown as version
 
@@ -109,8 +109,8 @@ def test_the_form_edits_the_name_as_typed_and_says_how_it_is_shown(
     assert item.name_shown == shown
     response = admin_client.get(f"{ITEMS}/{item.id}")
     page = text(response)
-    # Exact markup on purpose: the thin and no-break spaces as sent.
-    assert f"<h1>{shown}</h1>" in page
+    # The thin and no-break spaces kept: text reads them as they are.
+    assert read(response.text).one("h1").text == shown
     assert read(response.text).one("input", name="name").attrs["value"] == typed
     assert f"Shown as {shown}." in page
     # A package and an alias, added on its page, alike.
@@ -119,11 +119,11 @@ def test_the_form_edits_the_name_as_typed_and_says_how_it_is_shown(
         f"{path}/packages", data={"package_name": "Reel 1,000ft", "size": "1"}
     )
     admin_client.post(f"{path}/aliases", data={"alias_name": f"Spool {mark} 305M"})
-    page = text(admin_client.get(path))
-    # Exact markup on purpose: the no-break space as sent.
-    assert f"<td>Spool {mark} 305{NB}M</td>" in page
+    response = admin_client.get(path)
+    page = text(response)
+    assert read(response.text).all("td", f"Spool {mark} 305{NB}M")
     assert f"Reel 1000{NB}ft" in page
-    assert 'value="Reel 1,000ft"' in page
+    assert "Reel 1,000ft" in box_values(response.text, "package_name")
     assert f"Shown as Reel 1000{NB}ft." in page
     # The list, and its suggestions.
     assert shown in text(admin_client.get(ITEMS))
@@ -188,11 +188,8 @@ def test_close_and_taken_names_are_named_as_shown(
     items.add_alias(session, other, f"Drum {mark} 2,000ft")
     session.flush()
     form = {"category_id": str(cables.id), "unit": "each"}
-    asked = text(
-        admin_client.post(ITEMS, data=form | {"name": f"Spool {mark} 1,500ft"})
-    )
-    # Exact markup on purpose: the no-break space as sent.
-    assert f">Spool {mark} 1000{NB}ft</a>" in asked
+    close = admin_client.post(ITEMS, data=form | {"name": f"Spool {mark} 1,500ft"})
+    assert read(close.text).all("a", f"Spool {mark} 1000{NB}ft")
     asked = text(admin_client.post(ITEMS, data=form | {"name": f"Drum {mark} 2,500ft"}))
     assert f"(alias Drum {mark} 2000{NB}ft)" in asked
     taken = text(
@@ -239,8 +236,8 @@ def test_a_name_is_found_as_shown(
     mark = tag()
     item = add(session, Item(name=f"Box {mark} 10,000 ft", category_id=cables.id))
     session.flush()
-    page = text(admin_client.get(ITEMS, params={"q": f"Box {mark} {typed}"}))
-    assert f'href="{ITEMS}/{item.id}"' in page
+    page = admin_client.get(ITEMS, params={"q": f"Box {mark} {typed}"}).text
+    assert f"{ITEMS}/{item.id}" in addresses(page)
 
 
 def test_the_catalogue_sends_names_as_shown(

@@ -23,6 +23,8 @@ from inventory_tng.web.forms import NAME_MAX, up_to
 from helpers.devices import new_device
 from helpers.markup import (
     Element,
+    addresses,
+    box_values,
     button,
     forms,
     hidden_fields,
@@ -30,6 +32,7 @@ from helpers.markup import (
     options,
     read,
     row_links,
+    sorted_columns,
     text,
     words_on,
 )
@@ -56,8 +59,12 @@ def test_making_a_code_shows_it_once(
     assert read(made.text).all("svg")
     assert f"/register?code={phrase}" in page
     # Ready to print: one sheet, with where to type the phrase.
-    assert page.count('class="print-sheet"') == 1
-    assert page.count("://testserver/register</strong>") == 1
+    shown = read(made.text)
+    assert len(shown.all("*", class_="print-sheet")) == 1
+    typed = [
+        s for s in shown.all("strong") if s.text.endswith("://testserver/register")
+    ]
+    assert len(typed) == 1
     code = session.scalars(select(RegistrationCode)).one()
     assert (code.label, code.max_uses) == ("Open day", 2)
     assert (history(session, "registration_code", code.id)[0].actor or "").startswith(
@@ -175,7 +182,7 @@ def test_devices_are_listed_by_when_they_registered(
     bad = admin_client.get(DEVICE_LIST, params={"since": "soon", "code": "x"})
     assert bad.status_code == 400
     assert "A date and time" in text(bad)
-    assert "A code&#39;s number" in bad.text
+    assert "A code's number" in words_on(bad.text)
 
 
 def test_revoking_the_ticked_ones_asks_first(
@@ -220,7 +227,7 @@ def test_a_date_past_what_a_time_holds_is_refused(admin_client: TestClient) -> N
 
 
 def test_the_devices_page_links_to_every_device(admin_client: TestClient) -> None:
-    assert f'href="{DEVICE_LIST}"' in admin_client.get(DEVICES).text
+    assert DEVICE_LIST in addresses(admin_client.get(DEVICES).text)
 
 
 def test_revoked_and_all_devices_are_listed_too(
@@ -267,9 +274,9 @@ def test_each_device_has_a_page_reached_from_both_lists(
     assert link in links(
         admin_client.get(f"{CODES}/{device.registration_code_id}").text
     )
-    page = text(admin_client.get(f"{DEVICES}/{device.id}"))
-    assert f'href="{CODES}/{device.registration_code_id}"' in page
-    assert "Revoke this device" in page
+    page = admin_client.get(f"{DEVICES}/{device.id}").text
+    assert f"{CODES}/{device.registration_code_id}" in addresses(page)
+    assert "Revoke this device" in words_on(page)
     assert admin_client.get(f"{DEVICES}/999999").status_code == 404
 
 
@@ -380,10 +387,11 @@ def test_devices_are_sorted_by_registered_or_last_used(
     # The headings sort, the filter kept, and say how it is sorted now:
     # newest registered first, so pressed again, oldest first.
     page = admin_client.get(DEVICE_LIST, params=window).text
-    assert 'aria-sort="descending"' in page
-    assert "sort=registered&amp;order=asc" in page
-    assert 'sort=used"' in page
-    assert "until=2026-11-05T08%3A00" in page
+    kept = f"{DEVICE_LIST}?since=2026-11-05T07%3A00&until=2026-11-05T08%3A00"
+    assert sorted_columns(page) == [
+        ("descending", "Registered", f"{kept}&sort=registered&order=asc")
+    ]
+    assert f"{kept}&sort=used" in addresses(page)
 
 
 def test_devices_come_in_pages_of_the_size_asked(
@@ -421,8 +429,8 @@ def test_devices_come_in_pages_of_the_size_asked(
     assert ("page", "2") in hidden_fields(second)
     every = admin_client.get(DEVICE_LIST, params=window | {"per": "all"}).text
     assert len(listed_ids(every)) == 26
-    assert "Every current one listed is selected" in every
-    assert "other pages" not in every
+    assert "Every current one listed is selected" in words_on(every)
+    assert "other pages" not in words_on(every)
     # Clear drops the filter, not the size.
     assert ("Clear", f"{DEVICE_LIST}?per=all") in links(every)
 
@@ -439,8 +447,8 @@ def test_a_revoke_keeps_the_window_and_sort(
         sort="used",
     )
     asked = admin_client.post(BULK_REVOKE, data=form | {"device": str(device.id)})
-    assert 'name="until" value="2026-11-05T08:00"' in asked.text
-    assert 'name="sort" value="used"' in asked.text
+    assert "2026-11-05T08:00" in box_values(asked.text, "until")
+    assert "used" in box_values(asked.text, "sort")
     done = admin_client.post(
         BULK_REVOKE, data=form | {"device": str(device.id), "sure": "yes"}
     )

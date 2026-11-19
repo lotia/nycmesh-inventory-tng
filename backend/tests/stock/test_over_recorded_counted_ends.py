@@ -27,7 +27,7 @@ from inventory_tng.stock import (
 from inventory_tng.stock.moments import expected
 from inventory_tng.stock.paths import COUNTS
 
-from helpers.markup import read, text, words_on
+from helpers.markup import box_values, read, text, words_on
 from helpers.over_recorded import (
     PAGE,
     arrived_field,
@@ -113,7 +113,7 @@ def test_the_count_its_link_opens_counts_the_item_and_closes_it(
     radios_raised(registered_client, place)
     count_at(admin_client, place.van.id, {f"counted_{place.item.id}": "1"})
     link = f"{COUNTS}/{place.store.id}?item={place.item.id}"
-    assert f'name="counted_{place.cable.id}"' not in admin_client.get(link).text
+    assert not box_values(admin_client.get(link).text, f"counted_{place.cable.id}")
     form = count_form_at(admin_client, place.store.id)
     done = admin_client.post(link, data=form | {f"counted_{place.item.id}": "2"})
     assert done.status_code == 303

@@ -26,7 +26,7 @@ from inventory_tng.stock.ledger import (
     Form,
 )
 
-from helpers.markup import button, links, read, text, words_on
+from helpers.markup import button, forms, links, read, text, words_on
 from helpers.package_forms import quantities_by_form
 from helpers.rows import add, tag
 from helpers.stock import URL, Spools, cut
@@ -415,8 +415,8 @@ def test_an_open_package_is_closed_from_its_items_page(
         f"{page}?notice=open_package_closed&section=open-packages#open-packages"
     )
     # The last one closed: its section is there to say so.
-    shown = text(admin_client.get(done.headers["location"]))
-    assert 'id="open-packages"' in shown
+    shown = admin_client.get(done.headers["location"]).text
+    assert read(shown).all("*", id="open-packages")
     assert admin_client.get(path).status_code == 404
     session.refresh(made)
     assert made.closed_at is not None
@@ -538,10 +538,10 @@ def test_an_answer_comes_back_to_the_used_up_list_as_it_was(
     view = f"item={spools.cable.id}&sort=shows&order=desc&per=25&page=2"
     page = admin_client.get(f"{USED_UP}?{view}").text
     # Drawn, the page is 1 of 1: a page past the end shows the last.
-    shown = view.removesuffix("&page=2").replace("&", "&amp;")
-    assert f'action="{USED_UP}?{shown}"' in page
-    assert f'action="{USED_UP}/{one.id}/confirm?{shown}"' in page
-    assert f'formaction="{USED_UP}/{one.id}/clear?{shown}"' in page
+    shown = view.removesuffix("&page=2")
+    assert ("post", f"{USED_UP}?{shown}") in forms(page)
+    assert ("post", f"{USED_UP}/{one.id}/confirm?{shown}") in forms(page)
+    assert read(page).all("*", formaction=f"{USED_UP}/{one.id}/clear?{shown}")
     done = admin_client.post(f"{USED_UP}/{one.id}/clear?{view}")
     back = done.headers["location"]
     assert back == f"{USED_UP}?{view}&notice=used_up_cleared"

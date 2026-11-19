@@ -21,7 +21,7 @@ from inventory_tng.models.labels import Label
 from inventory_tng.stock import open_packages
 
 from helpers.items import NOW, new_item, same_size_twins
-from helpers.markup import box_values, read, text
+from helpers.markup import box_values, checked, forms, read, text
 from helpers.rows import add, history, shown
 from helpers.stock import Spools, retire
 
@@ -76,7 +76,7 @@ def test_a_package_is_renamed_and_resized_until_it_moves(
     taken = send(box, "old-REEL", "25")
     assert taken.status_code == 400
     assert str(PACKAGE_TAKEN) in text(taken)
-    assert 'value="old-REEL"' in taken.text
+    assert "old-REEL" in box_values(taken.text, "package_name")
     # Moved in its size: renamed, never resized.
     fixed = send(spools.spool, "Spool", "300")
     assert "Its size is fixed" in text(fixed)
@@ -127,7 +127,7 @@ def test_a_retired_package_is_brought_back(
     assert box.retired_at is not None
     # The notice offers it back, as the row does.
     offered = admin_client.get(retired.headers["location"])
-    assert f'action="{path}/restore"' in offered.text
+    assert ("post", f"{path}/restore") in forms(offered.text)
     assert str(PACKAGE_RETIRED) in text(offered)
     assert admin_client.post(f"{path}/restore").status_code == 303
     assert box.retired_at is None
@@ -163,13 +163,14 @@ def test_an_items_opened_packages_are_followed_when_ticked(
 ) -> None:
     item = new_item(session, radios, "Cat6 cable")
     assert item.track_opened is False  # A new item's are not.
-    page = text(admin_client.get(f"{ITEMS}/{item.id}"))
-    assert 'name="track_opened" >' in page or 'name="track_opened">' in page
+    page = admin_client.get(f"{ITEMS}/{item.id}").text
+    assert box_values(page, "track_opened") == [None]
+    assert checked(page, "track_opened") == []
     path = f"{ITEMS}/{item.id}"
     admin_client.post(path, data=saving(item, track_opened="on"))
     session.refresh(item)
     assert item.track_opened is True
-    assert 'name="track_opened" checked' in text(admin_client.get(path))
+    assert checked(admin_client.get(path).text, "track_opened") == [None]
     # A box left unticked is not sent: the form says off.
     admin_client.post(path, data=saving(item))
     session.refresh(item)
@@ -219,13 +220,13 @@ def test_items_ticked_are_set_together_and_packages_keep_their_own(
         session,
         ItemPackage(item_id=cable.id, name="Box", size=Decimal(10), track_opened=False),
     )
-    page = text(admin_client.get(ITEMS))
-    assert f'name="item" value="{cable.id}"' in page
-    assert f'name="item" value="{gone.id}"' not in page
+    page = admin_client.get(ITEMS).text
+    assert str(cable.id) in box_values(page, "item")
+    assert str(gone.id) not in box_values(page, "item")
     # The list as shown comes in the form's address, sorted and sized too.
-    assert f'action="{ITEMS}/tracking"' in page
+    assert ("post", f"{ITEMS}/tracking") in forms(page)
     sorted_page = admin_client.get(ITEMS, params={"sort": "unit", "per": "25"}).text
-    assert f'action="{ITEMS}/tracking?sort=unit&amp;per=25"' in sorted_page
+    assert ("post", f"{ITEMS}/tracking?sort=unit&per=25") in forms(sorted_page)
     done = admin_client.post(
         f"{ITEMS}/tracking?q=cable&sort=unit&per=25",
         data={"item": [str(cable.id), str(gone.id)], "track": "on"},
@@ -270,7 +271,7 @@ def test_a_refused_package_keeps_the_items_setting_shown(
         f"{ITEMS}/{item.id}/packages", data={"package_name": "Spool", "size": "lots"}
     )
     assert refused.status_code == 400
-    assert 'name="track_opened" checked' in text(refused)
+    assert checked(refused.text, "track_opened") == [None]
 
 
 def test_a_package_shows_its_own_setting_only_where_it_differs(
@@ -306,7 +307,7 @@ def test_a_package_of_a_fixed_size_is_renamed_whatever_its_unit_became(
     item.unit = "each"
     session.flush()
     page = admin_client.get(f"{ITEMS}/{item.id}").text
-    assert f'action="{ITEMS}/{item.id}/packages/{box.id}"' in page
+    assert ("post", f"{ITEMS}/{item.id}/packages/{box.id}") in forms(page)
     done = admin_client.post(
         f"{ITEMS}/{item.id}/packages/{box.id}",
         data={"package_name": "Reel", "package_version": shown(box)},

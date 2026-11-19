@@ -3,7 +3,6 @@ the checks, says what this measures and what a new page needs here. And
 every page names items and packages as shown (inventory-tng-ist.3)."""
 
 import json
-import re
 from collections.abc import Callable, Iterator
 
 import pytest
@@ -151,11 +150,11 @@ def listed(response: Response) -> str:
     list (_masthead.html). A reply in JSON has none."""
     if is_json(response):
         return response.text
-    page, cut = re.subn(
-        r'<header class="masthead">.*?</header>', "", response.text, flags=re.DOTALL
-    )
-    assert cut == 1, f"{response.url}: no masthead to cut, or more than one"
-    return page
+    page = read(response.text)
+    mastheads = page.all("header", class_="masthead")
+    assert len(mastheads) == 1, f"{response.url}: no masthead to cut, or more than one"
+    mastheads[0].decompose()
+    return str(page)
 
 
 # Pages that name no item or package, and why the one that does names them

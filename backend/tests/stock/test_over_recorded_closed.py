@@ -27,7 +27,7 @@ from inventory_tng.stock.ledger import Entry, Form
 from inventory_tng.stock.paths import COUNTS
 
 from helpers.concurrency import Committed
-from helpers.markup import links, words_on
+from helpers.markup import forms, links, read, words_on
 from helpers.over_recorded import (
     PAGE,
     checks,
@@ -47,6 +47,15 @@ from helpers.stock import URL, Spools, ada_id, count_at, count_form_at, cut
 # An opening's open package closed since (Confirm used up, Close, a count
 # whose lines were all withheld): Correct writes the sealed end alone, as
 # closing wrote off what it showed (Ali, 2026-11-15, inventory-tng-nyl).
+
+
+def offers(page: str, words: str) -> bool:
+    """Whether a button says `words`, then to a screen reader which row's."""
+    return any(
+        button.text == f"{words} {which[0].text}"
+        for button in read(page).all("button")
+        if (which := button.all("span", class_="sr-only"))
+    )
 
 
 def closed_by_confirm(admin_client: TestClient, spools: Spools, open_id: int) -> None:
@@ -97,7 +106,7 @@ def test_its_open_package_closed_outside_a_count_correct_writes_the_sealed_end(
     page = admin_client.get(f"{PAGE}?item={spools.cable.id}").text
     said = words_on(page)
     assert f"Open spool closed {day}. Sealed spool still to put right." in said
-    assert "Correct sealed spool<span" in page
+    assert offers(page, "Correct sealed spool")
     (check,) = checks(session)
     with capture_logs() as logs:
         done = admin_client.post(
@@ -573,8 +582,8 @@ def test_both_ends_right_it_says_so_and_offers_close_it(
     )
     page = admin_client.get(f"{PAGE}?item={spools.cable.id}").text
     assert words in words_on(page)
-    assert f'action="{PAGE}/{check.id}/close?item={spools.cable.id}"' in page
-    assert "Close it<span" in page
+    assert ("post", f"{PAGE}/{check.id}/close?item={spools.cable.id}") in forms(page)
+    assert offers(page, "Close it")
     assert f"{PAGE}/{check.id}/correct" not in page
     assert "still to put right" not in page
 

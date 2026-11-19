@@ -14,7 +14,7 @@ from inventory_tng.models.admins import Admin
 from inventory_tng.models.catalogue import Category, Item
 from inventory_tng.web.forms import RULES
 
-from helpers.markup import links, read, row_links, text
+from helpers.markup import addresses, forms, links, read, row_links, text
 from helpers.rows import add, history, named, shown
 
 pytestmark = pytest.mark.usefixtures("admin_client")
@@ -27,8 +27,7 @@ def test_the_pages_need_signing_in(make_client: Callable[..., TestClient]) -> No
 
 
 def test_the_home_page_leads_here(admin_client: TestClient) -> None:
-    page = text(admin_client.get("/admin"))
-    assert f'href="{CATEGORIES}"' in page
+    assert CATEGORIES in addresses(admin_client.get("/admin").text)
 
 
 def test_adding_a_category_is_recorded_as_the_admin(
@@ -133,7 +132,7 @@ def test_a_page_shown_again_after_a_refusal_still_links_right(
     refused = admin_client.post(f"{CATEGORIES}/{radios.id}/retire")
     assert refused.status_code == 400
     page = refused.text
-    assert f'action="{CATEGORIES}/{radios.id}/name"' in page
+    assert ("post", f"{CATEGORIES}/{radios.id}/name") in forms(page)
     back = read(page).one("p", class_="back")
     assert [href for _, href in links(back)] == [CATEGORIES]
 

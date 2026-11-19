@@ -27,7 +27,7 @@ from inventory_tng.stock import (
 from inventory_tng.stock.ledger import Entry, Form
 from inventory_tng.web import formatting
 
-from helpers.markup import links, read, text
+from helpers.markup import box_values, forms, links, read, text, words_on
 from helpers.query_counts import counting
 from helpers.rows import add, tag
 from helpers.stock import URL, Spools, cut, length, moment_fields, report
@@ -68,9 +68,9 @@ def test_the_check_page_hints_at_the_printed_length(
 ) -> None:
     made = spools.opened()
     registered_client.post(URL, json=report(spools, length(made, "250")))
-    page = text(admin_client.get(LENGTHS))
-    assert str(formatting.PRINTED_LENGTH) in page
-    assert f'aria-describedby="hint-{made.id}"' in page
+    page = admin_client.get(LENGTHS).text
+    assert str(formatting.PRINTED_LENGTH) in words_on(page)
+    assert read(page).all("input", aria_describedby=f"hint-{made.id}")
 
 
 def test_a_volunteer_reports_what_is_on_it_and_nothing_moves(
@@ -174,13 +174,14 @@ def test_needs_your_action_lists_lengths_to_check(
     spool = f"{spools.cable.name}: 1 \N{MULTIPLICATION SIGN} Spool"
     assert spool in [words for words, _ in links(home)]
     assert f"{spool}, 5 m below zero" in read(home).text
-    page = text(admin_client.get(f"{LENGTHS}?item={spools.cable.id}"))
+    response = admin_client.get(f"{LENGTHS}?item={spools.cable.id}")
+    page, shown = text(response), response.text
     assert f"Only {spools.cable.name}." in page
     assert "said 250 m is on it" in page
     # Set against what it showed.
-    assert 'name="showed" value="305.000"' in page
+    assert "305.000" in box_values(shown, "showed")
     moment = session.scalar(select(func.max(LedgerTransaction.id)))
-    assert f'name="as_of" value="{moment}"' in page
+    assert str(moment) in box_values(shown, "as_of")
     assert "310 m" in page  # The recent cut.
     # No such item: all of them.
     assert "Only" not in text(admin_client.get(f"{LENGTHS}?item=999999"))
@@ -482,11 +483,12 @@ def test_the_count_page_hints_at_the_printed_length_of_items_in_length(
     store = spools.store.id
     spools.opened()
     made = spools.opened()
-    page = text(admin_client.get(f"/admin/counts/{store}"))
+    response = admin_client.get(f"/admin/counts/{store}")
+    page, shown = text(response), response.text
     # Each open package's, and under one nobody recorded (inventory-tng-lby).
     assert page.count(str(formatting.PRINTED_LENGTH)) == 3
-    assert f'aria-describedby="hint-opened_{made.id}"' in page
-    assert 'aria-describedby="hint-found_left"' in page
+    for hint in (f"hint-opened_{made.id}", "hint-found_left"):
+        assert read(shown).all("input", aria_describedby=hint), hint
     # Beside a box of plugs, counted each: only the spool's option is one
     # the hint fits, as the page follows what is picked.
     plugs = add(
@@ -785,10 +787,10 @@ def test_an_answer_comes_back_to_the_checks_as_they_were(
     view = f"item={spools.cable.id}&sort=shows&order=desc&per=25&page=2"
     page = admin_client.get(f"{reported}?{view}").text
     # Drawn, the page is 1 of 1: a page past the end shows the last.
-    shown = view.removesuffix("&page=2").replace("&", "&amp;")
-    assert f'action="{LENGTHS}?{shown}"' in page
-    assert f'action="{LENGTHS}/{first.id}/set?{shown}"' in page
-    assert f'formaction="{LENGTHS}/{first.id}/leave?{shown}"' in page
+    shown = view.removesuffix("&page=2")
+    assert ("post", f"{LENGTHS}?{shown}") in forms(page)
+    assert ("post", f"{LENGTHS}/{first.id}/set?{shown}") in forms(page)
+    assert read(page).all("*", formaction=f"{LENGTHS}/{first.id}/leave?{shown}")
     left = admin_client.post(
         f"{LENGTHS}/{first.id}/leave?{view}",
         data={"seen": seen(session, first), "page": reported},

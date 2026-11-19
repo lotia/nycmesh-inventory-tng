@@ -32,7 +32,7 @@ from inventory_tng.models.admins import (
 )
 
 from helpers.mail import SentMail
-from helpers.markup import links, read, text
+from helpers.markup import box_values, forms, links, read, text
 from helpers.sign_in import (
     PASSWORD,
     TIME_STEP,
@@ -437,9 +437,8 @@ def test_a_late_form_asks_for_a_code_and_keeps_what_was_typed(
     confirmed_long_ago(session)
     asked = client.post(f"{ACCOUNT}/email", data={"email": "ada@example.org"})
     assert asked.status_code == 403
-    page = text(asked)
-    assert f'action="{ACCOUNT}/email"' in page
-    assert 'name="email" value="ada@example.org"' in page
+    assert ("post", f"{ACCOUNT}/email") in forms(asked.text)
+    assert "ada@example.org" in box_values(asked.text, "email")
     assert admin.email is None
     # A wrong code asks again, still carrying it.
     wrong = client.post(
@@ -447,7 +446,7 @@ def test_a_late_form_asks_for_a_code_and_keeps_what_was_typed(
         data={"email": "ada@example.org", guards.CONFIRM_FIELD: "nope"},
     )
     assert wrong.status_code == 400
-    assert 'value="ada@example.org"' in text(wrong)
+    assert "ada@example.org" in box_values(wrong.text, "email")
     with app_clock() as at:
         later = code(key, at + TIME_STEP)
         done = client.post(
@@ -471,8 +470,8 @@ def test_a_late_password_form_never_writes_the_password_into_the_page(
     page = text(asked)
     assert "type the passwords you gave again" in page
     # Asked for again under their own names, empty.
-    assert 'name="password" type="password"' in page
-    assert 'name="password_again" type="password"' in page
+    for name in ("password", "password_again"):
+        assert read(asked.text).one("input", name=name, type="password")
 
 
 SECRET_FIELDS = ["current_password", "api_token", "totp_secret"]
@@ -533,7 +532,7 @@ def test_a_late_new_authenticator_keeps_its_key(
             "code": code(new_key, at),
         }
         asked = client.post(paths.NEW_AUTHENTICATOR, data=form)
-        assert f'value="{new_key}"' in asked.text
+        assert new_key in box_values(asked.text, "key")
         later = {guards.CONFIRM_FIELD: code(key, at + TIME_STEP)}
         done = client.post(paths.NEW_AUTHENTICATOR, data=form | later)
     assert done.headers["location"] == paths.HOME

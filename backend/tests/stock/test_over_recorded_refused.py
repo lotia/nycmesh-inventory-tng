@@ -23,7 +23,15 @@ from inventory_tng.stock.forms import SAY_WHY, WORDS_FOR_ANOTHER
 from inventory_tng.stock.ledger import Entry, Form
 from inventory_tng.web.forms import RULES, up_to
 
-from helpers.markup import Element, box_values, hidden_fields, read, text, words_on
+from helpers.markup import (
+    Element,
+    box_values,
+    forms,
+    hidden_fields,
+    read,
+    text,
+    words_on,
+)
 from helpers.over_recorded import (
     PAGE,
     adjustments,
@@ -60,8 +68,8 @@ def test_refused_at_a_retired_place_it_says_why_and_offers_a_fix(
     assert over_recorded_routes.RETIRED_EMPTY["found"](place.store.name, "2") in page
     assert f"Bring back {place.store.name}" in page
     (check,) = checks(session)
-    assert f'action="{PAGE}/{check.id}/bring-back"' in response.text
-    assert f'name="place" value="{place.store.id}"' in response.text
+    assert ("post", f"{PAGE}/{check.id}/bring-back") in forms(response.text)
+    assert read(response.text).all("button", name="place", value=str(place.store.id))
     assert "someone answered or changed it meanwhile" not in page
     assert check.settled_at is None
     assert adjustments(session) == []
@@ -127,8 +135,8 @@ def test_a_count_refused_where_it_arrived_names_that_place(
     )
     assert f"Bring back {spools.van.name}" in page
     # Mark checked is offered there too, and what was typed is kept.
-    assert f'action="{PAGE}/{check.id}/checked"' in response.text
-    assert 'value="180"' in response.text
+    assert ("post", f"{PAGE}/{check.id}/checked") in forms(response.text)
+    assert "180" in box_values(response.text, "count")
 
 
 def refused_then(
@@ -450,7 +458,7 @@ def test_a_marker_not_of_a_refusal_draws_no_alert(
     for marker in (str(elsewhere.id), str(place.van.id), "x", "-1", "1.0"):
         response = mark_checked(admin_client, session, refused=marker)
         assert response.status_code == 400
-        assert 'role="alert"' not in response.text
+        assert not read(response.text).all("*", role="alert")
         assert "Bring back" not in response.text
         (row,) = checked_forms(response.text)
         assert has_problem(row, check)
@@ -469,9 +477,8 @@ def test_an_alert_drawn_again_keeps_only_one_item(
     assert response.status_code == 400
     assert f"Only {place.item.name}." in text(response)
     for each in ("bring-back", "checked"):
-        assert f'action="{PAGE}/{check.id}/{each}?item={place.item.id}"' in (
-            response.text
-        )
+        to = f"{PAGE}/{check.id}/{each}?item={place.item.id}"
+        assert ("post", to) in forms(response.text)
 
 
 def test_a_place_brought_back_since_its_alert_draws_no_alert(
@@ -483,6 +490,6 @@ def test_a_place_brought_back_since_its_alert_draws_no_alert(
     session.flush()
     response = checked_from_alert(admin_client, session, place.store)
     assert response.status_code == 400
-    assert 'role="alert"' not in response.text
+    assert not read(response.text).all("*", role="alert")
     assert "Bring back" not in response.text
     assert str(SAY_WHY) in response.text

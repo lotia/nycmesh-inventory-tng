@@ -24,7 +24,7 @@ from inventory_tng.core.db_errors import attempt
 from inventory_tng.models.catalogue import CURRENT_ALIAS, Category, Item, ItemAlias
 
 from helpers.items import NOW, items_named, new_item
-from helpers.markup import links, read, text
+from helpers.markup import links, problem, read, text
 from helpers.rows import add, history, item_fields, shown
 from helpers.stock import retire
 
@@ -212,7 +212,7 @@ def test_a_clash_with_an_alias_names_the_item(
     ):
         refused = admin_client.post(target, data=form)
         assert refused.status_code == 400, target
-        assert f'id="{field}-problem">{said}</span>' in refused.text, said
+        assert problem(refused.text, field) == said, said
 
 
 def test_an_alias_added_or_removed_refuses_no_save_of_the_item(
@@ -389,7 +389,7 @@ def test_a_rename_refused_keeps_its_aliases(
         refused = admin_client.post(f"{ITEMS}/{item.id}", data=form)
         assert refused.status_code == 400, name
         taken = TAKEN_FIELDS["old_code"]("Rocket")
-        assert f'id="old_code-problem">{taken}' in refused.text
+        assert problem(refused.text, "old_code").startswith(taken)
         session.refresh(item)
         session.refresh(pro)
         assert (item.name, pro.retired_at) == ("ToughCable", None)

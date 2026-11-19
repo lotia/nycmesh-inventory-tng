@@ -19,7 +19,7 @@ from inventory_tng.stock import (
 )
 from inventory_tng.stock.ledger import Form
 
-from helpers.markup import read, text, words_on
+from helpers.markup import box_values, read, text, words_on
 from helpers.over_recorded import (
     PAGE,
     adjustments,
@@ -48,7 +48,7 @@ def test_one_moved_whole_from_an_open_package_asks_for_its_count(
         in text(admin_client.get(PAGE))
     )
     assert "Count in the package" in page
-    assert 'value="305"' in page
+    assert box_values(page, "count") == ["305"]
     was = read(page).one("p", id=f"count-{check.id}-was")
     assert (was.text, was.classes, "hidden" in was.attrs) == (
         "Was 305 m",
@@ -151,7 +151,7 @@ def test_a_count_not_a_number_is_asked_again(
         assert response.status_code == 400
         page = response.text
         assert problem in page
-        assert f'value="{typed}"' in page
+        assert box_values(page, "count") == [typed]
         # Edited, what it held shows under it.
         was = read(page).one("p", id=f"count-{check.id}-was")
         assert (was.text, was.classes, "hidden" in was.attrs) == (

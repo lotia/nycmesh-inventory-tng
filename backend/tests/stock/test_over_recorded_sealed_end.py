@@ -190,7 +190,7 @@ def test_counting_its_place_from_the_row_counts_the_sealed_spool_and_closes_it(
     assert link in [href for _, href in listed]
     page = admin_client.get(link).text
     assert sealed_line(page, spools) == "0"
-    assert f'name="counted_{spools.cable.id}"' not in page
+    assert not box_values(page, f"counted_{spools.cable.id}")
     form = count_form_at(admin_client, spools.store.id)
     done = admin_client.post(link, data=form | {sealed_field(spools): "1"})
     assert done.status_code == 303

@@ -16,6 +16,7 @@ from inventory_tng.models.stock import (
     OVER_RECORDED_REASONS,
     LedgerTransaction,
     Movement,
+    OverRecorded,
 )
 from inventory_tng.stock import (
     over_recorded,
@@ -26,7 +27,7 @@ from inventory_tng.stock.forms import SAY_WHY, WORDS_FOR_ANOTHER
 from inventory_tng.web.forms import up_to
 
 from helpers.concurrency import Committed
-from helpers.markup import read, text
+from helpers.markup import Element, box_values, checked, forms, problem, read, text
 from helpers.over_recorded import (
     PAGE,
     checked_forms,
@@ -42,6 +43,11 @@ from helpers.over_recorded import (
 from helpers.stock import URL, Place, Spools, cut, write
 
 # The administrators' page.
+
+
+def described(page: str, check: OverRecorded) -> list[Element]:
+    """What `check`'s reason's problem describes: each reason, and the words."""
+    return read(page).all("*", aria_describedby=f"reason-{check.id}-problem")
 
 
 def test_needs_your_action_lists_it(
@@ -174,16 +180,12 @@ def test_marking_one_checked_asks_why(
         response = mark_checked(admin_client, session, **form)
     assert response.status_code == 400
     (check,) = checks(session)
-    # Exact markup on purpose: the id each reason's aria-describedby names.
-    assert (
-        f'<span class="problem" id="reason-{check.id}-problem">'
-        f"{SAY_WHY}</span>" in response.text
-    )
+    assert problem(response.text, f"reason-{check.id}") == str(SAY_WHY)
     # Each reason, and the words, described by it, as the count is.
-    assert response.text.count(f'aria-describedby="reason-{check.id}-problem"') == 5
+    assert len(described(response.text, check)) == 5
     if form.get("reason") == "other":
-        assert 'value="other" checked' in response.text
-        assert f'name="words" value="{form.get("words", "")}"' in response.text
+        assert checked(response.text, "reason") == ["other"]
+        assert form.get("words", "") in box_values(response.text, "words")
     assert check.settled_at is None
     assert "over recorded checked refused" in [line["event"] for line in logs]
     assert not any("words" in line for line in logs)
@@ -249,14 +251,10 @@ def test_words_for_another_reason_are_asked_about(
         )
     assert response.status_code == 400
     (check,) = checks(session)
-    # Exact markup on purpose: the id each reason's aria-describedby names.
-    assert (
-        f'<span class="problem" id="reason-{check.id}-problem">'
-        f"{WORDS_FOR_ANOTHER}</span>" in response.text
-    )
-    assert response.text.count(f'aria-describedby="reason-{check.id}-problem"') == 5
-    assert f'value="{reason}" checked' in response.text
-    assert 'name="words" value=" typed, then not "' in response.text
+    assert problem(response.text, f"reason-{check.id}") == str(WORDS_FOR_ANOTHER)
+    assert len(described(response.text, check)) == 5
+    assert checked(response.text, "reason") == [reason]
+    assert " typed, then not " in box_values(response.text, "words")
     assert check.settled_at is None
     assert check.checked_reason is None
     assert "typed, then not" not in repr(logs)
@@ -399,9 +397,10 @@ def test_one_moved_whole_marked_checked_without_a_reason_is_asked_again_above(
     response = mark_checked(admin_client, session)
     assert response.status_code == 400
     (check,) = checks(session)
-    assert response.text.count(f'action="{PAGE}/{check.id}/checked"') == 1
+    answers = [to for _, to in forms(response.text)]
+    assert answers.count(f"{PAGE}/{check.id}/checked") == 1
     assert str(SAY_WHY) in response.text
-    assert 'role="alert"' not in response.text
+    assert not read(response.text).all("*", role="alert")
 
 
 def test_one_said_again_since_it_was_shown_is_not_settled(

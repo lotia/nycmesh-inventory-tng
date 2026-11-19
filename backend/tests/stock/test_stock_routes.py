@@ -12,6 +12,7 @@ from inventory_tng.stock.paths import COUNTS, NEEDS_COUNTING, REORDER, STOCK
 
 from helpers.markup import (
     Element,
+    addresses,
     links,
     options,
     read,
@@ -135,7 +136,8 @@ def test_needs_counting_lists_each_place_short(
     write(session, place)
     page = needs_counting_page(admin_client)
     assert place.store.name in page
-    assert f'href="{COUNTS}/{place.store.id}"' in page
+    shown = admin_client.get(NEEDS_COUNTING).text
+    assert f"{COUNTS}/{place.store.id}" in addresses(shown)
     assert place.van.name not in page  # It has three, which is not short.
 
 

@@ -168,13 +168,16 @@ def test_the_sheet_prints_each_copy_twelve_to_a_page(
     query = {"label": [item_label.id, place_label.id, item_label.id], "copies": 7}
     page = admin_client.get(PRINT, params=query)
     assert page.status_code == 200
-    assert page.text.count('class="print-sheet label-sheet"') == 2  # 14 labels
-    assert page.text.count('class="print-label"') == 14
+    sheets = read(page.text).all("*", class_="print-sheet label-sheet")
+    assert len(sheets) == 2  # 14 labels
+    assert len(read(page.text).all("*", class_="print-label")) == 14
     assert "14 labels, on 2 pages" in words_on(page.text)
     # A full QR code of the bare code: segno would make a Micro QR of it.
     assert segno.make(item_label.code, error="q").is_micro
+    # Exact markup on purpose: the page holds this very code, as drawn.
     assert str(qr_svg(item_label.code, "q")) in page.text
-    assert 'width="125px"' in page.text  # 21 modules and the border, at 5px.
+    # 21 modules and the border, at 5px.
+    assert read(page.text).all("svg", width="125px")
 
 
 def test_copies_and_picks_must_make_sense(
@@ -421,7 +424,8 @@ def test_labels_come_in_pages_of_fifty_each_printed_from_its_own(
     shown = admin_client.get(LABELS, params={"q": "Paged"})
     first = text(shown)
     assert len(codes_listed(shown.text)) == PER_PAGE
-    assert first.count('form="print-labels"') == PER_PAGE + 2  # And copies, Print.
+    in_form = read(shown.text).all("*", form="print-labels")
+    assert len(in_form) == PER_PAGE + 2  # And copies, Print.
     assert "Page 1 of 2" in first
     second = admin_client.get(LABELS, params={"q": "Paged", "page": "2"}).text
     assert len(codes_listed(second)) == 5

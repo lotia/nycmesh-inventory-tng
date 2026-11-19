@@ -36,6 +36,7 @@ from inventory_tng.site_settings.paths import SETTINGS
 from inventory_tng.volunteers.paths import VOLUNTEERS
 
 from helpers.concurrency import Committed, made
+from helpers.markup import box_values
 from helpers.rows import shown
 from helpers.sign_in import new_admin, sign_in_with
 from helpers.source import SOURCE, offending, outside
@@ -324,6 +325,6 @@ def test_a_reason_renamed_meanwhile_is_not_renamed_back(
     changed(committed, AdjustmentReason, reason.id, name="Soaked")
     sent = client.post(f"{SETTINGS}/reasons/{reason.id}", data=form)
     assert sent.status_code == 409
-    assert 'value="Soaked"' in sent.text
+    assert "Soaked" in box_values(sent.text, "name")
     assert committed.session().get_one(AdjustmentReason, reason.id).name == "Soaked"
     assert loaded.name == "Soaked"

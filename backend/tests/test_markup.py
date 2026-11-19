@@ -3,7 +3,16 @@ tests built on it can be trusted."""
 
 import pytest
 
-from helpers.markup import Unescaped, read, row_links, table_rows, words_on
+from helpers.markup import (
+    Unescaped,
+    addresses,
+    checked,
+    problem,
+    read,
+    row_links,
+    table_rows,
+    words_on,
+)
 
 pytestmark = pytest.mark.helper
 
@@ -87,3 +96,27 @@ def test_words_on_reads_a_pages_words_with_its_references_read() -> None:
     page = "<html><body><h1>Ada &amp; Ben</h1><p hidden>gone</p>\n<p>12&quot;  mast</p>"
     assert words_on(page) == 'Ada & Ben 12" mast'
     assert words_on(read(page).one("h1")) == "Ada & Ben"
+
+
+def test_addresses_reads_each_links_address_with_its_references_read() -> None:
+    page = '<a href="/a?x=1&amp;y=2">A</a><link href="/s.css"><a>none</a>'
+    assert addresses(page) == ["/a?x=1&y=2", ""]
+
+
+def test_checked_reads_only_the_checked_boxes_of_that_name() -> None:
+    page = (
+        '<input type="radio" name="u" value="a">'
+        '<input checked value="b" type="radio" name="u">'
+        '<input type="checkbox" name="u" checked><input name="v" value="c" checked>'
+    )
+    assert checked(page, "u") == ["b", None]
+
+
+def test_problem_reads_the_words_said_under_one_field() -> None:
+    page = (
+        '<span class="problem" id="name-problem">Taken &amp; <b>kept</b></span>'
+        '<span class="problem" id="size-problem">Too big</span>'
+    )
+    assert problem(page, "name") == "Taken & kept"
+    with pytest.raises(AssertionError):
+        problem(page, "unit")

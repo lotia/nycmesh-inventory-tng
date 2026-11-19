@@ -6,7 +6,6 @@ from decimal import Decimal
 
 import pytest
 from fastapi.testclient import TestClient
-from markupsafe import escape
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
@@ -22,7 +21,7 @@ from inventory_tng.catalogue.reading_rules import NAMED, both
 from inventory_tng.models.catalogue import Category, Item, ItemPackage, ReadingRule
 
 from helpers.items import new_item
-from helpers.markup import read, text
+from helpers.markup import box_values, checked, problem, read, text, words_on
 from helpers.rows import add, named, shown
 
 
@@ -41,7 +40,7 @@ def test_a_name_is_saved_as_typed_and_its_units_said_under_it(
     assert "Read as 305m · length.\n  Saved as typed." in page
     assert "Read as 10\u03bcF · capacitance." in page
     assert read(response.text).all("summary", "Not right?")
-    assert 'name="unit:m" value="none"' in page
+    assert "none" in box_values(response.text, "unit:m")
     assert session.scalars(select(ReadingRule)).all() == []
 
 
@@ -74,7 +73,7 @@ def test_a_spelling_nothing_settles_is_asked_once(
     answered = form | {"unit:g": "Gbit/s"}
     close = admin_client.post(ITEMS, data=answered)
     assert "A different item?" in text(close)
-    assert 'name="unit:g" value="Gbit/s" checked' in close.text
+    assert checked(close.text, "unit:g") == ["Gbit/s"]
     assert session.scalars(select(ReadingRule)).all() == []
     again = answered | {"different": "Box 10g"}
     with capture_logs() as logs:
@@ -140,9 +139,10 @@ def test_not_right_is_offered_where_words_decide_and_its_rule_wins(
     rule, wins over the words near it, in every name."""
     item = new_item(session, radios, "Spool 305M")
     other = new_item(session, radios, "Cable reel 100M")
-    page = text(admin_client.get(f"{ITEMS}/{item.id}"))
+    response = admin_client.get(f"{ITEMS}/{item.id}")
+    page = text(response)
     assert "Read as 305m · length, by “spool”." in page
-    assert 'name="unit:M" value="Mbit/s"' in page
+    assert "Mbit/s" in box_values(response.text, "unit:M")
     form = {
         "name": "Spool 305M",
         "category_id": str(radios.id),
@@ -189,17 +189,17 @@ def test_a_name_taken_once_read_as_answered_names_the_item(
     form = {"category_id": str(radios.id), "unit": "each", "unit:g": "Gbit/s"}
     added = admin_client.post(ITEMS, data=form | {"name": "Box 10g"})
     assert added.status_code == 400
-    assert escape(said) in added.text
+    assert said in words_on(added.text)
     renamed = form | {"name": "Box 10g", "version": shown(item)}
     saved = admin_client.post(f"{ITEMS}/{item.id}", data=renamed)
     assert saved.status_code == 400
-    assert escape(said) in saved.text
+    assert said in words_on(saved.text)
     alias = admin_client.post(
         f"{ITEMS}/{item.id}/aliases",
         data={"alias_name": "Box 10g", "unit:g": "Gbit/s"},
     )
     assert alias.status_code == 400
-    assert escape(said) in alias.text
+    assert said in words_on(alias.text)
     assert session.scalars(select(ReadingRule)).all() == []
     assert other.name == "Box 10Gbps"
 
@@ -231,14 +231,14 @@ def test_a_correction_reading_names_alike_is_refused_naming_them(
     ):
         refused = admin_client.post(path, data=form | {"unit:g": "Gbit/s"})
         assert refused.status_code == 400, path
-        assert f'id="{field}-problem">{escape(said)}' in refused.text, path
+        assert problem(refused.text, field).startswith(said), path
     assert session.scalars(select(ReadingRule)).all() == []
     box = add(session, ItemPackage(item_id=spare.id, name="Box", size=Decimal(1)))
     renamed = {"package_name": "Box 10g", "size": "1", "package_version": shown(box)}
     refused = admin_client.post(
         f"{base}/packages/{box.id}", data=renamed | {"unit:g": "Gbit/s"}
     )
-    assert escape(said) in refused.text
+    assert said in words_on(refused.text)
 
 
 def test_a_read_alike_refusal_with_none_left_to_name_says_so(
@@ -269,7 +269,7 @@ def test_an_alias_answer_refused_is_not_the_items_name_answer(
     form = {"alias_name": "Extra 10g", "unit:g": "Gbit/s"}
     refused = admin_client.post(f"{ITEMS}/{box.id}/aliases", data=form)
     assert refused.status_code == 400
-    assert refused.text.count('name="unit:g" value="Gbit/s" checked') == 1
+    assert checked(refused.text, "unit:g") == ["Gbit/s"]
 
 
 def test_a_package_name_reads_units_too(
@@ -281,8 +281,8 @@ def test_a_package_name_reads_units_too(
     path = f"{ITEMS}/{item.id}/packages"
     added = admin_client.post(path, data={"package_name": "Bag 5 MG", "size": "2"})
     assert added.status_code == 400
-    assert 'name="unit:MG" value="mg"' in added.text
-    assert 'name="unit:MG" value="Mg" checked' not in added.text
+    assert "mg" in box_values(added.text, "unit:MG")
+    assert "Mg" not in checked(added.text, "unit:MG")
     chosen = {"package_name": "Bag 5 MG", "size": "2", "unit:MG": "Mg"}
     assert admin_client.post(path, data=chosen).status_code == 303
     package = named(session, ItemPackage, "Bag 5 MG")

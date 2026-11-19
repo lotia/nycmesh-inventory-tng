@@ -23,7 +23,7 @@ from inventory_tng.models.devices import RegistrationCode
 from inventory_tng.web.single_use_forms import FIELD, SENT_AGAIN
 
 from helpers.mail import NO_MAIL, SentMail
-from helpers.markup import read, text
+from helpers.markup import addresses, box_values, read, text
 from helpers.rows import tag
 from helpers.sign_in import (
     TIME_STEP,
@@ -71,12 +71,11 @@ def sent_twice_with_codes(
 def assert_sent_again(again: Response, back: str) -> None:
     assert again.status_code == 409
     assert again.headers["cache-control"] == "no-store"
-    words = text(again)
-    assert AGAIN in words
-    assert f'href="{back}"' in words
+    assert AGAIN in text(again)
+    assert back in addresses(again.text)
     # Its own link back is not taken for the way back above the title
     # (admin_base.html's back_link), which it has none of.
-    assert 'class="back"' not in words
+    assert not read(again.text).all("*", class_="back")
 
 
 def test_a_registration_code_is_made_once(
@@ -205,7 +204,7 @@ def test_a_key_that_is_not_text_is_none() -> None:
 def test_a_form_sent_once_carries_its_page(admin_client: TestClient) -> None:
     """For the page saying it was sent before to link back: browsers send
     no Referer here."""
-    assert f'name="back" value="{ACCOUNT}"' in admin_client.get(ACCOUNT).text
+    assert ACCOUNT in box_values(admin_client.get(ACCOUNT).text, "back")
 
 
 @pytest.mark.clone

@@ -13,7 +13,7 @@ from inventory_tng.catalogue.paths import ITEMS
 from inventory_tng.web import pages
 from inventory_tng.web.frontend_bundle import SCAN
 
-from helpers.markup import read, text
+from helpers.markup import addresses, read
 
 
 @pytest.mark.parametrize("method", ["GET", "HEAD"])
@@ -41,9 +41,8 @@ def test_a_page_error_is_a_page(
     answer = make_client_without_database().request(method, path)
     assert answer.status_code == status
     assert answer.headers["content-type"].startswith("text/html")
-    page = text(answer)
     assert read(answer.text).all("h1", str(title))
-    assert f'href="{SCAN}"' in page
+    assert SCAN in addresses(answer.text)
     if status == 405:
         # In no fixed order.
         assert set(answer.headers["allow"].split(", ")) == {"GET", "HEAD"}
@@ -61,9 +60,8 @@ def test_nothing_by_that_id_is_the_same_page(admin_client: TestClient) -> None:
 def test_the_logo_goes_where_they_likely_came_from(
     make_client_without_database: Callable[..., TestClient], path: str, home: str
 ) -> None:
-    assert (
-        f'class="brand" href="{home}"' in make_client_without_database().get(path).text
-    )
+    page = make_client_without_database().get(path).text
+    assert read(page).all("a", class_="brand", href=home)
 
 
 @pytest.mark.parametrize(

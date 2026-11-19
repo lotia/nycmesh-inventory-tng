@@ -7,7 +7,6 @@ from decimal import Decimal
 
 import pytest
 from fastapi.testclient import TestClient
-from markupsafe import escape
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
@@ -43,7 +42,15 @@ from inventory_tng.web.forms import (
 )
 
 from helpers.items import NOW, new_item
-from helpers.markup import hidden_fields, links, read, text, words_on
+from helpers.markup import (
+    box_values,
+    hidden_fields,
+    links,
+    problem,
+    read,
+    text,
+    words_on,
+)
 from helpers.query_counts import counting
 from helpers.rows import add, history, named, shown
 
@@ -147,7 +154,7 @@ def test_names_and_part_numbers_are_unique_naming_the_other(
             ITEMS, data={"category_id": str(radios.id), "unit": "each"} | form
         )
         assert refused.status_code == 400
-        assert f'id="{field}-problem">{words}</span>' in refused.text
+        assert problem(refused.text, field) == words
 
 
 def test_a_name_pasted_with_look_alikes_clashes_naming_the_other(
@@ -165,8 +172,7 @@ def test_a_name_pasted_with_look_alikes_clashes_naming_the_other(
         assert admin_client.post(ITEMS, data=form | {"name": kept}).status_code == 303
         refused = admin_client.post(ITEMS, data=form | {"name": pasted})
         assert refused.status_code == 400
-        taken = escape(TAKEN_FIELDS["name"](kept))
-        assert f'id="name-problem">{taken}</span>' in refused.text
+        assert problem(refused.text, "name") == TAKEN_FIELDS["name"](kept)
     assert named(session, Item, "Patch\u2014cord").name_key == "patchcord"
 
 
@@ -190,7 +196,7 @@ def test_a_saved_item_is_refused_what_another_has_its_own_respelt(
     refused = admin_client.post(path, data=form | {"old_code": "NYCM-1"})
     assert refused.status_code == 400
     taken = TAKEN_FIELDS["old_code"](other.name)
-    assert f'id="old_code-problem">{taken} {IS_RETIRED}</span>' in refused.text
+    assert problem(refused.text, "old_code") == f"{taken} {IS_RETIRED}"
     assert admin_client.post(path, data=form).status_code == 303
     session.refresh(item)
     assert item.name == "Lite Beam"
@@ -318,7 +324,7 @@ def test_editing_every_field(
         Decimal(305),
         None,
     )
-    assert 'value="305"' in admin_client.get(f"{ITEMS}/{item.id}").text
+    assert box_values(admin_client.get(f"{ITEMS}/{item.id}").text, "minimum") == ["305"]
 
 
 def test_the_unit_is_fixed_once_stock_has_moved(
@@ -517,7 +523,6 @@ def test_a_name_close_to_others_asks_first(
     form = {"name": "LiteBeam 5AC Gen2", "category_id": str(radios.id), "unit": "each"}
     asked = admin_client.post(ITEMS, data=form)
     assert asked.status_code == 200
-    page = text(asked)
     warning = read(asked.text).one("p", class_="warning", role="status")
     said = warning.text
     assert ("LiteBeam 5AC Gen1", f"{ITEMS}/{gen1.id}") in links(warning)
@@ -526,9 +531,9 @@ def test_a_name_close_to_others_asks_first(
     assert warning.one("span", class_="tag").text.startswith("Retired")
     assert "Patch cable" not in said
     assert "A different item? Add it again." in said
-    assert 'value="LiteBeam 5AC Gen2"' in page
+    assert "LiteBeam 5AC Gen2" in box_values(asked.text, "name")
     assert session.scalar(select(Item).where(Item.name == form["name"])) is None
-    assert f'name="different" value="{form["name"]}"' in asked.text
+    assert form["name"] in box_values(asked.text, "different")
     # Changed after the question: asked about again.
     gen3 = form | {"name": "LiteBeam 5AC Gen3", "different": form["name"]}
     assert "A different item?" in text(admin_client.post(ITEMS, data=gen3))
@@ -605,7 +610,7 @@ def test_a_name_asked_about_saves_however_it_was_spaced(
     new_item(session, radios, "LiteBeam 5AC Gen1")
     form = {"name": "LiteBeam 5AC Gen2 ", "category_id": str(radios.id), "unit": "each"}
     asked = admin_client.post(ITEMS, data=form)
-    assert 'name="different" value="LiteBeam 5AC Gen2"' in asked.text
+    assert "LiteBeam 5AC Gen2" in box_values(asked.text, "different")
     again = admin_client.post(ITEMS, data=form | {"different": "LiteBeam 5AC Gen2"})
     assert again.status_code == 303
 
@@ -630,7 +635,7 @@ def test_a_name_asked_about_stays_answered_through_another_refusal(
     }
     refused = admin_client.post(ITEMS, data=form)
     assert refused.status_code == 400
-    assert 'name="different" value="LiteBeam 5AC Gen2"' in refused.text
+    assert "LiteBeam 5AC Gen2" in box_values(refused.text, "different")
     assert "A different item?" not in text(refused)
     added = admin_client.post(ITEMS, data=form | {"part_number": "Q"})
     assert added.status_code == 303

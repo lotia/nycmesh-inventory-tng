@@ -35,7 +35,16 @@ from inventory_tng.web.listing import folded
 
 from helpers.concurrency import Committed
 from helpers.items import new_item
-from helpers.markup import links, options, read, row_links, text
+from helpers.markup import (
+    box_values,
+    hidden_fields,
+    links,
+    options,
+    read,
+    row_links,
+    text,
+    words_on,
+)
 from helpers.query_counts import counting
 from helpers.rows import (
     add,
@@ -398,9 +407,9 @@ def test_the_rules_page_lists_changes_and_deletes_them(
     assert ("Propose readings from every name", SEED) in links(listed)
     assert "Not a unit" in listed
     assert "The import" in listed
-    page = text(admin_client.get(f"{READINGS}/{rule.id}"))
-    assert 'value="g"' in page
-    assert "g · mass" in page
+    page = admin_client.get(f"{READINGS}/{rule.id}").text
+    assert "g" in box_values(page, "reading")
+    assert "g · mass" in words_on(page)
     path = f"{READINGS}/{rule.id}"
     with capture_logs() as logs:
         done = admin_client.post(path, data={"reading": "g", "version": shown(rule)})
@@ -419,8 +428,9 @@ def test_the_rules_page_lists_changes_and_deletes_them(
     # Nor deleted, changed since it was shown.
     assert admin_client.post(f"{path}/delete", data={"version": "1"}).status_code == 409
     assert session.get(ReadingRule, rule.id) is not None
-    page = text(admin_client.get(path))
-    assert f'name="version" value="{shown(rule)}"><button>Delete' in page
+    delete = read(admin_client.get(path).text).one("form", action=f"{path}/delete")
+    assert hidden_fields(delete) == [("version", shown(rule))]
+    assert delete.one("button").text == "Delete"
     deleted = admin_client.post(f"{path}/delete", data={"version": shown(rule)})
     assert deleted.headers["location"] == f"{READINGS}?notice=reading_deleted"
     assert session.get(ReadingRule, rule.id) is None

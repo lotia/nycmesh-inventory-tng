@@ -19,7 +19,7 @@ from inventory_tng.stock.forms import HOW_MUCH_LEFT, WHOLE_PACKAGES
 from inventory_tng.stock.ledger import LOOSE, Entry, Form
 
 from helpers.items import new_item, same_size_twins
-from helpers.markup import read, text
+from helpers.markup import box_values, read, text
 from helpers.package_forms import CABLE, OPEN, SEALED, open_form, quantities_by_form
 from helpers.rows import add, breaks, tag
 from helpers.stock import Spools, moment_fields
@@ -109,10 +109,10 @@ def test_the_count_page_counts_forms_finds_and_closes(
 ) -> None:
     store, cable = spools.store.id, spools.cable.id
     one, two = spools.opened(), spools.opened()
-    page = text(admin_client.get(f"{COUNTS}/{store}"))
-    assert f'name="sealed_{cable}_{spools.spool.id}"' not in page  # None sealed now.
-    assert f'name="opened_{one.id}"' in page
-    assert f'name="state_{two.id}"' in page
+    page = admin_client.get(f"{COUNTS}/{store}").text
+    assert not box_values(page, f"sealed_{cable}_{spools.spool.id}")  # None sealed.
+    assert box_values(page, f"opened_{one.id}")
+    assert read(page).all("*", name=f"state_{two.id}")
     form = {
         "key": str(uuid.uuid4()),
         **moment_fields(session, store),
@@ -150,7 +150,7 @@ def test_the_count_page_counts_sealed_and_says_whats_wrong(
     store, cable, spool = spools.store.id, spools.cable.id, spools.spool.id
     spools.write({"kind": "receipt", "to_location_id": store}, Entry(cable, Decimal(5)))
     field = f"sealed_{cable}_{spool}"
-    assert f'name="{field}"' in text(admin_client.get(f"{COUNTS}/{store}"))
+    assert box_values(admin_client.get(f"{COUNTS}/{store}").text, field)
     base = moment_fields(session, store)
     done = admin_client.post(
         f"{COUNTS}/{store}", data=base | {"key": str(uuid.uuid4()), field: "1"}
@@ -197,10 +197,9 @@ def test_counting_by_form_asks_again_for_what_moved(
     spools.opened()  # While it was counted.
     again = admin_client.post(f"{COUNTS}/{store}", data=form)
     assert again.status_code == 409
-    page = text(again)
-    assert "These moved while you counted" in page
+    assert "These moved while you counted" in text(again)
     # Asked again by form.
-    assert f'name="sealed_{cable}_{spool}"' in page
+    assert box_values(again.text, f"sealed_{cable}_{spool}")
 
 
 def test_an_open_package_found_where_its_item_was_counted_by_total(

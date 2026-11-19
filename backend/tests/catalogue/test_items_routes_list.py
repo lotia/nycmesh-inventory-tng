@@ -10,7 +10,15 @@ from inventory_tng.models.catalogue import Category, Item
 from inventory_tng.web.listing import PER_PAGE
 
 from helpers.items import items_named, new_item
-from helpers.markup import hidden_fields, links, read, sorted_columns, text, words_on
+from helpers.markup import (
+    addresses,
+    hidden_fields,
+    links,
+    read,
+    sorted_columns,
+    text,
+    words_on,
+)
 from helpers.rows import add, tag
 
 
@@ -58,7 +66,7 @@ def test_suggestions_come_from_the_filter_the_list_shows(
     assert admin_client.get(f"{ITEMS}/suggest").json() == []
     # A page size kept, as Find keeps it (inventory-tng-qwb).
     page = admin_client.get(ITEMS, params={"per": "100", "sort": "unit"}).text
-    assert f'data-suggest="{ITEMS}/suggest?per=100"' in page
+    assert read(page).all("input", data_suggest=f"{ITEMS}/suggest?per=100")
     sized = admin_client.get(
         f"{ITEMS}/suggest", params={"q": "litebem", "per": "100"}
     ).json()
@@ -222,9 +230,12 @@ def test_items_filter_by_category(
         ITEMS, params={"category": str(antennas.id), "q": f"Filtered {mark}"}
     ).text
     assert [kept.name] == items_named(found)
-    assert f"sort=name&amp;order=desc&amp;category={antennas.id}" not in found
-    assert f"category={antennas.id}&amp;sort=name" in found
-    assert f'data-suggest="{ITEMS}/suggest?category={antennas.id}"' in found
+    kept_in = addresses(found)
+    dropped = f"sort=name&order=desc&category={antennas.id}"
+    assert not [to for to in kept_in if dropped in to]
+    assert [to for to in kept_in if f"category={antennas.id}&sort=name" in to]
+    suggest = f"{ITEMS}/suggest?category={antennas.id}"
+    assert read(found).all("input", data_suggest=suggest)
     offered = admin_client.get(
         f"{ITEMS}/suggest", params={"q": f"Filtered {mark}", "category": str(radios.id)}
     ).json()
