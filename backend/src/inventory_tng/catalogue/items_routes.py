@@ -34,6 +34,12 @@ from inventory_tng.models.labels import Label
 from inventory_tng.models.names import canonical
 from inventory_tng.models.stock import Movement, OpenPackage
 from inventory_tng.stock import open_packages
+from inventory_tng.stock.open_packages_sorts import (
+    BY_OPENED,
+    BY_PACKAGE,
+    BY_SHOWS,
+    OLDEST_FIRST,
+)
 from inventory_tng.stock.queries import item_total
 from inventory_tng.web.admin_pages import (
     admin_page,
@@ -44,8 +50,13 @@ from inventory_tng.web.admin_pages import (
 )
 from inventory_tng.web.forms import ALERTS, RETIRED, RULES, form_version
 from inventory_tng.web.listing import (
+    UNASKED,
+    Asked,
     AskedView,
     Listing,
+    Sorting,
+    View,
+    in_order,
 )
 from inventory_tng.web.navigation import SECTION_ITEMS
 from inventory_tng.web.pages import add_notices, not_found, redirect
@@ -284,6 +295,24 @@ def _moved(session: Session, item_id: int) -> bool:
     return exists_where(session, Movement.item_id == item_id)
 
 
+# The item page's section of open packages, which its headings' links go
+# back to.
+OPEN_PACKAGES = "open-packages"
+# How an item's open packages sort: oldest first, the first reported used
+# up before the rest, as they always have; or by a heading (Ali,
+# 2026-11-18, inventory-tng-t150). The only list on the page that sorts,
+# so its query string's sort and order are its own.
+OPEN_SORTING = Sorting(
+    "oldest",
+    {
+        "oldest": OLDEST_FIRST,
+        "package": BY_PACKAGE,
+        "left": BY_SHOWS,
+        "opened": BY_OPENED,
+    },
+)
+
+
 def _item_page(
     request: Request,
     session: Session,
@@ -295,15 +324,23 @@ def _item_page(
     alert: Words | None = None,
     similar: Sequence[items.Close] = (),
     undo: str | None = None,
+    asked: Asked = UNASKED,
 ) -> HTMLResponse:
+    """The item's page; its open packages sorted as `asked`, all of them."""
+    here = f"{ITEMS}/{item.id}"
     packages = queries.packages_of_item(session, item.id)
+    view = View.read(here, OPEN_SORTING, asked, anchor=OPEN_PACKAGES)
+    opened = in_order(
+        open_packages.shown(session, OpenPackage.item_id == item.id), view
+    )
+    log.debug("open packages listed", item_id=item.id, found=len(opened), sort=view.by)
     return admin_page(
         request,
         signed,
         "catalogue/item.html",
         {
             "title": item.name_shown,
-            "here": f"{ITEMS}/{item.id}",
+            "here": here,
             "back_link": (ITEMS, SECTION_ITEMS),
             "item": item,
             **retirement(session, item),
@@ -321,9 +358,8 @@ def _item_page(
             "unit_fixed": _moved(session, item.id),
             "in_stock": item_total(session, item.id),
             "labels": labels.current_of(session, Label.item_id == item.id),
-            "open_packages": open_packages.shown(
-                session, OpenPackage.item_id == item.id
-            ),
+            "open_packages": opened,
+            "open_view": view,
             "zone": site_zone(session),
             "problems": problems,
             "values": values,
@@ -431,6 +467,7 @@ def item(
     signed: AdminSignedIn,
     session: DbSession,
     item_id: int,
+    asked: AskedView,
     undo: str = "",
 ) -> Response:
     found = session.get(Item, item_id)
@@ -438,7 +475,7 @@ def item(
         return not_found()
     # A package just retired, offered back.
     back = undo_retire(session, ItemPackage, undo, f"{ITEMS}/{item_id}/packages")
-    return _item_page(request, session, signed, found, undo=back)
+    return _item_page(request, session, signed, found, undo=back, asked=asked)
 
 
 @router.post(f"{ITEMS}/{{item_id}}")

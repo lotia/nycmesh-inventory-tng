@@ -45,10 +45,10 @@ from inventory_tng.stock.needs_action import (
     of_only,
     query,
 )
+from inventory_tng.stock.open_packages_sorts import BY_PACKAGE, BY_SHOWS, OLDEST_FIRST
 from inventory_tng.stock.paths import LENGTHS, STOCK
-from inventory_tng.stock.used_up_routes import BY_PACKAGE, BY_SHOWS
 from inventory_tng.web.admin_pages import admin_page, now
-from inventory_tng.web.listing import AskedView, Sort, Sorting, View, arranged
+from inventory_tng.web.listing import AskedView, Sorting, View, arranged
 from inventory_tng.web.navigation import SECTION_STOCK
 from inventory_tng.web.pages import add_notices, not_found, redirect
 
@@ -178,14 +178,7 @@ def recent_cuts(session: Session, open_ids: Collection[int]) -> dict[int, list[C
 SORTING = Sorting(
     "waiting",
     {
-        "waiting": Sort.keyed(
-            lambda each: (
-                each.row.reported_at is None,
-                each.row.reported_at or each.row.opened_at,
-                each.row.opened_at,
-                each.row.id,
-            )
-        ),
+        "waiting": OLDEST_FIRST,
         "package": BY_PACKAGE,
         "shows": BY_SHOWS,
     },

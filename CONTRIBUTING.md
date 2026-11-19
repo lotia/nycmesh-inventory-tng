@@ -690,7 +690,9 @@ utilities. When you style a page:
   the address says them, those left blank dropped. `ordered` applies it to
   a select, after `count`, with the id last; `arranged` to a list. A list
   of groups pages the groups with `paged` and sorts each group's rows with
-  `in_order`. In the template, `_listing.html`'s `sort_heading` for each
+  `in_order`. A list in a section of a longer page, as an item's open
+  packages, gives `View.read` the section's id as `anchor`, so its links
+  come back to it. In the template, `_listing.html`'s `sort_heading` for each
   sortable heading, `sizes` above the table, `filter_form` for the
   filters, `unfiltered_or` for the empty list and `pager` below. A form that
   acts on the list's rows sends the view in its action's query string

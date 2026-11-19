@@ -215,11 +215,22 @@ class Spools:
             key=key,
         )
 
-    def opened(self) -> OpenPackage:
-        """One spool opened in the store: an open package of all 305 m."""
-        made = open_packages.make(
-            self.session, uuid.uuid4(), self.spool.id, self.store.id
-        )
+    def opened(self, at: datetime | None = None) -> OpenPackage:
+        """One spool opened in the store: an open package of all 305 m,
+        opened `at` if given, else now. The app never changes when one was
+        opened, so one opened `at` is made first, and make() finds it."""
+        key = uuid.uuid4()
+        if at is not None:
+            row = OpenPackage(
+                key=key,
+                opened_at=at,
+                item_id=self.cable.id,
+                package_id=self.spool.id,
+                location_id=self.store.id,
+            )
+            self.session.add(row)
+            self.session.flush()
+        made = open_packages.make(self.session, key, self.spool.id, self.store.id)
         self.write(
             {
                 "kind": "open",

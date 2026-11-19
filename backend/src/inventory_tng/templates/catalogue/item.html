@@ -1,5 +1,6 @@
 {% extends "admin_base.html" %}
 {% from "_table.html" import table %}
+{% from "_listing.html" import sort_heading %}
 {% from "_labels.html" import labels_section with context %}
 {% from "_retired_record.html" import retired_record, retire_section with context %}
 {% block main %}
@@ -182,12 +183,15 @@ None is left, so nobody can pick it.{% endtrans %}{% endif %}{% endcall %}
   <p class="hint">{% trans %}Opened and followed until used up. Closing one writes off
   what it still shows, with the reason Used up; you'll be asked first.{% endtrans %}</p>
   {% call table() %}
+    <tr>{{ sort_heading(open_view, "package", _("Package and place")) }}
+      {{- sort_heading(open_view, "left", _("What is left")) }}
+      {{- sort_heading(open_view, "opened", _("When opened")) }}<th></th></tr>
     {% for each in open_packages %}
     <tr>
       <td>{{ each.package }} · {{ each.place }}
-        {%- if each.row.reported_at %} <span class="tag">{% trans %}Reported used up{% endtrans %}</span>{% endif %}
-        <span class="hint block">{% trans when=each.row.opened_at | when(zone) %}opened {{ when }}{% endtrans %}</span></td>
+        {%- if each.row.reported_at %} <span class="tag">{% trans %}Reported used up{% endtrans %}</span>{% endif %}</td>
       <td>{{ each.left | amount }} {{ each.unit }}</td>
+      <td>{{ each.row.opened_at | when(zone) }}</td>
       <td><form method="get" action="{{ here }}/open-packages/{{ each.row.id }}/close"><button>{% trans %}Close as used up{% endtrans %}<span class="sr-only"> {% trans what=each.package, place=each.place %}{{ what }} at {{ place }}{% endtrans %}</span></button></form></td>
     </tr>
     {% endfor %}

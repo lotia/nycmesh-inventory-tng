@@ -28,6 +28,7 @@ from inventory_tng.stock.needs_action import (
     of_only,
     query,
 )
+from inventory_tng.stock.open_packages_sorts import BY_PACKAGE, BY_SHOWS
 from inventory_tng.stock.paths import CLOSE, STOCK, USED_UP
 from inventory_tng.web.admin_pages import admin_page, now
 from inventory_tng.web.listing import AskedView, Sort, Sorting, View, arranged
@@ -78,12 +79,6 @@ TITLE = lazy_gettext("Reported used up")
 KIND = Kind(TITLE, USED_UP, REPORTED)
 
 
-# Open packages (open_packages.Shown) by their item, package and place, and
-# by what each shows left: here and on the length checks.
-BY_PACKAGE = Sort.keyed(
-    lambda each: (each.item.lower(), each.package.lower(), each.place.lower())
-)
-BY_SHOWS = Sort.keyed(lambda each: each.left)
 # How those reported sort: the first reported first, as they always have,
 # or by a heading (Ali, 2026-11-15, inventory-tng-qwb).
 SORTING = Sorting(

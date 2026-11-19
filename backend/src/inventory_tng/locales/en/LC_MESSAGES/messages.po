@@ -2502,6 +2502,10 @@ msgstr ""
 msgid "Package added."
 msgstr ""
 
+#: src/inventory_tng/templates/catalogue/item.html
+msgid "Package and place"
+msgstr ""
+
 #: src/inventory_tng/catalogue/items_routes.py
 msgid "Package brought back."
 msgstr ""
@@ -4067,6 +4071,10 @@ msgstr ""
 msgid "What"
 msgstr ""
 
+#: src/inventory_tng/templates/catalogue/item.html
+msgid "What is left"
+msgstr ""
+
 #: src/inventory_tng/templates/places/locations.html
 msgid "What it is"
 msgstr ""
@@ -4095,6 +4103,10 @@ msgstr ""
 #: src/inventory_tng/templates/catalogue/item.html
 #, python-format
 msgid "When one of %(package)s is opened"
+msgstr ""
+
+#: src/inventory_tng/templates/catalogue/item.html
+msgid "When opened"
 msgstr ""
 
 #: src/inventory_tng/templates/stock/counts.html
@@ -4604,11 +4616,6 @@ msgstr ""
 #: src/inventory_tng/templates/stock/_forms.html
 #, python-format
 msgid "open: %(left)s %(unit)s left"
-msgstr ""
-
-#: src/inventory_tng/templates/catalogue/item.html
-#, python-format
-msgid "opened %(when)s"
 msgstr ""
 
 #. Translators: as in "TOTP is now optional".

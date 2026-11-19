@@ -116,7 +116,9 @@ class View:
     one of `sorting`'s columns, or by its default (a search's best match
     first while searching); filtered; in pages of `per_page`, None for all;
     which page; and how many there are (counted). `kept` is the rest of the
-    query string, such as a search, which every link keeps."""
+    query string, such as a search, which every link keeps; `anchor`, the
+    id of the page's section the list is in, which every link goes back to,
+    for a list below others, as an item's open packages."""
 
     here: str
     sorting: Sorting
@@ -127,6 +129,7 @@ class View:
     searching: bool = False
     filters: tuple[tuple[str, str], ...] = ()
     kept: tuple[tuple[str, str], ...] = ()
+    anchor: str = ""
     found: int = 0
 
     @classmethod
@@ -139,6 +142,7 @@ class View:
         searching: bool = False,
         filters: Mapping[str, str] | None = None,
         kept: Mapping[str, str] | None = None,
+        anchor: str = "",
     ) -> View:
         """Anything odd is the default's, never an error, as a link may
         have been typed by hand: a sort not offered, the list's own order;
@@ -159,6 +163,7 @@ class View:
             searching=searching,
             filters=_pairs(filters),
             kept=_pairs(kept),
+            anchor=anchor,
         )
 
     @property
@@ -233,8 +238,10 @@ class View:
         return f"?{urlencode(query)}" if query else ""
 
     def link(self, **changed: object) -> str:
-        """This view's address, `changed` (View's fields)."""
-        return self.here + replace(self, **changed).query_string
+        """This view's address, `changed` (View's fields), at its anchor if
+        it has one."""
+        at = f"#{self.anchor}" if self.anchor else ""
+        return self.here + replace(self, **changed).query_string + at
 
     def sort_link(self, column: str) -> str:
         """A heading's link: sorted by its column the way it sorts first,
