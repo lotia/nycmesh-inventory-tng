@@ -37,7 +37,7 @@ from inventory_tng.core.db_errors import unique
 from inventory_tng.core.db_locking import get_locked, locked
 from inventory_tng.core.db_sessions import exists_where, set_actor
 from inventory_tng.core.mail import Notifier
-from inventory_tng.core.phrases import Words, gettext, lazy_gettext
+from inventory_tng.core.phrases import Words, gettext, lazy_gettext, number
 from inventory_tng.core.rate_limits import limiter
 from inventory_tng.core.settings import RateLimits
 from inventory_tng.devices import devices
@@ -169,8 +169,8 @@ PASSWORDS_DIFFER = lazy_gettext("The two passwords are different.")
 def username_problem(username: str) -> str | None:
     if not USERNAME.fullmatch(username):
         return gettext(
-            "Use 1 to %(max)d letters, digits, dots, dashes or underscores.",
-            max=USERNAME_MAX,
+            "Use 1 to %(max)s letters, digits, dots, dashes or underscores.",
+            max=number(USERNAME_MAX),
         )
     return None
 
@@ -184,11 +184,11 @@ def email_problem(email: str) -> Words | None:
 def password_problem(password: str, again: str) -> Words | None:
     if len(password) < PASSWORD_MIN:
         return gettext(
-            "Use at least %(min)d characters. A few words make a good one.",
-            min=PASSWORD_MIN,
+            "Use at least %(min)s characters. A few words make a good one.",
+            min=number(PASSWORD_MIN),
         )
     if len(password) > PASSWORD_MAX:
-        return gettext("Use at most %(max)d characters.", max=PASSWORD_MAX)
+        return gettext("Use at most %(max)s characters.", max=number(PASSWORD_MAX))
     if password != again:
         return PASSWORDS_DIFFER
     return None

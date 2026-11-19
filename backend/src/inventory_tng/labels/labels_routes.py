@@ -15,7 +15,7 @@ from inventory_tng.admins.guards import AdminSignedIn
 from inventory_tng.catalogue.paths import ITEMS
 from inventory_tng.core.db_sessions import DbSession
 from inventory_tng.core.local_time import site_zone
-from inventory_tng.core.phrases import gettext, lazy, lazy_gettext, ngettext
+from inventory_tng.core.phrases import gettext, lazy, lazy_gettext, ngettext, number
 from inventory_tng.labels import labels, queries
 from inventory_tng.labels.paths import LABELS, PRINT
 from inventory_tng.models.base import INTEGER_MAX, whole
@@ -56,7 +56,9 @@ def _too_many() -> str:
 
 
 def _copies() -> str:
-    return gettext("Print from 1 to %(max)d copies of each.", max=labels.MAX_COPIES)
+    return gettext(
+        "Print from 1 to %(max)s copies of each.", max=number(labels.MAX_COPIES)
+    )
 
 
 TOO_MANY = lazy(_too_many)

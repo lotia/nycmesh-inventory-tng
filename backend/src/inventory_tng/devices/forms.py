@@ -8,7 +8,7 @@ from datetime import timedelta
 from sqlalchemy.orm import Session
 
 from inventory_tng.core.local_time import parse_local, site_zone
-from inventory_tng.core.phrases import Words, gettext, lazy_gettext
+from inventory_tng.core.phrases import Words, gettext, lazy_gettext, number
 from inventory_tng.devices import devices
 from inventory_tng.models.base import whole
 from inventory_tng.web.forms import NAME_MAX, up_to
@@ -24,12 +24,12 @@ A_CODE_NUMBER = lazy_gettext("A code's number.")
 
 def uses_problem(most: int) -> str:
     """A code's most uses refused: from 1 to `most`."""
-    return gettext("From 1 to %(max)d devices.", max=most)
+    return gettext("From 1 to %(max)s devices.", max=number(most))
 
 
 def days_problem(most: int) -> str:
     """A code's days refused: from 1 to `most`."""
-    return gettext("From 1 to %(max)d days.", max=most)
+    return gettext("From 1 to %(max)s days.", max=number(most))
 
 
 def label_problem(label: str) -> str | None:

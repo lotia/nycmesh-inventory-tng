@@ -19,7 +19,7 @@ from inventory_tng.admins.guards import AdminSignedIn
 from inventory_tng.catalogue.items_listing import SEARCHED
 from inventory_tng.catalogue.paths import ITEMS
 from inventory_tng.core.db_sessions import DbSession
-from inventory_tng.core.phrases import Words, gettext, lazy_gettext
+from inventory_tng.core.phrases import Words, gettext, lazy_gettext, number
 from inventory_tng.models.base import INTEGER_MAX, whole
 from inventory_tng.models.catalogue import Item, ItemPackage
 from inventory_tng.models.places import Location
@@ -67,7 +67,7 @@ NEEDS_COUNTING_TITLE = lazy_gettext("Needs counting")
 
 
 def recorded_more_view(waiting: int) -> str:
-    return gettext("Recorded more (%(count)d)", count=waiting)
+    return gettext("Recorded more (%(count)s)", count=number(waiting))
 
 
 def stock_views(session: Session) -> list[tuple[str, Words, str]]:

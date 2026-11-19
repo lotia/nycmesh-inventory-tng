@@ -9,7 +9,7 @@ from decimal import Decimal, InvalidOperation
 from sqlalchemy.orm import Session
 
 from inventory_tng.core.db_sessions import Base
-from inventory_tng.core.phrases import Words, gettext, lazy_gettext
+from inventory_tng.core.phrases import Words, gettext, lazy_gettext, number
 from inventory_tng.models.base import INTEGER_MAX, whole
 from inventory_tng.models.names import canonical
 from inventory_tng.stock.ledger import whole_enough
@@ -117,17 +117,17 @@ def chosen[T: Base](
 
 def up_to(limit: int) -> str:
     """A field's longest, refused: in characters."""
-    return gettext("Up to %(max)d characters.", max=limit)
+    return gettext("Up to %(max)s characters.", max=number(limit))
 
 
 def name_up_to(limit: int) -> str:
     """A name too long, refused: in characters."""
-    return gettext("Give it a name of up to %(max)d characters.", max=limit)
+    return gettext("Give it a name of up to %(max)s characters.", max=number(limit))
 
 
 def at_most_places(places: int) -> str:
     """A quantity typed too finely, refused."""
-    return gettext("Use at most %(places)d decimal places.", places=places)
+    return gettext("Use at most %(places)s decimal places.", places=number(places))
 
 
 def name_problem(name: str) -> str | None:

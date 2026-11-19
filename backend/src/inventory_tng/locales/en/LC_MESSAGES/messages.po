@@ -686,7 +686,7 @@ msgstr ""
 
 #: src/inventory_tng/site_settings/forms.py
 #, python-format
-msgid "A whole number of minutes, from %(low)d to %(high)d."
+msgid "A whole number of minutes, from %(low)s to %(high)s."
 msgstr ""
 
 #: src/inventory_tng/catalogue/forms.py
@@ -1548,17 +1548,17 @@ msgstr ""
 
 #: src/inventory_tng/devices/forms.py
 #, python-format
-msgid "From 1 to %(max)d days."
+msgid "From 1 to %(max)s days."
 msgstr ""
 
 #: src/inventory_tng/devices/forms.py
 #, python-format
-msgid "From 1 to %(max)d devices."
+msgid "From 1 to %(max)s devices."
 msgstr ""
 
 #: src/inventory_tng/web/forms.py
 #, python-format
-msgid "Give it a name of up to %(max)d characters."
+msgid "Give it a name of up to %(max)s characters."
 msgstr ""
 
 #: src/inventory_tng/templates/error.html
@@ -2697,7 +2697,7 @@ msgstr ""
 
 #: src/inventory_tng/labels/labels_routes.py
 #, python-format
-msgid "Print from 1 to %(max)d copies of each."
+msgid "Print from 1 to %(max)s copies of each."
 msgstr ""
 
 #: src/inventory_tng/templates/devices/code_made.html
@@ -2821,7 +2821,7 @@ msgstr ""
 
 #: src/inventory_tng/stock/stock_routes.py
 #, python-format
-msgid "Recorded more (%(count)d)"
+msgid "Recorded more (%(count)s)"
 msgstr ""
 
 #: src/inventory_tng/stock/over_recorded_routes.py
@@ -3971,7 +3971,7 @@ msgstr ""
 
 #: src/inventory_tng/web/forms.py
 #, python-format
-msgid "Up to %(max)d characters."
+msgid "Up to %(max)s characters."
 msgstr ""
 
 #: src/inventory_tng/templates/stock/reorder.html
@@ -3984,7 +3984,7 @@ msgstr ""
 
 #: src/inventory_tng/admins/accounts.py
 #, python-format
-msgid "Use 1 to %(max)d letters, digits, dots, dashes or underscores."
+msgid "Use 1 to %(max)s letters, digits, dots, dashes or underscores."
 msgstr ""
 
 #: src/inventory_tng/web/forms.py
@@ -3993,17 +3993,17 @@ msgstr ""
 
 #: src/inventory_tng/admins/accounts.py
 #, python-format
-msgid "Use at least %(min)d characters. A few words make a good one."
+msgid "Use at least %(min)s characters. A few words make a good one."
 msgstr ""
 
 #: src/inventory_tng/admins/accounts.py
 #, python-format
-msgid "Use at most %(max)d characters."
+msgid "Use at most %(max)s characters."
 msgstr ""
 
 #: src/inventory_tng/web/forms.py
 #, python-format
-msgid "Use at most %(places)d decimal places."
+msgid "Use at most %(places)s decimal places."
 msgstr ""
 
 #: src/inventory_tng/templates/devices/devices.html
@@ -4050,7 +4050,7 @@ msgstr ""
 
 #: src/inventory_tng/stock/over_recorded_routes.py
 #, python-format
-msgid "Waiting (%(count)d)"
+msgid "Waiting (%(count)s)"
 msgstr ""
 
 #: src/inventory_tng/templates/stock/over_recorded.html
@@ -4160,17 +4160,17 @@ msgstr ""
 
 #: src/inventory_tng/site_settings/forms.py
 #, python-format
-msgid "Whole days, from %(low)d to %(high)d."
+msgid "Whole days, from %(low)s to %(high)s."
 msgstr ""
 
 #: src/inventory_tng/site_settings/forms.py
 #, python-format
-msgid "Whole hours, from %(low)d to %(high)d."
+msgid "Whole hours, from %(low)s to %(high)s."
 msgstr ""
 
 #: src/inventory_tng/site_settings/forms.py
 #, python-format
-msgid "Whole minutes, from %(low)d to %(high)d."
+msgid "Whole minutes, from %(low)s to %(high)s."
 msgstr ""
 
 #: src/inventory_tng/templates/stock/counts.html

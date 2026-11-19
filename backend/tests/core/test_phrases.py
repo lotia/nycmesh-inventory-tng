@@ -934,6 +934,29 @@ def test_a_count_is_written_as_the_locale_writes_it_its_form_chosen_by_number() 
         assert mail_messages.days(1000) == "1.000 days"
 
 
+def test_a_number_in_a_message_is_written_as_the_locale_writes_it() -> None:
+    """Not only a plural's count: a view's count and a field's limits too
+    (inventory-tng-31q3)."""
+    assert stock_routes.recorded_more_view(1000) == "Recorded more (1,000)"
+    assert over_recorded_routes.waiting_view(1000) == "Waiting (1,000)"
+    assert up_to(1000) == "Up to 1,000 characters."
+    assert whole_minutes(1, 10080) == "A whole number of minutes, from 1 to 10,080."
+    with speaking(GERMAN):
+        assert uses_problem(1000) == "From 1 to 1.000 devices."
+
+
+def test_only_an_id_fills_a_messages_placeholder_as_plain_digits() -> None:
+    """A number people read is filled as number() writes it, a string, so
+    a message's only %d is an id, which stays plain digits as in a link."""
+    placeholders = {
+        name
+        for message in read(ENGLISH_PO)
+        for text in forms(message)
+        for name in re.findall(r"%\((\w+)\)d", text)
+    }
+    assert placeholders <= {"id"}
+
+
 def test_a_badge_counts_as_the_locale_writes_numbers() -> None:
     badge = SimpleNamespace(count=1000, words=NOT_ENGLISH)
     sections = [("/admin/stock", NOT_ENGLISH, badge)]

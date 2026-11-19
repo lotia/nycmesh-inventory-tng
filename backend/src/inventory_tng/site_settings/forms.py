@@ -9,7 +9,7 @@ from typing import NamedTuple
 
 from babel.support import LazyProxy
 
-from inventory_tng.core.phrases import Words, gettext, lazy_gettext
+from inventory_tng.core.phrases import Words, gettext, lazy_gettext, number
 from inventory_tng.models.base import whole
 from inventory_tng.models.site_settings import (
     ACCOUNT_CHANGE_MINUTES,
@@ -25,13 +25,13 @@ REQUIRED_OR_OPTIONAL = lazy_gettext("Required or optional?")
 # A whole number refused, by its unit, from the lowest to the highest.
 WHOLE: dict[str, Callable[[int, int], str]] = {
     "days": lambda low, high: gettext(
-        "Whole days, from %(low)d to %(high)d.", low=low, high=high
+        "Whole days, from %(low)s to %(high)s.", low=number(low), high=number(high)
     ),
     "hours": lambda low, high: gettext(
-        "Whole hours, from %(low)d to %(high)d.", low=low, high=high
+        "Whole hours, from %(low)s to %(high)s.", low=number(low), high=number(high)
     ),
     "minutes": lambda low, high: gettext(
-        "Whole minutes, from %(low)d to %(high)d.", low=low, high=high
+        "Whole minutes, from %(low)s to %(high)s.", low=number(low), high=number(high)
     ),
 }
 
@@ -39,7 +39,9 @@ WHOLE: dict[str, Callable[[int, int], str]] = {
 def whole_minutes(low: int, high: int) -> str:
     """A number of minutes refused: from `low` to `high`."""
     return gettext(
-        "A whole number of minutes, from %(low)d to %(high)d.", low=low, high=high
+        "A whole number of minutes, from %(low)s to %(high)s.",
+        low=number(low),
+        high=number(high),
     )
 
 

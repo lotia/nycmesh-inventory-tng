@@ -24,7 +24,7 @@ from inventory_tng.admins.guards import AdminSignedIn
 from inventory_tng.core.db_errors import Gone, attempt
 from inventory_tng.core.db_sessions import DbSession, exists_where
 from inventory_tng.core.local_time import site_zone
-from inventory_tng.core.phrases import Words, gettext, lazy_gettext
+from inventory_tng.core.phrases import Words, gettext, lazy_gettext, number
 from inventory_tng.models.catalogue import Item
 from inventory_tng.models.names import canonical
 from inventory_tng.models.places import Location
@@ -203,7 +203,7 @@ def over_recorded_page(
 
 
 def waiting_view(waiting: int) -> str:
-    return gettext("Waiting (%(count)d)", count=waiting)
+    return gettext("Waiting (%(count)s)", count=number(waiting))
 
 
 def _views(waiting: int, only: Item | None) -> list[tuple[str, Words, str]]:
