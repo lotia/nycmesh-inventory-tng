@@ -78,9 +78,12 @@ def test_dropped_only_when_named_to_confirm_then_made_again(
     assert facts(url) == made
     again = f"To drop it and make it again, run: mise run reset-dev-database -- {name}"
     assert run_devtools(["database", "drop"]) == 1
-    assert capsys.readouterr().err == (
+    printed = capsys.readouterr()
+    assert printed.err == (
         f"This checkout's database is {name}: nothing was dropped. {again}\n"
     )
+    # Logged, as set_up configures logging: to stdout.
+    assert "development database drop refused" in printed.out
     assert facts(url) == made
     assert run_devtools(["database", "drop", "inventory"]) == 1
     assert capsys.readouterr().err == (

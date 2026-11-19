@@ -163,6 +163,7 @@ def main(argv: Sequence[str], prog: str) -> int:
                 f"reset-dev-database -- {name}",
                 file=sys.stderr,
             )
+            log.warning("development database drop refused", database=name)
             return 1
         drop(settings.database_url)
         log.info("dropped development database", database=name)
