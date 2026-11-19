@@ -44,7 +44,9 @@ Ali decided on 2026-11-15:
   though plural syntax differs inside: gettext's forms on the server,
   ICU's on the page. The sides keep separate catalogues.
 - **English source text is each message's id**, as gettext and Lingui
-  both do by default. A message has a context only where the same English
+  both do by default. That source text is US English (Ali, 2026-11-19):
+  every other locale, other forms of English included, gets its words
+  from its own catalogue. A message has a context only where the same English
   means two things, from a short fixed list in CONTRIBUTING.md (Phrases):
   From and To as places or as a mail's headers, and open as a thing to do
   or a state. A translator comment goes where the English could be misread.

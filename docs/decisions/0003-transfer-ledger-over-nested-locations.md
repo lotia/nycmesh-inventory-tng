@@ -87,8 +87,9 @@ is or how it got there.
 
 ## Amendment: a count form's moment, read without a lock (2026-11-18)
 
-Decided in implementing inventory-tng-0um on 2026-11-18, for Ali to
-confirm. Showing a count form took its place's lock for a moment, holding
+Decided in implementing inventory-tng-0um on 2026-11-18; Ali confirmed it
+on 2026-11-19, preferring it to the lock and to asking again line by line.
+Showing a count form took its place's lock for a moment, holding
 up volunteers' saves there. It now reads, with no lock, the place's latest
 ledger transaction and how many there it saw. A save under way then may
 commit after with an id inside that moment. The count, holding the place,
