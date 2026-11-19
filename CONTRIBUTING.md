@@ -1185,8 +1185,10 @@ Use it to find tests to merge or speed up; the module's docstring
 Only `uv run pytest --cov` and `npm run coverage` measure, so a test file
 run alone is never held to the floors. Their reports
 (`backend/coverage.xml`, `frontend/coverage/`) are not committed. Code that
-only the type checker sees (`if TYPE_CHECKING:`), the API types generated
-in `frontend/src/api/`, and the frontend's page entry files are left out.
+only the type checker sees (`if TYPE_CHECKING:`), a backend entry point's
+`if __name__ == "__main__":` block (tests call its `main()`), the API types
+generated in `frontend/src/api/`, and the frontend's page entry files are
+left out.
 
 ## Dependency updates
 

@@ -41,7 +41,7 @@ COMMANDS: Commands = {
 }
 
 
-def main(argv: Sequence[str] | None = None) -> int:
+def main(argv: Sequence[str]) -> int:
     return dispatch(
         argv,
         prog=PROG,
@@ -51,4 +51,4 @@ def main(argv: Sequence[str] | None = None) -> int:
 
 
 if __name__ == "__main__":
-    sys.exit(main())
+    sys.exit(main(sys.argv[1:]))

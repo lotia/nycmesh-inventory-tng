@@ -1,25 +1,20 @@
 """TOTP keys from the command line (admins/sealed_totp_keys_command.py;
 DEPLOYMENT.md, TOTP keys)."""
 
-import sys
 from pathlib import Path
 
 import pytest
 
+from inventory_tng import manage
 from inventory_tng.admins import sealed_totp_keys_command
 from inventory_tng.admins.sealed_totp_keys import TotpKeys
 
-from helpers.python_m import run_as_python_m
-
 
 def test_new_prints_a_key_that_loads(
-    tmp_path: Path,
-    monkeypatch: pytest.MonkeyPatch,
-    capsys: pytest.CaptureFixture[str],
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
     """As DEPLOYMENT.md runs it: python -m inventory_tng.manage sealed-totp-keys new."""
-    monkeypatch.setattr(sys, "argv", ["manage", "sealed-totp-keys", "new"])
-    assert run_as_python_m(monkeypatch, "inventory_tng.manage") == 0
+    assert manage.main(["sealed-totp-keys", "new"]) == 0
     printed = capsys.readouterr().out.strip()
     (tmp_path / "1").write_text(printed)
     assert TotpKeys.load(tmp_path).newest == 1

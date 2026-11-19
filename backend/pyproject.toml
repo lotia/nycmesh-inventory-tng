@@ -112,8 +112,10 @@ source_pkgs = ["inventory_tng", "devtools"]
 
 [tool.coverage.report]
 fail_under = 94
-# Only seen by the type checker, never run.
-exclude_also = ["if TYPE_CHECKING:"]
+# Only seen by the type checker, never run; and an entry point's
+# `__main__` block, which tests reach only through python -m in a
+# subprocess, unmeasured, as they call main() itself.
+exclude_also = ["if TYPE_CHECKING:", 'if __name__ == "__main__":']
 skip_covered = true
 show_missing = true
 

@@ -10,8 +10,6 @@ import pytest
 from devtools.__main__ import COMMANDS, main
 from inventory_tng.core.local_env import CLONE
 
-from helpers.python_m import run_as_python_m
-
 
 @pytest.mark.parametrize("name", COMMANDS)
 def test_every_listed_command_imports_and_shows_its_help(
@@ -24,14 +22,25 @@ def test_every_listed_command_imports_and_shows_its_help(
 
 
 def test_with_no_command_it_lists_every_one(
-    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+    capsys: pytest.CaptureFixture[str],
 ) -> None:
-    monkeypatch.setattr(sys, "argv", ["devtools"])
-    assert run_as_python_m(monkeypatch, "devtools.__main__") == 0
+    assert main([]) == 0
     out = capsys.readouterr().out
     for name, (_, line) in COMMANDS.items():
         assert f"  {name}" in out
         assert line in out
+
+
+def test_python_m_lists_every_one() -> None:
+    """For real, from backend/ as the tasks run it."""
+    shown = subprocess.run(
+        [sys.executable, "-m", "devtools"],
+        capture_output=True,
+        text=True,
+        check=True,
+        cwd=CLONE / "backend",
+    )
+    assert all(f"  {name}" in shown.stdout for name in COMMANDS)
 
 
 # What a fresh interpreter has imported of the tools once the entry point

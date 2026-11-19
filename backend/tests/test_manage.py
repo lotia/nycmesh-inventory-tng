@@ -8,8 +8,6 @@ import pytest
 
 from inventory_tng import manage
 
-from helpers.python_m import run_as_python_m
-
 
 @pytest.mark.parametrize("name", manage.COMMANDS)
 def test_every_listed_command_imports_and_shows_its_help(
@@ -23,19 +21,33 @@ def test_every_listed_command_imports_and_shows_its_help(
     )
 
 
-@pytest.mark.parametrize("argv", [["manage"], ["manage", "--help"]])
 def test_with_no_command_it_lists_every_one(
-    argv: list[str],
-    monkeypatch: pytest.MonkeyPatch,
     capsys: pytest.CaptureFixture[str],
 ) -> None:
-    """As DEPLOYMENT.md runs it."""
-    monkeypatch.setattr(sys, "argv", argv)
-    assert run_as_python_m(monkeypatch, "inventory_tng.manage") == 0
+    assert manage.main([]) == 0
     out = capsys.readouterr().out
     for name, (_, line) in manage.COMMANDS.items():
         assert f"  {name}" in out
         assert line in out
+
+
+def test_help_lists_every_one(capsys: pytest.CaptureFixture[str]) -> None:
+    with pytest.raises(SystemExit) as done:
+        manage.main(["--help"])
+    assert done.value.code == 0
+    out = capsys.readouterr().out
+    assert all(f"  {name}" in out for name in manage.COMMANDS)
+
+
+def test_python_m_lists_every_one() -> None:
+    """For real, as DEPLOYMENT.md runs it."""
+    shown = subprocess.run(
+        [sys.executable, "-m", "inventory_tng.manage"],
+        capture_output=True,
+        text=True,
+        check=True,
+    )
+    assert all(f"  {name}" in shown.stdout for name in manage.COMMANDS)
 
 
 def test_an_unknown_command_is_refused(capsys: pytest.CaptureFixture[str]) -> None:
