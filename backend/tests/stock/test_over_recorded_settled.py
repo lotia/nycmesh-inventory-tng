@@ -28,7 +28,7 @@ from inventory_tng.stock.paths import COUNTS
 from inventory_tng.stock.stock_routes import recorded_more_view
 from inventory_tng.web import listing
 
-from helpers.markup import Element, links, read, sorted_columns
+from helpers.markup import Element, links, read, sorted_columns, table_rows
 from helpers.over_recorded import PAGE
 from helpers.rows import tag
 from helpers.sign_in import new_admin
@@ -69,10 +69,7 @@ def seen(check: OverRecorded) -> str:
 
 def rows_of(page: str | Element) -> list[list[str]]:
     """The first table's rows, each cell's words."""
-    table = read(page).all("table")[0]
-    return [
-        cells for row in table.all("tr") if (cells := [c.text for c in row.all("td")])
-    ]
+    return table_rows(read(page).all("table")[0])
 
 
 def settled_rows(client: TestClient, path: str = SETTLED) -> list[list[str]]:

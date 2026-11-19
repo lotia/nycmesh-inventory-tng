@@ -95,9 +95,8 @@ def test_its_open_package_closed_outside_a_count_correct_writes_the_sealed_end(
     assert on is not None
     day = show_day(on, site_zone(session))
     page = admin_client.get(f"{PAGE}?item={spools.cable.id}").text
-    assert f"Open spool closed {day}. Sealed spool still to put right." in words_on(
-        page
-    )
+    said = words_on(page)
+    assert f"Open spool closed {day}. Sealed spool still to put right." in said
     assert "Correct sealed spool<span" in page
     (check,) = checks(session)
     with capture_logs() as logs:

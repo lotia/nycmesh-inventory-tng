@@ -156,6 +156,16 @@ def row_links(page: str | Element, path: str) -> list[str]:
     ]
 
 
+def table_rows(page: str | Element) -> list[list[str]]:
+    """The words of each cell of each table row with cells, in the page's
+    order: a row of headings only is left out."""
+    return [
+        cells
+        for row in read(page).all("tr")
+        if (cells := [cell.text for cell in row.all("td")])
+    ]
+
+
 def forms(page: str | Element) -> list[tuple[str, str]]:
     """Each form's method and address, in the page's order."""
     return [

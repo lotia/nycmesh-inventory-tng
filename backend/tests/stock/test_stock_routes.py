@@ -17,6 +17,7 @@ from helpers.markup import (
     read,
     row_links,
     sorted_columns,
+    table_rows,
     text,
     words_on,
 )
@@ -48,15 +49,10 @@ def test_less_than_nothing_asks_for_a_count(
     assert "less than nothing somewhere" in page
 
 
-def rows(part: Element) -> list[list[str]]:
-    """The words of each cell of each row in `part`."""
-    return [[cell.text for cell in row.all("td")] for row in part.all("tr")]
-
-
 def rows_under(page: str, heading: str) -> list[list[str]]:
     """The rows of the section headed `heading`."""
     (section,) = [s for s in read(page).all("section") if s.one("h2").text == heading]
-    return rows(section)
+    return table_rows(section)
 
 
 def shows(rows: list[list[str]], item: Item, amount: int) -> bool:
@@ -77,7 +73,7 @@ def needs_counting_page(admin_client: TestClient) -> str:
 
 def reorder_shows(page: str, item: Item, amount: int) -> bool:
     """Whether the reorder list has the item, with this much in the stores."""
-    return shows(rows(read(page)), item, amount)
+    return shows(table_rows(page), item, amount)
 
 
 def test_reorder_lists_what_is_at_or_below_its_level(

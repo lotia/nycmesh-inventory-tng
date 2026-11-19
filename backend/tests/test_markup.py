@@ -3,7 +3,7 @@ tests built on it can be trusted."""
 
 import pytest
 
-from helpers.markup import Unescaped, read, row_links, words_on
+from helpers.markup import Unescaped, read, row_links, table_rows, words_on
 
 pytestmark = pytest.mark.helper
 
@@ -55,6 +55,14 @@ def test_row_links_counts_each_link_in_a_cell_once() -> None:
         "</td></tr></table></td></tr></table>"
     )
     assert row_links(page, "/r") == ["In"]
+
+
+def test_table_rows_reads_each_rows_cells_and_leaves_out_headings() -> None:
+    page = (
+        "<table><tr><th>Item</th><th>Count</th></tr>"
+        "<tr><td>Cable</td><td>2&nbsp;m</td></tr><tr><td>Radio</td></tr></table>"
+    )
+    assert table_rows(page) == [["Cable", "2\N{NO-BREAK SPACE}m"], ["Radio"]]
 
 
 def test_one_refuses_none_or_several() -> None:
