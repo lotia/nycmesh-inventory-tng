@@ -291,13 +291,13 @@ def test_an_open_package_is_made_once_per_key(session: Session, spools: Spools) 
         open_packages.make(session, uuid.uuid4(), 999999, store)
 
 
-def _open_here(spools: Spools, *lines: Entry) -> object:
+def open_here(spools: Spools, *lines: Entry) -> object:
     store = spools.store.id
     here = {"kind": "open", "from_location_id": store, "to_location_id": store}
     return spools.write(here, *lines)
 
 
-def _of_another_item(spools: Spools, _opened: Form) -> object:
+def of_another_item(spools: Spools, _opened: Form) -> object:
     other = add(
         spools.session,
         ItemPackage(item_id=spools.place.item.id, name=f"Box {tag()}", size=10),
@@ -306,7 +306,7 @@ def _of_another_item(spools: Spools, _opened: Form) -> object:
     return spools.move(Entry(spools.cable.id, Decimal(10), whole, whole))
 
 
-def _from_where_it_is_not(spools: Spools, opened: Form) -> object:
+def from_where_it_is_not(spools: Spools, opened: Form) -> object:
     van_to_store = {
         "kind": "move",
         "from_location_id": spools.van.id,
@@ -345,13 +345,13 @@ LEDGER_BREAKS: list[tuple[str, Callable[[Spools, Form], object]]] = [
     ),
     (
         "opening_follows_setting",
-        lambda spools, _: _open_here(
+        lambda spools, _: open_here(
             spools, Entry(spools.cable.id, Decimal(305), spools.sealed)
         ),
     ),
     (
         "open_package_opened_once",
-        lambda spools, opened: _open_here(
+        lambda spools, opened: open_here(
             spools, Entry(spools.cable.id, Decimal(305), spools.sealed, opened)
         ),
     ),
@@ -362,8 +362,8 @@ LEDGER_BREAKS: list[tuple[str, Callable[[Spools, Form], object]]] = [
             Entry(spools.cable.id, Decimal(2), opened),
         ),
     ),
-    ("movement_package_of_item", _of_another_item),
-    ("movement_open_package_place", _from_where_it_is_not),
+    ("movement_package_of_item", of_another_item),
+    ("movement_open_package_place", from_where_it_is_not),
 ]
 
 

@@ -1130,7 +1130,7 @@ class Listed:
     shelf: Location
     ada: Admin
     bob: Admin
-    found: int
+    found_reason_id: int
 
     def __call__(self, **query: str) -> list[str]:
         """Each row's kind, as the list asked for by `query` shows it."""
@@ -1245,7 +1245,7 @@ def test_counts_come_in_pages(listed: Listed) -> None:
             listed.place.item.id,
             Decimal(1),
             found=True,
-            reason_id=listed.found,
+            reason_id=listed.found_reason_id,
         )
     listed.session.commit()
     assert len(listed()) == 31

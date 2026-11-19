@@ -19,6 +19,10 @@ const listingOf = (page: Page) =>
     has: page.getByRole("heading", { name: HEADING }),
   });
 
+/** The id of the item whose page is open. */
+const itemIdOf = (page: Page) =>
+  Number(new URL(page.url()).pathname.split("/").at(-1));
+
 /** The Discard of the listed line that says `words`. */
 const lineDiscard = (listing: Locator, words: string) =>
   listing
@@ -83,7 +87,7 @@ test("a save an older build left goes back in the cart, whole without a tap, and
   page,
 }) => {
   const cable = await ownCable(page);
-  const itemId = Number(new URL(page.url()).pathname.split("/").at(-1));
+  const itemId = itemIdOf(page);
   await page.goto("/scan");
   const { volunteerId, fromId, toId } = await leave(
     page,
@@ -137,7 +141,7 @@ test("a save's package retired since is named, never offered, and goes by its li
   page,
 }) => {
   const cable = await ownCable(page, "Retired cable");
-  const itemId = Number(new URL(page.url()).pathname.split("/").at(-1));
+  const itemId = itemIdOf(page);
   const listing = listingOf(page);
   const box = "Box of 305 m";
   const retireBox = page.getByRole("button", { name: `Retire ${box}` });
@@ -182,7 +186,7 @@ test("a save's package retired since is named, never offered, and goes by its li
  * the cable was retired with none left. The cable's name. */
 async function leaveOfRetiredItem(page: Page) {
   const cable = await ownCable(page, "Retired cable");
-  const itemId = Number(new URL(page.url()).pathname.split("/").at(-1));
+  const itemId = itemIdOf(page);
   await page.getByRole("button", { name: "Retire", exact: true }).click();
   await expect(page.getByRole("status")).toContainText("Retired.");
   await page.goto("/scan");
@@ -269,7 +273,7 @@ test("a save an older build's tab saved meanwhile is saved once, under its key; 
   page,
 }) => {
   const cable = await ownCable(page);
-  const itemId = Number(new URL(page.url()).pathname.split("/").at(-1));
+  const itemId = itemIdOf(page);
   await page.goto("/scan");
 
   const saved = await leaveSaved(page, itemId);
@@ -325,7 +329,7 @@ test("what a save another tab recorded first adds waits on a button while the ca
   page,
 }) => {
   const cable = await ownCable(page);
-  const itemId = Number(new URL(page.url()).pathname.split("/").at(-1));
+  const itemId = itemIdOf(page);
   await page.goto("/scan");
   await leaveSaved(page, itemId);
   await page.getByLabel(/^Loose/).fill("3");
@@ -362,7 +366,7 @@ test("a save another tab recorded first, taken down since, says an administrator
   page,
 }) => {
   const cable = await ownCable(page);
-  const itemId = Number(new URL(page.url()).pathname.split("/").at(-1));
+  const itemId = itemIdOf(page);
   await page.goto("/scan");
   const first = await leaveSaved(page, itemId);
   await page.getByLabel(/^Loose/).fill("1");
@@ -394,7 +398,7 @@ test("a cart this build filled, which its tab recorded as a newer build took it 
   page,
 }) => {
   const cable = await ownCable(page);
-  const itemId = Number(new URL(page.url()).pathname.split("/").at(-1));
+  const itemId = itemIdOf(page);
   await page.goto("/scan");
   const { volunteerId, fromId, toId } = await choices(page);
   await page.getByLabel("Your name").selectOption(String(volunteerId));
@@ -440,7 +444,7 @@ test("a double tap on a line's Discard discards that line only, and focuses the 
   page,
 }) => {
   const cable = await ownCable(page);
-  const itemId = Number(new URL(page.url()).pathname.split("/").at(-1));
+  const itemId = itemIdOf(page);
   await page.goto("/scan");
   const open = crypto.randomUUID();
   await leave(page, [
