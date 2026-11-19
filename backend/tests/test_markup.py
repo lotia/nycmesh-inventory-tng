@@ -108,6 +108,7 @@ def test_checked_reads_only_the_checked_boxes_of_that_name() -> None:
         '<input type="radio" name="u" value="a">'
         '<input checked value="b" type="radio" name="u">'
         '<input type="checkbox" name="u" checked><input name="v" value="c" checked>'
+        '<select name="u"><option value="d" selected>d</option></select>'
     )
     assert checked(page, "u") == ["b", None]
 
