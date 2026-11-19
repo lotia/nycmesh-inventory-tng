@@ -36,7 +36,9 @@ def parse(
         help="retire authenticators, for a lost or leaked key: each is set up again",
     ).add_mutually_exclusive_group(required=True)
     retire.add_argument(
-        "--unreadable", action="store_true", help="those a lost key sealed"
+        "--unreadable",
+        action="store_true",
+        help="those that do not open: their key lost or replaced",
     )
     retire.add_argument("--all", action="store_true", help="every one: a leaked key")
     return parser.parse_args(argv)

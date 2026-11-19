@@ -43,8 +43,9 @@ class TotpKeysError(SettingsError):
 
 
 class Unreadable(Exception):
-    """A sealed key that cannot be opened: its key version is gone, or it was
-    not sealed for this administrator."""
+    """A sealed key that cannot be opened: its key version is gone, its
+    version's file holds another key, it was not sealed for this
+    administrator, or it is damaged."""
 
 
 def new_key() -> str:
@@ -79,6 +80,10 @@ class TotpKeys:
         key = self.keys.get(version)
         if key is None:
             raise Unreadable(f"key version {version} is not in TOTP_KEYS_DIR")
+        # Too short for AESGCM to take as a nonce, which it refuses with a
+        # ValueError: damaged, so unreadable rather than a crash at startup.
+        if len(sealed) < NONCE_BYTES:
+            raise Unreadable("too short to be a sealed key")
         nonce, rest = sealed[:NONCE_BYTES], sealed[NONCE_BYTES:]
         try:
             return AESGCM(key).decrypt(nonce, rest, _for(admin_id)).decode()

@@ -53,6 +53,14 @@ def test_a_key_version_that_is_gone_is_unreadable() -> None:
         newer.open(version, one, 1)
 
 
+def test_a_damaged_sealed_key_is_unreadable() -> None:
+    """Not a ValueError from AES-GCM, which would stop the app starting."""
+    version, one = TOTP_KEYS.seal(KEY, 1)
+    for damaged in (b"", one[:3], one[:-1]):
+        with pytest.raises(Unreadable):
+            TOTP_KEYS.open(version, damaged, 1)
+
+
 def test_the_newest_version_seals_and_every_version_opens(tmp_path: Path) -> None:
     first = TotpKeys.load(keys_in(tmp_path, **{"1": sealed_totp_keys.new_key()}))
     version, one = first.seal(KEY, 1)
@@ -198,21 +206,40 @@ def test_startup_and_the_command_find_a_key_replaced_under_its_version(
     own_database: str,
 ) -> None:
     """Version 1's file now holds another key, as after it was overwritten:
-    the version is there, but what it sealed does not open. Its own database,
-    as startup reads what is committed."""
+    the version is there, but what it sealed does not open. Bob's, sealed
+    with the new one, still opens. Its own database, as startup reads what
+    is committed."""
     database = make_database(own_database)
     replaced = TotpKeys({1: raw_key()})
     try:
         with setting_up(database.session()) as session:
             admin_id = new_admin(session)[0].id
+            bob, bob_key = new_admin(session, "bob")
+            assert bob_key is not None
+            bobs = session.scalars(
+                select(Authenticator).where(Authenticator.admin_id == bob.id)
+            ).one()
+            bobs.key_version, bobs.sealed_key = replaced.seal(bob_key, bob.id)
+            authenticator_id = session.scalars(
+                select(Authenticator.id).where(Authenticator.admin_id == admin_id)
+            ).one()
             session.commit()
         with capture_logs() as logs:
             check_totp_keys(database, replaced)
-        assert {
-            "event": "authenticators unreadable with TOTP_KEYS_DIR",
-            "count": 1,
-            "log_level": "error",
-        } in logs
+        assert logs == [
+            {
+                "event": "authenticator unreadable",
+                "admin_id": admin_id,
+                "authenticator_id": authenticator_id,
+                "key_version": 1,
+                "log_level": "error",
+            },
+            {
+                "event": "authenticators unreadable with TOTP_KEYS_DIR",
+                "count": 1,
+                "log_level": "error",
+            },
+        ]
         with setting_up(database.session()) as session:
             retired, _ = accounts.retire_authenticators(
                 session, replaced, datetime.now(UTC), every=False, notify=NO_MAIL
