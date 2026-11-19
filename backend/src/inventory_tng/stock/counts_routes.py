@@ -733,7 +733,7 @@ def adjust(
     if asked is None:
         return _counts_page(request, session, signed, problems=problems, values=form)
     place, item, amount, direction, reason, key = asked
-    written, broken = refusal(
+    _, broken = refusal(
         session,
         lambda: record_adjustment(
             session,
@@ -754,6 +754,5 @@ def adjust(
         return _counts_page(
             request, session, signed, problems={field: RULES[broken]}, values=form
         )
-    assert written is not None
     session.commit()
     return redirect(COUNTS, notice="adjusted", section="adjust")

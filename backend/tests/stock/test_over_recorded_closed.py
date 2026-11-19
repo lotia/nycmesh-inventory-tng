@@ -516,10 +516,8 @@ def test_a_close_skips_one_a_count_holds_and_correct_then_closes_it_as_counted(
     assert waits.settled_at is None
     third = own_committed.session()
     ledger.lock_places(third, over_recorded.places_of(third, check.id))
-    assert over_recorded.correct(third, check.id, over_recorded.seen(waits), admin) == (
-        "counted",
-        [],
-    )
+    seen = over_recorded.seen(waits)
+    assert over_recorded.correct(third, check.id, seen, admin) == "counted"
     third.commit()
     (check,) = checks(first)
     assert (check.settled_how, check.settled_by_admin_id) == ("counted", admin)

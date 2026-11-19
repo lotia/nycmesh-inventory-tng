@@ -297,9 +297,7 @@ def close(session: Session, check_id: int, seen_as: str, admin_id: int) -> None:
     _closed_right(row, admin_id)
 
 
-def correct(
-    session: Session, check_id: int, seen_as: str, admin_id: int
-) -> tuple[Settled, list[counts.Written]]:
+def correct(session: Session, check_id: int, seen_as: str, admin_id: int) -> Settled:
     """Settle one, as corrected: an adjustment on each side its transaction
     has, but one a count put right (counted), undoes what was recorded more
     than moved, in the forms it moved in, with the reason REASON. Found
@@ -311,13 +309,13 @@ def correct(
     2026-11-15, inventory-tng-dro). Call it holding its places
     (places_of), locked first. Each under a key of the check's, so it is
     written once; with one end counted, a key of its own. How it was
-    settled, and what was written. RuleBroken as waiting(), or as
+    settled. RuleBroken as waiting(), or as
     counts.record_adjustment."""
     row = waiting(session, check_id, seen_as)
     movement, transaction, closed = _read(session, row)
     if _right(row, movement, transaction, closed):
         _closed_right(row, admin_id)
-        return "counted", []
+        return "counted"
     _settled(row, admin_id, "corrected")
     reason = adjustment_reasons.seeded(session, REASON)
     if closed:
@@ -340,11 +338,10 @@ def correct(
             movement.to_open_package_id,
         ),
     )
-    written: list[counts.Written] = []
     for place, found, package_id, open_id in sides:
         if place is None:
             continue
-        written += counts.record_adjustment(
+        counts.record_adjustment(
             session,
             correction_key(transaction.idempotency_key, row, found=found),
             admin_id,
@@ -356,18 +353,18 @@ def correct(
             form=ledger.Form(package_id, open_id),
         )
     log.info("over recorded corrected", over_recorded_id=check_id, admin_id=admin_id)
-    return "corrected", written
+    return "corrected"
 
 
 def confirm_count(
     session: Session, check_id: int, seen_as: str, admin_id: int, count: Decimal
-) -> tuple[Settled, list[counts.Written]]:
+) -> Settled:
     """Settle one of an open package moved whole
     (over_recorded_queries.Shown.moved_whole), given the count an
     administrator says it held when it moved: as it was, as checked,
     writing nothing; else as corrected, with an adjustment at the
     place it arrived, in it, for the difference, with the reason REASON,
-    under a key of the check's. How it was settled, and what was written.
+    under a key of the check's. How it was settled.
     Call it holding its places (places_of), locked first. RuleBroken as
     _settle, if it is not such a move (over_recorded_not_whole), or as
     counts.record_adjustment."""
@@ -385,9 +382,9 @@ def confirm_count(
         log.info(
             "over recorded confirmed", over_recorded_id=check_id, admin_id=admin_id
         )
-        return "checked", []
+        return "checked"
     row.settled_how = "corrected"
-    written = counts.record_adjustment(
+    counts.record_adjustment(
         session,
         uuid.uuid5(transaction.idempotency_key, f"over recorded {row.id} count"),
         admin_id,
@@ -401,7 +398,7 @@ def confirm_count(
     log.info(
         "over recorded count corrected", over_recorded_id=check_id, admin_id=admin_id
     )
-    return "corrected", written
+    return "corrected"
 
 
 def openings_waiting(

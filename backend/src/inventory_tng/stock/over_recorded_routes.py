@@ -533,27 +533,27 @@ def answer(
     # The place that refused it (counts.NotCountable), as it was then.
     refused_at: int | None = None
 
-    def settle() -> tuple[over_recorded.Settled, list[counts.Written]]:
+    def settle() -> over_recorded.Settled:
         nonlocal refused_at
         try:
             if do == "correct":
                 return over_recorded.correct(session, check_id, seen, admin_id)
             if do == "close":
                 over_recorded.close(session, check_id, seen, admin_id)
-                return "counted", []
+                return "counted"
             if count is not None:
                 return over_recorded.confirm_count(
                     session, check_id, seen, admin_id, count
                 )
             over_recorded.mark_checked(session, check_id, seen, admin_id, reason, words)
-            return "checked", []
+            return "checked"
         except counts.NotCountable as broken:
             refused_at = broken.location_id
             raise
 
-    settled, broken = attempt(session, settle)
+    how, broken = attempt(session, settle)
     session.commit()
-    if settled is None:
+    if how is None:
         log.info("over recorded not settled", over_recorded_id=check_id, rule=broken)
         refused = None
         if broken is not None and broken not in MEANWHILE:
@@ -564,7 +564,6 @@ def answer(
         return _page(
             request, signed, session, only, view, values=values, refused=refused
         )
-    how, _ = settled
     over_recorded.measure_settled(how, reason if do == "checked" else None)
     notice = f"over_recorded_{how}"
     if do == "count":
