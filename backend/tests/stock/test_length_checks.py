@@ -487,8 +487,9 @@ def test_the_count_page_hints_at_the_printed_length_of_items_in_length(
     page, shown = text(response), response.text
     # Each open package's, and under one nobody recorded (inventory-tng-lby).
     assert page.count(str(formatting.PRINTED_LENGTH)) == 3
+    boxes = read(shown)
     for hint in (f"hint-opened_{made.id}", "hint-found_left"):
-        assert read(shown).all("input", aria_describedby=hint), hint
+        assert boxes.all("input", aria_describedby=hint), hint
     # Beside a box of plugs, counted each: only the spool's option is one
     # the hint fits, as the page follows what is picked.
     plugs = add(

@@ -27,7 +27,7 @@ from inventory_tng.stock.forms import SAY_WHY, WORDS_FOR_ANOTHER
 from inventory_tng.web.forms import up_to
 
 from helpers.concurrency import Committed
-from helpers.markup import Element, box_values, checked, forms, problem, read, text
+from helpers.markup import Element, box_values, checked, problem, read, text
 from helpers.over_recorded import (
     PAGE,
     checked_forms,
@@ -397,8 +397,8 @@ def test_one_moved_whole_marked_checked_without_a_reason_is_asked_again_above(
     response = mark_checked(admin_client, session)
     assert response.status_code == 400
     (check,) = checks(session)
-    answers = [to for _, to in forms(response.text)]
-    assert answers.count(f"{PAGE}/{check.id}/checked") == 1
+    answer = f"{PAGE}/{check.id}/checked"
+    assert len(read(response.text).all("form", action=answer)) == 1
     assert str(SAY_WHY) in response.text
     assert not read(response.text).all("*", role="alert")
 

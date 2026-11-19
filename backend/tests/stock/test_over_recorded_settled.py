@@ -772,5 +772,5 @@ def test_an_answer_comes_back_to_those_waiting_as_they_were(
     back = done.headers["location"]
     assert back == f"{PAGE}?{view}&notice=over_recorded_checked"
     # Page 2 of 25 a page is past the end: the last page, the first.
-    answers = [to for _, to in forms(admin_client.get(back).text)]
-    assert [to for to in answers if to.startswith(f"{PAGE}/{other.id}/checked?")]
+    answers = forms(admin_client.get(back).text)
+    assert any(to.startswith(f"{PAGE}/{other.id}/checked?") for _, to in answers)

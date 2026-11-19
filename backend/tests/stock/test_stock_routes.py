@@ -134,10 +134,10 @@ def test_needs_counting_lists_each_place_short(
     assert "Nothing shows less than nothing." in needs_counting_page(admin_client)
     place = Place(session)
     write(session, place)
-    page = needs_counting_page(admin_client)
+    shown = admin_client.get(NEEDS_COUNTING)
+    page = text(shown)
     assert place.store.name in page
-    shown = admin_client.get(NEEDS_COUNTING).text
-    assert f"{COUNTS}/{place.store.id}" in addresses(shown)
+    assert f"{COUNTS}/{place.store.id}" in addresses(shown.text)
     assert place.van.name not in page  # It has three, which is not short.
 
 

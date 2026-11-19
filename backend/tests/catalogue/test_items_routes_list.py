@@ -230,10 +230,9 @@ def test_items_filter_by_category(
         ITEMS, params={"category": str(antennas.id), "q": f"Filtered {mark}"}
     ).text
     assert [kept.name] == items_named(found)
-    kept_in = addresses(found)
     dropped = f"sort=name&order=desc&category={antennas.id}"
-    assert not [to for to in kept_in if dropped in to]
-    assert [to for to in kept_in if f"category={antennas.id}&sort=name" in to]
+    assert not any(dropped in to for to in addresses(found))
+    assert any(f"category={antennas.id}&sort=name" in to for to in addresses(found))
     suggest = f"{ITEMS}/suggest?category={antennas.id}"
     assert read(found).all("input", data_suggest=suggest)
     offered = admin_client.get(

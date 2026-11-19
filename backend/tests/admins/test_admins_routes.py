@@ -51,7 +51,7 @@ NEW_PASSWORD = "a long passphrase of their own"
 
 def code_boxes(page: str) -> int:
     """How many boxes on the page ask for the administrator's code."""
-    return len(read(page).all("input", name="confirm_code"))
+    return len(box_values(page, guards.CONFIRM_FIELD))
 
 
 def link_on(page: str) -> str:
