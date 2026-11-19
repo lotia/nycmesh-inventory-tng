@@ -102,7 +102,12 @@ export function OpenPackageCard({
   const cut = cutOf(open, taken);
   const usedUp = usedUpOf(open, taken);
   const empty = open.left <= 0;
-  const short = isShortEnd(open.left, open.short_below);
+  // One flag at most: a short end has something left.
+  const flag = empty
+    ? SHOWS_NOTHING_LEFT
+    : isShortEnd(open.left, open.short_below)
+      ? SHORT_END
+      : null;
   const opened = open.opened_at.slice(0, 10);
   const note =
     cut?.ending != null && usedUp ? endingNote(cut.ending, name, unit) : "";
@@ -123,10 +128,7 @@ export function OpenPackageCard({
         <strong>{open.package_name}</strong>
         <span class="tag">{say(OPEN)}</span>
         <small>{say(OPENED, { date: opened })}</small>
-        {empty && (
-          <strong class="text-sm uppercase">{say(SHOWS_NOTHING_LEFT)}</strong>
-        )}
-        {short && <strong class="text-sm uppercase">{say(SHORT_END)}</strong>}
+        {flag && <strong class="text-sm uppercase">{say(flag)}</strong>}
       </legend>
       <div class="grid grid-cols-2 gap-2">
         <div>
