@@ -5,6 +5,7 @@ transaction rolled back, is never done."""
 
 from collections.abc import Callable
 
+import structlog
 from sqlalchemy import event
 from sqlalchemy.orm import Session, SessionTransaction
 
@@ -14,11 +15,15 @@ from inventory_tng.core.db_savepoints import innermost, savepoint_undone, within
 # or savepoint it was asked for in.
 PENDING_INFO = "inventory.once_committed"
 
+log = structlog.get_logger(__name__)
+
 
 def once_committed(session: Session, work: Callable[[], None]) -> None:
-    """Do `work` once the session's transaction commits: begun now, if
-    none is, so a rollback before it begins drops the work too."""
-    asked = innermost(session) or session.begin()
+    """Do `work` once the session's transaction commits: asked for after
+    a write, so in a transaction already begun."""
+    asked = innermost(session)
+    if asked is None:
+        raise RuntimeError("work after commit asked for outside a transaction")
     session.info.setdefault(PENDING_INFO, []).append((asked, work))
 
 
@@ -28,7 +33,12 @@ def _committed(session: Session) -> None:
     if session.in_nested_transaction():
         return
     for _, work in session.info.pop(PENDING_INFO, []):
-        work()
+        # What was written is committed: work that fails is logged, and
+        # neither fails the request nor stops the work after it.
+        try:
+            work()
+        except Exception:
+            log.exception("work after commit failed")
 
 
 @event.listens_for(Session, "after_soft_rollback")

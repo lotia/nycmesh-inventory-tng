@@ -86,6 +86,7 @@ def _correct(
     session: Session,
     key: uuid.UUID,
     kind: Literal["count", "adjustment"],
+    admin_id: int,
     header: Mapping[str, object],
     lines: Lines,
 ) -> list[Written]:
@@ -93,11 +94,11 @@ def _correct(
     key is written already. The one place either is written, so each is
     measured and logged here, once committed (_recorded), whichever page
     wrote it, and never twice (inventory-tng-vvp0)."""
-    transaction = insert_transaction(session, key, {"kind": kind, **header}, lines)
+    full = {"kind": kind, "admin_id": admin_id, **header}
+    transaction = insert_transaction(session, key, full, lines)
     if transaction is None:
         return []
     written = Written(transaction.id, kind, len(lines))
-    admin_id = header["admin_id"]
     once_committed(session, lambda: _recorded(admin_id, written))
     return [written]
 
@@ -117,7 +118,7 @@ class Counted(NamedTuple):
     put_right: list[tuple[int, Form | None]]
 
 
-def _recorded(admin_id: object, transaction: Written) -> None:
+def _recorded(admin_id: int, transaction: Written) -> None:
     """Measure and log a count or an adjustment committed."""
     recorded.add(1, {"kind": transaction.kind})
     log.info(
@@ -266,11 +267,11 @@ def record_count(
     # A count of nothing at all still says when the place was counted.
     anything = counted_at or by_form
     if into or ((kept or kept_forms or not anything) and not out):
-        header = {"admin_id": admin_id, "to_location_id": location_id}
-        written += _correct(session, key, "count", header, into)
+        header = {"to_location_id": location_id}
+        written += _correct(session, key, "count", admin_id, header, into)
     if out:
-        header = {"admin_id": admin_id, "from_location_id": location_id}
-        written += _correct(session, lost_key, "count", header, out)
+        header = {"from_location_id": location_id}
+        written += _correct(session, lost_key, "count", admin_id, header, out)
     put_right: list[tuple[int, Form | None]] = []
     if sent is None:
         put_right = [(item_id, None) for item_id in sorted(kept)]
@@ -321,11 +322,11 @@ def count_open_package(
     )
     written: list[Written] = []
     if found:
-        header = {"admin_id": admin_id, "to_location_id": place}
-        written += _correct(session, key, "count", header, found)
+        header = {"to_location_id": place}
+        written += _correct(session, key, "count", admin_id, header, found)
     if lost:
-        header = {"admin_id": admin_id, "from_location_id": place}
-        written += _correct(session, lost_key, "count", header, lost)
+        header = {"from_location_id": place}
+        written += _correct(session, lost_key, "count", admin_id, header, lost)
     return OpenCounted(now, written)
 
 
@@ -349,8 +350,8 @@ def record_adjustment(
         return []
     _require_countable(session, location_id)
     side = "to_location_id" if found else "from_location_id"
-    header = {"admin_id": admin_id, "reason_id": reason_id, side: location_id}
+    header = {"reason_id": reason_id, side: location_id}
     line = (
         Entry(item_id, amount, LOOSE, form) if found else Entry(item_id, amount, form)
     )
-    return _correct(session, key, "adjustment", header, [line])
+    return _correct(session, key, "adjustment", admin_id, header, [line])

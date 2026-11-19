@@ -12,6 +12,7 @@ from sqlalchemy.orm import Session
 
 from inventory_tng.app import create_app
 from inventory_tng.core.db_locking import LOCKS_INFO, UNGUARDED_INFO
+from inventory_tng.core.db_once_committed import PENDING_INFO
 from inventory_tng.core.db_sessions import (
     DbSession,
     get_session,
@@ -32,7 +33,8 @@ def as_the_app(session: Session) -> Generator[Session]:
     """The test's own session (helpers.rows.setting_up), lent to the app:
     1. what the test's setup left unflushed is written, unguarded;
     2. the app's writes meet the guard, knowing only the locks they take;
-    3. what the app left unflushed is dropped, as closing its session would;
+    3. what the app left unflushed is dropped, as closing its session would,
+       with the work it left waiting for a commit (db_once_committed);
     4. the test's next setup is unguarded again. Nested, it does nothing."""
     if UNGUARDED_INFO not in session.info:
         yield session
@@ -48,6 +50,7 @@ def as_the_app(session: Session) -> Generator[Session]:
         for row in list(session.new):
             session.expunge(row)
         session.expire_all()
+        session.info.pop(PENDING_INFO, None)
         session.info[UNGUARDED_INFO] = marker
 
 
