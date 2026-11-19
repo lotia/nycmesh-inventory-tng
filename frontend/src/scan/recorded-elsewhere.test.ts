@@ -1,8 +1,10 @@
 import { describe, expect, test } from "vitest";
-import { type Body, type Recorded, wordsOf } from "../shared/outbox";
+import type { Body, Recorded } from "../shared/outbox";
+import { wordsOf } from "../shared/outbox-notes";
 import { CATALOGUE } from "../testing/catalogue";
 import { freshCart } from "./cart";
-import { asSave, toCart } from "./older";
+import { asSave } from "./older-builds";
+import { toCart } from "./older-to-cart";
 import {
   changesShown,
   differenceOf,

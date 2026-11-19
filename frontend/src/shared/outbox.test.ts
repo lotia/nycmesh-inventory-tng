@@ -11,25 +11,26 @@ import {
   batchId,
   type Draft,
   Entry,
-  KEY_REUSED,
   Kept,
+  Outbox,
+  REPORT_AFTER,
+  RETRY_MS,
+  SAVED_MOST,
+  STORAGE_KEY,
+  type Summary,
+} from "./outbox";
+import {
+  KEY_REUSED,
   NOT_ACCEPTED,
   NOT_RECORDED,
   noteOf,
   ON_LINE,
-  Outbox,
   PROBLEMS,
   type ProblemKind,
-  REPORT_AFTER,
-  RETRY_MS,
-  recordedHeading,
-  SAVED_MOST,
   SOME_NOT_RECORDED,
-  STORAGE_KEY,
-  type Summary,
   UNAVAILABLE,
   wordsOf,
-} from "./outbox";
+} from "./outbox-notes";
 import { telemetry } from "./telemetry";
 
 function draft(fields: Partial<Draft> = {}): Draft {
@@ -748,16 +749,6 @@ describe("what another tab recorded (inventory-tng-0gg)", () => {
     expect(said(outbox)).toBe(say(SOME_NOT_RECORDED));
   });
 
-  test("what was recorded is headed by who recorded it: this tab, or another (Ali, inventory-tng-0gg, 2026-11-15, 1 and 6)", () => {
-    const batch = { ...draft(), key: uuid() };
-    expect(recordedHeading({ by: "here", transactionId: 412, batch })).toBe(
-      "Already recorded from this tab in transaction 412",
-    );
-    expect(
-      recordedHeading({ by: "elsewhere", transactionId: 412, batch }),
-    ).toBe("Recorded in another tab in transaction 412");
-  });
-
   test("a keyless batch refused for its key still asks for a report", async () => {
     const { api } = answering(() => recordedReply());
     const outbox = new Outbox(api);
@@ -1109,8 +1100,8 @@ describe("builds", () => {
       waitingFor: null,
       reason: null,
     });
-    // Listed with what older builds left (scan/older.ts), not here, and never
-    // sent again.
+    // Listed with what older builds left (scan/older-builds.ts), not here,
+    // and never sent again.
     expect(outbox.shown().map((each) => each.summary.from)).toEqual(["mine"]);
     await outbox.send();
     expect(sent).toHaveLength(2);
@@ -1588,7 +1579,7 @@ describe("listening", () => {
     const stop = outbox.listen();
     store(refused);
     window.dispatchEvent(new StorageEvent("storage", { key: STORAGE_KEY }));
-    // Still counted (scan/offered.ts, unseen), and its sibling still listed.
+    // Still counted (scan/unseen-batches.ts, unseen), and its sibling still listed.
     expect(outbox.entries.value).toEqual([saved, refused]);
     expect(outbox.shown()).toEqual([refused]);
     outbox.forgetShown([saved.body.key]);

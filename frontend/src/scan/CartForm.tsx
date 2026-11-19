@@ -6,14 +6,8 @@ import type { TargetedSubmitEvent } from "preact";
 import { useEffect, useMemo, useRef } from "preact/hooks";
 import { Field } from "../shared/Field";
 import { say, sayParts } from "../shared/i18n";
-import {
-  type Body,
-  batchId,
-  type Entry,
-  type Outbox,
-  type Said,
-  wordsOf,
-} from "../shared/outbox";
+import { type Body, batchId, type Entry, type Outbox } from "../shared/outbox";
+import { type Said, wordsOf } from "../shared/outbox-notes";
 import { MOST_SECONDS_TO_SAVE, telemetry } from "../shared/telemetry";
 import { type Batch, batchWords, toBatch } from "./batch";
 import { CartLine } from "./CartLine";
@@ -28,13 +22,14 @@ import {
   type Kind,
   openingPackage,
   placed,
+  placeSides,
   SIDES,
   type Side,
   withLine,
   withLineChanged,
 } from "./cart";
 import { Finder } from "./Finder";
-import { placeSides, readLabel, type Scanned } from "./label-codes";
+import { readLabel, type Scanned } from "./label-codes";
 import {
   AlertWords,
   CAUTION_BOX,
@@ -44,19 +39,19 @@ import {
 } from "./Notes";
 import { type NotPut, OlderList, olderSaid, recordOlder } from "./OlderList";
 import type { AddDifference } from "./OutboxList";
-import { offered, offeredAt, sealedCounts } from "./offered";
+import { offered, offeredAt } from "./offered";
 import {
   asSave,
-  type Gaps,
   nextWhole,
   type Older,
   type OlderStore,
   olderId,
-  toCart,
-} from "./older";
+} from "./older-builds";
+import { type Gaps, toCart } from "./older-to-cart";
 import { differenceOf } from "./recorded-elsewhere";
 import { Scanner } from "./Scanner";
 import { indexOf } from "./search";
+import { sealedCounts } from "./unseen-batches";
 
 /** How often an open page checks whether to ask whose name it is, and
  * whether its catalogue is stale. */
@@ -107,7 +102,7 @@ export function CartForm({
   adder,
 }: {
   catalogue: Catalogue;
-  /** The outbox's batches it does not show (offered.ts, unseen). */
+  /** The outbox's batches it does not show (unseen-batches.ts, unseen). */
   pending: readonly Entry[];
   outbox: Outbox;
   /** Kept as the cart changes, here or in another tab (NewerBuild). */

@@ -7,13 +7,15 @@ import {
   type Body,
   batchId,
   type Entry,
-  MAKE_CHANGES,
-  noteOf,
   type Outbox,
   type Recorded,
+} from "../shared/outbox";
+import {
+  MAKE_CHANGES,
+  noteOf,
   recordedHeading,
   wordsOf,
-} from "../shared/outbox";
+} from "../shared/outbox-notes";
 import { batchWords } from "./batch";
 import type { Catalogue } from "./cart";
 import {
@@ -25,7 +27,7 @@ import {
   RULED_LIST,
 } from "./Notes";
 import { type NotPut, olderSaid } from "./OlderList";
-import { linesSaid } from "./older";
+import { linesSaid } from "./older-builds";
 import {
   ADD_DIFFERENCE,
   changesShown,

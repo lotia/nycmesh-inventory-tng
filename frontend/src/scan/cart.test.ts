@@ -2,7 +2,8 @@ import { describe, expect, test } from "vitest";
 import { messages as pseudo } from "../locales/pseudo.po";
 import { BUILD } from "../shared/build";
 import { say, speak } from "../shared/i18n";
-import type { Body, Draft, Said } from "../shared/outbox";
+import type { Body, Draft } from "../shared/outbox";
+import type { Said } from "../shared/outbox-notes";
 import {
   ADD_SOMETHING,
   batchWords,
@@ -30,6 +31,7 @@ import {
   openingPackage,
   PACKAGE_NO_LONGER_USED,
   placed,
+  placeSides,
   quantityOf,
   reconcile,
   resized,
@@ -40,14 +42,8 @@ import {
   WHOLE_UNITS,
   withLine,
 } from "./cart";
-import {
-  keysToAsk,
-  type Offered,
-  offered,
-  offeredAt,
-  sealedCounts,
-  unseen,
-} from "./offered";
+import { type Offered, offered, offeredAt } from "./offered";
+import { keysToAsk, sealedCounts, unseen } from "./unseen-batches";
 
 /** A batch with a key, as the outbox keeps it. */
 let keys = 0;
@@ -63,7 +59,7 @@ const SHOWN = "99999999-9999-4999-8999-999999999999";
 import { CATALOGUE, cable, radio } from "../testing/catalogue";
 
 /** A batch's problems, or a quantity's, as text, each name the page quoted
- * in it (outbox.Said) in [brackets]. */
+ * in it (outbox-notes.Said) in [brackets]. */
 function shown<T extends object>(result: T) {
   const text = (said: Said) =>
     said
@@ -1177,7 +1173,7 @@ describe("turning a cart into a batch", () => {
     const shown = entry("saved");
     const saved = entry("saved");
     const refused = entry("refused");
-    // Listed with what older builds left (older.ts), never sent.
+    // Listed with what older builds left (older-builds.ts), never sent.
     const tooOld = entry("too_old");
     const outbox = [waiting, shown, saved, refused, tooOld];
     const catalogue = { ...CATALOGUE, saved: [shown.body.key] };
@@ -1585,4 +1581,13 @@ describe("a package resized while the cart counts it (inventory-tng-0qi)", () =>
       sizes: { 1000: "8.000" },
     });
   });
+});
+
+test("a place is offered for the side still empty first", () => {
+  const cart = freshCart();
+  expect(placeSides(cart)).toEqual(["from", "to"]);
+  expect(placeSides({ ...cart, fromId: 10 })).toEqual(["to", "from"]);
+  // A receipt has only a to side, an install only a from side.
+  expect(placeSides({ ...cart, kind: "receipt" })).toEqual(["to"]);
+  expect(placeSides({ ...cart, kind: "install" })).toEqual(["from"]);
 });

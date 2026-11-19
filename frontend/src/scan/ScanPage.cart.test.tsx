@@ -8,14 +8,14 @@ import {
 import { describe, expect, type MockInstance, test, vi } from "vitest";
 import { messages as pseudo } from "../locales/pseudo.po";
 import { say, speak } from "../shared/i18n";
+import { STORAGE_KEY as OUTBOX_KEY } from "../shared/outbox";
 import {
   NO_ANSWER,
   NOT_RECORDED,
   OFFLINE,
-  STORAGE_KEY as OUTBOX_KEY,
   PROBLEMS,
   SOME_NOT_RECORDED,
-} from "../shared/outbox";
+} from "../shared/outbox-notes";
 import { MOST_SECONDS_TO_SAVE, telemetry } from "../shared/telemetry";
 import { CATALOGUE, WITH_CAFE } from "../testing/catalogue";
 import { answering, deferred, json, saved } from "../testing/fetch";

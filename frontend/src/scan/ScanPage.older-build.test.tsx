@@ -7,13 +7,12 @@ import {
 } from "@testing-library/preact";
 import { describe, expect, test, vi } from "vitest";
 import { say } from "../shared/i18n";
+import { type Body, STORAGE_KEY as OUTBOX_KEY } from "../shared/outbox";
 import {
-  type Body,
   KEY_REUSED,
   MAKE_CHANGES,
-  STORAGE_KEY as OUTBOX_KEY,
   SOME_NOT_RECORDED,
-} from "../shared/outbox";
+} from "../shared/outbox-notes";
 import { telemetry } from "../shared/telemetry";
 import { CATALOGUE } from "../testing/catalogue";
 import { answering, deferred, json, saved, TOO_OLD } from "../testing/fetch";
@@ -72,7 +71,7 @@ import {
   SOMETHING,
 } from "./OlderList";
 import { CARTS_FROM_DEVICE, DISMISS } from "./OutboxList";
-import { ITEM_RETIRED, RESCAN as RESCAN_PHRASE } from "./older";
+import { ITEM_RETIRED, RESCAN as RESCAN_PHRASE } from "./older-to-cart";
 import { ADD_DIFFERENCE, IN_CART } from "./recorded-elsewhere";
 
 // The camera, faked: it sees whatever a test puts in `inView`.

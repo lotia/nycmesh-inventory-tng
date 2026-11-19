@@ -467,9 +467,9 @@ that build's, whichever tab sends it. Why a batch was refused, or waits, is
 kept as a code with its data (`outbox.Reason`), and what a batch's summary
 says as what it is made from, with its places named as when it was queued
 (`outbox.Summary`), never in words: the page makes the words as it shows
-them (`noteOf`, `batch.batchWords`), so they follow the language spoken and
-can change without a new key. Only older keys hold words, which
-`scan/older.ts` reads for their code and shows as kept.
+them (`outbox-notes.noteOf`, `batch.batchWords`), so they follow the
+language spoken and can change without a new key. Only older keys hold
+words, which `scan/older-builds.ts` reads for their code and shows as kept.
 
 A build reads and writes only its own keys. A tab of an older build sends
 its own batches and lets the volunteer record the cart, saying nothing of
@@ -509,10 +509,11 @@ test cannot see them: tightening one takes the same care, by hand.
 
 A newer build reads the saves and the cart an older one left only in the
 parts every version kept, and removes an older key once nothing in it is
-left to list (`frontend/src/scan/older.ts`). Into an empty cart, until it
-learns of a newer build, it puts, without a tap, the oldest save that goes
-back whole (nothing unread, nothing of an open package, no package
-resized, no item or package retired or gone, no refusal). It lists the
+left to list (`frontend/src/scan/older-builds.ts`). Into an empty cart,
+until it learns of a newer build, it puts, without a tap, the oldest save
+that goes back whole (nothing unread, nothing of an open package, no
+package resized, no item or package retired or gone, no refusal;
+`frontend/src/scan/older-to-cart.ts`). It lists the
 rest for the volunteer to add to the cart or discard, naming an item
 retired since from the catalogue's `retired_items`, and a package retired
 with none left from its item's `retired_packages`, neither ever offered.
@@ -526,8 +527,8 @@ the older build kept; the entry goes with its last listed line, unless
 it says lines could not be read, when it stays, saying so, until its own
 Discard. Add to cart or Discard, tapped on one another tab changed since
 it was listed, does nothing, lists it again as it is now and says so
-(`older.compared`); one going back without a tap is tried again as it is
-now.
+(`older-builds.compared`); one going back without a tap is tried again as
+it is now.
 
 A cart gets its batch key with its first line, and Record sends it under
 that key (`CartStore.change`), so every tab that records it, one of a
@@ -543,7 +544,7 @@ stock at once, as its periodic refresh does, whichever tab sent it, and
 the save stays listed with Dismiss, saying "Some items were not
 recorded. Details below.", then what was recorded, headed as recorded in
 another tab or, where this browser's outbox holds it recorded, already
-recorded from this tab (`outbox.recordedHeading`), and, under "Not
+recorded from this tab (`outbox-notes.recordedHeading`), and, under "Not
 recorded. Make any changes and record again.", what the volunteer changed
 since the cart went back, line by line
 (`frontend/src/scan/recorded-elsewhere.ts`): a cart put back under its key

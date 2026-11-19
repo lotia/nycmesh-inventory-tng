@@ -135,7 +135,7 @@ def test_a_size_is_said_only_of_a_package_of_the_lines_item(
         (["lines", 0, "package_id"], "not_found")
     ]
     # On package_size itself, in words naming both fields, for whoever
-    # writes a client; the scan page says it in its own (outbox.ts).
+    # writes a client; the scan page says it in its own (outbox-notes.ts).
     missing = (
         "package_size_required",
         (

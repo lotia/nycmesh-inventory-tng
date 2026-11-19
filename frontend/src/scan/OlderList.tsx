@@ -4,7 +4,7 @@ import { msg } from "@lingui/core/macro";
 import { useSignal } from "@preact/signals";
 import { useEffect, useMemo, useRef } from "preact/hooks";
 import { say } from "../shared/i18n";
-import { MAKE_CHANGES } from "../shared/outbox";
+import { MAKE_CHANGES } from "../shared/outbox-notes";
 import { type Event as Reported, telemetry } from "../shared/telemetry";
 import { type Catalogue, KIND_WORDS, type Kind } from "./cart";
 import {
@@ -20,9 +20,8 @@ import {
   type OlderStore,
   type Outcome,
   olderId,
-  toCart,
-  withRetired,
-} from "./older";
+} from "./older-builds";
+import { toCart, withRetired } from "./older-to-cart";
 import { indexOf } from "./search";
 
 /** An older build's cart, filled for each kind (olderKind). */
@@ -77,13 +76,13 @@ export const KEPT_ON_NOT_SENT = msg`Kept on this device {when}, not sent.`;
 
 /**
  * What older builds left and the page did not put back in the cart itself,
- * each in words, to add to the cart or discard (older.ts). Discarding asks
- * first, here on the page. A line that cannot go back says why under it,
- * and can be discarded on its own, without asking: focus then goes to its
- * entry's heading, and taps on the entry's buttons wait a moment
- * (SETTLE_MS). One holding an item
- * retired since, and out of the catalogue, names it from the catalogue's
- * retired items, and goes in the cart only once that line is discarded.
+ * each in words, to add to the cart (older-to-cart.ts) or discard
+ * (older-builds.ts). Discarding asks first, here on the page. A line that
+ * cannot go back says why under it, and can be discarded on its own,
+ * without asking: focus then goes to its entry's heading, and taps on the
+ * entry's buttons wait a moment (SETTLE_MS). One holding an item retired
+ * since, and out of the catalogue, names it from the catalogue's retired
+ * items, and goes in the cart only once that line is discarded.
  */
 export function OlderList({
   older,

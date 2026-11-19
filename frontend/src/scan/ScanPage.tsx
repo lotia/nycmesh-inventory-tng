@@ -18,8 +18,8 @@ import { type Loaded, loadCatalogue } from "./catalogue";
 import { CAUTION_BOX } from "./Notes";
 import { heldIn } from "./OlderList";
 import { type AddDifference, OutboxList } from "./OutboxList";
-import { unseen } from "./offered";
-import { OlderStore } from "./older";
+import { OlderStore } from "./older-builds";
+import { unseen } from "./unseen-batches";
 
 const API = makeApi();
 /** A page left open fetches the catalogue again once it is this old, so a
@@ -131,7 +131,8 @@ export function ScanPage({
     };
   }, [api]);
 
-  // The outbox's batches the catalogue does not show (offered.ts, unseen).
+  // The outbox's batches the catalogue does not show (unseen-batches.ts,
+  // unseen).
   const shown = loaded.value.state === "ready" ? loaded.value.catalogue : null;
   const entries = outbox.entries.value;
   const pending = useMemo(
@@ -247,7 +248,7 @@ export function ScanPage({
  * to send, as the newer build reads neither; until then it says nothing.
  * Too old, at once, saying what this tab holds is kept: the newer build
  * reads this build's cart, or lists it, and lists its saves waiting
- * (older.ts). A newer build's saves waiting here are not counted: that
+ * (older-builds.ts). A newer build's saves waiting here are not counted: that
  * build sends them.
  */
 function NewerBuild({

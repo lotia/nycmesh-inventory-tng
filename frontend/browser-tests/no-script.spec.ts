@@ -8,9 +8,9 @@
  */
 import { expect, type Page } from "@playwright/test";
 import { test } from "./csp-violations";
-import { printLabels } from "./labels";
 import { invite } from "./own-rows";
 import { prepared } from "./prepared";
+import { printLabels } from "./print-labels";
 import { makeCode } from "./registration-codes";
 
 test.use({ javaScriptEnabled: false });

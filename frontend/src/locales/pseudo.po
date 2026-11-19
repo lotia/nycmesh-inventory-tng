@@ -19,7 +19,7 @@ msgstr ""
 msgid "What is on an open package"
 msgstr ""
 
-#: src/shared/outbox.ts
+#: src/shared/outbox-notes.ts
 msgid "{tries, plural, one {The inventory keeps failing on this batch ({status}, # try). It is kept and tried again; please report this.} other {The inventory keeps failing on this batch ({status}, # tries). It is kept and tried again; please report this.}}"
 msgstr ""
 
@@ -31,7 +31,7 @@ msgstr ""
 msgid "This page has changes you haven't saved. Retiring now loses them."
 msgstr ""
 
-#: src/shared/outbox.ts
+#: src/shared/outbox-notes.ts
 msgid "This package is retired: what is left may be taken, never received"
 msgstr ""
 
@@ -52,7 +52,7 @@ msgstr ""
 msgid "After this cut:"
 msgstr ""
 
-#: src/scan/older.ts
+#: src/scan/older-to-cart.ts
 msgid "a removed package or item"
 msgstr ""
 
@@ -97,11 +97,11 @@ msgstr ""
 msgid "({packages} said used up)"
 msgstr ""
 
-#: src/shared/outbox.ts
+#: src/shared/outbox-notes.ts
 msgid "Line {n}: {why}"
 msgstr ""
 
-#: src/shared/outbox.ts
+#: src/shared/outbox-notes.ts
 msgid "This item is retired: what is left may be taken, never received"
 msgstr ""
 
@@ -117,7 +117,7 @@ msgstr ""
 msgid "Checked out items. Add to cart or discard before sending"
 msgstr ""
 
-#: src/shared/outbox.ts
+#: src/shared/outbox-notes.ts
 msgid "Not recorded."
 msgstr ""
 
@@ -149,7 +149,7 @@ msgstr ""
 msgid "opened {date}"
 msgstr ""
 
-#: src/shared/outbox.ts
+#: src/shared/outbox-notes.ts
 msgid "Not accepted"
 msgstr ""
 
@@ -226,7 +226,7 @@ msgstr ""
 msgid "Discard"
 msgstr ""
 
-#: src/shared/outbox.ts
+#: src/shared/outbox-notes.ts
 msgid "This package's size changed since the page loaded: load the page again, and count it again"
 msgstr ""
 
@@ -234,7 +234,7 @@ msgstr ""
 msgid "Now"
 msgstr ""
 
-#: src/shared/outbox.ts
+#: src/shared/outbox-notes.ts
 msgid "Whole packages only"
 msgstr ""
 
@@ -262,7 +262,7 @@ msgstr ""
 msgid "The inventory can't answer just now. Try again in a minute."
 msgstr ""
 
-#: src/shared/outbox.ts
+#: src/shared/outbox-notes.ts
 msgid "Open package said used up, {n}: {why}"
 msgstr ""
 
@@ -278,7 +278,7 @@ msgstr ""
 msgid "Saying what is on open packages"
 msgstr ""
 
-#: src/shared/outbox.ts
+#: src/shared/outbox-notes.ts
 msgid "The inventory can't record this just now. Trying again shortly."
 msgstr ""
 
@@ -334,7 +334,7 @@ msgstr ""
 msgid "(what is on {packages} said)"
 msgstr ""
 
-#: src/shared/outbox.ts
+#: src/shared/outbox-notes.ts
 msgid "Already recorded from this tab in transaction {transaction}"
 msgstr ""
 
@@ -375,7 +375,7 @@ msgid "That label isn't in the inventory ({code})."
 msgstr ""
 
 #. How many of a package, the package's name after the sign.
-#: src/scan/older.ts
+#: src/scan/older-to-cart.ts
 msgid "{count} × {package}"
 msgstr ""
 
@@ -395,11 +395,11 @@ msgstr ""
 msgid "What is on an open package, new"
 msgstr ""
 
-#: src/scan/older.ts
+#: src/scan/older-to-cart.ts
 msgid "Could not read previously added items, scan them again."
 msgstr ""
 
-#: src/shared/outbox.ts
+#: src/shared/outbox-notes.ts
 msgid "Recorded in another tab in transaction {transaction}"
 msgstr ""
 
@@ -411,11 +411,11 @@ msgstr ""
 msgid "Too many tries from here. Wait a minute, then try again."
 msgstr ""
 
-#: src/shared/outbox.ts
+#: src/shared/outbox-notes.ts
 msgid "A loose line says a package's size: load the page again, and count it again"
 msgstr ""
 
-#: src/shared/outbox.ts
+#: src/shared/outbox-notes.ts
 msgid "There is no such row"
 msgstr ""
 
@@ -527,11 +527,11 @@ msgstr ""
 msgid "An item"
 msgstr ""
 
-#: src/shared/outbox.ts
+#: src/shared/outbox-notes.ts
 msgid "Moving an open package whole takes all that is left on it, which changed: load the page again"
 msgstr ""
 
-#: src/shared/outbox.ts
+#: src/shared/outbox-notes.ts
 msgid "A line of a package says the size it was counted in: load the page again, and count it again"
 msgstr ""
 
@@ -547,7 +547,7 @@ msgstr ""
 msgid "{count, plural, one {# item} other {# items}}"
 msgstr ""
 
-#: src/shared/outbox.ts
+#: src/shared/outbox-notes.ts
 msgid "What is on an open package, {n}: {why}"
 msgstr ""
 
@@ -567,7 +567,7 @@ msgstr ""
 msgid "Discard cart"
 msgstr ""
 
-#: src/shared/outbox.ts
+#: src/shared/outbox-notes.ts
 msgid "Open one package a line: it is followed until used up"
 msgstr ""
 
@@ -579,7 +579,7 @@ msgstr ""
 msgid "Registration phrase"
 msgstr ""
 
-#: src/shared/outbox.ts
+#: src/shared/outbox-notes.ts
 msgid "That open package is at another place now"
 msgstr ""
 
@@ -595,7 +595,7 @@ msgstr ""
 msgid "Cannot Add to Cart"
 msgstr ""
 
-#: src/shared/outbox.ts
+#: src/shared/outbox-notes.ts
 msgid "That open package was closed as used up: take from another"
 msgstr ""
 
@@ -625,11 +625,11 @@ msgstr ""
 msgid "Torch"
 msgstr ""
 
-#: src/shared/outbox.ts
+#: src/shared/outbox-notes.ts
 msgid "This item is counted in whole units"
 msgstr ""
 
-#: src/scan/older.ts
+#: src/scan/older-to-cart.ts
 msgid "Can't add these items. Please rescan."
 msgstr ""
 
@@ -637,7 +637,7 @@ msgstr ""
 msgid "{name}: enter what is on the open package, in whole units, or leave it blank."
 msgstr ""
 
-#: src/shared/outbox.ts
+#: src/shared/outbox-notes.ts
 msgid "No answer from the inventory. Trying again shortly."
 msgstr ""
 
@@ -649,7 +649,7 @@ msgstr ""
 msgid "<0>Register it</0>, then come back."
 msgstr ""
 
-#: src/shared/outbox.ts
+#: src/shared/outbox-notes.ts
 msgid "The inventory's rules refuse this as sent: it changed since the page loaded. Load the page again, and do it again"
 msgstr ""
 
@@ -694,7 +694,7 @@ msgstr ""
 msgid "This browser wouldn't keep the cart, so it wasn't sent. Free some space or leave private browsing, then try again."
 msgstr ""
 
-#: src/scan/older.ts
+#: src/scan/older-to-cart.ts
 msgid "{count, plural, one {Could not read # previously added item, scan it again.} other {Could not read # previously added items, scan them again.}}"
 msgstr ""
 
@@ -706,7 +706,7 @@ msgstr ""
 msgid "That phrase isn't one we know. Check it word by word against the one you were given."
 msgstr ""
 
-#: src/scan/older.ts
+#: src/scan/older-to-cart.ts
 msgid "This item has been retired."
 msgstr ""
 
@@ -750,7 +750,7 @@ msgstr ""
 msgid "Remove"
 msgstr ""
 
-#: src/shared/outbox.ts
+#: src/shared/outbox-notes.ts
 msgid "Not recorded: its key was already used for a different batch. Please report this."
 msgstr ""
 
@@ -775,7 +775,7 @@ msgstr ""
 msgid "{amount} {unit} in all"
 msgstr ""
 
-#: src/scan/older.ts
+#: src/scan/older-to-cart.ts
 msgid "{n}. {words}"
 msgstr ""
 
@@ -819,7 +819,7 @@ msgstr ""
 msgid "The camera isn't allowed for this page. Allow it in the browser's settings, or find items in the list."
 msgstr ""
 
-#: src/shared/outbox.ts
+#: src/shared/outbox-notes.ts
 msgid "The inventory answered unexpectedly ({status}). Trying again shortly."
 msgstr ""
 
@@ -859,7 +859,7 @@ msgstr ""
 msgid "Record"
 msgstr ""
 
-#: src/scan/older.ts
+#: src/scan/older-to-cart.ts
 msgid "The package size has changed since this item was added. Discard and re-add the new package size."
 msgstr ""
 
@@ -875,11 +875,11 @@ msgstr ""
 msgid "Are you {name}? This phone hasn't been used for a while."
 msgstr ""
 
-#: src/shared/outbox.ts
+#: src/shared/outbox-notes.ts
 msgid "This item, in this package or loose, is on another line too: put it on one line"
 msgstr ""
 
-#: src/scan/older.ts
+#: src/scan/older-to-cart.ts
 msgid "An item no longer in the catalogue"
 msgstr ""
 
@@ -899,15 +899,15 @@ msgstr ""
 msgid "Install: {items} from {from}"
 msgstr ""
 
-#: src/scan/older.ts
+#: src/scan/older-to-cart.ts
 msgid "{amount} loose"
 msgstr ""
 
-#: src/shared/outbox.ts
+#: src/shared/outbox-notes.ts
 msgid "Some items were not recorded. Details below."
 msgstr ""
 
-#: src/scan/older.ts
+#: src/scan/older-to-cart.ts
 msgid "{amount} from an open package"
 msgstr ""
 
@@ -920,7 +920,7 @@ msgstr ""
 msgid "Your cut uses up the {name}, so it's ticked. Untick it if cable is left. An administrator confirms."
 msgstr ""
 
-#: src/shared/outbox.ts
+#: src/shared/outbox-notes.ts
 msgid "Not recorded. Make any changes and record again."
 msgstr ""
 
@@ -932,11 +932,11 @@ msgstr ""
 msgid "Where"
 msgstr ""
 
-#: src/shared/outbox.ts
+#: src/shared/outbox-notes.ts
 msgid "That open package moves whole, still open: it is not used up"
 msgstr ""
 
-#: src/shared/outbox.ts
+#: src/shared/outbox-notes.ts
 msgid "Register it to send this batch."
 msgstr ""
 
@@ -944,7 +944,7 @@ msgstr ""
 msgid "This item wasn't automatically removed. Record the cart and try to remove."
 msgstr ""
 
-#: src/shared/outbox.ts
+#: src/shared/outbox-notes.ts
 msgid "This device is offline. Sending when it's back."
 msgstr ""
 

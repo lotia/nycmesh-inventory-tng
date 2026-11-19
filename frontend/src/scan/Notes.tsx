@@ -2,7 +2,7 @@
 import { msg } from "@lingui/core/macro";
 import { Fragment } from "preact";
 import { say } from "../shared/i18n";
-import type { Note, Said } from "../shared/outbox";
+import type { Note, Said } from "../shared/outbox-notes";
 
 export const DISCARD = msg`Discard`;
 export const CONFIRM_DISCARD = msg`Confirm discard`;

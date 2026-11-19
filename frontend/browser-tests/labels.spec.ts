@@ -4,8 +4,8 @@
  */
 import { expect } from "@playwright/test";
 import { test } from "./csp-violations";
-import { printLabels } from "./labels";
 import { prepared } from "./prepared";
+import { printLabels } from "./print-labels";
 
 /** How many pages a PDF has. */
 function pageCount(pdf: Buffer): number {

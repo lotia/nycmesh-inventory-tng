@@ -4,7 +4,7 @@
  * that tab recorded, as the server said (outbox.Recorded), and what this
  * save holds otherwise, line by line, in words (Ali, inventory-tng-0gg).
  * What it holds more of, or new, goes in an empty cart, under a new key
- * (older.toCart); what was taken from an open package, or said of one,
+ * (older-to-cart.toCart); what was taken from an open package, or said of one,
  * cannot, as the open package may have changed since. What it holds less
  * of was recorded, and only an administrator can correct the ledger
  * (docs/decisions/0003): the server keeps that for one
@@ -19,12 +19,11 @@ import {
   batchId,
   type Draft,
   fromOpen,
-  type Note,
   REPORTS,
   type Recorded,
   type ReportKind,
-  type Said,
 } from "../shared/outbox";
+import type { Note, Said } from "../shared/outbox-notes";
 import { decimal, thousandths } from "../shared/quantity";
 import { type Catalogue, ITEM_SAYS, type Item } from "./cart";
 import {
@@ -34,7 +33,7 @@ import {
   PACKAGES_OF,
   RESCAN,
   withRetired,
-} from "./older";
+} from "./older-to-cart";
 import { indexOf } from "./search";
 
 type Line = Body["lines"][number];

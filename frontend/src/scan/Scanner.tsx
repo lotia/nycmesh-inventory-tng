@@ -1,6 +1,6 @@
 /**
  * Scanning labels with the camera (inventory-tng-8i4.13.7): open until Done,
- * each label read once while it stays in view (label-codes.ts, Repeats),
+ * each label read once while it stays in view (repeated-reads.ts, Repeats),
  * with a word on what it did. A refused or missing camera says so; the
  * lists below still work.
  */
@@ -10,7 +10,7 @@ import { useSignal } from "@preact/signals";
 import { useEffect, useRef } from "preact/hooks";
 import { say } from "../shared/i18n";
 import { DecoderUnavailable, openCamera, type Session } from "./camera";
-import { Repeats } from "./label-codes";
+import { Repeats } from "./repeated-reads";
 
 export const CAMERA = msg`Camera`;
 export const STARTING = msg`Starting the camera…`;

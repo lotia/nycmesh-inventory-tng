@@ -52,10 +52,10 @@ def test_refusals_name_their_reasons(schema: dict[str, Any]) -> None:
 
 
 def test_a_refused_batch_names_every_kind_of_problem(schema: dict[str, Any]) -> None:
-    """The scan page words each kind the schema lists (outbox.ts, PROBLEMS),
-    so every kind the ledger or a line's check refuses with is listed: the
-    ledger's in its own reply, a line's package size in FastAPI's, never
-    the one where the other is."""
+    """The scan page words each kind the schema lists (outbox-notes.ts,
+    PROBLEMS), so every kind the ledger or a line's check refuses with is
+    listed: the ledger's in its own reply, a line's package size in
+    FastAPI's, never the one where the other is."""
     replies = schema["components"]["schemas"]
     refused = schema["paths"]["/api/transactions"]["post"]["responses"]["422"]
     # Or FastAPI's own, for a body that cannot be a batch at all.

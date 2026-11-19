@@ -2,7 +2,8 @@
 import { msg } from "@lingui/core/macro";
 import { v4 as uuid, v5 as uuidFrom } from "uuid";
 import { say, sayParts } from "../shared/i18n";
-import type { Draft, Said, Summary } from "../shared/outbox";
+import type { Draft, Summary } from "../shared/outbox";
+import type { Said } from "../shared/outbox-notes";
 import { count, decimal, thousandths } from "../shared/quantity";
 import {
   type Cart,
@@ -99,7 +100,7 @@ export function toBatch(
   // What is really on open packages, said: with what is taken, or alone.
   const lengths: NonNullable<Draft["lengths"]> = [];
   // Each problem with the names in it quoted, as no number of a name is a
-  // count the page wrote (outbox.Said).
+  // count the page wrote (outbox-notes.Said).
   const problems: Said[] = [];
   for (const line of cart.lines) {
     const item = index.items.get(line.itemId);

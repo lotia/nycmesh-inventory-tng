@@ -25,10 +25,11 @@ import {
   readStored,
   writeStored,
 } from "../shared/local-storage";
-import { BatchKey, BatchLine, type Said } from "../shared/outbox";
+import { BatchKey, BatchLine } from "../shared/outbox";
+import type { Said } from "../shared/outbox-notes";
 import { count, decimal, thousandths } from "../shared/quantity";
-import { sealedKey } from "./offered";
 import { indexOf } from "./search";
+import { sealedKey } from "./unseen-batches";
 
 /** Versioned as the outbox's is (shared/outbox.ts): each build reads its own.
  * v2's is stamped with the build that wrote it, may keep a batch key
@@ -96,11 +97,11 @@ const CartSchema = v.object({
    * another tab has changed it since (CartStore). */
   revision: v.optional(v.string(), ""),
   /** The key it is to be recorded under: made with its first line, or the
-   * key of what an older build left that filled it (older.ts), kept until
-   * the cart is emptied. */
+   * key of what an older build left that filled it (older-builds.ts), kept
+   * until the cart is emptied. */
   batchKey: v.exactOptional(BatchKey),
   /** The lines, as a batch sends them, the cart held when put back under
-   * its key (older.ts, toCart), kept with the key: what a volunteer then
+   * its key (older-to-cart.ts, toCart), kept with the key: what a volunteer then
    * takes off, and another tab recorded under the key meanwhile, is kept
    * for an administrator (shared/outbox.ts, changed_from; inventory-tng-0gg). A
    * build before drops it from what it writes back: then nothing is kept. */
@@ -269,6 +270,22 @@ export class CartStore {
 
 /** A batch's two sides, of which a kind has one or both (SIDES). */
 export type Side = "from" | "to";
+
+/**
+ * The sides a place may fill for the cart's kind, the one still empty first:
+ * a volunteer is asked From or To, offered that one.
+ */
+export function placeSides(cart: Cart): Side[] {
+  const sides = SIDES[cart.kind];
+  const offered = (["from", "to"] as const).filter((side) => sides[side]);
+  return offered.sort(
+    (a, b) => Number(filled(cart, a)) - Number(filled(cart, b)),
+  );
+}
+
+function filled(cart: Cart, side: Side): boolean {
+  return (side === "from" ? cart.fromId : cart.toId) !== null;
+}
 
 /**
  * The cart with choices the catalogue no longer has (retired since it was

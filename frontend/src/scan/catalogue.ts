@@ -6,7 +6,7 @@ import {
 } from "../api/replies";
 import type { Outbox } from "../shared/outbox";
 import type { Catalogue } from "./cart";
-import { keysToAsk } from "./offered";
+import { keysToAsk } from "./unseen-batches";
 
 export type Loaded =
   | { state: "loading" }
@@ -15,7 +15,7 @@ export type Loaded =
   | { state: "unavailable" };
 
 /** The catalogue, asked which of the outbox's batches it shows
- * (offered.ts, unseen). */
+ * (unseen-batches.ts, unseen). */
 export async function loadCatalogue(api: Api, outbox: Outbox): Promise<Loaded> {
   const key = keysToAsk(outbox.entries.value);
   const reply = await check(

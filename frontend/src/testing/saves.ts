@@ -4,6 +4,8 @@
  * plain move with every field filled; a test names only the fields its
  * own data changes.
  */
+
+import { type Older, readOlder } from "../scan/older-builds";
 import { BUILD } from "../shared/build";
 import {
   type Body,
@@ -57,11 +59,49 @@ export function storeOutbox(entries: unknown[], build = BUILD) {
 
 /** A save of `body` in the list builds before v4 kept, with only what this
  * build needs to read one: the body, waiting. Older builds kept more
- * (queuedAt, what, install_number and others, scan/older.ts says which): a test
- * adds those its own data holds. Any field given replaces the default or is
- * added. */
+ * (queuedAt, what, install_number and others, scan/older-builds.ts says
+ * which): a test adds those its own data holds. Any field given replaces
+ * the default or is added. */
 export function olderSave(body: object, fields: Record<string, unknown> = {}) {
   return { body, state: "waiting", ...fields };
+}
+
+/** A batch as an older build kept it: a move of cable, waiting, with
+ * every field v3 kept. */
+export function olderMove(fields: Record<string, unknown> = {}, body = {}) {
+  return olderSave(
+    moveBody({ key: KEY, lines: [{ item_id: 101, quantity: "2" }], ...body }),
+    {
+      what: "Move: 1 item from Hub to Van",
+      queuedAt: 1_700_000_000_000,
+      waitingFor: null,
+      note: null,
+      transactionId: null,
+      failures: 0,
+      ...fields,
+    },
+  );
+}
+
+/** The only save kept, a move of cable but for `body` and `fields`, as
+ * read. */
+export function onlyOlder(body = {}, fields = {}): Older {
+  keep("inventory.outbox.v3", [olderMove(fields, body)]);
+  return readOlder()[0] as Older;
+}
+
+/** A save of a box retired with none left, cable taken from an open
+ * package, a box resized since, two boxes still offered, and a report. */
+export function mixedOlder(): Older {
+  return onlyOlder({
+    lines: [
+      { item_id: 100, quantity: "4", package_id: 1004 },
+      { item_id: 101, quantity: "12", open_package_key: OTHER_KEY },
+      { item_id: 100, quantity: "4", package_id: 1000, package_size: 2 },
+      { item_id: 100, quantity: "8", package_id: 1000 },
+    ],
+    used_up: [OTHER_KEY],
+  });
 }
 
 /** Keeps `value` under `key` as JSON, as the build that wrote it would:

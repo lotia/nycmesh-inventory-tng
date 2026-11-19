@@ -433,7 +433,7 @@ export interface components {
      * @description What an older build left under its own key, saves not sent or a cart
      *     with lines: a scan page found it as it loaded, a volunteer put one back
      *     in the cart, discarded it or discarded one line of it, or the page put
-     *     one back in an empty cart itself (frontend/src/scan/older.ts).
+     *     one back in an empty cart itself (frontend/src/scan/older-builds.ts).
      */
     OlderStorage: {
       /**
