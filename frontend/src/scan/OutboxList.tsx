@@ -45,6 +45,13 @@ export const SENDING = msg`Sending…`;
 export const HELD = msg`Held until you upgrade.`;
 export const DISMISS = msg`Dismiss`;
 
+/**
+ * Unseen and not read out, but keeping its room, so what is below does not
+ * move under a finger as it comes or goes (Ali, 2026-11-19,
+ * inventory-tng-2lad). aria-hidden as well, since jsdom applies no styles.
+ */
+const KEEPS_ROOM = { class: "invisible", "aria-hidden": "true" } as const;
+
 /** Whether the browser says it is online, following it as it changes. */
 function useOnline(): boolean {
   const online = useSignal(navigator.onLine);
@@ -190,14 +197,8 @@ export function OutboxList({
               )}
               {entry.state === "waiting" ? (
                 // Its room kept while it is sent, so the entry does not grow
-                // and move those below as it finishes (Ali, 2026-11-19,
-                // inventory-tng-2lad): not seen, focused or read out.
-                <button
-                  type="button"
-                  class="invisible"
-                  tabIndex={-1}
-                  aria-hidden="true"
-                >
+                // as it finishes.
+                <button type="button" tabIndex={-1} {...KEEPS_ROOM}>
                   {say(DISMISS)}
                 </button>
               ) : (
@@ -249,8 +250,8 @@ function RecordedElsewhere({
   );
   const inCart = difference !== null && cartKey === difference.key;
   // Once shown, the in-cart words keep their room when recorded, so Dismiss
-  // below does not move (Ali, 2026-11-19, inventory-tng-2lad); one already
-  // recorded as it is first drawn needs none.
+  // below does not move; one already recorded as it is first drawn needs
+  // none.
   const shownInCart = useRef(false);
   shownInCart.current ||= inCart;
   // Keyed by what each says, two saying the same apart.
@@ -287,13 +288,7 @@ function RecordedElsewhere({
         </button>
       )}
       {added === true && shownInCart.current && (
-        // Recorded, unseen and not read out.
-        <p
-          class={inCart ? undefined : "invisible"}
-          aria-hidden={inCart ? undefined : "true"}
-        >
-          {say(IN_CART)}
-        </p>
+        <p {...(inCart ? {} : KEEPS_ROOM)}>{say(IN_CART)}</p>
       )}
     </>
   );

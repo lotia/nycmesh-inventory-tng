@@ -6,6 +6,7 @@
  */
 import { expect } from "@playwright/test";
 import { test } from "./csp-violations";
+import { holdSaves } from "./held-saves";
 import { ownCable } from "./own-rows";
 
 test("a save's entry keeps its height, Dismiss's room kept unseen, as it is sent and recorded", async ({
@@ -22,14 +23,7 @@ test("a save's entry keeps its height, Dismiss's room kept unseen, as it is sent
   await page.getByLabel(/Find an item/).fill(cable);
   await page.getByRole("button", { name: cable, exact: true }).click();
   // Its save held until its entry is measured as being sent.
-  let release = () => {};
-  const held = new Promise<void>((done) => {
-    release = done;
-  });
-  await page.route("**/api/transactions", async (route) => {
-    await held;
-    await route.continue();
-  });
+  const release = await holdSaves(page);
   await page.getByRole("button", { name: "Record" }).click();
   const entry = page
     .locator("section", {

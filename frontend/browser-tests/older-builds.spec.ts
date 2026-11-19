@@ -7,6 +7,7 @@
  */
 import { expect, type Locator, type Page } from "@playwright/test";
 import { test } from "./csp-violations";
+import { holdSaves } from "./held-saves";
 import { ownCable, record } from "./own-rows";
 
 const HEADING = "Checked out items. Add to cart or discard before sending";
@@ -323,14 +324,7 @@ test("what a save another tab recorded first adds waits on a button while the ca
   await leaveSaved(page, itemId);
   await page.getByLabel(/^Loose/).fill("3");
   // Its refusal held until the cart has lines again.
-  let release = () => {};
-  const held = new Promise<void>((done) => {
-    release = done;
-  });
-  await page.route("**/api/transactions", async (route) => {
-    await held;
-    await route.continue();
-  });
+  const release = await holdSaves(page);
   await page.getByRole("button", { name: "Record" }).click();
   await expect(page.getByText("Nothing in the cart yet.")).toBeVisible();
   await page.getByLabel(/Find an item/).fill(cable);
