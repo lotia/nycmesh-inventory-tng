@@ -26,9 +26,9 @@ FIX = (
     " Exact markup on purpose: <the reason>"
 )
 
-# A tag, such as <td, </td or <!doctype, or an attribute's text, such as
-# class=" or data-copy='.
-MARKUP = re.compile(r"</?!?[A-Za-z][\w-]*|[A-Za-z][\w:-]*=[\"']")
+# A tag, such as <td, </td or <!doctype, but not a pattern's (?P<name> or
+# (?<!x), or an attribute's text, such as class=" or data-copy='.
+MARKUP = re.compile(r"(?<!\(\?P)(?<!\(\?)</?!?[A-Za-z][\w-]*|[A-Za-z][\w:-]*=[\"']")
 COMPARISONS = (ast.In, ast.NotIn, ast.Eq, ast.NotEq)
 # Methods whose arguments are looked for in the text they are called on.
 SEARCHES = {
@@ -46,14 +46,18 @@ SEARCHES = {
 PATTERNS = {"compile", "findall", "finditer", "fullmatch", "match", "search", "sub"}
 
 # A read of the page's markup as text in a frontend test: innerHTML or
-# outerHTML not being assigned, getHTML(), Playwright's content(), or a
-# snapshot. Assigning innerHTML is setup, so allowed.
+# outerHTML not being assigned, getHTML(), Playwright's content(), Testing
+# Library's prettyDOM(), or a snapshot. Assigning innerHTML is setup, so
+# allowed.
 READS = re.compile(
     r"\.(?:inner|outer)HTML\b(?!\s*\+?=(?!=))"
     r"|\.get(?:Inner)?HTML\("
     r"|\.content\(\)"
+    r"|\bprettyDOM\("
     r"|\.toMatch(?:Inline|File)?Snapshot\("
 )
+# A line that is only a comment, which may name a read in prose.
+COMMENT = re.compile(r"\s*(?://|/\*|\*)")
 FRONTEND_TESTS = (
     "src/**/*.test.ts",
     "src/**/*.test.tsx",
@@ -95,8 +99,9 @@ def strings(node: ast.expr) -> Iterator[tuple[int, str]]:
     """The line and text of each string constant an operand is made of:
     itself, the parts of an f-string or a concatenation, and the members of
     a literal collection, but not the arguments of a call, its input."""
-    if isinstance(node, ast.Constant) and isinstance(node.value, str):
-        yield node.lineno, node.value
+    if isinstance(node, ast.Constant) and isinstance(node.value, str | bytes):
+        value = node.value
+        yield node.lineno, value if isinstance(value, str) else value.decode("latin-1")
     elif isinstance(node, ast.JoinedStr):
         for part in node.values:
             yield from strings(part)
@@ -149,13 +154,16 @@ def markup_compared(source: str) -> list[tuple[int, str]]:
 
 def markup_read(source: str) -> list[tuple[int, str]]:
     """The line, and the read, of each place a frontend test reads markup as
-    text with no exact-markup comment on its line or directly above it."""
+    text with no exact-markup comment on its line or directly above it. A
+    line that is only a comment reads nothing."""
     lines = dict(enumerate(source.splitlines(), start=1))
-    alone = {number for number, line in lines.items() if line.lstrip().startswith("//")}
+    alone = {number for number, line in lines.items() if COMMENT.match(line)}
     return [
         (number, match.group())
         for number, line in lines.items()
-        if (match := READS.search(line)) and not explained(lines, alone, number, number)
+        if number not in alone
+        and (match := READS.search(line))
+        and not explained(lines, alone, number, number)
     ]
 
 
@@ -172,6 +180,8 @@ def markup_read(source: str) -> list[tuple[int, str]]:
         'assert said == "Start " + "<b>"',
         '# Exact markup on purpose: x\n\nassert "<b>" not in page',
         'assert "<b>" not in page  # Exact markup on purpose',
+        'assert b"<td" in response.content',
+        'assert re.search(r"(?P<id>\\d+)<td", page)',
     ],
 )
 def test_markup_compared_as_text_is_found(source: str) -> None:
@@ -186,6 +196,8 @@ def test_markup_compared_as_text_is_found(source: str) -> None:
         'assert said == "Start counting"',
         'assert "said 250 m" in page',
         'assert x == "a < b"',
+        "assert read(page).select('a[href=\"/x\"]') == []",
+        'assert re.fullmatch(r"(?P<id>\\d+)(?<!0)", said)',
         '# Exact markup on purpose: escaped.\nassert "<b>" not in page',
         '# Exact markup on purpose: escaped,\n# never a tag.\nassert "<b>" not in page',
         'assert "<b>" not in page  # Exact markup on purpose: escaped.',
@@ -216,6 +228,11 @@ def test_no_backend_test_compares_markup_as_text() -> None:
         ("expect(await page.content()).toContain('x');", [(1, ".content()")]),
         ("expect(container).toMatchSnapshot();", [(1, ".toMatchSnapshot(")]),
         ("expect(x).toMatchInlineSnapshot(`<p/>`);", [(1, ".toMatchInlineSnapshot(")]),
+        ("const html = await row.innerHTML();", [(1, ".innerHTML")]),
+        ("await row.evaluate((e) => e.outerHTML);", [(1, ".outerHTML")]),
+        ("expect(prettyDOM(container)).toContain('x');", [(1, "prettyDOM(")]),
+        ("// Never reads its .innerHTML, only the DOM.", []),
+        ("/**\n * Not its .outerHTML.\n */", []),
         ("document.body.innerHTML = `<p>Hint</p>`;", []),
         ("document.body.innerHTML += '<p>Hint</p>';", []),
         ("// Exact markup on purpose: why.\nconst html = node.outerHTML;", []),
