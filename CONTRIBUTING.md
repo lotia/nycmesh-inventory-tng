@@ -844,9 +844,9 @@ migrates as it starts: until `mise run dev-database` makes it, the
 container stops, and in development says to run that. Nor does it check
 the ports first, as the tasks do (Local settings): if one is taken, it
 fails with the runtime's own message. For most jobs a task is the safer
-way: [Local settings](#local-settings), [Migrations](#migrations) and
-[Running the app in a container](#running-the-app-in-a-container) say
-which.
+way: [Local settings](#local-settings), [Migrations](#migrations),
+[Running the app in a container](#running-the-app-in-a-container) and
+[Running the checks](#running-the-checks) say which.
 
 ### Podman's exec bug
 
@@ -1105,8 +1105,7 @@ of tests of what is in a clone marks itself `clone`.
 The backend's run from `backend/`. Start the database first, or with none
 run only the first row; the other checks take about a second each. Then
 `mise run fix` runs the fixes and `mise run check` runs every check. Each
-check is also a task of its own, named `check-…`, as is each fix, named
-`fix-…`; `mise tasks` lists them.
+check and each fix is also a task of its own, which `mise tasks` lists.
 
 Each test run creates a database of its own on that server and drops it at the
 end; a run that was killed before it could is dropped by a later one. It makes
@@ -1320,7 +1319,6 @@ running and working on the app. Keep them:
   it when a reader needs the reason.
 - **Short and clear.** Steps a reader can follow in order, in plain words.
   Cut what the reader does not need to do the task.
-
 - **Pointing, not copying.** What a reader can look up in a directory or
   with a command, the docs do not copy: the labels (`bd label list-all`),
   the tasks (`mise tasks`), files, modules, tests, migrations
@@ -1340,11 +1338,12 @@ an issue asks for it.
 Record a decision in words, with who made it and when, not as a link to
 where it was discussed or the letter of a choice made there.
 
-These are judgements, held in review, not checks, except two that tests
-enforce: every mise task has a description, so that `mise tasks` says what
-it does (`tests/codebase/test_contributing.py`), and no file in the clone
-holds a claude.ai artifact link, a lettered choice or a question code
-(`tests/codebase/test_artifact_links.py`).
+These are judgements, held in review, not checks, except what tests
+enforce. `backend/tests/codebase/test_contributing.py`: every mise task has
+a description, so that `mise tasks` says what it does, and every
+`mise run <task>` outside a decision record names a task.
+`backend/tests/codebase/test_artifact_links.py`: no file in the clone holds
+a claude.ai artifact link, a lettered choice or a question code.
 
 Lint what you write or change with `mise run check-markdown`.
 

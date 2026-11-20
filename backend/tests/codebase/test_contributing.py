@@ -1,8 +1,9 @@
 """AGENTS.md rule 10: every development workflow is a mise task with a
-description, so that `mise tasks` says what each does, and contributors run
-compose through `mise run compose`, which picks the container runtime. CI
-runs each check directly, not through mise, as a job named for the task that
-runs it locally."""
+description, so that `mise tasks` says what each does, every `mise run`
+the docs give names one, and contributors run compose through
+`mise run compose`, which picks the container runtime. CI runs each check
+directly, not through mise, as a job named for the task that runs it
+locally."""
 
 import os
 import re
@@ -24,8 +25,14 @@ JOB = re.compile(r"^  ([^\s:#]+):", re.MULTILINE)
 # A runtime's own compose command (a space, a hyphen or a line break between),
 # but not a value, such as INVENTORY_COMPOSE=docker compose.
 DIRECT = re.compile(r"(?<![=\"'])\b(?:docker|podman)(?:\s+|-)compose\b")
-# A task script's description, in the header mise reads.
-DESCRIPTION = re.compile(r"^#MISE description=([\"'])\S.*\1$", re.MULTILINE)
+# A task script's description, in either header form mise reads.
+DESCRIPTION = re.compile(
+    r"^#(?:MISE| \[MISE\]) description=([\"'])\S.*\1$", re.MULTILINE
+)
+# A task named as a command, in a doc, a comment or a script.
+RUN = re.compile(r"\bmise run ([a-z][a-z0-9-]*)")
+# Decision records keep the history, which may name a task since renamed.
+DECISIONS = CLONE / "docs" / "decisions"
 # Where running compose directly is right: the task that picks the runtime,
 # and CI, which runs its own.
 ALLOWED = {TASK_SCRIPTS / "compose", WORKFLOW}
@@ -84,7 +91,12 @@ def test_every_mise_task_has_a_description() -> None:
     """So `mise tasks` lists each with what it does: CONTRIBUTING.md names
     only the everyday ones."""
     named = tomllib.loads((CLONE / "mise.toml").read_text())["tasks"]
-    undescribed = {name for name, task in named.items() if not task.get("description")}
+    # A task given as a bare command or a list of them has no description.
+    undescribed = {
+        name
+        for name, task in named.items()
+        if not (isinstance(task, dict) and task.get("description"))
+    }
     undescribed |= {
         script.name
         for script in task_scripts()
@@ -92,6 +104,17 @@ def test_every_mise_task_has_a_description() -> None:
     }
     assert named
     assert undescribed == set()
+
+
+def test_every_mise_run_names_a_task(clone_files: dict[Path, str]) -> None:
+    """So a renamed task's old name does not linger where people read it."""
+    unknown = {
+        str(path.relative_to(CLONE)): names
+        for path, text in clone_files.items()
+        if not path.is_relative_to(DECISIONS)
+        and (names := set(RUN.findall(text)) - tasks())
+    }
+    assert unknown == {}
 
 
 def test_compose_runs_through_mise(clone_files: dict[Path, str]) -> None:
