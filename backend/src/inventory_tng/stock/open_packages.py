@@ -19,6 +19,7 @@ from sqlalchemy.orm import Session
 
 from inventory_tng.core.db_errors import enforce
 from inventory_tng.core.db_locking import get_locked, locked
+from inventory_tng.core.db_lookups import values_by
 from inventory_tng.core.db_once_committed import once_committed
 from inventory_tng.models.catalogue import Item, ItemPackage
 from inventory_tng.models.places import Location
@@ -527,13 +528,7 @@ def forms_of(
         )
     }
     open_ids = {row[3] for row in rows if row[3] is not None}
-    opened_from = dict(
-        session.execute(
-            select(OpenPackage.id, OpenPackage.package_id).where(
-                OpenPackage.id.in_(open_ids)
-            )
-        ).all()
-    )
+    opened_from = values_by(session, OpenPackage.id, OpenPackage.package_id, open_ids)
     grouped: dict[tuple[int, int], list[tuple[int | None, int | None, Decimal]]] = {}
     for item_id, place, package_id, open_id, amount in rows:
         grouped.setdefault((item_id, place), []).append((package_id, open_id, amount))

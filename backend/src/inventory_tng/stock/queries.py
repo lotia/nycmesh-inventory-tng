@@ -9,6 +9,7 @@ from typing import Any
 from sqlalchemy import ColumnElement, Row, Select, any_, func, or_, select, true
 from sqlalchemy.orm import Session
 
+from inventory_tng.core.db_lookups import values_by
 from inventory_tng.models.admins import Admin
 from inventory_tng.models.catalogue import Item, ItemPackage
 from inventory_tng.models.places import STORE_KINDS, Location
@@ -230,9 +231,7 @@ def current_packages(
 
 def units_of(session: Session, item_ids: Collection[int]) -> dict[int, str]:
     """Each item's unit, by id, of the items of `item_ids`."""
-    return dict(
-        session.execute(select(Item.id, Item.unit).where(Item.id.in_(item_ids))).all()
-    )
+    return values_by(session, Item.id, Item.unit, item_ids)
 
 
 def recent_cuts(

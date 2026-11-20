@@ -8,6 +8,7 @@ from collections.abc import Collection, Sequence
 from sqlalchemy import ColumnElement, func, select
 from sqlalchemy.orm import Session
 
+from inventory_tng.core.db_lookups import values_by
 from inventory_tng.models.volunteers import Volunteer
 
 
@@ -16,11 +17,8 @@ def volunteer_names(
 ) -> dict[int, str]:
     """The names of `volunteer_ids`' volunteers, by id (a place's
     volunteer_id may be None)."""
-    return dict(
-        session.execute(
-            select(Volunteer.id, Volunteer.name).where(Volunteer.id.in_(volunteer_ids))
-        ).all()
-    )
+    ids = [each for each in volunteer_ids if each is not None]
+    return values_by(session, Volunteer.id, Volunteer.name, ids)
 
 
 def ids_where(

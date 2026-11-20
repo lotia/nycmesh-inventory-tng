@@ -11,7 +11,7 @@ stock: nothing in stock imports this or its schemas (scan/batch_schemas.py).
 
 import uuid
 from collections import Counter, defaultdict
-from collections.abc import Collection, Mapping, Sequence
+from collections.abc import Mapping, Sequence
 from decimal import Decimal
 from typing import Literal, NamedTuple, cast
 
@@ -21,6 +21,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from inventory_tng.core.db_errors import RuleBroken
+from inventory_tng.core.db_lookups import values_by
 from inventory_tng.core.db_once_committed import once_committed
 from inventory_tng.models.catalogue import ItemPackage
 from inventory_tng.models.stock import LedgerTransaction, Movement, OpenPackage
@@ -185,7 +186,9 @@ def record(
     held = hold(session, header, [line.item_id for line in lines])
     length_keys = [each.open_package_key for each in lengths]
     # Read together: the open packages said used up, and those measured.
-    keyed = _keyed(session, {*used_up, *length_keys})
+    keyed = values_by(
+        session, OpenPackage.key, OpenPackage.id, {*used_up, *length_keys}
+    )
     reports = {key: keyed[key] for key in used_up if key in keyed}
     measured = {key: keyed[key] for key in length_keys if key in keyed}
     # Those reported too, with the lines', in one order (stock/ledger.py's).
@@ -687,8 +690,18 @@ def _as_batch(
         return None
     lines = list(movements.values())
     forms = [form for line in lines for form in (line.leaves, line.arrives)]
-    keys = _keys_of(session, {f.open_package_id for f in forms if f.open_package_id})
-    sizes = _sizes(session, {f.package_id for f in forms if f.package_id})
+    keys = values_by(
+        session,
+        OpenPackage.id,
+        OpenPackage.key,
+        {f.open_package_id for f in forms if f.open_package_id},
+    )
+    sizes = values_by(
+        session,
+        ItemPackage.id,
+        ItemPackage.size,
+        {f.package_id for f in forms if f.package_id},
+    )
 
     def line_of(line: Entry) -> batch_schemas.RecordedLine:
         if transaction.kind == "open":
@@ -729,36 +742,6 @@ def _as_batch(
     )
 
 
-def _keyed(session: Session, keys: Collection[uuid.UUID]) -> dict[uuid.UUID, int]:
-    """The open packages made under these keys, by key."""
-    if not keys:
-        return {}
-    found = session.execute(
-        select(OpenPackage.key, OpenPackage.id).where(OpenPackage.key.in_(list(keys)))
-    )
-    return {key: open_id for key, open_id in found}
-
-
-def _keys_of(session: Session, open_ids: Collection[int]) -> dict[int, uuid.UUID]:
-    """These open packages' keys, by id: _keyed the other way."""
-    if not open_ids:
-        return {}
-    found = session.execute(
-        select(OpenPackage.id, OpenPackage.key).where(OpenPackage.id.in_(open_ids))
-    )
-    return {open_id: key for open_id, key in found}
-
-
-def _sizes(session: Session, package_ids: Collection[int]) -> dict[int, Decimal]:
-    """These packages' sizes, by id."""
-    if not package_ids:
-        return {}
-    found = session.execute(
-        select(ItemPackage.id, ItemPackage.size).where(ItemPackage.id.in_(package_ids))
-    )
-    return {package_id: size for package_id, size in found}
-
-
 def _open_packages_named(
     session: Session, batch: batch_schemas.Batch
 ) -> dict[int, int]:
@@ -769,7 +752,7 @@ def _open_packages_named(
         for number, line in enumerate(batch.lines)
         if line.open_package_key is not None
     }
-    found = _keyed(session, keys.values())
+    found = values_by(session, OpenPackage.key, OpenPackage.id, keys.values())
     # Every line naming one, so two naming it are both found (and refused
     # as naming it twice).
     return {number: found[key] for number, key in keys.items() if key in found}
@@ -780,8 +763,10 @@ def _made_by_opening(
 ) -> dict[int, list[int]]:
     """The open packages an opening's lines made, under their keys
     (_opening_keys), by line number."""
-    sizes = _sizes(
+    sizes = values_by(
         session,
+        ItemPackage.id,
+        ItemPackage.size,
         {
             line.package_id
             for line in batch.lines
@@ -795,7 +780,12 @@ def _made_by_opening(
         # A package that is not there made none: the key was another batch's.
         elif (size := sizes.get(line.package_id or 0)) is not None:
             keys[number] = _opening_keys(batch, number, _packages_in(line, size))
-    found = _keyed(session, [key for each in keys.values() for key in each])
+    found = values_by(
+        session,
+        OpenPackage.key,
+        OpenPackage.id,
+        [key for each in keys.values() for key in each],
+    )
     return {
         number: [found[key] for key in each if key in found]
         for number, each in keys.items()
