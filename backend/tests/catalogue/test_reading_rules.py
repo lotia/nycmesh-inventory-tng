@@ -34,7 +34,7 @@ from inventory_tng.scan.catalogue_api import catalogue
 from inventory_tng.web.listing import folded
 
 from helpers.concurrency import Committed
-from helpers.items import new_item
+from helpers.items import item_form, new_item
 from helpers.markup import (
     box_values,
     hidden_fields,
@@ -175,7 +175,7 @@ def test_a_name_reading_as_another_is_refused_naming_it(
     admin_client: TestClient, session: Session, radios: Category
 ) -> None:
     new_item(session, radios, "Cap 10 uF")
-    form = {"category_id": str(radios.id), "unit": "each"}
+    form = item_form(radios)
     refused = admin_client.post(ITEMS, data=form | {"name": "Cap 10 µF"})
     assert refused.status_code == 400
     assert TAKEN_FIELDS["name"]("Cap 10\u00a0uF") in text(refused)
@@ -338,7 +338,7 @@ def test_the_answer_to_a_unit_asked_about_is_kept_as_a_rule(
     admin_client: TestClient, session: Session, radios: Category
 ) -> None:
     """Who settled it, and when; asked no more."""
-    form = {"name": "Weight 5 MG", "category_id": str(radios.id), "unit": "each"}
+    form = item_form(radios, name="Weight 5 MG")
     assert admin_client.post(ITEMS, data=form).status_code == 400
     done = admin_client.post(ITEMS, data=form | {"unit:MG": "mg"})
     assert done.status_code == 303
@@ -355,7 +355,7 @@ def test_a_g_after_a_number_is_asked_unless_the_words_near_it_say(
     """Ali, 2026-11-15: a g is never silently grams. Near SFP, a switch or
     an uplink it is a data rate, near paste or grease grams; else asked
     once, the answer kept as a rule. A G is Gbps without asking."""
-    form = {"category_id": str(radios.id), "unit": "each"}
+    form = item_form(radios)
 
     def adding(name: str, **more: str) -> dict[str, str]:
         # Each a different item, whatever names are close.
@@ -606,7 +606,7 @@ def test_a_rule_may_respell_names_typed_with_it(
     assert admin_client.post(f"{READINGS}/{rule.id}", data=sent).status_code == 303
     assert (rule.reading, rule.respell) == ("m", True)
     assert "Respelt" in text(admin_client.get(READINGS))
-    form = {"name": "Tape B 305 M", "category_id": str(radios.id), "unit": "each"}
+    form = item_form(radios, name="Tape B 305 M")
     # A different item from the other tape, whose name is close.
     sent = form | {"different": "Tape B 305 M"}
     assert admin_client.post(ITEMS, data=sent).status_code == 303

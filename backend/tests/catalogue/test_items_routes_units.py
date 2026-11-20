@@ -20,7 +20,7 @@ from inventory_tng.catalogue.paths import ITEMS
 from inventory_tng.catalogue.reading_rules import NAMED, both
 from inventory_tng.models.catalogue import Category, Item, ItemPackage, ReadingRule
 
-from helpers.items import new_item
+from helpers.items import item_form, new_item
 from helpers.markup import box_values, checked, problem, read, text, words_on
 from helpers.rows import add, named, shown
 
@@ -31,7 +31,7 @@ def test_a_name_is_saved_as_typed_and_its_units_said_under_it(
     """Ali, 2026-11-15 (inventory-tng-c0c.3): saved as typed, in canonical
     spelling; under the name, how each unit is read, with Not right? to correct
     it."""
-    form = {"category_id": str(radios.id), "unit": "each"}
+    form = item_form(radios)
     done = admin_client.post(ITEMS, data=form | {"name": "Cable 305 m, 10 \u00b5F"})
     assert done.status_code == 303
     item = named(session, Item, "Cable 305 m, 10 \u03bcF")
@@ -54,7 +54,7 @@ def test_a_spelling_nothing_settles_is_asked_once(
     from structlog.testing import capture_logs
 
     new_item(session, radios, "Box 10g spare")
-    form = {"name": "Box 10g", "category_id": str(radios.id), "unit": "each"}
+    form = item_form(radios, name="Box 10g")
     with capture_logs() as logs:
         asked = admin_client.post(ITEMS, data=form)
     assert asked.status_code == 400
@@ -101,12 +101,7 @@ def test_not_right_corrects_a_reading_for_every_name(
     respelling."""
     item = new_item(session, radios, "Tape 25 m")
     other = new_item(session, radios, "Spare 25 m")
-    form = {
-        "name": "Tape 25 m",
-        "category_id": str(radios.id),
-        "unit": "each",
-        "version": shown(item),
-    }
+    form = item_form(radios, name="Tape 25 m", version=shown(item))
     # What it is read as already: no rule.
     same = admin_client.post(f"{ITEMS}/{item.id}", data=form | {"unit:m": "m"})
     assert same.status_code == 303
@@ -143,12 +138,8 @@ def test_not_right_is_offered_where_words_decide_and_its_rule_wins(
     page = text(response)
     assert "Read as 305m · length, by “spool”." in page
     assert "Mbit/s" in box_values(response.text, "unit:M")
-    form = {
-        "name": "Spool 305M",
-        "category_id": str(radios.id),
-        "unit": "each",
-        "version": shown(item),
-        "unit:M": "Mbit/s",
+    form = item_form(radios, name="Spool 305M", version=shown(item)) | {
+        "unit:M": "Mbit/s"
     }
     assert admin_client.post(f"{ITEMS}/{item.id}", data=form).status_code == 303
     rule = session.scalars(select(ReadingRule)).one()
@@ -165,13 +156,7 @@ def test_a_rename_the_forms_answer_reads_as_its_own_name_asks_nothing(
     same name, so close names are not asked about, nor an alias kept."""
     item = new_item(session, radios, "Box 10Gbps")
     new_item(session, radios, "Box 10g spare")
-    form = {
-        "name": "Box 10g",
-        "category_id": str(radios.id),
-        "unit": "each",
-        "version": shown(item),
-        "unit:g": "Gbit/s",
-    }
+    form = item_form(radios, name="Box 10g", version=shown(item)) | {"unit:g": "Gbit/s"}
     assert admin_client.post(f"{ITEMS}/{item.id}", data=form).status_code == 303
     assert item.name == "Box 10g"
     assert items.aliases(session, item.id) == []
@@ -186,7 +171,7 @@ def test_a_name_taken_once_read_as_answered_names_the_item(
     item = new_item(session, radios, "Spare")
     # As shown (KeyedName.name_shown).
     said = TAKEN_FIELDS["name"]("Box 10\u00a0Gbps")
-    form = {"category_id": str(radios.id), "unit": "each", "unit:g": "Gbit/s"}
+    form = item_form(radios) | {"unit:g": "Gbit/s"}
     added = admin_client.post(ITEMS, data=form | {"name": "Box 10g"})
     assert added.status_code == 400
     assert said in words_on(added.text)
@@ -218,12 +203,7 @@ def test_a_correction_reading_names_alike_is_refused_naming_them(
     for path, form, field in (
         (
             base,
-            {
-                "name": "Spare 10g",
-                "category_id": str(radios.id),
-                "unit": "each",
-                "version": shown(spare),
-            },
+            item_form(radios, name="Spare 10g", version=shown(spare)),
             "name",
         ),
         (f"{base}/packages", {"package_name": "Bag 10g", "size": "1"}, "package_name"),

@@ -26,6 +26,7 @@ from inventory_tng.site_settings.paths import SETTINGS
 from inventory_tng.volunteers.paths import VOLUNTEERS
 from inventory_tng.web.forms import CHANGED, RULES
 
+from helpers.items import item_form
 from helpers.markup import text
 from helpers.rows import add, shown
 
@@ -44,7 +45,7 @@ class Form(NamedTuple):
 def _item(session: Session) -> Form:
     radios = add(session, Category(name="Radios"))
     item = add(session, Item(name="LiteBeam", category_id=radios.id))
-    form = {"name": "LiteBeam 5AC", "category_id": str(radios.id), "unit": "each"}
+    form = item_form(radios, name="LiteBeam 5AC")
     return Form(f"{ITEMS}/{item.id}", form, item)
 
 

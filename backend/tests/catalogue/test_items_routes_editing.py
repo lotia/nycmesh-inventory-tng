@@ -41,7 +41,7 @@ from inventory_tng.web.forms import (
     quantity,
 )
 
-from helpers.items import NOW, new_item
+from helpers.items import NOW, item_form, new_item
 from helpers.markup import (
     box_values,
     hidden_fields,
@@ -60,13 +60,9 @@ def test_adding_an_item(
 ) -> None:
     done = admin_client.post(
         ITEMS,
-        data={
-            "name": "LiteBeam 5AC",
-            "category_id": str(radios.id),
-            "unit": "each",
-            "manufacturer": "Ubiquiti",
-            "part_number": "LBE-5AC",
-        },
+        data=item_form(
+            radios, name="LiteBeam 5AC", manufacturer="Ubiquiti", part_number="LBE-5AC"
+        ),
     )
     item = named(session, Item, "LiteBeam 5AC")
     assert done.headers["location"] == f"{ITEMS}/{item.id}?notice=added"
@@ -79,7 +75,7 @@ def test_an_item_name_needs_more_than_punctuation(
     admin_client: TestClient, radios: Category
 ) -> None:
     """Punctuation alone would be one name with every other such."""
-    form = {"category_id": str(radios.id), "unit": "each"}
+    form = item_form(radios)
     refused = admin_client.post(ITEMS, data=form | {"name": "- ?"})
     assert refused.status_code == 400
     assert str(NO_LETTERS) in text(refused)
@@ -92,7 +88,7 @@ def test_a_name_of_signs_beyond_ascii_needs_a_letter_or_digit(
 ) -> None:
     """A key keeps an en dash, but a name needs a letter or a digit, an
     item's and a package's alike."""
-    form = {"category_id": str(radios.id), "unit": "each"}
+    form = item_form(radios)
     item = new_item(session, radios, "Probe")
     path = f"{ITEMS}/{item.id}/packages"
     for name in ("\u2013", "\u201c \u2014 \u201d", "\u00b1\u00b0"):
@@ -115,9 +111,7 @@ def test_an_item_needs_a_name_and_a_current_category(
 ) -> None:
     radios.retired_at = radios.created_at
     session.flush()
-    refused = admin_client.post(
-        ITEMS, data={"name": "", "category_id": str(radios.id), "unit": "each"}
-    )
+    refused = admin_client.post(ITEMS, data=item_form(radios, name=""))
     assert refused.status_code == 400
     page = text(refused)
     assert name_up_to(NAME_MAX) in page
@@ -150,9 +144,7 @@ def test_names_and_part_numbers_are_unique_naming_the_other(
             TAKEN_FIELDS["part_number"]("Lite-Beam 5AC"),
         ),
     ):
-        refused = admin_client.post(
-            ITEMS, data={"category_id": str(radios.id), "unit": "each"} | form
-        )
+        refused = admin_client.post(ITEMS, data=item_form(radios) | form)
         assert refused.status_code == 400
         assert problem(refused.text, field) == words
 
@@ -163,7 +155,7 @@ def test_a_name_pasted_with_look_alikes_clashes_naming_the_other(
     """A non-breaking space, a curly quote or an en dash is read as the
     plain one, so the name clashes with the one typed plainly, which the
     form names; a name is kept as typed."""
-    form = {"category_id": str(radios.id), "unit": "each"}
+    form = item_form(radios)
     for kept, pasted in (
         ("Tough cable", "Tough\u00a0Cable"),
         ("Ubiquiti's dish", "Ubiquiti\u2019s dish"),
@@ -186,12 +178,7 @@ def test_a_saved_item_is_refused_what_another_has_its_own_respelt(
         session,
         Item(name="Omni", category_id=radios.id, old_code="NYCM-1", retired_at=NOW),
     )
-    form = {
-        "name": "Lite Beam",
-        "category_id": str(radios.id),
-        "unit": "each",
-        "version": str(item.edit_version),
-    }
+    form = item_form(radios, name="Lite Beam", version=str(item.edit_version))
     path = f"{ITEMS}/{item.id}"
     refused = admin_client.post(path, data=form | {"old_code": "NYCM-1"})
     assert refused.status_code == 400
@@ -208,7 +195,7 @@ def test_a_name_is_checked_and_saved_in_canonical_spelling(
     """Typed with the micro sign, a name is compared and stored with μ
     (docs/decisions/0021, 2026-11-14): another's in that spelling is taken,
     naming it, and its own respelt so is no change asked about."""
-    form = {"category_id": str(radios.id), "unit": "each"}
+    form = item_form(radios)
     assert (
         admin_client.post(ITEMS, data=form | {"name": "Cap 10\u00b5F"}).status_code
         == 303
@@ -251,7 +238,7 @@ def test_a_number_and_its_unit_are_judged_as_search_reads_them(
     number, and finds a unit after a number and a no-break space as after
     a plain one, as search does: so asks about `M` after it, and refuses a
     name reading alike with another's, naming it."""
-    form = {"category_id": str(radios.id), "unit": "each"}
+    form = item_form(radios)
     asking = admin_client.post(ITEMS, data=form | {"name": asked})
     assert asking.status_code == 400
     question = f"\u201c{legend}\u201d is new. Is it a unit?"
@@ -291,7 +278,7 @@ def test_a_clash_gone_meanwhile_is_said_in_general(
     """The other item renamed between the refusal and the look for it."""
     new_item(session, radios, "LiteBeam")
     monkeypatch.setattr(items, "taken_by", lambda *_: None)
-    form = {"name": "litebeam", "category_id": str(radios.id), "unit": "each"}
+    form = item_form(radios, name="litebeam")
     refused = admin_client.post(ITEMS, data=form)
     assert str(TAKEN) in text(refused)
 
@@ -369,9 +356,7 @@ def test_retiring_and_bringing_back(
     assert item.retired_at is not None
     assert "Retired" in text(admin_client.get(ITEMS, params={"show": "retired"}))
     # Its name stays its own while it is retired, so it can come back.
-    taken = admin_client.post(
-        ITEMS, data={"name": item.name, "category_id": str(radios.id), "unit": "each"}
-    )
+    taken = admin_client.post(ITEMS, data=item_form(radios, name=item.name))
     assert taken.status_code == 400
     assert f"{TAKEN_FIELDS['name'](item.name)} {IS_RETIRED}" in text(taken)
     assert admin_client.post(f"{ITEMS}/{item.id}/restore").status_code == 303
@@ -455,7 +440,7 @@ def test_an_edit_with_a_problem_changes_nothing(
     item = new_item(session, radios)
     refused = admin_client.post(
         f"{ITEMS}/{item.id}",
-        data={"name": "", "category_id": str(radios.id), "unit": "each"},
+        data=item_form(radios, name=""),
     )
     assert refused.status_code == 400
     session.refresh(item)
@@ -470,7 +455,7 @@ def test_changes_are_logged_by_id(
     with capture_logs() as logs:
         admin_client.post(
             ITEMS,
-            data={"name": "Radio X", "category_id": str(radios.id), "unit": "each"},
+            data=item_form(radios, name="Radio X"),
         )
     (line,) = [line for line in logs if line["event"] == "item added"]
     assert line["item_id"] == named(session, Item, "Radio X").id
@@ -520,7 +505,7 @@ def test_a_name_close_to_others_asks_first(
         session, Item(name="LiteBeam 5AC Gen0", category_id=radios.id, retired_at=NOW)
     )
     new_item(session, radios, "Patch cable")
-    form = {"name": "LiteBeam 5AC Gen2", "category_id": str(radios.id), "unit": "each"}
+    form = item_form(radios, name="LiteBeam 5AC Gen2")
     asked = admin_client.post(ITEMS, data=form)
     assert asked.status_code == 200
     warning = read(asked.text).one("p", class_="warning", role="status")
@@ -547,7 +532,7 @@ def test_a_name_holding_another_items_asks_too(
 ) -> None:
     """ "mast" is close to "Mast, telescopic", though most of it is new."""
     mast = new_item(session, radios, "mast")
-    form = {"name": "Mast, telescopic", "category_id": str(radios.id), "unit": "each"}
+    form = item_form(radios, name="Mast, telescopic")
     asked = admin_client.post(ITEMS, data=form).text
     assert ("mast", f"{ITEMS}/{mast.id}") in links(asked)
 
@@ -559,7 +544,7 @@ def test_other_refusals_come_before_the_question(
     new_item(session, radios, "LiteBeam 5AC Gen1")
     radios.retired_at = NOW
     session.flush()
-    form = {"name": "LiteBeam 5AC Gen2", "category_id": str(radios.id), "unit": "each"}
+    form = item_form(radios, name="LiteBeam 5AC Gen2")
     refused = admin_client.post(ITEMS, data=form)
     assert refused.status_code == 400
     assert "A different item?" not in text(refused)
@@ -571,13 +556,9 @@ def test_renaming_close_to_another_asks_first(
     """Only a new name asks; saving the other fields does not."""
     new_item(session, radios, "LiteBeam 5AC Gen1")
     item = new_item(session, radios, "Radio")
-    form = {
-        "name": "Radio",
-        "category_id": str(radios.id),
-        "unit": "each",
-        "version": str(item.edit_version),
-        "notes": "On the shelf",
-    }
+    form = item_form(
+        radios, name="Radio", version=str(item.edit_version), notes="On the shelf"
+    )
     path = f"{ITEMS}/{item.id}"
     assert admin_client.post(path, data=form).status_code == 303
     form["version"] = str(item.edit_version)
@@ -608,7 +589,7 @@ def test_a_name_asked_about_saves_however_it_was_spaced(
     """Sent again with spaces around it, as typed, it is the name asked
     about, so it saves rather than asking again."""
     new_item(session, radios, "LiteBeam 5AC Gen1")
-    form = {"name": "LiteBeam 5AC Gen2 ", "category_id": str(radios.id), "unit": "each"}
+    form = item_form(radios, name="LiteBeam 5AC Gen2 ")
     asked = admin_client.post(ITEMS, data=form)
     assert "LiteBeam 5AC Gen2" in box_values(asked.text, "different")
     again = admin_client.post(ITEMS, data=form | {"different": "LiteBeam 5AC Gen2"})
@@ -625,14 +606,13 @@ def test_a_name_asked_about_stays_answered_through_another_refusal(
         session,
         Item(name="Omni", category_id=radios.id, manufacturer="U", part_number="P"),
     )
-    form = {
-        "name": "LiteBeam 5AC Gen2",
-        "category_id": str(radios.id),
-        "unit": "each",
-        "manufacturer": "U",
-        "part_number": "P",
-        "different": "LiteBeam 5AC Gen2",
-    }
+    form = item_form(
+        radios,
+        name="LiteBeam 5AC Gen2",
+        manufacturer="U",
+        part_number="P",
+        different="LiteBeam 5AC Gen2",
+    )
     refused = admin_client.post(ITEMS, data=form)
     assert refused.status_code == 400
     assert "LiteBeam 5AC Gen2" in box_values(refused.text, "different")

@@ -23,7 +23,7 @@ from inventory_tng.catalogue.paths import ITEMS
 from inventory_tng.core.db_errors import attempt
 from inventory_tng.models.catalogue import CURRENT_ALIAS, Category, Item, ItemAlias
 
-from helpers.items import NOW, items_named, new_item
+from helpers.items import NOW, item_form, items_named, new_item
 from helpers.markup import links, problem, read, text
 from helpers.rows import add, history, item_fields, shown
 from helpers.stock import retire
@@ -194,18 +194,13 @@ def test_a_clash_with_an_alias_names_the_item(
         ),
         (
             ITEMS,
-            {"name": "LBE gen2", "category_id": str(radios.id), "unit": "each"},
+            item_form(radios, name="LBE gen2"),
             "name",
             TAKEN_FIELDS["alias"](beams),
         ),
         (
             f"{ITEMS}/{rocket.id}",
-            {
-                "name": "LBE gen2",
-                "category_id": str(radios.id),
-                "unit": "each",
-                "version": shown(rocket),
-            },
+            item_form(radios, name="LBE gen2", version=shown(rocket)),
             "name",
             TAKEN_FIELDS["alias"](beams),
         ),
@@ -222,12 +217,7 @@ def test_an_alias_added_or_removed_refuses_no_save_of_the_item(
     a form opened before still saves, and the item's history is the
     alias's."""
     item = new_item(session, radios, "NanoBeam")
-    form = {
-        "name": "NanoBeam M5",
-        "category_id": str(radios.id),
-        "unit": "each",
-        "version": shown(item),
-    }
+    form = item_form(radios, name="NanoBeam M5", version=shown(item))
     path = f"{ITEMS}/{item.id}/aliases"
     assert admin_client.post(path, data={"alias_name": "NBE"}).status_code == 303
     (alias,) = items.aliases(session, item.id)
@@ -286,7 +276,7 @@ def test_a_rename_keeps_the_old_name_as_an_alias(
     from structlog.testing import capture_logs
 
     item = new_item(session, radios, "LiteBeam 5AC")
-    form = {"category_id": str(radios.id), "unit": "each"}
+    form = item_form(radios)
 
     def save(name: str) -> Response:
         session.refresh(item)
@@ -340,12 +330,7 @@ def test_renaming_to_its_own_alias_swaps_them(
     (pro,) = aliased(session, item, "Tough Cable Pro")
     # Close to the alias: would be asked about, for a new name.
     new_item(session, radios, "Tough Cable Pro 2")
-    form = {
-        "name": "tough cable PRO",
-        "category_id": str(radios.id),
-        "unit": "each",
-        "version": shown(item),
-    }
+    form = item_form(radios, name="tough cable PRO", version=shown(item))
     with capture_logs() as logs:
         done = admin_client.post(f"{ITEMS}/{item.id}", data=form)
     assert done.status_code == 303
@@ -378,14 +363,9 @@ def test_a_rename_refused_keeps_its_aliases(
     (pro,) = aliased(session, item, "Tough Cable Pro")
     add(session, Item(name="Rocket", category_id=radios.id, old_code="NYCM-9"))
     for name in ("Tough Cable Pro", "Tough Cable Max"):
-        form = {
-            "name": name,
-            "category_id": str(radios.id),
-            "unit": "each",
-            "old_code": "NYCM-9",
-            "different": name,
-            "version": shown(item),
-        }
+        form = item_form(
+            radios, name=name, old_code="NYCM-9", different=name, version=shown(item)
+        )
         refused = admin_client.post(f"{ITEMS}/{item.id}", data=form)
         assert refused.status_code == 400, name
         taken = TAKEN_FIELDS["old_code"]("Rocket")
@@ -441,11 +421,7 @@ def test_close_names_include_close_aliases(
     assert items.similar(session, "LiteBeam 5AC", 0) == [items.Close(beam)]
     assert items.similar(session, "Tuff cable outdoors", tough.id) == []
     assert items.similar(session, "Patch leads", 0) == []
-    form = {
-        "name": "Tuff cable outdoors",
-        "category_id": str(radios.id),
-        "unit": "each",
-    }
+    form = item_form(radios, name="Tuff cable outdoors")
     asked = read(admin_client.post(ITEMS, data=form).text)
     similar = asked.one("p", class_="warning", role="status")
     assert ("ToughCable", f"{ITEMS}/{tough.id}") in links(similar)

@@ -1,5 +1,6 @@
 """What the tests of items share: those of the administrators' item
-pages (tests/catalogue/test_items_routes_*.py) and of reading rules."""
+pages (tests/catalogue/test_items_routes_*.py), of reading rules and of
+the forms every page shares (tests/across/)."""
 
 from datetime import UTC, datetime
 from decimal import Decimal
@@ -16,6 +17,12 @@ NOW = datetime(2026, 11, 1, tzinfo=UTC)
 
 def new_item(session: Session, category: Category, name: str = "LiteBeam") -> Item:
     return add(session, Item(name=name, category_id=category.id))
+
+
+def item_form(category: Category, **fields: str) -> dict[str, str]:
+    """An item's form as its page sends it: in the category, counted
+    each, with the fields given."""
+    return {"category_id": str(category.id), "unit": "each"} | fields
 
 
 def same_size_twins(

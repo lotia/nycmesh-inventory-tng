@@ -18,6 +18,7 @@ from inventory_tng.catalogue.paths import ITEMS
 from inventory_tng.catalogue.reading_rules import NAMED, both
 from inventory_tng.models.catalogue import Category, Item, ItemPackage
 
+from helpers.items import item_form
 from helpers.markup import addresses, box_values, read, text
 from helpers.rows import add, named, tag
 from helpers.rows import shown as version
@@ -103,7 +104,7 @@ def test_the_form_edits_the_name_as_typed_and_says_how_it_is_shown(
     mark = tag()
     typed = f"Box {mark} 10,000 ft"
     shown = f"Box {mark} 10{THIN}000{NB}ft"
-    form = {"name": typed, "category_id": str(cables.id), "unit": "each"}
+    form = item_form(cables, name=typed)
     assert admin_client.post(ITEMS, data=form).status_code == 303
     item = named(session, Item, typed)
     assert item.name_shown == shown
@@ -140,7 +141,7 @@ def test_a_form_sent_back_shows_the_name_as_the_unit_answered_reads_it(
     mark = tag()
     spare = add(session, Item(name=f"Box {mark} 10g spare", category_id=cables.id))
     session.flush()
-    form = {"name": f"Box {mark} 10g", "category_id": str(cables.id), "unit": "each"}
+    form = item_form(cables, name=f"Box {mark} 10g")
     asked = text(admin_client.post(ITEMS, data=form))
     assert "Shown as" not in asked
     close = text(admin_client.post(ITEMS, data=form | {"unit:g": "Gbit/s"}))
@@ -187,7 +188,7 @@ def test_close_and_taken_names_are_named_as_shown(
     other = add(session, Item(name=f"Other {mark}", category_id=cables.id))
     items.add_alias(session, other, f"Drum {mark} 2,000ft")
     session.flush()
-    form = {"category_id": str(cables.id), "unit": "each"}
+    form = item_form(cables)
     close = admin_client.post(ITEMS, data=form | {"name": f"Spool {mark} 1,500ft"})
     assert read(close.text).all("a", f"Spool {mark} 1000{NB}ft")
     asked = text(admin_client.post(ITEMS, data=form | {"name": f"Drum {mark} 2,500ft"}))
@@ -210,12 +211,8 @@ def test_a_read_alike_refusal_names_each_as_typed(
     spare = add(session, Item(name=f"Spare {mark}", category_id=cables.id))
     session.flush()
     assert other.name_shown != other.name
-    form = {
-        "name": f"Spare {mark} 10g",
-        "category_id": str(cables.id),
-        "unit": "each",
-        "unit:g": "Gbit/s",
-        "version": version(spare),
+    form = item_form(cables, name=f"Spare {mark} 10g", version=version(spare)) | {
+        "unit:g": "Gbit/s"
     }
     refused = text(admin_client.post(f"{ITEMS}/{spare.id}", data=form))
     assert (
