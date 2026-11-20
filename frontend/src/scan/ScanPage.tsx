@@ -233,7 +233,6 @@ export function ScanPage({
           outbox={outbox}
           cartEmpty={cartEmpty}
           cartKept={cartKept}
-          reloadKeepsCart={reloadKeepsCart}
           cartKey={cartKey}
           older={older}
           adder={adder}

@@ -104,7 +104,6 @@ export function CartForm({
   outbox,
   cartEmpty,
   cartKept,
-  reloadKeepsCart,
   cartKey,
   older,
   adder,
@@ -117,10 +116,9 @@ export function CartForm({
   outbox: Outbox;
   /** Kept as the cart changes, here or in another tab (NewerBuild). */
   cartEmpty: Signal<boolean>;
-  /** Set to whether the browser kept the cart when last asked. */
+  /** Set to whether the browser kept the cart when last asked; kept
+   * again once this form goes, as what it held is then gone. */
   cartKept: Signal<boolean>;
-  /** Whether a reload or restart would keep the cart (ScanPage). */
-  reloadKeepsCart: boolean;
   /** Kept as the cart's batch key changes. */
   cartKey: Signal<string | undefined>;
   /** What older builds left, to put back in the cart or discard. */
@@ -168,6 +166,12 @@ export function CartForm({
 
   // Tabs share one cart; a refreshed catalogue clears what it no longer has.
   useEffect(() => store.listen(), [store]);
+  useEffect(
+    () => () => {
+      cartKept.value = true;
+    },
+    [],
+  );
   useEffect(() => store.useCatalogue(catalogue), [catalogue]);
   const empty = cart.value.lines.length === 0;
   const batchKey = cart.value.batchKey;
@@ -777,7 +781,9 @@ export function CartForm({
             scanning.value = false;
           }}
           reload={reload}
-          reloadKeepsCart={reloadKeepsCart}
+          // As ScanPage's reloadKeepsCart, from this render's cart rather
+          // than cartEmpty, which follows it a render later.
+          reloadKeepsCart={cartKept.value || empty}
         />
       ) : (
         <button type="button" onClick={() => (scanning.value = true)}>
