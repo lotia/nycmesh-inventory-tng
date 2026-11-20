@@ -37,18 +37,23 @@ afterEach(() => vi.restoreAllMocks());
 
 /** A Scanner on `open`'s camera, reading nothing and done or reloaded
  * to no effect unless a test says. */
-function scanner(
-  props: Pick<ComponentProps<typeof Scanner>, "open"> &
-    Partial<ComponentProps<typeof Scanner>>,
-) {
-  return render(
+function scanner(props: ScannerProps) {
+  return render(scannerOf(props));
+}
+
+type ScannerProps = Pick<ComponentProps<typeof Scanner>, "open"> &
+  Partial<ComponentProps<typeof Scanner>>;
+
+/** The Scanner element `scanner` renders. */
+function scannerOf(props: ScannerProps) {
+  return (
     <Scanner
       onCode={() => said("")}
       onDone={() => {}}
       reload={() => {}}
-      cartKept
+      reloadKeepsCart
       {...props}
-    />,
+    />
   );
 }
 
@@ -224,20 +229,25 @@ test("a session is reported as the camera closes, with its labels by kind", asyn
   );
 });
 
-/** The camera refused with `error`, its scanner's buttons, and the
- * sessions reported. The alert says the refusal's bold heading, then
- * `hint`, the usual one unless a test says. */
+/** The camera refused with `error`, its scanner's buttons, the sessions
+ * reported, and a rerender saying whether a reload keeps the cart. The
+ * alert says the refusal's bold heading, then `hint`, the usual one
+ * unless a test says. */
 async function refusedWith(
   error: unknown,
   refusal: Refusal,
-  { cartKept = true, hint = refusal.plain } = {},
+  { reloadKeepsCart = true, hint = refusal.plain } = {},
 ) {
   const sessions = reported();
   const reload = vi.fn();
-  const refused = async () => {
-    throw error;
+  const props = {
+    open: async (): Promise<Session> => {
+      throw error;
+    },
+    reload,
+    reloadKeepsCart,
   };
-  const shown = scanner({ open: refused, reload, cartKept });
+  const shown = scanner(props);
   const bold = await screen.findByText(say(refusal.bold));
   expect(bold.tagName).toBe("STRONG");
   // A refusal is a problem: said as an alert, and no status remains.
@@ -252,18 +262,44 @@ async function refusedWith(
   expect(screen.queryAllByRole("button")).toEqual(
     reloadButton === null ? [] : [reloadButton],
   );
-  return { sessions, reload, reloadButton, rerender: shown.rerender };
+  const rerender = (keeps: boolean) =>
+    shown.rerender(scannerOf({ ...props, reloadKeepsCart: keeps }));
+  return { sessions, reload, reloadButton, rerender };
 }
 
-// One error for each outcome refused; which error is which outcome is
-// camera-report.test.ts's table (outcomeOf).
-test.each([
-  [new DOMException("no", "NotAllowedError"), "not_allowed", NOT_ALLOWED],
-  [new DOMException("busy", "NotReadableError"), "in_use", IN_USE],
-  [new DOMException("none", "NotFoundError"), "not_found", NO_CAMERA],
-  [new DecoderUnavailable("offline"), "decoder_failed", NO_DECODER],
-  [new Error("?"), "other", NO_CAMERA],
-] as const)(
+// One error for each outcome refused, and the hint while a reload would
+// empty the cart: to record it first where Reload page is offered, else
+// the usual one (Ali, inventory-tng-0y0u). Which error is which outcome
+// is camera-report.test.ts's table (outcomeOf).
+const REFUSED = [
+  [
+    new DOMException("no", "NotAllowedError"),
+    "not_allowed",
+    NOT_ALLOWED,
+    NOT_ALLOWED.notKept,
+  ],
+  [
+    new DOMException("busy", "NotReadableError"),
+    "in_use",
+    IN_USE,
+    IN_USE.notKept,
+  ],
+  [
+    new DOMException("none", "NotFoundError"),
+    "not_found",
+    NO_CAMERA,
+    NO_CAMERA.plain,
+  ],
+  [
+    new DecoderUnavailable("offline"),
+    "decoder_failed",
+    NO_DECODER,
+    NO_DECODER.notKept,
+  ],
+  [new Error("?"), "other", NO_CAMERA, NO_CAMERA.plain],
+] as const;
+
+test.each(REFUSED)(
   "%s: the volunteer is told what the report says",
   async (error, outcome, refusal) => {
     const { sessions, reloadButton } = await refusedWith(error, refusal);
@@ -274,45 +310,29 @@ test.each([
   },
 );
 
-// While the browser isn't keeping the cart, a refusal offering Reload
-// page says to record the cart first, as a reload would empty it; one
-// offering none says what it always does (Ali, inventory-tng-0y0u).
-test.each([
-  [new DOMException("no", "NotAllowedError"), NOT_ALLOWED, true],
-  [new DOMException("busy", "NotReadableError"), IN_USE, true],
-  [new DecoderUnavailable("offline"), NO_DECODER, true],
-  [new DOMException("none", "NotFoundError"), NO_CAMERA, false],
-  [new Error("?"), NO_CAMERA, false],
-] as const)(
-  "%s, the cart not kept: Reload page offered is %s",
-  async (error, refusal, offered) => {
-    const hint = refusal.reload ? refusal.notKept : refusal.plain;
+test.each(REFUSED)(
+  "%s, a reload emptying the cart: the hint says so where Reload page is",
+  async (error, _outcome, refusal, hint) => {
     const { reloadButton } = await refusedWith(error, refusal, {
-      cartKept: false,
+      reloadKeepsCart: false,
       hint,
     });
-    expect(reloadButton !== null).toBe(offered);
+    expect(reloadButton !== null).toBe(refusal.reload);
   },
 );
 
-test("the hint follows the cart as the browser keeps it or not", async () => {
-  const error = new DOMException("no", "NotAllowedError");
-  const { rerender } = await refusedWith(error, NOT_ALLOWED);
+test("the hint follows whether a reload keeps the cart", async () => {
+  const { rerender } = await refusedWith(
+    new DOMException("no", "NotAllowedError"),
+    NOT_ALLOWED,
+  );
   const alert = screen.getByRole("alert");
-  const props = {
-    onCode: () => said(""),
-    onDone: () => {},
-    reload: () => {},
-    open: async (): Promise<Session> => {
-      throw error;
-    },
-  };
-  rerender(<Scanner {...props} cartKept={false} />);
+  rerender(false);
   expect(alert.textContent).toBe(
     `${say(NOT_ALLOWED.bold)} ${say(NOT_ALLOWED.notKept)}`,
   );
   screen.getByRole("button", { name: say(RELOAD_PAGE) });
-  rerender(<Scanner {...props} cartKept />);
+  rerender(true);
   expect(alert.textContent).toBe(
     `${say(NOT_ALLOWED.bold)} ${say(NOT_ALLOWED.plain)}`,
   );

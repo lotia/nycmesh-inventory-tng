@@ -3,9 +3,9 @@
  * each label read once while it stays in view (repeated-reads.ts, Repeats),
  * with a word on what it did. A refused or missing camera says so, and
  * offers Reload page where that may help, with no Done (Ali,
- * inventory-tng-qy02), saying to record the cart first while the browser
- * isn't keeping it (Ali, inventory-tng-0y0u); the lists below still work. Each session is
- * reported (camera-report.ts).
+ * inventory-tng-qy02), saying to record the cart first while a reload
+ * would empty it (Ali, inventory-tng-0y0u); the lists below still work.
+ * Each session is reported (camera-report.ts).
  */
 import type { MessageDescriptor } from "@lingui/core";
 import { msg } from "@lingui/core/macro";
@@ -92,7 +92,7 @@ export function Scanner({
   onCode,
   onDone,
   reload,
-  cartKept,
+  reloadKeepsCart,
   open = openCamera,
 }: {
   onCode: (code: string) => Acted;
@@ -101,7 +101,7 @@ export function Scanner({
   reload: () => void;
   /** Whether a reload would keep the cart: the browser keeps it
    * (CartForm, NOT_KEEPING), or it is empty. */
-  cartKept: boolean;
+  reloadKeepsCart: boolean;
   open?: (video: HTMLVideoElement) => Promise<Session>;
 }) {
   const video = useRef<HTMLVideoElement>(null);
@@ -240,7 +240,7 @@ export function Scanner({
             <AlertWords
               note={{
                 bold: [say(refusal.bold)],
-                plain: [" ", say(hintOf(refusal, cartKept))],
+                plain: [" ", say(hintOf(refusal, reloadKeepsCart))],
               }}
             />
           </p>
@@ -257,10 +257,10 @@ export function Scanner({
   );
 }
 
-/** A refusal's hint: before a reload, while the cart is not kept, to
- * record it first. */
-function hintOf(refusal: Refusal, cartKept: boolean) {
-  return refusal.reload && !cartKept ? refusal.notKept : refusal.plain;
+/** A refusal's hint: to record the cart first where a reload would
+ * empty it. */
+function hintOf(refusal: Refusal, reloadKeepsCart: boolean) {
+  return refusal.reload && !reloadKeepsCart ? refusal.notKept : refusal.plain;
 }
 
 /** Turns the camera's torch on and off. */

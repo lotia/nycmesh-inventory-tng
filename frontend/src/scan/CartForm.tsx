@@ -140,7 +140,7 @@ export function CartForm({
   const cart = store.cart;
   const query = useSignal("");
   const problems = useSignal<Said[]>([]);
-  // Whether the browser kept the cart when last asked (kept).
+  // Whether the browser kept the cart when last asked.
   const cartKept = useSignal(true);
   // What was last sent to be recorded, worded as it is shown.
   const saved = useSignal<Batch | null>(null);
@@ -774,7 +774,7 @@ export function CartForm({
           }}
           reload={reload}
           // An empty cart has nothing to record before a reload.
-          cartKept={cartKept.value || empty}
+          reloadKeepsCart={cartKept.value || empty}
         />
       ) : (
         <button type="button" onClick={() => (scanning.value = true)}>

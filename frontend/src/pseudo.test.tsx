@@ -490,7 +490,7 @@ const COVERED: Record<string, () => Promise<HTMLElement[]>> = {
         onCode={() => ({ said: "Κουτί", label: "item" })}
         onDone={() => {}}
         reload={() => {}}
-        cartKept
+        reloadKeepsCart
         open={open}
       />,
     );
@@ -508,14 +508,14 @@ const COVERED: Record<string, () => Promise<HTMLElement[]>> = {
       new DOMException("busy", "NotReadableError"),
       new Error("none"),
     ]) {
-      // Each said as the cart is kept, and as it is not.
-      for (const cartKept of [true, false]) {
+      // Each said as a reload keeps the cart, and as it would not.
+      for (const reloadKeepsCart of [true, false]) {
         render(
           <Scanner
             onCode={() => ({ said: "", label: "unknown" })}
             onDone={() => {}}
             reload={() => {}}
-            cartKept={cartKept}
+            reloadKeepsCart={reloadKeepsCart}
             open={() => Promise.reject(refusal)}
           />,
         );
@@ -532,7 +532,7 @@ const COVERED: Record<string, () => Promise<HTMLElement[]>> = {
           onCode={() => ({ said: "", label: "unknown" })}
           onDone={() => {}}
           reload={() => {}}
-          cartKept
+          reloadKeepsCart
           open={() => Promise.reject(new TypeError("no mediaDevices"))}
         />,
       );
