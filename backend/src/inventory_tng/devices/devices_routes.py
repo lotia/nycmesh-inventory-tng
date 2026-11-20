@@ -358,9 +358,7 @@ def revoke_device_page(
 def revoke_device(
     signed: ConfirmedAdmin, session: DbSession, device_id: int
 ) -> Response:
-    if session.get(Device, device_id) is None or not devices.revoke_device(
-        session, device_id
-    ):
+    if not devices.revoke_device(session, device_id):
         return not_found()
     changed(signed, session)
     return redirect(f"{DEVICES}/{device_id}", notice="device_revoked")
