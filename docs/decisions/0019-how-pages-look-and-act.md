@@ -54,7 +54,8 @@ the scan pages, on a phone (360 to 430 px, one hand) and a desktop alike.
 - **Three button styles.** Primary (brand fill, ink text): one per form,
   such as Save or Invite. Secondary (today's band button): the rest.
   Danger (problem-coloured text and border): only on a confirmation page,
-  for what cannot be undone (revoking, resetting a sign-in, merging).
+  for what cannot be undone (revoking, removing an authenticator,
+  resetting a sign-in, merging).
 - **Buttons, and links in a row of actions, are at least 44 px tall.**
 - **The way back is a link above the title** ("‹ Items"), not beside the
   buttons.

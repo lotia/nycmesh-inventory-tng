@@ -161,6 +161,7 @@ def listed(response: Response) -> str:
 # as typed.
 NAMES_NO_ITEM = {
     "/admin/account",
+    "/admin/account/authenticators/{authenticator_id}/remove",
     "/admin/volunteers",
     "/admin/volunteers/suggest",
     "/admin/volunteers/{volunteer_id}",

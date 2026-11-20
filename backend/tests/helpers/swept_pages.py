@@ -91,6 +91,7 @@ class World:
     labels: list[int] = field(default_factory=list)
     code_id: int = 0
     phrase: str = ""
+    authenticator_id: int = 0
 
     def on(self, session: Session) -> World:
         """This world writing in `session`, so what is added to it there
@@ -160,6 +161,8 @@ def base(session: Session) -> World:
     )
     over_recorded_line(world)
     over_recorded_settled(world)
+    # Ada's second, so removing it asks rather than refuses.
+    world.authenticator_id = authenticator(world).id
     return world
 
 
@@ -298,11 +301,11 @@ def admin(world: World) -> None:
     new_admin(world.session, f"admin-{tag()}", totp=False)
 
 
-def authenticator(world: World) -> None:
+def authenticator(world: World) -> Authenticator:
     """Another authenticator of the administrator signed in, Ada."""
     key = authenticator_totp.new_totp_key()
     authenticator = Authenticator(admin_id=world.ada_id, name=tag())
-    add(world.session, sealed(authenticator, key))
+    return add(world.session, sealed(authenticator, key))
 
 
 More = Callable[[World], object]
@@ -335,6 +338,14 @@ PAGES: dict[str, Page] = {
     CATALOGUE: Page(everything, unworded="the scan page's, which says its own words"),
     "/admin": Page(everything, worded={"home": "/admin"}),
     "/admin/account": Page(authenticator, worded={"your account": "/admin/account"}),
+    "/admin/account/authenticators/{authenticator_id}/remove": Page(
+        uncounted=A_FORM_OF_ONE_ROW,
+        worded={
+            "an authenticator to remove": lambda w: (
+                f"/admin/account/authenticators/{w.authenticator_id}/remove"
+            ),
+        },
+    ),
     "/admin/items": Page(
         everything,
         (

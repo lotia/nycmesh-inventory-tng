@@ -747,7 +747,7 @@ def not_english(session: Session) -> None:
             if re.search("[A-Za-z]{2,}", row.name):
                 row.name = f"{NOT_ENGLISH} {row.id}"
     for authenticator in session.scalars(select(Authenticator)):
-        authenticator.name = NOT_ENGLISH
+        authenticator.name = f"{NOT_ENGLISH} {authenticator.id}"
     for signed_in in session.scalars(select(AdminSession)):
         signed_in.user_agent = NOT_ENGLISH
     for admin in session.scalars(select(Admin)):

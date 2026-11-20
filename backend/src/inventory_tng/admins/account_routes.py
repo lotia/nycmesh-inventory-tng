@@ -30,8 +30,9 @@ from inventory_tng.core.db_errors import unique
 from inventory_tng.core.db_sessions import DbSession
 from inventory_tng.core.local_time import site_zone
 from inventory_tng.core.mail import Notify
-from inventory_tng.core.phrases import Words, lazy_gettext
+from inventory_tng.core.phrases import Words, gettext, lazy_gettext
 from inventory_tng.models.admins import running_low
+from inventory_tng.web.admin_pages import admin_page
 from inventory_tng.web.pages import add_notices, not_found, page, redirect
 from inventory_tng.web.single_use_forms import SingleUseKey, sent_before
 
@@ -205,6 +206,33 @@ def rename_authenticator(
     if not found[0]:
         return not_found()  # Someone else's, or gone: ids reveal nothing.
     return _done(signed, session, "renamed", section="authenticators")
+
+
+@router.get(f"{ACCOUNT}/authenticators/{{authenticator_id}}/remove")
+def confirm_remove_authenticator(
+    request: Request, signed: AdminSignedIn, session: DbSession, authenticator_id: int
+) -> Response:
+    """Asks first: removing cannot be undone, and the last one, while TOTP is
+    optional, takes the recovery codes with it."""
+    current = accounts.authenticators(session, signed.admin.id)
+    found = next((a for a in current if a.id == authenticator_id), None)
+    if found is None:
+        return not_found()  # Someone else's, or gone: ids reveal nothing.
+    last = len(current) == 1
+    if last and signed.settings.totp_policy == "required":
+        return _refused(request, session, signed, "authenticators", LAST_REQUIRED)
+    return admin_page(
+        request,
+        signed,
+        "admins/authenticator_remove.html",
+        {
+            "title": gettext("Remove %(name)s?", name=found.name),
+            "here": f"{ACCOUNT}/authenticators/{authenticator_id}/remove",
+            "keep": f"{ACCOUNT}#authenticators",
+            "authenticator": found,
+            "last": last,
+        },
+    )
 
 
 @router.post(f"{ACCOUNT}/authenticators/{{authenticator_id}}/remove")

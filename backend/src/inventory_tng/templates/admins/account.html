@@ -58,7 +58,7 @@
       <td>{{ authenticator.created_at | when(zone) }}</td>
       <td>{{ last_used | when(zone) if last_used else _("never") }}</td>
       <td>
-        <form method="post" action="{{ paths.account }}/authenticators/{{ authenticator.id }}/remove">
+        <form method="get" action="{{ paths.account }}/authenticators/{{ authenticator.id }}/remove">
           <button>{% trans %}Remove{% endtrans %}<span class="sr-only"> {{ authenticator.name }}</span></button>
         </form>
       </td>

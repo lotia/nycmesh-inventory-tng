@@ -32,7 +32,7 @@ from inventory_tng.models.admins import (
 )
 
 from helpers.mail import SentMail
-from helpers.markup import box_values, forms, links, read, text
+from helpers.markup import box_values, button, forms, links, read, text, words_on
 from helpers.sign_in import (
     PASSWORD,
     TIME_STEP,
@@ -220,6 +220,8 @@ def test_another_admins_authenticator_is_not_found(
     for action, form in (("name", {"authenticator_name": "Mine"}), ("remove", {})):
         path = f"{ACCOUNT}/authenticators/{theirs.id}/{action}"
         assert client.post(path, data=form).status_code == 404
+    remove = f"{ACCOUNT}/authenticators/{theirs.id}/remove"
+    assert client.get(remove).status_code == 404
     assert theirs.name == "Phone"
     assert theirs.retired_at is None
 
@@ -230,13 +232,15 @@ def test_the_last_authenticator_stays_while_totp_is_required(
     ada: tuple[Admin, str],
 ) -> None:
     (authenticator,) = accounts.authenticators(session, ada[0].id)
-    refused = client.post(f"{ACCOUNT}/authenticators/{authenticator.id}/remove")
-    assert refused.status_code == 400
-    assert "TOTP is required here" in text(refused)
+    path = f"{ACCOUNT}/authenticators/{authenticator.id}/remove"
+    # Not asked to confirm what would be refused.
+    for refused in (client.get(path), client.post(path)):
+        assert refused.status_code == 400
+        assert "TOTP is required here" in text(refused)
     assert authenticator.retired_at is None
 
 
-def test_removing_one_of_two_wipes_its_key(
+def test_removing_one_of_two_wipes_its_key_after_a_confirmation(
     client: TestClient,
     session: Session,
     ada: tuple[Admin, str],
@@ -245,7 +249,18 @@ def test_removing_one_of_two_wipes_its_key(
     spare = accounts.add_authenticator(
         session, TOTP_KEYS, admin.id, "Spare", authenticator_totp.new_totp_key(), 0
     )
-    done = client.post(f"{ACCOUNT}/authenticators/{spare.id}/remove")
+    path = f"{ACCOUNT}/authenticators/{spare.id}/remove"
+    assert ("get", path) in forms(client.get(ACCOUNT).text)
+    asked = client.get(path)
+    assert asked.status_code == 200
+    words = words_on(asked.text)
+    assert "Remove Spare?" in words
+    assert "Once removed, Spare's codes no longer sign you in" in words
+    assert "recovery codes" not in words  # Only the last one takes them.
+    assert "danger" in button(asked.text, "Remove").classes
+    assert ("Keep it", f"{ACCOUNT}#authenticators") in links(asked.text)
+    assert spare.retired_at is None  # Only its button removes.
+    done = client.post(path)
     assert (
         done.headers["location"]
         == f"{ACCOUNT}?notice=removed&section=authenticators#authenticators"
@@ -265,7 +280,12 @@ def test_removing_the_last_while_optional_turns_totp_off(
     policy(session, "optional")
     accounts.make_recovery_codes(session, admin.id, datetime.now(UTC))
     (authenticator,) = accounts.authenticators(session, admin.id)
-    done = client.post(f"{ACCOUNT}/authenticators/{authenticator.id}/remove")
+    path = f"{ACCOUNT}/authenticators/{authenticator.id}/remove"
+    asked = words_on(client.get(path).text)
+    assert "your recovery codes stop working" in asked
+    assert "your password alone signs you in" in asked
+    assert accounts.uses_totp(session, admin.id)  # Only its button removes.
+    done = client.post(path)
     assert (
         done.headers["location"]
         == f"{ACCOUNT}?notice=totp_off&section=authenticators#authenticators"
