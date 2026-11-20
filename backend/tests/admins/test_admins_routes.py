@@ -2,7 +2,7 @@
 (admins/admins_routes.py)."""
 
 from collections.abc import Callable
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, datetime
 from typing import NoReturn
 
 import pytest
@@ -17,7 +17,7 @@ from inventory_tng.admins.accounts import NOT_AN_EMAIL, username_problem
 from inventory_tng.admins.forms import OWN_RESET, OWN_RETIRE, TAKEN
 from inventory_tng.admins.paths import ADMINS
 from inventory_tng.core.settings import RateLimits
-from inventory_tng.models.admins import ACTIVITY_KINDS, Admin, AdminSession
+from inventory_tng.models.admins import ACTIVITY_KINDS, Admin
 from inventory_tng.models.site_settings import SignInSettings
 from inventory_tng.web.qr_codes import qr_svg
 from inventory_tng.web.single_use_forms import FIELD
@@ -37,6 +37,7 @@ from helpers.markup import (
 )
 from helpers.sign_in import (
     admin_named,
+    code_typed_ago,
     confirmed_long_ago,
     new_admin,
     reset_link,
@@ -412,16 +413,6 @@ def test_only_a_retired_administrator_is_brought_back(session: Session) -> None:
     assert accounts.has_password(session, ben.id)
 
 
-def code_typed_ago(session: Session, minutes: int) -> None:
-    """Every session's last code typed so long ago, for a change to another
-    administrator too, the window otherwise open."""
-    for row in session.scalars(select(AdminSession)):
-        typed = datetime.now(UTC) - timedelta(minutes=minutes)
-        row.confirmed_at = row.account_confirmed_at = typed
-        row.last_sensitive_at = datetime.now(UTC)
-    session.flush()
-
-
 def test_changing_another_needs_a_recent_code(
     admin_client: TestClient, session: Session
 ) -> None:
@@ -431,12 +422,12 @@ def test_changing_another_needs_a_recent_code(
     be, and nothing changes without it."""
     ben, _ = new_admin(session, "ben")
     carol, _ = new_admin(session, "carol")
-    code_typed_ago(session, 29)
+    code_typed_ago(session, 29, window_open=True)
     assert code_boxes(admin_client.get(f"{ADMINS}/{ben.id}").text) == 0
     retire = admin_client.post(f"{ADMINS}/{ben.id}/retire", data=single_use())
     assert retire.status_code == 303
     assert ben.retired_at is not None
-    code_typed_ago(session, 31)
+    code_typed_ago(session, 31, window_open=True)
     page = admin_client.get(f"{ADMINS}/{carol.id}").text
     assert code_boxes(page) == 1  # Retiring; reset asks on its page.
     assert "Your code" in words_on(page)
@@ -461,7 +452,7 @@ def test_at_0_minutes_each_change_asks_for_a_code(
 ) -> None:
     session.get_one(SignInSettings, 1).account_change_minutes = 0
     ben, _ = new_admin(session, "ben")
-    code_typed_ago(session, 0)
+    code_typed_ago(session, 0, window_open=True)
     assert code_boxes(admin_client.get(ADMINS).text)
     asked = admin_client.post(f"{ADMINS}/{ben.id}/retire", data=single_use())
     assert asked.status_code == 403
@@ -473,7 +464,7 @@ def test_a_code_typed_on_one_change_covers_the_next(
 ) -> None:
     ben, _ = new_admin(session, "ben")
     carol, _ = new_admin(session, "carol")
-    code_typed_ago(session, 31)
+    code_typed_ago(session, 31, window_open=True)
     form = with_code(session)
     assert admin_client.post(f"{ADMINS}/{ben.id}/retire", data=form).status_code == 303
     again = admin_client.post(f"{ADMINS}/{carol.id}/retire", data=single_use())
@@ -592,10 +583,10 @@ def test_a_change_sent_again_once_its_code_lapsed_spends_none(
     """Back then Forward, half an hour on: said so before a code is asked
     for, with a way back to the page it came from."""
     ben, _ = new_admin(session, "ben")
-    code_typed_ago(session, 31)
+    code_typed_ago(session, 31, window_open=True)
     form = with_code(session)
     assert admin_client.post(f"{ADMINS}/{ben.id}/retire", data=form).status_code == 303
-    code_typed_ago(session, 31)
+    code_typed_ago(session, 31, window_open=True)
     me = admin_named(session, "ada")
     left = accounts.recovery_codes_left(session, me.id)
     # The page it was on, as its form carries it
