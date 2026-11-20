@@ -191,14 +191,16 @@ def signed_in(request: Request, session: DbSession) -> SignedIn:
     request_logging.bind(admin_id=admin.id, sign_in_id=row.id)
     # Every change this request makes is theirs, in the history.
     set_actor(session, f"admin:{admin.id}")
-    # For an error page later in this request, drawn without the database.
-    setattr(request.state, SIGNED_IN_AS, SignedInAs(admin.username))
-    return SignedIn(
+    signed = SignedIn(
         admin=admin,
         row=row,
         settings=accounts.sign_in_settings(session),
         uses_totp=accounts.uses_totp(session, admin.id),
     )
+    # For an error page later in this request, drawn without the database:
+    # only once the check has finished, so a failure within it stays plain.
+    setattr(request.state, SIGNED_IN_AS, SignedInAs(admin.username))
+    return signed
 
 
 AnySignedIn = Annotated[SignedIn, Depends(signed_in)]

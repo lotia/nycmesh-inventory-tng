@@ -13,6 +13,7 @@ from fastapi import Depends, FastAPI, HTTPException
 from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
 
+from inventory_tng.admins import accounts
 from inventory_tng.admins.guards import admin_signed_in
 from inventory_tng.admins.paths import SIGN_OUT
 from inventory_tng.catalogue.paths import ITEMS
@@ -223,3 +224,15 @@ def test_an_error_page_under_admin_reads_no_database(
     # sign-in check's reads are counted, so the count sees the app's.
     assert bool(admin_failing.statements) == masthead
     assert admin_failing.at_failure == [len(admin_failing.statements)]
+
+
+def test_a_failure_within_the_sign_in_check_stays_plain(
+    admin_client: TestClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    def broken(_session: Session) -> NoReturn:
+        raise RuntimeError("a bug")
+
+    monkeypatch.setattr(accounts, "sign_in_settings", broken)
+    answer = admin_client.get(ITEMS)
+    assert answer.status_code == 500
+    assert not has_masthead(answer.text)
