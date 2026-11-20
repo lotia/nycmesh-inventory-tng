@@ -37,6 +37,7 @@ from inventory_tng.stock.over_recorded import (
     OPENED_INTO,
     WAITING,
     correction_key,
+    moved_whole,
 )
 from inventory_tng.web.formatting import amount, plain_amount
 
@@ -301,7 +302,7 @@ def shown(session: Session, *where: ColumnElement[bool]) -> list[Shown]:
         closed_on,
     ) in found:
         words = _amount(row.quantity, unit, package, size, from_open, kind)
-        whole = from_open is not None and from_open == to_open
+        whole = moved_whole(from_open, to_open)
         # An opening's open package closed since: Correct skips that end
         # (correct()), so the row says it is closed.
         arrived_how: Literal["counted", "closed"] = "counted"
@@ -567,7 +568,7 @@ def settled(
         closed_on,
         by,
     ) in found:
-        whole = from_open is not None and from_open == to_open
+        whole = moved_whole(from_open, to_open)
         left, arrived = _end_names(kind, item, package, to_open, from_place, to_place)
         at, how, reason = row.settled_at, row.settled_how, row.checked_reason
         # Settled: the CHECK sets all three or none.

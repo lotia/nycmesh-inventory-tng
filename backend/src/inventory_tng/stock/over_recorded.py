@@ -149,6 +149,12 @@ OPENED_INTO = and_(
 )
 
 
+def moved_whole(from_open: int | None, to_open: int | None) -> bool:
+    """Whether a movement moved an open package whole: it left one and
+    arrived in the same one."""
+    return from_open is not None and from_open == to_open
+
+
 def _all_right(
     left_at: int | None,
     arrived_at: int | None,
@@ -283,8 +289,7 @@ def _right(
     return _all_right(
         transaction.from_location_id,
         transaction.to_location_id,
-        movement.from_open_package_id is not None
-        and movement.from_open_package_id == movement.to_open_package_id,
+        moved_whole(movement.from_open_package_id, movement.to_open_package_id),
         row.left_count_id,
         row.arrived_count_id,
         closed,
@@ -526,10 +531,7 @@ def counted(
     found = session.execute(locked(query, of=OverRecorded)).all()
     closed = 0
     for row, movement, kind, left_at, arrived_at, closed_on in found:
-        whole = (
-            movement.from_open_package_id is not None
-            and movement.from_open_package_id == movement.to_open_package_id
-        )
+        whole = moved_whole(movement.from_open_package_id, movement.to_open_package_id)
         item_id = movement.item_id
         by_total = item_id in totals and not whole and kind != "open"
         left = ledger.Form(movement.from_package_id, movement.from_open_package_id)
