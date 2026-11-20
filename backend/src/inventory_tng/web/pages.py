@@ -2,6 +2,7 @@
 page or a redirect is sent."""
 
 from collections.abc import Mapping
+from dataclasses import dataclass
 from pathlib import Path
 from types import MappingProxyType
 from typing import Any, NoReturn, cast
@@ -19,7 +20,7 @@ from inventory_tng.core.db_errors import Gone
 from inventory_tng.core.local_time import show, show_day
 from inventory_tng.core.phrases import BRAND, lazy_gettext, number
 from inventory_tng.web.formatting import amount, plain_amount, printed_length
-from inventory_tng.web.navigation import sections
+from inventory_tng.web.navigation import sections, sections_without_badges
 from inventory_tng.web.template_phrases import install
 
 templates = Jinja2Templates(directory=Path(__file__).parent.parent / "templates")
@@ -45,6 +46,20 @@ def csp_nonce(request: Request) -> str | None:
 
 
 cast(dict[str, Any], templates.env.globals)["csp_nonce"] = csp_nonce
+
+# Where the administrator a request is signed in as is kept, in its state,
+# once the sign-in guard has checked them (admins/guards.signed_in): what an
+# error page's masthead shows, read without the database.
+SIGNED_IN_AS = "signed_in_as"
+
+
+@dataclass(frozen=True)
+class SignedInAs:
+    """What the masthead reads of the administrator signed in (_masthead.html),
+    as plain values: an ORM row may be detached or expired by the time an
+    error page is drawn, and reading it would query the database."""
+
+    username: str
 
 
 # {{ quantity | amount }}: a quantity as people read it ("1,234.5"); a
@@ -193,14 +208,20 @@ class ErrorPages:
 
     def page(self, request: Request, status: int) -> Response:
         title, words = ERRORS.get(status) or ERRORS[400 if status < 500 else 500]
-        # The logo goes where this person most likely came from.
-        home = self.admin if self._under(request, self.admin) else self.scan
-        context = {
+        under_admin = self._under(request, self.admin)
+        context: dict[str, Any] = {
             "title": title,
             "words": words,
             "scan": self.scan,
-            "brand_home": home,
+            # The logo goes where this person most likely came from.
+            "brand_home": self.admin if under_admin else self.scan,
         }
+        # Under the administrator pages, signed in as this request found:
+        # their masthead, with no badges, as the database is not read here.
+        # A mistyped address checked no sign-in, so its page stays plain.
+        admin = request.scope.get("state", {}).get(SIGNED_IN_AS)
+        if under_admin and admin is not None:
+            context |= {"admin": admin, "sections": sections_without_badges()}
         return page(request, "error.html", context, status)
 
     def failed(self, scope: Scope) -> Response:

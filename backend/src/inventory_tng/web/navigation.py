@@ -84,3 +84,9 @@ def sections(admin: object) -> list[tuple[str, str | LazyProxy, Badge | None]]:
         return BADGES[path](session) if session and path in BADGES else None
 
     return [(path, label, badge(path)) for path, label in SECTIONS]
+
+
+def sections_without_badges() -> list[tuple[str, str | LazyProxy, Badge | None]]:
+    """The navigation with no badges, for a page that must not read the
+    database: an error page (pages.ErrorPages)."""
+    return [(path, label, None) for path, label in SECTIONS]

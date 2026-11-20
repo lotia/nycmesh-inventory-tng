@@ -1,19 +1,26 @@
 """What a person meets when there is no page, or something goes wrong: a
 page of the app's own, with a way on; the API keeps answering JSON
-(inventory-tng-nrb). The site's root sends phones to the scan page (pkv)."""
+(inventory-tng-nrb). The site's root sends phones to the scan page (pkv).
+Under /admin, once the request checked the sign-in, the page keeps the
+administrator's masthead, read without the database (8i4.80)."""
 
 from collections.abc import Callable, Iterator
+from dataclasses import dataclass, field
 from typing import NoReturn
 
 import pytest
-from fastapi import FastAPI, HTTPException
+from fastapi import Depends, FastAPI, HTTPException
 from fastapi.testclient import TestClient
+from sqlalchemy.orm import Session
 
+from inventory_tng.admins.guards import admin_signed_in
+from inventory_tng.admins.paths import SIGN_OUT
 from inventory_tng.catalogue.paths import ITEMS
 from inventory_tng.web import pages
 from inventory_tng.web.frontend_bundle import SCAN
 
-from helpers.markup import addresses, read
+from helpers.markup import addresses, forms, read, words_on
+from helpers.query_counts import counting
 
 
 @pytest.mark.parametrize("method", ["GET", "HEAD"])
@@ -137,3 +144,82 @@ def test_a_request_the_app_cannot_take_says_so(failing: TestClient) -> None:
 def test_below_400_is_no_error_page(failing: TestClient) -> None:
     answer = failing.get("/refused/304")
     assert (answer.status_code, answer.content) == (304, b"")
+
+
+def has_masthead(page: str) -> bool:
+    """Whether the page shows an administrator signed in: their name, the
+    sections and a way to sign out."""
+    return (
+        "Signed in as ada" in words_on(page)
+        and ITEMS in addresses(page)
+        and ("post", SIGN_OUT) in forms(page)
+    )
+
+
+def test_nothing_by_that_id_keeps_the_masthead(admin_client: TestClient) -> None:
+    answer = admin_client.get(f"{ITEMS}/999999")
+    assert answer.status_code == 404
+    assert has_masthead(answer.text)
+
+
+def test_a_mistyped_address_stays_plain(admin_client: TestClient) -> None:
+    answer = admin_client.get("/admin/x/y")
+    assert answer.status_code == 404
+    assert not has_masthead(answer.text)
+
+
+@dataclass
+class Sent:
+    """The statements requests sent, and how many had been sent when each
+    page failed."""
+
+    statements: list[str]
+    at_failure: list[int] = field(default_factory=list)
+
+
+@pytest.fixture
+def admin_failing(admin_client: TestClient, session: Session) -> Iterator[Sent]:
+    """admin_client's app with pages under /admin that fail after the
+    sign-in is checked, or before it."""
+    with counting(session) as statements:
+        sent = Sent(statements)
+
+        def missing() -> None:
+            sent.at_failure.append(len(statements))
+            pages.not_found()
+
+        def fail() -> None:
+            sent.at_failure.append(len(statements))
+            raise RuntimeError("a bug")
+
+        app = admin_client.app
+        assert isinstance(app, FastAPI)
+        guarded = [Depends(admin_signed_in)]
+        app.add_api_route("/admin/test/missing", missing, dependencies=guarded)
+        app.add_api_route("/admin/test/broken", fail, dependencies=guarded)
+        app.add_api_route("/admin/test/broken-early", fail)
+        yield sent
+
+
+@pytest.mark.parametrize(
+    ("path", "status", "masthead"),
+    [
+        ("/admin/test/missing", 404, True),
+        ("/admin/test/broken", 500, True),
+        ("/admin/test/broken-early", 500, False),
+    ],
+)
+def test_an_error_page_under_admin_reads_no_database(
+    admin_client: TestClient,
+    admin_failing: Sent,
+    path: str,
+    status: int,
+    masthead: bool,
+) -> None:
+    answer = admin_client.get(path)
+    assert answer.status_code == status
+    assert has_masthead(answer.text) == masthead
+    # Nothing was read once the page failed: its error page included. The
+    # sign-in check's reads are counted, so the count sees the app's.
+    assert bool(admin_failing.statements) == masthead
+    assert admin_failing.at_failure == [len(admin_failing.statements)]

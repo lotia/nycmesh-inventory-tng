@@ -74,7 +74,13 @@ from inventory_tng.models.admins import Admin, AdminSession
 from inventory_tng.models.site_settings import SignInSettings
 from inventory_tng.web import single_use_forms
 from inventory_tng.web.navigation import Badge, sections
-from inventory_tng.web.pages import page, redirect, templates
+from inventory_tng.web.pages import (
+    SIGNED_IN_AS,
+    SignedInAs,
+    page,
+    redirect,
+    templates,
+)
 
 log = structlog.get_logger(__name__)
 
@@ -185,6 +191,8 @@ def signed_in(request: Request, session: DbSession) -> SignedIn:
     request_logging.bind(admin_id=admin.id, sign_in_id=row.id)
     # Every change this request makes is theirs, in the history.
     set_actor(session, f"admin:{admin.id}")
+    # For an error page later in this request, drawn without the database.
+    setattr(request.state, SIGNED_IN_AS, SignedInAs(admin.username))
     return SignedIn(
         admin=admin,
         row=row,
