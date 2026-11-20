@@ -45,12 +45,18 @@ from helpers.rows import history
 from helpers.sign_in import confirmed_long_ago, single_use
 
 
-def make_code(client: TestClient, **form: str) -> tuple[Response, str]:
-    made = client.post(
-        CODES, data=single_use(uses="2", days="1", label="Open day") | form
-    )
+def posted_phrase(client: TestClient, path: str, **form: str) -> tuple[Response, str]:
+    """Sends a form that makes codes; the response, and the first phrase
+    shown, or "" for none."""
+    made = client.post(path, data=single_use(**form))
     shown = read(made.text).all("*", class_="key")
     return made, shown[0].text if shown else ""
+
+
+def make_code(client: TestClient, **form: str) -> tuple[Response, str]:
+    return posted_phrase(
+        client, CODES, **({"uses": "2", "days": "1", "label": "Open day"} | form)
+    )
 
 
 def test_making_a_code_shows_it_once(
@@ -197,9 +203,7 @@ def test_how_many_codes_is_limited(admin_client: TestClient, session: Session) -
 
 
 def make_another(client: TestClient, code_id: int) -> tuple[Response, str]:
-    made = client.post(f"{CODES}/{code_id}/another", data=single_use())
-    shown = read(made.text).all("p", class_="key")
-    return made, shown[0].text if shown else ""
+    return posted_phrase(client, f"{CODES}/{code_id}/another")
 
 
 def test_another_like_a_code_has_what_it_has_left(

@@ -111,9 +111,10 @@ def create_code(
     label: str | None = None,
 ) -> tuple[RegistrationCode, str]:
     """A new code, and its phrase: the only time the phrase is known."""
-    return create_codes(session, 1, max_uses=max_uses, lifetime=lifetime, label=label)[
-        0
-    ]
+    (made,) = create_codes(
+        session, 1, max_uses=max_uses, lifetime=lifetime, label=label
+    )
+    return made
 
 
 def create_codes(
@@ -127,9 +128,7 @@ def create_codes(
     """`count` new codes alike, to print together, each with its phrase, as
     create_code makes one: they expire at the same moment."""
     expires_at = datetime.now(UTC) + lifetime
-    return [
-        _new_code(session, max_uses, expires_at, label, "new") for _ in range(count)
-    ]
+    return [_new_code(session, max_uses, expires_at, label) for _ in range(count)]
 
 
 def has_left(code: RegistrationCode, at: datetime) -> bool:
@@ -154,7 +153,6 @@ def another_like(session: Session, code_id: int) -> tuple[RegistrationCode, str]
         code.max_uses - code.uses,
         code.expires_at,
         code.label,
-        "another",
         like=code.id,
     )
 
@@ -164,9 +162,11 @@ def _new_code(
     max_uses: int,
     expires_at: datetime,
     label: str | None,
-    how: MadeHow,
     like: int | None = None,
 ) -> tuple[RegistrationCode, str]:
+    """A new code and its phrase: "another" like the code `like`, or
+    "new" without one."""
+    how: MadeHow = "new" if like is None else "another"
     phrase = new_phrase()
     code = RegistrationCode(
         phrase_hash=digest(phrase),

@@ -460,6 +460,24 @@
     }
 
     /*
+     * A card on a sheet of several, with lines to cut along: a registration
+     * code's .print-card or a .print-label, each sized below.
+     */
+    .print-card,
+    .print-label {
+      @apply flex flex-col items-center justify-center overflow-hidden border border-dashed border-gray-400 p-2;
+      break-inside: avoid;
+
+      & .qr svg {
+        @apply my-0;
+      }
+
+      & .print-small {
+        @apply line-clamp-2 wrap-anywhere;
+      }
+    }
+
+    /*
      * Registration codes made together (inventory-tng-8i4.73): one
      * .print-sheet of up to four .print-cards, two by two, with lines to
      * cut along. Rows a little short of half the paper, so two always fit.
@@ -474,11 +492,10 @@
     }
 
     .print-card {
-      @apply flex flex-col items-center justify-center overflow-hidden border border-dashed border-gray-400 p-2 *:my-1;
-      break-inside: avoid;
+      @apply *:my-1;
 
       & .qr svg {
-        @apply my-0 w-[2.5in];
+        @apply w-[2.5in];
       }
 
       & .print-title {
@@ -487,10 +504,6 @@
 
       & .key {
         @apply text-sm;
-      }
-
-      & .print-small {
-        @apply line-clamp-2 wrap-anywhere;
       }
     }
 
@@ -514,19 +527,14 @@
     }
 
     .print-label {
-      @apply flex flex-col items-center justify-center overflow-hidden border border-dashed border-gray-400 p-2 *:my-0;
-      break-inside: avoid;
+      @apply *:my-0;
 
       & .qr svg {
-        @apply my-0 w-[1.5in];
+        @apply w-[1.5in];
       }
 
       & .key {
         @apply text-base;
-      }
-
-      & .print-small {
-        @apply line-clamp-2 wrap-anywhere;
       }
     }
   }

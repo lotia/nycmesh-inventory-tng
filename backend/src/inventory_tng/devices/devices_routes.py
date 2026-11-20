@@ -214,7 +214,10 @@ def _made_page(
 ) -> HTMLResponse:
     """New codes, alike, each with its phrase, link and QR code, shown only
     now, ready to print on one sheet."""
-    links = [site_link(request, REGISTER_PATH, code=phrase) for _, phrase in made]
+    shown = []
+    for code, phrase in made:
+        link = site_link(request, REGISTER_PATH, code=phrase)
+        shown.append((code, phrase, link, qr_svg(link)))
     return admin_page(
         request,
         signed,
@@ -222,10 +225,7 @@ def _made_page(
         {
             "title": NEW_CODE_TITLE if len(made) == 1 else NEW_CODES_TITLE,
             "back_link": back_link,
-            "codes": [
-                (code, phrase, link, qr_svg(link))
-                for (code, phrase), link in zip(made, links, strict=True)
-            ],
+            "codes": shown,
             "register": site_link(request, REGISTER_PATH),
             "zone": site_zone(session),
         },
