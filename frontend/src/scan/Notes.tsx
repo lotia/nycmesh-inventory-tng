@@ -1,5 +1,6 @@
 /** What the scan page says in notes and alerts, its lists' and the
- * camera's, its lists' buttons, and asking before a discard. */
+ * camera's, the words of buttons both lists show, and asking before a
+ * discard. */
 import { msg } from "@lingui/core/macro";
 import { Fragment } from "preact";
 import { say } from "../shared/i18n";
