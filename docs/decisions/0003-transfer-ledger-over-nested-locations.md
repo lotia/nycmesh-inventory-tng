@@ -38,7 +38,8 @@ while. So we need more than one location from the start.
   somewhere, so the item needs counting. A move that takes stock below
   zero is taken from every client, the scan page included, as none can
   know what others moved meanwhile, with one exception: a retired package
-  with none sealed left (amendment, 2026-11-19).
+  with none sealed left (amendment below: a retired package with none
+  left is never taken).
 - **Reorder is a separate signal**: usable stock in stores (all but short
   ends, 0020) at or below the minimum, and, where a package sets one, sealed
   packages below their own minimum. An item with a negative balance shows
@@ -70,13 +71,13 @@ while. So we need more than one location from the start.
   undoes it. A retired item that still has stock, or a retired package
   with some still sealed, is never received again, but volunteers may take
   what is left, until it runs out (Ali, 2026-11-03; packages, 2026-11-11),
-  and then never take that package sealed again (amendment, 2026-11-19). A
+  and then never take that package sealed again (same amendment). A
   place is retired only once it holds nothing, but a save that waited in
   an outbox can still bring stock to it or take some from it, and is
-  accepted. Such a save is logged and counted, and the place
-  shows on the home page, beside Counts in the navigation and on the stock
-  page, and can be counted or adjusted, until it holds nothing again (Ali,
-  2026-11-09; inventory-tng-8i4.51.2).
+  accepted, but for that amendment's exception. Such a save is logged and
+  counted, and the place shows on the home page, beside Counts in the
+  navigation and on the stock page, and can be counted or adjusted, until
+  it holds nothing again (Ali, 2026-11-09; inventory-tng-8i4.51.2).
 
 We rejected keeping one quantity per item, because it cannot say where stock
 is or how it got there.

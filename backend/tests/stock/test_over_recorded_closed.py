@@ -210,10 +210,7 @@ def test_a_correct_waits_for_a_close_of_its_open_package_then_skips_it(
     setup.commit()
     (check,) = checks(setup)
     first, second = own_committed.session(), own_committed.session()
-    assert (
-        open_packages.close(first, made.id, admin, datetime.now(UTC), how="direct")
-        is not None
-    )
+    assert open_packages.close(first, made.id, admin, datetime.now(UTC), how="direct")
     worker = own_committed.blocked(
         second, lambda: correct_check(second, check, over_recorded.seen(check), admin)
     )

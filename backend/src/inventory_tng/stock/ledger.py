@@ -14,9 +14,10 @@ Two choices that keep a volunteer's work from being lost:
   readers follow a merged volunteer forward. The exceptions: a retired
   item is never received (docs/decisions/0003), so a receipt of one is
   refused, and the outbox says so; and a retired package with none sealed
-  left at a current place is never taken, from any client, the scan page
-  included (0003, Amendment, 2026-11-19). A save at a retired place is
-  logged and counted (scan/batch_api.py), and the place shows as holding stock
+  left at a current place, nor at the place it is taken from, is never
+  taken sealed, from any client, the scan page included (0003, Amendment,
+  2026-11-19; _none_sealed). A save at a retired place is logged and
+  counted (scan/batch.py), and the place shows as holding stock
   (balance.retired_holding_stock) until an administrator counts it.
 - The server's clock decides when a batch happened, not the phone's: a batch
   resent from the outbox is recorded when it arrives. created_at is the

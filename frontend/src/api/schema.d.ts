@@ -58,7 +58,8 @@ export interface paths {
      * @description Write a whole batch, or none of it. A 422 names each bad line, as
      *     FastAPI's own do: an item, package, location or volunteer that does not
      *     exist, a fraction of an item counted in each or of a package, a retired
-     *     item or package received, or an item another line names in the same
+     *     item or package received, a retired package taken sealed with none
+     *     left (docs/decisions/0003), or an item another line names in the same
      *     package, or loose, too (repeated): send each item on one line for each
      *     package it is in, sealed, and one loose (docs/decisions/0020). The
      *     reply's X-Inventory-Build header names the build of the pages this
