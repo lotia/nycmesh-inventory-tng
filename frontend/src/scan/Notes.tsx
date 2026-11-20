@@ -1,4 +1,5 @@
-/** What the scan page's lists say in notes and alerts, and asking before a discard. */
+/** What the scan page says in notes and alerts, its lists' and the
+ * camera's, and asking before a discard. */
 import { msg } from "@lingui/core/macro";
 import { Fragment } from "preact";
 import { say } from "../shared/i18n";
@@ -75,7 +76,8 @@ export function ConfirmDiscard({
 }
 
 /**
- * A failure or refusal note's words, in bold, the counts the page wrote
+ * A failure or refusal note's words, or why the camera could not be
+ * used, in bold, the counts the page wrote
  * in it in bold italic, never a number of a name it quotes (Ali,
  * inventory-tng-93z); of a refusal, the problems after "Not recorded."
  * (Note.plain) not in bold, words an older build kept in them as they

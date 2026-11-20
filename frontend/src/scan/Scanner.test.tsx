@@ -276,6 +276,28 @@ test.each([
   },
 );
 
+test("off HTTPS, the volunteer is told what the report says", async () => {
+  const sessions = reported();
+  vi.stubGlobal("isSecureContext", false);
+  try {
+    const refused = async () => {
+      throw new TypeError("no mediaDevices");
+    };
+    render(
+      <Scanner open={refused} onCode={() => said("")} onDone={() => {}} />,
+    );
+    await screen.findByText(say(NO_CAMERA.bold));
+    expect(screen.getByRole("status").textContent).toBe(
+      refusalWords(NO_CAMERA),
+    );
+    expect(sessions()).toEqual([
+      expect.objectContaining({ outcome: "insecure" }),
+    ]);
+  } finally {
+    vi.unstubAllGlobals();
+  }
+});
+
 test("Done while the camera opens is reported as cancelled, not refused", async () => {
   const sessions = reported();
   let abort: (error: unknown) => void = () => {};
