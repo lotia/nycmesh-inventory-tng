@@ -111,13 +111,8 @@ test("Record the rest takes only an empty cart, saying so, and is offered still"
   expect(within(entry).queryByText(say(REST_IN_CART))).toBeNull();
 });
 
-test.each<[string, Problem[]]>([
-  ["no line", [{ names: null, kind: "not_found" }]],
-  [
-    "every line",
-    [RETIRED_NONE_LEFT, { ...RETIRED_NONE_LEFT, names: { of: "line", n: 2 } }],
-  ],
-])("a refusal naming %s offers no Record the rest", async (_, problems) => {
-  const { entry } = await refusedWith(...problems);
+// Which refusals have no rest is restOf's (record-the-rest.test.ts).
+test("a refusal with no rest offers no Record the rest", async () => {
+  const { entry } = await refusedWith({ names: null, kind: "not_found" });
   expect(recordTheRest(entry)).toBeNull();
 });

@@ -1,4 +1,5 @@
 /** The carts this device has saved: waiting, sending, held, refused or recorded. */
+import type { MessageDescriptor } from "@lingui/core";
 import { msg } from "@lingui/core/macro";
 import { useSignal } from "@preact/signals";
 import { useEffect, useMemo, useRef } from "preact/hooks";
@@ -77,7 +78,7 @@ export type AddDifference = (entry: Entry, difference: Body) => NotPut | null;
 
 /** Puts the lines of a batch refused (422) its problems do not name in the
  * cart (CartForm, recordRest): why not, if it was not. */
-export type RecordRest = (entry: Entry) => NotPut | null;
+export type RecordRest = (entry: Entry, rest: Body) => NotPut | null;
 
 /**
  * What this browser sent, or is sending, and what became of each. A
@@ -88,7 +89,7 @@ export type RecordRest = (entry: Entry) => NotPut | null;
  * that does not say, what is left to do (SCAN_AGAIN_CHANGED), as the older
  * list does, while the page refreshes the stock (Ali, inventory-tng-g0e,
  * d; inventory-tng-0gg). One refused (422) whose problems name lines
- * offers Record the rest (RecordTheRest).
+ * offers Record the rest (record-the-rest.ts).
  */
 export function OutboxList({
   outbox,
@@ -155,10 +156,8 @@ export function OutboxList({
             reason?.code === "recorded_elsewhere" ? reason : undefined;
           const recorded = catalogue === null ? undefined : elsewhere?.recorded;
           const lines = recorded === undefined ? (linesOf.get(id) ?? []) : [];
-          const refused = reason?.code === "refused" ? reason : undefined;
           // Offered with the cart beside it, once the catalogue is loaded.
-          const rest =
-            refused === undefined || catalogue === null ? null : restOf(entry);
+          const rest = catalogue === null ? null : restOf(entry);
           return (
             <li key={id} class="flex flex-col items-start gap-1">
               <div>{batchWords(entry.body, entry.summary)}</div>
@@ -202,11 +201,13 @@ export function OutboxList({
                 />
               )}
               {rest !== null && (
-                <RecordTheRest
-                  added={refused?.added === true}
+                <PutInCart
+                  label={RECORD_THE_REST}
+                  inCartWords={REST_IN_CART}
+                  added={reason?.code === "refused" && reason.added === true}
                   inCart={cartKey === rest.key}
-                  onRecord={() => {
-                    const why = onRecordRest(entry);
+                  onPut={() => {
+                    const why = onRecordRest(entry, rest);
                     notAdded.value = why === null ? null : { on: id, why };
                   }}
                 />
@@ -271,12 +272,6 @@ function RecordedElsewhere({
     }),
     [recorded, entry.body, catalogue],
   );
-  const inCart = difference !== null && cartKey === difference.key;
-  // Once shown, the in-cart words keep their room when recorded, so Dismiss
-  // below does not move; one already recorded as it is first drawn needs
-  // none.
-  const shownInCart = useRef(false);
-  shownInCart.current ||= inCart;
   // Keyed by what each says, two saying the same apart.
   const wasKeys = keyedByWords(was.map(wordsOf));
   const changeKeys = keyedByWords(changes.map(({ words }) => wordsOf(words)));
@@ -305,47 +300,52 @@ function RecordedElsewhere({
           </ul>
         </>
       )}
-      {difference !== null && added !== true && (
-        <button type="button" onClick={() => onAdd(difference)}>
-          {say(ADD_DIFFERENCE)}
-        </button>
-      )}
-      {added === true && shownInCart.current && (
-        <p {...(inCart ? {} : KEEPS_ROOM)}>{say(IN_CART)}</p>
+      {difference !== null && (
+        <PutInCart
+          label={ADD_DIFFERENCE}
+          inCartWords={IN_CART}
+          added={added === true}
+          inCart={cartKey === difference.key}
+          onPut={() => onAdd(difference)}
+        />
       )}
     </>
   );
 }
 
 /**
- * Under a batch refused (422) whose problems name lines: Record the rest,
- * which puts its other lines in an empty cart (CartForm, recordRest),
- * until it has, then that they are there, until recorded (Ali,
- * 2026-11-20, inventory-tng-clvh).
+ * What an outbox entry offers to put in an empty cart (CartForm): a button
+ * until it has (Add these to cart, Record the rest), then words that it
+ * is there, until recorded.
  */
-function RecordTheRest({
+function PutInCart({
+  label,
+  inCartWords,
   added,
   inCart,
-  onRecord,
+  onPut,
 }: {
-  /** Its other lines were put in the cart. */
+  label: MessageDescriptor;
+  inCartWords: MessageDescriptor;
+  /** It was put in the cart. */
   added: boolean;
-  /** The cart holds them still. */
+  /** The cart holds it still. */
   inCart: boolean;
-  onRecord: () => void;
+  onPut: () => void;
 }) {
-  // Once shown, the in-cart words keep their room when recorded, so
-  // Dismiss below does not move, as RecordedElsewhere's do.
+  // Once shown, the in-cart words keep their room when recorded, so Dismiss
+  // below does not move; one already recorded as it is first drawn needs
+  // none.
   const shownInCart = useRef(false);
   shownInCart.current ||= inCart;
   if (!added) {
     return (
-      <button type="button" onClick={onRecord}>
-        {say(RECORD_THE_REST)}
+      <button type="button" onClick={onPut}>
+        {say(label)}
       </button>
     );
   }
   return shownInCart.current ? (
-    <p {...(inCart ? {} : KEEPS_ROOM)}>{say(REST_IN_CART)}</p>
+    <p {...(inCart ? {} : KEEPS_ROOM)}>{say(inCartWords)}</p>
   ) : null;
 }

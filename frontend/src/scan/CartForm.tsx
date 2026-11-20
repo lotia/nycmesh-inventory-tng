@@ -50,7 +50,7 @@ import {
   olderId,
 } from "./older-builds";
 import { type Gaps, nameOf, toCart, withRetired } from "./older-to-cart";
-import { restOf, takenOff } from "./record-the-rest";
+import { takenOff } from "./record-the-rest";
 import { differenceOf } from "./recorded-elsewhere";
 import { Scanner } from "./Scanner";
 import { indexOf } from "./search";
@@ -471,18 +471,12 @@ export function CartForm({
   }
   adder.current = addDifference;
 
-  /** Put the lines of a batch refused (422) its problems do not name in
-   * this cart, which must be empty, and mark it so, offering it no more;
-   * the status says each line taken off, and why, before what else could
-   * not go back (Ali, 2026-11-20, inventory-tng-clvh). Why not, if it was
-   * not. */
-  function recordRest(entry: Entry): NotPut | null {
-    const rest = restOf(entry);
-    // Offered only for one with a rest.
-    /* v8 ignore next */
-    if (rest === null) {
-      return null;
-    }
+  /** Put the `rest` of a batch refused (422), the lines its problems do
+   * not name (record-the-rest.ts, restOf), in this cart, which must be
+   * empty, and mark it so, offering it no more; the status says each line
+   * taken off, and why, before what else could not go back (Ali,
+   * 2026-11-20, inventory-tng-clvh). Why not, if it was not. */
+  function recordRest(entry: Entry, rest: Body): NotPut | null {
     const why = fill(
       asSave(rest),
       false,

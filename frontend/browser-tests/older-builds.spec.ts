@@ -8,7 +8,7 @@
 import { expect, type Locator, type Page } from "@playwright/test";
 import { test } from "./csp-violations";
 import { holdSaves } from "./held-saves";
-import { ownCable, record } from "./own-rows";
+import { itemIdOf, ownCable, record } from "./own-rows";
 import { pick, SAM, SHELF } from "./scan-page";
 
 const HEADING = "Checked out items. Add to cart or discard before sending";
@@ -19,10 +19,6 @@ const listingOf = (page: Page) =>
   page.locator("section", {
     has: page.getByRole("heading", { name: HEADING }),
   });
-
-/** The id of the item whose page is open. */
-const itemIdOf = (page: Page) =>
-  Number(new URL(page.url()).pathname.split("/").at(-1));
 
 /** The Discard of the listed line that says `words`. */
 const lineDiscard = (listing: Locator, words: string) =>

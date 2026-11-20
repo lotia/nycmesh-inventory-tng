@@ -6,8 +6,8 @@
  */
 import { expect } from "@playwright/test";
 import { test } from "./csp-violations";
-import { ownCable, record } from "./own-rows";
-import { fillMove, pick } from "./scan-page";
+import { itemIdOf, ownCable, record } from "./own-rows";
+import { fillMove, newestCart, pick } from "./scan-page";
 
 const BOX = "Box of 305 m";
 const NONE_LEFT =
@@ -19,7 +19,7 @@ test("a save refused for a line goes back without it, saying why, and the rest i
   const boxed = await ownCable(page, "Boxed cable");
   const boxedPage = page.url();
   const loose = await ownCable(page, "Loose cable");
-  const looseId = Number(new URL(page.url()).pathname.split("/").at(-1));
+  const looseId = itemIdOf(page);
   await page.goto("/scan");
   await fillMove(page, boxed);
   await page.getByLabel(/^Box of 305\sm/).fill("1");
@@ -35,12 +35,7 @@ test("a save refused for a line goes back without it, saying why, and the rest i
   ).toBeVisible();
   await admin.close();
   await page.getByRole("button", { name: "Record" }).click();
-  const entry = page
-    .locator("section", {
-      has: page.getByRole("heading", { name: "Carts from this device" }),
-    })
-    .getByRole("listitem")
-    .first();
+  const entry = newestCart(page);
   await expect(entry.getByText(`Line 1: ${NONE_LEFT}`)).toBeVisible();
 
   await entry.getByRole("button", { name: "Record the rest" }).click();

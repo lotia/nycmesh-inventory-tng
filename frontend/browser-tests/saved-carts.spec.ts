@@ -8,7 +8,7 @@ import { expect } from "@playwright/test";
 import { test } from "./csp-violations";
 import { holdSaves } from "./held-saves";
 import { ownCable } from "./own-rows";
-import { fillMove } from "./scan-page";
+import { fillMove, newestCart } from "./scan-page";
 
 test("a save's entry keeps its height, Dismiss's room kept unseen, as it is sent and recorded", async ({
   page,
@@ -19,12 +19,7 @@ test("a save's entry keeps its height, Dismiss's room kept unseen, as it is sent
   // Its save held until its entry is measured as being sent.
   const release = await holdSaves(page);
   await page.getByRole("button", { name: "Record" }).click();
-  const entry = page
-    .locator("section", {
-      has: page.getByRole("heading", { name: "Carts from this device" }),
-    })
-    .getByRole("listitem")
-    .first();
+  const entry = newestCart(page);
   await expect(entry.getByText("Sending…")).toBeVisible();
   await expect(entry.getByRole("button", { name: "Dismiss" })).toHaveCount(0);
   // There, keeping its room, but unseen (visibility: hidden).

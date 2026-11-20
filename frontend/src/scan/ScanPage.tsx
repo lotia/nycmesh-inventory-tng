@@ -228,7 +228,7 @@ export function ScanPage({
         onAddDifference={(entry, difference) =>
           adder.current?.(entry, difference) ?? null
         }
-        onRecordRest={(entry) => rester.current?.(entry) ?? null}
+        onRecordRest={(entry, rest) => rester.current?.(entry, rest) ?? null}
       />
     </main>
   );

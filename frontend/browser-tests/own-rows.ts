@@ -92,6 +92,11 @@ export async function ownCable(
   return name;
 }
 
+/** The id of the item whose page is open, as ownCable leaves it. */
+export function itemIdOf(page: Page): number {
+  return Number(new URL(page.url()).pathname.split("/").at(-1));
+}
+
 /**
  * Invites a new administrator from `page`'s session, confirming with its
  * password if asked, and leaves the page showing their link. Their

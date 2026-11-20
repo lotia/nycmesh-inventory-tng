@@ -1,8 +1,9 @@
 /**
  * Filling in the scan page as a volunteer would: the seed's volunteer and
- * shelf, a kind of save, and items picked from a search.
+ * shelf, a kind of save, and items picked from a search; and the cart it
+ * saved last, as the outbox lists it.
  */
-import type { Page } from "@playwright/test";
+import type { Locator, Page } from "@playwright/test";
 
 /** The seed's volunteer and shelf, as the scan page names them. */
 export const SAM = "Sam Example";
@@ -12,6 +13,16 @@ export const SHELF = "Supernode 1 › Shelf A";
 export async function pick(page: Page, cable: string): Promise<void> {
   await page.getByLabel(/Find an item/).fill(cable);
   await page.getByRole("button", { name: cable, exact: true }).click();
+}
+
+/** The newest of the carts this device saved, as the page lists them. */
+export function newestCart(page: Page): Locator {
+  return page
+    .locator("section", {
+      has: page.getByRole("heading", { name: "Carts from this device" }),
+    })
+    .getByRole("listitem")
+    .first();
 }
 
 /** Fills in a move of `cable` from the shelf to the van, by Sam. */

@@ -8,7 +8,7 @@
 import { msg } from "@lingui/core/macro";
 import { v5 as uuidFrom } from "uuid";
 import { say } from "../shared/i18n";
-import { type Body, batchId, type Entry } from "../shared/outbox";
+import { type Body, batchId, type Entry, lineNumbers } from "../shared/outbox";
 import { problemWords } from "../shared/outbox-notes";
 import type { Catalogue } from "./cart";
 import { nameOf, withRetired } from "./older-to-cart";
@@ -22,18 +22,20 @@ export const TAKEN_OFF = msg`{name}: taken off. {why}`;
 /** Under the refused batch, once the rest is in the cart, until recorded. */
 export const REST_IN_CART = msg`The other lines are in your cart, waiting to be recorded.`;
 
-/** Of a refused batch, each problem naming a line, with that line's item:
- * numbered by its item's first place among the batch's lines
- * (outbox.lineNumbers). */
+/** Of a refused batch, each problem naming a line, with that line's item,
+ * numbered as outbox.lineNumbers does. */
 function namedLines(entry: Entry): { itemId: number; kind: string }[] {
   const { reason, body } = entry;
   if (reason?.code !== "refused") {
     return [];
   }
-  const items = [...new Set(body.lines.map((line) => line.item_id))];
+  const lineOf = lineNumbers(body.lines.map((line) => line.item_id));
   return reason.problems.flatMap(({ names, kind }) => {
-    const itemId = names?.of === "line" ? items[names.n - 1] : undefined;
-    return itemId === undefined ? [] : [{ itemId, kind }];
+    const line =
+      names?.of === "line"
+        ? body.lines.find(({ item_id }) => lineOf(item_id) === names.n)
+        : undefined;
+    return line === undefined ? [] : [{ itemId: line.item_id, kind }];
   });
 }
 
