@@ -65,8 +65,7 @@ export function ScanPage({
   // What puts a save's difference in the cart, while the cart is shown
   // (CartForm), for the outbox's list below it.
   const adder = useRef<AddDifference | null>(null);
-  // And what puts a refused batch's other lines in it (Add the rest to
-  // cart).
+  // And what puts a refused batch's other lines in it (add-the-rest.ts).
   const rester = useRef<AddRest | null>(null);
   // One refresh at a time; one asked for meanwhile follows it.
   const asking = useRef<"no" | "yes" | "again">("no");
