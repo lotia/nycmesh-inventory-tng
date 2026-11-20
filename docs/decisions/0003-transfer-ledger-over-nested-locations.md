@@ -5,8 +5,9 @@ unregistered device is blocked), 2026-11-03 (counts, retired items),
 2026-11-06 (counting while stock moves), 2026-11-08 by 0016 (where the
 rules live, balance), 2026-11-09 (stock at a retired place), 2026-11-11
 by 0020 (sealed and open packages), 2026-11-15 (counting some items),
-2026-11-18 (a count form's moment read without a lock), 2026-11-19 and
-2026-11-20 (a retired package with none left is never taken)
+2026-11-18 (a count form's moment read without a lock), 2026-11-19 (a
+count's moment stays a ledger number), 2026-11-19 and 2026-11-20 (a
+retired package with none left is never taken)
 
 ## Context
 
@@ -112,6 +113,23 @@ We rejected carrying each line's figure shown (many fields, and it misses
 counts by form), comparing PostgreSQL's transaction snapshots (exact, but
 it ties the ledger to transaction ids' internals), and taking the lock
 without waiting (it still holds up saves).
+
+## Amendment: a count's moment stays a ledger number (2026-11-19)
+
+Decided by Ali on 2026-11-19 (inventory-tng-8i4.65): a count's moment
+stays the place's latest ledger number, with the place locks above, not
+PostgreSQL's transaction snapshots (`xid8`). Snapshots would have
+removed only the brief wait when a count form opened, which the amendment
+above has since removed without them, while saves still lock their places
+and a count still locks its own. They would add another
+PostgreSQL-only feature (0016), a hidden snapshot field to validate, a
+check that cannot use an index, and rewritten concurrency tests.
+
+A known limit, accepted: production runs on CloudNativePG, whose
+replication is asynchronous. A failover can lose the last few commits,
+and the new primary may hand out the same ledger numbers again, so a count
+form opened before the failover could quietly absorb a move saved after
+it. A later count of the place puts it right.
 
 ## Amendment: a retired package with none left is never taken (2026-11-19)
 
