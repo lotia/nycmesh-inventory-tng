@@ -109,9 +109,9 @@ many times a day you run directly, in `backend/` or `frontend/`:
 | --- | --- | --- |
 | `backend/` | `uv run alembic upgrade head` | Migrates this checkout's database ([Migrations](#migrations)) |
 | `backend/` | `uv run alembic downgrade <revision>` | Takes it back to that revision; `uv run alembic history` lists them, `uv run alembic current` says where it is |
-| `backend/` | `uv run pytest tests/places/test_locations.py` | Runs one test file; `<file>::<test>` runs one test, `-k <words>` those whose names match |
+| `backend/` | `uv run pytest tests/places/test_locations.py` | Runs one test file; `<file>::<test>` runs one test, `-k <words>` those whose names match. One that uses the database needs `mise run start-database` first |
 | `frontend/` | `npm test -- src/scan/cart.test.ts` | Runs one frontend test file; `-t <words>` runs the tests whose names match |
-| `frontend/` | `npx playwright test browser-tests/lists.spec.ts` | Runs one browser test file, after `mise run start-database` and `npm run build` ([Running the checks](#running-the-checks)) |
+| `frontend/` | `npx playwright test browser-tests/lists.spec.ts` | Runs one browser test file, after `mise run setup-browsers`, `mise run start-database` and `npm run build` ([Running the checks](#running-the-checks)) |
 | `backend/` | `uv run python -m devtools` | Lists the developer's tools (`backend/devtools/`, which no image ships); each one's `--help` says what it takes |
 
 The pages call the API through types generated from its schema. After you
@@ -166,8 +166,8 @@ container on the next free port up when its own is taken, as by `mise run
 dev`'s backend, and say which.
 
 A `.env` made before names no project, so its checkout uses the project
-`inventory-tng` (`compose.yaml`'s name), on the ports `compose.yaml` falls
-back to, and a database `inventory`: nothing changes for a single clone.
+`inventory-tng` (`compose.yaml`'s name), on the ports `.env.example`
+gives, and a database `inventory`: nothing changes for a single clone.
 Checkouts with such a `.env` share that one stack; to give one its own,
 move its `.env` aside, run `mise run setup`, and copy back any setting of
 yours.
@@ -247,8 +247,9 @@ container: `mise run compose -- exec app python -m devtools database seed`.
 Migrations are Alembic's, in `backend/migrations/versions/`, and run as
 the owner (`MIGRATION_DATABASE_URL`, from `.env`). In `backend/`,
 `uv run alembic upgrade head` migrates this checkout's database, as
-`mise run dev-database` does. A new one is numbered after the newest
-there: `uv run alembic revision --rev-id <number> -m "<what it does>"`.
+`mise run dev-database` does. A new one takes the next four-digit number
+after the newest there, such as `0002`:
+`uv run alembic revision --rev-id <number> -m "<what it does>"`.
 
 Until a test deployment holds people's data, a change may edit an existing
 migration instead of adding one, so the schema's history stays short; after
@@ -803,10 +804,10 @@ from the command line.
 ### Mail
 
 To see the mail the app sends, start Mailpit, which catches it all and sends
-nothing on: `mise run compose -- --profile mail up -d mail`. Uncomment the
-mail settings in `.env`, as `.env.example` gives them, and restart, then
-read the mail at `http://localhost:` and the port `INVENTORY_MAILPIT_PORT`
-names (Local settings).
+nothing on: `mise run compose -- --profile mail up -d mail`. Set the mail
+settings in `.env` as `.env.example` gives them, and restart, then
+read the mail at `http://localhost:<INVENTORY_MAILPIT_PORT>` (Local
+settings).
 
 `MAIL_SECURITY=none` works only with `APP_ENV=development`. For the app
 container, set `INVENTORY_APP_MAIL_HOST=mail` too.
@@ -886,14 +887,14 @@ mise run podman-exec-oom-workaround-still-needed  # fails once Podman fixes it
 ```
 
 The first asks exec in two containers of its own, then removes them: one
-for what compose asks, and one for a value below the lowest a process
-without privileges may go back down to; its script says how it reads the
-two. The second
-fails when Podman has fixed the bug and `compose.yaml` still works around
-it: then remove `oom_score_adj` from `compose.yaml`, both tasks, the test
-and this section (inventory-tng-46w). Run the second after upgrading
-Podman or crun. Neither is one of the checks, and both say "not applicable"
-in CI, whose Docker runs as root, where the bug never shows.
+for what compose would ask without the workaround, and one for a value
+below the lowest a process without privileges may go back down to; its
+script says how it reads the two. The second fails when Podman has fixed
+the bug and `compose.yaml` still works around it: then remove
+`oom_score_adj` from `compose.yaml`, both tasks, the test and this section
+(inventory-tng-46w). Run the second after upgrading Podman or crun. Neither
+is one of the checks, and both say "not applicable" in CI, whose Docker
+runs as root, where the bug never shows.
 
 ### SELinux and the server's setup scripts
 
@@ -1065,8 +1066,7 @@ what only a real browser can, such as that no page scrolls sideways:
 mise run check-browser           # builds, starts the app, runs them
 ```
 
-To run one file again, in `frontend/` after a build:
-`npx playwright test browser-tests/<file>.spec.ts`.
+To run one file again, see [Tasks and direct commands](#tasks-and-direct-commands).
 
 A test fails on any Content-Security-Policy violation in a page it opens:
 tests import `test` from `browser-tests/csp-violations.ts`, or
@@ -1420,8 +1420,8 @@ query strings are masked either way, unless `UNMASK_SECRETS=true`. How to
 see unredacted traces in production for a while is in DEPLOYMENT.md.
 To see telemetry locally, start the dashboard, uncomment
 `OTEL_EXPORTER_OTLP_ENDPOINT` in `.env`, as `.env.example` gives it, run the
-server, and open `http://localhost:` and the port `INVENTORY_DASHBOARD_PORT`
-names (Local settings):
+server, and open `http://localhost:<INVENTORY_DASHBOARD_PORT>` (Local
+settings):
 
 ```sh
 mise run compose -- --profile telemetry up -d dashboard

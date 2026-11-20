@@ -1,6 +1,6 @@
 """Writes frontend/src/api/openapi.json, the API's schema, which the
 frontend's types are generated from: `uv run python -m devtools
-write-api-schema` (CONTRIBUTING.md, The scan page).
+write-api-schema` (CONTRIBUTING.md, Tasks and direct commands).
 
 `npm run api` then formats it with Biome and generates the types. A test
 fails while the committed copy says something the code does not.

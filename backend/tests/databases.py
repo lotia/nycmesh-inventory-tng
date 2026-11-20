@@ -44,8 +44,8 @@ APP = "inventory_app"
 
 TEST_DATABASE = re.compile(r"test_(\d+)_[0-9a-f]{8}")
 # Connections each test database takes at most, as the roles log in (a
-# superuser's are not counted): twice the most measured on one, and how it
-# fits the server's, in CONTRIBUTING.md, Connections. It bounds each
+# superuser's are not counted): twice the most measured on one, about 21;
+# how it fits the server's is in CONTRIBUTING.md, Connections. It bounds each
 # database, not a run: a process that leaks connections is refused at its
 # own database's limit, with a clear message (refused_connection), long
 # before it could fill the server.
