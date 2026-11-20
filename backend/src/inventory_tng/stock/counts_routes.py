@@ -261,7 +261,6 @@ def _counts_page(
             "problems": problems,
             "values": values,
         },
-        400 if problems else 200,
     )
 
 

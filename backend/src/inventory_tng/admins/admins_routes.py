@@ -107,7 +107,6 @@ def _list_page(
             "problems": problems,
             "values": values,
         },
-        400 if problems else 200,
     )
 
 
@@ -134,7 +133,6 @@ def _admin_page(
             **code_field(signed, ACCOUNT_CHANGE),
             "problems": {"admin": problem} if problem else None,
         },
-        400 if problem else 200,
     )
 
 

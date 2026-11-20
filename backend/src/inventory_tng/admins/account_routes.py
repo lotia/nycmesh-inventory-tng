@@ -5,7 +5,6 @@ theirs (db_sessions.set_actor). The rules are in accounts.py.
 """
 
 from collections.abc import Mapping
-from datetime import UTC, datetime
 from typing import Annotated
 
 from fastapi import APIRouter, Form, Request
@@ -34,7 +33,7 @@ from inventory_tng.core.local_time import site_zone
 from inventory_tng.core.mail import Notify
 from inventory_tng.core.phrases import Words, gettext, lazy_gettext
 from inventory_tng.models.admins import running_low
-from inventory_tng.web.admin_pages import admin_page
+from inventory_tng.web.admin_pages import admin_page, now
 from inventory_tng.web.pages import add_notices, not_found, page, redirect
 from inventory_tng.web.single_use_forms import SingleUseKey, sent_before
 
@@ -68,10 +67,6 @@ LAST_REQUIRED = lazy_gettext(
 CODES_NEED_TOTP = lazy_gettext("Recovery codes come with an authenticator.")
 
 
-def _now() -> datetime:
-    return datetime.now(UTC)
-
-
 def _account_page(
     request: Request,
     session: Session,
@@ -102,7 +97,7 @@ def _account_page(
             "recovery_codes_left": left,
             "codes_low": running_low(left),
             "field": CONFIRM_FIELD,
-            "sessions": accounts.current_sessions(session, admin_id, _now()),
+            "sessions": accounts.current_sessions(session, admin_id, now()),
             "this_session": signed.row.id,
         },
         status_code,
@@ -153,9 +148,7 @@ def change_email(
     values = {"email": email}
     if problem := accounts.email_problem(email):
         return _refused(request, session, signed, "email", problem, values)
-    if not unique(
-        session, lambda: accounts.change_email(session, admin, email, _now())
-    ):
+    if not unique(session, lambda: accounts.change_email(session, admin, email, now())):
         taken = EMAIL_TAKEN
         return _refused(request, session, signed, "email", taken, values)
     response = _done(signed, session, "email", section="email")
@@ -177,7 +170,7 @@ def change_password(
 ) -> Response:
     if problem := accounts.password_problem(password, password_again):
         return _refused(request, session, signed, "password", problem)
-    accounts.change_password(session, signed.row, password, _now())
+    accounts.change_password(session, signed.row, password, now())
     response = _done(signed, session, "password", section="password")
     notify.tell(signed.admin.email, signed.admin.id, mail_messages.password_changed)
     return response
@@ -246,7 +239,7 @@ def remove_authenticator(
     authenticator_id: int,
 ) -> Response:
     outcome = accounts.remove_authenticator(
-        session, signed.admin.id, authenticator_id, _now()
+        session, signed.admin.id, authenticator_id, now()
     )
     if outcome == "missing":
         return not_found()
@@ -281,7 +274,7 @@ def new_recovery_codes(
         request, session, signed, single_use, "recovery_codes", ACCOUNT
     ):
         return again
-    codes = accounts.make_recovery_codes(session, signed.admin.id, _now())
+    codes = accounts.make_recovery_codes(session, signed.admin.id, now())
     changed(signed, session)
     notify.tell(signed.admin.email, signed.admin.id, mail_messages.recovery_codes_made)
     return page(
@@ -295,7 +288,7 @@ def new_recovery_codes(
 def end_session(
     signed: ConfirmedAdmin, session: DbSession, session_id: int
 ) -> Response:
-    if not accounts.end_sessions(session, signed.admin.id, _now(), only=session_id):
+    if not accounts.end_sessions(session, signed.admin.id, now(), only=session_id):
         return not_found()
     if session_id == signed.row.id:
         session.commit()
@@ -305,5 +298,5 @@ def end_session(
 
 @router.post(f"{ACCOUNT}/sessions/end-others")
 def end_other_sessions(signed: ConfirmedAdmin, session: DbSession) -> Response:
-    accounts.end_sessions(session, signed.admin.id, _now(), keep=signed.row.id)
+    accounts.end_sessions(session, signed.admin.id, now(), keep=signed.row.id)
     return _done(signed, session, "others", section="sessions")

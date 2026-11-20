@@ -71,7 +71,6 @@ def _list_page(
             "problems": {"name": problem} if problem else None,
             "values": {"name": name} if name is not None else None,
         },
-        400 if problem else 200,
     )
 
 

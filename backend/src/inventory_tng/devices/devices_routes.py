@@ -146,7 +146,6 @@ def _list_page(
             "problems": problems,
             "values": values,
         },
-        400 if problems else 200,
     )
 
 
@@ -444,7 +443,6 @@ def device_list(
             "zone": site_zone(session),
             "problems": problems or None,
         },
-        400 if problems else 200,
     )
 
 

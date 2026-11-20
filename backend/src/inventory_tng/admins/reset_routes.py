@@ -10,7 +10,6 @@ the account exists or has an address happens after the reply, so neither
 the words nor the time taken tell anyone which accounts there are.
 """
 
-from datetime import UTC, datetime
 from typing import Annotated
 
 from fastapi import APIRouter, Form, Request
@@ -24,6 +23,7 @@ from inventory_tng.core.db_sessions import DbSession, SessionFactory, Sessions
 from inventory_tng.core.mail import Mailer, Notify, deliver
 from inventory_tng.core.phrases import Words, lazy_gettext
 from inventory_tng.models.admins import ResetLink
+from inventory_tng.web.admin_pages import now
 from inventory_tng.web.browser import rate_key
 from inventory_tng.web.pages import add_notices, not_found, page, redirect
 
@@ -48,10 +48,6 @@ REFUSED = {
 FORGOT_TITLE = lazy_gettext("Forgot your password?")
 RESET_TITLE = lazy_gettext("Reset your account")
 RECOVER_TITLE = lazy_gettext("Recover an account")
-
-
-def _now() -> datetime:
-    return datetime.now(UTC)
 
 
 def _forgot_page(
@@ -104,7 +100,7 @@ def _email_reset(
 ) -> None:
     """After the reply, in a session of its own."""
     with sessions() as session:
-        found = accounts.emailed_reset(session, username, _now())
+        found = accounts.emailed_reset(session, username, now())
         if found is None:
             return
         session.commit()
@@ -139,7 +135,7 @@ def _reset_page(
 
 @router.get(RESET)
 def reset_form(request: Request, session: DbSession, token: str = "") -> Response:
-    found = accounts.find_reset_link(session, token, _now())
+    found = accounts.find_reset_link(session, token, now())
     return _reset_page(request, session, token, found[0] if found else None)
 
 
@@ -152,18 +148,18 @@ def reset(
     password: Annotated[str, Form()] = "",
     password_again: Annotated[str, Form()] = "",
 ) -> Response:
-    now = _now()
+    at = now()
     if not accounts.may_use_reset_link(
         session, rate_key(request), request.app.state.settings.rate_limits
     ):
-        found = accounts.find_reset_link(session, token, now)
+        found = accounts.find_reset_link(session, token, at)
         problems = {"password": TOO_MANY}
         link = found[0] if found else None
         return _reset_page(
             request, session, token, link, problems=problems, status_code=429
         )
     # Locked until the request's session ends, used or not.
-    found = accounts.find_reset_link(session, token, now, lock=True)
+    found = accounts.find_reset_link(session, token, at, lock=True)
     if found is None:
         return _reset_page(request, session, token, None)
     link, admin = found
@@ -172,7 +168,7 @@ def reset(
         return _reset_page(
             request, session, token, link, problems=problems, status_code=400
         )
-    accounts.use_reset_link(session, link, password, now)
+    accounts.use_reset_link(session, link, password, at)
     session.commit()
     # An invite's link chooses the first password: nothing to warn about.
     if link.kind != "invite":
@@ -229,7 +225,7 @@ def recover(
             token,
             username,
             rate_key(request),
-            _now(),
+            now(),
             notify,
             request.app.state.settings.rate_limits,
         )

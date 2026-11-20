@@ -270,7 +270,6 @@ def _list_page(
             "values": values,
             **_name_field(session, similar),
         },
-        400 if problems else 200,
     )
 
 
@@ -350,6 +349,28 @@ def _item_page(
             **_name_field(session, similar),
         },
     )
+
+
+def _item_changed(
+    request: Request,
+    session: Session,
+    signed: SignedIn,
+    item_id: int,
+    change: Callable[[], object],
+    notice: str,
+    *,
+    section: str = "packages",
+    **query: str,
+) -> Response:
+    """A change to an item's package or alias, made and committed, then the
+    item page saying `notice` by `section`; refused, said above the page,
+    while the item is retired."""
+    _, broken = refusal(session, change, RETIRED)
+    if broken:
+        found = session.get_one(Item, item_id)
+        return _item_page(request, session, signed, found, alert=RULES[RETIRED])
+    session.commit()
+    return redirect(f"{ITEMS}/{item_id}", notice=notice, section=section, **query)
 
 
 def _deciding[T](
@@ -670,14 +691,14 @@ def restore_package(
     package = _package(session, item_id, package_id)
     if package is None:
         return not_found()
-    _, broken = refusal(
-        session, lambda: items.restore_package(session, package), RETIRED
+    return _item_changed(
+        request,
+        session,
+        signed,
+        item_id,
+        lambda: items.restore_package(session, package),
+        "package_restored",
     )
-    if broken:
-        found = session.get_one(Item, item_id)
-        return _item_page(request, session, signed, found, alert=RULES[RETIRED])
-    session.commit()
-    return redirect(f"{ITEMS}/{item_id}", notice="package_restored", section="packages")
 
 
 @router.post(f"{ITEMS}/{{item_id}}/packages/{{package_id}}/retire")
@@ -691,17 +712,13 @@ def retire_package(
     package = _package(session, item_id, package_id)
     if package is None:
         return not_found()
-    _, broken = refusal(
-        session, lambda: items.retire_package(session, package, now()), RETIRED
-    )
-    if broken:
-        found = session.get_one(Item, item_id)
-        return _item_page(request, session, signed, found, alert=RULES[RETIRED])
-    session.commit()
-    return redirect(
-        f"{ITEMS}/{item_id}",
-        notice="package_retired",
-        section="packages",
+    return _item_changed(
+        request,
+        session,
+        signed,
+        item_id,
+        lambda: items.retire_package(session, package, now()),
+        "package_retired",
         undo=str(package_id),
     )
 
@@ -719,14 +736,14 @@ def track_package(
     package = _package(session, item_id, package_id)
     if package is None or track not in TRACKING:
         return not_found()
-    _, broken = refusal(
-        session, lambda: items.track_package(session, package, TRACKING[track]), RETIRED
+    return _item_changed(
+        request,
+        session,
+        signed,
+        item_id,
+        lambda: items.track_package(session, package, TRACKING[track]),
+        "package_tracking",
     )
-    if broken:
-        found = session.get_one(Item, item_id)
-        return _item_page(request, session, signed, found, alert=RULES[RETIRED])
-    session.commit()
-    return redirect(f"{ITEMS}/{item_id}", notice="package_tracking", section="packages")
 
 
 @router.post(f"{ITEMS}/{{item_id}}/packages/{{package_id}}/settings")
@@ -748,13 +765,13 @@ def package_settings(
     short, minimum, problems = forms.package_settings_fields(
         package, found.unit, short_below, minimum_sealed
     )
+    # Beside the fields of the package it was sent for.
+    values = {
+        "package_id": str(package_id),
+        "short_below": short_below,
+        "minimum_sealed": minimum_sealed,
+    }
     if problems:
-        # Beside the fields of the package it was sent for.
-        values = {
-            "package_id": str(package_id),
-            "short_below": short_below,
-            "minimum_sealed": minimum_sealed,
-        }
         return _item_page(
             request, session, signed, found, problems=problems, values=values
         )
@@ -768,11 +785,6 @@ def package_settings(
         return _item_page(request, session, signed, found, alert=RULES[RETIRED])
     if broken:
         # Resized meanwhile to no more than it: said beside it, as above.
-        values = {
-            "package_id": str(package_id),
-            "short_below": short_below,
-            "minimum_sealed": minimum_sealed,
-        }
         problems = {"short_below": forms.SHORTER_THAN_WHOLE}
         return _item_page(
             request, session, signed, found, problems=problems, values=values
@@ -838,11 +850,12 @@ def remove_alias(
     alias = session.get(ItemAlias, alias_id)
     if alias is None or alias.item_id != item_id:
         return not_found()
-    _, broken = refusal(
-        session, lambda: items.remove_alias(session, alias, now()), RETIRED
+    return _item_changed(
+        request,
+        session,
+        signed,
+        item_id,
+        lambda: items.remove_alias(session, alias, now()),
+        "alias_removed",
+        section="aliases",
     )
-    if broken:
-        found = session.get_one(Item, item_id)
-        return _item_page(request, session, signed, found, alert=RULES[RETIRED])
-    session.commit()
-    return redirect(f"{ITEMS}/{item_id}", notice="alias_removed", section="aliases")
