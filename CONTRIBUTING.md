@@ -101,10 +101,12 @@ runs Python through `uv run`.
 
 Whole workflows are mise tasks: setting up, running the app, the checks,
 the database's life, and compose. `mise tasks` lists every task with what
-it does. The ones you run every day are `mise run dev` (Running the app),
-`mise run check` (Running the checks) and `mise run compose -- <arguments>`,
-the only way to run compose. A small step you take many times a day you run
-directly, in `backend/` or `frontend/`:
+it does. The ones you run every day are `mise run dev`
+([Running the app](#running-the-app)), `mise run check`
+([Running the checks](#running-the-checks)) and
+`mise run compose -- <arguments>`, the only way to run compose. A small
+step you take many times a day you run directly, in `backend/` or
+`frontend/`:
 
 | In | Command | What it does |
 | --- | --- | --- |
@@ -1338,12 +1340,9 @@ an issue asks for it.
 Record a decision in words, with who made it and when, not as a link to
 where it was discussed or the letter of a choice made there.
 
-These are judgements, held in review, not checks, except what tests
-enforce. `backend/tests/codebase/test_contributing.py`: every mise task has
-a description, so that `mise tasks` says what it does, and every
-`mise run <task>` outside a decision record names a task.
-`backend/tests/codebase/test_artifact_links.py`: no file in the clone holds
-a claude.ai artifact link, a lettered choice or a question code.
+These are judgements held in review, not checks, except where a test in
+`backend/tests/codebase/` enforces one, as for task descriptions and
+artifact links.
 
 Lint what you write or change with `mise run check-markdown`.
 

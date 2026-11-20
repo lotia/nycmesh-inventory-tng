@@ -46,9 +46,12 @@ def task_scripts() -> list[Path]:
     ]
 
 
+def toml_tasks() -> dict[str, object]:
+    return tomllib.loads((CLONE / "mise.toml").read_text())["tasks"]
+
+
 def tasks() -> set[str]:
-    named = set(tomllib.loads((CLONE / "mise.toml").read_text())["tasks"])
-    return named | {script.name for script in task_scripts()}
+    return set(toml_tasks()) | {script.name for script in task_scripts()}
 
 
 def test_a_file_gone_before_it_is_read_is_skipped(
@@ -90,7 +93,7 @@ def test_what_a_gitignore_leaves_out_is_not_read(
 def test_every_mise_task_has_a_description() -> None:
     """So `mise tasks` lists each with what it does: CONTRIBUTING.md names
     only the everyday ones."""
-    named = tomllib.loads((CLONE / "mise.toml").read_text())["tasks"]
+    named = toml_tasks()
     # A task given as a bare command or a list of them has no description.
     undescribed = {
         name
@@ -108,11 +111,12 @@ def test_every_mise_task_has_a_description() -> None:
 
 def test_every_mise_run_names_a_task(clone_files: dict[Path, str]) -> None:
     """So a renamed task's old name does not linger where people read it."""
+    known = tasks()
     unknown = {
         str(path.relative_to(CLONE)): names
         for path, text in clone_files.items()
         if not path.is_relative_to(DECISIONS)
-        and (names := set(RUN.findall(text)) - tasks())
+        and (names := set(RUN.findall(text)) - known)
     }
     assert unknown == {}
 
@@ -130,6 +134,7 @@ def test_ci_runs_every_check_as_a_job_named_for_its_task() -> None:
     """So a failed job names the command that runs it locally, and no check
     runs only on a developer's machine. `check` runs them all, locally."""
     jobs = set(JOB.findall(WORKFLOW.read_text().split("\njobs:\n", 1)[1]))
+    known = tasks()
     assert jobs
-    assert jobs - tasks() == set()
-    assert {task for task in tasks() if task.startswith("check-")} - jobs == set()
+    assert jobs - known == set()
+    assert {task for task in known if task.startswith("check-")} - jobs == set()
