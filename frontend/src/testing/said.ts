@@ -3,7 +3,7 @@ import type { Said } from "../shared/outbox-notes";
 
 /** A batch's problems, or a quantity's, as text, each name the page quoted
  * in it (outbox-notes.Said) in [brackets]. */
-export function shown<T extends object>(result: T) {
+export function saidAsText<T extends object>(result: T) {
   const text = (said: Said) =>
     said
       .map((part) => (typeof part === "string" ? part : `[${part.quoted}]`))

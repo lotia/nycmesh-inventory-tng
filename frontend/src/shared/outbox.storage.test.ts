@@ -5,7 +5,7 @@ import {
   draft,
   entry,
   named,
-  said,
+  reasonSaid,
   states,
   store,
   stored,
@@ -59,7 +59,7 @@ describe("storage", () => {
     await outbox.send();
     expect((await bodies(sent))[0].lines).toEqual(lines);
     expect(states(outbox)).toEqual(["refused"]);
-    expect(said(outbox)).toBe(
+    expect(reasonSaid(outbox)).toBe(
       "Not recorded. Line 1: A line of a package says the size it was counted in: load the page again, and count it again",
     );
   });
@@ -75,7 +75,7 @@ describe("storage", () => {
     store(entry());
     const outbox = new Outbox(answering(() => json({ detail }, 422)).api);
     await outbox.send();
-    expect(said(outbox)).toBe(
+    expect(reasonSaid(outbox)).toBe(
       "Not recorded. Line 1: A loose line says a package's size: load the page again, and count it again",
     );
   });
@@ -87,7 +87,7 @@ describe("storage", () => {
     store(entry());
     const outbox = new Outbox(answering(() => json({ detail }, 422)).api);
     await outbox.send();
-    expect(said(outbox)).toBe(
+    expect(reasonSaid(outbox)).toBe(
       `Not recorded. Line 1: ${say(PROBLEMS.package_resized)}`,
     );
   });

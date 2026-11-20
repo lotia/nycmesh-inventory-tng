@@ -1,12 +1,11 @@
 import { describe, expect, test } from "vitest";
-import { type Event, Telemetry } from "../shared/telemetry";
+import { type Event, MOST_SECONDS, Telemetry } from "../shared/telemetry";
 import { DecoderUnavailable } from "./camera";
 import {
   CameraReport,
   labelKind,
   MOST_LABELS,
   MOST_OPEN_SECONDS,
-  MOST_SECONDS,
   outcomeOf,
 } from "./camera-report";
 

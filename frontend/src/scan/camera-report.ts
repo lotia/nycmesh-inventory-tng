@@ -10,7 +10,7 @@
  * own, `resumed`.
  */
 import type { Schemas } from "../api/client";
-import { type Telemetry, telemetry } from "../shared/telemetry";
+import { MOST_SECONDS, type Telemetry, telemetry } from "../shared/telemetry";
 import { DecoderUnavailable } from "./camera";
 import type { DecoderKind } from "./decoder";
 import type { Scanned } from "./label-codes";
@@ -22,7 +22,6 @@ export type LabelKind = keyof Schemas["LabelsRead"];
 /** The most of each the backend takes (page_telemetry_api.CameraSession):
  * a number past one would have the whole report refused. */
 export const MOST_OPEN_SECONDS = 120;
-export const MOST_SECONDS = 86_400;
 export const MOST_LABELS = 10_000;
 
 /** What a label read names, as counted: a package's own label apart from

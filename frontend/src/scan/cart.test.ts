@@ -3,7 +3,7 @@ import { BUILD } from "../shared/build";
 import { say } from "../shared/i18n";
 import { cart } from "../testing/cart";
 import { CATALOGUE, cable, radio } from "../testing/catalogue";
-import { shown } from "../testing/said";
+import { saidAsText } from "../testing/said";
 import { refusing } from "../testing/storage";
 import { toBatch } from "./batch";
 import {
@@ -121,14 +121,14 @@ describe("quantities", () => {
 
   test("a fraction of a package is refused", () => {
     const line = { itemId: 101, packages: { 1001: "0.5" }, loose: "" };
-    expect(shown(quantityOf(line, cable))).toEqual({
+    expect(saidAsText(quantityOf(line, cable))).toEqual({
       problem: "Count whole packages: [Spool].",
     });
   });
 
   test("an item counted in units takes whole numbers", () => {
     const line = { itemId: 100, packages: {}, loose: "1.5" };
-    expect(shown(quantityOf(line, radio))).toEqual({
+    expect(saidAsText(quantityOf(line, radio))).toEqual({
       problem: say(WHOLE_UNITS),
     });
   });
@@ -150,14 +150,14 @@ describe("quantities", () => {
       ],
     };
     const line = { itemId: 100, packages: { 7: "1" }, loose: "0.5" };
-    expect(shown(quantityOf(line, halves))).toEqual({
+    expect(saidAsText(quantityOf(line, halves))).toEqual({
       problem: say(WHOLE_UNITS),
     });
   });
 
   test("an unreadable amount says what is wanted", () => {
     const line = { itemId: 101, packages: {}, loose: "lots" };
-    expect(shown(quantityOf(line, cable))).toEqual({
+    expect(saidAsText(quantityOf(line, cable))).toEqual({
       problem: "Enter the loose amount in m, up to 3 decimals.",
     });
   });
@@ -278,7 +278,7 @@ describe("turning a cart into a batch", () => {
 describe("what has changed since the cart was filled", () => {
   test("counts for a retired package are not dropped silently", () => {
     const line = { itemId: 101, packages: { 9999: "3" }, loose: "1" };
-    expect(shown(quantityOf(line, cable))).toEqual({
+    expect(saidAsText(quantityOf(line, cable))).toEqual({
       problem: say(PACKAGE_NO_LONGER_USED),
     });
     // A retired package left at nothing is no matter.
@@ -492,7 +492,7 @@ describe("a package resized while the cart counts it (inventory-tng-0qi)", () =>
     // it would record less than was moved.
     expect(resized(first(now), box)).toBe(true);
     expect(reconcile(now, CATALOGUE)).toBe(now);
-    expect(shown(toBatch(now, CATALOGUE))).toEqual({
+    expect(saidAsText(toBatch(now, CATALOGUE))).toEqual({
       problems: [`[${radio.name}]: enter the count`],
     });
     expect(resized(first(counted), box)).toBe(false);
@@ -544,12 +544,12 @@ describe("a package resized while the cart counts it (inventory-tng-0qi)", () =>
       ],
     });
     // Not the rest without it: that would record less than was moved.
-    expect(shown(toBatch(counted, boxOf("8.000")))).toEqual({
+    expect(saidAsText(toBatch(counted, boxOf("8.000")))).toEqual({
       problems: [`[${radio.name}]: enter the count`],
     });
     // Alone in the cart, said in place of say(ADD_SOMETHING)
     expect(
-      shown(toBatch(boxes("2", { 1000: "4.000" }), boxOf("8.000"))),
+      saidAsText(toBatch(boxes("2", { 1000: "4.000" }), boxOf("8.000"))),
     ).toEqual({
       problems: [`[${radio.name}]: enter the count`],
     });

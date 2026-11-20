@@ -4,7 +4,7 @@ import {
   draft,
   entry,
   named,
-  said,
+  reasonSaid,
   states,
   store,
   stored,
@@ -90,7 +90,7 @@ describe("builds", () => {
       outbox.queue(draft(), named("second"));
       await vi.waitFor(() => expect(outbox.builds.newer.value).toBe("too_old"));
       expect(states(outbox)).toEqual(["waiting", "waiting"]);
-      expect(said(outbox)).toBe(say(MUST_UPGRADE));
+      expect(reasonSaid(outbox)).toBe(say(MUST_UPGRADE));
       expect(stored().map((each: Entry) => each.state)).toEqual([
         "waiting",
         "waiting",
@@ -186,7 +186,7 @@ describe("builds", () => {
     const { outbox } = of(() => json(body, 409));
     outbox.queue(draft(), named("a"));
     await vi.waitFor(() => expect(outbox.entries.value[0]?.failures).toBe(1));
-    expect(said(outbox)).toContain("answered unexpectedly");
+    expect(reasonSaid(outbox)).toContain("answered unexpectedly");
     expect(states(outbox)).toEqual(["waiting"]);
     expect(outbox.builds.newer.value).toBeNull();
   });

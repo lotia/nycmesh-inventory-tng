@@ -7,8 +7,8 @@ import {
   draft,
   entry,
   named,
+  reasonSaid,
   replies,
-  said,
   states,
   store,
 } from "../testing/outbox";
@@ -107,14 +107,14 @@ describe("sending again", () => {
     );
     const outbox = new Outbox(api);
     outbox.queue(draft(), named("a"));
-    await vi.waitFor(() => expect(said(outbox)).toBe(say(UNAVAILABLE)));
+    await vi.waitFor(() => expect(reasonSaid(outbox)).toBe(say(UNAVAILABLE)));
   });
 
   test("a revoked device is told to register again", async () => {
     const { api } = answering(() => json({ reason: "revoked" }, 403));
     const outbox = new Outbox(api);
     outbox.queue(draft(), named("a"));
-    await vi.waitFor(() => expect(said(outbox)).toContain("withdrawn"));
+    await vi.waitFor(() => expect(reasonSaid(outbox)).toContain("withdrawn"));
   });
 
   test("no answer holds back the batches after it", async () => {
@@ -173,13 +173,13 @@ describe("a batch the server keeps failing on", () => {
       await vi.waitFor(() =>
         expect(outbox.entries.value[0]?.failures).toBe(round),
       );
-      expect(said(outbox)).toContain("Trying again shortly");
+      expect(reasonSaid(outbox)).toContain("Trying again shortly");
       await vi.advanceTimersByTimeAsync(RETRY_MS);
     }
     await vi.waitFor(() =>
       expect(outbox.entries.value[0]?.failures).toBe(REPORT_AFTER),
     );
-    expect(said(outbox)).toContain("please report this");
+    expect(reasonSaid(outbox)).toContain("please report this");
     expect(states(outbox)).toEqual(["waiting"]);
   });
 
@@ -207,7 +207,7 @@ describe("refusals", () => {
     await vi.waitFor(() =>
       expect(states(outbox)).toEqual(["refused", "saved"]),
     );
-    expect(said(outbox)).toBe(say(KEY_REUSED));
+    expect(reasonSaid(outbox)).toBe(say(KEY_REUSED));
   });
 
   test("a save put back goes under its key, and refused as reused keeps that another tab recorded it first, not the page's reload words", async () => {
@@ -223,7 +223,7 @@ describe("refusals", () => {
       putBack: true,
       reason: { code: "recorded_elsewhere" },
     });
-    expect(said(outbox)).toBe(say(SOME_NOT_RECORDED));
+    expect(reasonSaid(outbox)).toBe(say(SOME_NOT_RECORDED));
     expect((await bodies(sent))[0]).toMatchObject({ key });
   });
 
@@ -264,7 +264,7 @@ describe("refusals", () => {
       ],
     });
     const row = say(PROBLEMS.not_found);
-    expect(said(outbox)).toBe(
+    expect(reasonSaid(outbox)).toBe(
       `Not recorded. Line 2: ${row} Not accepted Line 1: Not accepted Open package said used up, 1: ${row} What is on an open package, 1: ${say(PROBLEMS.repeated)}`,
     );
   });
@@ -281,13 +281,13 @@ describe("refusals", () => {
       await vi.waitFor(() => expect(states(outbox)).toEqual(["refused"]));
       const words = say(PROBLEMS[kind as ProblemKind]);
       expect(words).not.toBe(say(NOT_ACCEPTED));
-      expect(said(outbox)).toBe(`Not recorded. Line 1: ${words}`);
+      expect(reasonSaid(outbox)).toBe(`Not recorded. Line 1: ${words}`);
       // Kept as its kind, it is worded anew in another language.
       speak("pseudo", pseudo);
-      expect(said(outbox)).toBe(
+      expect(reasonSaid(outbox)).toBe(
         `${say(NOT_RECORDED)} ${say(ON_LINE, { n: 1, why: say(PROBLEMS[kind as ProblemKind]) })}`,
       );
-      expect(said(outbox)).not.toContain(words);
+      expect(reasonSaid(outbox)).not.toContain(words);
     },
   );
 
@@ -296,7 +296,9 @@ describe("refusals", () => {
     const outbox = new Outbox(answering(() => json({ detail }, 422)).api);
     outbox.queue(draft(), named("a"));
     await vi.waitFor(() => expect(states(outbox)).toEqual(["refused"]));
-    expect(said(outbox)).toBe(`Not recorded. Line 1: ${say(NOT_ACCEPTED)}`);
+    expect(reasonSaid(outbox)).toBe(
+      `Not recorded. Line 1: ${say(NOT_ACCEPTED)}`,
+    );
   });
 
   test("a 422 naming a report by no whole number is kept all the same", async () => {
@@ -309,7 +311,7 @@ describe("refusals", () => {
     expect(
       new Outbox(answering(() => json({}, 500)).api).entries.value,
     ).toEqual(outbox.entries.value);
-    expect(said(outbox)).toBe(`Not recorded. ${say(PROBLEMS.not_found)}`);
+    expect(reasonSaid(outbox)).toBe(`Not recorded. ${say(PROBLEMS.not_found)}`);
   });
 
   test("a batch taking from an opening not yet saved waits for it", async () => {

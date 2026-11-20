@@ -1,15 +1,8 @@
 /**
  * What the pages tell the backend about themselves (docs/decisions/0006):
- * errors, three Web Vitals, the outbox's retries, how long a batch took
- * from its first line to saving, a tab learning a newer build is out,
- * what an older build left behind and what volunteers did with it, a cart
- * discarded, a cart's line removed and put back with Undo, what a
- * save another tab recorded first held more of put in the cart, the
- * rest of a batch refused for some of its lines put there, and each
- * session of the camera (scan/camera-report.ts). No
- * OpenTelemetry here: events go to POST /api/telemetry on this origin,
- * whose schema is the list of what may be sent, and the backend turns them
- * into metrics. Nothing names a volunteer, an item or a place, and an error
+ * how they fare and what volunteers do on them. No OpenTelemetry here:
+ * events go to POST /api/telemetry on this origin, whose schema is the list
+ * of what may be sent, and the backend turns them into metrics. Nothing names a volunteer, an item or a place, and an error
  * sends only that one happened.
  *
  * Events wait in memory and go together: when FLUSH_AT are waiting, and
@@ -64,9 +57,10 @@ export const PER_HOUR_IN_ALL = Object.values(PER_HOUR).reduce(
   0,
 );
 export const HOUR_MS = 3_600_000;
-/** The longest scan_to_save the backend takes (page_telemetry_api.ScanToSave):
- * an event outside its bounds would have the whole report refused. */
-export const MOST_SECONDS_TO_SAVE = 86_400;
+/** The most seconds the backend takes in an event, as scan_to_save's
+ * (page_telemetry_api.UpToADay): an event outside its bounds would have the
+ * whole report refused. */
+export const MOST_SECONDS = 86_400;
 
 /** As POST /api/telemetry takes them: its schema is the list. */
 export type Event = Schemas["Report"]["events"][number];

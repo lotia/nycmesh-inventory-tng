@@ -49,7 +49,7 @@ export const states = (outbox: Outbox) =>
   outbox.entries.value.map((e) => e.state);
 
 /** What the page says of the first batch's reason, as plain text. */
-export function said(outbox: Outbox): string | null {
+export function reasonSaid(outbox: Outbox): string | null {
   const reason = outbox.entries.value[0]?.reason ?? null;
   if (reason === null) {
     return null;

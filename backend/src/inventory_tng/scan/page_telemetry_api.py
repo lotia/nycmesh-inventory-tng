@@ -33,6 +33,8 @@ PATH = "/telemetry"
 MOST_EVENTS = 50
 
 Page = Literal["scan", "register"]
+# Seconds a page measured: a day at most.
+UpToADay = Annotated[float, Field(ge=0, le=86_400)]
 
 
 class Strict(BaseModel):
@@ -61,8 +63,8 @@ class OutboxRetry(Strict):
 
 class ScanToSave(Strict):
     kind: Literal["scan_to_save"]
-    # From a batch's first line to saving it: a day at most.
-    seconds: Annotated[float, Field(ge=0, le=86_400)]
+    # From a batch's first line to saving it.
+    seconds: UpToADay
 
 
 class OutOfDate(Strict):
@@ -168,7 +170,7 @@ class CameraSession(Strict):
     # From asking for the camera to its opening: opened sessions only.
     open_seconds: Annotated[float, Field(ge=0, le=120)] | None = None
     # From asking for the camera, or the page shown again, to its closing.
-    seconds: Annotated[float, Field(ge=0, le=86_400)]
+    seconds: UpToADay
     labels: LabelsRead
 
 

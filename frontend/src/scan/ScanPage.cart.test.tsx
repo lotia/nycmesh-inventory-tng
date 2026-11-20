@@ -3,7 +3,7 @@ import { describe, expect, test, vi } from "vitest";
 import { say } from "../shared/i18n";
 import { STORAGE_KEY as OUTBOX_KEY } from "../shared/outbox";
 import { SOME_NOT_RECORDED } from "../shared/outbox-notes";
-import { MOST_SECONDS_TO_SAVE, telemetry } from "../shared/telemetry";
+import { MOST_SECONDS, telemetry } from "../shared/telemetry";
 import { CATALOGUE, WITH_CAFE } from "../testing/catalogue";
 import { answering, json } from "../testing/fetch";
 import {
@@ -427,7 +427,7 @@ test("a cart kept for days reports a day, the most the backend takes", async () 
     fromId: 10,
     toId: 12,
     lines: [{ itemId: 101, packages: {}, loose: "4" }],
-    startedAt: Date.now() - 3 * MOST_SECONDS_TO_SAVE * 1000,
+    startedAt: Date.now() - 3 * MOST_SECONDS * 1000,
   });
   const { api, sent } = server();
   open(api);
@@ -436,6 +436,6 @@ test("a cart kept for days reports a day, the most the backend takes", async () 
   await vi.waitFor(() => expect(saves(sent)).toHaveLength(1));
   expect(record).toHaveBeenCalledWith({
     kind: "scan_to_save",
-    seconds: MOST_SECONDS_TO_SAVE,
+    seconds: MOST_SECONDS,
   });
 });

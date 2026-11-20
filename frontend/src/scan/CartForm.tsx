@@ -8,7 +8,7 @@ import { Field } from "../shared/Field";
 import { say, sayParts } from "../shared/i18n";
 import { type Body, batchId, type Entry, type Outbox } from "../shared/outbox";
 import { type Said, wordsOf } from "../shared/outbox-notes";
-import { MOST_SECONDS_TO_SAVE, telemetry } from "../shared/telemetry";
+import { MOST_SECONDS, telemetry } from "../shared/telemetry";
 import { type Batch, batchWords, toBatch } from "./batch";
 import { CartLine } from "./CartLine";
 import { labelKind } from "./camera-report";
@@ -348,7 +348,7 @@ export function CartForm({
       // A cart kept overnight counts as a day, and a clock put back as none.
       const seconds = Math.min(
         Math.max((Date.now() - current.startedAt) / 1000, 0),
-        MOST_SECONDS_TO_SAVE,
+        MOST_SECONDS,
       );
       telemetry.record({ kind: "scan_to_save", seconds });
     }

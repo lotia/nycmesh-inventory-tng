@@ -244,7 +244,7 @@ Migrations are Alembic's, in `backend/migrations/versions/`, and run as
 the owner (`MIGRATION_DATABASE_URL`, from `.env`). In `backend/`,
 `uv run alembic upgrade head` migrates this checkout's database, as
 `mise run dev-database` does. A new one takes the next four-digit number
-after the newest there, such as `0002`:
+after the newest there:
 `uv run alembic revision --rev-id <number> -m "<what it does>"`.
 
 Until a test deployment holds people's data, a change may edit an existing
@@ -630,9 +630,7 @@ the cart's, so the same opening recorded again is the same batch
 A refused save in the outbox's list lists its lines, in the words of the
 older list, each item numbered as the refusal's "Line n" names it. One
 whose problems name lines, and that holds others, offers Record the
-rest, which puts those others in an empty cart under a key made from the
-save's, the status naming each line taken off and why
-(`frontend/src/scan/record-the-rest.ts`). While
+rest (`frontend/src/scan/record-the-rest.ts`, docs/decisions/0010). While
 the browser says it is offline, a batch waiting for an answer says so,
 and the page follows the browser going on and off line.
 
@@ -658,12 +656,7 @@ kept in the tab's memory, not with the cart, so a reload drops it.
 The scan page needs a registered device, and some catalogue rows to choose
 from. The camera works only over HTTPS or on `localhost`.
 
-Both pages report their errors, three Web Vitals, the outbox's retries,
-how long a batch took from its first line to Record, a tab learning that a
-newer build is out, what an older build left in storage and what
-volunteers did with it, a cart discarded, a cart's line removed and put
-back with Undo, what a save another tab recorded first added put in
-the cart, Record the rest tapped, and each session of the camera, through
+Both pages report how they fare and what volunteers do on them, through
 `frontend/src/shared/telemetry.ts`, to `POST /api/telemetry`, which turns
 them into `inventory.*` metrics (docs/decisions/0006). Its schema, in
 `backend/src/inventory_tng/scan/page_telemetry_api.py`, lists all a page
@@ -694,7 +687,7 @@ This serves the app over https on this machine's address on the local
 network, through Caddy, until you press Ctrl-C, for a phone on the same
 network. The address is this machine's on the network it reaches the
 internet through, never one on the internet; `INVENTORY_LAN_ADDRESS` in
-`.env` names another, and `INVENTORY_LAN_PORT` is the port. A firewall
+`.env` names another, and `INVENTORY_LAN_PORT` the port it tries first. A firewall
 on this machine may need to let the phone in. Caddy's certificate comes
 from its own authority, so the phone warns first: accept the warning.
 

@@ -6,8 +6,8 @@ import {
   draft,
   entry,
   named,
+  reasonSaid,
   replies,
-  said,
   states,
   store,
 } from "../testing/outbox";
@@ -62,7 +62,7 @@ describe("what another tab recorded (inventory-tng-0gg)", () => {
       },
     });
     // Then it says only that it was not recorded: the list shows the rest.
-    expect(said(outbox)).toBe(say(SOME_NOT_RECORDED));
+    expect(reasonSaid(outbox)).toBe(say(SOME_NOT_RECORDED));
   });
 
   test("a keyless batch refused for its key still asks for a report", async () => {
@@ -70,7 +70,7 @@ describe("what another tab recorded (inventory-tng-0gg)", () => {
     const outbox = new Outbox(api);
     outbox.queue(changed(), named("b"));
     await vi.waitFor(() => expect(states(outbox)).toEqual(["refused"]));
-    expect(said(outbox)).toBe(say(KEY_REUSED));
+    expect(reasonSaid(outbox)).toBe(say(KEY_REUSED));
   });
 
   /** A cart recorded here (41), then queued again changed, under its key:

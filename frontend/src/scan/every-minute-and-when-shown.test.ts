@@ -1,24 +1,15 @@
 import { renderHook } from "@testing-library/preact";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
+import { show, stubVisibility } from "../testing/visibility";
 import {
   CHECK_EVERY_MS,
   useEveryMinuteAndWhenShown,
 } from "./every-minute-and-when-shown";
 
-let visibility: DocumentVisibilityState = "visible";
-
-function show(state: DocumentVisibilityState) {
-  visibility = state;
-  document.dispatchEvent(new Event("visibilitychange"));
-}
-
 describe("useEveryMinuteAndWhenShown", () => {
   beforeEach(() => {
     vi.useFakeTimers();
-    visibility = "visible";
-    vi.spyOn(document, "visibilityState", "get").mockImplementation(
-      () => visibility,
-    );
+    stubVisibility();
   });
 
   afterEach(() => {

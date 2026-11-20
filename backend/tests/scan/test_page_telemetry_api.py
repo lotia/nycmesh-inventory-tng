@@ -109,9 +109,9 @@ def test_the_limit_on_reports_is_a_setting(
 @pytest.mark.parametrize(
     ("page", "clamp", "event", "field"),
     [
-        ("shared/telemetry.ts", "MOST_SECONDS_TO_SAVE", "ScanToSave", "seconds"),
+        ("shared/telemetry.ts", "MOST_SECONDS", "ScanToSave", "seconds"),
+        ("shared/telemetry.ts", "MOST_SECONDS", "CameraSession", "seconds"),
         ("scan/camera-report.ts", "MOST_OPEN_SECONDS", "CameraSession", "open_seconds"),
-        ("scan/camera-report.ts", "MOST_SECONDS", "CameraSession", "seconds"),
         ("scan/camera-report.ts", "MOST_LABELS", "LabelsRead", "item"),
     ],
 )

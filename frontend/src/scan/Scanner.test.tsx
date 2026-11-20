@@ -3,6 +3,7 @@ import { afterEach, beforeEach, expect, test, vi } from "vitest";
 import { say } from "../shared/i18n";
 import { telemetry } from "../shared/telemetry";
 import { fakeCamera as camera, pass } from "../testing/camera";
+import { setVisibility, show, stubVisibility } from "../testing/visibility";
 import { DecoderUnavailable, type Session } from "./camera";
 import type { LabelKind } from "./camera-report";
 import {
@@ -19,21 +20,11 @@ import {
 // with real time, so a read a test did not let pass still comes, only later.
 // Unmounts go in act: outside it, Preact closes the camera a frame later.
 // The page shown, unless a test hides it (show).
-let visibility: DocumentVisibilityState;
 beforeEach(() => {
   vi.useFakeTimers({ shouldAdvanceTime: true });
-  visibility = "visible";
-  vi.spyOn(document, "visibilityState", "get").mockImplementation(
-    () => visibility,
-  );
+  stubVisibility();
 });
 afterEach(() => vi.restoreAllMocks());
-
-/** The page shown or hidden, as the browser says it. */
-function show(state: DocumentVisibilityState) {
-  visibility = state;
-  document.dispatchEvent(new Event("visibilitychange"));
-}
 
 const said = (words: string, label: LabelKind = "item"): Acted => ({
   said: words,
@@ -272,7 +263,7 @@ test("Done while the camera opens is reported as cancelled, not refused", async 
 test("a camera that opens while the page is hidden is reported then", async () => {
   const sessions = reported();
   const { open } = camera();
-  visibility = "hidden";
+  setVisibility("hidden");
   render(<Scanner open={open} onCode={() => said("")} onDone={() => {}} />);
   await vi.waitFor(() =>
     expect(sessions()).toEqual([
