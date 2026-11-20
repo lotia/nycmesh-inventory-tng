@@ -152,7 +152,8 @@ def test_guessing_is_rate_limited_per_address(session: Session, phrase: str) -> 
 def test_neither_phrase_nor_cookie_is_logged(session: Session, phrase: str) -> None:
     with structlog.testing.capture_logs() as logs:
         _, token = devices.register(session, phrase, ADDRESS)
-    assert logs
+        session.commit()  # Logged once committed.
+    assert "device registered" in [line["event"] for line in logs]
     for line in logs:
         assert phrase not in str(line)
         assert token not in str(line)

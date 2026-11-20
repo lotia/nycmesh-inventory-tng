@@ -210,7 +210,10 @@ def test_a_correct_waits_for_a_close_of_its_open_package_then_skips_it(
     setup.commit()
     (check,) = checks(setup)
     first, second = own_committed.session(), own_committed.session()
-    assert open_packages.close(first, made.id, admin, datetime.now(UTC)) is not None
+    assert (
+        open_packages.close(first, made.id, admin, datetime.now(UTC), how="direct")
+        is not None
+    )
     worker = own_committed.blocked(
         second, lambda: correct_check(second, check, over_recorded.seen(check), admin)
     )
@@ -439,7 +442,7 @@ def test_a_correct_waits_for_a_close_that_closes_it_then_is_refused(
     first, so waits, then finds it settled."""
     check, made, admin = sealed_counted_check(own_committed)
     first, second = own_committed.session(), own_committed.session()
-    done = open_packages.close(first, made.id, admin, datetime.now(UTC))
+    done = open_packages.close(first, made.id, admin, datetime.now(UTC), how="direct")
     assert done is not None
     assert done.over_recorded == 1
     worker = own_committed.blocked(
@@ -465,7 +468,10 @@ def test_a_close_waits_for_a_correct_then_closes_only_its_package(
     first, second = own_committed.session(), own_committed.session()
     correct_check(first, check, over_recorded.seen(check), admin)
     worker = own_committed.blocked(
-        second, lambda: open_packages.close(second, made.id, admin, datetime.now(UTC))
+        second,
+        lambda: open_packages.close(
+            second, made.id, admin, datetime.now(UTC), how="direct"
+        ),
     )
     first.commit()
     finished = worker.finished()
@@ -517,7 +523,9 @@ def test_a_close_skips_one_a_count_holds_and_correct_then_closes_it_as_counted(
         )
         == 0
     )
-    closed = open_packages.close(second, made.id, admin, datetime.now(UTC))
+    closed = open_packages.close(
+        second, made.id, admin, datetime.now(UTC), how="direct"
+    )
     assert closed == open_packages.Closed(False, 0)
     second.commit()
     first.commit()

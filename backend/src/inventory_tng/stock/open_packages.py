@@ -290,7 +290,7 @@ def close(
     admin_id: int,
     at: datetime,
     *,
-    how: Closing = "direct",
+    how: Closing,
     reported: bool = False,
     reason: str = adjustment_reasons.USED_UP,
 ) -> Closed | None:

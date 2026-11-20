@@ -268,7 +268,9 @@ def test_an_openings_open_package_closed_before_correct_names_the_sealed_end(
     assert movement.to_open_package_id is not None
     # Before Correct: in one test transaction, now() is when it began.
     at = datetime.now(UTC) - timedelta(days=1)
-    assert open_packages.close(session, movement.to_open_package_id, admin, at)
+    assert open_packages.close(
+        session, movement.to_open_package_id, admin, at, how="direct"
+    )
     session.flush()
     over_recorded.correct(session, check.id, seen(check), admin)
     session.flush()
@@ -303,12 +305,12 @@ def test_what_correct_wrote_is_told_by_what_it_wrote_not_when(
     assert began is not None
     at = began + timedelta(hours=hours)
     if closed_first:
-        assert open_packages.close(session, open_id, admin, at)
+        assert open_packages.close(session, open_id, admin, at, how="direct")
         session.flush()
     over_recorded.correct(session, check.id, seen(check), admin)
     session.flush()
     if not closed_first:
-        assert open_packages.close(session, open_id, admin, at)
+        assert open_packages.close(session, open_id, admin, at, how="direct")
         session.flush()
     ((*_, how, shown_why, _),) = settled_rows(admin_client)
     assert (how, shown_why) == (HOW["corrected"], why)
@@ -483,7 +485,7 @@ def test_an_openings_sealed_end_counted_then_closed_says_so(
     )
     at = datetime(2026, 11, 20, 15, tzinfo=UTC)
     closed = open_packages.close(
-        session, movement.to_open_package_id, ada_id(session), at
+        session, movement.to_open_package_id, ada_id(session), at, how="direct"
     )
     assert closed
     session.flush()
@@ -528,7 +530,7 @@ def test_both_ends_right_then_closed_names_the_count_and_the_close(
     with monkeypatch.context() as patched:
         patched.setattr(over_recorded, "open_package_closed", lambda *_: 0)
         closed = open_packages.close(
-            session, movement.to_open_package_id, ada_id(session), at
+            session, movement.to_open_package_id, ada_id(session), at, how="direct"
         )
     assert closed == open_packages.Closed(False, 0)
     session.flush()

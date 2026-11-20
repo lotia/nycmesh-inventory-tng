@@ -236,7 +236,10 @@ def close_directly(
     if _closable(session, item_id, open_id) is None:
         return not_found()
     done, _ = attempt(
-        session, lambda: open_packages.close(session, open_id, signed.admin.id, now())
+        session,
+        lambda: open_packages.close(
+            session, open_id, signed.admin.id, now(), how="direct"
+        ),
     )
     session.commit()
     notice = "open_package_closed" if done is not None else "used_up_unchanged"

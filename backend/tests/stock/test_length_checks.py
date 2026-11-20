@@ -372,7 +372,7 @@ def test_a_count_leaves_a_check_to_be_answered_but_a_close_ends_it(
     session.refresh(made)
     assert made.length_reported == 250
     closer = new_admin_id(session)
-    open_packages.close(session, made.id, closer, made.opened_at)
+    open_packages.close(session, made.id, closer, made.opened_at, how="direct")
     session.flush()
     session.refresh(made)
     assert (made.length_reported, made.length_reported_in_id) == (None, None)
@@ -460,7 +460,7 @@ def test_a_length_of_an_item_counted_each_is_whole(
 def test_a_report_of_one_closed_is_not_kept(session: Session, spools: Spools) -> None:
     made = spools.opened()
     closer = new_admin_id(session)
-    open_packages.close(session, made.id, closer, made.opened_at)
+    open_packages.close(session, made.id, closer, made.opened_at, how="direct")
     session.flush()
     transaction = session.scalars(select(LedgerTransaction)).first()
     assert transaction is not None

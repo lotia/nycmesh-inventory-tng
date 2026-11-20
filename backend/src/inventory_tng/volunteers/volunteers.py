@@ -107,8 +107,11 @@ def save(
 def hold_stock(session: Session, volunteer: Volunteer) -> Location:
     """Their custody location, made if they have none."""
     held = _lock(session, volunteer)
+    if held is not None:
+        return held
+    held = locations.add_custody(session, volunteer.id, volunteer.name)
     _logged(session, "custody started", volunteer)
-    return held or locations.add_custody(session, volunteer.id, volunteer.name)
+    return held
 
 
 def stop_holding_stock(session: Session, volunteer: Volunteer, at: datetime) -> None:
