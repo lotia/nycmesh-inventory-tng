@@ -8,6 +8,7 @@ import { MAKE_CHANGES } from "../shared/outbox-notes";
 import { type Event as Reported, telemetry } from "../shared/telemetry";
 import { type Catalogue, KIND_WORDS, type Kind } from "./cart";
 import {
+  ADD_TO_CART,
   AlertWords,
   ConfirmDiscard,
   DISCARD,
@@ -35,7 +36,6 @@ const CART_KIND_WORDS: Record<Kind, MessageDescriptor> = {
 export const CHECKED_OUT = msg`Checked out items. Add to cart or discard before sending`;
 export const RETIRED_ITEM = msg`Item retired`;
 export const CANNOT_ADD = msg`Cannot Add to Cart`;
-export const ADD_TO_CART = msg`Add to cart`;
 export const SAYING_WHAT_IS_ON = msg`Saying what is on open packages`;
 export const SOMETHING = msg`Something`;
 export const A_CART_SOMETHING = msg`A cart: something`;

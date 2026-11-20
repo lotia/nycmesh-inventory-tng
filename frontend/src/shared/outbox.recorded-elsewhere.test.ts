@@ -276,7 +276,7 @@ describe("what another tab recorded (inventory-tng-0gg)", () => {
     expect(outbox.entries.value[0]?.reason).toBeNull();
   });
 
-  test("its other lines put in the cart (Add the rest to cart) is kept so, of that one alone (inventory-tng-clvh)", () => {
+  test("its other lines put in the cart (Add to cart) is kept so, of that one alone (inventory-tng-clvh)", () => {
     const problems = [{ names: { of: "line" as const, n: 1 }, kind: "x" }];
     const refused = (what: string): Entry =>
       entry({

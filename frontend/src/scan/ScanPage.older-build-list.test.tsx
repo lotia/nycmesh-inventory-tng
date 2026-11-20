@@ -48,9 +48,8 @@ import {
 } from "./CartForm";
 import { REMOVE } from "./CartLine";
 import { STORAGE_KEY as CART_KEY, freshCart, storeCart } from "./cart";
-import { CONFIRM_DISCARD, DISCARD, KEEP_IT } from "./Notes";
+import { ADD_TO_CART, CONFIRM_DISCARD, DISCARD, KEEP_IT } from "./Notes";
 import {
-  ADD_TO_CART,
   CANNOT_ADD,
   CART_NOT_EMPTY,
   CHANGED_CHECK_AGAIN,

@@ -585,9 +585,9 @@ export class Outbox {
 
   /** Mark one as having had what it offers put in the cart, so it is
    * offered no more: of one recorded elsewhere, its difference (Add these
-   * to cart); of one refused (422), its other lines (Add the rest to
-   * cart). That batch alone, not another under its key. False if the
-   * browser would not keep that. */
+   * to cart); of one refused (422), its other lines (Add to cart). That
+   * batch alone, not another under its key. False if the browser would
+   * not keep that. */
   addedToCart(listed: Entry): boolean {
     const body = v.parse(BatchBody, listed.body);
     return this.update((entries) =>

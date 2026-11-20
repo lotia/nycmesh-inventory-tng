@@ -89,10 +89,6 @@ msgstr "Opening packages"
 msgid "at {place}"
 msgstr "at {place}"
 
-#: src/shared/outbox-notes.ts
-msgid "This package is retired, and the inventory has none left sealed: take this line off, record the rest again, and ask an administrator to count it"
-msgstr "This package is retired, and the inventory has none left sealed: take this line off, record the rest again, and ask an administrator to count it"
-
 #: src/scan/OpenPackageCard.tsx
 msgid "Shows nothing left"
 msgstr "Shows nothing left"
@@ -117,7 +113,7 @@ msgstr "This item is retired: what is left may be taken, never received"
 msgid "That phrase has expired. Ask for a new one."
 msgstr "That phrase has expired. Ask for a new one."
 
-#: src/scan/OlderList.tsx
+#: src/scan/Notes.tsx
 msgid "Add to cart"
 msgstr "Add to cart"
 
@@ -377,10 +373,6 @@ msgstr "That install number is out of range."
 #: src/scan/batch.ts
 msgid "{name}: Open whole packages: leave loose empty."
 msgstr "{name}: Open whole packages: leave loose empty."
-
-#: src/scan/add-the-rest.ts
-msgid "Add the rest to cart"
-msgstr "Add the rest to cart"
 
 #: src/scan/batch.ts
 msgid "{name}: Nothing is taken from an open package here."
@@ -664,6 +656,10 @@ msgstr "to {place}"
 #: src/scan/Scanner.tsx
 msgid "Torch"
 msgstr "Torch"
+
+#: src/shared/outbox-notes.ts
+msgid "This package is retired, and the inventory has none left sealed. Add to cart leaves this line out. Ask an administrator to count it."
+msgstr "This package is retired, and the inventory has none left sealed. Add to cart leaves this line out. Ask an administrator to count it."
 
 #: src/shared/outbox-notes.ts
 msgid "This item is counted in whole units"

@@ -27,7 +27,8 @@ import {
 import { fillMove, open, ready, save, server } from "../testing/scan-page";
 import { ADDED_BACK as ADDED_BACK_PHRASE, NOTHING_IN_CART } from "./CartForm";
 import { addOne, STORAGE_KEY as CART_KEY, freshCart, storeCart } from "./cart";
-import { ADD_TO_CART, CHECKED_OUT } from "./OlderList";
+import { ADD_TO_CART } from "./Notes";
+import { CHECKED_OUT } from "./OlderList";
 import { CARTS_FROM_DEVICE, DISMISS, HELD, SENDING } from "./OutboxList";
 import { ScanPage } from "./ScanPage";
 

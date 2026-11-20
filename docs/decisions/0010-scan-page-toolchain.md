@@ -340,7 +340,8 @@ the compressed copy (fiddly header code ServeStatic already gets right).
   keeping that room, until Dismiss. The page counts each tap as a
   telemetry event of its own, two an hour added beside the rest. Ali
   renamed the button "Add the rest to cart" on 2026-11-20
-  (inventory-tng-r18l), as it records nothing itself.
+  (inventory-tng-r18l), as it records nothing itself, and then "Add to
+  cart" the same day (inventory-tng-r87e).
   The page's words drop "save" (Ali, 2026-11-13, inventory-tng-wyq): the
   cart lives in the browser, written to storage as it changes, so what
   the browser holds is "kept", and what the inventory takes is

@@ -63,8 +63,8 @@ import {
   freshCart,
   storeCart,
 } from "./cart";
-import { DISCARD } from "./Notes";
-import { ADD_TO_CART, CANNOT_ADD, CART_NOT_EMPTY } from "./OlderList";
+import { ADD_TO_CART, DISCARD } from "./Notes";
+import { CANNOT_ADD, CART_NOT_EMPTY } from "./OlderList";
 import { DISMISS } from "./OutboxList";
 import { ITEM_RETIRED } from "./older-to-cart";
 import { ADD_DIFFERENCE, IN_CART } from "./recorded-elsewhere";

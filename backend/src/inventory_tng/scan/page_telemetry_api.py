@@ -125,9 +125,9 @@ class DifferenceAdded(Strict):
 
 
 class RestPutBack(Strict):
-    """A volunteer tapped Add the rest to cart under a batch the
-    inventory refused for some of its lines, putting its other lines in
-    the scan page's cart (frontend/src/scan/add-the-rest.ts)."""
+    """A volunteer tapped Add to cart under a batch the inventory
+    refused for some of its lines, putting its other lines in the scan
+    page's cart (frontend/src/scan/add-the-rest.ts)."""
 
     kind: Literal["rest_put_back"]
 
@@ -266,7 +266,7 @@ rests_put_back = meter.create_counter(
     "inventory.cart.rests_put_back",
     unit="{batch}",
     description="Batches refused for some of their lines whose other lines a "
-    "volunteer put in the scan page's cart with Add the rest to cart",
+    "volunteer put in the scan page's cart with Add to cart",
 )
 camera_sessions = meter.create_counter(
     "inventory.scan.camera.sessions",

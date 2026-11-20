@@ -1,10 +1,13 @@
 /** What the scan page says in notes and alerts, its lists' and the
- * camera's, and asking before a discard. */
+ * camera's, its lists' buttons, and asking before a discard. */
 import { msg } from "@lingui/core/macro";
 import { Fragment } from "preact";
 import { say } from "../shared/i18n";
 import type { Note, Said } from "../shared/outbox-notes";
 
+/** Puts what the older list or a refused batch offers in an empty cart
+ * (Ali, 2026-11-20, inventory-tng-r87e). */
+export const ADD_TO_CART = msg`Add to cart`;
 export const DISCARD = msg`Discard`;
 export const CONFIRM_DISCARD = msg`Confirm discard`;
 export const KEEP_IT = msg`Keep it`;

@@ -17,10 +17,11 @@ import {
   recordedHeading,
   wordsOf,
 } from "../shared/outbox-notes";
-import { ADD_THE_REST, REST_IN_CART, restOf } from "./add-the-rest";
+import { REST_IN_CART, restOf } from "./add-the-rest";
 import { batchWords } from "./batch";
 import type { Catalogue } from "./cart";
 import {
+  ADD_TO_CART,
   AlertWords,
   CAUTION_BOX,
   Counted,
@@ -89,7 +90,7 @@ export type AddRest = (entry: Entry, rest: Body) => NotPut | null;
  * that does not say, what is left to do (SCAN_AGAIN_CHANGED), as the older
  * list does, while the page refreshes the stock (Ali, inventory-tng-g0e,
  * d; inventory-tng-0gg). One refused (422) whose problems name lines
- * offers Add the rest to cart (add-the-rest.ts).
+ * offers Add to cart, for the rest (add-the-rest.ts).
  */
 export function OutboxList({
   outbox,
@@ -202,7 +203,7 @@ export function OutboxList({
               )}
               {rest !== null && (
                 <PutInCart
-                  label={ADD_THE_REST}
+                  label={ADD_TO_CART}
                   inCartWords={REST_IN_CART}
                   added={reason?.code === "refused" && reason.added === true}
                   inCart={cartKey === rest.key}
@@ -315,7 +316,7 @@ function RecordedElsewhere({
 
 /**
  * What an outbox entry offers to put in an empty cart (CartForm): a button
- * until it has (Add these to cart, Add the rest to cart), then words that
+ * until it has (Add these to cart, Add to cart), then words that
  * it is there, until recorded.
  */
 function PutInCart({

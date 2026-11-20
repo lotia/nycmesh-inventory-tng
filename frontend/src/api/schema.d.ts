@@ -741,9 +741,9 @@ export interface components {
     };
     /**
      * RestPutBack
-     * @description A volunteer tapped Add the rest to cart under a batch the
-     *     inventory refused for some of its lines, putting its other lines in
-     *     the scan page's cart (frontend/src/scan/add-the-rest.ts).
+     * @description A volunteer tapped Add to cart under a batch the inventory
+     *     refused for some of its lines, putting its other lines in the scan
+     *     page's cart (frontend/src/scan/add-the-rest.ts).
      */
     RestPutBack: {
       /**

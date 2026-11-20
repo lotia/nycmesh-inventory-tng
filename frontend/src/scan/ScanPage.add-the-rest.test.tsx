@@ -17,8 +17,9 @@ import {
   storedCart,
   UUID,
 } from "../testing/scan-page";
-import { ADD_THE_REST, REST_IN_CART, TAKEN_OFF } from "./add-the-rest";
+import { REST_IN_CART, TAKEN_OFF } from "./add-the-rest";
 import { ADDED_BACK } from "./CartForm";
+import { ADD_TO_CART } from "./Notes";
 import { CART_NOT_EMPTY } from "./OlderList";
 import { DISMISS } from "./OutboxList";
 
@@ -54,9 +55,9 @@ async function refusedWith(...problems: Problem[]) {
 }
 
 const addTheRest = (entry: HTMLElement) =>
-  within(entry).queryByRole("button", { name: say(ADD_THE_REST) });
+  within(entry).queryByRole("button", { name: say(ADD_TO_CART) });
 
-test("Add the rest to cart puts the other lines in the cart, says each taken off and why, and Record sends them under a key of their own (Ali, 2026-11-20, inventory-tng-clvh)", async () => {
+test("Add to cart, under a refused batch, puts the other lines in the cart, says each taken off and why, and Record sends them under a key of their own (Ali, 2026-11-20, inventory-tng-clvh)", async () => {
   const record = vi.spyOn(telemetry, "record");
   record.mockClear();
   const { entry, outbox, sent } = await refusedWith(RETIRED_NONE_LEFT);
@@ -98,7 +99,7 @@ test("Add the rest to cart puts the other lines in the cart, says each taken off
   );
 });
 
-test("Add the rest to cart takes only an empty cart, saying so, and is offered still", async () => {
+test("Add to cart, under a refused batch, takes only an empty cart, saying so, and is offered still", async () => {
   const { entry } = await refusedWith(RETIRED_NONE_LEFT);
   fillMove();
   fireEvent.click(addTheRest(entry) as HTMLElement);
@@ -112,7 +113,7 @@ test("Add the rest to cart takes only an empty cart, saying so, and is offered s
 });
 
 // Which refusals have no rest is restOf's (add-the-rest.test.ts).
-test("a refusal with no rest offers no Add the rest to cart", async () => {
+test("a refusal with no rest offers no Add to cart", async () => {
   const { entry } = await refusedWith({ names: null, kind: "not_found" });
   expect(addTheRest(entry)).toBeNull();
 });
