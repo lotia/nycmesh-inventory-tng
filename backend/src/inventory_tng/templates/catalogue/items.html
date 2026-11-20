@@ -87,6 +87,7 @@ address, to come back to. #}
       <input name="part_number" value="{{ values.get('part_number', '') }}">
       {% with name = "part_number" %}{% include "_field_problem.html" %}{% endwith %}
     </label>
+    {% with manufacturer = values.get('manufacturer', ''), part_number = values.get('part_number', '') %}{% include "catalogue/_web_search.html" %}{% endwith %}
     <button class="primary">{% trans %}Add{% endtrans %}</button>
   </form>
 </section>

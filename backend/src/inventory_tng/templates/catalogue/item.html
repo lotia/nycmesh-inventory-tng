@@ -47,6 +47,9 @@ None is left, so nobody can pick it.{% endtrans %}{% endif %}{% endcall %}
     <input name="{{ name }}" value="{{ values.get(name, stored if stored is not none else '') }}">
     {% include "_field_problem.html" %}
   </label>
+  {% if name == "part_number" %}
+  {% with manufacturer = values.get('manufacturer', item.manufacturer or ''), part_number = values.get('part_number', item.part_number or '') %}{% include "catalogue/_web_search.html" %}{% endwith %}
+  {% endif %}
   {% endfor %}
   {#- The item's form sent back (it has a version): the box as sent; any
   other form's page, such as a package refused, shows the item's own. #}

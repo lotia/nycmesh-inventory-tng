@@ -3324,6 +3324,10 @@ msgstr ""
 msgid "Sealed %(package)s"
 msgstr ""
 
+#: src/inventory_tng/templates/catalogue/_web_search.html
+msgid "Search the web"
+msgstr ""
+
 #: src/inventory_tng/templates/_masthead.html
 msgid "Sections"
 msgstr ""
@@ -4519,6 +4523,10 @@ msgstr ""
 
 #: src/inventory_tng/templates/places/locations.html
 msgid "for an area only"
+msgstr ""
+
+#: src/inventory_tng/templates/catalogue/_web_search.html
+msgid "for the manufacturer and part number, on DuckDuckGo, in a new tab"
 msgstr ""
 
 #: src/inventory_tng/templates/stock/counts.html
