@@ -138,14 +138,50 @@ def _withheld(admin_id: int, location_id: int, lines: int) -> None:
     )
 
 
-def _first_sent(session: Session, location_id: int, *keys: uuid.UUID) -> int | None:
-    """The first transaction at the place written under any of `keys`: a
-    form sent before."""
-    return session.scalar(
+def _hold_place(session: Session, location_id: int, *keys: uuid.UUID) -> int | None:
+    """Lock the place to count or adjust it, and return the first
+    transaction there written under any of `keys`: a form sent before. If
+    none was, NotCountable unless the place may be counted
+    (_require_countable); a form sent before gets its first answer."""
+    lock_place(session, location_id)
+    sent = session.scalar(
         select(func.min(LedgerTransaction.id)).where(
             LedgerTransaction.idempotency_key.in_(keys), moments.at_place(location_id)
         )
     )
+    if sent is None:
+        _require_countable(session, location_id)
+    return sent
+
+
+def _write_count(
+    session: Session,
+    key: uuid.UUID,
+    admin_id: int,
+    location_id: int,
+    into: list[Entry],
+    out: list[Entry],
+    *,
+    when_unchanged: bool = False,
+) -> list[Written]:
+    """A count's corrections written: what it found, into the place under
+    `key`, and what it lost, out of it under a key made from it (_lost_key).
+    `when_unchanged`, a count that found nothing either way is written into
+    the place all the same, so it still says when the place was counted."""
+    written: list[Written] = []
+    if into or (when_unchanged and not out):
+        header = {"to_location_id": location_id}
+        written += _correct(session, key, "count", admin_id, header, into)
+    if out:
+        header = {"from_location_id": location_id}
+        written += _correct(session, _lost_key(key), "count", admin_id, header, out)
+    return written
+
+
+def _lost_key(key: uuid.UUID) -> uuid.UUID:
+    """The key a count's losses are written under, made from its own, so
+    sending it twice writes them once."""
+    return uuid.uuid5(key, "lost")
 
 
 # A count's line of a form (docs/decisions/0020): an item, the form it is
@@ -218,14 +254,10 @@ def record_count(
         when=bool({item_id for item_id, _ in counted} & {i for i, _ in forms_counted}),
     )
     counted_at = dict(counted)
-    lock_place(session, location_id)
-    lost_key = uuid.uuid5(key, "lost")
-    sent = _first_sent(session, location_id, key, lost_key)
+    sent = _hold_place(session, location_id, key, _lost_key(key))
     as_of = shown.as_of
     after = LedgerTransaction.id > as_of
-    if sent is None:
-        _require_countable(session, location_id)
-    else:
+    if sent is not None:
         after &= LedgerTransaction.id < sent
     enforce(
         "changed_since_shown",
@@ -244,30 +276,24 @@ def record_count(
         flow = form_moved[(item_id, _)]
         moved[item_id] = (came + flow[0], went + flow[1])
     kept_forms = [line for line in by_form if line[0] not in moved]
-    found_forms, lost_forms = count_corrections(
-        kept_forms,
-        {form: came - went for form, (came, went) in form_then.items()},
-    )
     kept = counted_at.keys() - moved.keys()
-    found: dict[int, Decimal] = {}
-    lost: dict[int, Decimal] = {}
-    for item_id in kept:
-        difference = counted_at[item_id] - then.get(item_id, Decimal(0))
-        if difference > 0:
-            found[item_id] = difference
-        elif difference < 0:
-            lost[item_id] = -difference
-    written: list[Written] = []
-    into = [*entries(list(found.items())), *found_forms]
-    out = [*entries(list(lost.items())), *lost_forms]
+    # Counted by total, loose; never also by form (movement_item_once).
+    into, out = count_corrections(
+        [(item_id, LOOSE, counted_at[item_id]) for item_id in kept] + kept_forms,
+        {(item_id, LOOSE): amount for item_id, amount in then.items()}
+        | {form: came - went for form, (came, went) in form_then.items()},
+    )
     # A count of nothing at all still says when the place was counted.
     anything = counted_at or by_form
-    if into or ((kept or kept_forms or not anything) and not out):
-        header = {"to_location_id": location_id}
-        written += _correct(session, key, "count", admin_id, header, into)
-    if out:
-        header = {"from_location_id": location_id}
-        written += _correct(session, lost_key, "count", admin_id, header, out)
+    written = _write_count(
+        session,
+        key,
+        admin_id,
+        location_id,
+        into,
+        out,
+        when_unchanged=bool(kept or kept_forms or not anything),
+    )
     put_right: list[tuple[int, Form | None]] = []
     if sent is None:
         put_right = [(item_id, None) for item_id in sorted(kept)]
@@ -302,25 +328,15 @@ def count_open_package(
     wrote; None if sent before under its key, and so written once, then.
     NotCountable (location_countable), as record_count."""
     place = row.location_id
-    lock_place(session, place)
-    lost_key = uuid.uuid5(key, "lost")
-    if _first_sent(session, place, key, lost_key) is not None:
+    if _hold_place(session, place, key, _lost_key(key)) is not None:
         return None
-    _require_countable(session, place)
     shows = left_on(session, [row])[row.id]
     now = shows + left - showed
     form = Form(open_package_id=row.id)
     found, lost = count_corrections(
         [(row.item_id, form, now)], {(row.item_id, form): shows}
     )
-    written: list[Written] = []
-    if found:
-        header = {"to_location_id": place}
-        written += _correct(session, key, "count", admin_id, header, found)
-    if lost:
-        header = {"from_location_id": place}
-        written += _correct(session, lost_key, "count", admin_id, header, lost)
-    return OpenCounted(now, written)
+    return OpenCounted(now, _write_count(session, key, admin_id, place, found, lost))
 
 
 def record_adjustment(
@@ -338,10 +354,8 @@ def record_adjustment(
     """Stock found at a place, or written off from it, for a reason, in
     `form` there (docs/decisions/0020). What it wrote: nothing if its key
     was written already. NotCountable (location_countable), as record_count."""
-    lock_place(session, location_id)
-    if _first_sent(session, location_id, key) is not None:
+    if _hold_place(session, location_id, key) is not None:
         return []
-    _require_countable(session, location_id)
     side = "to_location_id" if found else "from_location_id"
     header = {"reason_id": reason_id, side: location_id}
     line = (
