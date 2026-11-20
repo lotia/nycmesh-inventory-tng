@@ -1,5 +1,6 @@
 /** A small catalogue for the tests. Never bundled. */
 import type { Catalogue, Item } from "../scan/cart";
+import type { Offered } from "../scan/offered";
 
 export const radio: Item = {
   id: 100,
@@ -119,3 +120,21 @@ export function openSpool(fields: Partial<OpenPackage> = {}): OpenPackage {
     ...fields,
   };
 }
+
+/** Item 101's open spool `id` at place 10, `left` in thousandths. */
+export const openAt = (
+  id: number,
+  left: number,
+  fields: Partial<Offered> = {},
+): Offered => ({
+  id,
+  key: `open-${id}`,
+  item_id: 101,
+  package_id: 1001,
+  package_name: "Spool",
+  location_id: 10,
+  opened_at: "2026-11-03T10:00:00Z",
+  left,
+  short_below: null,
+  ...fields,
+});

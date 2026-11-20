@@ -9,6 +9,7 @@ import { type Older, readOlder } from "../scan/older-builds";
 import { BUILD } from "../shared/build";
 import {
   type Body,
+  type Draft,
   type Entry,
   STORAGE_KEY as OUTBOX_KEY,
 } from "../shared/outbox";
@@ -17,6 +18,16 @@ import {
 export const KEY = "0b7c6a51-9a3d-4d39-8f3e-1d1f2c4b5a61";
 /** A second batch's key. */
 export const OTHER_KEY = "6f1e2d3c-4b5a-4968-8776-5a4b3c2d1e0f";
+
+/** A batch with a key, as the outbox keeps it. */
+let keys = 0;
+export function keyed(draft: Draft): Body {
+  keys += 1;
+  return {
+    ...draft,
+    key: `00000000-0000-4000-8000-${String(keys).padStart(12, "0")}`,
+  };
+}
 
 /** A batch's body: volunteer 1 moving two boxes of radios (item 100,
  * package 1000) from the hub (10) to the van (12), under KEY. Any field
