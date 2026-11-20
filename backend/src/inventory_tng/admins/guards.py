@@ -284,6 +284,17 @@ ACCOUNT_CHANGE = Need(accounts.account_change_open, True, True, "change")
 BY_AUTHENTICATOR = Need(_never, False, False, "recovery_codes")
 
 
+def code_field(signed: SignedIn, need: Need) -> dict[str, object]:
+    """What admins/_code_field.html takes on a form that `need` guards:
+    whether it needs a code (its window has closed), and whose kind, the
+    one acting's. So the code is asked on the form, not on a page after."""
+    return {
+        "code_needed": not need.window(signed.row, signed.settings, _now()),
+        "code_totp": signed.asks_code,
+        "field": CONFIRM_FIELD,
+    }
+
+
 def _confirming(need: Need) -> Callable[..., Awaitable[SignedIn]]:
     """The dependency for `need`: within its window, goes on; viewing a page
     keeps nothing open. A page asked for once it has closed sends the

@@ -742,12 +742,11 @@ def not_english(session: Session) -> None:
     English on a page is a word not said through the catalogue."""
     # Adjustment reasons too, though the seeded ones stay English
     # (inventory-tng-0z5): they are rows, as names are.
-    for model in (Item, ItemPackage, Category, Location, Volunteer, AdjustmentReason):
+    named = (Item, ItemPackage, Category, Location, Volunteer, AdjustmentReason)
+    for model in (*named, Authenticator):
         for row in session.scalars(select(model)):
             if re.search("[A-Za-z]{2,}", row.name):
                 row.name = f"{NOT_ENGLISH} {row.id}"
-    for authenticator in session.scalars(select(Authenticator)):
-        authenticator.name = f"{NOT_ENGLISH} {authenticator.id}"
     for signed_in in session.scalars(select(AdminSession)):
         signed_in.user_agent = NOT_ENGLISH
     for admin in session.scalars(select(Admin)):

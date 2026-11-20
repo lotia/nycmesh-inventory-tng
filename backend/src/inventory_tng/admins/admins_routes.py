@@ -19,11 +19,12 @@ from sqlalchemy.orm import Session
 from inventory_tng.admins import accounts, activity, queries
 from inventory_tng.admins.forms import OWN_RESET, OWN_RETIRE, TAKEN, invite_problems
 from inventory_tng.admins.guards import (
-    CONFIRM_FIELD,
+    ACCOUNT_CHANGE,
     AdminSignedIn,
     ConfirmedAccountChange,
     SignedIn,
     changed,
+    code_field,
 )
 from inventory_tng.admins.paths import ADMINS, RESET
 from inventory_tng.core.db_errors import attempt
@@ -57,18 +58,6 @@ def link_title(username: str) -> str:
 
 def reset_title(username: str) -> str:
     return gettext("Reset %(username)s's sign-in?", username=username)
-
-
-def _code_field(signed: SignedIn) -> dict[str, object]:
-    """For a form here: whether it needs a code (none was typed within
-    account_change_minutes), and whose kind, the one acting's."""
-    return {
-        "code_needed": not accounts.account_change_open(
-            signed.row, signed.settings, now()
-        ),
-        "code_totp": signed.asks_code,
-        "field": CONFIRM_FIELD,
-    }
 
 
 # How the list of administrators sorts, each row an Admin and whether it
@@ -112,7 +101,7 @@ def _list_page(
             "retired": [a for a in admins if a.retired_at is not None],
             "with_totp": with_totp,
             "with_password": accounts.admins_with_passwords(session),
-            **_code_field(signed),
+            **code_field(signed, ACCOUNT_CHANGE),
             "changes": activity.recent(session),
             "zone": site_zone(session),
             "problems": problems,
@@ -142,7 +131,7 @@ def _admin_page(
             "uses_totp": accounts.uses_totp(session, other.id),
             "has_password": accounts.has_password(session, other.id),
             "themselves": other.id == signed.admin.id,
-            **_code_field(signed),
+            **code_field(signed, ACCOUNT_CHANGE),
             "problems": {"admin": problem} if problem else None,
         },
         400 if problem else 200,
@@ -265,7 +254,7 @@ def confirm_reset(
             "here": f"{ADMINS}/{admin_id}/reset",
             "keep": f"{ADMINS}/{admin_id}",
             "other": other,
-            **_code_field(signed),
+            **code_field(signed, ACCOUNT_CHANGE),
         },
     )
 

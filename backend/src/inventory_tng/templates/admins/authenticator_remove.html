@@ -3,7 +3,7 @@
 {% block main %}
 <p>{% trans name=authenticator.name %}Once removed, {{ name }}'s codes no longer sign you in, and it stays
 removed: set it up again as a new authenticator to use it.{% endtrans %}</p>
-{% if last %}
+{% if totp_off %}
 <p>{% trans %}It's your only one, so removing it turns TOTP off: your recovery codes
 stop working, and your password alone signs you in.{% endtrans %}</p>
 {% endif %}

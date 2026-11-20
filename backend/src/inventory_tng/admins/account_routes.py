@@ -18,11 +18,13 @@ from inventory_tng.admins.guards import (
     CONFIRM_FIELD,
     NAME_TAKEN,
     RECOVERY_CODES_TITLE,
+    SENSITIVE,
     AdminSignedIn,
     ConfirmedAdmin,
     ConfirmedByAuthenticator,
     SignedIn,
     changed,
+    code_field,
     signed_out,
 )
 from inventory_tng.admins.paths import ACCOUNT
@@ -229,13 +231,8 @@ def confirm_remove_authenticator(
             "here": f"{ACCOUNT}/authenticators/{authenticator_id}/remove",
             "keep": f"{ACCOUNT}#authenticators",
             "authenticator": found,
-            "last": outcome == "totp_off",
-            # Asked here, not on a page of its own after (guards.ConfirmedAdmin).
-            "code_needed": not accounts.confirmation_open(
-                signed.row, signed.settings, _now()
-            ),
-            "code_totp": signed.asks_code,
-            "field": CONFIRM_FIELD,
+            "totp_off": outcome == "totp_off",
+            **code_field(signed, SENSITIVE),
         },
     )
 
