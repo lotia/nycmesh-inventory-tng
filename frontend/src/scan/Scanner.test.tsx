@@ -18,6 +18,7 @@ import {
   RELOAD_PAGE,
   type Refusal,
   Scanner,
+  STARTING,
   TORCH,
   TORCH_FAILED,
 } from "./Scanner";
@@ -85,9 +86,14 @@ test("Done stops the camera", async () => {
       reload={() => {}}
     />,
   );
-  // There while it starts, too.
+  // There while it starts, too, with the picture shown; what it says
+  // then, and while it points, is a status, not an alert.
   screen.getByRole("button", { name: say(DONE) });
+  expect(document.querySelector("video")?.hidden).toBe(false);
+  expect(screen.getByRole("status").textContent).toBe(say(STARTING));
   await screen.findByText(say(POINT));
+  expect(screen.getByRole("status").textContent).toBe(say(POINT));
+  expect(screen.queryByRole("alert")).toBeNull();
   fireEvent.click(screen.getByRole("button", { name: say(DONE) }));
   expect(onDone).toHaveBeenCalled();
   act(unmount);
@@ -276,7 +282,11 @@ async function refusedWith(error: unknown, refusal: Refusal) {
   );
   const bold = await screen.findByText(say(refusal.bold));
   expect(bold.tagName).toBe("STRONG");
-  expect(screen.getByRole("status").textContent).toBe(refusalWords(refusal));
+  // A refusal is a problem: said as an alert, and no status remains.
+  expect(screen.getByRole("alert").textContent).toBe(refusalWords(refusal));
+  expect(screen.queryByRole("status")).toBeNull();
+  // No picture to show: the empty video is hidden, not left as a box.
+  expect(document.querySelector("video")?.hidden).toBe(true);
   const reloadButton = screen.queryByRole("button", { name: say(RELOAD_PAGE) });
   // Only Reload page, where offered: no Done.
   expect(screen.queryAllByRole("button")).toEqual(

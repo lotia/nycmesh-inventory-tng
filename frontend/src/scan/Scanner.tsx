@@ -195,15 +195,30 @@ export function Scanner({
 
   return (
     <section aria-label={say(CAMERA)}>
+      {/* Refused, it shows nothing: hidden, as no Done takes it away. */}
       <video
         class="block max-h-[60vh] w-full rounded bg-black object-cover"
         ref={video}
+        hidden={refusal !== null}
         muted
         playsInline
       />
-      <p role="status">
-        <Said said={said.value} />
-      </p>
+      {/* A refusal is a problem, in the alert's style (CONTRIBUTING,
+          Styles); a new element, so it is announced as it appears. */}
+      {refusal === null ? (
+        <p role="status">
+          <Said said={said.value as MessageDescriptor | string} />
+        </p>
+      ) : (
+        <p role="alert">
+          <AlertWords
+            note={{
+              bold: [say(refusal.bold)],
+              plain: [" ", say(refusal.plain)],
+            }}
+          />
+        </p>
+      )}
       {refusal === null ? (
         <div class="actions">
           {torch.value !== null && (
@@ -237,19 +252,9 @@ function isRefusal(
   return typeof said !== "string" && "bold" in said;
 }
 
-/** What the camera said last: a refusal as a bold heading then its hint. */
-function Said({ said }: { said: MessageDescriptor | string | Refusal }) {
-  if (typeof said === "string") {
-    return <>{said}</>;
-  }
-  if (isRefusal(said)) {
-    return (
-      <AlertWords
-        note={{ bold: [say(said.bold)], plain: [" ", say(said.plain)] }}
-      />
-    );
-  }
-  return <>{say(said)}</>;
+/** What the camera said last, short of a refusal. */
+function Said({ said }: { said: MessageDescriptor | string }) {
+  return <>{typeof said === "string" ? said : say(said)}</>;
 }
 
 /** Turns the camera's torch on and off. */
