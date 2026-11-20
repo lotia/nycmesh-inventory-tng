@@ -112,6 +112,34 @@ test("Add to cart, under a refused batch, takes only an empty cart, saying so, a
   expect(within(entry).queryByText(say(REST_IN_CART))).toBeNull();
 });
 
+test("each refused batch's Add to cart is described by its batch's words (inventory-tng-zwnj)", async () => {
+  // Two batches under one key, told apart by their cable's length.
+  const refused = (to: string, cable: string) =>
+    outboxEntry({
+      body: moveBody({
+        lines: [
+          { item_id: 100, quantity: "4", package_id: 1000, package_size: "4" },
+          { item_id: 101, quantity: cable, package_id: null },
+        ],
+      }),
+      summary: { from: "Hub", to },
+      state: "refused",
+      reason: { code: "refused", problems: [RETIRED_NONE_LEFT] },
+    });
+  storeOutbox([refused("Van", "2"), refused("Shelf", "3")]);
+  open(server(() => saved(78)).api);
+  await ready();
+  for (const to of ["Van", "Shelf"]) {
+    const words = `Move: 2 items from Hub to ${to}`;
+    const entry = screen.getByText(words).closest("li") as HTMLElement;
+    const add = screen.getByRole("button", {
+      name: say(ADD_TO_CART),
+      description: words,
+    });
+    expect(entry.contains(add)).toBe(true);
+  }
+});
+
 // Which refusals have no rest is restOf's (add-the-rest.test.ts).
 test("a refusal with no rest offers no Add to cart", async () => {
   const { entry } = await refusedWith({ names: null, kind: "not_found" });

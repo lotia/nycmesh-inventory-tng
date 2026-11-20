@@ -95,9 +95,12 @@ describe("the batches listed in the outbox", () => {
     const second = "Move: 1 item from Hub to Shelf";
     expect(lines(first)).toEqual([]);
     expect(lines(second)).toEqual(["1. Cat6 cable: 2 m"]);
-    fireEvent.click(
-      within(row(second)).getByRole("button", { name: say(DISMISS) }),
-    );
+    // Each Dismiss is described by its batch's words, read out with it, so
+    // two named alike are told apart (inventory-tng-zwnj).
+    const dismiss = (what: string) =>
+      screen.getByRole("button", { name: say(DISMISS), description: what });
+    expect(row(first).contains(dismiss(first))).toBe(true);
+    fireEvent.click(dismiss(second));
     expect(screen.queryByText(second)).toBeNull();
     screen.getByText(first);
     expect(outbox.entries.value).toHaveLength(1);

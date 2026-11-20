@@ -159,9 +159,13 @@ export function OutboxList({
           const lines = recorded === undefined ? (linesOf.get(id) ?? []) : [];
           // Offered with the cart beside it, once the catalogue is loaded.
           const rest = catalogue === null ? null : restOf(entry);
+          // What its buttons are about, read out with each, as two
+          // entries' buttons are named alike (inventory-tng-zwnj). A
+          // batchId may hold spaces, which would split an id reference.
+          const words = `outbox-${encodeURIComponent(id)}`;
           return (
             <li key={id} class="flex flex-col items-start gap-1">
-              <div>{batchWords(entry.body, entry.summary)}</div>
+              <div id={words}>{batchWords(entry.body, entry.summary)}</div>
               {entry.state === "saved" ? (
                 <small>
                   {say(RECORDED_IN, { transaction: entry.transactionId })}
@@ -195,6 +199,7 @@ export function OutboxList({
                   catalogue={catalogue}
                   added={elsewhere?.added === true}
                   cartKey={cartKey}
+                  describedBy={words}
                   onAdd={(difference) => {
                     const why = onAddDifference(entry, difference);
                     notAdded.value = why === null ? null : { on: id, why };
@@ -207,6 +212,7 @@ export function OutboxList({
                   inCartWords={REST_IN_CART}
                   added={reason?.code === "refused" && reason.added === true}
                   inCart={cartKey === rest.key}
+                  describedBy={words}
                   onPut={() => {
                     const why = onAddRest(entry, rest);
                     notAdded.value = why === null ? null : { on: id, why };
@@ -222,12 +228,17 @@ export function OutboxList({
               )}
               {entry.state === "waiting" ? (
                 // Its room kept while it is sent, so the entry does not grow
-                // as it finishes.
+                // as it finishes. Never focused nor read out, it needs no
+                // description.
                 <button type="button" tabIndex={-1} {...KEEPS_ROOM}>
                   {say(DISMISS)}
                 </button>
               ) : (
-                <button type="button" onClick={() => outbox.dismiss(entry)}>
+                <button
+                  type="button"
+                  aria-describedby={words}
+                  onClick={() => outbox.dismiss(entry)}
+                >
                   {say(DISMISS)}
                 </button>
               )}
@@ -254,6 +265,7 @@ function RecordedElsewhere({
   catalogue,
   added,
   cartKey,
+  describedBy,
   onAdd,
 }: {
   entry: Entry;
@@ -263,6 +275,8 @@ function RecordedElsewhere({
   added: boolean | undefined;
   /** The cart's batch key, if it has one. */
   cartKey: string | undefined;
+  /** The id of its entry's words, which describe its button. */
+  describedBy: string;
   onAdd: (difference: Body) => void;
 }) {
   const { was, changes, difference } = useMemo(
@@ -307,6 +321,7 @@ function RecordedElsewhere({
           inCartWords={IN_CART}
           added={added === true}
           inCart={cartKey === difference.key}
+          describedBy={describedBy}
           onPut={() => onAdd(difference)}
         />
       )}
@@ -324,6 +339,7 @@ function PutInCart({
   inCartWords,
   added,
   inCart,
+  describedBy,
   onPut,
 }: {
   label: MessageDescriptor;
@@ -332,6 +348,8 @@ function PutInCart({
   added: boolean;
   /** The cart holds it still. */
   inCart: boolean;
+  /** The id of its entry's words, which describe the button. */
+  describedBy: string;
   onPut: () => void;
 }) {
   // Once shown, the in-cart words keep their room when recorded, so Dismiss
@@ -341,7 +359,7 @@ function PutInCart({
   shownInCart.current ||= inCart;
   if (!added) {
     return (
-      <button type="button" onClick={onPut}>
+      <button type="button" aria-describedby={describedBy} onClick={onPut}>
         {say(label)}
       </button>
     );
