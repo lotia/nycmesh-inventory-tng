@@ -100,11 +100,12 @@ export function Scanner({
   // The newest onCode, so a refreshed catalogue is read from at once.
   const handle = useRef(onCode);
   handle.current = onCode;
-  // A phrase, said as shown, the words onCode said, or why the camera
-  // could not be used.
-  const said = useSignal<MessageDescriptor | string | Refusal>(STARTING);
+  // A phrase, or said as shown: the words onCode said.
+  const said = useSignal<MessageDescriptor | string>(STARTING);
+  // Why the camera could not be used, once it was refused.
+  const refused = useSignal<Refusal | null>(null);
   const torch = useSignal<((on: boolean) => Promise<void>) | null>(null);
-  const refusal = isRefusal(said.value) ? said.value : null;
+  const refusal = refused.value;
 
   // Done went with the refusal: Reload page takes the focus, unless
   // something else on the page holds it.
@@ -163,7 +164,7 @@ export function Scanner({
         }
         const outcome = outcomeOf(error);
         report.refused(outcome);
-        said.value = REFUSALS[outcome];
+        refused.value = REFUSALS[outcome];
       },
     );
     // Reported as the page is hidden or left, which may be the last of it.
@@ -206,55 +207,45 @@ export function Scanner({
       {/* A refusal is a problem, in the alert's style (CONTRIBUTING,
           Styles); a new element, so it is announced as it appears. */}
       {refusal === null ? (
-        <p role="status">
-          <Said said={said.value as MessageDescriptor | string} />
-        </p>
-      ) : (
-        <p role="alert">
-          <AlertWords
-            note={{
-              bold: [say(refusal.bold)],
-              plain: [" ", say(refusal.plain)],
-            }}
-          />
-        </p>
-      )}
-      {refusal === null ? (
-        <div class="actions">
-          {torch.value !== null && (
-            <Torch
-              turn={torch.value}
-              onFail={() => {
-                said.value = TORCH_FAILED;
-              }}
-            />
-          )}
-          <button type="button" onClick={onDone}>
-            {say(DONE)}
-          </button>
-        </div>
-      ) : (
-        refusal.reload && (
+        <>
+          <p role="status">
+            {typeof said.value === "string" ? said.value : say(said.value)}
+          </p>
           <div class="actions">
-            <button type="button" ref={reloadButton} onClick={reload}>
-              {say(RELOAD_PAGE)}
+            {torch.value !== null && (
+              <Torch
+                turn={torch.value}
+                onFail={() => {
+                  said.value = TORCH_FAILED;
+                }}
+              />
+            )}
+            <button type="button" onClick={onDone}>
+              {say(DONE)}
             </button>
           </div>
-        )
+        </>
+      ) : (
+        <>
+          <p role="alert">
+            <AlertWords
+              note={{
+                bold: [say(refusal.bold)],
+                plain: [" ", say(refusal.plain)],
+              }}
+            />
+          </p>
+          {refusal.reload && (
+            <div class="actions">
+              <button type="button" ref={reloadButton} onClick={reload}>
+                {say(RELOAD_PAGE)}
+              </button>
+            </div>
+          )}
+        </>
       )}
     </section>
   );
-}
-
-function isRefusal(
-  said: MessageDescriptor | string | Refusal,
-): said is Refusal {
-  return typeof said !== "string" && "bold" in said;
-}
-
-/** What the camera said last, short of a refusal. */
-function Said({ said }: { said: MessageDescriptor | string }) {
-  return <>{typeof said === "string" ? said : say(said)}</>;
 }
 
 /** Turns the camera's torch on and off. */

@@ -1,4 +1,5 @@
 import { act, fireEvent, render, screen } from "@testing-library/preact";
+import type { ComponentProps } from "preact";
 import { afterEach, beforeEach, expect, test, vi } from "vitest";
 import { say } from "../shared/i18n";
 import { telemetry } from "../shared/telemetry";
@@ -34,6 +35,22 @@ beforeEach(() => {
 });
 afterEach(() => vi.restoreAllMocks());
 
+/** A Scanner on `open`'s camera, reading nothing and done or reloaded
+ * to no effect unless a test says. */
+function scanner(
+  props: Pick<ComponentProps<typeof Scanner>, "open"> &
+    Partial<ComponentProps<typeof Scanner>>,
+) {
+  return render(
+    <Scanner
+      onCode={() => said("")}
+      onDone={() => {}}
+      reload={() => {}}
+      {...props}
+    />,
+  );
+}
+
 const said = (words: string, label: LabelKind = "item"): Acted => ({
   said: words,
   label,
@@ -63,9 +80,7 @@ function slowRead() {
 test("a label in view is taken once, and said what it did", async () => {
   const { state, open } = camera();
   const onCode = vi.fn((code: string) => said(`Read ${code}.`));
-  render(
-    <Scanner open={open} onCode={onCode} onDone={() => {}} reload={() => {}} />,
-  );
+  scanner({ open, onCode });
   await screen.findByText(say(POINT));
   state.inView = ["B3ZT9W"];
   await pass();
@@ -78,14 +93,7 @@ test("a label in view is taken once, and said what it did", async () => {
 test("Done stops the camera", async () => {
   const { state, open } = camera();
   const onDone = vi.fn();
-  const { unmount } = render(
-    <Scanner
-      open={open}
-      onCode={() => said("")}
-      onDone={onDone}
-      reload={() => {}}
-    />,
-  );
+  const { unmount } = scanner({ open, onDone });
   // There while it starts, too, with the picture shown; what it says
   // then, and while it points, is a status, not an alert.
   screen.getByRole("button", { name: say(DONE) });
@@ -107,14 +115,7 @@ test("the torch shows where the camera has one, and switches", async () => {
       lit.push(on);
     },
   });
-  render(
-    <Scanner
-      open={open}
-      onCode={() => said("")}
-      onDone={() => {}}
-      reload={() => {}}
-    />,
-  );
+  scanner({ open });
   const torch = await screen.findByRole("button", { name: say(TORCH) });
   fireEvent.click(torch);
   await vi.waitFor(() =>
@@ -125,14 +126,7 @@ test("the torch shows where the camera has one, and switches", async () => {
 });
 
 test("no torch, no button", async () => {
-  render(
-    <Scanner
-      open={camera().open}
-      onCode={() => said("")}
-      onDone={() => {}}
-      reload={() => {}}
-    />,
-  );
+  scanner({ open: camera().open });
   await screen.findByText(say(POINT));
   expect(screen.queryByRole("button", { name: say(TORCH) })).toBeNull();
 });
@@ -145,14 +139,7 @@ test("a camera closed before it opened is stopped when it does", async () => {
     new Promise<Session>((resolve) => {
       opened = resolve;
     });
-  const { unmount } = render(
-    <Scanner
-      open={late}
-      onCode={() => said("")}
-      onDone={() => {}}
-      reload={() => {}}
-    />,
-  );
+  const { unmount } = scanner({ open: late });
   // Closed, and only then does the camera open.
   act(unmount);
   opened(await open());
@@ -167,14 +154,10 @@ test("a frame that cannot be read yet is skipped", async () => {
     .fn<() => Promise<string[]>>()
     .mockRejectedValueOnce(new Error("not ready"))
     .mockResolvedValue(["K7QX2M"]);
-  render(
-    <Scanner
-      open={camera({ read }).open}
-      onCode={(code) => said(`Read ${code}.`)}
-      onDone={() => {}}
-      reload={() => {}}
-    />,
-  );
+  scanner({
+    open: camera({ read }).open,
+    onCode: (code) => said(`Read ${code}.`),
+  });
   await screen.findByText(say(POINT));
   await pass(2);
   await screen.findByText("Read K7QX2M.");
@@ -182,14 +165,10 @@ test("a frame that cannot be read yet is skipped", async () => {
 
 test("a slow read is waited for, not piled on", async () => {
   const { read, finish } = slowRead();
-  render(
-    <Scanner
-      open={camera({ read }).open}
-      onCode={(code) => said(`Read ${code}.`)}
-      onDone={() => {}}
-      reload={() => {}}
-    />,
-  );
+  scanner({
+    open: camera({ read }).open,
+    onCode: (code) => said(`Read ${code}.`),
+  });
   await screen.findByText(say(POINT));
   // Three reads' time, the first still reading: no second is begun.
   await pass(3);
@@ -204,14 +183,7 @@ test("a torch that won't switch says so", async () => {
       throw new DOMException("busy", "NotReadableError");
     },
   });
-  render(
-    <Scanner
-      open={open}
-      onCode={() => said("")}
-      onDone={() => {}}
-      reload={() => {}}
-    />,
-  );
+  scanner({ open });
   fireEvent.click(await screen.findByRole("button", { name: say(TORCH) }));
   await screen.findByText(say(TORCH_FAILED));
 });
@@ -219,14 +191,7 @@ test("a torch that won't switch says so", async () => {
 test("a label read as the camera closes is not taken", async () => {
   const { read, finish } = slowRead();
   const onCode = vi.fn(() => said(""));
-  const { unmount } = render(
-    <Scanner
-      open={camera({ read }).open}
-      onCode={onCode}
-      onDone={() => {}}
-      reload={() => {}}
-    />,
-  );
+  const { unmount } = scanner({ open: camera({ read }).open, onCode });
   await screen.findByText(say(POINT));
   await pass();
   expect(read).toHaveBeenCalledTimes(1);
@@ -241,9 +206,7 @@ test("a session is reported as the camera closes, with its labels by kind", asyn
   const { state, open } = camera();
   const onCode = (code: string) =>
     said("", code.startsWith("P") ? "place" : "item");
-  const { unmount } = render(
-    <Scanner open={open} onCode={onCode} onDone={() => {}} reload={() => {}} />,
-  );
+  const { unmount } = scanner({ open, onCode });
   await screen.findByText(say(POINT));
   state.inView = ["B3ZT9W", "PL4CE1"];
   await pass();
@@ -260,7 +223,7 @@ test("a session is reported as the camera closes, with its labels by kind", asyn
   );
 });
 
-/** The status line's words: the refusal's bold heading, then its hint. */
+/** The alert's words: the refusal's bold heading, then its hint. */
 const refusalWords = (refusal: Refusal) =>
   `${say(refusal.bold)} ${say(refusal.plain)}`;
 
@@ -272,14 +235,7 @@ async function refusedWith(error: unknown, refusal: Refusal) {
   const refused = async () => {
     throw error;
   };
-  render(
-    <Scanner
-      open={refused}
-      onCode={() => said("")}
-      onDone={() => {}}
-      reload={reload}
-    />,
-  );
+  scanner({ open: refused, reload });
   const bold = await screen.findByText(say(refusal.bold));
   expect(bold.tagName).toBe("STRONG");
   // A refusal is a problem: said as an alert, and no status remains.
@@ -359,14 +315,7 @@ test("Done while the camera opens is reported as cancelled, not refused", async 
     new Promise<Session>((_, reject) => {
       abort = reject;
     });
-  const { unmount } = render(
-    <Scanner
-      open={opening}
-      onCode={() => said("")}
-      onDone={() => {}}
-      reload={() => {}}
-    />,
-  );
+  const { unmount } = scanner({ open: opening });
   act(unmount);
   // The picture's play interrupted as its video left the page.
   abort(new DOMException("interrupted", "AbortError"));
@@ -381,14 +330,7 @@ test("a camera that opens while the page is hidden is reported then", async () =
   const sessions = reported();
   const { open } = camera();
   setVisibility("hidden");
-  render(
-    <Scanner
-      open={open}
-      onCode={() => said("")}
-      onDone={() => {}}
-      reload={() => {}}
-    />,
-  );
+  scanner({ open });
   await vi.waitFor(() =>
     expect(sessions()).toEqual([
       expect.objectContaining({ outcome: "opened" }),
@@ -406,14 +348,7 @@ test("a camera that opens while the page is hidden is reported then", async () =
 test("a page hidden or left with the camera open reports it then", async () => {
   const sessions = reported();
   const { open } = camera();
-  render(
-    <Scanner
-      open={open}
-      onCode={() => said("")}
-      onDone={() => {}}
-      reload={() => {}}
-    />,
-  );
+  scanner({ open });
   await screen.findByText(say(POINT));
   show("hidden");
   window.dispatchEvent(new Event("pagehide"));
