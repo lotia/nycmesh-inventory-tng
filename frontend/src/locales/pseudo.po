@@ -19,10 +19,6 @@ msgstr ""
 msgid "What is on an open package"
 msgstr ""
 
-#: src/scan/Scanner.tsx
-msgid "Close the other app using it, then press Camera again, or find items in the list."
-msgstr ""
-
 #: src/shared/outbox-notes.ts
 msgid "{tries, plural, one {The inventory keeps failing on this batch ({status}, # try). It is kept and tried again; please report this.} other {The inventory keeps failing on this batch ({status}, # tries). It is kept and tried again; please report this.}}"
 msgstr ""
@@ -62,6 +58,10 @@ msgstr ""
 
 #: src/scan/OpenPackageCard.tsx
 msgid "What's on the {name} now ({unit}), if you can tell"
+msgstr ""
+
+#: src/scan/Scanner.tsx
+msgid "Allow it in the browser's settings, then reload the page, or find items in the list."
 msgstr ""
 
 #: src/scan/OutboxList.tsx
@@ -129,10 +129,6 @@ msgstr ""
 msgid "{name}: {amount}, new"
 msgstr ""
 
-#: src/scan/Scanner.tsx
-msgid "Find items in the list instead."
-msgstr ""
-
 #: src/scan/OlderList.tsx
 msgid "That one was changed in another tab. Check it again."
 msgstr ""
@@ -175,6 +171,10 @@ msgstr ""
 
 #: src/scan/batch.ts
 msgid "Pick where it goes."
+msgstr ""
+
+#: src/scan/Scanner.tsx
+msgid "Check the connection, then reload the page."
 msgstr ""
 
 #: src/scan/batch.ts
@@ -284,6 +284,10 @@ msgstr ""
 
 #: src/scan/OpenPackageCard.tsx
 msgid "Cut or take from the {name} opened {date} ({unit})"
+msgstr ""
+
+#: src/scan/Scanner.tsx
+msgid "Check the phone's settings allow this browser to use the camera, then restart the browser, or find items in the list."
 msgstr ""
 
 #: src/scan/OlderList.tsx
@@ -423,6 +427,10 @@ msgstr ""
 msgid "Recorded in another tab in transaction {transaction}"
 msgstr ""
 
+#: src/scan/Scanner.tsx
+msgid "No camera could be found."
+msgstr ""
+
 #: src/scan/batch.ts
 msgid "Add something to the cart."
 msgstr ""
@@ -441,6 +449,10 @@ msgstr ""
 
 #: src/scan/OpenPackageCard.tsx
 msgid "Read the length printed on the cable where it leaves the spool. If it counts up from the start, what's left is the package size minus the mark."
+msgstr ""
+
+#: src/scan/Scanner.tsx
+msgid "Ask an administrator for the page's https address, or find items in the list."
 msgstr ""
 
 #: src/scan/Finder.tsx
@@ -497,10 +509,6 @@ msgstr ""
 
 #: src/scan/OlderList.tsx
 msgid "A cart: something"
-msgstr ""
-
-#: src/scan/Scanner.tsx
-msgid "Check the connection, then press Done and try again."
 msgstr ""
 
 #: src/scan/CartForm.tsx
@@ -689,6 +697,10 @@ msgstr ""
 msgid "The inventory's rules refuse this as sent: it changed since the page loaded. Load the page again, and do it again"
 msgstr ""
 
+#: src/scan/Scanner.tsx
+msgid "The camera needs a secure connection."
+msgstr ""
+
 #: src/scan/OlderList.tsx
 msgid "Kept on this device, not sent."
 msgstr ""
@@ -803,8 +815,16 @@ msgstr ""
 msgid "{amount} {unit} over"
 msgstr ""
 
+#: src/scan/Scanner.tsx
+msgid "Reload page"
+msgstr ""
+
 #: src/scan/CartLine.tsx
 msgid "{amount} {unit} in all"
+msgstr ""
+
+#: src/scan/Scanner.tsx
+msgid "Close the other app using it, then reload the page, or find items in the list."
 msgstr ""
 
 #: src/scan/older-builds.ts
@@ -817,10 +837,6 @@ msgstr ""
 
 #: src/scan/batch.ts
 msgid "Pick your name."
-msgstr ""
-
-#: src/scan/Scanner.tsx
-msgid "No camera could be opened."
 msgstr ""
 
 #: src/scan/OutboxList.tsx
@@ -992,8 +1008,4 @@ msgstr ""
 #. A clause of where a save was for; clauses that apply follow in this order, joined by spaces: at or from, to, for install.
 #: src/scan/OlderList.tsx
 msgid "from {place}"
-msgstr ""
-
-#: src/scan/Scanner.tsx
-msgid "Allow it in the browser's settings, then press Camera again, or find items in the list."
 msgstr ""

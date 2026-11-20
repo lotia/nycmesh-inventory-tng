@@ -489,6 +489,7 @@ const COVERED: Record<string, () => Promise<HTMLElement[]>> = {
       <Scanner
         onCode={() => ({ said: "Κουτί", label: "item" })}
         onDone={() => {}}
+        reload={() => {}}
         open={open}
       />,
     );
@@ -503,17 +504,36 @@ const COVERED: Record<string, () => Promise<HTMLElement[]>> = {
     for (const refusal of [
       new DecoderUnavailable(),
       new DOMException("no", "NotAllowedError"),
+      new DOMException("busy", "NotReadableError"),
       new Error("none"),
     ]) {
       render(
         <Scanner
           onCode={() => ({ said: "", label: "unknown" })}
           onDone={() => {}}
+          reload={() => {}}
           open={() => Promise.reject(refusal)}
         />,
       );
     }
     await new Promise((settled) => setTimeout(settled, 0));
+    return [document.body];
+  },
+  "the camera, off HTTPS": async () => {
+    vi.stubGlobal("isSecureContext", false);
+    try {
+      render(
+        <Scanner
+          onCode={() => ({ said: "", label: "unknown" })}
+          onDone={() => {}}
+          reload={() => {}}
+          open={() => Promise.reject(new TypeError("no mediaDevices"))}
+        />,
+      );
+      await new Promise((settled) => setTimeout(settled, 0));
+    } finally {
+      vi.unstubAllGlobals();
+    }
     return [document.body];
   },
   "an open package's card, as each cut ends it": async () => {

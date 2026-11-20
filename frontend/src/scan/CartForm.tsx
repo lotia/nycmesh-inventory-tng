@@ -107,6 +107,7 @@ export function CartForm({
   older,
   adder,
   rester,
+  reload,
 }: {
   catalogue: Catalogue;
   /** The outbox's batches it does not show (unseen-batches.ts, unseen). */
@@ -123,6 +124,8 @@ export function CartForm({
   /** Given what puts a refused batch's other lines in this cart
    * (addRest). */
   rester: { current: AddRest | null };
+  /** Refresh this page, offered where the camera was refused (Scanner). */
+  reload: () => void;
 }) {
   const store = useMemo(() => new CartStore(catalogue), []);
   // The open packages to take from, and how many are sealed where, as the
@@ -766,6 +769,7 @@ export function CartForm({
           onDone={() => {
             scanning.value = false;
           }}
+          reload={reload}
         />
       ) : (
         <button type="button" onClick={() => (scanning.value = true)}>

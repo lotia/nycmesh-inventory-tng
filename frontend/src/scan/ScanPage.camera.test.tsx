@@ -25,14 +25,18 @@ import {
   YOUR_NAME,
 } from "./CartForm";
 import { REMOVE } from "./CartLine";
+import { openCamera } from "./camera";
 import { freshCart, KIND_WORDS, storeCart } from "./cart";
 import { FIND } from "./Finder";
 import { DISMISS } from "./OutboxList";
-import { DONE, POINT } from "./Scanner";
+import { DONE, NOT_ALLOWED, POINT, RELOAD_PAGE } from "./Scanner";
 import { COULD_NOT_LOAD } from "./ScanPage";
 
 // The camera, faked: it sees whatever a test puts in `inView`.
-vi.mock("./camera", () => ({ openCamera: vi.fn() }));
+vi.mock(import("./camera"), async (actual) => ({
+  ...(await actual()),
+  openCamera: vi.fn(),
+}));
 
 describe("scanning labels with the camera", () => {
   // The camera's clock, faked: scan lets a read's time pass (testing/setup.ts
@@ -325,5 +329,20 @@ describe("scanning labels with the camera", () => {
     await screen.findByText("That label isn't in the inventory (OLD-FORM).");
     fireEvent.click(screen.getByRole("button", { name: say(DONE) }));
     screen.getByRole("button", { name: say(SCAN_WITH_CAMERA) });
+  });
+
+  test("a camera not allowed offers to reload the page", async () => {
+    vi.mocked(openCamera).mockRejectedValueOnce(
+      new DOMException("no", "NotAllowedError"),
+    );
+    const reload = vi.fn();
+    open(server().api, reload);
+    await ready();
+    fireEvent.click(
+      screen.getByRole("button", { name: say(SCAN_WITH_CAMERA) }),
+    );
+    await screen.findByText(say(NOT_ALLOWED.bold));
+    fireEvent.click(screen.getByRole("button", { name: say(RELOAD_PAGE) }));
+    expect(reload).toHaveBeenCalledOnce();
   });
 });

@@ -19,10 +19,6 @@ msgstr "That's me"
 msgid "What is on an open package"
 msgstr "What is on an open package"
 
-#: src/scan/Scanner.tsx
-msgid "Close the other app using it, then press Camera again, or find items in the list."
-msgstr "Close the other app using it, then press Camera again, or find items in the list."
-
 #: src/shared/outbox-notes.ts
 msgid "{tries, plural, one {The inventory keeps failing on this batch ({status}, # try). It is kept and tried again; please report this.} other {The inventory keeps failing on this batch ({status}, # tries). It is kept and tried again; please report this.}}"
 msgstr "{tries, plural, one {The inventory keeps failing on this batch ({status}, # try). It is kept and tried again; please report this.} other {The inventory keeps failing on this batch ({status}, # tries). It is kept and tried again; please report this.}}"
@@ -63,6 +59,10 @@ msgstr "a removed package or item"
 #: src/scan/OpenPackageCard.tsx
 msgid "What's on the {name} now ({unit}), if you can tell"
 msgstr "What's on the {name} now ({unit}), if you can tell"
+
+#: src/scan/Scanner.tsx
+msgid "Allow it in the browser's settings, then reload the page, or find items in the list."
+msgstr "Allow it in the browser's settings, then reload the page, or find items in the list."
 
 #: src/scan/OutboxList.tsx
 msgid "Dismiss"
@@ -129,10 +129,6 @@ msgstr "Not recorded."
 msgid "{name}: {amount}, new"
 msgstr "{name}: {amount}, new"
 
-#: src/scan/Scanner.tsx
-msgid "Find items in the list instead."
-msgstr "Find items in the list instead."
-
 #: src/scan/OlderList.tsx
 msgid "That one was changed in another tab. Check it again."
 msgstr "That one was changed in another tab. Check it again."
@@ -176,6 +172,10 @@ msgstr "Added back to cart. Review before Record."
 #: src/scan/batch.ts
 msgid "Pick where it goes."
 msgstr "Pick where it goes."
+
+#: src/scan/Scanner.tsx
+msgid "Check the connection, then reload the page."
+msgstr "Check the connection, then reload the page."
 
 #: src/scan/batch.ts
 msgid "Move: {items} from {from} to {to}"
@@ -285,6 +285,10 @@ msgstr "Count whole packages: {package}."
 #: src/scan/OpenPackageCard.tsx
 msgid "Cut or take from the {name} opened {date} ({unit})"
 msgstr "Cut or take from the {name} opened {date} ({unit})"
+
+#: src/scan/Scanner.tsx
+msgid "Check the phone's settings allow this browser to use the camera, then restart the browser, or find items in the list."
+msgstr "Check the phone's settings allow this browser to use the camera, then restart the browser, or find items in the list."
 
 #: src/scan/OlderList.tsx
 msgid "Saying what is on open packages"
@@ -423,6 +427,10 @@ msgstr "Could not read previously added items, scan them again."
 msgid "Recorded in another tab in transaction {transaction}"
 msgstr "Recorded in another tab in transaction {transaction}"
 
+#: src/scan/Scanner.tsx
+msgid "No camera could be found."
+msgstr "No camera could be found."
+
 #: src/scan/batch.ts
 msgid "Add something to the cart."
 msgstr "Add something to the cart."
@@ -442,6 +450,10 @@ msgstr "There is no such row"
 #: src/scan/OpenPackageCard.tsx
 msgid "Read the length printed on the cable where it leaves the spool. If it counts up from the start, what's left is the package size minus the mark."
 msgstr "Read the length printed on the cable where it leaves the spool. If it counts up from the start, what's left is the package size minus the mark."
+
+#: src/scan/Scanner.tsx
+msgid "Ask an administrator for the page's https address, or find items in the list."
+msgstr "Ask an administrator for the page's https address, or find items in the list."
 
 #: src/scan/Finder.tsx
 msgid "Nothing matches “{typed}”."
@@ -498,10 +510,6 @@ msgstr "Go to the scan page"
 #: src/scan/OlderList.tsx
 msgid "A cart: something"
 msgstr "A cart: something"
-
-#: src/scan/Scanner.tsx
-msgid "Check the connection, then press Done and try again."
-msgstr "Check the connection, then press Done and try again."
 
 #: src/scan/CartForm.tsx
 msgid "{place}: to here."
@@ -689,6 +697,10 @@ msgstr "<0>Register it</0>, then come back."
 msgid "The inventory's rules refuse this as sent: it changed since the page loaded. Load the page again, and do it again"
 msgstr "The inventory's rules refuse this as sent: it changed since the page loaded. Load the page again, and do it again"
 
+#: src/scan/Scanner.tsx
+msgid "The camera needs a secure connection."
+msgstr "The camera needs a secure connection."
+
 #: src/scan/OlderList.tsx
 msgid "Kept on this device, not sent."
 msgstr "Kept on this device, not sent."
@@ -803,9 +815,17 @@ msgstr "{package} ({size} {unit})"
 msgid "{amount} {unit} over"
 msgstr "{amount} {unit} over"
 
+#: src/scan/Scanner.tsx
+msgid "Reload page"
+msgstr "Reload page"
+
 #: src/scan/CartLine.tsx
 msgid "{amount} {unit} in all"
 msgstr "{amount} {unit} in all"
+
+#: src/scan/Scanner.tsx
+msgid "Close the other app using it, then reload the page, or find items in the list."
+msgstr "Close the other app using it, then reload the page, or find items in the list."
 
 #: src/scan/older-builds.ts
 msgid "{n}. {words}"
@@ -818,10 +838,6 @@ msgstr "<0>Register this browser</0> to send what is waiting."
 #: src/scan/batch.ts
 msgid "Pick your name."
 msgstr "Pick your name."
-
-#: src/scan/Scanner.tsx
-msgid "No camera could be opened."
-msgstr "No camera could be opened."
 
 #: src/scan/OutboxList.tsx
 msgid "Held until you upgrade."
@@ -993,7 +1009,3 @@ msgstr "What is happening"
 #: src/scan/OlderList.tsx
 msgid "from {place}"
 msgstr "from {place}"
-
-#: src/scan/Scanner.tsx
-msgid "Allow it in the browser's settings, then press Camera again, or find items in the list."
-msgstr "Allow it in the browser's settings, then press Camera again, or find items in the list."

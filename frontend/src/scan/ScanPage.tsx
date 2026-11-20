@@ -42,7 +42,8 @@ export function ScanPage({
 }: {
   api?: Api;
   outbox?: Outbox;
-  /** Refresh this page, to load a newer build (scan.tsx). */
+  /** Refresh this page, to load a newer build or retry the camera
+   * (scan.tsx). */
   reload: () => void;
 }) {
   const loaded = useSignal<Loaded>({ state: "loading" });
@@ -219,6 +220,7 @@ export function ScanPage({
           older={older}
           adder={adder}
           rester={rester}
+          reload={reload}
         />
       )}
       <OutboxList
