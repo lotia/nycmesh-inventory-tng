@@ -16,6 +16,7 @@ from sqlalchemy.orm import Session
 from inventory_tng.admins.guards import AdminSignedIn, SignedIn
 from inventory_tng.catalogue.paths import ITEMS
 from inventory_tng.core.db_errors import attempt
+from inventory_tng.core.db_once_committed import once_committed
 from inventory_tng.core.db_sessions import DbSession
 from inventory_tng.core.local_time import site_zone
 from inventory_tng.core.phrases import gettext, lazy_gettext
@@ -60,14 +61,6 @@ add_notices(
 
 def close_title(package: str) -> str:
     return gettext("Close this %(package)s as used up?", package=package)
-
-
-cleared = meter.create_counter(
-    "inventory.open_packages.cleared",
-    unit="{package}",
-    description="Volunteers' reports of open packages used up that an "
-    "administrator cleared, as not used up",
-)
 
 
 # Reported used up, and waiting.
@@ -150,7 +143,6 @@ def _answer(
     rows = queries.open_with_ids(session, list(ids), *REPORTED)
     ledger.lock_places(session, (row.location_id for row in rows))
     changed = 0
-    closed: list[open_packages.Closed | None] = []
     for row in sorted(rows, key=lambda each: each.id):
         if answer == "clear":
             changed += open_packages.clear(session, row.id)
@@ -158,22 +150,19 @@ def _answer(
         done, _ = attempt(
             session,
             lambda row=row: open_packages.close(
-                session, row.id, signed.admin.id, now(), reported=True
+                session, row.id, signed.admin.id, now(), how="confirmed", reported=True
             ),
         )
-        closed.append(done)
         changed += done is not None
-    session.commit()
-    if answer == "confirm":
-        open_packages.measure_closing("confirmed", closed)
-    elif changed:
-        cleared.add(changed)
-    log.info(
+    once_committed(
+        session,
+        log.info,
         "reports of used up answered",
         do=answer,
         changed=changed,
         admin_id=signed.admin.id,
     )
+    session.commit()
     return redirect(
         back.link(), notice=DONE[answer] if changed else "used_up_unchanged"
     )
@@ -252,6 +241,5 @@ def close_directly(
         session, lambda: open_packages.close(session, open_id, signed.admin.id, now())
     )
     session.commit()
-    open_packages.measure_closing("direct", [done])
     notice = "open_package_closed" if done is not None else "used_up_unchanged"
     return redirect(f"{ITEMS}/{item_id}", notice=notice, section="open-packages")

@@ -315,7 +315,7 @@ def test_counting_an_open_package_twice_under_its_key_writes_once(
     assert count(Decimal(290), Decimal(305)) is None
     assert left_on(session, made) == 300
     # Nothing to settle: said so.
-    assert open_packages.settle_check(session, made.id, "/") is False
+    assert open_packages.settle_check(session, made.id, "/", how="left") is False
 
 
 def test_a_report_since_the_page_was_shown_is_not_settled_unseen(
@@ -465,7 +465,7 @@ def test_a_report_of_one_closed_is_not_kept(session: Session, spools: Spools) ->
     transaction = session.scalars(select(LedgerTransaction)).first()
     assert transaction is not None
     assert not open_packages.report_length(
-        made, Decimal(1), spools.place.volunteer.id, transaction
+        session, made, Decimal(1), spools.place.volunteer.id, transaction
     )
     session.refresh(made)
     assert made.length_reported is None

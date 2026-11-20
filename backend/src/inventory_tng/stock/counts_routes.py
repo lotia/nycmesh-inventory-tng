@@ -61,7 +61,6 @@ from inventory_tng.stock import needs_action, open_packages, over_recorded, quer
 from inventory_tng.stock.balance import countable, takeable
 from inventory_tng.stock.counts import (
     Counted,
-    lines_withheld,
     record_adjustment,
     record_count,
 )
@@ -581,10 +580,6 @@ def count(
             items=sent_items,
             shown=shown,
         )
-    closed: list[open_packages.Closed | None] = []
-    # Recorded more than moved, closed by this count at each end.
-    settled = 0
-
     # An item counted by its total holds loose units alone (_forms): with
     # an open package of it found, its total is its loose units.
     found_item = forms.found[0].item_id if forms.found else None
@@ -594,7 +589,6 @@ def count(
     ]
 
     def put_right() -> Counted:
-        nonlocal settled
         # The place, then the items, as every count and save takes them
         # (stock/ledger.py), before a package found is held.
         lock_place(session, place.id)
@@ -629,13 +623,12 @@ def count(
         emptied: list[tuple[int, Form]] = []
         for open_id, reason in forms.close:
             done = open_packages.close(
-                session, open_id, signed.admin.id, now(), reason=reason
+                session, open_id, signed.admin.id, now(), how="count", reason=reason
             )
-            closed.append(done)
             if done is not None:
                 item_id = session.get_one(OpenPackage, open_id).item_id
                 emptied.append((item_id, Form(open_package_id=open_id)))
-        settled = over_recorded.counted(
+        over_recorded.counted(
             session,
             signed.admin.id,
             place.id,
@@ -694,9 +687,6 @@ def count(
         )
     assert result is not None
     session.commit()
-    lines_withheld(signed.admin.id, place.id, result.withheld)
-    open_packages.measure_closing("count", closed)
-    over_recorded.measure_counted(settled)
     if not result.moved:
         return redirect(
             COUNTS,

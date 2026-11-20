@@ -99,7 +99,7 @@ def _correct(
     if transaction is None:
         return []
     written = Written(transaction.id, kind, len(lines))
-    once_committed(session, lambda: _recorded(admin_id, written))
+    once_committed(session, _recorded, admin_id, written)
     return [written]
 
 
@@ -110,8 +110,6 @@ class Counted(NamedTuple):
     moved: dict[int, tuple[Decimal, Decimal]]
     # What this send wrote: nothing if an earlier send of it did.
     written: list[Written]
-    # How many lines it withheld that no earlier send of it did.
-    withheld: int
     # What this send put right, as of its moment: each item counted by its
     # total (no form), and each form of one counted by form. Nothing if an
     # earlier send of it did.
@@ -129,17 +127,15 @@ def _recorded(admin_id: int, transaction: Written) -> None:
     )
 
 
-def lines_withheld(admin_id: int, location_id: int, lines: int) -> None:
-    """Measure and log a count's lines withheld (Counted.withheld), called
-    once committed, so a failed commit and its retry count once."""
-    if lines:
-        withheld.add(lines)
-        log.info(
-            "count lines withheld",
-            location_id=location_id,
-            admin_id=admin_id,
-            lines=lines,
-        )
+def _withheld(admin_id: int, location_id: int, lines: int) -> None:
+    """Measure and log a count's lines withheld as moved, once committed."""
+    withheld.add(lines)
+    log.info(
+        "count lines withheld",
+        location_id=location_id,
+        admin_id=admin_id,
+        lines=lines,
+    )
 
 
 def _first_sent(session: Session, location_id: int, *keys: uuid.UUID) -> int | None:
@@ -276,13 +272,10 @@ def record_count(
     if sent is None:
         put_right = [(item_id, None) for item_id in sorted(kept)]
         put_right += [(item_id, form) for item_id, form, _ in kept_forms]
-    return Counted(
-        bool(into or out),
-        moved,
-        written,
-        len(moved) if sent is None else 0,
-        put_right,
-    )
+        # Withheld by no earlier send of it.
+        if moved:
+            once_committed(session, _withheld, admin_id, location_id, len(moved))
+    return Counted(bool(into or out), moved, written, put_right)
 
 
 class OpenCounted(NamedTuple):

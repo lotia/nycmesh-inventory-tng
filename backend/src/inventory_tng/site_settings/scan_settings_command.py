@@ -11,7 +11,6 @@ Changes are history, as the command line (system:cli).
 import argparse
 from collections.abc import Sequence
 
-import structlog
 from sqlalchemy.orm import Session
 
 from inventory_tng.core.db_sessions import CLI_ACTOR, set_actor
@@ -19,8 +18,6 @@ from inventory_tng.core.operator_commands import run_command
 from inventory_tng.models.base import whole
 from inventory_tng.models.site_settings import NAME_CHECK_MINUTES, ScanSettings
 from inventory_tng.site_settings import scan_settings
-
-log = structlog.get_logger(__name__)
 
 
 def minutes(text: str) -> int:
@@ -60,7 +57,6 @@ def run(session: Session, args: argparse.Namespace) -> int:
         # No form: what the operator types is meant to replace what is there.
         current = scan_settings.change(session, args.name_check_minutes, seen=None)
         session.flush()
-        log.info("scan settings changed", name_check_minutes=args.name_check_minutes)
     else:
         current = session.get_one(ScanSettings, 1)
     print(f"name check: {scan_settings.describe(current.name_check_minutes)}")

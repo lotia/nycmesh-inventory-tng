@@ -1,9 +1,12 @@
 """Work done once a session's transaction commits, such as measuring and
 logging what it wrote: so a commit that fails, and the retry after it,
 does it once. Work asked for in a savepoint rolled back, or in a
-transaction rolled back, is never done."""
+transaction rolled back, is never done. The project's one way to measure
+and log a write: the function that writes registers it, so every caller
+is counted (CONTRIBUTING.md, Logging)."""
 
 from collections.abc import Callable
+from functools import partial
 
 import structlog
 from sqlalchemy import event
@@ -18,13 +21,19 @@ PENDING_INFO = "inventory.once_committed"
 log = structlog.get_logger(__name__)
 
 
-def once_committed(session: Session, work: Callable[[], None]) -> None:
-    """Do `work` once the session's transaction commits: asked for after
-    a write, so in a transaction already begun."""
+def once_committed(
+    session: Session, work: Callable[..., object], *args: object, **kwargs: object
+) -> None:
+    """Call `work(*args, **kwargs)` once the session's transaction commits:
+    asked for after a write, so in a transaction already begun. The
+    arguments are taken now, as the commit expires rows and no SQL may
+    run then: `once_committed(session, log.info, "saved", item_id=item.id)`."""
     asked = innermost(session)
     if asked is None:
         raise RuntimeError("work after commit asked for outside a transaction")
-    session.info.setdefault(PENDING_INFO, []).append((asked, work))
+    session.info.setdefault(PENDING_INFO, []).append(
+        (asked, partial(work, *args, **kwargs))
+    )
 
 
 @event.listens_for(Session, "after_commit")

@@ -18,6 +18,7 @@ from inventory_tng.admins import accounts, activity, mail_messages
 from inventory_tng.admins.guards import AdminSignedIn, ConfirmedAdmin, SignedIn, changed
 from inventory_tng.core.db_errors import RuleBroken, refusal
 from inventory_tng.core.db_locking import settings_row
+from inventory_tng.core.db_once_committed import once_committed
 from inventory_tng.core.db_sessions import DbSession
 from inventory_tng.core.mail import Notify
 from inventory_tng.core.phrases import Words, lazy_gettext
@@ -135,7 +136,6 @@ def save_scan_settings(
     if broken is not None:
         return _changed(request, session, signed)
     session.commit()
-    log.info("scan settings changed", name_check_minutes=minutes)
     return redirect(SETTINGS, notice="settings_saved", section="scan-page")
 
 
@@ -157,7 +157,6 @@ def add_reason(
         problems = {"reason": problem or forms.REASON_TAKEN}
         return _page(request, session, signed, problems=problems)
     session.commit()
-    log.info("adjustment reason added", adjustment_reason_id=added.id)
     return redirect(SETTINGS, notice="added", section="reasons")
 
 
@@ -180,11 +179,11 @@ def change_reason(
 
     def change() -> None:
         if action == "retire":
-            adjustment_reasons.retire(reason, now())
+            adjustment_reasons.retire(session, reason, now())
         elif action == "restore":
-            adjustment_reasons.restore(reason)
+            adjustment_reasons.restore(session, reason)
         else:
-            adjustment_reasons.rename(reason, name, seen=form_version(version))
+            adjustment_reasons.rename(session, reason, name, seen=form_version(version))
 
     problem = name_problem(name)
     if problem is None:
@@ -200,7 +199,6 @@ def change_reason(
             problems={f"reason_{reason_id}": problem},
         )
     session.commit()
-    log.info("adjustment reason changed", adjustment_reason_id=reason_id, action=action)
     notice = {"retire": "reason_retired", "restore": "restored"}
     return redirect(SETTINGS, notice=notice.get(action, "saved"), section="reasons")
 
@@ -235,8 +233,8 @@ def save_sign_in_settings(
         notify,
         others=mail_messages.sign_in_settings_changed(current),
     )
+    once_committed(session, log.info, "sign-in settings changed", **chosen)
     changed(signed, session)
-    log.info("sign-in settings changed", **chosen)
     return redirect(SETTINGS, notice="saved", section="sign-in")
 
 
@@ -258,6 +256,7 @@ def save_site_settings(
 
     def save() -> None:
         site.time_zone = time_zone
+        once_committed(session, log.info, "site time zone changed")
 
     _, broken = refusal(session, save, "site_settings_time_zone")
     if broken is not None:
@@ -269,5 +268,4 @@ def save_site_settings(
             values={"time_zone": time_zone, "site_version": site_version},
         )
     session.commit()
-    log.info("site time zone changed")
     return redirect(SETTINGS, notice="site_saved", section="time-zone")

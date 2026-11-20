@@ -23,6 +23,7 @@ from sqlalchemy.orm import Session
 
 from inventory_tng.admins.guards import AdminSignedIn, SignedIn
 from inventory_tng.core.db_errors import RuleBroken, attempt
+from inventory_tng.core.db_once_committed import once_committed
 from inventory_tng.core.db_sessions import DbSession
 from inventory_tng.core.local_time import site_zone
 from inventory_tng.core.phrases import Words, lazy_gettext
@@ -291,7 +292,7 @@ def _set(
     key = uuid.uuid5(row.key, f"length {seen}")
 
     def both() -> tuple[bool, int]:
-        if not open_packages.settle_check(session, open_id, seen):
+        if not open_packages.settle_check(session, open_id, seen, how="set"):
             raise RuleBroken("length_unchanged")
         # Moved since its place was locked: its place is not, so nothing
         # more is locked holding it (stock/ledger.py's lock order).
@@ -317,7 +318,8 @@ def _set(
             counted.written,
             [(row.item_id, ledger.Form(open_package_id=open_id))],
         )
-        return open_packages.left_below_zero(row, counted.shows, now()), closed
+        below = open_packages.left_below_zero(session, row, counted.shows, now())
+        return below, closed
 
     done, broken = attempt(session, both)
     below, closed = done or (False, 0)
@@ -359,21 +361,23 @@ def _answer(
     the page is shown."""
     places = queries.places_of_open(session, [each.open_id for each in answers])
     ledger.lock_places(session, places)
-    set_, left_, below, closed = 0, 0, 0, 0
+    set_, left_ = 0, 0
     for each in sorted(answers):
         if each.left is None:
-            left_ += open_packages.settle_check(session, each.open_id, each.seen)
+            left_ += open_packages.settle_check(
+                session, each.open_id, each.seen, how="left"
+            )
         else:
-            done, still_below, counted = _set(session, signed.admin.id, each, places)
-            set_ += done
-            below += still_below
-            closed += counted
+            set_ += _set(session, signed.admin.id, each, places)[0]
+    once_committed(
+        session,
+        log.info,
+        "length checks answered",
+        set=set_,
+        left=left_,
+        admin_id=signed.admin.id,
+    )
     session.commit()
-    open_packages.measure_checks_settled("set", set_)
-    open_packages.measure_checks_settled("left", left_)
-    open_packages.measure_checks_raised("below_zero", below)
-    over_recorded.measure_counted(closed)
-    log.info("length checks answered", set=set_, left=left_, admin_id=signed.admin.id)
     if set_:
         notice = "length_set"
     elif left_:

@@ -443,9 +443,11 @@ def bring_back(
         # After the place, as answer() takes them: one settled meanwhile
         # brings nothing back.
         over_recorded.waiting(session, check_id, seen)
+        if brought:
+            over_recorded.brought_back(session, check_id, location.id, signed.admin.id)
         return brought
 
-    brought, broken = attempt(session, restore)
+    _, broken = attempt(session, restore)
     session.commit()
     if broken is not None:
         log.info(
@@ -458,14 +460,6 @@ def bring_back(
             return redirect(view.link(), notice="over_recorded_unchanged")
         alert = not_changed(rule_words(broken))
         return _page(request, signed, session, only, view, alert=alert)
-    if brought:
-        over_recorded.measure_brought_back()
-        log.info(
-            "over recorded place brought back",
-            over_recorded_id=check_id,
-            location_id=location.id,
-            admin_id=signed.admin.id,
-        )
     return redirect(
         view.link(), notice="over_recorded_brought_back", brought=str(location.id)
     )
@@ -564,7 +558,6 @@ def answer(
         return _page(
             request, signed, session, only, view, values=values, refused=refused
         )
-    over_recorded.measure_settled(how, reason if do == "checked" else None)
     notice = f"over_recorded_{how}"
     if do == "count":
         # By how it was settled, not by what was written: an adjustment

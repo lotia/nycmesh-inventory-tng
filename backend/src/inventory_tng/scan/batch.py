@@ -13,7 +13,6 @@ import uuid
 from collections import Counter, defaultdict
 from collections.abc import Collection, Mapping, Sequence
 from decimal import Decimal
-from types import MappingProxyType
 from typing import Literal, NamedTuple, cast
 
 import structlog
@@ -22,6 +21,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from inventory_tng.core.db_errors import RuleBroken
+from inventory_tng.core.db_once_committed import once_committed
 from inventory_tng.models.catalogue import ItemPackage
 from inventory_tng.models.stock import LedgerTransaction, Movement, OpenPackage
 from inventory_tng.models.volunteers import Volunteer
@@ -57,6 +57,40 @@ refused = meter.create_counter(
     # bug and are not counted here.
     description="Batches refused for naming rows that do not exist, for "
     "a package resized since the page read it, or for reusing a key, by reason",
+)
+recorded = meter.create_counter(
+    "inventory.transactions.recorded",
+    unit="{transaction}",
+    description="Batches written to the ledger, by kind",
+)
+lines_per_batch = meter.create_histogram(
+    "inventory.transaction.lines",
+    unit="{line}",
+    description="Lines in each batch written, by kind: an item is on one "
+    "line for each package and one loose",
+)
+packages_opened = meter.create_counter(
+    "inventory.packages.opened",
+    unit="{package}",
+    description="Sealed packages opened, by what each became: an open package "
+    "followed until used up, or loose units",
+)
+taken_from = meter.create_counter(
+    "inventory.open_packages.taken",
+    unit="{line}",
+    description="Lines of batches taken from an open package, by how: cut "
+    "loose, or the package moved whole",
+)
+packages_reported = meter.create_counter(
+    "inventory.packages.reported",
+    unit="{package}",
+    description="Open packages volunteers reported used up, by how: asked as a "
+    "cut took all one showed, or by its button",
+)
+at_retired_place = meter.create_counter(
+    "inventory.transactions.at_retired_place",
+    unit="{transaction}",
+    description="Batches written to or from a retired place, by side",
 )
 
 
@@ -98,15 +132,8 @@ def retired_sides(
 
 class Recorded(NamedTuple):
     transaction: LedgerTransaction
-    # Whether this call wrote it, and if so, the sides at a retired place.
+    # Whether this call wrote it.
     written: bool
-    retired: Sequence[Side] = ()
-    # How many packages an opening opened, by what they became.
-    opened: Mapping[Into, int] = MappingProxyType({})
-    # How many open packages it reported used up, by how.
-    reported: Mapping[Reported, int] = MappingProxyType({})
-    # How many checks of what an open package has it raised, by how.
-    checks: Mapping[open_packages.CheckRaised, int] = MappingProxyType({})
 
 
 def entry_of(line: batch_schemas.Line, kind: str, opened: int | None = None) -> Entry:
@@ -134,7 +161,8 @@ def record(
     session: Session, batch: batch_schemas.Batch, *, device_id: int | None
 ) -> Recorded:
     """Write the batch, or find the one already written with its key. The
-    caller commits.
+    caller commits; one written is measured and logged once committed
+    (_recorded).
 
     A batch already written is not checked again: the catalogue may have
     changed since, and the volunteer must not be asked to fix what is saved."""
@@ -231,23 +259,18 @@ def record(
     for number, open_id in taken.items():
         if not batch.lines[number].whole:
             cuts[open_id] += batch.lines[number].quantity
-    checks: dict[open_packages.CheckRaised, int] = {
-        "volunteer": sum(
-            open_packages.report_length(
-                rows[measured[each.open_package_key]],
-                each.left,
-                batch.volunteer_id,
-                transaction,
-            )
-            for each in lengths
-        ),
-        "below_zero": sum(
-            open_packages.went_below_zero(
-                rows[open_id], opens[open_id].left, cut, transaction.created_at
-            )
-            for open_id, cut in cuts.items()
-        ),
-    }
+    for each in lengths:
+        open_packages.report_length(
+            session,
+            rows[measured[each.open_package_key]],
+            each.left,
+            batch.volunteer_id,
+            transaction,
+        )
+    for open_id, cut in cuts.items():
+        open_packages.went_below_zero(
+            session, rows[open_id], opens[open_id].left, cut, transaction.created_at
+        )
     # Said with a cut from it, or alone, taking nothing from it.
     cut = {line.open_package_key for line in batch.lines}
     how: dict[Reported, int] = {}
@@ -255,7 +278,49 @@ def record(
         if open_id in reported:
             way: Reported = "cut" if key in cut else "button"
             how[way] = how.get(way, 0) + 1
-    return Recorded(transaction, True, retired, opened, how, checks)
+    once_committed(session, _recorded, batch, transaction.id, retired, opened, how)
+    return Recorded(transaction, True)
+
+
+def _recorded(
+    batch: batch_schemas.Batch,
+    transaction_id: int,
+    retired: Sequence[Side],
+    opened: Mapping[Into, int],
+    reported: Mapping[Reported, int],
+) -> None:
+    """Measure and log a batch written, once committed: the sides at a
+    retired place, the packages an opening opened by what they became, and
+    the open packages it reported used up by how."""
+    recorded.add(1, {"kind": batch.kind})
+    if batch.lines:
+        lines_per_batch.record(len(batch.lines), {"kind": batch.kind})
+    for into, packages in opened.items():
+        packages_opened.add(packages, {"into": into})
+    if batch.kind != "open":
+        for line in batch.lines:
+            if line.open_package_key is not None:
+                taken_from.add(1, {"how": "whole" if line.whole else "cut"})
+    for how, packages in reported.items():
+        packages_reported.add(packages, {"how": how})
+    log.info(
+        "transaction recorded",
+        transaction_id=transaction_id,
+        kind=batch.kind,
+        lines=len(batch.lines),
+        volunteer_id=batch.volunteer_id,
+    )
+    for side in retired:
+        at_retired_place.add(1, {"side": side})
+    if retired:
+        # Accepted, as a volunteer's work is never lost; the place shows as
+        # holding stock until it is counted (docs/decisions/0003).
+        log.warning(
+            "transaction at a retired place",
+            transaction_id=transaction_id,
+            from_location_id=batch.from_location_id,
+            to_location_id=batch.to_location_id,
+        )
 
 
 # What an opened package became: an open package, followed, or loose units.
@@ -316,7 +381,9 @@ def _opening(
                 for key in _opening_keys(batch, number, count)
             ]
             if len(ids) > 1:
-                log.info(
+                once_committed(
+                    session,
+                    log.info,
                     "opening line split into open packages",
                     item_package_id=line.package_id,
                     packages=len(ids),

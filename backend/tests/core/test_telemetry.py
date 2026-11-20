@@ -438,7 +438,7 @@ def test_counts_count_lines_withheld(rolled_back: Recorded, session: Session) ->
         session, uuid.uuid4(), ada.id, place.store.id, radios, shown
     )
     assert result.moved == {place.item.id: (Decimal(0), Decimal(3))}
-    counts.lines_withheld(ada.id, place.store.id, result.withheld)
+    session.commit()
     assert counted(reader, "inventory.count.lines.withheld")[()] >= 1
 
 

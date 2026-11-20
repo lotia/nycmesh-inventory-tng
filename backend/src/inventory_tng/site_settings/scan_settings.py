@@ -7,10 +7,14 @@ The page reads them with the catalogue, which an open page fetches again
 every ten minutes. Changes are history.
 """
 
+import structlog
 from sqlalchemy.orm import Session
 
 from inventory_tng.core.db_locking import Seen, settings_row
+from inventory_tng.core.db_once_committed import once_committed
 from inventory_tng.models.site_settings import ScanSettings
+
+log = structlog.get_logger(__name__)
 
 
 def change(session: Session, name_check_minutes: int, *, seen: Seen) -> ScanSettings:
@@ -18,6 +22,12 @@ def change(session: Session, name_check_minutes: int, *, seen: Seen) -> ScanSett
     (NAME_CHECK_MINUTES), which the page and the command check first."""
     current = settings_row(session, ScanSettings, seen=seen)
     current.name_check_minutes = name_check_minutes
+    once_committed(
+        session,
+        log.info,
+        "scan settings changed",
+        name_check_minutes=name_check_minutes,
+    )
     return current
 
 

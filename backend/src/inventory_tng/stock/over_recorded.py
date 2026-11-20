@@ -26,6 +26,7 @@ from sqlalchemy.orm import Session
 
 from inventory_tng.core.db_errors import RuleBroken
 from inventory_tng.core.db_locking import get_locked, locked
+from inventory_tng.core.db_once_committed import once_committed
 from inventory_tng.core.phrases import lazy_gettext
 from inventory_tng.models.stock import (
     LedgerTransaction,
@@ -99,25 +100,38 @@ def raise_checks(session: Session, over: Mapping[int, Decimal]) -> int:
         ).returning(OverRecorded.id)
     ).all()
     for (check_id,) in changed:
-        log.info("over recorded raised", over_recorded_id=check_id)
+        once_committed(
+            session, log.info, "over recorded raised", over_recorded_id=check_id
+        )
+    if changed:
+        once_committed(session, raised_counter.add, len(changed))
     return len(changed)
 
 
-def measure_raised(count: int) -> None:
-    """Measured once committed."""
-    if count:
-        raised_counter.add(count)
-
-
-def measure_settled(how: Settled, reason: str | None = None) -> None:
-    """One settled, measured once committed; marked checked, by its
+def _measure_settled(
+    session: Session, how: Settled, count: int = 1, reason: str | None = None
+) -> None:
+    """Those settled, measured once committed; marked checked, by its
     reason (CHECKED_REASONS), never its words."""
-    settled_counter.add(1, {"how": how} | ({"reason": reason} if reason else {}))
+    if count:
+        attributes = {"how": how} | ({"reason": reason} if reason else {})
+        once_committed(session, settled_counter.add, count, attributes)
 
 
-def measure_brought_back() -> None:
-    """A place brought back to correct one there, measured once committed."""
-    brought_back_counter.add(1)
+def brought_back(
+    session: Session, check_id: int, location_id: int, admin_id: int
+) -> None:
+    """A retired place brought back to correct one there: measured and
+    logged once committed."""
+    once_committed(session, brought_back_counter.add, 1)
+    once_committed(
+        session,
+        log.info,
+        "over recorded place brought back",
+        over_recorded_id=check_id,
+        location_id=location_id,
+        admin_id=admin_id,
+    )
 
 
 def seen(row: OverRecorded) -> str:
@@ -214,7 +228,10 @@ def mark_checked(
     row = _settle(session, check_id, seen_as, admin_id, "checked")
     row.checked_reason = reason
     row.checked_words = words
-    log.info(
+    _measure_settled(session, "checked", reason=reason)
+    once_committed(
+        session,
+        log.info,
         "over recorded checked",
         over_recorded_id=check_id,
         admin_id=admin_id,
@@ -275,12 +292,17 @@ def _right(
     )
 
 
-def _closed_right(row: OverRecorded, admin_id: int) -> None:
+def _closed_right(session: Session, row: OverRecorded, admin_id: int) -> None:
     """Settle one whose every end is put right already as counted, writing
     nothing (Ali, 2026-11-15, inventory-tng-dro)."""
     _settled(row, admin_id, "counted")
-    log.info(
-        "over recorded closed as right", over_recorded_id=row.id, admin_id=admin_id
+    _measure_settled(session, "counted")
+    once_committed(
+        session,
+        log.info,
+        "over recorded closed as right",
+        over_recorded_id=row.id,
+        admin_id=admin_id,
     )
 
 
@@ -294,7 +316,7 @@ def close(session: Session, check_id: int, seen_as: str, admin_id: int) -> None:
     row = waiting(session, check_id, seen_as)
     if not _right(row, *_read(session, row)):
         raise RuleBroken("over_recorded_unchanged")
-    _closed_right(row, admin_id)
+    _closed_right(session, row, admin_id)
 
 
 def correct(session: Session, check_id: int, seen_as: str, admin_id: int) -> Settled:
@@ -314,12 +336,14 @@ def correct(session: Session, check_id: int, seen_as: str, admin_id: int) -> Set
     row = waiting(session, check_id, seen_as)
     movement, transaction, closed = _read(session, row)
     if _right(row, movement, transaction, closed):
-        _closed_right(row, admin_id)
+        _closed_right(session, row, admin_id)
         return "counted"
     _settled(row, admin_id, "corrected")
     reason = adjustment_reasons.seeded(session, REASON)
     if closed:
-        log.info(
+        once_committed(
+            session,
+            log.info,
             "over recorded closed end skipped",
             over_recorded_id=check_id,
             open_package_id=movement.to_open_package_id,
@@ -352,7 +376,14 @@ def correct(session: Session, check_id: int, seen_as: str, admin_id: int) -> Set
             reason_id=reason.id,
             form=ledger.Form(package_id, open_id),
         )
-    log.info("over recorded corrected", over_recorded_id=check_id, admin_id=admin_id)
+    _measure_settled(session, "corrected")
+    once_committed(
+        session,
+        log.info,
+        "over recorded corrected",
+        over_recorded_id=check_id,
+        admin_id=admin_id,
+    )
     return "corrected"
 
 
@@ -379,8 +410,13 @@ def confirm_count(
     ):
         raise RuleBroken("over_recorded_not_whole")
     if count == movement.quantity:
-        log.info(
-            "over recorded confirmed", over_recorded_id=check_id, admin_id=admin_id
+        _measure_settled(session, "checked")
+        once_committed(
+            session,
+            log.info,
+            "over recorded confirmed",
+            over_recorded_id=check_id,
+            admin_id=admin_id,
         )
         return "checked"
     row.settled_how = "corrected"
@@ -395,8 +431,13 @@ def confirm_count(
         reason_id=adjustment_reasons.seeded(session, REASON).id,
         form=ledger.Form(movement.to_package_id, open_id),
     )
-    log.info(
-        "over recorded count corrected", over_recorded_id=check_id, admin_id=admin_id
+    _measure_settled(session, "corrected")
+    once_committed(
+        session,
+        log.info,
+        "over recorded count corrected",
+        over_recorded_id=check_id,
+        admin_id=admin_id,
     )
     return "corrected"
 
@@ -501,7 +542,7 @@ def counted(
             and (by_total or (item_id, left) in forms)
         ):
             row.left_count_id = count_id
-            _end_counted(row.id, "left", count_id, admin_id)
+            _end_counted(session, row.id, "left", count_id, admin_id)
         if (
             arrived_at == place_id
             and row.arrived_count_id is None
@@ -512,7 +553,7 @@ def counted(
             )
         ):
             row.arrived_count_id = count_id
-            _end_counted(row.id, "arrived", count_id, admin_id)
+            _end_counted(session, row.id, "arrived", count_id, admin_id)
         if _all_right(
             left_at,
             arrived_at,
@@ -523,12 +564,15 @@ def counted(
         ):
             _settled(row, admin_id, "counted")
             closed += 1
-            log.info(
+            once_committed(
+                session,
+                log.info,
                 "over recorded counted",
                 over_recorded_id=row.id,
                 ledger_transaction_id=count_id,
                 admin_id=admin_id,
             )
+    _measure_settled(session, "counted", closed)
     return closed
 
 
@@ -569,26 +613,27 @@ def open_package_closed(
     ).all()
     for row in found:
         _settled(row, admin_id, "counted", at)
-        log.info(
+        once_committed(
+            session,
+            log.info,
             "over recorded closed",
             over_recorded_id=row.id,
             open_package_id=open_id,
             admin_id=admin_id,
         )
+    _measure_settled(session, "counted", len(found))
     return len(found)
 
 
-def _end_counted(check_id: int, end: str, count_id: int, admin_id: int) -> None:
-    log.info(
+def _end_counted(
+    session: Session, check_id: int, end: str, count_id: int, admin_id: int
+) -> None:
+    once_committed(
+        session,
+        log.info,
         "over recorded end counted",
         over_recorded_id=check_id,
         end=end,
         ledger_transaction_id=count_id,
         admin_id=admin_id,
     )
-
-
-def measure_counted(closed: int) -> None:
-    """Those a count closed, measured once committed."""
-    if closed:
-        settled_counter.add(closed, {"how": "counted"})

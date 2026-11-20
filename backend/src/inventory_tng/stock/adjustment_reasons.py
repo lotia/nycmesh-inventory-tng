@@ -12,6 +12,7 @@ from sqlalchemy import exc, func, select
 from sqlalchemy.orm import Session
 
 from inventory_tng.core.db_locking import Seen, get_locked, unchanged
+from inventory_tng.core.db_once_committed import once_committed
 from inventory_tng.models.stock import AdjustmentReason
 
 log = structlog.get_logger(__name__)
@@ -50,13 +51,11 @@ def seeded(session: Session, name: str) -> AdjustmentReason:
             return session.scalars(
                 named.where(AdjustmentReason.retired_at.is_(None))
             ).one()
-        log.info("adjustment reason added", adjustment_reason_id=reason.id)
         return reason
     if reason.retired_at is not None:
         relocked = locked(session, reason.id)
         assert relocked is not None  # Read just now; reasons are never deleted.
-        restore(relocked)
-        log.info("adjustment reason restored", adjustment_reason_id=reason.id)
+        restore(session, relocked)
     return reason
 
 
@@ -70,17 +69,35 @@ def add(session: Session, name: str) -> AdjustmentReason:
     reason = AdjustmentReason(name=name)
     session.add(reason)
     session.flush()
+    once_committed(
+        session, log.info, "adjustment reason added", adjustment_reason_id=reason.id
+    )
     return reason
 
 
-def rename(reason: AdjustmentReason, name: str, *, seen: Seen) -> None:
+def _changed(session: Session, reason: AdjustmentReason, action: str) -> None:
+    once_committed(
+        session,
+        log.info,
+        "adjustment reason changed",
+        adjustment_reason_id=reason.id,
+        action=action,
+    )
+
+
+def rename(
+    session: Session, reason: AdjustmentReason, name: str, *, seen: Seen
+) -> None:
     unchanged(reason, seen)
     reason.name = name
+    _changed(session, reason, "rename")
 
 
-def retire(reason: AdjustmentReason, at: datetime) -> None:
+def retire(session: Session, reason: AdjustmentReason, at: datetime) -> None:
     reason.retired_at = at
+    _changed(session, reason, "retire")
 
 
-def restore(reason: AdjustmentReason) -> None:
+def restore(session: Session, reason: AdjustmentReason) -> None:
     reason.retired_at = None
+    _changed(session, reason, "restore")

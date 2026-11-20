@@ -36,6 +36,7 @@ from sqlalchemy.orm import Session
 
 from inventory_tng.core.db_errors import enforce
 from inventory_tng.core.db_locking import get_locked, locked
+from inventory_tng.core.db_once_committed import once_committed
 from inventory_tng.core.db_sessions import exists_where
 from inventory_tng.core.local_time import zone_at
 from inventory_tng.models.catalogue import Item, ItemPackage
@@ -535,8 +536,12 @@ def insert_transaction(
             open_id = line.arrives.open_package_id
             if open_id is not None and line.leaves == line.arrives and places[1]:
                 opened[open_id].location_id = places[1]
-                log.info(
-                    "open package moved", open_package_id=open_id, location_id=places[1]
+                once_committed(
+                    session,
+                    log.info,
+                    "open package moved",
+                    open_package_id=open_id,
+                    location_id=places[1],
                 )
         if transaction.kind == "receipt":
             _receive(session, lines)

@@ -19,6 +19,7 @@ from sqlalchemy.orm import Session
 
 from inventory_tng.core.db_errors import enforce
 from inventory_tng.core.db_locking import get_locked, locked
+from inventory_tng.core.db_once_committed import once_committed
 from inventory_tng.models.catalogue import Item, ItemPackage
 from inventory_tng.models.places import Location
 from inventory_tng.models.stock import LedgerTransaction, OpenPackage
@@ -39,6 +40,12 @@ closed = meter.create_counter(
     unit="{package}",
     description="Open packages an administrator closed, by how: confirming a "
     "volunteer's report, directly, or counting",
+)
+cleared = meter.create_counter(
+    "inventory.open_packages.cleared",
+    unit="{package}",
+    description="Volunteers' reports of open packages used up that an "
+    "administrator cleared, as not used up",
 )
 
 
@@ -63,16 +70,12 @@ checks_settled = meter.create_counter(
 )
 
 
-def measure_checks_raised(how: CheckRaised, count: int) -> None:
-    """Measured once committed."""
-    if count:
-        checks_raised.add(count, {"how": how})
+def _check_raised(session: Session, how: CheckRaised) -> None:
+    once_committed(session, checks_raised.add, 1, {"how": how})
 
 
-def measure_checks_settled(how: CheckSettled, count: int) -> None:
-    """Measured once committed."""
-    if count:
-        checks_settled.add(count, {"how": how})
+def _check_settled(session: Session, how: CheckSettled) -> None:
+    once_committed(session, checks_settled.add, 1, {"how": how})
 
 
 def make(
@@ -117,7 +120,9 @@ def make(
                 raise
             made = found
         else:
-            log.info(
+            once_committed(
+                session,
+                log.info,
                 "open package made",
                 open_package_id=made.id,
                 package_id=package_id,
@@ -152,7 +157,9 @@ def report(
         if row.reported_at is None and row.closed_at is None:
             row.reported_at, row.reported_by_volunteer_id = at, volunteer_id
             reported.append(row.id)
-            log.info(
+            once_committed(
+                session,
+                log.info,
                 "open package reported used up",
                 open_package_id=row.id,
                 volunteer_id=volunteer_id,
@@ -161,6 +168,7 @@ def report(
 
 
 def report_length(
+    session: Session,
     row: OpenPackage,
     left: Decimal,
     volunteer_id: int,
@@ -177,7 +185,10 @@ def report_length(
     row.length_reported_by_volunteer_id = volunteer_id
     row.length_reported = left
     row.length_reported_in_id = transaction.id
-    log.info(
+    _check_raised(session, "volunteer")
+    once_committed(
+        session,
+        log.info,
         "open package length reported",
         open_package_id=row.id,
         volunteer_id=volunteer_id,
@@ -186,7 +197,7 @@ def report_length(
 
 
 def went_below_zero(
-    row: OpenPackage, before: Decimal, cut: Decimal, at: datetime
+    session: Session, row: OpenPackage, before: Decimal, cut: Decimal, at: datetime
 ) -> bool:
     """Ask an administrator to check an open package a save's `cut` took
     from nothing or more (`before`) to below zero: its records are wrong,
@@ -196,11 +207,16 @@ def went_below_zero(
     if row.below_zero_at is not None or not before - cut < 0 <= before:
         return False
     row.below_zero_at = at
-    log.info("open package went below zero", open_package_id=row.id)
+    _check_raised(session, "below_zero")
+    once_committed(
+        session, log.info, "open package went below zero", open_package_id=row.id
+    )
     return True
 
 
-def left_below_zero(row: OpenPackage, left: Decimal, at: datetime) -> bool:
+def left_below_zero(
+    session: Session, row: OpenPackage, left: Decimal, at: datetime
+) -> bool:
     """Ask again about an open package an administrator's Set left below
     zero, as cuts since took more than it had: its records are wrong still.
     Whether it asked. Call it holding the row, its check just settled, as
@@ -208,7 +224,13 @@ def left_below_zero(row: OpenPackage, left: Decimal, at: datetime) -> bool:
     if left >= 0:
         return False
     row.below_zero_at = at
-    log.info("open package left below zero by a set", open_package_id=row.id)
+    _check_raised(session, "below_zero")
+    once_committed(
+        session,
+        log.info,
+        "open package left below zero by a set",
+        open_package_id=row.id,
+    )
     return True
 
 
@@ -231,17 +253,22 @@ def check_seen(row: OpenPackage) -> str:
     return f"{row.length_reported_in_id or ''}/{below}"
 
 
-def settle_check(session: Session, open_id: int, seen: str) -> bool:
-    """A check of what an open package has, settled: cleared, whoever raised
-    it, if it is still as `seen` (check_seen). False if there is no such
-    package, nothing to settle, or it changed since it was seen."""
+def settle_check(
+    session: Session, open_id: int, seen: str, *, how: Literal["set", "left"]
+) -> bool:
+    """A check of what an open package has, settled `how`: cleared, whoever
+    raised it, if it is still as `seen` (check_seen). False if there is no
+    such package, nothing to settle, or it changed since it was seen."""
     row = get_locked(session, OpenPackage, open_id, key_share=True)
     if row is None or (row.length_reported_at is None and row.below_zero_at is None):
         return False
     if check_seen(row) != seen:
         return False
     _clear_check(row)
-    log.info("open package length check settled", open_package_id=row.id)
+    _check_settled(session, how)
+    once_committed(
+        session, log.info, "open package length check settled", open_package_id=row.id
+    )
     return True
 
 
@@ -254,12 +281,16 @@ class Closed(NamedTuple):
     over_recorded: int
 
 
+Closing = Literal["confirmed", "direct", "count"]
+
+
 def close(
     session: Session,
     open_id: int,
     admin_id: int,
     at: datetime,
     *,
+    how: Closing = "direct",
     reported: bool = False,
     reason: str = adjustment_reasons.USED_UP,
 ) -> Closed | None:
@@ -273,7 +304,8 @@ def close(
     waiting as recorded more than moved, its sealed end counted, closes as
     counted (over_recorded.open_package_closed). Its place is locked first,
     then it, then those, as a save's are (stock/ledger.py). RuleBroken as
-    counts.record_adjustment refuses."""
+    counts.record_adjustment refuses. Measured `how` it was closed: by
+    confirming a volunteer's report, directly, or by a count."""
     found = session.get(OpenPackage, open_id)
     if found is None:
         return None
@@ -303,23 +335,19 @@ def close(
     row.closed_at, row.closed_by_admin_id = at, admin_id
     # Nobody checks what a closed package has: closing settles its check.
     settled = _clear_check(row)
-    log.info("open package closed", open_package_id=row.id, admin_id=admin_id)
+    once_committed(session, closed.add, 1, {"how": how})
+    if settled:
+        _check_settled(session, "closed")
+    once_committed(
+        session,
+        log.info,
+        "open package closed",
+        open_package_id=row.id,
+        admin_id=admin_id,
+    )
     return Closed(
         settled, over_recorded.open_package_closed(session, row.id, admin_id, at)
     )
-
-
-def measure_closing(
-    how: Literal["confirmed", "direct", "count"], done: Iterable[Closed | None]
-) -> None:
-    """Packages closed and the checks that settled, measured once committed:
-    a check closed with its package counts as settled, and a line recorded
-    with more than was moved closed with it as counted."""
-    closed_now = [each for each in done if each is not None]
-    if closed_now:
-        closed.add(len(closed_now), {"how": how})
-    measure_checks_settled("closed", sum(each.check_settled for each in closed_now))
-    over_recorded.measure_counted(sum(each.over_recorded for each in closed_now))
 
 
 def clear(session: Session, open_id: int) -> bool:
@@ -329,7 +357,10 @@ def clear(session: Session, open_id: int) -> bool:
     if row is None or row.reported_at is None or row.closed_at is not None:
         return False
     row.reported_at, row.reported_by_volunteer_id = None, None
-    log.info("open package report cleared", open_package_id=row.id)
+    once_committed(session, cleared.add, 1)
+    once_committed(
+        session, log.info, "open package report cleared", open_package_id=row.id
+    )
     return True
 
 

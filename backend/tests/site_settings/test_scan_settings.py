@@ -25,6 +25,7 @@ def test_set_changes_it_and_says_so(
 ) -> None:
     with capture_logs() as logs:
         assert run(session, "set", "--name-check-minutes", "20") == 0
+        session.commit()  # As run_command does: logged once committed.
     assert session.get_one(ScanSettings, 1).name_check_minutes == 20
     assert capsys.readouterr().out == "name check: asks after 20 minutes unused\n"
     (line,) = [line for line in logs if line["event"] == "scan settings changed"]
