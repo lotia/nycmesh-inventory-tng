@@ -28,8 +28,10 @@ from collections.abc import Collection, Iterable
 from dataclasses import asdict, dataclass
 from datetime import UTC, datetime
 from decimal import Decimal
-from typing import Any
+from typing import Any, Literal
 
+import structlog
+from opentelemetry import metrics
 from sqlalchemy import (
     ColumnElement,
     Select,
@@ -55,6 +57,7 @@ from inventory_tng.core.db_locking import (
     relock,
     require_current,
 )
+from inventory_tng.core.db_once_committed import once_committed
 from inventory_tng.core.db_sessions import exists_where
 from inventory_tng.models.catalogue import (
     CURRENT_ALIAS,
@@ -69,6 +72,30 @@ from inventory_tng.models.labels import Label
 from inventory_tng.models.names import unit_key
 from inventory_tng.models.search_text import fold, fuzzy, in_ascii
 from inventory_tng.models.stock import Movement, OpenPackage
+
+log = structlog.get_logger(__name__)
+meter = metrics.get_meter(__name__)
+
+tracking_changed = meter.create_counter(
+    "inventory.package_tracking.changed",
+    unit="{change}",
+    description="Items or packages whose opened packages are followed, or "
+    "no longer, set by an administrator, by where it was set",
+)
+
+
+def _tracking_changed(
+    session: Session,
+    scope: Literal["item", "package", "bulk"],
+    changed: int,
+    track: bool | None,
+    **ids: int | list[int],
+) -> None:
+    """Measure and log changes once committed: `ids` names what changed."""
+    once_committed(session, tracking_changed.add, changed, {"scope": scope})
+    once_committed(
+        session, log.info, "package tracking changed", scope=scope, track=track, **ids
+    )
 
 
 def _in_current_category(session: Session, category_id: int) -> None:
@@ -301,6 +328,7 @@ def add(session: Session, fields: Fields) -> Item:
     item = Item(**asdict(fields))
     session.add(item)
     session.flush()
+    once_committed(session, log.info, "item added", item_id=item.id)
     return item
 
 
@@ -334,13 +362,30 @@ def save(session: Session, item: Item, fields: Fields, *, seen: Seen) -> Renamed
     swapped = _own_alias(session, item.id, keys) if renamed else None
     # Its own alias aside, swapped, as matched by either key: no other.
     _not_an_alias(session, keys, but=swapped)
+    if fields.track_opened != item.track_opened:
+        _tracking_changed(session, "item", 1, fields.track_opened, item_id=item.id)
     for column, value in asdict(fields).items():
         setattr(item, column, value)
+    once_committed(session, log.info, "item saved", item_id=item.id)
     if not renamed:
         return None
+    how = "rename" if swapped is None else "swap"
     if swapped is not None:
         _retire_alias(session, swapped, datetime.now(UTC))
-    return Renamed(_aliased(session, item, old), swapped)
+    kept = _aliased(session, item, old)
+    once_committed(
+        session, log.info, "alias added", item_id=item.id, item_alias_id=kept.id, by=how
+    )
+    if swapped is not None:
+        once_committed(
+            session,
+            log.info,
+            "alias removed",
+            item_id=item.id,
+            item_alias_id=swapped.id,
+            by=how,
+        )
+    return Renamed(kept, swapped)
 
 
 def _own_alias(session: Session, item_id: int, keys: Keys) -> ItemAlias | None:
@@ -386,7 +431,11 @@ def add_alias(session: Session, item: Item, name: str) -> ItemAlias:
     enforce("retired_read_only", when=item.retired_at is not None)
     keys = Keys.of(session, name)
     enforce(ALIAS_IS_NAME, when=exists_where(session, keys.match(Item)))
-    return _aliased(session, item, name)
+    alias = _aliased(session, item, name)
+    once_committed(
+        session, log.info, "alias added", item_id=item.id, item_alias_id=alias.id
+    )
+    return alias
 
 
 def remove_alias(session: Session, alias: ItemAlias, at: datetime) -> None:
@@ -397,17 +446,22 @@ def remove_alias(session: Session, alias: ItemAlias, at: datetime) -> None:
     _retire_alias(session, alias, at)
     enforce("retired_read_only", when=item.retired_at is not None)
     session.flush()
+    once_committed(
+        session, log.info, "alias removed", item_id=item.id, item_alias_id=alias.id
+    )
 
 
 def retire(session: Session, item: Item, at: datetime) -> None:
     relock(session, item, current=True)
     item.retired_at = at
+    once_committed(session, log.info, "item retired", item_id=item.id)
 
 
 def restore(session: Session, item: Item) -> None:
     relock(session, item, current=False)
     _in_current_category(session, item.category_id)
     item.retired_at = None
+    once_committed(session, log.info, "item restored", item_id=item.id)
 
 
 def add_package(session: Session, item: Item, name: str, size: Decimal) -> ItemPackage:
@@ -416,6 +470,7 @@ def add_package(session: Session, item: Item, name: str, size: Decimal) -> ItemP
     package = ItemPackage(item_id=item.id, name=name, size=size)
     session.add(package)
     session.flush()
+    once_committed(session, log.info, "package added", item_package_id=package.id)
     return package
 
 
@@ -438,6 +493,7 @@ def save_package(
     if size != package.size:
         enforce("package_size_fixed", when=bool(sizes_fixed(session, [package.id])))
     package.name, package.size = name, size
+    once_committed(session, log.info, "package saved", item_package_id=package.id)
 
 
 def sizes_fixed(session: Session, package_ids: Collection[int]) -> set[int]:
@@ -465,6 +521,7 @@ def restore_package(session: Session, package: ItemPackage) -> None:
     relock(session, package, current=False)
     _item_current(session, package)
     package.retired_at = None
+    once_committed(session, log.info, "package restored", item_package_id=package.id)
 
 
 def retire_package(session: Session, package: ItemPackage, at: datetime) -> None:
@@ -472,6 +529,7 @@ def retire_package(session: Session, package: ItemPackage, at: datetime) -> None
     relock(session, package, current=True)
     _item_current(session, package)
     package.retired_at = at
+    once_committed(session, log.info, "package retired", item_package_id=package.id)
 
 
 def track_package(session: Session, package: ItemPackage, track: bool | None) -> None:
@@ -480,6 +538,8 @@ def track_package(session: Session, package: ItemPackage, track: bool | None) ->
     for a retired package, read only as a retired item is."""
     relock(session, package, current=True)
     _item_current(session, package)
+    if track != package.track_opened:
+        _tracking_changed(session, "package", 1, track, item_package_id=package.id)
     package.track_opened = track
 
 
@@ -494,6 +554,14 @@ def package_settings(
     relock(session, package, current=True)
     _item_current(session, package)
     package.short_below, package.minimum_sealed = short_below, minimum_sealed
+    once_committed(
+        session,
+        log.info,
+        "package settings saved",
+        item_package_id=package.id,
+        short_below=short_below,
+        minimum_sealed=minimum_sealed,
+    )
 
 
 def track_items(session: Session, item_ids: Collection[int], track: bool) -> list[int]:
@@ -513,7 +581,10 @@ def track_items(session: Session, item_ids: Collection[int], track: bool) -> lis
     ).all()
     for item in changing:
         item.track_opened = track
-    return [item.id for item in changing]
+    changed = [item.id for item in changing]
+    if changed:
+        _tracking_changed(session, "bulk", len(changed), track, item_ids=changed)
+    return changed
 
 
 # Refused: a reading rule changed that would make names read alike.

@@ -10,7 +10,6 @@ from typing import Annotated, Literal
 import structlog
 from fastapi import APIRouter, Depends, Form, Request
 from fastapi.responses import Response
-from opentelemetry import metrics
 from sqlalchemy.orm import Session
 
 from inventory_tng.admins.guards import AdminSignedIn, SignedIn
@@ -37,7 +36,6 @@ from inventory_tng.web.navigation import SECTION_STOCK
 from inventory_tng.web.pages import add_notices, not_found, redirect
 
 log = structlog.get_logger(__name__)
-meter = metrics.get_meter(__name__)
 
 router = APIRouter(include_in_schema=False)
 

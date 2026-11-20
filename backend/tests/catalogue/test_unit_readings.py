@@ -113,6 +113,7 @@ def test_the_round_trip_dry_run_correct_dry_run_again_load(
     capsys.readouterr()
     with capture_logs() as logs:
         assert run_load(session, path) == 0
+        session.commit()  # As run_command does: logged once committed.
     g, m = rule_of(session, "g"), rule_of(session, "M")
     assert (g.reading, g.decided_by_admin_id) == ("Gbit/s", None)
     assert (m.reading, m.decided_by_admin_id) == (None, None)
@@ -305,7 +306,9 @@ def test_the_commands_run_as_operator_commands(
     stdin = io.TextIOWrapper(io.BytesIO(path.read_bytes()))
     monkeypatch.setattr(sys, "stdin", stdin)
     assert unit_readings_command.main(["load", "-"]) == 0
-    assert capsys.readouterr().out.splitlines()[-1].startswith("Loaded 2 rules")
+    # What it loaded is logged once committed, after what it prints.
+    out = capsys.readouterr().out.splitlines()
+    assert any(line.startswith("Loaded 2 rules") for line in out)
 
 
 def test_propose_refuses_outside_its_settings(

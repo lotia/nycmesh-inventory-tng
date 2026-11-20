@@ -7,7 +7,6 @@ from collections.abc import Mapping
 from dataclasses import dataclass, field
 from typing import Annotated
 
-import structlog
 from fastapi import APIRouter, Form, Request
 from fastapi.responses import HTMLResponse, Response
 from sqlalchemy.orm import Session
@@ -36,8 +35,6 @@ from inventory_tng.web.admin_pages import (
 from inventory_tng.web.forms import ALERTS, RULES, form_version, rule_words
 from inventory_tng.web.navigation import SECTION_LOCATIONS
 from inventory_tng.web.pages import not_found, redirect
-
-log = structlog.get_logger(__name__)
 
 router = APIRouter(include_in_schema=False)
 
@@ -168,7 +165,6 @@ def add_location(
     if location is None:
         return _list_page(request, session, signed, problems=problems, values=form)
     session.commit()
-    log.info("location added", location_id=location.id)
     return redirect(f"{LOCATIONS}/{location.id}", notice="added")
 
 
@@ -226,7 +222,6 @@ def save_location(
             request, session, signed, found, problem, values, field=field
         )
     session.commit()
-    log.info("location saved", location_id=location_id)
     return redirect(f"{LOCATIONS}/{location_id}", notice="saved")
 
 
@@ -242,7 +237,6 @@ def retire_location(
         problem = rule_words(broken, TAKEN)
         return _location_page(request, session, signed, found, problem)
     session.commit()
-    log.info("location retired", location_id=location_id)
     return redirect(LOCATIONS, notice="retired", undo=str(location_id))
 
 
@@ -257,5 +251,4 @@ def restore_location(
     if broken:
         return _location_page(request, session, signed, found, RULES[broken])
     session.commit()
-    log.info("location restored", location_id=location_id)
     return redirect(f"{LOCATIONS}/{location_id}", notice="restored")

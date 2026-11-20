@@ -130,7 +130,6 @@ def add_category(
     if added is None:
         return _list_page(request, session, signed, problem, name)
     session.commit()
-    log.info("category added", category_id=added.id)
     return redirect(CATEGORIES, notice="added")
 
 
@@ -172,7 +171,6 @@ def rename_category(
     if problem is not None:
         return _category_page(request, session, signed, found, problem)
     session.commit()
-    log.info("category renamed", category_id=category_id)
     return redirect(f"{CATEGORIES}/{category_id}", notice="saved")
 
 
@@ -192,7 +190,6 @@ def retire_category(
             request, session, signed, found, RULES["category_has_items"]
         )
     session.commit()
-    log.info("category retired", category_id=category_id)
     return redirect(CATEGORIES, notice="retired", undo=str(category_id))
 
 
@@ -204,5 +201,4 @@ def restore_category(session: DbSession, category_id: int) -> Response:
     # Its name is its own still: names are unique, retired ones too.
     categories.restore(session, found)
     session.commit()
-    log.info("category restored", category_id=category_id)
     return redirect(f"{CATEGORIES}/{category_id}", notice="restored")

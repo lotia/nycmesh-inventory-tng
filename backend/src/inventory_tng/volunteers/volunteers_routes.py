@@ -7,7 +7,6 @@ volunteers/volunteers.py's; this page says them in words."""
 from collections.abc import Mapping
 from typing import Annotated
 
-import structlog
 from fastapi import APIRouter, Depends, Form, Request
 from fastapi.responses import HTMLResponse, JSONResponse, Response
 from sqlalchemy import exists, func, not_
@@ -33,8 +32,6 @@ from inventory_tng.web.forms import ALERTS, RULES, form_version, rule_words
 from inventory_tng.web.listing import AskedView, Listing, Searched, Sort, Sorting
 from inventory_tng.web.navigation import SECTION_VOLUNTEERS
 from inventory_tng.web.pages import add_notices, not_found, redirect
-
-log = structlog.get_logger(__name__)
 
 router = APIRouter(include_in_schema=False)
 
@@ -226,7 +223,6 @@ def add_volunteer(
         values = {"name": name, "email": email}
         return _list_page(request, session, signed, problems=problems, values=values)
     session.commit()
-    log.info("volunteer added", volunteer_id=volunteer.id)
     return redirect(f"{VOLUNTEERS}/{volunteer.id}", notice="added")
 
 
@@ -272,7 +268,6 @@ def save_volunteer(
             request, session, signed, found, problems=problems, values=values
         )
     session.commit()
-    log.info("volunteer saved", volunteer_id=volunteer_id)
     return redirect(f"{VOLUNTEERS}/{volunteer_id}", notice="saved")
 
 
@@ -288,7 +283,6 @@ def hold_stock(
     if broken:
         return _refused(request, session, signed, found, rule_words(broken, TAKEN))
     session.commit()
-    log.info("custody started", volunteer_id=volunteer_id)
     return redirect(
         f"{VOLUNTEERS}/{volunteer_id}", notice="custody_on", section="holding"
     )
@@ -309,7 +303,6 @@ def stop_holding_stock(
         problem = STILL_HOLD
         return _refused(request, session, signed, found, problem)
     session.commit()
-    log.info("custody ended", volunteer_id=volunteer_id)
     return redirect(
         f"{VOLUNTEERS}/{volunteer_id}", notice="custody_off", section="holding"
     )
@@ -326,7 +319,6 @@ def retire_volunteer(
     if broken:
         return _refused(request, session, signed, found, rule_words(broken, TAKEN))
     session.commit()
-    log.info("volunteer retired", volunteer_id=volunteer_id)
     return redirect(VOLUNTEERS, notice="retired", undo=str(volunteer_id))
 
 
@@ -378,7 +370,6 @@ def merge_volunteer(
     if broken:
         return _refused(request, session, signed, found, rule_words(broken, TAKEN))
     session.commit()
-    log.info("volunteer merged", volunteer_id=volunteer_id, merged_into_id=into.id)
     return redirect(f"{VOLUNTEERS}/{volunteer_id}", notice="volunteer_merged")
 
 
@@ -393,5 +384,4 @@ def restore_volunteer(
     if broken:
         return _refused(request, session, signed, found, rule_words(broken, TAKEN))
     session.commit()
-    log.info("volunteer restored", volunteer_id=volunteer_id)
     return redirect(f"{VOLUNTEERS}/{volunteer_id}", notice="restored")

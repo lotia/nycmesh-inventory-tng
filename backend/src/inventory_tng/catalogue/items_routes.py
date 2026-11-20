@@ -4,12 +4,11 @@ change it. A retired item with stock left may still be taken, never
 received (docs/decisions/0003)."""
 
 from collections.abc import Callable, Mapping, Sequence
-from typing import Annotated, Literal
+from typing import Annotated
 
 import structlog
 from fastapi import APIRouter, Depends, Form, Request
 from fastapi.responses import HTMLResponse, JSONResponse, Response
-from opentelemetry import metrics
 from sqlalchemy.orm import Session
 
 from inventory_tng.admins.guards import AdminSignedIn, SignedIn
@@ -18,6 +17,7 @@ from inventory_tng.catalogue.items_listing import SEARCHED
 from inventory_tng.catalogue.paths import CATEGORIES, ITEMS, READINGS
 from inventory_tng.catalogue.reading_rules import NOT_A_UNIT
 from inventory_tng.core.db_errors import refusal, refusal_naming_index
+from inventory_tng.core.db_once_committed import once_committed
 from inventory_tng.core.db_sessions import DbSession, exists_where
 from inventory_tng.core.local_time import site_zone
 from inventory_tng.core.phrases import Words, lazy_gettext
@@ -62,7 +62,6 @@ from inventory_tng.web.navigation import SECTION_ITEMS
 from inventory_tng.web.pages import add_notices, not_found, redirect
 
 log = structlog.get_logger(__name__)
-meter = metrics.get_meter(__name__)
 
 router = APIRouter(include_in_schema=False)
 
@@ -177,25 +176,8 @@ add_notices(
     }
 )
 
-tracking_changed = meter.create_counter(
-    "inventory.package_tracking.changed",
-    unit="{change}",
-    description="Items or packages whose opened packages are followed, or "
-    "no longer, set by an administrator, by where it was set",
-)
 # What "Same as the item", "Track" and "Don't track" send for a package.
 TRACKING = {"": None, "on": True, "off": False}
-
-
-def _tracking_changed(
-    scope: Literal["item", "package", "bulk"],
-    changed: int,
-    track: bool | None,
-    **ids: int | list[int],
-) -> None:
-    """Measure and log changes once committed: `ids` names what changed."""
-    tracking_changed.add(changed, {"scope": scope})
-    log.info("package tracking changed", scope=scope, track=track, **ids)
 
 
 TextForm = Annotated[dict[str, str], Depends(text_form)]
@@ -385,10 +367,17 @@ def _deciding[T](
     return deciding
 
 
-def _decided(typed: forms.Typed, **ids: int) -> None:
+def _decided(session: Session, typed: forms.Typed, **ids: int) -> None:
     """Log the reading rules a form wrote, once committed."""
     if typed.decided:
-        log.info("reading rules set", reading_rule_ids=typed.decided, by="form", **ids)
+        once_committed(
+            session,
+            log.info,
+            "reading rules set",
+            reading_rule_ids=typed.decided,
+            by="form",
+            **ids,
+        )
 
 
 @router.get(ITEMS)
@@ -429,9 +418,8 @@ def add_item(
             )
     if item is None:
         return _list_page(request, session, signed, problems=problems, values=form)
+    _decided(session, typed, item_id=item.id)
     session.commit()
-    log.info("item added", item_id=item.id)
-    _decided(typed, item_id=item.id)
     return redirect(f"{ITEMS}/{item.id}", notice="added")
 
 
@@ -455,7 +443,6 @@ def track_items(
     session.commit()
     if not changed:
         return redirect(back, notice="tracking_same")
-    _tracking_changed("bulk", len(changed), track == "on", item_ids=changed)
     return redirect(back, notice=f"tracking_{track}")
 
 
@@ -488,7 +475,7 @@ def save_item(
     if found is None:
         return not_found()
     fields, problems, typed = forms.item_fields(session, form, item_id)
-    tracked, renamed = found.track_opened, None
+    renamed = None
     if fields is not None:
         seen = form_version(form.get("version", ""))
         same = forms.same_name(session, found, form, fields, typed)
@@ -513,18 +500,10 @@ def save_item(
         return _item_page(
             request, session, signed, found, problems=problems, values=form
         )
+    _decided(session, typed, item_id=item_id)
     session.commit()
-    log.info("item saved", item_id=item_id)
-    _decided(typed, item_id=item_id)
-    if fields is not None and fields.track_opened != tracked:
-        _tracking_changed("item", 1, fields.track_opened, item_id=item_id)
     if renamed is None:
         return redirect(f"{ITEMS}/{item_id}", notice="saved")
-    how = "rename" if renamed.swapped is None else "swap"
-    log.info("alias added", item_id=item_id, item_alias_id=renamed.kept.id, by=how)
-    if renamed.swapped is not None:
-        swapped = renamed.swapped.id
-        log.info("alias removed", item_id=item_id, item_alias_id=swapped, by=how)
     return redirect(f"{ITEMS}/{item_id}", notice="item_renamed", section="aliases")
 
 
@@ -535,7 +514,6 @@ def retire_item(session: DbSession, item_id: int) -> Response:
         return not_found()
     items.retire(session, found, now())
     session.commit()
-    log.info("item retired", item_id=item_id)
     return redirect(ITEMS, notice="retired", undo=str(item_id))
 
 
@@ -555,7 +533,6 @@ def restore_item(
         problem = RULES[broken]
         return _item_page(request, session, signed, found, problems={"name": problem})
     session.commit()
-    log.info("item restored", item_id=item_id)
     return redirect(f"{ITEMS}/{item_id}", notice="restored")
 
 
@@ -601,9 +578,8 @@ def add_package(
         if broken == RETIRED:
             return _item_page(request, session, signed, found, alert=RULES[RETIRED])
         if package is not None:
+            _decided(session, typed, item_package_id=package.id)
             session.commit()
-            log.info("package added", item_package_id=package.id)
-            _decided(typed, item_package_id=package.id)
             return redirect(
                 f"{ITEMS}/{item_id}", notice="package_added", section="packages"
             )
@@ -660,9 +636,8 @@ def save_package(
         if broken in {*ALERTS, "package_size_fixed"}:
             return _item_page(request, session, signed, found, alert=RULES[broken])
         if broken is None:
+            _decided(session, typed, item_package_id=package_id)
             session.commit()
-            log.info("package saved", item_package_id=package_id)
-            _decided(typed, item_package_id=package_id)
             return redirect(
                 f"{ITEMS}/{item_id}", notice="package_saved", section="packages"
             )
@@ -702,7 +677,6 @@ def restore_package(
         found = session.get_one(Item, item_id)
         return _item_page(request, session, signed, found, alert=RULES[RETIRED])
     session.commit()
-    log.info("package restored", item_package_id=package_id)
     return redirect(f"{ITEMS}/{item_id}", notice="package_restored", section="packages")
 
 
@@ -724,7 +698,6 @@ def retire_package(
         found = session.get_one(Item, item_id)
         return _item_page(request, session, signed, found, alert=RULES[RETIRED])
     session.commit()
-    log.info("package retired", item_package_id=package_id)
     return redirect(
         f"{ITEMS}/{item_id}",
         notice="package_retired",
@@ -746,7 +719,6 @@ def track_package(
     package = _package(session, item_id, package_id)
     if package is None or track not in TRACKING:
         return not_found()
-    before = package.track_opened
     _, broken = refusal(
         session, lambda: items.track_package(session, package, TRACKING[track]), RETIRED
     )
@@ -754,8 +726,6 @@ def track_package(
         found = session.get_one(Item, item_id)
         return _item_page(request, session, signed, found, alert=RULES[RETIRED])
     session.commit()
-    if TRACKING[track] != before:
-        _tracking_changed("package", 1, TRACKING[track], item_package_id=package_id)
     return redirect(f"{ITEMS}/{item_id}", notice="package_tracking", section="packages")
 
 
@@ -808,12 +778,6 @@ def package_settings(
             request, session, signed, found, problems=problems, values=values
         )
     session.commit()
-    log.info(
-        "package settings saved",
-        item_package_id=package_id,
-        short_below=short,
-        minimum_sealed=minimum,
-    )
     return redirect(f"{ITEMS}/{item_id}", notice="package_settings", section="packages")
 
 
@@ -847,9 +811,8 @@ def add_alias(
         if broken == RETIRED:
             return _item_page(request, session, signed, found, alert=RULES[RETIRED])
         if alias is not None:
+            _decided(session, typed, item_alias_id=alias.id)
             session.commit()
-            log.info("alias added", item_id=item_id, item_alias_id=alias.id)
-            _decided(typed, item_alias_id=alias.id)
             return redirect(
                 f"{ITEMS}/{item_id}", notice="alias_added", section="aliases"
             )
@@ -882,5 +845,4 @@ def remove_alias(
         found = session.get_one(Item, item_id)
         return _item_page(request, session, signed, found, alert=RULES[RETIRED])
     session.commit()
-    log.info("alias removed", item_id=item_id, item_alias_id=alias_id)
     return redirect(f"{ITEMS}/{item_id}", notice="alias_removed", section="aliases")

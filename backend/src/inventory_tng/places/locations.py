@@ -11,15 +11,19 @@ from collections.abc import Mapping
 from dataclasses import dataclass
 from datetime import datetime
 
+import structlog
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from inventory_tng.core.db_errors import enforce
 from inventory_tng.core.db_locking import Seen, lock_catalogue, relock, require_current
+from inventory_tng.core.db_once_committed import once_committed
 from inventory_tng.core.db_sessions import exists_where
 from inventory_tng.models.places import STORE_KINDS, Location
 from inventory_tng.models.volunteers import Volunteer
 from inventory_tng.stock.balance import holds_stock
+
+log = structlog.get_logger(__name__)
 
 
 @dataclass(frozen=True)
@@ -98,6 +102,7 @@ def add(
     location = Location(name=name, kind=kind, parent_id=parent_id)
     session.add(location)
     session.flush()
+    once_committed(session, log.info, "location added", location_id=location.id)
     return location
 
 
@@ -133,6 +138,7 @@ def save(
     # Checked only when changed: one tzdata no longer knows may stay.
     if time_zone != location.time_zone:
         location.time_zone = time_zone
+    once_committed(session, log.info, "location saved", location_id=location.id)
 
 
 def rename_custody(custody: Location, name: str) -> None:
@@ -158,6 +164,7 @@ def retire_held(session: Session, location: Location, at: datetime) -> None:
         )
         enforce("location_parent_current", when=has_areas)
     location.retired_at = at
+    once_committed(session, log.info, "location retired", location_id=location.id)
 
 
 def restore(session: Session, location: Location) -> None:
@@ -168,3 +175,4 @@ def restore(session: Session, location: Location) -> None:
             session, Volunteer, location.volunteer_id, "location_custody_volunteer"
         )
     location.retired_at = None
+    once_committed(session, log.info, "location restored", location_id=location.id)

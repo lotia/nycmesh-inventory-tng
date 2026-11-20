@@ -8,6 +8,7 @@ the name of the rule a change would break, or None."""
 
 from datetime import datetime
 
+import structlog
 from sqlalchemy import Select, select
 from sqlalchemy.orm import Session
 
@@ -19,10 +20,17 @@ from inventory_tng.core.db_locking import (
     relock,
     require_current,
 )
+from inventory_tng.core.db_once_committed import once_committed
 from inventory_tng.core.db_sessions import exists_where
 from inventory_tng.models.places import Location
 from inventory_tng.models.volunteers import Volunteer
 from inventory_tng.places import locations
+
+log = structlog.get_logger(__name__)
+
+
+def _logged(session: Session, event: str, volunteer: Volunteer, **ids: int) -> None:
+    once_committed(session, log.info, event, volunteer_id=volunteer.id, **ids)
 
 
 def leaving(*, others_merged_in: bool, holds_custody: bool) -> str | None:
@@ -75,6 +83,7 @@ def add(session: Session, name: str, email: str | None) -> Volunteer:
     volunteer = Volunteer(name=name, email=email)
     session.add(volunteer)
     session.flush()
+    _logged(session, "volunteer added", volunteer)
     return volunteer
 
 
@@ -92,11 +101,13 @@ def save(
     volunteer.name, volunteer.email = name, email
     if held is not None:
         locations.rename_custody(held, name)
+    _logged(session, "volunteer saved", volunteer)
 
 
 def hold_stock(session: Session, volunteer: Volunteer) -> Location:
     """Their custody location, made if they have none."""
     held = _lock(session, volunteer)
+    _logged(session, "custody started", volunteer)
     return held or locations.add_custody(session, volunteer.id, volunteer.name)
 
 
@@ -107,12 +118,14 @@ def stop_holding_stock(session: Session, volunteer: Volunteer, at: datetime) -> 
     if held is None:
         raise Gone
     locations.retire_held(session, held, at)
+    _logged(session, "custody ended", volunteer)
 
 
 def retire(session: Session, volunteer: Volunteer, at: datetime) -> None:
     held = _lock(session, volunteer, current=True)
     _leaving(session, volunteer, held)
     volunteer.retired_at = at
+    _logged(session, "volunteer retired", volunteer)
 
 
 def merge(session: Session, volunteer: Volunteer, into_id: int, at: datetime) -> None:
@@ -121,9 +134,11 @@ def merge(session: Session, volunteer: Volunteer, into_id: int, at: datetime) ->
     require_current(session, Volunteer, into_id, "volunteer_merge_target")
     _leaving(session, volunteer, held)
     volunteer.merged_into_id, volunteer.retired_at = into_id, at
+    _logged(session, "volunteer merged", volunteer, merged_into_id=into_id)
 
 
 def restore(session: Session, volunteer: Volunteer) -> None:
     """Back, and a merged duplicate as themselves."""
     relock(session, volunteer, current=False)
     volunteer.retired_at, volunteer.merged_into_id = None, None
+    _logged(session, "volunteer restored", volunteer)

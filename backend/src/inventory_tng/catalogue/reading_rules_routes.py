@@ -26,6 +26,7 @@ from inventory_tng.catalogue.reading_rules import (
     read_alike_words,
 )
 from inventory_tng.core.db_errors import refusal
+from inventory_tng.core.db_once_committed import once_committed
 from inventory_tng.core.db_sessions import DbSession
 from inventory_tng.core.local_time import site_zone
 from inventory_tng.core.phrases import Words, gettext, lazy_gettext
@@ -242,7 +243,6 @@ def save_reading(
     if broken is not None:
         return _refused(request, session, signed, found, broken, change)
     session.commit()
-    log.info("reading rule saved", reading_rule_id=rule_id)
     return redirect(f"{READINGS}/{rule_id}", notice="reading_saved")
 
 
@@ -267,7 +267,6 @@ def delete_reading(
     if broken is not None:
         return _refused(request, session, signed, found, broken, None)
     session.commit()
-    log.info("reading rule deleted", reading_rule_id=rule_id)
     return redirect(READINGS, notice="reading_deleted")
 
 
@@ -372,11 +371,13 @@ def accept(
             read_alike=words,
             proposals=made,
         )
-    session.commit()
-    log.info(
+    once_committed(
+        session,
+        log.info,
         "reading rules set",
         reading_rule_ids=[rule.id for rule in written or ()],
         by="seed",
     )
+    session.commit()
     back = {"one": "1", "at": str(at)} if one else {}
     return redirect(SEED, notice="readings_accepted", **back)

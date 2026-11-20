@@ -13,12 +13,14 @@ from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from functools import reduce
 
+import structlog
 from sqlalchemy import select, union_all
 from sqlalchemy.orm import Session
 
 from inventory_tng.catalogue import items, units
 from inventory_tng.core.db_errors import enforce
 from inventory_tng.core.db_locking import Seen, lock_catalogue, locked, relock
+from inventory_tng.core.db_once_committed import once_committed
 from inventory_tng.core.phrases import gettext, lazy_gettext
 from inventory_tng.models.catalogue import (
     CURRENT_ALIAS,
@@ -27,6 +29,8 @@ from inventory_tng.models.catalogue import (
     ItemPackage,
     ReadingRule,
 )
+
+log = structlog.get_logger(__name__)
 
 # Refused: a reading no unit has, or a rule respelling no unit.
 NOT_A_READING = "reading_rule_reading"
@@ -114,6 +118,7 @@ def change(
     _set(row, rule, admin_id)
     session.flush()
     items.reread(session, [row.token])
+    once_committed(session, log.info, "reading rule saved", reading_rule_id=row.id)
 
 
 def delete(session: Session, row: ReadingRule, *, seen: Seen) -> None:
@@ -123,6 +128,7 @@ def delete(session: Session, row: ReadingRule, *, seen: Seen) -> None:
     session.delete(row)
     session.flush()
     items.reread(session, [row.token])
+    once_committed(session, log.info, "reading rule deleted", reading_rule_id=row.id)
 
 
 @dataclass
