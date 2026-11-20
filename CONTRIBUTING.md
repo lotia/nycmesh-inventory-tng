@@ -97,6 +97,37 @@ backend asks for), the backend's and frontend's dependencies, and makes a
 TOTP keys) if there are none. Git ignores `.local/`. Every command below
 runs Python through `uv run`.
 
+### Tasks and direct commands
+
+Whole workflows are mise tasks: setting up, running the app, the checks,
+the database's life, and compose, which always runs as
+`mise run compose -- <arguments>`. `mise tasks` lists every task and what
+it does; the sections below say when to use each. A small step you take
+many times a day you run directly, in `backend/` or `frontend/`:
+
+| In | Command | What it does |
+| --- | --- | --- |
+| `backend/` | `uv run alembic upgrade head` | Migrates this checkout's database ([Migrations](#migrations)) |
+| `backend/` | `uv run alembic downgrade <revision>` | Takes it back to that revision; `uv run alembic history` lists them, `uv run alembic current` says where it is |
+| `backend/` | `uv run pytest tests/places/test_locations.py` | Runs one test file; `<file>::<test>` runs one test, `-k <words>` those whose names match |
+| `frontend/` | `npm test -- src/scan/cart.test.ts` | Runs one frontend test file; `-t <words>` runs the tests whose names match |
+| `frontend/` | `npx playwright test browser-tests/lists.spec.ts` | Runs one browser test file, after `mise run start-database` and `npm run build` ([Running the checks](#running-the-checks)) |
+| `backend/` | `uv run python -m devtools` | Lists the developer's tools (`backend/devtools/`, which no image ships); each one's `--help` says what it takes |
+
+The pages call the API through types generated from its schema. After you
+change an endpoint, regenerate both, and commit `frontend/src/api/`:
+
+```sh
+cd backend
+uv run python -m devtools write-api-schema  # frontend/src/api/openapi.json
+cd ../frontend
+npm run api                                 # frontend/src/api/schema.d.ts
+```
+
+A backend test fails while the schema is out of date, and CI fails while the
+types are. `npm run api` installs the generator from `frontend/tools/openapi/`
+first, which has its own TypeScript (docs/decisions/0010).
+
 ## Local settings
 
 `.env` holds your local settings: this checkout's compose project and
@@ -113,11 +144,11 @@ settings, rebuild or seed never touch another's. When `mise run setup`
 makes `.env`, it names the project for the checkout's directory and where
 that is, `inventory-tng-<directory>_<n>`, and the database on its server
 `inventory_<directory>_<n>` (`INVENTORY_DB_NAME`, which both URLs name).
-It gives each port compose publishes (`INVENTORY_DB_PORT`, 5433, beside
-MeshDB's 5432; `INVENTORY_APP_PORT`, 8000; and the others `.env.example`
-lists), and Vite's (`INVENTORY_VITE_PORT`, 5173), its usual number, or, if
-another stack claims it or something listens on it, the next free one up.
-Never copy a `.env` from another checkout.
+It gives each port compose publishes, and Vite's, the number
+`.env.example` gives it, or, if another stack claims it or something
+listens on it, the next free one up. The database's usual port is not
+PostgreSQL's own, which MeshDB's development server takes. Never copy a
+`.env` from another checkout.
 
 A port can still be taken later, as by a checkout set up at the same time
 whose stack was not yet started. So each task that starts something
@@ -135,11 +166,11 @@ container on the next free port up when its own is taken, as by `mise run
 dev`'s backend, and say which.
 
 A `.env` made before names no project, so its checkout uses the project
-`inventory-tng` (`compose.yaml`'s name), as it always did, on ports 5433,
-8000 and 3000, and a database `inventory`: nothing changes for a single
-clone. Checkouts with such a `.env` share that one stack; to give one its
-own, move its `.env` aside, run `mise run setup`, and copy back any
-setting of yours.
+`inventory-tng` (`compose.yaml`'s name), on the ports `compose.yaml` falls
+back to, and a database `inventory`: nothing changes for a single clone.
+Checkouts with such a `.env` share that one stack; to give one its own,
+move its `.env` aside, run `mise run setup`, and copy back any setting of
+yours.
 
 Each task that needs the server runs `mise run start-database`, which
 starts it, and makes its container again, keeping its volume, when
@@ -147,7 +178,7 @@ starts it, and makes its container again, keeping its volume, when
 connections, and in `inventory-tng` those of every checkout sharing it.
 `mise run dev-database` starts the server, makes the database if it is
 missing, and migrates it; `mise run dev` and `mise run seed` run it first.
-It holds each to 30 connections (Connections, below).
+It caps each one's connections (Connections, below).
 
 A stack stays after its checkout is deleted. `mise run list-stale-stacks`
 lists each whose `compose.yaml` is gone, and
@@ -170,12 +201,11 @@ The server's container makes them on a new volume, and
 ## Running the app
 
 ```sh
-mise run dev             # http://127.0.0.1:8000, Ctrl-C stops it
+mise run dev             # prints the app's address; Ctrl-C stops it
 ```
 
 Its port is `INVENTORY_APP_PORT` and Vite's `INVENTORY_VITE_PORT`, from
-`.env` (Local settings), so checkouts can each run one at once; it prints
-the address.
+`.env` (Local settings), so checkouts can each run one at once.
 
 It runs, in order:
 
@@ -195,10 +225,8 @@ The backend is `uv run python -m inventory_tng --reload`, in `backend/`.
 run command starts uvicorn itself; uvicorn's own logging flags are not used,
 the `LOG_*` settings are (Logging, below).
 
-The developer's tools are `uv run python -m devtools <command>`, in
-`backend/`, from `backend/devtools/`, which no image ships. With no command
-it lists them, and each command's `--help` says what it takes. The tasks
-below run them for you.
+The tasks below run the developer's tools (`uv run python -m devtools`,
+[Tasks and direct commands](#tasks-and-direct-commands)) for you.
 
 ### Some data to work with
 
@@ -215,6 +243,12 @@ needs `APP_ENV=development`, as `.env.example` sets, also in the app
 container: `mise run compose -- exec app python -m devtools database seed`.
 
 ### Migrations
+
+Migrations are Alembic's, in `backend/migrations/versions/`, and run as
+the owner (`MIGRATION_DATABASE_URL`, from `.env`). In `backend/`,
+`uv run alembic upgrade head` migrates this checkout's database, as
+`mise run dev-database` does. A new one is numbered after the newest
+there: `uv run alembic revision --rev-id <number> -m "<what it does>"`.
 
 Until a test deployment holds people's data, a change may edit an existing
 migration instead of adding one, so the schema's history stays short; after
@@ -234,7 +268,7 @@ after it only rewrite rows and have downgrades that do nothing. In
 uv run alembic downgrade <revision> && uv run alembic upgrade head
 ```
 
-Migrations run as the owner, and every table they create gives the app
+Every table a migration creates gives the app
 `SELECT`, `INSERT`, `UPDATE` and `DELETE` (the initial migration's default
 privileges). A migration that creates a table the app must not change
 revokes what it must not do there, as the initial migration does for the
@@ -680,20 +714,6 @@ root, remove that volume, the one ending `_caddy` that `mise run compose
 both, `tailscale serve` gives the app's port a real certificate on the
 tailnet's name.
 
-The pages call the API through types generated from its schema. After you
-change an endpoint, regenerate both, and commit `frontend/src/api/`:
-
-```sh
-cd backend
-uv run python -m devtools write-api-schema  # frontend/src/api/openapi.json
-cd ../frontend
-npm run api                                 # frontend/src/api/schema.d.ts
-```
-
-A backend test fails while the schema is out of date, and CI fails while the
-types are. `npm run api` installs the generator from `frontend/tools/openapi/`
-first, which has its own TypeScript 5 (docs/decisions/0010).
-
 ### Styles
 
 Every page shares one stylesheet, `frontend/src/styles.css`, which Tailwind
@@ -770,34 +790,26 @@ utilities. When you style a page:
 ### Registering a device
 
 Administrator pages need someone signed in. To make the first administrator,
-set `SETUP_TOKEN` in `.env` to any 32 characters or more, restart, and open
-<http://127.0.0.1:8000/setup>. With `APP_ENV=development` the cookies work
-over plain http.
+set `SETUP_TOKEN` in `.env` to a token as long as DEPLOYMENT.md (Settings)
+asks, restart, and open `/setup` at the address `mise run dev` prints. With
+`APP_ENV=development` the cookies work over plain http.
 
 Pages that record anything need a registered device (docs/decisions/0009).
 Make a registration code on the Devices page, signed in, and enter its
-phrase at <http://127.0.0.1:8000/register>, or scan its QR code with a phone.
+phrase at `/register`, or scan its QR code with a phone.
 `uv run python -m inventory_tng.manage registration-codes` does the same
 from the command line.
 
 ### Mail
 
 To see the mail the app sends, start Mailpit, which catches it all and sends
-nothing on: `mise run compose -- --profile mail up -d mail`. Set these in `.env`
-and restart, then read the mail at <http://localhost:8025>, or the port
-`INVENTORY_MAILPIT_PORT` names (Local settings):
-
-```sh
-MAIL_HOST=localhost
-MAIL_PORT=${INVENTORY_SMTP_PORT:-1025}
-MAIL_SECURITY=none
-MAIL_FROM=inventory@localhost
-SITE_URL=http://127.0.0.1:8000
-```
+nothing on: `mise run compose -- --profile mail up -d mail`. Uncomment the
+mail settings in `.env`, as `.env.example` gives them, and restart, then
+read the mail at `http://localhost:` and the port `INVENTORY_MAILPIT_PORT`
+names (Local settings).
 
 `MAIL_SECURITY=none` works only with `APP_ENV=development`. For the app
-container, set `INVENTORY_APP_MAIL_HOST=mail` too, and `SITE_URL`'s port to
-`INVENTORY_APP_PORT`.
+container, set `INVENTORY_APP_MAIL_HOST=mail` too.
 
 ### Running the app in a container
 
@@ -830,8 +842,7 @@ because inside it `localhost` is the container, and its own
 send its telemetry to the dashboard, start the dashboard (Logging, below)
 and set `INVENTORY_APP_OTLP_ENDPOINT=http://dashboard:18890`; to send mail
 to Mailpit, `INVENTORY_APP_MAIL_HOST=mail`. It takes `INVENTORY_APP_PORT`
-(Local settings), which is 8000, as the run command's port, unless setup
-chose another. The client address it logs is
+(Local settings) as the run command's port. The client address it logs is
 the container network's, not your browser's.
 
 ### Using compose directly
@@ -863,7 +874,7 @@ asks for the lower one, and crun 1.31 and later apply it, so every exec fails
 with
 ``write to `/proc/self/oom_score_adj`: Permission denied``. A health check
 then never passes, and `compose up --wait` fails. So each service in
-`compose.yaml` with a health check sets `oom_score_adj: 200`, the value
+`compose.yaml` with a health check sets `oom_score_adj` to the value
 systemd gives a user's services, and a test checks that each does.
 Podman's issue:
 <https://github.com/podman-container-tools/podman/issues/30245>. Under
@@ -875,11 +886,9 @@ mise run podman-exec-oom-workaround-still-needed  # fails once Podman fixes it
 ```
 
 The first asks exec in two containers of its own, then removes them: one
-asked for 0, as compose asks, and one for -1000, below the lowest value a
-process without privileges may go back down to (the kernel's
-`oom_score_adj_min`, which systemd's defaults set to 100). Present, if
-both fail; present but not affecting compose here, if only -1000 fails;
-fixed, if neither does. The second
+for what compose asks, and one for a value below the lowest a process
+without privileges may go back down to; its script says how it reads the
+two. The second
 fails when Podman has fixed the bug and `compose.yaml` still works around
 it: then remove `oom_score_adj` from `compose.yaml`, both tasks, the test
 and this section (inventory-tng-46w). Run the second after upgrading
@@ -1022,10 +1031,11 @@ uv run pytest --cov              # tests, against the database started above
 ```
 
 `mise run check-backend` and CI run the tests across processes, one per
-core and at most 8: `uv run pytest -n auto --maxprocesses=8 --cov`. Each
-process makes databases of its own, which takes a moment, so past 8 a run
-is slower, and running a few tests is quicker without `-n`.
-Connections, below, says how many runs fit at once.
+core up to a cap (`--maxprocesses`, in the task in `mise.toml` and in CI).
+Each process makes databases of its own, which takes a moment, so past the
+cap a run is slower, and running a few tests is quicker without `-n`, as
+in [Tasks and direct commands](#tasks-and-direct-commands). Connections,
+below, says how many runs fit at once.
 
 The backend's code is grouped by feature and the frontend's by page, as
 docs/decisions/0023 says, which also says where a new file goes.
@@ -1055,6 +1065,9 @@ what only a real browser can, such as that no page scrolls sideways:
 mise run check-browser           # builds, starts the app, runs them
 ```
 
+To run one file again, in `frontend/` after a build:
+`npx playwright test browser-tests/<file>.spec.ts`.
+
 A test fails on any Content-Security-Policy violation in a page it opens:
 tests import `test` from `browser-tests/csp-violations.ts`, or
 `own-rows.ts`, which extends it, never from Playwright, which Biome
@@ -1079,11 +1092,11 @@ Playwright's WebKit is built for Ubuntu and may not start on other systems
 WebKit in Playwright's own container instead:
 
 ```sh
-mise run browser-webkit          # pulls the image (about 2 GB) the first time
+mise run browser-webkit          # pulls Playwright's large image the first time
 ```
 
 Only the browser runs in the container, from Playwright's server, published
-on `INVENTORY_WEBKIT_PORT` (3000); the tests and the app run here, and the
+on `INVENTORY_WEBKIT_PORT`; the tests and the app run here, and the
 browser reaches the app through the tests' connection.
 Playwright starts the backend itself, twice, each with a database of its
 own, on ports chosen for the run, so runs from two clones do not meet.
@@ -1202,29 +1215,30 @@ counterpart in the source has its own short `README.md` saying what it holds.
 ### Connections
 
 Each checkout's tests, apps and browser tests use its own stack's
-PostgreSQL, which allows 400 connections (`compose.yaml`), less 3 kept for
-the superuser. A whole test run, measured over 8 processes, holds about 70
-at once, all processes together; one process, and one database, held at most
-about 21; a dev app up to 20, as does each of the browser tests' two
-servers. So a checkout's checks and its app fit with room to spare, and so
-would three checkouts sharing `inventory-tng` (Local settings). Each test
-database allows twice the most measured on one (`TEST_CONNECTION_LIMIT` in
-`tests/databases.py`), so a process that leaks connections is refused at its
-own database, not the server's limit, and a test that fails for either limit
-says which. Long before a leak reaches that limit, a test that ends with a
-connection it took from any pool and kept errors at its teardown, named by
-`keeps_its_connections` in conftest.py. Each checkout's development database
-allows 30 (`backend/devtools/database.py`): one app, and a migration or seed
-beside it, so it cannot starve the tests beside it.
+PostgreSQL, whose `max_connections` (`compose.yaml`) is set so that a whole
+test run, at the most processes the checks use, a dev app and the browser
+tests' two servers fit with room to spare, and so would three checkouts
+sharing `inventory-tng` (Local settings). An app's pools are sized in
+`core/db_sessions.py` (`Database`). Each test database allows twice the
+most measured on one (`TEST_CONNECTION_LIMIT` in `tests/databases.py`), so
+a process that leaks connections is refused at its own database, not the
+server's limit, and a test that fails for either limit says which. Long
+before a leak reaches that limit, a test that ends with a connection it
+took from any pool and kept errors at its teardown, named by
+`keeps_its_connections` in conftest.py. Each checkout's development
+database allows enough for one app and a migration or seed beside it
+(`CONNECTION_LIMIT` in `backend/devtools/database.py`), so it cannot starve
+the tests beside it.
 
 ### Measuring the catalogue
 
 ```sh
-mise run measure-catalogue   # MEASURE_YEARS=10 MEASURE_PER_DAY=80 for more
+mise run measure-catalogue
 ```
 
-It fills a database of its own with years of saves, sealed and open
-(`tests/helpers/years_of_saves.py`, as many as its settings say), prints
+It fills a database of its own with years of saves, sealed and open, as
+many as the `MEASURE_*` settings in `tests/helpers/years_of_saves.py` say
+(set them in the shell for more), prints
 the plan of each ledger query the scan page's catalogue makes, as run
 (`EXPLAIN (ANALYZE, BUFFERS)`), and times `GET /api/catalogue`. It is not
 one of the checks: run it after changing those queries (inventory-tng-kcz).
@@ -1232,11 +1246,12 @@ one of the checks: run it after changing those queries (inventory-tng-kcz).
 ### Measuring the labels list
 
 ```sh
-mise run measure-labels      # MEASURE_ITEMS=3000 for more labels
+mise run measure-labels
 ```
 
-It fills a database of its own with thousands of labels, some revoked, and
-the same years of saves (their settings apply), prints the plan of
+It fills a database of its own with thousands of labels, some revoked
+(`MEASURE_ITEMS` in `tests/measure_labels.py`), and the same years of saves
+(their settings apply), prints the plan of
 each statement the labels list and its suggestions send, and times a few
 typical searches. It is not one of the checks: run it after changing the
 labels list's search (inventory-tng-8i4.60.24).
@@ -1244,7 +1259,7 @@ labels list's search (inventory-tng-8i4.60.24).
 ### Measuring the tests
 
 ```sh
-mise run test-report         # about five minutes
+mise run test-report         # takes several minutes
 ```
 
 It runs each suite, the backend's twice and each frontend test alone, and
@@ -1260,9 +1275,9 @@ Use it to find tests to merge or speed up; the module's docstring
 
 `mise run check` and CI measure which code the tests run, and fail when:
 
-- **the whole falls below its floor**: 94% of the backend's lines and
-  branches, its developer tools among them (`fail_under` in
-  `backend/pyproject.toml`), and the frontend's floors in
+- **the whole falls below its floor**: the backend's, of its lines and
+  branches, its developer tools among them, is `fail_under` in
+  `backend/pyproject.toml`, and the frontend's floors are in
   `frontend/vite.config.ts`. Vitest raises those as coverage rises: commit
   that change with yours.
 - **any line you added or changed is not run by a test**, or a branch on it
@@ -1291,13 +1306,13 @@ after it.
   installs the same pins.
 - **Python packages**: `uv lock --upgrade` in `backend/` moves everything in
   `uv.lock`, or `uv lock --upgrade-package <name>` one. `pyproject.toml` gives
-  each dependency a floor at a minor version only, such as `fastapi>=0.162`:
-  `uv.lock` pins what is installed, and is always committed. `uv add` (or
-  `uv add --dev` for one only tests and tools use, which the image leaves
-  out) writes a patch too (`>=0.162.0`); trim it, as a test checks. Two
-  exceptions: a `0.0.z` package keeps its patch, there being no minor to
-  name, and a series released only as betas, such as OpenTelemetry's
-  instrumentation, floors at the minor's first beta (`>=0.66b0`).
+  each dependency a floor at a minor version only, `>=x.y`: `uv.lock` pins
+  what is installed, and is always committed. `uv add` (or `uv add --dev`
+  for one only tests and tools use, which the image leaves out) writes a
+  patch too (`>=x.y.z`); trim it, as a test checks. Two exceptions: a
+  `0.0.z` package keeps its patch, there being no minor to name, and a
+  series released only as betas, such as OpenTelemetry's instrumentation,
+  floors at the minor's first beta (`>=x.yb0`).
   A new anyascii, or a Python with a newer Unicode, fails
   `tests/models/test_search_text_fold_reference.py`, with the difference:
   the file's first line names both versions. If you take it, run
@@ -1313,7 +1328,7 @@ after it.
 uv's exact version is the pin in `mise.toml`, which CI reads too.
 `backend/pyproject.toml` names it twice more, both by minor version:
 `required-version`, a floor, and `uv_build`, the build backend, capped below
-the next minor (`uv_build>=0.13,<0.14`). A patch release of uv needs only
+the next minor. A patch release of uv needs only
 `mise upgrade --bump uv`. A new minor needs the `uv_build` cap moved with it,
 or the build uses an older backend than the uv running it. The floor stops a
 uv older than it, not a newer one installed some other way, so use the uv
@@ -1403,10 +1418,10 @@ only the attributes in `KEPT_ATTRIBUTES` (add one there, with the reason,
 to keep it); in development, whole, unless `TRACE_REDACTION=on`. Secrets in
 query strings are masked either way, unless `UNMASK_SECRETS=true`. How to
 see unredacted traces in production for a while is in DEPLOYMENT.md.
-To see telemetry locally, start the dashboard, run the server with
-`OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:${INVENTORY_OTLP_PORT:-4318}` in
-`.env`, and open <http://localhost:18888>, or the port
-`INVENTORY_DASHBOARD_PORT` names (Local settings):
+To see telemetry locally, start the dashboard, uncomment
+`OTEL_EXPORTER_OTLP_ENDPOINT` in `.env`, as `.env.example` gives it, run the
+server, and open `http://localhost:` and the port `INVENTORY_DASHBOARD_PORT`
+names (Local settings):
 
 ```sh
 mise run compose -- --profile telemetry up -d dashboard

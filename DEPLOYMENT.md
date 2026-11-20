@@ -8,7 +8,8 @@ There is no production container image or Helm chart yet
 
 ## What it needs
 
-- PostgreSQL. Development and the tests use 18.
+- PostgreSQL, at the version development and the tests use (the `db`
+  image in `compose.yaml`).
 - [uv](https://docs.astral.sh/uv/), which installs the Python version the
   backend asks for.
 - Node, at the version in `mise.toml`, to build the scan page. It is needed
