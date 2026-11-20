@@ -12,7 +12,7 @@ compose itself, through mise-tasks/compose:
     uv run python -m devtools stack ports-free [--here] KEY...
     uv run python -m devtools stack new-ports
     uv run python -m devtools stack port KEY...
-    uv run python -m devtools stack free-port KEY
+    uv run python -m devtools stack free-port [--address ADDRESS] KEY
 
 list-stale reads compose's list of projects from standard input, so that
 compose failing fails the list (mise-tasks/list-stale-stacks):
@@ -30,11 +30,10 @@ import socket
 import subprocess
 import sys
 import zlib
-from collections.abc import Iterable, Sequence
+from collections.abc import Callable, Iterable, Sequence
 from functools import cache
 from pathlib import Path
 
-from devtools.lan_address import lan_address
 from inventory_tng.core.local_env import CLONE, ENV_FILE, local_env_values, setting
 
 # compose.yaml's name: the project of every checkout whose .env names none,
@@ -100,44 +99,41 @@ def claimed_ports(projects: Iterable[Project]) -> set[int]:
     return {port for project in ours(projects) for port in stack_ports(project)}
 
 
-def in_use(port: int) -> bool:
-    """Whether something listens on the port: on 127.0.0.1, where compose
-    publishes, or on ::1, where a server on localhost may, as Vite's does.
-    A machine without IPv6 has nothing on ::1. Each probe reuses the
-    address, as uvicorn and Vite do, so a server's closed connections
-    waiting out their time do not count, only a listener."""
-    with socket.socket() as probe:
-        probe.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-        try:
-            probe.bind(("127.0.0.1", port))
-        except OSError:
-            return True
+def bind_error(address: str, port: int) -> OSError | None:
+    """Why binding the port at this address fails, if it does. The probe
+    reuses the address, as uvicorn and Vite do, so a server's closed
+    connections waiting out their time do not count, only a listener."""
+    family = socket.AF_INET6 if ":" in address else socket.AF_INET
     try:
-        with socket.socket(socket.AF_INET6) as probe:
+        with socket.socket(family) as probe:
             probe.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-            probe.bind(("::1", port))
+            probe.bind((address, port))
     except OSError as error:
-        return error.errno == errno.EADDRINUSE
-    return False
+        return error
+    return None
 
 
 def listens_on(address: str, port: int) -> bool:
-    """Whether something listens on the port at this address, as Caddy
-    does on the local one, where in_use does not look."""
-    with socket.socket() as probe:
-        probe.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-        try:
-            probe.bind((address, port))
-        except OSError as error:
-            return error.errno == errno.EADDRINUSE
-    return False
+    """Whether something listens on the port at this address."""
+    error = bind_error(address, port)
+    return error is not None and error.errno == errno.EADDRINUSE
 
 
-def free_port(preferred: int, taken: set[int]) -> int:
+def in_use(port: int) -> bool:
+    """Whether something listens on the port: on 127.0.0.1, where compose
+    publishes, or on ::1, where a server on localhost may, as Vite's does.
+    A machine without IPv6 has nothing on ::1."""
+    return bind_error("127.0.0.1", port) is not None or listens_on("::1", port)
+
+
+def free_port(
+    preferred: int, taken: set[int], busy: Callable[[int], bool] | None = None
+) -> int:
     """The preferred port, else the next one up that no stack claims and
-    nothing listens on."""
+    nothing listens on, or, given busy, that it says is not busy."""
+    busy = busy or in_use
     port = preferred
-    while port in taken or in_use(port):
+    while port in taken or busy(port):
         port += 1
         if port > 65535:
             raise SystemExit(f"No port from {preferred} up is free")
@@ -263,35 +259,26 @@ def port(key: str) -> int:
 
 def free_port_for(key: str, address: str | None = None) -> int:
     """The setting's port while it is free; else the next one up that this
-    checkout's container for it holds, or that no stack claims and nothing
-    listens on, and none of this checkout's other settings names. For a
-    container that publishes it, so another port does when, say, `mise run
-    dev`'s backend holds this one; the container's own counts, as a run
-    before may have moved it there. With an address, a listener there
-    counts too."""
+    checkout's container for it holds (a run before may have moved it
+    there), or that is free, and none of this checkout's other settings
+    names. With an address, a listener there counts too."""
 
     def taken(candidate: int) -> bool:
         return in_use(candidate) or (
             address is not None and listens_on(address, candidate)
         )
 
-    number = port(key)
-    if not taken(number):
-        return number
+    preferred = port(key)
+    if not taken(preferred):
+        return preferred
     own = {held for held, service in own_ports().items() if service == MOVABLE[key]}
-    claimed = claimed_ports(other_stacks("--all"))
+    claimed = claimed_ports(other_stacks("--all")) - own
     mine = {port(other) for other in PORTS if other != key}
-
-    def usable(candidate: int) -> bool:
-        if candidate in mine:
-            return False
-        return candidate in own or not (candidate in claimed or taken(candidate))
-
-    while not usable(number):
-        number += 1
-        if number > 65535:
-            raise SystemExit(f"No port from {port(key)} up is free for {key}")
-    return number
+    return free_port(
+        preferred,
+        mine | claimed,
+        lambda candidate: candidate not in own and taken(candidate),
+    )
 
 
 def where_set(key: str) -> str:
@@ -384,6 +371,9 @@ def main(argv: Sequence[str], prog: str) -> int:
         help="print the setting's port, or, if it is taken, another free one",
     )
     instead.add_argument("key", metavar="KEY", choices=MOVABLE)
+    instead.add_argument(
+        "--address", help="where it is published, if not 127.0.0.1, to look there too"
+    )
     one = commands.add_parser("port", help="print the port for each setting")
     one.add_argument("keys", nargs="+", metavar="KEY", choices=PORTS)
     args = parser.parse_args(argv)
@@ -393,9 +383,7 @@ def main(argv: Sequence[str], prog: str) -> int:
             print(*problems, sep="\n", file=sys.stderr)
             return 1
     elif args.command == "free-port":
-        # Caddy publishes on the local address, not 127.0.0.1.
-        address = lan_address() if MOVABLE[args.key] == "caddy" else None
-        number = free_port_for(args.key, address)
+        number = free_port_for(args.key, args.address)
         if number != port(args.key):
             print(
                 f"Port {port(args.key)} ({where_set(args.key)}) is in use: "

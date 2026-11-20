@@ -16,7 +16,8 @@ devtools() {
 # run dev's backend; compose publishes them as these say.
 INVENTORY_LAN_ADDRESS=$(devtools lan-address)
 INVENTORY_APP_PORT=$(devtools stack free-port INVENTORY_APP_PORT)
-INVENTORY_LAN_PORT=$(devtools stack free-port INVENTORY_LAN_PORT)
+INVENTORY_LAN_PORT=$(devtools stack free-port \
+  --address "$INVENTORY_LAN_ADDRESS" INVENTORY_LAN_PORT)
 export INVENTORY_LAN_ADDRESS INVENTORY_APP_PORT INVENTORY_LAN_PORT
 # The app takes Caddy's forwarded headers, so its links say https and the
 # client is the phone: Caddy writes them itself, and the app is otherwise

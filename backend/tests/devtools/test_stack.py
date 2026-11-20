@@ -175,7 +175,7 @@ def test_compose_publishes_each_port_as_env_names_it() -> None:
     picks, with the same default."""
     compose = (CLONE / "compose.yaml").read_text()
     published = re.findall(
-        r'^ +- "(?:127\.0\.0\.1|\$\{INVENTORY_LAN_ADDRESS:-127\.0\.0\.1\}):'
+        r'^ +- "(?:127\.0\.0\.1|\$\{\w+:-127\.0\.0\.1\}):'
         r"(\$\{[^}]*\}|\d+):",
         compose,
         re.MULTILINE,
@@ -517,9 +517,9 @@ def test_it_prints_a_free_port_and_says_when_it_is_another(
     """Caddy's port, taken on the local address, where in_use does not
     look: here 127.0.0.1 stands in for it."""
     compose_answers(monkeypatch)
-    monkeypatch.setattr(stack, "lan_address", lambda: "127.0.0.1")
     env_file.write_text(f"INVENTORY_LAN_PORT={listening}\n")
-    run_devtools(["stack", "free-port", "INVENTORY_LAN_PORT"])
+    free_port = ["stack", "free-port", "--address", "127.0.0.1", "INVENTORY_LAN_PORT"]
+    run_devtools(free_port)
     printed = capsys.readouterr()
     moved = int(printed.out)
     assert moved > listening
@@ -528,7 +528,7 @@ def test_it_prints_a_free_port_and_says_when_it_is_another(
         f"using {moved} instead.\n"
     )
     monkeypatch.setattr(stack, "listens_on", lambda *_: False)
-    run_devtools(["stack", "free-port", "INVENTORY_LAN_PORT"])
+    run_devtools(free_port)
     assert capsys.readouterr() == (f"{listening}\n", "")
 
 
