@@ -532,7 +532,7 @@ def test_both_ends_right_then_closed_names_the_count_and_the_close(
         closed = open_packages.close(
             session, movement.to_open_package_id, ada_id(session), at, how="direct"
         )
-    assert closed == open_packages.Closed(False, 0)
+    assert closed
     session.flush()
     session.expire_all()
     check = session.get_one(OverRecorded, check.id)

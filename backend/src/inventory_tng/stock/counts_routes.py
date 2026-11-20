@@ -622,10 +622,9 @@ def count(
         # closed is at 0, as counted so, for an opening that arrived in it.
         emptied: list[tuple[int, Form]] = []
         for open_id, reason in forms.close:
-            done = open_packages.close(
+            if open_packages.close(
                 session, open_id, signed.admin.id, now(), how="count", reason=reason
-            )
-            if done is not None:
+            ):
                 item_id = session.get_one(OpenPackage, open_id).item_id
                 emptied.append((item_id, Form(open_package_id=open_id)))
         over_recorded.counted(

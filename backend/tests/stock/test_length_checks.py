@@ -464,7 +464,7 @@ def test_a_report_of_one_closed_is_not_kept(session: Session, spools: Spools) ->
     session.flush()
     transaction = session.scalars(select(LedgerTransaction)).first()
     assert transaction is not None
-    assert not open_packages.report_length(
+    open_packages.report_length(
         session, made, Decimal(1), spools.place.volunteer.id, transaction
     )
     session.refresh(made)
@@ -670,12 +670,8 @@ def test_a_package_moved_from_the_places_locked_is_not_set(
     answer = length_checks_routes.Answer(
         made.id, seen(session, made), Decimal(1), as_of=0
     )
-    assert length_checks_routes._set(
+    assert not length_checks_routes._set(
         session, setter, answer, [made.location_id + 1]
-    ) == (
-        False,
-        False,
-        0,
     )
     session.refresh(made)
     assert made.below_zero_at is not None
@@ -693,11 +689,7 @@ def test_a_set_whose_count_is_written_already_writes_nothing_more(
     key = uuid.uuid5(made.key, f"length {checked}")
     counts.count_open_package(session, key, setter, made, Decimal(1), Decimal(305))
     answer = length_checks_routes.Answer(made.id, checked, Decimal(2), Decimal(305), 0)
-    assert length_checks_routes._set(session, setter, answer, [made.location_id]) == (
-        True,
-        False,
-        0,
-    )
+    assert length_checks_routes._set(session, setter, answer, [made.location_id])
     assert left_on(session, made) == 1
 
 

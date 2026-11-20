@@ -274,7 +274,7 @@ def kind_page(
 
 def _set(
     session: Session, admin_id: int, answer: Answer, places: Collection[int]
-) -> tuple[bool, bool, int]:
+) -> bool:
     """A count of the open package by the difference between what it really
     had and what it showed then (docs/decisions/0020, amended by
     inventory-tng-b1z), so a cut since stays as saved: then is the report,
@@ -283,15 +283,14 @@ def _set(
     both, if the check is still as `seen` and the package still at one of
     `places`, locked already; else neither. A count of it puts right the
     end of one recorded more than moved it is in there (over_recorded.counted).
-    Whether it was set, whether that left it below zero, asked about again,
-    and how many recorded more than moved it closed."""
+    Whether it was set; one left below zero is asked about again."""
     open_id, seen, left, showed, as_of = answer
     # A Set's, never a Leave's.
     assert left is not None
     row = session.get_one(OpenPackage, open_id)
     key = uuid.uuid5(row.key, f"length {seen}")
 
-    def both() -> tuple[bool, int]:
+    def both() -> None:
         if not open_packages.settle_check(session, open_id, seen, how="set"):
             raise RuleBroken("length_unchanged")
         # Moved since its place was locked: its place is not, so nothing
@@ -307,10 +306,10 @@ def _set(
         )
         counted = counts.count_open_package(session, key, admin_id, row, left, then)
         if counted is None:
-            return False, 0
+            return
         # A report is as of its own batch, which may be the one that
         # recorded the move: only a move before that batch came before it.
-        closed = over_recorded.counted(
+        over_recorded.counted(
             session,
             admin_id,
             row.location_id,
@@ -318,12 +317,9 @@ def _set(
             counted.written,
             [(row.item_id, ledger.Form(open_package_id=open_id))],
         )
-        below = open_packages.left_below_zero(session, row, counted.shows, now())
-        return below, closed
+        open_packages.left_below_zero(session, row, counted.shows, now())
 
-    done, broken = attempt(session, both)
-    below, closed = done or (False, 0)
-    return broken is None, below, closed
+    return attempt(session, both)[1] is None
 
 
 def _back(view: View, sent: str) -> View:
@@ -368,7 +364,7 @@ def _answer(
                 session, each.open_id, each.seen, how="left"
             )
         else:
-            set_ += _set(session, signed.admin.id, each, places)[0]
+            set_ += _set(session, signed.admin.id, each, places)
     once_committed(
         session,
         log.info,

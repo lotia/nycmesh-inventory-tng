@@ -81,12 +81,12 @@ brought_back_counter = meter.create_counter(
 WAITING = OverRecorded.settled_at.is_(None)
 
 
-def raise_checks(session: Session, over: Mapping[int, Decimal]) -> int:
+def raise_checks(session: Session, over: Mapping[int, Decimal]) -> None:
     """Keep, for each movement, how much more of it was recorded than moved:
     a new check, or one waiting told the newest amount; one settled stays
-    settled. How many were raised or said again. The caller commits."""
+    settled. The caller commits."""
     if not over:
-        return 0
+        return
     rows = [
         {"movement_id": movement_id, "quantity": quantity}
         for movement_id, quantity in sorted(over.items())
@@ -105,7 +105,6 @@ def raise_checks(session: Session, over: Mapping[int, Decimal]) -> int:
         )
     if changed:
         once_committed(session, raised_counter.add, len(changed))
-    return len(changed)
 
 
 def _measure_settled(
@@ -578,14 +577,14 @@ def counted(
 
 def open_package_closed(
     session: Session, open_id: int, admin_id: int, at: datetime
-) -> int:
+) -> None:
     """Close as counted those waiting for an opening into an open package
     just closed (open_packages.close, however: Confirm used up, Close, a
     count) whose sealed end a count put right already: the close wrote off
     what the open package showed, so put the other end right (Ali,
     2026-11-15, inventory-tng-die). By the close's administrator, at its
     time; the open end keeps no count (arrived_count_id stays NULL), as a
-    close is none. How many closed.
+    close is none.
 
     Call it in the close's transaction, after its place and open package
     (stock/ledger.py's order), holding the rows it closes by id. One taken by
@@ -622,7 +621,6 @@ def open_package_closed(
             admin_id=admin_id,
         )
     _measure_settled(session, "counted", len(found))
-    return len(found)
 
 
 def _end_counted(

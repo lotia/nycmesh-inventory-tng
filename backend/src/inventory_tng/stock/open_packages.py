@@ -173,14 +173,14 @@ def report_length(
     left: Decimal,
     volunteer_id: int,
     transaction: LedgerTransaction,
-) -> bool:
+) -> None:
     """What a volunteer says is really on an open package, for an
     administrator to check: a report, never an adjustment (0003). A later
     report replaces one not yet checked; one of a package closed is left,
-    as nobody would check it. Whether it was kept. Call it holding the
-    row, as a save holds its open packages (stock/ledger.py's lock order)."""
+    as nobody would check it. Call it holding the row, as a save holds its
+    open packages (stock/ledger.py's lock order)."""
     if row.closed_at is not None:
-        return False
+        return
     row.length_reported_at = transaction.created_at
     row.length_reported_by_volunteer_id = volunteer_id
     row.length_reported = left
@@ -193,36 +193,33 @@ def report_length(
         open_package_id=row.id,
         volunteer_id=volunteer_id,
     )
-    return True
 
 
 def went_below_zero(
     session: Session, row: OpenPackage, before: Decimal, cut: Decimal, at: datetime
-) -> bool:
+) -> None:
     """Ask an administrator to check an open package a save's `cut` took
     from nothing or more (`before`) to below zero: its records are wrong,
     whether or not anyone reported it. Only on going below, so one left
-    below zero, checked and left, is not asked about at every cut. Whether
-    it asked. Call it holding the row, as report_length."""
+    below zero, checked and left, is not asked about at every cut. Call it
+    holding the row, as report_length."""
     if row.below_zero_at is not None or not before - cut < 0 <= before:
-        return False
+        return
     row.below_zero_at = at
     _check_raised(session, "below_zero")
     once_committed(
         session, log.info, "open package went below zero", open_package_id=row.id
     )
-    return True
 
 
 def left_below_zero(
     session: Session, row: OpenPackage, left: Decimal, at: datetime
-) -> bool:
+) -> None:
     """Ask again about an open package an administrator's Set left below
     zero, as cuts since took more than it had: its records are wrong still.
-    Whether it asked. Call it holding the row, its check just settled, as
-    went_below_zero."""
+    Call it holding the row, its check just settled, as went_below_zero."""
     if left >= 0:
-        return False
+        return
     row.below_zero_at = at
     _check_raised(session, "below_zero")
     once_committed(
@@ -231,7 +228,6 @@ def left_below_zero(
         "open package left below zero by a set",
         open_package_id=row.id,
     )
-    return True
 
 
 def _clear_check(row: OpenPackage) -> bool:
@@ -272,15 +268,6 @@ def settle_check(
     return True
 
 
-class Closed(NamedTuple):
-    """An open package closed, whether that settled a check of what it had
-    (docs/decisions/0020; inventory-tng-b1z), and how many lines recorded
-    with more than was moved it closed (over_recorded.open_package_closed)."""
-
-    check_settled: bool
-    over_recorded: int
-
-
 Closing = Literal["confirmed", "direct", "count"]
 
 
@@ -291,14 +278,13 @@ def close(
     at: datetime,
     *,
     how: Closing,
-    reported: bool = False,
     reason: str = adjustment_reasons.USED_UP,
-) -> Closed | None:
+) -> bool:
     """Close an open package as used up (docs/decisions/0020): an
     adjustment, under the administrator's name, for whatever it still
     showed, with the reason Used up, so it shows nothing; then closed.
-    None if it did not close it: if there is no such package, it is closed
-    already, it moved since it was read, or, with `reported`, it is no
+    False if it did not close it: if there is no such package, it is closed
+    already, it moved since it was read, or, confirming a report, it is no
     longer reported (a report cleared meanwhile). A count closes one not
     there with the reason Lost or stolen (`reason`). An opening into it
     waiting as recorded more than moved, its sealed end counted, closes as
@@ -308,7 +294,7 @@ def close(
     confirming a volunteer's report, directly, or by a count."""
     found = session.get(OpenPackage, open_id)
     if found is None:
-        return None
+        return False
     place = found.location_id
     # In the ledger's order: its place, its item, then it.
     ledger.lock_place(session, place)
@@ -316,9 +302,9 @@ def close(
     row = get_locked(session, OpenPackage, open_id, key_share=True)
     assert row is not None  # Read just now; open packages are never deleted.
     if row.closed_at is not None or row.location_id != place:
-        return None
-    if reported and row.reported_at is None:
-        return None
+        return False
+    if how == "confirmed" and row.reported_at is None:
+        return False
     left = balance.left_on(session, [row])[row.id]
     if left != 0:
         counts.record_adjustment(
@@ -345,9 +331,8 @@ def close(
         open_package_id=row.id,
         admin_id=admin_id,
     )
-    return Closed(
-        settled, over_recorded.open_package_closed(session, row.id, admin_id, at)
-    )
+    over_recorded.open_package_closed(session, row.id, admin_id, at)
+    return True
 
 
 def clear(session: Session, open_id: int) -> bool:

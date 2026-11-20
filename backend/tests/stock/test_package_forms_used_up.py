@@ -449,9 +449,8 @@ def test_closing_or_clearing_twice_changes_nothing_more(
 ) -> None:
     made = reported(session, spools)
     closer = new_admin_id(session)
-    assert (
-        open_packages.close(session, 999999, closer, datetime.now(UTC), how="direct")
-        is None
+    assert not open_packages.close(
+        session, 999999, closer, datetime.now(UTC), how="direct"
     )
     assert open_packages.clear(session, made.id) is True
     assert open_packages.clear(session, made.id) is False
@@ -461,7 +460,7 @@ def test_closing_or_clearing_twice_changes_nothing_more(
     again = open_packages.close(
         session, made.id, closer, datetime.now(UTC), how="direct"
     )
-    assert (first, again) == (open_packages.Closed(False, 0), None)
+    assert (first, again) == (True, False)
     # Ticked when no longer reported: left as it is.
     done = admin_client.post(
         USED_UP, data={"open_package": [str(made.id)], "do": "clear"}
@@ -490,10 +489,7 @@ def test_a_confirm_after_a_clear_closes_nothing(
     made = spools.opened()
     closer = new_admin_id(session)
     when = datetime.now(UTC)
-    assert (
-        open_packages.close(session, made.id, closer, when, reported=True, how="direct")
-        is None
-    )
+    assert not open_packages.close(session, made.id, closer, when, how="confirmed")
     assert made.closed_at is None
     assert balance.left_on(session, []) == {}
 

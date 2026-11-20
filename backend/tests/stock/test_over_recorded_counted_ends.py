@@ -313,10 +313,6 @@ def test_one_moved_whole_is_closed_by_setting_its_length_where_it_arrived(
     )
     assert length_checks_routes._set(
         session, new_admin_id(session), answer, [spools.van.id]
-    ) == (
-        True,
-        False,
-        1,
     )
     (check,) = checks(session)
     assert check.settled_how == "counted"
@@ -338,10 +334,6 @@ def test_only_a_report_after_the_batch_that_moved_it_whole_puts_it_right(
     )
     assert length_checks_routes._set(
         session, new_admin_id(session), answer, [spools.van.id]
-    ) == (
-        True,
-        False,
-        0,
     )
     (check,) = checks(session)
     assert check.settled_at is None
@@ -360,10 +352,6 @@ def test_only_a_report_after_the_batch_that_moved_it_whole_puts_it_right(
     )
     assert length_checks_routes._set(
         session, new_admin_id(session), answer, [spools.van.id]
-    ) == (
-        True,
-        False,
-        1,
     )
     (check,) = checks(session)
     assert check.settled_how == "counted"

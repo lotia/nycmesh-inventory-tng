@@ -273,12 +273,11 @@ def record(
         )
     # Said with a cut from it, or alone, taking nothing from it.
     cut = {line.open_package_key for line in batch.lines}
-    how: dict[Reported, int] = {}
     for key, open_id in reports.items():
         if open_id in reported:
-            way: Reported = "cut" if key in cut else "button"
-            how[way] = how.get(way, 0) + 1
-    once_committed(session, _recorded, batch, transaction.id, retired, opened, how)
+            how: Reported = "cut" if key in cut else "button"
+            once_committed(session, packages_reported.add, 1, {"how": how})
+    once_committed(session, _recorded, batch, transaction.id, retired, opened)
     return Recorded(transaction, True)
 
 
@@ -287,11 +286,10 @@ def _recorded(
     transaction_id: int,
     retired: Sequence[Side],
     opened: Mapping[Into, int],
-    reported: Mapping[Reported, int],
 ) -> None:
     """Measure and log a batch written, once committed: the sides at a
-    retired place, the packages an opening opened by what they became, and
-    the open packages it reported used up by how."""
+    retired place, and the packages an opening opened by what they
+    became."""
     recorded.add(1, {"kind": batch.kind})
     if batch.lines:
         lines_per_batch.record(len(batch.lines), {"kind": batch.kind})
@@ -301,8 +299,6 @@ def _recorded(
         for line in batch.lines:
             if line.open_package_key is not None:
                 taken_from.add(1, {"how": "whole" if line.whole else "cut"})
-    for how, packages in reported.items():
-        packages_reported.add(packages, {"how": how})
     log.info(
         "transaction recorded",
         transaction_id=transaction_id,

@@ -8,6 +8,7 @@ import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy import select
 from sqlalchemy.orm import Session
+from structlog.testing import capture_logs
 
 from inventory_tng.admins.accounts import NOT_AN_EMAIL
 from inventory_tng.core.local_time import DEFAULT_ZONE
@@ -94,11 +95,18 @@ def test_renaming_renames_their_custody(
 def test_holding_stock_and_stopping(admin_client: TestClient, session: Session) -> None:
     ada = add(session, Volunteer(name="Ada"))
     path = f"{VOLUNTEERS}/{ada.id}"
-    assert admin_client.post(f"{path}/custody").status_code == 303
+    with capture_logs() as logs:
+        assert admin_client.post(f"{path}/custody").status_code == 303
+    assert "custody started" in [line["event"] for line in logs]
     custody = custody_of(session, ada)
     assert custody is not None
     assert custody.kind == "custody"
     assert "yes" in text(admin_client.get(VOLUNTEERS))
+    # Asked again, as from a second tab: the same, and logged once.
+    with capture_logs() as logs:
+        assert admin_client.post(f"{path}/custody").status_code == 303
+    assert custody_of(session, ada) == custody
+    assert "custody started" not in [line["event"] for line in logs]
     # Not while they hold something.
     give(session, custody)
     refused = admin_client.post(f"{path}/custody/end")

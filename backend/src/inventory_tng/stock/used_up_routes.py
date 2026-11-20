@@ -148,10 +148,10 @@ def _answer(
         done, _ = attempt(
             session,
             lambda row=row: open_packages.close(
-                session, row.id, signed.admin.id, now(), how="confirmed", reported=True
+                session, row.id, signed.admin.id, now(), how="confirmed"
             ),
         )
-        changed += done is not None
+        changed += bool(done)
     once_committed(
         session,
         log.info,
@@ -242,5 +242,5 @@ def close_directly(
         ),
     )
     session.commit()
-    notice = "open_package_closed" if done is not None else "used_up_unchanged"
+    notice = "open_package_closed" if done else "used_up_unchanged"
     return redirect(f"{ITEMS}/{item_id}", notice=notice, section="open-packages")
