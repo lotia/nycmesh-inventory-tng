@@ -185,20 +185,20 @@ def admin_failing(admin_client: TestClient, session: Session) -> Iterator[Sent]:
     with counting(session) as statements:
         sent = Sent(statements)
 
-        def missing() -> None:
-            sent.at_failure.append(len(statements))
-            pages.not_found()
+        def failing(error: Exception) -> Callable[[], None]:
+            def route() -> None:
+                sent.at_failure.append(len(statements))
+                raise error
 
-        def fail() -> None:
-            sent.at_failure.append(len(statements))
-            raise RuntimeError("a bug")
+            return route
 
         app = admin_client.app
         assert isinstance(app, FastAPI)
         guarded = [Depends(admin_signed_in)]
+        missing, broken = failing(HTTPException(404)), failing(RuntimeError("a bug"))
         app.add_api_route("/admin/test/missing", missing, dependencies=guarded)
-        app.add_api_route("/admin/test/broken", fail, dependencies=guarded)
-        app.add_api_route("/admin/test/broken-early", fail)
+        app.add_api_route("/admin/test/broken", broken, dependencies=guarded)
+        app.add_api_route("/admin/test/broken-early", broken)
         yield sent
 
 

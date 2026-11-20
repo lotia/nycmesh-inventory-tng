@@ -47,10 +47,9 @@ def csp_nonce(request: Request) -> str | None:
 
 cast(dict[str, Any], templates.env.globals)["csp_nonce"] = csp_nonce
 
-# Where the administrator a request is signed in as is kept, in its state,
-# once the sign-in guard has checked them (admins/guards.signed_in): what an
-# error page's masthead shows, read without the database.
-SIGNED_IN_AS = "signed_in_as"
+# Where the administrator a request is signed in as is kept, in its state:
+# what an error page's masthead shows, read without the database.
+_SIGNED_IN_AS = "signed_in_as"
 
 
 @dataclass(frozen=True)
@@ -60,6 +59,17 @@ class SignedInAs:
     error page is drawn, and reading it would query the database."""
 
     username: str
+
+
+def remember_signed_in(request: Request, username: str) -> None:
+    """Keep, for an error page later in this request, who the sign-in guard
+    found (admins/guards.signed_in)."""
+    request.scope.setdefault("state", {})[_SIGNED_IN_AS] = SignedInAs(username)
+
+
+def signed_in_as(request: Request) -> SignedInAs | None:
+    """Who this request was found signed in as; None if nothing checked."""
+    return request.scope.get("state", {}).get(_SIGNED_IN_AS)
 
 
 # {{ quantity | amount }}: a quantity as people read it ("1,234.5"); a
@@ -219,7 +229,7 @@ class ErrorPages:
         # Under the administrator pages, signed in as this request found:
         # their masthead, with no badges, as the database is not read here.
         # A mistyped address checked no sign-in, so its page stays plain.
-        admin = request.scope.get("state", {}).get(SIGNED_IN_AS)
+        admin = signed_in_as(request)
         if under_admin and admin is not None:
             context |= {"admin": admin, "sections": sections_without_badges()}
         return page(request, "error.html", context, status)
