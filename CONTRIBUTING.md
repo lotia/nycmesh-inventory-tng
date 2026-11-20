@@ -76,9 +76,10 @@ bd label list-all
 - With Podman, Docker Compose as its compose provider. Podman's compose
   command runs whichever provider is installed, Docker Compose first, and
   says which it runs (`mise run compose -- version`). Podman Compose is
-  not supported: it has no `compose ls`, and its `ps` lacks the ports the
-  tasks read, so `mise run start-database` says this checkout's own
-  running server holds its port and refuses. To switch, install Docker
+  not supported: it has no `compose ls`, and its `ps` lacks the ports, so
+  the tasks cannot find the stacks and their ports. For one,
+  `mise run start-database` says this checkout's own running server's
+  port is in use "by something else" and refuses. To switch, install Docker
   Compose, or name it in `compose_providers` in the `[engine]` table of
   containers.conf (Podman's man page for its compose command).
 
@@ -854,23 +855,19 @@ in CI, whose Docker runs as root, where the bug never shows.
 
 ### SELinux and the server's setup scripts
 
-A known limit, untested: on Fedora or RHEL with rootless Podman, a new
-volume may never get its roles. Compose mounts the server's setup scripts
-(`configs` in `compose.yaml`) without an SELinux relabel, so the server
-cannot read them, and `mise run compose -- logs db` shows
-`/docker-entrypoint-initdb.d/1-roles.sql: Permission denied`. The setup
-stops there, and later starts never run it again. On such a host, label
-the scripts' directory for containers, then remove the volume, which holds
-nothing yet, and start again:
+A known limit, untested: on Fedora or RHEL with rootless Podman, the first
+`mise run start-database` on a new volume may fail. Compose mounts the
+server's setup scripts (`configs` in `compose.yaml`) without an SELinux
+relabel, so the server cannot read them, and `mise run compose -- logs db`
+shows `/docker-entrypoint-initdb.d/1-roles.sql: Permission denied`. Run
+`mise run dev-database`: the server starts, skipping the scripts, and the
+task makes the roles and the database. To stop the first start failing in
+each new checkout, label the scripts' directory for containers, from the
+clone's root (a relabel of the file system undoes it):
 
 ```sh
 chcon -R -t container_file_t backend/migrations
-mise run compose -- down --volumes   # only a new stack's, holding nothing
-mise run start-database
 ```
-
-This changes, with a relabelled mount in `compose.yaml`, once someone
-develops here on such a host.
 
 ## Phrases
 
