@@ -671,7 +671,9 @@ trust Caddy's root instead: open the `/caddy-root.crt` link the task
 prints on the iPhone, install the profile in Settings, then turn on full
 trust for it in Settings, General, About, Certificate Trust Settings.
 Remove the profile when you are done: its key, in Caddy's volume on this
-machine, could sign a certificate for any site.
+machine, could sign a certificate for any site. To start again with a new
+root, remove that volume, the one ending `_caddy` that `mise run compose
+-- volumes` lists, with `podman volume rm` (or `docker volume rm`).
 
 [Tailscale](https://tailscale.com/kb/1312/serve) is another way: with it on
 both, `tailscale serve` gives the app's port a real certificate on the

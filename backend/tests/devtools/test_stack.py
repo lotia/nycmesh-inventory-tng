@@ -482,8 +482,8 @@ def test_a_taken_port_moves_past_claims_to_one_free_or_this_stack_s(
     monkeypatch: pytest.MonkeyPatch, env_file: Path, tmp_path: Path
 ) -> None:
     """As when mise run dev's backend holds the app's port: past this
-    checkout's other settings, another stack's claim and a port something
-    else holds, to the app container's from a run before."""
+    checkout's other settings, another stack's claim and a port its Caddy
+    holds, to the app container's from a run before."""
     env_file.write_text("INVENTORY_APP_PORT=8000\nINVENTORY_VITE_PORT=8001\n")
     other = tmp_path / "other"
     other.mkdir()
@@ -494,7 +494,7 @@ def test_a_taken_port_moves_past_claims_to_one_free_or_this_stack_s(
     monkeypatch.setattr(stack, "in_use", lambda port: port in held)
     compose_answers(
         monkeypatch,
-        ps=[publishing("app", 8004)],
+        ps=[publishing("caddy", 8003), publishing("app", 8004)],
         ls=[project(f"{SHARED}-other_2", other)],
     )
     assert stack.free_port_for("INVENTORY_APP_PORT") == 8004
@@ -507,13 +507,17 @@ def test_a_taken_port_moves_past_claims_to_one_free_or_this_stack_s(
         stack.free_port_for("INVENTORY_APP_PORT")
 
 
+@pytest.mark.usefixtures("nothing_listens")
 def test_it_prints_a_free_port_and_says_when_it_is_another(
     monkeypatch: pytest.MonkeyPatch,
     capsys: pytest.CaptureFixture[str],
     env_file: Path,
     listening: int,
 ) -> None:
+    """Caddy's port, taken on the local address, where in_use does not
+    look: here 127.0.0.1 stands in for it."""
     compose_answers(monkeypatch)
+    monkeypatch.setattr(stack, "lan_address", lambda: "127.0.0.1")
     env_file.write_text(f"INVENTORY_LAN_PORT={listening}\n")
     run_devtools(["stack", "free-port", "INVENTORY_LAN_PORT"])
     printed = capsys.readouterr()
@@ -523,7 +527,7 @@ def test_it_prints_a_free_port_and_says_when_it_is_another(
         f"Port {listening} (INVENTORY_LAN_PORT in .env) is in use: "
         f"using {moved} instead.\n"
     )
-    monkeypatch.setattr(stack, "in_use", lambda _: False)
+    monkeypatch.setattr(stack, "listens_on", lambda *_: False)
     run_devtools(["stack", "free-port", "INVENTORY_LAN_PORT"])
     assert capsys.readouterr() == (f"{listening}\n", "")
 

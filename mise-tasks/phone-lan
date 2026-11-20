@@ -18,13 +18,29 @@ INVENTORY_LAN_ADDRESS=$(devtools lan-address)
 INVENTORY_APP_PORT=$(devtools stack free-port INVENTORY_APP_PORT)
 INVENTORY_LAN_PORT=$(devtools stack free-port INVENTORY_LAN_PORT)
 export INVENTORY_LAN_ADDRESS INVENTORY_APP_PORT INVENTORY_LAN_PORT
+# The app takes Caddy's forwarded headers, so its links say https and the
+# client is the phone: Caddy writes them itself, and the app is otherwise
+# reached only from 127.0.0.1. Until the app's container is next made.
+export FORWARDED_ALLOW_IPS='*'
 url="https://$INVENTORY_LAN_ADDRESS:$INVENTORY_LAN_PORT"
+
+# One at a time: another run's Caddy would be taken over, then removed
+# under it.
+if [[ -n $(compose ps --status running --quiet caddy) ]]; then
+  echo "Caddy already runs here: stop that run, or remove it with" \
+    "mise run compose -- --profile lan rm -sf caddy" >&2
+  exit 1
+fi
 
 # Caddy listens on the local network only while this runs: on any exit,
 # Ctrl-C included, it goes, and the app stays on 127.0.0.1.
-stop() { compose rm -sf caddy >/dev/null 2>&1 || true; }
+stop() {
+  [[ -z ${waiting-} ]] || kill "$waiting" 2>/dev/null || true
+  compose rm -sf caddy >/dev/null 2>&1 ||
+    echo "Caddy may still listen: mise run compose -- --profile lan rm -sf caddy" >&2
+}
 trap stop EXIT
-trap 'exit 130' INT TERM
+trap 'exit 130' INT TERM HUP
 
 # dev-database first (depends): the server's container makes only
 # `inventory`, not this checkout's database. The built pages, never
@@ -37,4 +53,9 @@ echo "The app here: http://127.0.0.1:$INVENTORY_APP_PORT"
 echo "On a phone on this network: $url (accept the certificate warning)"
 echo "Caddy's root, to trust it instead (optional): $url/caddy-root.crt"
 echo "Ctrl-C stops it."
-while :; do sleep 3600; done
+# In the background, so a signal to this script alone stops it at once.
+while :; do
+  sleep 3600 &
+  waiting=$!
+  wait "$waiting"
+done

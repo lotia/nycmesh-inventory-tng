@@ -34,6 +34,7 @@ from collections.abc import Iterable, Sequence
 from functools import cache
 from pathlib import Path
 
+from devtools.lan_address import lan_address
 from inventory_tng.core.local_env import CLONE, ENV_FILE, local_env_values, setting
 
 # compose.yaml's name: the project of every checkout whose .env names none,
@@ -55,6 +56,9 @@ PUBLISHED = {
 # Each port a checkout's .env gives: those, and Vite's dev server's, which
 # `mise run dev` runs here (the backend there takes INVENTORY_APP_PORT).
 PORTS = {**PUBLISHED, "INVENTORY_VITE_PORT": 5173}
+# The ports `mise run phone` and `mise run phone-lan` move when taken, each
+# with the service that publishes it.
+MOVABLE = {"INVENTORY_APP_PORT": "app", "INVENTORY_LAN_PORT": "caddy"}
 COMPOSE = CLONE / "mise-tasks" / "compose"
 NEW_PORTS = "mise run setup -- --new-ports"
 
@@ -114,6 +118,18 @@ def in_use(port: int) -> bool:
             probe.bind(("::1", port))
     except OSError as error:
         return error.errno == errno.EADDRINUSE
+    return False
+
+
+def listens_on(address: str, port: int) -> bool:
+    """Whether something listens on the port at this address, as Caddy
+    does on the local one, where in_use does not look."""
+    with socket.socket() as probe:
+        probe.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        try:
+            probe.bind((address, port))
+        except OSError as error:
+            return error.errno == errno.EADDRINUSE
     return False
 
 
@@ -245,24 +261,31 @@ def port(key: str) -> int:
     return int(value)
 
 
-def free_port_for(key: str) -> int:
+def free_port_for(key: str, address: str | None = None) -> int:
     """The setting's port while it is free; else the next one up that this
-    checkout's stack holds, or that no stack claims and nothing listens on,
-    and none of this checkout's other settings names. For a container that
-    publishes it, so another port does when, say, `mise run dev`'s backend
-    holds this one; the stack's own counts, as a run before may have moved
-    the container there."""
+    checkout's container for it holds, or that no stack claims and nothing
+    listens on, and none of this checkout's other settings names. For a
+    container that publishes it, so another port does when, say, `mise run
+    dev`'s backend holds this one; the container's own counts, as a run
+    before may have moved it there. With an address, a listener there
+    counts too."""
+
+    def taken(candidate: int) -> bool:
+        return in_use(candidate) or (
+            address is not None and listens_on(address, candidate)
+        )
+
     number = port(key)
-    if not in_use(number):
+    if not taken(number):
         return number
-    own = own_ports()
+    own = {held for held, service in own_ports().items() if service == MOVABLE[key]}
     claimed = claimed_ports(other_stacks("--all"))
     mine = {port(other) for other in PORTS if other != key}
 
     def usable(candidate: int) -> bool:
         if candidate in mine:
             return False
-        return candidate in own or not (candidate in claimed or in_use(candidate))
+        return candidate in own or not (candidate in claimed or taken(candidate))
 
     while not usable(number):
         number += 1
@@ -360,7 +383,7 @@ def main(argv: Sequence[str], prog: str) -> int:
         "free-port",
         help="print the setting's port, or, if it is taken, another free one",
     )
-    instead.add_argument("key", metavar="KEY", choices=PUBLISHED)
+    instead.add_argument("key", metavar="KEY", choices=MOVABLE)
     one = commands.add_parser("port", help="print the port for each setting")
     one.add_argument("keys", nargs="+", metavar="KEY", choices=PORTS)
     args = parser.parse_args(argv)
@@ -370,7 +393,9 @@ def main(argv: Sequence[str], prog: str) -> int:
             print(*problems, sep="\n", file=sys.stderr)
             return 1
     elif args.command == "free-port":
-        number = free_port_for(args.key)
+        # Caddy publishes on the local address, not 127.0.0.1.
+        address = lan_address() if MOVABLE[args.key] == "caddy" else None
+        number = free_port_for(args.key, address)
         if number != port(args.key):
             print(
                 f"Port {port(args.key)} ({where_set(args.key)}) is in use: "

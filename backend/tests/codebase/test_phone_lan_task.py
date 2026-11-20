@@ -25,17 +25,22 @@ case "$*" in
 esac
 """
 # Each call, with the settings compose would publish by; FAIL makes one
-# such call fail.
+# such call fail, and RUNNING is what ps answers.
 COMPOSE = """#!/bin/sh
-echo "$INVENTORY_LAN_ADDRESS:$INVENTORY_LAN_PORT $INVENTORY_APP_PORT $*" >> "$LOG"
+echo "$INVENTORY_LAN_ADDRESS:$INVENTORY_LAN_PORT $INVENTORY_APP_PORT" \\
+  "$FORWARDED_ALLOW_IPS $*" >> "$LOG"
 case "$*" in *"$FAIL"*) [ -n "$FAIL" ] && exit 1 ;; esac
+case "$*" in *" ps "*) echo "$RUNNING" ;; esac
 exit 0
 """
-# Ctrl-C, as the terminal sends it to the task.
-SLEEP = '#!/bin/sh\nkill -INT "$PPID"\n'
+# Ctrl-C, as the terminal sends it to the task, or SIGNAL, then a sleep
+# longer than the run's timeout, which the task must end too.
+SLEEP = '#!/bin/sh\nkill -"$SIGNAL" "$PPID"\nexec "$SLEEP" 60\n'
 
 
-def run(tmp_path: Path, fail: str = "") -> tuple[subprocess.CompletedProcess, list]:
+def run(
+    tmp_path: Path, fail: str = "", running: str = "", signal: str = "INT"
+) -> tuple[subprocess.CompletedProcess, list]:
     tasks = tmp_path / "mise-tasks"
     tools = tmp_path / "bin"
     tasks.mkdir()
@@ -52,7 +57,9 @@ def run(tmp_path: Path, fail: str = "") -> tuple[subprocess.CompletedProcess, li
     assert dirname is not None
     (tools / "dirname").symlink_to(dirname)
     bash = shutil.which("bash")
+    sleep = shutil.which("sleep")
     assert bash is not None
+    assert sleep is not None
     log = tmp_path / "compose.log"
     done = subprocess.run(
         [bash, str(tasks / "phone-lan")],
@@ -61,6 +68,9 @@ def run(tmp_path: Path, fail: str = "") -> tuple[subprocess.CompletedProcess, li
             "HOME": os.environ.get("HOME", str(tmp_path)),
             "LOG": str(log),
             "FAIL": fail,
+            "RUNNING": running,
+            "SIGNAL": signal,
+            "SLEEP": sleep,
         },
         capture_output=True,
         text=True,
@@ -74,12 +84,13 @@ def test_it_serves_on_the_local_address_until_ctrl_c(tmp_path: Path) -> None:
     done, calls = run(tmp_path)
     assert done.returncode == 130
     assert "On a phone on this network: https://192.168.1.20:8443" in done.stdout
-    settings = "192.168.1.20:8443 8002 --profile lan"
+    settings = "192.168.1.20:8443 8002 * --profile lan"
     code = (
         "python -m inventory_tng.manage registration-codes create --uses 1 "
         "--days 1 --label phone --base-url https://192.168.1.20:8443"
     )
     assert calls == [
+        f"{settings} ps --status running --quiet caddy",
         f"{settings} up -d --build --wait app",
         f"{settings} up -d --force-recreate --no-deps caddy",
         f"{settings} exec -T app {code}",
@@ -92,3 +103,19 @@ def test_a_failure_removes_caddy_too(tmp_path: Path) -> None:
     assert done.returncode == 1
     assert calls[-1].endswith("--profile lan rm -sf caddy")
     assert "Ctrl-C" not in done.stdout
+
+
+def test_a_signal_to_the_task_alone_stops_it_at_once(tmp_path: Path) -> None:
+    """As from kill: not only after the sleep it waits on ends."""
+    done, calls = run(tmp_path, signal="TERM")
+    assert done.returncode == 130
+    assert calls[-1].endswith("--profile lan rm -sf caddy")
+
+
+def test_a_second_run_leaves_the_first_s_caddy_alone(tmp_path: Path) -> None:
+    done, calls = run(tmp_path, running="0123abcd")
+    assert done.returncode == 1
+    assert "Caddy already runs here" in done.stderr
+    assert [call.split(" ", 3)[3] for call in calls] == [
+        "--profile lan ps --status running --quiet caddy"
+    ]

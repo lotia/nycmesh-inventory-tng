@@ -226,10 +226,10 @@ services:
 
   # Optional: `mise run phone-lan` (CONTRIBUTING.md, On a phone). The app
   # over https on the machine's local address, which the task sets, with a
-  # certificate from Caddy's own authority; unset, only on 127.0.0.1. The
-  # app sees Caddy's address as the client's: it trusts forwarded headers
-  # from 127.0.0.1 only. Its volume keeps that authority, so a phone that
-  # trusts it goes on trusting it.
+  # certificate from Caddy's own authority; unset, only on 127.0.0.1. Only
+  # the task checks the address is a local one, and makes the app trust
+  # Caddy's forwarded headers. Its volume keeps that authority, so a phone
+  # that trusts it goes on trusting it.
   caddy:
     image: docker.io/library/caddy:2.11.9
     profiles: [lan]
