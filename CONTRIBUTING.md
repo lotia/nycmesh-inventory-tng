@@ -73,15 +73,14 @@ bd label list-all
   app). `mise run compose -- <arguments>` runs compose with Podman if it is
   installed, else Docker. To choose, set `INVENTORY_COMPOSE` in `.env`, such
   as `INVENTORY_COMPOSE=docker compose`.
-- With Podman, Docker Compose as its compose provider. Podman's compose
-  command runs whichever provider is installed, Docker Compose first, and
-  says which it runs (`mise run compose -- version`). Podman Compose is
-  not supported: it has no `compose ls`, and its `ps` lacks the ports, so
-  the tasks cannot find the stacks and their ports. For one,
-  `mise run start-database` says this checkout's own running server's
-  port is in use "by something else" and refuses. To switch, install Docker
-  Compose, or name it in `compose_providers` in the `[engine]` table of
-  containers.conf (Podman's man page for its compose command).
+- With Podman, Docker Compose as its compose provider, which Podman runs
+  first if both are installed (`mise run compose -- version` names it).
+  Podman Compose is not supported: without `compose ls` and the ports in
+  `ps`, the tasks cannot find the stacks, so `mise run start-database`, for
+  one, refuses, saying this checkout's own server's port is in use "by
+  something else". To switch, install Docker Compose, or name it in
+  `compose_providers` under `[engine]` in containers.conf (Podman's man
+  page for its compose command).
 
 Activate mise in your shell (`mise activate`, in its docs), so the tools it
 installs are on your `PATH` in the clone. Then, in the clone, and again after
@@ -856,14 +855,14 @@ in CI, whose Docker runs as root, where the bug never shows.
 ### SELinux and the server's setup scripts
 
 A known limit, untested: on Fedora or RHEL with rootless Podman, the first
-`mise run start-database` on a new volume may fail. Compose mounts the
+`mise run start-database` on a new volume may fail, as compose mounts the
 server's setup scripts (`configs` in `compose.yaml`) without an SELinux
-relabel, so the server cannot read them, and `mise run compose -- logs db`
-shows `/docker-entrypoint-initdb.d/1-roles.sql: Permission denied`. Run
-`mise run dev-database`: the server starts, skipping the scripts, and the
-task makes the roles and the database. To stop the first start failing in
-each new checkout, label the scripts' directory for containers, from the
-clone's root (a relabel of the file system undoes it):
+relabel. `mise run compose -- logs db` then shows
+`/docker-entrypoint-initdb.d/1-roles.sql: Permission denied`.
+`mise run dev-database` recovers: the server starts without the scripts,
+and the task makes the roles and the database. To prevent it in new
+checkouts, label the scripts' directory for containers, from the clone's
+root (a file-system relabel undoes it):
 
 ```sh
 chcon -R -t container_file_t backend/migrations
