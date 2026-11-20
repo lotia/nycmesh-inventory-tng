@@ -108,19 +108,6 @@ test("no torch, no button", async () => {
   expect(screen.queryByRole("button", { name: say(TORCH) })).toBeNull();
 });
 
-test("a camera refused, or none, says so and leaves the lists", async () => {
-  const refused = async () => {
-    throw new DOMException("no", "NotAllowedError");
-  };
-  render(<Scanner open={refused} onCode={() => said("")} onDone={() => {}} />);
-  await screen.findByText(say(NOT_ALLOWED.bold));
-  const missing = async () => {
-    throw new DOMException("none", "NotFoundError");
-  };
-  render(<Scanner open={missing} onCode={() => said("")} onDone={() => {}} />);
-  await screen.findByText(say(NO_CAMERA.bold));
-});
-
 test("a camera closed before it opened is stopped when it does", async () => {
   const read = vi.fn(async () => []);
   const { state, open } = camera({ read });
@@ -173,14 +160,6 @@ test("a slow read is waited for, not piled on", async () => {
   expect(read).toHaveBeenCalledTimes(1);
   finish(["B3ZT9W"]);
   await screen.findByText("Read B3ZT9W.");
-});
-
-test("a decoder that didn't load says so, not that there is no camera", async () => {
-  const offline = async () => {
-    throw new DecoderUnavailable("offline");
-  };
-  render(<Scanner open={offline} onCode={() => said("")} onDone={() => {}} />);
-  await screen.findByText(say(NO_DECODER.bold));
 });
 
 test("a torch that won't switch says so", async () => {

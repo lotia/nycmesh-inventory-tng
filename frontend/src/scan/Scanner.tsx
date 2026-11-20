@@ -49,7 +49,7 @@ export const NO_CAMERA: Refusal = {
 
 /** What the volunteer is told for each way the report says the camera
  * was refused, so the two never disagree. */
-export const REFUSALS: Record<Refused, Refusal> = {
+const REFUSALS: Record<Refused, Refusal> = {
   decoder_failed: NO_DECODER,
   not_allowed: NOT_ALLOWED,
   in_use: IN_USE,
