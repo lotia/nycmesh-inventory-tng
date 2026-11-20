@@ -359,7 +359,9 @@ function PutInCart({
 }) {
   // Once shown, the in-cart words keep their room when recorded, so Dismiss
   // below does not move; one already recorded as it is first drawn needs
-  // none.
+  // none. Under a hint they take its place and the button keeps its room:
+  // Dismiss never rises to where the button was, for a second tap to land
+  // on.
   const shownInCart = useRef(false);
   shownInCart.current ||= inCart;
   if (!added) {
@@ -372,7 +374,17 @@ function PutInCart({
       </>
     );
   }
-  return shownInCart.current ? (
-    <p {...(inCart ? {} : KEEPS_ROOM)}>{say(inCartWords)}</p>
-  ) : null;
+  if (!shownInCart.current) {
+    return null;
+  }
+  return (
+    <>
+      <p {...(inCart ? {} : KEEPS_ROOM)}>{say(inCartWords)}</p>
+      {hint !== undefined && (
+        <button type="button" tabIndex={-1} {...KEEPS_ROOM}>
+          {say(label)}
+        </button>
+      )}
+    </>
+  );
 }

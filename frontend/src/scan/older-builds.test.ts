@@ -414,6 +414,15 @@ describe("as a cart", () => {
         },
       },
     );
+    // Spaces kept round a problem's words, and a marker with none after
+    // it, add nothing to its line.
+    expect(refusedFor({ note: "Not saved. Line 1: no.  Line 2: " })).toEqual({
+      code: "refused",
+      note: {
+        bold: ["Not saved."],
+        problems: [["Line 1: ", { quoted: "no." }], ["Line 2: "]],
+      },
+    });
     // Other words, bold whole; none, nothing.
     expect(refusedFor({ note: "No." })).toEqual({
       code: "refused",

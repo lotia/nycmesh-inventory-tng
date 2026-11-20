@@ -34,9 +34,9 @@ export function NoteSaid({
   note: string | Note | null;
   then?: string | undefined;
 }) {
-  // A div, not a p: a refusal's problems are a list.
+  // A div, not a p: a refusal's problems are a list. Spaced as a p is.
   return (
-    <div class="alert">
+    <div class="alert my-3">
       {note !== null && (
         <AlertWords note={typeof note === "string" ? { bold: [note] } : note} />
       )}
@@ -102,7 +102,7 @@ export function AlertWords({
       </strong>
       {plain.length > 0 && <Counted said={plain} />}
       {problems.length > 0 && (
-        <ul class="list-none p-0">
+        <ul class="m-0 list-none p-0">
           {problems.map((said, at) => (
             <li key={keys[at]}>
               <Counted said={said} />

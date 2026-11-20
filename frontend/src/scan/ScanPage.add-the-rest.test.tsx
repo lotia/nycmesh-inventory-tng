@@ -84,7 +84,13 @@ test("Add to cart, under a refused batch, puts the other lines in the cart, says
   // refusal stays listed.
   expect(addTheRest(entry)).toBeNull();
   expect(within(entry).queryByText(say(REST_WITHOUT_REFUSED))).toBeNull();
-  within(entry).getByText(say(REST_IN_CART));
+  const inCart = within(entry).getByText(say(REST_IN_CART));
+  // The button keeps its room, unseen, so Dismiss does not rise to where it
+  // was for a second tap to land on.
+  const room = inCart.nextElementSibling as HTMLElement;
+  expect(room.tagName).toBe("BUTTON");
+  expect(room.getAttribute("aria-hidden")).toBe("true");
+  expect(room.classList.contains("invisible")).toBe(true);
   within(entry).getByRole("button", { name: say(DISMISS) });
   expect(outbox.entries.value[0]?.reason).toMatchObject({ added: true });
   expect(

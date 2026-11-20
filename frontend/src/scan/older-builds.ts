@@ -275,9 +275,10 @@ function refusedOf(reason: Reason | null, note: string | null): Refused {
   const problems: Said[] =
     before.trim() === "" ? [] : [[{ quoted: before.trim() }]];
   for (let at = 0; at < named.length; at += 2) {
+    const why = (named[at + 1] as string).trim();
     problems.push([
       (named[at] as string).trimStart(),
-      { quoted: named[at + 1] ?? "" },
+      ...(why === "" ? [] : [{ quoted: why }]),
     ]);
   }
   return { code: "refused", note: { bold: [NOT_SAVED], problems } };
