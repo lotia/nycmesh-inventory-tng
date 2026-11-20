@@ -9,8 +9,14 @@ import { msg } from "@lingui/core/macro";
 import { useSignal } from "@preact/signals";
 import { useEffect, useRef } from "preact/hooks";
 import { say } from "../shared/i18n";
-import { DecoderUnavailable, openCamera, type Session } from "./camera";
-import { CameraReport, type LabelKind } from "./camera-report";
+import { openCamera, type Session } from "./camera";
+import {
+  CameraReport,
+  type LabelKind,
+  outcomeOf,
+  type Refused,
+} from "./camera-report";
+import { AlertWords } from "./Notes";
 import { Repeats } from "./repeated-reads";
 
 export const CAMERA = msg`Camera`;
@@ -19,9 +25,38 @@ export const POINT = msg`Point the camera at a label.`;
 export const TORCH_FAILED = msg`The torch wouldn't switch.`;
 export const DONE = msg`Done`;
 export const TORCH = msg`Torch`;
-export const NO_DECODER = msg`The label reader didn't load. Check the connection, then press Done and try again.`;
-export const NOT_ALLOWED = msg`The camera isn't allowed for this page. Allow it in the browser's settings, or find items in the list.`;
-export const NO_CAMERA = msg`No camera could be opened. Find items in the list instead.`;
+
+/** Why the camera could not be used, in the cart alerts' form: a bold
+ * heading, then a plain hint at what to do (Ali, inventory-tng-vz41). */
+export type Refusal = { bold: MessageDescriptor; plain: MessageDescriptor };
+
+export const NO_DECODER: Refusal = {
+  bold: msg`The label reader didn't load.`,
+  plain: msg`Check the connection, then press Done and try again.`,
+};
+export const NOT_ALLOWED: Refusal = {
+  bold: msg`The camera isn't allowed for this page.`,
+  plain: msg`Allow it in the browser's settings, then press Camera again, or find items in the list.`,
+};
+export const IN_USE: Refusal = {
+  bold: msg`The camera is in use.`,
+  plain: msg`Close the other app using it, then press Camera again, or find items in the list.`,
+};
+export const NO_CAMERA: Refusal = {
+  bold: msg`No camera could be opened.`,
+  plain: msg`Find items in the list instead.`,
+};
+
+/** What the volunteer is told for each way the report says the camera
+ * was refused, so the two never disagree. */
+export const REFUSALS: Record<Refused, Refusal> = {
+  decoder_failed: NO_DECODER,
+  not_allowed: NOT_ALLOWED,
+  in_use: IN_USE,
+  not_found: NO_CAMERA,
+  insecure: NO_CAMERA,
+  other: NO_CAMERA,
+};
 
 /** What a code read did, in words for the volunteer, and what its label
  * named, for the report. */
@@ -43,8 +78,9 @@ export function Scanner({
   // The newest onCode, so a refreshed catalogue is read from at once.
   const handle = useRef(onCode);
   handle.current = onCode;
-  // A phrase, said as shown, or the words onCode said.
-  const said = useSignal<MessageDescriptor | string>(STARTING);
+  // A phrase, said as shown, the words onCode said, or why the camera
+  // could not be used.
+  const said = useSignal<MessageDescriptor | string | Refusal>(STARTING);
   const torch = useSignal<((on: boolean) => Promise<void>) | null>(null);
 
   useEffect(() => {
@@ -92,10 +128,11 @@ export function Scanner({
         // was aborted, which is not the camera refused.
         if (stopped) {
           report.cancelled();
-        } else {
-          report.refused(error);
+          return;
         }
-        said.value = refused(error);
+        const outcome = outcomeOf(error);
+        report.refused(outcome);
+        said.value = REFUSALS[outcome];
       },
     );
     // Reported as the page is hidden or left, which may be the last of it.
@@ -134,7 +171,7 @@ export function Scanner({
         playsInline
       />
       <p role="status">
-        {typeof said.value === "string" ? said.value : say(said.value)}
+        <Said said={said.value} />
       </p>
       <div class="actions">
         {torch.value !== null && (
@@ -153,14 +190,19 @@ export function Scanner({
   );
 }
 
-/** Why the camera could not be used. */
-function refused(error: unknown): MessageDescriptor {
-  if (error instanceof DecoderUnavailable) {
-    return NO_DECODER;
+/** What the camera said last: a refusal as a bold heading then its hint. */
+function Said({ said }: { said: MessageDescriptor | string | Refusal }) {
+  if (typeof said === "string") {
+    return <>{said}</>;
   }
-  return error instanceof DOMException && error.name === "NotAllowedError"
-    ? NOT_ALLOWED
-    : NO_CAMERA;
+  if ("bold" in said) {
+    return (
+      <AlertWords
+        note={{ bold: [say(said.bold)], plain: [" ", say(said.plain)] }}
+      />
+    );
+  }
+  return <>{say(said)}</>;
 }
 
 /** Turns the camera's torch on and off. */

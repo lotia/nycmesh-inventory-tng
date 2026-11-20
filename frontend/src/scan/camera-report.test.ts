@@ -52,7 +52,7 @@ describe("what a session reports", () => {
   test("refused: reported at once, with no decoder and no open time", () => {
     const { report, clock, sent } = reporting();
     clock.now = 4_000;
-    report.refused(new DOMException("no", "NotAllowedError"));
+    report.refused("not_allowed");
     report.closed();
     expect(sent).toEqual([
       {

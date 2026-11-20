@@ -19,6 +19,10 @@ msgstr ""
 msgid "What is on an open package"
 msgstr ""
 
+#: src/scan/Scanner.tsx
+msgid "Close the other app using it, then press Camera again, or find items in the list."
+msgstr ""
+
 #: src/shared/outbox-notes.ts
 msgid "{tries, plural, one {The inventory keeps failing on this batch ({status}, # try). It is kept and tried again; please report this.} other {The inventory keeps failing on this batch ({status}, # tries). It is kept and tried again; please report this.}}"
 msgstr ""
@@ -127,6 +131,10 @@ msgstr ""
 
 #: src/scan/recorded-elsewhere.ts
 msgid "{name}: {amount}, new"
+msgstr ""
+
+#: src/scan/Scanner.tsx
+msgid "Find items in the list instead."
 msgstr ""
 
 #: src/scan/OlderList.tsx
@@ -307,6 +315,10 @@ msgid "From and to must be different places."
 msgstr ""
 
 #: src/scan/Scanner.tsx
+msgid "The label reader didn't load."
+msgstr ""
+
+#: src/scan/Scanner.tsx
 msgid "The torch wouldn't switch."
 msgstr ""
 
@@ -352,6 +364,10 @@ msgstr ""
 
 #: src/scan/OlderList.tsx
 msgid "Added on {when} but not sent"
+msgstr ""
+
+#: src/scan/Scanner.tsx
+msgid "The camera isn't allowed for this page."
 msgstr ""
 
 #: src/scan/batch.ts
@@ -491,6 +507,10 @@ msgstr ""
 msgid "A cart: something"
 msgstr ""
 
+#: src/scan/Scanner.tsx
+msgid "Check the connection, then press Done and try again."
+msgstr ""
+
 #: src/scan/CartForm.tsx
 msgid "{place}: to here."
 msgstr ""
@@ -557,6 +577,10 @@ msgstr ""
 
 #: src/scan/OpenPackageCard.tsx
 msgid "All of it, moved still open"
+msgstr ""
+
+#: src/scan/Scanner.tsx
+msgid "The camera is in use."
 msgstr ""
 
 #: src/scan/batch.ts
@@ -714,10 +738,6 @@ msgstr ""
 msgid "{count, plural, one {Could not read # previously added item, scan it again.} other {Could not read # previously added items, scan them again.}}"
 msgstr ""
 
-#: src/scan/Scanner.tsx
-msgid "No camera could be opened. Find items in the list instead."
-msgstr ""
-
 #: src/shared/registration.ts
 msgid "That phrase isn't one we know. Check it word by word against the one you were given."
 msgstr ""
@@ -803,6 +823,10 @@ msgstr ""
 msgid "Pick your name."
 msgstr ""
 
+#: src/scan/Scanner.tsx
+msgid "No camera could be opened."
+msgstr ""
+
 #: src/scan/OutboxList.tsx
 msgid "Held until you upgrade."
 msgstr ""
@@ -823,16 +847,8 @@ msgstr ""
 msgid "Taking it to an install"
 msgstr ""
 
-#: src/scan/Scanner.tsx
-msgid "The label reader didn't load. Check the connection, then press Done and try again."
-msgstr ""
-
 #: src/scan/batch.ts
 msgid "An install number is digits only."
-msgstr ""
-
-#: src/scan/Scanner.tsx
-msgid "The camera isn't allowed for this page. Allow it in the browser's settings, or find items in the list."
 msgstr ""
 
 #: src/shared/outbox-notes.ts
@@ -980,4 +996,8 @@ msgstr ""
 #. A clause of where a save was for; clauses that apply follow in this order, joined by spaces: at or from, to, for install.
 #: src/scan/OlderList.tsx
 msgid "from {place}"
+msgstr ""
+
+#: src/scan/Scanner.tsx
+msgid "Allow it in the browser's settings, then press Camera again, or find items in the list."
 msgstr ""

@@ -19,6 +19,10 @@ msgstr "That's me"
 msgid "What is on an open package"
 msgstr "What is on an open package"
 
+#: src/scan/Scanner.tsx
+msgid "Close the other app using it, then press Camera again, or find items in the list."
+msgstr "Close the other app using it, then press Camera again, or find items in the list."
+
 #: src/shared/outbox-notes.ts
 msgid "{tries, plural, one {The inventory keeps failing on this batch ({status}, # try). It is kept and tried again; please report this.} other {The inventory keeps failing on this batch ({status}, # tries). It is kept and tried again; please report this.}}"
 msgstr "{tries, plural, one {The inventory keeps failing on this batch ({status}, # try). It is kept and tried again; please report this.} other {The inventory keeps failing on this batch ({status}, # tries). It is kept and tried again; please report this.}}"
@@ -128,6 +132,10 @@ msgstr "Not recorded."
 #: src/scan/recorded-elsewhere.ts
 msgid "{name}: {amount}, new"
 msgstr "{name}: {amount}, new"
+
+#: src/scan/Scanner.tsx
+msgid "Find items in the list instead."
+msgstr "Find items in the list instead."
 
 #: src/scan/OlderList.tsx
 msgid "That one was changed in another tab. Check it again."
@@ -307,6 +315,10 @@ msgid "From and to must be different places."
 msgstr "From and to must be different places."
 
 #: src/scan/Scanner.tsx
+msgid "The label reader didn't load."
+msgstr "The label reader didn't load."
+
+#: src/scan/Scanner.tsx
 msgid "The torch wouldn't switch."
 msgstr "The torch wouldn't switch."
 
@@ -353,6 +365,10 @@ msgstr "Register"
 #: src/scan/OlderList.tsx
 msgid "Added on {when} but not sent"
 msgstr "Added on {when} but not sent"
+
+#: src/scan/Scanner.tsx
+msgid "The camera isn't allowed for this page."
+msgstr "The camera isn't allowed for this page."
 
 #: src/scan/batch.ts
 msgid "That install number is out of range."
@@ -491,6 +507,10 @@ msgstr "Go to the scan page"
 msgid "A cart: something"
 msgstr "A cart: something"
 
+#: src/scan/Scanner.tsx
+msgid "Check the connection, then press Done and try again."
+msgstr "Check the connection, then press Done and try again."
+
 #: src/scan/CartForm.tsx
 msgid "{place}: to here."
 msgstr "{place}: to here."
@@ -558,6 +578,10 @@ msgstr "The scanner has been updated. You must upgrade. Your data will be kept b
 #: src/scan/OpenPackageCard.tsx
 msgid "All of it, moved still open"
 msgstr "All of it, moved still open"
+
+#: src/scan/Scanner.tsx
+msgid "The camera is in use."
+msgstr "The camera is in use."
 
 #: src/scan/batch.ts
 msgid "{count, plural, one {# item} other {# items}}"
@@ -714,10 +738,6 @@ msgstr "This browser wouldn't keep the cart, so it wasn't sent. Free some space 
 msgid "{count, plural, one {Could not read # previously added item, scan it again.} other {Could not read # previously added items, scan them again.}}"
 msgstr "{count, plural, one {Could not read # previously added item, scan it again.} other {Could not read # previously added items, scan them again.}}"
 
-#: src/scan/Scanner.tsx
-msgid "No camera could be opened. Find items in the list instead."
-msgstr "No camera could be opened. Find items in the list instead."
-
 #: src/shared/registration.ts
 msgid "That phrase isn't one we know. Check it word by word against the one you were given."
 msgstr "That phrase isn't one we know. Check it word by word against the one you were given."
@@ -803,6 +823,10 @@ msgstr "<0>Register this browser</0> to send what is waiting."
 msgid "Pick your name."
 msgstr "Pick your name."
 
+#: src/scan/Scanner.tsx
+msgid "No camera could be opened."
+msgstr "No camera could be opened."
+
 #: src/scan/OutboxList.tsx
 msgid "Held until you upgrade."
 msgstr "Held until you upgrade."
@@ -823,17 +847,9 @@ msgstr "An item in the cart is no longer in the catalogue. Remove it."
 msgid "Taking it to an install"
 msgstr "Taking it to an install"
 
-#: src/scan/Scanner.tsx
-msgid "The label reader didn't load. Check the connection, then press Done and try again."
-msgstr "The label reader didn't load. Check the connection, then press Done and try again."
-
 #: src/scan/batch.ts
 msgid "An install number is digits only."
 msgstr "An install number is digits only."
-
-#: src/scan/Scanner.tsx
-msgid "The camera isn't allowed for this page. Allow it in the browser's settings, or find items in the list."
-msgstr "The camera isn't allowed for this page. Allow it in the browser's settings, or find items in the list."
 
 #: src/shared/outbox-notes.ts
 msgid "The inventory answered unexpectedly ({status}). Trying again shortly."
@@ -981,3 +997,7 @@ msgstr "What is happening"
 #: src/scan/OlderList.tsx
 msgid "from {place}"
 msgstr "from {place}"
+
+#: src/scan/Scanner.tsx
+msgid "Allow it in the browser's settings, then press Camera again, or find items in the list."
+msgstr "Allow it in the browser's settings, then press Camera again, or find items in the list."

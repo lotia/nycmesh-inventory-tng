@@ -17,6 +17,9 @@ import type { Scanned } from "./label-codes";
 
 type CameraSession = Schemas["CameraSession"];
 export type Outcome = CameraSession["outcome"];
+/** How a camera that could not be used ended: the one classification the
+ * report sends and the volunteer's words are chosen from (Scanner). */
+export type Refused = Exclude<Outcome, "opened" | "resumed" | "cancelled">;
 export type LabelKind = keyof Schemas["LabelsRead"];
 
 /** The most of each the backend takes (page_telemetry_api.CameraSession):
@@ -34,7 +37,7 @@ export function labelKind(read: Scanned): LabelKind {
 }
 
 /** Why the camera could not be used, as the report says it. */
-export function outcomeOf(error: unknown): Outcome {
+export function outcomeOf(error: unknown): Refused {
   if (error instanceof DecoderUnavailable) {
     return "decoder_failed";
   }
@@ -99,8 +102,8 @@ export class CameraReport {
     };
   }
 
-  refused(error: unknown): void {
-    this.ended(outcomeOf(error));
+  refused(outcome: Refused): void {
+    this.ended(outcome);
   }
 
   /** Closed while the camera was opening, and so not opened: the browser
