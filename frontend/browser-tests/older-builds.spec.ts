@@ -9,6 +9,7 @@ import { expect, type Locator, type Page } from "@playwright/test";
 import { test } from "./csp-violations";
 import { holdSaves } from "./held-saves";
 import { ownCable, record } from "./own-rows";
+import { pick, SAM, SHELF } from "./scan-page";
 
 const HEADING = "Checked out items. Add to cart or discard before sending";
 const PUT_BACK = "Added back to cart. Review before Record.";
@@ -42,8 +43,8 @@ async function choices(page: Page) {
         .getAttribute("value"),
     );
   return {
-    volunteerId: await value("Your name", "Sam Example"),
-    fromId: await value("From", "Supernode 1 › Shelf A"),
+    volunteerId: await value("Your name", SAM),
+    fromId: await value("From", SHELF),
     toId: await value("To", "Van"),
   };
 }
@@ -337,8 +338,7 @@ test("what a save another tab recorded first adds waits on a button while the ca
   const release = await holdSaves(page);
   await page.getByRole("button", { name: "Record" }).click();
   await expect(page.getByText("Nothing in the cart yet.")).toBeVisible();
-  await page.getByLabel(/Find an item/).fill(cable);
-  await page.getByRole("button", { name: cable, exact: true }).click();
+  await pick(page, cable);
   await page.getByLabel(/^Loose/).fill("5");
   const refused = answered(page, 409);
   release();
@@ -404,8 +404,7 @@ test("a cart this build filled, which its tab recorded as a newer build took it 
   await page.getByLabel("Your name").selectOption(String(volunteerId));
   await page.getByLabel("From", { exact: true }).selectOption(String(fromId));
   await page.getByLabel("To", { exact: true }).selectOption(String(toId));
-  await page.getByLabel(/Find an item/).fill(cable);
-  await page.getByRole("button", { name: cable, exact: true }).click();
+  await pick(page, cable);
   await page.getByLabel(/^Loose/).fill("2");
   // Left under an older key, as a newer build finds it once out.
   const key = await page.evaluate(() => {

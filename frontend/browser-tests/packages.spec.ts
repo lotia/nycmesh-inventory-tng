@@ -4,38 +4,10 @@
  * arrive (inventory-tng-8i4.133.2). Each test has a cable of its own
  * (own-rows.ts), so none sees another's open packages.
  */
-import { expect, type Page } from "@playwright/test";
+import { expect } from "@playwright/test";
 import { test } from "./csp-violations";
 import { ownCable, record } from "./own-rows";
-
-/** The seed's volunteer and shelf, as the scan page names them. */
-const SAM = "Sam Example";
-const SHELF = "Supernode 1 › Shelf A";
-
-/** Picks `cable` on the scan page, from a search for it. */
-async function pick(page: Page, cable: string): Promise<void> {
-  await page.getByLabel(/Find an item/).fill(cable);
-  await page.getByRole("button", { name: cable, exact: true }).click();
-}
-
-/** Fills in a move of `cable` from the shelf to the van, by Sam. */
-async function fillMove(page: Page, cable: string): Promise<void> {
-  await page.getByLabel("Your name").selectOption({ label: SAM });
-  await page.getByLabel("Moving stock").check();
-  await page.getByLabel("From", { exact: true }).selectOption({ label: SHELF });
-  await page.getByLabel("To", { exact: true }).selectOption({ label: "Van" });
-  await pick(page, cable);
-}
-
-/** Fills in an opening of `cable` on the shelf, by Sam. */
-async function fillOpening(page: Page, cable: string): Promise<void> {
-  await page.getByLabel("Your name").selectOption({ label: SAM });
-  await page.getByLabel("Opening packages").check();
-  await page
-    .getByLabel("Where", { exact: true })
-    .selectOption({ label: SHELF });
-  await pick(page, cable);
-}
+import { fillMove, fillOpening, pick, SAM, SHELF } from "./scan-page";
 
 test("a package counted on the scan page is saved sealed", async ({ page }) => {
   const cable = await ownCable(page);

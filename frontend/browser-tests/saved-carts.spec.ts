@@ -8,20 +8,14 @@ import { expect } from "@playwright/test";
 import { test } from "./csp-violations";
 import { holdSaves } from "./held-saves";
 import { ownCable } from "./own-rows";
+import { fillMove } from "./scan-page";
 
 test("a save's entry keeps its height, Dismiss's room kept unseen, as it is sent and recorded", async ({
   page,
 }) => {
   const cable = await ownCable(page);
   await page.goto("/scan");
-  await page.getByLabel("Your name").selectOption({ label: "Sam Example" });
-  await page.getByLabel("Moving stock").check();
-  await page
-    .getByLabel("From", { exact: true })
-    .selectOption({ label: "Supernode 1 › Shelf A" });
-  await page.getByLabel("To", { exact: true }).selectOption({ label: "Van" });
-  await page.getByLabel(/Find an item/).fill(cable);
-  await page.getByRole("button", { name: cable, exact: true }).click();
+  await fillMove(page, cable);
   // Its save held until its entry is measured as being sent.
   const release = await holdSaves(page);
   await page.getByRole("button", { name: "Record" }).click();

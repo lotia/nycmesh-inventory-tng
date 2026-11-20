@@ -3,14 +3,10 @@
  * 2026-11-13), by keyboard: the line goes back where it was, as it was,
  * and is recorded so. The cables are the test's own (own-rows.ts).
  */
-import { expect, type Page } from "@playwright/test";
+import { expect } from "@playwright/test";
 import { test } from "./csp-violations";
 import { ownCable, record } from "./own-rows";
-
-async function pick(page: Page, cable: string): Promise<void> {
-  await page.getByLabel(/Find an item/).fill(cable);
-  await page.getByRole("button", { name: cable, exact: true }).click();
-}
+import { fillMove, pick } from "./scan-page";
 
 test("a line removed is put back where it was by Undo, from the keyboard", async ({
   page,
@@ -18,13 +14,7 @@ test("a line removed is put back where it was by Undo, from the keyboard", async
   const first = await ownCable(page);
   const second = await ownCable(page);
   await page.goto("/scan");
-  await page.getByLabel("Your name").selectOption({ label: "Sam Example" });
-  await page.getByLabel("Moving stock").check();
-  await page
-    .getByLabel("From", { exact: true })
-    .selectOption({ label: "Supernode 1 › Shelf A" });
-  await page.getByLabel("To", { exact: true }).selectOption({ label: "Van" });
-  await pick(page, first);
+  await fillMove(page, first);
   await pick(page, second);
   const lines = page.locator("li", { hasText: "in all" });
   await lines
