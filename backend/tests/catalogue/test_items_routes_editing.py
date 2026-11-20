@@ -288,18 +288,18 @@ def test_editing_every_field(
 ) -> None:
     item = new_item(session, radios)
     cables = add(session, Category(name="Cables"))
-    form = {
-        "name": "Cat6 cable",
-        "category_id": str(cables.id),
-        "unit": "m",
-        "manufacturer": "",
-        "part_number": "",
-        "old_code": "NYCM-0042",
-        "minimum": "305",
-        "notes": "Outdoor",
-        "ordering_notes": "Buy by the reel",
-        "version": shown(item),
-    }
+    form = item_form(
+        cables,
+        name="Cat6 cable",
+        unit="m",
+        manufacturer="",
+        part_number="",
+        old_code="NYCM-0042",
+        minimum="305",
+        notes="Outdoor",
+        ordering_notes="Buy by the reel",
+        version=shown(item),
+    )
     done = admin_client.post(f"{ITEMS}/{item.id}", data=form)
     # Renamed: its old name kept as an alias.
     assert done.headers["location"] == (
@@ -332,8 +332,7 @@ def test_the_unit_is_fixed_once_stock_has_moved(
     page = admin_client.get(f"{ITEMS}/{item.id}").text
     assert "fixed, as stock has moved in it" in page
     assert ("unit", "each") in hidden_fields(page)
-    form = {"name": item.name, "category_id": str(radios.id), "unit": "m"}
-    form |= {"version": shown(item)}
+    form = item_form(radios, name=item.name, unit="m", version=shown(item))
     refused = admin_client.post(f"{ITEMS}/{item.id}", data=form)
     assert refused.status_code == 400
     assert str(RULES["item_unit_fixed"]) in text(refused)
