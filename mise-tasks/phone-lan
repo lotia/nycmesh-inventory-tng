@@ -1,0 +1,40 @@
+#!/usr/bin/env bash
+#MISE description="Serve the app over https on this machine's local address while it runs, and show a QR code that registers a phone"
+#MISE depends=["dev-database"]
+# CONTRIBUTING.md, On a phone. Ctrl-C stops it.
+set -euo pipefail
+
+compose=$(dirname "$0")/compose
+compose() { "$compose" --profile lan "$@"; }
+clone=$(dirname "$0")/..
+devtools() {
+  PYTHONPATH="$clone/backend" \
+    uv run --quiet --frozen --project "$clone/backend" python -m devtools "$@"
+}
+
+# Each port another when its own is taken, as INVENTORY_APP_PORT's by mise
+# run dev's backend; compose publishes them as these say.
+INVENTORY_LAN_ADDRESS=$(devtools lan-address)
+INVENTORY_APP_PORT=$(devtools stack free-port INVENTORY_APP_PORT)
+INVENTORY_LAN_PORT=$(devtools stack free-port INVENTORY_LAN_PORT)
+export INVENTORY_LAN_ADDRESS INVENTORY_APP_PORT INVENTORY_LAN_PORT
+url="https://$INVENTORY_LAN_ADDRESS:$INVENTORY_LAN_PORT"
+
+# Caddy listens on the local network only while this runs: on any exit,
+# Ctrl-C included, it goes, and the app stays on 127.0.0.1.
+stop() { compose rm -sf caddy >/dev/null 2>&1 || true; }
+trap stop EXIT
+trap 'exit 130' INT TERM
+
+# dev-database first (depends): the server's container makes only
+# `inventory`, not this checkout's database. The built pages, never
+# Vite's dev server.
+compose up -d --build --wait app
+compose up -d --force-recreate --no-deps caddy
+compose exec -T app python -m inventory_tng.manage registration-codes create \
+  --uses 1 --days 1 --label phone --base-url "$url"
+echo "The app here: http://127.0.0.1:$INVENTORY_APP_PORT"
+echo "On a phone on this network: $url (accept the certificate warning)"
+echo "Caddy's root, to trust it instead (optional): $url/caddy-root.crt"
+echo "Ctrl-C stops it."
+while :; do sleep 3600; done

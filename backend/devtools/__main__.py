@@ -18,6 +18,10 @@ COMMANDS: Commands = {
         "devtools.database",
         "make, seed or drop this checkout's development database",
     ),
+    "lan-address": (
+        "devtools.lan_address",
+        "print this machine's address on its local network",
+    ),
     "setting": (
         "devtools.setting",
         "print a setting as the backend reads it",

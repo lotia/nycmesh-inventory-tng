@@ -224,11 +224,53 @@ services:
       app:
         condition: service_healthy
 
+  # Optional: `mise run phone-lan` (CONTRIBUTING.md, On a phone). The app
+  # over https on the machine's local address, which the task sets, with a
+  # certificate from Caddy's own authority; unset, only on 127.0.0.1. The
+  # app sees Caddy's address as the client's: it trusts forwarded headers
+  # from 127.0.0.1 only. Its volume keeps that authority, so a phone that
+  # trusts it goes on trusting it.
+  caddy:
+    image: docker.io/library/caddy:2.11.9
+    profiles: [lan]
+    configs:
+      - source: caddyfile
+        target: /etc/caddy/Caddyfile
+    ports:
+      - "${INVENTORY_LAN_ADDRESS:-127.0.0.1}:${INVENTORY_LAN_PORT:-8443}:8443"
+    volumes:
+      - caddy:/data
+    depends_on:
+      app:
+        condition: service_healthy
+
 volumes:
   db:
+  caddy:
 
 configs:
   roles:
     file: ./backend/migrations/roles.sql
   database-owner:
     file: ./backend/migrations/database-owner.sql
+  # Caddy's, for mise run phone-lan. A phone sends no server name to an
+  # address, so default_sni says which certificate to give it. Its root at
+  # /caddy-root.crt, typed so that a phone offers to install it.
+  caddyfile:
+    content: |
+      {
+        admin off
+        skip_install_trust
+        auto_https disable_redirects
+        default_sni ${INVENTORY_LAN_ADDRESS:-127.0.0.1}
+      }
+      https://${INVENTORY_LAN_ADDRESS:-127.0.0.1}:8443 {
+        tls internal
+        handle /caddy-root.crt {
+          header Content-Type application/x-x509-ca-cert
+          root * /data/caddy/pki/authorities/local
+          rewrite * /root.crt
+          file_server
+        }
+        reverse_proxy app:8000
+      }

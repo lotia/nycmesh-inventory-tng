@@ -130,6 +130,9 @@ and what to do: `mise run setup -- --new-ports` gives `.env` free ports again,
 changing only its port settings, and only those another stack claims or
 something else holds. The URLs follow them. Without `--new-ports`, setup
 never changes an existing `.env`.
+`mise run phone` and `mise run phone-lan` instead publish the app's
+container on the next free port up when its own is taken, as by `mise run
+dev`'s backend, and say which.
 
 A `.env` made before names no project, so its checkout uses the project
 `inventory-tng` (`compose.yaml`'s name), as it always did, on ports 5433,
@@ -636,19 +639,43 @@ may send: something new to report starts there.
 
 #### On a phone
 
+The camera needs https, so a phone reaches the app in one of two ways.
+Both make and migrate this checkout's database (`mise run dev-database`),
+run the app in its container (below), with pages from its build, never
+Vite's dev server, and print a one-use registration code with a QR code:
+scan it with the phone to register it, then go on to the scan page.
+
 ```sh
 mise run phone
 ```
 
-This makes and migrates this checkout's database (`mise run
-dev-database`), then runs the app in its container (below) behind a
-Cloudflare quick tunnel, which gives it a public
-`https://….trycloudflare.com` address with a real certificate, and
-prints a one-use registration code for it, with a QR code. Scan that
-with the phone to register it, then go on to the scan page.
-Pages come from the container's build, not Vite's dev server. The address
+This puts the app behind a Cloudflare quick tunnel, which gives it a public
+`https://….trycloudflare.com` address with a real certificate. The address
 changes each time the tunnel starts, and anyone who has it reaches your app
 while it runs, so stop it when you are done.
+
+```sh
+mise run phone-lan
+```
+
+This serves the app over https on this machine's address on the local
+network, through Caddy, until you press Ctrl-C, for a phone on the same
+network. The address is this machine's on the network it reaches the
+internet through, never one on the internet; `INVENTORY_LAN_ADDRESS` in
+`.env` names another, and `INVENTORY_LAN_PORT` is the port. A firewall
+on this machine may need to let the phone in. Caddy's certificate comes
+from its own authority, so the phone warns first: accept the warning.
+
+If the warning keeps coming back, or the iPhone will not open the camera,
+trust Caddy's root instead: open the `/caddy-root.crt` link the task
+prints on the iPhone, install the profile in Settings, then turn on full
+trust for it in Settings, General, About, Certificate Trust Settings.
+Remove the profile when you are done: its key, in Caddy's volume on this
+machine, could sign a certificate for any site.
+
+[Tailscale](https://tailscale.com/kb/1312/serve) is another way: with it on
+both, `tailscale serve` gives the app's port a real certificate on the
+tailnet's name.
 
 The pages call the API through types generated from its schema. After you
 change an endpoint, regenerate both, and commit `frontend/src/api/`:

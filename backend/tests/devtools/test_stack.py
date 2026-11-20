@@ -170,11 +170,15 @@ def test_each_port_s_default_is_the_same_everywhere() -> None:
 
 @pytest.mark.clone
 def test_compose_publishes_each_port_as_env_names_it() -> None:
-    """Every port compose.yaml publishes on the host is a setting new_env
+    """Every port compose.yaml publishes on the host, on 127.0.0.1 or on the
+    local address mise run phone-lan gives Caddy, is a setting new_env
     picks, with the same default."""
     compose = (CLONE / "compose.yaml").read_text()
     published = re.findall(
-        r'^ +- "127\.0\.0\.1:(\$\{[^}]*\}|\d+):', compose, re.MULTILINE
+        r'^ +- "(?:127\.0\.0\.1|\$\{INVENTORY_LAN_ADDRESS:-127\.0\.0\.1\}):'
+        r"(\$\{[^}]*\}|\d+):",
+        compose,
+        re.MULTILINE,
     )
     assert sorted(published) == sorted(
         f"${{{key}:-{default}}}" for key, default in PUBLISHED.items()
@@ -463,6 +467,65 @@ def test_it_lets_a_start_go_on_when_its_ports_are_free(
 ) -> None:
     assert run_devtools(["stack", "ports-free", "--here", "INVENTORY_APP_PORT"]) == 0
     assert capsys.readouterr() == ("", "")
+
+
+@pytest.mark.usefixtures("env_file", "nothing_listens")
+def test_a_free_port_is_the_setting_s_and_asks_compose_nothing(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    calls = compose_answers(monkeypatch)
+    assert stack.free_port_for("INVENTORY_APP_PORT") == 8000
+    assert calls == []
+
+
+def test_a_taken_port_moves_past_claims_to_one_free_or_this_stack_s(
+    monkeypatch: pytest.MonkeyPatch, env_file: Path, tmp_path: Path
+) -> None:
+    """As when mise run dev's backend holds the app's port: past this
+    checkout's other settings, another stack's claim and a port something
+    else holds, to the app container's from a run before."""
+    env_file.write_text("INVENTORY_APP_PORT=8000\nINVENTORY_VITE_PORT=8001\n")
+    other = tmp_path / "other"
+    other.mkdir()
+    (other / ".env").write_text(
+        f"COMPOSE_PROJECT_NAME={SHARED}-other_2\nINVENTORY_APP_PORT=8002\n"
+    )
+    held = {8000, 8003, 8004}
+    monkeypatch.setattr(stack, "in_use", lambda port: port in held)
+    compose_answers(
+        monkeypatch,
+        ps=[publishing("app", 8004)],
+        ls=[project(f"{SHARED}-other_2", other)],
+    )
+    assert stack.free_port_for("INVENTORY_APP_PORT") == 8004
+    held.discard(8004)
+    compose_answers(monkeypatch, ls=[project(f"{SHARED}-other_2", other)])
+    assert stack.free_port_for("INVENTORY_APP_PORT") == 8004
+    monkeypatch.setattr(stack, "in_use", lambda _: True)
+    env_file.write_text("INVENTORY_APP_PORT=65535\n")
+    with pytest.raises(SystemExit, match="No port from 65535 up is free"):
+        stack.free_port_for("INVENTORY_APP_PORT")
+
+
+def test_it_prints_a_free_port_and_says_when_it_is_another(
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+    env_file: Path,
+    listening: int,
+) -> None:
+    compose_answers(monkeypatch)
+    env_file.write_text(f"INVENTORY_LAN_PORT={listening}\n")
+    run_devtools(["stack", "free-port", "INVENTORY_LAN_PORT"])
+    printed = capsys.readouterr()
+    moved = int(printed.out)
+    assert moved > listening
+    assert printed.err == (
+        f"Port {listening} (INVENTORY_LAN_PORT in .env) is in use: "
+        f"using {moved} instead.\n"
+    )
+    monkeypatch.setattr(stack, "in_use", lambda _: False)
+    run_devtools(["stack", "free-port", "INVENTORY_LAN_PORT"])
+    assert capsys.readouterr() == (f"{listening}\n", "")
 
 
 @pytest.mark.usefixtures("nothing_listens")

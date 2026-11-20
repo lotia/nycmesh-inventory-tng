@@ -3,13 +3,16 @@ project name, database and free ports `mise run setup` writes into a new
 `.env`, and the stacks of checkouts that no longer exist, which `mise run
 remove-stale-stacks` removes. The tasks that start something first check
 that the ports they need are free, or this checkout's stack's, and `mise run
-setup -- --new-ports` gives an existing `.env` free ones. Each command but
-list-stale asks compose itself, through mise-tasks/compose:
+setup -- --new-ports` gives an existing `.env` free ones. `mise run phone`
+and `mise run phone-lan` instead publish on another port when theirs is
+taken, as by `mise run dev`'s backend. Each command but list-stale asks
+compose itself, through mise-tasks/compose:
 
     uv run python -m devtools stack new-env
     uv run python -m devtools stack ports-free [--here] KEY...
     uv run python -m devtools stack new-ports
     uv run python -m devtools stack port KEY...
+    uv run python -m devtools stack free-port KEY
 
 list-stale reads compose's list of projects from standard input, so that
 compose failing fails the list (mise-tasks/list-stale-stacks):
@@ -46,6 +49,8 @@ PUBLISHED = {
     "INVENTORY_OTLP_PORT": 4318,
     "INVENTORY_MAILPIT_PORT": 8025,
     "INVENTORY_SMTP_PORT": 1025,
+    # On the machine's local address, not 127.0.0.1 (mise run phone-lan).
+    "INVENTORY_LAN_PORT": 8443,
 }
 # Each port a checkout's .env gives: those, and Vite's dev server's, which
 # `mise run dev` runs here (the backend there takes INVENTORY_APP_PORT).
@@ -240,6 +245,32 @@ def port(key: str) -> int:
     return int(value)
 
 
+def free_port_for(key: str) -> int:
+    """The setting's port while it is free; else the next one up that this
+    checkout's stack holds, or that no stack claims and nothing listens on,
+    and none of this checkout's other settings names. For a container that
+    publishes it, so another port does when, say, `mise run dev`'s backend
+    holds this one; the stack's own counts, as a run before may have moved
+    the container there."""
+    number = port(key)
+    if not in_use(number):
+        return number
+    own = own_ports()
+    claimed = claimed_ports(other_stacks("--all"))
+    mine = {port(other) for other in PORTS if other != key}
+
+    def usable(candidate: int) -> bool:
+        if candidate in mine:
+            return False
+        return candidate in own or not (candidate in claimed or in_use(candidate))
+
+    while not usable(number):
+        number += 1
+        if number > 65535:
+            raise SystemExit(f"No port from {port(key)} up is free for {key}")
+    return number
+
+
 def where_set(key: str) -> str:
     if key in os.environ:
         return f"{key}, set in your shell"
@@ -325,6 +356,11 @@ def main(argv: Sequence[str], prog: str) -> int:
     commands.add_parser(
         "new-ports", help="give .env free ports, changing only its port settings"
     )
+    instead = commands.add_parser(
+        "free-port",
+        help="print the setting's port, or, if it is taken, another free one",
+    )
+    instead.add_argument("key", metavar="KEY", choices=PUBLISHED)
     one = commands.add_parser("port", help="print the port for each setting")
     one.add_argument("keys", nargs="+", metavar="KEY", choices=PORTS)
     args = parser.parse_args(argv)
@@ -333,6 +369,15 @@ def main(argv: Sequence[str], prog: str) -> int:
         if problems:
             print(*problems, sep="\n", file=sys.stderr)
             return 1
+    elif args.command == "free-port":
+        number = free_port_for(args.key)
+        if number != port(args.key):
+            print(
+                f"Port {port(args.key)} ({where_set(args.key)}) is in use: "
+                f"using {number} instead.",
+                file=sys.stderr,
+            )
+        print(number)
     elif args.command == "port":
         print(*map(port, args.keys))
     elif args.command == "new-ports":

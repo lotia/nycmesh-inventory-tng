@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 #MISE description="Serve the app over https through a tunnel, and show a QR code that registers a phone"
-#MISE depends=["dev-database", "ports-free INVENTORY_APP_PORT"]
+#MISE depends=["dev-database"]
 # CONTRIBUTING.md, On a phone.
 set -euo pipefail
 
@@ -8,10 +8,21 @@ set -euo pipefail
 # can run it.
 compose=$(dirname "$0")/compose
 compose() { "$compose" "$@"; }
+clone=$(dirname "$0")/..
+devtools() {
+  PYTHONPATH="$clone/backend" \
+    uv run --quiet --frozen --project "$clone/backend" python -m devtools "$@"
+}
+
+# Another port, saying which, when INVENTORY_APP_PORT's is taken, as by
+# mise run dev's backend; the tunnel reaches the app inside its container.
+INVENTORY_APP_PORT=$(devtools stack free-port INVENTORY_APP_PORT)
+export INVENTORY_APP_PORT
 
 # dev-database first (depends): the server's container makes only
 # `inventory`, not this checkout's database.
 compose up -d --build --wait app
+echo "The app here: http://127.0.0.1:$INVENTORY_APP_PORT"
 # A new container, so its log holds only this tunnel's address; --no-deps
 # leaves the app as it is.
 compose --profile phone up -d --force-recreate --no-deps tunnel
