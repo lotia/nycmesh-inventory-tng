@@ -381,6 +381,7 @@ LINE_PROBLEMS: dict[str, tuple[str, batch_schemas.ProblemKind]] = {
     "movement_package_of_item": ("package_id", "not_found"),
     "movement_whole_packages": ("quantity", "not_whole_packages"),
     "receipt_retired_package": ("package_id", "retired_package"),
+    "movement_retired_package_none_left": ("package_id", "retired_package_none_left"),
     "open_package_full": ("quantity", "one_package"),
     "opening_from_sealed": ("package_id", "not_found"),
     "movement_open_package_of_item": ("open_package_key", "not_found"),

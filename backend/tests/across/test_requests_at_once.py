@@ -1171,6 +1171,28 @@ def test_a_cut_and_a_whole_move_of_one_open_package_go_one_at_a_time(
 
 
 @pytest.mark.concurrency
+def test_two_takes_of_the_last_of_a_retired_package_go_one_at_a_time(
+    own_committed: Committed,
+) -> None:
+    """Each holds the retired package it takes FOR NO KEY UPDATE
+    (ledger.hold_forms) until it commits: the second waits, then finds none
+    left sealed, and is refused (docs/decisions/0003, Amendment,
+    2026-11-19), rather than both reading some left. On a database of its
+    own, as it writes the ledger."""
+    setup = own_committed.session()
+    spools = Spools(setup)
+    spools.spool.retired_at = NOW
+    setup.commit()
+    header = {"kind": "install", "from_location_id": spools.store.id}
+    line = Entry(spools.cable.id, Decimal(610), spools.sealed)
+    installing: Write = lambda session: insert_transaction(
+        session, uuid.uuid4(), header, [line]
+    )
+    refused = at_once(own_committed, installing, installing)
+    assert refused == "movement_retired_package_none_left"
+
+
+@pytest.mark.concurrency
 def test_a_package_resized_while_it_moves_waits_then_is_refused(
     own_committed: Committed,
 ) -> None:

@@ -180,6 +180,7 @@ export interface components {
         | "refused"
         | "retired"
         | "retired_package"
+        | "retired_package_none_left"
         | "repeated";
       /** Loc */
       loc: (string | number)[];

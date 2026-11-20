@@ -217,3 +217,25 @@ def test_a_retired_package_is_never_received(
     assert [(p["loc"][1:], p["type"]) for p in response.json()["detail"]] == [
         (["lines", 0, "package_id"], "retired_package")
     ]
+
+
+def test_a_retired_package_with_none_left_sealed_is_never_taken(
+    registered_client: TestClient, session: Session, spools: Spools
+) -> None:
+    """Which the scan page never offers (Ali, 2026-11-19; docs/decisions/0003,
+    Amendment): refused whole, saying which line, and nothing saved."""
+    gone = spools.place.batch(
+        kind="install", to_location_id=None, lines=[sealed_line(spools, "610")]
+    )
+    assert registered_client.post(URL, json=gone).status_code == 201
+    spools.spool.retired_at = datetime.now(UTC)
+    session.flush()
+    before = quantities_by_form(session, spools.cable)
+    loose = {"item_id": spools.cable.id, "quantity": "5"}
+    move = spools.place.batch(lines=[loose, sealed_line(spools, "305")])
+    response = registered_client.post(URL, json=move)
+    assert response.status_code == 422
+    assert [(p["loc"][1:], p["type"]) for p in response.json()["detail"]] == [
+        (["lines", 1, "package_id"], "retired_package_none_left")
+    ]
+    assert quantities_by_form(session, spools.cable) == before == {}

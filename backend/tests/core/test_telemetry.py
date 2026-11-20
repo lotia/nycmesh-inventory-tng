@@ -704,6 +704,33 @@ def test_counts_batches_from_a_build_too_old(
     assert added(reader, "inventory.transactions.too_old", before) == {(): 1}
 
 
+def test_counts_a_take_of_a_retired_package_none_left_as_invalid(
+    rolled_back: Recorded, session: Session
+) -> None:
+    client, _, reader, _ = rolled_back
+    spools = Spools(session)
+    spools.write(
+        {"kind": "install", "from_location_id": spools.store.id},
+        ledger.Entry(spools.cable.id, Decimal(610), spools.sealed),
+    )
+    spools.spool.retired_at = datetime.now(UTC)
+    session.flush()
+    before = counted(reader, "inventory.transactions.refused")
+    _, token = new_device(session)
+    client.cookies.set(devices.COOKIE, token)
+    line = {
+        "item_id": spools.cable.id,
+        "quantity": "305",
+        "package_id": spools.spool.id,
+        "package_size": "305",
+    }
+    response = client.post("/api/transactions", json=spools.place.batch(lines=[line]))
+    client.cookies.clear()
+    assert response.status_code == 422
+    added_now = added(reader, "inventory.transactions.refused", before)
+    assert added_now == {(("reason", "invalid"),): 1}
+
+
 def test_counts_packages_opened_by_what_they_became(
     rolled_back: Recorded, session: Session
 ) -> None:

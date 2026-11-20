@@ -5,7 +5,8 @@ unregistered device is blocked), 2026-11-03 (counts, retired items),
 2026-11-06 (counting while stock moves), 2026-11-08 by 0016 (where the
 rules live, balance), 2026-11-09 (stock at a retired place), 2026-11-11
 by 0020 (sealed and open packages), 2026-11-15 (counting some items),
-2026-11-18 (a count form's moment read without a lock)
+2026-11-18 (a count form's moment read without a lock), 2026-11-19 (a
+retired package with none left is never taken)
 
 ## Context
 
@@ -33,7 +34,9 @@ while. So we need more than one location from the start.
 - **Balance is in minus out**, computed by a query (0016), per item, place
   and form (0020).
 - **Negative balances are allowed.** They mean the records are wrong
-  somewhere, so the item needs counting. A volunteer is never blocked.
+  somewhere, so the item needs counting. A volunteer is never blocked,
+  with one exception: a retired package with none sealed left (amendment,
+  2026-11-19).
 - **Reorder is a separate signal**: usable stock in stores (all but short
   ends, 0020) at or below the minimum, and, where a package sets one, sealed
   packages below their own minimum. An item with a negative balance shows
@@ -64,7 +67,8 @@ while. So we need more than one location from the start.
 - **Nothing is deleted: retiring is the soft delete**, and bringing back
   undoes it. A retired item that still has stock, or a retired package
   with some still sealed, is never received again, but volunteers may take
-  what is left, until it runs out (Ali, 2026-11-03; packages, 2026-11-11). A
+  what is left, until it runs out (Ali, 2026-11-03; packages, 2026-11-11),
+  and then never take that package sealed again (amendment, 2026-11-19). A
   place is retired only once it holds nothing, but a save that waited in
   an outbox can still bring stock to it or take some from it, and is
   accepted. Such a save is logged and counted, and the place
@@ -106,3 +110,24 @@ We rejected carrying each line's figure shown (many fields, and it misses
 counts by form), comparing PostgreSQL's transaction snapshots (exact, but
 it ties the ledger to transaction ids' internals), and taking the lock
 without waiting (it still holds up saves).
+
+## Amendment: a retired package with none left is never taken (2026-11-19)
+
+Decided by Ali on 2026-11-19 (inventory-tng-m5y, built under
+inventory-tng-3yo). Every move that takes stock below zero is still
+taken, except one: a move, install or opening that takes sealed a retired
+package with none left sealed at any current place. The scan page never
+offers such a package, so mostly another program or a batch made by hand
+sends one; a phone's batch that waited in its outbox while others took
+the last one is refused too, and its outbox says so. The server refuses
+it as it refuses a receipt of a retired package: the whole batch is
+answered 422, naming the line's package (`retired_package_none_left`),
+and nothing is saved. An administrator's
+count or adjustment may still find or lose some. Two saves taking the
+last of one go one at a time, so the second finds none left and is
+refused.
+
+The other cases that take stock below zero stay as above: a retired item
+with none left, or an item that never had stock at a place, can come from
+a phone that saved offline before it ran out, so they are taken and show
+on reorder as "count first".

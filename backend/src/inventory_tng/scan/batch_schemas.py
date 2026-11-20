@@ -213,6 +213,7 @@ ProblemKind = Literal[
     "refused",
     "retired",
     "retired_package",
+    "retired_package_none_left",
     "repeated",
 ]
 Problem = tuple[tuple[str | int, ...], ProblemKind]

@@ -40,6 +40,10 @@ msgstr ""
 msgid "{name}: {what}"
 msgstr ""
 
+#: src/shared/outbox-notes.ts
+msgid "This package is retired, and none is left sealed: it can no longer be taken"
+msgstr ""
+
 #: src/shared/registration.ts
 msgid "This browser isn't registered yet."
 msgstr ""

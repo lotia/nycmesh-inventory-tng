@@ -13,7 +13,9 @@ Two choices that keep a volunteer's work from being lost:
   wait in the outbox while an administrator retires or merges something, and
   readers follow a merged volunteer forward. The one exception: a retired
   item is never received (docs/decisions/0003), so a receipt of one is
-  refused, and the outbox says so. A save at a retired place is logged and
+  refused, and the outbox says so; and a retired package with none sealed
+  left at a current place, which the scan page never offers, is never
+  taken (0003, Amendment, 2026-11-19). A save at a retired place is logged and
   counted (scan/batch_api.py), and the place shows as holding stock
   (balance.retired_holding_stock) until an administrator counts it.
 - The server's clock decides when a batch happened, not the phone's: a batch
@@ -39,7 +41,7 @@ from inventory_tng.core.local_time import zone_at
 from inventory_tng.models.catalogue import Item, ItemPackage
 from inventory_tng.models.places import Location
 from inventory_tng.models.stock import LedgerTransaction, Movement, OpenPackage
-from inventory_tng.stock.balance import by_form
+from inventory_tng.stock.balance import by_form, sealed_somewhere
 
 log = structlog.get_logger(__name__)
 
@@ -135,13 +137,19 @@ def tracks_opened(item: bool, package: bool | None) -> bool:
 
 class PackageFacts(NamedTuple):
     """What the ledger's rules read of a package: its item, its size,
-    whether opening one makes an open package (tracks_opened), and whether
-    it is retired."""
+    whether opening one makes an open package (tracks_opened), whether it
+    is retired, and, read only for a retired one a line takes sealed,
+    whether none is left sealed at a current place."""
 
     item_id: int
     size: Decimal
     tracked: bool
     retired: bool = False
+    none_sealed: bool = False
+
+
+# The kinds a volunteer takes stock from a place in.
+TAKES = ("move", "install", "open")
 
 
 class OpenFacts(NamedTuple):
@@ -170,7 +178,8 @@ def form_breaks(
     - No form outside: what comes from or goes outside is loose.
     - A sealed side names a package of the line's item, and moves a whole
       number of them; a retired package is never received, as a retired
-      item is not (0003).
+      item is not (0003), nor taken by a volunteer once none is left
+      sealed at a current place (0003, Amendment, 2026-11-19).
     - An open side names an open package of the line's item, not closed,
       at that side's place, but for one moved whole: all that is left on it
       leaves one place and arrives at the other. One not yet filled is
@@ -192,6 +201,9 @@ def form_breaks(
                 broken.append("movement_whole_packages")
             if package is not None and package.retired and kind == "receipt":
                 broken.append("receipt_retired_package")
+            taken = not arriving and place is not None and kind in TAKES
+            if package is not None and package.none_sealed and taken:
+                broken.append("movement_retired_package_none_left")
         if form.open_package_id is not None:
             opened = opens.get(form.open_package_id)
             if opened is None or opened.item_id != entry.item_id:
@@ -270,6 +282,9 @@ def lock_places(session: Session, location_ids: Iterable[int]) -> None:
 #    transaction's foreign keys take them.
 # 4. Its packages, FOR KEY SHARE, by id: their item, size and whether
 #    tracked opened, which a change to one waits for (catalogue/items.py).
+#    Then the retired ones a line takes sealed, FOR NO KEY UPDATE, by id,
+#    so two saves taking one go one at a time, and the second reads
+#    whether any is left sealed once the first has committed.
 # 5. Its open packages, FOR NO KEY UPDATE, by id: where each is and whether
 #    closed, which a report or close waits for (stock/open_packages.py), and
 #    what is left on it, which another line on it waits for; and so a whole
@@ -357,6 +372,7 @@ def hold_forms(
             )
             for package, item_tracks in rows
         }
+        packages |= _none_sealed(session, lines, packages)
     if not open_ids:
         return packages, {}, {}
     opened = {
@@ -395,6 +411,35 @@ def hold_forms(
         for row in opened.values()
     }
     return packages, facts, opened
+
+
+def _none_sealed(
+    session: Session, lines: Sequence[Entry], packages: Mapping[int, PackageFacts]
+) -> dict[int, PackageFacts]:
+    """The retired packages the lines take sealed, held FOR NO KEY UPDATE
+    (above), with none left sealed at a current place, as form_breaks
+    reads them."""
+    leaving = {line.leaves.package_id for line in lines}
+    taken = sorted(
+        package_id
+        for package_id, package in packages.items()
+        if package.retired and package_id in leaving
+    )
+    if not taken:
+        return {}
+    held = locked(
+        select(ItemPackage.id)
+        .where(ItemPackage.id.in_(taken))
+        .order_by(ItemPackage.id),
+        key_share=True,
+    )
+    session.execute(held)
+    left = sealed_somewhere(session, taken)
+    return {
+        package_id: packages[package_id]._replace(none_sealed=True)
+        for package_id in taken
+        if package_id not in left
+    }
 
 
 def _where(header: Mapping[str, object], custody: frozenset[int]) -> int | None:

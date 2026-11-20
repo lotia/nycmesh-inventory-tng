@@ -48,6 +48,7 @@ export const PROBLEMS: Record<ProblemKind, MessageDescriptor> = {
   refused: msg`The inventory's rules refuse this as sent: it changed since the page loaded. Load the page again, and do it again`,
   retired: msg`This item is retired: what is left may be taken, never received`,
   retired_package: msg`This package is retired: what is left may be taken, never received`,
+  retired_package_none_left: msg`This package is retired, and none is left sealed: it can no longer be taken`,
   repeated: msg`This item, in this package or loose, is on another line too: put it on one line`,
   package_size_required: msg`A line of a package says the size it was counted in: load the page again, and count it again`,
   package_size_without_package: msg`A loose line says a package's size: load the page again, and count it again`,

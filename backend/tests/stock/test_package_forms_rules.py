@@ -51,12 +51,17 @@ STORE, VAN = 100, 101
 
 
 OLD = 12
+# Retired, and none left sealed at a current place.
+ALL_GONE = 13
 
 
 PACKAGES = {
     SPOOL: PackageFacts(CABLE, Decimal(305), tracked=True),
     BOX: PackageFacts(CABLE, Decimal(100), tracked=False),
     OLD: PackageFacts(CABLE, Decimal(50), tracked=False, retired=True),
+    ALL_GONE: PackageFacts(
+        CABLE, Decimal(50), tracked=False, retired=True, none_sealed=True
+    ),
 }
 
 
@@ -113,6 +118,9 @@ def test_a_package_tracks_opened_as_set_on_it_else_as_its_item(
         (line(5, open_form(OPEN)), "count", (STORE, None)),
         (line(50, Form(package_id=OLD), Form(package_id=OLD)), "move", (STORE, VAN)),
         (line(7, LOOSE, open_form(FRESH)), "count", (None, STORE)),
+        # An administrator's count or adjustment may still find or lose it.
+        (line(50, LOOSE, Form(package_id=ALL_GONE)), "count", (None, STORE)),
+        (line(50, Form(package_id=ALL_GONE)), "adjustment", (STORE, None)),
     ],
 )
 def test_lines_keeping_the_rules(
@@ -183,6 +191,24 @@ def test_lines_keeping_the_rules(
             "move",
             (STORE, VAN),
             "movement_open_package_whole",
+        ),
+        (
+            line(50, Form(package_id=ALL_GONE), Form(package_id=ALL_GONE)),
+            "move",
+            (STORE, VAN),
+            "movement_retired_package_none_left",
+        ),
+        (
+            line(50, Form(package_id=ALL_GONE)),
+            "install",
+            (STORE, None),
+            "movement_retired_package_none_left",
+        ),
+        (
+            line(50, Form(package_id=ALL_GONE)),
+            "open",
+            (STORE, STORE),
+            "movement_retired_package_none_left",
         ),
         (line(5), "open", (STORE, STORE), "opening_from_sealed"),
         (line(5, open_form(OPEN)), "open", (STORE, STORE), "opening_from_sealed"),
@@ -380,6 +406,36 @@ def test_each_rule_is_refused_through_the_ledger(
     opened = Form(open_package_id=spools.opened().id)
     with breaks(session, rule):
         write(spools, opened)
+
+
+def test_a_retired_package_is_taken_until_none_is_left_sealed(
+    session: Session, spools: Spools
+) -> None:
+    """Taken below zero at one place while some is sealed at another, as
+    any stock is (docs/decisions/0003); once none is left sealed at any
+    current place, never taken again (0003, Amendment, 2026-11-19)."""
+    store, van = spools.store.id, spools.van.id
+    spools.spool.retired_at = datetime.now(UTC)
+    session.flush()
+
+    def install(place: int, metres: int) -> object:
+        return spools.write(
+            {"kind": "install", "from_location_id": place},
+            Entry(spools.cable.id, Decimal(metres), spools.sealed),
+        )
+
+    assert spools.move(
+        Entry(spools.cable.id, Decimal(305), spools.sealed, spools.sealed)
+    )
+    assert install(store, 610)
+    assert install(van, 305)
+    assert quantities_by_form(session, spools.cable) == {
+        (store, spools.spool.id, None): -305
+    }
+    with breaks(session, "movement_retired_package_none_left"):
+        install(store, 305)
+    with breaks(session, "movement_retired_package_none_left"):
+        spools.move(Entry(spools.cable.id, Decimal(305), spools.sealed, spools.sealed))
 
 
 def test_a_closed_open_package_is_refused_through_the_ledger(

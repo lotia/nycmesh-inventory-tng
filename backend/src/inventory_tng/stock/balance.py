@@ -113,6 +113,17 @@ def retired_packages_in_stock() -> Select[tuple[int]]:
     return _retired_left(by_form, "package_id", ItemPackage)
 
 
+def sealed_somewhere(session: Session, package_ids: Sequence[int]) -> set[int]:
+    """Which of these packages have some sealed at a current place, as
+    retired_packages_in_stock reads them."""
+    if not package_ids:
+        return set()
+    query = _left_at_current(select(by_form.c.package_id), by_form).where(
+        by_form.c.package_id.in_(list(package_ids))
+    )
+    return set(session.scalars(query.distinct()))
+
+
 def sealed_places(session: Session) -> dict[int, dict[int, Decimal]]:
     """How much of each package is sealed at each current place with some,
     in its item's unit, by package then place: where opening its item opens
