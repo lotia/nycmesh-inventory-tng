@@ -209,6 +209,10 @@ msgstr ""
 msgid "{package} ({size} {unit}), retired: taking only"
 msgstr ""
 
+#: src/scan/record-the-rest.ts
+msgid "The other lines are in your cart, waiting to be recorded."
+msgstr ""
+
 #: src/scan/CartForm.tsx
 msgid "Pick a place"
 msgstr ""
@@ -457,6 +461,10 @@ msgstr ""
 
 #: src/scan/OlderList.tsx
 msgid "That one was changed in another tab. Check it, then add it to the cart again."
+msgstr ""
+
+#: src/scan/record-the-rest.ts
+msgid "Record the rest"
 msgstr ""
 
 #: src/scan/OlderList.tsx
@@ -918,6 +926,10 @@ msgstr ""
 
 #: src/shared/outbox-notes.ts
 msgid "Some items were not recorded. Details below."
+msgstr ""
+
+#: src/scan/record-the-rest.ts
+msgid "{name}: taken off. {why}"
 msgstr ""
 
 #: src/scan/older-to-cart.ts

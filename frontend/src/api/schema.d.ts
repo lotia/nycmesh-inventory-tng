@@ -684,7 +684,21 @@ export interface components {
         | components["schemas"]["LineRemoved"]
         | components["schemas"]["RemovalUndone"]
         | components["schemas"]["DifferenceAdded"]
+        | components["schemas"]["RestPutBack"]
       )[];
+    };
+    /**
+     * RestPutBack
+     * @description A volunteer tapped Record the rest under a batch the inventory
+     *     refused for some of its lines, putting its other lines in the scan
+     *     page's cart (frontend/src/scan/record-the-rest.ts).
+     */
+    RestPutBack: {
+      /**
+       * @description discriminator enum property added by openapi-typescript
+       * @enum {string}
+       */
+      kind: "rest_put_back";
     };
     /**
      * RetiredItem

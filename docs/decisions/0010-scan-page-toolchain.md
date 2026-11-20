@@ -328,6 +328,17 @@ the compressed copy (fiddly header code ServeStatic already gets right).
   difference is recorded, "These are in your cart", if shown, is hidden
   in the same way, not removed, keeping its room. We rejected
   listing the newest last, which changes the order volunteers see.
+  A save refused (422) whose problems name lines offers "Record the
+  rest" (Ali, 2026-11-20, inventory-tng-clvh): it puts the save's other
+  lines in an empty cart, under a key made from the save's, and the
+  cart's status names each line taken off, "item: taken off." and the
+  problem's words, so nothing is dropped unseen; the volunteer then
+  presses Record. A refused save recorded nothing, so the rest is never
+  recorded twice. It is never sent by itself. As "Add these to cart", it
+  takes only an empty cart, and the save stays listed, saying "The other
+  lines are in your cart, waiting to be recorded." until recorded, then
+  keeping that room, until Dismiss. The page counts each tap as a
+  telemetry event of its own, two an hour added beside the rest.
   The page's words drop "save" (Ali, 2026-11-13, inventory-tng-wyq): the
   cart lives in the browser, written to storage as it changes, so what
   the browser holds is "kept", and what the inventory takes is

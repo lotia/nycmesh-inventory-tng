@@ -170,10 +170,16 @@ export function noteOf(reason: Reason, online = true): Note {
 /** One of a 422's problems, after a space: what it names, then why, in
  * the page's words for its kind. */
 function problemSaid({ names, kind }: Problem): Said {
-  const why = say(isProblem(kind) ? PROBLEMS[kind] : NOT_ACCEPTED);
+  const why = problemWords(kind);
   if (names === null) {
     return [" ", why];
   }
   const where = names.of === "line" ? ON_LINE : ON_REPORT[names.of];
   return [" ", say(where, { n: names.n, why })];
+}
+
+/** Why, for a problem of `kind`: the page's words for it, or, for one it
+ * has none for, NOT_ACCEPTED. */
+export function problemWords(kind: string): string {
+  return say(isProblem(kind) ? PROBLEMS[kind] : NOT_ACCEPTED);
 }

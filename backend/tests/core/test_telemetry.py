@@ -1026,6 +1026,7 @@ PAGE_EVENTS = [
         "inventory.cart.differences_added",
         (("how", "tap"),),
     ),
+    ({"kind": "rest_put_back"}, counted, "inventory.cart.rests_put_back", ()),
 ]
 
 

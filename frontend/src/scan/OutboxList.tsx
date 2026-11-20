@@ -28,6 +28,7 @@ import {
 } from "./Notes";
 import { type NotPut, olderSaid } from "./OlderList";
 import { linesSaid } from "./older-builds";
+import { RECORD_THE_REST, REST_IN_CART, restOf } from "./record-the-rest";
 import {
   ADD_DIFFERENCE,
   changesShown,
@@ -74,6 +75,10 @@ function useOnline(): boolean {
  * addDifference): why not, if it was not. */
 export type AddDifference = (entry: Entry, difference: Body) => NotPut | null;
 
+/** Puts the lines of a batch refused (422) its problems do not name in the
+ * cart (CartForm, recordRest): why not, if it was not. */
+export type RecordRest = (entry: Entry) => NotPut | null;
+
 /**
  * What this browser sent, or is sending, and what became of each. A
  * refusal or failure says so in the alert's style, and a refused batch
@@ -82,13 +87,15 @@ export type AddDifference = (entry: Entry, difference: Body) => NotPut | null;
  * tab recorded and what differs (RecordedElsewhere), or, from a server
  * that does not say, what is left to do (SCAN_AGAIN_CHANGED), as the older
  * list does, while the page refreshes the stock (Ali, inventory-tng-g0e,
- * d; inventory-tng-0gg).
+ * d; inventory-tng-0gg). One refused (422) whose problems name lines
+ * offers Record the rest (RecordTheRest).
  */
 export function OutboxList({
   outbox,
   catalogue,
   cartKey,
   onAddDifference,
+  onRecordRest,
 }: {
   outbox: Outbox;
   /** To name the lines of one refused; null until it is loaded. */
@@ -96,9 +103,11 @@ export function OutboxList({
   /** The cart's batch key, if it has one. */
   cartKey: string | undefined;
   onAddDifference: AddDifference;
+  onRecordRest: RecordRest;
 }) {
   const online = useOnline();
-  // Under which save (batchId), why its difference did not go in the cart.
+  // Under which save (batchId), why its difference, or its rest, did not
+  // go in the cart.
   const notAdded = useSignal<{ on: string; why: NotPut } | null>(null);
   const stored = outbox.entries.value;
   // Of each refused, its lines, read again only as the outbox or
@@ -146,6 +155,10 @@ export function OutboxList({
             reason?.code === "recorded_elsewhere" ? reason : undefined;
           const recorded = catalogue === null ? undefined : elsewhere?.recorded;
           const lines = recorded === undefined ? (linesOf.get(id) ?? []) : [];
+          const refused = reason?.code === "refused" ? reason : undefined;
+          // Offered with the cart beside it, once the catalogue is loaded.
+          const rest =
+            refused === undefined || catalogue === null ? null : restOf(entry);
           return (
             <li key={id} class="flex flex-col items-start gap-1">
               <div>{batchWords(entry.body, entry.summary)}</div>
@@ -184,6 +197,16 @@ export function OutboxList({
                   cartKey={cartKey}
                   onAdd={(difference) => {
                     const why = onAddDifference(entry, difference);
+                    notAdded.value = why === null ? null : { on: id, why };
+                  }}
+                />
+              )}
+              {rest !== null && (
+                <RecordTheRest
+                  added={refused?.added === true}
+                  inCart={cartKey === rest.key}
+                  onRecord={() => {
+                    const why = onRecordRest(entry);
                     notAdded.value = why === null ? null : { on: id, why };
                   }}
                 />
@@ -292,4 +315,37 @@ function RecordedElsewhere({
       )}
     </>
   );
+}
+
+/**
+ * Under a batch refused (422) whose problems name lines: Record the rest,
+ * which puts its other lines in an empty cart (CartForm, recordRest),
+ * until it has, then that they are there, until recorded (Ali,
+ * 2026-11-20, inventory-tng-clvh).
+ */
+function RecordTheRest({
+  added,
+  inCart,
+  onRecord,
+}: {
+  /** Its other lines were put in the cart. */
+  added: boolean;
+  /** The cart holds them still. */
+  inCart: boolean;
+  onRecord: () => void;
+}) {
+  // Once shown, the in-cart words keep their room when recorded, so
+  // Dismiss below does not move, as RecordedElsewhere's do.
+  const shownInCart = useRef(false);
+  shownInCart.current ||= inCart;
+  if (!added) {
+    return (
+      <button type="button" onClick={onRecord}>
+        {say(RECORD_THE_REST)}
+      </button>
+    );
+  }
+  return shownInCart.current ? (
+    <p {...(inCart ? {} : KEEPS_ROOM)}>{say(REST_IN_CART)}</p>
+  ) : null;
 }

@@ -122,6 +122,14 @@ class DifferenceAdded(Strict):
     how: Literal["automatic", "tap"]
 
 
+class RestPutBack(Strict):
+    """A volunteer tapped Record the rest under a batch the inventory
+    refused for some of its lines, putting its other lines in the scan
+    page's cart (frontend/src/scan/record-the-rest.ts)."""
+
+    kind: Literal["rest_put_back"]
+
+
 AnyEvent = (
     WebVital
     | PageError
@@ -133,6 +141,7 @@ AnyEvent = (
     | LineRemoved
     | RemovalUndone
     | DifferenceAdded
+    | RestPutBack
 )
 Event = Annotated[AnyEvent, Field(discriminator="kind")]
 
@@ -208,6 +217,12 @@ differences_added = meter.create_counter(
     description="What saves refused as another tab recorded their cart first "
     "held more of, put in the scan page's cart, by the page itself or a tap",
 )
+rests_put_back = meter.create_counter(
+    "inventory.cart.rests_put_back",
+    unit="{batch}",
+    description="Batches refused for some of their lines whose other lines a "
+    "volunteer put in the scan page's cart with Record the rest",
+)
 scan_to_save = meter.create_histogram(
     "inventory.scan.to_save.duration",
     unit="s",
@@ -249,6 +264,8 @@ def record(event: AnyEvent) -> None:
             removals_undone.add(1)
         case DifferenceAdded():
             differences_added.add(1, {"how": event.how})
+        case RestPutBack():
+            rests_put_back.add(1)
         case _:  # ScanToSave, the last kind left.
             scan_to_save.record(event.seconds)
 

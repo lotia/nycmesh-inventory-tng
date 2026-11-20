@@ -40,7 +40,7 @@ import {
   RULED_LIST,
 } from "./Notes";
 import { type NotPut, OlderList, olderSaid, recordOlder } from "./OlderList";
-import type { AddDifference } from "./OutboxList";
+import type { AddDifference, RecordRest } from "./OutboxList";
 import { offered, offeredAt } from "./offered";
 import {
   asSave,
@@ -50,6 +50,7 @@ import {
   olderId,
 } from "./older-builds";
 import { type Gaps, nameOf, toCart, withRetired } from "./older-to-cart";
+import { restOf, takenOff } from "./record-the-rest";
 import { differenceOf } from "./recorded-elsewhere";
 import { Scanner } from "./Scanner";
 import { indexOf } from "./search";
@@ -104,6 +105,7 @@ export function CartForm({
   cartKey,
   older,
   adder,
+  rester,
 }: {
   catalogue: Catalogue;
   /** The outbox's batches it does not show (unseen-batches.ts, unseen). */
@@ -117,6 +119,9 @@ export function CartForm({
   older: OlderStore;
   /** Given what puts a save's difference in this cart (addDifference). */
   adder: { current: AddDifference | null };
+  /** Given what puts a refused batch's other lines in this cart
+   * (recordRest). */
+  rester: { current: RecordRest | null };
 }) {
   const store = useMemo(() => new CartStore(catalogue), []);
   // The open packages to take from, and how many are sealed where, as the
@@ -374,13 +379,15 @@ export function CartForm({
 
   /** Fill this cart, as stored, which must be empty, with `save`, once
    * `ready` says it still may (else why not), and `forget` it where it
-   * was (false if that could not be): putInCart's and addDifference's
-   * steps. True once filled, else why not. */
+   * was (false if that could not be): putInCart's, addDifference's and
+   * recordRest's steps; the status says what was `taken` off first. True
+   * once filled, else why not. */
   function fill(
     save: Older,
     automatically: boolean,
     forget: () => boolean,
     ready: () => NotPut | null | true = () => true,
+    taken: Gaps = [],
   ): NotPut | null | true {
     const current = storedCart();
     if (current.lines.length > 0) {
@@ -406,7 +413,7 @@ export function CartForm({
     if (!forget()) {
       problems.value = [[say(NOT_REMOVED)]];
     }
-    putBack.value = gaps;
+    putBack.value = [...taken, ...gaps];
     return true;
   }
 
@@ -451,7 +458,7 @@ export function CartForm({
     automatically = false,
   ): NotPut | null {
     const why = fill(asSave(difference), automatically, () =>
-      outbox.differenceAdded(entry),
+      outbox.addedToCart(entry),
     );
     if (why !== true) {
       return why;
@@ -463,6 +470,33 @@ export function CartForm({
     return null;
   }
   adder.current = addDifference;
+
+  /** Put the lines of a batch refused (422) its problems do not name in
+   * this cart, which must be empty, and mark it so, offering it no more;
+   * the status says each line taken off, and why, before what else could
+   * not go back (Ali, 2026-11-20, inventory-tng-clvh). Why not, if it was
+   * not. */
+  function recordRest(entry: Entry): NotPut | null {
+    const rest = restOf(entry);
+    // Offered only for one with a rest.
+    /* v8 ignore next */
+    if (rest === null) {
+      return null;
+    }
+    const why = fill(
+      asSave(rest),
+      false,
+      () => outbox.addedToCart(entry),
+      undefined,
+      takenOff(entry, catalogue),
+    );
+    if (why !== true) {
+      return why;
+    }
+    telemetry.record({ kind: "rest_put_back" });
+    return null;
+  }
+  rester.current = recordRest;
 
   // An empty cart takes what a save recorded elsewhere adds, without a
   // tap, as it takes what an older build left (Ali, inventory-tng-0gg,

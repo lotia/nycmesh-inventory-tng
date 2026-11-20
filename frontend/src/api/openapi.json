@@ -1572,6 +1572,9 @@
                 },
                 {
                   "$ref": "#/components/schemas/DifferenceAdded"
+                },
+                {
+                  "$ref": "#/components/schemas/RestPutBack"
                 }
               ],
               "discriminator": {
@@ -1585,6 +1588,7 @@
                   "out_of_date": "#/components/schemas/OutOfDate",
                   "outbox_retry": "#/components/schemas/OutboxRetry",
                   "removal_undone": "#/components/schemas/RemovalUndone",
+                  "rest_put_back": "#/components/schemas/RestPutBack",
                   "scan_to_save": "#/components/schemas/ScanToSave",
                   "web_vital": "#/components/schemas/WebVital"
                 }
@@ -1600,6 +1604,20 @@
         "type": "object",
         "required": ["events"],
         "title": "Report"
+      },
+      "RestPutBack": {
+        "properties": {
+          "kind": {
+            "type": "string",
+            "const": "rest_put_back",
+            "title": "Kind"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": ["kind"],
+        "title": "RestPutBack",
+        "description": "A volunteer tapped Record the rest under a batch the inventory\nrefused for some of its lines, putting its other lines in the scan\npage's cart (frontend/src/scan/record-the-rest.ts)."
       },
       "RetiredItem": {
         "properties": {

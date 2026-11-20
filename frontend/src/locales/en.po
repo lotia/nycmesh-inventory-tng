@@ -209,6 +209,10 @@ msgstr "Install: {items} from {from} for install {number}"
 msgid "{package} ({size} {unit}), retired: taking only"
 msgstr "{package} ({size} {unit}), retired: taking only"
 
+#: src/scan/record-the-rest.ts
+msgid "The other lines are in your cart, waiting to be recorded."
+msgstr "The other lines are in your cart, waiting to be recorded."
+
 #: src/scan/CartForm.tsx
 msgid "Pick a place"
 msgstr "Pick a place"
@@ -458,6 +462,10 @@ msgstr "Recorded {was}, you changed it to {now}. An administrator will correct i
 #: src/scan/OlderList.tsx
 msgid "That one was changed in another tab. Check it, then add it to the cart again."
 msgstr "That one was changed in another tab. Check it, then add it to the cart again."
+
+#: src/scan/record-the-rest.ts
+msgid "Record the rest"
+msgstr "Record the rest"
 
 #: src/scan/OlderList.tsx
 msgid "A cart: moving stock"
@@ -919,6 +927,10 @@ msgstr "{amount} loose"
 #: src/shared/outbox-notes.ts
 msgid "Some items were not recorded. Details below."
 msgstr "Some items were not recorded. Details below."
+
+#: src/scan/record-the-rest.ts
+msgid "{name}: taken off. {why}"
+msgstr "{name}: taken off. {why}"
 
 #: src/scan/older-to-cart.ts
 msgid "{amount} from an open package"

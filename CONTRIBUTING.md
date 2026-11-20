@@ -593,7 +593,11 @@ the cart's, so the same opening recorded again is the same batch
 (`batch.openings`).
 
 A refused save in the outbox's list lists its lines, in the words of the
-older list, each item numbered as the refusal's "Line n" names it. While
+older list, each item numbered as the refusal's "Line n" names it. One
+whose problems name lines, and that holds others, offers Record the
+rest, which puts those others in an empty cart under a key made from the
+save's, the status naming each line taken off and why
+(`frontend/src/scan/record-the-rest.ts`). While
 the browser says it is offline, a batch waiting for an answer says so,
 and the page follows the browser going on and off line.
 
@@ -623,8 +627,8 @@ Both pages report their errors, three Web Vitals, the outbox's retries,
 how long a batch took from its first line to Record, a tab learning that a
 newer build is out, what an older build left in storage and what
 volunteers did with it, a cart discarded, a cart's line removed and put
-back with Undo, and what a save another tab recorded first added put in
-the cart, through
+back with Undo, what a save another tab recorded first added put in
+the cart, and Record the rest tapped, through
 `frontend/src/shared/telemetry.ts`, to `POST /api/telemetry`, which turns
 them into `inventory.*` metrics (docs/decisions/0006). Its schema, in
 `backend/src/inventory_tng/scan/page_telemetry_api.py`, lists all a page

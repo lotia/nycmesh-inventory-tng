@@ -257,7 +257,7 @@ describe("queueing", () => {
     const third = changed("2", "c");
     store(first, second, third);
     const outbox = new Outbox(answering(() => saved()).api);
-    expect(outbox.differenceAdded(third)).toBe(true);
+    expect(outbox.addedToCart(third)).toBe(true);
     expect(outbox.entries.value.map((e) => e.reason)).toEqual([
       null,
       { code: "recorded_elsewhere" },
@@ -945,9 +945,31 @@ describe("what another tab recorded (inventory-tng-0gg)", () => {
     await vi.waitFor(() =>
       expect(states(outbox)).toEqual(["saved", "refused"]),
     );
-    expect(outbox.differenceAdded(outbox.entries.value[1] as Entry)).toBe(true);
+    expect(outbox.addedToCart(outbox.entries.value[1] as Entry)).toBe(true);
     expect(outbox.entries.value[1]?.reason).toMatchObject({ added: true });
     expect(outbox.entries.value[0]?.reason).toBeNull();
+  });
+
+  test("its other lines put in the cart (Record the rest) is kept so, of that one alone (inventory-tng-clvh)", () => {
+    const problems = [{ names: { of: "line" as const, n: 1 }, kind: "x" }];
+    const refused = (what: string): Entry =>
+      entry({
+        summary: named(what),
+        state: "refused",
+        reason: { code: "refused", problems },
+      });
+    const first = refused("a");
+    const second = refused("b");
+    store(first, second);
+    const outbox = new Outbox(answering(() => saved()).api);
+    expect(outbox.addedToCart(second)).toBe(true);
+    expect(outbox.entries.value.map((e) => e.reason)).toEqual([
+      { code: "refused", problems },
+      { code: "refused", problems, added: true },
+    ]);
+    expect(new Outbox(answering(() => saved()).api).entries.value).toEqual(
+      outbox.entries.value,
+    );
   });
 
   test("one listed recorded elsewhere waits to be asked about while the batch under its key waits", async () => {
@@ -1343,6 +1365,8 @@ describe("storage", () => {
         "queuedAt",
         "reason",
         "reason.added",
+        "reason.added",
+        "reason.added = true",
         "reason.added = true",
         "reason.code",
         "reason.code",

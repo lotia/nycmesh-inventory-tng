@@ -3,8 +3,9 @@
  * errors, three Web Vitals, the outbox's retries, how long a batch took
  * from its first line to saving, a tab learning a newer build is out,
  * what an older build left behind and what volunteers did with it, a cart
- * discarded, a cart's line removed and put back with Undo, and what a
- * save another tab recorded first held more of put in the cart. No
+ * discarded, a cart's line removed and put back with Undo, what a
+ * save another tab recorded first held more of put in the cart, and the
+ * rest of a batch refused for some of its lines put there. No
  * OpenTelemetry here: events go to POST /api/telemetry on this origin,
  * whose schema is the list of what may be sent, and the backend turns them
  * into metrics. Nothing names a volunteer, an item or a place, and an error
@@ -47,6 +48,9 @@ export const PER_HOUR: Record<Event["kind"], number> = {
   removal_undone: 4,
   // Rare: a cart recorded in two tabs, changed in one.
   difference_added: 2,
+  // Rare: a batch refused for some of its lines (inventory-tng-clvh),
+  // added beside the rest, not taken from them.
+  rest_put_back: 2,
 };
 /** How many a page sends an hour in all: PER_HOUR's sum, never written
  * out. */

@@ -116,6 +116,7 @@ describe("reporting", () => {
       line_removed: { kind: "line_removed" },
       removal_undone: { kind: "removal_undone" },
       difference_added: { kind: "difference_added", how: "tap" },
+      rest_put_back: { kind: "rest_put_back" },
     };
     for (const event of Object.values(each)) {
       for (let i = 0; i <= PER_HOUR_IN_ALL; i++) {

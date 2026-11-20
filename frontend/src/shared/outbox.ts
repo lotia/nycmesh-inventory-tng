@@ -222,7 +222,13 @@ export const Reason = v.union([
     why: DeviceRefusedReply.entries.reason,
   }),
   /** 422, and its problems. */
-  v.object({ code: v.literal("refused"), problems: v.array(Problem) }),
+  v.object({
+    code: v.literal("refused"),
+    problems: v.array(Problem),
+    /** Its lines its problems do not name put in the cart (Record the
+     * rest, scan/record-the-rest.ts). */
+    added: v.exactOptional(v.literal(true)),
+  }),
 ]);
 
 export type Reason = v.InferOutput<typeof Reason>;
@@ -577,16 +583,18 @@ export class Outbox {
     return queued;
   }
 
-  /** Mark one recorded elsewhere as having had its difference put in the
-   * cart (Add the difference to cart), so it is offered no more: that batch
-   * alone, not another under its key. False if the browser would not keep
-   * that. */
-  differenceAdded(listed: Entry): boolean {
+  /** Mark one as having had what it offers put in the cart, so it is
+   * offered no more: of one recorded elsewhere, its difference (Add these
+   * to cart); of one refused (422), its other lines (Record the rest). That
+   * batch alone, not another under its key. False if the browser would not
+   * keep that. */
+  addedToCart(listed: Entry): boolean {
     const body = v.parse(BatchBody, listed.body);
     return this.update((entries) =>
       entries.map((entry) =>
         sameBatch(entry.body, body) &&
-        entry.reason?.code === "recorded_elsewhere"
+        (entry.reason?.code === "recorded_elsewhere" ||
+          entry.reason?.code === "refused")
           ? { ...entry, reason: { ...entry.reason, added: true as const } }
           : entry,
       ),
