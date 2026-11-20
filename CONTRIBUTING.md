@@ -73,6 +73,14 @@ bd label list-all
   app). `mise run compose -- <arguments>` runs compose with Podman if it is
   installed, else Docker. To choose, set `INVENTORY_COMPOSE` in `.env`, such
   as `INVENTORY_COMPOSE=docker compose`.
+- With Podman, Docker Compose as its compose provider. Podman's compose
+  command runs whichever provider is installed, Docker Compose first, and
+  says which it runs (`mise run compose -- version`). Podman Compose is
+  not supported: it has no `compose ls`, and its `ps` lacks the ports the
+  tasks read, so `mise run start-database` says this checkout's own
+  running server holds its port and refuses. To switch, install Docker
+  Compose, or name it in `compose_providers` in the `[engine]` table of
+  containers.conf (Podman's man page for its compose command).
 
 Activate mise in your shell (`mise activate`, in its docs), so the tools it
 installs are on your `PATH` in the clone. Then, in the clone, and again after
@@ -843,6 +851,26 @@ it: then remove `oom_score_adj` from `compose.yaml`, both tasks, the test
 and this section (inventory-tng-46w). Run the second after upgrading
 Podman or crun. Neither is one of the checks, and both say "not applicable"
 in CI, whose Docker runs as root, where the bug never shows.
+
+### SELinux and the server's setup scripts
+
+A known limit, untested: on Fedora or RHEL with rootless Podman, a new
+volume may never get its roles. Compose mounts the server's setup scripts
+(`configs` in `compose.yaml`) without an SELinux relabel, so the server
+cannot read them, and `mise run compose -- logs db` shows
+`/docker-entrypoint-initdb.d/1-roles.sql: Permission denied`. The setup
+stops there, and later starts never run it again. On such a host, label
+the scripts' directory for containers, then remove the volume, which holds
+nothing yet, and start again:
+
+```sh
+chcon -R -t container_file_t backend/migrations
+mise run compose -- down --volumes   # only a new stack's, holding nothing
+mise run start-database
+```
+
+This changes, with a relabelled mount in `compose.yaml`, once someone
+develops here on such a host.
 
 ## Phrases
 
