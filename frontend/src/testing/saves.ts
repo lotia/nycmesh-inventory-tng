@@ -19,8 +19,8 @@ export const KEY = "0b7c6a51-9a3d-4d39-8f3e-1d1f2c4b5a61";
 /** A second batch's key. */
 export const OTHER_KEY = "6f1e2d3c-4b5a-4968-8776-5a4b3c2d1e0f";
 
-/** A batch with a key, as the outbox keeps it. */
 let keys = 0;
+/** A batch with a key, as the outbox keeps it. */
 export function keyed(draft: Draft): Body {
   keys += 1;
   return {

@@ -359,7 +359,7 @@ describe("turning a cart into a batch", () => {
   });
 
   test("what is taken from an open package no longer offered is not sent", () => {
-    const shown = "11111111-1111-4111-8111-111111111111";
+    const offeredKey = "11111111-1111-4111-8111-111111111111";
     const gone = "22222222-2222-4222-8222-222222222222";
     const lines = [
       {
@@ -367,31 +367,31 @@ describe("turning a cart into a batch", () => {
         packages: {},
         loose: "",
         open: {
-          [shown]: { amount: "5", whole: false },
+          [offeredKey]: { amount: "5", whole: false },
           [gone]: { amount: "20", whole: false },
         },
       },
     ];
-    const here = openAt(5, 120_000, { key: shown });
+    const here = openAt(5, 120_000, { key: offeredKey });
     // Offered elsewhere is not offered here.
     const elsewhere = { ...here, key: gone, location_id: 12 };
     const batch = toBatch(cart({ lines }), CATALOGUE, [here, elsewhere]);
     expect("draft" in batch && batch.draft.lines).toEqual([
-      { item_id: 101, quantity: "5", open_package_key: shown },
+      { item_id: 101, quantity: "5", open_package_key: offeredKey },
     ]);
     // A cut of all it shows says it is used up, unless the volunteer
     // said not.
     const line = { itemId: 101, packages: {}, loose: "" };
     const all = [
-      { ...line, open: { [shown]: { amount: "120", whole: false } } },
+      { ...line, open: { [offeredKey]: { amount: "120", whole: false } } },
     ];
     expect(toBatch(cart({ lines: all }), CATALOGUE, [here])).toMatchObject({
-      draft: { used_up: [shown] },
+      draft: { used_up: [offeredKey] },
     });
     const kept = [
       {
         ...line,
-        open: { [shown]: { amount: "120", whole: false, usedUp: false } },
+        open: { [offeredKey]: { amount: "120", whole: false, usedUp: false } },
       },
     ];
     const notSaid = toBatch(cart({ lines: kept }), CATALOGUE, [here]);
