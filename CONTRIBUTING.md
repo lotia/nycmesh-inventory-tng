@@ -100,10 +100,11 @@ runs Python through `uv run`.
 ### Tasks and direct commands
 
 Whole workflows are mise tasks: setting up, running the app, the checks,
-the database's life, and compose, which always runs as
-`mise run compose -- <arguments>`. `mise tasks` lists every task and what
-it does; the sections below say when to use each. A small step you take
-many times a day you run directly, in `backend/` or `frontend/`:
+the database's life, and compose. `mise tasks` lists every task with what
+it does. The ones you run every day are `mise run dev` (Running the app),
+`mise run check` (Running the checks) and `mise run compose -- <arguments>`,
+the only way to run compose. A small step you take many times a day you run
+directly, in `backend/` or `frontend/`:
 
 | In | Command | What it does |
 | --- | --- | --- |
@@ -843,15 +844,9 @@ migrates as it starts: until `mise run dev-database` makes it, the
 container stops, and in development says to run that. Nor does it check
 the ports first, as the tasks do (Local settings): if one is taken, it
 fails with the runtime's own message. For most jobs a task is the safer
-way:
-
-| Command | What it does | When |
-| --- | --- | --- |
-| `mise run dev-database` | Starts the server, makes this checkout's database if missing, migrates it | Before the app, here or in its container |
-| `mise run start-database` | Starts the server, making its container again if its settings changed | Before the checks |
-| `mise run reset-dev-database -- <name>` | Drops this checkout's database, makes it again empty and migrated | After a migration was edited ([Migrations](#migrations)) |
-| `mise run compose -- up -d --build --wait app` | The app in its container | After `mise run dev-database` ([above](#running-the-app-in-a-container)) |
-| `mise run remove-stale-stacks` | Removes the stacks of checkouts that are gone, once you confirm | After deleting a checkout ([Local settings](#local-settings)) |
+way: [Local settings](#local-settings), [Migrations](#migrations) and
+[Running the app in a container](#running-the-app-in-a-container) say
+which.
 
 ### Podman's exec bug
 
@@ -1109,19 +1104,9 @@ of tests of what is in a clone marks itself `clone`.
 
 The backend's run from `backend/`. Start the database first, or with none
 run only the first row; the other checks take about a second each. Then
-`mise run fix` runs the fixes and `mise run check` runs every check, or one
-side of them:
-
-```sh
-mise run fix-backend    # or: mise run fix-frontend
-mise run check-backend  # or: mise run check-frontend
-mise run check-browser  # the browser tests
-mise run check-changed-lines  # both sides, then coverage of what you changed
-mise run check-scripts  # shellcheck, on the scripts in mise-tasks/
-mise run check-markdown # markdownlint (mise run fix-markdown fixes)
-mise run check-toml     # taplo: lint and formatting (mise run fix-toml formats)
-mise run check-catalogues  # both sides' catalogues are current (Phrases)
-```
+`mise run fix` runs the fixes and `mise run check` runs every check. Each
+check is also a task of its own, named `check-…`, as is each fix, named
+`fix-…`; `mise tasks` lists them.
 
 Each test run creates a database of its own on that server and drops it at the
 end; a run that was killed before it could is dropped by a later one. It makes
@@ -1336,13 +1321,30 @@ running and working on the app. Keep them:
 - **Short and clear.** Steps a reader can follow in order, in plain words.
   Cut what the reader does not need to do the task.
 
+- **Pointing, not copying.** What a reader can look up in a directory or
+  with a command, the docs do not copy: the labels (`bd label list-all`),
+  the tasks (`mise tasks`), files, modules, tests, migrations
+  (`backend/migrations/versions/`) and versions. Say that the project uses
+  it and, where it is obscure, where to look or what to run.
+- **Commands at the right size.** Give an everyday granular step directly,
+  such as one test file or a migration
+  ([Tasks and direct commands](#tasks-and-direct-commands)); a whole
+  workflow is a mise task.
+- **Settings by name.** Docs and comments name the setting or file that
+  holds a tunable value, never the value. A decision record may keep the
+  figure decided then.
+
 Change an existing doc rather than adding one, and add a new file only when
 an issue asks for it.
 
 Record a decision in words, with who made it and when, not as a link to
-where it was discussed or the letter of a choice made there. A test refuses
-claude.ai artifact links, lettered choices and question codes in the
-clone's files.
+where it was discussed or the letter of a choice made there.
+
+These are judgements, held in review, not checks, except two that tests
+enforce: every mise task has a description, so that `mise tasks` says what
+it does (`tests/codebase/test_contributing.py`), and no file in the clone
+holds a claude.ai artifact link, a lettered choice or a question code
+(`tests/codebase/test_artifact_links.py`).
 
 Lint what you write or change with `mise run check-markdown`.
 

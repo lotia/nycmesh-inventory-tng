@@ -52,9 +52,10 @@ is, read [README.md](README.md).
    first. The ignores in `.markdownlint-cli2.jsonc` leave out only files
    tools write.
 10. **Development workflows are mise tasks**, in `mise.toml` or as scripts
-    in `mise-tasks/`, each named in CONTRIBUTING.md as `mise run <task>`.
-    Compose runs through `mise run compose --`, never a runtime's own compose
-    command. `backend/tests/codebase/test_contributing.py` enforces both.
+    in `mise-tasks/`, each with a description, so `mise tasks` lists it
+    with what it does. Compose runs through `mise run compose --`, never a
+    runtime's own compose command.
+    `backend/tests/codebase/test_contributing.py` enforces both.
 11. **Never refer to an artifact** (a claude.ai artifact link, its id, or
     words like "the questions page") in beads, docs, decision records or
     code comments, unless the person asks. Artifacts are tools to guide the

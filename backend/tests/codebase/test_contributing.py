@@ -1,8 +1,8 @@
-"""AGENTS.md rule 10: every development workflow is a mise task named in
-CONTRIBUTING.md as `mise run <task>`, and contributors run compose through
-`mise run compose`, which picks the container runtime. CI runs each check
-directly, not through mise, as a job named for the task that runs it
-locally."""
+"""AGENTS.md rule 10: every development workflow is a mise task with a
+description, so that `mise tasks` says what each does, and contributors run
+compose through `mise run compose`, which picks the container runtime. CI
+runs each check directly, not through mise, as a job named for the task that
+runs it locally."""
 
 import os
 import re
@@ -24,18 +24,24 @@ JOB = re.compile(r"^  ([^\s:#]+):", re.MULTILINE)
 # A runtime's own compose command (a space, a hyphen or a line break between),
 # but not a value, such as INVENTORY_COMPOSE=docker compose.
 DIRECT = re.compile(r"(?<![=\"'])\b(?:docker|podman)(?:\s+|-)compose\b")
+# A task script's description, in the header mise reads.
+DESCRIPTION = re.compile(r"^#MISE description=([\"'])\S.*\1$", re.MULTILINE)
 # Where running compose directly is right: the task that picks the runtime,
 # and CI, which runs its own.
 ALLOWED = {TASK_SCRIPTS / "compose", WORKFLOW}
 
 
-def tasks() -> set[str]:
-    named = set(tomllib.loads((CLONE / "mise.toml").read_text())["tasks"])
-    return named | {
-        script.name
+def task_scripts() -> list[Path]:
+    return [
+        script
         for script in TASK_SCRIPTS.iterdir()
         if script.is_file() and os.access(script, os.X_OK)
-    }
+    ]
+
+
+def tasks() -> set[str]:
+    named = set(tomllib.loads((CLONE / "mise.toml").read_text())["tasks"])
+    return named | {script.name for script in task_scripts()}
 
 
 def test_a_file_gone_before_it_is_read_is_skipped(
@@ -74,14 +80,18 @@ def test_what_a_gitignore_leaves_out_is_not_read(
     assert (backend, frontend, claude, beads) == (["src"], ["src"], ["skills"], [])
 
 
-def test_every_mise_task_is_in_contributing() -> None:
-    text = (CLONE / "CONTRIBUTING.md").read_text()
-    missing = {
-        task
-        for task in tasks()
-        if not re.search(rf"mise run {re.escape(task)}(?=[\s`]|$)", text, re.MULTILINE)
+def test_every_mise_task_has_a_description() -> None:
+    """So `mise tasks` lists each with what it does: CONTRIBUTING.md names
+    only the everyday ones."""
+    named = tomllib.loads((CLONE / "mise.toml").read_text())["tasks"]
+    undescribed = {name for name, task in named.items() if not task.get("description")}
+    undescribed |= {
+        script.name
+        for script in task_scripts()
+        if not DESCRIPTION.search(script.read_text())
     }
-    assert missing == set()
+    assert named
+    assert undescribed == set()
 
 
 def test_compose_runs_through_mise(clone_files: dict[Path, str]) -> None:
