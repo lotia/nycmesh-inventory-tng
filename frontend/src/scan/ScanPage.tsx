@@ -2,7 +2,12 @@ import { msg } from "@lingui/core/macro";
 import { signal, useSignal } from "@preact/signals";
 import { useEffect, useMemo, useRef } from "preact/hooks";
 import { type Api, makeApi } from "../api/client";
-import { MUST_UPGRADE, UPDATED, UPGRADE } from "../shared/build";
+import {
+  MUST_UPGRADE,
+  MUST_UPGRADE_NOT_KEPT,
+  UPDATED,
+  UPGRADE,
+} from "../shared/build";
 import { say, sayParts } from "../shared/i18n";
 import { onStoredChange } from "../shared/local-storage";
 import {
@@ -50,6 +55,12 @@ export function ScanPage({
   // Whether the cart holds no lines: until it does, a newer build is not
   // loaded, as it would not read this build's cart (shared/build.ts).
   const cartEmpty = useMemo(() => signal(storedCartEmpty()), []);
+  // Whether the browser kept the cart when last asked (CartForm, kept).
+  const cartKept = useMemo(() => signal(true), []);
+  // Whether a reload, or a restart of the browser, would keep the cart:
+  // it is kept, or has nothing to lose (Ali, inventory-tng-0y0u,
+  // inventory-tng-sdfg).
+  const reloadKeepsCart = cartKept.value || cartEmpty.value;
   // The cart's batch key, while the cart is shown (CartForm): a save's
   // difference put in it is said to be there until it is recorded.
   const cartKey = useMemo(() => signal<string | undefined>(undefined), []);
@@ -190,7 +201,12 @@ export function ScanPage({
   return (
     <main class="volunteer page-width">
       <h1>{say(SCAN)}</h1>
-      <NewerBuild outbox={outbox} cartEmpty={cartEmpty.value} reload={reload} />
+      <NewerBuild
+        outbox={outbox}
+        cartEmpty={cartEmpty.value}
+        reloadKeepsCart={reloadKeepsCart}
+        reload={reload}
+      />
       {current.state === "loading" && <p>{say(LOADING)}</p>}
       {current.state === "unregistered" && (
         <p role="alert">
@@ -216,6 +232,8 @@ export function ScanPage({
           pending={pending}
           outbox={outbox}
           cartEmpty={cartEmpty}
+          cartKept={cartKept}
+          reloadKeepsCart={reloadKeepsCart}
           cartKey={cartKey}
           older={older}
           adder={adder}
@@ -242,16 +260,19 @@ export function ScanPage({
  * to send, as the newer build reads neither; until then it says nothing.
  * Too old, at once, saying what this tab holds is kept: the newer build
  * reads this build's cart, or lists it, and lists its saves waiting
- * (older-builds.ts). A newer build's saves waiting here are not counted: that
- * build sends them.
+ * (older-builds.ts); or, while the browser isn't keeping a cart with
+ * lines, that upgrading empties it (Ali, inventory-tng-sdfg). A newer
+ * build's saves waiting here are not counted: that build sends them.
  */
 function NewerBuild({
   outbox,
   cartEmpty,
+  reloadKeepsCart,
   reload,
 }: {
   outbox: Outbox;
   cartEmpty: boolean;
+  reloadKeepsCart: boolean;
   reload: () => void;
 }) {
   const learned = outbox.builds.newer.value;
@@ -269,12 +290,20 @@ function NewerBuild({
   }
   return (
     <div role="alert" class={CAUTION_BOX}>
-      <div>{say(holds ? MUST_UPGRADE : UPDATED)}</div>
+      <div>{say(upgradeWords(holds, reloadKeepsCart))}</div>
       <button type="button" class="primary" onClick={reload}>
         {say(UPGRADE)}
       </button>
     </div>
   );
+}
+
+/** What the alert asking for a reload says. */
+function upgradeWords(holds: boolean, reloadKeepsCart: boolean) {
+  if (!reloadKeepsCart) {
+    return MUST_UPGRADE_NOT_KEPT;
+  }
+  return holds ? MUST_UPGRADE : UPDATED;
 }
 
 /** Whether the stored cart holds no lines. */

@@ -133,6 +133,10 @@ msgstr "Not recorded."
 msgid "{name}: {amount}, new"
 msgstr "{name}: {amount}, new"
 
+#: src/scan/Scanner.tsx
+msgid "This browser isn't keeping the cart, so record it before you reload the page, or find items in the list."
+msgstr "This browser isn't keeping the cart, so record it before you reload the page, or find items in the list."
+
 #: src/scan/OlderList.tsx
 msgid "That one was changed in another tab. Check it again."
 msgstr "That one was changed in another tab. Check it again."
@@ -250,6 +254,10 @@ msgstr "Discard"
 msgid "This package's size changed since the page loaded: load the page again, and count it again"
 msgstr "This package's size changed since the page loaded: load the page again, and count it again"
 
+#: src/scan/Scanner.tsx
+msgid "Reload the page to try again, or find items in the list."
+msgstr "Reload the page to try again, or find items in the list."
+
 #: src/scan/OpenPackageCard.tsx
 msgid "Now"
 msgstr "Now"
@@ -293,10 +301,6 @@ msgstr "Count whole packages: {package}."
 #: src/scan/OpenPackageCard.tsx
 msgid "Cut or take from the {name} opened {date} ({unit})"
 msgstr "Cut or take from the {name} opened {date} ({unit})"
-
-#: src/scan/Scanner.tsx
-msgid "Check the phone's settings allow this browser to use the camera, then restart the browser, or find items in the list."
-msgstr "Check the phone's settings allow this browser to use the camera, then restart the browser, or find items in the list."
 
 #: src/scan/OlderList.tsx
 msgid "Saying what is on open packages"
@@ -482,6 +486,10 @@ msgstr "Scan"
 #: src/scan/OpenPackageCard.tsx
 msgid "Short end"
 msgstr "Short end"
+
+#: src/scan/Scanner.tsx
+msgid "Check the device's settings allow this browser to use the camera. This browser isn't keeping the cart, so record it before you restart the browser, or find items in the list."
+msgstr "Check the device's settings allow this browser to use the camera. This browser isn't keeping the cart, so record it before you restart the browser, or find items in the list."
 
 #: src/scan/cart.ts
 msgid "Enter how much from the open package, up to 3 decimals."
@@ -713,6 +721,10 @@ msgstr "The inventory's rules refuse this as sent: it changed since the page loa
 msgid "The camera needs a secure connection."
 msgstr "The camera needs a secure connection."
 
+#: src/scan/Scanner.tsx
+msgid "Check the device's settings allow this browser to use the camera, then restart the browser, or find items in the list."
+msgstr "Check the device's settings allow this browser to use the camera, then restart the browser, or find items in the list."
+
 #: src/scan/OlderList.tsx
 msgid "Kept on this device, not sent."
 msgstr "Kept on this device, not sent."
@@ -757,6 +769,10 @@ msgstr "This browser wouldn't keep the cart, so it wasn't sent. Free some space 
 #: src/scan/older-to-cart.ts
 msgid "{count, plural, one {Could not read # previously added item, scan it again.} other {Could not read # previously added items, scan them again.}}"
 msgstr "{count, plural, one {Could not read # previously added item, scan it again.} other {Could not read # previously added items, scan them again.}}"
+
+#: src/shared/build.ts
+msgid "The scanner has been updated. You must upgrade. This browser isn't keeping the cart, so upgrading empties it. Note what is in it, then add it again after upgrading."
+msgstr "The scanner has been updated. You must upgrade. This browser isn't keeping the cart, so upgrading empties it. Note what is in it, then add it again after upgrading."
 
 #: src/shared/registration.ts
 msgid "That phrase isn't one we know. Check it word by word against the one you were given."
@@ -943,6 +959,10 @@ msgstr "Are you {name}? This phone hasn't been used for a while."
 #: src/shared/outbox-notes.ts
 msgid "This item, in this package or loose, is on another line too: put it on one line"
 msgstr "This item, in this package or loose, is on another line too: put it on one line"
+
+#: src/scan/Scanner.tsx
+msgid "The camera couldn't be opened."
+msgstr "The camera couldn't be opened."
 
 #: src/scan/older-to-cart.ts
 msgid "An item no longer in the catalogue"

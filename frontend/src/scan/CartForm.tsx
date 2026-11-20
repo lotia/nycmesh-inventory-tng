@@ -103,6 +103,8 @@ export function CartForm({
   pending,
   outbox,
   cartEmpty,
+  cartKept,
+  reloadKeepsCart,
   cartKey,
   older,
   adder,
@@ -115,6 +117,10 @@ export function CartForm({
   outbox: Outbox;
   /** Kept as the cart changes, here or in another tab (NewerBuild). */
   cartEmpty: Signal<boolean>;
+  /** Set to whether the browser kept the cart when last asked. */
+  cartKept: Signal<boolean>;
+  /** Whether a reload or restart would keep the cart (ScanPage). */
+  reloadKeepsCart: boolean;
   /** Kept as the cart's batch key changes. */
   cartKey: Signal<string | undefined>;
   /** What older builds left, to put back in the cart or discard. */
@@ -140,8 +146,6 @@ export function CartForm({
   const cart = store.cart;
   const query = useSignal("");
   const problems = useSignal<Said[]>([]);
-  // Whether the browser kept the cart when last asked.
-  const cartKept = useSignal(true);
   // What was last sent to be recorded, worded as it is shown.
   const saved = useSignal<Batch | null>(null);
   // While Discard cart waits to be confirmed, the cart's revision then.
@@ -773,8 +777,7 @@ export function CartForm({
             scanning.value = false;
           }}
           reload={reload}
-          // An empty cart has nothing to record before a reload.
-          reloadKeepsCart={cartKept.value || empty}
+          reloadKeepsCart={reloadKeepsCart}
         />
       ) : (
         <button type="button" onClick={() => (scanning.value = true)}>

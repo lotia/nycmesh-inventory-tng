@@ -4,7 +4,8 @@
  * with a word on what it did. A refused or missing camera says so, and
  * offers Reload page where that may help, with no Done (Ali,
  * inventory-tng-qy02), saying to record the cart first while a reload
- * would empty it (Ali, inventory-tng-0y0u); the lists below still work.
+ * or restart would empty it (Ali, inventory-tng-0y0u, inventory-tng-xtig);
+ * the lists below still work.
  * Each session is reported (camera-report.ts).
  */
 import type { MessageDescriptor } from "@lingui/core";
@@ -33,13 +34,14 @@ export const RELOAD_PAGE = msg`Reload page`;
 
 /** Why the camera could not be used, in the cart alerts' form: a bold
  * heading, then a plain hint at what to do, and whether Reload page is
- * offered, as reloading may help (Ali, inventory-tng-qy02). One that
- * offers it has a hint for when the browser isn't keeping the cart, as a
- * reload then empties it (Ali, inventory-tng-0y0u). */
+ * offered, as reloading may help (Ali, inventory-tng-qy02). One whose
+ * hint says to reload or restart has a hint for when the browser isn't
+ * keeping the cart, as either then empties it (Ali, inventory-tng-0y0u,
+ * inventory-tng-xtig); one offering Reload page must have it. */
 export type Refusal = {
   bold: MessageDescriptor;
   plain: MessageDescriptor;
-} & ({ reload: true; notKept: MessageDescriptor } | { reload: false });
+} & ({ reload: boolean; notKept: MessageDescriptor } | { reload: false });
 
 export const NOT_ALLOWED = {
   bold: msg`The camera isn't allowed for this page.`,
@@ -61,8 +63,15 @@ export const NO_DECODER = {
 } satisfies Refusal;
 export const NO_CAMERA = {
   bold: msg`No camera could be found.`,
-  plain: msg`Check the phone's settings allow this browser to use the camera, then restart the browser, or find items in the list.`,
+  plain: msg`Check the device's settings allow this browser to use the camera, then restart the browser, or find items in the list.`,
   reload: false,
+  notKept: msg`Check the device's settings allow this browser to use the camera. This browser isn't keeping the cart, so record it before you restart the browser, or find items in the list.`,
+} satisfies Refusal;
+export const NOT_OPENED = {
+  bold: msg`The camera couldn't be opened.`,
+  plain: msg`Reload the page to try again, or find items in the list.`,
+  reload: true,
+  notKept: msg`This browser isn't keeping the cart, so record it before you reload the page, or find items in the list.`,
 } satisfies Refusal;
 export const INSECURE = {
   bold: msg`The camera needs a secure connection.`,
@@ -77,7 +86,7 @@ const REFUSALS: Record<Refused, Refusal> = {
   in_use: IN_USE,
   decoder_failed: NO_DECODER,
   not_found: NO_CAMERA,
-  other: NO_CAMERA,
+  other: NOT_OPENED,
   insecure: INSECURE,
 };
 
@@ -99,8 +108,8 @@ export function Scanner({
   onDone: () => void;
   /** Refresh this page (ScanPage's reload). */
   reload: () => void;
-  /** Whether a reload would keep the cart: the browser keeps it
-   * (CartForm, NOT_KEEPING), or it is empty. */
+  /** Whether a reload or restart would keep the cart (ScanPage,
+   * reloadKeepsCart). */
   reloadKeepsCart: boolean;
   open?: (video: HTMLVideoElement) => Promise<Session>;
 }) {
@@ -259,10 +268,12 @@ export function Scanner({
   );
 }
 
-/** A refusal's hint: to record the cart first where a reload would
- * empty it. */
+/** A refusal's hint: to record the cart first where reloading or
+ * restarting would empty it. */
 function hintOf(refusal: Refusal, reloadKeepsCart: boolean) {
-  return refusal.reload && !reloadKeepsCart ? refusal.notKept : refusal.plain;
+  return "notKept" in refusal && !reloadKeepsCart
+    ? refusal.notKept
+    : refusal.plain;
 }
 
 /** Turns the camera's torch on and off. */

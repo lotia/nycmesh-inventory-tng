@@ -133,6 +133,10 @@ msgstr ""
 msgid "{name}: {amount}, new"
 msgstr ""
 
+#: src/scan/Scanner.tsx
+msgid "This browser isn't keeping the cart, so record it before you reload the page, or find items in the list."
+msgstr ""
+
 #: src/scan/OlderList.tsx
 msgid "That one was changed in another tab. Check it again."
 msgstr ""
@@ -250,6 +254,10 @@ msgstr ""
 msgid "This package's size changed since the page loaded: load the page again, and count it again"
 msgstr ""
 
+#: src/scan/Scanner.tsx
+msgid "Reload the page to try again, or find items in the list."
+msgstr ""
+
 #: src/scan/OpenPackageCard.tsx
 msgid "Now"
 msgstr ""
@@ -292,10 +300,6 @@ msgstr ""
 
 #: src/scan/OpenPackageCard.tsx
 msgid "Cut or take from the {name} opened {date} ({unit})"
-msgstr ""
-
-#: src/scan/Scanner.tsx
-msgid "Check the phone's settings allow this browser to use the camera, then restart the browser, or find items in the list."
 msgstr ""
 
 #: src/scan/OlderList.tsx
@@ -481,6 +485,10 @@ msgstr ""
 
 #: src/scan/OpenPackageCard.tsx
 msgid "Short end"
+msgstr ""
+
+#: src/scan/Scanner.tsx
+msgid "Check the device's settings allow this browser to use the camera. This browser isn't keeping the cart, so record it before you restart the browser, or find items in the list."
 msgstr ""
 
 #: src/scan/cart.ts
@@ -713,6 +721,10 @@ msgstr ""
 msgid "The camera needs a secure connection."
 msgstr ""
 
+#: src/scan/Scanner.tsx
+msgid "Check the device's settings allow this browser to use the camera, then restart the browser, or find items in the list."
+msgstr ""
+
 #: src/scan/OlderList.tsx
 msgid "Kept on this device, not sent."
 msgstr ""
@@ -756,6 +768,10 @@ msgstr ""
 
 #: src/scan/older-to-cart.ts
 msgid "{count, plural, one {Could not read # previously added item, scan it again.} other {Could not read # previously added items, scan them again.}}"
+msgstr ""
+
+#: src/shared/build.ts
+msgid "The scanner has been updated. You must upgrade. This browser isn't keeping the cart, so upgrading empties it. Note what is in it, then add it again after upgrading."
 msgstr ""
 
 #: src/shared/registration.ts
@@ -942,6 +958,10 @@ msgstr ""
 
 #: src/shared/outbox-notes.ts
 msgid "This item, in this package or loose, is on another line too: put it on one line"
+msgstr ""
+
+#: src/scan/Scanner.tsx
+msgid "The camera couldn't be opened."
 msgstr ""
 
 #: src/scan/older-to-cart.ts

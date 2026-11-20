@@ -15,6 +15,7 @@ import {
   NO_CAMERA,
   NO_DECODER,
   NOT_ALLOWED,
+  NOT_OPENED,
   POINT,
   RELOAD_PAGE,
   type Refusal,
@@ -267,10 +268,11 @@ async function refusedWith(
   return { sessions, reload, reloadButton, rerender };
 }
 
-// One error for each outcome refused, and the hint while a reload would
-// empty the cart: to record it first where Reload page is offered, else
-// the usual one (Ali, inventory-tng-0y0u). Which error is which outcome
-// is camera-report.test.ts's table (outcomeOf).
+// One error for each outcome refused, and the hint while a reload or
+// restart would empty the cart: to record it first (Ali,
+// inventory-tng-0y0u, inventory-tng-xtig). Which error is which outcome
+// is camera-report.test.ts's table (outcomeOf); off HTTPS, which has no
+// such hint, is tested on its own.
 const REFUSED = [
   [
     new DOMException("no", "NotAllowedError"),
@@ -288,7 +290,7 @@ const REFUSED = [
     new DOMException("none", "NotFoundError"),
     "not_found",
     NO_CAMERA,
-    NO_CAMERA.plain,
+    NO_CAMERA.notKept,
   ],
   [
     new DecoderUnavailable("offline"),
@@ -296,7 +298,7 @@ const REFUSED = [
     NO_DECODER,
     NO_DECODER.notKept,
   ],
-  [new Error("?"), "other", NO_CAMERA, NO_CAMERA.plain],
+  [new Error("?"), "other", NOT_OPENED, NOT_OPENED.notKept],
 ] as const;
 
 test.each(REFUSED)(
@@ -311,7 +313,7 @@ test.each(REFUSED)(
 );
 
 test.each(REFUSED)(
-  "%s, a reload emptying the cart: the hint says so where Reload page is",
+  "%s, a reload emptying the cart: the hint says to record it first",
   async (error, _outcome, refusal, hint) => {
     const { reloadButton } = await refusedWith(error, refusal, {
       reloadKeepsCart: false,
@@ -341,14 +343,20 @@ test("the hint follows whether a reload keeps the cart", async () => {
 test("off HTTPS, the volunteer is told what the report says", async () => {
   vi.stubGlobal("isSecureContext", false);
   try {
-    const { sessions, reloadButton } = await refusedWith(
+    const refused = await refusedWith(
       new TypeError("no mediaDevices"),
       INSECURE,
     );
+    const { sessions, reloadButton } = refused;
     expect(reloadButton).toBeNull();
     expect(sessions()).toEqual([
       expect.objectContaining({ outcome: "insecure" }),
     ]);
+    // The https address needs no reload here: the hint stays.
+    refused.rerender(false);
+    expect(screen.getByRole("alert").textContent).toBe(
+      `${say(INSECURE.bold)} ${say(INSECURE.plain)}`,
+    );
   } finally {
     vi.unstubAllGlobals();
   }

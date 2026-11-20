@@ -8,17 +8,24 @@
  */
 import { signal } from "@preact/signals";
 import { fireEvent, render, screen } from "@testing-library/preact";
-import { afterEach, expect, test, vi } from "vitest";
+import { afterEach, expect, onTestFinished, test, vi } from "vitest";
 import { suggest } from "./admin/combobox";
 import { guardRetire } from "./admin/retire";
 import { messages as pseudo } from "./locales/pseudo.po";
 import { RegisterPage } from "./register/RegisterPage";
 import { DecoderUnavailable } from "./scan/camera";
-import { type Catalogue, freshCart, type Item, storeCart } from "./scan/cart";
+import {
+  STORAGE_KEY as CART_KEY,
+  type Catalogue,
+  freshCart,
+  type Item,
+  storeCart,
+} from "./scan/cart";
 import { OpenPackageCard } from "./scan/OpenPackageCard";
 import { HELD } from "./scan/OutboxList";
 import { Scanner } from "./scan/Scanner";
 import { ScanPage } from "./scan/ScanPage";
+import { UPGRADE } from "./shared/build";
 import { say, speak } from "./shared/i18n";
 import {
   type Entry,
@@ -36,6 +43,7 @@ import {
   outboxEntry,
   storeOutbox,
 } from "./testing/saves";
+import { refusingWrites } from "./testing/storage";
 
 afterEach(() => {
   vi.restoreAllMocks();
@@ -382,6 +390,20 @@ const COVERED: Record<string, () => Promise<HTMLElement[]>> = {
     expect(await screen.findAllByText(say(HELD))).toHaveLength(2);
     return [document.body];
   },
+  "the scan page, too old, the cart not kept": async () => {
+    storeCart({
+      ...freshCart(),
+      lines: [{ itemId: 100, packages: {}, loose: "1" }],
+    });
+    const outbox = await loaded();
+    const setItem = refusingWrites(CART_KEY);
+    onTestFinished(() => setItem.mockRestore());
+    // A change the browser does not keep.
+    fireEvent.click(screen.getAllByRole("radio")[1] as HTMLElement);
+    outbox.builds.learn("too_old");
+    await screen.findByRole("button", { name: say(UPGRADE) });
+    return [document.body];
+  },
   "the outbox's list, each reason": async () => {
     vi.spyOn(navigator, "onLine", "get").mockReturnValue(false);
     const recorded: Recorded = {
@@ -506,7 +528,8 @@ const COVERED: Record<string, () => Promise<HTMLElement[]>> = {
       new DecoderUnavailable(),
       new DOMException("no", "NotAllowedError"),
       new DOMException("busy", "NotReadableError"),
-      new Error("none"),
+      new DOMException("none", "NotFoundError"),
+      new Error("other"),
     ]) {
       // Each said as a reload keeps the cart, and as it would not.
       for (const reloadKeepsCart of [true, false]) {

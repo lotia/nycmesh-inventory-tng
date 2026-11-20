@@ -6,10 +6,11 @@ import {
   screen,
   within,
 } from "@testing-library/preact";
-import { describe, expect, test, vi } from "vitest";
+import { describe, expect, onTestFinished, test, vi } from "vitest";
 import {
   BUILD_KEY,
   Builds,
+  MUST_UPGRADE_NOT_KEPT,
   MUST_UPGRADE as MUST_UPGRADE_PHRASE,
   UPDATED as UPDATED_PHRASE,
   UPGRADE,
@@ -24,8 +25,21 @@ import {
   outboxEntry,
   storeOutbox,
 } from "../testing/saves";
-import { fillMove, open, ready, save, server } from "../testing/scan-page";
-import { ADDED_BACK as ADDED_BACK_PHRASE, NOTHING_IN_CART } from "./CartForm";
+import {
+  fillMove,
+  open,
+  pick,
+  ready,
+  save,
+  server,
+} from "../testing/scan-page";
+import { refusingWrites } from "../testing/storage";
+import {
+  ADDED_BACK as ADDED_BACK_PHRASE,
+  NOT_KEEPING,
+  NOTHING_IN_CART,
+  YOUR_NAME,
+} from "./CartForm";
 import { addOne, STORAGE_KEY as CART_KEY, freshCart, storeCart } from "./cart";
 import { ADD_TO_CART } from "./Notes";
 import { CHECKED_OUT } from "./OlderList";
@@ -295,5 +309,30 @@ describe("a newer build", () => {
     outbox.builds.learn("too_old");
     await vi.waitFor(() => expect(banner()).toBe(MUST_UPGRADE));
     expect(reloadButton()).not.toBeNull();
+  });
+
+  test("too old with the cart filled but not kept, it says upgrading empties it", async () => {
+    const { outbox, reload } = openMine();
+    await ready();
+    const setItem = refusingWrites(CART_KEY);
+    onTestFinished(() => setItem.mockRestore());
+    fillMove();
+    screen.getByText(say(NOT_KEEPING));
+    outbox.builds.learn("too_old");
+    await vi.waitFor(() => expect(banner()).toBe(say(MUST_UPGRADE_NOT_KEPT)));
+    // Still offered: the volunteer may note the cart first.
+    fireEvent.click(reloadButton() as HTMLElement);
+    expect(reload).toHaveBeenCalledOnce();
+  });
+
+  test("too old with the cart not kept but empty, nothing is lost", async () => {
+    const { outbox } = openMine();
+    await ready();
+    const setItem = refusingWrites(CART_KEY);
+    onTestFinished(() => setItem.mockRestore());
+    pick(say(YOUR_NAME), "1");
+    screen.getByText(say(NOT_KEEPING));
+    outbox.builds.learn("too_old");
+    await vi.waitFor(() => expect(banner()).toBe(UPDATED));
   });
 });
