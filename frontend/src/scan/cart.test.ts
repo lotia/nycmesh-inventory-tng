@@ -1,8 +1,9 @@
 import { describe, expect, test } from "vitest";
 import { BUILD } from "../shared/build";
 import { say } from "../shared/i18n";
-import { cart, shown } from "../testing/cart";
+import { cart } from "../testing/cart";
 import { CATALOGUE, cable, radio } from "../testing/catalogue";
+import { shown } from "../testing/said";
 import { refusing } from "../testing/storage";
 import { toBatch } from "./batch";
 import {

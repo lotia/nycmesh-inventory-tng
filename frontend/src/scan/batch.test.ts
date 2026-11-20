@@ -1,8 +1,9 @@
 import { describe, expect, test } from "vitest";
 import { messages as pseudo } from "../locales/pseudo.po";
 import { say, speak } from "../shared/i18n";
-import { cart, shown } from "../testing/cart";
+import { cart } from "../testing/cart";
 import { CATALOGUE, cable, openAt } from "../testing/catalogue";
+import { shown } from "../testing/said";
 import {
   ADD_SOMETHING,
   batchWords,

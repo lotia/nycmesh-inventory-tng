@@ -1,6 +1,7 @@
 import { fireEvent, screen } from "@testing-library/preact";
 import { describe, expect, test, vi } from "vitest";
 import { say } from "../shared/i18n";
+import { cart } from "../testing/cart";
 import { CATALOGUE } from "../testing/catalogue";
 import { answering, json, saved } from "../testing/fetch";
 import {
@@ -46,7 +47,7 @@ describe("other tabs and a changing catalogue", () => {
     await ready();
     fillMove();
     // Another tab saved it, and stored the next, empty cart.
-    storeCart({ ...freshCart(), volunteerId: 1, fromId: 10, toId: 12 });
+    storeCart(cart());
     save();
     expect((await screen.findByRole("alert")).textContent).toContain(
       "changed in another tab",
