@@ -11,9 +11,8 @@ from sqlalchemy.orm import Session
 from inventory_tng.catalogue.paths import ITEMS
 from inventory_tng.models.catalogue import Category
 
-from helpers.items import item_form, new_item
+from helpers.items import new_item, shown_item_form
 from helpers.markup import Element, read
-from helpers.rows import shown
 
 
 def search(page: str) -> Element:
@@ -89,7 +88,7 @@ def test_a_form_sent_back_searches_for_what_was_typed(
     session.flush()
     refused = admin_client.post(
         f"{ITEMS}/{item.id}",
-        data=item_form(radios, version=shown(item), name="") | typed,
+        data=shown_item_form(item, name="", **typed),
     )
     assert refused.status_code == 400
     assert searched_for(search(refused.text)) == "MikroTik RB5009UG+S+IN"

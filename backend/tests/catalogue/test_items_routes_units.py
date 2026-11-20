@@ -20,7 +20,7 @@ from inventory_tng.catalogue.paths import ITEMS
 from inventory_tng.catalogue.reading_rules import NAMED, both
 from inventory_tng.models.catalogue import Category, Item, ItemPackage, ReadingRule
 
-from helpers.items import item_form, new_item
+from helpers.items import item_form, new_item, shown_item_form
 from helpers.markup import box_values, checked, problem, read, text, words_on
 from helpers.rows import add, named, shown
 
@@ -101,7 +101,7 @@ def test_not_right_corrects_a_reading_for_every_name(
     respelling."""
     item = new_item(session, radios, "Tape 25 m")
     other = new_item(session, radios, "Spare 25 m")
-    form = item_form(radios, name="Tape 25 m", version=shown(item))
+    form = shown_item_form(item)
     # What it is read as already: no rule.
     same = admin_client.post(f"{ITEMS}/{item.id}", data=form | {"unit:m": "m"})
     assert same.status_code == 303
@@ -138,9 +138,7 @@ def test_not_right_is_offered_where_words_decide_and_its_rule_wins(
     page = text(response)
     assert "Read as 305m · length, by “spool”." in page
     assert "Mbit/s" in box_values(response.text, "unit:M")
-    form = item_form(radios, name="Spool 305M", version=shown(item)) | {
-        "unit:M": "Mbit/s"
-    }
+    form = shown_item_form(item) | {"unit:M": "Mbit/s"}
     assert admin_client.post(f"{ITEMS}/{item.id}", data=form).status_code == 303
     rule = session.scalars(select(ReadingRule)).one()
     assert (rule.token, rule.reading) == ("M", "Mbit/s")
@@ -156,7 +154,7 @@ def test_a_rename_the_forms_answer_reads_as_its_own_name_asks_nothing(
     same name, so close names are not asked about, nor an alias kept."""
     item = new_item(session, radios, "Box 10Gbps")
     new_item(session, radios, "Box 10g spare")
-    form = item_form(radios, name="Box 10g", version=shown(item)) | {"unit:g": "Gbit/s"}
+    form = shown_item_form(item, name="Box 10g") | {"unit:g": "Gbit/s"}
     assert admin_client.post(f"{ITEMS}/{item.id}", data=form).status_code == 303
     assert item.name == "Box 10g"
     assert items.aliases(session, item.id) == []
@@ -203,7 +201,7 @@ def test_a_correction_reading_names_alike_is_refused_naming_them(
     for path, form, field in (
         (
             base,
-            item_form(radios, name="Spare 10g", version=shown(spare)),
+            shown_item_form(spare, name="Spare 10g"),
             "name",
         ),
         (f"{base}/packages", {"package_name": "Bag 10g", "size": "1"}, "package_name"),

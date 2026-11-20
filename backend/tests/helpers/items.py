@@ -1,6 +1,4 @@
-"""What the tests of items share: those of the administrators' item
-pages (tests/catalogue/test_items_routes_*.py), of reading rules and of
-the forms every page shares (tests/across/)."""
+"""What the tests that make, edit or post items share."""
 
 from datetime import UTC, datetime
 from decimal import Decimal
@@ -10,7 +8,7 @@ from sqlalchemy.orm import Session
 from inventory_tng.models.catalogue import Category, Item, ItemPackage
 
 from helpers.markup import Element, row_links
-from helpers.rows import add
+from helpers.rows import add, shown
 
 NOW = datetime(2026, 11, 1, tzinfo=UTC)
 
@@ -23,6 +21,16 @@ def item_form(category: Category, **fields: str) -> dict[str, str]:
     """An item's form as its page sends it: in the category, counted
     each, with the fields given."""
     return {"category_id": str(category.id), "unit": "each"} | fields
+
+
+def shown_item_form(item: Item, **fields: str) -> dict[str, str]:
+    """The item's edit form as its page shows it, with `fields` changed."""
+    return {
+        "name": item.name,
+        "category_id": str(item.category_id),
+        "unit": item.unit,
+        "version": shown(item),
+    } | fields
 
 
 def same_size_twins(

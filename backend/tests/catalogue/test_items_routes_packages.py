@@ -20,7 +20,7 @@ from inventory_tng.models.catalogue import Category, Item, ItemPackage
 from inventory_tng.models.labels import Label
 from inventory_tng.stock import open_packages
 
-from helpers.items import NOW, new_item, same_size_twins
+from helpers.items import NOW, new_item, same_size_twins, shown_item_form
 from helpers.markup import box_values, checked, forms, read, text
 from helpers.rows import add, history, shown
 from helpers.stock import Spools, retire
@@ -148,16 +148,6 @@ def test_a_retired_package_is_brought_back(
 # Whether opened packages are followed (docs/decisions/0020, Amendment).
 
 
-def saving(item: Item, **fields: str) -> dict[str, str]:
-    """The item's form as shown, with `fields` changed."""
-    return {
-        "name": item.name,
-        "category_id": str(item.category_id),
-        "unit": item.unit,
-        "version": shown(item),
-    } | fields
-
-
 def test_an_items_opened_packages_are_followed_when_ticked(
     admin_client: TestClient, session: Session, radios: Category
 ) -> None:
@@ -167,12 +157,12 @@ def test_an_items_opened_packages_are_followed_when_ticked(
     assert box_values(page, "track_opened") == [None]
     assert checked(page, "track_opened") == []
     path = f"{ITEMS}/{item.id}"
-    admin_client.post(path, data=saving(item, track_opened="on"))
+    admin_client.post(path, data=shown_item_form(item, track_opened="on"))
     session.refresh(item)
     assert item.track_opened is True
     assert checked(admin_client.get(path).text, "track_opened") == [None]
     # A box left unticked is not sent: the form says off.
-    admin_client.post(path, data=saving(item))
+    admin_client.post(path, data=shown_item_form(item))
     session.refresh(item)
     assert item.track_opened is False
 

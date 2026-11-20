@@ -50,6 +50,7 @@ from inventory_tng.web import security_headers
 from helpers.apps import on_session
 from helpers.csp_reports import SHAPES
 from helpers.devices import new_device
+from helpers.items import shown_item_form
 from helpers.mail import NO_MAIL, FailingMail, SentMail
 from helpers.pools import small_database
 from helpers.rows import add, shown, tag
@@ -1202,13 +1203,7 @@ def test_counts_package_tracking_changed_by_where(
         data={"track": "off"},
     )
     session.refresh(cable)
-    form = {
-        "name": cable.name,
-        "category_id": str(cable.category_id),
-        "unit": cable.unit,
-        "version": str(cable.edit_version),
-    }
-    client.post(f"{items_path}/{cable.id}", data=form)
+    client.post(f"{items_path}/{cable.id}", data=shown_item_form(cable))
     changed = counted(reader, "inventory.package_tracking.changed")
     assert {
         scope: changed[(("scope", scope),)] for scope in ("bulk", "package", "item")

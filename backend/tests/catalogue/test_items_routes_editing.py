@@ -41,7 +41,7 @@ from inventory_tng.web.forms import (
     quantity,
 )
 
-from helpers.items import NOW, item_form, new_item
+from helpers.items import NOW, item_form, new_item, shown_item_form
 from helpers.markup import (
     box_values,
     hidden_fields,
@@ -178,7 +178,7 @@ def test_a_saved_item_is_refused_what_another_has_its_own_respelt(
         session,
         Item(name="Omni", category_id=radios.id, old_code="NYCM-1", retired_at=NOW),
     )
-    form = item_form(radios, name="Lite Beam", version=str(item.edit_version))
+    form = shown_item_form(item, name="Lite Beam")
     path = f"{ITEMS}/{item.id}"
     refused = admin_client.post(path, data=form | {"old_code": "NYCM-1"})
     assert refused.status_code == 400
@@ -205,7 +205,7 @@ def test_a_name_is_checked_and_saved_in_canonical_spelling(
     assert refused.status_code == 400
     assert TAKEN_FIELDS["name"]("Cap 10\u00a0\u03bcF") in refused.text
     path = f"{ITEMS}/{item.id}"
-    edit = form | {"version": str(item.edit_version)}
+    edit = form | {"version": shown(item)}
     saved = admin_client.post(path, data=edit | {"name": "Cap 10\u00b5F"})
     assert saved.status_code == 303
     # Close names, asked about, then sent again as the form sends them.
@@ -332,7 +332,7 @@ def test_the_unit_is_fixed_once_stock_has_moved(
     page = admin_client.get(f"{ITEMS}/{item.id}").text
     assert "fixed, as stock has moved in it" in page
     assert ("unit", "each") in hidden_fields(page)
-    form = item_form(radios, name=item.name, unit="m", version=shown(item))
+    form = shown_item_form(item, unit="m")
     refused = admin_client.post(f"{ITEMS}/{item.id}", data=form)
     assert refused.status_code == 400
     assert str(RULES["item_unit_fixed"]) in text(refused)
@@ -555,12 +555,10 @@ def test_renaming_close_to_another_asks_first(
     """Only a new name asks; saving the other fields does not."""
     new_item(session, radios, "LiteBeam 5AC Gen1")
     item = new_item(session, radios, "Radio")
-    form = item_form(
-        radios, name="Radio", version=str(item.edit_version), notes="On the shelf"
-    )
+    form = shown_item_form(item, notes="On the shelf")
     path = f"{ITEMS}/{item.id}"
     assert admin_client.post(path, data=form).status_code == 303
-    form["version"] = str(item.edit_version)
+    form["version"] = shown(item)
     asked = admin_client.post(path, data=form | {"name": "LiteBeam 5AC Gen2"})
     assert "A different item? Save it again." in text(asked)
     session.refresh(item)
@@ -571,7 +569,7 @@ def test_renaming_close_to_another_asks_first(
     assert item.name == "LiteBeam 5AC Gen2"
     # Respelling its own name is the same name: nothing is asked.
     form = {k: v for k, v in form.items() if k != "different"}
-    form |= {"name": "Litebeam-5AC-Gen2", "version": str(item.edit_version)}
+    form |= {"name": "Litebeam-5AC-Gen2", "version": shown(item)}
     assert admin_client.post(path, data=form).status_code == 303
 
 
