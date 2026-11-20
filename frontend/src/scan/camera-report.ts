@@ -61,9 +61,7 @@ export function outcomeOf(error: unknown): Outcome {
   }
 }
 
-type Unsent = Omit<CameraSession, "kind" | "decoder" | "seconds"> & {
-  from: number;
-};
+type Unsent = Omit<CameraSession, "kind" | "decoder" | "seconds">;
 
 const none = (): Schemas["LabelsRead"] => ({
   item: 0,
@@ -74,7 +72,9 @@ const none = (): Schemas["LabelsRead"] => ({
 
 /** One camera session's report, from asking for the camera on. */
 export class CameraReport {
-  private readonly asked: number;
+  /** When this session began: the camera asked for, or the page shown
+   * again. */
+  private from: number;
   private decoder: CameraSession["decoder"] = "none";
   /** What is not sent yet: nothing before the camera opens or is refused,
    * nor once sent. */
@@ -88,15 +88,14 @@ export class CameraReport {
     // would have the whole report refused.
     private readonly now: () => number = () => performance.now(),
   ) {
-    this.asked = now();
+    this.from = now();
   }
 
   opened(decoder: DecoderKind): void {
     this.decoder = decoder;
     this.unsent = {
       outcome: "opened",
-      from: this.asked,
-      open_seconds: Math.min(this.since(this.asked), MOST_OPEN_SECONDS),
+      open_seconds: Math.min(this.since(this.from), MOST_OPEN_SECONDS),
       labels: none(),
     };
   }
@@ -130,7 +129,8 @@ export class CameraReport {
       return;
     }
     this.hiddenOpen = false;
-    this.unsent = { outcome: "resumed", from: this.now(), labels: none() };
+    this.from = this.now();
+    this.unsent = { outcome: "resumed", labels: none() };
   }
 
   closed(): void {
@@ -139,7 +139,7 @@ export class CameraReport {
   }
 
   private ended(outcome: Outcome): void {
-    this.unsent = { outcome, from: this.asked, labels: none() };
+    this.unsent = { outcome, labels: none() };
     this.send();
   }
 
@@ -147,13 +147,13 @@ export class CameraReport {
     if (this.unsent === null) {
       return;
     }
-    const { from, ...rest } = this.unsent;
+    const unsent = this.unsent;
     this.unsent = null;
     this.to.record({
       kind: "camera_session",
-      ...rest,
+      ...unsent,
       decoder: this.decoder,
-      seconds: Math.min(this.since(from), MOST_SECONDS),
+      seconds: Math.min(this.since(this.from), MOST_SECONDS),
     });
     this.to.flush();
   }

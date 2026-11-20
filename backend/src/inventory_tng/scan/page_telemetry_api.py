@@ -130,14 +130,17 @@ class RestPutBack(Strict):
     kind: Literal["rest_put_back"]
 
 
+LabelCount = Annotated[int, Field(ge=0, le=10_000)]
+
+
 class LabelsRead(Strict):
     """Labels a camera session read, by what each names: an item, an
     item's package, a place, or nothing the catalogue has (old stickers)."""
 
-    item: Annotated[int, Field(ge=0, le=10_000)]
-    package: Annotated[int, Field(ge=0, le=10_000)]
-    place: Annotated[int, Field(ge=0, le=10_000)]
-    unknown: Annotated[int, Field(ge=0, le=10_000)]
+    item: LabelCount
+    package: LabelCount
+    place: LabelCount
+    unknown: LabelCount
 
 
 class CameraSession(Strict):

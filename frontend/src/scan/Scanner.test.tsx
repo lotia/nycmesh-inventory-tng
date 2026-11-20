@@ -1,5 +1,5 @@
 import { act, fireEvent, render, screen } from "@testing-library/preact";
-import { beforeEach, expect, test, vi } from "vitest";
+import { afterEach, beforeEach, expect, test, vi } from "vitest";
 import { say } from "../shared/i18n";
 import { telemetry } from "../shared/telemetry";
 import { fakeCamera as camera, pass } from "../testing/camera";
@@ -18,7 +18,22 @@ import {
 // needs (testing/setup.ts makes it real again). The fake clock also keeps up
 // with real time, so a read a test did not let pass still comes, only later.
 // Unmounts go in act: outside it, Preact closes the camera a frame later.
-beforeEach(() => vi.useFakeTimers({ shouldAdvanceTime: true }));
+// The page shown, unless a test hides it (show).
+let visibility: DocumentVisibilityState;
+beforeEach(() => {
+  vi.useFakeTimers({ shouldAdvanceTime: true });
+  visibility = "visible";
+  vi.spyOn(document, "visibilityState", "get").mockImplementation(
+    () => visibility,
+  );
+});
+afterEach(() => vi.restoreAllMocks());
+
+/** The page shown or hidden, as the browser says it. */
+function show(state: DocumentVisibilityState) {
+  visibility = state;
+  document.dispatchEvent(new Event("visibilitychange"));
+}
 
 const said = (words: string, label: LabelKind = "item"): Acted => ({
   said: words,
@@ -257,22 +272,15 @@ test("Done while the camera opens is reported as cancelled, not refused", async 
 test("a camera that opens while the page is hidden is reported then", async () => {
   const sessions = reported();
   const { open } = camera();
-  Object.defineProperty(document, "visibilityState", {
-    value: "hidden",
-    configurable: true,
-  });
-  try {
-    render(<Scanner open={open} onCode={() => said("")} onDone={() => {}} />);
-    await vi.waitFor(() =>
-      expect(sessions()).toEqual([
-        expect.objectContaining({ outcome: "opened" }),
-      ]),
-    );
-  } finally {
-    Reflect.deleteProperty(document, "visibilityState");
-  }
+  visibility = "hidden";
+  render(<Scanner open={open} onCode={() => said("")} onDone={() => {}} />);
+  await vi.waitFor(() =>
+    expect(sessions()).toEqual([
+      expect.objectContaining({ outcome: "opened" }),
+    ]),
+  );
   // Shown again: what follows is a session of its own.
-  document.dispatchEvent(new Event("visibilitychange"));
+  show("visible");
   window.dispatchEvent(new Event("pagehide"));
   expect(sessions()).toEqual([
     expect.objectContaining({ outcome: "opened" }),
@@ -285,21 +293,7 @@ test("a page hidden or left with the camera open reports it then", async () => {
   const { open } = camera();
   render(<Scanner open={open} onCode={() => said("")} onDone={() => {}} />);
   await screen.findByText(say(POINT));
-  Object.defineProperty(document, "visibilityState", {
-    value: "hidden",
-    configurable: true,
-  });
-  try {
-    document.dispatchEvent(new Event("visibilitychange"));
-    window.dispatchEvent(new Event("pagehide"));
-  } finally {
-    Reflect.deleteProperty(document, "visibilityState");
-  }
-  expect(sessions()).toEqual([expect.objectContaining({ outcome: "opened" })]);
-  document.dispatchEvent(new Event("visibilitychange"));
+  show("hidden");
   window.dispatchEvent(new Event("pagehide"));
-  expect(sessions()).toEqual([
-    expect.objectContaining({ outcome: "opened" }),
-    expect.objectContaining({ outcome: "resumed" }),
-  ]);
+  expect(sessions()).toEqual([expect.objectContaining({ outcome: "opened" })]);
 });
