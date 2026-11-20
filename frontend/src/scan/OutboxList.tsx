@@ -150,7 +150,7 @@ export function OutboxList({
         </p>
       )}
       <ul class={RULED_LIST}>
-        {entries.map((entry) => {
+        {entries.map((entry, at) => {
           const id = batchId(entry.body);
           const { reason } = entry;
           const elsewhere =
@@ -160,9 +160,8 @@ export function OutboxList({
           // Offered with the cart beside it, once the catalogue is loaded.
           const rest = catalogue === null ? null : restOf(entry);
           // What its buttons are about, read out with each, as two
-          // entries' buttons are named alike (inventory-tng-zwnj). A
-          // batchId may hold spaces, which would split an id reference.
-          const words = `outbox-${encodeURIComponent(id)}`;
+          // entries' buttons are named alike (inventory-tng-zwnj).
+          const words = `outbox-${at}`;
           return (
             <li key={id} class="flex flex-col items-start gap-1">
               <div id={words}>{batchWords(entry.body, entry.summary)}</div>
