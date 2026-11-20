@@ -1,6 +1,6 @@
 {#- A link that searches the web for an item's manufacturer and part number, so a typo shows before a label is printed. It opens DuckDuckGo in the administrator's own browser: the app makes no call and sends nothing, and no address goes with it. Hidden while both are blank. `manufacturer` and `part_number` are what the fields hold; admin/web-search.ts keeps the link current as they are typed in. #}
 {% set query = [manufacturer, part_number] | map("trim") | select | join(" ") %}
 <p data-web-search {% if not query %}hidden{% endif %}>
-  <a href="https://duckduckgo.com/?{{ {"q": query} | urlencode }}" target="_blank" rel="noopener noreferrer">{% trans %}Search the web{% endtrans %}</a>
-  <span class="hint">{% trans %}for the manufacturer and part number, on DuckDuckGo, in a new tab{% endtrans %}</span>
+  <a href="https://duckduckgo.com/?{{ {"q": query} | urlencode }}" target="_blank" rel="noopener noreferrer" aria-describedby="web-search-hint">{% trans %}Search the web{% endtrans %}</a>
+  <span class="hint" id="web-search-hint">{% trans %}for the manufacturer and part number, on DuckDuckGo, in a new tab{% endtrans %}</span>
 </p>

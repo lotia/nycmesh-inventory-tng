@@ -36,8 +36,9 @@ test("the link searches for what is typed, encoded", () => {
 });
 
 test("either field alone is searched for", () => {
-  type("part_number", "RB5009");
-  expect(new URL(link().href).searchParams.get("q")).toBe("RB5009");
+  type("part_number", "RB5009*1~2");
+  // The server spells * and ~ differently (%2A, ~), but q reads the same.
+  expect(new URL(link().href).searchParams.get("q")).toBe("RB5009*1~2");
   expect(shown().hidden).toBe(false);
 });
 

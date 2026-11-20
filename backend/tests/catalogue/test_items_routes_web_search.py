@@ -44,6 +44,9 @@ def test_an_items_page_searches_for_its_manufacturer_and_part_number(
     assert link.text == "Search the web"
     assert link.attrs["target"] == "_blank"
     assert link.attrs["rel"].split() == ["noopener", "noreferrer"]
+    # The hint, which says it opens a new tab, is read with the link.
+    hint = shown.one("span", id=link.attrs["aria-describedby"])
+    assert "in a new tab" in hint.text
     # Encoded as a form's query is, nothing left as it was typed.
     assert link.attrs["href"].endswith("?q=Ubiquiti+LBE-5AC%2FGen2+%26+co%3F")
     assert searched_for(shown) == "Ubiquiti LBE-5AC/Gen2 & co?"
@@ -53,11 +56,11 @@ def test_either_field_alone_is_searched_for(
     admin_client: TestClient, session: Session, radios: Category
 ) -> None:
     item = new_item(session, radios)
-    item.part_number = " RB5009 "
+    item.part_number = " RB5009*1~2 "
     session.flush()
     shown = search(admin_client.get(f"{ITEMS}/{item.id}").text)
     assert "hidden" not in shown.attrs
-    assert searched_for(shown) == "RB5009"
+    assert searched_for(shown) == "RB5009*1~2"
 
 
 def test_it_is_hidden_while_both_are_blank(
