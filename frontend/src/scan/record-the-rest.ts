@@ -65,17 +65,16 @@ export function restOf(entry: Entry): Body | null {
 
 /** The lines Record the rest takes off `entry`, each as "item: taken off.
  * why", in the problem's words, named from `catalogue`, retired items
- * too; each said once. */
+ * too; each item's each kind once, two items alike in words both said. */
 export function takenOff(entry: Entry, catalogue: Catalogue): string[] {
   const { items } = indexOf(withRetired(catalogue));
-  return [
-    ...new Set(
-      namedLines(entry).map(({ itemId, kind }) =>
-        say(TAKEN_OFF, {
-          name: nameOf(items.get(itemId)),
-          why: problemWords(kind),
-        }),
-      ),
-    ),
-  ];
+  const each = new Map(
+    namedLines(entry).map((named) => [`${named.itemId} ${named.kind}`, named]),
+  );
+  return [...each.values()].map(({ itemId, kind }) =>
+    say(TAKEN_OFF, {
+      name: nameOf(items.get(itemId)),
+      why: problemWords(kind),
+    }),
+  );
 }

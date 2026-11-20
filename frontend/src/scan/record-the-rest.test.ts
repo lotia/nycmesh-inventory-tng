@@ -93,4 +93,21 @@ describe("takenOff", () => {
       }),
     ]);
   });
+
+  test("says each of two items alike in words, as two no longer in the catalogue", () => {
+    const entry = outboxEntry({
+      body: moveBody({
+        lines: [
+          { item_id: 998, quantity: "1", package_id: null },
+          { item_id: 999, quantity: "1", package_id: null },
+          { item_id: 101, quantity: "2", package_id: null },
+        ],
+      }),
+      state: "refused",
+      reason: { code: "refused", problems: [onLine(1), onLine(2)] },
+    });
+    const [first, second, ...more] = takenOff(entry, CATALOGUE);
+    expect(more).toEqual([]);
+    expect(second).toBe(first);
+  });
 });

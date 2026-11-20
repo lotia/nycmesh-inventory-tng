@@ -581,6 +581,9 @@ export function CartForm({
     removed.value?.revision === cart.value.revision ? removed.value : null;
   // Keyed by what each says, two saying the same apart.
   const problemKeys = keyedByWords(problems.value.map(wordsOf));
+  // Two put back alike in words, as two items no longer in the catalogue
+  // taken off, are both listed.
+  const putBackKeys = keyedByWords(putBack.value ?? []);
 
   return (
     <form onSubmit={save}>
@@ -690,8 +693,8 @@ export function CartForm({
           <p>{say(ADDED_BACK)}</p>
           {putBack.value.length > 0 && (
             <ul>
-              {putBack.value.map((gap) => (
-                <li key={gap}>{gap}</li>
+              {putBack.value.map((gap, at) => (
+                <li key={putBackKeys[at]}>{gap}</li>
               ))}
             </ul>
           )}
