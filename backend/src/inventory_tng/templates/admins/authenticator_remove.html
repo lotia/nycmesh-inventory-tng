@@ -7,5 +7,7 @@ removed: set it up again as a new authenticator to use it.{% endtrans %}</p>
 <p>{% trans %}It's your only one, so removing it turns TOTP off: your recovery codes
 stop working, and your password alone signs you in.{% endtrans %}</p>
 {% endif %}
-{{ confirm(here, _("Remove"), keep, _("Keep it")) }}
+{% call confirm(here, _("Remove"), keep, _("Keep it")) %}
+  {% if code_needed %}{% include "admins/_code_field.html" %}{% endif %}
+{% endcall %}
 {% endblock %}

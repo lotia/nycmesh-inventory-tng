@@ -215,11 +215,10 @@ def confirm_remove_authenticator(
     """Asks first: removing cannot be undone, and the last one, while TOTP is
     optional, takes the recovery codes with it."""
     current = accounts.authenticators(session, signed.admin.id)
-    found = next((a for a in current if a.id == authenticator_id), None)
+    outcome, found = accounts.removal(current, authenticator_id, signed.settings)
     if found is None:
         return not_found()  # Someone else's, or gone: ids reveal nothing.
-    last = len(current) == 1
-    if last and signed.settings.totp_policy == "required":
+    if outcome == "last_required":
         return _refused(request, session, signed, "authenticators", LAST_REQUIRED)
     return admin_page(
         request,
@@ -230,7 +229,13 @@ def confirm_remove_authenticator(
             "here": f"{ACCOUNT}/authenticators/{authenticator_id}/remove",
             "keep": f"{ACCOUNT}#authenticators",
             "authenticator": found,
-            "last": last,
+            "last": outcome == "totp_off",
+            # Asked here, not on a page of its own after (guards.ConfirmedAdmin).
+            "code_needed": not accounts.confirmation_open(
+                signed.row, signed.settings, _now()
+            ),
+            "code_totp": signed.asks_code,
+            "field": CONFIRM_FIELD,
         },
     )
 

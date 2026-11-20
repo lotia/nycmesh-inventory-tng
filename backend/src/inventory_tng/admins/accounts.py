@@ -835,29 +835,43 @@ def rename_authenticator(
 Removal = Literal["removed", "totp_off", "missing", "last_required"]
 
 
+def removal(
+    current: list[Authenticator], authenticator_id: int, settings: SignInSettings
+) -> tuple[Removal, Authenticator | None]:
+    """What removing `authenticator_id` from the administrator's `current`
+    ones would do, and the one it would remove: the last one goes only
+    while TOTP is optional, and turns TOTP off. Asked first and done by the
+    same rule."""
+    found = next((a for a in current if a.id == authenticator_id), None)
+    if found is None:
+        return "missing", None
+    last = len(current) == 1
+    if last and settings.totp_policy == "required":
+        return "last_required", found
+    return ("totp_off" if last else "removed"), found
+
+
 def remove_authenticator(
     session: Session, admin_id: int, authenticator_id: int, now: datetime
 ) -> Removal:
-    """Its key is wiped. The last one goes only while TOTP is optional, and
-    takes the recovery codes with it: TOTP is then off."""
+    """Its key is wiped (removal says when it may go). The last one takes the
+    recovery codes with it: TOTP is then off."""
     # Locked in order, so two removals cannot each leave the other's last.
     current = locked_authenticators(session, admin_id)
-    found = next((a for a in current if a.id == authenticator_id), None)
-    if found is None:
-        return "missing"
-    last = len(current) == 1
-    if last and sign_in_settings(session).totp_policy == "required":
-        return "last_required"
+    outcome, found = removal(current, authenticator_id, sign_in_settings(session))
+    if found is None or outcome == "last_required":
+        return outcome
     retire(found, now)
-    if last:
+    totp_off = outcome == "totp_off"
+    if totp_off:
         _void_recovery_codes(session, admin_id, now)
     log.info(
         "authenticator removed",
         admin_id=admin_id,
         authenticator_id=found.id,
-        totp_off=last,
+        totp_off=totp_off,
     )
-    return "totp_off" if last else "removed"
+    return outcome
 
 
 def has_recovery_codes(session: Session, admin_id: int) -> bool:

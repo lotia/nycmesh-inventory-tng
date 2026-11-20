@@ -259,6 +259,7 @@ def test_removing_one_of_two_wipes_its_key_after_a_confirmation(
     assert "recovery codes" not in words  # Only the last one takes them.
     assert "danger" in button(asked.text, "Remove").classes
     assert ("Keep it", f"{ACCOUNT}#authenticators") in links(asked.text)
+    assert not box_values(asked.text, guards.CONFIRM_FIELD)  # Typed lately.
     assert spare.retired_at is None  # Only its button removes.
     done = client.post(path)
     assert (
@@ -294,6 +295,28 @@ def test_removing_the_last_while_optional_turns_totp_off(
     assert accounts.recovery_codes_left(session, admin.id) == 0
     client.cookies.clear()
     assert sign_in_with(client).status_code == 303
+
+
+def test_a_late_removal_asks_for_the_code_on_its_confirmation(
+    client: TestClient,
+    session: Session,
+    ada: tuple[Admin, str],
+) -> None:
+    """Not on a page of its own after Remove is pressed."""
+    admin, key = ada
+    spare = accounts.add_authenticator(
+        session, TOTP_KEYS, admin.id, "Spare", authenticator_totp.new_totp_key(), 0
+    )
+    confirmed_long_ago(session)
+    path = f"{ACCOUNT}/authenticators/{spare.id}/remove"
+    asked = client.get(path)
+    assert asked.status_code == 200
+    assert box_values(asked.text, guards.CONFIRM_FIELD) == [None]
+    with app_clock() as at:
+        typed = {guards.CONFIRM_FIELD: code(key, at + TIME_STEP)}
+        done = client.post(path, data=typed)
+    assert done.status_code == 303
+    assert spare.retired_at is not None
 
 
 def test_new_recovery_codes(
