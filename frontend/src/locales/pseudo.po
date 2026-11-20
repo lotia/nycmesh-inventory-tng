@@ -141,6 +141,10 @@ msgstr ""
 msgid "Sending: {what}. A new cart is ready."
 msgstr ""
 
+#: src/scan/Scanner.tsx
+msgid "Allow it in the browser's settings. This browser isn't keeping the cart, so record it before you reload the page, or find items in the list."
+msgstr ""
+
 #: src/scan/CartForm.tsx
 msgid "Scan with the camera"
 msgstr ""
@@ -405,6 +409,10 @@ msgstr ""
 
 #: src/scan/Notes.tsx
 msgid "Confirm discard"
+msgstr ""
+
+#: src/scan/Scanner.tsx
+msgid "Check the connection. This browser isn't keeping the cart, so record it before you reload the page."
 msgstr ""
 
 #: src/scan/OutboxList.tsx
@@ -796,6 +804,10 @@ msgstr ""
 
 #: src/shared/outbox-notes.ts
 msgid "Not recorded: its key was already used for a different batch. Please report this."
+msgstr ""
+
+#: src/scan/Scanner.tsx
+msgid "Close the other app using it. This browser isn't keeping the cart, so record it before you reload the page, or find items in the list."
 msgstr ""
 
 #: src/scan/CartForm.tsx

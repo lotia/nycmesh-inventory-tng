@@ -46,6 +46,7 @@ function scanner(
       onCode={() => said("")}
       onDone={() => {}}
       reload={() => {}}
+      cartKept
       {...props}
     />,
   );
@@ -223,23 +224,26 @@ test("a session is reported as the camera closes, with its labels by kind", asyn
   );
 });
 
-/** The alert's words: the refusal's bold heading, then its hint. */
-const refusalWords = (refusal: Refusal) =>
-  `${say(refusal.bold)} ${say(refusal.plain)}`;
-
 /** The camera refused with `error`, its scanner's buttons, and the
- * sessions reported. */
-async function refusedWith(error: unknown, refusal: Refusal) {
+ * sessions reported. The alert says the refusal's bold heading, then
+ * `hint`, the usual one unless a test says. */
+async function refusedWith(
+  error: unknown,
+  refusal: Refusal,
+  { cartKept = true, hint = refusal.plain } = {},
+) {
   const sessions = reported();
   const reload = vi.fn();
   const refused = async () => {
     throw error;
   };
-  scanner({ open: refused, reload });
+  const shown = scanner({ open: refused, reload, cartKept });
   const bold = await screen.findByText(say(refusal.bold));
   expect(bold.tagName).toBe("STRONG");
   // A refusal is a problem: said as an alert, and no status remains.
-  expect(screen.getByRole("alert").textContent).toBe(refusalWords(refusal));
+  expect(screen.getByRole("alert").textContent).toBe(
+    `${say(refusal.bold)} ${say(hint)}`,
+  );
   expect(screen.queryByRole("status")).toBeNull();
   // No picture to show: the empty video is hidden, not left as a box.
   expect(document.querySelector("video")?.hidden).toBe(true);
@@ -248,7 +252,7 @@ async function refusedWith(error: unknown, refusal: Refusal) {
   expect(screen.queryAllByRole("button")).toEqual(
     reloadButton === null ? [] : [reloadButton],
   );
-  return { sessions, reload, reloadButton };
+  return { sessions, reload, reloadButton, rerender: shown.rerender };
 }
 
 // One error for each outcome refused; which error is which outcome is
@@ -269,6 +273,50 @@ test.each([
     ]);
   },
 );
+
+// While the browser isn't keeping the cart, a refusal offering Reload
+// page says to record the cart first, as a reload would empty it; one
+// offering none says what it always does (Ali, inventory-tng-0y0u).
+test.each([
+  [new DOMException("no", "NotAllowedError"), NOT_ALLOWED, true],
+  [new DOMException("busy", "NotReadableError"), IN_USE, true],
+  [new DecoderUnavailable("offline"), NO_DECODER, true],
+  [new DOMException("none", "NotFoundError"), NO_CAMERA, false],
+  [new Error("?"), NO_CAMERA, false],
+] as const)(
+  "%s, the cart not kept: Reload page offered is %s",
+  async (error, refusal, offered) => {
+    const hint = refusal.reload ? refusal.notKept : refusal.plain;
+    const { reloadButton } = await refusedWith(error, refusal, {
+      cartKept: false,
+      hint,
+    });
+    expect(reloadButton !== null).toBe(offered);
+  },
+);
+
+test("the hint follows the cart as the browser keeps it or not", async () => {
+  const error = new DOMException("no", "NotAllowedError");
+  const { rerender } = await refusedWith(error, NOT_ALLOWED);
+  const alert = screen.getByRole("alert");
+  const props = {
+    onCode: () => said(""),
+    onDone: () => {},
+    reload: () => {},
+    open: async (): Promise<Session> => {
+      throw error;
+    },
+  };
+  rerender(<Scanner {...props} cartKept={false} />);
+  expect(alert.textContent).toBe(
+    `${say(NOT_ALLOWED.bold)} ${say(NOT_ALLOWED.notKept)}`,
+  );
+  screen.getByRole("button", { name: say(RELOAD_PAGE) });
+  rerender(<Scanner {...props} cartKept />);
+  expect(alert.textContent).toBe(
+    `${say(NOT_ALLOWED.bold)} ${say(NOT_ALLOWED.plain)}`,
+  );
+});
 
 test("off HTTPS, the volunteer is told what the report says", async () => {
   vi.stubGlobal("isSecureContext", false);

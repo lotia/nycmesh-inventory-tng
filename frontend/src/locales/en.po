@@ -141,6 +141,10 @@ msgstr "Open package said used up"
 msgid "Sending: {what}. A new cart is ready."
 msgstr "Sending: {what}. A new cart is ready."
 
+#: src/scan/Scanner.tsx
+msgid "Allow it in the browser's settings. This browser isn't keeping the cart, so record it before you reload the page, or find items in the list."
+msgstr "Allow it in the browser's settings. This browser isn't keeping the cart, so record it before you reload the page, or find items in the list."
+
 #: src/scan/CartForm.tsx
 msgid "Scan with the camera"
 msgstr "Scan with the camera"
@@ -406,6 +410,10 @@ msgstr "{count} × {package}"
 #: src/scan/Notes.tsx
 msgid "Confirm discard"
 msgstr "Confirm discard"
+
+#: src/scan/Scanner.tsx
+msgid "Check the connection. This browser isn't keeping the cart, so record it before you reload the page."
+msgstr "Check the connection. This browser isn't keeping the cart, so record it before you reload the page."
 
 #: src/scan/OutboxList.tsx
 msgid "Carts from this device"
@@ -797,6 +805,10 @@ msgstr "Remove"
 #: src/shared/outbox-notes.ts
 msgid "Not recorded: its key was already used for a different batch. Please report this."
 msgstr "Not recorded: its key was already used for a different batch. Please report this."
+
+#: src/scan/Scanner.tsx
+msgid "Close the other app using it. This browser isn't keeping the cart, so record it before you reload the page, or find items in the list."
+msgstr "Close the other app using it. This browser isn't keeping the cart, so record it before you reload the page, or find items in the list."
 
 #: src/scan/CartForm.tsx
 msgid "MeshDB install number (if you know it)"

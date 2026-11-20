@@ -16,8 +16,10 @@ import {
   selected,
   server,
 } from "../testing/scan-page";
+import { refusingWrites } from "../testing/storage";
 import {
   FROM,
+  NOT_KEEPING,
   NOTHING_IN_CART,
   SCAN_WITH_CAMERA,
   TO,
@@ -26,7 +28,12 @@ import {
 } from "./CartForm";
 import { REMOVE } from "./CartLine";
 import { openCamera } from "./camera";
-import { freshCart, KIND_WORDS, storeCart } from "./cart";
+import {
+  STORAGE_KEY as CART_KEY,
+  freshCart,
+  KIND_WORDS,
+  storeCart,
+} from "./cart";
 import { FIND } from "./Finder";
 import { DISMISS } from "./OutboxList";
 import { DONE, NOT_ALLOWED, POINT, RELOAD_PAGE } from "./Scanner";
@@ -344,5 +351,28 @@ describe("scanning labels with the camera", () => {
     await screen.findByText(say(NOT_ALLOWED.bold));
     fireEvent.click(screen.getByRole("button", { name: say(RELOAD_PAGE) }));
     expect(reload).toHaveBeenCalledOnce();
+  });
+
+  test("a camera not allowed, while the cart is not kept, says to record it before a reload", async () => {
+    vi.mocked(openCamera).mockRejectedValueOnce(
+      new DOMException("no", "NotAllowedError"),
+    );
+    const reload = vi.fn();
+    open(server().api, reload);
+    await ready();
+    const setItem = refusingWrites(CART_KEY);
+    pick(say(YOUR_NAME), "1");
+    screen.getByText(say(NOT_KEEPING));
+    fireEvent.click(
+      screen.getByRole("button", { name: say(SCAN_WITH_CAMERA) }),
+    );
+    await screen.findByText(say(NOT_ALLOWED.notKept));
+    // Still offered: the volunteer may record the cart first.
+    screen.getByRole("button", { name: say(RELOAD_PAGE) });
+    // Kept again, the usual hint.
+    setItem.mockRestore();
+    pick(say(YOUR_NAME), "2");
+    await screen.findByText(say(NOT_ALLOWED.plain));
+    expect(screen.queryByText(say(NOT_KEEPING))).toBeNull();
   });
 });

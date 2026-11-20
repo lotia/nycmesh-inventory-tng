@@ -3,7 +3,8 @@
  * each label read once while it stays in view (repeated-reads.ts, Repeats),
  * with a word on what it did. A refused or missing camera says so, and
  * offers Reload page where that may help, with no Done (Ali,
- * inventory-tng-qy02); the lists below still work. Each session is
+ * inventory-tng-qy02), saying to record the cart first while the browser
+ * isn't keeping it (Ali, inventory-tng-0y0u); the lists below still work. Each session is
  * reported (camera-report.ts).
  */
 import type { MessageDescriptor } from "@lingui/core";
@@ -32,38 +33,42 @@ export const RELOAD_PAGE = msg`Reload page`;
 
 /** Why the camera could not be used, in the cart alerts' form: a bold
  * heading, then a plain hint at what to do, and whether Reload page is
- * offered, as reloading may help (Ali, inventory-tng-qy02). */
+ * offered, as reloading may help (Ali, inventory-tng-qy02). One that
+ * offers it has a hint for when the browser isn't keeping the cart, as a
+ * reload then empties it (Ali, inventory-tng-0y0u). */
 export type Refusal = {
   bold: MessageDescriptor;
   plain: MessageDescriptor;
-  reload: boolean;
-};
+} & ({ reload: true; notKept: MessageDescriptor } | { reload: false });
 
-export const NOT_ALLOWED: Refusal = {
+export const NOT_ALLOWED = {
   bold: msg`The camera isn't allowed for this page.`,
   plain: msg`Allow it in the browser's settings, then reload the page, or find items in the list.`,
   reload: true,
-};
-export const IN_USE: Refusal = {
+  notKept: msg`Allow it in the browser's settings. This browser isn't keeping the cart, so record it before you reload the page, or find items in the list.`,
+} satisfies Refusal;
+export const IN_USE = {
   bold: msg`The camera is in use.`,
   plain: msg`Close the other app using it, then reload the page, or find items in the list.`,
   reload: true,
-};
-export const NO_DECODER: Refusal = {
+  notKept: msg`Close the other app using it. This browser isn't keeping the cart, so record it before you reload the page, or find items in the list.`,
+} satisfies Refusal;
+export const NO_DECODER = {
   bold: msg`The label reader didn't load.`,
   plain: msg`Check the connection, then reload the page.`,
   reload: true,
-};
-export const NO_CAMERA: Refusal = {
+  notKept: msg`Check the connection. This browser isn't keeping the cart, so record it before you reload the page.`,
+} satisfies Refusal;
+export const NO_CAMERA = {
   bold: msg`No camera could be found.`,
   plain: msg`Check the phone's settings allow this browser to use the camera, then restart the browser, or find items in the list.`,
   reload: false,
-};
-export const INSECURE: Refusal = {
+} satisfies Refusal;
+export const INSECURE = {
   bold: msg`The camera needs a secure connection.`,
   plain: msg`Ask an administrator for the page's https address, or find items in the list.`,
   reload: false,
-};
+} satisfies Refusal;
 
 /** What the volunteer is told for each way the report says the camera
  * was refused, so the two never disagree. */
@@ -87,12 +92,15 @@ export function Scanner({
   onCode,
   onDone,
   reload,
+  cartKept,
   open = openCamera,
 }: {
   onCode: (code: string) => Acted;
   onDone: () => void;
   /** Refresh this page (ScanPage's reload). */
   reload: () => void;
+  /** Whether the browser is keeping the cart (CartForm, NOT_KEEPING). */
+  cartKept: boolean;
   open?: (video: HTMLVideoElement) => Promise<Session>;
 }) {
   const video = useRef<HTMLVideoElement>(null);
@@ -231,7 +239,7 @@ export function Scanner({
             <AlertWords
               note={{
                 bold: [say(refusal.bold)],
-                plain: [" ", say(refusal.plain)],
+                plain: [" ", say(hintOf(refusal, cartKept))],
               }}
             />
           </p>
@@ -246,6 +254,12 @@ export function Scanner({
       )}
     </section>
   );
+}
+
+/** A refusal's hint: before a reload, while the cart is not kept, to
+ * record it first. */
+function hintOf(refusal: Refusal, cartKept: boolean) {
+  return refusal.reload && !cartKept ? refusal.notKept : refusal.plain;
 }
 
 /** Turns the camera's torch on and off. */

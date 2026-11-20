@@ -140,6 +140,8 @@ export function CartForm({
   const cart = store.cart;
   const query = useSignal("");
   const problems = useSignal<Said[]>([]);
+  // Whether the browser kept the cart when last asked (kept).
+  const cartKept = useSignal(true);
   // What was last sent to be recorded, worded as it is shown.
   const saved = useSignal<Batch | null>(null);
   // While Discard cart waits to be confirmed, the cart's revision then.
@@ -187,6 +189,7 @@ export function CartForm({
 
   /** Say so if the browser would not keep the cart. */
   function kept(stored: boolean) {
+    cartKept.value = stored;
     problems.value = stored ? [] : [[say(NOT_KEEPING)]];
   }
 
@@ -770,6 +773,7 @@ export function CartForm({
             scanning.value = false;
           }}
           reload={reload}
+          cartKept={cartKept.value}
         />
       ) : (
         <button type="button" onClick={() => (scanning.value = true)}>
