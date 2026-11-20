@@ -419,7 +419,8 @@ def test_of_two_registrations_at_once_with_a_code_one_is_its_first(
     committed: Committed,
 ) -> None:
     """The second waits for the code's row, so it sees the first's use
-    and is counted as registering again (inventory-tng-nlwn)."""
+    and is counted as registering again (inventory-tng-nlwn). Sorted, as
+    the first's line, logged once committed, can come after the second's."""
     with committed.session() as setup, setup.begin():
         _, phrase = devices.create_code(setup, max_uses=2, lifetime=timedelta(days=1))
     with structlog.testing.capture_logs() as logs:
@@ -433,9 +434,9 @@ def test_of_two_registrations_at_once_with_a_code_one_is_its_first(
 
         worker = committed.blocked(other, scan)
         phone.commit()
-        worker.finished()
+        assert worker.finished().error is None
     uses = [line["use"] for line in logs if line["event"] == "device registered"]
-    assert uses == ["first", "again"]
+    assert sorted(uses) == ["again", "first"]
 
 
 def test_good_codes_waiting_on_the_code_all_register(committed: Committed) -> None:
