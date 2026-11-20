@@ -58,11 +58,16 @@ Refusal = Literal["unregistered", "revoked"]
 # How a code was made: a new one, or another like one whose printout was
 # lost (another_like).
 MadeHow = Literal["new", "another"]
+# Which use of its code a registration is: the first, or again with a code
+# that has registered a phone before, a sign of cleared browser data
+# (inventory-tng-8i4.43). Another like a code is a code of its own, so its
+# first phone is "first".
+CodeUse = Literal["first", "again"]
 
 registered = meter.create_counter(
     "inventory.devices.registered",
     unit="{device}",
-    description="Devices registered with a code",
+    description="Devices registered with a code, by use: its first, or again",
 )
 rejected = meter.create_counter(
     "inventory.registrations.rejected",
@@ -209,6 +214,9 @@ def register(session: Session, phrase: str, address: str | None) -> tuple[Device
         _reject("unknown", None)
     refund(session, ATTEMPTS, "register", bucket)
     code = _usable_code(session, phrase)
+    # Read under the code's lock, so of two at once the second sees the
+    # first's use.
+    use: CodeUse = "first" if code.uses == 0 else "again"
     code.uses += 1
     token = secrets.token_urlsafe(16)
     device = Device(
@@ -218,13 +226,14 @@ def register(session: Session, phrase: str, address: str | None) -> tuple[Device
     )
     session.add(device)
     session.flush()
-    once_committed(session, registered.add, 1)
+    once_committed(session, registered.add, 1, {"use": use})
     once_committed(
         session,
         log.info,
         "device registered",
         device_id=device.id,
         registration_code_id=code.id,
+        use=use,
     )
     return device, token
 

@@ -331,6 +331,28 @@ def test_counts_registrations_and_refusals(
     )
 
 
+def test_counts_registrations_again_with_a_code(
+    rolled_back: Recorded, session: Session
+) -> None:
+    """A code's first phone, then one again with it, as after cleared
+    browser data; another like it is a code of its own, so its first phone
+    is first."""
+    client, _, reader, _ = rolled_back
+    before = counted(reader, "inventory.devices.registered")
+    code, phrase = devices.create_code(session, max_uses=3, lifetime=timedelta(hours=1))
+    for _ in range(2):
+        client.cookies.clear()
+        assert client.post("/api/devices", json={"code": phrase}).status_code == 201
+    made = devices.another_like(session, code.id)
+    assert made is not None
+    client.cookies.clear()
+    assert client.post("/api/devices", json={"code": made[1]}).status_code == 201
+    assert added(reader, "inventory.devices.registered", before) == {
+        (("use", "first"),): 2,
+        (("use", "again"),): 1,
+    }
+
+
 @pytest.fixture
 def rolled_back(recorded: Recorded, session: Session) -> Iterator[Recorded]:
     """The recorded app on the test's session, so what it writes is rolled

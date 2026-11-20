@@ -415,6 +415,29 @@ def test_another_like_a_code_waits_for_a_registration_under_way(
     assert made[0].max_uses == 1
 
 
+def test_of_two_registrations_at_once_with_a_code_one_is_its_first(
+    committed: Committed,
+) -> None:
+    """The second waits for the code's row, so it sees the first's use
+    and is counted as registering again (inventory-tng-nlwn)."""
+    with committed.session() as setup, setup.begin():
+        _, phrase = devices.create_code(setup, max_uses=2, lifetime=timedelta(days=1))
+    with structlog.testing.capture_logs() as logs:
+        phone = committed.session()
+        devices.register(phone, phrase, "192.0.2.83")
+        other = committed.session()
+
+        def scan() -> None:
+            devices.register(other, phrase, "192.0.2.84")
+            other.commit()
+
+        worker = committed.blocked(other, scan)
+        phone.commit()
+        worker.finished()
+    uses = [line["use"] for line in logs if line["event"] == "device registered"]
+    assert uses == ["first", "again"]
+
+
 def test_good_codes_waiting_on_the_code_all_register(committed: Committed) -> None:
     """A room of phones scanning one code: each counts, then is refunded
     before it waits for the code's row, which a registration under way
