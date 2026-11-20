@@ -35,6 +35,10 @@ msgstr ""
 msgid "This package is retired: what is left may be taken, never received"
 msgstr ""
 
+#: src/shared/outbox-notes.ts
+msgid "This package is retired, and the inventory has none left sealed. Ask an administrator to count it."
+msgstr ""
+
 #. An item's name, then how much of it, or what is wrong with it.
 #: src/scan/cart.ts
 msgid "{name}: {what}"
@@ -447,6 +451,10 @@ msgstr ""
 msgid "Too many tries from here. Wait a minute, then try again."
 msgstr ""
 
+#: src/scan/add-the-rest.ts
+msgid "Add to cart puts the other lines in your cart, without the ones refused."
+msgstr ""
+
 #: src/shared/outbox-notes.ts
 msgid "A loose line says a package's size: load the page again, and count it again"
 msgstr ""
@@ -671,10 +679,6 @@ msgstr ""
 
 #: src/scan/Scanner.tsx
 msgid "Torch"
-msgstr ""
-
-#: src/shared/outbox-notes.ts
-msgid "This package is retired, and the inventory has none left sealed. Add to cart leaves this line out. Ask an administrator to count it."
 msgstr ""
 
 #: src/shared/outbox-notes.ts

@@ -17,7 +17,7 @@ import {
   recordedHeading,
   wordsOf,
 } from "../shared/outbox-notes";
-import { REST_IN_CART, restOf } from "./add-the-rest";
+import { REST_IN_CART, REST_WITHOUT_REFUSED, restOf } from "./add-the-rest";
 import { batchWords } from "./batch";
 import type { Catalogue } from "./cart";
 import {
@@ -208,6 +208,7 @@ export function OutboxList({
               {rest !== null && (
                 <PutInCart
                   label={ADD_TO_CART}
+                  hint={REST_WITHOUT_REFUSED}
                   inCartWords={REST_IN_CART}
                   added={reason?.code === "refused" && reason.added === true}
                   inCart={cartKey === rest.key}
@@ -330,11 +331,12 @@ function RecordedElsewhere({
 
 /**
  * What an outbox entry offers to put in an empty cart (CartForm): a button
- * until it has (Add these to cart, Add to cart), then words that
- * it is there, until recorded.
+ * until it has (Add these to cart, Add to cart), under its hint if it has
+ * one, then words that it is there, until recorded.
  */
 function PutInCart({
   label,
+  hint,
   inCartWords,
   added,
   inCart,
@@ -342,6 +344,10 @@ function PutInCart({
   onPut,
 }: {
   label: MessageDescriptor;
+  /** What the button does, just above it while it is shown: plain, as
+   * guidance, not a failure. Read just before the button, it is not its
+   * description, which names the entry: the two would run together. */
+  hint?: MessageDescriptor;
   inCartWords: MessageDescriptor;
   /** It was put in the cart. */
   added: boolean;
@@ -358,9 +364,12 @@ function PutInCart({
   shownInCart.current ||= inCart;
   if (!added) {
     return (
-      <button type="button" aria-describedby={describedBy} onClick={onPut}>
-        {say(label)}
-      </button>
+      <>
+        {hint !== undefined && <p>{say(hint)}</p>}
+        <button type="button" aria-describedby={describedBy} onClick={onPut}>
+          {say(label)}
+        </button>
+      </>
     );
   }
   return shownInCart.current ? (

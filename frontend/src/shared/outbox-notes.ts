@@ -48,7 +48,7 @@ export const PROBLEMS: Record<ProblemKind, MessageDescriptor> = {
   refused: msg`The inventory's rules refuse this as sent: it changed since the page loaded. Load the page again, and do it again`,
   retired: msg`This item is retired: what is left may be taken, never received`,
   retired_package: msg`This package is retired: what is left may be taken, never received`,
-  retired_package_none_left: msg`This package is retired, and the inventory has none left sealed. Add to cart leaves this line out. Ask an administrator to count it.`,
+  retired_package_none_left: msg`This package is retired, and the inventory has none left sealed. Ask an administrator to count it.`,
   repeated: msg`This item, in this package or loose, is on another line too: put it on one line`,
   package_size_required: msg`A line of a package says the size it was counted in: load the page again, and count it again`,
   package_size_without_package: msg`A loose line says a package's size: load the page again, and count it again`,
@@ -60,9 +60,10 @@ export const PROBLEMS: Record<ProblemKind, MessageDescriptor> = {
  * inventory-tng-93z). */
 export type Said = readonly (string | { quoted: string })[];
 
-/** A note on show: `bold`, then `plain`, not bold, as a refusal's
- * problems after "Not recorded." (Ali, inventory-tng-93z). */
-export type Note = { bold: Said; plain?: Said };
+/** A note on show: `bold`, then `plain`, not bold; then a refusal's
+ * `problems` after "Not recorded.", not bold (Ali, inventory-tng-93z),
+ * each on a line of its own (Ali, 2026-11-20, inventory-tng-61ys). */
+export type Note = { bold: Said; plain?: Said; problems?: readonly Said[] };
 
 /** `said` as plain text, where nothing is in italic. */
 export function wordsOf(said: Said): string {
@@ -162,20 +163,20 @@ export function noteOf(reason: Reason, online = true): Note {
     case "refused":
       return {
         bold: [say(NOT_RECORDED)],
-        plain: reason.problems.flatMap(problemSaid),
+        problems: reason.problems.map(problemSaid),
       };
   }
 }
 
-/** One of a 422's problems, after a space: what it names, then why, in
- * the page's words for its kind. */
+/** One of a 422's problems: what it names, then why, in the page's words
+ * for its kind. */
 function problemSaid({ names, kind }: Problem): Said {
   const why = problemWords(kind);
   if (names === null) {
-    return [" ", why];
+    return [why];
   }
   const where = names.of === "line" ? ON_LINE : ON_REPORT[names.of];
-  return [" ", say(where, { n: names.n, why })];
+  return [say(where, { n: names.n, why })];
 }
 
 /** Why, for a problem of `kind`: the page's words for it, or, for one it

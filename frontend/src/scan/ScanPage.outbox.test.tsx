@@ -53,15 +53,23 @@ describe("the batches listed in the outbox", () => {
       (_, element) =>
         element?.classList.contains("alert") === true &&
         element.textContent ===
-          `Not recorded. Line 2: ${say(PROBLEMS.not_whole)}`,
+          `Not recorded.Line 2: ${say(PROBLEMS.not_whole)}`,
     );
     // Only say(NOT_RECORDED) in bold; in what follows, the line's number
-    // the page wrote in italic (Ali, inventory-tng-93z).
+    // the page wrote in italic (Ali, inventory-tng-93z); each problem on a
+    // line of its own (Ali, 2026-11-20, inventory-tng-61ys).
     expectRefusal(note, say(NOT_RECORDED), ["2"]);
+    expect(
+      within(note)
+        .getAllByRole("listitem")
+        .map((each) => each.textContent),
+    ).toEqual([`Line 2: ${say(PROBLEMS.not_whole)}`]);
     const entry = note.closest("li") as HTMLElement;
     // Numbered as the problems name them.
     expect(
-      [...entry.querySelectorAll("ul li")].map((each) => each.textContent),
+      [...entry.querySelectorAll(":scope > ul li")].map(
+        (each) => each.textContent,
+      ),
     ).toEqual(["1. Cat6 cable: 1 m", "2. LiteBeam 5AC: 1"]);
     within(entry).getByRole("button", { name: say(DISMISS) });
   });

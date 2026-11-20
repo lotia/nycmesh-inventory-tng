@@ -12,7 +12,9 @@ import { fillMove, newestCart, pick } from "./scan-page";
 const BOX = "Box of 305 m";
 const ADD_TO_CART = "Add to cart";
 const NONE_LEFT =
-  "This package is retired, and the inventory has none left sealed. Add to cart leaves this line out. Ask an administrator to count it.";
+  "This package is retired, and the inventory has none left sealed. Ask an administrator to count it.";
+const WITHOUT_REFUSED =
+  "Add to cart puts the other lines in your cart, without the ones refused.";
 
 test("a save refused for a line goes back without it, saying why, and the rest is recorded", async ({
   page,
@@ -37,7 +39,10 @@ test("a save refused for a line goes back without it, saying why, and the rest i
   await admin.close();
   await page.getByRole("button", { name: "Record" }).click();
   const entry = newestCart(page);
-  await expect(entry.getByText(`Line 1: ${NONE_LEFT}`)).toBeVisible();
+  await expect(
+    entry.locator(".alert li", { hasText: `Line 1: ${NONE_LEFT}` }),
+  ).toBeVisible();
+  await expect(entry.getByText(WITHOUT_REFUSED)).toBeVisible();
 
   await entry.getByRole("button", { name: ADD_TO_CART, exact: true }).click();
   await expect(
@@ -51,6 +56,7 @@ test("a save refused for a line goes back without it, saying why, and the rest i
   await expect(
     entry.getByRole("button", { name: ADD_TO_CART, exact: true }),
   ).toHaveCount(0);
+  await expect(entry.getByText(WITHOUT_REFUSED)).toHaveCount(0);
   const recorded = await record(page);
   expect(recorded.request().postDataJSON().lines).toEqual([
     expect.objectContaining({ item_id: looseId, quantity: "1" }),

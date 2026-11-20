@@ -48,14 +48,15 @@ export function replies(...queued: (() => Response | Promise<Response>)[]) {
 export const states = (outbox: Outbox) =>
   outbox.entries.value.map((e) => e.state);
 
-/** What the page says of the first batch's reason, as plain text. */
+/** What the page says of the first batch's reason, as plain text, each
+ * problem after a space. */
 export function reasonSaid(outbox: Outbox): string | null {
   const reason = outbox.entries.value[0]?.reason ?? null;
   if (reason === null) {
     return null;
   }
-  const { bold, plain = [] } = noteOf(reason);
-  return wordsOf([...bold, ...plain]);
+  const { bold, plain = [], problems = [] } = noteOf(reason);
+  return wordsOf([...bold, ...plain, ...problems.flatMap((p) => [" ", ...p])]);
 }
 
 /** The entries kept under the outbox's key. */

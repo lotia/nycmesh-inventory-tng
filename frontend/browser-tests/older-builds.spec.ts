@@ -293,9 +293,7 @@ test("a save an older build's tab saved meanwhile is saved once, under its key; 
   // One note, bold whole, then what the other tab recorded and what was
   // not, with Dismiss at once and no Reload.
   const entry = refusedEntry(page);
-  await expect(entry.locator("p.alert strong").first()).toHaveText(
-    NOT_RECORDED,
-  );
+  await expect(entry.locator(".alert strong").first()).toHaveText(NOT_RECORDED);
   await expect(
     entry.getByText(`Recorded in another tab in transaction ${first}`),
   ).toBeVisible();
@@ -373,7 +371,7 @@ test("a save another tab recorded first, taken down since, says an administrator
   await expect(entry.getByText(`${cable}: 1 m fewer`)).toBeVisible();
   const lowered =
     "Recorded 2 m, you changed it to 1 m. An administrator will correct it.";
-  await expect(entry.locator("p.alert strong").last()).toHaveText(lowered);
+  await expect(entry.locator(".alert strong").last()).toHaveText(lowered);
   await expect(entry.getByRole("button", { name: ADD_THESE })).toHaveCount(0);
 
   await page.goto("/admin");

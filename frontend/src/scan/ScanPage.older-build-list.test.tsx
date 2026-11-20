@@ -360,17 +360,24 @@ describe("what an older build left", () => {
   });
 
   test("a refused one says why", async () => {
-    leaveSave({ state: "refused", note: "Not saved. Line 1: no." });
+    leaveSave({
+      state: "refused",
+      note: "Not saved. Line 1: no. Line 2: gone",
+    });
     open();
     await ready();
     // In the alert's style: "Not saved." in bold, the rest not, its
-    // numbers in italic (Ali, inventory-tng-93z).
+    // numbers in italic (Ali, inventory-tng-93z), each problem on a line
+    // of its own (Ali, 2026-11-20, inventory-tng-61ys).
     const why = within(listing()).getByText(
-      noted(
-        "Not saved. Line 1: no. Add it to the cart, fix that, then record it.",
-      ),
+      noted(`Not saved.Line 1: no.Line 2: gone ${say(FIX_THEN_RECORD)}`),
     );
-    expectRefusal(why, "Not saved.", ["1"]);
+    expectRefusal(why, "Not saved.", ["1", "2"]);
+    expect(
+      within(why)
+        .getAllByRole("listitem")
+        .map((each) => each.textContent),
+    ).toEqual(["Line 1: no.", "Line 2: gone"]);
     // What to do, in bold as after any other refusal (row 11).
     expect(
       [...why.querySelectorAll("strong")].map((each) => each.textContent),

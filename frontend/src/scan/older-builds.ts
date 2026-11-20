@@ -269,13 +269,18 @@ function refusedOf(reason: Reason | null, note: string | null): Refused {
   if (!words.startsWith(NOT_SAVED)) {
     return { code: "refused", note: words === "" ? null : { bold: [words] } };
   }
-  const plain: Said = words
-    .slice(NOT_SAVED.length)
-    .split(MARKERS)
-    .flatMap((part, at) =>
-      part === "" ? [] : [at % 2 === 1 ? part : { quoted: part }],
-    );
-  return { code: "refused", note: { bold: [NOT_SAVED], plain } };
+  // Each problem on a line of its own, as this build's (Ali, 2026-11-20,
+  // inventory-tng-61ys): its marker, then the words up to the next.
+  const [before = "", ...named] = words.slice(NOT_SAVED.length).split(MARKERS);
+  const problems: Said[] =
+    before.trim() === "" ? [] : [[{ quoted: before.trim() }]];
+  for (let at = 0; at < named.length; at += 2) {
+    problems.push([
+      (named[at] as string).trimStart(),
+      { quoted: named[at + 1] ?? "" },
+    ]);
+  }
+  return { code: "refused", note: { bold: [NOT_SAVED], problems } };
 }
 
 /** A line of a batch refused, numbered as its problems name it. */

@@ -15,30 +15,30 @@ describe("what another tab recorded (inventory-tng-0gg)", () => {
   });
 });
 
-describe("a refusal's problems, joined (inventory-tng-r87e)", () => {
-  // retired_package_none_left alone ends in a full stop (Ali,
-  // 2026-11-20): nothing is added after it, before or after another.
-  const said = (...kinds: string[]) =>
-    wordsOf(
+describe("a refusal's problems (inventory-tng-61ys)", () => {
+  const problems = (...kinds: string[]) =>
+    (
       noteOf({
         code: "refused",
         problems: kinds.map((kind, at) => ({
           names: { of: "line" as const, n: at + 1 },
           kind,
         })),
-      }).plain ?? [],
-    );
-  const noneLeft = say(PROBLEMS.retired_package_none_left);
-  const retired = say(PROBLEMS.retired);
+      }).problems ?? []
+    ).map(wordsOf);
 
-  test("its own stop is never doubled, before another or after", () => {
-    expect(noneLeft.endsWith("count it.")).toBe(true);
-    expect(said("retired_package_none_left", "retired")).toBe(
-      ` Line 1: ${noneLeft} Line 2: ${retired}`,
+  test("each is one of its own, never joined to another (Ali, 2026-11-20)", () => {
+    const retired = say(PROBLEMS.retired);
+    const noneLeft = say(PROBLEMS.retired_package_none_left);
+    expect(problems("retired", "retired_package_none_left")).toEqual([
+      `Line 1: ${retired}`,
+      `Line 2: ${noneLeft}`,
+    ]);
+  });
+
+  test("a retired package with none left never names a button (Ali, 2026-11-20, inventory-tng-3ukw)", () => {
+    expect(say(PROBLEMS.retired_package_none_left)).toBe(
+      "This package is retired, and the inventory has none left sealed. Ask an administrator to count it.",
     );
-    expect(said("retired", "retired_package_none_left")).toBe(
-      ` Line 1: ${retired} Line 2: ${noneLeft}`,
-    );
-    expect(said("retired_package_none_left", "retired")).not.toContain("..");
   });
 });

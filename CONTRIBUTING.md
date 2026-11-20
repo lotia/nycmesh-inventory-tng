@@ -633,7 +633,8 @@ the cart's, so the same opening recorded again is the same batch
 A refused save in the outbox's list lists its lines, in the words of the
 older list, each item numbered as the refusal's "Line n" names it. One
 whose problems name lines, and that holds others, offers Add to cart,
-for the rest (`frontend/src/scan/add-the-rest.ts`, docs/decisions/0010).
+for the rest, with a line above it saying what it does
+(`frontend/src/scan/add-the-rest.ts`, docs/decisions/0010).
 While the browser says it is offline, a batch waiting for an answer says
 so, and the page follows the browser going on and off line.
 
@@ -732,9 +733,10 @@ utilities. When you style a page:
   bold as a whole, with no "Sorry.", and the counts the page wrote in it
   in bold italic, never the numbers of a name or of words an older build
   kept (`AlertWords` in `scan/Notes.tsx`). A refusal's problems, after "Not
-  recorded.", are not bold. A status that reports no problem is plain,
-  but a save held for an upgrade is in a caution box like the upgrade
-  banner's (`CAUTION_BOX`), with no `role="alert"`.
+  recorded.", are not bold, each on a line of its own. A status that
+  reports no problem is plain, but a save held for an upgrade is in a
+  caution box like the upgrade banner's (`CAUTION_BOX`), with no
+  `role="alert"`.
 - Follow docs/decisions/0019 for links, buttons and lists. A button is
   secondary unless it is its form's main one, `class="primary"`, or the one
   a confirmation page asks for, `class="danger"`. A page's way back is

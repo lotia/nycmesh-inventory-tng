@@ -17,7 +17,7 @@ import {
   storedCart,
   UUID,
 } from "../testing/scan-page";
-import { REST_IN_CART, TAKEN_OFF } from "./add-the-rest";
+import { REST_IN_CART, REST_WITHOUT_REFUSED, TAKEN_OFF } from "./add-the-rest";
 import { ADDED_BACK } from "./CartForm";
 import { ADD_TO_CART } from "./Notes";
 import { CART_NOT_EMPTY } from "./OlderList";
@@ -61,6 +61,11 @@ test("Add to cart, under a refused batch, puts the other lines in the cart, says
   const record = vi.spyOn(telemetry, "record");
   record.mockClear();
   const { entry, outbox, sent } = await refusedWith(RETIRED_NONE_LEFT);
+  // Just above the button, plain, what it does (Ali, 2026-11-20,
+  // inventory-tng-3ukw).
+  const hint = within(entry).getByText(say(REST_WITHOUT_REFUSED));
+  expect(hint.closest("strong, .alert, [role=alert]")).toBeNull();
+  expect(hint.nextElementSibling).toBe(addTheRest(entry));
   fireEvent.click(addTheRest(entry) as HTMLElement);
   const cart = storedCart();
   expect(cart.lines.map((line: { itemId: number }) => line.itemId)).toEqual([
@@ -75,8 +80,10 @@ test("Add to cart, under a refused batch, puts the other lines in the cart, says
       why: say(PROBLEMS.retired_package_none_left),
     }),
   );
-  // Offered no more, and said to be in the cart; the refusal stays listed.
+  // Offered no more, nor what it does, and said to be in the cart; the
+  // refusal stays listed.
   expect(addTheRest(entry)).toBeNull();
+  expect(within(entry).queryByText(say(REST_WITHOUT_REFUSED))).toBeNull();
   within(entry).getByText(say(REST_IN_CART));
   within(entry).getByRole("button", { name: say(DISMISS) });
   expect(outbox.entries.value[0]?.reason).toMatchObject({ added: true });
@@ -144,4 +151,5 @@ test("each refused batch's Add to cart is described by its batch's words (invent
 test("a refusal with no rest offers no Add to cart", async () => {
   const { entry } = await refusedWith({ names: null, kind: "not_found" });
   expect(addTheRest(entry)).toBeNull();
+  expect(within(entry).queryByText(say(REST_WITHOUT_REFUSED))).toBeNull();
 });

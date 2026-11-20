@@ -434,7 +434,7 @@ describe("what an older build left", () => {
     const entry = await differing([boxed(1)], "2");
     // The note, bold as a whole, in the alert's style.
     expectBold(
-      whole(entry, say(SOME_NOT_RECORDED)).closest("p"),
+      whole(entry, say(SOME_NOT_RECORDED)).closest(".alert"),
       say(SOME_NOT_RECORDED),
     );
     expect(within(entry).queryByText(/Scan again only/)).toBeNull();
@@ -592,7 +592,7 @@ describe("what an older build left", () => {
     whole(entry, "LiteBeam 5AC: 1 × Box fewer");
     const lowered =
       "Recorded 2 × Box, you changed it to 1. An administrator will correct it.";
-    expectBold(whole(entry, lowered).closest("p"), lowered, ["2", "1"]);
+    expectBold(whole(entry, lowered).closest(".alert"), lowered, ["2", "1"]);
     expect(
       within(entry).queryByRole("button", { name: say(ADD_DIFFERENCE) }),
     ).toBeNull();

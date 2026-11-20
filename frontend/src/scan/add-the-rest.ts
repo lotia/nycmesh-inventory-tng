@@ -16,6 +16,9 @@ import { indexOf } from "./search";
 
 /** In the cart's status, a line taken off, then why: the problem's words. */
 export const TAKEN_OFF = msg`{name}: taken off. {why}`;
+/** Just above Add to cart under a refused batch, while it is offered
+ * (Ali, 2026-11-20, inventory-tng-3ukw). */
+export const REST_WITHOUT_REFUSED = msg`Add to cart puts the other lines in your cart, without the ones refused.`;
 /** Under the refused batch, once the rest is in the cart, until recorded. */
 export const REST_IN_CART = msg`The other lines are in your cart, waiting to be recorded.`;
 

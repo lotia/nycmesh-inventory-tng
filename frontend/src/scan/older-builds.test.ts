@@ -48,7 +48,10 @@ describe("reading what older builds left", () => {
       {
         key: "inventory.outbox.v3",
         batch: OTHER_KEY,
-        refused: { code: "refused", note: { bold: ["Not saved."], plain: [] } },
+        refused: {
+          code: "refused",
+          note: { bold: ["Not saved."], problems: [] },
+        },
       },
     ]);
   });
@@ -380,8 +383,9 @@ describe("as a cart", () => {
       code: "key_reused",
       note: { bold: [mainKey] },
     });
-    // Main's refusal: "Not saved." in bold, each line or report it names
-    // in the page's words, why in the server's.
+    // Main's refusal: "Not saved." in bold, then each problem on a line
+    // of its own: the line or report it names in the page's words, why in
+    // the server's.
     expect(
       refusedFor({
         note: "Not saved. Line 1: no. Open package said used up, 2: gone What is on an open package, 1: x",
@@ -390,16 +394,26 @@ describe("as a cart", () => {
       code: "refused",
       note: {
         bold: ["Not saved."],
-        plain: [
-          " Line 1: ",
-          { quoted: "no." },
-          " Open package said used up, 2: ",
-          { quoted: "gone" },
-          " What is on an open package, 1: ",
-          { quoted: "x" },
+        problems: [
+          ["Line 1: ", { quoted: "no." }],
+          ["Open package said used up, 2: ", { quoted: "gone" }],
+          ["What is on an open package, 1: ", { quoted: "x" }],
         ],
       },
     });
+    // A problem naming nothing, before one naming a line: each its own.
+    expect(refusedFor({ note: "Not saved. Not accepted Line 1: no." })).toEqual(
+      {
+        code: "refused",
+        note: {
+          bold: ["Not saved."],
+          problems: [
+            [{ quoted: "Not accepted" }],
+            ["Line 1: ", { quoted: "no." }],
+          ],
+        },
+      },
+    );
     // Other words, bold whole; none, nothing.
     expect(refusedFor({ note: "No." })).toEqual({
       code: "refused",
