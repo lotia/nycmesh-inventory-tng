@@ -72,11 +72,11 @@ def one_bag_waits(client: TestClient, place: Place, bags: ItemPackage) -> None:
 
 def answered(
     client: TestClient, session: Session, action: str, **form: str
-) -> tuple[OverRecorded, Response]:
-    """The one waiting, and `form` sent to its `action` as seen."""
+) -> Response:
+    """`form` sent to the one waiting's `action`, as seen."""
     (check,) = checks(session)
     data = {"seen": over_recorded.seen(check)} | form
-    return check, client.post(f"{PAGE}/{check.id}/{action}", data=data)
+    return client.post(f"{PAGE}/{check.id}/{action}", data=data)
 
 
 def radios_raised(client: TestClient, place: Place) -> None:
@@ -89,7 +89,7 @@ def radios_raised(client: TestClient, place: Place) -> None:
 
 def mark_checked(client: TestClient, session: Session, **form: str) -> Response:
     """The one waiting marked checked, as seen, with `form`'s reason."""
-    return answered(client, session, "checked", **form)[1]
+    return answered(client, session, "checked", **form)
 
 
 def checked_forms(page: str) -> list[Element]:
@@ -124,7 +124,8 @@ def counted(
     admin_client: TestClient, session: Session, count: str, **form: str
 ) -> tuple[OverRecorded, Any]:
     """The one waiting, and the answer to its count sent as `count`."""
-    return answered(admin_client, session, "count", count=count, **form)
+    (check,) = checks(session)
+    return check, answered(admin_client, session, "count", count=count, **form)
 
 
 def adjustments(session: Session) -> list[tuple[object, ...]]:
@@ -157,7 +158,7 @@ def from_emptied_store(client: TestClient, session: Session) -> Place:
 
 
 def correct(client: TestClient, session: Session) -> Response:
-    return answered(client, session, "correct")[1]
+    return answered(client, session, "correct")
 
 
 def count_ids(session: Session) -> list[int]:

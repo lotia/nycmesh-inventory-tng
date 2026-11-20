@@ -422,12 +422,12 @@ def test_changing_another_needs_a_recent_code(
     be, and nothing changes without it."""
     ben, _ = new_admin(session, "ben")
     carol, _ = new_admin(session, "carol")
-    code_typed_ago(session, 29, window_open=True)
+    code_typed_ago(session, 29)
     assert code_boxes(admin_client.get(f"{ADMINS}/{ben.id}").text) == 0
     retire = admin_client.post(f"{ADMINS}/{ben.id}/retire", data=single_use())
     assert retire.status_code == 303
     assert ben.retired_at is not None
-    code_typed_ago(session, 31, window_open=True)
+    code_typed_ago(session, 31)
     page = admin_client.get(f"{ADMINS}/{carol.id}").text
     assert code_boxes(page) == 1  # Retiring; reset asks on its page.
     assert "Your code" in words_on(page)
@@ -452,7 +452,7 @@ def test_at_0_minutes_each_change_asks_for_a_code(
 ) -> None:
     session.get_one(SignInSettings, 1).account_change_minutes = 0
     ben, _ = new_admin(session, "ben")
-    code_typed_ago(session, 0, window_open=True)
+    code_typed_ago(session, 0)
     assert code_boxes(admin_client.get(ADMINS).text)
     asked = admin_client.post(f"{ADMINS}/{ben.id}/retire", data=single_use())
     assert asked.status_code == 403
@@ -464,7 +464,7 @@ def test_a_code_typed_on_one_change_covers_the_next(
 ) -> None:
     ben, _ = new_admin(session, "ben")
     carol, _ = new_admin(session, "carol")
-    code_typed_ago(session, 31, window_open=True)
+    code_typed_ago(session, 31)
     form = with_code(session)
     assert admin_client.post(f"{ADMINS}/{ben.id}/retire", data=form).status_code == 303
     again = admin_client.post(f"{ADMINS}/{carol.id}/retire", data=single_use())
@@ -583,10 +583,10 @@ def test_a_change_sent_again_once_its_code_lapsed_spends_none(
     """Back then Forward, half an hour on: said so before a code is asked
     for, with a way back to the page it came from."""
     ben, _ = new_admin(session, "ben")
-    code_typed_ago(session, 31, window_open=True)
+    code_typed_ago(session, 31)
     form = with_code(session)
     assert admin_client.post(f"{ADMINS}/{ben.id}/retire", data=form).status_code == 303
-    code_typed_ago(session, 31, window_open=True)
+    code_typed_ago(session, 31)
     me = admin_named(session, "ada")
     left = accounts.recovery_codes_left(session, me.id)
     # The page it was on, as its form carries it

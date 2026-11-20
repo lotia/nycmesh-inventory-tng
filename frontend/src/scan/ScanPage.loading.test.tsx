@@ -45,7 +45,7 @@ describe("loading", () => {
       ...CATALOGUE,
       volunteers: [{ id: 3, name: "Hedy" }],
     };
-    const second = server(() => saved(), newer).api;
+    const second = server(saved, newer).api;
     rerender(<ScanPage api={second} outbox={outbox} reload={vi.fn()} />);
     await screen.findByRole("option", { name: "Hedy" });
     older.resolve(json(CATALOGUE, 200));

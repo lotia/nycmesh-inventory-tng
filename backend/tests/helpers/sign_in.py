@@ -219,13 +219,11 @@ def other_session(
     return accounts.start_session(session, admin.id, user_agent, datetime.now(UTC))[0]
 
 
-def code_typed_ago(
-    session: Session, minutes: int, *, window_open: bool = False
-) -> None:
+def code_typed_ago(session: Session, minutes: int, *, window_open: bool = True) -> None:
     """Every session's last code typed `minutes` ago, for a change to
-    another administrator too. Nothing sensitive done since, as confirming
-    leaves it, or with window_open one done just now, so the window for
-    other sensitive actions is open."""
+    another administrator too, and a sensitive action done just now, so
+    the window for other sensitive actions is open. Without window_open,
+    nothing sensitive done since, as confirming leaves it."""
     typed = datetime.now(UTC) - timedelta(minutes=minutes)
     for row in session.scalars(select(AdminSession)):
         row.confirmed_at = row.account_confirmed_at = typed
@@ -236,4 +234,4 @@ def code_typed_ago(
 def confirmed_long_ago(session: Session) -> None:
     """Every session's code typed longer ago than confirm_idle_minutes can
     be: the window has closed, whatever the setting."""
-    code_typed_ago(session, CONFIRM_IDLE_MINUTES[1] + 1)
+    code_typed_ago(session, CONFIRM_IDLE_MINUTES[1] + 1, window_open=False)

@@ -1104,7 +1104,7 @@ describe("what an older build left", () => {
       lines: [{ itemId: 100, packages: { 1004: "3", 1009: "1" }, loose: "" }],
       usedAt: AT,
     });
-    const { api } = server(() => saved(), named);
+    const { api } = server(saved, named);
     open(api);
     await ready();
     within(listing()).getByText("LiteBeam 5AC: 2 × Old box");

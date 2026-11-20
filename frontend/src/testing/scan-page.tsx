@@ -23,7 +23,7 @@ export const isCatalogue = (request: Request) =>
 /** An API with `catalogue`, the test one unless another is given, saving
  * batches as transaction 77 unless `save` answers otherwise. */
 export function server(
-  save: () => Response | Promise<Response> = () => saved(),
+  save: () => Response | Promise<Response> = saved,
   catalogue: Catalogue = CATALOGUE,
 ) {
   return answering((request) =>

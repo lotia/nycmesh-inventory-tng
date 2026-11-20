@@ -82,7 +82,7 @@ function setOnline(onLine: MockInstance<() => boolean>, online: boolean) {
 describe("filling and saving a cart", () => {
   /** The cable at the hub, with these open packages there. */
   async function cableWith(...opens: ReturnType<typeof openSpool>[]) {
-    const { api } = server(() => saved(), {
+    const { api } = server(saved, {
       ...CATALOGUE,
       open_packages: opens,
     });
@@ -893,7 +893,7 @@ describe("filling and saving a cart", () => {
         item.id === 101 ? { ...item, name: "Cat 6 cable" } : item,
       ),
     };
-    const { api } = server(() => saved(), named);
+    const { api } = server(saved, named);
     open(api);
     await ready();
     fillMove("Cat 6 cable");
@@ -920,7 +920,7 @@ describe("filling and saving a cart", () => {
         item.id === 101 ? { ...item, name: "3" } : item,
       ),
     };
-    const { api } = server(() => saved(), named);
+    const { api } = server(saved, named);
     open(api);
     await ready();
     pick(say(YOUR_NAME), "1");

@@ -56,7 +56,7 @@ def bring_back(
     client: TestClient, session: Session, location: Location, **form: str
 ) -> Response:
     form = {"place": str(location.id)} | form
-    return answered(client, session, "bring-back", **form)[1]
+    return answered(client, session, "bring-back", **form)
 
 
 def test_refused_at_a_retired_place_it_says_why_and_offers_a_fix(
