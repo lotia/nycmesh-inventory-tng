@@ -249,7 +249,7 @@ const NOT_SAVED = "Not saved.";
 /** Where a problem main's build kept names its line or report, in its
  * words, as kept: not REPORTS, whose words may change. */
 const MARKERS =
-  /((?:^| )(?:Line \d+|(?:Open package said used up|What is on an open package), \d+): )/;
+  /(?:^| )((?:Line \d+|(?:Open package said used up|What is on an open package), \d+): )/;
 
 /**
  * Why a save was refused: from its code, as this build keeps it; or from
@@ -272,12 +272,12 @@ function refusedOf(reason: Reason | null, note: string | null): Refused {
   // Each problem on a line of its own, as this build's (Ali, 2026-11-20,
   // inventory-tng-61ys): its marker, then the words up to the next.
   const [before = "", ...named] = words.slice(NOT_SAVED.length).split(MARKERS);
-  const problems: Said[] =
-    before.trim() === "" ? [] : [[{ quoted: before.trim() }]];
+  const unnamed = before.trim();
+  const problems: Said[] = unnamed === "" ? [] : [[{ quoted: unnamed }]];
   for (let at = 0; at < named.length; at += 2) {
     const why = (named[at + 1] as string).trim();
     problems.push([
-      (named[at] as string).trimStart(),
+      named[at] as string,
       ...(why === "" ? [] : [{ quoted: why }]),
     ]);
   }

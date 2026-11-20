@@ -52,17 +52,22 @@ export function expectBold(
   ).toEqual(numbers);
 }
 
-/** A refusal's note: only its lead in bold, and in italic only the
- * `numbers` the page wrote after it. */
+/** A refusal's note: only its lead in bold, in italic only the `numbers`
+ * the page wrote after it, and each of its `problems` on a line of its
+ * own. */
 export function expectRefusal(
   element: Element,
   lead: string,
   numbers: string[],
+  problems: string[],
 ) {
   expect(element.querySelector("strong")?.textContent).toBe(lead);
   expect(
     [...element.querySelectorAll("em")].map((each) => each.textContent),
   ).toEqual(numbers);
+  expect(
+    [...element.querySelectorAll("li")].map((each) => each.textContent),
+  ).toEqual(problems);
 }
 
 export const pick = (label: string, value: string) =>

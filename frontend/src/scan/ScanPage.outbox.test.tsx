@@ -58,12 +58,12 @@ describe("the batches listed in the outbox", () => {
     // Only say(NOT_RECORDED) in bold; in what follows, the line's number
     // the page wrote in italic (Ali, inventory-tng-93z); each problem on a
     // line of its own (Ali, 2026-11-20, inventory-tng-61ys).
-    expectRefusal(note, say(NOT_RECORDED), ["2"]);
-    expect(
-      within(note)
-        .getAllByRole("listitem")
-        .map((each) => each.textContent),
-    ).toEqual([`Line 2: ${say(PROBLEMS.not_whole)}`]);
+    expectRefusal(
+      note,
+      say(NOT_RECORDED),
+      ["2"],
+      [`Line 2: ${say(PROBLEMS.not_whole)}`],
+    );
     const entry = note.closest("li") as HTMLElement;
     // Numbered as the problems name them.
     expect(

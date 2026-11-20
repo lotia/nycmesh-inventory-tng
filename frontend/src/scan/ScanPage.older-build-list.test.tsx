@@ -372,12 +372,12 @@ describe("what an older build left", () => {
     const why = within(listing()).getByText(
       noted(`Not saved.Line 1: no.Line 2: gone ${say(FIX_THEN_RECORD)}`),
     );
-    expectRefusal(why, "Not saved.", ["1", "2"]);
-    expect(
-      within(why)
-        .getAllByRole("listitem")
-        .map((each) => each.textContent),
-    ).toEqual(["Line 1: no.", "Line 2: gone"]);
+    expectRefusal(
+      why,
+      "Not saved.",
+      ["1", "2"],
+      ["Line 1: no.", "Line 2: gone"],
+    );
     // What to do, in bold as after any other refusal (row 11).
     expect(
       [...why.querySelectorAll("strong")].map((each) => each.textContent),

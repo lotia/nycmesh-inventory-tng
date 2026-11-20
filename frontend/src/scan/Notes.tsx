@@ -34,11 +34,17 @@ export function NoteSaid({
   note: string | Note | null;
   then?: string | undefined;
 }) {
+  const shown: Note | null = typeof note === "string" ? { bold: [note] } : note;
+  const problems = shown?.problems ?? [];
   // A div, not a p: a refusal's problems are a list. Spaced as a p is.
   return (
     <div class="alert my-3">
-      {note !== null && (
-        <AlertWords note={typeof note === "string" ? { bold: [note] } : note} />
+      {shown !== null && <AlertWords note={shown} />}
+      {problems.length > 0 && (
+        // Of a refusal, the problems after "Not recorded.", not in bold, each
+        // on a line of its own (Ali, 2026-11-20, inventory-tng-61ys), words
+        // an older build kept in them as they are.
+        <SaidList said={problems} class="m-0" />
       )}
       {then !== undefined && (
         <>
@@ -85,32 +91,38 @@ export function ConfirmDiscard({
  * used, in bold, the counts the page wrote
  * in it in bold italic, never a number of a name it quotes (Ali,
  * inventory-tng-93z), then any words after them (Note.plain) not in
- * bold; of a refusal, the problems after "Not recorded." (Note.problems)
- * not in bold, each on a line of its own (Ali, 2026-11-20,
- * inventory-tng-61ys), words an older build kept in them as they are.
+ * bold. Inline, to sit in a p: a refusal's problems (Note.problems) are
+ * NoteSaid's to list.
  */
-export function AlertWords({
-  note: { bold, plain = [], problems = [] },
-}: {
-  note: Note;
-}) {
-  const keys = keyedByWords(problems.map(wordsOf));
+export function AlertWords({ note: { bold, plain = [] } }: { note: Note }) {
   return (
     <>
       <strong>
         <Counted said={bold} />
       </strong>
       {plain.length > 0 && <Counted said={plain} />}
-      {problems.length > 0 && (
-        <ul class="m-0 list-none p-0">
-          {problems.map((said, at) => (
-            <li key={keys[at]}>
-              <Counted said={said} />
-            </li>
-          ))}
-        </ul>
-      )}
     </>
+  );
+}
+
+/** Each of `said` on a line of its own, keyed by what it says. */
+export function SaidList({
+  said,
+  class: spacing = "",
+}: {
+  said: readonly Said[];
+  /** Spacing beyond the bare list's. */
+  class?: string;
+}) {
+  const keys = keyedByWords(said.map(wordsOf));
+  return (
+    <ul class={`${spacing} list-none p-0`.trim()}>
+      {said.map((each, at) => (
+        <li key={keys[at]}>
+          <Counted said={each} />
+        </li>
+      ))}
+    </ul>
   );
 }
 

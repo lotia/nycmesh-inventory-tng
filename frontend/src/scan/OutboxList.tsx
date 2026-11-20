@@ -28,6 +28,7 @@ import {
   keyedByWords,
   NoteSaid,
   RULED_LIST,
+  SaidList,
 } from "./Notes";
 import { type NotPut, olderSaid } from "./OlderList";
 import { linesSaid } from "./older-builds";
@@ -54,6 +55,16 @@ export const DISMISS = msg`Dismiss`;
  * inventory-tng-2lad). aria-hidden as well, since jsdom applies no styles.
  */
 const KEEPS_ROOM = { class: "invisible", "aria-hidden": "true" } as const;
+
+/** Where a button was or will be, keeping its room (KEEPS_ROOM). Never
+ * focused nor read out, it needs no description. */
+function ButtonRoom({ label }: { label: MessageDescriptor }) {
+  return (
+    <button type="button" tabIndex={-1} {...KEEPS_ROOM}>
+      {say(label)}
+    </button>
+  );
+}
 
 /** Whether the browser says it is online, following it as it changes. */
 function useOnline(): boolean {
@@ -228,11 +239,8 @@ export function OutboxList({
               )}
               {entry.state === "waiting" ? (
                 // Its room kept while it is sent, so the entry does not grow
-                // as it finishes. Never focused nor read out, it needs no
-                // description.
-                <button type="button" tabIndex={-1} {...KEEPS_ROOM}>
-                  {say(DISMISS)}
-                </button>
+                // as it finishes.
+                <ButtonRoom label={DISMISS} />
               ) : (
                 <button
                   type="button"
@@ -288,18 +296,11 @@ function RecordedElsewhere({
     [recorded, entry.body, catalogue],
   );
   // Keyed by what each says, two saying the same apart.
-  const wasKeys = keyedByWords(was.map(wordsOf));
   const changeKeys = keyedByWords(changes.map(({ words }) => wordsOf(words)));
   return (
     <>
       <h3>{recordedHeading(recorded)}</h3>
-      <ul class="list-none p-0">
-        {was.map((said, at) => (
-          <li key={wasKeys[at]}>
-            <Counted said={said} />
-          </li>
-        ))}
-      </ul>
+      <SaidList said={was} />
       {changes.length > 0 && (
         <>
           <h3>{say(MAKE_CHANGES)}</h3>
@@ -380,11 +381,7 @@ function PutInCart({
   return (
     <>
       <p {...(inCart ? {} : KEEPS_ROOM)}>{say(inCartWords)}</p>
-      {hint !== undefined && (
-        <button type="button" tabIndex={-1} {...KEEPS_ROOM}>
-          {say(label)}
-        </button>
-      )}
+      {hint !== undefined && <ButtonRoom label={label} />}
     </>
   );
 }
