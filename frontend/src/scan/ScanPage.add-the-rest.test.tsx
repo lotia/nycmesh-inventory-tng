@@ -17,10 +17,10 @@ import {
   storedCart,
   UUID,
 } from "../testing/scan-page";
+import { ADD_THE_REST, REST_IN_CART, TAKEN_OFF } from "./add-the-rest";
 import { ADDED_BACK } from "./CartForm";
 import { CART_NOT_EMPTY } from "./OlderList";
 import { DISMISS } from "./OutboxList";
-import { RECORD_THE_REST, REST_IN_CART, TAKEN_OFF } from "./record-the-rest";
 
 // The camera, faked, as the page imports it.
 vi.mock("./camera", () => ({ openCamera: vi.fn() }));
@@ -53,14 +53,14 @@ async function refusedWith(...problems: Problem[]) {
   return { entry, outbox, sent };
 }
 
-const recordTheRest = (entry: HTMLElement) =>
-  within(entry).queryByRole("button", { name: say(RECORD_THE_REST) });
+const addTheRest = (entry: HTMLElement) =>
+  within(entry).queryByRole("button", { name: say(ADD_THE_REST) });
 
-test("Record the rest puts the other lines in the cart, says each taken off and why, and Record sends them under a key of their own (Ali, 2026-11-20, inventory-tng-clvh)", async () => {
+test("Add the rest to cart puts the other lines in the cart, says each taken off and why, and Record sends them under a key of their own (Ali, 2026-11-20, inventory-tng-clvh)", async () => {
   const record = vi.spyOn(telemetry, "record");
   record.mockClear();
   const { entry, outbox, sent } = await refusedWith(RETIRED_NONE_LEFT);
-  fireEvent.click(recordTheRest(entry) as HTMLElement);
+  fireEvent.click(addTheRest(entry) as HTMLElement);
   const cart = storedCart();
   expect(cart.lines.map((line: { itemId: number }) => line.itemId)).toEqual([
     101,
@@ -75,7 +75,7 @@ test("Record the rest puts the other lines in the cart, says each taken off and 
     }),
   );
   // Offered no more, and said to be in the cart; the refusal stays listed.
-  expect(recordTheRest(entry)).toBeNull();
+  expect(addTheRest(entry)).toBeNull();
   within(entry).getByText(say(REST_IN_CART));
   within(entry).getByRole("button", { name: say(DISMISS) });
   expect(outbox.entries.value[0]?.reason).toMatchObject({ added: true });
@@ -98,21 +98,21 @@ test("Record the rest puts the other lines in the cart, says each taken off and 
   );
 });
 
-test("Record the rest takes only an empty cart, saying so, and is offered still", async () => {
+test("Add the rest to cart takes only an empty cart, saying so, and is offered still", async () => {
   const { entry } = await refusedWith(RETIRED_NONE_LEFT);
   fillMove();
-  fireEvent.click(recordTheRest(entry) as HTMLElement);
+  fireEvent.click(addTheRest(entry) as HTMLElement);
   expectBold(within(entry).getByRole("alert"), say(CART_NOT_EMPTY));
   expect(
     storedCart().lines.map((line: { itemId: number }) => line.itemId),
   ).toEqual([101]);
   expect(screen.queryByText(say(ADDED_BACK))).toBeNull();
-  expect(recordTheRest(entry)).not.toBeNull();
+  expect(addTheRest(entry)).not.toBeNull();
   expect(within(entry).queryByText(say(REST_IN_CART))).toBeNull();
 });
 
-// Which refusals have no rest is restOf's (record-the-rest.test.ts).
-test("a refusal with no rest offers no Record the rest", async () => {
+// Which refusals have no rest is restOf's (add-the-rest.test.ts).
+test("a refusal with no rest offers no Add the rest to cart", async () => {
   const { entry } = await refusedWith({ names: null, kind: "not_found" });
-  expect(recordTheRest(entry)).toBeNull();
+  expect(addTheRest(entry)).toBeNull();
 });

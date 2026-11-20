@@ -18,7 +18,7 @@ import { type Loaded, loadCatalogue } from "./catalogue";
 import { useEveryMinuteAndWhenShown } from "./every-minute-and-when-shown";
 import { CAUTION_BOX } from "./Notes";
 import { heldIn } from "./OlderList";
-import { type AddDifference, OutboxList, type RecordRest } from "./OutboxList";
+import { type AddDifference, type AddRest, OutboxList } from "./OutboxList";
 import { OlderStore } from "./older-builds";
 import { unseen } from "./unseen-batches";
 
@@ -65,8 +65,9 @@ export function ScanPage({
   // What puts a save's difference in the cart, while the cart is shown
   // (CartForm), for the outbox's list below it.
   const adder = useRef<AddDifference | null>(null);
-  // And what puts a refused batch's other lines in it (Record the rest).
-  const rester = useRef<RecordRest | null>(null);
+  // And what puts a refused batch's other lines in it (Add the rest to
+  // cart).
+  const rester = useRef<AddRest | null>(null);
   // One refresh at a time; one asked for meanwhile follows it.
   const asking = useRef<"no" | "yes" | "again">("no");
 
@@ -228,7 +229,7 @@ export function ScanPage({
         onAddDifference={(entry, difference) =>
           adder.current?.(entry, difference) ?? null
         }
-        onRecordRest={(entry, rest) => rester.current?.(entry, rest) ?? null}
+        onAddRest={(entry, rest) => rester.current?.(entry, rest) ?? null}
       />
     </main>
   );

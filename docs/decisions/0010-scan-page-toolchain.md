@@ -338,7 +338,9 @@ the compressed copy (fiddly header code ServeStatic already gets right).
   takes only an empty cart, and the save stays listed, saying "The other
   lines are in your cart, waiting to be recorded." until recorded, then
   keeping that room, until Dismiss. The page counts each tap as a
-  telemetry event of its own, two an hour added beside the rest.
+  telemetry event of its own, two an hour added beside the rest. Ali
+  renamed the button "Add the rest to cart" on 2026-11-20
+  (inventory-tng-r18l), as it records nothing itself.
   The page's words drop "save" (Ali, 2026-11-13, inventory-tng-wyq): the
   cart lives in the browser, written to storage as it changes, so what
   the browser holds is "kept", and what the inventory takes is

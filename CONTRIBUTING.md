@@ -629,8 +629,8 @@ the cart's, so the same opening recorded again is the same batch
 
 A refused save in the outbox's list lists its lines, in the words of the
 older list, each item numbered as the refusal's "Line n" names it. One
-whose problems name lines, and that holds others, offers Record the
-rest (`frontend/src/scan/record-the-rest.ts`, docs/decisions/0010). While
+whose problems name lines, and that holds others, offers Add the rest
+to cart (`frontend/src/scan/add-the-rest.ts`, docs/decisions/0010). While
 the browser says it is offline, a batch waiting for an answer says so,
 and the page follows the browser going on and off line.
 

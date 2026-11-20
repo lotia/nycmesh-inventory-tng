@@ -225,8 +225,8 @@ export const Reason = v.union([
   v.object({
     code: v.literal("refused"),
     problems: v.array(Problem),
-    /** Its lines its problems do not name put in the cart (Record the
-     * rest, scan/record-the-rest.ts). */
+    /** Its lines its problems do not name put in the cart (Add the
+     * rest to cart, scan/add-the-rest.ts). */
     added: v.exactOptional(v.literal(true)),
   }),
 ]);
@@ -585,9 +585,9 @@ export class Outbox {
 
   /** Mark one as having had what it offers put in the cart, so it is
    * offered no more: of one recorded elsewhere, its difference (Add these
-   * to cart); of one refused (422), its other lines (Record the rest). That
-   * batch alone, not another under its key. False if the browser would not
-   * keep that. */
+   * to cart); of one refused (422), its other lines (Add the rest to
+   * cart). That batch alone, not another under its key. False if the
+   * browser would not keep that. */
   addedToCart(listed: Entry): boolean {
     const body = v.parse(BatchBody, listed.body);
     return this.update((entries) =>

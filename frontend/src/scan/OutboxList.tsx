@@ -17,6 +17,7 @@ import {
   recordedHeading,
   wordsOf,
 } from "../shared/outbox-notes";
+import { ADD_THE_REST, REST_IN_CART, restOf } from "./add-the-rest";
 import { batchWords } from "./batch";
 import type { Catalogue } from "./cart";
 import {
@@ -29,7 +30,6 @@ import {
 } from "./Notes";
 import { type NotPut, olderSaid } from "./OlderList";
 import { linesSaid } from "./older-builds";
-import { RECORD_THE_REST, REST_IN_CART, restOf } from "./record-the-rest";
 import {
   ADD_DIFFERENCE,
   changesShown,
@@ -77,8 +77,8 @@ function useOnline(): boolean {
 export type AddDifference = (entry: Entry, difference: Body) => NotPut | null;
 
 /** Puts the lines of a batch refused (422) its problems do not name in the
- * cart (CartForm, recordRest): why not, if it was not. */
-export type RecordRest = (entry: Entry, rest: Body) => NotPut | null;
+ * cart (CartForm, addRest): why not, if it was not. */
+export type AddRest = (entry: Entry, rest: Body) => NotPut | null;
 
 /**
  * What this browser sent, or is sending, and what became of each. A
@@ -89,14 +89,14 @@ export type RecordRest = (entry: Entry, rest: Body) => NotPut | null;
  * that does not say, what is left to do (SCAN_AGAIN_CHANGED), as the older
  * list does, while the page refreshes the stock (Ali, inventory-tng-g0e,
  * d; inventory-tng-0gg). One refused (422) whose problems name lines
- * offers Record the rest (record-the-rest.ts).
+ * offers Add the rest to cart (add-the-rest.ts).
  */
 export function OutboxList({
   outbox,
   catalogue,
   cartKey,
   onAddDifference,
-  onRecordRest,
+  onAddRest,
 }: {
   outbox: Outbox;
   /** To name the lines of one refused; null until it is loaded. */
@@ -104,7 +104,7 @@ export function OutboxList({
   /** The cart's batch key, if it has one. */
   cartKey: string | undefined;
   onAddDifference: AddDifference;
-  onRecordRest: RecordRest;
+  onAddRest: AddRest;
 }) {
   const online = useOnline();
   // Under which save (batchId), why its difference, or its rest, did not
@@ -202,12 +202,12 @@ export function OutboxList({
               )}
               {rest !== null && (
                 <PutInCart
-                  label={RECORD_THE_REST}
+                  label={ADD_THE_REST}
                   inCartWords={REST_IN_CART}
                   added={reason?.code === "refused" && reason.added === true}
                   inCart={cartKey === rest.key}
                   onPut={() => {
-                    const why = onRecordRest(entry, rest);
+                    const why = onAddRest(entry, rest);
                     notAdded.value = why === null ? null : { on: id, why };
                   }}
                 />
@@ -315,8 +315,8 @@ function RecordedElsewhere({
 
 /**
  * What an outbox entry offers to put in an empty cart (CartForm): a button
- * until it has (Add these to cart, Record the rest), then words that it
- * is there, until recorded.
+ * until it has (Add these to cart, Add the rest to cart), then words that
+ * it is there, until recorded.
  */
 function PutInCart({
   label,

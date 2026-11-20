@@ -4,7 +4,7 @@ import type { Entry, Problem } from "../shared/outbox";
 import { NOT_ACCEPTED, PROBLEMS } from "../shared/outbox-notes";
 import { CATALOGUE } from "../testing/catalogue";
 import { KEY, moveBody, outboxEntry } from "../testing/saves";
-import { restOf, TAKEN_OFF, takenOff } from "./record-the-rest";
+import { restOf, TAKEN_OFF, takenOff } from "./add-the-rest";
 
 /** Radios in a box and loose (item 100, line 1), cable (101, line 2) and
  * a retired item the catalogue only names (103, line 3). */

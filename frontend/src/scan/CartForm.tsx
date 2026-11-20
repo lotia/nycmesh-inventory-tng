@@ -9,6 +9,7 @@ import { say, sayParts } from "../shared/i18n";
 import { type Body, batchId, type Entry, type Outbox } from "../shared/outbox";
 import { type Said, wordsOf } from "../shared/outbox-notes";
 import { MOST_SECONDS, telemetry } from "../shared/telemetry";
+import { takenOff } from "./add-the-rest";
 import { type Batch, batchWords, toBatch } from "./batch";
 import { CartLine } from "./CartLine";
 import { labelKind } from "./camera-report";
@@ -41,7 +42,7 @@ import {
   RULED_LIST,
 } from "./Notes";
 import { type NotPut, OlderList, olderSaid, recordOlder } from "./OlderList";
-import type { AddDifference, RecordRest } from "./OutboxList";
+import type { AddDifference, AddRest } from "./OutboxList";
 import { offered, offeredAt } from "./offered";
 import {
   asSave,
@@ -51,7 +52,6 @@ import {
   olderId,
 } from "./older-builds";
 import { type Gaps, nameOf, toCart, withRetired } from "./older-to-cart";
-import { takenOff } from "./record-the-rest";
 import { differenceOf } from "./recorded-elsewhere";
 import { Scanner } from "./Scanner";
 import { indexOf } from "./search";
@@ -121,8 +121,8 @@ export function CartForm({
   /** Given what puts a save's difference in this cart (addDifference). */
   adder: { current: AddDifference | null };
   /** Given what puts a refused batch's other lines in this cart
-   * (recordRest). */
-  rester: { current: RecordRest | null };
+   * (addRest). */
+  rester: { current: AddRest | null };
 }) {
   const store = useMemo(() => new CartStore(catalogue), []);
   // The open packages to take from, and how many are sealed where, as the
@@ -381,7 +381,7 @@ export function CartForm({
   /** Fill this cart, as stored, which must be empty, with `save`, once
    * `ready` says it still may (else why not), and `forget` it where it
    * was (false if that could not be): putInCart's, addDifference's and
-   * recordRest's steps; the status says what was `taken` off first. True
+   * addRest's steps; the status says what was `taken` off first. True
    * once filled, else why not. */
   function fill(
     save: Older,
@@ -473,11 +473,11 @@ export function CartForm({
   adder.current = addDifference;
 
   /** Put the `rest` of a batch refused (422), the lines its problems do
-   * not name (record-the-rest.ts, restOf), in this cart, which must be
+   * not name (add-the-rest.ts, restOf), in this cart, which must be
    * empty, and mark it so, offering it no more; the status says each line
    * taken off, and why, before what else could not go back (Ali,
    * 2026-11-20, inventory-tng-clvh). Why not, if it was not. */
-  function recordRest(entry: Entry, rest: Body): NotPut | null {
+  function addRest(entry: Entry, rest: Body): NotPut | null {
     const why = fill(
       asSave(rest),
       false,
@@ -491,7 +491,7 @@ export function CartForm({
     telemetry.record({ kind: "rest_put_back" });
     return null;
   }
-  rester.current = recordRest;
+  rester.current = addRest;
 
   // An empty cart takes what a save recorded elsewhere adds, without a
   // tap, as it takes what an older build left (Ali, inventory-tng-0gg,

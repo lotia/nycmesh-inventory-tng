@@ -1710,7 +1710,7 @@
         "type": "object",
         "required": ["kind"],
         "title": "RestPutBack",
-        "description": "A volunteer tapped Record the rest under a batch the inventory\nrefused for some of its lines, putting its other lines in the scan\npage's cart (frontend/src/scan/record-the-rest.ts)."
+        "description": "A volunteer tapped Add the rest to cart under a batch the\ninventory refused for some of its lines, putting its other lines in\nthe scan page's cart (frontend/src/scan/add-the-rest.ts)."
       },
       "RetiredItem": {
         "properties": {

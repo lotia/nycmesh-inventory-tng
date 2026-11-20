@@ -217,7 +217,7 @@ msgstr ""
 msgid "{package} ({size} {unit}), retired: taking only"
 msgstr ""
 
-#: src/scan/record-the-rest.ts
+#: src/scan/add-the-rest.ts
 msgid "The other lines are in your cart, waiting to be recorded."
 msgstr ""
 
@@ -378,6 +378,10 @@ msgstr ""
 msgid "{name}: Open whole packages: leave loose empty."
 msgstr ""
 
+#: src/scan/add-the-rest.ts
+msgid "Add the rest to cart"
+msgstr ""
+
 #: src/scan/batch.ts
 msgid "{name}: Nothing is taken from an open package here."
 msgstr ""
@@ -477,10 +481,6 @@ msgstr ""
 
 #: src/scan/OlderList.tsx
 msgid "That one was changed in another tab. Check it, then add it to the cart again."
-msgstr ""
-
-#: src/scan/record-the-rest.ts
-msgid "Record the rest"
 msgstr ""
 
 #: src/scan/OlderList.tsx
@@ -944,7 +944,7 @@ msgstr ""
 msgid "Some items were not recorded. Details below."
 msgstr ""
 
-#: src/scan/record-the-rest.ts
+#: src/scan/add-the-rest.ts
 msgid "{name}: taken off. {why}"
 msgstr ""
 
