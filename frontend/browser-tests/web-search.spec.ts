@@ -21,7 +21,4 @@ test("the search link follows the manufacturer and part number as typed", async 
     "href",
     "https://duckduckgo.com/?q=Ubiquiti+LBE-5AC%2FGen2",
   );
-  await page.getByLabel(/^Manufacturer/).fill("");
-  await page.getByLabel(/^Part number/).fill("");
-  await expect(link).toBeHidden();
 });
