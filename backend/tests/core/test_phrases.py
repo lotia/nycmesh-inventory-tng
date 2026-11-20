@@ -657,15 +657,27 @@ COVERED: dict[str, Callable[[], str]] = {
     "stock/over_recorded.html, a row of each kind": recorded_more,
     "stock/count.html, a recount": count_page,
     "stock/counts.html, a count listed": counts_page,
-    "devices/code_made.html": lambda: signed_in(
-        "devices/code_made.html",
-        code=SimpleNamespace(max_uses=2, expires_at=DAY, label=NOT_ENGLISH),
-        qr="",
-        phrase=NOT_ENGLISH,
-        link="/",
-        register=NOT_ENGLISH,
-        zone=ZONE,
-    ),
+    **{
+        f"devices/code_made.html, {count} made": (
+            lambda count=count: signed_in(
+                "devices/code_made.html",
+                codes=[
+                    (
+                        SimpleNamespace(
+                            id=1, max_uses=2, expires_at=DAY, label=NOT_ENGLISH
+                        ),
+                        NOT_ENGLISH,
+                        "/",
+                        "",
+                    )
+                ]
+                * count,
+                register=NOT_ENGLISH,
+                zone=ZONE,
+            )
+        )
+        for count in (1, 4)
+    },
     "devices/device_revoke.html": lambda: signed_in(
         "devices/device_revoke.html",
         devices=[SimpleNamespace(id=1, name=NOT_ENGLISH)],

@@ -404,6 +404,19 @@ def test_counts_recovery_codes_made_and_reminders(
     assert events[(("event", "reminded"),)] >= 1
 
 
+def test_counts_registration_codes_made(
+    rolled_back: Recorded, session: Session
+) -> None:
+    _, _, reader, _ = rolled_back
+    devices.create_codes(session, 2, max_uses=1, lifetime=timedelta(hours=1))
+    code, _ = devices.create_code(session, max_uses=1, lifetime=timedelta(hours=1))
+    devices.another_like(session, code)
+    session.commit()  # Counted once committed.
+    made = counted(reader, "inventory.registration_codes.made")
+    assert made[(("how", "new"),)] >= 3
+    assert made[(("how", "another"),)] >= 1
+
+
 def test_counts_devices_revoked(rolled_back: Recorded, session: Session) -> None:
     _, _, reader, _ = rolled_back
     one, _ = new_device(session)

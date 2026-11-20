@@ -1,7 +1,8 @@
 # 0009 — Devices register with a code, and the ledger records them
 
 **Status:** accepted · 2026-11-01 · amends 0003 (an unregistered device is
-blocked) · amended 2026-11-10 (revoking ticked devices at once)
+blocked) · amended 2026-11-10 (revoking ticked devices at once) ·
+amended 2026-11-19 (a lost printout replaced, codes made together)
 
 ## Context
 
@@ -19,13 +20,20 @@ decide which devices may record anything at all.
 - **A device registers once, with a code.** An administrator makes a code
   with an expiry and a use limit, and hands it out as a QR code in the room or
   as a phrase of five random words for a remote volunteer: one code, two
-  spellings. The code is checked first; only then does the device register,
+  spellings. Up to four alike can be made together, to print on one
+  sheet, two by two, such as single-use codes for a training night (Ali,
+  2026-11-19). The code is checked first; only then does the device register,
   with a random id of its own. The code is never the device's identity.
 - **The device is a cookie the server sets**: `HttpOnly`, `Secure`,
   `SameSite=Lax`, 400 days. Every request that needs a device reads the
   cookie and looks up its row, so revoking a device refuses its next request.
   Only SHA-256 hashes of cookies and phrases are stored. Nothing is signed:
   the row is what decides, and a made-up value finds none.
+- **A phrase is never kept, so a printout is never reprinted** (Ali,
+  2026-11-19). In place of a lost one, a code's page makes another like
+  it: a new phrase, with the uses and time the code has left and its
+  label. The lost one can then be revoked; its devices stay registered.
+  Codes to print together are made together for the same reason.
 - **An unregistered device is blocked**, amending 0003's "a volunteer is
   never blocked". No cookie, or one without a current row, means registering
   first. A cleared cookie means registering again.
@@ -48,8 +56,10 @@ decide which devices may record anything at all.
 
 We rejected `localStorage` for the device itself (invisible to the server
 without script, and cleared by Safari), signed tokens (the row lookup makes
-the signature redundant, and keys would need rotating), and browser
-fingerprinting (unreliable, and hostile to privacy).
+the signature redundant, and keys would need rotating), browser
+fingerprinting (unreliable, and hostile to privacy), and keeping a phrase,
+sealed or in the clear, to reprint it (a leak would expose live codes, and
+making another costs nothing; 2026-11-19).
 
 ## Consequences
 

@@ -4,6 +4,15 @@
 {% set state_shown %}{% if state == "open" %}{{ state_words[state] }}{% else %}<span class="tag">{{ state_words[state] }}</span>{% endif %}{% endset %}
 <p>{% trans state=state_shown, uses=code.uses, most=code.max_uses, until=code.expires_at | when(zone) %}{{ state }}: {{ uses }} of {{ most }} used,
 until {{ until }}.{% endtrans %}</p>
+{% if has_left %}
+<form method="post" action="{{ here }}/another">
+  {{ single_use_field() }}
+  <button>{% trans %}Make another like this{% endtrans %}</button>
+</form>
+<p class="hint">{% trans %}A new code with its own phrase, for the devices and time this
+one has left, to print in place of a lost printout. Making one asks for a
+fresh code.{% endtrans %}</p>
+{% endif %}
 {% if not code.revoked_at %}
 <form method="get" action="{{ here }}/revoke"><button>{% trans %}Revoke{% endtrans %}</button></form>
 <p class="hint">{% trans %}Revoking stops new registrations. Devices it registered stay

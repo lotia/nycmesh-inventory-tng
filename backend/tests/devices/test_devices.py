@@ -105,6 +105,37 @@ def test_phrases_ignore_case_and_separators(typed: str) -> None:
     assert devices.normalise_phrase(typed) == "abacus-tulip"
 
 
+def test_codes_made_together_are_alike_but_for_their_phrases(
+    session: Session,
+) -> None:
+    made = devices.create_codes(
+        session, 4, max_uses=1, lifetime=timedelta(days=1), label="Training"
+    )
+    assert len({phrase for _, phrase in made}) == 4
+    assert len({(c.max_uses, c.expires_at, c.label) for c, _ in made}) == 1
+
+
+def test_another_like_a_code_has_its_uses_and_time_left(session: Session) -> None:
+    """Revoked or not: only uses and time decide (has_left)."""
+    code, phrase = devices.create_code(
+        session, max_uses=2, lifetime=timedelta(days=1), label="Hub"
+    )
+    devices.register(session, phrase, ADDRESS)
+    devices.revoke_code(session, code.id)
+    assert devices.has_left(code, datetime.now(UTC))
+    other, again = devices.another_like(session, code)
+    assert again != phrase
+    assert (other.max_uses, other.expires_at, other.label) == (
+        1,
+        code.expires_at,
+        "Hub",
+    )
+    assert other.revoked_at is None
+    devices.register(session, again, ADDRESS)
+    assert not devices.has_left(other, datetime.now(UTC))
+    assert not devices.has_left(code, code.expires_at)
+
+
 def test_registering_gives_a_device_its_own_id(session: Session, phrase: str) -> None:
     first, token = devices.register(session, phrase.upper().replace("-", " "), ADDRESS)
     second, other = devices.register(session, phrase, ADDRESS)

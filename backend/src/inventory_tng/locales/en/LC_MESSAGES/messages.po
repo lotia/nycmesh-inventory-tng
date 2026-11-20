@@ -660,6 +660,13 @@ msgstr ""
 msgid "A name needs at least one letter or number."
 msgstr ""
 
+#: src/inventory_tng/templates/devices/code.html
+msgid ""
+"A new code with its own phrase, for the devices and time this one has "
+"left, to print in place of a lost printout. Making one asks for a fresh "
+"code."
+msgstr ""
+
 #: src/inventory_tng/devices/devices_routes.py
 msgid "A new registration code"
 msgstr ""
@@ -1208,6 +1215,7 @@ msgid "Code"
 msgstr ""
 
 #: src/inventory_tng/models/devices.py
+#: src/inventory_tng/templates/devices/code_made.html
 #, python-format
 msgid "Code %(number)s"
 msgstr ""
@@ -1407,6 +1415,13 @@ msgstr ""
 msgid "Don't track"
 msgstr ""
 
+#: src/inventory_tng/templates/devices/code_made.html
+#, python-format
+msgid "Each registers up to %(count)s device, until %(until)s."
+msgid_plural "Each registers up to %(count)s devices, until %(until)s."
+msgstr[0] ""
+msgstr[1] ""
+
 #: src/inventory_tng/templates/admins/account.html
 #: src/inventory_tng/templates/admins/admins.html
 #: src/inventory_tng/templates/admins/setup.html
@@ -1548,6 +1563,11 @@ msgstr ""
 
 #: src/inventory_tng/devices/forms.py
 #, python-format
+msgid "From 1 to %(max)s codes."
+msgstr ""
+
+#: src/inventory_tng/devices/forms.py
+#, python-format
 msgid "From 1 to %(max)s days."
 msgstr ""
 
@@ -1618,6 +1638,10 @@ msgid ""
 "near it do not say: by searches, here and on the scan page, and by the "
 "item forms, before the unit table. Settled as an item's form asks, or "
 "corrected here."
+msgstr ""
+
+#: src/inventory_tng/templates/devices/devices.html
+msgid "How many codes"
 msgstr ""
 
 #: src/inventory_tng/catalogue/forms.py
@@ -1944,6 +1968,10 @@ msgstr ""
 msgid "Make a registration code"
 msgstr ""
 
+#: src/inventory_tng/templates/devices/code.html
+msgid "Make another like this"
+msgstr ""
+
 #: src/inventory_tng/templates/labels/labels.html
 #, python-format
 msgid ""
@@ -2071,6 +2099,10 @@ msgstr ""
 msgid ""
 "New recovery codes were just made for your administrator account on "
 "%(brand)s. The ones you had no longer work."
+msgstr ""
+
+#: src/inventory_tng/devices/devices_routes.py
+msgid "New registration codes"
 msgstr ""
 
 #: src/inventory_tng/templates/_listing.html
@@ -2733,8 +2765,15 @@ msgstr ""
 msgid "Print the ones picked"
 msgstr ""
 
+#: src/inventory_tng/templates/devices/code_made.html
 #: src/inventory_tng/templates/labels/labels_print.html
 msgid "Print them"
+msgstr ""
+
+#: src/inventory_tng/templates/devices/code_made.html
+msgid ""
+"Print them now: the phrases are never shown again. If the print dialog "
+"offers paper sizes, pick the same one there."
 msgstr ""
 
 #: src/inventory_tng/labels/labels_routes.py
@@ -4363,6 +4402,11 @@ msgstr ""
 #: src/inventory_tng/catalogue/reading_rules.py
 #, python-format
 msgid "alias %(id)d (%(name)s)"
+msgstr ""
+
+#: src/inventory_tng/templates/devices/devices.html
+#, python-format
+msgid "alike, up to %(most)s, printed on one sheet"
 msgstr ""
 
 #: src/inventory_tng/templates/devices/device_list.html

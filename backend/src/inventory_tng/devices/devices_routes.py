@@ -3,7 +3,9 @@ from the browser. Making or revoking a code, and revoking a device, are
 sensitive: they ask for a fresh code (guards.ConfirmedAdmin).
 
 A code's phrase is shown once, as it is made, with the link and QR code that
-open the registration page with it filled in; only its hash is kept.
+open the registration page with it filled in; only its hash is kept. Several
+made together print on one sheet, and a lost printout is replaced by another
+code like it (Ali, 2026-11-19).
 """
 
 from datetime import datetime, timedelta
@@ -64,6 +66,7 @@ CODE_REVOKED = lazy_gettext(
 DEVICE_REVOKED = lazy_gettext("Revoked: it can't save anything now.")
 add_notices({"code_revoked": CODE_REVOKED, "device_revoked": DEVICE_REVOKED})
 NEW_CODE_TITLE = lazy_gettext("A new registration code")
+NEW_CODES_TITLE = lazy_gettext("New registration codes")
 REGISTERED_DEVICES = lazy_gettext("Registered devices")
 
 
@@ -143,6 +146,7 @@ def _list_page(
             "zone": site_zone(session),
             "max_uses": forms.MAX_USES,
             "max_days": forms.MAX_DAYS,
+            "max_codes": forms.MAX_CODES,
             "problems": problems,
             "values": values,
         },
@@ -169,44 +173,59 @@ def codes(
 
 
 @router.post(CODES)
-def make_code(
+def make_codes(
     request: Request,
     signed: ConfirmedAdmin,
     session: DbSession,
     uses: Annotated[str, Form()] = "1",
     days: Annotated[str, Form()] = "1",
     label: Annotated[str, Form()] = "",
+    count: Annotated[str, Form()] = "1",
     single_use: SingleUseKey = "",
 ) -> Response:
-    form = {"uses": uses, "days": days, "label": label}
-    label = label.strip()
-    max_uses, lifetime, problems = forms.code_settings(uses, days, label)
-    if problems or max_uses is None or lifetime is None:
+    """As many codes as asked, alike, shown together to print on one sheet
+    (Ali, 2026-11-19)."""
+    form = {"uses": uses, "days": days, "label": label, "count": count}
+    settings, problems = forms.code_settings(uses, days, label, count)
+    if settings is None:
         return _list_page(request, session, signed, problems=problems, values=form)
     if again := sent_before(
         request, session, signed, single_use, "registration_code", DEVICES
     ):
         return again
-    code, phrase = devices.create_code(
+    made = devices.create_codes(
         session,
-        max_uses=max_uses,
-        lifetime=timedelta(days=lifetime),
-        label=label or None,
+        settings.count,
+        max_uses=settings.max_uses,
+        lifetime=timedelta(days=settings.days),
+        label=settings.label,
     )
     changed(signed, session)
-    link = site_link(request, REGISTER_PATH, code=phrase)
+    return _made_page(request, signed, session, made, (DEVICES, SECTION_DEVICES))
+
+
+def _made_page(
+    request: Request,
+    signed: SignedIn,
+    session: Session,
+    made: list[tuple[RegistrationCode, str]],
+    back_link: tuple[str, Words],
+) -> HTMLResponse:
+    """New codes, alike, each with its phrase, link and QR code, shown only
+    now, ready to print on one sheet."""
+    links = [site_link(request, REGISTER_PATH, code=phrase) for _, phrase in made]
     return admin_page(
         request,
         signed,
         "devices/code_made.html",
         {
-            "title": NEW_CODE_TITLE,
-            "back_link": (DEVICES, SECTION_DEVICES),
-            "code": code,
-            "phrase": phrase,
-            "link": link,
+            "title": NEW_CODE_TITLE if len(made) == 1 else NEW_CODES_TITLE,
+            "back_link": back_link,
+            "codes": [
+                (code, phrase, link, qr_svg(link))
+                for (code, phrase), link in zip(made, links, strict=True)
+            ],
             "register": site_link(request, REGISTER_PATH),
-            "qr": qr_svg(link),
             "zone": site_zone(session),
         },
     )
@@ -220,6 +239,7 @@ def code(
     registered = devices.devices_registered_with(session, code_id)
     if found is None or registered is None:
         return not_found()
+    at = now()
     return admin_page(
         request,
         signed,
@@ -229,12 +249,39 @@ def code(
             "here": f"{CODES}/{found.id}",
             "back_link": (DEVICES, SECTION_DEVICES),
             "code": found,
-            "state": state(found, now()),
+            "state": state(found, at),
             "state_words": STATE_WORDS,
+            "has_left": devices.has_left(found, at),
             "devices": registered,
             "zone": site_zone(session),
         },
     )
+
+
+@router.post(f"{CODES}/{{code_id}}/another")
+def make_another(
+    request: Request,
+    signed: ConfirmedAdmin,
+    session: DbSession,
+    code_id: int,
+    single_use: SingleUseKey = "",
+) -> Response:
+    """Another code like this one, with a phrase of its own, to print in
+    place of a lost printout (Ali, 2026-11-19). One with nothing left goes
+    back to its page, which says why."""
+    found = session.get(RegistrationCode, code_id)
+    if found is None:
+        return not_found()
+    here = f"{CODES}/{code_id}"
+    if not devices.has_left(found, now()):
+        return redirect(here)
+    if again := sent_before(
+        request, session, signed, single_use, "registration_code", here
+    ):
+        return again
+    made = devices.another_like(session, found)
+    changed(signed, session)
+    return _made_page(request, signed, session, [made], (here, found.name))
 
 
 @router.get(f"{CODES}/{{code_id}}/revoke")

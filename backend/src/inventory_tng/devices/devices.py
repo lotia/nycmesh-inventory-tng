@@ -55,6 +55,9 @@ ATTEMPTS = RateLimitItemPerMinute(10)
 BadCode = Literal["unknown", "expired", "used_up", "revoked"]
 Rejection = BadCode | Literal["rate_limited"]
 Refusal = Literal["unregistered", "revoked"]
+# How a code was made: a new one, or another like one whose printout was
+# lost (another_like).
+MadeHow = Literal["new", "another"]
 
 registered = meter.create_counter(
     "inventory.devices.registered",
@@ -65,6 +68,11 @@ rejected = meter.create_counter(
     "inventory.registrations.rejected",
     unit="{registration}",
     description="Registration attempts refused, by reason",
+)
+made = meter.create_counter(
+    "inventory.registration_codes.made",
+    unit="{code}",
+    description="Registration codes made, by how: new, or another like one",
 )
 revoked = meter.create_counter(
     "inventory.devices.revoked",
@@ -103,21 +111,74 @@ def create_code(
     label: str | None = None,
 ) -> tuple[RegistrationCode, str]:
     """A new code, and its phrase: the only time the phrase is known."""
+    return create_codes(session, 1, max_uses=max_uses, lifetime=lifetime, label=label)[
+        0
+    ]
+
+
+def create_codes(
+    session: Session,
+    count: int,
+    *,
+    max_uses: int,
+    lifetime: timedelta,
+    label: str | None = None,
+) -> list[tuple[RegistrationCode, str]]:
+    """`count` new codes alike, to print together, each with its phrase, as
+    create_code makes one: they expire at the same moment."""
+    expires_at = datetime.now(UTC) + lifetime
+    return [
+        _new_code(session, max_uses, expires_at, label, "new") for _ in range(count)
+    ]
+
+
+def has_left(code: RegistrationCode, at: datetime) -> bool:
+    """Whether the code has uses and time left at `at`, revoked or not:
+    what another_like would copy."""
+    return code.expires_at > at and code.uses < code.max_uses
+
+
+def another_like(
+    session: Session, code: RegistrationCode
+) -> tuple[RegistrationCode, str]:
+    """A new code with the uses `code` has left, until it expires, under its
+    label, and its phrase: to print in place of a lost printout, as the
+    phrase is never kept (Ali, 2026-11-19). The caller checks has_left."""
+    return _new_code(
+        session,
+        code.max_uses - code.uses,
+        code.expires_at,
+        code.label,
+        "another",
+        like=code.id,
+    )
+
+
+def _new_code(
+    session: Session,
+    max_uses: int,
+    expires_at: datetime,
+    label: str | None,
+    how: MadeHow,
+    like: int | None = None,
+) -> tuple[RegistrationCode, str]:
     phrase = new_phrase()
     code = RegistrationCode(
         phrase_hash=digest(phrase),
         label=label,
         max_uses=max_uses,
-        expires_at=datetime.now(UTC) + lifetime,
+        expires_at=expires_at,
     )
     session.add(code)
     session.flush()
+    once_committed(session, made.add, 1, {"how": how})
     once_committed(
         session,
         log.info,
         "registration code created",
         registration_code_id=code.id,
         max_uses=max_uses,
+        like_registration_code_id=like,
     )
     return code, phrase
 

@@ -22,6 +22,10 @@ someone remote. Making one asks for a fresh code.{% endtrans %}</p>
       <input name="days" type="number" min="1" max="{{ max_days }}" value="{{ values.get('days', '1') }}" required>
       {% with name = "days" %}{% include "_field_problem.html" %}{% endwith %}
     </label>
+    <label>{% trans %}How many codes{% endtrans %} <span class="hint">{% trans most=max_codes %}alike, up to {{ most }}, printed on one sheet{% endtrans %}</span>
+      <input name="count" type="number" min="1" max="{{ max_codes }}" value="{{ values.get('count', '1') }}" required>
+      {% with name = "count" %}{% include "_field_problem.html" %}{% endwith %}
+    </label>
     <button class="primary">{% trans %}Make a code{% endtrans %}</button>
   </form>
 </section>

@@ -1,6 +1,7 @@
 /**
  * A registration code prints cleanly (inventory-tng-8i4.61, 8i4.60.9): only
- * the code, one to a page, on US Letter or A4.
+ * the code, one to a page, on US Letter or A4; up to four made together
+ * share one page, two by two (8i4.73).
  */
 import { expect, type Page } from "@playwright/test";
 import { test } from "./csp-violations";
@@ -42,6 +43,32 @@ test("the code fits one page of each paper", async ({ page, browserName }) => {
   test.skip(browserName !== "chromium", "only Chromium prints to PDF");
   // As long a label as the server takes (admin.common.NAME_MAX).
   await makeCode(page, "A label ".repeat(25));
+  const sizes = { "US Letter": "612x792", A4: "595x842" };
+  for (const [paper, size] of Object.entries(sizes)) {
+    await page.getByLabel(paper).check();
+    const pdf = await page.pdf({ preferCSSPageSize: true });
+    expect(pages(pdf), paper).toEqual([size]);
+  }
+});
+
+test("four codes made together share a page, two by two", async ({ page }) => {
+  await makeCode(page, "A label ".repeat(25), undefined, 4);
+  await page.emulateMedia({ media: "print" });
+  const cards = sheet(page).locator(".print-card");
+  await expect(cards).toHaveCount(4);
+  const lefts = await Promise.all(
+    (await cards.all()).map(async (card) => (await card.boundingBox())?.x),
+  );
+  // Two columns: the first and third cards in one, the second and fourth
+  // in the other.
+  expect(lefts[0]).toBe(lefts[2]);
+  expect(lefts[1]).toBe(lefts[3]);
+  expect(lefts[0]).not.toBe(lefts[1]);
+});
+
+test("four codes fit one page of each paper", async ({ page, browserName }) => {
+  test.skip(browserName !== "chromium", "only Chromium prints to PDF");
+  await makeCode(page, "A label ".repeat(25), undefined, 4);
   const sizes = { "US Letter": "612x792", A4: "595x842" };
   for (const [paper, size] of Object.entries(sizes)) {
     await page.getByLabel(paper).check();

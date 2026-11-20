@@ -14,7 +14,12 @@ from sqlalchemy.orm import Session
 from inventory_tng.core.phrases import compiled, speaking
 from inventory_tng.devices import devices
 from inventory_tng.devices.devices_routes import revoke_many_title
-from inventory_tng.devices.forms import AFTER_FROM, days_problem, uses_problem
+from inventory_tng.devices.forms import (
+    AFTER_FROM,
+    codes_problem,
+    days_problem,
+    uses_problem,
+)
 from inventory_tng.devices.paths import BULK_REVOKE, CODES, DEVICE_LIST, DEVICES
 from inventory_tng.models.devices import Device, RegistrationCode
 from inventory_tng.models.site_settings import SiteSettings
@@ -146,6 +151,118 @@ def test_changes_here_ask_for_a_fresh_code(
     assert asked.status_code == 403
     assert "needs a fresh" in text(asked)
     assert session.scalars(select(RegistrationCode)).first() is None
+
+
+def test_up_to_four_codes_are_made_together_on_one_sheet(
+    admin_client: TestClient,
+    session: Session,
+    make_client: Callable[..., TestClient],
+) -> None:
+    """Alike, each with its own phrase, printed two by two (Ali,
+    2026-11-19)."""
+    made = admin_client.post(
+        CODES, data=single_use(uses="1", days="1", label="Training", count="4")
+    )
+    assert made.status_code == 200
+    shown = read(made.text)
+    phrases = [key.text for key in shown.all("p", class_="key")]
+    assert len(set(phrases)) == 4
+    (sheet,) = shown.all("*", class_="print-sheet")
+    assert "code-sheet" in sheet.classes
+    assert len(sheet.all("*", class_="print-card")) == 4
+    codes = session.scalars(select(RegistrationCode)).all()
+    assert [(c.label, c.max_uses) for c in codes] == [("Training", 1)] * 4
+    assert len({c.expires_at for c in codes}) == 1
+    for n, phrase in enumerate(phrases):
+        phone = make_client(admin_client.app, address=f"192.0.2.{60 + n}")
+        assert phone.post("/api/devices", json={"code": phrase}).status_code == 201
+
+
+def test_one_code_fills_its_sheet(admin_client: TestClient) -> None:
+    made, _ = make_code(admin_client)
+    (sheet,) = read(made.text).all("*", class_="print-sheet")
+    assert "code-sheet" not in sheet.classes
+    assert not sheet.all("*", class_="print-card")
+
+
+def test_how_many_codes_is_limited(admin_client: TestClient, session: Session) -> None:
+    for count in ("0", "5", "many"):
+        refused, _ = make_code(admin_client, count=count)
+        assert refused.status_code == 400
+        assert str(codes_problem(4)) in text(refused)
+    assert session.scalars(select(RegistrationCode)).first() is None
+
+
+def make_another(client: TestClient, code_id: int) -> tuple[Response, str]:
+    made = client.post(f"{CODES}/{code_id}/another", data=single_use())
+    shown = read(made.text).all("p", class_="key")
+    return made, shown[0].text if shown else ""
+
+
+def test_another_like_a_code_has_what_it_has_left(
+    admin_client: TestClient, session: Session
+) -> None:
+    """In place of a lost printout: a new phrase, the uses left, the same
+    expiry and label (Ali, 2026-11-19). The old one registers until
+    revoked."""
+    _, phrase = make_code(admin_client, uses="3")
+    devices.register(session, phrase, "192.0.2.52")
+    old = session.scalars(select(RegistrationCode)).one()
+    path = f"{CODES}/{old.id}"
+    assert ("post", f"{path}/another") in forms(admin_client.get(path).text)
+    made, other = make_another(admin_client, old.id)
+    assert made.status_code == 200
+    assert made.headers["cache-control"] == "no-store"
+    assert other
+    assert other != phrase
+    assert path in [to for _, to in links(made.text)]  # Back to the old one.
+    new = session.scalars(
+        select(RegistrationCode).where(RegistrationCode.id != old.id)
+    ).one()
+    assert (new.label, new.max_uses, new.uses) == ("Open day", 2, 0)
+    assert new.expires_at == old.expires_at
+    assert (history(session, "registration_code", new.id)[0].actor or "").startswith(
+        "admin:"
+    )
+    devices.register(session, other, "192.0.2.53")
+    devices.register(session, phrase, "192.0.2.54")
+
+
+def test_another_is_offered_while_a_code_has_uses_and_time_left(
+    admin_client: TestClient, session: Session
+) -> None:
+    """Revoked too, as revoking the lost one may come first."""
+    _, phrase = make_code(admin_client, uses="1")
+    code = session.scalars(select(RegistrationCode)).one()
+    path = f"{CODES}/{code.id}"
+    admin_client.post(f"{path}/revoke")
+    assert ("post", f"{path}/another") in forms(admin_client.get(path).text)
+    code.revoked_at = None
+    devices.register(session, phrase, "192.0.2.55")
+    for _ in ("used up", "expired"):
+        assert ("post", f"{path}/another") not in forms(admin_client.get(path).text)
+        refused = admin_client.post(f"{path}/another", data=single_use())
+        assert refused.headers["location"] == path
+        assert session.scalars(select(RegistrationCode)).all() == [code]
+        code.uses, code.expires_at = 0, datetime.now(UTC) - timedelta(minutes=1)
+        session.flush()
+    assert admin_client.post(f"{CODES}/999999/another").status_code == 404
+
+
+def test_another_asks_for_a_fresh_code_and_is_made_once(
+    admin_client: TestClient, session: Session
+) -> None:
+    make_code(admin_client)
+    code = session.scalars(select(RegistrationCode)).one()
+    form = single_use()
+    assert admin_client.post(f"{CODES}/{code.id}/another", data=form).status_code == 200
+    again = admin_client.post(f"{CODES}/{code.id}/another", data=form)
+    assert again.status_code == 409
+    assert len(session.scalars(select(RegistrationCode)).all()) == 2
+    confirmed_long_ago(session)
+    asked, _ = make_another(admin_client, code.id)
+    assert asked.status_code == 403
+    assert len(session.scalars(select(RegistrationCode)).all()) == 2
 
 
 def test_unknown_codes_and_devices_are_not_found(admin_client: TestClient) -> None:

@@ -1,28 +1,53 @@
 {% extends "admin_base.html" %}
 {% from "_print_controls.html" import print_controls %}
 {% block main %}
-<p><strong>{% trans %}Shown only now.{% endtrans %}</strong> {% trans count=code.max_uses, until=code.expires_at | when(zone) %}It registers up to {{ count }}
+{#- One code, or several alike made together (devices_routes._made_page).
+With several, a section each, so the headings in it are under its own. #}
+{% set several = codes | length > 1 %}
+{% set first = codes[0][0] %}
+{% set h = "h3" if several else "h2" %}
+<p><strong>{% trans %}Shown only now.{% endtrans %}</strong>
+{% if several %}{% trans count=first.max_uses, until=first.expires_at | when(zone) %}Each registers up to {{ count }}
+device, until {{ until }}.{% pluralize %}Each registers up to {{ count }}
+devices, until {{ until }}.{% endtrans %}
+{% else %}{% trans count=first.max_uses, until=first.expires_at | when(zone) %}It registers up to {{ count }}
 device, until {{ until }}.{% pluralize %}It registers up to {{ count }}
-devices, until {{ until }}.{% endtrans %}</p>
-<h2>{% trans %}Scan this with the phone's camera{% endtrans %}</h2>
-<div class="qr">{{ qr }}</div>
-<h2>{% trans %}Or type this phrase{% endtrans %}</h2>
-<p class="key">{{ phrase }}</p>
-<p class="hint">{% trans link=link %}at <a href="{{ link }}">the registration page</a>, in the browser the
-volunteer will use for the scan page.{% endtrans %}</p>
+devices, until {{ until }}.{% endtrans %}{% endif %}</p>
+{% for code, phrase, link, qr in codes %}
+<section>
+  {% if several %}<h2>{% trans number=code.id %}Code {{ number }}{% endtrans %}</h2>{% endif %}
+  <{{ h }}>{% trans %}Scan this with the phone's camera{% endtrans %}</{{ h }}>
+  <div class="qr">{{ qr }}</div>
+  <{{ h }}>{% trans %}Or type this phrase{% endtrans %}</{{ h }}>
+  <p class="key">{{ phrase }}</p>
+  <p class="hint">{% trans link=link %}at <a href="{{ link }}">the registration page</a>, in the browser the
+  volunteer will use for the scan page.{% endtrans %}</p>
+</section>
+{% endfor %}
 
-{#- Printing (styles.css): the paper, then what prints, one code to a page. #}
+{#- Printing (styles.css): the paper, then what prints. One code fills its
+page; several share one, two by two. #}
 <div class="printable">
+  {% if several %}
+  {% call print_controls(_("Print them")) %}{% trans %}Print them now: the phrases are never
+  shown again. If the print dialog offers paper sizes, pick the same one
+  there.{% endtrans %}{% endcall %}
+  {% else %}
   {% call print_controls(_("Print it")) %}{% trans %}Print it now: the phrase is never shown
   again. If the print dialog offers paper sizes, pick the same one there.{% endtrans %}{% endcall %}
-  <div class="print-sheet">
-    <p class="print-title">{% trans brand=BRAND %}Register your phone for {{ brand }}{% endtrans %}</p>
-    <div class="qr">{{ qr }}</div>
-    <p>{% trans %}Scan this with your phone's camera.{% endtrans %}</p>
-    <p>{% trans register=register, phrase=phrase %}Or open <strong>{{ register }}</strong> and type
-      <span class="key">{{ phrase }}</span>{% endtrans %}</p>
-    {% if code.label %}<p class="print-small">{{ code.label }}</p>{% endif %}
-    <p class="print-small">{% trans until=code.expires_at | when(zone) %}Until {{ until }}{% endtrans %}</p>
+  {% endif %}
+  <div class="print-sheet{% if several %} code-sheet{% endif %}">
+    {% for code, phrase, link, qr in codes %}
+    <div{% if several %} class="print-card"{% endif %}>
+      <p class="print-title">{% trans brand=BRAND %}Register your phone for {{ brand }}{% endtrans %}</p>
+      <div class="qr">{{ qr }}</div>
+      <p>{% trans %}Scan this with your phone's camera.{% endtrans %}</p>
+      <p>{% trans register=register, phrase=phrase %}Or open <strong>{{ register }}</strong> and type
+        <span class="key">{{ phrase }}</span>{% endtrans %}</p>
+      {% if code.label %}<p class="print-small">{{ code.label }}</p>{% endif %}
+      <p class="print-small">{% trans until=code.expires_at | when(zone) %}Until {{ until }}{% endtrans %}</p>
+    </div>
+    {% endfor %}
   </div>
 </div>
 
