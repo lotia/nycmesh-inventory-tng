@@ -87,7 +87,7 @@ from helpers.sign_in import (
     reset_link,
     sign_in_with,
 )
-from helpers.stock import Place, Spools, committed_place
+from helpers.stock import Place, Spools, committed_place, sealed_line
 
 NEW_PASSWORD = "a long passphrase of their own"
 
@@ -1341,20 +1341,13 @@ def test_the_last_of_a_retired_package_sent_twice_at_once_is_written_once(
     written, rather than refusing it as none left (batch.record)."""
     setup = own_committed.session()
     spools = Spools(setup)
-    spools.write(
-        {"kind": "install", "from_location_id": spools.store.id},
-        Entry(spools.cable.id, Decimal(305), spools.sealed),
-    )
+    spools.install(spools.store.id)
     spools.spool.retired_at = NOW
     setup.commit()
-    line = {
-        "item_id": spools.cable.id,
-        "quantity": "305",
-        "package_id": spools.spool.id,
-        "package_size": "305",
-    }
     batch = Batch.model_validate(
-        spools.place.batch(kind="install", to_location_id=None, lines=[line])
+        spools.place.batch(
+            kind="install", to_location_id=None, lines=[sealed_line(spools, "305")]
+        )
     )
     one, two = own_committed.session(), own_committed.session()
     first, wrote, *_ = record(one, batch, device_id=None)

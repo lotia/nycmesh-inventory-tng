@@ -94,10 +94,16 @@ def _retired_left(
     )
 
 
-def _left_at_current[*T](query: Select[*T], summed: Subquery) -> Select[*T]:
-    """`query` of `summed`'s rows with some left at a current place."""
+def _left_at_current[*T](
+    query: Select[*T], summed: Subquery, *, at: int | None = None
+) -> Select[*T]:
+    """`query` of `summed`'s rows with some left at a current place, or at
+    the place `at`, even retired."""
+    current = Location.retired_at.is_(None)
+    if at is not None:
+        current = or_(current, Location.id == at)
     return query.join(Location, Location.id == summed.c.location_id).where(
-        Location.retired_at.is_(None), summed.c.quantity > 0
+        current, summed.c.quantity > 0
     )
 
 
@@ -119,18 +125,9 @@ def sealed_somewhere(
     """Which of these packages have some sealed at a current place, as
     retired_packages_in_stock reads them, or at the place `at`, even
     retired."""
-    if not package_ids:
-        return set()
-    query = (
-        select(by_form.c.package_id)
-        .join(Location, Location.id == by_form.c.location_id)
-        .where(
-            or_(Location.retired_at.is_(None), Location.id == at),
-            by_form.c.quantity > 0,
-            by_form.c.package_id.in_(list(package_ids)),
-        )
-    )
-    return set(session.scalars(query.distinct()))
+    query = _left_at_current(select(by_form.c.package_id), by_form, at=at)
+    query = query.where(by_form.c.package_id.in_(package_ids)).distinct()
+    return set(session.scalars(query))
 
 
 def sealed_places(session: Session) -> dict[int, dict[int, Decimal]]:

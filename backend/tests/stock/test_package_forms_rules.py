@@ -45,7 +45,7 @@ from helpers.package_forms import (
 )
 from helpers.rows import add, breaks, tag, violates
 from helpers.sign_in import new_admin_id
-from helpers.stock import Spools
+from helpers.stock import Spools, retire
 
 STORE, VAN = 100, 101
 
@@ -415,25 +415,17 @@ def test_a_retired_package_is_taken_until_none_is_left_sealed(
     any stock is (docs/decisions/0003); once none is left sealed at any
     current place, never taken again (0003, Amendment, 2026-11-19)."""
     store, van = spools.store.id, spools.van.id
-    spools.spool.retired_at = datetime.now(UTC)
-    session.flush()
-
-    def install(place: int, metres: int) -> object:
-        return spools.write(
-            {"kind": "install", "from_location_id": place},
-            Entry(spools.cable.id, Decimal(metres), spools.sealed),
-        )
-
+    retire(session, spools.spool)
     assert spools.move(
         Entry(spools.cable.id, Decimal(305), spools.sealed, spools.sealed)
     )
-    assert install(store, 610)
-    assert install(van, 305)
+    assert spools.install(store, 610)
+    assert spools.install(van)
     assert quantities_by_form(session, spools.cable) == {
         (store, spools.spool.id, None): -305
     }
     with breaks(session, "movement_retired_package_none_left"):
-        install(store, 305)
+        spools.install(store)
     with breaks(session, "movement_retired_package_none_left"):
         spools.move(Entry(spools.cable.id, Decimal(305), spools.sealed, spools.sealed))
 
@@ -445,22 +437,14 @@ def test_a_retired_package_left_only_at_a_retired_place_is_taken_from_there(
     is there (docs/decisions/0003), sealed too, though no current place
     has any; from another place, it is refused."""
     store, van = spools.store.id, spools.van.id
-
-    def install(place: int) -> object:
-        return spools.write(
-            {"kind": "install", "from_location_id": place},
-            Entry(spools.cable.id, Decimal(305), spools.sealed),
-        )
-
-    assert install(store)
+    assert spools.install(store)
     assert spools.move(
         Entry(spools.cable.id, Decimal(305), spools.sealed, spools.sealed)
     )
-    spools.spool.retired_at = spools.van.retired_at = datetime.now(UTC)
-    session.flush()
+    retire(session, spools.spool, spools.van)
     with breaks(session, "movement_retired_package_none_left"):
-        install(store)
-    assert install(van)
+        spools.install(store)
+    assert spools.install(van)
     assert quantities_by_form(session, spools.cable) == {}
 
 

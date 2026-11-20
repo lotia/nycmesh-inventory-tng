@@ -252,6 +252,13 @@ class Spools:
         }
         return self.write(header, *lines)
 
+    def install(self, place: int, metres: int = 305) -> LedgerTransaction | None:
+        """Sealed spools of `metres` installed from `place`."""
+        return self.write(
+            {"kind": "install", "from_location_id": place},
+            Entry(self.cable.id, Decimal(metres), self.sealed),
+        )
+
 
 def length(made: OpenPackage, left: str) -> dict[str, str]:
     """A batch's report of what is really on an open package."""

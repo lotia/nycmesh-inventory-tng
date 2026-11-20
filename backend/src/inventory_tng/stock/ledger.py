@@ -138,9 +138,8 @@ def tracks_opened(item: bool, package: bool | None) -> bool:
 class PackageFacts(NamedTuple):
     """What the ledger's rules read of a package: its item, its size,
     whether opening one makes an open package (tracks_opened), whether it
-    is retired, and, read only for a retired one a line takes sealed,
-    whether none is left sealed at a current place nor at the place it is
-    taken from."""
+    is retired, and whether a line takes it sealed with none left
+    (_none_sealed)."""
 
     item_id: int
     size: Decimal
@@ -179,9 +178,8 @@ def form_breaks(
     - No form outside: what comes from or goes outside is loose.
     - A sealed side names a package of the line's item, and moves a whole
       number of them; a retired package is never received, as a retired
-      item is not (0003), nor taken by a volunteer once none is left
-      sealed at a current place nor at the place it is taken from (0003,
-      Amendment, 2026-11-19).
+      item is not (0003), nor taken once none is left sealed (_none_sealed;
+      0003, Amendment, 2026-11-19).
     - An open side names an open package of the line's item, not closed,
       at that side's place, but for one moved whole: all that is left on it
       leaves one place and arrives at the other. One not yet filled is
@@ -203,7 +201,7 @@ def form_breaks(
                 broken.append("movement_whole_packages")
             if package is not None and package.retired and kind == "receipt":
                 broken.append("receipt_retired_package")
-            taken = not arriving and place is not None and kind in TAKES
+            taken = not arriving and kind in TAKES
             if package is not None and package.none_sealed and taken:
                 broken.append("movement_retired_package_none_left")
         if form.open_package_id is not None:
@@ -419,15 +417,6 @@ def hold_forms(
     return packages, facts, opened
 
 
-def waited(
-    packages: Mapping[int, PackageFacts], opens: Mapping[int, OpenFacts]
-) -> bool:
-    """Whether hold_forms held rows a request writing the same transaction
-    changes, so a form rule could refuse what that request wrote: open
-    packages, or a retired package with none left sealed."""
-    return bool(opens) or any(package.none_sealed for package in packages.values())
-
-
 def _none_sealed(
     session: Session,
     header: Mapping[str, object],
@@ -503,11 +492,8 @@ def insert_transaction(
             enforce(rule)
     packages, opens, opened = hold_forms(session, header, lines)
     # The form rules read what the transaction itself changes, so one sent
-    # again is found before them: the open packages' and retired packages'
-    # locks waited for it.
-    if waited(packages, opens) and exists_where(
-        session, LedgerTransaction.idempotency_key == key
-    ):
+    # again is found before them: the locks just taken waited for it.
+    if exists_where(session, LedgerTransaction.idempotency_key == key):
         return None
     places = (_place(header, "from_location_id"), _place(header, "to_location_id"))
     for line in lines:

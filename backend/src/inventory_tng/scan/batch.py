@@ -40,7 +40,6 @@ from inventory_tng.stock.ledger import (
     insert_transaction,
     lines_break,
     repeated,
-    waited,
 )
 
 log = structlog.get_logger(__name__)
@@ -165,10 +164,9 @@ def record(
     packages, opens, rows = hold_forms(
         session, header, lines, also={*reports.values(), *measured.values()}
     )
-    # Its open packages' and retired packages' locks waited for any request
-    # writing it, which a form rule would refuse, as it changed them: found
-    # as written instead.
-    if waited(packages, opens) and (written := _replay(session, batch)) is not None:
+    # Their locks waited for any request writing it, which a form rule
+    # would refuse, as it changed them: found as written instead.
+    if (written := _replay(session, batch)) is not None:
         return Recorded(written, False)
     problems = _problems(session, batch, held, lines, packages, opens)
     problems += [

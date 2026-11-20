@@ -71,6 +71,7 @@ from helpers.stock import (
     received,
     report,
     retire,
+    sealed_line,
     stocked,
     write,
 )
@@ -709,22 +710,13 @@ def test_counts_a_take_of_a_retired_package_none_left_as_invalid(
 ) -> None:
     client, _, reader, _ = rolled_back
     spools = Spools(session)
-    spools.write(
-        {"kind": "install", "from_location_id": spools.store.id},
-        ledger.Entry(spools.cable.id, Decimal(610), spools.sealed),
-    )
-    spools.spool.retired_at = datetime.now(UTC)
-    session.flush()
+    spools.install(spools.store.id, 610)
+    retire(session, spools.spool)
     before = counted(reader, "inventory.transactions.refused")
     _, token = new_device(session)
     client.cookies.set(devices.COOKIE, token)
-    line = {
-        "item_id": spools.cable.id,
-        "quantity": "305",
-        "package_id": spools.spool.id,
-        "package_size": "305",
-    }
-    response = client.post("/api/transactions", json=spools.place.batch(lines=[line]))
+    batch = spools.place.batch(lines=[sealed_line(spools, "305")])
+    response = client.post("/api/transactions", json=batch)
     client.cookies.clear()
     assert response.status_code == 422
     added_now = added(reader, "inventory.transactions.refused", before)

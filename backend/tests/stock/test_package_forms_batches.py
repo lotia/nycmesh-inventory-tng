@@ -13,7 +13,7 @@ from inventory_tng.scan.batch_schemas import BodyRefusedReply, SizeProblem
 
 from helpers.package_forms import quantities_by_form
 from helpers.rows import add, tag
-from helpers.stock import URL, Spools, sealed_line
+from helpers.stock import URL, Spools, retire, sealed_line
 
 # The scan page's batches (POST /api/transactions): sealed packages stay
 # sealed.
@@ -229,8 +229,7 @@ def test_a_retired_package_with_none_left_sealed_is_never_taken(
         kind="install", to_location_id=None, lines=[sealed_line(spools, "610")]
     )
     assert registered_client.post(URL, json=gone).status_code == 201
-    spools.spool.retired_at = datetime.now(UTC)
-    session.flush()
+    retire(session, spools.spool)
     before = quantities_by_form(session, spools.cable)
     loose = {"item_id": spools.cable.id, "quantity": "5"}
     move = spools.place.batch(lines=[loose, sealed_line(spools, "305")])
