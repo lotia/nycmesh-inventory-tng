@@ -195,8 +195,8 @@ describe("queueing", () => {
     await vi.waitFor(() =>
       expect(states(outbox)).toEqual(["refused", "saved"]),
     );
-    const bodies = await Promise.all(sent.map((each) => each.clone().json()));
-    expect(bodies.map((each) => each.key)).toEqual([key, key]);
+    const posted = await bodies(sent);
+    expect(posted.map((each) => each.key)).toEqual([key, key]);
     // The refused one, under a key of its own, is not taken as saved.
     expect(outbox.entries.value[0]?.body.key).not.toBe(key);
     expect(outbox.entries.value[0]?.reason?.code).toBe("refused");

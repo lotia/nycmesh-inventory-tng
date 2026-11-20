@@ -38,7 +38,7 @@ function setOnline(onLine: MockInstance<() => boolean>, online: boolean) {
   });
 }
 
-describe("filling and saving a cart", () => {
+describe("the batches listed in the outbox", () => {
   test("a refused batch says why in the alert's style, and lists its lines", async () => {
     const detail = [
       { type: "not_whole", loc: ["body", "lines", 1, "quantity"] },

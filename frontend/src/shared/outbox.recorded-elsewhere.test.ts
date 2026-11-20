@@ -2,6 +2,7 @@ import { v4 as uuid } from "uuid";
 import { describe, expect, test, vi } from "vitest";
 import { answering, json, keyReused, saved, TOO_OLD } from "../testing/fetch";
 import {
+  bodies,
   draft,
   entry,
   named,
@@ -305,9 +306,9 @@ describe("what another tab recorded (inventory-tng-0gg)", () => {
     await vi.waitFor(() => expect(sent).toHaveLength(1));
     expect(outbox.queue(changed(), named("b"), key)).toBe("refused");
     await outbox.send();
-    const bodies = await Promise.all(sent.map((each) => each.clone().json()));
-    expect(bodies.map((body) => body.lines[0].quantity)).toEqual(
-      bodies.map(() => "3"),
+    const posted = await bodies(sent);
+    expect(posted.map((body) => body.lines[0].quantity)).toEqual(
+      posted.map(() => "3"),
     );
   });
 

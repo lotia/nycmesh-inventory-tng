@@ -198,6 +198,15 @@ short test. `core/` is the name FastAPI's full-stack template uses;
   `placeSides` and `Repeats` left `scan/label-codes.ts`, and
   `browser-tests/labels.ts` became `print-labels.ts`
   (inventory-tng-u3fp.12).
+- On 2026-11-20 three oversized frontend test files were split by aspect
+  (inventory-tng-vtda.13): `shared/outbox.test.ts` into a
+  `shared/outbox.<aspect>.test.ts` per describe group,
+  `scan/ScanPage.older-build.test.tsx` into
+  `ScanPage.older-build-list.test.tsx` and
+  `ScanPage.older-build-recorded.test.tsx`, and from
+  `scan/ScanPage.cart.test.tsx` its open packages and its outbox went to
+  `ScanPage.open-packages.test.tsx` and `ScanPage.outbox.test.tsx`. What
+  the parts share is in `testing/outbox.ts` and `testing/older-list.ts`.
 - Older decision records keep the paths of their time. The tables below
   give each old path's new home; a later move adds its rows.
 
@@ -465,7 +474,9 @@ searched for (AGENTS.md rule 12).
 - **In the frontend**, components are PascalCase, named for the
   component; other modules are kebab-case, named for what they hold, as
   `testing/scan-page.tsx`. Tests sit beside them, as `<module>.test.ts` or
-  `<Component>.<aspect>.test.tsx`.
+  `<Component>.<aspect>.test.tsx`, and a module's tests too many for one
+  file as `<module>.<aspect>.test.ts` (Amendment, 2026-11-20,
+  inventory-tng-vtda.13).
 
 We rejected prefixing the role files with their feature
 (`stock/stock_queries.py`) and suffixing the models' modules

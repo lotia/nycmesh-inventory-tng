@@ -18,7 +18,7 @@ import {
 // The camera, faked: it sees whatever a test puts in `inView`.
 vi.mock("./camera", () => ({ openCamera: vi.fn() }));
 
-describe("filling and saving a cart", () => {
+describe("open packages", () => {
   /** The cable at the hub, with these open packages there. */
   async function cableWith(...opens: ReturnType<typeof openSpool>[]) {
     const { api } = server(saved, {
