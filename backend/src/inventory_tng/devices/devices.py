@@ -34,6 +34,7 @@ from sqlalchemy.orm import Session
 
 from inventory_tng.core.db_errors import enforce
 from inventory_tng.core.db_locking import Seen, get_locked, locked, unchanged
+from inventory_tng.core.db_once_committed import once_committed
 from inventory_tng.core.db_sessions import exists_where
 from inventory_tng.core.rate_limits import limiter, refund
 from inventory_tng.models.devices import Device, RegistrationCode
@@ -111,8 +112,12 @@ def create_code(
     )
     session.add(code)
     session.flush()
-    log.info(
-        "registration code created", registration_code_id=code.id, max_uses=max_uses
+    once_committed(
+        session,
+        log.info,
+        "registration code created",
+        registration_code_id=code.id,
+        max_uses=max_uses,
     )
     return code, phrase
 
@@ -147,8 +152,14 @@ def register(session: Session, phrase: str, address: str | None) -> tuple[Device
     )
     session.add(device)
     session.flush()
-    registered.add(1)
-    log.info("device registered", device_id=device.id, registration_code_id=code.id)
+    once_committed(session, registered.add, 1)
+    once_committed(
+        session,
+        log.info,
+        "device registered",
+        device_id=device.id,
+        registration_code_id=code.id,
+    )
     return device, token
 
 
@@ -214,7 +225,7 @@ def revoke_every_code(session: Session, now: datetime) -> int:
     ).all()
     for code in current:
         code.revoked_at = now
-    log.info("registration codes revoked", count=len(current))
+    once_committed(session, log.info, "registration codes revoked", count=len(current))
     return len(current)
 
 
@@ -222,7 +233,7 @@ def revoke_device(session: Session, device_id: int) -> bool:
     """Refuse this device from its next request. False if there is no such
     current device."""
     if done := _revoke(session, Device, device_id, "device_id"):
-        revoked.add(1, {"how": "one"})
+        once_committed(session, revoked.add, 1, {"how": "one"})
     return done
 
 
@@ -235,7 +246,7 @@ def name_device(
     unchanged(device, seen)
     enforce("retired_read_only", when=device.revoked_at is not None)
     device.label = label
-    log.info("device named", device_id=device.id)
+    once_committed(session, log.info, "device named", device_id=device.id)
 
 
 @dataclass(frozen=True)
@@ -301,8 +312,14 @@ def revoke_devices(
     for device in current:
         device.revoked_at = now
     if current:
-        revoked.add(len(current), {"how": "bulk"})
-    log.info("devices revoked", device_ids=[d.id for d in current], count=len(current))
+        once_committed(session, revoked.add, len(current), {"how": "bulk"})
+    once_committed(
+        session,
+        log.info,
+        "devices revoked",
+        device_ids=[d.id for d in current],
+        count=len(current),
+    )
     return len(current)
 
 
@@ -316,7 +333,8 @@ def _revoke(
     if found is None or found.revoked_at is not None:
         return False
     found.revoked_at = datetime.now(UTC)
-    log.info(f"{model.__tablename__.replace('_', ' ')} revoked", **{field: row_id})
+    event = f"{model.__tablename__.replace('_', ' ')} revoked"
+    once_committed(session, log.info, event, **{field: row_id})
     return True
 
 

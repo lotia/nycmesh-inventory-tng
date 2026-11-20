@@ -35,6 +35,7 @@ from inventory_tng.admins.authenticator_totp import (
 from inventory_tng.admins.sealed_totp_keys import TotpKeys, Unreadable
 from inventory_tng.core.db_errors import unique
 from inventory_tng.core.db_locking import get_locked, locked
+from inventory_tng.core.db_once_committed import once_committed
 from inventory_tng.core.db_sessions import exists_where, set_actor
 from inventory_tng.core.mail import Notifier
 from inventory_tng.core.phrases import Words, gettext, lazy_gettext, number
@@ -297,8 +298,12 @@ def add_authenticator(
     )
     session.add(authenticator)
     session.flush()
-    log.info(
-        "authenticator added", admin_id=admin_id, authenticator_id=authenticator.id
+    once_committed(
+        session,
+        log.info,
+        "authenticator added",
+        admin_id=admin_id,
+        authenticator_id=authenticator.id,
     )
     # Set up again, as the operator asked (retire_authenticators): nothing
     # is written if not. The caller holds their row's lock.
@@ -355,7 +360,9 @@ def reseal_authenticators(session: Session, keys: TotpKeys) -> tuple[int, int]:
             )
             resealed += 1
     session.flush()
-    log.info(
+    once_committed(
+        session,
+        log.info,
         "authenticators resealed",
         key_version=keys.newest,
         resealed=resealed,
@@ -394,8 +401,8 @@ def make_recovery_codes(session: Session, admin_id: int, now: datetime) -> list[
         for code in codes
     )
     session.flush()
-    log.info("recovery codes made", admin_id=admin_id)
-    recovery_code_events.add(1, {"event": "made"})
+    once_committed(session, log.info, "recovery codes made", admin_id=admin_id)
+    once_committed(session, recovery_code_events.add, 1, {"event": "made"})
     return [grouped(code, RECOVERY_CODE_GROUP, "-") for code in codes]
 
 
@@ -433,7 +440,13 @@ def check_second_factor(
     if used is None:
         return None
     used.used_at = now
-    log.warning("recovery code used", admin_id=admin_id, recovery_code_id=used.id)
+    once_committed(
+        session,
+        log.warning,
+        "recovery code used",
+        admin_id=admin_id,
+        recovery_code_id=used.id,
+    )
     return "recovery"
 
 
@@ -493,8 +506,15 @@ def sign_in(
     if factor is None:
         _refuse_sign_in("bad_code", admin)
     row, token = start_session(session, admin.id, user_agent, now)
-    sign_ins.add(1, {"outcome": "signed_in", "factor": factor})
-    log.info("signed in", admin_id=admin.id, sign_in_id=row.id, factor=factor)
+    once_committed(session, sign_ins.add, 1, {"outcome": "signed_in", "factor": factor})
+    once_committed(
+        session,
+        log.info,
+        "signed in",
+        admin_id=admin.id,
+        sign_in_id=row.id,
+        factor=factor,
+    )
     return row, token, factor
 
 
@@ -583,9 +603,11 @@ def hold_signed_in(
     return row.ended_at is None and row.expires_at > now()
 
 
-def end_session(row: AdminSession, now: datetime) -> None:
+def end_session(session: Session, row: AdminSession, now: datetime) -> None:
     row.ended_at = now
-    log.info("signed out", admin_id=row.admin_id, sign_in_id=row.id)
+    once_committed(
+        session, log.info, "signed out", admin_id=row.admin_id, sign_in_id=row.id
+    )
 
 
 def confirmation_open(
@@ -639,7 +661,7 @@ def confirm(
     administrator's codes, shared with signing in, so a stolen session
     cannot guess them. Returns the outcome and the factor used."""
     if not limiter(session).hit(_per_account(limits), "code", str(row.admin_id)):
-        return _confirmation(row, "rate_limited"), None
+        return _confirmation(session, row, "rate_limited"), None
     set_actor(session, f"admin:{row.admin_id}")
     factor: Factor | None = None
     admin = session.get_one(Admin, row.admin_id)
@@ -652,11 +674,11 @@ def confirm(
     elif check_password(session, row.admin_id, typed) and not asks_code(session, admin):
         factor = "password"
     if factor is None:
-        return _confirmation(row, "refused"), None
+        return _confirmation(session, row, "refused"), None
     row.confirmed_at, row.last_sensitive_at = now, None
     if account_change:
         row.account_confirmed_at = now
-    return _confirmation(row, "confirmed"), factor
+    return _confirmation(session, row, "confirmed"), factor
 
 
 def note_sensitive(row: AdminSession, now: datetime) -> None:
@@ -664,12 +686,17 @@ def note_sensitive(row: AdminSession, now: datetime) -> None:
     row.last_sensitive_at = now
 
 
-def _confirmation(row: AdminSession, outcome: Confirmation) -> Confirmation:
-    confirmations.add(1, {"outcome": outcome})
+def _confirmation(
+    session: Session, row: AdminSession, outcome: Confirmation
+) -> Confirmation:
+    """Measured and logged: confirmed once committed, as it writes; refused
+    at once, as nothing it refuses is written."""
     fields = {"admin_id": row.admin_id, "sign_in_id": row.id}
     if outcome == "confirmed":
-        log.info("confirmed", **fields)
+        once_committed(session, confirmations.add, 1, {"outcome": outcome})
+        once_committed(session, log.info, "confirmed", **fields)
     else:
+        confirmations.add(1, {"outcome": outcome})
         log.warning("confirmation refused", outcome=outcome, **fields)
     return outcome
 
@@ -760,7 +787,13 @@ def create_first_admin(
         add_authenticator(session, keys, admin.id, authenticator_name, totp_key, step)
         codes = make_recovery_codes(session, admin.id, now)
     row, token = start_session(session, admin.id, user_agent, now)
-    log.info("first administrator set up", admin_id=admin.id, sign_in_id=row.id)
+    once_committed(
+        session,
+        log.info,
+        "first administrator set up",
+        admin_id=admin.id,
+        sign_in_id=row.id,
+    )
     return FirstAdmin(admin, row, token, codes)
 
 
@@ -789,7 +822,9 @@ def set_password(
     _set_password(session, admin_id, password, now)
     ended = end_sessions(session, admin_id, now, keep=keep)
     void_reset_links(session, admin_id, now)
-    log.info("password changed", admin_id=admin_id, sessions_ended=ended)
+    once_committed(
+        session, log.info, "password changed", admin_id=admin_id, sessions_ended=ended
+    )
 
 
 def change_email(session: Session, admin: Admin, email: str, now: datetime) -> None:
@@ -799,7 +834,13 @@ def change_email(session: Session, admin: Admin, email: str, now: datetime) -> N
     admin.email = email or None
     session.flush()
     void_reset_links(session, admin.id, now)
-    log.info("email changed", admin_id=admin.id, has_email=admin.email is not None)
+    once_committed(
+        session,
+        log.info,
+        "email changed",
+        admin_id=admin.id,
+        has_email=admin.email is not None,
+    )
 
 
 def authenticators(session: Session, admin_id: int) -> list[Authenticator]:
@@ -828,7 +869,13 @@ def rename_authenticator(
         return False
     found.name = name
     session.flush()
-    log.info("authenticator renamed", admin_id=admin_id, authenticator_id=found.id)
+    once_committed(
+        session,
+        log.info,
+        "authenticator renamed",
+        admin_id=admin_id,
+        authenticator_id=found.id,
+    )
     return True
 
 
@@ -865,7 +912,9 @@ def remove_authenticator(
     totp_off = outcome == "totp_off"
     if totp_off:
         _void_recovery_codes(session, admin_id, now)
-    log.info(
+    once_committed(
+        session,
+        log.info,
         "authenticator removed",
         admin_id=admin_id,
         authenticator_id=found.id,
@@ -941,7 +990,9 @@ def end_sessions(
         query = query.where(AdminSession.id != keep)
     ended = session.execute(query.values(ended_at=now).returning(AdminSession.id)).all()
     if ended:
-        log.info("sessions ended", admin_id=admin_id, count=len(ended))
+        once_committed(
+            session, log.info, "sessions ended", admin_id=admin_id, count=len(ended)
+        )
     return len(ended)
 
 
@@ -981,7 +1032,9 @@ def make_reset_link(
     )
     session.add(link)
     session.flush()
-    log.info(
+    once_committed(
+        session,
+        log.info,
         "reset link made",
         admin_id=admin_id,
         reset_link_id=link.id,
@@ -1096,7 +1149,9 @@ def use_reset_link(
     # Any other link for them, of whatever kind, would undo what this did.
     void_reset_links(session, link.admin_id, now)
     ended = end_sessions(session, link.admin_id, now)
-    log.info(
+    once_committed(
+        session,
+        log.info,
         "reset link used",
         admin_id=link.admin_id,
         reset_link_id=link.id,
@@ -1150,8 +1205,8 @@ def recover(
     # Two at once both pass the check above: the unique index stops one.
     if not unique(session, make):
         _refuse("recovery", "used")
-    recoveries.add(1, {"outcome": "made"})
-    log.warning("recovery link made", admin_id=admin.id)
+    once_committed(session, recoveries.add, 1, {"outcome": "made"})
+    once_committed(session, log.warning, "recovery link made", admin_id=admin.id)
     activity.record(
         session,
         "recovery_link_made",
@@ -1247,8 +1302,10 @@ def reset_admin_sign_in(
     admin = _locked_other(session, "reset", admin_id, by_admin_id, retired=False)
     token, kind, ended = _reissue(session, admin, by_admin_id, now)
     if kind == "reset":
-        sign_in_resets.add(1, {"action": "reset"})
-    log.info(
+        once_committed(session, sign_in_resets.add, 1, {"action": "reset"})
+    once_committed(
+        session,
+        log.info,
         "sign-in reset",
         target_admin_id=admin.id,
         by_admin_id=by_admin_id,
@@ -1302,7 +1359,13 @@ def invite(
     token = make_reset_link(
         session, admin.id, now, kind="invite", made_by_id=made_by_id
     )
-    log.info("administrator invited", admin_id=admin.id, made_by_id=made_by_id)
+    once_committed(
+        session,
+        log.info,
+        "administrator invited",
+        admin_id=admin.id,
+        made_by_id=made_by_id,
+    )
     them = (
         mail_messages.invited
         if made_by_id is not None
@@ -1411,7 +1474,9 @@ def retire_admin(
     can sign in always remains (lock_admins). Raises AdminRefused."""
     admin = _locked_other(session, "retire", admin_id, by_admin_id, retired=False)
     ended = _retire(session, admin, now)
-    log.info(
+    once_committed(
+        session,
+        log.info,
         "administrator retired",
         target_admin_id=admin.id,
         by_admin_id=by_admin_id,
@@ -1443,8 +1508,12 @@ def restore_admin(
     the one acting to pass on. Raises AdminRefused."""
     admin = _locked_other(session, "restore", admin_id, by_admin_id, retired=True)
     token, _, _ = _reissue(session, admin, by_admin_id, now)
-    log.info(
-        "administrator restored", target_admin_id=admin_id, by_admin_id=by_admin_id
+    once_committed(
+        session,
+        log.info,
+        "administrator restored",
+        target_admin_id=admin_id,
+        by_admin_id=by_admin_id,
     )
     activity.record(
         session, "restored", by_admin_id, admin.id, notify, them=mail_messages.restored
@@ -1487,7 +1556,9 @@ def lock_down(
     for admin in current:
         _retire(session, admin, now)
     codes = devices.revoke_every_code(session, now)
-    log.warning(
+    once_committed(
+        session,
+        log.warning,
         "administrators locked out",
         admin_ids=[a.id for a in current],
         registration_codes_revoked=codes,
@@ -1508,7 +1579,7 @@ def let_in(
         raise OperatorRefused(f"No administrator is called {username}.")
     set_actor(session, OPERATOR_ACTOR)
     token, _, _ = _reissue(session, admin, None, now)
-    log.warning("administrator let in", admin_id=admin.id)
+    once_committed(session, log.warning, "administrator let in", admin_id=admin.id)
     activity.record(
         session, "let_in", None, admin.id, notify, them=mail_messages.let_in
     )
@@ -1567,7 +1638,9 @@ def retire_authenticators(
             _remove_sign_in(session, admin.id, now)
             stranded.append(admin.username)
             notify.tell(admin.email, admin.id, mail_messages.left_without_a_factor)
-    log.warning(
+    once_committed(
+        session,
+        log.warning,
         "authenticators retired",
         retired=retired,
         every=every,

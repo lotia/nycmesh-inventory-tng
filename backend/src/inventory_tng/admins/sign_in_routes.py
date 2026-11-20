@@ -332,7 +332,7 @@ def sign_in(
 
 @router.post(SIGN_OUT)
 def sign_out(signed: AnySignedIn, session: DbSession) -> Response:
-    accounts.end_session(signed.row, guards._now())
+    accounts.end_session(session, signed.row, guards._now())
     session.commit()
     return signed_out()
 

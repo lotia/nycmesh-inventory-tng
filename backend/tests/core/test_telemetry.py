@@ -375,6 +375,7 @@ def test_counts_recoveries(rolled_back: Recorded, session: Session) -> None:
     accounts.recover(
         session, token, token, "ada", "192.0.2.90", now, NO_MAIL, RateLimits()
     )
+    session.commit()  # Counted once committed.
     recoveries = counted(reader, "inventory.admin.recoveries")
     assert recoveries[(("outcome", "bad_token"),)] >= 1
     assert recoveries[(("outcome", "made"),)] >= 1
@@ -386,6 +387,7 @@ def test_counts_sign_in_resets(rolled_back: Recorded, session: Session) -> None:
     ben, _ = new_admin(session, "ben")
     now = datetime.now(UTC)
     accounts.reset_admin_sign_in(session, ben.id, ada.id, now, NO_MAIL)
+    session.commit()  # Counted once committed.
     resets = counted(reader, "inventory.admin.sign_in_resets")
     assert resets[(("action", "reset"),)] >= 1
 
@@ -410,6 +412,7 @@ def test_counts_devices_revoked(rolled_back: Recorded, session: Session) -> None
     devices.revoke_devices(
         session, devices.DeviceFilter(), [many.id], datetime.now(UTC)
     )
+    session.commit()  # Counted once committed.
     revoked = counted(reader, "inventory.devices.revoked")
     assert revoked[(("how", "one"),)] >= 1
     assert revoked[(("how", "bulk"),)] >= 1
@@ -420,6 +423,7 @@ def test_counts_activity(rolled_back: Recorded, session: Session) -> None:
     ada, _ = new_admin(session)
     ben, _ = new_admin(session, "ben")
     accounts.retire_admin(session, ben.id, ada.id, datetime.now(UTC), NO_MAIL)
+    session.commit()  # Counted once committed.
     told = counted(reader, "inventory.admin.activity")
     assert told[(("kind", "retired"),)] >= 1
 
@@ -795,11 +799,38 @@ def test_counts_labels_made_printed_and_revoked(
     assert labels.make_for_place(session, place.store.id) is not None
     assert labels.record_printing(labels.printable(session, [made.id]), 5) == 5
     assert labels.revoke(session, made.id, datetime.now(UTC))
+    session.commit()  # Counted once committed.
     by_names = counted(reader, "inventory.labels.made")
     assert by_names[(("names", "item"),)] >= 1
     assert by_names[(("names", "location"),)] >= 1
     assert sum(counted(reader, "inventory.labels.printed").values()) >= 5
     assert sum(counted(reader, "inventory.labels.revoked").values()) >= 1
+
+
+def test_a_write_rolled_back_is_neither_counted_nor_logged(
+    rolled_back: Recorded, session: Session
+) -> None:
+    """Measured and logged once committed (db_once_committed): a label and
+    a count written, then rolled back, leave no trace in either."""
+    _, _, reader, _ = rolled_back
+    ada, _ = new_admin(session)
+    place = stocked(session)
+    session.commit()
+    labels_before = counted(reader, "inventory.labels.made")
+    counts_before = counted(reader, "inventory.counts.recorded")
+    with capture_logs() as logs:
+        assert labels.make_for_item(session, place.item.id) is not None
+        shown = moments.moment(session, place.store.id)
+        radios = [(place.item.id, Decimal(5))]
+        counts.record_count(
+            session, uuid.uuid4(), ada.id, place.store.id, radios, shown
+        )
+        session.rollback()
+        session.commit()
+    assert added(reader, "inventory.labels.made", labels_before) == {}
+    assert added(reader, "inventory.counts.recorded", counts_before) == {}
+    # Debug lines trace the attempt, as they are for (CONTRIBUTING.md, Logging).
+    assert [line["event"] for line in logs if line["log_level"] != "debug"] == []
 
 
 def test_counts_saves_refused_as_changed_since_shown(

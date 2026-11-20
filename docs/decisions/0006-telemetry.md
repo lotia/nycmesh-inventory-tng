@@ -1,6 +1,7 @@
 # 0006 — Telemetry: metrics and logs over OTLP, traces on demand
 
-**Status:** accepted · 2026-10-30
+**Status:** accepted · 2026-10-30 · amended 2026-11-19 (measured and
+logged once committed)
 
 ## Context
 
@@ -51,3 +52,20 @@ earns its cost here.
 - When logs are exported over OTLP, the cluster must not also collect the
   app's output, or each line arrives twice.
 - Where the providers start, and why, is 0007.
+
+## Amendment: measured and logged once committed (2026-11-19)
+
+Decided by Ali on 2026-11-19 (inventory-tng-3v8m): what a write did is
+measured and logged only once its transaction commits, through one
+function, `once_committed` (`core/db_once_committed.py`). The function
+that writes a table registers its metrics and log lines there, so every
+caller is counted, and a write rolled back records nothing. Before,
+routes called measure functions after `session.commit()`, and a new
+caller had to remember to: closing a package and length checks were
+missed from `inventory.counts.recorded` that way.
+
+We rejected keeping the hand-written calls and adding a test that each
+route measures its write.
+
+What was refused, or failed, is measured and logged at once, as nothing
+of it commits. Debug lines trace an attempt as it happens.

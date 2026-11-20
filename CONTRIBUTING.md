@@ -1328,6 +1328,15 @@ names a person:
 | Free text (notes, reasons, searches), request bodies, database error messages | no | no |
 | Secrets (passwords, tokens, cookies, sessions, TOTP, connection strings) | never | never |
 
+What a write did is measured and logged once its transaction commits,
+through `once_committed` (`core/db_once_committed.py`), registered by the
+function that writes the table, so every caller is counted and a write
+rolled back records nothing (docs/decisions/0006). Never measure or log a
+write after `session.commit()` by hand. A refusal or failure, which
+commits nothing, is measured and logged at once, and so are `debug`
+lines. A test that calls a write directly commits before it reads the
+metric or log line.
+
 Metric attributes take values from a fixed list in code. For a database error,
 log `describe_error(error)`: its class, code and constraint, never its message,
 which can quote values.

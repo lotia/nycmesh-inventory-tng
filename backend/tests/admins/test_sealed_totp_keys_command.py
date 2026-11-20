@@ -29,7 +29,5 @@ def test_reseal_runs_as_an_operator_command(
     database, as it commits."""
     monkeypatch.setenv("DATABASE_URL", own_database)
     assert sealed_totp_keys_command.main(["reseal"]) == 0
-    # After its log lines, which go to standard output too.
-    assert (
-        capsys.readouterr().out.splitlines()[-1] == "Resealed 0; 0 could not be read."
-    )
+    # Among its log lines, which go to standard output too, once committed.
+    assert "Resealed 0; 0 could not be read." in capsys.readouterr().out.splitlines()

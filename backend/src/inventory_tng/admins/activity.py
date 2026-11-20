@@ -18,6 +18,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from inventory_tng.admins import mail_messages
+from inventory_tng.core.db_once_committed import once_committed
 from inventory_tng.core.mail import Notifier, Told
 from inventory_tng.core.phrases import gettext, lazy_gettext
 from inventory_tng.models.admins import Activity, ActivityKind, Admin
@@ -102,8 +103,10 @@ def record(
     row = Activity(kind=kind, by_admin_id=by_admin_id, admin_id=admin_id)
     session.add(row)
     session.flush()
-    recorded.add(1, {"kind": kind})
-    log.info(
+    once_committed(session, recorded.add, 1, {"kind": kind})
+    once_committed(
+        session,
+        log.info,
         "activity recorded",
         activity_id=row.id,
         kind=kind,
