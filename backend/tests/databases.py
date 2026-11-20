@@ -43,12 +43,11 @@ SERVER_URL = superuser_url("postgres")
 APP = "inventory_app"
 
 TEST_DATABASE = re.compile(r"test_(\d+)_[0-9a-f]{8}")
-# Connections each test database takes at most, as the roles log in (a
-# superuser's are not counted): twice the most measured on one, about 21;
-# how it fits the server's is in CONTRIBUTING.md, Connections. It bounds each
-# database, not a run: a process that leaks connections is refused at its
-# own database's limit, with a clear message (refused_connection), long
-# before it could fill the server.
+# Connections each test database takes at most as the roles log in (the
+# superuser's not counted): twice the most measured on one, about 21. It
+# bounds each database, not a run: a process that leaks connections is
+# refused at its own database's limit (refused_connection), long before it
+# fills the server (CONTRIBUTING.md, Connections).
 TEST_CONNECTION_LIMIT = 42
 # The server's max_connections, as a role or the superuser finds it full.
 FULL = (

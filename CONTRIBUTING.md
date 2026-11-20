@@ -220,13 +220,9 @@ It runs, in order:
 `mise run dev-backend` or `mise run dev-vite` runs one on its own. The
 backend runs with `APP_ENV=development`, whatever `.env` says.
 
-The backend is `uv run python -m inventory_tng --reload`, in `backend/`.
-`--host`, `--port` and `--workers` are there too (`--help` lists them). The
-run command starts uvicorn itself; uvicorn's own logging flags are not used,
-the `LOG_*` settings are (Logging, below).
-
-The tasks below run the developer's tools (`uv run python -m devtools`,
-[Tasks and direct commands](#tasks-and-direct-commands)) for you.
+The backend is `uv run python -m inventory_tng --reload`, in `backend/`;
+`--help` lists its options. It starts uvicorn itself, so uvicorn's own
+logging flags are not used, the `LOG_*` settings are (Logging, below).
 
 ### Some data to work with
 
@@ -827,8 +823,7 @@ image builds the scan page too, and serves Brotli and gzip copies of its
 files, as production will. It does not replace uv: the checks, new
 migrations and your editor still use it. The container migrates this
 checkout's database (`INVENTORY_DB_NAME`, which `mise run dev-database`
-makes) when it starts, then serves with `--reload`. Each checkout's stack
-has its own.
+makes) when it starts, then serves with `--reload`.
 Your `backend/src`, `backend/devtools` and `backend/migrations` are mounted
 into it, so it picks up your edits. Pass `--build` again after changing
 dependencies or `frontend/`.
@@ -840,11 +835,10 @@ in `.env.example` and in that list; a test checks that every one
 `MIGRATION_DATABASE_URL`, `OTEL_EXPORTER_OTLP_ENDPOINT` and `MAIL_HOST`,
 because inside it `localhost` is the container, and its own
 `VITE_DEV_SERVER` and `FRONTEND_DIST`, so it serves the bundle it built. To
-send its telemetry to the dashboard, start the dashboard (Logging, below)
-and set `INVENTORY_APP_OTLP_ENDPOINT=http://dashboard:18890`; to send mail
-to Mailpit, `INVENTORY_APP_MAIL_HOST=mail`. It takes `INVENTORY_APP_PORT`
-(Local settings) as the run command's port. The client address it logs is
-the container network's, not your browser's.
+send its telemetry to the dashboard (Logging, below), set
+`INVENTORY_APP_OTLP_ENDPOINT` as `.env.example` gives it; for mail, see
+Mail. The client address it logs is the container network's, not your
+browser's.
 
 ### Using compose directly
 
@@ -1101,12 +1095,11 @@ browser reaches the app through the tests' connection.
 Playwright starts the backend itself, twice, each with a database of its
 own, on ports chosen for the run, so runs from two clones do not meet.
 
-CI runs each of these checks as a job named for its task, on pushes to `main`
-and on pull requests, and builds the frontend. It calls each tool directly,
-not through mise. A task named `check-…` is a check CI runs too, as a job of
-the same name; one that only makes sense on your machine, such as setting it
-up, is named otherwise. A test fails on a job not named for a task, or a
-`check-…` task without a job.
+CI runs each check as a job named for its task, on pushes to `main` and on
+pull requests, calling each tool directly, not through mise, and builds the
+frontend. So a task named `check-…` is one CI runs; one that only makes
+sense on your machine, such as setting it up, is named otherwise. A test
+fails on a job not named for a task, or a `check-…` task without a job.
 
 Each test belongs to a category by what it needs to run. `tests/conftest.py`
 marks the backend's `database` from their fixtures, never by hand: a test
@@ -1408,8 +1401,8 @@ log lines with structlog's `capture_logs()`.
 
 Exporting logs and metrics over OpenTelemetry stays off unless
 `OTEL_EXPORTER_OTLP_ENDPOINT` is set (or a signal's own endpoint, such as
-`OTEL_EXPORTER_OTLP_LOGS_ENDPOINT`). Export is OTLP over HTTP (port 4318),
-not gRPC. Of the other standard variables, `OTEL_SERVICE_NAME`,
+`OTEL_EXPORTER_OTLP_LOGS_ENDPOINT`). Export is OTLP over HTTP, not gRPC.
+Of the other standard variables, `OTEL_SERVICE_NAME`,
 `OTEL_RESOURCE_ATTRIBUTES` and the SDK's timing settings apply, and
 `OTEL_LOGS_EXPORTER=none` or `OTEL_METRICS_EXPORTER=none` stops one signal.
 `OTEL_TRACES_EXPORTER=otlp` sends traces, which are off by default. Spans

@@ -19,13 +19,12 @@ services:
     # https://github.com/podman-container-tools/podman/issues/30245).
     oom_score_adj: 200
     # Room for a test run, an app and the browser tests at once, for each
-    # checkout that shares the project (CONTRIBUTING.md, Connections); 100 is
-    # the default. A whole test run at the checks' most processes was
-    # measured holding about 70 at once; a dev app, and each of the browser
-    # tests' two servers, holds at most its pools (core/db_sessions.py); the
-    # superuser keeps 3. An idle connection costs a few MB, so slots are
-    # cheap. A change here takes effect at the next `mise run
-    # start-database`, which makes the container again, keeping its volume.
+    # checkout sharing the project (CONTRIBUTING.md, Connections). A whole
+    # test run at the checks' most processes was measured at about 70; an
+    # app holds at most its pools (core/db_sessions.py); the superuser keeps
+    # 3. Idle slots cost a few MB. A change takes effect at the next
+    # `mise run start-database`, which remakes the container, keeping its
+    # volume.
     command: ["postgres", "-c", "max_connections=400"]
     environment:
       # The superuser, which only makes the owner and app roles, the tests'
