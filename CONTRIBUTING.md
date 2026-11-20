@@ -1341,8 +1341,8 @@ Record a decision in words, with who made it and when, not as a link to
 where it was discussed or the letter of a choice made there.
 
 These are judgements held in review, not checks, except where a test in
-`backend/tests/codebase/` enforces one, as for task descriptions and
-artifact links.
+`backend/tests/codebase/` enforces one, as for a `mise run` that names no
+task, and for artifact links, lettered choices and question codes.
 
 Lint what you write or change with `mise run check-markdown`.
 

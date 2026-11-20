@@ -27,7 +27,7 @@ JOB = re.compile(r"^  ([^\s:#]+):", re.MULTILINE)
 DIRECT = re.compile(r"(?<![=\"'])\b(?:docker|podman)(?:\s+|-)compose\b")
 # A task script's description, in either header form mise reads.
 DESCRIPTION = re.compile(
-    r"^#(?:MISE| \[MISE\]) description=([\"'])\S.*\1$", re.MULTILINE
+    r"^#(?:MISE| \[MISE\]) description\s*=\s*([\"'])\S.*\1\s*$", re.MULTILINE
 )
 # A task named as a command, in a doc, a comment or a script.
 RUN = re.compile(r"\bmise run ([a-z][a-z0-9-]*)")
