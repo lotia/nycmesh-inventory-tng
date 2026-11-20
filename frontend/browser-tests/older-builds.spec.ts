@@ -171,8 +171,8 @@ test("a save's package retired since is named, never offered, and goes by its li
   );
   await lineDiscard(listing, `${cable}: 2 × ${box}`).click();
   // What is left goes back whole, without a tap: its only count, the box
-  // not offered. What such a cart saves ScanPage.older-build.test.tsx
-  // checks.
+  // not offered. What such a cart saves
+  // ScanPage.older-build-recorded.test.tsx checks.
   await expect(listing).toHaveCount(0);
   await expect(page.getByText(PUT_BACK)).toBeVisible();
   await expect(page.getByLabel("How many m")).toHaveValue("3");
@@ -434,7 +434,7 @@ test("a cart this build filled, which its tab recorded as a newer build took it 
 // What only a real browser shows: a real double click, both its clicks
 // landing before the page settles, and the ignored taps taken again on a
 // real clock. The rest of how a line's Discard behaves is in
-// ScanPage.older-build.test.tsx (inventory-tng-vtda.1).
+// ScanPage.older-build-list.test.tsx (inventory-tng-vtda.1).
 test("a double tap on a line's Discard discards that line only, and focuses the entry; once settled, a tap is taken again", async ({
   page,
 }) => {

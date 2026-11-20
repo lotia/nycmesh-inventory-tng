@@ -470,17 +470,18 @@ key with a version (`frontend/src/shared/outbox.ts`, `scan/cart.ts`),
 stamped with the build that wrote them. A change to what is kept, or to a
 value a field may take, takes a new key, as a tab of the build before, open
 during a deploy, drops what it cannot read from what it writes back;
-`shared/outbox.test.ts` lists both for the outbox's key. The one exception is an
-optional field whose loss leaves the entry as the build before would have
-kept it, which that test lists apart. Builds that keep the same shape share
-a key, so each batch is kept with the build that queued it, and is sent as
-that build's, whichever tab sends it. Why a batch was refused, or waits, is
-kept as a code with its data (`outbox.Reason`), and what a batch's summary
-says as what it is made from, with its places named as when it was queued
-(`outbox.Summary`), never in words: the page makes the words as it shows
-them (`outbox-notes.noteOf`, `batch.batchWords`), so they follow the
-language spoken and can change without a new key. Only older keys hold
-words, which `scan/older-builds.ts` reads for their code and shows as kept.
+`shared/outbox.storage.test.ts` lists both for the outbox's key. The one
+exception is an optional field whose loss leaves the entry as the build
+before would have kept it, which that test lists apart. Builds that keep
+the same shape share a key, so each batch is kept with the build that
+queued it, and is sent as that build's, whichever tab sends it. Why a
+batch was refused, or waits, is kept as a code with its data
+(`outbox.Reason`), and what a batch's summary says as what it is made
+from, with its places named as when it was queued (`outbox.Summary`),
+never in words: the page makes the words as it shows them
+(`outbox-notes.noteOf`, `batch.batchWords`), so they follow the language
+spoken and can change without a new key. Only older keys hold words, which
+`scan/older-builds.ts` reads for their code and shows as kept.
 
 A build reads and writes only its own keys. A tab of an older build sends
 its own batches and lets the volunteer record the cart, saying nothing of
