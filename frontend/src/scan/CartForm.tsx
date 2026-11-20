@@ -781,8 +781,8 @@ export function CartForm({
             scanning.value = false;
           }}
           reload={reload}
-          // As ScanPage's reloadKeepsCart, from this render's cart rather
-          // than cartEmpty, which follows it a render later.
+          // As NewerBuild's, from this render's cart rather than
+          // cartEmpty, which follows it a render later.
           reloadKeepsCart={cartKept.value || empty}
         />
       ) : (

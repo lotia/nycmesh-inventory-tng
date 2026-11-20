@@ -41,7 +41,10 @@ export const RELOAD_PAGE = msg`Reload page`;
 export type Refusal = {
   bold: MessageDescriptor;
   plain: MessageDescriptor;
-} & ({ reload: boolean; notKept: MessageDescriptor } | { reload: false });
+} & (
+  | { reload: true; notKept: MessageDescriptor }
+  | { reload: false; notKept?: MessageDescriptor }
+);
 
 export const NOT_ALLOWED = {
   bold: msg`The camera isn't allowed for this page.`,
@@ -108,8 +111,8 @@ export function Scanner({
   onDone: () => void;
   /** Refresh this page (ScanPage's reload). */
   reload: () => void;
-  /** Whether a reload or restart would keep the cart (ScanPage,
-   * reloadKeepsCart). */
+  /** Whether a reload or restart would keep the cart: the browser keeps
+   * it (CartForm, NOT_KEEPING), or it is empty. */
   reloadKeepsCart: boolean;
   open?: (video: HTMLVideoElement) => Promise<Session>;
 }) {
@@ -271,9 +274,7 @@ export function Scanner({
 /** A refusal's hint: to record the cart first where reloading or
  * restarting would empty it. */
 function hintOf(refusal: Refusal, reloadKeepsCart: boolean) {
-  return "notKept" in refusal && !reloadKeepsCart
-    ? refusal.notKept
-    : refusal.plain;
+  return (!reloadKeepsCart && refusal.notKept) || refusal.plain;
 }
 
 /** Turns the camera's torch on and off. */

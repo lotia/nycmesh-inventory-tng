@@ -8,7 +8,7 @@
  */
 import { signal } from "@preact/signals";
 import { fireEvent, render, screen } from "@testing-library/preact";
-import { afterEach, expect, onTestFinished, test, vi } from "vitest";
+import { afterEach, expect, test, vi } from "vitest";
 import { suggest } from "./admin/combobox";
 import { guardRetire } from "./admin/retire";
 import { messages as pseudo } from "./locales/pseudo.po";
@@ -396,8 +396,7 @@ const COVERED: Record<string, () => Promise<HTMLElement[]>> = {
       lines: [{ itemId: 100, packages: {}, loose: "1" }],
     });
     const outbox = await loaded();
-    const setItem = refusingWrites(CART_KEY);
-    onTestFinished(() => setItem.mockRestore());
+    refusingWrites(CART_KEY);
     // A change the browser does not keep.
     fireEvent.click(screen.getAllByRole("radio")[1] as HTMLElement);
     outbox.builds.learn("too_old");

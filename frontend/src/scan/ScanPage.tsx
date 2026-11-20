@@ -1,5 +1,5 @@
 import { msg } from "@lingui/core/macro";
-import { signal, useSignal } from "@preact/signals";
+import { type Signal, signal, useSignal } from "@preact/signals";
 import { useEffect, useMemo, useRef } from "preact/hooks";
 import { type Api, makeApi } from "../api/client";
 import {
@@ -57,10 +57,6 @@ export function ScanPage({
   const cartEmpty = useMemo(() => signal(storedCartEmpty()), []);
   // Whether the browser kept the cart when last asked (CartForm, kept).
   const cartKept = useMemo(() => signal(true), []);
-  // Whether a reload, or a restart of the browser, would keep the cart:
-  // it is kept, or has nothing to lose (Ali, inventory-tng-0y0u,
-  // inventory-tng-sdfg).
-  const reloadKeepsCart = cartKept.value || cartEmpty.value;
   // The cart's batch key, while the cart is shown (CartForm): a save's
   // difference put in it is said to be there until it is recorded.
   const cartKey = useMemo(() => signal<string | undefined>(undefined), []);
@@ -203,8 +199,8 @@ export function ScanPage({
       <h1>{say(SCAN)}</h1>
       <NewerBuild
         outbox={outbox}
-        cartEmpty={cartEmpty.value}
-        reloadKeepsCart={reloadKeepsCart}
+        cartEmpty={cartEmpty}
+        cartKept={cartKept}
         reload={reload}
       />
       {current.state === "loading" && <p>{say(LOADING)}</p>}
@@ -266,19 +262,20 @@ export function ScanPage({
 function NewerBuild({
   outbox,
   cartEmpty,
-  reloadKeepsCart,
+  cartKept,
   reload,
 }: {
   outbox: Outbox;
-  cartEmpty: boolean;
-  reloadKeepsCart: boolean;
+  cartEmpty: Signal<boolean>;
+  cartKept: Signal<boolean>;
   reload: () => void;
 }) {
   const learned = outbox.builds.newer.value;
+  const empty = cartEmpty.value;
   // Whether this tab holds what a newer build reads not as this build's:
   // a cart, or a batch waiting; too old, a newer build's own not counted.
   const holds =
-    !cartEmpty ||
+    !empty ||
     outbox.entries.value.some(
       (entry) =>
         entry.state === "waiting" &&
@@ -289,7 +286,7 @@ function NewerBuild({
   }
   return (
     <div role="alert" class={CAUTION_BOX}>
-      <div>{say(upgradeWords(holds, reloadKeepsCart))}</div>
+      <div>{say(upgradeWords(holds, cartKept.value || empty))}</div>
       <button type="button" class="primary" onClick={reload}>
         {say(UPGRADE)}
       </button>
@@ -297,7 +294,9 @@ function NewerBuild({
   );
 }
 
-/** What the alert asking for a reload says. */
+/** What the alert asking for a reload says. A reload keeps the cart
+ * while the browser keeps it, or it has nothing to lose (Ali,
+ * inventory-tng-0y0u, inventory-tng-sdfg). */
 function upgradeWords(holds: boolean, reloadKeepsCart: boolean) {
   if (!reloadKeepsCart) {
     return MUST_UPGRADE_NOT_KEPT;

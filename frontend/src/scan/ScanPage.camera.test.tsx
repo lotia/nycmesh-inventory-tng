@@ -1,5 +1,5 @@
 import { fireEvent, screen } from "@testing-library/preact";
-import { beforeEach, describe, expect, onTestFinished, test, vi } from "vitest";
+import { beforeEach, describe, expect, test, vi } from "vitest";
 import { say } from "../shared/i18n";
 import { STORAGE_KEY as OUTBOX_KEY, Outbox } from "../shared/outbox";
 import { pass } from "../testing/camera";
@@ -365,8 +365,6 @@ describe("scanning labels with the camera", () => {
     open(server().api, reload);
     await ready();
     const setItem = refusingWrites(CART_KEY);
-    // Restored even if the test fails, so later tests can keep the cart.
-    onTestFinished(() => setItem.mockRestore());
     fillMove();
     screen.getByText(say(NOT_KEEPING));
     startCamera();
@@ -386,8 +384,7 @@ describe("scanning labels with the camera", () => {
     );
     open();
     await ready();
-    const setItem = refusingWrites(CART_KEY);
-    onTestFinished(() => setItem.mockRestore());
+    refusingWrites(CART_KEY);
     pick(say(YOUR_NAME), "1");
     screen.getByText(say(NOT_KEEPING));
     startCamera();

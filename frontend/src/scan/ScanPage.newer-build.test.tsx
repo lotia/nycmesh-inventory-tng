@@ -6,7 +6,7 @@ import {
   screen,
   within,
 } from "@testing-library/preact";
-import { describe, expect, onTestFinished, test, vi } from "vitest";
+import { describe, expect, test, vi } from "vitest";
 import {
   BUILD_KEY,
   Builds,
@@ -314,8 +314,7 @@ describe("a newer build", () => {
   test("too old with the cart filled but not kept, it says upgrading empties it", async () => {
     const { outbox, reload } = openMine();
     await ready();
-    const setItem = refusingWrites(CART_KEY);
-    onTestFinished(() => setItem.mockRestore());
+    refusingWrites(CART_KEY);
     fillMove();
     screen.getByText(say(NOT_KEEPING));
     outbox.builds.learn("too_old");
@@ -328,8 +327,7 @@ describe("a newer build", () => {
   test("too old with the cart not kept but empty, nothing is lost", async () => {
     const { outbox } = openMine();
     await ready();
-    const setItem = refusingWrites(CART_KEY);
-    onTestFinished(() => setItem.mockRestore());
+    refusingWrites(CART_KEY);
     pick(say(YOUR_NAME), "1");
     screen.getByText(say(NOT_KEEPING));
     outbox.builds.learn("too_old");
