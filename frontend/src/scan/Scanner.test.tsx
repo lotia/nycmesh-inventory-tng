@@ -364,6 +364,13 @@ test("Reload page takes the focus, and reloads the page", async () => {
   expect(reload).toHaveBeenCalledOnce();
 });
 
+test("with no Reload page, the refusal's words take the focus", async () => {
+  await refusedWith(new DOMException("none", "NotFoundError"), NO_CAMERA);
+  await vi.waitFor(() =>
+    expect(document.activeElement).toBe(screen.getByRole("alert")),
+  );
+});
+
 test("Reload page leaves the focus where the volunteer put it", async () => {
   const typing = document.body.appendChild(document.createElement("input"));
   try {

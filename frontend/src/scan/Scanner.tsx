@@ -106,6 +106,7 @@ export function Scanner({
 }) {
   const video = useRef<HTMLVideoElement>(null);
   const reloadButton = useRef<HTMLButtonElement>(null);
+  const refusalWords = useRef<HTMLParagraphElement>(null);
   // The newest onCode, so a refreshed catalogue is read from at once.
   const handle = useRef(onCode);
   handle.current = onCode;
@@ -116,11 +117,12 @@ export function Scanner({
   const torch = useSignal<((on: boolean) => Promise<void>) | null>(null);
   const refusal = refused.value;
 
-  // Done went with the refusal: Reload page takes the focus, unless
-  // something else on the page holds it.
+  // Done went with the refusal: Reload page takes the focus, or, where
+  // none is offered, the refusal's words, so the volunteer keeps their
+  // place; unless something else on the page holds it.
   useEffect(() => {
     if (document.activeElement === document.body) {
-      reloadButton.current?.focus();
+      (reloadButton.current ?? refusalWords.current)?.focus();
     }
   }, [refusal]);
 
@@ -236,7 +238,7 @@ export function Scanner({
         </>
       ) : (
         <>
-          <p role="alert">
+          <p role="alert" ref={refusalWords} tabIndex={-1}>
             <AlertWords
               note={{
                 bold: [say(refusal.bold)],
