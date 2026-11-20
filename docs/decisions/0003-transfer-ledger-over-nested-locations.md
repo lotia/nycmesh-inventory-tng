@@ -110,29 +110,27 @@ both or in neither. Shown again after a send, it reads them apart, so a
 save committing just then may refuse it once more, keeping what was typed.
 
 We rejected carrying each line's figure shown (many fields, and it misses
-counts by form), comparing PostgreSQL's transaction snapshots (exact, but
-it ties the ledger to transaction ids' internals; more in the amendment
-below), and taking the lock without waiting (it still holds up saves).
+counts by form), comparing PostgreSQL's transaction snapshots (the next
+amendment says why), and taking the lock without waiting (it still holds
+up saves).
 
 ## Amendment: a count's moment stays a ledger number (2026-11-19)
 
 Decided by Ali on 2026-11-19 (inventory-tng-8i4.65): a count's moment
-stays the place's latest ledger number, kept true by locking places (a
-save holds its places before it draws its number, and a count locks its
-own), not PostgreSQL's transaction snapshots (`xid8`). Snapshots would
-have removed only the brief wait when a count form opened, which the
-amendment above has since removed without them; both those locks would
-stay. They would add another PostgreSQL-only feature (0016), a hidden
-snapshot field to validate, a check that cannot use an index, and
-rewritten concurrency tests.
+stays the place's latest ledger number, kept true by place locks (a save
+holds its places before it draws its number; a count locks its own), not
+PostgreSQL's transaction snapshots (`xid8`). Snapshots would keep both
+locks and remove only the wait as a count form opens, which the
+amendment above already removed. They would add another PostgreSQL-only
+feature (0016), a hidden snapshot field to validate, a check no index can
+serve, and rewritten concurrency tests.
 
 A known limit, accepted: production runs on CloudNativePG, which
 replicates asynchronously unless set to wait for a replica. A failover
-can lose the last few commits, and with them how far the ledger's
-numbering had got, so the new primary may hand out the same ledger
-numbers again. A count form opened before the failover could then
-quietly absorb a move saved after it. A later count of the place puts it
-right.
+can lose the last few commits and the ledger numbers they took, so the
+new primary may hand those numbers out again. A count form opened before
+the failover could then quietly absorb a move saved after it; a later
+count of the place puts it right.
 
 ## Amendment: a retired package with none left is never taken (2026-11-19)
 
