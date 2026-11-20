@@ -57,13 +57,18 @@ describe("scanning labels with the camera", () => {
     await pass();
   }
 
+  /** The volunteer opens the camera. */
+  function startCamera() {
+    fireEvent.click(
+      screen.getByRole("button", { name: say(SCAN_WITH_CAMERA) }),
+    );
+  }
+
   async function opened(api = server().api) {
     const outbox = open(api);
     await ready();
     camera.state.inView = [];
-    fireEvent.click(
-      screen.getByRole("button", { name: say(SCAN_WITH_CAMERA) }),
-    );
+    startCamera();
     await screen.findByText(say(POINT));
     return outbox;
   }
@@ -346,9 +351,7 @@ describe("scanning labels with the camera", () => {
     const reload = vi.fn();
     open(server().api, reload);
     await ready();
-    fireEvent.click(
-      screen.getByRole("button", { name: say(SCAN_WITH_CAMERA) }),
-    );
+    startCamera();
     await screen.findByText(say(NOT_ALLOWED.bold));
     fireEvent.click(screen.getByRole("button", { name: say(RELOAD_PAGE) }));
     expect(reload).toHaveBeenCalledOnce();
@@ -366,9 +369,7 @@ describe("scanning labels with the camera", () => {
     onTestFinished(() => setItem.mockRestore());
     fillMove();
     screen.getByText(say(NOT_KEEPING));
-    fireEvent.click(
-      screen.getByRole("button", { name: say(SCAN_WITH_CAMERA) }),
-    );
+    startCamera();
     await screen.findByText(say(NOT_ALLOWED.notKept));
     // Still offered: the volunteer may record the cart first.
     screen.getByRole("button", { name: say(RELOAD_PAGE) });
@@ -389,9 +390,7 @@ describe("scanning labels with the camera", () => {
     onTestFinished(() => setItem.mockRestore());
     pick(say(YOUR_NAME), "1");
     screen.getByText(say(NOT_KEEPING));
-    fireEvent.click(
-      screen.getByRole("button", { name: say(SCAN_WITH_CAMERA) }),
-    );
+    startCamera();
     // Nothing in it to record first.
     await screen.findByText(say(NOT_ALLOWED.plain));
   });
