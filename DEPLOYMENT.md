@@ -143,11 +143,11 @@ would otherwise install them.
 
 Build the scan page into a new folder for each version, for example one
 named after its commit, with a Brotli and a gzip copy beside each file.
-`servestatic` reports success even when compressing or hashing a file fails
-([ServeStatic#129](https://github.com/Archmonger/ServeStatic/issues/129)), so
-check its log for an `Error compressing` or `Error hashing` line, and that it
-wrote the copies. Each command exits non-zero when a step failed, and the log
-says why:
+`servestatic` reports success even when a file fails
+([ServeStatic#129](https://github.com/Archmonger/ServeStatic/issues/129)) or
+the Brotli extra is missing, so the last two lines fail when its log has an
+error line or no Brotli copy was written; the log shows the error. Once a
+release fixes #129, drop the log check but keep the Brotli one:
 
 ```sh
 export UV_NO_DEV=1
@@ -158,8 +158,7 @@ cd ../backend
 uv sync --locked
 uv run servestatic ../frontend/dist /srv/inventory/static-<commit> \
   --compress --no-zstd > /srv/inventory/static-<commit>.log 2>&1
-test -z "$(grep -e 'Error compressing' -e 'Error hashing' \
-  /srv/inventory/static-<commit>.log)"
+test -z "$(grep -E 'Error (compressing|hashing)' /srv/inventory/static-<commit>.log)"
 test -n "$(find /srv/inventory/static-<commit>/assets -name '*.br' -print -quit)"
 ```
 

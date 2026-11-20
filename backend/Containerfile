@@ -40,15 +40,15 @@ RUN --mount=type=cache,target=/root/.cache/uv \
 # The bundle, with a Brotli and a gzip copy of each file (docs/decisions/0010),
 # compressed in a stage of its own: the image takes only the result, and
 # COPY --from keys the cache on the bundle's contents. servestatic exits 0
-# even when compressing or hashing a file fails (ServeStatic#129), so the
-# step fails on an "Error compressing" or "Error hashing" line in its output,
-# or when no .br copy was written. Drop both checks once a release fixes #129.
+# when a file fails (ServeStatic#129) and when the brotli extra is missing,
+# so the step fails on an error line in its output or when no .br copy was
+# written. Once a release fixes #129, drop only the error-line check.
 FROM deps AS bundle
 COPY --from=frontend /frontend/dist /tmp/dist
 RUN set -o pipefail \
     && servestatic /tmp/dist /app/static --compress --no-zstd 2>&1 \
         | tee /tmp/servestatic.log \
-    && ! grep -q -e 'Error compressing' -e 'Error hashing' /tmp/servestatic.log \
+    && ! grep -qE 'Error (compressing|hashing)' /tmp/servestatic.log \
     && test -n "$(find /app/static/assets -name '*.br' -print -quit)"
 
 FROM deps
