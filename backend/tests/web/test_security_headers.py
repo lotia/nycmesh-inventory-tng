@@ -23,6 +23,7 @@ from inventory_tng.core.settings import FrontendConfig, RateLimits
 from inventory_tng.web import security_headers
 from inventory_tng.web.frontend_bundle import MANIFEST
 
+from helpers.apps import with_failures
 from helpers.csp_reports import REPORT_URI, REPORTING_API, SHAPES
 from helpers.markup import read
 from helpers.source import TEMPLATES
@@ -128,12 +129,7 @@ def test_a_refused_cross_site_request_is_protected(built: TestClient) -> None:
 
 @pytest.fixture
 def failing(make_app_without_database: Callable[..., FastAPI]) -> Iterator[TestClient]:
-    app = make_app_without_database()
-
-    def fail() -> None:
-        raise RuntimeError("a bug")
-
-    app.add_api_route("/broken", fail)
+    app = with_failures(make_app_without_database())
     with TestClient(app, raise_server_exceptions=False) as client:
         yield client
 

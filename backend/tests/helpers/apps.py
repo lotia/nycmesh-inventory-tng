@@ -5,7 +5,7 @@ from collections.abc import Callable, Generator, Iterator
 from contextlib import contextmanager
 from typing import Any
 
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
 from fastapi.testclient import TestClient
 from sqlalchemy import event
 from sqlalchemy.orm import Session
@@ -127,4 +127,20 @@ def new_app(
     if reached is not None:
         for name, pool in app.state.db.pools.items():
             event.listen(pool, "do_connect", lambda *_, name=name: reached.append(name))
+    return app
+
+
+def with_failures(app: FastAPI) -> FastAPI:
+    """`app` with a page (/broken) and an API route (/api/broken) that fail,
+    and /refused/{status} refusing with that status."""
+
+    def fail() -> None:
+        raise RuntimeError("a bug")
+
+    def refuse(status: int) -> None:
+        raise HTTPException(status)
+
+    app.add_api_route("/broken", fail)
+    app.add_api_route("/api/broken", fail)
+    app.add_api_route("/refused/{status}", refuse)
     return app

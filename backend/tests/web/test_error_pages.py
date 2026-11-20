@@ -20,6 +20,7 @@ from inventory_tng.catalogue.paths import ITEMS
 from inventory_tng.web import pages
 from inventory_tng.web.frontend_bundle import SCAN
 
+from helpers.apps import with_failures
 from helpers.markup import addresses, forms, read, words_on
 from helpers.query_counts import counting
 
@@ -95,17 +96,7 @@ def failing(make_app_without_database: Callable[..., FastAPI]) -> Iterator[TestC
     """An app with a page and an API route that fail, its errors answered
     as a browser would get them, not raised into the test. With no database:
     the failures here are the app's own, never a database's 503."""
-    app = make_app_without_database()
-
-    def fail() -> None:
-        raise RuntimeError("a bug")
-
-    def refuse(status: int) -> None:
-        raise HTTPException(status)
-
-    app.add_api_route("/broken", fail)
-    app.add_api_route("/api/broken", fail)
-    app.add_api_route("/refused/{status}", refuse)
+    app = with_failures(make_app_without_database())
     with TestClient(app, raise_server_exceptions=False) as client:
         yield client
 

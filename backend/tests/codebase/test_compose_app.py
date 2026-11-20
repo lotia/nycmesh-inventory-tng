@@ -10,18 +10,14 @@ import pytest
 from devtools.database import OWNER, ROLES_SQL
 from inventory_tng.core.local_env import CLONE
 
+from helpers.compose import services
+
 pytestmark = pytest.mark.clone
 
 # A setting, set or commented out: `NAME=` or `# NAME=`.
 SETTING = re.compile(r"^#? ?([A-Z][A-Z0-9_]*)=", re.MULTILINE)
 # The app's own environment: its keys, six spaces in.
 LISTED = re.compile(r"^ {6}([A-Z][A-Z0-9_]*):", re.MULTILINE)
-
-
-def service(name: str) -> str:
-    """The service `name`, up to the next line as little indented."""
-    after = (CLONE / "compose.yaml").read_text().split(f"\n  {name}:\n", 1)[1]
-    return re.split(r"^ {0,2}\S", after, maxsplit=1, flags=re.MULTILINE)[0]
 
 
 def test_the_app_takes_the_settings_env_example_names() -> None:
@@ -31,18 +27,18 @@ def test_the_app_takes_the_settings_env_example_names() -> None:
     for_the_app = {
         name for name in named if not name.startswith(("INVENTORY_", "COMPOSE_"))
     }
-    assert set(LISTED.findall(service("app"))) == for_the_app | {"FRONTEND_DIST"}
+    assert set(LISTED.findall(services()["app"])) == for_the_app | {"FRONTEND_DIST"}
 
 
 def test_the_app_is_not_given_the_whole_env() -> None:
-    assert not re.search(r"^ {4}env_file:", service("app"), re.MULTILINE)
+    assert not re.search(r"^ {4}env_file:", services()["app"], re.MULTILINE)
 
 
 def test_the_database_has_only_its_named_volume() -> None:
     """A bind mount would put the path of the checkout that made the
     container in its hash, so each checkout sharing the project would make
     it again."""
-    after = service("db").split("\n    volumes:\n", 1)[1]
+    after = services()["db"].split("\n    volumes:\n", 1)[1]
     volumes = re.split(r"^ {4}\S", after, maxsplit=1, flags=re.MULTILINE)[0]
     assert re.findall(r"^ +- *(.*)$", volumes, re.MULTILINE) == [
         "db:/var/lib/postgresql"
@@ -53,7 +49,7 @@ def test_the_database_init_scripts_are_the_roles_file_and_the_owners() -> None:
     """The roles first, from the one file devtools/database.py runs too, then the
     database the server makes, made the owner's."""
     text = (CLONE / "compose.yaml").read_text()
-    db = service("db")
+    db = services()["db"]
     owners = ROLES_SQL.with_name("database-owner.sql")
     for name, script, file in (
         ("roles", "1-roles.sql", ROLES_SQL),

@@ -21,11 +21,11 @@ from inventory_tng.core.settings import LogConfig, Settings
 from inventory_tng.devices import devices, registration_codes_command
 from inventory_tng.devices.devices import COOKIE, RegistrationRejected
 from inventory_tng.devices.guards import RegisteredDevice
-from inventory_tng.models.core import CatalogueHistory
 from inventory_tng.models.devices import Device, RegistrationCode
 
 from helpers.concurrency import Committed
 from helpers.devices import ADDRESS, new_device
+from helpers.rows import history
 
 
 def whoami(device: RegisteredDevice) -> dict[str, int]:
@@ -72,16 +72,7 @@ def refused(request: pytest.FixtureRequest, session: Session) -> tuple[str, str]
 
 
 def device_history(session: Session, device_id: int) -> list[str]:
-    return list(
-        session.scalars(
-            select(CatalogueHistory.action)
-            .where(
-                CatalogueHistory.table_name == "device",
-                CatalogueHistory.row_id == device_id,
-            )
-            .order_by(CatalogueHistory.id)
-        )
-    )
+    return [row.action for row in history(session, "device", device_id)]
 
 
 @pytest.fixture

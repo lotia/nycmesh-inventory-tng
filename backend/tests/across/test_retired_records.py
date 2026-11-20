@@ -7,7 +7,6 @@ from datetime import UTC, datetime
 
 import pytest
 from fastapi.testclient import TestClient
-from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from inventory_tng.catalogue import categories
@@ -22,6 +21,7 @@ from inventory_tng.web.forms import RETIRED, RULES
 
 from helpers.markup import read, text
 from helpers.rows import add, shown, tag
+from helpers.sign_in import admin_named
 
 KINDS = [
     ("/admin/items", "item"),
@@ -131,7 +131,7 @@ def test_a_retired_administrators_page_says_who_retired_them(
     admin_client: TestClient, session: Session
 ) -> None:
     ben = add(session, Admin(username=f"ben{tag()}"))
-    ada = named_admin(session, "ada")
+    ada = admin_named(session, "ada")
     set_actor(session, f"admin:{ada.id}")
     ben.retired_at = datetime.now(UTC)
     session.flush()
@@ -144,10 +144,6 @@ def test_a_retired_administrators_page_says_who_retired_them(
     ]
     assert re.fullmatch(r"Retired on .+ by ada\.", line)
     assert "They can't sign in." in page
-
-
-def named_admin(session: Session, username: str) -> Admin:
-    return session.scalars(select(Admin).where(Admin.username == username)).one()
 
 
 def test_who_retired_it_is_read_from_the_history(session: Session) -> None:
