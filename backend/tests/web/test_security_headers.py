@@ -9,12 +9,11 @@ import json
 import re
 import subprocess
 import sys
-from collections.abc import Callable, Iterator, MutableMapping
+from collections.abc import Callable, MutableMapping
 from pathlib import Path
 from typing import Any
 
 import pytest
-from fastapi import FastAPI
 from fastapi.testclient import TestClient
 from httpx2 import Response
 from structlog.testing import capture_logs
@@ -23,7 +22,6 @@ from inventory_tng.core.settings import FrontendConfig, RateLimits
 from inventory_tng.web import security_headers
 from inventory_tng.web.frontend_bundle import MANIFEST
 
-from helpers.apps import with_failures
 from helpers.csp_reports import REPORT_URI, REPORTING_API, SHAPES
 from helpers.markup import read
 from helpers.source import TEMPLATES
@@ -125,13 +123,6 @@ def test_a_refused_cross_site_request_is_protected(built: TestClient) -> None:
     response = built.post("/admin/sign-in", headers={"Sec-Fetch-Site": "cross-site"})
     assert response.status_code == 403
     assert_protected(response)
-
-
-@pytest.fixture
-def failing(make_app_without_database: Callable[..., FastAPI]) -> Iterator[TestClient]:
-    app = with_failures(make_app_without_database())
-    with TestClient(app, raise_server_exceptions=False) as client:
-        yield client
 
 
 def test_a_failure_page_is_protected(failing: TestClient) -> None:

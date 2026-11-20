@@ -528,7 +528,7 @@ def test_both_ends_right_then_closed_names_the_count_and_the_close(
     )
     at = datetime(2026, 11, 20, 15, tzinfo=UTC)
     with monkeypatch.context() as patched:
-        patched.setattr(over_recorded, "open_package_closed", lambda *_: 0)
+        patched.setattr(over_recorded, "open_package_closed", lambda *_: None)
         closed = open_packages.close(
             session, movement.to_open_package_id, ada_id(session), at, how="direct"
         )

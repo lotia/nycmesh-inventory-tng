@@ -2,8 +2,7 @@
 logging what it wrote: so a commit that fails, and the retry after it,
 does it once. Work asked for in a savepoint rolled back, or in a
 transaction rolled back, is never done. The project's one way to measure
-and log a write: the function that writes registers it, so every caller
-is counted (CONTRIBUTING.md, Logging)."""
+and log a write (CONTRIBUTING.md, Logging)."""
 
 from collections.abc import Callable
 from functools import partial

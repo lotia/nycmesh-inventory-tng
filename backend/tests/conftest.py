@@ -46,7 +46,7 @@ from databases import (
     new_database,
     refused_connection,
 )
-from helpers.apps import new_app, on_session
+from helpers.apps import new_app, on_session, with_failures
 from helpers.clone_files import text_files
 from helpers.concurrency import LOCK_TIMEOUT, Committed, delete_made, newest_ids
 from helpers.devices import new_device
@@ -635,6 +635,16 @@ def make_client_without_database(
 ) -> Callable[..., TestClient]:
     """make_client's, of apps with no database (make_app_without_database)."""
     return _client_maker(make_app_without_database, _clients)
+
+
+@pytest.fixture
+def failing(make_app_without_database: Callable[..., FastAPI]) -> Iterator[TestClient]:
+    """An app with a page and an API route that fail, its errors answered
+    as a browser would get them, not raised into the test. With no database:
+    the failures here are the app's own, never a database's 503."""
+    app = with_failures(make_app_without_database())
+    with TestClient(app, raise_server_exceptions=False) as client:
+        yield client
 
 
 def _client_maker(

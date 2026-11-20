@@ -87,7 +87,7 @@ from helpers.sign_in import (
     reset_link,
     sign_in_with,
 )
-from helpers.stock import Place, Spools, committed_place, sealed_line
+from helpers.stock import Place, Spools, committed_place, report, sealed_line
 
 NEW_PASSWORD = "a long passphrase of their own"
 
@@ -1373,11 +1373,7 @@ def test_a_report_sent_twice_at_once_is_compared_with_the_first(
     spools = Spools(setup)
     one, two = spools.opened(), spools.opened()
     setup.commit()
-    batch = Batch.model_validate(
-        spools.place.batch(
-            kind="report", to_location_id=None, lines=[], used_up=[str(one.key)]
-        )
-    )
+    batch = Batch.model_validate(report(spools, used_up=[one.key]))
     other = batch if same else batch.model_copy(update={"used_up": [two.key]})
     first_session, second_session = own_committed.session(), own_committed.session()
     first, *_ = record(first_session, batch, device_id=None)

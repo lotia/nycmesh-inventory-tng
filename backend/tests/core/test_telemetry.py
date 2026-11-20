@@ -1340,7 +1340,7 @@ def test_counts_lines_recorded_more_than_moved_closed_with_both_ends_right(
     over_recorded.counted(
         session, admin.id, store, shown.as_of, count.written, count.put_right
     )
-    monkeypatch.setattr(over_recorded, "open_package_closed", lambda *_: 0)
+    monkeypatch.setattr(over_recorded, "open_package_closed", lambda *_: None)
     assert open_packages.close(
         session, made.id, admin.id, datetime.now(UTC), how="direct"
     )

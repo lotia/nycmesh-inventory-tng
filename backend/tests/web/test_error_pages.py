@@ -20,7 +20,6 @@ from inventory_tng.catalogue.paths import ITEMS
 from inventory_tng.web import pages
 from inventory_tng.web.frontend_bundle import SCAN
 
-from helpers.apps import with_failures
 from helpers.markup import addresses, forms, read, words_on
 from helpers.query_counts import counting
 
@@ -89,16 +88,6 @@ def test_the_api_answers_json(
 ) -> None:
     answer = make_client_without_database().request(method, path)
     assert (answer.status_code, answer.json()) == (status, {"detail": detail})
-
-
-@pytest.fixture
-def failing(make_app_without_database: Callable[..., FastAPI]) -> Iterator[TestClient]:
-    """An app with a page and an API route that fail, its errors answered
-    as a browser would get them, not raised into the test. With no database:
-    the failures here are the app's own, never a database's 503."""
-    app = with_failures(make_app_without_database())
-    with TestClient(app, raise_server_exceptions=False) as client:
-        yield client
 
 
 def test_a_failure_on_a_page_is_a_page(failing: TestClient) -> None:

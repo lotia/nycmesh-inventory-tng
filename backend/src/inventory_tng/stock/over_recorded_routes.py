@@ -434,7 +434,7 @@ def bring_back(
     ):
         return not_found()
 
-    def restore() -> bool:
+    def restore() -> None:
         try:
             locations.restore(session, location)
             brought = True
@@ -445,7 +445,6 @@ def bring_back(
         over_recorded.waiting(session, check_id, seen)
         if brought:
             over_recorded.brought_back(session, check_id, location.id, signed.admin.id)
-        return brought
 
     _, broken = attempt(session, restore)
     session.commit()

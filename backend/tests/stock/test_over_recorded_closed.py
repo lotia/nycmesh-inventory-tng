@@ -559,7 +559,7 @@ def both_right(
     moved = registered_client.post(URL, json=spools.place.batch(lines=[whole]))
     assert moved.status_code == 201
     with monkeypatch.context() as patched:
-        patched.setattr(over_recorded, "open_package_closed", lambda *_: 0)
+        patched.setattr(over_recorded, "open_package_closed", lambda *_: None)
         closed_from_its_item(admin_client, spools, open_id)
     session.expire_all()
     (check,) = checks(session)
