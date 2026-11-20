@@ -1,8 +1,8 @@
 /**
  * A save the inventory refuses for one of its lines: Add the rest to cart
  * puts its other lines back in the cart, saying the line taken off and
- * why, and Record records them (Ali, 2026-11-20, inventory-tng-clvh). The cables are
- * the test's own (own-rows.ts).
+ * why, and Record records them (Ali, 2026-11-20, inventory-tng-clvh).
+ * The cables are the test's own (own-rows.ts).
  */
 import { expect } from "@playwright/test";
 import { test } from "./csp-violations";

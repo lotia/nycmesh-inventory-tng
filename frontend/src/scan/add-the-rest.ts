@@ -65,9 +65,10 @@ export function restOf(entry: Entry): Body | null {
   };
 }
 
-/** The lines Add the rest to cart takes off `entry`, each as "item: taken off.
- * why", in the problem's words, named from `catalogue`, retired items
- * too; each item's each kind once, two items alike in words both said. */
+/** The lines Add the rest to cart takes off `entry`, each as "item:
+ * taken off. why", in the problem's words, named from `catalogue`, retired
+ * items too; each item's each kind once, two items alike in words both
+ * said. */
 export function takenOff(entry: Entry, catalogue: Catalogue): string[] {
   const { items } = indexOf(withRetired(catalogue));
   const each = new Map(
