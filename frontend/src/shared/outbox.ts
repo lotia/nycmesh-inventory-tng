@@ -339,15 +339,15 @@ export function lineNumbers(
   return (itemId) => items.indexOf(itemId) + 1;
 }
 
-/** A 422's problems, as kept. A line of the cart may be sent as several,
- * one for each package and one loose (scan/batch.ts, toBatch), so a line is
- * named as the cart's: by its item's place in it. */
-function problems(
+/** A 422, as kept: refused, with its problems. A line of the cart may be
+ * sent as several, one for each package and one loose (scan/batch.ts,
+ * toBatch), so a line is named as the cart's: by its item's place in it. */
+function refused(
   detail: v.InferOutput<typeof ValidationFailed>["detail"],
   body: Body,
-): Problem[] {
+): Reason {
   const lineOf = lineNumbers(body.lines.map((line) => line.item_id));
-  return detail.map(({ loc, type: kind }) => {
+  const problems = detail.map(({ loc, type: kind }): Problem => {
     const line = loc[0] === "body" && loc[1] === "lines" ? loc[2] : undefined;
     // A report's, by its place in the batch's list of them.
     if (
@@ -366,6 +366,7 @@ function problems(
       kind,
     };
   });
+  return { code: "refused", problems };
 }
 
 export class Outbox {
@@ -745,22 +746,14 @@ export class Outbox {
           });
           return "next";
         }
-        if (
-          entry.build === this.builds.build ||
-          this.builds.isNewer(entry.build)
-        ) {
+        if (this.builds.isThisOrNewer(entry.build)) {
           this.builds.learn("too_old");
           return "stop";
         }
         listed({ reason: { code: "recorded_elsewhere" } });
         return "next";
       case 422:
-        listed({
-          reason: {
-            code: "refused",
-            problems: problems(reply.body.detail, entry.body),
-          },
-        });
+        listed({ reason: refused(reply.body.detail, entry.body) });
         return "next";
       case "unexpected":
         this.later();
@@ -818,10 +811,7 @@ export class Outbox {
         return "stop";
       case 409:
         if (reply.body.reason === "build_too_old") {
-          if (
-            entry.build !== this.builds.build &&
-            !this.builds.isNewer(entry.build)
-          ) {
+          if (!this.builds.isThisOrNewer(entry.build)) {
             // An older build's, kept under this key: too old itself, not
             // this tab. Listed with what older builds left
             // (scan/older-builds.ts).
@@ -861,10 +851,7 @@ export class Outbox {
         this.settle(entry.body, {
           state: "refused",
           waitingFor: null,
-          reason: {
-            code: "refused",
-            problems: problems(reply.body.detail, entry.body),
-          },
+          reason: refused(reply.body.detail, entry.body),
         });
         return "next";
       case "unexpected": {

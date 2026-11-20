@@ -63,6 +63,11 @@ export class Builds {
     return typeof other === "string" && ID.test(other) && other > this.build;
   }
 
+  /** Whether `other` names this build or a newer one. */
+  isThisOrNewer(other: unknown): boolean {
+    return other === this.build || this.isNewer(other);
+  }
+
   /** A newer build is out, learned so. */
   learn(how: Learned): void {
     const now = this.newer.value;

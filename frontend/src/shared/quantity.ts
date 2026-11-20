@@ -49,3 +49,14 @@ export function decimal(amount: number): string {
     .replace(/0+$/, "");
   return fraction === "" ? String(units) : `${units}.${fraction}`;
 }
+
+/** How many whole packages of `size` thousandths `amount` makes, or null
+ * if it is not a whole number of them, or the size is unknown or none. */
+export function wholePackages(
+  amount: number,
+  size: number | null,
+): number | null {
+  return size !== null && size > 0 && amount % size === 0
+    ? amount / size
+    : null;
+}

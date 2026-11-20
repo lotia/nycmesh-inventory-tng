@@ -9,7 +9,7 @@ import { msg } from "@lingui/core/macro";
 import * as v from "valibot";
 import { say, sayAmount, sayNumber } from "../shared/i18n";
 import { BatchKey, fromOpen, REPORTS, type ReportKind } from "../shared/outbox";
-import { count, decimal, thousandths } from "../shared/quantity";
+import { count, decimal, thousandths, wholePackages } from "../shared/quantity";
 import { toBatch } from "./batch";
 import {
   type Cart,
@@ -218,15 +218,18 @@ export function toCart(
         // so it is done again. An item gone is named as it is (withRetired);
         // its package, counted as saved, if the catalogue still names it.
         const gone = retiredPackage(item, String(line.package_id));
-        const size =
+        const packs =
           gone === undefined
-            ? 0
-            : (thousandths(String(line.package_size ?? gone.size)) ?? 0);
+            ? null
+            : wholePackages(
+                amount,
+                thousandths(String(line.package_size ?? gone.size)),
+              );
         leave(
           say(ITEM_RETIRED),
-          gone !== undefined && size > 0 && amount % size === 0
+          gone !== undefined && packs !== null
             ? say(PACKAGES_OF, {
-                count: sayNumber(amount / size),
+                count: sayNumber(packs),
                 package: gone.name,
               })
             : by,
@@ -245,17 +248,13 @@ export function toCart(
         return;
       }
       const made = lineOf(line.item_id, { at });
-      if (
-        pack !== undefined &&
-        size !== null &&
-        size > 0 &&
-        amount % size === 0
-      ) {
+      const packs = wholePackages(amount, size);
+      if (pack !== undefined && packs !== null) {
         // What this loop wrote: a count, or none yet.
         const before = Number(made.packages[pack.id] ?? 0);
         made.packages = {
           ...made.packages,
-          [pack.id]: String(before + amount / size),
+          [pack.id]: String(before + packs),
         };
       } else {
         // What this loop wrote is always a decimal, so never null here.

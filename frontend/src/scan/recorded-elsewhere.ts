@@ -24,7 +24,7 @@ import {
   type ReportKind,
 } from "../shared/outbox";
 import type { Note, Said } from "../shared/outbox-notes";
-import { decimal, thousandths } from "../shared/quantity";
+import { decimal, thousandths, wholePackages } from "../shared/quantity";
 import { type Catalogue, ITEM_SAYS, type Item } from "./cart";
 import {
   FROM_OPEN,
@@ -188,13 +188,11 @@ class Namer {
     const pack = this.items
       .get(line.item_id)
       ?.packages.find((each) => each.id === line.package_id);
-    const size = thousandths(String(line.package_size ?? pack?.size ?? ""));
-    return pack !== undefined &&
-      size !== null &&
-      size > 0 &&
-      amount % size === 0
-      ? { name: pack.name, n: amount / size }
-      : null;
+    const n = wholePackages(
+      amount,
+      thousandths(String(line.package_size ?? pack?.size ?? "")),
+    );
+    return pack !== undefined && n !== null ? { name: pack.name, n } : null;
   }
 
   /** `amount` of a line's item: "2 × Bag of 50", or so much in its unit,
@@ -215,10 +213,8 @@ class Namer {
    * recorded, else so much in its unit (Ali, inventory-tng-0gg, 3). */
   changedTo(line: Line, recorded: number, amount: number): Said {
     const pack = this.packageOf(line, recorded);
-    const size = pack === null ? null : recorded / pack.n;
-    return size !== null && amount % size === 0
-      ? [sayNumber(amount / size)]
-      : [this.inUnit(line, amount)];
+    const n = wholePackages(amount, pack === null ? null : recorded / pack.n);
+    return n !== null ? [sayNumber(n)] : [this.inUnit(line, amount)];
   }
 
   private inUnit(line: Line, amount: number): string {
