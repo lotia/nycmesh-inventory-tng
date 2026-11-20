@@ -3,7 +3,7 @@
  * (decoder.ts). Needs a real camera, so browser-tests/camera.spec.ts tests it,
  * not Vitest.
  */
-import { qrDetector } from "./decoder";
+import { type DecoderKind, qrDetector } from "./decoder";
 
 /** A camera opened onto a video element, and what it can read. */
 export type Session = {
@@ -12,6 +12,8 @@ export type Session = {
   /** Turns the torch on or off; null where the camera has none. */
   torch: ((on: boolean) => Promise<void>) | null;
   stop(): void;
+  /** Which decoder reads. */
+  decoder: DecoderKind;
 };
 
 /** The camera opened, but the decoder did not load: offline, say. */
@@ -37,7 +39,7 @@ export async function openCamera(video: HTMLVideoElement): Promise<Session> {
   try {
     video.srcObject = stream;
     await video.play();
-    const detector = await decoder;
+    const { detector, kind } = await decoder;
     const [track] = stream.getVideoTracks();
     const capabilities = track?.getCapabilities?.() as
       | (MediaTrackCapabilities & { torch?: boolean })
@@ -53,6 +55,7 @@ export async function openCamera(video: HTMLVideoElement): Promise<Session> {
               })
           : null,
       stop,
+      decoder: kind,
     };
   } catch (error) {
     stop();

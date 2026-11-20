@@ -604,6 +604,61 @@
         "title": "BuildTooOldReply",
         "description": "A batch from a build of the scan page older than this server takes:\nnot checked, nor saved."
       },
+      "CameraSession": {
+        "properties": {
+          "kind": {
+            "type": "string",
+            "const": "camera_session",
+            "title": "Kind"
+          },
+          "outcome": {
+            "type": "string",
+            "enum": [
+              "opened",
+              "resumed",
+              "not_allowed",
+              "not_found",
+              "in_use",
+              "insecure",
+              "decoder_failed",
+              "other"
+            ],
+            "title": "Outcome"
+          },
+          "decoder": {
+            "type": "string",
+            "enum": ["native", "ponyfill", "none"],
+            "title": "Decoder"
+          },
+          "open_seconds": {
+            "anyOf": [
+              {
+                "type": "number",
+                "maximum": 120.0,
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Open Seconds"
+          },
+          "seconds": {
+            "type": "number",
+            "maximum": 86400.0,
+            "minimum": 0.0,
+            "title": "Seconds"
+          },
+          "labels": {
+            "$ref": "#/components/schemas/LabelsRead"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": ["kind", "outcome", "decoder", "seconds", "labels"],
+        "title": "CameraSession",
+        "description": "One session of the scan page's camera, sent as it closed, or as the\npage was hidden with it open (frontend/src/scan/camera-report.ts)."
+      },
       "CartDiscarded": {
         "properties": {
           "kind": {
@@ -939,6 +994,39 @@
         "required": ["code", "item_id", "package_id", "location_id"],
         "title": "LabelEntry",
         "description": "A printed code, and the one thing it names."
+      },
+      "LabelsRead": {
+        "properties": {
+          "item": {
+            "type": "integer",
+            "maximum": 10000.0,
+            "minimum": 0.0,
+            "title": "Item"
+          },
+          "package": {
+            "type": "integer",
+            "maximum": 10000.0,
+            "minimum": 0.0,
+            "title": "Package"
+          },
+          "place": {
+            "type": "integer",
+            "maximum": 10000.0,
+            "minimum": 0.0,
+            "title": "Place"
+          },
+          "unknown": {
+            "type": "integer",
+            "maximum": 10000.0,
+            "minimum": 0.0,
+            "title": "Unknown"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": ["item", "package", "place", "unknown"],
+        "title": "LabelsRead",
+        "description": "Labels a camera session read, by what each names: an item, an\nitem's package, a place, or nothing the catalogue has (old stickers)."
       },
       "LengthReport": {
         "properties": {
@@ -1575,11 +1663,15 @@
                 },
                 {
                   "$ref": "#/components/schemas/RestPutBack"
+                },
+                {
+                  "$ref": "#/components/schemas/CameraSession"
                 }
               ],
               "discriminator": {
                 "propertyName": "kind",
                 "mapping": {
+                  "camera_session": "#/components/schemas/CameraSession",
                   "cart_discarded": "#/components/schemas/CartDiscarded",
                   "difference_added": "#/components/schemas/DifferenceAdded",
                   "error": "#/components/schemas/PageError",

@@ -9,6 +9,7 @@ export function fakeCamera(overrides: Partial<Session> = {}) {
   const session: Session = {
     read: async () => state.inView,
     torch: null,
+    decoder: "native",
     stop: () => {
       state.stopped = true;
     },

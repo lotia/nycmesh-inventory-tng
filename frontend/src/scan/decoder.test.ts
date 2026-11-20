@@ -47,14 +47,18 @@ afterEach(() => {
 test("the browser's own detector, where it reads QR codes", async () => {
   const Native = browserDetector(["qr_code", "ean_13"]);
   const { qrDetector } = await decoder();
-  expect(await qrDetector()).toBeInstanceOf(Native);
+  const { detector, kind } = await qrDetector();
+  expect(detector).toBeInstanceOf(Native);
+  expect(kind).toBe("native");
   expect(library.prepare).not.toHaveBeenCalled();
 });
 
 test("else the ponyfill, with its WebAssembly from this origin", async () => {
   browserDetector(["ean_13"]);
   const { qrDetector } = await decoder();
-  expect(await qrDetector()).toBeInstanceOf(library.Ponyfill);
+  const { detector, kind } = await qrDetector();
+  expect(detector).toBeInstanceOf(library.Ponyfill);
+  expect(kind).toBe("ponyfill");
   const [options] = library.prepare.mock.calls[0] as unknown as [
     {
       overrides: { locateFile: (path: string, prefix: string) => string };
@@ -80,6 +84,6 @@ test("a ponyfill that failed to load is tried again", async () => {
   library.prepare.mockRejectedValueOnce(new Error("offline"));
   const { qrDetector } = await decoder();
   await expect(qrDetector()).rejects.toThrow("offline");
-  expect(await qrDetector()).toBeInstanceOf(library.Ponyfill);
+  expect((await qrDetector()).detector).toBeInstanceOf(library.Ponyfill);
   expect(library.prepare).toHaveBeenCalledTimes(2);
 });

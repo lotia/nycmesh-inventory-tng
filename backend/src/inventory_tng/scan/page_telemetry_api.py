@@ -130,6 +130,43 @@ class RestPutBack(Strict):
     kind: Literal["rest_put_back"]
 
 
+class LabelsRead(Strict):
+    """Labels a camera session read, by what each names: an item, an
+    item's package, a place, or nothing the catalogue has (old stickers)."""
+
+    item: Annotated[int, Field(ge=0, le=10_000)]
+    package: Annotated[int, Field(ge=0, le=10_000)]
+    place: Annotated[int, Field(ge=0, le=10_000)]
+    unknown: Annotated[int, Field(ge=0, le=10_000)]
+
+
+class CameraSession(Strict):
+    """One session of the scan page's camera, sent as it closed, or as the
+    page was hidden with it open (frontend/src/scan/camera-report.ts)."""
+
+    kind: Literal["camera_session"]
+    # Opened, or what refused it; resumed when the page was shown again
+    # with the camera open, after reporting as it was hidden.
+    outcome: Literal[
+        "opened",
+        "resumed",
+        "not_allowed",
+        "not_found",
+        "in_use",
+        "insecure",
+        "decoder_failed",
+        "other",
+    ]
+    # The decoder that read, which tells browsers apart with no user agent
+    # read; none where the camera never opened.
+    decoder: Literal["native", "ponyfill", "none"]
+    # From asking for the camera to its opening: opened sessions only.
+    open_seconds: Annotated[float, Field(ge=0, le=120)] | None = None
+    # From asking for the camera, or the page shown again, to its closing.
+    seconds: Annotated[float, Field(ge=0, le=86_400)]
+    labels: LabelsRead
+
+
 AnyEvent = (
     WebVital
     | PageError
@@ -142,6 +179,7 @@ AnyEvent = (
     | RemovalUndone
     | DifferenceAdded
     | RestPutBack
+    | CameraSession
 )
 Event = Annotated[AnyEvent, Field(discriminator="kind")]
 
@@ -223,6 +261,31 @@ rests_put_back = meter.create_counter(
     description="Batches refused for some of their lines whose other lines a "
     "volunteer put in the scan page's cart with Record the rest",
 )
+camera_sessions = meter.create_counter(
+    "inventory.scan.camera.sessions",
+    unit="{session}",
+    description="Times the scan page's camera was opened, or refused, by how "
+    "it ended and the decoder that read",
+)
+# Most cameras open in a second or two; a first one waits on the
+# browser's question to allow it.
+OPEN_SECONDS = (0.25, 0.5, 1, 1.5, 2, 3, 5, 10, 20, 30, 60, 120)
+camera_open = meter.create_histogram(
+    "inventory.scan.camera.open.duration",
+    unit="s",
+    description="From asking for the scan page's camera to its opening",
+    explicit_bucket_boundaries_advisory=OPEN_SECONDS,
+)
+camera_session_durations = meter.create_histogram(
+    "inventory.scan.camera.session.duration",
+    unit="s",
+    description="How long the scan page's camera stayed open, or took to be refused",
+)
+camera_labels = meter.create_counter(
+    "inventory.scan.camera.labels",
+    unit="{label}",
+    description="Labels the scan page's camera read, by what each names",
+)
 scan_to_save = meter.create_histogram(
     "inventory.scan.to_save.duration",
     unit="s",
@@ -266,8 +329,21 @@ def record(event: AnyEvent) -> None:
             differences_added.add(1, {"how": event.how})
         case RestPutBack():
             rests_put_back.add(1)
+        case CameraSession():
+            record_camera_session(event)
         case _:  # ScanToSave, the last kind left.
             scan_to_save.record(event.seconds)
+
+
+def record_camera_session(event: CameraSession) -> None:
+    session = {"outcome": event.outcome, "decoder": event.decoder}
+    camera_sessions.add(1, session)
+    camera_session_durations.record(event.seconds, session)
+    if event.open_seconds is not None:
+        camera_open.record(event.open_seconds, {"decoder": event.decoder})
+    for kind, read in event.labels:
+        if read:
+            camera_labels.add(read, {"label.kind": kind})
 
 
 # Async: it works in memory only, so it holds no thread a request for the

@@ -9,6 +9,11 @@ export type Detector = {
   detect(source: HTMLVideoElement): Promise<{ rawValue: string }[]>;
 };
 
+/** Which decoder reads: the browser's own, or the ponyfill. It tells
+ * browsers apart in the camera's report (camera-report.ts) with no user
+ * agent read. */
+export type DecoderKind = "native" | "ponyfill";
+
 type DetectorClass = {
   new (options: { formats: "qr_code"[] }): Detector;
   getSupportedFormats(): Promise<readonly string[]>;
@@ -17,14 +22,17 @@ type DetectorClass = {
 /** The ponyfill, loaded with its WebAssembly; tried again if that failed. */
 let ponyfill: Promise<DetectorClass> | undefined;
 
-export async function qrDetector(): Promise<Detector> {
+export async function qrDetector(): Promise<{
+  detector: Detector;
+  kind: DecoderKind;
+}> {
   const native = (globalThis as { BarcodeDetector?: DetectorClass })
     .BarcodeDetector;
   if (
     native !== undefined &&
     (await native.getSupportedFormats()).includes("qr_code")
   ) {
-    return new native({ formats: ["qr_code"] });
+    return { detector: new native({ formats: ["qr_code"] }), kind: "native" };
   }
   ponyfill ??= loadPonyfill();
   const Ponyfill = await ponyfill.catch((error: unknown) => {
@@ -32,7 +40,10 @@ export async function qrDetector(): Promise<Detector> {
     ponyfill = undefined;
     throw error;
   });
-  return new Ponyfill({ formats: ["qr_code"] });
+  return {
+    detector: new Ponyfill({ formats: ["qr_code"] }),
+    kind: "ponyfill",
+  };
 }
 
 async function loadPonyfill(): Promise<DetectorClass> {

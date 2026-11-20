@@ -2,7 +2,7 @@
  * Scanning labels with the camera (inventory-tng-8i4.13.7): open until Done,
  * each label read once while it stays in view (repeated-reads.ts, Repeats),
  * with a word on what it did. A refused or missing camera says so; the
- * lists below still work.
+ * lists below still work. Each session is reported (camera-report.ts).
  */
 import type { MessageDescriptor } from "@lingui/core";
 import { msg } from "@lingui/core/macro";
@@ -10,6 +10,7 @@ import { useSignal } from "@preact/signals";
 import { useEffect, useRef } from "preact/hooks";
 import { say } from "../shared/i18n";
 import { DecoderUnavailable, openCamera, type Session } from "./camera";
+import { CameraReport, type LabelKind } from "./camera-report";
 import { Repeats } from "./repeated-reads";
 
 export const CAMERA = msg`Camera`;
@@ -22,6 +23,10 @@ export const NO_DECODER = msg`The label reader didn't load. Check the connection
 export const NOT_ALLOWED = msg`The camera isn't allowed for this page. Allow it in the browser's settings, or find items in the list.`;
 export const NO_CAMERA = msg`No camera could be opened. Find items in the list instead.`;
 
+/** What a code read did, in words for the volunteer, and what its label
+ * named, for the report. */
+export type Acted = { said: string; label: LabelKind };
+
 /** How often the camera's picture is read, in milliseconds. */
 export const READ_EVERY_MS = 200;
 
@@ -30,8 +35,7 @@ export function Scanner({
   onDone,
   open = openCamera,
 }: {
-  /** What a code read did, in words for the volunteer. */
-  onCode: (code: string) => string;
+  onCode: (code: string) => Acted;
   onDone: () => void;
   open?: (video: HTMLVideoElement) => Promise<Session>;
 }) {
@@ -47,9 +51,11 @@ export function Scanner({
     let stopped = false;
     let timer: ReturnType<typeof setTimeout> | undefined;
     const repeats = new Repeats();
+    const report = new CameraReport();
     const camera = open(video.current as HTMLVideoElement);
     camera.then(
       (session) => {
+        report.opened(session.decoder);
         if (stopped) {
           return;
         }
@@ -63,7 +69,9 @@ export function Scanner({
             // Closed while reading: what it read is not taken.
             for (const code of stopped ? [] : codes) {
               if (repeats.fresh(code, Date.now())) {
-                said.value = handle.current(code);
+                const acted = handle.current(code);
+                report.read(acted.label);
+                said.value = acted.said;
               }
             }
           } catch {
@@ -76,15 +84,32 @@ export function Scanner({
         timer = setTimeout(read, READ_EVERY_MS);
       },
       (error: unknown) => {
+        report.refused(error);
         said.value = refused(error);
       },
     );
+    // Reported as the page is hidden or left, which may be the last of it.
+    const listening = new AbortController();
+    const { signal } = listening;
+    document.addEventListener(
+      "visibilitychange",
+      () =>
+        document.visibilityState === "hidden"
+          ? report.hidden()
+          : report.shown(),
+      { signal },
+    );
+    window.addEventListener("pagehide", () => report.hidden(), { signal });
     return () => {
       stopped = true;
       clearTimeout(timer);
-      // Stopped when it opens, if it has not yet.
+      listening.abort();
+      // Stopped when it opens, if it has not yet, and reported.
       camera.then(
-        (session) => session.stop(),
+        (session) => {
+          session.stop();
+          report.closed();
+        },
         () => {},
       );
     };

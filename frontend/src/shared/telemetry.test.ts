@@ -117,6 +117,14 @@ describe("reporting", () => {
       removal_undone: { kind: "removal_undone" },
       difference_added: { kind: "difference_added", how: "tap" },
       rest_put_back: { kind: "rest_put_back" },
+      camera_session: {
+        kind: "camera_session",
+        outcome: "opened",
+        decoder: "native",
+        open_seconds: 1,
+        seconds: 60,
+        labels: { item: 1, package: 0, place: 0, unknown: 0 },
+      },
     };
     for (const event of Object.values(each)) {
       for (let i = 0; i <= PER_HOUR_IN_ALL; i++) {
@@ -136,6 +144,9 @@ describe("reporting", () => {
     expect(PER_HOUR.scan_to_save).toBe(18);
     expect(PER_HOUR.difference_added).toBe(2);
     expect(PER_HOUR.web_vital).toBe(10);
+    // Errors 10 and camera sessions 20 (Ali, inventory-tng-8i4.63).
+    expect(PER_HOUR.error).toBe(10);
+    expect(PER_HOUR.camera_session).toBe(20);
   });
 
   test("each kind has its own share an hour, so none crowds out the rest", async () => {

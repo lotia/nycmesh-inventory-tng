@@ -11,6 +11,7 @@ import { type Said, wordsOf } from "../shared/outbox-notes";
 import { MOST_SECONDS_TO_SAVE, telemetry } from "../shared/telemetry";
 import { type Batch, batchWords, toBatch } from "./batch";
 import { CartLine } from "./CartLine";
+import { labelKind } from "./camera-report";
 import {
   addOne,
   askWho,
@@ -758,7 +759,10 @@ export function CartForm({
 
       {scanning.value ? (
         <Scanner
-          onCode={(code) => actOn(readLabel(catalogue, code))}
+          onCode={(code) => {
+            const read = readLabel(catalogue, code);
+            return { said: actOn(read), label: labelKind(read) };
+          }}
           onDone={() => {
             scanning.value = false;
           }}

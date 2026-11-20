@@ -294,11 +294,17 @@ def counted(reader: InMemoryMetricReader, name: str) -> dict[tuple[object, ...],
 
 
 def added(
-    reader: InMemoryMetricReader, name: str, before: dict[tuple[object, ...], int]
+    reader: InMemoryMetricReader,
+    name: str,
+    before: dict[tuple[object, ...], int],
+    reading: Callable[
+        [InMemoryMetricReader, str], dict[tuple[object, ...], int]
+    ] = counted,
 ) -> dict[tuple[object, ...], int]:
-    """A counter's totals since `before` (counted): the reader keeps them for
-    the module, and more than one test may add to a counter."""
-    now = counted(reader, name)
+    """A counter's totals since `before` (counted), or a histogram's numbers
+    of values (histogram_counts): the reader keeps them for the module, and
+    more than one test may add to a metric."""
+    now = reading(reader, name)
     return {
         key: n - before.get(key, 0) for key, n in now.items() if n != before.get(key, 0)
     }
@@ -1062,6 +1068,57 @@ def test_records_each_event_a_page_reports(
     before = reading(reader, metric).get(attributes, 0)
     assert client.post("/api/telemetry", json={"events": [event]}).status_code == 204
     assert reading(reader, metric)[attributes] == before + 1
+
+
+CAMERA_SESSION = {
+    "kind": "camera_session",
+    "outcome": "opened",
+    "decoder": "ponyfill",
+    "open_seconds": 1.5,
+    "seconds": 240,
+    "labels": {"item": 3, "package": 1, "place": 2, "unknown": 0},
+}
+
+
+def test_records_a_camera_session(rolled_back: Recorded) -> None:
+    """Its session, open time, length and labels, each by fixed values."""
+    client, _, reader, _ = rolled_back
+    sessions = "inventory.scan.camera.sessions"
+    opening = "inventory.scan.camera.open.duration"
+    lengths = "inventory.scan.camera.session.duration"
+    labels = "inventory.scan.camera.labels"
+    before = {
+        sessions: counted(reader, sessions),
+        opening: histogram_counts(reader, opening),
+        lengths: histogram_counts(reader, lengths),
+        labels: counted(reader, labels),
+    }
+    refused = CAMERA_SESSION | {
+        "outcome": "not_allowed",
+        "decoder": "none",
+        "open_seconds": None,
+        "seconds": 3,
+        "labels": {"item": 0, "package": 0, "place": 0, "unknown": 0},
+    }
+    answer = client.post("/api/telemetry", json={"events": [CAMERA_SESSION, refused]})
+    assert answer.status_code == 204
+    opened = (("decoder", "ponyfill"), ("outcome", "opened"))
+    not_allowed = (("decoder", "none"), ("outcome", "not_allowed"))
+    assert added(reader, sessions, before[sessions]) == {opened: 1, not_allowed: 1}
+    # Only a camera that opened says how long it took.
+    assert added(reader, opening, before[opening], histogram_counts) == {
+        (("decoder", "ponyfill"),): 1
+    }
+    assert added(reader, lengths, before[lengths], histogram_counts) == {
+        opened: 1,
+        not_allowed: 1,
+    }
+    # No label of a kind, nothing counted for it.
+    assert added(reader, labels, before[labels]) == {
+        (("label.kind", "item"),): 3,
+        (("label.kind", "package"),): 1,
+        (("label.kind", "place"),): 2,
+    }
 
 
 def test_web_vitals_are_recorded_in_buckets_that_fit_them(

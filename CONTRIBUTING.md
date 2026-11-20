@@ -628,7 +628,7 @@ how long a batch took from its first line to Record, a tab learning that a
 newer build is out, what an older build left in storage and what
 volunteers did with it, a cart discarded, a cart's line removed and put
 back with Undo, what a save another tab recorded first added put in
-the cart, and Record the rest tapped, through
+the cart, Record the rest tapped, and each session of the camera, through
 `frontend/src/shared/telemetry.ts`, to `POST /api/telemetry`, which turns
 them into `inventory.*` metrics (docs/decisions/0006). Its schema, in
 `backend/src/inventory_tng/scan/page_telemetry_api.py`, lists all a page

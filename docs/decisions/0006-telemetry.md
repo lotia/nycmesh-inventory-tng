@@ -1,7 +1,7 @@
 # 0006 — Telemetry: metrics and logs over OTLP, traces on demand
 
 **Status:** accepted · 2026-10-30 · amended 2026-11-19 (measured and
-logged once committed)
+logged once committed; camera sessions)
 
 ## Context
 
@@ -32,8 +32,9 @@ judged too heavy, especially in the browser: about 1,000 lines and 9 packages.
 - **The scan page uses no OpenTelemetry.** It sends errors, Web Vitals,
   outbox retries, scan-to-save time, a tab learning that a newer build is
   out, what an older build left in storage and what volunteers did with
-  it, and a cart discarded to `/api/telemetry`, which records them. Its
-  schema limits what may be sent.
+  it, a cart discarded, and each session of the camera to
+  `/api/telemetry`, which records them. Its schema limits what may be
+  sent.
 
 We rejected always-on tracing and OpenTelemetry in the browser: neither
 earns its cost here.
@@ -69,3 +70,19 @@ route measures its write.
 
 What was refused, or failed, is measured and logged at once, as nothing
 of it commits. Debug lines trace an attempt as it happens.
+
+## Amendment: camera sessions (2026-11-19)
+
+Decided by Ali on 2026-11-19 (inventory-tng-8i4.63): the scan page sends
+one report per camera session, when the camera closes, saying how it
+ended, how long the camera took to open, and the labels read in four
+kinds: item, package, place and unknown. Browsers are told apart by the
+decoder in use, the browser's own or the ponyfill (0010), so no user
+agent is read. Each kind of page report has its own allowance, refilled
+every hour, so a hub tablet left open all day keeps reporting.
+
+A session is also reported as the page is hidden or left with the camera
+open, by `sendBeacon`, which outlives the page; shown again, what follows
+is a session of its own. Reports lost offline are not kept for later:
+they are numbers, not records, and stay out of the outbox. The endpoint
+reads no cookie, so a report cannot be joined to a registered device.

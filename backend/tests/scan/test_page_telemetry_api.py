@@ -14,6 +14,14 @@ from inventory_tng.scan import page_telemetry_api
 
 PATH = "/api/telemetry"
 RETRY = {"kind": "outbox_retry", "reason": "unavailable"}
+CAMERA = {
+    "kind": "camera_session",
+    "outcome": "opened",
+    "decoder": "native",
+    "open_seconds": 1,
+    "seconds": 60,
+    "labels": {"item": 1, "package": 0, "place": 0, "unknown": 0},
+}
 
 
 @pytest.fixture
@@ -55,6 +63,11 @@ def test_a_report_is_taken_with_nothing_in_reply(client: TestClient) -> None:
             }
         ],
         [{"kind": "scan_to_save", "seconds": 86_401}],
+        [CAMERA | {"decoder": "Mozilla/5.0"}],
+        [CAMERA | {"open_seconds": 121}],
+        [CAMERA | {"labels": {"item": 1, "package": 0, "place": 0}}],
+        [CAMERA | {"labels": CAMERA["labels"] | {"code": "B3ZT9W"}}],
+        [CAMERA | {"labels": CAMERA["labels"] | {"item": 10_001}}],
     ],
 )
 def test_only_what_the_schema_names_is_taken(

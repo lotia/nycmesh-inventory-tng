@@ -483,8 +483,15 @@ const COVERED: Record<string, () => Promise<HTMLElement[]>> = {
         throw new Error("no torch");
       },
       stop: () => {},
+      decoder: "native" as const,
     });
-    render(<Scanner onCode={() => "Κουτί"} onDone={() => {}} open={open} />);
+    render(
+      <Scanner
+        onCode={() => ({ said: "Κουτί", label: "item" })}
+        onDone={() => {}}
+        open={open}
+      />,
+    );
     const [torch] = await screen.findAllByRole("button", { pressed: false });
     const status = screen.getByRole("status");
     const pointing = status.textContent;
@@ -500,7 +507,7 @@ const COVERED: Record<string, () => Promise<HTMLElement[]>> = {
     ]) {
       render(
         <Scanner
-          onCode={() => ""}
+          onCode={() => ({ said: "", label: "unknown" })}
           onDone={() => {}}
           open={() => Promise.reject(refusal)}
         />,

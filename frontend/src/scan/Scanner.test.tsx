@@ -1,15 +1,38 @@
 import { act, fireEvent, render, screen } from "@testing-library/preact";
 import { beforeEach, expect, test, vi } from "vitest";
 import { say } from "../shared/i18n";
+import { telemetry } from "../shared/telemetry";
 import { fakeCamera as camera, pass } from "../testing/camera";
 import { DecoderUnavailable, type Session } from "./camera";
-import { DONE, POINT, Scanner, TORCH, TORCH_FAILED } from "./Scanner";
+import type { LabelKind } from "./camera-report";
+import {
+  type Acted,
+  DONE,
+  POINT,
+  Scanner,
+  TORCH,
+  TORCH_FAILED,
+} from "./Scanner";
 
 // The camera's clock, faked: each test lets as many reads' time pass as it
 // needs (testing/setup.ts makes it real again). The fake clock also keeps up
 // with real time, so a read a test did not let pass still comes, only later.
 // Unmounts go in act: outside it, Preact closes the camera a frame later.
 beforeEach(() => vi.useFakeTimers({ shouldAdvanceTime: true }));
+
+const said = (words: string, label: LabelKind = "item"): Acted => ({
+  said: words,
+  label,
+});
+
+/** The camera sessions reported, as telemetry.record took them. */
+function reported() {
+  const record = vi.spyOn(telemetry, "record");
+  return () =>
+    record.mock.calls
+      .map(([event]) => event)
+      .filter((event) => event.kind === "camera_session");
+}
 
 /** A read that answers only when `finish` is called. */
 function slowRead() {
@@ -25,7 +48,7 @@ function slowRead() {
 
 test("a label in view is taken once, and said what it did", async () => {
   const { state, open } = camera();
-  const onCode = vi.fn((code: string) => `Read ${code}.`);
+  const onCode = vi.fn((code: string) => said(`Read ${code}.`));
   render(<Scanner open={open} onCode={onCode} onDone={() => {}} />);
   await screen.findByText(say(POINT));
   state.inView = ["B3ZT9W"];
@@ -40,7 +63,7 @@ test("Done stops the camera", async () => {
   const { state, open } = camera();
   const onDone = vi.fn();
   const { unmount } = render(
-    <Scanner open={open} onCode={() => ""} onDone={onDone} />,
+    <Scanner open={open} onCode={() => said("")} onDone={onDone} />,
   );
   await screen.findByText(say(POINT));
   fireEvent.click(screen.getByRole("button", { name: say(DONE) }));
@@ -56,7 +79,7 @@ test("the torch shows where the camera has one, and switches", async () => {
       lit.push(on);
     },
   });
-  render(<Scanner open={open} onCode={() => ""} onDone={() => {}} />);
+  render(<Scanner open={open} onCode={() => said("")} onDone={() => {}} />);
   const torch = await screen.findByRole("button", { name: say(TORCH) });
   fireEvent.click(torch);
   await vi.waitFor(() =>
@@ -67,7 +90,9 @@ test("the torch shows where the camera has one, and switches", async () => {
 });
 
 test("no torch, no button", async () => {
-  render(<Scanner open={camera().open} onCode={() => ""} onDone={() => {}} />);
+  render(
+    <Scanner open={camera().open} onCode={() => said("")} onDone={() => {}} />,
+  );
   await screen.findByText(say(POINT));
   expect(screen.queryByRole("button", { name: say(TORCH) })).toBeNull();
 });
@@ -76,12 +101,12 @@ test("a camera refused, or none, says so and leaves the lists", async () => {
   const refused = async () => {
     throw new DOMException("no", "NotAllowedError");
   };
-  render(<Scanner open={refused} onCode={() => ""} onDone={() => {}} />);
+  render(<Scanner open={refused} onCode={() => said("")} onDone={() => {}} />);
   await screen.findByText(/The camera isn't allowed for this page/);
   const missing = async () => {
     throw new DOMException("none", "NotFoundError");
   };
-  render(<Scanner open={missing} onCode={() => ""} onDone={() => {}} />);
+  render(<Scanner open={missing} onCode={() => said("")} onDone={() => {}} />);
   await screen.findByText(/No camera could be opened/);
 });
 
@@ -94,7 +119,7 @@ test("a camera closed before it opened is stopped when it does", async () => {
       opened = resolve;
     });
   const { unmount } = render(
-    <Scanner open={late} onCode={() => ""} onDone={() => {}} />,
+    <Scanner open={late} onCode={() => said("")} onDone={() => {}} />,
   );
   // Closed, and only then does the camera open.
   act(unmount);
@@ -113,7 +138,7 @@ test("a frame that cannot be read yet is skipped", async () => {
   render(
     <Scanner
       open={camera({ read }).open}
-      onCode={(code) => `Read ${code}.`}
+      onCode={(code) => said(`Read ${code}.`)}
       onDone={() => {}}
     />,
   );
@@ -127,7 +152,7 @@ test("a slow read is waited for, not piled on", async () => {
   render(
     <Scanner
       open={camera({ read }).open}
-      onCode={(code) => `Read ${code}.`}
+      onCode={(code) => said(`Read ${code}.`)}
       onDone={() => {}}
     />,
   );
@@ -143,7 +168,7 @@ test("a decoder that didn't load says so, not that there is no camera", async ()
   const offline = async () => {
     throw new DecoderUnavailable("offline");
   };
-  render(<Scanner open={offline} onCode={() => ""} onDone={() => {}} />);
+  render(<Scanner open={offline} onCode={() => said("")} onDone={() => {}} />);
   await screen.findByText(/The label reader didn't load/);
 });
 
@@ -153,14 +178,14 @@ test("a torch that won't switch says so", async () => {
       throw new DOMException("busy", "NotReadableError");
     },
   });
-  render(<Scanner open={open} onCode={() => ""} onDone={() => {}} />);
+  render(<Scanner open={open} onCode={() => said("")} onDone={() => {}} />);
   fireEvent.click(await screen.findByRole("button", { name: say(TORCH) }));
   await screen.findByText(say(TORCH_FAILED));
 });
 
 test("a label read as the camera closes is not taken", async () => {
   const { read, finish } = slowRead();
-  const onCode = vi.fn(() => "");
+  const onCode = vi.fn(() => said(""));
   const { unmount } = render(
     <Scanner open={camera({ read }).open} onCode={onCode} onDone={() => {}} />,
   );
@@ -171,4 +196,64 @@ test("a label read as the camera closes is not taken", async () => {
   finish(["B3ZT9W"]);
   await pass();
   expect(onCode).not.toHaveBeenCalled();
+});
+
+test("a session is reported as the camera closes, with its labels by kind", async () => {
+  const sessions = reported();
+  const { state, open } = camera();
+  const onCode = (code: string) =>
+    said("", code.startsWith("P") ? "place" : "item");
+  const { unmount } = render(
+    <Scanner open={open} onCode={onCode} onDone={() => {}} />,
+  );
+  await screen.findByText(say(POINT));
+  state.inView = ["B3ZT9W", "PL4CE1"];
+  await pass();
+  expect(sessions()).toEqual([]);
+  act(unmount);
+  await vi.waitFor(() =>
+    expect(sessions()).toEqual([
+      expect.objectContaining({
+        outcome: "opened",
+        decoder: "native",
+        labels: { item: 1, package: 0, place: 1, unknown: 0 },
+      }),
+    ]),
+  );
+});
+
+test("a camera refused is reported at once", async () => {
+  const sessions = reported();
+  const refused = async () => {
+    throw new DOMException("none", "NotFoundError");
+  };
+  render(<Scanner open={refused} onCode={() => said("")} onDone={() => {}} />);
+  await screen.findByText(/No camera could be opened/);
+  expect(sessions()).toEqual([
+    expect.objectContaining({ outcome: "not_found", decoder: "none" }),
+  ]);
+});
+
+test("a page hidden or left with the camera open reports it then", async () => {
+  const sessions = reported();
+  const { open } = camera();
+  render(<Scanner open={open} onCode={() => said("")} onDone={() => {}} />);
+  await screen.findByText(say(POINT));
+  Object.defineProperty(document, "visibilityState", {
+    value: "hidden",
+    configurable: true,
+  });
+  try {
+    document.dispatchEvent(new Event("visibilitychange"));
+    window.dispatchEvent(new Event("pagehide"));
+  } finally {
+    Reflect.deleteProperty(document, "visibilityState");
+  }
+  expect(sessions()).toEqual([expect.objectContaining({ outcome: "opened" })]);
+  document.dispatchEvent(new Event("visibilitychange"));
+  window.dispatchEvent(new Event("pagehide"));
+  expect(sessions()).toEqual([
+    expect.objectContaining({ outcome: "opened" }),
+    expect.objectContaining({ outcome: "resumed" }),
+  ]);
 });

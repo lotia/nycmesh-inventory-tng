@@ -241,6 +241,41 @@ export interface components {
       message: string;
     };
     /**
+     * CameraSession
+     * @description One session of the scan page's camera, sent as it closed, or as the
+     *     page was hidden with it open (frontend/src/scan/camera-report.ts).
+     */
+    CameraSession: {
+      /**
+       * @description discriminator enum property added by openapi-typescript
+       * @enum {string}
+       */
+      kind: "camera_session";
+      /**
+       * Outcome
+       * @enum {string}
+       */
+      outcome:
+        | "opened"
+        | "resumed"
+        | "not_allowed"
+        | "not_found"
+        | "in_use"
+        | "insecure"
+        | "decoder_failed"
+        | "other";
+      /**
+       * Decoder
+       * @enum {string}
+       */
+      decoder: "native" | "ponyfill" | "none";
+      /** Open Seconds */
+      open_seconds?: number | null;
+      /** Seconds */
+      seconds: number;
+      labels: components["schemas"]["LabelsRead"];
+    };
+    /**
      * CartDiscarded
      * @description A volunteer discarded the scan page's cart, once they confirmed it.
      */
@@ -377,6 +412,21 @@ export interface components {
       package_id: number | null;
       /** Location Id */
       location_id: number | null;
+    };
+    /**
+     * LabelsRead
+     * @description Labels a camera session read, by what each names: an item, an
+     *     item's package, a place, or nothing the catalogue has (old stickers).
+     */
+    LabelsRead: {
+      /** Item */
+      item: number;
+      /** Package */
+      package: number;
+      /** Place */
+      place: number;
+      /** Unknown */
+      unknown: number;
     };
     /**
      * LengthReport
@@ -685,6 +735,7 @@ export interface components {
         | components["schemas"]["RemovalUndone"]
         | components["schemas"]["DifferenceAdded"]
         | components["schemas"]["RestPutBack"]
+        | components["schemas"]["CameraSession"]
       )[];
     };
     /**
