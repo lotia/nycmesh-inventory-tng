@@ -145,8 +145,9 @@ Build the scan page into a new folder for each version, for example one
 named after its commit, with a Brotli and a gzip copy beside each file.
 `servestatic` reports success even when compressing or hashing a file fails
 ([ServeStatic#129](https://github.com/Archmonger/ServeStatic/issues/129)), so
-check that it printed no `Error compressing` or `Error hashing` line and wrote
-the copies:
+check its log for an `Error compressing` or `Error hashing` line, and that it
+wrote the copies. Each command exits non-zero when a step failed, and the log
+says why:
 
 ```sh
 export UV_NO_DEV=1
@@ -156,8 +157,9 @@ npm run build
 cd ../backend
 uv sync --locked
 uv run servestatic ../frontend/dist /srv/inventory/static-<commit> \
-  --compress --no-zstd 2>&1 | tee servestatic.log
-! grep -e 'Error compressing' -e 'Error hashing' servestatic.log
+  --compress --no-zstd > /srv/inventory/static-<commit>.log 2>&1
+test -z "$(grep -e 'Error compressing' -e 'Error hashing' \
+  /srv/inventory/static-<commit>.log)"
 test -n "$(find /srv/inventory/static-<commit>/assets -name '*.br' -print -quit)"
 ```
 
