@@ -212,30 +212,16 @@ test("a session is reported as the camera closes, with its labels by kind", asyn
   );
 });
 
-test("a camera refused is reported at once", async () => {
-  const sessions = reported();
-  const refused = async () => {
-    throw new DOMException("none", "NotFoundError");
-  };
-  render(<Scanner open={refused} onCode={() => said("")} onDone={() => {}} />);
-  await screen.findByText(say(NO_CAMERA.bold));
-  expect(sessions()).toEqual([
-    expect.objectContaining({ outcome: "not_found", decoder: "none" }),
-  ]);
-});
-
 /** The status line's words: the refusal's bold heading, then its hint. */
 const refusalWords = (refusal: Refusal) =>
   `${say(refusal.bold)} ${say(refusal.plain)}`;
 
+// One error for each outcome refused; which error is which outcome is
+// camera-report.test.ts's table (outcomeOf).
 test.each([
   [new DOMException("no", "NotAllowedError"), "not_allowed", NOT_ALLOWED],
-  [new DOMException("no", "SecurityError"), "not_allowed", NOT_ALLOWED],
   [new DOMException("busy", "NotReadableError"), "in_use", IN_USE],
-  [new DOMException("busy", "AbortError"), "in_use", IN_USE],
   [new DOMException("none", "NotFoundError"), "not_found", NO_CAMERA],
-  [new DOMException("none", "OverconstrainedError"), "not_found", NO_CAMERA],
-  [new DOMException("?", "TypeError"), "other", NO_CAMERA],
   [new DecoderUnavailable("offline"), "decoder_failed", NO_DECODER],
   [new Error("?"), "other", NO_CAMERA],
 ] as const)(
@@ -251,7 +237,9 @@ test.each([
     const bold = await screen.findByText(say(refusal.bold));
     expect(bold.tagName).toBe("STRONG");
     expect(screen.getByRole("status").textContent).toBe(refusalWords(refusal));
-    expect(sessions()).toEqual([expect.objectContaining({ outcome })]);
+    expect(sessions()).toEqual([
+      expect.objectContaining({ outcome, decoder: "none" }),
+    ]);
   },
 );
 
