@@ -222,8 +222,9 @@ def test_a_retired_package_is_never_received(
 def test_a_retired_package_with_none_left_sealed_is_never_taken(
     registered_client: TestClient, session: Session, spools: Spools
 ) -> None:
-    """Which the scan page never offers (Ali, 2026-11-19; docs/decisions/0003,
-    Amendment): refused whole, saying which line, and nothing saved."""
+    """From any client, the scan page included (Ali, 2026-11-19 and
+    2026-11-20; docs/decisions/0003, Amendment): refused whole, saying
+    which line, and nothing saved."""
     gone = spools.place.batch(
         kind="install", to_location_id=None, lines=[sealed_line(spools, "610")]
     )

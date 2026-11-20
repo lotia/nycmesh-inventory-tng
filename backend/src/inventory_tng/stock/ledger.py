@@ -11,12 +11,12 @@ Two choices that keep a volunteer's work from being lost:
 
 - Retired items, locations and volunteers are still accepted. A batch can
   wait in the outbox while an administrator retires or merges something, and
-  readers follow a merged volunteer forward. The one exception: a retired
+  readers follow a merged volunteer forward. The exceptions: a retired
   item is never received (docs/decisions/0003), so a receipt of one is
   refused, and the outbox says so; and a retired package with none sealed
-  left at a current place, which the scan page never offers, is never
-  taken (0003, Amendment, 2026-11-19). A save at a retired place is logged and
-  counted (scan/batch_api.py), and the place shows as holding stock
+  left at a current place is never taken, from any client, the scan page
+  included (0003, Amendment, 2026-11-19). A save at a retired place is
+  logged and counted (scan/batch_api.py), and the place shows as holding stock
   (balance.retired_holding_stock) until an administrator counts it.
 - The server's clock decides when a batch happened, not the phone's: a batch
   resent from the outbox is recorded when it arrives. created_at is the
@@ -139,7 +139,8 @@ class PackageFacts(NamedTuple):
     """What the ledger's rules read of a package: its item, its size,
     whether opening one makes an open package (tracks_opened), whether it
     is retired, and, read only for a retired one a line takes sealed,
-    whether none is left sealed at a current place."""
+    whether none is left sealed at a current place nor at the place it is
+    taken from."""
 
     item_id: int
     size: Decimal
@@ -179,7 +180,8 @@ def form_breaks(
     - A sealed side names a package of the line's item, and moves a whole
       number of them; a retired package is never received, as a retired
       item is not (0003), nor taken by a volunteer once none is left
-      sealed at a current place (0003, Amendment, 2026-11-19).
+      sealed at a current place nor at the place it is taken from (0003,
+      Amendment, 2026-11-19).
     - An open side names an open package of the line's item, not closed,
       at that side's place, but for one moved whole: all that is left on it
       leaves one place and arrives at the other. One not yet filled is
@@ -340,7 +342,11 @@ def hold(
 
 
 def hold_forms(
-    session: Session, lines: Sequence[Entry], *, also: Iterable[int] = ()
+    session: Session,
+    header: Mapping[str, object],
+    lines: Sequence[Entry],
+    *,
+    also: Iterable[int] = (),
 ) -> tuple[dict[int, PackageFacts], dict[int, OpenFacts], dict[int, OpenPackage]]:
     """Hold the packages and open packages a transaction's lines name, and
     the open packages `also`, in that order (above), and read what
@@ -372,7 +378,7 @@ def hold_forms(
             )
             for package, item_tracks in rows
         }
-        packages |= _none_sealed(session, lines, packages)
+        packages |= _none_sealed(session, header, lines, packages)
     if not open_ids:
         return packages, {}, {}
     opened = {
@@ -413,12 +419,26 @@ def hold_forms(
     return packages, facts, opened
 
 
+def waited(
+    packages: Mapping[int, PackageFacts], opens: Mapping[int, OpenFacts]
+) -> bool:
+    """Whether hold_forms held rows a request writing the same transaction
+    changes, so a form rule could refuse what that request wrote: open
+    packages, or a retired package with none left sealed."""
+    return bool(opens) or any(package.none_sealed for package in packages.values())
+
+
 def _none_sealed(
-    session: Session, lines: Sequence[Entry], packages: Mapping[int, PackageFacts]
+    session: Session,
+    header: Mapping[str, object],
+    lines: Sequence[Entry],
+    packages: Mapping[int, PackageFacts],
 ) -> dict[int, PackageFacts]:
-    """The retired packages the lines take sealed, held FOR NO KEY UPDATE
-    (above), with none left sealed at a current place, as form_breaks
-    reads them."""
+    """The retired packages the lines of a kind in TAKES take sealed, held
+    FOR NO KEY UPDATE (above), with none left sealed at a current place
+    nor at the place they are taken from, as form_breaks reads them."""
+    if header["kind"] not in TAKES:
+        return {}
     leaving = {line.leaves.package_id for line in lines}
     taken = sorted(
         package_id
@@ -434,7 +454,7 @@ def _none_sealed(
         key_share=True,
     )
     session.execute(held)
-    left = sealed_somewhere(session, taken)
+    left = sealed_somewhere(session, taken, at=_place(header, "from_location_id"))
     return {
         package_id: packages[package_id]._replace(none_sealed=True)
         for package_id in taken
@@ -481,10 +501,13 @@ def insert_transaction(
         # An item that does not exist is the foreign key's to refuse.
         for rule in broken or ():
             enforce(rule)
-    packages, opens, opened = hold_forms(session, lines)
+    packages, opens, opened = hold_forms(session, header, lines)
     # The form rules read what the transaction itself changes, so one sent
-    # again is found before them: the open packages' locks waited for it.
-    if opens and exists_where(session, LedgerTransaction.idempotency_key == key):
+    # again is found before them: the open packages' and retired packages'
+    # locks waited for it.
+    if waited(packages, opens) and exists_where(
+        session, LedgerTransaction.idempotency_key == key
+    ):
         return None
     places = (_place(header, "from_location_id"), _place(header, "to_location_id"))
     for line in lines:

@@ -113,13 +113,22 @@ def retired_packages_in_stock() -> Select[tuple[int]]:
     return _retired_left(by_form, "package_id", ItemPackage)
 
 
-def sealed_somewhere(session: Session, package_ids: Sequence[int]) -> set[int]:
+def sealed_somewhere(
+    session: Session, package_ids: Sequence[int], *, at: int | None = None
+) -> set[int]:
     """Which of these packages have some sealed at a current place, as
-    retired_packages_in_stock reads them."""
+    retired_packages_in_stock reads them, or at the place `at`, even
+    retired."""
     if not package_ids:
         return set()
-    query = _left_at_current(select(by_form.c.package_id), by_form).where(
-        by_form.c.package_id.in_(list(package_ids))
+    query = (
+        select(by_form.c.package_id)
+        .join(Location, Location.id == by_form.c.location_id)
+        .where(
+            or_(Location.retired_at.is_(None), Location.id == at),
+            by_form.c.quantity > 0,
+            by_form.c.package_id.in_(list(package_ids)),
+        )
     )
     return set(session.scalars(query.distinct()))
 

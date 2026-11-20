@@ -438,6 +438,32 @@ def test_a_retired_package_is_taken_until_none_is_left_sealed(
         spools.move(Entry(spools.cable.id, Decimal(305), spools.sealed, spools.sealed))
 
 
+def test_a_retired_package_left_only_at_a_retired_place_is_taken_from_there(
+    session: Session, spools: Spools
+) -> None:
+    """A save that waited in an outbox may take from a retired place what
+    is there (docs/decisions/0003), sealed too, though no current place
+    has any; from another place, it is refused."""
+    store, van = spools.store.id, spools.van.id
+
+    def install(place: int) -> object:
+        return spools.write(
+            {"kind": "install", "from_location_id": place},
+            Entry(spools.cable.id, Decimal(305), spools.sealed),
+        )
+
+    assert install(store)
+    assert spools.move(
+        Entry(spools.cable.id, Decimal(305), spools.sealed, spools.sealed)
+    )
+    spools.spool.retired_at = spools.van.retired_at = datetime.now(UTC)
+    session.flush()
+    with breaks(session, "movement_retired_package_none_left"):
+        install(store)
+    assert install(van)
+    assert quantities_by_form(session, spools.cable) == {}
+
+
 def test_a_closed_open_package_is_refused_through_the_ledger(
     session: Session, spools: Spools
 ) -> None:

@@ -1334,6 +1334,40 @@ def test_a_whole_move_sent_twice_at_once_is_written_once(
 
 
 @pytest.mark.concurrency
+def test_the_last_of_a_retired_package_sent_twice_at_once_is_written_once(
+    own_committed: Committed,
+) -> None:
+    """The second waits on the retired package's lock, then finds the first
+    written, rather than refusing it as none left (batch.record)."""
+    setup = own_committed.session()
+    spools = Spools(setup)
+    spools.write(
+        {"kind": "install", "from_location_id": spools.store.id},
+        Entry(spools.cable.id, Decimal(305), spools.sealed),
+    )
+    spools.spool.retired_at = NOW
+    setup.commit()
+    line = {
+        "item_id": spools.cable.id,
+        "quantity": "305",
+        "package_id": spools.spool.id,
+        "package_size": "305",
+    }
+    batch = Batch.model_validate(
+        spools.place.batch(kind="install", to_location_id=None, lines=[line])
+    )
+    one, two = own_committed.session(), own_committed.session()
+    first, wrote, *_ = record(one, batch, device_id=None)
+    worker = own_committed.blocked(two, lambda: record(two, batch, device_id=None))
+    one.commit()
+    finished = worker.finished()
+    two.rollback()
+    assert finished.error is None, finished.error
+    second, wrote_again, *_ = cast(Recorded, finished.result)
+    assert (wrote, wrote_again, second.id) == (True, False, first.id)
+
+
+@pytest.mark.concurrency
 @pytest.mark.parametrize("same", [True, False])
 def test_a_report_sent_twice_at_once_is_compared_with_the_first(
     own_committed: Committed, same: bool

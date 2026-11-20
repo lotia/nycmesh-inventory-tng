@@ -40,10 +40,6 @@ msgstr "This package is retired: what is left may be taken, never received"
 msgid "{name}: {what}"
 msgstr "{name}: {what}"
 
-#: src/shared/outbox-notes.ts
-msgid "This package is retired, and none is left sealed: it can no longer be taken"
-msgstr "This package is retired, and none is left sealed: it can no longer be taken"
-
 #: src/shared/registration.ts
 msgid "This browser isn't registered yet."
 msgstr "This browser isn't registered yet."
@@ -88,6 +84,10 @@ msgstr "Opening packages"
 #: src/scan/OlderList.tsx
 msgid "at {place}"
 msgstr "at {place}"
+
+#: src/shared/outbox-notes.ts
+msgid "This package is retired, and the inventory has none left sealed: take this line off, record the rest again, and ask an administrator to count it"
+msgstr "This package is retired, and the inventory has none left sealed: take this line off, record the rest again, and ask an administrator to count it"
 
 #: src/scan/OpenPackageCard.tsx
 msgid "Shows nothing left"

@@ -5,8 +5,8 @@ unregistered device is blocked), 2026-11-03 (counts, retired items),
 2026-11-06 (counting while stock moves), 2026-11-08 by 0016 (where the
 rules live, balance), 2026-11-09 (stock at a retired place), 2026-11-11
 by 0020 (sealed and open packages), 2026-11-15 (counting some items),
-2026-11-18 (a count form's moment read without a lock), 2026-11-19 (a
-retired package with none left is never taken)
+2026-11-18 (a count form's moment read without a lock), 2026-11-19 and
+2026-11-20 (a retired package with none left is never taken)
 
 ## Context
 
@@ -34,9 +34,10 @@ while. So we need more than one location from the start.
 - **Balance is in minus out**, computed by a query (0016), per item, place
   and form (0020).
 - **Negative balances are allowed.** They mean the records are wrong
-  somewhere, so the item needs counting. A volunteer is never blocked,
-  with one exception: a retired package with none sealed left (amendment,
-  2026-11-19).
+  somewhere, so the item needs counting. A move that takes stock below
+  zero is taken from every client, the scan page included, as none can
+  know what others moved meanwhile, with one exception: a retired package
+  with none sealed left (amendment, 2026-11-19).
 - **Reorder is a separate signal**: usable stock in stores (all but short
   ends, 0020) at or below the minimum, and, where a package sets one, sealed
   packages below their own minimum. An item with a negative balance shows
@@ -84,8 +85,9 @@ is or how it got there.
 - History is never lost, and every balance can be explained line by line.
 - Fixing a mistake means adding a transaction, which takes a little more work
   than editing a cell.
-- Volunteers can always record what they did, even when the numbers look
-  wrong. Counting catches the error later.
+- Volunteers can record what they did even when the numbers look wrong,
+  but for taking sealed a retired package with none left. Counting catches
+  the error later.
 - There is one store today, which receives the sheet's opening counts. A
   second store, or a hub, is just another store location.
 
@@ -114,20 +116,21 @@ without waiting (it still holds up saves).
 ## Amendment: a retired package with none left is never taken (2026-11-19)
 
 Decided by Ali on 2026-11-19 (inventory-tng-m5y, built under
-inventory-tng-3yo). Every move that takes stock below zero is still
-taken, except one: a move, install or opening that takes sealed a retired
-package with none left sealed at any current place. The scan page never
-offers such a package, so mostly another program or a batch made by hand
-sends one; a phone's batch that waited in its outbox while others took
-the last one is refused too, and its outbox says so. The server refuses
-it as it refuses a receipt of a retired package: the whole batch is
-answered 422, naming the line's package (`retired_package_none_left`),
-and nothing is saved. An administrator's
-count or adjustment may still find or lose some. Two saves taking the
-last of one go one at a time, so the second finds none left and is
-refused.
+inventory-tng-3yo), and on 2026-11-20 that the scan page is a client like
+any other, given nothing apart by the server (inventory-tng-o7i2). A move
+that takes stock below zero is taken because no client can know what
+others moved meanwhile, not as a promise to one client. One case is
+refused, for every client: a move, install or opening that takes sealed a
+retired package with none left sealed at any current place, nor at the
+retired place it may be taken from (as above). The server
+refuses it as it refuses a receipt of a retired package: the whole batch
+is answered 422, naming the line's package (`retired_package_none_left`),
+and nothing is saved. A batch the scan page saved offline before another
+phone took the last one is refused the same way, and its outbox says why.
+An administrator's count or adjustment may still find or lose some. Two
+saves taking the last of one go one at a time, so the second finds none
+left and is refused.
 
-The other cases that take stock below zero stay as above: a retired item
-with none left, or an item that never had stock at a place, can come from
-a phone that saved offline before it ran out, so they are taken and show
-on reorder as "count first".
+The other cases that take stock below zero stay as above, for every
+client: a retired item with none left, or an item that never had stock at
+a place, is taken and shows on reorder as "count first".
