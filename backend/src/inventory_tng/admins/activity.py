@@ -18,6 +18,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from inventory_tng.admins import mail_messages
+from inventory_tng.core.db_lookups import values_by
 from inventory_tng.core.db_once_committed import once_committed
 from inventory_tng.core.mail import Notifier, Told
 from inventory_tng.core.phrases import gettext, lazy_gettext
@@ -151,12 +152,7 @@ def recent(
 
 def _usernames(session: Session, ids: Iterable[int | None]) -> dict[int, str]:
     wanted = {i for i in ids if i is not None}
-    if not wanted:
-        return {}
-    found = session.execute(
-        select(Admin.id, Admin.username).where(Admin.id.in_(wanted))
-    )
-    return {admin_id: username for admin_id, username in found}
+    return values_by(session, Admin.id, Admin.username, wanted)
 
 
 def _words(row: Activity, names: Mapping[int, str]) -> str:

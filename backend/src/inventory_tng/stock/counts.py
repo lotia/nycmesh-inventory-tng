@@ -140,9 +140,9 @@ def _withheld(admin_id: int, location_id: int, lines: int) -> None:
 
 def _hold_place(session: Session, location_id: int, *keys: uuid.UUID) -> int | None:
     """Lock the place to count or adjust it, and return the first
-    transaction there written under any of `keys`: a form sent before. If
-    none was, NotCountable unless the place may be counted
-    (_require_countable); a form sent before gets its first answer."""
+    transaction there written under any of `keys` (the form was sent
+    before), or None. Only when None, NotCountable unless the place may be
+    counted (_require_countable)."""
     lock_place(session, location_id)
     sent = session.scalar(
         select(func.min(LedgerTransaction.id)).where(
