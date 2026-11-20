@@ -100,3 +100,22 @@ export const WITH_CAFE: Catalogue = {
   ...CATALOGUE,
   items: [...CATALOGUE.items, cafe],
 };
+
+type OpenPackage = Catalogue["open_packages"][number];
+
+/** A spool of the cable open at the hub, as the catalogue lists one, with
+ * `fields` changed. */
+export function openSpool(fields: Partial<OpenPackage> = {}): OpenPackage {
+  return {
+    id: 5,
+    key: "11111111-1111-4111-8111-111111111111",
+    item_id: 101,
+    package_id: 1001,
+    package_name: "Spool",
+    location_id: 10,
+    opened_at: "2026-11-03T10:00:00Z",
+    left: "120.000",
+    short_below: null,
+    ...fields,
+  };
+}

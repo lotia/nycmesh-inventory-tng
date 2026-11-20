@@ -4,7 +4,7 @@ import { say } from "../shared/i18n";
 import { Outbox } from "../shared/outbox";
 import { CATALOGUE } from "../testing/catalogue";
 import { answering, deferred, json, saved } from "../testing/fetch";
-import { expectBold, isCatalogue, open, ready } from "../testing/scan-page";
+import { expectBold, open, ready, server } from "../testing/scan-page";
 import { FROM, NO_NAME_PICKED, PICK_A_PLACE, YOUR_NAME } from "./CartForm";
 import { COULD_NOT_LOAD, ScanPage, TRY_AGAIN } from "./ScanPage";
 
@@ -45,9 +45,7 @@ describe("loading", () => {
       ...CATALOGUE,
       volunteers: [{ id: 3, name: "Hedy" }],
     };
-    const second = answering((request) =>
-      isCatalogue(request) ? json(newer, 200) : saved(),
-    ).api;
+    const second = server(() => saved(), newer).api;
     rerender(<ScanPage api={second} outbox={outbox} reload={vi.fn()} />);
     await screen.findByRole("option", { name: "Hedy" });
     older.resolve(json(CATALOGUE, 200));

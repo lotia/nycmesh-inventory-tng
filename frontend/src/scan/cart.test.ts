@@ -56,7 +56,7 @@ function keyed(draft: Draft): Body {
 }
 const SHOWN = "99999999-9999-4999-8999-999999999999";
 
-import { CATALOGUE, cable, radio } from "../testing/catalogue";
+import { CATALOGUE, cable, openSpool, radio } from "../testing/catalogue";
 import { refusing } from "../testing/storage";
 
 /** A batch's problems, or a quantity's, as text, each name the page quoted
@@ -420,17 +420,7 @@ describe("turning a cart into a batch", () => {
   });
 
   test("open packages offered: the catalogue's, and as waiting batches leave them", () => {
-    const known = {
-      id: 5,
-      key: "11111111-1111-4111-8111-111111111111",
-      item_id: 101,
-      package_id: 1001,
-      package_name: "Spool",
-      location_id: 10,
-      opened_at: "2026-11-03T10:00:00Z",
-      left: "120.000",
-      short_below: null,
-    };
+    const known = openSpool();
     const fresh = "33333333-3333-4333-8333-333333333333";
     const catalogue = { ...CATALOGUE, open_packages: [known] };
     const opening: Draft = {
@@ -749,18 +739,8 @@ describe("turning a cart into a batch", () => {
   });
 
   test("an open package said used up is offered no more", () => {
-    const key = "11111111-1111-4111-8111-111111111111";
-    const known = {
-      id: 5,
-      key,
-      item_id: 101,
-      package_id: 1001,
-      package_name: "Spool",
-      location_id: 10,
-      opened_at: "2026-11-03T10:00:00Z",
-      left: "120.000",
-      short_below: null,
-    };
+    const known = openSpool();
+    const { key } = known;
     const report: Draft = {
       kind: "report",
       volunteer_id: 1,

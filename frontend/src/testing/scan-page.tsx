@@ -5,7 +5,7 @@ import { fireEvent, render, screen } from "@testing-library/preact";
 import { expect, vi } from "vitest";
 import { FROM, RECORD, TO, YOUR_NAME } from "../scan/CartForm";
 import { openCamera } from "../scan/camera";
-import { STORAGE_KEY as CART_KEY } from "../scan/cart";
+import { STORAGE_KEY as CART_KEY, type Catalogue } from "../scan/cart";
 import { FIND } from "../scan/Finder";
 import { ScanPage } from "../scan/ScanPage";
 import { say } from "../shared/i18n";
@@ -20,12 +20,14 @@ vi.mocked(openCamera).mockImplementation(camera.open);
 export const isCatalogue = (request: Request) =>
   new URL(request.url).pathname === "/api/catalogue";
 
-/** An API with the test catalogue, saving batches as transaction 77. */
+/** An API with `catalogue`, the test one unless another is given, saving
+ * batches as transaction 77 unless `save` answers otherwise. */
 export function server(
   save: () => Response | Promise<Response> = () => saved(),
+  catalogue: Catalogue = CATALOGUE,
 ) {
   return answering((request) =>
-    isCatalogue(request) ? json(CATALOGUE, 200) : save(),
+    isCatalogue(request) ? json(catalogue, 200) : save(),
   );
 }
 

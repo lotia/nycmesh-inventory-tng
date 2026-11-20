@@ -17,7 +17,7 @@ import {
   SOME_NOT_RECORDED,
 } from "../shared/outbox-notes";
 import { MOST_SECONDS_TO_SAVE, telemetry } from "../shared/telemetry";
-import { CATALOGUE, WITH_CAFE } from "../testing/catalogue";
+import { CATALOGUE, openSpool, WITH_CAFE } from "../testing/catalogue";
 import { answering, deferred, json, saved } from "../testing/fetch";
 import { KEY, moveBody, outboxEntry, storeOutbox } from "../testing/saves";
 import {
@@ -25,7 +25,6 @@ import {
   expectRefusal,
   fillMove,
   find,
-  isCatalogue,
   open,
   pick,
   ready,
@@ -82,31 +81,17 @@ function setOnline(onLine: MockInstance<() => boolean>, online: boolean) {
 
 describe("filling and saving a cart", () => {
   /** The cable at the hub, with these open packages there. */
-  async function cableWith(...opens: Record<string, unknown>[]) {
-    const { api } = answering((request) =>
-      isCatalogue(request)
-        ? json({ ...CATALOGUE, open_packages: opens }, 200)
-        : saved(),
-    );
+  async function cableWith(...opens: ReturnType<typeof openSpool>[]) {
+    const { api } = server(() => saved(), {
+      ...CATALOGUE,
+      open_packages: opens,
+    });
     open(api);
     await ready();
     pick(say(FROM), "10");
     find("cat6");
     fireEvent.click(screen.getByRole("button", { name: "Cat6 cable" }));
   }
-
-  const spool = (fields: Record<string, unknown> = {}) => ({
-    id: 5,
-    key: "11111111-1111-4111-8111-111111111111",
-    item_id: 101,
-    package_id: 1001,
-    package_name: "Spool",
-    location_id: 10,
-    opened_at: "2026-11-03T10:00:00Z",
-    left: "120.000",
-    short_below: null,
-    ...fields,
-  });
 
   const CUT = "Cut or take from the Spool opened 2026-11-03 (m)";
   const NOTHING_LEFT = say(NOTHING_USABLE);
@@ -202,7 +187,7 @@ describe("filling and saving a cart", () => {
   });
 
   test("an open package is a card: now, after this cut, and a box that ticks itself", async () => {
-    await cableWith(spool());
+    await cableWith(openSpool());
     const card = screen.getByRole("group", {
       name: /^Spool open opened 2026-11-03/,
     });
@@ -252,7 +237,7 @@ describe("filling and saving a cart", () => {
   });
 
   test("what is on it now: asked for when a cut passes it, or by a button", async () => {
-    await cableWith(spool());
+    await cableWith(openSpool());
     const now = "What's on the Spool now (m), if you can tell";
     expect(screen.queryByLabelText(now)).toBeNull();
     fireEvent.input(screen.getByLabelText(CUT), { target: { value: "150" } });
@@ -275,7 +260,7 @@ describe("filling and saving a cart", () => {
   });
 
   test("a cut leaving less than the package's short length ticks the box", async () => {
-    await cableWith(spool({ short_below: "15.000" }));
+    await cableWith(openSpool({ short_below: "15.000" }));
     fireEvent.input(screen.getByLabelText(CUT), { target: { value: "110" } });
     expect(ticked()).toBe(true);
     expect(note()).toBe(
@@ -286,19 +271,19 @@ describe("filling and saving a cart", () => {
   test("several open packages: fewest left first, ties by id, one showing nothing last", async () => {
     // As on the stock page (Ali, 2026-11-18, inventory-tng-qskv).
     await cableWith(
-      spool({
+      openSpool({
         id: 6,
         key: "22222222-2222-4222-8222-222222222222",
         left: "-4.000",
       }),
-      spool({
+      openSpool({
         id: 9,
         key: "33333333-3333-4333-8333-333333333333",
         left: "40.000",
         opened_at: "2026-11-05T10:00:00Z",
       }),
-      spool(),
-      spool({
+      openSpool(),
+      openSpool({
         id: 7,
         key: "44444444-4444-4444-8444-444444444444",
         left: "40.000",
@@ -339,15 +324,19 @@ describe("filling and saving a cart", () => {
   test("several open packages: short ends after the usable ones, before one showing nothing", async () => {
     // Ali, 2026-11-18, inventory-tng-qskv.
     await cableWith(
-      spool({ id: 6, key: "22222222-2222-4222-8222-222222222222", left: "0" }),
-      spool({
+      openSpool({
+        id: 6,
+        key: "22222222-2222-4222-8222-222222222222",
+        left: "0",
+      }),
+      openSpool({
         id: 9,
         key: "33333333-3333-4333-8333-333333333333",
         left: "10.000",
         short_below: "15.000",
       }),
-      spool({ short_below: "15.000" }),
-      spool({
+      openSpool({ short_below: "15.000" }),
+      openSpool({
         id: 7,
         key: "44444444-4444-4444-8444-444444444444",
         left: "40.000",
@@ -364,19 +353,19 @@ describe("filling and saving a cart", () => {
   test("a short end's card is flagged, a usable one and one showing nothing are not", async () => {
     // Ali, 2026-11-18, inventory-tng-j5c2.
     await cableWith(
-      spool({
+      openSpool({
         id: 6,
         key: "22222222-2222-4222-8222-222222222222",
         left: "0",
         short_below: "15.000",
       }),
-      spool({
+      openSpool({
         id: 9,
         key: "33333333-3333-4333-8333-333333333333",
         left: "10.000",
         short_below: "15.000",
       }),
-      spool({ short_below: "15.000" }),
+      openSpool({ short_below: "15.000" }),
     );
     const cards = screen.getAllByRole("group", { name: /^Spool open/ });
     const flagged = cards.map(
@@ -404,7 +393,7 @@ describe("filling and saving a cart", () => {
     // A retired spool with none sealed left is not among the cable's
     // packages, but its open one is still taken from (inventory-tng-4w4).
     await cableWith(
-      spool({ package_id: 1009, package_name: "Old reel", left: "40.000" }),
+      openSpool({ package_id: 1009, package_name: "Old reel", left: "40.000" }),
     );
     expect(
       screen.getByRole("group", { name: /^Old reel open opened 2026-11-03/ }),
@@ -904,9 +893,7 @@ describe("filling and saving a cart", () => {
         item.id === 101 ? { ...item, name: "Cat 6 cable" } : item,
       ),
     };
-    const { api } = answering((request) =>
-      isCatalogue(request) ? json(named, 200) : saved(),
-    );
+    const { api } = server(() => saved(), named);
     open(api);
     await ready();
     fillMove("Cat 6 cable");
@@ -933,9 +920,7 @@ describe("filling and saving a cart", () => {
         item.id === 101 ? { ...item, name: "3" } : item,
       ),
     };
-    const { api } = answering((request) =>
-      isCatalogue(request) ? json(named, 200) : saved(),
-    );
+    const { api } = server(() => saved(), named);
     open(api);
     await ready();
     pick(say(YOUR_NAME), "1");

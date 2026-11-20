@@ -1104,9 +1104,7 @@ describe("what an older build left", () => {
       lines: [{ itemId: 100, packages: { 1004: "3", 1009: "1" }, loose: "" }],
       usedAt: AT,
     });
-    const { api } = answering((request) =>
-      isCatalogue(request) ? json(named, 200) : saved(),
-    );
+    const { api } = server(() => saved(), named);
     open(api);
     await ready();
     within(listing()).getByText("LiteBeam 5AC: 2 × Old box");
@@ -1544,9 +1542,7 @@ describe("what an older build left", () => {
   test("a cart not put back, refused as a tab of a newer build recorded it changed, lists no changes of its own (inventory-tng-0gg review)", async () => {
     // That tab took the cart over and changed it: what differs is its
     // change, not this cart's, which nothing here could add back.
-    const { api } = answering((request) =>
-      isCatalogue(request) ? json(CATALOGUE, 200) : keyReused(),
-    );
+    const { api } = server(() => keyReused());
     open(api);
     await ready();
     fillMove();

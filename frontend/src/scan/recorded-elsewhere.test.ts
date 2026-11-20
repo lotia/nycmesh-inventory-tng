@@ -2,6 +2,7 @@ import { describe, expect, test } from "vitest";
 import type { Body, Recorded } from "../shared/outbox";
 import { wordsOf } from "../shared/outbox-notes";
 import { CATALOGUE } from "../testing/catalogue";
+import { KEY, moveBody } from "../testing/saves";
 import { freshCart } from "./cart";
 import { asSave } from "./older-builds";
 import { toCart } from "./older-to-cart";
@@ -13,21 +14,11 @@ import {
   reportsAdded,
 } from "./recorded-elsewhere";
 
-const KEY = "0b7c6a51-9a3d-4d39-8f3e-1d1f2c4b5a61";
 const OPEN = "5d0c2f1e-7a7b-4f43-9c1a-2b3c4d5e6f70";
 
 /** A move from the hub to the van holding `lines`. */
 function move(lines: Body["lines"], fields: Partial<Body> = {}): Body {
-  return {
-    key: KEY,
-    kind: "move",
-    volunteer_id: 1,
-    from_location_id: 10,
-    to_location_id: 12,
-    install_number: null,
-    lines,
-    ...fields,
-  };
+  return moveBody({ install_number: null, lines, ...fields });
 }
 
 const boxes = (n: number) => ({
