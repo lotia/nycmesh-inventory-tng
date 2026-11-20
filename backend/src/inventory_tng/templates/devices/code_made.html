@@ -46,6 +46,8 @@ page; several share one, two by two. #}
         <span class="key">{{ phrase }}</span>{% endtrans %}</p>
       {% if code.label %}<p class="print-small">{{ code.label }}</p>{% endif %}
       <p class="print-small">{% trans until=code.expires_at | when(zone) %}Until {{ until }}{% endtrans %}</p>
+      {#- Alike but for this, so a lost one can be found and revoked. #}
+      {% if several %}<p class="print-small">{% trans number=code.id %}Code {{ number }}{% endtrans %}</p>{% endif %}
     </div>
     {% endfor %}
   </div>

@@ -3659,6 +3659,13 @@ msgid ""
 "new was made. It can't be shown again: Back and Forward don't keep it."
 msgstr ""
 
+#: src/inventory_tng/web/single_use_forms.py
+msgid ""
+"That form was already sent, and made registration codes, shown then. "
+"Nothing new was made. They can't be shown again: Back and Forward don't "
+"keep them."
+msgstr ""
+
 #: src/inventory_tng/templates/sent_again.html
 msgid ""
 "That form was already sent, and nothing was done again. Anything it "

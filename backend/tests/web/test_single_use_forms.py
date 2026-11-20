@@ -20,7 +20,7 @@ from inventory_tng.core.sent_forms import form_key, spend
 from inventory_tng.devices.paths import CODES, DEVICES
 from inventory_tng.models.admins import Admin, ResetLink
 from inventory_tng.models.devices import RegistrationCode
-from inventory_tng.web.single_use_forms import FIELD, SENT_AGAIN
+from inventory_tng.web.single_use_forms import FIELD, SENT_AGAIN, Made
 
 from helpers.mail import NO_MAIL, SentMail
 from helpers.markup import addresses, box_values, read, text
@@ -78,20 +78,24 @@ def assert_sent_again(again: Response, back: str) -> None:
     assert not read(again.text).all("*", class_="back")
 
 
-def test_a_registration_code_is_made_once(
-    admin_client: TestClient, session: Session
+@pytest.mark.parametrize(
+    ("count", "said"), [(1, "registration_code"), (4, "registration_codes")]
+)
+def test_registration_codes_are_made_once(
+    admin_client: TestClient, session: Session, count: int, said: Made
 ) -> None:
+    """Sent again, the page says a code, or codes, as the form made."""
     label = f"Open day {tag()}"
-    form = {"uses": "1", "days": "1", "label": label}
+    form = {"uses": "1", "days": "1", "label": label, "count": str(count)}
     with capture_logs() as logs:
         made, again = sent_twice(admin_client, DEVICES, CODES, **form)
     assert made.status_code == 200
     assert CANT_SHOW in text(made)
     assert_sent_again(again, DEVICES)
-    assert str(SENT_AGAIN["registration_code"]) in text(again)
+    assert str(SENT_AGAIN[said]) in text(again)
     made_here = select(func.count()).where(RegistrationCode.label == label)
-    assert session.scalar(made_here) == 1
-    assert {"event": "form sent again", "made": "registration_code"} in [
+    assert session.scalar(made_here) == count
+    assert {"event": "form sent again", "made": said} in [
         {key: line.get(key) for key in ("event", "made")} for line in logs
     ]
 

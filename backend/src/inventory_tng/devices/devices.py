@@ -138,12 +138,17 @@ def has_left(code: RegistrationCode, at: datetime) -> bool:
     return code.expires_at > at and code.uses < code.max_uses
 
 
-def another_like(
-    session: Session, code: RegistrationCode
-) -> tuple[RegistrationCode, str]:
-    """A new code with the uses `code` has left, until it expires, under its
-    label, and its phrase: to print in place of a lost printout, as the
-    phrase is never kept (Ali, 2026-11-19). The caller checks has_left."""
+def another_like(session: Session, code_id: int) -> tuple[RegistrationCode, str] | None:
+    """A new code with the uses the code `code_id` has left, until it
+    expires, under its label, and its phrase: to print in place of a lost
+    printout, as the phrase is never kept (Ali, 2026-11-19). None if there
+    is no such code or it has nothing left (has_left). Its row is locked
+    first, so a phone registering with it at the same moment is counted
+    before its uses are copied, or waits until they are."""
+    code = get_locked(session, RegistrationCode, code_id, key_share=True)
+    if code is None or not has_left(code, datetime.now(UTC)):
+        log.info("another registration code refused", registration_code_id=code_id)
+        return None
     return _new_code(
         session,
         code.max_uses - code.uses,

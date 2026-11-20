@@ -123,7 +123,9 @@ def test_another_like_a_code_has_its_uses_and_time_left(session: Session) -> Non
     devices.register(session, phrase, ADDRESS)
     devices.revoke_code(session, code.id)
     assert devices.has_left(code, datetime.now(UTC))
-    other, again = devices.another_like(session, code)
+    made = devices.another_like(session, code.id)
+    assert made is not None
+    other, again = made
     assert again != phrase
     assert (other.max_uses, other.expires_at, other.label) == (
         1,
@@ -133,6 +135,13 @@ def test_another_like_a_code_has_its_uses_and_time_left(session: Session) -> Non
     assert other.revoked_at is None
     devices.register(session, again, ADDRESS)
     assert not devices.has_left(other, datetime.now(UTC))
+    with structlog.testing.capture_logs() as logs:
+        assert devices.another_like(session, other.id) is None
+    assert {
+        "event": "another registration code refused",
+        "registration_code_id": other.id,
+        "log_level": "info",
+    } in logs
     assert not devices.has_left(code, code.expires_at)
 
 
@@ -384,6 +393,26 @@ def test_guesses_sent_at_once_get_no_more_than_the_limit(
         reasons = list(pool.map(guess, range(25)))
     assert reasons.count("rate_limited") == 15
     assert reasons.count("unknown") == 10
+
+
+def test_another_like_a_code_waits_for_a_registration_under_way(
+    committed: Committed,
+) -> None:
+    """Made while a phone registers with the code, the copy has the uses
+    left once that registration is counted."""
+    with committed.session() as setup, setup.begin():
+        code, phrase = devices.create_code(
+            setup, max_uses=2, lifetime=timedelta(days=1)
+        )
+        code_id = code.id
+    phone = committed.session()
+    devices.register(phone, phrase, "192.0.2.82")
+    session = committed.session()
+    worker = committed.blocked(session, lambda: devices.another_like(session, code_id))
+    phone.commit()
+    made = worker.finished().result
+    assert isinstance(made, tuple)
+    assert made[0].max_uses == 1
 
 
 def test_good_codes_waiting_on_the_code_all_register(committed: Committed) -> None:

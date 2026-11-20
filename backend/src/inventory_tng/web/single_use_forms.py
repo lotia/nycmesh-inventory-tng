@@ -39,13 +39,20 @@ SingleUseKey = Annotated[str, Form(alias=FIELD)]
 # What was made, for the log and the page: a fixed list. "change": what a
 # form that showed nothing made, or what one sent again is answered with
 # before its route says more (guards.ConfirmedAccountChange).
-Made = Literal["registration_code", "recovery_codes", "link", "change"]
+Made = Literal[
+    "registration_code", "registration_codes", "recovery_codes", "link", "change"
+]
 # What the page says of each but "change", which sent_again.html words.
 SENT_AGAIN: dict[Made, LazyProxy] = {
     "registration_code": lazy_gettext(
         "That form was already sent, and made a registration code, shown then. "
         "Nothing new was made. It can't be shown again: Back and Forward don't "
         "keep it."
+    ),
+    "registration_codes": lazy_gettext(
+        "That form was already sent, and made registration codes, shown then. "
+        "Nothing new was made. They can't be shown again: Back and Forward "
+        "don't keep them."
     ),
     "recovery_codes": lazy_gettext(
         "That form was already sent, and made recovery codes, shown then. "

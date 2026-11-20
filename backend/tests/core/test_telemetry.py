@@ -410,7 +410,7 @@ def test_counts_registration_codes_made(
     _, _, reader, _ = rolled_back
     devices.create_codes(session, 2, max_uses=1, lifetime=timedelta(hours=1))
     code, _ = devices.create_code(session, max_uses=1, lifetime=timedelta(hours=1))
-    devices.another_like(session, code)
+    devices.another_like(session, code.id)
     session.commit()  # Counted once committed.
     made = counted(reader, "inventory.registration_codes.made")
     assert made[(("how", "new"),)] >= 3

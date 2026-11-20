@@ -169,9 +169,12 @@ def test_up_to_four_codes_are_made_together_on_one_sheet(
     assert len(set(phrases)) == 4
     (sheet,) = shown.all("*", class_="print-sheet")
     assert "code-sheet" in sheet.classes
-    assert len(sheet.all("*", class_="print-card")) == 4
+    cards = sheet.all("*", class_="print-card")
+    assert len(cards) == 4
     codes = session.scalars(select(RegistrationCode)).all()
     assert [(c.label, c.max_uses) for c in codes] == [("Training", 1)] * 4
+    # Alike but for their numbers, so a lost one can be told apart.
+    assert all(any(f"Code {c.id}" in card.text for card in cards) for c in codes)
     assert len({c.expires_at for c in codes}) == 1
     for n, phrase in enumerate(phrases):
         phone = make_client(admin_client.app, address=f"192.0.2.{60 + n}")

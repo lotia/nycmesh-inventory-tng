@@ -51,7 +51,7 @@ from inventory_tng.web.listing import order as order_of
 from inventory_tng.web.navigation import SECTION_DEVICES
 from inventory_tng.web.pages import add_notices, not_found, redirect
 from inventory_tng.web.qr_codes import qr_svg
-from inventory_tng.web.single_use_forms import SingleUseKey, sent_before
+from inventory_tng.web.single_use_forms import Made, SingleUseKey, sent_before
 
 log = structlog.get_logger(__name__)
 
@@ -189,9 +189,10 @@ def make_codes(
     settings, problems = forms.code_settings(uses, days, label, count)
     if settings is None:
         return _list_page(request, session, signed, problems=problems, values=form)
-    if again := sent_before(
-        request, session, signed, single_use, "registration_code", DEVICES
-    ):
+    made_what: Made = (
+        "registration_code" if settings.count == 1 else "registration_codes"
+    )
+    if again := sent_before(request, session, signed, single_use, made_what, DEVICES):
         return again
     made = devices.create_codes(
         session,
@@ -273,13 +274,13 @@ def make_another(
     if found is None:
         return not_found()
     here = f"{CODES}/{code_id}"
-    if not devices.has_left(found, now()):
-        return redirect(here)
     if again := sent_before(
         request, session, signed, single_use, "registration_code", here
     ):
         return again
-    made = devices.another_like(session, found)
+    made = devices.another_like(session, code_id)
+    if made is None:
+        return redirect(here)
     changed(signed, session)
     return _made_page(request, signed, session, [made], (here, found.name))
 
