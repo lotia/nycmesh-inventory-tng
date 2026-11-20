@@ -542,14 +542,11 @@ describe("what an older build left", () => {
 
   test("its difference waits on a button while the cart has lines, and goes in by itself once it is empty (Ali, inventory-tng-0gg, 2026-11-15, 2)", async () => {
     const entry = await differing([boxed(1)], "2", fillMove);
+    // Described by its batch's words, read out with it (inventory-tng-zwnj).
     const add = within(entry).getByRole("button", {
       name: say(ADD_DIFFERENCE),
+      description: "Move: 1 item from Hub to Van",
     });
-    // Described by its batch's words, read out with it (inventory-tng-zwnj).
-    expect(add.getAttribute("aria-describedby")).toBe(
-      entry.firstElementChild?.id,
-    );
-    expect(entry.firstElementChild?.textContent).not.toBe("");
     fireEvent.click(add);
     expectBold(within(entry).getByRole("alert"), say(CART_NOT_EMPTY));
     expect(itemsInCart()).toEqual([101]);
