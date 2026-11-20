@@ -64,12 +64,7 @@ import {
   storeCart,
 } from "./cart";
 import { DISCARD } from "./Notes";
-import {
-  ADD_TO_CART,
-  CANNOT_ADD,
-  CART_NOT_EMPTY,
-  NOT_KEPT as NOT_KEPT_PHRASE,
-} from "./OlderList";
+import { ADD_TO_CART, CANNOT_ADD, CART_NOT_EMPTY } from "./OlderList";
 import { DISMISS } from "./OutboxList";
 import { ITEM_RETIRED } from "./older-to-cart";
 import { ADD_DIFFERENCE, IN_CART } from "./recorded-elsewhere";
@@ -566,7 +561,7 @@ describe("what an older build left", () => {
     const entry = await differing([boxed(1)], "2", () => {
       refused = refusingWrites(CART_KEY);
     });
-    await screen.findByText(say(NOT_KEPT_PHRASE));
+    await screen.findByText(NOT_KEPT);
     refused?.mockRestore();
     expect(storedCart().lines).toEqual([]);
     fireEvent.click(

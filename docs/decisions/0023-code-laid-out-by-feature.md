@@ -1,7 +1,7 @@
 # 0023 — Code laid out by feature
 
 **Status:** accepted · 2026-11-17 · amended 2026-11-18 (how files and
-tests are named)
+tests are named) and 2026-11-20 (a module's tests split by aspect)
 
 ## Context
 
