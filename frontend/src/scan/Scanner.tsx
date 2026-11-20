@@ -99,7 +99,8 @@ export function Scanner({
   onDone: () => void;
   /** Refresh this page (ScanPage's reload). */
   reload: () => void;
-  /** Whether the browser is keeping the cart (CartForm, NOT_KEEPING). */
+  /** Whether a reload would keep the cart: the browser keeps it
+   * (CartForm, NOT_KEEPING), or it is empty. */
   cartKept: boolean;
   open?: (video: HTMLVideoElement) => Promise<Session>;
 }) {

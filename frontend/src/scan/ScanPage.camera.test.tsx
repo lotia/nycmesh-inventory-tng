@@ -1,5 +1,5 @@
 import { fireEvent, screen } from "@testing-library/preact";
-import { beforeEach, describe, expect, test, vi } from "vitest";
+import { beforeEach, describe, expect, onTestFinished, test, vi } from "vitest";
 import { say } from "../shared/i18n";
 import { STORAGE_KEY as OUTBOX_KEY, Outbox } from "../shared/outbox";
 import { pass } from "../testing/camera";
@@ -7,6 +7,7 @@ import { CATALOGUE } from "../testing/catalogue";
 import { answering, deferred, json, saved } from "../testing/fetch";
 import {
   camera,
+  fillMove,
   find,
   isCatalogue,
   open,
@@ -361,7 +362,9 @@ describe("scanning labels with the camera", () => {
     open(server().api, reload);
     await ready();
     const setItem = refusingWrites(CART_KEY);
-    pick(say(YOUR_NAME), "1");
+    // Restored even if the test fails, so later tests can keep the cart.
+    onTestFinished(() => setItem.mockRestore());
+    fillMove();
     screen.getByText(say(NOT_KEEPING));
     fireEvent.click(
       screen.getByRole("button", { name: say(SCAN_WITH_CAMERA) }),
@@ -374,5 +377,22 @@ describe("scanning labels with the camera", () => {
     pick(say(YOUR_NAME), "2");
     await screen.findByText(say(NOT_ALLOWED.plain));
     expect(screen.queryByText(say(NOT_KEEPING))).toBeNull();
+  });
+
+  test("a camera not allowed, with an empty cart not kept, gives the usual hint", async () => {
+    vi.mocked(openCamera).mockRejectedValueOnce(
+      new DOMException("no", "NotAllowedError"),
+    );
+    open();
+    await ready();
+    const setItem = refusingWrites(CART_KEY);
+    onTestFinished(() => setItem.mockRestore());
+    pick(say(YOUR_NAME), "1");
+    screen.getByText(say(NOT_KEEPING));
+    fireEvent.click(
+      screen.getByRole("button", { name: say(SCAN_WITH_CAMERA) }),
+    );
+    // Nothing in it to record first.
+    await screen.findByText(say(NOT_ALLOWED.plain));
   });
 });

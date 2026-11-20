@@ -773,7 +773,8 @@ export function CartForm({
             scanning.value = false;
           }}
           reload={reload}
-          cartKept={cartKept.value}
+          // An empty cart has nothing to record before a reload.
+          cartKept={cartKept.value || empty}
         />
       ) : (
         <button type="button" onClick={() => (scanning.value = true)}>
