@@ -38,7 +38,7 @@ from helpers.over_recorded import (
     sealed_field,
 )
 from helpers.sign_in import new_admin_id
-from helpers.stock import Place, Spools, count_at, count_form_at, write
+from helpers.stock import Place, Spools, count_at, count_form_at, raise_check, write
 
 # An opening's sealed end can be counted though the records hold none of
 # it sealed, and an open package it arrived in closed on a count puts that
@@ -322,11 +322,7 @@ def committed_check(
     setup = own_committed.session()
     place = Place(setup)
     moved = write(setup, place)
-    movement_id = setup.scalar(
-        select(Movement.id).where(Movement.transaction_id == moved.id)
-    )
-    assert movement_id is not None
-    over_recorded.raise_checks(setup, {movement_id: Decimal(1)})
+    raise_check(setup, moved)
     admin = new_admin_id(setup)
     setup.commit()
     (check,) = checks(setup)

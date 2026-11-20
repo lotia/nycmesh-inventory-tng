@@ -37,7 +37,7 @@ from helpers.over_recorded import (
     one_bag_waits,
     opened_into,
     opening_raised,
-    recorded_then_changed,
+    radios_raised,
 )
 from helpers.sign_in import new_admin_id
 from helpers.stock import (
@@ -53,16 +53,6 @@ from helpers.stock import (
 )
 
 # A count of an end puts it right (Ali, 2026-11-15, inventory-tng-qs8).
-
-
-def radios_raised(client: TestClient, place: Place) -> None:
-    """Three radios recorded moved from the store to the van, then one: two
-    wait, loose at each end."""
-    recorded_then_changed(
-        client,
-        place.batch(),
-        lines=[{"item_id": place.item.id, "quantity": "1"}],
-    )
 
 
 def test_a_count_after_it_puts_that_end_right_and_says_what_is_left(

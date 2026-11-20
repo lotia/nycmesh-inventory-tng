@@ -35,6 +35,7 @@ from helpers.markup import (
 from helpers.over_recorded import (
     PAGE,
     adjustments,
+    answered,
     checked_forms,
     checks,
     correct,
@@ -42,6 +43,7 @@ from helpers.over_recorded import (
     from_emptied_store,
     mark_checked,
     moved_whole,
+    radios_raised,
     recorded_then_changed,
 )
 from helpers.rows import add, tag
@@ -53,9 +55,8 @@ from helpers.stock import Place, Spools, received, retire, write
 def bring_back(
     client: TestClient, session: Session, location: Location, **form: str
 ) -> Response:
-    (check,) = checks(session)
-    data = {"seen": over_recorded.seen(check), "place": str(location.id)} | form
-    return client.post(f"{PAGE}/{check.id}/bring-back", data=data)
+    form = {"place": str(location.id)} | form
+    return answered(client, session, "bring-back", **form)[1]
 
 
 def test_refused_at_a_retired_place_it_says_why_and_offers_a_fix(
@@ -82,11 +83,7 @@ def test_refused_where_it_arrived_it_names_that_place(
     write-off there is what is refused."""
     place = Place(session)
     received(session, place)
-    recorded_then_changed(
-        registered_client,
-        place.batch(),
-        lines=[{"item_id": place.item.id, "quantity": "1"}],
-    )
+    radios_raised(registered_client, place)
     write(
         session,
         place,
@@ -216,11 +213,7 @@ def test_refused_by_another_rule_it_says_that_rule(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     place = Place(session)
-    recorded_then_changed(
-        registered_client,
-        place.batch(),
-        lines=[{"item_id": place.item.id, "quantity": "1"}],
-    )
+    radios_raised(registered_client, place)
 
     def refused(*_: object) -> None:
         raise RuleBroken("movement_whole_units")

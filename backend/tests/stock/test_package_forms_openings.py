@@ -16,20 +16,9 @@ from inventory_tng.stock import open_packages
 
 from helpers.package_forms import quantities_by_form
 from helpers.sign_in import new_admin_id
-from helpers.stock import URL, Spools, cut, sealed_line
+from helpers.stock import URL, Spools, cut, opened_line, opening, sealed_line
 
 # Opening on the scan page.
-
-
-def opening(spools: Spools, *lines: dict[str, object]) -> dict[str, object]:
-    store = spools.store.id
-    return spools.place.batch(
-        kind="open", from_location_id=store, to_location_id=store, lines=list(lines)
-    )
-
-
-def opened_line(spools: Spools, **fields: object) -> dict[str, object]:
-    return sealed_line(spools, "305") | {"open_package_key": str(uuid.uuid4())} | fields
 
 
 def test_a_package_opened_and_followed_is_made_once(

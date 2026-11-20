@@ -1,7 +1,6 @@
 """What the tests of lines recorded with more than was moved share
 (tests/stock/test_over_recorded_*.py)."""
 
-import uuid
 from typing import Any
 
 from fastapi.testclient import TestClient
@@ -27,6 +26,8 @@ from helpers.stock import (
     Spools,
     cut,
     length,
+    opened_line,
+    opening,
     received,
     retire,
     sealed_line,
@@ -69,11 +70,26 @@ def one_bag_waits(client: TestClient, place: Place, bags: ItemPackage) -> None:
     recorded_then_changed(client, first, lines=[bagged(bags, 1)])
 
 
-def mark_checked(client: TestClient, session: Session, **form: str) -> Response:
-    """The one waiting marked checked, as seen, with `form`'s reason."""
+def answered(
+    client: TestClient, session: Session, action: str, **form: str
+) -> tuple[OverRecorded, Response]:
+    """The one waiting, and `form` sent to its `action` as seen."""
     (check,) = checks(session)
     data = {"seen": over_recorded.seen(check)} | form
-    return client.post(f"{PAGE}/{check.id}/checked", data=data)
+    return check, client.post(f"{PAGE}/{check.id}/{action}", data=data)
+
+
+def radios_raised(client: TestClient, place: Place) -> None:
+    """Three radios recorded moved from the store to the van, then one: two
+    wait, loose at each end."""
+    recorded_then_changed(
+        client, place.batch(), lines=[{"item_id": place.item.id, "quantity": "1"}]
+    )
+
+
+def mark_checked(client: TestClient, session: Session, **form: str) -> Response:
+    """The one waiting marked checked, as seen, with `form`'s reason."""
+    return answered(client, session, "checked", **form)[1]
 
 
 def checked_forms(page: str) -> list[Element]:
@@ -108,9 +124,7 @@ def counted(
     admin_client: TestClient, session: Session, count: str, **form: str
 ) -> tuple[OverRecorded, Any]:
     """The one waiting, and the answer to its count sent as `count`."""
-    (check,) = checks(session)
-    data = {"seen": over_recorded.seen(check), "count": count} | form
-    return check, admin_client.post(f"{PAGE}/{check.id}/count", data=data)
+    return answered(admin_client, session, "count", count=count, **form)
 
 
 def adjustments(session: Session) -> list[tuple[object, ...]]:
@@ -137,18 +151,13 @@ def from_emptied_store(client: TestClient, session: Session) -> Place:
     again as one: two wait, and the store holds nothing, retired."""
     place = Place(session)
     received(session, place)
-    recorded_then_changed(
-        client, place.batch(), lines=[{"item_id": place.item.id, "quantity": "1"}]
-    )
+    radios_raised(client, place)
     retire(session, place.store)
     return place
 
 
 def correct(client: TestClient, session: Session) -> Response:
-    (check,) = checks(session)
-    return client.post(
-        f"{PAGE}/{check.id}/correct", data={"seen": over_recorded.seen(check)}
-    )
+    return answered(client, session, "correct")[1]
 
 
 def count_ids(session: Session) -> list[int]:
@@ -165,21 +174,15 @@ def opening_raised(client: TestClient, spools: Spools) -> OverRecorded:
     """Both sealed spools in the store recorded opened, then one: one
     waits, sealed where it left, open (tracked) or loose where it
     arrived."""
-    line = sealed_line(spools, "305")
     # A page sends a line for each tracked one opened, under its own key;
     # one line of them all for loose units.
     lines = (
-        [line | {"open_package_key": str(uuid.uuid4())} for _ in range(2)]
+        [opened_line(spools) for _ in range(2)]
         if spools.cable.track_opened
-        else [line | {"quantity": "610"}]
+        else [sealed_line(spools, "610")]
     )
-    opening = spools.place.batch(
-        kind="open",
-        from_location_id=spools.store.id,
-        to_location_id=spools.store.id,
-        lines=lines,
-    )
-    recorded_then_changed(client, opening, lines=[lines[0] | {"quantity": "305"}])
+    first = opening(spools, *lines)
+    recorded_then_changed(client, first, lines=[lines[0] | {"quantity": "305"}])
     (check,) = checks(spools.session)
     return check
 

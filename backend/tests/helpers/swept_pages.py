@@ -176,8 +176,7 @@ def stock_to_put_right(spools: Spools) -> None:
     write(session, spools.place, **report(spools, length(spools.opened(), "250")))
     # Radios the store never had moved out: less than none there.
     write(session, spools.place)
-    used_up = report(spools) | {"lengths": None, "used_up": [str(spools.opened().key)]}
-    write(session, spools.place, **used_up)
+    write(session, spools.place, **report(spools, used_up=[spools.opened().key]))
 
 
 def everything(world: World) -> None:

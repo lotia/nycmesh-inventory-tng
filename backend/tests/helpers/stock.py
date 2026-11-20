@@ -2,7 +2,7 @@
 and signs of the pages that put stock right."""
 
 import uuid
-from collections.abc import Mapping
+from collections.abc import Iterable, Mapping
 from datetime import UTC, datetime
 from decimal import Decimal
 from typing import Any, Protocol
@@ -265,10 +265,17 @@ def length(made: OpenPackage, left: str) -> dict[str, str]:
     return {"open_package_key": str(made.key), "left": left}
 
 
-def report(spools: Spools, *lengths: dict[str, str]) -> dict[str, object]:
-    """A batch of reports alone, of `lengths`, at the spools' store."""
+def report(
+    spools: Spools, *lengths: dict[str, str], used_up: Iterable[object] = ()
+) -> dict[str, object]:
+    """A batch of reports alone at the spools' store: of `lengths`, and of
+    the open packages whose keys are `used_up` used up."""
     return spools.place.batch(
-        kind="report", to_location_id=None, lines=[], lengths=list(lengths)
+        kind="report",
+        to_location_id=None,
+        lines=[],
+        lengths=list(lengths),
+        used_up=[str(key) for key in used_up],
     )
 
 
@@ -290,6 +297,19 @@ def sealed_line(spools: Spools, quantity: str) -> dict[str, object]:
         "package_id": spools.spool.id,
         "package_size": "305",
     }
+
+
+def opening(spools: Spools, *lines: dict[str, object]) -> dict[str, object]:
+    """A batch opening `lines` in the spools' store."""
+    store = spools.store.id
+    return spools.place.batch(
+        kind="open", from_location_id=store, to_location_id=store, lines=list(lines)
+    )
+
+
+def opened_line(spools: Spools, **fields: object) -> dict[str, object]:
+    """A line opening a sealed spool, under a key of its own."""
+    return sealed_line(spools, "305") | {"open_package_key": str(uuid.uuid4())} | fields
 
 
 def count_form(page: Response) -> dict[str, str]:

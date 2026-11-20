@@ -40,7 +40,7 @@ from helpers.over_recorded import (
     recorded_then_changed,
 )
 from helpers.sign_in import new_admin_id
-from helpers.stock import URL, Place, Spools, cut, write
+from helpers.stock import URL, Place, Spools, cut, raise_check, write
 
 # The administrators' page.
 
@@ -439,12 +439,7 @@ def test_one_answered_meanwhile_waits_then_is_refused(own_committed: Committed) 
     the check's line is in the ledger."""
     setup = own_committed.session()
     place = Place(setup)
-    transaction = write(setup, place)
-    movement_id = setup.scalar(
-        select(Movement.id).where(Movement.transaction_id == transaction.id)
-    )
-    assert movement_id is not None
-    over_recorded.raise_checks(setup, {movement_id: Decimal(1)})
+    raise_check(setup, write(setup, place))
     admin = new_admin_id(setup)
     setup.commit()
     (check,) = checks(setup)
