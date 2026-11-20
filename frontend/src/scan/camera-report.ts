@@ -84,7 +84,9 @@ export class CameraReport {
 
   constructor(
     private readonly to: Telemetry = telemetry,
-    private readonly now: () => number = Date.now,
+    // Monotonic, so a clock put back never makes a time below zero, which
+    // would have the whole report refused.
+    private readonly now: () => number = () => performance.now(),
   ) {
     this.asked = now();
   }
@@ -100,12 +102,13 @@ export class CameraReport {
   }
 
   refused(error: unknown): void {
-    this.unsent = {
-      outcome: outcomeOf(error),
-      from: this.asked,
-      labels: none(),
-    };
-    this.send();
+    this.ended(outcomeOf(error));
+  }
+
+  /** Closed while the camera was opening, and so not opened: the browser
+   * then says why it stopped, which is no refusal. */
+  cancelled(): void {
+    this.ended("cancelled");
   }
 
   read(kind: LabelKind): void {
@@ -135,6 +138,11 @@ export class CameraReport {
     this.send();
   }
 
+  private ended(outcome: Outcome): void {
+    this.unsent = { outcome, from: this.asked, labels: none() };
+    this.send();
+  }
+
   private send(): void {
     if (this.unsent === null) {
       return;
@@ -151,6 +159,6 @@ export class CameraReport {
   }
 
   private since(from: number): number {
-    return (this.now() - from) / 1000;
+    return Math.max(this.now() - from, 0) / 1000;
   }
 }

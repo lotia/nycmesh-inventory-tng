@@ -13,7 +13,8 @@
  * sends only that one happened.
  *
  * Events wait in memory and go together: when FLUSH_AT are waiting, and
- * when the page is hidden or left, by sendBeacon, which outlives the page.
+ * when the page is hidden or left, by sendBeacon, which outlives the page;
+ * a camera session's report goes at once (scan/camera-report.ts).
  * Each kind has its own budget an hour (PER_HOUR), so a loop of errors
  * cannot flood the server, retries while offline cannot crowd out the
  * rest, and a scan page left open all day still reports.

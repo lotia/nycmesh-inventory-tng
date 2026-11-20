@@ -146,10 +146,12 @@ class CameraSession(Strict):
 
     kind: Literal["camera_session"]
     # Opened, or what refused it; resumed when the page was shown again
-    # with the camera open, after reporting as it was hidden.
+    # with the camera open, after reporting as it was hidden; cancelled when
+    # closed before it opened or was refused.
     outcome: Literal[
         "opened",
         "resumed",
+        "cancelled",
         "not_allowed",
         "not_found",
         "in_use",
@@ -264,8 +266,9 @@ rests_put_back = meter.create_counter(
 camera_sessions = meter.create_counter(
     "inventory.scan.camera.sessions",
     unit="{session}",
-    description="Times the scan page's camera was opened, or refused, by how "
-    "it ended and the decoder that read",
+    description="Sessions of the scan page's camera, by how each ended and the "
+    "decoder that read: opened, refused, closed while opening, or resumed as the "
+    "page was shown again with it open",
 )
 # Most cameras open in a second or two; a first one waits on the
 # browser's question to allow it.
@@ -276,10 +279,14 @@ camera_open = meter.create_histogram(
     description="From asking for the scan page's camera to its opening",
     explicit_bucket_boundaries_advisory=OPEN_SECONDS,
 )
+# From a refusal in a second to a hub tablet's camera open all day: the
+# SDK's own buckets stop short of a working day.
+SESSION_SECONDS = (1, 5, 15, 30, 60, 120, 300, 600, 1800, 3600, 7200, 14400, 28800)
 camera_session_durations = meter.create_histogram(
     "inventory.scan.camera.session.duration",
     unit="s",
     description="How long the scan page's camera stayed open, or took to be refused",
+    explicit_bucket_boundaries_advisory=SESSION_SECONDS,
 )
 camera_labels = meter.create_counter(
     "inventory.scan.camera.labels",

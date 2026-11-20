@@ -56,6 +56,10 @@ export function Scanner({
     camera.then(
       (session) => {
         report.opened(session.decoder);
+        // Opened while hidden: sent now, as the page may not come back.
+        if (document.visibilityState === "hidden") {
+          report.hidden();
+        }
         if (stopped) {
           return;
         }
@@ -84,7 +88,13 @@ export function Scanner({
         timer = setTimeout(read, READ_EVERY_MS);
       },
       (error: unknown) => {
-        report.refused(error);
+        // Done before it opened: the browser may say the picture's play
+        // was aborted, which is not the camera refused.
+        if (stopped) {
+          report.cancelled();
+        } else {
+          report.refused(error);
+        }
         said.value = refused(error);
       },
     );

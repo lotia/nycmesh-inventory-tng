@@ -10,9 +10,9 @@ import {
   outcomeOf,
 } from "./camera-report";
 
-/** A report on a clock the test moves, and what it sent. */
-function reporting() {
-  const clock = { now: 0 };
+/** A report on a clock the test moves, from `start`, and what it sent. */
+function reporting(start = 0) {
+  const clock = { now: start };
   const sent: Event[] = [];
   const telemetry = new Telemetry();
   telemetry.record = (event) => sent.push(event);
@@ -108,6 +108,32 @@ describe("what a session reports", () => {
     report.closed();
     expect(sent.map((event) => "outcome" in event && event.outcome)).toEqual([
       "opened",
+    ]);
+  });
+
+  test("closed while the camera was opening: cancelled, not refused", () => {
+    const { report, clock, sent } = reporting();
+    clock.now = 800;
+    report.cancelled();
+    report.closed();
+    expect(sent).toEqual([
+      {
+        kind: "camera_session",
+        outcome: "cancelled",
+        decoder: "none",
+        seconds: 0.8,
+        labels: NONE,
+      },
+    ]);
+  });
+
+  test("a clock put back is sent as no time, never below zero", () => {
+    const { report, clock, sent } = reporting(5_000);
+    clock.now = 1_000;
+    report.opened("native");
+    report.closed();
+    expect(sent).toEqual([
+      expect.objectContaining({ open_seconds: 0, seconds: 0 }),
     ]);
   });
 

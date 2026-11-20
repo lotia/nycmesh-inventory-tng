@@ -258,6 +258,7 @@ export interface components {
       outcome:
         | "opened"
         | "resumed"
+        | "cancelled"
         | "not_allowed"
         | "not_found"
         | "in_use"

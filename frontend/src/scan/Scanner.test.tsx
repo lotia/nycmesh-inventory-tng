@@ -234,6 +234,52 @@ test("a camera refused is reported at once", async () => {
   ]);
 });
 
+test("Done while the camera opens is reported as cancelled, not refused", async () => {
+  const sessions = reported();
+  let abort: (error: unknown) => void = () => {};
+  const opening = () =>
+    new Promise<Session>((_, reject) => {
+      abort = reject;
+    });
+  const { unmount } = render(
+    <Scanner open={opening} onCode={() => said("")} onDone={() => {}} />,
+  );
+  act(unmount);
+  // The picture's play interrupted as its video left the page.
+  abort(new DOMException("interrupted", "AbortError"));
+  await vi.waitFor(() =>
+    expect(sessions()).toEqual([
+      expect.objectContaining({ outcome: "cancelled", decoder: "none" }),
+    ]),
+  );
+});
+
+test("a camera that opens while the page is hidden is reported then", async () => {
+  const sessions = reported();
+  const { open } = camera();
+  Object.defineProperty(document, "visibilityState", {
+    value: "hidden",
+    configurable: true,
+  });
+  try {
+    render(<Scanner open={open} onCode={() => said("")} onDone={() => {}} />);
+    await vi.waitFor(() =>
+      expect(sessions()).toEqual([
+        expect.objectContaining({ outcome: "opened" }),
+      ]),
+    );
+  } finally {
+    Reflect.deleteProperty(document, "visibilityState");
+  }
+  // Shown again: what follows is a session of its own.
+  document.dispatchEvent(new Event("visibilitychange"));
+  window.dispatchEvent(new Event("pagehide"));
+  expect(sessions()).toEqual([
+    expect.objectContaining({ outcome: "opened" }),
+    expect.objectContaining({ outcome: "resumed" }),
+  ]);
+});
+
 test("a page hidden or left with the camera open reports it then", async () => {
   const sessions = reported();
   const { open } = camera();
