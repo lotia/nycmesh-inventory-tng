@@ -1507,6 +1507,21 @@ def test_a_save_takes_its_places_in_id_order(committed: Committed) -> None:
     saving.rollback()
 
 
+def two_areas(session: Session, store: Location) -> tuple[Location, Location]:
+    """Two areas of the store, made one after the other, so the first has
+    the lower id."""
+    first, second = (
+        Location(name=f"Shelf {tag()}", kind="area", parent_id=store.id)
+        for _ in range(2)
+    )
+    session.add(first)
+    session.flush()
+    session.add(second)
+    session.flush()
+    assert first.id < second.id
+    return first, second
+
+
 @pytest.mark.end_to_end
 def test_a_store_count_waits_for_a_save_between_two_of_its_areas(
     own_committed: Committed, make_client: Callable[..., TestClient]
@@ -1524,13 +1539,7 @@ def test_a_store_count_waits_for_a_save_between_two_of_its_areas(
     place = Place(setup)
     _, totp = new_admin(setup)
     store = place.store
-    # Made one after the other, so the first has the lower id.
-    first = Location(name=f"Shelf {tag()}", kind="area", parent_id=store.id)
-    setup.add(first)
-    setup.flush()
-    second = Location(name=f"Shelf {tag()}", kind="area", parent_id=store.id)
-    setup.add(second)
-    setup.flush()
+    first, second = two_areas(setup, store)
     radio = place.item.id
     insert_transaction(
         setup,
@@ -1539,7 +1548,6 @@ def test_a_store_count_waits_for_a_save_between_two_of_its_areas(
         [(radio, Decimal(3))],
     )
     setup.commit()
-    assert first.id < second.id
     page = own_committed.session()
     client = make_client(on=page)
     assert sign_in_with(client, key=totp).status_code == 303
@@ -1576,6 +1584,55 @@ def test_a_store_count_waits_for_a_save_between_two_of_its_areas(
     assert counted == []
     assert expected(checking, first.id) == {radio: Decimal(1)}
     assert expected(checking, second.id) == {radio: Decimal(2)}
+
+
+@pytest.mark.end_to_end
+def test_a_store_count_holds_its_items_by_id_across_its_areas(
+    own_committed: Committed, make_client: Callable[..., TestClient]
+) -> None:
+    """A store count holds every item its areas' counts name, by id across
+    them all (ledger.hold_across), before writing the first area's. Two
+    items set to track opened packages meanwhile (items.track_items, FOR
+    UPDATE by id), the first held when the count is sent: the count waits
+    for it holding neither, so tracking takes both and commits, then the
+    count writes. Written area by area, the count would hold the second
+    item, counted at the first area, and wait for the first, counted at
+    the second, while tracking waits for the second: a deadlock
+    (inventory-tng-nfia). On a database of its own, as it writes the
+    ledger."""
+    setup = own_committed.session()
+    place = Place(setup)
+    _, totp = new_admin(setup)
+    first, second = two_areas(setup, place.store)
+    radio, cable = place.item.id, place.cable.id
+    assert radio < cable
+    for area, item_id in ((first, cable), (second, radio)):
+        insert_transaction(
+            setup,
+            uuid.uuid4(),
+            {"kind": "receipt", "to_location_id": area.id},
+            [(item_id, Decimal(3))],
+        )
+    setup.commit()
+    page = own_committed.session()
+    client = make_client(on=page)
+    assert sign_in_with(client, key=totp).status_code == 303
+    path = f"{COUNTS}/{place.store.id}"
+    form = count_form(client.get(path)) | {
+        f"at_{first.id}_counted_{cable}": "4",
+        f"at_{second.id}_counted_{radio}": "4",
+    }
+    tracking = own_committed.session()
+    tracking.execute(locked(select(Item.id).where(Item.id == radio)))
+    worker = own_committed.blocked(page, lambda: client.post(path, data=form))
+    assert items.track_items(tracking, [radio, cable], True) == [radio, cable]
+    tracking.commit()
+    finished = worker.finished()
+    assert finished.error is None
+    assert cast(Answer, finished.result).status_code == 303
+    checking = own_committed.session()
+    assert expected(checking, first.id) == {cable: Decimal(4)}
+    assert expected(checking, second.id) == {radio: Decimal(4)}
 
 
 @pytest.mark.end_to_end

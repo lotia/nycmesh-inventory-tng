@@ -293,6 +293,10 @@ def lock_places(session: Session, location_ids: Iterable[int]) -> None:
 #    move changes where it is.
 # 6. A receipt's items, FOR NO KEY UPDATE, by id (_receive), to lower what
 #    is on order, which KEY SHARE does not wait for.
+#
+# A change writing a transaction at each of several places (a count of a
+# store and its areas) holds 2, 4 and 5 for them all, by id across them,
+# before writing the first (hold_across).
 
 
 def _hold_places(
@@ -454,6 +458,52 @@ def _none_sealed(
         for package_id in taken
         if package_id not in left
     }
+
+
+def hold_across(
+    session: Session,
+    places: Collection[int],
+    item_ids: Iterable[int],
+    package_ids: Iterable[int],
+    open_ids: Iterable[int],
+) -> None:
+    """For a change that writes several transactions, holding `places`
+    (lock_places): hold every item, package and open package they may
+    name, each kind by id across them all, in the order above, before the
+    first is written (inventory-tng-nfia). Each transaction then takes
+    again only rows already held, never one of a lower id after a higher,
+    as it would written one after another. Open packages at `places` only,
+    with their items, as closing one holds it (open_packages.close): those
+    cannot move while the places are held, and one elsewhere is refused or
+    withheld as before. A count takes no retired package sealed (TAKES)."""
+    named = set(open_ids)
+    opens = (
+        session.execute(
+            select(OpenPackage.id, OpenPackage.item_id).where(
+                OpenPackage.id.in_(named), OpenPackage.location_id.in_(places)
+            )
+        ).all()
+        if named
+        else []
+    )
+    items = {*item_ids, *(item_id for _, item_id in opens)}
+    if items:
+        query = select(Item.id).where(Item.id.in_(items)).order_by(Item.id)
+        session.execute(locked(query, key_share=True, shared=True))
+    if packages := set(package_ids):
+        query = (
+            select(ItemPackage.id)
+            .where(ItemPackage.id.in_(packages))
+            .order_by(ItemPackage.id)
+        )
+        session.execute(locked(query, key_share=True, shared=True))
+    if opens:
+        query = (
+            select(OpenPackage.id)
+            .where(OpenPackage.id.in_([open_id for open_id, _ in opens]))
+            .order_by(OpenPackage.id)
+        )
+        session.execute(locked(query, key_share=True))
 
 
 def _where(header: Mapping[str, object], custody: frozenset[int]) -> int | None:

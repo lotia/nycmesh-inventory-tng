@@ -39,9 +39,10 @@ keeps its own ledger and when it was last counted. Every area is shown, an
 empty one marked, a retired one holding stock marked retired; one retired
 and empty is left out. The form lists the places it shows (forms.PLACES),
 so an area moved meanwhile only regroups; its moment is read across them
-all, and the send holds them all, in id order. A line stays with its
-place: stock found in another area is a loss under one and a find under
-the other. Something else here and an open package nobody recorded are
+all, and the send holds them all, in id order, then the rows the form
+names, each kind by id across them all (ledger.hold_across). A line stays
+with its place: stock found in another area is a loss under one and a
+find under the other. Something else here and an open package nobody recorded are
 asked once for the form, each beside the place it was found in, which
 comes back picked after the save. Filtered to some items, an area with
 nothing typed is not counted. An area retired since the form was shown
@@ -95,7 +96,14 @@ from inventory_tng.stock.forms import (
     places_listed,
     read_count,
 )
-from inventory_tng.stock.ledger import LOOSE, Form, hold, lock_places, tracks_opened
+from inventory_tng.stock.ledger import (
+    LOOSE,
+    Form,
+    hold,
+    hold_across,
+    lock_places,
+    tracks_opened,
+)
 from inventory_tng.stock.moments import Moment, expected_at, expected_forms_at, moment
 from inventory_tng.stock.needs_action import OnlyItem
 from inventory_tng.stock.paths import ADJUSTMENTS, COUNTS
@@ -775,6 +783,27 @@ def _count_at(
     return counted_now
 
 
+def _hold_named(
+    session: Session, places: Collection[int], counts: Collection[PlaceCount]
+) -> None:
+    """Hold the items, packages and open packages the places' counts name
+    (ledger.hold_across), so writing them one place after another never
+    takes a row of a lower id after a higher (inventory-tng-nfia)."""
+    forms = [form for count in counts for _, form, _ in count.forms.lines]
+    found = [count.forms.found[0] for count in counts if count.forms.found]
+    hold_across(
+        session,
+        places,
+        [item_id for count in counts for item_id, _ in count.counted]
+        + [item_id for count in counts for item_id, _, _ in count.forms.lines]
+        + [package.item_id for package in found],
+        [form.package_id for form in forms if form.package_id is not None]
+        + [package.id for package in found],
+        [form.open_package_id for form in forms if form.open_package_id is not None]
+        + [open_id for count in counts for open_id, _ in count.forms.close],
+    )
+
+
 def _anything(count: PlaceCount) -> bool:
     """Whether a count form says anything of a place."""
     forms = count.forms
@@ -847,8 +876,10 @@ def count(
 
     def put_right() -> dict[int, Counted]:
         # Every place on the form, in id order, as every count and save
-        # takes them (stock/ledger.py), before any item.
+        # takes them (stock/ledger.py), then every row the places' counts
+        # name, by id across them all, before any is written.
         lock_places(session, across)
+        _hold_named(session, across, [sent.places[place_id] for place_id in counting])
         return {
             place_id: _count_at(
                 session,

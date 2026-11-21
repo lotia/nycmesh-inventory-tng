@@ -234,7 +234,9 @@ def record_count(
     is one record_count for each place, each under a key of its own, with
     `across` every place the form's moment was read across (moments.moment):
     the first locks them all, in id order (ledger.lock_places), and each
-    checks the moment across them all.
+    checks the moment across them all. The caller holds the rows they all
+    name first (ledger.hold_across), so none takes one after another of a
+    higher id.
 
     An item that moved there since may have been counted before the move or
     after it, so its line is not written: it comes back to count again. The

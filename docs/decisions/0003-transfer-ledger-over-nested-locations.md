@@ -177,7 +177,9 @@ the area picked comes back picked after the save.
 
 The form lists the places it shows, so an area moved meanwhile only
 regroups. Its moment is read across them all, and the count holds every
-one, in id order, as saves take them (inventory-tng-8i4.51.3). A move
+one, in id order, as saves take them (inventory-tng-8i4.51.3), then the
+items, packages and open packages the form names, each by id across them
+all, before writing any (inventory-tng-nfia). A move
 between two of them while counting withholds the item at both, and the
 recount asks for it place by place. A send naming an area retired since
 it was shown is refused whole, keeping what was typed.
