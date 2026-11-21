@@ -17,7 +17,7 @@ from inventory_tng.stock.moments import at_place, expected
 from inventory_tng.stock.paths import COUNTS
 
 from helpers.markup import hidden_fields, options, read, text
-from helpers.rows import add
+from helpers.rows import add, tag
 from helpers.stock import Place, Spools, count_form, retire, stocked, write
 
 
@@ -60,9 +60,7 @@ class Store:
 
 
 def area(name: str, parent: Location) -> Location:
-    return Location(
-        name=f"{name} {uuid.uuid4().hex[:6]}", kind="area", parent_id=parent.id
-    )
+    return Location(name=f"{name} {tag()}", kind="area", parent_id=parent.id)
 
 
 def field(place: Location, store: Location, name: str) -> str:
@@ -471,7 +469,7 @@ def test_an_area_moved_out_while_counted_stays_on_the_form(
     made = Store(session)
     item = made.place.item.id
     form = count_form(admin_client.get(made.path))
-    other = add(session, Location(name=f"Other {uuid.uuid4().hex[:6]}", kind="store"))
+    other = add(session, Location(name=f"Other {tag()}", kind="store"))
     made.shelf.parent_id = other.id
     session.flush()
     typed = f"at_{made.shelf.id}_counted_{item}"

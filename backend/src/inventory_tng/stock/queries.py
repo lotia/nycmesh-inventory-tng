@@ -47,6 +47,8 @@ def items_with_ids(
     matching: ColumnElement[bool] | None = None,
 ) -> Sequence[Item]:
     """The items of `ids`, those `matching` too if given."""
+    if not ids:
+        return []
     found = select(Item).where(Item.id.in_(ids))
     if matching is not None:
         found = found.where(matching)

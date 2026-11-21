@@ -126,12 +126,7 @@ def by_form(
         if field.startswith(LOOSE_FIELD)
         and (item_id := row_id(field.removeprefix(LOOSE_FIELD))) is not None
     ]
-    # Read for each place on a store's form: none asked, no query.
-    items = (
-        {item.id: item for item in queries.items_with_ids(session, item_ids)}
-        if item_ids
-        else {}
-    )
+    items = {item.id: item for item in queries.items_with_ids(session, item_ids)}
     for field, typed in form.items():
         state = form.get(f"{STATE}{field.removeprefix(OPENED)}", "here")
         # A blank line is not counted, but one said used up or not here is
@@ -271,6 +266,25 @@ class PlaceCount(NamedTuple):
     counted: ItemLines
     forms: ByForm
     items: set[int]
+
+    @property
+    def anything(self) -> bool:
+        """Whether it says anything of the place."""
+        forms = self.forms
+        return bool(self.counted or forms.lines or forms.close or forms.found)
+
+    def typed(self) -> dict[int, Decimal]:
+        """What was typed of each item: its total, or its forms', an open
+        package nobody recorded among them."""
+        typed = dict(self.counted)
+        found = (
+            [(self.forms.found[0].item_id, LOOSE, self.forms.found[1])]
+            if self.forms.found
+            else []
+        )
+        for item_id, _, amount in [*self.forms.lines, *found]:
+            typed[item_id] = typed.get(item_id, Decimal(0)) + amount
+        return typed
 
 
 class CountForm(NamedTuple):

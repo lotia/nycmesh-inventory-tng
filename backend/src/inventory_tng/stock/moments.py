@@ -11,7 +11,16 @@ from collections.abc import Collection, Sequence
 from decimal import Decimal
 from typing import Any, NamedTuple
 
-from sqlalchemy import ColumnElement, case, func, literal, or_, select, union_all
+from sqlalchemy import (
+    ColumnElement,
+    Result,
+    case,
+    func,
+    literal,
+    or_,
+    select,
+    union_all,
+)
 from sqlalchemy.orm import Session
 
 from inventory_tng.models.stock import LedgerTransaction, Movement
@@ -242,13 +251,8 @@ def expected_at(
     """What the records said was at each place at moment `as_of`, by place
     and item, of `items` only if given: only what was not zero. One query,
     however many places."""
-    place, item_id, quantity = _signed_at(location_ids, as_of)
-    total = func.sum(quantity)
-    query = select(place, item_id, total).group_by(place, item_id).having(total != 0)
-    if items is not None:
-        query = query.where(item_id.in_(list(items)))
     found: dict[int, dict[int, Decimal]] = {}
-    for place_id, item, amount in session.execute(query):
+    for place_id, item, amount in _netted_at(session, location_ids, as_of, items):
         found.setdefault(place_id, {})[item] = amount
     return found
 
@@ -260,17 +264,31 @@ def expected_forms_at(
     moment `as_of`, by place, item and form, of `items`. One query."""
     if not items:
         return {}
-    place, item_id, package, opened, quantity = _signed_at(
-        location_ids, as_of, "package_id", "open_package_id"
-    )
-    total = func.sum(quantity)
-    query = (
-        select(place, item_id, package, opened, total)
-        .where(item_id.in_(list(items)))
-        .group_by(place, item_id, package, opened)
-        .having(total != 0)
+    rows = _netted_at(
+        session, location_ids, as_of, items, "package_id", "open_package_id"
     )
     found: dict[int, dict[tuple[int, Form], Decimal]] = {}
-    for place_id, item, package_id, open_id, amount in session.execute(query):
+    for place_id, item, package_id, open_id, amount in rows:
         found.setdefault(place_id, {})[(item, Form(package_id, open_id))] = amount
     return found
+
+
+def _netted_at(
+    session: Session,
+    location_ids: Collection[int],
+    as_of: int,
+    items: Collection[int] | None,
+    *columns: str,
+) -> Result[*tuple[Any, ...]]:
+    """_signed_at summed by place, item and `columns`, of `items` only if
+    given: each row's place, item, columns and amount, where not zero."""
+    place, item_id, *forms, quantity = _signed_at(location_ids, as_of, *columns)
+    total = func.sum(quantity)
+    query = (
+        select(place, item_id, *forms, total)
+        .group_by(place, item_id, *forms)
+        .having(total != 0)
+    )
+    if items is not None:
+        query = query.where(item_id.in_(list(items)))
+    return session.execute(query)

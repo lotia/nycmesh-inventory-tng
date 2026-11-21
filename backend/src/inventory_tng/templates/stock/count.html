@@ -44,12 +44,11 @@ if you didn't count it. Anything else here, add below.{% endtrans %}</p>
     {#- A store's areas, each under its own heading: one filtered to
     nothing is left out, but still counted only if something is typed. #}
     {% if areas and (group.rows or not filtered or group.place.id == place.id) %}
-    {% set label = group.path | join(" › ") if group.path else group.place.name %}
-    <tr{% if not group.rows %} class="text-muted"{% endif %}><th colspan="{{ columns }}" scope="rowgroup">{{ label }}
+    <tr{% if not group.rows %} class="text-muted"{% endif %}><th colspan="{{ columns }}" scope="rowgroup">{{ group.label }}
       {%- if group.place.retired_at %} <span class="hint">{% trans %}Retired: count what is really here, and put nothing here again.{% endtrans %}</span>{% endif %}</th></tr>
     {% endif %}
     {% set prefix = group.prefix %}
-    {% set where = (group.path | join(" › ")) if group.path else "" %}
+    {% set where = group.label if group.path else "" %}
     {% for item, amount in group.rows %}
     {% if item.id in group.forms %}
     {#- In more than loose units: each form counted on its own (0020). #}
@@ -102,11 +101,11 @@ if you didn't count it. Anything else here, add below.{% endtrans %}</p>
   a recount leaves it off (stock/forms.py). #}
   {% macro where_found(name) %}
   {% if areas %}
-  {% set chosen = values.get(name) or picked.get(name) %}
+  {% set chosen = picked.get(name) %}
   {% set chosen = chosen if chosen in choices | map(attribute="place.id") | map("string") else choices[0].place.id | string %}
   <label>{% trans %}Found in{% endtrans %}
     <select name="{{ name }}">
-      {% for group in choices %}<option value="{{ group.place.id }}" {% if chosen == group.place.id | string %}selected{% endif %}>{{ group.path | join(" › ") if group.path else group.place.name }}</option>{% endfor %}
+      {% for group in choices %}<option value="{{ group.place.id }}" {% if chosen == group.place.id | string %}selected{% endif %}>{{ group.label }}</option>{% endfor %}
     </select>
     {% include "_field_problem.html" %}
   </label>

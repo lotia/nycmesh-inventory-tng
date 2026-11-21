@@ -34,20 +34,12 @@ counted; the rest stay as they are, as any item left uncounted does. The
 filter rides on the form's action, so a form shown again keeps it.
 
 A place with areas in it is counted with every area inside it, at any
-depth, on one form, grouped by area (inventory-tng-8i4.51.4). Each line is
-written at the place it is listed under, one count at each place, so each
-keeps its own ledger and when it was last counted. Every area is shown, an
-empty one marked, a retired one holding stock marked retired; one retired
-and empty is left out. The form lists the places it shows (forms.PLACES),
-so an area moved meanwhile only regroups; its moment is read across them
-all, and the send holds them all before writing any
-(stock/store_counts.py). A line stays with its
-place: stock found in another area is a loss under one and a find under
-the other. Something else here and an open package nobody recorded are
-asked once for the form, each beside the place it was found in, which
-comes back picked after the save. Filtered to some items, an area with
-nothing typed is not counted. An area retired since the form was shown
-refuses the send whole, keeping what was typed.
+depth, on one form, grouped by area, one count at each place, as decision
+0003's 2026-11-21 amendment says (inventory-tng-8i4.51.4). The form lists
+the places it shows (forms.PLACES); its moment is read across them all,
+and the send holds them all before writing any (stock/store_counts.py).
+An area retired and empty is left out. Filtered to some items, an area
+with nothing typed is not counted.
 """
 
 import uuid
@@ -86,7 +78,6 @@ from inventory_tng.stock.forms import (
     OPENED,
     PICKED,
     SEALED,
-    PlaceCount,
     adjustment,
     field_at,
     item_counts,
@@ -357,6 +348,10 @@ def shown_items(only: OnlyItem, q: str = "") -> Shown:
 ShownItems = Annotated[Shown, Depends(shown_items)]
 
 
+# Between the names of an area's path on a count form.
+PATH_BETWEEN = " \N{SINGLE RIGHT-POINTING ANGLE QUOTATION MARK} "
+
+
 class Group(NamedTuple):
     """One place on a count form, its lines under it: the page's own place
     or an area in it (inventory-tng-8i4.51.4). Its path below the page's
@@ -371,6 +366,11 @@ class Group(NamedTuple):
     forms: dict[int, list[FormRow]]
     items: list[int]
     recount: Mapping[int, tuple[Decimal, Decimal, Decimal]] | None
+
+    @property
+    def label(self) -> str:
+        """Its path, or for the page's own place its name."""
+        return PATH_BETWEEN.join(self.path) if self.path else self.place.name
 
 
 def _shown_places(
@@ -696,12 +696,6 @@ def _followed(session: Session) -> list[tuple[ItemPackage, str, str]]:
     ]
 
 
-def _anything(count: PlaceCount) -> bool:
-    """Whether a count form says anything of a place."""
-    forms = count.forms
-    return bool(count.counted or forms.lines or forms.close or forms.found)
-
-
 @router.post(f"{COUNTS}/{{location_id:int}}")
 def count(
     request: Request,
@@ -760,7 +754,7 @@ def count(
     counting = [
         place_id
         for place_id, each in sent.places.items()
-        if not (areas and filtered) or _anything(each)
+        if not (areas and filtered) or each.anything
     ]
 
     # Bound again, as checked, for put_right.
@@ -877,19 +871,7 @@ def count(
             picker: form[picker] for picker in PICKED if form.get(picker)
         }
         return redirect(f"{COUNTS}/{place.id}", notice=notice, **again)
-    # What was typed of each item withheld, by place: its total, or its
-    # forms', an open package nobody recorded among them.
-    amounts: dict[int, dict[int, Decimal]] = {}
-    for place_id in result:
-        typed = amounts[place_id] = dict(sent.places[place_id].counted)
-        by_form = sent.places[place_id].forms
-        found = (
-            [(by_form.found[0].item_id, LOOSE, by_form.found[1])]
-            if by_form.found
-            else []
-        )
-        for item_id, _, amount in [*by_form.lines, *found]:
-            typed[item_id] = typed.get(item_id, Decimal(0)) + amount
+    amounts = {place_id: sent.places[place_id].typed() for place_id in result}
     saved = sum(len(typed) for typed in amounts.values()) - sum(
         len(each) for each in moved.values()
     )

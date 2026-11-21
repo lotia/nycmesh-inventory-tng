@@ -20,7 +20,7 @@ from typing import Literal
 
 import structlog
 from opentelemetry import metrics
-from sqlalchemy import and_, func, select
+from sqlalchemy import Select, and_, func, select
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.orm import Session
 
@@ -484,14 +484,24 @@ def hold_waiting(
     """Hold, by id, every check waiting at any of `places` of these items,
     moved by moment `as_of`: those counted() may settle at each of them, for
     a count of several places (a store and its areas) to take before it
-    writes the first (inventory-tng-nfia). Taken place by place, a check of
-    a higher id at the first could be held before one of a lower id at the
-    second, while a count elsewhere sharing both took them by id."""
+    writes the first (stock/ledger.py's lock order, inventory-tng-nfia)."""
     if not item_ids:
         return
-    query = (
-        select(OverRecorded.id)
-        .join(Movement, Movement.id == OverRecorded.movement_id)
+    query = _waiting_at(select(OverRecorded.id), places, as_of, item_ids)
+    session.execute(locked(query, of=OverRecorded))
+
+
+def _waiting_at[*Columns](
+    query: Select[*Columns],
+    places: Collection[int],
+    as_of: int,
+    item_ids: Collection[int],
+) -> Select[*Columns]:
+    """`query` of the checks waiting at any of `places` of these items,
+    moved by moment `as_of`, by id: what hold_waiting holds and counted()
+    reads."""
+    return (
+        query.join(Movement, Movement.id == OverRecorded.movement_id)
         .join(LedgerTransaction, LedgerTransaction.id == Movement.transaction_id)
         .where(
             WAITING,
@@ -501,7 +511,6 @@ def hold_waiting(
         )
         .order_by(OverRecorded.id)
     )
-    session.execute(locked(query, of=OverRecorded))
 
 
 def counted(
@@ -541,7 +550,7 @@ def counted(
     count_id = written[0].id
     totals = {item_id for item_id, form in put_right if form is None}
     forms = {(item_id, form) for item_id, form in put_right if form is not None}
-    query = (
+    query = _waiting_at(
         select(
             OverRecorded,
             Movement,
@@ -549,18 +558,11 @@ def counted(
             LedgerTransaction.from_location_id,
             LedgerTransaction.to_location_id,
             OpenPackage.closed_at,
-        )
-        .join(Movement, Movement.id == OverRecorded.movement_id)
-        .join(LedgerTransaction, LedgerTransaction.id == Movement.transaction_id)
-        .outerjoin(OpenPackage, OPENED_INTO)
-        .where(
-            WAITING,
-            Movement.item_id.in_({item_id for item_id, _ in [*put_right, *emptied]}),
-            LedgerTransaction.id <= as_of,
-            moments.at_place(place_id),
-        )
-        .order_by(OverRecorded.id)
-    )
+        ),
+        [place_id],
+        as_of,
+        {item_id for item_id, _ in [*put_right, *emptied]},
+    ).outerjoin(OpenPackage, OPENED_INTO)
     found = session.execute(locked(query, of=OverRecorded)).all()
     closed = 0
     for row, movement, kind, left_at, arrived_at, closed_on in found:

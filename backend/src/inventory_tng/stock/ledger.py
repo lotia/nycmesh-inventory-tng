@@ -470,12 +470,10 @@ def hold_across(
 ) -> set[int]:
     """For a change that writes several transactions, holding their places
     (lock_places): hold every item, package and open package they may
-    name, each kind by id across them all, in the order above, before the
-    first is written (inventory-tng-nfia). Each transaction then takes
-    again only rows already held, never one of a lower id after a higher,
-    as it would written one after another. The open packages' items too,
-    as closing one holds it (open_packages.close). A count takes no
-    retired package sealed (TAKES). The items held."""
+    name, each kind by id across them all, in the order above, so each
+    then takes again only rows already held (inventory-tng-nfia). The open
+    packages' items too, as closing one holds it (open_packages.close). A
+    count takes no retired package sealed (TAKES). The items held."""
     opens = sorted(set(open_ids))
     items = set(item_ids)
     if opens:
