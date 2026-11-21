@@ -5,12 +5,14 @@ line written at the place it was found in."""
 import uuid
 from decimal import Decimal
 
+import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from inventory_tng.models.places import Location
 from inventory_tng.models.stock import LedgerTransaction, OpenPackage
+from inventory_tng.stock.counts_routes import PATH_BETWEEN
 from inventory_tng.stock.forms import ON_THE_FORM_TWICE, PICK_A_PLACE, TYPE_IT_HERE
 from inventory_tng.stock.ledger import Entry
 from inventory_tng.stock.moments import at_place, expected
@@ -228,6 +230,42 @@ def test_something_else_here_listed_in_the_area_picked_is_refused(
     )
     assert done.status_code == 303
     assert expected(session, made.shelf.id) == {item: Decimal(6)}
+
+
+@pytest.mark.parametrize("where", ["store", "bin"])
+def test_something_else_here_listed_is_said_as_the_form_names_the_place(
+    admin_client: TestClient, session: Session, where: str
+) -> None:
+    """Radios found in the store itself, on its unprefixed line, named by
+    its name; cable found in Bin 1, inside Shelf A, named by its path below
+    the store, as its heading names it. Nothing is written."""
+    made = Store(session)
+    place, item, named = {
+        "store": (made.store, made.place.item, made.store.name),
+        "bin": (
+            made.bin,
+            made.place.cable,
+            PATH_BETWEEN.join((made.shelf.name, made.bin.name)),
+        ),
+    }[where]
+    # Its line is sent empty, as a browser sends it.
+    line = field(place, made.store, f"counted_{item.id}")
+    form = count_form(admin_client.get(made.path)) | {
+        line: "",
+        "extra_location_id": str(place.id),
+        "extra_item_id": str(item.id),
+        "extra_quantity": "1",
+    }
+    refused = admin_client.post(made.path, data=form)
+    assert refused.status_code == 400
+    assert f"{item.name_shown} is already listed under {named}." in text(refused)
+    shown = read(refused.text)
+    assert shown.one("span", id=f"{line}-problem").text == str(TYPE_IT_HERE)
+    assert (
+        shown.one("span", id="extra_item_id-problem").text
+        == f"Listed under {named} already."
+    )
+    assert counts_at(session, place) == []
 
 
 def test_something_else_here_listed_in_another_place_is_counted_where_picked(
