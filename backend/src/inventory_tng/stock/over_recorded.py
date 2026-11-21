@@ -446,21 +446,15 @@ def confirm_count(
     return "corrected"
 
 
-def openings_waiting(
-    session: Session, place_id: int, as_of: int
-) -> dict[int, set[int]]:
-    """Of those waiting, the openings at a place as of moment `as_of`: by
-    item, the packages each opened. Its count asks each such item by form,
-    with a line of those packages sealed though the records hold none, so
-    the sealed ones really there can be counted and each end put right
-    (Ali, 2026-11-15, inventory-tng-he9, inventory-tng-dd8)."""
-    return openings_waiting_at(session, [place_id], as_of).get(place_id, {})
-
-
 def openings_waiting_at(
     session: Session, place_ids: Collection[int], as_of: int
 ) -> dict[int, dict[int, set[int]]]:
-    """openings_waiting at each of the places, by place: one query."""
+    """Of those waiting, the openings at each of the places as of moment
+    `as_of`, by place: by item, the packages each opened. Its count asks
+    each such item by form, with a line of those packages sealed though the
+    records hold none, so the sealed ones really there can be counted and
+    each end put right (Ali, 2026-11-15, inventory-tng-he9,
+    inventory-tng-dd8). One query."""
     found: dict[int, dict[int, set[int]]] = {}
     for place_id, item_id, package_id in session.execute(
         select(

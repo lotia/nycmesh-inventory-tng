@@ -1,6 +1,7 @@
 """Counts and adjustments: the pages an administrator puts the records right
-with (docs/decisions/0003). The writing is stock/counts.py's (record_count,
-record_adjustment); these pages check what was typed and say what is wrong.
+with (docs/decisions/0003). The writing is stock/store_counts.py's
+(record_store_count) and stock/counts.py's (record_adjustment); these
+pages check what was typed and say what is wrong.
 
 Each form carries a key made when it was shown, so sending it twice writes
 it once. A count also carries the place's latest ledger entry as it was
@@ -39,9 +40,8 @@ keeps its own ledger and when it was last counted. Every area is shown, an
 empty one marked, a retired one holding stock marked retired; one retired
 and empty is left out. The form lists the places it shows (forms.PLACES),
 so an area moved meanwhile only regroups; its moment is read across them
-all, and the send holds them all, in id order, then the rows the form
-names, each kind by id across them all (ledger.hold_across), and the
-checks of recorded more than moved it may settle. A line stays with its
+all, and the send holds them all before writing any
+(stock/store_counts.py). A line stays with its
 place: stock found in another area is a loss under one and a find under
 the other. Something else here and an open package nobody recorded are
 asked once for the form, each beside the place it was found in, which
@@ -75,13 +75,9 @@ from inventory_tng.models.catalogue import Item, ItemPackage
 from inventory_tng.models.places import Location
 from inventory_tng.models.stock import AdjustmentReason, LedgerTransaction, OpenPackage
 from inventory_tng.site_settings.paths import SETTINGS
-from inventory_tng.stock import needs_action, open_packages, over_recorded, queries
+from inventory_tng.stock import needs_action, over_recorded, queries
 from inventory_tng.stock.balance import countable, takeable
-from inventory_tng.stock.counts import (
-    Counted,
-    record_adjustment,
-    record_count,
-)
+from inventory_tng.stock.counts import Counted, NotCountable, record_adjustment
 from inventory_tng.stock.forms import (
     CLOSED_MEANWHILE,
     EXTRA_PLACE,
@@ -97,17 +93,11 @@ from inventory_tng.stock.forms import (
     places_listed,
     read_count,
 )
-from inventory_tng.stock.ledger import (
-    LOOSE,
-    Form,
-    hold,
-    hold_across,
-    lock_places,
-    tracks_opened,
-)
+from inventory_tng.stock.ledger import LOOSE, Form, tracks_opened
 from inventory_tng.stock.moments import Moment, expected_at, expected_forms_at, moment
 from inventory_tng.stock.needs_action import OnlyItem
 from inventory_tng.stock.paths import ADJUSTMENTS, COUNTS
+from inventory_tng.stock.store_counts import record_store_count
 from inventory_tng.web.admin_pages import admin_page, current_rows, now, text_form
 from inventory_tng.web.forms import CHANGED, RULES
 from inventory_tng.web.listing import UNASKED, AskedView, Sort, Sorting, View, order
@@ -601,7 +591,7 @@ def _forms(
     packages, by how many; open packages; loose. Others are counted by
     their total, as before, but an item of an opening waiting there,
     recorded more than opened (`openings`, by place,
-    over_recorded.openings_waiting): it is counted by form, with a row of
+    over_recorded.openings_waiting_at): it is counted by form, with a row of
     each package it opened sealed, though the records hold none, as a total
     puts neither of its ends right (docs/decisions/0020). The same number
     of queries however many places."""
@@ -706,109 +696,6 @@ def _followed(session: Session) -> list[tuple[ItemPackage, str, str]]:
     ]
 
 
-def _count_at(
-    session: Session,
-    key: uuid.UUID,
-    admin_id: int,
-    place_id: int,
-    count: PlaceCount,
-    at: Moment,
-    across: Collection[int],
-) -> Counted:
-    """Put the records right at one place of a count form, holding every
-    place on it (`across`): its count, under a key of its own made from the
-    form's (counts.record_count), an open package nobody recorded found
-    there, the open packages closed there, and the ends there of lines
-    recorded more than moved that it puts right."""
-    forms = count.forms
-    # An item counted by its total holds loose units alone (_forms): with
-    # an open package of it found, its total is its loose units.
-    found_item = forms.found[0].item_id if forms.found else None
-    totals = [(item_id, n) for item_id, n in count.counted if item_id != found_item]
-    lines = [*forms.lines]
-    lines += [
-        (item_id, LOOSE, n) for item_id, n in count.counted if item_id == found_item
-    ]
-    place_key = uuid.uuid5(key, str(place_id))
-    if forms.found is not None:
-        # The places are held: then the item, before a package found is.
-        hold(session, {"to_location_id": place_id}, [forms.found[0].item_id])
-        package, left = forms.found
-        with session.begin_nested() as finding:
-            made = open_packages.make(
-                session, uuid.uuid5(key, "found"), package.id, place_id
-            )
-            found = (package.item_id, Form(open_package_id=made.id), left)
-            counted_now = record_count(
-                session,
-                place_key,
-                admin_id,
-                place_id,
-                totals,
-                at,
-                by_form=[*lines, found],
-                across=across,
-            )
-            if package.item_id in counted_now.moved:
-                # Its item moved meanwhile: asked again, found again then.
-                finding.rollback()
-    if forms.found is None or package.item_id in counted_now.moved:
-        counted_now = record_count(
-            session,
-            place_key,
-            admin_id,
-            place_id,
-            totals,
-            at,
-            by_form=lines,
-            across=across,
-        )
-    # Closed after the count: one not there, or used up, as said. Each
-    # closed is at 0, as counted so, for an opening that arrived in it.
-    emptied: list[tuple[int, Form]] = []
-    for open_id, reason in forms.close:
-        if open_packages.close(
-            session, open_id, admin_id, now(), how="count", reason=reason
-        ):
-            item_id = session.get_one(OpenPackage, open_id).item_id
-            emptied.append((item_id, Form(open_package_id=open_id)))
-    over_recorded.counted(
-        session,
-        admin_id,
-        place_id,
-        at.as_of,
-        counted_now.written,
-        counted_now.put_right,
-        emptied,
-    )
-    return counted_now
-
-
-def _hold_named(
-    session: Session,
-    places: Collection[int],
-    at: Moment,
-    counts: Collection[PlaceCount],
-) -> None:
-    """Hold the items, packages and open packages the places' counts name
-    (ledger.hold_across), then the checks waiting there they may settle
-    (over_recorded.hold_waiting), so writing them one place after another
-    never takes a row of a lower id after a higher (inventory-tng-nfia)."""
-    forms = [form for count in counts for _, form, _ in count.forms.lines]
-    found = [count.forms.found[0] for count in counts if count.forms.found]
-    items = hold_across(
-        session,
-        [item_id for count in counts for item_id, _ in count.counted]
-        + [item_id for count in counts for item_id, _, _ in count.forms.lines]
-        + [package.item_id for package in found],
-        [form.package_id for form in forms if form.package_id is not None]
-        + [package.id for package in found],
-        [form.open_package_id for form in forms if form.open_package_id is not None]
-        + [open_id for count in counts for open_id, _ in count.forms.close],
-    )
-    over_recorded.hold_waiting(session, places, at.as_of, items)
-
-
 def _anything(count: PlaceCount) -> bool:
     """Whether a count form says anything of a place."""
     forms = count.forms
@@ -835,7 +722,7 @@ def count(
         or as_of is None
         or seen is None
         or place_ids is None
-        or len(by_name(session, Location, Location.id.in_(place_ids))) != len(place_ids)
+        or len(queries.places_with_ids(session, place_ids)) != len(place_ids)
     ):
         return not_found()
     at = Moment(as_of, seen)
@@ -878,27 +765,24 @@ def count(
 
     # Bound again, as checked, for put_right.
     sent_key, across = key, place_ids
+    # The place that refused it (counts.NotCountable), as it was then.
+    retired: int | None = None
 
     def put_right() -> dict[int, Counted]:
-        # Every place on the form, in id order, as every count and save
-        # takes them (stock/ledger.py), then every row the places' counts
-        # name, by id across them all, before any is written.
-        lock_places(session, across)
-        _hold_named(
-            session, counting, at, [sent.places[place_id] for place_id in counting]
-        )
-        return {
-            place_id: _count_at(
+        nonlocal retired
+        try:
+            return record_store_count(
                 session,
                 sent_key,
                 signed.admin.id,
-                place_id,
-                sent.places[place_id],
-                at,
                 across,
+                at,
+                {place_id: sent.places[place_id] for place_id in counting},
+                now(),
             )
-            for place_id in counting
-        }
+        except NotCountable as broken:
+            retired = broken.location_id
+            raise
 
     result, broken = refusal(
         session,
@@ -913,12 +797,7 @@ def count(
     if broken is not None:
         log.info("count refused by a rule", location_id=place.id, rule=broken)
         if broken == COUNTABLE:
-            retired = [
-                place_id
-                for place_id in place_ids
-                if queries.countable_place(session, place_id) is None
-            ]
-            if not retired or place.id in retired:
+            if retired is None or retired == place.id:
                 # As for a place there is not, as the form's own page answers.
                 return not_found()
             # An area retired since: the form as it is now, without it,
@@ -931,11 +810,11 @@ def count(
                 place,
                 None,
                 values={name: value for name, value in form.items() if name != "key"},
-                alert=retired_meanwhile(session.get_one(Location, retired[0]).name),
+                alert=retired_meanwhile(session.get_one(Location, retired).name),
                 items={
                     place_id: each
                     for place_id, each in asked.items()
-                    if place_id not in retired
+                    if place_id != retired
                 },
                 shown=shown,
                 status_code=409,

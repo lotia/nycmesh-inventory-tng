@@ -95,10 +95,7 @@ def _into_open(session: Session, open_id: int, *where: ColumnElement[bool]) -> D
 
 def at_place(location_id: int) -> ColumnElement[bool]:
     """A ledger transaction into or out of a place."""
-    return or_(
-        LedgerTransaction.to_location_id == location_id,
-        LedgerTransaction.from_location_id == location_id,
-    )
+    return at_places([location_id])
 
 
 def at_places(location_ids: Collection[int]) -> ColumnElement[bool]:
@@ -206,14 +203,6 @@ def form_flows(
                 came, went = flow.get(form, (Decimal(0), Decimal(0)))
                 flow[form] = (came + total, went) if into else (came, went + total)
     return by_window
-
-
-def expected_forms(
-    session: Session, location_id: int, as_of: int, items: Collection[int]
-) -> dict[tuple[int, Form], Decimal]:
-    """What the records said was at a place at moment `as_of`, by item and
-    form, of `items`: only what was not zero."""
-    return expected_forms_at(session, [location_id], as_of, items).get(location_id, {})
 
 
 def _signed_at(

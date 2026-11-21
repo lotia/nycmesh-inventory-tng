@@ -87,12 +87,10 @@ def test_its_open_package_closed_on_a_count_puts_that_end_right_then_correct_wor
         None,
     )
     session.expire_all()
-    forms = moments.expected_forms(
-        session,
-        spools.store.id,
-        moments.moment(session, spools.store.id).as_of,
-        [spools.cable.id],
-    )
+    store = spools.store.id
+    forms = moments.expected_forms_at(
+        session, [store], moments.moment(session, store).as_of, [spools.cable.id]
+    )[store]
     assert forms == {(spools.cable.id, spools.sealed): 305} | {
         (spools.cable.id, Form(open_package_id=other.id)): 305
         for other in session.scalars(
@@ -199,9 +197,9 @@ def test_counting_its_place_from_the_row_counts_the_sealed_spool_and_closes_it(
     session.expire_all()
     store = spools.store.id
     sealed = (spools.cable.id, spools.sealed)
-    found = moments.expected_forms(
-        session, store, moments.moment(session, store).as_of, [spools.cable.id]
-    )
+    found = moments.expected_forms_at(
+        session, [store], moments.moment(session, store).as_of, [spools.cable.id]
+    )[store]
     assert found[sealed] == 305
 
 
@@ -287,9 +285,9 @@ def test_its_loose_only_place_counted_by_form_puts_each_form_right(
     (check,) = checks(session)
     assert check.settled_how == "counted"
     session.expire_all()
-    found = moments.expected_forms(
-        session, store, moments.moment(session, store).as_of, [spools.cable.id]
-    )
+    found = moments.expected_forms_at(
+        session, [store], moments.moment(session, store).as_of, [spools.cable.id]
+    )[store]
     assert found == {
         (spools.cable.id, spools.sealed): 305,
         (spools.cable.id, Form()): 305,
@@ -308,7 +306,7 @@ def test_a_move_waiting_asks_no_sealed_line(
     moved_whole(registered_client, spools)
     for place in (spools.store, spools.van):
         moment = moments.moment(session, place.id).as_of
-        assert over_recorded.openings_waiting(session, place.id, moment) == {}
+        assert over_recorded.openings_waiting_at(session, [place.id], moment) == {}
     page = admin_client.get(f"{COUNTS}/{spools.van.id}").text
     assert sealed_line(page, spools) is None
 

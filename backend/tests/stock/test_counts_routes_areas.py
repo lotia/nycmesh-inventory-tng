@@ -12,7 +12,7 @@ from sqlalchemy.orm import Session
 from inventory_tng.models.places import Location
 from inventory_tng.models.stock import LedgerTransaction, OpenPackage
 from inventory_tng.stock.forms import PICK_A_PLACE
-from inventory_tng.stock.moments import expected
+from inventory_tng.stock.moments import at_place, expected
 from inventory_tng.stock.paths import COUNTS
 
 from helpers.markup import hidden_fields, options, read, text
@@ -73,11 +73,7 @@ def counts_at(session: Session, place: Location) -> list[LedgerTransaction]:
     return list(
         session.scalars(
             select(LedgerTransaction)
-            .where(
-                LedgerTransaction.kind == "count",
-                (LedgerTransaction.to_location_id == place.id)
-                | (LedgerTransaction.from_location_id == place.id),
-            )
+            .where(LedgerTransaction.kind == "count", at_place(place.id))
             .order_by(LedgerTransaction.id)
         )
     )

@@ -49,6 +49,7 @@ RULES = {
     "stock/counts.py",
     "stock/ledger.py",
     "stock/moments.py",
+    "stock/store_counts.py",
     *(
         table.info["owner"]
         for table in Base.metadata.tables.values()

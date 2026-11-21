@@ -126,7 +126,12 @@ def by_form(
         if field.startswith(LOOSE_FIELD)
         and (item_id := row_id(field.removeprefix(LOOSE_FIELD))) is not None
     ]
-    items = {item.id: item for item in queries.items_with_ids(session, item_ids)}
+    # Read for each place on a store's form: none asked, no query.
+    items = (
+        {item.id: item for item in queries.items_with_ids(session, item_ids)}
+        if item_ids
+        else {}
+    )
     for field, typed in form.items():
         state = form.get(f"{STATE}{field.removeprefix(OPENED)}", "here")
         # A blank line is not counted, but one said used up or not here is

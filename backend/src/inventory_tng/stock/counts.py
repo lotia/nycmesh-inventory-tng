@@ -1,5 +1,6 @@
-"""Counts and adjustments: an administrator's, from stock/counts_routes.py,
-a length check (stock/length_checks_routes.py), a package closed
+"""Counts and adjustments: an administrator's, from stock/counts_routes.py
+(a count through stock/store_counts.py), a length check
+(stock/length_checks_routes.py), a package closed
 (open_packages.close) or a check settled (over_recorded)
 (docs/decisions/0003, 0020). They put the records right for what was
 found at a place, as of when its form was shown (moments.Moment), and
