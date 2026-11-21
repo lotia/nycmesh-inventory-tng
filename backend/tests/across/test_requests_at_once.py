@@ -16,7 +16,7 @@ CONTRIBUTING.md says how to run or skip a kind.
 """
 
 import uuid
-from collections.abc import Callable, Mapping
+from collections.abc import Callable
 from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 from typing import cast
@@ -28,7 +28,7 @@ from fastapi.testclient import TestClient
 from httpx2 import Response as Answer
 from sqlalchemy import Engine, delete, select, text, update
 from sqlalchemy.exc import IntegrityError, OperationalError
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import InstrumentedAttribute, Session
 
 from inventory_tng.admins import (
     accounts,
@@ -1529,6 +1529,53 @@ def two_areas(session: Session, store: Location) -> tuple[Location, Location]:
     return first, second
 
 
+def signed_in(
+    committed: Committed, make_client: Callable[..., TestClient], totp: str | None
+) -> tuple[Session, TestClient]:
+    """A client on a session of its own, signed in with `totp`."""
+    page = committed.session()
+    client = make_client(on=page)
+    assert sign_in_with(client, key=totp).status_code == 303
+    return page, client
+
+
+def held(column: InstrumentedAttribute[int], row_id: int) -> Write:
+    """Taking the row of `column` `row_id`, FOR UPDATE."""
+    return lambda session: session.execute(
+        locked(select(column).where(column == row_id))
+    )
+
+
+def tracking(item_ids: list[int], on: bool) -> Write:
+    """Setting these items to track opened packages, or not
+    (items.track_items, FOR UPDATE by id), all of them taken."""
+
+    def track(session: Session) -> None:
+        assert items.track_items(session, item_ids, on) == item_ids
+
+    return track
+
+
+def answered_while_held(
+    committed: Committed,
+    page: Session,
+    send: Callable[[], object],
+    first: Write,
+    then: Write,
+) -> Answer:
+    """`send` run while another session has done `first`: it waits for
+    that holding nothing the other needs, so the other does `then` and
+    commits, then `send` finishes. What it answered."""
+    other = committed.session()
+    first(other)
+    worker = committed.blocked(page, send)
+    then(other)
+    other.commit()
+    finished = worker.finished()
+    assert finished.error is None
+    return cast(Answer, finished.result)
+
+
 @pytest.mark.end_to_end
 def test_a_store_count_waits_for_a_save_between_two_of_its_areas(
     own_committed: Committed, make_client: Callable[..., TestClient]
@@ -1555,9 +1602,7 @@ def test_a_store_count_waits_for_a_save_between_two_of_its_areas(
         [(radio, Decimal(3))],
     )
     setup.commit()
-    page = own_committed.session()
-    client = make_client(on=page)
-    assert sign_in_with(client, key=totp).status_code == 303
+    page, client = signed_in(own_committed, make_client, totp)
     path = f"{COUNTS}/{store.id}"
     form = count_form(client.get(path)) | {
         f"at_{first.id}_counted_{radio}": "0",
@@ -1621,22 +1666,20 @@ def test_a_store_count_holds_its_items_by_id_across_its_areas(
             [(item_id, Decimal(3))],
         )
     setup.commit()
-    page = own_committed.session()
-    client = make_client(on=page)
-    assert sign_in_with(client, key=totp).status_code == 303
+    page, client = signed_in(own_committed, make_client, totp)
     path = f"{COUNTS}/{place.store.id}"
     form = count_form(client.get(path)) | {
         f"at_{first.id}_counted_{cable}": "4",
         f"at_{second.id}_counted_{radio}": "4",
     }
-    tracking = own_committed.session()
-    tracking.execute(locked(select(Item.id).where(Item.id == radio)))
-    worker = own_committed.blocked(page, lambda: client.post(path, data=form))
-    assert items.track_items(tracking, [radio, cable], True) == [radio, cable]
-    tracking.commit()
-    finished = worker.finished()
-    assert finished.error is None
-    assert cast(Answer, finished.result).status_code == 303
+    answered = answered_while_held(
+        own_committed,
+        page,
+        lambda: client.post(path, data=form),
+        held(Item.id, radio),
+        tracking([radio, cable], True),
+    )
+    assert answered.status_code == 303
     checking = own_committed.session()
     assert expected(checking, first.id) == {cable: Decimal(4)}
     assert expected(checking, second.id) == {radio: Decimal(4)}
@@ -1666,22 +1709,20 @@ def test_a_count_holds_what_it_finds_and_loses_by_id(
         [(radio, Decimal(3)), (cable, Decimal(3))],
     )
     setup.commit()
-    page = own_committed.session()
-    client = make_client(on=page)
-    assert sign_in_with(client, key=totp).status_code == 303
+    page, client = signed_in(own_committed, make_client, totp)
     path = f"{COUNTS}/{store}"
     form = count_form(client.get(path)) | {
         f"counted_{radio}": "2",
         f"counted_{cable}": "4",
     }
-    tracking = own_committed.session()
-    tracking.execute(locked(select(Item.id).where(Item.id == radio)))
-    worker = own_committed.blocked(page, lambda: client.post(path, data=form))
-    assert items.track_items(tracking, [radio, cable], True) == [radio, cable]
-    tracking.commit()
-    finished = worker.finished()
-    assert finished.error is None
-    assert cast(Answer, finished.result).status_code == 303
+    answered = answered_while_held(
+        own_committed,
+        page,
+        lambda: client.post(path, data=form),
+        held(Item.id, radio),
+        tracking([radio, cable], True),
+    )
+    assert answered.status_code == 303
     checking = own_committed.session()
     assert expected(checking, store) == {radio: Decimal(2), cable: Decimal(4)}
 
@@ -1730,25 +1771,17 @@ def test_a_store_count_holds_the_checks_it_settles_by_id_across_its_areas(
     ]
     setup.commit()
     assert raised == sorted(raised)
-    page = own_committed.session()
-    client = make_client(on=page)
-    assert sign_in_with(client, key=totp).status_code == 303
+    page, client = signed_in(own_committed, make_client, totp)
     path = f"{COUNTS}/{place.store.id}"
     form = count_form(client.get(path)) | {
         f"at_{first.id}_counted_{radio}": "3",
         f"at_{second.id}_counted_{radio}": "3",
     }
-    van = own_committed.session()
-    lower, higher = (
-        select(OverRecorded.id).where(OverRecorded.id == check) for check in raised
+    lower, higher = (held(OverRecorded.id, check) for check in raised)
+    answered = answered_while_held(
+        own_committed, page, lambda: client.post(path, data=form), lower, higher
     )
-    van.execute(locked(lower))
-    worker = own_committed.blocked(page, lambda: client.post(path, data=form))
-    van.execute(locked(higher))
-    van.commit()
-    finished = worker.finished()
-    assert finished.error is None
-    assert cast(Answer, finished.result).status_code == 303
+    assert answered.status_code == 303
     checking = own_committed.session()
     arrived = checking.scalars(
         select(OverRecorded.arrived_count_id).where(OverRecorded.id.in_(raised))
@@ -1782,28 +1815,6 @@ def opened_out_of_item_order(
     return (first.cable.id, second.cable.id), (first_open, second_open)
 
 
-def answered_while_tracking(
-    committed: Committed,
-    page: Session,
-    client: TestClient,
-    path: str,
-    form: Mapping[str, object],
-    cables: tuple[int, int],
-) -> Answer:
-    """`form` sent to `path` while tracking opened packages of both cables
-    (items.track_items, FOR UPDATE by id) holds the first: the answer waits
-    for it holding neither, so tracking takes both and commits, then the
-    answer is written. What the page answered."""
-    tracking = committed.session()
-    tracking.execute(locked(select(Item.id).where(Item.id == cables[0])))
-    worker = committed.blocked(page, lambda: client.post(path, data=form))
-    assert items.track_items(tracking, cables, False) == list(cables)
-    tracking.commit()
-    finished = worker.finished()
-    assert finished.error is None
-    return cast(Answer, finished.result)
-
-
 @pytest.mark.end_to_end
 def test_used_up_confirmed_together_holds_their_items_by_id(
     own_committed: Committed, make_client: Callable[..., TestClient]
@@ -1822,12 +1833,14 @@ def test_used_up_confirmed_together_holds_their_items_by_id(
         setup, two_spools(setup), lambda spools, row: report(spools, used_up=[row.key])
     )
     setup.commit()
-    page = own_committed.session()
-    client = make_client(on=page)
-    assert sign_in_with(client, key=totp).status_code == 303
+    page, client = signed_in(own_committed, make_client, totp)
     form = {"open_package": [str(row.id) for row in opened], "do": "confirm"}
-    answered = answered_while_tracking(
-        own_committed, page, client, USED_UP, form, cables
+    answered = answered_while_held(
+        own_committed,
+        page,
+        lambda: client.post(USED_UP, data=form),
+        held(Item.id, cables[0]),
+        tracking(list(cables), False),
     )
     assert answered.headers["location"].endswith("notice=used_up_confirmed")
     checking = own_committed.session()
@@ -1859,12 +1872,14 @@ def test_length_checks_answered_together_hold_their_items_by_id(
     )
     setup.commit()
     ticked = [f"{row.id} {open_packages.check_seen(row)}" for row in opened]
-    page = own_committed.session()
-    client = make_client(on=page)
-    assert sign_in_with(client, key=totp).status_code == 303
+    page, client = signed_in(own_committed, make_client, totp)
     form = {"open_package": ticked, "do": "set"}
-    answered = answered_while_tracking(
-        own_committed, page, client, LENGTHS, form, cables
+    answered = answered_while_held(
+        own_committed,
+        page,
+        lambda: client.post(LENGTHS, data=form),
+        held(Item.id, cables[0]),
+        tracking(list(cables), False),
     )
     assert answered.headers["location"].endswith("notice=length_set")
     checking = own_committed.session()
@@ -1908,22 +1923,12 @@ def test_length_checks_answered_together_hold_the_checks_they_settle_by_id(
     )
     setup.commit()
     ticked = [f"{row.id} {open_packages.check_seen(row)}" for row in opened]
-    page = own_committed.session()
-    client = make_client(on=page)
-    assert sign_in_with(client, key=totp).status_code == 303
-    counting = own_committed.session()
-    lower, higher = (
-        select(OverRecorded.id).where(OverRecorded.id == check) for check in raised
+    page, client = signed_in(own_committed, make_client, totp)
+    form = {"open_package": ticked, "do": "set"}
+    lower, higher = (held(OverRecorded.id, check) for check in raised)
+    answered = answered_while_held(
+        own_committed, page, lambda: client.post(LENGTHS, data=form), lower, higher
     )
-    counting.execute(locked(lower))
-    worker = own_committed.blocked(
-        page, lambda: client.post(LENGTHS, data={"open_package": ticked, "do": "set"})
-    )
-    counting.execute(locked(higher))
-    counting.commit()
-    finished = worker.finished()
-    assert finished.error is None
-    answered = cast(Answer, finished.result)
     assert answered.headers["location"].endswith("notice=length_set")
 
 
