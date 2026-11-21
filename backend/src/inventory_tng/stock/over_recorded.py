@@ -454,21 +454,33 @@ def openings_waiting(
     with a line of those packages sealed though the records hold none, so
     the sealed ones really there can be counted and each end put right
     (Ali, 2026-11-15, inventory-tng-he9, inventory-tng-dd8)."""
-    found: dict[int, set[int]] = {}
-    for item_id, package_id in session.execute(
-        select(Movement.item_id, Movement.from_package_id)
+    return openings_waiting_at(session, [place_id], as_of).get(place_id, {})
+
+
+def openings_waiting_at(
+    session: Session, place_ids: Collection[int], as_of: int
+) -> dict[int, dict[int, set[int]]]:
+    """openings_waiting at each of the places, by place: one query."""
+    found: dict[int, dict[int, set[int]]] = {}
+    for place_id, item_id, package_id in session.execute(
+        select(
+            LedgerTransaction.from_location_id,
+            Movement.item_id,
+            Movement.from_package_id,
+        )
         .join(OverRecorded, OverRecorded.movement_id == Movement.id)
         .join(LedgerTransaction, LedgerTransaction.id == Movement.transaction_id)
         .where(
             WAITING,
             LedgerTransaction.kind == "open",
-            LedgerTransaction.from_location_id == place_id,
+            LedgerTransaction.from_location_id.in_(list(place_ids)),
             LedgerTransaction.id <= as_of,
         )
     ):
-        # An opening leaves sealed (ledger._opening_breaks).
+        # An opening leaves sealed, from where it is (ledger._opening_breaks).
         assert package_id is not None
-        found.setdefault(item_id, set()).add(package_id)
+        assert place_id is not None
+        found.setdefault(place_id, {}).setdefault(item_id, set()).add(package_id)
     return found
 
 

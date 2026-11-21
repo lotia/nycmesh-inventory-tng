@@ -1,5 +1,5 @@
 """How the counts pages' forms are read and checked: a place's count, its
-lines by item and by form, and an adjustment, and what is wrong, in
+lines by place, by item and by form, and an adjustment, and what is wrong, in
 words, beside the field it is about; and those of lines recorded with
 more than was moved, and of lengths to check. The handlers in
 stock/counts_routes.py, stock/over_recorded_routes.py and
@@ -192,6 +192,121 @@ def by_form(
             assert left is not None  # Required, so a problem if blank.
             found = (package, left)
     return ByForm(lines, close, found), problems
+
+
+# A count of a store and its areas on one form (inventory-tng-8i4.51.4):
+# an area's fields are named at_<its id>_<field>; the page's own place's
+# have no prefix, as on a count of one place. The form lists every place
+# it shows, so one with nothing on it is counted too.
+AT, PLACES, ITEMS = "at_", "places", "items"
+# Something else here and an open package nobody recorded are asked once
+# for the whole form, each with the place it was found in beside it.
+EXTRA_PLACE, FOUND_PLACE = "extra_location_id", "found_location_id"
+PICKED = {
+    EXTRA_PLACE: ("extra_item_id", EXTRA),
+    FOUND_PLACE: (FOUND_PACKAGE, FOUND_LEFT),
+}
+# Fields said once, wherever their place: never prefixed.
+SHARED = {*PICKED, *(name for names in PICKED.values() for name in names)}
+
+
+def field_at(root_id: int, place_id: int, name: str) -> str:
+    """The count form's name for a field of a place on the count of
+    `root_id` (AT)."""
+    if place_id == root_id or name in SHARED or name == CLOSED_MEANWHILE:
+        return name
+    return f"{AT}{place_id}_{name}"
+
+
+def places_listed(form: Mapping[str, str], root_id: int) -> list[int] | None:
+    """The places a count form shows (PLACES), by id; just its own, on a
+    form that lists none; None if one listed is no id at all."""
+    listed = form.get(PLACES, "").split() or [str(root_id)]
+    ids = [row_id(typed) for typed in listed]
+    if any(place_id is None for place_id in ids):
+        return None
+    return sorted({place_id for place_id in ids if place_id is not None})
+
+
+def by_place(
+    form: Mapping[str, str], root_id: int, place_ids: Collection[int]
+) -> tuple[dict[int, dict[str, str]], dict[str, Words]]:
+    """A count form's fields, place by place, each unprefixed (AT): those
+    of a place it does not list are dropped. Something else here and an
+    open package nobody recorded go to the place picked beside them, the
+    page's own if none is; and what is wrong: one picked it does not list."""
+    split: dict[int, dict[str, str]] = {place_id: {} for place_id in place_ids}
+    for field, typed in form.items():
+        if field in SHARED:
+            continue
+        place_id: int | None = root_id
+        name = field
+        if field.startswith(AT):
+            number, _, name = field.removeprefix(AT).partition("_")
+            place_id = row_id(number)
+        if place_id in split:
+            split[place_id][name] = typed
+    problems: dict[str, Words] = {}
+    for picker, names in PICKED.items():
+        typed = form.get(picker, "")
+        place_id = row_id(typed) if typed else root_id
+        if place_id in split:
+            split[place_id] |= {name: form[name] for name in names if name in form}
+        elif any(form.get(name, "").strip() for name in names):
+            problems[picker] = PICK_A_PLACE
+    return split, problems
+
+
+class PlaceCount(NamedTuple):
+    """What a count form says of one place: its lines as typed, those
+    counted by total, those by form, and, on a recount, the items it asks
+    for again."""
+
+    found: list[Line]
+    counted: ItemLines
+    forms: ByForm
+    items: set[int]
+
+
+class CountForm(NamedTuple):
+    """A count form read: each place's count, by id; what is wrong, by the
+    form's own field names; and the fields naming an item twice there, by
+    those names too, and that item."""
+
+    places: dict[int, PlaceCount]
+    problems: dict[str, Words]
+    twice: dict[str, int | None]
+
+
+def read_count(
+    session: Session, form: Mapping[str, str], root_id: int, place_ids: list[int]
+) -> CountForm:
+    """A count form, of the places `place_ids` (places_listed), read place
+    by place (by_place) and checked."""
+    split, problems = by_place(form, root_id, place_ids)
+    places: dict[int, PlaceCount] = {}
+    twice: dict[str, int | None] = {}
+    for place_id, fields in split.items():
+        found = lines(fields)
+        counted, wrong = item_counts(session, found)
+        forms, form_wrong = by_form(session, fields, place_id)
+        items = {
+            item_id
+            for typed in fields.get(ITEMS, "").split()
+            if (item_id := row_id(typed)) is not None
+        }
+        places[place_id] = PlaceCount(found, counted, forms, items)
+        named = {
+            field_at(root_id, place_id, field): item_id
+            for field, item_id in named_twice(found).items()
+        }
+        twice |= named
+        problems |= {
+            field_at(root_id, place_id, field): words
+            for field, words in (wrong | form_wrong).items()
+        }
+        problems |= dict.fromkeys(named, ON_THE_FORM_TWICE)
+    return CountForm(places, problems, twice)
 
 
 def item_counts(

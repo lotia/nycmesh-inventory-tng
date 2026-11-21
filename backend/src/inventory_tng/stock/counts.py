@@ -7,7 +7,7 @@ write through the ledger's one writer (ledger.insert_transaction).
 """
 
 import uuid
-from collections.abc import Mapping, Sequence
+from collections.abc import Collection, Mapping, Sequence
 from decimal import Decimal
 from typing import Literal, NamedTuple
 
@@ -32,6 +32,7 @@ from inventory_tng.stock.ledger import (
     entries,
     insert_transaction,
     lock_place,
+    lock_places,
     repeated,
 )
 
@@ -215,6 +216,7 @@ def record_count(
     shown: moments.Moment,
     *,
     by_form: FormLines = (),
+    across: Collection[int] = (),
 ) -> Counted:
     """Put the records right for what was counted at a place, as they stood
     when the form was shown: as of `shown`, the place's latest ledger
@@ -227,6 +229,12 @@ def record_count(
     found by counting the place's transactions up to the moment: then the
     figures shown are not the records as of it, and the count is refused
     (changed_since_shown).
+
+    A count of a store and its areas on one form (inventory-tng-8i4.51.4)
+    is one record_count for each place, each under a key of its own, with
+    `across` every place the form's moment was read across (moments.moment):
+    the first locks them all, in id order (ledger.lock_places), and each
+    checks the moment across them all.
 
     An item that moved there since may have been counted before the move or
     after it, so its line is not written: it comes back to count again. The
@@ -254,6 +262,8 @@ def record_count(
         when=bool({item_id for item_id, _ in counted} & {i for i, _ in forms_counted}),
     )
     counted_at = dict(counted)
+    places = {location_id, *across}
+    lock_places(session, places)
     sent = _hold_place(session, location_id, key, _lost_key(key))
     as_of = shown.as_of
     after = LedgerTransaction.id > as_of
@@ -261,7 +271,7 @@ def record_count(
         after &= LedgerTransaction.id < sent
     enforce(
         "changed_since_shown",
-        when=moments.seen_up_to(session, location_id, as_of) != shown.seen,
+        when=moments.seen_up_to(session, places, as_of) != shown.seen,
     )
     moved, flows = moments.flows(
         session, location_id, after, LedgerTransaction.id <= as_of, items=counted_at

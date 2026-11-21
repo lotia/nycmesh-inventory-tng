@@ -20,64 +20,101 @@ with a way to show them all (stock/counts_routes.py). #}
   {%- elif shown.only %}{% trans item=shown.only.name_shown %}Only {{ item }}. Only these are counted; the rest stay as they are.{% endtrans %}
   {%- else %}{% trans search=shown.search %}Only items matching “{{ search }}”. Only these are counted; the rest stay as they are.{% endtrans %}{% endif %} <a href="{{ here }}">{% trans %}Show all{% endtrans %}</a></p>
 {% endif %}
-{% if items %}
+{% set recounting = groups | selectattr("items") | list %}
+{% if recounting %}
 <p>{% trans %}Something came in or went out of each of these after you started, so it's
 not clear whether you counted it before or after. Count them again now.{% endtrans %}</p>
 {% else %}
 <p>{% trans %}Type what is really there. Leave a line as it is if it's right, or blank
 if you didn't count it. Anything else here, add below.{% endtrans %}</p>
 {% endif %}
+{% set filtered = shown.only or shown.search %}
+{% set columns = 4 if recount else 3 %}
 <form method="post" action="{{ here }}{{ shown.query() }}">
   <input type="hidden" name="key" value="{{ key }}">
   <input type="hidden" name="as_of" value="{{ moment.as_of }}">
   <input type="hidden" name="seen" value="{{ moment.seen }}">
-  {% if items %}<input type="hidden" name="items" value="{{ items | join(' ') }}">{% endif %}
+  {#- Every place shown, so one with nothing on it is counted too
+  (stock/forms.py). #}
+  <input type="hidden" name="places" value="{{ groups | map(attribute='place.id') | join(' ') }}">
+  {% for group in groups if group.items %}<input type="hidden" name="{{ group.prefix }}items" value="{{ group.items | join(' ') }}">{% endfor %}
   {% call table() %}
     <tr><th>{% trans %}Item{% endtrans %}</th><th>{% trans %}Records say{% endtrans %}</th>{% if recount %}<th>{% trans %}While you counted{% endtrans %}</th>{% endif %}<th>{% trans %}Counted{% endtrans %}</th></tr>
-    {% for item, amount in rows %}
-    {% if item.id in forms %}
+    {% for group in groups %}
+    {#- A store's areas, each under its own heading: one filtered to
+    nothing is left out, but still counted only if something is typed. #}
+    {% if areas and (group.rows or not filtered or group.place.id == place.id) %}
+    {% set label = group.path | join(" › ") if group.path else group.place.name %}
+    <tr{% if not group.rows %} class="text-muted"{% endif %}><th colspan="{{ columns }}" scope="rowgroup">{{ label }}
+      {%- if group.place.retired_at %} <span class="hint">{% trans %}Retired: count what is really here, and put nothing here again.{% endtrans %}</span>{% endif %}</th></tr>
+    {% endif %}
+    {% set prefix = group.prefix %}
+    {% set where = (group.path | join(" › ")) if group.path else "" %}
+    {% for item, amount in group.rows %}
+    {% if item.id in group.forms %}
     {#- In more than loose units: each form counted on its own (0020). #}
-    <tr><td colspan="{{ 4 if recount else 3 }}"><strong>{{ item.name_shown }}</strong> <span class="hint">
-      {%- if recount %}{% set typed, came, went = recount[item.id] %}{% trans amount=amount | amount, unit=item.unit, came=came | amount, went=went | amount, typed=typed | amount %}{{ amount }} {{ unit }} in all; while you counted, {{ came }} in, {{ went }} out; you typed {{ typed }}{% endtrans %}
+    <tr><td colspan="{{ columns }}"><strong>{{ item.name_shown }}</strong> <span class="hint">
+      {%- if group.recount %}{% set typed, came, went = group.recount[item.id] %}{% trans amount=amount | amount, unit=item.unit, came=came | amount, went=went | amount, typed=typed | amount %}{{ amount }} {{ unit }} in all; while you counted, {{ came }} in, {{ went }} out; you typed {{ typed }}{% endtrans %}
       {%- else %}{% trans amount=amount | amount, unit=item.unit %}{{ amount }} {{ unit }} in all{% endtrans %}{% endif %}</span></td></tr>
-    {% for row in forms[item.id] %}
+    {% for row in group.forms[item.id] %}
+    {% set field = prefix ~ row.field %}
     <tr>
       <td>{{ row.words }}</td>
       <td>{{ row.amount | amount }}{% if not row.field.startswith("sealed_") %} {{ item.unit }}{% endif %}</td>
       {% if recount %}<td></td>{% endif %}
       {%- set hint = item.unit | printed_length if row.open_id else "" %}
-      <td><input name="{{ row.field }}" inputmode="decimal" value="{{ values.get(row.field, row.amount | plain_amount if row.amount > 0 else '0') }}" aria-label="{{ item.name_shown }}, {{ row.words }}"{% if hint %} aria-describedby="hint-{{ row.field }}"{% endif %}>
+      <td><input name="{{ field }}" inputmode="decimal" value="{{ values.get(field, row.amount | plain_amount if row.amount > 0 else '0') }}" aria-label="{% if where %}{{ where }}, {% endif %}{{ item.name_shown }}, {{ row.words }}"{% if hint %} aria-describedby="hint-{{ field }}"{% endif %}>
         {% if row.open_id %}
-        <select name="state_{{ row.open_id }}" aria-label="{% trans item=item.name_shown, form=row.words %}{{ item }}, {{ form }}: is it here?{% endtrans %}">
-          {% set state = values.get("state_" ~ row.open_id, "here") %}
+        {% set state_field = prefix ~ "state_" ~ row.open_id %}
+        <select name="{{ state_field }}" aria-label="{% trans item=item.name_shown, form=row.words %}{{ item }}, {{ form }}: is it here?{% endtrans %}">
+          {% set state = values.get(state_field, "here") %}
           <option value="here" {% if state == "here" %}selected{% endif %}>{% trans %}Here{% endtrans %}</option>
           <option value="used_up" {% if state == "used_up" %}selected{% endif %}>{% trans %}Used up: close it{% endtrans %}</option>
           <option value="missing" {% if state == "missing" %}selected{% endif %}>{% trans %}Not here: close it, lost{% endtrans %}</option>
         </select>
         {% endif %}
-        {% with name = row.field %}{% include "_field_problem.html" %}{% endwith %}
-        {% if hint %}<p class="hint" id="hint-{{ row.field }}">{{ hint }}</p>{% endif %}</td>
+        {% with name = field %}{% include "_field_problem.html" %}{% endwith %}
+        {% if hint %}<p class="hint" id="hint-{{ field }}">{{ hint }}</p>{% endif %}</td>
     </tr>
     {% endfor %}
     {% else %}
-    {% set field = "counted_" ~ item.id %}
+    {% set field = prefix ~ "counted_" ~ item.id %}
     <tr>
       <td>{{ item.name_shown }}</td>
       <td>{{ amount | amount }} {{ item.unit }}{% if amount < 0 %} <strong>{% trans %}less than nothing{% endtrans %}</strong>{% endif %}</td>
-      {% if recount %}{% set typed, came, went = recount[item.id] %}
+      {% if group.recount %}{% set typed, came, went = group.recount[item.id] %}
       <td>{% trans came=came | amount, went=went | amount, typed=typed | amount %}{{ came }} in, {{ went }} out; you typed {{ typed }}{% endtrans %}</td>
+      {% elif recount %}<td></td>
       {% endif %}
-      <td><input name="{{ field }}" inputmode="decimal" value="{{ values.get(field, amount | plain_amount if amount > 0 else '0') }}" aria-label="{% trans item=item.name_shown %}{{ item }} counted{% endtrans %}">
+      <td><input name="{{ field }}" inputmode="decimal" value="{{ values.get(field, amount | plain_amount if amount > 0 else '0') }}" aria-label="{% if where %}{% trans place=where, item=item.name_shown %}{{ place }}: {{ item }} counted{% endtrans %}{% else %}{% trans item=item.name_shown %}{{ item }} counted{% endtrans %}{% endif %}">
         {% with name = field %}{% include "_field_problem.html" %}{% endwith %}</td>
     </tr>
     {% endif %}
     {% else %}
-    <tr><td colspan="3">{% if shown.only or shown.search %}{% trans %}Nothing here matches.{% endtrans %}{% else %}{% trans %}The records say nothing is here.{% endtrans %}{% endif %}</td></tr>
+    {% if not areas or not filtered or group.place.id == place.id %}
+    <tr{% if areas %} class="text-muted"{% endif %}><td colspan="{{ columns }}">{% if filtered %}{% trans %}Nothing here matches.{% endtrans %}{% else %}{% trans %}The records say nothing is here.{% endtrans %}{% endif %}</td></tr>
+    {% endif %}
+    {% endfor %}
     {% endfor %}
   {% endcall %}
-  {% if others %}
+  {#- Where it was found, on a count of a store and its areas: the place
+  picked at the last save, else the page's own (stock/forms.py). #}
+  {% macro where_found(name) %}
+  {% if areas %}
+  {% set chosen = values.get(name) or picked.get(name) %}
+  {% set chosen = chosen if chosen in choices | map(attribute="place.id") | map("string") else place.id | string %}
+  <label>{% trans %}Found in{% endtrans %}
+    <select name="{{ name }}">
+      {% for group in choices %}<option value="{{ group.place.id }}" {% if chosen == group.place.id | string %}selected{% endif %}>{{ group.path | join(" › ") if group.path else group.place.name }}</option>{% endfor %}
+    </select>
+    {% include "_field_problem.html" %}
+  </label>
+  {% endif %}
+  {% endmacro %}
+  {% if others and choices %}
   <fieldset>
     <legend>{% trans %}Something else here{% endtrans %}</legend>
+    {{ where_found("extra_location_id") }}
     <label>{% trans %}Item{% endtrans %}
       <select name="extra_item_id">
         <option value="">{% trans %}Nothing else{% endtrans %}</option>
@@ -90,12 +127,13 @@ if you didn't count it. Anything else here, add below.{% endtrans %}</p>
     </label>
   </fieldset>
   {% endif %}
-  {% if found_packages %}
+  {% if found_packages and choices %}
   {#- Under what is left on one: how to read a printed length, if any
   offered is of an item in a length (inventory-tng-lby). #}
   {% set found_hint = found_packages | map(attribute=2) | map("printed_length") | select | first | default("") %}
   <fieldset>
     <legend>{% trans %}An open package nobody recorded{% endtrans %}</legend>
+    {{ where_found("found_location_id") }}
     <label>{% trans %}Package{% endtrans %}
       <select name="found_package_id">
         <option value="">{% trans %}None{% endtrans %}</option>
@@ -113,7 +151,7 @@ if you didn't count it. Anything else here, add below.{% endtrans %}</p>
   </fieldset>
   {% endif %}
   {#- Filtered to nothing: saved, it would say the place was counted. #}
-  {% if rows or others or found_packages or not (shown.only or shown.search) %}
+  {% if groups | selectattr("rows") | list or others or found_packages or not filtered %}
   <button class="primary">{% trans %}Save the count{% endtrans %}</button>
   {% endif %}
 </form>

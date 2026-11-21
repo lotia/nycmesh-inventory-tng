@@ -432,6 +432,11 @@ msgstr ""
 msgid "%(place)s, in %(parent)s"
 msgstr ""
 
+#: src/inventory_tng/templates/stock/count.html
+#, python-format
+msgid "%(place)s: %(item)s counted"
+msgstr ""
+
 #. Translators: prefix is an SI prefix in English, such as kilo, or none.
 #: src/inventory_tng/catalogue/units.py
 #, python-format
@@ -1549,6 +1554,10 @@ msgstr ""
 msgid "Forgot your password?"
 msgstr ""
 
+#: src/inventory_tng/templates/stock/count.html
+msgid "Found in"
+msgstr ""
+
 #: src/inventory_tng/templates/stock/counts.html
 msgid "Found or written off"
 msgstr ""
@@ -2254,6 +2263,13 @@ msgstr ""
 
 #: src/inventory_tng/templates/catalogue/_units_read.html
 msgid "Not right?"
+msgstr ""
+
+#: src/inventory_tng/stock/counts_routes.py
+#, python-format
+msgid ""
+"Not saved: %(place)s was retired while you counted, so it is no longer on"
+" this form. What you typed is kept: check it and save again."
 msgstr ""
 
 #: src/inventory_tng/web/forms.py
@@ -3106,6 +3122,10 @@ msgstr ""
 
 #: src/inventory_tng/web/admin_pages.py
 msgid "Retired."
+msgstr ""
+
+#: src/inventory_tng/templates/stock/count.html
+msgid "Retired: count what is really here, and put nothing here again."
 msgstr ""
 
 #: src/inventory_tng/site_settings/site_settings_routes.py

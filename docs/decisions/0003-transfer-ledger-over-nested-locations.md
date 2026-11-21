@@ -7,7 +7,8 @@ rules live, balance), 2026-11-09 (stock at a retired place), 2026-11-11
 by 0020 (sealed and open packages), 2026-11-15 (counting some items),
 2026-11-18 (a count form's moment read without a lock), 2026-11-19 (a
 count's moment stays a ledger number), 2026-11-19 and 2026-11-20 (a
-retired package with none left is never taken)
+retired package with none left is never taken), 2026-11-21 (a store
+counted with its areas)
 
 ## Context
 
@@ -62,7 +63,9 @@ while. So we need more than one location from the start.
   2026-11-08). A
   place's count page can show one item, or those whose names match a search
   as the items list searches; then only those are counted, and the rest stay
-  as they are (Ali, 2026-11-15). An
+  as they are (Ali, 2026-11-15). A place with areas is counted with
+  every area in it on one form, each line written at its own place
+  (amendment below). An
   adjustment gives a reason from a list administrators extend, seeded with
   Damaged, Lost or stolen, Found, Used for testing and Records were wrong (Ali,
   2026-11-03), and Used up, for closing an open package (0020). A volunteer
@@ -154,3 +157,33 @@ left and is refused.
 The other cases that take stock below zero stay as above, for every
 client: a retired item with none left, or an item that never had stock at
 a place, is taken and shows on reorder as "count first".
+
+## Amendment: a store counted with its areas (2026-11-21)
+
+Decided by Ali on 2026-11-21 (inventory-tng-8i4.51.1, built as
+inventory-tng-8i4.51.4). A place's count page shows its own stock and that
+of every area inside it, at any depth, grouped by area. Each line is
+written at the place it is listed under: one count at each place, under a
+key made from the form's and the place's id, so the ledger and when each
+place was last counted stay per place. Every area is shown, an empty one
+marked as holding nothing but still able to take what is found there, and
+a retired one holding stock marked retired, so nobody puts anything there
+again. There is no depth or size limit. A line stays with its area: stock
+found in another area than the records say is counted there as missing
+and added where it was found, a loss and a find, not a move. Something
+else here and an open package nobody recorded are asked once for the whole
+form, as on a count of one place, each beside the area it was found in;
+the area picked comes back picked after the save.
+
+The form lists the places it shows, so an area moved meanwhile only
+regroups. Its moment is read across them all, and the count holds every
+one, in id order, as saves take them (inventory-tng-8i4.51.3). A move
+between two of them while counting withholds the item at both, and the
+recount asks for it place by place. A send naming an area retired since
+it was shown is refused whole, keeping what was typed.
+
+We rejected counting the store as a whole (where in it stock is would be
+lost, and the areas' own counts would fight the store's) and a read-only
+list of each area's stock linking to its own count (it saves no work at
+the shelf). A "found in another area" choice that records a move was
+left out for now: revisit it if counters find a loss and a find awkward.

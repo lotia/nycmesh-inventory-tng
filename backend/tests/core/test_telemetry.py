@@ -36,6 +36,7 @@ from inventory_tng.devices.guards import RegisteredDevice
 from inventory_tng.labels import labels
 from inventory_tng.models.catalogue import Category, ItemPackage
 from inventory_tng.models.devices import Device
+from inventory_tng.models.places import Location
 from inventory_tng.models.stock import (
     LedgerTransaction,
     Movement,
@@ -486,6 +487,38 @@ def test_counts_count_lines_withheld(rolled_back: Recorded, session: Session) ->
     assert result.moved == {place.item.id: (Decimal(0), Decimal(3))}
     session.commit()
     assert counted(reader, "inventory.count.lines.withheld")[()] >= 1
+
+
+def test_counts_the_places_a_count_was_saved_at(
+    rolled_back: Recorded, session: Session
+) -> None:
+    """A store and its shelf counted on one form: one count of two places;
+    sent again, none (inventory-tng-8i4.51.4)."""
+    client, _, reader, _ = rolled_back
+    _, key = new_admin(session)
+    sign_in_with(client, key=key)
+    place = stocked(session)
+    add(session, Location(name=f"Shelf {tag()}", kind="area", parent_id=place.store.id))
+    path = f"{COUNTS}/{place.store.id}"
+    form = count_form_at(client, place.store.id)
+    name = "inventory.count.places"
+
+    def measured() -> tuple[int, float]:
+        """How many counts were measured, and their places in all."""
+        points = [
+            point
+            for metric in metrics_in(reader)
+            if metric.name == name
+            for point in metric.data.data_points
+            if isinstance(point, HistogramDataPoint)
+        ]
+        return sum(p.count for p in points), sum(p.sum for p in points)
+
+    before = measured()
+    for _ in range(2):
+        assert client.post(path, data=form, follow_redirects=False).status_code == 303
+    after = measured()
+    assert (after[0] - before[0], after[1] - before[1]) == (1, 2)
 
 
 def recorded_by_kind(reader: InMemoryMetricReader) -> tuple[int, int]:

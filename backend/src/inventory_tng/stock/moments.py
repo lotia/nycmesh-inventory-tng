@@ -1,6 +1,7 @@
-"""What the ledger says, as of a moment: a place's latest ledger
-transaction and how many there it saw (moment()), and what the records
-said was at a place, or left in an open package, as of one.
+"""What the ledger says, as of a moment: the latest ledger transaction at
+a place, or at several (a store and its areas), and how many there it
+saw (moment()), and what the records said was at a place, or left in an
+open package, as of one.
 
 The ledger's core (stock/ledger.py) writes; these only read it, taking no
 lock. They import the core.
@@ -8,9 +9,9 @@ lock. They import the core.
 
 from collections.abc import Collection, Sequence
 from decimal import Decimal
-from typing import NamedTuple
+from typing import Any, NamedTuple
 
-from sqlalchemy import ColumnElement, case, func, or_, select
+from sqlalchemy import ColumnElement, case, func, literal, or_, select, union_all
 from sqlalchemy.orm import Session
 
 from inventory_tng.models.stock import LedgerTransaction, Movement
@@ -19,32 +20,34 @@ from inventory_tng.stock.ledger import Form
 
 
 class Moment(NamedTuple):
-    """Now, at a place, as a count form shows it: its latest ledger
-    transaction, `as_of`, and how many of its ledger transactions up to that
-    one it saw, `seen`."""
+    """Now, at the places a count form shows (one, or a store and its
+    areas): their latest ledger transaction, `as_of`, and how many of their
+    ledger transactions up to that one it saw, `seen`."""
 
     as_of: int
     seen: int
 
 
-def moment(session: Session, location_id: int) -> Moment:
-    """Now, at a place, read without its lock, so the form holds up no
-    save there (inventory-tng-0um). A save under way as it is read may
-    commit after it with a lower id, unseen: the count, holding the place,
-    finds it by seen_up_to and is refused (counts.record_count)."""
+def moment(session: Session, *location_ids: int) -> Moment:
+    """Now, at the places, read without their locks, so the form holds up
+    no save there (inventory-tng-0um). A save under way as it is read may
+    commit after it with a lower id, unseen: the count, holding the
+    places, finds it by seen_up_to and is refused (counts.record_count)."""
     latest, seen = session.execute(
         select(func.max(LedgerTransaction.id), func.count()).where(
-            at_place(location_id)
+            at_places(location_ids)
         )
     ).one()
     return Moment(latest or 0, seen)
 
 
-def seen_up_to(session: Session, location_id: int, as_of: int) -> int:
-    """How many ledger transactions at a place there are up to `as_of`, as
-    Moment.seen counts them."""
+def seen_up_to(session: Session, location_ids: Collection[int], as_of: int) -> int:
+    """How many ledger transactions at the places there are up to `as_of`,
+    as Moment.seen counts them: a move between two of them once."""
     return session.execute(
-        select(func.count()).where(at_place(location_id), LedgerTransaction.id <= as_of)
+        select(func.count()).where(
+            at_places(location_ids), LedgerTransaction.id <= as_of
+        )
     ).scalar_one()
 
 
@@ -98,6 +101,15 @@ def at_place(location_id: int) -> ColumnElement[bool]:
     )
 
 
+def at_places(location_ids: Collection[int]) -> ColumnElement[bool]:
+    """A ledger transaction into or out of any of the places."""
+    ids = list(location_ids)
+    return or_(
+        LedgerTransaction.to_location_id.in_(ids),
+        LedgerTransaction.from_location_id.in_(ids),
+    )
+
+
 def flows(
     session: Session,
     location_id: int,
@@ -137,23 +149,9 @@ def flows(
     return by_window
 
 
-def expected(
-    session: Session,
-    location_id: int,
-    *,
-    as_of: int | None = None,
-    items: Collection[int] | None = None,
-) -> dict[int, Decimal]:
-    """What the records say is at a place, by item: only what is not zero,
-    as balance says now; with as_of, what they said at that moment
-    (Moment.as_of), of `items` only if given."""
-    if as_of is not None:
-        (moved,) = flows(
-            session, location_id, LedgerTransaction.id <= as_of, items=items
-        )
-        return {
-            item: came - went for item, (came, went) in moved.items() if came != went
-        }
+def expected(session: Session, location_id: int) -> dict[int, Decimal]:
+    """What the records say is at a place now, by item: only what is not
+    zero, as balance says; expected_at says what they said at a moment."""
     query = select(balance.c.item_id, balance.c.quantity).where(
         balance.c.location_id == location_id, balance.c.quantity != 0
     )
@@ -215,5 +213,75 @@ def expected_forms(
 ) -> dict[tuple[int, Form], Decimal]:
     """What the records said was at a place at moment `as_of`, by item and
     form, of `items`: only what was not zero."""
-    (moved,) = form_flows(session, location_id, (LedgerTransaction.id <= as_of,), items)
-    return {form: came - went for form, (came, went) in moved.items() if came != went}
+    return expected_forms_at(session, [location_id], as_of, items).get(location_id, {})
+
+
+def _signed_at(
+    location_ids: Collection[int], as_of: int, *columns: str
+) -> tuple[ColumnElement[Any], ...]:
+    """Each movement up to the moment `as_of` at the places, once at each
+    end there: the place, the item, its `columns` on that side (to_ or
+    from_), and its quantity, more for in, less for out. A subquery's
+    columns, by name: place, item_id, the columns unprefixed, and quantity.
+    An opening, both ends at one place, nets to nothing but by form."""
+    ids = list(location_ids)
+    sides = []
+    for side, sign in (("to", 1), ("from", -1)):
+        place = getattr(LedgerTransaction, f"{side}_location_id")
+        sides.append(
+            select(
+                place.label("place"),
+                Movement.item_id,
+                *(
+                    getattr(Movement, f"{side}_{column}").label(column)
+                    for column in columns
+                ),
+                (Movement.quantity * literal(sign)).label("quantity"),
+            )
+            .join(LedgerTransaction, LedgerTransaction.id == Movement.transaction_id)
+            .where(place.in_(ids), LedgerTransaction.id <= as_of)
+        )
+    return tuple(union_all(*sides).subquery().c)
+
+
+def expected_at(
+    session: Session,
+    location_ids: Collection[int],
+    as_of: int,
+    items: Collection[int] | None = None,
+) -> dict[int, dict[int, Decimal]]:
+    """What the records said was at each place at moment `as_of`, by place
+    and item, of `items` only if given: only what was not zero. One query,
+    however many places."""
+    place, item_id, quantity = _signed_at(location_ids, as_of)
+    total = func.sum(quantity)
+    query = select(place, item_id, total).group_by(place, item_id).having(total != 0)
+    if items is not None:
+        query = query.where(item_id.in_(list(items)))
+    found: dict[int, dict[int, Decimal]] = {}
+    for place_id, item, amount in session.execute(query):
+        found.setdefault(place_id, {})[item] = amount
+    return found
+
+
+def expected_forms_at(
+    session: Session, location_ids: Collection[int], as_of: int, items: Collection[int]
+) -> dict[int, dict[tuple[int, Form], Decimal]]:
+    """expected_at, by form too: what the records said was at each place at
+    moment `as_of`, by place, item and form, of `items`. One query."""
+    if not items:
+        return {}
+    place, item_id, package, opened, quantity = _signed_at(
+        location_ids, as_of, "package_id", "open_package_id"
+    )
+    total = func.sum(quantity)
+    query = (
+        select(place, item_id, package, opened, total)
+        .where(item_id.in_(list(items)))
+        .group_by(place, item_id, package, opened)
+        .having(total != 0)
+    )
+    found: dict[int, dict[tuple[int, Form], Decimal]] = {}
+    for place_id, item, package_id, open_id, amount in session.execute(query):
+        found.setdefault(place_id, {})[(item, Form(package_id, open_id))] = amount
+    return found

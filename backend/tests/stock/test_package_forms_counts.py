@@ -291,14 +291,17 @@ def test_the_count_form_lists_sealed_smallest_first_ties_by_id(
     # The records' forms come in no set order; handed over by package id
     # descending, so only the form's own tie-break puts the twins in order.
     def descending_forms(
-        session: Session, place_id: int, as_of: int, items: Collection[int]
-    ) -> dict[tuple[int, Form], Decimal]:
-        found = moments.expected_forms(session, place_id, as_of, items)
-        return dict(
-            sorted(found.items(), key=lambda pair: -(pair[0][1].package_id or 0))
-        )
+        session: Session, place_ids: Collection[int], as_of: int, items: Collection[int]
+    ) -> dict[int, dict[tuple[int, Form], Decimal]]:
+        found = moments.expected_forms_at(session, place_ids, as_of, items)
+        return {
+            place_id: dict(
+                sorted(forms.items(), key=lambda pair: -(pair[0][1].package_id or 0))
+            )
+            for place_id, forms in found.items()
+        }
 
-    monkeypatch.setattr(counts_routes, "expected_forms", descending_forms)
+    monkeypatch.setattr(counts_routes, "expected_forms_at", descending_forms)
     page = read(admin_client.get(f"{COUNTS}/{store}").text)
     expected = [
         f"sealed_{cable}_{small.id}",

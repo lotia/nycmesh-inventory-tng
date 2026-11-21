@@ -335,7 +335,7 @@ def count_van(
     """The van, or `at`, counted as of `as_of`, as the count page does, its
     form having seen every transaction there up to it: how many it closed."""
     where = (at or place.van).id
-    shown = moments.Moment(as_of, moments.seen_up_to(session, where, as_of))
+    shown = moments.Moment(as_of, moments.seen_up_to(session, [where], as_of))
     counted = counts.record_count(
         session, uuid.uuid4(), admin, where, [(place.item.id, Decimal(2))], shown
     )

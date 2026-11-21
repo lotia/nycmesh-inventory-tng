@@ -31,6 +31,21 @@ what needs an administrator's action take it), those whose names match a
 search (`?q=`, as the items list searches), or both. Only those are
 counted; the rest stay as they are, as any item left uncounted does. The
 filter rides on the form's action, so a form shown again keeps it.
+
+A place with areas in it is counted with every area inside it, at any
+depth, on one form, grouped by area (inventory-tng-8i4.51.4). Each line is
+written at the place it is listed under, one count at each place, so each
+keeps its own ledger and when it was last counted. Every area is shown, an
+empty one marked, a retired one holding stock marked retired; one retired
+and empty is left out. The form lists the places it shows (forms.PLACES),
+so an area moved meanwhile only regroups; its moment is read across them
+all, and the send holds them all, in id order. A line stays with its
+place: stock found in another area is a loss under one and a find under
+the other. Something else here and an open package nobody recorded are
+asked once for the form, each beside the place it was found in, which
+comes back picked after the save. Filtered to some items, an area with
+nothing typed is not counted. An area retired since the form was shown
+refuses the send whole, keeping what was typed.
 """
 
 import uuid
@@ -42,6 +57,7 @@ from urllib.parse import urlencode
 import structlog
 from fastapi import APIRouter, Depends, Request
 from fastapi.responses import HTMLResponse, Response
+from opentelemetry import metrics
 from sqlalchemy import ColumnElement, case, func
 from sqlalchemy.orm import Session
 
@@ -66,27 +82,31 @@ from inventory_tng.stock.counts import (
 )
 from inventory_tng.stock.forms import (
     CLOSED_MEANWHILE,
+    EXTRA_PLACE,
+    FOUND_PLACE,
     LOOSE_FIELD,
-    ON_THE_FORM_TWICE,
     OPENED,
+    PICKED,
     SEALED,
+    PlaceCount,
     adjustment,
-    by_form,
+    field_at,
     item_counts,
-    lines,
-    named_twice,
+    places_listed,
+    read_count,
 )
-from inventory_tng.stock.ledger import LOOSE, Form, hold, lock_place, tracks_opened
-from inventory_tng.stock.moments import Moment, expected, expected_forms, moment
+from inventory_tng.stock.ledger import LOOSE, Form, hold, lock_places, tracks_opened
+from inventory_tng.stock.moments import Moment, expected_at, expected_forms_at, moment
 from inventory_tng.stock.needs_action import OnlyItem
 from inventory_tng.stock.paths import ADJUSTMENTS, COUNTS
 from inventory_tng.web.admin_pages import admin_page, current_rows, now, text_form
-from inventory_tng.web.forms import CHANGED, RULES, row_id
+from inventory_tng.web.forms import CHANGED, RULES
 from inventory_tng.web.listing import UNASKED, AskedView, Sort, Sorting, View, order
 from inventory_tng.web.navigation import SECTION_COUNTS
 from inventory_tng.web.pages import add_notices, not_found, redirect
 
 log = structlog.get_logger(__name__)
+meter = metrics.get_meter(__name__)
 
 router = APIRouter(include_in_schema=False)
 
@@ -110,6 +130,23 @@ SAVED_AS_SHOWN = lazy_gettext(
     "and save again."
 )
 COUNTS_TITLE = lazy_gettext("Counts and adjustments")
+# A count of a store and its areas, saved (inventory-tng-8i4.51.4).
+places_counted = meter.create_histogram(
+    "inventory.count.places",
+    unit="{place}",
+    description="Places each count form saved counted: one, or a store or "
+    "area and the areas in it",
+)
+
+
+def retired_meanwhile(place: str) -> str:
+    """A count refused whole as an area on it was retired while it was
+    counted: what was typed is kept."""
+    return gettext(
+        "Not saved: %(place)s was retired while you counted, so it is no "
+        "longer on this form. What you typed is kept: check it and save again.",
+        place=place,
+    )
 
 
 def count_title(place: str) -> str:
@@ -299,12 +336,16 @@ class Shown(NamedTuple):
             None if self.only is None else self.only.id,
         )
 
+    def params(self) -> dict[str, str]:
+        """The query that shows the count so."""
+        return needs_action.query(self.only) | (
+            {"q": self.search} if self.search else {}
+        )
+
     def query(self) -> str:
         """The query string that shows the count so, for links and the
         form's action."""
-        query = needs_action.query(self.only) | (
-            {"q": self.search} if self.search else {}
-        )
+        query = self.params()
         return f"?{urlencode(query)}" if query else ""
 
 
@@ -317,62 +358,145 @@ def shown_items(only: OnlyItem, q: str = "") -> Shown:
 ShownItems = Annotated[Shown, Depends(shown_items)]
 
 
+class Group(NamedTuple):
+    """One place on a count form, its lines under it: the page's own place
+    or an area in it (inventory-tng-8i4.51.4). Its path below the page's
+    place (none for that place), the prefix of its fields (forms.AT), its
+    rows of an item and the records' amount, those counted by form, the
+    recount's items it asks for again, and each one's figures."""
+
+    place: Location
+    path: tuple[str, ...]
+    prefix: str
+    rows: list[tuple[Item, Decimal]]
+    forms: dict[int, list[FormRow]]
+    items: list[int]
+    recount: Mapping[int, tuple[Decimal, Decimal, Decimal]] | None
+
+
+def _shown_places(
+    session: Session, root: Location, places: Collection[int] | None
+) -> list[tuple[Location, tuple[str, ...]]]:
+    """The places a count form shows, each with its path: the place and
+    every area in it that may be counted, as they are now; or of those, the
+    places `places` names, in that order, then any not in it now (an area
+    moved out of it since), under its own name."""
+    tree = queries.countable_tree(session, root)
+    if places is None:
+        return tree
+    shown = [(place, path) for place, path in tree if place.id in places]
+    gone = set(places) - {place.id for place, _ in shown}
+    for place in by_name(session, Location, Location.id.in_(gone)):
+        shown.append((place, (place.name,)))
+    return shown
+
+
 def _count_page(
     request: Request,
     session: Session,
     signed: SignedIn,
     place: Location,
-    at: Moment,
+    at: Moment | None,
     *,
     shown: Shown,
+    places: Collection[int] | None = None,
     problems: Mapping[str, Words] | None = None,
     values: Mapping[str, str] | None = None,
-    items: Collection[int] = (),
-    recount: Mapping[int, tuple[Decimal, Decimal, Decimal]] | None = None,
+    items: Mapping[int, Collection[int]] | None = None,
+    recount: Mapping[int, Mapping[int, tuple[Decimal, Decimal, Decimal]]] | None = None,
     alert: Words | None = None,
+    picked: Mapping[str, str] | None = None,
     status_code: int = 200,
 ) -> HTMLResponse:
-    """The count form, with the records as of `at`: of everything there,
-    or a recount of `items` only, which the form carries. With `recount`, a
-    recount of its items: what was typed for each and what came in and went
-    out while it was counted. Of those, only the items `shown`, but a
-    recount's every one."""
-    items = items or (recount or {}).keys()
+    """The count form of a place and the areas in it, with the records as
+    of `at`, or now if None, read across the places it shows. Of everything
+    there, or a recount of `items` only, by place, which the form carries.
+    With `recount`, by place, a recount of its items: what was typed for
+    each and what came in and went out while it was counted. Of those, only
+    the items `shown`, but a recount's every one. `places`, the places the
+    form showed when sent; else every one that may be counted now.
+    `picked`, the places picked for something else here and an open
+    package nobody recorded at the last save (forms.PICKED)."""
+    asked = {
+        place_id: set(each)
+        for place_id, each in [*(items or {}).items(), *(recount or {}).items()]
+        if each
+    }
+    groups_shown = _shown_places(session, place, asked or places)
+    ids_shown = [each.id for each, _ in groups_shown]
+    at = at or moment(session, *ids_shown)
     as_of = at.as_of
-    was = expected(session, place.id, as_of=as_of, items=items or None)
-    if items:
-        was = {item_id: was.get(item_id, Decimal(0)) for item_id in items}
+    every = set().union(*asked.values()) if asked else None
+    was_at = expected_at(session, ids_shown, as_of, every)
     listed = _items(session)
     named = {item.id: item for item in listed}
-    if shown.only is not None and not items and shown.only.id in named:
-        # The item asked for, to count, though the records say none is here.
-        was.setdefault(shown.only.id, Decimal(0))
-    openings = over_recorded.openings_waiting(session, place.id, as_of)
-    if not items:
-        # An opening recorded more than opened, waiting here: its item, to
-        # count, though the records say none is here.
-        for item_id in openings:
-            was.setdefault(item_id, Decimal(0))
-    if (ids := shown.ids(session)) is not None:
-        if not items:
+    openings = over_recorded.openings_waiting_at(session, ids_shown, as_of)
+    ids = shown.ids(session)
+    if ids is not None:
+        listed = [item for item in listed if item.id in ids]
+    was: dict[int, dict[int, Decimal]] = {}
+    for each in ids_shown:
+        here = was_at.get(each, {})
+        if asked:
             # A recount's items were shown when counted: each is asked for
             # again, though the search may no longer find it.
-            was = {item_id: n for item_id, n in was.items() if item_id in ids}
-        listed = [item for item in listed if item.id in ids]
-    if missing := was.keys() - named.keys():
+            here = {
+                item_id: here.get(item_id, Decimal(0))
+                for item_id in asked.get(each, ())
+            }
+        else:
+            if shown.only is not None and each == place.id and shown.only.id in named:
+                # The item asked for, to count, though the records say none
+                # is here.
+                here.setdefault(shown.only.id, Decimal(0))
+            # An opening recorded more than opened, waiting here: its item,
+            # to count, though the records say none is here.
+            for item_id in openings.get(each, {}):
+                here.setdefault(item_id, Decimal(0))
+            if ids is not None:
+                here = {item_id: n for item_id, n in here.items() if item_id in ids}
+        was[each] = here
+    if missing := set().union(*was.values()) - named.keys():
         # What the records had then but cannot be counted now, or what the
         # form's items, sent back, name that is no item at all.
         missed = queries.items_with_ids(session, missing)
         named |= {item.id: item for item in missed}
-    rows = sorted(
-        (
-            (named[item_id], amount)
-            for item_id, amount in was.items()
-            if item_id in named
-        ),
-        key=lambda row: row[0].name.lower(),
+    rows = {
+        each: sorted(
+            (
+                (named[item_id], amount)
+                for item_id, amount in here.items()
+                if item_id in named
+            ),
+            key=lambda row: row[0].name.lower(),
+        )
+        for each, here in was.items()
+    }
+    forms = _forms(
+        session,
+        as_of,
+        {each: [item.id for item, _ in found] for each, found in rows.items()},
+        openings,
     )
-    forms = _forms(session, place.id, as_of, [item.id for item, _ in rows], openings)
+    groups = [
+        Group(
+            each,
+            path,
+            field_at(place.id, each.id, ""),
+            rows[each.id],
+            forms.get(each.id, {}),
+            sorted(asked.get(each.id, ())),
+            (recount or {}).get(each.id),
+        )
+        for each, path in groups_shown
+    ]
+    # Something else here and an open package nobody recorded may be found
+    # in any place shown but a retired area (forms.PICKED).
+    choices = [
+        group
+        for group in groups
+        if group.place.retired_at is None or group.place.id == place.id
+    ]
     return admin_page(
         request,
         signed,
@@ -382,16 +506,24 @@ def _count_page(
             "here": f"{COUNTS}/{place.id}",
             "back_link": (COUNTS, SECTION_COUNTS),
             "place": place,
-            "rows": rows,
-            "forms": forms,
+            "groups": groups,
+            "areas": any(group.place.id != place.id for group in groups),
+            "choices": choices,
+            "picked": {
+                picker: (values or {}).get(picker) or (picked or {}).get(picker, "")
+                for picker in PICKED
+            },
             "found_packages": [
                 found
                 for found in _followed(session)
                 if ids is None or found[0].item_id in ids
             ],
             "recount": recount,
-            "items": sorted(items),
-            "others": [item for item in listed if item.id not in was],
+            "others": [
+                item
+                for item in listed
+                if not all(item.id in here for here in was.values())
+            ],
             "key": (values or {}).get("key") or uuid.uuid4(),
             "moment": at,
             "shown": shown,
@@ -410,15 +542,19 @@ def count_form(
     session: SnapshotSession,
     location_id: int,
     shown: ShownItems,
+    extra_location_id: str = "",
+    found_location_id: str = "",
 ) -> Response:
     # One snapshot: the form's moment and every figure it shows, so it saw
     # each save there up to its moment that it shows, and a count is
-    # refused only for one it did not (counts.record_count).
+    # refused only for one it did not (counts.record_count). The places
+    # picked at the last save come back picked (forms.PICKED).
     place = queries.countable_place(session, location_id)
     if place is None:
         return not_found()
+    picked = {EXTRA_PLACE: extra_location_id, FOUND_PLACE: found_location_id}
     return _count_page(
-        request, session, signed, place, moment(session, place.id), shown=shown
+        request, session, signed, place, None, shown=shown, picked=picked
     )
 
 
@@ -447,27 +583,56 @@ class FormRow(NamedTuple):
 
 def _forms(
     session: Session,
-    place_id: int,
     as_of: int,
-    item_ids: Sequence[int],
-    openings: Mapping[int, Collection[int]],
-) -> dict[int, list[FormRow]]:
-    """The items at the place whose stock was in more than loose units, as
-    of the form, each form a row: sealed packages, by how many; open
-    packages; loose. Others are counted by their total, as before, but an
-    item of an opening waiting here, recorded more than opened (`openings`,
+    item_ids: Mapping[int, Sequence[int]],
+    openings: Mapping[int, Mapping[int, Collection[int]]],
+) -> dict[int, dict[int, list[FormRow]]]:
+    """At each place, by id, the items of `item_ids` there whose stock was
+    in more than loose units, as of the form, each form a row: sealed
+    packages, by how many; open packages; loose. Others are counted by
+    their total, as before, but an item of an opening waiting there,
+    recorded more than opened (`openings`, by place,
     over_recorded.openings_waiting): it is counted by form, with a row of
     each package it opened sealed, though the records hold none, as a total
-    puts neither of its ends right (docs/decisions/0020)."""
-    found = expected_forms(session, place_id, as_of, item_ids)
+    puts neither of its ends right (docs/decisions/0020). The same number
+    of queries however many places."""
+    every = sorted(set().union(*item_ids.values())) if item_ids else []
+    found = expected_forms_at(session, item_ids.keys(), as_of, every)
     packages = {
-        package.id: package for package in queries.packages_of_items(session, item_ids)
+        package.id: package for package in queries.packages_of_items(session, every)
     }
-    opened = {row.id: row for row in queries.open_at(session, place_id, item_ids)}
+    opened = {row.id: row for row in queries.open_at(session, item_ids.keys(), every)}
+    return {
+        place_id: _place_forms(
+            set(items),
+            found.get(place_id, {}),
+            packages,
+            {
+                open_id: row
+                for open_id, row in opened.items()
+                if row.location_id == place_id and row.item_id in items
+            },
+            openings.get(place_id, {}),
+        )
+        for place_id, items in item_ids.items()
+    }
+
+
+def _place_forms(
+    item_ids: Collection[int],
+    found: Mapping[tuple[int, Form], Decimal],
+    packages: Mapping[int, ItemPackage],
+    opened: Mapping[int, OpenPackage],
+    openings: Mapping[int, Collection[int]],
+) -> dict[int, list[FormRow]]:
+    """_forms at one place, from what it read."""
     held: dict[int, dict[Form, Decimal]] = {}
     for (item_id, form), amount in found.items():
-        # One closed since is not counted: its row is gone from the place.
-        if form.open_package_id is None or form.open_package_id in opened:
+        # Of its items only; and one closed since is not counted: its row
+        # is gone from the place.
+        if item_id in item_ids and (
+            form.open_package_id is None or form.open_package_id in opened
+        ):
             held.setdefault(item_id, {})[form] = amount
     for row in opened.values():
         held.setdefault(row.item_id, {}).setdefault(
@@ -532,6 +697,90 @@ def _followed(session: Session) -> list[tuple[ItemPackage, str, str]]:
     ]
 
 
+def _count_at(
+    session: Session,
+    key: uuid.UUID,
+    admin_id: int,
+    place_id: int,
+    count: PlaceCount,
+    at: Moment,
+    across: Collection[int],
+) -> Counted:
+    """Put the records right at one place of a count form, holding every
+    place on it (`across`): its count, under a key of its own made from the
+    form's (counts.record_count), an open package nobody recorded found
+    there, the open packages closed there, and the ends there of lines
+    recorded more than moved that it puts right."""
+    forms = count.forms
+    # An item counted by its total holds loose units alone (_forms): with
+    # an open package of it found, its total is its loose units.
+    found_item = forms.found[0].item_id if forms.found else None
+    totals = [(item_id, n) for item_id, n in count.counted if item_id != found_item]
+    lines = [*forms.lines]
+    lines += [
+        (item_id, LOOSE, n) for item_id, n in count.counted if item_id == found_item
+    ]
+    place_key = uuid.uuid5(key, str(place_id))
+    if forms.found is not None:
+        # The places are held: then the item, before a package found is.
+        hold(session, {"to_location_id": place_id}, [forms.found[0].item_id])
+        package, left = forms.found
+        with session.begin_nested() as finding:
+            made = open_packages.make(
+                session, uuid.uuid5(key, "found"), package.id, place_id
+            )
+            found = (package.item_id, Form(open_package_id=made.id), left)
+            counted_now = record_count(
+                session,
+                place_key,
+                admin_id,
+                place_id,
+                totals,
+                at,
+                by_form=[*lines, found],
+                across=across,
+            )
+            if package.item_id in counted_now.moved:
+                # Its item moved meanwhile: asked again, found again then.
+                finding.rollback()
+    if forms.found is None or package.item_id in counted_now.moved:
+        counted_now = record_count(
+            session,
+            place_key,
+            admin_id,
+            place_id,
+            totals,
+            at,
+            by_form=lines,
+            across=across,
+        )
+    # Closed after the count: one not there, or used up, as said. Each
+    # closed is at 0, as counted so, for an opening that arrived in it.
+    emptied: list[tuple[int, Form]] = []
+    for open_id, reason in forms.close:
+        if open_packages.close(
+            session, open_id, admin_id, now(), how="count", reason=reason
+        ):
+            item_id = session.get_one(OpenPackage, open_id).item_id
+            emptied.append((item_id, Form(open_package_id=open_id)))
+    over_recorded.counted(
+        session,
+        admin_id,
+        place_id,
+        at.as_of,
+        counted_now.written,
+        counted_now.put_right,
+        emptied,
+    )
+    return counted_now
+
+
+def _anything(count: PlaceCount) -> bool:
+    """Whether a count form says anything of a place."""
+    forms = count.forms
+    return bool(count.counted or forms.lines or forms.close or forms.found)
+
+
 @router.post(f"{COUNTS}/{{location_id:int}}")
 def count(
     request: Request,
@@ -545,97 +794,72 @@ def count(
     place = session.get(Location, location_id)
     as_of = whole(form.get("as_of", ""), 0, INTEGER_MAX)
     seen = whole(form.get("seen", ""), 0, INTEGER_MAX)
-    if place is None or key is None or as_of is None or seen is None:
+    place_ids = places_listed(form, location_id)
+    if (
+        place is None
+        or key is None
+        or as_of is None
+        or seen is None
+        or place_ids is None
+        or len(by_name(session, Location, Location.id.in_(place_ids))) != len(place_ids)
+    ):
         return not_found()
     at = Moment(as_of, seen)
-    found = lines(form)
-    sent_items = {
-        item_id
-        for typed in form.get("items", "").split()
-        if (item_id := row_id(typed)) is not None
-    }
-    counted, problems = item_counts(session, found)
-    forms, form_problems = by_form(session, form, place.id)
-    problems |= form_problems
-    if repeats := named_twice(found):
-        problems |= dict.fromkeys(repeats, ON_THE_FORM_TWICE)
+    areas = place_ids != [place.id]
+    sent = read_count(session, form, place.id, place_ids)
+    asked = {place_id: each.items for place_id, each in sent.places.items()}
+    if place.id not in place_ids and not any(asked.values()):
+        # Only a recount of some areas leaves its own place off.
+        return not_found()
+    if sent.twice:
         log.info(
             "count refused: an item named twice",
             location_id=place.id,
-            item_ids=sorted({item_id for item_id in repeats.values() if item_id}),
+            item_ids=sorted({item_id for item_id in sent.twice.values() if item_id}),
         )
-    if problems:
-        # What was typed is as of when the form was shown; a recount asks
-        # again for its own items only.
+    if sent.problems:
+        # What was typed is as of when the form was shown, of the places it
+        # showed; a recount asks again for its own items only.
         return _count_page(
             request,
             session,
             signed,
             place,
             at,
-            problems=problems,
+            places=place_ids,
+            problems=sent.problems,
             values=form,
-            alert=TWICE if repeats else problems.get(CLOSED_MEANWHILE),
-            items=sent_items,
+            alert=TWICE if sent.twice else sent.problems.get(CLOSED_MEANWHILE),
+            items=asked,
             shown=shown,
         )
-    # An item counted by its total holds loose units alone (_forms): with
-    # an open package of it found, its total is its loose units.
-    found_item = forms.found[0].item_id if forms.found else None
-    totals = [(item_id, amount) for item_id, amount in counted if item_id != found_item]
-    loose = [
-        (item_id, LOOSE, amount) for item_id, amount in counted if item_id == found_item
+    # Filtered to some items, an area with nothing typed was not counted.
+    filtered = shown.only is not None or bool(shown.search)
+    counting = [
+        place_id
+        for place_id, each in sent.places.items()
+        if place_id == place.id or not filtered or _anything(each)
     ]
 
-    def put_right() -> Counted:
-        # The place, then the items, as every count and save takes them
-        # (stock/ledger.py), before a package found is held.
-        lock_place(session, place.id)
-        if forms.found is not None:
-            hold(session, {"to_location_id": place.id}, [forms.found[0].item_id])
-        lines = [*forms.lines, *loose]
-        if forms.found is not None:
-            package, left = forms.found
-            with session.begin_nested() as finding:
-                made = open_packages.make(
-                    session, uuid.uuid5(key, "found"), package.id, place.id
-                )
-                found = (package.item_id, Form(open_package_id=made.id), left)
-                counted_now = record_count(
-                    session,
-                    key,
-                    signed.admin.id,
-                    place.id,
-                    totals,
-                    at,
-                    by_form=[*lines, found],
-                )
-                if package.item_id in counted_now.moved:
-                    # Its item moved meanwhile: asked again, found again then.
-                    finding.rollback()
-        if forms.found is None or package.item_id in counted_now.moved:
-            counted_now = record_count(
-                session, key, signed.admin.id, place.id, totals, at, by_form=lines
+    # Bound again, as checked, for put_right.
+    sent_key, across = key, place_ids
+
+    def put_right() -> dict[int, Counted]:
+        # Every place on the form, in id order, as every count and save
+        # takes them (stock/ledger.py), before any item.
+        lock_places(session, across)
+        return {
+            place_id: _count_at(
+                session,
+                sent_key,
+                signed.admin.id,
+                place_id,
+                sent.places[place_id],
+                at,
+                across,
             )
-        # Closed after the count: one not there, or used up, as said. Each
-        # closed is at 0, as counted so, for an opening that arrived in it.
-        emptied: list[tuple[int, Form]] = []
-        for open_id, reason in forms.close:
-            if open_packages.close(
-                session, open_id, signed.admin.id, now(), how="count", reason=reason
-            ):
-                item_id = session.get_one(OpenPackage, open_id).item_id
-                emptied.append((item_id, Form(open_package_id=open_id)))
-        over_recorded.counted(
-            session,
-            signed.admin.id,
-            place.id,
-            as_of,
-            counted_now.written,
-            counted_now.put_right,
-            emptied,
-        )
-        return counted_now
+            for place_id in counting
+        }
 
     result, broken = refusal(
         session,
@@ -650,8 +874,28 @@ def count(
     if broken is not None:
         log.info("count refused by a rule", location_id=place.id, rule=broken)
         if broken == COUNTABLE:
-            # As for a place there is not, as the form's own page answers.
-            return not_found()
+            retired = [
+                place_id
+                for place_id in place_ids
+                if queries.countable_place(session, place_id) is None
+            ]
+            if not retired or place.id in retired:
+                # As for a place there is not, as the form's own page answers.
+                return not_found()
+            # An area retired since: the form as it is now, without it,
+            # keeping what was typed, to check and send again.
+            return _count_page(
+                request,
+                session,
+                signed,
+                place,
+                None,
+                values={name: value for name, value in form.items() if name != "key"},
+                alert=retired_meanwhile(session.get_one(Location, retired[0]).name),
+                items=asked,
+                shown=shown,
+                status_code=409,
+            )
         if broken == CHANGED:
             # What was typed may be of before that save or after it, of
             # items it cannot tell: the form as it is now, with a new key,
@@ -661,50 +905,77 @@ def count(
                 session,
                 signed,
                 place,
-                moment(session, place.id),
+                None,
                 values={name: value for name, value in form.items() if name != "key"},
                 alert=SAVED_AS_SHOWN,
-                items=sent_items,
+                items=asked,
                 shown=shown,
                 status_code=409,
             )
         # Checked again, the units as they are now mark the lines it broke.
-        _, problems = item_counts(session, found)
+        problems: dict[str, Words] = {}
+        for place_id, each in sent.places.items():
+            _, wrong = item_counts(session, each.found)
+            problems |= {
+                field_at(place.id, place_id, field): words
+                for field, words in wrong.items()
+            }
         return _count_page(
             request,
             session,
             signed,
             place,
             at,
+            places=place_ids,
             problems=problems,
             values=form,
             alert=None if problems else RULES[broken],
-            items=sent_items,
+            items=asked,
             shown=shown,
             status_code=400,
         )
     assert result is not None
     session.commit()
-    if not result.moved:
-        return redirect(
-            COUNTS,
-            notice="counted" if result.differed else "counted_same",
-            section="count",
+    if any(each.written for each in result.values()):
+        places_counted.record(len(result))
+        log.info("count saved", location_id=place.id, places=len(result))
+    moved = {place_id: each.moved for place_id, each in result.items() if each.moved}
+    if not moved:
+        notice = (
+            "counted"
+            if any(each.differed for each in result.values())
+            else "counted_same"
         )
-    # What was typed of each item withheld: its total, or its forms'.
-    amounts = dict(counted)
-    for item_id, _, amount in forms.lines:
-        amounts[item_id] = amounts.get(item_id, Decimal(0)) + amount
-    saved = len(amounts) - len(result.moved)
+        if not areas:
+            return redirect(COUNTS, notice=notice, section="count")
+        # Back to the form, the places picked for something else here and
+        # an open package nobody recorded picked again (forms.PICKED).
+        again = shown.params() | {
+            picker: form[picker] for picker in PICKED if form.get(picker)
+        }
+        return redirect(f"{COUNTS}/{place.id}", notice=notice, **again)
+    # What was typed of each item withheld, by place: its total, or its
+    # forms'.
+    amounts: dict[int, dict[int, Decimal]] = {}
+    for place_id in result:
+        typed = amounts[place_id] = dict(sent.places[place_id].counted)
+        for item_id, _, amount in sent.places[place_id].forms.lines:
+            typed[item_id] = typed.get(item_id, Decimal(0)) + amount
+    saved = sum(len(typed) for typed in amounts.values()) - sum(
+        len(each) for each in moved.values()
+    )
     return _count_page(
         request,
         session,
         signed,
         place,
-        moment(session, place.id),
+        None,
         recount={
-            item_id: (amounts[item_id], came, went)
-            for item_id, (came, went) in result.moved.items()
+            place_id: {
+                item_id: (amounts[place_id][item_id], came, went)
+                for item_id, (came, went) in each.items()
+            }
+            for place_id, each in moved.items()
         },
         alert=moved_meanwhile(saved),
         shown=shown,

@@ -193,6 +193,39 @@ def countable_place(session: Session, location_id: int) -> Location | None:
     )
 
 
+def countable_tree(
+    session: Session, root: Location
+) -> list[tuple[Location, tuple[str, ...]]]:
+    """A place and every area inside it, at any depth, that may be counted
+    (balance.countable), each with its path below the place: the names of
+    the areas it is in, then its own; none for the place. Depth first, each
+    level by name. A retired area holding nothing is left out, but the
+    areas in it are walked through, its name in their path. One query, by
+    a recursive CTE."""
+    tree = select(Location.id).where(Location.id == root.id).cte("tree", recursive=True)
+    tree = tree.union(select(Location.id).join(tree, Location.parent_id == tree.c.id))
+    rows = session.execute(
+        select(Location, countable()).where(Location.id.in_(select(tree.c.id)))
+    ).all()
+    children: dict[int | None, list[Location]] = {}
+    may_count = {place.id for place, ok in rows if ok} | {root.id}
+    for place, _ in rows:
+        if place.id != root.id:
+            children.setdefault(place.parent_id, []).append(place)
+    found: list[tuple[Location, tuple[str, ...]]] = []
+
+    def walk(place: Location, path: tuple[str, ...]) -> None:
+        if place.id in may_count:
+            found.append((place, path))
+        for child in sorted(
+            children.get(place.id, []), key=lambda row: row.name.lower()
+        ):
+            walk(child, (*path, child.name))
+
+    walk(root, ())
+    return found
+
+
 def packages_of_items(
     session: Session, item_ids: Collection[int]
 ) -> Sequence[ItemPackage]:
@@ -203,12 +236,12 @@ def packages_of_items(
 
 
 def open_at(
-    session: Session, place_id: int, item_ids: Collection[int]
+    session: Session, place_ids: Collection[int], item_ids: Collection[int]
 ) -> Sequence[OpenPackage]:
-    """The packages open at a place, of the items of `item_ids`."""
+    """The packages open at the places, of the items of `item_ids`."""
     return session.scalars(
         select(OpenPackage).where(
-            OpenPackage.location_id == place_id,
+            OpenPackage.location_id.in_(list(place_ids)),
             OpenPackage.closed_at.is_(None),
             OpenPackage.item_id.in_(item_ids),
         )
