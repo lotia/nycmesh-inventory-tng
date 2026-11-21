@@ -301,10 +301,9 @@ def _hold_places(
     """A save's places, held before it has an id: a count (lock_place) then
     waits for it whole, so one that drew an id inside a count's moment and
     committed after it is found as the count is written
-    (counts.record_count). By id, as lock_places takes them, so a save
-    between two places a count holds waits for the first and has not yet
-    taken the second. Those that exist, by id, and
-    whether each is retired; and which are volunteers' custody."""
+    (counts.record_count). In id order, as lock_places takes them. Those
+    that exist, by id, and whether each is retired; and which are
+    volunteers' custody."""
     rows = session.execute(
         locked(
             select(Location.id, Location.retired_at.is_not(None), Location.kind)

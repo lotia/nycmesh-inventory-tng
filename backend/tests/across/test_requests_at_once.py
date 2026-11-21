@@ -1485,7 +1485,6 @@ def test_a_save_takes_its_places_in_id_order(committed: Committed) -> None:
             break
     else:
         pytest.fail("the first place never came to be stored after the second")
-    renaming.rollback()
     counting = committed.session()
     ledger.lock_place(counting, first.id)
     saving = committed.session()
