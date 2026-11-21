@@ -1460,16 +1460,32 @@ def test_a_save_takes_its_places_in_id_order(committed: Committed) -> None:
     count holds has not taken the second, so the count takes it, rather
     than the two waiting on each other (inventory-tng-8i4.51.3). The save
     reads the table in the order it stores rows (no index), where renaming
-    the first place has put it last, so only ordering by id takes it
-    first."""
+    the first place puts it after the second, so only ordering by id takes
+    it first."""
+    # Made one after the other, so the first has the lower id.
     first = Location(name=f"Store {tag()}", kind="store")
+    made(committed, first)
     second = Location(name=f"Store {tag()}", kind="store")
-    made(committed, first, second)
+    made(committed, second)
     renaming = committed.session()
-    renaming.execute(
-        update(Location).where(Location.id == first.id).values(name=f"Store {tag()}")
+    stored_after = text(
+        "SELECT (SELECT ctid FROM location WHERE id = :first)"
+        " > (SELECT ctid FROM location WHERE id = :second)"
     )
-    renaming.commit()
+    ids = {"first": first.id, "second": second.id}
+    # A rename can land in a slot an earlier test freed: rename until not.
+    for _ in range(20):
+        renaming.execute(
+            update(Location)
+            .where(Location.id == first.id)
+            .values(name=f"Store {tag()}")
+        )
+        renaming.commit()
+        if renaming.scalar(stored_after, ids):
+            break
+    else:
+        pytest.fail("the first place never came to be stored after the second")
+    renaming.rollback()
     counting = committed.session()
     ledger.lock_place(counting, first.id)
     saving = committed.session()
