@@ -133,13 +133,17 @@ def _answer(
     back: View,
 ) -> Response:
     """Confirm, or clear, each of `ids` still reported, and say so. Their
-    places locked first, by id, as saves take places, so none waits on
-    another the wrong way round; then each closes or clears."""
+    places locked first, by id, as saves take places, then, to confirm,
+    their items and them, each by id across them all (ledger.hold_across),
+    so none waits on another the wrong way round; then each closes or
+    clears, taking only rows already held (inventory-tng-q0t5)."""
     if do not in DONE:
         return not_found()
     answer: Doing = "confirm" if do == "confirm" else "clear"
     rows = queries.open_with_ids(session, list(ids), *REPORTED)
     ledger.lock_places(session, (row.location_id for row in rows))
+    if answer == "confirm":
+        ledger.hold_across(session, (), (), (row.id for row in rows))
     changed = 0
     for row in sorted(rows, key=lambda each: each.id):
         if answer == "clear":

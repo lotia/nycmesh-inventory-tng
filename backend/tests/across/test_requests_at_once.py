@@ -16,7 +16,7 @@ CONTRIBUTING.md says how to run or skip a kind.
 """
 
 import uuid
-from collections.abc import Callable
+from collections.abc import Callable, Mapping
 from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 from typing import cast
@@ -56,7 +56,12 @@ from inventory_tng.models.catalogue import Category, Item, ItemPackage
 from inventory_tng.models.core import SentForm
 from inventory_tng.models.places import Location
 from inventory_tng.models.site_settings import SignInSettings
-from inventory_tng.models.stock import LedgerTransaction, Movement, OverRecorded
+from inventory_tng.models.stock import (
+    LedgerTransaction,
+    Movement,
+    OpenPackage,
+    OverRecorded,
+)
 from inventory_tng.models.volunteers import Volunteer
 from inventory_tng.places import locations
 from inventory_tng.scan import catalogue_api
@@ -65,7 +70,7 @@ from inventory_tng.scan.batch_schemas import Batch
 from inventory_tng.stock import adjustment_reasons, ledger, open_packages
 from inventory_tng.stock.ledger import Entry, Form, insert_transaction
 from inventory_tng.stock.moments import expected
-from inventory_tng.stock.paths import COUNTS
+from inventory_tng.stock.paths import COUNTS, LENGTHS, USED_UP
 from inventory_tng.volunteers import volunteers
 from inventory_tng.volunteers.paths import VOLUNTEERS
 from inventory_tng.web.single_use_forms import FIELD
@@ -94,6 +99,7 @@ from helpers.stock import (
     Spools,
     committed_place,
     count_form,
+    length,
     raise_check,
     report,
     sealed_line,
@@ -1749,6 +1755,116 @@ def test_a_store_count_holds_the_checks_it_settles_by_id_across_its_areas(
     ).all()
     assert len(arrived) == 2
     assert None not in arrived
+
+
+def opened_out_of_item_order(
+    session: Session, reported: Callable[[Spools, OpenPackage], dict[str, object]]
+) -> tuple[tuple[int, int], tuple[OpenPackage, OpenPackage]]:
+    """Two cables' items, the first of the lower id, and a spool of each
+    opened and reported by a volunteer's batch (`reported`): the second
+    cable's first, so its open package has the lower id, the other way
+    round from their items."""
+    first, second = Spools(session), Spools(session)
+    assert first.cable.id < second.cable.id
+    second_open, first_open = second.opened(), first.opened()
+    assert second_open.id < first_open.id
+    for spools, row in ((first, first_open), (second, second_open)):
+        record(session, Batch.model_validate(reported(spools, row)), device_id=None)
+    return (first.cable.id, second.cable.id), (first_open, second_open)
+
+
+def answered_while_tracking(
+    committed: Committed,
+    page: Session,
+    client: TestClient,
+    path: str,
+    form: Mapping[str, object],
+    cables: tuple[int, int],
+) -> Answer:
+    """`form` sent to `path` while tracking opened packages of both cables
+    (items.track_items, FOR UPDATE by id) holds the first: the answer waits
+    for it holding neither, so tracking takes both and commits, then the
+    answer is written. What the page answered."""
+    tracking = committed.session()
+    tracking.execute(locked(select(Item.id).where(Item.id == cables[0])))
+    worker = committed.blocked(page, lambda: client.post(path, data=form))
+    assert items.track_items(tracking, cables, False) == list(cables)
+    tracking.commit()
+    finished = worker.finished()
+    assert finished.error is None
+    return cast(Answer, finished.result)
+
+
+@pytest.mark.end_to_end
+def test_used_up_confirmed_together_holds_their_items_by_id(
+    own_committed: Committed, make_client: Callable[..., TestClient]
+) -> None:
+    """Confirming several open packages used up at once holds every one's
+    item, then them, by id across them all (ledger.hold_across), before
+    closing the first. Closed one after another, in open package order,
+    the answer would hold the second cable, of the first open package, and
+    wait for the first, held by tracking opened packages
+    (items.track_items), which then waits for the second: a deadlock
+    (inventory-tng-q0t5). On a database of its own, as it writes the
+    ledger."""
+    setup = own_committed.session()
+    _, totp = new_admin(setup)
+    cables, opened = opened_out_of_item_order(
+        setup, lambda spools, row: report(spools, used_up=[row.key])
+    )
+    setup.commit()
+    page = own_committed.session()
+    client = make_client(on=page)
+    assert sign_in_with(client, key=totp).status_code == 303
+    form = {"open_package": [str(row.id) for row in opened], "do": "confirm"}
+    answered = answered_while_tracking(
+        own_committed, page, client, USED_UP, form, cables
+    )
+    assert answered.headers["location"].endswith("notice=used_up_confirmed")
+    checking = own_committed.session()
+    closed = checking.scalars(
+        select(OpenPackage.closed_at).where(
+            OpenPackage.id.in_([row.id for row in opened])
+        )
+    ).all()
+    assert len(closed) == 2
+    assert None not in closed
+
+
+@pytest.mark.end_to_end
+def test_length_checks_answered_together_hold_their_items_by_id(
+    own_committed: Committed, make_client: Callable[..., TestClient]
+) -> None:
+    """Setting several length checks at once holds every open package's
+    item, then them, by id across them all (ledger.hold_across), before
+    counting the first. Counted one after another, in open package order,
+    the answer would hold the second cable, of the first open package, and
+    wait for the first, held by tracking opened packages
+    (items.track_items), which then waits for the second: a deadlock
+    (inventory-tng-q0t5). On a database of its own, as it writes the
+    ledger."""
+    setup = own_committed.session()
+    _, totp = new_admin(setup)
+    cables, opened = opened_out_of_item_order(
+        setup, lambda spools, row: report(spools, length(row, "250"))
+    )
+    setup.commit()
+    ticked = [f"{row.id} {open_packages.check_seen(row)}" for row in opened]
+    page = own_committed.session()
+    client = make_client(on=page)
+    assert sign_in_with(client, key=totp).status_code == 303
+    form = {"open_package": ticked, "do": "set"}
+    answered = answered_while_tracking(
+        own_committed, page, client, LENGTHS, form, cables
+    )
+    assert answered.headers["location"].endswith("notice=length_set")
+    checking = own_committed.session()
+    reported = checking.scalars(
+        select(OpenPackage.length_reported).where(
+            OpenPackage.id.in_([row.id for row in opened])
+        )
+    ).all()
+    assert reported == [None, None]
 
 
 @pytest.mark.end_to_end

@@ -483,8 +483,9 @@ def hold_waiting(
 ) -> None:
     """Hold, by id, every check waiting at any of `places` of these items,
     moved by moment `as_of`: those counted() may settle at each of them, for
-    a count of several places (a store and its areas) to take before it
-    writes the first (stock/ledger.py's lock order, inventory-tng-nfia)."""
+    a change counting several places or open packages (a store and its
+    areas, length checks answered together) to take before it writes the
+    first (stock/ledger.py's lock order, inventory-tng-nfia)."""
     if not item_ids:
         return
     query = _waiting_at(select(OverRecorded.id), places, as_of, item_ids)
@@ -543,7 +544,8 @@ def counted(
     Call it in the count's transaction, holding the place (ledger.lock_place):
     it holds the rows it reads, by id, as Correct and Mark checked take a
     check after its places, so none waits on another the wrong way round.
-    A count of several places holds them all first (hold_waiting).
+    A change counting several places or open packages holds them all
+    first (hold_waiting).
     A send that wrote nothing (sent before) puts nothing right."""
     if not written or not (put_right or emptied):
         return 0

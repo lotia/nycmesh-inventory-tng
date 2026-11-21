@@ -294,10 +294,11 @@ def lock_places(session: Session, location_ids: Iterable[int]) -> None:
 # 6. A receipt's items, FOR NO KEY UPDATE, by id (_receive), to lower what
 #    is on order, which KEY SHARE does not wait for.
 #
-# A change writing a transaction at each of several places (a count of a
-# store and its areas) holds 2, 4 and 5 for them all, by id across them,
-# before writing the first (hold_across), then the over-recorded checks it
-# may settle (over_recorded.hold_waiting). Its writes take 3 after them:
+# A change writing several transactions (a count of a store and its areas;
+# confirming several open packages used up, or answering several length
+# checks, at once) holds 2, 4 and 5 for them all, by id across them, before
+# writing the first (hold_across), then the over-recorded checks it may
+# settle (over_recorded.hold_waiting). Its writes take 3 after them:
 # nothing takes an administrator FOR UPDATE, all KEY SHARE waits for.
 
 
@@ -471,9 +472,10 @@ def hold_across(
     """For a change that writes several transactions, holding their places
     (lock_places): hold every item, package and open package they may
     name, each kind by id across them all, in the order above, so each
-    then takes again only rows already held (inventory-tng-nfia). The open
-    packages' items too, as closing one holds it (open_packages.close). A
-    count takes no retired package sealed (TAKES). The items held."""
+    then takes again only rows already held (inventory-tng-nfia,
+    inventory-tng-q0t5). The open packages' items too, as closing or
+    counting one holds it (open_packages.close). Neither a count nor an
+    adjustment takes a retired package sealed (TAKES). The items held."""
     opens = sorted(set(open_ids))
     items = set(item_ids)
     if opens:

@@ -307,13 +307,11 @@ def _set(
         counted = counts.count_open_package(session, key, admin_id, row, left, then)
         if counted is None:
             return
-        # A report is as of its own batch, which may be the one that
-        # recorded the move: only a move before that batch came before it.
         over_recorded.counted(
             session,
             admin_id,
             row.location_id,
-            as_of if showed is not None else as_of - 1,
+            answer.moved_by,
             counted.written,
             [(row.item_id, ledger.Form(open_package_id=open_id))],
         )
@@ -343,6 +341,13 @@ class Answer(NamedTuple):
     showed: Decimal | None = None
     as_of: int = 0
 
+    @property
+    def moved_by(self) -> int:
+        """The moment a move must be by to come before a Set: a report is
+        as of its own batch, which may be the one that recorded the move,
+        so only a move before that batch came before it."""
+        return self.as_of if self.showed is not None else self.as_of - 1
+
 
 def _answer(
     session: Session,
@@ -354,9 +359,16 @@ def _answer(
 ) -> Response:
     """Set or leave each of `answers` still as seen, and say so. Their
     places locked first, by id, as saves take places: only here, never as
-    the page is shown."""
-    places = queries.places_of_open(session, [each.open_id for each in answers])
+    the page is shown. Then their items and them, each by id across them
+    all (ledger.hold_across), and the checks of recorded more than moved a
+    Set may settle (over_recorded.hold_waiting), so each answer takes only
+    rows already held (inventory-tng-q0t5)."""
+    open_ids = [each.open_id for each in answers]
+    places = queries.places_of_open(session, open_ids)
     ledger.lock_places(session, places)
+    items = ledger.hold_across(session, (), (), open_ids)
+    if setting := [each.moved_by for each in answers if each.left is not None]:
+        over_recorded.hold_waiting(session, places, max(setting), items)
     set_, left_ = 0, 0
     for each in sorted(answers):
         if each.left is None:
