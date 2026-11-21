@@ -66,7 +66,7 @@ if you didn't count it. Anything else here, add below.{% endtrans %}</p>
       <td><input name="{{ field }}" inputmode="decimal" value="{{ values.get(field, row.amount | plain_amount if row.amount > 0 else '0') }}" aria-label="{% if where %}{{ where }}, {% endif %}{{ item.name_shown }}, {{ row.words }}"{% if hint %} aria-describedby="hint-{{ field }}"{% endif %}>
         {% if row.open_id %}
         {% set state_field = prefix ~ "state_" ~ row.open_id %}
-        <select name="{{ state_field }}" aria-label="{% trans item=item.name_shown, form=row.words %}{{ item }}, {{ form }}: is it here?{% endtrans %}">
+        <select name="{{ state_field }}" aria-label="{% if where %}{{ where }}, {% endif %}{% trans item=item.name_shown, form=row.words %}{{ item }}, {{ form }}: is it here?{% endtrans %}">
           {% set state = values.get(state_field, "here") %}
           <option value="here" {% if state == "here" %}selected{% endif %}>{% trans %}Here{% endtrans %}</option>
           <option value="used_up" {% if state == "used_up" %}selected{% endif %}>{% trans %}Used up: close it{% endtrans %}</option>
@@ -98,11 +98,12 @@ if you didn't count it. Anything else here, add below.{% endtrans %}</p>
     {% endfor %}
   {% endcall %}
   {#- Where it was found, on a count of a store and its areas: the place
-  picked at the last save, else the page's own (stock/forms.py). #}
+  picked at the last save, else the first offered, the page's own unless
+  a recount leaves it off (stock/forms.py). #}
   {% macro where_found(name) %}
   {% if areas %}
   {% set chosen = values.get(name) or picked.get(name) %}
-  {% set chosen = chosen if chosen in choices | map(attribute="place.id") | map("string") else place.id | string %}
+  {% set chosen = chosen if chosen in choices | map(attribute="place.id") | map("string") else choices[0].place.id | string %}
   <label>{% trans %}Found in{% endtrans %}
     <select name="{{ name }}">
       {% for group in choices %}<option value="{{ group.place.id }}" {% if chosen == group.place.id | string %}selected{% endif %}>{{ group.path | join(" › ") if group.path else group.place.name }}</option>{% endfor %}

@@ -833,12 +833,13 @@ def count(
             items=asked,
             shown=shown,
         )
-    # Filtered to some items, an area with nothing typed was not counted.
+    # Filtered to some items, a place of a store's form with nothing typed
+    # was not counted, the store's own too.
     filtered = shown.only is not None or bool(shown.search)
     counting = [
         place_id
         for place_id, each in sent.places.items()
-        if place_id == place.id or not filtered or _anything(each)
+        if not (areas and filtered) or _anything(each)
     ]
 
     # Bound again, as checked, for put_right.
@@ -883,7 +884,8 @@ def count(
                 # As for a place there is not, as the form's own page answers.
                 return not_found()
             # An area retired since: the form as it is now, without it,
-            # keeping what was typed, to check and send again.
+            # keeping what was typed, to check and send again; a recount
+            # asks no more there.
             return _count_page(
                 request,
                 session,
@@ -892,7 +894,11 @@ def count(
                 None,
                 values={name: value for name, value in form.items() if name != "key"},
                 alert=retired_meanwhile(session.get_one(Location, retired[0]).name),
-                items=asked,
+                items={
+                    place_id: each
+                    for place_id, each in asked.items()
+                    if place_id not in retired
+                },
                 shown=shown,
                 status_code=409,
             )

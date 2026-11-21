@@ -56,7 +56,7 @@ from inventory_tng.models.catalogue import Category, Item, ItemPackage
 from inventory_tng.models.core import SentForm
 from inventory_tng.models.places import Location
 from inventory_tng.models.site_settings import SignInSettings
-from inventory_tng.models.stock import LedgerTransaction
+from inventory_tng.models.stock import LedgerTransaction, Movement
 from inventory_tng.models.volunteers import Volunteer
 from inventory_tng.places import locations
 from inventory_tng.scan import catalogue_api
@@ -64,6 +64,8 @@ from inventory_tng.scan.batch import BatchRefused, KeyReused, Recorded, record
 from inventory_tng.scan.batch_schemas import Batch
 from inventory_tng.stock import adjustment_reasons, ledger, open_packages
 from inventory_tng.stock.ledger import Entry, Form, insert_transaction
+from inventory_tng.stock.moments import expected
+from inventory_tng.stock.paths import COUNTS
 from inventory_tng.volunteers import volunteers
 from inventory_tng.volunteers.paths import VOLUNTEERS
 from inventory_tng.web.single_use_forms import FIELD
@@ -87,7 +89,14 @@ from helpers.sign_in import (
     reset_link,
     sign_in_with,
 )
-from helpers.stock import Place, Spools, committed_place, report, sealed_line
+from helpers.stock import (
+    Place,
+    Spools,
+    committed_place,
+    count_form,
+    report,
+    sealed_line,
+)
 
 NEW_PASSWORD = "a long passphrase of their own"
 
@@ -1496,6 +1505,77 @@ def test_a_save_takes_its_places_in_id_order(committed: Committed) -> None:
     counting.commit()
     assert worker.finished().error is None
     saving.rollback()
+
+
+@pytest.mark.end_to_end
+def test_a_store_count_waits_for_a_save_between_two_of_its_areas(
+    own_committed: Committed, make_client: Callable[..., TestClient]
+) -> None:
+    """A save between two areas of a store has held the first by id, as
+    saves take places (ledger._hold_places), when the store's count is
+    sent: the count waits for that place, not having taken the second
+    (ledger.lock_places), so the save takes the second, writes and
+    commits, rather than the two waiting on each other. The count then
+    finds the radios moved after its moment, withholds them at both areas
+    and asks for them again, writing no line of them (inventory-tng-099,
+    inventory-tng-8i4.51.4). On a database of its own, as it writes the
+    ledger."""
+    setup = own_committed.session()
+    place = Place(setup)
+    _, totp = new_admin(setup)
+    store = place.store
+    # Made one after the other, so the first has the lower id.
+    first = Location(name=f"Shelf {tag()}", kind="area", parent_id=store.id)
+    setup.add(first)
+    setup.flush()
+    second = Location(name=f"Shelf {tag()}", kind="area", parent_id=store.id)
+    setup.add(second)
+    setup.flush()
+    radio = place.item.id
+    insert_transaction(
+        setup,
+        uuid.uuid4(),
+        {"kind": "receipt", "to_location_id": second.id},
+        [(radio, Decimal(3))],
+    )
+    setup.commit()
+    assert first.id < second.id
+    page = own_committed.session()
+    client = make_client(on=page)
+    assert sign_in_with(client, key=totp).status_code == 303
+    path = f"{COUNTS}/{store.id}"
+    form = count_form(client.get(path)) | {
+        f"at_{first.id}_counted_{radio}": "0",
+        f"at_{second.id}_counted_{radio}": "3",
+    }
+    saving = own_committed.session()
+    saving.execute(
+        locked(
+            select(Location.id).where(Location.id == first.id),
+            key_share=True,
+            shared=True,
+        )
+    )
+    worker = own_committed.blocked(page, lambda: client.post(path, data=form))
+    insert_transaction(
+        saving,
+        uuid.uuid4(),
+        {"kind": "move", "from_location_id": second.id, "to_location_id": first.id},
+        [(radio, Decimal(1))],
+    )
+    saving.commit()
+    finished = worker.finished()
+    assert finished.error is None
+    assert cast(Answer, finished.result).status_code == 409
+    checking = own_committed.session()
+    counted = checking.scalars(
+        select(Movement.item_id)
+        .join(LedgerTransaction, LedgerTransaction.id == Movement.transaction_id)
+        .where(LedgerTransaction.kind == "count")
+    ).all()
+    assert counted == []
+    assert expected(checking, first.id) == {radio: Decimal(1)}
+    assert expected(checking, second.id) == {radio: Decimal(2)}
 
 
 @pytest.mark.end_to_end

@@ -319,8 +319,8 @@ def test_an_area_retired_since_the_form_was_shown_refuses_it_whole(
 def test_a_filtered_store_count_counts_only_the_areas_typed_in(
     admin_client: TestClient, session: Session
 ) -> None:
-    """Showing only the cable, the shelves have nothing to show and are
-    not said to be counted; the bin is."""
+    """Showing only the cable, the store and the shelves have nothing to
+    show and are not said to be counted; the bin is."""
     made = Store(session)
     cable = made.place.cable.id
     path = f"{made.path}?item={cable}"
@@ -333,6 +333,51 @@ def test_a_filtered_store_count_counts_only_the_areas_typed_in(
     assert len(counts_at(session, made.bin)) == 1
     assert counts_at(session, made.empty) == []
     assert counts_at(session, made.shelf) == []
+    assert counts_at(session, made.store) == []
+
+
+def test_a_recount_at_an_area_retired_since_asks_no_more_there(
+    admin_client: TestClient, session: Session
+) -> None:
+    """A radio moved from the shelf to the empty shelf while the store was
+    counted, then out again, and the empty shelf retired: the recount is
+    refused once, and comes back asking only at the shelf, which then
+    saves."""
+    made = Store(session)
+    item = made.place.item.id
+    shown = count_form(admin_client.get(made.path))
+    made.move(session, made.shelf, made.empty)
+    asked = admin_client.post(
+        made.path,
+        data=shown
+        | {
+            f"at_{made.shelf.id}_counted_{item}": "2",
+            "extra_location_id": str(made.empty.id),
+            "extra_item_id": str(item),
+            "extra_quantity": "1",
+        },
+    )
+    assert asked.status_code == 409
+    again = count_form(asked)
+    assert sorted(again["places"].split()) == sorted(
+        [str(made.shelf.id), str(made.empty.id)]
+    )
+    made.move(session, made.empty, made.shelf)
+    retire(session, made.empty)
+    recount = again | {
+        f"at_{made.shelf.id}_counted_{item}": "3",
+        f"at_{made.empty.id}_counted_{item}": "0",
+    }
+    refused = admin_client.post(made.path, data=recount)
+    assert refused.status_code == 409
+    assert f"Not saved: {made.empty.name} was retired" in text(refused)
+    last = count_form(refused)
+    assert last["places"] == str(made.shelf.id)
+    done = admin_client.post(
+        made.path, data=last | {f"at_{made.shelf.id}_counted_{item}": "3"}
+    )
+    assert done.status_code == 303
+    assert expected(session, made.shelf.id) == {item: Decimal(3)}
 
 
 def test_a_place_without_areas_is_counted_as_before(
