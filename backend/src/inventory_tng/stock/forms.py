@@ -339,10 +339,9 @@ def read_count(
     for place_id, fields in split.items():
         found = lines(fields)
         extra = next((item_id for field, item_id, _ in found if field == EXTRA), None)
-        line = listed_line(fields, extra) if extra is not None else None
         if (
             extra is not None
-            and line is not None
+            and (line := listed_line(fields, extra)) is not None
             and session.get(Item, extra) is not None
         ):
             listed = Listed(extra, place_id)
