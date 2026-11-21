@@ -297,9 +297,11 @@ def lock_places(session: Session, location_ids: Iterable[int]) -> None:
 # A change writing several transactions (a count of a store and its areas;
 # confirming several open packages used up, or answering several length
 # checks, at once) holds 2, 4 and 5 for them all, by id across them, before
-# writing the first (hold_across), then the over-recorded checks it may
-# settle (over_recorded.hold_waiting). Its writes take 3 after them:
-# nothing takes an administrator FOR UPDATE, all KEY SHARE waits for.
+# writing the first (hold_across). One that counts then holds the
+# over-recorded checks it may settle (over_recorded.hold_waiting); a close
+# leaves out those taken (over_recorded.open_package_closed), so waits for
+# none. Its writes take 3 after them: nothing takes an administrator FOR
+# UPDATE, all KEY SHARE waits for.
 
 
 def _hold_places(
@@ -474,8 +476,9 @@ def hold_across(
     name, each kind by id across them all, in the order above, so each
     then takes again only rows already held (inventory-tng-nfia,
     inventory-tng-q0t5). The open packages' items too, as closing or
-    counting one holds it (open_packages.close). Neither a count nor an
-    adjustment takes a retired package sealed (TAKES). The items held."""
+    counting one holds it (open_packages.close,
+    counts.count_open_package). Neither a count nor an adjustment takes a
+    retired package sealed (TAKES). The items held."""
     opens = sorted(set(open_ids))
     items = set(item_ids)
     if opens:

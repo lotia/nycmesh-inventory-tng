@@ -1757,19 +1757,28 @@ def test_a_store_count_holds_the_checks_it_settles_by_id_across_its_areas(
     assert None not in arrived
 
 
-def opened_out_of_item_order(
-    session: Session, reported: Callable[[Spools, OpenPackage], dict[str, object]]
-) -> tuple[tuple[int, int], tuple[OpenPackage, OpenPackage]]:
-    """Two cables' items, the first of the lower id, and a spool of each
-    opened and reported by a volunteer's batch (`reported`): the second
-    cable's first, so its open package has the lower id, the other way
-    round from their items."""
+def two_spools(session: Session) -> tuple[Spools, Spools]:
+    """Two cables in spools, each at a store of its own, the first's item
+    of the lower id."""
     first, second = Spools(session), Spools(session)
     assert first.cable.id < second.cable.id
+    return first, second
+
+
+def opened_out_of_item_order(
+    session: Session,
+    spools: tuple[Spools, Spools],
+    reported: Callable[[Spools, OpenPackage], dict[str, object]],
+) -> tuple[tuple[int, int], tuple[OpenPackage, OpenPackage]]:
+    """The two cables' items (two_spools), and a spool of each opened and
+    reported by a volunteer's batch (`reported`): the second cable's
+    first, so its open package has the lower id, the other way round from
+    their items."""
+    first, second = spools
     second_open, first_open = second.opened(), first.opened()
     assert second_open.id < first_open.id
-    for spools, row in ((first, first_open), (second, second_open)):
-        record(session, Batch.model_validate(reported(spools, row)), device_id=None)
+    for each, row in ((first, first_open), (second, second_open)):
+        record(session, Batch.model_validate(reported(each, row)), device_id=None)
     return (first.cable.id, second.cable.id), (first_open, second_open)
 
 
@@ -1810,7 +1819,7 @@ def test_used_up_confirmed_together_holds_their_items_by_id(
     setup = own_committed.session()
     _, totp = new_admin(setup)
     cables, opened = opened_out_of_item_order(
-        setup, lambda spools, row: report(spools, used_up=[row.key])
+        setup, two_spools(setup), lambda spools, row: report(spools, used_up=[row.key])
     )
     setup.commit()
     page = own_committed.session()
@@ -1846,7 +1855,7 @@ def test_length_checks_answered_together_hold_their_items_by_id(
     setup = own_committed.session()
     _, totp = new_admin(setup)
     cables, opened = opened_out_of_item_order(
-        setup, lambda spools, row: report(spools, length(row, "250"))
+        setup, two_spools(setup), lambda spools, row: report(spools, length(row, "250"))
     )
     setup.commit()
     ticked = [f"{row.id} {open_packages.check_seen(row)}" for row in opened]
@@ -1865,6 +1874,57 @@ def test_length_checks_answered_together_hold_their_items_by_id(
         )
     ).all()
     assert reported == [None, None]
+
+
+@pytest.mark.end_to_end
+def test_length_checks_answered_together_hold_the_checks_they_settle_by_id(
+    own_committed: Committed, make_client: Callable[..., TestClient]
+) -> None:
+    """Setting several length checks at once holds every check of recorded
+    more than moved the Sets may put right, by id across them all
+    (over_recorded.hold_waiting), before counting the first. A spool of
+    each cable moved from its store recorded more than moved, the first
+    cable's check first, so it has the lower id; a count holding that
+    check when the answer is sent, as it takes them by id, lets the
+    answer wait for it holding neither, so the count takes the other check
+    too and commits. Counted one after another, in open package order,
+    the answer would hold the second cable's check, of the higher id, and
+    wait for the first's, while the count waits for the second's: a
+    deadlock (inventory-tng-q0t5). On a database of its own, as it writes
+    the ledger."""
+    setup = own_committed.session()
+    _, totp = new_admin(setup)
+    spools = two_spools(setup)
+    raised = [
+        raise_check(
+            setup,
+            each.move(Entry(each.cable.id, Decimal(305), each.sealed, each.sealed)),
+        ).id
+        for each in spools
+    ]
+    assert raised == sorted(raised)
+    _, opened = opened_out_of_item_order(
+        setup, spools, lambda each, row: report(each, length(row, "250"))
+    )
+    setup.commit()
+    ticked = [f"{row.id} {open_packages.check_seen(row)}" for row in opened]
+    page = own_committed.session()
+    client = make_client(on=page)
+    assert sign_in_with(client, key=totp).status_code == 303
+    counting = own_committed.session()
+    lower, higher = (
+        select(OverRecorded.id).where(OverRecorded.id == check) for check in raised
+    )
+    counting.execute(locked(lower))
+    worker = own_committed.blocked(
+        page, lambda: client.post(LENGTHS, data={"open_package": ticked, "do": "set"})
+    )
+    counting.execute(locked(higher))
+    counting.commit()
+    finished = worker.finished()
+    assert finished.error is None
+    answered = cast(Answer, finished.result)
+    assert answered.headers["location"].endswith("notice=length_set")
 
 
 @pytest.mark.end_to_end
