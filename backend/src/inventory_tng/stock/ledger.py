@@ -296,7 +296,9 @@ def lock_places(session: Session, location_ids: Iterable[int]) -> None:
 #
 # A change writing a transaction at each of several places (a count of a
 # store and its areas) holds 2, 4 and 5 for them all, by id across them,
-# before writing the first (hold_across).
+# before writing the first (hold_across), then the over-recorded checks it
+# may settle (over_recorded.hold_waiting). Its writes take 3 after them:
+# nothing takes an administrator FOR UPDATE, all KEY SHARE waits for.
 
 
 def _hold_places(
@@ -462,31 +464,27 @@ def _none_sealed(
 
 def hold_across(
     session: Session,
-    places: Collection[int],
     item_ids: Iterable[int],
     package_ids: Iterable[int],
     open_ids: Iterable[int],
-) -> None:
-    """For a change that writes several transactions, holding `places`
+) -> set[int]:
+    """For a change that writes several transactions, holding their places
     (lock_places): hold every item, package and open package they may
     name, each kind by id across them all, in the order above, before the
     first is written (inventory-tng-nfia). Each transaction then takes
     again only rows already held, never one of a lower id after a higher,
-    as it would written one after another. Open packages at `places` only,
-    with their items, as closing one holds it (open_packages.close): those
-    cannot move while the places are held, and one elsewhere is refused or
-    withheld as before. A count takes no retired package sealed (TAKES)."""
-    named = set(open_ids)
-    opens = (
-        session.execute(
-            select(OpenPackage.id, OpenPackage.item_id).where(
-                OpenPackage.id.in_(named), OpenPackage.location_id.in_(places)
+    as it would written one after another. The open packages' items too,
+    as closing one holds it (open_packages.close). A count takes no
+    retired package sealed (TAKES). The items held."""
+    opens = sorted(set(open_ids))
+    items = set(item_ids)
+    if opens:
+        # An open package's item never changes, so it is read unlocked.
+        items |= set(
+            session.scalars(
+                select(OpenPackage.item_id).where(OpenPackage.id.in_(opens))
             )
-        ).all()
-        if named
-        else []
-    )
-    items = {*item_ids, *(item_id for _, item_id in opens)}
+        )
     if items:
         query = select(Item.id).where(Item.id.in_(items)).order_by(Item.id)
         session.execute(locked(query, key_share=True, shared=True))
@@ -498,12 +496,9 @@ def hold_across(
         )
         session.execute(locked(query, key_share=True, shared=True))
     if opens:
-        query = (
-            select(OpenPackage.id)
-            .where(OpenPackage.id.in_([open_id for open_id, _ in opens]))
-            .order_by(OpenPackage.id)
-        )
-        session.execute(locked(query, key_share=True))
+        query = select(OpenPackage.id).where(OpenPackage.id.in_(opens))
+        session.execute(locked(query.order_by(OpenPackage.id), key_share=True))
+    return items
 
 
 def _where(header: Mapping[str, object], custody: frozenset[int]) -> int | None:

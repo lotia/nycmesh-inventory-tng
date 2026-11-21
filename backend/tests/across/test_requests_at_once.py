@@ -56,7 +56,7 @@ from inventory_tng.models.catalogue import Category, Item, ItemPackage
 from inventory_tng.models.core import SentForm
 from inventory_tng.models.places import Location
 from inventory_tng.models.site_settings import SignInSettings
-from inventory_tng.models.stock import LedgerTransaction, Movement
+from inventory_tng.models.stock import LedgerTransaction, Movement, OverRecorded
 from inventory_tng.models.volunteers import Volunteer
 from inventory_tng.places import locations
 from inventory_tng.scan import catalogue_api
@@ -94,6 +94,7 @@ from helpers.stock import (
     Spools,
     committed_place,
     count_form,
+    raise_check,
     report,
     sealed_line,
 )
@@ -1633,6 +1634,121 @@ def test_a_store_count_holds_its_items_by_id_across_its_areas(
     checking = own_committed.session()
     assert expected(checking, first.id) == {cable: Decimal(4)}
     assert expected(checking, second.id) == {radio: Decimal(4)}
+
+
+@pytest.mark.end_to_end
+def test_a_count_holds_what_it_finds_and_loses_by_id(
+    own_committed: Committed, make_client: Callable[..., TestClient]
+) -> None:
+    """A count of one place holds the items it finds and loses by id
+    (ledger.hold_across) before writing either. Written as it was, what
+    it found first, then what it lost, the count held the cable it found
+    and waited for the radio it lost, held when it was sent by tracking
+    opened packages (items.track_items), which then waited for the cable:
+    a deadlock (inventory-tng-nfia). On a database of its own, as it
+    writes the ledger."""
+    setup = own_committed.session()
+    place = Place(setup)
+    _, totp = new_admin(setup)
+    store = place.store.id
+    radio, cable = place.item.id, place.cable.id
+    assert radio < cable
+    insert_transaction(
+        setup,
+        uuid.uuid4(),
+        {"kind": "receipt", "to_location_id": store},
+        [(radio, Decimal(3)), (cable, Decimal(3))],
+    )
+    setup.commit()
+    page = own_committed.session()
+    client = make_client(on=page)
+    assert sign_in_with(client, key=totp).status_code == 303
+    path = f"{COUNTS}/{store}"
+    form = count_form(client.get(path)) | {
+        f"counted_{radio}": "2",
+        f"counted_{cable}": "4",
+    }
+    tracking = own_committed.session()
+    tracking.execute(locked(select(Item.id).where(Item.id == radio)))
+    worker = own_committed.blocked(page, lambda: client.post(path, data=form))
+    assert items.track_items(tracking, [radio, cable], True) == [radio, cable]
+    tracking.commit()
+    finished = worker.finished()
+    assert finished.error is None
+    assert cast(Answer, finished.result).status_code == 303
+    checking = own_committed.session()
+    assert expected(checking, store) == {radio: Decimal(2), cable: Decimal(4)}
+
+
+@pytest.mark.end_to_end
+def test_a_store_count_holds_the_checks_it_settles_by_id_across_its_areas(
+    own_committed: Committed, make_client: Callable[..., TestClient]
+) -> None:
+    """A store count holds every check of recorded more than moved it may
+    put right, by id across its areas (over_recorded.hold_waiting), before
+    writing the first area's. Radios recorded more moved from a van to
+    each area, the second area's check first, so it has the lower id; a
+    count at the van holds that check when the store's is sent, as it
+    takes them by id: the store's count waits for it holding neither, so
+    the van's takes the other check too and commits. Put right area by
+    area, the store's would hold the first area's check, of the higher
+    id, and wait for the second's, while the van's waits for the first's:
+    a deadlock (inventory-tng-nfia). On a database of its own, as it
+    writes the ledger."""
+    setup = own_committed.session()
+    place = Place(setup)
+    _, totp = new_admin(setup)
+    first, second = two_areas(setup, place.store)
+    radio = place.item.id
+    insert_transaction(
+        setup,
+        uuid.uuid4(),
+        {"kind": "receipt", "to_location_id": place.van.id},
+        [(radio, Decimal(6))],
+    )
+    raised = [
+        raise_check(
+            setup,
+            insert_transaction(
+                setup,
+                uuid.uuid4(),
+                {
+                    "kind": "move",
+                    "from_location_id": place.van.id,
+                    "to_location_id": area.id,
+                },
+                [(radio, Decimal(3))],
+            ),
+        ).id
+        for area in (second, first)
+    ]
+    setup.commit()
+    assert raised == sorted(raised)
+    page = own_committed.session()
+    client = make_client(on=page)
+    assert sign_in_with(client, key=totp).status_code == 303
+    path = f"{COUNTS}/{place.store.id}"
+    form = count_form(client.get(path)) | {
+        f"at_{first.id}_counted_{radio}": "3",
+        f"at_{second.id}_counted_{radio}": "3",
+    }
+    van = own_committed.session()
+    lower, higher = (
+        select(OverRecorded.id).where(OverRecorded.id == check) for check in raised
+    )
+    van.execute(locked(lower))
+    worker = own_committed.blocked(page, lambda: client.post(path, data=form))
+    van.execute(locked(higher))
+    van.commit()
+    finished = worker.finished()
+    assert finished.error is None
+    assert cast(Answer, finished.result).status_code == 303
+    checking = own_committed.session()
+    arrived = checking.scalars(
+        select(OverRecorded.arrived_count_id).where(OverRecorded.id.in_(raised))
+    ).all()
+    assert len(arrived) == 2
+    assert None not in arrived
 
 
 @pytest.mark.end_to_end

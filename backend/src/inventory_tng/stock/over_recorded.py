@@ -484,6 +484,32 @@ def openings_waiting_at(
     return found
 
 
+def hold_waiting(
+    session: Session, places: Collection[int], as_of: int, item_ids: Collection[int]
+) -> None:
+    """Hold, by id, every check waiting at any of `places` of these items,
+    moved by moment `as_of`: those counted() may settle at each of them, for
+    a count of several places (a store and its areas) to take before it
+    writes the first (inventory-tng-nfia). Taken place by place, a check of
+    a higher id at the first could be held before one of a lower id at the
+    second, while a count elsewhere sharing both took them by id."""
+    if not item_ids:
+        return
+    query = (
+        select(OverRecorded.id)
+        .join(Movement, Movement.id == OverRecorded.movement_id)
+        .join(LedgerTransaction, LedgerTransaction.id == Movement.transaction_id)
+        .where(
+            WAITING,
+            Movement.item_id.in_(item_ids),
+            LedgerTransaction.id <= as_of,
+            moments.at_places(places),
+        )
+        .order_by(OverRecorded.id)
+    )
+    session.execute(locked(query, of=OverRecorded))
+
+
 def counted(
     session: Session,
     admin_id: int,
@@ -514,6 +540,7 @@ def counted(
     Call it in the count's transaction, holding the place (ledger.lock_place):
     it holds the rows it reads, by id, as Correct and Mark checked take a
     check after its places, so none waits on another the wrong way round.
+    A count of several places holds them all first (hold_waiting).
     A send that wrote nothing (sent before) puts nothing right."""
     if not written or not (put_right or emptied):
         return 0
