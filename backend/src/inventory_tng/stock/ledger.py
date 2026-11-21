@@ -276,7 +276,7 @@ def lock_places(session: Session, location_ids: Iterable[int]) -> None:
 # what it read of them holds when it is written, in this order, as every
 # change that locks rows a save refers to must (db_locking.locked_row):
 #
-# 1. Its places, FOR KEY SHARE (_hold_places), before it has an id.
+# 1. Its places, FOR KEY SHARE, by id (_hold_places), before it has an id.
 # 2. Its items, FOR KEY SHARE, by id (hold): what the ledger's rules read
 #    of them, a unit and whether retired. Changing either takes FOR UPDATE
 #    (items.save, items.retire), which waits for it, and it for that.
@@ -301,16 +301,20 @@ def _hold_places(
     """A save's places, held before it has an id: a count (lock_place) then
     waits for it whole, so one that drew an id inside a count's moment and
     committed after it is found as the count is written
-    (counts.record_count). Those that exist, by id, and
+    (counts.record_count). By id, as lock_places takes them, so a save
+    between two places a count holds waits for the first and has not yet
+    taken the second. Those that exist, by id, and
     whether each is retired; and which are volunteers' custody."""
     rows = session.execute(
         locked(
-            select(Location.id, Location.retired_at.is_not(None), Location.kind).where(
+            select(Location.id, Location.retired_at.is_not(None), Location.kind)
+            .where(
                 Location.id.in_(
                     {header.get("from_location_id"), header.get("to_location_id")}
                     - {None}
                 )
-            ),
+            )
+            .order_by(Location.id),
             key_share=True,
             shared=True,
         )

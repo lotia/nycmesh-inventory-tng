@@ -26,7 +26,7 @@ from fastapi import BackgroundTasks, FastAPI
 from fastapi.responses import Response
 from fastapi.testclient import TestClient
 from httpx2 import Response as Answer
-from sqlalchemy import Engine, delete, select, text
+from sqlalchemy import Engine, delete, select, text, update
 from sqlalchemy.exc import IntegrityError, OperationalError
 from sqlalchemy.orm import Session
 
@@ -62,7 +62,7 @@ from inventory_tng.places import locations
 from inventory_tng.scan import catalogue_api
 from inventory_tng.scan.batch import BatchRefused, KeyReused, Recorded, record
 from inventory_tng.scan.batch_schemas import Batch
-from inventory_tng.stock import adjustment_reasons, open_packages
+from inventory_tng.stock import adjustment_reasons, ledger, open_packages
 from inventory_tng.stock.ledger import Entry, Form, insert_transaction
 from inventory_tng.volunteers import volunteers
 from inventory_tng.volunteers.paths import VOLUNTEERS
@@ -1451,6 +1451,36 @@ def test_a_page_waits_for_a_write_that_refers_to_its_row(
     worker = committed.blocked(page, lambda: locked_row(page, model, row.id))
     saving.commit()
     assert worker.finished().error is None
+
+
+@pytest.mark.concurrency
+def test_a_save_takes_its_places_in_id_order(committed: Committed) -> None:
+    """A save holds its places by id (ledger._hold_places), as a count
+    locks several (ledger.lock_places): one waiting for the first place a
+    count holds has not taken the second, so the count takes it, rather
+    than the two waiting on each other (inventory-tng-8i4.51.3). The save
+    reads the table in the order it stores rows (no index), where renaming
+    the first place has put it last, so only ordering by id takes it
+    first."""
+    first = Location(name=f"Store {tag()}", kind="store")
+    second = Location(name=f"Store {tag()}", kind="store")
+    made(committed, first, second)
+    renaming = committed.session()
+    renaming.execute(
+        update(Location).where(Location.id == first.id).values(name=f"Store {tag()}")
+    )
+    renaming.commit()
+    counting = committed.session()
+    ledger.lock_place(counting, first.id)
+    saving = committed.session()
+    saving.execute(text("SET LOCAL enable_indexscan = off"))
+    saving.execute(text("SET LOCAL enable_bitmapscan = off"))
+    header = {"from_location_id": second.id, "to_location_id": first.id}
+    worker = committed.blocked(saving, lambda: ledger.hold(saving, header, ()))
+    ledger.lock_place(counting, second.id)
+    counting.commit()
+    assert worker.finished().error is None
+    saving.rollback()
 
 
 @pytest.mark.end_to_end
