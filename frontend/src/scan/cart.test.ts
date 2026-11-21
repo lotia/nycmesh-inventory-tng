@@ -429,6 +429,27 @@ describe("the cart store, shared by tabs", () => {
       expect(loadCart().lines).toEqual(filled().lines);
     });
 
+    test("marking the cart used leaves the stored cart, already this one", () => {
+      storeCart(filled());
+      const store = new CartStore(CATALOGUE, refusing("setItem"));
+      expect(store.touch()).toBe(true);
+      expect(loadCart().lines).toEqual(filled().lines);
+    });
+
+    test("an emptied cart is kept while the browser holds an empty one it will not remove", () => {
+      storeCart(freshCart());
+      const store = new CartStore(CATALOGUE, refusing("setItem", "removeItem"));
+      expect(store.change(freshCart(cart({ volunteerId: 2 })))).toBe(true);
+    });
+
+    test("an empty cart kept with none stored is the one saved, its choices kept", () => {
+      const store = new CartStore(CATALOGUE, refusing("setItem"));
+      const named = freshCart(cart({ volunteerId: 2 }));
+      expect(store.change(named)).toBe(true);
+      expect(store.forSaving()?.volunteerId).toBe(2);
+      expect(store.cart.value.volunteerId).toBe(2);
+    });
+
     test("an emptied cart is kept where the browser shows nothing stored", () => {
       const store = new CartStore(
         CATALOGUE,

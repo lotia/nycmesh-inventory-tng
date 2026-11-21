@@ -21,7 +21,6 @@ import { id } from "../api/replies";
 import { BUILD } from "../shared/build";
 import { say, sayParts } from "../shared/i18n";
 import {
-  hasStored,
   onStoredChange,
   readStored,
   removeStored,
@@ -211,20 +210,30 @@ export class CartStore {
 
   /**
    * Show and store `next`; false if a reload would not bring it back. A
-   * write refused, the stored cart is removed and the write tried once
-   * more, as a full disk may take it then: storage holds this cart or
-   * none, so a reload never brings back lines recorded or discarded since
-   * (Ali, inventory-tng-xm07). An empty cart with none stored is as good
-   * as kept; one the browser would not remove may still hold old lines.
+   * write refused, the stored cart is removed, unless a reload brings it
+   * back anyway, and the write tried once more, as a full disk may take
+   * it then: storage holds this cart or none, so a reload never brings
+   * back lines recorded or discarded since (Ali, inventory-tng-xm07). One
+   * the browser would not remove may still hold old lines.
    */
   private write(next: Cart): boolean {
     this.cart.value = next;
     this.kept =
       storeCart(next, this.storage) ||
+      this.reloadBrings(next) ||
       (removeStored(this.storage, STORAGE_KEY) &&
-        storeCart(next, this.storage)) ||
-      (next.lines.length === 0 && !hasStored(this.storage, STORAGE_KEY));
+        (storeCart(next, this.storage) || this.reloadBrings(next)));
     return this.kept;
+  }
+
+  /** Whether a reload, reading what is stored, brings back `cart`: the
+   * same revision, only its time older (touch), or both empty. */
+  private reloadBrings(cart: Cart): boolean {
+    const stored = loadCart(this.storage);
+    return (
+      stored.revision === cart.revision ||
+      (stored.lines.length === 0 && cart.lines.length === 0)
+    );
   }
 
   /** Change what the cart holds, each count typed at the size this tab's
@@ -262,11 +271,11 @@ export class CartStore {
   }
 
   /** The cart to save; or null when another tab has changed it since, and
-   * this tab now shows that tab's cart instead. */
+   * this tab now shows that tab's cart instead. An empty cart kept with
+   * none stored is not taken as changed (reloadBrings). */
   forSaving(): Cart | null {
-    const stored = loadCart(this.storage);
-    if (this.kept && stored.revision !== this.cart.value.revision) {
-      this.cart.value = reconcile(stored, this.catalogue);
+    if (this.kept && !this.reloadBrings(this.cart.value)) {
+      this.cart.value = this.stored();
       return null;
     }
     return this.cart.value;

@@ -170,6 +170,9 @@ export function CartForm({
     () =>
       store.listen(() => {
         cartKept.value = true;
+        problems.value = problems.value.filter(
+          (problem) => wordsOf(problem) !== say(NOT_KEEPING),
+        );
       }),
     [store],
   );

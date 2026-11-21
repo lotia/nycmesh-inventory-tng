@@ -349,7 +349,7 @@ describe("a newer build", () => {
     await vi.waitFor(() => expect(banner()).toBe(say(MUST_UPGRADE_NOT_KEPT)));
   });
 
-  test("too old with the cart not kept, once another tab writes the cart it is kept again (inventory-tng-xm07)", async () => {
+  test("too old with the cart not kept, once another tab writes the cart it is kept again, and not said otherwise (inventory-tng-xm07)", async () => {
     const { outbox } = openMine();
     await ready();
     const refused = refusingWrites(CART_KEY);
@@ -358,6 +358,9 @@ describe("a newer build", () => {
     refused.mockRestore();
     storeCart(addOne(freshCart(), 100));
     window.dispatchEvent(new StorageEvent("storage", { key: CART_KEY }));
+    await vi.waitFor(() =>
+      expect(screen.queryByText(say(NOT_KEEPING))).toBeNull(),
+    );
     outbox.builds.learn("too_old");
     await vi.waitFor(() => expect(banner()).toBe(MUST_UPGRADE));
   });
