@@ -35,6 +35,7 @@ class Store:
         self.shelf = add(session, area("Shelf A", store))
         self.bin = add(session, area("Bin 1", self.shelf))
         self.empty = add(session, area("Shelf B", store))
+        self.every_place = (store, self.shelf, self.bin, self.empty)
         self.receive(session, self.shelf, self.place.item.id, "3")
         self.receive(session, self.bin, self.place.cable.id, "2")
         self.path = f"{COUNTS}/{store.id}"
@@ -110,9 +111,7 @@ def test_a_store_count_lists_every_area_at_any_depth_grouped(
         == "2"
     )
     places = dict(hidden_fields(page.text))["places"].split()
-    assert sorted(places) == sorted(
-        str(each.id) for each in (made.store, made.shelf, made.bin, made.empty)
-    )
+    assert sorted(places) == sorted(str(each.id) for each in made.every_place)
 
 
 def test_a_store_count_writes_one_count_at_each_place(
@@ -134,7 +133,7 @@ def test_a_store_count_writes_one_count_at_each_place(
     assert expected(session, made.shelf.id) == {item: Decimal(3)}
     assert expected(session, made.bin.id) == {cable: Decimal(5)}
     key = uuid.UUID(form["key"])
-    for place in (made.store, made.shelf, made.bin, made.empty):
+    for place in made.every_place:
         written = counts_at(session, place)
         assert len(written) == 1, place.name
     (lost,) = counts_at(session, made.store)
@@ -222,7 +221,7 @@ def test_something_else_here_listed_in_the_area_picked_is_refused(
             if picked
         ]
         assert chosen == [str(value)], picker_name
-    for place in (made.store, made.shelf, made.bin, made.empty):
+    for place in made.every_place:
         assert counts_at(session, place) == []
     # Typed on its line, the same form saves.
     done = admin_client.post(
@@ -491,7 +490,7 @@ def test_a_filtered_store_count_with_nothing_typed_is_shown_again(
         str(made.bin.id)
     ]
     assert count_form(refused)["key"] == form["key"]
-    for place in (made.store, made.shelf, made.bin, made.empty):
+    for place in made.every_place:
         assert counts_at(session, place) == [], place.name
 
 
@@ -505,7 +504,7 @@ def test_a_store_count_filtered_to_nothing_and_sent_is_shown_again(
     refused = admin_client.post(path, data=count_form(admin_client.get(path)))
     assert refused.status_code == 400
     assert "Nothing was typed, so nothing was counted." in text(refused)
-    for place in (made.store, made.shelf, made.bin, made.empty):
+    for place in made.every_place:
         assert counts_at(session, place) == [], place.name
 
 
@@ -536,7 +535,7 @@ def test_an_unfiltered_store_count_with_nothing_typed_is_still_counted(
     made = Store(session)
     done = admin_client.post(made.path, data=count_form(admin_client.get(made.path)))
     assert done.status_code == 303
-    for place in (made.store, made.shelf, made.bin, made.empty):
+    for place in made.every_place:
         assert len(counts_at(session, place)) == 1, place.name
 
 
