@@ -21,8 +21,10 @@ import { id } from "../api/replies";
 import { BUILD } from "../shared/build";
 import { say, sayParts } from "../shared/i18n";
 import {
+  hasStored,
   onStoredChange,
   readStored,
+  removeStored,
   writeStored,
 } from "../shared/local-storage";
 import { BatchKey, BatchLine } from "../shared/outbox";
@@ -188,8 +190,9 @@ export function storeCart(
 export class CartStore {
   readonly cart: Signal<Cart>;
   private catalogue: Catalogue;
-  /** Whether the browser kept the last write. If not, storage cannot tell
-   * what another tab did, and this tab's cart is the one to save. */
+  /** Whether a reload brings back this tab's cart (write). If not,
+   * storage cannot tell what another tab did, and this tab's cart is the
+   * one to save. */
   private kept = true;
 
   constructor(
@@ -206,14 +209,27 @@ export class CartStore {
     return reconcile(loadCart(this.storage), this.catalogue);
   }
 
+  /**
+   * Show and store `next`; false if a reload would not bring it back. A
+   * write refused, the stored cart is removed and the write tried once
+   * more, as a full disk may take it then: storage holds this cart or
+   * none, so a reload never brings back lines recorded or discarded since
+   * (Ali, inventory-tng-xm07). An empty cart with none stored is as good
+   * as kept; one the browser would not remove may still hold old lines.
+   */
   private write(next: Cart): boolean {
     this.cart.value = next;
-    this.kept = storeCart(next, this.storage);
+    this.kept =
+      storeCart(next, this.storage) ||
+      (removeStored(this.storage, STORAGE_KEY) &&
+        storeCart(next, this.storage)) ||
+      (next.lines.length === 0 && !hasStored(this.storage, STORAGE_KEY));
     return this.kept;
   }
 
   /** Change what the cart holds, each count typed at the size this tab's
-   * catalogue shows (sized). False if the browser would not keep it. */
+   * catalogue shows (sized). False if a reload would not bring it back
+   * (write). */
   change(next: Cart, now = Date.now()): boolean {
     const empty = next.lines.length === 0;
     // Its key from its first line, so whichever tab records it sends that
@@ -239,7 +255,8 @@ export class CartStore {
     });
   }
 
-  /** Mark the cart used now, changing nothing in it. */
+  /** Mark the cart used now, changing nothing in it. False if a reload
+   * would not bring it back (write). */
   touch(now = Date.now()): boolean {
     return this.write({ ...this.cart.value, usedAt: now });
   }
@@ -261,10 +278,14 @@ export class CartStore {
     this.cart.value = reconcile(this.cart.value, catalogue);
   }
 
-  /** Follow other tabs' changes. Returns what stops it. */
-  listen(): () => void {
+  /** Follow other tabs' changes, calling `followed` after each: storage
+   * then holds the cart this tab shows, so it is kept. Returns what stops
+   * it. */
+  listen(followed?: () => void): () => void {
     return onStoredChange([STORAGE_KEY], () => {
       this.cart.value = this.stored();
+      this.kept = true;
+      followed?.();
     });
   }
 }

@@ -116,8 +116,9 @@ export function CartForm({
   outbox: Outbox;
   /** Kept as the cart changes, here or in another tab (NewerBuild). */
   cartEmpty: Signal<boolean>;
-  /** Set to whether the browser kept the cart when last asked; kept
-   * again once this form goes, as what it held is then gone. */
+  /** Set to whether a reload brings back this cart (CartStore.write),
+   * as it is written here or followed from another tab; kept again once
+   * this form goes, as what it held is then gone. */
   cartKept: Signal<boolean>;
   /** Kept as the cart's batch key changes. */
   cartKey: Signal<string | undefined>;
@@ -165,7 +166,13 @@ export function CartForm({
   const nameList = useRef<HTMLSelectElement>(null);
 
   // Tabs share one cart; a refreshed catalogue clears what it no longer has.
-  useEffect(() => store.listen(), [store]);
+  useEffect(
+    () =>
+      store.listen(() => {
+        cartKept.value = true;
+      }),
+    [store],
+  );
   useEffect(
     () => () => {
       cartKept.value = true;
@@ -195,7 +202,7 @@ export function CartForm({
     }
   }, [catalogue]);
 
-  /** Say so if the browser would not keep the cart. */
+  /** Say so if a reload would not bring back the cart. */
   function kept(stored: boolean) {
     cartKept.value = stored;
     problems.value = stored ? [] : [[say(NOT_KEEPING)]];
@@ -781,9 +788,7 @@ export function CartForm({
             scanning.value = false;
           }}
           reload={reload}
-          // As NewerBuild's, from this render's cart rather than
-          // cartEmpty, which follows it a render later.
-          reloadKeepsCart={cartKept.value || empty}
+          reloadKeepsCart={cartKept.value}
         />
       ) : (
         <button type="button" onClick={() => (scanning.value = true)}>

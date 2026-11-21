@@ -55,7 +55,7 @@ export function ScanPage({
   // Whether the cart holds no lines: until it does, a newer build is not
   // loaded, as it would not read this build's cart (shared/build.ts).
   const cartEmpty = useMemo(() => signal(storedCartEmpty()), []);
-  // Whether the browser kept the cart when last asked (CartForm, kept).
+  // Whether a reload brings back the cart (CartForm, cartKept).
   const cartKept = useMemo(() => signal(true), []);
   // The cart's batch key, while the cart is shown (CartForm): a save's
   // difference put in it is said to be there until it is recorded.
@@ -255,8 +255,8 @@ export function ScanPage({
  * to send, as the newer build reads neither; until then it says nothing.
  * Too old, at once, saying what this tab holds is kept: the newer build
  * reads this build's cart, or lists it, and lists its saves waiting
- * (older-builds.ts); or, while the browser isn't keeping a cart with
- * lines, that upgrading empties it (Ali, inventory-tng-sdfg). A newer
+ * (older-builds.ts); or, while the browser isn't keeping the cart, that
+ * upgrading empties it (Ali, inventory-tng-sdfg). A newer
  * build's saves waiting here are not counted: that build sends them.
  */
 function NewerBuild({
@@ -286,7 +286,7 @@ function NewerBuild({
   }
   return (
     <div role="alert" class={CAUTION_BOX}>
-      <div>{say(upgradeWords(holds, cartKept.value || empty))}</div>
+      <div>{say(upgradeWords(holds, cartKept.value))}</div>
       <button type="button" class="primary" onClick={reload}>
         {say(UPGRADE)}
       </button>
@@ -295,8 +295,8 @@ function NewerBuild({
 }
 
 /** What the alert asking for a reload says. A reload keeps the cart
- * while the browser keeps it, or it has nothing to lose (Ali,
- * inventory-tng-0y0u, inventory-tng-sdfg). */
+ * while the browser keeps it, an empty one included once none is stored
+ * (Ali, inventory-tng-0y0u, inventory-tng-sdfg, inventory-tng-xm07). */
 function upgradeWords(holds: boolean, reloadKeepsCart: boolean) {
   if (!reloadKeepsCart) {
     return MUST_UPGRADE_NOT_KEPT;

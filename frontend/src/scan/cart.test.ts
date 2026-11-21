@@ -1,10 +1,10 @@
-import { describe, expect, test } from "vitest";
+import { describe, expect, test, vi } from "vitest";
 import { BUILD } from "../shared/build";
 import { say } from "../shared/i18n";
 import { cart } from "../testing/cart";
 import { CATALOGUE, cable, radio } from "../testing/catalogue";
 import { saidAsText } from "../testing/said";
-import { refusing } from "../testing/storage";
+import { full, refusing } from "../testing/storage";
 import { toBatch } from "./batch";
 import {
   addOne,
@@ -401,6 +401,59 @@ describe("the cart store, shared by tabs", () => {
     const store = new CartStore(CATALOGUE, refusing("setItem"));
     expect(store.change(filled())).toBe(false);
     expect(store.forSaving()?.lines).toEqual(filled().lines);
+  });
+
+  describe("a write the browser refuses (inventory-tng-xm07)", () => {
+    test("is tried again once the stored cart is removed, as a full disk may take it then", () => {
+      const store = new CartStore(CATALOGUE, full());
+      store.change(filled());
+      const more = addOne(store.cart.value, 101);
+      expect(store.change(more)).toBe(true);
+      expect(loadCart().lines).toEqual(more.lines);
+    });
+
+    test("refused again, leaves none stored: a reload brings an empty cart, never lines since recorded", () => {
+      storeCart(filled());
+      const store = new CartStore(CATALOGUE, refusing("setItem"));
+      expect(store.change(addOne(store.cart.value, 101))).toBe(false);
+      expect(localStorage.getItem(STORAGE_KEY)).toBeNull();
+      // Emptied, as after Record or Discard, with none stored: kept.
+      expect(store.change(freshCart(store.cart.value))).toBe(true);
+      expect(loadCart().lines).toEqual([]);
+    });
+
+    test("an emptied cart is not kept while the browser will not remove the lines stored", () => {
+      storeCart(filled());
+      const store = new CartStore(CATALOGUE, refusing("setItem", "removeItem"));
+      expect(store.change(freshCart(store.cart.value))).toBe(false);
+      expect(loadCart().lines).toEqual(filled().lines);
+    });
+
+    test("an emptied cart is kept where the browser shows nothing stored", () => {
+      const store = new CartStore(
+        CATALOGUE,
+        refusing("getItem", "setItem", "removeItem"),
+      );
+      expect(store.change(freshCart())).toBe(true);
+      expect(store.change(filled())).toBe(false);
+    });
+
+    test("once another tab writes, the cart shown is kept, and saved only if unchanged since", () => {
+      const store = new CartStore(CATALOGUE, refusing("setItem"));
+      const followed = vi.fn();
+      const stop = store.listen(followed);
+      store.change(filled());
+      const there = new CartStore(CATALOGUE);
+      there.change(addOne(filled(), 101));
+      window.dispatchEvent(new StorageEvent("storage", { key: STORAGE_KEY }));
+      expect(followed).toHaveBeenCalledOnce();
+      expect(store.cart.value.lines).toEqual(there.cart.value.lines);
+      expect(store.forSaving()?.revision).toBe(there.cart.value.revision);
+      // Changed there again, unheard: this tab's cart is not saved.
+      there.change(filled());
+      expect(store.forSaving()).toBeNull();
+      stop();
+    });
   });
 
   test("a newer catalogue clears choices it no longer has", () => {

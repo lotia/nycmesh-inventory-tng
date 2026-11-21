@@ -33,15 +33,16 @@ import {
   save,
   server,
 } from "../testing/scan-page";
-import { refusingWrites } from "../testing/storage";
+import { refusingRemovals, refusingWrites } from "../testing/storage";
 import {
   ADDED_BACK as ADDED_BACK_PHRASE,
+  DISCARD_CART,
   NOT_KEEPING,
   NOTHING_IN_CART,
   YOUR_NAME,
 } from "./CartForm";
 import { addOne, STORAGE_KEY as CART_KEY, freshCart, storeCart } from "./cart";
-import { ADD_TO_CART } from "./Notes";
+import { ADD_TO_CART, DISCARD } from "./Notes";
 import { CHECKED_OUT } from "./OlderList";
 import { CARTS_FROM_DEVICE, DISMISS, HELD, SENDING } from "./OutboxList";
 import { ScanPage } from "./ScanPage";
@@ -324,13 +325,40 @@ describe("a newer build", () => {
     expect(reload).toHaveBeenCalledOnce();
   });
 
-  test("too old with the cart not kept but empty, nothing is lost", async () => {
+  test("too old with an empty cart the browser would not write, none being stored, nothing is lost", async () => {
     const { outbox } = openMine();
     await ready();
     refusingWrites(CART_KEY);
     pick(say(YOUR_NAME), "1");
-    screen.getByText(say(NOT_KEEPING));
+    expect(screen.queryByText(say(NOT_KEEPING))).toBeNull();
     outbox.builds.learn("too_old");
     await vi.waitFor(() => expect(banner()).toBe(UPDATED));
+  });
+
+  test("too old with the cart discarded but its lines still stored, it says upgrading empties it, as they would come back (inventory-tng-xm07)", async () => {
+    const { outbox } = openMine();
+    await ready();
+    fillMove();
+    refusingWrites(CART_KEY);
+    refusingRemovals(CART_KEY);
+    fireEvent.click(screen.getByRole("button", { name: say(DISCARD_CART) }));
+    fireEvent.click(screen.getByRole("button", { name: say(DISCARD) }));
+    screen.getByText(say(NOTHING_IN_CART));
+    screen.getByText(say(NOT_KEEPING));
+    outbox.builds.learn("too_old");
+    await vi.waitFor(() => expect(banner()).toBe(say(MUST_UPGRADE_NOT_KEPT)));
+  });
+
+  test("too old with the cart not kept, once another tab writes the cart it is kept again (inventory-tng-xm07)", async () => {
+    const { outbox } = openMine();
+    await ready();
+    const refused = refusingWrites(CART_KEY);
+    fillMove();
+    screen.getByText(say(NOT_KEEPING));
+    refused.mockRestore();
+    storeCart(addOne(freshCart(), 100));
+    window.dispatchEvent(new StorageEvent("storage", { key: CART_KEY }));
+    outbox.builds.learn("too_old");
+    await vi.waitFor(() => expect(banner()).toBe(MUST_UPGRADE));
   });
 });

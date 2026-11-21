@@ -566,7 +566,8 @@ describe("what an older build left", () => {
     });
     await screen.findByText(NOT_KEPT);
     refused?.mockRestore();
-    expect(storedCart().lines).toEqual([]);
+    // None stored: a reload brings the cart back empty (CartStore.write).
+    expect(localStorage.getItem(CART_KEY)).toBeNull();
     fireEvent.click(
       within(entry).getByRole("button", { name: say(ADD_DIFFERENCE) }),
     );

@@ -31,8 +31,8 @@ export const BUILD_KEY = "inventory.build";
  * something; each with the button UPGRADE, which reloads. */
 export const UPDATED = msg`The scanner has been updated.`;
 export const MUST_UPGRADE = msg`The scanner has been updated. You must upgrade. Your data will be kept but may need some changes before sending.`;
-/** MUST_UPGRADE while the browser isn't keeping a cart that has lines, so
- * upgrading empties it (Ali, inventory-tng-sdfg). */
+/** MUST_UPGRADE while the browser isn't keeping the cart, so upgrading
+ * empties it (scan/cart.ts, CartStore.write; Ali, inventory-tng-sdfg). */
 export const MUST_UPGRADE_NOT_KEPT = msg`The scanner has been updated. You must upgrade. This browser isn't keeping the cart, so upgrading empties it. Note what is in it, then add it again after upgrading.`;
 export const UPGRADE = msg`Upgrade`;
 /** The header a batch names its build in, and the reply the server's. */

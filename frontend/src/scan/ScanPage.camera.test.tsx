@@ -17,7 +17,7 @@ import {
   selected,
   server,
 } from "../testing/scan-page";
-import { refusingWrites } from "../testing/storage";
+import { refusingRemovals, refusingWrites } from "../testing/storage";
 import {
   FROM,
   NOT_KEEPING,
@@ -378,7 +378,7 @@ describe("scanning labels with the camera", () => {
     expect(screen.queryByText(say(NOT_KEEPING))).toBeNull();
   });
 
-  test("a camera not allowed, with an empty cart not kept, gives the usual hint", async () => {
+  test("a camera not allowed, with an empty cart the browser would not write but holds none of, gives the usual hint", async () => {
     vi.mocked(openCamera).mockRejectedValueOnce(
       new DOMException("no", "NotAllowedError"),
     );
@@ -386,9 +386,25 @@ describe("scanning labels with the camera", () => {
     await ready();
     refusingWrites(CART_KEY);
     pick(say(YOUR_NAME), "1");
+    // None stored, a reload brings an empty cart: nothing to record first.
+    expect(screen.queryByText(say(NOT_KEEPING))).toBeNull();
+    startCamera();
+    await screen.findByText(say(NOT_ALLOWED.plain));
+  });
+
+  test("a camera not allowed, with the cart emptied but its lines still stored, says to record it before a reload (inventory-tng-xm07)", async () => {
+    vi.mocked(openCamera).mockRejectedValueOnce(
+      new DOMException("no", "NotAllowedError"),
+    );
+    open();
+    await ready();
+    fillMove();
+    refusingWrites(CART_KEY);
+    refusingRemovals(CART_KEY);
+    fireEvent.click(screen.getByRole("button", { name: say(REMOVE) }));
+    screen.getByText(say(NOTHING_IN_CART));
     screen.getByText(say(NOT_KEEPING));
     startCamera();
-    // Nothing in it to record first.
-    await screen.findByText(say(NOT_ALLOWED.plain));
+    await screen.findByText(say(NOT_ALLOWED.notKept));
   });
 });
