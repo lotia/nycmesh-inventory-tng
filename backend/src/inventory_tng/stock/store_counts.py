@@ -9,6 +9,7 @@ a form of one place, saved the same way.
 import uuid
 from collections.abc import Collection, Mapping
 from datetime import datetime
+from decimal import Decimal
 
 from sqlalchemy.orm import Session
 
@@ -94,6 +95,8 @@ def _count_at(
         (item_id, LOOSE, n) for item_id, n in count.counted if item_id == found_item
     ]
     place_key = uuid.uuid5(key, str(place_id))
+    # Its item's figures, if a package found was not kept (below).
+    withheld: dict[int, tuple[Decimal, Decimal]] = {}
     if forms.found is not None:
         package, left = forms.found
         with session.begin_nested() as finding:
@@ -112,9 +115,11 @@ def _count_at(
                 across=across,
             )
             if package.item_id in counted_now.moved:
-                # Its item moved meanwhile: asked again, found again then.
+                # Its item moved meanwhile: asked again, found again then,
+                # though no line but the package counted it.
+                withheld = counted_now.moved
                 finding.rollback()
-    if forms.found is None or package.item_id in counted_now.moved:
+    if forms.found is None or withheld:
         counted_now = record_count(
             session,
             place_key,
@@ -125,6 +130,7 @@ def _count_at(
             by_form=lines,
             across=across,
         )
+        counted_now = counted_now._replace(moved=withheld | counted_now.moved)
     # Closed after the count: one not there, or used up, as said. Each
     # closed is at 0, as counted so, for an opening that arrived in it.
     emptied: list[tuple[int, Form]] = []

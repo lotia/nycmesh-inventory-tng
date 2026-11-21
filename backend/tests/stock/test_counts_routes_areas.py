@@ -12,6 +12,7 @@ from sqlalchemy.orm import Session
 from inventory_tng.models.places import Location
 from inventory_tng.models.stock import LedgerTransaction, OpenPackage
 from inventory_tng.stock.forms import PICK_A_PLACE
+from inventory_tng.stock.ledger import Entry
 from inventory_tng.stock.moments import at_place, expected
 from inventory_tng.stock.paths import COUNTS
 
@@ -408,6 +409,39 @@ def test_an_open_package_nobody_recorded_is_made_in_the_area_picked(
     ).one()
     assert found.location_id == shelf.id
     assert expected(session, shelf.id) == {spools.cable.id: Decimal(40)}
+
+
+def test_an_open_package_found_in_an_area_its_item_moved_into_is_asked_again(
+    admin_client: TestClient, session: Session
+) -> None:
+    """Found in an empty area that cable came into while it was counted,
+    and nothing else typed of cable there: not kept, and cable is asked
+    for again there, so the package can be found again."""
+    spools = Spools(session)
+    shelf = add(session, area("Shelf", spools.store))
+    cable = spools.cable.id
+    path = f"{COUNTS}/{spools.store.id}"
+    form = count_form(admin_client.get(path)) | {
+        "found_location_id": str(shelf.id),
+        "found_package_id": str(spools.spool.id),
+        "found_left": "40",
+    }
+    spools.write(
+        {
+            "kind": "move",
+            "from_location_id": spools.store.id,
+            "to_location_id": shelf.id,
+        },
+        Entry(cable, Decimal(5)),
+    )
+    asked = admin_client.post(path, data=form)
+    assert asked.status_code == 409
+    assert "These moved while you counted" in text(asked)
+    assert count_form(asked)[f"at_{shelf.id}_items"] == str(cable)
+    made = select(OpenPackage).where(
+        OpenPackage.key == uuid.uuid5(uuid.UUID(form["key"]), "found")
+    )
+    assert session.scalars(made).first() is None
 
 
 def test_something_found_at_a_place_not_on_the_form_is_refused(

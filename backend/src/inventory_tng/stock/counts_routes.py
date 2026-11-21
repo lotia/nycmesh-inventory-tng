@@ -878,11 +878,17 @@ def count(
         }
         return redirect(f"{COUNTS}/{place.id}", notice=notice, **again)
     # What was typed of each item withheld, by place: its total, or its
-    # forms'.
+    # forms', an open package nobody recorded among them.
     amounts: dict[int, dict[int, Decimal]] = {}
     for place_id in result:
         typed = amounts[place_id] = dict(sent.places[place_id].counted)
-        for item_id, _, amount in sent.places[place_id].forms.lines:
+        by_form = sent.places[place_id].forms
+        found = (
+            [(by_form.found[0].item_id, LOOSE, by_form.found[1])]
+            if by_form.found
+            else []
+        )
+        for item_id, _, amount in [*by_form.lines, *found]:
             typed[item_id] = typed.get(item_id, Decimal(0)) + amount
     saved = sum(len(typed) for typed in amounts.values()) - sum(
         len(each) for each in moved.values()
