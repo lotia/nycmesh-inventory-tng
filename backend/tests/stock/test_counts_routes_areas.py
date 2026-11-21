@@ -495,6 +495,39 @@ def test_a_filtered_store_count_with_nothing_typed_is_shown_again(
         assert counts_at(session, place) == [], place.name
 
 
+def test_a_store_count_filtered_to_nothing_and_sent_is_shown_again(
+    admin_client: TestClient, session: Session
+) -> None:
+    """A search matching nothing shows no lines; sent so, nothing is
+    written and the form says nothing was counted (inventory-tng-fxsy)."""
+    made = Store(session)
+    path = f"{made.path}?q=nothing-{tag()}"
+    refused = admin_client.post(path, data=count_form(admin_client.get(path)))
+    assert refused.status_code == 400
+    assert "Nothing was typed, so nothing was counted." in text(refused)
+    for place in (made.store, made.shelf, made.bin, made.empty):
+        assert counts_at(session, place) == [], place.name
+
+
+def test_a_filtered_store_count_with_only_something_else_here_is_counted(
+    admin_client: TestClient, session: Session
+) -> None:
+    """Showing only the cable, every line blank but something else here
+    typed: that is something typed, so the place picked is counted and
+    no other (inventory-tng-fxsy)."""
+    made = Store(session)
+    path = f"{made.path}?item={made.place.cable.id}"
+    form = count_form(admin_client.get(path)) | {
+        "extra_location_id": str(made.empty.id),
+        "extra_item_id": str(made.place.item.id),
+        "extra_quantity": "1",
+    }
+    assert admin_client.post(path, data=form).status_code == 303
+    assert len(counts_at(session, made.empty)) == 1
+    for place in (made.store, made.shelf, made.bin):
+        assert counts_at(session, place) == [], place.name
+
+
 def test_an_unfiltered_store_count_with_nothing_typed_is_still_counted(
     admin_client: TestClient, session: Session
 ) -> None:
