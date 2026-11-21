@@ -4,6 +4,7 @@ line written at the place it was found in."""
 
 import uuid
 from decimal import Decimal
+from urllib.parse import urlencode
 
 import pytest
 from fastapi.testclient import TestClient
@@ -18,7 +19,7 @@ from inventory_tng.stock.ledger import Entry
 from inventory_tng.stock.moments import at_place, expected
 from inventory_tng.stock.paths import COUNTS
 
-from helpers.markup import hidden_fields, options, read, text
+from helpers.markup import forms, hidden_fields, options, read, text
 from helpers.rows import add, tag
 from helpers.stock import Place, Spools, count_form, retire, stocked, write
 
@@ -461,6 +462,49 @@ def test_a_filtered_store_count_counts_only_the_areas_typed_in(
     assert counts_at(session, made.empty) == []
     assert counts_at(session, made.shelf) == []
     assert counts_at(session, made.store) == []
+
+
+@pytest.mark.parametrize("by", ["item", "q"])
+def test_a_filtered_store_count_with_nothing_typed_is_shown_again(
+    admin_client: TestClient, session: Session, by: str
+) -> None:
+    """Showing only the cable, by id or by search, every line left blank
+    and something else here picked but not typed: nothing is written at
+    any place, and the form comes back, filtered the same and with the
+    place picked, saying nothing was counted (inventory-tng-fxsy)."""
+    made = Store(session)
+    cable = made.place.cable
+    query = urlencode({by: cable.id if by == "item" else cable.name})
+    path = f"{made.path}?{query}"
+    form = count_form(admin_client.get(path)) | {
+        "extra_location_id": str(made.bin.id),
+        "extra_item_id": "",
+        "extra_quantity": "",
+        f"at_{made.bin.id}_counted_{cable.id}": "",
+    }
+    refused = admin_client.post(path, data=form)
+    assert refused.status_code == 400
+    assert "Nothing was typed, so nothing was counted." in text(refused)
+    assert ("post", path) in forms(refused.text)
+    picker = read(refused.text).one("select", name="extra_location_id")
+    assert [value for value, _, chosen in options(picker) if chosen] == [
+        str(made.bin.id)
+    ]
+    assert count_form(refused)["key"] == form["key"]
+    for place in (made.store, made.shelf, made.bin, made.empty):
+        assert counts_at(session, place) == [], place.name
+
+
+def test_an_unfiltered_store_count_with_nothing_typed_is_still_counted(
+    admin_client: TestClient, session: Session
+) -> None:
+    """Showing everything, a send with every line blank counts every
+    place, as a count of one place does."""
+    made = Store(session)
+    done = admin_client.post(made.path, data=count_form(admin_client.get(made.path)))
+    assert done.status_code == 303
+    for place in (made.store, made.shelf, made.bin, made.empty):
+        assert len(counts_at(session, place)) == 1, place.name
 
 
 def test_a_recount_at_an_area_retired_since_asks_no_more_there(

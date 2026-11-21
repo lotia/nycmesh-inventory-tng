@@ -2389,6 +2389,10 @@ msgstr ""
 msgid "Nothing waits."
 msgstr ""
 
+#: src/inventory_tng/stock/counts_routes.py
+msgid "Nothing was typed, so nothing was counted."
+msgstr ""
+
 #: src/inventory_tng/templates/places/locations.html
 msgid "Nowhere"
 msgstr ""

@@ -179,7 +179,12 @@ is listed under that area and to type what was found on its line there;
 nothing is saved and everything typed is kept (Ali, 2026-11-21,
 inventory-tng-fh0e). We rejected hiding the items an area lists from the
 picker as Found in changes, and adding the amount to the line, which could
-count it twice without anyone noticing.
+count it twice without anyone noticing. A count showing only some items
+counts only the places something was typed at; sent with nothing typed
+anywhere, nothing is recorded and the form is shown again, with the same
+items, saying "Nothing was typed, so nothing was counted." (Ali,
+2026-11-21, inventory-tng-fxsy). We rejected going back to Counts with no
+message, and recording an empty count at each place.
 
 The form lists the places it shows, so an area moved meanwhile only
 regroups. Its moment is read across them all, and the count holds every

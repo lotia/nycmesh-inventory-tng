@@ -43,7 +43,9 @@ depth, on one form, grouped by area, one count at each place, as decision
 the places it shows (forms.PLACES); its moment is read across them all,
 and the send holds them all before writing any (stock/store_counts.py).
 An area retired and empty is left out. Filtered to some items, an area
-with nothing typed is not counted.
+with nothing typed is not counted; with nothing typed at any place,
+nothing is, and the form is shown again saying so (Ali, 2026-11-21,
+inventory-tng-fxsy).
 """
 
 import uuid
@@ -125,6 +127,9 @@ SAVED_AS_SHOWN = lazy_gettext(
     "the records may say otherwise now. What you typed is kept: check it "
     "and save again."
 )
+# A filtered count of a store and its areas sent with nothing typed at
+# any place.
+NOTHING_TYPED = lazy_gettext("Nothing was typed, so nothing was counted.")
 COUNTS_TITLE = lazy_gettext("Counts and adjustments")
 # A count of a store and its areas, saved (inventory-tng-8i4.51.4).
 places_counted = meter.create_histogram(
@@ -807,6 +812,23 @@ def count(
         for place_id, each in sent.places.items()
         if not (areas and filtered) or each.anything
     ]
+    if not counting:
+        # Nothing typed at any place: nothing to count, so the form again,
+        # as sent, saying so (inventory-tng-fxsy).
+        log.info("count refused: nothing typed", location_id=place.id)
+        return _count_page(
+            request,
+            session,
+            signed,
+            place,
+            at,
+            places=place_ids,
+            values=form,
+            alert=NOTHING_TYPED,
+            items=asked,
+            shown=shown,
+            status_code=400,
+        )
 
     # Bound again, as checked, for put_right.
     sent_key, across = key, place_ids
