@@ -218,11 +218,8 @@ export class CartStore {
    */
   private write(next: Cart): boolean {
     this.cart.value = next;
-    this.kept =
-      storeCart(next, this.storage) ||
-      this.reloadBrings(next) ||
-      (removeStored(this.storage, STORAGE_KEY) &&
-        (storeCart(next, this.storage) || this.reloadBrings(next)));
+    const kept = () => storeCart(next, this.storage) || this.reloadBrings(next);
+    this.kept = kept() || (removeStored(this.storage, STORAGE_KEY) && kept());
     return this.kept;
   }
 

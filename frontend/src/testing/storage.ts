@@ -42,31 +42,30 @@ export function full(): Storage {
  * restored, or the test ends, pass or fail, so later tests can write. For
  * code that takes no storage of its own; refusing() is for code that does. */
 export function refusingWrites(key?: string) {
-  const real = localStorage.setItem.bind(localStorage);
-  const setItem = vi
-    .spyOn(localStorage, "setItem")
-    .mockImplementation((at, value) => {
-      if (key === undefined || at === key) {
-        throw new DOMException("full", "QuotaExceededError");
-      }
-      real(at, value);
-    });
-  onTestFinished(() => setItem.mockRestore());
-  return setItem;
+  return refusingOn("setItem", key);
 }
 
 /** The page's own localStorage refusing to remove `key`, or any key if
  * none is given, as refusingWrites refuses writes. */
 export function refusingRemovals(key?: string) {
-  const real = localStorage.removeItem.bind(localStorage);
-  const removeItem = vi
-    .spyOn(localStorage, "removeItem")
-    .mockImplementation((at) => {
+  return refusingOn("removeItem", key);
+}
+
+/** The page's own localStorage refusing `method` on `key`, or on every
+ * key, with refusing()'s errors, until restored or the test ends. */
+function refusingOn(method: "setItem" | "removeItem", key?: string) {
+  const real = localStorage[method].bind(localStorage);
+  const spy = vi
+    .spyOn(localStorage, method)
+    .mockImplementation((at: string, value?: string) => {
       if (key === undefined || at === key) {
-        throw new DOMException("refused", "SecurityError");
+        throw new DOMException(
+          "refused",
+          method === "setItem" ? "QuotaExceededError" : "SecurityError",
+        );
       }
-      real(at);
+      real(at, value as string);
     });
-  onTestFinished(() => removeItem.mockRestore());
-  return removeItem;
+  onTestFinished(() => spy.mockRestore());
+  return spy;
 }
