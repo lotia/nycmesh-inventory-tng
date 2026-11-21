@@ -11,6 +11,7 @@ from fastapi.testclient import TestClient
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from inventory_tng.models.catalogue import Item
 from inventory_tng.models.places import Location
 from inventory_tng.models.stock import LedgerTransaction, OpenPackage
 from inventory_tng.stock.counts_routes import PATH_BETWEEN
@@ -429,8 +430,7 @@ def test_an_area_retired_since_the_form_was_shown_refuses_it_whole(
     retire(session, made.empty)
     refused = admin_client.post(made.path, data=form)
     assert refused.status_code == 409
-    page = text(refused)
-    assert f"Not saved: {made.empty.name} was retired while you counted" in page
+    assert gone_from_the_form(made.empty) in text(refused)
     assert made.empty.id not in [
         int(each) for each in count_form(refused)["places"].split()
     ]
@@ -441,6 +441,72 @@ def test_an_area_retired_since_the_form_was_shown_refuses_it_whole(
         == "1"
     )
     assert counts_at(session, made.shelf) == []
+
+
+def gone_from_the_form(place: Location) -> str:
+    return f"Not saved: {place.name} is retired and holds nothing, so it is no longer"
+
+
+def test_an_area_retired_before_and_emptied_since_refuses_it_whole(
+    admin_client: TestClient, session: Session
+) -> None:
+    """A retired shelf holding a radio, shown, then emptied while the
+    store was counted: refused saying it is retired and holds nothing, not
+    that it was retired meanwhile."""
+    made = Store(session)
+    retire(session, made.empty)
+    made.move(session, made.store, made.empty)
+    form = count_form(admin_client.get(made.path))
+    made.move(session, made.empty, made.store)
+    refused = admin_client.post(made.path, data=form)
+    assert refused.status_code == 409
+    assert gone_from_the_form(made.empty) in text(refused)
+    for place in made.every_place:
+        assert counts_at(session, place) == [], place.name
+
+
+def test_something_else_here_offers_only_what_a_place_it_may_be_found_lacks(
+    admin_client: TestClient, session: Session
+) -> None:
+    """Radios listed at the store and every current area, but not at a
+    retired shelf holding cable: no place Found in offers lacks them, so
+    they are not offered; cable, which the store lacks, is."""
+    made = Store(session)
+    item, cable = made.place.item.id, made.place.cable.id
+    made.move(session, made.store, made.bin)
+    made.move(session, made.store, made.empty)
+    retire(session, made.empty)
+    write(
+        session,
+        made.place,
+        from_location_id=made.bin.id,
+        to_location_id=made.empty.id,
+        lines=[{"item_id": cable, "quantity": "1"}],
+    )
+    made.move(session, made.empty, made.store)
+    page = read(admin_client.get(made.path).text)
+    picker = page.one("select", name="extra_item_id")
+    offered = [value for value, _, _ in options(picker)]
+    assert str(item) not in offered
+    assert str(cable) in offered
+
+
+def test_a_store_filtered_to_an_item_in_an_area_shows_no_line_of_it_at_the_store(
+    admin_client: TestClient, session: Session
+) -> None:
+    """Asked for the cable, which only the bin holds: the store gets no
+    line of it, so a browser sends nothing there; asked for an item no
+    place holds, the store does, to count it at."""
+    made = Store(session)
+    cable = made.place.cable.id
+    page = read(admin_client.get(f"{made.path}?item={cable}").text)
+    assert page.one("input", name=f"at_{made.bin.id}_counted_{cable}") is not None
+    assert not page.all("input", name=f"counted_{cable}")
+    spare = add(
+        session, Item(name=f"Spare {tag()}", category_id=made.place.item.category_id)
+    )
+    page = read(admin_client.get(f"{made.path}?item={spare.id}").text)
+    assert page.one("input", name=f"counted_{spare.id}").attrs["value"] == "0"
 
 
 def test_a_filtered_store_count_counts_only_the_areas_typed_in(
@@ -573,7 +639,7 @@ def test_a_recount_at_an_area_retired_since_asks_no_more_there(
     }
     refused = admin_client.post(made.path, data=recount)
     assert refused.status_code == 409
-    assert f"Not saved: {made.empty.name} was retired" in text(refused)
+    assert f"Not saved: {made.empty.name} is retired" in text(refused)
     last = count_form(refused)
     assert last["places"] == str(made.shelf.id)
     done = admin_client.post(

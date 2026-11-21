@@ -2280,8 +2280,8 @@ msgstr ""
 #: src/inventory_tng/stock/counts_routes.py
 #, python-format
 msgid ""
-"Not saved: %(place)s was retired while you counted, so it is no longer on"
-" this form. What you typed is kept: check it and save again."
+"Not saved: %(place)s is retired and holds nothing, so it is no longer on "
+"this form. What you typed is kept: check it and save again."
 msgstr ""
 
 #: src/inventory_tng/web/forms.py

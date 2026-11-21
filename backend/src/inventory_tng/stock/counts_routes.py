@@ -141,10 +141,11 @@ places_counted = meter.create_histogram(
 
 
 def retired_meanwhile(place: str) -> str:
-    """A count refused whole as an area on it was retired while it was
-    counted: what was typed is kept."""
+    """A count refused whole as an area on it may no longer be counted,
+    retired while it was counted, or retired before and emptied since: what
+    was typed is kept."""
     return gettext(
-        "Not saved: %(place)s was retired while you counted, so it is no "
+        "Not saved: %(place)s is retired and holds nothing, so it is no "
         "longer on this form. What you typed is kept: check it and save again.",
         place=place,
     )
@@ -488,10 +489,6 @@ def _count_page(
                 for item_id in asked.get(each, ())
             }
         else:
-            if shown.only is not None and each == place.id and shown.only.id in named:
-                # The item asked for, to count, though the records say none
-                # is here.
-                here.setdefault(shown.only.id, Decimal(0))
             # An opening recorded more than opened, waiting here: its item,
             # to count, though the records say none is here.
             for item_id in openings.get(each, {}):
@@ -499,6 +496,18 @@ def _count_page(
             if ids is not None:
                 here = {item_id: n for item_id, n in here.items() if item_id in ids}
         was[each] = here
+    only = shown.only
+    if (
+        not asked
+        and only is not None
+        and only.id in named
+        and (ids is None or only.id in ids)
+        and place.id in was
+        and not any(only.id in here for here in was.values())
+    ):
+        # The item asked for, to count, though the records say none is at
+        # any place shown: at the page's own place.
+        was[place.id] = {**was[place.id], only.id: Decimal(0)}
     if missing := set().union(*was.values()) - named.keys():
         # What the records had then but cannot be counted now, or what the
         # form's items, sent back, name that is no item at all.
@@ -562,10 +571,11 @@ def _count_page(
                 if ids is None or found[0].item_id in ids
             ],
             "recount": recount,
+            # What a place it may be found in does not list already.
             "others": [
                 item
                 for item in listed
-                if not all(item.id in here for here in was.values())
+                if not all(item.id in was[group.place.id] for group in choices)
             ],
             "key": (values or {}).get("key") or uuid.uuid4(),
             "moment": at,
