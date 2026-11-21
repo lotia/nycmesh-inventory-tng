@@ -173,7 +173,13 @@ found in another area than the records say is counted there as missing
 and added where it was found, a loss and a find, not a move. Something
 else here and an open package nobody recorded are asked once for the whole
 form, as on a count of one place, each beside the area it was found in;
-the area picked comes back picked after the save.
+the area picked comes back picked after the save. Something else here
+naming an item the area picked already lists is refused, saying the item
+is listed under that area and to type what was found on its line there;
+nothing is saved and everything typed is kept (Ali, 2026-11-21,
+inventory-tng-fh0e). We rejected hiding the items an area lists from the
+picker as Found in changes, and adding the amount to the line, which could
+count it twice without anyone noticing.
 
 The form lists the places it shows, so an area moved meanwhile only
 regroups. Its moment is read across them all, and the count holds every

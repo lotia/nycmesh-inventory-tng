@@ -38,6 +38,7 @@ from inventory_tng.stock.forms import (
     PICK_A_PLACE,
     PICK_A_REASON,
     PICK_AN_ITEM,
+    TYPE_IT_HERE,
     lines,
     named_twice,
 )
@@ -66,6 +67,7 @@ from helpers.rows import item_fields, shown, violates
 from helpers.sign_in import new_admin, sign_in_with
 from helpers.stock import (
     Place,
+    Spools,
     adjustment_form,
     at_retired_van,
     badge,
@@ -262,18 +264,8 @@ def test_a_count_form_reads_the_item_each_field_names() -> None:
     }
 
 
-@pytest.mark.parametrize(
-    "fields",
-    [
-        lambda place: {f"counted_0{place.item.id}": "2"},
-        lambda place: {"extra_item_id": str(place.item.id), "extra_quantity": "2"},
-    ],
-    ids=["two spellings", "chosen at the foot too"],
-)
 def test_a_count_naming_an_item_twice_is_refused(
-    admin_client: TestClient,
-    session: Session,
-    fields: Callable[[Place], dict[str, str]],
+    admin_client: TestClient, session: Session
 ) -> None:
     """The page cannot send this; a hand-made form can. Nothing is written,
     and the page says why, and the same key saves the count put right."""
@@ -281,7 +273,9 @@ def test_a_count_naming_an_item_twice_is_refused(
     path = f"{COUNTS}/{place.store.id}"
     shown = count_form(admin_client.get(path)) | {f"counted_{place.item.id}": "3"}
     with capture_logs() as logs:
-        refused = admin_client.post(path, data=shown | fields(place))
+        refused = admin_client.post(
+            path, data=shown | {f"counted_0{place.item.id}": "2"}
+        )
     assert refused.status_code == 400
     assert {
         "event": "count refused: an item named twice",
@@ -298,6 +292,45 @@ def test_a_count_naming_an_item_twice_is_refused(
     done = admin_client.post(path, data=shown)
     assert done.headers["location"] == f"{COUNTS}?notice=counted&section=count#count"
     assert expected(session, place.store.id) == {place.item.id: Decimal(3)}
+
+
+def test_something_else_here_listed_on_a_count_of_one_place_is_refused(
+    admin_client: TestClient, session: Session
+) -> None:
+    """The page offers no item listed here; a hand-made form may name one,
+    counted by form: it is said as on a store's count, with the place's
+    name, its loose line marked (inventory-tng-fh0e). Nothing is written."""
+    spools = Spools(session)
+    cable = spools.cable.id
+    path = f"{COUNTS}/{spools.store.id}"
+    form = count_form(admin_client.get(path)) | {
+        f"sealed_{cable}_{spools.spool.id}": "2",
+        f"loose_{cable}": "0",
+        "extra_item_id": str(cable),
+        "extra_quantity": "3",
+    }
+    with capture_logs() as logs:
+        refused = admin_client.post(path, data=form)
+    assert refused.status_code == 400
+    assert {
+        "event": "count refused: something else here listed there",
+        "location_id": spools.store.id,
+        "found_location_id": spools.store.id,
+        "item_id": cable,
+        "log_level": "info",
+    } in logs
+    page = read(refused.text)
+    assert page.one("span", id=f"loose_{cable}-problem").text == str(TYPE_IT_HERE)
+    assert (
+        page.one("span", id="extra_item_id-problem").text
+        == f"Listed under {spools.store.name} already."
+    )
+    assert (
+        f"{spools.cable.name_shown} is already listed under {spools.store.name}."
+        in text(refused)
+    )
+    assert "An item is on this form more than once." not in text(refused)
+    assert counts_written(session) == []
 
 
 def test_found_and_written_off(admin_client: TestClient, session: Session) -> None:

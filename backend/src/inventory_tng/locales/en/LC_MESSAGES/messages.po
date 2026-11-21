@@ -286,6 +286,13 @@ msgstr ""
 msgid "%(item)s counted"
 msgstr ""
 
+#: src/inventory_tng/stock/counts_routes.py
+#, python-format
+msgid ""
+"%(item)s is already listed under %(place)s. Type what you found on its "
+"line there. Nothing was saved, and what you typed is kept."
+msgstr ""
+
 #: src/inventory_tng/templates/stock/count.html
 #, python-format
 msgid "%(item)s, %(form)s: is it here?"
@@ -1935,6 +1942,11 @@ msgstr ""
 
 #: src/inventory_tng/templates/volunteers/volunteer.html
 msgid "Let them hold stock"
+msgstr ""
+
+#: src/inventory_tng/stock/counts_routes.py
+#, python-format
+msgid "Listed under %(place)s already."
 msgstr ""
 
 #: src/inventory_tng/web/navigation.py
@@ -4016,6 +4028,10 @@ msgstr ""
 
 #: src/inventory_tng/web/forms.py
 msgid "Type a number, such as 12 or 0.5."
+msgstr ""
+
+#: src/inventory_tng/stock/forms.py
+msgid "Type everything you found here."
 msgstr ""
 
 #: src/inventory_tng/stock/length_checks_routes.py

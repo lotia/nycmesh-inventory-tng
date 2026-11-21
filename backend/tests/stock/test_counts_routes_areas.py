@@ -11,7 +11,7 @@ from sqlalchemy.orm import Session
 
 from inventory_tng.models.places import Location
 from inventory_tng.models.stock import LedgerTransaction, OpenPackage
-from inventory_tng.stock.forms import PICK_A_PLACE
+from inventory_tng.stock.forms import ON_THE_FORM_TWICE, PICK_A_PLACE, TYPE_IT_HERE
 from inventory_tng.stock.ledger import Entry
 from inventory_tng.stock.moments import at_place, expected
 from inventory_tng.stock.paths import COUNTS
@@ -171,6 +171,100 @@ def test_something_found_goes_to_the_area_picked_which_comes_back_picked(
     picker = read(again.text).one("select", name="extra_location_id")
     chosen = [value for value, _, chosen in options(picker) if chosen]
     assert chosen == [str(made.empty.id)]
+
+
+def test_something_else_here_listed_in_the_area_picked_is_refused(
+    admin_client: TestClient, session: Session
+) -> None:
+    """Radios found on Shelf A, which lists radios: nothing is written, the
+    page says to type them on their line there, marks both fields, and
+    keeps everything typed (Ali, 2026-11-21, inventory-tng-fh0e)."""
+    made = Store(session)
+    item = made.place.item.id
+    page = admin_client.get(made.path)
+    picker = read(page.text).one("select", name="extra_item_id")
+    assert str(item) in [value for value, _, _ in options(picker)]
+    line = f"at_{made.shelf.id}_counted_{item}"
+    form = count_form(page) | {
+        f"counted_{item}": "6",
+        line: "4",
+        "extra_location_id": str(made.shelf.id),
+        "extra_item_id": str(item),
+        "extra_quantity": "2",
+    }
+    refused = admin_client.post(made.path, data=form)
+    assert refused.status_code == 400
+    name = made.place.item.name_shown
+    assert (
+        f"{name} is already listed under {made.shelf.name}. Type what you found "
+        "on its line there. Nothing was saved, and what you typed is kept."
+    ) in text(refused)
+    assert "more than once" not in text(refused)
+    shown = read(refused.text)
+    assert shown.one("span", id=f"{line}-problem").text == str(TYPE_IT_HERE)
+    assert (
+        shown.one("span", id="extra_item_id-problem").text
+        == f"Listed under {made.shelf.name} already."
+    )
+    assert shown.one("input", name=line).attrs["value"] == "4"
+    assert shown.one("input", name=f"counted_{item}").attrs["value"] == "6"
+    assert shown.one("input", name="extra_quantity").attrs["value"] == "2"
+    for picker_name, value in (
+        ("extra_location_id", made.shelf.id),
+        ("extra_item_id", item),
+    ):
+        chosen = [
+            each
+            for each, _, picked in options(shown.one("select", name=picker_name))
+            if picked
+        ]
+        assert chosen == [str(value)], picker_name
+    for place in (made.store, made.shelf, made.bin, made.empty):
+        assert counts_at(session, place) == []
+    # Typed on its line, the same form saves.
+    done = admin_client.post(
+        made.path,
+        data=form | {line: "6", "extra_item_id": "", "extra_quantity": ""},
+    )
+    assert done.status_code == 303
+    assert expected(session, made.shelf.id) == {item: Decimal(6)}
+
+
+def test_something_else_here_listed_in_another_place_is_counted_where_picked(
+    admin_client: TestClient, session: Session
+) -> None:
+    """Radios, listed in the store and on Shelf A, found on Shelf B, which
+    lists none: counted there."""
+    made = Store(session)
+    item = made.place.item.id
+    form = count_form(admin_client.get(made.path)) | {
+        "extra_location_id": str(made.empty.id),
+        "extra_item_id": str(item),
+        "extra_quantity": "2",
+    }
+    assert admin_client.post(made.path, data=form).status_code == 303
+    assert expected(session, made.empty.id) == {item: Decimal(2)}
+
+
+def test_an_item_on_an_area_twice_and_found_there_too_is_said_twice(
+    admin_client: TestClient, session: Session
+) -> None:
+    """A hand-made form naming Shelf A's radios on two lines and found
+    there besides: that it is twice is said above the form."""
+    made = Store(session)
+    item = made.place.item.id
+    form = count_form(admin_client.get(made.path)) | {
+        f"at_{made.shelf.id}_counted_{item}": "3",
+        f"at_{made.shelf.id}_counted_0{item}": "4",
+        "extra_location_id": str(made.shelf.id),
+        "extra_item_id": str(item),
+        "extra_quantity": "2",
+    }
+    refused = admin_client.post(made.path, data=form)
+    assert refused.status_code == 400
+    assert "An item is on this form more than once." in text(refused)
+    assert str(ON_THE_FORM_TWICE) in text(refused)
+    assert counts_at(session, made.shelf) == []
 
 
 def test_a_retired_area_holding_stock_is_shown_retired_and_counted(

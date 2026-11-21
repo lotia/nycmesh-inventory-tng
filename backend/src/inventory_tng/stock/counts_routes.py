@@ -26,6 +26,10 @@ and counted_05, or the select at the foot choosing an item listed above) is
 refused and shown again saying why, as it isn't clear which number is
 right. The page itself never sends one. The ledger refuses a repeat too
 (movement_item_once), but the page checks first, to say which fields.
+Something else here naming an item the place picked for it lists already,
+which a store's form offers, is refused too, saying it is listed there and
+to type it on its line (Ali, 2026-11-21, inventory-tng-fh0e): on a count of
+one place only a hand-made form sends that, and it is said the same way.
 
 A place's count can show only some items: one (`?item=`, as the pages of
 what needs an administrator's action take it), those whose names match a
@@ -72,12 +76,14 @@ from inventory_tng.stock.balance import countable, takeable
 from inventory_tng.stock.counts import Counted, NotCountable, record_adjustment
 from inventory_tng.stock.forms import (
     CLOSED_MEANWHILE,
+    EXTRA_ITEM,
     EXTRA_PLACE,
     FOUND_PLACE,
     LOOSE_FIELD,
     OPENED,
     PICKED,
     SEALED,
+    Listed,
     adjustment,
     field_at,
     item_counts,
@@ -137,6 +143,22 @@ def retired_meanwhile(place: str) -> str:
         "longer on this form. What you typed is kept: check it and save again.",
         place=place,
     )
+
+
+def already_listed(item: str, place: str) -> str:
+    """A count refused as something else here names an item the place
+    picked for it lists (forms.Listed): what was typed is kept."""
+    return gettext(
+        "%(item)s is already listed under %(place)s. Type what you found on "
+        "its line there. Nothing was saved, and what you typed is kept.",
+        item=item,
+        place=place,
+    )
+
+
+def listed_under(place: str) -> str:
+    """Beside something else here's item, listed at the place picked."""
+    return gettext("Listed under %(place)s already.", place=place)
 
 
 def count_title(place: str) -> str:
@@ -369,8 +391,13 @@ class Group(NamedTuple):
 
     @property
     def label(self) -> str:
-        """Its path, or for the page's own place its name."""
-        return PATH_BETWEEN.join(self.path) if self.path else self.place.name
+        return label(self.place, self.path)
+
+
+def label(place: Location, path: tuple[str, ...]) -> str:
+    """How a count form names a place it shows: its path, or for the page's
+    own place its name."""
+    return PATH_BETWEEN.join(path) if path else place.name
 
 
 def _shown_places(
@@ -388,6 +415,18 @@ def _shown_places(
     for place in by_name(session, Location, Location.id.in_(gone)):
         shown.append((place, (place.name,)))
     return shown
+
+
+def _listed_words(
+    session: Session, root: Location, listed: Listed
+) -> tuple[Words, dict[str, Words]]:
+    """What a count form says of something else here naming an item the
+    place picked for it lists (forms.Listed): above the form, and beside
+    the item picked."""
+    item = session.get_one(Item, listed.item_id)
+    ((place, path),) = _shown_places(session, root, [listed.place_id])
+    where = label(place, path)
+    return already_listed(item.name_shown, where), {EXTRA_ITEM: listed_under(where)}
 
 
 def _count_page(
@@ -732,7 +771,19 @@ def count(
             location_id=place.id,
             item_ids=sorted({item_id for item_id in sent.twice.values() if item_id}),
         )
-    if sent.problems:
+    problems: dict[str, Words] = dict(sent.problems)
+    alert = TWICE if sent.twice else problems.get(CLOSED_MEANWHILE)
+    if sent.listed is not None:
+        log.info(
+            "count refused: something else here listed there",
+            location_id=place.id,
+            found_location_id=sent.listed.place_id,
+            item_id=sent.listed.item_id,
+        )
+        listed_alert, beside = _listed_words(session, place, sent.listed)
+        problems |= beside
+        alert = alert or listed_alert
+    if problems:
         # What was typed is as of when the form was shown, of the places it
         # showed; a recount asks again for its own items only.
         return _count_page(
@@ -742,9 +793,9 @@ def count(
             place,
             at,
             places=place_ids,
-            problems=sent.problems,
+            problems=problems,
             values=form,
-            alert=TWICE if sent.twice else sent.problems.get(CLOSED_MEANWHILE),
+            alert=alert,
             items=asked,
             shown=shown,
         )
@@ -830,7 +881,7 @@ def count(
                 status_code=409,
             )
         # Checked again, the units as they are now mark the lines it broke.
-        problems: dict[str, Words] = {}
+        problems = {}
         for place_id, each in sent.places.items():
             _, wrong = item_counts(session, each.found)
             problems |= {

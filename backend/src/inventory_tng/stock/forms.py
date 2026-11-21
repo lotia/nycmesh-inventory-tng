@@ -39,11 +39,14 @@ from inventory_tng.web.forms import (
 # The count form's fields of items: counted, by item, and one chosen at
 # the foot.
 COUNTED = "counted_"
-EXTRA = "extra_quantity"
+EXTRA, EXTRA_ITEM = "extra_quantity", "extra_item_id"
 # An open package closed while it was counted: a ledger rule a race can
 # break past the page's checks, said above the form as rules are.
 CLOSED_MEANWHILE = "movement_open_package_closed"
 ON_THE_FORM_TWICE = lazy_gettext("This item is on the form more than once.")
+# Something else here naming an item the place picked for it lists: said on
+# that item's line there (Ali, 2026-11-21, inventory-tng-fh0e).
+TYPE_IT_HERE = lazy_gettext("Type everything you found here.")
 NO_SUCH_PACKAGE = lazy_gettext("No such package.")
 NO_SUCH_ITEM = lazy_gettext("No such item.")
 NO_SUCH_OPEN_PACKAGE = lazy_gettext("No such open package here.")
@@ -87,10 +90,25 @@ def lines(form: Mapping[str, str]) -> list[Line]:
         for field, typed in form.items()
         if field.startswith(COUNTED)
     ]
-    extra, typed = form.get("extra_item_id", ""), form.get(EXTRA, "")
+    extra, typed = form.get(EXTRA_ITEM, ""), form.get(EXTRA, "")
     if extra and typed.strip():
         found.append((EXTRA, _item_id(extra), typed))
     return found
+
+
+def listed_line(fields: Mapping[str, str], item_id: int) -> str | None:
+    """A place's field for an item it lists: counted by its total, or, by
+    form, its loose units, which such an item always has."""
+    for field in fields:
+        if field.startswith(COUNTED):
+            named = _item_id(field.removeprefix(COUNTED))
+        elif field.startswith(LOOSE_FIELD):
+            named = row_id(field.removeprefix(LOOSE_FIELD))
+        else:
+            continue
+        if named == item_id:
+            return field
+    return None
 
 
 def named_twice(found: Sequence[Line]) -> dict[str, int | None]:
@@ -203,7 +221,7 @@ AT, PLACES, ITEMS = "at_", "places", "items"
 # for the whole form, each with the place it was found in beside it.
 EXTRA_PLACE, FOUND_PLACE = "extra_location_id", "found_location_id"
 PICKED = {
-    EXTRA_PLACE: ("extra_item_id", EXTRA),
+    EXTRA_PLACE: (EXTRA_ITEM, EXTRA),
     FOUND_PLACE: (FOUND_PACKAGE, FOUND_LEFT),
 }
 # Fields said once, wherever their place: never prefixed.
@@ -287,26 +305,52 @@ class PlaceCount(NamedTuple):
         return typed
 
 
+class Listed(NamedTuple):
+    """Something else here naming an item the place picked for it lists
+    already: the item, one there is, and the place, by id."""
+
+    item_id: int
+    place_id: int
+
+
 class CountForm(NamedTuple):
     """A count form read: each place's count, by id; what is wrong, by the
-    form's own field names; and the fields naming an item twice there, by
-    those names too, and that item."""
+    form's own field names; the fields naming an item twice there, by those
+    names too, and that item; and something else here naming an item its
+    place lists, if it does."""
 
     places: dict[int, PlaceCount]
     problems: dict[str, Words]
     twice: dict[str, int | None]
+    listed: Listed | None
 
 
 def read_count(
     session: Session, form: Mapping[str, str], root_id: int, place_ids: list[int]
 ) -> CountForm:
     """A count form, of the places `place_ids` (places_listed), read place
-    by place (by_place) and checked."""
+    by place (by_place) and checked. Something else here naming an item its
+    place lists is not that item twice but typed on the wrong line: its
+    line there is marked (TYPE_IT_HERE), and the page says the rest."""
     split, problems = by_place(form, root_id, place_ids)
     places: dict[int, PlaceCount] = {}
     twice: dict[str, int | None] = {}
+    listed: Listed | None = None
     for place_id, fields in split.items():
         found = lines(fields)
+        extra = next((item_id for field, item_id, _ in found if field == EXTRA), None)
+        line = listed_line(fields, extra) if extra is not None else None
+        if (
+            extra is not None
+            and line is not None
+            and session.get(Item, extra) is not None
+        ):
+            listed = Listed(extra, place_id)
+            problems[field_at(root_id, place_id, line)] = TYPE_IT_HERE
+            # Not counted twice, then, unless another line names it too.
+            found_once = [each for each in found if each[0] != EXTRA]
+        else:
+            found_once = found
         counted, wrong = item_counts(session, found)
         forms, form_wrong = by_form(session, fields, place_id)
         items = {
@@ -317,7 +361,7 @@ def read_count(
         places[place_id] = PlaceCount(found, counted, forms, items)
         named = {
             field_at(root_id, place_id, field): item_id
-            for field, item_id in named_twice(found).items()
+            for field, item_id in named_twice(found_once).items()
         }
         twice |= named
         problems |= {
@@ -325,7 +369,7 @@ def read_count(
             for field, words in (wrong | form_wrong).items()
         }
         problems |= dict.fromkeys(named, ON_THE_FORM_TWICE)
-    return CountForm(places, problems, twice)
+    return CountForm(places, problems, twice, listed)
 
 
 def item_counts(
