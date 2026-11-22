@@ -22,13 +22,11 @@ PICK_A_ZONE = lazy_gettext("Pick a zone from the list.")
 # that a change broke (db_errors.RuleBroken's), in words. A page passes its own
 # words for "unique", which depend on what it is naming.
 RULES = {
-    "location_area_parent": lazy_gettext(
-        "An area goes inside a store or another area."
-    ),
-    "location_no_cycle": lazy_gettext("That would put it inside itself."),
+    "location_area_parent": lazy_gettext("An area is part of a store or another area."),
+    "location_no_cycle": lazy_gettext("That would make it part of itself."),
     "location_parent_current": lazy_gettext(
         "Its place is retired, or places are still "
-        "inside it: bring that back, or move those, first."
+        "part of it: bring that back, or move those, first."
     ),
     "location_custody_volunteer": lazy_gettext("Stop them holding stock first."),
     "location_holds_stock": lazy_gettext(

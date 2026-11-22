@@ -938,7 +938,7 @@ msgid ""
 msgstr ""
 
 #: src/inventory_tng/web/forms.py
-msgid "An area goes inside a store or another area."
+msgid "An area is part of a store or another area."
 msgstr ""
 
 #: src/inventory_tng/admins/mail_messages.py
@@ -1954,8 +1954,8 @@ msgstr ""
 
 #: src/inventory_tng/web/forms.py
 msgid ""
-"Its place is retired, or places are still inside it: bring that back, or "
-"move those, first."
+"Its place is retired, or places are still part of it: bring that back, or"
+" move those, first."
 msgstr ""
 
 #: src/inventory_tng/web/forms.py
@@ -3926,7 +3926,7 @@ msgid ""
 msgstr ""
 
 #: src/inventory_tng/web/forms.py
-msgid "That would put it inside itself."
+msgid "That would make it part of itself."
 msgstr ""
 
 #: src/inventory_tng/templates/admins/_totp_fields.html

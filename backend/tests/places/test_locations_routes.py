@@ -79,7 +79,7 @@ def test_a_place_needs_a_kind_and_an_area_keeps_a_place(
     assert str(PICK_WHERE) in text(refused)
 
 
-def test_an_area_goes_inside_a_store_or_area_not_a_vehicle(
+def test_an_area_is_part_of_a_store_or_area_not_a_vehicle(
     admin_client: TestClient, session: Session
 ) -> None:
     van = place(session, "Van", "vehicle")
@@ -87,7 +87,7 @@ def test_an_area_goes_inside_a_store_or_area_not_a_vehicle(
         LOCATIONS, data={"name": "Glovebox", "kind": "area", "parent_id": str(van.id)}
     )
     assert refused.status_code == 400
-    assert str(RULES["location_area_parent"]) in text(refused)
+    assert "An area is part of a store or another area." in text(refused)
 
 
 def test_names_are_unique_beside_each_other_only(
@@ -106,7 +106,7 @@ def test_names_are_unique_beside_each_other_only(
     assert elsewhere.status_code == 303
 
 
-def test_moving_an_area_but_never_inside_itself(
+def test_moving_an_area_but_never_into_part_of_itself(
     admin_client: TestClient, session: Session
 ) -> None:
     hub = place(session, "Hub", "store")
@@ -126,7 +126,7 @@ def test_moving_an_area_but_never_inside_itself(
     form = {"name": "Shelf", "parent_id": str(bin_.id), "version": shown(shelf)}
     loop = admin_client.post(path, data=form)
     assert loop.status_code == 400
-    assert "inside itself" in text(loop)
+    assert "That would make it part of itself." in text(loop)
     assert shelf.parent_id == depot.id
 
 
@@ -137,7 +137,7 @@ def test_retiring_needs_its_areas_gone_first(
     shelf = place(session, "Shelf", "area", hub)
     refused = admin_client.post(f"{LOCATIONS}/{hub.id}/retire")
     assert refused.status_code == 400
-    assert "places are still inside it" in text(refused)
+    assert "places are still part of it:" in text(refused)
     admin_client.post(f"{LOCATIONS}/{shelf.id}/retire")
     assert admin_client.post(f"{LOCATIONS}/{hub.id}/retire").status_code == 303
     # Bringing the area back first is refused: its store is retired.
