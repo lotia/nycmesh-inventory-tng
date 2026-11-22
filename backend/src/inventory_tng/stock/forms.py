@@ -369,15 +369,10 @@ def recount_figures(
     each read as a quantity typed is; those of other items, or not three
     such, left out."""
     figures: dict[int, Figures] = {}
-    for field, value in fields.items():
-        if not field.startswith(WHILE):
-            continue
-        item_id = row_id(field.removeprefix(WHILE))
-        read = [quantity(typed, positive=False) for typed in value.split()]
-        match read:
-            case [Decimal() as typed, Decimal() as came, Decimal() as went] if (
-                item_id is not None and item_id in items
-            ):
+    for item_id in items:
+        value = fields.get(f"{WHILE}{item_id}", "")
+        match [quantity(typed, positive=False) for typed in value.split()]:
+            case [Decimal() as typed, Decimal() as came, Decimal() as went]:
                 figures[item_id] = (typed, came, went)
     return figures
 

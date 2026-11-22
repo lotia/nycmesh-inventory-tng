@@ -10,7 +10,7 @@ from inventory_tng.core.phrases import Words, gettext, lazy_gettext
 from inventory_tng.models.catalogue import Item, ItemPackage
 from inventory_tng.models.places import Location
 from inventory_tng.models.stock import OpenPackage
-from inventory_tng.stock.forms import LOOSE_FIELD, OPENED, SEALED
+from inventory_tng.stock.forms import LOOSE_FIELD, OPENED, SEALED, Figures
 from inventory_tng.stock.ledger import Form
 
 # Between the names of an area's path on a count form.
@@ -100,7 +100,7 @@ class Group(NamedTuple):
     rows: list[tuple[Item, Decimal]]
     forms: dict[int, list[FormRow]]
     items: list[int]
-    recount: Mapping[int, tuple[Decimal, Decimal, Decimal]] | None
+    recount: Mapping[int, Figures] | None
 
     @property
     def label(self) -> str:

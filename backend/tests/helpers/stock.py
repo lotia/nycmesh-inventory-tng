@@ -322,8 +322,7 @@ def count_form(page: Response) -> dict[str, str]:
         for name, value in hidden_fields(page.text)
         if name in {"key", "as_of", "seen", "places", "gone", "gone_since"}
         or name.endswith("items")
-        or name.startswith("while_")
-        or "_while_" in name
+        or "while_" in name
     }
 
 
