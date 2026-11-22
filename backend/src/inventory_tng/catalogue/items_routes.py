@@ -42,10 +42,10 @@ from inventory_tng.stock.open_packages_listing import (
 )
 from inventory_tng.stock.queries import item_total
 from inventory_tng.web.admin_pages import (
+    TextForm,
     admin_page,
     now,
     retirement,
-    text_form,
     undo_retire,
 )
 from inventory_tng.web.forms import ALERTS, RETIRED, RULES, form_version
@@ -178,9 +178,6 @@ add_notices(
 
 # What "Same as the item", "Track" and "Don't track" send for a package.
 TRACKING = {"": None, "on": True, "off": False}
-
-
-TextForm = Annotated[dict[str, str], Depends(text_form)]
 
 
 def _listed(

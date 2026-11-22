@@ -11,7 +11,7 @@ from dataclasses import dataclass
 from typing import Annotated
 
 import structlog
-from fastapi import APIRouter, Depends, Form, Request
+from fastapi import APIRouter, Form, Request
 from fastapi.responses import HTMLResponse, Response
 from sqlalchemy.orm import Session
 
@@ -32,7 +32,7 @@ from inventory_tng.core.local_time import site_zone
 from inventory_tng.core.phrases import Words, gettext, lazy_gettext
 from inventory_tng.models.base import INTEGER_MAX, whole
 from inventory_tng.models.catalogue import ReadingRule, reading_rules_held
-from inventory_tng.web.admin_pages import admin_page, text_form
+from inventory_tng.web.admin_pages import TextForm, admin_page
 from inventory_tng.web.forms import ALERTS, RULES, form_version
 from inventory_tng.web.listing import (
     AskedView,
@@ -333,7 +333,7 @@ def accept(
     request: Request,
     signed: AdminSignedIn,
     session: DbSession,
-    form: Annotated[dict[str, str], Depends(text_form)],
+    form: TextForm,
 ) -> Response:
     """The readings sent, each kept as a rule: refused, saying so, while any
     is not chosen, or if names would then read alike. One settled since is

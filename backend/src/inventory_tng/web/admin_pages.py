@@ -15,10 +15,10 @@ refused form still links where it should.
 
 from collections.abc import Mapping
 from datetime import UTC, datetime
-from typing import Any, cast
+from typing import Annotated, Any, cast
 from urllib.parse import urlencode
 
-from fastapi import Request
+from fastapi import Depends, Request
 from fastapi.responses import HTMLResponse
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -90,6 +90,10 @@ async def text_form(request: Request) -> dict[str, str]:
     """A form's fields, for a route that takes more than it names, as a
     dependency, so the route itself runs in the threadpool."""
     return {k: v for k, v in (await request.form()).items() if isinstance(v, str)}
+
+
+# A route's parameter of a form's fields (text_form).
+TextForm = Annotated[dict[str, str], Depends(text_form)]
 
 
 def undo_retire[T: Base](

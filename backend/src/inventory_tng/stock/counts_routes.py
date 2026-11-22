@@ -39,7 +39,7 @@ from inventory_tng.stock.balance import countable
 from inventory_tng.stock.counts import record_adjustment
 from inventory_tng.stock.forms import adjustment
 from inventory_tng.stock.paths import ADJUSTMENTS, COUNTS
-from inventory_tng.web.admin_pages import admin_page, current_rows, text_form
+from inventory_tng.web.admin_pages import TextForm, admin_page, current_rows
 from inventory_tng.web.forms import RULES
 from inventory_tng.web.listing import UNASKED, AskedView, Sort, Sorting, View, order
 from inventory_tng.web.pages import add_notices, redirect
@@ -55,8 +55,6 @@ COUNTABLE = "location_countable"
 COUNTS_TITLE = lazy_gettext("Counts and adjustments")
 ADJUSTED = lazy_gettext("Recorded.")
 add_notices({"adjusted": ADJUSTED})
-
-TextForm = Annotated[dict[str, str], Depends(text_form)]
 
 
 def _places(session: Session) -> list[Location]:

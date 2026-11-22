@@ -147,7 +147,7 @@ def forms_by_place(
     every = sorted(set().union(*item_ids.values())) if item_ids else []
     found = expected_forms_at(session, item_ids.keys(), as_of, every)
     if packages is None:
-        packages = packages_by_id(session, every)
+        packages = queries.packages_by_id(session, every)
     opened = {row.id: row for row in queries.open_at(session, item_ids.keys(), every)}
     return {
         place_id: _place_forms(
@@ -201,15 +201,6 @@ def _place_forms(
         if not any(row.field.startswith(LOOSE_FIELD) for row in each):
             each.append(form_row(item_id, LOOSE, Decimal(0), packages, opened))
     return rows
-
-
-def packages_by_id(
-    session: Session, item_ids: Collection[int]
-) -> dict[int, ItemPackage]:
-    """Every package of the items of `item_ids`, by id."""
-    return {
-        package.id: package for package in queries.packages_of_items(session, item_ids)
-    }
 
 
 def line_of(session: Session, as_of: int, listed: Listed) -> str:

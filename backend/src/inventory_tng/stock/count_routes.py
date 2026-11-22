@@ -127,7 +127,6 @@ from inventory_tng.stock.count_groups import (
     forms_by_place,
     label,
     line_of,
-    packages_by_id,
 )
 from inventory_tng.stock.counts import NotCountable
 from inventory_tng.stock.ledger import by_item, tracks_opened
@@ -141,7 +140,7 @@ from inventory_tng.stock.moved_out import Leaving, MovedOut, areas_leaving
 from inventory_tng.stock.needs_action import OnlyItem
 from inventory_tng.stock.paths import COUNTS
 from inventory_tng.stock.store_counts import StoreCounted, record_store_count
-from inventory_tng.web.admin_pages import admin_page, now, text_form
+from inventory_tng.web.admin_pages import TextForm, admin_page, now
 from inventory_tng.web.forms import CHANGED, RULES, row_id
 from inventory_tng.web.navigation import SECTION_COUNTS
 from inventory_tng.web.pages import add_notices, not_found, redirect
@@ -266,8 +265,6 @@ add_notices(
         "count_saved_already": SAVED_ALREADY,
     }
 )
-
-TextForm = Annotated[dict[str, str], Depends(text_form)]
 
 
 class Shown(NamedTuple):
@@ -556,7 +553,9 @@ def _place_lines(
         for each, here in was.items()
     }
     on_lines = {each: [item.id for item, _ in found] for each, found in rows.items()}
-    packages = packages_by_id(session, set().union(*on_lines.values(), moved_ids))
+    packages = queries.packages_by_id(
+        session, set().union(*on_lines.values(), moved_ids)
+    )
     forms = forms_by_place(session, as_of, on_lines, openings, aside, packages)
     groups = [
         Group(
@@ -765,7 +764,9 @@ def count(
             # again, saying what left them since it was first shown; a
             # recount asks no more there, but where it went (_asked_after)
             # (Ali, 2026-11-22, inventory-tng-ygk5).
-            fresh, gone = _gone_now(session, place.id, place_ids, retired, gone, at)
+            fresh, gone = _gone_now(
+                session, place.id, place_ids, retired, gone, at.as_of
+            )
             log.info(
                 "count refused: areas gone from the form",
                 location_id=place.id,
@@ -887,16 +888,16 @@ def _gone_now(
     place_ids: Collection[int],
     retired: int,
     gone: Gone,
-    at: Moment,
+    as_of: int,
 ) -> tuple[set[int], Gone]:
     """The areas of `place_ids` that may no longer be counted, of a count
-    form of `root_id` sent as of `at` that `retired` refused; and the areas
+    form of `root_id` sent as of moment `as_of` that `retired` refused; and the areas
     gone from it, with them. The one refused, if brought back since the
     refusal, is said gone all the same, as the save was refused for it."""
     fresh = queries.not_countable(session, place_ids) - {root_id} or {retired}
     return fresh, Gone(
         tuple(sorted({*gone.ids, *fresh})),
-        gone.since if gone.ids else at.as_of,
+        gone.since if gone.ids else as_of,
     )
 
 

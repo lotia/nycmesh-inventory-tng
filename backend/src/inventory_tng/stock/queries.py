@@ -244,13 +244,16 @@ def not_countable(session: Session, ids: Collection[int]) -> set[int]:
     )
 
 
-def packages_of_items(
+def packages_by_id(
     session: Session, item_ids: Collection[int]
-) -> Sequence[ItemPackage]:
-    """Every package of the items of `item_ids`."""
-    return session.scalars(
-        select(ItemPackage).where(ItemPackage.item_id.in_(item_ids))
-    ).all()
+) -> dict[int, ItemPackage]:
+    """Every package of the items of `item_ids`, by id."""
+    return {
+        package.id: package
+        for package in session.scalars(
+            select(ItemPackage).where(ItemPackage.item_id.in_(item_ids))
+        )
+    }
 
 
 def open_at(
