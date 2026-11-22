@@ -529,8 +529,10 @@ def _count_page(
     (count_arrivals.set_aside); `leaving`, those areas as read already, if
     they were; `more_alerts`, under `alert`; `caution`, words above the
     form, said as a warning is."""
+    # Only places with figures: a form with none has no While you counted.
+    recount = {place_id: each for place_id, each in (recount or {}).items() if each}
     asked: dict[int, set[int]] = {}
-    for place_id, each in [*(items or {}).items(), *(recount or {}).items()]:
+    for place_id, each in [*(items or {}).items(), *recount.items()]:
         if each:
             asked.setdefault(place_id, set()).update(each)
     ids = shown.ids(session)
@@ -622,7 +624,7 @@ def _count_page(
             rows[each.id],
             forms.get(each.id, {}),
             sorted(asked.get(each.id, ())),
-            (recount or {}).get(each.id),
+            recount.get(each.id),
         )
         for each, path in groups_shown
     ]

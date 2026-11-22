@@ -768,6 +768,8 @@ def test_a_count_shown_again_for_a_problem_keeps_its_moment(
     )
     assert refused.status_code == 400
     assert count_form(refused)["as_of"] == shown["as_of"]
+    # No recount: no While you counted column (inventory-tng-up4h).
+    assert "While you counted" not in refused.text
     # Every radio has gone since, but the radios' line is still there.
     assert counted_box(refused.text, place.item.id) == "5"
 
