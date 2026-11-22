@@ -5,11 +5,13 @@ saying where its items went, with a way to bring it back."""
 
 from decimal import Decimal
 
+import pytest
 from fastapi.testclient import TestClient
 from httpx2 import Response
 from sqlalchemy.orm import Session
 
 from inventory_tng.models.places import Location
+from inventory_tng.stock import queries
 from inventory_tng.stock.counts_routes import PATH_BETWEEN
 from inventory_tng.stock.moments import expected
 
@@ -394,3 +396,59 @@ def test_a_recount_at_an_area_emptied_since_lists_what_left_it(
     assert emptied_words(gone.name) in text(refused)
     assert count_form(refused)["places"] == str(made.shelf.id)
     assert heading(refused, f"Taken out of {made.store.name}")
+
+
+def test_an_item_moved_from_two_areas_to_one_place_has_one_box(
+    admin_client: TestClient, session: Session
+) -> None:
+    """Radios moved to Shelf B from Shelf C and from Shelf D, both retired:
+    under the first move only, so its box is on the form once."""
+    setup = Emptied(session, admin_client)
+    made, gone = setup.made, setup.gone
+    other = add(session, area("Shelf D", made.store))
+    retire(session, other)
+    setup.send(session, made.store, other, "1")
+    shown = count_form(admin_client.get(made.path))
+    setup.send(session, gone, made.empty, "2")
+    setup.send(session, other, made.empty, "1")
+    refused = admin_client.post(made.path, data=shown)
+    assert refused.status_code == 409
+    assert cells_by(refused, setup.counted(made.empty))[1] == "3 each"
+    assert heading(refused, f"Moved from {gone.name} to {made.empty.name}")
+    assert f"Moved from {other.name}" not in text(refused)
+
+
+def test_bring_it_back_of_a_place_not_in_the_store_is_not_found(
+    admin_client: TestClient, session: Session
+) -> None:
+    """A hand-made form naming as gone the store itself, or a retired area
+    of another store: nothing is brought back."""
+    setup = Emptied(session, admin_client)
+    made = setup.made
+    elsewhere = add(session, area("Shelf Z", Store(session).store))
+    retire(session, elsewhere, made.store)
+    setup.send(session, setup.gone, made.empty, "2")
+    form = count_form(admin_client.post(made.path, data=setup.shown))
+    for place in (elsewhere, made.store):
+        sent = form | {"gone": f"{setup.gone.id} {place.id}", "area_id": str(place.id)}
+        assert admin_client.post(f"{made.path}/bring-back", data=sent).status_code == (
+            404
+        )
+        session.refresh(place)
+        assert place.retired_at is not None
+
+
+def test_an_area_brought_back_since_the_refusal_is_still_said_gone(
+    admin_client: TestClient, session: Session, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Shelf C brought back between the refusal and the form shown again
+    (none found that may not be counted): still named, as the save was
+    refused for it."""
+    setup = Emptied(session, admin_client)
+    made, gone = setup.made, setup.gone
+    setup.send(session, gone, made.empty, "2")
+    monkeypatch.setattr(queries, "not_countable", lambda *_: set())
+    refused = admin_client.post(made.path, data=setup.shown)
+    assert refused.status_code == 409
+    assert emptied_words(gone.name) in text(refused)
+    assert count_form(refused)["gone"] == str(gone.id)

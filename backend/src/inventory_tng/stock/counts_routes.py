@@ -81,6 +81,7 @@ from sqlalchemy.orm import Session
 
 from inventory_tng.admins.guards import AdminSignedIn, SignedIn
 from inventory_tng.catalogue.items_listing import SEARCHED
+from inventory_tng.core.db_errors import Gone as RowGone
 from inventory_tng.core.db_errors import attempt, refusal
 from inventory_tng.core.db_sessions import DbSession, SnapshotSession, by_name
 from inventory_tng.core.phrases import (
@@ -644,14 +645,19 @@ def _moves(
         key=lambda pair: tuple(leaving.order.get(each, 0) for each in pair[0]),
     ):
         group = by_id[to_id]
+        # An item that went there from two areas gone: under the first only,
+        # so its box is on the form once.
+        new = items - moved_to.get(to_id, set())
+        if not new:
+            continue
         held = {item.id: n for item, n in group.rows}
         rows = sorted(
-            ((named[item_id], held.get(item_id, Decimal(0))) for item_id in items),
+            ((named[item_id], held.get(item_id, Decimal(0))) for item_id in new),
             key=lambda row: row[0].name.lower(),
         )
         heading = moved_from(leaving.labels[from_id], group.label)
         sections.append((heading, group._replace(rows=rows)))
-        moved_to.setdefault(to_id, set()).update(items)
+        moved_to.setdefault(to_id, set()).update(new)
     shown = [
         group._replace(
             rows=[
@@ -1195,7 +1201,9 @@ def count(
             # without them, keeping what was typed, to check and send
             # again, saying what left them since it was first shown; a
             # recount asks no more there (Ali, 2026-11-22, inventory-tng-ygk5).
-            fresh = queries.not_countable(session, place_ids) - {place.id}
+            # The one refused, if brought back since the refusal: said gone
+            # all the same, as the save was refused for it.
+            fresh = queries.not_countable(session, place_ids) - {place.id} or {retired}
             gone = Gone(
                 tuple(sorted({*gone.ids, *fresh})),
                 gone.since if gone.ids else at.as_of,
@@ -1298,6 +1306,11 @@ def bring_back(
     if carried is None or area_id not in carried.gone.ids:
         return not_found()
     place, _, at, place_ids, gone = carried
+    leaving = _leaving(session, place, gone)
+    if area_id == place.id or area_id not in leaving.order:
+        # Not one of the place's areas, as only a hand-made form names: none
+        # this form may bring back.
+        return not_found()
     asked = {
         place_id: each.items
         for place_id, each in read_count(
@@ -1316,26 +1329,33 @@ def bring_back(
         gone=gone,
     )
     area = session.get_one(Location, area_id)
-    if area.retired_at is not None:
-        _, broken = attempt(session, lambda: locations.restore(session, area))
-        if broken is not None:
-            log.info(
-                "count area not brought back",
-                location_id=place.id,
-                area_id=area.id,
-                rule=broken,
-            )
-            return again(at, places=place_ids, alert=RULES[broken], status_code=409)
-        session.commit()
+
+    def restore() -> bool:
+        try:
+            locations.restore(session, area)
+        except RowGone:  # Current already, as after a second press.
+            return False
+        return True
+
+    brought, broken = attempt(session, restore)
+    if broken is not None:
+        log.info(
+            "count area not brought back",
+            location_id=place.id,
+            area_id=area.id,
+            rule=broken,
+        )
+        return again(at, places=place_ids, alert=RULES[broken], status_code=409)
+    session.commit()
+    if brought:
         areas_brought_back.add(1)
         log.info("count area brought back", location_id=place.id, area_id=area.id)
     # Shown with it, as of the same moment: what it saw there counted too.
     listed = [*place_ids, area.id]
-    label_of = _leaving(session, place, gone).labels[area.id]
     return again(
         Moment(at.as_of, seen_up_to(session, listed, at.as_of)),
         places=listed,
-        caution=brought_back(label_of),
+        caution=brought_back(leaving.labels[area.id]),
     )
 
 
