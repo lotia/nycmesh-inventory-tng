@@ -27,6 +27,7 @@ from inventory_tng.stock.adjustment_reasons import LOST, USED_UP
 from inventory_tng.stock.counts import ItemLines
 from inventory_tng.stock.ledger import LOOSE, Form, repeated
 from inventory_tng.stock.moments import expected_at
+from inventory_tng.stock.over_recorded import openings_waiting_at
 from inventory_tng.web.forms import (
     QUANTITY_MAX,
     RULES,
@@ -371,9 +372,7 @@ def read_count(
                 # Not counted twice, then, unless another line names it too.
                 found_once = [each for each in found if each[0] != EXTRA]
             elif (
-                items
-                and extra not in items
-                and expected_at(session, [place_id], as_of, [extra])
+                items and extra not in items and _held(session, place_id, as_of, extra)
             ):
                 listed = Listed(extra, place_id, on_form=False)
                 items.add(extra)
@@ -385,6 +384,16 @@ def read_count(
         problems |= fields_at(root_id, place_id, wrong | form_wrong)
         problems |= dict.fromkeys(named, ON_THE_FORM_TWICE)
     return CountForm(places, problems, twice, listed)
+
+
+def _held(session: Session, place_id: int, as_of: int, item_id: int) -> bool:
+    """Whether a full count of the place, as of moment `as_of`, asks for the
+    item: the records hold some there, or an opening of it waits there
+    (over_recorded.openings_waiting_at), asked for by form though they hold
+    none."""
+    return bool(expected_at(session, [place_id], as_of, [item_id])) or (
+        item_id in openings_waiting_at(session, [place_id], as_of).get(place_id, {})
+    )
 
 
 def item_counts(

@@ -42,7 +42,7 @@ from inventory_tng.stock.forms import (
     lines,
     named_twice,
 )
-from inventory_tng.stock.ledger import lock_place
+from inventory_tng.stock.ledger import LOOSE, Entry, lock_place
 from inventory_tng.stock.moments import Moment, expected, moment
 from inventory_tng.stock.paths import ADJUSTMENTS, COUNTS, STOCK
 from inventory_tng.web.forms import ABOVE_ZERO, RULES, TYPE_A_NUMBER, WHOLE_UNITS
@@ -62,6 +62,7 @@ from helpers.markup import (
     text,
     words_on,
 )
+from helpers.over_recorded import opening_raised
 from helpers.query_counts import counting
 from helpers.rows import item_fields, shown, violates
 from helpers.sign_in import new_admin, sign_in_with
@@ -626,6 +627,35 @@ def test_something_else_here_held_by_form_but_not_recounted_marks_its_loose_line
     page = read(refused.text)
     assert page.one("span", id=f"loose_{cable}-problem").text == str(TYPE_IT_HERE)
     assert page.all("input", name=f"sealed_{cable}_{spools.spool.id}")
+    assert counts_written(session) == []
+
+
+def test_something_else_here_with_an_opening_waiting_but_not_recounted_is_refused(
+    admin_client: TestClient, registered_client: TestClient, session: Session
+) -> None:
+    """An opening waits in the store, all its cable moved out since: the
+    records hold none there, but a full count asks for it by form, so the
+    recount refuses it too, its loose line marked (inventory-tng-oazl)."""
+    spools = Spools(session, tracked=False)
+    opening_raised(registered_client, spools)
+    spools.move(
+        Entry(spools.cable.id, Decimal(305), spools.sealed, spools.sealed),
+        Entry(spools.cable.id, Decimal(305), LOOSE, LOOSE),
+    )
+    radio, cable = spools.place.item.id, spools.cable.id
+    path = f"{COUNTS}/{spools.store.id}"
+    shown = count_form(admin_client.get(path))
+    assert cable not in expected(session, spools.store.id)
+    form = shown | {
+        "items": str(radio),
+        f"counted_{radio}": "5",
+        "extra_item_id": str(cable),
+        "extra_quantity": "3",
+    }
+    refused = admin_client.post(path, data=form)
+    assert refused.status_code == 400
+    page = read(refused.text)
+    assert page.one("span", id=f"loose_{cable}-problem").text == str(TYPE_IT_HERE)
     assert counts_written(session) == []
 
 
