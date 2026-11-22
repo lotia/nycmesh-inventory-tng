@@ -3946,6 +3946,12 @@ msgstr ""
 msgid "This changes something that matters, so it needs a fresh password."
 msgstr ""
 
+#: src/inventory_tng/stock/counts_routes.py
+msgid ""
+"This count was saved already, so what you changed wasn't saved. To record"
+" it, start a new count."
+msgstr ""
+
 #: src/inventory_tng/stock/forms.py
 msgid "This form is out of date: try again."
 msgstr ""

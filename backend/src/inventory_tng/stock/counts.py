@@ -115,6 +115,8 @@ class Counted(NamedTuple):
     # total (no form), and each form of one counted by form. Nothing if an
     # earlier send of it did.
     put_right: list[tuple[int, Form | None]]
+    # Sent before under its key, so written once, then.
+    sent_before: bool
 
 
 def _recorded(admin_id: int, transaction: Written) -> None:
@@ -310,7 +312,7 @@ def record_count(
         # Withheld by no earlier send of it.
         if moved:
             once_committed(session, _withheld, admin_id, location_id, len(moved))
-    return Counted(bool(into or out), moved, written, put_right)
+    return Counted(bool(into or out), moved, written, put_right, sent is not None)
 
 
 class OpenCounted(NamedTuple):

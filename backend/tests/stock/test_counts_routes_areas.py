@@ -8,10 +8,11 @@ from urllib.parse import urlencode
 
 import pytest
 from fastapi.testclient import TestClient
-from sqlalchemy import select
+from httpx2 import Response
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
-from inventory_tng.models.catalogue import Item
+from inventory_tng.models.catalogue import Item, ItemPackage
 from inventory_tng.models.places import Location
 from inventory_tng.models.stock import LedgerTransaction, OpenPackage
 from inventory_tng.stock.counts_routes import PATH_BETWEEN
@@ -761,3 +762,80 @@ def test_a_form_listing_a_place_that_is_no_id_is_not_found(
     made = Store(session)
     form = count_form(admin_client.get(made.path)) | {"places": f"{made.store.id} x"}
     assert admin_client.post(made.path, data=form).status_code == 404
+
+
+def found_on(place: Location, package: ItemPackage) -> dict[str, str]:
+    """A count form's open package nobody recorded, found at `place`."""
+    return {
+        "found_location_id": str(place.id),
+        "found_package_id": str(package.id),
+        "found_left": "40",
+    }
+
+
+class SentAgain:
+    """Spools in a store with a shelf in it, and a drum of cable besides:
+    the store's count form as shown, and how to send it."""
+
+    def __init__(self, client: TestClient, session: Session) -> None:
+        self.client, self.session = client, session
+        self.spools = Spools(session)
+        self.shelf = add(session, area("Shelf", self.spools.store))
+        self.drum = add(
+            session, ItemPackage(item_id=self.spools.cable.id, name="Drum", size=100)
+        )
+        self.path = f"{COUNTS}/{self.spools.store.id}"
+        self.shown = count_form(client.get(self.path))
+
+    def send(self, found: dict[str, str]) -> Response:
+        return self.client.post(self.path, data=self.shown | found)
+
+    def written(self) -> tuple[int | None, list[int]]:
+        """The ledger's latest transaction, and where the form's open
+        package nobody recorded was made, if it was."""
+        made = select(OpenPackage.location_id).where(
+            OpenPackage.key == uuid.uuid5(uuid.UUID(self.shown["key"]), "found")
+        )
+        latest = select(func.max(LedgerTransaction.id))
+        return self.session.scalar(latest), list(self.session.scalars(made))
+
+
+@pytest.mark.parametrize("change", ["elsewhere", "another package", "none before"])
+def test_a_count_saved_and_sent_again_finding_otherwise_writes_nothing_more(
+    admin_client: TestClient, session: Session, change: str
+) -> None:
+    """Sent again with the same key (browser Back after a save), with the
+    open package nobody recorded found at another place, another package
+    found, or one found where the first send found none: nothing more is
+    written, and Counts says the count was saved already (Ali, 2026-11-22,
+    inventory-tng-53im)."""
+    made = SentAgain(admin_client, session)
+    spool, store = made.spools.spool, made.spools.store
+    first, again = {
+        "elsewhere": (found_on(made.shelf, spool), found_on(store, spool)),
+        "another package": (found_on(store, spool), found_on(store, made.drum)),
+        "none before": ({}, found_on(made.shelf, spool)),
+    }[change]
+    assert made.send(first).status_code == 303
+    before = made.written()
+    sent = made.send(again)
+    assert sent.status_code == 303
+    assert sent.headers["location"].startswith(f"{COUNTS}?notice=count_saved_already")
+    said = read(admin_client.get(sent.headers["location"]).text)
+    assert said.one("p", role="status").text == (
+        "This count was saved already, so what you changed wasn't saved. To "
+        "record it, start a new count."
+    )
+    assert made.written() == before
+
+
+def test_a_count_saved_and_sent_again_unchanged_is_answered_as_before(
+    admin_client: TestClient, session: Session
+) -> None:
+    made = SentAgain(admin_client, session)
+    found = found_on(made.shelf, made.spools.spool)
+    saved = made.send(found)
+    before = made.written()
+    again = made.send(found)
+    assert again.headers["location"] == saved.headers["location"]
+    assert made.written() == before

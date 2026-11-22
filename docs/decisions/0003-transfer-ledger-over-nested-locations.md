@@ -184,7 +184,14 @@ counts only the places something was typed at; sent with nothing typed
 anywhere, nothing is recorded and the form is shown again, with the same
 items, saying "Nothing was typed, so nothing was counted." (Ali,
 2026-11-21, inventory-tng-fxsy). We rejected going back to Counts with no
-message, and recording an empty count at each place.
+message, and recording an empty count at each place. A form saved and
+sent again, such as by going back after the save, finding the open package
+nobody recorded at another place, another package, or one where the first
+send found none, writes nothing more and goes back to Counts saying "This
+count was saved already, so what you changed wasn't saved. To record it,
+start a new count." (Ali, 2026-11-22, inventory-tng-53im). We rejected a
+fresh form with a new key keeping what was typed, as anything the first
+save found would be found a second time.
 
 The form lists the places it shows, so an area moved meanwhile only
 regroups. Its moment is read across them all, and the count holds every

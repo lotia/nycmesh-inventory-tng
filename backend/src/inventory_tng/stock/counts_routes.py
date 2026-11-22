@@ -4,7 +4,10 @@ with (docs/decisions/0003). The writing is stock/store_counts.py's
 pages check what was typed and say what is wrong.
 
 Each form carries a key made when it was shown, so sending it twice writes
-it once. A count also carries the place's latest ledger entry as it was
+it once. Sent again finding the open package nobody recorded otherwise
+(another place or package, or one where the first send found none), it
+writes nothing more and goes back to Counts saying it was saved already
+(Ali, 2026-11-22, inventory-tng-53im). A count also carries the place's latest ledger entry as it was
 shown, and how many there it saw (moments.Moment): the count is true for
 that moment, so a save made at the place meanwhile still applies, and an
 item it moved comes back to count again. The moment is read without the
@@ -118,6 +121,10 @@ COUNTABLE = "location_countable"
 # form counted twice: said as rules are.
 UNTRACKED = "open_package_untracked"
 ONCE = "movement_item_once"
+# A form saved, sent again finding an open package nobody recorded
+# otherwise (store_counts._count_at): nothing more is written, and Counts
+# says so (Ali, 2026-11-22, inventory-tng-53im).
+SENT_AGAIN = "open_package_key"
 TWICE = lazy_gettext(
     "An item is on this form more than once. Each item is counted once, so "
     "it isn't clear which number is right: nothing was saved."
@@ -187,11 +194,16 @@ def moved_meanwhile(saved: int) -> str:
 
 COUNTED_NOTICE = lazy_gettext("Counted. The records now match what you found.")
 COUNTED_SAME = lazy_gettext("Counted: everything was as the records say.")
+SAVED_ALREADY = lazy_gettext(
+    "This count was saved already, so what you changed wasn't saved. To "
+    "record it, start a new count."
+)
 ADJUSTED = lazy_gettext("Recorded.")
 add_notices(
     {
         "counted": COUNTED_NOTICE,
         "counted_same": COUNTED_SAME,
+        "count_saved_already": SAVED_ALREADY,
         "adjusted": ADJUSTED,
     }
 )
@@ -866,9 +878,13 @@ def count(
         ONCE,
         CLOSED_MEANWHILE,
         CHANGED,
+        SENT_AGAIN,
     )
     if broken is not None:
         log.info("count refused by a rule", location_id=place.id, rule=broken)
+        if broken == SENT_AGAIN:
+            # The saved count is listed on Counts, to see what went through.
+            return redirect(COUNTS, notice="count_saved_already", section="count")
         if broken == COUNTABLE:
             if retired is None or retired == place.id:
                 # As for a place there is not, as the form's own page answers.

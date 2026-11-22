@@ -12,6 +12,8 @@ from decimal import Decimal
 
 from sqlalchemy.orm import Session
 
+from inventory_tng.core.db_errors import enforce
+from inventory_tng.core.db_sessions import exists_where
 from inventory_tng.models.stock import OpenPackage
 from inventory_tng.stock import open_packages, over_recorded
 from inventory_tng.stock.counts import Counted, FormLines, record_count
@@ -111,13 +113,21 @@ def _count_at(
     withheld: dict[int, tuple[Decimal, Decimal]] = {}
     if forms.found is not None:
         package, left = forms.found
+        found_key = uuid.uuid5(key, "found")
+        # None made under it yet: a form saved before found none.
+        fresh = not exists_where(session, OpenPackage.key == found_key)
         with session.begin_nested() as finding:
-            made = open_packages.make(
-                session, uuid.uuid5(key, "found"), package.id, place_id
-            )
+            made = open_packages.make(session, found_key, package.id, place_id)
             found = (package.item_id, Form(open_package_id=made.id), left)
             counted_now = counted_by([*lines, found])
-            if package.item_id in counted_now.moved:
+            moved = package.item_id in counted_now.moved
+            # A form saved before finding none, sent again finding one, is
+            # refused as one finding another package or place is (make()).
+            enforce(
+                "open_package_key",
+                when=fresh and counted_now.sent_before and not moved,
+            )
+            if moved:
                 # Its item moved meanwhile: asked again, found again then,
                 # though no line but the package counted it.
                 withheld = counted_now.moved
