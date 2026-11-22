@@ -26,6 +26,7 @@ from inventory_tng.stock import over_recorded, queries
 from inventory_tng.stock.adjustment_reasons import LOST, USED_UP
 from inventory_tng.stock.counts import ItemLines
 from inventory_tng.stock.ledger import LOOSE, Form, repeated
+from inventory_tng.stock.moments import expected_at
 from inventory_tng.web.forms import (
     QUANTITY_MAX,
     RULES,
@@ -315,10 +316,12 @@ class PlaceCount(NamedTuple):
 
 class Listed(NamedTuple):
     """Something else here naming an item the place picked for it lists
-    already: the item, one there is, and the place, by id."""
+    already: the item, one there is, and the place, by id; and whether the
+    form shows its line there, which a recount's may not."""
 
     item_id: int
     place_id: int
+    on_form: bool = True
 
 
 class CountForm(NamedTuple):
@@ -334,12 +337,20 @@ class CountForm(NamedTuple):
 
 
 def read_count(
-    session: Session, form: Mapping[str, str], root_id: int, place_ids: list[int]
+    session: Session,
+    form: Mapping[str, str],
+    root_id: int,
+    place_ids: list[int],
+    as_of: int,
 ) -> CountForm:
-    """A count form, of the places `place_ids` (places_listed), read place
-    by place (by_place) and checked. Something else here naming an item its
-    place lists is not that item twice but typed on the wrong line: its
-    line there is marked (TYPE_IT_HERE), and the page says the rest."""
+    """A count form, of the places `place_ids` (places_listed), shown as of
+    moment `as_of`, read place by place (by_place) and checked. Something
+    else here naming an item its place lists is not that item twice but
+    typed on the wrong line: its line there is marked (TYPE_IT_HERE), and
+    the page says the rest. On a recount, naming one the place held then
+    but the recount does not ask for, it is refused too, and the item is
+    asked for there, so the form shown again has its line (Ali,
+    2026-11-22, inventory-tng-oazl)."""
     split, problems = by_place(form, root_id, place_ids)
     places: dict[int, PlaceCount] = {}
     twice: dict[str, int | None] = {}
@@ -347,24 +358,27 @@ def read_count(
     for place_id, fields in split.items():
         found = lines(fields)
         extra = next((item_id for field, item_id, _ in found if field == EXTRA), None)
-        if (
-            extra is not None
-            and (line := listed_line(fields, extra)) is not None
-            and session.get(Item, extra) is not None
-        ):
-            listed = Listed(extra, place_id)
-            problems[field_at(root_id, place_id, line)] = TYPE_IT_HERE
-            # Not counted twice, then, unless another line names it too.
-            found_once = [each for each in found if each[0] != EXTRA]
-        else:
-            found_once = found
-        counted, wrong = item_counts(session, found)
-        forms, form_wrong = by_form(session, fields, place_id)
         items = {
             item_id
             for typed in fields.get(ITEMS, "").split()
             if (item_id := row_id(typed)) is not None
         }
+        found_once = found
+        if extra is not None and session.get(Item, extra) is not None:
+            if (line := listed_line(fields, extra)) is not None:
+                listed = Listed(extra, place_id)
+                problems[field_at(root_id, place_id, line)] = TYPE_IT_HERE
+                # Not counted twice, then, unless another line names it too.
+                found_once = [each for each in found if each[0] != EXTRA]
+            elif (
+                items
+                and extra not in items
+                and expected_at(session, [place_id], as_of, [extra])
+            ):
+                listed = Listed(extra, place_id, on_form=False)
+                items.add(extra)
+        counted, wrong = item_counts(session, found)
+        forms, form_wrong = by_form(session, fields, place_id)
         places[place_id] = PlaceCount(found, counted, forms, items)
         named = fields_at(root_id, place_id, named_twice(found_once))
         twice |= named

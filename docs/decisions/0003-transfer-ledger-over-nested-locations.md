@@ -179,7 +179,13 @@ is listed under that area and to type what was found on its line there;
 nothing is saved and everything typed is kept (Ali, 2026-11-21,
 inventory-tng-fh0e). We rejected hiding the items an area lists from the
 picker as Found in changes, and adding the amount to the line, which could
-count it twice without anyone noticing. A count showing only some items
+count it twice without anyone noticing. So too on a recount, which asks
+again only for the items that moved while it was counted: Something else
+here naming an item the place picked held then, but the recount does not
+ask for, is refused the same way, and the form shown again adds that
+item's line under the place (Ali, 2026-11-22, inventory-tng-oazl). We
+rejected adding the amount to what the place holds, and leaving the items
+a place holds out of the picker. A count showing only some items
 counts only the places something was typed at; sent with nothing typed
 anywhere, nothing is recorded and the form is shown again, with the same
 items, saying "Nothing was typed, so nothing was counted." (Ali,

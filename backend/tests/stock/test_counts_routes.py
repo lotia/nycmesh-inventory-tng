@@ -531,6 +531,104 @@ def test_a_recount_sent_back_leaves_out_an_item_there_is_not(
     assert not box_values(refused.text, f"counted_{INTEGER_MAX}")
 
 
+def test_something_else_here_held_but_not_recounted_is_refused_with_its_line(
+    admin_client: TestClient, session: Session
+) -> None:
+    """The recount asks for the radios only; something else here names the
+    cable the store holds: refused as on a full count, the cable's line
+    added under the store to type it on, nothing written, everything typed
+    kept (Ali, 2026-11-22, inventory-tng-oazl)."""
+    place = stocked(session)
+    with_cable(session, place)
+    radio, cable = place.item.id, place.cable.id
+    path = f"{COUNTS}/{place.store.id}"
+    shown = count_form(admin_client.get(path))
+    write(session, place)  # Three radios to the van.
+    asked = admin_client.post(
+        path, data=shown | {f"counted_{radio}": "5", f"counted_{cable}": "20"}
+    )
+    assert asked.status_code == 409
+    again = count_form(asked)
+    assert again["items"] == str(radio)
+    form = again | {
+        f"counted_{radio}": "1",
+        "extra_item_id": str(cable),
+        "extra_quantity": "2",
+    }
+    with capture_logs() as logs:
+        refused = admin_client.post(path, data=form)
+    assert refused.status_code == 400
+    assert {
+        "event": "count refused: something else here listed there",
+        "location_id": place.store.id,
+        "found_location_id": place.store.id,
+        "item_id": cable,
+        "log_level": "info",
+    } in logs
+    assert (
+        f"{place.cable.name_shown} is already listed under {place.store.name}. "
+        "Type what you found on its line there. Nothing was saved, and what "
+        "you typed is kept."
+    ) in text(refused)
+    page = read(refused.text)
+    assert page.one("span", id=f"counted_{cable}-problem").text == str(TYPE_IT_HERE)
+    assert (
+        page.one("span", id="extra_item_id-problem").text
+        == f"Listed under {place.store.name} already."
+    )
+    assert f"{place.cable.name_shown} 20 m" in words_on(refused.text)
+    assert counted_box(refused.text, radio) == "1"
+    assert page.one("input", name="extra_quantity").attrs["value"] == "2"
+    picked = options(page.one("select", name="extra_item_id"))
+    assert [value for value, _, chosen in picked if chosen] == [str(cable)]
+    assert sorted(count_form(refused)["items"].split()) == sorted(
+        [str(radio), str(cable)]
+    )
+    assert expected(session, place.store.id) == {
+        radio: Decimal(2),
+        cable: Decimal(20),
+    }
+    # Typed on its line, the recount saves both.
+    done = admin_client.post(
+        path,
+        data=count_form(refused)
+        | {
+            f"counted_{radio}": "1",
+            f"counted_{cable}": "22",
+            "extra_item_id": "",
+            "extra_quantity": "",
+        },
+    )
+    assert done.headers["location"] == f"{COUNTS}?notice=counted&section=count#count"
+    assert expected(session, place.store.id) == {
+        radio: Decimal(1),
+        cable: Decimal(22),
+    }
+
+
+def test_something_else_here_held_by_form_but_not_recounted_marks_its_loose_line(
+    admin_client: TestClient, session: Session
+) -> None:
+    """The cable, held in sealed spools, is counted by form: the line added
+    for it is marked on its loose units (inventory-tng-oazl)."""
+    spools = Spools(session)
+    radio, cable = spools.place.item.id, spools.cable.id
+    received(session, spools.place, [{"item_id": radio, "quantity": "5"}])
+    path = f"{COUNTS}/{spools.store.id}"
+    form = count_form(admin_client.get(path)) | {
+        "items": str(radio),
+        f"counted_{radio}": "5",
+        "extra_item_id": str(cable),
+        "extra_quantity": "3",
+    }
+    refused = admin_client.post(path, data=form)
+    assert refused.status_code == 400
+    page = read(refused.text)
+    assert page.one("span", id=f"loose_{cable}-problem").text == str(TYPE_IT_HERE)
+    assert page.all("input", name=f"sealed_{cable}_{spools.spool.id}")
+    assert counts_written(session) == []
+
+
 def test_a_count_whose_every_line_moved_writes_nothing(
     admin_client: TestClient, session: Session
 ) -> None:

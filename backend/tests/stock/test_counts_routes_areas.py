@@ -401,6 +401,65 @@ def test_a_move_between_two_areas_during_a_count_is_counted_again_at_both(
     assert len(counts_at(session, made.store)) == 1
 
 
+def test_something_else_here_held_in_an_area_but_not_recounted_is_refused(
+    admin_client: TestClient, session: Session
+) -> None:
+    """The recount asks for radios on Shelf A and in Bin 1; something else
+    here names the cable Bin 1 holds: refused, its line added under Bin 1,
+    nothing written. Found on Shelf A, which holds none, it is counted there
+    (Ali, 2026-11-22, inventory-tng-oazl)."""
+    made = Store(session)
+    item, cable = made.place.item.id, made.place.cable.id
+    made.receive(session, made.bin, item, "1")
+    shown = count_form(admin_client.get(made.path))
+    made.move(session, made.shelf, made.bin)
+    asked = admin_client.post(
+        made.path,
+        data=shown
+        | {
+            f"counted_{item}": "5",
+            f"at_{made.shelf.id}_counted_{item}": "3",
+            f"at_{made.bin.id}_counted_{item}": "1",
+            f"at_{made.bin.id}_counted_{cable}": "2",
+        },
+    )
+    again = count_form(asked)
+    assert again[f"at_{made.bin.id}_items"] == str(item)
+    recounted = {
+        f"at_{made.shelf.id}_counted_{item}": "1",
+        f"at_{made.bin.id}_counted_{item}": "3",
+        "extra_item_id": str(cable),
+        "extra_quantity": "1",
+    }
+    refused = admin_client.post(
+        made.path,
+        data=again | recounted | {"extra_location_id": str(made.bin.id)},
+    )
+    assert refused.status_code == 400
+    where = PATH_BETWEEN.join([made.shelf.name, made.bin.name])
+    name = made.place.cable.name_shown
+    assert f"{name} is already listed under {where}." in text(refused)
+    line = f"at_{made.bin.id}_counted_{cable}"
+    page = read(refused.text)
+    assert page.one("span", id=f"{line}-problem").text == str(TYPE_IT_HERE)
+    assert (
+        page.one("span", id="extra_item_id-problem").text
+        == f"Listed under {where} already."
+    )
+    assert sorted(count_form(refused)[f"at_{made.bin.id}_items"].split()) == sorted(
+        [str(item), str(cable)]
+    )
+    assert expected(session, made.bin.id) == {item: Decimal(2), cable: Decimal(2)}
+    # Found on Shelf A, which holds no cable, it is counted there.
+    done = admin_client.post(
+        made.path,
+        data=again | recounted | {"extra_location_id": str(made.shelf.id)},
+    )
+    assert done.status_code == 303
+    assert expected(session, made.shelf.id) == {item: Decimal(1), cable: Decimal(1)}
+    assert expected(session, made.bin.id) == {item: Decimal(3), cable: Decimal(2)}
+
+
 def test_a_save_at_an_area_as_the_form_was_shown_refuses_the_whole_count(
     admin_client: TestClient, session: Session
 ) -> None:

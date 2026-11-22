@@ -32,7 +32,10 @@ right. The page itself never sends one. The ledger refuses a repeat too
 Something else here naming an item the place picked for it lists already,
 which a store's form offers, is refused too, saying it is listed there and
 to type it on its line (Ali, 2026-11-21, inventory-tng-fh0e): on a count of
-one place only a hand-made form sends that, and it is said the same way.
+one place only a hand-made form sends that, and it is said the same way. On
+a recount, naming an item the place held but the recount does not ask for
+is refused so too, and the form shown again adds that item's line there
+(Ali, 2026-11-22, inventory-tng-oazl).
 
 A place's count can show only some items: one (`?item=`, as the pages of
 what needs an administrator's action take it), those whose names match a
@@ -82,6 +85,7 @@ from inventory_tng.stock.balance import countable, takeable
 from inventory_tng.stock.counts import Counted, NotCountable, record_adjustment
 from inventory_tng.stock.forms import (
     CLOSED_MEANWHILE,
+    COUNTED,
     EXTRA_ITEM,
     EXTRA_PLACE,
     FOUND_PLACE,
@@ -89,6 +93,7 @@ from inventory_tng.stock.forms import (
     OPENED,
     PICKED,
     SEALED,
+    TYPE_IT_HERE,
     Listed,
     adjustment,
     field_at,
@@ -585,11 +590,14 @@ def _count_page(
                 if ids is None or found[0].item_id in ids
             ],
             "recount": recount,
-            # What a place it may be found in does not list already.
+            # What a place it may be found in does not list already, and the
+            # item picked, to keep it picked on a form shown again: a
+            # recount adds its line (forms.read_count).
             "others": [
                 item
                 for item in listed
                 if not all(item.id in was[group.place.id] for group in choices)
+                or str(item.id) == (values or {}).get(EXTRA_ITEM)
             ],
             "key": (values or {}).get("key") or uuid.uuid4(),
             "moment": at,
@@ -754,6 +762,15 @@ def _place_forms(
     return rows
 
 
+def _line_of(session: Session, as_of: int, listed: Listed) -> str:
+    """The field a count form, as of moment `as_of`, shows an item's line at
+    a place by: its total, or, counted by form (_forms), its loose units."""
+    place_id, item_id = listed.place_id, listed.item_id
+    openings = over_recorded.openings_waiting_at(session, [place_id], as_of)
+    by_form = _forms(session, as_of, {place_id: [item_id]}, openings)[place_id]
+    return f"{LOOSE_FIELD if item_id in by_form else COUNTED}{item_id}"
+
+
 def _followed(session: Session) -> list[tuple[ItemPackage, str, str]]:
     """Current packages of current items followed once opened, with their
     item's name and unit: what an open package nobody recorded may be."""
@@ -789,7 +806,7 @@ def count(
         return not_found()
     at = Moment(as_of, seen)
     areas = place_ids != [place.id]
-    sent = read_count(session, form, place.id, place_ids)
+    sent = read_count(session, form, place.id, place_ids, at.as_of)
     asked = {place_id: each.items for place_id, each in sent.places.items()}
     # The form shown again: as sent, or with `at` None, as it is now.
     again = partial(_count_page, request, session, signed, place, shown=shown)
@@ -815,6 +832,10 @@ def count(
         )
         listed_alert, beside = _listed_words(session, place, sent.listed)
         problems |= beside
+        if not sent.listed.on_form:
+            # A recount's line added for it (forms.read_count), marked.
+            line = _line_of(session, at.as_of, sent.listed)
+            problems[field_at(place.id, sent.listed.place_id, line)] = TYPE_IT_HERE
         alert = alert or listed_alert
     if problems:
         # What was typed is as of when the form was shown, of the places it
