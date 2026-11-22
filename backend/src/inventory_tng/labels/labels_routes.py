@@ -15,14 +15,7 @@ from inventory_tng.admins.guards import AdminSignedIn
 from inventory_tng.catalogue.paths import ITEMS
 from inventory_tng.core.db_sessions import DbSession
 from inventory_tng.core.local_time import site_zone
-from inventory_tng.core.phrases import (
-    PATH_BETWEEN,
-    gettext,
-    lazy,
-    lazy_gettext,
-    ngettext,
-    number,
-)
+from inventory_tng.core.phrases import gettext, lazy, lazy_gettext, ngettext, number
 from inventory_tng.labels import labels, queries
 from inventory_tng.labels.paths import LABELS, PRINT
 from inventory_tng.models.base import INTEGER_MAX, whole
@@ -241,7 +234,6 @@ def print_labels(
             "picked": picked,
             "copies": count,
             "total": total,
-            "path_between": PATH_BETWEEN,
             "sheets": labels.lay_out(picked, count, PER_PAGE),
             # The camera reads a scuffed label at "q": a quarter can be lost.
             "qrs": {each.label.id: qr_svg(each.label.code, "q") for each in picked},

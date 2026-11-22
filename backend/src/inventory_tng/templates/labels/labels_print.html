@@ -28,8 +28,8 @@
       <p class="key">{{ named.label.code }}</p>
       {#- The place it is part of yields its lines to the place's own name. #}
       <div class="print-words">
-        {%- if named.within %}<p class="print-within">{{ named.within }}{{ path_between }}</p>{% endif -%}
-        <p>{{ named.own }}</p>
+        {%- if named.within %}<p class="print-small print-within">{{ named.within_words }}</p>{% endif -%}
+        <p class="print-small">{{ named.own }}</p>
       </div>
     </div>
     {% endfor %}

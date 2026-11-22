@@ -12,12 +12,12 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from inventory_tng.catalogue.paths import ITEMS
+from inventory_tng.core.phrases import PATH_BETWEEN
 from inventory_tng.labels import labels
 from inventory_tng.labels.labels import (
     INACTIVE_WORDS,
     Inactive,
     package_label,
-    place_words,
 )
 from inventory_tng.labels.labels_routes import PICK_LABELS
 from inventory_tng.labels.paths import LABELS, PRINT
@@ -112,8 +112,7 @@ def test_a_package_and_a_place_have_codes_of_their_own(
     assert package_label("Cat6 cable", "Reel", "305 m") in page
     # The place it is part of, then it, as a count form's path (Ali,
     # 2026-11-22): no preposition chosen by the kind of place.
-    assert "Hub \N{SINGLE RIGHT-POINTING ANGLE QUOTATION MARK} Shelf A" in page
-    assert place_words("Hub", None) == "Hub"
+    assert PATH_BETWEEN.join(("Hub", "Shelf A")) in page
     page = admin_client.get(f"{LOCATIONS}/{shelf.id}").text
     assert on_shelf.code in page
     assert ("post", LABELS) in forms(page)
@@ -193,9 +192,9 @@ def test_a_printed_place_label_names_the_place_it_is_part_of_apart(
     query = {"label": [place_label.id, item_label.id], "copies": 1}
     shown = read(admin_client.get(PRINT, params=query).text)
     on_shelf, on_cable = shown.all("*", class_="print-words")
-    assert on_shelf.text == "Hub \N{SINGLE RIGHT-POINTING ANGLE QUOTATION MARK} Shelf A"
-    assert on_shelf.one("p", class_="print-within").text.startswith("Hub ")
-    assert [p.text for p in on_shelf.all("p")][-1] == "Shelf A"
+    assert on_shelf.text == PATH_BETWEEN.join(("Hub", "Shelf A"))
+    assert on_shelf.one("p", class_="print-within")
+    assert on_shelf.all("p")[-1].text == "Shelf A"
     assert not on_cable.all("p", class_="print-within")
     assert [p.text for p in on_cable.all("p")] == ["Cat6 cable"]
 

@@ -110,7 +110,14 @@ class Named:
 
     @property
     def words(self) -> str:
-        return place_words(self.own, self.within)
+        """Its words whole, as the lists show them: the place it is part of,
+        if any, then it, as a count form names a place by its path."""
+        return self.within_words + self.own
+
+    @property
+    def within_words(self) -> str:
+        """The place it is part of and the path's separator; empty if none."""
+        return f"{self.within}{PATH_BETWEEN}" if self.within else ""
 
     @property
     def current(self) -> bool:
@@ -139,12 +146,6 @@ def package_label(item: str, package: str, size: str) -> str:
     return gettext(
         "%(item)s: %(package)s of %(size)s", item=item, package=package, size=size
     )
-
-
-def place_words(place: str, parent: str | None) -> str:
-    """A place's label's words: the place it is part of, if any, then it,
-    as a count form names a place by its path."""
-    return place if parent is None else PATH_BETWEEN.join((parent, place))
 
 
 def _by_id[M: (Item, ItemPackage, Location)](

@@ -558,15 +558,11 @@
        * the label's own name.
        */
       & .print-words {
-        @apply flex max-h-10 flex-col text-sm *:my-0 *:wrap-anywhere;
+        @apply flex max-h-10 flex-col *:my-0 *:shrink-0;
 
-        & > :last-child {
-          @apply line-clamp-2 shrink-0;
+        & .print-within {
+          @apply line-clamp-1 min-h-0 shrink;
         }
-      }
-
-      & .print-within {
-        @apply line-clamp-1 min-h-0 shrink;
       }
     }
   }

@@ -6,7 +6,7 @@ import { expect, type Locator } from "@playwright/test";
 import { test } from "./csp-violations";
 import { unique } from "./own-rows";
 import { prepared } from "./prepared";
-import { printLabels } from "./print-labels";
+import { printFromHere, printLabels } from "./print-labels";
 
 type Box = NonNullable<Awaited<ReturnType<Locator["boundingBox"]>>>;
 
@@ -62,8 +62,7 @@ test("a long name of the place it is part of never hides a place's own", async (
   await page.getByLabel(/^Part of/).selectOption({ label: store });
   await page.getByRole("button", { name: "Add", exact: true }).click();
   await expect(page.getByRole("heading", { level: 1 })).toHaveText(area);
-  await page.getByLabel("Copies").fill("1");
-  await page.getByRole("button", { name: "Print labels" }).click();
+  await printFromHere(page, 1);
   await page.emulateMedia({ media: "print" });
   const label = page.locator(".print-label");
   const within = label.locator(".print-within");
