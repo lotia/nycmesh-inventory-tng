@@ -63,6 +63,10 @@ test("a long name of the place it is part of never hides a place's own", async (
   await page.getByRole("button", { name: "Add", exact: true }).click();
   await expect(page.getByRole("heading", { level: 1 })).toHaveText(area);
   await printFromHere(page, 1);
+  // As wide as US Letter prints, less its margins: at a phone's width a
+  // label is a third as wide as on paper, too narrow for some unique names
+  // of the place in one line, and then the other rightly has no line.
+  await page.setViewportSize({ width: 7.5 * 96, height: 10 * 96 });
   await page.emulateMedia({ media: "print" });
   const label = page.locator(".print-label");
   const within = label.locator(".print-within");
