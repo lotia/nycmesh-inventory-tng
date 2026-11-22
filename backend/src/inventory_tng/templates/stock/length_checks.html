@@ -20,9 +20,9 @@ stays.{% endtrans %}</p>
   {% for each in checked %}
   {% set shown = each.shown %}
   {% set row = shown.row %}
-  {% set which %}{% trans what=shown.item, place=shown.place %}{{ what }} at {{ place }}{% endtrans %}{% endset %}
+  {% set which %}{#- Translators: %(place)s is a place of any kind, such as a store, a shelf, a bin or a volunteer's home. #}{% trans what=shown.item, place=shown.place %}{{ what }} at {{ place }}{% endtrans %}{% endset %}
   <tr>
-    <td><input type="checkbox" name="open_package" value="{{ row.id }} {{ each.seen }}" form="answer-ticked" aria-label="{% trans item=shown.item, package=shown.package, place=shown.place %}Pick {{ item }}, {{ package }}, at {{ place }}{% endtrans %}"></td>
+    <td><input type="checkbox" name="open_package" value="{{ row.id }} {{ each.seen }}" form="answer-ticked" aria-label="{#- Translators: %(place)s is a place of any kind, such as a store, a shelf, a bin or a volunteer's home. #}{% trans item=shown.item, package=shown.package, place=shown.place %}Pick {{ item }}, {{ package }}, at {{ place }}{% endtrans %}"></td>
     <td>{{ shown.item }}, {{ shown.package }} · {{ shown.place }}</td>
     <td>{% trans left=shown.left | amount, unit=shown.unit %}Shows {{ left }} {{ unit }}.{% endtrans %}
       {% if row.length_reported is not none %}

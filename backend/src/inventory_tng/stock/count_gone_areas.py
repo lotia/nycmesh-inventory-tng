@@ -4,7 +4,7 @@ or retired and emptied, while it was counted, so no longer on it (Ali,
 form is saved, what left them since it was first shown (stock/moved_out.py):
 what went to a place on it under "Moved from … to …", counted there and
 only there; what went elsewhere, with nothing to type; which may be
-brought back; and what Found in says of those it leaves out. The routes
+brought back; and what Found at says of those it leaves out. The routes
 are stock/counts_routes.py's."""
 
 from collections.abc import Collection, Mapping, Sequence
@@ -25,6 +25,8 @@ from inventory_tng.stock.moved_out import MovedOut, moved_out
 def emptied_meanwhile(places: Sequence[str]) -> str:
     """A count refused whole as retired areas on it were emptied while it
     was counted, so they may no longer be counted."""
+    # Translators: %(places)s names one or more places, each of any kind,
+    # such as a store, a shelf, a bin or a volunteer's home.
     return ngettext(
         "Not saved: %(places)s was emptied while you counted, so the records "
         "show no items there now. Move details are shown below, and your other "
@@ -40,6 +42,8 @@ def emptied_meanwhile(places: Sequence[str]) -> str:
 def retired_meanwhile(places: Sequence[str]) -> str:
     """A count refused whole as empty areas on it were retired while it was
     counted, nothing moving out of them."""
+    # Translators: %(places)s names one or more places, each of any kind,
+    # such as a store, a shelf, a bin or a volunteer's home.
     return ngettext(
         "Not saved: %(places)s was retired while you counted, so it is no "
         "longer on this form. What you typed for the other areas is kept: check "
@@ -55,23 +59,31 @@ def retired_meanwhile(places: Sequence[str]) -> str:
 def moved_from(place: str, there: str) -> str:
     """The heading of what left an area gone from a count form for another
     place on it, counted there."""
+    # Translators: %(place)s and %(there)s are places of any kind, such as a
+    # store, a shelf, a bin or a volunteer's home.
     return gettext("Moved from %(place)s to %(there)s", place=place, there=there)
 
 
 def taken_out(place: str) -> str:
     """The heading of what left areas gone from a count form for no place
     on it."""
+    # Translators: %(place)s is a place of any kind, such as a store, a shelf,
+    # a bin or a volunteer's home.
     return gettext("Taken out of %(place)s", place=place)
 
 
 def removed(place: str) -> str:
     """The heading of an empty area retired while it was counted."""
+    # Translators: %(place)s is a place of any kind, such as a store, a shelf,
+    # a bin or a volunteer's home.
     return gettext("%(place)s (retired): removed from this form.", place=place)
 
 
 def not_offered(places: Sequence[str]) -> str:
     """Beside where something was found: the areas gone from the form, not
     offered."""
+    # Translators: %(places)s names one or more places, each of any kind,
+    # such as a store, a shelf, a bin or a volunteer's home.
     return ngettext(
         "%(places)s isn't offered: it's retired.",
         "%(places)s aren't offered: they're retired.",
@@ -145,7 +157,7 @@ class Moves(NamedTuple):
     what went there, as that place's own lines, taken from under it; what
     went nowhere on it, with its heading; and, of the areas gone, those
     still retired that anything left, each with its label, to bring back;
-    the headings of those nothing left; what Found in says of those it
+    the headings of those nothing left; what Found at says of those it
     leaves out; and those back now."""
 
     sections: list[tuple[str, Group]]

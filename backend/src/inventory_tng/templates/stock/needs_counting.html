@@ -17,7 +17,7 @@ wrong there until someone counts it.{% endtrans %}</p>
     <tr><td>{{ row.item.name_shown }}</td><td>{{ row.quantity | amount }} {{ row.item.unit }}</td></tr>
     {% endfor %}
   {% endcall %}
-  <p><a href="{{ counts_path }}/{{ group.heading.id }}">{% trans name=group.heading.name %}Start counting {{ name }}{% endtrans %}</a>{{ retired(group.heading) }}</p>
+  <p><a href="{{ counts_path }}/{{ group.heading.id }}">{#- Translators: %(place)s is a place of any kind, such as a store, a shelf, a bin or a volunteer's home. #}{% trans place=group.heading.name %}Start counting {{ place }}{% endtrans %}</a>{{ retired(group.heading) }}</p>
 </section>
 {% else %}
 <p>{% trans %}Nothing shows less than nothing.{% endtrans %}</p>

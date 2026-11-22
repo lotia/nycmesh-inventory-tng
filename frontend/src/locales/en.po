@@ -88,7 +88,7 @@ msgstr "The cart was changed in another tab. Check it, then record it again."
 msgid "Opening packages"
 msgstr "Opening packages"
 
-#. A clause of where a save was for; clauses that apply follow in this order, joined by spaces: at or from, to, for install.
+#. A clause of where a save was for; clauses that apply follow in this order, joined by spaces: at or from, to, for install. {place} is a place of any kind, such as a store, a shelf, a bin or a volunteer's home.
 #: src/scan/OlderList.tsx
 msgid "at {place}"
 msgstr "at {place}"
@@ -189,6 +189,7 @@ msgstr "Pick where it goes."
 msgid "Check the connection, then reload the page."
 msgstr "Check the connection, then reload the page."
 
+#. {from} and {to} are places of any kind, such as a store, a shelf, a bin or a volunteer's home.
 #: src/scan/batch.ts
 msgid "Move: {items} from {from} to {to}"
 msgstr "Move: {items} from {from} to {to}"
@@ -197,6 +198,7 @@ msgstr "Move: {items} from {from} to {to}"
 msgid "Loose units"
 msgstr "Loose units"
 
+#. {to} is a place of any kind, such as a store, a shelf, a bin or a volunteer's home.
 #: src/scan/batch.ts
 msgid "Receipt: {items} to {to}"
 msgstr "Receipt: {items} to {to}"
@@ -217,6 +219,7 @@ msgstr "Cart"
 msgid "{item}: type how many of which package to open."
 msgstr "{item}: type how many of which package to open."
 
+#. {from} is a place of any kind, such as a store, a shelf, a bin or a volunteer's home.
 #: src/scan/batch.ts
 msgid "Install: {items} from {from} for install {number}"
 msgstr "Install: {items} from {from} for install {number}"
@@ -282,6 +285,7 @@ msgstr "Registering…"
 msgid "Go back"
 msgstr "Go back"
 
+#. {from} is a place of any kind, such as a store, a shelf, a bin or a volunteer's home.
 #: src/scan/batch.ts
 msgid "What's on it: {packages} at {from}"
 msgstr "What's on it: {packages} at {from}"
@@ -334,6 +338,7 @@ msgstr "The label reader didn't load."
 msgid "The torch wouldn't switch."
 msgstr "The torch wouldn't switch."
 
+#. {place} is a place of any kind, such as a store, a shelf, a bin or a volunteer's home.
 #: src/scan/CartForm.tsx
 msgid "{place}: from here."
 msgstr "{place}: from here."
@@ -535,6 +540,7 @@ msgstr "Go to the scan page"
 msgid "A cart: something"
 msgstr "A cart: something"
 
+#. {place} is a place of any kind, such as a store, a shelf, a bin or a volunteer's home.
 #: src/scan/CartForm.tsx
 msgid "{place}: to here."
 msgstr "{place}: to here."
@@ -555,6 +561,7 @@ msgstr "Try again"
 msgid "Kept on this device {when}, not sent."
 msgstr "Kept on this device {when}, not sent."
 
+#. {from} is a place of any kind, such as a store, a shelf, a bin or a volunteer's home.
 #: src/scan/batch.ts
 msgid "Used up: {packages} at {from}"
 msgstr "Used up: {packages} at {from}"
@@ -579,6 +586,7 @@ msgstr "Added one: {item}."
 msgid "Couldn't load the catalogue."
 msgstr "Couldn't load the catalogue."
 
+#. {place} is a place of any kind, such as a store, a shelf, a bin or a volunteer's home.
 #: src/scan/CartForm.tsx
 msgid "{place}: from here, or to here?"
 msgstr "{place}: from here, or to here?"
@@ -680,7 +688,7 @@ msgstr "open"
 msgid "{name}: enter the count"
 msgstr "{name}: enter the count"
 
-#. A clause of where a save was for; clauses that apply follow in this order, joined by spaces: at or from, to, for install.
+#. A clause of where a save was for; clauses that apply follow in this order, joined by spaces: at or from, to, for install. {place} is a place of any kind, such as a store, a shelf, a bin or a volunteer's home.
 #: src/scan/OlderList.tsx
 msgid "to {place}"
 msgstr "to {place}"
@@ -879,6 +887,7 @@ msgstr "Held until you upgrade."
 msgid "This item was changed in another tab. Check it before discarding."
 msgstr "This item was changed in another tab. Check it before discarding."
 
+#. {place} is a place of any kind, such as a store, a shelf, a bin or a volunteer's home.
 #: src/scan/CartForm.tsx
 msgid "{place}: here."
 msgstr "{place}: here."
@@ -907,6 +916,7 @@ msgstr "{name}: {amount} fewer"
 msgid "Enter the loose amount in {unit}, up to 3 decimals."
 msgstr "Enter the loose amount in {unit}, up to 3 decimals."
 
+#. {from} is a place of any kind, such as a store, a shelf, a bin or a volunteer's home.
 #: src/scan/batch.ts
 msgid "Opening: {items} at {from}"
 msgstr "Opening: {items} at {from}"
@@ -980,6 +990,7 @@ msgstr "{count, plural, one {# open package} other {# open packages}}"
 msgid "Starting the camera…"
 msgstr "Starting the camera…"
 
+#. {from} is a place of any kind, such as a store, a shelf, a bin or a volunteer's home.
 #: src/scan/batch.ts
 msgid "Install: {items} from {from}"
 msgstr "Install: {items} from {from}"
@@ -1041,7 +1052,7 @@ msgstr "This device is offline. Sending when it's back."
 msgid "What is happening"
 msgstr "What is happening"
 
-#. A clause of where a save was for; clauses that apply follow in this order, joined by spaces: at or from, to, for install.
+#. A clause of where a save was for; clauses that apply follow in this order, joined by spaces: at or from, to, for install. {place} is a place of any kind, such as a store, a shelf, a bin or a volunteer's home.
 #: src/scan/OlderList.tsx
 msgid "from {place}"
 msgstr "from {place}"

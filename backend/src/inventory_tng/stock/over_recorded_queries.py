@@ -392,22 +392,30 @@ def held_words(amount: str) -> str:
 
 def adjusted_at(place: str) -> str:
     """Why a count of one moved whole was corrected: where."""
+    # Translators: %(place)s is a place of any kind, such as a store, a shelf,
+    # a bin or a volunteer's home.
     return gettext("Adjusted at %(place)s", place=place)
 
 
 def closed_on_day(end: str, day: str) -> str:
     """An opening's open end, closed since, and the day."""
+    # Translators: %(end)s is a place of any kind, such as a store, a shelf, a
+    # bin or a volunteer's home, or a form, such as "open spool".
     return gettext("%(end)s closed %(day)s", end=end, day=day)
 
 
 def end_only(end: str) -> str:
     """Correct wrote one end only."""
+    # Translators: %(end)s is a place of any kind, such as a store, a shelf, a
+    # bin or a volunteer's home, or a form, such as "open spool".
     return gettext("%(end)s only", end=end)
 
 
 def counted_on(end: str, day: str) -> str:
     """An end of a settled check, and the day a count put it right."""
-    # Translators: a place or a form, then the day it was counted ("14 Nov").
+    # Translators: %(end)s is a place of any kind, such as a store, a shelf, a
+    # bin or a volunteer's home, or a form, such as "open spool"; then the day
+    # it was counted ("14 Nov").
     return gettext("%(end)s %(day)s", end=end, day=day)
 
 

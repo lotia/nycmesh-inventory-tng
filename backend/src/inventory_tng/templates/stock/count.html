@@ -3,7 +3,7 @@
 {% block main %}
 {% if caution %}<p class="warning" role="status">{{ caution }}</p>{% endif %}
 {% if place.retired_at %}
-<p class="warning">{% trans place=place.name %}{{ place }} is retired, but the records say something
+<p class="warning">{#- Translators: %(place)s is a place of any kind, such as a store, a shelf, a bin or a volunteer's home. #}{% trans place=place.name %}{{ place }} is retired, but the records say something
 is here: a save brought or took it after it was retired. Count what is really
 there: usually nothing. Anything you find, take to a current place, count
 this one as empty, and record it found there.{% endtrans %}</p>
@@ -73,7 +73,7 @@ to confirm (stock/count_gone_areas.py). #}
       <td>{% trans came=came | amount, went=went | amount, typed=typed | amount %}{{ came }} in, {{ went }} out; you typed {{ typed }}{% endtrans %}</td>
       {% elif recount %}<td></td>
       {% endif %}
-      <td><input name="{{ field }}" inputmode="decimal" value="{{ values.get(field, '' if blank else amount | plain_amount if amount > 0 else '0') }}" aria-label="{% if where %}{% trans place=where, item=item.name_shown %}{{ place }}: {{ item }} counted{% endtrans %}{% else %}{% trans item=item.name_shown %}{{ item }} counted{% endtrans %}{% endif %}">
+      <td><input name="{{ field }}" inputmode="decimal" value="{{ values.get(field, '' if blank else amount | plain_amount if amount > 0 else '0') }}" aria-label="{% if where %}{#- Translators: %(place)s is a place of any kind, such as a store, a shelf, a bin or a volunteer's home. #}{% trans place=where, item=item.name_shown %}{{ place }}: {{ item }} counted{% endtrans %}{% else %}{% trans item=item.name_shown %}{{ item }} counted{% endtrans %}{% endif %}">
         {% with name = field %}{% include "_field_problem.html" %}{% endwith %}</td>
     </tr>
     {% endif %}
@@ -131,7 +131,7 @@ to confirm (stock/count_gone_areas.py). #}
   {% if areas %}
   {% set chosen = picked.get(name) %}
   {% set chosen = chosen if chosen in choices | map(attribute="place.id") | map("string") else choices[0].place.id | string %}
-  <label>{% trans %}Found in{% endtrans %}
+  <label>{% trans %}Found at{% endtrans %}
     <select name="{{ name }}">
       {% for group in choices %}<option value="{{ group.place.id }}" {% if chosen == group.place.id | string %}selected{% endif %}>{{ group.label }}</option>{% endfor %}
     </select>
@@ -192,9 +192,9 @@ to confirm (stock/count_gone_areas.py). #}
   brought back with what was typed sent along, and the form shown again
   (stock/counts_routes.py). #}
   {% for area_id, where in bring_back %}
-  <p>{% trans place=where %}Things still at {{ place }}?{% endtrans %}</p>
+  <p>{#- Translators: %(place)s is a place of any kind, such as a store, a shelf, a bin or a volunteer's home. #}{% trans place=where %}Things still at {{ place }}?{% endtrans %}</p>
   <button formaction="{{ here }}/bring-back{{ shown.query() }}" name="area_id" value="{{ area_id }}">{% trans %}Bring it back{% endtrans %}</button>
-  <p class="hint">{% trans place=where %}Brings it back and shows this form again with {{ place }} listed and everything you typed kept.{% endtrans %}</p>
+  <p class="hint">{#- Translators: %(place)s is a place of any kind, such as a store, a shelf, a bin or a volunteer's home. #}{% trans place=where %}Brings it back and shows this form again with {{ place }} listed and everything you typed kept.{% endtrans %}</p>
   {% endfor %}
 </form>
 {% endblock %}

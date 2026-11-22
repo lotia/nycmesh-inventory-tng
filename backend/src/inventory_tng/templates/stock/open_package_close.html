@@ -1,7 +1,7 @@
 {% extends "admin_base.html" %}
 {% from "_confirm.html" import confirm %}
 {% block main %}
-<p>{% trans item=shown.item, package=shown.package, place=shown.place, left=shown.left | amount, unit=shown.unit %}{{ item }}, {{ package }}, at {{ place }}: it shows
+<p>{#- Translators: %(place)s is a place of any kind, such as a store, a shelf, a bin or a volunteer's home. #}{% trans item=shown.item, package=shown.package, place=shown.place, left=shown.left | amount, unit=shown.unit %}{{ item }}, {{ package }}, at {{ place }}: it shows
 {{ left }} {{ unit }}. Closing it writes that off, with
 the reason Used up, and it is offered no more. It can't be opened again;
 a count puts right a mistake.{% endtrans %}</p>

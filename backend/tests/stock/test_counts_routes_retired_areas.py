@@ -78,7 +78,7 @@ def cells_by(page: Response, name: str) -> list[str]:
 
 
 def found_at(page: Response) -> list[str | None]:
-    """The places Something else here's Found in offers."""
+    """The places Something else here's Found at offers."""
     picker = read(page.text).one("select", name="extra_location_id")
     return [value for value, _, _ in options(picker)]
 

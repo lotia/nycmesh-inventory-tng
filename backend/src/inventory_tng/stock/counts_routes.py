@@ -190,6 +190,8 @@ areas_brought_back = meter.create_counter(
 
 def brought_back(place: str) -> str:
     """An area gone from a count form, brought back from it."""
+    # Translators: %(place)s is a place of any kind, such as a store, a
+    # shelf, a bin or a volunteer's home.
     return gettext(
         "%(place)s is back, and what you typed is kept. Add what's at %(place)s "
         "with Something else here, then save the count.",
@@ -200,6 +202,8 @@ def brought_back(place: str) -> str:
 def already_listed(item: str, place: str) -> str:
     """A count refused as something else here names an item the place
     picked for it lists (forms.Listed): what was typed is kept."""
+    # Translators: %(place)s is a place of any kind, such as a store, a
+    # shelf, a bin or a volunteer's home.
     return gettext(
         "%(item)s is already listed under %(place)s. Type what you found on "
         "its line there. Nothing was saved, and what you typed is kept.",
@@ -210,10 +214,14 @@ def already_listed(item: str, place: str) -> str:
 
 def listed_under(place: str) -> str:
     """Beside something else here's item, listed at the place picked."""
+    # Translators: %(place)s is a place of any kind, such as a store, a shelf,
+    # a bin or a volunteer's home.
     return gettext("Listed under %(place)s already.", place=place)
 
 
 def count_title(place: str) -> str:
+    # Translators: %(place)s is a place of any kind, such as a store, a shelf,
+    # a bin or a volunteer's home.
     return gettext("Count %(place)s", place=place)
 
 

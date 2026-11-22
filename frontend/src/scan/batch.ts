@@ -55,13 +55,41 @@ export const ITEMS = msg({
 export const OPEN_PACKAGES = msg({
   message: "{count, plural, one {# open package} other {# open packages}}",
 });
-export const MOVE = msg`Move: {items} from {from} to {to}`;
-export const RECEIPT = msg`Receipt: {items} to {to}`;
-export const INSTALL = msg`Install: {items} from {from}`;
-export const INSTALL_NUMBERED = msg`Install: {items} from {from} for install {number}`;
-export const OPENING = msg`Opening: {items} at {from}`;
-export const REPORT = msg`Used up: {packages} at {from}`;
-export const LENGTHS = msg`What's on it: {packages} at {from}`;
+export const MOVE = msg({
+  comment:
+    "{from} and {to} are places of any kind, such as a store, a shelf, a bin or a volunteer's home.",
+  message: "Move: {items} from {from} to {to}",
+});
+export const RECEIPT = msg({
+  comment:
+    "{to} is a place of any kind, such as a store, a shelf, a bin or a volunteer's home.",
+  message: "Receipt: {items} to {to}",
+});
+export const INSTALL = msg({
+  comment:
+    "{from} is a place of any kind, such as a store, a shelf, a bin or a volunteer's home.",
+  message: "Install: {items} from {from}",
+});
+export const INSTALL_NUMBERED = msg({
+  comment:
+    "{from} is a place of any kind, such as a store, a shelf, a bin or a volunteer's home.",
+  message: "Install: {items} from {from} for install {number}",
+});
+export const OPENING = msg({
+  comment:
+    "{from} is a place of any kind, such as a store, a shelf, a bin or a volunteer's home.",
+  message: "Opening: {items} at {from}",
+});
+export const REPORT = msg({
+  comment:
+    "{from} is a place of any kind, such as a store, a shelf, a bin or a volunteer's home.",
+  message: "Used up: {packages} at {from}",
+});
+export const LENGTHS = msg({
+  comment:
+    "{from} is a place of any kind, such as a store, a shelf, a bin or a volunteer's home.",
+  message: "What's on it: {packages} at {from}",
+});
 /** After a batch that takes from open packages, and says of some. */
 export const SAID_USED_UP = msg`({packages} said used up)`;
 export const SAID_LENGTHS = msg`(what is on {packages} said)`;

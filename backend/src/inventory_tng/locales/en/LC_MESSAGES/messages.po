@@ -231,11 +231,15 @@ msgid_plural "%(count)s volunteers"
 msgstr[0] ""
 msgstr[1] ""
 
+#. %(counted)s is a place of any kind, such as a store, a shelf, a bin or a
+#. volunteer's home, or a form, such as "open spool".
 #: src/inventory_tng/templates/stock/over_recorded.html
 #, python-format
 msgid "%(counted)s closed %(day)s. %(still)s still to put right."
 msgstr ""
 
+#. %(counted)s is a place of any kind, such as a store, a shelf, a bin or a
+#. volunteer's home, or a form, such as "open spool".
 #: src/inventory_tng/templates/stock/over_recorded.html
 #, python-format
 msgid "%(counted)s counted %(day)s. %(still)s still to put right."
@@ -248,17 +252,23 @@ msgid ""
 "have to register again with a new code."
 msgstr ""
 
-#. Translators: a place or a form, then the day it was counted ("14 Nov").
+#. Translators: %(end)s is a place of any kind, such as a store, a shelf, a
+#. bin or a volunteer's home, or a form, such as "open spool"; then the day
+#. it was counted ("14 Nov").
 #: src/inventory_tng/stock/over_recorded_queries.py
 #, python-format
 msgid "%(end)s %(day)s"
 msgstr ""
 
+#. Translators: %(end)s is a place of any kind, such as a store, a shelf, a
+#. bin or a volunteer's home, or a form, such as "open spool".
 #: src/inventory_tng/stock/over_recorded_queries.py
 #, python-format
 msgid "%(end)s closed %(day)s"
 msgstr ""
 
+#. Translators: %(end)s is a place of any kind, such as a store, a shelf, a
+#. bin or a volunteer's home, or a form, such as "open spool".
 #: src/inventory_tng/stock/over_recorded_queries.py
 #, python-format
 msgid "%(end)s only"
@@ -286,6 +296,8 @@ msgstr ""
 msgid "%(item)s counted"
 msgstr ""
 
+#. Translators: %(place)s is a place of any kind, such as a store, a
+#. shelf, a bin or a volunteer's home.
 #: src/inventory_tng/stock/counts_routes.py
 #, python-format
 msgid ""
@@ -298,6 +310,8 @@ msgstr ""
 msgid "%(item)s, %(form)s: is it here?"
 msgstr ""
 
+#. %(place)s is a place of any kind, such as a store, a shelf, a bin or a
+#. volunteer's home.
 #: src/inventory_tng/templates/stock/open_package_close.html
 #, python-format
 msgid ""
@@ -415,21 +429,29 @@ msgstr ""
 msgid "%(package)s, sealed: how many"
 msgstr ""
 
+#. %(place)s is a place of any kind, such as a store, a shelf, a bin or a
+#. volunteer's home.
 #: src/inventory_tng/templates/stock/over_recorded_settled.html
 #, python-format
 msgid "%(place)s (opened)"
 msgstr ""
 
+#. Translators: %(place)s is a place of any kind, such as a store, a shelf,
+#. a bin or a volunteer's home.
 #: src/inventory_tng/stock/count_gone_areas.py
 #, python-format
 msgid "%(place)s (retired): removed from this form."
 msgstr ""
 
+#. Translators: %(place)s is a place of any kind, such as a store, a shelf,
+#. a bin or a volunteer's home.
 #: src/inventory_tng/stock/over_recorded_routes.py
 #, python-format
 msgid "%(place)s brought back. Correct it now."
 msgstr ""
 
+#. Translators: %(place)s is a place of any kind, such as a store, a
+#. shelf, a bin or a volunteer's home.
 #: src/inventory_tng/stock/counts_routes.py
 #, python-format
 msgid ""
@@ -437,6 +459,8 @@ msgid ""
 "with Something else here, then save the count."
 msgstr ""
 
+#. %(place)s is a place of any kind, such as a store, a shelf, a bin or a
+#. volunteer's home.
 #: src/inventory_tng/templates/stock/count.html
 #, python-format
 msgid ""
@@ -451,11 +475,15 @@ msgstr ""
 msgid "%(place)s, in %(parent)s"
 msgstr ""
 
+#. %(place)s is a place of any kind, such as a store, a shelf, a bin or a
+#. volunteer's home.
 #: src/inventory_tng/templates/stock/count.html
 #, python-format
 msgid "%(place)s: %(item)s counted"
 msgstr ""
 
+#. Translators: %(places)s names one or more places, each of any kind,
+#. such as a store, a shelf, a bin or a volunteer's home.
 #: src/inventory_tng/stock/count_gone_areas.py
 #, python-format
 msgid "%(places)s isn't offered: it's retired."
@@ -554,6 +582,8 @@ msgstr ""
 msgid "%(uses)s of %(most)s"
 msgstr ""
 
+#. %(place)s is a place of any kind, such as a store, a shelf, a bin or a
+#. volunteer's home.
 #: src/inventory_tng/templates/catalogue/item.html
 #: src/inventory_tng/templates/stock/length_checks.html
 #: src/inventory_tng/templates/stock/used_up.html
@@ -619,7 +649,7 @@ msgstr ""
 
 #: src/inventory_tng/templates/admin_base.html
 #, python-format
-msgid "<span class=\"sr-only\">Back to </span>%(place)s"
+msgid "<span class=\"sr-only\">Back to </span>%(page)s"
 msgstr ""
 
 #: src/inventory_tng/templates/admins/admin.html
@@ -796,6 +826,8 @@ msgstr ""
 msgid "Added."
 msgstr ""
 
+#. Translators: %(place)s is a place of any kind, such as a store, a shelf,
+#. a bin or a volunteer's home.
 #: src/inventory_tng/stock/over_recorded_queries.py
 #, python-format
 msgid "Adjusted at %(place)s"
@@ -936,6 +968,8 @@ msgid ""
 "isn't clear which number is right: nothing was saved."
 msgstr ""
 
+#. %(place)s is a place of any kind, such as a store, a shelf, a bin or a
+#. volunteer's home.
 #: src/inventory_tng/templates/stock/over_recorded.html
 #, python-format
 msgid "An open package moved to %(place)s. Confirm or correct count."
@@ -1079,6 +1113,8 @@ msgstr ""
 msgid "Best match"
 msgstr ""
 
+#. %(left)s and %(arrived)s are places of any kind, such as a store, a shelf, a
+#. bin or a volunteer's home, or a form, such as "open spool".
 #: src/inventory_tng/templates/stock/over_recorded.html
 #, python-format
 msgid ""
@@ -1086,6 +1122,8 @@ msgid ""
 "%(arrived_on)s."
 msgstr ""
 
+#. %(left)s and %(arrived)s are places of any kind, such as a store, a shelf, a
+#. bin or a volunteer's home, or a form, such as "open spool".
 #: src/inventory_tng/templates/stock/over_recorded.html
 #, python-format
 msgid ""
@@ -1097,6 +1135,8 @@ msgstr ""
 msgid "Box"
 msgstr ""
 
+#. %(place)s is a place of any kind, such as a store, a shelf, a bin or a
+#. volunteer's home.
 #: src/inventory_tng/templates/stock/over_recorded.html
 #, python-format
 msgid "Bring back %(place)s"
@@ -1124,6 +1164,8 @@ msgstr ""
 msgid "Bring them back to change anything here."
 msgstr ""
 
+#. %(place)s is a place of any kind, such as a store, a shelf, a bin or a
+#. volunteer's home.
 #: src/inventory_tng/templates/stock/count.html
 #, python-format
 msgid ""
@@ -1307,6 +1349,8 @@ msgstr ""
 msgid "Correct"
 msgstr ""
 
+#. %(end)s is a place of any kind, such as a store, a shelf, a bin or a
+#. volunteer's home, or a form, such as "open spool".
 #: src/inventory_tng/templates/stock/over_recorded.html
 #, python-format
 msgid "Correct %(end)s"
@@ -1329,6 +1373,8 @@ msgstr ""
 msgid "Count"
 msgstr ""
 
+#. Translators: %(place)s is a place of any kind, such as a store, a shelf,
+#. a bin or a volunteer's home.
 #: src/inventory_tng/stock/counts_routes.py
 #: src/inventory_tng/templates/stock/over_recorded.html
 #, python-format
@@ -1589,7 +1635,7 @@ msgid "Forgot your password?"
 msgstr ""
 
 #: src/inventory_tng/templates/stock/count.html
-msgid "Found in"
+msgid "Found at"
 msgstr ""
 
 #: src/inventory_tng/templates/stock/counts.html
@@ -1971,6 +2017,8 @@ msgstr ""
 msgid "Let them hold stock"
 msgstr ""
 
+#. Translators: %(place)s is a place of any kind, such as a store, a shelf,
+#. a bin or a volunteer's home.
 #: src/inventory_tng/stock/counts_routes.py
 #, python-format
 msgid "Listed under %(place)s already."
@@ -2081,6 +2129,8 @@ msgstr ""
 msgid "Move what is here elsewhere, or count it, first."
 msgstr ""
 
+#. Translators: %(place)s and %(there)s are places of any kind, such as a
+#. store, a shelf, a bin or a volunteer's home.
 #: src/inventory_tng/stock/count_gone_areas.py
 #, python-format
 msgid "Moved from %(place)s to %(there)s"
@@ -2261,6 +2311,8 @@ msgstr ""
 msgid "Not a unit: keep “%(typed)s”"
 msgstr ""
 
+#. Translators: %(place)s is a place of any kind, such as a store, a shelf,
+#. a bin or a volunteer's home.
 #: src/inventory_tng/stock/over_recorded_routes.py
 #, python-format
 msgid ""
@@ -2268,6 +2320,8 @@ msgid ""
 "be corrected there."
 msgstr ""
 
+#. Translators: %(place)s is a place of any kind, such as a store, a shelf,
+#. a bin or a volunteer's home.
 #: src/inventory_tng/stock/over_recorded_routes.py
 #, python-format
 msgid ""
@@ -2275,6 +2329,8 @@ msgid ""
 "can't be found there again."
 msgstr ""
 
+#. Translators: %(place)s is a place of any kind, such as a store, a shelf,
+#. a bin or a volunteer's home.
 #: src/inventory_tng/stock/over_recorded_routes.py
 #, python-format
 msgid ""
@@ -2309,6 +2365,8 @@ msgstr ""
 msgid "Not right?"
 msgstr ""
 
+#. Translators: %(places)s names one or more places, each of any kind,
+#. such as a store, a shelf, a bin or a volunteer's home.
 #: src/inventory_tng/stock/count_gone_areas.py
 #, python-format
 msgid ""
@@ -2322,6 +2380,8 @@ msgid_plural ""
 msgstr[0] ""
 msgstr[1] ""
 
+#. Translators: %(places)s names one or more places, each of any kind,
+#. such as a store, a shelf, a bin or a volunteer's home.
 #: src/inventory_tng/stock/count_gone_areas.py
 #, python-format
 msgid ""
@@ -2724,6 +2784,8 @@ msgstr ""
 msgid "Pick %(item)s"
 msgstr ""
 
+#. %(place)s is a place of any kind, such as a store, a shelf, a bin or a
+#. volunteer's home.
 #: src/inventory_tng/templates/stock/length_checks.html
 #: src/inventory_tng/templates/stock/used_up.html
 #, python-format
@@ -3664,10 +3726,12 @@ msgstr ""
 msgid "Start a count"
 msgstr ""
 
+#. %(place)s is a place of any kind, such as a store, a shelf, a bin or a
+#. volunteer's home.
 #: src/inventory_tng/templates/_retired_holding.html
 #: src/inventory_tng/templates/stock/needs_counting.html
 #, python-format
-msgid "Start counting %(name)s"
+msgid "Start counting %(place)s"
 msgstr ""
 
 #: src/inventory_tng/templates/devices/devices.html
@@ -3706,6 +3770,8 @@ msgid ""
 "first to replace it."
 msgstr ""
 
+#. Translators: %(place)s is a place of any kind, such as a store, a shelf,
+#. a bin or a volunteer's home.
 #: src/inventory_tng/stock/count_gone_areas.py
 #, python-format
 msgid "Taken out of %(place)s"
@@ -3998,6 +4064,8 @@ msgstr ""
 msgid "They still hold stock: move it back to a store first."
 msgstr ""
 
+#. %(place)s is a place of any kind, such as a store, a shelf, a bin or a
+#. volunteer's home.
 #: src/inventory_tng/templates/stock/count.html
 #, python-format
 msgid "Things still at %(place)s?"
@@ -4177,14 +4245,14 @@ msgstr ""
 msgid "Use at least %(min)s characters. A few words make a good one."
 msgstr ""
 
+#: src/inventory_tng/web/forms.py
+#, python-format
+msgid "Use at most %(digits)s decimal places."
+msgstr ""
+
 #: src/inventory_tng/admins/accounts.py
 #, python-format
 msgid "Use at most %(max)s characters."
-msgstr ""
-
-#: src/inventory_tng/web/forms.py
-#, python-format
-msgid "Use at most %(places)s decimal places."
 msgstr ""
 
 #: src/inventory_tng/templates/devices/devices.html
@@ -4648,11 +4716,15 @@ msgstr ""
 msgid "frequency"
 msgstr ""
 
+#. %(from_place)s and %(to_place)s are places of any kind, such as a store, a
+#. shelf, a bin or a volunteer's home.
 #: src/inventory_tng/templates/stock/over_recorded.html
 #, python-format
 msgid "from %(from_place)s to %(to_place)s"
 msgstr ""
 
+#. %(place)s is a place of any kind, such as a store, a shelf, a bin or a
+#. volunteer's home.
 #: src/inventory_tng/templates/stock/over_recorded.html
 #: src/inventory_tng/templates/stock/over_recorded_settled.html
 #, python-format
@@ -4929,6 +5001,8 @@ msgstr ""
 msgid "to"
 msgstr ""
 
+#. %(place)s is a place of any kind, such as a store, a shelf, a bin or a
+#. volunteer's home.
 #: src/inventory_tng/templates/stock/over_recorded.html
 #: src/inventory_tng/templates/stock/over_recorded_settled.html
 #, python-format

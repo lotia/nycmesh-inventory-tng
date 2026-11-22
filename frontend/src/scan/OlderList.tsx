@@ -45,17 +45,17 @@ export const A_CART_SOMETHING = msg`A cart: something`;
  * the 20 ways they combine. */
 export const AT_PLACE = msg({
   comment:
-    "A clause of where a save was for; clauses that apply follow in this order, joined by spaces: at or from, to, for install.",
+    "A clause of where a save was for; clauses that apply follow in this order, joined by spaces: at or from, to, for install. {place} is a place of any kind, such as a store, a shelf, a bin or a volunteer's home.",
   message: "at {place}",
 });
 export const FROM_PLACE = msg({
   comment:
-    "A clause of where a save was for; clauses that apply follow in this order, joined by spaces: at or from, to, for install.",
+    "A clause of where a save was for; clauses that apply follow in this order, joined by spaces: at or from, to, for install. {place} is a place of any kind, such as a store, a shelf, a bin or a volunteer's home.",
   message: "from {place}",
 });
 export const TO_PLACE = msg({
   comment:
-    "A clause of where a save was for; clauses that apply follow in this order, joined by spaces: at or from, to, for install.",
+    "A clause of where a save was for; clauses that apply follow in this order, joined by spaces: at or from, to, for install. {place} is a place of any kind, such as a store, a shelf, a bin or a volunteer's home.",
   message: "to {place}",
 });
 export const FOR_INSTALL = msg({

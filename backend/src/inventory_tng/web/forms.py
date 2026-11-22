@@ -127,7 +127,7 @@ def name_up_to(limit: int) -> str:
 
 def at_most_places(places: int) -> str:
     """A quantity typed too finely, refused."""
-    return gettext("Use at most %(places)s decimal places.", places=number(places))
+    return gettext("Use at most %(digits)s decimal places.", digits=number(places))
 
 
 def name_problem(name: str) -> str | None:

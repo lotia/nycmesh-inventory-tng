@@ -101,6 +101,8 @@ add_notices(
 
 
 def place_brought_back(place: str) -> str:
+    # Translators: %(place)s is a place of any kind, such as a store, a shelf,
+    # a bin or a volunteer's home.
     return gettext("%(place)s brought back. Correct it now.", place=place)
 
 
@@ -112,17 +114,23 @@ def not_changed(why: Words) -> str:
 # A change refused at a place retired and empty, by what it would do
 # there, which (Correct's) needs the amount.
 RETIRED_EMPTY: dict[str, Callable[[str, str], str]] = {
+    # Translators: %(place)s is a place of any kind, such as a store, a shelf,
+    # a bin or a volunteer's home.
     "count": lambda place, _amount: gettext(
         "Not changed: %(place)s is retired and holds nothing, so its count "
         "can't be corrected there.",
         place=place,
     ),
+    # Translators: %(place)s is a place of any kind, such as a store, a shelf,
+    # a bin or a volunteer's home.
     "found": lambda place, amount: gettext(
         "Not changed: %(place)s is retired and holds nothing, so the "
         "%(amount)s can't be found there again.",
         place=place,
         amount=amount,
     ),
+    # Translators: %(place)s is a place of any kind, such as a store, a shelf,
+    # a bin or a volunteer's home.
     "written_off": lambda place, amount: gettext(
         "Not changed: %(place)s is retired and holds nothing, so the "
         "%(amount)s can't be written off there.",

@@ -212,7 +212,7 @@ form is shown again without it (Ali, 2026-11-22, inventory-tng-ygk5).
 One emptied is said so, and what left it while it was counted is shown
 under "Moved from Shelf C to Shelf B", with an empty box, counted at the
 place it went to and shown only there, or listed under "Taken out of"
-the store if it went elsewhere. Found in leaves the area out, saying it
+the store if it went elsewhere. Found at leaves the area out, saying it
 is retired, and a "Bring it back" button on the form brings it back, as
 its own page does, and shows the form again with it, everything typed
 kept. A recorded move is never undone: if the items never left, the

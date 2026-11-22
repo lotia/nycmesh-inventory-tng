@@ -977,7 +977,21 @@ the page, `msg({ context: "place", message: "To" })`.
 
 For a translator, a comment starting `Translators:` just before a message
 goes into the catalogue with it: `# Translators: …` in Python, `{#
-Translators: … #}` in a template, and `msg`'s `comment` on the page.
+Translators: … #}` in a template, and `msg`'s `comment` on the page. In
+Python it goes just before the line that calls `gettext`, not inside the
+call. In a template, the first message on the comment's line, or the next
+line with one, takes it, so a message sharing a line with another goes
+on a line of its own.
+
+A message never chooses a preposition by the kind of place: English says
+in a store, on a shelf, in a bin, and other languages decline names or
+choose by rules of their own. Say "at" for where something is, "from" and
+"to" for a move, and "under" for a heading on the form, or put the name
+where it stands alone: a heading, a picker's options, after a colon. So
+"Found at", not "Found in". A message with a place in it tells a
+translator it can be any kind of place, such as a store, a shelf, a bin
+or a volunteer's home. `backend/tests/codebase/test_place_phrases.py`
+checks both, on either side.
 
 After adding or changing a phrase, write the catalogues again, and commit
 them:

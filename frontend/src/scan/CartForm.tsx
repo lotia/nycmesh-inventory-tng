@@ -65,10 +65,26 @@ export const WHICH_PACKAGE = msg`{item}: type how many of which package to open.
 export const ADDED_ONE = msg`Added one: {item}.`;
 export const ADDED_PACKAGE = msg`Added a {package}: {item}.`;
 export const UNKNOWN_LABEL = msg`That label isn't in the inventory ({code}).`;
-export const PLACE_HERE = msg`{place}: here.`;
-export const PLACE_FROM_HERE = msg`{place}: from here.`;
-export const PLACE_TO_HERE = msg`{place}: to here.`;
-export const PLACE_WHICH = msg`{place}: from here, or to here?`;
+export const PLACE_HERE = msg({
+  comment:
+    "{place} is a place of any kind, such as a store, a shelf, a bin or a volunteer's home.",
+  message: "{place}: here.",
+});
+export const PLACE_FROM_HERE = msg({
+  comment:
+    "{place} is a place of any kind, such as a store, a shelf, a bin or a volunteer's home.",
+  message: "{place}: from here.",
+});
+export const PLACE_TO_HERE = msg({
+  comment:
+    "{place} is a place of any kind, such as a store, a shelf, a bin or a volunteer's home.",
+  message: "{place}: to here.",
+});
+export const PLACE_WHICH = msg({
+  comment:
+    "{place} is a place of any kind, such as a store, a shelf, a bin or a volunteer's home.",
+  message: "{place}: from here, or to here?",
+});
 export const CHANGED_BEFORE_RECORD = msg`The cart was changed in another tab. Check it, then record it again.`;
 export const NOT_SENT = msg`This browser wouldn't keep the cart, so it wasn't sent. Free some space or leave private browsing, then try again.`;
 export const ARE_YOU = msg`Are you {name}? This phone hasn't been used for a while.`;

@@ -13,7 +13,7 @@
   {% include "_masthead.html" %}
   <main class="admin page-width">
     {#- The way back, above the title (docs/decisions/0019): back_link = (path, words). #}
-    {% if back_link %}<p class="back"><a href="{{ back_link[0] }}"><span aria-hidden="true">‹&nbsp;</span>{% trans place=back_link[1] %}<span class="sr-only">Back to </span>{{ place }}{% endtrans %}</a></p>{% endif %}
+    {% if back_link %}<p class="back"><a href="{{ back_link[0] }}"><span aria-hidden="true">‹&nbsp;</span>{% trans page=back_link[1] %}<span class="sr-only">Back to </span>{{ page }}{% endtrans %}</a></p>{% endif %}
     <h1>{{ title }}</h1>
     {% if alert %}<p role="alert">{{ alert }}</p>{% endif %}
     {#- A notice about one section is said by its heading; any other, here. #}

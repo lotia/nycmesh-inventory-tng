@@ -18,9 +18,9 @@ up. Not used up offers it again, for a box ticked by mistake.{% endtrans %}</p>
   {% for each in reported %}
   {% set row = each.row %}
   {% set who = each.reported_by or _("someone") %}
-  {% set which %}{% trans what=each.item, place=each.place %}{{ what }} at {{ place }}{% endtrans %}{% endset %}
+  {% set which %}{#- Translators: %(place)s is a place of any kind, such as a store, a shelf, a bin or a volunteer's home. #}{% trans what=each.item, place=each.place %}{{ what }} at {{ place }}{% endtrans %}{% endset %}
   <tr>
-    <td><input type="checkbox" name="open_package" value="{{ row.id }}" form="answer-ticked" aria-label="{% trans item=each.item, package=each.package, place=each.place %}Pick {{ item }}, {{ package }}, at {{ place }}{% endtrans %}"></td>
+    <td><input type="checkbox" name="open_package" value="{{ row.id }}" form="answer-ticked" aria-label="{#- Translators: %(place)s is a place of any kind, such as a store, a shelf, a bin or a volunteer's home. #}{% trans item=each.item, package=each.package, place=each.place %}Pick {{ item }}, {{ package }}, at {{ place }}{% endtrans %}"></td>
     <td>{{ each.item }}, {{ each.package }} · {{ each.place }}
       <span class="hint block sm:hidden">{% trans left=each.left | amount, unit=each.unit, who=who, when=row.reported_at | when(zone) %}shows {{ left }} {{ unit }}; {{ who }}, {{ when }}{% endtrans %}</span></td>
     <td class="hidden sm:table-cell">{{ each.left | amount }} {{ each.unit }}</td>

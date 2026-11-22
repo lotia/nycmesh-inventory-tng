@@ -32,7 +32,7 @@ Mark checked asked again, for a row without it. #}
   {% if refused and refused.place %}
   <form method="post" action="{{ here }}/{{ each.row.id }}/bring-back{{ view.query_string }}">
     <input type="hidden" name="seen" value="{{ seen(each.row) }}">
-    <button class="primary" name="place" value="{{ refused.place.id }}">{% trans place=refused.place.name %}Bring back {{ place }}{% endtrans %}</button>
+    <button class="primary" name="place" value="{{ refused.place.id }}">{#- Translators: %(place)s is a place of any kind, such as a store, a shelf, a bin or a volunteer's home. #}{% trans place=refused.place.name %}Bring back {{ place }}{% endtrans %}</button>
   </form>
   {% endif %}
   <form method="post" action="{{ here }}/{{ each.row.id }}/checked{{ view.query_string }}">
@@ -62,9 +62,9 @@ with an adjustment. Mark checked if you already fixed it.{% endtrans %}</p>
   <tr>
     <td>{{ each.item }}</td>
     <td>{{ each.amount }}</td>
-    <td>{% if each.from_place and each.to_place %}{% trans from_place=each.from_place, to_place=each.to_place %}from {{ from_place }} to {{ to_place }}{% endtrans %}
-      {%- elif each.from_place %}{% trans place=each.from_place %}from {{ place }}{% endtrans %}
-      {%- elif each.to_place %}{% trans place=each.to_place %}to {{ place }}{% endtrans %}{% endif %}</td>
+    <td>{% if each.from_place and each.to_place %}{#- Translators: %(from_place)s and %(to_place)s are places of any kind, such as a store, a shelf, a bin or a volunteer's home. #}{% trans from_place=each.from_place, to_place=each.to_place %}from {{ from_place }} to {{ to_place }}{% endtrans %}
+      {%- elif each.from_place %}{#- Translators: %(place)s is a place of any kind, such as a store, a shelf, a bin or a volunteer's home. #}{% trans place=each.from_place %}from {{ place }}{% endtrans %}
+      {%- elif each.to_place %}{#- Translators: %(place)s is a place of any kind, such as a store, a shelf, a bin or a volunteer's home. #}{% trans place=each.to_place %}to {{ place }}{% endtrans %}{% endif %}</td>
     <td>{{ each.transaction_id }}, {{ each.recorded_at | when(zone) }}</td>
     <td>
       {% if whole %}
@@ -72,7 +72,7 @@ with an adjustment. Mark checked if you already fixed it.{% endtrans %}</p>
       count there is confirmed, or corrected by an adjustment. #}
       {% set name = "count-" ~ row.id %}
       <form method="post" action="{{ here }}/{{ row.id }}/count{{ view.query_string }}">
-        <p>{% trans place=each.to_place %}An open package moved to {{ place }}. Confirm or correct count.{% endtrans %}</p>
+        <p>{#- Translators: %(place)s is a place of any kind, such as a store, a shelf, a bin or a volunteer's home. #}{% trans place=each.to_place %}An open package moved to {{ place }}. Confirm or correct count.{% endtrans %}</p>
         <input type="hidden" name="seen" value="{{ seen(row) }}">
         <label for="{{ name }}">{% trans %}Count in the package{% endtrans %}</label>
         <input id="{{ name }}" name="count" inputmode="decimal" required value="{{ values.get(name, whole.count) }}" data-was="{{ whole.count }}" aria-describedby="{{ name }}-was{% if problems.get(name) %} {{ name }}-problem{% endif %}">
@@ -88,17 +88,18 @@ with an adjustment. Mark checked if you already fixed it.{% endtrans %}</p>
       {#- How an end was put right (over_recorded_queries.OneCounted, BothRight):
       "counted", or "closed", an opening's open package closed since. #}
       {% if one %}
-      <p>{% if one.how == "closed" %}{% trans counted=one.counted, day=one.on | day(zone), still=one.still %}{{ counted }} closed {{ day }}. {{ still }} still to put right.{% endtrans %}
-      {%- else %}{% trans counted=one.counted, day=one.on | day(zone), still=one.still %}{{ counted }} counted {{ day }}. {{ still }} still to put right.{% endtrans %}{% endif %}</p>
+      <p>{#- Translators: %(counted)s is a place of any kind, such as a store, a shelf, a bin or a volunteer's home, or a form, such as "open spool". #}{% if one.how == "closed" %}{% trans counted=one.counted, day=one.on | day(zone), still=one.still %}{{ counted }} closed {{ day }}. {{ still }} still to put right.{% endtrans %}
+      {#- Translators: %(counted)s is a place of any kind, such as a store, a shelf, a bin or a volunteer's home, or a form, such as "open spool". #}{%- else %}{% trans counted=one.counted, day=one.on | day(zone), still=one.still %}{{ counted }} counted {{ day }}. {{ still }} still to put right.{% endtrans %}{% endif %}</p>
       {% elif both %}
-      <p>{% if both.arrived_how == "closed" %}{% trans left=both.left, left_on=both.left_on | day(zone), arrived=both.arrived, arrived_on=both.arrived_on | day(zone) %}Both ends are right: {{ left }} counted {{ left_on }}, {{ arrived }} closed {{ arrived_on }}.{% endtrans %}
-      {%- else %}{% trans left=both.left, left_on=both.left_on | day(zone), arrived=both.arrived, arrived_on=both.arrived_on | day(zone) %}Both ends are right: {{ left }} counted {{ left_on }}, {{ arrived }} counted {{ arrived_on }}.{% endtrans %}{% endif %}</p>
+      <p>{#- Translators: %(left)s and %(arrived)s are places of any kind, such as a store, a shelf, a bin or a volunteer's home, or a form, such as "open spool". #}{% if both.arrived_how == "closed" %}{% trans left=both.left, left_on=both.left_on | day(zone), arrived=both.arrived, arrived_on=both.arrived_on | day(zone) %}Both ends are right: {{ left }} counted {{ left_on }}, {{ arrived }} closed {{ arrived_on }}.{% endtrans %}
+      {#- Translators: %(left)s and %(arrived)s are places of any kind, such as a store, a shelf, a bin or a volunteer's home, or a form, such as "open spool". #}{%- else %}{% trans left=both.left, left_on=both.left_on | day(zone), arrived=both.arrived, arrived_on=both.arrived_on | day(zone) %}Both ends are right: {{ left }} counted {{ left_on }}, {{ arrived }} counted {{ arrived_on }}.{% endtrans %}{% endif %}</p>
       {% endif %}
       {#- Forms of their own, so Enter in the words marks it checked. #}
       <div class="actions">
         <form method="post" action="{{ here }}/{{ row.id }}/{{ 'close' if both else 'correct' }}{{ view.query_string }}">
           <input type="hidden" name="seen" value="{{ seen(row) }}">
-          <button>{% if both %}{% trans %}Close it{% endtrans %}{% elif one %}{% trans end=one.correct %}Correct {{ end }}{% endtrans %}{% else %}{% trans %}Correct{% endtrans %}{% endif %}<span class="sr-only"> {{ which(each) }}</span></button>
+          <button>{% if both %}{% trans %}Close it{% endtrans %}{% elif one %}
+          {#- Translators: %(end)s is a place of any kind, such as a store, a shelf, a bin or a volunteer's home, or a form, such as "open spool". #}{% trans end=one.correct %}Correct {{ end }}{% endtrans %}{% else %}{% trans %}Correct{% endtrans %}{% endif %}<span class="sr-only"> {{ which(each) }}</span></button>
         </form>
         {% if one and one.countable %}
         <a href="{{ counts_path }}/{{ one.place_id }}?item={{ each.item_id }}">{% trans place=one.place %}Count {{ place }}{% endtrans %}<span class="sr-only"> {{ which(each) }}</span></a>

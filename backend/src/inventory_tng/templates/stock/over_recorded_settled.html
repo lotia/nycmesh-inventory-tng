@@ -26,10 +26,10 @@
     <td><a href="{{ stock_path }}?by=item#item-{{ each.item_id }}">{{ each.item }}</a></td>
     <td>{{ each.amount }}</td>
     <td>
-      {%- if each.opening %}{% trans place=place(each.from_place, each) %}{{ place }} (opened){% endtrans %}
+      {%- if each.opening %}{#- Translators: %(place)s is a place of any kind, such as a store, a shelf, a bin or a volunteer's home. #}{% trans place=place(each.from_place, each) %}{{ place }} (opened){% endtrans %}
       {%- elif each.from_place and each.to_place %}{{ place(each.from_place, each) }} → {{ place(each.to_place, each) }}
-      {%- elif each.from_place %}{% trans place=place(each.from_place, each) %}from {{ place }}{% endtrans %}
-      {%- elif each.to_place %}{% trans place=place(each.to_place, each) %}to {{ place }}{% endtrans %}{% endif -%}
+      {%- elif each.from_place %}{#- Translators: %(place)s is a place of any kind, such as a store, a shelf, a bin or a volunteer's home. #}{% trans place=place(each.from_place, each) %}from {{ place }}{% endtrans %}
+      {%- elif each.to_place %}{#- Translators: %(place)s is a place of any kind, such as a store, a shelf, a bin or a volunteer's home. #}{% trans place=place(each.to_place, each) %}to {{ place }}{% endtrans %}{% endif -%}
     </td>
     <td>{{ each.how }}</td>
     <td>{{ each.why }}</td>

@@ -433,7 +433,7 @@ def test_something_else_here_offers_only_what_a_place_it_may_be_found_lacks(
     admin_client: TestClient, session: Session
 ) -> None:
     """Radios listed at the store and every current area, but not at a
-    retired shelf holding cable: no place Found in offers lacks them, so
+    retired shelf holding cable: no place Found at offers lacks them, so
     they are not offered; cable, which the store lacks, is."""
     made = Store(session)
     item, cable = made.place.item.id, made.place.cable.id
