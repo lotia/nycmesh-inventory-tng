@@ -143,7 +143,7 @@ def _answer(
     rows = queries.open_with_ids(session, list(ids), *REPORTED)
     ledger.lock_places(session, (row.location_id for row in rows))
     if answer == "confirm":
-        ledger.hold_across(session, (), (), (row.id for row in rows))
+        ledger.hold_across(session, open_ids=(row.id for row in rows))
     changed = 0
     for row in sorted(rows, key=lambda each: each.id):
         if answer == "clear":

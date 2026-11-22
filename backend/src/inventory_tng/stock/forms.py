@@ -236,6 +236,14 @@ def field_at(root_id: int, place_id: int, name: str) -> str:
     return f"{AT}{place_id}_{name}"
 
 
+def fields_at[V](
+    root_id: int, place_id: int, by_field: Mapping[str, V]
+) -> dict[str, V]:
+    """These fields of a place, each by its name on the count form of
+    `root_id` (field_at)."""
+    return {field_at(root_id, place_id, name): v for name, v in by_field.items()}
+
+
 def places_listed(form: Mapping[str, str], root_id: int) -> list[int] | None:
     """The places a count form shows (PLACES), by id; just its own, on a
     form that lists none; None if one listed is no id at all."""
@@ -358,15 +366,9 @@ def read_count(
             if (item_id := row_id(typed)) is not None
         }
         places[place_id] = PlaceCount(found, counted, forms, items)
-        named = {
-            field_at(root_id, place_id, field): item_id
-            for field, item_id in named_twice(found_once).items()
-        }
+        named = fields_at(root_id, place_id, named_twice(found_once))
         twice |= named
-        problems |= {
-            field_at(root_id, place_id, field): words
-            for field, words in (wrong | form_wrong).items()
-        }
+        problems |= fields_at(root_id, place_id, wrong | form_wrong)
         problems |= dict.fromkeys(named, ON_THE_FORM_TWICE)
     return CountForm(places, problems, twice, listed)
 

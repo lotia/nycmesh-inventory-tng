@@ -366,7 +366,7 @@ def _answer(
     open_ids = [each.open_id for each in answers]
     places = queries.places_of_open(session, open_ids)
     ledger.lock_places(session, places)
-    items = ledger.hold_across(session, (), (), open_ids)
+    items = ledger.hold_across(session, open_ids=open_ids)
     if setting := [each.moved_by for each in answers if each.left is not None]:
         over_recorded.hold_waiting(session, places, max(setting), items)
     set_, left_ = 0, 0

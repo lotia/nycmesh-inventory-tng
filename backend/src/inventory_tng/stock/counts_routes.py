@@ -51,6 +51,7 @@ inventory-tng-fxsy).
 import uuid
 from collections.abc import Collection, Mapping, Sequence
 from decimal import Decimal
+from functools import partial
 from typing import Annotated, Any, NamedTuple
 from urllib.parse import urlencode
 
@@ -88,6 +89,7 @@ from inventory_tng.stock.forms import (
     Listed,
     adjustment,
     field_at,
+    fields_at,
     item_counts,
     places_listed,
     read_count,
@@ -777,6 +779,10 @@ def count(
     areas = place_ids != [place.id]
     sent = read_count(session, form, place.id, place_ids)
     asked = {place_id: each.items for place_id, each in sent.places.items()}
+    # The form shown again: as sent, or with `at` None, as it is now.
+    again = partial(_count_page, request, session, signed, place, shown=shown)
+    # What was typed, kept on a form shown as it is now, with a new key.
+    typed = {name: value for name, value in form.items() if name != "key"}
     if place.id not in place_ids and not any(asked.values()):
         # Only a recount of some areas leaves its own place off.
         return not_found()
@@ -801,18 +807,13 @@ def count(
     if problems:
         # What was typed is as of when the form was shown, of the places it
         # showed; a recount asks again for its own items only.
-        return _count_page(
-            request,
-            session,
-            signed,
-            place,
+        return again(
             at,
             places=place_ids,
             problems=problems,
             values=form,
             alert=alert,
             items=asked,
-            shown=shown,
         )
     # Filtered to some items, a place of a store's form with nothing typed
     # was not counted, the store's own too.
@@ -826,17 +827,12 @@ def count(
         # Nothing typed at any place: nothing to count, so the form again,
         # as sent, saying so (inventory-tng-fxsy).
         log.info("count refused: nothing typed", location_id=place.id)
-        return _count_page(
-            request,
-            session,
-            signed,
-            place,
+        return again(
             at,
             places=place_ids,
             values=form,
             alert=NOTHING_TYPED,
             items=asked,
-            shown=shown,
             status_code=400,
         )
 
@@ -880,58 +876,40 @@ def count(
             # An area retired since: the form as it is now, without it,
             # keeping what was typed, to check and send again; a recount
             # asks no more there.
-            return _count_page(
-                request,
-                session,
-                signed,
-                place,
+            return again(
                 None,
-                values={name: value for name, value in form.items() if name != "key"},
+                values=typed,
                 alert=retired_meanwhile(session.get_one(Location, retired).name),
                 items={
                     place_id: each
                     for place_id, each in asked.items()
                     if place_id != retired
                 },
-                shown=shown,
                 status_code=409,
             )
         if broken == CHANGED:
             # What was typed may be of before that save or after it, of
             # items it cannot tell: the form as it is now, with a new key,
             # keeping what was typed, to check and send again.
-            return _count_page(
-                request,
-                session,
-                signed,
-                place,
+            return again(
                 None,
-                values={name: value for name, value in form.items() if name != "key"},
+                values=typed,
                 alert=SAVED_AS_SHOWN,
                 items=asked,
-                shown=shown,
                 status_code=409,
             )
         # Checked again, the units as they are now mark the lines it broke.
         problems = {}
         for place_id, each in sent.places.items():
             _, wrong = item_counts(session, each.found)
-            problems |= {
-                field_at(place.id, place_id, field): words
-                for field, words in wrong.items()
-            }
-        return _count_page(
-            request,
-            session,
-            signed,
-            place,
+            problems |= fields_at(place.id, place_id, wrong)
+        return again(
             at,
             places=place_ids,
             problems=problems,
             values=form,
             alert=None if problems else RULES[broken],
             items=asked,
-            shown=shown,
             status_code=400,
         )
     assert result is not None
@@ -950,19 +928,15 @@ def count(
             return redirect(COUNTS, notice=notice, section="count")
         # Back to the form, the places picked for something else here and
         # an open package nobody recorded picked again (forms.PICKED).
-        again = shown.params() | {
+        params = shown.params() | {
             picker: form[picker] for picker in PICKED if form.get(picker)
         }
-        return redirect(f"{COUNTS}/{place.id}", notice=notice, **again)
+        return redirect(f"{COUNTS}/{place.id}", notice=notice, **params)
     amounts = {place_id: sent.places[place_id].typed() for place_id in result}
     saved = sum(len(typed) for typed in amounts.values()) - sum(
         len(each) for each in moved.values()
     )
-    return _count_page(
-        request,
-        session,
-        signed,
-        place,
+    return again(
         None,
         recount={
             place_id: {
@@ -972,7 +946,6 @@ def count(
             for place_id, each in moved.items()
         },
         alert=moved_meanwhile(saved),
-        shown=shown,
         status_code=409,
     )
 

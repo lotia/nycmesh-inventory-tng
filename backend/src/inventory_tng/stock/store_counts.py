@@ -1,9 +1,8 @@
 """A count form saved (stock/counts_routes.py): a place and every area in
 it on the form, each counted at its own place (inventory-tng-8i4.51.4).
-Every place is held first, in id order, then every row the places' counts
-name, each kind by id across them all, then the checks they may settle,
-before any place is written (inventory-tng-nfia). A place with no areas is
-a form of one place, saved the same way.
+Everything the places' counts hold is held for them all before any is
+written, in the order stock/ledger.py gives (inventory-tng-nfia). A place
+with no areas is a form of one place, saved the same way.
 """
 
 import uuid
@@ -15,7 +14,7 @@ from sqlalchemy.orm import Session
 
 from inventory_tng.models.stock import OpenPackage
 from inventory_tng.stock import open_packages, over_recorded
-from inventory_tng.stock.counts import Counted, record_count
+from inventory_tng.stock.counts import Counted, FormLines, record_count
 from inventory_tng.stock.forms import PlaceCount
 from inventory_tng.stock.ledger import LOOSE, Form, hold_across, lock_places
 from inventory_tng.stock.moments import Moment
@@ -34,8 +33,6 @@ def record_store_count(
     `places`, as of `at`, read across them all (moments.moment): every
     place held, then the rows they name (_hold_named), then each written
     (_count_at). NotCountable names the place that may not be counted."""
-    # Every place on the form, in id order, as every count and save takes
-    # them (stock/ledger.py).
     lock_places(session, places)
     _hold_named(session, counts.keys(), at, counts.values())
     return {
@@ -58,12 +55,14 @@ def _hold_named(
     found = [count.forms.found[0] for count in counts if count.forms.found]
     items = hold_across(
         session,
-        [item_id for count in counts for item_id, _ in count.counted]
+        item_ids=[item_id for count in counts for item_id, _ in count.counted]
         + [item_id for count in counts for item_id, _, _ in count.forms.lines]
         + [package.item_id for package in found],
-        [form.package_id for form in forms if form.package_id is not None]
+        package_ids=[form.package_id for form in forms if form.package_id is not None]
         + [package.id for package in found],
-        [form.open_package_id for form in forms if form.open_package_id is not None]
+        open_ids=[
+            form.open_package_id for form in forms if form.open_package_id is not None
+        ]
         + [open_id for count in counts for open_id, _ in count.forms.close],
     )
     over_recorded.hold_waiting(session, places, at.as_of, items)
@@ -90,11 +89,24 @@ def _count_at(
     # loose units.
     found_item = forms.found[0].item_id if forms.found else None
     totals = [(item_id, n) for item_id, n in count.counted if item_id != found_item]
-    lines = [*forms.lines]
-    lines += [
-        (item_id, LOOSE, n) for item_id, n in count.counted if item_id == found_item
+    lines = [
+        *forms.lines,
+        *((item_id, LOOSE, n) for item_id, n in count.counted if item_id == found_item),
     ]
     place_key = uuid.uuid5(key, str(place_id))
+
+    def counted_by(by_form: FormLines) -> Counted:
+        return record_count(
+            session,
+            place_key,
+            admin_id,
+            place_id,
+            totals,
+            at,
+            by_form=by_form,
+            across=across,
+        )
+
     # Its item's figures, if a package found was not kept (below).
     withheld: dict[int, tuple[Decimal, Decimal]] = {}
     if forms.found is not None:
@@ -104,32 +116,14 @@ def _count_at(
                 session, uuid.uuid5(key, "found"), package.id, place_id
             )
             found = (package.item_id, Form(open_package_id=made.id), left)
-            counted_now = record_count(
-                session,
-                place_key,
-                admin_id,
-                place_id,
-                totals,
-                at,
-                by_form=[*lines, found],
-                across=across,
-            )
+            counted_now = counted_by([*lines, found])
             if package.item_id in counted_now.moved:
                 # Its item moved meanwhile: asked again, found again then,
                 # though no line but the package counted it.
                 withheld = counted_now.moved
                 finding.rollback()
     if forms.found is None or withheld:
-        counted_now = record_count(
-            session,
-            place_key,
-            admin_id,
-            place_id,
-            totals,
-            at,
-            by_form=lines,
-            across=across,
-        )
+        counted_now = counted_by(lines)
         counted_now = counted_now._replace(moved=withheld | counted_now.moved)
     # Closed after the count: one not there, or used up, as said. Each
     # closed is at 0, as counted so, for an opening that arrived in it.

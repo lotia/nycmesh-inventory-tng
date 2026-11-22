@@ -33,7 +33,6 @@ from inventory_tng.stock.ledger import (
     entries,
     insert_transaction,
     lock_place,
-    lock_places,
     repeated,
 )
 
@@ -233,11 +232,9 @@ def record_count(
 
     A count of a store and its areas on one form (inventory-tng-8i4.51.4)
     is one record_count for each place, each under a key of its own, with
-    `across` every place the form's moment was read across (moments.moment):
-    the first locks them all, in id order (ledger.lock_places), and each
-    checks the moment across them all. The caller holds the rows they all
-    name first (ledger.hold_across), so none takes one after another of a
-    higher id.
+    `across` every place the form's moment was read across (moments.moment),
+    each checking the moment across them all. The caller holds them all
+    first, then the rows they all name (stock/store_counts.py).
 
     An item that moved there since may have been counted before the move or
     after it, so its line is not written: it comes back to count again. The
@@ -266,7 +263,6 @@ def record_count(
     )
     counted_at = dict(counted)
     places = {location_id, *across}
-    lock_places(session, places)
     sent = _hold_place(session, location_id, key, _lost_key(key))
     as_of = shown.as_of
     after = LedgerTransaction.id > as_of

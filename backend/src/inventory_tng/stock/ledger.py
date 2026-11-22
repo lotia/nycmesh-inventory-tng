@@ -467,9 +467,10 @@ def _none_sealed(
 
 def hold_across(
     session: Session,
-    item_ids: Iterable[int],
-    package_ids: Iterable[int],
-    open_ids: Iterable[int],
+    *,
+    item_ids: Iterable[int] = (),
+    package_ids: Iterable[int] = (),
+    open_ids: Iterable[int] = (),
 ) -> set[int]:
     """For a change that writes several transactions, holding their places
     (lock_places): hold every item, package and open package they may
