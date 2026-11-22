@@ -8,7 +8,7 @@ lost or found where it went, in that form, and nothing is written against
 the area it left (fixed). The moves
 are those after the form was first shown, those to a place on it up to
 its moment, so the save reads the same ones the form showed. The routes are
-stock/counts_routes.py's; the writing is stock/store_counts.py's."""
+stock/count_routes.py's; the writing is stock/store_counts.py's."""
 
 from collections.abc import Collection, Mapping, Sequence
 from decimal import Decimal

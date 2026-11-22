@@ -6,7 +6,7 @@ what went to a place on it under "Moved to …", a part for each area it
 came from, each item with the amount moved and a box to fix it (what the
 save does with it is stock/count_arrivals.py's); what went elsewhere, with
 nothing to type; which may be brought back; and what Found at says of
-those it leaves out. The routes are stock/counts_routes.py's."""
+those it leaves out. The routes are stock/count_routes.py's."""
 
 from collections.abc import Collection, Mapping, Sequence
 from decimal import Decimal

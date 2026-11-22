@@ -1,5 +1,5 @@
-"""Counts and adjustments: an administrator's, from stock/counts_routes.py
-(a count through stock/store_counts.py), a length check
+"""Counts and adjustments: an administrator's, from stock/count_routes.py
+(through stock/store_counts.py) and stock/counts_routes.py, a length check
 (stock/length_checks_routes.py), a package closed
 (open_packages.close) or a check settled (over_recorded)
 (docs/decisions/0003, 0020). They put the records right for what was

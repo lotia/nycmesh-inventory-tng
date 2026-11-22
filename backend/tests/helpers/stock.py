@@ -116,6 +116,17 @@ def raise_check(
     ).one()
 
 
+def counts_written(session: Session) -> list[LedgerTransaction]:
+    """The counts and adjustments in the ledger, oldest first."""
+    return list(
+        session.scalars(
+            select(LedgerTransaction)
+            .where(LedgerTransaction.kind.in_(("count", "adjustment")))
+            .order_by(LedgerTransaction.id)
+        )
+    )
+
+
 def ada_id(session: Session) -> int:
     """The id of admin_client's administrator."""
     return admin_named(session, "ada").id

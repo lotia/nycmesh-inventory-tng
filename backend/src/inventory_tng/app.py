@@ -44,6 +44,7 @@ from inventory_tng.scan import (
 )
 from inventory_tng.site_settings import site_settings_routes
 from inventory_tng.stock import (
+    count_routes,
     counts_routes,
     length_checks_routes,
     over_recorded_routes,
@@ -155,6 +156,7 @@ def create_app(
         over_recorded_routes,
         reading_rules_routes,
         counts_routes,
+        count_routes,
         devices_routes,
         admins_routes,
         site_settings_routes,

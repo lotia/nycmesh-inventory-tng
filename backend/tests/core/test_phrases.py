@@ -63,6 +63,7 @@ from inventory_tng.models.volunteers import Volunteer
 from inventory_tng.site_settings.forms import WHOLE, whole_minutes
 from inventory_tng.stock import (
     count_groups,
+    count_routes,
     counts_routes,
     length_checks_routes,
     over_recorded_queries,
@@ -178,10 +179,10 @@ SAID_WITH_VALUES: list[Callable[[], Words]] = [
     *(lambda said=said: said(1, 9) for said in WHOLE.values()),
     lambda: whole_minutes(1, 9),
     lambda: used_up_routes.close_title(NOT_ENGLISH),
-    lambda: counts_routes.count_title(NOT_ENGLISH),
-    lambda: counts_routes.moved_meanwhile(0),
-    lambda: counts_routes.moved_meanwhile(1),
-    lambda: counts_routes.moved_meanwhile(3),
+    lambda: count_routes.count_title(NOT_ENGLISH),
+    lambda: count_routes.moved_meanwhile(0),
+    lambda: count_routes.moved_meanwhile(1),
+    lambda: count_routes.moved_meanwhile(3),
     lambda: count_groups.sealed_how_many(NOT_ENGLISH),
     lambda: count_groups.opened_left(NOT_ENGLISH, "2026-11-15"),
     lambda: stock_routes.recorded_more_view(2),

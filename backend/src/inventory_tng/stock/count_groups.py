@@ -1,4 +1,4 @@
-"""How a count form lays out what it shows (stock/counts_routes.py): a
+"""How a count form lays out what it shows (stock/count_routes.py): a
 group of lines for each place on it, named by its path, and each line's
 forms of an item as rows to count, each with its words and field."""
 

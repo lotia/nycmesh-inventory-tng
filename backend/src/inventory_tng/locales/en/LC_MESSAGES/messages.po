@@ -298,7 +298,7 @@ msgstr ""
 
 #. Translators: %(place)s is a place of any kind, such as a store, a
 #. shelf, a bin or a volunteer's home.
-#: src/inventory_tng/stock/counts_routes.py
+#: src/inventory_tng/stock/count_routes.py
 #, python-format
 msgid ""
 "%(item)s is already listed under %(place)s. Type what you found on its "
@@ -464,7 +464,7 @@ msgstr ""
 
 #. Translators: %(place)s is a place of any kind, such as a store, a
 #. shelf, a bin or a volunteer's home.
-#: src/inventory_tng/stock/counts_routes.py
+#: src/inventory_tng/stock/count_routes.py
 #, python-format
 msgid ""
 "%(place)s is back, and what you typed is kept. Add what's at %(place)s "
@@ -969,7 +969,7 @@ msgstr ""
 msgid "An item is on the count twice: count it once."
 msgstr ""
 
-#: src/inventory_tng/stock/counts_routes.py
+#: src/inventory_tng/stock/count_routes.py
 msgid ""
 "An item is on this form more than once. Each item is counted once, so it "
 "isn't clear which number is right: nothing was saved."
@@ -1382,7 +1382,7 @@ msgstr ""
 
 #. Translators: %(place)s is a place of any kind, such as a store, a shelf,
 #. a bin or a volunteer's home.
-#: src/inventory_tng/stock/counts_routes.py
+#: src/inventory_tng/stock/count_routes.py
 #: src/inventory_tng/templates/stock/over_recorded.html
 #, python-format
 msgid "Count %(place)s"
@@ -1437,11 +1437,11 @@ msgstr ""
 msgid "Counted where it left"
 msgstr ""
 
-#: src/inventory_tng/stock/counts_routes.py
+#: src/inventory_tng/stock/count_routes.py
 msgid "Counted. The records now match what you found."
 msgstr ""
 
-#: src/inventory_tng/stock/counts_routes.py
+#: src/inventory_tng/stock/count_routes.py
 msgid "Counted: everything was as the records say."
 msgstr ""
 
@@ -2036,7 +2036,7 @@ msgstr ""
 
 #. Translators: %(place)s is a place of any kind, such as a store, a shelf,
 #. a bin or a volunteer's home.
-#: src/inventory_tng/stock/counts_routes.py
+#: src/inventory_tng/stock/count_routes.py
 #, python-format
 msgid "Listed under %(place)s already."
 msgstr ""
@@ -2428,7 +2428,7 @@ msgid ""
 "is now: make your change again."
 msgstr ""
 
-#: src/inventory_tng/stock/counts_routes.py
+#: src/inventory_tng/stock/count_routes.py
 msgid ""
 "Not saved: something here was saved just as you opened this count, so the"
 " records may say otherwise now. What you typed is kept: check it and save"
@@ -2525,7 +2525,7 @@ msgstr ""
 msgid "Nothing waits."
 msgstr ""
 
-#: src/inventory_tng/stock/counts_routes.py
+#: src/inventory_tng/stock/count_routes.py
 msgid "Nothing was typed, so nothing was counted."
 msgstr ""
 
@@ -3419,7 +3419,7 @@ msgstr ""
 msgid "Saved"
 msgstr ""
 
-#: src/inventory_tng/stock/counts_routes.py
+#: src/inventory_tng/stock/count_routes.py
 #, python-format
 msgid "Saved %(num)s line. These moved while you counted, so count them again."
 msgid_plural "Saved %(num)s lines. These moved while you counted, so count them again."
@@ -4046,7 +4046,7 @@ msgid ""
 " to register again with a new code."
 msgstr ""
 
-#: src/inventory_tng/stock/counts_routes.py
+#: src/inventory_tng/stock/count_routes.py
 msgid "These moved while you counted, so count them again."
 msgstr ""
 
@@ -4101,7 +4101,7 @@ msgstr ""
 msgid "This changes something that matters, so it needs a fresh password."
 msgstr ""
 
-#: src/inventory_tng/stock/counts_routes.py
+#: src/inventory_tng/stock/count_routes.py
 msgid ""
 "This count was saved already, so what you changed wasn't saved. To record"
 " it, start a new count."

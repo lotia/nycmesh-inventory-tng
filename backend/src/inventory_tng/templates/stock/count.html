@@ -12,7 +12,7 @@ there: usually nothing. Anything you find, take to a current place, count
 this one as empty, and record it found there.{% endtrans %}</p>
 {% endif %}
 {#- Which items: a search over their names, and the filter on, if any,
-with a way to show them all (stock/counts_routes.py). #}
+with a way to show them all (stock/count_routes.py). #}
 <form method="get" action="{{ here }}" role="search" class="actions">
   <label class="grow">{% trans %}Find items{% endtrans %}
     <input name="q" type="search" value="{{ shown.search }}" maxlength="200" autocomplete="off">
@@ -231,7 +231,7 @@ one by its size, an open package closed as none
   {% endif %}
   {#- An area gone from it, retired and emptied while it was counted:
   brought back with what was typed sent along, and the form shown again
-  (stock/counts_routes.py). #}
+  (stock/count_routes.py). #}
   {% for area_id, where in bring_back %}
   <p>{#- Translators: %(place)s is a place of any kind, such as a store, a shelf, a bin or a volunteer's home. #}{% trans place=where %}Things still at {{ place }}?{% endtrans %}</p>
   <button formaction="{{ here }}/bring-back{{ shown.query() }}" name="area_id" value="{{ area_id }}">{% trans %}Bring it back{% endtrans %}</button>

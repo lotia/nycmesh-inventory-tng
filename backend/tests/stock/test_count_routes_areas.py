@@ -1,4 +1,4 @@
-"""A count of a store and its areas on one form (stock/counts_routes.py,
+"""A count of a store and its areas on one form (stock/count_routes.py,
 inventory-tng-8i4.51.4): every area at any depth, grouped by area, each
 line written at the place it was found in."""
 

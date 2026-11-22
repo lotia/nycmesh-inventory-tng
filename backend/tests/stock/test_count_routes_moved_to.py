@@ -1,5 +1,5 @@
 """What a count of a store and its areas saves of the moves from a retired
-area emptied while it was counted (stock/counts_routes.py,
+area emptied while it was counted (stock/count_routes.py,
 stock/count_arrivals.py; Ali, 2026-11-22, inventory-tng-ygk5): a move left
 alone writes nothing; How many arrived, fixed, records the difference as
 lost or found where it went, nothing against the area it left; and the

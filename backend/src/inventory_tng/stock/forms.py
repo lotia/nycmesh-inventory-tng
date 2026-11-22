@@ -2,9 +2,9 @@
 lines by place, by item and by form, and an adjustment, and what is wrong, in
 words, beside the field it is about; and those of lines recorded with
 more than was moved, and of lengths to check. The handlers in
-stock/counts_routes.py, stock/over_recorded_routes.py and
-stock/length_checks_routes.py read the request and pass the form's
-fields."""
+stock/count_routes.py, stock/counts_routes.py,
+stock/over_recorded_routes.py and stock/length_checks_routes.py read the
+request and pass the form's fields."""
 
 import uuid
 from collections.abc import Collection, Mapping, Sequence
@@ -135,7 +135,7 @@ class ByForm(NamedTuple):
 def by_form(
     session: Session, form: Mapping[str, str], place_id: int
 ) -> tuple[ByForm, dict[str, Words]]:
-    """The count form's forms (stock/counts_routes.py's _forms), as lines, and
+    """The count form's forms (stock/count_routes.py's _forms), as lines, and
     what is wrong."""
     problems: dict[str, Words] = {}
     lines: list[tuple[int, Form, Decimal]] = []

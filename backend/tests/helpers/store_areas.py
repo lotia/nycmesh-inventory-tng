@@ -1,4 +1,4 @@
-"""A store with areas to count on one form (stock/counts_routes.py,
+"""A store with areas to count on one form (stock/count_routes.py,
 inventory-tng-8i4.51.4), and what the tests of it read back."""
 
 from sqlalchemy import select

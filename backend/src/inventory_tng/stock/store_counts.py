@@ -1,4 +1,4 @@
-"""A count form saved (stock/counts_routes.py): a place and every area in
+"""A count form saved (stock/count_routes.py): a place and every area in
 it on the form, each counted at its own place (inventory-tng-8i4.51.4),
 and the moves to them from areas gone from it whose amounts were fixed,
 after every count (stock/count_arrivals.py, inventory-tng-ygk5).

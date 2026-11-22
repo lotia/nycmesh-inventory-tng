@@ -10,6 +10,7 @@ from sqlalchemy import ColumnElement, Row, Select, any_, func, or_, select, true
 from sqlalchemy.orm import Session
 
 from inventory_tng.core.db_lookups import values_by
+from inventory_tng.core.db_sessions import by_name
 from inventory_tng.models.admins import Admin
 from inventory_tng.models.catalogue import Item, ItemPackage
 from inventory_tng.models.places import STORE_KINDS, Location
@@ -21,7 +22,7 @@ from inventory_tng.models.stock import (
 )
 from inventory_tng.models.volunteers import Volunteer
 from inventory_tng.stock import open_packages
-from inventory_tng.stock.balance import balance, by_form, countable
+from inventory_tng.stock.balance import balance, by_form, countable, takeable
 
 
 def balances(
@@ -186,6 +187,12 @@ def item_ids_matching(
     if only_id is not None:
         query = query.where(Item.id == only_id)
     return set(session.scalars(query))
+
+
+def countable_items(session: Session) -> list[Item]:
+    """What can be counted or adjusted, by name: current items, and retired
+    ones with stock left, which may still be written off."""
+    return by_name(session, Item, takeable())
 
 
 def countable_place(session: Session, location_id: int) -> Location | None:

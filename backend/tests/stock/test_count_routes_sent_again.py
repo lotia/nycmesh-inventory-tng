@@ -1,5 +1,5 @@
 """A count form saved and sent again under the same key, as the browser's
-Back sends it (stock/counts_routes.py, stock/store_counts.py): sent as it
+Back sends it (stock/count_routes.py, stock/store_counts.py): sent as it
 was, it is answered as before; sent otherwise in anything, it is refused
 whole, nothing is written, and Counts says it was saved already (Ali,
 2026-11-22, inventory-tng-53im, inventory-tng-kro9)."""

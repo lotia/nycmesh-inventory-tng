@@ -1,5 +1,5 @@
 """A count of a store and its areas when an area on it is retired, or a
-retired one emptied, while it is counted (stock/counts_routes.py, Ali,
+retired one emptied, while it is counted (stock/count_routes.py, Ali,
 2026-11-22, inventory-tng-ygk5): refused whole, the form shown again
 saying where its items went, with a way to bring it back."""
 
