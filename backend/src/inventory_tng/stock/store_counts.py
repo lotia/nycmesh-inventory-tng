@@ -28,6 +28,7 @@ from inventory_tng.core.db_errors import enforce
 from inventory_tng.core.sent_forms import digest_spent, spend
 from inventory_tng.models.stock import OpenPackage
 from inventory_tng.stock import open_packages, over_recorded
+from inventory_tng.stock.count_forms import PlaceCount
 from inventory_tng.stock.counts import (
     Counted,
     FormLines,
@@ -35,7 +36,6 @@ from inventory_tng.stock.counts import (
     record_arrivals,
     record_count,
 )
-from inventory_tng.stock.forms import PlaceCount
 from inventory_tng.stock.ledger import LOOSE, Form, hold_across, lock_places
 from inventory_tng.stock.moments import Moment
 

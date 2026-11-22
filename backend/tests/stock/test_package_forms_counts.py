@@ -13,8 +13,8 @@ from sqlalchemy.orm import Session
 
 from inventory_tng.models.catalogue import Category, ItemPackage
 from inventory_tng.models.stock import AdjustmentReason, LedgerTransaction, OpenPackage
-from inventory_tng.stock import count_routes, counts, moments, queries
-from inventory_tng.stock.forms import HOW_MUCH_LEFT, WHOLE_PACKAGES
+from inventory_tng.stock import count_groups, counts, moments, queries
+from inventory_tng.stock.count_forms import HOW_MUCH_LEFT, WHOLE_PACKAGES
 from inventory_tng.stock.ledger import LOOSE, Entry, Form
 
 from helpers.items import new_item, same_size_twins
@@ -311,7 +311,7 @@ def test_the_count_form_lists_sealed_smallest_first_ties_by_id(
             for place_id, forms in found.items()
         }
 
-    monkeypatch.setattr(count_routes, "expected_forms_at", descending_forms)
+    monkeypatch.setattr(count_groups, "expected_forms_at", descending_forms)
     page = read(admin_client.get(f"{COUNTS}/{store}").text)
     expected = [
         f"sealed_{cable}_{small.id}",

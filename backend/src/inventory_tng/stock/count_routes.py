@@ -48,7 +48,7 @@ filter rides on the form's action, so a form shown again keeps it.
 A place with areas in it is counted with every area inside it, at any
 depth, on one form, grouped by area, one count at each place, as decision
 0003's 2026-11-21 amendment says (inventory-tng-8i4.51.4). The form lists
-the places it shows (forms.PLACES); its moment is read across them all,
+the places it shows (count_forms.PLACES); its moment is read across them all,
 and the send holds them all before writing any (stock/store_counts.py).
 An area retired and empty is left out. Filtered to some items, an area
 with nothing typed is not counted; with nothing typed at any place,
@@ -59,7 +59,7 @@ An area on the form that is retired, or a retired one emptied, while it
 is counted may no longer be counted: the save is refused whole, and the
 form shown again without it, keeping what was typed (Ali, 2026-11-22,
 inventory-tng-ygk5). The form then carries the areas gone from it and
-the moment it was first shown (forms.GONE), so it shows, until saved,
+the moment it was first shown (count_forms.GONE), so it shows, until saved,
 what left them since (stock/count_gone_areas.py): what went to a place on
 it is set aside from what that place's own lines count, and each move is
 taken as right unless its amount is fixed, in each form it arrived in,
@@ -91,11 +91,9 @@ from inventory_tng.core.sent_forms import form_key
 from inventory_tng.models.base import INTEGER_MAX, whole
 from inventory_tng.models.catalogue import Item, ItemPackage
 from inventory_tng.models.places import Location
-from inventory_tng.models.stock import OpenPackage
 from inventory_tng.places import locations
 from inventory_tng.stock import needs_action, over_recorded, queries
 from inventory_tng.stock.count_arrivals import (
-    Aside,
     arrived_at,
     fixed,
     fixed_lines,
@@ -103,27 +101,11 @@ from inventory_tng.stock.count_arrivals import (
     less,
     set_aside,
 )
-from inventory_tng.stock.count_gone_areas import (
-    Leaving,
-    areas_leaving,
-    gone_words,
-    moved_sections,
-)
-from inventory_tng.stock.count_groups import (
-    FormRow,
-    Group,
-    form_order,
-    form_row,
-    label,
-)
-from inventory_tng.stock.counts import NotCountable
-from inventory_tng.stock.forms import (
+from inventory_tng.stock.count_forms import (
     CLOSED_MEANWHILE,
-    COUNTED,
     EXTRA_ITEM,
     EXTRA_PLACE,
     FOUND_PLACE,
-    LOOSE_FIELD,
     NONE_GONE,
     PICKED,
     TYPE_IT_HERE,
@@ -137,14 +119,23 @@ from inventory_tng.stock.forms import (
     places_listed,
     read_count,
 )
-from inventory_tng.stock.ledger import LOOSE, Form, by_item, tracks_opened
+from inventory_tng.stock.count_gone_areas import gone_words, moved_sections
+from inventory_tng.stock.count_groups import (
+    Group,
+    asks_for,
+    forms_by_place,
+    label,
+    line_of,
+)
+from inventory_tng.stock.counts import NotCountable
+from inventory_tng.stock.ledger import by_item, tracks_opened
 from inventory_tng.stock.moments import (
     Moment,
     expected_at,
-    expected_forms_at,
     moment,
     seen_up_to,
 )
+from inventory_tng.stock.moved_out import Leaving, areas_leaving
 from inventory_tng.stock.needs_action import OnlyItem
 from inventory_tng.stock.paths import COUNTS
 from inventory_tng.stock.store_counts import StoreCounted, record_store_count
@@ -224,7 +215,7 @@ def brought_back(place: str) -> str:
 
 def already_listed(item: str, place: str) -> str:
     """A count refused as something else here names an item the place
-    picked for it lists (forms.Listed): what was typed is kept."""
+    picked for it lists (count_forms.Listed): what was typed is kept."""
     # Translators: %(place)s is a place of any kind, such as a store, a
     # shelf, a bin or a volunteer's home.
     return gettext(
@@ -337,7 +328,7 @@ def _listed_words(
     session: Session, root: Location, listed: Listed
 ) -> tuple[Words, dict[str, Words]]:
     """What a count form says of something else here naming an item the
-    place picked for it lists (forms.Listed): above the form, and beside
+    place picked for it lists (count_forms.Listed): above the form, and beside
     the item picked."""
     item = session.get_one(Item, listed.item_id)
     ((place, path),) = _shown_places(session, root, [listed.place_id])
@@ -374,7 +365,7 @@ def _count_page(
     the items `shown`, but a recount's every one. `places`, the places the
     form showed when sent; else every one that may be counted now.
     `picked`, the places picked for something else here and an open
-    package nobody recorded at the last save (forms.PICKED). `gone`, the
+    package nobody recorded at the last save (count_forms.PICKED). `gone`, the
     areas gone from it, retired, and what left them since it was first
     shown, up to its moment, shown under the places it went to
     (count_gone_areas), whose own lines count what they held before
@@ -461,7 +452,7 @@ def _count_page(
         )
         for each, here in was.items()
     }
-    forms = _forms(
+    forms = forms_by_place(
         session,
         as_of,
         {each: [item.id for item, _ in found] for each, found in rows.items()},
@@ -484,7 +475,7 @@ def _count_page(
     if leaving is not None:
         moved = moved_sections(session, place, groups, leaving, moves, named)
     # Something else here and an open package nobody recorded may be found
-    # in any place shown but a retired area (forms.PICKED).
+    # in any place shown but a retired area (count_forms.PICKED).
     choices = [
         group
         for group in groups
@@ -514,7 +505,7 @@ def _count_page(
             "recount": recount,
             # What a place it may be found in does not list already, and the
             # item picked, to keep it picked on a form shown again: a
-            # recount adds its line (forms.read_count).
+            # recount adds its line (count_forms.read_count).
             "others": [
                 item
                 for item in listed
@@ -549,7 +540,7 @@ def count_form(
     # One snapshot: the form's moment and every figure it shows, so it saw
     # each save there up to its moment that it shows, and a count is
     # refused only for one it did not (counts.record_count). The places
-    # picked at the last save come back picked (forms.PICKED).
+    # picked at the last save come back picked (count_forms.PICKED).
     place = queries.countable_place(session, location_id)
     if place is None:
         return not_found()
@@ -557,92 +548,6 @@ def count_form(
     return _count_page(
         request, session, signed, place, None, shown=shown, picked=picked
     )
-
-
-def _forms(
-    session: Session,
-    as_of: int,
-    item_ids: Mapping[int, Sequence[int]],
-    openings: Mapping[int, Mapping[int, Collection[int]]],
-    aside: Mapping[int, Aside] | None = None,
-) -> dict[int, dict[int, list[FormRow]]]:
-    """At each place, by id, the items of `item_ids` there whose stock was
-    in more than loose units, as of the form, each form a row: sealed
-    packages, by how many; open packages; loose. Others are counted by
-    their total, as before, but an item of an opening waiting there,
-    recorded more than opened (`openings`, by place,
-    over_recorded.openings_waiting_at): it is counted by form, with a row of
-    each package it opened sealed, though the records hold none, as a total
-    puts neither of its ends right (docs/decisions/0020). Less, by place,
-    what is `aside` there (count_arrivals.set_aside). The same number of
-    queries however many places."""
-    every = sorted(set().union(*item_ids.values())) if item_ids else []
-    found = expected_forms_at(session, item_ids.keys(), as_of, every)
-    packages = {
-        package.id: package for package in queries.packages_of_items(session, every)
-    }
-    opened = {row.id: row for row in queries.open_at(session, item_ids.keys(), every)}
-    return {
-        place_id: _place_forms(
-            set(items),
-            less(found.get(place_id, {}), (aside or {}).get(place_id, {})),
-            packages,
-            {
-                open_id: row
-                for open_id, row in opened.items()
-                if row.location_id == place_id and row.item_id in items
-            },
-            openings.get(place_id, {}),
-        )
-        for place_id, items in item_ids.items()
-    }
-
-
-def _place_forms(
-    item_ids: Collection[int],
-    found: Mapping[tuple[int, Form], Decimal],
-    packages: Mapping[int, ItemPackage],
-    opened: Mapping[int, OpenPackage],
-    openings: Mapping[int, Collection[int]],
-) -> dict[int, list[FormRow]]:
-    """_forms at one place, from what it read."""
-    held: dict[int, dict[Form, Decimal]] = {}
-    for (item_id, form), amount in found.items():
-        # Of its items only; and one closed since is not counted: its row
-        # is gone from the place.
-        if item_id in item_ids and (
-            form.open_package_id is None or form.open_package_id in opened
-        ):
-            held.setdefault(item_id, {})[form] = amount
-    for row in opened.values():
-        held.setdefault(row.item_id, {}).setdefault(
-            Form(open_package_id=row.id), Decimal(0)
-        )
-    for item_id in item_ids:
-        for package_id in openings.get(item_id, ()):
-            held.setdefault(item_id, {}).setdefault(
-                Form(package_id=package_id), Decimal(0)
-            )
-
-    rows: dict[int, list[FormRow]] = {}
-    for item_id, forms in held.items():
-        if set(forms) <= {LOOSE}:
-            continue
-        each = rows.setdefault(item_id, [])
-        for form in sorted(forms, key=lambda form: form_order(form, packages)):
-            each.append(form_row(item_id, form, forms[form], packages, opened))
-        if not any(row.field.startswith(LOOSE_FIELD) for row in each):
-            each.append(form_row(item_id, LOOSE, Decimal(0), packages, opened))
-    return rows
-
-
-def _line_of(session: Session, as_of: int, listed: Listed) -> str:
-    """The field a count form, as of moment `as_of`, shows an item's line at
-    a place by: its total, or, counted by form (_forms), its loose units."""
-    place_id, item_id = listed.place_id, listed.item_id
-    openings = over_recorded.openings_waiting_at(session, [place_id], as_of)
-    by_form = _forms(session, as_of, {place_id: [item_id]}, openings)[place_id]
-    return f"{LOOSE_FIELD if item_id in by_form else COUNTED}{item_id}"
 
 
 def _followed(session: Session) -> list[tuple[ItemPackage, str, str]]:
@@ -657,7 +562,7 @@ def _followed(session: Session) -> list[tuple[ItemPackage, str, str]]:
 
 class Sent(NamedTuple):
     """What every count form carries, as sent: its place, key and moment,
-    the places it showed, and the areas gone from it (forms.Gone)."""
+    the places it showed, and the areas gone from it (count_forms.Gone)."""
 
     place: Location
     key: uuid.UUID
@@ -702,10 +607,12 @@ def count(
         return not_found()
     place, key, at, place_ids, gone = carried
     areas = place_ids != [place.id]
-    sent = read_count(session, form, place.id, place_ids, at.as_of)
+    sent = read_count(
+        session, form, place.id, place_ids, partial(asks_for, session, at.as_of)
+    )
     asked = {place_id: each.items for place_id, each in sent.places.items()}
     # The form shown again: as sent, or with `at` None, as it is now; a
-    # recount with the figures it first showed (forms.WHILE).
+    # recount with the figures it first showed (count_forms.WHILE).
     figures = {place_id: each.recount for place_id, each in sent.places.items()}
     again = partial(
         _count_page, request, session, signed, place, shown=shown, gone=gone
@@ -737,8 +644,8 @@ def count(
         listed_alert, beside = _listed_words(session, place, sent.listed)
         problems |= beside
         if not sent.listed.on_form:
-            # A recount's line added for it (forms.read_count), marked.
-            line = _line_of(session, at.as_of, sent.listed)
+            # A recount's line added for it (count_forms.read_count), marked.
+            line = line_of(session, at.as_of, sent.listed)
             problems[field_at(place.id, sent.listed.place_id, line)] = TYPE_IT_HERE
         alert = alert or listed_alert
     if problems:
@@ -889,7 +796,7 @@ def count(
         if not areas:
             return redirect(COUNTS, notice=notice, section="count")
         # Back to the form, the places picked for something else here and
-        # an open package nobody recorded picked again (forms.PICKED).
+        # an open package nobody recorded picked again (count_forms.PICKED).
         params = shown.params() | {
             picker: form[picker] for picker in PICKED if form.get(picker)
         }
@@ -977,7 +884,9 @@ def bring_back(
         # Not one of the place's areas, as only a hand-made form names: none
         # this form may bring back.
         return not_found()
-    sent = read_count(session, form, place.id, place_ids, at.as_of).places
+    sent = read_count(
+        session, form, place.id, place_ids, partial(asks_for, session, at.as_of)
+    ).places
     again = partial(
         _count_page,
         request,

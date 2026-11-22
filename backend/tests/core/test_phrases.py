@@ -71,7 +71,7 @@ from inventory_tng.stock import (
     stock_routes,
     used_up_routes,
 )
-from inventory_tng.stock.forms import NONE_GONE
+from inventory_tng.stock.count_forms import NONE_GONE
 from inventory_tng.stock.moments import Moment
 from inventory_tng.volunteers import volunteers_routes
 from inventory_tng.web.admin_pages import revoke_title

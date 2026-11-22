@@ -768,7 +768,7 @@ msgstr ""
 msgid "A whole number of packages, or blank."
 msgstr ""
 
-#: src/inventory_tng/stock/forms.py
+#: src/inventory_tng/stock/count_forms.py
 msgid "A whole number of packages."
 msgstr ""
 
@@ -1766,7 +1766,7 @@ msgstr ""
 msgid "How much"
 msgstr ""
 
-#: src/inventory_tng/stock/forms.py
+#: src/inventory_tng/stock/count_forms.py
 msgid "How much is left on it."
 msgstr ""
 
@@ -2237,15 +2237,15 @@ msgstr ""
 msgid "No current administrator has that username."
 msgstr ""
 
-#: src/inventory_tng/stock/forms.py
+#: src/inventory_tng/stock/count_forms.py
 msgid "No such item."
 msgstr ""
 
-#: src/inventory_tng/stock/forms.py
+#: src/inventory_tng/stock/count_forms.py
 msgid "No such open package here."
 msgstr ""
 
-#: src/inventory_tng/stock/forms.py
+#: src/inventory_tng/stock/count_forms.py
 msgid "No such package."
 msgstr ""
 
@@ -3869,7 +3869,7 @@ msgstr ""
 msgid "That is its name already."
 msgstr ""
 
-#: src/inventory_tng/stock/forms.py
+#: src/inventory_tng/stock/count_forms.py
 msgid "That is more than the inventory can count."
 msgstr ""
 
@@ -4115,7 +4115,7 @@ msgstr ""
 msgid "This item is counted in whole units."
 msgstr ""
 
-#: src/inventory_tng/stock/forms.py
+#: src/inventory_tng/stock/count_forms.py
 msgid "This item is on the form more than once."
 msgstr ""
 
@@ -4195,7 +4195,7 @@ msgstr ""
 msgid "Type a number, such as 12 or 0.5."
 msgstr ""
 
-#: src/inventory_tng/stock/forms.py
+#: src/inventory_tng/stock/count_forms.py
 msgid "Type everything you found here."
 msgstr ""
 

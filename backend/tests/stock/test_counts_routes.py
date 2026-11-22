@@ -34,8 +34,6 @@ from inventory_tng.stock.forms import (
     PICK_A_PLACE,
     PICK_A_REASON,
     PICK_AN_ITEM,
-    lines,
-    named_twice,
 )
 from inventory_tng.stock.moments import Moment, expected, moment
 from inventory_tng.stock.paths import ADJUSTMENTS, COUNTS, STOCK
@@ -96,27 +94,6 @@ def test_count_a_place_goes_to_the_place_picked(admin_client: TestClient) -> Non
     assert picked.headers["location"] == f"{COUNTS}/7"
     odd = admin_client.get(f"{COUNTS}/place", params={"location_id": "x"})
     assert odd.headers["location"] == COUNTS
-
-
-def test_a_count_form_reads_the_item_each_field_names() -> None:
-    form = {
-        "key": "k",
-        "counted_07": "1",
-        "counted_x": "2",
-        f"counted_{INTEGER_MAX + 1}": "3",
-        "extra_item_id": "8",
-        "extra_quantity": "4",
-    }
-    assert lines(form) == [
-        ("counted_07", 7, "1"),
-        ("counted_x", None, "2"),
-        (f"counted_{INTEGER_MAX + 1}", None, "3"),
-        ("extra_quantity", 8, "4"),
-    ]
-    assert named_twice([("counted_5", 5, "1"), ("counted_05", 5, "2")]) == {
-        "counted_5": 5,
-        "counted_05": 5,
-    }
 
 
 def test_found_and_written_off(admin_client: TestClient, session: Session) -> None:

@@ -1,12 +1,13 @@
-"""What a count form says of the areas gone from it (forms.Gone): retired,
-or retired and emptied, while it was counted, so no longer on it (Ali,
-2026-11-22, inventory-tng-ygk5). Why the save was refused, and, until the
-form is saved, what left them since it was first shown (stock/moved_out.py):
-what went to a place on it under "Moved to …", a part for each area it
-came from, each item with the amount moved and a box to fix it (what the
-save does with it is stock/count_arrivals.py's); what went elsewhere, with
-nothing to type; which may be brought back; and what Found at says of
-those it leaves out. The routes are stock/count_routes.py's."""
+"""What a count form says of the areas gone from it (count_forms.Gone):
+retired, or retired and emptied, while it was counted, so no longer on it
+(Ali, 2026-11-22, inventory-tng-ygk5). Why the save was refused, and,
+until the form is saved, what left them since it was first shown
+(moved_out.areas_leaving): what went to a place on it under "Moved to …",
+a part for each area it came from, each item with the amount moved and a
+box to fix it (what the save does with it is stock/count_arrivals.py's);
+what went elsewhere, with nothing to type; which may be brought back; and
+what Found at says of those it leaves out. The routes are
+stock/count_routes.py's."""
 
 from collections.abc import Collection, Mapping, Sequence
 from decimal import Decimal
@@ -18,16 +19,15 @@ from inventory_tng.core.phrases import gettext, joined, ngettext
 from inventory_tng.models.catalogue import Item
 from inventory_tng.models.places import Location
 from inventory_tng.stock import queries
+from inventory_tng.stock.count_forms import ARRIVED, LOOSE_FIELD
 from inventory_tng.stock.count_groups import (
     FormRow,
     Group,
     form_order,
     form_row,
-    label,
 )
-from inventory_tng.stock.forms import ARRIVED, LOOSE_FIELD, Gone
 from inventory_tng.stock.ledger import Form
-from inventory_tng.stock.moved_out import MovedOut, moved_out
+from inventory_tng.stock.moved_out import Leaving, MovedOut
 
 
 def emptied_meanwhile(places: Sequence[str]) -> str:
@@ -108,56 +108,6 @@ def not_offered(places: Sequence[str]) -> str:
     )
 
 
-class Leaving(NamedTuple):
-    """The areas gone from a count form as they are now: each one's label,
-    by id, as the form names it; what left them since the form was first
-    shown, by the ledger (moved_out); which are still retired; and the
-    order of the places in the tree, to say them in."""
-
-    labels: dict[int, str]
-    moves: list[MovedOut]
-    retired: set[int]
-    order: dict[int, int]
-
-    @property
-    def emptied(self) -> set[int]:
-        """The areas anything left."""
-        return {move.from_id for move in self.moves}
-
-    def ordered(self, ids: Collection[int]) -> list[int]:
-        """The areas of `ids` in the tree's order."""
-        return sorted(ids, key=lambda each: self.order.get(each, 0))
-
-    def said(self, ids: Collection[int]) -> list[str]:
-        """The labels of the areas of `ids`, in the tree's order."""
-        return [self.labels[area_id] for area_id in self.ordered(ids)]
-
-
-def areas_leaving(session: Session, root: Location, gone: Gone) -> Leaving:
-    """The areas gone from a count form of `root`, and what left them."""
-    tree = queries.place_tree(session, root)
-    order = {each.id: n for n, (each, _, _) in enumerate(tree)}
-    found = {
-        each.id: (each, label(each, path))
-        for each, path, _ in tree
-        if each.id in gone.ids
-    }
-    if missing := set(gone.ids) - found.keys():
-        # One moved out of the place since: under its own name.
-        for each in queries.places_with_ids(session, missing):
-            found[each.id] = (each, each.name)
-    return Leaving(
-        {area_id: said for area_id, (_, said) in found.items()},
-        moved_out(session, gone.ids, gone.since),
-        {
-            area_id
-            for area_id, (each, _) in found.items()
-            if each.retired_at is not None
-        },
-        order,
-    )
-
-
 def gone_words(leaving: Leaving, ids: Collection[int]) -> list[str]:
     """What a count form says of the areas of `ids`, just gone from it, one
     alert under another: those anything left, emptied while it was
@@ -173,7 +123,7 @@ def gone_words(leaving: Leaving, ids: Collection[int]) -> list[str]:
 class MovedItem(NamedTuple):
     """An item moved from an area gone from a count form to a place on it:
     how much was moved, in its unit; the prefix of its boxes of how many
-    arrived (forms.ARRIVED); and a row for each form it arrived in, as the
+    arrived (count_forms.ARRIVED); and a row for each form it arrived in, as the
     count form asks for that form (count_groups.form_row), its amount what
     arrived in it as moved."""
 

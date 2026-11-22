@@ -1,5 +1,5 @@
 """What came to a count form's places from the areas gone from it
-(forms.Gone), and what its save does with it (Ali, 2026-11-22,
+(count_forms.Gone), and what its save does with it (Ali, 2026-11-22,
 inventory-tng-ygk5). Each place's own lines count what it held before
 those moves, so the moves are set aside from what the records say there
 (set_aside), and each move is taken as right unless its amount is fixed
@@ -16,7 +16,7 @@ from typing import NamedTuple
 
 from sqlalchemy.orm import Session
 
-from inventory_tng.stock.forms import Gone
+from inventory_tng.stock.count_forms import Gone
 from inventory_tng.stock.ledger import Form, by_item
 from inventory_tng.stock.moved_out import MovedOut, moved_out
 
@@ -68,7 +68,7 @@ def fixed(
     """The moves whose amount `arrived` fixes, by place it went to, then
     area it left, item and the form it arrived in: each one not as moved,
     its difference in that form, so a sealed one's in whole packages
-    (forms.arrivals). A box for no such move is left alone."""
+    (count_forms.arrivals). A box for no such move is left alone."""
     moved: dict[tuple[int, int, int, Form], Decimal] = {}
     for move in moves:
         if move.to_id is not None:

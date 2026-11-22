@@ -17,14 +17,12 @@ from inventory_tng.models.admins import Admin
 from inventory_tng.models.base import INTEGER_MAX
 from inventory_tng.models.stock import Movement
 from inventory_tng.stock import count_routes
-from inventory_tng.stock.count_routes import SAVED_AS_SHOWN
-from inventory_tng.stock.counts import Counted, record_count
-from inventory_tng.stock.forms import (
+from inventory_tng.stock.count_forms import (
     ON_THE_FORM_TWICE,
     TYPE_IT_HERE,
-    lines,
-    named_twice,
 )
+from inventory_tng.stock.count_routes import SAVED_AS_SHOWN
+from inventory_tng.stock.counts import Counted, record_count
 from inventory_tng.stock.ledger import LOOSE, Entry, lock_place
 from inventory_tng.stock.moments import Moment, expected, moment
 from inventory_tng.stock.paths import COUNTS
@@ -154,35 +152,6 @@ def test_a_count_refuses_what_is_not_a_quantity(
         assert refused.status_code == 400
         assert str(problem) in text(refused)
     assert counts_written(session) == []
-
-
-@pytest.mark.parametrize(
-    ("form", "twice"),
-    [
-        ({"counted_5": "1"}, set()),
-        ({"counted_5": "1", "counted_6": "2"}, set()),
-        ({"counted_5": "1", "counted_05": "2"}, {"counted_5", "counted_05"}),
-        ({"counted_5": "1", "counted_005": ""}, {"counted_5", "counted_005"}),
-        (
-            {"counted_5": "1", "extra_item_id": "5", "extra_quantity": "2"},
-            {"counted_5", "extra_quantity"},
-        ),
-        (
-            {"counted_5": "1", "extra_item_id": "05", "extra_quantity": "2"},
-            {"counted_5", "extra_quantity"},
-        ),
-        # An item chosen at the foot with no amount is not counted.
-        ({"counted_5": "1", "extra_item_id": "5", "extra_quantity": " "}, set()),
-        ({"counted_5": "1", "extra_item_id": "6", "extra_quantity": "2"}, set()),
-        # What names no item is no item's repeat.
-        ({"counted_x": "1", "counted_y": "2", "counted_0": "3"}, set()),
-        ({"counted_²": "1", "counted_2": "2"}, set()),
-    ],
-)
-def test_a_count_form_naming_an_item_twice_names_each_field(
-    form: dict[str, str], twice: set[str]
-) -> None:
-    assert named_twice(lines(form)).keys() == twice
 
 
 def test_a_count_naming_an_item_twice_is_refused(
