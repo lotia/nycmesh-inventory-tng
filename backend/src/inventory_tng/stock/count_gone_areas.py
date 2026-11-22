@@ -16,7 +16,7 @@ from typing import NamedTuple
 from sqlalchemy.orm import Session
 
 from inventory_tng.core.phrases import gettext, joined, ngettext
-from inventory_tng.models.catalogue import Item
+from inventory_tng.models.catalogue import Item, ItemPackage
 from inventory_tng.models.places import Location
 from inventory_tng.stock import queries
 from inventory_tng.stock.count_forms import ARRIVED, LOOSE_FIELD
@@ -192,10 +192,12 @@ def moved_sections(
     leaving: Leaving,
     moves: Sequence[MovedOut],
     named: Mapping[int, Item],
+    packages: Mapping[int, ItemPackage],
 ) -> Moves:
     """What a count form shows of what left the areas gone from it
     (Moves): `moves`, of the items it shows, as of its moment, and its
-    groups, whose lines count what each place held before them."""
+    groups, whose lines count what each place held before them; `packages`,
+    by id, every package of the items moved, at least."""
     by_id = {group.place.id: group for group in groups}
     went: dict[int, dict[int, dict[int, dict[Form, Decimal]]]] = {}
     taken: dict[int, Decimal] = {}
@@ -206,12 +208,6 @@ def moved_sections(
             forms[move.arrives] = forms.get(move.arrives, Decimal(0)) + move.quantity
         else:
             taken[move.item_id] = taken.get(move.item_id, Decimal(0)) + move.quantity
-    packages = {
-        package.id: package
-        for package in queries.packages_of_items(
-            session, {move.item_id for move in moves}
-        )
-    }
     open_ids = {move.arrives.open_package_id for move in moves}
     opened = {
         row.id: row

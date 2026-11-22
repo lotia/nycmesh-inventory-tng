@@ -18,7 +18,7 @@ from sqlalchemy.orm import Session
 
 from inventory_tng.stock.count_forms import Gone
 from inventory_tng.stock.ledger import Form, by_item
-from inventory_tng.stock.moved_out import MovedOut, moved_out
+from inventory_tng.stock.moved_out import Leaving, MovedOut, moved_out
 
 # What a place's records hold that came from the areas gone from its
 # count form, by item and form there.
@@ -26,13 +26,20 @@ Aside = dict[tuple[int, Form], Decimal]
 
 
 def gone_moves(
-    session: Session, gone: Gone, as_of: int, places: Collection[int]
+    session: Session,
+    gone: Gone,
+    as_of: int,
+    places: Collection[int],
+    leaving: Leaving | None = None,
 ) -> list[MovedOut]:
     """What left the areas gone from a count form after it was first
     shown (moved_out): to the `places` it shows, up to its moment
-    `as_of`."""
+    `as_of`. Of `leaving`'s moves, if they were split at that moment,
+    rather than read again."""
     if not gone.ids:
         return []
+    if leaving is not None and leaving.as_of == as_of:
+        return leaving.moved_by(places)
     return moved_out(session, gone.ids, gone.since, up_to=as_of, into=places)
 
 

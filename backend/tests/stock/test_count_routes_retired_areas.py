@@ -16,6 +16,7 @@ from inventory_tng.stock import queries
 from inventory_tng.stock.moments import expected
 
 from helpers.markup import Element, button, options, read, text
+from helpers.query_counts import counting
 from helpers.rows import add
 from helpers.stock import count_form, retire, write
 from helpers.store_areas import Store, area, counts_at, field
@@ -493,3 +494,29 @@ def test_a_recount_shows_what_went_to_an_area_it_does_not_ask_at(
     saved = admin_client.post(made.path, data=again)
     assert saved.status_code == 303
     assert expected(session, made.empty.id) == {setup.item: Decimal(1)}
+
+
+def test_a_form_shown_again_reads_what_left_the_areas_gone_once(
+    admin_client: TestClient, session: Session
+) -> None:
+    """Sent back for a problem, a form with an area gone from it reads the
+    store's tree, what left the area since and the packages of what it
+    shows once each, for the send and the form shown again."""
+    setup = Emptied(session, admin_client)
+    made = setup.made
+    made.move(session, setup.gone, made.empty, "2")
+    typed = {setup.counted(made.shelf): "3"}
+    refused = admin_client.post(made.path, data=setup.shown | typed)
+    assert refused.status_code == 409
+    wrong = {setup.counted(made.shelf): "x"}
+    with counting(session) as sent:
+        again = admin_client.post(made.path, data=count_form(refused) | wrong)
+    assert again.status_code == 400
+    assert heading(again, f"Moved to {made.empty.name}")
+
+    def reads(words: str) -> int:
+        return sum(words in each for each in sent)
+
+    assert reads("WITH RECURSIVE") == 1
+    assert reads("GROUP BY ledger_transaction.from_location_id") == 1
+    assert reads("WHERE item_package.item_id IN") == 1

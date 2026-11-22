@@ -5,7 +5,7 @@ what a count form says of a retired area emptied while it was counted
 it went (stock/count_arrivals.py; Ali, 2026-11-22, inventory-tng-ygk5). It
 only reads, taking no lock."""
 
-from collections.abc import Collection
+from collections.abc import Collection, Sequence
 from decimal import Decimal
 from typing import NamedTuple
 
@@ -23,13 +23,15 @@ from inventory_tng.stock.ledger import LOOSE, Form
 class MovedOut(NamedTuple):
     """So much of an item that left a place for another, or for none (used,
     lost or written off), and the form it arrived in there (loose for
-    none)."""
+    none); and whether it left after the moment the read was split at
+    (moved_out's `split`)."""
 
     from_id: int
     to_id: int | None
     item_id: int
     quantity: Decimal
     arrives: Form = LOOSE
+    later: bool = False
 
 
 def moved_out(
@@ -39,31 +41,38 @@ def moved_out(
     *,
     up_to: int | None = None,
     into: Collection[int] = (),
+    split: int | None = None,
 ) -> list[MovedOut]:
     """What left each of the places in the ledger transactions after
     `after`, by where it went, item and the form it arrived in, in all:
     an opening, which changes only the form of stock at a place, is no
     move. What went to the places `into` only up to the moment `up_to`,
-    if given. In order of place, then where it went, then
-    item, then form, by id."""
+    if given. Split at the moment `split`, if given, into what left up to
+    it and what left after it (MovedOut.later). In order of place, then
+    where it went, then item, then form, by id, then up to the moment
+    first."""
     went = LedgerTransaction.from_location_id
     to = LedgerTransaction.to_location_id
     package, opened = Movement.to_package_id, Movement.to_open_package_id
+    by = [went, to, Movement.item_id, package, opened]
+    if split is not None:
+        by.append(LedgerTransaction.id > split)
     query = (
-        select(went, to, Movement.item_id, package, opened, func.sum(Movement.quantity))
+        select(*by, func.sum(Movement.quantity))
         .join(LedgerTransaction, LedgerTransaction.id == Movement.transaction_id)
         .where(
             went.in_(list(location_ids)),
             LedgerTransaction.id > after,
             LedgerTransaction.kind != "open",
         )
-        .group_by(went, to, Movement.item_id, package, opened)
+        .group_by(*by)
         .order_by(
             went,
             to.nulls_last(),
             Movement.item_id,
             package.nulls_first(),
             opened.nulls_first(),
+            *by[5:],
         )
     )
     if up_to is not None:
@@ -72,9 +81,9 @@ def moved_out(
         )
     # Each from one of the places, so from somewhere.
     return [
-        MovedOut(from_id, to_id, item_id, quantity, Form(package_id, open_id))
-        for from_id, to_id, item_id, package_id, open_id, quantity in session.execute(
-            query
+        MovedOut(from_id, to_id, item_id, quantity, Form(package_id, open_id), *later)
+        for from_id, to_id, item_id, package_id, open_id, *later, quantity in (
+            session.execute(query)
         )
         if from_id is not None
     ]
@@ -83,13 +92,15 @@ def moved_out(
 class Leaving(NamedTuple):
     """The areas gone from a count form as they are now: each one's label,
     by id, as the form names it; what left them since the form was first
-    shown, by the ledger (moved_out); which are still retired; and the
-    order of the places in the tree, to say them in."""
+    shown, by the ledger (moved_out), split at the moment `as_of`, if it
+    was; which are still retired; and the order of the places in the
+    tree, to say them in."""
 
     labels: dict[int, str]
     moves: list[MovedOut]
     retired: set[int]
     order: dict[int, int]
+    as_of: int | None = None
 
     @property
     def emptied(self) -> set[int]:
@@ -104,10 +115,30 @@ class Leaving(NamedTuple):
         """The labels of the areas of `ids`, in the tree's order."""
         return [self.labels[area_id] for area_id in self.ordered(ids)]
 
+    def moved_by(self, places: Collection[int]) -> list[MovedOut]:
+        """Of what left the areas, what went to the `places` up to the
+        moment its moves were split at, and what went anywhere else
+        whenever: what moved_out reads up to that moment into those
+        places."""
+        return [
+            move
+            for move in self.moves
+            if not move.later or move.to_id is None or move.to_id not in places
+        ]
 
-def areas_leaving(session: Session, root: Location, gone: Gone) -> Leaving:
-    """The areas gone from a count form of `root`, and what left them."""
-    tree = queries.place_tree(session, root)
+
+def areas_leaving(
+    session: Session,
+    root: Location,
+    gone: Gone,
+    as_of: int | None = None,
+    tree: Sequence[tuple[Location, tuple[str, ...], bool]] | None = None,
+) -> Leaving:
+    """The areas gone from a count form of `root`, and what left them,
+    split at the moment `as_of`, if given. `tree`, the place's
+    (queries.place_tree), if read already."""
+    if tree is None:
+        tree = queries.place_tree(session, root)
     order = {each.id: n for n, (each, _, _) in enumerate(tree)}
     # As the count form names it (count_groups.label): by its path.
     found = {
@@ -121,11 +152,12 @@ def areas_leaving(session: Session, root: Location, gone: Gone) -> Leaving:
             found[each.id] = (each, each.name)
     return Leaving(
         {area_id: said for area_id, (_, said) in found.items()},
-        moved_out(session, gone.ids, gone.since),
+        moved_out(session, gone.ids, gone.since, split=as_of),
         {
             area_id
             for area_id, (each, _) in found.items()
             if each.retired_at is not None
         },
         order,
+        as_of,
     )

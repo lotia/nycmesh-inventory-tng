@@ -202,23 +202,15 @@ def countable_place(session: Session, location_id: int) -> Location | None:
     )
 
 
-def countable_tree(
-    session: Session, root: Location
-) -> list[tuple[Location, tuple[str, ...]]]:
-    """A place and every area inside it, at any depth, that may be counted
-    (balance.countable), each with its path below the place: the names of
-    the areas it is in, then its own; none for the place. Depth first, each
-    level by name. A retired area holding nothing is left out, but the
-    areas in it are walked through, its name in their path."""
-    return [(place, path) for place, path, may in place_tree(session, root) if may]
-
-
 def place_tree(
     session: Session, root: Location
 ) -> list[tuple[Location, tuple[str, ...], bool]]:
-    """A place and every area inside it, at any depth, as countable_tree
-    walks them, each with its path and whether it may be counted: those it
-    leaves out too. One query, by a recursive CTE."""
+    """A place and every area inside it, at any depth, each with its path
+    below the place, the names of the areas it is in, then its own (none
+    for the place), and whether it may be counted (balance.countable; the
+    place always may). Depth first, each level by name: an area that may
+    not be counted is walked through too, its name in the paths of the
+    areas in it. One query, by a recursive CTE."""
     tree = select(Location.id).where(Location.id == root.id).cte("tree", recursive=True)
     tree = tree.union(select(Location.id).join(tree, Location.parent_id == tree.c.id))
     rows = session.execute(

@@ -127,6 +127,7 @@ from inventory_tng.stock.count_groups import (
     forms_by_place,
     label,
     line_of,
+    packages_by_id,
 )
 from inventory_tng.stock.counts import NotCountable
 from inventory_tng.stock.ledger import by_item, tracks_opened
@@ -309,16 +310,19 @@ ShownItems = Annotated[Shown, Depends(shown_items)]
 
 
 def _shown_places(
-    session: Session, root: Location, places: Collection[int] | None
+    session: Session,
+    tree: Sequence[tuple[Location, tuple[str, ...], bool]],
+    places: Collection[int] | None,
 ) -> list[tuple[Location, tuple[str, ...]]]:
-    """The places a count form shows, each with its path: the place and
-    every area in it that may be counted, as they are now; or of those, the
-    places `places` names, in that order, then any not in it now (an area
-    moved out of it since), under its own name."""
-    tree = queries.countable_tree(session, root)
+    """The places a count form shows, each with its path, of its place's
+    `tree` (queries.place_tree): the place and every area in it that may be
+    counted, as they are now; or of those, the places `places` names, in
+    that order, then any not in it now (an area moved out of it since),
+    under its own name."""
+    countable = [(place, path) for place, path, may in tree if may]
     if places is None:
-        return tree
-    shown = [(place, path) for place, path in tree if place.id in places]
+        return countable
+    shown = [(place, path) for place, path in countable if place.id in places]
     gone = set(places) - {place.id for place, _ in shown}
     for place in by_name(session, Location, Location.id.in_(gone)):
         shown.append((place, (place.name,)))
@@ -333,7 +337,8 @@ def _listed_words(
     (count_forms.Listed): above the form, and by field, beside the item
     picked and on a recount's line added for it (count_forms.read_count)."""
     item = session.get_one(Item, listed.item_id)
-    ((place, path),) = _shown_places(session, root, [listed.place_id])
+    tree = queries.place_tree(session, root)
+    ((place, path),) = _shown_places(session, tree, [listed.place_id])
     where = label(place, path)
     problems: dict[str, Words] = {EXTRA_ITEM: listed_under(where)}
     if not listed.on_form:
@@ -386,22 +391,24 @@ def _count_page(
         if each:
             asked.setdefault(place_id, set()).update(each)
     ids = shown.ids(session)
-    if leaving is None and gone.ids:
-        leaving = areas_leaving(session, place, gone)
+    # The place's tree, read once for the places shown and the areas gone.
+    tree = queries.place_tree(session, place)
     groups_shown = _shown_places(
-        session, place, places if places is not None else asked or None
+        session, tree, places if places is not None else asked or None
     )
     ids_shown = [each.id for each, _ in groups_shown]
     at = at or moment(session, *ids_shown)
+    if leaving is None and gone.ids:
+        leaving = areas_leaving(session, place, gone, at.as_of, tree)
     # Of what left the areas gone, only the items shown; each place's own
     # lines count what it held before.
     moves = [
         move
-        for move in gone_moves(session, gone, at.as_of, ids_shown)
+        for move in gone_moves(session, gone, at.as_of, ids_shown, leaving)
         if ids is None or move.item_id in ids
     ]
     listed = queries.countable_items(session)
-    groups, named = _place_lines(
+    groups, named, packages = _place_lines(
         session,
         place,
         groups_shown,
@@ -417,7 +424,7 @@ def _count_page(
         listed = [item for item in listed if item.id in ids]
     moved = None
     if leaving is not None:
-        moved = moved_sections(session, place, groups, leaving, moves, named)
+        moved = moved_sections(session, place, groups, leaving, moves, named, packages)
     # Something else here and an open package nobody recorded may be found
     # in any place shown but a retired area (count_forms.PICKED).
     choices = [
@@ -483,7 +490,7 @@ def _place_lines(
     ids: Collection[int] | None,
     moves: Sequence[MovedOut],
     items: Sequence[Item],
-) -> tuple[list[Group], dict[int, Item]]:
+) -> tuple[list[Group], dict[int, Item], dict[int, ItemPackage]]:
     """What a count form of `place` shows at each of `shown_places`, as of
     moment `as_of`, a group of lines at each; and every item they name, by
     id, of `items`, those that may be counted, and of the rest. Everything
@@ -491,7 +498,8 @@ def _place_lines(
     `recount` figures; of the items of `ids` only, None for all, and
     `only`, asked for, at the page's own place if none is at any place
     shown; less what `moves` brought there from the areas gone from it
-    (count_arrivals.set_aside)."""
+    (count_arrivals.set_aside). And every package of the items on its
+    lines and of `moves`, by id, read once for both."""
     ids_shown = [each.id for each, _ in shown_places]
     every = set().union(*asked.values()) if asked else None
     was_at = expected_at(session, ids_shown, as_of, every)
@@ -547,13 +555,9 @@ def _place_lines(
         )
         for each, here in was.items()
     }
-    forms = forms_by_place(
-        session,
-        as_of,
-        {each: [item.id for item, _ in found] for each, found in rows.items()},
-        openings,
-        aside,
-    )
+    on_lines = {each: [item.id for item, _ in found] for each, found in rows.items()}
+    packages = packages_by_id(session, set().union(*on_lines.values(), moved_ids))
+    forms = forms_by_place(session, as_of, on_lines, openings, aside, packages)
     groups = [
         Group(
             each,
@@ -566,7 +570,7 @@ def _place_lines(
         )
         for each, path in shown_places
     ]
-    return groups, named
+    return groups, named, packages
 
 
 @router.get(f"{COUNTS}/{{location_id:int}}")
@@ -945,7 +949,7 @@ def bring_back(
     if carried is None or area_id not in carried.gone.ids:
         return not_found()
     place, _, at, place_ids, gone = carried
-    leaving = areas_leaving(session, place, gone)
+    leaving = areas_leaving(session, place, gone, at.as_of)
     if area_id == place.id or area_id not in leaving.order:
         # Not one of the place's areas, as only a hand-made form names: none
         # this form may bring back.

@@ -131,6 +131,7 @@ def forms_by_place(
     item_ids: Mapping[int, Sequence[int]],
     openings: Mapping[int, Mapping[int, Collection[int]]],
     aside: Mapping[int, Aside] | None = None,
+    packages: Mapping[int, ItemPackage] | None = None,
 ) -> dict[int, dict[int, list[FormRow]]]:
     """At each place, by id, the items of `item_ids` there whose stock was
     in more than loose units, as of the form, each form a row: sealed
@@ -140,13 +141,13 @@ def forms_by_place(
     over_recorded.openings_waiting_at): it is counted by form, with a row of
     each package it opened sealed, though the records hold none, as a total
     puts neither of its ends right (docs/decisions/0020). Less, by place,
-    what is `aside` there (count_arrivals.set_aside). The same number of
+    what is `aside` there (count_arrivals.set_aside). `packages`, by id,
+    every package of those items, if read already. The same number of
     queries however many places."""
     every = sorted(set().union(*item_ids.values())) if item_ids else []
     found = expected_forms_at(session, item_ids.keys(), as_of, every)
-    packages = {
-        package.id: package for package in queries.packages_of_items(session, every)
-    }
+    if packages is None:
+        packages = packages_by_id(session, every)
     opened = {row.id: row for row in queries.open_at(session, item_ids.keys(), every)}
     return {
         place_id: _place_forms(
@@ -200,6 +201,15 @@ def _place_forms(
         if not any(row.field.startswith(LOOSE_FIELD) for row in each):
             each.append(form_row(item_id, LOOSE, Decimal(0), packages, opened))
     return rows
+
+
+def packages_by_id(
+    session: Session, item_ids: Collection[int]
+) -> dict[int, ItemPackage]:
+    """Every package of the items of `item_ids`, by id."""
+    return {
+        package.id: package for package in queries.packages_of_items(session, item_ids)
+    }
 
 
 def line_of(session: Session, as_of: int, listed: Listed) -> str:
