@@ -28,21 +28,9 @@ class Emptied:
     def __init__(self, session: Session, client: TestClient) -> None:
         self.made = made = Store(session)
         self.item = made.place.item.id
-        self.gone = add(session, area("Shelf C", made.store))
-        retire(session, self.gone)
-        self.send(session, made.store, self.gone, "2")
+        self.gone = made.emptied_later(session)
         self.shown = count_form(client.get(made.path))
         assert str(self.gone.id) in self.shown["places"].split()
-
-    def send(self, session: Session, here: Location, there: Location, n: str) -> None:
-        """`n` radios moved from `here` to `there`."""
-        write(
-            session,
-            self.made.place,
-            from_location_id=here.id,
-            to_location_id=there.id,
-            lines=[{"item_id": self.item, "quantity": n}],
-        )
 
     def counted(self, place: Location) -> str:
         """The count form's name for the radios counted at `place`."""
@@ -111,7 +99,7 @@ def test_a_retired_area_emptied_while_counted_says_where_its_items_went(
     offered for what is found but there to bring back."""
     setup = Emptied(session, admin_client)
     made, gone = setup.made, setup.gone
-    setup.send(session, gone, made.empty, "2")
+    setup.made.move(session, gone, made.empty, "2")
     typed = {setup.counted(made.shelf): "3"}
     refused = admin_client.post(made.path, data=setup.shown | typed)
     assert refused.status_code == 409
@@ -162,8 +150,8 @@ def test_items_moved_to_two_areas_get_a_section_each(
     A's own line as it was before the move."""
     setup = Emptied(session, admin_client)
     made, gone = setup.made, setup.gone
-    setup.send(session, gone, made.shelf, "1")
-    setup.send(session, gone, made.empty, "1")
+    setup.made.move(session, gone, made.shelf, "1")
+    setup.made.move(session, gone, made.empty, "1")
     refused = admin_client.post(made.path, data=setup.shown)
     for there in (made.shelf, made.empty):
         assert heading(refused, f"Moved to {there.name}")
@@ -184,7 +172,7 @@ def test_items_taken_out_of_the_store_are_listed_with_no_box(
     store, with nothing to type."""
     setup = Emptied(session, admin_client)
     made = setup.made
-    setup.send(session, setup.gone, made.place.van, "2")
+    setup.made.move(session, setup.gone, made.place.van, "2")
     refused = admin_client.post(made.path, data=setup.shown)
     assert refused.status_code == 409
     assert heading(refused, f"Taken out of {made.store.name}")
@@ -206,7 +194,7 @@ def test_bring_it_back_restores_the_area_and_shows_the_form_again(
     put at none, Shelf C holds them again."""
     setup = Emptied(session, admin_client)
     made, gone = setup.made, setup.gone
-    setup.send(session, gone, made.empty, "2")
+    setup.made.move(session, gone, made.empty, "2")
     refused = admin_client.post(made.path, data=setup.shown)
     typed = {setup.counted(made.shelf): "3", setup.arrived(made.empty): "0"}
     back = bring_back(admin_client, made, refused, typed, gone.id)
@@ -249,7 +237,7 @@ def test_bring_it_back_of_an_area_back_already_shows_the_form(
     """Brought back meanwhile on its own page: the form, as if just now."""
     setup = Emptied(session, admin_client)
     made, gone = setup.made, setup.gone
-    setup.send(session, gone, made.empty, "2")
+    setup.made.move(session, gone, made.empty, "2")
     refused = admin_client.post(made.path, data=setup.shown)
     gone.retired_at = None
     session.flush()
@@ -268,9 +256,9 @@ def test_bring_it_back_refused_by_a_rule_says_so(
     shelf = add(session, area("Shelf D", made.store))
     inner = add(session, area("Bin X", shelf))
     retire(session, shelf, inner)
-    setup.send(session, made.store, inner, "1")
+    setup.made.move(session, made.store, inner, "1")
     shown = count_form(admin_client.get(made.path))
-    setup.send(session, inner, made.empty, "1")
+    setup.made.move(session, inner, made.empty, "1")
     refused = admin_client.post(made.path, data=shown)
     label = PATH_BETWEEN.join([shelf.name, inner.name])
     assert emptied_words(label) in text(refused)
@@ -286,7 +274,7 @@ def test_bring_it_back_of_an_area_not_gone_from_the_form_is_not_found(
 ) -> None:
     setup = Emptied(session, admin_client)
     made = setup.made
-    setup.send(session, setup.gone, made.empty, "2")
+    setup.made.move(session, setup.gone, made.empty, "2")
     refused = admin_client.post(made.path, data=setup.shown)
     form = count_form(refused)
     for area_id in (str(made.empty.id), "x"):
@@ -337,7 +325,7 @@ def test_an_area_emptied_and_another_retired_are_named_together(
     heading dimmed, and both named as not offered for what is found."""
     setup = Emptied(session, admin_client)
     made, gone = setup.made, setup.gone
-    setup.send(session, gone, made.shelf, "2")
+    setup.made.move(session, gone, made.shelf, "2")
     retire(session, made.empty)
     refused = admin_client.post(made.path, data=setup.shown)
     words = text(refused)
@@ -376,7 +364,7 @@ def test_a_moved_item_the_filter_leaves_out_is_not_shown(
     )
     path = f"{made.path}?item={cable}"
     shown = count_form(admin_client.get(path))
-    setup.send(session, gone, made.empty, "2")
+    setup.made.move(session, gone, made.empty, "2")
     write(
         session,
         made.place,
@@ -403,7 +391,7 @@ def test_a_recount_at_an_area_emptied_since_lists_what_left_it(
     refused, asking again only at Shelf A, the radio listed as taken out."""
     setup = Emptied(session, admin_client)
     made, gone = setup.made, setup.gone
-    setup.send(session, gone, made.shelf, "1")
+    setup.made.move(session, gone, made.shelf, "1")
     typed = {setup.counted(made.shelf): "3", setup.counted(gone): "2"}
     asked = admin_client.post(made.path, data=setup.shown | typed)
     assert asked.status_code == 409
@@ -411,7 +399,7 @@ def test_a_recount_at_an_area_emptied_since_lists_what_left_it(
     assert sorted(recount["places"].split()) == sorted(
         [str(made.shelf.id), str(gone.id)]
     )
-    setup.send(session, gone, made.place.van, "1")
+    setup.made.move(session, gone, made.place.van, "1")
     refused = admin_client.post(made.path, data=recount | typed)
     assert refused.status_code == 409
     assert emptied_words(gone.name) in text(refused)
@@ -428,10 +416,10 @@ def test_an_item_moved_from_two_areas_to_one_place_has_a_part_each(
     made, gone = setup.made, setup.gone
     other = add(session, area("Shelf D", made.store))
     retire(session, other)
-    setup.send(session, made.store, other, "1")
+    setup.made.move(session, made.store, other, "1")
     shown = count_form(admin_client.get(made.path))
-    setup.send(session, gone, made.empty, "2")
-    setup.send(session, other, made.empty, "1")
+    setup.made.move(session, gone, made.empty, "2")
+    setup.made.move(session, other, made.empty, "1")
     refused = admin_client.post(made.path, data=shown)
     assert refused.status_code == 409
     item = made.place.item.name_shown
@@ -454,7 +442,7 @@ def test_bring_it_back_of_a_place_not_in_the_store_is_not_found(
     made = setup.made
     elsewhere = add(session, area("Shelf Z", Store(session).store))
     retire(session, elsewhere, made.store)
-    setup.send(session, setup.gone, made.empty, "2")
+    setup.made.move(session, setup.gone, made.empty, "2")
     form = count_form(admin_client.post(made.path, data=setup.shown))
     for place in (elsewhere, made.store):
         sent = form | {"gone": f"{setup.gone.id} {place.id}", "area_id": str(place.id)}
@@ -473,7 +461,7 @@ def test_an_area_brought_back_since_the_refusal_is_still_said_gone(
     refused for it."""
     setup = Emptied(session, admin_client)
     made, gone = setup.made, setup.gone
-    setup.send(session, gone, made.empty, "2")
+    setup.made.move(session, gone, made.empty, "2")
     monkeypatch.setattr(queries, "not_countable", lambda *_: set())
     refused = admin_client.post(made.path, data=setup.shown)
     assert refused.status_code == 409
@@ -489,10 +477,10 @@ def test_a_recount_shows_what_went_to_an_area_it_does_not_ask_at(
     the radio under "Moved to Shelf B", not taken out of the store."""
     setup = Emptied(session, admin_client)
     made, gone = setup.made, setup.gone
-    setup.send(session, gone, made.shelf, "1")
+    setup.made.move(session, gone, made.shelf, "1")
     typed = {setup.counted(made.shelf): "3", setup.counted(gone): "2"}
     recount = count_form(admin_client.post(made.path, data=setup.shown | typed))
-    setup.send(session, gone, made.empty, "1")
+    setup.made.move(session, gone, made.empty, "1")
     refused = admin_client.post(made.path, data=recount | typed)
     assert refused.status_code == 409
     again = count_form(refused)

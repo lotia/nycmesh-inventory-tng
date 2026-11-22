@@ -57,8 +57,8 @@ def record_store_count(
     counts: Mapping[int, PlaceCount],
     when: datetime,
     *,
-    aside: Mapping[int, Mapping[tuple[int, Form], Decimal]] | None = None,
-    fixed: Mapping[int, FormLines] | None = None,
+    aside: Mapping[int, Mapping[tuple[int, Form], Decimal]],
+    fixed: Mapping[int, FormLines],
 ) -> StoreCounted:
     """Put the records right at each place of `counts`, of a form showing
     `places`, as of `at`, read across them all (moments.moment): every
@@ -69,7 +69,6 @@ def record_store_count(
     (counts.record_count). NotCountable names the place that may not be
     counted; RuleBroken (count_sent_otherwise) for a form saved before
     that says otherwise now (module docstring)."""
-    aside, fixed = aside or {}, fixed or {}
     lock_places(session, places)
     _hold_named(session, counts.keys(), at, counts.values(), fixed)
     said = _digest(places, at, counts, aside, fixed)

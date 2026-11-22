@@ -17,7 +17,7 @@ from typing import NamedTuple
 from sqlalchemy.orm import Session
 
 from inventory_tng.stock.forms import Gone
-from inventory_tng.stock.ledger import Form
+from inventory_tng.stock.ledger import Form, by_item
 from inventory_tng.stock.moved_out import MovedOut, moved_out
 
 # What a place's records hold that came from the areas gone from its
@@ -81,15 +81,6 @@ def fixed(
         if (key := (to_id, from_id, item_id, form)) in moved and amount != moved[key]
     ]
     return sorted(fixes, key=lambda fix: (fix.to_id, fix.from_id, fix.item_id))
-
-
-def by_item(aside: Mapping[tuple[int, Form], Decimal]) -> dict[int, Decimal]:
-    """What is set aside at a place (set_aside), by item, in all its
-    forms."""
-    total: dict[int, Decimal] = {}
-    for (item_id, _), n in aside.items():
-        total[item_id] = total.get(item_id, Decimal(0)) + n
-    return total
 
 
 def less[Line](

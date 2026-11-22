@@ -11,7 +11,7 @@ from inventory_tng.stock.moments import at_place
 from inventory_tng.stock.paths import COUNTS
 
 from helpers.rows import add, tag
-from helpers.stock import stocked, write
+from helpers.stock import retire, stocked, write
 
 
 class Store:
@@ -41,16 +41,25 @@ class Store:
         )
 
     def move(
-        self, session: Session, here: Location, there: Location
+        self, session: Session, here: Location, there: Location, n: str = "1"
     ) -> LedgerTransaction:
-        """One radio moved from `here` to `there`."""
+        """`n` radios moved from `here` to `there`."""
         return write(
             session,
             self.place,
             from_location_id=here.id,
             to_location_id=there.id,
-            lines=[{"item_id": self.place.item.id, "quantity": "1"}],
+            lines=[{"item_id": self.place.item.id, "quantity": n}],
         )
+
+    def emptied_later(self, session: Session) -> Location:
+        """Shelf C, retired, holding two radios a save brought after it was
+        retired: what a count's moves from an area gone from it start
+        from."""
+        gone = add(session, area("Shelf C", self.store))
+        retire(session, gone)
+        self.move(session, self.store, gone, "2")
+        return gone
 
 
 def area(name: str, parent: Location) -> Location:

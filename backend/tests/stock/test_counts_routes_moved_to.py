@@ -38,28 +38,17 @@ class Moved:
     ) -> None:
         self.made = made = Store(session)
         self.item = made.place.item.id
-        self.gone = add(session, area("Shelf C", made.store))
-        retire(session, self.gone)
-        self.send(session, made.store, self.gone, "2")
+        self.gone = made.emptied_later(session)
         self.path = made.path + (f"?item={self.item}" if only else "")
         shown = count_form(client.get(self.path))
         self.there: Location = getattr(made, there)
-        self.send(session, self.gone, self.there, "2")
+        made.move(session, self.gone, self.there, "2")
         # Filtered, Shelf C counted, so it is refused for it.
         typed = {field(self.gone, made.store, f"counted_{self.item}"): "2"}
         refused = client.post(self.path, data=shown | (typed if only else {}))
         assert refused.status_code == 409
         self.page = read(refused.text)
         self.form = count_form(refused)
-
-    def send(self, session: Session, here: Location, there: Location, n: str) -> None:
-        write(
-            session,
-            self.made.place,
-            from_location_id=here.id,
-            to_location_id=there.id,
-            lines=[{"item_id": self.item, "quantity": n}],
-        )
 
     def arrived(self, area_id: int | None = None) -> str:
         name = f"arrived_{area_id or self.gone.id}_loose_{self.item}"
@@ -437,8 +426,8 @@ def test_a_save_sent_again_after_a_later_move_out_of_the_store_is_as_before(
     moved = Moved(session, admin_client)
     form = moved.form | {moved.arrived(): "1"}
     first = admin_client.post(moved.path, data=form)
-    moved.send(session, moved.made.store, moved.gone, "1")
-    moved.send(session, moved.gone, moved.made.place.van, "1")
+    moved.made.move(session, moved.made.store, moved.gone, "1")
+    moved.made.move(session, moved.gone, moved.made.place.van, "1")
     again = admin_client.post(moved.path, data=form)
     assert again.headers["location"] == first.headers["location"]
     assert expected(session, moved.there.id) == {moved.item: Decimal(1)}

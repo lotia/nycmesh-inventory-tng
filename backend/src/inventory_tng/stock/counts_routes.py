@@ -100,7 +100,6 @@ from inventory_tng.stock.balance import countable, takeable
 from inventory_tng.stock.count_arrivals import (
     Aside,
     arrived_at,
-    by_item,
     fixed,
     fixed_lines,
     gone_moves,
@@ -142,7 +141,7 @@ from inventory_tng.stock.forms import (
     places_listed,
     read_count,
 )
-from inventory_tng.stock.ledger import LOOSE, Form, tracks_opened
+from inventory_tng.stock.ledger import LOOSE, Form, by_item, tracks_opened
 from inventory_tng.stock.moments import (
     Moment,
     expected_at,
@@ -859,6 +858,10 @@ def count(
     again = partial(
         _count_page, request, session, signed, place, shown=shown, gone=gone
     )
+    # Asking again for what it asked, with the figures it showed.
+    asking = partial(again, items=asked, recount=figures)
+    # The form as sent, as of when it was shown, of the places it showed.
+    as_sent = partial(asking, at, places=place_ids, values=form)
     # What was typed, kept on a form shown as it is now, with a new key.
     typed = {name: value for name, value in form.items() if name != "key"}
     if place.id not in place_ids and not any(asked.values()):
@@ -889,15 +892,7 @@ def count(
     if problems:
         # What was typed is as of when the form was shown, of the places it
         # showed; a recount asks again for its own items only.
-        return again(
-            at,
-            places=place_ids,
-            problems=problems,
-            values=form,
-            alert=alert,
-            items=asked,
-            recount=figures,
-        )
+        return as_sent(problems=problems, alert=alert)
     # Filtered to some items, a place of a store's form with nothing typed
     # was not counted, the store's own too.
     filtered = shown.only is not None or bool(shown.search)
@@ -919,15 +914,7 @@ def count(
         # Nothing typed at any place: nothing to count, so the form again,
         # as sent, saying so (inventory-tng-fxsy).
         log.info("count refused: nothing typed", location_id=place.id)
-        return again(
-            at,
-            places=place_ids,
-            values=form,
-            alert=NOTHING_TYPED,
-            items=asked,
-            recount=figures,
-            status_code=400,
-        )
+        return as_sent(alert=NOTHING_TYPED, status_code=400)
 
     # Bound again, as checked, for put_right.
     sent_key, across = key, place_ids
@@ -1010,27 +997,15 @@ def count(
             # What was typed may be of before that save or after it, of
             # items it cannot tell: the form as it is now, with a new key,
             # keeping what was typed, to check and send again.
-            return again(
-                None,
-                values=typed,
-                alert=SAVED_AS_SHOWN,
-                items=asked,
-                recount=figures,
-                status_code=409,
-            )
+            return asking(None, values=typed, alert=SAVED_AS_SHOWN, status_code=409)
         # Checked again, the units as they are now mark the lines it broke.
         problems = {}
         for place_id, each in sent.places.items():
             _, wrong = item_counts(session, each.found)
             problems |= fields_at(place.id, place_id, wrong)
-        return again(
-            at,
-            places=place_ids,
+        return as_sent(
             problems=problems,
-            values=form,
             alert=None if problems else RULES[broken],
-            items=asked,
-            recount=figures,
             status_code=400,
         )
     assert result is not None
@@ -1180,7 +1155,14 @@ def bring_back(
             area_id=area.id,
             rule=broken,
         )
-        return again(at, places=place_ids, alert=RULES[broken], status_code=409)
+        # Nothing changed: the areas as read already.
+        return again(
+            at,
+            places=place_ids,
+            alert=RULES[broken],
+            leaving=leaving,
+            status_code=409,
+        )
     session.commit()
     if brought:
         areas_brought_back.add(1)

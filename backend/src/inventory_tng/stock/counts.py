@@ -29,6 +29,7 @@ from inventory_tng.stock.ledger import (
     Entry,
     Form,
     Lines,
+    by_item,
     each_once,
     entries,
     insert_transaction,
@@ -282,9 +283,7 @@ def record_count(
         session, location_id, after, LedgerTransaction.id <= as_of, items=counted_at
     )
     aside = aside or {}
-    aside_total: dict[int, Decimal] = {}
-    for (item_id, _), amount in aside.items():
-        aside_total[item_id] = aside_total.get(item_id, Decimal(0)) + amount
+    aside_total = by_item(aside)
     then = {
         item_id: came - went - aside_total.get(item_id, Decimal(0))
         for item_id, (came, went) in flows.items()

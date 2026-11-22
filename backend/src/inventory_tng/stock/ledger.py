@@ -112,6 +112,14 @@ def entries(lines: Lines) -> list[Entry]:
     return [Entry(*line) for line in lines]
 
 
+def by_item(lines: Mapping[tuple[int, Form], Decimal]) -> dict[int, Decimal]:
+    """Amounts by item and form, summed by item, in all its forms."""
+    total: dict[int, Decimal] = {}
+    for (item_id, _), n in lines.items():
+        total[item_id] = total.get(item_id, Decimal(0)) + n
+    return total
+
+
 def repeated[K](keys: Sequence[K | None]) -> set[int]:
     """The positions of the lines whose key, such as an item, another line
     has too (None is no key, so repeats none). A batch or a count names each
