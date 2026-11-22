@@ -51,7 +51,7 @@ class Emptied:
     def arrived(self, place: Location, area: Location | None = None) -> str:
         """The count form's name for how many radios arrived at `place`
         from `area`, Shelf C if none."""
-        name = f"arrived_{(area or self.gone).id}_{self.item}"
+        name = f"arrived_{(area or self.gone).id}_loose_{self.item}"
         return field(place, self.made.store, name)
 
 
@@ -390,7 +390,8 @@ def test_a_moved_item_the_filter_leaves_out_is_not_shown(
     assert emptied_words(gone.name) in text(refused)
     assert heading(refused, f"Moved to {made.empty.name}")
     page = read(refused.text)
-    assert page.all("input", name=f"at_{made.empty.id}_arrived_{gone.id}_{cable}")
+    cable_arrived = f"at_{made.empty.id}_arrived_{gone.id}_loose_{cable}"
+    assert page.all("input", name=cable_arrived)
     assert page.all("input", name=setup.arrived(made.empty)) == []
 
 

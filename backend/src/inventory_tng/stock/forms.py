@@ -274,36 +274,36 @@ class Gone(NamedTuple):
 NONE_GONE = Gone()
 
 # How many arrived of an item moved from an area gone from a count form to
-# a place on it, fixing the amount moved: arrived_<area id>_<item id>, as
-# the place's field (stock/count_arrivals.py).
+# a place on it, fixing the amount moved, in each form it arrived in:
+# arrived_<area id>_<the field the count form counts that form by> (SEALED,
+# LOOSE_FIELD, OPENED), as the place's field (stock/count_arrivals.py). A
+# sealed form is fixed in whole packages, so no fix leaves a loose balance
+# below nothing (coordinator, 2026-11-22, inventory-tng-ygk5).
 ARRIVED = "arrived_"
 
 
 def arrivals(
-    session: Session, fields: Mapping[str, str]
-) -> tuple[dict[tuple[int, int], Decimal], dict[str, Words]]:
-    """A place's boxes of how many arrived, by the area each move left and
-    its item, those blank left out; and what is wrong."""
-    typed: dict[tuple[int, int], tuple[str, str]] = {}
+    session: Session, fields: Mapping[str, str], place_id: int
+) -> tuple[dict[tuple[int, int, Form], Decimal], dict[str, Words]]:
+    """A place's boxes of how many arrived, read as its count by form is
+    (by_form), by the area each move left, its item and form, those blank
+    left out; and what is wrong."""
+    by_area: dict[int, dict[str, str]] = {}
     for field, value in fields.items():
-        if field.startswith(ARRIVED) and value.strip():
-            area, _, item = field.removeprefix(ARRIVED).partition("_")
-            area_id, item_id = row_id(area), row_id(item)
-            if area_id is not None and item_id is not None:
-                typed[(area_id, item_id)] = (field, value)
-    units = queries.units_of(session, [item_id for _, item_id in typed])
-    arrived: dict[tuple[int, int], Decimal] = {}
+        if field.startswith(ARRIVED):
+            area, _, name = field.removeprefix(ARRIVED).partition("_")
+            if (area_id := row_id(area)) is not None:
+                by_area.setdefault(area_id, {})[name] = value
+    arrived: dict[tuple[int, int, Form], Decimal] = {}
     problems: dict[str, Words] = {}
-    for (area_id, item_id), (field, value) in typed.items():
-        if (unit := units.get(item_id)) is None:
-            problems[field] = NO_SUCH_ITEM
-            continue
-        amount = quantity(value, positive=False, unit=unit)
-        if isinstance(amount, str):
-            problems[field] = amount
-        else:
-            assert amount is not None  # Typed, so not blank.
-            arrived[(area_id, item_id)] = amount
+    for area_id, typed in by_area.items():
+        read, wrong = by_form(session, typed, place_id)
+        for item_id, form, amount in read.lines:
+            arrived[(area_id, item_id, form)] = amount
+        problems |= {
+            name if name == CLOSED_MEANWHILE else f"{ARRIVED}{area_id}_{name}": words
+            for name, words in wrong.items()
+        }
     return arrived, problems
 
 
@@ -361,7 +361,7 @@ class PlaceCount(NamedTuple):
     counted: ItemLines
     forms: ByForm
     items: set[int]
-    arrived: dict[tuple[int, int], Decimal]
+    arrived: dict[tuple[int, int, Form], Decimal]
 
     @property
     def anything(self) -> bool:
@@ -446,7 +446,7 @@ def read_count(
                 items.add(extra)
         counted, wrong = item_counts(session, found)
         forms, form_wrong = by_form(session, fields, place_id)
-        arrived, arrived_wrong = arrivals(session, fields)
+        arrived, arrived_wrong = arrivals(session, fields, place_id)
         places[place_id] = PlaceCount(found, counted, forms, items, arrived)
         named = fields_at(root_id, place_id, named_twice(found_once))
         twice |= named

@@ -60,8 +60,8 @@ inventory-tng-ygk5). The form then carries the areas gone from it and
 the moment it was first shown (forms.GONE), so it shows, until saved,
 what left them since (stock/count_gone_areas.py): what went to a place on
 it is set aside from what that place's own lines count, and each move is
-taken as right unless its amount is fixed, the difference then lost or
-found there (stock/count_arrivals.py). One emptied can be brought back
+taken as right unless its amount is fixed, in each form it arrived in,
+the difference then lost or found there (stock/count_arrivals.py). One emptied can be brought back
 from the form (bring_back), as its own page does
 (places/locations.restore), and the form shown again with it.
 """
@@ -110,7 +110,13 @@ from inventory_tng.stock.count_gone_areas import (
     gone_words,
     moved_sections,
 )
-from inventory_tng.stock.count_groups import FormRow, Group, label
+from inventory_tng.stock.count_groups import (
+    FormRow,
+    Group,
+    form_order,
+    form_row,
+    label,
+)
 from inventory_tng.stock.counts import NotCountable, record_adjustment
 from inventory_tng.stock.forms import (
     CLOSED_MEANWHILE,
@@ -120,9 +126,7 @@ from inventory_tng.stock.forms import (
     FOUND_PLACE,
     LOOSE_FIELD,
     NONE_GONE,
-    OPENED,
     PICKED,
-    SEALED,
     TYPE_IT_HERE,
     Gone,
     Listed,
@@ -200,12 +204,14 @@ areas_brought_back = meter.create_counter(
 )
 
 # A move from an area gone from a count form fixed on it: more or less
-# arrived than was moved (inventory-tng-ygk5).
+# arrived than was moved, each form it arrived in on its own
+# (inventory-tng-ygk5).
 moves_fixed = meter.create_counter(
     "inventory.count.moves_fixed",
     unit="{move}",
     description="Moves from retired areas emptied while counted whose amount "
-    "a count form fixed, by whether more arrived (found) or less (lost)",
+    "a count form fixed, each form they arrived in apart, by whether more "
+    "arrived (found) or less (lost)",
 )
 
 
@@ -625,7 +631,7 @@ def _count_page(
     ]
     moved = None
     if leaving is not None:
-        moved = moved_sections(place, groups, leaving, moves, named)
+        moved = moved_sections(session, place, groups, leaving, moves, named)
     # Something else here and an open package nobody recorded may be found
     # in any place shown but a retired area (forms.PICKED).
     choices = [
@@ -702,18 +708,6 @@ def count_form(
     )
 
 
-# How the count form asks for each form of an item.
-LOOSE_WORDS = lazy_gettext("Loose")
-
-
-def sealed_how_many(package: str) -> str:
-    return gettext("%(package)s, sealed: how many", package=package)
-
-
-def opened_left(package: str, day: str) -> str:
-    return gettext("%(package)s, opened %(day)s: left", package=package, day=day)
-
-
 def _forms(
     session: Session,
     as_of: int,
@@ -788,47 +782,15 @@ def _place_forms(
                 Form(package_id=package_id), Decimal(0)
             )
 
-    # Sealed smallest package first, ties by package id, as the item and
-    # scan pages list packages; then open ones oldest first; then loose.
-    def order(pair: tuple[Form, Decimal]) -> tuple[int | Decimal, ...]:
-        form = pair[0]
-        if form.package_id is not None:
-            return 0, packages[form.package_id].size, form.package_id
-        if form.open_package_id is not None:
-            return 1, form.open_package_id
-        return (2,)
-
     rows: dict[int, list[FormRow]] = {}
     for item_id, forms in held.items():
         if set(forms) <= {LOOSE}:
             continue
         each = rows.setdefault(item_id, [])
-        for form, amount in sorted(forms.items(), key=order):
-            if form.package_id is not None:
-                package = packages[form.package_id]
-                each.append(
-                    FormRow(
-                        f"{SEALED}{item_id}_{package.id}",
-                        sealed_how_many(package.name_shown),
-                        amount / package.size,
-                        per=Decimal(package.size),
-                    )
-                )
-            elif form.open_package_id is not None:
-                row = opened[form.open_package_id]
-                name = packages[row.package_id].name_shown
-                each.append(
-                    FormRow(
-                        f"{OPENED}{row.id}",
-                        opened_left(name, f"{row.opened_at:%Y-%m-%d}"),
-                        amount,
-                        row.id,
-                    )
-                )
-            else:
-                each.append(FormRow(f"{LOOSE_FIELD}{item_id}", LOOSE_WORDS, amount))
+        for form in sorted(forms, key=lambda form: form_order(form, packages)):
+            each.append(form_row(item_id, form, forms[form], packages, opened))
         if not any(row.field.startswith(LOOSE_FIELD) for row in each):
-            each.append(FormRow(f"{LOOSE_FIELD}{item_id}", LOOSE_WORDS, Decimal(0)))
+            each.append(form_row(item_id, LOOSE, Decimal(0), packages, opened))
     return rows
 
 
@@ -955,7 +917,6 @@ def count(
     # (stock/count_arrivals.py).
     moves = gone_moves(session, gone, at.as_of, place_ids)
     fixes = fixed(
-        session,
         moves,
         {place_id: each.arrived for place_id, each in sent.places.items()},
     )

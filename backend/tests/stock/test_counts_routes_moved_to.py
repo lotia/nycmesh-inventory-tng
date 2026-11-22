@@ -13,11 +13,11 @@ from sqlalchemy.orm import Session
 
 from inventory_tng.models.places import Location
 from inventory_tng.models.stock import LedgerTransaction, Movement
-from inventory_tng.stock.ledger import LOOSE, Entry
+from inventory_tng.stock.ledger import LOOSE, Entry, Form
 from inventory_tng.stock.moments import expected, expected_forms_at
 from inventory_tng.stock.paths import COUNTS
 
-from helpers.markup import read, text
+from helpers.markup import problem, read, text
 from helpers.rows import add
 from helpers.stock import Spools, count_form, retire, write
 from helpers.store_areas import Store, area, counts_at, field
@@ -62,7 +62,7 @@ class Moved:
         )
 
     def arrived(self, area_id: int | None = None) -> str:
-        name = f"arrived_{area_id or self.gone.id}_{self.item}"
+        name = f"arrived_{area_id or self.gone.id}_loose_{self.item}"
         return field(self.there, self.made.store, name)
 
     def counted(self) -> str:
@@ -167,7 +167,7 @@ def test_moves_from_two_areas_are_fixed_each_on_its_own(
             lines=lines,
         )
     form = count_form(admin_client.post(made.path, data=shown))
-    fix = {field(made.shelf, made.store, f"arrived_{gone[1].id}_{item}"): "0"}
+    fix = {field(made.shelf, made.store, f"arrived_{gone[1].id}_loose_{item}"): "0"}
     saved(admin_client, made.path, form | fix)
     assert expected(session, made.shelf.id) == {item: Decimal(5)}
 
@@ -214,50 +214,141 @@ def test_a_box_for_no_such_move_is_left_alone(
     moved = Moved(session, admin_client)
     store = moved.made.store
     made_up = {
-        field(moved.there, store, f"arrived_{moved.made.shelf.id}_{moved.item}"): "9",
+        field(
+            moved.there, store, f"arrived_{moved.made.shelf.id}_loose_{moved.item}"
+        ): "9",
         field(moved.there, store, "arrived_x_1"): "9",
     }
     saved(admin_client, moved.path, moved.form | made_up)
     assert expected(session, moved.there.id) == {moved.item: Decimal(2)}
-    nothing = {field(moved.there, store, f"arrived_{moved.gone.id}_999999"): "1"}
+    nothing = {field(moved.there, store, f"arrived_{moved.gone.id}_loose_999999"): "1"}
     page = admin_client.post(moved.path, data=moved.form | nothing)
     assert page.status_code == 400
 
 
-def test_a_sealed_package_that_never_arrived_is_lost_sealed(
+class SpoolsMoved:
+    """The store's two sealed spools of cable and 10 m loose, and Shelf B
+    and Shelf C in it, C retired; `spools` sealed and `metres` loose moved
+    to Shelf C, each form a move of its own, before the count form is
+    shown, then on to Shelf B while it is open, so the form is refused and
+    shown again with the moves."""
+
+    def __init__(
+        self, session: Session, client: TestClient, spools: int, metres: int = 0
+    ) -> None:
+        self.spools = made = Spools(session)
+        store, sealed = made.store, made.sealed
+        self.cable = cable = made.cable.id
+        made.write(
+            {"kind": "receipt", "to_location_id": store.id},
+            Entry(cable, Decimal(10), LOOSE, LOOSE),
+        )
+        self.shelf, self.gone = (
+            add(session, area(name, store)) for name in ("Shelf B", "Shelf C")
+        )
+        retire(session, self.gone)
+        lines = [Entry(cable, Decimal(305 * spools), sealed, sealed)] + (
+            [Entry(cable, Decimal(metres), LOOSE, LOOSE)] if metres else []
+        )
+        self.path = f"{COUNTS}/{store.id}"
+        self._move(store, self.gone, lines)
+        shown = count_form(client.get(self.path))
+        self._move(self.gone, self.shelf, lines)
+        refused = client.post(self.path, data=shown)
+        assert refused.status_code == 409
+        self.page = read(refused.text)
+        self.form = count_form(refused)
+
+    def _move(self, here: Location, there: Location, lines: list[Entry]) -> None:
+        moving = {"kind": "move", "from_location_id": here.id}
+        for line in lines:
+            self.spools.write(moving | {"to_location_id": there.id}, line)
+
+    def box(self, form: str) -> str:
+        """The count form's name for how much cable arrived at Shelf B from
+        Shelf C in a form, by the count form's own name of that form."""
+        return f"at_{self.shelf.id}_arrived_{self.gone.id}_{form}"
+
+    @property
+    def sealed(self) -> str:
+        return self.box(f"sealed_{self.cable}_{self.spools.spool.id}")
+
+    @property
+    def loose(self) -> str:
+        return self.box(f"loose_{self.cable}")
+
+    def at_shelf(self, session: Session) -> dict[tuple[int, Form], Decimal]:
+        """What the records hold at Shelf B, by item and form."""
+        forms = expected_forms_at(session, [self.shelf.id], 2**31 - 1, [self.cable])
+        return forms.get(self.shelf.id, {})
+
+
+def test_a_sealed_arrival_is_fixed_in_whole_packages(
     session: Session, admin_client: TestClient
 ) -> None:
-    """A spool moved sealed from a retired shelf to another: none arrived,
-    so a sealed spool is lost there; 300 m arrived of it, which is no whole
-    spool, so 5 m are lost loose."""
-    for arrived, form_lost in (("0", "sealed"), ("300", "loose")):
-        spools = Spools(session)
-        store = spools.store
-        shelf, gone = (add(session, area(name, store)) for name in ("B", "C"))
-        retire(session, gone)
-        cable, sealed = spools.cable.id, spools.sealed
-        spool = Entry(cable, Decimal(305), sealed, sealed)
-        moving = {"kind": "move", "from_location_id": store.id}
-        spools.write(moving | {"to_location_id": gone.id}, spool)
-        path = f"{COUNTS}/{store.id}"
-        shown = count_form(admin_client.get(path))
-        spools.write(
-            {"kind": "move", "from_location_id": gone.id, "to_location_id": shelf.id},
-            spool,
-        )
-        form = count_form(admin_client.post(path, data=shown))
-        fix = {f"at_{shelf.id}_arrived_{gone.id}_{cable}": arrived}
-        saved(admin_client, path, form | fix)
-        left = {cable: Decimal(arrived)} if arrived != "0" else {}
-        assert expected(session, shelf.id) == left
-        (lost,) = session.scalars(
-            select(Movement)
-            .join(LedgerTransaction)
-            .where(LedgerTransaction.from_location_id == shelf.id)
-            .where(LedgerTransaction.kind == "count")
-        ).all()
-        assert (lost.from_package_id is not None) == (form_lost == "sealed")
-        assert lost.quantity == Decimal(305) - Decimal(arrived)
+    """Two spools moved sealed: How many arrived counts spools, labelled as
+    the count form's sealed lines are; one arrived, so one is lost sealed
+    and no loose cable goes below nothing (coordinator, 2026-11-22)."""
+    moved = SpoolsMoved(session, admin_client, spools=2)
+    box = moved.page.one("input", name=moved.sealed)
+    assert (box.attrs["value"], box.attrs["inputmode"]) == ("2", "numeric")
+    assert (box.attrs["data-per"], box.attrs["data-unset"]) == ("305", "2")
+    label = box.parent
+    assert label is not None
+    assert "Spool, sealed: how many" in label.get_text()
+    assert moved.page.all("input", name=moved.loose) == []
+    saved(admin_client, moved.path, moved.form | {moved.sealed: "1"})
+    assert moved.at_shelf(session) == {(moved.cable, moved.spools.sealed): 305}
+    (lost,) = session.scalars(
+        select(Movement)
+        .join(LedgerTransaction)
+        .where(LedgerTransaction.from_location_id == moved.shelf.id)
+        .where(LedgerTransaction.kind == "count")
+    ).all()
+    assert (lost.from_package_id, lost.quantity) == (moved.spools.spool.id, 305)
+
+
+def test_a_mixed_arrival_is_fixed_in_each_form(
+    session: Session, admin_client: TestClient
+) -> None:
+    """A spool and 10 m loose moved: a box for each, as the count form's
+    lines split them, each filled with what arrived in it. No spool and
+    4 m arrived: the spool is lost sealed, 6 m lost loose."""
+    moved = SpoolsMoved(session, admin_client, spools=1, metres=10)
+    sealed = moved.page.one("input", name=moved.sealed)
+    loose = moved.page.one("input", name=moved.loose)
+    assert (sealed.attrs["value"], loose.attrs["value"]) == ("1", "10")
+    assert "data-per" not in loose.attrs
+    assert loose.attrs["inputmode"] == "decimal"
+    (details,) = [
+        each
+        for each in moved.page.all("details")
+        if each.all("input", name=moved.loose)
+    ]
+    assert "How many arrived?" in details.text
+    assert "Spool, sealed: how many" in details.text
+    assert "Loose" in details.text
+    assert "open" not in details.attrs
+    typed = {moved.sealed: "0", moved.loose: "4"}
+    saved(admin_client, moved.path, moved.form | typed)
+    assert moved.at_shelf(session) == {(moved.cable, LOOSE): 4}
+
+
+def test_a_package_count_that_is_not_whole_is_said_beside_its_box(
+    session: Session, admin_client: TestClient
+) -> None:
+    """1.5 spools: refused, the box shown open with what was typed."""
+    moved = SpoolsMoved(session, admin_client, spools=2)
+    page = admin_client.post(moved.path, data=moved.form | {moved.sealed: "1.5"})
+    assert page.status_code == 400
+    shown = read(page.text)
+    (details,) = [
+        each for each in shown.all("details") if each.all("input", name=moved.sealed)
+    ]
+    assert "open" in details.attrs
+    assert details.one("input", name=moved.sealed).attrs["value"] == "1.5"
+    assert problem(shown, moved.sealed) == "A whole number of packages."
+    assert moved.at_shelf(session) == {(moved.cable, moved.spools.sealed): 610}
 
 
 def test_a_recount_says_what_was_typed_with_what_arrived(

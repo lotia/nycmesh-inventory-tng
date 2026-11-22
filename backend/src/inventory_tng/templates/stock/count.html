@@ -117,15 +117,26 @@ one by its size, an open package closed as none
     {% for heading, items in section.parts %}
     <tr><td colspan="{{ columns }}"><strong>{{ heading }}</strong></td></tr>
     {% for each in items %}
-    {% set moved_amount = each.moved | plain_amount %}
+    {#- How many arrived, a box for each form it arrived in, as the count
+    form's own lines of the item split them: sealed packages by how many,
+    whole (stock/forms.py, arrivals). #}
+    {% set fix = namespace(open=false) %}
+    {% for row in each.rows %}{% set name = each.prefix ~ row.field %}{% if values.get(name, row.amount | plain_amount) != row.amount | plain_amount or name in (problems or {}) %}{% set fix.open = true %}{% endif %}{% endfor %}
+    {% set said %}<span class="sr-only"> {{ each.item.name_shown }}, {{ heading }}</span>{% endset %}
     <tr>
       <td colspan="{{ columns - 1 }}">{% trans item=each.item.name_shown, amount=each.moved | amount %}{{ item }} · {{ amount }} moved{% endtrans %}</td>
-      <td><details{% if values.get(each.field, moved_amount) != moved_amount or each.field in (problems or {}) %} open{% endif %}>
+      <td><details{% if fix.open %} open{% endif %}>
         <summary class="as-button">{% trans %}Fix amount{% endtrans %}</summary>
-        <label>{% trans %}How many arrived?{% endtrans %}<span class="sr-only"> {{ each.item.name_shown }}, {{ heading }}</span>
-          <input name="{{ each.field }}" inputmode="{{ 'numeric' if each.item.unit == 'each' else 'decimal' }}" value="{{ values.get(each.field, moved_amount) }}" data-adds-to="{{ section.place.id }}-{{ each.item.id }}" data-unset="{{ moved_amount }}">
+        {% if each.worded %}<fieldset><legend>{% trans %}How many arrived?{% endtrans %}{{ said }}</legend>{% endif %}
+        {% for row in each.rows %}
+        {% set name = each.prefix ~ row.field %}
+        {% set sealed = row.field.startswith("sealed_") %}
+        <label>{% if each.worded %}{{ row.words }}{% else %}{% trans %}How many arrived?{% endtrans %}{{ said }}{% endif %}
+          <input name="{{ name }}" inputmode="{{ 'numeric' if sealed or each.item.unit == 'each' else 'decimal' }}" value="{{ values.get(name, row.amount | plain_amount) }}" data-adds-to="{{ section.place.id }}-{{ each.item.id }}" data-unset="{{ row.amount | plain_amount }}"{% if sealed %} data-per="{{ row.per | plain_amount }}"{% endif %}>
         </label>
-        {% with name = each.field %}{% include "_field_problem.html" %}{% endwith %}
+        {% include "_field_problem.html" %}
+        {% endfor %}
+        {% if each.worded %}</fieldset>{% endif %}
       </details></td>
     </tr>
     {% endfor %}

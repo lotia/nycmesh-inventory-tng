@@ -602,7 +602,7 @@ def test_counts_the_moves_fixed_on_a_count_form(
         )
         refused = client.post(path, data=form)
         assert refused.status_code == 409
-        fix = {f"at_{there.id}_arrived_{gone.id}_{place.item.id}": arrived}
+        fix = {f"at_{there.id}_arrived_{gone.id}_loose_{place.item.id}": arrived}
         before = counted(reader, name).get((("direction", direction),), 0)
         for _ in range(2):
             sent = client.post(

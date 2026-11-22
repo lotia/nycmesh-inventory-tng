@@ -424,12 +424,12 @@ msgstr ""
 msgid "%(package)s of %(size)s"
 msgstr ""
 
-#: src/inventory_tng/stock/counts_routes.py
+#: src/inventory_tng/stock/count_groups.py
 #, python-format
 msgid "%(package)s, opened %(day)s: left"
 msgstr ""
 
-#: src/inventory_tng/stock/counts_routes.py
+#: src/inventory_tng/stock/count_groups.py
 #, python-format
 msgid "%(package)s, sealed: how many"
 msgstr ""
@@ -2068,7 +2068,7 @@ msgid ""
 "your password and authenticators here. Each token works once."
 msgstr ""
 
-#: src/inventory_tng/stock/counts_routes.py
+#: src/inventory_tng/stock/count_groups.py
 msgid "Loose"
 msgstr ""
 

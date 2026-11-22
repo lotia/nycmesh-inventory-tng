@@ -3,7 +3,8 @@ import { count, decimal, sent, thousandths } from "../shared/quantity";
 /**
  * What a place on the count form holds once saved, under "Moved to" it:
  * what is typed on its own lines of an item moved there from a retired
- * area emptied while it was counted, plus how many arrived of each move
+ * area emptied while it was counted, plus how many arrived of each move,
+ * a box for each form it arrived in, sealed packages whole
  * (inventory-tng-ygk5). Without this, the line stays hidden, as the
  * page sends it.
  *

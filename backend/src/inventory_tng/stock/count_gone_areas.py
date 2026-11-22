@@ -18,8 +18,15 @@ from inventory_tng.core.phrases import gettext, joined, ngettext
 from inventory_tng.models.catalogue import Item
 from inventory_tng.models.places import Location
 from inventory_tng.stock import queries
-from inventory_tng.stock.count_groups import Group, label
-from inventory_tng.stock.forms import ARRIVED, Gone
+from inventory_tng.stock.count_groups import (
+    FormRow,
+    Group,
+    form_order,
+    form_row,
+    label,
+)
+from inventory_tng.stock.forms import ARRIVED, LOOSE_FIELD, Gone
+from inventory_tng.stock.ledger import Form
 from inventory_tng.stock.moved_out import MovedOut, moved_out
 
 
@@ -165,11 +172,20 @@ def gone_words(leaving: Leaving, ids: Collection[int]) -> list[str]:
 
 class MovedItem(NamedTuple):
     """An item moved from an area gone from a count form to a place on it:
-    how much was moved, and the field of how many arrived (forms.ARRIVED)."""
+    how much was moved, in its unit; the prefix of its boxes of how many
+    arrived (forms.ARRIVED); and a row for each form it arrived in, as the
+    count form asks for that form (count_groups.form_row), its amount what
+    arrived in it as moved."""
 
     item: Item
     moved: Decimal
-    field: str
+    prefix: str
+    rows: list[FormRow]
+
+    @property
+    def worded(self) -> bool:
+        """Whether each box says its form: not when it all arrived loose."""
+        return any(not row.field.startswith(LOOSE_FIELD) for row in self.rows)
 
 
 class MovedTo(NamedTuple):
@@ -222,6 +238,7 @@ def _by_name(rows: Collection[tuple[Item, Decimal]]) -> list[tuple[Item, Decimal
 
 
 def moved_sections(
+    session: Session,
     root: Location,
     groups: list[Group],
     leaving: Leaving,
@@ -232,14 +249,36 @@ def moved_sections(
     (Moves): `moves`, of the items it shows, as of its moment, and its
     groups, whose lines count what each place held before them."""
     by_id = {group.place.id: group for group in groups}
-    went: dict[int, dict[int, dict[int, Decimal]]] = {}
+    went: dict[int, dict[int, dict[int, dict[Form, Decimal]]]] = {}
     taken: dict[int, Decimal] = {}
     for move in moves:
         if move.to_id in by_id:
             items = went.setdefault(move.to_id, {}).setdefault(move.from_id, {})
-            items[move.item_id] = items.get(move.item_id, Decimal(0)) + move.quantity
+            forms = items.setdefault(move.item_id, {})
+            forms[move.arrives] = forms.get(move.arrives, Decimal(0)) + move.quantity
         else:
             taken[move.item_id] = taken.get(move.item_id, Decimal(0)) + move.quantity
+    packages = {
+        package.id: package
+        for package in queries.packages_of_items(
+            session, {move.item_id for move in moves}
+        )
+    }
+    open_ids = {move.arrives.open_package_id for move in moves}
+    opened = {
+        row.id: row
+        for row in queries.open_with_ids(
+            session, [open_id for open_id in open_ids if open_id is not None]
+        )
+    }
+
+    def moved_item(prefix: str, item: Item, forms: dict[Form, Decimal]) -> MovedItem:
+        rows = [
+            form_row(item.id, form, forms[form], packages, opened)
+            for form in sorted(forms, key=lambda form: form_order(form, packages))
+        ]
+        return MovedItem(item, sum(forms.values(), Decimal(0)), prefix, rows)
+
     sections: list[MovedTo] = []
     for group in groups:
         if group.place.id not in went:
@@ -248,23 +287,23 @@ def moved_sections(
         parts = [
             (
                 came_from(leaving.labels[from_id]),
-                [
-                    MovedItem(
-                        item,
-                        n,
-                        f"{group.prefix}{ARRIVED}{from_id}_{item.id}",
-                    )
-                    for item, n in _by_name(
-                        [(named[item_id], n) for item_id, n in sources[from_id].items()]
-                    )
-                ],
+                sorted(
+                    (
+                        moved_item(
+                            f"{group.prefix}{ARRIVED}{from_id}_", named[item_id], forms
+                        )
+                        for item_id, forms in sources[from_id].items()
+                    ),
+                    key=lambda each: each.item.name.lower(),
+                ),
             )
             for from_id in leaving.ordered(sources)
         ]
         held = {item.id: n for item, n in group.rows}
         moved: dict[int, Decimal] = {}
         for items in sources.values():
-            for item_id, n in items.items():
+            for item_id, forms in items.items():
+                n = sum(forms.values(), Decimal(0))
                 moved[item_id] = moved.get(item_id, Decimal(0)) + n
         totals = _by_name(
             [

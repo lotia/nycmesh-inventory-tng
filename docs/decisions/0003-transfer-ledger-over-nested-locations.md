@@ -205,29 +205,33 @@ one, in id order, as saves take them (inventory-tng-8i4.51.3), then the
 items, packages and open packages the form names, each by id across them
 all, and the checks of recorded more than moved it may settle, before
 writing any (inventory-tng-nfia). A move between two of them while
-counting withholds the item at both, and the recount asks for it place
-by place. A send naming an area retired since it was shown, or a retired
-area emptied since, is refused whole, keeping what was typed, and the
-form is shown again without it (Ali, 2026-11-22, inventory-tng-ygk5).
-One emptied is said so, and what left it while it was counted is shown
-under "Moved to Shelf B", a part for each area it came from ("From Shelf
-C"), each item with the amount moved and "Fix amount", or listed under
-"Taken out of" the store if it went elsewhere. A move left alone is taken
-as right and writes nothing; "How many arrived?", fixed lower or higher,
-records the difference as lost or found where it went, never against the
-area it left. The place's own lines count what it held before the moves,
-which are set aside from what its records say, and a line under the
-heading, in the browser only, gives what it will hold once saved. Found
-at leaves the area out, saying it is retired, and a "Bring it back"
-button on the form brings it back, as its own page does, and shows the
-form again with it, everything typed kept. A recorded move is never
-undone: if the items never left, "How many arrived?" says none, and what
-is at the area is found there. One retired with nothing moved is said
-so, its heading dimmed; one emptied and another retired in one send show
-both alerts. We rejected one message for both cases with what came in and
-went out only, a short message without the reason, a box to count the
-moved items again, yes or no buttons per move, an Arrived box always
-shown, and "Correct" or "Fix count" for the button (Ali, 2026-11-22).
+counting withholds the item at both, and the recount asks for it place by
+place. A send naming an area retired since it was shown, or a retired area
+emptied since, is refused whole, keeping what was typed, and the form is
+shown again without it (Ali, 2026-11-22, inventory-tng-ygk5). One emptied
+is said so, and what left it while it was counted is shown under "Moved to
+Shelf B", a part for each area it came from ("From Shelf C"), each item
+with the amount moved and "Fix amount", or listed under "Taken out of" the
+store if it went elsewhere. A move left alone is taken as right and writes
+nothing; "How many arrived?", fixed lower or higher, records the
+difference as lost or found where it went, never against the area it left.
+It is fixed in the forms the move arrived in: sealed packages by how many,
+whole, and one box for each form when it arrived partly sealed and partly
+loose, as the count form's own lines split them, so a fix never takes
+loose stock below nothing (the coordinator, 2026-11-22, for Ali to
+confirm). The place's own lines count what it held before the moves, which
+are set aside from what its records say, and a line under the heading, in
+the browser only, gives what it will hold once saved. Found at leaves the
+area out, saying it is retired, and a "Bring it back" button on the form
+brings it back, as its own page does, and shows the form again with it,
+everything typed kept. A recorded move is never undone: if the items never
+left, "How many arrived?" says none, and what is at the area is found
+there. One retired with nothing moved is said so, its heading dimmed; one
+emptied and another retired in one send show both alerts. We rejected one
+message for both cases with what came in and went out only, a short
+message without the reason, a box to count the moved items again, yes or
+no buttons per move, an Arrived box always shown, and "Correct" or "Fix
+count" for the button (Ali, 2026-11-22).
 
 We rejected counting the store as a whole (where in it stock is would be
 lost, and the areas' own counts would fight the store's) and a read-only
