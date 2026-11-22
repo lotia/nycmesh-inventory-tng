@@ -978,10 +978,9 @@ the page, `msg({ context: "place", message: "To" })`.
 For a translator, a comment starting `Translators:` just before a message
 goes into the catalogue with it: `# Translators: …` in Python, `{#
 Translators: … #}` in a template, and `msg`'s `comment` on the page. In
-Python it goes just before the line that calls `gettext`, not inside the
-call. In a template, the first message on the comment's line, or the next
-line with one, takes it, so a message sharing a line with another goes
-on a line of its own.
+Python it goes on the line before the `gettext` call, not inside it. In
+a template, the first message on the comment's line, or on the next line
+with one, takes it, so a message that shares a line goes on its own.
 
 A message never chooses a preposition by the kind of place: English says
 in a store, on a shelf, in a bin, and other languages decline names or

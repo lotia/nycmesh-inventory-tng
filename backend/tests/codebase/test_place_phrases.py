@@ -3,6 +3,8 @@ tells a translator the place can be any kind, on either side
 (CONTRIBUTING.md, Phrases)."""
 
 import re
+from collections.abc import Iterable
+from functools import cache
 from pathlib import Path
 
 import pytest
@@ -30,13 +32,13 @@ SIDES = {
 
 # Printed labels' path, which waits on Ali (inventory-tng-uomm): told,
 # but its "in" not yet judged.
-WAITING = {"%(place)s, in %(parent)s"}
+WAITING = {"server": {"%(place)s, in %(parent)s"}}
 
 # The prepositions English chooses by a place's kind.
 BY_KIND = r"\b(?:in|on|into|onto|inside)\s+"
 
 
-def placed(messages: list[Message], value: str, places: set[str]) -> list[Message]:
+def placed(messages: Iterable[Message], value: str, places: set[str]) -> list[Message]:
     """The messages that say a place's name."""
     return [
         message
@@ -47,8 +49,15 @@ def placed(messages: list[Message], value: str, places: set[str]) -> list[Messag
 
 def by_kind(message: Message, value: str, places: set[str]) -> bool:
     """Whether a preposition chosen by the place's kind comes before one."""
-    before = value.replace(r"(\w+)", "(?:" + "|".join(sorted(places)) + ")")
-    return re.search(BY_KIND + before, str(message.id), re.IGNORECASE) is not None
+    return not places.isdisjoint(
+        re.findall(BY_KIND + value, str(message.id), re.IGNORECASE)
+    )
+
+
+@cache
+def side_placed(side: str) -> list[Message]:
+    catalogue, value, places = SIDES[side]
+    return placed(read(catalogue), value, places)
 
 
 def told(message: Message) -> bool:
@@ -63,22 +72,20 @@ def test_a_place_is_found_and_judged(tmp_path: Path) -> None:
         'msgid "In %(unit)s"\nmsgstr ""\n'
     )
     value, places = SIDES["server"][1:]
-    at, on = placed(list(read(po)), value, places)
+    at, on = placed(read(po), value, places)
     assert (told(at), by_kind(at, value, places)) == (True, False)
     assert (told(on), by_kind(on, value, places)) == (False, True)
 
 
 @pytest.mark.parametrize("side", SIDES)
 def test_no_place_follows_a_preposition_chosen_by_its_kind(side: str) -> None:
-    catalogue, value, places = SIDES[side]
-    messages = placed(list(read(catalogue)), value, places)
+    _, value, places = SIDES[side]
+    messages = side_placed(side)
     assert messages
-    judged = [m for m in messages if str(m.id) not in WAITING]
-    assert [m.id for m in judged if by_kind(m, value, places)] == []
+    flagged = {str(m.id) for m in messages if by_kind(m, value, places)}
+    assert flagged == WAITING.get(side, set())
 
 
 @pytest.mark.parametrize("side", SIDES)
 def test_a_translator_is_told_a_place_can_be_any_kind(side: str) -> None:
-    catalogue, value, places = SIDES[side]
-    messages = placed(list(read(catalogue)), value, places)
-    assert [m.id for m in messages if not told(m)] == []
+    assert [m.id for m in side_placed(side) if not told(m)] == []
