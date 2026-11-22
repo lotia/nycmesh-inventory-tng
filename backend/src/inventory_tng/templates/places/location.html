@@ -19,7 +19,7 @@
     {% with name = "name" %}{% include "_field_problem.html" %}{% endwith %}
   </label>
   {% if location.kind == "area" %}
-  <label>{% trans %}Inside{% endtrans %}
+  <label>{% trans %}Part of{% endtrans %}
     <select name="parent_id" required>
       {% set chosen = values.get('parent_id', location.parent_id | string) %}
       {% for parent in parents %}<option value="{{ parent.id }}" {% if chosen == parent.id | string %}selected{% endif %}>{{ parent.name }}</option>{% endfor %}
@@ -44,7 +44,7 @@
 
 {% if areas %}
 <section>
-  <h2>{% trans %}Areas inside{% endtrans %}</h2>
+  <h2>{% trans %}Areas{% endtrans %}</h2>
   <ul>{% for area in areas %}<li><a href="{{ back_link[0] }}/{{ area.id }}">{{ area.name }}</a></li>{% endfor %}</ul>
 </section>
 {% endif %}

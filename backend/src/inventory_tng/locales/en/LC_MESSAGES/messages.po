@@ -1073,11 +1073,11 @@ msgid "Anyone"
 msgstr ""
 
 #: src/inventory_tng/places/forms.py
-msgid "Area inside another"
+msgid "Area"
 msgstr ""
 
 #: src/inventory_tng/templates/places/location.html
-msgid "Areas inside"
+msgid "Areas"
 msgstr ""
 
 #: src/inventory_tng/templates/admins/admin_reset.html
@@ -1829,11 +1829,6 @@ msgstr ""
 msgid "Inactive"
 msgstr ""
 
-#: src/inventory_tng/templates/places/location.html
-#: src/inventory_tng/templates/places/locations.html
-msgid "Inside"
-msgstr ""
-
 #: src/inventory_tng/admins/home_routes.py
 msgid "Inventory"
 msgstr ""
@@ -2463,6 +2458,10 @@ msgstr ""
 msgid "Notes"
 msgstr ""
 
+#: src/inventory_tng/templates/places/locations.html
+msgid "Nothing"
+msgstr ""
+
 #: src/inventory_tng/stock/used_up_routes.py
 msgid ""
 "Nothing changed: it was answered meanwhile, moved, or its place can't be "
@@ -2535,10 +2534,6 @@ msgstr ""
 
 #: src/inventory_tng/stock/counts_routes.py
 msgid "Nothing was typed, so nothing was counted."
-msgstr ""
-
-#: src/inventory_tng/templates/places/locations.html
-msgid "Nowhere"
 msgstr ""
 
 #: src/inventory_tng/templates/catalogue/item.html
@@ -2768,6 +2763,11 @@ msgstr ""
 #: src/inventory_tng/templates/catalogue/item.html
 #: src/inventory_tng/templates/catalogue/items.html
 msgid "Part number"
+msgstr ""
+
+#: src/inventory_tng/templates/places/location.html
+#: src/inventory_tng/templates/places/locations.html
+msgid "Part of"
 msgstr ""
 
 #: src/inventory_tng/templates/admins/link_made.html

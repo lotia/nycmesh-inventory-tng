@@ -12,7 +12,7 @@ from inventory_tng.places.forms import PICK_WHAT, PICK_WHERE, TAKEN
 from inventory_tng.places.paths import LOCATIONS
 from inventory_tng.web.forms import NAME_MAX, PICK_A_ZONE, RULES, name_up_to
 
-from helpers.markup import options, text
+from helpers.markup import options, read, text
 from helpers.rows import add, history, named, shown, tag
 from helpers.stock import Place, write
 
@@ -38,6 +38,22 @@ def test_adding_a_store_and_an_area_inside_it(
     assert named(session, Location, "Shelf A").parent_id == hub.id
     page = text(admin_client.get(LOCATIONS))
     assert page.index("Hub") < page.index("Shelf A")
+
+
+def test_the_place_an_area_is_part_of_is_named_by_no_preposition(
+    admin_client: TestClient, session: Session
+) -> None:
+    """The picker says what an area is part of, not where it sits in it;
+    with no kind of place to choose a preposition for (Ali, 2026-11-22)."""
+    hub = place(session, "Hub", "store")
+    shelf = place(session, "Shelf", "area", hub)
+    adding = read(admin_client.get(LOCATIONS).text)
+    adding.one("label", "Part of for an area only Nothing Hub Shelf")
+    assert ("area", "Area", False) in options(adding.one("select", name="kind"))
+    shown_hub = read(admin_client.get(f"{LOCATIONS}/{hub.id}").text)
+    shown_hub.one("section", "Areas Shelf")
+    shown_shelf = read(admin_client.get(f"{LOCATIONS}/{shelf.id}").text)
+    shown_shelf.one("label", "Part of Hub")
 
 
 def test_an_area_needs_a_place_to_be(admin_client: TestClient) -> None:

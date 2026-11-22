@@ -27,9 +27,9 @@
       </select>
       {% with name = "kind" %}{% include "_field_problem.html" %}{% endwith %}
     </label>
-    <label>{% trans %}Inside{% endtrans %} <span class="hint">{% trans %}for an area only{% endtrans %}</span>
+    <label>{% trans %}Part of{% endtrans %} <span class="hint">{% trans %}for an area only{% endtrans %}</span>
       <select name="parent_id">
-        <option value="">{% trans %}Nowhere{% endtrans %}</option>
+        <option value="">{% trans %}Nothing{% endtrans %}</option>
         {% for parent in parents %}<option value="{{ parent.id }}" {% if values.get('parent_id') == parent.id | string %}selected{% endif %}>{{ parent.name }}</option>{% endfor %}
       </select>
       {% with name = "parent_id" %}{% include "_field_problem.html" %}{% endwith %}

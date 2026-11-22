@@ -12,7 +12,7 @@ from inventory_tng.web.forms import chosen, name_problem
 # What an administrator makes here; custody comes with a volunteer.
 KINDS = {
     "store": lazy_gettext("Store"),
-    "area": lazy_gettext("Area inside another"),
+    "area": lazy_gettext("Area"),
     "vehicle": lazy_gettext("Vehicle"),
 }
 TAKEN = lazy_gettext(
