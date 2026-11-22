@@ -7,15 +7,15 @@ Each form carries a key made when it was shown, so sending it twice writes
 it once. Sent again finding the open package nobody recorded otherwise
 (another place or package, or one where the first send found none), it
 writes nothing more and goes back to Counts saying it was saved already
-(Ali, 2026-11-22, inventory-tng-53im). A count also carries the place's latest ledger entry as it was
-shown, and how many there it saw (moments.Moment): the count is true for
-that moment, so a save made at the place meanwhile still applies, and an
-item it moved comes back to count again. The moment is read without the
-place's lock, so showing the form holds up no save there; a save under way
-as it was shown, committed after with an id inside the moment, refuses the
-count (changed_since_shown). Which items that save moved cannot be told, so
-the form is shown again as it is now, keeping what was typed, to be checked
-and sent again.
+(Ali, 2026-11-22, inventory-tng-53im). A count also carries the place's
+latest ledger entry as it was shown, and how many there it saw
+(moments.Moment): the count is true for that moment, so a save made at the
+place meanwhile still applies, and an item it moved comes back to count
+again. The moment is read without the place's lock, so showing the form
+holds up no save there; a save under way as it was shown, committed after
+with an id inside the moment, refuses the count (changed_since_shown). Which
+items that save moved cannot be told, so the form is shown again as it is
+now, keeping what was typed, to be checked and sent again.
 
 The pages check what was typed before writing, but an item's unit may
 change to each between that check and the write: the ledger then refuses

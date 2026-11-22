@@ -16,7 +16,7 @@ from inventory_tng.core.db_errors import enforce
 from inventory_tng.core.db_sessions import exists_where
 from inventory_tng.models.stock import OpenPackage
 from inventory_tng.stock import open_packages, over_recorded
-from inventory_tng.stock.counts import Counted, FormLines, record_count
+from inventory_tng.stock.counts import Counted, FormLines, record_count, sent_under
 from inventory_tng.stock.forms import PlaceCount
 from inventory_tng.stock.ledger import LOOSE, Form, hold_across, lock_places
 from inventory_tng.stock.moments import Moment
@@ -37,10 +37,20 @@ def record_store_count(
     (_count_at). NotCountable names the place that may not be counted."""
     lock_places(session, places)
     _hold_named(session, counts.keys(), at, counts.values())
+    # At any place: one left out of a filtered form's first send is not
+    # (inventory-tng-53im).
+    saved = sent_under(session, [_place_key(key, place_id) for place_id in places])
     return {
-        place_id: _count_at(session, key, admin_id, place_id, count, at, places, when)
+        place_id: _count_at(
+            session, key, admin_id, place_id, count, at, places, when, saved=saved
+        )
         for place_id, count in counts.items()
     }
+
+
+def _place_key(key: uuid.UUID, place_id: int) -> uuid.UUID:
+    """The key a form's count at one of its places is written under."""
+    return uuid.uuid5(key, str(place_id))
 
 
 def _hold_named(
@@ -79,12 +89,18 @@ def _count_at(
     at: Moment,
     across: Collection[int],
     when: datetime,
+    *,
+    saved: bool,
 ) -> Counted:
     """Put the records right at one place of a count form, holding every
     place on it (`across`) and the rows they name: its count, under a key
     of its own made from the form's (counts.record_count), an open package
     nobody recorded found there, the open packages closed there, and the
-    ends there of lines recorded more than moved that it puts right."""
+    ends there of lines recorded more than moved that it puts right.
+    RuleBroken (open_package_key) for a form `saved` before, at any of
+    its places, sent again finding that open package otherwise: elsewhere,
+    another package, or one where the saved send found none
+    (inventory-tng-53im)."""
     forms = count.forms
     # An item counted by its total holds loose units alone (the count
     # form's rows): with an open package of it found, its total is its
@@ -95,7 +111,7 @@ def _count_at(
         *forms.lines,
         *((item_id, LOOSE, n) for item_id, n in count.counted if item_id == found_item),
     ]
-    place_key = uuid.uuid5(key, str(place_id))
+    place_key = _place_key(key, place_id)
 
     def counted_by(by_form: FormLines) -> Counted:
         return record_count(
@@ -123,10 +139,7 @@ def _count_at(
             moved = package.item_id in counted_now.moved
             # A form saved before finding none, sent again finding one, is
             # refused as one finding another package or place is (make()).
-            enforce(
-                "open_package_key",
-                when=fresh and counted_now.sent_before and not moved,
-            )
+            enforce("open_package_key", when=fresh and saved and not moved)
             if moved:
                 # Its item moved meanwhile: asked again, found again then,
                 # though no line but the package counted it.

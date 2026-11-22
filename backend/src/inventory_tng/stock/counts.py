@@ -115,8 +115,6 @@ class Counted(NamedTuple):
     # total (no form), and each form of one counted by form. Nothing if an
     # earlier send of it did.
     put_right: list[tuple[int, Form | None]]
-    # Sent before under its key, so written once, then.
-    sent_before: bool
 
 
 def _recorded(admin_id: int, transaction: Written) -> None:
@@ -179,6 +177,13 @@ def _write_count(
         header = {"from_location_id": location_id}
         written += _correct(session, _lost_key(key), "count", admin_id, header, out)
     return written
+
+
+def sent_under(session: Session, keys: Collection[uuid.UUID]) -> bool:
+    """Whether a count was written under any of `keys`, its losses' keys
+    (_lost_key) too: a form of them sent before."""
+    every = [*keys, *map(_lost_key, keys)]
+    return exists_where(session, LedgerTransaction.idempotency_key.in_(every))
 
 
 def _lost_key(key: uuid.UUID) -> uuid.UUID:
@@ -312,7 +317,7 @@ def record_count(
         # Withheld by no earlier send of it.
         if moved:
             once_committed(session, _withheld, admin_id, location_id, len(moved))
-    return Counted(bool(into or out), moved, written, put_right, sent is not None)
+    return Counted(bool(into or out), moved, written, put_right)
 
 
 class OpenCounted(NamedTuple):

@@ -784,8 +784,12 @@ class SentAgain:
         self.drum = add(
             session, ItemPackage(item_id=self.spools.cable.id, name="Drum", size=100)
         )
-        self.path = f"{COUNTS}/{self.spools.store.id}"
-        self.shown = count_form(client.get(self.path))
+        self.show()
+
+    def show(self, query: str = "") -> None:
+        """The form shown, filtered by `query` if given."""
+        self.path = f"{COUNTS}/{self.spools.store.id}{query}"
+        self.shown = count_form(self.client.get(self.path))
 
     def send(self, found: dict[str, str]) -> Response:
         return self.client.post(self.path, data=self.shown | found)
@@ -826,6 +830,23 @@ def test_a_count_saved_and_sent_again_finding_otherwise_writes_nothing_more(
         "This count was saved already, so what you changed wasn't saved. To "
         "record it, start a new count."
     )
+    assert made.written() == before
+
+
+def test_a_filtered_count_saved_and_sent_again_finding_where_none_was_counted(
+    admin_client: TestClient, session: Session
+) -> None:
+    """Filtered, the first send counts the store alone: sent again finding
+    an open package on the shelf it left out, the form was saved already
+    all the same, and nothing more is written (inventory-tng-53im)."""
+    made = SentAgain(admin_client, session)
+    item = made.spools.place.item.id
+    made.show(f"?item={item}")
+    typed = {f"counted_{item}": "1"}
+    assert made.send(typed).status_code == 303
+    before = made.written()
+    sent = made.send(typed | found_on(made.shelf, made.spools.spool))
+    assert sent.headers["location"].startswith(f"{COUNTS}?notice=count_saved_already")
     assert made.written() == before
 
 
