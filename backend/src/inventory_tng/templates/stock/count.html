@@ -43,8 +43,7 @@ one by its size, an open package closed as none
     {% set prefix = group.prefix %}
     {% set where = group.label if group.path else "" %}
     {% for item, amount in group.rows %}
-    {% set key = "%d-%d" % (group.place.id, item.id) %}
-    {% set adds = key if moved and key in moved.adds else "" %}
+    {% set adds = moved.adds_to(group.place.id, item.id) if moved else "" %}
     {% if item.id in group.forms %}
     {#- In more than loose units: each form counted on its own (0020). #}
     <tr><td colspan="{{ columns }}"><strong>{{ item.name_shown }}</strong> <span class="hint">
@@ -112,7 +111,7 @@ one by its size, an open package closed as none
     {% for section in moved.sections %}
     <tr><th colspan="{{ columns }}" scope="rowgroup">{{ section.heading }}</th></tr>
     {% for item, total in section.totals %}
-    <tr data-total="{{ section.place.id }}-{{ item.id }}" hidden><td>{{ item.name_shown }}</td><td colspan="{{ columns - 1 }}"><span role="status" aria-atomic="true">{#- Translators: %(place)s is a place of any kind, such as a store, a shelf, a bin or a volunteer's home. #}{% trans place=section.label, amount=total | plain_amount, unit=item.unit %}{{ place }} after saving: <span data-total-amount>{{ amount }}</span> {{ unit }}{% endtrans %}</span></td></tr>
+    <tr data-total="{{ moved.adds_to(section.place.id, item.id) }}" hidden><td>{{ item.name_shown }}</td><td colspan="{{ columns - 1 }}"><span role="status" aria-atomic="true">{#- Translators: %(place)s is a place of any kind, such as a store, a shelf, a bin or a volunteer's home. #}{% trans place=section.label, amount=total | plain_amount, unit=item.unit %}{{ place }} after saving: <span data-total-amount>{{ amount }}</span> {{ unit }}{% endtrans %}</span></td></tr>
     {% endfor %}
     {% for heading, items in section.parts %}
     <tr><td colspan="{{ columns }}"><strong>{{ heading }}</strong></td></tr>
@@ -132,7 +131,7 @@ one by its size, an open package closed as none
         {% set name = each.prefix ~ row.field %}
         {% set sealed = row.field.startswith("sealed_") %}
         <label>{% if each.worded %}{{ row.words }}{% else %}{% trans %}How many arrived?{% endtrans %}{{ said }}{% endif %}
-          <input name="{{ name }}" inputmode="{{ 'numeric' if sealed or each.item.unit == 'each' else 'decimal' }}" value="{{ values.get(name, row.amount | plain_amount) }}" data-adds-to="{{ section.place.id }}-{{ each.item.id }}" data-unset="{{ row.amount | plain_amount }}"{% if sealed %} data-per="{{ row.per | plain_amount }}"{% endif %}>
+          <input name="{{ name }}" inputmode="{{ 'numeric' if sealed or each.item.unit == 'each' else 'decimal' }}" value="{{ values.get(name, row.amount | plain_amount) }}" data-adds-to="{{ moved.adds_to(section.place.id, each.item.id) }}" data-unset="{{ row.amount | plain_amount }}"{% if sealed %} data-per="{{ row.per | plain_amount }}"{% endif %}>
         </label>
         {% include "_field_problem.html" %}
         {% endfor %}

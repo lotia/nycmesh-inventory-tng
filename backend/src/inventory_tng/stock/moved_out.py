@@ -31,13 +31,15 @@ def moved_out(
     session: Session,
     location_ids: Collection[int],
     after: int,
-    up_to: tuple[int, Collection[int]] | None = None,
+    *,
+    up_to: int | None = None,
+    into: Collection[int] = (),
 ) -> list[MovedOut]:
     """What left each of the places in the ledger transactions after
     `after`, by where it went, item and the form it arrived in, in all:
     an opening, which changes only the form of stock at a place, is no
-    move. With `up_to`, a moment and places, what went to those places
-    only up to that moment. In order of place, then where it went, then
+    move. What went to the places `into` only up to the moment `up_to`,
+    if given. In order of place, then where it went, then
     item, then form, by id."""
     went = LedgerTransaction.from_location_id
     to = LedgerTransaction.to_location_id
@@ -60,13 +62,8 @@ def moved_out(
         )
     )
     if up_to is not None:
-        moment, places = up_to
         query = query.where(
-            or_(
-                LedgerTransaction.id <= moment,
-                to.is_(None),
-                to.not_in(list(places)),
-            )
+            or_(LedgerTransaction.id <= up_to, to.is_(None), to.not_in(list(into)))
         )
     # Each from one of the places, so from somewhere.
     return [

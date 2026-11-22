@@ -62,4 +62,4 @@ def test_what_arrived_is_what_was_moved_as_fixed() -> None:
         MovedOut(1, None, 5, Decimal(4)),
     ]
     fixes = [Fix(3, 2, 5, Decimal(-2), LOOSE)]
-    assert arrived_at(moves, fixes) == {(2, 5): Decimal(11)}
+    assert arrived_at(set_aside(moves), fixes) == {(2, 5): Decimal(11)}

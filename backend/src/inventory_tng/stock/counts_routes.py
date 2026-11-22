@@ -99,9 +99,11 @@ from inventory_tng.stock.balance import countable, takeable
 from inventory_tng.stock.count_arrivals import (
     Aside,
     arrived_at,
+    by_item,
     fixed,
     fixed_lines,
     gone_moves,
+    less,
     set_aside,
 )
 from inventory_tng.stock.count_gone_areas import (
@@ -204,14 +206,13 @@ areas_brought_back = meter.create_counter(
 )
 
 # A move from an area gone from a count form fixed on it: more or less
-# arrived than was moved, each form it arrived in on its own
+# arrived than was moved, in any of the forms it arrived in
 # (inventory-tng-ygk5).
 moves_fixed = meter.create_counter(
     "inventory.count.moves_fixed",
     unit="{move}",
     description="Moves from retired areas emptied while counted whose amount "
-    "a count form fixed, each form they arrived in apart, by whether more "
-    "arrived (found) or less (lost)",
+    "a count form fixed, by whether more arrived (found) or less (lost)",
 )
 
 
@@ -552,12 +553,8 @@ def _count_page(
     ]
     aside = set_aside(moves)
     for place_id, here in aside.items():
-        held = was_at.get(place_id, {})
-        for (item_id, _), amount in here.items():
-            if item_id in held:
-                held[item_id] -= amount
-                if not held[item_id]:
-                    del held[item_id]
+        if place_id in was_at:
+            was_at[place_id] = less(was_at[place_id], by_item(here))
     listed = _items(session)
     named = {item.id: item for item in listed}
     openings = over_recorded.openings_waiting_at(session, ids_shown, as_of)
@@ -734,7 +731,7 @@ def _forms(
     return {
         place_id: _place_forms(
             set(items),
-            _less(found.get(place_id, {}), (aside or {}).get(place_id, {})),
+            less(found.get(place_id, {}), (aside or {}).get(place_id, {})),
             packages,
             {
                 open_id: row
@@ -745,15 +742,6 @@ def _forms(
         )
         for place_id, items in item_ids.items()
     }
-
-
-def _less(
-    found: Mapping[tuple[int, Form], Decimal], aside: Mapping[tuple[int, Form], Decimal]
-) -> dict[tuple[int, Form], Decimal]:
-    """What was found of each form, less what is set aside of it: none
-    where that leaves nothing."""
-    less = {form: n - aside.get(form, Decimal(0)) for form, n in found.items()}
-    return {form: n for form, n in less.items() if n}
 
 
 def _place_forms(
@@ -920,6 +908,7 @@ def count(
         moves,
         {place_id: each.arrived for place_id, each in sent.places.items()},
     )
+    aside = set_aside(moves)
     if not counting and not fixes:
         # Nothing typed at any place: nothing to count, so the form again,
         # as sent, saying so (inventory-tng-fxsy).
@@ -949,7 +938,7 @@ def count(
                 at,
                 {place_id: sent.places[place_id] for place_id in counting},
                 now(),
-                aside=set_aside(moves),
+                aside=aside,
                 fixed=fixed_lines(fixes),
             )
         except NotCountable as broken:
@@ -1040,13 +1029,17 @@ def count(
         places_counted.record(len(counted))
         log.info("count saved", location_id=place.id, places=len(counted))
     if result.fixed:
-        for fix in fixes:
-            moves_fixed.add(1, {"direction": "found" if fix.difference > 0 else "lost"})
+        # A move fixed in two forms is one move, unless one form came out
+        # more and the other less.
+        for to_id, from_id, item_id, found in sorted(
+            {(fix.to_id, fix.from_id, fix.item_id, fix.difference > 0) for fix in fixes}
+        ):
+            moves_fixed.add(1, {"direction": "found" if found else "lost"})
             log.info(
                 "count move fixed",
-                location_id=fix.to_id,
-                from_location_id=fix.from_id,
-                item_id=fix.item_id,
+                location_id=to_id,
+                from_location_id=from_id,
+                item_id=item_id,
             )
     moved = {place_id: each.moved for place_id, each in counted.items() if each.moved}
     if not moved:
@@ -1067,7 +1060,7 @@ def count(
     # The moves from the areas gone, and their fixes, are in the records
     # now, while what was typed counted what each place held before them:
     # what arrived is added to it, so the recount says all it holds.
-    arrived = arrived_at(moves, fixes)
+    arrived = arrived_at(aside, fixes)
     saved = sum(len(typed) for typed in amounts.values()) - sum(
         len(each) for each in moved.values()
     )

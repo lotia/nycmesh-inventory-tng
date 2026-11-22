@@ -19,27 +19,30 @@ import { count, decimal, sent, thousandths } from "../shared/quantity";
  * changes on input, as one types, and reading out coalesces.
  */
 export function followTotals(document: Document): void {
+  const boxesOf = new Map<string | undefined, HTMLInputElement[]>();
+  for (const box of document.querySelectorAll<HTMLInputElement>(
+    "input[data-adds-to]",
+  )) {
+    const key = box.dataset.addsTo;
+    boxesOf.set(key, [...(boxesOf.get(key) ?? []), box]);
+  }
   for (const line of document.querySelectorAll<HTMLElement>("[data-total]")) {
     const shown = line.querySelector<HTMLElement>("[data-total-amount]");
-    const boxes = [
-      ...document.querySelectorAll<HTMLInputElement>(
-        `input[data-adds-to="${line.dataset.total}"]`,
-      ),
-    ];
-    if (shown === null || boxes.length === 0) {
-      continue;
-    }
-    const states = boxes.map((box) =>
-      box.dataset.state
+    const boxes = (boxesOf.get(line.dataset.total) ?? []).map((box) => ({
+      box,
+      state: box.dataset.state
         ? document.querySelector<HTMLSelectElement>(
             `select[name="${box.dataset.state}"]`,
           )
         : null,
-    );
+    }));
+    if (shown === null || boxes.length === 0) {
+      continue;
+    }
     const add = () => {
       let total = 0;
-      for (const [index, box] of boxes.entries()) {
-        if ((states[index]?.value ?? "here") !== "here") {
+      for (const { box, state } of boxes) {
+        if ((state?.value ?? "here") !== "here") {
           continue;
         }
         const amount = boxAmount(box);
@@ -53,10 +56,8 @@ export function followTotals(document: Document): void {
       shown.textContent = decimal(total);
       line.hidden = false;
     };
-    for (const box of boxes) {
+    for (const { box, state } of boxes) {
       box.addEventListener("input", add);
-    }
-    for (const state of states) {
       state?.addEventListener("change", add);
     }
     add();

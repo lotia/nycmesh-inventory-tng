@@ -217,20 +217,18 @@ class Moves(NamedTuple):
     not_offered: str
     back: set[int]
 
-    @property
-    def adds(self) -> set[str]:
-        """The running totals' keys, place and item, that a place's own
-        lines add to (total_key)."""
-        return {
-            total_key(section.place.id, item.id)
-            for section in self.sections
-            for item, _ in section.totals
-        }
-
-
-def total_key(place_id: int, item_id: int) -> str:
-    """What ties a running total to the boxes it adds up, in the page."""
-    return f"{place_id}-{item_id}"
+    def adds_to(self, place_id: int, item_id: int) -> str:
+        """What ties the running total of an item at a place to the boxes
+        it adds up, in the page: none if it has none."""
+        return (
+            f"{place_id}-{item_id}"
+            if any(
+                section.place.id == place_id and item.id == item_id
+                for section in self.sections
+                for item, _ in section.totals
+            )
+            else ""
+        )
 
 
 def _by_name(rows: Collection[tuple[Item, Decimal]]) -> list[tuple[Item, Decimal]]:

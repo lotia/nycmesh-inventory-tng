@@ -33,7 +33,7 @@ def gone_moves(
     `as_of`."""
     if not gone.ids:
         return []
-    return moved_out(session, gone.ids, gone.since, (as_of, places))
+    return moved_out(session, gone.ids, gone.since, up_to=as_of, into=places)
 
 
 def set_aside(moves: Sequence[MovedOut]) -> dict[int, Aside]:
@@ -83,16 +83,34 @@ def fixed(
     return sorted(fixes, key=lambda fix: (fix.to_id, fix.from_id, fix.item_id))
 
 
+def by_item(aside: Mapping[tuple[int, Form], Decimal]) -> dict[int, Decimal]:
+    """What is set aside at a place (set_aside), by item, in all its
+    forms."""
+    total: dict[int, Decimal] = {}
+    for (item_id, _), n in aside.items():
+        total[item_id] = total.get(item_id, Decimal(0)) + n
+    return total
+
+
+def less[Line](
+    held: Mapping[Line, Decimal], aside: Mapping[Line, Decimal]
+) -> dict[Line, Decimal]:
+    """What a place's records hold of each line, by item or by item and
+    form, less what is set aside of it: none where that leaves nothing."""
+    left = {line: n - aside.get(line, Decimal(0)) for line, n in held.items()}
+    return {line: n for line, n in left.items() if n}
+
+
 def arrived_at(
-    moves: Sequence[MovedOut], fixes: Sequence[Fix]
+    aside: Mapping[int, Aside], fixes: Sequence[Fix]
 ) -> dict[tuple[int, int], Decimal]:
     """How many arrived of each item at each place it went to, by place
-    and item: what was moved, as fixed."""
-    arrived: dict[tuple[int, int], Decimal] = {}
-    for place_id, here in set_aside(moves).items():
-        for (item_id, _), n in here.items():
-            key = (place_id, item_id)
-            arrived[key] = arrived.get(key, Decimal(0)) + n
+    and item: what was moved (set_aside), as fixed."""
+    arrived = {
+        (place_id, item_id): n
+        for place_id, here in aside.items()
+        for item_id, n in by_item(here).items()
+    }
     for fix in fixes:
         key = (fix.to_id, fix.item_id)
         arrived[key] = arrived.get(key, Decimal(0)) + fix.difference
@@ -108,8 +126,8 @@ def fixed_lines(fixes: Sequence[Fix]) -> dict[int, list[tuple[int, Form, Decimal
         here = summed.setdefault(fix.to_id, {})
         line = (fix.item_id, fix.form)
         here[line] = here.get(line, Decimal(0)) + fix.difference
-    return {
+    lines = {
         place_id: [(item_id, form, n) for (item_id, form), n in here.items() if n]
         for place_id, here in summed.items()
-        if any(here.values())
     }
+    return {place_id: each for place_id, each in lines.items() if each}

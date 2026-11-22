@@ -84,7 +84,7 @@ def test_what_went_to_some_places_is_read_up_to_a_moment(session: Session) -> No
         install_number=1234,
         lines=[{"item_id": item, "quantity": "3"}],
     )
-    assert moved_out(session, [store], after, (up_to, [van])) == [
+    assert moved_out(session, [store], after, up_to=up_to, into=[van]) == [
         MovedOut(store, van, item, Decimal(1)),
         MovedOut(store, None, item, Decimal(3)),
     ]
