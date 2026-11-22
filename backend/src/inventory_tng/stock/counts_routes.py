@@ -975,7 +975,8 @@ def count(
             # Areas retired, or emptied, since: the form as it is now,
             # without them, keeping what was typed, to check and send
             # again, saying what left them since it was first shown; a
-            # recount asks no more there (Ali, 2026-11-22, inventory-tng-ygk5).
+            # recount asks no more there, but where it went (_asked_after)
+            # (Ali, 2026-11-22, inventory-tng-ygk5).
             # The one refused, if brought back since the refusal: said gone
             # all the same, as the save was refused for it.
             fresh = queries.not_countable(session, place_ids) - {place.id} or {retired}
@@ -995,11 +996,7 @@ def count(
                 values=typed,
                 alert=first,
                 more_alerts=more,
-                items={
-                    place_id: each
-                    for place_id, each in asked.items()
-                    if place_id not in fresh
-                },
+                items=_asked_after(session, shown, asked, fresh, gone, leaving),
                 recount={
                     place_id: each
                     for place_id, each in figures.items()
@@ -1097,6 +1094,37 @@ def count(
         gone=NONE_GONE,
         status_code=409,
     )
+
+
+def _asked_after(
+    session: Session,
+    shown: Shown,
+    asked: Mapping[int, Collection[int]],
+    fresh: Collection[int],
+    gone: Gone,
+    leaving: Leaving,
+) -> dict[int, set[int]]:
+    """What a recount refused as areas on it are gone (`fresh`) asks for
+    again, by place: the same, but at those; and, of the items shown, what
+    left the areas gone for a place in the store it does not ask at, there
+    too, so it is shown moved there, not taken out of the store (Ali,
+    2026-11-22, inventory-tng-ygk5). Nothing, for a form asking for nothing
+    else, which is shown again whole."""
+    items = {
+        place_id: set(each)
+        for place_id, each in asked.items()
+        if place_id not in fresh and each
+    }
+    if items:
+        ids = shown.ids(session)
+        for move in leaving.moves:
+            if (
+                move.to_id in leaving.order
+                and move.to_id not in gone.ids
+                and (ids is None or move.item_id in ids)
+            ):
+                items.setdefault(move.to_id, set()).add(move.item_id)
+    return items
 
 
 @router.post(f"{COUNTS}/{{location_id:int}}/bring-back")

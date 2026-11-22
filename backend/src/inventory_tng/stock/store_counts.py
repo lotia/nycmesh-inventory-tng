@@ -109,7 +109,9 @@ def _digest(
 ) -> bytes:
     """A digest (hashlib's SHA-256) of all a count form's save writes from:
     the same for one sent again unchanged, whatever order its lines came
-    in or however its amounts were written, as 5 or 5.0."""
+    in or however its amounts were written, as 5 or 5.0. Of `aside`, only
+    the places counted: what went elsewhere is read up to no moment
+    (count_arrivals.gone_moves), so it may grow after the save."""
     said = (
         places,
         at,
@@ -119,10 +121,10 @@ def _digest(
                 count.forms.lines,
                 count.forms.close,
                 count.forms.found and (count.forms.found[0].id, count.forms.found[1]),
+                aside.get(place_id, {}),
             )
             for place_id, count in counts.items()
         },
-        aside,
         fixed,
     )
     return hashlib.sha256(json.dumps(_plain(said)).encode()).digest()

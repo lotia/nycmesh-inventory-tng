@@ -425,3 +425,20 @@ def test_a_move_fixed_only_on_a_send_again_is_not_written(
     assert again.headers["location"].startswith(f"{COUNTS}?notice=count_saved_already")
     assert counts_at(session, moved.there) == before
     assert expected(session, moved.there.id) == {moved.item: Decimal(2)}
+
+
+def test_a_save_sent_again_after_a_later_move_out_of_the_store_is_as_before(
+    admin_client: TestClient, session: Session
+) -> None:
+    """Saved with a move fixed, then radios move from Shelf C out of the
+    store: that move counts at no place on the form, so the form sent
+    again unchanged is answered as the save was, not as saved already
+    (inventory-tng-kro9)."""
+    moved = Moved(session, admin_client)
+    form = moved.form | {moved.arrived(): "1"}
+    first = admin_client.post(moved.path, data=form)
+    moved.send(session, moved.made.store, moved.gone, "1")
+    moved.send(session, moved.gone, moved.made.place.van, "1")
+    again = admin_client.post(moved.path, data=form)
+    assert again.headers["location"] == first.headers["location"]
+    assert expected(session, moved.there.id) == {moved.item: Decimal(1)}

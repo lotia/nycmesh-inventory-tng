@@ -479,3 +479,29 @@ def test_an_area_brought_back_since_the_refusal_is_still_said_gone(
     assert refused.status_code == 409
     assert emptied_words(gone.name) in text(refused)
     assert count_form(refused)["gone"] == str(gone.id)
+
+
+def test_a_recount_shows_what_went_to_an_area_it_does_not_ask_at(
+    admin_client: TestClient, session: Session
+) -> None:
+    """Asked again at Shelf A and Shelf C, Shelf C's last radio then went to
+    Shelf B, still in the store: the recount refused asks at Shelf B too,
+    the radio under "Moved to Shelf B", not taken out of the store."""
+    setup = Emptied(session, admin_client)
+    made, gone = setup.made, setup.gone
+    setup.send(session, gone, made.shelf, "1")
+    typed = {setup.counted(made.shelf): "3", setup.counted(gone): "2"}
+    recount = count_form(admin_client.post(made.path, data=setup.shown | typed))
+    setup.send(session, gone, made.empty, "1")
+    refused = admin_client.post(made.path, data=recount | typed)
+    assert refused.status_code == 409
+    again = count_form(refused)
+    assert sorted(again["places"].split()) == sorted(
+        [str(made.shelf.id), str(made.empty.id)]
+    )
+    assert heading(refused, f"Moved to {made.empty.name}")
+    assert read(refused.text).all("th", text=f"Taken out of {made.store.name}") == []
+    # Saved as shown, the move left alone: Shelf B keeps the radio.
+    saved = admin_client.post(made.path, data=again)
+    assert saved.status_code == 303
+    assert expected(session, made.empty.id) == {setup.item: Decimal(1)}
