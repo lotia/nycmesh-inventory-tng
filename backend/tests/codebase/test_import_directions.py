@@ -36,8 +36,8 @@ type App = Mapping[str, ast.Module]
 type Check = Callable[[str, App], set[str]]
 
 # Rules: each table's owner (db_protection.protection), any queries.py,
-# <thing>_queries.py or forms.py, and these, which hold rules but own no
-# table.
+# <thing>_queries.py, forms.py or a feature's <thing>_forms.py, and these,
+# which hold rules but own no table.
 RULES = {
     "admins/authenticator_totp.py",
     "catalogue/name_keys.py",
@@ -105,6 +105,8 @@ def is_rules(path: str) -> bool:
         or path in RULES_MAY_IMPORT
         or name in {"queries.py", "forms.py"}
         or name.endswith("_queries.py")
+        # web/single_use_forms.py serves pages: it is web/, not rules.
+        or (name.endswith("_forms.py") and not path.startswith("web/"))
     )
 
 
@@ -231,6 +233,7 @@ APP = {
     "stock/counts_api.py": ROUTER,
     "stock/ledger.py": "",
     "web/formatting.py": "",
+    "web/forms.py": "",
     "web/pages.py": "",
 }
 
@@ -255,6 +258,12 @@ APP = {
             "stock/over_recorded_queries.py",
             "from fastapi import Request\nfrom inventory_tng.web import formatting",
             {"fastapi"},
+        ),
+        (
+            "rules_import_fastapi_or_web",
+            "stock/count_forms.py",
+            "from fastapi import Request\nfrom inventory_tng.web import forms, pages",
+            {"fastapi", "web/pages.py"},
         ),
         (
             "routes_run_queries",

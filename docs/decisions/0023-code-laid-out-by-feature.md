@@ -452,7 +452,8 @@ searched for (AGENTS.md rule 12).
   one thing that need a file of their own are named for it,
   `<thing>_queries.py`, beside the feature's `queries.py` and held to its
   import rules, as `stock/over_recorded_queries.py`
-  (inventory-tng-u3fp.10).
+  (inventory-tng-u3fp.10). So too a form's reading, `<thing>_forms.py`,
+  beside `forms.py`, as `stock/count_forms.py` (inventory-tng-umob).
 - **`models/<feature>.py` keeps its name.** Callers import a model's
   names, never the module, so it never meets its feature's package of the
   same name under aliases. A function in it is named so it cannot be read

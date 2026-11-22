@@ -91,14 +91,14 @@ one by its size, an open package closed as none
   <input type="hidden" name="as_of" value="{{ moment.as_of }}">
   <input type="hidden" name="seen" value="{{ moment.seen }}">
   {#- Every place shown, so one with nothing on it is counted too
-  (stock/forms.py). #}
+  (stock/count_forms.py). #}
   <input type="hidden" name="places" value="{{ groups | map(attribute='place.id') | join(' ') }}">
   {% for group in groups if group.items %}<input type="hidden" name="{{ group.prefix }}items" value="{{ group.items | join(' ') }}">{% endfor %}
   {#- A recount's figures of each item, kept on a recount shown again
-  (stock/forms.py). #}
+  (stock/count_forms.py). #}
   {% for group in groups %}{% for item_id, figures in (group.recount or {}).items() %}<input type="hidden" name="{{ group.prefix }}while_{{ item_id }}" value="{{ figures | map('plain_amount') | join(' ') }}">{% endfor %}{% endfor %}
   {#- The areas gone from it since it was first shown, and that moment,
-  until it is saved (stock/forms.py). #}
+  until it is saved (stock/count_forms.py). #}
   {% if gone.ids %}<input type="hidden" name="gone" value="{{ gone.ids | join(' ') }}"><input type="hidden" name="gone_since" value="{{ gone.since }}">{% endif %}
   {% call table() %}
     <tr><th>{% trans %}Item{% endtrans %}</th><th>{% trans %}Records say{% endtrans %}</th>{% if recount %}<th>{% trans %}While you counted{% endtrans %}</th>{% endif %}<th>{% trans %}Counted{% endtrans %}</th></tr>
@@ -121,7 +121,7 @@ one by its size, an open package closed as none
     {% for each in items %}
     {#- How many arrived, a box for each form it arrived in, as the count
     form's own lines of the item split them: sealed packages by how many,
-    whole (stock/forms.py, arrivals). #}
+    whole (stock/count_forms.py, arrivals). #}
     {% set fix = namespace(open=false) %}
     {% for row in each.rows %}{% set name = each.prefix ~ row.field %}{% if values.get(name, row.amount | plain_amount) != row.amount | plain_amount or name in (problems or {}) %}{% set fix.open = true %}{% endif %}{% endfor %}
     {% set said %}<span class="sr-only"> {{ each.item.name_shown }}, {{ heading }}</span>{% endset %}
@@ -167,7 +167,7 @@ one by its size, an open package closed as none
   {% endcall %}
   {#- Where it was found, on a count of a store and its areas: the place
   picked at the last save, else the first offered, the page's own unless
-  a recount leaves it off (stock/forms.py). #}
+  a recount leaves it off (stock/count_forms.py). #}
   {% macro where_found(name) %}
   {% if areas %}
   {% set chosen = picked.get(name) %}

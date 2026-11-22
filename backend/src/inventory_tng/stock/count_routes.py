@@ -1,6 +1,6 @@
-"""A place's count form: the page an administrator counts a place, and
-the areas in it, with to put the records right (docs/decisions/0003),
-reached from Counts (stock/counts_routes.py). The writing is
+"""A place's count form: the page with which an administrator counts a
+place, and the areas in it, to put the records right
+(docs/decisions/0003), reached from Counts (stock/counts_routes.py). The writing is
 stock/store_counts.py's (record_store_count); this page checks what was
 typed and says what is wrong.
 
