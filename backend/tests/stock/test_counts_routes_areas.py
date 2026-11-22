@@ -310,7 +310,7 @@ def test_a_move_between_two_areas_during_a_count_is_counted_again_at_both(
     )
     boxes = {
         name
-        for box in read(asked.text).all("input", inputmode="decimal")
+        for box in read(asked.text).all("input", inputmode="numeric")
         if "counted" in (name := box.attrs["name"])
     }
     assert boxes == {
