@@ -1,6 +1,7 @@
 {% extends "admin_base.html" %}
 {% from "_table.html" import table %}
 {% block main %}
+{% if caution %}<p class="warning" role="status">{{ caution }}</p>{% endif %}
 {% if place.retired_at %}
 <p class="warning">{% trans place=place.name %}{{ place }} is retired, but the records say something
 is here: a save brought or took it after it was retired. Count what is really
@@ -30,30 +31,17 @@ if you didn't count it. Anything else here, add below.{% endtrans %}</p>
 {% endif %}
 {% set filtered = shown.only or shown.search %}
 {% set columns = 4 if recount else 3 %}
-<form method="post" action="{{ here }}{{ shown.query() }}">
-  <input type="hidden" name="key" value="{{ key }}">
-  <input type="hidden" name="as_of" value="{{ moment.as_of }}">
-  <input type="hidden" name="seen" value="{{ moment.seen }}">
-  {#- Every place shown, so one with nothing on it is counted too
-  (stock/forms.py). #}
-  <input type="hidden" name="places" value="{{ groups | map(attribute='place.id') | join(' ') }}">
-  {% for group in groups if group.items %}<input type="hidden" name="{{ group.prefix }}items" value="{{ group.items | join(' ') }}">{% endfor %}
-  {% call table() %}
-    <tr><th>{% trans %}Item{% endtrans %}</th><th>{% trans %}Records say{% endtrans %}</th>{% if recount %}<th>{% trans %}While you counted{% endtrans %}</th>{% endif %}<th>{% trans %}Counted{% endtrans %}</th></tr>
-    {% for group in groups %}
-    {#- A store's areas, each under its own heading: one filtered to
-    nothing is left out, but still counted only if something is typed. #}
-    {% if areas and (group.rows or not filtered or group.place.id == place.id) %}
-    <tr{% if not group.rows %} class="text-muted"{% endif %}><th colspan="{{ columns }}" scope="rowgroup">{{ group.label }}
-      {%- if group.place.retired_at %} <span class="hint">{% trans %}Retired: count what is really here, and put nothing here again.{% endtrans %}</span>{% endif %}</th></tr>
-    {% endif %}
+{#- A place's lines on the count form: its items, each by its total or by
+form (0020); under a move from an area gone from the form, each box blank,
+to confirm (stock/counts_routes.py). #}
+{% macro item_rows(group, columns, blank=false) %}
     {% set prefix = group.prefix %}
     {% set where = group.label if group.path else "" %}
     {% for item, amount in group.rows %}
     {% if item.id in group.forms %}
     {#- In more than loose units: each form counted on its own (0020). #}
     <tr><td colspan="{{ columns }}"><strong>{{ item.name_shown }}</strong> <span class="hint">
-      {%- if group.recount %}{% set typed, came, went = group.recount[item.id] %}{% trans amount=amount | amount, unit=item.unit, came=came | amount, went=went | amount, typed=typed | amount %}{{ amount }} {{ unit }} in all; while you counted, {{ came }} in, {{ went }} out; you typed {{ typed }}{% endtrans %}
+      {%- if item.id in (group.recount or {}) %}{% set typed, came, went = group.recount[item.id] %}{% trans amount=amount | amount, unit=item.unit, came=came | amount, went=went | amount, typed=typed | amount %}{{ amount }} {{ unit }} in all; while you counted, {{ came }} in, {{ went }} out; you typed {{ typed }}{% endtrans %}
       {%- else %}{% trans amount=amount | amount, unit=item.unit %}{{ amount }} {{ unit }} in all{% endtrans %}{% endif %}</span></td></tr>
     {% for row in group.forms[item.id] %}
     {% set field = prefix ~ row.field %}
@@ -62,7 +50,7 @@ if you didn't count it. Anything else here, add below.{% endtrans %}</p>
       <td>{{ row.amount | amount }}{% if not row.field.startswith("sealed_") %} {{ item.unit }}{% endif %}</td>
       {% if recount %}<td></td>{% endif %}
       {%- set hint = item.unit | printed_length if row.open_id else "" %}
-      <td><input name="{{ field }}" inputmode="decimal" value="{{ values.get(field, row.amount | plain_amount if row.amount > 0 else '0') }}" aria-label="{% if where %}{{ where }}, {% endif %}{{ item.name_shown }}, {{ row.words }}"{% if hint %} aria-describedby="hint-{{ field }}"{% endif %}>
+      <td><input name="{{ field }}" inputmode="decimal" value="{{ values.get(field, '' if blank else row.amount | plain_amount if row.amount > 0 else '0') }}" aria-label="{% if where %}{{ where }}, {% endif %}{{ item.name_shown }}, {{ row.words }}"{% if hint %} aria-describedby="hint-{{ field }}"{% endif %}>
         {% if row.open_id %}
         {% set state_field = prefix ~ "state_" ~ row.open_id %}
         <select name="{{ state_field }}" aria-label="{% if where %}{{ where }}, {% endif %}{% trans item=item.name_shown, form=row.words %}{{ item }}, {{ form }}: is it here?{% endtrans %}">
@@ -81,19 +69,59 @@ if you didn't count it. Anything else here, add below.{% endtrans %}</p>
     <tr>
       <td>{{ item.name_shown }}</td>
       <td>{{ amount | amount }} {{ item.unit }}{% if amount < 0 %} <strong>{% trans %}less than nothing{% endtrans %}</strong>{% endif %}</td>
-      {% if group.recount %}{% set typed, came, went = group.recount[item.id] %}
+      {% if item.id in (group.recount or {}) %}{% set typed, came, went = group.recount[item.id] %}
       <td>{% trans came=came | amount, went=went | amount, typed=typed | amount %}{{ came }} in, {{ went }} out; you typed {{ typed }}{% endtrans %}</td>
       {% elif recount %}<td></td>
       {% endif %}
-      <td><input name="{{ field }}" inputmode="decimal" value="{{ values.get(field, amount | plain_amount if amount > 0 else '0') }}" aria-label="{% if where %}{% trans place=where, item=item.name_shown %}{{ place }}: {{ item }} counted{% endtrans %}{% else %}{% trans item=item.name_shown %}{{ item }} counted{% endtrans %}{% endif %}">
+      <td><input name="{{ field }}" inputmode="decimal" value="{{ values.get(field, '' if blank else amount | plain_amount if amount > 0 else '0') }}" aria-label="{% if where %}{% trans place=where, item=item.name_shown %}{{ place }}: {{ item }} counted{% endtrans %}{% else %}{% trans item=item.name_shown %}{{ item }} counted{% endtrans %}{% endif %}">
         {% with name = field %}{% include "_field_problem.html" %}{% endwith %}</td>
     </tr>
     {% endif %}
-    {% else %}
-    {% if not areas or not filtered or group.place.id == place.id %}
-    <tr{% if areas %} class="text-muted"{% endif %}><td colspan="{{ columns }}">{% if filtered %}{% trans %}Nothing here matches.{% endtrans %}{% else %}{% trans %}The records say nothing is here.{% endtrans %}{% endif %}</td></tr>
-    {% endif %}
     {% endfor %}
+{% endmacro %}
+<form method="post" action="{{ here }}{{ shown.query() }}">
+  <input type="hidden" name="key" value="{{ key }}">
+  <input type="hidden" name="as_of" value="{{ moment.as_of }}">
+  <input type="hidden" name="seen" value="{{ moment.seen }}">
+  {#- Every place shown, so one with nothing on it is counted too
+  (stock/forms.py). #}
+  <input type="hidden" name="places" value="{{ groups | map(attribute='place.id') | join(' ') }}">
+  {% for group in groups if group.items %}<input type="hidden" name="{{ group.prefix }}items" value="{{ group.items | join(' ') }}">{% endfor %}
+  {#- The areas gone from it since it was first shown, and that moment,
+  until it is saved (stock/forms.py). #}
+  {% if gone.ids %}<input type="hidden" name="gone" value="{{ gone.ids | join(' ') }}"><input type="hidden" name="gone_since" value="{{ gone.since }}">{% endif %}
+  {% call table() %}
+    <tr><th>{% trans %}Item{% endtrans %}</th><th>{% trans %}Records say{% endtrans %}</th>{% if recount %}<th>{% trans %}While you counted{% endtrans %}</th>{% endif %}<th>{% trans %}Counted{% endtrans %}</th></tr>
+    {#- What left the areas gone from it: what went to a place on it under
+    the move, counted there and only there; what went elsewhere, with
+    nothing to type (stock/counts_routes.py). #}
+    {% if moved %}
+    {% for words in moved.removed %}
+    <tr class="text-muted"><th colspan="{{ columns }}" scope="rowgroup">{{ words }}</th></tr>
+    {% endfor %}
+    {% for heading, section in moved.sections %}
+    <tr><th colspan="{{ columns }}" scope="rowgroup">{{ heading }}</th></tr>
+    {{ item_rows(section, columns, blank=true) }}
+    {% endfor %}
+    {% if moved.taken %}
+    {% set heading, taken = moved.taken %}
+    <tr><th colspan="{{ columns }}" scope="rowgroup">{{ heading }}</th></tr>
+    {% for item, amount in taken %}
+    <tr><td>{{ item.name_shown }}</td><td>{{ amount | amount }} {{ item.unit }}</td>{% if recount %}<td></td>{% endif %}<td></td></tr>
+    {% endfor %}
+    {% endif %}
+    {% endif %}
+    {% for group in groups %}
+    {#- A store's areas, each under its own heading: one filtered to
+    nothing is left out, but still counted only if something is typed. #}
+    {% if areas and (group.rows or not filtered or group.place.id == place.id) %}
+    <tr{% if not group.rows %} class="text-muted"{% endif %}><th colspan="{{ columns }}" scope="rowgroup">{{ group.label }}
+      {%- if group.place.retired_at %} <span class="hint">{% trans %}Retired: count what is really here, and put nothing here again.{% endtrans %}</span>{% endif %}</th></tr>
+    {% endif %}
+    {{ item_rows(group, columns) }}
+    {% if not group.rows and (not areas or not filtered or group.place.id == place.id) and not (moved and group.place.id in moved.into) %}
+    <tr{% if areas %} class="text-muted"{% endif %}><td colspan="{{ columns }}">{% if filtered %}{% trans %}Nothing here matches.{% endtrans %}{% elif moved and group.place.id in moved.back %}{% trans %}Nothing recorded here.{% endtrans %}{% else %}{% trans %}The records say nothing is here.{% endtrans %}{% endif %}</td></tr>
+    {% endif %}
     {% endfor %}
   {% endcall %}
   {#- Where it was found, on a count of a store and its areas: the place
@@ -108,6 +136,8 @@ if you didn't count it. Anything else here, add below.{% endtrans %}</p>
       {% for group in choices %}<option value="{{ group.place.id }}" {% if chosen == group.place.id | string %}selected{% endif %}>{{ group.label }}</option>{% endfor %}
     </select>
     {% include "_field_problem.html" %}
+    {#- The areas gone from the form, retired: not offered, and why. #}
+    {% if moved and moved.not_offered %}<span class="hint block">{{ moved.not_offered }}</span>{% endif %}
   </label>
   {% endif %}
   {% endmacro %}
@@ -152,8 +182,19 @@ if you didn't count it. Anything else here, add below.{% endtrans %}</p>
   </fieldset>
   {% endif %}
   {#- Filtered to nothing: saved, it would say the place was counted. #}
-  {% if groups | selectattr("rows") | list or others or found_packages or not filtered %}
-  <button class="primary">{% trans %}Save the count{% endtrans %}</button>
+  {% set bring_back = moved.to_bring_back if moved else [] %}
+  {% if groups | selectattr("rows") | list or others or found_packages or not filtered or moved and moved.sections %}
+  {#- First, so Enter saves the count; shown after what brings an area
+  back. #}
+  <button class="primary{% if bring_back %} order-last{% endif %}">{% trans %}Save the count{% endtrans %}</button>
   {% endif %}
+  {#- An area gone from it, retired and emptied while it was counted:
+  brought back with what was typed sent along, and the form shown again
+  (stock/counts_routes.py). #}
+  {% for area_id, where in bring_back %}
+  <p>{% trans place=where %}Things still at {{ place }}?{% endtrans %}</p>
+  <button formaction="{{ here }}/bring-back{{ shown.query() }}" name="area_id" value="{{ area_id }}">{% trans %}Bring it back{% endtrans %}</button>
+  <p class="hint">{% trans place=where %}Brings it back and shows this form again with {{ place }} listed and everything you typed kept.{% endtrans %}</p>
+  {% endfor %}
 </form>
 {% endblock %}

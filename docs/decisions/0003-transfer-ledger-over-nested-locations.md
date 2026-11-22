@@ -206,8 +206,20 @@ items, packages and open packages the form names, each by id across them
 all, and the checks of recorded more than moved it may settle, before
 writing any (inventory-tng-nfia). A move between two of them while
 counting withholds the item at both, and the recount asks for it place
-by place. A send naming an area retired since it was shown is refused
-whole, keeping what was typed.
+by place. A send naming an area retired since it was shown, or a retired
+area emptied since, is refused whole, keeping what was typed, and the
+form is shown again without it (Ali, 2026-11-22, inventory-tng-ygk5).
+One emptied is said so, and what left it while it was counted is shown
+under "Moved from Shelf C to Shelf B", with an empty box, counted at the
+place it went to and shown only there, or listed under "Taken out of"
+the store if it went elsewhere. Found in leaves the area out, saying it
+is retired, and a "Bring it back" button on the form brings it back, as
+its own page does, and shows the form again with it, everything typed
+kept. A recorded move is never undone: if the items never left, the
+count records a loss where they went and a find where they are. One
+retired with nothing moved is said so, its heading dimmed. We rejected
+one message for both cases with what came in and went out only, and a
+short message without the reason.
 
 We rejected counting the store as a whole (where in it stock is would be
 lost, and the areas' own counts would fight the store's) and a read-only

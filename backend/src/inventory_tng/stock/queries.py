@@ -202,8 +202,16 @@ def countable_tree(
     (balance.countable), each with its path below the place: the names of
     the areas it is in, then its own; none for the place. Depth first, each
     level by name. A retired area holding nothing is left out, but the
-    areas in it are walked through, its name in their path. One query, by
-    a recursive CTE."""
+    areas in it are walked through, its name in their path."""
+    return [(place, path) for place, path, may in place_tree(session, root) if may]
+
+
+def place_tree(
+    session: Session, root: Location
+) -> list[tuple[Location, tuple[str, ...], bool]]:
+    """A place and every area inside it, at any depth, as countable_tree
+    walks them, each with its path and whether it may be counted: those it
+    leaves out too. One query, by a recursive CTE."""
     tree = select(Location.id).where(Location.id == root.id).cte("tree", recursive=True)
     tree = tree.union(select(Location.id).join(tree, Location.parent_id == tree.c.id))
     rows = session.execute(
@@ -214,11 +222,10 @@ def countable_tree(
     for place, _ in rows:
         if place.id != root.id:
             children.setdefault(place.parent_id, []).append(place)
-    found: list[tuple[Location, tuple[str, ...]]] = []
+    found: list[tuple[Location, tuple[str, ...], bool]] = []
 
     def walk(place: Location, path: tuple[str, ...]) -> None:
-        if place.id in may_count:
-            found.append((place, path))
+        found.append((place, path, place.id in may_count))
         for child in sorted(
             children.get(place.id, []), key=lambda row: row.name.lower()
         ):
@@ -226,6 +233,16 @@ def countable_tree(
 
     walk(root, ())
     return found
+
+
+def not_countable(session: Session, ids: Collection[int]) -> set[int]:
+    """Of the places of `ids`, those that may not be counted now
+    (balance.countable): retired, and holding nothing."""
+    return set(
+        session.scalars(
+            select(Location.id).where(Location.id.in_(ids), ~countable())
+        ).all()
+    )
 
 
 def packages_of_items(

@@ -10,10 +10,10 @@ formats its values as `%(name)s`, always, so a literal per cent is `%%`.
 A context (`pgettext`) only where the same English means two things, from
 the fixed list in CONTRIBUTING.md (Phrases). A number people read is
 written as the locale writes it (`number`, a template's `| number`), a
-plural's count too.
+plural's count too, and a list of names as it joins them (`joined`).
 """
 
-from collections.abc import Callable, Generator
+from collections.abc import Callable, Generator, Sequence
 from contextlib import contextmanager
 from decimal import Decimal
 from functools import cache
@@ -21,6 +21,7 @@ from io import BytesIO
 from pathlib import Path
 
 from babel import Locale, localedata
+from babel.lists import format_list
 from babel.messages.catalog import Catalog
 from babel.messages.mofile import write_mo
 from babel.messages.pofile import read_po
@@ -98,10 +99,18 @@ def number(value: int | Decimal) -> str:
     return format_decimal(value, locale=locale, decimal_quantization=False)
 
 
+def joined(names: Sequence[str]) -> str:
+    """Names joined as the active locale joins a list, such as "A, B and C"
+    in English: in its catalogue's language, as `number` writes."""
+    return format_list(
+        list(names), locale=_number_locale(_active.info().get("language"))
+    )
+
+
 @cache
 def _number_locale(language: str | None) -> Locale:
-    """The locale `number` writes in for a catalogue's `language`, parsed
-    once: English if Babel knows no such language."""
+    """The locale `number` and `joined` write in for a catalogue's
+    `language`, parsed once: English if Babel knows no such language."""
     return Locale.parse(language if language and localedata.exists(language) else "en")
 
 

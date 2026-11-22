@@ -256,6 +256,40 @@ def places_listed(form: Mapping[str, str], root_id: int) -> list[int] | None:
     return sorted({place_id for place_id in ids if place_id is not None})
 
 
+# The areas gone from a count form since it was first shown, retired and
+# holding nothing, and that first form's moment: what left them since is
+# shown on the form until it is saved (Ali, 2026-11-22, inventory-tng-ygk5).
+GONE, GONE_SINCE = "gone", "gone_since"
+
+
+class Gone(NamedTuple):
+    """The areas gone from a count form (GONE), by id, and the moment what
+    left them is read from."""
+
+    ids: tuple[int, ...] = ()
+    since: int = 0
+
+
+# A count form with no area gone from it.
+NONE_GONE = Gone()
+
+
+def gone_listed(form: Mapping[str, str]) -> Gone | None:
+    """The areas a count form lists as gone from it (GONE), none on a form
+    that lists none; None if one listed is no id, or its moment no
+    number."""
+    listed = form.get(GONE, "").split()
+    if not listed:
+        return NONE_GONE
+    ids = [row_id(typed) for typed in listed]
+    since = whole(form.get(GONE_SINCE, ""), 0, INTEGER_MAX)
+    if since is None or any(area_id is None for area_id in ids):
+        return None
+    return Gone(
+        tuple(sorted({area_id for area_id in ids if area_id is not None})), since
+    )
+
+
 def by_place(
     form: Mapping[str, str], root_id: int, place_ids: Collection[int]
 ) -> tuple[dict[int, dict[str, str]], dict[str, Words]]:

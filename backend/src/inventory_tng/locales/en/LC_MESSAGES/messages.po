@@ -420,9 +420,21 @@ msgstr ""
 msgid "%(place)s (opened)"
 msgstr ""
 
+#: src/inventory_tng/stock/counts_routes.py
+#, python-format
+msgid "%(place)s (retired): removed from this form."
+msgstr ""
+
 #: src/inventory_tng/stock/over_recorded_routes.py
 #, python-format
 msgid "%(place)s brought back. Correct it now."
+msgstr ""
+
+#: src/inventory_tng/stock/counts_routes.py
+#, python-format
+msgid ""
+"%(place)s is back, and what you typed is kept. Add what's at %(place)s "
+"with Something else here, then save the count."
 msgstr ""
 
 #: src/inventory_tng/templates/stock/count.html
@@ -443,6 +455,13 @@ msgstr ""
 #, python-format
 msgid "%(place)s: %(item)s counted"
 msgstr ""
+
+#: src/inventory_tng/stock/counts_routes.py
+#, python-format
+msgid "%(places)s isn't offered: it's retired."
+msgid_plural "%(places)s aren't offered: they're retired."
+msgstr[0] ""
+msgstr[1] ""
 
 #. Translators: prefix is an SI prefix in English, such as kilo, or none.
 #: src/inventory_tng/catalogue/units.py
@@ -1087,6 +1106,7 @@ msgstr ""
 #: src/inventory_tng/templates/_retired_record.html
 #: src/inventory_tng/templates/catalogue/item.html
 #: src/inventory_tng/templates/site_settings/settings.html
+#: src/inventory_tng/templates/stock/count.html
 msgid "Bring it back"
 msgstr ""
 
@@ -1102,6 +1122,13 @@ msgstr ""
 
 #: src/inventory_tng/templates/_retired_record.html
 msgid "Bring them back to change anything here."
+msgstr ""
+
+#: src/inventory_tng/templates/stock/count.html
+#, python-format
+msgid ""
+"Brings it back and shows this form again with %(place)s listed and "
+"everything you typed kept."
 msgstr ""
 
 #: src/inventory_tng/web/admin_pages.py
@@ -2054,6 +2081,11 @@ msgstr ""
 msgid "Move what is here elsewhere, or count it, first."
 msgstr ""
 
+#: src/inventory_tng/stock/counts_routes.py
+#, python-format
+msgid "Moved from %(place)s to %(there)s"
+msgstr ""
+
 #: src/inventory_tng/templates/admins/account.html
 #: src/inventory_tng/templates/catalogue/_item_name.html
 #: src/inventory_tng/templates/catalogue/category.html
@@ -2280,9 +2312,28 @@ msgstr ""
 #: src/inventory_tng/stock/counts_routes.py
 #, python-format
 msgid ""
-"Not saved: %(place)s is retired and holds nothing, so it is no longer on "
-"this form. What you typed is kept: check it and save again."
-msgstr ""
+"Not saved: %(places)s was emptied while you counted, so the records show "
+"no items there now. Move details are shown below, and your other counts "
+"are kept. Confirm and save again."
+msgid_plural ""
+"Not saved: %(places)s were emptied while you counted, so the records show"
+" no items there now. Move details are shown below, and your other counts "
+"are kept. Confirm and save again."
+msgstr[0] ""
+msgstr[1] ""
+
+#: src/inventory_tng/stock/counts_routes.py
+#, python-format
+msgid ""
+"Not saved: %(places)s was retired while you counted, so it is no longer "
+"on this form. What you typed for the other areas is kept: check it and "
+"save again."
+msgid_plural ""
+"Not saved: %(places)s were retired while you counted, so they are no "
+"longer on this form. What you typed for the other areas is kept: check it"
+" and save again."
+msgstr[0] ""
+msgstr[1] ""
 
 #: src/inventory_tng/web/forms.py
 msgid "Not saved: it's retired. Bring it back first to change it."
@@ -2360,6 +2411,10 @@ msgstr ""
 msgid ""
 "Nothing matches. Check the spelling, or <a href=\"%(link)s\">clear the "
 "search</a>."
+msgstr ""
+
+#: src/inventory_tng/templates/stock/count.html
+msgid "Nothing recorded here."
 msgstr ""
 
 #: src/inventory_tng/templates/catalogue/reading_seed.html
@@ -3651,6 +3706,11 @@ msgid ""
 "first to replace it."
 msgstr ""
 
+#: src/inventory_tng/stock/counts_routes.py
+#, python-format
+msgid "Taken out of %(place)s"
+msgstr ""
+
 #: src/inventory_tng/web/forms.py
 msgid "That breaks one of the inventory's rules."
 msgstr ""
@@ -3936,6 +3996,11 @@ msgstr ""
 
 #: src/inventory_tng/volunteers/forms.py
 msgid "They still hold stock: move it back to a store first."
+msgstr ""
+
+#: src/inventory_tng/templates/stock/count.html
+#, python-format
+msgid "Things still at %(place)s?"
 msgstr ""
 
 #: src/inventory_tng/templates/admins/confirm.html

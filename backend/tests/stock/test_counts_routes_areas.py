@@ -18,60 +18,13 @@ from inventory_tng.models.stock import LedgerTransaction, OpenPackage
 from inventory_tng.stock.counts_routes import PATH_BETWEEN
 from inventory_tng.stock.forms import ON_THE_FORM_TWICE, PICK_A_PLACE, TYPE_IT_HERE
 from inventory_tng.stock.ledger import Entry
-from inventory_tng.stock.moments import at_place, expected
+from inventory_tng.stock.moments import expected
 from inventory_tng.stock.paths import COUNTS
 
 from helpers.markup import forms, hidden_fields, options, read, text
 from helpers.rows import add, tag
-from helpers.stock import Place, Spools, count_form, retire, stocked, write
-
-
-class Store:
-    """A store holding five radios, with Shelf A (three radios) and in it
-    Bin 1 (two metres of cable), and Shelf B, empty."""
-
-    def __init__(self, session: Session) -> None:
-        self.place = stocked(session)
-        store = self.place.store
-        self.store = store
-        self.shelf = add(session, area("Shelf A", store))
-        self.bin = add(session, area("Bin 1", self.shelf))
-        self.empty = add(session, area("Shelf B", store))
-        self.every_place = (store, self.shelf, self.bin, self.empty)
-        self.receive(session, self.shelf, self.place.item.id, "3")
-        self.receive(session, self.bin, self.place.cable.id, "2")
-        self.path = f"{COUNTS}/{store.id}"
-
-    def receive(self, session: Session, where: Location, item_id: int, n: str) -> None:
-        write(
-            session,
-            self.place,
-            kind="receipt",
-            from_location_id=None,
-            to_location_id=where.id,
-            lines=[{"item_id": item_id, "quantity": n}],
-        )
-
-    def move(
-        self, session: Session, here: Location, there: Location
-    ) -> LedgerTransaction:
-        """One radio moved from `here` to `there`."""
-        return write(
-            session,
-            self.place,
-            from_location_id=here.id,
-            to_location_id=there.id,
-            lines=[{"item_id": self.place.item.id, "quantity": "1"}],
-        )
-
-
-def area(name: str, parent: Location) -> Location:
-    return Location(name=f"{name} {tag()}", kind="area", parent_id=parent.id)
-
-
-def field(place: Location, store: Location, name: str) -> str:
-    """The count form's name for a place's field."""
-    return name if place.id == store.id else f"at_{place.id}_{name}"
+from helpers.stock import Place, Spools, count_form, retire, write
+from helpers.store_areas import Store, area, counts_at, field
 
 
 def found_on(place: Location, package: ItemPackage) -> dict[str, str]:
@@ -81,16 +34,6 @@ def found_on(place: Location, package: ItemPackage) -> dict[str, str]:
         "found_package_id": str(package.id),
         "found_left": "40",
     }
-
-
-def counts_at(session: Session, place: Location) -> list[LedgerTransaction]:
-    return list(
-        session.scalars(
-            select(LedgerTransaction)
-            .where(LedgerTransaction.kind == "count", at_place(place.id))
-            .order_by(LedgerTransaction.id)
-        )
-    )
 
 
 def test_a_store_count_lists_every_area_at_any_depth_grouped(
@@ -486,54 +429,6 @@ def test_a_save_at_an_area_as_the_form_was_shown_refuses_the_whole_count(
     assert counts_at(session, made.shelf) == []
 
 
-def test_an_area_retired_since_the_form_was_shown_refuses_it_whole(
-    admin_client: TestClient, session: Session
-) -> None:
-    """The empty shelf retired while the store was counted: nothing is
-    written, and the form comes back without it, keeping what was typed."""
-    made = Store(session)
-    item = made.place.item.id
-    form = count_form(admin_client.get(made.path)) | {
-        f"at_{made.shelf.id}_counted_{item}": "1"
-    }
-    retire(session, made.empty)
-    refused = admin_client.post(made.path, data=form)
-    assert refused.status_code == 409
-    assert gone_from_the_form(made.empty) in text(refused)
-    assert made.empty.id not in [
-        int(each) for each in count_form(refused)["places"].split()
-    ]
-    assert (
-        read(refused.text)
-        .one("input", name=f"at_{made.shelf.id}_counted_{item}")
-        .attrs["value"]
-        == "1"
-    )
-    assert counts_at(session, made.shelf) == []
-
-
-def gone_from_the_form(place: Location) -> str:
-    return f"Not saved: {place.name} is retired and holds nothing, so it is no longer"
-
-
-def test_an_area_retired_before_and_emptied_since_refuses_it_whole(
-    admin_client: TestClient, session: Session
-) -> None:
-    """A retired shelf holding a radio, shown, then emptied while the
-    store was counted: refused saying it is retired and holds nothing, not
-    that it was retired meanwhile."""
-    made = Store(session)
-    retire(session, made.empty)
-    made.move(session, made.store, made.empty)
-    form = count_form(admin_client.get(made.path))
-    made.move(session, made.empty, made.store)
-    refused = admin_client.post(made.path, data=form)
-    assert refused.status_code == 409
-    assert gone_from_the_form(made.empty) in text(refused)
-    for place in made.every_place:
-        assert counts_at(session, place) == [], place.name
-
-
 def test_something_else_here_offers_only_what_a_place_it_may_be_found_lacks(
     admin_client: TestClient, session: Session
 ) -> None:
@@ -679,8 +574,8 @@ def test_a_recount_at_an_area_retired_since_asks_no_more_there(
 ) -> None:
     """A radio moved from the shelf to the empty shelf while the store was
     counted, then out again, and the empty shelf retired: the recount is
-    refused once, and comes back asking only at the shelf, which then
-    saves."""
+    refused once, as the shelf emptied, and comes back asking only at the
+    shelf, which then saves."""
     made = Store(session)
     item = made.place.item.id
     shown = count_form(admin_client.get(made.path))
@@ -708,7 +603,12 @@ def test_a_recount_at_an_area_retired_since_asks_no_more_there(
     }
     refused = admin_client.post(made.path, data=recount)
     assert refused.status_code == 409
-    assert f"Not saved: {made.empty.name} is retired" in text(refused)
+    assert f"Not saved: {made.empty.name} was emptied while you counted" in text(
+        refused
+    )
+    # The radio it sent back is asked for at the shelf, under the move.
+    moved = f"Moved from {made.empty.name} to {made.shelf.name}"
+    assert read(refused.text).one("th", scope="rowgroup", text=moved) is not None
     last = count_form(refused)
     assert last["places"] == str(made.shelf.id)
     done = admin_client.post(

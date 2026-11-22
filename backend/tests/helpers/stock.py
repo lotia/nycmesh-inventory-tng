@@ -315,11 +315,13 @@ def opened_line(spools: Spools, **fields: object) -> dict[str, object]:
 def count_form(page: Response) -> dict[str, str]:
     """A count page's hidden fields, as it was shown: its key, the places'
     latest ledger entry then and how many it saw, the places it showed,
-    and the items each asked for again."""
+    the items each asked for again, and the areas gone from it since it
+    was first shown, with that moment."""
     return {
         name: value
         for name, value in hidden_fields(page.text)
-        if name in {"key", "as_of", "seen", "places"} or name.endswith("items")
+        if name in {"key", "as_of", "seen", "places", "gone", "gone_since"}
+        or name.endswith("items")
     }
 
 

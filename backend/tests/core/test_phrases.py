@@ -41,6 +41,7 @@ from inventory_tng.core.phrases import (
     Words,
     compiled,
     gettext,
+    joined,
     lazy_gettext,
     lazy_pgettext,
     ngettext,
@@ -68,6 +69,7 @@ from inventory_tng.stock import (
     stock_routes,
     used_up_routes,
 )
+from inventory_tng.stock.forms import NONE_GONE
 from inventory_tng.stock.moments import Moment
 from inventory_tng.volunteers import volunteers_routes
 from inventory_tng.web.admin_pages import revoke_title
@@ -540,6 +542,7 @@ def count_page() -> str:
         problems={},
         others=[item],
         found_packages=[(package, NOT_ENGLISH, NOT_ENGLISH)],
+        gone=NONE_GONE,
     )
 
 
@@ -899,6 +902,14 @@ def test_a_language_babel_does_not_know_writes_numbers_as_english() -> None:
     header = 'msgid ""\nmsgstr ""\n"Language: en_XA\\n"\n'
     with speaking(compiled(read_po(StringIO(header)))):
         assert number(1000) == "1,000"
+
+
+def test_names_are_joined_as_the_locale_joins_a_list() -> None:
+    """Shelf C and Bin 4 in English, und in German (inventory-tng-ygk5)."""
+    assert joined(["Shelf C"]) == "Shelf C"
+    assert joined(["Shelf C", "Bin 4"]) == "Shelf C and Bin 4"
+    with speaking(GERMAN):
+        assert joined(["Shelf C", "Bin 4"]) == "Shelf C und Bin 4"
 
 
 def items_page(total: int) -> str:

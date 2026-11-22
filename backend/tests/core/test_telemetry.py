@@ -521,6 +521,47 @@ def test_counts_the_places_a_count_was_saved_at(
     assert (after[0] - before[0], after[1] - before[1]) == (1, 2)
 
 
+def test_counts_the_areas_brought_back_from_a_count_form(
+    rolled_back: Recorded, session: Session
+) -> None:
+    """A retired shelf emptied while its store was counted, brought back
+    from the form shown again (inventory-tng-ygk5)."""
+    client, _, reader, _ = rolled_back
+    _, key = new_admin(session)
+    sign_in_with(client, key=key)
+    place = stocked(session)
+    shelf = add(
+        session, Location(name=f"Shelf {tag()}", kind="area", parent_id=place.store.id)
+    )
+    retire(session, shelf)
+    radio = [{"item_id": place.item.id, "quantity": "1"}]
+    write(
+        session,
+        place,
+        from_location_id=place.store.id,
+        to_location_id=shelf.id,
+        lines=radio,
+    )
+    path = f"{COUNTS}/{place.store.id}"
+    form = count_form_at(client, place.store.id)
+    write(
+        session,
+        place,
+        from_location_id=shelf.id,
+        to_location_id=place.van.id,
+        lines=radio,
+    )
+    refused = client.post(path, data=form)
+    assert refused.status_code == 409
+    name = "inventory.count.areas_brought_back"
+    before = counted(reader, name).get((), 0)
+    back = client.post(
+        f"{path}/bring-back", data=count_form(refused) | {"area_id": str(shelf.id)}
+    )
+    assert back.status_code == 200
+    assert counted(reader, name)[()] == before + 1
+
+
 def recorded_by_kind(reader: InMemoryMetricReader) -> tuple[int, int]:
     """inventory.counts.recorded's totals so far: counts, adjustments."""
     totals = counted(reader, "inventory.counts.recorded")
