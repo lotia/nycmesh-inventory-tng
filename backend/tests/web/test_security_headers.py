@@ -67,7 +67,7 @@ def assert_protected(response: Response) -> None:
         f'{security_headers.REPORT_GROUP}="{security_headers.REPORTS}"'
     )
     assert response.headers["x-content-type-options"] == "nosniff"
-    assert response.headers["referrer-policy"] == "no-referrer"
+    assert response.headers["referrer-policy"] == "same-origin"
     permissions = dict(
         feature.split("=")
         for feature in response.headers["permissions-policy"].split(", ")

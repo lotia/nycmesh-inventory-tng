@@ -128,8 +128,10 @@ PERMISSIONS = ", ".join(
         )
     ]
 )
-# No address is sent on: reset and sign-in links carry their token in it.
-REFERRER_POLICY = "no-referrer"
+# The address is sent to the app's own pages only: reset and sign-in links
+# carry their token in it. A browser without Sec-Fetch-Site then sends a
+# same-origin post its real Origin, not null (core/cross_site.py).
+REFERRER_POLICY = "same-origin"
 
 violations = meter.create_counter(
     "inventory.csp.violations",

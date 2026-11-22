@@ -1,7 +1,7 @@
 # 0010 — How the scan page is built and served
 
 **Status:** accepted · 2026-11-01 · builds on 0002 (one client-side page, in
-TypeScript)
+TypeScript) · amended 2026-11-22 (`Referer` to the app's own pages)
 
 ## Context
 
@@ -397,10 +397,10 @@ the compressed copy (fiddly header code ServeStatic already gets right).
   would show violations that never happened (Ali, 2026-11-17,
   inventory-tng-e0y). Nothing else a report says is kept
   or logged: it names pages, addresses and what the page held. We rejected
-  sending no reports. Beside it, every response says `nosniff`, sends no
-  `Referer` (`Referrer-Policy: no-referrer`, as the administrator pages
-  already asked: reset and sign-in links carry a token in their address,
-  and the app needs no referrer from its own pages), and allows the camera
+  sending no reports. Beside it, every response says `nosniff`, sends
+  `Referer` to the app's own pages only (`Referrer-Policy: same-origin`,
+  see the amendment: reset and sign-in links carry a token in their
+  address, which no other site should see), and allows the camera
   to this origin only, denying every other feature a page could ask for
   (`Permissions-Policy`).
 - **The policy allows one style attribute, WebKit's own for a `<select>`**
@@ -427,3 +427,23 @@ the compressed copy (fiddly header code ServeStatic already gets right).
   them (one report per select on each Safari 27.2 page).
 - Testing the camera on a phone in development needs HTTPS for the dev
   server, or a tunnel.
+
+## Amendment: `Referer` to the app's own pages (2026-11-22)
+
+Decided by Ali on 2026-11-22 (inventory-tng-7f6e): every response sends
+`Referrer-Policy: same-origin`, not `no-referrer`. Under `no-referrer`,
+browsers send `Origin: null` on a same-origin form post or fetch. Current
+browsers also send `Sec-Fetch-Site`, which the cross-site check (0012)
+trusts first, but one without it (Safari before 16.4, so iPhones on iOS
+15) fell back to `Origin`, saw `null`, and was refused every save and
+sign-in. Under `same-origin`, the app's own requests carry `Referer` and
+their real `Origin`, and other sites get neither. A post with
+`Origin: null` and no `Sec-Fetch-Site` is still refused.
+
+What `no-referrer` kept from the app is nothing it lacked: its own access
+log is off and its request log has no headers, and a link's token is
+already in the address any proxy logs on the `GET`. The web search link
+keeps `rel="noreferrer"`, as it goes to another site.
+
+We rejected keeping `no-referrer` and stating the oldest browsers
+supported, and leaving it as it was.

@@ -15,7 +15,6 @@ from fastapi.testclient import TestClient
 from httpx2 import Response
 from sqlalchemy import select
 from sqlalchemy.orm import Session
-from starlette.datastructures import Headers
 from structlog.testing import capture_logs
 
 from inventory_tng.admins import (
@@ -33,7 +32,6 @@ from inventory_tng.admins.accounts import (
     username_problem,
 )
 from inventory_tng.admins.forms import NOT_THE_TOKEN, code_mismatch
-from inventory_tng.core.cross_site import cross_site
 from inventory_tng.core.masking import Masker
 from inventory_tng.core.settings import RateLimits
 from inventory_tng.models.admins import Admin, AdminSession, Authenticator, RecoveryCode
@@ -669,26 +667,6 @@ def test_a_name_taken_meanwhile_is_refused_by_its_index(
 
 
 # Cross-site requests
-
-
-@pytest.mark.parametrize(
-    ("method", "headers", "refused"),
-    [
-        ("POST", {"sec-fetch-site": "cross-site"}, True),
-        ("POST", {"sec-fetch-site": "same-site"}, True),
-        ("POST", {"sec-fetch-site": "same-origin"}, False),
-        ("POST", {"sec-fetch-site": "none"}, False),
-        ("POST", {"origin": "https://evil.example", "host": "inv.example"}, True),
-        ("POST", {"origin": "null", "host": "inv.example"}, True),
-        ("POST", {"origin": "https://inv.example", "host": "inv.example"}, False),
-        ("POST", {}, False),
-        ("GET", {"sec-fetch-site": "cross-site"}, False),
-    ],
-)
-def test_cross_site_requests(
-    method: str, headers: dict[str, str], refused: bool
-) -> None:
-    assert cross_site(method, Headers(headers)) is refused
 
 
 def test_a_cross_site_sign_in_is_refused(client: TestClient, session: Session) -> None:

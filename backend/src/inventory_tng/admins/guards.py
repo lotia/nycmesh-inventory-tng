@@ -356,8 +356,8 @@ async def _confirmed(
     if not was_open and await run_in_threadpool(
         is_spent, session, form.get(single_use_forms.FIELD)
     ):
-        # The page the form was on (single_use_forms.single_use_field):
-        # browsers send no Referer here (security_headers.REFERRER_POLICY).
+        # The page the form was on (single_use_forms.single_use_field), not
+        # Referer, which a browser's settings may leave out.
         back = _local(str(form.get(single_use_forms.BACK, "")))
         raise Answered(single_use_forms.sent_again(request, signed, need.made, back))
     if not was_open:

@@ -69,8 +69,7 @@ ALREADY_SENT = lazy_gettext("Already sent")
 
 
 # The page a form was on, which a page saying it was sent before links back
-# to: browsers send no Referer to these pages
-# (security_headers.REFERRER_POLICY).
+# to: carried in the form, as a browser's settings may leave out Referer.
 BACK = "back"
 
 
