@@ -184,11 +184,15 @@ def by_form(
             amount = quantity(typed, positive=False, unit=unit)
             if row is None or row.location_id != place_id or state not in STATES:
                 problems[field] = NO_SUCH_OPEN_PACKAGE
+            elif (reason := STATES[state]) is not None:
+                # Closed already, by this form saved and sent again or
+                # meanwhile, it is as said: closing it writes nothing
+                # (open_packages.close), so a form sent again unchanged
+                # is answered as before (inventory-tng-kro9).
+                close.append((row.id, reason))
             elif row.closed_at is not None:
                 # Its line is gone from the form, so said above it.
                 problems[CLOSED_MEANWHILE] = RULES[CLOSED_MEANWHILE]
-            elif (reason := STATES[state]) is not None:
-                close.append((row.id, reason))
             elif isinstance(amount, str):
                 problems[field] = amount
             else:

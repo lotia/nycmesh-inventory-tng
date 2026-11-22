@@ -225,6 +225,11 @@ def test_open_packages_closed_by_a_count_and_refusals_said(
     assert "was closed meanwhile" in text(
         admin_client.post(f"{COUNTS}/{store}", data=closed)
     )
+    # Said not here on another form shown before: closed, as it says, so
+    # saved.
+    missing = {f"opened_{one.id}": "", f"state_{one.id}": "missing"}
+    again = at | {"key": str(uuid.uuid4())} | missing
+    assert admin_client.post(f"{COUNTS}/{store}", data=again).status_code == 303
     huge = at | {"key": str(uuid.uuid4()), f"sealed_{cable}_{spool}": "9999999"}
     # None sealed is here now, so no line shows it: refused whole.
     assert admin_client.post(f"{COUNTS}/{store}", data=huge).status_code == 400

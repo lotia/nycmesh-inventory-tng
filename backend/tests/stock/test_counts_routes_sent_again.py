@@ -155,6 +155,34 @@ def test_a_count_saved_and_sent_again_unchanged_is_answered_as_before(
     assert made.written() == before
 
 
+def test_a_count_closing_an_open_package_sent_again_unchanged_is_as_before(
+    admin_client: TestClient, session: Session
+) -> None:
+    """The open package it closed is closed already when it is sent again:
+    as it said, so answered as before, not as closed meanwhile
+    (inventory-tng-kro9)."""
+    made = SentAgain(admin_client, session)
+    opened = made.spools.opened()
+    made.show()
+    close = {f"opened_{opened.id}": "", f"state_{opened.id}": "used_up"}
+    saved = made.send(close)
+    before = made.written()
+    again = made.send(close)
+    assert again.headers["location"] == saved.headers["location"]
+    assert made.written() == before
+
+
+def test_a_count_closing_an_open_package_sent_again_otherwise_is_refused(
+    admin_client: TestClient, session: Session
+) -> None:
+    made = SentAgain(admin_client, session)
+    opened = made.spools.opened()
+    made.show()
+    item = made.spools.place.item.id
+    close = {f"opened_{opened.id}": "", f"state_{opened.id}": "used_up"}
+    made.refused(close | {f"counted_{item}": "1"}, close | {f"counted_{item}": "2"})
+
+
 def test_a_count_sent_again_with_its_amounts_written_otherwise_is_unchanged(
     admin_client: TestClient, session: Session
 ) -> None:
