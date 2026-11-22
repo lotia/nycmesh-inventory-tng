@@ -58,8 +58,12 @@ is counted may no longer be counted: the save is refused whole, and the
 form shown again without it, keeping what was typed (Ali, 2026-11-22,
 inventory-tng-ygk5). The form then carries the areas gone from it and
 the moment it was first shown (forms.GONE), so it shows, until saved,
-what left them since (stock/count_gone_areas.py). One emptied can be brought back from the form (bring_back), as its own
-page does (places/locations.restore), and the form shown again with it.
+what left them since (stock/count_gone_areas.py): what went to a place on
+it is set aside from what that place's own lines count, and each move is
+taken as right unless its amount is fixed, the difference then lost or
+found there (stock/count_arrivals.py). One emptied can be brought back
+from the form (bring_back), as its own page does
+(places/locations.restore), and the form shown again with it.
 """
 
 import uuid
@@ -92,6 +96,13 @@ from inventory_tng.places import locations
 from inventory_tng.site_settings.paths import SETTINGS
 from inventory_tng.stock import needs_action, over_recorded, queries
 from inventory_tng.stock.balance import countable, takeable
+from inventory_tng.stock.count_arrivals import (
+    Aside,
+    fixed,
+    fixed_lines,
+    gone_moves,
+    set_aside,
+)
 from inventory_tng.stock.count_gone_areas import (
     Leaving,
     areas_leaving,
@@ -99,7 +110,7 @@ from inventory_tng.stock.count_gone_areas import (
     moved_sections,
 )
 from inventory_tng.stock.count_groups import FormRow, Group, label
-from inventory_tng.stock.counts import Counted, NotCountable, record_adjustment
+from inventory_tng.stock.counts import NotCountable, record_adjustment
 from inventory_tng.stock.forms import (
     CLOSED_MEANWHILE,
     COUNTED,
@@ -132,7 +143,7 @@ from inventory_tng.stock.moments import (
 )
 from inventory_tng.stock.needs_action import OnlyItem
 from inventory_tng.stock.paths import ADJUSTMENTS, COUNTS
-from inventory_tng.stock.store_counts import record_store_count
+from inventory_tng.stock.store_counts import StoreCounted, record_store_count
 from inventory_tng.web.admin_pages import admin_page, current_rows, now, text_form
 from inventory_tng.web.forms import CHANGED, RULES, row_id
 from inventory_tng.web.listing import UNASKED, AskedView, Sort, Sorting, View, order
@@ -185,6 +196,15 @@ areas_brought_back = meter.create_counter(
     unit="{area}",
     description="Retired areas emptied while they were counted, brought back "
     "from the count form",
+)
+
+# A move from an area gone from a count form fixed on it: more or less
+# arrived than was moved (inventory-tng-ygk5).
+moves_fixed = meter.create_counter(
+    "inventory.count.moves_fixed",
+    unit="{move}",
+    description="Moves from retired areas emptied while counted whose amount "
+    "a count form fixed, by whether more arrived (found) or less (lost)",
 )
 
 
@@ -478,6 +498,7 @@ def _count_page(
     items: Mapping[int, Collection[int]] | None = None,
     recount: Mapping[int, Mapping[int, tuple[Decimal, Decimal, Decimal]]] | None = None,
     alert: Words | None = None,
+    more_alerts: Sequence[Words] = (),
     picked: Mapping[str, str] | None = None,
     gone: Gone = NONE_GONE,
     leaving: Leaving | None = None,
@@ -493,10 +514,12 @@ def _count_page(
     form showed when sent; else every one that may be counted now.
     `picked`, the places picked for something else here and an open
     package nobody recorded at the last save (forms.PICKED). `gone`, the
-    areas gone from it, retired, and what left them shown under the
-    places it went to (count_gone_areas); `leaving`, those areas as read
-    already, if they were; `caution`, words above the form, said as
-    a warning is."""
+    areas gone from it, retired, and what left them since it was first
+    shown, up to its moment, shown under the places it went to
+    (count_gone_areas), whose own lines count what they held before
+    (count_arrivals.set_aside); `leaving`, those areas as read already, if
+    they were; `more_alerts`, under `alert`; `caution`, words above the
+    form, said as a warning is."""
     asked = {
         place_id: set(each)
         for place_id, each in [*(items or {}).items(), *(recount or {}).items()]
@@ -505,17 +528,6 @@ def _count_page(
     ids = shown.ids(session)
     if leaving is None and gone.ids:
         leaving = areas_leaving(session, place, gone)
-    # Of what left the areas gone, only the items shown.
-    moves = [
-        move
-        for move in (leaving.moves if leaving else [])
-        if ids is None or move.item_id in ids
-    ]
-    if asked and leaving is not None:
-        # A recount asks for what went to a place in the tree there.
-        for move in moves:
-            if move.to_id in leaving.order:
-                asked.setdefault(move.to_id, set()).add(move.item_id)
     groups_shown = _shown_places(
         session, place, places if places is not None else asked or None
     )
@@ -524,6 +536,21 @@ def _count_page(
     as_of = at.as_of
     every = set().union(*asked.values()) if asked else None
     was_at = expected_at(session, ids_shown, as_of, every)
+    # Of what left the areas gone, only the items shown; each place's own
+    # lines count what it held before.
+    moves = [
+        move
+        for move in gone_moves(session, gone, as_of, ids_shown)
+        if ids is None or move.item_id in ids
+    ]
+    aside = set_aside(moves)
+    for place_id, here in aside.items():
+        held = was_at.get(place_id, {})
+        for (item_id, _), amount in here.items():
+            if item_id in held:
+                held[item_id] -= amount
+                if not held[item_id]:
+                    del held[item_id]
     listed = _items(session)
     named = {item.id: item for item in listed}
     openings = over_recorded.openings_waiting_at(session, ids_shown, as_of)
@@ -581,6 +608,7 @@ def _count_page(
         as_of,
         {each: [item.id for item, _ in found] for each, found in rows.items()},
         openings,
+        aside,
     )
     groups = [
         Group(
@@ -596,7 +624,7 @@ def _count_page(
     ]
     moved = None
     if leaving is not None:
-        groups, moved = moved_sections(place, groups, leaving, moves, named)
+        moved = moved_sections(place, groups, leaving, moves, named)
     # Something else here and an open package nobody recorded may be found
     # in any place shown but a retired area (forms.PICKED).
     choices = [
@@ -639,6 +667,7 @@ def _count_page(
             "moment": at,
             "shown": shown,
             "alert": alert,
+            "more_alerts": more_alerts,
             "caution": caution,
             "gone": gone,
             "moved": moved,
@@ -689,6 +718,7 @@ def _forms(
     as_of: int,
     item_ids: Mapping[int, Sequence[int]],
     openings: Mapping[int, Mapping[int, Collection[int]]],
+    aside: Mapping[int, Aside] | None = None,
 ) -> dict[int, dict[int, list[FormRow]]]:
     """At each place, by id, the items of `item_ids` there whose stock was
     in more than loose units, as of the form, each form a row: sealed
@@ -697,8 +727,9 @@ def _forms(
     recorded more than opened (`openings`, by place,
     over_recorded.openings_waiting_at): it is counted by form, with a row of
     each package it opened sealed, though the records hold none, as a total
-    puts neither of its ends right (docs/decisions/0020). The same number
-    of queries however many places."""
+    puts neither of its ends right (docs/decisions/0020). Less, by place,
+    what is `aside` there (count_arrivals.set_aside). The same number of
+    queries however many places."""
     every = sorted(set().union(*item_ids.values())) if item_ids else []
     found = expected_forms_at(session, item_ids.keys(), as_of, every)
     packages = {
@@ -708,7 +739,7 @@ def _forms(
     return {
         place_id: _place_forms(
             set(items),
-            found.get(place_id, {}),
+            _less(found.get(place_id, {}), (aside or {}).get(place_id, {})),
             packages,
             {
                 open_id: row
@@ -719,6 +750,15 @@ def _forms(
         )
         for place_id, items in item_ids.items()
     }
+
+
+def _less(
+    found: Mapping[tuple[int, Form], Decimal], aside: Mapping[tuple[int, Form], Decimal]
+) -> dict[tuple[int, Form], Decimal]:
+    """What was found of each form, less what is set aside of it: none
+    where that leaves nothing."""
+    less = {form: n - aside.get(form, Decimal(0)) for form, n in found.items()}
+    return {form: n for form, n in less.items() if n}
 
 
 def _place_forms(
@@ -770,6 +810,7 @@ def _place_forms(
                         f"{SEALED}{item_id}_{package.id}",
                         sealed_how_many(package.name_shown),
                         amount / package.size,
+                        per=Decimal(package.size),
                     )
                 )
             elif form.open_package_id is not None:
@@ -908,7 +949,16 @@ def count(
         for place_id, each in sent.places.items()
         if not (areas and filtered) or each.anything
     ]
-    if not counting:
+    # What came from the areas gone from it, as the form showed it: set
+    # aside from what each place's lines count, and the moves fixed
+    # (stock/count_arrivals.py).
+    moves = gone_moves(session, gone, at.as_of, place_ids)
+    fixes = fixed(
+        session,
+        moves,
+        {place_id: each.arrived for place_id, each in sent.places.items()},
+    )
+    if not counting and not fixes:
         # Nothing typed at any place: nothing to count, so the form again,
         # as sent, saying so (inventory-tng-fxsy).
         log.info("count refused: nothing typed", location_id=place.id)
@@ -926,7 +976,7 @@ def count(
     # The place that refused it (counts.NotCountable), as it was then.
     retired: int | None = None
 
-    def put_right() -> dict[int, Counted]:
+    def put_right() -> StoreCounted:
         nonlocal retired
         try:
             return record_store_count(
@@ -937,6 +987,8 @@ def count(
                 at,
                 {place_id: sent.places[place_id] for place_id in counting},
                 now(),
+                aside=set_aside(moves),
+                fixed=fixed_lines(fixes),
             )
         except NotCountable as broken:
             retired = broken.location_id
@@ -979,10 +1031,12 @@ def count(
                 gone_ids=sorted(fresh),
             )
             leaving = areas_leaving(session, place, gone)
+            first, *more = gone_words(leaving, fresh)
             return again(
                 None,
                 values=typed,
-                alert=gone_words(leaving, fresh),
+                alert=first,
+                more_alerts=more,
                 items={
                     place_id: each
                     for place_id, each in asked.items()
@@ -1019,14 +1073,24 @@ def count(
         )
     assert result is not None
     session.commit()
-    if any(each.written for each in result.values()):
-        places_counted.record(len(result))
-        log.info("count saved", location_id=place.id, places=len(result))
-    moved = {place_id: each.moved for place_id, each in result.items() if each.moved}
+    counted = result.places
+    if any(each.written for each in counted.values()):
+        places_counted.record(len(counted))
+        log.info("count saved", location_id=place.id, places=len(counted))
+    if result.fixed:
+        for fix in fixes:
+            moves_fixed.add(1, {"direction": "found" if fix.difference > 0 else "lost"})
+            log.info(
+                "count move fixed",
+                location_id=fix.to_id,
+                from_location_id=fix.from_id,
+                item_id=fix.item_id,
+            )
+    moved = {place_id: each.moved for place_id, each in counted.items() if each.moved}
     if not moved:
         notice = (
             "counted"
-            if any(each.differed for each in result.values())
+            if fixes or any(each.differed for each in counted.values())
             else "counted_same"
         )
         if not areas:
@@ -1037,7 +1101,7 @@ def count(
             picker: form[picker] for picker in PICKED if form.get(picker)
         }
         return redirect(f"{COUNTS}/{place.id}", notice=notice, **params)
-    amounts = {place_id: sent.places[place_id].typed() for place_id in result}
+    amounts = {place_id: sent.places[place_id].typed() for place_id in counted}
     saved = sum(len(typed) for typed in amounts.values()) - sum(
         len(each) for each in moved.values()
     )
@@ -1051,6 +1115,8 @@ def count(
             for place_id, each in moved.items()
         },
         alert=moved_meanwhile(saved),
+        # Saved: the moves from the areas gone are in the records now.
+        gone=NONE_GONE,
         status_code=409,
     )
 

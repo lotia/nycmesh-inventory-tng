@@ -606,15 +606,17 @@ def test_a_recount_at_an_area_retired_since_asks_no_more_there(
     assert f"Not saved: {made.empty.name} was emptied while you counted" in text(
         refused
     )
-    # The radio it sent back is asked for at the shelf, under the move.
-    moved = f"Moved from {made.empty.name} to {made.shelf.name}"
+    # The radio it sent back is under the move to the shelf, whose own line
+    # counts what it held before (inventory-tng-ygk5).
+    moved = f"Moved to {made.shelf.name}"
     assert read(refused.text).one("th", scope="rowgroup", text=moved) is not None
     last = count_form(refused)
     assert last["places"] == str(made.shelf.id)
     done = admin_client.post(
-        made.path, data=last | {f"at_{made.shelf.id}_counted_{item}": "3"}
+        made.path, data=last | {f"at_{made.shelf.id}_counted_{item}": "2"}
     )
     assert done.status_code == 303
+    assert expected(session, made.shelf.id) == {item: Decimal(3)}
     assert expected(session, made.shelf.id) == {item: Decimal(3)}
 
 

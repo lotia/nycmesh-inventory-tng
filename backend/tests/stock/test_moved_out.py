@@ -8,6 +8,7 @@ from sqlalchemy.orm import Session
 
 from inventory_tng.models.stock import AdjustmentReason
 from inventory_tng.stock.counts import record_adjustment
+from inventory_tng.stock.ledger import Entry
 from inventory_tng.stock.moments import moment
 from inventory_tng.stock.moved_out import MovedOut, moved_out
 
@@ -51,3 +52,39 @@ def test_an_opening_is_no_move(session: Session) -> None:
     after = moment(session, spools.store.id).as_of
     spools.opened()
     assert moved_out(session, [spools.store.id], after) == []
+
+
+def test_what_left_is_said_by_the_form_it_arrived_in(session: Session) -> None:
+    spools = Spools(session)
+    store, van = spools.store.id, spools.van.id
+    after = moment(session, store).as_of
+    sealed = spools.sealed
+    spools.move(Entry(spools.cable.id, Decimal(305), sealed, sealed))
+    spools.move(Entry(spools.cable.id, Decimal(5)))
+    assert moved_out(session, [store], after) == [
+        MovedOut(store, van, spools.cable.id, Decimal(5)),
+        MovedOut(store, van, spools.cable.id, Decimal(305), sealed),
+    ]
+
+
+def test_what_went_to_some_places_is_read_up_to_a_moment(session: Session) -> None:
+    """Up to the moment at the van: the move after it to the van is left
+    out, not the write-off, which went nowhere."""
+    place = stocked(session, "9")
+    store, van, item = place.store.id, place.van.id, place.item.id
+    after = moment(session, store).as_of
+    write(session, place, lines=[{"item_id": item, "quantity": "1"}])
+    up_to = moment(session, store).as_of
+    write(session, place, lines=[{"item_id": item, "quantity": "2"}])
+    write(
+        session,
+        place,
+        kind="install",
+        to_location_id=None,
+        install_number=1234,
+        lines=[{"item_id": item, "quantity": "3"}],
+    )
+    assert moved_out(session, [store], after, (up_to, [van])) == [
+        MovedOut(store, van, item, Decimal(1)),
+        MovedOut(store, None, item, Decimal(3)),
+    ]

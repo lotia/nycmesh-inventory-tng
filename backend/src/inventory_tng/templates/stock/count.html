@@ -1,6 +1,9 @@
 {% extends "admin_base.html" %}
 {% from "_table.html" import table %}
 {% block main %}
+{#- Under the alert, one more: areas emptied and others retired at once
+(stock/count_gone_areas.py). #}
+{% for words in more_alerts %}<p role="alert">{{ words }}</p>{% endfor %}
 {% if caution %}<p class="warning" role="status">{{ caution }}</p>{% endif %}
 {% if place.retired_at %}
 <p class="warning">{#- Translators: %(place)s is a place of any kind, such as a store, a shelf, a bin or a volunteer's home. #}{% trans place=place.name %}{{ place }} is retired, but the records say something
@@ -32,12 +35,16 @@ if you didn't count it. Anything else here, add below.{% endtrans %}</p>
 {% set filtered = shown.only or shown.search %}
 {% set columns = 4 if recount else 3 %}
 {#- A place's lines on the count form: its items, each by its total or by
-form (0020); under a move from an area gone from the form, each box blank,
-to confirm (stock/count_gone_areas.py). #}
-{% macro item_rows(group, columns, blank=false) %}
+form (0020). Those of an item moved there from an area gone from the form
+add to its running total, a box left blank as the records say, a sealed
+one by its size, an open package closed as none
+(frontend/src/admin/running-totals.ts). #}
+{% macro item_rows(group, columns) %}
     {% set prefix = group.prefix %}
     {% set where = group.label if group.path else "" %}
     {% for item, amount in group.rows %}
+    {% set key = "%d-%d" % (group.place.id, item.id) %}
+    {% set adds = key if moved and key in moved.adds else "" %}
     {% if item.id in group.forms %}
     {#- In more than loose units: each form counted on its own (0020). #}
     <tr><td colspan="{{ columns }}"><strong>{{ item.name_shown }}</strong> <span class="hint">
@@ -50,7 +57,8 @@ to confirm (stock/count_gone_areas.py). #}
       <td>{{ row.amount | amount }}{% if not row.field.startswith("sealed_") %} {{ item.unit }}{% endif %}</td>
       {% if recount %}<td></td>{% endif %}
       {%- set hint = item.unit | printed_length if row.open_id else "" %}
-      <td><input name="{{ field }}" inputmode="decimal" value="{{ values.get(field, '' if blank else row.amount | plain_amount if row.amount > 0 else '0') }}" aria-label="{% if where %}{{ where }}, {% endif %}{{ item.name_shown }}, {{ row.words }}"{% if hint %} aria-describedby="hint-{{ field }}"{% endif %}>
+      <td><input name="{{ field }}" inputmode="decimal" value="{{ values.get(field, row.amount | plain_amount if row.amount > 0 else '0') }}" aria-label="{% if where %}{{ where }}, {% endif %}{{ item.name_shown }}, {{ row.words }}"{% if hint %} aria-describedby="hint-{{ field }}"{% endif %}
+        {%- if adds %} data-adds-to="{{ adds }}" data-unset="{{ row.amount | plain_amount }}" data-per="{{ row.per | plain_amount }}"{% if row.open_id %} data-state="{{ prefix ~ 'state_' ~ row.open_id }}"{% endif %}{% endif %}>
         {% if row.open_id %}
         {% set state_field = prefix ~ "state_" ~ row.open_id %}
         <select name="{{ state_field }}" aria-label="{% if where %}{{ where }}, {% endif %}{% trans item=item.name_shown, form=row.words %}{{ item }}, {{ form }}: is it here?{% endtrans %}">
@@ -73,7 +81,7 @@ to confirm (stock/count_gone_areas.py). #}
       <td>{% trans came=came | amount, went=went | amount, typed=typed | amount %}{{ came }} in, {{ went }} out; you typed {{ typed }}{% endtrans %}</td>
       {% elif recount %}<td></td>
       {% endif %}
-      <td><input name="{{ field }}" inputmode="decimal" value="{{ values.get(field, '' if blank else amount | plain_amount if amount > 0 else '0') }}" aria-label="{% if where %}{#- Translators: %(place)s is a place of any kind, such as a store, a shelf, a bin or a volunteer's home. #}{% trans place=where, item=item.name_shown %}{{ place }}: {{ item }} counted{% endtrans %}{% else %}{% trans item=item.name_shown %}{{ item }} counted{% endtrans %}{% endif %}">
+      <td><input name="{{ field }}" inputmode="decimal" value="{{ values.get(field, amount | plain_amount if amount > 0 else '0') }}"{% if adds %} data-adds-to="{{ adds }}" data-unset="{{ amount | plain_amount }}"{% endif %} aria-label="{% if where %}{#- Translators: %(place)s is a place of any kind, such as a store, a shelf, a bin or a volunteer's home. #}{% trans place=where, item=item.name_shown %}{{ place }}: {{ item }} counted{% endtrans %}{% else %}{% trans item=item.name_shown %}{{ item }} counted{% endtrans %}{% endif %}">
         {% with name = field %}{% include "_field_problem.html" %}{% endwith %}</td>
     </tr>
     {% endif %}
@@ -93,15 +101,35 @@ to confirm (stock/count_gone_areas.py). #}
   {% call table() %}
     <tr><th>{% trans %}Item{% endtrans %}</th><th>{% trans %}Records say{% endtrans %}</th>{% if recount %}<th>{% trans %}While you counted{% endtrans %}</th>{% endif %}<th>{% trans %}Counted{% endtrans %}</th></tr>
     {#- What left the areas gone from it: what went to a place on it under
-    the move, counted there and only there; what went elsewhere, with
-    nothing to type (stock/count_gone_areas.py). #}
+    the place, a part for each area it came from, each move taken as right
+    unless its amount is fixed, with the running total of the place once
+    saved, shown only in the browser; what went elsewhere, with nothing to
+    type (stock/count_gone_areas.py). #}
     {% if moved %}
     {% for words in moved.removed %}
     <tr class="text-muted"><th colspan="{{ columns }}" scope="rowgroup">{{ words }}</th></tr>
     {% endfor %}
-    {% for heading, section in moved.sections %}
-    <tr><th colspan="{{ columns }}" scope="rowgroup">{{ heading }}</th></tr>
-    {{ item_rows(section, columns, blank=true) }}
+    {% for section in moved.sections %}
+    <tr><th colspan="{{ columns }}" scope="rowgroup">{{ section.heading }}</th></tr>
+    {% for item, total in section.totals %}
+    <tr data-total="{{ section.place.id }}-{{ item.id }}" hidden><td>{{ item.name_shown }}</td><td colspan="{{ columns - 1 }}"><span role="status" aria-atomic="true">{#- Translators: %(place)s is a place of any kind, such as a store, a shelf, a bin or a volunteer's home. #}{% trans place=section.label, amount=total | plain_amount, unit=item.unit %}{{ place }} after saving: <span data-total-amount>{{ amount }}</span> {{ unit }}{% endtrans %}</span></td></tr>
+    {% endfor %}
+    {% for heading, items in section.parts %}
+    <tr><td colspan="{{ columns }}"><strong>{{ heading }}</strong></td></tr>
+    {% for each in items %}
+    {% set moved_amount = each.moved | plain_amount %}
+    <tr>
+      <td colspan="{{ columns - 1 }}">{% trans item=each.item.name_shown, amount=each.moved | amount %}{{ item }} · {{ amount }} moved{% endtrans %}</td>
+      <td><details{% if values.get(each.field, moved_amount) != moved_amount or each.field in (problems or {}) %} open{% endif %}>
+        <summary class="as-button">{% trans %}Fix amount{% endtrans %}</summary>
+        <label>{% trans %}How many arrived?{% endtrans %}<span class="sr-only"> {{ each.item.name_shown }}, {{ heading }}</span>
+          <input name="{{ each.field }}" inputmode="{{ 'numeric' if each.item.unit == 'each' else 'decimal' }}" value="{{ values.get(each.field, moved_amount) }}" data-adds-to="{{ section.place.id }}-{{ each.item.id }}" data-unset="{{ moved_amount }}">
+        </label>
+        {% with name = each.field %}{% include "_field_problem.html" %}{% endwith %}
+      </details></td>
+    </tr>
+    {% endfor %}
+    {% endfor %}
     {% endfor %}
     {% if moved.taken %}
     {% set heading, taken = moved.taken %}
@@ -119,7 +147,7 @@ to confirm (stock/count_gone_areas.py). #}
       {%- if group.place.retired_at %} <span class="hint">{% trans %}Retired: count what is really here, and put nothing here again.{% endtrans %}</span>{% endif %}</th></tr>
     {% endif %}
     {{ item_rows(group, columns) }}
-    {% if not group.rows and (not areas or not filtered or group.place.id == place.id) and not (moved and group.place.id in moved.into) %}
+    {% if not group.rows and (not areas or not filtered or group.place.id == place.id) %}
     <tr{% if areas %} class="text-muted"{% endif %}><td colspan="{{ columns }}">{% if filtered %}{% trans %}Nothing here matches.{% endtrans %}{% elif moved and group.place.id in moved.back %}{% trans %}Nothing recorded here.{% endtrans %}{% else %}{% trans %}The records say nothing is here.{% endtrans %}{% endif %}</td></tr>
     {% endif %}
     {% endfor %}

@@ -562,6 +562,56 @@ def test_counts_the_areas_brought_back_from_a_count_form(
     assert counted(reader, name)[()] == before + 1
 
 
+def test_counts_the_moves_fixed_on_a_count_form(
+    rolled_back: Recorded, session: Session
+) -> None:
+    """A retired shelf emptied into another while its store was counted:
+    fewer arrived, then, on a second such count, more (inventory-tng-ygk5).
+    Sent twice, each is counted once."""
+    client, _, reader, _ = rolled_back
+    _, key = new_admin(session)
+    sign_in_with(client, key=key)
+    name = "inventory.count.moves_fixed"
+    for arrived, direction in (("1", "lost"), ("3", "found")):
+        place = stocked(session)
+        shelves = [
+            add(
+                session,
+                Location(name=f"Shelf {tag()}", kind="area", parent_id=place.store.id),
+            )
+            for _ in range(2)
+        ]
+        gone, there = shelves
+        retire(session, gone)
+        radios = [{"item_id": place.item.id, "quantity": "2"}]
+        write(
+            session,
+            place,
+            from_location_id=place.store.id,
+            to_location_id=gone.id,
+            lines=radios,
+        )
+        path = f"{COUNTS}/{place.store.id}"
+        form = count_form_at(client, place.store.id)
+        write(
+            session,
+            place,
+            from_location_id=gone.id,
+            to_location_id=there.id,
+            lines=radios,
+        )
+        refused = client.post(path, data=form)
+        assert refused.status_code == 409
+        fix = {f"at_{there.id}_arrived_{gone.id}_{place.item.id}": arrived}
+        before = counted(reader, name).get((("direction", direction),), 0)
+        for _ in range(2):
+            sent = client.post(
+                path, data=count_form(refused) | fix, follow_redirects=False
+            )
+            assert sent.status_code == 303
+        assert counted(reader, name)[(("direction", direction),)] == before + 1
+
+
 def recorded_by_kind(reader: InMemoryMetricReader) -> tuple[int, int]:
     """inventory.counts.recorded's totals so far: counts, adjustments."""
     totals = counted(reader, "inventory.counts.recorded")

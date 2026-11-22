@@ -307,6 +307,11 @@ msgstr ""
 
 #: src/inventory_tng/templates/stock/count.html
 #, python-format
+msgid "%(item)s · %(amount)s moved"
+msgstr ""
+
+#: src/inventory_tng/templates/stock/count.html
+#, python-format
 msgid "%(item)s, %(form)s: is it here?"
 msgstr ""
 
@@ -441,6 +446,13 @@ msgstr ""
 #: src/inventory_tng/stock/count_gone_areas.py
 #, python-format
 msgid "%(place)s (retired): removed from this form."
+msgstr ""
+
+#. %(place)s is a place of any kind, such as a store, a shelf, a bin or a
+#. volunteer's home.
+#: src/inventory_tng/templates/stock/count.html
+#, python-format
+msgid "%(place)s after saving: <span data-total-amount>%(amount)s</span> %(unit)s"
 msgstr ""
 
 #. Translators: %(place)s is a place of any kind, such as a store, a shelf,
@@ -1625,6 +1637,10 @@ msgstr ""
 msgid "First seen from"
 msgstr ""
 
+#: src/inventory_tng/templates/stock/count.html
+msgid "Fix amount"
+msgstr ""
+
 #: src/inventory_tng/templates/catalogue/items.html
 msgid ""
 "For the items ticked on this page: whether a package of theirs, opened, "
@@ -1650,6 +1666,13 @@ msgstr ""
 
 #: src/inventory_tng/templates/devices/code.html
 msgid "From"
+msgstr ""
+
+#. Translators: %(place)s is a place of any kind, such as a store, a shelf,
+#. a bin or a volunteer's home.
+#: src/inventory_tng/stock/count_gone_areas.py
+#, python-format
+msgid "From %(place)s"
 msgstr ""
 
 #: src/inventory_tng/devices/forms.py
@@ -1729,6 +1752,10 @@ msgid ""
 "near it do not say: by searches, here and on the scan page, and by the "
 "item forms, before the unit table. Settled as an item's form asks, or "
 "corrected here."
+msgstr ""
+
+#: src/inventory_tng/templates/stock/count.html
+msgid "How many arrived?"
 msgstr ""
 
 #: src/inventory_tng/templates/devices/devices.html
@@ -2131,11 +2158,11 @@ msgstr ""
 msgid "Move what is here elsewhere, or count it, first."
 msgstr ""
 
-#. Translators: %(place)s and %(there)s are places of any kind, such as a
-#. store, a shelf, a bin or a volunteer's home.
+#. Translators: %(place)s is a place of any kind, such as a store, a shelf,
+#. a bin or a volunteer's home.
 #: src/inventory_tng/stock/count_gone_areas.py
 #, python-format
-msgid "Moved from %(place)s to %(there)s"
+msgid "Moved to %(place)s"
 msgstr ""
 
 #: src/inventory_tng/templates/admins/account.html

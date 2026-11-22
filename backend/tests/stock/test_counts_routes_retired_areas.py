@@ -48,6 +48,12 @@ class Emptied:
         """The count form's name for the radios counted at `place`."""
         return field(place, self.made.store, f"counted_{self.item}")
 
+    def arrived(self, place: Location, area: Location | None = None) -> str:
+        """The count form's name for how many radios arrived at `place`
+        from `area`, Shelf C if none."""
+        name = f"arrived_{(area or self.gone).id}_{self.item}"
+        return field(place, self.made.store, name)
+
 
 def emptied_words(place: str) -> str:
     return (
@@ -99,9 +105,10 @@ def test_a_retired_area_emptied_while_counted_says_where_its_items_went(
 ) -> None:
     """Shelf C's two radios moved to Shelf B while the store was counted: the
     count is refused whole, and the form comes back without Shelf C, the
-    radios under "Moved from Shelf C to Shelf B" with an empty box, not also
-    under Shelf B, what was typed kept, and Shelf C not offered for what is
-    found but there to bring back."""
+    radios under "Moved to Shelf B", "From Shelf C", with the amount moved
+    and Fix amount, its box holding that amount; Shelf B's own lines as
+    before the move (it held none); what was typed kept, and Shelf C not
+    offered for what is found but there to bring back."""
     setup = Emptied(session, admin_client)
     made, gone = setup.made, setup.gone
     setup.send(session, gone, made.empty, "2")
@@ -115,11 +122,23 @@ def test_a_retired_area_emptied_while_counted_says_where_its_items_went(
     assert again["gone"] == str(gone.id)
     assert again["gone_since"] == setup.shown["as_of"]
     shown = read(refused.text)
-    assert heading(refused, f"Moved from {gone.name} to {made.empty.name}")
-    moved = shown.one("input", name=setup.counted(made.empty))
-    assert moved.attrs["value"] == ""
-    row = cells_by(refused, setup.counted(made.empty))
-    assert row[:2] == [made.place.item.name_shown, "2 each"]
+    assert heading(refused, f"Moved to {made.empty.name}")
+    assert shown.one("strong", text=f"From {gone.name}")
+    arrived = shown.one("input", name=setup.arrived(made.empty))
+    assert arrived.attrs["value"] == "2"
+    assert arrived.attrs["inputmode"] == "numeric"
+    item = made.place.item.name_shown
+    assert cells_by(refused, setup.arrived(made.empty))[0] == f"{item} · 2 moved"
+    assert shown.one("summary", text="Fix amount")
+    assert "How many arrived?" in words
+    assert shown.all("input", name=setup.counted(made.empty)) == []
+    # Shown only in the browser, which keeps it up to date.
+    total = shown.one("tr", **{"data-total": f"{made.empty.id}-{setup.item}"})
+    assert "hidden" in total.attrs
+    assert (
+        total.one("span", role="status").text
+        == f"{made.empty.name} after saving: 2 each"
+    )
     assert shown.one("input", name=setup.counted(made.shelf)).attrs["value"] == "3"
     assert str(gone.id) not in found_at(refused)
     assert f"{gone.name} isn't offered: it's retired." in words
@@ -136,33 +155,26 @@ def test_a_retired_area_emptied_while_counted_says_where_its_items_went(
         assert counts_at(session, place) == [], place.name
 
 
-def test_the_items_moved_are_counted_where_they_went(
-    admin_client: TestClient, session: Session
-) -> None:
-    """What is typed under the move is counted at Shelf B."""
-    setup = Emptied(session, admin_client)
-    made = setup.made
-    setup.send(session, setup.gone, made.empty, "2")
-    refused = admin_client.post(made.path, data=setup.shown)
-    form = count_form(refused) | {setup.counted(made.empty): "1"}
-    assert admin_client.post(made.path, data=form).status_code == 303
-    assert expected(session, made.empty.id) == {setup.item: Decimal(1)}
-
-
 def test_items_moved_to_two_areas_get_a_section_each(
     admin_client: TestClient, session: Session
 ) -> None:
     """One radio to Shelf A, one to Shelf B: a section for each, and Shelf
-    A's radios only under its own."""
+    A's own line as it was before the move."""
     setup = Emptied(session, admin_client)
     made, gone = setup.made, setup.gone
     setup.send(session, gone, made.shelf, "1")
     setup.send(session, gone, made.empty, "1")
     refused = admin_client.post(made.path, data=setup.shown)
     for there in (made.shelf, made.empty):
-        assert heading(refused, f"Moved from {gone.name} to {there.name}")
-    # Shelf A's own three radios and the one moved there.
-    assert cells_by(refused, setup.counted(made.shelf))[1] == "4 each"
+        assert heading(refused, f"Moved to {there.name}")
+    # Shelf A's own three radios, without the one moved there.
+    assert cells_by(refused, setup.counted(made.shelf))[1] == "3 each"
+    shown = read(refused.text)
+    total = shown.one("tr", **{"data-total": f"{made.shelf.id}-{setup.item}"})
+    assert (
+        total.one("span", role="status").text
+        == f"{made.shelf.name} after saving: 4 each"
+    )
 
 
 def test_items_taken_out_of_the_store_are_listed_with_no_box(
@@ -196,7 +208,7 @@ def test_bring_it_back_restores_the_area_and_shows_the_form_again(
     made, gone = setup.made, setup.gone
     setup.send(session, gone, made.empty, "2")
     refused = admin_client.post(made.path, data=setup.shown)
-    typed = {setup.counted(made.shelf): "3", setup.counted(made.empty): "0"}
+    typed = {setup.counted(made.shelf): "3", setup.arrived(made.empty): "0"}
     back = bring_back(admin_client, made, refused, typed, gone.id)
     assert back.status_code == 200
     session.refresh(gone)
@@ -216,7 +228,7 @@ def test_bring_it_back_restores_the_area_and_shows_the_form_again(
     words = text(back)
     assert "isn't offered" not in words
     assert "Things still at" not in words
-    assert heading(back, f"Moved from {gone.name} to {made.empty.name}")
+    assert heading(back, f"Moved to {made.empty.name}")
     shown = read(back.text)
     for name, value in typed.items():
         assert shown.one("input", name=name).attrs["value"] == value
@@ -321,15 +333,23 @@ def test_an_area_emptied_and_another_retired_are_named_together(
     admin_client: TestClient, session: Session
 ) -> None:
     """Shelf C emptied and the empty Shelf B retired in one count: refused
-    saying Shelf C was emptied, Shelf B's heading dimmed, and both named as
-    not offered for what is found."""
+    with both alerts, one under the other (Ali, 2026-11-22), Shelf B's
+    heading dimmed, and both named as not offered for what is found."""
     setup = Emptied(session, admin_client)
     made, gone = setup.made, setup.gone
     setup.send(session, gone, made.shelf, "2")
     retire(session, made.empty)
     refused = admin_client.post(made.path, data=setup.shown)
     words = text(refused)
-    assert emptied_words(gone.name) in words
+    alerts = [each.text for each in read(refused.text).all("p", role="alert")]
+    assert alerts == [
+        emptied_words(gone.name),
+        (
+            f"Not saved: {made.empty.name} was retired while you counted, so it "
+            "is no longer on this form. What you typed for the other areas is "
+            "kept: check it and save again."
+        ),
+    ]
     assert heading(refused, f"{made.empty.name} (retired): removed from this form.")
     first, second = sorted([gone.name, made.empty.name], key=str.lower)
     assert f"{first} and {second} aren't offered: they're retired." in words
@@ -368,10 +388,10 @@ def test_a_moved_item_the_filter_leaves_out_is_not_shown(
     refused = admin_client.post(path, data=shown | typed)
     assert refused.status_code == 409
     assert emptied_words(gone.name) in text(refused)
-    assert heading(refused, f"Moved from {gone.name} to {made.empty.name}")
+    assert heading(refused, f"Moved to {made.empty.name}")
     page = read(refused.text)
-    assert page.all("input", name=f"at_{made.empty.id}_counted_{cable}") != []
-    assert page.all("input", name=setup.counted(made.empty)) == []
+    assert page.all("input", name=f"at_{made.empty.id}_arrived_{gone.id}_{cable}")
+    assert page.all("input", name=setup.arrived(made.empty)) == []
 
 
 def test_a_recount_at_an_area_emptied_since_lists_what_left_it(
@@ -398,11 +418,11 @@ def test_a_recount_at_an_area_emptied_since_lists_what_left_it(
     assert heading(refused, f"Taken out of {made.store.name}")
 
 
-def test_an_item_moved_from_two_areas_to_one_place_has_one_box(
+def test_an_item_moved_from_two_areas_to_one_place_has_a_part_each(
     admin_client: TestClient, session: Session
 ) -> None:
     """Radios moved to Shelf B from Shelf C and from Shelf D, both retired:
-    under the first move only, so its box is on the form once."""
+    one section, a part for each area, each move with its own box."""
     setup = Emptied(session, admin_client)
     made, gone = setup.made, setup.gone
     other = add(session, area("Shelf D", made.store))
@@ -413,9 +433,15 @@ def test_an_item_moved_from_two_areas_to_one_place_has_one_box(
     setup.send(session, other, made.empty, "1")
     refused = admin_client.post(made.path, data=shown)
     assert refused.status_code == 409
-    assert cells_by(refused, setup.counted(made.empty))[1] == "3 each"
-    assert heading(refused, f"Moved from {gone.name} to {made.empty.name}")
-    assert f"Moved from {other.name}" not in text(refused)
+    item = made.place.item.name_shown
+    assert cells_by(refused, setup.arrived(made.empty))[0] == f"{item} · 2 moved"
+    assert cells_by(refused, setup.arrived(made.empty, other))[0] == (
+        f"{item} · 1 moved"
+    )
+    assert heading(refused, f"Moved to {made.empty.name}")
+    page = read(refused.text)
+    parts = [each.text for each in page.all("strong") if each.text.startswith("From")]
+    assert parts == [f"From {gone.name}", f"From {other.name}"]
 
 
 def test_bring_it_back_of_a_place_not_in_the_store_is_not_found(

@@ -224,6 +224,7 @@ def record_count(
     *,
     by_form: FormLines = (),
     across: Collection[int] = (),
+    aside: Mapping[tuple[int, Form], Decimal] | None = None,
 ) -> Counted:
     """Put the records right for what was counted at a place, as they stood
     when the form was shown: as of `shown`, the place's latest ledger
@@ -257,6 +258,11 @@ def record_count(
     form: sealed packages of each, each open package, loose; and withheld,
     as moved, if anything of them moved there, an opening too.
 
+    `aside`, by item and form, is what the records there held as of
+    `shown` that the form counts apart, as moves from areas gone from it
+    (stock/count_arrivals.py): the lines count what was there without it,
+    so it is taken from what the records said, and stays.
+
     NotCountable (location_countable) at a place that may not be counted,
     unless the form was sent there before, so it gets its first answer;
     RuleBroken (movement_item_once) for an item counted on two lines, or
@@ -282,7 +288,14 @@ def record_count(
     moved, flows = moments.flows(
         session, location_id, after, LedgerTransaction.id <= as_of, items=counted_at
     )
-    then = {item_id: came - went for item_id, (came, went) in flows.items()}
+    aside = aside or {}
+    aside_total: dict[int, Decimal] = {}
+    for (item_id, _), amount in aside.items():
+        aside_total[item_id] = aside_total.get(item_id, Decimal(0)) + amount
+    then = {
+        item_id: came - went - aside_total.get(item_id, Decimal(0))
+        for item_id, (came, went) in flows.items()
+    }
     form_items = {item_id for item_id, _ in forms_counted}
     form_moved, form_then = moments.form_flows(
         session, location_id, (after, LedgerTransaction.id <= as_of), form_items
@@ -297,7 +310,10 @@ def record_count(
     into, out = count_corrections(
         [(item_id, LOOSE, counted_at[item_id]) for item_id in kept] + kept_forms,
         {(item_id, LOOSE): amount for item_id, amount in then.items()}
-        | {form: came - went for form, (came, went) in form_then.items()},
+        | {
+            form: came - went - aside.get(form, Decimal(0))
+            for form, (came, went) in form_then.items()
+        },
     )
     # A count of nothing at all still says when the place was counted.
     anything = counted_at or by_form
@@ -318,6 +334,24 @@ def record_count(
         if moved:
             once_committed(session, _withheld, admin_id, location_id, len(moved))
     return Counted(bool(into or out), moved, written, put_right)
+
+
+def record_arrivals(
+    session: Session,
+    key: uuid.UUID,
+    admin_id: int,
+    location_id: int,
+    lines: FormLines,
+) -> list[Written]:
+    """Moves to a place fixed on a count form (stock/count_arrivals.py):
+    each line's difference, in its form there, found if more, lost if
+    less, as a count's corrections are. What it wrote: nothing if sent
+    before under its key. NotCountable (location_countable), as
+    record_count."""
+    if _hold_place(session, location_id, key, _lost_key(key)) is not None:
+        return []
+    found, lost = count_corrections(lines, {})
+    return _write_count(session, key, admin_id, location_id, found, lost)
 
 
 class OpenCounted(NamedTuple):

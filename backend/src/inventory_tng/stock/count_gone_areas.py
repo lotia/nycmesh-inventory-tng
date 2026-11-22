@@ -2,10 +2,11 @@
 or retired and emptied, while it was counted, so no longer on it (Ali,
 2026-11-22, inventory-tng-ygk5). Why the save was refused, and, until the
 form is saved, what left them since it was first shown (stock/moved_out.py):
-what went to a place on it under "Moved from … to …", counted there and
-only there; what went elsewhere, with nothing to type; which may be
-brought back; and what Found at says of those it leaves out. The routes
-are stock/counts_routes.py's."""
+what went to a place on it under "Moved to …", a part for each area it
+came from, each item with the amount moved and a box to fix it (what the
+save does with it is stock/count_arrivals.py's); what went elsewhere, with
+nothing to type; which may be brought back; and what Found at says of
+those it leaves out. The routes are stock/counts_routes.py's."""
 
 from collections.abc import Collection, Mapping, Sequence
 from decimal import Decimal
@@ -18,7 +19,7 @@ from inventory_tng.models.catalogue import Item
 from inventory_tng.models.places import Location
 from inventory_tng.stock import queries
 from inventory_tng.stock.count_groups import Group, label
-from inventory_tng.stock.forms import Gone
+from inventory_tng.stock.forms import ARRIVED, Gone
 from inventory_tng.stock.moved_out import MovedOut, moved_out
 
 
@@ -56,12 +57,20 @@ def retired_meanwhile(places: Sequence[str]) -> str:
     )
 
 
-def moved_from(place: str, there: str) -> str:
-    """The heading of what left an area gone from a count form for another
-    place on it, counted there."""
-    # Translators: %(place)s and %(there)s are places of any kind, such as a
-    # store, a shelf, a bin or a volunteer's home.
-    return gettext("Moved from %(place)s to %(there)s", place=place, there=there)
+def moved_to(place: str) -> str:
+    """The heading of what went to a place on a count form from the areas
+    gone from it."""
+    # Translators: %(place)s is a place of any kind, such as a store, a shelf,
+    # a bin or a volunteer's home.
+    return gettext("Moved to %(place)s", place=place)
+
+
+def came_from(place: str) -> str:
+    """Under Moved to: the heading of what came from one area gone from
+    the form."""
+    # Translators: %(place)s is a place of any kind, such as a store, a shelf,
+    # a bin or a volunteer's home.
+    return gettext("From %(place)s", place=place)
 
 
 def taken_out(place: str) -> str:
@@ -142,25 +151,50 @@ def areas_leaving(session: Session, root: Location, gone: Gone) -> Leaving:
     )
 
 
-def gone_words(leaving: Leaving, ids: Collection[int]) -> str:
-    """What a count form says of the areas of `ids`, just gone from it:
-    emptied while it was counted, if anything left any; else retired."""
+def gone_words(leaving: Leaving, ids: Collection[int]) -> list[str]:
+    """What a count form says of the areas of `ids`, just gone from it, one
+    alert under another: those anything left, emptied while it was
+    counted; the others, retired (Ali, 2026-11-22)."""
     emptied = [area_id for area_id in ids if area_id in leaving.emptied]
-    if emptied:
-        return emptied_meanwhile(leaving.said(emptied))
-    return retired_meanwhile(leaving.said(ids))
+    retired = [area_id for area_id in ids if area_id not in leaving.emptied]
+    return [
+        *([emptied_meanwhile(leaving.said(emptied))] if emptied else []),
+        *([retired_meanwhile(leaving.said(retired))] if retired else []),
+    ]
+
+
+class MovedItem(NamedTuple):
+    """An item moved from an area gone from a count form to a place on it:
+    how much was moved, and the field of how many arrived (forms.ARRIVED)."""
+
+    item: Item
+    moved: Decimal
+    field: str
+
+
+class MovedTo(NamedTuple):
+    """What went to one place on a count form from the areas gone from it:
+    its heading; the place, and its label as the form names it; a part of
+    each area it came from, its heading and the items; and, of each item,
+    what the place holds once saved if nothing else is typed, the running
+    total's start."""
+
+    heading: str
+    place: Location
+    label: str
+    parts: list[tuple[str, list[MovedItem]]]
+    totals: list[tuple[Item, Decimal]]
 
 
 class Moves(NamedTuple):
     """What a count form shows of what left the areas gone from it: a
-    section of each place on it that something went to, its heading and
-    what went there, as that place's own lines, taken from under it; what
+    section of each place on it that something went to (MovedTo); what
     went nowhere on it, with its heading; and, of the areas gone, those
     still retired that anything left, each with its label, to bring back;
     the headings of those nothing left; what Found at says of those it
     leaves out; and those back now."""
 
-    sections: list[tuple[str, Group]]
+    sections: list[MovedTo]
     taken: tuple[str, list[tuple[Item, Decimal]]] | None
     to_bring_back: list[tuple[int, str]]
     removed: list[str]
@@ -168,9 +202,19 @@ class Moves(NamedTuple):
     back: set[int]
 
     @property
-    def into(self) -> set[int]:
-        """The places on the form something went to."""
-        return {group.place.id for _, group in self.sections}
+    def adds(self) -> set[str]:
+        """The running totals' keys, place and item, that a place's own
+        lines add to (total_key)."""
+        return {
+            total_key(section.place.id, item.id)
+            for section in self.sections
+            for item, _ in section.totals
+        }
+
+
+def total_key(place_id: int, item_id: int) -> str:
+    """What ties a running total to the boxes it adds up, in the page."""
+    return f"{place_id}-{item_id}"
 
 
 def _by_name(rows: Collection[tuple[Item, Decimal]]) -> list[tuple[Item, Decimal]]:
@@ -183,52 +227,59 @@ def moved_sections(
     leaving: Leaving,
     moves: Sequence[MovedOut],
     named: Mapping[int, Item],
-) -> tuple[list[Group], Moves]:
-    """The groups of a count form, without the lines of what went to them
-    from the areas gone from it, and those lines, under the moves
-    (Moves)."""
+) -> Moves:
+    """What a count form shows of what left the areas gone from it
+    (Moves): `moves`, of the items it shows, as of its moment, and its
+    groups, whose lines count what each place held before them."""
     by_id = {group.place.id: group for group in groups}
-    went: dict[tuple[int, int], set[int]] = {}
+    went: dict[int, dict[int, dict[int, Decimal]]] = {}
     taken: dict[int, Decimal] = {}
     for move in moves:
         if move.to_id in by_id:
-            went.setdefault((move.from_id, move.to_id), set()).add(move.item_id)
+            items = went.setdefault(move.to_id, {}).setdefault(move.from_id, {})
+            items[move.item_id] = items.get(move.item_id, Decimal(0)) + move.quantity
         else:
             taken[move.item_id] = taken.get(move.item_id, Decimal(0)) + move.quantity
-    sections: list[tuple[str, Group]] = []
-    moved_to: dict[int, set[int]] = {}
-    for (from_id, to_id), items in sorted(
-        went.items(),
-        key=lambda pair: tuple(leaving.order.get(each, 0) for each in pair[0]),
-    ):
-        group = by_id[to_id]
-        # An item that went there from two areas gone: under the first only,
-        # so its box is on the form once.
-        new = items - moved_to.get(to_id, set())
-        if not new:
+    sections: list[MovedTo] = []
+    for group in groups:
+        if group.place.id not in went:
             continue
+        sources = went[group.place.id]
+        parts = [
+            (
+                came_from(leaving.labels[from_id]),
+                [
+                    MovedItem(
+                        item,
+                        n,
+                        f"{group.prefix}{ARRIVED}{from_id}_{item.id}",
+                    )
+                    for item, n in _by_name(
+                        [(named[item_id], n) for item_id, n in sources[from_id].items()]
+                    )
+                ],
+            )
+            for from_id in leaving.ordered(sources)
+        ]
         held = {item.id: n for item, n in group.rows}
-        rows = _by_name(
-            [(named[item_id], held.get(item_id, Decimal(0))) for item_id in new]
-        )
-        heading = moved_from(leaving.labels[from_id], group.label)
-        sections.append((heading, group._replace(rows=rows)))
-        moved_to.setdefault(to_id, set()).update(new)
-    shown = [
-        group._replace(
-            rows=[
-                row
-                for row in group.rows
-                if row[0].id not in moved_to.get(group.place.id, ())
+        moved: dict[int, Decimal] = {}
+        for items in sources.values():
+            for item_id, n in items.items():
+                moved[item_id] = moved.get(item_id, Decimal(0)) + n
+        totals = _by_name(
+            [
+                (named[item_id], held.get(item_id, Decimal(0)) + n)
+                for item_id, n in moved.items()
             ]
         )
-        for group in groups
-    ]
+        sections.append(
+            MovedTo(moved_to(group.label), group.place, group.label, parts, totals)
+        )
     gone = set(leaving.labels)
     still_retired = gone & leaving.retired
     emptied = leaving.emptied
     taken_rows = _by_name([(named[item_id], n) for item_id, n in taken.items()])
-    return shown, Moves(
+    return Moves(
         sections,
         (taken_out(root.name), taken_rows) if taken else None,
         [

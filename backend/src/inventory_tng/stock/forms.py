@@ -273,6 +273,39 @@ class Gone(NamedTuple):
 # A count form with no area gone from it.
 NONE_GONE = Gone()
 
+# How many arrived of an item moved from an area gone from a count form to
+# a place on it, fixing the amount moved: arrived_<area id>_<item id>, as
+# the place's field (stock/count_arrivals.py).
+ARRIVED = "arrived_"
+
+
+def arrivals(
+    session: Session, fields: Mapping[str, str]
+) -> tuple[dict[tuple[int, int], Decimal], dict[str, Words]]:
+    """A place's boxes of how many arrived, by the area each move left and
+    its item, those blank left out; and what is wrong."""
+    typed: dict[tuple[int, int], tuple[str, str]] = {}
+    for field, value in fields.items():
+        if field.startswith(ARRIVED) and value.strip():
+            area, _, item = field.removeprefix(ARRIVED).partition("_")
+            area_id, item_id = row_id(area), row_id(item)
+            if area_id is not None and item_id is not None:
+                typed[(area_id, item_id)] = (field, value)
+    units = queries.units_of(session, [item_id for _, item_id in typed])
+    arrived: dict[tuple[int, int], Decimal] = {}
+    problems: dict[str, Words] = {}
+    for (area_id, item_id), (field, value) in typed.items():
+        if (unit := units.get(item_id)) is None:
+            problems[field] = NO_SUCH_ITEM
+            continue
+        amount = quantity(value, positive=False, unit=unit)
+        if isinstance(amount, str):
+            problems[field] = amount
+        else:
+            assert amount is not None  # Typed, so not blank.
+            arrived[(area_id, item_id)] = amount
+    return arrived, problems
+
 
 def gone_listed(form: Mapping[str, str]) -> Gone | None:
     """The areas a count form lists as gone from it (GONE), none on a form
@@ -321,13 +354,14 @@ def by_place(
 
 class PlaceCount(NamedTuple):
     """What a count form says of one place: its lines as typed, those
-    counted by total, those by form, and, on a recount, the items it asks
-    for again."""
+    counted by total, those by form, on a recount, the items it asks for
+    again, and how many arrived of the moves to it (arrivals)."""
 
     found: list[Line]
     counted: ItemLines
     forms: ByForm
     items: set[int]
+    arrived: dict[tuple[int, int], Decimal]
 
     @property
     def anything(self) -> bool:
@@ -412,10 +446,11 @@ def read_count(
                 items.add(extra)
         counted, wrong = item_counts(session, found)
         forms, form_wrong = by_form(session, fields, place_id)
-        places[place_id] = PlaceCount(found, counted, forms, items)
+        arrived, arrived_wrong = arrivals(session, fields)
+        places[place_id] = PlaceCount(found, counted, forms, items, arrived)
         named = fields_at(root_id, place_id, named_twice(found_once))
         twice |= named
-        problems |= fields_at(root_id, place_id, wrong | form_wrong)
+        problems |= fields_at(root_id, place_id, wrong | form_wrong | arrived_wrong)
         problems |= dict.fromkeys(named, ON_THE_FORM_TWICE)
     return CountForm(places, problems, twice, listed)
 

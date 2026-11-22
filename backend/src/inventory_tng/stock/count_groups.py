@@ -17,12 +17,14 @@ PATH_BETWEEN = " \N{SINGLE RIGHT-POINTING ANGLE QUOTATION MARK} "
 class FormRow(NamedTuple):
     """One form of an item at a place, as the count form asks for it
     (docs/decisions/0020): its field, words, and the records as of the
-    form; for an open package, its id."""
+    form; for an open package, its id; and how many of the item's unit
+    one of what is typed is (a sealed package's size)."""
 
     field: str
     words: Words
     amount: Decimal
     open_id: int | None = None
+    per: Decimal = Decimal(1)
 
 
 class Group(NamedTuple):

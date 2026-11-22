@@ -1,51 +1,78 @@
-"""Where what left some places after a moment went, by the ledger: what a
-count form says of a retired area emptied while it was counted
-(stock/count_gone_areas.py, Ali, 2026-11-22, inventory-tng-ygk5). It only
-reads the ledger, taking no lock."""
+"""Where what left some places between two moments went, by the ledger:
+what a count form says of a retired area emptied while it was counted
+(stock/count_gone_areas.py), and what its save sets aside and fixes where
+it went (stock/count_arrivals.py; Ali, 2026-11-22, inventory-tng-ygk5). It
+only reads the ledger, taking no lock."""
 
 from collections.abc import Collection
 from decimal import Decimal
 from typing import NamedTuple
 
-from sqlalchemy import func, select
+from sqlalchemy import func, or_, select
 from sqlalchemy.orm import Session
 
 from inventory_tng.models.stock import LedgerTransaction, Movement
+from inventory_tng.stock.ledger import LOOSE, Form
 
 
 class MovedOut(NamedTuple):
     """So much of an item that left a place for another, or for none (used,
-    lost or written off)."""
+    lost or written off), and the form it arrived in there (loose for
+    none)."""
 
     from_id: int
     to_id: int | None
     item_id: int
     quantity: Decimal
+    arrives: Form = LOOSE
 
 
 def moved_out(
-    session: Session, location_ids: Collection[int], after: int
+    session: Session,
+    location_ids: Collection[int],
+    after: int,
+    up_to: tuple[int, Collection[int]] | None = None,
 ) -> list[MovedOut]:
     """What left each of the places in the ledger transactions after
-    `after`, by where it went and item, in all: an opening, which changes
-    only the form of stock at a place, is no move. In order of place,
-    then where it went, then item, by id."""
+    `after`, by where it went, item and the form it arrived in, in all:
+    an opening, which changes only the form of stock at a place, is no
+    move. With `up_to`, a moment and places, what went to those places
+    only up to that moment. In order of place, then where it went, then
+    item, then form, by id."""
     went = LedgerTransaction.from_location_id
     to = LedgerTransaction.to_location_id
-    rows = session.execute(
-        select(went, to, Movement.item_id, func.sum(Movement.quantity))
+    package, opened = Movement.to_package_id, Movement.to_open_package_id
+    query = (
+        select(went, to, Movement.item_id, package, opened, func.sum(Movement.quantity))
         .join(LedgerTransaction, LedgerTransaction.id == Movement.transaction_id)
         .where(
             went.in_(list(location_ids)),
             LedgerTransaction.id > after,
             LedgerTransaction.kind != "open",
         )
-        .group_by(went, to, Movement.item_id)
-        .order_by(went, to.nulls_last(), Movement.item_id)
+        .group_by(went, to, Movement.item_id, package, opened)
+        .order_by(
+            went,
+            to.nulls_last(),
+            Movement.item_id,
+            package.nulls_first(),
+            opened.nulls_first(),
+        )
     )
+    if up_to is not None:
+        moment, places = up_to
+        query = query.where(
+            or_(
+                LedgerTransaction.id <= moment,
+                to.is_(None),
+                to.not_in(list(places)),
+            )
+        )
     # Each from one of the places, so from somewhere.
     return [
-        MovedOut(from_id, to_id, item_id, quantity)
-        for from_id, to_id, item_id, quantity in rows
+        MovedOut(from_id, to_id, item_id, quantity, Form(package_id, open_id))
+        for from_id, to_id, item_id, package_id, open_id, quantity in session.execute(
+            query
+        )
         if from_id is not None
     ]

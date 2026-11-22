@@ -234,6 +234,20 @@
     }
   }
 
+  /* A disclosure's summary that reads as a secondary button: the count
+     form's Fix amount, which opens its box with no script. */
+  summary.as-button {
+    @apply inline-flex min-h-11 cursor-pointer list-none items-center justify-center rounded border border-heading bg-band px-5 py-2 text-base hover:bg-highlight;
+
+    &::-webkit-details-marker {
+      @apply hidden;
+    }
+  }
+
+  details[open] > summary.as-button {
+    @apply mb-2;
+  }
+
   /* One per form: what it is for, such as Save or Invite. */
   button.primary {
     @apply border-brand bg-brand font-semibold text-on-brand hover:bg-highlight hover:text-ink;
