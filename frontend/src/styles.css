@@ -550,6 +550,24 @@
       & .key {
         @apply text-base;
       }
+
+      /*
+       * Its words, two lines at most (max-h-10, of text-sm's line height).
+       * Its own name takes what it needs of them; the place it is part
+       * of, before it, only a line left over, so a long one never hides
+       * the label's own name.
+       */
+      & .print-words {
+        @apply flex max-h-10 flex-col text-sm *:my-0 *:wrap-anywhere;
+
+        & > :last-child {
+          @apply line-clamp-2 shrink-0;
+        }
+      }
+
+      & .print-within {
+        @apply line-clamp-1 min-h-0 shrink;
+      }
     }
   }
 }

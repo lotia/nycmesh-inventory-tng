@@ -26,7 +26,11 @@
     <div class="print-label">
       <div class="qr">{{ qrs[named.label.id] }}</div>
       <p class="key">{{ named.label.code }}</p>
-      <p class="print-small">{{ named.words }}</p>
+      {#- The place it is part of yields its lines to the place's own name. #}
+      <div class="print-words">
+        {%- if named.within %}<p class="print-within">{{ named.within }}{{ path_between }}</p>{% endif -%}
+        <p>{{ named.own }}</p>
+      </div>
     </div>
     {% endfor %}
   </div>

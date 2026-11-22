@@ -99,11 +99,18 @@ def scanned() -> ColumnElement[bool]:
 
 @dataclass(frozen=True)
 class Named:
-    """A label, what it names in words, and why it is inactive, if it is."""
+    """A label, what it names in words, and why it is inactive, if it is.
+    A place's label also has the place it is part of, if any: printed
+    apart, so a long name there never hides the place's own."""
 
     label: Label
-    words: str
+    own: str
     why: Inactive | None
+    within: str | None = None
+
+    @property
+    def words(self) -> str:
+        return place_words(self.own, self.within)
 
     @property
     def current(self) -> bool:
@@ -189,14 +196,13 @@ def named(session: Session, labels: Sequence[Label]) -> list[Named]:
         if label.location_id is not None:
             place = places[label.location_id]
             parent = places.get(place.parent_id or 0)
-            words = place_words(place.name, parent.name if parent else None)
+            own, within = place.name, parent.name if parent else None
         else:
             item = items[label.item_id or 0]
             package = packages.get(label.package_id or 0)
-            words = (
-                item.name_shown if package is None else _package_words(item, package)
-            )
-        found.append(Named(label, words, inactive(label, sent)))
+            own = item.name_shown if package is None else _package_words(item, package)
+            within = None
+        found.append(Named(label, own, inactive(label, sent), within))
     return found
 
 

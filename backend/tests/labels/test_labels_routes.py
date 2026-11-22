@@ -183,6 +183,23 @@ def test_the_sheet_prints_each_copy_twelve_to_a_page(
     assert shown.all("svg", width="125px")
 
 
+def test_a_printed_place_label_names_the_place_it_is_part_of_apart(
+    admin_client: TestClient, session: Session, cable: Item, shelf: Location
+) -> None:
+    """The place it is part of is printed apart from its own name, and only
+    it yields lines (styles.css), so a long one never hides the place's."""
+    place_label = add(session, Label(location_id=shelf.id))
+    item_label = add(session, Label(item_id=cable.id))
+    query = {"label": [place_label.id, item_label.id], "copies": 1}
+    shown = read(admin_client.get(PRINT, params=query).text)
+    on_shelf, on_cable = shown.all("*", class_="print-words")
+    assert on_shelf.text == "Hub \N{SINGLE RIGHT-POINTING ANGLE QUOTATION MARK} Shelf A"
+    assert on_shelf.one("p", class_="print-within").text.startswith("Hub ")
+    assert [p.text for p in on_shelf.all("p")][-1] == "Shelf A"
+    assert not on_cable.all("p", class_="print-within")
+    assert [p.text for p in on_cable.all("p")] == ["Cat6 cable"]
+
+
 def test_copies_and_picks_must_make_sense(
     admin_client: TestClient, session: Session, cable: Item
 ) -> None:

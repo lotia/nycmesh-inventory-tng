@@ -2,10 +2,20 @@
  * Labels print twelve to a page, cut apart or on sticker paper
  * (inventory-tng-8i4.16), on US Letter or A4.
  */
-import { expect } from "@playwright/test";
+import { expect, type Locator } from "@playwright/test";
 import { test } from "./csp-violations";
+import { unique } from "./own-rows";
 import { prepared } from "./prepared";
 import { printLabels } from "./print-labels";
+
+type Box = NonNullable<Awaited<ReturnType<Locator["boundingBox"]>>>;
+
+/** Where it is laid out. */
+async function boxOf(shown: Locator): Promise<Box> {
+  const box = await shown.boundingBox();
+  if (box === null) throw new Error("not laid out");
+  return box;
+}
 
 /** How many pages a PDF has. */
 function pageCount(pdf: Buffer): number {
@@ -33,4 +43,42 @@ test("twelve fit a page of each paper", async ({ page, browserName }) => {
     const pdf = await page.pdf({ preferCSSPageSize: true });
     expect(pageCount(pdf), paper).toBe(2);
   }
+});
+
+test("a long name of the place it is part of never hides a place's own", async ({
+  page,
+}) => {
+  const store = unique(
+    "Store with a name long enough to fill a label ".repeat(3),
+  );
+  await page.goto("/admin/locations");
+  await page.getByLabel(/^Name/).fill(store);
+  await page.getByLabel(/^What it is/).selectOption({ label: "Store" });
+  await page.getByRole("button", { name: "Add", exact: true }).click();
+  const area = unique("Shelf");
+  await page.goto("/admin/locations");
+  await page.getByLabel(/^Name/).fill(area);
+  await page.getByLabel(/^What it is/).selectOption({ label: "Area" });
+  await page.getByLabel(/^Part of/).selectOption({ label: store });
+  await page.getByRole("button", { name: "Add", exact: true }).click();
+  await expect(page.getByRole("heading", { level: 1 })).toHaveText(area);
+  await page.getByLabel("Copies").fill("1");
+  await page.getByRole("button", { name: "Print labels" }).click();
+  await page.emulateMedia({ media: "print" });
+  const label = page.locator(".print-label");
+  const within = label.locator(".print-within");
+  const own = label.locator(".print-words > :last-child");
+  await expect(own).toHaveText(area);
+  const [card, parent, name] = await Promise.all([
+    boxOf(label),
+    boxOf(within),
+    boxOf(own),
+  ]);
+  // The place's own name whole, on the label; the other in one line.
+  expect(name.y).toBeGreaterThanOrEqual(card.y);
+  expect(name.y + name.height).toBeLessThanOrEqual(card.y + card.height);
+  expect(parent.height).toBe(name.height);
+  expect(await own.evaluate((p) => p.scrollHeight <= p.clientHeight)).toBe(
+    true,
+  );
 });
