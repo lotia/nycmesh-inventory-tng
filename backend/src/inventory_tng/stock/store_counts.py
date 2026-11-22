@@ -37,9 +37,11 @@ def record_store_count(
     (_count_at). NotCountable names the place that may not be counted."""
     lock_places(session, places)
     _hold_named(session, counts.keys(), at, counts.values())
-    # At any place: one left out of a filtered form's first send is not
-    # (inventory-tng-53im).
-    saved = sent_under(session, [_place_key(key, place_id) for place_id in places])
+    # Asked only with an open package found, and at any place: one left out
+    # of a filtered form's first send is not (inventory-tng-53im).
+    finding = any(count.forms.found is not None for count in counts.values())
+    keys = [_place_key(key, place_id) for place_id in places]
+    saved = finding and sent_under(session, keys)
     return {
         place_id: _count_at(
             session, key, admin_id, place_id, count, at, places, when, saved=saved

@@ -74,6 +74,15 @@ def field(place: Location, store: Location, name: str) -> str:
     return name if place.id == store.id else f"at_{place.id}_{name}"
 
 
+def found_on(place: Location, package: ItemPackage) -> dict[str, str]:
+    """A count form's open package nobody recorded, found at `place`."""
+    return {
+        "found_location_id": str(place.id),
+        "found_package_id": str(package.id),
+        "found_left": "40",
+    }
+
+
 def counts_at(session: Session, place: Location) -> list[LedgerTransaction]:
     return list(
         session.scalars(
@@ -669,11 +678,7 @@ def test_an_open_package_nobody_recorded_is_made_in_the_area_picked(
     spools = Spools(session)
     shelf = add(session, area("Shelf", spools.store))
     path = f"{COUNTS}/{spools.store.id}"
-    form = count_form(admin_client.get(path)) | {
-        "found_location_id": str(shelf.id),
-        "found_package_id": str(spools.spool.id),
-        "found_left": "40",
-    }
+    form = count_form(admin_client.get(path)) | found_on(shelf, spools.spool)
     assert admin_client.post(path, data=form).status_code == 303
     found = session.scalars(
         select(OpenPackage).where(
@@ -694,11 +699,7 @@ def test_an_open_package_found_in_an_area_its_item_moved_into_is_asked_again(
     shelf = add(session, area("Shelf", spools.store))
     cable = spools.cable.id
     path = f"{COUNTS}/{spools.store.id}"
-    form = count_form(admin_client.get(path)) | {
-        "found_location_id": str(shelf.id),
-        "found_package_id": str(spools.spool.id),
-        "found_left": "40",
-    }
+    form = count_form(admin_client.get(path)) | found_on(shelf, spools.spool)
     spools.write(
         {
             "kind": "move",
@@ -762,15 +763,6 @@ def test_a_form_listing_a_place_that_is_no_id_is_not_found(
     made = Store(session)
     form = count_form(admin_client.get(made.path)) | {"places": f"{made.store.id} x"}
     assert admin_client.post(made.path, data=form).status_code == 404
-
-
-def found_on(place: Location, package: ItemPackage) -> dict[str, str]:
-    """A count form's open package nobody recorded, found at `place`."""
-    return {
-        "found_location_id": str(place.id),
-        "found_package_id": str(package.id),
-        "found_left": "40",
-    }
 
 
 class SentAgain:
