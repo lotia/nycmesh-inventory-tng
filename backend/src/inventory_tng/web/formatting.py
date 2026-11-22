@@ -35,3 +35,10 @@ def printed_length(unit: str) -> str:
     `unit`, if it is a length (any but each, models.catalogue.UNITS); else
     nothing."""
     return str(PRINTED_LENGTH) if unit != "each" else ""
+
+
+def keyboard(unit: str) -> str:
+    """The inputmode of a box for an amount of an item in `unit`: the
+    number keypad for one counted each, whose amounts are whole
+    (stock/ledger.whole_enough), else the keypad with a decimal point."""
+    return "numeric" if unit == "each" else "decimal"

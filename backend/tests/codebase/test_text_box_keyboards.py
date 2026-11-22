@@ -20,22 +20,23 @@ import pytest
 
 from inventory_tng.core.local_env import CLONE
 
+from helpers.source import TEMPLATES
+
 pytestmark = pytest.mark.clone
 
-TEMPLATES = CLONE / "backend/src/inventory_tng/templates"
 FRONTEND = CLONE / "frontend/src"
-# The types a person types free text into; the keyboard is the box's own
-# choice.
+# The types of box a person types into whose keyboard the box must name.
 TYPED = {None, "text", "number"}
 KEYBOARDS = {"numeric", "decimal", "text"}
 # A JSX input, from its tag to the end of its self-closing tag, and its
-# two attributes. Exact markup on purpose: the rule is about how the
-# source writes its inputs, which a rendered page cannot show for every
-# branch.
+# two attributes, `{` for a mode worked out as it renders.
+# Exact markup on purpose: the rule is about how the source writes its
+# inputs, which a rendered page cannot show for every branch.
 JSX_INPUT = re.compile(r"<input\b(.*?)/>", re.DOTALL)
 # Exact markup on purpose: as above.
 JSX_TYPE = re.compile(r'\btype="(\w+)"')
-JSX_MODE = re.compile(r'\binputMode=(?:"(\w+)"|\{)')
+# Exact markup on purpose: as above.
+JSX_MODE = re.compile(r'\binputMode="?(\w+|\{)')
 
 
 class Inputs(HTMLParser):
@@ -83,7 +84,7 @@ def frontend_problems(path: Path) -> list[str]:
         mode = JSX_MODE.search(match.group(1))
         problem = wrong(
             kind.group(1) if kind else None,
-            (mode.group(1) or "{}") if mode else None,
+            mode.group(1) if mode else None,
         )
         if problem:
             line = source.count("\n", 0, match.start()) + 1

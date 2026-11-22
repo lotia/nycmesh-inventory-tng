@@ -150,8 +150,8 @@ def test_the_count_page_counts_sealed_and_says_whats_wrong(
     # Whole packages only, so a phone shows its number keypad; its loose
     # line takes metres, perhaps with a decimal point.
     boxes = read(shown.text)
-    assert boxes.one("input", name=field).attrs["inputmode"] == "numeric"
-    assert boxes.one("input", name=f"loose_{cable}").attrs["inputmode"] == "decimal"
+    assert boxes.one("input", name=field, inputmode="numeric")
+    assert boxes.one("input", name=f"loose_{cable}", inputmode="decimal")
     base = count_form(shown)
     done = admin_client.post(f"{COUNTS}/{store}", data=base | {field: "1"})
     assert done.status_code == 303

@@ -314,8 +314,9 @@ def test_editing_every_field(
     page = admin_client.get(f"{ITEMS}/{item.id}").text
     assert box_values(page, "minimum") == ["305"]
     # A quantity, perhaps with a decimal point; its neighbours take words.
-    assert read(page).one("input", name="minimum").attrs["inputmode"] == "decimal"
-    assert read(page).one("input", name="part_number").attrs["inputmode"] == "text"
+    boxes = read(page)
+    assert boxes.one("input", name="minimum", inputmode="decimal")
+    assert boxes.one("input", name="part_number", inputmode="text")
 
 
 def test_the_unit_is_fixed_once_stock_has_moved(

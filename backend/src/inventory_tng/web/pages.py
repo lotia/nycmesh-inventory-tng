@@ -19,7 +19,12 @@ from starlette.types import Scope
 from inventory_tng.core.db_errors import Gone
 from inventory_tng.core.local_time import show, show_day
 from inventory_tng.core.phrases import BRAND, lazy_gettext, number
-from inventory_tng.web.formatting import amount, plain_amount, printed_length
+from inventory_tng.web.formatting import (
+    amount,
+    keyboard,
+    plain_amount,
+    printed_length,
+)
 from inventory_tng.web.navigation import sections, sections_without_badges
 from inventory_tng.web.template_phrases import install
 
@@ -78,6 +83,7 @@ def signed_in_as(request: Request) -> SignedInAs | None:
 templates.env.filters["amount"] = amount
 templates.env.filters["plain_amount"] = plain_amount
 templates.env.filters["printed_length"] = printed_length
+templates.env.filters["keyboard"] = keyboard
 
 
 # What a page says after a change, by the ?notice= it was sent back with

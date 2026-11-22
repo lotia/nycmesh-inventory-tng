@@ -132,7 +132,7 @@ def test_the_count_page_reads_an_amount_grouped_but_its_box_holds_it_plainly(
         assert box_values(shown.text, field) == ["1234.5"]
         assert written in text(shown)
     # Metres, perhaps with a decimal point: the keypad with one.
-    assert read(shown.text).one("input", name=field).attrs["inputmode"] == "decimal"
+    assert read(shown.text).one("input", name=field, inputmode="decimal")
 
 
 def test_a_count_puts_the_records_right(
@@ -142,8 +142,7 @@ def test_a_count_puts_the_records_right(
     page = admin_client.get(f"{COUNTS}/{place.store.id}").text
     assert counted_box(page, place.item.id) == "5"
     # Counted each, so whole: the number keypad.
-    box = read(page).one("input", name=f"counted_{place.item.id}")
-    assert box.attrs["inputmode"] == "numeric"
+    assert read(page).one("input", name=f"counted_{place.item.id}", inputmode="numeric")
     done = count_at(
         admin_client,
         place.store.id,
