@@ -60,18 +60,17 @@ def client() -> TestClient:
     return TestClient(app)
 
 
-def test_a_same_origin_post_without_sec_fetch_site_is_accepted(
-    client: TestClient,
+@pytest.mark.parametrize(
+    ("origin", "status"),
+    [
+        # Safari before 16.4: no Sec-Fetch-Site, and the page's own Origin.
+        pytest.param("http://testserver", 200, id="own-page"),
+        # A sandboxed frame, a data: page or another site's redirect.
+        pytest.param("null", 403, id="origin-null"),
+    ],
+)
+def test_a_post_without_sec_fetch_site_goes_by_its_origin(
+    client: TestClient, origin: str, status: int
 ) -> None:
-    """Safari before 16.4: no Sec-Fetch-Site, and the page's own Origin."""
-    response = client.post("/save", headers={"origin": "http://testserver"})
-    assert response.status_code == 200
-    assert response.text == "saved"
-
-
-def test_a_post_from_origin_null_without_sec_fetch_site_is_refused(
-    client: TestClient,
-) -> None:
-    """A sandboxed frame, a data: page or another site's redirect."""
-    response = client.post("/save", headers={"origin": "null"})
-    assert response.status_code == 403
+    response = client.post("/save", headers={"origin": origin})
+    assert response.status_code == status

@@ -36,7 +36,7 @@ from inventory_tng.models.stock import AdjustmentReason, LedgerTransaction
 from inventory_tng.site_settings.paths import SETTINGS
 from inventory_tng.stock import queries
 from inventory_tng.stock.balance import countable
-from inventory_tng.stock.counts import record_adjustment
+from inventory_tng.stock.counts import COUNTABLE, WHOLE, record_adjustment
 from inventory_tng.stock.forms import adjustment
 from inventory_tng.stock.paths import ADJUSTMENTS, COUNTS
 from inventory_tng.web.admin_pages import TextForm, admin_page, current_rows
@@ -48,10 +48,6 @@ log = structlog.get_logger(__name__)
 
 router = APIRouter(include_in_schema=False)
 
-# The ledger rules a race can break past the page's checks (module
-# docstring).
-WHOLE = "movement_whole_units"
-COUNTABLE = "location_countable"
 COUNTS_TITLE = lazy_gettext("Counts and adjustments")
 ADJUSTED = lazy_gettext("Recorded.")
 add_notices({"adjusted": ADJUSTED})

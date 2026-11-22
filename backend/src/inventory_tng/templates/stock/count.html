@@ -53,11 +53,11 @@ one by its size, an open package closed as none
     {% set field = prefix ~ row.field %}
     <tr>
       <td>{{ row.words }}</td>
-      <td>{{ row.amount | amount }}{% if not row.field.startswith("sealed_") %} {{ item.unit }}{% endif %}</td>
+      <td>{{ row.amount | amount }}{% if not row.sealed %} {{ item.unit }}{% endif %}</td>
       {% if recount %}<td></td>{% endif %}
       {%- set hint = item.unit | printed_length if row.open_id else "" %}
-      <td><input name="{{ field }}" inputmode="{{ 'numeric' if row.field.startswith('sealed_') else item.unit | keyboard }}" value="{{ values.get(field, row.amount | plain_amount if row.amount > 0 else '0') }}" aria-label="{% if where %}{{ where }}, {% endif %}{{ item.name_shown }}, {{ row.words }}"{% if hint %} aria-describedby="hint-{{ field }}"{% endif %}
-        {%- if adds %} data-adds-to="{{ adds }}" data-unset="{{ row.amount | plain_amount }}"{% if row.field.startswith("sealed_") %} data-per="{{ row.per | plain_amount }}"{% endif %}{% if row.open_id %} data-state="{{ prefix ~ 'state_' ~ row.open_id }}"{% endif %}{% endif %}>
+      <td><input name="{{ field }}" inputmode="{{ item.unit | keyboard(row.sealed) }}" value="{{ values.get(field, row.amount | plain_amount if row.amount > 0 else '0') }}" aria-label="{% if where %}{{ where }}, {% endif %}{{ item.name_shown }}, {{ row.words }}"{% if hint %} aria-describedby="hint-{{ field }}"{% endif %}
+        {%- if adds %} data-adds-to="{{ adds }}" data-unset="{{ row.amount | plain_amount }}"{% if row.sealed %} data-per="{{ row.per | plain_amount }}"{% endif %}{% if row.open_id %} data-state="{{ prefix ~ 'state_' ~ row.open_id }}"{% endif %}{% endif %}>
         {% if row.open_id %}
         {% set state_field = prefix ~ "state_" ~ row.open_id %}
         <select name="{{ state_field }}" aria-label="{% if where %}{{ where }}, {% endif %}{% trans item=item.name_shown, form=row.words %}{{ item }}, {{ form }}: is it here?{% endtrans %}">
@@ -132,9 +132,8 @@ one by its size, an open package closed as none
         {% if each.worded %}<fieldset><legend>{% trans %}How many arrived?{% endtrans %}{{ said }}</legend>{% endif %}
         {% for row in each.rows %}
         {% set name = each.prefix ~ row.field %}
-        {% set sealed = row.field.startswith("sealed_") %}
         <label>{% if each.worded %}{{ row.words }}{% else %}{% trans %}How many arrived?{% endtrans %}{{ said }}{% endif %}
-          <input name="{{ name }}" inputmode="{{ 'numeric' if sealed else each.item.unit | keyboard }}" value="{{ values.get(name, row.amount | plain_amount) }}" data-adds-to="{{ moved.adds_to(section.place.id, each.item.id) }}" data-unset="{{ row.amount | plain_amount }}"{% if sealed %} data-per="{{ row.per | plain_amount }}"{% endif %}>
+          <input name="{{ name }}" inputmode="{{ each.item.unit | keyboard(row.sealed) }}" value="{{ values.get(name, row.amount | plain_amount) }}" data-adds-to="{{ moved.adds_to(section.place.id, each.item.id) }}" data-unset="{{ row.amount | plain_amount }}"{% if row.sealed %} data-per="{{ row.per | plain_amount }}"{% endif %}>
         </label>
         {% include "_field_problem.html" %}
         {% endfor %}

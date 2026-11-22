@@ -12,7 +12,6 @@ from typing import NamedTuple
 from sqlalchemy import func, or_, select
 from sqlalchemy.orm import Session
 
-from inventory_tng.core.phrases import PATH_BETWEEN
 from inventory_tng.models.places import Location
 from inventory_tng.models.stock import LedgerTransaction, Movement
 from inventory_tng.stock import queries
@@ -140,9 +139,8 @@ def areas_leaving(
     if tree is None:
         tree = queries.place_tree(session, root)
     order = {each.id: n for n, (each, _, _) in enumerate(tree)}
-    # As the count form names it (count_groups.label): by its path.
     found = {
-        each.id: (each, PATH_BETWEEN.join(path or (each.name,)))
+        each.id: (each, queries.place_label(each, path))
         for each, path, _ in tree
         if each.id in gone.ids
     }

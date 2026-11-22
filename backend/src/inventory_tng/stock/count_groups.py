@@ -10,7 +10,7 @@ from typing import NamedTuple
 
 from sqlalchemy.orm import Session
 
-from inventory_tng.core.phrases import PATH_BETWEEN, Words, gettext, lazy_gettext
+from inventory_tng.core.phrases import Words, gettext, lazy_gettext
 from inventory_tng.models.catalogue import Item, ItemPackage
 from inventory_tng.models.places import Location
 from inventory_tng.models.stock import OpenPackage
@@ -40,6 +40,11 @@ class FormRow(NamedTuple):
     amount: Decimal
     open_id: int | None = None
     per: Decimal = Decimal(1)
+
+    @property
+    def sealed(self) -> bool:
+        """Whether it asks how many sealed packages, a whole number."""
+        return self.field.startswith(SEALED)
 
 
 # How the count form asks for each form of an item.
@@ -116,13 +121,7 @@ class Group(NamedTuple):
 
     @property
     def label(self) -> str:
-        return label(self.place, self.path)
-
-
-def label(place: Location, path: tuple[str, ...]) -> str:
-    """How a count form names a place it shows: its path, or for the page's
-    own place its name."""
-    return PATH_BETWEEN.join(path) if path else place.name
+        return queries.place_label(self.place, self.path)
 
 
 def forms_by_place(

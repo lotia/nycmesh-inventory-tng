@@ -1,6 +1,7 @@
 """A message names a place without a preposition chosen by its kind, and
 tells a translator the place can be any kind, on either side
-(CONTRIBUTING.md, Phrases)."""
+(CONTRIBUTING.md, Phrases); and the scan page joins a place's path as
+the server does."""
 
 import re
 from collections.abc import Iterable
@@ -11,7 +12,7 @@ import pytest
 from babel.messages.catalog import Message
 
 from inventory_tng.core.local_env import CLONE
-from inventory_tng.core.phrases import ENGLISH_PO, read
+from inventory_tng.core.phrases import ENGLISH_PO, PATH_BETWEEN, read
 
 pytestmark = pytest.mark.clone
 
@@ -84,3 +85,10 @@ def test_no_place_follows_a_preposition_chosen_by_its_kind(side: str) -> None:
 @pytest.mark.parametrize("side", SIDES)
 def test_a_translator_is_told_a_place_can_be_any_kind(side: str) -> None:
     assert [m.id for m in side_placed(side) if not told(m)] == []
+
+
+def test_the_scan_page_joins_a_path_as_the_server_does() -> None:
+    # Exact markup on purpose: the scan page's source, which a test of the
+    # server cannot run.
+    search = (CLONE / "frontend/src/scan/search.ts").read_text()
+    assert f'.join("{PATH_BETWEEN}")' in search

@@ -11,6 +11,7 @@ from sqlalchemy.orm import Session
 
 from inventory_tng.core.db_lookups import values_by
 from inventory_tng.core.db_sessions import by_name
+from inventory_tng.core.phrases import PATH_BETWEEN
 from inventory_tng.models.admins import Admin
 from inventory_tng.models.catalogue import Item, ItemPackage
 from inventory_tng.models.places import STORE_KINDS, Location
@@ -232,6 +233,12 @@ def place_tree(
 
     walk(root, ())
     return found
+
+
+def place_label(place: Location, path: tuple[str, ...]) -> str:
+    """How a count form names a place of its tree (place_tree): by its
+    path, or for the page's own place by its name."""
+    return PATH_BETWEEN.join(path) if path else place.name
 
 
 def not_countable(session: Session, ids: Collection[int]) -> set[int]:

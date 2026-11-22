@@ -40,13 +40,18 @@ from inventory_tng.stock.ledger import (
 log = structlog.get_logger(__name__)
 meter = metrics.get_meter(__name__)
 
+# The ledger rules a race can break past a count's or an adjustment's
+# page checks: an item's unit changed to each, a place retired meanwhile.
+WHOLE = "movement_whole_units"
+COUNTABLE = "location_countable"
+
 
 class NotCountable(RuleBroken):
     """location_countable, with the place that refused it, so a page names
     that one, not one it reads again after the place may have changed."""
 
     def __init__(self, location_id: int) -> None:
-        super().__init__("location_countable")
+        super().__init__(COUNTABLE)
         self.location_id = location_id
 
 
@@ -55,7 +60,7 @@ def _require_countable(session: Session, location_id: int) -> None:
     it locked (lock_place): a retire waits for that lock, and it for a
     retire, so a place retired since the page checked is refused."""
     if not exists_where(session, Location.id == location_id, countable()):
-        log.debug("rule broken", rule="location_countable", location_id=location_id)
+        log.debug("rule broken", rule=COUNTABLE, location_id=location_id)
         raise NotCountable(location_id)
 
 

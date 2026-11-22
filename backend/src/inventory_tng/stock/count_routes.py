@@ -125,10 +125,9 @@ from inventory_tng.stock.count_groups import (
     Group,
     asks_for,
     forms_by_place,
-    label,
     line_of,
 )
-from inventory_tng.stock.counts import NotCountable
+from inventory_tng.stock.counts import COUNTABLE, WHOLE, NotCountable
 from inventory_tng.stock.ledger import by_item, tracks_opened
 from inventory_tng.stock.moments import (
     Moment,
@@ -150,10 +149,6 @@ meter = metrics.get_meter(__name__)
 
 router = APIRouter(include_in_schema=False)
 
-# The ledger rules a race can break past the page's checks (module
-# docstring).
-WHOLE = "movement_whole_units"
-COUNTABLE = "location_countable"
 # An open package found that its item does not follow once opened, and a
 # form counted twice: said as rules are.
 UNTRACKED = "open_package_untracked"
@@ -336,7 +331,7 @@ def _listed_words(
     item = session.get_one(Item, listed.item_id)
     tree = queries.place_tree(session, root)
     ((place, path),) = _shown_places(session, tree, [listed.place_id])
-    where = label(place, path)
+    where = queries.place_label(place, path)
     problems: dict[str, Words] = {EXTRA_ITEM: listed_under(where)}
     if not listed.on_form:
         line = field_at(root.id, listed.place_id, line_of(session, as_of, listed))
