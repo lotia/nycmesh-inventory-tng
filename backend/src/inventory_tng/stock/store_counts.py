@@ -138,8 +138,7 @@ def _plain(value: object) -> object:
         case tuple():
             return [_plain(each) for each in value]
         case Mapping():
-            pairs = [[_plain(k), _plain(v)] for k, v in value.items()]
-            return sorted(pairs, key=json.dumps)
+            return _plain(list(value.items()))
         case list():
             return sorted((_plain(each) for each in value), key=json.dumps)
         case _:

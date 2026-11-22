@@ -69,6 +69,14 @@ class SentAgain:
         )
         assert self.written() == before
 
+    def as_before(self, first: dict[str, str], again: dict[str, str]) -> None:
+        """Saved with `first`, then sent again with `again`: answered as
+        the save was, and nothing more written."""
+        saved = self.send(first)
+        before = self.written()
+        assert self.send(again).headers["location"] == saved.headers["location"]
+        assert self.written() == before
+
 
 @pytest.mark.parametrize("change", ["elsewhere", "another package", "none before"])
 def test_a_count_saved_and_sent_again_finding_otherwise_writes_nothing_more(
@@ -148,11 +156,7 @@ def test_a_count_saved_and_sent_again_unchanged_is_answered_as_before(
 ) -> None:
     made = SentAgain(admin_client, session)
     found = found_on(made.shelf, made.spools.spool)
-    saved = made.send(found)
-    before = made.written()
-    again = made.send(found)
-    assert again.headers["location"] == saved.headers["location"]
-    assert made.written() == before
+    made.as_before(found, found)
 
 
 def test_a_count_closing_an_open_package_sent_again_unchanged_is_as_before(
@@ -165,11 +169,7 @@ def test_a_count_closing_an_open_package_sent_again_unchanged_is_as_before(
     opened = made.spools.opened()
     made.show()
     close = {f"opened_{opened.id}": "", f"state_{opened.id}": "used_up"}
-    saved = made.send(close)
-    before = made.written()
-    again = made.send(close)
-    assert again.headers["location"] == saved.headers["location"]
-    assert made.written() == before
+    made.as_before(close, close)
 
 
 def test_a_count_closing_an_open_package_sent_again_otherwise_is_refused(
@@ -189,16 +189,10 @@ def test_a_count_sent_again_with_its_amounts_written_otherwise_is_unchanged(
     """5 sent again as 5.0, its lines in another order: the same count."""
     made = SentAgain(admin_client, session)
     item, cable = made.spools.place.item.id, made.spools.cable.id
-    first = {f"counted_{item}": "5", f"at_{made.shelf.id}_counted_{cable}": "2"}
-    saved = made.send(first)
-    before = made.written()
-    again = made.client.post(
-        made.path,
-        data={f"at_{made.shelf.id}_counted_{cable}": "2.0", f"counted_{item}": "5"}
-        | made.shown,
+    made.as_before(
+        {f"counted_{item}": "5", f"at_{made.shelf.id}_counted_{cable}": "2"},
+        {f"at_{made.shelf.id}_counted_{cable}": "2.0", f"counted_{item}": "5"},
     )
-    assert again.headers["location"] == saved.headers["location"]
-    assert made.written() == before
 
 
 def test_a_count_of_one_place_sent_again_with_other_figures_is_refused(
