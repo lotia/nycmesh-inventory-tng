@@ -4,10 +4,11 @@ with (docs/decisions/0003). The writing is stock/store_counts.py's
 pages check what was typed and say what is wrong.
 
 Each form carries a key made when it was shown, so sending it twice writes
-it once. Sent again finding the open package nobody recorded otherwise
-(another place or package, or one where the first send found none), it
-writes nothing more and goes back to Counts saying it was saved already
-(Ali, 2026-11-22, inventory-tng-53im). A count also carries the place's
+it once. Saved, then sent again under that key saying anything otherwise
+(other figures, an open package found otherwise or closed, a place left
+out before now typed at, a move's amount fixed), it writes nothing and
+goes back to Counts saying it was saved already (Ali, 2026-11-22,
+inventory-tng-53im, inventory-tng-kro9). A count also carries the place's
 latest ledger entry as it was shown, and how many there it saw
 (moments.Moment): the count is true for that moment, so a save made at the
 place meanwhile still applies, and an item it moved comes back to count
@@ -171,10 +172,10 @@ COUNTABLE = "location_countable"
 # form counted twice: said as rules are.
 UNTRACKED = "open_package_untracked"
 ONCE = "movement_item_once"
-# A form saved, sent again finding an open package nobody recorded
-# otherwise (store_counts._count_at): nothing more is written, and Counts
-# says so (Ali, 2026-11-22, inventory-tng-53im).
-SENT_AGAIN = "open_package_key"
+# A form saved, sent again saying otherwise (stock/store_counts.py):
+# nothing is written, and Counts says so (Ali, 2026-11-22,
+# inventory-tng-53im, inventory-tng-kro9).
+SENT_AGAIN = "count_sent_otherwise"
 TWICE = lazy_gettext(
     "An item is on this form more than once. Each item is counted once, so "
     "it isn't clear which number is right: nothing was saved."

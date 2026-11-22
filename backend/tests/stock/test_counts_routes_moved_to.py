@@ -410,3 +410,18 @@ def test_a_place_counted_by_form_counts_its_own_spools_apart(
     assert expected_forms_at(session, [store.id], 2**31 - 1, [cable]) == {
         store.id: {(cable, sealed): Decimal(610), (cable, LOOSE): Decimal(10)}
     }
+
+
+def test_a_move_fixed_only_on_a_send_again_is_not_written(
+    admin_client: TestClient, session: Session
+) -> None:
+    """Saved with the move left alone, then sent again with How many
+    arrived fixed: refused as saved already, and nothing is lost there
+    (Ali, 2026-11-22, inventory-tng-kro9)."""
+    moved = Moved(session, admin_client)
+    saved(admin_client, moved.path, moved.form)
+    before = counts_at(session, moved.there)
+    again = admin_client.post(moved.path, data=moved.form | {moved.arrived(): "1"})
+    assert again.headers["location"].startswith(f"{COUNTS}?notice=count_saved_already")
+    assert counts_at(session, moved.there) == before
+    assert expected(session, moved.there.id) == {moved.item: Decimal(2)}

@@ -1,5 +1,5 @@
 """Plumbing's tables: the history of changes, rate limits, and the keys of
-single-use forms sent."""
+forms sent once."""
 
 import uuid
 from datetime import datetime
@@ -10,6 +10,7 @@ from sqlalchemy import (
     DateTime,
     Identity,
     Index,
+    LargeBinary,
     Text,
     func,
 )
@@ -72,8 +73,10 @@ class RateLimit(Base):
 
 
 class SentForm(Base):
-    """A form that makes something shown only once, by the key it was shown
-    with (web/single_use_forms.py), so sending it again makes nothing. Only
+    """A form sent, by the key it was shown with: one that makes something
+    shown only once (web/single_use_forms.py), so sending it again makes
+    nothing, or a count form saved, with a digest of what it said
+    (stock/store_counts.py), so one sent again otherwise is refused. Only
     ever added to, so it is its own history, as the ledger is."""
 
     __tablename__ = "sent_form"
@@ -82,3 +85,4 @@ class SentForm(Base):
     id: Mapped[IntId]
     created_at: Mapped[CreatedAt]
     key: Mapped[uuid.UUID] = mapped_column(unique=True)
+    digest: Mapped[bytes | None] = mapped_column(LargeBinary)

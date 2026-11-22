@@ -191,13 +191,18 @@ anywhere, nothing is recorded and the form is shown again, with the same
 items, saying "Nothing was typed, so nothing was counted." (Ali,
 2026-11-21, inventory-tng-fxsy). We rejected going back to Counts with no
 message, and recording an empty count at each place. A form saved and
-sent again, such as by going back after the save, finding the open package
-nobody recorded at another place, another package, or one where the first
-send found none, writes nothing more and goes back to Counts saying "This
-count was saved already, so what you changed wasn't saved. To record it,
-start a new count." (Ali, 2026-11-22, inventory-tng-53im). We rejected a
-fresh form with a new key keeping what was typed, as anything the first
-save found would be found a second time.
+sent again, such as by going back after the save, saying anything
+otherwise (other figures, the open package nobody recorded found
+elsewhere, otherwise or not at all, an open package closed, a place the
+first send left out now typed at, a move's amount fixed) is refused
+whole: nothing is written, and it goes back to Counts saying "This count
+was saved already, so what you changed wasn't saved. To record it, start
+a new count." (Ali, 2026-11-22, inventory-tng-53im, inventory-tng-kro9).
+Sent as it was, it is answered as before. The save keeps a digest of what
+the form said under its key to tell the two apart. We rejected a fresh
+form with a new key keeping what was typed, as anything the first save
+found would be found a second time, and leaving a changed send to say
+Counted though nothing more was saved.
 
 The form lists the places it shows, so an area moved meanwhile only
 regroups. Its moment is read across them all, and the count holds every

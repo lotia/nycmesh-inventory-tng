@@ -4,6 +4,7 @@ inventory-tng-8i4.51.4), and what the tests of it read back."""
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from inventory_tng.models.catalogue import ItemPackage
 from inventory_tng.models.places import Location
 from inventory_tng.models.stock import LedgerTransaction
 from inventory_tng.stock.moments import at_place
@@ -69,3 +70,12 @@ def counts_at(session: Session, place: Location) -> list[LedgerTransaction]:
             .order_by(LedgerTransaction.id)
         )
     )
+
+
+def found_on(place: Location, package: ItemPackage) -> dict[str, str]:
+    """A count form's open package nobody recorded, found at `place`."""
+    return {
+        "found_location_id": str(place.id),
+        "found_package_id": str(package.id),
+        "found_left": "40",
+    }

@@ -5,8 +5,17 @@ after every count (stock/count_arrivals.py, inventory-tng-ygk5).
 Everything the places' counts and fixes hold is held for them all before
 any is written, in the order stock/ledger.py gives (inventory-tng-nfia). A
 place with no areas is a form of one place, saved the same way.
+
+A form saved keeps a digest of what it said under its key
+(core/sent_forms.py). Sent again under that key, as the browser's Back
+sends it, saying anything otherwise, it is refused whole
+(count_sent_otherwise), nothing written; sent as it was, it is answered as
+before, each write under its key once (Ali, 2026-11-22,
+inventory-tng-kro9).
 """
 
+import hashlib
+import json
 import uuid
 from collections.abc import Collection, Mapping
 from datetime import datetime
@@ -16,7 +25,7 @@ from typing import NamedTuple
 from sqlalchemy.orm import Session
 
 from inventory_tng.core.db_errors import enforce
-from inventory_tng.core.db_sessions import exists_where
+from inventory_tng.core.sent_forms import digest_spent, spend
 from inventory_tng.models.stock import OpenPackage
 from inventory_tng.stock import open_packages, over_recorded
 from inventory_tng.stock.counts import (
@@ -25,7 +34,6 @@ from inventory_tng.stock.counts import (
     Written,
     record_arrivals,
     record_count,
-    sent_under,
 )
 from inventory_tng.stock.forms import PlaceCount
 from inventory_tng.stock.ledger import LOOSE, Form, hold_across, lock_places
@@ -59,15 +67,14 @@ def record_store_count(
     their own (counts.record_arrivals). `aside`, by place, what came from
     the areas gone from the form, which its lines count apart
     (counts.record_count). NotCountable names the place that may not be
-    counted."""
+    counted; RuleBroken (count_sent_otherwise) for a form saved before
+    that says otherwise now (module docstring)."""
     aside, fixed = aside or {}, fixed or {}
     lock_places(session, places)
     _hold_named(session, counts.keys(), at, counts.values(), fixed)
-    # Asked only with an open package found, and at any place: one left out
-    # of a filtered form's first send is not (inventory-tng-53im).
-    finding = any(count.forms.found is not None for count in counts.values())
-    keys = [_place_key(key, place_id) for place_id in places]
-    saved = finding and sent_under(session, keys)
+    said = _digest(places, at, counts, aside, fixed)
+    if not spend(session, key, said):
+        enforce("count_sent_otherwise", when=digest_spent(session, key) != said)
     counted = {
         place_id: _count_at(
             session,
@@ -78,7 +85,6 @@ def record_store_count(
             at,
             places,
             when,
-            saved=saved,
             aside=aside.get(place_id, {}),
         )
         for place_id, count in counts.items()
@@ -92,6 +98,52 @@ def record_store_count(
         )
     ]
     return StoreCounted(counted, written)
+
+
+def _digest(
+    places: Collection[int],
+    at: Moment,
+    counts: Mapping[int, PlaceCount],
+    aside: Mapping[int, Mapping[tuple[int, Form], Decimal]],
+    fixed: Mapping[int, FormLines],
+) -> bytes:
+    """A digest (hashlib's SHA-256) of all a count form's save writes from:
+    the same for one sent again unchanged, whatever order its lines came
+    in or however its amounts were written, as 5 or 5.0."""
+    said = (
+        places,
+        at,
+        {
+            place_id: (
+                count.counted,
+                count.forms.lines,
+                count.forms.close,
+                count.forms.found and (count.forms.found[0].id, count.forms.found[1]),
+            )
+            for place_id, count in counts.items()
+        },
+        aside,
+        fixed,
+    )
+    return hashlib.sha256(json.dumps(_plain(said)).encode()).digest()
+
+
+def _plain(value: object) -> object:
+    """`value` as JSON says it, put together one way: a mapping's pairs and
+    a list's members sorted, amounts normalized; a tuple, a record, kept
+    in its order."""
+    match value:
+        case Decimal():
+            return str(value.normalize())
+        case tuple():
+            return [_plain(each) for each in value]
+        case Mapping():
+            pairs = [[_plain(k), _plain(v)] for k, v in value.items()]
+            return sorted(pairs, key=json.dumps)
+        case list():
+            return sorted((_plain(each) for each in value), key=json.dumps)
+        case _:
+            return value
 
 
 def _place_key(key: uuid.UUID, place_id: int) -> uuid.UUID:
@@ -142,7 +194,6 @@ def _count_at(
     across: Collection[int],
     when: datetime,
     *,
-    saved: bool,
     aside: Mapping[tuple[int, Form], Decimal],
 ) -> Counted:
     """Put the records right at one place of a count form, holding every
@@ -150,11 +201,8 @@ def _count_at(
     of its own made from the form's (counts.record_count), an open package
     nobody recorded found there, the open packages closed there, and the
     ends there of lines recorded more than moved that it puts right.
-    RuleBroken (open_package_key) for a form `saved` before, at any of
-    its places, sent again finding that open package otherwise: elsewhere,
-    another package, or one where the saved send found none
-    (inventory-tng-53im). `aside`, what came there from the areas gone from
-    the form, counted apart (counts.record_count)."""
+    `aside`, what came there from the areas gone from the form, counted
+    apart (counts.record_count)."""
     forms = count.forms
     # An item counted by its total holds loose units alone (the count
     # form's rows): with an open package of it found, its total is its
@@ -185,17 +233,11 @@ def _count_at(
     if forms.found is not None:
         package, left = forms.found
         found_key = uuid.uuid5(key, "found")
-        # None made under it yet: a form saved before found none.
-        fresh = not exists_where(session, OpenPackage.key == found_key)
         with session.begin_nested() as finding:
             made = open_packages.make(session, found_key, package.id, place_id)
             found = (package.item_id, Form(open_package_id=made.id), left)
             counted_now = counted_by([*lines, found])
-            moved = package.item_id in counted_now.moved
-            # A form saved before finding none, sent again finding one, is
-            # refused as one finding another package or place is (make()).
-            enforce("open_package_key", when=fresh and saved and not moved)
-            if moved:
+            if package.item_id in counted_now.moved:
                 # Its item moved meanwhile: asked again, found again then,
                 # though no line but the package counted it.
                 withheld = counted_now.moved

@@ -179,13 +179,6 @@ def _write_count(
     return written
 
 
-def sent_under(session: Session, keys: Collection[uuid.UUID]) -> bool:
-    """Whether a count was written under any of `keys`, its losses' keys
-    (_lost_key) too: a form of them sent before."""
-    every = [*keys, *map(_lost_key, keys)]
-    return exists_where(session, LedgerTransaction.idempotency_key.in_(every))
-
-
 def _lost_key(key: uuid.UUID) -> uuid.UUID:
     """The key a count's losses are written under, made from its own, so
     sending it twice writes them once."""
