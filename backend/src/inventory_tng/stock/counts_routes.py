@@ -58,10 +58,7 @@ is counted may no longer be counted: the save is refused whole, and the
 form shown again without it, keeping what was typed (Ali, 2026-11-22,
 inventory-tng-ygk5). The form then carries the areas gone from it and
 the moment it was first shown (forms.GONE), so it shows, until saved,
-what left them since (stock/moved_out.py): what went to a place on it
-under "Moved from … to …", counted there and only there, and what went
-elsewhere, with nothing to type; Found in says why it leaves them out.
-One emptied can be brought back from the form (bring_back), as its own
+what left them since (stock/count_gone_areas.py). One emptied can be brought back from the form (bring_back), as its own
 page does (places/locations.restore), and the form shown again with it.
 """
 
@@ -84,14 +81,7 @@ from inventory_tng.catalogue.items_listing import SEARCHED
 from inventory_tng.core.db_errors import Gone as RowGone
 from inventory_tng.core.db_errors import attempt, refusal
 from inventory_tng.core.db_sessions import DbSession, SnapshotSession, by_name
-from inventory_tng.core.phrases import (
-    Words,
-    gettext,
-    in_query,
-    joined,
-    lazy_gettext,
-    ngettext,
-)
+from inventory_tng.core.phrases import Words, gettext, in_query, lazy_gettext, ngettext
 from inventory_tng.core.sent_forms import form_key
 from inventory_tng.models.admins import Admin
 from inventory_tng.models.base import INTEGER_MAX, whole
@@ -102,6 +92,13 @@ from inventory_tng.places import locations
 from inventory_tng.site_settings.paths import SETTINGS
 from inventory_tng.stock import needs_action, over_recorded, queries
 from inventory_tng.stock.balance import countable, takeable
+from inventory_tng.stock.count_gone_areas import (
+    Leaving,
+    areas_leaving,
+    gone_words,
+    moved_sections,
+)
+from inventory_tng.stock.count_groups import FormRow, Group, label
 from inventory_tng.stock.counts import Counted, NotCountable, record_adjustment
 from inventory_tng.stock.forms import (
     CLOSED_MEANWHILE,
@@ -133,7 +130,6 @@ from inventory_tng.stock.moments import (
     moment,
     seen_up_to,
 )
-from inventory_tng.stock.moved_out import MovedOut, moved_out
 from inventory_tng.stock.needs_action import OnlyItem
 from inventory_tng.stock.paths import ADJUSTMENTS, COUNTS
 from inventory_tng.stock.store_counts import record_store_count
@@ -190,65 +186,6 @@ areas_brought_back = meter.create_counter(
     description="Retired areas emptied while they were counted, brought back "
     "from the count form",
 )
-
-
-def emptied_meanwhile(places: Sequence[str]) -> str:
-    """A count refused whole as retired areas on it were emptied while it
-    was counted, so they may no longer be counted (Ali, 2026-11-22,
-    inventory-tng-ygk5)."""
-    return ngettext(
-        "Not saved: %(places)s was emptied while you counted, so the records "
-        "show no items there now. Move details are shown below, and your other "
-        "counts are kept. Confirm and save again.",
-        "Not saved: %(places)s were emptied while you counted, so the records "
-        "show no items there now. Move details are shown below, and your other "
-        "counts are kept. Confirm and save again.",
-        len(places),
-        places=joined(places),
-    )
-
-
-def retired_meanwhile(places: Sequence[str]) -> str:
-    """A count refused whole as empty areas on it were retired while it was
-    counted, nothing moving out of them."""
-    return ngettext(
-        "Not saved: %(places)s was retired while you counted, so it is no "
-        "longer on this form. What you typed for the other areas is kept: check "
-        "it and save again.",
-        "Not saved: %(places)s were retired while you counted, so they are no "
-        "longer on this form. What you typed for the other areas is kept: check "
-        "it and save again.",
-        len(places),
-        places=joined(places),
-    )
-
-
-def moved_from(place: str, there: str) -> str:
-    """The heading of what left an area gone from a count form for another
-    place on it, counted there."""
-    return gettext("Moved from %(place)s to %(there)s", place=place, there=there)
-
-
-def taken_out(place: str) -> str:
-    """The heading of what left areas gone from a count form for no place
-    on it."""
-    return gettext("Taken out of %(place)s", place=place)
-
-
-def removed(place: str) -> str:
-    """The heading of an empty area retired while it was counted."""
-    return gettext("%(place)s (retired): removed from this form.", place=place)
-
-
-def not_offered(places: Sequence[str]) -> str:
-    """Beside where something was found: the areas gone from the form, not
-    offered."""
-    return ngettext(
-        "%(places)s isn't offered: it's retired.",
-        "%(places)s aren't offered: they're retired.",
-        len(places),
-        places=joined(places),
-    )
 
 
 def brought_back(place: str) -> str:
@@ -490,36 +427,6 @@ def shown_items(only: OnlyItem, q: str = "") -> Shown:
 ShownItems = Annotated[Shown, Depends(shown_items)]
 
 
-# Between the names of an area's path on a count form.
-PATH_BETWEEN = " \N{SINGLE RIGHT-POINTING ANGLE QUOTATION MARK} "
-
-
-class Group(NamedTuple):
-    """One place on a count form, its lines under it: the page's own place
-    or an area in it (inventory-tng-8i4.51.4). Its path below the page's
-    place (none for that place), the prefix of its fields (forms.AT), its
-    rows of an item and the records' amount, those counted by form, the
-    recount's items it asks for again, and each one's figures."""
-
-    place: Location
-    path: tuple[str, ...]
-    prefix: str
-    rows: list[tuple[Item, Decimal]]
-    forms: dict[int, list[FormRow]]
-    items: list[int]
-    recount: Mapping[int, tuple[Decimal, Decimal, Decimal]] | None
-
-    @property
-    def label(self) -> str:
-        return label(self.place, self.path)
-
-
-def label(place: Location, path: tuple[str, ...]) -> str:
-    """How a count form names a place it shows: its path, or for the page's
-    own place its name."""
-    return PATH_BETWEEN.join(path) if path else place.name
-
-
 def _shown_places(
     session: Session, root: Location, places: Collection[int] | None
 ) -> list[tuple[Location, tuple[str, ...]]]:
@@ -549,148 +456,6 @@ def _listed_words(
     return already_listed(item.name_shown, where), {EXTRA_ITEM: listed_under(where)}
 
 
-class Leaving(NamedTuple):
-    """The areas gone from a count form (forms.Gone) as they are now: each
-    one's label, by id, as the form names it; what left them since the
-    form was first shown, by the ledger (moved_out), and which of them
-    anything left; which are still retired; and the order of the places
-    in the tree, to say them in."""
-
-    labels: dict[int, str]
-    moves: list[MovedOut]
-    emptied: set[int]
-    retired: set[int]
-    order: dict[int, int]
-
-    def ordered(self, ids: Collection[int]) -> list[int]:
-        """The areas of `ids` in the tree's order."""
-        return sorted(ids, key=lambda each: self.order.get(each, 0))
-
-    def said(self, ids: Collection[int]) -> list[str]:
-        """The labels of the areas of `ids`, in the tree's order."""
-        return [self.labels[area_id] for area_id in self.ordered(ids)]
-
-
-def _leaving(session: Session, root: Location, gone: Gone) -> Leaving:
-    """The areas gone from a count form of `root`, and what left them."""
-    tree = queries.place_tree(session, root)
-    order = {each.id: n for n, (each, _, _) in enumerate(tree)}
-    labels = {each.id: label(each, path) for each, path, _ in tree}
-    found = queries.places_with_ids(session, gone.ids)
-    # One moved out of the place since: under its own name.
-    labels = {each.id: labels.get(each.id, each.name) for each in found}
-    moves = moved_out(session, gone.ids, gone.since)
-    return Leaving(
-        labels,
-        moves,
-        {move.from_id for move in moves},
-        {each.id for each in found if each.retired_at is not None},
-        order,
-    )
-
-
-def gone_words(leaving: Leaving, ids: Collection[int]) -> str:
-    """What a count form says of the areas of `ids`, just gone from it:
-    emptied while it was counted, if anything left any; else retired."""
-    emptied = [area_id for area_id in ids if area_id in leaving.emptied]
-    if emptied:
-        return emptied_meanwhile(leaving.said(emptied))
-    return retired_meanwhile(leaving.said(ids))
-
-
-class Moves(NamedTuple):
-    """What a count form shows of what left the areas gone from it: a
-    section of each place on it that something went to, its heading and
-    what went there, as that place's own lines, taken from under it; what
-    went nowhere on it, with its heading; and, of the areas gone, those
-    still retired that anything left, each with its label, to bring back;
-    the headings of those nothing left; what Found in says of those it
-    leaves out; and those back now."""
-
-    sections: list[tuple[str, Group]]
-    taken: tuple[str, list[tuple[Item, Decimal]]] | None
-    to_bring_back: list[tuple[int, str]]
-    removed: list[str]
-    not_offered: str
-    back: set[int]
-
-    @property
-    def into(self) -> set[int]:
-        """The places on the form something went to."""
-        return {group.place.id for _, group in self.sections}
-
-
-def _moves(
-    root: Location,
-    groups: list[Group],
-    leaving: Leaving,
-    moves: Sequence[MovedOut],
-    named: Mapping[int, Item],
-) -> tuple[list[Group], Moves]:
-    """The groups of a count form, without the lines of what went to them
-    from the areas gone from it, and those lines, under the moves
-    (Moves)."""
-    by_id = {group.place.id: group for group in groups}
-    went: dict[tuple[int, int], set[int]] = {}
-    taken: dict[int, Decimal] = {}
-    for move in moves:
-        if move.to_id in by_id:
-            went.setdefault((move.from_id, move.to_id), set()).add(move.item_id)
-        else:
-            taken[move.item_id] = taken.get(move.item_id, Decimal(0)) + move.quantity
-    sections: list[tuple[str, Group]] = []
-    moved_to: dict[int, set[int]] = {}
-    for (from_id, to_id), items in sorted(
-        went.items(),
-        key=lambda pair: tuple(leaving.order.get(each, 0) for each in pair[0]),
-    ):
-        group = by_id[to_id]
-        # An item that went there from two areas gone: under the first only,
-        # so its box is on the form once.
-        new = items - moved_to.get(to_id, set())
-        if not new:
-            continue
-        held = {item.id: n for item, n in group.rows}
-        rows = sorted(
-            ((named[item_id], held.get(item_id, Decimal(0))) for item_id in new),
-            key=lambda row: row[0].name.lower(),
-        )
-        heading = moved_from(leaving.labels[from_id], group.label)
-        sections.append((heading, group._replace(rows=rows)))
-        moved_to.setdefault(to_id, set()).update(new)
-    shown = [
-        group._replace(
-            rows=[
-                row
-                for row in group.rows
-                if row[0].id not in moved_to.get(group.place.id, ())
-            ]
-        )
-        for group in groups
-    ]
-    retired = leaving.retired
-    gone = set(leaving.labels)
-    return shown, Moves(
-        sections,
-        (
-            taken_out(root.name),
-            sorted(
-                ((named[item_id], n) for item_id, n in taken.items()),
-                key=lambda row: row[0].name.lower(),
-            ),
-        )
-        if taken
-        else None,
-        [
-            (area_id, leaving.labels[area_id])
-            for area_id in leaving.ordered(gone & retired & leaving.emptied)
-        ],
-        [removed(each) for each in leaving.said((gone & retired) - leaving.emptied)],
-        not_offered(leaving.said(gone & retired)) if gone & retired else "",
-        gone - retired,
-    )
-
-
 def _count_page(
     request: Request,
     session: Session,
@@ -707,6 +472,7 @@ def _count_page(
     alert: Words | None = None,
     picked: Mapping[str, str] | None = None,
     gone: Gone = NONE_GONE,
+    leaving: Leaving | None = None,
     caution: Words | None = None,
     status_code: int = 200,
 ) -> HTMLResponse:
@@ -720,7 +486,8 @@ def _count_page(
     `picked`, the places picked for something else here and an open
     package nobody recorded at the last save (forms.PICKED). `gone`, the
     areas gone from it, retired, and what left them shown under the
-    places it went to (_moves); `caution`, words above the form, said as
+    places it went to (count_gone_areas); `leaving`, those areas as read
+    already, if they were; `caution`, words above the form, said as
     a warning is."""
     asked = {
         place_id: set(each)
@@ -728,7 +495,8 @@ def _count_page(
         if each
     }
     ids = shown.ids(session)
-    leaving = _leaving(session, place, gone) if gone.ids else None
+    if leaving is None and gone.ids:
+        leaving = areas_leaving(session, place, gone)
     # Of what left the areas gone, only the items shown.
     moves = [
         move
@@ -820,7 +588,7 @@ def _count_page(
     ]
     moved = None
     if leaving is not None:
-        groups, moved = _moves(place, groups, leaving, moves, named)
+        groups, moved = moved_sections(place, groups, leaving, moves, named)
     # Something else here and an open package nobody recorded may be found
     # in any place shown but a retired area (forms.PICKED).
     choices = [
@@ -906,17 +674,6 @@ def sealed_how_many(package: str) -> str:
 
 def opened_left(package: str, day: str) -> str:
     return gettext("%(package)s, opened %(day)s: left", package=package, day=day)
-
-
-class FormRow(NamedTuple):
-    """One form of an item at a place, as the count form asks for it
-    (docs/decisions/0020): its field, words, and the records as of the
-    form; for an open package, its id."""
-
-    field: str
-    words: Words
-    amount: Decimal
-    open_id: int | None = None
 
 
 def _forms(
@@ -1213,16 +970,18 @@ def count(
                 location_id=place.id,
                 gone_ids=sorted(fresh),
             )
+            leaving = areas_leaving(session, place, gone)
             return again(
                 None,
                 values=typed,
-                alert=gone_words(_leaving(session, place, gone), fresh),
+                alert=gone_words(leaving, fresh),
                 items={
                     place_id: each
                     for place_id, each in asked.items()
                     if place_id not in fresh
                 },
                 gone=gone,
+                leaving=leaving,
                 status_code=409,
             )
         if broken == CHANGED:
@@ -1306,7 +1065,7 @@ def bring_back(
     if carried is None or area_id not in carried.gone.ids:
         return not_found()
     place, _, at, place_ids, gone = carried
-    leaving = _leaving(session, place, gone)
+    leaving = areas_leaving(session, place, gone)
     if area_id == place.id or area_id not in leaving.order:
         # Not one of the place's areas, as only a hand-made form names: none
         # this form may bring back.

@@ -1,6 +1,6 @@
 """Where what left some places after a moment went, by the ledger: what a
 count form says of a retired area emptied while it was counted
-(stock/counts_routes.py, Ali, 2026-11-22, inventory-tng-ygk5). It only
+(stock/count_gone_areas.py, Ali, 2026-11-22, inventory-tng-ygk5). It only
 reads the ledger, taking no lock."""
 
 from collections.abc import Collection

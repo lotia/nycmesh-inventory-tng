@@ -420,7 +420,7 @@ msgstr ""
 msgid "%(place)s (opened)"
 msgstr ""
 
-#: src/inventory_tng/stock/counts_routes.py
+#: src/inventory_tng/stock/count_gone_areas.py
 #, python-format
 msgid "%(place)s (retired): removed from this form."
 msgstr ""
@@ -456,7 +456,7 @@ msgstr ""
 msgid "%(place)s: %(item)s counted"
 msgstr ""
 
-#: src/inventory_tng/stock/counts_routes.py
+#: src/inventory_tng/stock/count_gone_areas.py
 #, python-format
 msgid "%(places)s isn't offered: it's retired."
 msgid_plural "%(places)s aren't offered: they're retired."
@@ -2081,7 +2081,7 @@ msgstr ""
 msgid "Move what is here elsewhere, or count it, first."
 msgstr ""
 
-#: src/inventory_tng/stock/counts_routes.py
+#: src/inventory_tng/stock/count_gone_areas.py
 #, python-format
 msgid "Moved from %(place)s to %(there)s"
 msgstr ""
@@ -2309,7 +2309,7 @@ msgstr ""
 msgid "Not right?"
 msgstr ""
 
-#: src/inventory_tng/stock/counts_routes.py
+#: src/inventory_tng/stock/count_gone_areas.py
 #, python-format
 msgid ""
 "Not saved: %(places)s was emptied while you counted, so the records show "
@@ -2322,7 +2322,7 @@ msgid_plural ""
 msgstr[0] ""
 msgstr[1] ""
 
-#: src/inventory_tng/stock/counts_routes.py
+#: src/inventory_tng/stock/count_gone_areas.py
 #, python-format
 msgid ""
 "Not saved: %(places)s was retired while you counted, so it is no longer "
@@ -3706,7 +3706,7 @@ msgid ""
 "first to replace it."
 msgstr ""
 
-#: src/inventory_tng/stock/counts_routes.py
+#: src/inventory_tng/stock/count_gone_areas.py
 #, python-format
 msgid "Taken out of %(place)s"
 msgstr ""

@@ -33,7 +33,7 @@ if you didn't count it. Anything else here, add below.{% endtrans %}</p>
 {% set columns = 4 if recount else 3 %}
 {#- A place's lines on the count form: its items, each by its total or by
 form (0020); under a move from an area gone from the form, each box blank,
-to confirm (stock/counts_routes.py). #}
+to confirm (stock/count_gone_areas.py). #}
 {% macro item_rows(group, columns, blank=false) %}
     {% set prefix = group.prefix %}
     {% set where = group.label if group.path else "" %}
@@ -94,7 +94,7 @@ to confirm (stock/counts_routes.py). #}
     <tr><th>{% trans %}Item{% endtrans %}</th><th>{% trans %}Records say{% endtrans %}</th>{% if recount %}<th>{% trans %}While you counted{% endtrans %}</th>{% endif %}<th>{% trans %}Counted{% endtrans %}</th></tr>
     {#- What left the areas gone from it: what went to a place on it under
     the move, counted there and only there; what went elsewhere, with
-    nothing to type (stock/counts_routes.py). #}
+    nothing to type (stock/count_gone_areas.py). #}
     {% if moved %}
     {% for words in moved.removed %}
     <tr class="text-muted"><th colspan="{{ columns }}" scope="rowgroup">{{ words }}</th></tr>
