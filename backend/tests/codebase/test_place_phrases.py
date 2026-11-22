@@ -30,10 +30,6 @@ SIDES = {
     ),
 }
 
-# Printed labels' path, which waits on Ali (inventory-tng-uomm): told,
-# but its "in" not yet judged.
-WAITING = {"server": {"%(place)s, in %(parent)s"}}
-
 # The prepositions English chooses by a place's kind.
 BY_KIND = r"\b(?:in|on|into|onto|inside)\s+"
 
@@ -82,8 +78,7 @@ def test_no_place_follows_a_preposition_chosen_by_its_kind(side: str) -> None:
     _, value, places = SIDES[side]
     messages = side_placed(side)
     assert messages
-    flagged = {str(m.id) for m in messages if by_kind(m, value, places)}
-    assert flagged == WAITING.get(side, set())
+    assert [str(m.id) for m in messages if by_kind(m, value, places)] == []
 
 
 @pytest.mark.parametrize("side", SIDES)

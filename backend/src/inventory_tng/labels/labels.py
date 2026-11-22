@@ -19,7 +19,7 @@ from sqlalchemy.orm import Session
 
 from inventory_tng.core.db_locking import get_locked, locked_row
 from inventory_tng.core.db_once_committed import once_committed
-from inventory_tng.core.phrases import gettext, lazy_gettext
+from inventory_tng.core.phrases import PATH_BETWEEN, gettext, lazy_gettext
 from inventory_tng.models.catalogue import Item, ItemPackage
 from inventory_tng.models.labels import Label
 from inventory_tng.models.places import Location
@@ -135,12 +135,9 @@ def package_label(item: str, package: str, size: str) -> str:
 
 
 def place_words(place: str, parent: str | None) -> str:
-    """A place's label's words: the place, and the place around it."""
-    if parent is None:
-        return place
-    # Translators: %(place)s and %(parent)s are places of any kind, such as
-    # a store, a shelf, a bin or a volunteer's home.
-    return gettext("%(place)s, in %(parent)s", place=place, parent=parent)
+    """A place's label's words: the place it is part of, if any, then it,
+    as a count form names a place by its path."""
+    return place if parent is None else PATH_BETWEEN.join((parent, place))
 
 
 def _by_id[M: (Item, ItemPackage, Location)](

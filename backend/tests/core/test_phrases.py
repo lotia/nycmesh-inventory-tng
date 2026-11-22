@@ -203,7 +203,6 @@ SAID_WITH_VALUES: list[Callable[[], Words]] = [
     lambda: over_recorded_queries.closed_on_day(NOT_ENGLISH, NOT_ENGLISH),
     lambda: over_recorded_queries.counted_on(NOT_ENGLISH, NOT_ENGLISH),
     lambda: labels.package_label(NOT_ENGLISH, NOT_ENGLISH, NOT_ENGLISH),
-    lambda: labels.place_words(NOT_ENGLISH, NOT_ENGLISH),
     *(lambda said=said: said("") for said in units.NAMES.values()),
 ]
 

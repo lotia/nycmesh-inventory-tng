@@ -33,6 +33,9 @@ from sqlalchemy import BindParameter, String, bindparam
 # never in the catalogue. Messages take it as %(brand)s. Authenticator apps
 # show it too (authenticator_totp.ISSUER), so it must not change with the locale.
 BRAND = "NYC Mesh Inventory"
+# Between the names of a place's path, as a count form and a printed label
+# name a place that is part of another (the scan page's search.ts too).
+PATH_BETWEEN = " \N{SINGLE RIGHT-POINTING ANGLE QUOTATION MARK} "
 ENGLISH_PO = (
     Path(__file__).parents[1] / "locales" / "en" / "LC_MESSAGES" / "messages.po"
 )

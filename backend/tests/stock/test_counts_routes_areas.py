@@ -11,10 +11,10 @@ from fastapi.testclient import TestClient
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from inventory_tng.core.phrases import PATH_BETWEEN
 from inventory_tng.models.catalogue import Item
 from inventory_tng.models.places import Location
 from inventory_tng.models.stock import OpenPackage
-from inventory_tng.stock.count_groups import PATH_BETWEEN
 from inventory_tng.stock.forms import ON_THE_FORM_TWICE, PICK_A_PLACE, TYPE_IT_HERE
 from inventory_tng.stock.ledger import Entry
 from inventory_tng.stock.moments import expected

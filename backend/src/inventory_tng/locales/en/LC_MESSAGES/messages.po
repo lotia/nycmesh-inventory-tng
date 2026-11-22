@@ -482,13 +482,6 @@ msgid ""
 "one as empty, and record it found there."
 msgstr ""
 
-#. Translators: %(place)s and %(parent)s are places of any kind, such as
-#. a store, a shelf, a bin or a volunteer's home.
-#: src/inventory_tng/labels/labels.py
-#, python-format
-msgid "%(place)s, in %(parent)s"
-msgstr ""
-
 #. %(place)s is a place of any kind, such as a store, a shelf, a bin or a
 #. volunteer's home.
 #: src/inventory_tng/templates/stock/count.html

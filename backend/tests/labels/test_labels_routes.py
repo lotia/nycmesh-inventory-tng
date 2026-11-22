@@ -110,7 +110,10 @@ def test_a_package_and_a_place_have_codes_of_their_own(
     (on_shelf,) = labels_of(session, location_id=shelf.id)
     page = text(admin_client.get(LABELS))
     assert package_label("Cat6 cable", "Reel", "305 m") in page
-    assert place_words("Shelf A", "Hub") in page
+    # The place it is part of, then it, as a count form's path (Ali,
+    # 2026-11-22): no preposition chosen by the kind of place.
+    assert "Hub \N{SINGLE RIGHT-POINTING ANGLE QUOTATION MARK} Shelf A" in page
+    assert place_words("Hub", None) == "Hub"
     page = admin_client.get(f"{LOCATIONS}/{shelf.id}").text
     assert on_shelf.code in page
     assert ("post", LABELS) in forms(page)
