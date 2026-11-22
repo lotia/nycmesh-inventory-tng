@@ -138,6 +138,8 @@ def place_words(place: str, parent: str | None) -> str:
     """A place's label's words: the place, and the place around it."""
     if parent is None:
         return place
+    # Translators: %(place)s and %(parent)s are places of any kind, such as
+    # a store, a shelf, a bin or a volunteer's home.
     return gettext("%(place)s, in %(parent)s", place=place, parent=parent)
 
 

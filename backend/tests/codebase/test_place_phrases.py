@@ -19,7 +19,7 @@ SIDES = {
     "server": (
         ENGLISH_PO,
         r"%\((\w+)\)s",
-        {"place", "places", "there", "from_place", "to_place"},
+        {"place", "places", "there", "from_place", "to_place", "parent"},
     ),
     "scan page": (
         CLONE / "frontend/src/locales/en.po",
@@ -28,7 +28,8 @@ SIDES = {
     ),
 }
 
-# Printed labels' path, which waits on Ali (inventory-tng-uomm).
+# Printed labels' path, which waits on Ali (inventory-tng-uomm): told,
+# but its "in" not yet judged.
 WAITING = {"%(place)s, in %(parent)s"}
 
 # The prepositions English chooses by a place's kind.
@@ -40,9 +41,7 @@ def placed(messages: list[Message], value: str, places: set[str]) -> list[Messag
     return [
         message
         for message in messages
-        if message.id
-        and str(message.id) not in WAITING
-        and places & set(re.findall(value, str(message.id)))
+        if message.id and places & set(re.findall(value, str(message.id)))
     ]
 
 
@@ -74,7 +73,8 @@ def test_no_place_follows_a_preposition_chosen_by_its_kind(side: str) -> None:
     catalogue, value, places = SIDES[side]
     messages = placed(list(read(catalogue)), value, places)
     assert messages
-    assert [m.id for m in messages if by_kind(m, value, places)] == []
+    judged = [m for m in messages if str(m.id) not in WAITING]
+    assert [m.id for m in judged if by_kind(m, value, places)] == []
 
 
 @pytest.mark.parametrize("side", SIDES)
