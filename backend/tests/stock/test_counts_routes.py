@@ -516,6 +516,70 @@ def test_a_recount_sent_back_with_a_problem_asks_for_its_items_only(
     assert "Count them again now." in text(refused)
 
 
+def test_a_recount_refused_for_a_bad_number_keeps_its_figures(
+    admin_client: TestClient, session: Session
+) -> None:
+    """Refused for a problem, the recount is shown again with what was
+    typed, came in and went out while it was counted, as first shown
+    (inventory-tng-up4h)."""
+    place = stocked(session)
+    path = f"{COUNTS}/{place.store.id}"
+    shown = count_form(admin_client.get(path))
+    write(session, place)  # Three radios to the van.
+    asked = admin_client.post(path, data=shown | {f"counted_{place.item.id}": "5"})
+    again = count_form(asked)
+    refused = admin_client.post(path, data=again | {f"counted_{place.item.id}": "x"})
+    assert refused.status_code == 400
+    page = text(refused)
+    assert "While you counted" in page
+    assert "0 in, 3 out; you typed 5" in page
+    assert count_form(refused) == again
+    done = admin_client.post(path, data=again | {f"counted_{place.item.id}": "1"})
+    assert done.status_code == 303
+    assert expected(session, place.store.id)[place.item.id] == Decimal(1)
+
+
+def test_a_recount_figures_sent_changed_change_only_what_is_shown(
+    admin_client: TestClient, session: Session
+) -> None:
+    """A hand-made form's figures are only shown, and only of the items the
+    recount asks for; one that is no number is left blank, and the count
+    is written as typed."""
+    place = stocked(session)
+    with_cable(session, place)
+    path = f"{COUNTS}/{place.store.id}"
+    shown = count_form(admin_client.get(path))
+    write(session, place)  # Three radios to the van.
+    asked = admin_client.post(
+        path,
+        data=shown
+        | {f"counted_{place.item.id}": "5", f"counted_{place.cable.id}": "18"},
+    )
+    again = count_form(asked)
+    item = f"counted_{place.item.id}"
+    made = again | {
+        f"while_{place.item.id}": "7 8 9",
+        f"while_{place.cable.id}": "1 2 3",
+        "while_x": "4 5 6",
+    }
+    refused = admin_client.post(path, data=made | {item: "x"})
+    assert "8 in, 9 out; you typed 7" in text(refused)
+    assert "2 in, 3 out" not in text(refused)
+    assert "5 in, 6 out" not in text(refused)
+    assert not box_values(refused.text, f"counted_{place.cable.id}")
+    for wrong in ("7 8", "x 8 9", "-1 8 9"):
+        page = admin_client.post(
+            path, data=again | {f"while_{place.item.id}": wrong, item: "x"}
+        )
+        assert " in, " not in text(page), wrong
+    done = admin_client.post(path, data=made | {item: "1"})
+    assert done.status_code == 303
+    assert expected(session, place.store.id) == {
+        place.item.id: Decimal(1),
+        place.cable.id: Decimal(18),
+    }
+
+
 def test_a_recount_sent_back_leaves_out_an_item_there_is_not(
     admin_client: TestClient, session: Session
 ) -> None:

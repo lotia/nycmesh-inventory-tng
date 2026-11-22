@@ -94,6 +94,9 @@ one by its size, an open package closed as none
   (stock/forms.py). #}
   <input type="hidden" name="places" value="{{ groups | map(attribute='place.id') | join(' ') }}">
   {% for group in groups if group.items %}<input type="hidden" name="{{ group.prefix }}items" value="{{ group.items | join(' ') }}">{% endfor %}
+  {#- A recount's figures of each item, kept on a recount shown again
+  (stock/forms.py). #}
+  {% for group in groups %}{% for item_id, figures in (group.recount or {}).items() %}<input type="hidden" name="{{ group.prefix }}while_{{ item_id }}" value="{{ figures | map('plain_amount') | join(' ') }}">{% endfor %}{% endfor %}
   {#- The areas gone from it since it was first shown, and that moment,
   until it is saved (stock/forms.py). #}
   {% if gone.ids %}<input type="hidden" name="gone" value="{{ gone.ids | join(' ') }}"><input type="hidden" name="gone_since" value="{{ gone.since }}">{% endif %}

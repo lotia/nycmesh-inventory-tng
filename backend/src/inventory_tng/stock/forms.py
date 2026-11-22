@@ -352,15 +352,47 @@ def by_place(
     return split, problems
 
 
+# A recount's figures of an item, as it first showed them: what was typed,
+# what came in and what went out while it was counted.
+Figures = tuple[Decimal, Decimal, Decimal]
+
+# A recount's figures of each item it asks for again, carried so a recount
+# refused for a problem shows them again (inventory-tng-up4h): while_<item
+# id>, "typed came went". Only ever shown, never written.
+WHILE = "while_"
+
+
+def recount_figures(
+    fields: Mapping[str, str], items: Collection[int]
+) -> dict[int, Figures]:
+    """A place's recount figures (WHILE) of the items it asks for again,
+    each read as a quantity typed is; those of other items, or not three
+    such, left out."""
+    figures: dict[int, Figures] = {}
+    for field, value in fields.items():
+        if not field.startswith(WHILE):
+            continue
+        item_id = row_id(field.removeprefix(WHILE))
+        read = [quantity(typed, positive=False) for typed in value.split()]
+        match read:
+            case [Decimal() as typed, Decimal() as came, Decimal() as went] if (
+                item_id is not None and item_id in items
+            ):
+                figures[item_id] = (typed, came, went)
+    return figures
+
+
 class PlaceCount(NamedTuple):
     """What a count form says of one place: its lines as typed, those
     counted by total, those by form, on a recount, the items it asks for
-    again, and how many arrived of the moves to it (arrivals)."""
+    again and their figures (recount_figures), and how many arrived of the
+    moves to it (arrivals)."""
 
     found: list[Line]
     counted: ItemLines
     forms: ByForm
     items: set[int]
+    recount: dict[int, Figures]
     arrived: dict[tuple[int, int, Form], Decimal]
 
     @property
@@ -447,7 +479,8 @@ def read_count(
         counted, wrong = item_counts(session, found)
         forms, form_wrong = by_form(session, fields, place_id)
         arrived, arrived_wrong = arrivals(session, fields, place_id)
-        places[place_id] = PlaceCount(found, counted, forms, items, arrived)
+        figures = recount_figures(fields, items)
+        places[place_id] = PlaceCount(found, counted, forms, items, figures, arrived)
         named = fields_at(root_id, place_id, named_twice(found_once))
         twice |= named
         problems |= fields_at(root_id, place_id, wrong | form_wrong | arrived_wrong)

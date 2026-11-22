@@ -344,6 +344,36 @@ def test_a_move_between_two_areas_during_a_count_is_counted_again_at_both(
     assert len(counts_at(session, made.store)) == 1
 
 
+def test_a_recount_of_areas_refused_for_a_bad_number_keeps_their_figures(
+    admin_client: TestClient, session: Session
+) -> None:
+    """A radio moved from the shelf to the bin while the store was counted;
+    the recount, refused for a bad number in the bin, still says what
+    each was typed, came in and went out (inventory-tng-up4h)."""
+    made = Store(session)
+    item = made.place.item.id
+    made.receive(session, made.bin, item, "1")
+    shown = count_form(admin_client.get(made.path))
+    made.move(session, made.shelf, made.bin)
+    asked = admin_client.post(
+        made.path,
+        data=shown
+        | {
+            f"at_{made.shelf.id}_counted_{item}": "3",
+            f"at_{made.bin.id}_counted_{item}": "1",
+        },
+    )
+    again = count_form(asked)
+    refused = admin_client.post(
+        made.path, data=again | {f"at_{made.bin.id}_counted_{item}": "x"}
+    )
+    assert refused.status_code == 400
+    page = text(refused)
+    assert "0 in, 1 out; you typed 3" in page
+    assert "1 in, 0 out; you typed 1" in page
+    assert count_form(refused) == again
+
+
 def test_something_else_here_held_in_an_area_but_not_recounted_is_refused(
     admin_client: TestClient, session: Session
 ) -> None:
@@ -606,6 +636,9 @@ def test_a_recount_at_an_area_retired_since_asks_no_more_there(
     assert f"Not saved: {made.empty.name} was emptied while you counted" in text(
         refused
     )
+    # The shelf's figures as first shown; none of the empty shelf's.
+    assert "0 in, 1 out; you typed 2" in text(refused)
+    assert f"at_{made.empty.id}_while_{item}" not in count_form(refused)
     # The radio it sent back is under the move to the shelf, whose own line
     # counts what it held before (inventory-tng-ygk5).
     moved = f"Moved to {made.shelf.name}"

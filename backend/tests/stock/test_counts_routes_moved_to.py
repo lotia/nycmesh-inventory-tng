@@ -366,6 +366,12 @@ def test_a_recount_says_what_was_typed_with_what_arrived(
     assert page.status_code == 409
     assert "1 in, 0 out; you typed 4" in text(page)
     assert expected(session, moved.there.id) == {moved.item: Decimal(5)}
+    # Refused for a bad number, it says so still (inventory-tng-up4h).
+    refused = admin_client.post(
+        moved.path, data=count_form(page) | {moved.counted(): "x"}
+    )
+    assert refused.status_code == 400
+    assert "1 in, 0 out; you typed 4" in text(refused)
 
 
 def test_a_place_counted_by_form_counts_its_own_spools_apart(

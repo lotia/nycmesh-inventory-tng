@@ -130,6 +130,7 @@ from inventory_tng.stock.forms import (
     NONE_GONE,
     PICKED,
     TYPE_IT_HERE,
+    Figures,
     Gone,
     Listed,
     adjustment,
@@ -504,7 +505,7 @@ def _count_page(
     problems: Mapping[str, Words] | None = None,
     values: Mapping[str, str] | None = None,
     items: Mapping[int, Collection[int]] | None = None,
-    recount: Mapping[int, Mapping[int, tuple[Decimal, Decimal, Decimal]]] | None = None,
+    recount: Mapping[int, Mapping[int, Figures]] | None = None,
     alert: Words | None = None,
     more_alerts: Sequence[Words] = (),
     picked: Mapping[str, str] | None = None,
@@ -528,11 +529,10 @@ def _count_page(
     (count_arrivals.set_aside); `leaving`, those areas as read already, if
     they were; `more_alerts`, under `alert`; `caution`, words above the
     form, said as a warning is."""
-    asked = {
-        place_id: set(each)
-        for place_id, each in [*(items or {}).items(), *(recount or {}).items()]
-        if each
-    }
+    asked: dict[int, set[int]] = {}
+    for place_id, each in [*(items or {}).items(), *(recount or {}).items()]:
+        if each:
+            asked.setdefault(place_id, set()).update(each)
     ids = shown.ids(session)
     if leaving is None and gone.ids:
         leaving = areas_leaving(session, place, gone)
@@ -850,7 +850,9 @@ def count(
     areas = place_ids != [place.id]
     sent = read_count(session, form, place.id, place_ids, at.as_of)
     asked = {place_id: each.items for place_id, each in sent.places.items()}
-    # The form shown again: as sent, or with `at` None, as it is now.
+    # The form shown again: as sent, or with `at` None, as it is now; a
+    # recount with the figures it first showed (forms.WHILE).
+    figures = {place_id: each.recount for place_id, each in sent.places.items()}
     again = partial(
         _count_page, request, session, signed, place, shown=shown, gone=gone
     )
@@ -891,6 +893,7 @@ def count(
             values=form,
             alert=alert,
             items=asked,
+            recount=figures,
         )
     # Filtered to some items, a place of a store's form with nothing typed
     # was not counted, the store's own too.
@@ -919,6 +922,7 @@ def count(
             values=form,
             alert=NOTHING_TYPED,
             items=asked,
+            recount=figures,
             status_code=400,
         )
 
@@ -993,6 +997,11 @@ def count(
                     for place_id, each in asked.items()
                     if place_id not in fresh
                 },
+                recount={
+                    place_id: each
+                    for place_id, each in figures.items()
+                    if place_id not in fresh
+                },
                 gone=gone,
                 leaving=leaving,
                 status_code=409,
@@ -1006,6 +1015,7 @@ def count(
                 values=typed,
                 alert=SAVED_AS_SHOWN,
                 items=asked,
+                recount=figures,
                 status_code=409,
             )
         # Checked again, the units as they are now mark the lines it broke.
@@ -1020,6 +1030,7 @@ def count(
             values=form,
             alert=None if problems else RULES[broken],
             items=asked,
+            recount=figures,
             status_code=400,
         )
     assert result is not None
@@ -1108,12 +1119,7 @@ def bring_back(
         # Not one of the place's areas, as only a hand-made form names: none
         # this form may bring back.
         return not_found()
-    asked = {
-        place_id: each.items
-        for place_id, each in read_count(
-            session, form, place.id, place_ids, at.as_of
-        ).places.items()
-    }
+    sent = read_count(session, form, place.id, place_ids, at.as_of).places
     again = partial(
         _count_page,
         request,
@@ -1122,7 +1128,8 @@ def bring_back(
         place,
         shown=shown,
         values=form,
-        items=asked,
+        items={place_id: each.items for place_id, each in sent.items()},
+        recount={place_id: each.recount for place_id, each in sent.items()},
         gone=gone,
     )
     area = session.get_one(Location, area_id)
