@@ -617,7 +617,6 @@ def test_a_recount_at_an_area_retired_since_asks_no_more_there(
     )
     assert done.status_code == 303
     assert expected(session, made.shelf.id) == {item: Decimal(3)}
-    assert expected(session, made.shelf.id) == {item: Decimal(3)}
 
 
 def test_a_place_without_areas_is_counted_as_before(

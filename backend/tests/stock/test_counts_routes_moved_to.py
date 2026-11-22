@@ -13,8 +13,8 @@ from sqlalchemy.orm import Session
 
 from inventory_tng.models.places import Location
 from inventory_tng.models.stock import LedgerTransaction, Movement
-from inventory_tng.stock.ledger import Entry
-from inventory_tng.stock.moments import expected
+from inventory_tng.stock.ledger import LOOSE, Entry
+from inventory_tng.stock.moments import expected, expected_forms_at
 from inventory_tng.stock.paths import COUNTS
 
 from helpers.markup import read, text
@@ -258,3 +258,58 @@ def test_a_sealed_package_that_never_arrived_is_lost_sealed(
         ).all()
         assert (lost.from_package_id is not None) == (form_lost == "sealed")
         assert lost.quantity == Decimal(305) - Decimal(arrived)
+
+
+def test_a_recount_says_what_was_typed_with_what_arrived(
+    admin_client: TestClient, session: Session
+) -> None:
+    """Shelf A held three radios before two came from Shelf C; one more
+    came from the store after the form was shown again, so Shelf A's line
+    is withheld and asked again. Three typed for what it held before, and
+    one of the move arrived: the recount says four were typed, as the
+    records now hold the move and its fix."""
+    moved = Moved(session, admin_client, "shelf")
+    moved.made.move(session, moved.made.store, moved.there)
+    typed = {moved.counted(): "3", moved.arrived(): "1"}
+    page = admin_client.post(moved.path, data=moved.form | typed)
+    assert page.status_code == 409
+    assert "1 in, 0 out; you typed 4" in text(page)
+    assert expected(session, moved.there.id) == {moved.item: Decimal(5)}
+
+
+def test_a_place_counted_by_form_counts_its_own_spools_apart(
+    session: Session, admin_client: TestClient
+) -> None:
+    """The store held two sealed spools and 10 m loose; one spool went to
+    Shelf C before the form was shown, and back while it was counted. The
+    store's own lines say one spool, sealed boxes adding whole spools to
+    the running total, and saved as shown it holds both and the 10 m."""
+    spools = Spools(session)
+    store, cable, sealed = spools.store, spools.cable.id, spools.sealed
+    spools.write(
+        {"kind": "receipt", "to_location_id": store.id},
+        Entry(cable, Decimal(10), LOOSE, LOOSE),
+    )
+    gone = add(session, area("Shelf C", store))
+    retire(session, gone)
+    spool = Entry(cable, Decimal(305), sealed, sealed)
+    spools.write(
+        {"kind": "move", "from_location_id": store.id, "to_location_id": gone.id},
+        spool,
+    )
+    path = f"{COUNTS}/{store.id}"
+    shown = count_form(admin_client.get(path))
+    spools.write(
+        {"kind": "move", "from_location_id": gone.id, "to_location_id": store.id},
+        spool,
+    )
+    refused = admin_client.post(path, data=shown)
+    assert refused.status_code == 409
+    page = read(refused.text)
+    box = page.one("input", name=f"sealed_{cable}_{spools.spool.id}").attrs
+    assert (box["value"], box["data-per"]) == ("1", "305")
+    assert "data-per" not in page.one("input", name=f"loose_{cable}").attrs
+    saved(admin_client, path, count_form(refused))
+    assert expected_forms_at(session, [store.id], 2**31 - 1, [cable]) == {
+        store.id: {(cable, sealed): Decimal(610), (cable, LOOSE): Decimal(10)}
+    }

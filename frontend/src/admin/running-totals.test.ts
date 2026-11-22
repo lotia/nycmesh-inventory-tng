@@ -60,6 +60,14 @@ test("a box with no number hides the line until it has one", () => {
   expect(total("7-5")).toBe("8");
 });
 
+test("a sealed package is counted whole, as the server reads it", () => {
+  type("at_7_sealed_6_2", "1.5");
+  expect(line("7-6").hidden).toBe(true);
+  type("at_7_sealed_6_2", "2");
+  expect(line("7-6").hidden).toBe(false);
+  expect(total("7-6")).toBe("630.5");
+});
+
 test("the words are a polite live region, read out whole", () => {
   const words = line("7-5").querySelector("[role=status]") as HTMLElement;
   expect(words.getAttribute("aria-atomic")).toBe("true");

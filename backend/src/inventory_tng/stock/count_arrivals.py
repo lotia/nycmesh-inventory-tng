@@ -113,6 +113,22 @@ def _sizes(session: Session, package_ids: set[int]) -> dict[int, Decimal]:
     return {package_id: Decimal(size) for package_id, size in rows}
 
 
+def arrived_at(
+    moves: Sequence[MovedOut], fixes: Sequence[Fix]
+) -> dict[tuple[int, int], Decimal]:
+    """How many arrived of each item at each place it went to, by place
+    and item: what was moved, as fixed."""
+    arrived: dict[tuple[int, int], Decimal] = {}
+    for place_id, here in set_aside(moves).items():
+        for (item_id, _), n in here.items():
+            key = (place_id, item_id)
+            arrived[key] = arrived.get(key, Decimal(0)) + n
+    for fix in fixes:
+        key = (fix.to_id, fix.item_id)
+        arrived[key] = arrived.get(key, Decimal(0)) + fix.difference
+    return arrived
+
+
 def fixed_lines(fixes: Sequence[Fix]) -> dict[int, list[tuple[int, Form, Decimal]]]:
     """The fixes as lines to write at each place, by place: one line of
     an item in a form, the differences fixed there summed (a line names

@@ -98,6 +98,7 @@ from inventory_tng.stock import needs_action, over_recorded, queries
 from inventory_tng.stock.balance import countable, takeable
 from inventory_tng.stock.count_arrivals import (
     Aside,
+    arrived_at,
     fixed,
     fixed_lines,
     gone_moves,
@@ -1102,6 +1103,10 @@ def count(
         }
         return redirect(f"{COUNTS}/{place.id}", notice=notice, **params)
     amounts = {place_id: sent.places[place_id].typed() for place_id in counted}
+    # The moves from the areas gone, and their fixes, are in the records
+    # now, while what was typed counted what each place held before them:
+    # what arrived is added to it, so the recount says all it holds.
+    arrived = arrived_at(moves, fixes)
     saved = sum(len(typed) for typed in amounts.values()) - sum(
         len(each) for each in moved.values()
     )
@@ -1109,7 +1114,12 @@ def count(
         None,
         recount={
             place_id: {
-                item_id: (amounts[place_id][item_id], came, went)
+                item_id: (
+                    amounts[place_id][item_id]
+                    + arrived.get((place_id, item_id), Decimal(0)),
+                    came,
+                    went,
+                )
                 for item_id, (came, went) in each.items()
             }
             for place_id, each in moved.items()

@@ -1,4 +1,4 @@
-import { decimal, sent, thousandths } from "../shared/quantity";
+import { count, decimal, sent, thousandths } from "../shared/quantity";
 
 /**
  * What a place on the count form holds once saved, under "Moved to" it:
@@ -41,15 +41,13 @@ export function followTotals(document: Document): void {
         if ((states[index]?.value ?? "here") !== "here") {
           continue;
         }
-        const typed = box.value.trim();
-        const amount =
-          typed === "" ? sent(box.dataset.unset ?? "0") : thousandths(typed);
+        const amount = boxAmount(box);
         if (amount === null) {
           line.hidden = true;
           return;
         }
         // Thousandths times thousandths: back to thousandths.
-        total += (amount * sent(box.dataset.per ?? "1")) / 1000;
+        total += Math.round((amount * sent(box.dataset.per ?? "1")) / 1000);
       }
       shown.textContent = decimal(total);
       line.hidden = false;
@@ -62,4 +60,19 @@ export function followTotals(document: Document): void {
     }
     add();
   }
+}
+
+/** What a box adds, in thousandths of what it counts (a sealed package,
+ * whole, as the server reads it), what it was sent as if blank; null if
+ * it holds no such number. */
+function boxAmount(box: HTMLInputElement): number | null {
+  const typed = box.value.trim();
+  if (typed === "") {
+    return sent(box.dataset.unset ?? "0");
+  }
+  if (box.dataset.per === undefined) {
+    return thousandths(typed);
+  }
+  const packages = count(typed);
+  return packages === null ? null : packages * 1000;
 }

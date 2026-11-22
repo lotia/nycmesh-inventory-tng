@@ -58,7 +58,7 @@ one by its size, an open package closed as none
       {% if recount %}<td></td>{% endif %}
       {%- set hint = item.unit | printed_length if row.open_id else "" %}
       <td><input name="{{ field }}" inputmode="decimal" value="{{ values.get(field, row.amount | plain_amount if row.amount > 0 else '0') }}" aria-label="{% if where %}{{ where }}, {% endif %}{{ item.name_shown }}, {{ row.words }}"{% if hint %} aria-describedby="hint-{{ field }}"{% endif %}
-        {%- if adds %} data-adds-to="{{ adds }}" data-unset="{{ row.amount | plain_amount }}" data-per="{{ row.per | plain_amount }}"{% if row.open_id %} data-state="{{ prefix ~ 'state_' ~ row.open_id }}"{% endif %}{% endif %}>
+        {%- if adds %} data-adds-to="{{ adds }}" data-unset="{{ row.amount | plain_amount }}"{% if row.field.startswith("sealed_") %} data-per="{{ row.per | plain_amount }}"{% endif %}{% if row.open_id %} data-state="{{ prefix ~ 'state_' ~ row.open_id }}"{% endif %}{% endif %}>
         {% if row.open_id %}
         {% set state_field = prefix ~ "state_" ~ row.open_id %}
         <select name="{{ state_field }}" aria-label="{% if where %}{{ where }}, {% endif %}{% trans item=item.name_shown, form=row.words %}{{ item }}, {{ form }}: is it here?{% endtrans %}">

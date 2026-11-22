@@ -5,7 +5,13 @@ from decimal import Decimal
 
 from sqlalchemy.orm import Session
 
-from inventory_tng.stock.count_arrivals import Fix, fixed, fixed_lines, set_aside
+from inventory_tng.stock.count_arrivals import (
+    Fix,
+    arrived_at,
+    fixed,
+    fixed_lines,
+    set_aside,
+)
 from inventory_tng.stock.ledger import LOOSE, Form
 from inventory_tng.stock.moved_out import MovedOut
 
@@ -43,3 +49,14 @@ def test_fixes_at_a_place_are_summed_by_item_and_form() -> None:
         Fix(3, 4, 6, Decimal(2), LOOSE),
     ]
     assert fixed_lines(fixes) == {4: [(6, LOOSE, Decimal(2))]}
+
+
+def test_what_arrived_is_what_was_moved_as_fixed() -> None:
+    moves = [
+        MovedOut(1, 2, 5, Decimal(1)),
+        MovedOut(1, 2, 5, Decimal(10), SEALED),
+        MovedOut(3, 2, 5, Decimal(2)),
+        MovedOut(1, None, 5, Decimal(4)),
+    ]
+    fixes = [Fix(3, 2, 5, Decimal(-2), LOOSE)]
+    assert arrived_at(moves, fixes) == {(2, 5): Decimal(11)}
