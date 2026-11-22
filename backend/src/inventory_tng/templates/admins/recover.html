@@ -5,11 +5,11 @@ the server can set a recovery token and give it to you. With it, reset your
 password and authenticators here. Each token works once.{% endtrans %}</p>
 <form method="post" action="{{ here }}">
   <label>{% trans %}Recovery token{% endtrans %} <span class="hint">{% trans %}from whoever runs the server{% endtrans %}</span>
-    <input name="token" autocomplete="off" required>
+    <input name="token" inputmode="text" autocomplete="off" required>
     {% with name = "token" %}{% include "_field_problem.html" %}{% endwith %}
   </label>
   <label>{% trans %}Your username{% endtrans %}
-    <input name="username" value="{{ values.username }}" autocomplete="username" required>
+    <input name="username" inputmode="text" value="{{ values.username }}" autocomplete="username" required>
     {% with name = "username" %}{% include "_field_problem.html" %}{% endwith %}
   </label>
   <button class="primary">{% trans %}Reset my account{% endtrans %}</button>

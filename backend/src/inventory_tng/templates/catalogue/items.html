@@ -81,10 +81,10 @@ address, to come back to. #}
       </select>
     </label>
     <label>{% trans %}Manufacturer{% endtrans %} <span class="hint">{% trans %}optional{% endtrans %}</span>
-      <input name="manufacturer" value="{{ values.get('manufacturer', '') }}">
+      <input name="manufacturer" inputmode="text" value="{{ values.get('manufacturer', '') }}">
     </label>
     <label>{% trans %}Part number{% endtrans %} <span class="hint">{% trans %}optional{% endtrans %}</span>
-      <input name="part_number" value="{{ values.get('part_number', '') }}">
+      <input name="part_number" inputmode="text" value="{{ values.get('part_number', '') }}">
       {% with name = "part_number" %}{% include "_field_problem.html" %}{% endwith %}
     </label>
     {% with manufacturer = values.get('manufacturer', ''), part_number = values.get('part_number', '') %}{% include "catalogue/_web_search.html" %}{% endwith %}

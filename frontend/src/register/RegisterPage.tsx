@@ -105,6 +105,7 @@ export function RegisterPage({
             <input
               id={id}
               name="code"
+              inputMode="text"
               required
               autoComplete="off"
               autoCapitalize="none"

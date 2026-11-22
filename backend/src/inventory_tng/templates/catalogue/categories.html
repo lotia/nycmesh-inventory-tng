@@ -4,7 +4,7 @@
 {% block main %}
 <form method="post" action="{{ here }}" class="actions">
   <label>{% trans %}New category{% endtrans %}
-    <input name="name" value="{{ values.get('name', '') }}" maxlength="{{ name_max }}" required>
+    <input name="name" inputmode="text" value="{{ values.get('name', '') }}" maxlength="{{ name_max }}" required>
     {% with name = "name" %}{% include "_field_problem.html" %}{% endwith %}
   </label>
   <button class="primary">{% trans %}Add{% endtrans %}</button>

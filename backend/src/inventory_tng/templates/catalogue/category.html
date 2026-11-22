@@ -8,7 +8,7 @@
 <form method="post" action="{{ here }}/name" class="actions">
   <input type="hidden" name="version" value="{{ category.edit_version }}">
   <label>{% trans %}Name{% endtrans %}
-    <input name="name" value="{{ category.name }}" maxlength="{{ name_max }}" required {% if retired %}disabled{% endif %}>
+    <input name="name" inputmode="text" value="{{ category.name }}" maxlength="{{ name_max }}" required {% if retired %}disabled{% endif %}>
     {% with name = "name" %}{% include "_field_problem.html" %}{% endwith %}
   </label>
   {% if not retired %}<button class="primary">{% trans %}Rename{% endtrans %}</button>{% endif %}

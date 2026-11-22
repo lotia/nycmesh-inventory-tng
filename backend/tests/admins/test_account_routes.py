@@ -312,6 +312,9 @@ def test_a_late_removal_asks_for_the_code_on_its_confirmation(
     asked = client.get(path)
     assert asked.status_code == 200
     assert box_values(asked.text, guards.CONFIRM_FIELD) == [None]
+    # A recovery code has letters: the full keyboard.
+    box = read(asked.text).one("input", name=guards.CONFIRM_FIELD)
+    assert box.attrs["inputmode"] == "text"
     with app_clock() as at:
         typed = {guards.CONFIRM_FIELD: code(key, at + TIME_STEP)}
         done = client.post(path, data=typed)
@@ -329,6 +332,9 @@ def test_new_recovery_codes(
     asked = client.post(f"{ACCOUNT}/recovery-codes", data=single_use())
     assert asked.status_code == 403
     assert "or a recovery code" not in text(asked)
+    # Only digits will do, so a phone shows its number keypad.
+    box = read(asked.text).one("input", name=guards.CONFIRM_FIELD)
+    assert box.attrs["inputmode"] == "numeric"
     with app_clock() as at:
         form = single_use(**{guards.CONFIRM_FIELD: code(ada[1], at + TIME_STEP)})
         made = client.post(f"{ACCOUNT}/recovery-codes", data=form)

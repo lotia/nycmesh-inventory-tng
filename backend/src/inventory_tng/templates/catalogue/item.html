@@ -44,7 +44,7 @@ None is left, so nobody can pick it.{% endtrans %}{% endif %}{% endcall %}
   ] %}
   <label>{{ label }}{% if hint %} <span class="hint">{{ hint }}</span>{% endif %}
     {% set stored = item[name] | plain_amount if name == "minimum" else item[name] %}
-    <input name="{{ name }}" value="{{ values.get(name, stored if stored is not none else '') }}">
+    <input name="{{ name }}" inputmode="{{ 'decimal' if name == 'minimum' else 'text' }}" value="{{ values.get(name, stored if stored is not none else '') }}">
     {% include "_field_problem.html" %}
   </label>
   {% if name == "part_number" %}
@@ -83,7 +83,7 @@ None is left, so nobody can pick it.{% endtrans %}{% endif %}{% endcall %}
   {% if not retired %}
   {% set sent = values if 'alias_name' in values else {} %}
   <form method="post" action="{{ here }}/aliases" class="actions">
-    <label>{% trans %}Alias{% endtrans %} <input name="alias_name" value="{{ sent.get('alias_name', '') }}" maxlength="{{ name_max }}" required>
+    <label>{% trans %}Alias{% endtrans %} <input name="alias_name" inputmode="text" value="{{ sent.get('alias_name', '') }}" maxlength="{{ name_max }}" required>
       {% if sent %}{% with name = "alias_name" %}{% include "_field_problem.html" %}{% endwith %}{% endif %}
     </label>
     {% with typed = sent.get('alias_name', '') %}{% include "catalogue/_units_read.html" %}{% endwith %}
@@ -109,7 +109,7 @@ None is left, so nobody can pick it.{% endtrans %}{% endif %}{% endcall %}
         <form method="post" action="{{ here }}/packages/{{ package.id }}" class="actions">
           <input type="hidden" name="package_version" value="{{ sent.get('package_version', package.edit_version) }}">
           <label>{% trans %}Name{% endtrans %}
-            <input name="package_name" value="{{ sent.get('package_name', package.name) }}" required>
+            <input name="package_name" inputmode="text" value="{{ sent.get('package_name', package.name) }}" required>
             {% if sent %}{% with name = "package_name" %}{% include "_field_problem.html" %}{% endwith %}{% endif %}
           </label>
           {% with typed = sent.get('package_name', package.name) %}{% include "catalogue/_units_read.html" %}{% endwith %}
@@ -166,7 +166,7 @@ None is left, so nobody can pick it.{% endtrans %}{% endif %}{% endcall %}
   {% set adding = 'package_id' not in values %}
   {% set new = values if adding else {} %}
   <form method="post" action="{{ here }}/packages" class="actions">
-    <label>{% trans %}Package{% endtrans %} <input name="package_name" value="{{ new.get('package_name', '') }}" placeholder="{% trans %}Box{% endtrans %}" required>
+    <label>{% trans %}Package{% endtrans %} <input name="package_name" inputmode="text" value="{{ new.get('package_name', '') }}" placeholder="{% trans %}Box{% endtrans %}" required>
       {% if adding %}{% with name = "package_name" %}{% include "_field_problem.html" %}{% endwith %}{% endif %}
     </label>
     {% with typed = new.get('package_name', ''), sent = new %}{% include "catalogue/_units_read.html" %}{% endwith %}

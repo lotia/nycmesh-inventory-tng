@@ -9,7 +9,7 @@ Authenticator or a password manager:{% endtrans %}</p>
 It isn't shown again once saved.{% endtrans %}</p>
 <input type="hidden" name="key" value="{{ key }}">
 <label>{% trans %}Name for it{% endtrans %} <span class="hint">{% trans %}such as the phone or app{% endtrans %}</span>
-  <input name="authenticator_name" value="{{ values.get('authenticator_name', _('Phone')) }}" maxlength="{{ limits.authenticator_name_max }}" required>
+  <input name="authenticator_name" inputmode="text" value="{{ values.get('authenticator_name', _('Phone')) }}" maxlength="{{ limits.authenticator_name_max }}" required>
   {% with name = "authenticator_name" %}{% include "_field_problem.html" %}{% endwith %}
 </label>
 <label>{% trans %}The 6-digit code it shows{% endtrans %}{% if totp_optional %} <span class="hint">{% trans %}leave blank to sign in with your password alone{% endtrans %}</span>{% endif %}

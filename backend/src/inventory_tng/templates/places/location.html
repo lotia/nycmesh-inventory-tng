@@ -15,7 +15,7 @@
   <fieldset class="contents" {% if retired %}disabled{% endif %}>
   <input type="hidden" name="version" value="{{ values.get('version', location.edit_version) }}">
   <label>{% trans %}Name{% endtrans %}
-    <input name="name" value="{{ values.get('name', location.name) }}" maxlength="{{ name_max }}" required>
+    <input name="name" inputmode="text" value="{{ values.get('name', location.name) }}" maxlength="{{ name_max }}" required>
     {% with name = "name" %}{% include "_field_problem.html" %}{% endwith %}
   </label>
   {% if location.kind == "area" %}

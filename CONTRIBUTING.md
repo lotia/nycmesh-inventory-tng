@@ -737,6 +737,13 @@ utilities. When you style a page:
   reports no problem is plain, but a save held for an upgrade is in a
   caution box like the upgrade banner's (`CAUTION_BOX`), with no
   `role="alert"`.
+- A box a person types into names the keyboard a phone shows for it
+  with `inputmode`: `numeric` for whole numbers, `decimal` for numbers
+  with a decimal point, `text` for anything with letters. A number with
+  limits keeps `type="number"` and `min`/`max` for the browser's checks,
+  with `inputmode="numeric"` too; other number boxes are text boxes the
+  server checks. `tests/codebase/test_text_box_keyboards.py` refuses a box
+  without one.
 - Follow docs/decisions/0019 for links, buttons and lists. A button is
   secondary unless it is its form's main one, `class="primary"`, or the one
   a confirmation page asks for, `class="danger"`. A page's way back is

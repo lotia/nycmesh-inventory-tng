@@ -3,13 +3,13 @@
 <form method="post" action="{{ paths.sign_in }}">
   <input type="hidden" name="next" value="{{ next }}">
   <label>{% trans %}Username{% endtrans %}
-    <input name="username" value="{{ username }}" autocomplete="username" required autofocus>
+    <input name="username" inputmode="text" value="{{ username }}" autocomplete="username" required autofocus>
   </label>
   <label>{% trans %}Password{% endtrans %}
     <input name="password" type="password" autocomplete="current-password" required>
   </label>
   <label>{% trans %}Code{% endtrans %} <span class="hint">{% trans %}from your authenticator, or a recovery code; leave blank if you don't use one{% endtrans %}</span>
-    <input name="code" autocomplete="one-time-code" maxlength="{{ limits.code_max }}">
+    <input name="code" inputmode="text" autocomplete="one-time-code" maxlength="{{ limits.code_max }}">
   </label>
   <button class="primary">{% trans %}Sign in{% endtrans %}</button>
 </form>

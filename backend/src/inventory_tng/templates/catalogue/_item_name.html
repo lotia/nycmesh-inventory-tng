@@ -2,7 +2,7 @@
 <label>{% trans %}Name{% endtrans %} <span class="hint">{% trans %}what it is, then what tells it apart from the
   items nearest it, such as LiteBeam 5AC Gen2, or Cat6 cable, outdoor,
   shielded; the maker goes in Manufacturer{% endtrans %}</span>
-  <input name="name" value="{{ values.get('name', default) }}" maxlength="{{ name_max }}" required>
+  <input name="name" inputmode="text" value="{{ values.get('name', default) }}" maxlength="{{ name_max }}" required>
   {% with name = "name" %}{% include "_field_problem.html" %}{% endwith %}
 </label>
 {#- Only the name's own form's answers: another form sent back holds its own. #}

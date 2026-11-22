@@ -44,7 +44,7 @@
   <h2>{% trans %}Add a volunteer{% endtrans %}</h2>
   <form method="post" action="{{ here }}">
     <label>{% trans %}Name{% endtrans %} <span class="hint">{% trans %}as they pick it on the scan page{% endtrans %}</span>
-      <input name="name" value="{{ values.get('name', '') }}" maxlength="{{ name_max }}" required>
+      <input name="name" inputmode="text" value="{{ values.get('name', '') }}" maxlength="{{ name_max }}" required>
       {% with name = "name" %}{% include "_field_problem.html" %}{% endwith %}
     </label>
     <label>{% trans %}Email{% endtrans %} <span class="hint">{% trans %}optional{% endtrans %}</span>

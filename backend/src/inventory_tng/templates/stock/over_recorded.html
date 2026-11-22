@@ -14,7 +14,7 @@ refusal's alert, when drawn, is where it was sent from. #}
   {% for value, words in reasons.items() %}
   <label><input type="radio" name="reason" value="{{ value }}"{% if chosen == value %} checked{% endif %}{% if described %} aria-describedby="{{ name }}-problem"{% endif %} required> {{ words }}</label>
   {% endfor %}
-  <input name="words" value="{{ values.get('words-' ~ row.id, '') if sent }}" maxlength="{{ words_max }}" aria-label="{% trans %}Put right another way{% endtrans %}"{% if described %} aria-describedby="{{ name }}-problem"{% endif %}>
+  <input name="words" inputmode="text" value="{{ values.get('words-' ~ row.id, '') if sent }}" maxlength="{{ words_max }}" aria-label="{% trans %}Put right another way{% endtrans %}"{% if described %} aria-describedby="{{ name }}-problem"{% endif %}>
   {% if sent %}{% include "_field_problem.html" %}{% endif %}
 </fieldset>
 {% endmacro %}

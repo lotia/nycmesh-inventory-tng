@@ -9,11 +9,11 @@ token.{% endtrans %}</p>
 invited from the administrator pages.{% endtrans %}</p>
 <form method="post" action="{{ paths.setup }}">
   <label>{% trans %}Setup token{% endtrans %} <span class="hint">{% trans %}from whoever runs the server{% endtrans %}</span>
-    <input name="token" value="{{ values.get('token', '') }}" autocomplete="off" required>
+    <input name="token" inputmode="text" value="{{ values.get('token', '') }}" autocomplete="off" required>
     {% with name = "token" %}{% include "_field_problem.html" %}{% endwith %}
   </label>
   <label>{% trans %}Username{% endtrans %}
-    <input name="username" value="{{ values.get('username', '') }}" autocomplete="username" maxlength="{{ limits.username_max }}" required>
+    <input name="username" inputmode="text" value="{{ values.get('username', '') }}" autocomplete="username" maxlength="{{ limits.username_max }}" required>
     {% with name = "username" %}{% include "_field_problem.html" %}{% endwith %}
   </label>
   <label>{% trans %}Email{% endtrans %} <span class="hint">{% trans %}optional: lets you reset your own password{% endtrans %}</span>
