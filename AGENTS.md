@@ -70,6 +70,49 @@ is, read [README.md](README.md).
     widening the name. This is a judgement, not a check. Where code goes,
     and how files and tests are named, is in
     `docs/decisions/0023-code-laid-out-by-feature.md`.
+13. **Work goes in batches, each with a bead of its own.** The batch bead
+    says the order of its issues and anything else the batch needs, and
+    each issue blocks it (`bd dep add <batch> <issue>`).
+    - **The next batch** is the one bead labelled `do-next`. A planned
+      batch gets the label only once the person agrees it comes next.
+      Only one bead ever carries it: move the label, never add a second.
+    - **Starting a batch** takes the label off and marks the batch in
+      progress (`bd label remove <batch> do-next`, then
+      `bd update <batch> --claim`). Mark each issue in progress as its
+      work starts (`bd update <issue> --claim`).
+    - **After a restart**, `bd list --status in_progress` shows the batch
+      under way and its issues being worked. With none,
+      `bd list --label do-next` shows what comes next.
+    - **A P1 bug found while working a batch:** one the batch's own
+      changes cause is fixed in that batch, before it is pushed. One that
+      was there already, or is unrelated, goes first in the `do-next`
+      batch: add it to that bead, put it at the front of its order, and
+      tell the person at the next check-in. With no `do-next` batch, it
+      leads the next one planned. A P0 bug: stop and ask whether the
+      current batch takes it before it is pushed.
+    - **A batch of one** is still a batch: a P1 worked on its own gets a
+      bead of its own, so the restart check, stages and check-in stay
+      the same.
+    - **Order between batches** is dependencies between their beads
+      (`bd dep add <later> <earlier>`); `do-next` marks only the one to
+      start next.
+    - **Inserting a batch** ahead of the `do-next` one, once the person
+      agrees it goes first: move the label to it, make the displaced
+      batch wait on it (`bd dep add <displaced> <inserted>`), and note
+      on the displaced batch what was put ahead of it, when, and who
+      decided. Its plan stays as it was. When the inserted batch is
+      pushed and closed, the label goes back to the displaced one
+      without asking again. Several inserted in a row each wait on the
+      one before.
+    - **An urgent batch while one is in progress:** ask whether to
+      finish and push the current batch first or pause it. A paused
+      batch stays in progress and waits on the urgent one
+      (`bd dep add <paused> <urgent>`), so `bd show` says why it waits.
+    - **An investigation batch** has its own stages: investigate,
+      review the findings, report to the person, file beads for what
+      it found. Nothing is simplified or pushed; it closes once the
+      person has the report and the beads are filed.
+    - **The batch bead closes** once its issues are closed and pushed.
 
 ## More guidance
 
