@@ -206,8 +206,8 @@ def test_a_key_that_is_not_text_is_none() -> None:
 
 
 def test_a_form_sent_once_carries_its_page(admin_client: TestClient) -> None:
-    """For the page saying it was sent before to link back: browsers send
-    no Referer here."""
+    """For the page saying it was sent before to link back, as a browser's
+    settings may leave out Referer."""
     assert ACCOUNT in box_values(admin_client.get(ACCOUNT).text, "back")
 
 
