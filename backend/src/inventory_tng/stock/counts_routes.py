@@ -234,6 +234,8 @@ def adjust(
             )
         field = "location_id" if broken == COUNTABLE else "amount"
         problems = {field: RULES[broken]}
+        # The savepoint's rollback keeps the item as read before it.
+        session.refresh(item)
         if unit != item.unit:
             # Refused for another reason, shown again in the unit it is
             # counted in now, keeping what was typed: one changed since is

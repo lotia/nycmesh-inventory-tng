@@ -15,12 +15,13 @@ from structlog.testing import capture_logs
 
 from inventory_tng.core.db_locking import UNGUARDED_INFO
 from inventory_tng.models.catalogue import ItemPackage
-from inventory_tng.stock import counts_routes
+from inventory_tng.stock import count_routes, counts_routes
 from inventory_tng.stock.count_forms import changed_words
 from inventory_tng.stock.forms import now_counted_in, now_holds, shown_field, shown_in
 from inventory_tng.stock.moments import expected
 from inventory_tng.stock.paths import ADJUSTMENTS, COUNTS
 from inventory_tng.stock.units_shown import Now, Shown
+from inventory_tng.web.forms import RULES
 
 from helpers.markup import box_values, hidden_fields, problem, text
 from helpers.over_recorded import adjustments, checks, counted, moved_whole
@@ -226,6 +227,33 @@ def test_a_count_of_50_m_saved_after_a_switch_to_ft_is_asked_again(
     )
     assert sent.status_code == 303
     assert expected(session, place.store.id) == {place.cable.id: Decimal(50)}
+
+
+def test_a_count_refused_by_a_rule_after_a_switch_says_both(
+    admin_client: TestClient, session: Session, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Refused by a rule that marks no line, and the cable switched to ft
+    just after: the form shown again says the rule above it and the switch
+    beside the 50 typed in m."""
+    place = Place(session)
+    form = count_form_at(admin_client, place.store.id) | {
+        "extra_item_id": str(place.cable.id),
+        "extra_quantity": "50",
+    }
+
+    def refused_once(*_: object) -> tuple[object, str]:
+        # Another administrator's edit, as the test's own rows are written.
+        to_feet(setting_up(session), place)
+        del session.info[UNGUARDED_INFO]
+        return None, count_routes.ONCE
+
+    monkeypatch.setattr(count_routes, "refusal", refused_once)
+    response = admin_client.post(f"{COUNTS}/{place.store.id}", data=form)
+    assert response.status_code == 400
+    assert str(RULES[count_routes.ONCE]) in text(response)
+    assert problem(response.text, "extra_quantity") == now_counted_in("ft")
+    assert box_values(response.text, "extra_quantity") == ["50"]
+    assert counts_written(session) == []
 
 
 def test_a_count_saved_then_sent_again_after_a_switch_is_answered_as_saved(

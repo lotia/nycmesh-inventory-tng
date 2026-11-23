@@ -926,9 +926,12 @@ def count(
             words, said = _asked_again(session, form, place.id, place_ids, shown_now)
             return as_sent(problems=words, alert=said, left=left())
         # Refused for another reason, shown again keeping what was typed, in
-        # the units and sizes now: one changed since is said too.
-        changed, said = _kept_as_now(
-            session, form, key, sent.places.values(), place.id, place_ids
+        # the units and sizes now: one changed since is said too. The
+        # savepoint's rollback keeps the rows read before it as they were
+        # then, so they are read again, as the words are.
+        session.expire_all()
+        kept_as_now = partial(
+            _kept_as_now, session, form, key, sent.places.values(), place.id, place_ids
         )
         if broken == COUNTABLE:
             if retired is None or retired == place.id:
@@ -948,6 +951,7 @@ def count(
                 gone_ids=sorted(fresh),
             )
             tree = queries.place_tree(session, place)
+            changed, said = kept_as_now()
             return again(
                 None,
                 values=typed,
@@ -961,27 +965,34 @@ def count(
                 },
                 gone=gone,
                 tree=tree,
+                caution=said,
                 status_code=409,
             )
         if broken == CHANGED:
             # What was typed may be of before that save or after it, of
             # items it cannot tell: the form as it is now, with a new key,
             # keeping what was typed, to check and send again.
+            changed, said = kept_as_now()
             return asking(
                 None,
                 values=typed,
                 problems=changed,
                 alert=SAVED_AS_SHOWN,
+                caution=said,
                 status_code=409,
             )
-        # Checked again, the units as they are now mark the lines it broke.
-        problems = dict(changed)
+        # Checked again, the units as they are now mark the lines it broke;
+        # a rule that marks none is said above the form, and a unit or size
+        # changed since beside its boxes and below that.
+        changed, said = kept_as_now()
+        marked: dict[str, Words] = {}
         for place_id, each in sent.places.items():
             _, wrong = item_counts(session, each.found)
-            problems |= fields_at(place.id, place_id, wrong)
+            marked |= fields_at(place.id, place_id, wrong)
         return as_sent(
-            problems=problems,
-            alert=said or (None if problems else RULES[broken]),
+            problems=marked | changed,
+            alert=said if marked else RULES[broken],
+            caution=None if marked else said,
             left=left(),
             status_code=400,
         )
