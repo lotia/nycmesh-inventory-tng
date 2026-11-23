@@ -211,8 +211,10 @@ short test. `core/` is the name FastAPI's full-stack template uses;
   (inventory-tng-9gwp): it keeps the open packages' rows, making,
   reporting, checking and closing them, and `stock/package_forms.py`
   holds an item's stock split by form and the orders each form is listed
-  in. Their tests kept their names, as `test_package_forms_*.py` named
-  the second job already.
+  in. Their tests kept their names: `test_package_forms_*.py` test sealed
+  and open packages as one feature, through the ledger, the open
+  packages' rows and counts, and `test_package_forms_stock.py` tests the
+  split by form.
 - On 2026-11-23, as Ali decided (inventory-tng-9gwp), opening and
   resealing authenticators' keys left `admins/accounts.py` for
   `admins/sealed_totp_keys.py`, named for that job: `_opened`, as

@@ -63,6 +63,7 @@ from inventory_tng.core.db_once_committed import once_committed
 from inventory_tng.core.db_sessions import exists_where
 from inventory_tng.models.catalogue import (
     CURRENT_ALIAS,
+    SMALLEST_PACKAGE_FIRST,
     Category,
     Item,
     ItemAlias,
@@ -350,7 +351,7 @@ def fractional_package(session: Session, item_id: int) -> ItemPackage | None:
             ItemPackage.retired_at.is_(None),
             or_(size != func.trunc(size), and_(short != func.trunc(short), size > 1)),
         )
-        .order_by(size, ItemPackage.id)
+        .order_by(*SMALLEST_PACKAGE_FIRST)
     )
     return session.scalars(query).first()
 
