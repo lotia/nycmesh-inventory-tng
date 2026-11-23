@@ -126,7 +126,10 @@ one by its size, an open package closed as none
     {% for row in each.rows %}{% set name = each.prefix ~ row.field %}{% if values.get(name, row.amount | plain_amount) != row.amount | plain_amount or name in (problems or {}) %}{% set fix.open = true %}{% endif %}{% endfor %}
     {% set said %}<span class="sr-only"> {{ each.item.name_shown }}, {{ heading }}</span>{% endset %}
     <tr>
-      <td colspan="{{ columns - 1 }}">{% trans item=each.item.name_shown, amount=each.moved | amount %}{{ item }} · {{ amount }} moved{% endtrans %}</td>
+      <td colspan="{{ columns - 1 }}">{% trans item=each.item.name_shown, amount=each.moved | amount %}{{ item }} · {{ amount }} moved{% endtrans %}
+        {#- Each sealed package of it opened here since: what is left of
+        it (stock/count_gone_areas.py, opened_here_since). #}
+        {% for words in each.opened %}<span class="hint block">{{ words }}</span>{% endfor %}</td>
       <td><details{% if fix.open %} open{% endif %}>
         <summary class="as-button">{% trans %}Fix amount{% endtrans %}</summary>
         {% if each.worded %}<fieldset><legend>{% trans %}How many arrived?{% endtrans %}{{ said }}</legend>{% endif %}

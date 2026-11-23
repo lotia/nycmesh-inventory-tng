@@ -20,6 +20,7 @@ from inventory_tng.models.catalogue import Item, ItemPackage
 from inventory_tng.models.places import Location
 from inventory_tng.stock import queries
 from inventory_tng.stock.count_areas_leaving import Leaving
+from inventory_tng.stock.count_arrivals import Arrivals, opened_since
 from inventory_tng.stock.count_forms import ARRIVED, LOOSE_FIELD
 from inventory_tng.stock.count_groups import (
     FormRow,
@@ -29,6 +30,7 @@ from inventory_tng.stock.count_groups import (
 )
 from inventory_tng.stock.ledger import Form
 from inventory_tng.stock.moved_out import MovedOut
+from inventory_tng.web.formatting import amount
 
 
 def emptied_meanwhile(places: Sequence[str]) -> str:
@@ -81,6 +83,16 @@ def came_from(place: str) -> str:
     return gettext("From %(place)s", place=place)
 
 
+def opened_here_since(left: Decimal, unit: str) -> str:
+    """Under an item moved to a place on a count form: a sealed package of
+    it opened there since, and what is left of it at the form's moment
+    (Ali, 2026-11-23, inventory-tng-0fbn)."""
+    # Translators: %(amount)s %(unit)s is how much is left, such as 250 m.
+    return gettext(
+        "Opened here since: %(amount)s %(unit)s left.", amount=amount(left), unit=unit
+    )
+
+
 def taken_out(place: str) -> str:
     """The heading of what left areas gone from a count form for no place
     on it."""
@@ -124,14 +136,16 @@ def gone_words(leaving: Leaving, ids: Collection[int]) -> list[str]:
 class MovedItem(NamedTuple):
     """An item moved from an area gone from a count form to a place on it:
     how much was moved, in its unit; the prefix of its boxes of how many
-    arrived (count_forms.ARRIVED); and a row for each form it arrived in, as the
-    count form asks for that form (count_groups.form_row), its amount what
-    arrived in it as moved."""
+    arrived (count_forms.ARRIVED); a row for each form it arrived in, as
+    the count form asks for that form (count_groups.form_row), its amount
+    what arrived in it as moved; and what it says of each sealed package
+    of it opened there since (opened_here_since), if any."""
 
     item: Item
     moved: Decimal
     prefix: str
     rows: list[FormRow]
+    opened: list[str]
 
     @property
     def worded(self) -> bool:
@@ -194,11 +208,15 @@ def moved_sections(
     moves: Sequence[MovedOut],
     named: Mapping[int, Item],
     packages: Mapping[int, ItemPackage],
+    arrivals: Mapping[int, Arrivals],
 ) -> Moves:
     """What a count form shows of what left the areas gone from it
     (Moves): `moves`, of the items it shows, as of its moment, and its
     groups, whose lines count what each place held before them; `packages`,
-    by id, every package of the items moved, at least."""
+    by id, every package of the items moved, at least; `arrivals`, the
+    moves as each place holds them (count_arrivals.as_held). A package
+    opened there since is said under the item the first time it is shown
+    there arriving sealed."""
     by_id = {group.place.id: group for group in groups}
     went: dict[int, dict[int, dict[int, dict[Form, Decimal]]]] = {}
     taken: dict[int, Decimal] = {}
@@ -217,25 +235,42 @@ def moved_sections(
         )
     }
 
-    def moved_item(prefix: str, item: Item, forms: dict[Form, Decimal]) -> MovedItem:
+    def moved_item(
+        prefix: str,
+        item: Item,
+        forms: dict[Form, Decimal],
+        since: dict[int, list[Decimal]],
+    ) -> MovedItem:
         rows = [
             form_row(item.id, form, forms[form], packages, opened)
             for form in sorted(forms, key=lambda form: form_order(form, packages))
         ]
-        return MovedItem(item, sum(forms.values(), Decimal(0)), prefix, rows)
+        sealed = any(form.package_id is not None for form in forms)
+        left = since.pop(item.id, []) if sealed else []
+        return MovedItem(
+            item,
+            sum(forms.values(), Decimal(0)),
+            prefix,
+            rows,
+            [opened_here_since(n, item.unit) for n in left],
+        )
 
     sections: list[MovedTo] = []
     for group in groups:
         if group.place.id not in went:
             continue
         sources = went[group.place.id]
+        since = opened_since(arrivals.get(group.place.id, {}))
         parts = [
             (
                 came_from(leaving.labels[from_id]),
                 sorted(
                     (
                         moved_item(
-                            f"{group.prefix}{ARRIVED}{from_id}_", named[item_id], forms
+                            f"{group.prefix}{ARRIVED}{from_id}_",
+                            named[item_id],
+                            forms,
+                            since,
                         )
                         for item_id, forms in sources[from_id].items()
                     ),

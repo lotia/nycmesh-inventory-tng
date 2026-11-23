@@ -99,6 +99,7 @@ from inventory_tng.stock.count_areas_leaving import (
     moves_since,
 )
 from inventory_tng.stock.count_arrivals import (
+    Arrivals,
     Fix,
     arrived_at,
     as_held,
@@ -410,6 +411,7 @@ def _count_page(
         move for move in as_shown(left, ids_shown) if ids is None or move.item_id in ids
     ]
     listed = queries.countable_items(session)
+    arrivals = as_held(session, gone, at.as_of, moves)
     groups, named, packages = _place_lines(
         session,
         place,
@@ -420,14 +422,16 @@ def _count_page(
         shown.only,
         ids,
         moves,
-        gone,
+        arrivals,
         listed,
     )
     if ids is not None:
         listed = [item for item in listed if item.id in ids]
     moved = None
     if leaving is not None:
-        moved = moved_sections(session, place, groups, leaving, moves, named, packages)
+        moved = moved_sections(
+            session, place, groups, leaving, moves, named, packages, arrivals
+        )
     if off_form is not None:
         # Its line there, as shown: by its total, or by its forms, loose.
         group = next(group for group in groups if group.place.id == off_form.place_id)
@@ -498,7 +502,7 @@ def _place_lines(
     only: Item | None,
     ids: Collection[int] | None,
     moves: Sequence[MovedOut],
-    gone: Gone,
+    arrivals: Mapping[int, Arrivals],
     items: Sequence[Item],
 ) -> tuple[list[Group], dict[int, Item], dict[int, ItemPackage]]:
     """What a count form of `place` shows at each of `shown_places`, as of
@@ -507,13 +511,14 @@ def _place_lines(
     there, or a recount of `asked` only, by place, with each one's
     `recount` figures; of the items of `ids` only, None for all, and
     `only`, asked for, at the page's own place if none is at any place
-    shown; less what `moves` brought there from the areas `gone` from it
-    (count_arrivals.as_held). And every package of
-    the items on its lines and of `moves`, by id, read once for both."""
+    shown; less what `moves` brought there from the areas gone from it,
+    as each place holds it (`arrivals`, count_arrivals.as_held). And
+    every package of the items on its lines and of `moves`, by id, read
+    once for both."""
     ids_shown = [each.id for each, _ in shown_places]
     every = set().union(*asked.values()) if asked else None
     was_at = expected_at(session, ids_shown, as_of, every)
-    aside = held_aside(as_held(session, gone, as_of, moves))
+    aside = held_aside(arrivals)
     for place_id, here in aside.items():
         if place_id in was_at:
             was_at[place_id] = less(was_at[place_id], by_item(here))

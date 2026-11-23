@@ -18,6 +18,7 @@ from sqlalchemy.orm import Session
 from inventory_tng.models.base import INTEGER_MAX
 from inventory_tng.models.stock import LedgerTransaction, Movement, OpenPackage
 from inventory_tng.stock import open_packages
+from inventory_tng.stock.count_gone_areas import opened_here_since
 from inventory_tng.stock.ledger import LOOSE, Entry, Form
 from inventory_tng.stock.moments import at_place, expected_forms_at
 from inventory_tng.stock.paths import COUNTS
@@ -371,3 +372,63 @@ def test_a_recount_says_what_the_place_holds_of_a_spool_cut_there(
     page = admin_client.post(moved.path, data=moved.form | typed)
     assert page.status_code == 409
     assert "3 in, 0 out; you typed 257" in text(page)
+
+
+def opened_since(moved: Arrived) -> list[str]:
+    """The lines under the cable moved to Shelf B, in the page's order:
+    what is left of each spool of it opened there since (Ali,
+    2026-11-23, inventory-tng-0fbn)."""
+    (row,) = [row for row in moved.page.all("tr") if row.all("details")]
+    assert row.all("td")[0].text.startswith(f"{moved.made.cable.name} · 305 moved")
+    return [each.text for each in row.all("span", class_="hint")]
+
+
+def test_a_spool_opened_where_it_went_says_what_is_left_on_it(
+    session: Session, admin_client: TestClient
+) -> None:
+    """The spool moved from Shelf C to Shelf B, Shelf C retired, then
+    opened at Shelf B and 55 m cut before the form's moment: under Moved
+    to Shelf B, the cable moved says what is left on it, 250 m; the box
+    still asks for sealed spools, filled with 1."""
+    moved = Arrived(session, admin_client, then=open_and_cut(55))
+    assert opened_since(moved) == [opened_here_since(Decimal(250), "m")]
+    assert moved.shows(moved.arrived_box()) == "1"
+
+
+def test_a_spool_opened_after_the_form_s_moment_says_nothing_of_it(
+    session: Session, admin_client: TestClient
+) -> None:
+    """The spool opened at Shelf B after the form's moment, the form
+    sent back for a problem, so shown as of that moment: no line."""
+    moved = Arrived(session, admin_client)
+    moved.open()
+    page = admin_client.post(
+        moved.path, data=moved.form | {moved.field(moved.arrived_box()): "x"}
+    )
+    assert page.status_code == 400
+    moved.page = read(page.text)
+    assert opened_since(moved) == []
+
+
+def test_a_spool_still_sealed_says_nothing_of_it(
+    session: Session, admin_client: TestClient
+) -> None:
+    """The spool still sealed at Shelf B: no line under it."""
+    moved = Arrived(session, admin_client)
+    assert opened_since(moved) == []
+
+
+def test_a_box_opened_loose_where_it_went_says_what_is_left_in_each(
+    session: Session, admin_client: TestClient
+) -> None:
+    """A box counted in each, not followed once opened, as a box of
+    connectors is, opened loose at Shelf B and 5 used: what is left of
+    the box, in each."""
+
+    def in_each(moved: Arrived) -> None:
+        moved.made.cable.unit = "each"
+
+    moved = Arrived(
+        session, admin_client, tracked=False, own=in_each, then=open_and_cut(5)
+    )
+    assert opened_since(moved) == [opened_here_since(Decimal(300), "each")]

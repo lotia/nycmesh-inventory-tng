@@ -62,6 +62,7 @@ from inventory_tng.models.stock import TRANSACTION_KINDS, AdjustmentReason
 from inventory_tng.models.volunteers import Volunteer
 from inventory_tng.site_settings.forms import WHOLE, whole_minutes
 from inventory_tng.stock import (
+    count_gone_areas,
     count_groups,
     count_routes,
     counts_routes,
@@ -185,6 +186,7 @@ SAID_WITH_VALUES: list[Callable[[], Words]] = [
     lambda: count_routes.moved_meanwhile(3),
     lambda: count_groups.sealed_how_many(NOT_ENGLISH),
     lambda: count_groups.opened_left(NOT_ENGLISH, "2026-11-15"),
+    lambda: count_gone_areas.opened_here_since(Decimal(250), NOT_ENGLISH),
     lambda: stock_routes.recorded_more_view(2),
     lambda: over_recorded_routes.place_brought_back(NOT_ENGLISH),
     lambda: over_recorded_routes.not_changed(NOT_ENGLISH),

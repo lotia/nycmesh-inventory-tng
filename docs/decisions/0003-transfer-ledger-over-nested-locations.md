@@ -230,8 +230,13 @@ never more than it holds: a sealed package opened there since is set aside
 from what opening it made, an open package its lines then leave out or
 loose units, and what was used or has gone from there since from nothing.
 A fix lowering a move is lost from those forms too, never more than is
-still there of it (2026-11-23, inventory-tng-nlog). A line under the heading, in
-the browser only, gives what it will hold once saved. Found at leaves the
+still there of it (2026-11-23, inventory-tng-nlog). Under the item, a
+muted line for each package of it opened there since, before the form's
+moment, says what is left of it then: "Opened here since: 250 m left.";
+the box still asks for sealed packages. We rejected asking for the open
+package as it is now, and no "Fix amount" for an opened arrival (Ali,
+2026-11-23, inventory-tng-0fbn). A line under the heading, in the browser
+only, gives what it will hold once saved. Found at leaves the
 area out, saying it is retired, and a "Bring it back" button on the form
 brings it back, as its own page does, and shows the form again with it,
 everything typed kept. A recorded move is never undone: if the items never
