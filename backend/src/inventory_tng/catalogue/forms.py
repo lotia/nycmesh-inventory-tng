@@ -236,25 +236,101 @@ def package_fraction(session: Session, item_id: int) -> str | None:
     return fraction_held(package)
 
 
+def size_has_fraction(package: ItemPackage) -> bool:
+    """Whether the package's Holds has a fraction: said before its
+    too-short length, which then needs no outline."""
+    return package.size != package.size.to_integral_value()
+
+
+def _whole_range(package: ItemPackage) -> tuple[str, str] | None:
+    """The whole numbers its too-short length may be, its size whole: more
+    than 0 and less than its size; None if none is."""
+    high = package.size - 1
+    return None if high < 1 else (amount(Decimal(1)), amount(high))
+
+
 def fraction_held(package: ItemPackage) -> str:
     """What package_fraction says of the package: its size, if that has a
-    fraction, else its too-short length."""
-    if package.size != package.size.to_integral_value():
-        # Translators: a package's size, its "Holds" on the item page, has
-        # a fraction; %(package)s is its name, %(amount)s its size.
+    fraction, else the whole numbers its too-short length may be, never
+    naming Too short to use, a length that no longer applies once the item
+    counts pieces (Ali, 2026-11-23, inventory-tng-fa5i)."""
+    name = package.name_shown
+    if size_has_fraction(package):
+        # Translators: refused switching an item's unit to each: a
+        # package's size, its "Holds" on the item page, has a fraction;
+        # %(package)s is its name, %(amount)s its size.
         return gettext(
-            "The %(package)s package holds %(amount)s: make that whole, or "
-            "retire the package, before counting this item in each.",
-            package=package.name_shown,
+            "The %(package)s package holds %(amount)s: change that to a whole "
+            "number, or retire the package, before switching the item count "
+            "to each.",
+            package=name,
             amount=amount(package.size),
         )
-    # Translators: a package's "Too short to use" length has a fraction;
-    # %(package)s is its name, %(amount)s that length.
+    short = amount(package.short_below)
+    if (fits := _whole_range(package)) is None:
+        # Translators: refused switching an item's unit to each: a
+        # package's "Too short to use" length, outlined on the page, has a
+        # fraction and no whole number is less than its size; %(package)s
+        # is its name, %(amount)s that length.
+        return gettext(
+            "The %(package)s package has a fraction (%(amount)s) that no whole "
+            "number fits: clear it before switching the item count to each.",
+            package=name,
+            amount=short,
+        )
+    # Translators: refused switching an item's unit to each: a package's
+    # "Too short to use" length, outlined on the page, has a fraction;
+    # %(package)s is its name, %(amount)s that length, %(low)s and
+    # %(high)s the whole numbers it may be.
     return gettext(
-        "The %(package)s package is too short to use below %(amount)s: make "
-        "that whole, or blank, before counting this item in each.",
-        package=package.name_shown,
-        amount=amount(package.short_below),
+        "The %(package)s package has a fraction (%(amount)s): set it to a "
+        "whole number from %(low)s to %(high)s before switching the item "
+        "count to each.",
+        package=name,
+        amount=short,
+        low=fits[0],
+        high=fits[1],
+    )
+
+
+def fraction_brought_back(package: ItemPackage) -> str:
+    """Why a retired package is not brought back to an item counted each:
+    its size, or else its too-short length, has a fraction, said as
+    fraction_held says it (Ali, 2026-11-23, inventory-tng-fa5i)."""
+    name = package.name_shown
+    if size_has_fraction(package):
+        # Translators: refused bringing back a retired package of an item
+        # counted each: its size, its "Holds", has a fraction; %(package)s
+        # is its name, %(amount)s its size.
+        return gettext(
+            "The %(package)s package holds %(amount)s: change that to a whole "
+            "number before bringing it back.",
+            package=name,
+            amount=amount(package.size),
+        )
+    short = amount(package.short_below)
+    if (fits := _whole_range(package)) is None:
+        # Translators: refused bringing back a retired package of an item
+        # counted each: its "Too short to use" length has a fraction and no
+        # whole number is less than its size; %(package)s is its name,
+        # %(amount)s that length.
+        return gettext(
+            "The %(package)s package has a fraction (%(amount)s) that no whole "
+            "number fits: clear it before bringing it back.",
+            package=name,
+            amount=short,
+        )
+    # Translators: refused bringing back a retired package of an item
+    # counted each: its "Too short to use" length has a fraction;
+    # %(package)s is its name, %(amount)s that length, %(low)s and
+    # %(high)s the whole numbers it may be.
+    return gettext(
+        "The %(package)s package has a fraction (%(amount)s): set it to a "
+        "whole number from %(low)s to %(high)s before bringing it back.",
+        package=name,
+        amount=short,
+        low=fits[0],
+        high=fits[1],
     )
 
 

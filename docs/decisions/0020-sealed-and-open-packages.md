@@ -567,3 +567,25 @@ you" counts every report in one line, which hides what is waiting.
 - Built by inventory-tng-ck0 (the card and its box), inventory-tng-pll
   ("Needs your action"), inventory-tng-wy7 (reporting and checking a
   length) and inventory-tng-pg7 (the hint).
+
+## Amendment: a package's fractions once its item counts each (2026-11-23)
+
+An item counted each moves whole units, so none of its current packages may
+hold, or be too short to use below, a fraction (Ali, 2026-11-23,
+inventory-tng-fa5i):
+
+- **Switching an item to each** is refused beside its unit while a current
+  package has one, naming the package. Holds with a fraction says what it
+  holds and to change that to a whole number or retire the package. Too
+  short to use with one is not named, as a length no longer applies once
+  the item counts pieces: the words give the whole numbers it may be, more
+  than 0 and less than what the package holds, and that package's box is
+  outlined. Clearing the box is accepted too.
+- **A retired package with a fraction** is not brought back to an item
+  counted each, said the same way, naming it.
+- **An item already counted each** may keep a current package with a
+  fraction: only the switch is checked (inventory-tng-jwlh).
+
+We rejected naming Too short to use, and clearing and hiding the box for
+items counted each: the scan page uses it to show an open package as a
+short end.

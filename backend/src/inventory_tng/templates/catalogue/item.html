@@ -141,7 +141,9 @@ None is left, so nobody can pick it.{% endtrans %}{% endif %}{% endcall %}
       <td>{% if not package.retired_at and not retired %}
         <form method="post" action="{{ here }}/packages/{{ package.id }}/settings" class="actions">
           <label>{% trans %}Too short to use{% endtrans %} <span class="hint">{% trans unit=item.unit %}below, in {{ unit }}; blank: none{% endtrans %}</span>
-            <input name="short_below" inputmode="{{ item.unit | keyboard }}" value="{{ sent.get('short_below', short) }}">
+            {#- A switch to each refused for its fraction outlines it. #}
+            <input name="short_below" inputmode="{{ item.unit | keyboard }}" value="{{ sent.get('short_below', short) }}"
+              {%- if package.id == short_fraction %} aria-invalid="true" aria-describedby="unit-problem"{% endif %}>
             {% if sent %}{% with name = "short_below" %}{% include "_field_problem.html" %}{% endwith %}{% endif %}
           </label>
           <label>{% trans %}Keep sealed{% endtrans %} <span class="hint">{% trans %}in the stores; blank: no minimum{% endtrans %}</span>

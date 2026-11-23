@@ -13,7 +13,6 @@ from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
 
 from inventory_tng.catalogue import items
-from inventory_tng.catalogue.forms import package_fraction
 from inventory_tng.catalogue.paths import ITEMS
 from inventory_tng.models.catalogue import Category, Item, ItemPackage
 from inventory_tng.web.forms import WHOLE_UNITS
@@ -88,33 +87,95 @@ def _packaged(
     return cable, add(session, reel)
 
 
-@pytest.mark.parametrize(
-    ("package", "amount"),
-    [
-        ({"size": Decimal("30.5")}, "30.5"),
-        ({"short_below": Decimal("1.5")}, "1.5"),
-    ],
-)
+# What a refused switch to each, or bringing a package back, says of the
+# Reel package as each case leaves it (Ali, 2026-11-23).
+FRACTIONS = [
+    pytest.param(
+        {"size": Decimal("30.5"), "short_below": Decimal("1.5")},
+        "The Reel package holds 30.5: change that to a whole number, or retire "
+        "the package, before switching the item count to each.",
+        "The Reel package holds 30.5: change that to a whole number before "
+        "bringing it back.",
+        id="holds",
+    ),
+    pytest.param(
+        {"short_below": Decimal("1.5")},
+        "The Reel package has a fraction (1.5): set it to a whole number from 1 "
+        "to 304 before switching the item count to each.",
+        "The Reel package has a fraction (1.5): set it to a whole number from 1 "
+        "to 304 before bringing it back.",
+        id="too-short",
+    ),
+    pytest.param(
+        {"size": Decimal(1), "short_below": Decimal("0.5")},
+        "The Reel package has a fraction (0.5) that no whole number fits: clear "
+        "it before switching the item count to each.",
+        "The Reel package has a fraction (0.5) that no whole number fits: clear "
+        "it before bringing it back.",
+        id="no-whole-number-fits",
+    ),
+]
+
+
+@pytest.mark.parametrize(("package", "switching", "_"), FRACTIONS)
 def test_a_change_to_each_is_refused_while_a_package_has_a_fraction(
     admin_client: TestClient,
     session: Session,
     radios: Category,
     package: dict[str, object],
-    amount: str,
+    switching: str,
+    _: str,
 ) -> None:
     """Said beside the unit, naming the package and the amount, with a
     decimal Reorder at refused beside it too."""
-    cable, _ = _packaged(session, radios, **package)
+    cable, _reel = _packaged(session, radios, **package)
     form = shown_item_form(cable, unit="each", minimum="2.5")
     refused = admin_client.post(f"{ITEMS}/{cable.id}", data=form)
     session.refresh(cable)
     assert refused.status_code == 400
-    said = problem(refused.text, "unit")
-    assert said == package_fraction(session, cable.id)
-    assert "Reel" in said
-    assert amount in said
+    assert problem(refused.text, "unit") == switching
     assert problem(refused.text, "minimum") == str(WHOLE_UNITS)
     assert cable.unit == "m"
+
+
+def _outlined(page: str) -> list[dict[str, str]]:
+    """The Too short to use boxes outlined on the page, as their
+    attributes."""
+    boxes = read(page).all("input", name="short_below")
+    return [box.attrs for box in boxes if box.attrs.get("aria-invalid")]
+
+
+@pytest.mark.parametrize(
+    ("package", "outlined"),
+    [
+        ({"short_below": Decimal("1.5")}, True),
+        ({"size": Decimal(1), "short_below": Decimal("0.5")}, True),
+        # Its Holds is said instead.
+        ({"size": Decimal("30.5"), "short_below": Decimal("1.5")}, False),
+    ],
+)
+def test_the_too_short_box_a_refused_switch_means_is_outlined(
+    admin_client: TestClient,
+    session: Session,
+    radios: Category,
+    package: dict[str, object],
+    outlined: bool,
+) -> None:
+    """Only that package's, tied to the words beside the unit; none on
+    the page as first shown."""
+    cable, _reel = _packaged(session, radios, **package)
+    add(session, ItemPackage(item_id=cable.id, name="Drum", size=Decimal(500)))
+    assert _outlined(admin_client.get(f"{ITEMS}/{cable.id}").text) == []
+    form = shown_item_form(cable, unit="each")
+    refused = admin_client.post(f"{ITEMS}/{cable.id}", data=form)
+    boxes = _outlined(refused.text)
+    if not outlined:
+        assert boxes == []
+        return
+    [box] = boxes
+    assert box["aria-invalid"] == "true"
+    assert box["aria-describedby"] == "unit-problem"
+    assert box["value"] == str(package["short_below"])
 
 
 @pytest.mark.parametrize(
@@ -225,20 +286,21 @@ def test_a_package_fraction_is_refused_once_its_item_is_each_meanwhile(
     assert (reel.size, reel.short_below) == (Decimal(305), None)
 
 
-@pytest.mark.parametrize(
-    "package", [{"size": Decimal("30.5")}, {"short_below": Decimal("1.5")}]
-)
+@pytest.mark.parametrize(("package", "_", "bringing_back"), FRACTIONS)
 def test_a_retired_package_with_a_fraction_stays_retired_on_an_item_counted_each(
     admin_client: TestClient,
     session: Session,
     radios: Category,
     package: dict[str, object],
+    _: str,
+    bringing_back: str,
 ) -> None:
-    """Brought back, it would be a current one with a fraction."""
+    """Brought back, it would be a current one with a fraction: said above
+    the page, naming it."""
     cable, reel = _packaged(session, radios, retired_at=NOW, **package)
     cable.unit = "each"
     session.flush()
     refused = admin_client.post(f"{ITEMS}/{cable.id}/packages/{reel.id}/restore")
     session.refresh(reel)
-    assert read(refused.text).one("p", role="alert").text == str(WHOLE_UNITS)
+    assert read(refused.text).one("p", role="alert").text == bringing_back
     assert reel.retired_at == NOW

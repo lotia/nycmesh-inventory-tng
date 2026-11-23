@@ -20,7 +20,7 @@ from inventory_tng.core.db_errors import refusal, refusal_naming_index
 from inventory_tng.core.db_once_committed import once_committed
 from inventory_tng.core.db_sessions import DbSession, exists_where
 from inventory_tng.core.local_time import site_zone
-from inventory_tng.core.phrases import Words, lazy_gettext
+from inventory_tng.core.phrases import Words, lazy, lazy_gettext
 from inventory_tng.labels import labels
 from inventory_tng.models.base import INTEGER_MAX, whole
 from inventory_tng.models.catalogue import (
@@ -297,6 +297,24 @@ OPEN_SORTING = Sorting(
 )
 
 
+def _short_fraction(
+    session: Session,
+    item: Item,
+    problems: Mapping[str, Words] | None,
+    values: Mapping[str, str] | None,
+) -> int | None:
+    """The package whose Too short to use box a switch to each refused for
+    its fraction is outlined in, as the words beside the unit do not name
+    it (Ali, 2026-11-23, inventory-tng-fa5i); None for any other page."""
+    switching = (values or {}).get("unit") == "each" != item.unit
+    if not switching or "unit" not in (problems or {}):
+        return None
+    package = items.fractional_package(session, item.id)
+    if package is None or forms.size_has_fraction(package):
+        return None
+    return package.id
+
+
 def _item_page(
     request: Request,
     session: Session,
@@ -347,6 +365,7 @@ def _item_page(
             "zone": site_zone(session),
             "problems": problems,
             "values": values,
+            "short_fraction": _short_fraction(session, item, problems, values),
             "alert": alert,
             **_name_field(session, similar),
         },
@@ -362,16 +381,17 @@ def _item_changed(
     notice: str,
     *,
     section: str = "packages",
+    refused: Mapping[str, Words] | None = None,
     **query: str,
 ) -> Response:
     """A change to an item's package or alias, made and committed, then the
     item page saying `notice` by `section`; refused, said above the page,
-    while the item is retired, or for a package with a fraction brought
-    back to an item counted each."""
-    _, broken = refusal(session, change, RETIRED, items.PACKAGE_WHOLE)
+    while the item is retired, or as `refused` says for its own rules."""
+    said = {RETIRED: RULES[RETIRED], **(refused or {})}
+    _, broken = refusal(session, change, *said)
     if broken:
         found = session.get_one(Item, item_id)
-        return _item_page(request, session, signed, found, alert=RULES[broken])
+        return _item_page(request, session, signed, found, alert=said[broken])
     session.commit()
     return redirect(f"{ITEMS}/{item_id}", notice=notice, section=section, **query)
 
@@ -706,6 +726,8 @@ def restore_package(
         item_id,
         lambda: items.restore_package(session, package),
         "package_restored",
+        # Nor with a fraction, to an item counted each.
+        refused={items.PACKAGE_WHOLE: lazy(forms.fraction_brought_back, package)},
     )
 
 

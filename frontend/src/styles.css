@@ -104,6 +104,11 @@
     @apply block w-full rounded border border-line bg-page px-2 py-2 text-base;
   }
 
+  /* A box a problem said elsewhere points at is outlined. */
+  [aria-invalid="true"] {
+    @apply border-2 border-problem;
+  }
+
   input[type="checkbox"],
   input[type="radio"] {
     @apply inline-block w-auto;
