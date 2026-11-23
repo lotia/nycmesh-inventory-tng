@@ -331,22 +331,45 @@ def _not_an_alias(session: Session, keys: Keys, but: ItemAlias | None = None) ->
 PACKAGES_WHOLE = "item_packages_whole"
 PACKAGE_WHOLE = "package_whole_units"
 
+# A package holding 1 whose too-short length, less than 1, is set: no
+# whole number fits it, and it only catches an empty package, so for an
+# item counted each it is cleared by itself, history keeping it (Ali,
+# 2026-11-23, inventory-tng-fa5i).
+_HOLDS_ONE = (ItemPackage.size == 1, ItemPackage.short_below.is_not(None))
+
 
 def fractional_package(session: Session, item_id: int) -> ItemPackage | None:
     """The item's first current package, smallest first, that holds, or is
     too short to use below, a fraction: none may, for an item counted each.
-    A retired one may."""
+    A retired one may; one holding 1 is cleared instead (_HOLDS_ONE)."""
     size, short = ItemPackage.size, ItemPackage.short_below
     query = (
         select(ItemPackage)
         .where(
             ItemPackage.item_id == item_id,
             ItemPackage.retired_at.is_(None),
-            or_(size != func.trunc(size), short != func.trunc(short)),
+            or_(size != func.trunc(size), and_(short != func.trunc(short), size > 1)),
         )
         .order_by(size, ItemPackage.id)
     )
     return session.scalars(query).first()
+
+
+def _short_cleared(session: Session, package: ItemPackage, by: str) -> None:
+    """Its too-short length cleared, as _HOLDS_ONE says, `by` "switch" or
+    "restore"."""
+    package.short_below = None
+    once_committed(
+        session,
+        log.info,
+        "package short end cleared",
+        item_package_id=package.id,
+        by=by,
+    )
+
+
+def _unit(session: Session, item_id: int) -> str:
+    return session.scalars(select(Item.unit).where(Item.id == item_id)).one()
 
 
 def _whole_for_its_item(
@@ -358,8 +381,7 @@ def _whole_for_its_item(
     amounts are whole in any unit, so with none the unit is not read."""
     if all(each is None or whole_enough("each", each) for each in amounts):
         return
-    unit = session.scalars(select(Item.unit).where(Item.id == item_id)).one()
-    enforce(PACKAGE_WHOLE, when=unit == "each")
+    enforce(PACKAGE_WHOLE, when=_unit(session, item_id) == "each")
 
 
 def add(session: Session, fields: Fields) -> Item:
@@ -394,9 +416,17 @@ def save(session: Session, item: Item, fields: Fields, *, seen: Seen) -> Renamed
     if fields.unit != item.unit:
         moved = exists_where(session, Movement.item_id == item.id)
         enforce("item_unit_fixed", when=moved)
-        # Under the catalogue lock, which every package write takes.
-        fraction = fields.unit == "each" and fractional_package(session, item.id)
-        enforce(PACKAGES_WHOLE, when=bool(fraction))
+        if fields.unit == "each":
+            # Under the catalogue lock, which every package write takes.
+            fraction = fractional_package(session, item.id)
+            enforce(PACKAGES_WHOLE, when=fraction is not None)
+            holding_one = select(ItemPackage).where(
+                ItemPackage.item_id == item.id,
+                ItemPackage.retired_at.is_(None),
+                *_HOLDS_ONE,
+            )
+            for package in session.scalars(locked(holding_one)):
+                _short_cleared(session, package, "switch")
     if fields.category_id != item.category_id:
         _in_current_category(session, fields.category_id)
     keys = Keys.of(session, fields.name)
@@ -565,9 +595,13 @@ def sizes_fixed(session: Session, package_ids: Collection[int]) -> set[int]:
 def restore_package(session: Session, package: ItemPackage) -> None:
     """A retired package brought back, unless its item is retired, or is
     counted each and the package holds, or is too short to use below, a
-    fraction. Its name is its own still: unique, retired ones too."""
+    fraction; one holding 1 is cleared instead (_HOLDS_ONE). Its name is
+    its own still: unique, retired ones too."""
     relock(session, package, current=False)
     _item_current(session, package)
+    holds_one = package.size == 1 and package.short_below is not None
+    if holds_one and _unit(session, package.item_id) == "each":
+        _short_cleared(session, package, "restore")
     # Nor with a fraction, once its item is counted each.
     _whole_for_its_item(session, package.item_id, package.size, package.short_below)
     package.retired_at = None

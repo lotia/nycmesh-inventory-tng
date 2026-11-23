@@ -242,11 +242,11 @@ def size_has_fraction(package: ItemPackage) -> bool:
     return package.size != package.size.to_integral_value()
 
 
-def _whole_range(package: ItemPackage) -> tuple[str, str] | None:
-    """The whole numbers its too-short length may be, its size whole: more
-    than 0 and less than its size; None if none is."""
-    high = package.size - 1
-    return None if high < 1 else (amount(Decimal(1)), amount(high))
+def _whole_range(package: ItemPackage) -> dict[str, str]:
+    """The whole numbers its too-short length may be, its size whole and
+    more than 1 (items.fractional_package): more than 0 and less than its
+    size."""
+    return {"low": amount(Decimal(1)), "high": amount(package.size - 1)}
 
 
 def fraction_held(package: ItemPackage) -> str:
@@ -266,18 +266,6 @@ def fraction_held(package: ItemPackage) -> str:
             package=name,
             amount=amount(package.size),
         )
-    short = amount(package.short_below)
-    if (fits := _whole_range(package)) is None:
-        # Translators: refused switching an item's unit to each: a
-        # package's "Too short to use" length, outlined on the page, has a
-        # fraction and no whole number is less than its size; %(package)s
-        # is its name, %(amount)s that length.
-        return gettext(
-            "The %(package)s package has a fraction (%(amount)s) that no whole "
-            "number fits: clear it before switching the item count to each.",
-            package=name,
-            amount=short,
-        )
     # Translators: refused switching an item's unit to each: a package's
     # "Too short to use" length, outlined on the page, has a fraction;
     # %(package)s is its name, %(amount)s that length, %(low)s and
@@ -287,39 +275,16 @@ def fraction_held(package: ItemPackage) -> str:
         "whole number from %(low)s to %(high)s before switching the item "
         "count to each.",
         package=name,
-        amount=short,
-        low=fits[0],
-        high=fits[1],
+        amount=amount(package.short_below),
+        **_whole_range(package),
     )
 
 
 def fraction_brought_back(package: ItemPackage) -> str:
     """Why a retired package is not brought back to an item counted each:
-    its size, or else its too-short length, has a fraction, said as
-    fraction_held says it (Ali, 2026-11-23, inventory-tng-fa5i)."""
-    name = package.name_shown
-    if size_has_fraction(package):
-        # Translators: refused bringing back a retired package of an item
-        # counted each: its size, its "Holds", has a fraction; %(package)s
-        # is its name, %(amount)s its size.
-        return gettext(
-            "The %(package)s package holds %(amount)s: change that to a whole "
-            "number before bringing it back.",
-            package=name,
-            amount=amount(package.size),
-        )
-    short = amount(package.short_below)
-    if (fits := _whole_range(package)) is None:
-        # Translators: refused bringing back a retired package of an item
-        # counted each: its "Too short to use" length has a fraction and no
-        # whole number is less than its size; %(package)s is its name,
-        # %(amount)s that length.
-        return gettext(
-            "The %(package)s package has a fraction (%(amount)s) that no whole "
-            "number fits: clear it before bringing it back.",
-            package=name,
-            amount=short,
-        )
+    its too-short length has a fraction, said as fraction_held says it
+    (Ali, 2026-11-23, inventory-tng-fa5i). A fraction in its size is said
+    by catalogue/item.html, with a link to add it again."""
     # Translators: refused bringing back a retired package of an item
     # counted each: its "Too short to use" length has a fraction;
     # %(package)s is its name, %(amount)s that length, %(low)s and
@@ -327,10 +292,9 @@ def fraction_brought_back(package: ItemPackage) -> str:
     return gettext(
         "The %(package)s package has a fraction (%(amount)s): set it to a "
         "whole number from %(low)s to %(high)s before bringing it back.",
-        package=name,
-        amount=short,
-        low=fits[0],
-        high=fits[1],
+        package=package.name_shown,
+        amount=amount(package.short_below),
+        **_whole_range(package),
     )
 
 

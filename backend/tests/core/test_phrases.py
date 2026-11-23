@@ -172,18 +172,14 @@ SAID_WITH_VALUES: list[Callable[[], Words]] = [
     *(lambda said=said: said(NOT_ENGLISH) for said in TAKEN_FIELDS.values()),
     *(lambda said=said: said(NOT_ENGLISH) for said in ALIAS_TAKEN.values()),
     lambda: read_as_one(NOT_ENGLISH),
+    lambda: fraction_held(ItemPackage(name_shown=NOT_ENGLISH, size=Decimal("30.5"))),
     *(
-        lambda said=said, package=package: said(package)
-        for said in (fraction_held, fraction_brought_back)
-        for package in (
-            ItemPackage(name_shown=NOT_ENGLISH, size=Decimal("30.5")),
+        lambda said=said: said(
             ItemPackage(
                 name_shown=NOT_ENGLISH, size=Decimal(30), short_below=Decimal("1.5")
-            ),
-            ItemPackage(
-                name_shown=NOT_ENGLISH, size=Decimal(1), short_below=Decimal("0.5")
-            ),
+            )
         )
+        for said in (fraction_held, fraction_brought_back)
     ),
     *(lambda said=said: said(1, NOT_ENGLISH) for said in reading_rules.NAMED.values()),
     lambda: reading_rules.both(NOT_ENGLISH, NOT_ENGLISH),

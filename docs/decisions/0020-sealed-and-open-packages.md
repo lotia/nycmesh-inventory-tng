@@ -581,8 +581,19 @@ inventory-tng-fa5i):
   the item counts pieces: the words give the whole numbers it may be, more
   than 0 and less than what the package holds, and that package's box is
   outlined. Clearing the box is accepted too.
-- **A retired package with a fraction** is not brought back to an item
-  counted each, said the same way, naming it.
+- **A package holding 1** can only be too short to use below a fraction,
+  which no whole number fits and which only catches an empty package. The
+  switch to each clears it by itself, saying nothing; history keeps the
+  old value. Bringing such a package back to an item counted each clears it
+  the same way.
+- **A retired package holding a fraction** is not brought back to an item
+  counted each. It has no Holds box while retired, so the words above the
+  page link to the Add package form, to add it again with a whole number;
+  that form's Holds box is outlined and focused. Its Package box stays
+  empty: a package's name is unique among its item's, retired ones too, so
+  the old name cannot be taken again. One too short to use below a
+  fraction, holding more than 1, is refused naming the whole numbers it may
+  be.
 - **An item already counted each** may keep a current package with a
   fraction: only the switch is checked (inventory-tng-jwlh).
 

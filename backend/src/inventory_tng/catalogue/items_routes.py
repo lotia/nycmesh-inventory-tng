@@ -20,7 +20,7 @@ from inventory_tng.core.db_errors import refusal, refusal_naming_index
 from inventory_tng.core.db_once_committed import once_committed
 from inventory_tng.core.db_sessions import DbSession, exists_where
 from inventory_tng.core.local_time import site_zone
-from inventory_tng.core.phrases import Words, lazy, lazy_gettext
+from inventory_tng.core.phrases import Words, lazy_gettext
 from inventory_tng.labels import labels
 from inventory_tng.models.base import INTEGER_MAX, whole
 from inventory_tng.models.catalogue import (
@@ -327,8 +327,11 @@ def _item_page(
     similar: Sequence[items.Close] = (),
     undo: str | None = None,
     asked: Asked = UNASKED,
+    held_back: ItemPackage | None = None,
 ) -> HTMLResponse:
-    """The item's page; its open packages sorted as `asked`, all of them."""
+    """The item's page; its open packages sorted as `asked`, all of them.
+    With `held_back`, a retired package not brought back for its size's
+    fraction: said above the page, with a link to add it again."""
     here = f"{ITEMS}/{item.id}"
     packages = queries.packages_of_item(session, item.id)
     view = View.read(here, OPEN_SORTING, asked, anchor=OPEN_PACKAGES)
@@ -367,8 +370,10 @@ def _item_page(
             "values": values,
             "short_fraction": _short_fraction(session, item, problems, values),
             "alert": alert,
+            "held_back": held_back,
             **_name_field(session, similar),
         },
+        status_code=409 if held_back else None,
     )
 
 
@@ -381,17 +386,15 @@ def _item_changed(
     notice: str,
     *,
     section: str = "packages",
-    refused: Mapping[str, Words] | None = None,
     **query: str,
 ) -> Response:
     """A change to an item's package or alias, made and committed, then the
     item page saying `notice` by `section`; refused, said above the page,
-    while the item is retired, or as `refused` says for its own rules."""
-    said = {RETIRED: RULES[RETIRED], **(refused or {})}
-    _, broken = refusal(session, change, *said)
+    while the item is retired."""
+    _, broken = refusal(session, change, RETIRED)
     if broken:
         found = session.get_one(Item, item_id)
-        return _item_page(request, session, signed, found, alert=said[broken])
+        return _item_page(request, session, signed, found, alert=RULES[RETIRED])
     session.commit()
     return redirect(f"{ITEMS}/{item_id}", notice=notice, section=section, **query)
 
@@ -719,16 +722,27 @@ def restore_package(
     package = _package(session, item_id, package_id)
     if package is None:
         return not_found()
-    return _item_changed(
-        request,
+    _, broken = refusal(
         session,
-        signed,
-        item_id,
         lambda: items.restore_package(session, package),
-        "package_restored",
-        # Nor with a fraction, to an item counted each.
-        refused={items.PACKAGE_WHOLE: lazy(forms.fraction_brought_back, package)},
+        RETIRED,
+        items.PACKAGE_WHOLE,
     )
+    if broken is None:
+        session.commit()
+        return redirect(
+            f"{ITEMS}/{item_id}", notice="package_restored", section="packages"
+        )
+    found = session.get_one(Item, item_id)
+    # Nor with a fraction, to an item counted each: one in its size has no
+    # box to change while retired, so it is added again instead (Ali,
+    # 2026-11-23, inventory-tng-fa5i).
+    if broken == items.PACKAGE_WHOLE and forms.size_has_fraction(package):
+        return _item_page(request, session, signed, found, held_back=package)
+    alert = (
+        RULES[RETIRED] if broken == RETIRED else forms.fraction_brought_back(package)
+    )
+    return _item_page(request, session, signed, found, alert=alert)
 
 
 @router.post(f"{ITEMS}/{{item_id}}/packages/{{package_id}}/retire")

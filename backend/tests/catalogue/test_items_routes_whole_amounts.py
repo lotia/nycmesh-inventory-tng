@@ -10,6 +10,7 @@ from decimal import Decimal
 
 import pytest
 from fastapi.testclient import TestClient
+from httpx2 import Response
 from sqlalchemy.orm import Session
 
 from inventory_tng.catalogue import items
@@ -19,7 +20,7 @@ from inventory_tng.web.forms import WHOLE_UNITS
 
 from helpers.items import NOW, new_item, shown_item_form
 from helpers.markup import problem, read
-from helpers.rows import add, item_fields, shown
+from helpers.rows import add, history, item_fields, shown
 
 
 @pytest.mark.parametrize(("unit", "keyboard"), [("each", "numeric"), ("m", "decimal")])
@@ -87,44 +88,31 @@ def _packaged(
     return cable, add(session, reel)
 
 
-# What a refused switch to each, or bringing a package back, says of the
-# Reel package as each case leaves it (Ali, 2026-11-23).
+# What a refused switch to each says of the Reel package as each case
+# leaves it (Ali, 2026-11-23).
 FRACTIONS = [
     pytest.param(
         {"size": Decimal("30.5"), "short_below": Decimal("1.5")},
         "The Reel package holds 30.5: change that to a whole number, or retire "
         "the package, before switching the item count to each.",
-        "The Reel package holds 30.5: change that to a whole number before "
-        "bringing it back.",
         id="holds",
     ),
     pytest.param(
         {"short_below": Decimal("1.5")},
         "The Reel package has a fraction (1.5): set it to a whole number from 1 "
         "to 304 before switching the item count to each.",
-        "The Reel package has a fraction (1.5): set it to a whole number from 1 "
-        "to 304 before bringing it back.",
         id="too-short",
-    ),
-    pytest.param(
-        {"size": Decimal(1), "short_below": Decimal("0.5")},
-        "The Reel package has a fraction (0.5) that no whole number fits: clear "
-        "it before switching the item count to each.",
-        "The Reel package has a fraction (0.5) that no whole number fits: clear "
-        "it before bringing it back.",
-        id="no-whole-number-fits",
     ),
 ]
 
 
-@pytest.mark.parametrize(("package", "switching", "_"), FRACTIONS)
+@pytest.mark.parametrize(("package", "switching"), FRACTIONS)
 def test_a_change_to_each_is_refused_while_a_package_has_a_fraction(
     admin_client: TestClient,
     session: Session,
     radios: Category,
     package: dict[str, object],
     switching: str,
-    _: str,
 ) -> None:
     """Said beside the unit, naming the package and the amount, with a
     decimal Reorder at refused beside it too."""
@@ -149,7 +137,6 @@ def _outlined(page: str) -> list[dict[str, str]]:
     ("package", "outlined"),
     [
         ({"short_below": Decimal("1.5")}, True),
-        ({"size": Decimal(1), "short_below": Decimal("0.5")}, True),
         # Its Holds is said instead.
         ({"size": Decimal("30.5"), "short_below": Decimal("1.5")}, False),
     ],
@@ -286,21 +273,109 @@ def test_a_package_fraction_is_refused_once_its_item_is_each_meanwhile(
     assert (reel.size, reel.short_below) == (Decimal(305), None)
 
 
-@pytest.mark.parametrize(("package", "_", "bringing_back"), FRACTIONS)
-def test_a_retired_package_with_a_fraction_stays_retired_on_an_item_counted_each(
-    admin_client: TestClient,
-    session: Session,
-    radios: Category,
-    package: dict[str, object],
-    _: str,
-    bringing_back: str,
+def test_a_switch_to_each_clears_a_too_short_length_no_whole_number_fits(
+    admin_client: TestClient, session: Session, radios: Category
 ) -> None:
-    """Brought back, it would be a current one with a fraction: said above
-    the page, naming it."""
+    """A package holding 1 can only be too short to use below a fraction,
+    which catches only an empty one: cleared by itself as the item saves,
+    with nothing said, its history keeping it (Ali, 2026-11-23)."""
+    cable, reel = _packaged(
+        session, radios, size=Decimal(1), short_below=Decimal("0.5")
+    )
+    form = shown_item_form(cable, unit="each")
+    done = admin_client.post(f"{ITEMS}/{cable.id}", data=form)
+    session.refresh(cable)
+    session.refresh(reel)
+    assert done.headers["location"] == f"{ITEMS}/{cable.id}?notice=saved"
+    assert (cable.unit, reel.short_below) == ("each", None)
+    cleared = history(session, "item_package", reel.id)[-1]
+    assert cleared.old_row is not None
+    assert cleared.new_row is not None
+    assert (cleared.old_row["short_below"], cleared.new_row["short_below"]) == (
+        0.5,
+        None,
+    )
+
+
+def _restore(
+    admin_client: TestClient, session: Session, radios: Category, **package: object
+) -> tuple[Response, ItemPackage]:
+    """The retired Reel package, as `package` says, brought back to a cable
+    counted each."""
     cable, reel = _packaged(session, radios, retired_at=NOW, **package)
     cable.unit = "each"
     session.flush()
-    refused = admin_client.post(f"{ITEMS}/{cable.id}/packages/{reel.id}/restore")
+    sent = admin_client.post(f"{ITEMS}/{cable.id}/packages/{reel.id}/restore")
     session.refresh(reel)
-    assert read(refused.text).one("p", role="alert").text == bringing_back
+    return sent, reel
+
+
+def test_a_retired_package_too_short_to_use_below_a_fraction_stays_retired(
+    admin_client: TestClient, session: Session, radios: Category
+) -> None:
+    """Said above the page, naming it and the whole numbers it may be."""
+    refused, reel = _restore(admin_client, session, radios, short_below=Decimal("1.5"))
+    assert refused.status_code == 409
+    assert read(refused.text).one("p", role="alert").text == (
+        "The Reel package has a fraction (1.5): set it to a whole number from 1 "
+        "to 304 before bringing it back."
+    )
     assert reel.retired_at == NOW
+
+
+def test_a_retired_package_holding_a_fraction_is_added_again_instead(
+    admin_client: TestClient, session: Session, radios: Category
+) -> None:
+    """It has no Holds box while retired: the alert links to the Add
+    package form, whose Holds box is outlined and focused (Ali,
+    2026-11-23). Its name is still its own, retired ones' too, so the
+    form's Package box is left empty."""
+    refused, reel = _restore(
+        admin_client, session, radios, size=Decimal("30.5"), short_below=Decimal("1.5")
+    )
+    page = read(refused.text)
+    alert = page.one("p", role="alert")
+    assert refused.status_code == 409
+    assert alert.text == (
+        "The Reel package holds 30.5, which an item counted in each can't hold: "
+        "add it again with a whole number."
+    )
+    assert alert.attrs["id"] == "held-back"
+    link = alert.one("a")
+    assert (link.text, link.attrs["href"]) == (
+        "add it again with a whole number",
+        "#add-package",
+    )
+    form = page.one("form", id="add-package")
+    assert form.one("input", name="package_name").attrs["value"] == ""
+    holds = form.one("input", name="size").attrs
+    assert holds["aria-invalid"] == "true"
+    assert holds["aria-describedby"] == "held-back"
+    assert "autofocus" in holds
+    assert (reel.retired_at, reel.size) == (NOW, Decimal("30.5"))
+
+
+def test_a_retired_package_holding_1_comes_back_without_its_too_short_length(
+    admin_client: TestClient, session: Session, radios: Category
+) -> None:
+    """As a switch to each clears it: nothing said, its history keeping
+    it."""
+    done, reel = _restore(
+        admin_client, session, radios, size=Decimal(1), short_below=Decimal("0.5")
+    )
+    assert done.status_code == 303
+    assert (reel.retired_at, reel.short_below) == (None, None)
+    brought_back = history(session, "item_package", reel.id)[-1]
+    assert brought_back.old_row is not None
+    assert brought_back.old_row["short_below"] == 0.5
+
+
+def test_the_add_package_forms_holds_box_is_not_outlined_on_first_show(
+    admin_client: TestClient, session: Session, radios: Category
+) -> None:
+    cable = new_item(session, radios, unit="each")
+    form = read(admin_client.get(f"{ITEMS}/{cable.id}").text).one(
+        "form", id="add-package"
+    )
+    attrs = form.one("input", name="size").attrs
+    assert not {"aria-invalid", "autofocus"} & attrs.keys()

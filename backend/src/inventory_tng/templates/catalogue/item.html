@@ -4,6 +4,9 @@
 {% from "_labels.html" import labels_section with context %}
 {% from "_retired_record.html" import retired_record, retire_section with context %}
 {% block main %}
+{#- A retired package not brought back for a fraction in its size, which it
+has no box to change: added again instead (Ali, 2026-11-23). #}
+{% if held_back %}<p role="alert" id="held-back">{#- Translators: refused bringing back a retired package of an item counted each: its size, its "Holds", has a fraction. %(package)s is its name, %(amount)s its size; the link goes to the Add package form. #}{% trans package=held_back.name_shown, amount=held_back.size | amount, link="#add-package" %}The {{ package }} package holds {{ amount }}, which an item counted in each can't hold: <a href="{{ link }}">add it again with a whole number</a>.{% endtrans %}</p>{% endif %}
 {% set retired = item.retired_at is not none %}
 {% if retired %}
 {% call retired_record(item) %}{% if in_stock > 0 %}{% trans left=in_stock | amount, unit=item.unit %}It can't be received. Volunteers can still
@@ -167,12 +170,13 @@ None is left, so nobody can pick it.{% endtrans %}{% endif %}{% endcall %}
   {#- A package's own form sent back names it: its problems are beside it. #}
   {% set adding = 'package_id' not in values %}
   {% set new = values if adding else {} %}
-  <form method="post" action="{{ here }}/packages" class="actions">
+  <form method="post" action="{{ here }}/packages" class="actions" id="add-package">
     <label>{% trans %}Package{% endtrans %} <input name="package_name" inputmode="text" value="{{ new.get('package_name', '') }}" placeholder="{% trans %}Box{% endtrans %}" required>
       {% if adding %}{% with name = "package_name" %}{% include "_field_problem.html" %}{% endwith %}{% endif %}
     </label>
     {% with typed = new.get('package_name', ''), sent = new %}{% include "catalogue/_units_read.html" %}{% endwith %}
-    <label>{% trans %}Holds{% endtrans %} <input name="size" value="{{ new.get('size', '') }}" inputmode="{{ item.unit | keyboard }}" required>
+    <label>{% trans %}Holds{% endtrans %} <input name="size" value="{{ new.get('size', '') }}" inputmode="{{ item.unit | keyboard }}" required
+      {%- if held_back %} aria-invalid="true" aria-describedby="held-back" autofocus{% endif %}>
       {% if adding %}{% with name = "size" %}{% include "_field_problem.html" %}{% endwith %}{% endif %}
     </label>
     <button class="primary">{% trans %}Add package{% endtrans %}</button>

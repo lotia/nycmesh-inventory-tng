@@ -3957,28 +3957,6 @@ msgid "That would make it part of itself."
 msgstr ""
 
 #. Translators: refused bringing back a retired package of an item
-#. counted each: its "Too short to use" length has a fraction and no
-#. whole number is less than its size; %(package)s is its name,
-#. %(amount)s that length.
-#: src/inventory_tng/catalogue/forms.py
-#, python-format
-msgid ""
-"The %(package)s package has a fraction (%(amount)s) that no whole number "
-"fits: clear it before bringing it back."
-msgstr ""
-
-#. Translators: refused switching an item's unit to each: a
-#. package's "Too short to use" length, outlined on the page, has a
-#. fraction and no whole number is less than its size; %(package)s
-#. is its name, %(amount)s that length.
-#: src/inventory_tng/catalogue/forms.py
-#, python-format
-msgid ""
-"The %(package)s package has a fraction (%(amount)s) that no whole number "
-"fits: clear it before switching the item count to each."
-msgstr ""
-
-#. Translators: refused bringing back a retired package of an item
 #. counted each: its "Too short to use" length has a fraction;
 #. %(package)s is its name, %(amount)s that length, %(low)s and
 #. %(high)s the whole numbers it may be.
@@ -4000,14 +3978,14 @@ msgid ""
 "number from %(low)s to %(high)s before switching the item count to each."
 msgstr ""
 
-#. Translators: refused bringing back a retired package of an item
-#. counted each: its size, its "Holds", has a fraction; %(package)s
-#. is its name, %(amount)s its size.
-#: src/inventory_tng/catalogue/forms.py
+#. refused bringing back a retired package of an item counted each: its size,
+#. its "Holds", has a fraction. %(package)s is its name, %(amount)s its size;
+#. the link goes to the Add package form.
+#: src/inventory_tng/templates/catalogue/item.html
 #, python-format
 msgid ""
-"The %(package)s package holds %(amount)s: change that to a whole number "
-"before bringing it back."
+"The %(package)s package holds %(amount)s, which an item counted in each "
+"can't hold: <a href=\"%(link)s\">add it again with a whole number</a>."
 msgstr ""
 
 #. Translators: refused switching an item's unit to each: a
