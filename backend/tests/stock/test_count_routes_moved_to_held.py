@@ -257,7 +257,8 @@ def test_an_arrival_opened_and_moved_on_leaves_the_place_s_own_open_spool(
     """Shelf B's own spool opened there before the form was shown, 100 m
     cut from it; the spool that came opened and its open package moved on
     to the van: Shelf B's line shows its own open spool's 205 m, and
-    saved so writes nothing."""
+    saved so writes nothing; under Moved to, the spool that came says what
+    Shelf B holds of it, 0 m left (inventory-tng-0fbn)."""
 
     def opened_own(moved: Arrived) -> None:
         moved.bring(spools=1, metres=2)
@@ -273,6 +274,7 @@ def test_an_arrival_opened_and_moved_on_leaves_the_place_s_own_open_spool(
 
     moved = Arrived(session, admin_client, own=opened_own, then=moved_on)
     mine = moved.opened[0].id
+    assert opened_since(moved) == [opened_here_since(Decimal(0), "m")]
     assert moved.shows(f"opened_{mine}") == "205"
     assert moved.shows(f"loose_{moved.cable}") == "2"
     moved.save({f"opened_{mine}": "205", f"loose_{moved.cable}": "2"})
@@ -432,3 +434,25 @@ def test_a_box_opened_loose_where_it_went_says_what_is_left_in_each(
         session, admin_client, tracked=False, own=in_each, then=open_and_cut(5)
     )
     assert opened_since(moved) == [opened_here_since(Decimal(300), "each")]
+
+
+def test_a_box_opened_loose_among_loose_of_its_own_says_no_more_than_came(
+    session: Session, admin_client: TestClient
+) -> None:
+    """Shelf B holding 10 of its own loose, the box that came opened
+    loose there and 5 used: its loose units are not told apart, so the
+    line counts the place's own towards what is left, but never more than
+    the box held: 305, not 310."""
+
+    def in_each_and_own(moved: Arrived) -> None:
+        moved.made.cable.unit = "each"
+        moved.bring(metres=10)
+
+    moved = Arrived(
+        session,
+        admin_client,
+        tracked=False,
+        own=in_each_and_own,
+        then=open_and_cut(5),
+    )
+    assert opened_since(moved) == [opened_here_since(Decimal(305), "each")]
