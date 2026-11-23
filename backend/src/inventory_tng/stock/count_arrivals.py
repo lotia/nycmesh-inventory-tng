@@ -150,9 +150,10 @@ def opened_since(arrivals: Arrivals) -> dict[int, list[Decimal]]:
     (inventory-tng-0fbn)."""
     left: dict[int, list[Decimal]] = {}
     for (item_id, form), parts in arrivals.items():
-        for each in parts:
-            if form.package_id is not None and each.form != form:
-                left.setdefault(item_id, []).append(each.there)
+        if form.package_id is not None:
+            opened = [each.there for each in parts if each.form != form]
+            if opened:
+                left.setdefault(item_id, []).extend(opened)
     return left
 
 
