@@ -52,3 +52,19 @@ def test_reorder_at_is_whole_for_an_item_counted_each(
     else:
         assert sent.status_code == 303
         assert item.minimum == Decimal("2.5")
+
+
+def test_reorder_at_is_checked_against_the_unit_sent(
+    admin_client: TestClient, session: Session, radios: Category
+) -> None:
+    """A change to each with a decimal Reorder at is refused, and the box
+    comes back with the keypad of the unit it was checked against."""
+    item = add(session, Item(name="LiteBeam", category_id=radios.id, unit="m"))
+    form = shown_item_form(item, unit="each", minimum="2.5")
+    refused = admin_client.post(f"{ITEMS}/{item.id}", data=form)
+    session.refresh(item)
+    assert refused.status_code == 400
+    assert problem(refused.text, "minimum") == str(WHOLE_UNITS)
+    assert (item.unit, item.minimum) == ("m", None)
+    box = read(refused.text).one("input", name="minimum")
+    assert box.attrs["inputmode"] == "numeric"

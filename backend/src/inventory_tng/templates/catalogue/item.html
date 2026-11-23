@@ -44,7 +44,7 @@ None is left, so nobody can pick it.{% endtrans %}{% endif %}{% endcall %}
   ] %}
   <label>{{ label }}{% if hint %} <span class="hint">{{ hint }}</span>{% endif %}
     {% set stored = item[name] | plain_amount if name == "minimum" else item[name] %}
-    <input name="{{ name }}" inputmode="{{ item.unit | keyboard if name == 'minimum' else 'text' }}" value="{{ values.get(name, stored if stored is not none else '') }}">
+    <input name="{{ name }}" inputmode="{{ values.get('unit', item.unit) | keyboard if name == 'minimum' else 'text' }}" value="{{ values.get(name, stored if stored is not none else '') }}">
     {% include "_field_problem.html" %}
   </label>
   {% if name == "part_number" %}
