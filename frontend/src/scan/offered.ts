@@ -89,7 +89,7 @@ export function offered(
 
 /** offered's open packages of an item at a place: usable ones fewest left
  * first, ties by id, as the stock page lists them
- * (open_packages.fewest_left_first), then short ends (isShortEnd), which
+ * (package_forms.fewest_left_first), then short ends (isShortEnd), which
  * the stock page shows on a line of their own, the same way, then those
  * showing nothing, or less (docs/decisions/0020). One opened on this
  * phone that the catalogue does not show yet has no id here (0), so it
@@ -116,7 +116,7 @@ export function offeredAt(
 
 /** Whether an open package with `left` (thousandths) on it is a short
  * end: some left, but less than its package's too-short-to-use length
- * (open_packages.is_short_end). Never one showing nothing, so a card is
+ * (package_forms.is_short_end). Never one showing nothing, so a card is
  * flagged one or the other, not both. */
 export function isShortEnd(
   left: number,
@@ -131,7 +131,7 @@ export type Ending = "short" | "used" | "over";
 
 /** What a cut of `amount` (thousandths) leaves on an open package, and
  * why nothing usable would be left then, if so: less than nothing, none,
- * or less than its too-short-to-use length (open_packages.is_short_end). */
+ * or less than its too-short-to-use length (package_forms.is_short_end). */
 export function afterCut(
   open: Pick<Offered, "left" | "short_below">,
   amount: number,

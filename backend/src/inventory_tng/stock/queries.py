@@ -23,7 +23,7 @@ from inventory_tng.models.stock import (
     OpenPackage,
 )
 from inventory_tng.models.volunteers import Volunteer
-from inventory_tng.stock import open_packages
+from inventory_tng.stock import package_forms
 from inventory_tng.stock.balance import balance, by_form, countable, takeable
 
 
@@ -89,9 +89,9 @@ def items_to_reorder(session: Session, item_ids: Collection[int]) -> Sequence[It
 
 def forms_in_stores(
     session: Session,
-) -> dict[tuple[int, int], open_packages.Forms]:
+) -> dict[tuple[int, int], package_forms.Forms]:
     """Stock in the current stores, by item and place, form by form
-    (open_packages.forms_of)."""
+    (package_forms.forms_of)."""
     # The stores' ids as an array: PostgreSQL pushes it down to the
     # ledger's indexes, so only the stores' balances are summed.
     stores = func.array(
@@ -99,7 +99,7 @@ def forms_in_stores(
         .where(Location.kind.in_(STORE_KINDS), Location.retired_at.is_(None))
         .scalar_subquery()
     )
-    return open_packages.forms_of(session, by_form.c.location_id == any_(stores))
+    return package_forms.forms_of(session, by_form.c.location_id == any_(stores))
 
 
 # The place a count or an adjustment was at.

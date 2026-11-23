@@ -207,6 +207,12 @@ short test. `core/` is the name FastAPI's full-stack template uses;
   `scan/ScanPage.cart.test.tsx` its open packages and its outbox went to
   `ScanPage.open-packages.test.tsx` and `ScanPage.outbox.test.tsx`. What
   the parts share is in `testing/outbox.ts` and `testing/older-list.ts`.
+- On 2026-11-23 `stock/open_packages.py` was split in two
+  (inventory-tng-9gwp): it keeps the open packages' rows, making,
+  reporting, checking and closing them, and `stock/package_forms.py`
+  holds an item's stock split by form and the orders each form is listed
+  in. Their tests kept their names, as `test_package_forms_*.py` named
+  the second job already.
 - Older decision records keep the paths of their time. The tables below
   give each old path's new home; a later move adds its rows.
 
@@ -288,6 +294,7 @@ queries to its `queries.py`.
 | `site_settings/command.py` | `site_settings/scan_settings_command.py` |
 | `site_settings/routes.py` | `site_settings/site_settings_routes.py` |
 | `stacks.py` | `backend/devtools/stack.py`; its `stale` is `list-stale` |
+| `stock/open_packages.py` | itself, the open packages' rows; `Forms`, `is_short_end`, `fewest_left_first`, `largest_first`, `PackageSize`, `split`, `forms_of`: `stock/package_forms.py` |
 | `stock/over_recorded.py` | itself, with what changes a check: `raise_checks`, `seen`, `waiting`, `ends`, `places_of`, `mark_checked`, `close`, `correct`, `confirm_count`, `openings_waiting`, `counted`, `open_package_closed`, the metrics, `REASON`, `Settled`, `CHECKED_REASONS`, `WAITING`, `OPENED_INTO`, with `_correction_key` as `correction_key`; what the pages read and show: `Shown`, `OneCounted`, `BothRight`, `MovedWhole`, `Spot`, `WasSettled`, `within`, `times`, `amount_words` and the other words, `shown`, `how_many`, `settled`, `SETTLED`, `SETTLED_HOW`, `SETTLED_ORDER`, `TWO_ADJUSTMENTS`, `NO_ADJUSTMENT`, `FROM`, `TO`, `LEFT_COUNT`, `ARRIVED_COUNT`: `stock/over_recorded_queries.py` |
 | `stock/paths.py` | itself, with `RECORDED_MORE` and `RECORDED_MORE_SETTLED` as `OVER_RECORDED` and `OVER_RECORDED_SETTLED` |
 | `templates/scan/page.html` | `templates/frontend_page.html` |

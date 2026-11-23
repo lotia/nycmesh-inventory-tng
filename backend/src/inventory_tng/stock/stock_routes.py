@@ -24,9 +24,9 @@ from inventory_tng.models.base import INTEGER_MAX, whole
 from inventory_tng.models.catalogue import Item, ItemPackage
 from inventory_tng.models.places import Location
 from inventory_tng.stock import (
-    open_packages,
     over_recorded,
     over_recorded_queries,
+    package_forms,
     queries,
 )
 from inventory_tng.stock.balance import SHORT, retired_places_holding_stock
@@ -156,7 +156,7 @@ def stock(
     place: str = "",
 ) -> Response:
     """Every item at every place it is, each form on its own line, from one
-    read of the ledger by form (open_packages.forms_of); the items a search
+    read of the ledger by form (package_forms.forms_of); the items a search
     finds, at one place, if asked (Ali, 2026-11-15). Page size counts
     groups."""
     # An odd search is none, as the items list reads it.
@@ -170,7 +170,7 @@ def stock(
         filters=filters,
         kept={"by": by} if by == "item" else None,
     )
-    forms = open_packages.forms_of(session, true())
+    forms = package_forms.forms_of(session, true())
     matching = SEARCHED.matching(search, SEARCHED.rules(session)) if search else None
     items = {
         item.id: item
@@ -251,7 +251,7 @@ def reorder_rows(
     point, or a package's sealed below its minimum. `usable` and `sealed`
     (by item, then package) are in the stores; `short`, items less than
     nothing somewhere there. Low packages are listed as the stock page
-    lists sealed ones (open_packages.largest_first)."""
+    lists sealed ones (package_forms.largest_first)."""
     kept = [
         package
         for package in packages
@@ -259,7 +259,7 @@ def reorder_rows(
     ]
     minimums: dict[int, list[ItemPackage]] = {}
     for package in sorted(
-        kept, key=lambda each: open_packages.largest_first(each.id, each.size)
+        kept, key=lambda each: package_forms.largest_first(each.id, each.size)
     ):
         minimums.setdefault(package.item_id, []).append(package)
     rows = []

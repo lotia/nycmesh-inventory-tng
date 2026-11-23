@@ -11,7 +11,7 @@ from sqlalchemy.orm import Session
 
 from inventory_tng.catalogue.forms import SHORTER_THAN_WHOLE, WHOLE_PACKAGES
 from inventory_tng.models.catalogue import Item, ItemPackage
-from inventory_tng.stock import balance, open_packages, stock_routes
+from inventory_tng.stock import balance, package_forms, stock_routes
 from inventory_tng.stock.ledger import Entry, Form
 
 from helpers.markup import read, text, words_on
@@ -23,8 +23,8 @@ from helpers.stock import Spools
 
 def test_stock_splits_into_forms_and_short_ends_are_not_usable() -> None:
     packages = {
-        SPOOL: open_packages.PackageSize("Spool", Decimal(305), Decimal(15)),
-        BOX: open_packages.PackageSize("Box", Decimal(100), None),
+        SPOOL: package_forms.PackageSize("Spool", Decimal(305), Decimal(15)),
+        BOX: package_forms.PackageSize("Box", Decimal(100), None),
     }
     rows = [
         (SPOOL, None, Decimal(915)),
@@ -33,12 +33,12 @@ def test_stock_splits_into_forms_and_short_ends_are_not_usable() -> None:
         (None, FRESH, Decimal(3)),
         (None, None, Decimal(85)),
     ]
-    forms = open_packages.split(rows, packages, {OPEN: SPOOL, GONE: SPOOL, FRESH: BOX})
+    forms = package_forms.split(rows, packages, {OPEN: SPOOL, GONE: SPOOL, FRESH: BOX})
     assert forms.sealed == [("Spool", Decimal(3), Decimal(915))]
     assert (forms.open, forms.short_ends) == ([Decimal(3), Decimal(120)], [Decimal(12)])
     assert (forms.loose, forms.total, forms.usable) == (85, 1135, 1123)
     # Less than nothing left is the records', not a short end.
-    below = open_packages.split([(None, OPEN, Decimal(-8))], packages, {OPEN: SPOOL})
+    below = package_forms.split([(None, OPEN, Decimal(-8))], packages, {OPEN: SPOOL})
     assert (below.open, below.short_ends) == ([Decimal(-8)], [])
 
 
@@ -47,16 +47,16 @@ def test_an_items_open_packages_are_ordered_fewest_left_first() -> None:
     those showing nothing or less last (Ali, 2026-11-18, inventory-tng-qskv),
     whatever order the balances arrive in."""
     opened = [(9, Decimal(40)), (4, Decimal(-8)), (7, Decimal(40)), (5, Decimal(120))]
-    assert sorted(opened, key=lambda each: open_packages.fewest_left_first(*each)) == [
+    assert sorted(opened, key=lambda each: package_forms.fewest_left_first(*each)) == [
         (7, Decimal(40)),
         (9, Decimal(40)),
         (5, Decimal(120)),
         (4, Decimal(-8)),
     ]
-    packages = {SPOOL: open_packages.PackageSize("Spool", Decimal(305), None)}
+    packages = {SPOOL: package_forms.PackageSize("Spool", Decimal(305), None)}
     rows = [(None, open_id, left) for open_id, left in opened]
     opened_from = {open_id: SPOOL for open_id, _ in opened}
-    forms = open_packages.split(rows, packages, opened_from)
+    forms = package_forms.split(rows, packages, opened_from)
     assert forms.open == [Decimal(40), Decimal(40), Decimal(120), Decimal(-8)]
 
 
@@ -65,10 +65,10 @@ def test_an_items_sealed_packages_are_ordered_largest_first() -> None:
     inventory-tng-7mby), whatever order the balances arrive in."""
     drum, pack = 12, 9
     packages = {
-        BOX: open_packages.PackageSize("Box", Decimal(100), None),
-        pack: open_packages.PackageSize("Pack", Decimal(100), None),
-        drum: open_packages.PackageSize("Drum", Decimal(305), None),
-        SPOOL: open_packages.PackageSize("Spool", Decimal(305), None),
+        BOX: package_forms.PackageSize("Box", Decimal(100), None),
+        pack: package_forms.PackageSize("Pack", Decimal(100), None),
+        drum: package_forms.PackageSize("Drum", Decimal(305), None),
+        SPOOL: package_forms.PackageSize("Spool", Decimal(305), None),
     }
     rows = [
         (BOX, None, Decimal(200)),
@@ -77,7 +77,7 @@ def test_an_items_sealed_packages_are_ordered_largest_first() -> None:
         (SPOOL, None, Decimal(915)),
     ]
     for arrived in (rows, rows[::-1], rows[1:] + rows[:1]):
-        forms = open_packages.split(arrived, packages, {})
+        forms = package_forms.split(arrived, packages, {})
         assert forms.sealed == [
             ("Spool", 3, Decimal(915)),
             ("Drum", 2, Decimal(610)),
