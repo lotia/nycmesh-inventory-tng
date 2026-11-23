@@ -349,14 +349,15 @@ def fractional_package(session: Session, item_id: int) -> ItemPackage | None:
     return session.scalars(query).first()
 
 
-def _whole_for_its_item(session: Session, item_id: int, amount: Decimal | None) -> None:
-    """RuleBroken (PACKAGE_WHOLE) if `amount`, a package's, has a fraction
-    and its item, read afresh under the catalogue lock, is counted each: a
-    form checked it against the unit before the lock."""
-    if amount is None:
-        return
+def _whole_for_its_item(
+    session: Session, item_id: int, *amounts: Decimal | None
+) -> None:
+    """RuleBroken (PACKAGE_WHOLE) if any of `amounts`, a package's, has a
+    fraction and its item, read afresh under the catalogue lock, is counted
+    each: a form checked them against the unit before the lock."""
     unit = session.scalars(select(Item.unit).where(Item.id == item_id)).one()
-    enforce(PACKAGE_WHOLE, when=not whole_enough(unit, amount))
+    fraction = (each is not None and not whole_enough(unit, each) for each in amounts)
+    enforce(PACKAGE_WHOLE, when=any(fraction))
 
 
 def add(session: Session, fields: Fields) -> Item:
@@ -566,8 +567,7 @@ def restore_package(session: Session, package: ItemPackage) -> None:
     relock(session, package, current=False)
     _item_current(session, package)
     # Nor with a fraction, once its item is counted each.
-    _whole_for_its_item(session, package.item_id, package.size)
-    _whole_for_its_item(session, package.item_id, package.short_below)
+    _whole_for_its_item(session, package.item_id, package.size, package.short_below)
     package.retired_at = None
     once_committed(session, log.info, "package restored", item_package_id=package.id)
 
