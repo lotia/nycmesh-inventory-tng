@@ -560,10 +560,14 @@ def sizes_fixed(session: Session, package_ids: Collection[int]) -> set[int]:
 
 
 def restore_package(session: Session, package: ItemPackage) -> None:
-    """A retired package brought back, unless its item is retired. Its name
-    is its own still: unique, retired ones too."""
+    """A retired package brought back, unless its item is retired, or is
+    counted each and the package holds, or is too short to use below, a
+    fraction. Its name is its own still: unique, retired ones too."""
     relock(session, package, current=False)
     _item_current(session, package)
+    # Nor with a fraction, once its item is counted each.
+    _whole_for_its_item(session, package.item_id, package.size)
+    _whole_for_its_item(session, package.item_id, package.short_below)
     package.retired_at = None
     once_committed(session, log.info, "package restored", item_package_id=package.id)
 

@@ -223,3 +223,22 @@ def test_a_package_fraction_is_refused_once_its_item_is_each_meanwhile(
     assert refused.status_code == 400
     assert problem(refused.text, field) == str(WHOLE_UNITS)
     assert (reel.size, reel.short_below) == (Decimal(305), None)
+
+
+@pytest.mark.parametrize(
+    "package", [{"size": Decimal("30.5")}, {"short_below": Decimal("1.5")}]
+)
+def test_a_retired_package_with_a_fraction_stays_retired_on_an_item_counted_each(
+    admin_client: TestClient,
+    session: Session,
+    radios: Category,
+    package: dict[str, object],
+) -> None:
+    """Brought back, it would be a current one with a fraction."""
+    cable, reel = _packaged(session, radios, retired_at=NOW, **package)
+    cable.unit = "each"
+    session.flush()
+    refused = admin_client.post(f"{ITEMS}/{cable.id}/packages/{reel.id}/restore")
+    session.refresh(reel)
+    assert read(refused.text).one("p", role="alert").text == str(WHOLE_UNITS)
+    assert reel.retired_at == NOW

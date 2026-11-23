@@ -366,11 +366,12 @@ def _item_changed(
 ) -> Response:
     """A change to an item's package or alias, made and committed, then the
     item page saying `notice` by `section`; refused, said above the page,
-    while the item is retired."""
-    _, broken = refusal(session, change, RETIRED)
+    while the item is retired, or for a package with a fraction brought
+    back to an item counted each."""
+    _, broken = refusal(session, change, RETIRED, items.PACKAGE_WHOLE)
     if broken:
         found = session.get_one(Item, item_id)
-        return _item_page(request, session, signed, found, alert=RULES[RETIRED])
+        return _item_page(request, session, signed, found, alert=RULES[broken])
     session.commit()
     return redirect(f"{ITEMS}/{item_id}", notice=notice, section=section, **query)
 
