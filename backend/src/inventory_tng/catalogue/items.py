@@ -1,8 +1,9 @@
 """Items and the packages they come in: every write to the item and
 item_package tables, and their rules. A current item is in a current
 category (categories.retire is the other side), and an item's unit is
-fixed once stock has moved in it, as the ledger's quantities are in that
-unit, and an item counted each has no current package holding, or too
+fixed once stock has moved in it or a label of it or its packages is
+printed, as the ledger's quantities and the labels are in that unit
+(unit_fixed), and an item counted each has no current package holding, or too
 short to use below, a fraction; a package's size is fixed once it has
 moved, been opened or labelled. The app may not move a package to another
 item (the initial migration), so its labels always name its item, and a
