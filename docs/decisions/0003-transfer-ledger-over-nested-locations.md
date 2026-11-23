@@ -233,7 +233,11 @@ A fix lowering a move is lost from those forms too, never more than is
 still there of it (2026-11-23, inventory-tng-nlog). Under the item, a
 muted line for each package of it opened there since, before the form's
 moment, says what is left of it then: "Opened here since: 250 m left.";
-the box still asks for sealed packages. We rejected asking for the open
+with none left, where the last of it went, as the ledger line that took
+it says: "Opened here since, then moved to Shelf A." for another place on
+the form, "Opened here since, then taken out of Supernode 1." for one
+elsewhere, else "Opened here since, then used up." The box still asks for
+sealed packages. We rejected asking for the open
 package as it is now, and no "Fix amount" for an opened arrival (Ali,
 2026-11-23, inventory-tng-0fbn). A line under the heading, in the browser
 only, gives what it will hold once saved. Found at leaves the

@@ -143,18 +143,17 @@ def as_held_at(
     return kept
 
 
-def opened_since(arrivals: Arrivals) -> dict[int, list[Decimal]]:
+def opened_since(arrivals: Arrivals) -> dict[int, list[Held]]:
     """Of what arrived sealed at a place (as_held there), each package of
-    it opened there since, by item, the newest first: how much of it the
-    place holds in the form opening it made, at the form's moment
-    (inventory-tng-0fbn)."""
-    left: dict[int, list[Decimal]] = {}
+    it opened there since, by item, the newest first: the form opening it
+    made, and how much of it the place holds in that form at the form's
+    moment (inventory-tng-0fbn)."""
+    opened: dict[int, list[Held]] = {}
     for (item_id, form), parts in arrivals.items():
-        if form.package_id is not None:
-            opened = [each.there for each in parts if each.form != form]
-            if opened:
-                left.setdefault(item_id, []).extend(opened)
-    return left
+        made = [each for each in parts if each.form != form]
+        if form.package_id is not None and made:
+            opened.setdefault(item_id, []).extend(made)
+    return opened
 
 
 def held_aside(arrivals: Mapping[int, Arrivals]) -> dict[int, Aside]:

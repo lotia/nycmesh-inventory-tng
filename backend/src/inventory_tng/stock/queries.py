@@ -7,6 +7,7 @@ from decimal import Decimal
 from typing import Any
 
 from sqlalchemy import ColumnElement, Row, Select, any_, func, or_, select, true
+from sqlalchemy.dialects.postgresql import distinct_on
 from sqlalchemy.orm import Session
 
 from inventory_tng.core.db_lookups import values_by
@@ -384,6 +385,37 @@ def openings_at(
             Movement.from_package_id.is_not(None),
         )
         .order_by(LedgerTransaction.id.desc(), Movement.id.desc())
+    ).all()
+
+
+def last_taken_from(
+    session: Session,
+    place_ids: Collection[int],
+    item_ids: Collection[int],
+    after: int,
+    up_to: int,
+) -> Sequence[Row[int | None, int, int | None, str, int | None]]:
+    """Of `item_ids` at the places, the ledger line after `after` up to
+    `up_to` that last took each from an open package there, or from loose
+    units: its place, item, open package (None, loose), transaction kind,
+    and the place it went to (None: installed, counted or written off)."""
+    taken = (
+        LedgerTransaction.from_location_id,
+        Movement.item_id,
+        Movement.from_open_package_id,
+    )
+    return session.execute(
+        select(*taken, LedgerTransaction.kind, LedgerTransaction.to_location_id)
+        .join(LedgerTransaction, LedgerTransaction.id == Movement.transaction_id)
+        .where(
+            LedgerTransaction.from_location_id.in_(list(place_ids)),
+            LedgerTransaction.id > after,
+            LedgerTransaction.id <= up_to,
+            Movement.item_id.in_(list(item_ids)),
+            Movement.from_package_id.is_(None),
+        )
+        .ext(distinct_on(*taken))
+        .order_by(*taken, LedgerTransaction.id.desc(), Movement.id.desc())
     ).all()
 
 

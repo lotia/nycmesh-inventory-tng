@@ -431,7 +431,16 @@ def _count_page(
     moved = None
     if leaving is not None:
         moved = moved_sections(
-            session, place, groups, leaving, moves, named, packages, arrivals
+            session,
+            place,
+            groups,
+            leaving,
+            moves,
+            named,
+            packages,
+            arrivals,
+            gone.since,
+            at.as_of,
         )
     if off_form is not None:
         # Its line there, as shown: by its total, or by its forms, loose.

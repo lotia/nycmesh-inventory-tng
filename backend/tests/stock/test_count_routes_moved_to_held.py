@@ -15,9 +15,15 @@ from fastapi.testclient import TestClient
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from inventory_tng.models.places import Location
 from inventory_tng.models.stock import LedgerTransaction, Movement, OpenPackage
 from inventory_tng.stock import open_packages
-from inventory_tng.stock.count_gone_areas import opened_here_since
+from inventory_tng.stock.count_gone_areas import (
+    OPENED_THEN_USED_UP,
+    opened_here_since,
+    opened_then_moved,
+    opened_then_taken_out,
+)
 from inventory_tng.stock.ledger import LOOSE, Entry, Form
 from inventory_tng.stock.moments import at_place
 from inventory_tng.stock.paths import COUNTS
@@ -255,8 +261,8 @@ def test_an_arrival_opened_and_moved_on_leaves_the_place_s_own_open_spool(
     """Shelf B's own spool opened there before the form was shown, 100 m
     cut from it; the spool that came opened and its open package moved on
     to the van: Shelf B's line shows its own open spool's 205 m, and
-    saved so writes nothing; under Moved to, the spool that came says what
-    Shelf B holds of it, 0 m left (inventory-tng-0fbn)."""
+    saved so writes nothing; under Moved to, the spool that came says it
+    was taken out of the store (inventory-tng-0fbn)."""
 
     def opened_own(moved: Arrived) -> None:
         moved.bring(spools=1, metres=2)
@@ -272,7 +278,7 @@ def test_an_arrival_opened_and_moved_on_leaves_the_place_s_own_open_spool(
 
     moved = Arrived(session, admin_client, own=opened_own, then=moved_on)
     mine = moved.opened[0].id
-    assert opened_since(moved) == [opened_here_since(Decimal(0), "m")]
+    assert opened_since(moved) == [opened_then_taken_out(moved.store.name)]
     assert moved.shows(f"opened_{mine}") == "205"
     assert moved.shows(f"loose_{moved.cable}") == "2"
     moved.save({f"opened_{mine}": "205", f"loose_{moved.cable}": "2"})
@@ -477,3 +483,77 @@ def test_a_box_opened_loose_among_loose_of_its_own_says_no_more_than_came(
         then=open_and_cut(5),
     )
     assert opened_since(moved) == [opened_here_since(Decimal(305), "each")]
+
+
+def test_a_spool_opened_where_it_went_and_used_up_says_so(
+    session: Session, admin_client: TestClient
+) -> None:
+    """All 305 m of the spool that came cut at Shelf B before the form's
+    moment: it says it was used up, not that 0 m is left (Ali,
+    2026-11-23)."""
+    moved = Arrived(session, admin_client, then=open_and_cut(305))
+    assert opened_since(moved) == [str(OPENED_THEN_USED_UP)]
+
+
+def test_a_spool_opened_where_it_went_and_moved_on_in_the_store_names_where(
+    session: Session, admin_client: TestClient
+) -> None:
+    """The spool that came opened at Shelf B and moved whole to Shelf A,
+    another area of the store on the form: named as the form names it,
+    by its path below the store."""
+    shelves: list[Location] = []
+
+    def shelf_a(moved: Arrived) -> None:
+        shelves.append(add(session, area("Shelf A", moved.store)))
+
+    def moved_on(moved: Arrived) -> None:
+        arrival = moved.open()
+        moved.move(
+            moved.shelf.id,
+            shelves[0].id,
+            Entry(moved.cable, Decimal(305), arrival, arrival),
+        )
+
+    moved = Arrived(session, admin_client, own=shelf_a, then=moved_on)
+    assert opened_since(moved) == [opened_then_moved(shelves[0].name)]
+
+
+@pytest.mark.parametrize(
+    ("last", "said"),
+    [("moved", "taken out"), ("cut", "used up")],
+)
+def test_a_spool_partly_cut_and_partly_moved_says_what_took_the_last_of_it(
+    session: Session, admin_client: TestClient, last: str, said: str
+) -> None:
+    """The spool that came opened at Shelf B, 100 m of it and then the
+    rest taken: cut, or moved loose to the van, either way round. The
+    ledger line that took the last of it says where it went."""
+
+    def taken(moved: Arrived) -> None:
+        arrival = moved.open()
+        to_van = moved.made.van.id
+        for metres, how in ((100, "cut" if last == "moved" else "moved"), (205, last)):
+            line = Entry(moved.cable, Decimal(metres), arrival)
+            moved.move(moved.shelf.id, to_van if how == "moved" else None, line)
+
+    moved = Arrived(session, admin_client, then=taken)
+    words = {
+        "taken out": opened_then_taken_out(moved.store.name),
+        "used up": str(OPENED_THEN_USED_UP),
+    }
+    assert opened_since(moved) == [words[said]]
+
+
+def test_a_box_opened_loose_where_it_went_and_all_used_says_used_up(
+    session: Session, admin_client: TestClient
+) -> None:
+    """A box not followed once opened, opened loose at Shelf B and all of
+    it used: used up, as its loose units are."""
+
+    def in_each(moved: Arrived) -> None:
+        moved.made.cable.unit = "each"
+
+    moved = Arrived(
+        session, admin_client, tracked=False, own=in_each, then=open_and_cut(305)
+    )
+    assert opened_since(moved) == [str(OPENED_THEN_USED_UP)]

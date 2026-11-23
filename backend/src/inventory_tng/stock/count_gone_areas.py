@@ -15,12 +15,12 @@ from typing import NamedTuple
 
 from sqlalchemy.orm import Session
 
-from inventory_tng.core.phrases import gettext, joined, ngettext
+from inventory_tng.core.phrases import Words, gettext, joined, lazy_gettext, ngettext
 from inventory_tng.models.catalogue import Item, ItemPackage
 from inventory_tng.models.places import Location
 from inventory_tng.stock import queries
 from inventory_tng.stock.count_areas_leaving import Leaving
-from inventory_tng.stock.count_arrivals import Arrivals, opened_since
+from inventory_tng.stock.count_arrivals import Arrivals, Held, opened_since
 from inventory_tng.stock.count_forms import ARRIVED, LOOSE_FIELD
 from inventory_tng.stock.count_groups import (
     FormRow,
@@ -93,6 +93,30 @@ def opened_here_since(left: Decimal, unit: str) -> str:
     )
 
 
+def opened_then_moved(place: str) -> str:
+    """Under an item moved to a place on a count form: a sealed package of
+    it opened there since, none of it there at the form's moment, the
+    last of it moved to another place on the form (Ali, 2026-11-23,
+    inventory-tng-0fbn)."""
+    # Translators: %(place)s is a place of any kind, such as a store, a shelf,
+    # a bin or a volunteer's home.
+    return gettext("Opened here since, then moved to %(place)s.", place=place)
+
+
+def opened_then_taken_out(place: str) -> str:
+    """As opened_then_moved, the last of it moved to a place not on the
+    form: out of the store, `place`."""
+    # Translators: %(place)s is a place of any kind, such as a store, a shelf,
+    # a bin or a volunteer's home.
+    return gettext("Opened here since, then taken out of %(place)s.", place=place)
+
+
+# Translators: under an item moved to a place on a count form: a sealed
+# package of it was opened there since, and the last of it was used or
+# written off.
+OPENED_THEN_USED_UP = lazy_gettext("Opened here since, then used up.")
+
+
 def taken_out(place: str) -> str:
     """The heading of what left areas gone from a count form for no place
     on it."""
@@ -139,13 +163,14 @@ class MovedItem(NamedTuple):
     arrived (count_forms.ARRIVED); a row for each form it arrived in, as
     the count form asks for that form (count_groups.form_row), its amount
     what arrived in it as moved; and what it says of each sealed package
-    of it opened there since (opened_here_since), if any."""
+    of it opened there since (opened_here_since, or where the last of it
+    went), if any."""
 
     item: Item
     moved: Decimal
     prefix: str
     rows: list[FormRow]
-    opened: list[str]
+    opened: list[Words]
 
     @property
     def worded(self) -> bool:
@@ -196,6 +221,38 @@ class Moves(NamedTuple):
         )
 
 
+def _last_out(
+    session: Session,
+    opened_at: Mapping[int, Mapping[int, Sequence[Held]]],
+    since: int,
+    as_of: int,
+) -> dict[tuple[int | None, int, int | None], tuple[str, int | None]]:
+    """Of the packages opened at each place since (count_arrivals.
+    opened_since) that it holds none of at the form's moment, the last
+    ledger line that took from the form opening it made there: its kind
+    and where it went, by place, item and open package (None, loose).
+    One read for the whole form, none if every one has some left."""
+    empty = {
+        (place_id, item_id)
+        for place_id, opened in opened_at.items()
+        for item_id, parts in opened.items()
+        if any(not part.there for part in parts)
+    }
+    if not empty:
+        return {}
+    rows = queries.last_taken_from(
+        session,
+        {place_id for place_id, _ in empty},
+        {item_id for _, item_id in empty},
+        since,
+        as_of,
+    )
+    return {
+        (place_id, item_id, open_id): (kind, to_id)
+        for place_id, item_id, open_id, kind, to_id in rows
+    }
+
+
 def _by_name(rows: Collection[tuple[Item, Decimal]]) -> list[tuple[Item, Decimal]]:
     return sorted(rows, key=lambda row: row[0].name.lower())
 
@@ -209,14 +266,18 @@ def moved_sections(
     named: Mapping[int, Item],
     packages: Mapping[int, ItemPackage],
     arrivals: Mapping[int, Arrivals],
+    since: int,
+    as_of: int,
 ) -> Moves:
     """What a count form shows of what left the areas gone from it
     (Moves): `moves`, of the items it shows, as of its moment, and its
     groups, whose lines count what each place held before them; `packages`,
     by id, every package of the items moved, at least; `arrivals`, the
-    moves as each place holds them (count_arrivals.as_held). A package
-    opened there since is said under the item the first time it is shown
-    there arriving sealed."""
+    moves as each place holds them (count_arrivals.as_held), after ledger
+    moment `since` up to the form's, `as_of`. A package opened there
+    since is said under the item the first time it is shown there
+    arriving sealed: what is left of it, or, with none left, where the
+    last of it went (_opened_words)."""
     by_id = {group.place.id: group for group in groups}
     went: dict[int, dict[int, dict[int, dict[Form, Decimal]]]] = {}
     taken: dict[int, Decimal] = {}
@@ -235,24 +296,46 @@ def moved_sections(
         )
     }
 
+    opened_at = {
+        place_id: opened_since(arrivals.get(place_id, {})) for place_id in went
+    }
+    last_out = _last_out(session, opened_at, since, as_of)
+
+    def opened_words(place_id: int, item: Item, part: Held) -> Words:
+        """What a package of `item` opened at the place since says: what
+        is left of it at the form's moment; with none, where the last of it
+        went, as the form says of moves (Ali, 2026-11-23): another place on
+        it, else out of the store; or, taken by no move, used up."""
+        if part.there:
+            return opened_here_since(part.there, item.unit)
+        kind, to_id = last_out.get(
+            (place_id, item.id, part.form.open_package_id), ("", None)
+        )
+        if kind != "move":
+            return OPENED_THEN_USED_UP
+        if to_id in by_id:
+            return opened_then_moved(by_id[to_id].label)
+        return opened_then_taken_out(root.name)
+
     def moved_item(
         prefix: str,
+        place_id: int,
         item: Item,
         forms: dict[Form, Decimal],
-        since: dict[int, list[Decimal]],
+        since_here: dict[int, list[Held]],
     ) -> MovedItem:
         rows = [
             form_row(item.id, form, forms[form], packages, opened)
             for form in sorted(forms, key=lambda form: form_order(form, packages))
         ]
         sealed = any(form.package_id is not None for form in forms)
-        left = since.pop(item.id, []) if sealed else []
+        parts = since_here.pop(item.id, []) if sealed else []
         return MovedItem(
             item,
             sum(forms.values(), Decimal(0)),
             prefix,
             rows,
-            [opened_here_since(n, item.unit) for n in left],
+            [opened_words(place_id, item, part) for part in parts],
         )
 
     sections: list[MovedTo] = []
@@ -260,7 +343,7 @@ def moved_sections(
         if group.place.id not in went:
             continue
         sources = went[group.place.id]
-        since = opened_since(arrivals.get(group.place.id, {}))
+        since_here = opened_at[group.place.id]
         parts = [
             (
                 came_from(leaving.labels[from_id]),
@@ -268,9 +351,10 @@ def moved_sections(
                     (
                         moved_item(
                             f"{group.prefix}{ARRIVED}{from_id}_",
+                            group.place.id,
                             named[item_id],
                             forms,
-                            since,
+                            since_here,
                         )
                         for item_id, forms in sources[from_id].items()
                     ),

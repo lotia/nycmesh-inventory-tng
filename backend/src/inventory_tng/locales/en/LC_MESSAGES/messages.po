@@ -2664,6 +2664,27 @@ msgstr ""
 msgid "Opened followed"
 msgstr ""
 
+#. Translators: %(place)s is a place of any kind, such as a store, a shelf,
+#. a bin or a volunteer's home.
+#: src/inventory_tng/stock/count_gone_areas.py
+#, python-format
+msgid "Opened here since, then moved to %(place)s."
+msgstr ""
+
+#. Translators: %(place)s is a place of any kind, such as a store, a shelf,
+#. a bin or a volunteer's home.
+#: src/inventory_tng/stock/count_gone_areas.py
+#, python-format
+msgid "Opened here since, then taken out of %(place)s."
+msgstr ""
+
+#. Translators: under an item moved to a place on a count form: a sealed
+#. package of it was opened there since, and the last of it was used or
+#. written off.
+#: src/inventory_tng/stock/count_gone_areas.py
+msgid "Opened here since, then used up."
+msgstr ""
+
 #. Translators: %(amount)s %(unit)s is how much is left, such as 250 m.
 #: src/inventory_tng/stock/count_gone_areas.py
 #, python-format
