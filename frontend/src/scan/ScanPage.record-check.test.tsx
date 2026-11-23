@@ -48,33 +48,31 @@ function page(
   return { outbox: open(api), sent };
 }
 
+/** `value` typed as the cable's loose metres. */
+function typeLoose(value: string) {
+  fireEvent.input(screen.getByLabelText("Loose m"), { target: { value } });
+}
+
 /** 50 m of the cable moved from the hub to the van, by Ada. */
 async function fifty() {
   await ready();
   fillMove();
-  fireEvent.input(screen.getByLabelText("Loose m"), {
-    target: { value: "50" },
-  });
+  typeLoose("50");
 }
 
-/** A page whose catalogue, asked second by Record, is answered only once
- * `answer` is called; `asked` waits until it has been asked `times`. */
-function waiting() {
+/** Fifty, with Record tapped and waiting for the catalogue, answered only
+ * once `answer` is called. */
+async function recordWaiting() {
   const later = deferred();
   let count = 0;
   const { outbox } = page(() => {
     count += 1;
     return count === 2 ? later.promise : json(CATALOGUE, 200);
   });
-  return {
-    outbox,
-    answer: () => later.resolve(json(CATALOGUE, 200)),
-    asked: (times: number) => vi.waitFor(() => expect(count).toBe(times)),
-  };
-}
-
-function typeLoose(value: string) {
-  fireEvent.input(screen.getByLabelText("Loose m"), { target: { value } });
+  await fifty();
+  save();
+  await vi.waitFor(() => expect(count).toBe(2));
+  return { outbox, answer: () => later.resolve(json(CATALOGUE, 200)) };
 }
 
 /** Another tab stores the cart with `loose` m of the cable, heard here. */
@@ -93,14 +91,19 @@ async function changedInAnotherTab(loose: string) {
   });
 }
 
-/** Once Record has had its answer, `words` are the one problem said. */
-async function saidOnly(words: MessageDescriptor) {
+/** Until Record has had its answer and can be tapped again. */
+async function recordReady() {
   await vi.waitFor(() =>
     expect(
       (screen.getByRole("button", { name: say(RECORD) }) as HTMLButtonElement)
         .disabled,
     ).toBe(false),
   );
+}
+
+/** Once Record has had its answer, `words` are the one problem said. */
+async function saidOnly(words: MessageDescriptor) {
+  await recordReady();
   expect(screen.getByRole("alert").textContent).toBe(say(words));
 }
 
@@ -226,10 +229,7 @@ describe("Record checks the cart against the catalogue first", () => {
   });
 
   test("a cart changed here while Record waits is not queued, says so, and is recorded once Record is tapped again", async () => {
-    const { outbox, answer, asked } = waiting();
-    await fifty();
-    save();
-    await asked(2);
+    const { outbox, answer } = await recordWaiting();
     typeLoose("5");
     answer();
     await saidOnly(CHANGED_WHILE_CHECKED);
@@ -242,10 +242,7 @@ describe("Record checks the cart against the catalogue first", () => {
   });
 
   test("a cart changed in another tab while Record waits is not queued, asks for it to be checked, and is recorded once Record is tapped again", async () => {
-    const { outbox, answer, asked } = waiting();
-    await fifty();
-    save();
-    await asked(2);
+    const { outbox, answer } = await recordWaiting();
     await changedInAnotherTab("40");
     answer();
     await saidOnly(CHANGED_BEFORE_RECORD);
@@ -257,10 +254,7 @@ describe("Record checks the cart against the catalogue first", () => {
   });
 
   test("changed here and in another tab during one wait, it asks for the cart to be checked", async () => {
-    const { outbox, answer, asked } = waiting();
-    await fifty();
-    save();
-    await asked(2);
+    const { outbox, answer } = await recordWaiting();
     typeLoose("5");
     await changedInAnotherTab("40");
     answer();
@@ -269,10 +263,7 @@ describe("Record checks the cart against the catalogue first", () => {
   });
 
   test("another tab only marking the cart used is not taken for a change there", async () => {
-    const { answer, asked } = waiting();
-    await fifty();
-    save();
-    await asked(2);
+    const { answer } = await recordWaiting();
     typeLoose("5");
     // Only its time changes, as That's me does there.
     storeCart({ ...loadCart(), usedAt: Date.now() });
@@ -282,27 +273,16 @@ describe("Record checks the cart against the catalogue first", () => {
   });
 
   test("a cart emptied while Record waits is not queued, and nothing is said", async () => {
-    const { outbox, answer, asked } = waiting();
-    await fifty();
-    save();
-    await asked(2);
+    const { outbox, answer } = await recordWaiting();
     fireEvent.click(screen.getByRole("button", { name: say(REMOVE) }));
     answer();
-    await vi.waitFor(() =>
-      expect(
-        (screen.getByRole("button", { name: say(RECORD) }) as HTMLButtonElement)
-          .disabled,
-      ).toBe(false),
-    );
+    await recordReady();
     expect(screen.queryByRole("alert")).toBeNull();
     expect(outbox.entries.value).toEqual([]);
   });
 
   test("a change here not kept while Record waits still says a reload would empty the cart", async () => {
-    const { outbox, answer, asked } = waiting();
-    await fifty();
-    save();
-    await asked(2);
+    const { outbox, answer } = await recordWaiting();
     refusingWrites(CART_KEY);
     typeLoose("5");
     answer();

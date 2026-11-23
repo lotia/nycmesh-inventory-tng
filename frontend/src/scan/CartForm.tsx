@@ -201,7 +201,7 @@ export function CartForm({
         }
         cartKept.value = true;
         problems.value = problems.value.filter(
-          (problem) => wordsOf(problem) !== say(NOT_KEEPING),
+          (problem) => !isNotKeeping(problem),
         );
       }),
     [store],
@@ -415,9 +415,7 @@ export function CartForm({
       if (cart.value.lines.length > 0) {
         // Beside a reload's warning, if this tab's change was not kept.
         problems.value = [
-          ...problems.value.filter(
-            (problem) => wordsOf(problem) === say(NOT_KEEPING),
-          ),
+          ...problems.value.filter(isNotKeeping),
           [
             say(
               followed.current === followedThen
@@ -975,6 +973,11 @@ function PlaceSides({
       </div>
     </fieldset>
   );
+}
+
+/** Whether `problem` is the warning that a reload would empty the cart. */
+function isNotKeeping(problem: Said) {
+  return wordsOf(problem) === say(NOT_KEEPING);
 }
 
 function idOrNull(value: string): number | null {
