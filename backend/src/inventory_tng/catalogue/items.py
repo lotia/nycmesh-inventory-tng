@@ -418,8 +418,8 @@ def save(session: Session, item: Item, fields: Fields, *, seen: Seen) -> Renamed
         enforce("item_unit_fixed", when=moved)
         if fields.unit == "each":
             # Under the catalogue lock, which every package write takes.
-            fraction = fractional_package(session, item.id)
-            enforce(PACKAGES_WHOLE, when=fraction is not None)
+            fraction = fractional_package(session, item.id) is not None
+            enforce(PACKAGES_WHOLE, when=fraction)
             holding_one = select(ItemPackage).where(
                 ItemPackage.item_id == item.id,
                 ItemPackage.retired_at.is_(None),
