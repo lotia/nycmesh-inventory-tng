@@ -350,6 +350,38 @@ def places_of_open(session: Session, open_ids: Collection[int]) -> set[int]:
     )
 
 
+def openings_at(
+    session: Session,
+    place_ids: Collection[int],
+    item_ids: Collection[int],
+    after: int,
+    up_to: int,
+) -> Sequence[Row[int | None, int, int | None, int | None, Decimal]]:
+    """The sealed packages of `item_ids` opened at the places in the ledger
+    transactions after `after` up to `up_to`, the newest first: each
+    line's place, item, package, the open package it made (None, opened
+    loose) and amount."""
+    return session.execute(
+        select(
+            LedgerTransaction.to_location_id,
+            Movement.item_id,
+            Movement.from_package_id,
+            Movement.to_open_package_id,
+            Movement.quantity,
+        )
+        .join(LedgerTransaction, LedgerTransaction.id == Movement.transaction_id)
+        .where(
+            LedgerTransaction.kind == "open",
+            LedgerTransaction.to_location_id.in_(list(place_ids)),
+            LedgerTransaction.id > after,
+            LedgerTransaction.id <= up_to,
+            Movement.item_id.in_(list(item_ids)),
+            Movement.from_package_id.is_not(None),
+        )
+        .order_by(LedgerTransaction.id.desc(), Movement.id.desc())
+    ).all()
+
+
 def open_with_ids(
     session: Session, open_ids: Collection[int], *where: ColumnElement[bool]
 ) -> Sequence[OpenPackage]:

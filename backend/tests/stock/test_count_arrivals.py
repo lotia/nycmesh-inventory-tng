@@ -5,10 +5,13 @@ from decimal import Decimal
 
 from inventory_tng.stock.count_arrivals import (
     Fix,
+    Held,
+    Opening,
     arrived_at,
     as_held_at,
     fixed,
     fixed_lines,
+    held_aside,
     set_aside,
 )
 from inventory_tng.stock.ledger import LOOSE, Form
@@ -52,42 +55,81 @@ def test_fixes_at_a_place_are_summed_by_item_and_form() -> None:
         Fix(3, 4, 5, Decimal(1), LOOSE),
         Fix(3, 4, 6, Decimal(2), LOOSE),
     ]
-    assert fixed_lines(fixes) == {4: [(6, LOOSE, Decimal(2))]}
+    assert fixed_lines(fixes, {}) == {4: [(6, LOOSE, Decimal(2))]}
 
 
-def test_what_arrived_is_what_was_moved_as_fixed() -> None:
-    moves = [
-        MovedOut(1, 2, 5, Decimal(1)),
-        MovedOut(1, 2, 5, Decimal(10), SEALED),
-        MovedOut(3, 2, 5, Decimal(2)),
-        MovedOut(1, None, 5, Decimal(4)),
-    ]
-    fixes = [Fix(3, 2, 5, Decimal(-2), LOOSE)]
-    assert arrived_at(set_aside(moves), fixes) == {(2, 5): Decimal(11)}
+def test_what_arrived_is_what_is_held_of_it_as_fixed() -> None:
+    aside = {2: {(5, LOOSE): Decimal(3), (5, SEALED): Decimal(10)}}
+    lines = {2: [(5, LOOSE, Decimal(-2))], 4: [(5, SEALED, Decimal(5))]}
+    assert arrived_at(aside, lines) == {(2, 5): Decimal(11), (4, 5): Decimal(5)}
 
 
-def test_what_arrived_sealed_and_was_opened_is_set_aside_from_the_open_ones() -> None:
-    """A spool and a half's worth set aside sealed where one is still
-    sealed: the rest from the newest open package of that package, then
-    the next, up to what each held, none from another package's; what is
-    left beyond them has gone, so nothing stands for it. Loose and an open
-    package's arrival as they came (inventory-tng-nlog)."""
+def test_what_arrived_is_set_aside_as_held_and_never_beyond() -> None:
+    """Two spools set aside sealed where one is still sealed: the other
+    from the newest opening of that package there, a package's worth, an
+    open package cut to 4 or loose units; none from another package's.
+    Loose beyond what the place holds loose is not set aside, nor an open
+    package's arrival beyond what is left on it; what was opened loose
+    comes after the loose that arrived (inventory-tng-nlog)."""
     first, newest, other = (Form(open_package_id=n) for n in (1, 2, 3))
     aside = {
-        (5, SEALED): Decimal(40),
+        (5, SEALED): Decimal(20),
         (5, LOOSE): Decimal(3),
-        (5, first): Decimal(2),
+        (5, first): Decimal(8),
     }
     held = {
         (5, SEALED): Decimal(10),
         (5, LOOSE): Decimal(1),
-        (5, first): Decimal(8),
+        (5, first): Decimal(6),
         (5, newest): Decimal(4),
         (5, other): Decimal(50),
     }
-    assert as_held_at(aside, held, {1: 7, 2: 7, 3: 8}) == {
-        (5, SEALED): Decimal(10),
-        (5, LOOSE): Decimal(3),
-        (5, newest): Decimal(4),
-        (5, first): Decimal(8),
+    openings = [
+        Opening(5, 8, other, Decimal(10)),
+        Opening(5, 7, newest, Decimal(10)),
+        Opening(5, 7, LOOSE, Decimal(10)),
+    ]
+    assert as_held_at(aside, held, openings) == {
+        (5, LOOSE): [Held(LOOSE, Decimal(3), Decimal(1))],
+        (5, first): [Held(first, Decimal(8), Decimal(6))],
+        (5, SEALED): [
+            Held(SEALED, Decimal(10), Decimal(10)),
+            Held(newest, Decimal(10), Decimal(4)),
+        ],
+    }
+    assert as_held_at({(5, SEALED): Decimal(30)}, held, openings) == {
+        (5, SEALED): [
+            Held(SEALED, Decimal(10), Decimal(10)),
+            Held(newest, Decimal(10), Decimal(4)),
+            Held(LOOSE, Decimal(10), Decimal(1)),
+        ]
+    }
+    assert as_held_at({(5, SEALED): Decimal(40)}, held, openings)[(5, SEALED)][
+        -1
+    ] == Held(SEALED, Decimal(10), Decimal(0))
+
+
+def test_a_fix_of_less_is_lost_from_the_forms_it_is_held_in() -> None:
+    """Two spools arrived at place 2, one still sealed and one opened and
+    cut to 4: a spool fixed less from each of two areas comes off the
+    sealed one, then the open one, only what is left on it; a third
+    spool, gone from there, writes nothing."""
+    opened = Form(open_package_id=1)
+    arrivals = {
+        2: {
+            (5, SEALED): [
+                Held(SEALED, Decimal(10), Decimal(10)),
+                Held(opened, Decimal(10), Decimal(4)),
+                Held(SEALED, Decimal(10), Decimal(0)),
+            ]
+        }
+    }
+    one = [Fix(1, 2, 5, Decimal(-10), SEALED)]
+    assert fixed_lines(one, arrivals) == {2: [(5, SEALED, Decimal(-10))]}
+    two = [*one, Fix(3, 2, 5, Decimal(-20), SEALED)]
+    assert fixed_lines(two, arrivals) == {
+        2: [(5, SEALED, Decimal(-10)), (5, opened, Decimal(-4))]
+    }
+    assert held_aside(arrivals) == {
+        2: {(5, SEALED): Decimal(10), (5, opened): Decimal(4)}
     }

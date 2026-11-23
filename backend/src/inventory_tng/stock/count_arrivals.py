@@ -2,13 +2,14 @@
 (count_forms.Gone), and what its save does with it (Ali, 2026-11-22,
 inventory-tng-ygk5). Each place's own lines count what it held before
 those moves, so the moves are set aside from what the records say there
-(set_aside), in the forms it holds them in (as_held), and each move is taken as right unless its amount is fixed
-("How many arrived?", in each form it arrived in): the difference is then
-lost or found where it went, in that form, and nothing is written against
-the area it left (fixed). The moves
-are those after the form was first shown, those to a place on it up to
-its moment, so the save reads the same ones the form showed. The routes are
-stock/count_routes.py's; the writing is stock/store_counts.py's."""
+(set_aside), in the forms it holds them in (as_held), and each move is
+taken as right unless its amount is fixed ("How many arrived?", in each
+form it arrived in): the difference is then lost or found where it went,
+in the forms it is held in (fixed_lines), and nothing is written against
+the area it left (fixed). The moves are those after the form was first
+shown, those to a place on it up to its moment, so the save reads the
+same ones the form showed. The routes are stock/count_routes.py's; the
+writing is stock/store_counts.py's."""
 
 from collections.abc import Collection, Mapping, Sequence
 from decimal import Decimal
@@ -25,6 +26,9 @@ from inventory_tng.stock.moved_out import Leaving, MovedOut, moved_out
 # What a place's records hold that came from the areas gone from its
 # count form, by item and form there.
 Aside = dict[tuple[int, Form], Decimal]
+
+# A line to write at a place: so much of an item in a form there.
+Line = tuple[int, Form, Decimal]
 
 
 def gone_moves(
@@ -58,37 +62,62 @@ def set_aside(moves: Sequence[MovedOut]) -> dict[int, Aside]:
     return aside
 
 
+class Held(NamedTuple):
+    """Part of what arrived at a place, as the records hold it there at the
+    form's moment: the form it is in there, how much of what arrived it
+    stands for, and how much of that is still there in that form."""
+
+    form: Form
+    arrived: Decimal
+    there: Decimal
+
+
+# What arrived at a place, by item and the form it arrived in: the parts
+# the records hold it in there (as_held).
+Arrivals = dict[tuple[int, Form], list[Held]]
+
+
+class Opening(NamedTuple):
+    """A sealed package of an item opened at a place: into the form it
+    made there, so much (queries.openings_at)."""
+
+    item_id: int
+    package_id: int | None
+    form: Form
+    quantity: Decimal
+
+
 def as_held(
-    session: Session, as_of: int, aside: Mapping[int, Aside]
-) -> dict[int, Aside]:
+    session: Session, since: int, as_of: int, aside: Mapping[int, Aside]
+) -> dict[int, Arrivals]:
     """`aside` (set_aside), by place, in the forms each place held it in at
-    moment `as_of`, which its lines are less, by item and by form, on the
-    page and in the save alike (inventory-tng-nlog). What arrived sealed
-    beyond what the place held sealed then was opened there, or has left
-    it: it is set aside from the packages of that package open there, an
-    opened one standing for the sealed one it was, the newest first, up
-    to what each held; beyond those, it has left the place, as the
-    records say, so nothing is set aside for it. What arrived loose or in
-    an open package is set aside as it came."""
-    sealed = {
-        place_id: {item_id for (item_id, form) in here if form.package_id is not None}
-        for place_id, here in aside.items()
-    }
-    items = set().union(*sealed.values()) if sealed else set()
-    if not items:
-        return {place_id: dict(here) for place_id, here in aside.items()}
+    moment `as_of`, the form first shown at moment `since`: what its lines
+    are less, by item and by form, on the page and in the save alike
+    (held_aside), and the forms a fix of it is written in (fixed_lines)
+    (inventory-tng-nlog). Never more of a form than the place held of it
+    then: beyond that, it was used or has left, as the records say, so
+    nothing is set aside for it. What arrived sealed beyond what the
+    place held sealed was opened there since, or has left: it is set
+    aside from what each sealed package of it opened there since made, an
+    open package or loose units, the newest first, a package's worth
+    each."""
+    items = {item_id for here in aside.values() for item_id, _ in here}
     held = expected_forms_at(session, aside.keys(), as_of, items)
-    open_ids = {
-        form.open_package_id
-        for here in held.values()
-        for _, form in here
-        if form.open_package_id is not None
+    sealed = {
+        item_id
+        for here in aside.values()
+        for item_id, form in here
+        if form.package_id is not None
     }
-    package_of = {
-        row.id: row.package_id for row in queries.open_with_ids(session, open_ids)
-    }
+    openings: dict[int | None, list[Opening]] = {}
+    if sealed:
+        rows = queries.openings_at(session, aside.keys(), sealed, since, as_of)
+        for place_id, item_id, package_id, open_id, quantity in rows:
+            openings.setdefault(place_id, []).append(
+                Opening(item_id, package_id, Form(open_package_id=open_id), quantity)
+            )
     return {
-        place_id: as_held_at(here, held.get(place_id, {}), package_of)
+        place_id: as_held_at(here, held.get(place_id, {}), openings.get(place_id, []))
         for place_id, here in aside.items()
     }
 
@@ -96,42 +125,54 @@ def as_held(
 def as_held_at(
     aside: Aside,
     held: Mapping[tuple[int, Form], Decimal],
-    package_of: Mapping[int, int],
-) -> Aside:
-    """as_held at one place, from what it read: `package_of` each open
-    package's package, by id."""
-    kept: Aside = {}
+    openings: Sequence[Opening],
+) -> Arrivals:
+    """as_held at one place, from what it read: `held` there at the form's
+    moment, and `openings` there since, the newest first. What arrived
+    loose or in an open package first, then what arrived sealed."""
+    left = {line: max(n, Decimal(0)) for line, n in held.items()}
 
-    def take(line: tuple[int, Form], n: Decimal) -> None:
-        if n:
-            kept[line] = kept.get(line, Decimal(0)) + n
+    def part(item_id: int, form: Form, arrived: Decimal) -> Held:
+        there = min(arrived, left.get((item_id, form), Decimal(0)))
+        left[(item_id, form)] = left.get((item_id, form), Decimal(0)) - there
+        return Held(form, arrived, there)
 
-    for line, n in aside.items():
-        if line[1].package_id is None:
-            take(line, n)
-    for (item_id, form), n in aside.items():
+    kept: Arrivals = {}
+    for (item_id, form), n in sorted(
+        aside.items(), key=lambda line: line[0][1].package_id is not None
+    ):
+        first = part(item_id, form, n)
         if form.package_id is None:
+            kept[(item_id, form)] = [first]
             continue
-        sealed = min(n, max(held.get((item_id, form), Decimal(0)), Decimal(0)))
-        take((item_id, form), sealed)
-        rest = n - sealed
-        opened = sorted(
-            (
-                line
-                for line in held
-                if line[0] == item_id
-                and line[1].open_package_id is not None
-                and package_of.get(line[1].open_package_id) == form.package_id
-            ),
-            key=lambda line: line[1].open_package_id or 0,
-            reverse=True,
-        )
-        for line in opened:
-            left = held[line] - kept.get(line, Decimal(0))
-            part = min(rest, max(left, Decimal(0)))
-            take(line, part)
-            rest -= part
+        # Sealed: what the place still held sealed stands for as much.
+        parts = [first._replace(arrived=first.there)] if first.there else []
+        rest = n - first.there
+        for opening in openings:
+            if rest and (opening.item_id, opening.package_id) == (
+                item_id,
+                form.package_id,
+            ):
+                parts.append(part(item_id, opening.form, min(rest, opening.quantity)))
+                rest -= parts[-1].arrived
+        if rest:
+            parts.append(Held(form, rest, Decimal(0)))
+        kept[(item_id, form)] = parts
     return kept
+
+
+def held_aside(arrivals: Mapping[int, Arrivals]) -> dict[int, Aside]:
+    """What each place's lines are less, by place, item and form: what the
+    records hold there of what arrived (as_held)."""
+    aside: dict[int, Aside] = {}
+    for place_id, here in arrivals.items():
+        lines = aside.setdefault(place_id, {})
+        for (item_id, _), parts in here.items():
+            for each in parts:
+                if each.there:
+                    line = (item_id, each.form)
+                    lines[line] = lines.get(line, Decimal(0)) + each.there
+    return aside
 
 
 class Fix(NamedTuple):
@@ -178,30 +219,57 @@ def less[Line](
 
 
 def arrived_at(
-    aside: Mapping[int, Aside], fixes: Sequence[Fix]
+    aside: Mapping[int, Aside], lines: Mapping[int, Sequence[Line]]
 ) -> dict[tuple[int, int], Decimal]:
-    """How many arrived of each item at each place it went to, by place
-    and item: what was moved (set_aside), as fixed."""
+    """How much of what arrived each place holds once saved, by place and
+    item: what is set aside there (held_aside), and the lines its fixes
+    write there (fixed_lines)."""
     arrived = {
         (place_id, item_id): n
         for place_id, here in aside.items()
         for item_id, n in by_item(here).items()
     }
-    for fix in fixes:
-        key = (fix.to_id, fix.item_id)
-        arrived[key] = arrived.get(key, Decimal(0)) + fix.difference
+    for place_id, each in lines.items():
+        for item_id, _, n in each:
+            key = (place_id, item_id)
+            arrived[key] = arrived.get(key, Decimal(0)) + n
     return arrived
 
 
-def fixed_lines(fixes: Sequence[Fix]) -> dict[int, list[tuple[int, Form, Decimal]]]:
+def fixed_lines(
+    fixes: Sequence[Fix], arrivals: Mapping[int, Arrivals]
+) -> dict[int, list[Line]]:
     """The fixes as lines to write at each place, by place: one line of
     an item in a form, the differences fixed there summed (a line names
-    each once, ledger.each_once); none where they cancel out."""
+    each once, ledger.each_once); none where they cancel out. More is
+    found in the form it arrived in. Less is lost from the parts it is
+    held in there (as_held), each in turn for as much as it stands for,
+    but never more than is still there of it: a spool opened there since
+    is lost from what opening it made, and what was used or has gone from
+    there writes nothing, so no form goes below nothing."""
+    left = {
+        (place_id, *line): list(parts)
+        for place_id, here in arrivals.items()
+        for line, parts in here.items()
+    }
     summed: dict[int, dict[tuple[int, Form], Decimal]] = {}
     for fix in fixes:
         here = summed.setdefault(fix.to_id, {})
-        line = (fix.item_id, fix.form)
-        here[line] = here.get(line, Decimal(0)) + fix.difference
+        written = [(fix.form, fix.difference)]
+        parts = left.get((fix.to_id, fix.item_id, fix.form))
+        if fix.difference < 0 and parts is not None:
+            rest, written = -fix.difference, []
+            for index, each in enumerate(parts):
+                arrived = min(rest, each.arrived)
+                there = min(arrived, each.there)
+                parts[index] = Held(
+                    each.form, each.arrived - arrived, each.there - there
+                )
+                rest -= arrived
+                written.append((each.form, -there))
+        for form, n in written:
+            line = (fix.item_id, form)
+            here[line] = here.get(line, Decimal(0)) + n
     lines = {
         place_id: [(item_id, form, n) for (item_id, form), n in here.items() if n]
         for place_id, here in summed.items()

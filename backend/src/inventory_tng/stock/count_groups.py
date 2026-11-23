@@ -140,7 +140,7 @@ def forms_by_place(
     over_recorded.openings_waiting_at): it is counted by form, with a row of
     each package it opened sealed, though the records hold none, as a total
     puts neither of its ends right (docs/decisions/0020). Less, by place,
-    what is `aside` there, in the forms held (count_arrivals.as_held): an
+    what is `aside` there, in the forms held (count_arrivals.held_aside): an
     open package set aside whole is no row. `packages`, by id,
     every package of those items, if read already. The same number of
     queries however many places."""
@@ -224,7 +224,7 @@ def line_of(
     """The field a count form, as of moment `as_of`, shows an item's line
     at a place by: its total, or, counted by form (forms_by_place), its
     loose units. Less, by place, what is `aside` there, as the form shows
-    it (count_arrivals.as_held)."""
+    it (count_arrivals.held_aside)."""
     place_id, item_id = listed.place_id, listed.item_id
     openings = openings_waiting_at(session, [place_id], as_of)
     by_form = forms_by_place(session, as_of, {place_id: [item_id]}, openings, aside)
@@ -240,7 +240,7 @@ def asks_for(
 ) -> bool:
     """Whether a full count of the place, as of moment `as_of`, asks for the
     item: the records hold some there, less what is `aside` there, by place
-    (count_arrivals.as_held), or an opening of it waits there
+    (count_arrivals.held_aside), or an opening of it waits there
     (over_recorded.openings_waiting_at), asked for by form though they hold
     none."""
     held = expected_at(session, [place_id], as_of, [item_id]).get(place_id, {})
