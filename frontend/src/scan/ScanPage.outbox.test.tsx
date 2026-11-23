@@ -20,6 +20,7 @@ import {
   pick,
   ready,
   save,
+  saveQueued,
   server,
 } from "../testing/scan-page";
 import { ITEMS, MOVE } from "./batch";
@@ -117,10 +118,10 @@ describe("the batches listed in the outbox", () => {
 
   test("a batch being sent keeps Dismiss's room, unseen, unfocusable and not read out, and shows it once saved (Ali, 2026-11-19, inventory-tng-2lad)", async () => {
     const answer = deferred();
-    open(server(() => answer.promise).api);
+    const outbox = open(server(() => answer.promise).api);
     await ready();
     fillMove();
-    save();
+    await saveQueued(outbox, 1);
     const entry = screen
       .getByText("Move: 1 item from Hub to Van")
       .closest("li") as HTMLElement;
@@ -142,13 +143,13 @@ describe("the batches listed in the outbox", () => {
 
   test("a batch queued is worded in the language spoken as it is shown, its places as named when queued (inventory-tng-ar8)", async () => {
     const answer = deferred();
-    open(server(() => answer.promise).api);
+    const outbox = open(server(() => answer.promise).api);
     await ready();
     fillMove();
     fireEvent.input(screen.getByLabelText("Loose m"), {
       target: { value: "2" },
     });
-    save();
+    await saveQueued(outbox, 1);
     const english = "Move: 1 item from Hub to Van";
     screen.getByText(`Sending: ${english}. A new cart is ready.`);
     screen.getByText(english);

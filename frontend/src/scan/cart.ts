@@ -326,7 +326,8 @@ function filled(cart: Cart, side: Side): boolean {
  * stay: a line whose item has gone says so, for the volunteer to remove.
  * A count of a package the catalogue now gives another size than it was
  * counted at is cleared, keeping that size, so the line says so (resized)
- * until a count is typed again (inventory-tng-0qi).
+ * until a count is typed again (inventory-tng-0qi); so is all a line holds
+ * typed in a unit the item is no longer counted in (unitChanged).
  */
 export function reconcile(cart: Cart, catalogue: Catalogue): Cart {
   const { volunteers, places, items } = indexOf(catalogue);
@@ -364,8 +365,61 @@ export function resized(line: Line, pack: Package): boolean {
   );
 }
 
-/** The line with its counts of packages resized since cleared. */
+/** Whether the line's amounts were typed in another unit than the item is
+ * counted in now: they are cleared (reconcile), and the line says so
+ * until they are typed again in the new unit (Ali, 2026-11-23,
+ * inventory-tng-h7ua). */
+export function unitChanged(line: Line, item: Item): boolean {
+  return line.unit !== undefined && line.unit !== item.unit;
+}
+
+/** Whether anything is typed on the line: a count of packages, loose,
+ * or of an open package. */
+function holdsAmounts(line: Line): boolean {
+  return (
+    Object.values(line.packages).some((typed) => typed !== "") ||
+    line.loose !== "" ||
+    Object.values(line.open ?? {}).some(
+      (taken) => taken.amount !== "" || (taken.now ?? "") !== "",
+    )
+  );
+}
+
+/** The line with everything typed on it cleared, keeping the unit it was
+ * typed in, so it says so (unitChanged). Its package counts go too: each
+ * package's size is in the item's unit, and the server refuses a line in
+ * the old one (inventory-tng-57u8). */
+function cleared(line: Line): Line {
+  const { sizes: _, open, ...rest } = line;
+  return {
+    ...rest,
+    packages: Object.fromEntries(
+      Object.keys(line.packages).map((packageId) => [packageId, ""]),
+    ),
+    loose: "",
+    ...(open === undefined
+      ? {}
+      : {
+          open: Object.fromEntries(
+            Object.entries(open).map(([key, taken]) => [
+              key,
+              {
+                amount: "",
+                whole: false,
+                ...(taken.now === undefined ? {} : { now: "" }),
+              },
+            ]),
+          ),
+        }),
+  };
+}
+
+/** The line with its amounts typed in another unit since cleared, or its
+ * counts of packages resized since. */
 function recounted(line: Line, item: Item | undefined): Line {
+  if (item !== undefined && unitChanged(line, item)) {
+    return holdsAmounts(line) ? cleared(line) : line;
+  }
   const clear = (item?.packages ?? []).filter(
     (pack) => (line.packages[pack.id] ?? "") !== "" && resized(line, pack),
   );
@@ -388,7 +442,8 @@ function recounted(line: Line, item: Item | undefined): Line {
  * counted at the size shown now, as it was read before; a count blank has
  * none, but one cleared as resized keeps its size until typed again
  * (reconcile). So too the unit its amounts were typed in: the one it
- * has, until its loose or open amounts change; else the one shown now.
+ * has, until any of its amounts change; else the one shown now, or none
+ * while nothing is typed on it.
  */
 export function sized(before: Cart, next: Cart, catalogue: Catalogue): Cart {
   const { items } = indexOf(catalogue);
@@ -415,10 +470,16 @@ export function sized(before: Cart, next: Cart, catalogue: Catalogue): Cart {
         line.unit !== undefined &&
         (previous === undefined ||
           (previous.loose === line.loose &&
+            JSON.stringify(previous.packages) ===
+              JSON.stringify(line.packages) &&
             JSON.stringify(previous.open) === JSON.stringify(line.open)))
           ? line.unit
-          : items.get(line.itemId)?.unit;
-      const inUnit = typedIn === undefined ? line : { ...line, unit: typedIn };
+          : holdsAmounts(line)
+            ? items.get(line.itemId)?.unit
+            : undefined;
+      const { unit: _, ...unsized } = line;
+      const inUnit =
+        typedIn === undefined ? unsized : { ...unsized, unit: typedIn };
       return Object.keys(sizes).length === 0 ? inUnit : { ...inUnit, sizes };
     }),
   };

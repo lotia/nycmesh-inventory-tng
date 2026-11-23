@@ -89,6 +89,8 @@ describe("as a cart", () => {
       CATALOGUE,
     );
     expect(cart.lines.map((line) => line.itemId)).toEqual([100]);
+    // One put back keeps the unit it was typed in (inventory-tng-h7ua).
+    expect(cart.lines[0]?.unit).toBe("each");
     expect(gaps).toEqual([`Cat6 cable: ${say(UNIT_CHANGED)}`]);
     // Said in the unit it was typed in, never the one it is counted in now.
     expect(parts.find((part) => part.itemId === 101)?.words).toContain("50 ft");

@@ -26,6 +26,7 @@ import {
   sealedHere,
   sized,
   storeCart,
+  unitChanged,
   WHOLE_UNITS,
   withLine,
 } from "./cart";
@@ -615,6 +616,59 @@ describe("a package resized while the cart counts it (inventory-tng-0qi)", () =>
         unit: "each",
       },
     ]);
+  });
+
+  test("a line typed in a unit the item is no longer counted in is cleared, keeping that unit, until typed again (inventory-tng-h7ua)", () => {
+    const inFeet = { ...CATALOGUE, items: [radio, { ...cable, unit: "ft" }] };
+    const typed = cart({
+      lines: [
+        {
+          itemId: 101,
+          packages: { 1001: "1" },
+          sizes: { 1001: "305.000" },
+          loose: "50",
+          unit: "m",
+          open: { k: { amount: "2", whole: false, usedUp: true, now: "9" } },
+        },
+      ],
+    });
+    const line = first(reconcile(typed, inFeet));
+    expect(line).toEqual({
+      itemId: 101,
+      packages: { 1001: "" },
+      loose: "",
+      unit: "m",
+      open: { k: { amount: "", whole: false, now: "" } },
+    });
+    expect(unitChanged(line, { ...cable, unit: "ft" })).toBe(true);
+    // Cleared once, it stays so: nothing typed in the old unit is left.
+    expect(reconcile({ ...typed, lines: [line] }, inFeet).lines[0]).toBe(line);
+    // Typed again, the line is in the new unit.
+    const again = cart({ lines: [{ ...line, loose: "40" }] });
+    expect(
+      sized({ ...typed, lines: [line] }, again, inFeet).lines[0]?.unit,
+    ).toBe("ft");
+    // In the unit it was typed in, nothing changes.
+    expect(reconcile(typed, CATALOGUE)).toBe(typed);
+  });
+
+  test("each to m clears a count of units too (inventory-tng-h7ua)", () => {
+    const inMetres = { ...CATALOGUE, items: [{ ...radio, unit: "m" }, cable] };
+    const typed = cart({
+      lines: [{ itemId: 100, packages: {}, loose: "3", unit: "each" }],
+    });
+    expect(first(reconcile(typed, inMetres))).toMatchObject({
+      loose: "",
+      unit: "each",
+    });
+  });
+
+  test("a line with nothing typed keeps no unit, so a unit changed says nothing of it", () => {
+    const blank = cart({ lines: [{ itemId: 101, packages: {}, loose: "" }] });
+    expect(sized(cart(), blank, CATALOGUE).lines[0]).not.toHaveProperty("unit");
+    const typed = cart({ lines: [{ itemId: 101, packages: {}, loose: "5" }] });
+    const emptied = sized(typed, blank, CATALOGUE);
+    expect(emptied.lines[0]).not.toHaveProperty("unit");
   });
 
   test("a line keeps the unit it was typed in until its amounts change (inventory-tng-57u8)", () => {

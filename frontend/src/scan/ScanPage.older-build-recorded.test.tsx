@@ -334,7 +334,8 @@ describe("what an older build left", () => {
 
   test("one changed after it went back, which an older build's tab saved first, says what is left to do, bold whole, with Dismiss at once, and refreshes the stock once", async () => {
     const { catalogues } = await putBackSavedFirst();
-    const before = catalogues();
+    // Record asks once itself, before queuing (inventory-tng-h7ua).
+    const before = catalogues() + 1;
     const said = await changedRefused();
     // In bold, in the alert's style, one note, and no reload (Ali,
     // inventory-tng-g0e, d).

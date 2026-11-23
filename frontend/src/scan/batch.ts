@@ -15,6 +15,7 @@ import {
   reconcile,
   resized,
   SIDES,
+  unitChanged,
 } from "./cart";
 import { type Offered, usedUpOf } from "./offered";
 import { indexOf } from "./search";
@@ -43,6 +44,7 @@ export const ITEM_GONE = msg`An item in the cart is no longer in the catalogue. 
 export const RETIRED_NOT_RECEIVED = msg`{name}: retired: taking only, so it can't be received.`;
 export const PACKAGE_RETIRED_NOT_RECEIVED = msg`{name}, {package}: retired: taking only, so it can't be received.`;
 export const ENTER_THE_COUNT = msg`{name}: enter the count`;
+export const ENTER_AGAIN_IN = msg`{name}: enter the amount again in {unit}`;
 export const NOTHING_FROM_OPEN = msg`{name}: Nothing is taken from an open package here.`;
 export const OPEN_WHOLE = msg`{name}: Open whole packages: leave loose empty.`;
 export const ADD_SOMETHING = msg`Add something to the cart.`;
@@ -210,6 +212,12 @@ export function toBatch(
     // left out: saving the rest would record less than was moved.
     if (item.packages.some((pack) => resized(line, pack))) {
       problems.push(sayParts(ENTER_THE_COUNT, { name }));
+      continue;
+    }
+    // Cleared as typed in another unit (reconcile): typed again in this
+    // one, never saved in the old (Ali, 2026-11-23, inventory-tng-h7ua).
+    if (unitChanged(line, item)) {
+      problems.push(sayParts(ENTER_AGAIN_IN, { name, unit: item.unit }));
       continue;
     }
     const quantity = quantityOf(line, item);

@@ -2,11 +2,12 @@ import { describe, expect, test } from "vitest";
 import { messages as pseudo } from "../locales/pseudo.po";
 import { say, speak } from "../shared/i18n";
 import { cart } from "../testing/cart";
-import { CATALOGUE, cable, openAt } from "../testing/catalogue";
+import { CATALOGUE, cable, openAt, radio } from "../testing/catalogue";
 import { saidAsText } from "../testing/said";
 import {
   ADD_SOMETHING,
   batchWords,
+  ENTER_AGAIN_IN,
   INSTALL_DIGITS,
   INSTALL_RANGE,
   ITEM_GONE,
@@ -541,12 +542,38 @@ describe("turning a cart into a batch", () => {
 
   test("each line says the unit its amounts were typed in, else the one shown now (inventory-tng-57u8)", () => {
     const lines = [
-      { itemId: 101, packages: { 1001: "1" }, loose: "50", unit: "ft" },
+      { itemId: 101, packages: { 1001: "1" }, loose: "50", unit: "m" },
+      { itemId: 100, packages: {}, loose: "2" },
     ];
     const batch = toBatch(cart({ lines }), CATALOGUE);
     expect(
       "draft" in batch && batch.draft.lines.map(({ unit }) => unit),
-    ).toEqual(["ft", "ft"]);
+    ).toEqual(["m", "m", "each"]);
+  });
+
+  test("a line typed in a unit the item is no longer counted in is not saved until typed again (inventory-tng-h7ua)", () => {
+    const inFeet = { ...CATALOGUE, items: [radio, { ...cable, unit: "ft" }] };
+    const typed = cart({
+      lines: [
+        { itemId: 101, packages: { 1001: "1" }, loose: "50", unit: "m" },
+        { itemId: 100, packages: {}, loose: "2", unit: "each" },
+      ],
+    });
+    // Not the rest without it: that would record less than was moved.
+    expect(saidAsText(toBatch(typed, inFeet))).toEqual({
+      problems: [say(ENTER_AGAIN_IN, { name: `[${cable.name}]`, unit: "ft" })],
+    });
+    const inMetres = { ...CATALOGUE, items: [{ ...radio, unit: "m" }, cable] };
+    expect(saidAsText(toBatch(typed, inMetres))).toEqual({
+      problems: [say(ENTER_AGAIN_IN, { name: `[${radio.name}]`, unit: "m" })],
+    });
+    // Typed again, in the new unit, it is saved in it.
+    const again = cart({
+      lines: [{ itemId: 101, packages: {}, loose: "40", unit: "ft" }],
+    });
+    expect(toBatch(again, inFeet)).toMatchObject({
+      draft: { lines: [{ item_id: 101, quantity: "40", unit: "ft" }] },
+    });
   });
 
   test("says everything still to do", () => {

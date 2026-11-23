@@ -18,7 +18,7 @@ import {
 import { NOT_REGISTERED } from "../shared/registration";
 import { telemetry } from "../shared/telemetry";
 import { CartForm } from "./CartForm";
-import { STORAGE_KEY as CART_KEY, loadCart } from "./cart";
+import { STORAGE_KEY as CART_KEY, type Catalogue, loadCart } from "./cart";
 import { type Loaded, loadCatalogue } from "./catalogue";
 import { useEveryMinuteAndWhenShown } from "./every-minute-and-when-shown";
 import { CAUTION_BOX } from "./Notes";
@@ -31,6 +31,12 @@ const API = makeApi();
 /** A page left open fetches the catalogue again once it is this old, so a
  * hub tablet sees new items, volunteers and settings. */
 const CATALOGUE_FRESH_MS = 10 * 60_000;
+/** How long Record waits for the catalogue to check the cart against
+ * before queuing it as checked against the one shown (Ali, 2026-11-23,
+ * inventory-tng-h7ua): long enough for a weak signal to bring it, short
+ * enough that a phone with none is not kept waiting; the server refuses
+ * a line in a unit or package size changed since all the same. */
+const RECORD_CHECK_MS = 3_000;
 
 export const SCAN = msg`Scan`;
 export const LOADING = msg`Loading the catalogue…`;
@@ -82,12 +88,14 @@ export function ScanPage({
   // a batch a newer one let the outbox forget, is never shown after it.
   const newest = useRef(0);
 
-  /** Load it; again, keeping the one it has if that fails. */
-  async function fetch(again: boolean) {
+  /** Load it; again, keeping the one it has if that fails. The one
+   * loaded, shown or not; or null. */
+  async function fetch(again: boolean): Promise<Catalogue | null> {
     const order = ++newest.current;
     const result = await loadCatalogue(api, outbox);
+    const catalogue = result.state === "ready" ? result.catalogue : null;
     if (order !== newest.current) {
-      return;
+      return catalogue;
     }
     if (!again || result.state === "ready") {
       loaded.value = result;
@@ -96,6 +104,22 @@ export function ScanPage({
     if (result.state === "ready") {
       // Shown now: what it shows need not be kept (shared/outbox.ts).
       outbox.forgetShown(result.catalogue.saved);
+    }
+    return catalogue;
+  }
+
+  /** The catalogue loaded again, for Record to check the cart against;
+   * null if it does not come within RECORD_CHECK_MS. Come later, it is
+   * shown all the same. */
+  async function latest(): Promise<Catalogue | null> {
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const late = new Promise<null>((resolve) => {
+      timer = setTimeout(() => resolve(null), RECORD_CHECK_MS);
+    });
+    try {
+      return await Promise.race([fetch(true), late]);
+    } finally {
+      clearTimeout(timer);
     }
   }
 
@@ -234,6 +258,7 @@ export function ScanPage({
           adder={adder}
           rester={rester}
           reload={reload}
+          latest={latest}
         />
       )}
       <OutboxList

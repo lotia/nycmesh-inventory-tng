@@ -257,6 +257,10 @@ export function toCart(
         return;
       }
       const made = lineOf(line.item_id, { at });
+      // In the unit it was typed in, which the item still has.
+      if (typeof line.unit === "string") {
+        made.unit = line.unit;
+      }
       const packs = wholePackages(amount, size);
       if (pack !== undefined && packs !== null) {
         // What this loop wrote: a count, or none yet.

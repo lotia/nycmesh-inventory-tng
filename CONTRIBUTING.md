@@ -650,7 +650,17 @@ cart kept sizes is taken as counted at the size shown. So too each line
 keeps the unit its amounts were typed in, until they are typed again
 (`sized`), and sends it, so the server refuses a line of an item counted
 in another unit since (`unit_changed`, docs/decisions/0003, work saved as
-it was shown).
+it was shown). Where the page's catalogue shows another unit, everything
+typed on the line is cleared, its package counts too, and the line says
+the unit changed until an amount is typed again in the new one; until
+then Record refuses the cart.
+
+Record first loads the catalogue again and checks the cart against it, so
+a unit or package size changed since is said beside its box, and nothing
+queued, before the batch leaves. With no answer within the wait
+`RECORD_CHECK_MS` sets (`frontend/src/scan/ScanPage.tsx`), the cart is
+queued as checked against the catalogue shown, and the server refuses what
+changed. Record does nothing more while it waits.
 
 The page's words never say "save": the inventory records what Record
 sends, and the browser keeps the cart, which every change writes to

@@ -280,6 +280,16 @@ what was shown into what is now: a unit switched because it was wrong may
 mean the volunteer's number was right in the new one, so asking again is
 safer.
 
+The scan page says so before Record too (Ali, 2026-11-23,
+inventory-tng-h7ua): where its catalogue shows a line's item counted in
+another unit than its amounts were typed in, any unit, it clears what was
+typed and says beside the box "The unit changed from m to ft. Enter the
+amount again in ft.", and refuses to record the cart until the amount is
+typed again, as it does for a package resized. Record loads the catalogue
+first and checks the cart against it; without an answer in a few seconds
+it queues the batch as before, and the server's refusal still holds.
+Rejected again: converting the amount, and saying so only after Record.
+
 A batch line must say its unit: one without is refused. It was required
 at once, not added first and required in a later deploy (CONTRIBUTING.md,
 The scan page), as nothing is deployed and Ali decided on 2026-11-15 that

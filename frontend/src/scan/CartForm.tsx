@@ -43,7 +43,7 @@ import {
 } from "./Notes";
 import { type NotPut, OlderList, olderSaid, recordOlder } from "./OlderList";
 import type { AddDifference, AddRest } from "./OutboxList";
-import { offered, offeredAt } from "./offered";
+import { type Offered, offered, offeredAt } from "./offered";
 import {
   asSave,
   nextWhole,
@@ -125,6 +125,7 @@ export function CartForm({
   adder,
   rester,
   reload,
+  latest,
 }: {
   catalogue: Catalogue;
   /** The outbox's batches it does not show (unseen-batches.ts, unseen). */
@@ -147,6 +148,9 @@ export function CartForm({
   rester: { current: AddRest | null };
   /** Refresh this page, offered where the camera was refused (Scanner). */
   reload: () => void;
+  /** The catalogue as it is now, which Record checks the cart against
+   * first; null if it cannot be had soon (ScanPage). */
+  latest: () => Promise<Catalogue | null>;
 }) {
   const store = useMemo(() => new CartStore(catalogue), []);
   // The open packages to take from, and how many are sealed where, as the
@@ -161,6 +165,8 @@ export function CartForm({
   const cart = store.cart;
   const query = useSignal("");
   const problems = useSignal<Said[]>([]);
+  // While Record waits for the catalogue: Record does nothing meanwhile.
+  const checking = useSignal(false);
   // What was last sent to be recorded, worded as it is shown.
   const saved = useSignal<Batch | null>(null);
   // While Discard cart waits to be confirmed, the cart's revision then.
@@ -357,20 +363,51 @@ export function CartForm({
     placeRead.value = null;
   }
 
-  function save(event: TargetedSubmitEvent<HTMLFormElement>) {
-    event.preventDefault();
+  /** The cart to record, as a batch, checked against `against`; or null,
+   * saying what is to do first. */
+  function checked(against: Catalogue, open: readonly Offered[]) {
     // Another tab may have changed or saved this cart: saving what this tab
     // shows could record it twice, so it shows that cart instead.
     const current = store.forSaving();
     if (current === null) {
       problems.value = [[say(CHANGED_BEFORE_RECORD)]];
-      return;
+      return null;
     }
-    const batch = toBatch(current, catalogue, opens);
+    const batch = toBatch(current, against, open);
     if ("problems" in batch) {
       problems.value = batch.problems;
+      return null;
+    }
+    return { current, batch };
+  }
+
+  /** Record the cart, checked first against the catalogue as it is now:
+   * one that changed a unit or a package's size since clears what was
+   * typed in it, said beside its box, and nothing is queued. Without an
+   * answer in time, it is queued as checked against the one shown, and the
+   * server refuses what changed (Ali, 2026-11-23, inventory-tng-h7ua). */
+  async function save(event: TargetedSubmitEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (checking.value || checked(catalogue, opens) === null) {
       return;
     }
+    checking.value = true;
+    const fresh = await latest()
+      .catch(() => null)
+      .finally(() => {
+        checking.value = false;
+      });
+    if (fresh !== null) {
+      store.useCatalogue(fresh);
+    }
+    const ready =
+      fresh === null
+        ? checked(catalogue, opens)
+        : checked(fresh, offered(fresh, pending));
+    if (ready === null) {
+      return;
+    }
+    const { current, batch } = ready;
     // Under the cart's key, which any tab that records this cart sends.
     const queued = outbox.queue(batch.draft, batch.summary, current.batchKey);
     if (queued === "not_kept") {
@@ -849,7 +886,11 @@ export function CartForm({
           </button>
         </p>
       )}
-      <button type="submit" class="primary w-full text-xl">
+      <button
+        type="submit"
+        class="primary w-full text-xl"
+        disabled={checking.value}
+      >
         {say(RECORD)}
       </button>
       {!empty &&

@@ -403,6 +403,10 @@ msgstr ""
 msgid "{name}: Open whole packages: leave loose empty."
 msgstr ""
 
+#: src/scan/CartLine.tsx
+msgid "The unit changed from {was} to {unit}. Enter the amount again in {unit}."
+msgstr ""
+
 #: src/scan/batch.ts
 msgid "{name}: Nothing is taken from an open package here."
 msgstr ""
@@ -927,6 +931,10 @@ msgstr ""
 #. {from} is a place of any kind, such as a store, a shelf, a bin or a volunteer's home.
 #: src/scan/batch.ts
 msgid "Opening: {items} at {from}"
+msgstr ""
+
+#: src/scan/batch.ts
+msgid "{name}: enter the amount again in {unit}"
 msgstr ""
 
 #: src/scan/cart.ts

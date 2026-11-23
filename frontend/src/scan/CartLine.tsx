@@ -5,7 +5,14 @@ import { Field } from "../shared/Field";
 import { say, sayAmount } from "../shared/i18n";
 import { wordsOf } from "../shared/outbox-notes";
 import { thousandths } from "../shared/quantity";
-import { type Item, type Line, quantityOf, RETIRED, resized } from "./cart";
+import {
+  type Item,
+  type Line,
+  quantityOf,
+  RETIRED,
+  resized,
+  unitChanged,
+} from "./cart";
 import { AlertWords } from "./Notes";
 import { NOTHING_TAKEN, OpenPackageCard } from "./OpenPackageCard";
 import type { Offered } from "./offered";
@@ -13,6 +20,9 @@ import type { Offered } from "./offered";
 export const LINE_GONE = msg`No longer in the catalogue.`;
 export const REMOVE = msg`Remove`;
 export const RESIZED_TO = msg`The package size has changed to {size} since this item was added. Enter the count again.`;
+/** Beside a line whose amounts were typed in a unit the item is no longer
+ * counted in, and so cleared (Ali, 2026-11-23, inventory-tng-h7ua). */
+export const UNIT_CHANGED = msg`The unit changed from {was} to {unit}. Enter the amount again in {unit}.`;
 export const PACKAGE_COUNT = msg`{package} ({size} {unit})`;
 export const PACKAGE_COUNT_RETIRED = msg`{package} ({size} {unit}), retired: taking only`;
 export const LOOSE_UNITS = msg`Loose units`;
@@ -58,6 +68,15 @@ export function CartLine({
         <strong>{item.name}</strong>
         {item.retired && <small> {say(RETIRED)}</small>}
       </div>
+      {line.unit !== undefined && unitChanged(line, item) && (
+        <p role="alert">
+          <AlertWords
+            note={{
+              bold: [say(UNIT_CHANGED, { was: line.unit, unit: item.unit })],
+            }}
+          />
+        </p>
+      )}
       {opens.map((open) => (
         <OpenPackageCard
           key={open.key}

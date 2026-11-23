@@ -101,6 +101,13 @@ export function fillMove(cable = "Cat6 cable") {
 export const save = () =>
   fireEvent.click(screen.getByRole("button", { name: say(RECORD) }));
 
+/** Record, then wait until `outbox` holds `count` batches: Record asks for
+ * the catalogue before it queues the cart (inventory-tng-h7ua). */
+export async function saveQueued(outbox: Outbox, count: number) {
+  save();
+  await vi.waitFor(() => expect(outbox.entries.value).toHaveLength(count));
+}
+
 /** The cart as stored. */
 export const storedCart = () =>
   JSON.parse(localStorage.getItem(CART_KEY) ?? "");

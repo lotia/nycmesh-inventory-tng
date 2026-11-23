@@ -88,8 +88,8 @@ describe("filling and saving a cart", () => {
       open(api);
       await ready();
       save();
+      await screen.findByText(say(NOTHING_IN_CART));
       expect(screen.queryByText(/^Sending:/)).toBeNull();
-      expect(screen.getByText(say(NOTHING_IN_CART))).toBeDefined();
       return sent;
     };
     expect(saves(await again(left))).toHaveLength(0);
@@ -112,8 +112,8 @@ describe("filling and saving a cart", () => {
     fillMove();
     const setItem = refusingWrites(OUTBOX_KEY);
     save();
+    await screen.findByText(say(NOT_SENT));
     setItem.mockRestore();
-    screen.getByText(say(NOT_SENT));
     screen.getByText("Cat6 cable");
     expect(outbox.entries.value).toEqual([]);
   });

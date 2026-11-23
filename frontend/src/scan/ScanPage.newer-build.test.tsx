@@ -31,6 +31,7 @@ import {
   pick,
   ready,
   save,
+  saveQueued,
   server,
 } from "../testing/scan-page";
 import { refusingRemovals, refusingWrites } from "../testing/storage";
@@ -176,9 +177,9 @@ describe("a newer build", () => {
     const { outbox, reload } = openMine(api);
     await ready();
     fillMove();
-    save();
+    await saveQueued(outbox, 1);
     fillMove();
-    save();
+    await saveQueued(outbox, 2);
     // The first is out; the second waits its turn, said to be on its way.
     await vi.waitFor(() =>
       expect(within(list()).getAllByText(say(SENDING))).toHaveLength(2),
@@ -194,7 +195,7 @@ describe("a newer build", () => {
     expectAllHeld(2);
     // One saved after the banner shows is held too, never sent.
     fillMove();
-    save();
+    await saveQueued(outbox, 3);
     await vi.waitFor(() => expectAllHeld(3));
     expect(screen.queryByRole("button", { name: say(DISMISS) })).toBeNull();
     fireEvent.click(reloadButton() as HTMLElement);
@@ -229,9 +230,9 @@ describe("a newer build", () => {
     const { outbox } = openMine(api);
     await ready();
     fillMove();
-    save();
+    await saveQueued(outbox, 1);
     fillMove();
-    save();
+    await saveQueued(outbox, 2);
     await vi.waitFor(() =>
       expect(outbox.entries.value.map((each) => each.waitingFor)).toEqual([
         "registration",
@@ -248,10 +249,10 @@ describe("a newer build", () => {
 
   test("a save on its way is said in plain small text", async () => {
     const answer = deferred();
-    open(server(() => answer.promise).api);
+    const outbox = open(server(() => answer.promise).api);
     await ready();
     fillMove();
-    save();
+    await saveQueued(outbox, 1);
     const list = screen
       .getByRole("heading", { name: say(CARTS_FROM_DEVICE) })
       .closest("section") as HTMLElement;

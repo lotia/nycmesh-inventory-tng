@@ -130,9 +130,11 @@ describe("scanning labels with the camera", () => {
     await openSpoolInVan();
     save();
     await screen.findByText("Recorded (transaction 77).");
-    await vi.waitFor(() => expect(asked()).toBe(2));
+    // Once by Record, to check the cart against (inventory-tng-h7ua), and
+    // once after it is saved.
+    await vi.waitFor(() => expect(asked()).toBe(3));
     // Asked whether it shows the batch saved.
-    const [, again] = sent.filter(isCatalogue);
+    const [, , again] = sent.filter(isCatalogue);
     const [entry] = outbox.entries.value;
     expect(new URL(again?.url ?? "").searchParams.getAll("key")).toEqual([
       entry?.body.key,
@@ -147,12 +149,14 @@ describe("scanning labels with the camera", () => {
         return saved();
       }
       catalogues.push(request);
-      return catalogues.length === 2 ? later.promise : json(CATALOGUE, 200);
+      // The first after a save: Record's own check is answered at once.
+      return catalogues.length === 3 ? later.promise : json(CATALOGUE, 200);
     });
     await opened(api);
     await openSpoolInVan();
     save();
-    await screen.findByText(/^Sending: Opening/);
+    // Asked for again once saved, after Record's own check.
+    await vi.waitFor(() => expect(catalogues).toHaveLength(3));
     // The radio's box, sealed at the hub.
     pick(say(WHERE), "10");
     find("beam");
@@ -161,10 +165,11 @@ describe("scanning labels with the camera", () => {
     await vi.waitFor(() =>
       expect(screen.getAllByText(/^Recorded \(/)).toHaveLength(2),
     );
-    // One at a time: the second save waits for the first answer.
-    expect(catalogues).toHaveLength(2);
+    // One at a time: the second save's refresh waits for the first's
+    // answer; Record's check does not.
+    expect(catalogues).toHaveLength(4);
     later.resolve(json(CATALOGUE, 200));
-    await vi.waitFor(() => expect(catalogues).toHaveLength(3));
+    await vi.waitFor(() => expect(catalogues).toHaveLength(5));
   });
 
   test("asked for again and not answered, the catalogue it has is kept", async () => {
@@ -182,7 +187,8 @@ describe("scanning labels with the camera", () => {
     await openSpoolInVan();
     save();
     await screen.findByText("Recorded (transaction 77).");
-    await vi.waitFor(() => expect(asked).toBe(2));
+    // Record's check, unanswered, queued it as before (inventory-tng-h7ua).
+    await vi.waitFor(() => expect(asked).toBe(3));
     await vi.advanceTimersByTimeAsync(0);
     expect(screen.queryByText(say(COULD_NOT_LOAD))).toBeNull();
     expect(screen.getByLabelText(say(YOUR_NAME))).toBeDefined();
@@ -206,7 +212,7 @@ describe("scanning labels with the camera", () => {
     await openSpoolInVan();
     save();
     await screen.findByText("Recorded (transaction 77).");
-    await vi.waitFor(() => expect(asked).toBe(2));
+    await vi.waitFor(() => expect(asked).toBe(3));
     fireEvent.click(screen.getByRole("button", { name: say(DISMISS) }));
     expect(screen.queryByText(/^Recorded \(/)).toBeNull();
     const [batch] = outbox.entries.value;

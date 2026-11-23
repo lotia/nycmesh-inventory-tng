@@ -403,6 +403,10 @@ msgstr "That install number is out of range."
 msgid "{name}: Open whole packages: leave loose empty."
 msgstr "{name}: Open whole packages: leave loose empty."
 
+#: src/scan/CartLine.tsx
+msgid "The unit changed from {was} to {unit}. Enter the amount again in {unit}."
+msgstr "The unit changed from {was} to {unit}. Enter the amount again in {unit}."
+
 #: src/scan/batch.ts
 msgid "{name}: Nothing is taken from an open package here."
 msgstr "{name}: Nothing is taken from an open package here."
@@ -928,6 +932,10 @@ msgstr "Enter the loose amount in {unit}, up to 3 decimals."
 #: src/scan/batch.ts
 msgid "Opening: {items} at {from}"
 msgstr "Opening: {items} at {from}"
+
+#: src/scan/batch.ts
+msgid "{name}: enter the amount again in {unit}"
+msgstr "{name}: enter the amount again in {unit}"
 
 #: src/scan/cart.ts
 msgid "retired: taking only"
