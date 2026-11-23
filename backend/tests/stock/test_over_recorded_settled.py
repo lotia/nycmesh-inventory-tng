@@ -27,6 +27,7 @@ from inventory_tng.stock.over_recorded_routes import SETTLED_VIEW, waiting_view
 from inventory_tng.stock.paths import COUNTS
 from inventory_tng.stock.stock_routes import recorded_more_view
 from inventory_tng.web import listing
+from inventory_tng.web.formatting import times
 
 from helpers.markup import (
     Element,
@@ -255,7 +256,7 @@ def test_an_opening_is_listed_at_its_place_opened(
         HOW["corrected"],
         TWO,
     )
-    assert amount == over_recorded_queries.times(1, "Spool")
+    assert amount == times(1, "Spool")
 
 
 def test_an_openings_open_package_closed_before_correct_names_the_sealed_end(

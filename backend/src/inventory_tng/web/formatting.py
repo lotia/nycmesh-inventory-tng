@@ -4,7 +4,7 @@ neither FastAPI nor the templates, so rules may import it
 
 from decimal import Decimal
 
-from inventory_tng.core.phrases import lazy_gettext, number
+from inventory_tng.core.phrases import gettext, lazy_gettext, number
 
 
 def amount(value: Decimal | None) -> str:
@@ -35,6 +35,15 @@ def printed_length(unit: str) -> str:
     `unit`, if it is a length (any but each, models.catalogue.UNITS); else
     nothing."""
     return str(PRINTED_LENGTH) if unit != "each" else ""
+
+
+def times(num: int | Decimal, package: str) -> str:
+    """So many of a package: 2, a multiplication sign, "Spool 305 m"."""
+    return gettext(
+        "%(num)s \N{MULTIPLICATION SIGN} %(package)s",
+        num=number(num),
+        package=package,
+    )
 
 
 def keyboard(unit: str, whole: bool = False) -> str:

@@ -383,7 +383,7 @@ msgid_plural "%(num)s retired places hold stock"
 msgstr[0] ""
 msgstr[1] ""
 
-#: src/inventory_tng/stock/over_recorded_queries.py
+#: src/inventory_tng/web/formatting.py
 #, python-format
 msgid "%(num)s × %(package)s"
 msgstr ""

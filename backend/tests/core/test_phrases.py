@@ -81,6 +81,7 @@ from inventory_tng.stock import (
 from inventory_tng.stock.count_forms import NONE_GONE
 from inventory_tng.stock.moments import Moment
 from inventory_tng.volunteers import volunteers_routes
+from inventory_tng.web import formatting
 from inventory_tng.web.admin_pages import revoke_title
 from inventory_tng.web.forms import at_most_places, name_up_to, up_to
 from inventory_tng.web.listing import Lapsed
@@ -210,7 +211,7 @@ SAID_WITH_VALUES: list[Callable[[], Words]] = [
         lambda said=said: said(NOT_ENGLISH, NOT_ENGLISH)
         for said in over_recorded_routes.RETIRED_EMPTY.values()
     ),
-    lambda: over_recorded_queries.times(2, NOT_ENGLISH),
+    lambda: formatting.times(2, NOT_ENGLISH),
     lambda: over_recorded_queries.from_an_open_package(NOT_ENGLISH),
     lambda: over_recorded_queries.sealed(NOT_ENGLISH),
     lambda: over_recorded_queries.opened(NOT_ENGLISH),

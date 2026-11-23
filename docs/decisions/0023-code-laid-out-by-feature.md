@@ -296,6 +296,7 @@ queries to its `queries.py`.
 | `stacks.py` | `backend/devtools/stack.py`; its `stale` is `list-stale` |
 | `stock/open_packages.py` | itself, the open packages' rows; `Forms`, `is_short_end`, `fewest_left_first`, `largest_first`, `PackageSize`, `split`, `forms_of`: `stock/package_forms.py` |
 | `stock/over_recorded.py` | itself, with what changes a check: `raise_checks`, `seen`, `waiting`, `ends`, `places_of`, `mark_checked`, `close`, `correct`, `confirm_count`, `openings_waiting`, `counted`, `open_package_closed`, the metrics, `REASON`, `Settled`, `CHECKED_REASONS`, `WAITING`, `OPENED_INTO`, with `_correction_key` as `correction_key`; what the pages read and show: `Shown`, `OneCounted`, `BothRight`, `MovedWhole`, `Spot`, `WasSettled`, `within`, `times`, `amount_words` and the other words, `shown`, `how_many`, `settled`, `SETTLED`, `SETTLED_HOW`, `SETTLED_ORDER`, `TWO_ADJUSTMENTS`, `NO_ADJUSTMENT`, `FROM`, `TO`, `LEFT_COUNT`, `ARRIVED_COUNT`: `stock/over_recorded_queries.py` |
+| `stock/over_recorded_queries.py` | itself, but for `times`: `web/formatting.py`, as "Needs your action" says it too |
 | `stock/paths.py` | itself, with `RECORDED_MORE` and `RECORDED_MORE_SETTLED` as `OVER_RECORDED` and `OVER_RECORDED_SETTLED` |
 | `templates/scan/page.html` | `templates/frontend_page.html` |
 | `totp_keys.py` | `admins/sealed_totp_keys.py`; its command: `admins/sealed_totp_keys_command.py` |
