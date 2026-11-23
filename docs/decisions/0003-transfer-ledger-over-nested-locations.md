@@ -261,8 +261,9 @@ left out for now: revisit it if counters find a loss and a find awkward.
 ## Amendment: work saved as it was shown (2026-11-23)
 
 Decided by Ali on 2026-11-23 (inventory-tng-jwlh, built as
-inventory-tng-57u8). An item's unit may change until its first movement,
-and a package's size until it has moved, been opened or been labelled:
+inventory-tng-57u8). An item's unit may change until its first movement
+or the first label of it or its packages, and a package's size until it
+has moved, been opened or been labelled:
 exactly when its first saves may still be on their way, such as a phone's
 outbox holding a receipt of 50 m of a new cable when an administrator
 switches it to ft. So every save says the units and package sizes it
@@ -289,6 +290,15 @@ typed again, as it does for a package resized. Record loads the catalogue
 first and checks the cart against it; without an answer in a few seconds
 it queues the batch as before, and the server's refusal still holds.
 Rejected again: converting the amount, and saying so only after Record.
+
+A label fixes an item's unit as a movement does (Ali, 2026-11-23,
+inventory-tng-rpud): it says the unit, and a scan of it counts the
+package's size, or one, in whatever unit the item has. So a "Spool 305 m"
+label scanned after a switch to ft would receive 305 ft. Its page says
+"m: fixed, as a label has been printed for it", and a change is refused.
+Making a label locks the item, as changing its unit does, so neither
+slips past the other. Rejected: converting m and ft numbers
+automatically, and allowing the change with a warning.
 
 A batch line must say its unit: one without is refused. It was required
 at once, not added first and required in a later deploy (CONTRIBUTING.md,

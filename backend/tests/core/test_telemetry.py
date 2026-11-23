@@ -25,6 +25,7 @@ from structlog.testing import capture_logs
 
 from inventory_tng.admins import accounts, mail_messages
 from inventory_tng.app import create_app
+from inventory_tng.catalogue import items
 from inventory_tng.catalogue.paths import CATEGORIES
 from inventory_tng.core import db_sessions, mail
 from inventory_tng.core.db_errors import NoSession, RuleBroken
@@ -54,7 +55,7 @@ from helpers.devices import new_device
 from helpers.items import shown_item_form
 from helpers.mail import NO_MAIL, FailingMail, SentMail
 from helpers.pools import small_database
-from helpers.rows import add, shown, tag
+from helpers.rows import add, item_fields, shown, tag
 from helpers.sign_in import (
     PASSWORD,
     TOTP_KEYS,
@@ -1022,6 +1023,31 @@ def test_counts_labels_made_printed_and_revoked(
     assert by_names[(("names", "location"),)] >= 1
     assert sum(counted(reader, "inventory.labels.printed").values()) >= 5
     assert sum(counted(reader, "inventory.labels.revoked").values()) >= 1
+
+
+def test_counts_unit_changes_refused_by_why_the_unit_is_fixed(
+    rolled_back: Recorded, session: Session
+) -> None:
+    """Counted and logged at once, as a refusal writes nothing to commit."""
+    _, _, reader, _ = rolled_back
+    name = "inventory.unit_changes.refused"
+    before = counted(reader, name)
+    moved = stocked(session).item
+    labelled = Place(session).cable
+    assert labels.make_for_item(session, labelled.id) is not None
+    with capture_logs() as logs:
+        for item, unit in ((moved, "m"), (labelled, "ft")):
+            with pytest.raises(RuleBroken):
+                items.save(session, item, item_fields(item, unit=unit), seen=None)
+    assert added(reader, name, before) == {
+        (("reason", "moved"),): 1,
+        (("reason", "labelled"),): 1,
+    }
+    assert [
+        (line["item_id"], line["reason"], line["log_level"])
+        for line in logs
+        if line["event"] == "unit change refused"
+    ] == [(moved.id, "moved", "info"), (labelled.id, "labelled", "info")]
 
 
 def test_a_write_rolled_back_is_neither_counted_nor_logged(

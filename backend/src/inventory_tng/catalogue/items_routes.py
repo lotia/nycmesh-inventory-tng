@@ -18,7 +18,7 @@ from inventory_tng.catalogue.paths import CATEGORIES, ITEMS, READINGS
 from inventory_tng.catalogue.reading_rules import NOT_A_UNIT
 from inventory_tng.core.db_errors import refusal, refusal_naming_index
 from inventory_tng.core.db_once_committed import once_committed
-from inventory_tng.core.db_sessions import DbSession, exists_where
+from inventory_tng.core.db_sessions import DbSession
 from inventory_tng.core.local_time import site_zone
 from inventory_tng.core.phrases import Words, lazy_gettext
 from inventory_tng.labels import labels
@@ -32,7 +32,7 @@ from inventory_tng.models.catalogue import (
 )
 from inventory_tng.models.labels import Label
 from inventory_tng.models.names import canonical
-from inventory_tng.models.stock import Movement, OpenPackage
+from inventory_tng.models.stock import OpenPackage
 from inventory_tng.stock import open_packages
 from inventory_tng.stock.open_packages_listing import (
     BY_OPENED,
@@ -72,6 +72,7 @@ CLOSE = "close_names"
 REFUSED_FIELDS = {
     "item_category_current": "category_id",
     "item_unit_fixed": "unit",
+    "item_unit_labelled": "unit",
 }
 
 
@@ -275,10 +276,6 @@ def _list_page(
     )
 
 
-def _moved(session: Session, item_id: int) -> bool:
-    return exists_where(session, Movement.item_id == item_id)
-
-
 # The item page's section of open packages, which its headings' links go
 # back to.
 OPEN_PACKAGES = "open-packages"
@@ -363,7 +360,7 @@ def _item_page(
                 c for c in queries.categories_by_name(session) if c.retired_at is None
             ],
             "units": UNITS,
-            "unit_fixed": _moved(session, item.id),
+            "unit_fixed": items.unit_fixed(session, item.id),
             "in_stock": item_total(session, item.id),
             "labels": labels.current_of(session, Label.item_id == item.id),
             "open_packages": opened,

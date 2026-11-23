@@ -51,6 +51,7 @@ from inventory_tng.core.db_sessions import (
 from inventory_tng.core.mail import Message, Notify
 from inventory_tng.core.settings import RateLimits
 from inventory_tng.devices import devices
+from inventory_tng.labels import labels
 from inventory_tng.models.admins import Admin, AdminPassword, AdminSession
 from inventory_tng.models.catalogue import Category, Item, ItemPackage
 from inventory_tng.models.core import SentForm
@@ -1152,6 +1153,32 @@ def test_a_unit_changed_while_stock_moves_waits_then_is_refused(
     )
     receipt = receiving(place.cable, place.store, "1.5")
     assert either_first(own_committed, receipt, to_each, swapped=swapped) == refused
+
+
+@pytest.mark.concurrency
+@pytest.mark.parametrize(
+    ("swapped", "refused"), [(False, "item_unit_labelled"), (True, None)]
+)
+def test_a_unit_changed_while_a_label_is_made_waits_then_is_refused(
+    committed: Committed, swapped: bool, refused: str | None
+) -> None:
+    """Both take the catalogue lock and hold the item FOR UPDATE
+    (labels.make_for_item, items.save): a unit change second waits, then
+    reads the label and is refused; a label second is made for the new
+    unit (Ali, 2026-11-23, inventory-tng-rpud)."""
+    place = committed_place(committed)
+    reel = ItemPackage(item_id=place.cable.id, name="Reel", size=Decimal(305))
+    made(committed, reel)
+    to_ft = doing(
+        Item,
+        place.cable.id,
+        lambda s, item: items.save(s, item, item_fields(item, unit="ft"), seen=None),
+    )
+
+    def labelling(session: Session) -> None:
+        assert labels.make_for_item(session, place.cable.id, reel.id) is not None
+
+    assert either_first(committed, labelling, to_ft, swapped=swapped) == refused
 
 
 @pytest.mark.concurrency

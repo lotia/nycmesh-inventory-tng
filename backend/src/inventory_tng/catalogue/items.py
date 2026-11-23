@@ -86,6 +86,31 @@ tracking_changed = meter.create_counter(
     description="Items or packages whose opened packages are followed, or "
     "no longer, set by an administrator, by where it was set",
 )
+unit_changes_refused = meter.create_counter(
+    "inventory.unit_changes.refused",
+    unit="{change}",
+    description="Changes to an item's unit refused, by why it is fixed",
+)
+
+# Why an item's unit is fixed, and the rule each refuses a change by.
+UnitFixed = Literal["moved", "labelled"]
+UNIT_FIXED_RULES: dict[UnitFixed, str] = {
+    "moved": "item_unit_fixed",
+    "labelled": "item_unit_labelled",
+}
+
+
+def unit_fixed(session: Session, item_id: int) -> UnitFixed | None:
+    """Why the item's unit can no longer change, if it can't: stock has
+    moved in it, or a label has been printed for it or one of its packages
+    (a package's label names its item too), revoked ones too. Its ledger
+    and its labels say that unit, so a change would silently change what
+    they mean; nothing is converted (Ali, 2026-11-23, inventory-tng-rpud)."""
+    if exists_where(session, Movement.item_id == item_id):
+        return "moved"
+    if exists_where(session, Label.item_id == item_id):
+        return "labelled"
+    return None
 
 
 def _tracking_changed(
@@ -411,12 +436,15 @@ def save(session: Session, item: Item, fields: Fields, *, seen: Seen) -> Renamed
     one of its own (Ali, 2026-11-15): what that did. The old name was the
     item's, so no other item's name nor any current alias, and so is free
     as an alias."""
-    # FOR UPDATE waits for any movement of it being written.
+    # FOR UPDATE waits for any movement of it being written, and for any
+    # label of it being made, which locks the item too (labels.make_for_item).
     relock(session, item, seen=seen)
     enforce("retired_read_only", when=item.retired_at is not None)
     if fields.unit != item.unit:
-        moved = exists_where(session, Movement.item_id == item.id)
-        enforce("item_unit_fixed", when=moved)
+        if (why := unit_fixed(session, item.id)) is not None:
+            log.info("unit change refused", item_id=item.id, reason=why)
+            unit_changes_refused.add(1, {"reason": why})
+            enforce(UNIT_FIXED_RULES[why])
         if fields.unit == "each":
             # Under the catalogue lock, which every package write takes.
             fraction = fractional_package(session, item.id) is not None

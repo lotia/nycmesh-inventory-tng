@@ -581,6 +581,11 @@ msgstr ""
 
 #: src/inventory_tng/templates/catalogue/item.html
 #, python-format
+msgid "%(unit)s: fixed, as a label has been printed for it"
+msgstr ""
+
+#: src/inventory_tng/templates/catalogue/item.html
+#, python-format
 msgid "%(unit)s: fixed, as stock has moved in it"
 msgstr ""
 
@@ -1962,6 +1967,10 @@ msgstr ""
 msgid ""
 "Its size is fixed, as some has moved, been opened or labelled: add a "
 "package of the new size instead."
+msgstr ""
+
+#: src/inventory_tng/web/forms.py
+msgid "Its unit is fixed, as a label has been printed for it."
 msgstr ""
 
 #: src/inventory_tng/web/forms.py

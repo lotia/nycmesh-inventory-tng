@@ -28,7 +28,11 @@ None is left, so nobody can pick it.{% endtrans %}{% endif %}{% endcall %}
   </label>
   <label>{% trans %}Unit{% endtrans %}
     {% if unit_fixed %}
+    {% if unit_fixed == "moved" %}
     <span class="hint">{% trans unit=item.unit %}{{ unit }}: fixed, as stock has moved in it{% endtrans %}</span>
+    {% else %}
+    <span class="hint">{% trans unit=item.unit %}{{ unit }}: fixed, as a label has been printed for it{% endtrans %}</span>
+    {% endif %}
     <input type="hidden" name="unit" value="{{ item.unit }}">
     {% else %}
     <select name="unit">

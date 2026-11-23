@@ -20,7 +20,9 @@ from inventory_tng.catalogue.forms import (
     TAKEN_FIELDS,
 )
 from inventory_tng.catalogue.paths import ITEMS
+from inventory_tng.core.db_errors import RuleBroken
 from inventory_tng.core.local_time import DEFAULT_ZONE
+from inventory_tng.labels import labels
 from inventory_tng.models.catalogue import (
     Category,
     Item,
@@ -52,7 +54,7 @@ from helpers.markup import (
     words_on,
 )
 from helpers.query_counts import counting
-from helpers.rows import add, history, named, shown
+from helpers.rows import add, history, item_fields, named, shown
 
 
 def test_adding_an_item(
@@ -350,6 +352,47 @@ def test_the_unit_is_fixed_once_stock_has_moved(
     assert str(PICK_A_UNIT) in text(unitless)
     negative = admin_client.post(f"{ITEMS}/{item.id}", data=form | {"minimum": "-1"})
     assert negative.status_code == 400
+
+
+def test_the_unit_is_fixed_once_a_spools_label_is_printed(
+    admin_client: TestClient, session: Session, radios: Category
+) -> None:
+    """Cat6 cable, Spool 305 m of 305 m, labelled, nothing moved yet: a
+    switch to ft would make the next scan of that label receive 305 ft. So
+    the unit is fixed once any label of the item or its packages is
+    printed, and nothing is converted (Ali, 2026-11-23, inventory-tng-rpud)."""
+    cable = new_item(session, radios, "Cat6 cable", unit="m")
+    spool = add(session, ItemPackage(item_id=cable.id, name="Spool", size=305))
+    page = admin_client.get(f"{ITEMS}/{cable.id}").text
+    assert ("unit", "m") not in hidden_fields(page)
+    assert labels.make_for_item(session, cable.id, spool.id) is not None
+    page = admin_client.get(f"{ITEMS}/{cable.id}").text
+    assert "m: fixed, as a label has been printed for it" in page
+    assert ("unit", "m") in hidden_fields(page)
+    form = shown_item_form(cable, unit="ft")
+    refused = admin_client.post(f"{ITEMS}/{cable.id}", data=form)
+    assert refused.status_code == 400
+    assert str(RULES["item_unit_labelled"]) in text(refused)
+    assert (cable.unit, spool.size) == ("m", 305)
+    kept = admin_client.post(f"{ITEMS}/{cable.id}", data=form | {"unit": "m"})
+    assert kept.status_code == 303
+
+
+@pytest.mark.parametrize("package", [False, True])
+def test_one_label_alone_fixes_the_unit_revoked_too(
+    session: Session, radios: Category, package: bool
+) -> None:
+    """The item's own label, counting one unit a scan, or one of a
+    package's, each alone: revoked, it was printed all the same."""
+    item = new_item(session, radios, "Patch cord", unit="m")
+    reel = add(session, ItemPackage(item_id=item.id, name="Reel", size=10))
+    label = labels.make_for_item(session, item.id, reel.id if package else None)
+    assert label is not None
+    assert labels.revoke(session, label.id, NOW)
+    assert items.unit_fixed(session, item.id) == "labelled"
+    with pytest.raises(RuleBroken) as refused:
+        items.save(session, item, item_fields(item, unit="ft"), seen=None)
+    assert refused.value.rule == "item_unit_labelled"
 
 
 def test_retiring_and_bringing_back(
