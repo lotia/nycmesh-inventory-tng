@@ -140,7 +140,8 @@ def forms_by_place(
     over_recorded.openings_waiting_at): it is counted by form, with a row of
     each package it opened sealed, though the records hold none, as a total
     puts neither of its ends right (docs/decisions/0020). Less, by place,
-    what is `aside` there (count_arrivals.set_aside). `packages`, by id,
+    what is `aside` there, in the forms held (count_arrivals.as_held): an
+    open package set aside whole is no row. `packages`, by id,
     every package of those items, if read already. The same number of
     queries however many places."""
     every = sorted(set().union(*item_ids.values())) if item_ids else []
@@ -148,20 +149,35 @@ def forms_by_place(
     if packages is None:
         packages = queries.packages_by_id(session, every)
     opened = {row.id: row for row in queries.open_at(session, item_ids.keys(), every)}
-    return {
-        place_id: _place_forms(
+    forms: dict[int, dict[int, list[FormRow]]] = {}
+    for place_id, items in item_ids.items():
+        here = aside.get(place_id, {})
+        left = less(found.get(place_id, {}), here)
+        forms[place_id] = _place_forms(
             set(items),
-            less(found.get(place_id, {}), aside.get(place_id, {})),
+            left,
             packages,
             {
                 open_id: row
                 for open_id, row in opened.items()
-                if row.location_id == place_id and row.item_id in items
+                if row.location_id == place_id
+                and row.item_id in items
+                and not _aside_whole(row, here, left)
             },
             openings.get(place_id, {}),
         )
-        for place_id, items in item_ids.items()
-    }
+    return forms
+
+
+def _aside_whole(
+    row: OpenPackage,
+    aside: Mapping[tuple[int, Form], Decimal],
+    left: Mapping[tuple[int, Form], Decimal],
+) -> bool:
+    """Whether the open package is set aside whole: what arrived, counted
+    apart, so none of it is the place's own."""
+    line = (row.item_id, Form(open_package_id=row.id))
+    return line in aside and line not in left
 
 
 def _place_forms(
@@ -208,7 +224,7 @@ def line_of(
     """The field a count form, as of moment `as_of`, shows an item's line
     at a place by: its total, or, counted by form (forms_by_place), its
     loose units. Less, by place, what is `aside` there, as the form shows
-    it (count_arrivals.set_aside)."""
+    it (count_arrivals.as_held)."""
     place_id, item_id = listed.place_id, listed.item_id
     openings = openings_waiting_at(session, [place_id], as_of)
     by_form = forms_by_place(session, as_of, {place_id: [item_id]}, openings, aside)
@@ -224,7 +240,7 @@ def asks_for(
 ) -> bool:
     """Whether a full count of the place, as of moment `as_of`, asks for the
     item: the records hold some there, less what is `aside` there, by place
-    (count_arrivals.set_aside), or an opening of it waits there
+    (count_arrivals.as_held), or an opening of it waits there
     (over_recorded.openings_waiting_at), asked for by form though they hold
     none."""
     held = expected_at(session, [place_id], as_of, [item_id]).get(place_id, {})

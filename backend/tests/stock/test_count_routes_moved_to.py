@@ -5,16 +5,19 @@ alone writes nothing; How many arrived, fixed, records the difference as
 lost or found where it went, nothing against the area it left; and the
 place's own lines count what it held before the moves."""
 
+import uuid
 from decimal import Decimal
 
+import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from inventory_tng.models.places import Location
 from inventory_tng.models.stock import LedgerTransaction, Movement
+from inventory_tng.stock import open_packages
 from inventory_tng.stock.ledger import LOOSE, Entry, Form
-from inventory_tng.stock.moments import expected, expected_forms_at
+from inventory_tng.stock.moments import at_place, expected, expected_forms_at
 from inventory_tng.stock.paths import COUNTS
 
 from helpers.markup import problem, read, text
@@ -431,3 +434,153 @@ def test_a_save_sent_again_after_a_later_move_out_of_the_store_is_as_before(
     again = admin_client.post(moved.path, data=form)
     assert again.headers["location"] == first.headers["location"]
     assert expected(session, moved.there.id) == {moved.item: Decimal(1)}
+
+
+class SpoolOpenedThere:
+    """Shelf B holding 2 m of cable loose, and Shelf C, retired, in the
+    store; a sealed spool moved to Shelf C before the count form is shown,
+    then on to Shelf B while it is open, and opened there: `cut` metres of
+    it installed from Shelf B then, and `before`, the opening before the
+    form is refused and shown again with the move, else after
+    (inventory-tng-nlog)."""
+
+    def __init__(
+        self, session: Session, client: TestClient, *, cut: int = 0, before: bool = True
+    ) -> None:
+        self.spools = spools = Spools(session)
+        store, sealed = spools.store, spools.sealed
+        self.cable = cable = spools.cable.id
+        self.shelf, self.gone = (
+            add(session, area(name, store)) for name in ("Shelf B", "Shelf C")
+        )
+        retire(session, self.gone)
+        spools.write(
+            {"kind": "receipt", "to_location_id": self.shelf.id},
+            Entry(cable, Decimal(2), LOOSE, LOOSE),
+        )
+        spool = Entry(cable, Decimal(305), sealed, sealed)
+        moving = {"kind": "move"}
+        spools.write(
+            moving | {"from_location_id": store.id, "to_location_id": self.gone.id},
+            spool,
+        )
+        self.path = f"{COUNTS}/{store.id}"
+        shown = count_form(client.get(self.path))
+        spools.write(
+            moving
+            | {"from_location_id": self.gone.id, "to_location_id": self.shelf.id},
+            spool,
+        )
+        if before:
+            self.open(cut)
+        refused = client.post(self.path, data=shown)
+        assert refused.status_code == 409
+        self.refused = refused
+        self.page = read(refused.text)
+        self.form = count_form(refused)
+        self.typed = {self.counted: "2"}
+
+    def open(self, cut: int = 0) -> None:
+        """The spool opened at Shelf B, and `cut` metres of it installed."""
+        key, shelf = uuid.uuid4(), self.shelf.id
+        spools = self.spools
+        self.opened = made = open_packages.make(
+            spools.session, key, spools.spool.id, shelf
+        )
+        here = Form(open_package_id=made.id)
+        spools.write(
+            {"kind": "open", "from_location_id": shelf, "to_location_id": shelf},
+            Entry(self.cable, Decimal(305), spools.sealed, here),
+        )
+        if cut:
+            spools.write(
+                {"kind": "install", "from_location_id": shelf},
+                Entry(self.cable, Decimal(cut), here),
+            )
+
+    @property
+    def counted(self) -> str:
+        return field(self.shelf, self.spools.store, f"counted_{self.cable}")
+
+    def at_shelf(self, session: Session) -> dict[tuple[int, Form], Decimal]:
+        forms = expected_forms_at(session, [self.shelf.id], 2**31 - 1, [self.cable])
+        return forms.get(self.shelf.id, {})
+
+
+def counted_lines(session: Session, place: Location) -> list[Movement]:
+    """The lines of the counts written at `place`: what they found or lost."""
+    return list(
+        session.scalars(
+            select(Movement)
+            .join(LedgerTransaction)
+            .where(LedgerTransaction.kind == "count", at_place(place.id))
+        )
+    )
+
+
+def _no_spool_row(moved: SpoolOpenedThere) -> None:
+    """Shelf B's cable line says the 2 m it held before the spool came, by
+    its total, and no row of the spool, which is under Moved to Shelf B."""
+    assert moved.page.one("input", name=moved.counted).attrs["value"] == "2"
+    prefix = field(moved.shelf, moved.spools.store, "")
+    names = [each.attrs["name"] for each in moved.page.all("input")]
+    assert [name for name in names if name.startswith(f"{prefix}opened_")] == []
+    assert [name for name in names if name.startswith(f"{prefix}loose_")] == []
+    assert moved.page.one("th", scope="rowgroup", text=f"Moved to {moved.shelf.name}")
+
+
+@pytest.mark.parametrize("cut", [0, 50])
+def test_a_spool_opened_where_it_went_is_shown_once(
+    session: Session, admin_client: TestClient, cut: int
+) -> None:
+    """A spool from Shelf C opened at Shelf B, some of it installed or none,
+    before the form's moment: Shelf B's line counts the 2 m it held
+    before, and its 2 m counted, the move left alone, nothing is written
+    there."""
+    moved = SpoolOpenedThere(session, admin_client, cut=cut)
+    _no_spool_row(moved)
+    saved(admin_client, moved.path, moved.form | moved.typed)
+    here = Form(open_package_id=moved.opened.id)
+    assert moved.at_shelf(session) == {
+        (moved.cable, here): Decimal(305 - cut),
+        (moved.cable, LOOSE): Decimal(2),
+    }
+    assert counted_lines(session, moved.shelf) == []
+
+
+def test_a_spool_opened_where_it_went_counted_by_form_writes_no_loss(
+    session: Session, admin_client: TestClient
+) -> None:
+    """Shelf B's cable counted by form all the same, the open spool left at
+    none and 2 m loose, as a form before the fix showed it: its spool is
+    set aside, so nothing is lost or found there."""
+    moved = SpoolOpenedThere(session, admin_client)
+    prefix = field(moved.shelf, moved.spools.store, "")
+    by_form = {
+        f"{prefix}opened_{moved.opened.id}": "0",
+        f"{prefix}loose_{moved.cable}": "2",
+    }
+    form = {name: value for name, value in moved.form.items() if name != moved.counted}
+    saved(admin_client, moved.path, form | by_form)
+    here = Form(open_package_id=moved.opened.id)
+    assert moved.at_shelf(session) == {
+        (moved.cable, here): Decimal(305),
+        (moved.cable, LOOSE): Decimal(2),
+    }
+
+
+def test_a_spool_opened_where_it_went_after_the_form_s_moment_is_left_alone(
+    session: Session, admin_client: TestClient
+) -> None:
+    """The spool opened at Shelf B after the form's moment: Shelf B's line
+    showed the 2 m it held, sealed then, and its 2 m counted, nothing is
+    written there."""
+    moved = SpoolOpenedThere(session, admin_client, before=False)
+    assert moved.page.one("input", name=moved.counted).attrs["value"] == "2"
+    moved.open()
+    saved(admin_client, moved.path, moved.form | moved.typed)
+    assert moved.at_shelf(session) == {
+        (moved.cable, Form(open_package_id=moved.opened.id)): Decimal(305),
+        (moved.cable, LOOSE): Decimal(2),
+    }
+    assert counted_lines(session, moved.shelf) == []

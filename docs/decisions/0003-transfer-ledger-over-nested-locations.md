@@ -225,7 +225,10 @@ whole, and one box for each form when it arrived partly sealed and partly
 loose, as the count form's own lines split them, so a fix never takes
 loose stock below nothing (the coordinator, 2026-11-22, for Ali to
 confirm). The place's own lines count what it held before the moves, which
-are set aside from what its records say, and a line under the heading, in
+are set aside from what its records say, in the forms it holds them in: a
+sealed package opened there since is set aside from its open package, which
+its lines then leave out, and one gone from there since from nothing
+(2026-11-23, inventory-tng-nlog). A line under the heading, in
 the browser only, gives what it will hold once saved. Found at leaves the
 area out, saying it is retired, and a "Bring it back" button on the form
 brings it back, as its own page does, and shows the form again with it,

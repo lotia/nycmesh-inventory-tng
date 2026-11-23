@@ -6,6 +6,7 @@ from decimal import Decimal
 from inventory_tng.stock.count_arrivals import (
     Fix,
     arrived_at,
+    as_held_at,
     fixed,
     fixed_lines,
     set_aside,
@@ -63,3 +64,30 @@ def test_what_arrived_is_what_was_moved_as_fixed() -> None:
     ]
     fixes = [Fix(3, 2, 5, Decimal(-2), LOOSE)]
     assert arrived_at(set_aside(moves), fixes) == {(2, 5): Decimal(11)}
+
+
+def test_what_arrived_sealed_and_was_opened_is_set_aside_from_the_open_ones() -> None:
+    """A spool and a half's worth set aside sealed where one is still
+    sealed: the rest from the newest open package of that package, then
+    the next, up to what each held, none from another package's; what is
+    left beyond them has gone, so nothing stands for it. Loose and an open
+    package's arrival as they came (inventory-tng-nlog)."""
+    first, newest, other = (Form(open_package_id=n) for n in (1, 2, 3))
+    aside = {
+        (5, SEALED): Decimal(40),
+        (5, LOOSE): Decimal(3),
+        (5, first): Decimal(2),
+    }
+    held = {
+        (5, SEALED): Decimal(10),
+        (5, LOOSE): Decimal(1),
+        (5, first): Decimal(8),
+        (5, newest): Decimal(4),
+        (5, other): Decimal(50),
+    }
+    assert as_held_at(aside, held, {1: 7, 2: 7, 3: 8}) == {
+        (5, SEALED): Decimal(10),
+        (5, LOOSE): Decimal(3),
+        (5, newest): Decimal(4),
+        (5, first): Decimal(8),
+    }
