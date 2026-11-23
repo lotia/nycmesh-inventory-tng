@@ -594,16 +594,18 @@ def sizes_fixed(session: Session, package_ids: Collection[int]) -> set[int]:
 
 def restore_package(session: Session, package: ItemPackage) -> None:
     """A retired package brought back, unless its item is retired, or is
-    counted each and the package holds, or is too short to use below, a
-    fraction; one holding 1 is cleared instead (_HOLDS_ONE). Its name is
-    its own still: unique, retired ones too."""
+    counted each and the package holds a fraction. One too short to use
+    below a fraction comes back so, to be set whole on the item page, as
+    it only says when an open package is a short end (Ali, 2026-11-23,
+    inventory-tng-fa5i); one holding 1 is cleared instead (_HOLDS_ONE).
+    Its name is its own still: unique, retired ones too."""
     relock(session, package, current=False)
     _item_current(session, package)
     holds_one = package.size == 1 and package.short_below is not None
     if holds_one and _unit(session, package.item_id) == "each":
         _short_cleared(session, package, "restore")
-    # Nor with a fraction, once its item is counted each.
-    _whole_for_its_item(session, package.item_id, package.size, package.short_below)
+    # Nor holding a fraction, once its item is counted each.
+    _whole_for_its_item(session, package.item_id, package.size)
     package.retired_at = None
     once_committed(session, log.info, "package restored", item_package_id=package.id)
 

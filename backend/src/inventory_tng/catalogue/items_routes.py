@@ -328,10 +328,13 @@ def _item_page(
     undo: str | None = None,
     asked: Asked = UNASKED,
     held_back: ItemPackage | None = None,
+    short_to_set: ItemPackage | None = None,
 ) -> HTMLResponse:
     """The item's page; its open packages sorted as `asked`, all of them.
     With `held_back`, a retired package not brought back for its size's
-    fraction: said above the page, with a link to add it again."""
+    fraction: said above the page, with a link to add a new package. With
+    `short_to_set`, a package brought back whose Too short to use box is
+    outlined, the whole numbers it may be beside it."""
     here = f"{ITEMS}/{item.id}"
     packages = queries.packages_of_item(session, item.id)
     view = View.read(here, OPEN_SORTING, asked, anchor=OPEN_PACKAGES)
@@ -371,6 +374,8 @@ def _item_page(
             "short_fraction": _short_fraction(session, item, problems, values),
             "alert": alert,
             "held_back": held_back,
+            "short_to_set": short_to_set,
+            "set_whole": short_to_set and forms.short_to_set(short_to_set),
             **_name_field(session, similar),
         },
         status_code=409 if held_back else None,
@@ -501,13 +506,40 @@ def item(
     item_id: int,
     asked: AskedView,
     undo: str = "",
+    short: str = "",
 ) -> Response:
     found = session.get(Item, item_id)
     if found is None:
         return not_found()
     # A package just retired, offered back.
     back = undo_retire(session, ItemPackage, undo, f"{ITEMS}/{item_id}/packages")
-    return _item_page(request, session, signed, found, undo=back, asked=asked)
+    return _item_page(
+        request,
+        session,
+        signed,
+        found,
+        undo=back,
+        asked=asked,
+        short_to_set=_short_to_set(session, found, whole(short, 1, INTEGER_MAX)),
+    )
+
+
+def _short_to_set(
+    session: Session, item: Item, package_id: int | None
+) -> ItemPackage | None:
+    """The package, just brought back, if it is current and too short to
+    use below a fraction on an item counted each: its box is outlined to
+    be set whole (Ali, 2026-11-23, inventory-tng-fa5i). Read on each
+    show, so a reload once it is set whole outlines nothing."""
+    if package_id is None or item.unit != "each":
+        return None
+    package = _package(session, item.id, package_id)
+    if package is None or package.retired_at is not None:
+        return None
+    if not forms.short_has_fraction(package):
+        return None
+    log.debug("package short end to set", item_package_id=package.id)
+    return package
 
 
 @router.post(f"{ITEMS}/{{item_id}}")
@@ -728,21 +760,20 @@ def restore_package(
         RETIRED,
         items.PACKAGE_WHOLE,
     )
+    found = session.get_one(Item, item_id)
     if broken is None:
         session.commit()
+        to_set = _short_to_set(session, found, package_id)
+        short = {"short": str(package_id)} if to_set else {}
         return redirect(
-            f"{ITEMS}/{item_id}", notice="package_restored", section="packages"
+            f"{ITEMS}/{item_id}", notice="package_restored", section="packages", **short
         )
-    found = session.get_one(Item, item_id)
-    # Nor with a fraction, to an item counted each: one in its size has no
-    # box to change while retired, so it is added again instead (Ali,
+    # Nor holding a fraction, to an item counted each: it has no box to
+    # change while retired, so a new package is added instead (Ali,
     # 2026-11-23, inventory-tng-fa5i).
-    if broken == items.PACKAGE_WHOLE and forms.size_has_fraction(package):
+    if broken == items.PACKAGE_WHOLE:
         return _item_page(request, session, signed, found, held_back=package)
-    alert = (
-        RULES[RETIRED] if broken == RETIRED else forms.fraction_brought_back(package)
-    )
-    return _item_page(request, session, signed, found, alert=alert)
+    return _item_page(request, session, signed, found, alert=RULES[RETIRED])
 
 
 @router.post(f"{ITEMS}/{{item_id}}/packages/{{package_id}}/retire")

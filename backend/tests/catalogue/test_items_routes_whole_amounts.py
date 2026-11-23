@@ -310,17 +310,65 @@ def _restore(
     return sent, reel
 
 
-def test_a_retired_package_too_short_to_use_below_a_fraction_stays_retired(
+def test_a_retired_package_too_short_to_use_below_a_fraction_comes_back_to_set(
     admin_client: TestClient, session: Session, radios: Category
 ) -> None:
-    """Said above the page, naming it and the whole numbers it may be."""
-    refused, reel = _restore(admin_client, session, radios, short_below=Decimal("1.5"))
-    assert refused.status_code == 409
-    assert read(refused.text).one("p", role="alert").text == (
-        "The Reel package has a fraction (1.5): set it to a whole number from 1 "
-        "to 304 before bringing it back."
+    """Brought back, then its Too short to use box outlined and focused,
+    the whole numbers it may be beside it (Ali, 2026-11-23); saving the
+    box refuses the fraction until it is whole."""
+    done, reel = _restore(admin_client, session, radios, short_below=Decimal("1.5"))
+    here = f"{ITEMS}/{reel.item_id}"
+    assert done.headers["location"] == (
+        f"{here}?short={reel.id}&notice=package_restored&section=packages#packages"
     )
-    assert reel.retired_at == NOW
+    assert (reel.retired_at, reel.short_below) == (None, Decimal("1.5"))
+    page = read(admin_client.get(done.headers["location"]).text)
+    box = page.one("input", name="short_below").attrs
+    assert box["value"] == "1.5"
+    assert (box["aria-invalid"], box["aria-describedby"]) == ("true", "short-to-set")
+    assert "autofocus" in box
+    beside = page.one("span", id="short-to-set").text
+    assert beside == "Set it to a whole number from 1 to 304."
+    refused = admin_client.post(
+        f"{here}/packages/{reel.id}/settings", data={"short_below": "1.5"}
+    )
+    assert refused.status_code == 400
+    assert problem(refused.text, "short_below") == str(WHOLE_UNITS)
+
+
+@pytest.mark.parametrize(
+    ("unit", "short_below"), [("each", Decimal(2)), ("m", Decimal("1.5"))]
+)
+def test_a_package_whole_for_its_item_is_not_outlined_once_back(
+    admin_client: TestClient,
+    session: Session,
+    radios: Category,
+    unit: str,
+    short_below: Decimal,
+) -> None:
+    """Not on an item in another unit, nor once set whole: a reload of
+    the page it came back to outlines nothing."""
+    cable, reel = _packaged(session, radios, retired_at=NOW, short_below=short_below)
+    cable.unit = unit
+    session.flush()
+    done = admin_client.post(f"{ITEMS}/{cable.id}/packages/{reel.id}/restore")
+    assert "short=" not in done.headers["location"]
+    again = admin_client.get(f"{ITEMS}/{cable.id}?short={reel.id}").text
+    assert _outlined(again) == []
+    assert read(again).all("span", id="short-to-set") == []
+
+
+@pytest.mark.parametrize("which", ["retired", "none", "not a number"])
+def test_only_a_current_package_of_the_item_is_outlined_to_set(
+    admin_client: TestClient, session: Session, radios: Category, which: str
+) -> None:
+    """A link naming a package retired again, or none, outlines nothing."""
+    cable, reel = _packaged(session, radios, retired_at=NOW, short_below=Decimal("1.5"))
+    cable.unit = "each"
+    session.flush()
+    short = {"retired": reel.id, "none": reel.id + 1, "not a number": "x"}[which]
+    page = admin_client.get(f"{ITEMS}/{cable.id}?short={short}").text
+    assert read(page).all("span", id="short-to-set") == []
 
 
 def test_a_retired_package_holding_a_fraction_is_added_again_instead(
@@ -338,12 +386,12 @@ def test_a_retired_package_holding_a_fraction_is_added_again_instead(
     assert refused.status_code == 409
     assert alert.text == (
         "The Reel package holds 30.5, which an item counted in each can't hold: "
-        "add it again with a whole number."
+        "add a new package with a whole number."
     )
     assert alert.attrs["id"] == "held-back"
     link = alert.one("a")
     assert (link.text, link.attrs["href"]) == (
-        "add it again with a whole number",
+        "add a new package with a whole number",
         "#add-package",
     )
     form = page.one("form", id="add-package")

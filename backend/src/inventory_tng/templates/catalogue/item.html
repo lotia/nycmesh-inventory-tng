@@ -6,7 +6,7 @@
 {% block main %}
 {#- A retired package not brought back for a fraction in its size, which it
 has no box to change: added again instead (Ali, 2026-11-23). #}
-{% if held_back %}<p role="alert" id="held-back">{#- Translators: refused bringing back a retired package of an item counted each: its size, its "Holds", has a fraction. %(package)s is its name, %(amount)s its size; the link goes to the Add package form. #}{% trans package=held_back.name_shown, amount=held_back.size | amount, link="#add-package" %}The {{ package }} package holds {{ amount }}, which an item counted in each can't hold: <a href="{{ link }}">add it again with a whole number</a>.{% endtrans %}</p>{% endif %}
+{% if held_back %}<p role="alert" id="held-back">{#- Translators: refused bringing back a retired package of an item counted each: its size, its "Holds", has a fraction. %(package)s is its name, %(amount)s its size; the link goes to the Add package form, as a new package can't take a retired one's name. #}{% trans package=held_back.name_shown, amount=held_back.size | amount, link="#add-package" %}The {{ package }} package holds {{ amount }}, which an item counted in each can't hold: <a href="{{ link }}">add a new package with a whole number</a>.{% endtrans %}</p>{% endif %}
 {% set retired = item.retired_at is not none %}
 {% if retired %}
 {% call retired_record(item) %}{% if in_stock > 0 %}{% trans left=in_stock | amount, unit=item.unit %}It can't be received. Volunteers can still
@@ -144,9 +144,13 @@ None is left, so nobody can pick it.{% endtrans %}{% endif %}{% endcall %}
       <td>{% if not package.retired_at and not retired %}
         <form method="post" action="{{ here }}/packages/{{ package.id }}/settings" class="actions">
           <label>{% trans %}Too short to use{% endtrans %} <span class="hint">{% trans unit=item.unit %}below, in {{ unit }}; blank: none{% endtrans %}</span>
-            {#- A switch to each refused for its fraction outlines it. #}
+            {#- A switch to each refused for its fraction outlines it, as
+            does the package brought back with one, to be set whole. #}
+            {% set to_set = short_to_set and package.id == short_to_set.id %}
             <input name="short_below" inputmode="{{ item.unit | keyboard }}" value="{{ sent.get('short_below', short) }}"
-              {%- if package.id == short_fraction %} aria-invalid="true" aria-describedby="unit-problem"{% endif %}>
+              {%- if package.id == short_fraction %} aria-invalid="true" aria-describedby="unit-problem"{% endif %}
+              {%- if to_set %} aria-invalid="true" aria-describedby="short-to-set" autofocus{% endif %}>
+            {% if to_set %}<span class="problem" id="short-to-set">{{ set_whole }}</span>{% endif %}
             {% if sent %}{% with name = "short_below" %}{% include "_field_problem.html" %}{% endwith %}{% endif %}
           </label>
           <label>{% trans %}Keep sealed{% endtrans %} <span class="hint">{% trans %}in the stores; blank: no minimum{% endtrans %}</span>

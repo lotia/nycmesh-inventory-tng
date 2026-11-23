@@ -3563,6 +3563,14 @@ msgstr ""
 msgid "Set it"
 msgstr ""
 
+#. Translators: beside the "Too short to use" box of a package just
+#. brought back to an item counted each, whose length has a fraction;
+#. %(low)s and %(high)s are the whole numbers it may be.
+#: src/inventory_tng/catalogue/forms.py
+#, python-format
+msgid "Set it to a whole number from %(low)s to %(high)s."
+msgstr ""
+
 #: src/inventory_tng/templates/stock/length_checks.html
 msgid "Set the ones ticked to what was said"
 msgstr ""
@@ -3956,17 +3964,6 @@ msgstr ""
 msgid "That would make it part of itself."
 msgstr ""
 
-#. Translators: refused bringing back a retired package of an item
-#. counted each: its "Too short to use" length has a fraction;
-#. %(package)s is its name, %(amount)s that length, %(low)s and
-#. %(high)s the whole numbers it may be.
-#: src/inventory_tng/catalogue/forms.py
-#, python-format
-msgid ""
-"The %(package)s package has a fraction (%(amount)s): set it to a whole "
-"number from %(low)s to %(high)s before bringing it back."
-msgstr ""
-
 #. Translators: refused switching an item's unit to each: a package's
 #. "Too short to use" length, outlined on the page, has a fraction;
 #. %(package)s is its name, %(amount)s that length, %(low)s and
@@ -3980,12 +3977,14 @@ msgstr ""
 
 #. refused bringing back a retired package of an item counted each: its size,
 #. its "Holds", has a fraction. %(package)s is its name, %(amount)s its size;
-#. the link goes to the Add package form.
+#. the link goes to the Add package form, as a new package can't take a retired
+#. one's name.
 #: src/inventory_tng/templates/catalogue/item.html
 #, python-format
 msgid ""
 "The %(package)s package holds %(amount)s, which an item counted in each "
-"can't hold: <a href=\"%(link)s\">add it again with a whole number</a>."
+"can't hold: <a href=\"%(link)s\">add a new package with a whole "
+"number</a>."
 msgstr ""
 
 #. Translators: refused switching an item's unit to each: a

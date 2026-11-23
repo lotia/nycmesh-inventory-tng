@@ -280,21 +280,22 @@ def fraction_held(package: ItemPackage) -> str:
     )
 
 
-def fraction_brought_back(package: ItemPackage) -> str:
-    """Why a retired package is not brought back to an item counted each:
-    its too-short length has a fraction, said as fraction_held says it
-    (Ali, 2026-11-23, inventory-tng-fa5i). A fraction in its size is said
-    by catalogue/item.html, with a link to add it again."""
-    # Translators: refused bringing back a retired package of an item
-    # counted each: its "Too short to use" length has a fraction;
-    # %(package)s is its name, %(amount)s that length, %(low)s and
-    # %(high)s the whole numbers it may be.
+def short_has_fraction(package: ItemPackage) -> bool:
+    """Whether the package, holding more than 1, is too short to use below
+    a fraction: one holding 1 is cleared instead (items._HOLDS_ONE)."""
+    short = package.short_below
+    return short is not None and package.size > 1 and short != short.to_integral_value()
+
+
+def short_to_set(package: ItemPackage) -> str:
+    """Beside the Too short to use box of a package brought back to an item
+    counted each with a fraction there: the whole numbers it may be (Ali,
+    2026-11-23, inventory-tng-fa5i)."""
+    # Translators: beside the "Too short to use" box of a package just
+    # brought back to an item counted each, whose length has a fraction;
+    # %(low)s and %(high)s are the whole numbers it may be.
     return gettext(
-        "The %(package)s package has a fraction (%(amount)s): set it to a "
-        "whole number from %(low)s to %(high)s before bringing it back.",
-        package=package.name_shown,
-        amount=amount(package.short_below),
-        **_whole_range(package),
+        "Set it to a whole number from %(low)s to %(high)s.", **_whole_range(package)
     )
 
 

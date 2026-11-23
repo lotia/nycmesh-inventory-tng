@@ -588,12 +588,16 @@ inventory-tng-fa5i):
   the same way.
 - **A retired package holding a fraction** is not brought back to an item
   counted each. It has no Holds box while retired, so the words above the
-  page link to the Add package form, to add it again with a whole number;
-  that form's Holds box is outlined and focused. Its Package box stays
-  empty: a package's name is unique among its item's, retired ones too, so
-  the old name cannot be taken again. One too short to use below a
-  fraction, holding more than 1, is refused naming the whole numbers it may
-  be.
+  page link to the Add package form, to add a new package with a whole
+  number; that form's Holds box is outlined and focused. Its Package box
+  stays empty: a package's name is unique among its item's, retired ones
+  too, so the old name cannot be taken again.
+- **A retired package too short to use below a fraction**, holding more
+  than 1, is brought back to an item counted each. The item page then
+  outlines and focuses that package's Too short to use box, with the whole
+  numbers it may be beside it. The fraction only decides when the scan
+  page calls an open package a short end, never a count, so it is safe for
+  the moment it takes to fix; saving the box refuses it until it is whole.
 - **An item already counted each** may keep a current package with a
   fraction: only the switch is checked (inventory-tng-jwlh).
 
