@@ -201,7 +201,7 @@ def record(
     # would refuse, as it changed them: found as written instead.
     if (written := _replay(session, batch)) is not None:
         return Recorded(written, False)
-    problems = _problems(session, batch, held, lines, packages, opens)
+    problems, now = _problems(session, batch, held, lines, packages, opens)
     problems += [
         (("lines", number, "open_package_key"), "not_found")
         for number, line in enumerate(batch.lines)
@@ -235,7 +235,7 @@ def record(
         elif opened.location_id != batch.from_location_id:
             problems.append((at, "open_package_elsewhere"))
     if problems:
-        if now := _shown_otherwise(batch, held, packages):
+        if now:
             units_shown.refusing("batch", now)
         kinds = {kind for _, kind in problems}
         # Counted apart: how often a page's catalogue is only a resize behind.
@@ -475,27 +475,6 @@ def _as_counted(
     return package._replace(size=line.package_size)
 
 
-def _shown_otherwise(
-    batch: batch_schemas.Batch, held: Held, packages: Mapping[int, PackageFacts]
-) -> Now:
-    """The items of a batch's lines shown in another unit than they are
-    counted in now (unit_changed), and the packages at another size
-    (package_resized), as they are now (units_shown)."""
-    units: dict[int, str] = {}
-    sizes: dict[int, tuple[Decimal, str]] = {}
-    for line in batch.lines:
-        item = held.items.get(line.item_id)
-        if item is None:
-            continue
-        if line.unit != item.unit:
-            units[item.id] = item.unit
-        counted = _as_counted(line, packages)
-        package = packages.get(line.package_id or 0)
-        if counted is not None and package is not None and counted != package:
-            sizes[line.package_id or 0] = (package.size, item.unit)
-    return Now(units, sizes)
-
-
 def _packages_opened(
     batch: batch_schemas.Batch, packages: Mapping[int, PackageFacts]
 ) -> int:
@@ -515,10 +494,13 @@ def _problems(
     lines: Sequence[Entry],
     packages: Mapping[int, PackageFacts],
     opens: Mapping[int, OpenFacts],
-) -> list[batch_schemas.Problem]:
+) -> tuple[list[batch_schemas.Problem], Now]:
     """What is wrong with a batch, line by line (`lines`, its own), with its
-    rows held (hold)."""
+    rows held (hold), and the items shown in another unit than they are
+    counted in now (unit_changed) and the packages at another size
+    (package_resized), as they are now (units_shown)."""
     problems: list[batch_schemas.Problem] = []
+    now = Now({}, {})
     if session.get(Volunteer, batch.volunteer_id) is None:
         problems.append((("volunteer_id",), "not_found"))
     for field in ("from_location_id", "to_location_id"):
@@ -544,6 +526,7 @@ def _problems(
         item = held.items[sent.item_id]
         if sent.unit != item.unit:
             problems.append((("lines", number, "unit"), "unit_changed"))
+            now.units[item.id] = item.unit
             broken = [rule for rule in broken if rule != "movement_whole_units"]
             if not whole_enough(sent.unit, sent.quantity):
                 broken.append("movement_whole_units")
@@ -551,8 +534,11 @@ def _problems(
         # read in the size it was counted in.
         facts = packages
         counted = _as_counted(sent, packages)
-        if counted is not None and counted != packages[sent.package_id or 0]:
+        if counted is not None and counted != (
+            package := packages[sent.package_id or 0]
+        ):
             problems.append((("lines", number, "package_size"), "package_resized"))
+            now.sizes[sent.package_id or 0] = (package.size, item.unit)
             facts = {**packages, sent.package_id or 0: counted}
         broken += _line_form_breaks(
             batch.kind,
@@ -576,7 +562,7 @@ def _problems(
             if line.open_package_key is None
         ]
     # Two rules may say one thing of one field: said once.
-    return list(dict.fromkeys(problems))
+    return list(dict.fromkeys(problems)), now
 
 
 def _header(batch: batch_schemas.Batch) -> dict[str, object]:

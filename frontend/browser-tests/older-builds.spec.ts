@@ -233,7 +233,8 @@ test("saves of an item retired since go by their line's Discard, or by their own
  * flight would; then the page loaded again, which puts it back. The
  * transaction the older tab saved. */
 async function leaveSaved(page: Page, itemId: number) {
-  await leave(page, [{ item_id: itemId, quantity: "2" }]);
+  // The server takes no line without the unit it was shown in (scan/batch.py).
+  await leave(page, [{ item_id: itemId, quantity: "2", unit: "m" }]);
   const [left] = JSON.parse(
     (await page.evaluate(() => localStorage.getItem("inventory.outbox.v3"))) ??
       "[]",
@@ -416,7 +417,7 @@ test("a cart this build filled, which its tab recorded as a newer build took it 
       volunteer_id: volunteerId,
       from_location_id: fromId,
       to_location_id: toId,
-      lines: [{ item_id: itemId, quantity: "2" }],
+      lines: [{ item_id: itemId, quantity: "2", unit: "m" }],
     },
   });
   expect(first.status()).toBe(201);

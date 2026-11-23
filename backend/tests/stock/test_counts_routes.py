@@ -34,7 +34,9 @@ from inventory_tng.stock.forms import (
     PICK_A_PLACE,
     PICK_A_REASON,
     PICK_AN_ITEM,
+    UNITS,
     now_counted_in,
+    shown_field,
 )
 from inventory_tng.stock.moments import Moment, expected, moment
 from inventory_tng.stock.paths import ADJUSTMENTS, COUNTS, STOCK
@@ -327,7 +329,7 @@ def test_a_form_for_a_retired_place_holding_nothing_writes_nothing(
             "key": str(uuid.uuid4()),
             "as_of": "0",
             "seen": "0",
-            "units": f"{place.item.id}:{place.item.unit}",
+            UNITS: shown_field({place.item.id: place.item.unit}),
             f"counted_{place.item.id}": "2",
         },
     )

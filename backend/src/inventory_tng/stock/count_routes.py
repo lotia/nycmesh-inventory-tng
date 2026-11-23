@@ -321,14 +321,22 @@ def shown_items(only: OnlyItem, q: str = "") -> Shown:
 ShownItems = Annotated[Shown, Depends(shown_items)]
 
 
-def _changed_alert(now: Now) -> str:
-    """Above a count form shown again as one of its items or packages
-    changed since it was shown: what one is now, said beside its box too,
-    if the form shows one, as a sealed row of a package held nowhere it
-    does not."""
+def _asked_again(
+    session: Session,
+    form: Mapping[str, str],
+    root_id: int,
+    place_ids: Collection[int],
+    now: Now,
+) -> tuple[dict[str, Words], str]:
+    """A count form shown again as one of its items or packages changed
+    since it was shown: the words beside each box of one
+    (count_forms.changed_words), and above the form what one is now, as a
+    sealed row of a package held nowhere has no box to say it beside."""
     if now.units:
-        return now_counted_in(min(now.units.items())[1])
-    return now_holds(*min(now.sizes.items())[1])
+        alert = now_counted_in(min(now.units.items())[1])
+    else:
+        alert = now_holds(*min(now.sizes.items())[1])
+    return changed_words(session, form, root_id, place_ids, now), alert
 
 
 def _shown_places(
@@ -781,8 +789,9 @@ def count(
         )
     if named_now:
         refusing("count", named_now)
-        problems |= changed_words(session, form, place.id, place_ids, named_now)
-        alert = alert or _changed_alert(named_now)
+        words, said = _asked_again(session, form, place.id, place_ids, named_now)
+        problems |= words
+        alert = alert or said
     tree = None
     off_form = None
     if sent.listed is not None:
@@ -906,8 +915,8 @@ def count(
             # Changed between the check above and the save: the form as
             # sent, in the units and sizes now, each box of one changed
             # saying so.
-            words = changed_words(session, form, place.id, place_ids, shown_now)
-            return as_sent(problems=words, alert=_changed_alert(shown_now), left=left())
+            words, said = _asked_again(session, form, place.id, place_ids, shown_now)
+            return as_sent(problems=words, alert=said, left=left())
         if broken == CHANGED:
             # What was typed may be of before that save or after it, of
             # items it cannot tell: the form as it is now, with a new key,
