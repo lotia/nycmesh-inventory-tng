@@ -12,6 +12,7 @@ from httpx2 import Response
 from sqlalchemy.orm import Session
 
 from inventory_tng.core.phrases import PATH_BETWEEN
+from inventory_tng.models.base import INTEGER_MAX
 from inventory_tng.models.catalogue import ItemPackage
 from inventory_tng.models.places import Location
 from inventory_tng.stock import queries
@@ -578,21 +579,16 @@ class SpoolArrived:
         assert refused.status_code == 409
         asked = count_form(refused)
         assert asked["places"] == str(made.shelf.id)
-        for header in (
-            {"kind": "receipt", "to_location_id": gone.id},
-            {
-                "kind": "move",
-                "from_location_id": gone.id,
-                "to_location_id": made.shelf.id,
-            },
-        ):
-            line = Entry(
-                self.cable,
-                Decimal(305),
-                self.sealed if header["kind"] == "move" else LOOSE,
-                self.sealed,
-            )
-            insert_transaction(session, uuid.uuid4(), header, [line])
+        received = Entry(self.cable, Decimal(305), LOOSE, self.sealed)
+        receipt = {"kind": "receipt", "to_location_id": gone.id}
+        insert_transaction(session, uuid.uuid4(), receipt, [received])
+        moved = Entry(self.cable, Decimal(305), self.sealed, self.sealed)
+        move = {
+            "kind": "move",
+            "from_location_id": gone.id,
+            "to_location_id": made.shelf.id,
+        }
+        insert_transaction(session, uuid.uuid4(), move, [moved])
         unseen = asked | {"seen": str(int(asked["seen"]) - 1)}
         self.page = client.post(made.path, data=unseen | self.typed)
         assert self.page.status_code == 409
@@ -609,7 +605,7 @@ class SpoolArrived:
 
     def at_shelf(self, session: Session) -> dict[tuple[int, Form], Decimal]:
         shelf = self.made.shelf.id
-        return expected_forms_at(session, [shelf], 2**31 - 1, [self.cable])[shelf]
+        return expected_forms_at(session, [shelf], INTEGER_MAX, [self.cable])[shelf]
 
 
 def test_something_else_here_of_what_came_only_from_an_area_gone_is_counted(

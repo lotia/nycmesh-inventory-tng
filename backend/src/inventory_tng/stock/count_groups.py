@@ -129,7 +129,7 @@ def forms_by_place(
     as_of: int,
     item_ids: Mapping[int, Sequence[int]],
     openings: Mapping[int, Mapping[int, Collection[int]]],
-    aside: Mapping[int, Aside] | None = None,
+    aside: Mapping[int, Aside],
     packages: Mapping[int, ItemPackage] | None = None,
 ) -> dict[int, dict[int, list[FormRow]]]:
     """At each place, by id, the items of `item_ids` there whose stock was
@@ -151,7 +151,7 @@ def forms_by_place(
     return {
         place_id: _place_forms(
             set(items),
-            less(found.get(place_id, {}), (aside or {}).get(place_id, {})),
+            less(found.get(place_id, {}), aside.get(place_id, {})),
             packages,
             {
                 open_id: row
@@ -203,7 +203,7 @@ def _place_forms(
 
 
 def line_of(
-    session: Session, as_of: int, listed: Listed, aside: Mapping[int, Aside]
+    session: Session, as_of: int, aside: Mapping[int, Aside], listed: Listed
 ) -> str:
     """The field a count form, as of moment `as_of`, shows an item's line
     at a place by: its total, or, counted by form (forms_by_place), its

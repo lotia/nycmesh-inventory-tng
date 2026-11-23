@@ -342,7 +342,7 @@ def _listed_words(
     problems: dict[str, Words] = {EXTRA_ITEM: listed_under(where)}
     if not listed.on_form:
         line = field_at(
-            root.id, listed.place_id, line_of(session, as_of, listed, aside())
+            root.id, listed.place_id, line_of(session, as_of, aside(), listed)
         )
         problems[line] = TYPE_IT_HERE
     return already_listed(item.name_shown, where), problems
