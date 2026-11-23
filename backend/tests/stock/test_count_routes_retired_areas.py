@@ -526,14 +526,41 @@ def test_a_form_shown_again_reads_what_left_the_areas_gone_once(
     assert reads("WHERE item_package.item_id IN") == 1
 
 
+def test_something_else_here_listed_with_an_area_gone_reads_what_left_it_once(
+    admin_client: TestClient, session: Session
+) -> None:
+    """Something else here naming an item its place's line shows, on a form
+    with an area gone from it, reads what left the area once: to show the
+    form again, not to mark a line it shows already."""
+    setup = Emptied(session, admin_client)
+    made = setup.made
+    made.move(session, setup.gone, made.empty, "2")
+    refused = admin_client.post(made.path, data=setup.shown)
+    assert refused.status_code == 409
+    found = {
+        setup.counted(made.shelf): "3",
+        "extra_location_id": str(made.shelf.id),
+        "extra_item_id": str(setup.item),
+        "extra_quantity": "1",
+    }
+    with counting(session) as sent:
+        again = admin_client.post(made.path, data=count_form(refused) | found)
+    assert again.status_code == 400
+    moves = "GROUP BY ledger_transaction.from_location_id"
+    assert sum(moves in each for each in sent) == 1
+
+
 class SpoolArrived:
     """A recount asking for radios on Shelf A, Shelf C gone from it, Shelf A
-    holding `cable` metres loose before; then a late save brings a sealed
-    spool of cable into Shelf C and on to Shelf A, and the form is shown
-    again as it is now (a save under way as it was shown), the spool under
-    "Moved to Shelf A" (inventory-tng-t38l)."""
+    holding `cable` metres loose before; then a late save brings a spool
+    of cable, sealed or, if not `sealed`, its 305 m loose, into Shelf C
+    and on to Shelf A, and the form is shown again as it is now (a save
+    under way as it was shown), the spool under "Moved to Shelf A"
+    (inventory-tng-t38l)."""
 
-    def __init__(self, session: Session, client: TestClient, cable: str) -> None:
+    def __init__(
+        self, session: Session, client: TestClient, cable: str, sealed: bool = True
+    ) -> None:
         setup = Emptied(session, client)
         self.made = made = setup.made
         self.cable = made.place.cable.id
@@ -541,7 +568,7 @@ class SpoolArrived:
             made.receive(session, made.shelf, self.cable, cable)
             setup.shown = count_form(client.get(made.path))
         spool = add(session, ItemPackage(item_id=self.cable, name="Spool", size=305))
-        self.sealed = Form(package_id=spool.id)
+        self.sealed = Form(package_id=spool.id) if sealed else LOOSE
         gone = setup.gone
         made.move(session, gone, made.shelf, "1")
         self.typed = {setup.counted(made.shelf): "3", setup.counted(gone): "2"}
@@ -562,7 +589,7 @@ class SpoolArrived:
             line = Entry(
                 self.cable,
                 Decimal(305),
-                LOOSE if header["kind"] == "receipt" else self.sealed,
+                self.sealed if header["kind"] == "move" else LOOSE,
                 self.sealed,
             )
             insert_transaction(session, uuid.uuid4(), header, [line])
@@ -599,6 +626,18 @@ def test_something_else_here_of_what_came_only_from_an_area_gone_is_counted(
         (moved.cable, moved.sealed): Decimal(305),
         (moved.cable, LOOSE): Decimal(1),
     }
+
+
+def test_something_else_here_of_loose_that_came_only_from_an_area_gone_is_counted(
+    admin_client: TestClient, session: Session
+) -> None:
+    """The spool's 305 m came loose: Shelf A held none before, so cable
+    picked under Something else here there is counted there, the 305 m
+    added to it, as the save adds what came from an area gone."""
+    moved = SpoolArrived(session, admin_client, "", sealed=False)
+    saved = admin_client.post(moved.made.path, data=moved.form | moved.found)
+    assert saved.status_code == 303
+    assert moved.at_shelf(session) == {(moved.cable, LOOSE): Decimal(306)}
 
 
 def test_something_else_here_held_before_a_move_from_an_area_gone_marks_its_line(

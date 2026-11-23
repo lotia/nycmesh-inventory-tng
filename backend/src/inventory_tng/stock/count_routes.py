@@ -69,7 +69,7 @@ does (places/locations.restore), and the form shown again with it.
 """
 
 import uuid
-from collections.abc import Collection, Mapping, Sequence
+from collections.abc import Callable, Collection, Mapping, Sequence
 from decimal import Decimal
 from functools import cache, partial
 from typing import Annotated, NamedTuple
@@ -327,14 +327,14 @@ def _listed_words(
     root: Location,
     as_of: int,
     listed: Listed,
-    aside: Mapping[int, Aside],
+    aside: Callable[[], Mapping[int, Aside]],
 ) -> tuple[Words, dict[str, Words]]:
     """What a count form of `root`, as of moment `as_of`, says of something
     else here naming an item the place picked for it lists
     (count_forms.Listed): above the form, and by field, beside the item
     picked and on a recount's line added for it (count_forms.read_count),
-    whose places' lines count what they held before what is `aside` there
-    (count_arrivals.set_aside)."""
+    whose places' lines count what they held before what `aside()` says is
+    there (count_arrivals.set_aside), read only for such a line."""
     item = session.get_one(Item, listed.item_id)
     tree = queries.place_tree(session, root)
     ((place, path),) = _shown_places(session, tree, [listed.place_id])
@@ -342,7 +342,7 @@ def _listed_words(
     problems: dict[str, Words] = {EXTRA_ITEM: listed_under(where)}
     if not listed.on_form:
         line = field_at(
-            root.id, listed.place_id, line_of(session, as_of, listed, aside)
+            root.id, listed.place_id, line_of(session, as_of, listed, aside())
         )
         problems[line] = TYPE_IT_HERE
     return already_listed(item.name_shown, where), problems
@@ -658,14 +658,14 @@ def count(
     areas = place_ids != [place.id]
     # What came from the areas gone from it, as the form showed it: set
     # aside from what each place's lines count, so from what a full count
-    # asks for, and the moves fixed (stock/count_arrivals.py). Read only
-    # when first needed, so a form sent back for a problem, which reads
-    # them to show them, reads them once.
+    # asks for, and the moves fixed (stock/count_arrivals.py). Read when
+    # first needed, so a form sent back for a problem reads them only to
+    # show them, unless something else here names a line it does not show.
     gone_since = cache(partial(gone_moves, session, gone, at.as_of, place_ids))
+    aside_since = cache(lambda: set_aside(gone_since()))
 
     def held(place_id: int, item_id: int) -> bool:
-        aside = set_aside(gone_since())
-        return asks_for(session, at.as_of, aside, place_id, item_id)
+        return asks_for(session, at.as_of, aside_since(), place_id, item_id)
 
     sent = read_count(session, form, place.id, place_ids, held)
     asked = {place_id: each.items for place_id, each in sent.places.items()}
@@ -700,7 +700,7 @@ def count(
             item_id=sent.listed.item_id,
         )
         listed_alert, beside = _listed_words(
-            session, place, at.as_of, sent.listed, set_aside(gone_since())
+            session, place, at.as_of, sent.listed, aside_since
         )
         problems |= beside
         alert = alert or listed_alert
@@ -721,7 +721,7 @@ def count(
         moves,
         {place_id: each.arrived for place_id, each in sent.places.items()},
     )
-    aside = set_aside(moves)
+    aside = aside_since()
     if not counting and not fixes:
         # Nothing typed at any place: nothing to count, so the form again,
         # as sent, saying so (inventory-tng-fxsy).
