@@ -319,16 +319,13 @@ describe("removing one", () => {
   });
 
   test("a cart changed meanwhile, by an older tab, is not removed", () => {
-    const cart = {
-      ...freshCart(),
-      lines: [{ itemId: 100, packages: {}, loose: "1" }],
-    };
-    keep("inventory.cart.v1", cart);
+    const fields = { lines: [{ itemId: 100, packages: {}, loose: "1" }] };
+    keepOlderCart(fields);
     const [listedCart] = readOlder();
-    keep("inventory.cart.v1", { ...cart, toId: 12 });
+    keepOlderCart({ ...fields, toId: 12 });
     expect(compared(listedCart as Older)).toBe("changed");
     expect(removeOlder(listedCart as Older)).toBe("changed");
-    keep("inventory.cart.v1", cart);
+    keepOlderCart(fields);
     expect(compared(listedCart as Older)).toBe("unchanged");
     expect(removeOlder(listedCart as Older)).toBe("done");
     expect(localStorage.getItem("inventory.cart.v1")).toBeNull();

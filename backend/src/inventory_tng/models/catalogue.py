@@ -206,8 +206,10 @@ class ItemPackage(KeyedName, Searchable, Versioned, Base):
     retired_at: Mapped[RetiredAt]
 
 
-# How an item's packages are listed, wherever they are: the smallest
-# first, ties by id, so two of a size keep one order (inventory-tng-7mby).
+# How an item's packages are listed on the item, scan and count pages: the
+# smallest first, ties by id, so two of a size keep one order
+# (inventory-tng-7mby). The stock and reorder pages list sealed packages
+# largest first instead (stock/package_forms.py, largest_first).
 SMALLEST_PACKAGE_FIRST = (ItemPackage.size, ItemPackage.id)
 
 
