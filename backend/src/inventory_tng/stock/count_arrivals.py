@@ -28,7 +28,7 @@ from inventory_tng.stock.moved_out import Leaving, MovedOut, moved_out
 Aside = dict[tuple[int, Form], Decimal]
 
 # A line to write at a place: so much of an item in a form there.
-Line = tuple[int, Form, Decimal]
+FormLine = tuple[int, Form, Decimal]
 
 
 def gone_moves(
@@ -88,10 +88,10 @@ class Opening(NamedTuple):
 
 
 def as_held(
-    session: Session, since: int, as_of: int, aside: Mapping[int, Aside]
+    session: Session, gone: Gone, as_of: int, moves: Sequence[MovedOut]
 ) -> dict[int, Arrivals]:
-    """`aside` (set_aside), by place, in the forms each place held it in at
-    moment `as_of`, the form first shown at moment `since`: what its lines
+    """What `moves` brought from the areas `gone` (set_aside), by place, in
+    the forms each place held it in at moment `as_of`: what its lines
     are less, by item and by form, on the page and in the save alike
     (held_aside), and the forms a fix of it is written in (fixed_lines)
     (inventory-tng-nlog). Never more of a form than the place held of it
@@ -101,6 +101,7 @@ def as_held(
     aside from what each sealed package of it opened there since made, an
     open package or loose units, the newest first, a package's worth
     each."""
+    aside = set_aside(moves)
     items = {item_id for here in aside.values() for item_id, _ in here}
     held = expected_forms_at(session, aside.keys(), as_of, items)
     sealed = {
@@ -111,7 +112,7 @@ def as_held(
     }
     openings: dict[int | None, list[Opening]] = {}
     if sealed:
-        rows = queries.openings_at(session, aside.keys(), sealed, since, as_of)
+        rows = queries.openings_at(session, aside.keys(), sealed, gone.since, as_of)
         for place_id, item_id, package_id, open_id, quantity in rows:
             openings.setdefault(place_id, []).append(
                 Opening(item_id, package_id, Form(open_package_id=open_id), quantity)
@@ -146,13 +147,12 @@ def as_held_at(
             kept[(item_id, form)] = [first]
             continue
         # Sealed: what the place still held sealed stands for as much.
-        parts = [first._replace(arrived=first.there)] if first.there else []
+        parts = [Held(form, first.there, first.there)] if first.there else []
         rest = n - first.there
         for opening in openings:
-            if rest and (opening.item_id, opening.package_id) == (
-                item_id,
-                form.package_id,
-            ):
+            if not rest:
+                break
+            if (opening.item_id, opening.package_id) == (item_id, form.package_id):
                 parts.append(part(item_id, opening.form, min(rest, opening.quantity)))
                 rest -= parts[-1].arrived
         if rest:
@@ -219,7 +219,7 @@ def less[Line](
 
 
 def arrived_at(
-    aside: Mapping[int, Aside], lines: Mapping[int, Sequence[Line]]
+    aside: Mapping[int, Aside], lines: Mapping[int, Sequence[FormLine]]
 ) -> dict[tuple[int, int], Decimal]:
     """How much of what arrived each place holds once saved, by place and
     item: what is set aside there (held_aside), and the lines its fixes
@@ -238,7 +238,7 @@ def arrived_at(
 
 def fixed_lines(
     fixes: Sequence[Fix], arrivals: Mapping[int, Arrivals]
-) -> dict[int, list[Line]]:
+) -> dict[int, list[FormLine]]:
     """The fixes as lines to write at each place, by place: one line of
     an item in a form, the differences fixed there summed (a line names
     each once, ledger.each_once); none where they cancel out. More is
@@ -260,10 +260,12 @@ def fixed_lines(
         if fix.difference < 0 and parts is not None:
             rest, written = -fix.difference, []
             for index, each in enumerate(parts):
+                if not rest:
+                    break
                 arrived = min(rest, each.arrived)
                 there = min(arrived, each.there)
-                parts[index] = Held(
-                    each.form, each.arrived - arrived, each.there - there
+                parts[index] = each._replace(
+                    arrived=each.arrived - arrived, there=each.there - there
                 )
                 rest -= arrived
                 written.append((each.form, -there))

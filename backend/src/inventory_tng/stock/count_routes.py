@@ -103,7 +103,6 @@ from inventory_tng.stock.count_arrivals import (
     gone_moves,
     held_aside,
     less,
-    set_aside,
 )
 from inventory_tng.stock.count_forms import (
     CLOSED_MEANWHILE,
@@ -383,7 +382,7 @@ def _count_page(
     the areas gone from it, retired, and what left them since it was first
     shown, up to its moment, shown under the places it went to
     (count_gone_areas), whose own lines count what they held before
-    (count_arrivals.set_aside); `leaving`, those areas as read already, if
+    (count_arrivals.as_held); `leaving`, those areas as read already, if
     they were; `more_alerts`, under `alert`; `caution`, words above the
     form, said as a warning is. What it shows at each place is
     _place_lines'."""
@@ -421,7 +420,7 @@ def _count_page(
         shown.only,
         ids,
         moves,
-        gone.since,
+        gone,
         listed,
     )
     if ids is not None:
@@ -493,7 +492,7 @@ def _place_lines(
     only: Item | None,
     ids: Collection[int] | None,
     moves: Sequence[MovedOut],
-    since: int,
+    gone: Gone,
     items: Sequence[Item],
 ) -> tuple[list[Group], dict[int, Item], dict[int, ItemPackage]]:
     """What a count form of `place` shows at each of `shown_places`, as of
@@ -502,13 +501,13 @@ def _place_lines(
     there, or a recount of `asked` only, by place, with each one's
     `recount` figures; of the items of `ids` only, None for all, and
     `only`, asked for, at the page's own place if none is at any place
-    shown; less what `moves` brought there from the areas gone from it
-    since moment `since` (count_arrivals.as_held). And every package of
+    shown; less what `moves` brought there from the areas `gone` from it
+    (count_arrivals.as_held). And every package of
     the items on its lines and of `moves`, by id, read once for both."""
     ids_shown = [each.id for each, _ in shown_places]
     every = set().union(*asked.values()) if asked else None
     was_at = expected_at(session, ids_shown, as_of, every)
-    aside = held_aside(as_held(session, since, as_of, set_aside(moves)))
+    aside = held_aside(as_held(session, gone, as_of, moves))
     for place_id, here in aside.items():
         if place_id in was_at:
             was_at[place_id] = less(was_at[place_id], by_item(here))
@@ -666,9 +665,7 @@ def count(
     # first needed, so a form sent back for a problem reads them only to
     # show them, unless something else here names a line it does not show.
     gone_since = cache(partial(gone_moves, session, gone, at.as_of, place_ids))
-    held_since = cache(
-        lambda: as_held(session, gone.since, at.as_of, set_aside(gone_since()))
-    )
+    held_since = cache(lambda: as_held(session, gone, at.as_of, gone_since()))
     aside_since = cache(lambda: held_aside(held_since()))
 
     def held(place_id: int, item_id: int) -> bool:
@@ -976,7 +973,7 @@ def bring_back(
         # this form may bring back.
         return not_found()
     moves = gone_moves(session, gone, at.as_of, place_ids, leaving)
-    aside = held_aside(as_held(session, gone.since, at.as_of, set_aside(moves)))
+    aside = held_aside(as_held(session, gone, at.as_of, moves))
     sent = read_count(
         session, form, place.id, place_ids, partial(asks_for, session, at.as_of, aside)
     ).places
