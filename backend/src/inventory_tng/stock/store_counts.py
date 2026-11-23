@@ -110,7 +110,7 @@ def _digest(
     the same for one sent again unchanged, whatever order its lines came
     in or however its amounts were written, as 5 or 5.0. Of `aside`, only
     the places counted: what went elsewhere is read up to no moment
-    (count_areas_leaving.gone_moves), so it may grow after the save."""
+    (count_areas_leaving.as_shown), so it may grow after the save."""
     said = (
         places,
         at,

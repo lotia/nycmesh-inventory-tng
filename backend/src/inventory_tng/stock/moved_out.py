@@ -5,7 +5,7 @@ from collections.abc import Collection
 from decimal import Decimal
 from typing import NamedTuple
 
-from sqlalchemy import func, or_, select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from inventory_tng.models.stock import LedgerTransaction, Movement
@@ -31,16 +31,13 @@ def moved_out(
     location_ids: Collection[int],
     after: int,
     *,
-    up_to: int | None = None,
-    into: Collection[int] = (),
     split: int | None = None,
 ) -> list[MovedOut]:
     """What left each of the places in the ledger transactions after
     `after`, by where it went, item and the form it arrived in, in all:
     an opening, which changes only the form of stock at a place, is no
-    move. What went to the places `into` only up to the moment `up_to`,
-    if given. Split at the moment `split`, if given, into what left up to
-    it and what left after it (MovedOut.later). In order of place, then
+    move. Split at the moment `split`, if given, into what left up to it
+    and what left after it (MovedOut.later). In order of place, then
     where it went, then item, then form, by id, then up to the moment
     first."""
     went = LedgerTransaction.from_location_id
@@ -67,10 +64,6 @@ def moved_out(
             *by[5:],
         )
     )
-    if up_to is not None:
-        query = query.where(
-            or_(LedgerTransaction.id <= up_to, to.is_(None), to.not_in(list(into)))
-        )
     # Each from one of the places, so from somewhere.
     return [
         MovedOut(from_id, to_id, item_id, quantity, Form(package_id, open_id), *later)

@@ -69,7 +69,7 @@ does (places/locations.restore), and the form shown again with it.
 """
 
 import uuid
-from collections.abc import Callable, Collection, Mapping, Sequence
+from collections.abc import Collection, Mapping, Sequence
 from decimal import Decimal
 from functools import cache, partial
 from typing import Annotated, NamedTuple
@@ -93,9 +93,12 @@ from inventory_tng.models.catalogue import Item, ItemPackage
 from inventory_tng.models.places import Location
 from inventory_tng.places import locations
 from inventory_tng.stock import needs_action, over_recorded, queries
-from inventory_tng.stock.count_areas_leaving import Leaving, areas_leaving, gone_moves
+from inventory_tng.stock.count_areas_leaving import (
+    areas_leaving,
+    as_shown,
+    moves_since,
+)
 from inventory_tng.stock.count_arrivals import (
-    Aside,
     Fix,
     arrived_at,
     as_held,
@@ -104,12 +107,14 @@ from inventory_tng.stock.count_arrivals import (
     held_aside,
     less,
 )
-from inventory_tng.stock.count_asked_for import asks_for, forms_by_place, line_of
+from inventory_tng.stock.count_asked_for import asks_for, forms_by_place
 from inventory_tng.stock.count_forms import (
     CLOSED_MEANWHILE,
+    COUNTED,
     EXTRA_ITEM,
     EXTRA_PLACE,
     FOUND_PLACE,
+    LOOSE_FIELD,
     NONE_GONE,
     PICKED,
     TYPE_IT_HERE,
@@ -133,9 +138,10 @@ from inventory_tng.stock.moments import (
     moment,
     seen_up_to,
 )
-from inventory_tng.stock.moved_out import MovedOut
+from inventory_tng.stock.moved_out import MovedOut, moved_out
 from inventory_tng.stock.needs_action import OnlyItem
 from inventory_tng.stock.paths import COUNTS
+from inventory_tng.stock.queries import PlaceTree
 from inventory_tng.stock.store_counts import StoreCounted, record_store_count
 from inventory_tng.web.admin_pages import TextForm, admin_page, now
 from inventory_tng.web.forms import CHANGED, RULES, row_id
@@ -301,7 +307,7 @@ ShownItems = Annotated[Shown, Depends(shown_items)]
 
 def _shown_places(
     session: Session,
-    tree: Sequence[tuple[Location, tuple[str, ...], bool]],
+    tree: PlaceTree,
     places: Collection[int] | None,
 ) -> list[tuple[Location, tuple[str, ...]]]:
     """The places a count form shows, each with its path, of its place's
@@ -320,29 +326,17 @@ def _shown_places(
 
 
 def _listed_words(
-    session: Session,
-    root: Location,
-    as_of: int,
-    listed: Listed,
-    aside: Callable[[], Mapping[int, Aside]],
+    session: Session, tree: PlaceTree, listed: Listed
 ) -> tuple[Words, dict[str, Words]]:
-    """What a count form of `root`, as of moment `as_of`, says of something
-    else here naming an item the place picked for it lists
-    (count_forms.Listed): above the form, and by field, beside the item
-    picked and on a recount's line added for it (count_forms.read_count),
-    whose places' lines count what they held before what `aside()` says is
-    there (count_arrivals.held_aside), read only for such a line."""
+    """What a count form of the place of `tree` (queries.place_tree) says
+    of something else here naming an item the place picked for it lists
+    (count_forms.Listed): above the form, and beside the item picked. A
+    recount's line added for it is marked as the form shown again shows it
+    (_count_page's `off_form`)."""
     item = session.get_one(Item, listed.item_id)
-    tree = queries.place_tree(session, root)
     ((place, path),) = _shown_places(session, tree, [listed.place_id])
     where = queries.place_label(place, path)
-    problems: dict[str, Words] = {EXTRA_ITEM: listed_under(where)}
-    if not listed.on_form:
-        line = field_at(
-            root.id, listed.place_id, line_of(session, as_of, aside(), listed)
-        )
-        problems[line] = TYPE_IT_HERE
-    return already_listed(item.name_shown, where), problems
+    return already_listed(item.name_shown, where), {EXTRA_ITEM: listed_under(where)}
 
 
 def _count_page(
@@ -359,10 +353,12 @@ def _count_page(
     items: Mapping[int, Collection[int]] | None = None,
     recount: Mapping[int, Mapping[int, Figures]] | None = None,
     alert: Words | None = None,
-    more_alerts: Sequence[Words] = (),
     picked: Mapping[str, str] | None = None,
     gone: Gone = NONE_GONE,
-    leaving: Leaving | None = None,
+    gone_now: Collection[int] = (),
+    tree: PlaceTree | None = None,
+    left: list[MovedOut] | None = None,
+    off_form: Listed | None = None,
     caution: Words | None = None,
     status_code: int = 200,
 ) -> HTMLResponse:
@@ -378,10 +374,14 @@ def _count_page(
     the areas gone from it, retired, and what left them since it was first
     shown, up to its moment, shown under the places it went to
     (count_gone_areas), whose own lines count what they held before
-    (count_arrivals.as_held); `leaving`, those areas as read already, if
-    they were; `more_alerts`, under `alert`; `caution`, words above the
-    form, said as a warning is. What it shows at each place is
-    _place_lines'."""
+    (count_arrivals.as_held); `gone_now`, those of them just gone, said
+    in alerts in place of `alert` (gone_words); `tree`, the place's
+    (queries.place_tree), and `left`, what left the areas gone, split at
+    `at` (moves_since), if read already. `off_form`, something else here
+    naming an item a recount did not ask for at its place
+    (count_forms.Listed), whose line the form now shows there, marked;
+    `caution`, words above the form, said as a warning is. What it shows
+    at each place is _place_lines'."""
     # Only places with figures: a form with none has no While you counted.
     recount = {place_id: each for place_id, each in (recount or {}).items() if each}
     asked: dict[int, set[int]] = {}
@@ -390,20 +390,24 @@ def _count_page(
             asked.setdefault(place_id, set()).update(each)
     ids = shown.ids(session)
     # The place's tree, read once for the places shown and the areas gone.
-    tree = queries.place_tree(session, place)
+    if tree is None:
+        tree = queries.place_tree(session, place)
     groups_shown = _shown_places(
         session, tree, places if places is not None else asked or None
     )
     ids_shown = [each.id for each, _ in groups_shown]
     at = at or moment(session, *ids_shown)
-    if leaving is None and gone.ids:
-        leaving = areas_leaving(session, place, gone, at.as_of, tree)
+    if left is None:
+        left = moves_since(session, gone, at.as_of)
+    leaving = areas_leaving(session, gone, tree, left) if gone.ids else None
+    more_alerts: Sequence[Words] = ()
+    if gone_now:
+        assert leaving is not None  # The areas just gone are of those gone.
+        alert, *more_alerts = gone_words(leaving, gone_now)
     # Of what left the areas gone, only the items shown; each place's own
     # lines count what it held before.
     moves = [
-        move
-        for move in gone_moves(session, gone, at.as_of, ids_shown, leaving)
-        if ids is None or move.item_id in ids
+        move for move in as_shown(left, ids_shown) if ids is None or move.item_id in ids
     ]
     listed = queries.countable_items(session)
     groups, named, packages = _place_lines(
@@ -424,6 +428,12 @@ def _count_page(
     moved = None
     if leaving is not None:
         moved = moved_sections(session, place, groups, leaving, moves, named, packages)
+    if off_form is not None:
+        # Its line there, as shown: by its total, or by its forms, loose.
+        group = next(group for group in groups if group.place.id == off_form.place_id)
+        by_form = off_form.item_id in group.forms
+        line = f"{group.prefix}{LOOSE_FIELD if by_form else COUNTED}{off_form.item_id}"
+        problems = {**(problems or {}), line: TYPE_IT_HERE}
     # Something else here and an open package nobody recorded may be found
     # in any place shown but a retired area (count_forms.PICKED).
     choices = [
@@ -660,13 +670,11 @@ def count(
     # asks for, and the moves fixed (stock/count_arrivals.py). Read when
     # first needed, so a form sent back for a problem reads them only to
     # show them, unless something else here names a line it does not show.
-    gone_since = cache(partial(gone_moves, session, gone, at.as_of, place_ids))
+    left = cache(partial(moves_since, session, gone, at.as_of))
+    gone_since = cache(lambda: as_shown(left(), place_ids))
     held_since = cache(lambda: as_held(session, gone, at.as_of, gone_since()))
     aside_since = cache(lambda: held_aside(held_since()))
-
-    def held(place_id: int, item_id: int) -> bool:
-        return asks_for(session, at.as_of, aside_since(), place_id, item_id)
-
+    held = partial(asks_for, session, at.as_of, aside_since)
     sent = read_count(session, form, place.id, place_ids, held)
     asked = {place_id: each.items for place_id, each in sent.places.items()}
     # The form shown again: as sent, or with `at` None, as it is now; a
@@ -692,6 +700,8 @@ def count(
         )
     problems: dict[str, Words] = dict(sent.problems)
     alert = TWICE if sent.twice else problems.get(CLOSED_MEANWHILE)
+    tree = None
+    off_form = None
     if sent.listed is not None:
         log.info(
             "count refused: something else here listed there",
@@ -699,15 +709,17 @@ def count(
             found_location_id=sent.listed.place_id,
             item_id=sent.listed.item_id,
         )
-        listed_alert, beside = _listed_words(
-            session, place, at.as_of, sent.listed, aside_since
-        )
+        tree = queries.place_tree(session, place)
+        listed_alert, beside = _listed_words(session, tree, sent.listed)
         problems |= beside
         alert = alert or listed_alert
+        off_form = None if sent.listed.on_form else sent.listed
     if problems:
         # What was typed is as of when the form was shown, of the places it
         # showed; a recount asks again for its own items only.
-        return as_sent(problems=problems, alert=alert)
+        return as_sent(
+            problems=problems, alert=alert, tree=tree, left=left(), off_form=off_form
+        )
     # Filtered to some items, a place of a store's form with nothing typed
     # was not counted, the store's own too.
     filtered = shown.only is not None or bool(shown.search)
@@ -727,7 +739,7 @@ def count(
         # Nothing typed at any place: nothing to count, so the form again,
         # as sent, saying so (inventory-tng-fxsy).
         log.info("count refused: nothing typed", location_id=place.id)
-        return as_sent(alert=NOTHING_TYPED, status_code=400)
+        return as_sent(alert=NOTHING_TYPED, left=left(), status_code=400)
 
     # Bound again, as checked, for put_right.
     sent_key, across = key, place_ids
@@ -785,21 +797,19 @@ def count(
                 location_id=place.id,
                 gone_ids=sorted(fresh),
             )
-            leaving = areas_leaving(session, place, gone)
-            first, *more = gone_words(leaving, fresh)
+            tree = queries.place_tree(session, place)
             return again(
                 None,
                 values=typed,
-                alert=first,
-                more_alerts=more,
-                items=_asked_after(session, shown, asked, fresh, gone, leaving),
+                gone_now=fresh,
+                items=_asked_after(session, shown, asked, fresh, gone, tree),
                 recount={
                     place_id: each
                     for place_id, each in figures.items()
                     if place_id not in fresh
                 },
                 gone=gone,
-                leaving=leaving,
+                tree=tree,
                 status_code=409,
             )
         if broken == CHANGED:
@@ -815,6 +825,7 @@ def count(
         return as_sent(
             problems=problems,
             alert=None if problems else RULES[broken],
+            left=left(),
             status_code=400,
         )
     assert result is not None
@@ -920,14 +931,17 @@ def _asked_after(
     asked: Mapping[int, Collection[int]],
     fresh: Collection[int],
     gone: Gone,
-    leaving: Leaving,
+    tree: PlaceTree,
 ) -> dict[int, set[int]]:
     """What a recount refused as areas on it are gone (`fresh`) asks for
     again, by place: the same, but at those; and, of the items shown, what
     left the areas gone for a place in the store it does not ask at, there
     too, so it is shown moved there, not taken out of the store (Ali,
-    2026-11-22, inventory-tng-ygk5). Nothing, for a form asking for nothing
-    else, which is shown again whole."""
+    2026-11-22, inventory-tng-ygk5), of its place's `tree`
+    (queries.place_tree). Nothing, for a form asking for nothing else,
+    which is shown again whole. What left them is read here, as the
+    places it adds decide the moment of the form shown again, which it
+    reads them as of."""
     items = {
         place_id: set(each)
         for place_id, each in asked.items()
@@ -935,9 +949,10 @@ def _asked_after(
     }
     if items:
         ids = shown.ids(session)
-        for move in leaving.moves:
+        in_tree = {each.id for each, _, _ in tree}
+        for move in moved_out(session, gone.ids, gone.since):
             if (
-                move.to_id in leaving.order
+                move.to_id in in_tree
                 and move.to_id not in gone.ids
                 and (ids is None or move.item_id in ids)
             ):
@@ -963,16 +978,29 @@ def bring_back(
     if carried is None or area_id not in carried.gone.ids:
         return not_found()
     place, _, at, place_ids, gone = carried
-    leaving = areas_leaving(session, place, gone, at.as_of)
-    if area_id == place.id or area_id not in leaving.order:
+    tree = queries.place_tree(session, place)
+    label = next(
+        (
+            queries.place_label(each, path)
+            for each, path, _ in tree
+            if each.id == area_id
+        ),
+        None,
+    )
+    if area_id == place.id or label is None:
         # Not one of the place's areas, as only a hand-made form names: none
         # this form may bring back.
         return not_found()
-    moves = gone_moves(session, gone, at.as_of, place_ids, leaving)
-    aside = held_aside(as_held(session, gone, at.as_of, moves))
-    sent = read_count(
-        session, form, place.id, place_ids, partial(asks_for, session, at.as_of, aside)
-    ).places
+    # What left the areas gone, and what of it each place holds, read when
+    # first needed, once, as count reads them.
+    left = cache(partial(moves_since, session, gone, at.as_of))
+    aside = cache(
+        lambda: held_aside(
+            as_held(session, gone, at.as_of, as_shown(left(), place_ids))
+        )
+    )
+    held = partial(asks_for, session, at.as_of, aside)
+    sent = read_count(session, form, place.id, place_ids, held).places
     again = partial(
         _count_page,
         request,
@@ -1002,22 +1030,26 @@ def bring_back(
             area_id=area.id,
             rule=broken,
         )
-        # Nothing changed: the areas as read already.
+        # Nothing changed: the tree and the areas as read already.
         return again(
             at,
             places=place_ids,
             alert=RULES[broken],
-            leaving=leaving,
+            tree=tree,
+            left=left(),
             status_code=409,
         )
     session.commit()
     if brought:
         areas_brought_back.add(1)
         log.info("count area brought back", location_id=place.id, area_id=area.id)
-    # Shown with it, as of the same moment: what it saw there counted too.
+    # Shown with it, as of the same moment: what it saw there counted too,
+    # and what left the areas gone as read already, split at that moment.
+    # The tree is read again, as bringing the area back changed it.
     listed = [*place_ids, area.id]
     return again(
         Moment(at.as_of, seen_up_to(session, listed, at.as_of)),
         places=listed,
-        caution=brought_back(leaving.labels[area.id]),
+        left=left(),
+        caution=brought_back(label),
     )

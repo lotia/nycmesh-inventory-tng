@@ -203,6 +203,11 @@ def countable_place(session: Session, location_id: int) -> Location | None:
     )
 
 
+# A place and every area inside it, each with its path below the place
+# and whether it may be counted (place_tree).
+PlaceTree = Sequence[tuple[Location, tuple[str, ...], bool]]
+
+
 def place_tree(
     session: Session, root: Location
 ) -> list[tuple[Location, tuple[str, ...], bool]]:

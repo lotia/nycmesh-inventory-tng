@@ -67,29 +67,6 @@ def test_what_left_is_said_by_the_form_it_arrived_in(session: Session) -> None:
     ]
 
 
-def test_what_went_to_some_places_is_read_up_to_a_moment(session: Session) -> None:
-    """Up to the moment at the van: the move after it to the van is left
-    out, not the write-off, which went nowhere."""
-    place = stocked(session, "9")
-    store, van, item = place.store.id, place.van.id, place.item.id
-    after = moment(session, store).as_of
-    write(session, place, lines=[{"item_id": item, "quantity": "1"}])
-    up_to = moment(session, store).as_of
-    write(session, place, lines=[{"item_id": item, "quantity": "2"}])
-    write(
-        session,
-        place,
-        kind="install",
-        to_location_id=None,
-        install_number=1234,
-        lines=[{"item_id": item, "quantity": "3"}],
-    )
-    assert moved_out(session, [store], after, up_to=up_to, into=[van]) == [
-        MovedOut(store, van, item, Decimal(1)),
-        MovedOut(store, None, item, Decimal(3)),
-    ]
-
-
 def test_what_left_is_split_at_a_moment_when_asked(session: Session) -> None:
     """One read says what left up to the moment and what left after it,
     each summed."""

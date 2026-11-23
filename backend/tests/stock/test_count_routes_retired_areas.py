@@ -77,6 +77,18 @@ def cells_by(page: Response, name: str) -> list[str]:
     return [cell.text for cell in row.all("td")]
 
 
+# What a count's requests read, each once a request at most: the store's
+# tree, what left the areas gone from it and the packages of what it shows.
+TREE = "WITH RECURSIVE tree"
+MOVES = "GROUP BY ledger_transaction.from_location_id"
+PACKAGES = "WHERE item_package.item_id IN"
+
+
+def reads(sent: list[str], words: str) -> int:
+    """How many of the statements `sent` hold `words`."""
+    return sum(words in each for each in sent)
+
+
 def found_at(page: Response) -> list[str | None]:
     """The places Something else here's Found at offers."""
     picker = read(page.text).one("select", name="extra_location_id")
@@ -268,11 +280,41 @@ def test_bring_it_back_refused_by_a_rule_says_so(
     refused = admin_client.post(made.path, data=shown)
     label = PATH_BETWEEN.join([shelf.name, inner.name])
     assert emptied_words(label) in text(refused)
-    back = bring_back(admin_client, made, refused, {}, inner.id)
+    with counting(session) as sent:
+        back = bring_back(admin_client, made, refused, {}, inner.id)
     assert back.status_code == 409
+    # Nothing changed: the tree and what left the areas, as read already.
+    assert [reads(sent, each) for each in (TREE, MOVES, PACKAGES)] == [1, 1, 1]
     assert "Bring it back" in back.text
     session.refresh(inner)
     assert inner.retired_at is not None
+
+
+def test_an_area_gone_and_moved_out_of_the_store_since_is_named_by_its_own_name(
+    admin_client: TestClient, session: Session
+) -> None:
+    """Bin X, in Shelf D, emptied into Shelf B while counted, then moved to
+    another store: the form shown again says what came from it under its
+    own name, as the store's tree no longer names it."""
+    setup = Emptied(session, admin_client)
+    made = setup.made
+    shelf = add(session, area("Shelf D", made.store))
+    inner = add(session, area("Bin X", shelf))
+    setup.made.move(session, made.store, inner, "1")
+    shown = count_form(admin_client.get(made.path))
+    retire(session, inner)
+    setup.made.move(session, inner, made.empty, "1")
+    refused = admin_client.post(made.path, data=shown)
+    assert refused.status_code == 409
+    label = PATH_BETWEEN.join([shelf.name, inner.name])
+    assert f"From {label}" in text(refused)
+    inner.parent_id = Store(session).store.id
+    session.flush()
+    wrong = {setup.counted(made.shelf): "x"}
+    again = admin_client.post(made.path, data=count_form(refused) | wrong)
+    assert again.status_code == 400
+    assert f"From {inner.name}" in text(again)
+    assert f"From {label}" not in text(again)
 
 
 def test_bring_it_back_of_an_area_not_gone_from_the_form_is_not_found(
@@ -518,13 +560,60 @@ def test_a_form_shown_again_reads_what_left_the_areas_gone_once(
         again = admin_client.post(made.path, data=count_form(refused) | wrong)
     assert again.status_code == 400
     assert heading(again, f"Moved to {made.empty.name}")
+    assert [reads(sent, each) for each in (TREE, MOVES, PACKAGES)] == [1, 1, 1]
 
-    def reads(words: str) -> int:
-        return sum(words in each for each in sent)
 
-    assert reads("WITH RECURSIVE") == 1
-    assert reads("GROUP BY ledger_transaction.from_location_id") == 1
-    assert reads("WHERE item_package.item_id IN") == 1
+def test_a_send_refused_as_an_area_is_gone_reads_what_left_it_once(
+    admin_client: TestClient, session: Session
+) -> None:
+    """Refused as Shelf C was emptied while counted, the form shown again
+    reads the store's tree, what left Shelf C and the packages once each."""
+    setup = Emptied(session, admin_client)
+    made = setup.made
+    made.move(session, setup.gone, made.empty, "2")
+    typed = {setup.counted(made.shelf): "3"}
+    with counting(session) as sent:
+        refused = admin_client.post(made.path, data=setup.shown | typed)
+    assert refused.status_code == 409
+    assert heading(refused, f"Moved to {made.empty.name}")
+    assert [reads(sent, each) for each in (TREE, MOVES, PACKAGES)] == [1, 1, 1]
+
+
+def test_a_filtered_form_with_nothing_typed_reads_what_left_the_areas_gone_once(
+    admin_client: TestClient, session: Session
+) -> None:
+    """A count of radios only, refused as Shelf C was emptied, then sent
+    again with nothing typed: refused as nothing was typed, it reads what
+    left Shelf C once, for the send and the form shown again."""
+    setup = Emptied(session, admin_client)
+    made = setup.made
+    path = f"{made.path}?item={setup.item}"
+    shown = count_form(admin_client.get(path))
+    made.move(session, setup.gone, made.empty, "2")
+    refused = admin_client.post(path, data=shown | {setup.counted(setup.gone): "2"})
+    assert refused.status_code == 409
+    with counting(session) as sent:
+        again = admin_client.post(path, data=count_form(refused))
+    assert again.status_code == 400
+    assert "Nothing was typed, so nothing was counted." in text(again)
+    assert [reads(sent, each) for each in (TREE, MOVES, PACKAGES)] == [1, 1, 1]
+
+
+def test_bring_it_back_reads_what_left_the_areas_gone_once(
+    admin_client: TestClient, session: Session
+) -> None:
+    """Bring it back reads what left Shelf C and the packages once; the
+    store's tree before bringing it back, to find it there, and after, as
+    bringing it back changed it."""
+    setup = Emptied(session, admin_client)
+    made, gone = setup.made, setup.gone
+    made.move(session, gone, made.empty, "2")
+    refused = admin_client.post(made.path, data=setup.shown)
+    with counting(session) as sent:
+        back = bring_back(admin_client, made, refused, {}, gone.id)
+    assert back.status_code == 200
+    assert heading(back, f"Moved to {made.empty.name}")
+    assert [reads(sent, each) for each in (TREE, MOVES, PACKAGES)] == [2, 1, 1]
 
 
 def test_something_else_here_listed_with_an_area_gone_reads_what_left_it_once(
@@ -547,8 +636,7 @@ def test_something_else_here_listed_with_an_area_gone_reads_what_left_it_once(
     with counting(session) as sent:
         again = admin_client.post(made.path, data=count_form(refused) | found)
     assert again.status_code == 400
-    moves = "GROUP BY ledger_transaction.from_location_id"
-    assert sum(moves in each for each in sent) == 1
+    assert reads(sent, MOVES) == 1
 
 
 class SpoolArrived:
@@ -644,8 +732,11 @@ def test_something_else_here_held_before_a_move_from_an_area_gone_marks_its_line
     refused, its line added as the form shows it, by its total, and marked;
     typed there, it is counted beside the spool."""
     moved = SpoolArrived(session, admin_client, "2")
-    refused = admin_client.post(moved.made.path, data=moved.form | moved.found)
+    with counting(session) as sent:
+        refused = admin_client.post(moved.made.path, data=moved.form | moved.found)
     assert refused.status_code == 400
+    # Its line marked as the form shown again shows it, read once.
+    assert [reads(sent, each) for each in (TREE, MOVES, PACKAGES)] == [1, 1, 1]
     line = moved.line("counted")
     assert problem(refused.text, line) == str(TYPE_IT_HERE)
     assert read(refused.text).one("input", name=line).attrs["value"] == "2"

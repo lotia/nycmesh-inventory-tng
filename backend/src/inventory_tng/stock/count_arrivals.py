@@ -8,8 +8,8 @@ form it arrived in): the difference is then lost or found where it went,
 in the forms it is held in (fixed_lines), and nothing is written against
 the area it left (fixed). The moves are those after the form was first
 shown, those to a place on it up to its moment, so the save reads the
-same ones the form showed (count_areas_leaving.gone_moves). The routes are stock/count_routes.py's; the
-writing is stock/store_counts.py's."""
+same ones the form showed (count_areas_leaving.as_shown). The routes are
+stock/count_routes.py's; the writing is stock/store_counts.py's."""
 
 from collections.abc import Mapping, Sequence
 from decimal import Decimal
