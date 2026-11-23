@@ -177,7 +177,11 @@ def test_an_opening_that_cannot_be_is_refused(
     for change in (
         {"to_location_id": None},
         {"to_location_id": spools.van.id},
-        {"lines": [{"item_id": spools.cable.id, "quantity": "1"}]},
+        {
+            "lines": [
+                {"item_id": spools.cable.id, "quantity": "1", "unit": spools.cable.unit}
+            ]
+        },
     ):
         response = registered_client.post(URL, json=batch | change)
         assert response.status_code == 422, change
@@ -306,7 +310,9 @@ def test_a_line_taken_from_an_open_package_that_cannot_be_is_refused(
             lines=[cut(made, "1", whole=True)],
         ),
         spools.place.batch(
-            lines=[{"item_id": made.item_id, "quantity": "1", "whole": True}]
+            lines=[
+                {"item_id": made.item_id, "quantity": "1", "unit": "m", "whole": True}
+            ]
         ),
     ):
         assert registered_client.post(URL, json=batch).status_code == 422

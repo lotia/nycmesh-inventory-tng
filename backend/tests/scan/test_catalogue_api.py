@@ -303,7 +303,7 @@ def test_a_retired_item_counts_stock_where_there_is_some(
         kind="receipt",
         from_location_id=None,
         to_location_id=place.store.id,
-        lines=[{"item_id": place.item.id, "quantity": "4"}],
+        lines=[{"item_id": place.item.id, "quantity": "4", "unit": place.item.unit}],
     )
     write(
         session,
@@ -311,7 +311,7 @@ def test_a_retired_item_counts_stock_where_there_is_some(
         kind="install",
         from_location_id=place.van.id,
         to_location_id=None,
-        lines=[{"item_id": place.item.id, "quantity": "4"}],
+        lines=[{"item_id": place.item.id, "quantity": "4", "unit": place.item.unit}],
     )
     retire(session, place.item)
     assert place.item.id in by_id(registered_client.get(URL).json()["items"])

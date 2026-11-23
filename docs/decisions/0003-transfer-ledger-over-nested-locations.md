@@ -280,6 +280,7 @@ what was shown into what is now: a unit switched because it was wrong may
 mean the volunteer's number was right in the new one, so asking again is
 safer.
 
-A batch line without a unit, as a build from before sends, is not
-compared, as the batch endpoint expands before it contracts
-(CONTRIBUTING.md, The scan page).
+A batch line must say its unit: one without is refused. It was required
+at once, not added first and required in a later deploy (CONTRIBUTING.md,
+The scan page), as nothing is deployed and Ali decided on 2026-11-15 that
+earlier builds, their tabs and what they stored need not keep working.

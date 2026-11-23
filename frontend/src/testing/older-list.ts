@@ -25,8 +25,8 @@ export function leaveSave(fields = {}, body = {}) {
       moveBody({
         key: KEY,
         lines: [
-          { item_id: 100, quantity: "8", package_id: 1000 },
-          { item_id: 101, quantity: "3", open_package_key: KEY },
+          { item_id: 100, quantity: "8", unit: "each", package_id: 1000 },
+          { item_id: 101, quantity: "3", unit: "m", open_package_key: KEY },
         ],
         ...body,
       }),

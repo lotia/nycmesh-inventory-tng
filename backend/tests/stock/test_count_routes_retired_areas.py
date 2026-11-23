@@ -429,7 +429,7 @@ def test_a_moved_item_the_filter_leaves_out_is_not_shown(
     setup = Emptied(session, admin_client)
     made, gone = setup.made, setup.gone
     cable = made.place.cable.id
-    lines = [{"item_id": cable, "quantity": "1"}]
+    lines = [{"item_id": cable, "quantity": "1", "unit": made.place.cable.unit}]
     write(
         session,
         made.place,

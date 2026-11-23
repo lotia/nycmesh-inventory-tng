@@ -249,7 +249,7 @@ def item_parts(world: World) -> None:
         world.session,
         spools.place,
         to_location_id=van.id,
-        lines=[{"item_id": cable.id, "quantity": "1"}],
+        lines=[{"item_id": cable.id, "quantity": "1", "unit": cable.unit}],
     )
 
 
@@ -274,7 +274,11 @@ def item_in_store(world: World) -> None:
         world.session,
         Item(name=f"Radio {tag()}", category_id=world.spools.cable.category_id),
     )
-    received(world.session, world.spools.place, [{"item_id": item.id, "quantity": "1"}])
+    received(
+        world.session,
+        world.spools.place,
+        [{"item_id": item.id, "quantity": "1", "unit": item.unit}],
+    )
 
 
 def volunteer(world: World) -> None:

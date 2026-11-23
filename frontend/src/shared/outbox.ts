@@ -99,9 +99,8 @@ export const BatchLine = v.object({
   /** A move's taken from an open package: all of it, moved whole. */
   whole: v.exactOptional(v.nullable(v.boolean())),
   /** The item's unit the quantity was typed in: refused if its item is
-   * counted in another since (unit_changed). A build from before it was
-   * sent kept none, which the server does not compare. */
-  unit: v.exactOptional(v.nullable(v.string())),
+   * counted in another since (unit_changed). */
+  unit: v.string(),
   /** An opening's: the key of the open package it makes, followed;
    * another's, the open package it is taken from. */
   open_package_key: v.exactOptional(v.nullable(v.pipe(v.string(), v.uuid()))),

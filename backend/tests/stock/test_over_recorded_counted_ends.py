@@ -99,7 +99,11 @@ def test_the_count_its_link_opens_counts_the_item_and_closes_it(
 ) -> None:
     """The store's count, of the radios alone (inventory-tng-hnv), puts its
     end right too; the cable there is left as it is."""
-    received(session, place, [{"item_id": place.cable.id, "quantity": "20"}])
+    received(
+        session,
+        place,
+        [{"item_id": place.cable.id, "quantity": "20", "unit": place.cable.unit}],
+    )
     radios_raised(registered_client, place)
     count_at(admin_client, place.van.id, {f"counted_{place.item.id}": "1"})
     link = f"{COUNTS}/{place.store.id}?item={place.item.id}"

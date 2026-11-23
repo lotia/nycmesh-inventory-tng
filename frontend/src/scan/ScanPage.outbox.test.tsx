@@ -78,7 +78,7 @@ describe("the batches listed in the outbox", () => {
     // Saved, then queued again under its key by a tab of an older build,
     // changed, and refused as the key was used.
     const batch = (quantity: string) =>
-      moveBody({ key: KEY, lines: [{ item_id: 101, quantity }] });
+      moveBody({ key: KEY, lines: [{ item_id: 101, quantity, unit: "m" }] });
     storeOutbox([
       outboxEntry({
         body: batch("1"),

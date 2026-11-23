@@ -24,6 +24,7 @@ test("a package counted on the scan page is saved sealed", async ({ page }) => {
       quantity: "305",
       package_id: expect.any(Number),
       package_size: "305",
+      unit: "m",
     },
   ]);
 });
@@ -92,7 +93,12 @@ test("a package opened on the scan page is saved as an opening", async ({
   const cut = await record(page);
   expect(cut.status()).toBe(201);
   expect(cut.request().postDataJSON().lines).toEqual([
-    { item_id: expect.any(Number), quantity: "20", open_package_key: key },
+    {
+      item_id: expect.any(Number),
+      quantity: "20",
+      open_package_key: key,
+      unit: "m",
+    },
   ]);
   // Said to be used up by its button, alone: a report (8i4.133.5).
   await page.goto("/scan");

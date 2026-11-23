@@ -38,7 +38,7 @@ export async function registering(): Promise<void> {
 }
 
 export async function saving(): Promise<void> {
-  const line = { item_id: 1, quantity: 2 };
+  const line = { item_id: 1, quantity: 2, unit: "each" };
   const batch = { key: "k", volunteer_id: 1, lines: [line] };
   const { data, error } = await api.POST("/api/transactions", {
     body: { ...batch, kind: "move", from_location_id: 1, to_location_id: 2 },

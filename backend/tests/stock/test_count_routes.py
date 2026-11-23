@@ -68,7 +68,11 @@ def test_the_count_page_reads_an_amount_grouped_but_its_box_holds_it_plainly(
     """In English and in German: a box holds what the form reads back
     (inventory-tng-31q3)."""
     place = Place(session)
-    received(session, place, [{"item_id": place.cable.id, "quantity": "1234.5"}])
+    received(
+        session,
+        place,
+        [{"item_id": place.cable.id, "quantity": "1234.5", "unit": place.cable.unit}],
+    )
     field = f"counted_{place.cable.id}"
     for catalogue, written in ((ENGLISH, "1,234.5 m"), (GERMAN, "1.234,5 m")):
         with speaking(catalogue):
@@ -225,7 +229,11 @@ def test_something_else_here_listed_on_a_count_of_one_place_is_refused(
 
 def with_cable(session: Session, place: Place) -> None:
     """Twenty metres of cable received into the store, beside the radios."""
-    received(session, place, [{"item_id": place.cable.id, "quantity": "20"}])
+    received(
+        session,
+        place,
+        [{"item_id": place.cable.id, "quantity": "20", "unit": place.cable.unit}],
+    )
 
 
 def test_a_save_during_a_count_still_applies(
@@ -470,7 +478,11 @@ def test_something_else_here_held_by_form_but_not_recounted_marks_its_loose_line
     for it is marked on its loose units (inventory-tng-oazl)."""
     spools = Spools(session)
     radio, cable = spools.place.item.id, spools.cable.id
-    received(session, spools.place, [{"item_id": radio, "quantity": "5"}])
+    received(
+        session,
+        spools.place,
+        [{"item_id": radio, "quantity": "5", "unit": spools.place.item.unit}],
+    )
     path = f"{COUNTS}/{spools.store.id}"
     form = count_form(admin_client.get(path)) | {
         "items": str(radio),
@@ -552,7 +564,11 @@ def test_a_count_shown_again_for_a_problem_keeps_its_moment(
     with_cable(session, place)
     path = f"{COUNTS}/{place.store.id}"
     shown = count_form(admin_client.get(path))
-    write(session, place, lines=[{"item_id": place.item.id, "quantity": "5"}])
+    write(
+        session,
+        place,
+        lines=[{"item_id": place.item.id, "quantity": "5", "unit": place.item.unit}],
+    )
     refused = admin_client.post(
         path,
         data=shown
@@ -689,7 +705,11 @@ def test_a_save_under_way_as_the_form_was_shown_refuses_the_count(
     saving = own_committed.session()
     early = write(saving, place, **fields(place))
     later = own_committed.session()
-    late = received(later, place, [{"item_id": place.cable.id, "quantity": "20"}])
+    late = received(
+        later,
+        place,
+        [{"item_id": place.cable.id, "quantity": "20", "unit": place.cable.unit}],
+    )
     later.commit()
     assert early.id < late.id
     counting = own_committed.session()

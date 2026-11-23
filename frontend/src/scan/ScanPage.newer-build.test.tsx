@@ -279,7 +279,9 @@ describe("a newer build", () => {
     keep("inventory.outbox.v3", [
       olderSave(
         moveBody({
-          lines: [{ item_id: 100, quantity: "4", package_id: 1000 }],
+          lines: [
+            { item_id: 100, quantity: "4", unit: "each", package_id: 1000 },
+          ],
         }),
         { queuedAt: 1_700_000_000_000 },
       ),

@@ -78,12 +78,13 @@ def test_a_batch_line_shown_in_m_saved_after_a_switch_to_ft_is_refused(
     assert response.status_code == 422
     assert problems_of(response) == [(["lines", 0, "unit"], "unit_changed")]
     assert expected(session, place.store.id) == {}
-    # Shown in ft, it is saved; a line saying no unit, from a build from
-    # before it was sent, is not compared.
-    for sent in ({**line, "unit": "ft"}, {"item_id": place.cable.id, "quantity": "50"}):
-        again = receipt | {"key": str(uuid.uuid4()), "lines": [sent]}
-        response = registered_client.post(URL, json=again)
-        assert response.status_code == 201
+    # Saying no unit, it is refused as the schema says; shown in ft, saved.
+    unsaid = {"item_id": place.cable.id, "quantity": "50"}
+    response = registered_client.post(URL, json=receipt | {"lines": [unsaid]})
+    assert response.status_code == 422
+    assert response.json()["detail"][0]["loc"] == ["body", "lines", 0, "unit"]
+    again = receipt | {"key": str(uuid.uuid4()), "lines": [{**line, "unit": "ft"}]}
+    assert registered_client.post(URL, json=again).status_code == 201
 
 
 def test_a_batch_line_shown_whole_in_each_is_read_in_each(
@@ -222,6 +223,26 @@ def test_a_count_of_50_m_saved_after_a_switch_to_ft_is_asked_again(
     assert expected(session, place.store.id) == {place.cable.id: Decimal(50)}
 
 
+def test_a_count_saved_then_sent_again_after_a_switch_is_answered_as_saved(
+    admin_client: TestClient, session: Session
+) -> None:
+    """Sent again, as the browser's Back sends it, a saved count is
+    answered as it was, whatever the unit is now: what it showed was
+    checked as it was saved. The switch is made straight in the database,
+    as a moved item's unit is fixed."""
+    place = Place(session)
+    form = count_form_at(admin_client, place.store.id) | {
+        "extra_item_id": str(place.cable.id),
+        "extra_quantity": "50",
+    }
+    path = f"{COUNTS}/{place.store.id}"
+    saved = admin_client.post(path, data=form, follow_redirects=False)
+    assert saved.status_code == 303
+    to_feet(session, place)
+    again = admin_client.post(path, data=form, follow_redirects=False)
+    assert again.headers["location"] == saved.headers["location"]
+
+
 def test_a_count_of_a_box_of_ten_saved_once_it_holds_twelve_is_asked_again(
     admin_client: TestClient, session: Session
 ) -> None:
@@ -240,6 +261,8 @@ def test_a_count_of_a_box_of_ten_saved_once_it_holds_twelve_is_asked_again(
     with capture_logs() as logs:
         response = admin_client.post(f"{COUNTS}/{place.store.id}", data=form)
     assert response.status_code == 400
+    # No box of it is shown again: said above the form.
+    assert now_holds(Decimal(12), "each") in text(response)
     assert counts_written(session) == []
     (refused,) = [
         line for line in logs if line["event"] == "save refused: shown otherwise"
@@ -278,6 +301,23 @@ def test_an_adjustment_of_50_m_saved_after_a_switch_to_ft_is_asked_again(
         follow_redirects=False,
     )
     assert saved.status_code == 303
+
+
+def test_an_adjustment_shown_in_m_says_so_whatever_else_is_wrong(
+    admin_client: TestClient, session: Session
+) -> None:
+    """Sent with no reason once the cable counts in ft: the form shown
+    again asks for a reason and says the cable is now counted in ft, so
+    it is never saved in ft unawares."""
+    place = Place(session)
+    form = adjustment_form(
+        session, place.store, place.cable, amount="50", direction="found"
+    )
+    to_feet(session, place)
+    response = admin_client.post(ADJUSTMENTS, data=form | {"reason_id": ""})
+    assert response.status_code == 400
+    assert now_counted_in("ft") in text(response)
+    assert counts_written(session) == []
 
 
 def test_a_confirmed_count_shown_in_another_unit_is_asked_again(

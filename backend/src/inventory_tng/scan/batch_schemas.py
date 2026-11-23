@@ -82,15 +82,15 @@ class Line(BaseModel):
         ),
     ] = None
     unit: Annotated[
-        str | None,
+        str,
         Field(
+            min_length=1,
             max_length=UNIT_MAX,
             description="The item's unit the page showed `quantity` in, from "
             "the catalogue. A line of an item counted in another unit since is "
-            "refused (unit_changed), never recorded in the new unit. Left out, "
-            "as by a build from before it was sent, it is not compared.",
+            "refused (unit_changed), never recorded in the new unit.",
         ),
-    ] = None
+    ]
 
     @field_validator("package_size")
     @classmethod
@@ -280,6 +280,8 @@ class RecordedLine(BaseModel):
     package_size: Decimal | None
     open_package_key: uuid.UUID | None
     whole: bool | None
+    # Its item's unit, fixed once it moved.
+    unit: str
 
 
 class RecordedLength(BaseModel):

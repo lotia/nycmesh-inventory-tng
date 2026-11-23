@@ -1131,21 +1131,15 @@
             "description": "A move's line taken from an open package: all that is left on it, `quantity`, moves with it, and it stays open there."
           },
           "unit": {
-            "anyOf": [
-              {
-                "type": "string",
-                "maxLength": 32
-              },
-              {
-                "type": "null"
-              }
-            ],
+            "type": "string",
+            "maxLength": 32,
+            "minLength": 1,
             "title": "Unit",
-            "description": "The item's unit the page showed `quantity` in, from the catalogue. A line of an item counted in another unit since is refused (unit_changed), never recorded in the new unit. Left out, as by a build from before it was sent, it is not compared."
+            "description": "The item's unit the page showed `quantity` in, from the catalogue. A line of an item counted in another unit since is refused (unit_changed), never recorded in the new unit."
           }
         },
         "type": "object",
-        "required": ["item_id", "quantity"],
+        "required": ["item_id", "quantity", "unit"],
         "title": "Line"
       },
       "LineRemoved": {
@@ -1591,6 +1585,10 @@
               }
             ],
             "title": "Whole"
+          },
+          "unit": {
+            "type": "string",
+            "title": "Unit"
           }
         },
         "type": "object",
@@ -1600,7 +1598,8 @@
           "package_id",
           "package_size",
           "open_package_key",
-          "whole"
+          "whole",
+          "unit"
         ],
         "title": "RecordedLine",
         "description": "A line of the transaction recorded under a batch's key, as a batch\nsends one (Line), so the scan page compares it with what it sent."

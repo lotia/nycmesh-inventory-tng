@@ -119,12 +119,13 @@ def test_a_batch_naming_no_build_is_told_which_field_it_lacks(
     served: TestClient, place: Place
 ) -> None:
     """Another client of the API that sends what the batch no longer takes
-    is told what, as by a 422, not that a build is too old."""
-    batch = place.batch(lines=[{"item_id": place.item.id}])
+    is told what, as by a 422, not that a build is too old: a line's unit
+    (inventory-tng-57u8)."""
+    batch = place.batch(lines=[{"item_id": place.item.id, "quantity": "3"}])
     response = served.post(URL, json=batch)
     assert response.status_code == 422
     (problem,) = response.json()["detail"]
-    assert problem["loc"] == ["body", "lines", 0, "quantity"]
+    assert problem["loc"] == ["body", "lines", 0, "unit"]
 
 
 @pytest.mark.usefixtures("oldest")

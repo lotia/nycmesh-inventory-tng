@@ -92,6 +92,7 @@ describe("what an older build left", () => {
   const radios = (n: number) => ({
     item_id: 100,
     quantity: String(n * 4),
+    unit: "each",
     package_id: 1000,
   });
 
@@ -101,7 +102,10 @@ describe("what an older build left", () => {
     leaveMoves([
       KEY,
       AT,
-      [{ item_id: 100, quantity: "4", package_id: 1004 }, radios(1)],
+      [
+        { item_id: 100, quantity: "4", unit: "each", package_id: 1004 },
+        radios(1),
+      ],
     ]);
     const { api, sent } = server();
     const outbox = open(api);
@@ -162,7 +166,10 @@ describe("what an older build left", () => {
     leaveMoves([
       KEY,
       AT,
-      [{ item_id: 100, quantity: "8", package_id: 1004 }, radios(1)],
+      [
+        { item_id: 100, quantity: "8", unit: "each", package_id: 1004 },
+        radios(1),
+      ],
     ]);
     keepOlderCart({
       lines: [{ itemId: 100, packages: { 1004: "3", 1009: "1" }, loose: "" }],
@@ -813,7 +820,10 @@ describe("what an older build left", () => {
     leaveMoves([
       KEY,
       AT,
-      [{ item_id: 103, quantity: "4", package_id: 1003 }, radios(1)],
+      [
+        { item_id: 103, quantity: "4", unit: "each", package_id: 1003 },
+        radios(1),
+      ],
     ]);
     const { api, sent } = server();
     const outbox = open(api);
@@ -857,7 +867,10 @@ describe("what an older build left", () => {
     leaveMoves([
       KEY,
       AT,
-      [{ item_id: 103, quantity: "4", package_id: 1003 }, radios(1)],
+      [
+        { item_id: 103, quantity: "4", unit: "each", package_id: 1003 },
+        radios(1),
+      ],
     ]);
     open();
     await ready();

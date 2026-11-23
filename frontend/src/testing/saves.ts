@@ -40,7 +40,7 @@ export function moveBody(fields: Partial<Body> = {}): Body {
     volunteer_id: 1,
     from_location_id: 10,
     to_location_id: 12,
-    lines: [{ item_id: 100, quantity: "8", package_id: 1000 }],
+    lines: [{ item_id: 100, quantity: "8", unit: "each", package_id: 1000 }],
     ...fields,
   };
 }
@@ -82,7 +82,11 @@ export function olderSave(body: object, fields: Record<string, unknown> = {}) {
  * every field v3 kept. */
 export function olderMove(fields: Record<string, unknown> = {}, body = {}) {
   return olderSave(
-    moveBody({ key: KEY, lines: [{ item_id: 101, quantity: "2" }], ...body }),
+    moveBody({
+      key: KEY,
+      lines: [{ item_id: 101, quantity: "2", unit: "m" }],
+      ...body,
+    }),
     {
       what: "Move: 1 item from Hub to Van",
       queuedAt: 1_700_000_000_000,
@@ -125,10 +129,16 @@ export function onlyOlderCart(fields: Record<string, unknown> = {}): Older {
 export function mixedOlder(): Older {
   return onlyOlder({
     lines: [
-      { item_id: 100, quantity: "4", package_id: 1004 },
-      { item_id: 101, quantity: "12", open_package_key: OTHER_KEY },
-      { item_id: 100, quantity: "4", package_id: 1000, package_size: 2 },
-      { item_id: 100, quantity: "8", package_id: 1000 },
+      { item_id: 100, quantity: "4", unit: "each", package_id: 1004 },
+      { item_id: 101, quantity: "12", unit: "m", open_package_key: OTHER_KEY },
+      {
+        item_id: 100,
+        quantity: "4",
+        unit: "each",
+        package_id: 1000,
+        package_size: 2,
+      },
+      { item_id: 100, quantity: "8", unit: "each", package_id: 1000 },
     ],
     used_up: [OTHER_KEY],
   });

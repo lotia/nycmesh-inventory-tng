@@ -19,7 +19,7 @@ export function draft(fields: Partial<Draft> = {}): Draft {
     volunteer_id: 1,
     from_location_id: 1,
     to_location_id: 2,
-    lines: [{ item_id: 5, quantity: "3" }],
+    lines: [{ item_id: 5, quantity: "3", unit: "each" }],
     ...fields,
   };
 }

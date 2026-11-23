@@ -200,15 +200,9 @@
           ]
         },
         "unit": {
-          "anyOf": [
-            {
-              "maxLength": 32,
-              "type": "string"
-            },
-            {
-              "type": "null"
-            }
-          ]
+          "maxLength": 32,
+          "minLength": 1,
+          "type": "string"
         },
         "whole": {
           "anyOf": [
@@ -223,7 +217,8 @@
       },
       "required": [
         "item_id",
-        "quantity"
+        "quantity",
+        "unit"
       ],
       "type": "object"
     }

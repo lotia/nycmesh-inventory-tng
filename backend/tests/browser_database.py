@@ -150,8 +150,8 @@ def open_a_box(session: Session, volunteer_id: int) -> None:
     (phone-width.spec.ts) sees lists of open packages, the cable's page's
     among them."""
     item, package, size = seed.PACKAGE
-    box = session.scalars(
-        select(ItemPackage)
+    box, unit = session.execute(
+        select(ItemPackage, Item.unit)
         .join(Item)
         .where(Item.name == item, ItemPackage.name == package)
     ).one()
@@ -160,6 +160,7 @@ def open_a_box(session: Session, volunteer_id: int) -> None:
     opening = {
         "item_id": box.item_id,
         "quantity": str(size),
+        "unit": unit,
         "package_id": box.id,
         "package_size": str(size),
         "open_package_key": str(key),

@@ -362,7 +362,7 @@ describe("the cart store, shared by tabs", () => {
 
   test("what a cart was put back with is kept with its key, and dropped with it (inventory-tng-0gg)", () => {
     const key = "0b7c6a51-9a3d-4d39-8f3e-1d1f2c4b5a61";
-    const changedFrom = [{ item_id: 100, quantity: "1" }];
+    const changedFrom = [{ item_id: 100, quantity: "1", unit: "each" }];
     const store = new CartStore(CATALOGUE);
     store.change({ ...filled(), batchKey: key, changedFrom });
     store.change(addOne(store.cart.value, 101));
@@ -595,7 +595,7 @@ describe("a package resized while the cart counts it (inventory-tng-0qi)", () =>
     });
     expect(reconcile(none, boxOf("8.000"))).toBe(none);
     expect(toBatch(none, boxOf("8.000"))).toMatchObject({
-      draft: { lines: [{ item_id: 100, quantity: "1" }] },
+      draft: { lines: [{ item_id: 100, quantity: "1", unit: "each" }] },
     });
   });
 
@@ -663,7 +663,13 @@ describe("a package resized while the cart counts it (inventory-tng-0qi)", () =>
     ).toMatchObject({
       draft: {
         lines: [
-          { item_id: 100, quantity: "8", package_id: 1000, package_size: "8" },
+          {
+            item_id: 100,
+            quantity: "8",
+            unit: "each",
+            package_id: 1000,
+            package_size: "8",
+          },
         ],
       },
     });

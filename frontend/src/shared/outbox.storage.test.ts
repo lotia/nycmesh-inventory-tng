@@ -29,8 +29,14 @@ describe("storage", () => {
   test("a batch's sealed packages are kept and sent with their size; an older page's lines too", async () => {
     // An older page's lines have no package_id: the server takes them loose.
     const lines = [
-      { item_id: 5, quantity: "305", package_id: 9, package_size: "305" },
-      { item_id: 6, quantity: "3" },
+      {
+        item_id: 5,
+        quantity: "305",
+        unit: "each",
+        package_id: 9,
+        package_size: "305",
+      },
+      { item_id: 6, quantity: "3", unit: "each" },
     ];
     const waiting = entry({ body: { ...entry().body, lines } });
     store(waiting);
@@ -45,7 +51,9 @@ describe("storage", () => {
     // Kept by a build from before sizes were sent (inventory-tng-1p8): the
     // server refuses it, and the volunteer is told which line, not left
     // with a batch dropped unseen.
-    const lines = [{ item_id: 5, quantity: "305", package_id: 9 }];
+    const lines = [
+      { item_id: 5, quantity: "305", unit: "each", package_id: 9 },
+    ];
     store(entry({ body: { ...entry().body, lines } }));
     const detail = [
       {
@@ -159,15 +167,8 @@ describe("storage", () => {
     };
     // Optional fields added since a build keeping this key was deployed
     // whose loss leaves an entry as that build itself would have kept it:
-    // only such a field may be added here without a new key. A line's
-    // unit (inventory-tng-57u8): lost, the server compares none, as with
-    // the build before's own lines.
-    const droppedAsBefore = [
-      "body.changed_from.unit",
-      "body.lines.unit",
-      "reason.recorded.batch.changed_from.unit",
-      "reason.recorded.batch.lines.unit",
-    ];
+    // only such a field may be added here without a new key. None yet.
+    const droppedAsBefore: string[] = [];
     expect(Object.keys(Kept.entries)).toEqual(["build", "entries"]);
     expect({
       [STORAGE_KEY]: paths(Entry)
@@ -182,6 +183,7 @@ describe("storage", () => {
         "body.changed_from.package_id",
         "body.changed_from.package_size",
         "body.changed_from.quantity",
+        "body.changed_from.unit",
         "body.changed_from.whole",
         "body.from_location_id",
         "body.install_number",
@@ -197,6 +199,7 @@ describe("storage", () => {
         "body.lines.package_id",
         "body.lines.package_size",
         "body.lines.quantity",
+        "body.lines.unit",
         "body.lines.whole",
         "body.to_location_id",
         "body.used_up",
@@ -239,6 +242,7 @@ describe("storage", () => {
         "reason.recorded.batch.changed_from.package_id",
         "reason.recorded.batch.changed_from.package_size",
         "reason.recorded.batch.changed_from.quantity",
+        "reason.recorded.batch.changed_from.unit",
         "reason.recorded.batch.changed_from.whole",
         "reason.recorded.batch.from_location_id",
         "reason.recorded.batch.install_number",
@@ -254,6 +258,7 @@ describe("storage", () => {
         "reason.recorded.batch.lines.package_id",
         "reason.recorded.batch.lines.package_size",
         "reason.recorded.batch.lines.quantity",
+        "reason.recorded.batch.lines.unit",
         "reason.recorded.batch.lines.whole",
         "reason.recorded.batch.to_location_id",
         "reason.recorded.batch.used_up",

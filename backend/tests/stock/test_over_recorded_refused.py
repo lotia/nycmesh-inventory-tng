@@ -346,7 +346,7 @@ def test_a_place_whose_own_place_is_retired_says_so(
     recorded_then_changed(
         registered_client,
         place.batch(from_location_id=shelf.id),
-        lines=[{"item_id": place.item.id, "quantity": "1"}],
+        lines=[{"item_id": place.item.id, "quantity": "1", "unit": place.item.unit}],
     )
     retire(session, shelf, place.store)
     response = bring_back(admin_client, session, shelf)

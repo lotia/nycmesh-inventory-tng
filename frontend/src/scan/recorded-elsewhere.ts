@@ -218,7 +218,7 @@ class Namer {
   }
 
   private inUnit(line: Line, amount: number): string {
-    return inUnit(amount, this.items.get(line.item_id));
+    return inUnit(amount, line.unit ?? this.items.get(line.item_id)?.unit);
   }
 }
 

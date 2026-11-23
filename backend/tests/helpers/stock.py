@@ -10,7 +10,7 @@ from typing import Any, Protocol
 from fastapi.testclient import TestClient
 from httpx2 import Response
 from sqlalchemy import select
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, object_session
 
 from inventory_tng.models.base import INTEGER_MAX
 from inventory_tng.models.catalogue import Category, Item, ItemPackage
@@ -40,6 +40,21 @@ from helpers.sign_in import admin_named
 URL = "/api/transactions"
 
 
+def item_unit(session: Session, item_id: int) -> str:
+    """The unit an item is counted in now, which a batch's line says it
+    showed (batch_schemas.Line.unit)."""
+    item = session.get(Item, item_id)
+    assert item is not None
+    return item.unit
+
+
+def unit_of(row: ItemPackage | OpenPackage) -> str:
+    """The unit of the item a package or an open package is of."""
+    session = object_session(row)
+    assert session is not None
+    return item_unit(session, row.item_id)
+
+
 class Place:
     """The rows a batch needs, made in one session."""
 
@@ -62,7 +77,9 @@ class Place:
             "volunteer_id": self.volunteer.id,
             "from_location_id": self.store.id,
             "to_location_id": self.van.id,
-            "lines": [{"item_id": self.item.id, "quantity": "3"}],
+            "lines": [
+                {"item_id": self.item.id, "quantity": "3", "unit": self.item.unit}
+            ],
         } | fields
 
 
@@ -77,7 +94,11 @@ def committed_place(committed: Committed) -> Place:
 def stocked(session: Session, quantity: str = "5") -> Place:
     """A Place with `quantity` radios received into its store."""
     place = Place(session)
-    received(session, place, [{"item_id": place.item.id, "quantity": quantity}])
+    received(
+        session,
+        place,
+        [{"item_id": place.item.id, "quantity": quantity, "unit": place.item.unit}],
+    )
     return place
 
 
@@ -308,6 +329,7 @@ def cut(made: OpenPackage, quantity: str, **fields: object) -> dict[str, object]
     return {
         "item_id": str(made.item_id),
         "quantity": quantity,
+        "unit": unit_of(made),
         "open_package_key": str(made.key),
     } | fields
 
@@ -317,6 +339,7 @@ def sealed_line(spools: Spools, quantity: str) -> dict[str, object]:
     return {
         "item_id": spools.cable.id,
         "quantity": quantity,
+        "unit": spools.cable.unit,
         "package_id": spools.spool.id,
         "package_size": "305",
     }

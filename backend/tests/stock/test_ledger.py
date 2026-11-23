@@ -71,8 +71,8 @@ def test_a_batch_is_written_whole(
     client: TestClient, session: Session, place: Place
 ) -> None:
     lines = [
-        {"item_id": place.item.id, "quantity": "3"},
-        {"item_id": place.cable.id, "quantity": "12.5"},
+        {"item_id": place.item.id, "quantity": "3", "unit": place.item.unit},
+        {"item_id": place.cable.id, "quantity": "12.5", "unit": place.cable.unit},
     ]
     with capture_logs() as logs:
         response = client.post(URL, json=place.batch(lines=lines))
@@ -107,7 +107,9 @@ def test_a_key_cannot_be_used_for_another_batch(
 ) -> None:
     batch = place.batch()
     assert client.post(URL, json=batch).status_code == 201
-    changed = batch | {"lines": [{"item_id": place.item.id, "quantity": "4"}]}
+    changed = batch | {
+        "lines": [{"item_id": place.item.id, "quantity": "4", "unit": place.item.unit}]
+    }
     response = client.post(URL, json=changed)
     assert (response.status_code, response.json()["reason"]) == (409, "key_reused")
 
@@ -116,10 +118,10 @@ def test_a_refusal_names_each_bad_line(
     client: TestClient, session: Session, place: Place
 ) -> None:
     lines = [
-        {"item_id": place.item.id, "quantity": "1"},
-        {"item_id": 999999, "quantity": "1"},
-        {"item_id": place.item.id, "quantity": "1.5"},
-        {"item_id": place.cable.id, "quantity": "1.5"},
+        {"item_id": place.item.id, "quantity": "1", "unit": place.item.unit},
+        {"item_id": 999999, "quantity": "1", "unit": "each"},
+        {"item_id": place.item.id, "quantity": "1.5", "unit": place.item.unit},
+        {"item_id": place.cable.id, "quantity": "1.5", "unit": place.cable.unit},
     ]
     batch = place.batch(lines=lines, to_location_id=999999, volunteer_id=999999)
     response = client.post(URL, json=batch)
@@ -142,7 +144,7 @@ def test_a_body_that_cannot_be_a_batch_is_refused_as_the_schema_says(
 ) -> None:
     """FastAPI's own 422, in pydantic's types and words, is the other shape
     the route declares (BodyRefusedReply)."""
-    batch = place.batch(lines=[{"item_id": place.item.id}])
+    batch = place.batch(lines=[{"item_id": place.item.id, "unit": "each"}])
     response = client.post(URL, json=batch)
     assert response.status_code == 422
     refused = BodyRefusedReply.model_validate(response.json())
@@ -157,9 +159,9 @@ def test_a_batch_naming_an_item_twice_is_refused(
     """Each line of the item is named, nothing is written, and the key is
     still free for the batch put right."""
     lines = [
-        {"item_id": place.item.id, "quantity": "3"},
-        {"item_id": place.cable.id, "quantity": "1"},
-        {"item_id": place.item.id, "quantity": "2"},
+        {"item_id": place.item.id, "quantity": "3", "unit": place.item.unit},
+        {"item_id": place.cable.id, "quantity": "1", "unit": place.cable.unit},
+        {"item_id": place.item.id, "quantity": "2", "unit": place.item.unit},
     ]
     batch = place.batch(lines=lines)
     response = client.post(URL, json=batch)
@@ -170,7 +172,9 @@ def test_a_batch_naming_an_item_twice_is_refused(
     ]
     assert saved(session, batch["key"]) == []
     assert balances(session, place.item, place.cable) == {}
-    merged = batch | {"lines": [{"item_id": place.item.id, "quantity": "5"}]}
+    merged = batch | {
+        "lines": [{"item_id": place.item.id, "quantity": "5", "unit": place.item.unit}]
+    }
     first = client.post(URL, json=merged)
     again = client.post(URL, json=merged)
     assert (first.status_code, again.status_code) == (201, 200)
@@ -186,7 +190,7 @@ def test_a_batch_naming_an_item_twice_is_refused(
         {"install_number": 1234},
         {"kind": "count"},
         {"lines": []},
-        {"lines": [{"item_id": 1, "quantity": "0"}]},
+        {"lines": [{"item_id": 1, "quantity": "0", "unit": "each"}]},
         # Not ids at all, and never past the database's integer.
         {"volunteer_id": -1},
         {"kind": "install", "to_location_id": None, "install_number": 2**31},
@@ -249,8 +253,8 @@ def test_a_receipt_lowers_on_order_but_not_below_zero(
     place.cable.on_order = Decimal(100)
     session.flush()
     lines = [
-        {"item_id": place.item.id, "quantity": "8"},
-        {"item_id": place.cable.id, "quantity": "30"},
+        {"item_id": place.item.id, "quantity": "8", "unit": place.item.unit},
+        {"item_id": place.cable.id, "quantity": "30", "unit": place.cable.unit},
     ]
     batch = place.batch(kind="receipt", from_location_id=None, lines=lines)
     assert client.post(URL, json=batch).status_code == 201
@@ -541,7 +545,13 @@ def test_an_items_unit_is_fixed_once_stock_has_moved(
 ) -> None:
     """In whole units or not: the ledger's quantities are in that unit."""
     items.save(session, place.cable, item_fields(place.cable, unit="ft"), seen=None)
-    write(session, place, lines=[{"item_id": place.cable.id, "quantity": "1.5"}])
+    write(
+        session,
+        place,
+        lines=[
+            {"item_id": place.cable.id, "quantity": "1.5", "unit": place.cable.unit}
+        ],
+    )
     for unit in ("each", "m"):
         with breaks(session, "item_unit_fixed"):
             items.save(

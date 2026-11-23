@@ -466,7 +466,7 @@ def test_something_else_here_offers_only_what_a_place_it_may_be_found_lacks(
         made.place,
         from_location_id=made.bin.id,
         to_location_id=made.empty.id,
-        lines=[{"item_id": cable, "quantity": "1"}],
+        lines=[{"item_id": cable, "quantity": "1", "unit": made.place.cable.unit}],
     )
     made.move(session, made.empty, made.store)
     page = read(admin_client.get(made.path).text)

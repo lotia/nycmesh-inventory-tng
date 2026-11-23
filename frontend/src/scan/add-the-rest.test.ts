@@ -10,10 +10,16 @@ import { restOf, TAKEN_OFF, takenOff } from "./add-the-rest";
  * a retired item the catalogue only names (103, line 3). */
 const BODY = moveBody({
   lines: [
-    { item_id: 100, quantity: "4", package_id: 1000, package_size: "4" },
-    { item_id: 101, quantity: "2", package_id: null },
-    { item_id: 100, quantity: "1", package_id: null },
-    { item_id: 103, quantity: "3", package_id: null },
+    {
+      item_id: 100,
+      quantity: "4",
+      unit: "each",
+      package_id: 1000,
+      package_size: "4",
+    },
+    { item_id: 101, quantity: "2", unit: "m", package_id: null },
+    { item_id: 100, quantity: "1", unit: "each", package_id: null },
+    { item_id: 103, quantity: "3", unit: "each", package_id: null },
   ],
   used_up: ["8a1b2c3d-4e5f-4a6b-8c7d-9e0f1a2b3c4d"],
 });
@@ -98,9 +104,9 @@ describe("takenOff", () => {
     const entry = outboxEntry({
       body: moveBody({
         lines: [
-          { item_id: 998, quantity: "1", package_id: null },
-          { item_id: 999, quantity: "1", package_id: null },
-          { item_id: 101, quantity: "2", package_id: null },
+          { item_id: 998, quantity: "1", unit: "each", package_id: null },
+          { item_id: 999, quantity: "1", unit: "each", package_id: null },
+          { item_id: 101, quantity: "2", unit: "m", package_id: null },
         ],
       }),
       state: "refused",

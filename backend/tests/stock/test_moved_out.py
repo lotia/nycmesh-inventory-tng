@@ -26,7 +26,11 @@ def test_what_left_a_place_is_said_by_where_it_went_and_item_in_all(
     write(session, place)
     after = moment(session, store).as_of
     for _ in range(2):
-        write(session, place, lines=[{"item_id": item, "quantity": "1"}])
+        write(
+            session,
+            place,
+            lines=[{"item_id": item, "quantity": "1", "unit": place.item.unit}],
+        )
     reason = session.scalars(
         select(AdjustmentReason.id).where(AdjustmentReason.name == "Damaged")
     ).one()
@@ -73,10 +77,18 @@ def test_what_left_is_split_at_a_moment_when_asked(session: Session) -> None:
     place = stocked(session, "9")
     store, van, item = place.store.id, place.van.id, place.item.id
     after = moment(session, store).as_of
-    write(session, place, lines=[{"item_id": item, "quantity": "1"}])
+    write(
+        session,
+        place,
+        lines=[{"item_id": item, "quantity": "1", "unit": place.item.unit}],
+    )
     split = moment(session, store).as_of
     for _ in range(2):
-        write(session, place, lines=[{"item_id": item, "quantity": "2"}])
+        write(
+            session,
+            place,
+            lines=[{"item_id": item, "quantity": "2", "unit": place.item.unit}],
+        )
     moves = moved_out(session, [store], after, split=split)
     assert moves == [
         MovedOut(store, van, item, Decimal(1)),

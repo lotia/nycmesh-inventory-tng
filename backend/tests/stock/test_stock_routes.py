@@ -99,13 +99,17 @@ def test_reorder_counts_the_stores_and_their_areas_only(
     shelf = add(
         session, Location(name=f"Shelf {tag()}", kind="area", parent_id=place.store.id)
     )
-    received(session, place, [{"item_id": place.item.id, "quantity": "2"}])
+    received(
+        session,
+        place,
+        [{"item_id": place.item.id, "quantity": "2", "unit": place.item.unit}],
+    )
     write(
         session,
         place,
         to_location_id=shelf.id,
         from_location_id=place.store.id,
-        lines=[{"item_id": place.item.id, "quantity": "1"}],
+        lines=[{"item_id": place.item.id, "quantity": "1", "unit": place.item.unit}],
     )
     write(session, place)  # Three from the store to the van: gone from the stores.
     place.item.minimum = Decimal(10)
@@ -193,14 +197,18 @@ def test_the_stock_page_counts_the_places_short(
 ) -> None:
     place = Place(session)
     write(session, place)  # The store is short three.
-    write(session, place, lines=[{"item_id": place.cable.id, "quantity": "1"}])
+    write(
+        session,
+        place,
+        lines=[{"item_id": place.cable.id, "quantity": "1", "unit": place.cable.unit}],
+    )
     assert "1 place shows less than nothing" in words_on(admin_client.get(STOCK).text)
     write(
         session,
         place,
         from_location_id=place.van.id,
         to_location_id=place.store.id,
-        lines=[{"item_id": place.cable.id, "quantity": "5"}],
+        lines=[{"item_id": place.cable.id, "quantity": "5", "unit": place.cable.unit}],
     )
     assert "2 places show less than nothing" in words_on(admin_client.get(STOCK).text)
 
@@ -224,8 +232,8 @@ def test_stock_sorts_within_each_group_and_filters(
         session,
         place,
         [
-            {"item_id": place.item.id, "quantity": "5"},
-            {"item_id": place.cable.id, "quantity": "2"},
+            {"item_id": place.item.id, "quantity": "5", "unit": place.item.unit},
+            {"item_id": place.cable.id, "quantity": "2", "unit": place.cable.unit},
         ],
     )
     write(session, place)  # Three radios to the van.
@@ -237,7 +245,11 @@ def test_stock_sorts_within_each_group_and_filters(
     assert amounts() == ["2", "2", "3"]
     assert amounts(sort="quantity") == ["2", "2", "3"]
     assert amounts(sort="item", order="desc") == ["2", "2", "3"]
-    received(session, place, [{"item_id": place.cable.id, "quantity": "5"}])
+    received(
+        session,
+        place,
+        [{"item_id": place.cable.id, "quantity": "5", "unit": place.cable.unit}],
+    )
     assert amounts() == ["7", "2", "3"]
     assert amounts(sort="quantity") == ["2", "7", "3"]
     assert amounts(sort="quantity", order="desc") == ["7", "2", "3"]
@@ -283,8 +295,8 @@ def test_stock_pages_count_groups_and_never_split_one(
             session,
             place,
             [
-                {"item_id": place.item.id, "quantity": "1"},
-                {"item_id": place.cable.id, "quantity": "1"},
+                {"item_id": place.item.id, "quantity": "1", "unit": place.item.unit},
+                {"item_id": place.cable.id, "quantity": "1", "unit": place.cable.unit},
             ],
         )
     first = admin_client.get(STOCK, params={"per": "25"})
@@ -343,7 +355,11 @@ def test_reorder_sorts_by_each_heading_and_shows_25_50_100_or_all(
     """By name unless a heading sorts them (Ali, 2026-11-15,
     inventory-tng-qwb)."""
     place = Place(session)
-    received(session, place, [{"item_id": place.cable.id, "quantity": "4"}])
+    received(
+        session,
+        place,
+        [{"item_id": place.cable.id, "quantity": "4", "unit": place.cable.unit}],
+    )
     place.item.minimum = Decimal(1)  # None held: 0.
     place.cable.minimum = Decimal(9)
     session.flush()
@@ -379,7 +395,7 @@ def test_needs_counting_sorts_within_each_place_and_pages_places(
         place,
         from_location_id=place.store.id,
         to_location_id=place.van.id,
-        lines=[{"item_id": place.cable.id, "quantity": "5"}],
+        lines=[{"item_id": place.cable.id, "quantity": "5", "unit": place.cable.unit}],
     )
 
     def amounts(**query: str) -> list[str]:
@@ -400,7 +416,11 @@ def test_a_filter_leaves_the_whole_stocks_figures_whole(
     stock's, whatever a filter shows (inventory-tng-qwb)."""
     place = stocked(session)  # Five radios at the store.
     write(session, place)  # Three of them to the van.
-    write(session, place, lines=[{"item_id": place.cable.id, "quantity": "1"}])
+    write(
+        session,
+        place,
+        lines=[{"item_id": place.cable.id, "quantity": "1", "unit": place.cable.unit}],
+    )
     van = {"by": "item", "place": str(place.van.id)}
     by_item = words_on(admin_client.get(STOCK, params=van).text)
     assert "5 each in all" in by_item

@@ -79,7 +79,7 @@ describe("as a cart", () => {
   });
 
   test("a save's line typed in a unit its item is no longer counted in is done again (inventory-tng-57u8)", () => {
-    const { cart, gaps } = toCart(
+    const { cart, gaps, parts } = toCart(
       onlyOlder({
         lines: [
           { item_id: 101, quantity: "50", unit: "ft" },
@@ -90,6 +90,8 @@ describe("as a cart", () => {
     );
     expect(cart.lines.map((line) => line.itemId)).toEqual([100]);
     expect(gaps).toEqual([`Cat6 cable: ${say(UNIT_CHANGED)}`]);
+    // Said in the unit it was typed in, never the one it is counted in now.
+    expect(parts.find((part) => part.itemId === 101)?.words).toContain("50 ft");
   });
 
   test("a save's cart keeps its batch key, to be sent under; a cart's has none", () => {

@@ -23,7 +23,7 @@ from sqlalchemy.orm import Session
 from inventory_tng.core.db_errors import RuleBroken
 from inventory_tng.core.db_lookups import values_by
 from inventory_tng.core.db_once_committed import once_committed
-from inventory_tng.models.catalogue import ItemPackage
+from inventory_tng.models.catalogue import Item, ItemPackage
 from inventory_tng.models.stock import LedgerTransaction, Movement, OpenPackage
 from inventory_tng.models.volunteers import Volunteer
 from inventory_tng.scan import batch_schemas
@@ -487,7 +487,7 @@ def _shown_otherwise(
         item = held.items.get(line.item_id)
         if item is None:
             continue
-        if line.unit is not None and line.unit != item.unit:
+        if line.unit != item.unit:
             units[item.id] = item.unit
         counted = _as_counted(line, packages)
         package = packages.get(line.package_id or 0)
@@ -542,7 +542,7 @@ def _problems(
         # Counted in another unit since the page read its catalogue: refused,
         # and read as whole or not in the unit it was shown in.
         item = held.items[sent.item_id]
-        if sent.unit is not None and sent.unit != item.unit:
+        if sent.unit != item.unit:
             problems.append((("lines", number, "unit"), "unit_changed"))
             broken = [rule for rule in broken if rule != "movement_whole_units"]
             if not whole_enough(sent.unit, sent.quantity):
@@ -735,6 +735,8 @@ def _as_batch(
         ItemPackage.size,
         {f.package_id for f in forms if f.package_id},
     )
+    # A moved item's unit is fixed (catalogue/items.py): the one it moved in.
+    units = values_by(session, Item.id, Item.unit, {line.item_id for line in lines})
 
     def line_of(line: Entry) -> batch_schemas.RecordedLine:
         if transaction.kind == "open":
@@ -757,6 +759,7 @@ def _as_batch(
             package_size=sizes.get(package_id) if package_id is not None else None,
             open_package_key=keys.get(open_id) if open_id is not None else None,
             whole=whole,
+            unit=units[line.item_id],
         )
 
     return batch_schemas.RecordedBatch(

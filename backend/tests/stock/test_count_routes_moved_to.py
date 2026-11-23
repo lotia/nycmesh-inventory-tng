@@ -137,7 +137,7 @@ def test_moves_from_two_areas_are_fixed_each_on_its_own(
     item = made.place.item.id
     gone = [add(session, area(name, made.store)) for name in ("Shelf C", "Shelf D")]
     retire(session, *gone)
-    lines = [{"item_id": item, "quantity": "2"}]
+    lines = [{"item_id": item, "quantity": "2", "unit": made.place.item.unit}]
     for each in gone:
         write(
             session,

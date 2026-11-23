@@ -21,6 +21,7 @@ describe("turning a cart into a batch", () => {
         {
           item_id: 101,
           quantity: "305",
+          unit: "m",
           package_id: 1001,
           package_size: "305",
           open_package_key: fresh,
@@ -29,6 +30,7 @@ describe("turning a cart into a batch", () => {
         {
           item_id: 101,
           quantity: "305",
+          unit: "m",
           package_id: 1001,
           package_size: "305",
           open_package_key: known.key,
@@ -36,6 +38,7 @@ describe("turning a cart into a batch", () => {
         {
           item_id: 101,
           quantity: "305",
+          unit: "m",
           package_id: 1001,
           package_size: "305",
         },
@@ -44,6 +47,7 @@ describe("turning a cart into a batch", () => {
         {
           item_id: 101,
           quantity: "610",
+          unit: "m",
           package_id: 1001,
           package_size: "610",
           open_package_key: "55555555-5555-4555-8555-555555555555",
@@ -51,6 +55,7 @@ describe("turning a cart into a batch", () => {
         {
           item_id: 101,
           quantity: "305",
+          unit: "m",
           package_id: 1001,
           open_package_key: "66666666-6666-4666-8666-666666666666",
         },
@@ -62,13 +67,25 @@ describe("turning a cart into a batch", () => {
       from_location_id: 10,
       to_location_id: 12,
       lines: [
-        { item_id: 101, quantity: "20", open_package_key: known.key },
-        { item_id: 101, quantity: "305", open_package_key: fresh, whole: true },
-        { item_id: 101, quantity: "1" },
+        {
+          item_id: 101,
+          quantity: "20",
+          unit: "m",
+          open_package_key: known.key,
+        },
+        {
+          item_id: 101,
+          quantity: "305",
+          unit: "m",
+          open_package_key: fresh,
+          whole: true,
+        },
+        { item_id: 101, quantity: "1", unit: "m" },
         // Opened on another phone: the catalogue's, once loaded again.
         {
           item_id: 101,
           quantity: "1",
+          unit: "m",
           open_package_key: "44444444-4444-4444-8444-444444444444",
         },
       ],
@@ -151,6 +168,7 @@ describe("turning a cart into a batch", () => {
         {
           item_id: 101,
           quantity: "305",
+          unit: "m",
           package_id: 1009,
           package_size: "305",
           open_package_key: "33333333-3333-4333-8333-333333333333",

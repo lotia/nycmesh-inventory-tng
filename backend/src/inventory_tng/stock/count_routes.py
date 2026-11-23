@@ -88,7 +88,7 @@ from inventory_tng.core.db_errors import Gone as RowGone
 from inventory_tng.core.db_errors import attempt, refusal
 from inventory_tng.core.db_sessions import DbSession, SnapshotSession, by_name
 from inventory_tng.core.phrases import Words, gettext, lazy_gettext, ngettext
-from inventory_tng.core.sent_forms import form_key
+from inventory_tng.core.sent_forms import digest_spent, form_key
 from inventory_tng.models.base import INTEGER_MAX, whole
 from inventory_tng.models.catalogue import Item, ItemPackage
 from inventory_tng.models.places import Location
@@ -135,7 +135,7 @@ from inventory_tng.stock.count_forms import (
 from inventory_tng.stock.count_gone_areas import gone_words, moved_sections
 from inventory_tng.stock.count_groups import Group
 from inventory_tng.stock.counts import COUNTABLE, WHOLE, NotCountable
-from inventory_tng.stock.forms import shown_field, shown_in
+from inventory_tng.stock.forms import now_counted_in, now_holds, shown_field, shown_in
 from inventory_tng.stock.ledger import by_item, tracks_opened
 from inventory_tng.stock.moments import (
     Moment,
@@ -319,6 +319,16 @@ def shown_items(only: OnlyItem, q: str = "") -> Shown:
 
 
 ShownItems = Annotated[Shown, Depends(shown_items)]
+
+
+def _changed_alert(now: Now) -> str:
+    """Above a count form shown again as one of its items or packages
+    changed since it was shown: what one is now, said beside its box too,
+    if the form shows one, as a sealed row of a package held nowhere it
+    does not."""
+    if now.units:
+        return now_counted_in(min(now.units.items())[1])
+    return now_holds(*min(now.sizes.items())[1])
 
 
 def _shown_places(
@@ -761,14 +771,18 @@ def count(
     problems: dict[str, Words] = dict(sent.problems)
     alert = TWICE if sent.twice else problems.get(CLOSED_MEANWHILE)
     # Shown in a unit or a package size changed since: asked again in the
-    # new ones (units_shown), checked again as it is saved.
+    # new ones (units_shown), checked again as it is saved. A form saved
+    # before is answered as it was (store_counts.record_store_count).
     shown_as = shown_in(form)
-    named_now = changed_since(
-        session, shown_as, *amounts_named(sent.places.values(), {})
-    )
+    named_now = Now({}, {})
+    if digest_spent(session, key) is None:
+        named_now = changed_since(
+            session, shown_as, *amounts_named(sent.places.values(), {})
+        )
     if named_now:
         refusing("count", named_now)
         problems |= changed_words(session, form, place.id, place_ids, named_now)
+        alert = alert or _changed_alert(named_now)
     tree = None
     off_form = None
     if sent.listed is not None:
@@ -893,7 +907,7 @@ def count(
             # sent, in the units and sizes now, each box of one changed
             # saying so.
             words = changed_words(session, form, place.id, place_ids, shown_now)
-            return as_sent(problems=words, left=left())
+            return as_sent(problems=words, alert=_changed_alert(shown_now), left=left())
         if broken == CHANGED:
             # What was typed may be of before that save or after it, of
             # items it cannot tell: the form as it is now, with a new key,

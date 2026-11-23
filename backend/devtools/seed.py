@@ -130,6 +130,7 @@ def _catalogue(session: Session) -> None:
             {
                 "item_id": things[name].id,
                 "quantity": quantity,
+                "unit": things[name].unit,
                 **(
                     {"package_id": box.id, "package_size": size} if name == item else {}
                 ),

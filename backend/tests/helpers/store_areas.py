@@ -11,7 +11,7 @@ from inventory_tng.stock.moments import at_place
 from inventory_tng.stock.paths import COUNTS
 
 from helpers.rows import add, tag
-from helpers.stock import retire, stocked, write
+from helpers.stock import item_unit, retire, stocked, write
 
 
 class Store:
@@ -37,7 +37,9 @@ class Store:
             kind="receipt",
             from_location_id=None,
             to_location_id=where.id,
-            lines=[{"item_id": item_id, "quantity": n}],
+            lines=[
+                {"item_id": item_id, "quantity": n, "unit": item_unit(session, item_id)}
+            ],
         )
 
     def move(
@@ -49,7 +51,13 @@ class Store:
             self.place,
             from_location_id=here.id,
             to_location_id=there.id,
-            lines=[{"item_id": self.place.item.id, "quantity": n}],
+            lines=[
+                {
+                    "item_id": self.place.item.id,
+                    "quantity": n,
+                    "unit": self.place.item.unit,
+                }
+            ],
         )
 
     def emptied_later(self, session: Session) -> Location:

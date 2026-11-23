@@ -230,9 +230,15 @@ describe("refusals", () => {
   test("a 422 says which line of the cart, and why in the page's words for its kind", async () => {
     // The cart's first line went as two, a box and loose units.
     const lines = [
-      { item_id: 5, quantity: "4", package_id: 9, package_size: "4" },
-      { item_id: 5, quantity: "1" },
-      { item_id: 6, quantity: "2" },
+      {
+        item_id: 5,
+        quantity: "4",
+        unit: "each",
+        package_id: 9,
+        package_size: "4",
+      },
+      { item_id: 5, quantity: "1", unit: "each" },
+      { item_id: 6, quantity: "2", unit: "each" },
     ];
     const detail = [
       { type: "not_found", loc: ["body", "lines", 2, "item_id"] },
@@ -323,16 +329,25 @@ describe("refusals", () => {
         {
           item_id: 5,
           quantity: "305",
+          unit: "each",
           package_id: 9,
           package_size: "305",
           open_package_key: key,
         },
         // A box its item does not follow: no key.
-        { item_id: 6, quantity: "100", package_id: 8, package_size: "100" },
+        {
+          item_id: 6,
+          quantity: "100",
+          unit: "each",
+          package_id: 8,
+          package_size: "100",
+        },
       ],
     });
     const cut = draft({
-      lines: [{ item_id: 5, quantity: "20", open_package_key: key }],
+      lines: [
+        { item_id: 5, quantity: "20", unit: "each", open_package_key: key },
+      ],
     });
     // The opening gets no good answer: the cut is not tried behind it.
     const { api, sent } = answering(
@@ -352,11 +367,19 @@ describe("refusals", () => {
   test("a batch naming an open package an earlier unsaved one names waits", async () => {
     const key = "33333333-3333-4333-8333-333333333333";
     const cut = draft({
-      lines: [{ item_id: 5, quantity: "50", open_package_key: key }],
+      lines: [
+        { item_id: 5, quantity: "50", unit: "each", open_package_key: key },
+      ],
     });
     const whole = draft({
       lines: [
-        { item_id: 5, quantity: "255", open_package_key: key, whole: true },
+        {
+          item_id: 5,
+          quantity: "255",
+          unit: "each",
+          open_package_key: key,
+          whole: true,
+        },
       ],
     });
     const { api, sent } = answering(
@@ -382,6 +405,7 @@ describe("refusals", () => {
         {
           item_id: 5,
           quantity: "305",
+          unit: "each",
           package_id: 9,
           package_size: "305",
           open_package_key: key,

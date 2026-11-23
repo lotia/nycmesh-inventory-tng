@@ -23,7 +23,10 @@ def test_sealed_packages_saved_arrive_sealed(
     registered_client: TestClient, session: Session, spools: Spools
 ) -> None:
     store, van, spool = spools.store.id, spools.van.id, spools.spool.id
-    lines = [sealed_line(spools, "305"), {"item_id": spools.cable.id, "quantity": "5"}]
+    lines = [
+        sealed_line(spools, "305"),
+        {"item_id": spools.cable.id, "quantity": "5", "unit": spools.cable.unit},
+    ]
     batch = spools.place.batch(lines=lines)
     assert registered_client.post(URL, json=batch).status_code == 201
     assert registered_client.post(URL, json=batch).status_code == 200
@@ -49,7 +52,7 @@ def test_a_batch_saved_before_packages_were_kept_sealed_saves_loose(
     registered_client: TestClient, session: Session, spools: Spools
 ) -> None:
     """An outbox's batch from an older page, of units alone."""
-    lines = [{"item_id": spools.cable.id, "quantity": "305"}]
+    lines = [{"item_id": spools.cable.id, "quantity": "305", "unit": spools.cable.unit}]
     response = registered_client.post(URL, json=spools.place.batch(lines=lines))
     assert response.status_code == 201
     assert quantities_by_form(session, spools.cable)[(spools.van.id, None, None)] == 305
@@ -62,7 +65,12 @@ def test_a_line_sent_in_a_size_its_package_no_longer_has_is_refused(
     (inventory-tng-5f7): its count of boxes is of the old size, so it is
     refused, not saved as another number of them; an opening's too."""
     box = add(session, ItemPackage(item_id=spools.cable.id, name=f"B {tag()}", size=50))
-    line = {"item_id": spools.cable.id, "quantity": "50", "package_id": box.id}
+    line = {
+        "item_id": spools.cable.id,
+        "quantity": "50",
+        "unit": spools.cable.unit,
+        "package_id": box.id,
+    }
     built = spools.place.batch(lines=[line | {"package_size": "50"}])
     opening = spools.place.batch(
         kind="open",
@@ -89,6 +97,7 @@ def test_a_line_sent_in_a_size_its_package_no_longer_has_is_refused(
     halves = {
         "item_id": spools.place.item.id,
         "quantity": "2.5",
+        "unit": spools.place.item.unit,
         "package_id": radios.id,
     }
     many = sealed_line(spools, "610") | {"package_size": "305"}
@@ -128,6 +137,7 @@ def test_a_size_is_said_only_of_a_package_of_the_lines_item(
     refused already, on that alone."""
     other = sealed_line(spools, "300") | {
         "item_id": spools.place.item.id,
+        "unit": spools.place.item.unit,
         "package_size": "1",
     }
     response = registered_client.post(URL, json=spools.place.batch(lines=[other]))
@@ -150,7 +160,12 @@ def test_a_size_is_said_only_of_a_package_of_the_lines_item(
         (unsized, missing),
         (unsized | {"package_size": None}, missing),
         (
-            {"item_id": spools.cable.id, "quantity": "5", "package_size": "5"},
+            {
+                "item_id": spools.cable.id,
+                "quantity": "5",
+                "unit": spools.cable.unit,
+                "package_size": "5",
+            },
             (
                 "package_size_without_package",
                 "package_size is only allowed with package_id",
@@ -184,11 +199,12 @@ def test_a_refusal_names_each_bad_package_line(
         {
             "item_id": spools.cable.id,
             "quantity": "10",
+            "unit": spools.cable.unit,
             "package_id": other.id,
             "package_size": "10",
         },
         sealed_line(spools, "305"),
-        {"item_id": spools.cable.id, "quantity": "1"},
+        {"item_id": spools.cable.id, "quantity": "1", "unit": spools.cable.unit},
     ]
     response = registered_client.post(URL, json=spools.place.batch(lines=lines))
     assert response.status_code == 422
@@ -231,7 +247,7 @@ def test_a_retired_package_with_none_left_sealed_is_never_taken(
     assert registered_client.post(URL, json=gone).status_code == 201
     retire(session, spools.spool)
     before = quantities_by_form(session, spools.cable)
-    loose = {"item_id": spools.cable.id, "quantity": "5"}
+    loose = {"item_id": spools.cable.id, "quantity": "5", "unit": spools.cable.unit}
     move = spools.place.batch(lines=[loose, sealed_line(spools, "305")])
     response = registered_client.post(URL, json=move)
     assert response.status_code == 422

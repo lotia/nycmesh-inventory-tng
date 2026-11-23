@@ -1282,6 +1282,7 @@ def test_a_batch_of_a_package_resized_meanwhile_waits_then_is_refused(
     line = {
         "item_id": place.cable.id,
         "quantity": "50",
+        "unit": place.cable.unit,
         "package_id": box.id,
         "package_size": "50",
     }
@@ -1398,6 +1399,7 @@ def test_a_whole_move_sent_twice_at_once_is_written_once(
     line = {
         "item_id": spools.cable.id,
         "quantity": "305",
+        "unit": spools.cable.unit,
         "open_package_key": str(made.key),
         "whole": True,
     }

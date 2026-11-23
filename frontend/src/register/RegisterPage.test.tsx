@@ -148,7 +148,7 @@ test("registering sends the batches that waited for it", async () => {
       kind: "receipt",
       volunteer_id: 1,
       to_location_id: 2,
-      lines: [{ item_id: 5, quantity: "1" }],
+      lines: [{ item_id: 5, quantity: "1", unit: "each" }],
     },
     summary: { from: null, to: "Hub" },
     queuedAt: 1,

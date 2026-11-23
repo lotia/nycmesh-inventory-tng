@@ -14,6 +14,7 @@ describe("turning a cart into a batch", () => {
     const spools = (n: number, extra = {}) => ({
       item_id: 101,
       quantity: String(305 * n),
+      unit: "m",
       package_id: 1001,
       package_size: "305",
       ...extra,
@@ -52,6 +53,7 @@ describe("turning a cart into a batch", () => {
             {
               item_id: 101,
               quantity: "20",
+              unit: "m",
               package_id: 1001,
               open_package_key: "33333333-3333-4333-8333-333333333333",
             },
@@ -76,7 +78,7 @@ describe("turning a cart into a batch", () => {
           from_location_id: 10,
           lines: [
             spools(1),
-            { item_id: 101, quantity: "5" },
+            { item_id: 101, quantity: "5", unit: "m" },
             // A package the catalogue has no more: not counted.
             spools(1, { package_id: 1009 }),
           ],
@@ -130,6 +132,7 @@ describe("turning a cart into a batch", () => {
           {
             item_id: 101,
             quantity: "abc",
+            unit: "m",
             open_package_key: "11111111-1111-4111-8111-111111111111",
           },
         ],

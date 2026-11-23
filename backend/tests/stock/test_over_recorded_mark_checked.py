@@ -466,7 +466,9 @@ def test_an_install_corrected_is_found_again_where_it_left(
     """An install has no place it arrives at: one adjustment only."""
     first = place.batch(kind="install", to_location_id=None, install_number=12)
     recorded_then_changed(
-        registered_client, first, lines=[{"item_id": place.item.id, "quantity": "1"}]
+        registered_client,
+        first,
+        lines=[{"item_id": place.item.id, "quantity": "1", "unit": place.item.unit}],
     )
     (check,) = checks(session)
     admin_client.post(
@@ -501,7 +503,12 @@ def test_what_a_batch_was_changed_from_does_not_make_it_another(
     assert created.status_code == 201
     again = registered_client.post(
         URL,
-        json=first | {"changed_from": [{"item_id": place.item.id, "quantity": "9"}]},
+        json=first
+        | {
+            "changed_from": [
+                {"item_id": place.item.id, "quantity": "9", "unit": place.item.unit}
+            ]
+        },
     )
     assert again.status_code == 200
     assert again.json() == created.json()

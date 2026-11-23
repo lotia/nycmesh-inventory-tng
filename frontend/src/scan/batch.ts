@@ -216,7 +216,7 @@ export function toBatch(
     // Each of its lines says the unit it was typed in (cart.sized): one
     // counted in another since is refused, for the volunteer to count again
     // (Ali, 2026-11-23, inventory-tng-57u8).
-    const first = lines.length;
+    const unit = line.unit ?? item.unit;
     if ("problem" in quantity) {
       problems.push(sayParts(ITEM_SAYS, { name, what: quantity.problem }));
     } else if (quantity.amount >= MAX_AMOUNT) {
@@ -229,15 +229,19 @@ export function toBatch(
     } else if (cart.kind === "open" && quantity.loose > 0) {
       problems.push(sayParts(OPEN_WHOLE, { name }));
     } else if (cart.kind === "open" && quantity.amount > 0) {
-      lines.push(...openings(item, quantity.sealed, cart.batchKey));
+      lines.push(...openings(item, unit, quantity.sealed, cart.batchKey));
     } else if (quantity.amount > 0) {
       // Each package counted on a line of its own, sealed, so stock keeps
       // them sealed where they arrive (docs/decisions/0020); then loose.
       for (const [packageId, { count, size }] of quantity.sealed) {
-        lines.push(packageLine(item.id, packageId, size, count * size));
+        lines.push(packageLine(item.id, unit, packageId, size, count * size));
       }
       if (quantity.loose > 0) {
-        lines.push({ item_id: item.id, quantity: decimal(quantity.loose) });
+        lines.push({
+          item_id: item.id,
+          quantity: decimal(quantity.loose),
+          unit,
+        });
       }
       // From an open package: cut loose, or, moving it, all of it whole.
       for (const [key, { amount, whole }] of quantity.taken) {
@@ -246,11 +250,9 @@ export function toBatch(
           quantity: decimal(amount),
           open_package_key: key,
           ...(whole && cart.kind === "move" ? { whole: true } : {}),
+          unit,
         });
       }
-    }
-    for (const added of lines.slice(first)) {
-      added.unit = line.unit ?? item.unit;
     }
   }
   if (
@@ -355,6 +357,7 @@ export function batchWords(
  */
 function openings(
   item: Item,
+  unit: string,
   sealed: Map<number, Packs>,
   batchKey: string | undefined,
 ): Draft["lines"] {
@@ -364,13 +367,13 @@ function openings(
   return [...sealed].flatMap(([packageId, { count, size }]) =>
     followed.has(packageId)
       ? Array.from({ length: count }, (_, each) => ({
-          ...packageLine(item.id, packageId, size, size),
+          ...packageLine(item.id, unit, packageId, size, size),
           open_package_key:
             batchKey === undefined
               ? uuid()
               : uuidFrom(`open ${item.id} ${packageId} ${each}`, batchKey),
         }))
-      : [packageLine(item.id, packageId, size, count * size)],
+      : [packageLine(item.id, unit, packageId, size, count * size)],
   );
 }
 
@@ -383,11 +386,12 @@ type PackageLine = Draft["lines"][number] & {
   package_size: string;
 };
 
-/** `amount` of the package `packageId`, in thousandths of the item's unit,
- * with the size it was counted in: one resized since is refused, not
+/** `amount` of the package `packageId`, in thousandths of `unit`, the
+ * item's as typed, with the size it was counted in: one resized since is refused, not
  * recounted. */
 function packageLine(
   itemId: number,
+  unit: string,
   packageId: number,
   size: number,
   amount: number,
@@ -397,6 +401,7 @@ function packageLine(
     quantity: decimal(amount),
     package_id: packageId,
     package_size: decimal(size),
+    unit,
   };
 }
 

@@ -19,14 +19,17 @@ import { KEY_REUSED, noteOf, SOME_NOT_RECORDED } from "./outbox-notes";
 describe("what another tab recorded (inventory-tng-0gg)", () => {
   /** The server's 409 for a key whose transaction 41, from location 1 to
    * 2, held `lines`. */
-  const recordedReply = (lines = [{ item_id: 5, quantity: "3.000" }]) =>
+  const recordedReply = (
+    lines = [{ item_id: 5, quantity: "3.000", unit: "each" }],
+  ) =>
     keyReused(lines, {
       transaction_id: 41,
       from_location_id: 1,
       to_location_id: 2,
     });
 
-  const changed = () => draft({ lines: [{ item_id: 5, quantity: "4" }] });
+  const changed = () =>
+    draft({ lines: [{ item_id: 5, quantity: "4", unit: "each" }] });
 
   test("a cart's batch refused for its key keeps what the server says was recorded", async () => {
     const { api } = answering(() => recordedReply());
@@ -50,6 +53,7 @@ describe("what another tab recorded (inventory-tng-0gg)", () => {
             {
               item_id: 5,
               quantity: "3.000",
+              unit: "each",
               package_id: null,
               package_size: null,
               open_package_key: null,
@@ -182,7 +186,7 @@ describe("what another tab recorded (inventory-tng-0gg)", () => {
     const outbox = new Outbox(api);
     const key = uuid();
     outbox.queue(
-      draft({ changed_from: [{ item_id: 5, quantity: "9" }] }),
+      draft({ changed_from: [{ item_id: 5, quantity: "9", unit: "each" }] }),
       named("a"),
       key,
     );

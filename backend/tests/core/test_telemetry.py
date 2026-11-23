@@ -534,7 +534,7 @@ def test_counts_the_areas_brought_back_from_a_count_form(
         session, Location(name=f"Shelf {tag()}", kind="area", parent_id=place.store.id)
     )
     retire(session, shelf)
-    radio = [{"item_id": place.item.id, "quantity": "1"}]
+    radio = [{"item_id": place.item.id, "quantity": "1", "unit": place.item.unit}]
     write(
         session,
         place,
@@ -583,7 +583,7 @@ def test_counts_the_moves_fixed_on_a_count_form(
         ]
         gone, there = shelves
         retire(session, gone)
-        radios = [{"item_id": place.item.id, "quantity": "2"}]
+        radios = [{"item_id": place.item.id, "quantity": "2", "unit": place.item.unit}]
         write(
             session,
             place,
@@ -790,7 +790,7 @@ def test_counts_lines_recorded_more_than_moved_corrected_as_adjustments(
     first = place.batch()
     assert client.post("/api/transactions", json=first).status_code == 201
     changed = first | {
-        "lines": [{"item_id": place.item.id, "quantity": "1"}],
+        "lines": [{"item_id": place.item.id, "quantity": "1", "unit": place.item.unit}],
         "changed_from": first["lines"],
     }
     assert client.post("/api/transactions", json=changed).status_code == 409
@@ -838,10 +838,15 @@ def test_counts_batches_written_replayed_and_refused(
     batch = place.batch()
     assert client.post("/api/transactions", json=batch).status_code == 201
     assert client.post("/api/transactions", json=batch).status_code == 200
-    unknown = place.batch(lines=[{"item_id": 999999, "quantity": "1"}])
+    unknown = place.batch(lines=[{"item_id": 999999, "quantity": "1", "unit": "each"}])
     assert client.post("/api/transactions", json=unknown).status_code == 422
     box = add(session, ItemPackage(item_id=place.cable.id, name="Box", size=25))
-    resized = {"item_id": place.cable.id, "quantity": "50", "package_id": box.id}
+    resized = {
+        "item_id": place.cable.id,
+        "quantity": "50",
+        "unit": place.cable.unit,
+        "package_id": box.id,
+    }
     stale = place.batch(lines=[resized | {"package_size": "50"}])
     assert client.post("/api/transactions", json=stale).status_code == 422
     client.cookies.clear()
@@ -870,7 +875,12 @@ def test_counts_saves_shown_in_a_unit_or_size_changed_since(
     box = add(session, ItemPackage(item_id=place.item.id, name="Box", size=10))
     lines = [
         {"item_id": place.cable.id, "quantity": "50", "unit": "m"},
-        {"item_id": place.item.id, "quantity": "30", "package_id": box.id}
+        {
+            "item_id": place.item.id,
+            "quantity": "30",
+            "unit": place.item.unit,
+            "package_id": box.id,
+        }
         | {"package_size": "10", "unit": "each"},
     ]
     receipt = place.batch(
@@ -952,6 +962,7 @@ def test_counts_packages_opened_by_what_they_became(
             {
                 "item_id": spools.cable.id,
                 "quantity": "305",
+                "unit": spools.cable.unit,
                 "package_id": spools.spool.id,
                 "package_size": "305",
                 "open_package_key": str(uuid.uuid4()),
@@ -1464,14 +1475,14 @@ def test_counts_lines_recorded_more_than_moved_raised_and_settled(
     settled = counted(reader, "inventory.over_recorded.settled")
     first = place.batch(
         lines=[
-            {"item_id": place.item.id, "quantity": "3"},
-            {"item_id": place.cable.id, "quantity": "10"},
+            {"item_id": place.item.id, "quantity": "3", "unit": place.item.unit},
+            {"item_id": place.cable.id, "quantity": "10", "unit": place.cable.unit},
         ]
     )
     assert client.post("/api/transactions", json=first).status_code == 201
     # As a page sends a cart put back with first's lines, changed.
     changed = first | {
-        "lines": [{"item_id": place.item.id, "quantity": "1"}],
+        "lines": [{"item_id": place.item.id, "quantity": "1", "unit": place.item.unit}],
         "changed_from": first["lines"],
     }
     assert client.post("/api/transactions", json=changed).status_code == 409
@@ -1506,7 +1517,7 @@ def test_counts_lines_recorded_more_than_moved_settled_by_counts(
     first = place.batch()
     assert client.post("/api/transactions", json=first).status_code == 201
     changed = first | {
-        "lines": [{"item_id": place.item.id, "quantity": "1"}],
+        "lines": [{"item_id": place.item.id, "quantity": "1", "unit": place.item.unit}],
         "changed_from": first["lines"],
     }
     assert client.post("/api/transactions", json=changed).status_code == 409
@@ -1620,7 +1631,7 @@ def test_counts_places_brought_back_to_correct_one(
     first = place.batch()
     assert client.post("/api/transactions", json=first).status_code == 201
     changed = first | {
-        "lines": [{"item_id": place.item.id, "quantity": "1"}],
+        "lines": [{"item_id": place.item.id, "quantity": "1", "unit": place.item.unit}],
         "changed_from": first["lines"],
     }
     assert client.post("/api/transactions", json=changed).status_code == 409

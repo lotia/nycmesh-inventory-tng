@@ -32,6 +32,7 @@ from helpers.stock import (
     received,
     retire,
     sealed_line,
+    unit_of,
 )
 
 PAGE = "/admin/stock/recorded-more"
@@ -41,6 +42,7 @@ def bagged(bags: ItemPackage, n: int) -> dict[str, object]:
     return {
         "item_id": bags.item_id,
         "quantity": str(50 * n),
+        "unit": unit_of(bags),
         "package_id": bags.id,
         "package_size": "50",
     }
@@ -84,7 +86,9 @@ def radios_raised(client: TestClient, place: Place) -> None:
     """Three radios recorded moved from the store to the van, then one: two
     wait, loose at each end."""
     recorded_then_changed(
-        client, place.batch(), lines=[{"item_id": place.item.id, "quantity": "1"}]
+        client,
+        place.batch(),
+        lines=[{"item_id": place.item.id, "quantity": "1", "unit": place.item.unit}],
     )
 
 
@@ -110,7 +114,11 @@ def moved_whole(
     `reported`, the batch that moved it said that length was left on it."""
     made = spools.opened()
     whole = cut(made, "305") | {"whole": True}
-    loose = {"item_id": spools.place.item.id, "quantity": "1"}
+    loose = {
+        "item_id": spools.place.item.id,
+        "quantity": "1",
+        "unit": spools.place.item.unit,
+    }
     lengths = [length(made, reported)] if reported else None
     recorded_then_changed(
         client,

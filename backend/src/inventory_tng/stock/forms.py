@@ -1,6 +1,8 @@
 """How the stock pages' other forms are read and checked: an adjustment,
 lines recorded with more than was moved, and lengths to check, and what
-is wrong, in words, beside the field it is about. The handlers in
+is wrong, in words, beside the field it is about. Also the hidden fields
+of the units and package sizes a stock form showed, the count form's
+too, and the words asking again in the new ones (UNITS, SIZES). The handlers in
 stock/counts_routes.py, stock/over_recorded_routes.py,
 stock/length_checks_routes.py and stock/used_up_routes.py read the
 request and pass the form's fields. A place's count form is
@@ -96,7 +98,8 @@ def now_holds(size: Decimal, unit: str) -> str:
 class Adjustment(NamedTuple):
     """An adjustment as its form asks for it: at a place, of an item, how
     much, found or written off ("found" or "off"), why, the key its form
-    was shown with, and the unit it showed the item in ("" for none)."""
+    was shown with, and the unit it showed the item in, its unit when read,
+    checked again as it is saved (counts.record_adjustment)."""
 
     place: Location
     item: Item
@@ -128,6 +131,12 @@ def adjustment(
     )
     if isinstance(amount, str):
         problems["amount"] = amount
+    # Shown in another unit, or in none: asked again in its unit now, which
+    # the form shown again shows, whatever else is wrong (units_shown).
+    unit = shown_in(form).units.get(item.id, "") if item else ""
+    if item and unit != item.unit:
+        units_shown.refusing("adjustment", Now({item.id: item.unit}, {}))
+        problems["amount"] = now_counted_in(item.unit)
     direction = form.get("direction")
     if direction not in ("found", "off"):
         problems["direction"] = FOUND_OR_OFF
@@ -142,8 +151,6 @@ def adjustment(
         or not isinstance(amount, Decimal)
     ):
         return None, problems
-    # Not shown, it was shown in none: asked again (units_shown).
-    unit = shown_in(form).units.get(item.id, "")
     return Adjustment(place, item, amount, direction, reason, key, unit), problems
 
 

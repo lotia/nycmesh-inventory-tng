@@ -149,7 +149,7 @@ export function toCart(
               what:
                 packs === null
                   ? say(PACKAGES_OF, { count: n, package: pack.name })
-                  : inUnit(packs * countedAt, item),
+                  : inUnit(packs * countedAt, item?.unit),
             }),
             say(RESIZED),
             { at, packages: [packageId] },
@@ -199,7 +199,7 @@ export function toCart(
         lineOf(line.item_id, { at });
         return;
       }
-      const by = inUnit(amount, item);
+      const by = inUnit(amount, line.unit ?? item?.unit);
       const leave = (note: string, what = by) =>
         left.push({
           itemId: line.item_id,
@@ -370,7 +370,7 @@ function openWords(item: Item | undefined, said: unknown): string {
   const taken = typeof amount === "string" ? (thousandths(amount) ?? 0) : 0;
   const what =
     taken > 0
-      ? say(FROM_OPEN, { amount: inUnit(taken, item) })
+      ? say(FROM_OPEN, { amount: inUnit(taken, item?.unit) })
       : say(REPORTS[usedUp === true ? "used_up" : "lengths"]);
   return say(ITEM_SAYS, { name: nameOf(item), what });
 }
@@ -390,7 +390,7 @@ export function lineWords(line: Line, item: Item | undefined): string | null {
   });
   const loose = thousandths(line.loose) ?? 0;
   if (loose > 0) {
-    const amount = inUnit(loose, item);
+    const amount = inUnit(loose, line.unit ?? item?.unit);
     parts.push(parts.length > 0 ? say(LOOSE, { amount }) : amount);
   }
   if (parts.length === 0) {
@@ -493,10 +493,11 @@ export function nameOf(item: { name: string } | undefined): string {
   return item?.name ?? say(NO_LONGER_IN_CATALOGUE);
 }
 
-/** `amount`, in thousandths, of `item` in its unit: "20 m", or "2" for
- * things counted. */
-export function inUnit(amount: number, item: Item | undefined): string {
-  const unit =
-    item === undefined || item.unit === "each" ? "" : ` ${item.unit}`;
-  return `${sayAmount(amount)}${unit}`;
+/** `amount`, in thousandths, in `unit`, the one it was typed in, else its
+ * item's now: "20 m", or "2" for things counted. */
+export function inUnit(
+  amount: number,
+  unit: string | null | undefined,
+): string {
+  return `${sayAmount(amount)}${unit == null || unit === "each" ? "" : ` ${unit}`}`;
 }

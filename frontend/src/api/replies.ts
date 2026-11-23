@@ -31,6 +31,8 @@ export const RecordedLine = v.object({
   package_size: v.nullable(v.string()),
   open_package_key: v.nullable(v.pipe(v.string(), v.uuid())),
   whole: v.nullable(v.boolean()),
+  /** Its item's unit, fixed once it moved. */
+  unit: v.string(),
 });
 
 /** The transaction recorded under a batch's key, as a batch sends one,

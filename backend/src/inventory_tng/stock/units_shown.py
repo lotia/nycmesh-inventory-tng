@@ -32,10 +32,10 @@ Save = Literal["batch", "count", "adjustment", "confirm_count"]
 
 refused = meter.create_counter(
     "inventory.saves.shown_otherwise",
-    unit="{line}",
-    description="Items and packages a save named that were shown in a unit "
-    "or package size changed since, so the save was refused and asked again, "
-    "by what changed and the save",
+    unit="{change}",
+    description="Item units and package sizes a save showed that changed "
+    "since, one for each item or package, so the save was refused and asked "
+    "again, by what changed and the save",
 )
 
 SHOWN_OTHERWISE = "shown_otherwise"

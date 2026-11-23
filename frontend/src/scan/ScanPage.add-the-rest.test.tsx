@@ -39,8 +39,14 @@ async function refusedWith(...problems: Problem[]) {
     outboxEntry({
       body: moveBody({
         lines: [
-          { item_id: 100, quantity: "4", package_id: 1000, package_size: "4" },
-          { item_id: 101, quantity: "2", package_id: null },
+          {
+            item_id: 100,
+            quantity: "4",
+            unit: "each",
+            package_id: 1000,
+            package_size: "4",
+          },
+          { item_id: 101, quantity: "2", unit: "m", package_id: null },
         ],
       }),
       state: "refused",
@@ -102,7 +108,7 @@ test("Add to cart, under a refused batch, puts the other lines in the cart, says
   const body = await (saves(sent)[0] as Request).clone().json();
   expect(body.key).toBe(cart.batchKey);
   expect(body.lines).toEqual([
-    expect.objectContaining({ item_id: 101, quantity: "2" }),
+    expect.objectContaining({ item_id: 101, quantity: "2", unit: "m" }),
   ]);
   // Recorded, the words keep their room, unseen.
   await vi.waitFor(() =>
@@ -131,8 +137,14 @@ test("each refused batch's Add to cart is described by its batch's words (invent
     outboxEntry({
       body: moveBody({
         lines: [
-          { item_id: 100, quantity: "4", package_id: 1000, package_size: "4" },
-          { item_id: 101, quantity: cable, package_id: null },
+          {
+            item_id: 100,
+            quantity: "4",
+            unit: "each",
+            package_id: 1000,
+            package_size: "4",
+          },
+          { item_id: 101, quantity: cable, unit: "m", package_id: null },
         ],
       }),
       summary: { from: "Hub", to },

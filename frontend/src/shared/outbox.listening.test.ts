@@ -89,7 +89,10 @@ describe("listening", () => {
   function underOneKey() {
     const saved = entry({ state: "saved", transactionId: 1, queuedAt: 1 });
     const refused = entry({
-      body: { ...saved.body, lines: [{ item_id: 6, quantity: "1" }] },
+      body: {
+        ...saved.body,
+        lines: [{ item_id: 6, quantity: "1", unit: "each" }],
+      },
       state: "refused",
       reason: { code: "refused", problems: [] },
       queuedAt: 2,

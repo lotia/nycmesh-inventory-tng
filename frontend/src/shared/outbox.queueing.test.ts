@@ -69,7 +69,7 @@ describe("queueing", () => {
     // Filled again by a tab that had not heard, and changed there.
     expect(
       outbox.queue(
-        draft({ lines: [{ item_id: 6, quantity: "1" }] }),
+        draft({ lines: [{ item_id: 6, quantity: "1", unit: "each" }] }),
         named("b"),
         key,
       ),
@@ -105,7 +105,7 @@ describe("queueing", () => {
     outbox.queue(draft(), named("a"), key);
     // Refused at once, listed under a key of its own, never read back yet.
     outbox.queue(
-      draft({ lines: [{ item_id: 6, quantity: "1" }] }),
+      draft({ lines: [{ item_id: 6, quantity: "1", unit: "each" }] }),
       named("b"),
       key,
     );
@@ -122,7 +122,10 @@ describe("queueing", () => {
     const key = uuid();
     const first = entry({ body: { ...draft(), key }, putBack: true });
     const changed = entry({
-      body: { ...draft({ lines: [{ item_id: 6, quantity: "1" }] }), key },
+      body: {
+        ...draft({ lines: [{ item_id: 6, quantity: "1", unit: "each" }] }),
+        key,
+      },
       summary: named("b"),
       putBack: true,
     });
@@ -152,7 +155,10 @@ describe("queueing", () => {
     const key = uuid();
     const changed = (quantity: string, what: string): Entry =>
       entry({
-        body: { ...draft({ lines: [{ item_id: 6, quantity }] }), key },
+        body: {
+          ...draft({ lines: [{ item_id: 6, quantity, unit: "each" }] }),
+          key,
+        },
         summary: named(what),
         state: "refused",
         reason: { code: "recorded_elsewhere" },
@@ -188,7 +194,7 @@ describe("queueing", () => {
     // Fixed in the cart, whose emptying was not kept, and recorded again.
     reply = saved(41);
     outbox.queue(
-      draft({ lines: [{ item_id: 6, quantity: "1" }] }),
+      draft({ lines: [{ item_id: 6, quantity: "1", unit: "each" }] }),
       named("b"),
       key,
     );

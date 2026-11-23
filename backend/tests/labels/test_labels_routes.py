@@ -330,6 +330,7 @@ def test_inactive_labels_say_why_and_agree_with_the_scan_page(
             {
                 "item_id": place.item.id,
                 "quantity": "8",
+                "unit": place.item.unit,
                 "package_id": crate.id,
                 "package_size": "8",
             }

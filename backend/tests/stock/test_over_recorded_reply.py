@@ -34,10 +34,15 @@ def test_a_reused_key_is_told_what_was_recorded(
     registered_client: TestClient, place: Place, bags: ItemPackage
 ) -> None:
     first = place.batch(
-        lines=[{"item_id": place.item.id, "quantity": "3"}, bagged(bags, 2)]
+        lines=[
+            {"item_id": place.item.id, "quantity": "3", "unit": place.item.unit},
+            bagged(bags, 2),
+        ]
     )
     reply = recorded_then_changed(
-        registered_client, first, lines=[{"item_id": place.item.id, "quantity": "4"}]
+        registered_client,
+        first,
+        lines=[{"item_id": place.item.id, "quantity": "4", "unit": place.item.unit}],
     )
     recorded = reply["recorded"]
     assert reply["reason"] == "key_reused"
@@ -71,14 +76,20 @@ def test_what_a_batch_took_off_waits_for_an_administrator(
     registered_client: TestClient, session: Session, place: Place, bags: ItemPackage
 ) -> None:
     first = place.batch(
-        lines=[{"item_id": place.item.id, "quantity": "3"}, bagged(bags, 2)]
+        lines=[
+            {"item_id": place.item.id, "quantity": "3", "unit": place.item.unit},
+            bagged(bags, 2),
+        ]
     )
     with capture_logs() as logs:
         recorded_then_changed(
             registered_client,
             first,
             # One more radio, which is no check, and one bag fewer.
-            lines=[{"item_id": place.item.id, "quantity": "4"}, bagged(bags, 1)],
+            lines=[
+                {"item_id": place.item.id, "quantity": "4", "unit": place.item.unit},
+                bagged(bags, 1),
+            ],
         )
     (check,) = checks(session)
     movement = session.get_one(Movement, check.movement_id)
@@ -106,10 +117,15 @@ def test_a_line_taken_off_whole_waits_whole(
     registered_client: TestClient, session: Session, place: Place, bags: ItemPackage
 ) -> None:
     first = place.batch(
-        lines=[{"item_id": place.item.id, "quantity": "3"}, bagged(bags, 2)]
+        lines=[
+            {"item_id": place.item.id, "quantity": "3", "unit": place.item.unit},
+            bagged(bags, 2),
+        ]
     )
     recorded_then_changed(
-        registered_client, first, lines=[{"item_id": place.item.id, "quantity": "3"}]
+        registered_client,
+        first,
+        lines=[{"item_id": place.item.id, "quantity": "3", "unit": place.item.unit}],
     )
     assert [check.quantity for check in checks(session)] == [100]
 
@@ -136,10 +152,12 @@ def test_another_volunteer_alone_takes_nothing_off(
 def test_said_again_while_waiting_it_says_the_newest_and_settled_stays(
     registered_client: TestClient, session: Session, place: Place
 ) -> None:
-    first = place.batch(lines=[{"item_id": place.item.id, "quantity": "5"}])
+    first = place.batch(
+        lines=[{"item_id": place.item.id, "quantity": "5", "unit": place.item.unit}]
+    )
 
     def less(n: str) -> None:
-        lines = [{"item_id": place.item.id, "quantity": n}]
+        lines = [{"item_id": place.item.id, "quantity": n, "unit": place.item.unit}]
         response = registered_client.post(
             URL, json=first | {"lines": lines, "changed_from": first["lines"]}
         )
@@ -184,6 +202,7 @@ def test_an_opening_and_a_cut_are_said_by_their_open_packages(
             {
                 "item_id": spools.cable.id,
                 "quantity": "305",
+                "unit": spools.cable.unit,
                 "package_id": spools.spool.id,
                 "package_size": "305",
                 "open_package_key": key,
@@ -265,9 +284,15 @@ def test_a_batch_older_than_the_one_recorded_takes_nothing_off(
     batch, from before that change, sent after it (a tab of a build before,
     which sends no changed_from), took nothing off. Its difference is that
     tab's change, which moved (inventory-tng-0gg review)."""
-    original = [{"item_id": place.item.id, "quantity": "3"}, bagged(bags, 1)]
+    original = [
+        {"item_id": place.item.id, "quantity": "3", "unit": place.item.unit},
+        bagged(bags, 1),
+    ]
     newer = place.batch(
-        lines=[{"item_id": place.item.id, "quantity": "5"}, bagged(bags, 2)]
+        lines=[
+            {"item_id": place.item.id, "quantity": "5", "unit": place.item.unit},
+            bagged(bags, 2),
+        ]
     )
     reply = recorded_then_changed(
         registered_client, newer, lines=original, changed_from=None
@@ -282,12 +307,18 @@ def test_only_what_this_batch_took_off_since_it_was_put_back_waits(
     """Put back with 3 radios and 1 bag; another tab raised the bags to 2
     and recorded that; this one took the radios down to 1: only the 2 radios
     wait, not the bag the other tab added."""
-    put_back = [{"item_id": place.item.id, "quantity": "3"}, bagged(bags, 1)]
+    put_back = [
+        {"item_id": place.item.id, "quantity": "3", "unit": place.item.unit},
+        bagged(bags, 1),
+    ]
     other = place.batch(lines=[put_back[0], bagged(bags, 2)])
     recorded_then_changed(
         registered_client,
         other,
-        lines=[{"item_id": place.item.id, "quantity": "1"}, bagged(bags, 1)],
+        lines=[
+            {"item_id": place.item.id, "quantity": "1", "unit": place.item.unit},
+            bagged(bags, 1),
+        ],
         changed_from=put_back,
     )
     ((check, item_id),) = [

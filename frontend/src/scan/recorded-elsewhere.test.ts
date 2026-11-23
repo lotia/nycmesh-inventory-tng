@@ -24,10 +24,15 @@ function move(lines: Body["lines"], fields: Partial<Body> = {}): Body {
 const boxes = (n: number) => ({
   item_id: 100,
   quantity: `${4 * n}.000`,
+  unit: "each",
   package_id: 1000,
   package_size: "4",
 });
-const metres = (n: number) => ({ item_id: 101, quantity: String(n) });
+const metres = (n: number) => ({
+  item_id: 101,
+  quantity: String(n),
+  unit: "m",
+});
 const cut = (n: number) => ({ ...metres(n), open_package_key: OPEN });
 
 const recorded = (batch: Body): Recorded => ({
@@ -67,9 +72,9 @@ describe("what differs", () => {
     expect(shown(move([boxes(2)]), move([]))).toEqual([
       "LiteBeam 5AC: removed / Recorded 2 × Box, you removed it. An administrator will correct it.",
     ]);
-    expect(shown(move([]), move([{ item_id: 100, quantity: "1" }]))).toEqual([
-      "LiteBeam 5AC: 1, new",
-    ]);
+    expect(
+      shown(move([]), move([{ item_id: 100, quantity: "1", unit: "each" }])),
+    ).toEqual(["LiteBeam 5AC: 1, new"]);
   });
 
   test("the same lines, in any order or way of writing them, differ in nothing", () => {
@@ -215,7 +220,13 @@ describe("the difference", () => {
       from_location_id: 10,
       to_location_id: 12,
       lines: [
-        { item_id: 100, quantity: "8", package_id: 1000, package_size: "4" },
+        {
+          item_id: 100,
+          quantity: "8",
+          unit: "each",
+          package_id: 1000,
+          package_size: "4",
+        },
       ],
     });
     expect(difference).not.toHaveProperty("used_up");
