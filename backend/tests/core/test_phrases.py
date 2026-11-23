@@ -33,7 +33,12 @@ from inventory_tng.admins import (
 )
 from inventory_tng.admins.reset_routes import RESET_NOTICE
 from inventory_tng.catalogue import reading_rules, reading_rules_routes, units
-from inventory_tng.catalogue.forms import ALIAS_TAKEN, TAKEN_FIELDS, read_as_one
+from inventory_tng.catalogue.forms import (
+    ALIAS_TAKEN,
+    TAKEN_FIELDS,
+    fraction_held,
+    read_as_one,
+)
 from inventory_tng.core import mail
 from inventory_tng.core.phrases import (
     BRAND,
@@ -166,6 +171,12 @@ SAID_WITH_VALUES: list[Callable[[], Words]] = [
     *(lambda said=said: said(NOT_ENGLISH) for said in TAKEN_FIELDS.values()),
     *(lambda said=said: said(NOT_ENGLISH) for said in ALIAS_TAKEN.values()),
     lambda: read_as_one(NOT_ENGLISH),
+    lambda: fraction_held(ItemPackage(name_shown=NOT_ENGLISH, size=Decimal("30.5"))),
+    lambda: fraction_held(
+        ItemPackage(
+            name_shown=NOT_ENGLISH, size=Decimal(30), short_below=Decimal("1.5")
+        )
+    ),
     *(lambda said=said: said(1, NOT_ENGLISH) for said in reading_rules.NAMED.values()),
     lambda: reading_rules.both(NOT_ENGLISH, NOT_ENGLISH),
     lambda: reading_rules.near(NOT_ENGLISH),

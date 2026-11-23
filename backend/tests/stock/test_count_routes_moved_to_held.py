@@ -348,6 +348,29 @@ def test_a_fix_of_a_spool_opened_there_comes_off_its_open_package(
     assert moved.at_shelf(session) == {(moved.cable, LOOSE): Decimal(2)}
 
 
+def test_a_spool_opened_where_it_went_sent_again_is_as_before_unless_changed(
+    session: Session, admin_client: TestClient
+) -> None:
+    """Its 2 m counted and the spool that came, opened at Shelf B, left
+    alone: sent again unchanged, answered as before, nothing more written;
+    sent again with the spool said not to have arrived, refused as saved
+    already, and its open package keeps what it holds (the digest of
+    what the save sets aside, as held, is the same each time:
+    inventory-tng-kro9, inventory-tng-nlog)."""
+    moved = Arrived(session, admin_client, own=own_metres, then=open_and_cut(55))
+    moved.save({moved.counted: "2"})
+    before = moved.at_shelf(session)
+    moved.save({moved.counted: "2"})
+    sent = moved.form | {
+        moved.field(moved.counted): "2",
+        moved.field(moved.arrived_box()): "0",
+    }
+    again = moved.client.post(moved.path, data=sent)
+    assert again.headers["location"].startswith(f"{COUNTS}?notice=count_saved_already")
+    assert moved.at_shelf(session) == before
+    assert moved.found_or_lost(session) == []
+
+
 def test_a_fix_of_two_spools_one_opened_comes_off_the_sealed_one_first(
     session: Session, admin_client: TestClient
 ) -> None:

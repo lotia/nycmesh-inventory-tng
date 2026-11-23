@@ -233,6 +233,12 @@ def package_fraction(session: Session, item_id: int) -> str | None:
     if package is None:
         return None
     log.debug("unit change refused", item_id=item_id, item_package_id=package.id)
+    return fraction_held(package)
+
+
+def fraction_held(package: ItemPackage) -> str:
+    """What package_fraction says of the package: its size, if that has a
+    fraction, else its too-short length."""
     if package.size != package.size.to_integral_value():
         # Translators: a package's size, its "Holds" on the item page, has
         # a fraction; %(package)s is its name, %(amount)s its size.

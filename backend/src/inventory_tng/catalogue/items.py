@@ -4,10 +4,10 @@ category (categories.retire is the other side), and an item's unit is
 fixed once stock has moved in it, as the ledger's quantities are in that
 unit, and an item counted each has no current package holding, or too
 short to use below, a fraction; a package's size is fixed once it has
-moved, been opened or labelled. The
-app may not move a package to another item (the initial migration), so its
-labels always name its item, and a package's name is its own among its
-item's, retired ones too, so one can always be brought back. A retired
+moved, been opened or labelled. The app may not move a package to another
+item (the initial migration), so its labels always name its item, and a
+package's name is its own among its item's, retired ones too, so one can
+always be brought back. A retired
 item is read only until it is brought back (docs/decisions/0019). An
 item's name, its manufacturer and part number together, and its old code
 are each its own, retired items' too (models.catalogue.Item); taken_by says
