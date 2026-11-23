@@ -857,6 +857,46 @@ def test_counts_batches_written_replayed_and_refused(
     assert "inventory.transaction.lines" in metric_names(reader)
 
 
+def test_counts_saves_shown_in_a_unit_or_size_changed_since(
+    rolled_back: Recorded, session: Session
+) -> None:
+    """A batch's line shown in m, and a box at another size, and an
+    adjustment shown in m, once the cable counts in ft (inventory-tng-57u8):
+    each counted by what changed and the save."""
+    client, _, reader, _ = rolled_back
+    name = "inventory.saves.shown_otherwise"
+    before = counted(reader, name)
+    place = Place(session)
+    box = add(session, ItemPackage(item_id=place.item.id, name="Box", size=10))
+    lines = [
+        {"item_id": place.cable.id, "quantity": "50", "unit": "m"},
+        {"item_id": place.item.id, "quantity": "30", "package_id": box.id}
+        | {"package_size": "10", "unit": "each"},
+    ]
+    receipt = place.batch(
+        kind="receipt", from_location_id=None, to_location_id=place.store.id
+    )
+    form = adjustment_form(session, place.store, place.cable, direction="found")
+    place.cable.unit = "ft"
+    box.size = Decimal(12)
+    session.flush()
+    _, token = new_device(session)
+    client.cookies.set(devices.COOKIE, token)
+    assert (
+        client.post("/api/transactions", json=receipt | {"lines": lines}).status_code
+        == 422
+    )
+    client.cookies.clear()
+    _, key = new_admin(session)
+    sign_in_with(client, key=key)
+    assert client.post(ADJUSTMENTS, data=form).status_code == 400
+    assert added(reader, name, before) == {
+        (("changed", "unit"), ("save", "batch")): 1,
+        (("changed", "package_size"), ("save", "batch")): 1,
+        (("changed", "unit"), ("save", "adjustment")): 1,
+    }
+
+
 def test_counts_batches_from_a_build_too_old(
     rolled_back: Recorded, session: Session, monkeypatch: pytest.MonkeyPatch
 ) -> None:

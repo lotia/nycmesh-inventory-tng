@@ -28,6 +28,8 @@ SIDES: dict[str, tuple[bool, bool]] = {
     "report": (True, False),
 }
 MAX_LINES = 500
+# Longer than any unit an item may have (models.catalogue.UNITS).
+UNIT_MAX = 32
 
 # An id or install number: positive, and fits PostgreSQL's integer.
 Number = Annotated[int, Field(gt=0, le=INTEGER_MAX)]
@@ -77,6 +79,16 @@ class Line(BaseModel):
         Field(
             description="A move's line taken from an open package: all that "
             "is left on it, `quantity`, moves with it, and it stays open there."
+        ),
+    ] = None
+    unit: Annotated[
+        str | None,
+        Field(
+            max_length=UNIT_MAX,
+            description="The item's unit the page showed `quantity` in, from "
+            "the catalogue. A line of an item counted in another unit since is "
+            "refused (unit_changed), never recorded in the new unit. Left out, "
+            "as by a build from before it was sent, it is not compared.",
         ),
     ] = None
 
@@ -210,6 +222,7 @@ ProblemKind = Literal[
     "open_package_whole",
     "moved_whole",
     "package_resized",
+    "unit_changed",
     "refused",
     "retired",
     "retired_package",

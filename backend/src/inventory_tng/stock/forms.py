@@ -13,14 +13,15 @@ from typing import NamedTuple
 
 from sqlalchemy.orm import Session
 
-from inventory_tng.core.phrases import Words, lazy_gettext
+from inventory_tng.core.phrases import Words, gettext, lazy_gettext, number
 from inventory_tng.models.catalogue import Item
 from inventory_tng.models.places import Location
 from inventory_tng.models.stock import (
     OVER_RECORDED_WORDS_MAX,
     AdjustmentReason,
 )
-from inventory_tng.stock import over_recorded, queries
+from inventory_tng.stock import over_recorded, queries, units_shown
+from inventory_tng.stock.units_shown import Now, Shown
 from inventory_tng.web.forms import (
     TYPE_A_NUMBER,
     chosen,
@@ -39,10 +40,63 @@ OUT_OF_DATE = lazy_gettext("This form is out of date: try again.")
 TICK_OPEN_PACKAGES = lazy_gettext("Tick the open packages first.")
 
 
+# The units and package sizes a form showed its amounts in
+# (stock/units_shown.py): "<item id>:<unit> ..." and "<package id>:<size>
+# ...", hidden on the form, so a save of one changed since is refused and
+# asked again (Ali, 2026-11-23, inventory-tng-57u8).
+UNITS, SIZES = "units", "sizes"
+
+
+def shown_field(shown: Mapping[int, object]) -> str:
+    """A hidden field of what a form shows (UNITS, SIZES), by id."""
+    return " ".join(f"{row_id}:{value}" for row_id, value in sorted(shown.items()))
+
+
+def _pairs(typed: str) -> dict[int, str]:
+    """A hidden field of what a form showed, read: those not an id and a
+    value left out."""
+    pairs: dict[int, str] = {}
+    for each in typed.split():
+        typed_id, _, value = each.partition(":")
+        if (found := row_id(typed_id)) is not None and value:
+            pairs[found] = value
+    return pairs
+
+
+def shown_in(form: Mapping[str, str]) -> Shown:
+    """The units and package sizes a form showed (UNITS, SIZES); a size
+    that is no number is not shown."""
+    sizes = {
+        package_id: size
+        for package_id, typed in _pairs(form.get(SIZES, "")).items()
+        if (size := showed(typed)) is not None
+    }
+    return Shown(_pairs(form.get(UNITS, "")), sizes)
+
+
+def now_counted_in(unit: str) -> str:
+    """Beside an amount shown in an item's unit since changed: refused, and
+    shown again in `unit`."""
+    return gettext(
+        "This item is now counted in %(unit)s. Check the amount and save again.",
+        unit=unit,
+    )
+
+
+def now_holds(size: Decimal, unit: str) -> str:
+    """Beside a count of a package shown at a size since changed: refused,
+    and shown again at `size`, in its item's `unit`."""
+    return gettext(
+        "This package now holds %(size)s %(unit)s. Check the count and save again.",
+        size=number(size),
+        unit=unit,
+    )
+
+
 class Adjustment(NamedTuple):
     """An adjustment as its form asks for it: at a place, of an item, how
-    much, found or written off ("found" or "off"), why, and the key its
-    form was shown with."""
+    much, found or written off ("found" or "off"), why, the key its form
+    was shown with, and the unit it showed the item in ("" for none)."""
 
     place: Location
     item: Item
@@ -50,6 +104,7 @@ class Adjustment(NamedTuple):
     direction: str
     reason: AdjustmentReason
     key: uuid.UUID
+    unit: str
 
 
 def adjustment(
@@ -87,7 +142,9 @@ def adjustment(
         or not isinstance(amount, Decimal)
     ):
         return None, problems
-    return Adjustment(place, item, amount, direction, reason, key), problems
+    # Not shown, it was shown in none: asked again (units_shown).
+    unit = shown_in(form).units.get(item.id, "")
+    return Adjustment(place, item, amount, direction, reason, key, unit), problems
 
 
 # Mark checked with no reason, or put right another way with no words.
@@ -101,11 +158,17 @@ WORDS_FOR_ANOTHER = lazy_gettext(
 
 
 def confirmed_count(
-    session: Session, movement_id: int, typed: str
+    session: Session, movement_id: int, typed: str, shown: str
 ) -> Decimal | str | None:
     """The count typed to confirm an open package moved whole by a ledger
-    line, in its item's unit, or what is wrong with it."""
-    unit = queries.unit_moved(session, movement_id)
+    line, in its item's unit, or what is wrong with it: shown in another
+    unit than its item's, it is asked again (stock/units_shown.py). The
+    line moved, so the unit is fixed (catalogue/items.py): read unlocked,
+    it is the one the save writes in."""
+    item_id, unit = queries.item_moved(session, movement_id)
+    if shown != unit:
+        units_shown.refusing("confirm_count", Now({item_id: unit}, {}))
+        return now_counted_in(unit)
     return quantity(typed, positive=False, unit=unit, required=TYPE_A_NUMBER)
 
 

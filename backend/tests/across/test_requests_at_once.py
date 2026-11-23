@@ -1309,6 +1309,42 @@ def test_a_batch_of_a_package_resized_meanwhile_waits_then_is_refused(
 
 
 @pytest.mark.concurrency
+def test_a_batch_of_an_item_switched_to_ft_meanwhile_waits_then_is_refused(
+    own_committed: Committed,
+) -> None:
+    """The outbox's race of a unit (inventory-tng-57u8): a receipt of 50 m
+    of a cable nobody had moved, saved as its switch to ft commits. It waits
+    for the item's lock (ledger.hold), then finds it shown in m and is
+    refused, rather than saved as 50 ft. On a database of its own, as it
+    may write the ledger."""
+    setup = own_committed.session()
+    place = Place(setup)
+    setup.commit()
+    line = {"item_id": place.cable.id, "quantity": "50", "unit": "m"}
+    batch = Batch.model_validate(
+        place.batch(
+            kind="receipt",
+            from_location_id=None,
+            to_location_id=place.store.id,
+            lines=[line],
+        )
+    )
+    one, two = own_committed.session(), own_committed.session()
+    doing(
+        Item,
+        place.cable.id,
+        lambda s, item: items.save(s, item, item_fields(item, unit="ft"), seen=None),
+    )(one)
+    one.flush()
+    worker = own_committed.blocked(two, lambda: record(two, batch, device_id=None))
+    one.commit()
+    error = worker.finished().error
+    two.rollback()
+    assert isinstance(error, BatchRefused), error
+    assert error.problems == [(("lines", 0, "unit"), "unit_changed")]
+
+
+@pytest.mark.concurrency
 def test_an_open_package_made_twice_at_once_is_made_once(
     own_committed: Committed,
 ) -> None:

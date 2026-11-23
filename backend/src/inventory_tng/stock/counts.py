@@ -22,7 +22,7 @@ from inventory_tng.core.db_once_committed import once_committed
 from inventory_tng.core.db_sessions import exists_where
 from inventory_tng.models.places import Location
 from inventory_tng.models.stock import LedgerTransaction, OpenPackage
-from inventory_tng.stock import moments
+from inventory_tng.stock import moments, units_shown
 from inventory_tng.stock.balance import countable, left_on
 from inventory_tng.stock.ledger import (
     LOOSE,
@@ -32,6 +32,7 @@ from inventory_tng.stock.ledger import (
     by_item,
     each_once,
     entries,
+    hold_across,
     insert_transaction,
     lock_place,
     repeated,
@@ -397,12 +398,20 @@ def record_adjustment(
     found: bool,
     reason_id: int,
     form: Form = LOOSE,
+    shown_unit: str | None = None,
 ) -> list[Written]:
     """Stock found at a place, or written off from it, for a reason, in
     `form` there (docs/decisions/0020). What it wrote: nothing if its key
-    was written already. NotCountable (location_countable), as record_count."""
+    was written already. NotCountable (location_countable), as record_count;
+    with `shown_unit`, the unit an administrator's form showed the amount
+    in, ShownOtherwise unless it is the item's (units_shown)."""
     if _hold_place(session, location_id, key) is not None:
         return []
+    if shown_unit is not None:
+        # Held as the ledger holds it, after the place, before writing.
+        hold_across(session, item_ids=[item_id])
+        shown = units_shown.Shown({item_id: shown_unit}, {})
+        units_shown.require_as_shown(session, "adjustment", shown, [item_id])
     side = "to_location_id" if found else "from_location_id"
     header = {"reason_id": reason_id, side: location_id}
     line = (

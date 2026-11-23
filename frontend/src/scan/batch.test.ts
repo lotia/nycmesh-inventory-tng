@@ -48,9 +48,10 @@ describe("turning a cart into a batch", () => {
             quantity: "4",
             package_id: 1000,
             package_size: "4",
+            unit: "each",
           },
-          { item_id: 100, quantity: "2" },
-          { item_id: 101, quantity: "0.25" },
+          { item_id: 100, quantity: "2", unit: "each" },
+          { item_id: 101, quantity: "0.25", unit: "m" },
         ],
       },
       what: "Move: 2 items from Hub to Van",
@@ -127,6 +128,7 @@ describe("turning a cart into a batch", () => {
         package_size: "305",
         quantity: "305",
         open_package_key: expect.any(String),
+        unit: "m",
       },
       {
         item_id: 101,
@@ -134,9 +136,16 @@ describe("turning a cart into a batch", () => {
         package_size: "305",
         quantity: "305",
         open_package_key: expect.any(String),
+        unit: "m",
       },
       // The box is not: its radios become loose units.
-      { item_id: 100, package_id: 1000, package_size: "4", quantity: "12" },
+      {
+        item_id: 100,
+        package_id: 1000,
+        package_size: "4",
+        quantity: "12",
+        unit: "each",
+      },
     ]);
     expect(sent[0]?.open_package_key).not.toBe(sent[1]?.open_package_key);
   });
@@ -209,6 +218,7 @@ describe("turning a cart into a batch", () => {
       item_id: 101,
       quantity: "120",
       open_package_key: other,
+      unit: "m",
     });
     const receipt = toBatch(cart({ kind: "receipt", lines }), CATALOGUE);
     expect(saidAsText(receipt)).toEqual({
@@ -380,7 +390,7 @@ describe("turning a cart into a batch", () => {
     const elsewhere = { ...here, key: gone, location_id: 12 };
     const batch = toBatch(cart({ lines }), CATALOGUE, [here, elsewhere]);
     expect("draft" in batch && batch.draft.lines).toEqual([
-      { item_id: 101, quantity: "5", open_package_key: offeredKey },
+      { item_id: 101, quantity: "5", open_package_key: offeredKey, unit: "m" },
     ]);
     // A cut of all it shows says it is used up, unless the volunteer
     // said not.
@@ -525,8 +535,18 @@ describe("turning a cart into a batch", () => {
     ];
     const batch = toBatch(cart({ lines }), CATALOGUE);
     expect("draft" in batch && batch.draft.lines).toEqual([
-      { item_id: 100, quantity: "1" },
+      { item_id: 100, quantity: "1", unit: "each" },
     ]);
+  });
+
+  test("each line says the unit its amounts were typed in, else the one shown now (inventory-tng-57u8)", () => {
+    const lines = [
+      { itemId: 101, packages: { 1001: "1" }, loose: "50", unit: "ft" },
+    ];
+    const batch = toBatch(cart({ lines }), CATALOGUE);
+    expect(
+      "draft" in batch && batch.draft.lines.map(({ unit }) => unit),
+    ).toEqual(["ft", "ft"]);
   });
 
   test("says everything still to do", () => {

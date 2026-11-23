@@ -90,6 +90,10 @@ one by its size, an open package closed as none
   <input type="hidden" name="key" value="{{ key }}">
   <input type="hidden" name="as_of" value="{{ moment.as_of }}">
   <input type="hidden" name="seen" value="{{ moment.seen }}">
+  {#- The unit of each item and the size of each package as shown now,
+  never as sent: one changed since is asked again (stock/forms.py, UNITS). #}
+  <input type="hidden" name="units" value="{{ units }}">
+  <input type="hidden" name="sizes" value="{{ sizes }}">
   {#- Every place shown, so one with nothing on it is counted too
   (stock/count_forms.py). #}
   <input type="hidden" name="places" value="{{ groups | map(attribute='place.id') | join(' ') }}">

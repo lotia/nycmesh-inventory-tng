@@ -34,6 +34,7 @@ from inventory_tng.stock.forms import (
     PICK_A_PLACE,
     PICK_A_REASON,
     PICK_AN_ITEM,
+    now_counted_in,
 )
 from inventory_tng.stock.moments import Moment, expected, moment
 from inventory_tng.stock.paths import ADJUSTMENTS, COUNTS, STOCK
@@ -209,14 +210,14 @@ def test_leftovers_of_a_retired_item_can_be_written_off(
 
 @pytest.mark.end_to_end
 @pytest.mark.parametrize("kind", ["count", "adjustment"])
-def test_a_unit_changed_to_each_as_the_page_writes_is_said_and_nothing_is_written(
+def test_a_unit_changed_to_each_as_the_page_writes_is_asked_again(
     own_committed: Committed, make_client: Callable[..., TestClient], kind: str
 ) -> None:
     """The page finds 1.5 m of cable fine, then waits for the cable, held by
-    a change of its unit to each; once that commits, the ledger refuses the
-    line, and the page says why, as for any other problem, and writes
-    nothing (inventory-tng-8i4.104). On a database of its own, as it would
-    write the ledger if it were wrong."""
+    a change of its unit to each; once that commits, the save finds it shown
+    in m, and asks again in each beside the box, writing nothing
+    (inventory-tng-8i4.104, inventory-tng-57u8). On a database of its own,
+    as it would write the ledger if it were wrong."""
     place = committed_place(own_committed)
     setup = own_committed.session()
     _, totp = new_admin(setup)
@@ -249,7 +250,7 @@ def test_a_unit_changed_to_each_as_the_page_writes_is_said_and_nothing_is_writte
     answer = worker.finished().result
     assert isinstance(answer, Response)
     assert answer.status_code == 400
-    assert str(RULES["movement_whole_units"]) in text(answer)
+    assert now_counted_in("each") in text(answer)
     assert counts_written(own_committed.session()) == []
 
 
@@ -326,6 +327,7 @@ def test_a_form_for_a_retired_place_holding_nothing_writes_nothing(
             "key": str(uuid.uuid4()),
             "as_of": "0",
             "seen": "0",
+            "units": f"{place.item.id}:{place.item.unit}",
             f"counted_{place.item.id}": "2",
         },
     )

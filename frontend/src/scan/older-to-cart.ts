@@ -36,6 +36,8 @@ export type Gaps = string[];
 export const LINES_LOST = msg`Could not read previously added items, scan them again.`;
 /** Under a save's line of a package resized since. */
 export const RESIZED = msg`The package size has changed since this item was added. Discard and re-add the new package size.`;
+/** Under a save's line of an item counted in another unit since. */
+export const UNIT_CHANGED = msg`This item's unit has changed since it was added. Discard it and add it again in the new unit.`;
 /** Under a sealed count of a package no longer offered: retired, with none
  * sealed left. */
 export const ITEM_RETIRED = msg`This item has been retired.`;
@@ -78,7 +80,8 @@ type Part = {
  * offered too where it names it (Item.retired_packages). A batch's package line goes
  * back as packages, if the item still has the package and the amount is
  * whole ones of it; else as loose, for the cart to say what is wrong; one
- * of a package resized since it was saved, or of one the catalogue no
+ * of an item counted in another unit since it was saved, of a package
+ * resized since, or of one the catalogue no
  * longer offers, is left to do again, as is an older cart's count of one
  * no longer offered, unless blank or none, or of one counted at a size
  * since changed (v2's sizes). What was taken from an open
@@ -245,6 +248,12 @@ export function toCart(
         // Resized since: neither its count of packages nor loose would say
         // what was moved, so it is done again, as the server would ask.
         leave(say(RESIZED));
+        return;
+      }
+      if (line.unit !== null && item !== undefined && line.unit !== item.unit) {
+        // Typed in another unit: done again in this one, as the server
+        // would ask, never taken as so much of the new (inventory-tng-57u8).
+        leave(say(UNIT_CHANGED));
         return;
       }
       const made = lineOf(line.item_id, { at });

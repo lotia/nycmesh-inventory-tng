@@ -100,6 +100,7 @@ describe("reading what older builds left", () => {
             package_id: null,
             package_size: null,
             open_package_key: null,
+            unit: null,
           },
           null,
           {
@@ -108,6 +109,7 @@ describe("reading what older builds left", () => {
             package_id: null,
             package_size: null,
             open_package_key: null,
+            unit: null,
           },
         ],
         linesLost: false,

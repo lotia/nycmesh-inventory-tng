@@ -96,6 +96,16 @@ describe("turning a cart into a batch", () => {
           lines: [spools(2, { package_size: "610" })],
         }),
       },
+      // Typed in ft, the spool's cable counted in m: refused, so none.
+      {
+        state: "waiting" as const,
+        queuedAt: 0,
+        body: batch({
+          kind: "receipt",
+          to_location_id: 12,
+          lines: [spools(1, { unit: "ft" })],
+        }),
+      },
       // Stored by a build from before sizes were sent: refused, so none.
       {
         state: "waiting" as const,

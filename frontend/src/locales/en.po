@@ -117,6 +117,10 @@ msgstr "This item is retired: what is left may be taken, never received"
 msgid "That phrase has expired. Ask for a new one."
 msgstr "That phrase has expired. Ask for a new one."
 
+#: src/scan/older-to-cart.ts
+msgid "This item's unit has changed since it was added. Discard it and add it again in the new unit."
+msgstr "This item's unit has changed since it was added. Discard it and add it again in the new unit."
+
 #: src/scan/Notes.tsx
 msgid "Add to cart"
 msgstr "Add to cart"
@@ -309,6 +313,10 @@ msgstr "Cut or take from the {name} opened {date} ({unit})"
 #: src/scan/OlderList.tsx
 msgid "Saying what is on open packages"
 msgstr "Saying what is on open packages"
+
+#: src/shared/outbox-notes.ts
+msgid "This item's unit changed since the page loaded: load the page again, and count it again"
+msgstr "This item's unit changed since the page loaded: load the page again, and count it again"
 
 #: src/shared/outbox-notes.ts
 msgid "The inventory can't record this just now. Trying again shortly."

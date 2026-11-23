@@ -199,6 +199,17 @@
             }
           ]
         },
+        "unit": {
+          "anyOf": [
+            {
+              "maxLength": 32,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
         "whole": {
           "anyOf": [
             {

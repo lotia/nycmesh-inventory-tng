@@ -19,12 +19,13 @@ with an id inside the moment, refuses the count (changed_since_shown). Which
 items that save moved cannot be told, so the form is shown again as it is
 now, keeping what was typed, to be checked and sent again.
 
-The pages check what was typed before writing, but an item's unit may
-change to each between that check and the write: the ledger then refuses
-the line (movement_whole_units), and the form is shown again with that
-line marked, and nothing written. So too a place retired meanwhile, which
-the ledger refuses (location_countable) unless the form was written there
-before.
+A count also carries the unit of each item and the size of each package
+it showed (forms.UNITS): one changed since, even between the page's
+checks and the write, is refused, and the form shown again in the units
+and sizes now, each box of one changed saying so, nothing written
+(stock/units_shown.py; Ali, 2026-11-23, inventory-tng-57u8). A place
+retired meanwhile the ledger refuses (location_countable) unless the form
+was written there before.
 
 A count names each item once: a form naming one on two fields (counted_5
 and counted_05, or the select at the foot choosing an item listed above) is
@@ -123,6 +124,7 @@ from inventory_tng.stock.count_forms import (
     Figures,
     Gone,
     Listed,
+    changed_words,
     field_at,
     fields_at,
     gone_listed,
@@ -133,6 +135,7 @@ from inventory_tng.stock.count_forms import (
 from inventory_tng.stock.count_gone_areas import gone_words, moved_sections
 from inventory_tng.stock.count_groups import Group
 from inventory_tng.stock.counts import COUNTABLE, WHOLE, NotCountable
+from inventory_tng.stock.forms import shown_field, shown_in
 from inventory_tng.stock.ledger import by_item, tracks_opened
 from inventory_tng.stock.moments import (
     Moment,
@@ -144,7 +147,18 @@ from inventory_tng.stock.moved_out import MovedOut, moved_out
 from inventory_tng.stock.needs_action import OnlyItem
 from inventory_tng.stock.paths import COUNTS
 from inventory_tng.stock.queries import PlaceTree
-from inventory_tng.stock.store_counts import StoreCounted, record_store_count
+from inventory_tng.stock.store_counts import (
+    StoreCounted,
+    amounts_named,
+    record_store_count,
+)
+from inventory_tng.stock.units_shown import (
+    SHOWN_OTHERWISE,
+    Now,
+    ShownOtherwise,
+    changed_since,
+    refusing,
+)
 from inventory_tng.web.admin_pages import TextForm, admin_page, now
 from inventory_tng.web.forms import CHANGED, RULES, row_id
 from inventory_tng.web.navigation import SECTION_COUNTS
@@ -456,6 +470,19 @@ def _count_page(
         if group.place.retired_at is None or group.place.id == place.id
     ]
     on_lines = [{item.id for item, _ in group.rows} for group in choices]
+    found_packages = [
+        found for found in _followed(session) if ids is None or found[0].item_id in ids
+    ]
+    others = [
+        item
+        for item in listed
+        if not all(item.id in here for here in on_lines)
+        or str(item.id) == (values or {}).get(EXTRA_ITEM)
+    ]
+    # The unit of every item it shows a box of an amount of, and the size of
+    # every package of them, as it shows them now (forms.UNITS).
+    units = {item.id: item.unit for item in [*named.values(), *others]}
+    units |= {package.item_id: unit for package, _, unit in found_packages}
     return admin_page(
         request,
         signed,
@@ -472,21 +499,16 @@ def _count_page(
                 picker: (values or {}).get(picker) or (picked or {}).get(picker, "")
                 for picker in PICKED
             },
-            "found_packages": [
-                found
-                for found in _followed(session)
-                if ids is None or found[0].item_id in ids
-            ],
+            "found_packages": found_packages,
             "recount": recount,
             # What a place it may be found in does not list already, and the
             # item picked, to keep it picked on a form shown again: a
             # recount adds its line (count_forms.read_count).
-            "others": [
-                item
-                for item in listed
-                if not all(item.id in here for here in on_lines)
-                or str(item.id) == (values or {}).get(EXTRA_ITEM)
-            ],
+            "others": others,
+            "units": shown_field(units),
+            "sizes": shown_field(
+                {package_id: package.size for package_id, package in packages.items()}
+            ),
             "key": (values or {}).get("key") or uuid.uuid4(),
             "moment": at,
             "shown": shown,
@@ -738,6 +760,15 @@ def count(
         )
     problems: dict[str, Words] = dict(sent.problems)
     alert = TWICE if sent.twice else problems.get(CLOSED_MEANWHILE)
+    # Shown in a unit or a package size changed since: asked again in the
+    # new ones (units_shown), checked again as it is saved.
+    shown_as = shown_in(form)
+    named_now = changed_since(
+        session, shown_as, *amounts_named(sent.places.values(), {})
+    )
+    if named_now:
+        refusing("count", named_now)
+        problems |= changed_words(session, form, place.id, place_ids, named_now)
     tree = None
     off_form = None
     if sent.listed is not None:
@@ -783,9 +814,11 @@ def count(
     sent_key, across = key, place_ids
     # The place that refused it (counts.NotCountable), as it was then.
     retired: int | None = None
+    # What it showed otherwise, as it is now (units_shown.ShownOtherwise).
+    shown_now: Now | None = None
 
     def put_right() -> StoreCounted:
-        nonlocal retired
+        nonlocal retired, shown_now
         try:
             return record_store_count(
                 session,
@@ -797,9 +830,13 @@ def count(
                 now(),
                 aside=aside,
                 fixed=fix_lines,
+                shown=shown_as,
             )
         except NotCountable as broken:
             retired = broken.location_id
+            raise
+        except ShownOtherwise as broken:
+            shown_now = broken.now
             raise
 
     result, broken = refusal(
@@ -812,6 +849,7 @@ def count(
         CLOSED_MEANWHILE,
         CHANGED,
         SENT_AGAIN,
+        SHOWN_OTHERWISE,
     )
     if broken is not None:
         log.info("count refused by a rule", location_id=place.id, rule=broken)
@@ -850,6 +888,12 @@ def count(
                 tree=tree,
                 status_code=409,
             )
+        if shown_now is not None:
+            # Changed between the check above and the save: the form as
+            # sent, in the units and sizes now, each box of one changed
+            # saying so.
+            words = changed_words(session, form, place.id, place_ids, shown_now)
+            return as_sent(problems=words, left=left())
         if broken == CHANGED:
             # What was typed may be of before that save or after it, of
             # items it cannot tell: the form as it is now, with a new key,

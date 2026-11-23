@@ -53,7 +53,8 @@ export function sealedCounts(
   pending: readonly Pending[],
 ): Map<string, number> {
   const counts = new Map<string, number>();
-  const sizes = new Map<number, number>();
+  // Each package's size, in thousandths, and its item's unit.
+  const packs = new Map<number, { size: number; unit: string }>();
   const add = (
     packageId: number,
     placeId: number | null | undefined,
@@ -66,7 +67,7 @@ export function sealedCounts(
   };
   for (const item of catalogue.items) {
     for (const pack of item.packages) {
-      sizes.set(pack.id, sent(pack.size));
+      packs.set(pack.id, { size: sent(pack.size), unit: item.unit });
       for (const { location_id, count } of pack.sealed) {
         add(pack.id, location_id, count);
       }
@@ -78,22 +79,22 @@ export function sealedCounts(
       // package the catalogue has no more counted.
       const packageId = line.package_id;
       const taken = fromOpen(line, body.kind);
-      const size = packageId == null ? undefined : sizes.get(packageId);
+      const pack = packageId == null ? undefined : packs.get(packageId);
       // Read as stored, which another build may have written: one
       // unreadable is skipped.
       const quantity = thousandths(String(line.quantity));
       if (
         packageId == null ||
         taken ||
-        size === undefined ||
-        refusedAsCounted(line, size) ||
+        pack === undefined ||
+        refusedAsCounted(line, pack.size, pack.unit) ||
         quantity === null
       ) {
         continue;
       }
       // Rounded up, as the catalogue counts a part of one
       // (scan/catalogue_api.py).
-      const n = Math.ceil(quantity / size);
+      const n = Math.ceil(quantity / pack.size);
       add(packageId, body.from_location_id, -n);
       if (body.kind !== "open") {
         add(packageId, body.to_location_id, n);
@@ -104,14 +105,18 @@ export function sealedCounts(
 }
 
 /** Whether the server refuses a line of a package of `size` (thousandths)
- * as counted, so it moves none: counted in a size its package no longer
- * has (package_resized), or in none, as an older build's stored line may
- * be (inventory-tng-1p8). */
+ * of an item counted in `unit` as counted, so it moves none: counted in a
+ * size its package no longer has (package_resized), or in none, as an
+ * older build's stored line may be (inventory-tng-1p8); or in another
+ * unit than its item's now (unit_changed). */
 export function refusedAsCounted(
   line: Draft["lines"][number],
   size: number,
+  unit: string,
 ): boolean {
   return (
-    line.package_size == null || thousandths(String(line.package_size)) !== size
+    line.package_size == null ||
+    thousandths(String(line.package_size)) !== size ||
+    (line.unit != null && line.unit !== unit)
   );
 }

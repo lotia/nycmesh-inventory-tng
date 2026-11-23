@@ -324,6 +324,7 @@ export function differenceOf(recorded: Body, mine: Body): Body | null {
               quantity: decimal(changed),
               package_id: line.package_id ?? null,
               package_size: line.package_size ?? null,
+              unit: line.unit ?? null,
             },
           ]
         : [],

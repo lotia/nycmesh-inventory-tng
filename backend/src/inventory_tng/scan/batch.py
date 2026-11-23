@@ -27,7 +27,7 @@ from inventory_tng.models.catalogue import ItemPackage
 from inventory_tng.models.stock import LedgerTransaction, Movement, OpenPackage
 from inventory_tng.models.volunteers import Volunteer
 from inventory_tng.scan import batch_schemas
-from inventory_tng.stock import open_packages
+from inventory_tng.stock import open_packages, units_shown
 from inventory_tng.stock.ledger import (
     LOOSE,
     Entry,
@@ -41,7 +41,9 @@ from inventory_tng.stock.ledger import (
     insert_transaction,
     lines_break,
     repeated,
+    whole_enough,
 )
+from inventory_tng.stock.units_shown import Now
 
 log = structlog.get_logger(__name__)
 meter = metrics.get_meter(__name__)
@@ -233,6 +235,8 @@ def record(
         elif opened.location_id != batch.from_location_id:
             problems.append((at, "open_package_elsewhere"))
     if problems:
+        if now := _shown_otherwise(batch, held, packages):
+            units_shown.refusing("batch", now)
         kinds = {kind for _, kind in problems}
         # Counted apart: how often a page's catalogue is only a resize behind.
         reason = "package_resized" if kinds == {"package_resized"} else "invalid"
@@ -471,6 +475,27 @@ def _as_counted(
     return package._replace(size=line.package_size)
 
 
+def _shown_otherwise(
+    batch: batch_schemas.Batch, held: Held, packages: Mapping[int, PackageFacts]
+) -> Now:
+    """The items of a batch's lines shown in another unit than they are
+    counted in now (unit_changed), and the packages at another size
+    (package_resized), as they are now (units_shown)."""
+    units: dict[int, str] = {}
+    sizes: dict[int, tuple[Decimal, str]] = {}
+    for line in batch.lines:
+        item = held.items.get(line.item_id)
+        if item is None:
+            continue
+        if line.unit is not None and line.unit != item.unit:
+            units[item.id] = item.unit
+        counted = _as_counted(line, packages)
+        package = packages.get(line.package_id or 0)
+        if counted is not None and package is not None and counted != package:
+            sizes[line.package_id or 0] = (package.size, item.unit)
+    return Now(units, sizes)
+
+
 def _packages_opened(
     batch: batch_schemas.Batch, packages: Mapping[int, PackageFacts]
 ) -> int:
@@ -514,6 +539,14 @@ def _problems(
         if broken is None:
             problems.append((("lines", number, "item_id"), "not_found"))
             continue
+        # Counted in another unit since the page read its catalogue: refused,
+        # and read as whole or not in the unit it was shown in.
+        item = held.items[sent.item_id]
+        if sent.unit is not None and sent.unit != item.unit:
+            problems.append((("lines", number, "unit"), "unit_changed"))
+            broken = [rule for rule in broken if rule != "movement_whole_units"]
+            if not whole_enough(sent.unit, sent.quantity):
+                broken.append("movement_whole_units")
         # Resized since the page read its catalogue: refused, and its rules
         # read in the size it was counted in.
         facts = packages

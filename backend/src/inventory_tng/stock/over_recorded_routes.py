@@ -483,19 +483,21 @@ def answer(
     view: WaitingView,
     seen: Annotated[str, Form()] = "",
     typed: Annotated[str, Form(alias="count")] = "",
+    shown_unit: Annotated[str, Form(alias="unit")] = "",
     reason: Annotated[str, Form()] = "",
     typed_words: Annotated[str, Form(alias="words")] = "",
     marker: Annotated[str, Form(alias="refused")] = "",
 ) -> Response:
     """Correct one, close one with both ends right, mark it checked, saying
     why, or confirm the count of an open package moved whole, if still as
-    seen. Its places locked first, by id, as saves take places."""
+    seen. Its places locked first, by id, as saves take places. A count
+    carries the unit it was shown in (forms.confirmed_count)."""
     check = session.get(OverRecorded, check_id)
     if do not in ("correct", "close", "checked", "count") or check is None:
         return not_found()
     count = None
     if do == "count":
-        count = confirmed_count(session, check.movement_id, typed)
+        count = confirmed_count(session, check.movement_id, typed, shown_unit)
         if not isinstance(count, Decimal):
             field = f"count-{check_id}"
             log.debug("over recorded count refused", over_recorded_id=check_id)

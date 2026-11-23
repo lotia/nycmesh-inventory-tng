@@ -178,6 +178,7 @@ export interface components {
         | "open_package_whole"
         | "moved_whole"
         | "package_resized"
+        | "unit_changed"
         | "refused"
         | "retired"
         | "retired_package"
@@ -469,6 +470,11 @@ export interface components {
        * @description A move's line taken from an open package: all that is left on it, `quantity`, moves with it, and it stays open there.
        */
       whole?: boolean | null;
+      /**
+       * Unit
+       * @description The item's unit the page showed `quantity` in, from the catalogue. A line of an item counted in another unit since is refused (unit_changed), never recorded in the new unit. Left out, as by a build from before it was sent, it is not compared.
+       */
+      unit?: string | null;
     };
     /**
      * LineRemoved

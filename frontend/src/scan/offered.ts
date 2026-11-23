@@ -48,15 +48,14 @@ export function offered(
         }
         // A retired package is missing once the catalogue says none is
         // sealed: named once saved, from the catalogue's open package.
-        const pack = items
-          .get(line.item_id)
-          ?.packages.find((each) => each.id === line.package_id);
+        const item = items.get(line.item_id);
+        const pack = item?.packages.find((each) => each.id === line.package_id);
         // One the server refuses opens none, so is never offered: one in no
         // size whatever the catalogue holds.
         const refused =
           pack === undefined
             ? line.package_size == null
-            : refusedAsCounted(line, sent(pack.size));
+            : refusedAsCounted(line, sent(pack.size), item?.unit ?? "");
         if (!refused) {
           byKey.set(key, {
             id: 0,

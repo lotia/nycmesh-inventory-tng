@@ -117,7 +117,13 @@ describe("what an older build left", () => {
     await vi.waitFor(() => expect(saves(sent)).toHaveLength(1));
     // Not 4 loose.
     expect(outbox.entries.value[0]?.body.lines).toEqual([
-      { item_id: 100, package_id: 1000, package_size: "4", quantity: "4" },
+      {
+        item_id: 100,
+        package_id: 1000,
+        package_size: "4",
+        quantity: "4",
+        unit: "each",
+      },
     ]);
   });
 
@@ -837,7 +843,13 @@ describe("what an older build left", () => {
     save();
     await vi.waitFor(() => expect(saves(sent)).toHaveLength(1));
     expect(outbox.entries.value[0]?.body.lines).toEqual([
-      { item_id: 100, package_id: 1000, package_size: "4", quantity: "4" },
+      {
+        item_id: 100,
+        package_id: 1000,
+        package_size: "4",
+        quantity: "4",
+        unit: "each",
+      },
     ]);
   });
 

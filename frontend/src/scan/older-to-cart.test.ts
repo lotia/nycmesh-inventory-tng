@@ -22,6 +22,7 @@ import {
   RESCAN as RESCAN_PHRASE,
   RESIZED as RESIZED_PHRASE,
   toCart,
+  UNIT_CHANGED,
   unreadWords,
   withRetired,
 } from "./older-to-cart";
@@ -77,6 +78,20 @@ describe("as a cart", () => {
     expect(gaps).toEqual([]);
   });
 
+  test("a save's line typed in a unit its item is no longer counted in is done again (inventory-tng-57u8)", () => {
+    const { cart, gaps } = toCart(
+      onlyOlder({
+        lines: [
+          { item_id: 101, quantity: "50", unit: "ft" },
+          { item_id: 100, quantity: "1", unit: "each" },
+        ],
+      }),
+      CATALOGUE,
+    );
+    expect(cart.lines.map((line) => line.itemId)).toEqual([100]);
+    expect(gaps).toEqual([`Cat6 cable: ${say(UNIT_CHANGED)}`]);
+  });
+
   test("a save's cart keeps its batch key, to be sent under; a cart's has none", () => {
     expect(toCart(onlyOlder(), CATALOGUE).cart.batchKey).toBe(KEY);
     // A key no build made is not sent: the outbox gives a new one.
@@ -92,11 +107,10 @@ describe("as a cart", () => {
 
   test("one put back under its key keeps what it went back with, sent as what it was changed from; one without a key keeps none (inventory-tng-0gg)", () => {
     const { cart } = toCart(onlyOlder(), CATALOGUE);
-    expect(cart.changedFrom).toEqual([{ item_id: 101, quantity: "2" }]);
+    const was = [{ item_id: 101, quantity: "2", unit: "m" }];
+    expect(cart.changedFrom).toEqual(was);
     const batch = toBatch(addOne(cart, 101), CATALOGUE);
-    expect(batch).toMatchObject({
-      draft: { changed_from: [{ item_id: 101, quantity: "2" }] },
-    });
+    expect(batch).toMatchObject({ draft: { changed_from: was } });
     expect(toCart(onlyOlder({ key: "c" }), CATALOGUE).cart).not.toHaveProperty(
       "changedFrom",
     );

@@ -317,6 +317,9 @@ describe("asking whose name it is", () => {
 
 describe("the cart store, shared by tabs", () => {
   const filled = () => addOne(cart(), 100);
+  // As a change keeps them: typed in the radio's unit (sized).
+  const filledLines = () =>
+    filled().lines.map((line) => ({ ...line, unit: "each" }));
 
   test("a change gets a new revision; marking it used keeps the revision", () => {
     const store = new CartStore(CATALOGUE);
@@ -394,13 +397,13 @@ describe("the cart store, shared by tabs", () => {
     here.change(filled());
     const there = new CartStore(CATALOGUE);
     there.touch();
-    expect(here.forSaving()?.lines).toEqual(filled().lines);
+    expect(here.forSaving()?.lines).toEqual(filledLines());
   });
 
   test("when the browser will not store it, this tab's cart is the one saved", () => {
     const store = new CartStore(CATALOGUE, refusing("setItem"));
     expect(store.change(filled())).toBe(false);
-    expect(store.forSaving()?.lines).toEqual(filled().lines);
+    expect(store.forSaving()?.lines).toEqual(filledLines());
   });
 
   describe("a write the browser refuses (inventory-tng-xm07)", () => {
@@ -409,7 +412,10 @@ describe("the cart store, shared by tabs", () => {
       store.change(filled());
       const more = addOne(store.cart.value, 101);
       expect(store.change(more)).toBe(true);
-      expect(loadCart().lines).toEqual(more.lines);
+      expect(loadCart().lines).toEqual([
+        ...filledLines(),
+        { ...more.lines[1], unit: "m" },
+      ]);
     });
 
     test("refused again, leaves none stored: a reload brings an empty cart, never lines since recorded", () => {
@@ -601,8 +607,32 @@ describe("a package resized while the cart counts it (inventory-tng-0qi)", () =>
     });
     const batch = toBatch(counted, CATALOGUE);
     expect("draft" in batch && batch.draft.lines).toEqual([
-      { item_id: 100, quantity: "8", package_id: 1000, package_size: "4" },
+      {
+        item_id: 100,
+        quantity: "8",
+        package_id: 1000,
+        package_size: "4",
+        unit: "each",
+      },
     ]);
+  });
+
+  test("a line keeps the unit it was typed in until its amounts change (inventory-tng-57u8)", () => {
+    const typed = cart({
+      lines: [{ itemId: 101, packages: {}, loose: "50", unit: "m" }],
+    });
+    const inFeet = { ...CATALOGUE, items: [{ ...cable, unit: "ft" }] };
+    const touched = { ...typed, installNumber: "7" };
+    expect(sized(typed, touched, inFeet).lines[0]?.unit).toBe("m");
+    const retyped = cart({
+      lines: [{ itemId: 101, packages: {}, loose: "40", unit: "m" }],
+    });
+    expect(sized(typed, retyped, inFeet).lines[0]?.unit).toBe("ft");
+    // A line new to the cart is typed in the unit shown, unless it brings
+    // its own, as one put back by Undo does.
+    const added = cart({ lines: [{ itemId: 101, packages: {}, loose: "1" }] });
+    expect(sized(cart(), added, inFeet).lines[0]?.unit).toBe("ft");
+    expect(sized(cart(), typed, inFeet).lines[0]?.unit).toBe("m");
   });
 
   test("a cart with a count cleared as resized is not saved until counted again", () => {

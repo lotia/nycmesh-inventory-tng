@@ -159,8 +159,15 @@ describe("storage", () => {
     };
     // Optional fields added since a build keeping this key was deployed
     // whose loss leaves an entry as that build itself would have kept it:
-    // only such a field may be added here without a new key. None yet.
-    const droppedAsBefore: string[] = [];
+    // only such a field may be added here without a new key. A line's
+    // unit (inventory-tng-57u8): lost, the server compares none, as with
+    // the build before's own lines.
+    const droppedAsBefore = [
+      "body.changed_from.unit",
+      "body.lines.unit",
+      "reason.recorded.batch.changed_from.unit",
+      "reason.recorded.batch.lines.unit",
+    ];
     expect(Object.keys(Kept.entries)).toEqual(["build", "entries"]);
     expect({
       [STORAGE_KEY]: paths(Entry)

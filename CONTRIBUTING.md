@@ -646,7 +646,11 @@ that package is typed or scanned again, even if its size changes back
 (`frontend/src/scan/cart.ts`, `reconcile` and `sized`); a count of none of it
 is left as it is. Until then Record refuses the cart, as the rest without
 it would record less than was moved (`toBatch`). A count kept before the
-cart kept sizes is taken as counted at the size shown.
+cart kept sizes is taken as counted at the size shown. So too each line
+keeps the unit its amounts were typed in, until they are typed again
+(`sized`), and sends it, so the server refuses a line of an item counted
+in another unit since (`unit_changed`, docs/decisions/0003, work saved as
+it was shown).
 
 The page's words never say "save": the inventory records what Record
 sends, and the browser keeps the cart, which every change writes to

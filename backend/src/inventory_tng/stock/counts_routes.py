@@ -5,11 +5,12 @@ right (docs/decisions/0003). The writing is stock/counts.py's
 wrong. A place's count form is stock/count_routes.py's.
 
 An adjustment carries a key made when its form was shown, so sending it
-twice writes it once. The page checks what was typed before writing, but
-an item's unit may change to each between that check and the write: the
-ledger then refuses the line (movement_whole_units), and the form is shown
-again saying so, nothing written. So too a place retired meanwhile, which
-the ledger refuses (location_countable).
+twice writes it once, and the unit it showed each item in. An item
+counted in another unit since, even between the page's checks and the
+write, is refused, and the form shown again in the unit it is counted in
+now, saying so, nothing written (stock/units_shown.py; Ali, 2026-11-23,
+inventory-tng-57u8). So too a place retired meanwhile, which the ledger
+refuses (location_countable).
 """
 
 import uuid
@@ -34,11 +35,12 @@ from inventory_tng.models.catalogue import Item
 from inventory_tng.models.places import Location
 from inventory_tng.models.stock import AdjustmentReason, LedgerTransaction
 from inventory_tng.site_settings.paths import SETTINGS
-from inventory_tng.stock import queries
+from inventory_tng.stock import queries, units_shown
 from inventory_tng.stock.balance import countable
 from inventory_tng.stock.counts import COUNTABLE, WHOLE, record_adjustment
-from inventory_tng.stock.forms import adjustment
+from inventory_tng.stock.forms import adjustment, now_counted_in, shown_field
 from inventory_tng.stock.paths import ADJUSTMENTS, COUNTS
+from inventory_tng.stock.units_shown import SHOWN_OTHERWISE
 from inventory_tng.web.admin_pages import TextForm, admin_page, current_rows
 from inventory_tng.web.forms import RULES
 from inventory_tng.web.listing import UNASKED, AskedView, Sort, Sorting, View, order
@@ -144,6 +146,7 @@ def _counts_page(
     values: Mapping[str, str] | None = None,
 ) -> HTMLResponse:
     recent, view = _recent(session, view or _view(UNASKED))
+    items = queries.countable_items(session)
     # The filters offer where and by whom there are any.
     return admin_page(
         request,
@@ -154,7 +157,9 @@ def _counts_page(
             "here": COUNTS,
             "settings_path": SETTINGS,
             "places": _places(session),
-            "items": queries.countable_items(session),
+            "items": items,
+            # The unit each is shown in, beside its name (forms.UNITS).
+            "units": shown_field({item.id: item.unit for item in items}),
             "reasons": current_rows(session, AdjustmentReason),
             "recent": recent,
             "view": view,
@@ -195,24 +200,38 @@ def adjust(
     asked, problems = adjustment(session, form, key)
     if asked is None:
         return _counts_page(request, session, signed, problems=problems, values=form)
-    place, item, amount, direction, reason, key = asked
-    _, broken = refusal(
-        session,
-        lambda: record_adjustment(
-            session,
-            key,
-            signed.admin.id,
-            place.id,
-            item.id,
-            amount,
-            found=direction == "found",
-            reason_id=reason.id,
-        ),
-        WHOLE,
-        COUNTABLE,
-    )
+    place, item, amount, direction, reason, key, unit = asked
+    # The item as it is now, if shown otherwise (units_shown.ShownOtherwise).
+    now: units_shown.Now | None = None
+
+    def adjust_it() -> None:
+        nonlocal now
+        try:
+            record_adjustment(
+                session,
+                key,
+                signed.admin.id,
+                place.id,
+                item.id,
+                amount,
+                found=direction == "found",
+                reason_id=reason.id,
+                shown_unit=unit,
+            )
+        except units_shown.ShownOtherwise as broken:
+            now = broken.now
+            raise
+
+    _, broken = refusal(session, adjust_it, WHOLE, COUNTABLE, SHOWN_OTHERWISE)
     if broken is not None:
         log.info("adjustment refused by a rule", item_id=item.id, rule=broken)
+        if now is not None:
+            # Asked again in the unit it is counted in now, which the form
+            # shown again shows.
+            words = now_counted_in(now.units[item.id])
+            return _counts_page(
+                request, session, signed, problems={"amount": words}, values=form
+            )
         field = "location_id" if broken == COUNTABLE else "amount"
         return _counts_page(
             request, session, signed, problems={field: RULES[broken]}, values=form

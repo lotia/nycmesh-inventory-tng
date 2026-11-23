@@ -117,6 +117,10 @@ msgstr ""
 msgid "That phrase has expired. Ask for a new one."
 msgstr ""
 
+#: src/scan/older-to-cart.ts
+msgid "This item's unit has changed since it was added. Discard it and add it again in the new unit."
+msgstr ""
+
 #: src/scan/Notes.tsx
 msgid "Add to cart"
 msgstr ""
@@ -308,6 +312,10 @@ msgstr ""
 
 #: src/scan/OlderList.tsx
 msgid "Saying what is on open packages"
+msgstr ""
+
+#: src/shared/outbox-notes.ts
+msgid "This item's unit changed since the page loaded: load the page again, and count it again"
 msgstr ""
 
 #: src/shared/outbox-notes.ts

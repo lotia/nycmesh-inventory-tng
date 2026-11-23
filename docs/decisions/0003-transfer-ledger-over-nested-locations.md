@@ -8,7 +8,7 @@ by 0020 (sealed and open packages), 2026-11-15 (counting some items),
 2026-11-18 (a count form's moment read without a lock), 2026-11-19 (a
 count's moment stays a ledger number), 2026-11-19 and 2026-11-20 (a
 retired package with none left is never taken), 2026-11-21 (a store
-counted with its areas)
+counted with its areas), 2026-11-23 (work saved as it was shown)
 
 ## Context
 
@@ -257,3 +257,29 @@ lost, and the areas' own counts would fight the store's) and a read-only
 list of each area's stock linking to its own count (it saves no work at
 the shelf). A "found in another area" choice that records a move was
 left out for now: revisit it if counters find a loss and a find awkward.
+
+## Amendment: work saved as it was shown (2026-11-23)
+
+Decided by Ali on 2026-11-23 (inventory-tng-jwlh, built as
+inventory-tng-57u8). An item's unit may change until its first movement,
+and a package's size until it has moved, been opened or been labelled:
+exactly when its first saves may still be on their way, such as a phone's
+outbox holding a receipt of 50 m of a new cable when an administrator
+switches it to ft. So every save says the units and package sizes it
+showed: each line of a scan page's batch its item's unit, as it already
+said its package's size; a count form the unit of every item and the size
+of every package it shows; an adjustment the unit of every item it offers;
+an open package's count confirmed its item's unit. The save compares them
+with the catalogue while holding the items and packages, as it does to
+write, so no change slips between. One changed since is refused, nothing
+written, and asked again in the new ones: the batch's line is refused
+(`unit_changed`, as `package_resized`) for the outbox to say so, and a
+form is shown again as it is now, saying beside the box "This item is now
+counted in ft. Check the amount and save again." We rejected converting
+what was shown into what is now: a unit switched because it was wrong may
+mean the volunteer's number was right in the new one, so asking again is
+safer.
+
+A batch line without a unit, as a build from before sends, is not
+compared, as the batch endpoint expands before it contracts
+(CONTRIBUTING.md, The scan page).

@@ -163,8 +163,8 @@ def adjustment_form(
     **fields: str,
 ) -> dict[str, str]:
     """An adjustment as the Counts page sends it: one of the item written
-    off at the place, for `reason`, with a key of its own; `fields` change
-    any of that."""
+    off at the place, for `reason`, with a key of its own, the item shown
+    in its unit; `fields` change any of that."""
     reason_id = session.scalars(
         select(AdjustmentReason.id).where(AdjustmentReason.name == reason)
     ).one()
@@ -175,6 +175,7 @@ def adjustment_form(
         "amount": "1",
         "direction": "off",
         "reason_id": str(reason_id),
+        "units": f"{item.id}:{item.unit}",
     } | fields
 
 
@@ -336,15 +337,15 @@ def opened_line(spools: Spools, **fields: object) -> dict[str, object]:
 
 def count_form(page: Response) -> dict[str, str]:
     """A count page's hidden fields, as it was shown: its key, the places'
-    latest ledger entry then and how many it saw, the places it showed,
-    the items each asked for again and their figures while counted, and
-    the areas gone from it since it was first shown, with that moment."""
+    latest ledger entry then and how many it saw, the units and package
+    sizes it showed, the places it showed, the items each asked for again
+    and their figures while counted, and the areas gone from it since it
+    was first shown, with that moment."""
+    shown = {"key", "as_of", "seen", "units", "sizes", "places", "gone", "gone_since"}
     return {
         name: value
         for name, value in hidden_fields(page.text)
-        if name in {"key", "as_of", "seen", "places", "gone", "gone_since"}
-        or name.endswith("items")
-        or "while_" in name
+        if name in shown or name.endswith("items") or "while_" in name
     }
 
 

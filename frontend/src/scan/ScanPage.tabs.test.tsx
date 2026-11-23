@@ -119,6 +119,7 @@ describe("other tabs and a changing catalogue", () => {
       quantity: "8",
       package_id: 1000,
       package_size: "8",
+      unit: "each",
     });
   });
 

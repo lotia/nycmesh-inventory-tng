@@ -45,6 +45,7 @@ export const PROBLEMS: Record<ProblemKind, MessageDescriptor> = {
   open_package_whole: msg`Moving an open package whole takes all that is left on it, which changed: load the page again`,
   moved_whole: msg`That open package moves whole, still open: it is not used up`,
   package_resized: msg`This package's size changed since the page loaded: load the page again, and count it again`,
+  unit_changed: msg`This item's unit changed since the page loaded: load the page again, and count it again`,
   refused: msg`The inventory's rules refuse this as sent: it changed since the page loaded. Load the page again, and do it again`,
   retired: msg`This item is retired: what is left may be taken, never received`,
   retired_package: msg`This package is retired: what is left may be taken, never received`,

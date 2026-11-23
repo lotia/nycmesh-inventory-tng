@@ -23,6 +23,9 @@
   {% with section_id="adjust" %}{% include "_notice.html" %}{% endwith %}
   <form method="post" action="{{ here }}/adjustments">
     <input type="hidden" name="key" value="{{ values.get('key', key) }}">
+    {#- The unit each item is shown in: an adjustment of one counted in
+    another since is asked again (stock/forms.py, UNITS). #}
+    <input type="hidden" name="units" value="{{ units }}">
     <label>{% trans %}Place{% endtrans %}
       <select name="location_id" required>
         <option value="">{% trans %}Pick one{% endtrans %}</option>

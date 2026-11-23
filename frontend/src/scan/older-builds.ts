@@ -91,6 +91,9 @@ const OldLine = v.object({
    * (during v3). */
   package_size: maybe(v.union([v.number(), v.string()])),
   open_package_key: maybe(v.string()),
+  /** The unit its quantity was typed in, kept since inventory-tng-57u8
+   * (during v5). */
+  unit: maybe(v.string()),
 });
 
 /** A cart as any version kept it. */

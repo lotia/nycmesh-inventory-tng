@@ -54,6 +54,11 @@ const LineSchema = v.object({
   sizes: v.exactOptional(v.record(v.string(), v.string())),
   /** Loose units, in the item's unit, as typed. */
   loose: v.string(),
+  /** The item's unit its amounts were typed in, as the catalogue gave it
+   * then (sized): what is saved, so a batch of an item counted in another
+   * unit since is refused, not recorded in the new one (inventory-tng-57u8).
+   * A line kept without, by a build from before, is in the unit shown now. */
+  unit: v.exactOptional(v.string()),
   /** Taken from open packages, by key: how much, as typed, and whether
    * all of one moves with it, whole (docs/decisions/0020). */
   open: v.exactOptional(
@@ -382,7 +387,8 @@ function recounted(line: Line, item: Item | undefined): Line {
  * before sizes were (a cart an older build left, put back) is taken as
  * counted at the size shown now, as it was read before; a count blank has
  * none, but one cleared as resized keeps its size until typed again
- * (reconcile).
+ * (reconcile). So too the unit its amounts were typed in: the one it
+ * has, until its loose or open amounts change; else the one shown now.
  */
 export function sized(before: Cart, next: Cart, catalogue: Catalogue): Cart {
   const { items } = indexOf(catalogue);
@@ -405,7 +411,15 @@ export function sized(before: Cart, next: Cart, catalogue: Catalogue): Cart {
           sizes[packageId] = pack.size;
         }
       }
-      return Object.keys(sizes).length === 0 ? line : { ...line, sizes };
+      const typedIn =
+        line.unit !== undefined &&
+        (previous === undefined ||
+          (previous.loose === line.loose &&
+            JSON.stringify(previous.open) === JSON.stringify(line.open)))
+          ? line.unit
+          : items.get(line.itemId)?.unit;
+      const inUnit = typedIn === undefined ? line : { ...line, unit: typedIn };
+      return Object.keys(sizes).length === 0 ? inUnit : { ...inUnit, sizes };
     }),
   };
 }

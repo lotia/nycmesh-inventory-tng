@@ -18,6 +18,7 @@ from inventory_tng.models.stock import (
 )
 from inventory_tng.stock import ledger, over_recorded
 from inventory_tng.stock.ledger import Form
+from inventory_tng.stock.queries import item_moved
 
 from helpers.markup import Element, read
 from helpers.stock import (
@@ -123,9 +124,12 @@ def moved_whole(
 def counted(
     admin_client: TestClient, session: Session, count: str, **form: str
 ) -> tuple[OverRecorded, Any]:
-    """The one waiting, and the answer to its count sent as `count`."""
+    """The one waiting, and the answer to its count sent as `count`, shown
+    in its item's unit."""
     (check,) = checks(session)
-    return check, answered(admin_client, session, "count", count=count, **form)
+    _, unit = item_moved(session, check.movement_id)
+    shown = {"unit": unit} | form
+    return check, answered(admin_client, session, "count", count=count, **shown)
 
 
 def adjustments(session: Session) -> list[tuple[object, ...]]:

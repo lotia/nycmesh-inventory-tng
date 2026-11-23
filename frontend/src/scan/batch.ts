@@ -213,6 +213,10 @@ export function toBatch(
       continue;
     }
     const quantity = quantityOf(line, item);
+    // Each of its lines says the unit it was typed in (cart.sized): one
+    // counted in another since is refused, for the volunteer to count again
+    // (Ali, 2026-11-23, inventory-tng-57u8).
+    const first = lines.length;
     if ("problem" in quantity) {
       problems.push(sayParts(ITEM_SAYS, { name, what: quantity.problem }));
     } else if (quantity.amount >= MAX_AMOUNT) {
@@ -244,6 +248,9 @@ export function toBatch(
           ...(whole && cart.kind === "move" ? { whole: true } : {}),
         });
       }
+    }
+    for (const added of lines.slice(first)) {
+      added.unit = line.unit ?? item.unit;
     }
   }
   if (

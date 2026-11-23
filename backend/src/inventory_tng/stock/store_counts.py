@@ -38,6 +38,7 @@ from inventory_tng.stock.counts import (
 )
 from inventory_tng.stock.ledger import LOOSE, Form, hold_across, lock_places
 from inventory_tng.stock.moments import Moment
+from inventory_tng.stock.units_shown import Shown, require_as_shown
 
 
 class StoreCounted(NamedTuple):
@@ -59,6 +60,7 @@ def record_store_count(
     *,
     aside: Mapping[int, Mapping[tuple[int, Form], Decimal]],
     fixed: Mapping[int, FormLines],
+    shown: Shown,
 ) -> StoreCounted:
     """Put the records right at each place of `counts`, of a form showing
     `places`, as of `at`, read across them all (moments.moment): every
@@ -68,11 +70,18 @@ def record_store_count(
     the areas gone from the form, which its lines count apart
     (counts.record_count). NotCountable names the place that may not be
     counted; RuleBroken (count_sent_otherwise) for a form saved before
-    that says otherwise now (module docstring)."""
+    that says otherwise now (module docstring); ShownOtherwise for an item
+    or package the form `shown` otherwise than it is (units_shown)."""
     lock_places(session, places)
     _hold_named(session, counts.keys(), at, counts.values(), fixed)
     said = _digest(places, at, counts, aside, fixed)
-    if not spend(session, key, said):
+    if spend(session, key, said):
+        require_as_shown(
+            session, "count", shown, *amounts_named(counts.values(), fixed)
+        )
+    else:
+        # Saved before, it is answered as it was, as a batch is: what was
+        # shown then was checked then.
         enforce("count_sent_otherwise", when=digest_spent(session, key) != said)
     counted = {
         place_id: _count_at(
@@ -149,6 +158,23 @@ def _plain(value: object) -> object:
 def _place_key(key: uuid.UUID, place_id: int) -> uuid.UUID:
     """The key a form's count at one of its places is written under."""
     return uuid.uuid5(key, str(place_id))
+
+
+def amounts_named(
+    counts: Collection[PlaceCount], fixed: Mapping[int, FormLines]
+) -> tuple[set[int], set[int]]:
+    """The items a count form's places and the moves it fixes count an
+    amount of, in their unit, and the packages they count sealed, by their
+    size: those the form says the unit and size it showed of
+    (units_shown)."""
+    lines = [line for count in counts for line in count.forms.lines] + [
+        line for each in fixed.values() for line in each
+    ]
+    items = {item_id for item_id, _, _ in lines}
+    items |= {item_id for count in counts for item_id, _ in count.counted}
+    items |= {count.forms.found[0].item_id for count in counts if count.forms.found}
+    packages = {form.package_id for _, form, _ in lines if form.package_id is not None}
+    return items, packages
 
 
 def _hold_named(

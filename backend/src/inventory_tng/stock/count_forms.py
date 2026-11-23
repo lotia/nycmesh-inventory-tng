@@ -16,8 +16,15 @@ from inventory_tng.models.stock import OpenPackage
 from inventory_tng.stock import queries
 from inventory_tng.stock.adjustment_reasons import LOST, USED_UP
 from inventory_tng.stock.counts import ItemLines
-from inventory_tng.stock.forms import PICK_A_PLACE
+from inventory_tng.stock.forms import (
+    PICK_A_PLACE,
+    SIZES,
+    UNITS,
+    now_counted_in,
+    now_holds,
+)
 from inventory_tng.stock.ledger import LOOSE, Form, repeated
+from inventory_tng.stock.units_shown import Now
 from inventory_tng.web.forms import QUANTITY_MAX, RULES, quantity, row_id
 
 # The count form's fields of items: counted, by item, and one chosen at
@@ -204,8 +211,14 @@ PICKED = {
     EXTRA_PLACE: (EXTRA_ITEM, EXTRA),
     FOUND_PLACE: (FOUND_PACKAGE, FOUND_LEFT),
 }
-# Fields said once, wherever their place: never prefixed.
-SHARED = {*PICKED, *(name for names in PICKED.values() for name in names)}
+# Fields said once, wherever their place: never prefixed. The units and
+# sizes shown are the whole form's (forms.UNITS, forms.SIZES).
+SHARED = {
+    *PICKED,
+    *(name for names in PICKED.values() for name in names),
+    UNITS,
+    SIZES,
+}
 
 
 def field_at(root_id: int, place_id: int, name: str) -> str:
@@ -479,3 +492,56 @@ def item_counts(
         elif amount is not None:
             counted.append((item_id, amount))
     return counted, problems
+
+
+def _counts_of(
+    session: Session, name: str, fields: Mapping[str, str]
+) -> tuple[int | None, int | None]:
+    """The item a place's field `name` counts an amount of, in its unit,
+    and the package, if it counts it sealed; neither for a field of no
+    amount."""
+    if name.startswith(COUNTED):
+        return _item_id(name.removeprefix(COUNTED)), None
+    if name.startswith(LOOSE_FIELD):
+        return row_id(name.removeprefix(LOOSE_FIELD)), None
+    if name.startswith(SEALED):
+        item_part, _, package_part = name.removeprefix(SEALED).partition("_")
+        return row_id(item_part), row_id(package_part)
+    if name.startswith(OPENED):
+        row = session.get(OpenPackage, row_id(name.removeprefix(OPENED)) or 0)
+        return (row.item_id if row else None), None
+    if name == EXTRA:
+        return _item_id(fields.get(EXTRA_ITEM, "")), None
+    if name == FOUND_LEFT:
+        package = session.get(ItemPackage, row_id(fields.get(FOUND_PACKAGE, "")) or 0)
+        return (package.item_id if package else None), None
+    if name.startswith(ARRIVED):
+        _, _, inner = name.removeprefix(ARRIVED).partition("_")
+        return _counts_of(session, inner, fields)
+    return None, None
+
+
+def changed_words(
+    session: Session,
+    form: Mapping[str, str],
+    root_id: int,
+    place_ids: Collection[int],
+    now: Now,
+) -> dict[str, Words]:
+    """Beside each box of a count form of an item counted in another unit
+    since it was shown, or of a package now of another size, by the form's
+    own field names: what it is now, to check and save again (Ali,
+    2026-11-23, inventory-tng-57u8)."""
+    split, _ = by_place(form, root_id, place_ids)
+    words: dict[str, Words] = {}
+    for place_id, fields in split.items():
+        for name in fields:
+            item_id, package_id = _counts_of(session, name, fields)
+            if item_id in now.units:
+                said = now_counted_in(now.units[item_id])
+            elif package_id in now.sizes:
+                said = now_holds(*now.sizes[package_id])
+            else:
+                continue
+            words[field_at(root_id, place_id, name)] = said
+    return words

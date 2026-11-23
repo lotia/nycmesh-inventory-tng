@@ -428,13 +428,14 @@ def open_with_ids(
     ).all()
 
 
-def unit_moved(session: Session, movement_id: int) -> str:
-    """The unit of the item a ledger line moved."""
-    return session.scalars(
-        select(Item.unit)
+def item_moved(session: Session, movement_id: int) -> tuple[int, str]:
+    """The item a ledger line moved, and its unit."""
+    item_id, unit = session.execute(
+        select(Item.id, Item.unit)
         .join(Movement, Movement.item_id == Item.id)
         .where(Movement.id == movement_id)
     ).one()
+    return item_id, unit
 
 
 def item_total(session: Session, item_id: int) -> Decimal:

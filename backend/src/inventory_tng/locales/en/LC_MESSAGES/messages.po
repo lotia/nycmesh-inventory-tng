@@ -4183,6 +4183,11 @@ msgstr ""
 msgid "This item is counted in whole units."
 msgstr ""
 
+#: src/inventory_tng/stock/forms.py
+#, python-format
+msgid "This item is now counted in %(unit)s. Check the amount and save again."
+msgstr ""
+
 #: src/inventory_tng/stock/count_forms.py
 msgid "This item is on the form more than once."
 msgstr ""
@@ -4194,6 +4199,11 @@ msgid ""
 "it, or its time ran out. <a href=\"%(link)s\">Ask for a new one</a>, or "
 "ask another administrator. If nobody else can help, ask whoever runs the "
 "server for a new recovery token."
+msgstr ""
+
+#: src/inventory_tng/stock/forms.py
+#, python-format
+msgid "This package now holds %(size)s %(unit)s. Check the count and save again."
 msgstr ""
 
 #: src/inventory_tng/stock/length_checks_routes.py
