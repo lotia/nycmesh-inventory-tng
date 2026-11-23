@@ -113,6 +113,15 @@ is, read [README.md](README.md).
       it found. Nothing is simplified or pushed; it closes once the
       person has the report and the beads are filed.
     - **The batch bead closes** once its issues are closed and pushed.
+14. **Write beads so a maintainer can follow them.** Every bead, note and
+    handoff must make clear what issue it tracks and give enough context to
+    act on it. Open with a short summary of the problem or task and why it
+    matters, with a concrete example where it helps. Then lay it out for
+    reading: short headed sections or numbered steps, one point per bullet.
+    No long run-on paragraphs, and no "(1) … (2) …" lists inside a
+    sentence. Name functions, files (file:line) and tables where relevant,
+    but say what each does or why it matters, so the reader needn't open
+    the code to follow the issue.
 
 ## More guidance
 
