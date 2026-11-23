@@ -37,11 +37,16 @@ test("a save refused for a line goes back without it, saying why, and the rest i
     admin.getByRole("button", { name: `Bring it back ${BOX}` }),
   ).toBeVisible();
   await admin.close();
+  // Record's own look at the catalogue goes unanswered, as with no
+  // signal, so the cart is queued as shown and the inventory refuses it
+  // (Ali, 2026-11-23, inventory-tng-h7ua).
+  await page.route("**/api/catalogue**", (route) => route.abort());
   await page.getByRole("button", { name: "Record" }).click();
   const entry = newestCart(page);
   await expect(
     entry.locator(".alert li", { hasText: `Line 1: ${NONE_LEFT}` }),
   ).toBeVisible();
+  await page.unroute("**/api/catalogue**");
   await expect(entry.getByText(WITHOUT_REFUSED)).toBeVisible();
 
   await entry.getByRole("button", { name: ADD_TO_CART, exact: true }).click();

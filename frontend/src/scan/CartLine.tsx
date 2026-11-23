@@ -68,7 +68,7 @@ export function CartLine({
         <strong>{item.name}</strong>
         {item.retired && <small> {say(RETIRED)}</small>}
       </div>
-      {line.unit !== undefined && unitChanged(line, item) && (
+      {unitChanged(line, item) && (
         <p role="alert">
           <AlertWords
             note={{

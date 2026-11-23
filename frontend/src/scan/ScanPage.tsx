@@ -115,18 +115,22 @@ export function ScanPage({
   }
 
   /** The catalogue loaded again and shown, for Record to check the cart
-   * against; null if it does not come within RECORD_CATALOGUE_WAIT_MS.
-   * Come later, it is shown all the same. */
-  async function latest(): Promise<Catalogue | null> {
+   * against; if it does not come within RECORD_CATALOGUE_WAIT_MS, the one
+   * shown then, which a refresh may have changed meanwhile. Come later, it
+   * is shown all the same. */
+  async function latest(): Promise<Catalogue> {
     let timer: ReturnType<typeof setTimeout> | undefined;
     const late = new Promise<null>((resolve) => {
       timer = setTimeout(() => resolve(null), RECORD_CATALOGUE_WAIT_MS);
     });
-    try {
-      return await Promise.race([fetch(true), late]);
-    } finally {
-      clearTimeout(timer);
-    }
+    const fresh = await Promise.race([fetch(true), late]).finally(() =>
+      clearTimeout(timer),
+    );
+    // Record is offered only while one is shown, and a reload that fails
+    // keeps it.
+    return (
+      fresh ?? (loaded.value as Extract<Loaded, { state: "ready" }>).catalogue
+    );
   }
 
   function load() {

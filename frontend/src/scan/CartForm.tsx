@@ -149,8 +149,8 @@ export function CartForm({
   /** Refresh this page, offered where the camera was refused (Scanner). */
   reload: () => void;
   /** The catalogue as it is now, which Record checks the cart against
-   * first; null if it cannot be had soon (ScanPage). */
-  latest: () => Promise<Catalogue | null>;
+   * first; the one shown if it cannot be had soon (ScanPage). */
+  latest: () => Promise<Catalogue>;
 }) {
   const store = useMemo(() => new CartStore(catalogue), []);
   // The open packages to take from, and how many are sealed where, as the
@@ -163,9 +163,6 @@ export function CartForm({
     [catalogue, pending],
   );
   const cart = store.cart;
-  // The catalogue shown, as Record finds it once it has waited (save).
-  const shown = useRef(catalogue);
-  shown.current = catalogue;
   const query = useSignal("");
   const problems = useSignal<Said[]>([]);
   // While Record waits for the catalogue: Record does nothing meanwhile.
@@ -400,20 +397,14 @@ export function CartForm({
     }
     const tapped = cart.value.revision;
     checking.value = true;
-    const fresh = await latest()
-      .catch(() => null)
-      .finally(() => {
-        checking.value = false;
-      });
+    const against = await latest().finally(() => {
+      checking.value = false;
+    });
     if (cart.value.revision !== tapped) {
       return;
     }
-    if (fresh !== null) {
-      store.useCatalogue(fresh);
-    }
-    // The one shown now, which a refresh may have changed meanwhile, and
-    // what the outbox holds that it does not show, as `pending` is.
-    const against = fresh ?? shown.current;
+    store.useCatalogue(against);
+    // With what the outbox holds that it does not show, as `pending` is.
     const ready = checked(
       against,
       offered(against, unseen(outbox.entries.value, against)),

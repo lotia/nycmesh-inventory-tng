@@ -369,35 +369,35 @@ export function resized(line: Line, pack: Package): boolean {
  * counted in now: they are cleared (reconcile), and the line says so
  * until they are typed again in the new unit (Ali, 2026-11-23,
  * inventory-tng-h7ua). */
-export function unitChanged(line: Line, item: Item): boolean {
+export function unitChanged(
+  line: Line,
+  item: Item,
+): line is Line & { unit: string } {
   return line.unit !== undefined && line.unit !== item.unit;
 }
 
-/** Whether anything is typed on the line: a count of packages, loose,
- * or of an open package. */
-function holdsAmounts(line: Line): boolean {
-  return (
-    Object.values(line.packages).some((typed) => typed !== "") ||
-    line.loose !== "" ||
-    Object.values(line.open ?? {}).some(
-      (taken) => taken.amount !== "" || (taken.now ?? "") !== "",
-    )
-  );
+type Typed = Pick<Line, "packages" | "loose" | "open">;
+
+/** What is typed on the line, each beside where: counts of packages,
+ * loose, and what is taken from open packages. Not what is ticked, so a
+ * used-up box ticked on a line cleared as typed in another unit leaves it
+ * asking for the amount again (unitChanged). */
+function typedOn(line: Typed): [string, string][] {
+  return [
+    ...Object.entries(line.packages),
+    ["loose", line.loose],
+    ...Object.entries(line.open ?? {}).flatMap(
+      ([key, { amount, now }]): [string, string][] => [
+        [`${key} amount`, amount],
+        [`${key} now`, now ?? ""],
+      ],
+    ),
+  ];
 }
 
-/** What is typed on the line, to tell whether it changed: not what is
- * ticked, so a used-up box ticked on a line cleared as typed in another
- * unit leaves it asking for the amount again (unitChanged). */
-function amountsOf(line: Line): string {
-  return JSON.stringify([
-    line.packages,
-    line.loose,
-    Object.entries(line.open ?? {}).map(([key, { amount, now }]) => [
-      key,
-      amount,
-      now,
-    ]),
-  ]);
+/** Whether anything is typed on the line (typedOn). */
+function holdsAmounts(line: Typed): boolean {
+  return typedOn(line).some(([, typed]) => typed !== "");
 }
 
 /** The line with everything typed on it cleared, keeping the unit it was
@@ -457,7 +457,7 @@ function recounted(line: Line, item: Item | undefined): Line {
  * counted at the size shown now, as it was read before; a count blank has
  * none, but one cleared as resized keeps its size until typed again
  * (reconcile). So too the unit its amounts were typed in: the one it
- * has, until any of its amounts change (amountsOf); else the one shown
+ * has, until any of its amounts change (unitTypedIn); else the one shown
  * now, or none while nothing is typed on it.
  */
 export function sized(before: Cart, next: Cart, catalogue: Catalogue): Cart {
@@ -481,19 +481,31 @@ export function sized(before: Cart, next: Cart, catalogue: Catalogue): Cart {
           sizes[packageId] = pack.size;
         }
       }
-      const typedIn =
-        line.unit !== undefined &&
-        (previous === undefined || amountsOf(previous) === amountsOf(line))
-          ? line.unit
-          : holdsAmounts(line)
-            ? items.get(line.itemId)?.unit
-            : undefined;
+      const typedIn = unitTypedIn(previous, line, items.get(line.itemId));
       const { unit: _, ...unsized } = line;
       const inUnit =
         typedIn === undefined ? unsized : { ...unsized, unit: typedIn };
       return Object.keys(sizes).length === 0 ? inUnit : { ...inUnit, sizes };
     }),
   };
+}
+
+/** The unit `line`'s amounts were typed in (sized): the one it has, until
+ * any of them change from `previous`; else the item's, or none while
+ * nothing is typed on it. */
+function unitTypedIn(
+  previous: Line | undefined,
+  line: Omit<Line, "sizes">,
+  item: Item | undefined,
+): string | undefined {
+  if (
+    line.unit !== undefined &&
+    (previous === undefined ||
+      JSON.stringify(typedOn(previous)) === JSON.stringify(typedOn(line)))
+  ) {
+    return line.unit;
+  }
+  return holdsAmounts(line) ? item?.unit : undefined;
 }
 
 /** Add one of this item, or of this package of it, to the cart. */
