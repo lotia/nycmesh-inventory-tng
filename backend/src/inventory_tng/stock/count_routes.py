@@ -979,15 +979,15 @@ def bring_back(
         return not_found()
     place, _, at, place_ids, gone = carried
     tree = queries.place_tree(session, place)
-    label = next(
+    area, label = next(
         (
-            queries.place_label(each, path)
+            (each, queries.place_label(each, path))
             for each, path, _ in tree
             if each.id == area_id
         ),
-        None,
+        (None, ""),
     )
-    if area_id == place.id or label is None:
+    if area_id == place.id or area is None:
         # Not one of the place's areas, as only a hand-made form names: none
         # this form may bring back.
         return not_found()
@@ -1013,7 +1013,6 @@ def bring_back(
         recount={place_id: each.recount for place_id, each in sent.items()},
         gone=gone,
     )
-    area = session.get_one(Location, area_id)
 
     def restore() -> bool:
         try:
