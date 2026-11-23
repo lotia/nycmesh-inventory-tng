@@ -2,11 +2,10 @@
  * it listed (ScanPage.older-build-*.test.tsx). Never bundled. */
 import { screen, within } from "@testing-library/preact";
 import { ADDED_BACK as ADDED_BACK_PHRASE } from "../scan/CartForm";
-import { freshCart } from "../scan/cart";
 import { DISCARD } from "../scan/Notes";
 import { CHECKED_OUT, NOT_KEPT as NOT_KEPT_PHRASE } from "../scan/OlderList";
 import { say } from "../shared/i18n";
-import { KEY, keep, moveBody, olderSave } from "./saves";
+import { KEY, keep, keepOlderCart, moveBody, olderSave } from "./saves";
 
 /** The heading of the list of what older builds left. */
 export const HEADING = say(CHECKED_OUT);
@@ -39,8 +38,7 @@ export function leaveSave(fields = {}, body = {}) {
 /** A cart filled for an install, under v1, with a line no build wrote:
  * not whole, so it waits for the volunteer. */
 export function leaveCart(fields = {}) {
-  keep("inventory.cart.v1", {
-    ...freshCart(),
+  keepOlderCart({
     kind: "install",
     volunteerId: 2,
     fromId: 12,

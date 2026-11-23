@@ -5,6 +5,7 @@
  * own data changes.
  */
 
+import { freshCart } from "../scan/cart";
 import { type Older, readOlder } from "../scan/older-builds";
 import { BUILD } from "../shared/build";
 import {
@@ -103,6 +104,19 @@ export function firstOlder(): Older {
  * read. */
 export function onlyOlder(body = {}, fields = {}): Older {
   keep("inventory.outbox.v3", [olderMove(fields, body)]);
+  return firstOlder();
+}
+
+/** Keeps a cart as an older build left it, under v1: an empty one but
+ * for `fields`. */
+export function keepOlderCart(fields: Record<string, unknown> = {}) {
+  keep("inventory.cart.v1", { ...freshCart(), ...fields });
+}
+
+/** The only thing kept, an older build's cart, empty but for `fields`,
+ * as read: onlyOlder's counterpart for a cart. */
+export function onlyOlderCart(fields: Record<string, unknown> = {}): Older {
+  keepOlderCart(fields);
   return firstOlder();
 }
 

@@ -33,10 +33,12 @@ import {
   type Reason,
   type Recorded,
 } from "./shared/outbox";
+import { openSpool } from "./testing/catalogue";
 import { answering, deferred, json } from "./testing/fetch";
 import {
   KEY,
   keep,
+  keepOlderCart,
   moveBody,
   OTHER_KEY,
   olderSave,
@@ -122,17 +124,13 @@ const retired: Item = {
   retired: true,
 };
 
-const OPEN = {
+const OPEN = openSpool({
   id: 1,
   key: OPEN_KEY,
-  item_id: 101,
-  package_id: 1001,
   package_name: "Καρούλι",
-  location_id: 10,
-  opened_at: "2026-11-03T10:00:00Z",
   left: "4.000",
   short_below: "15",
-};
+});
 
 const CATALOGUE: Catalogue = {
   settings: { name_check_minutes: 15 },
@@ -239,8 +237,7 @@ function leaveOlder(at: number | null) {
       { what: "Ραδιόφωνο", queuedAt: at },
     ),
   ]);
-  keep("inventory.cart.v1", {
-    ...freshCart(),
+  keepOlderCart({
     // A kind no build knows.
     kind: "lost",
     volunteerId: 2,

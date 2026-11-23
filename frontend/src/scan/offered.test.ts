@@ -86,17 +86,11 @@ describe("turning a cart into a batch", () => {
     );
     expect(offeredAt(all, 101, 10)).toEqual([{ ...known, left: 100000 }]);
     expect(offeredAt(all, 101, 12)).toEqual([
-      {
-        id: 0,
+      openAt(0, 305000, {
         key: fresh,
-        item_id: 101,
-        package_id: 1001,
-        package_name: "Spool",
         location_id: 12,
         opened_at: "2026-11-04T09:00:00.000Z",
-        left: 305000,
-        short_below: null,
-      },
+      }),
     ]);
   });
 

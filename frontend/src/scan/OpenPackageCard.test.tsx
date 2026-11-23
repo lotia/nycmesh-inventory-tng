@@ -2,7 +2,7 @@ import { fireEvent, render, screen } from "@testing-library/preact";
 import { describe, expect, test, vi } from "vitest";
 import { messages as english } from "../locales/en.po";
 import { say, speak } from "../shared/i18n";
-import { cable, radio } from "../testing/catalogue";
+import { cable, openAt, radio } from "../testing/catalogue";
 import {
   ALL_OF_IT,
   endingNote,
@@ -52,17 +52,12 @@ function card(
   taken: { amount: string; whole: boolean; now?: string },
   { left = 4000, moving = false, onTake = () => {} } = {},
 ) {
-  const open = {
-    id: 1,
+  const open = openAt(1, left, {
     key: "11111111-1111-4111-8111-111111111111",
     item_id: item.id,
     package_id: item.packages[0]?.id ?? 0,
     package_name: item.packages[0]?.name ?? "",
-    location_id: 10,
-    opened_at: "2026-11-03T10:00:00Z",
-    left,
-    short_below: null,
-  };
+  });
   return render(
     <OpenPackageCard
       open={open}
