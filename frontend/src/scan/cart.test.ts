@@ -474,9 +474,13 @@ describe("the cart store, shared by tabs", () => {
       const there = new CartStore(CATALOGUE);
       there.change(addOne(filled(), 101));
       window.dispatchEvent(new StorageEvent("storage", { key: STORAGE_KEY }));
-      expect(followed).toHaveBeenCalledOnce();
+      expect(followed).toHaveBeenCalledExactlyOnceWith(true);
       expect(store.cart.value.lines).toEqual(there.cart.value.lines);
       expect(store.forSaving()?.revision).toBe(there.cart.value.revision);
+      // Only marked used there: the same revision.
+      there.touch();
+      window.dispatchEvent(new StorageEvent("storage", { key: STORAGE_KEY }));
+      expect(followed).toHaveBeenLastCalledWith(false);
       // Changed there again, unheard: this tab's cart is not saved.
       there.change(filled());
       expect(store.forSaving()).toBeNull();

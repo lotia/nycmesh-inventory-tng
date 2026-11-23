@@ -289,14 +289,15 @@ export class CartStore {
     this.cart.value = reconcile(this.cart.value, catalogue);
   }
 
-  /** Follow other tabs' changes, calling `followed` after each: storage
-   * then holds the cart this tab shows, so it is kept. Returns what stops
-   * it. */
-  listen(followed?: () => void): () => void {
+  /** Follow other tabs' changes, calling `followed` after each, told
+   * whether it gave the cart another revision: storage then holds the
+   * cart this tab shows, so it is kept. Returns what stops it. */
+  listen(followed?: (revised: boolean) => void): () => void {
     return onStoredChange([STORAGE_KEY], () => {
+      const before = this.cart.value.revision;
       this.cart.value = this.stored();
       this.kept = true;
-      followed?.();
+      followed?.(this.cart.value.revision !== before);
     });
   }
 }

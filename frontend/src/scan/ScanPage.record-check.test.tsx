@@ -15,13 +15,15 @@ import {
   saveQueued,
   saves,
 } from "../testing/scan-page";
+import { refusingWrites } from "../testing/storage";
 import { ENTER_AGAIN_IN } from "./batch";
 import {
   CHANGED_BEFORE_RECORD,
   CHANGED_WHILE_CHECKED,
+  NOT_KEEPING,
   RECORD,
 } from "./CartForm";
-import { UNIT_CHANGED } from "./CartLine";
+import { REMOVE, UNIT_CHANGED } from "./CartLine";
 import { STORAGE_KEY as CART_KEY, loadCart, storeCart } from "./cart";
 
 // The camera, stubbed: never opened here.
@@ -263,6 +265,51 @@ describe("Record checks the cart against the catalogue first", () => {
     await changedInAnotherTab("40");
     answer();
     await saidOnly(CHANGED_BEFORE_RECORD);
+    expect(outbox.entries.value).toEqual([]);
+  });
+
+  test("another tab only marking the cart used is not taken for a change there", async () => {
+    const { answer, asked } = waiting();
+    await fifty();
+    save();
+    await asked(2);
+    typeLoose("5");
+    // Only its time changes, as That's me does there.
+    storeCart({ ...loadCart(), usedAt: Date.now() });
+    window.dispatchEvent(new StorageEvent("storage", { key: CART_KEY }));
+    answer();
+    await saidOnly(CHANGED_WHILE_CHECKED);
+  });
+
+  test("a cart emptied while Record waits is not queued, and nothing is said", async () => {
+    const { outbox, answer, asked } = waiting();
+    await fifty();
+    save();
+    await asked(2);
+    fireEvent.click(screen.getByRole("button", { name: say(REMOVE) }));
+    answer();
+    await vi.waitFor(() =>
+      expect(
+        (screen.getByRole("button", { name: say(RECORD) }) as HTMLButtonElement)
+          .disabled,
+      ).toBe(false),
+    );
+    expect(screen.queryByRole("alert")).toBeNull();
+    expect(outbox.entries.value).toEqual([]);
+  });
+
+  test("a change here not kept while Record waits still says a reload would empty the cart", async () => {
+    const { outbox, answer, asked } = waiting();
+    await fifty();
+    save();
+    await asked(2);
+    refusingWrites(CART_KEY);
+    typeLoose("5");
+    answer();
+    await vi.waitFor(() =>
+      expect(screen.getByText(say(CHANGED_WHILE_CHECKED))).not.toBeNull(),
+    );
+    expect(screen.getByText(say(NOT_KEEPING))).not.toBeNull();
     expect(outbox.entries.value).toEqual([]);
   });
 

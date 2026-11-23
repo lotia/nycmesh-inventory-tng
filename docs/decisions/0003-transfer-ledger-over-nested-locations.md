@@ -294,6 +294,13 @@ typed again, as it does for a package resized. Record loads the catalogue
 first and checks the cart against it; without an answer in a few seconds
 it queues the batch as before, and the server's refusal still holds.
 Rejected again: converting the amount, and saying so only after Record.
+A cart changed while Record waits is not queued, and the page says so
+(Ali, 2026-11-23, inventory-tng-h60m): changed in another tab, "The cart
+was changed in another tab. Check it, then record it again."; changed in
+this one, "The cart changed while it was being checked, so it wasn't
+recorded. Tap Record again." Rejected: locking the cart while Record
+checks, as another tab's change would still need saying, and the page
+would feel frozen on a slow connection.
 
 A label fixes an item's unit as a movement does (Ali, 2026-11-23,
 inventory-tng-rpud): it says the unit, and a scan of it counts the

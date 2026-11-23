@@ -169,8 +169,8 @@ export function CartForm({
   const problems = useSignal<Said[]>([]);
   // While Record waits for the catalogue: Record does nothing meanwhile.
   const checking = useSignal(false);
-  // How many of other tabs' changes this tab has followed, so Record can
-  // tell who changed the cart while it waited.
+  // How many times another tab gave the cart a new revision, followed
+  // here, so Record can tell who changed the cart while it waited.
   const followed = useRef(0);
   // What was last sent to be recorded, worded as it is shown.
   const saved = useSignal<Batch | null>(null);
@@ -195,8 +195,10 @@ export function CartForm({
   // Tabs share one cart; a refreshed catalogue clears what it no longer has.
   useEffect(
     () =>
-      store.listen(() => {
-        followed.current += 1;
+      store.listen((revised) => {
+        if (revised) {
+          followed.current += 1;
+        }
         cartKept.value = true;
         problems.value = problems.value.filter(
           (problem) => wordsOf(problem) !== say(NOT_KEEPING),
@@ -394,9 +396,10 @@ export function CartForm({
    * typed in it, said beside its box, and nothing is queued. Without an
    * answer in time, it is queued as checked against the one shown, and the
    * server refuses what changed (Ali, 2026-11-23, inventory-tng-h7ua). A
-   * cart changed meanwhile is not queued, and the volunteer is asked to
-   * tap Record again; changed in another tab, as well as here or not,
-   * to check it first (Ali, 2026-11-23, inventory-tng-h60m). */
+   * cart changed meanwhile is not queued: the volunteer is asked to tap
+   * Record again or, if another tab changed it (whether or not this one
+   * did too), to check it first (Ali, 2026-11-23, inventory-tng-h60m).
+   * One emptied meanwhile has nothing to record, so nothing is said. */
   async function save(event: TargetedSubmitEvent<HTMLFormElement>) {
     event.preventDefault();
     if (checking.value || checked(catalogue, opens) === null) {
@@ -409,15 +412,21 @@ export function CartForm({
       checking.value = false;
     });
     if (cart.value.revision !== tapped) {
-      problems.value = [
-        [
-          say(
-            followed.current === followedThen
-              ? CHANGED_WHILE_CHECKED
-              : CHANGED_BEFORE_RECORD,
+      if (cart.value.lines.length > 0) {
+        // Beside a reload's warning, if this tab's change was not kept.
+        problems.value = [
+          ...problems.value.filter(
+            (problem) => wordsOf(problem) === say(NOT_KEEPING),
           ),
-        ],
-      ];
+          [
+            say(
+              followed.current === followedThen
+                ? CHANGED_WHILE_CHECKED
+                : CHANGED_BEFORE_RECORD,
+            ),
+          ],
+        ];
+      }
       return;
     }
     store.useCatalogue(against);
