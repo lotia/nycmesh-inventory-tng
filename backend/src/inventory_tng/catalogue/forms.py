@@ -240,7 +240,6 @@ def item_fields(
     unit = form.get("unit", "")
     if unit not in UNITS:
         problems["unit"] = PICK_A_UNIT
-    # Whole, for an item counted each, as its packages' sizes are.
     minimum = quantity(form.get("minimum", ""), positive=False, unit=unit)
     if isinstance(minimum, str):
         problems["minimum"] = minimum

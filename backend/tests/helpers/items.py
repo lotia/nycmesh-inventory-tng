@@ -13,8 +13,10 @@ from helpers.rows import add, shown
 NOW = datetime(2026, 11, 1, tzinfo=UTC)
 
 
-def new_item(session: Session, category: Category, name: str = "LiteBeam") -> Item:
-    return add(session, Item(name=name, category_id=category.id))
+def new_item(
+    session: Session, category: Category, name: str = "LiteBeam", unit: str = "each"
+) -> Item:
+    return add(session, Item(name=name, category_id=category.id, unit=unit))
 
 
 def item_form(category: Category, **fields: str) -> dict[str, str]:
