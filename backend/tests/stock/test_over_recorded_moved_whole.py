@@ -60,6 +60,23 @@ def test_one_moved_whole_from_an_open_package_asks_for_its_count(
     assert "/correct" not in page
 
 
+def test_its_count_box_shows_the_keypad_its_items_unit_takes(
+    admin_client: TestClient, registered_client: TestClient, session: Session
+) -> None:
+    """Metres take a decimal point; an item counted each, whose count is
+    whole (forms.confirmed_count), the number keypad (inventory-tng-qt6z).
+    The cable is made each once it waits, to show the same row both ways."""
+    spools = Spools(session)
+    moved_whole(registered_client, spools)
+    keyboards = []
+    for unit in ("m", "each"):
+        spools.cable.unit = unit
+        session.flush()
+        page = admin_client.get(PAGE).text
+        keyboards.append(read(page).one("input", name="count").attrs["inputmode"])
+    assert keyboards == ["decimal", "numeric"]
+
+
 def test_its_count_confirmed_as_it_was_writes_nothing(
     admin_client: TestClient, registered_client: TestClient, session: Session
 ) -> None:

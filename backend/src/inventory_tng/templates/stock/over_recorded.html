@@ -75,7 +75,7 @@ with an adjustment. Mark checked if you already fixed it.{% endtrans %}</p>
         <p>{#- Translators: %(place)s is a place of any kind, such as a store, a shelf, a bin or a volunteer's home. #}{% trans place=each.to_place %}An open package moved to {{ place }}. Confirm or correct count.{% endtrans %}</p>
         <input type="hidden" name="seen" value="{{ seen(row) }}">
         <label for="{{ name }}">{% trans %}Count in the package{% endtrans %}</label>
-        <input id="{{ name }}" name="count" inputmode="decimal" required value="{{ values.get(name, whole.count) }}" data-was="{{ whole.count }}" aria-describedby="{{ name }}-was{% if problems.get(name) %} {{ name }}-problem{% endif %}">
+        <input id="{{ name }}" name="count" inputmode="{{ each.unit | keyboard }}" required value="{{ values.get(name, whole.count) }}" data-was="{{ whole.count }}" aria-describedby="{{ name }}-was{% if problems.get(name) %} {{ name }}-problem{% endif %}">
         {% include "_field_problem.html" %}
         <p class="hint" id="{{ name }}-was"{% if values.get(name, whole.count) == whole.count %} hidden{% endif %}>{% trans words=whole.words %}Was {{ words }}{% endtrans %}</p>
         <button>{% trans %}Confirm count{% endtrans %}<span class="sr-only"> {{ which(each) }}</span></button>

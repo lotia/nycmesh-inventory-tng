@@ -44,7 +44,7 @@ None is left, so nobody can pick it.{% endtrans %}{% endif %}{% endcall %}
   ] %}
   <label>{{ label }}{% if hint %} <span class="hint">{{ hint }}</span>{% endif %}
     {% set stored = item[name] | plain_amount if name == "minimum" else item[name] %}
-    <input name="{{ name }}" inputmode="{{ 'decimal' if name == 'minimum' else 'text' }}" value="{{ values.get(name, stored if stored is not none else '') }}">
+    <input name="{{ name }}" inputmode="{{ item.unit | keyboard if name == 'minimum' else 'text' }}" value="{{ values.get(name, stored if stored is not none else '') }}">
     {% include "_field_problem.html" %}
   </label>
   {% if name == "part_number" %}
@@ -115,7 +115,7 @@ None is left, so nobody can pick it.{% endtrans %}{% endif %}{% endcall %}
           {% with typed = sent.get('package_name', package.name) %}{% include "catalogue/_units_read.html" %}{% endwith %}
           {% if package.id not in sizes_fixed %}
           <label>{% trans %}Holds{% endtrans %} <span class="hint">{% trans unit=item.unit %}in {{ unit }}; fixed once some has moved, been opened or labelled{% endtrans %}</span>
-            <input name="size" inputmode="decimal" value="{{ sent.get('size', package.size | plain_amount) }}" required>
+            <input name="size" inputmode="{{ item.unit | keyboard }}" value="{{ sent.get('size', package.size | plain_amount) }}" required>
             {% if sent %}{% with name = "size" %}{% include "_field_problem.html" %}{% endwith %}{% endif %}
           </label>
           {% endif %}
@@ -141,7 +141,7 @@ None is left, so nobody can pick it.{% endtrans %}{% endif %}{% endcall %}
       <td>{% if not package.retired_at and not retired %}
         <form method="post" action="{{ here }}/packages/{{ package.id }}/settings" class="actions">
           <label>{% trans %}Too short to use{% endtrans %} <span class="hint">{% trans unit=item.unit %}below, in {{ unit }}; blank: none{% endtrans %}</span>
-            <input name="short_below" inputmode="decimal" value="{{ sent.get('short_below', short) }}">
+            <input name="short_below" inputmode="{{ item.unit | keyboard }}" value="{{ sent.get('short_below', short) }}">
             {% if sent %}{% with name = "short_below" %}{% include "_field_problem.html" %}{% endwith %}{% endif %}
           </label>
           <label>{% trans %}Keep sealed{% endtrans %} <span class="hint">{% trans %}in the stores; blank: no minimum{% endtrans %}</span>
@@ -170,7 +170,7 @@ None is left, so nobody can pick it.{% endtrans %}{% endif %}{% endcall %}
       {% if adding %}{% with name = "package_name" %}{% include "_field_problem.html" %}{% endwith %}{% endif %}
     </label>
     {% with typed = new.get('package_name', ''), sent = new %}{% include "catalogue/_units_read.html" %}{% endwith %}
-    <label>{% trans %}Holds{% endtrans %} <input name="size" value="{{ new.get('size', '') }}" inputmode="decimal" required>
+    <label>{% trans %}Holds{% endtrans %} <input name="size" value="{{ new.get('size', '') }}" inputmode="{{ item.unit | keyboard }}" required>
       {% if adding %}{% with name = "size" %}{% include "_field_problem.html" %}{% endwith %}{% endif %}
     </label>
     <button class="primary">{% trans %}Add package{% endtrans %}</button>
