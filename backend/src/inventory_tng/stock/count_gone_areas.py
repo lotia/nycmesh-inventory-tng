@@ -2,7 +2,7 @@
 retired, or retired and emptied, while it was counted, so no longer on it
 (Ali, 2026-11-22, inventory-tng-ygk5). Why the save was refused, and,
 until the form is saved, what left them since it was first shown
-(moved_out.areas_leaving): what went to a place on it under "Moved to …",
+(count_areas_leaving.areas_leaving): what went to a place on it under "Moved to …",
 a part for each area it came from, each item with the amount moved and a
 box to fix it (what the save does with it is stock/count_arrivals.py's);
 what went elsewhere, with nothing to type; which may be brought back; and
@@ -19,6 +19,7 @@ from inventory_tng.core.phrases import gettext, joined, ngettext
 from inventory_tng.models.catalogue import Item, ItemPackage
 from inventory_tng.models.places import Location
 from inventory_tng.stock import queries
+from inventory_tng.stock.count_areas_leaving import Leaving
 from inventory_tng.stock.count_forms import ARRIVED, LOOSE_FIELD
 from inventory_tng.stock.count_groups import (
     FormRow,
@@ -27,7 +28,7 @@ from inventory_tng.stock.count_groups import (
     form_row,
 )
 from inventory_tng.stock.ledger import Form
-from inventory_tng.stock.moved_out import Leaving, MovedOut
+from inventory_tng.stock.moved_out import MovedOut
 
 
 def emptied_meanwhile(places: Sequence[str]) -> str:

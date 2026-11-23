@@ -1,21 +1,14 @@
-"""Where what left some places between two moments went, by the ledger,
-and the areas gone from a count form as they are now (areas_leaving):
-what a count form says of a retired area emptied while it was counted
-(stock/count_gone_areas.py), and what its save sets aside and fixes where
-it went (stock/count_arrivals.py; Ali, 2026-11-22, inventory-tng-ygk5). It
-only reads, taking no lock."""
+"""Where what left some places between two moments went, by the ledger.
+It only reads, taking no lock."""
 
-from collections.abc import Collection, Sequence
+from collections.abc import Collection
 from decimal import Decimal
 from typing import NamedTuple
 
 from sqlalchemy import func, or_, select
 from sqlalchemy.orm import Session
 
-from inventory_tng.models.places import Location
 from inventory_tng.models.stock import LedgerTransaction, Movement
-from inventory_tng.stock import queries
-from inventory_tng.stock.count_forms import Gone
 from inventory_tng.stock.ledger import LOOSE, Form
 
 
@@ -86,76 +79,3 @@ def moved_out(
         )
         if from_id is not None
     ]
-
-
-class Leaving(NamedTuple):
-    """The areas gone from a count form as they are now: each one's label,
-    by id, as the form names it; what left them since the form was first
-    shown, by the ledger (moved_out), split at the moment `as_of`, if it
-    was; which are still retired; and the order of the places in the
-    tree, to say them in."""
-
-    labels: dict[int, str]
-    moves: list[MovedOut]
-    retired: set[int]
-    order: dict[int, int]
-    as_of: int | None = None
-
-    @property
-    def emptied(self) -> set[int]:
-        """The areas anything left."""
-        return {move.from_id for move in self.moves}
-
-    def ordered(self, ids: Collection[int]) -> list[int]:
-        """The areas of `ids` in the tree's order."""
-        return sorted(ids, key=lambda each: self.order.get(each, 0))
-
-    def said(self, ids: Collection[int]) -> list[str]:
-        """The labels of the areas of `ids`, in the tree's order."""
-        return [self.labels[area_id] for area_id in self.ordered(ids)]
-
-    def moved_by(self, places: Collection[int]) -> list[MovedOut]:
-        """Of what left the areas, what went to the `places` up to the
-        moment its moves were split at, and what went anywhere else
-        whenever: what moved_out reads up to that moment into those
-        places."""
-        return [
-            move
-            for move in self.moves
-            if not move.later or move.to_id is None or move.to_id not in places
-        ]
-
-
-def areas_leaving(
-    session: Session,
-    root: Location,
-    gone: Gone,
-    as_of: int | None = None,
-    tree: Sequence[tuple[Location, tuple[str, ...], bool]] | None = None,
-) -> Leaving:
-    """The areas gone from a count form of `root`, and what left them,
-    split at the moment `as_of`, if given. `tree`, the place's
-    (queries.place_tree), if read already."""
-    if tree is None:
-        tree = queries.place_tree(session, root)
-    order = {each.id: n for n, (each, _, _) in enumerate(tree)}
-    found = {
-        each.id: (each, queries.place_label(each, path))
-        for each, path, _ in tree
-        if each.id in gone.ids
-    }
-    if missing := set(gone.ids) - found.keys():
-        # One moved out of the place since: under its own name.
-        for each in queries.places_with_ids(session, missing):
-            found[each.id] = (each, each.name)
-    return Leaving(
-        {area_id: said for area_id, (_, said) in found.items()},
-        moved_out(session, gone.ids, gone.since, split=as_of),
-        {
-            area_id
-            for area_id, (each, _) in found.items()
-            if each.retired_at is not None
-        },
-        order,
-        as_of,
-    )

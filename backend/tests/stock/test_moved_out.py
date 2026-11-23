@@ -10,7 +10,7 @@ from inventory_tng.models.stock import AdjustmentReason
 from inventory_tng.stock.counts import record_adjustment
 from inventory_tng.stock.ledger import Entry
 from inventory_tng.stock.moments import moment
-from inventory_tng.stock.moved_out import Leaving, MovedOut, moved_out
+from inventory_tng.stock.moved_out import MovedOut, moved_out
 
 from helpers.sign_in import new_admin_id
 from helpers.stock import Spools, stocked, write
@@ -92,8 +92,7 @@ def test_what_went_to_some_places_is_read_up_to_a_moment(session: Session) -> No
 
 def test_what_left_is_split_at_a_moment_when_asked(session: Session) -> None:
     """One read says what left up to the moment and what left after it,
-    each summed; what Leaving.moved_by keeps of them is what a read up to
-    that moment into the van finds."""
+    each summed."""
     place = stocked(session, "9")
     store, van, item = place.store.id, place.van.id, place.item.id
     after = moment(session, store).as_of
@@ -105,10 +104,4 @@ def test_what_left_is_split_at_a_moment_when_asked(session: Session) -> None:
     assert moves == [
         MovedOut(store, van, item, Decimal(1)),
         MovedOut(store, van, item, Decimal(4), later=True),
-    ]
-    leaving = Leaving({}, moves, set(), {}, split)
-    assert leaving.moved_by([van]) == [MovedOut(store, van, item, Decimal(1))]
-    assert leaving.moved_by([]) == moves
-    assert moved_out(session, [store], after, up_to=split, into=[van]) == [
-        MovedOut(store, van, item, Decimal(1))
     ]

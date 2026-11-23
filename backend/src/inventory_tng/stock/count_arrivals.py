@@ -8,10 +8,10 @@ form it arrived in): the difference is then lost or found where it went,
 in the forms it is held in (fixed_lines), and nothing is written against
 the area it left (fixed). The moves are those after the form was first
 shown, those to a place on it up to its moment, so the save reads the
-same ones the form showed. The routes are stock/count_routes.py's; the
+same ones the form showed (count_areas_leaving.gone_moves). The routes are stock/count_routes.py's; the
 writing is stock/store_counts.py's."""
 
-from collections.abc import Collection, Mapping, Sequence
+from collections.abc import Mapping, Sequence
 from decimal import Decimal
 from typing import NamedTuple
 
@@ -21,7 +21,7 @@ from inventory_tng.stock import queries
 from inventory_tng.stock.count_forms import Gone
 from inventory_tng.stock.ledger import Form, by_item
 from inventory_tng.stock.moments import expected_forms_at
-from inventory_tng.stock.moved_out import Leaving, MovedOut, moved_out
+from inventory_tng.stock.moved_out import MovedOut
 
 # What a place's records hold that came from the areas gone from its
 # count form, by item and form there.
@@ -29,24 +29,6 @@ Aside = dict[tuple[int, Form], Decimal]
 
 # A line to write at a place: so much of an item in a form there.
 FormLine = tuple[int, Form, Decimal]
-
-
-def gone_moves(
-    session: Session,
-    gone: Gone,
-    as_of: int,
-    places: Collection[int],
-    leaving: Leaving | None = None,
-) -> list[MovedOut]:
-    """What left the areas gone from a count form after it was first
-    shown (moved_out): to the `places` it shows, up to its moment
-    `as_of`. Of `leaving`'s moves, if they were split at that moment,
-    rather than read again."""
-    if not gone.ids:
-        return []
-    if leaving is not None and leaving.as_of == as_of:
-        return leaving.moved_by(places)
-    return moved_out(session, gone.ids, gone.since, up_to=as_of, into=places)
 
 
 def set_aside(moves: Sequence[MovedOut]) -> dict[int, Aside]:

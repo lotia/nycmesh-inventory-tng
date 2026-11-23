@@ -109,7 +109,7 @@ class ByForm(NamedTuple):
 def by_form(
     session: Session, form: Mapping[str, str], place_id: int
 ) -> tuple[ByForm, dict[str, Words]]:
-    """The count form's forms (count_groups.forms_by_place), as lines, and
+    """The count form's forms (count_asked_for.forms_by_place), as lines, and
     what is wrong."""
     problems: dict[str, Words] = {}
     lines: list[tuple[int, Form, Decimal]] = []
@@ -420,7 +420,7 @@ def read_count(
     """A count form, of the places `place_ids` (places_listed), read place
     by place (by_place) and checked; `held(place_id, item_id)`, whether a
     full count of a place, as of the form's moment, asks for an item
-    (count_groups.asks_for). Something
+    (count_asked_for.asks_for). Something
     else here naming an item its place lists is not that item twice but
     typed on the wrong line: its line there is marked (TYPE_IT_HERE), and
     the page says the rest. On a recount, naming one the place held then
