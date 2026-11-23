@@ -11,6 +11,7 @@ from sqlalchemy.orm import Session
 
 from inventory_tng.models.catalogue import (
     CURRENT_ALIAS,
+    SMALLEST_PACKAGE_FIRST,
     Category,
     Item,
     ItemAlias,
@@ -56,7 +57,7 @@ def packages_with_tracking(session: Session) -> Sequence[Row[ItemPackage, bool]]
     return session.execute(
         select(ItemPackage, Item.track_opened)
         .join(Item, Item.id == ItemPackage.item_id)
-        .order_by(ItemPackage.size, ItemPackage.id)
+        .order_by(*SMALLEST_PACKAGE_FIRST)
     ).all()
 
 

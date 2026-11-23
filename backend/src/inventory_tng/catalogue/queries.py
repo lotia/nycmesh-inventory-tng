@@ -9,7 +9,13 @@ from sqlalchemy import ColumnElement, Row, func, select
 from sqlalchemy.orm import Session
 
 from inventory_tng.models.admins import Admin
-from inventory_tng.models.catalogue import Category, Item, ItemPackage, ReadingRule
+from inventory_tng.models.catalogue import (
+    SMALLEST_PACKAGE_FIRST,
+    Category,
+    Item,
+    ItemPackage,
+    ReadingRule,
+)
 from inventory_tng.models.places import Location
 from inventory_tng.models.volunteers import Volunteer
 
@@ -49,7 +55,7 @@ def packages_of_item(session: Session, item_id: int) -> Sequence[ItemPackage]:
     return session.scalars(
         select(ItemPackage)
         .where(ItemPackage.item_id == item_id)
-        .order_by(ItemPackage.retired_at.is_not(None), ItemPackage.size, ItemPackage.id)
+        .order_by(ItemPackage.retired_at.is_not(None), *SMALLEST_PACKAGE_FIRST)
     ).all()
 
 

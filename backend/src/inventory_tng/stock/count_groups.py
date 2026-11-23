@@ -51,7 +51,8 @@ def form_order(
 ) -> tuple[int | Decimal, ...]:
     """Where a form of an item is in the count form's rows: sealed, the
     smallest package first, ties by package id, as the item and scan pages
-    list packages; then open ones, oldest first; then loose."""
+    list packages (models.catalogue.SMALLEST_PACKAGE_FIRST); then open
+    ones, oldest first; then loose."""
     if form.package_id is not None:
         return 0, packages[form.package_id].size, form.package_id
     if form.open_package_id is not None:

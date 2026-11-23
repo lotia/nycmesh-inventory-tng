@@ -14,7 +14,7 @@ from inventory_tng.core.db_lookups import values_by
 from inventory_tng.core.db_sessions import by_name
 from inventory_tng.core.phrases import PATH_BETWEEN
 from inventory_tng.models.admins import Admin
-from inventory_tng.models.catalogue import Item, ItemPackage
+from inventory_tng.models.catalogue import SMALLEST_PACKAGE_FIRST, Item, ItemPackage
 from inventory_tng.models.places import STORE_KINDS, Location
 from inventory_tng.models.stock import (
     AdjustmentReason,
@@ -292,7 +292,7 @@ def current_packages(
         select(ItemPackage, Item.name_shown, Item.unit, Item.track_opened)
         .join(Item, Item.id == ItemPackage.item_id)
         .where(ItemPackage.retired_at.is_(None), Item.retired_at.is_(None))
-        .order_by(func.lower(Item.name), ItemPackage.size, ItemPackage.id)
+        .order_by(func.lower(Item.name), *SMALLEST_PACKAGE_FIRST)
     ).all()
 
 

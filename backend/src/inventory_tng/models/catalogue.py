@@ -206,6 +206,11 @@ class ItemPackage(KeyedName, Searchable, Versioned, Base):
     retired_at: Mapped[RetiredAt]
 
 
+# How an item's packages are listed, wherever they are: the smallest
+# first, ties by id, so two of a size keep one order (inventory-tng-7mby).
+SMALLEST_PACKAGE_FIRST = (ItemPackage.size, ItemPackage.id)
+
+
 class ItemAlias(KeyedName, Base):
     """Another name an item is found by, such as one it was known by: kept
     when an administrator adds it or renames the item, searched as the
