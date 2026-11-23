@@ -71,7 +71,7 @@ does (places/locations.restore), and the form shown again with it.
 import uuid
 from collections.abc import Collection, Mapping, Sequence
 from decimal import Decimal
-from functools import partial
+from functools import cache, partial
 from typing import Annotated, NamedTuple
 from urllib.parse import urlencode
 
@@ -94,6 +94,7 @@ from inventory_tng.models.places import Location
 from inventory_tng.places import locations
 from inventory_tng.stock import needs_action, over_recorded, queries
 from inventory_tng.stock.count_arrivals import (
+    Aside,
     Fix,
     arrived_at,
     fixed,
@@ -322,19 +323,27 @@ def _shown_places(
 
 
 def _listed_words(
-    session: Session, root: Location, as_of: int, listed: Listed
+    session: Session,
+    root: Location,
+    as_of: int,
+    listed: Listed,
+    aside: Mapping[int, Aside],
 ) -> tuple[Words, dict[str, Words]]:
     """What a count form of `root`, as of moment `as_of`, says of something
     else here naming an item the place picked for it lists
     (count_forms.Listed): above the form, and by field, beside the item
-    picked and on a recount's line added for it (count_forms.read_count)."""
+    picked and on a recount's line added for it (count_forms.read_count),
+    whose places' lines count what they held before what is `aside` there
+    (count_arrivals.set_aside)."""
     item = session.get_one(Item, listed.item_id)
     tree = queries.place_tree(session, root)
     ((place, path),) = _shown_places(session, tree, [listed.place_id])
     where = queries.place_label(place, path)
     problems: dict[str, Words] = {EXTRA_ITEM: listed_under(where)}
     if not listed.on_form:
-        line = field_at(root.id, listed.place_id, line_of(session, as_of, listed))
+        line = field_at(
+            root.id, listed.place_id, line_of(session, as_of, listed, aside)
+        )
         problems[line] = TYPE_IT_HERE
     return already_listed(item.name_shown, where), problems
 
@@ -647,9 +656,18 @@ def count(
         return not_found()
     place, key, at, place_ids, gone = carried
     areas = place_ids != [place.id]
-    sent = read_count(
-        session, form, place.id, place_ids, partial(asks_for, session, at.as_of)
-    )
+    # What came from the areas gone from it, as the form showed it: set
+    # aside from what each place's lines count, so from what a full count
+    # asks for, and the moves fixed (stock/count_arrivals.py). Read only
+    # when first needed, so a form sent back for a problem, which reads
+    # them to show them, reads them once.
+    gone_since = cache(partial(gone_moves, session, gone, at.as_of, place_ids))
+
+    def held(place_id: int, item_id: int) -> bool:
+        aside = set_aside(gone_since())
+        return asks_for(session, at.as_of, aside, place_id, item_id)
+
+    sent = read_count(session, form, place.id, place_ids, held)
     asked = {place_id: each.items for place_id, each in sent.places.items()}
     # The form shown again: as sent, or with `at` None, as it is now; a
     # recount with the figures it first showed (count_forms.WHILE).
@@ -681,7 +699,9 @@ def count(
             found_location_id=sent.listed.place_id,
             item_id=sent.listed.item_id,
         )
-        listed_alert, beside = _listed_words(session, place, at.as_of, sent.listed)
+        listed_alert, beside = _listed_words(
+            session, place, at.as_of, sent.listed, set_aside(gone_since())
+        )
         problems |= beside
         alert = alert or listed_alert
     if problems:
@@ -696,10 +716,7 @@ def count(
         for place_id, each in sent.places.items()
         if not (areas and filtered) or each.anything
     ]
-    # What came from the areas gone from it, as the form showed it: set
-    # aside from what each place's lines count, and the moves fixed
-    # (stock/count_arrivals.py).
-    moves = gone_moves(session, gone, at.as_of, place_ids)
+    moves = gone_since()
     fixes = fixed(
         moves,
         {place_id: each.arrived for place_id, each in sent.places.items()},
@@ -950,8 +967,9 @@ def bring_back(
         # Not one of the place's areas, as only a hand-made form names: none
         # this form may bring back.
         return not_found()
+    aside = set_aside(gone_moves(session, gone, at.as_of, place_ids, leaving))
     sent = read_count(
-        session, form, place.id, place_ids, partial(asks_for, session, at.as_of)
+        session, form, place.id, place_ids, partial(asks_for, session, at.as_of, aside)
     ).places
     again = partial(
         _count_page,

@@ -24,7 +24,7 @@ from inventory_tng.stock.count_forms import (
     Figures,
     Listed,
 )
-from inventory_tng.stock.ledger import LOOSE, Form
+from inventory_tng.stock.ledger import LOOSE, Form, by_item
 from inventory_tng.stock.moments import expected_at, expected_forms_at
 from inventory_tng.stock.over_recorded import openings_waiting_at
 
@@ -202,21 +202,32 @@ def _place_forms(
     return rows
 
 
-def line_of(session: Session, as_of: int, listed: Listed) -> str:
+def line_of(
+    session: Session, as_of: int, listed: Listed, aside: Mapping[int, Aside]
+) -> str:
     """The field a count form, as of moment `as_of`, shows an item's line
     at a place by: its total, or, counted by form (forms_by_place), its
-    loose units."""
+    loose units. Less, by place, what is `aside` there, as the form shows
+    it (count_arrivals.set_aside)."""
     place_id, item_id = listed.place_id, listed.item_id
     openings = openings_waiting_at(session, [place_id], as_of)
-    by_form = forms_by_place(session, as_of, {place_id: [item_id]}, openings)[place_id]
-    return f"{LOOSE_FIELD if item_id in by_form else COUNTED}{item_id}"
+    by_form = forms_by_place(session, as_of, {place_id: [item_id]}, openings, aside)
+    return f"{LOOSE_FIELD if item_id in by_form[place_id] else COUNTED}{item_id}"
 
 
-def asks_for(session: Session, as_of: int, place_id: int, item_id: int) -> bool:
+def asks_for(
+    session: Session,
+    as_of: int,
+    aside: Mapping[int, Aside],
+    place_id: int,
+    item_id: int,
+) -> bool:
     """Whether a full count of the place, as of moment `as_of`, asks for the
-    item: the records hold some there, or an opening of it waits there
+    item: the records hold some there, less what is `aside` there, by place
+    (count_arrivals.set_aside), or an opening of it waits there
     (over_recorded.openings_waiting_at), asked for by form though they hold
     none."""
-    return bool(expected_at(session, [place_id], as_of, [item_id])) or (
+    held = expected_at(session, [place_id], as_of, [item_id]).get(place_id, {})
+    return bool(less(held, by_item(aside.get(place_id, {})))) or (
         item_id in openings_waiting_at(session, [place_id], as_of).get(place_id, {})
     )

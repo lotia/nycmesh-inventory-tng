@@ -3,6 +3,7 @@ retired one emptied, while it is counted (stock/count_routes.py, Ali,
 2026-11-22, inventory-tng-ygk5): refused whole, the form shown again
 saying where its items went, with a way to bring it back."""
 
+import uuid
 from decimal import Decimal
 
 import pytest
@@ -11,11 +12,14 @@ from httpx2 import Response
 from sqlalchemy.orm import Session
 
 from inventory_tng.core.phrases import PATH_BETWEEN
+from inventory_tng.models.catalogue import ItemPackage
 from inventory_tng.models.places import Location
 from inventory_tng.stock import queries
-from inventory_tng.stock.moments import expected
+from inventory_tng.stock.count_forms import TYPE_IT_HERE
+from inventory_tng.stock.ledger import LOOSE, Entry, Form, insert_transaction
+from inventory_tng.stock.moments import expected, expected_forms_at
 
-from helpers.markup import Element, button, options, read, text
+from helpers.markup import Element, button, options, problem, read, text
 from helpers.query_counts import counting
 from helpers.rows import add
 from helpers.stock import count_form, retire, write
@@ -520,3 +524,100 @@ def test_a_form_shown_again_reads_what_left_the_areas_gone_once(
     assert reads("WITH RECURSIVE") == 1
     assert reads("GROUP BY ledger_transaction.from_location_id") == 1
     assert reads("WHERE item_package.item_id IN") == 1
+
+
+class SpoolArrived:
+    """A recount asking for radios on Shelf A, Shelf C gone from it, Shelf A
+    holding `cable` metres loose before; then a late save brings a sealed
+    spool of cable into Shelf C and on to Shelf A, and the form is shown
+    again as it is now (a save under way as it was shown), the spool under
+    "Moved to Shelf A" (inventory-tng-t38l)."""
+
+    def __init__(self, session: Session, client: TestClient, cable: str) -> None:
+        setup = Emptied(session, client)
+        self.made = made = setup.made
+        self.cable = made.place.cable.id
+        if cable:
+            made.receive(session, made.shelf, self.cable, cable)
+            setup.shown = count_form(client.get(made.path))
+        spool = add(session, ItemPackage(item_id=self.cable, name="Spool", size=305))
+        self.sealed = Form(package_id=spool.id)
+        gone = setup.gone
+        made.move(session, gone, made.shelf, "1")
+        self.typed = {setup.counted(made.shelf): "3", setup.counted(gone): "2"}
+        recount = count_form(client.post(made.path, data=setup.shown | self.typed))
+        made.move(session, gone, made.shelf, "1")
+        refused = client.post(made.path, data=recount | self.typed)
+        assert refused.status_code == 409
+        asked = count_form(refused)
+        assert asked["places"] == str(made.shelf.id)
+        for header in (
+            {"kind": "receipt", "to_location_id": gone.id},
+            {
+                "kind": "move",
+                "from_location_id": gone.id,
+                "to_location_id": made.shelf.id,
+            },
+        ):
+            line = Entry(
+                self.cable,
+                Decimal(305),
+                LOOSE if header["kind"] == "receipt" else self.sealed,
+                self.sealed,
+            )
+            insert_transaction(session, uuid.uuid4(), header, [line])
+        unseen = asked | {"seen": str(int(asked["seen"]) - 1)}
+        self.page = client.post(made.path, data=unseen | self.typed)
+        assert self.page.status_code == 409
+        assert heading(self.page, f"Moved to {made.shelf.name}")
+        self.form = count_form(self.page) | self.typed
+        self.found = {
+            "extra_location_id": str(made.shelf.id),
+            "extra_item_id": str(self.cable),
+            "extra_quantity": "1",
+        }
+
+    def line(self, name: str) -> str:
+        return f"at_{self.made.shelf.id}_{name}_{self.cable}"
+
+    def at_shelf(self, session: Session) -> dict[tuple[int, Form], Decimal]:
+        shelf = self.made.shelf.id
+        return expected_forms_at(session, [shelf], 2**31 - 1, [self.cable])[shelf]
+
+
+def test_something_else_here_of_what_came_only_from_an_area_gone_is_counted(
+    admin_client: TestClient, session: Session
+) -> None:
+    """Shelf A held no cable before the spool came: its lines list none, so
+    cable picked under Something else here there is counted there, beside
+    the spool."""
+    moved = SpoolArrived(session, admin_client, "")
+    assert read(moved.page.text).all("input", name=moved.line("counted")) == []
+    saved = admin_client.post(moved.made.path, data=moved.form | moved.found)
+    assert saved.status_code == 303
+    assert moved.at_shelf(session) == {
+        (moved.cable, moved.sealed): Decimal(305),
+        (moved.cable, LOOSE): Decimal(1),
+    }
+
+
+def test_something_else_here_held_before_a_move_from_an_area_gone_marks_its_line(
+    admin_client: TestClient, session: Session
+) -> None:
+    """Shelf A held 2 m of cable before the spool came, which the recount
+    did not ask for: cable picked under Something else here there is
+    refused, its line added as the form shows it, by its total, and marked;
+    typed there, it is counted beside the spool."""
+    moved = SpoolArrived(session, admin_client, "2")
+    refused = admin_client.post(moved.made.path, data=moved.form | moved.found)
+    assert refused.status_code == 400
+    line = moved.line("counted")
+    assert problem(refused.text, line) == str(TYPE_IT_HERE)
+    assert read(refused.text).one("input", name=line).attrs["value"] == "2"
+    assert read(refused.text).all("input", name=moved.line("loose")) == []
+    retyped = count_form(refused) | moved.typed | {line: "3"}
+    assert admin_client.post(moved.made.path, data=retyped).status_code == 303
+    assert moved.at_shelf(session) == {
+        (moved.cable, moved.sealed): Decimal(305),
+        (moved.cable, LOOSE): Decimal(3),
+    }
