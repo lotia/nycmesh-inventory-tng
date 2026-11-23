@@ -23,8 +23,8 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from inventory_tng.catalogue.paths import CATEGORIES, ITEMS
+from inventory_tng.core.db_base import Base
 from inventory_tng.core.db_locking import get_locked, locked
-from inventory_tng.core.db_sessions import Base
 from inventory_tng.devices import devices
 from inventory_tng.models.catalogue import Category, Item, ItemPackage
 from inventory_tng.models.devices import RegistrationCode

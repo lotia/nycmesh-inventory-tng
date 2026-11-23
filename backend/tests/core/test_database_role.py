@@ -22,7 +22,8 @@ from inventory_tng.core.database_role import (
     named,
     refusals,
 )
-from inventory_tng.core.db_sessions import Base, make_engine
+from inventory_tng.core.db_base import Base
+from inventory_tng.core.db_sessions import make_engine
 from inventory_tng.core.settings import Settings
 
 from databases import NO_DATABASE, OWNER, as_role, superuser_url

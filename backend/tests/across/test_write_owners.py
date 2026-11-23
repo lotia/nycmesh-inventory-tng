@@ -24,6 +24,7 @@ from sqlalchemy.orm import DeclarativeBase, Mapped, Session, mapped_column
 from structlog.testing import capture_logs
 
 from inventory_tng.admins import accounts
+from inventory_tng.core.db_base import Base
 from inventory_tng.core.db_errors import Gone, attempt, enforce
 from inventory_tng.core.db_locking import (
     CATALOGUE,
@@ -35,7 +36,7 @@ from inventory_tng.core.db_locking import (
     settings_row,
 )
 from inventory_tng.core.db_protection import Action, Lock, changed_columns, flagged
-from inventory_tng.core.db_sessions import Base, DbSession, Sessions
+from inventory_tng.core.db_sessions import DbSession, Sessions
 from inventory_tng.models.admins import Admin, AdminPassword
 from inventory_tng.models.catalogue import Category, Item
 from inventory_tng.models.site_settings import SiteSettings

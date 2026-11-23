@@ -23,8 +23,9 @@ import pytest
 from sqlalchemy import Executable, delete, exc, text, update
 from sqlalchemy.orm import Session
 
+from inventory_tng.core.db_base import Base
 from inventory_tng.core.db_protection import Flag
-from inventory_tng.core.db_sessions import Base, set_actor
+from inventory_tng.core.db_sessions import set_actor
 from inventory_tng.core.history import (
     Change,
     change,

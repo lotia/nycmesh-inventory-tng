@@ -25,9 +25,9 @@ from sqlalchemy.orm import (
 )
 
 from inventory_tng.catalogue import units
+from inventory_tng.core.db_base import Base
 from inventory_tng.core.db_locking import READ_AGAIN_ONCE_LOCKED
 from inventory_tng.core.db_protection import protection
-from inventory_tng.core.db_sessions import Base
 from inventory_tng.models.base import (
     MONEY,
     QUANTITY,

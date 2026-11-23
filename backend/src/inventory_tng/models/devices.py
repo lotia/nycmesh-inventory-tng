@@ -8,8 +8,8 @@ from sqlalchemy import CheckConstraint, DateTime, LargeBinary, Text, func
 from sqlalchemy.dialects.postgresql import INET
 from sqlalchemy.orm import Mapped, mapped_column
 
+from inventory_tng.core.db_base import Base
 from inventory_tng.core.db_protection import protection
-from inventory_tng.core.db_sessions import Base
 from inventory_tng.core.phrases import gettext
 from inventory_tng.models.base import CreatedAt, IntId, Versioned, reference
 

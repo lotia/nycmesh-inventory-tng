@@ -6,7 +6,7 @@ from typing import Literal, NamedTuple
 from sqlalchemy import Column, Table, inspect
 from sqlalchemy.orm import DeclarativeBase, Session, UOWTransaction
 
-from inventory_tng.core.db_sessions import Base
+from inventory_tng.core.db_base import Base
 
 # Each table's protection, declared once on its model (protection()) and
 # read from Base.metadata by the lock guard (db_locking), by history.py and by

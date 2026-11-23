@@ -11,10 +11,11 @@ from sqlalchemy import Engine, exc, select
 from sqlalchemy.orm import Session
 
 from inventory_tng.catalogue import items
+from inventory_tng.core.db_base import Base
 from inventory_tng.core.db_errors import RuleBroken, describe_error
 from inventory_tng.core.db_locking import UNGUARDED_INFO
 from inventory_tng.core.db_protection import Flag, flagged
-from inventory_tng.core.db_sessions import DATABASE_INFO, Base, Database
+from inventory_tng.core.db_sessions import DATABASE_INFO, Database
 from inventory_tng.models.catalogue import Item, ReadingRule
 from inventory_tng.models.core import CatalogueHistory
 

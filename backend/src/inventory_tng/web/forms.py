@@ -8,7 +8,7 @@ from decimal import Decimal, InvalidOperation
 
 from sqlalchemy.orm import Session
 
-from inventory_tng.core.db_sessions import Base
+from inventory_tng.core.db_base import Base
 from inventory_tng.core.phrases import Words, gettext, lazy_gettext, number
 from inventory_tng.models.base import INTEGER_MAX, whole
 from inventory_tng.models.names import canonical

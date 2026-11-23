@@ -39,10 +39,10 @@ from inventory_tng.admins import (
 )
 from inventory_tng.admins.paths import ADMINS
 from inventory_tng.catalogue import categories, items, reading_rules, units
+from inventory_tng.core.db_base import Base
 from inventory_tng.core.db_errors import RuleBroken
 from inventory_tng.core.db_locking import locked, locked_row
 from inventory_tng.core.db_sessions import (
-    Base,
     DbSession,
     get_snapshot,
     hold_until_commit,

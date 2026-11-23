@@ -10,7 +10,8 @@ from psycopg.errors import LockNotAvailable
 from sqlalchemy import Connection, Engine, exc, text
 from sqlalchemy.orm import Session
 
-from inventory_tng.core.db_sessions import Base, Database
+from inventory_tng.core.db_base import Base
+from inventory_tng.core.db_sessions import Database
 
 from helpers.rows import setting_up
 

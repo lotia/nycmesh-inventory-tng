@@ -222,6 +222,11 @@ short test. `core/` is the name FastAPI's full-stack template uses;
   sign-in and mail) using the accounts' own helpers. `CURRENT_TOTP` went
   to `models/admins.py`, beside `Authenticator`, as both modules filter
   on it.
+- On 2026-11-23, as Ali decided (inventory-tng-9gwp), `Base` and its
+  constraints' naming convention left `core/db_sessions.py`, which is
+  about pools and sessions, for `core/db_base.py`, beside the other `db_`
+  modules. `models/base.py` would make a cycle: it imports
+  `core/history.py`, which imports `Base`.
 - Older decision records keep the paths of their time. The tables below
   give each old path's new home; a later move adds its rows.
 
@@ -274,6 +279,7 @@ queries to its `queries.py`.
 | `catalogue/names.py` | `catalogue/name_keys.py` |
 | `core/command.py` | `core/operator_commands.py` |
 | `core/db.py` | `Base`, the pools, `Database`, sessions, the actor, `ping`, `exists_where`, `by_name`, `hold_until_commit`, `release_hold`, `run_outside_transaction`, `record_last_seen`: `core/db_sessions.py`; `locked`, `get_locked`, `settings_row`, `Seen`, `unchanged`, `lock_catalogue`, the lock guard, `_next_version`, `require_current`, `locked_row`, `relock`: `core/db_locking.py`; `protection`, `Lock`, `Flag`, `Action`, `flagged`, `Write`, `changed_columns`, `flushed_id`, `flush_writes`, with `_table` as `table_of`: `core/db_protection.py`; `PoolTimeout`, `NoSession`, `RuleBroken`, `Gone`, `enforce`, `attempt`, `refusal`, `unique`, `describe_error`, the SQLSTATEs, `UNAVAILABLE`, `install`: `core/db_errors.py` |
+| `core/db_sessions.py` | itself, but for `Base` and its naming convention: `core/db_base.py` |
 | `core/mail.py` | itself, with `Message`, `Kind`, `Told`, `Mailer`, `SmtpMailer`, `get_mailer`, `Notifier`, `Notify`, `deliver`, `sent`, `TIMEOUT_SECONDS`; what each mail says (`branded`, the shared paragraphs, `TOTP_POLICY_WORDS`, the counts' plurals and a function per mail): `admins/mail_messages.py` |
 | `dev_database.py` | `backend/devtools/database.py`; `seed` is one of its subcommands |
 | `devices.py` | `devices/devices.py`; `register_device`: `devices/api.py`; the request and reply schemas: `devices/schemas.py`; what every route needing a device depends on: `devices/guards.py`; `REGISTER_PATH`: `devices/paths.py` |

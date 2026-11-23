@@ -18,8 +18,9 @@ from sqlalchemy.orm import Session
 
 from inventory_tng.catalogue import categories, items
 from inventory_tng.catalogue.name_keys import LOOK_ALIKES, name_key, name_key_sql
+from inventory_tng.core.db_base import Base
 from inventory_tng.core.db_errors import refusal
-from inventory_tng.core.db_sessions import ACTOR_INFO, Base, set_actor
+from inventory_tng.core.db_sessions import ACTOR_INFO, set_actor
 from inventory_tng.labels import labels
 from inventory_tng.models.catalogue import Category, Item, ItemPackage
 from inventory_tng.models.core import CatalogueHistory

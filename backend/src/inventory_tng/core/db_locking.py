@@ -15,6 +15,7 @@ from sqlalchemy.orm import (
     UOWTransaction,
 )
 
+from inventory_tng.core.db_base import Base
 from inventory_tng.core.db_errors import Gone, RuleBroken, enforce
 from inventory_tng.core.db_protection import (
     Action,
@@ -24,7 +25,7 @@ from inventory_tng.core.db_protection import (
     table_of,
 )
 from inventory_tng.core.db_savepoints import innermost, savepoint_undone, within
-from inventory_tng.core.db_sessions import Base, exists_where
+from inventory_tng.core.db_sessions import exists_where
 
 if TYPE_CHECKING:
     # The type with_for_update takes for `of`, which locked passes on.

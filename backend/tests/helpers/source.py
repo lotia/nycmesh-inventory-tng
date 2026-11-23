@@ -13,7 +13,7 @@ import inventory_tng
 
 # Imported for its mapped classes, so Base has every model.
 from inventory_tng import models  # noqa: F401
-from inventory_tng.core.db_sessions import Base
+from inventory_tng.core.db_base import Base
 
 SOURCE = Path(inventory_tng.__file__).parent
 TEMPLATES = SOURCE / "templates"

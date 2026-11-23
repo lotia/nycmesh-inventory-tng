@@ -11,7 +11,7 @@ from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
 
 from inventory_tng.catalogue.paths import CATEGORIES, ITEMS
-from inventory_tng.core.db_sessions import Base
+from inventory_tng.core.db_base import Base
 from inventory_tng.models.catalogue import Category, Item
 from inventory_tng.models.places import Location
 from inventory_tng.models.site_settings import (

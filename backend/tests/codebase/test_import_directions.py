@@ -26,7 +26,7 @@ from pathlib import Path
 import pytest
 
 # Has every table: helpers.source imports every model.
-from inventory_tng.core.db_sessions import Base
+from inventory_tng.core.db_base import Base
 
 from helpers.source import SOURCE, TEMPLATES, modules
 

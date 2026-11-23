@@ -1,5 +1,5 @@
-"""The database: Base, the app's pools, one session per request, which of
-its transactions may commit while a gated request holds its lock, and who
+"""The database: the app's pools, one session per request, which of its
+transactions may commit while a gated request holds its lock, and who
 makes a session's changes."""
 
 import re
@@ -18,7 +18,6 @@ from sqlalchemy import (
     ColumnElement,
     Connection,
     Engine,
-    MetaData,
     create_engine,
     event,
     exc,
@@ -29,8 +28,9 @@ from sqlalchemy import (
     update,
 )
 from sqlalchemy.engine.interfaces import DBAPIConnection
-from sqlalchemy.orm import DeclarativeBase, Session
+from sqlalchemy.orm import Session
 
+from inventory_tng.core.db_base import Base
 from inventory_tng.core.db_errors import (
     LOCK_NOT_AVAILABLE,
     NoSession,
@@ -39,22 +39,6 @@ from inventory_tng.core.db_errors import (
 )
 
 log = structlog.get_logger(__name__)
-
-
-class Base(DeclarativeBase):
-    """Every mapped class derives from this. Alembic compares its metadata
-    with the database."""
-
-    # Named constraints, so a later migration can drop or alter them by name.
-    metadata = MetaData(
-        naming_convention={
-            "ix": "ix_%(column_0_label)s",
-            "uq": "uq_%(table_name)s_%(column_0_name)s",
-            "ck": "ck_%(table_name)s_%(constraint_name)s",
-            "fk": "fk_%(table_name)s_%(column_0_name)s_%(referred_table_name)s",
-            "pk": "pk_%(table_name)s",
-        }
-    )
 
 
 # Connections per process, by pool (Database; DEPLOYMENT.md, Database

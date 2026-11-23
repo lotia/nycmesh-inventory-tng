@@ -17,8 +17,9 @@ from sqlalchemy import (
 from sqlalchemy.dialects.postgresql import ARRAY, JSONB
 from sqlalchemy.orm import Mapped, mapped_column
 
+from inventory_tng.core.db_base import Base
 from inventory_tng.core.db_protection import protection
-from inventory_tng.core.db_sessions import ACTOR_PATTERN, Base
+from inventory_tng.core.db_sessions import ACTOR_PATTERN
 from inventory_tng.models.base import CreatedAt, IntId
 
 
