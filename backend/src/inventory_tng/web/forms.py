@@ -51,6 +51,7 @@ RULES = {
     "site_settings_time_zone": PICK_A_ZONE,
     "location_time_zone": PICK_A_ZONE,
     "movement_whole_units": WHOLE_UNITS,
+    "package_whole_units": WHOLE_UNITS,
     "open_package_untracked": lazy_gettext(
         "That package isn't followed once opened any "
         "more: count what is on it as loose."

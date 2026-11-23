@@ -1157,6 +1157,34 @@ def test_a_unit_changed_while_stock_moves_waits_then_is_refused(
 @pytest.mark.concurrency
 @pytest.mark.parametrize(
     ("swapped", "refused"),
+    [(False, items.PACKAGE_WHOLE), (True, items.PACKAGES_WHOLE)],
+)
+def test_a_change_to_each_and_a_fraction_on_its_package_go_one_at_a_time(
+    committed: Committed, swapped: bool, refused: str
+) -> None:
+    """Both take the catalogue lock, and each reads what the other writes
+    afresh under it: a too-short length with a fraction, second, is
+    refused as the item is counted each now; the change to each, second,
+    as its package has a fraction (Ali, 2026-11-23, inventory-tng-fa5i)."""
+    place = committed_place(committed)
+    reel = ItemPackage(item_id=place.cable.id, name="Reel", size=Decimal(305))
+    made(committed, reel)
+    to_each = doing(
+        Item,
+        place.cable.id,
+        lambda s, item: items.save(s, item, item_fields(item, unit="each"), seen=None),
+    )
+    short = doing(
+        ItemPackage,
+        reel.id,
+        lambda s, package: items.package_settings(s, package, Decimal("1.5"), None),
+    )
+    assert either_first(committed, to_each, short, swapped=swapped) == refused
+
+
+@pytest.mark.concurrency
+@pytest.mark.parametrize(
+    ("swapped", "refused"),
     [(False, "movement_open_package_whole"), (True, "movement_open_package_place")],
 )
 def test_a_cut_and_a_whole_move_of_one_open_package_go_one_at_a_time(

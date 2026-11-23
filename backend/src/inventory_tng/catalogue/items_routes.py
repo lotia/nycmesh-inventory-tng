@@ -48,7 +48,7 @@ from inventory_tng.web.admin_pages import (
     retirement,
     undo_retire,
 )
-from inventory_tng.web.forms import ALERTS, RETIRED, RULES, form_version
+from inventory_tng.web.forms import ALERTS, RETIRED, RULES, WHOLE_UNITS, form_version
 from inventory_tng.web.listing import (
     UNASKED,
     Asked,
@@ -116,6 +116,7 @@ def _change_or_note[T](
             "unique",
             items.NAME_IS_ALIAS,
             items.READ_ALIKE,
+            items.PACKAGES_WHOLE,
             *REFUSED_FIELDS,
             *ALERTS,
         )
@@ -128,6 +129,10 @@ def _change_or_note[T](
         problems[field] = words
     elif broken == items.READ_ALIKE:
         problems["name"] = forms.read_alike(session, typed)
+    elif broken == items.PACKAGES_WHOLE:
+        # Made a fraction after the form was checked: rare.
+        fraction = forms.package_fraction(session, item_id) if item_id else None
+        problems["unit"] = fraction or WHOLE_UNITS
     elif broken in REFUSED_FIELDS:
         problems[REFUSED_FIELDS[broken]] = RULES[broken]
     return done, broken
@@ -492,7 +497,7 @@ def save_item(
     found = session.get(Item, item_id)
     if found is None:
         return not_found()
-    fields, problems, typed = forms.item_fields(session, form, item_id)
+    fields, problems, typed = forms.item_fields(session, form, found)
     renamed = None
     if fields is not None:
         seen = form_version(form.get("version", ""))
@@ -592,6 +597,7 @@ def add_package(
             "unique",
             RETIRED,
             items.READ_ALIKE,
+            items.PACKAGE_WHOLE,
         )
         if broken == RETIRED:
             return _item_page(request, session, signed, found, alert=RULES[RETIRED])
@@ -601,11 +607,14 @@ def add_package(
             return redirect(
                 f"{ITEMS}/{item_id}", notice="package_added", section="packages"
             )
-        problems["package_name"] = (
-            forms.read_alike(session, typed)
-            if broken == items.READ_ALIKE
-            else forms.PACKAGE_TAKEN
-        )
+        if broken == items.PACKAGE_WHOLE:  # Its item made each meanwhile.
+            problems["size"] = WHOLE_UNITS
+        else:
+            problems["package_name"] = (
+                forms.read_alike(session, typed)
+                if broken == items.READ_ALIKE
+                else forms.PACKAGE_TAKEN
+            )
     # With the units chosen, if any: not a package's own form's (package_id).
     values = {**form, "package_name": name, "size": size}
     return _item_page(request, session, signed, found, problems=problems, values=values)
@@ -647,6 +656,7 @@ def save_package(
             "unique",
             "package_size_fixed",
             SHORT_UNDER_SIZE,
+            items.PACKAGE_WHOLE,
             *ALERTS,
         )
         # Its size field is gone once fixed: said above the page, as for a
@@ -663,7 +673,7 @@ def save_package(
             problems["package_name"] = forms.PACKAGE_TAKEN
         elif broken == items.READ_ALIKE:
             problems["package_name"] = forms.read_alike(session, typed)
-        else:  # SHORT_UNDER_SIZE, the one other refusal it expects.
+        else:  # SHORT_UNDER_SIZE, or PACKAGE_WHOLE: its item made each.
             problems["size"] = RULES[broken]
     # Beside the fields of the package it was sent for, with the units
     # chosen, if any.
@@ -777,12 +787,17 @@ def package_settings(
         lambda: items.package_settings(session, package, short, minimum),
         RETIRED,
         SHORT_UNDER_SIZE,
+        items.PACKAGE_WHOLE,
     )
     if broken == RETIRED:
         return _item_page(request, session, signed, found, alert=RULES[RETIRED])
     if broken:
-        # Resized meanwhile to no more than it: said beside it, as above.
-        problems = {"short_below": forms.SHORTER_THAN_WHOLE}
+        # Resized meanwhile to no more than it, or its item made each: said
+        # beside it, as above.
+        words = (
+            WHOLE_UNITS if broken == items.PACKAGE_WHOLE else forms.SHORTER_THAN_WHOLE
+        )
+        problems = {"short_below": words}
         return _item_page(
             request, session, signed, found, problems=problems, values=values
         )

@@ -2,7 +2,9 @@
 item_package tables, and their rules. A current item is in a current
 category (categories.retire is the other side), and an item's unit is
 fixed once stock has moved in it, as the ledger's quantities are in that
-unit; a package's size, once it has moved, been opened or labelled. The
+unit, and an item counted each has no current package holding, or too
+short to use below, a fraction; a package's size is fixed once it has
+moved, been opened or labelled. The
 app may not move a package to another item (the initial migration), so its
 labels always name its item, and a package's name is its own among its
 item's, retired ones too, so one can always be brought back. A retired
@@ -72,6 +74,7 @@ from inventory_tng.models.labels import Label
 from inventory_tng.models.names import unit_key
 from inventory_tng.models.search_text import fold, fuzzy, in_ascii
 from inventory_tng.models.stock import Movement, OpenPackage
+from inventory_tng.stock.ledger import whole_enough
 
 log = structlog.get_logger(__name__)
 meter = metrics.get_meter(__name__)
@@ -321,6 +324,41 @@ def _not_an_alias(session: Session, keys: Keys, but: ItemAlias | None = None) ->
     enforce(NAME_IS_ALIAS, when=exists_where(session, *taken, *other))
 
 
+# Refused: an item changed to each while a current package of it holds, or
+# is too short to use below, a fraction (Ali, 2026-11-23,
+# inventory-tng-fa5i); and a package's size or too-short length with a
+# fraction, its item counted each.
+PACKAGES_WHOLE = "item_packages_whole"
+PACKAGE_WHOLE = "package_whole_units"
+
+
+def fractional_package(session: Session, item_id: int) -> ItemPackage | None:
+    """The item's first current package, smallest first, that holds, or is
+    too short to use below, a fraction: none may, for an item counted each.
+    A retired one may."""
+    size, short = ItemPackage.size, ItemPackage.short_below
+    query = (
+        select(ItemPackage)
+        .where(
+            ItemPackage.item_id == item_id,
+            ItemPackage.retired_at.is_(None),
+            or_(size != func.trunc(size), short != func.trunc(short)),
+        )
+        .order_by(size, ItemPackage.id)
+    )
+    return session.scalars(query).first()
+
+
+def _whole_for_its_item(session: Session, item_id: int, amount: Decimal | None) -> None:
+    """RuleBroken (PACKAGE_WHOLE) if `amount`, a package's, has a fraction
+    and its item, read afresh under the catalogue lock, is counted each: a
+    form checked it against the unit before the lock."""
+    if amount is None:
+        return
+    unit = session.scalars(select(Item.unit).where(Item.id == item_id)).one()
+    enforce(PACKAGE_WHOLE, when=not whole_enough(unit, amount))
+
+
 def add(session: Session, fields: Fields) -> Item:
     lock_catalogue(session)
     _in_current_category(session, fields.category_id)
@@ -353,6 +391,9 @@ def save(session: Session, item: Item, fields: Fields, *, seen: Seen) -> Renamed
     if fields.unit != item.unit:
         moved = exists_where(session, Movement.item_id == item.id)
         enforce("item_unit_fixed", when=moved)
+        # Under the catalogue lock, which every package write takes.
+        fraction = fields.unit == "each" and fractional_package(session, item.id)
+        enforce(PACKAGES_WHOLE, when=bool(fraction))
     if fields.category_id != item.category_id:
         _in_current_category(session, fields.category_id)
     keys = Keys.of(session, fields.name)
@@ -467,6 +508,8 @@ def restore(session: Session, item: Item) -> None:
 def add_package(session: Session, item: Item, name: str, size: Decimal) -> ItemPackage:
     relock(session, item)
     enforce("retired_read_only", when=item.retired_at is not None)
+    # Its unit as locked: the form checked the size against the one before.
+    enforce(PACKAGE_WHOLE, when=not whole_enough(item.unit, size))
     package = ItemPackage(item_id=item.id, name=name, size=size)
     session.add(package)
     session.flush()
@@ -492,6 +535,7 @@ def save_package(
     _item_current(session, package)
     if size != package.size:
         enforce("package_size_fixed", when=bool(sizes_fixed(session, [package.id])))
+        _whole_for_its_item(session, package.item_id, size)
     package.name, package.size = name, size
     once_committed(session, log.info, "package saved", item_package_id=package.id)
 
@@ -553,6 +597,7 @@ def package_settings(
     stores (docs/decisions/0020), each optional. Gone for a retired one."""
     relock(session, package, current=True)
     _item_current(session, package)
+    _whole_for_its_item(session, package.item_id, short_below)
     package.short_below, package.minimum_sealed = short_below, minimum_sealed
     once_committed(
         session,

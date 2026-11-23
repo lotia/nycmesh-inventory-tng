@@ -3935,6 +3935,24 @@ msgstr ""
 msgid "That would make it part of itself."
 msgstr ""
 
+#. Translators: a package's size, its "Holds" on the item page, has
+#. a fraction; %(package)s is its name, %(amount)s its size.
+#: src/inventory_tng/catalogue/forms.py
+#, python-format
+msgid ""
+"The %(package)s package holds %(amount)s: make that whole, or retire the "
+"package, before counting this item in each."
+msgstr ""
+
+#. Translators: a package's "Too short to use" length has a fraction;
+#. %(package)s is its name, %(amount)s that length.
+#: src/inventory_tng/catalogue/forms.py
+#, python-format
+msgid ""
+"The %(package)s package is too short to use below %(amount)s: make that "
+"whole, or blank, before counting this item in each."
+msgstr ""
+
 #: src/inventory_tng/templates/admins/_totp_fields.html
 msgid "The 6-digit code it shows"
 msgstr ""

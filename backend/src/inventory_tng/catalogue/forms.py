@@ -26,6 +26,7 @@ from inventory_tng.models.catalogue import (
     reading_rules_held,
 )
 from inventory_tng.models.names import canonical
+from inventory_tng.web.formatting import amount
 from inventory_tng.web.forms import chosen, name_problem, quantity
 
 log = structlog.get_logger(__name__)
@@ -224,11 +225,39 @@ def same_name(
     )
 
 
+def package_fraction(session: Session, item_id: int) -> str | None:
+    """Beside the unit: an item changed to each while a current package of
+    it holds, or is too short to use below, a fraction
+    (items.fractional_package), naming it; None if none does."""
+    package = items.fractional_package(session, item_id)
+    if package is None:
+        return None
+    log.debug("unit change refused", item_id=item_id, item_package_id=package.id)
+    if package.size != package.size.to_integral_value():
+        # Translators: a package's size, its "Holds" on the item page, has
+        # a fraction; %(package)s is its name, %(amount)s its size.
+        return gettext(
+            "The %(package)s package holds %(amount)s: make that whole, or "
+            "retire the package, before counting this item in each.",
+            package=package.name_shown,
+            amount=amount(package.size),
+        )
+    # Translators: a package's "Too short to use" length has a fraction;
+    # %(package)s is its name, %(amount)s that length.
+    return gettext(
+        "The %(package)s package is too short to use below %(amount)s: make "
+        "that whole, or blank, before counting this item in each.",
+        package=package.name_shown,
+        amount=amount(package.short_below),
+    )
+
+
 def item_fields(
-    session: Session, form: Mapping[str, str], item_id: int | None = None
+    session: Session, form: Mapping[str, str], item: Item | None = None
 ) -> tuple[items.Fields | None, dict[str, Words], Typed]:
     """What to set, unless something is wrong, what is, and the name as
-    typed."""
+    typed; for `item`'s form, if given, else a new item's."""
+    item_id = item.id if item is not None else None
     typed = typed_name(session, form.get("name", ""), form)
     name = typed.name
     problems: dict[str, Words] = {}
@@ -240,6 +269,13 @@ def item_fields(
     unit = form.get("unit", "")
     if unit not in UNITS:
         problems["unit"] = PICK_A_UNIT
+    # Checked again under the lock (items.save).
+    elif (
+        item is not None
+        and unit == "each" != item.unit
+        and (fraction := package_fraction(session, item.id))
+    ):
+        problems["unit"] = fraction
     minimum = quantity(form.get("minimum", ""), positive=False, unit=unit)
     if isinstance(minimum, str):
         problems["minimum"] = minimum
