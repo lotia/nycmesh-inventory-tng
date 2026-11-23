@@ -233,8 +233,13 @@ def adjust(
                 request, session, signed, problems={"amount": words}, values=form
             )
         field = "location_id" if broken == COUNTABLE else "amount"
-        return _counts_page(
-            request, session, signed, problems={field: RULES[broken]}, values=form
-        )
+        problems = {field: RULES[broken]}
+        if unit != item.unit:
+            # Refused for another reason, shown again in the unit it is
+            # counted in now, keeping what was typed: one changed since is
+            # said too, so it is never saved in it unawares.
+            log.info("adjustment shown again in a unit changed since", item_id=item.id)
+            problems["amount"] = now_counted_in(item.unit)
+        return _counts_page(request, session, signed, problems=problems, values=form)
     session.commit()
     return redirect(COUNTS, notice="adjusted", section="adjust")

@@ -4,6 +4,7 @@ retired one emptied, while it is counted (stock/count_routes.py, Ali,
 saying where its items went, with a way to bring it back."""
 
 import uuid
+from collections.abc import Callable
 from decimal import Decimal
 
 import pytest
@@ -11,17 +12,28 @@ from fastapi.testclient import TestClient
 from httpx2 import Response
 from sqlalchemy.orm import Session
 
+from inventory_tng.core.db_locking import UNGUARDED_INFO
 from inventory_tng.core.phrases import PATH_BETWEEN
 from inventory_tng.models.catalogue import ItemPackage
 from inventory_tng.models.places import Location
-from inventory_tng.stock import queries
+from inventory_tng.stock import count_routes, queries
 from inventory_tng.stock.count_forms import TYPE_IT_HERE
+from inventory_tng.stock.forms import now_counted_in
 from inventory_tng.stock.ledger import LOOSE, Entry, Form, insert_transaction
 from inventory_tng.stock.moments import expected
 
-from helpers.markup import Element, button, options, problem, read, text
+from helpers.markup import (
+    Element,
+    box_values,
+    button,
+    hidden_fields,
+    options,
+    problem,
+    read,
+    text,
+)
 from helpers.query_counts import counting
-from helpers.rows import add
+from helpers.rows import add, setting_up
 from helpers.stock import count_form, held_by_form, retire, write
 from helpers.store_areas import Store, area, counts_at, field
 
@@ -246,6 +258,61 @@ def test_bring_it_back_restores_the_area_and_shows_the_form_again(
     assert saved.status_code == 303
     assert expected(session, gone.id) == {setup.item: Decimal(2)}
     assert expected(session, made.empty.id) == {}
+
+
+def test_bring_it_back_after_a_switch_to_ft_asks_again_in_ft(
+    admin_client: TestClient, session: Session
+) -> None:
+    """50 typed for the cable in Bin 1, shown in m; switched to ft (made
+    straight in the database, as a moved item's unit is fixed), then Bring
+    it back: the area comes back and the form says beside the box that the
+    cable is now counted in ft, so 50 is never saved in ft unawares (Ali,
+    2026-11-23, inventory-tng-57u8)."""
+    setup = Emptied(session, admin_client)
+    made, gone, cable = setup.made, setup.gone, setup.made.place.cable
+    made.move(session, gone, made.empty, "2")
+    refused = admin_client.post(made.path, data=setup.shown)
+    box = field(made.bin, made.store, f"counted_{cable.id}")
+    typed = {box: "50", setup.arrived(made.empty): "2"}
+    cable.unit = "ft"
+    session.flush()
+    back = bring_back(admin_client, made, refused, typed, gone.id)
+    session.refresh(gone)
+    assert gone.retired_at is None
+    assert problem(back.text, box) == now_counted_in("ft")
+    assert box_values(back.text, box) == ["50"]
+    assert f"{cable.id}:ft" in dict(hidden_fields(back.text))["units"]
+
+
+def test_a_count_refused_as_an_area_is_gone_says_a_switch_since(
+    admin_client: TestClient, session: Session, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Refused as Shelf C is gone, and the cable switched to ft just after
+    (made straight in the database, as a moved item's unit is fixed): the
+    form shown again in ft says so beside the 50 typed in m."""
+    setup = Emptied(session, admin_client)
+    made, cable = setup.made, setup.made.place.cable
+    made.move(session, setup.gone, made.empty, "2")
+    box = field(made.bin, made.store, f"counted_{cable.id}")
+    refusal = count_routes.refusal
+
+    def switched_after(
+        held: Session, change: Callable[[], object], *expected: str
+    ) -> tuple[object, str | None]:
+        refused = refusal(held, change, *expected)
+        # Another administrator's edit, as the test's own rows are written.
+        setting_up(session)
+        cable.unit = "ft"
+        session.flush()
+        del session.info[UNGUARDED_INFO]
+        return refused
+
+    monkeypatch.setattr(count_routes, "refusal", switched_after)
+    again = admin_client.post(made.path, data=setup.shown | {box: "50"})
+    assert again.status_code == 400
+    assert emptied_words(setup.gone.name) in text(again)
+    assert problem(again.text, box) == now_counted_in("ft")
+    assert box_values(again.text, box) == ["50"]
 
 
 def test_bring_it_back_of_an_area_back_already_shows_the_form(

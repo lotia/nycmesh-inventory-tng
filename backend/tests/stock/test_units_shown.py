@@ -4,24 +4,28 @@ adjustment say the unit and package sizes they showed; one changed since
 is refused and asked again in the new ones, never converted."""
 
 import uuid
+from collections.abc import Callable
 from decimal import Decimal
 
+import pytest
 from fastapi.testclient import TestClient
 from httpx2 import Response
 from sqlalchemy.orm import Session
 from structlog.testing import capture_logs
 
+from inventory_tng.core.db_locking import UNGUARDED_INFO
 from inventory_tng.models.catalogue import ItemPackage
+from inventory_tng.stock import counts_routes
 from inventory_tng.stock.count_forms import changed_words
 from inventory_tng.stock.forms import now_counted_in, now_holds, shown_field, shown_in
 from inventory_tng.stock.moments import expected
 from inventory_tng.stock.paths import ADJUSTMENTS, COUNTS
 from inventory_tng.stock.units_shown import Now, Shown
 
-from helpers.markup import box_values, hidden_fields, text
+from helpers.markup import box_values, hidden_fields, problem, text
 from helpers.over_recorded import adjustments, checks, counted, moved_whole
 from helpers.package_forms import quantities_by_form
-from helpers.rows import add, tag
+from helpers.rows import add, setting_up, tag
 from helpers.stock import (
     URL,
     Place,
@@ -29,6 +33,7 @@ from helpers.stock import (
     adjustment_form,
     count_form_at,
     counts_written,
+    retire,
 )
 
 
@@ -317,6 +322,35 @@ def test_an_adjustment_shown_in_m_says_so_whatever_else_is_wrong(
     response = admin_client.post(ADJUSTMENTS, data=form | {"reason_id": ""})
     assert response.status_code == 400
     assert now_counted_in("ft") in text(response)
+    assert counts_written(session) == []
+
+
+def test_an_adjustment_refused_otherwise_says_a_switch_since(
+    admin_client: TestClient, session: Session, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Refused as the store was retired, and the cable switched to ft just
+    after: the form shown again in ft says so beside the 50 typed in m."""
+    place = Place(session)
+    form = adjustment_form(
+        session, place.store, place.cable, amount="50", direction="found"
+    )
+    retire(session, place.store)
+    refusal = counts_routes.refusal
+
+    def switched_after(
+        held: Session, change: Callable[[], object], *expected: str
+    ) -> tuple[object, str | None]:
+        refused = refusal(held, change, *expected)
+        # Another administrator's edit, as the test's own rows are written.
+        to_feet(setting_up(session), place)
+        del session.info[UNGUARDED_INFO]
+        return refused
+
+    monkeypatch.setattr(counts_routes, "refusal", switched_after)
+    response = admin_client.post(ADJUSTMENTS, data=form)
+    assert response.status_code == 400
+    assert problem(response.text, "amount") == now_counted_in("ft")
+    assert box_values(response.text, "amount") == ["50"]
     assert counts_written(session) == []
 
 

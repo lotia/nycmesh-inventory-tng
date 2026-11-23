@@ -276,7 +276,11 @@ write, so no change slips between. One changed since is refused, nothing
 written, and asked again in the new ones: the batch's line is refused
 (`unit_changed`, as `package_resized`) for the outbox to say so, and a
 form is shown again as it is now, saying beside the box "This item is now
-counted in ft. Check the amount and save again." We rejected converting
+counted in ft. Check the amount and save again." A form shown again
+for anything else while keeping what was typed (Bring it back on a count,
+a save refused by another rule) is shown in the units and sizes now
+too, so it says the same beside each box of one changed since
+(inventory-tng-dcqp). We rejected converting
 what was shown into what is now: a unit switched because it was wrong may
 mean the volunteer's number was right in the new one, so asking again is
 safer.

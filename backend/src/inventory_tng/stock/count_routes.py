@@ -66,7 +66,9 @@ it is set aside from what that place's own lines count, and each move is
 taken as right unless its amount is fixed, in each form it arrived in,
 the difference then lost or found there (stock/count_arrivals.py). One
 emptied can be brought back from the form (bring_back), as its own page
-does (places/locations.restore), and the form shown again with it.
+does (places/locations.restore), and the form shown again with it,
+keeping what was typed, a box of an item or package shown otherwise
+since saying so as a count sent does.
 """
 
 import uuid
@@ -124,6 +126,7 @@ from inventory_tng.stock.count_forms import (
     Figures,
     Gone,
     Listed,
+    PlaceCount,
     changed_words,
     field_at,
     fields_at,
@@ -337,6 +340,47 @@ def _asked_again(
     else:
         alert = now_holds(*min(now.sizes.items())[1])
     return changed_words(session, form, root_id, place_ids, now), alert
+
+
+def _changed_since_sent(
+    session: Session,
+    form: Mapping[str, str],
+    key: uuid.UUID,
+    counts: Collection[PlaceCount],
+) -> Now:
+    """What a count form, of `counts` as read, shows in a unit or package
+    size changed since (units_shown.changed_since), as it is now; nothing
+    for a form saved before, which is answered as it was
+    (store_counts.record_store_count)."""
+    if digest_spent(session, key) is not None:
+        return Now({}, {})
+    return changed_since(session, shown_in(form), *amounts_named(counts, {}))
+
+
+def _kept_as_now(
+    session: Session,
+    form: Mapping[str, str],
+    key: uuid.UUID,
+    counts: Collection[PlaceCount],
+    root_id: int,
+    place_ids: Collection[int],
+) -> tuple[dict[str, Words], Words | None]:
+    """A count form shown again keeping what was typed, though not saved
+    for it (Bring it back, a save refused for another reason): the words
+    beside each box of an item or package shown otherwise since, and
+    above the form (_asked_again), as it shows them as they are now, so
+    what was typed in the old unit or size is not saved in the new one
+    unawares (Ali, 2026-11-23, inventory-tng-57u8). None for none."""
+    now = _changed_since_sent(session, form, key, counts)
+    if not now:
+        return {}, None
+    log.info(
+        "count shown again in units changed since",
+        location_id=root_id,
+        item_ids=sorted(now.units),
+        item_package_ids=sorted(now.sizes),
+    )
+    return _asked_again(session, form, root_id, place_ids, now)
 
 
 def _shown_places(
@@ -782,11 +826,7 @@ def count(
     # new ones (units_shown), checked again as it is saved. A form saved
     # before is answered as it was (store_counts.record_store_count).
     shown_as = shown_in(form)
-    named_now = Now({}, {})
-    if digest_spent(session, key) is None:
-        named_now = changed_since(
-            session, shown_as, *amounts_named(sent.places.values(), {})
-        )
+    named_now = _changed_since_sent(session, form, key, sent.places.values())
     if named_now:
         refusing("count", named_now)
         words, said = _asked_again(session, form, place.id, place_ids, named_now)
@@ -879,6 +919,17 @@ def count(
         if broken == SENT_AGAIN:
             # The saved count is listed on Counts, to see what went through.
             return redirect(COUNTS, notice="count_saved_already", section="count")
+        if shown_now is not None:
+            # Changed between the check above and the save: the form as
+            # sent, in the units and sizes now, each box of one changed
+            # saying so.
+            words, said = _asked_again(session, form, place.id, place_ids, shown_now)
+            return as_sent(problems=words, alert=said, left=left())
+        # Refused for another reason, shown again keeping what was typed, in
+        # the units and sizes now: one changed since is said too.
+        changed, said = _kept_as_now(
+            session, form, key, sent.places.values(), place.id, place_ids
+        )
         if broken == COUNTABLE:
             if retired is None or retired == place.id:
                 # As for a place there is not, as the form's own page answers.
@@ -900,6 +951,7 @@ def count(
             return again(
                 None,
                 values=typed,
+                problems=changed,
                 gone_now=fresh,
                 items=_asked_after(session, shown, asked, fresh, gone, tree),
                 recount={
@@ -911,25 +963,25 @@ def count(
                 tree=tree,
                 status_code=409,
             )
-        if shown_now is not None:
-            # Changed between the check above and the save: the form as
-            # sent, in the units and sizes now, each box of one changed
-            # saying so.
-            words, said = _asked_again(session, form, place.id, place_ids, shown_now)
-            return as_sent(problems=words, alert=said, left=left())
         if broken == CHANGED:
             # What was typed may be of before that save or after it, of
             # items it cannot tell: the form as it is now, with a new key,
             # keeping what was typed, to check and send again.
-            return asking(None, values=typed, alert=SAVED_AS_SHOWN, status_code=409)
+            return asking(
+                None,
+                values=typed,
+                problems=changed,
+                alert=SAVED_AS_SHOWN,
+                status_code=409,
+            )
         # Checked again, the units as they are now mark the lines it broke.
-        problems = {}
+        problems = dict(changed)
         for place_id, each in sent.places.items():
             _, wrong = item_counts(session, each.found)
             problems |= fields_at(place.id, place_id, wrong)
         return as_sent(
             problems=problems,
-            alert=None if problems else RULES[broken],
+            alert=said or (None if problems else RULES[broken]),
             left=left(),
             status_code=400,
         )
@@ -1077,12 +1129,13 @@ def bring_back(
     """The count form's Bring it back: an area gone from it, retired and
     emptied while it was counted, brought back as its own page does
     (places/locations.restore), and the same form shown again with it,
-    keeping what was typed (Ali, 2026-11-22, inventory-tng-ygk5)."""
+    keeping what was typed (Ali, 2026-11-22, inventory-tng-ygk5), in the
+    units and sizes now, saying so beside a box of one changed since."""
     carried = _sent(session, form, location_id)
     area_id = row_id(form.get("area_id", ""))
     if carried is None or area_id not in carried.gone.ids:
         return not_found()
-    place, _, at, place_ids, gone = carried
+    place, key, at, place_ids, gone = carried
     tree = queries.place_tree(session, place)
     area, label = next(
         (
@@ -1101,6 +1154,7 @@ def bring_back(
     since = _since_shown(session, carried)
     left = since.left
     sent = read_count(session, form, place.id, place_ids, since.asks_for).places
+    words, said = _kept_as_now(session, form, key, sent.values(), place.id, place_ids)
     again = partial(
         _count_page,
         request,
@@ -1109,6 +1163,7 @@ def bring_back(
         place,
         shown=shown,
         values=form,
+        problems=words,
         items={place_id: each.items for place_id, each in sent.items()},
         recount={place_id: each.recount for place_id, each in sent.items()},
         gone=gone,
@@ -1150,5 +1205,6 @@ def bring_back(
         Moment(at.as_of, seen_up_to(session, listed, at.as_of)),
         places=listed,
         left=left(),
+        alert=said,
         caution=brought_back(label),
     )

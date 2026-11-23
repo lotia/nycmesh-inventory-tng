@@ -675,6 +675,29 @@ describe("a package resized while the cart counts it (inventory-tng-0qi)", () =>
     });
   });
 
+  test("a line of sealed packages only, counted again after a unit change, is in the new unit and saved (inventory-tng-dcqp)", () => {
+    const inFeet = { ...CATALOGUE, items: [radio, { ...cable, unit: "ft" }] };
+    const typed = cart({
+      lines: [
+        {
+          itemId: 101,
+          packages: { 1001: "2" },
+          sizes: { 1001: "305.000" },
+          loose: "",
+          unit: "m",
+        },
+      ],
+    });
+    const line = first(reconcile(typed, inFeet));
+    expect(line).toMatchObject({ packages: { 1001: "" }, unit: "m" });
+    const again = cart({ lines: [{ ...line, packages: { 1001: "2" } }] });
+    const counted = sized(cart({ lines: [line] }), again, inFeet);
+    expect(counted.lines[0]?.unit).toBe("ft");
+    expect(toBatch(counted, inFeet)).toMatchObject({
+      draft: { lines: [{ item_id: 101, package_id: 1001, unit: "ft" }] },
+    });
+  });
+
   test("a line with nothing typed keeps no unit, so a unit changed says nothing of it", () => {
     const blank = cart({ lines: [{ itemId: 101, packages: {}, loose: "" }] });
     expect(sized(cart(), blank, CATALOGUE).lines[0]).not.toHaveProperty("unit");
