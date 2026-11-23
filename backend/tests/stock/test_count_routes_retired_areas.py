@@ -316,6 +316,34 @@ def test_an_area_gone_and_moved_out_of_the_store_since_is_named_by_its_own_name(
     assert f"From {label}" not in text(again)
 
 
+def test_an_area_gone_and_moved_out_of_the_store_is_named_after_its_own(
+    admin_client: TestClient, session: Session
+) -> None:
+    """Shelf C and Bin X, in Shelf D, both emptied into Shelf B while
+    counted, then Bin X moved to another store: the form shown again names
+    Shelf C first, as the store's tree does, and Bin X, which the tree no
+    longer holds, after it, in its "From" parts and where it says what is
+    not offered."""
+    setup = Emptied(session, admin_client)
+    made, gone = setup.made, setup.gone
+    inner = add(session, area("Bin X", add(session, area("Shelf D", made.store))))
+    made.move(session, made.store, inner, "1")
+    shown = count_form(admin_client.get(made.path))
+    retire(session, inner)
+    made.move(session, gone, made.empty, "2")
+    made.move(session, inner, made.empty, "1")
+    refused = admin_client.post(made.path, data=shown)
+    assert refused.status_code == 409
+    inner.parent_id = Store(session).store.id
+    session.flush()
+    wrong = {setup.counted(made.shelf): "x"}
+    again = admin_client.post(made.path, data=count_form(refused) | wrong)
+    assert again.status_code == 400
+    words = text(again)
+    assert words.index(f"From {gone.name}") < words.index(f"From {inner.name}")
+    assert f"{gone.name} and {inner.name} aren't offered: they're retired." in words
+
+
 def test_bring_it_back_of_an_area_not_gone_from_the_form_is_not_found(
     admin_client: TestClient, session: Session
 ) -> None:

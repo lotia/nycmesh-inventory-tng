@@ -34,8 +34,10 @@ class Leaving(NamedTuple):
         return {move.from_id for move in self.moves}
 
     def ordered(self, ids: Collection[int]) -> list[int]:
-        """The areas of `ids` in the tree's order."""
-        return sorted(ids, key=lambda each: self.order.get(each, 0))
+        """The areas of `ids` in the tree's order, then any the tree no
+        longer holds (moved out of the place since), by id."""
+        last = len(self.order)
+        return sorted(ids, key=lambda each: (self.order.get(each, last), each))
 
     def said(self, ids: Collection[int]) -> list[str]:
         """The labels of the areas of `ids`, in the tree's order."""
