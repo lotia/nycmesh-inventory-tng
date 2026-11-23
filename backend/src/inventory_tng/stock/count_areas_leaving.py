@@ -46,7 +46,7 @@ def moves_since(session: Session, gone: Gone, as_of: int) -> list[MovedOut]:
     """What left the areas gone from a count form after it was first
     shown (moved_out), split at its moment `as_of`: one read, of which the
     form shows, and its save sets aside, what went to its places up to
-    that moment (as_shown). None if no area is gone."""
+    that moment (as_shown). Nothing if no area is gone."""
     if not gone.ids:
         return []
     return moved_out(session, gone.ids, gone.since, split=as_of)
