@@ -14,12 +14,12 @@ from sqlalchemy.orm import Session
 from inventory_tng.models.places import Location
 from inventory_tng.models.stock import LedgerTransaction, Movement
 from inventory_tng.stock.ledger import LOOSE, Entry, Form
-from inventory_tng.stock.moments import expected, expected_forms_at
+from inventory_tng.stock.moments import expected
 from inventory_tng.stock.paths import COUNTS
 
 from helpers.markup import problem, read, text
 from helpers.rows import add
-from helpers.stock import Spools, count_form, retire, write
+from helpers.stock import Spools, count_form, held_by_form, retire, write
 from helpers.store_areas import Store, area, counts_at, field
 
 
@@ -268,8 +268,7 @@ class SpoolsMoved:
 
     def at_shelf(self, session: Session) -> dict[tuple[int, Form], Decimal]:
         """What the records hold at Shelf B, by item and form."""
-        forms = expected_forms_at(session, [self.shelf.id], 2**31 - 1, [self.cable])
-        return forms.get(self.shelf.id, {})
+        return held_by_form(session, self.shelf.id, self.cable)
 
 
 def test_a_sealed_arrival_is_fixed_in_whole_packages(
@@ -396,8 +395,9 @@ def test_a_place_counted_by_form_counts_its_own_spools_apart(
     assert (box["value"], box["data-per"]) == ("1", "305")
     assert "data-per" not in page.one("input", name=f"loose_{cable}").attrs
     saved(admin_client, path, count_form(refused))
-    assert expected_forms_at(session, [store.id], 2**31 - 1, [cable]) == {
-        store.id: {(cable, sealed): Decimal(610), (cable, LOOSE): Decimal(10)}
+    assert held_by_form(session, store.id, cable) == {
+        (cable, sealed): Decimal(610),
+        (cable, LOOSE): Decimal(10),
     }
 
 

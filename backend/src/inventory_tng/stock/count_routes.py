@@ -69,7 +69,7 @@ does (places/locations.restore), and the form shown again with it.
 """
 
 import uuid
-from collections.abc import Collection, Mapping, Sequence
+from collections.abc import Callable, Collection, Mapping, Sequence
 from decimal import Decimal
 from functools import cache, partial
 from typing import Annotated, NamedTuple
@@ -100,6 +100,7 @@ from inventory_tng.stock.count_areas_leaving import (
 )
 from inventory_tng.stock.count_arrivals import (
     Arrivals,
+    Aside,
     Fix,
     arrived_at,
     as_held,
@@ -656,6 +657,32 @@ def _sent(session: Session, form: Mapping[str, str], location_id: int) -> Sent |
     return Sent(place, key, Moment(as_of, seen), place_ids, gone)
 
 
+class SinceShown(NamedTuple):
+    """What left a sent form's gone areas since it was shown, each read
+    when first needed, once: all of it (`left`, moves_since); what the
+    form showed of it (`shown`); what each place holds of that (`held`,
+    count_arrivals.as_held), so what its lines are less (`aside`); and
+    whether a full count of a place asks for an item, less that
+    (`asks_for`)."""
+
+    left: Callable[[], list[MovedOut]]
+    shown: Callable[[], list[MovedOut]]
+    held: Callable[[], dict[int, Arrivals]]
+    aside: Callable[[], dict[int, Aside]]
+    asks_for: Callable[[int, int], bool]
+
+
+def _since_shown(session: Session, sent: Sent) -> SinceShown:
+    """SinceShown of the form `sent`, as count and bring_back read it."""
+    gone, as_of = sent.gone, sent.at.as_of
+    left = cache(partial(moves_since, session, gone, as_of))
+    shown = cache(lambda: as_shown(left(), sent.place_ids))
+    held = cache(lambda: as_held(session, gone, as_of, shown()))
+    aside = cache(lambda: held_aside(held()))
+    asked = partial(asks_for, session, as_of, aside)
+    return SinceShown(left, shown, held, aside, asked)
+
+
 @router.post(f"{COUNTS}/{{location_id:int}}")
 def count(
     request: Request,
@@ -675,12 +702,9 @@ def count(
     # asks for, and the moves fixed (stock/count_arrivals.py). Read when
     # first needed, so a form sent back for a problem reads them only to
     # show them, unless something else here names a line it does not show.
-    left = cache(partial(moves_since, session, gone, at.as_of))
-    gone_since = cache(lambda: as_shown(left(), place_ids))
-    held_since = cache(lambda: as_held(session, gone, at.as_of, gone_since()))
-    aside_since = cache(lambda: held_aside(held_since()))
-    held = partial(asks_for, session, at.as_of, aside_since)
-    sent = read_count(session, form, place.id, place_ids, held)
+    since = _since_shown(session, carried)
+    left = since.left
+    sent = read_count(session, form, place.id, place_ids, since.asks_for)
     asked = {place_id: each.items for place_id, each in sent.places.items()}
     # The form shown again: as sent, or with `at` None, as it is now; a
     # recount with the figures it first showed (count_forms.WHILE).
@@ -733,13 +757,13 @@ def count(
         for place_id, each in sent.places.items()
         if not (areas and filtered) or each.anything
     ]
-    moves = gone_since()
+    moves = since.shown()
     fixes = fixed(
         moves,
         {place_id: each.arrived for place_id, each in sent.places.items()},
     )
-    aside = aside_since()
-    fix_lines = fixed_lines(fixes, held_since())
+    aside = since.aside()
+    fix_lines = fixed_lines(fixes, since.held())
     if not counting and not fixes:
         # Nothing typed at any place: nothing to count, so the form again,
         # as sent, saying so (inventory-tng-fxsy).
@@ -998,14 +1022,9 @@ def bring_back(
         return not_found()
     # What left the areas gone, and what of it each place holds, read when
     # first needed, once, as count reads them.
-    left = cache(partial(moves_since, session, gone, at.as_of))
-    aside = cache(
-        lambda: held_aside(
-            as_held(session, gone, at.as_of, as_shown(left(), place_ids))
-        )
-    )
-    held = partial(asks_for, session, at.as_of, aside)
-    sent = read_count(session, form, place.id, place_ids, held).places
+    since = _since_shown(session, carried)
+    left = since.left
+    sent = read_count(session, form, place.id, place_ids, since.asks_for).places
     again = partial(
         _count_page,
         request,

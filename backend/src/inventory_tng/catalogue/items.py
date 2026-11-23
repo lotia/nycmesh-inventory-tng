@@ -354,10 +354,12 @@ def _whole_for_its_item(
 ) -> None:
     """RuleBroken (PACKAGE_WHOLE) if any of `amounts`, a package's, has a
     fraction and its item, read afresh under the catalogue lock, is counted
-    each: a form checked them against the unit before the lock."""
+    each: a form checked them against the unit before the lock. Whole
+    amounts are whole in any unit, so with none the unit is not read."""
+    if all(each is None or whole_enough("each", each) for each in amounts):
+        return
     unit = session.scalars(select(Item.unit).where(Item.id == item_id)).one()
-    fraction = (each is not None and not whole_enough(unit, each) for each in amounts)
-    enforce(PACKAGE_WHOLE, when=any(fraction))
+    enforce(PACKAGE_WHOLE, when=unit == "each")
 
 
 def add(session: Session, fields: Fields) -> Item:

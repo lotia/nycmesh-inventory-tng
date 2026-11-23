@@ -12,18 +12,17 @@ from httpx2 import Response
 from sqlalchemy.orm import Session
 
 from inventory_tng.core.phrases import PATH_BETWEEN
-from inventory_tng.models.base import INTEGER_MAX
 from inventory_tng.models.catalogue import ItemPackage
 from inventory_tng.models.places import Location
 from inventory_tng.stock import queries
 from inventory_tng.stock.count_forms import TYPE_IT_HERE
 from inventory_tng.stock.ledger import LOOSE, Entry, Form, insert_transaction
-from inventory_tng.stock.moments import expected, expected_forms_at
+from inventory_tng.stock.moments import expected
 
 from helpers.markup import Element, button, options, problem, read, text
 from helpers.query_counts import counting
 from helpers.rows import add
-from helpers.stock import count_form, retire, write
+from helpers.stock import count_form, held_by_form, retire, write
 from helpers.store_areas import Store, area, counts_at, field
 
 
@@ -689,11 +688,10 @@ class SpoolArrived:
         }
 
     def line(self, name: str) -> str:
-        return f"at_{self.made.shelf.id}_{name}_{self.cable}"
+        return field(self.made.shelf, self.made.store, f"{name}_{self.cable}")
 
     def at_shelf(self, session: Session) -> dict[tuple[int, Form], Decimal]:
-        shelf = self.made.shelf.id
-        return expected_forms_at(session, [shelf], INTEGER_MAX, [self.cable])[shelf]
+        return held_by_form(session, self.made.shelf.id, self.cable)
 
 
 def test_something_else_here_of_what_came_only_from_an_area_gone_is_counted(

@@ -15,17 +15,16 @@ from fastapi.testclient import TestClient
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from inventory_tng.models.base import INTEGER_MAX
 from inventory_tng.models.stock import LedgerTransaction, Movement, OpenPackage
 from inventory_tng.stock import open_packages
 from inventory_tng.stock.count_gone_areas import opened_here_since
 from inventory_tng.stock.ledger import LOOSE, Entry, Form
-from inventory_tng.stock.moments import at_place, expected_forms_at
+from inventory_tng.stock.moments import at_place
 from inventory_tng.stock.paths import COUNTS
 
 from helpers.markup import read, text
 from helpers.rows import add
-from helpers.stock import Spools, count_form, retire
+from helpers.stock import Spools, count_form, held_by_form, retire
 from helpers.store_areas import area, field
 
 
@@ -149,8 +148,7 @@ class Arrived:
 
     def at_shelf(self, session: Session) -> dict[tuple[int, Form], Decimal]:
         """What the records hold at Shelf B, by item and form."""
-        forms = expected_forms_at(session, [self.shelf.id], INTEGER_MAX, [self.cable])
-        return forms.get(self.shelf.id, {})
+        return held_by_form(session, self.shelf.id, self.cable)
 
     def found_or_lost(self, session: Session) -> list[Movement]:
         """The lines of the counts written at Shelf B: what they found or

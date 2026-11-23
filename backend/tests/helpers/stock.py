@@ -12,6 +12,7 @@ from httpx2 import Response
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from inventory_tng.models.base import INTEGER_MAX
 from inventory_tng.models.catalogue import Category, Item, ItemPackage
 from inventory_tng.models.places import Location
 from inventory_tng.models.stock import (
@@ -26,6 +27,7 @@ from inventory_tng.scan.batch import record
 from inventory_tng.scan.batch_schemas import Batch
 from inventory_tng.stock import open_packages, over_recorded
 from inventory_tng.stock.ledger import LOOSE, Entry, Form, insert_transaction
+from inventory_tng.stock.moments import expected_forms_at
 from inventory_tng.stock.paths import COUNTS
 from inventory_tng.web.navigation import retired_holding
 
@@ -114,6 +116,15 @@ def raise_check(
     return session.scalars(
         select(OverRecorded).where(OverRecorded.movement_id == movement_id)
     ).one()
+
+
+def held_by_form(
+    session: Session, place_id: int, item_id: int
+) -> dict[tuple[int, Form], Decimal]:
+    """What the records hold of the item at the place now, by form."""
+    return expected_forms_at(session, [place_id], INTEGER_MAX, [item_id]).get(
+        place_id, {}
+    )
 
 
 def counts_written(session: Session) -> list[LedgerTransaction]:
