@@ -35,6 +35,10 @@ msgstr ""
 msgid "This package is retired: what is left may be taken, never received"
 msgstr ""
 
+#: src/scan/CartForm.tsx
+msgid "The cart changed while it was being checked, so it wasn't recorded. Tap Record again."
+msgstr ""
+
 #: src/shared/outbox-notes.ts
 msgid "This package is retired, and the inventory has none left sealed. Ask an administrator to count it."
 msgstr ""

@@ -1,5 +1,6 @@
 /** Record checks the cart against the catalogue as it is now before it
  * queues it (Ali, 2026-11-23, inventory-tng-h7ua). */
+import type { MessageDescriptor } from "@lingui/core";
 import { fireEvent, screen } from "@testing-library/preact";
 import { describe, expect, test, vi } from "vitest";
 import { say } from "../shared/i18n";
@@ -15,8 +16,13 @@ import {
   saves,
 } from "../testing/scan-page";
 import { ENTER_AGAIN_IN } from "./batch";
-import { RECORD } from "./CartForm";
+import {
+  CHANGED_BEFORE_RECORD,
+  CHANGED_WHILE_CHECKED,
+  RECORD,
+} from "./CartForm";
 import { UNIT_CHANGED } from "./CartLine";
+import { STORAGE_KEY as CART_KEY, loadCart, storeCart } from "./cart";
 
 // The camera, stubbed: never opened here.
 vi.mock("./camera", () => ({ openCamera: vi.fn() }));
@@ -47,6 +53,53 @@ async function fifty() {
   fireEvent.input(screen.getByLabelText("Loose m"), {
     target: { value: "50" },
   });
+}
+
+/** A page whose catalogue, asked second by Record, is answered only once
+ * `answer` is called; `asked` waits until it has been asked `times`. */
+function waiting() {
+  const later = deferred();
+  let count = 0;
+  const { outbox } = page(() => {
+    count += 1;
+    return count === 2 ? later.promise : json(CATALOGUE, 200);
+  });
+  return {
+    outbox,
+    answer: () => later.resolve(json(CATALOGUE, 200)),
+    asked: (times: number) => vi.waitFor(() => expect(count).toBe(times)),
+  };
+}
+
+function typeLoose(value: string) {
+  fireEvent.input(screen.getByLabelText("Loose m"), { target: { value } });
+}
+
+/** Another tab stores the cart with `loose` m of the cable, heard here. */
+async function changedInAnotherTab(loose: string) {
+  const stored = loadCart();
+  storeCart({
+    ...stored,
+    revision: "another tab's",
+    lines: stored.lines.map((line) => ({ ...line, loose })),
+  });
+  await vi.waitFor(() => {
+    window.dispatchEvent(new StorageEvent("storage", { key: CART_KEY }));
+    expect((screen.getByLabelText("Loose m") as HTMLInputElement).value).toBe(
+      loose,
+    );
+  });
+}
+
+/** Once Record has had its answer, `words` are the one problem said. */
+async function saidOnly(words: MessageDescriptor) {
+  await vi.waitFor(() =>
+    expect(
+      (screen.getByRole("button", { name: say(RECORD) }) as HTMLButtonElement)
+        .disabled,
+    ).toBe(false),
+  );
+  expect(screen.getByRole("alert").textContent).toBe(say(words));
 }
 
 describe("Record checks the cart against the catalogue first", () => {
@@ -170,31 +223,47 @@ describe("Record checks the cart against the catalogue first", () => {
     );
   });
 
-  test("a cart changed while Record waits is not queued until Record is tapped again", async () => {
-    const later = deferred();
-    let asked = 0;
-    const { outbox } = page(() => {
-      asked += 1;
-      return asked === 2 ? later.promise : json(CATALOGUE, 200);
-    });
+  test("a cart changed here while Record waits is not queued, says so, and is recorded once Record is tapped again", async () => {
+    const { outbox, answer, asked } = waiting();
     await fifty();
     save();
-    await vi.waitFor(() => expect(asked).toBe(2));
-    fireEvent.input(screen.getByLabelText("Loose m"), {
-      target: { value: "5" },
-    });
-    later.resolve(json(CATALOGUE, 200));
-    await vi.waitFor(() =>
-      expect(
-        (screen.getByRole("button", { name: say(RECORD) }) as HTMLButtonElement)
-          .disabled,
-      ).toBe(false),
-    );
+    await asked(2);
+    typeLoose("5");
+    answer();
+    await saidOnly(CHANGED_WHILE_CHECKED);
     expect(outbox.entries.value).toEqual([]);
     await saveQueued(outbox, 1);
     expect(outbox.entries.value[0]?.body.lines).toEqual([
       { item_id: cable.id, quantity: "5", unit: "m" },
     ]);
+    expect(screen.queryByText(say(CHANGED_WHILE_CHECKED))).toBeNull();
+  });
+
+  test("a cart changed in another tab while Record waits is not queued, asks for it to be checked, and is recorded once Record is tapped again", async () => {
+    const { outbox, answer, asked } = waiting();
+    await fifty();
+    save();
+    await asked(2);
+    await changedInAnotherTab("40");
+    answer();
+    await saidOnly(CHANGED_BEFORE_RECORD);
+    expect(outbox.entries.value).toEqual([]);
+    await saveQueued(outbox, 1);
+    expect(outbox.entries.value[0]?.body.lines).toEqual([
+      { item_id: cable.id, quantity: "40", unit: "m" },
+    ]);
+  });
+
+  test("changed here and in another tab during one wait, it asks for the cart to be checked", async () => {
+    const { outbox, answer, asked } = waiting();
+    await fifty();
+    save();
+    await asked(2);
+    typeLoose("5");
+    await changedInAnotherTab("40");
+    answer();
+    await saidOnly(CHANGED_BEFORE_RECORD);
+    expect(outbox.entries.value).toEqual([]);
   });
 
   test("a refresh under way is shown, though Record's own load fails", async () => {

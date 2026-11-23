@@ -86,6 +86,8 @@ export const PLACE_WHICH = msg({
   message: "{place}: from here, or to here?",
 });
 export const CHANGED_BEFORE_RECORD = msg`The cart was changed in another tab. Check it, then record it again.`;
+/** Said when this tab changed the cart while Record checked it. */
+export const CHANGED_WHILE_CHECKED = msg`The cart changed while it was being checked, so it wasn't recorded. Tap Record again.`;
 export const NOT_SENT = msg`This browser wouldn't keep the cart, so it wasn't sent. Free some space or leave private browsing, then try again.`;
 export const ARE_YOU = msg`Are you {name}? This phone hasn't been used for a while.`;
 export const THATS_ME = msg`That's me`;
@@ -167,6 +169,9 @@ export function CartForm({
   const problems = useSignal<Said[]>([]);
   // While Record waits for the catalogue: Record does nothing meanwhile.
   const checking = useSignal(false);
+  // How many of other tabs' changes this tab has followed, so Record can
+  // tell who changed the cart while it waited.
+  const followed = useRef(0);
   // What was last sent to be recorded, worded as it is shown.
   const saved = useSignal<Batch | null>(null);
   // While Discard cart waits to be confirmed, the cart's revision then.
@@ -191,6 +196,7 @@ export function CartForm({
   useEffect(
     () =>
       store.listen(() => {
+        followed.current += 1;
         cartKept.value = true;
         problems.value = problems.value.filter(
           (problem) => wordsOf(problem) !== say(NOT_KEEPING),
@@ -388,19 +394,30 @@ export function CartForm({
    * typed in it, said beside its box, and nothing is queued. Without an
    * answer in time, it is queued as checked against the one shown, and the
    * server refuses what changed (Ali, 2026-11-23, inventory-tng-h7ua). A
-   * cart changed meanwhile, here or in another tab, is not queued: it is
-   * recorded once Record is tapped again. */
+   * cart changed meanwhile is not queued, and the volunteer is asked to
+   * tap Record again; changed in another tab, as well as here or not,
+   * to check it first (Ali, 2026-11-23, inventory-tng-h60m). */
   async function save(event: TargetedSubmitEvent<HTMLFormElement>) {
     event.preventDefault();
     if (checking.value || checked(catalogue, opens) === null) {
       return;
     }
     const tapped = cart.value.revision;
+    const followedThen = followed.current;
     checking.value = true;
     const against = await latest().finally(() => {
       checking.value = false;
     });
     if (cart.value.revision !== tapped) {
+      problems.value = [
+        [
+          say(
+            followed.current === followedThen
+              ? CHANGED_WHILE_CHECKED
+              : CHANGED_BEFORE_RECORD,
+          ),
+        ],
+      ];
       return;
     }
     store.useCatalogue(against);
