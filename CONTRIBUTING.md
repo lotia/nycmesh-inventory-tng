@@ -658,9 +658,10 @@ then Record refuses the cart.
 Record first loads the catalogue again and checks the cart against it, so
 a unit or package size changed since is said beside its box, and nothing
 queued, before the batch leaves. With no answer within the wait
-`RECORD_CHECK_MS` sets (`frontend/src/scan/ScanPage.tsx`), the cart is
-queued as checked against the catalogue shown, and the server refuses what
-changed. Record does nothing more while it waits.
+`RECORD_CATALOGUE_WAIT_MS` sets (`frontend/src/scan/ScanPage.tsx`), the
+cart is queued as checked against the catalogue shown, and the server
+refuses what changed. Record does nothing more while it waits, and a
+cart changed meanwhile is not queued until Record is tapped again.
 
 The page's words never say "save": the inventory records what Record
 sends, and the browser keeps the cart, which every change writes to

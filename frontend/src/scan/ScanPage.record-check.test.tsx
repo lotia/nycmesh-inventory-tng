@@ -3,7 +3,7 @@
 import { fireEvent, screen } from "@testing-library/preact";
 import { describe, expect, test, vi } from "vitest";
 import { say } from "../shared/i18n";
-import { CATALOGUE, cable } from "../testing/catalogue";
+import { CATALOGUE, cable, openSpool } from "../testing/catalogue";
 import { answering, deferred, json, saved } from "../testing/fetch";
 import {
   fillMove,
@@ -15,9 +15,10 @@ import {
   saves,
 } from "../testing/scan-page";
 import { ENTER_AGAIN_IN } from "./batch";
+import { RECORD } from "./CartForm";
 import { UNIT_CHANGED } from "./CartLine";
 
-// The camera, faked: it sees whatever a test puts in `inView`.
+// The camera, stubbed: never opened here.
 vi.mock("./camera", () => ({ openCamera: vi.fn() }));
 
 const IN_FEET = {
@@ -61,7 +62,6 @@ describe("Record checks the cart against the catalogue first", () => {
     screen.getByText(
       "The unit changed from m to ft. Enter the amount again in ft.",
     );
-    console.log("DBG", document.body.textContent);
     expect((screen.getByLabelText("Loose ft") as HTMLInputElement).value).toBe(
       "",
     );
@@ -121,6 +121,108 @@ describe("Record checks the cart against the catalogue first", () => {
       await vi.advanceTimersByTimeAsync(0);
       expect(outbox.entries.value).toHaveLength(1);
       expect(asked).toBe(2);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  test("checked against one that shows a batch saved since, what that batch took from an open package is not taken twice", async () => {
+    const CUT = "Cut or take from the Spool opened 2026-11-03 (m)";
+    let shown = {
+      ...CATALOGUE,
+      open_packages: [openSpool({ left: "10.000" })],
+    };
+    const later = deferred();
+    let asked = 0;
+    // Asked on load, by Record, once saved (unanswered), by Record again.
+    const { outbox } = page(() => {
+      asked += 1;
+      return asked === 3 ? later.promise : json(shown, 200);
+    });
+    await ready();
+    fillMove();
+    fireEvent.input(screen.getByLabelText(CUT), { target: { value: "8" } });
+    await saveQueued(outbox, 1);
+    await vi.waitFor(() => expect(asked).toBe(3));
+    const first = outbox.entries.value[0]?.body.key ?? "";
+    // Saved, and shown by the catalogue Record checks against: 2 m left.
+    shown = {
+      ...shown,
+      saved: [first],
+      open_packages: [openSpool({ left: "2.000" })],
+    };
+    fillMove();
+    fireEvent.input(screen.getByLabelText(CUT), { target: { value: "1" } });
+    save();
+    await vi.waitFor(() =>
+      expect(
+        outbox.entries.value.find((each) => each.body.key !== first),
+      ).toBeDefined(),
+    );
+    const second = outbox.entries.value.find((each) => each.body.key !== first);
+    // 1 m of 2: not used up, as it would be were the 8 m taken again.
+    expect(second?.body.used_up ?? []).toEqual([]);
+    expect(second?.body.lines).toContainEqual(
+      expect.objectContaining({
+        open_package_key: openSpool().key,
+        quantity: "1",
+      }),
+    );
+  });
+
+  test("a cart changed while Record waits is not queued until Record is tapped again", async () => {
+    const later = deferred();
+    let asked = 0;
+    const { outbox } = page(() => {
+      asked += 1;
+      return asked === 2 ? later.promise : json(CATALOGUE, 200);
+    });
+    await fifty();
+    save();
+    await vi.waitFor(() => expect(asked).toBe(2));
+    fireEvent.input(screen.getByLabelText("Loose m"), {
+      target: { value: "5" },
+    });
+    later.resolve(json(CATALOGUE, 200));
+    await vi.waitFor(() =>
+      expect(
+        (screen.getByRole("button", { name: say(RECORD) }) as HTMLButtonElement)
+          .disabled,
+      ).toBe(false),
+    );
+    expect(outbox.entries.value).toEqual([]);
+    await saveQueued(outbox, 1);
+    expect(outbox.entries.value[0]?.body.lines).toEqual([
+      { item_id: cable.id, quantity: "5", unit: "m" },
+    ]);
+  });
+
+  test("a refresh under way is shown, though Record's own load fails", async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    try {
+      const refresh = deferred();
+      const later = deferred();
+      let asked = 0;
+      const { outbox } = page(() => {
+        asked += 1;
+        if (asked === 2) {
+          return refresh.promise;
+        }
+        if (asked === 3) {
+          return Promise.reject(new TypeError("Failed to fetch"));
+        }
+        // Never asked again, as saved meanwhile, would it be shown.
+        return asked === 1 ? json(CATALOGUE, 200) : later.promise;
+      });
+      await fifty();
+      // A stale catalogue is asked for again, as a page left open does.
+      await vi.advanceTimersByTimeAsync(11 * 60_000);
+      await vi.waitFor(() => expect(asked).toBe(2));
+      await saveQueued(outbox, 1);
+      refresh.resolve(json(IN_FEET, 200));
+      await vi.advanceTimersByTimeAsync(0);
+      fillMove();
+      await screen.findByLabelText("Loose ft");
     } finally {
       vi.useRealTimers();
     }

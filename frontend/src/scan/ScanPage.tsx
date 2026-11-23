@@ -31,12 +31,16 @@ const API = makeApi();
 /** A page left open fetches the catalogue again once it is this old, so a
  * hub tablet sees new items, volunteers and settings. */
 const CATALOGUE_FRESH_MS = 10 * 60_000;
-/** How long Record waits for the catalogue to check the cart against
- * before queuing it as checked against the one shown (Ali, 2026-11-23,
- * inventory-tng-h7ua): long enough for a weak signal to bring it, short
- * enough that a phone with none is not kept waiting; the server refuses
- * a line in a unit or package size changed since all the same. */
-const RECORD_CHECK_MS = 3_000;
+/**
+ * How long Record waits for a fresh catalogue to check the cart against
+ * before it queues the cart anyway (Ali, 2026-11-23, inventory-tng-h7ua).
+ * Run out, the cart is queued as checked against the catalogue shown, and
+ * the server still refuses a line in a unit or package size changed since;
+ * the catalogue, come later, is shown all the same. Long enough for a weak
+ * signal to bring the catalogue, short enough that a phone with none is
+ * not kept waiting at Record.
+ */
+const RECORD_CATALOGUE_WAIT_MS = 3_000;
 
 export const SCAN = msg`Scan`;
 export const LOADING = msg`Loading the catalogue…`;
@@ -84,37 +88,39 @@ export function ScanPage({
   // One refresh at a time; one asked for meanwhile follows it.
   const asking = useRef<"no" | "yes" | "again">("no");
 
-  // The newest load asked for: an older one's answer, which may not show
-  // a batch a newer one let the outbox forget, is never shown after it.
+  // The newest load shown: an older one's answer, which may not show a
+  // batch a newer one let the outbox forget, is never shown after it. One
+  // whose newer loads have not answered, or failed, is shown: Record's own
+  // load (latest), failing, never drops a refresh that came.
   const newest = useRef(0);
+  const asked = useRef(0);
 
   /** Load it; again, keeping the one it has if that fails. The one
-   * loaded, shown or not; or null. */
+   * loaded and shown; or null. */
   async function fetch(again: boolean): Promise<Catalogue | null> {
-    const order = ++newest.current;
+    const order = ++asked.current;
     const result = await loadCatalogue(api, outbox);
-    const catalogue = result.state === "ready" ? result.catalogue : null;
-    if (order !== newest.current) {
-      return catalogue;
+    if (order < newest.current || (again && result.state !== "ready")) {
+      return null;
     }
-    if (!again || result.state === "ready") {
-      loaded.value = result;
-      loadedAt.current = Date.now();
+    newest.current = order;
+    loaded.value = result;
+    loadedAt.current = Date.now();
+    if (result.state !== "ready") {
+      return null;
     }
-    if (result.state === "ready") {
-      // Shown now: what it shows need not be kept (shared/outbox.ts).
-      outbox.forgetShown(result.catalogue.saved);
-    }
-    return catalogue;
+    // Shown now: what it shows need not be kept (shared/outbox.ts).
+    outbox.forgetShown(result.catalogue.saved);
+    return result.catalogue;
   }
 
-  /** The catalogue loaded again, for Record to check the cart against;
-   * null if it does not come within RECORD_CHECK_MS. Come later, it is
-   * shown all the same. */
+  /** The catalogue loaded again and shown, for Record to check the cart
+   * against; null if it does not come within RECORD_CATALOGUE_WAIT_MS.
+   * Come later, it is shown all the same. */
   async function latest(): Promise<Catalogue | null> {
     let timer: ReturnType<typeof setTimeout> | undefined;
     const late = new Promise<null>((resolve) => {
-      timer = setTimeout(() => resolve(null), RECORD_CHECK_MS);
+      timer = setTimeout(() => resolve(null), RECORD_CATALOGUE_WAIT_MS);
     });
     try {
       return await Promise.race([fetch(true), late]);

@@ -281,12 +281,20 @@ test("a save an older build's tab saved meanwhile is saved once, under its key; 
 
   const first = await leaveSaved(page, itemId);
   await page.getByLabel(/^Loose/).fill("3");
-  const refused = answered(page, 409);
+  let refusedYet = false;
+  const refused = page.waitForResponse((response) => {
+    refusedYet ||=
+      response.url().endsWith("/api/transactions") && response.status() === 409;
+    return refusedYet;
+  });
   // Then the page asks for the stock again at once, which shows what the
-  // other tab recorded (Ali, inventory-tng-g0e, d).
+  // other tab recorded (Ali, inventory-tng-g0e, d): after the refusal, not
+  // the catalogue Record checks the cart against before it is sent.
   const refreshed = page.waitForResponse(
     (response) =>
-      response.url().includes("/api/catalogue") && response.status() === 200,
+      refusedYet &&
+      response.url().includes("/api/catalogue") &&
+      response.status() === 200,
   );
   await page.getByRole("button", { name: "Record" }).click();
   await refused;

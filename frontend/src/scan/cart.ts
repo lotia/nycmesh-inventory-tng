@@ -385,6 +385,21 @@ function holdsAmounts(line: Line): boolean {
   );
 }
 
+/** What is typed on the line, to tell whether it changed: not what is
+ * ticked, so a used-up box ticked on a line cleared as typed in another
+ * unit leaves it asking for the amount again (unitChanged). */
+function amountsOf(line: Line): string {
+  return JSON.stringify([
+    line.packages,
+    line.loose,
+    Object.entries(line.open ?? {}).map(([key, { amount, now }]) => [
+      key,
+      amount,
+      now,
+    ]),
+  ]);
+}
+
 /** The line with everything typed on it cleared, keeping the unit it was
  * typed in, so it says so (unitChanged). Its package counts go too: each
  * package's size is in the item's unit, and the server refuses a line in
@@ -442,8 +457,8 @@ function recounted(line: Line, item: Item | undefined): Line {
  * counted at the size shown now, as it was read before; a count blank has
  * none, but one cleared as resized keeps its size until typed again
  * (reconcile). So too the unit its amounts were typed in: the one it
- * has, until any of its amounts change; else the one shown now, or none
- * while nothing is typed on it.
+ * has, until any of its amounts change (amountsOf); else the one shown
+ * now, or none while nothing is typed on it.
  */
 export function sized(before: Cart, next: Cart, catalogue: Catalogue): Cart {
   const { items } = indexOf(catalogue);
@@ -468,11 +483,7 @@ export function sized(before: Cart, next: Cart, catalogue: Catalogue): Cart {
       }
       const typedIn =
         line.unit !== undefined &&
-        (previous === undefined ||
-          (previous.loose === line.loose &&
-            JSON.stringify(previous.packages) ===
-              JSON.stringify(line.packages) &&
-            JSON.stringify(previous.open) === JSON.stringify(line.open)))
+        (previous === undefined || amountsOf(previous) === amountsOf(line))
           ? line.unit
           : holdsAmounts(line)
             ? items.get(line.itemId)?.unit

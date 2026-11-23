@@ -648,6 +648,18 @@ describe("a package resized while the cart counts it (inventory-tng-0qi)", () =>
     expect(
       sized({ ...typed, lines: [line] }, again, inFeet).lines[0]?.unit,
     ).toBe("ft");
+    // Its open package ticked used up, it still asks for the amount.
+    const ticked = cart({
+      lines: [
+        {
+          ...line,
+          open: { k: { amount: "", whole: false, usedUp: true, now: "" } },
+        },
+      ],
+    });
+    expect(sized(cart({ lines: [line] }), ticked, inFeet).lines[0]?.unit).toBe(
+      "m",
+    );
     // In the unit it was typed in, nothing changes.
     expect(reconcile(typed, CATALOGUE)).toBe(typed);
   });

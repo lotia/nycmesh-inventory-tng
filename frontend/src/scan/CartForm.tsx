@@ -3,7 +3,7 @@ import type { MessageDescriptor } from "@lingui/core";
 import { msg } from "@lingui/core/macro";
 import { type Signal, useSignal } from "@preact/signals";
 import type { TargetedSubmitEvent } from "preact";
-import { useEffect, useMemo, useRef } from "preact/hooks";
+import { useEffect, useLayoutEffect, useMemo, useRef } from "preact/hooks";
 import { Field } from "../shared/Field";
 import { say, sayParts } from "../shared/i18n";
 import { type Body, batchId, type Entry, type Outbox } from "../shared/outbox";
@@ -56,7 +56,7 @@ import { differenceOf } from "./recorded-elsewhere";
 import { Scanner } from "./Scanner";
 import { indexOf } from "./search";
 import { type Removed, removeLine, undone } from "./undo-remove";
-import { sealedCounts } from "./unseen-batches";
+import { sealedCounts, unseen } from "./unseen-batches";
 
 export const NOT_KEEPING = msg`This browser isn't keeping the cart, so a reload will empty it. Free some space or leave private browsing.`;
 /** What a label or a tap did, said under the camera. */
@@ -163,6 +163,9 @@ export function CartForm({
     [catalogue, pending],
   );
   const cart = store.cart;
+  // The catalogue shown, as Record finds it once it has waited (save).
+  const shown = useRef(catalogue);
+  shown.current = catalogue;
   const query = useSignal("");
   const problems = useSignal<Said[]>([]);
   // While Record waits for the catalogue: Record does nothing meanwhile.
@@ -204,7 +207,9 @@ export function CartForm({
     },
     [],
   );
-  useEffect(() => store.useCatalogue(catalogue), [catalogue]);
+  // Before the page is painted, so an amount cleared as typed in a unit
+  // changed since is never shown beside the new unit.
+  useLayoutEffect(() => store.useCatalogue(catalogue), [catalogue]);
   const empty = cart.value.lines.length === 0;
   const batchKey = cart.value.batchKey;
   useEffect(() => {
@@ -385,25 +390,34 @@ export function CartForm({
    * one that changed a unit or a package's size since clears what was
    * typed in it, said beside its box, and nothing is queued. Without an
    * answer in time, it is queued as checked against the one shown, and the
-   * server refuses what changed (Ali, 2026-11-23, inventory-tng-h7ua). */
+   * server refuses what changed (Ali, 2026-11-23, inventory-tng-h7ua). A
+   * cart changed meanwhile, here or in another tab, is not queued: it is
+   * recorded once Record is tapped again. */
   async function save(event: TargetedSubmitEvent<HTMLFormElement>) {
     event.preventDefault();
     if (checking.value || checked(catalogue, opens) === null) {
       return;
     }
+    const tapped = cart.value.revision;
     checking.value = true;
     const fresh = await latest()
       .catch(() => null)
       .finally(() => {
         checking.value = false;
       });
+    if (cart.value.revision !== tapped) {
+      return;
+    }
     if (fresh !== null) {
       store.useCatalogue(fresh);
     }
-    const ready =
-      fresh === null
-        ? checked(catalogue, opens)
-        : checked(fresh, offered(fresh, pending));
+    // The one shown now, which a refresh may have changed meanwhile, and
+    // what the outbox holds that it does not show, as `pending` is.
+    const against = fresh ?? shown.current;
+    const ready = checked(
+      against,
+      offered(against, unseen(outbox.entries.value, against)),
+    );
     if (ready === null) {
       return;
     }
