@@ -14,7 +14,11 @@ from datetime import UTC, datetime
 from sqlalchemy.orm import Session
 
 from inventory_tng.admins import accounts
-from inventory_tng.admins.sealed_totp_keys import TotpKeys, new_key
+from inventory_tng.admins.sealed_totp_keys import (
+    TotpKeys,
+    new_key,
+    reseal_authenticators,
+)
 from inventory_tng.core.mail import Notifier
 from inventory_tng.core.operator_commands import run_command, run_command_telling
 
@@ -53,9 +57,7 @@ def main(argv: Sequence[str], prog: str | None = None) -> int:
 
 
 def _reseal(session: Session, _args: argparse.Namespace) -> int:
-    resealed, unreadable = accounts.reseal_authenticators(
-        session, TotpKeys.from_environ()
-    )
+    resealed, unreadable = reseal_authenticators(session, TotpKeys.from_environ())
     print(f"Resealed {resealed}; {unreadable} could not be read.")
     return 1 if unreadable else 0
 

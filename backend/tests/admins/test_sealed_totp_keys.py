@@ -154,8 +154,8 @@ def test_an_unreadable_authenticator_still_lets_a_recovery_code_in(
         )
         == "recovery"
     )
-    assert accounts.unreadable_authenticators(session, lost) == 1
-    assert accounts.unreadable_authenticators(session, TOTP_KEYS) == 0
+    assert sealed_totp_keys.unreadable_authenticators(session, lost) == 1
+    assert sealed_totp_keys.unreadable_authenticators(session, TOTP_KEYS) == 0
 
 
 def test_resealing_moves_every_readable_key_to_the_newest_version(
@@ -170,7 +170,7 @@ def test_resealing_moves_every_readable_key_to_the_newest_version(
     ).one()
     lost.key_version = 7
     session.flush()
-    assert accounts.reseal_authenticators(session, newer) == (1, 1)
+    assert sealed_totp_keys.reseal_authenticators(session, newer) == (1, 1)
     resealed = session.scalars(
         select(Authenticator).where(Authenticator.admin_id == ada.id)
     ).one()
@@ -181,7 +181,7 @@ def test_resealing_moves_every_readable_key_to_the_newest_version(
     assert only_newest.open(2, resealed.sealed_key, ada.id) == ada_key
     assert lost.key_version == 7
     # Again, nothing is left to move.
-    assert accounts.reseal_authenticators(session, newer) == (0, 1)
+    assert sealed_totp_keys.reseal_authenticators(session, newer) == (0, 1)
 
 
 def test_startup_says_how_many_authenticators_are_unreadable(
@@ -190,7 +190,7 @@ def test_startup_says_how_many_authenticators_are_unreadable(
     with capture_logs() as logs:
         check_totp_keys(database, TOTP_KEYS)
     assert logs == []
-    monkeypatch.setattr(accounts, "unreadable_authenticators", lambda *_: 2)
+    monkeypatch.setattr("inventory_tng.app.unreadable_authenticators", lambda *_: 2)
     with capture_logs() as logs:
         check_totp_keys(database, TOTP_KEYS)
     assert logs == [

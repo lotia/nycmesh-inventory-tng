@@ -10,6 +10,12 @@ highest version seals; every version present opens. A Kubernetes Secret
 mounted as a directory has this shape. In development the directory
 defaults to the clone's .local/totp-keys, which `mise run setup` fills.
 
+Opening an authenticator's key (open_key), for sign-in, startup and the
+command, counting those that do not open, and resealing them with the
+newest version are here too. Retiring them is account work
+(admins/accounts.py's retire_authenticators): it ends sessions, removes
+sign-in and mails administrators.
+
 DEPLOYMENT.md, TOTP keys, says how to rotate them and what to do if one is
 lost.
 """
@@ -21,11 +27,20 @@ from collections.abc import Mapping
 from dataclasses import dataclass, field
 from pathlib import Path
 
+import structlog
 from cryptography.exceptions import InvalidTag
 from cryptography.hazmat.primitives.ciphers.aead import AESGCM
+from sqlalchemy import select
+from sqlalchemy.orm import Session
 
+from inventory_tng.core.db_locking import locked
+from inventory_tng.core.db_once_committed import once_committed
+from inventory_tng.core.db_sessions import set_actor
 from inventory_tng.core.local_env import CLONE
 from inventory_tng.core.settings import SettingsError, is_development
+from inventory_tng.models.admins import CURRENT_TOTP, Authenticator
+
+log = structlog.get_logger(__name__)
 
 DEVELOPMENT_DIR = CLONE / ".local" / "totp-keys"
 KEY_BITS = 256
@@ -142,3 +157,63 @@ def keys_dir(environ: Mapping[str, str]) -> Path:
     if is_development(environ):
         return DEVELOPMENT_DIR
     raise TotpKeysError("TOTP_KEYS_DIR is needed outside APP_ENV=development")
+
+
+def open_key(keys: TotpKeys, authenticator: Authenticator) -> str | None:
+    """Its key, or None if it cannot be read (its key version is gone from
+    TOTP_KEYS_DIR, or that version's file holds another key): the one test of
+    unreadable, for sign-in, startup and the operator's command. It then takes
+    no code, and recovery codes and reset links still let its administrator
+    in (DEPLOYMENT.md, TOTP keys)."""
+    # Current ones keep theirs.
+    assert authenticator.sealed_key is not None
+    assert authenticator.key_version is not None
+    try:
+        return keys.open(
+            authenticator.key_version, authenticator.sealed_key, authenticator.admin_id
+        )
+    except Unreadable:
+        log.error(
+            "authenticator unreadable",
+            admin_id=authenticator.admin_id,
+            authenticator_id=authenticator.id,
+            key_version=authenticator.key_version,
+        )
+        return None
+
+
+def unreadable_authenticators(session: Session, keys: TotpKeys) -> int:
+    """How many current authenticators `keys` cannot open (open_key). Each is
+    opened, one AES-GCM decryption apiece."""
+    current = session.scalars(select(Authenticator).where(CURRENT_TOTP))
+    return sum(open_key(keys, authenticator) is None for authenticator in current)
+
+
+def reseal_authenticators(session: Session, keys: TotpKeys) -> tuple[int, int]:
+    """Every current authenticator's key sealed again with the newest version,
+    so older ones can leave TOTP_KEYS_DIR: how many were, and how many could
+    not be read (left as they are). The caller commits."""
+    set_actor(session, "system:reseal")
+    resealed = unreadable = 0
+    current = session.scalars(
+        locked(select(Authenticator).where(CURRENT_TOTP).order_by(Authenticator.id))
+    )
+    for authenticator in current:
+        key = open_key(keys, authenticator)
+        if key is None:
+            unreadable += 1
+        elif authenticator.key_version != keys.newest:
+            authenticator.key_version, authenticator.sealed_key = keys.seal(
+                key, authenticator.admin_id
+            )
+            resealed += 1
+    session.flush()
+    once_committed(
+        session,
+        log.info,
+        "authenticators resealed",
+        key_version=keys.newest,
+        resealed=resealed,
+        unreadable=unreadable,
+    )
+    return resealed, unreadable

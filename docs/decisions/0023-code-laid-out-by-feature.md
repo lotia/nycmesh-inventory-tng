@@ -213,6 +213,15 @@ short test. `core/` is the name FastAPI's full-stack template uses;
   holds an item's stock split by form and the orders each form is listed
   in. Their tests kept their names, as `test_package_forms_*.py` named
   the second job already.
+- On 2026-11-23, as Ali decided (inventory-tng-9gwp), opening and
+  resealing authenticators' keys left `admins/accounts.py` for
+  `admins/sealed_totp_keys.py`, named for that job: `_opened`, as
+  `open_key`, `unreadable_authenticators` and `reseal_authenticators`.
+  `admins/accounts.py` imports `open_key` for sign-in, never the other
+  way. `retire_authenticators` stayed, as it is account work (sessions,
+  sign-in and mail) using the accounts' own helpers. `CURRENT_TOTP` went
+  to `models/admins.py`, beside `Authenticator`, as both modules filter
+  on it.
 - Older decision records keep the paths of their time. The tables below
   give each old path's new home; a later move adds its rows.
 
@@ -257,7 +266,7 @@ queries to its `queries.py`.
 | `admin/used_up.py` | `stock/used_up_routes.py` |
 | `admin/volunteers.py` | `volunteers/routes.py` |
 | `admins.py` | `admins/admins_command.py` |
-| `admins/accounts.py` | itself, but for `qr_svg`: `web/qr_codes.py`; `name_up_to`: `web/forms.py`; `new_totp_key`, `is_totp_key`, `totp_link`, `grouped`, `key_for_typing`, `accepted_step`, `ISSUER`, `TOTP_FIELD_MAX`, `TOTP_CODE`, `TOTP_INTERVAL`, with `_totp_code` as `totp_code`: `admins/authenticator_totp.py` |
+| `admins/accounts.py` | itself, but for `qr_svg`: `web/qr_codes.py`; `name_up_to`: `web/forms.py`; `new_totp_key`, `is_totp_key`, `totp_link`, `grouped`, `key_for_typing`, `accepted_step`, `ISSUER`, `TOTP_FIELD_MAX`, `TOTP_CODE`, `TOTP_INTERVAL`, with `_totp_code` as `totp_code`: `admins/authenticator_totp.py`; `_opened` as `open_key`, `unreadable_authenticators`, `reseal_authenticators`: `admins/sealed_totp_keys.py`; `CURRENT_TOTP`: `models/admins.py` |
 | `admins/totp_keys.py` | `admins/sealed_totp_keys.py` |
 | `admins/totp_keys_command.py` | `admins/sealed_totp_keys_command.py` |
 | `catalogue.py` | `scan/catalogue_api.py`; the reply schemas: `scan/catalogue_schemas.py`; its queries: `scan/queries.py` |

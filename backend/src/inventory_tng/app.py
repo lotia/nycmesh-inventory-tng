@@ -11,7 +11,6 @@ from fastapi import Depends, FastAPI
 
 from inventory_tng.admins import (
     account_routes,
-    accounts,
     admins_routes,
     home_routes,
     reset_routes,
@@ -19,7 +18,7 @@ from inventory_tng.admins import (
 )
 from inventory_tng.admins.guards import admin_signed_in, install_admin_answers
 from inventory_tng.admins.paths import HOME
-from inventory_tng.admins.sealed_totp_keys import TotpKeys
+from inventory_tng.admins.sealed_totp_keys import TotpKeys, unreadable_authenticators
 from inventory_tng.catalogue import (
     categories_routes,
     items_routes,
@@ -179,6 +178,6 @@ def check_totp_keys(database: Database, keys: TotpKeys) -> None:
     its version gone or its file replaced: those take no code until their
     administrators enrol again (DEPLOYMENT.md, TOTP keys)."""
     with database.session() as session:
-        unreadable = accounts.unreadable_authenticators(session, keys)
+        unreadable = unreadable_authenticators(session, keys)
     if unreadable:
         log.error("authenticators unreadable with TOTP_KEYS_DIR", count=unreadable)

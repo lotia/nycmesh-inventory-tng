@@ -32,7 +32,7 @@ from inventory_tng.admins.authenticator_totp import (
     grouped,
     totp_code,
 )
-from inventory_tng.admins.sealed_totp_keys import TotpKeys, Unreadable
+from inventory_tng.admins.sealed_totp_keys import TotpKeys, open_key
 from inventory_tng.core.db_errors import unique
 from inventory_tng.core.db_locking import get_locked, locked
 from inventory_tng.core.db_once_committed import once_committed
@@ -44,6 +44,7 @@ from inventory_tng.core.settings import RateLimits
 from inventory_tng.devices import devices
 from inventory_tng.devices.devices import digest
 from inventory_tng.models.admins import (
+    CURRENT_TOTP,
     Admin,
     AdminPassword,
     AdminSession,
@@ -195,9 +196,6 @@ def password_problem(password: str, again: str) -> Words | None:
     return None
 
 
-CURRENT_TOTP = Authenticator.retired_at.is_(None)
-
-
 def _current(admin_id: int) -> tuple[ColumnElement[bool], ...]:
     return (Authenticator.admin_id == admin_id, CURRENT_TOTP)
 
@@ -311,66 +309,6 @@ def add_authenticator(
     return authenticator
 
 
-def _opened(keys: TotpKeys, authenticator: Authenticator) -> str | None:
-    """Its key, or None if it cannot be read (its key version is gone from
-    TOTP_KEYS_DIR, or that version's file holds another key): the one test of
-    unreadable, for sign-in, startup and the operator's command. It then takes
-    no code, and recovery codes and reset links still let its administrator
-    in (DEPLOYMENT.md, TOTP keys)."""
-    # Current ones keep theirs.
-    assert authenticator.sealed_key is not None
-    assert authenticator.key_version is not None
-    try:
-        return keys.open(
-            authenticator.key_version, authenticator.sealed_key, authenticator.admin_id
-        )
-    except Unreadable:
-        log.error(
-            "authenticator unreadable",
-            admin_id=authenticator.admin_id,
-            authenticator_id=authenticator.id,
-            key_version=authenticator.key_version,
-        )
-        return None
-
-
-def unreadable_authenticators(session: Session, keys: TotpKeys) -> int:
-    """How many current authenticators `keys` cannot open (_opened). Each is
-    opened, one AES-GCM decryption apiece."""
-    current = session.scalars(select(Authenticator).where(CURRENT_TOTP))
-    return sum(_opened(keys, authenticator) is None for authenticator in current)
-
-
-def reseal_authenticators(session: Session, keys: TotpKeys) -> tuple[int, int]:
-    """Every current authenticator's key sealed again with the newest version,
-    so older ones can leave TOTP_KEYS_DIR: how many were, and how many could
-    not be read (left as they are). The caller commits."""
-    set_actor(session, "system:reseal")
-    resealed = unreadable = 0
-    current = session.scalars(
-        locked(select(Authenticator).where(CURRENT_TOTP).order_by(Authenticator.id))
-    )
-    for authenticator in current:
-        key = _opened(keys, authenticator)
-        if key is None:
-            unreadable += 1
-        elif authenticator.key_version != keys.newest:
-            authenticator.key_version, authenticator.sealed_key = keys.seal(
-                key, authenticator.admin_id
-            )
-            resealed += 1
-    session.flush()
-    once_committed(
-        session,
-        log.info,
-        "authenticators resealed",
-        key_version=keys.newest,
-        resealed=resealed,
-        unreadable=unreadable,
-    )
-    return resealed, unreadable
-
-
 # Recovery codes
 
 
@@ -420,7 +358,7 @@ def check_second_factor(
     locked_authenticators), or one of their recovery codes unless not
     `recovery`, used up as it is accepted."""
     for authenticator in authenticators:
-        key = _opened(keys, authenticator)
+        key = open_key(keys, authenticator)
         if key is None:
             continue
         step = accepted_step(key, typed, authenticator.last_step, now)
@@ -1621,7 +1559,7 @@ def retire_authenticators(
         chosen = [
             a
             for a in locked_authenticators(session, admin.id)
-            if every or _opened(keys, a) is None
+            if every or open_key(keys, a) is None
         ]
         if not chosen:
             continue

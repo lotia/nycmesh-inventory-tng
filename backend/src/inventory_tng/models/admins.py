@@ -163,6 +163,10 @@ class Authenticator(Base):
     retired_at: Mapped[RetiredAt]
 
 
+# Whether an authenticator is current: not removed.
+CURRENT_TOTP = Authenticator.retired_at.is_(None)
+
+
 class RecoveryCode(Base):
     """One of an administrator's one-use codes, for when their authenticator
     is lost. Only its hash is kept."""
