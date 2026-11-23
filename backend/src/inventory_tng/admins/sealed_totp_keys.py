@@ -10,11 +10,8 @@ highest version seals; every version present opens. A Kubernetes Secret
 mounted as a directory has this shape. In development the directory
 defaults to the clone's .local/totp-keys, which `mise run setup` fills.
 
-Opening an authenticator's key (open_key), for sign-in, startup and the
-command, counting those that do not open, and resealing them with the
-newest version are here too. Retiring them is account work
-(admins/accounts.py's retire_authenticators): it ends sessions, removes
-sign-in and mails administrators.
+Opening authenticators' keys (open_key), counting those that do not open
+and resealing them are here too; retiring them is in admins/accounts.py.
 
 DEPLOYMENT.md, TOTP keys, says how to rotate them and what to do if one is
 lost.

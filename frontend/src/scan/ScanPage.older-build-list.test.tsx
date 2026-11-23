@@ -20,6 +20,7 @@ import {
 import {
   KEY,
   keep,
+  keepOlderCart,
   olderSave,
   outboxEntry,
   storeOutbox,
@@ -304,8 +305,7 @@ describe("what an older build left", () => {
   });
 
   test("a cart's line with nothing readable in it is not told", async () => {
-    keep("inventory.cart.v1", {
-      ...freshCart(),
+    keepOlderCart({
       lines: [
         { itemId: 100, packages: { 1000: "some" }, loose: "lots" },
         { itemId: 101, packages: {}, loose: "2" },
@@ -891,7 +891,7 @@ describe("what an older build left", () => {
   test("nothing is removed without the volunteer acting, but empty keys", async () => {
     leaveSave();
     const left = localStorage.getItem("inventory.outbox.v3");
-    keep("inventory.cart.v1", freshCart());
+    keepOlderCart();
     open();
     await ready();
     expect(localStorage.getItem("inventory.cart.v1")).toBeNull();

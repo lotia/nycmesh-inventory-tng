@@ -6,10 +6,12 @@ import {
   firstOlder,
   KEY,
   keep,
+  keepOlderCart,
   mixedOlder,
   OTHER_KEY,
   olderMove,
   onlyOlder,
+  onlyOlderCart,
 } from "../testing/saves";
 import { refusing } from "../testing/storage";
 import { freshCart } from "./cart";
@@ -150,8 +152,7 @@ describe("reading what older builds left", () => {
   });
 
   test("a cart with lines is listed after the saves; one without is not", () => {
-    keep("inventory.cart.v1", {
-      ...freshCart(),
+    keepOlderCart({
       lines: [{ itemId: 100, packages: { 1000: "1" }, loose: "" }],
       usedAt: 1_700_000_000_000,
     });
@@ -160,7 +161,7 @@ describe("reading what older builds left", () => {
       ["inventory.outbox.v3", KEY, 1_700_000_000_000],
       ["inventory.cart.v1", null, 1_700_000_000_000],
     ]);
-    keep("inventory.cart.v1", freshCart());
+    keepOlderCart();
     expect(readOlder()).toHaveLength(1);
   });
 
@@ -180,7 +181,7 @@ describe("reading what older builds left", () => {
 describe("tidying on load", () => {
   test("older keys with nothing to list go", () => {
     keep("inventory.outbox.v3", [olderMove({ state: "saved" })]);
-    keep("inventory.cart.v1", freshCart());
+    keepOlderCart();
     tidyOlder();
     expect(localStorage.getItem("inventory.outbox.v3")).toBeNull();
     expect(localStorage.getItem("inventory.cart.v1")).toBeNull();
@@ -358,8 +359,7 @@ describe("a browser that will not let it at storage", () => {
       olderMove({ state: "saved" }),
       olderMove({}, { key: OTHER_KEY }),
     ]);
-    keep("inventory.cart.v1", {
-      ...freshCart(),
+    keepOlderCart({
       lines: [{ itemId: 100, packages: {}, loose: "1" }],
     });
     const storage = refusing("removeItem");
@@ -537,8 +537,7 @@ describe("line by line", () => {
       loose: "",
       open: { [KEY]: { amount: "3" }, [OTHER_KEY]: { usedUp: true } },
     };
-    keep("inventory.cart.v1", { ...freshCart(), lines: [line] });
-    const older = firstOlder();
+    const older = onlyOlderCart({ lines: [line] });
     const taken = toCart(older, CATALOGUE).parts.find(
       (part) => part.words === "Cat6 cable: 3 m from an open package",
     );
@@ -572,8 +571,7 @@ describe("line by line", () => {
       loose: "3",
       picked: 4,
     };
-    keep("inventory.cart.v1", { ...freshCart(), lines: [line] });
-    const listedCart = firstOlder();
+    const listedCart = onlyOlderCart({ lines: [line] });
     const [back, gone] = toCart(listedCart, CATALOGUE).parts;
     expect(gone?.note).toBe(say(ITEM_RETIRED));
     expect(dropPart(listedCart, gone?.drop ?? [], CATALOGUE)).toBe("done");
@@ -581,8 +579,7 @@ describe("line by line", () => {
     expect(stored("inventory.cart.v1").lines).toEqual([
       { ...line, packages: { 1000: "1" } },
     ]);
-    keep("inventory.cart.v1", {
-      ...freshCart(),
+    keepOlderCart({
       lines: [line, { itemId: 101, packages: {}, loose: "1" }],
     });
     const two = firstOlder();
@@ -611,8 +608,7 @@ describe("line by line", () => {
     expect(parts).toHaveLength(1);
     expect(dropPart(older, parts[0]?.drop ?? [], CATALOGUE)).toBe("done");
     expect(localStorage.getItem("inventory.outbox.v3")).toBeNull();
-    keep("inventory.cart.v1", {
-      ...freshCart(),
+    keepOlderCart({
       lines: [{ itemId: 100, packages: { 1004: "2" }, loose: "" }],
     });
     const cart = firstOlder();

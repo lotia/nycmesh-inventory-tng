@@ -32,6 +32,7 @@ import {
 import {
   KEY,
   keep,
+  keepOlderCart,
   moveBody,
   olderSave,
   outboxEntry,
@@ -121,8 +122,7 @@ describe("what an older build left", () => {
   });
 
   test("an older cart's count of a package no longer offered is told when put back", async () => {
-    keep("inventory.cart.v1", {
-      ...freshCart(),
+    keepOlderCart({
       volunteerId: 1,
       fromId: 10,
       toId: 12,
@@ -158,8 +158,7 @@ describe("what an older build left", () => {
       AT,
       [{ item_id: 100, quantity: "8", package_id: 1004 }, radios(1)],
     ]);
-    keep("inventory.cart.v1", {
-      ...freshCart(),
+    keepOlderCart({
       lines: [{ itemId: 100, packages: { 1004: "3", 1009: "1" }, loose: "" }],
       usedAt: AT,
     });

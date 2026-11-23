@@ -244,9 +244,8 @@ describe("as a cart", () => {
   test("an older cart's count of a package resized since it was counted is told, not put back at today's size", () => {
     // As a later build reads a v2 cart, which keeps the size each count
     // was made at: 2 boxes of 2 are 4, not 2 boxes of today's 4.
-    const resized = (lines: unknown[]) => {
-      return toCart(onlyOlderCart({ lines }), CATALOGUE);
-    };
+    const resized = (lines: unknown[]) =>
+      toCart(onlyOlderCart({ lines }), CATALOGUE);
     const { cart, gaps, parts } = resized([
       {
         itemId: 100,

@@ -1,7 +1,6 @@
-"""Base, which every mapped class derives from, and the naming convention
-its constraints are named by. Not in models/base.py, which imports
-core/history.py for its flush listeners: history imports Base, so that
-would be a cycle."""
+"""Base and the naming convention its constraints are named by. Not in
+models/base.py, which imports core/history.py for its flush listeners:
+history imports Base, so that would be a cycle."""
 
 from sqlalchemy import MetaData
 from sqlalchemy.orm import DeclarativeBase
