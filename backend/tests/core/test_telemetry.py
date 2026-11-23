@@ -55,7 +55,7 @@ from helpers.devices import new_device
 from helpers.items import shown_item_form
 from helpers.mail import NO_MAIL, FailingMail, SentMail
 from helpers.pools import small_database
-from helpers.rows import add, item_fields, shown, tag
+from helpers.rows import add, breaks, item_fields, shown, tag
 from helpers.sign_in import (
     PASSWORD,
     TOTP_KEYS,
@@ -1036,8 +1036,11 @@ def test_counts_unit_changes_refused_by_why_the_unit_is_fixed(
     labelled = Place(session).cable
     assert labels.make_for_item(session, labelled.id) is not None
     with capture_logs() as logs:
-        for item, unit in ((moved, "m"), (labelled, "ft")):
-            with pytest.raises(RuleBroken):
+        for item, unit, rule in (
+            (moved, "m", "item_unit_fixed"),
+            (labelled, "ft", "item_unit_labelled"),
+        ):
+            with breaks(session, rule):
                 items.save(session, item, item_fields(item, unit=unit), seen=None)
     assert added(reader, name, before) == {
         (("reason", "moved"),): 1,

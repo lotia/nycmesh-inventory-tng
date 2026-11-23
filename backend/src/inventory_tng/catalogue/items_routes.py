@@ -1,7 +1,7 @@
 """Items and the packages they come in. An item's unit is fixed once stock
 has moved in it or a label of it is printed (items.unit_fixed): the form
-shows it, and does not offer to change it. A retired item with stock left may still be taken, never
-received (docs/decisions/0003)."""
+shows it, and does not offer to change it. A retired item with stock
+left may still be taken, never received (docs/decisions/0003)."""
 
 from collections.abc import Callable, Mapping, Sequence
 from typing import Annotated

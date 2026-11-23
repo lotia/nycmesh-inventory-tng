@@ -20,7 +20,6 @@ from inventory_tng.catalogue.forms import (
     TAKEN_FIELDS,
 )
 from inventory_tng.catalogue.paths import ITEMS
-from inventory_tng.core.db_errors import RuleBroken
 from inventory_tng.core.local_time import DEFAULT_ZONE
 from inventory_tng.labels import labels
 from inventory_tng.models.catalogue import (
@@ -54,7 +53,7 @@ from helpers.markup import (
     words_on,
 )
 from helpers.query_counts import counting
-from helpers.rows import add, history, item_fields, named, shown
+from helpers.rows import add, breaks, history, item_fields, named, shown
 
 
 def test_adding_an_item(
@@ -390,9 +389,8 @@ def test_one_label_alone_fixes_the_unit_revoked_too(
     assert label is not None
     assert labels.revoke(session, label.id, NOW)
     assert items.unit_fixed(session, item.id) == "labelled"
-    with pytest.raises(RuleBroken) as refused:
+    with breaks(session, "item_unit_labelled"):
         items.save(session, item, item_fields(item, unit="ft"), seen=None)
-    assert refused.value.rule == "item_unit_labelled"
 
 
 def test_retiring_and_bringing_back(
