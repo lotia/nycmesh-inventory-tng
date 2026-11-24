@@ -1,0 +1,115 @@
+{
+  "about": "What a number box reads each text as, on the server (web/forms.read_decimal) and on the scan page (shared/quantity.amountTyped), in a locale writing decimals with a point (en) and one writing them with a comma (de): the amount, as a plain decimal, or why it is refused (web/forms.Unreadable). backend tests/web/test_forms.py and frontend src/shared/quantity.test.ts read it (inventory-tng-qnwz).",
+  "cases": [
+    {
+      "typed": "1,5",
+      "en": { "refused": "separator" },
+      "de": { "amount": "1.5" }
+    },
+    {
+      "typed": "1.5",
+      "en": { "amount": "1.5" },
+      "de": { "refused": "separator" }
+    },
+    {
+      "typed": ".5",
+      "en": { "amount": "0.5" },
+      "de": { "refused": "separator" }
+    },
+    {
+      "typed": ",5",
+      "en": { "refused": "separator" },
+      "de": { "amount": "0.5" }
+    },
+    {
+      "typed": "5.",
+      "en": { "amount": "5" },
+      "de": { "refused": "separator" }
+    },
+    {
+      "typed": "1_000",
+      "en": { "refused": "number" },
+      "de": { "refused": "number" }
+    },
+    {
+      "typed": "1e3",
+      "en": { "refused": "number" },
+      "de": { "refused": "number" }
+    },
+    {
+      "typed": "+5",
+      "en": { "refused": "number" },
+      "de": { "refused": "number" }
+    },
+    { "typed": "-0", "en": { "amount": "0" }, "de": { "amount": "0" } },
+    {
+      "typed": "-2.5",
+      "en": { "amount": "-2.5" },
+      "de": { "refused": "separator" }
+    },
+    {
+      "typed": "NaN",
+      "en": { "refused": "number" },
+      "de": { "refused": "number" }
+    },
+    {
+      "typed": "sNaN",
+      "en": { "refused": "number" },
+      "de": { "refused": "number" }
+    },
+    {
+      "typed": "-NaN",
+      "en": { "refused": "number" },
+      "de": { "refused": "number" }
+    },
+    {
+      "typed": "Infinity",
+      "en": { "refused": "number" },
+      "de": { "refused": "number" }
+    },
+    { "typed": "١٢", "en": { "amount": "12" }, "de": { "amount": "12" } },
+    { "typed": "١٫٥", "en": { "amount": "1.5" }, "de": { "amount": "1.5" } },
+    { "typed": "１２", "en": { "amount": "12" }, "de": { "amount": "12" } },
+    {
+      "typed": "1,000",
+      "en": { "refused": "thousands" },
+      "de": { "amount": "1" }
+    },
+    {
+      "typed": "1.000",
+      "en": { "amount": "1" },
+      "de": { "refused": "thousands" }
+    },
+    {
+      "typed": "1,000.5",
+      "en": { "refused": "number" },
+      "de": { "refused": "number" }
+    },
+    {
+      "typed": "1 000",
+      "en": { "refused": "number" },
+      "de": { "refused": "number" }
+    },
+    {
+      "typed": "1.2345",
+      "en": { "refused": "places" },
+      "de": { "refused": "separator" }
+    },
+    { "typed": " 7 ", "en": { "amount": "7" }, "de": { "amount": "7" } },
+    {
+      "typed": "300.000",
+      "en": { "amount": "300" },
+      "de": { "refused": "thousands" }
+    },
+    {
+      "typed": ".",
+      "en": { "refused": "number" },
+      "de": { "refused": "number" }
+    },
+    {
+      "typed": "",
+      "en": { "refused": "number" },
+      "de": { "refused": "number" }
+    }
+  ]
+}

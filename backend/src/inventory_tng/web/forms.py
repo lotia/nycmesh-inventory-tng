@@ -4,7 +4,10 @@ catalogue's rules a change breaks. It loads neither FastAPI nor the
 templates, so each feature's forms.py may import it
 (docs/decisions/0023)."""
 
-from decimal import Decimal, InvalidOperation
+import re
+import unicodedata
+from decimal import Decimal
+from enum import StrEnum
 
 from sqlalchemy.orm import Session
 
@@ -148,28 +151,98 @@ QUANTITY_PLACES = 3  # numeric(12,3), as models.base.QUANTITY keeps them.
 QUANTITY_MAX = Decimal("999999999.999")
 
 
+class Unreadable(StrEnum):
+    """Why what was typed in a number box is not an amount: not a number;
+    written with the other decimal separator than the box's; that
+    separator followed by three digits, as thousands are grouped; or more
+    decimal places than the ledger keeps (QUANTITY_PLACES).
+    frontend/src/shared/quantity.ts says the same of the scan page's boxes,
+    and both are tested against frontend/src/shared/quantity-cases.json."""
+
+    NUMBER = "number"
+    SEPARATOR = "separator"
+    THOUSANDS = "thousands"
+    PLACES = "places"
+
+
+# The Arabic decimal sign, read as the box's own separator, as digits of any
+# script are read as 0-9 (Ali, 2026-11-23, inventory-tng-qnwz).
+ARABIC_DECIMAL = "\N{ARABIC DECIMAL SEPARATOR}"
+_DIGITS = re.compile("[0-9]*")
+
+
+def _split(plain: str, separator: str) -> tuple[bool, str, str] | None:
+    """`plain` as a sign, whole digits and decimals, with `separator`
+    between them; None if it is not so."""
+    negative = plain.startswith("-")
+    units, _, fraction = plain.removeprefix("-").partition(separator)
+    if not (units or fraction) or not all(
+        _DIGITS.fullmatch(part) for part in (units, fraction)
+    ):
+        return None
+    return negative, units, fraction
+
+
+def read_decimal(text: str, separator: str = ".") -> Decimal | Unreadable:
+    """A number typed in a box whose decimal separator is `separator`, "."
+    or ",": digits, of any script, with that separator and up to
+    QUANTITY_PLACES decimals after it, and a "-" before them if below
+    zero. Neither grouping, an exponent, "+" nor "_"; -0 reads as 0. With
+    the default it reads a field the page wrote itself (plain_amount)."""
+    other = "," if separator == "." else "."
+    plain = "".join(
+        str(unicodedata.decimal(char))
+        if char.isdecimal()
+        else separator
+        if char == ARABIC_DECIMAL
+        else char
+        for char in text.strip()
+    )
+    parts = _split(plain, separator)
+    if parts is None:
+        mistaken = _split(plain, other)
+        if mistaken is None:
+            return Unreadable.NUMBER
+        _, units, fraction = mistaken
+        if units and len(fraction) == 3:
+            return Unreadable.THOUSANDS
+        return Unreadable.SEPARATOR
+    negative, units, fraction = parts
+    if len(fraction) > QUANTITY_PLACES:
+        return Unreadable.PLACES
+    value = Decimal(f"{units or 0}.{fraction}" if fraction else units)
+    return -value if negative else value
+
+
+def read_amount(text: str, separator: str = ".") -> Decimal | None:
+    """read_decimal's number, or None if it is none."""
+    value = read_decimal(text, separator)
+    return value if isinstance(value, Decimal) else None
+
+
 def quantity(
     text: str,
     *,
     positive: bool,
     unit: str | None = None,
     required: Words | None = None,
+    separator: str = ".",
 ) -> Decimal | str | None:
-    """A quantity typed into a form: a Decimal, or what is wrong with it as a
+    """A quantity typed into a form's box whose decimal separator is
+    `separator` (read_decimal): a Decimal, or what is wrong with it as a
     str. Blank is None, or `required` if one must be given. Up to three
     decimal places, as the ledger keeps; more than zero if `positive`, else
     zero or more; whole, for an item in `unit` "each"."""
     text = text.strip()
     if not text:
         return None if required is None else str(required)
-    try:
-        value = Decimal(text)
-    except InvalidOperation:
-        return str(TYPE_A_NUMBER)
-    if not value.is_finite() or value > QUANTITY_MAX:
-        return str(TOO_BIG)
-    if value.as_tuple().exponent < -QUANTITY_PLACES:  # ty: ignore[unsupported-operator]
+    value = read_decimal(text, separator)
+    if value is Unreadable.PLACES:
         return at_most_places(QUANTITY_PLACES)
+    if isinstance(value, Unreadable):
+        return str(TYPE_A_NUMBER)
+    if value > QUANTITY_MAX:
+        return str(TOO_BIG)
     if value < 0 or (positive and value == 0):
         return str(ABOVE_ZERO if positive else ZERO_OR_MORE)
     if unit is not None and not whole_enough(unit, value):

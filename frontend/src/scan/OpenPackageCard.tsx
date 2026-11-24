@@ -9,7 +9,7 @@ import { msg } from "@lingui/core/macro";
 import { useId } from "preact/hooks";
 import { Field } from "../shared/Field";
 import { say, sayAmount } from "../shared/i18n";
-import { decimal } from "../shared/quantity";
+import { boxAmount } from "../shared/quantity";
 import type { Item } from "./cart";
 import {
   cutOf,
@@ -177,7 +177,7 @@ export function OpenPackageCard({
                 // Moved whole, it is not used up.
                 ...(taken.now === undefined ? {} : { now: taken.now }),
                 ...(event.currentTarget.checked
-                  ? { amount: decimal(open.left), whole: true }
+                  ? { amount: boxAmount(open.left), whole: true }
                   : NOTHING_TAKEN),
               })
             }

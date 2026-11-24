@@ -9,7 +9,13 @@ import { msg } from "@lingui/core/macro";
 import * as v from "valibot";
 import { say, sayAmount, sayNumber } from "../shared/i18n";
 import { BatchKey, fromOpen, REPORTS, type ReportKind } from "../shared/outbox";
-import { count, decimal, thousandths, wholePackages } from "../shared/quantity";
+import {
+  boxAmount,
+  count,
+  readBox,
+  thousandths,
+  wholePackages,
+} from "../shared/quantity";
 import { toBatch } from "./batch";
 import {
   type Cart,
@@ -272,7 +278,7 @@ export function toCart(
       } else {
         // What this loop wrote is always a decimal, so never null here.
         /* v8 ignore next */
-        made.loose = decimal((thousandths(made.loose) ?? 0) + amount);
+        made.loose = boxAmount((readBox(made.loose) ?? 0) + amount);
       }
     }
   });
@@ -371,7 +377,7 @@ function retiredPackage(item: Item | undefined, packageId: string) {
 /** What an older cart's line said of an open package, in words. */
 function openWords(item: Item | undefined, said: unknown): string {
   const { amount, usedUp } = said as Record<string, unknown>;
-  const taken = typeof amount === "string" ? (thousandths(amount) ?? 0) : 0;
+  const taken = typeof amount === "string" ? (readBox(amount) ?? 0) : 0;
   const what =
     taken > 0
       ? say(FROM_OPEN, { amount: inUnit(taken, item?.unit) })
@@ -392,7 +398,7 @@ export function lineWords(line: Line, item: Item | undefined): string | null {
       ? [say(PACKAGES_OF, { count: sayNumber(packs), package: pack.name })]
       : [];
   });
-  const loose = thousandths(line.loose) ?? 0;
+  const loose = readBox(line.loose) ?? 0;
   if (loose > 0) {
     const amount = inUnit(loose, line.unit ?? item?.unit);
     parts.push(parts.length > 0 ? say(LOOSE, { amount }) : amount);
@@ -487,7 +493,7 @@ export function saidOfOpen(said: unknown): boolean {
     return false;
   }
   const { amount, usedUp, now } = said as Record<string, unknown>;
-  const taken = typeof amount === "string" && (thousandths(amount) ?? 1) > 0;
+  const taken = typeof amount === "string" && (readBox(amount) ?? 1) > 0;
   const told = typeof now === "string" && now.trim() !== "";
   return taken || usedUp === true || told;
 }

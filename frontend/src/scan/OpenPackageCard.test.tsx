@@ -31,7 +31,7 @@ describe("an open package's card", () => {
     // Nothing cut, not yet a number, or all of it moved: no cut.
     for (const taken of [
       { amount: "0", whole: false },
-      { amount: "120.", whole: false },
+      { amount: ".", whole: false },
       { amount: "120", whole: true },
       { amount: "", whole: false },
     ]) {

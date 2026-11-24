@@ -1,6 +1,6 @@
 /** Open packages offered to a cart, and what a cut leaves on one. */
 
-import { sent, thousandths } from "../shared/quantity";
+import { readBox, sent, thousandths } from "../shared/quantity";
 import type { Catalogue, Line } from "./cart";
 import { indexOf } from "./search";
 import { type Pending, refusedAsCounted } from "./unseen-batches";
@@ -156,7 +156,7 @@ export function cutOf(
   open: Pick<Offered, "left" | "short_below">,
   taken: Taken,
 ): ReturnType<typeof afterCut> | null {
-  const typed = thousandths(taken.amount);
+  const typed = readBox(taken.amount);
   return taken.whole || typed === null || typed === 0
     ? null
     : afterCut(open, typed);

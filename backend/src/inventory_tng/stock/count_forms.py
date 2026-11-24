@@ -25,7 +25,7 @@ from inventory_tng.stock.forms import (
 )
 from inventory_tng.stock.ledger import LOOSE, Form, repeated
 from inventory_tng.stock.units_shown import Now
-from inventory_tng.web.forms import QUANTITY_MAX, RULES, quantity, row_id
+from inventory_tng.web.forms import QUANTITY_MAX, RULES, quantity, read_amount, row_id
 
 # The count form's fields of items: counted, by item, and one chosen at
 # the foot.
@@ -357,13 +357,15 @@ def recount_figures(
     fields: Mapping[str, str], items: Collection[int]
 ) -> dict[int, Figures]:
     """A place's recount figures (WHILE) of the items it asks for again,
-    each read as a quantity typed is; those of other items, or not three
-    such, left out."""
+    each read as plain_amount wrote it; those of other items, or not three
+    such of 0 or more, left out."""
     figures: dict[int, Figures] = {}
     for item_id in items:
         value = fields.get(f"{WHILE}{item_id}", "")
-        match [quantity(typed, positive=False) for typed in value.split()]:
-            case [Decimal() as typed, Decimal() as came, Decimal() as went]:
+        match [read_amount(typed) for typed in value.split()]:
+            case [Decimal() as typed, Decimal() as came, Decimal() as went] if (
+                min(typed, came, went) >= 0
+            ):
                 figures[item_id] = (typed, came, went)
     return figures
 

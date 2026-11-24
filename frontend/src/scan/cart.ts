@@ -28,7 +28,7 @@ import {
 } from "../shared/local-storage";
 import { BatchKey, BatchLine } from "../shared/outbox";
 import type { Said } from "../shared/outbox-notes";
-import { count, decimal, thousandths } from "../shared/quantity";
+import { boxAmount, count, readBox, thousandths } from "../shared/quantity";
 import { indexOf } from "./search";
 import { sealedKey } from "./unseen-batches";
 
@@ -533,7 +533,7 @@ export function withLineChanged(
 /** A line with one more of a package of its item, or loose. */
 function bumped(line: Line, packageId?: number): Line {
   return packageId === undefined
-    ? { ...line, loose: decimal((thousandths(line.loose) ?? 0) + 1000) }
+    ? { ...line, loose: boxAmount((readBox(line.loose) ?? 0) + 1000) }
     : {
         ...line,
         packages: {
@@ -683,7 +683,7 @@ export function quantityOf(
     }
     amount += packs * size;
   }
-  const loose = thousandths(line.loose);
+  const loose = readBox(line.loose);
   if (loose === null) {
     return { problem: [say(LOOSE_DECIMALS, { unit: item.unit })] };
   }
@@ -692,7 +692,7 @@ export function quantityOf(
   for (const [key, { amount: typed, whole }] of Object.entries(
     line.open ?? {},
   )) {
-    const part = thousandths(typed);
+    const part = readBox(typed);
     if (part === null) {
       return { problem: [say(OPEN_DECIMALS)] };
     }

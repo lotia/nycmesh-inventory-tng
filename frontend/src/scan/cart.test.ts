@@ -156,6 +156,15 @@ describe("quantities", () => {
     });
   });
 
+  test("a box reads as the server does", () => {
+    // .5 and other digits, which the server saves (inventory-tng-qnwz).
+    const line = { itemId: 101, packages: {}, loose: ".5", open: {} };
+    expect(quantityOf(line, cable)).toMatchObject({ amount: 500 });
+    expect(quantityOf({ ...line, loose: "١٫٥" }, cable)).toMatchObject({
+      amount: 1500,
+    });
+  });
+
   test("an unreadable amount says what is wanted", () => {
     const line = { itemId: 101, packages: {}, loose: "lots" };
     expect(saidAsText(quantityOf(line, cable))).toEqual({

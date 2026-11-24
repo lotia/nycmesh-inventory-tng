@@ -32,7 +32,7 @@ const writers = new Map<string, Intl.NumberFormat>();
  * `value` written as the active locale writes a number, grouped and with
  * its decimal sign (1,234.5, or 1.234,5 in German), keeping every
  * thousandth the ledger keeps, as the server's web/formatting.amount
- * does. For words only: a box holds shared/quantity's plain `decimal`,
+ * does. For words only: a box holds shared/quantity's `boxAmount`,
  * which it reads back.
  */
 export function sayNumber(value: number): string {

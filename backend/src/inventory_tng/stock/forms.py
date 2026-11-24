@@ -10,7 +10,7 @@ stock/count_forms.py's."""
 
 import uuid
 from collections.abc import Mapping, Sequence
-from decimal import Decimal, InvalidOperation
+from decimal import Decimal
 from typing import NamedTuple
 
 from sqlalchemy.orm import Session
@@ -28,6 +28,7 @@ from inventory_tng.web.forms import (
     TYPE_A_NUMBER,
     chosen,
     quantity,
+    read_amount,
     row_id,
     up_to,
 )
@@ -203,12 +204,8 @@ def length(session: Session, item_id: int, typed: str) -> Decimal | str | None:
 
 def showed(typed: str) -> Decimal | None:
     """What a package showed on the page, as it sent it back, below zero
-    too; None if it sent none it could have."""
-    try:
-        found = Decimal(typed)
-    except InvalidOperation:
-        return None
-    return found if found.is_finite() else None
+    too, as plain_amount wrote it; None if it sent none it could have."""
+    return read_amount(typed)
 
 
 def ticked(boxes: Sequence[str]) -> dict[int, str]:

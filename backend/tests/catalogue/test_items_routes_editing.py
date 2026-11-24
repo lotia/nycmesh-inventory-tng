@@ -30,17 +30,7 @@ from inventory_tng.models.catalogue import (
 )
 from inventory_tng.models.places import Location
 from inventory_tng.models.stock import LedgerTransaction, Movement
-from inventory_tng.web.forms import (
-    ABOVE_ZERO,
-    NAME_MAX,
-    RULES,
-    TOO_BIG,
-    TYPE_A_NUMBER,
-    ZERO_OR_MORE,
-    at_most_places,
-    name_up_to,
-    quantity,
-)
+from inventory_tng.web.forms import NAME_MAX, RULES, name_up_to
 
 from helpers.items import NOW, item_form, new_item, shown_item_form
 from helpers.markup import (
@@ -425,24 +415,6 @@ def test_unknown_items_and_others_packages_are_not_found(
     path = f"{ITEMS}/{item.id}/packages/{theirs.id}"
     for action in ("/retire", "/restore", ""):
         assert admin_client.post(f"{path}{action}").status_code == 404
-
-
-@pytest.mark.parametrize(
-    ("typed", "positive", "parsed"),
-    [
-        ("", True, None),
-        (" 2.5 ", True, Decimal("2.5")),
-        ("0", False, Decimal(0)),
-        ("0", True, ABOVE_ZERO),
-        ("-1", False, ZERO_OR_MORE),
-        ("1.2345", False, at_most_places(3)),
-        ("NaN", False, TOO_BIG),
-        ("1e12", False, TOO_BIG),
-        ("lots", False, TYPE_A_NUMBER),
-    ],
-)
-def test_quantities_typed(typed: str, positive: bool, parsed: object) -> None:
-    assert quantity(typed, positive=positive) == parsed
 
 
 def test_a_retired_item_says_what_is_left(

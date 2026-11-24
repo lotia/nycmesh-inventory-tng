@@ -21,10 +21,12 @@ from inventory_tng.core.local_time import show, show_day
 from inventory_tng.core.phrases import BRAND, lazy_gettext, number
 from inventory_tng.web.formatting import (
     amount,
+    box_amount,
     keyboard,
     plain_amount,
     printed_length,
 )
+from inventory_tng.web.forms import read_amount
 from inventory_tng.web.navigation import sections, sections_without_badges
 from inventory_tng.web.template_phrases import install
 
@@ -78,10 +80,14 @@ def signed_in_as(request: Request) -> SignedInAs | None:
 
 
 # {{ quantity | amount }}: a quantity as people read it ("1,234.5"); a
-# form's box or hidden field takes {{ quantity | plain_amount }} ("1234.5"),
-# as the form reads it back.
+# number box takes {{ quantity | box_amount }} ("1234.5"), and a field the
+# page writes itself, such as a hidden one, {{ quantity | plain_amount }},
+# as the form reads each back. {{ typed | read_amount }} is what a box's
+# text reads as, or None.
 templates.env.filters["amount"] = amount
+templates.env.filters["box_amount"] = box_amount
 templates.env.filters["plain_amount"] = plain_amount
+templates.env.filters["read_amount"] = read_amount
 templates.env.filters["printed_length"] = printed_length
 templates.env.filters["keyboard"] = keyboard
 

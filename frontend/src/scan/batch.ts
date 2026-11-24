@@ -4,7 +4,7 @@ import { v4 as uuid, v5 as uuidFrom } from "uuid";
 import { say, sayParts } from "../shared/i18n";
 import type { Draft, Summary } from "../shared/outbox";
 import type { Said } from "../shared/outbox-notes";
-import { count, decimal, thousandths } from "../shared/quantity";
+import { count, decimal, readBox } from "../shared/quantity";
 import {
   type Cart,
   type Catalogue,
@@ -140,7 +140,7 @@ export function toBatch(
       if (now === undefined || now.trim() === "") {
         continue;
       }
-      const left = thousandths(now);
+      const left = readBox(now);
       if (left === null || (each && left % 1000 !== 0)) {
         problems.push(
           sayParts(each ? OPEN_NOW_WHOLE : OPEN_NOW_DECIMALS, { name: named }),

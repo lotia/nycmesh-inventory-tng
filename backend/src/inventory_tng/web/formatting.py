@@ -15,9 +15,17 @@ def amount(value: Decimal | None) -> str:
 
 
 def plain_amount(value: Decimal | None) -> str:
-    """A quantity a form posts back, in a box's value or a hidden field:
-    1234.500 as "1234.5", in every locale, as the forms read it."""
+    """A quantity a page posts back in a field it wrote itself, such as a
+    hidden one: 1234.500 as "1234.5", in every locale, as the forms read
+    it. A box someone types in takes box_amount."""
     return "" if value is None else format(value.normalize(), "f")
+
+
+def box_amount(value: Decimal | None, separator: str = ".") -> str:
+    """A quantity in a number box, to be read back as typed
+    (web/forms.read_decimal): plain_amount with the box's decimal
+    `separator`, "." or ",", so the box posts back unchanged as valid."""
+    return plain_amount(value).replace(".", separator)
 
 
 # One wording, wherever what is on an open package is typed: the count

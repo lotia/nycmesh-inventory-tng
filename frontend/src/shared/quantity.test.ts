@@ -1,5 +1,55 @@
-import { expect, test } from "vitest";
-import { count, decimal, sent, thousandths } from "./quantity";
+import { describe, expect, test } from "vitest";
+import {
+  amountTyped,
+  boxAmount,
+  count,
+  decimal,
+  readBox,
+  type Separator,
+  sent,
+  thousandths,
+} from "./quantity";
+import shared from "./quantity-cases.json";
+
+// The locales the shared cases are written for, by their separator.
+const SEPARATORS: Record<"en" | "de", Separator> = { en: ".", de: "," };
+
+describe("a box, as the server reads it", () => {
+  test.each(
+    shared.cases.flatMap((each) =>
+      (["en", "de"] as const).map((locale) => ({
+        text: each.typed,
+        locale,
+        expected: each[locale] as { amount?: string; refused?: string },
+      })),
+    ),
+  )("$text in $locale", ({ text, locale, expected }) => {
+    const read = amountTyped(text, SEPARATORS[locale]);
+    // toBe, as Object.is, tells -0 from 0.
+    expect(read).toBe(
+      expected.amount === undefined ? expected.refused : sent(expected.amount),
+    );
+  });
+});
+
+test.each([
+  ["", 0],
+  ["2,5", 2500],
+  ["-1", null],
+  ["2.5", null],
+])("readBox(%j) in a comma box is %j", (text, amount) => {
+  expect(readBox(text, ",")).toBe(amount);
+});
+
+test.each([".", ","] as const)(
+  "a box written with %j reads back unchanged",
+  (separator) => {
+    for (const amount of [0, 1, 500, 12500, 1234500]) {
+      expect(readBox(boxAmount(amount, separator), separator)).toBe(amount);
+    }
+    expect(boxAmount(1234500, separator)).toBe(`1234${separator}5`);
+  },
+);
 
 test.each([
   ["", 0],

@@ -431,3 +431,21 @@ def test_a_save_sent_again_after_a_later_move_out_of_the_store_is_as_before(
     again = admin_client.post(moved.path, data=form)
     assert again.headers["location"] == first.headers["location"]
     assert expected(session, moved.there.id) == {moved.item: Decimal(1)}
+
+
+def test_an_arrival_typed_as_the_amount_that_arrived_leaves_its_box_closed(
+    session: Session, admin_client: TestClient
+) -> None:
+    """10.0 m is the 10 m that arrived: the form refused for another box
+    shows its arrival closed, as it compares amounts, not text
+    (inventory-tng-qnwz)."""
+    moved = SpoolsMoved(session, admin_client, spools=1, metres=10)
+    typed = {moved.sealed: "1", moved.loose: "10.0", f"loose_{moved.cable}": "x"}
+    page = admin_client.post(moved.path, data=moved.form | typed)
+    assert page.status_code == 400
+    (details,) = [
+        each
+        for each in read(page.text).all("details")
+        if each.all("input", name=moved.loose)
+    ]
+    assert "open" not in details.attrs

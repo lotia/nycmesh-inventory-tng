@@ -953,8 +953,11 @@ On the server (`backend/src/inventory_tng/core/phrases.py`, which
   grouped: `{{ size | number }}` in a template, `number(size)` in Python.
   A plural's count is written so already, and its form still chosen by
   the number. A quantity is `{{ left | amount }}`, every stored digit
-  kept. A number in a link stays plain digits, and one a form sends back,
-  in a box or a hidden field, is `{{ left | plain_amount }}`.
+  kept. A number in a link stays plain digits. A number box takes
+  `{{ left | box_amount }}`, no digits grouped, and its form reads it
+  with `web/forms.quantity`; a field the page writes itself, such as a
+  hidden one, takes `{{ left | plain_amount }}`, read with
+  `web/forms.read_amount`.
 - Values are always filled, so a per cent sign in a message is `%%`; a
   test refuses a lone one.
 - The app's name is `phrases.BRAND`, the same in every language: a
@@ -977,7 +980,10 @@ On the scan page (`frontend/src/shared/i18n.ts`):
   `sayParts(REGISTER_IT, {}, [(inside) => <a href="/register">{inside}</a>])`.
 - A quantity people read, in thousandths, is `sayAmount(left)`, written
   as the locale writes a number with every thousandth kept, and any other
-  number is `sayNumber(n)`. One a box holds stays `decimal(left)`, plain.
+  number is `sayNumber(n)`. One a box holds is `boxAmount(left)`, read
+  back with `readBox`; one sent to the server is `decimal(left)`, plain.
+  `frontend/src/shared/quantity-cases.json` holds what both sides must
+  read some typed text as; both test against it.
 
 On either side, a sentence is one message, any link's markup inside it,
 never pieces glued together: `{name}: enter the count`, not the name and
