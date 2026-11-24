@@ -771,7 +771,7 @@ utilities. When you style a page:
   running totals or "Set to 40 m", is written as a box value is: that
   separator, no grouping. On a page whose separator is ",", numbers in
   sentences follow it too, ungrouped ("1500 m", "1,5 m"): the server's
-  `number` and `amount` within the request (`NumbersInWords`), the scan
+  `number` and `amount` within the request (`web/numbers_in_words.py`), the scan
   page's `sayNumber` and `sayAmount`. Mail, logs and operator commands
   keep English's style, and a printed label writes amounts in one style
   whatever the locale: a point and no grouping.

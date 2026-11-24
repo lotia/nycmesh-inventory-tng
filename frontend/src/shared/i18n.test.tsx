@@ -97,9 +97,15 @@ test("on a comma page a quantity takes its comma, ungrouped", () => {
     expect(sayAmount(1500)).toBe("1,5");
     expect(sayAmount(-1_234_567)).toBe("-1234,567");
     expect(sayNumber(1000)).toBe("1000");
+    expect(say(BATCHES_WAITING, { count: 1500 })).toBe(
+      "The 1500 batches waiting on this browser are being sent.",
+    );
   } finally {
     page.dataset.decimal = ".";
     takeSeparatorFrom(page);
   }
   expect(sayAmount(1_500_000)).toBe("1,500");
+  expect(say(BATCHES_WAITING, { count: 1500 })).toBe(
+    "The 1,500 batches waiting on this browser are being sent.",
+  );
 });

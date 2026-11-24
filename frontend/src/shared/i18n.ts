@@ -5,7 +5,11 @@
  * locale. Vite's plugin compiles each catalogue as it is imported, so the
  * build holds compiled messages and nothing is compiled in the browser.
  */
-import { i18n, type MessageDescriptor } from "@lingui/core";
+import {
+  i18n,
+  type MessageDescriptor,
+  type MessageOptions,
+} from "@lingui/core";
 import { signal } from "@preact/signals";
 import { messages } from "../locales/en.po";
 import { boxSeparator } from "./quantity";
@@ -80,8 +84,8 @@ const MARKED = /<(\d+)>([\s\S]*?)<\/\1>/;
  * `phrase` said in the active locale with each value left as a hole, and
  * the values held for those holes. Lingui never reads a value, as it
  * would decode `\uXXXX` in one, so a name is shown exactly as typed.
- * Numbers are filled, so a plural can count them, and a missing value is
- * left out, as Lingui leaves it.
+ * Numbers are filled, so a plural can count them, its # written as
+ * `sayNumber` would, and a missing value is left out, as Lingui leaves it.
  */
 function holed(
   phrase: MessageDescriptor,
@@ -99,8 +103,20 @@ function holed(
       return [name, `\uE000${held.length - 1}\uE001`];
     }),
   );
-  return [i18n._({ ...phrase, values: filled }), held];
+  const options: MessageOptions = {};
+  if (phrase.message !== undefined) {
+    options.message = phrase.message;
+  }
+  // A plural's # ungrouped on a comma page, as sayNumber writes it.
+  if (boxSeparator() === ",") {
+    options.formats = UNGROUPED;
+  }
+  return [i18n._(phrase.id, filled, options), held];
 }
+
+/** Lingui's number format for a plural's # on a comma page: its counts
+ * are whole, so no grouping is all that sayNumber's rule asks. */
+const UNGROUPED = { number: { useGrouping: false } };
 
 /** A phrase in the active locale, with the values its placeholders name. */
 export function say(

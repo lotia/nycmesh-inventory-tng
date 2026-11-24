@@ -52,7 +52,7 @@ from inventory_tng.stock import (
 )
 from inventory_tng.volunteers import volunteers_routes
 from inventory_tng.web import frontend_bundle, pages, security_headers
-from inventory_tng.web.decimal_separator import NumbersInWords
+from inventory_tng.web.numbers_in_words import NumbersInWords
 
 log = structlog.get_logger(__name__)
 
@@ -110,8 +110,6 @@ def create_app(
     errors = pages.ErrorPages(api=API, scan=frontend_bundle.SCAN, admin=HOME)
     errors.install(app)
     app.add_middleware(CrossSiteRefusal)
-    # Numbers in words in the request's decimal separator.
-    app.add_middleware(NumbersInWords)
     app.add_middleware(
         RequestLogging,
         failed=errors.failed,
@@ -121,6 +119,9 @@ def create_app(
         if settings.logging.health_checks
         else frozenset({API + health.PATH}),
     )
+    # Numbers in words in the request's decimal separator, on every page,
+    # the one RequestLogging shows for a failure included.
+    app.add_middleware(NumbersInWords)
     # Outermost, so every answer has them, failures and refusals included.
     # Vite's dev server: development only (Settings).
     app.add_middleware(
