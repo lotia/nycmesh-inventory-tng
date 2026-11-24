@@ -9,13 +9,14 @@ import type { MessageDescriptor } from "@lingui/core";
 import { msg } from "@lingui/core/macro";
 import type { Schemas } from "../api/client";
 import { MUST_UPGRADE } from "./build";
-import { say } from "./i18n";
+import { say, sayParts } from "./i18n";
 import {
   type Problem,
   REPORT_AFTER,
   type Reason,
   type Recorded,
   type ReportKind,
+  type Summary,
 } from "./outbox";
 import { NOT_REGISTERED } from "./registration";
 
@@ -133,9 +134,19 @@ const ON_REPORT: Record<ReportKind, MessageDescriptor> = {
   lengths: msg`What is on an open package, {n}: {why}`,
 };
 
+/** A box of pieces' amount left, said with a fraction, refused (not_whole
+ * of a `lengths` report), by the box's name (Ali, 2026-11-24,
+ * inventory-tng-uwi3). */
+export const COUNT_WHOLE_LEFT = msg`{box}: count whole pieces left.`;
+
 /** What the page says of `reason`; of no_answer, as the browser is
- * `online` or not. */
-export function noteOf(reason: Reason, online = true): Note {
+ * `online` or not; a refusal's problems naming the open packages in
+ * `boxes` (Summary.boxes) by name where it can. */
+export function noteOf(
+  reason: Reason,
+  online = true,
+  boxes: Summary["boxes"] = [],
+): Note {
   switch (reason.code) {
     case "no_answer":
       return { bold: [say(online ? NO_ANSWER : OFFLINE)] };
@@ -164,17 +175,25 @@ export function noteOf(reason: Reason, online = true): Note {
     case "refused":
       return {
         bold: [say(NOT_RECORDED)],
-        problems: reason.problems.map(problemSaid),
+        problems: reason.problems.map((problem) => problemSaid(problem, boxes)),
       };
   }
 }
 
 /** One of a 422's problems: what it names, then why, in the page's words
- * for its kind. */
-function problemSaid({ names, kind }: Problem): Said {
+ * for its kind; a fraction left in a box of pieces by the box's name, from
+ * `boxes`, once known. */
+function problemSaid(
+  { names, kind }: Problem,
+  boxes: NonNullable<Summary["boxes"]>,
+): Said {
   const why = problemWords(kind);
   if (names === null) {
     return [why];
+  }
+  const box = names.of === "lengths" ? boxes[names.n - 1] : undefined;
+  if (kind === "not_whole" && typeof box === "string") {
+    return sayParts(COUNT_WHOLE_LEFT, { box: { quoted: box } });
   }
   const where = names.of === "line" ? ON_LINE : ON_REPORT[names.of];
   return [say(where, { n: names.n, why })];

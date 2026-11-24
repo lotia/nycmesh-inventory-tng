@@ -144,6 +144,8 @@ export function toBatch(
   );
   // What is really on open packages, said: with what is taken, or alone.
   const lengths: NonNullable<Draft["lengths"]> = [];
+  // Their packages' names, as the cards show them (outbox.Summary.boxes).
+  const boxes: (string | null)[] = [];
   // Each problem with the names in it quoted, as no number of a name is a
   // count the page wrote (outbox-notes.Said).
   const problems: Said[] = [];
@@ -176,6 +178,7 @@ export function toBatch(
         problems.push(sayParts(TOO_MUCH, { name: named }));
       } else {
         lengths.push({ open_package_key: key, left: decimal(left) });
+        boxes.push(here.get(key)?.package_name ?? null);
       }
     }
   }
@@ -331,7 +334,11 @@ export function toBatch(
   // Each kind names the places its batch must have (problems above).
   const place = (placeId: number | null) =>
     placeId === null ? null : String(index.places.get(placeId));
-  return { draft, summary: { from: place(fromId), to: place(toId) } };
+  const summary: Summary = { from: place(fromId), to: place(toId) };
+  if (boxes.length > 0) {
+    summary.boxes = boxes;
+  }
+  return { draft, summary };
 }
 
 /**

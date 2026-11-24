@@ -190,7 +190,7 @@ export function OutboxList({
                 <small>{say(SENDING)}</small>
               ) : (
                 // Not role="alert": every one is there as the page loads.
-                <NoteSaid note={noteOf(reason, online)} />
+                <NoteSaid note={noteOf(reason, online, entry.summary.boxes)} />
               )}
               {elsewhere !== undefined && elsewhere.recorded === undefined && (
                 <h3>{say(MAKE_CHANGES)}</h3>

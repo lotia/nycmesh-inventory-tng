@@ -11,6 +11,8 @@ import {
   endingNote,
   OpenPackageCard,
   PRINTED_LENGTH,
+  SHORT_END,
+  TOO_FEW_LEFT,
   WRONG_LENGTH,
   WRONG_NUMBER,
 } from "./OpenPackageCard";
@@ -46,14 +48,14 @@ describe("an open package's card", () => {
 
   test("things counted each are not cable", () => {
     expect(endingNote("used", "bag", "each")).toBe(
-      "Taking these uses up the bag, so it's ticked. Untick it if any is left. An administrator confirms.",
+      "Taking these uses up the bag, so “Nothing usable left on it” is ticked. Untick it if any is left. An administrator confirms.",
     );
     expect(endingNote("over", "bag", "each")).toBe(
-      "You're taking more than the bag shows, so it's ticked. It's recorded as you typed it, and an administrator will check the bag.",
+      "You're taking more than the bag shows, so “Nothing usable left on it” is ticked. It's recorded as you typed it, and an administrator will check the bag.",
     );
     // A box of pieces may be too short to use below a number left too.
     expect(endingNote("short", "bag", "each")).toBe(
-      "After taking these, too few are left in the bag to use, so it's ticked. Untick it if you'll keep them.",
+      "After taking these, too few are left in the bag to use, so “Nothing usable left on it” is ticked. Untick it if you'll keep them.",
     );
   });
 });
@@ -236,5 +238,25 @@ describe("an open box of 500 connectors, followed", () => {
         "[RJ45 connectors]: enter what is on the open package, in whole units, or leave it blank.",
       ],
     });
+  });
+
+  test("too few left in it to use is flagged so, not as a short end", () => {
+    // Ali, 2026-11-24, inventory-tng-uwi3.
+    render(
+      <OpenPackageCard
+        open={openAt(1, 30_000, {
+          item_id: connectors.id,
+          package_id: 1002,
+          package_name: "Box of 500",
+          short_below: "50.000",
+        })}
+        item={connectors}
+        taken={{ amount: "", whole: false }}
+        moving={false}
+        onTake={() => {}}
+      />,
+    );
+    expect(screen.getByText(say(TOO_FEW_LEFT))).toBeDefined();
+    expect(screen.queryByText(say(SHORT_END))).toBeNull();
   });
 });

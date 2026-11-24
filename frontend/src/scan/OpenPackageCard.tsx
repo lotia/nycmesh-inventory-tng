@@ -5,6 +5,7 @@
  * (usedUpOf) until the volunteer ticks or unticks it. Flagged when it
  * shows nothing left, or is a short end.
  */
+import type { MessageDescriptor } from "@lingui/core";
 import { msg } from "@lingui/core/macro";
 import { useId } from "preact/hooks";
 import { countedWhole, isLength, isShortEnd } from "../amount-rules";
@@ -28,20 +29,23 @@ export const PRINTED_LENGTH = msg`Read the length printed on the cable where it 
 
 /** The notes when the box follows the cut (Ali, 2026-11-12), by how the
  * cut ends it; an item counted in each says "taking" and "any", in a
- * length "cut" and "cable". */
-export const USED_EACH = msg`Taking these uses up the {name}, so it's ticked. Untick it if any is left. An administrator confirms.`;
-export const USED_CABLE = msg`Your cut uses up the {name}, so it's ticked. Untick it if cable is left. An administrator confirms.`;
-export const SHORT = msg`This {name} will be unusable after this cut, so it's ticked. Untick it if you'll keep the short end.`;
-export const SHORT_EACH = msg`After taking these, too few are left in the {name} to use, so it's ticked. Untick it if you'll keep them.`;
-export const OVER_EACH = msg`You're taking more than the {name} shows, so it's ticked. It's recorded as you typed it, and an administrator will check the {name}.`;
-export const OVER = msg`Your cut is more than the {name} shows, so it's ticked. It's recorded as you typed it, and an administrator will check the {name}.`;
+ * length "cut" and "cable". Each names the box it ticks, {checkbox}, by
+ * its label, NOTHING_USABLE (Ali, 2026-11-24, inventory-tng-uwi3). */
+export const USED_EACH = msg`Taking these uses up the {name}, so “{checkbox}” is ticked. Untick it if any is left. An administrator confirms.`;
+export const USED_CABLE = msg`Your cut uses up the {name}, so “{checkbox}” is ticked. Untick it if cable is left. An administrator confirms.`;
+export const SHORT = msg`This {name} will be unusable after this cut, so “{checkbox}” is ticked. Untick it if you'll keep the short end.`;
+export const SHORT_EACH = msg`After taking these, too few are left in the {name} to use, so “{checkbox}” is ticked. Untick it if you'll keep them.`;
+export const OVER_EACH = msg`You're taking more than the {name} shows, so “{checkbox}” is ticked. It's recorded as you typed it, and an administrator will check the {name}.`;
+export const OVER = msg`Your cut is more than the {name} shows, so “{checkbox}” is ticked. It's recorded as you typed it, and an administrator will check the {name}.`;
 
 export const OPEN = msg({ context: "state", message: "open" });
 export const OPENED = msg`opened {date}`;
 export const SHOWS_NOTHING_LEFT = msg`Shows nothing left`;
 /** The flag on a short end's card, by what is on it now (Ali,
- * 2026-11-18, inventory-tng-j5c2). */
+ * 2026-11-18, inventory-tng-j5c2); of a box of pieces, TOO_FEW_LEFT (Ali,
+ * 2026-11-24, inventory-tng-uwi3). */
 export const SHORT_END = msg`Short end`;
+export const TOO_FEW_LEFT = msg`Too few left`;
 export const NOW = msg`Now`;
 /** NOW, for a screen reader, before what is on it now. */
 export const NOW_SAID = msg`Now:`;
@@ -77,15 +81,43 @@ export const WRONG_NUMBER = msg`Shows the wrong number left?`;
 /** Nothing taken yet. */
 export const NOTHING_TAKEN: Taken = { amount: "", whole: false };
 
+/** The card's words that differ by how its item is counted: the notes
+ * by how the cut ends it, its short end's flag, its boxes' labels and the
+ * button that asks what is on it. */
+type Words = Record<
+  Ending | "shortEnd" | "take" | "askNow" | "askAfter" | "wrong",
+  MessageDescriptor
+>;
+
+const PIECES_WORDS: Words = {
+  used: USED_EACH,
+  short: SHORT_EACH,
+  over: OVER_EACH,
+  shortEnd: TOO_FEW_LEFT,
+  take: TAKE,
+  askNow: HOW_MANY_NOW,
+  askAfter: HOW_MANY_AFTER,
+  wrong: WRONG_NUMBER,
+};
+
+const LENGTH_WORDS: Words = {
+  used: USED_CABLE,
+  short: SHORT,
+  over: OVER,
+  shortEnd: SHORT_END,
+  take: CUT_OR_TAKE,
+  askNow: WHATS_ON_NOW,
+  askAfter: WHATS_ON_AFTER,
+  wrong: WRONG_LENGTH,
+};
+
+/** The card's words for an item in `unit`: pieces, or a length. */
+const wordsFor = (unit: string): Words =>
+  countedWhole(unit) ? PIECES_WORDS : LENGTH_WORDS;
+
 /** The note when the box follows the cut (Ali, 2026-11-12). */
 export function endingNote(ending: Ending, name: string, unit: string): string {
-  const pieces = countedWhole(unit);
-  const note = {
-    used: pieces ? USED_EACH : USED_CABLE,
-    short: pieces ? SHORT_EACH : SHORT,
-    over: pieces ? OVER_EACH : OVER,
-  }[ending];
-  return say(note, { name });
+  return say(wordsFor(unit)[ending], { name, checkbox: say(NOTHING_USABLE) });
 }
 
 /** An amount on it, in words: "300 left" of pieces, else "300 m". */
@@ -149,6 +181,7 @@ export function OpenPackageCard({
   const unit = item.unit;
   const printed = isLength(unit);
   const pieces = countedWhole(unit);
+  const words = wordsFor(unit);
   // Its package as named, never a word made from the name
   // (inventory-tng-b1z): "the Spool 305 m".
   const name = open.package_name;
@@ -159,7 +192,7 @@ export function OpenPackageCard({
   const flag = empty
     ? SHOWS_NOTHING_LEFT
     : isShortEnd(open.left, open.short_below)
-      ? SHORT_END
+      ? words.shortEnd
       : null;
   const opened = open.opened_at.slice(0, 10);
   const note =
@@ -203,10 +236,7 @@ export function OpenPackageCard({
           </div>
         </div>
       </div>
-      <Field
-        quiet
-        label={say(pieces ? TAKE : CUT_OR_TAKE, { name, date: opened, unit })}
-      >
+      <Field quiet label={say(words.take, { name, date: opened, unit })}>
         {(id) => (
           <input
             id={id}
@@ -251,16 +281,10 @@ export function OpenPackageCard({
       {asking ? (
         <Field
           quiet
-          label={say(
-            pieces
-              ? cut === null
-                ? HOW_MANY_NOW
-                : HOW_MANY_AFTER
-              : cut === null
-                ? WHATS_ON_NOW
-                : WHATS_ON_AFTER,
-            { name, unit },
-          )}
+          label={say(cut === null ? words.askNow : words.askAfter, {
+            name,
+            unit,
+          })}
         >
           {(id) => (
             <>
@@ -287,7 +311,7 @@ export function OpenPackageCard({
           class="self-start"
           onClick={() => onTake({ ...taken, now: "" })}
         >
-          {say(pieces ? WRONG_NUMBER : WRONG_LENGTH)}
+          {say(words.wrong)}
         </button>
       )}
       {/* The note is always there, so it is read out as it changes. */}

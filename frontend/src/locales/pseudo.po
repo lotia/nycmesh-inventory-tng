@@ -52,6 +52,10 @@ msgstr ""
 msgid "{name}: {what}"
 msgstr ""
 
+#: src/scan/OpenPackageCard.tsx
+msgid "You're taking more than the {name} shows, so “{checkbox}” is ticked. It's recorded as you typed it, and an administrator will check the {name}."
+msgstr ""
+
 #: src/shared/registration.ts
 msgid "This browser isn't registered yet."
 msgstr ""
@@ -155,6 +159,10 @@ msgstr ""
 
 #: src/shared/outbox.ts
 msgid "Open package said used up"
+msgstr ""
+
+#: src/scan/OpenPackageCard.tsx
+msgid "Your cut uses up the {name}, so “{checkbox}” is ticked. Untick it if cable is left. An administrator confirms."
 msgstr ""
 
 #: src/scan/CartForm.tsx
@@ -493,6 +501,10 @@ msgid "Could not read previously added items, scan them again."
 msgstr ""
 
 #: src/shared/outbox-notes.ts
+msgid "{box}: count whole pieces left."
+msgstr ""
+
+#: src/shared/outbox-notes.ts
 msgid "Recorded in another tab in transaction {transaction}"
 msgstr ""
 
@@ -550,10 +562,6 @@ msgstr ""
 
 #: src/scan/batch.ts
 msgid "{name}, {package}: retired: taking only, so it can't be received."
-msgstr ""
-
-#: src/scan/OpenPackageCard.tsx
-msgid "Your cut is more than the {name} shows, so it's ticked. It's recorded as you typed it, and an administrator will check the {name}."
 msgstr ""
 
 #: src/scan/recorded-elsewhere.ts
@@ -685,6 +693,10 @@ msgstr ""
 
 #: src/register/RegisterPage.tsx
 msgid "Registering lets this browser record in the inventory. It covers only this browser, so use the same one for the scan page. If the QR code opened a browser you don't usually use, open the link in yours."
+msgstr ""
+
+#: src/scan/OpenPackageCard.tsx
+msgid "Too few left"
 msgstr ""
 
 #: src/scan/cart.ts
@@ -846,6 +858,10 @@ msgstr ""
 msgid "{amount} over"
 msgstr ""
 
+#: src/scan/OpenPackageCard.tsx
+msgid "This {name} will be unusable after this cut, so “{checkbox}” is ticked. Untick it if you'll keep the short end."
+msgstr ""
+
 #: src/shared/build.ts
 msgid "The scanner has been updated. You must upgrade. This browser isn't keeping the cart, so upgrading empties it. Note what is in it, then add it again after upgrading."
 msgstr ""
@@ -880,6 +896,10 @@ msgstr ""
 
 #: src/scan/batch.ts
 msgid "{name}: retired: taking only, so it can't be received."
+msgstr ""
+
+#: src/scan/OpenPackageCard.tsx
+msgid "After taking these, too few are left in the {name} to use, so “{checkbox}” is ticked. Untick it if you'll keep them."
 msgstr ""
 
 #: src/scan/OutboxList.tsx
@@ -925,10 +945,6 @@ msgstr ""
 
 #: src/scan/OpenPackageCard.tsx
 msgid "{amount} {unit} over"
-msgstr ""
-
-#: src/scan/OpenPackageCard.tsx
-msgid "You're taking more than the {name} shows, so it's ticked. It's recorded as you typed it, and an administrator will check the {name}."
 msgstr ""
 
 #: src/scan/Scanner.tsx
@@ -997,10 +1013,6 @@ msgstr ""
 msgid "Opening: {items} at {from}"
 msgstr ""
 
-#: src/scan/OpenPackageCard.tsx
-msgid "Taking these uses up the {name}, so it's ticked. Untick it if any is left. An administrator confirms."
-msgstr ""
-
 #: src/scan/batch.ts
 msgid "{name}: enter the amount again in {unit}"
 msgstr ""
@@ -1034,6 +1046,10 @@ msgstr ""
 msgid "Record"
 msgstr ""
 
+#: src/scan/OpenPackageCard.tsx
+msgid "Taking these uses up the {name}, so “{checkbox}” is ticked. Untick it if any is left. An administrator confirms."
+msgstr ""
+
 #: src/scan/older-to-cart.ts
 msgid "The package size has changed since this item was added. Discard and re-add the new package size."
 msgstr ""
@@ -1064,10 +1080,6 @@ msgstr ""
 
 #: src/scan/older-to-cart.ts
 msgid "An item no longer in the catalogue"
-msgstr ""
-
-#: src/scan/OpenPackageCard.tsx
-msgid "This {name} will be unusable after this cut, so it's ticked. Untick it if you'll keep the short end."
 msgstr ""
 
 #: src/scan/batch.ts
@@ -1104,10 +1116,6 @@ msgstr ""
 msgid "for install {number}"
 msgstr ""
 
-#: src/scan/OpenPackageCard.tsx
-msgid "Your cut uses up the {name}, so it's ticked. Untick it if cable is left. An administrator confirms."
-msgstr ""
-
 #: src/shared/outbox-notes.ts
 msgid "Not recorded. Make any changes and record again."
 msgstr ""
@@ -1132,16 +1140,16 @@ msgstr ""
 msgid "This item wasn't automatically removed. Record the cart and try to remove."
 msgstr ""
 
+#: src/scan/OpenPackageCard.tsx
+msgid "Your cut is more than the {name} shows, so “{checkbox}” is ticked. It's recorded as you typed it, and an administrator will check the {name}."
+msgstr ""
+
 #: src/shared/outbox-notes.ts
 msgid "This device is offline. Sending when it's back."
 msgstr ""
 
 #: src/scan/CartForm.tsx
 msgid "What is happening"
-msgstr ""
-
-#: src/scan/OpenPackageCard.tsx
-msgid "After taking these, too few are left in the {name} to use, so it's ticked. Untick it if you'll keep them."
 msgstr ""
 
 #. A clause of where a save was for; clauses that apply follow in this order, joined by spaces: at or from, to, for install. {place} is a place of any kind, such as a store, a shelf, a bin or a volunteer's home.

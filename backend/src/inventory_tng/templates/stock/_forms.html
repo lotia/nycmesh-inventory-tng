@@ -1,11 +1,12 @@
 {#- An item's stock at a place, form by form, each on its own labelled line
 (package_forms.Forms, docs/decisions/0020): sealed packages, open ones,
-loose units, short ends, and what is usable, loose units included, so a
-total never hides what it is made of. -#}
+loose units, short ends ("too few left" of a box of pieces, Ali,
+2026-11-24), and what is usable, loose units included, so a total never
+hides what it is made of. -#}
 {% macro forms_lines(forms, unit) -%}
 {%- for name, count, amount in forms.sealed %}<span class="hint block">{% trans sealed=count | amount, package=name %}{{ sealed }} sealed {{ package }}{% endtrans %}</span>{% endfor -%}
 {%- for left in forms.open %}<span class="hint block">{% trans left=left | amount, unit=unit %}open: {{ left }} {{ unit }} left{% endtrans %}</span>{% endfor -%}
 {%- if forms.loose %}<span class="hint block">{% trans loose=forms.loose | amount, unit=unit %}loose: {{ loose }} {{ unit }}{% endtrans %}</span>{% endif -%}
-{%- for left in forms.short_ends %}<span class="hint block">{% trans left=left | amount, unit=unit %}short end: {{ left }} {{ unit }}{% endtrans %}</span>{% endfor -%}
+{%- for left in forms.short_ends %}<span class="hint block">{% if unit | counted_whole %}{% trans left=left | amount, unit=unit %}too few left: {{ left }} {{ unit }}{% endtrans %}{% else %}{% trans left=left | amount, unit=unit %}short end: {{ left }} {{ unit }}{% endtrans %}{% endif %}</span>{% endfor -%}
 {%- if forms.short_ends %}<span class="hint block">{% trans usable=forms.usable | amount, unit=unit %}usable: {{ usable }} {{ unit }}{% endtrans %}</span>{% endif -%}
 {%- endmacro %}

@@ -335,6 +335,11 @@ describe("turning a cart into a batch", () => {
     ).toMatchObject({
       what: "Used up: 1 open package at Hub (what is on 1 open package said)",
     });
+    // Its package named as its card shows it, for a refusal to say.
+    const offered = [openAt(1, 300_000, { key, package_name: "Spool 305 m" })];
+    expect(
+      toBatch(cart({ lines: line({ now: "12" }) }), CATALOGUE, offered),
+    ).toMatchObject({ summary: { boxes: ["Spool 305 m"] } });
     // Blank is no report; not a number is a problem.
     expect(
       saidAsText(toBatch(cart({ lines: line({ now: " " }) }), CATALOGUE)),

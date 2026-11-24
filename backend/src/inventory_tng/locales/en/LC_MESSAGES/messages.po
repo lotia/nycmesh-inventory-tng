@@ -5162,6 +5162,11 @@ msgstr ""
 msgid "to %(place)s"
 msgstr ""
 
+#: src/inventory_tng/templates/stock/_forms.html
+#, python-format
+msgid "too few left: %(left)s %(unit)s"
+msgstr ""
+
 #: src/inventory_tng/templates/catalogue/item.html
 #, python-format
 msgid "total across stores, in %(unit)s; blank never reorders"

@@ -291,8 +291,10 @@ you" counts every report in one line, which hides what is waiting.
 - **One checkbox, one wording**: "Nothing usable left on it", whatever is
   typed, in the card whose legend names the package.
 - **It ticks itself** when a cut leaves a short end, uses up what the
-  package shows, or passes it, and a note appears in the card saying why
-  and that an administrator confirms: "Your cut uses up the Spool 305 m",
+  package shows, or passes it, and a note appears in the card saying why,
+  naming the checkbox it ticked ("so “Nothing usable left on it” is
+  ticked", Ali, 2026-11-24), and that an administrator confirms: "Your
+  cut uses up the Spool 305 m",
   "This Spool 305 m will be unusable after this cut" (a short end), or
   that the cut is more than it shows and an administrator will check it. The
   volunteer unticks it when cable is left, a short end kept for patch
@@ -306,6 +308,9 @@ you" counts every report in one line, which hides what is waiting.
   20", "Take from the Box", "Shows the wrong number left?", with the
   number keypad, and whole amounts only, which the server refuses too.
   Lengths keep the words above. The check page is "Amounts to check".
+  Its flag reads "Too few left", not "Short end", on the card and on the
+  stock pages, and a fraction the server refuses for what is left in it
+  reads "Box of 500: count whole pieces left." (Ali, 2026-11-24).
 
 ### Correcting what a package shows
 

@@ -167,8 +167,10 @@ describe("storage", () => {
     };
     // Optional fields added since a build keeping this key was deployed
     // whose loss leaves an entry as that build itself would have kept it:
-    // only such a field may be added here without a new key. None yet.
-    const droppedAsBefore: string[] = [];
+    // only such a field may be added here without a new key. Lost,
+    // summary.boxes leaves a refusal naming a report by its number, as
+    // before (inventory-tng-uwi3).
+    const droppedAsBefore: string[] = ["summary.boxes"];
     expect(Object.keys(Kept.entries)).toEqual(["build", "entries"]);
     expect({
       [STORAGE_KEY]: paths(Entry)

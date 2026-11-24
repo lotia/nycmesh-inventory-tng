@@ -244,6 +244,11 @@ export type Reason = v.InferOutput<typeof Reason>;
 export const Summary = v.object({
   from: v.nullable(v.string()),
   to: v.nullable(v.string()),
+  /** The names of the open packages its `lengths` report on, in their
+   * order, as their cards showed them, for a refusal to name (outbox-notes,
+   * noteOf); null where the page had none. Absent, a refusal names the
+   * report by its number. */
+  boxes: v.exactOptional(v.array(v.nullable(v.string()))),
 });
 
 export type Summary = v.InferOutput<typeof Summary>;

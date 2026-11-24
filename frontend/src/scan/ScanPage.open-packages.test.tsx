@@ -64,7 +64,7 @@ describe("open packages", () => {
     fireEvent.input(field, { target: { value: "120" } });
     expect(ticked()).toBe(true);
     expect(note()).toBe(
-      "Your cut uses up the Spool, so it's ticked. Untick it if cable is left. An administrator confirms.",
+      "Your cut uses up the Spool, so “Nothing usable left on it” is ticked. Untick it if cable is left. An administrator confirms.",
     );
     // Unticked by the volunteer: no note.
     fireEvent.click(screen.getByLabelText(NOTHING_LEFT));
@@ -75,7 +75,7 @@ describe("open packages", () => {
     expect(within(card).getByText("30 m over")).toBeDefined();
     expect(ticked()).toBe(true);
     expect(note()).toBe(
-      "Your cut is more than the Spool shows, so it's ticked. It's recorded as you typed it, and an administrator will check the Spool.",
+      "Your cut is more than the Spool shows, so “Nothing usable left on it” is ticked. It's recorded as you typed it, and an administrator will check the Spool.",
     );
     // Back to a cut that leaves some: unticked again.
     fireEvent.input(field, { target: { value: "20" } });
@@ -122,7 +122,7 @@ describe("open packages", () => {
     fireEvent.input(screen.getByLabelText(CUT), { target: { value: "110" } });
     expect(ticked()).toBe(true);
     expect(note()).toBe(
-      "This Spool will be unusable after this cut, so it's ticked. Untick it if you'll keep the short end.",
+      "This Spool will be unusable after this cut, so “Nothing usable left on it” is ticked. Untick it if you'll keep the short end.",
     );
   });
 

@@ -23,7 +23,7 @@ from inventory_tng.stock import (
     open_packages,
     used_up_routes,
 )
-from inventory_tng.stock.ledger import LOOSE, Entry, Form
+from inventory_tng.stock.ledger import Entry, Form
 from inventory_tng.web import formatting
 
 from helpers.markup import box_values, forms, links, read, text, words_on
@@ -457,30 +457,6 @@ def test_a_length_of_an_item_counted_each_is_whole(
     assert done.headers["location"] == f"{LENGTHS}?notice=length_bad"
 
 
-def box_of_connectors_opened(session: Session, spools: Spools) -> OpenPackage:
-    """The spools' item made connectors, counted each, in boxes of 500
-    followed when opened: one received and opened in the store."""
-    spools.cable.unit = "each"
-    spools.spool.name, spools.spool.size = "Box", Decimal(500)
-    session.flush()
-    store = spools.store.id
-    spools.write(
-        {"kind": "receipt", "to_location_id": store},
-        Entry(spools.cable.id, Decimal(500), LOOSE, spools.sealed),
-    )
-    made = open_packages.make(session, uuid.uuid4(), spools.spool.id, store)
-    spools.write(
-        {"kind": "open", "from_location_id": store, "to_location_id": store},
-        Entry(
-            spools.cable.id,
-            Decimal(500),
-            spools.sealed,
-            Form(open_package_id=made.id),
-        ),
-    )
-    return made
-
-
 def test_what_is_in_an_open_box_of_pieces_is_whole(
     admin_client: TestClient,
     registered_client: TestClient,
@@ -488,8 +464,9 @@ def test_what_is_in_an_open_box_of_pieces_is_whole(
     spools: Spools,
 ) -> None:
     # Ali, 2026-11-23, inventory-tng-uwi3: the server refuses it, as the
-    # scan page does.
-    made = box_of_connectors_opened(session, spools)
+    # scan page does. The spools' item made pieces, counted each.
+    spools.cable.unit = "each"
+    made = spools.opened()
     response = registered_client.post(URL, json=report(spools, length(made, "2.5")))
     assert response.status_code == 422
     assert [(p["loc"][1:], p["type"]) for p in response.json()["detail"]] == [

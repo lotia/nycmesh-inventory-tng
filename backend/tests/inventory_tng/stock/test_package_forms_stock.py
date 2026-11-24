@@ -152,6 +152,20 @@ def test_stock_and_reorder_pages_show_forms(
     assert "1 sealed Spool, of 2 to keep" in reorder
 
 
+def test_the_stock_page_says_too_few_are_left_in_a_box_of_pieces(
+    admin_client: TestClient, session: Session, spools: Spools
+) -> None:
+    """A box of pieces below its too-short-to-use number is "too few left",
+    a length's "short end" (Ali, 2026-11-24, inventory-tng-uwi3)."""
+    spools.cable.unit, spools.spool.short_below = "each", Decimal(15)
+    made = spools.opened()
+    spools.move(Entry(spools.cable.id, Decimal(295), Form(open_package_id=made.id)))
+    session.flush()
+    page = read(admin_client.get("/admin/stock").text)
+    assert page.all("span", "too few left: 10 each", class_="hint block")
+    assert not page.all("span", "short end: 10 each", class_="hint block")
+
+
 def test_the_stock_page_lists_open_packages_fewest_left_first(
     admin_client: TestClient, session: Session, spools: Spools
 ) -> None:
