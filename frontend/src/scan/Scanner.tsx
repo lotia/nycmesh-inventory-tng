@@ -9,7 +9,9 @@
  * No label is read while the picture is not wholly on the screen, so
  * nothing is added out of the volunteer's sight (Ali, 2026-11-24,
  * inventory-tng-rj2g), nor while a text box has focus, as the on-screen
- * keyboard may cover the picture (Ali, 2026-11-24, inventory-tng-5663);
+ * keyboard may cover the picture (Ali, 2026-11-24, inventory-tng-5663),
+ * nor while this build is too old, till the volunteer upgrades (Ali,
+ * 2026-11-24, inventory-tng-af63);
  * a label held in view through the pause is not taken again
  * (repeated-reads.ts). Off the screen, the status line keeps its last
  * words; while a text box has focus, it says reading waits, and a tap on

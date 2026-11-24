@@ -305,6 +305,16 @@ describe("scanning labels with the camera", () => {
     expect(status.getAttribute("role")).toBe("status");
   });
 
+  test("too old, the camera reads no label, till an upgrade", async () => {
+    const outbox = await opened();
+    act(() => outbox.builds.learn("too_old"));
+    await scan("B3ZT9W");
+    await pass(2);
+    expect(lineNames()).toEqual([]);
+    const camera = screen.getByRole("region", { name: say(CAMERA) });
+    expect(within(camera).getByRole("status").textContent).toBe(UPGRADE_WORDS);
+  });
+
   test("too old, Upgrade on the camera's line takes focus to the alert's Upgrade button", async () => {
     const outbox = await opened();
     act(() => outbox.builds.learn("too_old"));

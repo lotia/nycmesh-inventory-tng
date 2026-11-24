@@ -776,9 +776,10 @@ utilities. When you style a page:
   point the camera at a label. A tap on the picture takes focus from the
   box. Enter in the item search leaves
   focus there, as a scanner gun types code after code. While the build is
-  too old, the line says to upgrade instead, over everything else, as the
-  alert saying so is below the camera; its Upgrade is a link that takes
-  focus to the alert's Upgrade button.
+  too old, the camera reads no labels till an upgrade, and the line says
+  to upgrade instead, over everything else, as the alert saying so is
+  below the camera; its Upgrade is a link that takes focus to the alert's
+  Upgrade button.
 - A box a person types into names the keyboard a phone shows for it
   with `inputmode`: `numeric` for whole numbers, `decimal` for numbers
   with a decimal point, `text` for anything with letters. A number with

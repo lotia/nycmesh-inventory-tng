@@ -369,9 +369,12 @@ export function CartForm({
   const picture = useSignal<HTMLVideoElement | null>(null);
   const pictureOnScreen = useWhollyOnScreen(picture.value);
   const typing = useTextBoxFocused();
-  // Labels are read only while the picture is wholly on the screen and
-  // the on-screen keyboard is not up (Scanner).
-  const reads = useComputed(() => pictureOnScreen.value && !typing.value);
+  // Labels are read only while the picture is wholly on the screen, the
+  // on-screen keyboard is not up, and this build is not too old (Scanner).
+  const tooOld = useComputed(() => outbox.builds.newer.value === "too_old");
+  const reads = useComputed(
+    () => pictureOnScreen.value && !typing.value && !tooOld.value,
+  );
   const placeRead = useSignal<number | null>(null);
 
   /** Acts on a label, read by the camera or typed by a scanner gun. */
@@ -842,7 +845,7 @@ export function CartForm({
           reload={reload}
           reloadKeepsCart={cartKept.value}
           typing={typing}
-          tooOld={outbox.builds.newer.value === "too_old"}
+          tooOld={tooOld.value}
         />
       ) : (
         <button type="button" onClick={() => (scanning.value = true)}>
