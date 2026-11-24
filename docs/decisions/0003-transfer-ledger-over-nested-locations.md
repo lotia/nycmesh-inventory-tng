@@ -335,8 +335,10 @@ Decided by Ali on 2026-11-24 (inventory-tng-a97r). A take of an item can
 wait in a phone's outbox while an administrator retires the item, and is
 still saved, as above, so a retired item can show less than nothing at a
 place. A count of a place offers a retired item whose balance there is
-not zero, positive or negative, so it can be counted to zero; so does
-an adjustment on Counts, of a retired item with a balance that is not
-zero at any current place. A retired item at zero everywhere is not
-offered. Takes of a retired item stay allowed. Rejected: refusing a take
-of a retired item that would go below zero.
+not zero, positive or negative, so it can be counted to zero. The item
+lists, the adjustment's on Counts and a count form's Something else
+here, do not depend on the place: they offer a retired item whose
+balance is not zero at any current place, in any form, as sealed and
+loose that net to nothing are still to be counted. A retired item at
+zero everywhere is not offered. Takes of a retired item stay allowed.
+Rejected: refusing a take of a retired item that would go below zero.

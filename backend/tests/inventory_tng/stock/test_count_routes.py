@@ -49,6 +49,7 @@ from helpers.stock import (
     count_at,
     count_form,
     counts_written,
+    held_by_form,
     received,
     retire,
     stocked,
@@ -997,3 +998,24 @@ def test_a_retired_item_at_zero_is_not_offered(
         picker = read(page).all("select", name="extra_item_id")
         choices = [value for each in picker for value, _, _ in options(each)]
         assert str(place.item.id) not in choices, shown
+
+
+def test_a_retired_item_netted_to_nothing_but_not_by_form_is_counted_to_zero(
+    admin_client: TestClient, session: Session
+) -> None:
+    """Loose cable taken from a store holding only sealed spools, after the
+    cable was retired: nothing in all, but sealed and loose are wrong, so
+    the form still offers it, by form, to count to zero."""
+    spools = Spools(session)
+    cable = spools.cable.id
+    retire(session, spools.cable)
+    spools.write(
+        {"kind": "install", "from_location_id": spools.store.id},
+        Entry(cable, Decimal(610)),
+    )
+    shown = admin_client.get(f"{COUNTS}/{spools.store.id}?item={cable}")
+    assert box_values(shown.text, f"sealed_{cable}_{spools.spool.id}")
+    assert box_values(shown.text, f"loose_{cable}")
+    lines = {f"sealed_{cable}_{spools.spool.id}": "0", f"loose_{cable}": "0"}
+    count_at(admin_client, spools.store.id, lines, count_form(shown))
+    assert held_by_form(session, spools.store.id, cable) == {}

@@ -120,15 +120,16 @@ def _left_at_current[*T](
 
 def retired_in_stock() -> Select[tuple[int]]:
     """The ids of retired items with some left at a current place: what
-    volunteers may still take, and administrators write off."""
+    volunteers may still take. What a count may name is retired_not_zero."""
     return _retired_left(balance, "item_id", Item)
 
 
 def retired_not_zero() -> Select[tuple[int]]:
     """The ids of retired items whose balance at a current place is not
-    zero, more or less than nothing: what a count may still bring to zero
-    there (docs/decisions/0003)."""
-    return _retired_left(balance, "item_id", Item, short_too=True)
+    zero, more or less than nothing, in some form: what a count may still
+    bring to zero there (docs/decisions/0003). By form, as holds_stock:
+    sealed and loose that net to nothing are still to be counted."""
+    return _retired_left(by_form, "item_id", Item, short_too=True)
 
 
 def retired_packages_in_stock() -> Select[tuple[int]]:
@@ -211,8 +212,9 @@ def holds_stock(session: Session, location_id: int) -> bool:
 def countable_item() -> ColumnElement[bool]:
     """Items a count or an adjustment may name: current ones, and retired
     ones with a balance at a current place that is not zero, positive or
-    negative (retired_not_zero), so they can be counted to zero there (Ali,
-    2026-11-24). A retired item at zero everywhere is not."""
+    negative, in some form (retired_not_zero), so they can be counted to
+    zero there (Ali, 2026-11-24). A retired item at zero everywhere is
+    not."""
     return or_(Item.retired_at.is_(None), Item.id.in_(retired_not_zero()))
 
 

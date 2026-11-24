@@ -38,6 +38,7 @@ from inventory_tng.stock.forms import (
     now_counted_in,
     shown_field,
 )
+from inventory_tng.stock.ledger import Entry
 from inventory_tng.stock.moments import Moment, expected, moment
 from inventory_tng.stock.paths import ADJUSTMENTS, COUNTS, STOCK
 from inventory_tng.web.forms import ABOVE_ZERO, RULES, WHOLE_UNITS
@@ -58,6 +59,7 @@ from helpers.rows import item_fields, shown, violates
 from helpers.sign_in import new_admin, sign_in_with
 from helpers.stock import (
     Place,
+    Spools,
     adjustment_form,
     at_retired_van,
     badge,
@@ -211,21 +213,40 @@ def test_leftovers_of_a_retired_item_can_be_written_off(
     assert expected(session, place.store.id) == {}
 
 
-@pytest.mark.parametrize(("taken", "offered"), [("2", True), ("0", False)])
-def test_a_retired_item_is_offered_while_its_balance_is_not_zero(
-    admin_client: TestClient, session: Session, taken: str, offered: bool
-) -> None:
-    """Taken after it was retired, the store holds less than nothing of it:
-    offered to adjust, so it can be put right; at zero everywhere, not
-    (Ali, 2026-11-24, inventory-tng-a97r)."""
-    place = Place(session)
+def _retired_and_taken(session: Session, held: str) -> Item:
+    """A retired item taken from a store after it was retired, leaving it
+    `held` there: short (less than nothing), zero (all of it), or netted
+    (loose units taken from sealed spools: nothing in all, but not by
+    form)."""
+    if held == "netted":
+        spools = Spools(session)
+        retire(session, spools.cable)
+        spools.write(
+            {"kind": "install", "from_location_id": spools.store.id},
+            Entry(spools.cable.id, Decimal(610)),
+        )
+        assert expected(session, spools.store.id) == {}
+        return spools.cable
+    place = Place(session) if held == "short" else stocked(session, "2")
     retire(session, place.item)
-    if taken != "0":
-        line = {"item_id": place.item.id, "quantity": taken, "unit": "each"}
-        write(session, place, kind="install", to_location_id=None, lines=[line])
+    line = {"item_id": place.item.id, "quantity": "2", "unit": "each"}
+    write(session, place, kind="install", to_location_id=None, lines=[line])
+    return place.item
+
+
+@pytest.mark.parametrize(
+    ("held", "offered"), [("short", True), ("zero", False), ("netted", True)]
+)
+def test_a_retired_item_is_offered_while_its_balance_is_not_zero(
+    admin_client: TestClient, session: Session, held: str, offered: bool
+) -> None:
+    """Taken after it was retired, the store holds less than nothing of it,
+    or nothing in all but not by form: offered to adjust, so it can be put
+    right; at zero, not (Ali, 2026-11-24, inventory-tng-a97r)."""
+    item = _retired_and_taken(session, held)
     page = read(admin_client.get(COUNTS).text)
     choices = [value for value, _, _ in options(page.one("select", name="item_id"))]
-    assert (str(place.item.id) in choices) is offered
+    assert (str(item.id) in choices) is offered
 
 
 @pytest.mark.end_to_end
