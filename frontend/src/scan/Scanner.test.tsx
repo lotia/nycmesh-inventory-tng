@@ -26,8 +26,10 @@ import {
   TORCH,
   TORCH_FAILED,
   TYPING,
-  UPGRADE_BELOW,
 } from "./Scanner";
+
+/** UPGRADE_TO_SAVE as shown, its link's words in it. */
+const UPGRADE_WORDS = "Scanner updated. Upgrade to keep saving.";
 
 // The camera's clock, faked: each test lets as many reads' time pass as it
 // needs (testing/setup.ts makes it real again). The fake clock also keeps up
@@ -123,11 +125,14 @@ test("no label is read while reading is paused, and reading resumes after", asyn
   expect(onCode).toHaveBeenCalledTimes(1);
 });
 
-test("while typing, the status line says reading waits, then what it said before", async () => {
-  const { open } = camera();
+test("while typing, the status line says reading waits, then to point the camera, not what a label did again", async () => {
+  const { state, open } = camera();
+  const onCode = vi.fn((code: string) => said(`Read ${code}.`));
   const typing = signal(false);
-  scanner({ open, typing });
-  const status = await screen.findByText(say(POINT));
+  scanner({ open, onCode, typing });
+  state.inView = ["B3ZT9W"];
+  await pass();
+  const status = await screen.findByText("Read B3ZT9W.");
   act(() => {
     typing.value = true;
   });
@@ -143,14 +148,15 @@ test("too old, the status line says to upgrade, over typing and what a label did
   const onCode = vi.fn((code: string) => said(`Read ${code}.`));
   const typing = signal(true);
   const view = scanner({ open, onCode, typing, tooOld: true });
-  const status = await screen.findByText(say(UPGRADE_BELOW));
+  const status = screen.getByRole("status");
+  await vi.waitFor(() => expect(status.textContent).toBe(UPGRADE_WORDS));
   act(() => {
     typing.value = false;
   });
   state.inView = ["B3ZT9W"];
   await pass();
   expect(onCode).toHaveBeenCalledTimes(1);
-  expect(status.textContent).toBe(say(UPGRADE_BELOW));
+  expect(status.textContent).toBe(UPGRADE_WORDS);
   view.rerender(scannerOf({ open, onCode, typing, tooOld: false }));
   expect(status.textContent).toBe("Read B3ZT9W.");
 });
@@ -164,14 +170,17 @@ test("a tap on the picture takes focus from a text box, and from nothing else", 
   const tick = document.createElement("input");
   tick.type = "checkbox";
   document.body.append(box, tick);
-  box.focus();
-  fireEvent.click(picture);
-  expect(document.activeElement).toBe(document.body);
-  tick.focus();
-  fireEvent.click(picture);
-  expect(document.activeElement).toBe(tick);
-  box.remove();
-  tick.remove();
+  try {
+    box.focus();
+    fireEvent.click(picture);
+    expect(document.activeElement).toBe(document.body);
+    tick.focus();
+    fireEvent.click(picture);
+    expect(document.activeElement).toBe(tick);
+  } finally {
+    box.remove();
+    tick.remove();
+  }
 });
 
 test("a label held in view through a pause is not taken again after it", async () => {

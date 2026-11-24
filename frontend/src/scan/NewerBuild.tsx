@@ -10,6 +10,10 @@ import { say } from "../shared/i18n";
 import type { Outbox } from "../shared/outbox";
 import { CAUTION_BOX } from "./Notes";
 
+/** The Upgrade button's id, which the camera's status line links to
+ * while too old (Scanner). */
+export const UPGRADE_BUTTON = "upgrade";
+
 /**
  * Asks for a reload once a newer build is out (shared/build.ts). While this tab
  * can still save, only once the cart is saved or emptied and nothing waits
@@ -48,7 +52,12 @@ export function NewerBuild({
   return (
     <div role="alert" class={CAUTION_BOX}>
       <div>{say(upgradeWords(holds, cartKept.value))}</div>
-      <button type="button" class="primary" onClick={reload}>
+      <button
+        type="button"
+        id={UPGRADE_BUTTON}
+        class="primary"
+        onClick={reload}
+      >
         {say(UPGRADE)}
       </button>
     </div>

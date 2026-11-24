@@ -2,13 +2,14 @@
  * The scan page's status lines, under the camera and under the item
  * search, at a phone's width: each keeps room for two lines of words, so
  * a refusal appearing or clearing once its line is fixed moves nothing
- * below it, as do the words that reading waits while typing; empty, it
- * shows no bar (Ali, 2026-11-24, inventory-tng-2l6n, inventory-tng-0w3n).
+ * below it, as do the words that reading waits while typing and those
+ * saying to upgrade; empty, it shows no bar (Ali, 2026-11-24,
+ * inventory-tng-2l6n, inventory-tng-0w3n, inventory-tng-j3wt).
  */
 import { expect, type Locator, type Page } from "@playwright/test";
 import { test } from "./csp-violations";
 import { prepared } from "./prepared";
-import { looseBox, pick } from "./scan-page";
+import { looseBox, pick, startMove } from "./scan-page";
 
 const NOT_ADDED = "Not added. Fix the incorrect amount below, then scan again.";
 const TYPING = "Not reading while you type. Tap the picture to scan.";
@@ -23,6 +24,40 @@ async function placed(line: Locator, below: Locator[]) {
     }),
   );
 }
+
+test("too old, the camera's line says to upgrade in its room, and its link goes to Upgrade", async ({
+  page,
+  browserName,
+}) => {
+  test.skip(browserName !== "chromium", "only Chromium has a fake camera");
+  // The server holds back the cart's save as from a build too old.
+  await page.route("**/api/transactions", (route) =>
+    route.fulfill({ status: 409, json: { reason: "build_too_old" } }),
+  );
+  await page.goto("/scan");
+  await startMove(page);
+  const camera = page.getByRole("region", { name: "Camera" });
+  const line = camera.getByRole("status");
+  // Not the cart, which Record empties.
+  const below = [
+    camera.getByRole("button", { name: "Done" }),
+    page.getByLabel(/Find an item/),
+  ];
+  await page.getByRole("button", { name: "Scan with the camera" }).click();
+  await expect(line).toHaveText(`Added one: ${prepared().labelled}.`, {
+    timeout: 15_000,
+  });
+  const added = await placed(line, below);
+  await page.getByRole("button", { name: "Record" }).click();
+  await expect(line).toHaveText("Scanner updated. Upgrade to keep saving.");
+  expect(await placed(line, below)).toEqual(added);
+  await line.getByRole("link", { name: "Upgrade" }).click();
+  const upgrade = page
+    .getByRole("alert")
+    .getByRole("button", { name: "Upgrade" });
+  await expect(upgrade).toBeFocused();
+  await expect(upgrade).toBeInViewport();
+});
 
 /** The item search's status line, just after its field. */
 function searchLine(page: Page): Locator {

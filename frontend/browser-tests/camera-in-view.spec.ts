@@ -186,12 +186,13 @@ test("the camera stays put as labels are scanned, reads none off the screen, and
 
   // Off the screen, a label shown is not read: its line is as it was
   // after longer than a repeat's quiet time (repeated-reads.ts), so it is
-  // taken once read.
+  // taken once read. The line says what it did after typing ended
+  // (inventory-tng-0w3n).
   const status = camera.getByRole("status");
   await show(page, labels[0] as Drawn);
   await page.waitForTimeout(2_500);
   await expect(loose).toHaveValue("3");
-  await expect(status).toHaveText(`Added one: ${cable}.`);
+  await expect(status).toHaveText("Point the camera at a label.");
 
   // At the page's bottom, nothing is left under it.
   await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight));

@@ -11,6 +11,10 @@ msgstr ""
 msgid "Enter the phrase you were given."
 msgstr "Enter the phrase you were given."
 
+#: src/scan/Scanner.tsx
+msgid "Scanner updated. <0>Upgrade</0> to keep saving."
+msgstr "Scanner updated. <0>Upgrade</0> to keep saving."
+
 #: src/scan/CartForm.tsx
 msgid "That's me"
 msgstr "That's me"
@@ -736,10 +740,6 @@ msgstr "Can't add these items. Please rescan."
 #: src/scan/batch.ts
 msgid "{name}: enter what is on the open package, in whole units, or leave it blank."
 msgstr "{name}: enter what is on the open package, in whole units, or leave it blank."
-
-#: src/scan/Scanner.tsx
-msgid "The scanner has been updated. You must upgrade: the Upgrade button is below."
-msgstr "The scanner has been updated. You must upgrade: the Upgrade button is below."
 
 #: src/shared/outbox-notes.ts
 msgid "No answer from the inventory. Trying again shortly."

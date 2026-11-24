@@ -14,17 +14,21 @@
  * (repeated-reads.ts). Off the screen, the status line keeps its last
  * words; while a text box has focus, it says reading waits, and a tap on
  * the picture takes focus from the box (Ali, 2026-11-24,
- * inventory-tng-0w3n). Once reading resumes, it says what it said before.
+ * inventory-tng-0w3n). Once reading resumes, it says a refusal still
+ * standing again, or else to point the camera at a label, so what a label
+ * did is not announced twice.
  * While this build is too old, it says to upgrade, over everything else,
- * as the alert saying so is below the camera (Ali, 2026-11-24,
- * inventory-tng-j3wt).
+ * as the alert saying so is below the camera, its Upgrade a link that
+ * takes focus to the alert's Upgrade button (Ali, 2026-11-24,
+ * inventory-tng-j3wt): a link, as it goes to another place on the page
+ * and does nothing there itself.
  * Each session is reported (camera-report.ts).
  */
 import type { MessageDescriptor } from "@lingui/core";
 import { msg } from "@lingui/core/macro";
 import { type ReadonlySignal, useSignal } from "@preact/signals";
 import { useEffect, useRef } from "preact/hooks";
-import { say } from "../shared/i18n";
+import { say, sayParts } from "../shared/i18n";
 import { openCamera, type Session } from "./camera";
 import {
   CameraReport,
@@ -33,6 +37,7 @@ import {
   type Refused,
 } from "./camera-report";
 import type { Cart } from "./cart";
+import { UPGRADE_BUTTON } from "./NewerBuild";
 import { AlertWords } from "./Notes";
 import { type About, useClearedWhenLineChanges } from "./refused-line";
 import { Repeats } from "./repeated-reads";
@@ -42,7 +47,7 @@ export const CAMERA = msg`Camera`;
 export const STARTING = msg`Starting the camera…`;
 export const POINT = msg`Point the camera at a label.`;
 export const TYPING = msg`Not reading while you type. Tap the picture to scan.`;
-export const UPGRADE_BELOW = msg`The scanner has been updated. You must upgrade: the Upgrade button is below.`;
+export const UPGRADE_TO_SAVE = msg`Scanner updated. <0>Upgrade</0> to keep saving.`;
 export const TORCH_FAILED = msg`The torch wouldn't switch.`;
 export const DONE = msg`Done`;
 export const TORCH = msg`Torch`;
@@ -164,20 +169,37 @@ export function Scanner({
   // A phrase, or said as shown: the words onCode said; empty once the
   // line a refusal was about changes.
   const said = useSignal<MessageDescriptor | string>(STARTING);
+  // Whether `said` is a refusal still standing.
+  const standing = useRef(false);
   const refusing = useClearedWhenLineChanges(cart, () => {
+    standing.current = false;
     said.value = "";
   });
   const show = (words: MessageDescriptor | string, about?: About) => {
     said.value = words;
+    standing.current = about !== undefined;
     refusing(about);
   };
   // Why the camera could not be used, once it was refused.
   const refused = useSignal<Refusal | null>(null);
   const torch = useSignal<((on: boolean) => Promise<void>) | null>(null);
   const refusal = refused.value;
-  // What the status line says: too old, to upgrade; else, while typing
-  // pauses reading, that it does; over the words kept beneath.
-  const shown = tooOld ? UPGRADE_BELOW : typing.value ? TYPING : said.value;
+  // What the status line says, too old aside: while typing pauses
+  // reading, that it does; over the words kept beneath.
+  const shown = typing.value ? TYPING : said.value;
+  // Beneath the typing words, what a label did becomes Point, so the
+  // live region does not announce it again once typing ends; a refusal
+  // stays, as it still asks for a fix, as do Starting and an empty line.
+  useEffect(() => {
+    if (
+      typing.value &&
+      !standing.current &&
+      said.peek() !== STARTING &&
+      said.peek() !== ""
+    ) {
+      said.value = POINT;
+    }
+  }, [typing.value]);
 
   // Done went with the refusal: Reload page takes the focus, or, where
   // none is offered, the refusal's words, so the volunteer keeps their
@@ -296,7 +318,7 @@ export function Scanner({
         onClick={() => {
           // The keyboard may be gone with focus still in its box.
           const box = document.activeElement;
-          if (isTextBox(box)) {
+          if (box instanceof HTMLElement && isTextBox(box)) {
             box.blur();
           }
         }}
@@ -306,7 +328,17 @@ export function Scanner({
       {refusal === null ? (
         <>
           <p role="status" class="status-line">
-            {typeof shown === "string" ? shown : say(shown)}
+            {tooOld
+              ? sayParts(UPGRADE_TO_SAVE, {}, [
+                  (inside) => (
+                    <a href={`#${UPGRADE_BUTTON}`} onClick={toUpgrade}>
+                      {inside}
+                    </a>
+                  ),
+                ])
+              : typeof shown === "string"
+                ? shown
+                : say(shown)}
           </p>
           <div class="actions">
             {torch.value !== null && (
@@ -371,4 +403,14 @@ function Torch({
       {say(TORCH)}
     </button>
   );
+}
+
+/** Takes focus to the alert's Upgrade button, which brings it into view;
+ * without it, the link's own jump. */
+function toUpgrade(event: MouseEvent) {
+  const button = document.getElementById(UPGRADE_BUTTON);
+  if (button !== null) {
+    event.preventDefault();
+    button.focus();
+  }
 }

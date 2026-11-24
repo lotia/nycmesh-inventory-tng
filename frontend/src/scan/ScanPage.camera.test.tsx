@@ -1,5 +1,6 @@
-import { act, fireEvent, screen } from "@testing-library/preact";
+import { act, fireEvent, screen, within } from "@testing-library/preact";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
+import { UPGRADE } from "../shared/build";
 import { say } from "../shared/i18n";
 import { STORAGE_KEY as OUTBOX_KEY, Outbox } from "../shared/outbox";
 import { pass } from "../testing/camera";
@@ -48,8 +49,11 @@ import {
   POINT,
   RELOAD_PAGE,
   TYPING,
-  UPGRADE_BELOW,
 } from "./Scanner";
+
+/** UPGRADE_TO_SAVE as shown, its link's words in it. */
+const UPGRADE_WORDS = "Scanner updated. Upgrade to keep saving.";
+
 import { COULD_NOT_LOAD } from "./ScanPage";
 
 // The camera, faked: it sees whatever a test puts in `inView`.
@@ -292,13 +296,25 @@ describe("scanning labels with the camera", () => {
       "Added one: LiteBeam 5AC.",
     )) as HTMLElement;
     act(() => outbox.builds.learn("too_old"));
-    expect(status.textContent).toBe(say(UPGRADE_BELOW));
+    expect(status.textContent).toBe(UPGRADE_WORDS);
     const search = screen.getByLabelText<HTMLInputElement>(say(FIND));
     act(() => search.focus());
-    expect(status.textContent).toBe(say(UPGRADE_BELOW));
+    expect(status.textContent).toBe(UPGRADE_WORDS);
     act(() => search.blur());
-    expect(status.textContent).toBe(say(UPGRADE_BELOW));
+    expect(status.textContent).toBe(UPGRADE_WORDS);
     expect(status.getAttribute("role")).toBe("status");
+  });
+
+  test("too old, Upgrade on the camera's line takes focus to the alert's Upgrade button", async () => {
+    const outbox = await opened();
+    act(() => outbox.builds.learn("too_old"));
+    const camera = screen.getByRole("region", { name: say(CAMERA) });
+    fireEvent.click(within(camera).getByRole("link", { name: say(UPGRADE) }));
+    expect(document.activeElement).toBe(
+      within(screen.getByRole("alert")).getByRole("button", {
+        name: say(UPGRADE),
+      }),
+    );
   });
 
   test("Enter in the item search leaves focus there, for the next code", async () => {

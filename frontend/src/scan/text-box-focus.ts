@@ -22,9 +22,7 @@ const UNTYPED = new Set([
 ]);
 
 /** Whether `target` is a box the volunteer types in. */
-export function isTextBox(
-  target: EventTarget | null,
-): target is HTMLInputElement | HTMLTextAreaElement {
+export function isTextBox(target: EventTarget | null): boolean {
   return (
     target instanceof HTMLTextAreaElement ||
     (target instanceof HTMLInputElement && !UNTYPED.has(target.type))
