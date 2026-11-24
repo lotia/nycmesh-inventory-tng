@@ -875,6 +875,7 @@ export function CartForm({
         cart={cart.value}
         onAdd={add}
         onLabel={actOn}
+        tooOld={tooOld.value}
       />
 
       {/* Below the camera, as a scan may take it away (Ali, 2026-11-24,

@@ -1,10 +1,15 @@
-/** The scan page's search box: find an item by its words, or type or scan its code. */
+/** The scan page's search box: find an item by its words, or type or scan
+ * its code. While this build is too old, nothing it picks or reads is
+ * added, as the camera reads nothing then (Ali, 2026-11-24,
+ * inventory-tng-n1p8). */
 import { msg } from "@lingui/core/macro";
 import { useSignal } from "@preact/signals";
+import type { ComponentChildren } from "preact";
 import { Field } from "../shared/Field";
 import { say } from "../shared/i18n";
 import { type Cart, type Catalogue, RETIRED } from "./cart";
 import { readLabel, type Scanned } from "./label-codes";
+import { UpgradeToSave } from "./NewerBuild";
 import { type About, useClearedWhenLineChanges } from "./refused-line";
 import { search } from "./search";
 
@@ -30,6 +35,7 @@ export function Finder({
   cart,
   onAdd,
   onLabel,
+  tooOld,
 }: {
   catalogue: Catalogue;
   /** The cart as it is now, whose lines a refusal may be about. */
@@ -37,6 +43,8 @@ export function Finder({
   onAdd: (itemId: number, packageId?: number) => Picked;
   /** A label's code typed, as a scanner gun types one. */
   onLabel: (read: Scanned) => Picked;
+  /** Whether the server takes nothing more from this build (NewerBuild). */
+  tooOld: boolean;
 }) {
   // Emptied only by a pick or a code typed here, never by a label the
   // camera reads while the volunteer types (inventory-tng-tjyo).
@@ -44,13 +52,20 @@ export function Finder({
   const matches = search(catalogue, query.value);
   // A refused pick's words, under the search as the scanner says them, till
   // the next pick, typing, or a change to the line it is about; a pick that
-  // adds needs none, as its line shows it.
-  const refusal = useSignal("");
+  // adds needs none, as its line shows it. Too old, every pick is refused,
+  // saying to upgrade.
+  const refusal = useSignal<ComponentChildren>("");
   const refusing = useClearedWhenLineChanges(cart, () => {
     refusal.value = "";
   });
-  const show = (picked: Picked) => {
+  const show = (pick: () => Picked) => {
     query.value = "";
+    if (tooOld) {
+      refusal.value = <UpgradeToSave />;
+      refusing(undefined);
+      return;
+    }
+    const picked = pick();
     refusal.value = picked.refused ? picked.said : "";
     refusing(picked.about);
   };
@@ -77,10 +92,11 @@ export function Finder({
                 }
                 event.preventDefault();
                 const read = readLabel(catalogue, query.value);
+                const [only] = matches;
                 if (read.kind !== "unknown") {
-                  show(onLabel(read));
-                } else if (matches.length === 1 && matches[0] !== undefined) {
-                  show(onAdd(matches[0].id));
+                  show(() => onLabel(read));
+                } else if (matches.length === 1 && only !== undefined) {
+                  show(() => onAdd(only.id));
                 }
               }}
             />
@@ -99,7 +115,7 @@ export function Finder({
         <ul class="list-none p-0 *:py-1">
           {matches.map((item) => (
             <li key={item.id}>
-              <button type="button" onClick={() => show(onAdd(item.id))}>
+              <button type="button" onClick={() => show(() => onAdd(item.id))}>
                 {item.name}
               </button>{" "}
               <small>

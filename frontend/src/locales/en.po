@@ -11,7 +11,7 @@ msgstr ""
 msgid "Enter the phrase you were given."
 msgstr "Enter the phrase you were given."
 
-#: src/scan/Scanner.tsx
+#: src/scan/NewerBuild.tsx
 msgid "Scanner updated. <0>Upgrade</0> to keep saving."
 msgstr "Scanner updated. <0>Upgrade</0> to keep saving."
 

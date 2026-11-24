@@ -19,18 +19,15 @@
  * inventory-tng-0w3n). Once reading resumes, it says a refusal or question
  * still standing again, or else to point the camera at a label, so what a
  * label did is not announced twice (inventory-tng-3pxj).
- * While this build is too old, it says to upgrade, over everything else,
- * as the alert saying so is below the camera, its Upgrade a link that
- * takes focus to the alert's Upgrade button (Ali, 2026-11-24,
- * inventory-tng-j3wt): a link, as it goes to another place on the page
- * and does nothing there itself.
+ * While this build is too old, it says to upgrade, over everything else
+ * (NewerBuild's UpgradeToSave; Ali, 2026-11-24, inventory-tng-j3wt).
  * Each session is reported (camera-report.ts).
  */
 import type { MessageDescriptor } from "@lingui/core";
 import { msg } from "@lingui/core/macro";
 import { effect, type ReadonlySignal, useSignal } from "@preact/signals";
 import { useEffect, useRef } from "preact/hooks";
-import { say, sayParts } from "../shared/i18n";
+import { say } from "../shared/i18n";
 import { openCamera, type Session } from "./camera";
 import {
   CameraReport,
@@ -39,7 +36,7 @@ import {
   type Refused,
 } from "./camera-report";
 import type { Cart } from "./cart";
-import { UPGRADE_BUTTON } from "./NewerBuild";
+import { UpgradeToSave } from "./NewerBuild";
 import { AlertWords } from "./Notes";
 import { type About, useClearedWhenLineChanges } from "./refused-line";
 import { Repeats } from "./repeated-reads";
@@ -49,7 +46,6 @@ export const CAMERA = msg`Camera`;
 export const STARTING = msg`Starting the camera…`;
 export const POINT = msg`Point the camera at a label.`;
 export const TYPING = msg`Not reading while you type. Tap the picture to scan.`;
-export const UPGRADE_TO_SAVE = msg`Scanner updated. <0>Upgrade</0> to keep saving.`;
 export const TORCH_FAILED = msg`The torch wouldn't switch.`;
 export const DONE = msg`Done`;
 export const TORCH = msg`Torch`;
@@ -341,17 +337,13 @@ export function Scanner({
       {refusal === null ? (
         <>
           <p role="status" class="status-line">
-            {tooOld
-              ? sayParts(UPGRADE_TO_SAVE, {}, [
-                  (inside) => (
-                    <a href={`#${UPGRADE_BUTTON}`} onClick={toUpgrade}>
-                      {inside}
-                    </a>
-                  ),
-                ])
-              : typeof shown === "string"
-                ? shown
-                : say(shown)}
+            {tooOld ? (
+              <UpgradeToSave />
+            ) : typeof shown === "string" ? (
+              shown
+            ) : (
+              say(shown)
+            )}
           </p>
           <div class="actions">
             {torch.value !== null && (
@@ -416,16 +408,4 @@ function Torch({
       {say(TORCH)}
     </button>
   );
-}
-
-/** Brings the alert's Upgrade button into view and takes focus to it,
- * scrolled as Back to camera does, as a phone's browser may not scroll to
- * what a script focuses; without it, the link's own jump. */
-function toUpgrade(event: MouseEvent) {
-  const button = document.getElementById(UPGRADE_BUTTON);
-  if (button !== null) {
-    event.preventDefault();
-    button.scrollIntoView({ block: "center" });
-    button.focus({ preventScroll: true });
-  }
 }

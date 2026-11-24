@@ -27,12 +27,14 @@ import {
 } from "../testing/saves";
 import {
   fillMove,
+  find,
   open,
   pick,
   ready,
   save,
   saveQueued,
   server,
+  status,
 } from "../testing/scan-page";
 import { refusingRemovals, refusingWrites } from "../testing/storage";
 import {
@@ -43,6 +45,8 @@ import {
   YOUR_NAME,
 } from "./CartForm";
 import { addOne, STORAGE_KEY as CART_KEY, freshCart, storeCart } from "./cart";
+import { FIND } from "./Finder";
+import { UPGRADE_BUTTON } from "./NewerBuild";
 import { ADD_TO_CART, DISCARD } from "./Notes";
 import { CHECKED_OUT } from "./OlderList";
 import { CARTS_FROM_DEVICE, DISMISS, HELD, SENDING } from "./OutboxList";
@@ -71,6 +75,7 @@ describe("a newer build", () => {
     );
   }
 
+  const search = () => screen.getByLabelText<HTMLInputElement>(say(FIND));
   const reloadButton = () =>
     screen.queryByRole("button", { name: say(UPGRADE) });
   const UPDATED = say(UPDATED_PHRASE);
@@ -184,6 +189,8 @@ describe("a newer build", () => {
     await vi.waitFor(() =>
       expect(within(list()).getAllByText(say(SENDING))).toHaveLength(2),
     );
+    // A third filled now, as too old the item search adds nothing.
+    fillMove();
     // Any send after is answered so too, each with a Response of its own.
     answer = () => json(TOO_OLD, 409);
     first.resolve(json(TOO_OLD, 409));
@@ -194,7 +201,6 @@ describe("a newer build", () => {
     ]);
     expectAllHeld(2);
     // One saved after the banner shows is held too, never sent.
-    fillMove();
     await saveQueued(outbox, 3);
     await vi.waitFor(() => expectAllHeld(3));
     expect(screen.queryByRole("button", { name: say(DISMISS) })).toBeNull();
@@ -305,6 +311,34 @@ describe("a newer build", () => {
     await vi.waitFor(() => expect(banner()).toBe(UPDATED));
     expect(reloadButton()).not.toBeNull();
   });
+
+  test.each([
+    [
+      "a code typed",
+      "b3zt9w",
+      () => fireEvent.keyDown(search(), { key: "Enter" }),
+    ],
+    [
+      "a pick from its list",
+      "LiteBeam",
+      () =>
+        fireEvent.click(screen.getByRole("button", { name: "LiteBeam 5AC" })),
+    ],
+  ])(
+    "too old, %s in the item search adds nothing, and its line says to upgrade",
+    async (_how, typed, take) => {
+      const { outbox } = openMine();
+      await ready();
+      act(() => outbox.builds.learn("too_old"));
+      find(typed);
+      take();
+      screen.getByText(say(NOTHING_IN_CART));
+      const line = status();
+      expect(line.textContent).toBe("Scanner updated. Upgrade to keep saving.");
+      const link = within(line).getByRole("link", { name: say(UPGRADE) });
+      expect(link.getAttribute("href")).toBe(`#${UPGRADE_BUTTON}`);
+    },
+  );
 
   test("too old with the cart filled, it asks for the upgrade, as the cart is kept", async () => {
     const { outbox } = openMine();
