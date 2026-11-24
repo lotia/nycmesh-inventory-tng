@@ -163,6 +163,17 @@ describe("quantities", () => {
       problem: say(WHOLE_UNITS),
     });
     expect(quantityOf(whole, halves)).not.toHaveProperty("box");
+    // A fraction taken from an open package: that box is refused.
+    const cut = {
+      itemId: 100,
+      packages: {},
+      loose: "1",
+      open: { "open-1": { amount: "0.5", whole: false } },
+    };
+    expect(quantityOf(cut, radio)).toMatchObject({
+      problem: [say(WHOLE_UNITS)],
+      box: { kind: "open", key: "open-1" },
+    });
   });
 
   test("a box reads as the server does", () => {

@@ -35,7 +35,14 @@ export const IN_ALL = msg`{amount} {unit} in all`;
 
 /** Whether two boxes are the same box of a line. */
 function sameBox(a: Box, b: Box): boolean {
-  return JSON.stringify(a) === JSON.stringify(b);
+  switch (a.kind) {
+    case "loose":
+      return b.kind === "loose";
+    case "package":
+      return b.kind === "package" && b.packageId === a.packageId;
+    case "open":
+      return b.kind === "open" && b.key === a.key;
+  }
 }
 
 export function CartLine({

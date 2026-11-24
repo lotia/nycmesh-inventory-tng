@@ -780,9 +780,15 @@ export function quantityOf(
     ...[...taken.values()].map((t) => t.amount),
   ];
   if (item.unit === "each" && parts.some((part) => part % 1000 !== 0)) {
-    return loose % 1000 === 0
-      ? { problem: [say(WHOLE_UNITS)] }
-      : { problem: [say(WHOLE_UNITS)], box: { kind: "loose" } };
+    // The box typed in a fraction; a package's part is its size's, no box.
+    const cut = [...taken].find(([, t]) => t.amount % 1000 !== 0)?.[0];
+    const box: Box | undefined =
+      loose % 1000 !== 0
+        ? { kind: "loose" }
+        : cut === undefined
+          ? undefined
+          : { kind: "open", key: cut };
+    return { problem: [say(WHOLE_UNITS)], ...(box && { box }) };
   }
   return { amount, sealed, loose, taken };
 }
