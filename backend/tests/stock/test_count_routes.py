@@ -26,7 +26,7 @@ from inventory_tng.stock.counts import Counted, record_count
 from inventory_tng.stock.ledger import LOOSE, Entry, lock_place
 from inventory_tng.stock.moments import Moment, expected, moment
 from inventory_tng.stock.paths import COUNTS
-from inventory_tng.web.forms import TYPE_A_NUMBER, WHOLE_UNITS
+from inventory_tng.web.forms import WHOLE_UNITS, type_a_number
 
 from helpers.concurrency import Committed, isolation_seen
 from helpers.locales import ENGLISH, GERMAN
@@ -149,7 +149,7 @@ def test_a_count_refuses_what_is_not_a_quantity(
     place = stocked(session)
     path = f"{COUNTS}/{place.store.id}"
     shown = count_form(admin_client.get(path))
-    for typed, problem in (("lots", TYPE_A_NUMBER), ("1.5", WHOLE_UNITS)):
+    for typed, problem in (("lots", type_a_number()), ("1.5", WHOLE_UNITS)):
         refused = admin_client.post(
             path, data=shown | {f"counted_{place.item.id}": typed}
         )

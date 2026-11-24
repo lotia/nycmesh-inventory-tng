@@ -1,4 +1,5 @@
 import { beforeEach, expect, test } from "vitest";
+import { takeSeparatorFrom } from "../shared/quantity";
 import { followTotals } from "./running-totals";
 
 // Shelf B held 3 radios before 2 came from Shelf C and 1 from Bin 4, and a
@@ -109,5 +110,19 @@ test("a line with no boxes, or no number in it, is left hidden", () => {
   followTotals(document);
   for (const each of document.querySelectorAll<HTMLElement>("[data-total]")) {
     expect(each.hidden).toBe(true);
+  }
+});
+
+test("a box is read in the page's decimal separator (inventory-tng-qnwz)", () => {
+  const root = document.createElement("html");
+  root.dataset.decimal = ",";
+  takeSeparatorFrom(root);
+  try {
+    type("at_7_opened_4", "10,5");
+    expect(total("7-6")).toBe("315.5");
+    type("at_7_opened_4", "10.5");
+    expect(line("7-6").hidden).toBe(true);
+  } finally {
+    takeSeparatorFrom(document.createElement("html"));
   }
 });

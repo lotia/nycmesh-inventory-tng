@@ -372,6 +372,34 @@ describe("turning a cart into a batch", () => {
     });
   });
 
+  test("a box with the other decimal separator says the page's, and which", () => {
+    // In a page whose boxes take a point (inventory-tng-qnwz).
+    const key = "11111111-1111-4111-8111-111111111111";
+    const lines = [
+      {
+        itemId: 101,
+        packages: {},
+        loose: "1,5",
+        open: { [key]: { amount: "", whole: false, now: "1,000" } },
+      },
+    ];
+    const refused = toBatch(cart({ lines }), CATALOGUE);
+    expect(saidAsText(refused)).toEqual({
+      problems: [
+        "[Cat6 cable]: Type thousands without a separator: 1000.",
+        "[Cat6 cable]: Use “.” for decimals, such as 0.5.",
+      ],
+    });
+    expect(refused).toMatchObject({ refused: ["thousands", "comma"] });
+    // Another refusal is not one of these.
+    const other = toBatch(
+      cart({ lines: [{ itemId: 101, packages: {}, loose: "x" }] }),
+      CATALOGUE,
+    );
+    expect(other).toHaveProperty("problems");
+    expect(other).not.toHaveProperty("refused");
+  });
+
   test("what is taken from an open package no longer offered is not sent", () => {
     const offeredKey = "11111111-1111-4111-8111-111111111111";
     const gone = "22222222-2222-4222-8222-222222222222";

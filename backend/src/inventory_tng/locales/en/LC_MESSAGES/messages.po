@@ -4279,11 +4279,16 @@ msgid "Two adjustments"
 msgstr ""
 
 #: src/inventory_tng/web/forms.py
-msgid "Type a number, such as 12 or 0.5."
+#, python-format
+msgid "Type a number, such as 12 or %(example)s."
 msgstr ""
 
 #: src/inventory_tng/stock/count_forms.py
 msgid "Type everything you found here."
+msgstr ""
+
+#: src/inventory_tng/web/forms.py
+msgid "Type thousands without a separator: 1000."
 msgstr ""
 
 #: src/inventory_tng/stock/length_checks_routes.py
@@ -4362,6 +4367,11 @@ msgstr ""
 #: src/inventory_tng/admins/accounts.py
 #, python-format
 msgid "Use at most %(max)s characters."
+msgstr ""
+
+#: src/inventory_tng/web/forms.py
+#, python-format
+msgid "Use “%(separator)s” for decimals, such as %(example)s."
 msgstr ""
 
 #: src/inventory_tng/templates/devices/devices.html

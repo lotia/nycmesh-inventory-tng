@@ -9,7 +9,9 @@ import { guardRetire } from "./admin/retire";
 import { followTotals } from "./admin/running-totals";
 import { sendOnce } from "./admin/single-use-forms";
 import { followWebSearch } from "./admin/web-search";
+import { takeSeparatorFrom } from "./shared/quantity";
 
+takeSeparatorFrom(document.documentElement);
 guardRetire(document);
 sendOnce(window);
 printButtons(document);

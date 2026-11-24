@@ -49,6 +49,8 @@ from inventory_tng.stock.needs_action import (
 from inventory_tng.stock.open_packages_listing import BY_PACKAGE, BY_SHOWS, OLDEST_FIRST
 from inventory_tng.stock.paths import LENGTHS, STOCK
 from inventory_tng.web.admin_pages import admin_page, now
+from inventory_tng.web.decimal_separator import decimal_separator
+from inventory_tng.web.forms import THOUSANDS, Unreadable, read_decimal, use_separator
 from inventory_tng.web.listing import AskedView, Sorting, View, arranged
 from inventory_tng.web.navigation import SECTION_STOCK
 from inventory_tng.web.pages import add_notices, not_found, redirect
@@ -83,8 +85,28 @@ add_notices(
         "length_bad": LENGTH_BAD,
         "length_reload": LENGTH_RELOAD,
         "length_none_said": LENGTH_NONE_SAID,
+        # A length typed with the other decimal separator than the page's,
+        # the page's named (web/forms.refused_words).
+        "length_use_point": LazyProxy(use_separator, "."),
+        "length_use_comma": LazyProxy(use_separator, ","),
+        "length_thousands": THOUSANDS,
     }
 )
+
+
+def length_refused(typed: str, separator: str) -> str:
+    """The notice a length typed in a box whose decimal separator is
+    `separator` is refused with: the separator to use, if it was typed with
+    the other, or thousands without one; else what to type."""
+    match read_decimal(typed.strip(), separator):
+        case Unreadable.THOUSANDS:
+            return "length_thousands"
+        case Unreadable.SEPARATOR:
+            return "length_use_point" if separator == "." else "length_use_comma"
+        case _:
+            return "length_bad"
+
+
 LENGTHS_TITLE = lazy_gettext("Lengths to check")
 
 # Waiting for a check, not closed: reported by a volunteer, or gone below
@@ -399,6 +421,7 @@ def _answer(
 
 @router.post(f"{LENGTHS}/{{open_id}}/set")
 def set_one(
+    request: Request,
     signed: AdminSignedIn,
     session: DbSession,
     open_id: int,
@@ -414,9 +437,10 @@ def set_one(
     if row is None:
         return not_found()
     back = _back(view, page)
-    length = forms.length(session, row.item_id, left)
+    separator = decimal_separator(request)
+    length = forms.length(session, row.item_id, left, separator=separator)
     if not isinstance(length, Decimal):
-        return redirect(back.link(), notice="length_bad")
+        return redirect(back.link(), notice=length_refused(left, separator))
     # The volunteer's figure, as the box is filled, is set against what it
     # showed at the report; any other, against what the page showed.
     if row.length_reported_in_id is not None and length == row.length_reported:

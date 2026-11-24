@@ -4,7 +4,13 @@ import { v4 as uuid, v5 as uuidFrom } from "uuid";
 import { say, sayParts } from "../shared/i18n";
 import type { Draft, Summary } from "../shared/outbox";
 import type { Said } from "../shared/outbox-notes";
-import { count, decimal, readBox } from "../shared/quantity";
+import {
+  count,
+  decimal,
+  type OtherSeparator,
+  otherSeparator,
+  readBox,
+} from "../shared/quantity";
 import {
   type Cart,
   type Catalogue,
@@ -15,6 +21,7 @@ import {
   reconcile,
   resized,
   SIDES,
+  separatorWords,
   unitChanged,
 } from "./cart";
 import { type Offered, usedUpOf } from "./offered";
@@ -108,7 +115,7 @@ export function toBatch(
   filled: Cart,
   catalogue: Catalogue,
   all?: readonly Offered[],
-): Batch | { problems: Said[] } {
+): Batch | { problems: Said[]; refused?: OtherSeparator[] } {
   const reconciled = reconcile(filled, catalogue);
   // Only what the page offers to take from, where it comes from.
   const here = new Map(
@@ -132,6 +139,9 @@ export function toBatch(
   // Each problem with the names in it quoted, as no number of a name is a
   // count the page wrote (outbox-notes.Said).
   const problems: Said[] = [];
+  // Boxes refused for the other decimal separator than the page's, for
+  // the page to count (CartForm).
+  const refused: OtherSeparator[] = [];
   for (const line of cart.lines) {
     const item = index.items.get(line.itemId);
     const named = item === undefined ? say(AN_ITEM) : { quoted: item.name };
@@ -141,7 +151,13 @@ export function toBatch(
         continue;
       }
       const left = readBox(now);
-      if (left === null || (each && left % 1000 !== 0)) {
+      const other = left === null ? otherSeparator(now) : null;
+      if (other !== null) {
+        refused.push(other);
+        problems.push(
+          sayParts(ITEM_SAYS, { name: named, what: separatorWords(other) }),
+        );
+      } else if (left === null || (each && left % 1000 !== 0)) {
         problems.push(
           sayParts(each ? OPEN_NOW_WHOLE : OPEN_NOW_DECIMALS, { name: named }),
         );
@@ -227,6 +243,9 @@ export function toBatch(
     const unit = line.unit ?? item.unit;
     if ("problem" in quantity) {
       problems.push(sayParts(ITEM_SAYS, { name, what: quantity.problem }));
+      if (quantity.refused !== undefined) {
+        refused.push(quantity.refused);
+      }
     } else if (quantity.amount >= MAX_AMOUNT) {
       problems.push(sayParts(TOO_MUCH, { name }));
     } else if (
@@ -274,7 +293,7 @@ export function toBatch(
   }
   // The volunteer check again only narrows the type; it was reported above.
   if (problems.length > 0 || cart.volunteerId === null) {
-    return { problems };
+    return refused.length > 0 ? { problems, refused } : { problems };
   }
   const draft: Draft = { kind, volunteer_id: cart.volunteerId, lines };
   if (cart.changedFrom !== undefined) {

@@ -407,6 +407,10 @@ msgstr ""
 msgid "{name}: Open whole packages: leave loose empty."
 msgstr ""
 
+#: src/scan/cart.ts
+msgid "Use “{separator}” for decimals, such as {example}."
+msgstr ""
+
 #: src/scan/CartLine.tsx
 msgid "The unit changed from {was} to {unit}. Enter the amount again in {unit}."
 msgstr ""
@@ -984,6 +988,10 @@ msgstr ""
 
 #: src/scan/CartForm.tsx
 msgid "Are you {name}? This phone hasn't been used for a while."
+msgstr ""
+
+#: src/scan/cart.ts
+msgid "Type thousands without a separator: 1000."
 msgstr ""
 
 #: src/shared/outbox-notes.ts

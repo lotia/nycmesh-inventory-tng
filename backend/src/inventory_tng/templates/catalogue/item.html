@@ -50,7 +50,7 @@ None is left, so nobody can pick it.{% endtrans %}{% endif %}{% endcall %}
     ("ordering_notes", _("Ordering notes"), ""),
   ] %}
   <label>{{ label }}{% if hint %} <span class="hint">{{ hint }}</span>{% endif %}
-    {% set stored = item[name] | box_amount if name == "minimum" else item[name] %}
+    {% set stored = item[name] | box_amount(decimal) if name == "minimum" else item[name] %}
     <input name="{{ name }}" inputmode="{{ values.get('unit', item.unit) | keyboard if name == 'minimum' else 'text' }}" value="{{ values.get(name, stored if stored is not none else '') }}">
     {% include "_field_problem.html" %}
   </label>
@@ -109,7 +109,7 @@ None is left, so nobody can pick it.{% endtrans %}{% endif %}{% endcall %}
     {% set followed = package.track_opened if own else item.track_opened %}
     {#- What was sent, and its problems, beside the package it was for. #}
     {% set sent = values if values.get('package_id') == package.id | string else {} %}
-    {% set short = package.short_below | box_amount if package.short_below is not none else '' %}
+    {% set short = package.short_below | box_amount(decimal) if package.short_below is not none else '' %}
     {% set keep = package.minimum_sealed if package.minimum_sealed is not none else '' %}
     <tr>
       <td>{% if not package.retired_at and not retired %}
@@ -122,7 +122,7 @@ None is left, so nobody can pick it.{% endtrans %}{% endif %}{% endcall %}
           {% with typed = sent.get('package_name', package.name) %}{% include "catalogue/_units_read.html" %}{% endwith %}
           {% if package.id not in sizes_fixed %}
           <label>{% trans %}Holds{% endtrans %} <span class="hint">{% trans unit=item.unit %}in {{ unit }}; fixed once some has moved, been opened or labelled{% endtrans %}</span>
-            <input name="size" inputmode="{{ item.unit | keyboard }}" value="{{ sent.get('size', package.size | box_amount) }}" required>
+            <input name="size" inputmode="{{ item.unit | keyboard }}" value="{{ sent.get('size', package.size | box_amount(decimal)) }}" required>
             {% if sent %}{% with name = "size" %}{% include "_field_problem.html" %}{% endwith %}{% endif %}
           </label>
           {% endif %}

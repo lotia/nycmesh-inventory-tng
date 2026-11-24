@@ -22,6 +22,7 @@ from opentelemetry import metrics
 from pydantic import BaseModel, ConfigDict, Field
 
 from inventory_tng.core.rate_limits import RateLimitedReply
+from inventory_tng.web import forms
 from inventory_tng.web.browser import over_limit
 
 log = structlog.get_logger(__name__)
@@ -132,6 +133,15 @@ class RestPutBack(Strict):
     kind: Literal["rest_put_back"]
 
 
+class OtherSeparator(Strict):
+    """A scan page's box refused as written with the decimal separator its
+    locale does not use, as Record was tapped: a point, a comma, or either
+    followed by three digits, as thousands are grouped (web/forms.py)."""
+
+    kind: Literal["other_separator"]
+    separator: forms.OtherSeparator
+
+
 LabelCount = Annotated[int, Field(ge=0, le=10_000)]
 
 
@@ -186,6 +196,7 @@ AnyEvent = (
     | RemovalUndone
     | DifferenceAdded
     | RestPutBack
+    | OtherSeparator
     | CameraSession
 )
 Event = Annotated[AnyEvent, Field(discriminator="kind")]
@@ -341,6 +352,9 @@ def record(event: AnyEvent) -> None:
             differences_added.add(1, {"how": event.how})
         case RestPutBack():
             rests_put_back.add(1)
+        case OtherSeparator():
+            # Counted with the server's own (web/forms.quantity).
+            forms.other_separators.add(1, {"separator": event.separator})
         case CameraSession():
             record_camera_session(event)
         case _:  # ScanToSave, the last kind left.

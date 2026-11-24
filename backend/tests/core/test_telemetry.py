@@ -908,6 +908,31 @@ def test_counts_saves_shown_in_a_unit_or_size_changed_since(
     }
 
 
+def test_counts_numbers_typed_with_the_other_decimal_separator(
+    rolled_back: Recorded, session: Session
+) -> None:
+    """A point refused in a German page's box, and a comma and thousands in
+    an English one's; a number refused otherwise is not counted
+    (inventory-tng-qnwz)."""
+    client, _, reader, _ = rolled_back
+    name = "inventory.numbers.other_separator"
+    before = counted(reader, name)
+    place = Place(session)
+    _, key = new_admin(session)
+    sign_in_with(client, key=key)
+    for language, typed in (("de", "1.5"), ("en", "1,5"), ("en", "1,000"), ("en", "x")):
+        form = adjustment_form(session, place.store, place.cable, amount=typed)
+        answer = client.post(
+            ADJUSTMENTS, data=form, headers={"Accept-Language": language}
+        )
+        assert answer.status_code == 400
+    assert added(reader, name, before) == {
+        (("separator", "point"),): 1,
+        (("separator", "comma"),): 1,
+        (("separator", "thousands"),): 1,
+    }
+
+
 def test_counts_batches_from_a_build_too_old(
     rolled_back: Recorded, session: Session, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -1273,6 +1298,12 @@ PAGE_EVENTS = [
         (("how", "tap"),),
     ),
     ({"kind": "rest_put_back"}, counted, "inventory.cart.rests_put_back", ()),
+    (
+        {"kind": "other_separator", "separator": "thousands"},
+        counted,
+        "inventory.numbers.other_separator",
+        (("separator", "thousands"),),
+    ),
 ]
 
 

@@ -36,6 +36,22 @@ export function sent(text: string): number {
 /** A box's decimal separator, as the server tells the page. */
 export type Separator = "." | ",";
 
+/** The decimal separator this page's boxes take: "." until its entry
+ * point reads the page's own (takeSeparatorFrom). */
+let pageSeparator: Separator = ".";
+
+/** Take the decimal separator `root` says, in its data-decimal, as this
+ * page's: the one the server chose from the browser's Accept-Language
+ * (web/decimal_separator.py). Its boxes are read and written in it. */
+export function takeSeparatorFrom(root: HTMLElement): void {
+  pageSeparator = root.dataset.decimal === "," ? "," : ".";
+}
+
+/** The decimal separator this page's boxes take. */
+export function boxSeparator(): Separator {
+  return pageSeparator;
+}
+
 /** Why what was typed in a number box is no amount, as the server says
  * (web/forms.Unreadable): not a number; the other decimal separator than
  * the box's; that one followed by three digits, as thousands are grouped;
@@ -82,7 +98,7 @@ function split(plain: string, separator: string) {
  * "_"; -0 reads as 0. */
 export function amountTyped(
   text: string,
-  separator: Separator = ".",
+  separator: Separator = pageSeparator,
 ): number | Unreadable {
   let plain = "";
   for (const char of text.trim()) {
@@ -115,7 +131,7 @@ export function amountTyped(
  * nothing; null if it is no amount of 0 or more. */
 export function readBox(
   text: string,
-  separator: Separator = ".",
+  separator: Separator = pageSeparator,
 ): number | null {
   if (text.trim() === "") {
     return 0;
@@ -126,8 +142,33 @@ export function readBox(
 
 /** 12500 as "12.5", or "12,5": `decimal` in a box whose decimal separator
  * is `separator`, without grouping, so it reads back unchanged (readBox). */
-export function boxAmount(amount: number, separator: Separator = "."): string {
+export function boxAmount(
+  amount: number,
+  separator: Separator = pageSeparator,
+): string {
   return decimal(amount).replace(".", separator);
+}
+
+/** A box's refusal of the decimal separator its page does not use, as
+ * the server counts them (web/forms.OtherSeparator): a point, a comma, or
+ * either followed by three digits, as thousands are grouped. */
+export type OtherSeparator = "point" | "comma" | "thousands";
+
+/** Which decimal separator other than its box's, `separator`, what is
+ * typed in it was refused for; null if that is not why, or it is no
+ * refusal. */
+export function otherSeparator(
+  text: string,
+  separator: Separator = pageSeparator,
+): OtherSeparator | null {
+  switch (amountTyped(text, separator)) {
+    case "thousands":
+      return "thousands";
+    case "separator":
+      return separator === "." ? "comma" : "point";
+    default:
+      return null;
+  }
 }
 
 /** A count of whole things, such as packages. Blank is none. */

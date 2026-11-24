@@ -48,6 +48,7 @@ from inventory_tng.web.admin_pages import (
     retirement,
     undo_retire,
 )
+from inventory_tng.web.decimal_separator import decimal_separator
 from inventory_tng.web.forms import ALERTS, RETIRED, RULES, WHOLE_UNITS, form_version
 from inventory_tng.web.listing import (
     UNASKED,
@@ -453,7 +454,9 @@ def suggest_items(session: DbSession, listing: Listed) -> JSONResponse:
 def add_item(
     request: Request, signed: AdminSignedIn, session: DbSession, form: TextForm
 ) -> Response:
-    fields, problems, typed = forms.item_fields(session, form)
+    fields, problems, typed = forms.item_fields(
+        session, form, separator=decimal_separator(request)
+    )
     item = None
     if fields is not None:
         asked = None if forms.confirmed(session, form, fields) else []
@@ -550,7 +553,9 @@ def save_item(
     found = session.get(Item, item_id)
     if found is None:
         return not_found()
-    fields, problems, typed = forms.item_fields(session, form, found)
+    fields, problems, typed = forms.item_fields(
+        session, form, found, separator=decimal_separator(request)
+    )
     renamed = None
     if fields is not None:
         seen = form_version(form.get("version", ""))
@@ -637,7 +642,9 @@ def add_package(
         return not_found()
     typed = forms.typed_name(session, package_name, form)
     name = typed.name
-    parsed, problems = forms.package_fields(found, name, typed.asked, size)
+    parsed, problems = forms.package_fields(
+        found, name, typed.asked, size, separator=decimal_separator(request)
+    )
     if parsed is not None and not problems:
         package, broken = refusal(
             session,
@@ -693,7 +700,12 @@ def save_package(
     typed = forms.typed_name(session, package_name, form)
     name = typed.name
     parsed, problems = forms.package_fields(
-        found, name, typed.asked, size, kept=package.size
+        found,
+        name,
+        typed.asked,
+        size,
+        kept=package.size,
+        separator=decimal_separator(request),
     )
     if parsed is not None and not problems:
         seen = form_version(package_version)
@@ -835,7 +847,11 @@ def package_settings(
         return not_found()
     found = session.get_one(Item, item_id)
     short, minimum, problems = forms.package_settings_fields(
-        package, found.unit, short_below, minimum_sealed
+        package,
+        found.unit,
+        short_below,
+        minimum_sealed,
+        separator=decimal_separator(request),
     )
     # Beside the fields of the package it was sent for.
     values = {

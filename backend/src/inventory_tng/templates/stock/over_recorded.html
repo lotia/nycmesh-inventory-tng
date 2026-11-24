@@ -76,9 +76,10 @@ with an adjustment. Mark checked if you already fixed it.{% endtrans %}</p>
         <input type="hidden" name="seen" value="{{ seen(row) }}">
         <input type="hidden" name="unit" value="{{ each.unit }}">
         <label for="{{ name }}">{% trans %}Count in the package{% endtrans %}</label>
-        <input id="{{ name }}" name="count" inputmode="{{ each.unit | keyboard }}" required value="{{ values.get(name, whole.count) }}" data-was="{{ whole.count }}" aria-describedby="{{ name }}-was{% if problems.get(name) %} {{ name }}-problem{% endif %}">
+        {% set was = whole.count | box_amount(decimal) %}
+        <input id="{{ name }}" name="count" inputmode="{{ each.unit | keyboard }}" required value="{{ values.get(name, was) }}" data-was="{{ was }}" aria-describedby="{{ name }}-was{% if problems.get(name) %} {{ name }}-problem{% endif %}">
         {% include "_field_problem.html" %}
-        <p class="hint" id="{{ name }}-was"{% if values.get(name, whole.count) == whole.count %} hidden{% endif %}>{% trans words=whole.words %}Was {{ words }}{% endtrans %}</p>
+        <p class="hint" id="{{ name }}-was"{% if values.get(name, was) == was %} hidden{% endif %}>{% trans words=whole.words %}Was {{ words }}{% endtrans %}</p>
         <button>{% trans %}Confirm count{% endtrans %}<span class="sr-only"> {{ which(each) }}</span></button>
       </form>
       {% else %}

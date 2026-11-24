@@ -1,12 +1,15 @@
-import { describe, expect, test } from "vitest";
+import { afterEach, describe, expect, test } from "vitest";
 import {
   amountTyped,
   boxAmount,
+  boxSeparator,
   count,
   decimal,
+  otherSeparator,
   readBox,
   type Separator,
   sent,
+  takeSeparatorFrom,
   thousandths,
 } from "./quantity";
 import shared from "./quantity-cases.json";
@@ -29,6 +32,58 @@ describe("a box, as the server reads it", () => {
     expect(read).toBe(
       expected.amount === undefined ? expected.refused : sent(expected.amount),
     );
+  });
+});
+
+describe("a box's refusal of the other separator, as the server counts it", () => {
+  test.each(
+    shared.cases.flatMap((each) =>
+      (["en", "de"] as const).map((locale) => ({
+        text: each.typed,
+        locale,
+        refused: (each[locale] as { refused?: string }).refused,
+      })),
+    ),
+  )("$text in $locale", ({ text, locale, refused }) => {
+    const separator = SEPARATORS[locale];
+    expect(otherSeparator(text, separator)).toBe(
+      refused === "thousands"
+        ? "thousands"
+        : refused === "separator"
+          ? { ".": "comma", ",": "point" }[separator]
+          : null,
+    );
+  });
+});
+
+describe("the page's decimal separator", () => {
+  afterEach(() => takeSeparatorFrom(document.createElement("html")));
+
+  test("is a point until the page says otherwise", () => {
+    expect(boxSeparator()).toBe(".");
+    expect(readBox("2.5")).toBe(2500);
+  });
+
+  test.each([
+    [",", ","],
+    [".", "."],
+    // Anything else the server never says: a point.
+    [";", "."],
+  ])("data-decimal %j is %j", (said, separator) => {
+    const root = document.createElement("html");
+    root.dataset.decimal = said;
+    takeSeparatorFrom(root);
+    expect(boxSeparator()).toBe(separator);
+  });
+
+  test("boxes are read and written in it", () => {
+    const root = document.createElement("html");
+    root.dataset.decimal = ",";
+    takeSeparatorFrom(root);
+    expect(readBox("2,5")).toBe(2500);
+    expect(readBox("2.5")).toBeNull();
+    expect(boxAmount(2500)).toBe("2,5");
+    expect(otherSeparator("2.5")).toBe("point");
   });
 });
 

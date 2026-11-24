@@ -46,6 +46,10 @@ export const PER_HOUR: Record<Event["kind"], number> = {
   // Rare: a batch refused for some of its lines (inventory-tng-clvh),
   // added beside the rest, not taken from them.
   rest_put_back: 2,
+  // A box refused for the decimal separator the page does not use, as
+  // Record is tapped (inventory-tng-qnwz), added beside the rest, not
+  // taken from them.
+  other_separator: 4,
   // One a camera session (Ali, inventory-tng-8i4.63, 2026-11-19), added
   // beside the rest, not taken from them.
   camera_session: 20,

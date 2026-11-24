@@ -365,3 +365,11 @@ def test_development_serves_each_new_build(
         (tmp_path / MANIFEST).write_text(json.dumps(rebuilt))
         assert "/static/assets/scan-N3wHa5h0.js" in client.get("/scan").text
         assert app.state.bundle.build_id() == "2026-11-13T00:00:00.000Z"
+
+
+def test_the_scan_page_says_its_decimal_separator(pages: TestClient) -> None:
+    """From the browser's Accept-Language (web/decimal_separator.py), which
+    the scan page reads its boxes in (inventory-tng-qnwz)."""
+    for language, separator in (("de-DE", ","), ("en-US", ".")):
+        page = pages.get("/scan", headers={"Accept-Language": language}).text
+        assert read(page)["data-decimal"] == separator

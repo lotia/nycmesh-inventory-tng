@@ -386,6 +386,9 @@ export function CartForm({
     const batch = toBatch(current, against, open);
     if ("problems" in batch) {
       problems.value = batch.problems;
+      for (const separator of batch.refused ?? []) {
+        telemetry.record({ kind: "other_separator", separator });
+      }
       return null;
     }
     return { current, batch };

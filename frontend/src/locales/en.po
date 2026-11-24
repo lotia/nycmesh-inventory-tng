@@ -407,6 +407,10 @@ msgstr "That install number is out of range."
 msgid "{name}: Open whole packages: leave loose empty."
 msgstr "{name}: Open whole packages: leave loose empty."
 
+#: src/scan/cart.ts
+msgid "Use “{separator}” for decimals, such as {example}."
+msgstr "Use “{separator}” for decimals, such as {example}."
+
 #: src/scan/CartLine.tsx
 msgid "The unit changed from {was} to {unit}. Enter the amount again in {unit}."
 msgstr "The unit changed from {was} to {unit}. Enter the amount again in {unit}."
@@ -985,6 +989,10 @@ msgstr "This browser isn't keeping the cart, so a reload will empty it. Free som
 #: src/scan/CartForm.tsx
 msgid "Are you {name}? This phone hasn't been used for a while."
 msgstr "Are you {name}? This phone hasn't been used for a while."
+
+#: src/scan/cart.ts
+msgid "Type thousands without a separator: 1000."
+msgstr "Type thousands without a separator: 1000."
 
 #: src/shared/outbox-notes.ts
 msgid "This item, in this package or loose, is on another line too: put it on one line"

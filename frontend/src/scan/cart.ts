@@ -28,7 +28,15 @@ import {
 } from "../shared/local-storage";
 import { BatchKey, BatchLine } from "../shared/outbox";
 import type { Said } from "../shared/outbox-notes";
-import { boxAmount, count, readBox, thousandths } from "../shared/quantity";
+import {
+  boxAmount,
+  boxSeparator,
+  count,
+  type OtherSeparator,
+  otherSeparator,
+  readBox,
+  thousandths,
+} from "../shared/quantity";
 import { indexOf } from "./search";
 import { sealedKey } from "./unseen-batches";
 
@@ -658,7 +666,7 @@ export function quantityOf(
       loose: number;
       taken: Map<string, { amount: number; whole: boolean }>;
     }
-  | { problem: Said } {
+  | { problem: Said; refused?: OtherSeparator } {
   const current = new Set(item.packages.map((pack) => String(pack.id)));
   for (const [packageId, typed] of Object.entries(line.packages)) {
     if (!current.has(packageId) && holdsSome(typed)) {
@@ -685,7 +693,7 @@ export function quantityOf(
   }
   const loose = readBox(line.loose);
   if (loose === null) {
-    return { problem: [say(LOOSE_DECIMALS, { unit: item.unit })] };
+    return boxProblem(line.loose, say(LOOSE_DECIMALS, { unit: item.unit }));
   }
   amount += loose;
   const taken = new Map<string, { amount: number; whole: boolean }>();
@@ -694,7 +702,7 @@ export function quantityOf(
   )) {
     const part = readBox(typed);
     if (part === null) {
-      return { problem: [say(OPEN_DECIMALS)] };
+      return boxProblem(typed, say(OPEN_DECIMALS));
     }
     if (part > 0) {
       taken.set(key, { amount: part, whole });
@@ -718,6 +726,34 @@ export const COUNT_WHOLE_PACKAGES = msg`Count whole packages: {package}.`;
 export const LOOSE_DECIMALS = msg`Enter the loose amount in {unit}, up to 3 decimals.`;
 export const OPEN_DECIMALS = msg`Enter how much from the open package, up to 3 decimals.`;
 export const WHOLE_UNITS = msg`Counted in whole units.`;
+/** A box refused for the decimal separator its page does not use: the
+ * other followed by three digits, as thousands are grouped, which naming
+ * the decimal one would turn into a thousandth of what was meant; else
+ * the one to use, named (Ali, 2026-11-23, inventory-tng-qnwz). As the
+ * server's web/forms.THOUSANDS and use_separator say. */
+export const THOUSANDS = msg`Type thousands without a separator: 1000.`;
+export const USE_SEPARATOR = msg`Use “{separator}” for decimals, such as {example}.`;
+
+/** What a box says of the other decimal separator than its page's. */
+export function separatorWords(refused: OtherSeparator): string {
+  const separator = boxSeparator();
+  return refused === "thousands"
+    ? say(THOUSANDS)
+    : say(USE_SEPARATOR, { separator, example: `0${separator}5` });
+}
+
+/** What a box says of what is typed in it, which it refused: `otherwise`,
+ * unless it was for the other decimal separator than its page's, said as
+ * separatorWords, and which it was. */
+function boxProblem(
+  typed: string,
+  otherwise: string,
+): { problem: Said; refused?: OtherSeparator } {
+  const refused = otherSeparator(typed);
+  return refused === null
+    ? { problem: [otherwise] }
+    : { problem: [separatorWords(refused)], refused };
+}
 
 /** What the page says beside a retired item, or package. */
 export const RETIRED = msg`retired: taking only`;

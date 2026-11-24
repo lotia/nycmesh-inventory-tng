@@ -114,9 +114,10 @@ class ByForm(NamedTuple):
 
 
 def by_form(
-    session: Session, form: Mapping[str, str], place_id: int
+    session: Session, form: Mapping[str, str], place_id: int, *, separator: str
 ) -> tuple[ByForm, dict[str, Words]]:
-    """The count form's forms (count_asked_for.forms_by_place), as lines, and
+    """The count form's forms (count_asked_for.forms_by_place), as lines,
+    their boxes in the decimal `separator` (web/decimal_separator.py), and
     what is wrong."""
     problems: dict[str, Words] = {}
     lines: list[tuple[int, Form, Decimal]] = []
@@ -153,7 +154,9 @@ def by_form(
             if item is None:
                 problems[field] = NO_SUCH_ITEM
                 continue
-            amount = quantity(typed, positive=False, unit=item.unit)
+            amount = quantity(
+                typed, positive=False, unit=item.unit, separator=separator
+            )
             if isinstance(amount, str):
                 problems[field] = amount
             else:
@@ -162,7 +165,7 @@ def by_form(
         elif field.startswith(OPENED):
             row = session.get(OpenPackage, row_id(field.removeprefix(OPENED)) or 0)
             unit = session.get_one(Item, row.item_id).unit if row else "m"
-            amount = quantity(typed, positive=False, unit=unit)
+            amount = quantity(typed, positive=False, unit=unit, separator=separator)
             if row is None or row.location_id != place_id or state not in STATES:
                 problems[field] = NO_SUCH_OPEN_PACKAGE
             elif (reason := STATES[state]) is not None:
@@ -188,6 +191,7 @@ def by_form(
             positive=True,
             unit=unit,
             required=HOW_MUCH_LEFT,
+            separator=separator,
         )
         if package is None:
             problems[FOUND_PACKAGE] = NO_SUCH_PACKAGE
@@ -274,7 +278,7 @@ ARRIVED = "arrived_"
 
 
 def arrivals(
-    session: Session, fields: Mapping[str, str], place_id: int
+    session: Session, fields: Mapping[str, str], place_id: int, *, separator: str
 ) -> tuple[dict[tuple[int, int, Form], Decimal], dict[str, Words]]:
     """A place's boxes of how many arrived, read as its count by form is
     (by_form), by the area each move left, its item and form, those blank
@@ -288,7 +292,7 @@ def arrivals(
     arrived: dict[tuple[int, int, Form], Decimal] = {}
     problems: dict[str, Words] = {}
     for area_id, typed in by_area.items():
-        read, wrong = by_form(session, typed, place_id)
+        read, wrong = by_form(session, typed, place_id, separator=separator)
         for item_id, form, amount in read.lines:
             arrived[(area_id, item_id, form)] = amount
         problems |= {
@@ -431,6 +435,8 @@ def read_count(
     root_id: int,
     place_ids: list[int],
     held: Callable[[int, int], bool],
+    *,
+    separator: str,
 ) -> CountForm:
     """A count form, of the places `place_ids` (places_listed), read place
     by place (by_place) and checked; `held(place_id, item_id)`, whether a
@@ -464,9 +470,11 @@ def read_count(
             elif items and extra not in items and held(place_id, extra):
                 listed = Listed(extra, place_id, on_form=False)
                 items.add(extra)
-        counted, wrong = item_counts(session, found)
-        forms, form_wrong = by_form(session, fields, place_id)
-        arrived, arrived_wrong = arrivals(session, fields, place_id)
+        counted, wrong = item_counts(session, found, separator=separator)
+        forms, form_wrong = by_form(session, fields, place_id, separator=separator)
+        arrived, arrived_wrong = arrivals(
+            session, fields, place_id, separator=separator
+        )
         figures = recount_figures(fields, items)
         places[place_id] = PlaceCount(found, counted, forms, items, figures, arrived)
         named = fields_at(root_id, place_id, named_twice(found_once))
@@ -477,10 +485,10 @@ def read_count(
 
 
 def item_counts(
-    session: Session, found: Collection[Line]
+    session: Session, found: Collection[Line], *, separator: str
 ) -> tuple[ItemLines, dict[str, Words]]:
-    """What was typed, as lines of an item and an amount, and what is wrong
-    with it."""
+    """What was typed, as lines of an item and an amount, in the decimal
+    `separator`, and what is wrong with it."""
     units = queries.units_of(session, [item_id for _, item_id, _ in found if item_id])
     counted: list[tuple[int, Decimal]] = []
     problems: dict[str, Words] = {}
@@ -488,7 +496,7 @@ def item_counts(
         if item_id is None or (unit := units.get(item_id)) is None:
             problems[field] = NO_SUCH_ITEM
             continue
-        amount = quantity(typed, positive=False, unit=unit)
+        amount = quantity(typed, positive=False, unit=unit, separator=separator)
         if isinstance(amount, str):
             problems[field] = amount
         elif amount is not None:

@@ -954,8 +954,10 @@ On the server (`backend/src/inventory_tng/core/phrases.py`, which
   A plural's count is written so already, and its form still chosen by
   the number. A quantity is `{{ left | amount }}`, every stored digit
   kept. A number in a link stays plain digits. A number box takes
-  `{{ left | box_amount }}`, no digits grouped, and its form reads it
-  with `web/forms.quantity`; a field the page writes itself, such as a
+  `{{ left | box_amount(decimal) }}`, in the page's decimal separator
+  and no digits grouped, and its form reads it with `web/forms.quantity`,
+  given `separator=decimal_separator(request)`
+  (`web/decimal_separator.py`); a field the page writes itself, such as a
   hidden one, takes `{{ left | plain_amount }}`, read with
   `web/forms.read_amount`.
 - Values are always filled, so a per cent sign in a message is `%%`; a
@@ -981,7 +983,9 @@ On the scan page (`frontend/src/shared/i18n.ts`):
 - A quantity people read, in thousandths, is `sayAmount(left)`, written
   as the locale writes a number with every thousandth kept, and any other
   number is `sayNumber(n)`. One a box holds is `boxAmount(left)`, read
-  back with `readBox`; one sent to the server is `decimal(left)`, plain.
+  back with `readBox`, both in the decimal separator the page's
+  `<html data-decimal>` says (`takeSeparatorFrom`); one sent to the
+  server is `decimal(left)`, plain.
   `frontend/src/shared/quantity-cases.json` holds what both sides must
   read some typed text as; both test against it.
 

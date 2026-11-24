@@ -339,6 +339,8 @@ SIGNED_IN = {
     ],
     "title": NOT_ENGLISH,
     "back_link": ("/admin", NOT_ENGLISH),
+    # The page's decimal separator, as web/pages.page gives every page.
+    "decimal": ".",
 }
 
 
@@ -503,7 +505,7 @@ def recorded_more() -> str:
         "arrived_on": DAY,
     }
     waiting = [
-        recorded(moved_whole=SimpleNamespace(count="1", words=NOT_ENGLISH)),
+        recorded(moved_whole=SimpleNamespace(count=Decimal(1), words=NOT_ENGLISH)),
         *(
             recorded(one_counted=SimpleNamespace(**one, how=how))
             for how in ("counted", "closed")

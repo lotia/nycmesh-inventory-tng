@@ -39,7 +39,7 @@ stays.{% endtrans %}</p>
         <input type="hidden" name="page" value="{{ all_path }}">
         {% set hint = shown.unit | printed_length %}
         <label>{% trans unit=shown.unit %}Really on it ({{ unit }}){% endtrans %}
-          <input name="left" id="left-{{ row.id }}" inputmode="decimal" value="{{ row.length_reported | box_amount if row.length_reported is not none else '' }}"{% if hint %} aria-describedby="hint-{{ row.id }}"{% endif %}></label>
+          <input name="left" id="left-{{ row.id }}" inputmode="decimal" value="{{ row.length_reported | box_amount(decimal) if row.length_reported is not none else '' }}"{% if hint %} aria-describedby="hint-{{ row.id }}"{% endif %}></label>
         {% if hint %}<p class="hint" id="hint-{{ row.id }}">{{ hint }}</p>{% endif %}
         {#- "Set to 40 m", following the box in the browser
         (frontend/src/admin/hints.ts); "Set to it" without, as the box may

@@ -53,6 +53,7 @@ from inventory_tng.stock.paths import (
     STOCK,
 )
 from inventory_tng.web.admin_pages import admin_page
+from inventory_tng.web.decimal_separator import decimal_separator
 from inventory_tng.web.forms import row_id, rule_words
 from inventory_tng.web.listing import (
     AskedView,
@@ -497,7 +498,13 @@ def answer(
         return not_found()
     count = None
     if do == "count":
-        count = confirmed_count(session, check.movement_id, typed, shown_unit)
+        count = confirmed_count(
+            session,
+            check.movement_id,
+            typed,
+            shown_unit,
+            separator=decimal_separator(request),
+        )
         if not isinstance(count, Decimal):
             field = f"count-{check_id}"
             log.debug("over recorded count refused", over_recorded_id=check_id)

@@ -42,6 +42,7 @@ from inventory_tng.stock.forms import adjustment, now_counted_in, shown_field
 from inventory_tng.stock.paths import ADJUSTMENTS, COUNTS
 from inventory_tng.stock.units_shown import SHOWN_OTHERWISE
 from inventory_tng.web.admin_pages import TextForm, admin_page, current_rows
+from inventory_tng.web.decimal_separator import decimal_separator
 from inventory_tng.web.forms import RULES
 from inventory_tng.web.listing import UNASKED, AskedView, Sort, Sorting, View, order
 from inventory_tng.web.pages import add_notices, redirect
@@ -197,7 +198,9 @@ def adjust(
     request: Request, signed: AdminSignedIn, session: DbSession, form: TextForm
 ) -> Response:
     key = form_key(form.get("key", ""))
-    asked, problems = adjustment(session, form, key)
+    asked, problems = adjustment(
+        session, form, key, separator=decimal_separator(request)
+    )
     if asked is None:
         return _counts_page(request, session, signed, problems=problems, values=form)
     place, item, amount, direction, reason, key, unit = asked

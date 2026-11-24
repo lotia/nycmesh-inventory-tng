@@ -1280,6 +1280,25 @@
         "title": "OpenPackageEntry",
         "description": "A package opened and followed, not reported used up: one a cart can\ntake from where it is."
       },
+      "OtherSeparator": {
+        "properties": {
+          "kind": {
+            "type": "string",
+            "const": "other_separator",
+            "title": "Kind"
+          },
+          "separator": {
+            "type": "string",
+            "enum": ["point", "comma", "thousands"],
+            "title": "Separator"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": ["kind", "separator"],
+        "title": "OtherSeparator",
+        "description": "A scan page's box refused as written with the decimal separator its\nlocale does not use, as Record was tapped: a point, a comma, or either\nfollowed by three digits, as thousands are grouped (web/forms.py)."
+      },
       "OutOfDate": {
         "properties": {
           "kind": {
@@ -1679,6 +1698,9 @@
                   "$ref": "#/components/schemas/RestPutBack"
                 },
                 {
+                  "$ref": "#/components/schemas/OtherSeparator"
+                },
+                {
                   "$ref": "#/components/schemas/CameraSession"
                 }
               ],
@@ -1691,6 +1713,7 @@
                   "error": "#/components/schemas/PageError",
                   "line_removed": "#/components/schemas/LineRemoved",
                   "older_storage": "#/components/schemas/OlderStorage",
+                  "other_separator": "#/components/schemas/OtherSeparator",
                   "out_of_date": "#/components/schemas/OutOfDate",
                   "outbox_retry": "#/components/schemas/OutboxRetry",
                   "removal_undone": "#/components/schemas/RemovalUndone",

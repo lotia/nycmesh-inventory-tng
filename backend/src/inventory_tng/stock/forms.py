@@ -25,11 +25,11 @@ from inventory_tng.models.stock import (
 from inventory_tng.stock import over_recorded, queries, units_shown
 from inventory_tng.stock.units_shown import Now, Shown
 from inventory_tng.web.forms import (
-    TYPE_A_NUMBER,
     chosen,
     quantity,
     read_amount,
     row_id,
+    type_a_number,
     up_to,
 )
 
@@ -112,10 +112,16 @@ class Adjustment(NamedTuple):
 
 
 def adjustment(
-    session: Session, form: Mapping[str, str], key: uuid.UUID | None
+    session: Session,
+    form: Mapping[str, str],
+    key: uuid.UUID | None,
+    *,
+    separator: str,
 ) -> tuple[Adjustment | None, dict[str, Words]]:
-    """The adjustment the form asks for, unless something is wrong, and
-    what is: a form without its `key` (sent_forms.form_key) is out of date."""
+    """The adjustment the form asks for, its amount in the decimal
+    `separator` of the page's boxes (web/decimal_separator.py), unless
+    something is wrong, and what is: a form without its `key`
+    (sent_forms.form_key) is out of date."""
     problems: dict[str, Words] = {}
     location_id = row_id(form.get("location_id", ""))
     place = session.get(Location, location_id) if location_id is not None else None
@@ -129,6 +135,7 @@ def adjustment(
         positive=True,
         unit=item.unit if item else None,
         required=HOW_MUCH,
+        separator=separator,
     )
     if isinstance(amount, str):
         problems["amount"] = amount
@@ -166,7 +173,7 @@ WORDS_FOR_ANOTHER = lazy_gettext(
 
 
 def confirmed_count(
-    session: Session, movement_id: int, typed: str, shown: str
+    session: Session, movement_id: int, typed: str, shown: str, *, separator: str
 ) -> Decimal | str | None:
     """The count typed to confirm an open package moved whole by a ledger
     line, in its item's unit, or what is wrong with it: shown in another
@@ -177,7 +184,13 @@ def confirmed_count(
     if shown != unit:
         units_shown.refusing("confirm_count", Now({item_id: unit}, {}))
         return now_counted_in(unit)
-    return quantity(typed, positive=False, unit=unit, required=TYPE_A_NUMBER)
+    return quantity(
+        typed,
+        positive=False,
+        unit=unit,
+        required=type_a_number(separator),
+        separator=separator,
+    )
 
 
 def why_problem(reason: str, words: str) -> Words | None:
@@ -195,11 +208,13 @@ def why_problem(reason: str, words: str) -> Words | None:
     return None
 
 
-def length(session: Session, item_id: int, typed: str) -> Decimal | str | None:
+def length(
+    session: Session, item_id: int, typed: str, *, separator: str
+) -> Decimal | str | None:
     """What is on an open package of an item, as typed to set its length,
     in the item's unit, or what is wrong with it."""
     unit = session.get_one(Item, item_id).unit
-    return quantity(typed, positive=False, unit=unit)
+    return quantity(typed, positive=False, unit=unit, separator=separator)
 
 
 def showed(typed: str) -> Decimal | None:

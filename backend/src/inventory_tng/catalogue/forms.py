@@ -300,10 +300,15 @@ def short_to_set(package: ItemPackage) -> str:
 
 
 def item_fields(
-    session: Session, form: Mapping[str, str], item: Item | None = None
+    session: Session,
+    form: Mapping[str, str],
+    item: Item | None = None,
+    *,
+    separator: str,
 ) -> tuple[items.Fields | None, dict[str, Words], Typed]:
     """What to set, unless something is wrong, what is, and the name as
-    typed; for `item`'s form, if given, else a new item's."""
+    typed; for `item`'s form, if given, else a new item's. Its minimum is
+    in the decimal `separator` of the page's boxes."""
     item_id = item.id if item is not None else None
     typed = typed_name(session, form.get("name", ""), form)
     name = typed.name
@@ -323,7 +328,9 @@ def item_fields(
         and (fraction := package_fraction(session, item.id))
     ):
         problems["unit"] = fraction
-    minimum = quantity(form.get("minimum", ""), positive=False, unit=unit)
+    minimum = quantity(
+        form.get("minimum", ""), positive=False, unit=unit, separator=separator
+    )
     if isinstance(minimum, str):
         problems["minimum"] = minimum
     # Each None or str here is a problem already; checked again for the types.
@@ -357,6 +364,7 @@ def package_fields(
     size: str,
     *,
     kept: Decimal | None = None,
+    separator: str,
 ) -> tuple[Decimal | None, dict[str, Words]]:
     """A package's size as typed, and what is wrong with its name or size:
     its name compared as items' are, so it needs a letter or a digit, with
@@ -373,6 +381,7 @@ def package_fields(
         positive=True,
         unit=item.unit,
         required=SIZE_REQUIRED,
+        separator=separator,
     )
     if isinstance(parsed, str):
         problems["size"] = parsed
@@ -380,12 +389,17 @@ def package_fields(
 
 
 def package_settings_fields(
-    package: ItemPackage, unit: str, short_below: str, minimum_sealed: str
+    package: ItemPackage,
+    unit: str,
+    short_below: str,
+    minimum_sealed: str,
+    *,
+    separator: str,
 ) -> tuple[Decimal | None, int | None, dict[str, Words]]:
     """A package's too-short-to-use length and minimum sealed as typed,
     each blank for none, and what is wrong with them: the length shorter
     than a whole one, whole for an item counted each."""
-    short = quantity(short_below, positive=True, unit=unit)
+    short = quantity(short_below, positive=True, unit=unit, separator=separator)
     minimum = whole(minimum_sealed, 0, INTEGER_MAX) if minimum_sealed.strip() else None
     problems = {}
     if isinstance(short, str):

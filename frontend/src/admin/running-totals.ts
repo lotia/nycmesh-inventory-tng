@@ -1,4 +1,4 @@
-import { count, decimal, sent, thousandths } from "../shared/quantity";
+import { count, decimal, readBox, sent } from "../shared/quantity";
 
 /**
  * What a place on the count form holds once saved, under "Moved to" it:
@@ -65,15 +65,16 @@ export function followTotals(document: Document): void {
 }
 
 /** What a box adds, in thousandths of what it counts (a sealed package,
- * whole, as the server reads it), what it was sent as if blank; null if
- * it holds no such number. */
+ * whole, as the server reads it), read in the page's decimal separator
+ * (readBox), what it was sent as if blank; null if it holds no such
+ * number. */
 function boxAmount(box: HTMLInputElement): number | null {
   const typed = box.value.trim();
   if (typed === "") {
     return sent(box.dataset.unset ?? "0");
   }
   if (box.dataset.per === undefined) {
-    return thousandths(typed);
+    return readBox(typed);
   }
   const packages = count(typed);
   return packages === null ? null : packages * 1000;

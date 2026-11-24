@@ -117,6 +117,7 @@ describe("reporting", () => {
       removal_undone: { kind: "removal_undone" },
       difference_added: { kind: "difference_added", how: "tap" },
       rest_put_back: { kind: "rest_put_back" },
+      other_separator: { kind: "other_separator", separator: "point" },
       camera_session: {
         kind: "camera_session",
         outcome: "opened",

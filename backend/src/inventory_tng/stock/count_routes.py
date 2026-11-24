@@ -164,6 +164,7 @@ from inventory_tng.stock.units_shown import (
     refusing,
 )
 from inventory_tng.web.admin_pages import TextForm, admin_page, now
+from inventory_tng.web.decimal_separator import decimal_separator
 from inventory_tng.web.forms import CHANGED, RULES, row_id
 from inventory_tng.web.navigation import SECTION_COUNTS
 from inventory_tng.web.pages import add_notices, not_found, redirect
@@ -739,7 +740,14 @@ def count(
     # show them, unless something else here names a line it does not show.
     since = _since_shown(session, carried)
     left = since.left
-    sent = read_count(session, form, place.id, place_ids, since.asks_for)
+    sent = read_count(
+        session,
+        form,
+        place.id,
+        place_ids,
+        since.asks_for,
+        separator=decimal_separator(request),
+    )
     asked = {place_id: each.items for place_id, each in sent.places.items()}
     # The form shown again: as sent, or with `at` None, as it is now; a
     # recount with the figures it first showed (count_forms.WHILE).
@@ -926,7 +934,9 @@ def count(
         # changed since beside its boxes and below that.
         marked: dict[str, Words] = {}
         for place_id, each in sent.places.items():
-            _, wrong = item_counts(session, each.found)
+            _, wrong = item_counts(
+                session, each.found, separator=decimal_separator(request)
+            )
             marked |= fields_at(place.id, place_id, wrong)
         return as_sent(
             problems=marked | changed,
@@ -1103,7 +1113,14 @@ def bring_back(
     # first needed, once, as count reads them.
     since = _since_shown(session, carried)
     left = since.left
-    sent = read_count(session, form, place.id, place_ids, since.asks_for).places
+    sent = read_count(
+        session,
+        form,
+        place.id,
+        place_ids,
+        since.asks_for,
+        separator=decimal_separator(request),
+    ).places
     words, said = kept_as_now(session, form, key, sent.values(), place.id, place_ids)
     again = partial(
         _count_page,

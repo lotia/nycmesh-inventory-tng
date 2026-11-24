@@ -19,6 +19,7 @@ from starlette.types import Scope
 from inventory_tng.core.db_errors import Gone
 from inventory_tng.core.local_time import show, show_day
 from inventory_tng.core.phrases import BRAND, lazy_gettext, number
+from inventory_tng.web.decimal_separator import decimal_separator
 from inventory_tng.web.formatting import (
     amount,
     box_amount,
@@ -80,10 +81,11 @@ def signed_in_as(request: Request) -> SignedInAs | None:
 
 
 # {{ quantity | amount }}: a quantity as people read it ("1,234.5"); a
-# number box takes {{ quantity | box_amount }} ("1234.5"), and a field the
+# number box takes {{ quantity | box_amount(decimal) }} ("1234.5", or
+# "1234,5"), in the page's decimal separator (page()), and a field the
 # page writes itself, such as a hidden one, {{ quantity | plain_amount }},
-# as the form reads each back. {{ typed | read_amount }} is what a box's
-# text reads as, or None.
+# as the form reads each back. {{ typed | read_amount(decimal) }} is what a
+# box's text reads as, or None.
 templates.env.filters["amount"] = amount
 templates.env.filters["box_amount"] = box_amount
 templates.env.filters["plain_amount"] = plain_amount
@@ -142,13 +144,16 @@ def page(
     """A page, never cached: some show secrets once, and all show what only
     the person signed in may see. Forms read `problems` and `values`. A page
     for an administrator (`admin`) has the navigation, unless the context
-    gives its `sections`, read already."""
+    gives its `sections`, read already. Each page has its number boxes'
+    decimal separator as `decimal` (web/decimal_separator.py), which its
+    <html data-decimal> tells its scripts."""
     notice = NOTICES.get(request.query_params.get("notice", ""))
     section = request.query_params.get("section", "")
     full = {
         "problems": {},
         "values": {},
         "notice": notice,
+        "decimal": decimal_separator(request),
         # Only its section's heading says it (_notice.html), if there is one.
         "notice_section": section if notice and section in NOTICE_SECTIONS else None,
     } | dict(context)

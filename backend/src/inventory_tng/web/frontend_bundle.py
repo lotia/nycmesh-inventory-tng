@@ -23,6 +23,7 @@ from starlette.types import ASGIApp
 
 from inventory_tng.core.phrases import lazy_gettext
 from inventory_tng.core.settings import FrontendConfig, Settings
+from inventory_tng.web.decimal_separator import decimal_separator
 from inventory_tng.web.pages import templates
 
 log = structlog.get_logger(__name__)
@@ -172,7 +173,13 @@ def _page(title: LazyProxy, entry: str) -> Callable[[Request], Response]:
         return templates.TemplateResponse(
             request,
             "frontend_page.html",
-            {"title": title, "tags": page_tags, "brand_home": SCAN},
+            {
+                "title": title,
+                "tags": page_tags,
+                "brand_home": SCAN,
+                # The scan page reads its boxes in it (web/decimal_separator.py).
+                "decimal": decimal_separator(request),
+            },
             # The page names this build's files, so it must not outlive it.
             headers={"Cache-Control": "no-cache"},
         )

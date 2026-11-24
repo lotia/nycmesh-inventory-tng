@@ -1,6 +1,7 @@
-import { describe, expect, test, vi } from "vitest";
+import { afterEach, describe, expect, test, vi } from "vitest";
 import { BUILD } from "../shared/build";
 import { say } from "../shared/i18n";
+import { type Separator, takeSeparatorFrom } from "../shared/quantity";
 import { cart } from "../testing/cart";
 import { CATALOGUE, cable, radio } from "../testing/catalogue";
 import { saidAsText } from "../testing/said";
@@ -170,6 +171,83 @@ describe("quantities", () => {
     expect(saidAsText(quantityOf(line, cable))).toEqual({
       problem: "Enter the loose amount in m, up to 3 decimals.",
     });
+  });
+});
+
+/** The page's decimal separator, as its <html data-decimal> says. */
+function pageSays(separator: Separator) {
+  const root = document.createElement("html");
+  root.dataset.decimal = separator;
+  takeSeparatorFrom(root);
+}
+
+describe("a box in the page's decimal separator (inventory-tng-qnwz)", () => {
+  afterEach(() => pageSays("."));
+
+  test.each([
+    [",", "1,5", { amount: 1500 }],
+    [".", "1.5", { amount: 1500 }],
+    [
+      ",",
+      "1.5",
+      { problem: "Use “,” for decimals, such as 0,5.", refused: "point" },
+    ],
+    [
+      ".",
+      "1,5",
+      { problem: "Use “.” for decimals, such as 0.5.", refused: "comma" },
+    ],
+    [
+      ",",
+      "1.000",
+      {
+        problem: "Type thousands without a separator: 1000.",
+        refused: "thousands",
+      },
+    ],
+    [
+      ".",
+      "1,000",
+      {
+        problem: "Type thousands without a separator: 1000.",
+        refused: "thousands",
+      },
+    ],
+    [
+      ",",
+      "lots",
+      { problem: "Enter the loose amount in m, up to 3 decimals." },
+    ],
+  ] as const)("in %j, %j loose", (separator, loose, expected) => {
+    pageSays(separator);
+    const read = quantityOf({ itemId: 101, packages: {}, loose }, cable);
+    expect({ ...read, ...saidAsText(read) }).toMatchObject(expected);
+    if (!("refused" in expected)) {
+      expect(read).not.toHaveProperty("refused");
+    }
+  });
+
+  test("what is taken from an open package says it too", () => {
+    pageSays(",");
+    const line = {
+      itemId: 101,
+      packages: {},
+      loose: "",
+      open: { key: { amount: "2.5", whole: false } },
+    };
+    expect(quantityOf(line, cable)).toEqual({
+      problem: ["Use “,” for decimals, such as 0,5."],
+      refused: "point",
+    });
+  });
+
+  test("a bump writes the box in the page's separator", () => {
+    pageSays(",");
+    const bumped = addOne(
+      cart({ lines: [{ itemId: 101, packages: {}, loose: "1,5" }] }),
+      101,
+    );
+    expect(bumped.lines[0]?.loose).toBe("2,5");
   });
 });
 

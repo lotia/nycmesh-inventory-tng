@@ -560,6 +560,24 @@ export interface components {
       short_below: string | null;
     };
     /**
+     * OtherSeparator
+     * @description A scan page's box refused as written with the decimal separator its
+     *     locale does not use, as Record was tapped: a point, a comma, or either
+     *     followed by three digits, as thousands are grouped (web/forms.py).
+     */
+    OtherSeparator: {
+      /**
+       * @description discriminator enum property added by openapi-typescript
+       * @enum {string}
+       */
+      kind: "other_separator";
+      /**
+       * Separator
+       * @enum {string}
+       */
+      separator: "point" | "comma" | "thousands";
+    };
+    /**
      * OutOfDate
      * @description A scan page's tab learned that a newer build is out (page_builds.py),
      *     once a tab.
@@ -744,6 +762,7 @@ export interface components {
         | components["schemas"]["RemovalUndone"]
         | components["schemas"]["DifferenceAdded"]
         | components["schemas"]["RestPutBack"]
+        | components["schemas"]["OtherSeparator"]
         | components["schemas"]["CameraSession"]
       )[];
     };

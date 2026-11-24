@@ -39,7 +39,7 @@ from inventory_tng.stock.over_recorded import (
     correction_key,
     moved_whole,
 )
-from inventory_tng.web.formatting import amount, plain_amount, times
+from inventory_tng.web.formatting import amount, times
 
 # Where stock left, and where it arrived, and the counts that put each
 # right.
@@ -96,10 +96,10 @@ class BothRight(NamedTuple):
 
 
 class MovedWhole(NamedTuple):
-    """What an open package moved whole held when it moved: as its count
-    box is filled, and in words."""
+    """What an open package moved whole held when it moved, as its count
+    box is filled (box_amount), and in words."""
 
-    count: str
+    count: Decimal
     words: str
 
 
@@ -339,7 +339,7 @@ def shown(session: Session, *where: ColumnElement[bool]) -> list[Shown]:
                 at,
                 from_place,
                 to_place if kind != "open" else None,
-                MovedWhole(plain_amount(held), amount_words(held, unit, None, None))
+                MovedWhole(held, amount_words(held, unit, None, None))
                 if whole
                 else None,
                 one,

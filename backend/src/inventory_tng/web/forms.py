@@ -8,7 +8,10 @@ import re
 import unicodedata
 from decimal import Decimal
 from enum import StrEnum
+from typing import Literal
 
+import structlog
+from opentelemetry import metrics
 from sqlalchemy.orm import Session
 
 from inventory_tng.core.db_base import Base
@@ -16,6 +19,9 @@ from inventory_tng.core.phrases import Words, gettext, lazy_gettext, number
 from inventory_tng.models.base import INTEGER_MAX, whole
 from inventory_tng.models.names import canonical
 from inventory_tng.stock.ledger import whole_enough
+
+log = structlog.get_logger(__name__)
+meter = metrics.get_meter(__name__)
 
 NAME_MAX = 200
 
@@ -143,7 +149,6 @@ def name_problem(name: str) -> str | None:
     return None
 
 
-TYPE_A_NUMBER = lazy_gettext("Type a number, such as 12 or 0.5.")
 TOO_BIG = lazy_gettext("That number is too big.")
 ABOVE_ZERO = lazy_gettext("Use a number above 0.")
 ZERO_OR_MORE = lazy_gettext("Use 0 or more.")
@@ -220,6 +225,68 @@ def read_amount(text: str, separator: str = ".") -> Decimal | None:
     return value if isinstance(value, Decimal) else None
 
 
+def type_a_number(separator: str = ".") -> str:
+    """Something that is no number typed in a box whose decimal separator
+    is `separator`, refused, with a number such as it takes."""
+    return gettext(
+        "Type a number, such as 12 or %(example)s.", example=f"0{separator}5"
+    )
+
+
+# What a box refused as written with the decimal separator its locale does
+# not use says, the one it does use named (Ali, 2026-11-23,
+# inventory-tng-qnwz); and the other followed by three digits, as
+# thousands are grouped, which naming the decimal one would turn into a
+# thousandth of what was meant.
+THOUSANDS = lazy_gettext("Type thousands without a separator: 1000.")
+
+
+def use_separator(separator: str) -> str:
+    """A number typed with the other decimal separator than its box's,
+    `separator`, refused."""
+    return gettext(
+        "Use “%(separator)s” for decimals, such as %(example)s.",
+        separator=separator,
+        example=f"0{separator}5",
+    )
+
+
+# Which a box refused as its locale does not write decimals so: a point,
+# a comma, or either followed by three digits. The counter's attribute,
+# from this list only; the scan page reports its own (scan/page_telemetry_api).
+OtherSeparator = Literal["point", "comma", "thousands"]
+
+other_separators = meter.create_counter(
+    "inventory.numbers.other_separator",
+    unit="{refusal}",
+    description="Numbers typed in a box with the decimal separator its locale "
+    "does not use, refused, by which: a point, a comma, or either followed by "
+    "three digits, as thousands are grouped",
+)
+
+
+def other_separator(refused: Unreadable, separator: str) -> OtherSeparator | None:
+    """Which other decimal separator than a box's, `separator`, it was
+    refused for, if that is why."""
+    if refused is Unreadable.THOUSANDS:
+        return "thousands"
+    if refused is Unreadable.SEPARATOR:
+        return "comma" if separator == "." else "point"
+    return None
+
+
+def refused_words(refused: Unreadable, separator: str) -> str:
+    """What a box whose decimal separator is `separator` says of what it
+    could not read, refused for `refused`."""
+    if refused is Unreadable.PLACES:
+        return at_most_places(QUANTITY_PLACES)
+    if refused is Unreadable.THOUSANDS:
+        return str(THOUSANDS)
+    if refused is Unreadable.SEPARATOR:
+        return use_separator(separator)
+    return type_a_number(separator)
+
+
 def quantity(
     text: str,
     *,
@@ -230,17 +297,19 @@ def quantity(
 ) -> Decimal | str | None:
     """A quantity typed into a form's box whose decimal separator is
     `separator` (read_decimal): a Decimal, or what is wrong with it as a
-    str. Blank is None, or `required` if one must be given. Up to three
-    decimal places, as the ledger keeps; more than zero if `positive`, else
-    zero or more; whole, for an item in `unit` "each"."""
+    str (refused_words), one typed with the other separator counted. Blank
+    is None, or `required` if one must be given. Up to three decimal
+    places, as the ledger keeps; more than zero if `positive`, else zero or
+    more; whole, for an item in `unit` "each"."""
     text = text.strip()
     if not text:
         return None if required is None else str(required)
     value = read_decimal(text, separator)
-    if value is Unreadable.PLACES:
-        return at_most_places(QUANTITY_PLACES)
     if isinstance(value, Unreadable):
-        return str(TYPE_A_NUMBER)
+        if (which := other_separator(value, separator)) is not None:
+            other_separators.add(1, {"separator": which})
+            log.info("number refused", separator=which)
+        return refused_words(value, separator)
     if value > QUANTITY_MAX:
         return str(TOO_BIG)
     if value < 0 or (positive and value == 0):
