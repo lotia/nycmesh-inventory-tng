@@ -242,7 +242,8 @@ export function Scanner({
   }, []);
 
   return (
-    <section aria-label={say(CAMERA)}>
+    // Focusable, so Back to camera can hand focus here as it goes.
+    <section aria-label={say(CAMERA)} tabIndex={-1}>
       {/* Refused, it shows nothing: hidden, as no Done takes it away. */}
       <video
         class="block max-h-[60vh] w-full rounded bg-black object-cover"

@@ -160,7 +160,10 @@ test("the camera stays put as labels are scanned, and Back to camera brings it b
     button?.y ?? 0,
   );
 
-  await back.click();
+  // By keyboard: focus goes to the camera, not lost as the button goes.
+  await back.focus();
+  await page.keyboard.press("Enter");
   await expect(picture).toBeInViewport({ ratio: 1 });
   await expect(back).toBeHidden();
+  await expect(camera).toBeFocused();
 });

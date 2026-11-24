@@ -7,15 +7,20 @@ import { BACK_TO_CAMERA, BackToCamera, isTextBox, ROOM } from "./BackToCamera";
 
 let view: ReturnType<typeof stubInView>;
 let camera: HTMLVideoElement;
+/** The camera's region, as Scanner draws it: focusable, the picture in it. */
+let region: HTMLElement;
 
 beforeEach(() => {
   view = stubInView();
+  region = document.createElement("section");
+  region.tabIndex = -1;
   camera = document.createElement("video");
-  document.body.append(camera);
+  region.append(camera);
+  document.body.append(region);
 });
 
 afterEach(() => {
-  camera.remove();
+  region.remove();
   vi.unstubAllGlobals();
   vi.restoreAllMocks();
 });
@@ -76,6 +81,18 @@ describe("Back to camera", () => {
     fireEvent.click(back() as Element);
     expect(scroll).toHaveBeenCalledWith({ block: "start" });
     expect(record).toHaveBeenCalledWith({ kind: "back_to_camera" });
+  });
+
+  test("a tap hands focus to the camera's region, as the button goes", () => {
+    camera.scrollIntoView = vi.fn();
+    page();
+    view.inView(camera, 0);
+    const button = back() as HTMLButtonElement;
+    button.focus();
+    fireEvent.click(button);
+    view.inView(camera, 1);
+    expect(back()).toBeNull();
+    expect(document.activeElement).toBe(region);
   });
 
   test("keeps room at the page's bottom while it may show, and none after", () => {

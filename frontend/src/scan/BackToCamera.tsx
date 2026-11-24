@@ -1,10 +1,11 @@
 /**
  * Back to camera (Ali, 2026-11-24, inventory-tng-fdnt): while the camera
  * is open, a button at the bottom of the screen whenever its picture is
- * wholly or partly off the screen, which scrolls it back into view. Hidden
- * while a text box has focus, as the on-screen keyboard is then up. While
- * it may show, the page keeps room for it at its bottom, and a box given
- * focus lands above it (styles.css, .back-to-camera-room).
+ * wholly or partly off the screen, which scrolls it back into view and
+ * hands focus to the camera's region. Hidden while a text box has focus,
+ * as the on-screen keyboard is then up. While it may show, the page keeps
+ * room for it at its bottom, and a box given focus lands above it
+ * (styles.css, .back-to-camera-room).
  */
 import { msg } from "@lingui/core/macro";
 import { useSignal } from "@preact/signals";
@@ -90,6 +91,9 @@ export function BackToCamera({ camera }: { camera: HTMLElement }) {
       class="back-to-camera"
       onClick={() => {
         camera.scrollIntoView({ block: "start" });
+        // The button goes once the picture shows: focus goes to the
+        // camera's region (Scanner), not lost to the page.
+        camera.closest("section")?.focus({ preventScroll: true });
         telemetry.record({ kind: "back_to_camera" });
       }}
     >
