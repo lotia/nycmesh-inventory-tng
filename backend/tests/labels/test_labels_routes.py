@@ -375,7 +375,7 @@ def test_inactive_labels_say_why_and_agree_with_the_scan_page(
         # Not printed from here; revoked, unless it is already (Ali,
         # 2026-11-23, inventory-tng-x30g).
         assert not row.all("input", type="checkbox")
-        revoking = [to for _, to in links(row) if "/revoke" in to]
+        revoking = [to for _, to in links(row) + forms(row) if "/revoke" in to]
         offered = [] if why == "revoked" else [f"{LABELS}/{label.id}/revoke"]
         assert revoking == offered, why
     assert "4 inactive labels" in page

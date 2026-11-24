@@ -46,11 +46,10 @@ prefilled Google Form links, which the new app cannot read.
   asks to confirm first, as it can't be undone (8i4.88). Any label not
   yet revoked may be, an inactive one too, as a retired package's label
   still fixes its item's unit (Ali, 2026-11-23, inventory-tng-x30g). The
-  labels page
-  is one of 0019's long lists, "Current · Inactive · All"; the labels
-  picked to print are those on the page shown, so a search brings the ones
-  wanted onto one page (8i4.60.23). Each printed label shows
-  the bare code as a full QR code, the code in words beneath it for typing,
-  and what it names.
+  labels page is one of 0019's long lists, "Current · Inactive · All";
+  the labels picked to print are those on the page shown, so a search
+  brings the ones wanted onto one page (8i4.60.23). Each printed label
+  shows the bare code as a full QR code, the code in words beneath it for
+  typing, and what it names.
 - Chromium's fake camera, showing a seeded label, tests scanning end to end
   (`frontend/browser-tests/camera.spec.ts`); iOS Safari is checked by hand.

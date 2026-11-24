@@ -316,11 +316,12 @@ Only labels not revoked count (Ali, 2026-11-23, inventory-tng-37dj),
 so a unit or size set wrong and labelled can be corrected: a revoked
 label scans as no label, and work queued from it is refused as above.
 Its page says "m: fixed, as a label has been printed for it. Revoke its
-labels to change it.", linking to the item's labels on the labels page;
-a package's size fixed only by its labels says so beside it, with the
-same link. A movement still fixes both for good, and an opening the
-size. Revoking takes the catalogue lock, as a unit or size change does,
-so neither slips past the other.
+labels to change it.", linking to all the item's labels on the labels
+page, a retired package's too, each not revoked offered to revoke (Ali,
+2026-11-23, inventory-tng-x30g); a package's size fixed only by its
+labels says so beside it, with the same link. A movement still fixes
+both for good, and an opening the size. Revoking takes the catalogue
+lock, as a unit or size change does, so neither slips past the other.
 
 A batch line must say its unit: one without is refused. It was required
 at once, not added first and required in a later deploy (CONTRIBUTING.md,
