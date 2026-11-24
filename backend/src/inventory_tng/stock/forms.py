@@ -24,6 +24,7 @@ from inventory_tng.models.stock import (
 )
 from inventory_tng.stock import over_recorded, queries, units_shown
 from inventory_tng.stock.units_shown import Now, Shown
+from inventory_tng.web.formatting import Separator
 from inventory_tng.web.forms import (
     chosen,
     quantity,
@@ -116,7 +117,7 @@ def adjustment(
     form: Mapping[str, str],
     key: uuid.UUID | None,
     *,
-    separator: str,
+    separator: Separator,
 ) -> tuple[Adjustment | None, dict[str, Words]]:
     """The adjustment the form asks for, its amount in the decimal
     `separator` of the page's boxes (web/decimal_separator.py), unless
@@ -173,7 +174,7 @@ WORDS_FOR_ANOTHER = lazy_gettext(
 
 
 def confirmed_count(
-    session: Session, movement_id: int, typed: str, shown: str, *, separator: str
+    session: Session, movement_id: int, typed: str, shown: str, *, separator: Separator
 ) -> Decimal | str | None:
     """The count typed to confirm an open package moved whole by a ledger
     line, in its item's unit, or what is wrong with it: shown in another
@@ -209,7 +210,7 @@ def why_problem(reason: str, words: str) -> Words | None:
 
 
 def length(
-    session: Session, item_id: int, typed: str, *, separator: str
+    session: Session, item_id: int, typed: str, *, separator: Separator
 ) -> Decimal | str | None:
     """What is on an open package of an item, as typed to set its length,
     in the item's unit, or what is wrong with it."""

@@ -4,9 +4,11 @@ Accept-Language (web/decimal_separator.py; inventory-tng-qnwz)."""
 from collections.abc import Callable
 
 import pytest
+from babel.core import UnknownLocaleError
 from fastapi.testclient import TestClient
 from structlog.testing import capture_logs
 
+from inventory_tng.web import decimal_separator
 from inventory_tng.web.decimal_separator import languages, separator_for
 
 from helpers.markup import read
@@ -32,10 +34,28 @@ from helpers.markup import read
         ("en;q=0.5, de", ","),
         ("de;q=0, en", "."),
         ("xx, de", ","),
+        # A parameter other than q leaves the weight as it was.
+        ("en;level=1;q=0.5, de", ","),
     ],
 )
 def test_the_separator_is_the_best_matched_locales(header: str, separator: str) -> None:
     assert separator_for(header) == separator
+
+
+def test_a_locale_without_latin_digits_data_takes_a_point(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Where Babel has no decimal symbol for the locale it matched."""
+
+    def unknown(*_: object, **__: object) -> str:
+        raise UnknownLocaleError("de")
+
+    monkeypatch.setattr(decimal_separator, "get_decimal_symbol", unknown)
+    separator_for.cache_clear()
+    try:
+        assert separator_for("de") == "."
+    finally:
+        separator_for.cache_clear()
 
 
 def test_languages_are_read_most_wanted_first() -> None:

@@ -19,6 +19,7 @@ from inventory_tng.core.phrases import Words, gettext, lazy_gettext, number
 from inventory_tng.models.base import INTEGER_MAX, whole
 from inventory_tng.models.names import canonical
 from inventory_tng.stock.ledger import whole_enough
+from inventory_tng.web.formatting import Separator
 
 log = structlog.get_logger(__name__)
 meter = metrics.get_meter(__name__)
@@ -188,7 +189,7 @@ def _split(plain: str, separator: str) -> tuple[bool, str, str] | None:
     return negative, units, fraction
 
 
-def read_decimal(text: str, separator: str = ".") -> Decimal | Unreadable:
+def read_decimal(text: str, separator: Separator = ".") -> Decimal | Unreadable:
     """A number typed in a box whose decimal separator is `separator`, "."
     or ",": digits, of any script, with that separator and up to
     QUANTITY_PLACES decimals after it, and a "-" before them if below
@@ -219,13 +220,13 @@ def read_decimal(text: str, separator: str = ".") -> Decimal | Unreadable:
     return -value if negative else value
 
 
-def read_amount(text: str, separator: str = ".") -> Decimal | None:
+def read_amount(text: str, separator: Separator = ".") -> Decimal | None:
     """read_decimal's number, or None if it is none."""
     value = read_decimal(text, separator)
     return value if isinstance(value, Decimal) else None
 
 
-def type_a_number(separator: str = ".") -> str:
+def type_a_number(separator: Separator = ".") -> str:
     """Something that is no number typed in a box whose decimal separator
     is `separator`, refused, with a number such as it takes."""
     return gettext(
@@ -241,7 +242,7 @@ def type_a_number(separator: str = ".") -> str:
 THOUSANDS = lazy_gettext("Type thousands without a separator: 1000.")
 
 
-def use_separator(separator: str) -> str:
+def use_separator(separator: Separator) -> str:
     """A number typed with the other decimal separator than its box's,
     `separator`, refused."""
     return gettext(
@@ -265,7 +266,7 @@ other_separators = meter.create_counter(
 )
 
 
-def other_separator(refused: Unreadable, separator: str) -> OtherSeparator | None:
+def other_separator(refused: Unreadable, separator: Separator) -> OtherSeparator | None:
     """Which other decimal separator than a box's, `separator`, it was
     refused for, if that is why."""
     if refused is Unreadable.THOUSANDS:
@@ -275,7 +276,7 @@ def other_separator(refused: Unreadable, separator: str) -> OtherSeparator | Non
     return None
 
 
-def refused_words(refused: Unreadable, separator: str) -> str:
+def refused_words(refused: Unreadable, separator: Separator) -> str:
     """What a box whose decimal separator is `separator` says of what it
     could not read, refused for `refused`."""
     if refused is Unreadable.PLACES:
@@ -293,7 +294,7 @@ def quantity(
     positive: bool,
     unit: str | None = None,
     required: Words | None = None,
-    separator: str = ".",
+    separator: Separator,
 ) -> Decimal | str | None:
     """A quantity typed into a form's box whose decimal separator is
     `separator` (read_decimal): a Decimal, or what is wrong with it as a

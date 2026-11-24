@@ -50,7 +50,15 @@ from inventory_tng.stock.open_packages_listing import BY_PACKAGE, BY_SHOWS, OLDE
 from inventory_tng.stock.paths import LENGTHS, STOCK
 from inventory_tng.web.admin_pages import admin_page, now
 from inventory_tng.web.decimal_separator import decimal_separator
-from inventory_tng.web.forms import THOUSANDS, Unreadable, read_decimal, use_separator
+from inventory_tng.web.formatting import Separator
+from inventory_tng.web.forms import (
+    THOUSANDS,
+    OtherSeparator,
+    Unreadable,
+    other_separator,
+    read_decimal,
+    use_separator,
+)
 from inventory_tng.web.listing import AskedView, Sorting, View, arranged
 from inventory_tng.web.navigation import SECTION_STOCK
 from inventory_tng.web.pages import add_notices, not_found, redirect
@@ -94,17 +102,24 @@ add_notices(
 )
 
 
-def length_refused(typed: str, separator: str) -> str:
+# The notice for each other decimal separator than the page's a length
+# was refused for (web/forms.other_separator).
+_OTHER_SEPARATOR_NOTICES: dict[OtherSeparator, str] = {
+    "thousands": "length_thousands",
+    "comma": "length_use_point",
+    "point": "length_use_comma",
+}
+
+
+def length_refused(typed: str, separator: Separator) -> str:
     """The notice a length typed in a box whose decimal separator is
     `separator` is refused with: the separator to use, if it was typed with
     the other, or thousands without one; else what to type."""
-    match read_decimal(typed.strip(), separator):
-        case Unreadable.THOUSANDS:
-            return "length_thousands"
-        case Unreadable.SEPARATOR:
-            return "length_use_point" if separator == "." else "length_use_comma"
-        case _:
-            return "length_bad"
+    refused = read_decimal(typed.strip(), separator)
+    which = (
+        other_separator(refused, separator) if isinstance(refused, Unreadable) else None
+    )
+    return "length_bad" if which is None else _OTHER_SEPARATOR_NOTICES[which]
 
 
 LENGTHS_TITLE = lazy_gettext("Lengths to check")

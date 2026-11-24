@@ -8,7 +8,6 @@ and the words stay English. Each page says it in its <html data-decimal>
 (web/forms.quantity)."""
 
 from functools import cache, lru_cache
-from typing import Literal
 
 import structlog
 from babel.core import UnknownLocaleError, negotiate_locale
@@ -16,9 +15,9 @@ from babel.localedata import locale_identifiers
 from babel.numbers import get_decimal_symbol
 from starlette.requests import Request
 
-log = structlog.get_logger(__name__)
+from inventory_tng.web.formatting import Separator
 
-Separator = Literal[".", ","]
+log = structlog.get_logger(__name__)
 
 # Where a request's separator is kept, in its state, once chosen.
 _CHOSEN = "decimal_separator"

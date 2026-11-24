@@ -26,7 +26,7 @@ from inventory_tng.models.catalogue import (
     reading_rules_held,
 )
 from inventory_tng.models.names import canonical
-from inventory_tng.web.formatting import amount
+from inventory_tng.web.formatting import Separator, amount
 from inventory_tng.web.forms import chosen, name_problem, quantity
 
 log = structlog.get_logger(__name__)
@@ -304,7 +304,7 @@ def item_fields(
     form: Mapping[str, str],
     item: Item | None = None,
     *,
-    separator: str,
+    separator: Separator,
 ) -> tuple[items.Fields | None, dict[str, Words], Typed]:
     """What to set, unless something is wrong, what is, and the name as
     typed; for `item`'s form, if given, else a new item's. Its minimum is
@@ -364,7 +364,7 @@ def package_fields(
     size: str,
     *,
     kept: Decimal | None = None,
-    separator: str,
+    separator: Separator,
 ) -> tuple[Decimal | None, dict[str, Words]]:
     """A package's size as typed, and what is wrong with its name or size:
     its name compared as items' are, so it needs a letter or a digit, with
@@ -394,7 +394,7 @@ def package_settings_fields(
     short_below: str,
     minimum_sealed: str,
     *,
-    separator: str,
+    separator: Separator,
 ) -> tuple[Decimal | None, int | None, dict[str, Words]]:
     """A package's too-short-to-use length and minimum sealed as typed,
     each blank for none, and what is wrong with them: the length shorter

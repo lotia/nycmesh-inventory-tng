@@ -25,6 +25,7 @@ from inventory_tng.stock.forms import (
 )
 from inventory_tng.stock.ledger import LOOSE, Form, repeated
 from inventory_tng.stock.units_shown import Now
+from inventory_tng.web.formatting import Separator
 from inventory_tng.web.forms import QUANTITY_MAX, RULES, quantity, read_amount, row_id
 
 # The count form's fields of items: counted, by item, and one chosen at
@@ -114,7 +115,7 @@ class ByForm(NamedTuple):
 
 
 def by_form(
-    session: Session, form: Mapping[str, str], place_id: int, *, separator: str
+    session: Session, form: Mapping[str, str], place_id: int, *, separator: Separator
 ) -> tuple[ByForm, dict[str, Words]]:
     """The count form's forms (count_asked_for.forms_by_place), as lines,
     their boxes in the decimal `separator` (web/decimal_separator.py), and
@@ -278,7 +279,7 @@ ARRIVED = "arrived_"
 
 
 def arrivals(
-    session: Session, fields: Mapping[str, str], place_id: int, *, separator: str
+    session: Session, fields: Mapping[str, str], place_id: int, *, separator: Separator
 ) -> tuple[dict[tuple[int, int, Form], Decimal], dict[str, Words]]:
     """A place's boxes of how many arrived, read as its count by form is
     (by_form), by the area each move left, its item and form, those blank
@@ -436,7 +437,7 @@ def read_count(
     place_ids: list[int],
     held: Callable[[int, int], bool],
     *,
-    separator: str,
+    separator: Separator,
 ) -> CountForm:
     """A count form, of the places `place_ids` (places_listed), read place
     by place (by_place) and checked; `held(place_id, item_id)`, whether a
@@ -485,7 +486,7 @@ def read_count(
 
 
 def item_counts(
-    session: Session, found: Collection[Line], *, separator: str
+    session: Session, found: Collection[Line], *, separator: Separator
 ) -> tuple[ItemLines, dict[str, Words]]:
     """What was typed, as lines of an item and an amount, in the decimal
     `separator`, and what is wrong with it."""

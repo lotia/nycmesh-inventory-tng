@@ -3,8 +3,13 @@ neither FastAPI nor the templates, so rules may import it
 (docs/decisions/0023)."""
 
 from decimal import Decimal
+from typing import Literal
 
 from inventory_tng.core.phrases import gettext, lazy_gettext, number
+
+# A number box's decimal separator: the one its page's locale writes
+# (web/decimal_separator.py).
+Separator = Literal[".", ","]
 
 
 def amount(value: Decimal | None) -> str:
@@ -22,7 +27,7 @@ def plain_amount(value: Decimal | None) -> str:
     return "" if value is None else format(value.normalize(), "f")
 
 
-def box_amount(value: Decimal | None, separator: str = ".") -> str:
+def box_amount(value: Decimal | None, separator: Separator = ".") -> str:
     """A quantity in a number box, to be read back as typed
     (web/forms.read_decimal): plain_amount with the box's decimal
     `separator`, "." or ",", so the box posts back unchanged as valid."""

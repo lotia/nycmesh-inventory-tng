@@ -68,7 +68,8 @@ const ARABIC_DECIMAL = "\u066B";
 /** A digit of any script as 0-9: Unicode keeps each script's in runs of
  * ten, from zero, so its place in its run of digits is its value. */
 function asciiDigit(char: string): string {
-  const point = char.codePointAt(0) ?? 0;
+  // One code point, as a string's iterator gives them.
+  const point = char.codePointAt(0) as number;
   let zero = point;
   while (DIGIT.test(String.fromCodePoint(zero - 1))) {
     zero -= 1;

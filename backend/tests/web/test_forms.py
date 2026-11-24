@@ -8,7 +8,7 @@ from typing import Any
 import pytest
 
 from inventory_tng.core.local_env import CLONE
-from inventory_tng.web.formatting import box_amount, plain_amount
+from inventory_tng.web.formatting import Separator, box_amount, plain_amount
 from inventory_tng.web.forms import (
     ABOVE_ZERO,
     THOUSANDS,
@@ -25,7 +25,7 @@ from inventory_tng.web.forms import (
 
 CASES = CLONE / "frontend" / "src" / "shared" / "quantity-cases.json"
 # The locales the shared cases are written for, by their decimal separator.
-SEPARATORS = {"en": ".", "de": ","}
+SEPARATORS: dict[str, Separator] = {"en": ".", "de": ","}
 
 
 def _cases() -> list[tuple[str, str, dict[str, str]]]:
@@ -104,7 +104,7 @@ def test_a_box_says_why_it_refused_a_shared_case(
     ],
 )
 def test_quantities_typed(typed: str, positive: bool, parsed: object) -> None:
-    assert quantity(typed, positive=positive) == parsed
+    assert quantity(typed, positive=positive, separator=".") == parsed
 
 
 def test_a_quantity_reads_the_boxs_separator() -> None:
@@ -125,7 +125,7 @@ def test_a_quantity_reads_the_boxs_separator() -> None:
     ],
 )
 def test_a_refusal_names_the_separator_to_use(
-    separator: str, typed: str, said: str
+    separator: Separator, typed: str, said: str
 ) -> None:
     assert quantity(typed, positive=True, separator=separator) == said
 
