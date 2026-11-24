@@ -230,7 +230,9 @@ def record(
             problems.append((("used_up", number), "moved_whole"))
     twice = repeated(length_keys)
     # What is said to be on one of an item counted each is whole, as the
-    # scan page asks (Ali, 2026-11-23, inventory-tng-uwi3).
+    # scan page asks (Ali, 2026-11-23, inventory-tng-uwi3). Read without a
+    # lock: an open package exists only once stock moved in its item, which
+    # fixes its unit for good (catalogue/items.unit_fixed).
     units = values_by(
         session,
         Item.id,

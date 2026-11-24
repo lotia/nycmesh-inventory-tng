@@ -28,10 +28,11 @@ export const PRINTED_LENGTH = msg`Read the length printed on the cable where it 
 
 /** The notes when the box follows the cut (Ali, 2026-11-12), by how the
  * cut ends it; an item counted in each says "taking" and "any", in a
- * length "cut" and "cable". Only a length has a short end. */
+ * length "cut" and "cable". */
 export const USED_EACH = msg`Taking these uses up the {name}, so it's ticked. Untick it if any is left. An administrator confirms.`;
 export const USED_CABLE = msg`Your cut uses up the {name}, so it's ticked. Untick it if cable is left. An administrator confirms.`;
 export const SHORT = msg`This {name} will be unusable after this cut, so it's ticked. Untick it if you'll keep the short end.`;
+export const SHORT_EACH = msg`After taking these, too few are left in the {name} to use, so it's ticked. Untick it if you'll keep them.`;
 export const OVER_EACH = msg`You're taking more than the {name} shows, so it's ticked. It's recorded as you typed it, and an administrator will check the {name}.`;
 export const OVER = msg`Your cut is more than the {name} shows, so it's ticked. It's recorded as you typed it, and an administrator will check the {name}.`;
 
@@ -62,6 +63,8 @@ export const NOTHING_USABLE = msg`Nothing usable left on it`;
 export const AMOUNT_LEFT = msg`{amount} left`;
 /** The heading over what is left, before anything is typed to take. */
 export const AFTER_TAKING_SOME = msg`After taking`;
+/** AFTER_TAKING_SOME, for a screen reader, before what is left after it. */
+export const AFTER_TAKING_SOME_SAID = msg`After taking:`;
 export const AFTER_TAKING = msg`After taking {amount}`;
 /** AFTER_TAKING, for a screen reader, before what is left after it. */
 export const AFTER_TAKING_SAID = msg`After taking {amount}:`;
@@ -79,7 +82,7 @@ export function endingNote(ending: Ending, name: string, unit: string): string {
   const pieces = countedWhole(unit);
   const note = {
     used: pieces ? USED_EACH : USED_CABLE,
-    short: SHORT,
+    short: pieces ? SHORT_EACH : SHORT,
     over: pieces ? OVER_EACH : OVER,
   }[ending];
   return say(note, { name });
@@ -117,7 +120,7 @@ function afterHeading(
     return [say(AFTER_THIS_CUT), say(AFTER_THIS_CUT_SAID)];
   }
   if (taking === undefined) {
-    return [say(AFTER_TAKING_SOME), say(AFTER_TAKING_SOME)];
+    return [say(AFTER_TAKING_SOME), say(AFTER_TAKING_SOME_SAID)];
   }
   const amount = sayAmount(taking);
   return [say(AFTER_TAKING, { amount }), say(AFTER_TAKING_SAID, { amount })];

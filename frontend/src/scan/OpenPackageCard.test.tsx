@@ -51,6 +51,10 @@ describe("an open package's card", () => {
     expect(endingNote("over", "bag", "each")).toBe(
       "You're taking more than the bag shows, so it's ticked. It's recorded as you typed it, and an administrator will check the bag.",
     );
+    // A box of pieces may be too short to use below a number left too.
+    expect(endingNote("short", "bag", "each")).toBe(
+      "After taking these, too few are left in the bag to use, so it's ticked. Untick it if you'll keep them.",
+    );
   });
 });
 

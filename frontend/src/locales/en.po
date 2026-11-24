@@ -818,6 +818,10 @@ msgstr "Recorded {was}, you removed it. An administrator will correct it."
 msgid "What's on the {name} after this cut ({unit}), if you can tell"
 msgstr "What's on the {name} after this cut ({unit}), if you can tell"
 
+#: src/scan/OpenPackageCard.tsx
+msgid "After taking:"
+msgstr "After taking:"
+
 #: src/scan/CartForm.tsx
 msgid "Not me"
 msgstr "Not me"
@@ -1135,6 +1139,10 @@ msgstr "This device is offline. Sending when it's back."
 #: src/scan/CartForm.tsx
 msgid "What is happening"
 msgstr "What is happening"
+
+#: src/scan/OpenPackageCard.tsx
+msgid "After taking these, too few are left in the {name} to use, so it's ticked. Untick it if you'll keep them."
+msgstr "After taking these, too few are left in the {name} to use, so it's ticked. Untick it if you'll keep them."
 
 #. A clause of where a save was for; clauses that apply follow in this order, joined by spaces: at or from, to, for install. {place} is a place of any kind, such as a store, a shelf, a bin or a volunteer's home.
 #: src/scan/OlderList.tsx

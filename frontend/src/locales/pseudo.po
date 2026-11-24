@@ -818,6 +818,10 @@ msgstr ""
 msgid "What's on the {name} after this cut ({unit}), if you can tell"
 msgstr ""
 
+#: src/scan/OpenPackageCard.tsx
+msgid "After taking:"
+msgstr ""
+
 #: src/scan/CartForm.tsx
 msgid "Not me"
 msgstr ""
@@ -1134,6 +1138,10 @@ msgstr ""
 
 #: src/scan/CartForm.tsx
 msgid "What is happening"
+msgstr ""
+
+#: src/scan/OpenPackageCard.tsx
+msgid "After taking these, too few are left in the {name} to use, so it's ticked. Untick it if you'll keep them."
 msgstr ""
 
 #. A clause of where a save was for; clauses that apply follow in this order, joined by spaces: at or from, to, for install. {place} is a place of any kind, such as a store, a shelf, a bin or a volunteer's home.
