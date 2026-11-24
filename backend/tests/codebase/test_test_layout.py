@@ -29,10 +29,6 @@ def _folders(root: Path) -> set[Path]:
     }
 
 
-def _mirrored(folder: Path) -> bool:
-    return any(folder.is_relative_to(mirror) for mirror in MIRRORS)
-
-
 def test_every_mirrored_folder_is_a_package() -> None:
     # A mirror renamed away would leave nothing here to check.
     assert [str(mirror) for mirror in MIRRORS if not (TESTS / mirror).is_dir()] == []
@@ -55,7 +51,7 @@ def test_every_other_folder_says_what_it_holds() -> None:
         str(folder)
         for folder in folders
         if folder != Path()
-        and not _mirrored(folder)
+        and not any(folder.is_relative_to(mirror) for mirror in MIRRORS)
         and not (TESTS / folder / "README.md").is_file()
     )
     assert unexplained == []
