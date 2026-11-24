@@ -841,6 +841,7 @@ export function CartForm({
           reads={reads}
           reload={reload}
           reloadKeepsCart={cartKept.value}
+          typing={typing}
         />
       ) : (
         <button type="button" onClick={() => (scanning.value = true)}>

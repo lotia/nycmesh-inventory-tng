@@ -25,6 +25,7 @@ import {
   STARTING,
   TORCH,
   TORCH_FAILED,
+  TYPING,
 } from "./Scanner";
 
 // The camera's clock, faked: each test lets as many reads' time pass as it
@@ -56,6 +57,7 @@ function scannerOf(props: ScannerProps) {
       onDone={() => {}}
       onPicture={() => {}}
       reads={signal(true)}
+      typing={signal(false)}
       reload={() => {}}
       reloadKeepsCart
       {...props}
@@ -117,6 +119,40 @@ test("no label is read while reading is paused, and reading resumes after", asyn
   reads.value = true;
   await screen.findByText("Read B3ZT9W.");
   expect(onCode).toHaveBeenCalledTimes(1);
+});
+
+test("while typing, the status line says reading waits, then what it said before", async () => {
+  const { open } = camera();
+  const typing = signal(false);
+  scanner({ open, typing });
+  const status = await screen.findByText(say(POINT));
+  act(() => {
+    typing.value = true;
+  });
+  expect(status.textContent).toBe(say(TYPING));
+  act(() => {
+    typing.value = false;
+  });
+  expect(status.textContent).toBe(say(POINT));
+});
+
+test("a tap on the picture takes focus from a text box, and from nothing else", async () => {
+  const { open } = camera();
+  scanner({ open });
+  await screen.findByText(say(POINT));
+  const picture = document.querySelector("video") as HTMLVideoElement;
+  const box = document.createElement("input");
+  const tick = document.createElement("input");
+  tick.type = "checkbox";
+  document.body.append(box, tick);
+  box.focus();
+  fireEvent.click(picture);
+  expect(document.activeElement).toBe(document.body);
+  tick.focus();
+  fireEvent.click(picture);
+  expect(document.activeElement).toBe(tick);
+  box.remove();
+  tick.remove();
 });
 
 test("a label held in view through a pause is not taken again after it", async () => {

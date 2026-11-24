@@ -10,8 +10,11 @@
  * nothing is added out of the volunteer's sight (Ali, 2026-11-24,
  * inventory-tng-rj2g), nor while a text box has focus, as the on-screen
  * keyboard may cover the picture (Ali, 2026-11-24, inventory-tng-5663);
- * the status line keeps its last words, and a label held in view through
- * the pause is not taken again (repeated-reads.ts).
+ * a label held in view through the pause is not taken again
+ * (repeated-reads.ts). Off the screen, the status line keeps its last
+ * words; while a text box has focus, it says reading waits, and a tap on
+ * the picture takes focus from the box (Ali, 2026-11-24,
+ * inventory-tng-0w3n). Once reading resumes, it says what it said before.
  * Each session is reported (camera-report.ts).
  */
 import type { MessageDescriptor } from "@lingui/core";
@@ -30,10 +33,12 @@ import type { Cart } from "./cart";
 import { AlertWords } from "./Notes";
 import { type About, useClearedWhenLineChanges } from "./refused-line";
 import { Repeats } from "./repeated-reads";
+import { isTextBox } from "./text-box-focus";
 
 export const CAMERA = msg`Camera`;
 export const STARTING = msg`Starting the camera…`;
 export const POINT = msg`Point the camera at a label.`;
+export const TYPING = msg`Not reading while you type. Tap the picture to scan.`;
 export const TORCH_FAILED = msg`The torch wouldn't switch.`;
 export const DONE = msg`Done`;
 export const TORCH = msg`Torch`;
@@ -121,6 +126,7 @@ export function Scanner({
   reads,
   reload,
   reloadKeepsCart,
+  typing,
   open = openCamera,
 }: {
   /** The cart as it is now, whose lines a refusal may be about. */
@@ -138,6 +144,8 @@ export function Scanner({
   /** Whether a reload or restart would bring back the cart
    * (CartStore.write). */
   reloadKeepsCart: boolean;
+  /** Whether a text box has focus (useTextBoxFocused). */
+  typing: ReadonlySignal<boolean>;
   open?: (video: HTMLVideoElement) => Promise<Session>;
 }) {
   const video = useRef<HTMLVideoElement>(null);
@@ -160,6 +168,9 @@ export function Scanner({
   const refused = useSignal<Refusal | null>(null);
   const torch = useSignal<((on: boolean) => Promise<void>) | null>(null);
   const refusal = refused.value;
+  // What the status line says: while typing pauses reading, that it
+  // does, over the words kept beneath for when it resumes.
+  const shown = typing.value ? TYPING : said.value;
 
   // Done went with the refusal: Reload page takes the focus, or, where
   // none is offered, the refusal's words, so the volunteer keeps their
@@ -275,13 +286,20 @@ export function Scanner({
         hidden={refusal !== null}
         muted
         playsInline
+        onClick={() => {
+          // The keyboard may be gone with focus still in its box.
+          const box = document.activeElement;
+          if (isTextBox(box)) {
+            box.blur();
+          }
+        }}
       />
       {/* A refusal is a problem, in the alert's style (CONTRIBUTING,
           Styles); a new element, so it is announced as it appears. */}
       {refusal === null ? (
         <>
           <p role="status" class="status-line">
-            {typeof said.value === "string" ? said.value : say(said.value)}
+            {typeof shown === "string" ? shown : say(shown)}
           </p>
           <div class="actions">
             {torch.value !== null && (

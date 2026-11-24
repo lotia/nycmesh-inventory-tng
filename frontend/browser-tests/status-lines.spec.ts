@@ -2,7 +2,8 @@
  * The scan page's status lines, under the camera and under the item
  * search, at a phone's width: each keeps room for two lines of words, so
  * a refusal appearing or clearing once its line is fixed moves nothing
- * below it; empty, it shows no bar (Ali, 2026-11-24, inventory-tng-2l6n).
+ * below it, as do the words that reading waits while typing; empty, it
+ * shows no bar (Ali, 2026-11-24, inventory-tng-2l6n, inventory-tng-0w3n).
  */
 import { expect, type Locator, type Page } from "@playwright/test";
 import { test } from "./csp-violations";
@@ -10,6 +11,7 @@ import { prepared } from "./prepared";
 import { looseBox, pick } from "./scan-page";
 
 const NOT_ADDED = "Not added. Fix the incorrect amount below, then scan again.";
+const TYPING = "Not reading while you type. Tap the picture to scan.";
 
 /** Each of `below`'s box, measured from the top of `line`. */
 async function placed(line: Locator, below: Locator[]) {
@@ -54,8 +56,12 @@ test("the camera's status line keeps its room as a refusal appears and clears", 
   await scan.click();
   await expect(line).toHaveText(NOT_ADDED, { timeout: 15_000 });
   expect(await placed(line, below)).toEqual(added);
-  // Fixed, it clears, and shows no bar.
+  // Fixed, it clears, and shows no bar: said once typing in the box no
+  // longer pauses reading, by a tap on the picture (inventory-tng-0w3n).
   await looseBox(page, prepared().labelled).fill("1");
+  await expect(line).toHaveText(TYPING);
+  expect(await placed(line, below)).toEqual(added);
+  await camera.locator("video").click();
   await expect(line).toHaveText("");
   expect(await placed(line, below)).toEqual(added);
   await expect(line).toHaveCSS("border-left-color", "rgba(0, 0, 0, 0)");

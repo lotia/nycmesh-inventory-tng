@@ -1,4 +1,4 @@
-import { fireEvent, screen } from "@testing-library/preact";
+import { act, fireEvent, screen } from "@testing-library/preact";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import { say } from "../shared/i18n";
 import { STORAGE_KEY as OUTBOX_KEY, Outbox } from "../shared/outbox";
@@ -41,7 +41,14 @@ import {
 } from "./cart";
 import { FIND } from "./Finder";
 import { DISMISS } from "./OutboxList";
-import { CAMERA, DONE, NOT_ALLOWED, POINT, RELOAD_PAGE } from "./Scanner";
+import {
+  CAMERA,
+  DONE,
+  NOT_ALLOWED,
+  POINT,
+  RELOAD_PAGE,
+  TYPING,
+} from "./Scanner";
 import { COULD_NOT_LOAD } from "./ScanPage";
 
 // The camera, faked: it sees whatever a test puts in `inView`.
@@ -239,6 +246,53 @@ describe("scanning labels with the camera", () => {
     search.blur();
     await screen.findByText("Added one: LiteBeam 5AC.");
     expect(lineNames()).toEqual(["LiteBeam 5AC"]);
+  });
+
+  test("while a text box has focus, the camera's line says reading waits, over a refusal it says again after", async () => {
+    await opened();
+    await scan("B3ZT9W");
+    await screen.findByText("Added one: LiteBeam 5AC.");
+    const loose = screen.getByLabelText<HTMLInputElement>("Loose units");
+    fireEvent.input(loose, { target: { value: "2,5" } });
+    await scan();
+    await vi.advanceTimersByTimeAsync(2000);
+    await scan("B3ZT9W");
+    const status = (await screen.findByText(say(NOT_ADDED))) as HTMLElement;
+    const search = screen.getByLabelText<HTMLInputElement>(say(FIND));
+    act(() => search.focus());
+    expect(status.textContent).toBe(say(TYPING));
+    act(() => search.blur());
+    expect(status.textContent).toBe(say(NOT_ADDED));
+    // Fixed while typing in its box: cleared, so not said again.
+    act(() => loose.focus());
+    fireEvent.input(loose, { target: { value: "2" } });
+    expect(status.textContent).toBe(say(TYPING));
+    act(() => loose.blur());
+    expect(status.textContent).toBe("");
+  });
+
+  test("a tap on the camera's picture takes focus from a text box, so it reads again", async () => {
+    await opened();
+    const search = screen.getByLabelText<HTMLInputElement>(say(FIND));
+    act(() => search.focus());
+    await screen.findByText(say(TYPING));
+    await scan("B3ZT9W");
+    await pass(2);
+    expect(lineNames()).toEqual([]);
+    fireEvent.click(document.querySelector("video") as HTMLVideoElement);
+    expect(document.activeElement).not.toBe(search);
+    await screen.findByText("Added one: LiteBeam 5AC.");
+  });
+
+  test("Enter in the item search leaves focus there, for the next code", async () => {
+    await opened();
+    const search = screen.getByLabelText<HTMLInputElement>(say(FIND));
+    search.focus();
+    find("b3zt9w");
+    fireEvent.keyDown(search, { key: "Enter" });
+    expect(lineNames()).toEqual(["LiteBeam 5AC"]);
+    expect(document.activeElement).toBe(search);
+    expect(screen.getByText(say(TYPING))).toBeTruthy();
   });
 
   test("what a label added stays said as its line changes", async () => {

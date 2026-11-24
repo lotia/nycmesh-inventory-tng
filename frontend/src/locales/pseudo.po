@@ -695,6 +695,10 @@ msgstr ""
 msgid "That open package was closed as used up: take from another"
 msgstr ""
 
+#: src/scan/Scanner.tsx
+msgid "Not reading while you type. Tap the picture to scan."
+msgstr ""
+
 #: src/scan/OpenPackageCard.tsx
 msgid "Your cut uses up the {name}, so it's ticked. Untick it if any is left. An administrator confirms."
 msgstr ""
