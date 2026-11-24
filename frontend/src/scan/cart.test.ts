@@ -133,6 +133,8 @@ describe("quantities", () => {
     expect(saidAsText(quantityOf(line, radio))).toEqual({
       problem: say(WHOLE_UNITS),
     });
+    // The loose box's own refusal (CartLine ties the two).
+    expect(quantityOf(line, radio)).toMatchObject({ loose: true });
   });
 
   test("each part of an item counted in units is whole", () => {
@@ -155,6 +157,12 @@ describe("quantities", () => {
     expect(saidAsText(quantityOf(line, halves))).toEqual({
       problem: say(WHOLE_UNITS),
     });
+    // Only the box's part a fraction, the loose box is not refused.
+    const whole = { ...line, loose: "1" };
+    expect(saidAsText(quantityOf(whole, halves))).toEqual({
+      problem: say(WHOLE_UNITS),
+    });
+    expect(quantityOf(whole, halves)).not.toHaveProperty("loose");
   });
 
   test("a box reads as the server does", () => {

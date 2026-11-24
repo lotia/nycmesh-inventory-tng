@@ -176,7 +176,6 @@ function scanPage(status = 200): Outbox {
   return outbox;
 }
 
-/** The scan page once its catalogue is shown. */
 /** The scan page's status with words: its status lines stay on the
  * page, empty, once they have none. */
 function saying(): HTMLElement {
@@ -189,6 +188,7 @@ function saying(): HTMLElement {
   return said;
 }
 
+/** The scan page once its catalogue is shown. */
 async function loaded(): Promise<Outbox> {
   const outbox = scanPage();
   await screen.findByRole("searchbox");

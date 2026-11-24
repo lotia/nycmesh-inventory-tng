@@ -23,7 +23,8 @@ test("a line removed is put back where it was by Undo, from the keyboard", async
     .fill("7");
 
   await lines.first().getByRole("button", { name: "Remove" }).click();
-  const notice = page.getByRole("status");
+  // The page's other status lines stay on it, empty (inventory-tng-2l6n).
+  const notice = page.getByRole("status").filter({ hasText: "Removed" });
   await expect(notice).toHaveText(`Removed ${first}. Undo`);
   await expect(lines).toHaveCount(1);
   const undo = notice.getByRole("button", { name: "Undo" });

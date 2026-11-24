@@ -682,7 +682,7 @@ export function holdsSome(typed: string): boolean {
 
 /** A line's quantity in thousandths of the item's unit, and of it, the
  * packages counted, by package, and how much loose; or why it has none,
- * with `loose` set when that is the loose box's refusal. */
+ * with `loose` set when the loose box is what is refused. */
 export function quantityOf(
   line: Line,
   item: Item,
@@ -746,7 +746,9 @@ export function quantityOf(
     ...[...taken.values()].map((t) => t.amount),
   ];
   if (item.unit === "each" && parts.some((part) => part % 1000 !== 0)) {
-    return { problem: [say(WHOLE_UNITS)] };
+    return loose % 1000 === 0
+      ? { problem: [say(WHOLE_UNITS)] }
+      : { problem: [say(WHOLE_UNITS)], loose: true };
   }
   return { amount, sealed, loose, taken };
 }

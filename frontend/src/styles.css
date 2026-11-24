@@ -189,6 +189,16 @@
     /* Two lines, and the padding above and below of [role="status"]. */
     min-height: calc(2lh + --spacing(4));
 
+    /* Safari before 16.4 has no lh unit: two lines of the page's line
+       height, as Tailwind's preflight sets it. */
+    @supports not (height: 1lh) {
+      min-height: calc(
+        2em *
+        --theme(--default-line-height, 1.5) +
+        --spacing(4)
+      );
+    }
+
     &:empty {
       @apply border-transparent;
     }
