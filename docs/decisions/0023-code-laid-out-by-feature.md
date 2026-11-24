@@ -472,9 +472,9 @@ named for what it is:
 | `fold_reference.tsv` | `references/fold_reference.tsv` |
 | `measure_catalogue.py` | `measures/measure_catalogue.py` |
 | `measure_labels.py` | `measures/measure_labels.py` |
-| `test_markup.py` | `suite/test_markup.py` |
-| `test_suite_categories.py` | `suite/test_suite_categories.py` |
-| `test_test_databases.py` | `suite/test_test_databases.py` |
+| `test_markup.py` | `harness/test_markup.py` |
+| `test_suite_categories.py` | `harness/test_conftest_categories.py` |
+| `test_test_databases.py` | `harness/test_databases.py` |
 | `ucum_codes.tsv` | `references/ucum_codes.tsv` |
 
 ## Amendment: names (2026-11-18)
@@ -559,11 +559,16 @@ would have clashed.
     or by hand, are data, so `references/`;
   - the measurements, which pytest collects only when a `measure-*` task
     names one, are not tests, so `measures/`;
-  - the tests of the suite's own code, its helpers, its databases and how
-    `conftest.py` sorts tests, test no source package, so `suite/`.
+  - the tests of the test harness, the helpers in `helpers/` and
+    `conftest.py`, test no source package, so `harness/`, its files
+    named for what they test: `test_databases.py` the databases and
+    `test_conftest_categories.py` how `conftest.py` sorts tests.
     `test_markup.py` was named among the top-level modules' tests, but it
     tests `helpers/markup.py`, and no `inventory_tng/markup.py` exists,
-    so it went to `suite/` with the others.
+    so it went to `harness/` with the others. Ali named the folder
+    `harness/` on 2026-11-24, as "suite" is ambiguous; we rejected
+    `helper_tests/`, which the `conftest.py` test does not fit, and
+    `test_harness/`, which reads as a pytest module.
 
 We rejected keeping the loose files at the top, which tells a reader
 nothing of what they are, and putting the references and measurements in
