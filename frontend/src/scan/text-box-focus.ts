@@ -4,7 +4,7 @@
  * inventory-tng-fdnt), and the camera reads no labels (Ali, 2026-11-24,
  * inventory-tng-5663).
  */
-import { type ReadonlySignal, useSignal } from "@preact/signals";
+import { effect, type ReadonlySignal, useSignal } from "@preact/signals";
 import { useEffect } from "preact/hooks";
 
 /** Inputs that take no typing, so open no on-screen keyboard. */
@@ -51,15 +51,21 @@ export function useTextBoxFocused(): ReadonlySignal<boolean> {
       { signal },
     );
     // A box taken off the page with focus in it tells no focusout in
-    // Safari, so reading would stay paused till the next box is left.
+    // Safari, so reading would stay paused till the next box is left;
+    // watched only while a box has focus.
     const removed = new MutationObserver(() => {
-      if (typing.peek()) {
-        typing.value = isTextBox(document.activeElement);
+      typing.value = isTextBox(document.activeElement);
+    });
+    const watching = effect(() => {
+      if (typing.value) {
+        removed.observe(document.body, { childList: true, subtree: true });
+      } else {
+        removed.disconnect();
       }
     });
-    removed.observe(document.body, { childList: true, subtree: true });
     return () => {
       listening.abort();
+      watching();
       removed.disconnect();
     };
   }, []);

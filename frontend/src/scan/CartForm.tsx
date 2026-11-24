@@ -67,7 +67,7 @@ import {
 import { type Gaps, nameOf, toCart, withRetired } from "./older-to-cart";
 import { differenceOf } from "./recorded-elsewhere";
 import { aboutLine } from "./refused-line";
-import { POINT, Scanner } from "./Scanner";
+import { type Acted, POINT, Scanner } from "./Scanner";
 import { indexOf } from "./search";
 import { useTextBoxFocused } from "./text-box-focus";
 import { type Removed, removeLine, undone } from "./undo-remove";
@@ -375,12 +375,7 @@ export function CartForm({
   const picture = useSignal<HTMLVideoElement | null>(null);
   const pictureOnScreen = useWhollyOnScreen(picture.value);
   const typing = useTextBoxFocused();
-  // Labels are read only while the picture is wholly on the screen, the
-  // on-screen keyboard is not up, and this build is not too old (Scanner).
   const tooOld = useComputed(() => outbox.builds.newer.value === "too_old");
-  const reads = useComputed(
-    () => pictureOnScreen.value && !typing.value && !tooOld.value,
-  );
   const placeRead = useSignal<number | null>(null);
   // What the answer to that question did, in words, till the next label.
   const placeAnswer = useSignal<string | null>(null);
@@ -388,32 +383,31 @@ export function CartForm({
   /** Acts on a label, read by the camera or typed by a scanner gun; in a
    * batch, so a place's question asked again is not seen put away. */
   function actOn(read: Scanned): Picked {
-    return batch(() => actOnNow(read));
-  }
-
-  function actOnNow(read: Scanned): Picked {
-    if (read.kind === "unknown") {
-      // A stray code leaves a place's question to answer.
-      return refused(say(UNKNOWN_LABEL, { code: read.code }));
-    }
-    placeRead.value = null;
-    placeAnswer.value = null;
-    const { places } = indexOf(catalogue);
-    if (read.kind === "place") {
-      const place = places.get(read.locationId);
-      const [only, other] = placeSides(cart.value);
-      if (only !== undefined && other === undefined) {
-        placeOn(only, read.locationId);
-        const here = cart.value.kind === "open" ? PLACE_HERE : PLACE_FROM_HERE;
-        return done(say(only === "from" ? here : PLACE_TO_HERE, { place }));
+    return batch(() => {
+      if (read.kind === "unknown") {
+        // A stray code leaves a place's question to answer.
+        return refused(say(UNKNOWN_LABEL, { code: read.code }));
       }
-      placeRead.value = read.locationId;
-      return done(say(PLACE_WHICH, { place }));
-    }
-    const added = add(read.itemId, read.packageId);
-    // A buzz where the phone has one (not iOS Safari).
-    navigator.vibrate?.(60);
-    return added;
+      placeRead.value = null;
+      placeAnswer.value = null;
+      const { places } = indexOf(catalogue);
+      if (read.kind === "place") {
+        const place = places.get(read.locationId);
+        const [only, other] = placeSides(cart.value);
+        if (only !== undefined && other === undefined) {
+          placeOn(only, read.locationId);
+          const here =
+            cart.value.kind === "open" ? PLACE_HERE : PLACE_FROM_HERE;
+          return done(say(only === "from" ? here : PLACE_TO_HERE, { place }));
+        }
+        placeRead.value = read.locationId;
+        return done(say(PLACE_WHICH, { place }));
+      }
+      const added = add(read.itemId, read.packageId);
+      // A buzz where the phone has one (not iOS Safari).
+      navigator.vibrate?.(60);
+      return added;
+    });
   }
 
   function placeOn(side: Side, locationId: number) {
@@ -433,6 +427,23 @@ export function CartForm({
       );
       placeOn(side, locationId);
     });
+  }
+
+  /** Whether what a label did still stands, for the camera's line
+   * (Scanner's Acted): a refusal; a place's question, till it is
+   * answered, then saying what the answer did, or put away, here or by a
+   * label in the item search, then Point. */
+  function standsFor(picked: Picked): Acted["stands"] {
+    if (picked.refused) {
+      return true;
+    }
+    const asked = placeRead.peek();
+    if (asked === null) {
+      return undefined;
+    }
+    return computed(() =>
+      placeRead.value === asked ? null : (placeAnswer.value ?? POINT),
+    );
   }
 
   /** The cart to record, as a batch, checked against `against`; or null,
@@ -857,20 +868,11 @@ export function CartForm({
           onCode={(code) => {
             const read = readLabel(catalogue, code);
             const picked = actOn(read);
-            // A refusal stands; a place's question, till it is answered,
-            // then saying what the answer did, or put away, here or by a
-            // label in the item search, then Point.
-            const asked = placeRead.peek();
-            const stands = picked.refused
-              ? true
-              : asked === null
-                ? undefined
-                : computed(() =>
-                    placeRead.value === asked
-                      ? null
-                      : (placeAnswer.value ?? POINT),
-                  );
-            return { ...picked, label: labelKind(read), stands };
+            return {
+              ...picked,
+              label: labelKind(read),
+              stands: standsFor(picked),
+            };
           }}
           onDone={() => {
             scanning.value = false;
@@ -883,11 +885,11 @@ export function CartForm({
               scrollToPicture(video);
             }
           }}
-          reads={reads}
+          onScreen={pictureOnScreen}
+          typing={typing}
+          tooOld={tooOld}
           reload={reload}
           reloadKeepsCart={cartKept.value}
-          typing={typing}
-          tooOld={tooOld.value}
         />
       ) : (
         <button type="button" onClick={() => (scanning.value = true)}>
@@ -908,7 +910,7 @@ export function CartForm({
         cart={cart.value}
         onAdd={add}
         onLabel={actOn}
-        tooOld={tooOld.value}
+        tooOld={tooOld}
       />
 
       {/* Below the camera, as a scan may take it away (Ali, 2026-11-24,

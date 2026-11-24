@@ -27,7 +27,12 @@
  */
 import type { MessageDescriptor } from "@lingui/core";
 import { msg } from "@lingui/core/macro";
-import { effect, type ReadonlySignal, useSignal } from "@preact/signals";
+import {
+  effect,
+  type ReadonlySignal,
+  useComputed,
+  useSignal,
+} from "@preact/signals";
 import { useEffect, useRef } from "preact/hooks";
 import { say } from "../shared/i18n";
 import { openCamera, type Session } from "./camera";
@@ -137,11 +142,11 @@ export function Scanner({
   onCode,
   onDone,
   onPicture,
-  reads,
-  reload,
-  reloadKeepsCart,
+  onScreen,
   typing,
   tooOld,
+  reload,
+  reloadKeepsCart,
   open = openCamera,
 }: {
   /** The cart as it is now, whose lines a refusal may be about. */
@@ -151,19 +156,17 @@ export function Scanner({
   /** Given the camera's picture once it shows, and null once it stops
    * (BackToCamera). */
   onPicture: (video: HTMLVideoElement | null) => void;
-  /** Whether labels may be read now: only while the picture is wholly on
-   * the screen, no text box has focus and this build is not too old
-   * (CartForm). */
-  reads: ReadonlySignal<boolean>;
+  /** Whether the picture is wholly on the screen (useWhollyOnScreen). */
+  onScreen: ReadonlySignal<boolean>;
+  /** Whether a text box has focus (useTextBoxFocused). */
+  typing: ReadonlySignal<boolean>;
+  /** Whether the server takes nothing more from this build (NewerBuild). */
+  tooOld: ReadonlySignal<boolean>;
   /** Refresh this page (ScanPage's reload). */
   reload: () => void;
   /** Whether a reload or restart would bring back the cart
    * (CartStore.write). */
   reloadKeepsCart: boolean;
-  /** Whether a text box has focus (useTextBoxFocused). */
-  typing: ReadonlySignal<boolean>;
-  /** Whether the server takes nothing more from this build (NewerBuild). */
-  tooOld: boolean;
   open?: (video: HTMLVideoElement) => Promise<Session>;
 }) {
   const video = useRef<HTMLVideoElement>(null);
@@ -172,43 +175,49 @@ export function Scanner({
   // The newest onCode, so a refreshed catalogue is read from at once.
   const handle = useRef(onCode);
   handle.current = onCode;
+  // The one place that decides whether labels are read: only while the
+  // picture is wholly on the screen, no text box has focus and this build
+  // is not too old.
+  const reads = useComputed(
+    () => onScreen.value && !typing.value && !tooOld.value,
+  );
   // A phrase, or said as shown: the words onCode said; once the line a
-  // refusal was about changes, empty, or Point while typing, as typing's
-  // end says it.
+  // refusal was about changes, empty (typing's end makes that Point).
   const said = useSignal<MessageDescriptor | string>(STARTING);
-  // Whether `said`, a refusal or question, still stands.
-  const standing = useRef(false);
-  // Stops watching what became of a question `said` asks.
-  const unwatch = useRef<(() => void) | undefined>(undefined);
+  // Set while `said` still stands: true for a refusal; for a question,
+  // what stops watching what became of it.
+  const standing = useRef<true | (() => void) | undefined>(undefined);
+  const unwatch = () => {
+    if (typeof standing.current === "function") {
+      standing.current();
+    }
+    standing.current = undefined;
+  };
   const refusing = useClearedWhenLineChanges(cart, () => {
-    standing.current = false;
-    said.value = typing.peek() ? POINT : "";
+    unwatch();
+    said.value = "";
   });
   const show = (
     words: MessageDescriptor | string,
     { about, stands }: Pick<Acted, "about" | "stands"> = {},
   ) => {
-    unwatch.current?.();
-    unwatch.current = undefined;
+    unwatch();
     said.value = words;
-    standing.current = stands !== undefined;
     refusing(about);
-    if (stands !== undefined && stands !== true) {
-      unwatch.current = stands.subscribe((instead) => {
-        if (instead !== null) {
-          show(instead);
-        }
-      });
-    }
+    standing.current =
+      stands === undefined || stands === true
+        ? stands
+        : stands.subscribe((instead) => {
+            if (instead !== null) {
+              show(instead);
+            }
+          });
   };
-  useEffect(() => () => unwatch.current?.(), []);
+  useEffect(() => unwatch, []);
   // Why the camera could not be used, once it was refused.
   const refused = useSignal<Refusal | null>(null);
   const torch = useSignal<((on: boolean) => Promise<void>) | null>(null);
   const refusal = refused.value;
-  // What the status line says, too old aside: while typing pauses
-  // reading, that it does; over the words kept beneath.
-  const shown = typing.value ? TYPING : said.value;
   // As typing starts and ends, anything but a refusal or question still
   // standing becomes Point, so the live region does not announce what a
   // label did, or a question answered meanwhile, once typing ends;
@@ -218,7 +227,7 @@ export function Scanner({
     () =>
       effect(() => {
         typing.value;
-        if (!standing.current && said.peek() !== STARTING) {
+        if (standing.current === undefined && said.peek() !== STARTING) {
           said.value = POINT;
         }
       }),
@@ -352,12 +361,11 @@ export function Scanner({
       {refusal === null ? (
         <>
           <p role="status" class="status-line">
-            {tooOld ? (
+            {/* In this order: too old, typing, then the words beneath. */}
+            {tooOld.value ? (
               <UpgradeToSave />
-            ) : typeof shown === "string" ? (
-              shown
             ) : (
-              say(shown)
+              wordsOf(typing.value ? TYPING : said.value)
             )}
           </p>
           <div class="actions">
@@ -390,6 +398,11 @@ export function Scanner({
       )}
     </section>
   );
+}
+
+/** A phrase in the volunteer's language, or words already said so. */
+function wordsOf(words: MessageDescriptor | string) {
+  return typeof words === "string" ? words : say(words);
 }
 
 /** A refusal's hint: to record the cart first where reloading or

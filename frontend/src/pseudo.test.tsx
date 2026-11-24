@@ -539,9 +539,9 @@ const COVERED: Record<string, () => Promise<HTMLElement[]>> = {
         onCode={() => ({ said: "Κουτί", label: "item" })}
         onDone={() => {}}
         onPicture={() => {}}
-        reads={signal(true)}
+        onScreen={signal(true)}
         typing={signal(false)}
-        tooOld={false}
+        tooOld={signal(false)}
         reload={() => {}}
         reloadKeepsCart
         open={open}
@@ -570,9 +570,9 @@ const COVERED: Record<string, () => Promise<HTMLElement[]>> = {
             onCode={() => ({ said: "", label: "unknown" })}
             onDone={() => {}}
             onPicture={() => {}}
-            reads={signal(true)}
+            onScreen={signal(true)}
             typing={signal(false)}
-            tooOld={false}
+            tooOld={signal(false)}
             reload={() => {}}
             reloadKeepsCart={reloadKeepsCart}
             open={() => Promise.reject(refusal)}
@@ -592,9 +592,9 @@ const COVERED: Record<string, () => Promise<HTMLElement[]>> = {
           onCode={() => ({ said: "", label: "unknown" })}
           onDone={() => {}}
           onPicture={() => {}}
-          reads={signal(true)}
+          onScreen={signal(true)}
           typing={signal(false)}
-          tooOld={false}
+          tooOld={signal(false)}
           reload={() => {}}
           reloadKeepsCart
           open={() => Promise.reject(new TypeError("no mediaDevices"))}

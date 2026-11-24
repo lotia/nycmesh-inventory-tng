@@ -3,7 +3,7 @@
  * added, as the camera reads nothing then (Ali, 2026-11-24,
  * inventory-tng-n1p8). */
 import { msg } from "@lingui/core/macro";
-import { useSignal } from "@preact/signals";
+import { type ReadonlySignal, useSignal } from "@preact/signals";
 import type { ComponentChildren } from "preact";
 import { Field } from "../shared/Field";
 import { say } from "../shared/i18n";
@@ -44,7 +44,7 @@ export function Finder({
   /** A label's code typed, as a scanner gun types one. */
   onLabel: (read: Scanned) => Picked;
   /** Whether the server takes nothing more from this build (NewerBuild). */
-  tooOld: boolean;
+  tooOld: ReadonlySignal<boolean>;
 }) {
   // Emptied only by a pick or a code typed here, never by a label the
   // camera reads while the volunteer types (inventory-tng-tjyo).
@@ -60,7 +60,7 @@ export function Finder({
   });
   const show = (pick: () => Picked) => {
     query.value = "";
-    if (tooOld) {
+    if (tooOld.value) {
       refusal.value = <UpgradeToSave />;
       refusing(undefined);
       return;
