@@ -15,7 +15,7 @@ from typing import NamedTuple
 
 from sqlalchemy.orm import Session
 
-from inventory_tng.core.phrases import Words, gettext, lazy_gettext, number
+from inventory_tng.core.phrases import Separator, Words, gettext, lazy_gettext, number
 from inventory_tng.models.catalogue import Item
 from inventory_tng.models.places import Location
 from inventory_tng.models.stock import (
@@ -24,7 +24,6 @@ from inventory_tng.models.stock import (
 )
 from inventory_tng.stock import over_recorded, queries, units_shown
 from inventory_tng.stock.units_shown import Now, Shown
-from inventory_tng.web.formatting import Separator
 from inventory_tng.web.forms import (
     chosen,
     quantity,

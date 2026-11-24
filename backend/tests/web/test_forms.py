@@ -8,7 +8,8 @@ from typing import Any
 import pytest
 
 from inventory_tng.core.local_env import CLONE
-from inventory_tng.web.formatting import Separator, box_amount, plain_amount
+from inventory_tng.core.phrases import Separator
+from inventory_tng.web.formatting import box_amount, plain_amount
 from inventory_tng.web.forms import (
     ABOVE_ZERO,
     THOUSANDS,

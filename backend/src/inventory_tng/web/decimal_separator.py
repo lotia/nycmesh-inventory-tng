@@ -16,7 +16,7 @@ from babel.localedata import locale_identifiers
 from babel.numbers import get_decimal_symbol
 from starlette.requests import Request
 
-from inventory_tng.web.formatting import Separator
+from inventory_tng.core.phrases import Separator
 
 log = structlog.get_logger(__name__)
 

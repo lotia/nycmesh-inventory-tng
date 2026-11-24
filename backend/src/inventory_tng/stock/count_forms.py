@@ -9,7 +9,7 @@ from typing import NamedTuple
 
 from sqlalchemy.orm import Session
 
-from inventory_tng.core.phrases import Words, lazy_gettext
+from inventory_tng.core.phrases import Separator, Words, lazy_gettext
 from inventory_tng.models.base import INTEGER_MAX, whole
 from inventory_tng.models.catalogue import Item, ItemPackage
 from inventory_tng.models.stock import OpenPackage
@@ -25,7 +25,6 @@ from inventory_tng.stock.forms import (
 )
 from inventory_tng.stock.ledger import LOOSE, Form, repeated
 from inventory_tng.stock.units_shown import Now
-from inventory_tng.web.formatting import Separator
 from inventory_tng.web.forms import QUANTITY_MAX, RULES, quantity, read_amount, row_id
 
 # The count form's fields of items: counted, by item, and one chosen at

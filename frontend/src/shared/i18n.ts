@@ -103,14 +103,11 @@ function holed(
       return [name, `\uE000${held.length - 1}\uE001`];
     }),
   );
-  const options: MessageOptions = {};
-  if (phrase.message !== undefined) {
-    options.message = phrase.message;
-  }
-  // A plural's # ungrouped on a comma page, as sayNumber writes it.
-  if (boxSeparator() === ",") {
-    options.formats = UNGROUPED;
-  }
+  const options: MessageOptions = {
+    ...phrase,
+    // A plural's # ungrouped on a comma page, as sayNumber writes it.
+    ...(boxSeparator() === "," ? { formats: UNGROUPED } : {}),
+  };
   return [i18n._(phrase.id, filled, options), held];
 }
 

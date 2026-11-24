@@ -16,7 +16,7 @@ from inventory_tng.catalogue import items, reading_rules, units
 from inventory_tng.catalogue.name_keys import nameless
 from inventory_tng.catalogue.reading_rules import chosen_rule, read_alike_words
 from inventory_tng.core.db_errors import Broken
-from inventory_tng.core.phrases import Words, gettext, lazy_gettext
+from inventory_tng.core.phrases import Separator, Words, gettext, lazy_gettext
 from inventory_tng.models.base import INTEGER_MAX, whole
 from inventory_tng.models.catalogue import (
     UNITS,
@@ -26,7 +26,7 @@ from inventory_tng.models.catalogue import (
     reading_rules_held,
 )
 from inventory_tng.models.names import canonical
-from inventory_tng.web.formatting import Separator, amount
+from inventory_tng.web.formatting import amount
 from inventory_tng.web.forms import chosen, name_problem, quantity
 
 log = structlog.get_logger(__name__)

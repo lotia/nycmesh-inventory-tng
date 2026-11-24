@@ -26,7 +26,7 @@ from inventory_tng.core.db_errors import RuleBroken, attempt
 from inventory_tng.core.db_once_committed import once_committed
 from inventory_tng.core.db_sessions import DbSession
 from inventory_tng.core.local_time import site_zone
-from inventory_tng.core.phrases import Words, lazy, lazy_gettext
+from inventory_tng.core.phrases import Separator, Words, lazy, lazy_gettext
 from inventory_tng.models.base import INTEGER_MAX, whole
 from inventory_tng.models.catalogue import Item
 from inventory_tng.models.stock import OpenPackage
@@ -50,7 +50,6 @@ from inventory_tng.stock.open_packages_listing import BY_PACKAGE, BY_SHOWS, OLDE
 from inventory_tng.stock.paths import LENGTHS, STOCK
 from inventory_tng.web.admin_pages import admin_page, now
 from inventory_tng.web.decimal_separator import decimal_separator
-from inventory_tng.web.formatting import Separator
 from inventory_tng.web.forms import (
     THOUSANDS,
     OtherSeparator,

@@ -15,11 +15,10 @@ from opentelemetry import metrics
 from sqlalchemy.orm import Session
 
 from inventory_tng.core.db_base import Base
-from inventory_tng.core.phrases import Words, gettext, lazy_gettext, number
+from inventory_tng.core.phrases import Separator, Words, gettext, lazy_gettext, number
 from inventory_tng.models.base import INTEGER_MAX, whole
 from inventory_tng.models.names import canonical
 from inventory_tng.stock.ledger import whole_enough
-from inventory_tng.web.formatting import Separator
 
 log = structlog.get_logger(__name__)
 meter = metrics.get_meter(__name__)

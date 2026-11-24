@@ -144,7 +144,7 @@ class Notifier:
         """Mail `to` what `build` makes, if mail is set up and there is an
         address."""
         if self.mailer is not None and to:
-            self.tasks.add_task(deliver, self.mailer, _made(build, to, admin_id))
+            self.tasks.add_task(deliver, self.mailer, _as_mail(build, to, admin_id))
 
     def tell_admins(
         self,
@@ -170,24 +170,19 @@ class Notifier:
         nothing after it (admins/guards._confirm). The reply then waits for the
         provider."""
         if self.mailer is not None and to:
-            deliver(self.mailer, _made(build, to, admin_id))
+            deliver(self.mailer, _as_mail(build, to, admin_id))
 
     def later(self, job: Callable[[Mailer], None]) -> None:
         """Run `job` after the reply, if mail is set up."""
         if self.mailer is not None:
-            self.tasks.add_task(_in_mail_numbers, job, self.mailer)
+            self.tasks.add_task(_as_mail, job, self.mailer)
 
 
-def _made(build: Told, to: str, admin_id: int) -> Message:
-    """What `build` makes, its numbers as mail writes them."""
+def _as_mail[*Args, Made](make: Callable[[*Args], Made], *args: *Args) -> Made:
+    """What `make` makes of `args`, its numbers as mail writes them: only
+    those written within it, so a mail's numbers are written in its build."""
     with writing_numbers("."):
-        return build(to, admin_id)
-
-
-def _in_mail_numbers(job: Callable[[Mailer], None], mailer: Mailer) -> None:
-    """Run `job`, which makes mail, its numbers as mail writes them."""
-    with writing_numbers("."):
-        job(mailer)
+        return make(*args)
 
 
 def _notifier(

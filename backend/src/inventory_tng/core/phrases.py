@@ -125,12 +125,11 @@ def number(value: int | Decimal) -> str:
     digit it has, never rounded. Within `writing_numbers(",")`, ungrouped
     and with a comma: 1500 and 1,5."""
     locale = _number_locale(_active.info().get("language"))
-    if _separator.get() == ".":
-        return format_decimal(value, locale=locale, decimal_quantization=False)
+    comma = _separator.get() == ","
     written = format_decimal(
-        value, locale=locale, decimal_quantization=False, group_separator=False
+        value, locale=locale, decimal_quantization=False, group_separator=not comma
     )
-    return written.replace(get_decimal_symbol(locale), ",")
+    return written.replace(get_decimal_symbol(locale), ",") if comma else written
 
 
 def joined(names: Sequence[str]) -> str:
