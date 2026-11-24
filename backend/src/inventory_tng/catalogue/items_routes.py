@@ -144,6 +144,8 @@ def _change_or_note[T](
         fraction = forms.package_fraction(session, item_id) if item_id else None
         problems["unit"] = fraction or WHOLE_UNITS
     elif broken in REFUSED_FIELDS:
+        if broken == MINIMUM_WHOLE:  # The form's own check let it by.
+            log.warning("database refused a fractional reorder at", item_id=item_id)
         problems[REFUSED_FIELDS[broken]] = RULES[broken]
     return done, broken
 

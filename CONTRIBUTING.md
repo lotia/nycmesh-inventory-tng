@@ -403,14 +403,15 @@ forms, the locked services, the ledger, the templates and the scan page
 all ask it, never comparing a unit themselves, and a test fails until a
 new unit is placed in one of its lists. The scan page reads its copy
 (`frontend/src/amount-rules.ts`), and both sides test against
-`frontend/src/amount-rules-vectors.json`. The database's check that an
-item counted whole has a whole Reorder at (`ck_item_minimum_whole`) names
-its units in a migration, and a test fails until a new unit counted whole
-is added there. After changing it:
+`frontend/src/amount-rules-vectors.json`. After changing it:
 
 ```sh
 mise run regenerate-amount-rules    # frontend/src/amount-rules.json
 ```
+
+A unit newly counted whole also needs a migration that writes out again
+`ck_item_minimum_whole`, the database's check that such an item's Reorder
+at is whole; a test fails until it does.
 
 A reading rule (`models.catalogue.ReadingRule`, written only by
 `catalogue/reading_rules.py`) settles how a unit as typed after a
