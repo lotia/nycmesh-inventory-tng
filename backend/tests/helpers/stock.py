@@ -305,6 +305,19 @@ class Spools:
         )
 
 
+def netted_retired(session: Session) -> Spools:
+    """Spools whose cable is retired, then 610 m of loose cable taken from
+    the store holding only sealed spools: nothing in all, but sealed and
+    loose are wrong."""
+    spools = Spools(session)
+    retire(session, spools.cable)
+    spools.write(
+        {"kind": "install", "from_location_id": spools.store.id},
+        Entry(spools.cable.id, Decimal(610)),
+    )
+    return spools
+
+
 def length(made: OpenPackage, left: str) -> dict[str, str]:
     """A batch's report of what is really on an open package."""
     return {"open_package_key": str(made.key), "left": left}

@@ -38,7 +38,6 @@ from inventory_tng.stock.forms import (
     now_counted_in,
     shown_field,
 )
-from inventory_tng.stock.ledger import Entry
 from inventory_tng.stock.moments import Moment, expected, moment
 from inventory_tng.stock.paths import ADJUSTMENTS, COUNTS, STOCK
 from inventory_tng.web.forms import ABOVE_ZERO, RULES, WHOLE_UNITS
@@ -59,7 +58,6 @@ from helpers.rows import item_fields, shown, violates
 from helpers.sign_in import new_admin, sign_in_with
 from helpers.stock import (
     Place,
-    Spools,
     adjustment_form,
     at_retired_van,
     badge,
@@ -68,6 +66,7 @@ from helpers.stock import (
     count_at,
     count_form,
     counts_written,
+    netted_retired,
     retire,
     stocked,
     write,
@@ -219,12 +218,7 @@ def _retired_and_taken(session: Session, held: str) -> Item:
     (loose units taken from sealed spools: nothing in all, but not by
     form)."""
     if held == "netted":
-        spools = Spools(session)
-        retire(session, spools.cable)
-        spools.write(
-            {"kind": "install", "from_location_id": spools.store.id},
-            Entry(spools.cable.id, Decimal(610)),
-        )
+        spools = netted_retired(session)
         assert expected(session, spools.store.id) == {}
         return spools.cable
     place = Place(session) if held == "short" else stocked(session, "2")

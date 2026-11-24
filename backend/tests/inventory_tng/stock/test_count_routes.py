@@ -50,6 +50,7 @@ from helpers.stock import (
     count_form,
     counts_written,
     held_by_form,
+    netted_retired,
     received,
     retire,
     stocked,
@@ -1006,13 +1007,8 @@ def test_a_retired_item_netted_to_nothing_but_not_by_form_is_counted_to_zero(
     """Loose cable taken from a store holding only sealed spools, after the
     cable was retired: nothing in all, but sealed and loose are wrong, so
     the form still offers it, by form, to count to zero."""
-    spools = Spools(session)
+    spools = netted_retired(session)
     cable = spools.cable.id
-    retire(session, spools.cable)
-    spools.write(
-        {"kind": "install", "from_location_id": spools.store.id},
-        Entry(cable, Decimal(610)),
-    )
     shown = admin_client.get(f"{COUNTS}/{spools.store.id}?item={cable}")
     assert box_values(shown.text, f"sealed_{cable}_{spools.spool.id}")
     assert box_values(shown.text, f"loose_{cable}")

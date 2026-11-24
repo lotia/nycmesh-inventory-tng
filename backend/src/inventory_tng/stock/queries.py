@@ -192,9 +192,7 @@ def item_ids_matching(
 
 
 def countable_items(session: Session) -> list[Item]:
-    """What can be counted or adjusted, by name (balance.countable_item):
-    current items, and retired ones with a balance at a current place that
-    is not zero, which may still be written off or counted to zero."""
+    """What can be counted or adjusted (balance.countable_item), by name."""
     return by_name(session, Item, countable_item())
 
 
