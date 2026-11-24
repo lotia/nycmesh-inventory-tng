@@ -190,6 +190,24 @@ describe("scanning labels with the camera", () => {
     expect(view.watched()).toBe(0);
   });
 
+  test("opening, the camera is scrolled into view once, and off the screen it adds nothing until it is back", async () => {
+    const view = stubInView();
+    const scroll = vi.spyOn(HTMLElement.prototype, "scrollIntoView");
+    await opened();
+    const picture = document.querySelector("video") as HTMLVideoElement;
+    expect(scroll.mock.contexts).toEqual([picture]);
+    await vi.waitFor(() => expect(view.watched()).toBe(1));
+    view.inView(picture, 0.5);
+    await scan("B3ZT9W");
+    await pass(2);
+    expect(lineNames()).toEqual([]);
+    view.inView(picture, 1);
+    await screen.findByText("Added one: LiteBeam 5AC.");
+    expect(lineNames()).toEqual(["LiteBeam 5AC"]);
+    // Not scrolled again after a scan.
+    expect(scroll).toHaveBeenCalledTimes(1);
+  });
+
   test("what a label added stays said as its line changes", async () => {
     await opened();
     await scan("B3ZT9W");

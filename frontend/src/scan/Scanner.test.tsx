@@ -1,3 +1,4 @@
+import { signal } from "@preact/signals";
 import { act, fireEvent, render, screen } from "@testing-library/preact";
 import type { ComponentProps } from "preact";
 import { afterEach, beforeEach, expect, test, vi } from "vitest";
@@ -54,6 +55,7 @@ function scannerOf(props: ScannerProps) {
       onCode={() => said("")}
       onDone={() => {}}
       onPicture={() => {}}
+      onScreen={signal(true)}
       reload={() => {}}
       reloadKeepsCart
       {...props}
@@ -98,6 +100,40 @@ test("a label in view is taken once, and said what it did", async () => {
   // Still in view a moment later: not taken again.
   await pass(2);
   expect(onCode).toHaveBeenCalledTimes(1);
+});
+
+test("no label is read while the picture is off the screen, and reading resumes once it is back", async () => {
+  const { state, open } = camera();
+  const onCode = vi.fn((code: string) => said(`Read ${code}.`));
+  const onScreen = signal(true);
+  scanner({ open, onCode, onScreen });
+  await screen.findByText(say(POINT));
+  onScreen.value = false;
+  state.inView = ["B3ZT9W"];
+  await pass(3);
+  expect(onCode).not.toHaveBeenCalled();
+  // The status line keeps its last words.
+  expect(screen.getByRole("status").textContent).toBe(say(POINT));
+  onScreen.value = true;
+  await screen.findByText("Read B3ZT9W.");
+  expect(onCode).toHaveBeenCalledTimes(1);
+});
+
+test("a label read as the picture leaves the screen is not taken", async () => {
+  const { read, finish } = slowRead();
+  const { open } = camera({ read });
+  const onCode = vi.fn((code: string) => said(`Read ${code}.`));
+  const onScreen = signal(true);
+  scanner({ open, onCode, onScreen });
+  await screen.findByText(say(POINT));
+  await pass();
+  expect(read).toHaveBeenCalledTimes(1);
+  onScreen.value = false;
+  await act(async () => finish(["B3ZT9W"]));
+  await pass(3);
+  expect(onCode).not.toHaveBeenCalled();
+  // Off the screen, the camera is not asked again.
+  expect(read).toHaveBeenCalledTimes(1);
 });
 
 test("Done stops the camera", async () => {

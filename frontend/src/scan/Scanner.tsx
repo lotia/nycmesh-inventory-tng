@@ -6,11 +6,14 @@
  * inventory-tng-qy02), saying to record the cart first while a reload
  * or restart would empty it (Ali, inventory-tng-0y0u, inventory-tng-xtig);
  * the lists below still work.
+ * No label is read while the picture is not wholly on the screen, so
+ * nothing is added out of the volunteer's sight (Ali, 2026-11-24,
+ * inventory-tng-rj2g); the status line keeps its last words.
  * Each session is reported (camera-report.ts).
  */
 import type { MessageDescriptor } from "@lingui/core";
 import { msg } from "@lingui/core/macro";
-import { useSignal } from "@preact/signals";
+import { type ReadonlySignal, useSignal } from "@preact/signals";
 import { useEffect, useRef } from "preact/hooks";
 import { say } from "../shared/i18n";
 import { openCamera, type Session } from "./camera";
@@ -112,6 +115,7 @@ export function Scanner({
   onCode,
   onDone,
   onPicture,
+  onScreen,
   reload,
   reloadKeepsCart,
   open = openCamera,
@@ -123,6 +127,9 @@ export function Scanner({
   /** Given the camera's picture once it shows, and null once it stops
    * (BackToCamera). */
   onPicture: (video: HTMLVideoElement | null) => void;
+  /** Whether the picture is wholly on the screen (useWhollyOnScreen):
+   * labels are read only while it is. */
+  onScreen: ReadonlySignal<boolean>;
   /** Refresh this page (ScanPage's reload). */
   reload: () => void;
   /** Whether a reload or restart would bring back the cart
@@ -183,9 +190,11 @@ export function Scanner({
         // them up.
         const read = async () => {
           try {
-            const codes = await session.read();
-            // Closed while reading: what it read is not taken.
-            for (const code of stopped ? [] : codes) {
+            const codes = onScreen.peek() ? await session.read() : [];
+            // Closed, or scrolled off the screen, while reading: what it
+            // read is not taken.
+            const taken = stopped || !onScreen.peek() ? [] : codes;
+            for (const code of taken) {
               if (repeats.fresh(code, Date.now())) {
                 const acted = handle.current(code);
                 report.read(acted.label);

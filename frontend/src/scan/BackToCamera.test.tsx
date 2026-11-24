@@ -4,6 +4,7 @@ import { say } from "../shared/i18n";
 import { telemetry } from "../shared/telemetry";
 import { stubInView } from "../testing/in-view";
 import { BACK_TO_CAMERA, BackToCamera, isTextBox, ROOM } from "./BackToCamera";
+import { useWhollyOnScreen } from "./camera-in-view";
 
 let view: ReturnType<typeof stubInView>;
 let camera: HTMLVideoElement;
@@ -27,6 +28,11 @@ afterEach(() => {
 
 const back = () => screen.queryByRole("button", { name: say(BACK_TO_CAMERA) });
 
+/** The button, told what the camera's watch says, as CartForm does. */
+function Watched() {
+  return <BackToCamera camera={camera} onScreen={useWhollyOnScreen(camera)} />;
+}
+
 /** The page with a box of `type` and the button, the camera wholly in
  * view to begin with. */
 function page(type: "text" | "checkbox" = "text") {
@@ -37,7 +43,7 @@ function page(type: "text" | "checkbox" = "text") {
       ) : (
         <input aria-label="box" />
       )}
-      <BackToCamera camera={camera} />
+      <Watched />
     </div>,
   );
   view.inView(camera, 1);

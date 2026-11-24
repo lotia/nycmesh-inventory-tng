@@ -5,10 +5,11 @@
  * hands focus to the camera's region. Hidden while a text box has focus,
  * as the on-screen keyboard is then up. While it may show, the page keeps
  * room for it at its bottom, and a box given focus lands above it
- * (styles.css, .back-to-camera-room).
+ * (styles.css, .back-to-camera-room). Whether the picture is on the
+ * screen comes from camera-in-view.ts, which the camera reads too.
  */
 import { msg } from "@lingui/core/macro";
-import { useSignal } from "@preact/signals";
+import { type ReadonlySignal, useSignal } from "@preact/signals";
 import { useEffect } from "preact/hooks";
 import { say } from "../shared/i18n";
 import { telemetry } from "../shared/telemetry";
@@ -40,24 +41,20 @@ export function isTextBox(target: EventTarget | null): boolean {
   );
 }
 
-export function BackToCamera({ camera }: { camera: HTMLElement }) {
-  const offScreen = useSignal(false);
+export function BackToCamera({
+  camera,
+  onScreen,
+}: {
+  camera: HTMLElement;
+  /** Whether the camera's picture is wholly on the screen
+   * (useWhollyOnScreen). */
+  onScreen: ReadonlySignal<boolean>;
+}) {
   const typing = useSignal(isTextBox(document.activeElement));
 
   useEffect(() => {
     const root = document.documentElement;
     root.classList.add(ROOM);
-    // Wholly in view, the picture is all inside the screen: a pixel's
-    // margin, so a picture at a fraction of a pixel still counts.
-    const watching = new IntersectionObserver(
-      (entries) => {
-        for (const entry of entries) {
-          offScreen.value = entry.intersectionRatio < 1;
-        }
-      },
-      { threshold: 1, rootMargin: "1px" },
-    );
-    watching.observe(camera);
     const listening = new AbortController();
     const { signal } = listening;
     document.addEventListener(
@@ -77,12 +74,11 @@ export function BackToCamera({ camera }: { camera: HTMLElement }) {
     );
     return () => {
       root.classList.remove(ROOM);
-      watching.disconnect();
       listening.abort();
     };
-  }, [camera]);
+  }, []);
 
-  if (!offScreen.value || typing.value) {
+  if (onScreen.value || typing.value) {
     return null;
   }
   return (

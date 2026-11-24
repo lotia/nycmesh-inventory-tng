@@ -16,6 +16,7 @@ import { takenOff } from "./add-the-rest";
 import { BackToCamera } from "./BackToCamera";
 import { type Batch, batchWords, toBatch } from "./batch";
 import { CartLine } from "./CartLine";
+import { scrollToPicture, useWhollyOnScreen } from "./camera-in-view";
 import { labelKind } from "./camera-report";
 import {
   addOne,
@@ -365,6 +366,7 @@ export function CartForm({
   const scanning = useSignal(false);
   // The camera's picture, while it shows (BackToCamera).
   const picture = useSignal<HTMLVideoElement | null>(null);
+  const pictureOnScreen = useWhollyOnScreen(picture.value);
   const placeRead = useSignal<number | null>(null);
 
   /** Acts on a label, read by the camera or typed by a scanner gun. */
@@ -826,7 +828,13 @@ export function CartForm({
           }}
           onPicture={(video) => {
             picture.value = video;
+            // Brought into view once, in answer to Scan with the camera;
+            // never after a scan (Ali, 2026-11-24, inventory-tng-rj2g).
+            if (video !== null) {
+              scrollToPicture(video);
+            }
           }}
+          onScreen={pictureOnScreen}
           reload={reload}
           reloadKeepsCart={cartKept.value}
         />
@@ -980,7 +988,9 @@ export function CartForm({
           </button>
         ))}
       {/* Last, as it shows at the bottom of the screen. */}
-      {picture.value !== null && <BackToCamera camera={picture.value} />}
+      {picture.value !== null && (
+        <BackToCamera camera={picture.value} onScreen={pictureOnScreen} />
+      )}
     </form>
   );
 }

@@ -2,7 +2,9 @@
  * The scan page's camera stays where it is as labels are scanned, at a
  * phone's width, as each new line goes below it, and Back to camera brings
  * it back once the volunteer has scrolled away (Ali, 2026-11-24,
- * inventory-tng-fdnt). Chromium's camera here is a canvas this test draws
+ * inventory-tng-fdnt). Opening the camera brings its picture wholly on the
+ * screen, and off the screen it reads no labels (Ali, 2026-11-24,
+ * inventory-tng-rj2g). Chromium's camera here is a canvas this test draws
  * each label on, in place of its fake camera's one label.
  */
 import { expect, type Page } from "@playwright/test";
@@ -86,7 +88,27 @@ async function cameraPlace(page: Page) {
   }));
 }
 
-test("the camera stays put as labels are scanned, and Back to camera brings it back", async ({
+/** Waits for the page to stop scrolling: the same place two frames
+ * running. */
+async function settled(page: Page) {
+  await page.evaluate(
+    () =>
+      new Promise<void>((done) => {
+        let last = Number.NaN;
+        const check = () => {
+          if (window.scrollY === last) {
+            done();
+          } else {
+            last = window.scrollY;
+            requestAnimationFrame(check);
+          }
+        };
+        requestAnimationFrame(check);
+      }),
+  );
+}
+
+test("the camera stays put as labels are scanned, reads none off the screen, and Back to camera brings it back", async ({
   page,
   browserName,
 }) => {
@@ -111,11 +133,11 @@ test("the camera stays put as labels are scanned, and Back to camera brings it b
     "Point the camera at a label.",
     { timeout: 15_000 },
   );
-  // Opened from the page's top, the picture runs off the screen's bottom:
-  // Back to camera brings it wholly on, and goes.
-  await back.click();
+  // Opened from the page's top, where the picture would run off the
+  // screen's bottom: the page brings it wholly on, with no Back to camera.
   await expect(picture).toBeInViewport({ ratio: 1 });
   await expect(back).toBeHidden();
+  await settled(page);
   const before = await cameraPlace(page);
 
   for (const [at, name] of [radio, other, cable].entries()) {
@@ -141,6 +163,15 @@ test("the camera stays put as labels are scanned, and Back to camera brings it b
   await loose.blur();
   await expect(back).toBeVisible();
 
+  // Off the screen, a label shown is not read: its line is as it was
+  // after longer than a repeat's quiet time (repeated-reads.ts), so it is
+  // taken once read.
+  const status = camera.getByRole("status");
+  await show(page, labels[0] as Drawn);
+  await page.waitForTimeout(2_500);
+  await expect(loose).toHaveValue("3");
+  await expect(status).toHaveText(`Added one: ${cable}.`);
+
   // At the page's bottom, nothing is left under it.
   await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight));
   const button = await back.boundingBox();
@@ -157,4 +188,7 @@ test("the camera stays put as labels are scanned, and Back to camera brings it b
   await expect(picture).toBeInViewport({ ratio: 1 });
   await expect(back).toBeHidden();
   await expect(camera).toBeFocused();
+  // Wholly on the screen again, the label is read.
+  await expect(status).toHaveText(`Added one: ${radio}.`, { timeout: 15_000 });
+  await expect(loose).toHaveValue("4");
 });
