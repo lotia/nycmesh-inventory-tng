@@ -1,7 +1,7 @@
 /** The cart being filled: who, what is happening, where; the camera and
- * the item search, then the cart's lines below them, newest first, so a
- * scan moves nothing above the camera (Ali, 2026-11-24,
- * inventory-tng-fdnt); then Record. */
+ * the item search, then a newer build's alert and the cart's lines below
+ * them, newest first, so a scan moves nothing above the camera (Ali,
+ * 2026-11-24, inventory-tng-fdnt); then Record. */
 import type { MessageDescriptor } from "@lingui/core";
 import { msg } from "@lingui/core/macro";
 import { type Signal, useSignal } from "@preact/signals";
@@ -40,6 +40,7 @@ import {
 import { useEveryMinuteAndWhenShown } from "./every-minute-and-when-shown";
 import { done, Finder, type Picked, refused } from "./Finder";
 import { readLabel, type Scanned } from "./label-codes";
+import { NewerBuild } from "./NewerBuild";
 import {
   AlertWords,
   CAUTION_BOX,
@@ -158,7 +159,8 @@ export function CartForm({
   /** Given what puts a refused batch's other lines in this cart
    * (addRest). */
   rester: { current: AddRest | null };
-  /** Refresh this page, offered where the camera was refused (Scanner). */
+  /** Refresh this page, offered where the camera was refused (Scanner)
+   * and once a newer build is out (NewerBuild). */
   reload: () => void;
   /** The catalogue as it is now, which Record checks the cart against
    * first; the one shown if it cannot be had soon (ScanPage). */
@@ -856,6 +858,14 @@ export function CartForm({
         onLabel={actOn}
       />
 
+      {/* Below the camera, as a scan may take it away (Ali, 2026-11-24,
+          inventory-tng-oaao). */}
+      <NewerBuild
+        outbox={outbox}
+        cartEmpty={cartEmpty}
+        cartKept={cartKept}
+        reload={reload}
+      />
       <h2 ref={cartHeading} tabIndex={-1}>
         {say(CART)}
       </h2>

@@ -4,7 +4,9 @@
  * it back once the volunteer has scrolled away (Ali, 2026-11-24,
  * inventory-tng-fdnt). Opening the camera brings its picture wholly on the
  * screen, and off the screen it reads no labels (Ali, 2026-11-24,
- * inventory-tng-rj2g). Chromium's camera here is a canvas this test draws
+ * inventory-tng-rj2g). The alert that a newer build is out, which the
+ * first scan takes away, sits below it (Ali, 2026-11-24,
+ * inventory-tng-oaao). Chromium's camera here is a canvas this test draws
  * each label on, in place of its fake camera's one label.
  */
 import { expect, type Page } from "@playwright/test";
@@ -137,6 +139,18 @@ test("the camera stays put as labels are scanned, reads none off the screen, and
   // screen's bottom: the page brings it wholly on, with no Back to camera.
   await expect(picture).toBeInViewport({ ratio: 1 });
   await expect(back).toBeHidden();
+  // Another tab of a newer build: with the cart empty, the alert shows;
+  // the first scan takes it away.
+  const newer = await page.context().newPage();
+  await newer.goto("/scan");
+  await newer.evaluate(() =>
+    localStorage.setItem(
+      "inventory.build",
+      JSON.stringify({ build: "2999-01-01T00:00:00.000Z" }),
+    ),
+  );
+  const alert = page.getByRole("alert").filter({ hasText: "updated" });
+  await expect(alert).toBeVisible();
   await settled(page);
   const before = await cameraPlace(page);
 
@@ -148,6 +162,7 @@ test("the camera stays put as labels are scanned, reads none off the screen, and
     const now = await cameraPlace(page);
     expect(now.scrolled).toBe(before.scrolled);
     expect(Math.abs(now.top - before.top)).toBeLessThanOrEqual(2);
+    await expect(alert).toBeHidden();
   }
   // Newest first: each line's item, named first in it.
   const lines = page

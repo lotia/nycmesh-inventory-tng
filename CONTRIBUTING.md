@@ -762,13 +762,13 @@ utilities. When you style a page:
   move nothing below, and shows no bar when empty. A refusal there clears
   once the cart line it is about changes (`scan/refused-line.ts`).
 - Nothing a scan changes sits above the scan page's camera: the camera
-  and the item search come before the cart, whose lines are newest first,
-  and the page never scrolls by itself after a scan, only to bring the
-  camera's picture on the screen as it opens. While the picture is not
-  wholly on the screen, the camera reads no labels and Back to camera
-  (`scan/BackToCamera.tsx`) brings it back, both told by one watch
-  (`scan/camera-in-view.ts`); the page keeps room for the button at its
-  bottom (`.back-to-camera-room`).
+  and the item search come before the alert that a newer build is out and
+  the cart, whose lines are newest first, and the page never scrolls by
+  itself after a scan, only to bring the camera's picture on the screen
+  as it opens. While the picture is not wholly on the screen, the camera
+  reads no labels and Back to camera (`scan/BackToCamera.tsx`) brings it
+  back, both told by one watch (`scan/camera-in-view.ts`); the page keeps
+  room for the button at its bottom (`.back-to-camera-room`).
 - A box a person types into names the keyboard a phone shows for it
   with `inputmode`: `numeric` for whole numbers, `decimal` for numbers
   with a decimal point, `text` for anything with letters. A number with
