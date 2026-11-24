@@ -117,6 +117,18 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
   schemas: {
+    /**
+     * BackToCamera
+     * @description A volunteer tapped Back to camera on the scan page, as the camera's
+     *     picture was off the screen (frontend/src/scan/BackToCamera.tsx).
+     */
+    BackToCamera: {
+      /**
+       * @description discriminator enum property added by openapi-typescript
+       * @enum {string}
+       */
+      kind: "back_to_camera";
+    };
     /** Batch */
     Batch: {
       /**
@@ -761,6 +773,7 @@ export interface components {
         | components["schemas"]["CartDiscarded"]
         | components["schemas"]["LineRemoved"]
         | components["schemas"]["RemovalUndone"]
+        | components["schemas"]["BackToCamera"]
         | components["schemas"]["DifferenceAdded"]
         | components["schemas"]["RestPutBack"]
         | components["schemas"]["OtherSeparator"]

@@ -111,6 +111,7 @@ export function Scanner({
   cart,
   onCode,
   onDone,
+  onPicture,
   reload,
   reloadKeepsCart,
   open = openCamera,
@@ -119,6 +120,9 @@ export function Scanner({
   cart: Cart;
   onCode: (code: string) => Acted;
   onDone: () => void;
+  /** Given the camera's picture once it shows, and null once it stops
+   * (BackToCamera). */
+  onPicture: (video: HTMLVideoElement | null) => void;
   /** Refresh this page (ScanPage's reload). */
   reload: () => void;
   /** Whether a reload or restart would bring back the cart
@@ -174,6 +178,7 @@ export function Scanner({
         }
         torch.value = session.torch;
         show(POINT);
+        onPicture(video.current);
         // Each read waits for the one before: a slow phone never piles
         // them up.
         const read = async () => {
@@ -223,6 +228,7 @@ export function Scanner({
     return () => {
       stopped = true;
       clearTimeout(timer);
+      onPicture(null);
       listening.abort();
       // Stopped when it opens, if it has not yet, and reported.
       camera.then(

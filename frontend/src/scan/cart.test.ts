@@ -105,8 +105,8 @@ describe("adding", () => {
 test("adding to one line of several leaves the others", () => {
   const two = addOne(addOne(cart(), 100), 101);
   expect(addOne(two, 101).lines).toEqual([
-    { itemId: 100, packages: {}, loose: "1", picked: 1 },
     { itemId: 101, packages: {}, loose: "2", picked: 2 },
+    { itemId: 100, packages: {}, loose: "1", picked: 1 },
   ]);
 });
 
@@ -378,6 +378,17 @@ describe("turning a cart into a batch", () => {
       { itemId: 100, packages: {}, loose: "", picked: 2 },
     ]);
   });
+
+  test("a new line goes first; a picked one stays where it is", () => {
+    const two = withLine(withLine(cart({ lines: [] }), 100), 101);
+    expect(two.lines.map((line) => line.itemId)).toEqual([101, 100]);
+    expect(withLine(two, 100).lines.map((line) => line.itemId)).toEqual([
+      101, 100,
+    ]);
+    const added = addOne(addOne(two, 102), 100);
+    expect(added.lines.map((line) => line.itemId)).toEqual([102, 101, 100]);
+    expect(added.lines[2]?.loose).toBe("1");
+  });
 });
 
 describe("what has changed since the cart was filled", () => {
@@ -518,8 +529,8 @@ describe("the cart store, shared by tabs", () => {
       const more = addOne(store.cart.value, 101);
       expect(store.change(more)).toBe(true);
       expect(loadCart().lines).toEqual([
+        { ...more.lines[0], unit: "m" },
         ...filledLines(),
-        { ...more.lines[1], unit: "m" },
       ]);
     });
 

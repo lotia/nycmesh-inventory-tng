@@ -16,6 +16,7 @@ test("a line removed is put back where it was by Undo, from the keyboard", async
   await page.goto("/scan");
   await fillMove(page, first);
   await pick(page, second);
+  // Newest first: the second picked is the first line.
   const lines = page.locator("li", { hasText: "in all" });
   await lines
     .first()
@@ -25,7 +26,7 @@ test("a line removed is put back where it was by Undo, from the keyboard", async
   await lines.first().getByRole("button", { name: "Remove" }).click();
   // The page's other status lines stay on it, empty (inventory-tng-2l6n).
   const notice = page.getByRole("status").filter({ hasText: "Removed" });
-  await expect(notice).toHaveText(`Removed ${first}. Undo`);
+  await expect(notice).toHaveText(`Removed ${second}. Undo`);
   await expect(lines).toHaveCount(1);
   const undo = notice.getByRole("button", { name: "Undo" });
   await expect(undo).toBeFocused();
@@ -33,7 +34,7 @@ test("a line removed is put back where it was by Undo, from the keyboard", async
 
   await expect(notice).toHaveCount(0);
   await expect(lines).toHaveCount(2);
-  await expect(lines.first()).toContainText(first);
+  await expect(lines.first()).toContainText(second);
   await expect(lines.first().getByLabel(/^Loose/)).toHaveValue("7");
   await expect(
     lines.first().getByRole("button", { name: "Remove" }),

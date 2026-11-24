@@ -117,10 +117,6 @@ msgstr "Line {n}: {why}"
 msgid "This item is retired: what is left may be taken, never received"
 msgstr "This item is retired: what is left may be taken, never received"
 
-#: src/scan/CartForm.tsx
-msgid "Not added. Fix the incorrect amount above, then scan again."
-msgstr "Not added. Fix the incorrect amount above, then scan again."
-
 #: src/shared/registration.ts
 msgid "That phrase has expired. Ask for a new one."
 msgstr "That phrase has expired. Ask for a new one."
@@ -374,6 +370,10 @@ msgstr "{name}: {amount} more"
 #: src/shared/registration.ts
 msgid "That phrase has been withdrawn. Ask for a new one."
 msgstr "That phrase has been withdrawn. Ask for a new one."
+
+#: src/scan/CartForm.tsx
+msgid "Not added. Fix the incorrect amount below, then scan again."
+msgstr "Not added. Fix the incorrect amount below, then scan again."
 
 #: src/scan/Scanner.tsx
 msgid "Point the camera at a label."
@@ -841,6 +841,10 @@ msgstr "{name}: retired: taking only, so it can't be received."
 #: src/scan/OutboxList.tsx
 msgid "Sending…"
 msgstr "Sending…"
+
+#: src/scan/BackToCamera.tsx
+msgid "Back to camera"
+msgstr "Back to camera"
 
 #: src/scan/OlderList.tsx
 msgid "Unable to discard. Clear your site data to remove."

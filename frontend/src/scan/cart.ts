@@ -579,11 +579,12 @@ function bumped(line: Line, packageId?: number): Line {
 }
 
 /** The cart with this item picked once more: its line, made with nothing
- * in it if it has none, counts the pick (Line.picked). */
+ * in it at the top if it has none (newest first; one it has stays where
+ * it is), counts the pick (Line.picked). */
 export function withLine(cart: Cart, itemId: number): Cart {
   const made = cart.lines.some((line) => line.itemId === itemId)
     ? cart
-    : { ...cart, lines: [...cart.lines, { itemId, packages: {}, loose: "" }] };
+    : { ...cart, lines: [{ itemId, packages: {}, loose: "" }, ...cart.lines] };
   return withLineChanged(made, itemId, (line) => ({
     ...line,
     picked: (line.picked ?? 0) + 1,

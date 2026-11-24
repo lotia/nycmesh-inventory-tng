@@ -1,10 +1,11 @@
 import { fireEvent, screen } from "@testing-library/preact";
-import { beforeEach, describe, expect, test, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import { say } from "../shared/i18n";
 import { STORAGE_KEY as OUTBOX_KEY, Outbox } from "../shared/outbox";
 import { pass } from "../testing/camera";
 import { CATALOGUE } from "../testing/catalogue";
 import { answering, deferred, json, saved } from "../testing/fetch";
+import { stubInView } from "../testing/in-view";
 import {
   camera,
   fillMove,
@@ -18,7 +19,9 @@ import {
   server,
 } from "../testing/scan-page";
 import { refusingRemovals, refusingWrites } from "../testing/storage";
+import { BACK_TO_CAMERA } from "./BackToCamera";
 import {
+  CART,
   FROM,
   NOT_ADDED,
   NOT_KEEPING,
@@ -38,7 +41,7 @@ import {
 } from "./cart";
 import { FIND } from "./Finder";
 import { DISMISS } from "./OutboxList";
-import { DONE, NOT_ALLOWED, POINT, RELOAD_PAGE } from "./Scanner";
+import { CAMERA, DONE, NOT_ALLOWED, POINT, RELOAD_PAGE } from "./Scanner";
 import { COULD_NOT_LOAD } from "./ScanPage";
 
 // The camera, faked: it sees whatever a test puts in `inView`.
@@ -47,10 +50,23 @@ vi.mock(import("./camera"), async (actual) => ({
   openCamera: vi.fn(),
 }));
 
+/** The cart's lines' item names, top to bottom. */
+const lineNames = () =>
+  [...document.querySelectorAll("li > div > strong")].map(
+    (each) => each.textContent,
+  );
+
+/** Whether `later` comes after `earlier` on the page. */
+const follows = (earlier: Node, later: Node) =>
+  (earlier.compareDocumentPosition(later) &
+    Node.DOCUMENT_POSITION_FOLLOWING) !==
+  0;
+
 describe("scanning labels with the camera", () => {
   // The camera's clock, faked: scan lets a read's time pass (testing/setup.ts
   // makes it real again).
   beforeEach(() => vi.useFakeTimers({ shouldAdvanceTime: true }));
+  afterEach(() => vi.unstubAllGlobals());
 
   /** Shows the camera these labels, and lets the next read take them. */
   async function scan(...codes: string[]) {
@@ -131,6 +147,47 @@ describe("scanning labels with the camera", () => {
     expect(status.textContent).toBe("");
     expect(status.getAttribute("role")).toBe("status");
     expect(status.isConnected).toBe(true);
+  });
+
+  test("a new line goes first, under the camera and the search; a repeat adds to its line where it is", async () => {
+    await opened();
+    await scan("B3ZT9W");
+    await screen.findByText("Added one: LiteBeam 5AC.");
+    await scan("K7QX2M");
+    await screen.findByText("Added a Spool: Cat6 cable.");
+    expect(lineNames()).toEqual(["Cat6 cable", "LiteBeam 5AC"]);
+    // Out of view a while, then shown again: a new scan.
+    await scan();
+    await vi.advanceTimersByTimeAsync(2000);
+    await scan("B3ZT9W");
+    await vi.waitFor(() =>
+      expect(screen.getByLabelText<HTMLInputElement>("Loose units").value).toBe(
+        "2",
+      ),
+    );
+    expect(lineNames()).toEqual(["Cat6 cable", "LiteBeam 5AC"]);
+    // The camera, then the search, then the cart.
+    const [camera, search, cart] = [
+      screen.getByRole("region", { name: say(CAMERA) }),
+      screen.getByLabelText(say(FIND)),
+      screen.getByRole("heading", { name: say(CART) }),
+    ];
+    expect(follows(camera, search)).toBe(true);
+    expect(follows(search, cart)).toBe(true);
+  });
+
+  test("Back to camera is offered only while the camera is open and off the screen", async () => {
+    const view = stubInView();
+    await opened();
+    const picture = document.querySelector("video") as HTMLVideoElement;
+    await vi.waitFor(() => expect(view.watched()).toBe(1));
+    view.inView(picture, 0.5);
+    const back = () =>
+      screen.queryByRole("button", { name: say(BACK_TO_CAMERA) });
+    expect(back()).not.toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: say(DONE) }));
+    expect(back()).toBeNull();
+    expect(view.watched()).toBe(0);
   });
 
   test("what a label added stays said as its line changes", async () => {

@@ -115,6 +115,7 @@ describe("reporting", () => {
       cart_discarded: { kind: "cart_discarded" },
       line_removed: { kind: "line_removed" },
       removal_undone: { kind: "removal_undone" },
+      back_to_camera: { kind: "back_to_camera" },
       difference_added: { kind: "difference_added", how: "tap" },
       rest_put_back: { kind: "rest_put_back" },
       other_separator: { kind: "other_separator", separator: "point" },

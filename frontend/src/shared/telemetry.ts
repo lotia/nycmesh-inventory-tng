@@ -41,6 +41,9 @@ export const PER_HOUR: Record<Event["kind"], number> = {
   // out by removals.
   line_removed: 6,
   removal_undone: 4,
+  // Back to camera (inventory-tng-fdnt), added beside the rest, not taken
+  // from them.
+  back_to_camera: 4,
   // Rare: a cart recorded in two tabs, changed in one.
   difference_added: 2,
   // Rare: a batch refused for some of its lines (inventory-tng-clvh),

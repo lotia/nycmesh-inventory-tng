@@ -1,4 +1,7 @@
-/** The cart being filled: who, what is happening, where, the items, then Record. */
+/** The cart being filled: who, what is happening, where; the camera and
+ * the item search, then the cart's lines below them, newest first, so a
+ * scan moves nothing above the camera (Ali, 2026-11-24,
+ * inventory-tng-fdnt); then Record. */
 import type { MessageDescriptor } from "@lingui/core";
 import { msg } from "@lingui/core/macro";
 import { type Signal, useSignal } from "@preact/signals";
@@ -10,6 +13,7 @@ import { type Body, batchId, type Entry, type Outbox } from "../shared/outbox";
 import { type Said, wordsOf } from "../shared/outbox-notes";
 import { MOST_SECONDS, telemetry } from "../shared/telemetry";
 import { takenOff } from "./add-the-rest";
+import { BackToCamera } from "./BackToCamera";
 import { type Batch, batchWords, toBatch } from "./batch";
 import { CartLine } from "./CartLine";
 import { labelKind } from "./camera-report";
@@ -62,12 +66,13 @@ import { sealedCounts, unseen } from "./unseen-batches";
 
 export const NOT_KEEPING = msg`This browser isn't keeping the cart, so a reload will empty it. Free some space or leave private browsing.`;
 /** What a label or a tap did, said under the camera; a refusal, which
- * adds nothing, also under the item search. */
+ * adds nothing, also under the item search. The cart's lines are below
+ * both. */
 export const NO_PACKAGE_TO_OPEN = msg`{item} comes in no package to open.`;
 export const WHICH_PACKAGE = msg`{item}: type how many of which package to open.`;
 export const ADDED_ONE = msg`Added one: {item}.`;
 export const ADDED_PACKAGE = msg`Added a {package}: {item}.`;
-export const NOT_ADDED = msg`Not added. Fix the incorrect amount above, then scan again.`;
+export const NOT_ADDED = msg`Not added. Fix the incorrect amount below, then scan again.`;
 export const UNKNOWN_LABEL = msg`That label isn't in the inventory ({code}).`;
 export const PLACE_HERE = msg({
   comment:
@@ -358,6 +363,8 @@ export function CartForm({
 
   // The camera, while open, and a place it read, asking From or To.
   const scanning = useSignal(false);
+  // The camera's picture, while it shows (BackToCamera).
+  const picture = useSignal<HTMLVideoElement | null>(null);
   const placeRead = useSignal<number | null>(null);
 
   /** Acts on a label, read by the camera or typed by a scanner gun. */
@@ -807,6 +814,44 @@ export function CartForm({
         </Field>
       )}
 
+      {scanning.value ? (
+        <Scanner
+          cart={cart.value}
+          onCode={(code) => {
+            const read = readLabel(catalogue, code);
+            return { ...actOn(read), label: labelKind(read) };
+          }}
+          onDone={() => {
+            scanning.value = false;
+          }}
+          onPicture={(video) => {
+            picture.value = video;
+          }}
+          reload={reload}
+          reloadKeepsCart={cartKept.value}
+        />
+      ) : (
+        <button type="button" onClick={() => (scanning.value = true)}>
+          {say(SCAN_WITH_CAMERA)}
+        </button>
+      )}
+      {placeRead.value !== null && (
+        <PlaceSides
+          place={placeRead.value}
+          name={indexOf(catalogue).places.get(placeRead.value) ?? ""}
+          sides={placeSides(cart.value)}
+          onPick={placeOn}
+        />
+      )}
+
+      <Finder
+        catalogue={catalogue}
+        cart={cart.value}
+        query={query}
+        onAdd={add}
+        onLabel={actOn}
+      />
+
       <h2 ref={cartHeading} tabIndex={-1}>
         {say(CART)}
       </h2>
@@ -884,41 +929,6 @@ export function CartForm({
         </ul>
       )}
 
-      {scanning.value ? (
-        <Scanner
-          cart={cart.value}
-          onCode={(code) => {
-            const read = readLabel(catalogue, code);
-            return { ...actOn(read), label: labelKind(read) };
-          }}
-          onDone={() => {
-            scanning.value = false;
-          }}
-          reload={reload}
-          reloadKeepsCart={cartKept.value}
-        />
-      ) : (
-        <button type="button" onClick={() => (scanning.value = true)}>
-          {say(SCAN_WITH_CAMERA)}
-        </button>
-      )}
-      {placeRead.value !== null && (
-        <PlaceSides
-          place={placeRead.value}
-          name={indexOf(catalogue).places.get(placeRead.value) ?? ""}
-          sides={placeSides(cart.value)}
-          onPick={placeOn}
-        />
-      )}
-
-      <Finder
-        catalogue={catalogue}
-        cart={cart.value}
-        query={query}
-        onAdd={add}
-        onLabel={actOn}
-      />
-
       {problems.value.length > 0 && (
         <ul role="alert" class="list-none p-0">
           {problems.value.map((problem, at) => (
@@ -969,6 +979,8 @@ export function CartForm({
             {say(DISCARD_CART)}
           </button>
         ))}
+      {/* Last, as it shows at the bottom of the screen. */}
+      {picture.value !== null && <BackToCamera camera={picture.value} />}
     </form>
   );
 }

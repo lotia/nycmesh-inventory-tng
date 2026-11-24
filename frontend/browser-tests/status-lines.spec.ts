@@ -9,7 +9,7 @@ import { test } from "./csp-violations";
 import { prepared } from "./prepared";
 import { pick } from "./scan-page";
 
-const NOT_ADDED = "Not added. Fix the incorrect amount above, then scan again.";
+const NOT_ADDED = "Not added. Fix the incorrect amount below, then scan again.";
 
 /** Each of `below`'s box, measured from the top of `line`. */
 async function placed(line: Locator, below: Locator[]) {
@@ -50,7 +50,7 @@ test("the camera's status line keeps its room as a refusal appears and clears", 
   const below = [
     camera.getByRole("button", { name: "Done" }),
     page.getByLabel(/Find an item/),
-    page.getByRole("button", { name: "Record" }),
+    page.getByRole("heading", { name: "Cart" }),
   ];
   await scan.click();
   await expect(line).toHaveText(`Added one: ${prepared().labelled}.`, {
@@ -75,7 +75,7 @@ test("the item search's status line keeps its room as a refusal appears and clea
 }) => {
   await page.goto("/scan");
   const line = searchLine(page);
-  const below = [page.getByRole("button", { name: "Record" })];
+  const below = [page.getByRole("heading", { name: "Cart" })];
   await pick(page, prepared().labelled);
   await looseBox(page).fill("abc");
   await expect(line).toHaveText("");

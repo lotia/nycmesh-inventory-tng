@@ -44,7 +44,8 @@ test("a save refused for a line goes back without it, saying why, and the rest i
   await page.getByRole("button", { name: "Record" }).click();
   const entry = newestCart(page);
   await expect(
-    entry.locator(".alert li", { hasText: `Line 1: ${NONE_LEFT}` }),
+    // The boxed cable, picked first, is the second line (newest first).
+    entry.locator(".alert li", { hasText: `Line 2: ${NONE_LEFT}` }),
   ).toBeVisible();
   await page.unroute("**/api/catalogue**");
   await expect(entry.getByText(WITHOUT_REFUSED)).toBeVisible();

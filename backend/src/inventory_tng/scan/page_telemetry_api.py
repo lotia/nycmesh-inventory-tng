@@ -115,6 +115,13 @@ class RemovalUndone(Strict):
     kind: Literal["removal_undone"]
 
 
+class BackToCamera(Strict):
+    """A volunteer tapped Back to camera on the scan page, as the camera's
+    picture was off the screen (frontend/src/scan/BackToCamera.tsx)."""
+
+    kind: Literal["back_to_camera"]
+
+
 class DifferenceAdded(Strict):
     """What a save refused as another tab recorded its cart first holds
     more of, or new, put in the scan page's cart: by the page itself into
@@ -195,6 +202,7 @@ AnyEvent = (
     | CartDiscarded
     | LineRemoved
     | RemovalUndone
+    | BackToCamera
     | DifferenceAdded
     | RestPutBack
     | OtherSeparator
@@ -267,6 +275,12 @@ removals_undone = meter.create_counter(
     unit="{line}",
     description="Lines removed from the scan page's cart that a volunteer put "
     "back with Undo",
+)
+camera_returns = meter.create_counter(
+    "inventory.scan.camera.returns",
+    unit="{tap}",
+    description="Taps on the scan page's Back to camera, which scrolls the "
+    "camera's picture back onto the screen",
 )
 differences_added = meter.create_counter(
     "inventory.cart.differences_added",
@@ -349,6 +363,8 @@ def record(event: AnyEvent) -> None:
             lines_removed.add(1)
         case RemovalUndone():
             removals_undone.add(1)
+        case BackToCamera():
+            camera_returns.add(1)
         case DifferenceAdded():
             differences_added.add(1, {"how": event.how})
         case RestPutBack():

@@ -349,6 +349,20 @@
   },
   "components": {
     "schemas": {
+      "BackToCamera": {
+        "properties": {
+          "kind": {
+            "type": "string",
+            "const": "back_to_camera",
+            "title": "Kind"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": ["kind"],
+        "title": "BackToCamera",
+        "description": "A volunteer tapped Back to camera on the scan page, as the camera's\npicture was off the screen (frontend/src/scan/BackToCamera.tsx)."
+      },
       "Batch": {
         "properties": {
           "key": {
@@ -1692,6 +1706,9 @@
                   "$ref": "#/components/schemas/RemovalUndone"
                 },
                 {
+                  "$ref": "#/components/schemas/BackToCamera"
+                },
+                {
                   "$ref": "#/components/schemas/DifferenceAdded"
                 },
                 {
@@ -1707,6 +1724,7 @@
               "discriminator": {
                 "propertyName": "kind",
                 "mapping": {
+                  "back_to_camera": "#/components/schemas/BackToCamera",
                   "camera_session": "#/components/schemas/CameraSession",
                   "cart_discarded": "#/components/schemas/CartDiscarded",
                   "difference_added": "#/components/schemas/DifferenceAdded",

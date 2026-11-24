@@ -1295,6 +1295,7 @@ PAGE_EVENTS = [
     ({"kind": "cart_discarded"}, counted, "inventory.cart.discards", ()),
     ({"kind": "line_removed"}, counted, "inventory.cart.lines_removed", ()),
     ({"kind": "removal_undone"}, counted, "inventory.cart.removals_undone", ()),
+    ({"kind": "back_to_camera"}, counted, "inventory.scan.camera.returns", ()),
     (
         {"kind": "difference_added", "how": "automatic"},
         counted,

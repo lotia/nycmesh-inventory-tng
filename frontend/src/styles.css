@@ -204,6 +204,23 @@
     }
   }
 
+  /* The scan page's Back to camera (scan/BackToCamera.tsx), at the bottom
+     of the screen. While it may show, the page's bottom has room for it,
+     so Record and the cart's last line can scroll clear of it, and a box
+     given focus lands above it (Ali, 2026-11-24, inventory-tng-fdnt). */
+  .back-to-camera-room {
+    --back-to-camera-room: calc(--spacing(11) + --spacing(8));
+    scroll-padding-bottom: var(--back-to-camera-room);
+
+    & body {
+      padding-bottom: var(--back-to-camera-room);
+    }
+  }
+
+  .back-to-camera {
+    @apply fixed bottom-4 left-1/2 -translate-x-1/2 shadow-md;
+  }
+
   /* An administrator page's main part. */
   .admin {
     @apply pt-6 pb-12;

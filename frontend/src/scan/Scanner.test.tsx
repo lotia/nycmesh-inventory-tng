@@ -53,6 +53,7 @@ function scannerOf(props: ScannerProps) {
       cart={freshCart()}
       onCode={() => said("")}
       onDone={() => {}}
+      onPicture={() => {}}
       reload={() => {}}
       reloadKeepsCart
       {...props}

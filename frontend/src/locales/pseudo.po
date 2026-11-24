@@ -117,10 +117,6 @@ msgstr ""
 msgid "This item is retired: what is left may be taken, never received"
 msgstr ""
 
-#: src/scan/CartForm.tsx
-msgid "Not added. Fix the incorrect amount above, then scan again."
-msgstr ""
-
 #: src/shared/registration.ts
 msgid "That phrase has expired. Ask for a new one."
 msgstr ""
@@ -373,6 +369,10 @@ msgstr ""
 
 #: src/shared/registration.ts
 msgid "That phrase has been withdrawn. Ask for a new one."
+msgstr ""
+
+#: src/scan/CartForm.tsx
+msgid "Not added. Fix the incorrect amount below, then scan again."
 msgstr ""
 
 #: src/scan/Scanner.tsx
@@ -840,6 +840,10 @@ msgstr ""
 
 #: src/scan/OutboxList.tsx
 msgid "Sending…"
+msgstr ""
+
+#: src/scan/BackToCamera.tsx
+msgid "Back to camera"
 msgstr ""
 
 #: src/scan/OlderList.tsx

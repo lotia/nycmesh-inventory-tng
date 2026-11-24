@@ -427,8 +427,9 @@ describe("filling and saving a cart", () => {
     });
     expect(screen.getByText("2 m in all")).toBeDefined();
     expect(screen.getByText("1 each in all")).toBeDefined();
+    // The LiteBeam, picked last, is the first line.
     fireEvent.click(
-      screen.getAllByRole("button", { name: say(REMOVE) })[1] as Element,
+      screen.getAllByRole("button", { name: say(REMOVE) })[0] as Element,
     );
     expect(screen.queryByText("1 each in all")).toBeNull();
     expect(screen.getByText("2 m in all")).toBeDefined();

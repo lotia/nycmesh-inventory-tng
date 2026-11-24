@@ -71,7 +71,7 @@ describe("the batches listed in the outbox", () => {
       [...entry.querySelectorAll(":scope > ul li")].map(
         (each) => each.textContent,
       ),
-    ).toEqual(["1. Cat6 cable: 1 m", "2. LiteBeam 5AC: 1"]);
+    ).toEqual(["1. LiteBeam 5AC: 1", "2. Cat6 cable: 1 m"]);
     within(entry).getByRole("button", { name: say(DISMISS) });
   });
 

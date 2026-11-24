@@ -761,6 +761,12 @@ utilities. When you style a page:
   keeps room for two lines (`.status-line`), so words coming or going
   move nothing below, and shows no bar when empty. A refusal there clears
   once the cart line it is about changes (`scan/refused-line.ts`).
+- Nothing a scan changes sits above the scan page's camera: the camera
+  and the item search come before the cart, whose lines are newest first,
+  and the page never scrolls by itself after a scan. While the camera is
+  open and off the screen, Back to camera (`scan/BackToCamera.tsx`)
+  brings it back; the page keeps room for it at its bottom
+  (`.back-to-camera-room`).
 - A box a person types into names the keyboard a phone shows for it
   with `inputmode`: `numeric` for whole numbers, `decimal` for numbers
   with a decimal point, `text` for anything with letters. A number with
