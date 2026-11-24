@@ -83,6 +83,20 @@ export async function ready() {
   await screen.findByLabelText(say(YOUR_NAME));
 }
 
+/** The page's statuses with words: the status lines under the camera
+ * and the item search stay on the page, empty, once they have none. */
+export const statuses = () =>
+  screen.queryAllByRole("status").filter((each) => each.textContent !== "");
+
+/** The page's one status with words. */
+export function status(): HTMLElement {
+  const [only, ...more] = statuses();
+  if (only === undefined || more.length > 0) {
+    throw new Error(`${statuses().length} statuses with words`);
+  }
+  return only;
+}
+
 export function find(text: string) {
   fireEvent.input(screen.getByLabelText(say(FIND)), {
     target: { value: text },

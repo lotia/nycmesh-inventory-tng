@@ -20,7 +20,9 @@ import {
   outcomeOf,
   type Refused,
 } from "./camera-report";
+import type { Cart } from "./cart";
 import { AlertWords } from "./Notes";
+import { type About, useClearedWhenLineChanges } from "./refused-line";
 import { Repeats } from "./repeated-reads";
 
 export const CAMERA = msg`Camera`;
@@ -93,20 +95,28 @@ const REFUSALS: Record<Refused, Refusal> = {
   insecure: INSECURE,
 };
 
-/** What a code read did, in words for the volunteer, and what its label
- * named, for the report. */
-export type Acted = { said: string; label: LabelKind };
+/** What a code read did, in words for the volunteer, what its label
+ * named, for the report, and, refused, the cart line it is about, if any
+ * (refused-line.ts). */
+export type Acted = {
+  said: string;
+  label: LabelKind;
+  about?: About | undefined;
+};
 
 /** How often the camera's picture is read, in milliseconds. */
 export const READ_EVERY_MS = 200;
 
 export function Scanner({
+  cart,
   onCode,
   onDone,
   reload,
   reloadKeepsCart,
   open = openCamera,
 }: {
+  /** The cart as it is now, whose lines a refusal may be about. */
+  cart: Cart;
   onCode: (code: string) => Acted;
   onDone: () => void;
   /** Refresh this page (ScanPage's reload). */
@@ -122,8 +132,16 @@ export function Scanner({
   // The newest onCode, so a refreshed catalogue is read from at once.
   const handle = useRef(onCode);
   handle.current = onCode;
-  // A phrase, or said as shown: the words onCode said.
+  // A phrase, or said as shown: the words onCode said; empty once the
+  // line a refusal was about changes.
   const said = useSignal<MessageDescriptor | string>(STARTING);
+  const refusing = useClearedWhenLineChanges(cart, () => {
+    said.value = "";
+  });
+  const show = (words: MessageDescriptor | string, about?: About) => {
+    said.value = words;
+    refusing(about);
+  };
   // Why the camera could not be used, once it was refused.
   const refused = useSignal<Refusal | null>(null);
   const torch = useSignal<((on: boolean) => Promise<void>) | null>(null);
@@ -155,7 +173,7 @@ export function Scanner({
           return;
         }
         torch.value = session.torch;
-        said.value = POINT;
+        show(POINT);
         // Each read waits for the one before: a slow phone never piles
         // them up.
         const read = async () => {
@@ -166,7 +184,7 @@ export function Scanner({
               if (repeats.fresh(code, Date.now())) {
                 const acted = handle.current(code);
                 report.read(acted.label);
-                said.value = acted.said;
+                show(acted.said, acted.about);
               }
             }
           } catch {
@@ -231,17 +249,12 @@ export function Scanner({
           Styles); a new element, so it is announced as it appears. */}
       {refusal === null ? (
         <>
-          <p role="status">
+          <p role="status" class="status-line">
             {typeof said.value === "string" ? said.value : say(said.value)}
           </p>
           <div class="actions">
             {torch.value !== null && (
-              <Torch
-                turn={torch.value}
-                onFail={() => {
-                  said.value = TORCH_FAILED;
-                }}
-              />
+              <Torch turn={torch.value} onFail={() => show(TORCH_FAILED)} />
             )}
             <button type="button" onClick={onDone}>
               {say(DONE)}

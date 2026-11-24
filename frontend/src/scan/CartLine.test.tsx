@@ -38,3 +38,30 @@ test("a line's amounts are written as the locale writes numbers, its boxes plain
     "1000",
   );
 });
+
+test("the loose box's refusal is read with the box, and only its own", () => {
+  const spool = cable.packages[0] as (typeof cable.packages)[number];
+  const line = (packs: string, loose: string) => (
+    <CartLine
+      line={{ itemId: cable.id, packages: { [spool.id]: packs }, loose }}
+      item={cable}
+      opens={[]}
+      moving={false}
+      onChange={() => {}}
+      onRemove={() => {}}
+    />
+  );
+  const { rerender } = render(line("1", "abc"));
+  const loose = screen.getByLabelText("Loose m");
+  expect(loose.getAttribute("aria-invalid")).toBe("true");
+  const said = document.getElementById(
+    loose.getAttribute("aria-describedby") ?? "",
+  );
+  expect(said?.textContent).toBe(
+    "Enter the loose amount in m, up to 3 decimals.",
+  );
+  // The spool's count refused, the loose box is not named.
+  rerender(line("x", "abc"));
+  expect(loose.getAttribute("aria-invalid")).toBeNull();
+  expect(loose.getAttribute("aria-describedby")).toBeNull();
+});

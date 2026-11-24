@@ -177,6 +177,18 @@ function scanPage(status = 200): Outbox {
 }
 
 /** The scan page once its catalogue is shown. */
+/** The scan page's status with words: its status lines stay on the
+ * page, empty, once they have none. */
+function saying(): HTMLElement {
+  const said = screen
+    .getAllByRole("status")
+    .find((each) => each.textContent !== "");
+  if (said === undefined) {
+    throw new Error("no status with words");
+  }
+  return said;
+}
+
 async function loaded(): Promise<Outbox> {
   const outbox = scanPage();
   await screen.findByRole("searchbox");
@@ -344,7 +356,7 @@ const COVERED: Record<string, () => Promise<HTMLElement[]>> = {
     fireEvent.click(
       (line as HTMLElement).querySelectorAll("button")[0] as HTMLElement,
     );
-    return [await screen.findByRole("status")];
+    return [await vi.waitFor(saying)];
   },
   "the scan page, a cart sent": async () => {
     storeCart({
@@ -356,7 +368,7 @@ const COVERED: Record<string, () => Promise<HTMLElement[]>> = {
     });
     await loaded();
     fireEvent.submit(screen.getByRole("searchbox").closest("form") as Element);
-    await screen.findByRole("status");
+    await vi.waitFor(saying);
     fireEvent.input(screen.getByRole("searchbox"), { target: { value: "Ρα" } });
     return [document.body];
   },
@@ -523,6 +535,7 @@ const COVERED: Record<string, () => Promise<HTMLElement[]>> = {
     });
     render(
       <Scanner
+        cart={freshCart()}
         onCode={() => ({ said: "Κουτί", label: "item" })}
         onDone={() => {}}
         reload={() => {}}
@@ -549,6 +562,7 @@ const COVERED: Record<string, () => Promise<HTMLElement[]>> = {
       for (const reloadKeepsCart of [true, false]) {
         render(
           <Scanner
+            cart={freshCart()}
             onCode={() => ({ said: "", label: "unknown" })}
             onDone={() => {}}
             reload={() => {}}
@@ -566,6 +580,7 @@ const COVERED: Record<string, () => Promise<HTMLElement[]>> = {
     try {
       render(
         <Scanner
+          cart={freshCart()}
           onCode={() => ({ said: "", label: "unknown" })}
           onDone={() => {}}
           reload={() => {}}

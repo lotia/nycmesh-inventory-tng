@@ -681,8 +681,8 @@ export function holdsSome(typed: string): boolean {
 }
 
 /** A line's quantity in thousandths of the item's unit, and of it, the
- * packages counted, by package, and how much loose; or why it has none. */
-
+ * packages counted, by package, and how much loose; or why it has none,
+ * with `loose` set when that is the loose box's refusal. */
 export function quantityOf(
   line: Line,
   item: Item,
@@ -693,7 +693,7 @@ export function quantityOf(
       loose: number;
       taken: Map<string, { amount: number; whole: boolean }>;
     }
-  | { problem: Said; refused?: OtherSeparator } {
+  | { problem: Said; refused?: OtherSeparator; loose?: true } {
   const current = new Set(item.packages.map((pack) => String(pack.id)));
   for (const [packageId, typed] of Object.entries(line.packages)) {
     if (!current.has(packageId) && holdsSome(typed)) {
@@ -720,7 +720,10 @@ export function quantityOf(
   }
   const loose = readBox(line.loose);
   if (loose === null) {
-    return boxProblem(line.loose, say(LOOSE_DECIMALS, { unit: item.unit }));
+    return {
+      ...boxProblem(line.loose, say(LOOSE_DECIMALS, { unit: item.unit })),
+      loose: true,
+    };
   }
   amount += loose;
   const taken = new Map<string, { amount: number; whole: boolean }>();

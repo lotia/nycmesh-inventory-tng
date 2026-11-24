@@ -10,6 +10,8 @@ import {
   save,
   saves,
   server,
+  status,
+  statuses,
   storedCart,
 } from "../testing/scan-page";
 import { CART, DISCARD_CART, YOUR_NAME } from "./CartForm";
@@ -81,7 +83,7 @@ describe("Undo after Remove (Ali, inventory-tng-5uy, 2026-11-13)", () => {
     await opened();
     removeAt(1);
     expect(screen.queryByText("3.5 m in all")).toBeNull();
-    const notice = screen.getByRole("status");
+    const notice = status();
     // One message, the name in bold as on its line, Undo a button in it.
     expect(notice.textContent).toBe("Removed Cat6 cable. Undo");
     expect(notice.querySelector("strong")?.textContent).toBe("Cat6 cable");
@@ -92,7 +94,7 @@ describe("Undo after Remove (Ali, inventory-tng-5uy, 2026-11-13)", () => {
 
     fireEvent.click(undoButton() as Element);
     expect(undoButton()).toBeNull();
-    expect(screen.queryByRole("status")).toBeNull();
+    expect(statuses()).toEqual([]);
     // Where it was, with what it held, under the same key.
     const stored = storedCart();
     expect(stored.lines).toEqual(FILLED.lines);
@@ -118,7 +120,7 @@ describe("Undo after Remove (Ali, inventory-tng-5uy, 2026-11-13)", () => {
   test("a line whose item has gone is named as gone", async () => {
     await opened();
     removeAt(2);
-    expect(screen.getByRole("status").textContent).toBe(
+    expect(status().textContent).toBe(
       `Removed ${say(NO_LONGER_IN_CATALOGUE)}. Undo`,
     );
   });
@@ -129,9 +131,7 @@ describe("Undo after Remove (Ali, inventory-tng-5uy, 2026-11-13)", () => {
       lines: [...FILLED.lines, { itemId: 103, packages: {}, loose: "1" }],
     });
     removeAt(3);
-    expect(screen.getByRole("status").textContent).toBe(
-      "Removed NanoStation M5. Undo",
-    );
+    expect(status().textContent).toBe("Removed NanoStation M5. Undo");
   });
 
   test.each<[string, () => void]>([
@@ -191,7 +191,7 @@ describe("Undo after Remove (Ali, inventory-tng-5uy, 2026-11-13)", () => {
     // The line whose item has gone, so the rest can be recorded.
     removeAt(2);
     const offered = () =>
-      screen.queryByRole("status")?.textContent ===
+      statuses()[0]?.textContent ===
       `Removed ${say(NO_LONGER_IN_CATALOGUE)}. Undo`;
     expect(offered()).toBe(true);
     change();

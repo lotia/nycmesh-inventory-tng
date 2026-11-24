@@ -3,25 +3,38 @@ import { msg } from "@lingui/core/macro";
 import { type Signal, useSignal } from "@preact/signals";
 import { Field } from "../shared/Field";
 import { say } from "../shared/i18n";
-import { type Catalogue, RETIRED } from "./cart";
+import { type Cart, type Catalogue, RETIRED } from "./cart";
 import { readLabel, type Scanned } from "./label-codes";
+import { type About, useClearedWhenLineChanges } from "./refused-line";
 import { search } from "./search";
 
 export const FIND = msg`Find an item, or type or scan its code`;
 export const NOTHING_MATCHES = msg`Nothing matches “{typed}”.`;
 
-/** What a pick did, in words, and whether it was refused, adding nothing. */
-export type Picked = { said: string; refused: boolean };
+/** What a pick did, in words, and whether it was refused, adding nothing;
+ * refused, the cart line it is about, if any (refused-line.ts). */
+export type Picked = {
+  said: string;
+  refused: boolean;
+  about?: About | undefined;
+};
 export const done = (said: string): Picked => ({ said, refused: false });
-export const refused = (said: string): Picked => ({ said, refused: true });
+export const refused = (said: string, about?: About): Picked => ({
+  said,
+  refused: true,
+  about,
+});
 
 export function Finder({
   catalogue,
+  cart,
   query,
   onAdd,
   onLabel,
 }: {
   catalogue: Catalogue;
+  /** The cart as it is now, whose lines a refusal may be about. */
+  cart: Cart;
   query: Signal<string>;
   onAdd: (itemId: number, packageId?: number) => Picked;
   /** A label's code typed, as a scanner gun types one. */
@@ -29,11 +42,15 @@ export function Finder({
 }) {
   const matches = search(catalogue, query.value);
   // A refused pick's words, under the search as the scanner says them, till
-  // the next pick or typing; a pick that adds needs none, as its line
-  // shows it.
+  // the next pick, typing, or a change to the line it is about; a pick that
+  // adds needs none, as its line shows it.
   const refusal = useSignal("");
+  const refusing = useClearedWhenLineChanges(cart, () => {
+    refusal.value = "";
+  });
   const show = (picked: Picked) => {
     refusal.value = picked.refused ? picked.said : "";
+    refusing(picked.about);
   };
   return (
     <>
@@ -68,14 +85,10 @@ export function Finder({
           )}
         </Field>
         {/* Always there, as the scanner's status is, so a refusal is read
-            out as it appears; empty, it takes no room in the form. */}
-        <div aria-live="polite">
-          {refusal.value !== "" && (
-            <p role="status" class="mt-2 mb-0">
-              {refusal.value}
-            </p>
-          )}
-        </div>
+            out as it appears, and keeping its room (styles.css). */}
+        <p role="status" class="status-line mt-2 mb-0">
+          {refusal.value}
+        </p>
       </div>
       {query.value.trim() !== "" && matches.length === 0 && (
         <p>{say(NOTHING_MATCHES, { typed: query.value.trim() })}</p>

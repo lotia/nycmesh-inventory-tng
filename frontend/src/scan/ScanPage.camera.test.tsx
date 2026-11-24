@@ -109,6 +109,40 @@ describe("scanning labels with the camera", () => {
     expect(loose.value).toBe("2,5");
   });
 
+  test("a refusal under the camera clears once the line it is about changes, and no other", async () => {
+    await opened();
+    await scan("K7QX2M");
+    await screen.findByText("Added a Spool: Cat6 cable.");
+    await scan("B3ZT9W");
+    await screen.findByText("Added one: LiteBeam 5AC.");
+    const loose = screen.getByLabelText<HTMLInputElement>("Loose units");
+    fireEvent.input(loose, { target: { value: "2,5" } });
+    await scan();
+    await vi.advanceTimersByTimeAsync(2000);
+    await scan("B3ZT9W");
+    const status = (await screen.findByText(say(NOT_ADDED))) as HTMLElement;
+    // Another line changed: the refusal stays.
+    fireEvent.input(screen.getByLabelText("Loose m"), {
+      target: { value: "3" },
+    });
+    expect(status.textContent).toBe(say(NOT_ADDED));
+    // Its own line fixed: cleared, the live region still there.
+    fireEvent.input(loose, { target: { value: "2" } });
+    expect(status.textContent).toBe("");
+    expect(status.getAttribute("role")).toBe("status");
+    expect(status.isConnected).toBe(true);
+  });
+
+  test("what a label added stays said as its line changes", async () => {
+    await opened();
+    await scan("B3ZT9W");
+    const status = await screen.findByText("Added one: LiteBeam 5AC.");
+    fireEvent.input(screen.getByLabelText("Loose units"), {
+      target: { value: "3" },
+    });
+    expect(status.textContent).toBe("Added one: LiteBeam 5AC.");
+  });
+
   test("opening, an item's label asks which package if none is sealed there", async () => {
     await opened();
     fireEvent.click(screen.getByLabelText(say(KIND_WORDS.open)));

@@ -17,6 +17,7 @@ import {
   saves,
   selected,
   server,
+  status,
   storedCart,
   UUID,
 } from "../testing/scan-page";
@@ -243,7 +244,7 @@ describe("filling and saving a cart", () => {
     expect(screen.getByText("5 each in all")).toBeDefined();
     save();
 
-    expect((await screen.findByRole("status")).textContent).toBe(
+    expect((await vi.waitFor(status)).textContent).toBe(
       "Sending: Move: 1 item from Hub to Van. A new cart is ready.",
     );
     await screen.findByText("Recorded (transaction 77).");
@@ -313,19 +314,41 @@ describe("filling and saving a cart", () => {
     // before it has words, so they are read out.
     const live = screen.getByLabelText(say(FIND)).closest("div")
       ?.nextElementSibling as HTMLElement;
-    expect(live.getAttribute("aria-live")).toBe("polite");
+    expect(live.getAttribute("role")).toBe("status");
     expect(live.textContent).toBe("");
     const loose = screen.getByLabelText<HTMLInputElement>("Loose units");
     fireEvent.input(loose, { target: { value: "2,5" } });
     find("litebeam");
     fireEvent.click(screen.getByRole("button", { name: "LiteBeam 5AC" }));
-    const said = screen.getByText(say(NOT_ADDED));
-    expect(said.getAttribute("role")).toBe("status");
-    expect(live.contains(said)).toBe(true);
+    expect(live.textContent).toBe(say(NOT_ADDED));
     expect(loose.value).toBe("2,5");
     // The next change to the search clears it.
     find("cable");
     expect(live.textContent).toBe("");
+  });
+
+  test("a refusal below the search clears once the line it is about changes, and no other", async () => {
+    open();
+    await ready();
+    for (const name of ["Cat6 cable", "LiteBeam 5AC"]) {
+      find(name);
+      fireEvent.click(screen.getByRole("button", { name }));
+    }
+    const loose = screen.getByLabelText<HTMLInputElement>("Loose units");
+    fireEvent.input(loose, { target: { value: "2,5" } });
+    find("litebeam");
+    fireEvent.click(screen.getByRole("button", { name: "LiteBeam 5AC" }));
+    const live = screen.getByText(say(NOT_ADDED));
+    // Another line changed: the refusal stays.
+    fireEvent.input(screen.getByLabelText("Loose m"), {
+      target: { value: "3" },
+    });
+    expect(live.textContent).toBe(say(NOT_ADDED));
+    // Its own line fixed: cleared, the live region still there.
+    fireEvent.input(loose, { target: { value: "2" } });
+    expect(live.textContent).toBe("");
+    expect(live.getAttribute("role")).toBe("status");
+    expect(live.isConnected).toBe(true);
   });
 
   test("Save says what is missing, and sends nothing", async () => {

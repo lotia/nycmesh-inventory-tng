@@ -756,6 +756,11 @@ utilities. When you style a page:
   reports no problem is plain, but a save held for an upgrade is in a
   caution box like the upgrade banner's (`CAUTION_BOX`), with no
   `role="alert"`.
+- The scan page's status lines, under the camera and under the item
+  search, stay on the page as live regions whose words are replaced. Each
+  keeps room for two lines (`.status-line`), so words coming or going
+  move nothing below, and shows no bar when empty. A refusal there clears
+  once the cart line it is about changes (`scan/refused-line.ts`).
 - A box a person types into names the keyboard a phone shows for it
   with `inputmode`: `numeric` for whole numbers, `decimal` for numbers
   with a decimal point, `text` for anything with letters. A number with

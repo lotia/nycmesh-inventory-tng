@@ -7,6 +7,7 @@ import { fakeCamera as camera, pass } from "../testing/camera";
 import { setVisibility, show, stubVisibility } from "../testing/visibility";
 import { DecoderUnavailable, type Session } from "./camera";
 import type { LabelKind } from "./camera-report";
+import { freshCart } from "./cart";
 import {
   type Acted,
   DONE,
@@ -49,6 +50,7 @@ type ScannerProps = Pick<ComponentProps<typeof Scanner>, "open"> &
 function scannerOf(props: ScannerProps) {
   return (
     <Scanner
+      cart={freshCart()}
       onCode={() => said("")}
       onDone={() => {}}
       reload={() => {}}

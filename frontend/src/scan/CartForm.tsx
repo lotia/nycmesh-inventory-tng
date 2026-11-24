@@ -54,6 +54,7 @@ import {
 } from "./older-builds";
 import { type Gaps, nameOf, toCart, withRetired } from "./older-to-cart";
 import { differenceOf } from "./recorded-elsewhere";
+import { aboutLine } from "./refused-line";
 import { Scanner } from "./Scanner";
 import { indexOf } from "./search";
 import { type Removed, removeLine, undone } from "./undo-remove";
@@ -329,14 +330,17 @@ export function CartForm({
     query.value = "";
     if (opening && pack === undefined) {
       if (item?.packages.length === 0) {
-        return refused(say(NO_PACKAGE_TO_OPEN, { item: item.name }));
+        return refused(
+          say(NO_PACKAGE_TO_OPEN, { item: item.name }),
+          aboutLine(cart.value, itemId),
+        );
       }
       change(withLine(cart.value, itemId));
       return done(say(WHICH_PACKAGE, { item: item?.name }));
     }
     if (pack === undefined && looseUnread(cart.value, itemId)) {
       // Loose that reads as no amount is left as typed (cart.bumped).
-      return refused(say(NOT_ADDED));
+      return refused(say(NOT_ADDED), aboutLine(cart.value, itemId));
     }
     const next = addOne(cart.value, itemId, pack?.id);
     // A package's own label is the volunteer's choice (Line.typed).
@@ -882,9 +886,11 @@ export function CartForm({
 
       {scanning.value ? (
         <Scanner
+          cart={cart.value}
           onCode={(code) => {
             const read = readLabel(catalogue, code);
-            return { said: actOn(read).said, label: labelKind(read) };
+            const { said, about } = actOn(read);
+            return { said, about, label: labelKind(read) };
           }}
           onDone={() => {
             scanning.value = false;
@@ -906,7 +912,13 @@ export function CartForm({
         />
       )}
 
-      <Finder catalogue={catalogue} query={query} onAdd={add} onLabel={actOn} />
+      <Finder
+        catalogue={catalogue}
+        cart={cart.value}
+        query={query}
+        onAdd={add}
+        onLabel={actOn}
+      />
 
       {problems.value.length > 0 && (
         <ul role="alert" class="list-none p-0">

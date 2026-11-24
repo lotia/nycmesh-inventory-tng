@@ -35,6 +35,7 @@ import {
   saves,
   selected,
   server,
+  status,
   storedCart,
   UUID,
 } from "../testing/scan-page";
@@ -472,7 +473,7 @@ describe("what an older build left", () => {
     // with row 16's status and nothing left out to say (Ali,
     // inventory-tng-0su, question 10).
     await screen.findByText(ADDED_BACK);
-    expect(screen.getByRole("status").textContent).toBe(ADDED_BACK);
+    expect(status().textContent).toBe(ADDED_BACK);
     expect(record).toHaveBeenCalledWith({
       kind: "older_storage",
       held: "saves",

@@ -1,6 +1,7 @@
 /** One line of the cart: its item, how much of it, and the package it opens. */
 import { msg } from "@lingui/core/macro";
 import { Fragment, type Ref } from "preact";
+import { useId } from "preact/hooks";
 import { Field } from "../shared/Field";
 import { say, sayAmount } from "../shared/i18n";
 import { wordsOf } from "../shared/outbox-notes";
@@ -51,6 +52,9 @@ export function CartLine({
   /** Given its Remove button, to focus (CartForm, after Undo). */
   removeRef?: Ref<HTMLButtonElement>;
 }) {
+  // What the line comes to, or why it cannot: the loose box's refusal,
+  // read with the box (aria-describedby).
+  const sumId = useId();
   if (item === undefined) {
     return (
       <li>
@@ -62,6 +66,7 @@ export function CartLine({
     );
   }
   const quantity = quantityOf(line, item);
+  const looseRefused = "problem" in quantity && quantity.loose === true;
   return (
     <li class="flex flex-col gap-2">
       <div>
@@ -146,6 +151,8 @@ export function CartLine({
           <input
             id={id}
             inputMode={item.unit === "each" ? "numeric" : "decimal"}
+            aria-invalid={looseRefused || undefined}
+            aria-describedby={looseRefused ? sumId : undefined}
             value={line.loose}
             onInput={(event) =>
               onChange({ ...line, loose: event.currentTarget.value })
@@ -153,7 +160,7 @@ export function CartLine({
           />
         )}
       </Field>
-      <div>
+      <div id={sumId}>
         {"problem" in quantity
           ? wordsOf(quantity.problem)
           : say(IN_ALL, {
