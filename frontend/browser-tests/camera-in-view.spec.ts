@@ -8,8 +8,8 @@
 import { expect, type Page } from "@playwright/test";
 import { test } from "./csp-violations";
 import { prepared } from "./prepared";
-import { printFromHere } from "./print-labels";
-import { SAM, SHELF } from "./scan-page";
+import { printLabels } from "./print-labels";
+import { looseBox, startMove } from "./scan-page";
 
 /** A label's QR code, as its print page draws it: the path of its dark
  * modules, and how many modules across, its border with them. */
@@ -17,9 +17,7 @@ type Drawn = { d: string; modules: number };
 
 /** The label of the item named `name`, printed once from its page. */
 async function labelOf(page: Page, name: string): Promise<Drawn> {
-  await page.goto(`/admin/items?q=${encodeURIComponent(name)}`);
-  await page.getByRole("link", { name, exact: true }).click();
-  await printFromHere(page, 1);
+  await printLabels(page, 1, name);
   return page
     .locator(".print-label .qr svg")
     .first()
@@ -104,10 +102,7 @@ test("the camera stays put as labels are scanned, and Back to camera brings it b
   await drawnCamera(page);
   await page.goto("/scan");
   // A move from the shelf, where the cable's box is open.
-  await page.getByLabel("Your name").selectOption({ label: SAM });
-  await page.getByLabel("Moving stock").check();
-  await page.getByLabel("From", { exact: true }).selectOption({ label: SHELF });
-  await page.getByLabel("To", { exact: true }).selectOption({ label: "Van" });
+  await startMove(page);
   await page.getByRole("button", { name: "Scan with the camera" }).click();
   const camera = page.getByRole("region", { name: "Camera" });
   const picture = page.locator("video");
@@ -139,11 +134,7 @@ test("the camera stays put as labels are scanned, and Back to camera brings it b
   await expect(lines).toHaveText([cable, other, radio]);
 
   // Down to the first scan's line, to type: no Back to camera meanwhile.
-  const loose = page
-    .getByRole("listitem")
-    .filter({ has: page.getByText(radio, { exact: true }) })
-    .getByRole("textbox")
-    .last();
+  const loose = looseBox(page, radio);
   await loose.fill("3");
   await expect(picture).not.toBeInViewport({ ratio: 1 });
   await expect(back).toBeHidden();

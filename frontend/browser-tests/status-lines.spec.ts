@@ -7,7 +7,7 @@
 import { expect, type Locator, type Page } from "@playwright/test";
 import { test } from "./csp-violations";
 import { prepared } from "./prepared";
-import { pick } from "./scan-page";
+import { looseBox, pick } from "./scan-page";
 
 const NOT_ADDED = "Not added. Fix the incorrect amount below, then scan again.";
 
@@ -20,15 +20,6 @@ async function placed(line: Locator, below: Locator[]) {
       return box === null ? null : { ...box, y: box.y - top };
     }),
   );
-}
-
-/** The labelled item's loose box, the last box on its cart line. */
-function looseBox(page: Page): Locator {
-  return page
-    .getByRole("listitem")
-    .filter({ has: page.getByText(prepared().labelled, { exact: true }) })
-    .getByRole("textbox")
-    .last();
 }
 
 /** The item search's status line, just after its field. */
@@ -59,12 +50,12 @@ test("the camera's status line keeps its room as a refusal appears and clears", 
   const added = await placed(line, below);
   // Read again by a camera opened again, it is refused.
   await camera.getByRole("button", { name: "Done" }).click();
-  await looseBox(page).fill("abc");
+  await looseBox(page, prepared().labelled).fill("abc");
   await scan.click();
   await expect(line).toHaveText(NOT_ADDED, { timeout: 15_000 });
   expect(await placed(line, below)).toEqual(added);
   // Fixed, it clears, and shows no bar.
-  await looseBox(page).fill("1");
+  await looseBox(page, prepared().labelled).fill("1");
   await expect(line).toHaveText("");
   expect(await placed(line, below)).toEqual(added);
   await expect(line).toHaveCSS("border-left-color", "rgba(0, 0, 0, 0)");
@@ -77,14 +68,14 @@ test("the item search's status line keeps its room as a refusal appears and clea
   const line = searchLine(page);
   const below = [page.getByRole("heading", { name: "Cart" })];
   await pick(page, prepared().labelled);
-  await looseBox(page).fill("abc");
+  await looseBox(page, prepared().labelled).fill("abc");
   await expect(line).toHaveText("");
   await expect(line).toHaveCSS("border-left-color", "rgba(0, 0, 0, 0)");
   const empty = await placed(line, below);
   await pick(page, prepared().labelled);
   await expect(line).toHaveText(NOT_ADDED);
   expect(await placed(line, below)).toEqual(empty);
-  await looseBox(page).fill("1");
+  await looseBox(page, prepared().labelled).fill("1");
   await expect(line).toHaveText("");
   expect(await placed(line, below)).toEqual(empty);
 });

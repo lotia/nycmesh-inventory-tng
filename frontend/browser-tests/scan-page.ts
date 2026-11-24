@@ -25,13 +25,27 @@ export function newestCart(page: Page): Locator {
     .first();
 }
 
-/** Fills in a move of `cable` from the shelf to the van, by Sam. */
-export async function fillMove(page: Page, cable: string): Promise<void> {
+/** Fills in a move from the shelf to the van, by Sam, with no items. */
+export async function startMove(page: Page): Promise<void> {
   await page.getByLabel("Your name").selectOption({ label: SAM });
   await page.getByLabel("Moving stock").check();
   await page.getByLabel("From", { exact: true }).selectOption({ label: SHELF });
   await page.getByLabel("To", { exact: true }).selectOption({ label: "Van" });
+}
+
+/** Fills in a move of `cable` from the shelf to the van, by Sam. */
+export async function fillMove(page: Page, cable: string): Promise<void> {
+  await startMove(page);
   await pick(page, cable);
+}
+
+/** The loose box of `item`'s cart line, the last box on it. */
+export function looseBox(page: Page, item: string): Locator {
+  return page
+    .getByRole("listitem")
+    .filter({ has: page.getByText(item, { exact: true }) })
+    .getByRole("textbox")
+    .last();
 }
 
 /** Fills in an opening of `cable` on the shelf, by Sam. */

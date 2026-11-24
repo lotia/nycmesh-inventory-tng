@@ -2,12 +2,16 @@
 import { expect, type Page } from "@playwright/test";
 import { prepared } from "./prepared";
 
-/** Prints `copies` labels of the seed's labelled item, from its page. */
-export async function printLabels(page: Page, copies: number): Promise<void> {
-  const { labelled } = prepared();
+/** Prints `copies` labels of the item named `name` (the seed's labelled
+ * item unless given), from its page. */
+export async function printLabels(
+  page: Page,
+  copies: number,
+  name = prepared().labelled,
+): Promise<void> {
   // Found by name: other tests add items, which may push it off a page.
-  await page.goto(`/admin/items?q=${encodeURIComponent(labelled)}`);
-  await page.getByRole("link", { name: labelled, exact: true }).click();
+  await page.goto(`/admin/items?q=${encodeURIComponent(name)}`);
+  await page.getByRole("link", { name, exact: true }).click();
   await printFromHere(page, copies);
 }
 
