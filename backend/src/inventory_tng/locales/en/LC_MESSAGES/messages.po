@@ -1980,6 +1980,14 @@ msgid ""
 " move those, first."
 msgstr ""
 
+#: src/inventory_tng/templates/labels/label_revoke.html
+msgid ""
+"Its printed copies don't scan now, but would if what it names were "
+"brought back. Revoking it stops them scanning for good. It can't be "
+"undone: labels made for it after get a new code, to print and stick on "
+"again."
+msgstr ""
+
 #: src/inventory_tng/web/forms.py
 msgid ""
 "Its size is fixed, as a label has been printed for it: revoke its labels "

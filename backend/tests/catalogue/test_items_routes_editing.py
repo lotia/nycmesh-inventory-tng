@@ -22,7 +22,7 @@ from inventory_tng.catalogue.forms import (
 from inventory_tng.catalogue.paths import ITEMS
 from inventory_tng.core.local_time import DEFAULT_ZONE
 from inventory_tng.labels import labels
-from inventory_tng.labels.paths import LABELS
+from inventory_tng.labels.paths import item_labels
 from inventory_tng.models.catalogue import (
     Category,
     Item,
@@ -365,7 +365,7 @@ def test_the_unit_is_fixed_once_a_spools_label_is_printed(
     # To the labels list, filtered to this item's, each offered to revoke:
     # beside the unit, and the spool's size, labelled too.
     revoke = read(page).all("a", "Revoke its labels")
-    assert [a.attrs["href"] for a in revoke] == [f"{LABELS}?item={cable.id}"] * 2
+    assert [a.attrs["href"] for a in revoke] == [item_labels(cable.id)] * 2
     assert ("unit", "m") in hidden_fields(page)
     form = shown_item_form(cable, unit="ft")
     refused = admin_client.post(f"{ITEMS}/{cable.id}", data=form)

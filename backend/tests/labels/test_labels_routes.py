@@ -30,6 +30,7 @@ from inventory_tng.scan.catalogue_api import catalogue
 from inventory_tng.web.listing import PER_PAGE
 from inventory_tng.web.qr_codes import qr_svg
 
+from helpers.items import NOW, shown_item_form
 from helpers.markup import (
     button,
     forms,
@@ -371,9 +372,12 @@ def test_inactive_labels_say_why_and_agree_with_the_scan_page(
     for why, label in rows.items():
         (row,) = [line for line in lines if label.code in line.text]
         assert row.all("span", str(INACTIVE_WORDS[why]), class_="tag"), why
-        # Neither printed nor revoked again from here.
+        # Not printed from here; revoked, unless it is already (Ali,
+        # 2026-11-23, inventory-tng-x30g).
         assert not row.all("input", type="checkbox")
-        assert not [to for _, to in links(row) + forms(row) if "/revoke" in to]
+        revoking = [to for _, to in links(row) if "/revoke" in to]
+        offered = [] if why == "revoked" else [f"{LABELS}/{label.id}/revoke"]
+        assert revoking == offered, why
     assert "4 inactive labels" in page
 
 
@@ -552,6 +556,36 @@ def test_an_items_labels_its_packages_too_are_each_offered_to_revoke(
     page = read(admin_client.get(item_labels(cable.id)).text)
     for label in (own, reels):
         page.one("a", f"Revoke {label.code}", href=f"{LABELS}/{label.id}/revoke")
+
+
+def test_a_retired_packages_label_is_revoked_from_its_items_labels(
+    admin_client: TestClient, session: Session, cable: Item, reel: ItemPackage
+) -> None:
+    """A retired package's label, inactive, still fixes its item's unit;
+    the item page's link leads to it, offered to revoke, and revoked, the
+    unit may change (Ali, 2026-11-23, inventory-tng-x30g)."""
+    label = add(session, Label(item_id=cable.id, package_id=reel.id))
+    reel.retired_at = NOW
+    session.flush()
+    item_page = read(admin_client.get(f"{ITEMS}/{cable.id}").text)
+    (to_labels,) = item_page.all("a", "Revoke its labels")
+    assert to_labels.attrs["href"] == item_labels(cable.id)
+    listed = read(admin_client.get(item_labels(cable.id)).text)
+    revoke = f"{LABELS}/{label.id}/revoke"
+    listed.one("a", f"Revoke {label.code}", href=revoke)
+    asked = words_on(admin_client.get(revoke).text)
+    assert "Its printed copies don't scan now" in asked
+    assert admin_client.post(revoke).headers["location"] == (
+        f"{LABELS}?notice=label_revoked"
+    )
+    assert label.revoked_at is not None
+    form = shown_item_form(cable, unit="ft")
+    assert admin_client.post(f"{ITEMS}/{cable.id}", data=form).status_code == 303
+    assert cable.unit == "ft"
+    # Revoked, it is offered to revoke no more.
+    assert admin_client.get(revoke).status_code == 404
+    listed = read(admin_client.get(item_labels(cable.id)).text)
+    assert not listed.all("a", f"Revoke {label.code}")
 
 
 def test_labels_filter_by_kind_and_item(

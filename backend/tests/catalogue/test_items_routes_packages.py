@@ -17,7 +17,7 @@ from inventory_tng.catalogue.items_routes import PACKAGE_RETIRED
 from inventory_tng.catalogue.paths import ITEMS
 from inventory_tng.core.db_errors import RuleBroken, attempt
 from inventory_tng.labels import labels
-from inventory_tng.labels.paths import LABELS
+from inventory_tng.labels.paths import item_labels
 from inventory_tng.models.catalogue import Category, Item, ItemPackage
 from inventory_tng.models.labels import Label
 from inventory_tng.stock import open_packages
@@ -129,9 +129,7 @@ def test_a_packages_labels_fix_its_size_until_revoked(
     shown_page = admin_client.get(page).text
     assert wording in words_on(shown_page)
     # The box's alone: the spool has moved, and so has the item's unit.
-    read(shown_page).one(
-        "a", "Revoke its labels", href=f"{LABELS}?item={spools.cable.id}"
-    )
+    read(shown_page).one("a", "Revoke its labels", href=item_labels(spools.cable.id))
     _, broken = attempt(
         session, lambda: items.save_package(session, box, "Box", Decimal(25), seen=None)
     )
