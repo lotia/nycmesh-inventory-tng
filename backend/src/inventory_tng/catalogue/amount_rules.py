@@ -30,9 +30,14 @@ def is_length(unit: str) -> bool:
     return unit in LENGTHS
 
 
+def is_whole(amount: Decimal) -> bool:
+    """Whether `amount` has no fraction, whatever its unit."""
+    return amount == amount.to_integral_value()
+
+
 def whole_enough(unit: str, amount: Decimal) -> bool:
     """An item counted each moves, and is held, in whole units."""
-    return not counted_whole(unit) or amount == amount.to_integral_value()
+    return not counted_whole(unit) or is_whole(amount)
 
 
 def is_short_end(left: Decimal, short_below: Decimal | None) -> bool:

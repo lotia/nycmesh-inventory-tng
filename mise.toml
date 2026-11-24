@@ -112,7 +112,7 @@ run = [
 ]
 
 [tasks.regenerate-amount-rules]
-description = "Write frontend/src/amount-rules.json, the scan page's copy of which units are counted each, again after a change to backend catalogue/amount_rules.py (CONTRIBUTING.md)"
+description = "Write frontend/src/amount-rules.json, the scan page's copy of which units are counted each and which are lengths, again after a change to backend catalogue/amount_rules.py (CONTRIBUTING.md)"
 dir = "backend"
 run = [
     "uv run python -m devtools write-amount-rules",

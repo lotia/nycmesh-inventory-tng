@@ -52,7 +52,7 @@ from sqlalchemy.dialects.postgresql import distinct_on
 from sqlalchemy.orm import Session
 
 from inventory_tng.catalogue import units
-from inventory_tng.catalogue.amount_rules import counted_whole, whole_enough
+from inventory_tng.catalogue.amount_rules import counted_whole, is_whole, whole_enough
 from inventory_tng.catalogue.name_keys import SPACES, name_key
 from inventory_tng.core.db_errors import enforce
 from inventory_tng.core.db_locking import (
@@ -410,7 +410,7 @@ def _whole_for_its_item(
     fraction and its item, read afresh under the catalogue lock, is counted
     each: a form checked them against the unit before the lock. Whole
     amounts are whole in any unit, so with none the unit is not read."""
-    if all(each is None or each == each.to_integral_value() for each in amounts):
+    if all(each is None or is_whole(each) for each in amounts):
         return
     enforce(PACKAGE_WHOLE, when=counted_whole(_unit(session, item_id)))
 

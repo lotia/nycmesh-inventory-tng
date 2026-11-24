@@ -13,7 +13,7 @@ import structlog
 from sqlalchemy.orm import Session
 
 from inventory_tng.catalogue import items, reading_rules, units
-from inventory_tng.catalogue.amount_rules import counted_whole
+from inventory_tng.catalogue.amount_rules import counted_whole, is_whole
 from inventory_tng.catalogue.name_keys import nameless
 from inventory_tng.catalogue.reading_rules import chosen_rule, read_alike_words
 from inventory_tng.core.db_errors import Broken
@@ -240,7 +240,7 @@ def package_fraction(session: Session, item_id: int) -> str | None:
 def size_has_fraction(package: ItemPackage) -> bool:
     """Whether the package's Holds has a fraction: said before its
     too-short length, which then needs no outline."""
-    return package.size != package.size.to_integral_value()
+    return not is_whole(package.size)
 
 
 def _whole_range(package: ItemPackage) -> dict[str, str]:
@@ -285,7 +285,7 @@ def short_has_fraction(package: ItemPackage) -> bool:
     """Whether the package, holding more than 1, is too short to use below
     a fraction: one holding 1 is cleared instead (items._HOLDS_ONE)."""
     short = package.short_below
-    return short is not None and package.size > 1 and short != short.to_integral_value()
+    return short is not None and package.size > 1 and not is_whole(short)
 
 
 def short_to_set(package: ItemPackage) -> str:
