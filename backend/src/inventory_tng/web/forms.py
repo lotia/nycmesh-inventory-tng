@@ -159,8 +159,9 @@ QUANTITY_MAX = Decimal("999999999.999")
 class Unreadable(StrEnum):
     """Why what was typed in a number box is not an amount: not a number;
     written with the other decimal separator than the box's; that
-    separator followed by three digits, as thousands are grouped; or more
-    decimal places than the ledger keeps (QUANTITY_PLACES).
+    separator followed by three digits after a whole part above 0, as
+    thousands are grouped; or more decimal places than the ledger keeps
+    (QUANTITY_PLACES).
     frontend/src/shared/quantity.ts says the same of the scan page's boxes,
     and both are tested against frontend/src/shared/quantity-cases.json."""
 
@@ -209,7 +210,9 @@ def read_decimal(text: str, separator: Separator = ".") -> Decimal | Unreadable:
         if mistaken is None:
             return Unreadable.NUMBER
         _, units, fraction = mistaken
-        if units and len(fraction) == 3:
+        # A whole part of 0, or none, is no thousands, so a decimal
+        # (Ali, 2026-11-23, inventory-tng-mat2).
+        if units.strip("0") and len(fraction) == 3:
             return Unreadable.THOUSANDS
         return Unreadable.SEPARATOR
     negative, units, fraction = parts
@@ -235,9 +238,9 @@ def type_a_number(separator: Separator = ".") -> str:
 
 # What a box refused as written with the decimal separator its locale does
 # not use says, the one it does use named (Ali, 2026-11-23,
-# inventory-tng-qnwz); and the other followed by three digits, as
-# thousands are grouped, which naming the decimal one would turn into a
-# thousandth of what was meant.
+# inventory-tng-qnwz); and the other followed by three digits after a
+# whole part above 0, as thousands are grouped, which naming the decimal
+# one would turn into a thousandth of what was meant.
 THOUSANDS = lazy_gettext("Type thousands without a separator: 1000.")
 
 

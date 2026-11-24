@@ -121,6 +121,8 @@ def test_a_quantity_reads_the_boxs_separator() -> None:
         (".", "1,5", "Use “.” for decimals, such as 0.5."),
         (",", "1.000", "Type thousands without a separator: 1000."),
         (".", "1,000", "Type thousands without a separator: 1000."),
+        (",", "0.500", "Use “,” for decimals, such as 0,5."),
+        (".", ",500", "Use “.” for decimals, such as 0.5."),
         (",", "lots", "Type a number, such as 12 or 0,5."),
         (".", "lots", "Type a number, such as 12 or 0.5."),
     ],

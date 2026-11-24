@@ -97,6 +97,47 @@
     },
     { "typed": " 7 ", "en": { "amount": "7" }, "de": { "amount": "7" } },
     {
+      "typed": "0.500",
+      "en": { "amount": "0.5" },
+      "de": { "refused": "separator" }
+    },
+    {
+      "typed": ".500",
+      "en": { "amount": "0.5" },
+      "de": { "refused": "separator" }
+    },
+    {
+      "typed": "-0.500",
+      "en": { "amount": "-0.5" },
+      "de": { "refused": "separator" }
+    },
+    {
+      "typed": "00.500",
+      "en": { "amount": "0.5" },
+      "de": { "refused": "separator" }
+    },
+    {
+      "typed": "0,500",
+      "en": { "refused": "separator" },
+      "de": { "amount": "0.5" }
+    },
+    {
+      "typed": ",500",
+      "en": { "refused": "separator" },
+      "de": { "amount": "0.5" }
+    },
+    {
+      "typed": "-0,500",
+      "en": { "refused": "separator" },
+      "de": { "amount": "-0.5" }
+    },
+    { "typed": "٠٫٥٠٠", "en": { "amount": "0.5" }, "de": { "amount": "0.5" } },
+    {
+      "typed": "10.000",
+      "en": { "amount": "10" },
+      "de": { "refused": "thousands" }
+    },
+    {
       "typed": "300.000",
       "en": { "amount": "300" },
       "de": { "refused": "thousands" }

@@ -54,9 +54,9 @@ export function boxSeparator(): Separator {
 
 /** Why what was typed in a number box is no amount, as the server says
  * (web/forms.Unreadable): not a number; the other decimal separator than
- * the box's; that one followed by three digits, as thousands are grouped;
- * or more than three decimal places. Both sides are tested against
- * quantity-cases.json. */
+ * the box's; that one followed by three digits after a whole part above
+ * 0, as thousands are grouped; or more than three decimal places. Both
+ * sides are tested against quantity-cases.json. */
 export type Unreadable = "number" | "separator" | "thousands" | "places";
 
 const DIGIT = /\p{Nd}/u;
@@ -115,7 +115,9 @@ export function amountTyped(
     if (mistaken === null) {
       return "number";
     }
-    return mistaken.units !== "" && mistaken.fraction.length === 3
+    // A whole part of 0, or none, is no thousands, so a decimal (Ali,
+    // 2026-11-23, inventory-tng-mat2).
+    return /[1-9]/.test(mistaken.units) && mistaken.fraction.length === 3
       ? "thousands"
       : "separator";
   }
