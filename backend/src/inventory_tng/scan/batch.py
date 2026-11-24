@@ -229,15 +229,29 @@ def record(
         elif key in whole:
             problems.append((("used_up", number), "moved_whole"))
     twice = repeated(length_keys)
-    for number, key in enumerate(length_keys):
+    # What is said to be on one of an item counted each is whole, as the
+    # scan page asks (Ali, 2026-11-23, inventory-tng-uwi3).
+    units = values_by(
+        session,
+        Item.id,
+        Item.unit,
+        {
+            opened.item_id
+            for open_id in measured.values()
+            if (opened := opens.get(open_id))
+        },
+    )
+    for number, each in enumerate(lengths):
         at: tuple[str | int, ...] = ("lengths", number, "open_package_key")
-        opened = opens.get(measured.get(key, 0))
+        opened = opens.get(measured.get(each.open_package_key, 0))
         if number in twice:
             problems.append((at, "repeated"))
         elif opened is None:
             problems.append((at, "not_found"))
         elif opened.location_id != batch.from_location_id:
             problems.append((at, "open_package_elsewhere"))
+        elif not whole_enough(units[opened.item_id], each.left):
+            problems.append((("lengths", number, "left"), "not_whole"))
     if problems:
         if now:
             units_shown.refusing("batch", now)

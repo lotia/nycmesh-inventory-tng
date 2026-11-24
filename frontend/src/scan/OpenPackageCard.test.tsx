@@ -2,12 +2,17 @@ import { fireEvent, render, screen } from "@testing-library/preact";
 import { describe, expect, test, vi } from "vitest";
 import { messages as english } from "../locales/en.po";
 import { say, speak } from "../shared/i18n";
-import { cable, openAt, radio } from "../testing/catalogue";
+import { cart } from "../testing/cart";
+import { CATALOGUE, cable, openAt, radio } from "../testing/catalogue";
+import { saidAsText } from "../testing/said";
+import { toBatch } from "./batch";
 import {
   ALL_OF_IT,
   endingNote,
   OpenPackageCard,
   PRINTED_LENGTH,
+  WRONG_LENGTH,
+  WRONG_NUMBER,
 } from "./OpenPackageCard";
 import { afterCut, cutOf, usedUpOf } from "./offered";
 
@@ -41,7 +46,10 @@ describe("an open package's card", () => {
 
   test("things counted each are not cable", () => {
     expect(endingNote("used", "bag", "each")).toBe(
-      "Your cut uses up the bag, so it's ticked. Untick it if any is left. An administrator confirms.",
+      "Taking these uses up the bag, so it's ticked. Untick it if any is left. An administrator confirms.",
+    );
+    expect(endingNote("over", "bag", "each")).toBe(
+      "You're taking more than the bag shows, so it's ticked. It's recorded as you typed it, and an administrator will check the bag.",
     );
   });
 });
@@ -71,7 +79,9 @@ function card(
 
 test("things counted each get no hint to read a printed length", () => {
   card(radio, { amount: "", whole: false, now: "" });
-  expect(screen.getByLabelText(/^What's on the Box now/)).toBeDefined();
+  expect(
+    screen.getByLabelText(/^How many are left in the Box now/),
+  ).toBeDefined();
   expect(screen.queryByText(say(PRINTED_LENGTH))).toBeNull();
 });
 
@@ -143,4 +153,84 @@ test("what is on it is written as the locale writes numbers, a box takes it plai
   expect(document.body.textContent).toContain("1.234,067 m");
   fireEvent.click(screen.getByLabelText(say(ALL_OF_IT)));
   expect(onTake).toHaveBeenLastCalledWith({ amount: "1234.567", whole: true });
+});
+
+describe("an open box of 500 connectors, followed", () => {
+  // Worded for pieces, with the number keypad, whole amounts only (Ali,
+  // 2026-11-23, inventory-tng-uwi3).
+  const connectors = {
+    ...radio,
+    id: 102,
+    name: "RJ45 connectors",
+    packages: [
+      {
+        id: 1002,
+        name: "Box of 500",
+        size: "500.000",
+        track_opened: true,
+        retired: false,
+        short_below: null,
+        sealed: [],
+      },
+    ],
+  };
+
+  test("its card says how many are left and taken, on the number keypad", () => {
+    const onTake = vi.fn();
+    const shown = card(
+      connectors,
+      { amount: "20", whole: false },
+      { left: 300_000, onTake },
+    );
+    const take = screen.getByLabelText(
+      "Take from the Box of 500 opened 2026-11-03",
+    );
+    expect(take.getAttribute("inputmode")).toBe("numeric");
+    expect(
+      (take.getAttribute("aria-describedby") ?? "")
+        .split(" ")
+        .map((id) => document.getElementById(id)?.textContent),
+    ).toEqual(["Now: 300 left", "After taking 20: 280 left"]);
+    expect(screen.getByText("After taking 20")).toBeDefined();
+    expect(screen.queryByText(/ each/)).toBeNull();
+    expect(
+      screen.queryByRole("button", { name: say(WRONG_LENGTH) }),
+    ).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: say(WRONG_NUMBER) }));
+    expect(onTake).toHaveBeenLastCalledWith({
+      amount: "20",
+      whole: false,
+      now: "",
+    });
+    shown.unmount();
+    card(
+      connectors,
+      { amount: "320", whole: false, now: "" },
+      { left: 300_000 },
+    );
+    expect(screen.getByText("20 over")).toBeDefined();
+    const left = screen.getByLabelText(
+      "How many will be left in the Box of 500 after taking these, if you can tell",
+    );
+    expect(left.getAttribute("inputmode")).toBe("numeric");
+    expect(screen.queryByText(say(PRINTED_LENGTH))).toBeNull();
+  });
+
+  test("a part of one said to be left is refused", () => {
+    const key = "11111111-1111-4111-8111-111111111111";
+    const catalogue = { ...CATALOGUE, items: [...CATALOGUE.items, connectors] };
+    const lines = [
+      {
+        itemId: connectors.id,
+        packages: {},
+        loose: "",
+        open: { [key]: { amount: "", whole: false, now: "2.5" } },
+      },
+    ];
+    expect(saidAsText(toBatch(cart({ lines }), catalogue))).toEqual({
+      problems: [
+        "[RJ45 connectors]: enter what is on the open package, in whole units, or leave it blank.",
+      ],
+    });
+  });
 });

@@ -301,6 +301,11 @@ you" counts every report in one line, which hides what is waiting.
 - **A cut past what a package shows is warned of and saved as typed**,
   never refused: the cable is already cut, a phone offline cannot know
   other phones' cuts, and negative balances are allowed (0003).
+- **An open package of an item counted each is worded for pieces**
+  (Ali, 2026-11-23, inventory-tng-uwi3): "Now 300 left", "After taking
+  20", "Take from the Box", "Shows the wrong number left?", with the
+  number keypad, and whole amounts only, which the server refuses too.
+  Lengths keep the words above. The check page is "Amounts to check".
 
 ### Correcting what a package shows
 
@@ -332,7 +337,7 @@ you" counts every report in one line, which hides what is waiting.
 
 - **"Waiting for you" becomes "Needs your action (N)"**, N being what is
   to do, gone when nothing is (Ali: the name must say work is waiting).
-- **Under each kind**, reported used up, shows the wrong length, and went
+- **Under each kind**, reported used up, shows the wrong amount, and went
   below zero, **one line per item** names how many of each of its
   packages wait, by the package's name ("Cat6 cable: 3 × Spool 305 m",
   "RJ45 plugs: 2 × Bag of 100": inventory-tng-b1z), and links to that

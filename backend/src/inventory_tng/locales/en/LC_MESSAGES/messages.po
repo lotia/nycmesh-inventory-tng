@@ -915,6 +915,10 @@ msgstr ""
 msgid "Amount"
 msgstr ""
 
+#: src/inventory_tng/stock/length_checks_routes.py
+msgid "Amounts to check"
+msgstr ""
+
 #: src/inventory_tng/templates/catalogue/reading_rules.html
 msgid "An administrator"
 msgstr ""
@@ -2068,10 +2072,6 @@ msgstr ""
 
 #: src/inventory_tng/templates/stock/count.html
 msgid "Left on it"
-msgstr ""
-
-#: src/inventory_tng/stock/length_checks_routes.py
-msgid "Lengths to check"
 msgstr ""
 
 #: src/inventory_tng/templates/volunteers/volunteer.html
@@ -3711,7 +3711,7 @@ msgid "Shows %(left)s %(unit)s."
 msgstr ""
 
 #: src/inventory_tng/stock/length_checks_routes.py
-msgid "Shows the wrong length"
+msgid "Shows the wrong amount"
 msgstr ""
 
 #: src/inventory_tng/admins/sign_in_routes.py

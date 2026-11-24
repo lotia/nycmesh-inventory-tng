@@ -161,6 +161,10 @@ msgstr ""
 msgid "Sending: {what}. A new cart is ready."
 msgstr ""
 
+#: src/scan/OpenPackageCard.tsx
+msgid "How many will be left in the {name} after taking these, if you can tell"
+msgstr ""
+
 #: src/scan/Scanner.tsx
 msgid "Allow it in the browser's settings. This browser isn't keeping the cart, so record it before you reload the page, or find items in the list."
 msgstr ""
@@ -213,6 +217,10 @@ msgstr ""
 #. {to} is a place of any kind, such as a store, a shelf, a bin or a volunteer's home.
 #: src/scan/batch.ts
 msgid "Receipt: {items} to {to}"
+msgstr ""
+
+#: src/scan/OpenPackageCard.tsx
+msgid "Shows the wrong number left?"
 msgstr ""
 
 #: src/register/RegisterPage.tsx
@@ -297,6 +305,10 @@ msgstr ""
 msgid "Go back"
 msgstr ""
 
+#: src/scan/OpenPackageCard.tsx
+msgid "Take from the {name} opened {date}"
+msgstr ""
+
 #. {from} is a place of any kind, such as a store, a shelf, a bin or a volunteer's home.
 #: src/scan/batch.ts
 msgid "What's on it: {packages} at {from}"
@@ -326,6 +338,10 @@ msgstr ""
 msgid "This item's unit changed since the page loaded: load the page again, and count it again"
 msgstr ""
 
+#: src/scan/OpenPackageCard.tsx
+msgid "After taking {amount}:"
+msgstr ""
+
 #: src/shared/outbox-notes.ts
 msgid "The inventory can't record this just now. Trying again shortly."
 msgstr ""
@@ -352,6 +368,10 @@ msgstr ""
 
 #: src/scan/Scanner.tsx
 msgid "The torch wouldn't switch."
+msgstr ""
+
+#: src/scan/OpenPackageCard.tsx
+msgid "After taking"
 msgstr ""
 
 #. {place} is a place of any kind, such as a store, a shelf, a bin or a volunteer's home.
@@ -564,6 +584,10 @@ msgstr ""
 msgid "Go to the scan page"
 msgstr ""
 
+#: src/scan/OpenPackageCard.tsx
+msgid "After taking {amount}"
+msgstr ""
+
 #: src/scan/OlderList.tsx
 msgid "A cart: something"
 msgstr ""
@@ -639,6 +663,10 @@ msgstr ""
 msgid "All of it, moved still open"
 msgstr ""
 
+#: src/scan/OpenPackageCard.tsx
+msgid "{amount} left"
+msgstr ""
+
 #: src/scan/Scanner.tsx
 msgid "The camera is in use."
 msgstr ""
@@ -703,10 +731,6 @@ msgstr ""
 msgid "Not reading while you type. Tap the picture to scan."
 msgstr ""
 
-#: src/scan/OpenPackageCard.tsx
-msgid "Your cut uses up the {name}, so it's ticked. Untick it if any is left. An administrator confirms."
-msgstr ""
-
 #: src/scan/CartForm.tsx
 msgid "Change"
 msgstr ""
@@ -751,6 +775,10 @@ msgstr ""
 
 #: src/scan/ScanPage.tsx
 msgid "<0>Register it</0>, then come back."
+msgstr ""
+
+#: src/scan/OpenPackageCard.tsx
+msgid "How many are left in the {name} now, if you can tell"
 msgstr ""
 
 #: src/shared/outbox-notes.ts
@@ -808,6 +836,10 @@ msgstr ""
 
 #: src/scan/older-to-cart.ts
 msgid "{count, plural, one {Could not read # previously added item, scan it again.} other {Could not read # previously added items, scan them again.}}"
+msgstr ""
+
+#: src/scan/OpenPackageCard.tsx
+msgid "{amount} over"
 msgstr ""
 
 #: src/shared/build.ts
@@ -891,6 +923,10 @@ msgstr ""
 msgid "{amount} {unit} over"
 msgstr ""
 
+#: src/scan/OpenPackageCard.tsx
+msgid "You're taking more than the {name} shows, so it's ticked. It's recorded as you typed it, and an administrator will check the {name}."
+msgstr ""
+
 #: src/scan/Scanner.tsx
 msgid "Reload page"
 msgstr ""
@@ -955,6 +991,10 @@ msgstr ""
 #. {from} is a place of any kind, such as a store, a shelf, a bin or a volunteer's home.
 #: src/scan/batch.ts
 msgid "Opening: {items} at {from}"
+msgstr ""
+
+#: src/scan/OpenPackageCard.tsx
+msgid "Taking these uses up the {name}, so it's ticked. Untick it if any is left. An administrator confirms."
 msgstr ""
 
 #: src/scan/batch.ts

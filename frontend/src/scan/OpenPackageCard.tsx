@@ -27,10 +27,12 @@ import {
 export const PRINTED_LENGTH = msg`Read the length printed on the cable where it leaves the spool. If it counts up from the start, what's left is the package size minus the mark.`;
 
 /** The notes when the box follows the cut (Ali, 2026-11-12), by how the
- * cut ends it; an item counted in each says "any", in a length "cable". */
-export const USED_EACH = msg`Your cut uses up the {name}, so it's ticked. Untick it if any is left. An administrator confirms.`;
+ * cut ends it; an item counted in each says "taking" and "any", in a
+ * length "cut" and "cable". Only a length has a short end. */
+export const USED_EACH = msg`Taking these uses up the {name}, so it's ticked. Untick it if any is left. An administrator confirms.`;
 export const USED_CABLE = msg`Your cut uses up the {name}, so it's ticked. Untick it if cable is left. An administrator confirms.`;
 export const SHORT = msg`This {name} will be unusable after this cut, so it's ticked. Untick it if you'll keep the short end.`;
+export const OVER_EACH = msg`You're taking more than the {name} shows, so it's ticked. It's recorded as you typed it, and an administrator will check the {name}.`;
 export const OVER = msg`Your cut is more than the {name} shows, so it's ticked. It's recorded as you typed it, and an administrator will check the {name}.`;
 
 export const OPEN = msg({ context: "state", message: "open" });
@@ -54,17 +56,40 @@ export const WHATS_ON_AFTER = msg`What's on the {name} after this cut ({unit}), 
 export const WRONG_LENGTH = msg`Shows the wrong length?`;
 export const NOTHING_USABLE = msg`Nothing usable left on it`;
 
+/** The card of an open package of an item counted each, worded for
+ * pieces, not a length (Ali, 2026-11-23, inventory-tng-uwi3): "Now 300
+ * left", "After taking 20". */
+export const AMOUNT_LEFT = msg`{amount} left`;
+/** The heading over what is left, before anything is typed to take. */
+export const AFTER_TAKING_SOME = msg`After taking`;
+export const AFTER_TAKING = msg`After taking {amount}`;
+/** AFTER_TAKING, for a screen reader, before what is left after it. */
+export const AFTER_TAKING_SAID = msg`After taking {amount}:`;
+export const PIECES_OVER = msg`{amount} over`;
+export const TAKE = msg`Take from the {name} opened {date}`;
+export const HOW_MANY_NOW = msg`How many are left in the {name} now, if you can tell`;
+export const HOW_MANY_AFTER = msg`How many will be left in the {name} after taking these, if you can tell`;
+export const WRONG_NUMBER = msg`Shows the wrong number left?`;
+
 /** Nothing taken yet. */
 export const NOTHING_TAKEN: Taken = { amount: "", whole: false };
 
 /** The note when the box follows the cut (Ali, 2026-11-12). */
 export function endingNote(ending: Ending, name: string, unit: string): string {
+  const pieces = countedWhole(unit);
   const note = {
-    used: countedWhole(unit) ? USED_EACH : USED_CABLE,
+    used: pieces ? USED_EACH : USED_CABLE,
     short: SHORT,
-    over: OVER,
+    over: pieces ? OVER_EACH : OVER,
   }[ending];
   return say(note, { name });
+}
+
+/** An amount on it, in words: "300 left" of pieces, else "300 m". */
+function leftWords(left: number, unit: string): string {
+  return countedWhole(unit)
+    ? say(AMOUNT_LEFT, { amount: sayAmount(left) })
+    : `${sayAmount(left)} ${unit}`;
 }
 
 /** What is left after the cut, in words; blank before one is typed. */
@@ -72,9 +97,30 @@ function afterWords(after: number | undefined, unit: string): string {
   if (after === undefined) {
     return "";
   }
-  return after < 0
-    ? say(AMOUNT_OVER, { amount: sayAmount(-after), unit })
-    : `${sayAmount(after)} ${unit}`;
+  if (after >= 0) {
+    return leftWords(after, unit);
+  }
+  const amount = sayAmount(-after);
+  return countedWhole(unit)
+    ? say(PIECES_OVER, { amount })
+    : say(AMOUNT_OVER, { amount, unit });
+}
+
+/** The heading over what is left after the cut, and what a screen reader
+ * reads before it: "After this cut" of a length, "After taking 20" of
+ * pieces, once typed. */
+function afterHeading(
+  taking: number | undefined,
+  unit: string,
+): [string, string] {
+  if (!countedWhole(unit)) {
+    return [say(AFTER_THIS_CUT), say(AFTER_THIS_CUT_SAID)];
+  }
+  if (taking === undefined) {
+    return [say(AFTER_TAKING_SOME), say(AFTER_TAKING_SOME)];
+  }
+  const amount = sayAmount(taking);
+  return [say(AFTER_TAKING, { amount }), say(AFTER_TAKING_SAID, { amount })];
 }
 
 export function OpenPackageCard({
@@ -99,6 +145,7 @@ export function OpenPackageCard({
   const hintId = useId();
   const unit = item.unit;
   const printed = isLength(unit);
+  const pieces = countedWhole(unit);
   // Its package as named, never a word made from the name
   // (inventory-tng-b1z): "the Spool 305 m".
   const name = open.package_name;
@@ -123,6 +170,10 @@ export function OpenPackageCard({
   // What is really on it: asked when the cut passes what it shows, or
   // when the volunteer says it shows the wrong length.
   const asking = taken.now !== undefined || cut?.ending === "over";
+  const [afterTitle, afterSaid] = afterHeading(
+    cut === null ? undefined : open.left - cut.after,
+    unit,
+  );
   return (
     <fieldset
       class={`flex flex-col gap-2 border-2 border-line p-3 ${empty ? "bg-band" : ""}`}
@@ -138,22 +189,25 @@ export function OpenPackageCard({
           <div class="hint">{say(NOW)}</div>
           <div id={nowId}>
             <span class="sr-only">{say(NOW_SAID)} </span>
-            {sayAmount(open.left)} {unit}
+            {leftWords(open.left, unit)}
           </div>
         </div>
         <div>
-          <div class="hint">{say(AFTER_THIS_CUT)}</div>
+          <div class="hint">{afterTitle}</div>
           <div id={afterId}>
-            <span class="sr-only">{say(AFTER_THIS_CUT_SAID)} </span>
+            <span class="sr-only">{afterSaid} </span>
             {afterWords(cut?.after, unit)}
           </div>
         </div>
       </div>
-      <Field quiet label={say(CUT_OR_TAKE, { name, date: opened, unit })}>
+      <Field
+        quiet
+        label={say(pieces ? TAKE : CUT_OR_TAKE, { name, date: opened, unit })}
+      >
         {(id) => (
           <input
             id={id}
-            inputMode="decimal"
+            inputMode={pieces ? "numeric" : "decimal"}
             aria-invalid={refusedBy !== undefined || undefined}
             aria-describedby={[nowId, afterId, refusedBy]
               .filter(Boolean)
@@ -194,10 +248,16 @@ export function OpenPackageCard({
       {asking ? (
         <Field
           quiet
-          label={say(cut === null ? WHATS_ON_NOW : WHATS_ON_AFTER, {
-            name,
-            unit,
-          })}
+          label={say(
+            pieces
+              ? cut === null
+                ? HOW_MANY_NOW
+                : HOW_MANY_AFTER
+              : cut === null
+                ? WHATS_ON_NOW
+                : WHATS_ON_AFTER,
+            { name, unit },
+          )}
         >
           {(id) => (
             <>
@@ -224,7 +284,7 @@ export function OpenPackageCard({
           class="self-start"
           onClick={() => onTake({ ...taken, now: "" })}
         >
-          {say(WRONG_LENGTH)}
+          {say(pieces ? WRONG_NUMBER : WRONG_LENGTH)}
         </button>
       )}
       {/* The note is always there, so it is read out as it changes. */}

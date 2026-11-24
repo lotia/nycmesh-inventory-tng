@@ -122,7 +122,9 @@ def length_refused(typed: str, separator: Separator) -> str:
     return "length_bad" if which is None else _OTHER_SEPARATOR_NOTICES[which]
 
 
-LENGTHS_TITLE = lazy_gettext("Lengths to check")
+# Worded for lengths and pieces alike: an open box of connectors is
+# followed as a spool is (Ali, 2026-11-23, inventory-tng-uwi3).
+LENGTHS_TITLE = lazy_gettext("Amounts to check")
 
 # Waiting for a check, not closed: reported by a volunteer, or gone below
 # zero.
@@ -140,7 +142,7 @@ CHECKED = (or_(REPORTED, and_(*BELOW_ONLY)), OPEN)
 # too.
 KINDS = (
     Kind(
-        lazy_gettext("Shows the wrong length"),
+        lazy_gettext("Shows the wrong amount"),
         f"{LENGTHS}/reported",
         (REPORTED, OPEN),
     ),
