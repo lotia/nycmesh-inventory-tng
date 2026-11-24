@@ -1,6 +1,6 @@
 /** The scan page's search box: find an item by its words, or type or scan its code. */
 import { msg } from "@lingui/core/macro";
-import { type Signal, useSignal } from "@preact/signals";
+import { useSignal } from "@preact/signals";
 import { Field } from "../shared/Field";
 import { say } from "../shared/i18n";
 import { type Cart, type Catalogue, RETIRED } from "./cart";
@@ -28,18 +28,19 @@ export const refused = (said: string, about?: About): Picked => ({
 export function Finder({
   catalogue,
   cart,
-  query,
   onAdd,
   onLabel,
 }: {
   catalogue: Catalogue;
   /** The cart as it is now, whose lines a refusal may be about. */
   cart: Cart;
-  query: Signal<string>;
   onAdd: (itemId: number, packageId?: number) => Picked;
   /** A label's code typed, as a scanner gun types one. */
   onLabel: (read: Scanned) => Picked;
 }) {
+  // Emptied only by a pick or a code typed here, never by a label the
+  // camera reads while the volunteer types (inventory-tng-tjyo).
+  const query = useSignal("");
   const matches = search(catalogue, query.value);
   // A refused pick's words, under the search as the scanner says them, till
   // the next pick, typing, or a change to the line it is about; a pick that
@@ -49,6 +50,7 @@ export function Finder({
     refusal.value = "";
   });
   const show = (picked: Picked) => {
+    query.value = "";
     refusal.value = picked.refused ? picked.said : "";
     refusing(picked.about);
   };

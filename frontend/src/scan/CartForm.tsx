@@ -175,7 +175,6 @@ export function CartForm({
     [catalogue, pending],
   );
   const cart = store.cart;
-  const query = useSignal("");
   const problems = useSignal<Said[]>([]);
   // While Record waits for the catalogue: Record does nothing meanwhile.
   const checking = useSignal(false);
@@ -333,7 +332,6 @@ export function CartForm({
     const pack = opening
       ? openingPackage(item, cart.value.fromId, sealed)
       : item?.packages.find((each) => each.id === packageId);
-    query.value = "";
     if (opening && pack === undefined) {
       if (item?.packages.length === 0) {
         return refused(
@@ -380,7 +378,6 @@ export function CartForm({
     if (read.kind === "place") {
       const place = places.get(read.locationId);
       const [only, other] = placeSides(cart.value);
-      query.value = "";
       if (only !== undefined && other === undefined) {
         placeOn(only, read.locationId);
         const here = cart.value.kind === "open" ? PLACE_HERE : PLACE_FROM_HERE;
@@ -855,7 +852,6 @@ export function CartForm({
       <Finder
         catalogue={catalogue}
         cart={cart.value}
-        query={query}
         onAdd={add}
         onLabel={actOn}
       />

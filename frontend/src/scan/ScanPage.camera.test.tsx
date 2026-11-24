@@ -179,6 +179,24 @@ describe("scanning labels with the camera", () => {
     expect(follows(search, cart)).toBe(true);
   });
 
+  test("a label the camera reads leaves the item search's words and matches; a pick or a typed code empties it", async () => {
+    await opened();
+    const search = screen.getByLabelText<HTMLInputElement>(say(FIND));
+    find("cable");
+    screen.getByRole("button", { name: "Cat6 cable" });
+    await scan("B3ZT9W");
+    await screen.findByText("Added one: LiteBeam 5AC.");
+    expect(search.value).toBe("cable");
+    screen.getByRole("button", { name: "Cat6 cable" });
+    // A pick from its list.
+    fireEvent.click(screen.getByRole("button", { name: "Cat6 cable" }));
+    expect(search.value).toBe("");
+    // A code typed, as a scanner gun types one.
+    find("b3zt9w");
+    fireEvent.keyDown(search, { key: "Enter" });
+    expect(search.value).toBe("");
+  });
+
   test("Back to camera is offered only while the camera is open and off the screen", async () => {
     const view = stubInView();
     await opened();
