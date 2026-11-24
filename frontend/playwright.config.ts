@@ -6,7 +6,7 @@
  */
 import { execFileSync } from "node:child_process";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { delimiter, join } from "node:path";
 import { defineConfig, type Project } from "@playwright/test";
 import {
   adminState,
@@ -17,9 +17,9 @@ import {
   serverEnv,
 } from "./browser-tests/prepared";
 
-// Each server's folder (backend/tests/browser_database.py) and port, chosen
-// once, here in the main process, for the backends and the workers to
-// inherit (browser-tests/prepared.ts).
+// Each server's folder (backend/tests/helpers/browser_database.py) and
+// port, chosen once, here in the main process, for the backends and the
+// workers to inherit (browser-tests/prepared.ts).
 process.env.BROWSER_RUN ??= join(tmpdir(), `inventory-browser-${process.pid}`);
 process.env.BROWSER_CRAWL_RUN ??= join(
   tmpdir(),
@@ -96,13 +96,14 @@ const browsers = (
 export default defineConfig({
   testDir: "browser-tests",
   // Each server a database of its own, seeded, and the backend serving the
-  // build from it (backend/tests/browser_database.py).
+  // build from it (backend/tests/helpers/browser_database.py).
   webServer: SERVERS.map((server) => ({
     name: server,
-    command: "uv run python tests/browser_database.py serve",
+    command: "uv run python -m helpers.browser_database serve",
     cwd: "../backend",
-    // So it imports the seed from backend/devtools/ (CONTRIBUTING.md).
-    env: { PYTHONPATH: ".", ...serverEnv(server) },
+    // pytest's pythonpath (backend/pyproject.toml), so it imports the seed
+    // from backend/devtools/ and the tests' helpers (CONTRIBUTING.md).
+    env: { PYTHONPATH: [".", "tests"].join(delimiter), ...serverEnv(server) },
     // Its log lines, a traceback among them, with the tests'.
     stdout: "pipe" as const,
     url: `${baseOf(server)}/api/healthz`,

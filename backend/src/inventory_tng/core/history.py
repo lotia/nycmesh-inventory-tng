@@ -6,8 +6,9 @@ catalogue_history in the same transaction, with who did it
 What to record is decided by pure functions (change, json_value); the flush
 listeners below only read the rows and write what those return. A row
 written any other way, by a statement such as update(Item), a migration or
-SQL an operator types, is not recorded: tests/core/test_history.py fails
-on a statement that writes to a table with history in the app.
+SQL an operator types, is not recorded:
+tests/inventory_tng/core/test_history.py fails on a statement that writes
+to a table with history in the app.
 
 Only the rows the session was given to add, change or delete are seen, not
 any the flush changes by itself, as a relationship() would: no model has
@@ -28,7 +29,7 @@ from sqlalchemy.orm import Session, UOWTransaction
 
 # Imported for its flush listeners, before this module's: the lock guard
 # refuses a write before history reads anything for it
-# (tests/core/test_history.py checks the order).
+# (tests/inventory_tng/core/test_history.py checks the order).
 from inventory_tng.core import db_locking  # noqa: F401
 from inventory_tng.core.db_base import Base
 from inventory_tng.core.db_protection import Action, flagged, flush_writes, flushed_id

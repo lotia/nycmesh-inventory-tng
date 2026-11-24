@@ -112,7 +112,7 @@ step you take many times a day you run directly, in `backend/` or
 | --- | --- | --- |
 | `backend/` | `uv run alembic upgrade head` | Migrates this checkout's database ([Migrations](#migrations)) |
 | `backend/` | `uv run alembic downgrade <revision>` | Takes it back to that revision; `uv run alembic history` lists them, `uv run alembic current` says where it is |
-| `backend/` | `uv run pytest tests/places/test_locations.py` | Runs one test file; `<file>::<test>` runs one test, `-k <words>` those whose names match. One that uses the database needs `mise run start-database` first |
+| `backend/` | `uv run pytest tests/inventory_tng/places/test_locations.py` | Runs one test file; `<file>::<test>` runs one test, `-k <words>` those whose names match. One that uses the database needs `mise run start-database` first |
 | `frontend/` | `npm test -- src/scan/cart.test.ts` | Runs one frontend test file; `-t <words>` runs the tests whose names match |
 | `frontend/` | `npx playwright test browser-tests/lists.spec.ts` | Runs one browser test file, after `mise run setup-browsers`, `mise run start-database` and `npm run build` ([Running the checks](#running-the-checks)) |
 | `backend/` | `uv run python -m devtools` | Lists the developer's tools (`backend/devtools/`, which no image ships); each one's `--help` says what it takes |
@@ -274,10 +274,11 @@ privileges). A migration that creates a table the app must not change
 revokes what it must not do there, as the initial migration does for the
 tables the app only adds to, those it never deletes from, and columns set
 only as a row is made (`READ_AND_ADD`, `NEVER_DELETED` and `UPDATED_ONLY`).
-`tests/core/test_database_role.py` lists those columns, so a new column
-the app cannot change fails there until listed. What a migration writes is
-not in the history. Migrations create no trigger, function or view: the
-rules are the app's, and `tests/models/test_models.py` fails on one.
+`tests/inventory_tng/core/test_database_role.py` lists those columns, so a
+new column the app cannot change fails there until listed. What a migration
+writes is not in the history. Migrations create no trigger, function or view:
+the rules are the app's, and `tests/inventory_tng/models/test_models.py` fails
+on one.
 
 ### History
 
@@ -286,8 +287,9 @@ Every row added, changed or deleted through the ORM, in a table with history
 `catalogue_history` as the session flushes, with who did it
 (`db_sessions.set_actor`). So write those tables through the ORM:
 `session.add`, an object's attributes, `session.delete`. A statement such as
-`update(Item)` is never recorded, and `tests/core/test_history.py` fails on
-one. The app may only add to the history.
+`update(Item)` is never recorded, and
+`tests/inventory_tng/core/test_history.py` fails on one. The app may only add to
+the history.
 
 ### The catalogue's rules
 
@@ -540,11 +542,11 @@ there while that tab asks for a reload; queued by an older build, it is
 listed with what older builds left, to put back in the cart. One naming
 no build, from another client of the API, gets the 422.
 
-`backend/tests/batch_schema.json` keeps what the endpoint's schema
-accepts, and `backend/tests/scan/test_batch_schema.py` fails on a change
-that accepts less, naming each way. A change that only accepts more fails too,
-until the file is written again, so the next change is measured against
-what was deployed: `mise run regenerate-batch-schema` (from `backend/`:
+`backend/tests/references/batch_schema.json` keeps what the endpoint's schema
+accepts, and `backend/tests/inventory_tng/scan/test_batch_schema.py` fails
+on a change that accepts less, naming each way. A change that only accepts more
+fails too, until the file is written again, so the next change is measured
+against what was deployed: `mise run regenerate-batch-schema` (from `backend/`:
 `uv run python -m tests.helpers.batch_schema`, and `--check` only
 compares). Over a change that accepts less, it writes nothing until
 `OLDEST_BUILD` has moved, or `--tighten` says no older build's batch is
@@ -1052,13 +1054,13 @@ mise run check-catalogues    # fails while either is not current
 
 Each side has a test that renders its words in a pseudo-locale, every
 letter accented, and fails on a word left in plain English:
-`backend/tests/core/test_phrases.py` and `frontend/src/pseudo.test.tsx`. On
-the scan page, every component is in its `COVERED`, with names that are
-not English; add a part for a new component, or for a state of one that
-says something no part shows. On the server, every phrase named as a
-constant, alone or in a table such as `NOTICES`, is covered already; add
-a phrase said with values to `SAID_WITH_VALUES`, a page to its entry in
-`tests/helpers/swept_pages.py`'s `PAGES`, as `worded`, which fetches it
+`backend/tests/inventory_tng/core/test_phrases.py` and
+`frontend/src/pseudo.test.tsx`. On the scan page, every component is in its
+`COVERED`, with names that are not English; add a part for a new component, or
+for a state of one that says something no part shows. On the server, every
+phrase named as a constant, alone or in a table such as `NOTICES`, is covered
+already; add a phrase said with values to `SAID_WITH_VALUES`, a page to its
+entry in `tests/helpers/swept_pages.py`'s `PAGES`, as `worded`, which fetches it
 signed in with every name in the database not English, or as
 `signed_out`, and a template no page there shows, or a branch of one, to
 `COVERED`.
@@ -1107,8 +1109,8 @@ Those are unit tests: Vitest runs the frontend's in a page it simulates
 (happy-dom), with no layout. The browser tests, in
 `frontend/browser-tests/`, are another kind: Playwright drives a real
 browser engine against the whole app, built frontend and all, from
-databases of their own (`backend/tests/browser_database.py`), at a phone's
-width, with a fake camera in Chromium that shows a seeded label. They check
+databases of their own (`backend/tests/helpers/browser_database.py`), at a
+phone's width, with a fake camera in Chromium that shows a seeded label. They check
 what only a real browser can, such as that no page scrolls sideways:
 
 ```sh
@@ -1200,8 +1202,8 @@ either side unless a comment on or just above it says
 Write a rule of more than one condition as a function of plain values,
 such as a map of each place's parent, that returns the rule broken or
 nothing, and test every way it can be broken without the database
-(`tests/places/test_locations.py`). Test on PostgreSQL what only it can
-show: that the function making a change refuses it by the rule's name,
+(`tests/inventory_tng/places/test_locations.py`). Test on PostgreSQL what
+only it can show: that the function making a change refuses it by the rule's name,
 once per rule; constraints, indexes and privileges; and, for each rule
 that reads other rows, two changes at once, the second waiting, then
 refused. Use the real database there, never a mocked session.
@@ -1246,8 +1248,10 @@ request's statements for a test of its own.
 
 ### Where tests go
 
-`backend/tests/` mirrors the source tree. Any folder under it with no
-counterpart in the source has its own short `README.md` saying what it holds.
+`backend/tests/` mirrors each package it tests from a folder named for
+the package, as `tests/inventory_tng/` mirrors `src/inventory_tng/`. Any
+other folder under it has its own short `README.md` saying what it holds.
+`tests/codebase/test_test_layout.py` checks both.
 
 ### Connections
 
@@ -1257,11 +1261,11 @@ test run, at the most processes the checks use, a dev app and the browser
 tests' two servers fit with room to spare, and so would three checkouts
 sharing `inventory-tng` (Local settings). An app's pools are sized in
 `core/db_sessions.py` (`Database`). Each test database allows twice the
-most measured on one (`TEST_CONNECTION_LIMIT` in `tests/databases.py`), so
-a process that leaks connections is refused at its own database, not the
-server's limit, and a test that fails for either limit says which. Long
-before a leak reaches that limit, a test that ends with a connection it
-took from any pool and kept errors at its teardown, named by
+most measured on one (`TEST_CONNECTION_LIMIT` in
+`tests/helpers/databases.py`), so a process that leaks connections is refused at
+its own database, not the server's limit, and a test that fails for either limit
+says which. Long before a leak reaches that limit, a test that ends with a
+connection it took from any pool and kept errors at its teardown, named by
 `keeps_its_connections` in conftest.py. Each checkout's development
 database allows enough for one app and a migration or seed beside it
 (`CONNECTION_LIMIT` in `backend/devtools/database.py`), so it cannot starve
@@ -1287,8 +1291,8 @@ mise run measure-labels
 ```
 
 It fills a database of its own with thousands of labels, some revoked
-(`MEASURE_ITEMS` in `tests/measure_labels.py`), and the same years of saves
-(their settings apply), prints the plan of
+(`MEASURE_ITEMS` in `tests/measures/measure_labels.py`), and the same years
+of saves (their settings apply), prints the plan of
 each statement the labels list and its suggestions send, and times a few
 typical searches. It is not one of the checks: run it after changing the
 labels list's search (inventory-tng-8i4.60.24).
@@ -1351,8 +1355,8 @@ after it.
   series released only as betas, such as OpenTelemetry's instrumentation,
   floors at the minor's first beta (`>=x.yb0`).
   A new anyascii, or a Python with a newer Unicode, fails
-  `tests/models/test_search_text_fold_reference.py`, with the difference:
-  the file's first line names both versions. If you take it, run
+  `tests/inventory_tng/models/test_search_text_fold_reference.py`, with the
+  difference: the file's first line names both versions. If you take it, run
   `mise run regenerate-fold-reference` (from `backend/`:
   `uv run python -m tests.helpers.fold_reference`, and `--check` only
   compares). If a spelling changed, also add a migration that folds again

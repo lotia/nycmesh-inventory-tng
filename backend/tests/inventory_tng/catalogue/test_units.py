@@ -24,9 +24,9 @@ from inventory_tng.models.search_text import fold, folds, held
 from helpers.markup import text as page_text
 from helpers.rows import add, tag
 
-UCUM = Path(__file__).parents[1] / "ucum_codes.tsv"
+UCUM = Path(__file__).parents[2] / "references" / "ucum_codes.tsv"
 VECTORS = TABLE.with_name("units-vectors.json")
-MIGRATIONS = Path(__file__).parents[2] / "migrations" / "versions"
+MIGRATIONS = Path(__file__).parents[3] / "migrations" / "versions"
 # The SI's newest prefixes (2022), which UCUM 2.2 has not.
 NEWER_THAN_UCUM = {"Q", "R", "r", "q"}
 

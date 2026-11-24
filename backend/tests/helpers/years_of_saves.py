@@ -7,7 +7,7 @@ from sqlalchemy import Connection, Engine, text
 
 from inventory_tng.core.db_sessions import make_engine
 
-from databases import OWNER, as_role
+from helpers.databases import OWNER, as_role
 
 # The scale, from the shell: years of saves, and saves a day.
 YEARS = int(os.environ.get("MEASURE_YEARS", "5"))

@@ -1,5 +1,5 @@
 {
-  "about": "What a number box reads each text as, on the server (web/forms.read_decimal) and on the scan page (shared/quantity.amountTyped), in a locale writing decimals with a point (en) and one writing them with a comma (de): the amount, as a plain decimal, or why it is refused (web/forms.Unreadable). backend tests/web/test_forms.py and frontend src/shared/quantity.test.ts read it (inventory-tng-qnwz).",
+  "about": "What a number box reads each text as, on the server (web/forms.read_decimal) and on the scan page (shared/quantity.amountTyped), in a locale writing decimals with a point (en) and one writing them with a comma (de): the amount, as a plain decimal, or why it is refused (web/forms.Unreadable). backend tests/inventory_tng/web/test_forms.py and frontend src/shared/quantity.test.ts read it (inventory-tng-qnwz).",
   "cases": [
     {
       "typed": "1,5",

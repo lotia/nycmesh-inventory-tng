@@ -1,7 +1,8 @@
 # 0023 — Code laid out by feature
 
 **Status:** accepted · 2026-11-17 · amended 2026-11-18 (how files and
-tests are named) and 2026-11-20 (a module's tests split by aspect)
+tests are named), 2026-11-20 (a module's tests split by aspect) and
+2026-11-24 (each package's tests in a folder of its own)
 
 ## Context
 
@@ -457,6 +458,25 @@ Later renamed:
 | `core/test_mail.py` | itself, its settings and sending; the words of the mails: `admins/test_mail_messages.py`; the reset links: `admins/test_reset_routes.py`; a notice of a recovery code used: `admins/test_sign_in_routes.py`; the notices of a password changed: `admins/test_account_routes.py` |
 | `models/test_fold_reference.py` | `models/test_search_text_fold_reference.py` |
 
+On 2026-11-24 (inventory-tng-da0t, the amendment below) the tests of the
+app's package moved whole, keeping their names, into `inventory_tng/`:
+each feature's folder, as `admins/` or `stock/`, and `test_main.py` and
+`test_server.py`. The rest of the top of `backend/tests/` went to a home
+named for what it is:
+
+| Old path | New path |
+| --- | --- |
+| `batch_schema.json` | `references/batch_schema.json` |
+| `browser_database.py` | `helpers/browser_database.py`, run as `python -m helpers.browser_database` with pytest's `pythonpath` |
+| `databases.py` | `helpers/databases.py`, imported as `helpers.databases` |
+| `fold_reference.tsv` | `references/fold_reference.tsv` |
+| `measure_catalogue.py` | `measures/measure_catalogue.py` |
+| `measure_labels.py` | `measures/measure_labels.py` |
+| `test_markup.py` | `suite/test_markup.py` |
+| `test_suite_categories.py` | `suite/test_suite_categories.py` |
+| `test_test_databases.py` | `suite/test_test_databases.py` |
+| `ucum_codes.tsv` | `references/ucum_codes.tsv` |
+
 ## Amendment: names (2026-11-18)
 
 Ali decided on 2026-11-18 how files, modules and tests are named
@@ -511,3 +531,40 @@ clashes came from importing modules, not from their names. We rejected
 flat test names after the module tested, as Ali pointed out that importlib
 mode, which lets the tests mirror the tree, is pytest's recommendation for
 new projects.
+
+## Amendment: each package mirrored from its own folder (2026-11-24)
+
+Ali decided on 2026-11-24 (inventory-tng-da0t) that the backend's tests
+mirror each package they test from a folder named for it. Until then the
+contents of `src/inventory_tng/` were mirrored straight under
+`backend/tests/`, beside `tests/devtools/`, which mirrors a separate
+package, and beside folders that name no package, so a folder's name did
+not say which package it mirrored, and an app package named `helpers`
+would have clashed.
+
+- **`tests/inventory_tng/` mirrors `src/inventory_tng/` exactly**, its
+  top-level modules included, and **`tests/devtools/` mirrors
+  `backend/devtools/`**. Every folder in them is a package of the source.
+  The names of the test files keep the rule above.
+- **Every other folder** names no package and holds a `README.md` saying
+  what it holds, as `across/`, `codebase/` and `helpers/` did.
+  `tests/codebase/test_test_layout.py` checks both.
+- **`conftest.py` stays at the top**, as pytest applies it to the tests
+  beneath it, every folder's.
+- **What sat loose at the top** went where its kind is, so its folder
+  says what it is:
+  - the test databases (`databases.py`) and the browser tests' server
+    (`browser_database.py`) are code the tests share, so `helpers/`;
+  - the reference files the tests compare against, written by a helper
+    or by hand, are data, so `references/`;
+  - the measurements, which pytest collects only when a `measure-*` task
+    names one, are not tests, so `measures/`;
+  - the tests of the suite's own code, its helpers, its databases and how
+    `conftest.py` sorts tests, test no source package, so `suite/`.
+    `test_markup.py` was named among the top-level modules' tests, but it
+    tests `helpers/markup.py`, and no `inventory_tng/markup.py` exists,
+    so it went to `suite/` with the others.
+
+We rejected keeping the loose files at the top, which tells a reader
+nothing of what they are, and putting the references and measurements in
+`helpers/`, which holds code the tests import.

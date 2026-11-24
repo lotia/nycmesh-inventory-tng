@@ -16,7 +16,7 @@ from inventory_tng.core.local_env import CLONE
 
 TESTS = Path(__file__).parents[1]
 # The readers themselves, and their tests, hold markup on purpose.
-EXEMPT = {Path("helpers/markup.py"), Path("test_markup.py")}
+EXEMPT = {Path("helpers/markup.py"), Path("suite/test_markup.py")}
 # The comment that lets a check read markup as text, and its reason.
 MARKER = re.compile(r"Exact markup on purpose:\s*\S")
 FIX = (

@@ -1,5 +1,5 @@
 """What the tests of lines recorded with more than was moved share
-(tests/stock/test_over_recorded_*.py)."""
+(tests/inventory_tng/stock/test_over_recorded_*.py)."""
 
 from typing import Any
 

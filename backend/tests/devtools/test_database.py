@@ -20,7 +20,7 @@ from inventory_tng.core.db_sessions import (
     make_engine,
 )
 
-from databases import APP, as_role, database_name, superuser_url
+from helpers.databases import APP, as_role, database_name, superuser_url
 
 
 @pytest.fixture

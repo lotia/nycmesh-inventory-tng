@@ -1,9 +1,9 @@
-"""The batch endpoint accepts all it did when tests/batch_schema.json was
-written, so a change that makes it accept less, which would have a batch a
-phone holds from an older build of the scan page refused, fails here,
-naming each way, until the deploy follows expand, then contract
-(CONTRIBUTING.md, The scan page; DEPLOYMENT.md, Tightening what a batch
-accepts)."""
+"""The batch endpoint accepts all it did when
+tests/references/batch_schema.json was written, so a change that makes it
+accept less, which would have a batch a phone holds from an older build of
+the scan page refused, fails here, naming each way, until the deploy
+follows expand, then contract (CONTRIBUTING.md, The scan page;
+DEPLOYMENT.md, Tightening what a batch accepts)."""
 
 import copy
 from collections.abc import Callable

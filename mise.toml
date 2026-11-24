@@ -81,7 +81,7 @@ description = "Time the scan page's catalogue against years of saves, with its l
 dir = "backend"
 depends = ["start-database"]
 run = [
-    "uv run pytest tests/measure_catalogue.py -p no:randomly -p no:cacheprovider -q -s",
+    "uv run pytest tests/measures/measure_catalogue.py -p no:randomly -p no:cacheprovider -q -s",
 ]
 
 [tasks.measure-labels]
@@ -89,7 +89,7 @@ description = "Time the labels list's searches and suggestions against thousands
 dir = "backend"
 depends = ["start-database"]
 run = [
-    "uv run pytest tests/measure_labels.py -p no:randomly -p no:cacheprovider -q -s",
+    "uv run pytest tests/measures/measure_labels.py -p no:randomly -p no:cacheprovider -q -s",
 ]
 
 [tasks.test-report]
@@ -99,7 +99,7 @@ depends = ["setup-browsers", "start-database"]
 run = "uv run python -m devtools test-report"
 
 [tasks.regenerate-fold-reference]
-description = "Write tests/fold_reference.tsv again, after a release of anyascii, or a Python with a newer Unicode, changes how it folds (CONTRIBUTING.md)"
+description = "Write tests/references/fold_reference.tsv again, after a release of anyascii, or a Python with a newer Unicode, changes how it folds (CONTRIBUTING.md)"
 dir = "backend"
 run = "uv run python -m tests.helpers.fold_reference"
 
@@ -112,7 +112,7 @@ run = [
 ]
 
 [tasks.regenerate-batch-schema]
-description = "Write tests/batch_schema.json again, after a change to what the batch endpoint accepts (CONTRIBUTING.md, The scan page)"
+description = "Write tests/references/batch_schema.json again, after a change to what the batch endpoint accepts (CONTRIBUTING.md, The scan page)"
 dir = "backend"
 run = "uv run python -m tests.helpers.batch_schema"
 

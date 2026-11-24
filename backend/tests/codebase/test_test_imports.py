@@ -37,7 +37,7 @@ def shared_from(source: str) -> set[str]:
         ("from conftest import SentMail", {"conftest"}),
         ("from . import test_models", {"test_models"}),
         ("import tests.conftest", {"tests.conftest"}),
-        ("from helpers.rows import add\nimport databases", set()),
+        ("from helpers.rows import add\nimport helpers.databases", set()),
     ],
 )
 def test_imports_of_what_only_pytest_loads_are_found(

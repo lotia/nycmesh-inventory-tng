@@ -1,8 +1,8 @@
 /**
  * The run's servers (playwright.config.ts), each with its folder and port
- * (backend/tests/browser_database.py), and what the backend prepared there
- * for the tests: read when a test runs, as it is written once the backend
- * starts.
+ * (backend/tests/helpers/browser_database.py), and what the backend
+ * prepared there for the tests: read when a test runs, as it is written
+ * once the backend starts.
  */
 import { readFileSync } from "node:fs";
 import { join } from "node:path";

@@ -1,6 +1,6 @@
 """What the batch endpoint (POST /api/transactions) accepts, as its schema
-says, kept in tests/batch_schema.json, so a change that makes it accept
-less fails test_batch_schema, naming each way it does, rather than having a
+says, kept in tests/references/batch_schema.json, so a change that makes
+it accept less fails test_batch_schema, naming each way it does, rather than having a
 batch a phone holds from an older build of the scan page refused, and the
 volunteer's work lost (CONTRIBUTING.md, The scan page: expand, then
 contract; DEPLOYMENT.md, Tightening what a batch accepts).
@@ -29,7 +29,7 @@ from inventory_tng.scan import page_builds
 
 from . import committed
 
-KEPT = Path(__file__).parent.parent / "batch_schema.json"
+KEPT = Path(__file__).parents[1] / "references" / "batch_schema.json"
 URL = "/api/transactions"
 COMMANDS = (
     "mise run regenerate-batch-schema, or from backend/: "

@@ -131,7 +131,7 @@ testpaths = ["tests"]
 # Test modules are imported by their path, so two folders may each hold a
 # test_<module>.py of one name, as the tests mirror the source tree.
 addopts = ["--import-mode=importlib"]
-# Where tests import helpers and databases from, and devtools (CONTRIBUTING.md).
+# Where tests import helpers from, and devtools (CONTRIBUTING.md).
 pythonpath = ["tests", "."]
 strict = true
 filterwarnings = ["error"]

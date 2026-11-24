@@ -1,6 +1,6 @@
 """Each run has a database of its own, which nothing else reaches, and which
 is dropped when the run ends or, if it never could, by a later run
-(databases.py, and conftest.py's fixtures)."""
+(helpers/databases.py, and conftest.py's fixtures)."""
 
 import os
 import time
@@ -13,7 +13,7 @@ from sqlalchemy.exc import OperationalError
 from devtools.database import as_superuser
 from inventory_tng.core.db_sessions import make_engine
 
-from databases import (
+from helpers.databases import (
     NO_DATABASE,
     SERVER_URL,
     SWEEP_LOCK,

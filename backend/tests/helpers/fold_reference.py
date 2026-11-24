@@ -1,6 +1,6 @@
 """What models.search_text.fold made of a wide sample of text, kept in
-tests/fold_reference.tsv, so a release of anyascii, or a Python with a
-newer Unicode, that spells something otherwise fails
+tests/references/fold_reference.tsv, so a release of anyascii, or a Python
+with a newer Unicode, that spells something otherwise fails
 test_search_text_fold_reference with the difference, rather than leaving
 rows folded the old way (docs/decisions/0021, 2026-11-12).
 
@@ -21,7 +21,7 @@ from inventory_tng.models.search_text import FOLDED_WITH, fold
 
 from . import committed
 
-REFERENCE = Path(__file__).parent.parent / "fold_reference.tsv"
+REFERENCE = Path(__file__).parents[1] / "references" / "fold_reference.tsv"
 COMMANDS = (
     "mise run regenerate-fold-reference, or from backend/: "
     "uv run python -m tests.helpers.fold_reference"

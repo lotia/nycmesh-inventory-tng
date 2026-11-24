@@ -23,7 +23,7 @@ from inventory_tng.core.db_sessions import (
 from inventory_tng.core.mail import get_mailer
 from inventory_tng.core.settings import FrontendConfig, LogConfig, RateLimits, Settings
 
-from databases import NO_DATABASE
+from helpers.databases import NO_DATABASE
 from helpers.mail import SITE_MAIL, SentMail
 from helpers.sign_in import TOTP_KEYS
 

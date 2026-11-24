@@ -1,8 +1,8 @@
 """What the browser tests (frontend/browser-tests/) run against. Playwright
 starts each of its servers (playwright.config.ts: one shared, one for the
-crawl) as
+crawl), from backend/ with pytest's pythonpath, as
 
-    uv run python tests/browser_database.py serve
+    uv run python -m helpers.browser_database serve
 
 with BROWSER_RUN, a folder, and BROWSER_PORT set, each server's own. It
 makes a database of its own (databases.py), migrated and seeded, with a
@@ -44,7 +44,7 @@ from inventory_tng.scan.batch import record
 from inventory_tng.scan.batch_schemas import Batch
 from inventory_tng.volunteers import volunteers
 
-from databases import migrated_engine, new_database
+from helpers.databases import migrated_engine, new_database
 
 # What a run writes in its folder: these, and the signed-in session
 # sign-in.setup.ts keeps (frontend/browser-tests/prepared.ts, adminState).

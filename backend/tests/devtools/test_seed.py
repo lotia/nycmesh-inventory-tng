@@ -17,7 +17,7 @@ from inventory_tng.models.places import Location
 from inventory_tng.models.volunteers import Volunteer
 from inventory_tng.stock.moments import expected
 
-from databases import NO_DATABASE
+from helpers.databases import NO_DATABASE
 from helpers.rows import setting_up
 
 SIGN_IN = "Sign in at /admin as dev, password "

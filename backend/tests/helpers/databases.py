@@ -24,7 +24,7 @@ from inventory_tng.core.local_env import setting
 
 log = structlog.get_logger(__name__)
 
-PYPROJECT = Path(__file__).parents[1] / "pyproject.toml"
+PYPROJECT = Path(__file__).parents[2] / "pyproject.toml"
 
 # Compose's superuser, which makes the roles and the databases, on the port
 # from the shell, else the repository's .env (CONTRIBUTING.md, Local
@@ -57,8 +57,8 @@ FULL = (
 # What PostgreSQL says, by the limit it hit, and the likely cause.
 REFUSALS = {
     "too many connections for database": (
-        f"its database's CONNECTION LIMIT, {TEST_CONNECTION_LIMIT} (tests/databases.py)."
-        " Is a test in this process, perhaps an earlier one, holding"
+        f"its database's CONNECTION LIMIT, {TEST_CONNECTION_LIMIT}"
+        " (tests/helpers/databases.py). Is a test in this process, perhaps an earlier one, holding"
         " connections it no longer needs?"
     ),
     "remaining connection slots are reserved": FULL,
