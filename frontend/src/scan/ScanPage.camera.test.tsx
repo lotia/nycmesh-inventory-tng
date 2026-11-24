@@ -7,6 +7,7 @@ import { pass } from "../testing/camera";
 import { CATALOGUE } from "../testing/catalogue";
 import { answering, deferred, json, saved } from "../testing/fetch";
 import { stubInView } from "../testing/in-view";
+import { UPGRADE_WORDS } from "../testing/said";
 import {
   camera,
   fillMove,
@@ -51,9 +52,6 @@ import {
   TYPING,
 } from "./Scanner";
 import { COULD_NOT_LOAD } from "./ScanPage";
-
-/** UPGRADE_TO_SAVE as shown, its link's words in it. */
-const UPGRADE_WORDS = "Scanner updated. Upgrade to keep saving.";
 
 // The camera, faked: it sees whatever a test puts in `inView`.
 vi.mock(import("./camera"), async (actual) => ({

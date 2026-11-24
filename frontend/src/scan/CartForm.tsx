@@ -371,7 +371,7 @@ export function CartForm({
 
   // The camera, while open, and a place it read, asking From or To.
   const scanning = useSignal(false);
-  // The camera's picture, while it shows (BackToCamera).
+  // The camera's picture, while it shows (useWhollyOnScreen, BackToCamera).
   const picture = useSignal<HTMLVideoElement | null>(null);
   const pictureOnScreen = useWhollyOnScreen(picture.value);
   const typing = useTextBoxFocused();

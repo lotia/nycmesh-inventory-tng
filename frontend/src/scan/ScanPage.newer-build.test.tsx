@@ -18,6 +18,7 @@ import {
 import { say } from "../shared/i18n";
 import { Outbox } from "../shared/outbox";
 import { answering, deferred, json, saved, TOO_OLD } from "../testing/fetch";
+import { UPGRADE_WORDS } from "../testing/said";
 import {
   keep,
   moveBody,
@@ -334,7 +335,7 @@ describe("a newer build", () => {
       take();
       screen.getByText(say(NOTHING_IN_CART));
       const line = status();
-      expect(line.textContent).toBe("Scanner updated. Upgrade to keep saving.");
+      expect(line.textContent).toBe(UPGRADE_WORDS);
       const link = within(line).getByRole("link", { name: say(UPGRADE) });
       expect(link.getAttribute("href")).toBe(`#${UPGRADE_BUTTON}`);
     },

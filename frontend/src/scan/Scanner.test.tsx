@@ -5,6 +5,7 @@ import { afterEach, beforeEach, expect, test, vi } from "vitest";
 import { say } from "../shared/i18n";
 import { telemetry } from "../shared/telemetry";
 import { fakeCamera as camera, pass } from "../testing/camera";
+import { UPGRADE_WORDS } from "../testing/said";
 import { setVisibility, show, stubVisibility } from "../testing/visibility";
 import { DecoderUnavailable, type Session } from "./camera";
 import type { LabelKind } from "./camera-report";
@@ -28,9 +29,6 @@ import {
   TORCH_FAILED,
   TYPING,
 } from "./Scanner";
-
-/** UPGRADE_TO_SAVE as shown, its link's words in it. */
-const UPGRADE_WORDS = "Scanner updated. Upgrade to keep saving.";
 
 // The camera's clock, faked: each test lets as many reads' time pass as it
 // needs (testing/setup.ts makes it real again). The fake clock also keeps up

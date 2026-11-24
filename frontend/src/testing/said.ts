@@ -15,3 +15,6 @@ export function saidAsText<T extends object>(result: T) {
     ? { problem: text(result.problem as Said) }
     : result;
 }
+
+/** UPGRADE_TO_SAVE as shown, its link's words in it. */
+export const UPGRADE_WORDS = "Scanner updated. Upgrade to keep saving.";

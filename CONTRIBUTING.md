@@ -679,6 +679,23 @@ kept in the tab's memory, not with the cart, so a reload drops it.
 The scan page needs a registered device, and some catalogue rows to choose
 from. The camera works only over HTTPS or on `localhost`.
 
+The camera reads no labels while its picture is not wholly on the screen
+(`scan/camera-in-view.ts`, which also shows Back to camera), nor while a
+text box has focus, as the on-screen keyboard may cover the picture, when
+Back to camera hides too (`scan/text-box-focus.ts`). The camera's status
+line then says so, and once reading resumes says again a refusal or
+question still standing, or else to point the camera at a label. A
+place's question on that line, once answered with From or To, gives way
+to what the answer did, or, put away by an item code typed in the item
+search, to pointing the camera at a label. A tap on the picture takes
+focus from the box. Enter in the item search leaves focus there, as a
+scanner gun types code after code. While the build is too old, the camera
+reads no labels till an upgrade, nor does the item search add a code
+typed or a pick, and their lines say to upgrade instead, the camera's over
+everything else, as the alert saying so is below them; its Upgrade is a
+link that takes focus to the alert's Upgrade button (`UpgradeToSave` in
+`scan/NewerBuild.tsx`).
+
 Both pages report how they fare and what volunteers do on them, through
 `frontend/src/shared/telemetry.ts`, to `POST /api/telemetry`, which turns
 them into `inventory.*` metrics (docs/decisions/0006). Its schema, in
@@ -761,29 +778,13 @@ utilities. When you style a page:
   keeps room for two lines (`.status-line`), so words coming or going
   move nothing below, and shows no bar when empty. A refusal there clears
   once the cart line it is about changes (`scan/refused-line.ts`).
-- Nothing a scan changes sits above the scan page's camera: the camera
-  and the item search come before the alert that a newer build is out and
-  the cart, whose lines are newest first, and the page never scrolls by
-  itself after a scan, only to bring the camera's picture on the screen
-  as it opens. While the picture is not wholly on the screen, the camera
-  reads no labels and Back to camera (`scan/BackToCamera.tsx`) brings it
-  back, both told by one watch (`scan/camera-in-view.ts`); the page keeps
-  room for the button at its bottom (`.back-to-camera-room`). While a
-  text box has focus, as the on-screen keyboard may cover the picture,
-  the camera reads no labels either and the button hides
-  (`scan/text-box-focus.ts`); the camera's status line then says so,
-  and once reading resumes says again a refusal or question still
-  standing, or else to point the camera at a label. A place's question
-  on that line, once answered with From or To, gives way to what the
-  answer did, or, put away by an item code typed in the item search, to
-  pointing the camera at a label. A tap on the picture takes focus from
-  the box. Enter in the item search leaves focus there,
-  as a scanner gun types code after code. While the build is
-  too old, the camera reads no labels till an upgrade, nor does the item
-  search add a code typed or a pick, and their lines say to upgrade
-  instead, the camera's over everything else, as the alert saying so is
-  below them; its Upgrade is a link that takes focus to the alert's
-  Upgrade button (`UpgradeToSave` in `scan/NewerBuild.tsx`).
+- Nothing a scan adds or removes sits above the scan page's camera: the
+  camera and the item search come before the alert that a newer build is
+  out and the cart, whose lines are newest first, and the page never
+  scrolls by itself after a scan, only to bring the camera's picture on
+  the screen as it opens. While the picture is not wholly on the screen,
+  Back to camera (`scan/BackToCamera.tsx`) brings it back; the page keeps
+  room for the button at its bottom (`.back-to-camera-room`).
 - A box a person types into names the keyboard a phone shows for it
   with `inputmode`: `numeric` for whole numbers, `decimal` for numbers
   with a decimal point, `text` for anything with letters. A number with

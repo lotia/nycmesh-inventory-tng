@@ -62,7 +62,7 @@ export function Finder({
     query.value = "";
     if (tooOld.value) {
       refusal.value = <UpgradeToSave />;
-      refusing(undefined);
+      refusing();
       return;
     }
     const picked = pick();

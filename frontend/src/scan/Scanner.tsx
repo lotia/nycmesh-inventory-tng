@@ -154,7 +154,7 @@ export function Scanner({
   onCode: (code: string) => Acted;
   onDone: () => void;
   /** Given the camera's picture once it shows, and null once it stops
-   * (BackToCamera). */
+   * (useWhollyOnScreen, BackToCamera). */
   onPicture: (video: HTMLVideoElement | null) => void;
   /** Whether the picture is wholly on the screen (useWhollyOnScreen). */
   onScreen: ReadonlySignal<boolean>;
@@ -360,14 +360,7 @@ export function Scanner({
           Styles); a new element, so it is announced as it appears. */}
       {refusal === null ? (
         <>
-          <p role="status" class="status-line">
-            {/* In this order: too old, typing, then the words beneath. */}
-            {tooOld.value ? (
-              <UpgradeToSave />
-            ) : (
-              wordsOf(typing.value ? TYPING : said.value)
-            )}
-          </p>
+          <StatusLine said={said} typing={typing} tooOld={tooOld} />
           <div class="actions">
             {torch.value !== null && (
               <Torch turn={torch.value} onFail={() => show(TORCH_FAILED)} />
@@ -400,9 +393,31 @@ export function Scanner({
   );
 }
 
-/** A phrase in the volunteer's language, or words already said so. */
-function wordsOf(words: MessageDescriptor | string) {
-  return typeof words === "string" ? words : say(words);
+/** The camera's status line, in this order: too old, typing, then the
+ * words beneath, a phrase or words already said in the volunteer's
+ * language. A component of its own, so only the line is drawn again as
+ * they change, not the picture. */
+function StatusLine({
+  said,
+  typing,
+  tooOld,
+}: {
+  said: ReadonlySignal<MessageDescriptor | string>;
+  typing: ReadonlySignal<boolean>;
+  tooOld: ReadonlySignal<boolean>;
+}) {
+  const words = typing.value ? TYPING : said.value;
+  return (
+    <p role="status" class="status-line">
+      {tooOld.value ? (
+        <UpgradeToSave />
+      ) : typeof words === "string" ? (
+        words
+      ) : (
+        say(words)
+      )}
+    </p>
+  );
 }
 
 /** A refusal's hint: to record the cart first where reloading or
