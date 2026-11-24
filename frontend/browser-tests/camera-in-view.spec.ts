@@ -186,8 +186,8 @@ test("the camera stays put as labels are scanned, reads none off the screen, and
 
   // Off the screen, a label shown is not read: its line is as it was
   // after longer than a repeat's quiet time (repeated-reads.ts), so it is
-  // taken once read. The line says what it did after typing ended
-  // (inventory-tng-0w3n).
+  // taken once read. The camera's line says to point the camera, as
+  // typing put that over what the last label did (inventory-tng-0w3n).
   const status = camera.getByRole("status");
   await show(page, labels[0] as Drawn);
   await page.waitForTimeout(2_500);

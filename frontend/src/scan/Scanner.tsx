@@ -149,7 +149,8 @@ export function Scanner({
    * (BackToCamera). */
   onPicture: (video: HTMLVideoElement | null) => void;
   /** Whether labels may be read now: only while the picture is wholly on
-   * the screen and no text box has focus (CartForm). */
+   * the screen, no text box has focus and this build is not too old
+   * (CartForm). */
   reads: ReadonlySignal<boolean>;
   /** Refresh this page (ScanPage's reload). */
   reload: () => void;
@@ -407,12 +408,14 @@ function Torch({
   );
 }
 
-/** Takes focus to the alert's Upgrade button, which brings it into view;
- * without it, the link's own jump. */
+/** Brings the alert's Upgrade button into view and takes focus to it,
+ * scrolled as Back to camera does, as a phone's browser may not scroll to
+ * what a script focuses; without it, the link's own jump. */
 function toUpgrade(event: MouseEvent) {
   const button = document.getElementById(UPGRADE_BUTTON);
   if (button !== null) {
     event.preventDefault();
-    button.focus();
+    button.scrollIntoView({ block: "center" });
+    button.focus({ preventScroll: true });
   }
 }

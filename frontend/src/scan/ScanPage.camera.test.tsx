@@ -50,11 +50,10 @@ import {
   RELOAD_PAGE,
   TYPING,
 } from "./Scanner";
+import { COULD_NOT_LOAD } from "./ScanPage";
 
 /** UPGRADE_TO_SAVE as shown, its link's words in it. */
 const UPGRADE_WORDS = "Scanner updated. Upgrade to keep saving.";
-
-import { COULD_NOT_LOAD } from "./ScanPage";
 
 // The camera, faked: it sees whatever a test puts in `inView`.
 vi.mock(import("./camera"), async (actual) => ({
@@ -315,16 +314,19 @@ describe("scanning labels with the camera", () => {
     expect(within(camera).getByRole("status").textContent).toBe(UPGRADE_WORDS);
   });
 
-  test("too old, Upgrade on the camera's line takes focus to the alert's Upgrade button", async () => {
+  test("too old, Upgrade on the camera's line brings the alert's Upgrade button into view and focus", async () => {
     const outbox = await opened();
     act(() => outbox.builds.learn("too_old"));
+    const scroll = vi.spyOn(HTMLElement.prototype, "scrollIntoView");
     const camera = screen.getByRole("region", { name: say(CAMERA) });
-    fireEvent.click(within(camera).getByRole("link", { name: say(UPGRADE) }));
-    expect(document.activeElement).toBe(
-      within(screen.getByRole("alert")).getByRole("button", {
-        name: say(UPGRADE),
-      }),
-    );
+    const link = within(camera).getByRole("link", { name: say(UPGRADE) });
+    const button = within(screen.getByRole("alert")).getByRole("button", {
+      name: say(UPGRADE),
+    });
+    expect(link.getAttribute("href")).toBe(`#${button.id}`);
+    fireEvent.click(link);
+    expect(scroll.mock.contexts).toEqual([button]);
+    expect(document.activeElement).toBe(button);
   });
 
   test("Enter in the item search leaves focus there, for the next code", async () => {
