@@ -154,6 +154,10 @@ test("the camera stays put as labels are scanned, reads none off the screen, and
     .getByRole("heading", { name: "Cart" })
     .locator("xpath=following-sibling::ul[1]/li/div[1]/strong");
   await expect(lines).toHaveText([cable, other, radio]);
+  // Out of view longer than a repeat's quiet time before the picture
+  // leaves the screen, the first label is a scan of its own when shown
+  // again: one in view just before would count as held there throughout.
+  await page.waitForTimeout(2_500);
 
   // Down to the first scan's line, to type: no Back to camera meanwhile.
   const loose = looseBox(page, radio);

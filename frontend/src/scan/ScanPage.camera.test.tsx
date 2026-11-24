@@ -66,7 +66,10 @@ describe("scanning labels with the camera", () => {
   // The camera's clock, faked: scan lets a read's time pass (testing/setup.ts
   // makes it real again).
   beforeEach(() => vi.useFakeTimers({ shouldAdvanceTime: true }));
-  afterEach(() => vi.unstubAllGlobals());
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    vi.restoreAllMocks();
+  });
 
   /** Shows the camera these labels, and lets the next read take them. */
   async function scan(...codes: string[]) {

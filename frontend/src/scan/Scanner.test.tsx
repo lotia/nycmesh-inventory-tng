@@ -119,6 +119,28 @@ test("no label is read while the picture is off the screen, and reading resumes 
   expect(onCode).toHaveBeenCalledTimes(1);
 });
 
+test("a label held in view while the picture is off the screen is not taken again on its return", async () => {
+  const { state, open } = camera();
+  const onCode = vi.fn((code: string) => said(`Read ${code}.`));
+  const onScreen = signal(true);
+  scanner({ open, onCode, onScreen });
+  await screen.findByText(say(POINT));
+  state.inView = ["B3ZT9W"];
+  await screen.findByText("Read B3ZT9W.");
+  onScreen.value = false;
+  // Off the screen longer than a repeat's quiet time.
+  await pass(15);
+  onScreen.value = true;
+  await pass(3);
+  expect(onCode).toHaveBeenCalledTimes(1);
+  // Taken away for the quiet time and shown again, it is a scan.
+  state.inView = [];
+  await pass(11);
+  state.inView = ["B3ZT9W"];
+  await pass(2);
+  expect(onCode).toHaveBeenCalledTimes(2);
+});
+
 test("a label read as the picture leaves the screen is not taken", async () => {
   const { read, finish } = slowRead();
   const { open } = camera({ read });

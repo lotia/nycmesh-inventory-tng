@@ -13,4 +13,13 @@ export class Repeats {
     this.last.set(code, now);
     return before === undefined || now - before >= this.quietMs;
   }
+
+  /** Reading stopped for `ms`: the time does not count toward any label's
+   * quiet time, so a label held in view through the pause is not taken
+   * again as reading resumes. */
+  paused(ms: number) {
+    for (const [code, at] of this.last) {
+      this.last.set(code, at + ms);
+    }
+  }
 }

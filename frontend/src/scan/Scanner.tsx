@@ -8,7 +8,8 @@
  * the lists below still work.
  * No label is read while the picture is not wholly on the screen, so
  * nothing is added out of the volunteer's sight (Ali, 2026-11-24,
- * inventory-tng-rj2g); the status line keeps its last words.
+ * inventory-tng-rj2g); the status line keeps its last words, and a label
+ * held in view through the pause is not taken again (repeated-reads.ts).
  * Each session is reported (camera-report.ts).
  */
 import type { MessageDescriptor } from "@lingui/core";
@@ -188,9 +189,17 @@ export function Scanner({
         onPicture(video.current);
         // Each read waits for the one before: a slow phone never piles
         // them up.
+        // When reading paused for the picture being off the screen.
+        let pausedAt: number | null = null;
         const read = async () => {
           try {
-            const codes = onScreen.peek() ? await session.read() : [];
+            if (!onScreen.peek()) {
+              pausedAt ??= Date.now();
+            } else if (pausedAt !== null) {
+              repeats.paused(Date.now() - pausedAt);
+              pausedAt = null;
+            }
+            const codes = pausedAt === null ? await session.read() : [];
             // Closed, or scrolled off the screen, while reading: what it
             // read is not taken.
             const taken = stopped || !onScreen.peek() ? [] : codes;
