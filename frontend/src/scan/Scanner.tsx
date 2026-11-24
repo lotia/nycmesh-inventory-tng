@@ -15,6 +15,9 @@
  * words; while a text box has focus, it says reading waits, and a tap on
  * the picture takes focus from the box (Ali, 2026-11-24,
  * inventory-tng-0w3n). Once reading resumes, it says what it said before.
+ * While this build is too old, it says to upgrade, over everything else,
+ * as the alert saying so is below the camera (Ali, 2026-11-24,
+ * inventory-tng-j3wt).
  * Each session is reported (camera-report.ts).
  */
 import type { MessageDescriptor } from "@lingui/core";
@@ -39,6 +42,7 @@ export const CAMERA = msg`Camera`;
 export const STARTING = msg`Starting the camera…`;
 export const POINT = msg`Point the camera at a label.`;
 export const TYPING = msg`Not reading while you type. Tap the picture to scan.`;
+export const UPGRADE_BELOW = msg`The scanner has been updated. You must upgrade: the Upgrade button is below.`;
 export const TORCH_FAILED = msg`The torch wouldn't switch.`;
 export const DONE = msg`Done`;
 export const TORCH = msg`Torch`;
@@ -127,6 +131,7 @@ export function Scanner({
   reload,
   reloadKeepsCart,
   typing,
+  tooOld,
   open = openCamera,
 }: {
   /** The cart as it is now, whose lines a refusal may be about. */
@@ -146,6 +151,8 @@ export function Scanner({
   reloadKeepsCart: boolean;
   /** Whether a text box has focus (useTextBoxFocused). */
   typing: ReadonlySignal<boolean>;
+  /** Whether the server takes nothing more from this build (NewerBuild). */
+  tooOld: boolean;
   open?: (video: HTMLVideoElement) => Promise<Session>;
 }) {
   const video = useRef<HTMLVideoElement>(null);
@@ -168,9 +175,9 @@ export function Scanner({
   const refused = useSignal<Refusal | null>(null);
   const torch = useSignal<((on: boolean) => Promise<void>) | null>(null);
   const refusal = refused.value;
-  // What the status line says: while typing pauses reading, that it
-  // does, over the words kept beneath for when it resumes.
-  const shown = typing.value ? TYPING : said.value;
+  // What the status line says: too old, to upgrade; else, while typing
+  // pauses reading, that it does; over the words kept beneath.
+  const shown = tooOld ? UPGRADE_BELOW : typing.value ? TYPING : said.value;
 
   // Done went with the refusal: Reload page takes the focus, or, where
   // none is offered, the refusal's words, so the volunteer keeps their

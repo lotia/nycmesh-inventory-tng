@@ -737,6 +737,10 @@ msgstr "Can't add these items. Please rescan."
 msgid "{name}: enter what is on the open package, in whole units, or leave it blank."
 msgstr "{name}: enter what is on the open package, in whole units, or leave it blank."
 
+#: src/scan/Scanner.tsx
+msgid "The scanner has been updated. You must upgrade: the Upgrade button is below."
+msgstr "The scanner has been updated. You must upgrade: the Upgrade button is below."
+
 #: src/shared/outbox-notes.ts
 msgid "No answer from the inventory. Trying again shortly."
 msgstr "No answer from the inventory. Trying again shortly."

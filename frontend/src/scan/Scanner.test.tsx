@@ -26,6 +26,7 @@ import {
   TORCH,
   TORCH_FAILED,
   TYPING,
+  UPGRADE_BELOW,
 } from "./Scanner";
 
 // The camera's clock, faked: each test lets as many reads' time pass as it
@@ -58,6 +59,7 @@ function scannerOf(props: ScannerProps) {
       onPicture={() => {}}
       reads={signal(true)}
       typing={signal(false)}
+      tooOld={false}
       reload={() => {}}
       reloadKeepsCart
       {...props}
@@ -134,6 +136,23 @@ test("while typing, the status line says reading waits, then what it said before
     typing.value = false;
   });
   expect(status.textContent).toBe(say(POINT));
+});
+
+test("too old, the status line says to upgrade, over typing and what a label did", async () => {
+  const { state, open } = camera();
+  const onCode = vi.fn((code: string) => said(`Read ${code}.`));
+  const typing = signal(true);
+  const view = scanner({ open, onCode, typing, tooOld: true });
+  const status = await screen.findByText(say(UPGRADE_BELOW));
+  act(() => {
+    typing.value = false;
+  });
+  state.inView = ["B3ZT9W"];
+  await pass();
+  expect(onCode).toHaveBeenCalledTimes(1);
+  expect(status.textContent).toBe(say(UPGRADE_BELOW));
+  view.rerender(scannerOf({ open, onCode, typing, tooOld: false }));
+  expect(status.textContent).toBe("Read B3ZT9W.");
 });
 
 test("a tap on the picture takes focus from a text box, and from nothing else", async () => {

@@ -48,6 +48,7 @@ import {
   POINT,
   RELOAD_PAGE,
   TYPING,
+  UPGRADE_BELOW,
 } from "./Scanner";
 import { COULD_NOT_LOAD } from "./ScanPage";
 
@@ -282,6 +283,22 @@ describe("scanning labels with the camera", () => {
     fireEvent.click(document.querySelector("video") as HTMLVideoElement);
     expect(document.activeElement).not.toBe(search);
     await screen.findByText("Added one: LiteBeam 5AC.");
+  });
+
+  test("too old, the camera's line says to upgrade, over typing and what a label did", async () => {
+    const outbox = await opened();
+    await scan("B3ZT9W");
+    const status = (await screen.findByText(
+      "Added one: LiteBeam 5AC.",
+    )) as HTMLElement;
+    act(() => outbox.builds.learn("too_old"));
+    expect(status.textContent).toBe(say(UPGRADE_BELOW));
+    const search = screen.getByLabelText<HTMLInputElement>(say(FIND));
+    act(() => search.focus());
+    expect(status.textContent).toBe(say(UPGRADE_BELOW));
+    act(() => search.blur());
+    expect(status.textContent).toBe(say(UPGRADE_BELOW));
+    expect(status.getAttribute("role")).toBe("status");
   });
 
   test("Enter in the item search leaves focus there, for the next code", async () => {

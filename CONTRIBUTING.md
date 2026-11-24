@@ -774,7 +774,9 @@ utilities. When you style a page:
   (`scan/text-box-focus.ts`); the camera's status line then says so, over
   its own words, which it says again once reading resumes, and a tap on
   the picture takes focus from the box. Enter in the item search leaves
-  focus there, as a scanner gun types code after code.
+  focus there, as a scanner gun types code after code. While the build is
+  too old, the line says to upgrade instead, over everything else, as the
+  alert saying so is below the camera.
 - A box a person types into names the keyboard a phone shows for it
   with `inputmode`: `numeric` for whole numbers, `decimal` for numbers
   with a decimal point, `text` for anything with letters. A number with

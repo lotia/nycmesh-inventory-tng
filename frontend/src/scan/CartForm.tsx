@@ -842,6 +842,7 @@ export function CartForm({
           reload={reload}
           reloadKeepsCart={cartKept.value}
           typing={typing}
+          tooOld={outbox.builds.newer.value === "too_old"}
         />
       ) : (
         <button type="button" onClick={() => (scanning.value = true)}>

@@ -737,6 +737,10 @@ msgstr ""
 msgid "{name}: enter what is on the open package, in whole units, or leave it blank."
 msgstr ""
 
+#: src/scan/Scanner.tsx
+msgid "The scanner has been updated. You must upgrade: the Upgrade button is below."
+msgstr ""
+
 #: src/shared/outbox-notes.ts
 msgid "No answer from the inventory. Trying again shortly."
 msgstr ""
