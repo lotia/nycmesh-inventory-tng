@@ -1,6 +1,7 @@
 /** The cart as a batch to record, or what is still to do, and a batch in words. */
 import { msg } from "@lingui/core/macro";
 import { v4 as uuid, v5 as uuidFrom } from "uuid";
+import { countedWhole, wholeEnough } from "../amount-rules";
 import { say, sayParts } from "../shared/i18n";
 import type { Draft, Summary } from "../shared/outbox";
 import type { Said } from "../shared/outbox-notes";
@@ -145,7 +146,7 @@ export function toBatch(
   for (const line of cart.lines) {
     const item = index.items.get(line.itemId);
     const named = item === undefined ? say(AN_ITEM) : { quoted: item.name };
-    const each = item?.unit === "each";
+    const each = item !== undefined && countedWhole(item.unit);
     for (const [key, { now }] of Object.entries(line.open ?? {})) {
       if (now === undefined || now.trim() === "") {
         continue;
@@ -157,7 +158,10 @@ export function toBatch(
         problems.push(
           sayParts(ITEM_SAYS, { name: named, what: separatorWords(other) }),
         );
-      } else if (left === null || (each && left % 1000 !== 0)) {
+      } else if (
+        left === null ||
+        (item !== undefined && !wholeEnough(item.unit, left))
+      ) {
         problems.push(
           sayParts(each ? OPEN_NOW_WHOLE : OPEN_NOW_DECIMALS, { name: named }),
         );

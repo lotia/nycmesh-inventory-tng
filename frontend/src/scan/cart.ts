@@ -16,6 +16,7 @@ import { msg } from "@lingui/core/macro";
 import { type Signal, signal } from "@preact/signals";
 import { v4 as uuid } from "uuid";
 import * as v from "valibot";
+import { wholeEnough } from "../amount-rules";
 import type { Schemas } from "../api/client";
 import { id } from "../api/replies";
 import { BUILD } from "../shared/build";
@@ -779,13 +780,14 @@ export function quantityOf(
     ...[...sealed.values()].map((p) => p.count * p.size),
     ...[...taken.values()].map((t) => t.amount),
   ];
-  if (item.unit === "each" && parts.some((part) => part % 1000 !== 0)) {
+  const inWholeUnits = (part: number) => wholeEnough(item.unit, part);
+  if (!parts.every(inWholeUnits)) {
     // The box typed in a fraction; a package's part is its size's, no box.
     const fraction = { problem: [say(WHOLE_UNITS)] };
-    if (loose % 1000 !== 0) {
+    if (!inWholeUnits(loose)) {
       return refuse(fraction, { kind: "loose" });
     }
-    const cut = [...taken].find(([, t]) => t.amount % 1000 !== 0)?.[0];
+    const cut = [...taken].find(([, t]) => !inWholeUnits(t.amount))?.[0];
     return refuse(
       fraction,
       cut === undefined ? undefined : { kind: "open", key: cut },

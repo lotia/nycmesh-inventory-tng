@@ -396,6 +396,19 @@ mise run regenerate-fold-reference
 `frontend/src/units-vectors.json` holds what both sides must make of some
 text; both test against it.
 
+What an item's unit says of its amounts, counted each in whole units or
+measured as a length, and when what is left on an open package is a
+short end, is `backend/src/inventory_tng/catalogue/amount_rules.py`. The
+forms, the locked services, the ledger, the templates and the scan page
+all ask it, never comparing a unit themselves, and a test fails until a
+new unit is placed in one of its lists. The scan page reads its copy
+(`frontend/src/amount-rules.ts`), and both sides test against
+`frontend/src/amount-rules-vectors.json`. After changing it:
+
+```sh
+mise run regenerate-amount-rules    # frontend/src/amount-rules.json
+```
+
 A reading rule (`models.catalogue.ReadingRule`, written only by
 `catalogue/reading_rules.py`) settles how a unit as typed after a
 number, case kept (`M`, `g`), is read, or that it is no unit, on both

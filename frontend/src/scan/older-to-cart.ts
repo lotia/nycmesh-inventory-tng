@@ -7,6 +7,7 @@
  */
 import { msg } from "@lingui/core/macro";
 import * as v from "valibot";
+import { countedWhole } from "../amount-rules";
 import { say, sayAmount, sayNumber } from "../shared/i18n";
 import { BatchKey, fromOpen, REPORTS, type ReportKind } from "../shared/outbox";
 import {
@@ -509,5 +510,5 @@ export function inUnit(
   amount: number,
   unit: string | null | undefined,
 ): string {
-  return `${sayAmount(amount)}${unit == null || unit === "each" ? "" : ` ${unit}`}`;
+  return `${sayAmount(amount)}${unit == null || countedWhole(unit) ? "" : ` ${unit}`}`;
 }

@@ -13,6 +13,7 @@ import structlog
 from sqlalchemy.orm import Session
 
 from inventory_tng.catalogue import items, reading_rules, units
+from inventory_tng.catalogue.amount_rules import counted_whole
 from inventory_tng.catalogue.name_keys import nameless
 from inventory_tng.catalogue.reading_rules import chosen_rule, read_alike_words
 from inventory_tng.core.db_errors import Broken
@@ -324,7 +325,8 @@ def item_fields(
     # Checked again under the lock (items.save).
     elif (
         item is not None
-        and unit == "each" != item.unit
+        and counted_whole(unit)
+        and not counted_whole(item.unit)
         and (fraction := package_fraction(session, item.id))
     ):
         problems["unit"] = fraction

@@ -33,7 +33,6 @@ from inventory_tng.stock.ledger import (
     lines_break,
     on_order_after,
     repeated,
-    whole_enough,
 )
 from inventory_tng.stock.moments import Moment
 
@@ -273,21 +272,6 @@ def test_a_receipt_lowers_on_order_but_not_below_zero(
 
 
 # The ledger's rules, without the database.
-
-
-@pytest.mark.parametrize(
-    ("unit", "amount", "whole"),
-    [
-        ("each", Decimal(3), True),
-        ("each", Decimal("3.000"), True),
-        ("each", Decimal("0.5"), False),
-        ("m", Decimal("0.5"), True),
-    ],
-)
-def test_an_item_counted_in_each_moves_in_whole_units(
-    unit: str, amount: Decimal, whole: bool
-) -> None:
-    assert whole_enough(unit, amount) is whole
 
 
 @pytest.mark.parametrize(

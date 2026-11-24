@@ -20,6 +20,7 @@ from opentelemetry import metrics
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from inventory_tng.catalogue.amount_rules import whole_enough
 from inventory_tng.core.db_errors import RuleBroken
 from inventory_tng.core.db_lookups import values_by
 from inventory_tng.core.db_once_committed import once_committed
@@ -41,7 +42,6 @@ from inventory_tng.stock.ledger import (
     insert_transaction,
     lines_break,
     repeated,
-    whole_enough,
 )
 from inventory_tng.stock.units_shown import Now
 

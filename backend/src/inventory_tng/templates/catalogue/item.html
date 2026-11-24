@@ -228,7 +228,7 @@ None is left, so nobody can pick it.{% endtrans %}{% endif %}{% endcall %}
   <input type="hidden" name="item_id" value="{{ item.id }}">
   <label>{% trans %}Of{% endtrans %}
     <select name="package_id">
-      <option value="">{% if item.unit == "each" %}{% trans %}One unit{% endtrans %}{% else %}{% trans unit=item.unit %}One {{ unit }}{% endtrans %}{% endif %}</option>
+      <option value="">{% if item.unit | counted_whole %}{% trans %}One unit{% endtrans %}{% else %}{% trans unit=item.unit %}One {{ unit }}{% endtrans %}{% endif %}</option>
       {% for package in packages if not package.retired_at %}
       <option value="{{ package.id }}">{% trans package=package.name_shown, size=package.size | amount %}{{ package }} of {{ size }}{% endtrans %}</option>
       {% endfor %}

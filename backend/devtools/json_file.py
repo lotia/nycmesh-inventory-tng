@@ -1,6 +1,6 @@
-"""What write-api-schema and write-unit-table share: a command that writes
-one JSON file the frontend reads, laid out the same way, to its own path
-or to the one given.
+"""What write-api-schema, write-unit-table and write-amount-rules share:
+a command that writes one JSON file the frontend reads, laid out the same
+way, to its own path or to the one given.
 """
 
 import argparse

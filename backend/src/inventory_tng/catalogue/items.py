@@ -52,6 +52,7 @@ from sqlalchemy.dialects.postgresql import distinct_on
 from sqlalchemy.orm import Session
 
 from inventory_tng.catalogue import units
+from inventory_tng.catalogue.amount_rules import counted_whole, whole_enough
 from inventory_tng.catalogue.name_keys import SPACES, name_key
 from inventory_tng.core.db_errors import enforce
 from inventory_tng.core.db_locking import (
@@ -77,7 +78,6 @@ from inventory_tng.models.labels import Label
 from inventory_tng.models.names import unit_key
 from inventory_tng.models.search_text import fold, fuzzy, in_ascii
 from inventory_tng.models.stock import Movement, OpenPackage
-from inventory_tng.stock.ledger import whole_enough
 
 log = structlog.get_logger(__name__)
 meter = metrics.get_meter(__name__)
@@ -410,9 +410,9 @@ def _whole_for_its_item(
     fraction and its item, read afresh under the catalogue lock, is counted
     each: a form checked them against the unit before the lock. Whole
     amounts are whole in any unit, so with none the unit is not read."""
-    if all(each is None or whole_enough("each", each) for each in amounts):
+    if all(each is None or each == each.to_integral_value() for each in amounts):
         return
-    enforce(PACKAGE_WHOLE, when=_unit(session, item_id) == "each")
+    enforce(PACKAGE_WHOLE, when=counted_whole(_unit(session, item_id)))
 
 
 def add(session: Session, fields: Fields) -> Item:
@@ -450,7 +450,7 @@ def save(session: Session, item: Item, fields: Fields, *, seen: Seen) -> Renamed
             log.info("unit change refused", item_id=item.id, reason=why)
             unit_changes_refused.add(1, {"reason": why})
             enforce(UNIT_FIXED_RULES[why])
-        if fields.unit == "each":
+        if counted_whole(fields.unit):
             # Under the catalogue lock, which every package write takes.
             fraction = fractional_package(session, item.id) is not None
             enforce(PACKAGES_WHOLE, when=fraction)
@@ -654,7 +654,7 @@ def restore_package(session: Session, package: ItemPackage) -> None:
     relock(session, package, current=False)
     _item_current(session, package)
     holds_one = package.size == 1 and package.short_below is not None
-    if holds_one and _unit(session, package.item_id) == "each":
+    if holds_one and counted_whole(_unit(session, package.item_id)):
         _short_cleared(session, package, "restore")
     # Nor holding a fraction, once its item is counted each.
     _whole_for_its_item(session, package.item_id, package.size)

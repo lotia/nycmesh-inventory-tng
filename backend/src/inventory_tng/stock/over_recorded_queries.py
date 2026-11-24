@@ -20,6 +20,7 @@ from sqlalchemy import (
 )
 from sqlalchemy.orm import Session, aliased
 
+from inventory_tng.catalogue.amount_rules import counted_whole
 from inventory_tng.core.local_time import show_day
 from inventory_tng.core.phrases import gettext, in_query, lazy_gettext
 from inventory_tng.models.admins import Admin
@@ -137,7 +138,7 @@ def amount_words(
     one, or so much in its unit."""
     if package is not None and size and quantity % size == 0:
         return times(quantity // size, package)
-    after = "" if unit == "each" else f" {unit}"
+    after = "" if counted_whole(unit) else f" {unit}"
     return f"{amount(quantity)}{after}"
 
 

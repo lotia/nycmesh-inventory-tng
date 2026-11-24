@@ -1,5 +1,6 @@
 /** Open packages offered to a cart, and what a cut leaves on one. */
 
+import { isShortEnd } from "../amount-rules";
 import { readBox, sent, thousandths } from "../shared/quantity";
 import type { Catalogue, Line } from "./cart";
 import { indexOf } from "./search";
@@ -113,24 +114,12 @@ export function offeredAt(
     );
 }
 
-/** Whether an open package with `left` (thousandths) on it is a short
- * end: some left, but less than its package's too-short-to-use length
- * (package_forms.is_short_end). Never one showing nothing, so a card is
- * flagged one or the other, not both. */
-export function isShortEnd(
-  left: number,
-  shortBelow: Offered["short_below"],
-): boolean {
-  const below = shortBelow === null ? null : thousandths(shortBelow);
-  return below !== null && 0 < left && left < below;
-}
-
 /** Why a cut leaves nothing usable on an open package. */
 export type Ending = "short" | "used" | "over";
 
 /** What a cut of `amount` (thousandths) leaves on an open package, and
  * why nothing usable would be left then, if so: less than nothing, none,
- * or less than its too-short-to-use length (package_forms.is_short_end). */
+ * or less than its too-short-to-use length (amount-rules.ts, isShortEnd). */
 export function afterCut(
   open: Pick<Offered, "left" | "short_below">,
   amount: number,

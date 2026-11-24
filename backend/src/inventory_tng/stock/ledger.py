@@ -35,6 +35,7 @@ from sqlalchemy import func, insert, select
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.orm import Session
 
+from inventory_tng.catalogue.amount_rules import whole_enough
 from inventory_tng.core.db_errors import enforce
 from inventory_tng.core.db_locking import get_locked, locked
 from inventory_tng.core.db_once_committed import once_committed
@@ -69,11 +70,6 @@ class Entry(NamedTuple):
     quantity: Decimal
     leaves: Form = LOOSE
     arrives: Form = LOOSE
-
-
-def whole_enough(unit: str, amount: Decimal) -> bool:
-    """An item counted in each moves in whole units."""
-    return unit != "each" or amount == amount.to_integral_value()
 
 
 def line_breaks(kind: str, item: Item, amount: Decimal) -> list[str]:

@@ -7,6 +7,7 @@
  */
 import { msg } from "@lingui/core/macro";
 import { useId } from "preact/hooks";
+import { countedWhole, isLength, isShortEnd } from "../amount-rules";
 import { Field } from "../shared/Field";
 import { say, sayAmount } from "../shared/i18n";
 import { boxAmount } from "../shared/quantity";
@@ -14,7 +15,6 @@ import type { Item } from "./cart";
 import {
   cutOf,
   type Ending,
-  isShortEnd,
   type Offered,
   type Taken,
   usedUpOf,
@@ -60,7 +60,7 @@ export const NOTHING_TAKEN: Taken = { amount: "", whole: false };
 /** The note when the box follows the cut (Ali, 2026-11-12). */
 export function endingNote(ending: Ending, name: string, unit: string): string {
   const note = {
-    used: unit === "each" ? USED_EACH : USED_CABLE,
+    used: countedWhole(unit) ? USED_EACH : USED_CABLE,
     short: SHORT,
     over: OVER,
   }[ending];
@@ -98,7 +98,7 @@ export function OpenPackageCard({
   const afterId = useId();
   const hintId = useId();
   const unit = item.unit;
-  const printed = unit !== "each";
+  const printed = isLength(unit);
   // Its package as named, never a word made from the name
   // (inventory-tng-b1z): "the Spool 305 m".
   const name = open.package_name;

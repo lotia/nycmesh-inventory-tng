@@ -111,6 +111,14 @@ run = [
     "cd ../frontend && npx biome format --write src/units.json",
 ]
 
+[tasks.regenerate-amount-rules]
+description = "Write frontend/src/amount-rules.json, the scan page's copy of which units are counted each, again after a change to backend catalogue/amount_rules.py (CONTRIBUTING.md)"
+dir = "backend"
+run = [
+    "uv run python -m devtools write-amount-rules",
+    "cd ../frontend && npx biome format --write src/amount-rules.json",
+]
+
 [tasks.regenerate-batch-schema]
 description = "Write tests/references/batch_schema.json again, after a change to what the batch endpoint accepts (CONTRIBUTING.md, The scan page)"
 dir = "backend"

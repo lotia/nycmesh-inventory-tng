@@ -11,6 +11,7 @@ from typing import NamedTuple
 from sqlalchemy import ColumnElement, select
 from sqlalchemy.orm import Session
 
+from inventory_tng.catalogue.amount_rules import is_short_end
 from inventory_tng.core.db_lookups import values_by
 from inventory_tng.models.catalogue import ItemPackage
 from inventory_tng.models.stock import OpenPackage
@@ -50,14 +51,6 @@ class Forms:
     @property
     def usable(self) -> Decimal:
         return self.total - sum(self.short_ends, Decimal(0))
-
-
-def is_short_end(left: Decimal, short_below: Decimal | None) -> bool:
-    """Whether an open package with `left` on it is a short end: some
-    left, but less than its package's too-short-to-use length. Less than
-    nothing is the records', not a short end. The scan page tells one the
-    same way (frontend/src/scan/offered.ts, isShortEnd)."""
-    return short_below is not None and 0 < left < short_below
 
 
 def fewest_left_first(open_id: int, left: Decimal) -> tuple[bool, Decimal, int]:

@@ -4,6 +4,7 @@ neither FastAPI nor the templates, so rules may import it
 
 from decimal import Decimal
 
+from inventory_tng.catalogue.amount_rules import counted_whole, is_length
 from inventory_tng.core.phrases import Separator, gettext, lazy_gettext, number
 
 
@@ -42,9 +43,8 @@ PRINTED_LENGTH = lazy_gettext(
 
 def printed_length(unit: str) -> str:
     """How to read the length printed on an open package of an item in
-    `unit`, if it is a length (any but each, models.catalogue.UNITS); else
-    nothing."""
-    return str(PRINTED_LENGTH) if unit != "each" else ""
+    `unit`, if it is a length (amount_rules.is_length); else nothing."""
+    return str(PRINTED_LENGTH) if is_length(unit) else ""
 
 
 def times(num: int | Decimal, package: str) -> str:
@@ -59,6 +59,6 @@ def times(num: int | Decimal, package: str) -> str:
 def keyboard(unit: str, whole: bool = False) -> str:
     """The inputmode of a box for an amount of an item in `unit`: the
     number keypad for one counted each, whose amounts are whole
-    (stock/ledger.whole_enough), or for a `whole` number of something
+    (amount_rules.whole_enough), or for a `whole` number of something
     else, such as sealed packages; else the keypad with a decimal point."""
-    return "numeric" if whole or unit == "each" else "decimal"
+    return "numeric" if whole or counted_whole(unit) else "decimal"

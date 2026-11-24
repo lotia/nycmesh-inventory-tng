@@ -34,6 +34,10 @@ COMMANDS: Commands = {
         "devtools.suite_report",
         "measure the test suites: times, coverage, what each test adds",
     ),
+    "write-amount-rules": (
+        "devtools.write_amount_rules",
+        "write frontend/src/amount-rules.json, the scan page's unit rules",
+    ),
     "write-api-schema": (
         "devtools.write_api_schema",
         "write frontend/src/api/openapi.json, the API's schema",

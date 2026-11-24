@@ -16,6 +16,7 @@ from fastapi.templating import Jinja2Templates
 from starlette.exceptions import HTTPException
 from starlette.types import Scope
 
+from inventory_tng.catalogue.amount_rules import counted_whole
 from inventory_tng.core.db_errors import Gone
 from inventory_tng.core.local_time import show, show_day
 from inventory_tng.core.phrases import BRAND, lazy_gettext, number
@@ -92,6 +93,8 @@ templates.env.filters["plain_amount"] = plain_amount
 templates.env.filters["read_amount"] = read_amount
 templates.env.filters["printed_length"] = printed_length
 templates.env.filters["keyboard"] = keyboard
+# {% if item.unit | counted_whole %}: an item counted each, not measured.
+templates.env.filters["counted_whole"] = counted_whole
 
 
 # What a page says after a change, by the ?notice= it was sent back with

@@ -16,6 +16,7 @@ from sqlalchemy.orm import Session
 
 from inventory_tng.admins.guards import AdminSignedIn, SignedIn
 from inventory_tng.catalogue import forms, items, queries, reading_rules, units
+from inventory_tng.catalogue.amount_rules import counted_whole
 from inventory_tng.catalogue.items_listing import SEARCHED
 from inventory_tng.catalogue.paths import CATEGORIES, ITEMS, READINGS
 from inventory_tng.catalogue.reading_rules import NOT_A_UNIT
@@ -307,7 +308,8 @@ def _short_fraction(
     """The package whose Too short to use box a switch to each refused for
     its fraction is outlined in, as the words beside the unit do not name
     it (Ali, 2026-11-23, inventory-tng-fa5i); None for any other page."""
-    switching = (values or {}).get("unit") == "each" != item.unit
+    unit = (values or {}).get("unit", "")
+    switching = counted_whole(unit) and not counted_whole(item.unit)
     if not switching or "unit" not in (problems or {}):
         return None
     package = items.fractional_package(session, item.id)
@@ -535,7 +537,7 @@ def _short_to_set(
     use below a fraction on an item counted each: its box is outlined to
     be set whole (Ali, 2026-11-23, inventory-tng-fa5i). Read on each
     show, so a reload once it is set whole outlines nothing."""
-    if package_id is None or item.unit != "each":
+    if package_id is None or not counted_whole(item.unit):
         return None
     package = _package(session, item.id, package_id)
     if package is None or package.retired_at is not None:

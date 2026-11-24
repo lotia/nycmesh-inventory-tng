@@ -2,6 +2,7 @@
 import { msg } from "@lingui/core/macro";
 import { Fragment, type Ref } from "preact";
 import { useId } from "preact/hooks";
+import { countedWhole } from "../amount-rules";
 import { Field } from "../shared/Field";
 import { say, sayAmount } from "../shared/i18n";
 import { wordsOf } from "../shared/outbox-notes";
@@ -168,7 +169,7 @@ export function CartLine({
       <Field
         quiet
         label={
-          item.unit === "each"
+          countedWhole(item.unit)
             ? say(item.packages.length > 0 ? LOOSE_UNITS : HOW_MANY)
             : say(item.packages.length > 0 ? LOOSE_IN : HOW_MANY_IN, {
                 unit: item.unit,
@@ -178,7 +179,7 @@ export function CartLine({
         {(id) => (
           <input
             id={id}
-            inputMode={item.unit === "each" ? "numeric" : "decimal"}
+            inputMode={countedWhole(item.unit) ? "numeric" : "decimal"}
             aria-invalid={looseSaid !== undefined || undefined}
             aria-describedby={looseSaid}
             value={line.loose}

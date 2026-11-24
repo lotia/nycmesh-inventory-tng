@@ -1,0 +1,24 @@
+{
+  "units": [
+    { "unit": "each", "counted_whole": true, "length": false },
+    { "unit": "m", "counted_whole": false, "length": true },
+    { "unit": "ft", "counted_whole": false, "length": true }
+  ],
+  "whole_enough": [
+    { "unit": "each", "amount": "3", "whole": true },
+    { "unit": "each", "amount": "3.000", "whole": true },
+    { "unit": "each", "amount": "0.5", "whole": false },
+    { "unit": "each", "amount": "0.001", "whole": false },
+    { "unit": "m", "amount": "0.5", "whole": true },
+    { "unit": "ft", "amount": "0.001", "whole": true }
+  ],
+  "short_ends": [
+    { "left": "0.5", "short_below": "1", "short": true },
+    { "left": "4.999", "short_below": "5", "short": true },
+    { "left": "1", "short_below": "1", "short": false },
+    { "left": "2", "short_below": "1", "short": false },
+    { "left": "0", "short_below": "1", "short": false },
+    { "left": "-1", "short_below": "1", "short": false },
+    { "left": "0.5", "short_below": null, "short": false }
+  ]
+}

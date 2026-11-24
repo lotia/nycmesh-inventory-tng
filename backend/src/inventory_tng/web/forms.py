@@ -14,11 +14,11 @@ import structlog
 from opentelemetry import metrics
 from sqlalchemy.orm import Session
 
+from inventory_tng.catalogue.amount_rules import whole_enough
 from inventory_tng.core.db_base import Base
 from inventory_tng.core.phrases import Separator, Words, gettext, lazy_gettext, number
 from inventory_tng.models.base import INTEGER_MAX, whole
 from inventory_tng.models.names import canonical
-from inventory_tng.stock.ledger import whole_enough
 
 log = structlog.get_logger(__name__)
 meter = metrics.get_meter(__name__)
@@ -308,7 +308,7 @@ def quantity(
     str (refused_words), one typed with the other separator counted. Blank
     is None, or `required` if one must be given. Up to three decimal
     places, as the ledger keeps; more than zero if `positive`, else zero or
-    more; whole, for an item in `unit` "each"."""
+    more; whole, for an item in `unit` counted each (whole_enough)."""
     text = text.strip()
     if not text:
         return None if required is None else str(required)
