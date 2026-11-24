@@ -361,6 +361,10 @@ def _not_an_alias(session: Session, keys: Keys, but: ItemAlias | None = None) ->
 # fraction, its item counted each.
 PACKAGES_WHOLE = "item_packages_whole"
 PACKAGE_WHOLE = "package_whole_units"
+# The database's check (models.catalogue.Item) on a fractional Reorder at
+# for an item counted each, which the form refuses first (Ali, 2026-11-23,
+# inventory-tng-gfes).
+MINIMUM_WHOLE = "ck_item_minimum_whole"
 
 # A package holding 1 whose too-short length, less than 1, is set: no
 # whole number fits it, and it only catches an empty package, so for an

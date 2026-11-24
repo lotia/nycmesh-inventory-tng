@@ -84,7 +84,17 @@ def test_the_database_refusing_a_fractional_reorder_at_says_so_beside_it(
     # The form's own check let it by: said, by id.
     (line,) = [line for line in logs if line["log_level"] == "warning"]
     assert line["item_id"] == item.id
-    # An add, whose form has no Reorder at box, is refused too, not a 500.
+
+
+def test_the_database_refusing_a_fractional_reorder_at_on_an_add_is_no_500(
+    admin_client: TestClient,
+    session: Session,
+    radios: Category,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """An add, whose form has no Reorder at box, is refused too
+    (inventory-tng-gfes)."""
+    monkeypatch.setattr(web_forms, "whole_enough", lambda _unit, _amount: True)
     form = item_form(radios, name="RJ45 connector", minimum="2.5")
     assert admin_client.post(ITEMS, data=form).status_code == 400
     assert session.scalar(select(Item).where(Item.name == form["name"])) is None

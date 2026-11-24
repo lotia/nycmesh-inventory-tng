@@ -73,14 +73,11 @@ router = APIRouter(include_in_schema=False)
 
 # Refused by _change_or_note, as a rule would be, to ask about close names.
 CLOSE = "close_names"
-# A fractional Reorder at for an item counted each (models.catalogue.Item),
-# which the form refuses first (forms.item_fields).
-MINIMUM_WHOLE = "ck_item_minimum_whole"
 # The rules a change to an item may break, besides "unique", and the field
 # each is shown by.
 REFUSED_FIELDS = {
     "item_category_current": "category_id",
-    MINIMUM_WHOLE: "minimum",
+    items.MINIMUM_WHOLE: "minimum",
     **dict.fromkeys(items.UNIT_FIXED_RULES.values(), "unit"),
 }
 
@@ -144,7 +141,7 @@ def _change_or_note[T](
         fraction = forms.package_fraction(session, item_id) if item_id else None
         problems["unit"] = fraction or WHOLE_UNITS
     elif broken in REFUSED_FIELDS:
-        if broken == MINIMUM_WHOLE:  # The form's own check let it by.
+        if broken == items.MINIMUM_WHOLE:  # The form's own check let it by.
             log.warning("database refused a fractional reorder at", item_id=item_id)
         problems[REFUSED_FIELDS[broken]] = RULES[broken]
     return done, broken
