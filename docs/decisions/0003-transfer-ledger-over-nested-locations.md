@@ -8,7 +8,8 @@ by 0020 (sealed and open packages), 2026-11-15 (counting some items),
 2026-11-18 (a count form's moment read without a lock), 2026-11-19 (a
 count's moment stays a ledger number), 2026-11-19 and 2026-11-20 (a
 retired package with none left is never taken), 2026-11-21 (a store
-counted with its areas), 2026-11-23 (work saved as it was shown)
+counted with its areas), 2026-11-23 (work saved as it was shown),
+2026-11-24 (a retired item counted to zero)
 
 ## Context
 
@@ -327,3 +328,15 @@ A batch line must say its unit: one without is refused. It was required
 at once, not added first and required in a later deploy (CONTRIBUTING.md,
 The scan page), as nothing is deployed and Ali decided on 2026-11-15 that
 earlier builds, their tabs and what they stored need not keep working.
+
+## Amendment: a retired item counted to zero (2026-11-24)
+
+Decided by Ali on 2026-11-24 (inventory-tng-a97r). A take of an item can
+wait in a phone's outbox while an administrator retires the item, and is
+still saved, as above, so a retired item can show less than nothing at a
+place. A count of a place offers a retired item whose balance there is
+not zero, positive or negative, so it can be counted to zero; so does
+an adjustment on Counts, of a retired item with a balance that is not
+zero at any current place. A retired item at zero everywhere is not
+offered. Takes of a retired item stay allowed. Rejected: refusing a take
+of a retired item that would go below zero.

@@ -83,27 +83,38 @@ def _retired(model: type[Item | ItemPackage | Location]) -> ColumnElement[list[i
 
 
 def _retired_left(
-    summed: Subquery, column: str, model: type[Item | ItemPackage]
+    summed: Subquery,
+    column: str,
+    model: type[Item | ItemPackage],
+    *,
+    short_too: bool = False,
 ) -> Select[tuple[int]]:
     """The ids, in `summed`'s `column`, of `model`'s retired rows with some
-    left at a current place."""
+    left at a current place, or with less than nothing too if
+    `short_too`."""
     return (
-        _left_at_current(select(summed.c[column]), summed)
+        _left_at_current(select(summed.c[column]), summed, short_too=short_too)
         .where(summed.c[column] == any_(_retired(model)))
         .distinct()
     )
 
 
 def _left_at_current[*T](
-    query: Select[*T], summed: Subquery, *, at: int | None = None
+    query: Select[*T],
+    summed: Subquery,
+    *,
+    at: int | None = None,
+    short_too: bool = False,
 ) -> Select[*T]:
     """`query` of `summed`'s rows with some left at a current place, or at
-    the place `at`, even retired."""
+    the place `at`, even retired; or with less than nothing too if
+    `short_too`."""
     current = Location.retired_at.is_(None)
     if at is not None:
         current = or_(current, Location.id == at)
+    held = summed.c.quantity != 0 if short_too else summed.c.quantity > 0
     return query.join(Location, Location.id == summed.c.location_id).where(
-        current, summed.c.quantity > 0
+        current, held
     )
 
 
@@ -111,6 +122,13 @@ def retired_in_stock() -> Select[tuple[int]]:
     """The ids of retired items with some left at a current place: what
     volunteers may still take, and administrators write off."""
     return _retired_left(balance, "item_id", Item)
+
+
+def retired_not_zero() -> Select[tuple[int]]:
+    """The ids of retired items whose balance at a current place is not
+    zero, more or less than nothing: what a count may still bring to zero
+    there (docs/decisions/0003)."""
+    return _retired_left(balance, "item_id", Item, short_too=True)
 
 
 def retired_packages_in_stock() -> Select[tuple[int]]:
@@ -188,6 +206,14 @@ def holds_stock(session: Session, location_id: int) -> bool:
     return exists_where(
         session, by_form.c.location_id == location_id, by_form.c.quantity != 0
     )
+
+
+def countable_item() -> ColumnElement[bool]:
+    """Items a count or an adjustment may name: current ones, and retired
+    ones with a balance at a current place that is not zero, positive or
+    negative (retired_not_zero), so they can be counted to zero there (Ali,
+    2026-11-24). A retired item at zero everywhere is not."""
+    return or_(Item.retired_at.is_(None), Item.id.in_(retired_not_zero()))
 
 
 def takeable() -> ColumnElement[bool]:

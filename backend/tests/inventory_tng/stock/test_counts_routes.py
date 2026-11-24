@@ -68,6 +68,7 @@ from helpers.stock import (
     counts_written,
     retire,
     stocked,
+    write,
 )
 
 
@@ -208,6 +209,23 @@ def test_leftovers_of_a_retired_item_can_be_written_off(
     )
     assert admin_client.post(ADJUSTMENTS, data=form).status_code == 303
     assert expected(session, place.store.id) == {}
+
+
+@pytest.mark.parametrize(("taken", "offered"), [("2", True), ("0", False)])
+def test_a_retired_item_is_offered_while_its_balance_is_not_zero(
+    admin_client: TestClient, session: Session, taken: str, offered: bool
+) -> None:
+    """Taken after it was retired, the store holds less than nothing of it:
+    offered to adjust, so it can be put right; at zero everywhere, not
+    (Ali, 2026-11-24, inventory-tng-a97r)."""
+    place = Place(session)
+    retire(session, place.item)
+    if taken != "0":
+        line = {"item_id": place.item.id, "quantity": taken, "unit": "each"}
+        write(session, place, kind="install", to_location_id=None, lines=[line])
+    page = read(admin_client.get(COUNTS).text)
+    choices = [value for value, _, _ in options(page.one("select", name="item_id"))]
+    assert (str(place.item.id) in choices) is offered
 
 
 @pytest.mark.end_to_end

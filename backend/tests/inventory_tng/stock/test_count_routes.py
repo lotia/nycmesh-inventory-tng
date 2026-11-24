@@ -25,7 +25,7 @@ from inventory_tng.stock.count_routes import SAVED_AS_SHOWN
 from inventory_tng.stock.counts import Counted, record_count
 from inventory_tng.stock.ledger import LOOSE, Entry, lock_place
 from inventory_tng.stock.moments import Moment, expected, moment
-from inventory_tng.stock.paths import COUNTS
+from inventory_tng.stock.paths import COUNTS, NEEDS_COUNTING
 from inventory_tng.web.forms import WHOLE_UNITS, type_a_number
 
 from helpers.concurrency import Committed, isolation_seen
@@ -932,3 +932,68 @@ def test_a_recount_shows_each_item_it_asks_for_though_the_search_no_longer_finds
     assert asked.status_code == 409
     assert box_values(asked.text, f"counted_{place.item.id}")
     assert "Nothing here matches." not in text(asked)
+
+
+# A retired item a count may bring to zero (Ali, 2026-11-24,
+# inventory-tng-a97r).
+
+
+def short_of_retired(admin_client: TestClient, session: Session) -> Place:
+    """The bead's example: the store is counted at 2 radios, written off
+    to nothing, and the radio retired; then a take of 2 queued on a phone
+    before the retire is saved, so the store holds -2."""
+    place = stocked(session, "2")
+    count_at(admin_client, place.store.id, {f"counted_{place.item.id}": "0"})
+    retire(session, place.item)
+    line = {"item_id": place.item.id, "quantity": "2", "unit": place.item.unit}
+    write(
+        session,
+        place,
+        kind="install",
+        to_location_id=None,
+        install_number=1234,
+        lines=[line],
+    )
+    assert expected(session, place.store.id) == {place.item.id: Decimal(-2)}
+    return place
+
+
+def test_a_retired_item_short_at_a_place_is_counted_to_zero(
+    admin_client: TestClient, session: Session
+) -> None:
+    place = short_of_retired(admin_client, session)
+    assert place.store.name in text(admin_client.get(NEEDS_COUNTING))
+    path = f"{COUNTS}/{place.store.id}"
+    for shown in (path, f"{path}?item={place.item.id}", f"{path}?q=litebeam"):
+        page = admin_client.get(shown)
+        assert box_values(page.text, f"counted_{place.item.id}"), shown
+        assert f"{place.item.name} -2 each less than nothing" in words_on(page.text)
+    count_at(admin_client, place.store.id, {f"counted_{place.item.id}": "0"})
+    assert expected(session, place.store.id) == {}
+    assert place.store.name not in text(admin_client.get(NEEDS_COUNTING))
+
+
+def test_a_retired_item_with_stock_left_is_counted_to_zero(
+    admin_client: TestClient, session: Session
+) -> None:
+    place = stocked(session)
+    retire(session, place.item)
+    page = admin_client.get(f"{COUNTS}/{place.store.id}").text
+    assert counted_box(page, place.item.id) == "5"
+    count_at(admin_client, place.store.id, {f"counted_{place.item.id}": "0"})
+    assert expected(session, place.store.id) == {}
+
+
+def test_a_retired_item_at_zero_is_not_offered(
+    admin_client: TestClient, session: Session
+) -> None:
+    place = stocked(session)
+    count_at(admin_client, place.store.id, {f"counted_{place.item.id}": "0"})
+    retire(session, place.item)
+    path = f"{COUNTS}/{place.store.id}"
+    for shown in (path, f"{path}?item={place.item.id}"):
+        page = admin_client.get(shown).text
+        assert not box_values(page, f"counted_{place.item.id}"), shown
+        picker = read(page).all("select", name="extra_item_id")
+        choices = [value for each in picker for value, _, _ in options(each)]
+        assert str(place.item.id) not in choices, shown

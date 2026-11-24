@@ -24,7 +24,7 @@ from inventory_tng.models.stock import (
 )
 from inventory_tng.models.volunteers import Volunteer
 from inventory_tng.stock import package_forms
-from inventory_tng.stock.balance import balance, by_form, countable, takeable
+from inventory_tng.stock.balance import balance, by_form, countable, countable_item
 
 
 def balances(
@@ -192,9 +192,10 @@ def item_ids_matching(
 
 
 def countable_items(session: Session) -> list[Item]:
-    """What can be counted or adjusted, by name: current items, and retired
-    ones with stock left, which may still be written off."""
-    return by_name(session, Item, takeable())
+    """What can be counted or adjusted, by name (balance.countable_item):
+    current items, and retired ones with a balance at a current place that
+    is not zero, which may still be written off or counted to zero."""
+    return by_name(session, Item, countable_item())
 
 
 def countable_place(session: Session, location_id: int) -> Location | None:
