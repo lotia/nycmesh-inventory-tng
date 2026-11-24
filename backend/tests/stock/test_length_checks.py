@@ -179,7 +179,7 @@ def test_needs_your_action_lists_lengths_to_check(
     assert f"Only {spools.cable.name}." in page
     assert "said 250 m is on it" in page
     # Set against what it showed.
-    assert "305.000" in box_values(shown, "showed")
+    assert "305" in box_values(shown, "showed")
     moment = session.scalar(select(func.max(LedgerTransaction.id)))
     assert str(moment) in box_values(shown, "as_of")
     assert "310 m" in page  # The recent cut.

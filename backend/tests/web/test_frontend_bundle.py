@@ -371,5 +371,6 @@ def test_the_scan_page_says_its_decimal_separator(pages: TestClient) -> None:
     """From the browser's Accept-Language (web/decimal_separator.py), which
     the scan page reads its boxes in (inventory-tng-qnwz)."""
     for language, separator in (("de-DE", ","), ("en-US", ".")):
-        page = pages.get("/scan", headers={"Accept-Language": language}).text
-        assert read(page)["data-decimal"] == separator
+        page = pages.get("/scan", headers={"Accept-Language": language})
+        assert read(page.text)["data-decimal"] == separator
+        assert page.headers["vary"] == "Accept-Language"

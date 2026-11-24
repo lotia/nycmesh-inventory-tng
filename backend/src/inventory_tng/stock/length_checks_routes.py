@@ -26,7 +26,7 @@ from inventory_tng.core.db_errors import RuleBroken, attempt
 from inventory_tng.core.db_once_committed import once_committed
 from inventory_tng.core.db_sessions import DbSession
 from inventory_tng.core.local_time import site_zone
-from inventory_tng.core.phrases import Words, lazy_gettext
+from inventory_tng.core.phrases import Words, lazy, lazy_gettext
 from inventory_tng.models.base import INTEGER_MAX, whole
 from inventory_tng.models.catalogue import Item
 from inventory_tng.models.stock import OpenPackage
@@ -87,8 +87,8 @@ add_notices(
         "length_none_said": LENGTH_NONE_SAID,
         # A length typed with the other decimal separator than the page's,
         # the page's named (web/forms.refused_words).
-        "length_use_point": LazyProxy(use_separator, "."),
-        "length_use_comma": LazyProxy(use_separator, ","),
+        "length_use_point": lazy(use_separator, "."),
+        "length_use_comma": lazy(use_separator, ","),
         "length_thousands": THOUSANDS,
     }
 )

@@ -180,8 +180,9 @@ def _page(title: LazyProxy, entry: str) -> Callable[[Request], Response]:
                 # The scan page reads its boxes in it (web/decimal_separator.py).
                 "decimal": decimal_separator(request),
             },
-            # The page names this build's files, so it must not outlive it.
-            headers={"Cache-Control": "no-cache"},
+            # The page names this build's files, so it must not outlive it,
+            # and its decimal separator is the Accept-Language's.
+            headers={"Cache-Control": "no-cache", "Vary": "Accept-Language"},
         )
 
     return page

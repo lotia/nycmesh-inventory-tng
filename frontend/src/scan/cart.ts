@@ -538,17 +538,21 @@ export function withLineChanged(
   };
 }
 
-/** A line with one more of a package of its item, or loose. */
+/** A line with one more of a package of its item, or loose. Loose that
+ * reads as no amount, such as one typed with the other decimal separator,
+ * is left as typed, for Record to refuse, never counted as none. */
 function bumped(line: Line, packageId?: number): Line {
-  return packageId === undefined
-    ? { ...line, loose: boxAmount((readBox(line.loose) ?? 0) + 1000) }
-    : {
-        ...line,
-        packages: {
-          ...line.packages,
-          [packageId]: String((count(line.packages[packageId] ?? "") ?? 0) + 1),
-        },
-      };
+  if (packageId === undefined) {
+    const loose = readBox(line.loose);
+    return loose === null ? line : { ...line, loose: boxAmount(loose + 1000) };
+  }
+  return {
+    ...line,
+    packages: {
+      ...line.packages,
+      [packageId]: String((count(line.packages[packageId] ?? "") ?? 0) + 1),
+    },
+  };
 }
 
 /** The cart with this item picked once more: its line, made with nothing

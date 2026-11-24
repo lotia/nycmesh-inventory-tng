@@ -249,6 +249,15 @@ describe("a box in the page's decimal separator (inventory-tng-qnwz)", () => {
     );
     expect(bumped.lines[0]?.loose).toBe("2,5");
   });
+
+  test("a bump leaves loose typed with the other separator as typed, never counted as none", () => {
+    pageSays(",");
+    const bumped = addOne(
+      cart({ lines: [{ itemId: 101, packages: {}, loose: "2.5" }] }),
+      101,
+    );
+    expect(bumped.lines[0]?.loose).toBe("2.5");
+  });
 });
 
 describe("turning a cart into a batch", () => {
