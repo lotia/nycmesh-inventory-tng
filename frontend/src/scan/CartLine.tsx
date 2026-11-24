@@ -81,8 +81,7 @@ export function CartLine({
       </li>
     );
   }
-  // Only the open packages shown are read, as only they are saved
-  // (takingOffered): one gone since has no box to fix.
+  // Read as saved (takingOffered): only the open packages shown.
   const quantity = quantityOf(
     takingOffered(line, new Set(opens.map((open) => open.key))),
     item,

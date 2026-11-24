@@ -220,7 +220,7 @@ describe("turning a cart into a batch", () => {
     expect(takingOffered(line, new Set(["open-1"])).open).toEqual({
       "open-1": taken,
     });
-    const { open: _, ...none } = line;
+    const none = { itemId: 101, packages: {}, loose: "" };
     expect(takingOffered(none, new Set()).open).toEqual({});
   });
 });

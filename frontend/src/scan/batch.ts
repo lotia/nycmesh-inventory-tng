@@ -124,7 +124,14 @@ export function toBatch(
       .filter((each) => each.location_id === reconciled.fromId)
       .map((each) => [each.key, each]),
   );
-  const cart = all === undefined ? reconciled : withOffered(reconciled, here);
+  // What is typed for an open package no longer offered is left out.
+  const cart =
+    all === undefined
+      ? reconciled
+      : {
+          ...reconciled,
+          lines: reconciled.lines.map((line) => takingOffered(line, here)),
+        };
   const index = indexOf(catalogue);
   // Open packages said to be used up: with what is taken, or alone, when
   // nothing else is in the cart: a report, at the From place.
@@ -433,14 +440,5 @@ function packageLine(
     package_id: packageId,
     package_size: decimal(size),
     unit,
-  };
-}
-
-/** The cart with what it takes from open packages no longer offered left
- * out (takingOffered). */
-function withOffered(cart: Cart, here: ReadonlyMap<string, unknown>): Cart {
-  return {
-    ...cart,
-    lines: cart.lines.map((line) => takingOffered(line, here)),
   };
 }
