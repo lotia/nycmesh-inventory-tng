@@ -16,7 +16,7 @@ from sqlalchemy.orm import Session
 
 from inventory_tng.admins.guards import AdminSignedIn, SignedIn
 from inventory_tng.catalogue import forms, items, queries, reading_rules, units
-from inventory_tng.catalogue.amount_rules import counted_whole
+from inventory_tng.catalogue.amount_rules import becomes_counted_whole, counted_whole
 from inventory_tng.catalogue.items_listing import SEARCHED
 from inventory_tng.catalogue.paths import CATEGORIES, ITEMS, READINGS
 from inventory_tng.catalogue.reading_rules import NOT_A_UNIT
@@ -309,7 +309,7 @@ def _short_fraction(
     its fraction is outlined in, as the words beside the unit do not name
     it (Ali, 2026-11-23, inventory-tng-fa5i); None for any other page."""
     unit = (values or {}).get("unit", "")
-    switching = counted_whole(unit) and not counted_whole(item.unit)
+    switching = becomes_counted_whole(item.unit, unit)
     if not switching or "unit" not in (problems or {}):
         return None
     package = items.fractional_package(session, item.id)

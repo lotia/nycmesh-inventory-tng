@@ -12,6 +12,7 @@ from inventory_tng.catalogue import amount_rules
 from inventory_tng.catalogue.amount_rules import (
     COUNTED_WHOLE,
     LENGTHS,
+    becomes_counted_whole,
     counted_whole,
     is_length,
     is_short_end,
@@ -31,6 +32,22 @@ def _vectors(group: str) -> list[dict[str, Any]]:
 def test_every_unit_is_counted_whole_or_a_length() -> None:
     """A new unit is placed on purpose, never taken for a length."""
     assert sorted(COUNTED_WHOLE + LENGTHS) == sorted(UNITS)
+
+
+@pytest.mark.parametrize(
+    ("old", "new", "becomes"),
+    [
+        ("m", "each", True),
+        ("ft", "each", True),
+        ("each", "each", False),
+        ("each", "m", False),
+        ("m", "ft", False),
+    ],
+)
+def test_a_switch_to_each_makes_an_item_counted_whole(
+    old: str, new: str, becomes: bool
+) -> None:
+    assert becomes_counted_whole(old, new) is becomes
 
 
 @pytest.mark.clone

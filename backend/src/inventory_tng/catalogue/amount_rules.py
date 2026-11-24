@@ -25,6 +25,12 @@ def counted_whole(unit: str) -> bool:
     return unit in COUNTED_WHOLE
 
 
+def becomes_counted_whole(old: str, new: str) -> bool:
+    """Whether changing an item's unit from `old` to `new` makes it counted
+    whole, so its amounts must now be whole."""
+    return counted_whole(new) and not counted_whole(old)
+
+
 def is_length(unit: str) -> bool:
     """Whether an item in `unit` is measured as a length, as cable is."""
     return unit in LENGTHS
