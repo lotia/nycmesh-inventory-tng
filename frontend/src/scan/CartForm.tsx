@@ -889,8 +889,7 @@ export function CartForm({
           cart={cart.value}
           onCode={(code) => {
             const read = readLabel(catalogue, code);
-            const { said, about } = actOn(read);
-            return { said, about, label: labelKind(read) };
+            return { ...actOn(read), label: labelKind(read) };
           }}
           onDone={() => {
             scanning.value = false;
