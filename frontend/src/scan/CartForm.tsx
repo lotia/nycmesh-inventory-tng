@@ -4,7 +4,13 @@
  * 2026-11-24, inventory-tng-fdnt); then Record. */
 import type { MessageDescriptor } from "@lingui/core";
 import { msg } from "@lingui/core/macro";
-import { type Signal, useComputed, useSignal } from "@preact/signals";
+import {
+  batch,
+  computed,
+  type Signal,
+  useComputed,
+  useSignal,
+} from "@preact/signals";
 import type { TargetedSubmitEvent } from "preact";
 import { useEffect, useLayoutEffect, useMemo, useRef } from "preact/hooks";
 import { Field } from "../shared/Field";
@@ -61,7 +67,7 @@ import {
 import { type Gaps, nameOf, toCart, withRetired } from "./older-to-cart";
 import { differenceOf } from "./recorded-elsewhere";
 import { aboutLine } from "./refused-line";
-import { Scanner } from "./Scanner";
+import { POINT, Scanner } from "./Scanner";
 import { indexOf } from "./search";
 import { useTextBoxFocused } from "./text-box-focus";
 import { type Removed, removeLine, undone } from "./undo-remove";
@@ -376,14 +382,22 @@ export function CartForm({
     () => pictureOnScreen.value && !typing.value && !tooOld.value,
   );
   const placeRead = useSignal<number | null>(null);
+  // What the answer to that question did, in words, till the next label.
+  const placeAnswer = useSignal<string | null>(null);
 
-  /** Acts on a label, read by the camera or typed by a scanner gun. */
+  /** Acts on a label, read by the camera or typed by a scanner gun; in a
+   * batch, so a place's question asked again is not seen put away. */
   function actOn(read: Scanned): Picked {
+    return batch(() => actOnNow(read));
+  }
+
+  function actOnNow(read: Scanned): Picked {
     if (read.kind === "unknown") {
       // A stray code leaves a place's question to answer.
       return refused(say(UNKNOWN_LABEL, { code: read.code }));
     }
     placeRead.value = null;
+    placeAnswer.value = null;
     const { places } = indexOf(catalogue);
     if (read.kind === "place") {
       const place = places.get(read.locationId);
@@ -405,6 +419,20 @@ export function CartForm({
   function placeOn(side: Side, locationId: number) {
     set(side === "from" ? { fromId: locationId } : { toId: locationId });
     placeRead.value = null;
+  }
+
+  /** A place's question answered with From or To, saying what it did as a
+   * place's label with one side open does (Ali, 2026-11-24,
+   * inventory-tng-8ary). */
+  function answerPlace(side: Side, locationId: number) {
+    const place = indexOf(catalogue).places.get(locationId);
+    batch(() => {
+      placeAnswer.value = say(
+        side === "from" ? PLACE_FROM_HERE : PLACE_TO_HERE,
+        { place },
+      );
+      placeOn(side, locationId);
+    });
   }
 
   /** The cart to record, as a batch, checked against `against`; or null,
@@ -829,14 +857,19 @@ export function CartForm({
           onCode={(code) => {
             const read = readLabel(catalogue, code);
             const picked = actOn(read);
-            // A refusal stands; a place's question, till it is answered or
-            // put away, here or by a label in the item search.
+            // A refusal stands; a place's question, till it is answered,
+            // then saying what the answer did, or put away, here or by a
+            // label in the item search, then Point.
             const asked = placeRead.peek();
             const stands = picked.refused
-              ? () => true
+              ? true
               : asked === null
                 ? undefined
-                : () => placeRead.peek() === asked;
+                : computed(() =>
+                    placeRead.value === asked
+                      ? null
+                      : (placeAnswer.value ?? POINT),
+                  );
             return { ...picked, label: labelKind(read), stands };
           }}
           onDone={() => {
@@ -866,7 +899,7 @@ export function CartForm({
           place={placeRead.value}
           name={indexOf(catalogue).places.get(placeRead.value) ?? ""}
           sides={placeSides(cart.value)}
-          onPick={placeOn}
+          onPick={answerPlace}
         />
       )}
 

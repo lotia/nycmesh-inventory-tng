@@ -1,4 +1,4 @@
-import { signal } from "@preact/signals";
+import { computed, signal } from "@preact/signals";
 import { act, fireEvent, render, screen } from "@testing-library/preact";
 import type { ComponentProps } from "preact";
 import { afterEach, beforeEach, expect, test, vi } from "vitest";
@@ -149,7 +149,7 @@ test("a refusal or question still standing is said again once typing ends", asyn
   const onCode = vi.fn(
     (code: string): Acted => ({
       ...said(`Refused ${code}.`),
-      stands: () => true,
+      stands: true,
     }),
   );
   const typing = signal(false);
@@ -167,15 +167,35 @@ test("a refusal or question still standing is said again once typing ends", asyn
   expect(status.textContent).toBe("Refused B3ZT9W.");
 });
 
+/** A question about `code`, standing while `asked`, then answered. */
+const question = (code: string, asked: { value: boolean }): Acted => ({
+  ...said(`Which side of ${code}?`),
+  stands: computed(() => (asked.value ? null : `${code}: to here.`)),
+});
+
+test("a question answered says what the answer did, not the question", async () => {
+  const { state, open } = camera();
+  const asked = signal(true);
+  const onCode = vi.fn((code: string) => question(code, asked));
+  scanner({ open, onCode });
+  state.inView = ["S4HELF"];
+  await pass();
+  const status = await screen.findByText("Which side of S4HELF?");
+  act(() => {
+    asked.value = false;
+  });
+  expect(status.textContent).toBe("S4HELF: to here.");
+  // Answered, no longer watched.
+  act(() => {
+    asked.value = true;
+  });
+  expect(status.textContent).toBe("S4HELF: to here.");
+});
+
 test("a question answered while typing leaves Point once typing ends", async () => {
   const { state, open } = camera();
   const asked = signal(true);
-  const onCode = vi.fn(
-    (code: string): Acted => ({
-      ...said(`Which side of ${code}?`),
-      stands: () => asked.peek(),
-    }),
-  );
+  const onCode = vi.fn((code: string) => question(code, asked));
   const typing = signal(false);
   scanner({ open, onCode, typing });
   state.inView = ["S4HELF"];
@@ -198,7 +218,7 @@ test("a refusal whose line changes while typing leaves Point once typing ends", 
     (code: string): Acted => ({
       ...said(`Refused ${code}.`),
       about,
-      stands: () => true,
+      stands: true,
     }),
   );
   const typing = signal(false);

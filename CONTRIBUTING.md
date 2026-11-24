@@ -773,8 +773,11 @@ utilities. When you style a page:
   the camera reads no labels either and the button hides
   (`scan/text-box-focus.ts`); the camera's status line then says so,
   and once reading resumes says again a refusal or question still
-  standing, or else to point the camera at a label. A tap on the picture
-  takes focus from the box. Enter in the item search leaves focus there,
+  standing, or else to point the camera at a label. A place's question
+  on that line, once answered with From or To, gives way to what the
+  answer did, or, put away by an item code typed in the item search, to
+  pointing the camera at a label. A tap on the picture takes focus from
+  the box. Enter in the item search leaves focus there,
   as a scanner gun types code after code. While the build is
   too old, the camera reads no labels till an upgrade, nor does the item
   search add a code typed or a pick, and their lines say to upgrade

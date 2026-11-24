@@ -296,6 +296,49 @@ describe("scanning labels with the camera", () => {
     },
   );
 
+  test.each([
+    ["From", FROM, "Hub › Shelf A: from here."],
+    ["To", TO, "Hub › Shelf A: to here."],
+  ])(
+    "a place's question answered with %s says what it did, not the question",
+    async (_side, side, words) => {
+      await opened();
+      await scan("S4HELF");
+      const status = (await screen.findByText(
+        "Hub › Shelf A: from here, or to here?",
+      )) as HTMLElement;
+      fireEvent.click(screen.getByRole("button", { name: say(side) }));
+      expect(status.textContent).toBe(words);
+      expect(status.getAttribute("role")).toBe("status");
+    },
+  );
+
+  test("a place's question put away by an item code typed in the item search says Point", async () => {
+    await opened();
+    await scan("S4HELF");
+    const status = (await screen.findByText(
+      "Hub › Shelf A: from here, or to here?",
+    )) as HTMLElement;
+    const search = screen.getByLabelText<HTMLInputElement>(say(FIND));
+    find("b3zt9w");
+    fireEvent.keyDown(search, { key: "Enter" });
+    expect(screen.queryByRole("button", { name: say(FROM) })).toBeNull();
+    expect(status.textContent).toBe(say(POINT));
+  });
+
+  test("a place's question asked again by its label typed in the item search stands", async () => {
+    await opened();
+    await scan("S4HELF");
+    const status = (await screen.findByText(
+      "Hub › Shelf A: from here, or to here?",
+    )) as HTMLElement;
+    const search = screen.getByLabelText<HTMLInputElement>(say(FIND));
+    find("s4helf");
+    fireEvent.keyDown(search, { key: "Enter" });
+    fireEvent.click(screen.getByRole("button", { name: say(TO) }));
+    expect(status.textContent).toBe("Hub › Shelf A: to here.");
+  });
+
   test("a place's question answered says Point, not the question, once typing ends", async () => {
     await opened();
     await scan("S4HELF");

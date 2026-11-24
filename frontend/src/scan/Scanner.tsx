@@ -18,7 +18,9 @@
  * the picture takes focus from the box (Ali, 2026-11-24,
  * inventory-tng-0w3n). Once reading resumes, it says a refusal or question
  * still standing again, or else to point the camera at a label, so what a
- * label did is not announced twice (inventory-tng-3pxj).
+ * label did is not announced twice (inventory-tng-3pxj). A place's
+ * question answered says what the answer did; put away another way, to
+ * point the camera at a label (Ali, 2026-11-24, inventory-tng-8ary).
  * While this build is too old, it says to upgrade, over everything else
  * (NewerBuild's UpgradeToSave; Ali, 2026-11-24, inventory-tng-j3wt).
  * Each session is reported (camera-report.ts).
@@ -115,14 +117,16 @@ const REFUSALS: Record<Refused, Refusal> = {
 
 /** What a code read did, in words for the volunteer, what its label
  * named, for the report, refused, the cart line it is about, if any
- * (refused-line.ts), and, for a refusal or question, whether its words
- * still stand, asked as typing starts and ends: said again once typing
- * ends while they do. */
+ * (refused-line.ts), and, for a refusal or question, that its words still
+ * stand, so they are said again once typing ends: a refusal's (true) till
+ * the next read or a change to its line; a question's while this gives
+ * null, then the words it gives instead, once it is answered or put
+ * away. */
 export type Acted = {
   said: string;
   label: LabelKind;
   about?: About | undefined;
-  stands?: (() => boolean) | undefined;
+  stands?: true | ReadonlySignal<MessageDescriptor | string | null> | undefined;
 };
 
 /** How often the camera's picture is read, in milliseconds. */
@@ -173,19 +177,31 @@ export function Scanner({
   // end says it.
   const said = useSignal<MessageDescriptor | string>(STARTING);
   // Whether `said`, a refusal or question, still stands.
-  const standing = useRef<(() => boolean) | undefined>(undefined);
+  const standing = useRef(false);
+  // Stops watching what became of a question `said` asks.
+  const unwatch = useRef<(() => void) | undefined>(undefined);
   const refusing = useClearedWhenLineChanges(cart, () => {
-    standing.current = undefined;
+    standing.current = false;
     said.value = typing.peek() ? POINT : "";
   });
   const show = (
     words: MessageDescriptor | string,
     { about, stands }: Pick<Acted, "about" | "stands"> = {},
   ) => {
+    unwatch.current?.();
+    unwatch.current = undefined;
     said.value = words;
-    standing.current = stands;
+    standing.current = stands !== undefined;
     refusing(about);
+    if (stands !== undefined && stands !== true) {
+      unwatch.current = stands.subscribe((instead) => {
+        if (instead !== null) {
+          show(instead);
+        }
+      });
+    }
   };
+  useEffect(() => () => unwatch.current?.(), []);
   // Why the camera could not be used, once it was refused.
   const refused = useSignal<Refusal | null>(null);
   const torch = useSignal<((on: boolean) => Promise<void>) | null>(null);
@@ -202,8 +218,7 @@ export function Scanner({
     () =>
       effect(() => {
         typing.value;
-        if (!standing.current?.() && said.peek() !== STARTING) {
-          standing.current = undefined;
+        if (!standing.current && said.peek() !== STARTING) {
           said.value = POINT;
         }
       }),
