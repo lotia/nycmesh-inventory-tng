@@ -187,10 +187,10 @@ export function Scanner({
         torch.value = session.torch;
         show(POINT);
         onPicture(video.current);
-        // Each read waits for the one before: a slow phone never piles
-        // them up.
         // When reading paused for the picture being off the screen.
         let pausedAt: number | null = null;
+        // Each read waits for the one before: a slow phone never piles
+        // them up.
         const read = async () => {
           try {
             if (!onScreen.peek()) {
