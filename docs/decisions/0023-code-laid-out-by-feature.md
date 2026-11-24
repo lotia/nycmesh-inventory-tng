@@ -462,7 +462,8 @@ On 2026-11-24 (inventory-tng-da0t, the amendment below) the tests of the
 app's package moved whole, keeping their names, into `inventory_tng/`:
 each feature's folder, as `admins/` or `stock/`, and `test_main.py` and
 `test_server.py`. The rest of the top of `backend/tests/` went to a home
-named for what it is:
+named for what it is, and the helper that decides which tests need the
+database was named for that:
 
 | Old path | New path |
 | --- | --- |
@@ -470,10 +471,11 @@ named for what it is:
 | `browser_database.py` | `helpers/browser_database.py`, run as `python -m helpers.browser_database` with pytest's `pythonpath` |
 | `databases.py` | `helpers/databases.py`, imported as `helpers.databases` |
 | `fold_reference.tsv` | `references/fold_reference.tsv` |
+| `helpers/suite_categories.py` | `helpers/database_needs.py` |
 | `measure_catalogue.py` | `measures/measure_catalogue.py` |
 | `measure_labels.py` | `measures/measure_labels.py` |
 | `test_markup.py` | `harness/test_markup.py` |
-| `test_suite_categories.py` | `harness/test_conftest_categories.py` |
+| `test_suite_categories.py` | `harness/test_database_needs.py` |
 | `test_test_databases.py` | `harness/test_databases.py` |
 | `ucum_codes.tsv` | `references/ucum_codes.tsv` |
 
@@ -562,7 +564,9 @@ would have clashed.
   - the tests of the test harness, the helpers in `helpers/` and
     `conftest.py`, test no source package, so `harness/`, its files
     named for what they test: `test_databases.py` the databases and
-    `test_conftest_categories.py` how `conftest.py` sorts tests.
+    `test_database_needs.py` the rules `conftest.py` uses to decide
+    whether a test needs the database, in `helpers/database_needs.py`,
+    as Ali renamed `helpers/suite_categories.py` on 2026-11-24.
     `test_markup.py` was named among the top-level modules' tests, but it
     tests `helpers/markup.py`, and no `inventory_tng/markup.py` exists,
     so it went to `harness/` with the others. Ali named the folder
