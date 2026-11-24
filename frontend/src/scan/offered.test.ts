@@ -2,7 +2,7 @@ import { describe, expect, test } from "vitest";
 import type { Draft } from "../shared/outbox";
 import { CATALOGUE, openAt, openSpool } from "../testing/catalogue";
 import { keyed } from "../testing/saves";
-import { offered, offeredAt } from "./offered";
+import { offered, offeredAt, takingOffered } from "./offered";
 import { unseen } from "./unseen-batches";
 
 const SHOWN = "99999999-9999-4999-8999-999999999999";
@@ -207,5 +207,20 @@ describe("turning a cart into a batch", () => {
         { state: "waiting" as const, body: keyed(report), queuedAt: 0 },
       ]),
     ).toEqual([]);
+  });
+
+  test("a line takes only from the open packages offered, by key", () => {
+    const taken = { amount: "lots", whole: false };
+    const line = {
+      itemId: 101,
+      packages: {},
+      loose: "",
+      open: { "open-1": taken, "open-2": taken },
+    };
+    expect(takingOffered(line, new Set(["open-1"])).open).toEqual({
+      "open-1": taken,
+    });
+    const { open: _, ...none } = line;
+    expect(takingOffered(none, new Set()).open).toEqual({});
   });
 });

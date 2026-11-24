@@ -25,7 +25,7 @@ import {
   separatorWords,
   unitChanged,
 } from "./cart";
-import { type Offered, usedUpOf } from "./offered";
+import { type Offered, takingOffered, usedUpOf } from "./offered";
 import { indexOf } from "./search";
 
 /** The server's limits (scan/batch_schemas.py), checked here too, so a
@@ -437,16 +437,10 @@ function packageLine(
 }
 
 /** The cart with what it takes from open packages no longer offered left
- * out: reported or closed elsewhere, or moved, since it was typed, its
- * field is gone from the page, so what was typed there goes too. */
+ * out (takingOffered). */
 function withOffered(cart: Cart, here: ReadonlyMap<string, unknown>): Cart {
   return {
     ...cart,
-    lines: cart.lines.map((line) => ({
-      ...line,
-      open: Object.fromEntries(
-        Object.entries(line.open ?? {}).filter(([key]) => here.has(key)),
-      ),
-    })),
+    lines: cart.lines.map((line) => takingOffered(line, here)),
   };
 }

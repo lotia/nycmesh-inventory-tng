@@ -134,3 +134,25 @@ test("the loose box unread is marked though a package's refusal comes first", ()
     "Enter the loose amount in m, up to 3 decimals.",
   );
 });
+
+test("an amount typed for an open package no longer offered is not read, and kept", () => {
+  const gone = { "open-2": { amount: "lots", whole: false } };
+  const { rerender } = render(lineOf({ loose: "3", open: gone }));
+  // No box for it on the page, so nothing refused for it.
+  expect(screen.getByText("3 m in all")).toBeDefined();
+  expect(refusalOf(screen.getByLabelText(LOOSE))).toBeNull();
+  // Offered again, what was typed there is read again.
+  rerender(
+    <CartLine
+      line={{ itemId: cable.id, packages: {}, loose: "3", open: gone }}
+      item={cable}
+      opens={[openAt(2, 120000)]}
+      moving={false}
+      onChange={() => {}}
+      onRemove={() => {}}
+    />,
+  );
+  expect(refusalOf(screen.getByLabelText(TAKEN))).toMatch(
+    /\|Enter how much from the open package, up to 3 decimals\.$/,
+  );
+});

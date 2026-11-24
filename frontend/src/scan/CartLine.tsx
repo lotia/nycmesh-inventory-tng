@@ -18,7 +18,7 @@ import {
 } from "./cart";
 import { AlertWords } from "./Notes";
 import { NOTHING_TAKEN, OpenPackageCard } from "./OpenPackageCard";
-import type { Offered } from "./offered";
+import { type Offered, takingOffered } from "./offered";
 
 export const LINE_GONE = msg`No longer in the catalogue.`;
 export const REMOVE = msg`Remove`;
@@ -81,7 +81,12 @@ export function CartLine({
       </li>
     );
   }
-  const quantity = quantityOf(line, item);
+  // Only the open packages shown are read, as only they are saved
+  // (takingOffered): one gone since has no box to fix.
+  const quantity = quantityOf(
+    takingOffered(line, new Set(opens.map((open) => open.key))),
+    item,
+  );
   const refusal = "problem" in quantity ? quantity : null;
   /** What says why `box` is refused, if it is; read with it. */
   const refusing = (box: Box): string | undefined => {

@@ -114,6 +114,22 @@ export function offeredAt(
     );
 }
 
+/** `line` taking only from the open packages offered, by key: what was
+ * typed for one reported, closed or moved elsewhere since has no field on
+ * the page, so is left out of what the line comes to and of what is saved
+ * (toBatch); the cart keeps it, read again if that one is offered again. */
+export function takingOffered(
+  line: Line,
+  offered: { has: (key: string) => boolean },
+): Line {
+  return {
+    ...line,
+    open: Object.fromEntries(
+      Object.entries(line.open ?? {}).filter(([key]) => offered.has(key)),
+    ),
+  };
+}
+
 /** Why a cut leaves nothing usable on an open package. */
 export type Ending = "short" | "used" | "over";
 
