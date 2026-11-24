@@ -1,4 +1,5 @@
 import { beforeEach, expect, test } from "vitest";
+import { takeSeparatorFrom } from "../shared/quantity";
 import { followPicks, followTyped, followWas } from "./hints";
 
 beforeEach(() => {
@@ -87,6 +88,24 @@ test("with no unit, the number alone", () => {
   expect((document.querySelector("button") as HTMLElement).textContent).toBe(
     "Set to 3",
   );
+});
+
+test("a button says the number in the page's decimal separator (inventory-tng-qnwz)", () => {
+  const root = document.createElement("html");
+  root.dataset.decimal = ",";
+  takeSeparatorFrom(root);
+  try {
+    document.body.innerHTML = `
+      <input id="left-7" value="1502,50">
+      <button>Set to <span data-follows="left-7" data-unit="m">it</span></button>`;
+    followTyped(document);
+    // As a box writes it: no grouping.
+    expect((document.querySelector("button") as HTMLElement).textContent).toBe(
+      "Set to 1502,5 m",
+    );
+  } finally {
+    takeSeparatorFrom(document.createElement("html"));
+  }
 });
 
 test("what a field held shows once it is changed, and hides back", () => {

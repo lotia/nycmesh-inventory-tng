@@ -17,7 +17,8 @@ def amount(value: Decimal | None) -> str:
 def plain_amount(value: Decimal | None) -> str:
     """A quantity a page posts back in a field it wrote itself, such as a
     hidden one: 1234.500 as "1234.5", in every locale, as the forms read
-    it. A box someone types in takes box_amount."""
+    it; and a printed label's, in one style whatever the locale
+    (labels/labels.py). A box someone types in takes box_amount."""
     return "" if value is None else format(value.normalize(), "f")
 
 

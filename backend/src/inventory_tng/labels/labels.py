@@ -24,7 +24,7 @@ from inventory_tng.models.catalogue import Item, ItemPackage
 from inventory_tng.models.labels import Label
 from inventory_tng.models.places import Location
 from inventory_tng.stock.balance import takeable, takeable_package
-from inventory_tng.web.formatting import amount
+from inventory_tng.web.formatting import plain_amount
 
 log = structlog.get_logger(__name__)
 meter = metrics.get_meter(__name__)
@@ -135,9 +135,12 @@ class Named:
 
 
 def _package_words(item: Item, package: ItemPackage) -> str:
+    """A package's label's words, its size in the one style every printed
+    label uses, whatever the locale of whoever prints it: a point and no
+    grouping, "305 m", "1500.5 m" (Ali, 2026-11-23, inventory-tng-qnwz)."""
     unit = "" if item.unit == "each" else f" {item.unit}"
     return package_label(
-        item.name_shown, package.name_shown, f"{amount(package.size)}{unit}"
+        item.name_shown, package.name_shown, f"{plain_amount(package.size)}{unit}"
     )
 
 

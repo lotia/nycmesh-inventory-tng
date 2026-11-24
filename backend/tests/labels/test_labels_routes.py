@@ -118,6 +118,20 @@ def test_a_package_and_a_place_have_codes_of_their_own(
     assert ("post", LABELS) in forms(page)
 
 
+def test_a_labels_size_has_a_point_and_no_grouping_in_any_locale(
+    admin_client: TestClient, session: Session, cable: Item
+) -> None:
+    """One fixed style for printed amounts, whatever the browser's locale
+    (Ali, 2026-11-23, inventory-tng-qnwz)."""
+    drum = add(
+        session, ItemPackage(item_id=cable.id, name="Drum", size=Decimal("1500.5"))
+    )
+    made(admin_client, item_id=cable.id, package_id=drum.id)
+    for language in ("en", "de"):
+        page = text(admin_client.get(LABELS, headers={"Accept-Language": language}))
+        assert package_label("Cat6 cable", "Drum", "1500.5 m") in page, language
+
+
 def test_no_label_for_another_items_package(
     admin_client: TestClient, session: Session, cable: Item, reel: ItemPackage
 ) -> None:

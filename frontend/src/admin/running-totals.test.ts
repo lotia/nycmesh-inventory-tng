@@ -113,13 +113,22 @@ test("a line with no boxes, or no number in it, is left hidden", () => {
   }
 });
 
-test("a box is read in the page's decimal separator (inventory-tng-qnwz)", () => {
+test("a decimal with no units before it counts, as the server saves it", () => {
+  type("at_7_opened_4", ".5");
+  expect(line("7-6").hidden).toBe(false);
+  expect(total("7-6")).toBe("305.5");
+});
+
+test("a box is read, and the total shown, in the page's decimal separator (inventory-tng-qnwz)", () => {
   const root = document.createElement("html");
   root.dataset.decimal = ",";
   takeSeparatorFrom(root);
   try {
     type("at_7_opened_4", "10,5");
-    expect(total("7-6")).toBe("315.5");
+    // As a box writes it: no grouping.
+    expect(total("7-6")).toBe("315,5");
+    type("at_7_opened_4", "1000,5");
+    expect(total("7-6")).toBe("1305,5");
     type("at_7_opened_4", "10.5");
     expect(line("7-6").hidden).toBe(true);
   } finally {

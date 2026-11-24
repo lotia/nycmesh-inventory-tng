@@ -126,8 +126,10 @@ export function SaidList({
   );
 }
 
-/** `said`, each number standing alone in the page's own words in italic;
- * not digits joined to letters, such as LiteBeam 5AC's. */
+/** `said`, each number standing alone in the page's own words in italic,
+ * whole, in either decimal separator and grouped or not, as the words
+ * (i18n's sayAmount) and the boxes (quantity's boxAmount) write one; not
+ * digits joined to letters, such as LiteBeam 5AC's. */
 export function Counted({ said }: { said: Said }) {
   return (
     <>
@@ -135,7 +137,7 @@ export function Counted({ said }: { said: Said }) {
         <Fragment key={at}>
           {typeof part === "string"
             ? part
-                .split(/\b(\d+(?:\.\d+)?)\b/)
+                .split(/\b(\d+(?:[.,]\d+)*)\b/)
                 .map((bit, nth) =>
                   nth % 2 === 1 ? <em key={nth}>{bit}</em> : bit,
                 )

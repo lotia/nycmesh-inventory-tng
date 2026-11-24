@@ -1,4 +1,4 @@
-import { decimal, readBox } from "../shared/quantity";
+import { boxAmount, readBox } from "../shared/quantity";
 
 /**
  * Words that follow a field as it is filled in, each still right without
@@ -65,11 +65,13 @@ export function followTyped(document: Document): void {
     const unit = words.dataset.unit ? ` ${words.dataset.unit}` : "";
     const sent = words.textContent;
     const say = () => {
-      // A number, as the page takes one, in its decimal separator; else
-      // what is typed is no length.
+      // A number, as the page takes one, written back as its boxes are
+      // (boxAmount), in its decimal separator; else what is typed is no
+      // length.
       const typed = field.value.trim();
       const length = typed === "" ? null : readBox(typed);
-      words.textContent = length === null ? sent : `${decimal(length)}${unit}`;
+      words.textContent =
+        length === null ? sent : `${boxAmount(length)}${unit}`;
     };
     field.addEventListener("input", say);
     say();

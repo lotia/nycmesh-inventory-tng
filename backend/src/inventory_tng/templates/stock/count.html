@@ -118,7 +118,7 @@ one by its size, an open package closed as none
     {% for section in moved.sections %}
     <tr><th colspan="{{ columns }}" scope="rowgroup">{{ section.heading }}</th></tr>
     {% for item, total in section.totals %}
-    <tr data-total="{{ moved.adds_to(section.place.id, item.id) }}" hidden><td>{{ item.name_shown }}</td><td colspan="{{ columns - 1 }}"><span role="status" aria-atomic="true">{#- Translators: %(place)s is a place of any kind, such as a store, a shelf, a bin or a volunteer's home. #}{% trans place=section.label, amount=total | plain_amount, unit=item.unit %}{{ place }} after saving: <span data-total-amount>{{ amount }}</span> {{ unit }}{% endtrans %}</span></td></tr>
+    <tr data-total="{{ moved.adds_to(section.place.id, item.id) }}" hidden><td>{{ item.name_shown }}</td><td colspan="{{ columns - 1 }}"><span role="status" aria-atomic="true">{#- Translators: %(place)s is a place of any kind, such as a store, a shelf, a bin or a volunteer's home. #}{% trans place=section.label, amount=total | box_amount(decimal), unit=item.unit %}{{ place }} after saving: <span data-total-amount>{{ amount }}</span> {{ unit }}{% endtrans %}</span></td></tr>
     {% endfor %}
     {% for heading, items in section.parts %}
     <tr><td colspan="{{ columns }}"><strong>{{ heading }}</strong></td></tr>

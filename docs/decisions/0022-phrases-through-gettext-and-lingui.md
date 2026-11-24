@@ -123,5 +123,12 @@ them open:
   catalogue is active for the whole process (`phrases.speaking` switches
   it for tests). Choosing a locale per request will make that a
   context-local setting.
+- Number boxes do not wait for the locale of the words. The phone's
+  decimal keypad offers its own settings' separator, so the server
+  chooses "." or "," for each request from Accept-Language
+  (`web/decimal_separator.py`) and tells each page in its
+  `<html data-decimal>`; boxes, and numbers shown back from them, use it,
+  and the other is refused (Ali, 2026-11-23, inventory-tng-qnwz).
+  Printed labels keep one style, a point and no grouping.
 - The scan page's bundle holds the compiled English catalogue; Lingui's
   core adds about 2.5 kB, gzipped.

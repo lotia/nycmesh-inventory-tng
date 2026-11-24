@@ -759,6 +759,16 @@ utilities. When you style a page:
   with `inputmode="numeric"` too; other number boxes are text boxes the
   server checks. `tests/codebase/test_text_box_keyboards.py` refuses a box
   without one.
+- The `decimal` keypad shows the separator of the phone's own settings,
+  which may be only a comma, so a number box takes one decimal separator,
+  "." or ",", and refuses the other. The server chooses it for each
+  request from the browser's Accept-Language (`web/decimal_separator.py`)
+  and writes it in the page's `<html data-decimal>`, which the admin
+  scripts and the scan page read. Nothing is stored, and the words stay
+  English. A number shown back from the boxes, such as the count form's
+  running totals or "Set to 40 m", is written as a box value is: that
+  separator, no grouping. A printed label writes amounts in one style
+  whatever the locale: a point and no grouping.
 - Follow docs/decisions/0019 for links, buttons and lists. A button is
   secondary unless it is its form's main one, `class="primary"`, or the one
   a confirmation page asks for, `class="danger"`. A page's way back is
@@ -959,7 +969,7 @@ On the server (`backend/src/inventory_tng/core/phrases.py`, which
   given `separator=decimal_separator(request)`
   (`web/decimal_separator.py`); a field the page writes itself, such as a
   hidden one, takes `{{ left | plain_amount }}`, read with
-  `web/forms.read_amount`.
+  `web/forms.read_amount`, as does a printed label's size.
 - Values are always filled, so a per cent sign in a message is `%%`; a
   test refuses a lone one.
 - The app's name is `phrases.BRAND`, the same in every language: a
@@ -984,8 +994,8 @@ On the scan page (`frontend/src/shared/i18n.ts`):
   as the locale writes a number with every thousandth kept, and any other
   number is `sayNumber(n)`. One a box holds is `boxAmount(left)`, read
   back with `readBox`, both in the decimal separator the page's
-  `<html data-decimal>` says (`takeSeparatorFrom`); one sent to the
-  server is `decimal(left)`, plain.
+  `<html data-decimal>` says (`takeSeparatorFrom`), as is a number shown
+  back from boxes; one sent to the server is `decimal(left)`, plain.
   `frontend/src/shared/quantity-cases.json` holds what both sides must
   read some typed text as; both test against it.
 
