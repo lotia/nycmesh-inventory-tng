@@ -579,6 +579,11 @@ msgstr ""
 msgid "%(state)s: %(uses)s of %(most)s used, until %(until)s."
 msgstr ""
 
+#: src/inventory_tng/templates/catalogue/item.html
+#, python-format
+msgid "%(unit)s: fixed, as a label has been printed for it"
+msgstr ""
+
 #. the link goes to this item's labels, each of which can be revoked there.
 #: src/inventory_tng/templates/catalogue/item.html
 #, python-format
@@ -1977,8 +1982,14 @@ msgstr ""
 
 #: src/inventory_tng/web/forms.py
 msgid ""
-"Its size is fixed, as some has moved, been opened or labelled: add a "
-"package of the new size instead."
+"Its size is fixed, as a label has been printed for it: revoke its labels "
+"to change it."
+msgstr ""
+
+#: src/inventory_tng/web/forms.py
+msgid ""
+"Its size is fixed, as some has moved or been opened: add a package of the"
+" new size instead."
 msgstr ""
 
 #: src/inventory_tng/web/forms.py
@@ -4895,7 +4906,9 @@ msgstr ""
 
 #: src/inventory_tng/templates/catalogue/item.html
 #, python-format
-msgid "in %(unit)s; fixed once some has moved, been opened or labelled"
+msgid ""
+"in %(unit)s; fixed once some has moved or been opened, or while it is "
+"labelled"
 msgstr ""
 
 #: src/inventory_tng/templates/catalogue/item.html

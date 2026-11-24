@@ -13,7 +13,9 @@ from httpx2 import Response
 from sqlalchemy.orm import Session
 from structlog.testing import capture_logs
 
+from inventory_tng.catalogue import items
 from inventory_tng.core.db_locking import UNGUARDED_INFO
+from inventory_tng.labels import labels
 from inventory_tng.models.catalogue import ItemPackage
 from inventory_tng.stock import count_routes, counts_routes
 from inventory_tng.stock.count_forms import changed_words
@@ -23,10 +25,11 @@ from inventory_tng.stock.paths import ADJUSTMENTS, COUNTS
 from inventory_tng.stock.units_shown import Now, Shown
 from inventory_tng.web.forms import RULES
 
+from helpers.items import NOW
 from helpers.markup import box_values, hidden_fields, problem, text
 from helpers.over_recorded import adjustments, checks, counted, moved_whole
 from helpers.package_forms import quantities_by_form
-from helpers.rows import add, setting_up, tag
+from helpers.rows import add, item_fields, setting_up, tag
 from helpers.stock import (
     URL,
     Place,
@@ -143,6 +146,43 @@ def test_a_batch_line_of_a_box_of_ten_saved_once_it_holds_twelve_is_refused(
     response = registered_client.post(URL, json=receipt)
     assert problems_of(response) == [(["lines", 0, "package_size"], "package_resized")]
     assert quantities_by_form(session, place.item) == {}
+
+
+@pytest.mark.parametrize("resized", [False, True])
+def test_a_line_scanned_from_a_label_revoked_since_is_refused_once_corrected(
+    registered_client: TestClient, session: Session, resized: bool
+) -> None:
+    """A spool's label scanned into the outbox, then revoked so its unit or
+    size set wrong could be corrected (Ali, 2026-11-23, inventory-tng-37dj):
+    the queued line says the unit and size it was shown, so it is refused,
+    never recorded in the corrected ones."""
+    place = Place(session)
+    spool = add(session, ItemPackage(item_id=place.cable.id, name="Spool", size=305))
+    label = labels.make_for_item(session, place.cable.id, spool.id)
+    assert label is not None
+    line = {
+        "item_id": place.cable.id,
+        "quantity": "305",
+        "package_id": spool.id,
+        "package_size": "305",
+        "unit": "m",
+    }
+    receipt = place.batch(
+        kind="receipt",
+        from_location_id=None,
+        to_location_id=place.store.id,
+        lines=[line],
+    )
+    assert labels.revoke(session, label.id, NOW)
+    if resized:
+        items.save_package(session, spool, "Spool", Decimal(300), seen=None)
+        refused = (["lines", 0, "package_size"], "package_resized")
+    else:
+        items.save(session, place.cable, item_fields(place.cable, unit="ft"), seen=None)
+        refused = (["lines", 0, "unit"], "unit_changed")
+    response = registered_client.post(URL, json=receipt)
+    assert problems_of(response) == [refused]
+    assert quantities_by_form(session, place.cable) == {}
 
 
 # A count form.

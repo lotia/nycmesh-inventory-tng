@@ -601,7 +601,8 @@ def save_package(
     relock(session, package, current=True, seen=seen)
     _item_current(session, package)
     if size != package.size:
-        enforce("package_size_fixed", when=bool(sizes_fixed(session, [package.id])))
+        why = sizes_fixed(session, [package.id]).get(package.id)
+        enforce(SIZE_FIXED_RULES[why] if why else None)
         _whole_for_its_item(session, package.item_id, size)
     package.name, package.size = name, size
     once_committed(session, log.info, "package saved", item_package_id=package.id)
@@ -610,6 +611,10 @@ def save_package(
 # Why a package's size is fixed: some has moved or been opened in it, for
 # good, or only a label not revoked says it.
 SizeFixed = Literal["used", "labelled"]
+SIZE_FIXED_RULES: dict[SizeFixed, str] = {
+    "used": "package_size_fixed",
+    "labelled": "package_size_labelled",
+}
 
 
 def sizes_fixed(session: Session, package_ids: Collection[int]) -> dict[int, SizeFixed]:

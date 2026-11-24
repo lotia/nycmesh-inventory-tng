@@ -53,8 +53,12 @@ RULES = {
         "Its unit is fixed, as a label has been printed for it."
     ),
     "package_size_fixed": lazy_gettext(
-        "Its size is fixed, as some has moved, been opened "
-        "or labelled: add a package of the new size instead."
+        "Its size is fixed, as some has moved or been opened: "
+        "add a package of the new size instead."
+    ),
+    "package_size_labelled": lazy_gettext(
+        "Its size is fixed, as a label has been printed for it: "
+        "revoke its labels to change it."
     ),
     "ck_item_package_short_below_under_size": lazy_gettext(
         "Larger than its too-short length, or change that first."

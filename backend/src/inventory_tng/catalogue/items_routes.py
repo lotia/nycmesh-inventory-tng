@@ -724,14 +724,14 @@ def save_package(
             ),
             items.READ_ALIKE,
             "unique",
-            "package_size_fixed",
+            *items.SIZE_FIXED_RULES.values(),
             SHORT_UNDER_SIZE,
             items.PACKAGE_WHOLE,
             *ALERTS,
         )
         # Its size field is gone once fixed: said above the page, as for a
         # form that went stale.
-        if broken in {*ALERTS, "package_size_fixed"}:
+        if broken in {*ALERTS, *items.SIZE_FIXED_RULES.values()}:
             return _item_page(request, session, signed, found, alert=RULES[broken])
         if broken is None:
             _decided(session, typed, item_package_id=package_id)

@@ -414,6 +414,19 @@ def test_a_label_fixes_the_unit_until_revoked_a_movement_for_good(
         items.save(session, item, item_fields(item, unit="m"), seen=None)
 
 
+def test_a_retired_labelled_items_unit_offers_no_labels_to_revoke(
+    admin_client: TestClient, session: Session, radios: Category
+) -> None:
+    """Read only, its labels inactive: nothing there to revoke."""
+    item = new_item(session, radios, "Patch cord", unit="m")
+    assert labels.make_for_item(session, item.id) is not None
+    admin_client.post(f"{ITEMS}/{item.id}/retire")
+    assert item.retired_at is not None
+    words = words_on(admin_client.get(f"{ITEMS}/{item.id}").text)
+    assert "m: fixed, as a label has been printed for it" in words
+    assert "Revoke its labels" not in words
+
+
 def test_retiring_and_bringing_back(
     admin_client: TestClient, session: Session, radios: Category
 ) -> None:

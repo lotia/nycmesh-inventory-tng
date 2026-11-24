@@ -21,6 +21,7 @@ from inventory_tng.labels.paths import LABELS
 from inventory_tng.models.catalogue import Category, Item, ItemPackage
 from inventory_tng.models.labels import Label
 from inventory_tng.stock import open_packages
+from inventory_tng.web.forms import RULES
 
 from helpers.items import NOW, new_item, same_size_twins, shown_item_form
 from helpers.markup import box_values, checked, forms, read, text, words_on
@@ -81,7 +82,7 @@ def test_a_package_is_renamed_and_resized_until_it_moves(
     assert "old-REEL" in box_values(taken.text, "package_name")
     # Moved in its size: renamed, never resized.
     fixed = send(spools.spool, "Spool", "300")
-    assert "Its size is fixed" in text(fixed)
+    assert str(RULES["package_size_fixed"]) in text(fixed)
     assert send(spools.spool, "Spool 305 m", "305").status_code == 303
     # Saved as typed (Ali, 2026-11-15, inventory-tng-c0c.3).
     assert (spools.spool.name, spools.spool.size) == ("Spool 305 m", 305)
@@ -100,7 +101,8 @@ def test_a_package_is_renamed_and_resized_until_it_moves(
     assert "Larger than its too-short length" in text(short)
     # Labelled, its size is said on boxes: fixed, and offered no more.
     add(session, Label(item_id=spools.cable.id, package_id=box.id))
-    assert "Its size is fixed" in text(send(box, "Carton", "30"))
+    labelled = text(send(box, "Carton", "30"))
+    assert str(RULES["package_size_labelled"]) in labelled
     assert send(box, "Crate", "25").status_code == 303
 
 
@@ -133,7 +135,7 @@ def test_a_packages_labels_fix_its_size_until_revoked(
     _, broken = attempt(
         session, lambda: items.save_package(session, box, "Box", Decimal(25), seen=None)
     )
-    assert broken == "package_size_fixed"
+    assert broken == "package_size_labelled"
     assert labels.revoke(session, label.id, NOW)
     assert items.sizes_fixed(session, [box.id]) == {}
     assert wording not in words_on(admin_client.get(page).text)
