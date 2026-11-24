@@ -579,9 +579,12 @@ msgstr ""
 msgid "%(state)s: %(uses)s of %(most)s used, until %(until)s."
 msgstr ""
 
+#. the link goes to this item's labels, each of which can be revoked there.
 #: src/inventory_tng/templates/catalogue/item.html
 #, python-format
-msgid "%(unit)s: fixed, as a label has been printed for it"
+msgid ""
+"%(unit)s: fixed, as a label has been printed for it. <a "
+"href=\"%(link)s\">Revoke its labels</a> to change it."
 msgstr ""
 
 #: src/inventory_tng/templates/catalogue/item.html
@@ -1719,6 +1722,15 @@ msgstr ""
 
 #: src/inventory_tng/templates/catalogue/item.html
 msgid "Holds"
+msgstr ""
+
+#. a package's size, its "Holds", fixed only by its labels; the link goes to
+#. the item's labels, each of which can be revoked there.
+#: src/inventory_tng/templates/catalogue/item.html
+#, python-format
+msgid ""
+"Holds %(size)s %(unit)s: fixed, as a label has been printed for it. <a "
+"href=\"%(link)s\">Revoke its labels</a> to change it."
 msgstr ""
 
 #: src/inventory_tng/templates/volunteers/volunteers.html

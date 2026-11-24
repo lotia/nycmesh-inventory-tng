@@ -261,9 +261,9 @@ left out for now: revisit it if counters find a loss and a find awkward.
 ## Amendment: work saved as it was shown (2026-11-23)
 
 Decided by Ali on 2026-11-23 (inventory-tng-jwlh, built as
-inventory-tng-57u8). An item's unit may change until its first movement
-or the first label of it or its packages, and a package's size until it
-has moved, been opened or been labelled:
+inventory-tng-57u8). An item's unit may change until its first movement,
+and while no label of it or its packages is current; a package's size
+until it has moved or been opened, and while no label of it is current:
 exactly when its first saves may still be on their way, such as a phone's
 outbox holding a receipt of 50 m of a new cable when an administrator
 switches it to ft. So every save says the units and package sizes it
@@ -307,11 +307,20 @@ would feel frozen on a slow connection.
 A label fixes an item's unit as a movement does (Ali, 2026-11-23,
 inventory-tng-rpud): it says the unit, and a scan of it counts the
 package's size, or one, in whatever unit the item has. So a "Spool 305 m"
-label scanned after a switch to ft would receive 305 ft. Its page says
-"m: fixed, as a label has been printed for it", and a change is refused.
-Making a label locks the item, as changing its unit does, so neither
-slips past the other. Rejected: converting m and ft numbers
+label scanned after a switch to ft would receive 305 ft. A change is
+refused. Making a label locks the item, as changing its unit does, so
+neither slips past the other. Rejected: converting m and ft numbers
 automatically, and allowing the change with a warning.
+
+Only labels not revoked count (Ali, 2026-11-23, inventory-tng-37dj),
+so a unit or size set wrong and labelled can be corrected: a revoked
+label scans as no label, and work queued from it is refused as above.
+Its page says "m: fixed, as a label has been printed for it. Revoke its
+labels to change it.", linking to the item's labels on the labels page;
+a package's size fixed only by its labels says so beside it, with the
+same link. A movement still fixes both for good, and an opening the
+size. Revoking takes the catalogue lock, as a unit or size change does,
+so neither slips past the other.
 
 A batch line must say its unit: one without is refused. It was required
 at once, not added first and required in a later deploy (CONTRIBUTING.md,

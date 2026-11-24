@@ -1,6 +1,9 @@
 """Items and the packages they come in. An item's unit is fixed once stock
-has moved in it or a label of it is printed (items.unit_fixed): the form
-shows it, and does not offer to change it. A retired item with stock
+has moved in it, or while a label of it is printed and not revoked
+(items.unit_fixed): the form shows it, and does not offer to change it;
+fixed only by labels, it links to the item's labels, to revoke them and
+correct a mistake. A package's size fixed only by labels says so too
+(items.sizes_fixed). A retired item with stock
 left may still be taken, never received (docs/decisions/0003)."""
 
 from collections.abc import Callable, Mapping, Sequence
@@ -22,6 +25,7 @@ from inventory_tng.core.db_sessions import DbSession
 from inventory_tng.core.local_time import site_zone
 from inventory_tng.core.phrases import Words, lazy_gettext
 from inventory_tng.labels import labels
+from inventory_tng.labels.paths import item_labels
 from inventory_tng.models.base import INTEGER_MAX, whole
 from inventory_tng.models.catalogue import (
     UNITS,
@@ -362,6 +366,7 @@ def _item_page(
             ],
             "units": UNITS,
             "unit_fixed": items.unit_fixed(session, item.id),
+            "its_labels": item_labels(item.id),
             "in_stock": item_total(session, item.id),
             "labels": labels.current_of(session, Label.item_id == item.id),
             "open_packages": opened,

@@ -300,7 +300,9 @@ def make_for_place(session: Session, location_id: int) -> Label | None:
 
 
 def revoke(session: Session, label_id: int, at: datetime) -> bool:
-    """Revokes a current label: False if there is none by that id."""
+    """Revokes a current label: False if there is none by that id. Under
+    the catalogue lock, as a unit or size change it frees is
+    (items.unit_fixed, items.sizes_fixed)."""
     label = locked_row(session, Label, label_id)
     if label is None or label.revoked_at is not None:
         return False

@@ -22,6 +22,7 @@ from inventory_tng.catalogue.forms import (
 from inventory_tng.catalogue.paths import ITEMS
 from inventory_tng.core.local_time import DEFAULT_ZONE
 from inventory_tng.labels import labels
+from inventory_tng.labels.paths import LABELS
 from inventory_tng.models.catalogue import (
     Category,
     Item,
@@ -310,11 +311,9 @@ def test_editing_every_field(
     assert boxes.one("input", name="part_number", inputmode="text")
 
 
-def test_the_unit_is_fixed_once_stock_has_moved(
-    admin_client: TestClient, session: Session, radios: Category
-) -> None:
-    item = new_item(session, radios)
-    store = add(session, Location(name="Hub", kind="store"))
+def _moved(session: Session, item: Item) -> None:
+    """One of the item received into a store."""
+    store = add(session, Location(name=f"Hub {uuid.uuid4()}", kind="store"))
     batch = add(
         session,
         LedgerTransaction(
@@ -325,8 +324,16 @@ def test_the_unit_is_fixed_once_stock_has_moved(
         ),
     )
     add(session, Movement(transaction_id=batch.id, item_id=item.id, quantity=1))
+
+
+def test_the_unit_is_fixed_once_stock_has_moved(
+    admin_client: TestClient, session: Session, radios: Category
+) -> None:
+    item = new_item(session, radios)
+    _moved(session, item)
     page = admin_client.get(f"{ITEMS}/{item.id}").text
-    assert "fixed, as stock has moved in it" in page
+    assert "each: fixed, as stock has moved in it" in words_on(page)
+    assert "Revoke its labels" not in words_on(page)
     assert ("unit", "each") in hidden_fields(page)
     form = shown_item_form(item, unit="m")
     refused = admin_client.post(f"{ITEMS}/{item.id}", data=form)
@@ -351,12 +358,19 @@ def test_the_unit_is_fixed_once_a_spools_label_is_printed(
     the unit is fixed once any label of the item or its packages is
     printed, and nothing is converted (Ali, 2026-11-23, inventory-tng-rpud)."""
     cable = new_item(session, radios, "Cat6 cable", unit="m")
-    spool = add(session, ItemPackage(item_id=cable.id, name="Spool", size=305))
+    spool = add(session, ItemPackage(item_id=cable.id, name="Spool", size=Decimal(305)))
     page = admin_client.get(f"{ITEMS}/{cable.id}").text
     assert ("unit", "m") not in hidden_fields(page)
-    assert labels.make_for_item(session, cable.id, spool.id) is not None
+    label = labels.make_for_item(session, cable.id, spool.id)
+    assert label is not None
     page = admin_client.get(f"{ITEMS}/{cable.id}").text
-    assert "m: fixed, as a label has been printed for it" in page
+    assert (
+        "m: fixed, as a label has been printed for it. Revoke its labels to change it."
+    ) in words_on(page)
+    # To the labels list, filtered to this item's, each offered to revoke:
+    # beside the unit, and the spool's size, labelled too.
+    revoke = read(page).all("a", "Revoke its labels")
+    assert [a.attrs["href"] for a in revoke] == [f"{LABELS}?item={cable.id}"] * 2
     assert ("unit", "m") in hidden_fields(page)
     form = shown_item_form(cable, unit="ft")
     refused = admin_client.post(f"{ITEMS}/{cable.id}", data=form)
@@ -365,22 +379,39 @@ def test_the_unit_is_fixed_once_a_spools_label_is_printed(
     assert (cable.unit, spool.size) == ("m", 305)
     kept = admin_client.post(f"{ITEMS}/{cable.id}", data=form | {"unit": "m"})
     assert kept.status_code == 303
+    # Its labels revoked, a mistaken unit is corrected (Ali, 2026-11-23,
+    # inventory-tng-37dj).
+    assert labels.revoke(session, label.id, NOW)
+    page = admin_client.get(f"{ITEMS}/{cable.id}").text
+    assert ("unit", "m") not in hidden_fields(page)
+    form = shown_item_form(cable, unit="ft")
+    assert admin_client.post(f"{ITEMS}/{cable.id}", data=form).status_code == 303
+    assert cable.unit == "ft"
 
 
 @pytest.mark.parametrize("package", [False, True])
-def test_one_label_alone_fixes_the_unit_revoked_too(
+def test_a_label_fixes_the_unit_until_revoked_a_movement_for_good(
     session: Session, radios: Category, package: bool
 ) -> None:
     """The item's own label, counting one unit a scan, or one of a
-    package's, each alone: revoked, it was printed all the same."""
+    package's, each alone, fixes the unit; revoked, it scans as no label,
+    so the unit may change. Once stock has moved it may not, labels
+    revoked or not (Ali, 2026-11-23, inventory-tng-37dj)."""
     item = new_item(session, radios, "Patch cord", unit="m")
     reel = add(session, ItemPackage(item_id=item.id, name="Reel", size=10))
     label = labels.make_for_item(session, item.id, reel.id if package else None)
     assert label is not None
-    assert labels.revoke(session, label.id, NOW)
     assert items.unit_fixed(session, item.id) == "labelled"
     with breaks(session, "item_unit_labelled"):
         items.save(session, item, item_fields(item, unit="ft"), seen=None)
+    assert labels.revoke(session, label.id, NOW)
+    assert items.unit_fixed(session, item.id) is None
+    items.save(session, item, item_fields(item, unit="ft"), seen=None)
+    assert item.unit == "ft"
+    _moved(session, item)
+    assert items.unit_fixed(session, item.id) == "moved"
+    with breaks(session, "item_unit_fixed"):
+        items.save(session, item, item_fields(item, unit="m"), seen=None)
 
 
 def test_retiring_and_bringing_back(

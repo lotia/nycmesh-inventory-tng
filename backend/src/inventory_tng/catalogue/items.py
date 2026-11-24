@@ -1,11 +1,12 @@
 """Items and the packages they come in: every write to the item and
 item_package tables, and their rules. A current item is in a current
 category (categories.retire is the other side), and an item's unit is
-fixed once stock has moved in it or a label of it or its packages is
-printed, as the ledger's quantities and the labels are in that unit
-(unit_fixed), and an item counted each has no current package holding,
-or too short to use below, a fraction; a package's size is fixed once it has
-moved, been opened or labelled. The app may not move a package to another
+fixed once stock has moved in it, or while a label of it or its packages
+is printed and not revoked, as the ledger's quantities and the labels are
+in that unit (unit_fixed), and an item counted each has no current package
+holding, or too short to use below, a fraction; a package's size is fixed
+once it has moved or been opened, or while a label of it is not revoked
+(sizes_fixed). The app may not move a package to another
 item (the initial migration), so its labels always name its item, and a
 package's name is its own among its item's, retired ones too, so one can
 always be brought back. A retired
@@ -103,13 +104,16 @@ UNIT_FIXED_RULES: dict[UnitFixed, str] = {
 
 def unit_fixed(session: Session, item_id: int) -> UnitFixed | None:
     """Why the item's unit can no longer change, if it can't: stock has
-    moved in it, or a label has been printed for it or one of its packages
-    (a package's label names its item too), revoked ones too. Its ledger
-    and its labels say that unit, so a change would silently change what
-    they mean; nothing is converted (Ali, 2026-11-23, inventory-tng-rpud)."""
+    moved in it, for good, or a label not revoked has been printed for it
+    or one of its packages (a package's label names its item too). Its
+    ledger and its labels say that unit, so a change would silently change
+    what they mean; nothing is converted (Ali, 2026-11-23,
+    inventory-tng-rpud). A revoked label scans as no label, so it fixes
+    nothing, and revoking an item's labels lets a mistaken unit be
+    corrected (Ali, 2026-11-23, inventory-tng-37dj)."""
     if exists_where(session, Movement.item_id == item_id):
         return "moved"
-    if exists_where(session, Label.item_id == item_id):
+    if exists_where(session, Label.item_id == item_id, Label.revoked_at.is_(None)):
         return "labelled"
     return None
 
@@ -603,23 +607,35 @@ def save_package(
     once_committed(session, log.info, "package saved", item_package_id=package.id)
 
 
-def sizes_fixed(session: Session, package_ids: Collection[int]) -> set[int]:
-    """Those of these packages whose size is fixed: some has moved or been
-    opened in it, or a label printed for it says it. Each asks only
-    whether, stopping at the first."""
+# Why a package's size is fixed: some has moved or been opened in it, for
+# good, or only a label not revoked says it.
+SizeFixed = Literal["used", "labelled"]
+
+
+def sizes_fixed(session: Session, package_ids: Collection[int]) -> dict[int, SizeFixed]:
+    """Those of these packages whose size is fixed, and why: some has moved
+    or been opened in it, or a label printed for it, not revoked, says it
+    (Ali, 2026-11-23, inventory-tng-37dj). Each asks only whether, stopping
+    at the first."""
     if not package_ids:
-        return set()
+        return {}
     package = ItemPackage.id
     used = (
         select(Movement.id).where(Movement.from_package_id == package),
         select(Movement.id).where(Movement.to_package_id == package),
         select(OpenPackage.id).where(OpenPackage.package_id == package),
-        select(Label.id).where(Label.package_id == package),
     )
-    query = select(package).where(
-        package.in_(list(package_ids)), or_(*(each.exists() for each in used))
+    labelled = select(Label.id).where(
+        Label.package_id == package, Label.revoked_at.is_(None)
     )
-    return set(session.scalars(query))
+    query = select(package, or_(*(each.exists() for each in used))).where(
+        package.in_(list(package_ids)),
+        or_(labelled.exists(), *(each.exists() for each in used)),
+    )
+    return {
+        each: "used" if was_used else "labelled"
+        for each, was_used in session.execute(query)
+    }
 
 
 def restore_package(session: Session, package: ItemPackage) -> None:

@@ -20,7 +20,7 @@ from inventory_tng.labels.labels import (
     package_label,
 )
 from inventory_tng.labels.labels_routes import PICK_LABELS
-from inventory_tng.labels.paths import LABELS, PRINT
+from inventory_tng.labels.paths import LABELS, PRINT, item_labels
 from inventory_tng.models.catalogue import Category, Item, ItemPackage
 from inventory_tng.models.labels import Label
 from inventory_tng.models.places import Location
@@ -539,6 +539,19 @@ def test_labels_show_25_50_100_or_all(
     every = admin_client.get(LABELS, params=query | {"per": "all"}).text
     assert len(codes_listed(every)) == 30
     assert read(every).one("a", "All", aria_current="page")
+
+
+def test_an_items_labels_its_packages_too_are_each_offered_to_revoke(
+    admin_client: TestClient, session: Session, cable: Item
+) -> None:
+    """Where an item page sends one to revoke the labels fixing its unit or
+    a package's size (Ali, 2026-11-23, inventory-tng-37dj)."""
+    reel = add(session, ItemPackage(item_id=cable.id, name="Reel", size=Decimal(305)))
+    own = add(session, Label(item_id=cable.id))
+    reels = add(session, Label(item_id=cable.id, package_id=reel.id))
+    page = read(admin_client.get(item_labels(cable.id)).text)
+    for label in (own, reels):
+        page.one("a", f"Revoke {label.code}", href=f"{LABELS}/{label.id}/revoke")
 
 
 def test_labels_filter_by_kind_and_item(

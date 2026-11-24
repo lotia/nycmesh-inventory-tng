@@ -31,7 +31,7 @@ None is left, so nobody can pick it.{% endtrans %}{% endif %}{% endcall %}
     {% if unit_fixed == "moved" %}
     <span class="hint">{% trans unit=item.unit %}{{ unit }}: fixed, as stock has moved in it{% endtrans %}</span>
     {% else %}
-    <span class="hint">{% trans unit=item.unit %}{{ unit }}: fixed, as a label has been printed for it{% endtrans %}</span>
+    <span class="hint">{#- Translators: the link goes to this item's labels, each of which can be revoked there. #}{% trans unit=item.unit, link=its_labels %}{{ unit }}: fixed, as a label has been printed for it. <a href="{{ link }}">Revoke its labels</a> to change it.{% endtrans %}</span>
     {% endif %}
     <input type="hidden" name="unit" value="{{ item.unit }}">
     {% else %}
@@ -125,6 +125,8 @@ None is left, so nobody can pick it.{% endtrans %}{% endif %}{% endcall %}
             <input name="size" inputmode="{{ item.unit | keyboard }}" value="{{ sent.get('size', package.size | box_amount(decimal)) }}" required>
             {% if sent %}{% with name = "size" %}{% include "_field_problem.html" %}{% endwith %}{% endif %}
           </label>
+          {% elif sizes_fixed[package.id] == "labelled" %}
+          <span class="hint block">{#- Translators: a package's size, its "Holds", fixed only by its labels; the link goes to the item's labels, each of which can be revoked there. #}{% trans size=package.size | amount, unit=item.unit, link=its_labels %}Holds {{ size }} {{ unit }}: fixed, as a label has been printed for it. <a href="{{ link }}">Revoke its labels</a> to change it.{% endtrans %}</span>
           {% endif %}
           <button>{% if package.id in sizes_fixed %}{% trans package=package.name_shown %}Save<span class="sr-only"> the name of {{ package }}</span>{% endtrans %}
             {%- else %}{% trans package=package.name_shown %}Save<span class="sr-only"> the name and size of {{ package }}</span>{% endtrans %}{% endif %}</button>

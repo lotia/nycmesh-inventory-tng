@@ -1182,6 +1182,46 @@ def test_a_unit_changed_while_a_label_is_made_waits_then_is_refused(
 
 
 @pytest.mark.concurrency
+@pytest.mark.parametrize("package", [False, True])
+def test_a_unit_or_size_changed_while_its_label_is_revoked_waits_then_is_made(
+    committed: Committed, package: bool
+) -> None:
+    """Revoking takes the catalogue lock, as a unit or size change does
+    (labels.revoke, items.save, items.save_package): a change second waits,
+    then reads the label as revoked and is made (Ali, 2026-11-23,
+    inventory-tng-37dj). Second the other way, it would be refused before
+    the revoke began, which waits for nothing."""
+    place = committed_place(committed)
+    reel = ItemPackage(item_id=place.cable.id, name="Reel", size=Decimal(305))
+    made(committed, reel)
+    setup = committed.session()
+    label = labels.make_for_item(setup, place.cable.id, reel.id)
+    assert label is not None
+    setup.commit()
+    label_id = label.id
+
+    def revoking(session: Session) -> None:
+        assert labels.revoke(session, label_id, NOW)
+
+    change = (
+        doing(
+            ItemPackage,
+            reel.id,
+            lambda s, p: items.save_package(s, p, p.name, Decimal(300), seen=None),
+        )
+        if package
+        else doing(
+            Item,
+            place.cable.id,
+            lambda s, item: items.save(
+                s, item, item_fields(item, unit="ft"), seen=None
+            ),
+        )
+    )
+    assert at_once(committed, revoking, change) is None
+
+
+@pytest.mark.concurrency
 @pytest.mark.parametrize(
     ("swapped", "refused"),
     [(False, items.PACKAGE_WHOLE), (True, items.PACKAGES_WHOLE)],

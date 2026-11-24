@@ -16,12 +16,14 @@ from inventory_tng.catalogue.forms import PACKAGE_TAKEN, SHORTER_THAN_WHOLE
 from inventory_tng.catalogue.items_routes import PACKAGE_RETIRED
 from inventory_tng.catalogue.paths import ITEMS
 from inventory_tng.core.db_errors import RuleBroken, attempt
+from inventory_tng.labels import labels
+from inventory_tng.labels.paths import LABELS
 from inventory_tng.models.catalogue import Category, Item, ItemPackage
 from inventory_tng.models.labels import Label
 from inventory_tng.stock import open_packages
 
 from helpers.items import NOW, new_item, same_size_twins, shown_item_form
-from helpers.markup import box_values, checked, forms, read, text
+from helpers.markup import box_values, checked, forms, read, text, words_on
 from helpers.rows import add, history, shown
 from helpers.stock import Spools, retire
 
@@ -100,6 +102,48 @@ def test_a_package_is_renamed_and_resized_until_it_moves(
     add(session, Label(item_id=spools.cable.id, package_id=box.id))
     assert "Its size is fixed" in text(send(box, "Carton", "30"))
     assert send(box, "Crate", "25").status_code == 303
+
+
+def test_a_packages_labels_fix_its_size_until_revoked(
+    admin_client: TestClient, session: Session
+) -> None:
+    """Labelled, a package's size is fixed, and its Holds links to the
+    item's labels, to revoke them; revoked, it may be resized. Moved or
+    opened, it is fixed for good, labels revoked or not, and links to none
+    (Ali, 2026-11-23, inventory-tng-37dj)."""
+    spools = Spools(session)
+    box = add(session, ItemPackage(item_id=spools.cable.id, name="Box", size=50))
+    page = f"{ITEMS}/{spools.cable.id}"
+    wording = (
+        "Holds 50 m: fixed, as a label has been printed for it. "
+        "Revoke its labels to change it."
+    )
+    label = labels.make_for_item(session, spools.cable.id, box.id)
+    assert label is not None
+    assert items.sizes_fixed(session, [box.id, spools.spool.id]) == {
+        box.id: "labelled",
+        spools.spool.id: "used",
+    }
+    shown_page = admin_client.get(page).text
+    assert wording in words_on(shown_page)
+    # The box's alone: the spool has moved, and so has the item's unit.
+    read(shown_page).one(
+        "a", "Revoke its labels", href=f"{LABELS}?item={spools.cable.id}"
+    )
+    _, broken = attempt(
+        session, lambda: items.save_package(session, box, "Box", Decimal(25), seen=None)
+    )
+    assert broken == "package_size_fixed"
+    assert labels.revoke(session, label.id, NOW)
+    assert items.sizes_fixed(session, [box.id]) == {}
+    assert wording not in words_on(admin_client.get(page).text)
+    items.save_package(session, box, "Box", Decimal(25), seen=None)
+    assert box.size == 25
+    # The spool has moved: fixed for good, its labels revoked too.
+    spool_label = labels.make_for_item(session, spools.cable.id, spools.spool.id)
+    assert spool_label is not None
+    assert labels.revoke(session, spool_label.id, NOW)
+    assert items.sizes_fixed(session, [spools.spool.id]) == {spools.spool.id: "used"}
 
 
 def test_a_package_opened_keeps_its_size(session: Session) -> None:
