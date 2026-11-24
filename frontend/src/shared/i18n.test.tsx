@@ -8,6 +8,7 @@ import { ADDED_ONE } from "../scan/CartForm";
 import { ITEM_SAYS } from "../scan/cart";
 import { REGISTER_IT } from "../scan/ScanPage";
 import { say, sayAmount, sayNumber, sayParts, speak } from "./i18n";
+import { takeSeparatorFrom } from "./quantity";
 
 test("the page speaks English, from its catalogue", () => {
   expect(i18n.locale).toBe("en");
@@ -83,4 +84,22 @@ test("a quantity is written as the locale writes a number, every thousandth kept
   expect(sayAmount(1_234_500)).toBe("1.234,5");
   expect(sayAmount(1_234_567)).toBe("1.234,567");
   expect(sayNumber(1000)).toBe("1.000");
+});
+
+test("on a comma page a quantity takes its comma, ungrouped", () => {
+  // Ali, 2026-11-23 (inventory-tng-4mc3): as the page's boxes write it.
+  speak("en", english);
+  const page = document.createElement("html");
+  page.dataset.decimal = ",";
+  takeSeparatorFrom(page);
+  try {
+    expect(sayAmount(1_500_000)).toBe("1500");
+    expect(sayAmount(1500)).toBe("1,5");
+    expect(sayAmount(-1_234_567)).toBe("-1234,567");
+    expect(sayNumber(1000)).toBe("1000");
+  } finally {
+    page.dataset.decimal = ".";
+    takeSeparatorFrom(page);
+  }
+  expect(sayAmount(1_500_000)).toBe("1,500");
 });

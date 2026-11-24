@@ -128,7 +128,10 @@ them open:
   chooses "." or "," for each request from Accept-Language
   (`web/decimal_separator.py`) and tells each page in its
   `<html data-decimal>`; boxes, and numbers shown back from them, use it,
-  and the other is refused (Ali, 2026-11-23, inventory-tng-qnwz).
-  Printed labels keep one style, a point and no grouping.
+  and the other is refused (Ali, 2026-11-23, inventory-tng-qnwz). On a
+  page whose separator is ",", numbers in sentences use it too, ungrouped
+  ("1500 m", "1,5 m"), in English words (Ali, 2026-11-23,
+  inventory-tng-4mc3); on a "." page they are as English writes them.
+  Mail and printed labels keep one style, a point; labels never group.
 - The scan page's bundle holds the compiled English catalogue; Lingui's
   core adds about 2.5 kB, gzipped.

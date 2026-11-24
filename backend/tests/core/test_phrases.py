@@ -55,6 +55,7 @@ from inventory_tng.core.phrases import (
     pgettext,
     read,
     speaking,
+    writing_numbers,
 )
 from inventory_tng.devices import devices_routes
 from inventory_tng.devices.forms import days_problem, uses_problem
@@ -984,6 +985,17 @@ def test_a_number_in_a_message_is_written_as_the_locale_writes_it() -> None:
     assert whole_minutes(1, 10080) == "A whole number of minutes, from 1 to 10,080."
     with speaking(GERMAN):
         assert uses_problem(1000) == "From 1 to 1.000 devices."
+
+
+def test_numbers_in_words_on_a_comma_page_take_its_comma_ungrouped() -> None:
+    """A plural's count and a message's number alike, until the block
+    ends (Ali, 2026-11-23, inventory-tng-4mc3)."""
+    with writing_numbers(","):
+        assert retired_holding(1000) == "1000 retired places hold stock"
+        assert up_to(1500) == "Up to 1500 characters."
+        assert number(Decimal("1.5")) == "1,5"
+        assert "1000 items" in words_shown(items_page(1000))
+    assert up_to(1500) == "Up to 1,500 characters."
 
 
 def test_the_home_and_seeding_pages_write_their_counts_as_the_locale_does() -> None:

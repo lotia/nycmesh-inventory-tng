@@ -47,3 +47,15 @@ test("a point in a comma page is refused, naming the comma, and reported", async
     { quantity: "1.5" },
   ]);
 });
+
+test("an amount in words on a comma page takes its comma, ungrouped", async () => {
+  // Ali, 2026-11-23 (inventory-tng-4mc3).
+  open();
+  await ready();
+  fillMove();
+  const loose = screen.getByLabelText("Loose m");
+  fireEvent.input(loose, { target: { value: "1500" } });
+  expect(await screen.findByText("1500 m in all")).not.toBeNull();
+  fireEvent.input(loose, { target: { value: "1,5" } });
+  expect(await screen.findByText("1,5 m in all")).not.toBeNull();
+});

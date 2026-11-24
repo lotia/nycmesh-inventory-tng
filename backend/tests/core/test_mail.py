@@ -1,14 +1,18 @@
 """Mail settings, and sending it over SMTP (docs/decisions/0012)."""
 
+import asyncio
 import dataclasses
 import smtplib
+from decimal import Decimal
 from email.message import EmailMessage
 from typing import Self
 
 import pytest
+from fastapi import BackgroundTasks
 from structlog.testing import capture_logs
 
 from inventory_tng.core import mail
+from inventory_tng.core.phrases import number, writing_numbers
 from inventory_tng.core.settings import MailConfig, Settings, SettingsError
 
 from helpers.mail import SITE_MAIL, FailingMail
@@ -219,3 +223,29 @@ def test_a_password_smtplib_cannot_encode_is_logged_not_raised() -> None:
     with capture_logs() as logs:
         mail.deliver(FailingMail(error), MESSAGE)
     assert any(line["event"] == "mail not sent" for line in logs)
+
+
+class KeptMail:
+    def __init__(self) -> None:
+        self.sent: list[mail.Message] = []
+
+    def send(self, message: mail.Message) -> None:
+        self.sent.append(message)
+
+
+def _with_a_number(to: str, admin_id: int) -> mail.Message:
+    return mail.Message(to, "Subject", number(Decimal("1500.5")), "activity", admin_id)
+
+
+def test_mail_writes_numbers_as_its_words_do_whatever_the_page() -> None:
+    """Sent from a comma page, told, told now or later, its numbers stay
+    as the words' locale writes them (inventory-tng-4mc3)."""
+    kept = KeptMail()
+    tasks = BackgroundTasks()
+    notify = mail.Notifier(kept, tasks)
+    with writing_numbers(","):
+        notify.tell("a@example.org", 1, _with_a_number)
+        notify.tell_now("a@example.org", 1, _with_a_number)
+        notify.later(lambda mailer: mail.deliver(mailer, _with_a_number("b", 2)))
+        asyncio.run(tasks())
+    assert [message.body for message in kept.sent] == ["1,500.5"] * 3

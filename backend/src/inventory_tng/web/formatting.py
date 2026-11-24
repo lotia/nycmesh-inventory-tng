@@ -3,19 +3,15 @@ neither FastAPI nor the templates, so rules may import it
 (docs/decisions/0023)."""
 
 from decimal import Decimal
-from typing import Literal
 
-from inventory_tng.core.phrases import gettext, lazy_gettext, number
-
-# A number box's decimal separator: the one its page's locale writes
-# (web/decimal_separator.py).
-Separator = Literal[".", ","]
+from inventory_tng.core.phrases import Separator, gettext, lazy_gettext, number
 
 
 def amount(value: Decimal | None) -> str:
     """A quantity people read: 1234.500 as "1,234.5" in English and
-    "1.234,5" in German, 3.000 as "3". Every digit it holds after the point
-    but trailing zeros, never rounded."""
+    "1.234,5" in German, 3.000 as "3"; "1234,5" on a page whose boxes take a
+    comma (phrases.number). Every digit it holds after the point but
+    trailing zeros, never rounded."""
     return "" if value is None else number(value.normalize())
 
 

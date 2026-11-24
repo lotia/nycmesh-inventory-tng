@@ -5,7 +5,8 @@ can type 2,5 (Ali, 2026-11-23, inventory-tng-qnwz). Nothing is stored,
 and the words stay English. Each page says it in its <html data-decimal>
 (admin_base.html, frontend_page.html), which the pages' scripts read
 (frontend/src/shared/quantity.ts), and its forms read the boxes in it
-(web/forms.quantity)."""
+(web/forms.quantity). Its numbers in words follow it too
+(NumbersInWords, phrases.writing_numbers)."""
 
 from functools import cache, lru_cache
 
@@ -13,8 +14,11 @@ import structlog
 from babel.core import UnknownLocaleError, negotiate_locale
 from babel.localedata import locale_identifiers
 from babel.numbers import get_decimal_symbol
+from starlette.datastructures import Headers
 from starlette.requests import Request
+from starlette.types import ASGIApp, Receive, Scope, Send
 
+from inventory_tng.core.phrases import writing_numbers
 from inventory_tng.web.formatting import Separator
 
 log = structlog.get_logger(__name__)
@@ -77,3 +81,24 @@ def decimal_separator(request: Request) -> Separator:
         state[_CHOSEN] = separator_for(request.headers.get("accept-language", ""))
         log.debug("decimal separator chosen", separator=state[_CHOSEN])
     return state[_CHOSEN]
+
+
+class NumbersInWords:
+    """Writes the numbers in a request's words, its pages', refusals' and
+    notices' alike, with its decimal separator (phrases.writing_numbers):
+    on a page whose boxes take a comma, "1500 m" and "1,5 m" (Ali,
+    2026-11-23, inventory-tng-4mc3). Mail is written as anywhere else
+    (core/mail.py), and so are printed labels (labels/labels.py)."""
+
+    def __init__(self, app: ASGIApp) -> None:
+        self.app = app
+
+    async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
+        if scope["type"] != "http":
+            await self.app(scope, receive, send)
+            return
+        # Not logged: decimal_separator logs it once, where a page or form
+        # takes it, not for every request.
+        header = Headers(scope=scope).get("accept-language", "")
+        with writing_numbers(separator_for(header)):
+            await self.app(scope, receive, send)

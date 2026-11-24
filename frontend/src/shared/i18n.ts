@@ -8,6 +8,7 @@
 import { i18n, type MessageDescriptor } from "@lingui/core";
 import { signal } from "@preact/signals";
 import { messages } from "../locales/en.po";
+import { boxSeparator } from "./quantity";
 
 /** Counts each change of locale or catalogue: a component that says
  * anything reads it, through `say`, so it renders again on each. */
@@ -25,32 +26,45 @@ export function speak(name: string, catalogue: typeof messages): void {
 
 speak("en", messages);
 
-/** A number writer for each locale, made the first time it is needed. */
+/** A number writer for each locale and decimal separator, made the first
+ * time it is needed. */
 const writers = new Map<string, Intl.NumberFormat>();
 
 /**
  * `value` written as the active locale writes a number, grouped and with
  * its decimal sign (1,234.5, or 1.234,5 in German), keeping every
  * thousandth the ledger keeps, as the server's web/formatting.amount
- * does. For words only: a box holds shared/quantity's `boxAmount`,
- * which it reads back.
+ * does; on a page whose boxes take a comma (shared/quantity's
+ * `boxSeparator`), ungrouped and with that comma, 1234,5 (Ali,
+ * 2026-11-23, inventory-tng-4mc3). For words only: a box holds
+ * shared/quantity's `boxAmount`, which it reads back.
  */
 export function sayNumber(value: number): string {
   // Read so a component rendering this renders again on a change.
   void changes.value;
   // As Lingui writes a plural's #.
   const locales = i18n.locales ?? i18n.locale;
-  const key = String(locales);
+  const comma = boxSeparator() === ",";
+  const key = `${String(locales)} ${comma}`;
   let writer = writers.get(key);
   if (writer === undefined) {
-    writer = new Intl.NumberFormat(locales, { maximumFractionDigits: 3 });
+    writer = new Intl.NumberFormat(locales, {
+      maximumFractionDigits: 3,
+      useGrouping: !comma,
+    });
     writers.set(key, writer);
   }
-  return writer.format(value);
+  if (!comma) {
+    return writer.format(value);
+  }
+  return writer
+    .formatToParts(value)
+    .map((part) => (part.type === "decimal" ? "," : part.value))
+    .join("");
 }
 
 /** `amount`, in thousandths (shared/quantity.ts), as `sayNumber` writes
- * it: 1234500 as "1,234.5". */
+ * it: 1234500 as "1,234.5", or "1234,5" on a comma page. */
 export function sayAmount(amount: number): string {
   return sayNumber(amount / 1000);
 }

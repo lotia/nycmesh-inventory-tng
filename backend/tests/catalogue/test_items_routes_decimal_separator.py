@@ -12,7 +12,7 @@ from inventory_tng.catalogue.paths import ITEMS
 from inventory_tng.models.catalogue import Category, ItemPackage
 
 from helpers.items import new_item, shown_item_form
-from helpers.markup import box_values, problem
+from helpers.markup import box_values, problem, read
 from helpers.rows import add
 
 GERMAN = {"Accept-Language": "de-DE,de;q=0.9"}
@@ -83,3 +83,42 @@ def test_an_unchanged_box_posts_back_valid_in_a_comma_locale(
     )
     assert settings.status_code == 303
     assert package.short_below == Decimal("10.25")
+
+
+@pytest.mark.parametrize(
+    ("headers", "size", "fraction", "highest"),
+    [(GERMAN, "1500", "1,5", "1499"), (ENGLISH, "1,500", "1.5", "1,499")],
+)
+def test_amounts_in_words_follow_the_locales_separator(
+    admin_client: TestClient,
+    session: Session,
+    radios: Category,
+    headers: dict[str, str],
+    size: str,
+    fraction: str,
+    highest: str,
+) -> None:
+    """On a comma page, ungrouped and with a comma, in the page's words
+    and in a refusal the server writes; elsewhere as English writes them
+    (Ali, 2026-11-23, inventory-tng-4mc3)."""
+    item = new_item(session, radios, name="Cat6 cable", unit="m")
+    package = add(
+        session,
+        ItemPackage(
+            item_id=item.id,
+            name="Reel",
+            size=Decimal(1500),
+            short_below=Decimal("1.5"),
+        ),
+    )
+    path = f"{ITEMS}/{item.id}"
+    page = read(admin_client.get(path, headers=headers).text)
+    assert page.one("option", value=str(package.id)).text == f"Reel of {size}"
+    refused = admin_client.post(
+        path, data=shown_item_form(item, unit="each"), headers=headers
+    )
+    assert refused.status_code == 400
+    assert problem(refused.text, "unit") == (
+        f"The Reel package has a fraction ({fraction}): set it to a whole number "
+        f"from 1 to {highest} before switching the item count to each."
+    )

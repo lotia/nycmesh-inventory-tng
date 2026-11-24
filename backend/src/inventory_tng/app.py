@@ -52,6 +52,7 @@ from inventory_tng.stock import (
 )
 from inventory_tng.volunteers import volunteers_routes
 from inventory_tng.web import frontend_bundle, pages, security_headers
+from inventory_tng.web.decimal_separator import NumbersInWords
 
 log = structlog.get_logger(__name__)
 
@@ -109,6 +110,8 @@ def create_app(
     errors = pages.ErrorPages(api=API, scan=frontend_bundle.SCAN, admin=HOME)
     errors.install(app)
     app.add_middleware(CrossSiteRefusal)
+    # Numbers in words in the request's decimal separator.
+    app.add_middleware(NumbersInWords)
     app.add_middleware(
         RequestLogging,
         failed=errors.failed,

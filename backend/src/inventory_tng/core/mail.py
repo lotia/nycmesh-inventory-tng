@@ -9,7 +9,8 @@ notice of a recovery code used to confirm a form, sent as soon as that use
 is kept, as the form may yet end in an error whose page sends nothing
 after it (admins/guards._confirm). A failure is logged and
 counted, never shown on a page. Logs carry ids and the kind of mail, never
-addresses or links.
+addresses or links. Its numbers are written as the words' locale writes
+them, whatever the page that sent it writes (phrases.writing_numbers).
 """
 
 import smtplib
@@ -27,6 +28,7 @@ from opentelemetry import metrics
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from inventory_tng.core.phrases import writing_numbers
 from inventory_tng.core.settings import MailConfig
 from inventory_tng.models.admins import Admin
 
@@ -142,7 +144,7 @@ class Notifier:
         """Mail `to` what `build` makes, if mail is set up and there is an
         address."""
         if self.mailer is not None and to:
-            self.tasks.add_task(deliver, self.mailer, build(to, admin_id))
+            self.tasks.add_task(deliver, self.mailer, _made(build, to, admin_id))
 
     def tell_admins(
         self,
@@ -168,12 +170,24 @@ class Notifier:
         nothing after it (admins/guards._confirm). The reply then waits for the
         provider."""
         if self.mailer is not None and to:
-            deliver(self.mailer, build(to, admin_id))
+            deliver(self.mailer, _made(build, to, admin_id))
 
     def later(self, job: Callable[[Mailer], None]) -> None:
         """Run `job` after the reply, if mail is set up."""
         if self.mailer is not None:
-            self.tasks.add_task(job, self.mailer)
+            self.tasks.add_task(_in_mail_numbers, job, self.mailer)
+
+
+def _made(build: Told, to: str, admin_id: int) -> Message:
+    """What `build` makes, its numbers as mail writes them."""
+    with writing_numbers("."):
+        return build(to, admin_id)
+
+
+def _in_mail_numbers(job: Callable[[Mailer], None], mailer: Mailer) -> None:
+    """Run `job`, which makes mail, its numbers as mail writes them."""
+    with writing_numbers("."):
+        job(mailer)
 
 
 def _notifier(
