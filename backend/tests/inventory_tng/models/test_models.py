@@ -17,12 +17,13 @@ from sqlalchemy import delete, exc, literal_column, select, text, update
 from sqlalchemy.orm import Session
 
 from inventory_tng.catalogue import categories, items
+from inventory_tng.catalogue.amount_rules import counted_whole
 from inventory_tng.catalogue.name_keys import LOOK_ALIKES, name_key, name_key_sql
 from inventory_tng.core.db_base import Base
 from inventory_tng.core.db_errors import refusal
 from inventory_tng.core.db_sessions import ACTOR_INFO, set_actor
 from inventory_tng.labels import labels
-from inventory_tng.models.catalogue import Category, Item, ItemPackage
+from inventory_tng.models.catalogue import UNITS, Category, Item, ItemPackage
 from inventory_tng.models.core import CatalogueHistory
 from inventory_tng.models.labels import (
     LABEL_ALPHABET,
@@ -360,6 +361,20 @@ def test_item_checks(
 ) -> None:
     with violates(session, constraint):
         new_item(**fields)
+
+
+@pytest.mark.parametrize("unit", UNITS)
+def test_reorder_at_is_whole_for_every_unit_counted_whole(
+    new_item: Callable[..., Item], session: Session, unit: str
+) -> None:
+    """The check covers amount_rules.COUNTED_WHOLE as the migrations wrote
+    it, so a unit added there is held too (inventory-tng-gfes)."""
+    if counted_whole(unit):
+        with violates(session, "ck_item_minimum_whole"):
+            new_item(unit=unit, minimum=Decimal("2.5"))
+        new_item("Whole", unit=unit, minimum=Decimal(2))
+    else:
+        new_item(unit=unit, minimum=Decimal("2.5"))
 
 
 def test_unit_defaults_to_each(new_item: Callable[..., Item], session: Session) -> None:

@@ -16,6 +16,7 @@ from sqlalchemy.orm import Session
 from inventory_tng.catalogue import items
 from inventory_tng.catalogue.paths import ITEMS
 from inventory_tng.models.catalogue import Category, Item, ItemPackage
+from inventory_tng.web import forms as web_forms
 from inventory_tng.web.forms import WHOLE_UNITS
 
 from helpers.items import NOW, new_item, shown_item_form
@@ -59,6 +60,24 @@ def test_reorder_at_is_whole_for_an_item_counted_each(
     session.refresh(item)
     assert sent.status_code == status
     assert item.minimum == kept
+
+
+def test_the_database_refusing_a_fractional_reorder_at_says_so_beside_it(
+    admin_client: TestClient,
+    session: Session,
+    radios: Category,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Should the form let one by, the database's check refuses it, in the
+    form's words beside the box (inventory-tng-gfes)."""
+    monkeypatch.setattr(web_forms, "whole_enough", lambda _unit, _amount: True)
+    item = new_item(session, radios, unit="each")
+    form = shown_item_form(item, minimum="2.5")
+    refused = admin_client.post(f"{ITEMS}/{item.id}", data=form)
+    session.refresh(item)
+    assert refused.status_code == 400
+    assert problem(refused.text, "minimum") == str(WHOLE_UNITS)
+    assert item.minimum is None
 
 
 def test_reorder_at_is_checked_against_the_unit_sent(

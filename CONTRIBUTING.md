@@ -403,7 +403,10 @@ forms, the locked services, the ledger, the templates and the scan page
 all ask it, never comparing a unit themselves, and a test fails until a
 new unit is placed in one of its lists. The scan page reads its copy
 (`frontend/src/amount-rules.ts`), and both sides test against
-`frontend/src/amount-rules-vectors.json`. After changing it:
+`frontend/src/amount-rules-vectors.json`. The database's check that an
+item counted whole has a whole Reorder at (`ck_item_minimum_whole`) names
+its units in a migration, and a test fails until a new unit counted whole
+is added there. After changing it:
 
 ```sh
 mise run regenerate-amount-rules    # frontend/src/amount-rules.json

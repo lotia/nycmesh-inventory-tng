@@ -25,6 +25,7 @@ from sqlalchemy.orm import (
 )
 
 from inventory_tng.catalogue import units
+from inventory_tng.catalogue.amount_rules import COUNTED_WHOLE
 from inventory_tng.core.db_base import Base
 from inventory_tng.core.db_locking import READ_AGAIN_ONCE_LOCKED
 from inventory_tng.core.db_protection import protection
@@ -99,6 +100,12 @@ class Item(KeyedName, Searchable, Versioned, Base):
         ),
         CheckConstraint(one_of("unit", UNITS), name="unit"),
         CheckConstraint("minimum >= 0", name="minimum"),
+        # The app's rule (amount_rules.whole_enough), held here too, as it
+        # costs nothing on one row (Ali, 2026-11-23; inventory-tng-gfes).
+        CheckConstraint(
+            f"NOT {one_of('unit', COUNTED_WHOLE)} OR minimum = trunc(minimum)",
+            name="minimum_whole",
+        ),
         CheckConstraint("on_order >= 0", name="on_order"),
         protection(owner="catalogue/items.py", lock="catalogue", history=True),
     )

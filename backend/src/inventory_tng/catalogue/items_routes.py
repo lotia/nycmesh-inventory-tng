@@ -73,10 +73,14 @@ router = APIRouter(include_in_schema=False)
 
 # Refused by _change_or_note, as a rule would be, to ask about close names.
 CLOSE = "close_names"
+# A fractional Reorder at for an item counted each (models.catalogue.Item),
+# which the form refuses first (forms.item_fields).
+MINIMUM_WHOLE = "ck_item_minimum_whole"
 # The rules a change to an item may break, besides "unique", and the field
 # each is shown by.
 REFUSED_FIELDS = {
     "item_category_current": "category_id",
+    MINIMUM_WHOLE: "minimum",
     **dict.fromkeys(items.UNIT_FIXED_RULES.values(), "unit"),
 }
 

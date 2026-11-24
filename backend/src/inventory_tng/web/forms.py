@@ -66,6 +66,7 @@ RULES = {
     "category_has_items": lazy_gettext("Move or retire its items first."),
     "site_settings_time_zone": PICK_A_ZONE,
     "location_time_zone": PICK_A_ZONE,
+    "ck_item_minimum_whole": WHOLE_UNITS,
     "movement_whole_units": WHOLE_UNITS,
     "package_whole_units": WHOLE_UNITS,
     "open_package_untracked": lazy_gettext(
