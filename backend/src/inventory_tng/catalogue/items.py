@@ -601,8 +601,8 @@ def save_package(
     relock(session, package, current=True, seen=seen)
     _item_current(session, package)
     if size != package.size:
-        why = sizes_fixed(session, [package.id]).get(package.id)
-        enforce(SIZE_FIXED_RULES[why] if why else None)
+        if (why := sizes_fixed(session, [package.id]).get(package.id)) is not None:
+            enforce(SIZE_FIXED_RULES[why])
         _whole_for_its_item(session, package.item_id, size)
     package.name, package.size = name, size
     once_committed(session, log.info, "package saved", item_package_id=package.id)
@@ -625,17 +625,18 @@ def sizes_fixed(session: Session, package_ids: Collection[int]) -> dict[int, Siz
     if not package_ids:
         return {}
     package = ItemPackage.id
-    used = (
-        select(Movement.id).where(Movement.from_package_id == package),
-        select(Movement.id).where(Movement.to_package_id == package),
-        select(OpenPackage.id).where(OpenPackage.package_id == package),
+    used = or_(
+        select(Movement.id).where(Movement.from_package_id == package).exists(),
+        select(Movement.id).where(Movement.to_package_id == package).exists(),
+        select(OpenPackage.id).where(OpenPackage.package_id == package).exists(),
     )
-    labelled = select(Label.id).where(
-        Label.package_id == package, Label.revoked_at.is_(None)
+    labelled = (
+        select(Label.id)
+        .where(Label.package_id == package, Label.revoked_at.is_(None))
+        .exists()
     )
-    query = select(package, or_(*(each.exists() for each in used))).where(
-        package.in_(list(package_ids)),
-        or_(labelled.exists(), *(each.exists() for each in used)),
+    query = select(package, used).where(
+        package.in_(list(package_ids)), or_(used, labelled)
     )
     return {
         each: "used" if was_used else "labelled"

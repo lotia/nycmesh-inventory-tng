@@ -45,6 +45,7 @@ from helpers.markup import (
 )
 from helpers.query_counts import counting
 from helpers.rows import add, breaks, history, item_fields, named, shown
+from helpers.stock import Place, received
 
 
 def test_adding_an_item(
@@ -313,17 +314,11 @@ def test_editing_every_field(
 
 def _moved(session: Session, item: Item) -> None:
     """One of the item received into a store."""
-    store = add(session, Location(name=f"Hub {uuid.uuid4()}", kind="store"))
-    batch = add(
+    received(
         session,
-        LedgerTransaction(
-            time_zone=DEFAULT_ZONE,
-            idempotency_key=uuid.uuid4(),
-            kind="receipt",
-            to_location_id=store.id,
-        ),
+        Place(session),
+        [{"item_id": item.id, "quantity": "1", "unit": item.unit}],
     )
-    add(session, Movement(transaction_id=batch.id, item_id=item.id, quantity=1))
 
 
 def test_the_unit_is_fixed_once_stock_has_moved(
