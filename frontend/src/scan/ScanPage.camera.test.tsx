@@ -272,8 +272,29 @@ describe("scanning labels with the camera", () => {
     fireEvent.input(loose, { target: { value: "2" } });
     expect(status.textContent).toBe(say(TYPING));
     act(() => loose.blur());
-    expect(status.textContent).toBe("");
+    expect(status.textContent).toBe(say(POINT));
   });
+
+  test.each([
+    [
+      "a stray code",
+      "NOT-OURS",
+      "That label isn't in the inventory (NOT-OURS).",
+    ],
+    ["a place's question", "S4HELF", "Hub › Shelf A: from here, or to here?"],
+  ])(
+    "the camera's line says %s again once typing ends",
+    async (_what, code, words) => {
+      await opened();
+      await scan(code);
+      const status = (await screen.findByText(words)) as HTMLElement;
+      const search = screen.getByLabelText<HTMLInputElement>(say(FIND));
+      act(() => search.focus());
+      expect(status.textContent).toBe(say(TYPING));
+      act(() => search.blur());
+      expect(status.textContent).toBe(words);
+    },
+  );
 
   test("a tap on the camera's picture takes focus from a text box, so it reads again", async () => {
     await opened();

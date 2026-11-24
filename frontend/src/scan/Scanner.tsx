@@ -16,9 +16,9 @@
  * (repeated-reads.ts). Off the screen, the status line keeps its last
  * words; while a text box has focus, it says reading waits, and a tap on
  * the picture takes focus from the box (Ali, 2026-11-24,
- * inventory-tng-0w3n). Once reading resumes, it says a refusal still
- * standing again, or else to point the camera at a label, so what a label
- * did is not announced twice.
+ * inventory-tng-0w3n). Once reading resumes, it says a refusal or question
+ * still standing again, or else to point the camera at a label, so what a
+ * label did is not announced twice (inventory-tng-3pxj).
  * While this build is too old, it says to upgrade, over everything else,
  * as the alert saying so is below the camera, its Upgrade a link that
  * takes focus to the alert's Upgrade button (Ali, 2026-11-24,
@@ -118,12 +118,14 @@ const REFUSALS: Record<Refused, Refusal> = {
 };
 
 /** What a code read did, in words for the volunteer, what its label
- * named, for the report, and, refused, the cart line it is about, if any
- * (refused-line.ts). */
+ * named, for the report, refused, the cart line it is about, if any
+ * (refused-line.ts), and whether the words are a refusal or question
+ * still standing, said again once typing ends. */
 export type Acted = {
   said: string;
   label: LabelKind;
   about?: About | undefined;
+  stands?: boolean;
 };
 
 /** How often the camera's picture is read, in milliseconds. */
@@ -169,18 +171,22 @@ export function Scanner({
   // The newest onCode, so a refreshed catalogue is read from at once.
   const handle = useRef(onCode);
   handle.current = onCode;
-  // A phrase, or said as shown: the words onCode said; empty once the
-  // line a refusal was about changes.
+  // A phrase, or said as shown: the words onCode said; once the line a
+  // refusal was about changes, empty, or Point while typing, as typing's
+  // end says it.
   const said = useSignal<MessageDescriptor | string>(STARTING);
-  // Whether `said` is a refusal still standing.
+  // Whether `said` is a refusal or question still standing.
   const standing = useRef(false);
   const refusing = useClearedWhenLineChanges(cart, () => {
     standing.current = false;
-    said.value = "";
+    said.value = typing.peek() ? POINT : "";
   });
-  const show = (words: MessageDescriptor | string, about?: About) => {
+  const show = (
+    words: MessageDescriptor | string,
+    { about, stands = false }: Pick<Acted, "about" | "stands"> = {},
+  ) => {
     said.value = words;
-    standing.current = about !== undefined;
+    standing.current = stands;
     refusing(about);
   };
   // Why the camera could not be used, once it was refused.
@@ -190,16 +196,12 @@ export function Scanner({
   // What the status line says, too old aside: while typing pauses
   // reading, that it does; over the words kept beneath.
   const shown = typing.value ? TYPING : said.value;
-  // Beneath the typing words, what a label did becomes Point, so the
-  // live region does not announce it again once typing ends; a refusal
-  // stays, as it still asks for a fix, as do Starting and an empty line.
+  // Beneath the typing words, anything but a refusal or question still
+  // standing becomes Point, so the live region does not announce what a
+  // label did again once typing ends; Starting stays till the camera
+  // opens.
   useEffect(() => {
-    if (
-      typing.value &&
-      !standing.current &&
-      said.peek() !== STARTING &&
-      said.peek() !== ""
-    ) {
+    if (typing.value && !standing.current && said.peek() !== STARTING) {
       said.value = POINT;
     }
   }, [typing.value]);
@@ -256,7 +258,7 @@ export function Scanner({
               if (repeats.fresh(code, Date.now())) {
                 const acted = handle.current(code);
                 report.read(acted.label);
-                show(acted.said, acted.about);
+                show(acted.said, acted);
               }
             }
           } catch {

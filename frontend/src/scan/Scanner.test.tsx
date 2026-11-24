@@ -8,7 +8,8 @@ import { fakeCamera as camera, pass } from "../testing/camera";
 import { setVisibility, show, stubVisibility } from "../testing/visibility";
 import { DecoderUnavailable, type Session } from "./camera";
 import type { LabelKind } from "./camera-report";
-import { freshCart } from "./cart";
+import { freshCart, withLine } from "./cart";
+import { aboutLine } from "./refused-line";
 import {
   type Acted,
   DONE,
@@ -136,6 +137,54 @@ test("while typing, the status line says reading waits, then to point the camera
   act(() => {
     typing.value = true;
   });
+  expect(status.textContent).toBe(say(TYPING));
+  act(() => {
+    typing.value = false;
+  });
+  expect(status.textContent).toBe(say(POINT));
+});
+
+test("a refusal or question still standing is said again once typing ends", async () => {
+  const { state, open } = camera();
+  const onCode = vi.fn(
+    (code: string): Acted => ({ ...said(`Refused ${code}.`), stands: true }),
+  );
+  const typing = signal(false);
+  scanner({ open, onCode, typing });
+  state.inView = ["B3ZT9W"];
+  await pass();
+  const status = await screen.findByText("Refused B3ZT9W.");
+  act(() => {
+    typing.value = true;
+  });
+  expect(status.textContent).toBe(say(TYPING));
+  act(() => {
+    typing.value = false;
+  });
+  expect(status.textContent).toBe("Refused B3ZT9W.");
+});
+
+test("a refusal whose line changes while typing leaves Point once typing ends", async () => {
+  const { state, open } = camera();
+  const about = aboutLine(freshCart(), 1);
+  const onCode = vi.fn(
+    (code: string): Acted => ({
+      ...said(`Refused ${code}.`),
+      about,
+      stands: true,
+    }),
+  );
+  const typing = signal(false);
+  const view = scanner({ open, onCode, typing });
+  state.inView = ["B3ZT9W"];
+  await pass();
+  const status = await screen.findByText("Refused B3ZT9W.");
+  act(() => {
+    typing.value = true;
+  });
+  view.rerender(
+    scannerOf({ open, onCode, typing, cart: withLine(freshCart(), 1) }),
+  );
   expect(status.textContent).toBe(say(TYPING));
   act(() => {
     typing.value = false;

@@ -828,7 +828,10 @@ export function CartForm({
           cart={cart.value}
           onCode={(code) => {
             const read = readLabel(catalogue, code);
-            return { ...actOn(read), label: labelKind(read) };
+            const picked = actOn(read);
+            // A place's question stands till answered, as a refusal does.
+            const stands = picked.refused || placeRead.peek() !== null;
+            return { ...picked, label: labelKind(read), stands };
           }}
           onDone={() => {
             scanning.value = false;

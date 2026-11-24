@@ -13,6 +13,7 @@ import { looseBox, pick, startMove } from "./scan-page";
 
 const NOT_ADDED = "Not added. Fix the incorrect amount below, then scan again.";
 const TYPING = "Not reading while you type. Tap the picture to scan.";
+const POINT = "Point the camera at a label.";
 
 /** Each of `below`'s box, measured from the top of `line`. */
 async function placed(line: Locator, below: Locator[]) {
@@ -91,15 +92,15 @@ test("the camera's status line keeps its room as a refusal appears and clears", 
   await scan.click();
   await expect(line).toHaveText(NOT_ADDED, { timeout: 15_000 });
   expect(await placed(line, below)).toEqual(added);
-  // Fixed, it clears, and shows no bar: said once typing in the box no
-  // longer pauses reading, by a tap on the picture (inventory-tng-0w3n).
+  // Fixed while typing in its box, it clears, and once a tap on the
+  // picture ends typing, the line says to point the camera
+  // (inventory-tng-0w3n, inventory-tng-3pxj).
   await looseBox(page, prepared().labelled).fill("1");
   await expect(line).toHaveText(TYPING);
   expect(await placed(line, below)).toEqual(added);
   await camera.locator("video").click();
-  await expect(line).toHaveText("");
+  await expect(line).toHaveText(POINT);
   expect(await placed(line, below)).toEqual(added);
-  await expect(line).toHaveCSS("border-left-color", "rgba(0, 0, 0, 0)");
 });
 
 test("the item search's status line keeps its room as a refusal appears and clears", async ({

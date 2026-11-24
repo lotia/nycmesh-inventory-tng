@@ -771,11 +771,11 @@ utilities. When you style a page:
   room for the button at its bottom (`.back-to-camera-room`). While a
   text box has focus, as the on-screen keyboard may cover the picture,
   the camera reads no labels either and the button hides
-  (`scan/text-box-focus.ts`); the camera's status line then says so, and
-  once reading resumes says again a refusal still standing, or else to
-  point the camera at a label. A tap on the picture takes focus from the
-  box. Enter in the item search leaves
-  focus there, as a scanner gun types code after code. While the build is
+  (`scan/text-box-focus.ts`); the camera's status line then says so,
+  and once reading resumes says again a refusal or question still
+  standing, or else to point the camera at a label. A tap on the picture
+  takes focus from the box. Enter in the item search leaves focus there,
+  as a scanner gun types code after code. While the build is
   too old, the camera reads no labels till an upgrade, and the line says
   to upgrade instead, over everything else, as the alert saying so is
   below the camera; its Upgrade is a link that takes focus to the alert's
