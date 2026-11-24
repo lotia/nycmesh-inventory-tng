@@ -33,7 +33,7 @@ import {
   withLineChanged,
 } from "./cart";
 import { useEveryMinuteAndWhenShown } from "./every-minute-and-when-shown";
-import { Finder, type Picked } from "./Finder";
+import { done, Finder, type Picked, refused } from "./Finder";
 import { readLabel, type Scanned } from "./label-codes";
 import {
   AlertWords,
@@ -329,17 +329,14 @@ export function CartForm({
     query.value = "";
     if (opening && pack === undefined) {
       if (item?.packages.length === 0) {
-        return {
-          said: say(NO_PACKAGE_TO_OPEN, { item: item.name }),
-          refused: true,
-        };
+        return refused(say(NO_PACKAGE_TO_OPEN, { item: item.name }));
       }
       change(withLine(cart.value, itemId));
-      return { said: say(WHICH_PACKAGE, { item: item?.name }), refused: false };
+      return done(say(WHICH_PACKAGE, { item: item?.name }));
     }
     if (pack === undefined && looseUnread(cart.value, itemId)) {
       // Loose that reads as no amount is left as typed (cart.bumped).
-      return { said: say(NOT_ADDED), refused: true };
+      return refused(say(NOT_ADDED));
     }
     const next = addOne(cart.value, itemId, pack?.id);
     // A package's own label is the volunteer's choice (Line.typed).
@@ -348,13 +345,11 @@ export function CartForm({
         ? next
         : withLineChanged(next, itemId, (line) => ({ ...line, typed: true })),
     );
-    return {
-      said:
-        pack === undefined
-          ? say(ADDED_ONE, { item: item?.name })
-          : say(ADDED_PACKAGE, { package: pack.name, item: item?.name }),
-      refused: false,
-    };
+    return done(
+      pack === undefined
+        ? say(ADDED_ONE, { item: item?.name })
+        : say(ADDED_PACKAGE, { package: pack.name, item: item?.name }),
+    );
   }
 
   // The camera, while open, and a place it read, asking From or To.
@@ -365,7 +360,7 @@ export function CartForm({
   function actOn(read: Scanned): Picked {
     if (read.kind === "unknown") {
       // A stray code leaves a place's question to answer.
-      return { said: say(UNKNOWN_LABEL, { code: read.code }), refused: true };
+      return refused(say(UNKNOWN_LABEL, { code: read.code }));
     }
     placeRead.value = null;
     const { places } = indexOf(catalogue);
@@ -376,13 +371,10 @@ export function CartForm({
       if (only !== undefined && other === undefined) {
         placeOn(only, read.locationId);
         const here = cart.value.kind === "open" ? PLACE_HERE : PLACE_FROM_HERE;
-        return {
-          said: say(only === "from" ? here : PLACE_TO_HERE, { place }),
-          refused: false,
-        };
+        return done(say(only === "from" ? here : PLACE_TO_HERE, { place }));
       }
       placeRead.value = read.locationId;
-      return { said: say(PLACE_WHICH, { place }), refused: false };
+      return done(say(PLACE_WHICH, { place }));
     }
     const added = add(read.itemId, read.packageId);
     // A buzz where the phone has one (not iOS Safari).

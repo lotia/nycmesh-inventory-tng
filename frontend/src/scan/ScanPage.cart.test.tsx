@@ -309,20 +309,23 @@ describe("filling and saving a cart", () => {
     fireEvent.click(screen.getByRole("button", { name: "LiteBeam 5AC" }));
     // A pick that adds says nothing: its line shows it.
     expect(screen.queryByText("Added one: LiteBeam 5AC.")).toBeNull();
+    // Its live region, just after the search's field, is there and empty
+    // before it has words, so they are read out.
+    const live = screen.getByLabelText(say(FIND)).closest("div")
+      ?.nextElementSibling as HTMLElement;
+    expect(live.getAttribute("aria-live")).toBe("polite");
+    expect(live.textContent).toBe("");
     const loose = screen.getByLabelText<HTMLInputElement>("Loose units");
     fireEvent.input(loose, { target: { value: "2,5" } });
     find("litebeam");
     fireEvent.click(screen.getByRole("button", { name: "LiteBeam 5AC" }));
     const said = screen.getByText(say(NOT_ADDED));
     expect(said.getAttribute("role")).toBe("status");
-    expect(
-      screen.getByLabelText(say(FIND)).compareDocumentPosition(said) &
-        Node.DOCUMENT_POSITION_FOLLOWING,
-    ).toBeTruthy();
+    expect(live.contains(said)).toBe(true);
     expect(loose.value).toBe("2,5");
     // The next change to the search clears it.
     find("cable");
-    expect(screen.queryByText(say(NOT_ADDED))).toBeNull();
+    expect(live.textContent).toBe("");
   });
 
   test("Save says what is missing, and sends nothing", async () => {

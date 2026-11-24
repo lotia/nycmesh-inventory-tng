@@ -36,9 +36,12 @@ describe("open packages", () => {
   const NOTHING_LEFT = say(NOTHING_USABLE);
   const ticked = () =>
     (screen.getByLabelText(NOTHING_LEFT) as HTMLInputElement).checked;
+  // The card's note, not the item search's live region.
   const note = () =>
     screen.getByText(
-      (_, element) => element?.getAttribute("aria-live") === "polite",
+      (_, element) =>
+        element?.getAttribute("aria-live") === "polite" &&
+        element.closest("fieldset") !== null,
     ).textContent;
 
   test("an open package is a card: now, after this cut, and a box that ticks itself", async () => {
