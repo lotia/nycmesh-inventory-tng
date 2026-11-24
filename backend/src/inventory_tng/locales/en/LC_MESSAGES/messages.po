@@ -1892,6 +1892,12 @@ msgid ""
 "left, until it runs out."
 msgstr ""
 
+#: src/inventory_tng/templates/labels/label_revoke.html
+msgid ""
+"It can't be undone: labels made for it after get a new code, to print and"
+" stick on again."
+msgstr ""
+
 #: src/inventory_tng/templates/devices/device.html
 msgid ""
 "It can't save anything once revoked, and stays revoked: it would have to "
@@ -1983,9 +1989,7 @@ msgstr ""
 #: src/inventory_tng/templates/labels/label_revoke.html
 msgid ""
 "Its printed copies don't scan now, but would if what it names were "
-"brought back. Revoking it stops them scanning for good. It can't be "
-"undone: labels made for it after get a new code, to print and stick on "
-"again."
+"brought back. Revoking it stops them scanning for good."
 msgstr ""
 
 #: src/inventory_tng/web/forms.py
@@ -3434,10 +3438,7 @@ msgid "Revoked: they can't save anything now."
 msgstr ""
 
 #: src/inventory_tng/templates/labels/label_revoke.html
-msgid ""
-"Revoking it stops every printed copy scanning, wherever it is stuck. It "
-"can't be undone: labels made for it after get a new code, to print and "
-"stick on again."
+msgid "Revoking it stops every printed copy scanning, wherever it is stuck."
 msgstr ""
 
 #: src/inventory_tng/templates/devices/code.html

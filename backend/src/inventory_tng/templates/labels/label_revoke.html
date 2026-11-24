@@ -3,15 +3,10 @@
 {% block main %}
 <p>{% trans code=named.label.code, names=named.words %}Its code, <span class="key">{{ code }}</span>, names
 {{ names }}.{% endtrans %}</p>
-{% if named.current %}
-<p>{% trans %}Revoking it stops every printed copy scanning, wherever it is stuck.
-It can't be undone: labels made for it after get a new code, to print and
-stick on again.{% endtrans %}</p>
-{% else %}
-{#- Inactive: its copies would scan again were what it names brought back. #}
-<p>{% trans %}Its printed copies don't scan now, but would if what it names were
-brought back. Revoking it stops them scanning for good. It can't be undone:
-labels made for it after get a new code, to print and stick on again.{% endtrans %}</p>
-{% endif %}
+<p>{% if named.current %}{% trans %}Revoking it stops every printed copy scanning, wherever it is stuck.{% endtrans %}
+{%- else %}{% trans %}Its printed copies don't scan now, but would if what it names were
+brought back. Revoking it stops them scanning for good.{% endtrans %}
+{%- endif %} {% trans %}It can't be undone: labels made for it after get a new
+code, to print and stick on again.{% endtrans %}</p>
 {{ confirm(here, _("Revoke"), keep, _("Keep it")) }}
 {% endblock %}

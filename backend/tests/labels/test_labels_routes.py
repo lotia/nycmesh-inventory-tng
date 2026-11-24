@@ -30,7 +30,7 @@ from inventory_tng.scan.catalogue_api import catalogue
 from inventory_tng.web.listing import PER_PAGE
 from inventory_tng.web.qr_codes import qr_svg
 
-from helpers.items import NOW, shown_item_form
+from helpers.items import shown_item_form
 from helpers.markup import (
     button,
     forms,
@@ -43,7 +43,7 @@ from helpers.markup import (
     words_on,
 )
 from helpers.rows import add, history, tag
-from helpers.stock import stocked, write
+from helpers.stock import retire, stocked, write
 
 
 @pytest.fixture
@@ -565,8 +565,7 @@ def test_a_retired_packages_label_is_revoked_from_its_items_labels(
     the item page's link leads to it, offered to revoke, and revoked, the
     unit may change (Ali, 2026-11-23, inventory-tng-x30g)."""
     label = add(session, Label(item_id=cable.id, package_id=reel.id))
-    reel.retired_at = NOW
-    session.flush()
+    retire(session, reel)
     item_page = read(admin_client.get(f"{ITEMS}/{cable.id}").text)
     (to_labels,) = item_page.all("a", "Revoke its labels")
     assert to_labels.attrs["href"] == item_labels(cable.id)
