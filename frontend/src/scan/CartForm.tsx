@@ -33,7 +33,7 @@ import {
   withLineChanged,
 } from "./cart";
 import { useEveryMinuteAndWhenShown } from "./every-minute-and-when-shown";
-import { Finder } from "./Finder";
+import { Finder, type Picked } from "./Finder";
 import { readLabel, type Scanned } from "./label-codes";
 import {
   AlertWords,
@@ -60,7 +60,8 @@ import { type Removed, removeLine, undone } from "./undo-remove";
 import { sealedCounts, unseen } from "./unseen-batches";
 
 export const NOT_KEEPING = msg`This browser isn't keeping the cart, so a reload will empty it. Free some space or leave private browsing.`;
-/** What a label or a tap did, said under the camera. */
+/** What a label or a tap did, said under the camera; a refusal, which
+ * adds nothing, also under the item search. */
 export const NO_PACKAGE_TO_OPEN = msg`{item} comes in no package to open.`;
 export const WHICH_PACKAGE = msg`{item}: type how many of which package to open.`;
 export const ADDED_ONE = msg`Added one: {item}.`;
@@ -319,7 +320,7 @@ export function CartForm({
    * (openingPackage), as only whole packages are opened; with no such
    * package, its line, for the volunteer to fill. A package's own label
    * is the volunteer's choice, kept as typed. */
-  function add(itemId: number, packageId?: number): string {
+  function add(itemId: number, packageId?: number): Picked {
     const item = indexOf(catalogue).items.get(itemId);
     const opening = packageId === undefined && cart.value.kind === "open";
     const pack = opening
@@ -328,14 +329,17 @@ export function CartForm({
     query.value = "";
     if (opening && pack === undefined) {
       if (item?.packages.length === 0) {
-        return say(NO_PACKAGE_TO_OPEN, { item: item.name });
+        return {
+          said: say(NO_PACKAGE_TO_OPEN, { item: item.name }),
+          refused: true,
+        };
       }
       change(withLine(cart.value, itemId));
-      return say(WHICH_PACKAGE, { item: item?.name });
+      return { said: say(WHICH_PACKAGE, { item: item?.name }), refused: false };
     }
     if (pack === undefined && looseUnread(cart.value, itemId)) {
       // Loose that reads as no amount is left as typed (cart.bumped).
-      return say(NOT_ADDED);
+      return { said: say(NOT_ADDED), refused: true };
     }
     const next = addOne(cart.value, itemId, pack?.id);
     // A package's own label is the volunteer's choice (Line.typed).
@@ -344,9 +348,13 @@ export function CartForm({
         ? next
         : withLineChanged(next, itemId, (line) => ({ ...line, typed: true })),
     );
-    return pack === undefined
-      ? say(ADDED_ONE, { item: item?.name })
-      : say(ADDED_PACKAGE, { package: pack.name, item: item?.name });
+    return {
+      said:
+        pack === undefined
+          ? say(ADDED_ONE, { item: item?.name })
+          : say(ADDED_PACKAGE, { package: pack.name, item: item?.name }),
+      refused: false,
+    };
   }
 
   // The camera, while open, and a place it read, asking From or To.
@@ -354,10 +362,10 @@ export function CartForm({
   const placeRead = useSignal<number | null>(null);
 
   /** Acts on a label, read by the camera or typed by a scanner gun. */
-  function actOn(read: Scanned): string {
+  function actOn(read: Scanned): Picked {
     if (read.kind === "unknown") {
       // A stray code leaves a place's question to answer.
-      return say(UNKNOWN_LABEL, { code: read.code });
+      return { said: say(UNKNOWN_LABEL, { code: read.code }), refused: true };
     }
     placeRead.value = null;
     const { places } = indexOf(catalogue);
@@ -368,10 +376,13 @@ export function CartForm({
       if (only !== undefined && other === undefined) {
         placeOn(only, read.locationId);
         const here = cart.value.kind === "open" ? PLACE_HERE : PLACE_FROM_HERE;
-        return say(only === "from" ? here : PLACE_TO_HERE, { place });
+        return {
+          said: say(only === "from" ? here : PLACE_TO_HERE, { place }),
+          refused: false,
+        };
       }
       placeRead.value = read.locationId;
-      return say(PLACE_WHICH, { place });
+      return { said: say(PLACE_WHICH, { place }), refused: false };
     }
     const added = add(read.itemId, read.packageId);
     // A buzz where the phone has one (not iOS Safari).
@@ -881,7 +892,7 @@ export function CartForm({
         <Scanner
           onCode={(code) => {
             const read = readLabel(catalogue, code);
-            return { said: actOn(read), label: labelKind(read) };
+            return { said: actOn(read).said, label: labelKind(read) };
           }}
           onDone={() => {
             scanning.value = false;

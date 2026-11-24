@@ -26,6 +26,7 @@ import {
   CHANGED_BEFORE_DISCARD,
   DISCARD_CART,
   FROM,
+  NOT_ADDED,
   NOT_KEEPING as NOT_KEEPING_PHRASE,
   NOT_SENT,
   NOTHING_IN_CART,
@@ -299,6 +300,29 @@ describe("filling and saving a cart", () => {
     fireEvent.keyDown(finder, { key: "a" });
     fireEvent.keyDown(finder, { key: "Enter" });
     expect(screen.getByText(say(NOTHING_IN_CART))).toBeDefined();
+  });
+
+  test("an item picked in the search adds nothing to loose that reads as no amount, and says so below the search", async () => {
+    open();
+    await ready();
+    find("litebeam");
+    fireEvent.click(screen.getByRole("button", { name: "LiteBeam 5AC" }));
+    // A pick that adds says nothing: its line shows it.
+    expect(screen.queryByText("Added one: LiteBeam 5AC.")).toBeNull();
+    const loose = screen.getByLabelText<HTMLInputElement>("Loose units");
+    fireEvent.input(loose, { target: { value: "2,5" } });
+    find("litebeam");
+    fireEvent.click(screen.getByRole("button", { name: "LiteBeam 5AC" }));
+    const said = screen.getByText(say(NOT_ADDED));
+    expect(said.getAttribute("role")).toBe("status");
+    expect(
+      screen.getByLabelText(say(FIND)).compareDocumentPosition(said) &
+        Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+    expect(loose.value).toBe("2,5");
+    // The next change to the search clears it.
+    find("cable");
+    expect(screen.queryByText(say(NOT_ADDED))).toBeNull();
   });
 
   test("Save says what is missing, and sends nothing", async () => {
