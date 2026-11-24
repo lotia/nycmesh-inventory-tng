@@ -1297,7 +1297,7 @@
         "type": "object",
         "required": ["kind", "separator"],
         "title": "OtherSeparator",
-        "description": "A scan page's box refused as written with the decimal separator its\nlocale does not use, as Record was tapped: a point, a comma, or either\nfollowed by three digits, as thousands are grouped (web/forms.py)."
+        "description": "A scan page's box refused as written with the decimal separator its\nlocale does not use, as Record was tapped: a point, a comma, or either\nfollowed by three digits after a whole part above 0, as thousands are\ngrouped (web/forms.py)."
       },
       "OutOfDate": {
         "properties": {

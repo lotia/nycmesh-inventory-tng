@@ -136,7 +136,8 @@ class RestPutBack(Strict):
 class OtherSeparator(Strict):
     """A scan page's box refused as written with the decimal separator its
     locale does not use, as Record was tapped: a point, a comma, or either
-    followed by three digits, as thousands are grouped (web/forms.py)."""
+    followed by three digits after a whole part above 0, as thousands are
+    grouped (web/forms.py)."""
 
     kind: Literal["other_separator"]
     separator: forms.OtherSeparator

@@ -754,9 +754,9 @@ export const LOOSE_DECIMALS = msg`Enter the loose amount in {unit}, up to 3 deci
 export const OPEN_DECIMALS = msg`Enter how much from the open package, up to 3 decimals.`;
 export const WHOLE_UNITS = msg`Counted in whole units.`;
 /** A box refused for the decimal separator its page does not use: the
- * other followed by three digits, as thousands are grouped, which naming
- * the decimal one would turn into a thousandth of what was meant; else
- * the one to use, named (Ali, 2026-11-23, inventory-tng-qnwz). As the
+ * other followed by three digits after a whole part above 0, as
+ * thousands are grouped, which naming the decimal one would turn into a
+ * thousandth of what was meant; else the one to use, named (Ali, 2026-11-23, inventory-tng-qnwz). As the
  * server's web/forms.THOUSANDS and use_separator say. */
 export const THOUSANDS = msg`Type thousands without a separator: 1000.`;
 export const USE_SEPARATOR = msg`Use “{separator}” for decimals, such as {example}.`;

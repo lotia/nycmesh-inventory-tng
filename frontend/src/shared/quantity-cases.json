@@ -133,6 +133,16 @@
     },
     { "typed": "٠٫٥٠٠", "en": { "amount": "0.5" }, "de": { "amount": "0.5" } },
     {
+      "typed": "0.50",
+      "en": { "amount": "0.5" },
+      "de": { "refused": "separator" }
+    },
+    {
+      "typed": "0.5000",
+      "en": { "refused": "places" },
+      "de": { "refused": "separator" }
+    },
+    {
       "typed": "10.000",
       "en": { "amount": "10" },
       "de": { "refused": "thousands" }

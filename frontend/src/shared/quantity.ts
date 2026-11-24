@@ -154,7 +154,8 @@ export function boxAmount(
 
 /** A box's refusal of the decimal separator its page does not use, as
  * the server counts them (web/forms.OtherSeparator): a point, a comma, or
- * either followed by three digits, as thousands are grouped. */
+ * either followed by three digits after a whole part above 0, as
+ * thousands are grouped. */
 export type OtherSeparator = "point" | "comma" | "thousands";
 
 /** Which decimal separator other than its box's, `separator`, what is
