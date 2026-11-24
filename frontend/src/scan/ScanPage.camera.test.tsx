@@ -296,6 +296,34 @@ describe("scanning labels with the camera", () => {
     },
   );
 
+  test("a place's question answered says Point, not the question, once typing ends", async () => {
+    await opened();
+    await scan("S4HELF");
+    const status = (await screen.findByText(
+      "Hub › Shelf A: from here, or to here?",
+    )) as HTMLElement;
+    fireEvent.click(screen.getByRole("button", { name: say(TO) }));
+    const search = screen.getByLabelText<HTMLInputElement>(say(FIND));
+    act(() => search.focus());
+    act(() => search.blur());
+    expect(status.textContent).toBe(say(POINT));
+  });
+
+  test("a place's question put away by a code typed while typing says Point once typing ends", async () => {
+    await opened();
+    await scan("S4HELF");
+    const status = (await screen.findByText(
+      "Hub › Shelf A: from here, or to here?",
+    )) as HTMLElement;
+    const search = screen.getByLabelText<HTMLInputElement>(say(FIND));
+    act(() => search.focus());
+    find("b3zt9w");
+    fireEvent.keyDown(search, { key: "Enter" });
+    expect(screen.queryByRole("button", { name: say(FROM) })).toBeNull();
+    act(() => search.blur());
+    expect(status.textContent).toBe(say(POINT));
+  });
+
   test("a tap on the camera's picture takes focus from a text box, so it reads again", async () => {
     await opened();
     const search = screen.getByLabelText<HTMLInputElement>(say(FIND));

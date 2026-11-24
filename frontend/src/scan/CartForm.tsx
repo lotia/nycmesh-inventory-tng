@@ -829,8 +829,14 @@ export function CartForm({
           onCode={(code) => {
             const read = readLabel(catalogue, code);
             const picked = actOn(read);
-            // A place's question stands till answered, as a refusal does.
-            const stands = picked.refused || placeRead.peek() !== null;
+            // A refusal stands; a place's question, till it is answered or
+            // put away, here or by a label in the item search.
+            const asked = placeRead.peek();
+            const stands = picked.refused
+              ? () => true
+              : asked === null
+                ? undefined
+                : () => placeRead.peek() === asked;
             return { ...picked, label: labelKind(read), stands };
           }}
           onDone={() => {

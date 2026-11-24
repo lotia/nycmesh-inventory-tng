@@ -147,7 +147,10 @@ test("while typing, the status line says reading waits, then to point the camera
 test("a refusal or question still standing is said again once typing ends", async () => {
   const { state, open } = camera();
   const onCode = vi.fn(
-    (code: string): Acted => ({ ...said(`Refused ${code}.`), stands: true }),
+    (code: string): Acted => ({
+      ...said(`Refused ${code}.`),
+      stands: () => true,
+    }),
   );
   const typing = signal(false);
   scanner({ open, onCode, typing });
@@ -164,6 +167,30 @@ test("a refusal or question still standing is said again once typing ends", asyn
   expect(status.textContent).toBe("Refused B3ZT9W.");
 });
 
+test("a question answered while typing leaves Point once typing ends", async () => {
+  const { state, open } = camera();
+  const asked = signal(true);
+  const onCode = vi.fn(
+    (code: string): Acted => ({
+      ...said(`Which side of ${code}?`),
+      stands: () => asked.peek(),
+    }),
+  );
+  const typing = signal(false);
+  scanner({ open, onCode, typing });
+  state.inView = ["S4HELF"];
+  await pass();
+  const status = await screen.findByText("Which side of S4HELF?");
+  act(() => {
+    typing.value = true;
+  });
+  asked.value = false;
+  act(() => {
+    typing.value = false;
+  });
+  expect(status.textContent).toBe(say(POINT));
+});
+
 test("a refusal whose line changes while typing leaves Point once typing ends", async () => {
   const { state, open } = camera();
   const about = aboutLine(freshCart(), 1);
@@ -171,7 +198,7 @@ test("a refusal whose line changes while typing leaves Point once typing ends", 
     (code: string): Acted => ({
       ...said(`Refused ${code}.`),
       about,
-      stands: true,
+      stands: () => true,
     }),
   );
   const typing = signal(false);

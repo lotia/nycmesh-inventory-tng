@@ -28,7 +28,7 @@
  */
 import type { MessageDescriptor } from "@lingui/core";
 import { msg } from "@lingui/core/macro";
-import { type ReadonlySignal, useSignal } from "@preact/signals";
+import { effect, type ReadonlySignal, useSignal } from "@preact/signals";
 import { useEffect, useRef } from "preact/hooks";
 import { say, sayParts } from "../shared/i18n";
 import { openCamera, type Session } from "./camera";
@@ -119,13 +119,14 @@ const REFUSALS: Record<Refused, Refusal> = {
 
 /** What a code read did, in words for the volunteer, what its label
  * named, for the report, refused, the cart line it is about, if any
- * (refused-line.ts), and whether the words are a refusal or question
- * still standing, said again once typing ends. */
+ * (refused-line.ts), and, for a refusal or question, whether its words
+ * still stand, asked as typing starts and ends: said again once typing
+ * ends while they do. */
 export type Acted = {
   said: string;
   label: LabelKind;
   about?: About | undefined;
-  stands?: boolean;
+  stands?: (() => boolean) | undefined;
 };
 
 /** How often the camera's picture is read, in milliseconds. */
@@ -175,15 +176,15 @@ export function Scanner({
   // refusal was about changes, empty, or Point while typing, as typing's
   // end says it.
   const said = useSignal<MessageDescriptor | string>(STARTING);
-  // Whether `said` is a refusal or question still standing.
-  const standing = useRef(false);
+  // Whether `said`, a refusal or question, still stands.
+  const standing = useRef<(() => boolean) | undefined>(undefined);
   const refusing = useClearedWhenLineChanges(cart, () => {
-    standing.current = false;
+    standing.current = undefined;
     said.value = typing.peek() ? POINT : "";
   });
   const show = (
     words: MessageDescriptor | string,
-    { about, stands = false }: Pick<Acted, "about" | "stands"> = {},
+    { about, stands }: Pick<Acted, "about" | "stands"> = {},
   ) => {
     said.value = words;
     standing.current = stands;
@@ -196,15 +197,22 @@ export function Scanner({
   // What the status line says, too old aside: while typing pauses
   // reading, that it does; over the words kept beneath.
   const shown = typing.value ? TYPING : said.value;
-  // Beneath the typing words, anything but a refusal or question still
+  // As typing starts and ends, anything but a refusal or question still
   // standing becomes Point, so the live region does not announce what a
-  // label did again once typing ends; Starting stays till the camera
-  // opens.
-  useEffect(() => {
-    if (typing.value && !standing.current && said.peek() !== STARTING) {
-      said.value = POINT;
-    }
-  }, [typing.value]);
+  // label did, or a question answered meanwhile, once typing ends;
+  // Starting stays till the camera opens. Done as `typing` changes, so
+  // before the line is drawn again.
+  useEffect(
+    () =>
+      effect(() => {
+        typing.value;
+        if (!standing.current?.() && said.peek() !== STARTING) {
+          standing.current = undefined;
+          said.value = POINT;
+        }
+      }),
+    [],
+  );
 
   // Done went with the refusal: Reload page takes the focus, or, where
   // none is offered, the refusal's words, so the volunteer keeps their
