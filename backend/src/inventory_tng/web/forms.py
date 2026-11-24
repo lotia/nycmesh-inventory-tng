@@ -255,9 +255,9 @@ def use_separator(separator: Separator) -> str:
 
 
 # Which a box refused as its locale does not write decimals so: a point,
-# a comma, or either followed by three digits after a whole part above 0.
-# The counter's attribute, from this list only; the scan page reports its
-# own (scan/page_telemetry_api).
+# a comma, or either read as thousands (Unreadable). The counter's
+# attribute, from this list only; the scan page reports its own
+# (scan/page_telemetry_api).
 OtherSeparator = Literal["point", "comma", "thousands"]
 
 other_separators = meter.create_counter(
