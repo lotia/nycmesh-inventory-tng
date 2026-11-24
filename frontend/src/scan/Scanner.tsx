@@ -193,16 +193,20 @@ export function Scanner({
         // them up.
         const read = async () => {
           try {
-            if (!onScreen.peek()) {
-              pausedAt ??= Date.now();
-            } else if (pausedAt !== null) {
+            if (pausedAt !== null && onScreen.peek()) {
               repeats.paused(Date.now() - pausedAt);
               pausedAt = null;
             }
-            const codes = pausedAt === null ? await session.read() : [];
-            // Closed, or scrolled off the screen, while reading: what it
-            // read is not taken.
-            const taken = stopped || !onScreen.peek() ? [] : codes;
+            const asked = Date.now();
+            const codes = onScreen.peek() ? await session.read() : [];
+            if (!onScreen.peek()) {
+              // Off the screen, or scrolled off while reading: nothing
+              // read is taken, and the pause counts from this read, so a
+              // slow one thrown away is not left out of it.
+              pausedAt ??= asked;
+            }
+            // Closed while reading: what it read is not taken.
+            const taken = stopped || pausedAt !== null ? [] : codes;
             for (const code of taken) {
               if (repeats.fresh(code, Date.now())) {
                 const acted = handle.current(code);

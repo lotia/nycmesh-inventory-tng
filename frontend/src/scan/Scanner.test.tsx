@@ -158,6 +158,32 @@ test("a label read as the picture leaves the screen is not taken", async () => {
   expect(read).toHaveBeenCalledTimes(1);
 });
 
+test("a slow read thrown away as the picture leaves counts toward the pause", async () => {
+  const { read, finish } = slowRead();
+  const { open } = camera({ read });
+  const onCode = vi.fn((code: string) => said(`Read ${code}.`));
+  const onScreen = signal(true);
+  scanner({ open, onCode, onScreen });
+  await screen.findByText(say(POINT));
+  await pass();
+  await act(async () => finish(["B3ZT9W"]));
+  await screen.findByText("Read B3ZT9W.");
+  await pass();
+  expect(read).toHaveBeenCalledTimes(2);
+  // Most of a repeat's quiet time passes before it answers, as the
+  // picture leaves the screen; the label is held in view throughout.
+  await vi.advanceTimersByTimeAsync(1800);
+  onScreen.value = false;
+  await act(async () => finish(["B3ZT9W"]));
+  await pass(15);
+  onScreen.value = true;
+  await pass();
+  expect(read).toHaveBeenCalledTimes(3);
+  await act(async () => finish(["B3ZT9W"]));
+  await pass();
+  expect(onCode).toHaveBeenCalledTimes(1);
+});
+
 test("Done stops the camera", async () => {
   const { state, open } = camera();
   const onDone = vi.fn();
