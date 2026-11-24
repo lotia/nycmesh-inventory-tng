@@ -3,8 +3,9 @@ import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import { say } from "../shared/i18n";
 import { telemetry } from "../shared/telemetry";
 import { stubInView } from "../testing/in-view";
-import { BACK_TO_CAMERA, BackToCamera, isTextBox, ROOM } from "./BackToCamera";
+import { BACK_TO_CAMERA, BackToCamera, ROOM } from "./BackToCamera";
 import { useWhollyOnScreen } from "./camera-in-view";
+import { useTextBoxFocused } from "./text-box-focus";
 
 let view: ReturnType<typeof stubInView>;
 let camera: HTMLVideoElement;
@@ -28,9 +29,16 @@ afterEach(() => {
 
 const back = () => screen.queryByRole("button", { name: say(BACK_TO_CAMERA) });
 
-/** The button, told what the camera's watch says, as CartForm does. */
+/** The button, told what the camera's watch and the focus say, as
+ * CartForm does. */
 function Watched() {
-  return <BackToCamera camera={camera} onScreen={useWhollyOnScreen(camera)} />;
+  return (
+    <BackToCamera
+      camera={camera}
+      onScreen={useWhollyOnScreen(camera)}
+      typing={useTextBoxFocused()}
+    />
+  );
 }
 
 /** The page with a box of `type` and the button, the camera wholly in
@@ -108,26 +116,5 @@ describe("Back to camera", () => {
     act(unmount);
     expect(document.documentElement.classList.contains(ROOM)).toBe(false);
     expect(view.watched()).toBe(0);
-  });
-});
-
-describe("a text box", () => {
-  test("is a box the volunteer types in, not a choice or a button", () => {
-    const made = (tag: string, type?: string) => {
-      const element = document.createElement(tag);
-      if (type !== undefined) {
-        element.setAttribute("type", type);
-      }
-      return element;
-    };
-    expect(isTextBox(made("input"))).toBe(true);
-    expect(isTextBox(made("input", "search"))).toBe(true);
-    expect(isTextBox(made("input", "number"))).toBe(true);
-    expect(isTextBox(made("textarea"))).toBe(true);
-    expect(isTextBox(made("input", "radio"))).toBe(false);
-    expect(isTextBox(made("input", "checkbox"))).toBe(false);
-    expect(isTextBox(made("select"))).toBe(false);
-    expect(isTextBox(made("button"))).toBe(false);
-    expect(isTextBox(null)).toBe(false);
   });
 });

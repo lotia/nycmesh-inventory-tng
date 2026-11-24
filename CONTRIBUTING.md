@@ -768,7 +768,10 @@ utilities. When you style a page:
   as it opens. While the picture is not wholly on the screen, the camera
   reads no labels and Back to camera (`scan/BackToCamera.tsx`) brings it
   back, both told by one watch (`scan/camera-in-view.ts`); the page keeps
-  room for the button at its bottom (`.back-to-camera-room`).
+  room for the button at its bottom (`.back-to-camera-room`). While a
+  text box has focus, as the on-screen keyboard may cover the picture,
+  the camera reads no labels either and the button hides
+  (`scan/text-box-focus.ts`).
 - A box a person types into names the keyboard a phone shows for it
   with `inputmode`: `numeric` for whole numbers, `decimal` for numbers
   with a decimal point, `text` for anything with letters. A number with

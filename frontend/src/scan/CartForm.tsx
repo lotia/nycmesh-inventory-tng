@@ -4,7 +4,7 @@
  * 2026-11-24, inventory-tng-fdnt); then Record. */
 import type { MessageDescriptor } from "@lingui/core";
 import { msg } from "@lingui/core/macro";
-import { type Signal, useSignal } from "@preact/signals";
+import { type Signal, useComputed, useSignal } from "@preact/signals";
 import type { TargetedSubmitEvent } from "preact";
 import { useEffect, useLayoutEffect, useMemo, useRef } from "preact/hooks";
 import { Field } from "../shared/Field";
@@ -63,6 +63,7 @@ import { differenceOf } from "./recorded-elsewhere";
 import { aboutLine } from "./refused-line";
 import { Scanner } from "./Scanner";
 import { indexOf } from "./search";
+import { useTextBoxFocused } from "./text-box-focus";
 import { type Removed, removeLine, undone } from "./undo-remove";
 import { sealedCounts, unseen } from "./unseen-batches";
 
@@ -367,6 +368,10 @@ export function CartForm({
   // The camera's picture, while it shows (BackToCamera).
   const picture = useSignal<HTMLVideoElement | null>(null);
   const pictureOnScreen = useWhollyOnScreen(picture.value);
+  const typing = useTextBoxFocused();
+  // Labels are read only while the picture is wholly on the screen and
+  // the on-screen keyboard is not up (Scanner).
+  const reads = useComputed(() => pictureOnScreen.value && !typing.value);
   const placeRead = useSignal<number | null>(null);
 
   /** Acts on a label, read by the camera or typed by a scanner gun. */
@@ -833,7 +838,7 @@ export function CartForm({
               scrollToPicture(video);
             }
           }}
-          onScreen={pictureOnScreen}
+          reads={reads}
           reload={reload}
           reloadKeepsCart={cartKept.value}
         />
@@ -995,7 +1000,11 @@ export function CartForm({
         ))}
       {/* Last, as it shows at the bottom of the screen. */}
       {picture.value !== null && (
-        <BackToCamera camera={picture.value} onScreen={pictureOnScreen} />
+        <BackToCamera
+          camera={picture.value}
+          onScreen={pictureOnScreen}
+          typing={typing}
+        />
       )}
     </form>
   );

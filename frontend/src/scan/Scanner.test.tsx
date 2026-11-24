@@ -55,7 +55,7 @@ function scannerOf(props: ScannerProps) {
       onCode={() => said("")}
       onDone={() => {}}
       onPicture={() => {}}
-      onScreen={signal(true)}
+      reads={signal(true)}
       reload={() => {}}
       reloadKeepsCart
       {...props}
@@ -102,35 +102,35 @@ test("a label in view is taken once, and said what it did", async () => {
   expect(onCode).toHaveBeenCalledTimes(1);
 });
 
-test("no label is read while the picture is off the screen, and reading resumes once it is back", async () => {
+test("no label is read while reading is paused, and reading resumes after", async () => {
   const { state, open } = camera();
   const onCode = vi.fn((code: string) => said(`Read ${code}.`));
-  const onScreen = signal(true);
-  scanner({ open, onCode, onScreen });
+  const reads = signal(true);
+  scanner({ open, onCode, reads });
   await screen.findByText(say(POINT));
-  onScreen.value = false;
+  reads.value = false;
   state.inView = ["B3ZT9W"];
   await pass(3);
   expect(onCode).not.toHaveBeenCalled();
   // The status line keeps its last words.
   expect(screen.getByRole("status").textContent).toBe(say(POINT));
-  onScreen.value = true;
+  reads.value = true;
   await screen.findByText("Read B3ZT9W.");
   expect(onCode).toHaveBeenCalledTimes(1);
 });
 
-test("a label held in view while the picture is off the screen is not taken again on its return", async () => {
+test("a label held in view through a pause is not taken again after it", async () => {
   const { state, open } = camera();
   const onCode = vi.fn((code: string) => said(`Read ${code}.`));
-  const onScreen = signal(true);
-  scanner({ open, onCode, onScreen });
+  const reads = signal(true);
+  scanner({ open, onCode, reads });
   await screen.findByText(say(POINT));
   state.inView = ["B3ZT9W"];
   await screen.findByText("Read B3ZT9W.");
-  onScreen.value = false;
-  // Off the screen longer than a repeat's quiet time.
+  reads.value = false;
+  // Paused longer than a repeat's quiet time.
   await pass(15);
-  onScreen.value = true;
+  reads.value = true;
   await pass(3);
   expect(onCode).toHaveBeenCalledTimes(1);
   // Taken away for the quiet time and shown again, it is a scan.
@@ -141,29 +141,29 @@ test("a label held in view while the picture is off the screen is not taken agai
   expect(onCode).toHaveBeenCalledTimes(2);
 });
 
-test("a label read as the picture leaves the screen is not taken", async () => {
+test("a label read as reading pauses is not taken", async () => {
   const { read, finish } = slowRead();
   const { open } = camera({ read });
   const onCode = vi.fn((code: string) => said(`Read ${code}.`));
-  const onScreen = signal(true);
-  scanner({ open, onCode, onScreen });
+  const reads = signal(true);
+  scanner({ open, onCode, reads });
   await screen.findByText(say(POINT));
   await pass();
   expect(read).toHaveBeenCalledTimes(1);
-  onScreen.value = false;
+  reads.value = false;
   await act(async () => finish(["B3ZT9W"]));
   await pass(3);
   expect(onCode).not.toHaveBeenCalled();
-  // Off the screen, the camera is not asked again.
+  // Paused, the camera is not asked again.
   expect(read).toHaveBeenCalledTimes(1);
 });
 
-test("a slow read thrown away as the picture leaves counts toward the pause", async () => {
+test("a slow read thrown away as reading pauses counts toward the pause", async () => {
   const { read, finish } = slowRead();
   const { open } = camera({ read });
   const onCode = vi.fn((code: string) => said(`Read ${code}.`));
-  const onScreen = signal(true);
-  scanner({ open, onCode, onScreen });
+  const reads = signal(true);
+  scanner({ open, onCode, reads });
   await screen.findByText(say(POINT));
   await pass();
   await act(async () => finish(["B3ZT9W"]));
@@ -171,12 +171,12 @@ test("a slow read thrown away as the picture leaves counts toward the pause", as
   await pass();
   expect(read).toHaveBeenCalledTimes(2);
   // Most of a repeat's quiet time passes before it answers, as the
-  // picture leaves the screen; the label is held in view throughout.
+  // reading pauses; the label is held in view throughout.
   await vi.advanceTimersByTimeAsync(1800);
-  onScreen.value = false;
+  reads.value = false;
   await act(async () => finish(["B3ZT9W"]));
   await pass(15);
-  onScreen.value = true;
+  reads.value = true;
   await pass();
   expect(read).toHaveBeenCalledTimes(3);
   await act(async () => finish(["B3ZT9W"]));

@@ -8,8 +8,10 @@
  * the lists below still work.
  * No label is read while the picture is not wholly on the screen, so
  * nothing is added out of the volunteer's sight (Ali, 2026-11-24,
- * inventory-tng-rj2g); the status line keeps its last words, and a label
- * held in view through the pause is not taken again (repeated-reads.ts).
+ * inventory-tng-rj2g), nor while a text box has focus, as the on-screen
+ * keyboard may cover the picture (Ali, 2026-11-24, inventory-tng-5663);
+ * the status line keeps its last words, and a label held in view through
+ * the pause is not taken again (repeated-reads.ts).
  * Each session is reported (camera-report.ts).
  */
 import type { MessageDescriptor } from "@lingui/core";
@@ -116,7 +118,7 @@ export function Scanner({
   onCode,
   onDone,
   onPicture,
-  onScreen,
+  reads,
   reload,
   reloadKeepsCart,
   open = openCamera,
@@ -128,9 +130,9 @@ export function Scanner({
   /** Given the camera's picture once it shows, and null once it stops
    * (BackToCamera). */
   onPicture: (video: HTMLVideoElement | null) => void;
-  /** Whether the picture is wholly on the screen (useWhollyOnScreen):
-   * labels are read only while it is. */
-  onScreen: ReadonlySignal<boolean>;
+  /** Whether labels may be read now: only while the picture is wholly on
+   * the screen and no text box has focus (CartForm). */
+  reads: ReadonlySignal<boolean>;
   /** Refresh this page (ScanPage's reload). */
   reload: () => void;
   /** Whether a reload or restart would bring back the cart
@@ -187,22 +189,22 @@ export function Scanner({
         torch.value = session.torch;
         show(POINT);
         onPicture(video.current);
-        // When reading paused for the picture being off the screen.
+        // When reading paused (reads).
         let pausedAt: number | null = null;
         // Each read waits for the one before: a slow phone never piles
         // them up.
         const read = async () => {
           try {
-            if (pausedAt !== null && onScreen.peek()) {
+            if (pausedAt !== null && reads.peek()) {
               repeats.paused(Date.now() - pausedAt);
               pausedAt = null;
             }
             const asked = Date.now();
-            const codes = onScreen.peek() ? await session.read() : [];
-            if (!onScreen.peek()) {
-              // Off the screen, or scrolled off while reading: nothing
-              // read is taken, and the pause counts from this read, so a
-              // slow one thrown away is not left out of it.
+            const codes = reads.peek() ? await session.read() : [];
+            if (!reads.peek()) {
+              // Paused, or paused while reading: nothing read is taken,
+              // and the pause counts from this read, so a slow one thrown
+              // away is not left out of it.
               pausedAt ??= asked;
             }
             // Closed while reading: what it read is not taken.

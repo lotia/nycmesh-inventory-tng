@@ -229,6 +229,18 @@ describe("scanning labels with the camera", () => {
     expect(scroll).toHaveBeenCalledTimes(1);
   });
 
+  test("while a text box has focus, the camera adds nothing; once focus leaves it, it reads again", async () => {
+    await opened();
+    const search = screen.getByLabelText<HTMLInputElement>(say(FIND));
+    search.focus();
+    await scan("B3ZT9W");
+    await pass(2);
+    expect(lineNames()).toEqual([]);
+    search.blur();
+    await screen.findByText("Added one: LiteBeam 5AC.");
+    expect(lineNames()).toEqual(["LiteBeam 5AC"]);
+  });
+
   test("what a label added stays said as its line changes", async () => {
     await opened();
     await scan("B3ZT9W");
