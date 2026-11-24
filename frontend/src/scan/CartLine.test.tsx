@@ -103,9 +103,9 @@ test("a package's count refused is read with its box, and only it", () => {
   expect(refusalOf(screen.getByLabelText(TAKEN))).toBeNull();
   rerender(lineOf({ packages: { 1001: "1" } }));
   expect(refusalOf(screen.getByLabelText(SPOOL))).toBeNull();
-  expect(screen.getByLabelText(SPOOL).getAttribute("aria-describedby")).toBe(
-    null,
-  );
+  expect(
+    screen.getByLabelText(SPOOL).getAttribute("aria-describedby"),
+  ).toBeNull();
 });
 
 test("an amount from an open package refused is read with its box, and only it", () => {

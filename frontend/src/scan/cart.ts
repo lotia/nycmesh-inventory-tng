@@ -781,14 +781,15 @@ export function quantityOf(
   ];
   if (item.unit === "each" && parts.some((part) => part % 1000 !== 0)) {
     // The box typed in a fraction; a package's part is its size's, no box.
+    const fraction = { problem: [say(WHOLE_UNITS)] };
+    if (loose % 1000 !== 0) {
+      return refuse(fraction, { kind: "loose" });
+    }
     const cut = [...taken].find(([, t]) => t.amount % 1000 !== 0)?.[0];
-    const box: Box | undefined =
-      loose % 1000 !== 0
-        ? { kind: "loose" }
-        : cut === undefined
-          ? undefined
-          : { kind: "open", key: cut };
-    return { problem: [say(WHOLE_UNITS)], ...(box && { box }) };
+    return refuse(
+      fraction,
+      cut === undefined ? undefined : { kind: "open", key: cut },
+    );
   }
   return { amount, sealed, loose, taken };
 }

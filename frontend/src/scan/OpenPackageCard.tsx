@@ -155,7 +155,9 @@ export function OpenPackageCard({
             id={id}
             inputMode="decimal"
             aria-invalid={refusedBy !== undefined || undefined}
-            aria-describedby={[nowId, afterId, refusedBy].join(" ").trim()}
+            aria-describedby={[nowId, afterId, refusedBy]
+              .filter(Boolean)
+              .join(" ")}
             value={taken.amount}
             disabled={taken.whole}
             onInput={(event) => {
