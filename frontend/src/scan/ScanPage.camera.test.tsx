@@ -105,7 +105,7 @@ describe("scanning labels with the camera", () => {
     await scan();
     await vi.advanceTimersByTimeAsync(2000);
     await scan("B3ZT9W");
-    await screen.findByText(say(NOT_ADDED, { item: "LiteBeam 5AC" }));
+    await screen.findByText(say(NOT_ADDED));
     expect(loose.value).toBe("2,5");
   });
 

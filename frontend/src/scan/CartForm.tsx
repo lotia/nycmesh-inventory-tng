@@ -65,7 +65,7 @@ export const NO_PACKAGE_TO_OPEN = msg`{item} comes in no package to open.`;
 export const WHICH_PACKAGE = msg`{item}: type how many of which package to open.`;
 export const ADDED_ONE = msg`Added one: {item}.`;
 export const ADDED_PACKAGE = msg`Added a {package}: {item}.`;
-export const NOT_ADDED = msg`Not added: {item}. Fix its loose amount, then scan it again.`;
+export const NOT_ADDED = msg`Not added. Fix the incorrect amount above, then scan again.`;
 export const UNKNOWN_LABEL = msg`That label isn't in the inventory ({code}).`;
 export const PLACE_HERE = msg({
   comment:
@@ -335,7 +335,7 @@ export function CartForm({
     }
     if (pack === undefined && looseUnread(cart.value, itemId)) {
       // Loose that reads as no amount is left as typed (cart.bumped).
-      return say(NOT_ADDED, { item: item?.name });
+      return say(NOT_ADDED);
     }
     const next = addOne(cart.value, itemId, pack?.id);
     // A package's own label is the volunteer's choice (Line.typed).

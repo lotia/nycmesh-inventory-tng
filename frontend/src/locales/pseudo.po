@@ -117,6 +117,10 @@ msgstr ""
 msgid "This item is retired: what is left may be taken, never received"
 msgstr ""
 
+#: src/scan/CartForm.tsx
+msgid "Not added. Fix the incorrect amount above, then scan again."
+msgstr ""
+
 #: src/shared/registration.ts
 msgid "That phrase has expired. Ask for a new one."
 msgstr ""
@@ -840,10 +844,6 @@ msgstr ""
 
 #: src/scan/OlderList.tsx
 msgid "Unable to discard. Clear your site data to remove."
-msgstr ""
-
-#: src/scan/CartForm.tsx
-msgid "Not added: {item}. Fix its loose amount, then scan it again."
 msgstr ""
 
 #: src/scan/CartForm.tsx
