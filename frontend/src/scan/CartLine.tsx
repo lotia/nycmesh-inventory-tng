@@ -7,6 +7,7 @@ import { say, sayAmount } from "../shared/i18n";
 import { wordsOf } from "../shared/outbox-notes";
 import { thousandths } from "../shared/quantity";
 import {
+  type Box,
   type Item,
   type Line,
   quantityOf,
@@ -32,6 +33,11 @@ export const HOW_MANY = msg`How many`;
 export const HOW_MANY_IN = msg`How many {unit}`;
 export const IN_ALL = msg`{amount} {unit} in all`;
 
+/** Whether two boxes are the same box of a line. */
+function sameBox(a: Box, b: Box): boolean {
+  return JSON.stringify(a) === JSON.stringify(b);
+}
+
 export function CartLine({
   line,
   item,
@@ -52,9 +58,11 @@ export function CartLine({
   /** Given its Remove button, to focus (CartForm, after Undo). */
   removeRef?: Ref<HTMLButtonElement>;
 }) {
-  // What the line comes to, or why it cannot: the loose box's refusal,
-  // read with the box (aria-describedby).
+  // What the line comes to, or why it cannot, read with the box refused
+  // (aria-describedby); and the loose box's own refusal, when another
+  // comes first (cart.Refusal).
   const sumId = useId();
+  const looseId = useId();
   if (item === undefined) {
     return (
       <li>
@@ -66,7 +74,16 @@ export function CartLine({
     );
   }
   const quantity = quantityOf(line, item);
-  const looseRefused = "problem" in quantity && quantity.loose === true;
+  const refusal = "problem" in quantity ? quantity : null;
+  /** What says why `box` is refused, if it is; read with it. */
+  const refusing = (box: Box): string | undefined => {
+    const shown = refusal?.box;
+    if (shown !== undefined && sameBox(shown, box)) {
+      return sumId;
+    }
+    return box.kind === "loose" && refusal?.looseProblem ? looseId : undefined;
+  };
+  const looseSaid = refusing({ kind: "loose" });
   return (
     <li class="flex flex-col gap-2">
       <div>
@@ -89,6 +106,7 @@ export function CartLine({
           item={item}
           moving={moving}
           taken={line.open?.[open.key] ?? NOTHING_TAKEN}
+          refusedBy={refusing({ kind: "open", key: open.key })}
           onTake={(next) =>
             onChange({ ...line, open: { ...line.open, [open.key]: next } })
           }
@@ -98,6 +116,7 @@ export function CartLine({
         // The catalogue gives every size as a decimal, so never null.
         /* v8 ignore next */
         const size = sayAmount(thousandths(pack.size) ?? 0);
+        const said = refusing({ kind: "package", packageId: pack.id });
         return (
           <Fragment key={pack.id}>
             {resized(line, pack) && (
@@ -121,6 +140,8 @@ export function CartLine({
                 <input
                   id={id}
                   inputMode="numeric"
+                  aria-invalid={said !== undefined || undefined}
+                  aria-describedby={said}
                   value={line.packages[pack.id] ?? ""}
                   onInput={(event) =>
                     onChange({
@@ -151,8 +172,8 @@ export function CartLine({
           <input
             id={id}
             inputMode={item.unit === "each" ? "numeric" : "decimal"}
-            aria-invalid={looseRefused || undefined}
-            aria-describedby={looseRefused ? sumId : undefined}
+            aria-invalid={looseSaid !== undefined || undefined}
+            aria-describedby={looseSaid}
             value={line.loose}
             onInput={(event) =>
               onChange({ ...line, loose: event.currentTarget.value })
@@ -168,6 +189,9 @@ export function CartLine({
               unit: item.unit,
             })}
       </div>
+      {refusal?.looseProblem && (
+        <div id={looseId}>{wordsOf(refusal.looseProblem)}</div>
+      )}
       <button
         type="button"
         class="self-start"

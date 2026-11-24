@@ -83,6 +83,7 @@ export function OpenPackageCard({
   taken,
   moving,
   onTake,
+  refusedBy,
 }: {
   open: Offered;
   item: Item;
@@ -90,6 +91,8 @@ export function OpenPackageCard({
   /** Whether it can move whole. */
   moving: boolean;
   onTake: (next: Taken) => void;
+  /** The id of the words refusing what is taken, while they show. */
+  refusedBy?: string | undefined;
 }) {
   const nowId = useId();
   const afterId = useId();
@@ -151,7 +154,8 @@ export function OpenPackageCard({
           <input
             id={id}
             inputMode="decimal"
-            aria-describedby={`${nowId} ${afterId}`}
+            aria-invalid={refusedBy !== undefined || undefined}
+            aria-describedby={[nowId, afterId, refusedBy].join(" ").trim()}
             value={taken.amount}
             disabled={taken.whole}
             onInput={(event) => {

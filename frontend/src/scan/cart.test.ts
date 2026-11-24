@@ -134,7 +134,7 @@ describe("quantities", () => {
       problem: say(WHOLE_UNITS),
     });
     // The loose box's own refusal (CartLine ties the two).
-    expect(quantityOf(line, radio)).toMatchObject({ loose: true });
+    expect(quantityOf(line, radio)).toMatchObject({ box: { kind: "loose" } });
   });
 
   test("each part of an item counted in units is whole", () => {
@@ -162,7 +162,7 @@ describe("quantities", () => {
     expect(saidAsText(quantityOf(whole, halves))).toEqual({
       problem: say(WHOLE_UNITS),
     });
-    expect(quantityOf(whole, halves)).not.toHaveProperty("loose");
+    expect(quantityOf(whole, halves)).not.toHaveProperty("box");
   });
 
   test("a box reads as the server does", () => {
@@ -172,6 +172,21 @@ describe("quantities", () => {
     expect(quantityOf({ ...line, loose: "١٫٥" }, cable)).toMatchObject({
       amount: 1500,
     });
+  });
+
+  test("a refusal names its box, and the loose box's own words beside", () => {
+    const line = { itemId: 101, packages: { 1001: "x" }, loose: "lots" };
+    expect(saidAsText(quantityOf(line, cable))).toEqual({
+      problem: "Count whole packages: [Spool].",
+    });
+    expect(quantityOf(line, cable)).toMatchObject({
+      box: { kind: "package", packageId: 1001 },
+      looseProblem: ["Enter the loose amount in m, up to 3 decimals."],
+    });
+    // The loose box read, nothing of it beside.
+    expect(quantityOf({ ...line, loose: "1" }, cable)).not.toHaveProperty(
+      "looseProblem",
+    );
   });
 
   test("an unreadable amount says what is wanted", () => {
@@ -246,6 +261,7 @@ describe("a box in the page's decimal separator (inventory-tng-qnwz)", () => {
     expect(quantityOf(line, cable)).toEqual({
       problem: ["Use “,” for decimals, such as 0,5."],
       refused: "point",
+      box: { kind: "open", key: "key" },
     });
   });
 

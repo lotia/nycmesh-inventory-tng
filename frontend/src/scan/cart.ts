@@ -681,9 +681,28 @@ export function holdsSome(typed: string): boolean {
   return (count(typed) ?? 1) !== 0;
 }
 
+/** Which of a cart line's boxes a refusal is about, for CartLine to mark:
+ * the loose box, a package's count by its id, or what is taken from an
+ * open package by its key. */
+export type Box =
+  | { kind: "loose" }
+  | { kind: "package"; packageId: number }
+  | { kind: "open"; key: string };
+
+/** Why a line has no quantity: the first problem, the box it is about if
+ * it is one box, and, when another problem comes first but the loose box
+ * cannot be read either, the loose box's own words, so the box CartForm's
+ * NOT_ADDED sends the volunteer to is always marked (inventory-tng-weww). */
+export type Refusal = {
+  problem: Said;
+  refused?: OtherSeparator;
+  box?: Box;
+  looseProblem?: Said;
+};
+
 /** A line's quantity in thousandths of the item's unit, and of it, the
- * packages counted, by package, and how much loose; or why it has none,
- * with `loose` set when the loose box is what is refused. */
+ * packages counted, by package, and how much loose; or why it has none
+ * (Refusal). */
 export function quantityOf(
   line: Line,
   item: Item,
@@ -694,11 +713,23 @@ export function quantityOf(
       loose: number;
       taken: Map<string, { amount: number; whole: boolean }>;
     }
-  | { problem: Said; refused?: OtherSeparator; loose?: true } {
+  | Refusal {
+  const loose = readBox(line.loose);
+  const looseWords = () =>
+    boxProblem(line.loose, say(LOOSE_DECIMALS, { unit: item.unit }));
+  /** Refused for `said`, about `box`, the loose box's words beside. */
+  const refuse = (
+    said: { problem: Said; refused?: OtherSeparator },
+    box?: Box,
+  ): Refusal => ({
+    ...said,
+    ...(box && { box }),
+    ...(loose === null && { looseProblem: looseWords().problem }),
+  });
   const current = new Set(item.packages.map((pack) => String(pack.id)));
   for (const [packageId, typed] of Object.entries(line.packages)) {
     if (!current.has(packageId) && holdsSome(typed)) {
-      return { problem: [say(PACKAGE_NO_LONGER_USED)] };
+      return refuse({ problem: [say(PACKAGE_NO_LONGER_USED)] });
     }
   }
   let amount = 0;
@@ -708,23 +739,22 @@ export function quantityOf(
     // As counted: one resized since is refused when saved, not recounted.
     const size = thousandths(line.sizes?.[pack.id] ?? pack.size);
     if (packs === null || size === null) {
-      return {
-        problem: sayParts(COUNT_WHOLE_PACKAGES, {
-          package: { quoted: pack.name },
-        }),
-      };
+      return refuse(
+        {
+          problem: sayParts(COUNT_WHOLE_PACKAGES, {
+            package: { quoted: pack.name },
+          }),
+        },
+        { kind: "package", packageId: pack.id },
+      );
     }
     if (packs > 0) {
       sealed.set(pack.id, { count: packs, size });
     }
     amount += packs * size;
   }
-  const loose = readBox(line.loose);
   if (loose === null) {
-    return {
-      ...boxProblem(line.loose, say(LOOSE_DECIMALS, { unit: item.unit })),
-      loose: true,
-    };
+    return { ...looseWords(), box: { kind: "loose" } };
   }
   amount += loose;
   const taken = new Map<string, { amount: number; whole: boolean }>();
@@ -733,7 +763,10 @@ export function quantityOf(
   )) {
     const part = readBox(typed);
     if (part === null) {
-      return boxProblem(typed, say(OPEN_DECIMALS));
+      return refuse(boxProblem(typed, say(OPEN_DECIMALS)), {
+        kind: "open",
+        key,
+      });
     }
     if (part > 0) {
       taken.set(key, { amount: part, whole });
@@ -749,7 +782,7 @@ export function quantityOf(
   if (item.unit === "each" && parts.some((part) => part % 1000 !== 0)) {
     return loose % 1000 === 0
       ? { problem: [say(WHOLE_UNITS)] }
-      : { problem: [say(WHOLE_UNITS)], loose: true };
+      : { problem: [say(WHOLE_UNITS)], box: { kind: "loose" } };
   }
   return { amount, sealed, loose, taken };
 }
