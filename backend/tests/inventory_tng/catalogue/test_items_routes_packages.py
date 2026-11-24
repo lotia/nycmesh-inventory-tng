@@ -357,6 +357,8 @@ def test_a_too_short_length_refused_as_resized_meanwhile_says_so_beside_it(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     item = new_item(session, radios)
+    # Followed, so the page has the box to say it beside.
+    item.track_opened = True
     box = add(session, ItemPackage(item_id=item.id, name="Box", size=Decimal(10)))
 
     def resized_meanwhile(*_: object) -> None:
@@ -389,7 +391,13 @@ def test_an_items_amounts_read_grouped_but_its_boxes_hold_them_plainly(
     back (inventory-tng-31q3)."""
     item = add(
         session,
-        Item(name="Cable", category_id=radios.id, unit="m", minimum=Decimal("1234.5")),
+        Item(
+            name="Cable",
+            category_id=radios.id,
+            unit="m",
+            minimum=Decimal("1234.5"),
+            track_opened=True,
+        ),
     )
     add(
         session,

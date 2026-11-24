@@ -6,18 +6,18 @@ which administrator closed it.
 """
 
 import uuid
-from collections.abc import Collection, Iterable, Sequence
+from collections.abc import Callable, Collection, Iterable, Sequence
 from datetime import datetime
 from decimal import Decimal
 from typing import Literal, NamedTuple
 
 import structlog
 from opentelemetry import metrics
-from sqlalchemy import ColumnElement, exc, or_, select
+from sqlalchemy import ColumnElement, exc, func, or_, select
 from sqlalchemy.orm import Session
 
 from inventory_tng.core.db_errors import enforce
-from inventory_tng.core.db_locking import get_locked, locked
+from inventory_tng.core.db_locking import get_locked, lock_catalogue, locked
 from inventory_tng.core.db_once_committed import once_committed
 from inventory_tng.models.catalogue import Item, ItemPackage
 from inventory_tng.models.places import Location
@@ -38,7 +38,8 @@ closed = meter.create_counter(
     "inventory.open_packages.closed",
     unit="{package}",
     description="Open packages an administrator closed, by how: confirming a "
-    "volunteer's report, directly, or counting",
+    "volunteer's report, directly, counting, or no longer following its "
+    "package's opened ones",
 )
 cleared = meter.create_counter(
     "inventory.open_packages.cleared",
@@ -267,7 +268,7 @@ def settle_check(
     return True
 
 
-Closing = Literal["confirmed", "direct", "count"]
+Closing = Literal["confirmed", "direct", "count", "unfollowed"]
 
 
 def close(
@@ -317,6 +318,15 @@ def close(
             reason_id=adjustment_reasons.seeded(session, reason).id,
             form=ledger.Form(open_package_id=row.id),
         )
+    _closed(session, row, admin_id, at, how)
+    over_recorded.open_package_closed(session, row.id, admin_id, at)
+    return True
+
+
+def _closed(
+    session: Session, row: OpenPackage, admin_id: int, at: datetime, how: Closing
+) -> None:
+    """The row marked closed, never deleted, measured and logged `how`."""
     row.closed_at, row.closed_by_admin_id = at, admin_id
     # Nobody checks what a closed package has: closing settles its check.
     settled = _clear_check(row)
@@ -328,10 +338,142 @@ def close(
         log.info,
         "open package closed",
         open_package_id=row.id,
+        item_id=row.item_id,
         admin_id=admin_id,
+        how=how,
     )
-    over_recorded.open_package_closed(session, row.id, admin_id, at)
-    return True
+
+
+def unfollowing[T](
+    session: Session,
+    admin_id: int,
+    at: datetime,
+    change: Callable[[], T],
+    *,
+    item_ids: Collection[int] = (),
+    package_ids: Collection[int] = (),
+) -> tuple[T, int]:
+    """Make `change`, which may stop following the opened packages of
+    these items or packages (catalogue/items.py), then close each open
+    package of them no longer followed, in the same transaction
+    (close_unfollowed): what it did, and how many it closed.
+
+    `change` locks the items or packages FOR UPDATE, which a save at
+    their open packages' places holds after those places (stock/ledger.py's
+    order). So their places are locked first, after the catalogue lock
+    that every catalogue write takes first (db_locking.locked_row): a cut
+    under way there is counted before the close, and one sent after it
+    waits, then is refused, as its open package is closed."""
+    lock_catalogue(session)
+    query = select(OpenPackage.location_id).where(
+        OpenPackage.closed_at.is_(None),
+        or_(
+            OpenPackage.item_id.in_(list(item_ids)),
+            OpenPackage.package_id.in_(list(package_ids)),
+        ),
+    )
+    places = set(session.scalars(query.distinct()))
+    ledger.lock_places(session, places)
+    done = change()
+    return done, close_unfollowed(
+        session, places, admin_id, at, item_ids=item_ids, package_ids=package_ids
+    )
+
+
+def close_unfollowed(
+    session: Session,
+    places: Collection[int],
+    admin_id: int,
+    at: datetime,
+    *,
+    item_ids: Collection[int] = (),
+    package_ids: Collection[int] = (),
+) -> int:
+    """Close each open package of these items or packages whose package's
+    opened ones are no longer followed (ledger.tracks_opened), as Ali
+    decided on 2026-11-23 (inventory-tng-j89e): what is left on it becomes
+    loose units at its place, by a loosening under the administrator's
+    name, so the place holds what it held; the row is marked closed, never
+    deleted, in history. How many it closed. Nothing is written off, so,
+    unlike close, it puts no end of an opening recorded more than moved
+    right (over_recorded.open_package_closed).
+
+    Call it holding `places` (ledger.lock_places) from before the setting
+    was changed, as unfollowing does. One at a place not held, as moved
+    whole there meanwhile, is refused as changed (CHANGED_SINCE_SHOWN):
+    its place could only be locked now out of the ledger's order."""
+    followed = func.coalesce(ItemPackage.track_opened, Item.track_opened)
+    query = (
+        select(OpenPackage)
+        .join(ItemPackage, ItemPackage.id == OpenPackage.package_id)
+        .join(Item, Item.id == OpenPackage.item_id)
+        .where(
+            OpenPackage.closed_at.is_(None),
+            or_(
+                OpenPackage.item_id.in_(list(item_ids)),
+                OpenPackage.package_id.in_(list(package_ids)),
+            ),
+            followed.is_(False),
+        )
+        .order_by(OpenPackage.id)
+    )
+    candidates = session.scalars(query).all()
+    if not candidates:
+        return 0
+    # In the ledger's order, after the places: the items, then the open
+    # packages, each by id; then read again as locked.
+    ledger.hold_across(session, open_ids=[row.id for row in candidates])
+    rows = session.scalars(
+        locked(
+            select(OpenPackage)
+            .where(
+                OpenPackage.id.in_([row.id for row in candidates]),
+                OpenPackage.closed_at.is_(None),
+            )
+            .order_by(OpenPackage.id),
+            key_share=True,
+        )
+    ).all()
+    enforce(CHANGED_SINCE_SHOWN, when=any(r.location_id not in places for r in rows))
+    left = balance.left_on(session, rows)
+    for row in rows:
+        _loosen(session, row, left[row.id], admin_id)
+        _closed(session, row, admin_id, at, "unfollowed")
+    return len(rows)
+
+
+# What a change refused as made since its page was shown is refused by
+# (db_locking.unchanged).
+CHANGED_SINCE_SHOWN = "changed_since_shown"
+
+
+def _loosen(session: Session, row: OpenPackage, left: Decimal, admin_id: int) -> None:
+    """What is left on an open package made loose units at its place, by
+    a loosening (ledger._loosening_breaks); left below zero, as much taken
+    from them onto it. Nothing for one that shows nothing."""
+    if left == 0:
+        return
+    on_it, loose = ledger.Form(open_package_id=row.id), ledger.LOOSE
+    leaves, arrives = (on_it, loose) if left > 0 else (loose, on_it)
+    header = {
+        "kind": "loosen",
+        "from_location_id": row.location_id,
+        "to_location_id": row.location_id,
+        "admin_id": admin_id,
+    }
+    line = ledger.Entry(row.item_id, abs(left), leaves, arrives)
+    written = ledger.insert_transaction(
+        session, uuid.uuid5(row.key, "loosened"), header, [line]
+    )
+    once_committed(
+        session,
+        log.info,
+        "open package loosened",
+        open_package_id=row.id,
+        item_id=row.item_id,
+        location_id=row.location_id,
+        transaction_id=written and written.id,
+    )
 
 
 def clear(session: Session, open_id: int) -> bool:

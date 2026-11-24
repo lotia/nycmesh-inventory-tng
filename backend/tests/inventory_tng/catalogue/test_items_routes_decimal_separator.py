@@ -59,6 +59,7 @@ def test_an_unchanged_box_posts_back_valid_in_a_comma_locale(
     and too-short length, and the item's minimum, sent back as shown."""
     item = new_item(session, radios, name="Cat6 cable", unit="m")
     item.minimum = Decimal("2.5")
+    item.track_opened = True  # Else it has no Too short to use box.
     package = add(
         session,
         ItemPackage(

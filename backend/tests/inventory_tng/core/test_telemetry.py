@@ -1432,6 +1432,9 @@ def test_counts_package_tracking_changed_by_where(
     rolled_back: Recorded, session: Session
 ) -> None:
     client, _, reader, _ = rolled_back
+    tracking = "inventory.package_tracking.changed"
+    # Another test may have counted some in this process.
+    before = counted(reader, tracking)
     _, key = new_admin(session)
     sign_in_with(client, key=key)
     spools = Spools(session, tracked=False)
@@ -1450,13 +1453,10 @@ def test_counts_package_tracking_changed_by_where(
     )
     session.refresh(cable)
     client.post(f"{items_path}/{cable.id}", data=shown_item_form(cable))
-    changed = counted(reader, "inventory.package_tracking.changed")
-    assert {
-        scope: changed[(("scope", scope),)] for scope in ("bulk", "package", "item")
-    } == {
-        "bulk": 1,
-        "package": 1,
-        "item": 1,
+    assert added(reader, tracking, before) == {
+        (("scope", "bulk"),): 1,
+        (("scope", "package"),): 1,
+        (("scope", "item"),): 1,
     }
 
 
@@ -1484,10 +1484,16 @@ def test_counts_open_packages_closed_and_cleared(
         f"state_{four.id}": "missing",
     }
     client.post(f"/admin/counts/{store}", data=count)
+    # Its opened ones no longer followed, the one left open, two, closes.
+    client.post(
+        f"/admin/items/{spools.cable.id}/packages/{spools.spool.id}/tracking",
+        data={"track": "off"},
+    )
     assert added(reader, closed, before) == {
         (("how", "confirmed"),): 1,
         (("how", "direct"),): 1,
         (("how", "count"),): 1,
+        (("how", "unfollowed"),): 1,
     }
     assert counted(reader, "inventory.open_packages.cleared") == {(): 1}
 

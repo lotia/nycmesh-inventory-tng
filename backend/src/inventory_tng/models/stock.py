@@ -29,6 +29,9 @@ from inventory_tng.models.names import CanonicalName
 # units, at one place: its from and to are that place (docs/decisions/0020).
 # A report moves nothing: a volunteer says an open package at a place is
 # used up, for an administrator to confirm (open_packages.report).
+# Loosening turns what is left on an open package into loose units at its
+# place, as an administrator stops following its package's opened ones
+# (open_packages.close_unfollowed).
 TRANSACTION_KINDS = (
     "move",
     "receipt",
@@ -37,7 +40,13 @@ TRANSACTION_KINDS = (
     "adjustment",
     "open",
     "report",
+    "loosen",
 )
+# The kinds that change the form stock is in at one place, not how much
+# is there: their from and to are that place.
+AT_ONE_PLACE = ("open", "loosen")
+# The kinds an administrator records, under their name.
+BY_AN_ADMINISTRATOR = ("count", "adjustment", "loosen")
 
 
 class OpenPackage(Base):
@@ -106,12 +115,15 @@ class LedgerTransaction(Base):
     __table_args__ = (
         CheckConstraint(one_of("kind", TRANSACTION_KINDS), name="kind"),
         CheckConstraint(
-            "from_location_id <> to_location_id OR kind = 'open'", name="two_places"
+            f"from_location_id <> to_location_id OR {one_of('kind', AT_ONE_PLACE)}",
+            name="two_places",
         ),
         CheckConstraint(
             "CASE kind"
             " WHEN 'move' THEN num_nulls(from_location_id, to_location_id) = 0"
             " WHEN 'open' THEN from_location_id IS NOT NULL"
+            " AND from_location_id = to_location_id"
+            " WHEN 'loosen' THEN from_location_id IS NOT NULL"
             " AND from_location_id = to_location_id"
             " WHEN 'receipt' THEN from_location_id IS NULL"
             " AND to_location_id IS NOT NULL"
@@ -121,10 +133,10 @@ class LedgerTransaction(Base):
             name="sides",
         ),
         CheckConstraint("install_number > 0", name="install_number"),
-        # Counts and adjustments are an administrator's; an adjustment says
-        # why.
+        # Counts, adjustments and loosening are an administrator's; an
+        # adjustment says why.
         CheckConstraint(
-            "(kind IN ('count', 'adjustment')) = (admin_id IS NOT NULL)",
+            f"({one_of('kind', BY_AN_ADMINISTRATOR)}) = (admin_id IS NOT NULL)",
             name="admin_counts",
         ),
         CheckConstraint(

@@ -23,7 +23,7 @@ from sqlalchemy import (
 )
 from sqlalchemy.orm import Session
 
-from inventory_tng.models.stock import LedgerTransaction, Movement
+from inventory_tng.models.stock import AT_ONE_PLACE, LedgerTransaction, Movement
 from inventory_tng.stock.balance import balance
 from inventory_tng.stock.ledger import Form
 
@@ -129,8 +129,13 @@ def flows(
     into = LedgerTransaction.to_location_id == location_id
     out = LedgerTransaction.from_location_id == location_id
     windows = (window, *more)
-    # An opening changes the form of stock at a place, not how much is there.
-    where = [at_place(location_id), or_(*windows), LedgerTransaction.kind != "open"]
+    # An opening or a loosening changes the form of stock at a place, not
+    # how much is there.
+    where = [
+        at_place(location_id),
+        or_(*windows),
+        LedgerTransaction.kind.not_in(AT_ONE_PLACE),
+    ]
     if items is not None:
         where.append(Movement.item_id.in_(items))
     rows = session.execute(

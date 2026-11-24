@@ -92,6 +92,7 @@ from helpers.sign_in import (
     TOTP_KEYS,
     code,
     new_admin,
+    new_admin_id,
     reset_link,
     sign_in_with,
 )
@@ -100,6 +101,7 @@ from helpers.stock import (
     Spools,
     committed_place,
     count_form,
+    held_by_form,
     length,
     raise_check,
     report,
@@ -1279,6 +1281,52 @@ def test_a_cut_and_a_whole_move_of_one_open_package_go_one_at_a_time(
 
     cut, whole = moving(20, Form()), moving(305, opened)
     assert either_first(own_committed, cut, whole, swapped=swapped) == refused
+
+
+@pytest.mark.concurrency
+@pytest.mark.parametrize(
+    ("swapped", "refused"), [(False, None), (True, "movement_open_package_closed")]
+)
+def test_a_cut_and_following_turned_off_go_one_at_a_time(
+    own_committed: Committed, swapped: bool, refused: str | None
+) -> None:
+    """Turning following off takes the open package's place FOR UPDATE
+    first (open_packages.unfollowing), which a save holds FOR KEY SHARE: a
+    cut under way is counted before the close, and what it left is made
+    loose; a cut second waits, then is refused, as its open package is
+    closed (Ali, 2026-11-23, inventory-tng-j89e). On a database of its
+    own, as it writes the ledger."""
+    setup = own_committed.session()
+    spools = Spools(setup)
+    admin_id = new_admin_id(setup)
+    open_id = spools.opened().id
+    setup.commit()
+    cable, spool, store = spools.cable.id, spools.spool.id, spools.store.id
+    header = {
+        "kind": "move",
+        "from_location_id": store,
+        "to_location_id": spools.van.id,
+    }
+    line = Entry(cable, Decimal(20), Form(open_package_id=open_id), Form())
+
+    def cutting(session: Session) -> None:
+        insert_transaction(session, uuid.uuid4(), header, [line])
+
+    def turning_off(session: Session) -> None:
+        package = session.get_one(ItemPackage, spool)
+        _, closed = open_packages.unfollowing(
+            session,
+            admin_id,
+            datetime.now(UTC),
+            lambda: items.track_package(session, package, False),
+            package_ids=[spool],
+        )
+        assert closed == 1
+        # All of it, or what the cut first left.
+        loose = Decimal(305) if swapped else Decimal(285)
+        assert held_by_form(session, store, cable)[(cable, Form())] == loose
+
+    assert either_first(own_committed, cutting, turning_off, swapped=swapped) == refused
 
 
 @pytest.mark.concurrency

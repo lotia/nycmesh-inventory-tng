@@ -174,6 +174,9 @@ CUT_KINDS = {
     "open": lazy_gettext("open"),
     # Translators: a kind of save, a noun.
     "report": lazy_gettext("report"),
+    # Translators: a kind of save, a noun: what was left on an open package
+    # made loose, as its package's opened ones are no longer followed.
+    "loosen": lazy_gettext("loosening"),
 }
 
 

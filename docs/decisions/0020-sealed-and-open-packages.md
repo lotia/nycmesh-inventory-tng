@@ -10,7 +10,8 @@ moved; those settled listed, 2026-11-15) · amended 2026-11-18 (an item's
 open packages listed fewest left first, short ends after the usable ones
 on the scan page and flagged; its sealed packages largest first on the
 stock pages, smallest first on the item, scan and count pages; packages
-of one size by id)
+of one size by id) · amended 2026-11-23 (an item counted each; following
+turned off)
 
 ## Context
 
@@ -614,3 +615,33 @@ inventory-tng-fa5i):
 We rejected naming Too short to use, and clearing and hiding the box for
 items counted each: the scan page uses it to show an open package as a
 short end.
+
+## Amendment: turning following off, and Too short to use (2026-11-23)
+
+Turning "Track each opened package" off left the open packages already
+made followed, offered for cuts and closed by an administrator, while new
+openings went loose; and Too short to use was offered on every package,
+though it only says when an open package is a short end (Ali, 2026-11-23,
+inventory-tng-j89e):
+
+- **Too short to use is shown only for a package whose opened ones are
+  followed**, by its own setting or its item's. A hidden one keeps its
+  value, and comes back with the box. A box to be set whole for an item
+  counted each (above) is shown however its package is set.
+- **Turning following off closes the open packages no longer followed**,
+  in the same save, whether set on the item, on a package or for the items
+  ticked. What is left on each becomes loose units at its place, by a
+  ledger transaction of its own kind, a loosening, under the
+  administrator's name, so the place holds what it held. One left below
+  zero takes as much from loose units. The open package is marked closed,
+  never deleted, and its history says so. Nothing is written off, so a
+  loosening puts no end of an opening recorded more than moved right.
+- **Locks**: the change takes its open packages' places first, as a count
+  does, so a cut saved at the same moment is counted before the close or
+  refused after it. One moved whole to another place meanwhile refuses the
+  change as made since the page was shown.
+- **The page says how many closed**, after its own notice: "2 open
+  packages closed; what was left is now loose."
+
+We rejected leaving both as they were, and only showing "2 open packages
+still followed".

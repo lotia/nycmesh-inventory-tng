@@ -24,7 +24,7 @@ from inventory_tng.core.db_errors import refusal, refusal_naming_index
 from inventory_tng.core.db_once_committed import once_committed
 from inventory_tng.core.db_sessions import DbSession
 from inventory_tng.core.local_time import site_zone
-from inventory_tng.core.phrases import Words, lazy_gettext
+from inventory_tng.core.phrases import Words, lazy_gettext, ngettext
 from inventory_tng.labels import labels
 from inventory_tng.labels.paths import item_labels
 from inventory_tng.models.base import INTEGER_MAX, whole
@@ -39,6 +39,7 @@ from inventory_tng.models.labels import Label
 from inventory_tng.models.names import canonical
 from inventory_tng.models.stock import OpenPackage
 from inventory_tng.stock import open_packages
+from inventory_tng.stock.ledger import tracks_opened
 from inventory_tng.stock.open_packages_listing import (
     BY_OPENED,
     BY_PACKAGE,
@@ -54,7 +55,14 @@ from inventory_tng.web.admin_pages import (
     undo_retire,
 )
 from inventory_tng.web.decimal_separator import decimal_separator
-from inventory_tng.web.forms import ALERTS, RETIRED, RULES, WHOLE_UNITS, form_version
+from inventory_tng.web.forms import (
+    ALERTS,
+    CHANGED,
+    RETIRED,
+    RULES,
+    WHOLE_UNITS,
+    form_version,
+)
 from inventory_tng.web.listing import (
     UNASKED,
     Asked,
@@ -65,7 +73,7 @@ from inventory_tng.web.listing import (
     in_order,
 )
 from inventory_tng.web.navigation import SECTION_ITEMS
-from inventory_tng.web.pages import add_notices, not_found, redirect
+from inventory_tng.web.pages import NOTICES, add_notices, not_found, redirect
 
 log = structlog.get_logger(__name__)
 
@@ -184,6 +192,7 @@ add_notices(
         "tracking_off": TRACKING_OFF,
         "tracking_none": TRACKING_NONE,
         "tracking_same": TRACKING_SAME,
+        "tracking_changed": RULES[CHANGED],
         "alias_added": ALIAS_ADDED,
         "item_renamed": RENAMED,
         "alias_removed": ALIAS_REMOVED,
@@ -192,6 +201,33 @@ add_notices(
 
 # What "Same as the item", "Track" and "Don't track" send for a package.
 TRACKING = {"": None, "on": True, "off": False}
+
+
+def closed_loose(closed: int) -> str:
+    """After open packages were closed as their opened ones are no longer
+    followed (open_packages.unfollowing), what is left on them now loose
+    (Ali, 2026-11-23, inventory-tng-j89e)."""
+    return ngettext(
+        "%(num)s open package closed; what was left is now loose.",
+        "%(num)s open packages closed; what was left is now loose.",
+        closed,
+    )
+
+
+def _closed_said(request: Request) -> dict[str, str]:
+    """The page's notice and, after it, closed_loose for the open packages
+    its address says a change closed; nothing to add if none."""
+    notice = NOTICES.get(request.query_params.get("notice", ""))
+    closed = whole(request.query_params.get("closed", ""), 1, INTEGER_MAX)
+    if notice is None or closed is None:
+        return {}
+    return {"notice": f"{notice} {closed_loose(closed)}"}
+
+
+def _closed_query(closed: int) -> dict[str, str]:
+    """What a redirect's address says of the open packages a change closed,
+    for _closed_said."""
+    return {"closed": str(closed)} if closed else {}
 
 
 def _listed(
@@ -280,6 +316,7 @@ def _list_page(
             "problems": problems,
             "values": values,
             **_name_field(session, similar),
+            **_closed_said(request),
         },
     )
 
@@ -321,6 +358,24 @@ def _short_fraction(
     return package.id
 
 
+def _short_shown(
+    item: Item, packages: Sequence[ItemPackage], short_fraction: int | None
+) -> set[int]:
+    """The packages whose Too short to use box the item page shows: those
+    whose opened ones are followed, as it only says when an open package is
+    a short end (Ali, 2026-11-23, inventory-tng-j89e); and one whose box is
+    to be set whole, outlined, so it can be (inventory-tng-fa5i). The
+    value of one hidden is kept."""
+    each = counted_whole(item.unit)
+    return {
+        package.id
+        for package in packages
+        if tracks_opened(item.track_opened, package.track_opened)
+        or package.id == short_fraction
+        or (each and forms.short_has_fraction(package))
+    }
+
+
 def _item_page(
     request: Request,
     session: Session,
@@ -348,6 +403,7 @@ def _item_page(
         open_packages.shown(session, OpenPackage.item_id == item.id), view
     )
     log.debug("open packages listed", item_id=item.id, found=len(opened), sort=view.by)
+    short_fraction = _short_fraction(session, item, problems, values)
     return admin_page(
         request,
         signed,
@@ -378,12 +434,14 @@ def _item_page(
             "zone": site_zone(session),
             "problems": problems,
             "values": values,
-            "short_fraction": _short_fraction(session, item, problems, values),
+            "short_fraction": short_fraction,
             "alert": alert,
             "held_back": held_back,
             "short_to_set": short_to_set,
             "set_whole": short_to_set and forms.short_to_set(short_to_set),
+            "short_shown": _short_shown(item, packages, short_fraction),
             **_name_field(session, similar),
+            **_closed_said(request),
         },
         status_code=409 if held_back else None,
     )
@@ -487,6 +545,7 @@ def add_item(
 # Before the routes of one item, whose id would take "tracking".
 @router.post(f"{ITEMS}/tracking")
 def track_items(
+    signed: AdminSignedIn,
     session: DbSession,
     listing: Listed,
     item: Annotated[list[int], Form()] = [],  # noqa: B006  FastAPI copies it.
@@ -494,17 +553,33 @@ def track_items(
 ) -> Response:
     """Set "track each opened package" on the items ticked, on the page
     shown, and come back to it as it was: the list's view comes in the
-    form's address."""
+    form's address. Turned off, the open packages no longer followed are
+    closed, what was left on them loose (open_packages.unfollowing)."""
     back = listing.link()
     if TRACKING.get(track) is None:
         return not_found()
     if not item:
         return redirect(back, notice="tracking_none")
-    changed = items.track_items(session, item, track == "on")
+    done, broken = refusal(
+        session,
+        lambda: open_packages.unfollowing(
+            session,
+            signed.admin.id,
+            now(),
+            lambda: items.track_items(session, item, track == "on"),
+            # Only turning it off can leave open packages not followed.
+            item_ids=item if track == "off" else (),
+        ),
+        CHANGED,
+    )
+    if done is None:
+        log.info("package tracking refused", rule=broken, scope="bulk")
+        return redirect(back, notice="tracking_changed")
+    changed, closed = done
     session.commit()
     if not changed:
         return redirect(back, notice="tracking_same")
-    return redirect(back, notice=f"tracking_{track}")
+    return redirect(back, notice=f"tracking_{track}", **_closed_query(closed))
 
 
 @router.get(f"{ITEMS}/{{item_id}}")
@@ -570,12 +645,20 @@ def save_item(
         seen = form_version(form.get("version", ""))
         same = forms.same_name(session, found, form, fields, typed)
         asked = None if same else []
-        saving = _deciding(
-            session,
-            typed,
-            signed,
-            lambda: items.save(session, found, fields, seen=seen),
-        )
+        closed: list[int] = []
+
+        def save() -> items.Renamed | None:
+            renamed, count = open_packages.unfollowing(
+                session,
+                signed.admin.id,
+                now(),
+                lambda: items.save(session, found, fields, seen=seen),
+                item_ids=() if fields.track_opened else [item_id],
+            )
+            closed[:] = [count]
+            return renamed
+
+        saving = _deciding(session, typed, signed, save)
         renamed, broken = _change_or_note(
             session, saving, problems, fields, typed, item_id, asked=asked
         )
@@ -592,9 +675,12 @@ def save_item(
         )
     _decided(session, typed, item_id=item_id)
     session.commit()
+    said = _closed_query(sum(closed))
     if renamed is None:
-        return redirect(f"{ITEMS}/{item_id}", notice="saved")
-    return redirect(f"{ITEMS}/{item_id}", notice="item_renamed", section="aliases")
+        return redirect(f"{ITEMS}/{item_id}", notice="saved", **said)
+    return redirect(
+        f"{ITEMS}/{item_id}", notice="item_renamed", section="aliases", **said
+    )
 
 
 @router.post(f"{ITEMS}/{{item_id}}/retire")
@@ -825,17 +911,33 @@ def track_package(
     package_id: int,
     track: Annotated[str, Form()] = "",
 ) -> Response:
-    """A package's own "track each opened package", or as its item says."""
+    """A package's own "track each opened package", or as its item says.
+    No longer followed, its open packages are closed, what was left on
+    them loose (open_packages.unfollowing)."""
     package = _package(session, item_id, package_id)
     if package is None or track not in TRACKING:
         return not_found()
-    return _item_changed(
-        request,
+    done, broken = refusal(
         session,
-        signed,
-        item_id,
-        lambda: items.track_package(session, package, TRACKING[track]),
-        "package_tracking",
+        lambda: open_packages.unfollowing(
+            session,
+            signed.admin.id,
+            now(),
+            lambda: items.track_package(session, package, TRACKING[track]),
+            package_ids=() if TRACKING[track] else [package_id],
+        ),
+        RETIRED,
+        CHANGED,
+    )
+    if done is None:
+        found = session.get_one(Item, item_id)
+        return _item_page(request, session, signed, found, alert=RULES[str(broken)])
+    session.commit()
+    return redirect(
+        f"{ITEMS}/{item_id}",
+        notice="package_tracking",
+        section="packages",
+        **_closed_query(done[1]),
     )
 
 
@@ -846,11 +948,13 @@ def package_settings(
     session: DbSession,
     item_id: int,
     package_id: int,
-    short_below: Annotated[str, Form()] = "",
-    minimum_sealed: Annotated[str, Form()] = "",
+    form: TextForm,
 ) -> Response:
     """A package's too-short-to-use length and minimum sealed, each blank
-    for none."""
+    for none; the length kept as it is where the page has no box for it
+    (_short_shown), so none is sent."""
+    short_below = form.get("short_below")
+    minimum_sealed = form.get("minimum_sealed", "")
     package = _package(session, item_id, package_id)
     if package is None:
         return not_found()
@@ -865,7 +969,7 @@ def package_settings(
     # Beside the fields of the package it was sent for.
     values = {
         "package_id": str(package_id),
-        "short_below": short_below,
+        "short_below": short_below or "",
         "minimum_sealed": minimum_sealed,
     }
     if problems:

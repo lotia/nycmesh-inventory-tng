@@ -193,7 +193,9 @@ def form_breaks(
     - Between two places, stock keeps its form, or leaves an open package
       loose (a cut); only opening changes it otherwise, a sealed package
       into an open one, made for it and full, if its item tracks opened
-      packages, else into loose units."""
+      packages, else into loose units.
+    - Loosening, at one place, takes all that is left on an open package
+      into loose units there (_loosening_breaks)."""
     broken: list[str] = []
     sides = list(zip(places, (entry.leaves, entry.arrives), strict=True))
     if any(place is None and form != LOOSE for place, form in sides):
@@ -225,6 +227,8 @@ def form_breaks(
     leaves, arrives = entry.leaves, entry.arrives
     if kind == "open":
         broken += _opening_breaks(entry, packages, opens)
+    elif kind == "loosen":
+        broken += _loosening_breaks(entry, opens)
     elif None not in places:
         cut = leaves.open_package_id is not None and arrives == LOOSE
         if leaves != arrives and not cut:
@@ -257,6 +261,24 @@ def _opening_breaks(
         return ["open_package_opened_once"]
     if entry.quantity != package.size:
         return ["open_package_full"]
+    return []
+
+
+def _loosening_breaks(entry: Entry, opens: Mapping[int, OpenFacts]) -> list[str]:
+    """form_breaks' rules of loosening (open_packages.close_unfollowed):
+    all that is left on an open package leaves it as loose units; or, left
+    below zero, as much arrives on it from them, so it shows nothing and
+    the place holds what it held."""
+    taken = entry.leaves.open_package_id
+    given = entry.arrives.open_package_id
+    loose = entry.arrives if taken is not None else entry.leaves
+    if loose != LOOSE or (taken is None) == (given is None):
+        return ["movement_form_change"]
+    opened = opens.get(taken or given or 0)
+    if opened is None:
+        return []
+    if entry.quantity != (opened.left if taken is not None else -opened.left):
+        return ["movement_open_package_whole"]
     return []
 
 
@@ -306,6 +328,11 @@ def lock_places(session: Session, location_ids: Iterable[int]) -> None:
 # leaves out those taken (over_recorded.open_package_closed), so waits for
 # none. Its writes take 3 after them: nothing takes an administrator FOR
 # UPDATE, all KEY SHARE waits for.
+#
+# A change to whether an item's or package's opened ones are followed
+# (open_packages.unfollowing) takes the places of their open packages FOR
+# UPDATE (lock_places) before the item or package FOR UPDATE, then closes
+# those no longer followed in this order.
 
 
 def _hold_places(

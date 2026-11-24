@@ -35,6 +35,7 @@ def test_its_amount_boxes_show_the_keypad_its_unit_takes(
     keyboard: str,
 ) -> None:
     item = new_item(session, radios, unit=unit)
+    item.track_opened = True  # Else it has no Too short to use box.
     add(session, ItemPackage(item_id=item.id, name="Box", size=Decimal(10)))
     boxes = read(admin_client.get(f"{ITEMS}/{item.id}").text)
     assert boxes.one("input", name="minimum").attrs["inputmode"] == keyboard
@@ -119,8 +120,10 @@ def test_reorder_at_is_checked_against_the_unit_sent(
 def _packaged(
     session: Session, radios: Category, **package: object
 ) -> tuple[Item, ItemPackage]:
-    """A cable in m with a Reel package, as `package` says."""
+    """A cable in m, its opened ones followed, so each package has a Too
+    short to use box, with a Reel package, as `package` says."""
     cable = new_item(session, radios, name="Cable", unit="m")
+    cable.track_opened = True
     reel = ItemPackage(item_id=cable.id, name="Reel", size=Decimal(305))
     for column, value in package.items():
         setattr(reel, column, value)

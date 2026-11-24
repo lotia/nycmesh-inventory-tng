@@ -152,6 +152,9 @@ None is left, so nobody can pick it.{% endtrans %}{% endif %}{% endcall %}
       {% endif %}</td>
       <td>{% if not package.retired_at and not retired %}
         <form method="post" action="{{ here }}/packages/{{ package.id }}/settings" class="actions">
+          {#- Only where opened ones are followed, as it only says when an
+          open package is a short end; one hidden keeps its value. #}
+          {% if package.id in short_shown %}
           <label>{% trans %}Too short to use{% endtrans %} <span class="hint">{% trans unit=item.unit %}below, in {{ unit }}; blank: none{% endtrans %}</span>
             {#- A switch to each refused for its fraction outlines it, as
             does the package brought back with one, to be set whole. #}
@@ -162,6 +165,7 @@ None is left, so nobody can pick it.{% endtrans %}{% endif %}{% endcall %}
             {% if to_set %}<span class="problem" id="short-to-set">{{ set_whole }}</span>{% endif %}
             {% if sent %}{% with name = "short_below" %}{% include "_field_problem.html" %}{% endwith %}{% endif %}
           </label>
+          {% endif %}
           <label>{% trans %}Keep sealed{% endtrans %} <span class="hint">{% trans %}in the stores; blank: no minimum{% endtrans %}</span>
             <input name="minimum_sealed" inputmode="numeric" value="{{ sent.get('minimum_sealed', keep) }}">
             {% if sent %}{% with name = "minimum_sealed" %}{% include "_field_problem.html" %}{% endwith %}{% endif %}
