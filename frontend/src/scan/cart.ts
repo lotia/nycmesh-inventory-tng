@@ -298,14 +298,25 @@ export class CartStore {
   }
 
   /** Follow other tabs' changes, calling `followed` after each, told
-   * whether it gave the cart another revision: storage then holds the
-   * cart this tab shows, so it is kept. Returns what stops it. */
-  listen(followed?: (revised: boolean) => void): () => void {
+   * whether it gave the cart another revision, and whether it holds
+   * amounts typed in a unit this tab's catalogue does not show: another
+   * tab's may be the newer, so they are kept, not cleared, until this
+   * tab's is read again (useCatalogue). Storage then holds the cart this
+   * tab shows, so it is kept. Returns what stops it. */
+  listen(followed?: (revised: boolean, behind: boolean) => void): () => void {
     return onStoredChange([STORAGE_KEY], () => {
       const before = this.cart.value.revision;
-      this.cart.value = this.stored();
+      const stored = loadCart(this.storage);
+      const { items } = indexOf(this.catalogue);
+      const behind = stored.lines.some((line) => {
+        const item = items.get(line.itemId);
+        return (
+          item !== undefined && unitChanged(line, item) && holdsAmounts(line)
+        );
+      });
+      this.cart.value = reconcile(stored, this.catalogue, !behind);
       this.kept = true;
-      followed?.(this.cart.value.revision !== before);
+      followed?.(this.cart.value.revision !== before, behind);
     });
   }
 }
@@ -336,9 +347,14 @@ function filled(cart: Cart, side: Side): boolean {
  * A count of a package the catalogue now gives another size than it was
  * counted at is cleared, keeping that size, so the line says so (resized)
  * until a count is typed again (inventory-tng-0qi); so is all a line holds
- * typed in a unit the item is no longer counted in (unitChanged).
+ * typed in a unit the item is no longer counted in (unitChanged), unless
+ * `units` is false.
  */
-export function reconcile(cart: Cart, catalogue: Catalogue): Cart {
+export function reconcile(
+  cart: Cart,
+  catalogue: Catalogue,
+  units = true,
+): Cart {
   const { volunteers, places, items } = indexOf(catalogue);
   const place = (placeId: number | null) =>
     placeId !== null && places.has(placeId) ? placeId : null;
@@ -349,7 +365,7 @@ export function reconcile(cart: Cart, catalogue: Catalogue): Cart {
   const fromId = place(cart.fromId);
   const toId = place(cart.toId);
   const lines = cart.lines.map((line) =>
-    recounted(line, items.get(line.itemId)),
+    recounted(line, items.get(line.itemId), units),
   );
   return volunteerId === cart.volunteerId &&
     fromId === cart.fromId &&
@@ -438,11 +454,11 @@ function cleared(line: Line): Line {
   };
 }
 
-/** The line with its amounts typed in another unit since cleared, or its
- * counts of packages resized since. */
-function recounted(line: Line, item: Item | undefined): Line {
+/** The line with its amounts typed in another unit since cleared, if
+ * `units`, or its counts of packages resized since. */
+function recounted(line: Line, item: Item | undefined, units: boolean): Line {
   if (item !== undefined && unitChanged(line, item)) {
-    return holdsAmounts(line) ? cleared(line) : line;
+    return units && holdsAmounts(line) ? cleared(line) : line;
   }
   const clear = (item?.packages ?? []).filter(
     (pack) => (line.packages[pack.id] ?? "") !== "" && resized(line, pack),
@@ -515,6 +531,13 @@ function unitTypedIn(
     return line.unit;
   }
   return holdsAmounts(line) ? item?.unit : undefined;
+}
+
+/** Whether one more loose of this item cannot be added, as its loose box
+ * holds what reads as no amount (bumped leaves it as typed). */
+export function looseUnread(cart: Cart, itemId: number): boolean {
+  const line = cart.lines.find((each) => each.itemId === itemId);
+  return line !== undefined && readBox(line.loose) === null;
 }
 
 /** Add one of this item, or of this package of it, to the cart. */

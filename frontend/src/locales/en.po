@@ -843,6 +843,10 @@ msgid "Unable to discard. Clear your site data to remove."
 msgstr "Unable to discard. Clear your site data to remove."
 
 #: src/scan/CartForm.tsx
+msgid "Not added: {item}. Fix its loose amount, then scan it again."
+msgstr "Not added: {item}. Fix its loose amount, then scan it again."
+
+#: src/scan/CartForm.tsx
 msgid "The cart was changed in another tab. Check it, then discard it again."
 msgstr "The cart was changed in another tab. Check it, then discard it again."
 

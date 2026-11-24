@@ -41,6 +41,34 @@ describe("other tabs and a changing catalogue", () => {
     });
   });
 
+  test("another tab's amount in a unit this tab does not show is kept, and the catalogue read again", async () => {
+    let catalogue = CATALOGUE;
+    const { api, sent } = answering((request) =>
+      isCatalogue(request) ? json(catalogue, 200) : saved(),
+    );
+    open(api);
+    await ready();
+    const asked = () => sent.filter(isCatalogue).length;
+    const before = asked();
+    // An administrator switched the cable to ft; another tab, which read
+    // the catalogue since, typed 160 ft.
+    catalogue = {
+      ...CATALOGUE,
+      items: CATALOGUE.items.map((item) =>
+        item.id === 101 ? { ...item, unit: "ft" } : item,
+      ),
+    };
+    storeCart({
+      ...freshCart(),
+      lines: [{ itemId: 101, packages: {}, loose: "160", unit: "ft" }],
+    });
+    await vi.waitFor(() => {
+      window.dispatchEvent(new StorageEvent("storage", { key: CART_KEY }));
+      expect(asked()).toBeGreaterThan(before);
+    });
+    expect(await screen.findByText("160 ft in all")).toBeDefined();
+  });
+
   test("a cart another tab changed is shown again, not saved twice", async () => {
     const { api, sent } = server();
     open(api);

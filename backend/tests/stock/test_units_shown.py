@@ -229,6 +229,25 @@ def test_a_count_of_50_m_saved_after_a_switch_to_ft_is_asked_again(
     assert expected(session, place.store.id) == {place.cable.id: Decimal(50)}
 
 
+def test_a_count_box_not_read_after_a_switch_to_ft_says_so(
+    admin_client: TestClient, session: Session
+) -> None:
+    """2,5 typed for the cable on a point page, so not read, and the cable
+    switched to ft: the form shown again says beside the box that it is now
+    counted in ft, so 2.5 typed again is not saved in ft unawares."""
+    place = Place(session)
+    form = count_form_at(admin_client, place.store.id) | {
+        "extra_item_id": str(place.cable.id),
+        "extra_quantity": "2,5",
+    }
+    to_feet(session, place)
+    response = admin_client.post(f"{COUNTS}/{place.store.id}", data=form)
+    assert response.status_code == 400
+    assert problem(response.text, "extra_quantity") == now_counted_in("ft")
+    assert box_values(response.text, "extra_quantity") == ["2,5"]
+    assert counts_written(session) == []
+
+
 def test_a_count_refused_by_a_rule_after_a_switch_says_both(
     admin_client: TestClient, session: Session, monkeypatch: pytest.MonkeyPatch
 ) -> None:

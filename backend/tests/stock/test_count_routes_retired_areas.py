@@ -267,7 +267,9 @@ def test_bring_it_back_after_a_switch_to_ft_asks_again_in_ft(
     straight in the database, as a moved item's unit is fixed), then Bring
     it back: the area comes back and the form says beside the box that the
     cable is now counted in ft, so 50 is never saved in ft unawares (Ali,
-    2026-11-23, inventory-tng-57u8)."""
+    2026-11-23, inventory-tng-57u8). Brought back, it answers 200: the
+    words refuse nothing, as nothing was saved (Ali, 2026-11-23,
+    inventory-tng-itfm)."""
     setup = Emptied(session, admin_client)
     made, gone, cable = setup.made, setup.gone, setup.made.place.cable
     made.move(session, gone, made.empty, "2")
@@ -277,6 +279,7 @@ def test_bring_it_back_after_a_switch_to_ft_asks_again_in_ft(
     cable.unit = "ft"
     session.flush()
     back = bring_back(admin_client, made, refused, typed, gone.id)
+    assert back.status_code == 200
     session.refresh(gone)
     assert gone.retired_at is None
     assert problem(back.text, box) == now_counted_in("ft")
@@ -309,7 +312,8 @@ def test_a_count_refused_as_an_area_is_gone_says_a_switch_since(
 
     monkeypatch.setattr(count_routes, "refusal", switched_after)
     again = admin_client.post(made.path, data=setup.shown | {box: "50"})
-    assert again.status_code == 400
+    # Refused as the area is gone, as without the switch.
+    assert again.status_code == 409
     assert emptied_words(setup.gone.name) in text(again)
     assert problem(again.text, box) == now_counted_in("ft")
     assert box_values(again.text, box) == ["50"]
@@ -354,6 +358,29 @@ def test_bring_it_back_refused_by_a_rule_says_so(
     assert "Bring it back" in back.text
     session.refresh(inner)
     assert inner.retired_at is not None
+
+
+def test_bring_it_back_refused_by_a_rule_after_a_switch_answers_409(
+    admin_client: TestClient, session: Session
+) -> None:
+    """Not brought back, and the cable switched to ft since 50 was typed:
+    409 as without the switch, the words beside the box too (Ali,
+    2026-11-23, inventory-tng-itfm)."""
+    setup = Emptied(session, admin_client)
+    made, cable = setup.made, setup.made.place.cable
+    shelf = add(session, area("Shelf D", made.store))
+    inner = add(session, area("Bin X", shelf))
+    retire(session, shelf, inner)
+    made.move(session, made.store, inner, "1")
+    shown = count_form(admin_client.get(made.path))
+    made.move(session, inner, made.empty, "1")
+    refused = admin_client.post(made.path, data=shown)
+    box = field(made.bin, made.store, f"counted_{cable.id}")
+    cable.unit = "ft"
+    session.flush()
+    back = bring_back(admin_client, made, refused, {box: "50"}, inner.id)
+    assert back.status_code == 409
+    assert problem(back.text, box) == now_counted_in("ft")
 
 
 def test_an_area_gone_and_moved_out_of_the_store_since_is_named_by_its_own_name(

@@ -13,7 +13,7 @@ from sqlalchemy.orm import Session
 
 from inventory_tng.core.phrases import Words
 from inventory_tng.core.sent_forms import digest_spent
-from inventory_tng.stock.count_forms import PlaceCount, changed_words
+from inventory_tng.stock.count_forms import PlaceCount, changed_words, typed_named
 from inventory_tng.stock.forms import now_counted_in, now_holds, shown_in
 from inventory_tng.stock.store_counts import amounts_named
 from inventory_tng.stock.units_shown import Now, changed_since
@@ -44,14 +44,21 @@ def changed_since_sent(
     form: Mapping[str, str],
     key: uuid.UUID,
     counts: Collection[PlaceCount],
+    root_id: int,
+    place_ids: Collection[int],
 ) -> Now:
     """What a count form, of `counts` as read, shows in a unit or package
-    size changed since (units_shown.changed_since), as it is now; nothing
-    for a form saved before, which is answered as it was
-    (store_counts.record_store_count)."""
+    size changed since (units_shown.changed_since), as it is now, a box
+    typed in but not read too (count_forms.typed_named), as it is shown
+    again with its new unit; nothing for a form saved before, which is
+    answered as it was (store_counts.record_store_count)."""
     if digest_spent(session, key) is not None:
         return Now({}, {})
-    return changed_since(session, shown_in(form), *amounts_named(counts, {}))
+    items, packages = amounts_named(counts, {})
+    typed_items, typed_packages = typed_named(session, form, root_id, place_ids)
+    return changed_since(
+        session, shown_in(form), items | typed_items, packages | typed_packages
+    )
 
 
 def kept_as_now(
@@ -66,7 +73,7 @@ def kept_as_now(
     for it (Bring it back, a save refused for another reason): the words
     of asked_again for each item or package shown otherwise since, as it
     shows them as they are now. None for none."""
-    now = changed_since_sent(session, form, key, counts)
+    now = changed_since_sent(session, form, key, counts, root_id, place_ids)
     if not now:
         return {}, None
     log.info(

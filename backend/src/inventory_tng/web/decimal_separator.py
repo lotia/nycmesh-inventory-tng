@@ -21,12 +21,15 @@ log = structlog.get_logger(__name__)
 
 # Where a request's separator is kept, in its state, once chosen.
 _CHOSEN = "decimal_separator"
+# The most language tags of a header matched: a browser sends a few, and
+# matching each costs a look through every locale Babel knows.
+MOST_LANGUAGES = 10
 
 
 def languages(header: str) -> list[str]:
     """The language tags an Accept-Language header asks for, most wanted
     first, as Babel writes them ("de_DE"): those it refuses (q=0) and "*"
-    left out, ties in the order given."""
+    left out, ties in the order given, MOST_LANGUAGES at most."""
     ranked: list[tuple[float, int, str]] = []
     for at, part in enumerate(header.split(",")):
         tag, *parameters = (bit.strip() for bit in part.split(";"))
@@ -41,7 +44,7 @@ def languages(header: str) -> list[str]:
         # Not above 0 leaves NaN out too.
         if tag and tag != "*" and weight > 0:
             ranked.append((-weight, at, tag.replace("-", "_")))
-    return [tag for _, _, tag in sorted(ranked)]
+    return [tag for _, _, tag in sorted(ranked)][:MOST_LANGUAGES]
 
 
 @cache

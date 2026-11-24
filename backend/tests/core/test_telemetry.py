@@ -850,6 +850,10 @@ def test_counts_batches_written_replayed_and_refused(
     }
     stale = place.batch(lines=[resized | {"package_size": "50"}])
     assert client.post("/api/transactions", json=stale).status_code == 422
+    # Only a unit behind: a page behind the catalogue too, not invalid.
+    other_unit = {"item_id": place.cable.id, "quantity": "50", "unit": "ft"}
+    behind = place.batch(lines=[other_unit])
+    assert client.post("/api/transactions", json=behind).status_code == 422
     client.cookies.clear()
 
     kind = (("kind", "move"),)
@@ -858,8 +862,8 @@ def test_counts_batches_written_replayed_and_refused(
     assert (
         counted(reader, "inventory.transactions.refused")[(("reason", "invalid"),)] >= 1
     )
-    resized_reason = (("reason", "package_resized"),)
-    assert counted(reader, "inventory.transactions.refused")[resized_reason] >= 1
+    behind_reason = (("reason", "shown_otherwise"),)
+    assert counted(reader, "inventory.transactions.refused")[behind_reason] >= 2
     assert "inventory.transaction.lines" in metric_names(reader)
 
 

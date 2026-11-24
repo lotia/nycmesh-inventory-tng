@@ -653,7 +653,9 @@ in another unit since (`unit_changed`, docs/decisions/0003, work saved as
 it was shown). Where the page's catalogue shows another unit, everything
 typed on the line is cleared, its package counts too, and the line says
 the unit changed until an amount is typed again in the new one; until
-then Record refuses the cart.
+then Record refuses the cart. Amounts another tab typed in a unit this
+tab's catalogue does not show are kept, not cleared, and the catalogue is
+loaded again, as that tab's may be the newer (`CartStore.listen`).
 
 Record first loads the catalogue again and checks the cart against it, so
 a unit or package size changed since is said beside its box, and nothing

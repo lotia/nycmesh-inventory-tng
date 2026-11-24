@@ -66,6 +66,14 @@ def test_languages_are_read_most_wanted_first() -> None:
     ]
 
 
+def test_only_the_most_wanted_languages_are_matched() -> None:
+    """A header of many tags is matched by its first few, as a browser
+    sends a few and each costs a look through every locale."""
+    many = ", ".join(f"x{at};q=0.9" for at in range(30))
+    assert languages(f"{many}, de;q=0.5") == languages(many)
+    assert len(languages(many)) == decimal_separator.MOST_LANGUAGES
+
+
 @pytest.mark.parametrize(("language", "separator"), [("de", ","), ("en", ".")])
 def test_a_page_says_its_separator_and_logs_it(
     make_client_without_database: Callable[..., TestClient],

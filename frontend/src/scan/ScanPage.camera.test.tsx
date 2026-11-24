@@ -20,6 +20,7 @@ import {
 import { refusingRemovals, refusingWrites } from "../testing/storage";
 import {
   FROM,
+  NOT_ADDED,
   NOT_KEEPING,
   NOTHING_IN_CART,
   SCAN_WITH_CAMERA,
@@ -92,6 +93,20 @@ describe("scanning labels with the camera", () => {
     await scan("K7QX2M");
     await screen.findByText("Added a Spool: Cat6 cable.");
     expect(screen.queryByText(say(NOTHING_IN_CART))).toBeNull();
+  });
+
+  test("an item's label adds nothing to loose that reads as no amount, and says so", async () => {
+    await opened();
+    await scan("B3ZT9W");
+    await screen.findByText("Added one: LiteBeam 5AC.");
+    const loose = screen.getByLabelText<HTMLInputElement>("Loose units");
+    fireEvent.input(loose, { target: { value: "2,5" } });
+    // Out of view a while, then shown again: a new scan.
+    await scan();
+    await vi.advanceTimersByTimeAsync(2000);
+    await scan("B3ZT9W");
+    await screen.findByText(say(NOT_ADDED, { item: "LiteBeam 5AC" }));
+    expect(loose.value).toBe("2,5");
   });
 
   test("opening, an item's label asks which package if none is sealed there", async () => {

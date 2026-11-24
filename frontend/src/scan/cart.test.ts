@@ -570,18 +570,40 @@ describe("the cart store, shared by tabs", () => {
       const there = new CartStore(CATALOGUE);
       there.change(addOne(filled(), 101));
       window.dispatchEvent(new StorageEvent("storage", { key: STORAGE_KEY }));
-      expect(followed).toHaveBeenCalledExactlyOnceWith(true);
+      expect(followed).toHaveBeenCalledExactlyOnceWith(true, false);
       expect(store.cart.value.lines).toEqual(there.cart.value.lines);
       expect(store.forSaving()?.revision).toBe(there.cart.value.revision);
       // Only marked used there: the same revision.
       there.touch();
       window.dispatchEvent(new StorageEvent("storage", { key: STORAGE_KEY }));
-      expect(followed).toHaveBeenLastCalledWith(false);
+      expect(followed).toHaveBeenLastCalledWith(false, false);
       // Changed there again, unheard: this tab's cart is not saved.
       there.change(filled());
       expect(store.forSaving()).toBeNull();
       stop();
     });
+  });
+
+  test("another tab's amounts in a unit this tab's catalogue does not show are kept until it is read again", () => {
+    const inFeet = { ...CATALOGUE, items: [radio, { ...cable, unit: "ft" }] };
+    const store = new CartStore(CATALOGUE);
+    const followed = vi.fn();
+    const stop = store.listen(followed);
+    // Another tab, its catalogue newer, types 160 ft.
+    const there = new CartStore(inFeet);
+    there.change(
+      cart({ lines: [{ itemId: 101, packages: {}, loose: "160" }] }),
+    );
+    window.dispatchEvent(new StorageEvent("storage", { key: STORAGE_KEY }));
+    expect(followed).toHaveBeenCalledExactlyOnceWith(true, true);
+    expect(store.cart.value.lines[0]?.loose).toBe("160");
+    // Read again, this tab's says ft too: nothing cleared.
+    store.useCatalogue(inFeet);
+    expect(store.cart.value.lines[0]).toMatchObject({
+      loose: "160",
+      unit: "ft",
+    });
+    stop();
   });
 
   test("a newer catalogue clears choices it no longer has", () => {

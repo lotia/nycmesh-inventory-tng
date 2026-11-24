@@ -53,13 +53,17 @@ replayed = meter.create_counter(
     unit="{transaction}",
     description="Batches sent again with a key already written, by kind",
 )
+# A batch refused only for these is of a page behind the catalogue.
+SHOWN_BEHIND = frozenset({"unit_changed", "package_resized"})
+
 refused = meter.create_counter(
     "inventory.transactions.refused",
     unit="{transaction}",
     # FastAPI's own 422s, for a batch that cannot be at all, are a client's
     # bug and are not counted here.
-    description="Batches refused for naming rows that do not exist, for "
-    "a package resized since the page read it, or for reusing a key, by reason",
+    description="Batches refused for naming rows that do not exist, only "
+    "for a unit or package size changed since the page showed it, or for "
+    "reusing a key, by reason",
 )
 recorded = meter.create_counter(
     "inventory.transactions.recorded",
@@ -238,8 +242,10 @@ def record(
         if now:
             units_shown.refusing("batch", now)
         kinds = {kind for _, kind in problems}
-        # Counted apart: how often a page's catalogue is only a resize behind.
-        reason = "package_resized" if kinds == {"package_resized"} else "invalid"
+        # Counted apart: how often a page's catalogue is only behind, a
+        # unit or a size; which, and how many, inventory.saves.shown_otherwise
+        # counts.
+        reason = "shown_otherwise" if kinds <= SHOWN_BEHIND else "invalid"
         refused.add(1, {"reason": reason})
         log.info("batch refused", problems=sorted(kinds))
         raise BatchRefused(problems)

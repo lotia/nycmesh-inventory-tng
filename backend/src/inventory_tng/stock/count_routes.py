@@ -381,7 +381,7 @@ def _count_page(
     left: list[MovedOut] | None = None,
     off_form: Listed | None = None,
     caution: Words | None = None,
-    status_code: int = 200,
+    status_code: int | None = None,
 ) -> HTMLResponse:
     """The count form of a place and the areas in it, with the records as
     of `at`, or now if None, read across the places it shows. Of everything
@@ -401,7 +401,8 @@ def _count_page(
     `at` (moves_since), if read already. `off_form`, something else here
     naming an item a recount did not ask for at its place
     (count_forms.Listed), whose line the form now shows there, marked;
-    `caution`, words above the form, said as a warning is. What it shows
+    `caution`, words above the form, said as a warning is. Answered with
+    `status_code`, else 400 with `problems` and 200 without. What it shows
     at each place is _place_lines'."""
     # Only places with figures: a form with none has no While you counted.
     recount = {place_id: each for place_id, each in (recount or {}).items() if each}
@@ -525,7 +526,7 @@ def _count_page(
             "problems": problems,
             "values": values,
         },
-        400 if problems else status_code,
+        status_code or (400 if problems else 200),
     )
 
 
@@ -776,7 +777,9 @@ def count(
     # new ones (units_shown), checked again as it is saved. A form saved
     # before is answered as it was (store_counts.record_store_count).
     shown_as = shown_in(form)
-    named_now = changed_since_sent(session, form, key, sent.places.values())
+    named_now = changed_since_sent(
+        session, form, key, sent.places.values(), place.id, place_ids
+    )
     if named_now:
         refusing("count", named_now)
         words, said = asked_again(session, form, place.id, place_ids, named_now)
@@ -1168,10 +1171,14 @@ def bring_back(
     # and what left the areas gone as read already, split at that moment.
     # The tree is read again, as bringing the area back changed it.
     listed = [*place_ids, area.id]
+    # Brought back, so done: words beside a box refuse nothing here, as
+    # nothing is saved, but ask for a look before the next Save (Ali,
+    # 2026-11-23, inventory-tng-itfm).
     return again(
         Moment(at.as_of, seen_up_to(session, listed, at.as_of)),
         places=listed,
         left=left(),
         alert=said,
         caution=brought_back(label),
+        status_code=200,
     )

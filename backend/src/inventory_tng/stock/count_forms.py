@@ -532,6 +532,27 @@ def _counts_of(
     return None, None
 
 
+def typed_named(
+    session: Session, form: Mapping[str, str], root_id: int, place_ids: Collection[int]
+) -> tuple[set[int], set[int]]:
+    """The items and packages a count form's boxes with anything typed in
+    count (_counts_of), read or not, so a box refused as no number is
+    compared with the unit and size it was shown in too."""
+    split, _ = by_place(form, root_id, place_ids)
+    items: set[int] = set()
+    packages: set[int] = set()
+    for fields in split.values():
+        for name, typed in fields.items():
+            if not typed.strip():
+                continue
+            item_id, package_id = _counts_of(session, name, fields)
+            if item_id is not None:
+                items.add(item_id)
+            if package_id is not None:
+                packages.add(package_id)
+    return items, packages
+
+
 def changed_words(
     session: Session,
     form: Mapping[str, str],

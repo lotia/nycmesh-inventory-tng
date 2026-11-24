@@ -22,6 +22,7 @@ import {
   freshCart,
   KIND_WORDS,
   type Kind,
+  looseUnread,
   openingPackage,
   placed,
   placeSides,
@@ -64,6 +65,7 @@ export const NO_PACKAGE_TO_OPEN = msg`{item} comes in no package to open.`;
 export const WHICH_PACKAGE = msg`{item}: type how many of which package to open.`;
 export const ADDED_ONE = msg`Added one: {item}.`;
 export const ADDED_PACKAGE = msg`Added a {package}: {item}.`;
+export const NOT_ADDED = msg`Not added: {item}. Fix its loose amount, then scan it again.`;
 export const UNKNOWN_LABEL = msg`That label isn't in the inventory ({code}).`;
 export const PLACE_HERE = msg({
   comment:
@@ -193,9 +195,14 @@ export function CartForm({
   const nameList = useRef<HTMLSelectElement>(null);
 
   // Tabs share one cart; a refreshed catalogue clears what it no longer has.
+  // Another tab's amounts in a unit this one does not show: this tab's
+  // catalogue is read again, to tell which is the newer (CartStore.listen).
   useEffect(
     () =>
-      store.listen((revised) => {
+      store.listen((revised, behind) => {
+        if (behind) {
+          void latest();
+        }
         if (revised) {
           followed.current += 1;
         }
@@ -325,6 +332,10 @@ export function CartForm({
       }
       change(withLine(cart.value, itemId));
       return say(WHICH_PACKAGE, { item: item?.name });
+    }
+    if (pack === undefined && looseUnread(cart.value, itemId)) {
+      // Loose that reads as no amount is left as typed (cart.bumped).
+      return say(NOT_ADDED, { item: item?.name });
     }
     const next = addOne(cart.value, itemId, pack?.id);
     // A package's own label is the volunteer's choice (Line.typed).

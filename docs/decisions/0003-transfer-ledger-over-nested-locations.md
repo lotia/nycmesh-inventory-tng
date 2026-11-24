@@ -280,7 +280,9 @@ counted in ft. Check the amount and save again." A form shown again
 for anything else while keeping what was typed (Bring it back on a count,
 a save refused by another rule) is shown in the units and sizes now
 too, so it says the same beside each box of one changed since
-(inventory-tng-dcqp). We rejected converting
+(inventory-tng-dcqp), a box it could not read too. Bring it back that
+brings the area back answers 200 even so, as it saved no amount for the
+words to refuse (Ali, 2026-11-23, inventory-tng-itfm). We rejected converting
 what was shown into what is now: a unit switched because it was wrong may
 mean the volunteer's number was right in the new one, so asking again is
 safer.
