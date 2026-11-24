@@ -1,7 +1,8 @@
 """The tests mirror the source tree: tests/inventory_tng/ mirrors the app's
 package and tests/devtools/ the developer tools, each folder in them a
-package of its own, and every other folder under backend/tests/ holds a
-README.md saying what it holds (CONTRIBUTING.md, Where tests go)."""
+package of the source; every other folder under backend/tests/ holds a
+README.md saying what it holds; and nothing but conftest.py sits loose at
+the top (CONTRIBUTING.md, Where tests go)."""
 
 from pathlib import Path
 
@@ -33,6 +34,8 @@ def _mirrored(folder: Path) -> bool:
 
 
 def test_every_mirrored_folder_is_a_package() -> None:
+    # A mirror renamed away would leave nothing here to check.
+    assert [str(mirror) for mirror in MIRRORS if not (TESTS / mirror).is_dir()] == []
     unmatched = sorted(
         str(mirror / folder)
         for mirror, package in MIRRORS.items()
@@ -56,3 +59,8 @@ def test_every_other_folder_says_what_it_holds() -> None:
         and not (TESTS / folder / "README.md").is_file()
     )
     assert unexplained == []
+
+
+def test_nothing_but_conftest_sits_at_the_top() -> None:
+    loose = sorted(path.name for path in TESTS.iterdir() if path.is_file())
+    assert loose == ["conftest.py"]

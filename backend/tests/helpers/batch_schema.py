@@ -1,9 +1,9 @@
 """What the batch endpoint (POST /api/transactions) accepts, as its schema
 says, kept in tests/references/batch_schema.json, so a change that makes
-it accept less fails test_batch_schema, naming each way it does, rather than having a
-batch a phone holds from an older build of the scan page refused, and the
-volunteer's work lost (CONTRIBUTING.md, The scan page: expand, then
-contract; DEPLOYMENT.md, Tightening what a batch accepts).
+it accept less fails test_batch_schema, naming each way it does, rather
+than having a batch a phone holds from an older build of the scan page
+refused, and the volunteer's work lost (CONTRIBUTING.md, The scan page:
+expand, then contract; DEPLOYMENT.md, Tightening what a batch accepts).
 
 The file keeps the body's schema, every model it reaches, the endpoint's
 parameters, and OLDEST_BUILD, without titles or descriptions, which accept

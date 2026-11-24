@@ -101,7 +101,7 @@ extend-select = [
 
 [tool.ruff.lint.isort]
 # What tests import from tests/ (pythonpath, below), not from a package.
-known-local-folder = ["databases", "helpers"]
+known-local-folder = ["helpers"]
 
 [tool.ruff.lint.flake8-tidy-imports.banned-api]
 "unittest.TestCase".msg = "Write tests in pytest style: plain functions, fixtures and assert."

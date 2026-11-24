@@ -548,9 +548,9 @@ would have clashed.
   The names of the test files keep the rule above.
 - **Every other folder** names no package and holds a `README.md` saying
   what it holds, as `across/`, `codebase/` and `helpers/` did.
-  `tests/codebase/test_test_layout.py` checks both.
-- **`conftest.py` stays at the top**, as pytest applies it to the tests
-  beneath it, every folder's.
+- **`conftest.py` alone sits loose at the top**, as pytest applies it to
+  the tests beneath it, every folder's.
+  `tests/codebase/test_test_layout.py` checks all three.
 - **What sat loose at the top** went where its kind is, so its folder
   says what it is:
   - the test databases (`databases.py`) and the browser tests' server

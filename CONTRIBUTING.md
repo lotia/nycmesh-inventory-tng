@@ -282,14 +282,14 @@ on one.
 
 ### History
 
-Every row added, changed or deleted through the ORM, in a table with history
-(see [The catalogue's rules](#the-catalogues-rules)), is written to
-`catalogue_history` as the session flushes, with who did it
+Every row added, changed or deleted through the ORM, in a table with
+history (see [The catalogue's rules](#the-catalogues-rules)), is written
+to `catalogue_history` as the session flushes, with who did it
 (`db_sessions.set_actor`). So write those tables through the ORM:
-`session.add`, an object's attributes, `session.delete`. A statement such as
-`update(Item)` is never recorded, and
-`tests/inventory_tng/core/test_history.py` fails on one. The app may only add to
-the history.
+`session.add`, an object's attributes, `session.delete`. A statement such
+as `update(Item)` is never recorded, and
+`tests/inventory_tng/core/test_history.py` fails on one. The app may only
+add to the history.
 
 ### The catalogue's rules
 
@@ -1055,15 +1055,15 @@ mise run check-catalogues    # fails while either is not current
 Each side has a test that renders its words in a pseudo-locale, every
 letter accented, and fails on a word left in plain English:
 `backend/tests/inventory_tng/core/test_phrases.py` and
-`frontend/src/pseudo.test.tsx`. On the scan page, every component is in its
-`COVERED`, with names that are not English; add a part for a new component, or
-for a state of one that says something no part shows. On the server, every
-phrase named as a constant, alone or in a table such as `NOTICES`, is covered
-already; add a phrase said with values to `SAID_WITH_VALUES`, a page to its
-entry in `tests/helpers/swept_pages.py`'s `PAGES`, as `worded`, which fetches it
-signed in with every name in the database not English, or as
-`signed_out`, and a template no page there shows, or a branch of one, to
-`COVERED`.
+`frontend/src/pseudo.test.tsx`. On the scan page, every component is in
+its `COVERED`, with names that are not English; add a part for a new
+component, or for a state of one that says something no part shows. On the
+server, every phrase named as a constant, alone or in a table such as
+`NOTICES`, is covered already; add a phrase said with values to
+`SAID_WITH_VALUES`, a page to its entry in
+`tests/helpers/swept_pages.py`'s `PAGES`, as `worded`, which fetches it
+signed in with every name in the database not English, or as `signed_out`,
+and a template no page there shows, or a branch of one, to `COVERED`.
 
 ## Running the checks
 
@@ -1109,9 +1109,10 @@ Those are unit tests: Vitest runs the frontend's in a page it simulates
 (happy-dom), with no layout. The browser tests, in
 `frontend/browser-tests/`, are another kind: Playwright drives a real
 browser engine against the whole app, built frontend and all, from
-databases of their own (`backend/tests/helpers/browser_database.py`), at a
-phone's width, with a fake camera in Chromium that shows a seeded label. They check
-what only a real browser can, such as that no page scrolls sideways:
+databases of their own (`backend/tests/helpers/browser_database.py`), at
+a phone's width, with a fake camera in Chromium that shows a seeded label.
+They check what only a real browser can, such as that no page scrolls
+sideways:
 
 ```sh
 mise run check-browser           # builds, starts the app, runs them
@@ -1202,11 +1203,11 @@ either side unless a comment on or just above it says
 Write a rule of more than one condition as a function of plain values,
 such as a map of each place's parent, that returns the rule broken or
 nothing, and test every way it can be broken without the database
-(`tests/inventory_tng/places/test_locations.py`). Test on PostgreSQL what
-only it can show: that the function making a change refuses it by the rule's name,
-once per rule; constraints, indexes and privileges; and, for each rule
-that reads other rows, two changes at once, the second waiting, then
-refused. Use the real database there, never a mocked session.
+(`tests/inventory_tng/places/test_locations.py`). Test on PostgreSQL
+what only it can show: that the function making a change refuses it by
+the rule's name, once per rule; constraints, indexes and privileges; and,
+for each rule that reads other rows, two changes at once, the second
+waiting, then refused. Use the real database there, never a mocked session.
 
 Tests run in a random order, the backend's with pytest-randomly and the
 frontend's with Vitest's shuffle, so none can depend on another. Each run
@@ -1250,26 +1251,27 @@ request's statements for a test of its own.
 
 `backend/tests/` mirrors each package it tests from a folder named for
 the package, as `tests/inventory_tng/` mirrors `src/inventory_tng/`. Any
-other folder under it has its own short `README.md` saying what it holds.
-`tests/codebase/test_test_layout.py` checks both.
+other folder under it has its own short `README.md` saying what it holds,
+and only `conftest.py` sits loose at the top.
+`tests/codebase/test_test_layout.py` checks all three.
 
 ### Connections
 
 Each checkout's tests, apps and browser tests use its own stack's
-PostgreSQL, whose `max_connections` (`compose.yaml`) is set so that a whole
-test run, at the most processes the checks use, a dev app and the browser
-tests' two servers fit with room to spare, and so would three checkouts
-sharing `inventory-tng` (Local settings). An app's pools are sized in
-`core/db_sessions.py` (`Database`). Each test database allows twice the
-most measured on one (`TEST_CONNECTION_LIMIT` in
-`tests/helpers/databases.py`), so a process that leaks connections is refused at
-its own database, not the server's limit, and a test that fails for either limit
-says which. Long before a leak reaches that limit, a test that ends with a
-connection it took from any pool and kept errors at its teardown, named by
-`keeps_its_connections` in conftest.py. Each checkout's development
-database allows enough for one app and a migration or seed beside it
-(`CONNECTION_LIMIT` in `backend/devtools/database.py`), so it cannot starve
-the tests beside it.
+PostgreSQL, whose `max_connections` (`compose.yaml`) is set so that a
+whole test run, at the most processes the checks use, a dev app and the
+browser tests' two servers fit with room to spare, and so would three
+checkouts sharing `inventory-tng` (Local settings). An app's pools are
+sized in `core/db_sessions.py` (`Database`). Each test database allows
+twice the most measured on one (`TEST_CONNECTION_LIMIT` in
+`tests/helpers/databases.py`), so a process that leaks connections is
+refused at its own database, not the server's limit, and a test that fails
+for either limit says which. Long before a leak reaches that limit, a test
+that ends with a connection it took from any pool and kept errors at its
+teardown, named by `keeps_its_connections` in conftest.py. Each checkout's
+development database allows enough for one app and a migration or seed
+beside it (`CONNECTION_LIMIT` in `backend/devtools/database.py`), so it
+cannot starve the tests beside it.
 
 ### Measuring the catalogue
 

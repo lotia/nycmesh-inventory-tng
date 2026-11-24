@@ -1,6 +1,7 @@
 """What the browser tests (frontend/browser-tests/) run against. Playwright
 starts each of its servers (playwright.config.ts: one shared, one for the
-crawl), from backend/ with pytest's pythonpath, as
+crawl) from backend/, with PYTHONPATH set to pytest's pythonpath
+(pyproject.toml), as
 
     uv run python -m helpers.browser_database serve
 

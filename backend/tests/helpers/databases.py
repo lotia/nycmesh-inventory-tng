@@ -58,8 +58,8 @@ FULL = (
 REFUSALS = {
     "too many connections for database": (
         f"its database's CONNECTION LIMIT, {TEST_CONNECTION_LIMIT}"
-        " (tests/helpers/databases.py). Is a test in this process, perhaps an earlier one, holding"
-        " connections it no longer needs?"
+        " (tests/helpers/databases.py). Is a test in this process, perhaps an"
+        " earlier one, holding connections it no longer needs?"
     ),
     "remaining connection slots are reserved": FULL,
     "too many clients already": FULL,
