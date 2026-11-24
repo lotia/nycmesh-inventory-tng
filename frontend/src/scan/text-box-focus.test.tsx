@@ -49,4 +49,21 @@ describe("whether a text box has focus", () => {
     expect(said.at(-1)).toBe(false);
     act(unmount);
   });
+
+  test("ends when the box with focus is taken off the page", async () => {
+    const said: boolean[] = [];
+    function Watcher() {
+      said.push(useTextBoxFocused().value);
+      return <div />;
+    }
+    const { unmount } = render(<Watcher />);
+    const box = document.createElement("input");
+    document.body.append(box);
+    act(() => box.focus());
+    expect(said.at(-1)).toBe(true);
+    // Removed with no focusout, as Safari does.
+    await act(async () => box.remove());
+    expect(said.at(-1)).toBe(false);
+    act(unmount);
+  });
 });

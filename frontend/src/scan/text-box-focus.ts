@@ -50,7 +50,18 @@ export function useTextBoxFocused(): ReadonlySignal<boolean> {
       },
       { signal },
     );
-    return () => listening.abort();
+    // A box taken off the page with focus in it tells no focusout in
+    // Safari, so reading would stay paused till the next box is left.
+    const removed = new MutationObserver(() => {
+      if (typing.peek()) {
+        typing.value = isTextBox(document.activeElement);
+      }
+    });
+    removed.observe(document.body, { childList: true, subtree: true });
+    return () => {
+      listening.abort();
+      removed.disconnect();
+    };
   }, []);
   return typing;
 }

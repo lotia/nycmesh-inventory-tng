@@ -149,6 +149,8 @@ test("the camera stays put as labels are scanned, reads none off the screen, and
       JSON.stringify({ build: "2999-01-01T00:00:00.000Z" }),
     ),
   );
+  // Its storage event is sent; closed, it can't hide this page.
+  await newer.close();
   const alert = page.getByRole("alert").filter({ hasText: "updated" });
   await expect(alert).toBeVisible();
   await settled(page);
