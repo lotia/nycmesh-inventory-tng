@@ -264,7 +264,7 @@ export function toCart(
       }
       const made = lineOf(line.item_id, { at });
       // In the unit it was typed in, which the item still has.
-      if (typeof line.unit === "string") {
+      if (line.unit !== null) {
         made.unit = line.unit;
       }
       const packs = wholePackages(amount, size);

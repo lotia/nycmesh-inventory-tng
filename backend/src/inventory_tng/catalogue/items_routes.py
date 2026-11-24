@@ -76,8 +76,7 @@ CLOSE = "close_names"
 # each is shown by.
 REFUSED_FIELDS = {
     "item_category_current": "category_id",
-    "item_unit_fixed": "unit",
-    "item_unit_labelled": "unit",
+    **dict.fromkeys(items.UNIT_FIXED_RULES.values(), "unit"),
 }
 
 

@@ -23,7 +23,7 @@ def plain_amount(value: Decimal | None) -> str:
     return "" if value is None else format(value.normalize(), "f")
 
 
-def box_amount(value: Decimal | None, separator: Separator = ".") -> str:
+def box_amount(value: Decimal | None, separator: Separator) -> str:
     """A quantity in a number box, to be read back as typed
     (web/forms.read_decimal): plain_amount with the box's decimal
     `separator`, "." or ",", so the box posts back unchanged as valid."""

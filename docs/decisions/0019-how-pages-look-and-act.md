@@ -132,8 +132,9 @@ list's box.
   unique among retired ones too (Ali, 2026-11-10,
   inventory-tng-8i4.60.21). So are packages' among their item's, compared
   as items' names are (0021): a package can be renamed, its size changed
-  until some has moved, been opened or labelled, and a retired one
-  brought back (Ali, 2026-11-12, inventory-tng-f4f). Volunteers' are unique among
+  until some has moved or been opened, or while a label of it is not
+  revoked (0003, work saved as it was shown), and a retired one brought back
+  (Ali, 2026-11-12, inventory-tng-f4f). Volunteers' are unique among
   current ones only: a new volunteer may share a retired one's name. A
   volunteer's custody location is made again under their name each time
   they hold stock.

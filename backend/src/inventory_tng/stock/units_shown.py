@@ -19,8 +19,8 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from inventory_tng.core.db_errors import RuleBroken
-from inventory_tng.core.db_lookups import values_by
 from inventory_tng.models.catalogue import Item, ItemPackage
+from inventory_tng.stock.queries import units_of
 
 log = structlog.get_logger(__name__)
 meter = metrics.get_meter(__name__)
@@ -79,7 +79,7 @@ def changed_since(
     shows otherwise than they are, or does not show at all, as they are
     now. Those that do not exist are left out, for the save to refuse as
     it does."""
-    units = values_by(session, Item.id, Item.unit, set(item_ids))
+    units = units_of(session, set(item_ids))
     sizes: dict[int, tuple[Decimal, str]] = {}
     if package_ids:
         rows = session.execute(
@@ -104,7 +104,11 @@ def changed_since(
 
 def refusing(save: Save, now: Now) -> None:
     """Log and measure a save refused as shown otherwise (`now`)."""
-    for what, changed in (("unit", now.units), ("package_size", now.sizes)):
+    changes: tuple[tuple[Changed, Mapping[int, object]], ...] = (
+        ("unit", now.units),
+        ("package_size", now.sizes),
+    )
+    for what, changed in changes:
         if changed:
             refused.add(len(changed), {"changed": what, "save": save})
     log.info(

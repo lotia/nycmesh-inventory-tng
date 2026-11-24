@@ -16,7 +16,7 @@ from inventory_tng.core.sent_forms import digest_spent
 from inventory_tng.stock.count_forms import PlaceCount, changed_words, typed_named
 from inventory_tng.stock.forms import now_counted_in, now_holds, shown_in
 from inventory_tng.stock.store_counts import amounts_named
-from inventory_tng.stock.units_shown import Now, changed_since
+from inventory_tng.stock.units_shown import Now, changed_since, refusing
 
 log = structlog.get_logger(__name__)
 
@@ -68,14 +68,20 @@ def kept_as_now(
     counts: Collection[PlaceCount],
     root_id: int,
     place_ids: Collection[int],
+    *,
+    refused: bool = False,
 ) -> tuple[dict[str, Words], Words | None]:
-    """A count form shown again keeping what was typed, though not saved
-    for it (Bring it back, a save refused for another reason): the words
-    of asked_again for each item or package shown otherwise since, as it
-    shows them as they are now. None for none."""
+    """A count form shown again keeping what was typed: the words of
+    asked_again for each item or package shown otherwise since, as it
+    shows them as they are now. None for none. `refused` when the save is
+    refused for them (units_shown.refusing); otherwise it was not saved
+    for another reason (Bring it back, a save refused by another rule)."""
     now = changed_since_sent(session, form, key, counts, root_id, place_ids)
     if not now:
         return {}, None
+    if refused:
+        refusing("count", now)
+        return asked_again(session, form, root_id, place_ids, now)
     log.info(
         "count shown again in units changed since",
         location_id=root_id,

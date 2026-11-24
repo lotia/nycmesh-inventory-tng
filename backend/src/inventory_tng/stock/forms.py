@@ -72,7 +72,7 @@ def shown_in(form: Mapping[str, str]) -> Shown:
     sizes = {
         package_id: size
         for package_id, typed in _pairs(form.get(SIZES, "")).items()
-        if (size := showed(typed)) is not None
+        if (size := read_amount(typed)) is not None
     }
     return Shown(_pairs(form.get(UNITS, "")), sizes)
 
@@ -215,12 +215,6 @@ def length(
     in the item's unit, or what is wrong with it."""
     unit = session.get_one(Item, item_id).unit
     return quantity(typed, positive=False, unit=unit, separator=separator)
-
-
-def showed(typed: str) -> Decimal | None:
-    """What a package showed on the page, as it sent it back, below zero
-    too, as plain_amount wrote it; None if it sent none it could have."""
-    return read_amount(typed)
 
 
 def ticked(boxes: Sequence[str]) -> dict[int, str]:

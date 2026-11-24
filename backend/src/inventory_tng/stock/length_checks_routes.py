@@ -55,6 +55,7 @@ from inventory_tng.web.forms import (
     OtherSeparator,
     Unreadable,
     other_separator,
+    read_amount,
     read_decimal,
     use_separator,
 )
@@ -460,7 +461,7 @@ def set_one(
     if row.length_reported_in_id is not None and length == row.length_reported:
         answer = Answer(open_id, seen, length, as_of=row.length_reported_in_id)
     else:
-        shown, moment = forms.showed(showed), whole(as_of, 0, INTEGER_MAX)
+        shown, moment = read_amount(showed), whole(as_of, 0, INTEGER_MAX)
         if shown is None or moment is None:
             log.info(
                 "length not set: the form said not what it showed",

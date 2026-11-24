@@ -108,7 +108,7 @@ export function sealedCounts(
  * of an item counted in `unit` as counted, so it moves none: counted in a
  * size its package no longer has (package_resized), or in none, as an
  * older build's stored line may be (inventory-tng-1p8); or in another
- * unit than its item's now (unit_changed), or in none. */
+ * unit than its item's now (unit_changed). */
 export function refusedAsCounted(
   line: Draft["lines"][number],
   size: number,

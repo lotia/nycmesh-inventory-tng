@@ -137,7 +137,6 @@ from inventory_tng.stock.count_gone_areas import gone_words, moved_sections
 from inventory_tng.stock.count_groups import Group
 from inventory_tng.stock.count_units_shown import (
     asked_again,
-    changed_since_sent,
     kept_as_now,
 )
 from inventory_tng.stock.counts import COUNTABLE, WHOLE, NotCountable
@@ -161,7 +160,6 @@ from inventory_tng.stock.units_shown import (
     SHOWN_OTHERWISE,
     Now,
     ShownOtherwise,
-    refusing,
 )
 from inventory_tng.web.admin_pages import TextForm, admin_page, now
 from inventory_tng.web.decimal_separator import decimal_separator
@@ -777,14 +775,11 @@ def count(
     # new ones (units_shown), checked again as it is saved. A form saved
     # before is answered as it was (store_counts.record_store_count).
     shown_as = shown_in(form)
-    named_now = changed_since_sent(
-        session, form, key, sent.places.values(), place.id, place_ids
+    words, said = kept_as_now(
+        session, form, key, sent.places.values(), place.id, place_ids, refused=True
     )
-    if named_now:
-        refusing("count", named_now)
-        words, said = asked_again(session, form, place.id, place_ids, named_now)
-        problems |= words
-        alert = alert or said
+    problems |= words
+    alert = alert or said
     tree = None
     off_form = None
     if sent.listed is not None:
