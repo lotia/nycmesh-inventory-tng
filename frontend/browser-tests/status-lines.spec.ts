@@ -15,15 +15,19 @@ const NOT_ADDED = "Not added. Fix the incorrect amount below, then scan again.";
 const TYPING = "Not reading while you type. Tap the picture to scan.";
 const POINT = "Point the camera at a label.";
 
-/** Each of `below`'s box, measured from the top of `line`. */
+/** Each of `below`'s box, measured from the top of `line`, all in one
+ * read in the page: opening the camera scrolls it smoothly to the top,
+ * so boxes read one by one may each catch a different point of the
+ * scroll. */
 async function placed(line: Locator, below: Locator[]) {
-  const top = (await line.boundingBox())?.y ?? Number.NaN;
-  return Promise.all(
-    below.map(async (each) => {
-      const box = await each.boundingBox();
-      return box === null ? null : { ...box, y: box.y - top };
-    }),
-  );
+  const others = await Promise.all(below.map((each) => each.elementHandle()));
+  return line.evaluate((at, elements) => {
+    const top = at.getBoundingClientRect().top;
+    return elements.map((element) => {
+      const { x, y, width, height } = element.getBoundingClientRect();
+      return { x, y: y - top, width, height };
+    });
+  }, others);
 }
 
 test("too old, the camera's line says to upgrade in its room, and its link goes to Upgrade", async ({
