@@ -35,13 +35,18 @@ new unit; the page after links to each count.
 
 An item converted before whose stock never moved (Ali, 2026-11-25,
 inventory-tng-l26i) has nothing to write off, close or count, and no
-package is retired: each current package in its old unit keeps its name
-and links, its size, and its too-short length if it has one, given again
-in the new unit; those in the other unit stay as they are.
+package is retired: each package in its old unit, current ones first,
+then retired ones, which stay retired, keeps its name and links, its
+size, and its too-short length if it has one, given again in the new
+unit; those in the other unit stay as they are. A retired one brought
+back later (items.restore_package) has the new size, which its checks
+allow: they refuse only a fraction on an item counted each, and a
+converted item is a length, never counted each again.
 
 It revokes no labels, as none names the item's unit (Ali, 2026-11-25,
 inventory-tng-8ema; why: docs/decisions/0003), but those of the packages
-it gives a new size, which print the old one (inventory-tng-l26i)."""
+it gives a new size, retired ones' too, which print the old one
+(inventory-tng-l26i)."""
 
 import uuid
 from collections.abc import Iterable, Mapping, Sequence
@@ -131,11 +136,13 @@ class Planned(NamedTuple):
     """What a recount of the item, as it is now, does: the places it
     brings to zero, the open packages it closes, its packages in its unit
     and the name each is given as retired, or, `converted` before with no
-    stock moved, those it asks the size of again and their labels it
-    revokes, by id; the vendor offers it asks for again; whether a line of
-    it recorded with more than was moved waits, which refuses it; and
-    `seen`, all that as one string, which a recount sent from a page
-    showing it compares."""
+    stock moved, those it asks the size of again, current ones first, and
+    their labels it revokes, by id, and how many of those are retired
+    ones', which can't be printed again while they stay retired; the
+    vendor offers it asks for again; whether a line of it recorded with
+    more than was moved waits, which refuses it; and `seen`, all that as
+    one string, which a recount sent from a page showing it compares: a
+    package retired or brought back since has another version."""
 
     held: list[Held]
     opened: list[OpenPackage]
@@ -143,6 +150,7 @@ class Planned(NamedTuple):
     converted: bool
     resized: list[ItemPackage]
     revoking: list[int]
+    revoking_retired: int
     offers: list[Offer]
     waiting: bool
     seen: str
@@ -208,7 +216,10 @@ def planned(session: Session, item: Item) -> Planned:
     old = [] if converted else [each for each in every if each.unit == item.unit]
     renamed = _renamed(session, old, every, item.unit)
     resized = _asked_again(every, item.unit) if converted else []
-    revoking = _labels_of(session, [package.id for package in resized])
+    retired = [each.id for each in resized if each.retired_at is not None]
+    revoking_retired = _labels_of(session, retired)
+    current = [each.id for each in resized if each.retired_at is None]
+    revoking = sorted(_labels_of(session, current) + revoking_retired)
     offers = offers_of(session, item.id)
     waiting = unit_changes.checks_waiting(session, item.id)
     last = _last_transaction(session, item.id)
@@ -226,14 +237,23 @@ def planned(session: Session, item: Item) -> Planned:
         ]
     )
     return Planned(
-        held, opened, renamed, converted, resized, revoking, offers, waiting, seen
+        held,
+        opened,
+        renamed,
+        converted,
+        resized,
+        revoking,
+        len(revoking_retired),
+        offers,
+        waiting,
+        seen,
     )
 
 
 def resized_of(session: Session, item: Item) -> list[ItemPackage]:
     """The packages a recount of the item asks the size of again, in
     order (Planned.resized): if a conversion before, and no stock moved,
-    fixes its unit, its current ones in its unit; else none, as it
+    fixes its unit, those in its unit, retired ones too; else none, as it
     retires those instead."""
     if unit_changes.unit_fixed(session, item) != "converted":
         return []
@@ -243,8 +263,10 @@ def resized_of(session: Session, item: Item) -> list[ItemPackage]:
 
 def _asked_again(packages: Iterable[ItemPackage], unit: str) -> list[ItemPackage]:
     """Those of an item's packages whose size a recount asks again: the
-    current ones in its `unit`."""
-    return [each for each in packages if each.unit == unit and each.retired_at is None]
+    ones in its `unit`, current ones first, then retired ones (Ali,
+    2026-11-25), each in the order given."""
+    asked = [each for each in packages if each.unit == unit]
+    return sorted(asked, key=lambda each: each.retired_at is not None)
 
 
 def _labels_of(session: Session, package_ids: Sequence[int]) -> list[int]:
@@ -364,11 +386,13 @@ def recount(
 
 class Recounted(NamedTuple):
     """What is left to do after a recount: count the item again at the
-    places it brought to zero, by id, and print the labels it revoked,
-    how many."""
+    places it brought to zero, by id, and print the labels it revoked of
+    its current packages, how many; and how many it revoked of its
+    retired ones, to print if they are brought back."""
 
     places: list[int]
     revoked: int
+    revoked_retired: int
 
 
 def _places_of(session: Session, item_id: int) -> set[int]:
@@ -461,7 +485,8 @@ def _recounted(
         label_ids=plan.revoking,
         vendor_offer_ids=[each.offer.id for each in plan.offers],
     )
-    return Recounted(places, len(plan.revoking))
+    current = len(plan.revoking) - plan.revoking_retired
+    return Recounted(places, current, plan.revoking_retired)
 
 
 def _resize(
@@ -472,8 +497,8 @@ def _resize(
     at: datetime,
 ) -> None:
     """The packages the recount asks the size of again given `sizes` in
-    `unit`, and their labels revoked, as each prints its package's size as
-    it was (labels.package_label)."""
+    `unit`, retired ones staying retired, and their labels revoked, as
+    each prints its package's size as it was (labels.package_label)."""
     resizing = select(ItemPackage).where(
         ItemPackage.id.in_([package.id for package in plan.resized])
     )

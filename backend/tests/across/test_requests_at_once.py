@@ -1372,6 +1372,41 @@ def test_a_package_added_while_a_converted_item_is_recounted(
 
 
 @pytest.mark.concurrency
+@pytest.mark.parametrize(
+    ("swapped", "refused"), [(False, None), (True, "changed_since_shown")]
+)
+def test_a_retired_package_brought_back_while_a_converted_item_is_recounted(
+    own_committed: Committed, swapped: bool, refused: str | None
+) -> None:
+    """Bringing back a retired Box of 1000 ft takes the catalogue lock, as
+    the recount, which resizes it too, does (Ali, 2026-11-25,
+    inventory-tng-l26i). Second, it waits, then comes back with the new
+    size. First, the recount waits, then is refused, as its page showed
+    the Box retired. Never brought back in ft once the cable is in m."""
+    setup = own_committed.session()
+    place, _, reel = converted_reel(setup)
+    box = items.add_package(setup, place.cable, "Box", Decimal(1000), shown_unit="ft")
+    items.retire_package(setup, box, NOW)
+    admin_id = new_admin_id(setup)
+    setup.commit()
+    seen = unit_recounts.planned(setup, setup.get_one(Item, place.cable.id)).seen
+    sizes = {
+        reel.id: unit_recounts.Sized(Decimal(300), None),
+        box.id: unit_recounts.Sized(Decimal("304.8"), None),
+    }
+    recounting = _recounting(place, seen, admin_id, "m", sizes)
+    restoring = doing(ItemPackage, box.id, items.restore_package)
+    assert either_first(own_committed, recounting, restoring, swapped=swapped) == (
+        refused
+    )
+    # Only the first is committed (at_once).
+    check = own_committed.session().get_one(ItemPackage, box.id)
+    assert (check.size, check.unit, check.retired_at is None) == (
+        (1000, "ft", True) if swapped else (Decimal("304.8"), "m", False)
+    )
+
+
+@pytest.mark.concurrency
 def test_a_recount_while_a_place_first_receives_the_item_is_refused(
     own_committed: Committed,
 ) -> None:

@@ -2,9 +2,10 @@
 (catalogue/unit_recounts.py): its page, saying beforehand all it will do,
 and asking Reorder at, what is on order and its vendor offers again in the
 new unit, and, for one converted before whose stock never moved, its
-packages' sizes; and the page after, linking to a count of it at each
-place it brought to zero, and to its labels if it revoked any to print
-again (Ali, 2026-11-25, inventory-tng-qety, inventory-tng-l26i). The
+packages' sizes, retired ones' too; and the page after, linking to a
+count of it at each place it brought to zero, and to its labels if it
+revoked any of its current packages to print again (Ali, 2026-11-25,
+inventory-tng-qety, inventory-tng-l26i). The
 answer to No on the item page links here (items_routes)."""
 
 import uuid
@@ -152,10 +153,11 @@ def recount(
         )
     assert done is not None  # Refused, or done.
     session.commit()
+    revoked = {"labels": done.revoked, "retired_labels": done.revoked_retired}
     return redirect(
         UNIT_RECOUNTED.format(item_id=item_id),
         places=",".join(str(each) for each in done.places),
-        **({"labels": str(done.revoked)} if done.revoked else {}),
+        **{name: str(count) for name, count in revoked.items() if count},
     )
 
 
@@ -167,10 +169,12 @@ def recounted(
     item_id: int,
     places: str = "",
     labels: str = "",
+    retired_labels: str = "",
 ) -> Response:
     """The page after a recount: the places it brought to zero, in its
     address, each linked to its count of the item; and how many labels it
-    revoked, to print again."""
+    revoked of its current packages, to print again, and of its retired
+    ones, which can't be until they are brought back."""
     found = session.get(Item, item_id)
     if found is None:
         return not_found()
@@ -195,5 +199,6 @@ def recounted(
             "counts_path": COUNTS,
             "item_path": item_path,
             "revoked": whole(labels, 0, INTEGER_MAX) or 0,
+            "revoked_retired": whole(retired_labels, 0, INTEGER_MAX) or 0,
         },
     )

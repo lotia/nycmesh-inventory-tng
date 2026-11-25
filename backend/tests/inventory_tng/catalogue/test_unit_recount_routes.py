@@ -659,3 +659,86 @@ def test_a_converted_items_package_size_not_sent_is_refused(
     assert refused.status_code == 409
     session.expire_all()
     assert (cable.unit, reel.unit) == ("ft", "ft")
+
+
+def _retired_box(session: Session) -> tuple[Item, ItemPackage, ItemPackage, Label]:
+    """The cable converted to ft with no stock moved (converted_reel), its
+    Reel, and a Box of 1000 ft, labelled, then retired: its label, the one
+    a recount into m revokes."""
+    place, _, reel = converted_reel(session)
+    cable = place.cable
+    box = items.add_package(session, cable, "Box", Decimal(1000), shown_unit="ft")
+    on_box = labels.make_for_item(session, cable.id, box.id)
+    assert on_box is not None
+    items.retire_package(session, box, datetime.now(UTC))
+    session.flush()
+    return cable, reel, box, on_box
+
+
+def test_a_converted_items_retired_package_is_resized_and_stays_retired(
+    admin_client: TestClient, session: Session
+) -> None:
+    """Its retired Box of 1000 ft is asked below its current Reel, marked
+    retired, and given 304.8 m; it stays retired, its label revoked, to
+    print once it is brought back, when it has the new size; the Reel's
+    label, revoked too, is to print now (Ali, 2026-11-25,
+    inventory-tng-l26i)."""
+    cable, reel, box, on_box = _retired_box(session)
+    on_reel = labels.make_for_item(session, cable.id, reel.id)
+    assert on_reel is not None
+    retired_at = box.retired_at
+    page = _page(admin_client, cable.id, "m")
+    assert "revokes their 2 printed labels" in words_on(page.text)
+    asked = read(page.text).all("fieldset")
+    assert [words_on(each.one("legend")) for each in asked] == ["Reel", "Box Retired"]
+    assert box_values(page.text, f"size_{box.id}") == ["1000"]
+    done = admin_client.post(
+        unit_recount(cable.id, "m"),
+        data=_sent(page, **{f"size_{reel.id}": "300", f"size_{box.id}": "304.8"}),
+    )
+    assert done.status_code == 303
+    session.expire_all()
+    assert (reel.size, reel.unit, reel.retired_at) == (300, "m", None)
+    assert (box.name, box.size, box.unit, box.retired_at) == (
+        "Box",
+        Decimal("304.8"),
+        "m",
+        retired_at,
+    )
+    assert (on_box.revoked_at is not None, on_reel.revoked_at is not None) == (
+        True,
+        True,
+    )
+    after = words_on(admin_client.get(done.headers["location"]).text)
+    assert "Its package's printed label was revoked: print a new one." in after
+    assert (
+        "Its retired package's printed label was revoked too: print a new one "
+        "if it is brought back."
+    ) in after
+    items.restore_package(session, box)
+    session.flush()
+    session.expire_all()
+    assert (box.size, box.unit, box.retired_at) == (Decimal("304.8"), "m", None)
+
+
+@pytest.mark.parametrize("bringing_back", [False, True])
+def test_a_package_retired_or_brought_back_since_shown_is_refused(
+    admin_client: TestClient, session: Session, bringing_back: bool
+) -> None:
+    """Either changes what the page showed of it: refused as changed,
+    nothing resized."""
+    cable, reel, box, _ = _retired_box(session)
+    if not bringing_back:
+        items.restore_package(session, box)
+        session.flush()
+    page = _page(admin_client, cable.id, "m")
+    if bringing_back:
+        items.restore_package(session, box)
+    else:
+        items.retire_package(session, box, datetime.now(UTC))
+    session.flush()
+    refused = admin_client.post(unit_recount(cable.id, "m"), data=_sent(page))
+    assert refused.status_code == 409
+    assert str(RULES["changed_since_shown"]) in words_on(refused.text)
+    session.expire_all()
+    assert (cable.unit, reel.unit, box.unit) == ("ft", "ft", "ft")

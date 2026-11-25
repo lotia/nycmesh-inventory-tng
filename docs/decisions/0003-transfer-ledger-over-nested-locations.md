@@ -477,12 +477,18 @@ other unit, and retiring the item for a new one.
   or close; the rest is done as above. Its packages in the other unit,
   as a conversion left them, stay.
 - An item converted before whose stock never moved has nothing to write
-  off, close or count, and retires no package. Each of its current
-  packages in the old unit is asked its size again in the new unit, and
-  its too-short length if it has one, and keeps its name and links;
-  those in the other unit are not asked (Ali, 2026-11-25,
+  off, close or count, and retires no package. Each of its packages in
+  the old unit is asked its size again in the new unit, and its
+  too-short length if it has one, and keeps its name and links; those
+  in the other unit are not asked (Ali, 2026-11-25,
   inventory-tng-l26i). Rejected: retiring and renaming them, and
   leaving them as they are.
+- Its retired packages in the old unit are asked too, marked retired,
+  below its current ones, and stay retired, so one brought back later
+  has the new size. Bringing one back refuses only a fraction on an
+  item counted each, which a converted item never is again (Ali,
+  2026-11-25, inventory-tng-l26i). Rejected: asking a retired one's size
+  only when it is brought back, and leaving them as they are.
 - The item keeps its last ledger transaction then
   (`Item.unit_recounted_after`). What left a place since a count form
   was first shown leaves out the lines up to it, and so must use summed
@@ -491,9 +497,11 @@ other unit, and retiring the item for a new one.
   amendment); a retired package's label stops scanning anyway (Ali,
   2026-11-25, replacing his decision earlier that day that it revokes
   the item's labels). The one exception: the labels of the packages it
-  asks the size of again, as they print the size as it was. Its page
-  says so beforehand, and the page after links to the item's labels to
-  print new ones (Ali, 2026-11-25, inventory-tng-l26i).
+  asks the size of again, retired ones' too, as they print the size as
+  it was. Its page says so beforehand, and the page after links to the
+  item's labels to print new ones of its current packages, and says a
+  retired one's is printed once it is brought back (Ali, 2026-11-25,
+  inventory-tng-l26i).
 - The page after links to a count of the item at each place, in the new
   unit, and to adding its packages in it. For an item converted before
   whose stock never moved, neither page says to count it or add its

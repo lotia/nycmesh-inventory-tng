@@ -2063,6 +2063,17 @@ msgid ""
 "brought back. Revoking it stops them scanning for good."
 msgstr ""
 
+#: src/inventory_tng/templates/catalogue/unit_recounted.html
+#, python-format
+msgid ""
+"Its retired package's printed label was revoked too: print a new one if "
+"it is brought back."
+msgid_plural ""
+"Its retired packages' %(count)s printed labels were revoked too: print "
+"new ones if they are brought back."
+msgstr[0] ""
+msgstr[1] ""
+
 #: src/inventory_tng/web/forms.py
 msgid ""
 "Its size is fixed, as a label has been printed for it: revoke its labels "
@@ -3470,6 +3481,7 @@ msgstr ""
 #: src/inventory_tng/templates/catalogue/categories.html
 #: src/inventory_tng/templates/catalogue/item.html
 #: src/inventory_tng/templates/catalogue/items.html
+#: src/inventory_tng/templates/catalogue/unit_recount.html
 #: src/inventory_tng/templates/places/location.html
 #: src/inventory_tng/templates/places/locations.html
 #: src/inventory_tng/templates/site_settings/settings.html

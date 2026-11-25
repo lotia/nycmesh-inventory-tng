@@ -48,9 +48,10 @@ amounts to give again in the new unit (Ali, 2026-11-25). -#}
   </label>
   {% endfor %}
   {% for package in plan.resized %}
-  {#- Labelled as on its own form (forms.HOLDS), named by the package. #}
+  {#- Labelled as on its own form (forms.HOLDS), named by the package,
+  and marked retired as on the item page. #}
   <fieldset>
-    <legend>{{ package.name_shown }}</legend>
+    <legend>{{ package.name_shown }}{% if package.retired_at %} <span class="tag">{% trans %}Retired{% endtrans %}</span>{% endif %}</legend>
     {% set name = size_of ~ package.id %}
     <label>{{ holds }} <span class="hint">{% trans new=unit, size=package.size | amount, old=package.unit %}in {{ new }}; was {{ size }} {{ old }}{% endtrans %}</span>
       <input name="{{ name }}" inputmode="{{ unit | keyboard }}" value="{{ values.get(name, package.size | box_amount(decimal)) }}" required>
