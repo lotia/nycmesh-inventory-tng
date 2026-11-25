@@ -492,14 +492,16 @@ def _item_page(
     # Not revoked, its own and its packages': how many each hint says.
     printed = labels.current_of(session, Label.item_id == item.id)
     by_package = Counter(each.label.package_id for each in printed)
-    # Only a current one's size can change.
-    sizes = items.sizes_fixed(
-        session, [each.id for each in packages if each.retired_at is None]
-    )
     # Labels revoked between the reads fix nothing: no hint says "0 labels".
     if fixed == "labelled" and not printed:
         fixed = None
-    sizes = {i: why for i, why in sizes.items() if why == "used" or by_package[i]}
+    # Only a current one's size can change.
+    current = [each.id for each in packages if each.retired_at is None]
+    sizes = {
+        each: why
+        for each, why in items.sizes_fixed(session, current).items()
+        if why == "used" or by_package[each]
+    }
     return admin_page(
         request,
         signed,
