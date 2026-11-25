@@ -35,7 +35,13 @@ from inventory_tng.models.stock import (
     OpenPackage,
     OverRecorded,
 )
-from inventory_tng.stock import adjustment_reasons, counts, ledger, moments
+from inventory_tng.stock import (
+    adjustment_reasons,
+    counts,
+    ledger,
+    line_amounts,
+    moments,
+)
 from inventory_tng.web.formatting import plain_amount
 
 log = structlog.get_logger(__name__)
@@ -401,12 +407,29 @@ def close(session: Session, check_id: int, seen_as: str, admin_id: int) -> None:
     _closed_right(session, row, admin_id)
 
 
+def _in_items_unit(
+    session: Session, item_id: int, amount: Decimal, unit: str, form: ledger.Form
+) -> tuple[Decimal, str]:
+    """`amount` of a check, in the unit its line was recorded in, as its
+    item's unit says it now, and that unit (line_amounts.said_in_items_unit),
+    to write it in: a sealed form's by packages, so whole packages stay
+    whole (inventory-tng-4fjq). The item held first, as the ledger holds it
+    after the check's places, so a change of its unit between lengths
+    (catalogue/items.py), which holds it FOR UPDATE, has committed or
+    waits. A check raised while that change ran, after it looked for
+    checks waiting, so converts here too."""
+    ledger.hold_across(session, item_ids=[item_id])
+    sealed = form.package_id if form.open_package_id is None else None
+    return line_amounts.said_in_items_unit(session, item_id, amount, unit, sealed)
+
+
 def correct(
     session: Session, check_id: int, seen_as: str, admin_id: int, held: Collection[int]
 ) -> Settled:
     """Settle one, as corrected: an adjustment on each side its transaction
     has, but one a count put right (counted), undoes what was recorded more
-    than moved, in the forms it moved in, with the reason REASON. Found
+    than moved, in the forms it moved in, in its item's unit now
+    (_in_items_unit), with the reason REASON. Found
     again where it left, written off where it arrived. An opening's open
     package closed since, however, put its end right (_read), so its end is
     skipped: the sealed end alone is written (Ali, 2026-11-15,
@@ -464,19 +487,20 @@ def correct(
     for place, found, form in sides:
         if place is None:
             continue
+        amount, unit = _in_items_unit(
+            session, movement.item_id, row.quantity, row.unit, form
+        )
         counts.record_adjustment(
             session,
             correction_key(transaction.idempotency_key, row, found=found),
             admin_id,
             place,
             movement.item_id,
-            row.quantity,
+            amount,
             found=found,
             reason_id=reason.id,
             form=form,
-            # Undone in the unit it was recorded in, refused if its item is
-            # counted in another now.
-            shown_unit=row.unit,
+            shown_unit=unit,
         )
     _measure_settled(session, "corrected")
     once_committed(
@@ -496,7 +520,8 @@ def confirm_count(
     (over_recorded_queries.Shown.moved_whole), given the count an
     administrator says it held when it moved: as it was, as checked,
     writing nothing; else as corrected, with an adjustment at the
-    place it arrived, in it, for the difference, with the reason REASON,
+    place it arrived, in it, for the difference in its item's unit now
+    (_in_items_unit), with the reason REASON,
     under a key of the check's. How it was settled.
     Call it holding its places (places_of), locked first. RuleBroken as
     _settle, if it is not such a move (over_recorded_not_whole), if its
@@ -526,20 +551,23 @@ def confirm_count(
         )
         return "checked"
     row.settled_how = "corrected"
+    form = ledger.Form(movement.to_package_id, open_id)
+    # The count was typed in the unit the line was recorded in
+    # (forms.confirmed_count).
+    amount, unit = _in_items_unit(
+        session, movement.item_id, abs(count - movement.quantity), movement.unit, form
+    )
     counts.record_adjustment(
         session,
         uuid.uuid5(transaction.idempotency_key, f"over recorded {row.id} count"),
         admin_id,
         transaction.to_location_id,
         movement.item_id,
-        abs(count - movement.quantity),
+        amount,
         found=count > movement.quantity,
         reason_id=adjustment_reasons.seeded(session, REASON).id,
-        form=ledger.Form(movement.to_package_id, open_id),
-        # The count was typed in the unit the line was recorded in
-        # (forms.confirmed_count): refused if its item is counted in
-        # another now.
-        shown_unit=movement.unit,
+        form=form,
+        shown_unit=unit,
     )
     _measure_settled(session, "corrected")
     once_committed(

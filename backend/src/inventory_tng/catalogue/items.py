@@ -392,7 +392,8 @@ PACKAGE_WHOLE = "package_whole_units"
 # 2026-11-24, inventory-tng-y50b).
 UNIT_UNCONFIRMED = "item_unit_unconfirmed"
 # Refused: that change while a line of the item recorded with more than
-# was moved waits, its amounts in the line's unit (stock/over_recorded.py).
+# was moved waits, its amounts shown in the line's unit
+# (stock/over_recorded.py).
 UNIT_CHECKS_WAITING = "item_unit_checks_waiting"
 # Refused: that change, an amount it converts too large to keep in the new
 # unit, or a package's size or too-short length too small or no longer
@@ -501,7 +502,8 @@ def save(
         if not convertible(item.unit, fields.unit):
             _unit_refused(item.id, why, UNIT_FIXED_RULES[why])
         # Refused before it is asked: a line recorded with more than was
-        # moved, waiting, is undone in the line's unit (stock/over_recorded.py).
+        # moved, waiting, is shown in the line's unit. One raised while this
+        # runs is converted as it is corrected (stock/over_recorded.py).
         waiting = (
             OverRecorded.movement_id == Movement.id,
             Movement.item_id == item.id,

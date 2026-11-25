@@ -68,7 +68,12 @@ from inventory_tng.places import locations
 from inventory_tng.scan import catalogue_api
 from inventory_tng.scan.batch import BatchRefused, KeyReused, Recorded, record
 from inventory_tng.scan.batch_schemas import Batch
-from inventory_tng.stock import adjustment_reasons, ledger, open_packages
+from inventory_tng.stock import (
+    adjustment_reasons,
+    ledger,
+    open_packages,
+    over_recorded,
+)
 from inventory_tng.stock.balance import balance
 from inventory_tng.stock.ledger import Entry, Form, insert_transaction
 from inventory_tng.stock.moments import expected
@@ -87,6 +92,7 @@ from helpers.concurrency import (
 )
 from helpers.devices import new_device
 from helpers.mail import NO_MAIL, SentMail
+from helpers.over_recorded import correct_check
 from helpers.rows import item_fields, tag
 from helpers.sign_in import (
     PASSWORD,
@@ -1260,6 +1266,51 @@ def test_a_length_reported_while_a_unit_is_converted_is_converted(
     check = own_committed.session()
     row = check.get_one(OpenPackage, made.id)
     assert (row.length_reported, row.length_reported_unit) == (Decimal("984.252"), "ft")
+
+
+@pytest.mark.concurrency
+def test_a_check_raised_while_a_unit_is_converted_is_corrected_in_the_new_unit(
+    own_committed: Committed,
+) -> None:
+    """A change to ft holds the cable FOR UPDATE once it has looked for
+    checks waiting. A check of 3 m raised meanwhile does not hold the
+    cable, so commits, and the change, not seeing it, converts. Correct
+    holds the cable FOR KEY SHARE before it reads its unit
+    (over_recorded._in_items_unit), so waits for the change, then writes
+    3 m as 9.843 ft, never refused as shown in m (inventory-tng-4fjq)."""
+    setup = own_committed.session()
+    place = Place(setup)
+    cable = place.cable
+    admin_id = new_admin_id(setup)
+    header = {"kind": "receipt", "to_location_id": place.store.id}
+    insert_transaction(setup, uuid.uuid4(), header, [Entry(cable.id, Decimal(10))])
+    move = {
+        "kind": "move",
+        "from_location_id": place.store.id,
+        "to_location_id": place.van.id,
+    }
+    moved = insert_transaction(setup, uuid.uuid4(), move, [Entry(cable.id, Decimal(5))])
+    setup.commit()
+    changing, raising, correcting = (own_committed.session() for _ in range(3))
+    held = changing.get_one(Item, cable.id)
+    items.save(changing, held, item_fields(held, unit="ft"), seen=None, recorded_in="m")
+    changing.flush()
+    check = raise_check(raising, moved, Decimal(3))
+    raising.commit()
+    seen = over_recorded.seen(check)
+    worker = own_committed.blocked(
+        correcting, lambda: correct_check(correcting, check, seen, admin_id)
+    )
+    changing.commit()
+    assert worker.finished().error is None
+    assert worker.result == "corrected"
+    correcting.commit()
+    lines = own_committed.session().execute(
+        select(Movement.quantity, Movement.unit)
+        .join(LedgerTransaction, LedgerTransaction.id == Movement.transaction_id)
+        .where(LedgerTransaction.kind == "adjustment")
+    )
+    assert lines.all() == [(Decimal("9.843"), "ft")] * 2
 
 
 @pytest.mark.concurrency

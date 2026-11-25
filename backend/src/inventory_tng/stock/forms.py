@@ -177,10 +177,10 @@ def confirmed_count(
 ) -> Decimal | str | None:
     """The count typed to confirm an open package moved whole by a ledger
     line, in the unit the page showed, the line's, or what is wrong with
-    it: its item counted in another unit now, it is asked again
-    (stock/units_shown.py), as nothing converts one to the other. Compared
-    with its item's again under the lock it is saved with
-    (over_recorded.confirm_count)."""
+    it: shown in another, from a form sent from elsewhere, it is asked
+    again (stock/units_shown.py). Its item's unit may be the other length
+    now: over_recorded.confirm_count converts the difference into it, under
+    the lock it is saved with (inventory-tng-4fjq)."""
     item_id, unit = queries.item_moved(session, movement_id)
     if shown != unit:
         units_shown.refusing("confirm_count", Now({item_id: unit}, {}))

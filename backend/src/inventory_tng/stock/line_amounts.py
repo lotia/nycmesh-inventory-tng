@@ -13,8 +13,11 @@ A line of sealed packages converts by its packages instead: so many, each
 its size in its item's unit as kept
 (models.catalogue.ItemPackage.size_in_items_unit), as the ledger takes
 them since, so packages received before a change leave whole after it.
+An amount said of a line, as a correction undoing some of it is written,
+converts alike (said_in_items_unit; inventory-tng-4fjq).
 """
 
+from decimal import Decimal
 from typing import Any
 
 from sqlalchemy import (
@@ -28,12 +31,15 @@ from sqlalchemy import (
     literal,
     select,
 )
-from sqlalchemy.orm import aliased
+from sqlalchemy.orm import Session, aliased
 
 from inventory_tng.catalogue.unit_conversion import (
     IN_METRES,
+    at_scale,
+    converted,
     converted_kept_sql,
     converted_sql,
+    convertible,
 )
 from inventory_tng.models.catalogue import Item, ItemPackage
 from inventory_tng.models.stock import Movement
@@ -85,3 +91,25 @@ def in_items_unit() -> ColumnElement[Any]:
         (lengths, converted_sql(Movement.quantity, Movement.unit, Item.unit)),
         else_=cast(refused, Numeric),
     )
+
+
+def said_in_items_unit(
+    session: Session, item_id: int, amount: Decimal, unit: str, package_id: int | None
+) -> tuple[Decimal, str]:
+    """`amount` of a line of the item `item_id`, said in the line's `unit`,
+    as in_items_unit() reads the line, kept, and the unit it is in then:
+    sealed packages of `package_id` by packages, else exactly. In `unit`
+    still unless it converts into the item's, so a ledger write shown in it
+    is refused as it would be. Call it holding the item
+    (ledger.hold_across), so its unit cannot change before it is written."""
+    into = session.scalars(select(Item.unit).where(Item.id == item_id)).one()
+    if not convertible(unit, into):
+        return amount, unit
+    if package_id is None:
+        return converted(amount, unit, into), into
+    size, size_unit, size_now = session.execute(
+        select(
+            ItemPackage.size, ItemPackage.unit, ItemPackage.size_in_items_unit
+        ).where(ItemPackage.id == package_id)
+    ).one()
+    return at_scale(amount / converted(size, size_unit, unit) * size_now), into

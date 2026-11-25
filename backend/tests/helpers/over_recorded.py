@@ -133,7 +133,7 @@ def counted(
     admin_client: TestClient, session: Session, count: str, **form: str
 ) -> tuple[OverRecorded, Any]:
     """The one waiting, and the answer to its count sent as `count`, shown
-    in its item's unit."""
+    in its line's unit, as the page shows it."""
     (check,) = checks(session)
     _, unit = item_moved(session, check.movement_id)
     shown = {"unit": unit} | form
