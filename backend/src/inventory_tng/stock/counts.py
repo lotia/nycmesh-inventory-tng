@@ -287,33 +287,31 @@ def record_count(
         "changed_since_shown",
         when=moments.seen_up_to(session, places, as_of) != shown.seen,
     )
-    then_window = LedgerTransaction.id <= as_of
-    moved, flowed = moments.flows(
-        session, location_id, after, then_window, items=counted_at
-    )
+    [moved] = moments.flows(session, location_id, after, items=counted_at)
     form_items = {item_id for item_id, _ in forms_counted}
-    form_moved, form_flowed = moments.form_flows(
-        session, location_id, (after, then_window), form_items
-    )
-    # What the records said then of what moved there by then, its forms
-    # summed as kept, as the form showed it (moments.expected_at), less
-    # what came from areas gone: not the sum of its lines, which may differ
-    # by parts of a thousandth after a change between m and ft
-    # (inventory-tng-8s2c).
+    [form_moved] = moments.form_flows(session, location_id, (after,), form_items)
+    # What the records said then of what was counted, its forms summed as
+    # kept, as the form showed it (moments.expected_at), less what came
+    # from areas gone: not the sum of its lines, which may differ by parts
+    # of a thousandth after a change between m and ft (inventory-tng-8s2c).
     aside = aside or {}
     aside_total = by_item(aside)
     place = [location_id]
-    held = moments.expected_at(session, place, as_of, flowed).get(location_id, {})
+    held = (
+        moments.expected_at(session, place, as_of, counted_at).get(location_id, {})
+        if counted_at
+        else {}
+    )
     held_forms = moments.expected_forms_at(session, place, as_of, form_items).get(
         location_id, {}
     )
     then = {
         item_id: held.get(item_id, Decimal(0)) - aside_total.get(item_id, Decimal(0))
-        for item_id in flowed
+        for item_id in counted_at
     }
     form_then = {
         form: held_forms.get(form, Decimal(0)) - aside.get(form, Decimal(0))
-        for form in form_flowed
+        for form in forms_counted
     }
     for item_id, _ in form_moved:
         came, went = moved.get(item_id, (Decimal(0), Decimal(0)))
