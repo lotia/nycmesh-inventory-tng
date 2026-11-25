@@ -28,6 +28,7 @@ from inventory_tng.models.base import QUANTITY_MAX, QUANTITY_STEP
 from inventory_tng.models.catalogue import UNITS, Item, ItemPackage, VendorOffer
 from inventory_tng.models.labels import Label
 from inventory_tng.models.stock import Movement, OpenPackage, OverRecorded
+from inventory_tng.stock import units_shown
 
 log = structlog.get_logger(__name__)
 meter = metrics.get_meter(__name__)
@@ -44,13 +45,6 @@ unit_changes_converted = meter.create_counter(
     description="Changes to an item's unit between lengths that converted "
     "what is recorded, once stock had moved or a label was printed, by the "
     "unit it was in and the one it is in now",
-)
-
-stale_forms = meter.create_counter(
-    "inventory.unit_changes.stale_forms",
-    unit="{form}",
-    description="Package forms refused as their amount was typed in a unit "
-    "the item or package has left since the form was shown, by the form",
 )
 
 # Why an item's unit is fixed, and the rule each refuses a change by.
@@ -75,7 +69,8 @@ UNIT_OUT_OF_RANGE = "item_unit_out_of_range"
 # Refused: a package's amount typed in the unit its form showed, which its
 # item or package has left since (require_unit_shown).
 UNIT_CHANGED = "package_unit_changed"
-# The package forms that say the unit they showed: the counter's attribute.
+# The package forms that say the unit they showed, each a save of
+# units_shown's counter.
 PackageForm = Literal["add_package", "package_settings"]
 
 
@@ -94,7 +89,7 @@ def require_unit_shown(
         table=row.__tablename__,
         row_id=row.id,
     )
-    stale_forms.add(1, {"form": form})
+    units_shown.refused.add(1, {"changed": "unit", "save": form})
     enforce(UNIT_CHANGED)
 
 

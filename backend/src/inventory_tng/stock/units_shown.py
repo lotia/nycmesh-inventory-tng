@@ -6,7 +6,8 @@ again with the new ones, never converting from one to the other (Ali,
 2026-11-23, inventory-tng-57u8). Compared under the save's own locks on
 its items and packages (stock/ledger.py), which a change to either waits
 for, so none slips between the check and the write. Each refusal is
-logged and measured here, whichever save it was.
+logged and measured here, whichever save it was; an item page's package
+forms, compared by catalogue/unit_changes.py, are measured here too.
 """
 
 from collections.abc import Collection, Mapping
@@ -28,14 +29,17 @@ meter = metrics.get_meter(__name__)
 # What changed since a line was shown, and the save it was in: the
 # counter's attributes, from these lists only.
 Changed = Literal["unit", "package_size"]
-Save = Literal["batch", "count", "adjustment", "confirm_count"]
+# An item page's package forms count here too (catalogue/unit_changes.py).
+Save = Literal[
+    "batch", "count", "adjustment", "confirm_count", "add_package", "package_settings"
+]
 
 refused = meter.create_counter(
     "inventory.saves.shown_otherwise",
     unit="{change}",
-    description="Item units and package sizes a save showed that changed "
-    "since, one for each item or package, so the save was refused and asked "
-    "again, by what changed and the save",
+    description="Item and package units and package sizes a save showed "
+    "that changed since, one for each item or package, so the save was "
+    "refused and asked again, by what changed and the save",
 )
 
 SHOWN_OTHERWISE = "shown_otherwise"

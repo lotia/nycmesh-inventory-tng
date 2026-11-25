@@ -1177,7 +1177,7 @@ def test_counts_package_forms_refused_as_shown_in_a_unit_left_by_form(
     added, or its too-short length set, typed in m, the cable in ft now
     (inventory-tng-74f3). One in its unit, or a command's, is not."""
     _, _, reader, _ = rolled_back
-    name = "inventory.unit_changes.stale_forms"
+    name = "inventory.saves.shown_otherwise"
     before = counted(reader, name)
     cable = Place(session).cable
     reel = add(session, ItemPackage(item_id=cable.id, name="Reel", size=305))
@@ -1190,8 +1190,8 @@ def test_counts_package_forms_refused_as_shown_in_a_unit_left_by_form(
     items.add_package(session, cable, "Box", Decimal(300), shown_unit="ft")
     items.package_settings(session, reel, Decimal(5), None, shown_unit=None)
     assert added(reader, name, before) == {
-        (("form", "add_package"),): 1,
-        (("form", "package_settings"),): 1,
+        (("changed", "unit"), ("save", "add_package")): 1,
+        (("changed", "unit"), ("save", "package_settings")): 1,
     }
 
 
