@@ -119,7 +119,7 @@ def recount(
         return _page(
             request, session, signed, found, unit, values=form, problems=problems
         )
-    done, broken = refusal(
+    zeroed, broken = refusal(
         session,
         lambda: unit_recounts.recount(
             session,
@@ -142,11 +142,11 @@ def recount(
         return _page(
             request, session, signed, found, unit, values=form, alert=RULES[broken]
         )
-    assert done is not None  # Refused, or done.
+    assert zeroed is not None  # Refused, or done.
     session.commit()
     return redirect(
         UNIT_RECOUNTED.format(item_id=item_id),
-        places=",".join(str(each) for each in done.places),
+        places=",".join(str(each) for each in zeroed),
     )
 
 

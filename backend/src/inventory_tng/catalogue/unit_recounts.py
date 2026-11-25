@@ -33,9 +33,8 @@ done as above, and its packages in the other unit, as a conversion left
 them, stay. Then each place is counted in the new unit; the page after
 links to each count.
 
-It revokes no labels: none names the item's unit, as an item's prints its
-name and a package's that package's own size, and those in the old unit
-stop scanning as they are retired (Ali, 2026-11-25, inventory-tng-8ema)."""
+It revokes no labels, as none names the item's unit (Ali, 2026-11-25,
+inventory-tng-8ema; why: docs/decisions/0003)."""
 
 import uuid
 from collections.abc import Iterable, Mapping, Sequence
@@ -272,13 +271,6 @@ class Amounts(NamedTuple):
     per_order: Mapping[int, Decimal | None]
 
 
-class Recounted(NamedTuple):
-    """What a recount did: the places it brought to zero, by id, to count
-    again."""
-
-    places: list[int]
-
-
 def recount(
     session: Session,
     item: Item,
@@ -289,10 +281,11 @@ def recount(
     key: uuid.UUID,
     admin_id: int,
     at: datetime,
-) -> Recounted:
+) -> list[int]:
     """The item recounted into `unit` (above), as the page that showed
     `seen` (Planned.seen) said it would be, its adjustments written under
-    keys made from `key`.
+    keys made from `key`; the places it brought to zero, by id, to count
+    again.
     RuleBroken: CHANGED if anything it does changed since, or it may no
     longer be recounted into `unit`; RETIRED for a retired item;
     unit_changes.UNIT_CHECKS_WAITING while a check of it waits."""
@@ -335,7 +328,7 @@ def _recounted(
     key: uuid.UUID,
     admin_id: int,
     at: datetime,
-) -> Recounted:
+) -> list[int]:
     """recount's writes, holding the places and the item."""
     if item.retired_at is not None:
         _refused(item.id, "retired", RETIRED)
@@ -392,7 +385,7 @@ def _recounted(
         item_package_ids=sorted(names),
         vendor_offer_ids=[each.offer.id for each in plan.offers],
     )
-    return Recounted(places)
+    return places
 
 
 def _write_off(
