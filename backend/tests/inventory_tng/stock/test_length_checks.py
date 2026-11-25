@@ -544,10 +544,9 @@ def test_the_count_page_hints_at_the_printed_length_of_items_in_length(
     )
     box = add(session, ItemPackage(item_id=plugs.id, name="Box", size=Decimal(100)))
     page = read(admin_client.get(f"/admin/counts/{store}").text)
-    spool = page.all("option", value=str(spools.spool.id))
-    assert any("data-hinted" in choice.attrs for choice in spool)
-    boxes = page.all("option", value=str(box.id))
-    assert any(choice.attrs.keys() == {"value"} for choice in boxes)
+    picker = page.one("select", name="found_package_id")
+    assert "data-hinted" in picker.one("option", value=str(spools.spool.id)).attrs
+    assert picker.one("option", value=str(box.id)).attrs.keys() == {"value"}
     # Counted each, as the plugs are: none.
     spools.cable.unit = "each"
     session.flush()

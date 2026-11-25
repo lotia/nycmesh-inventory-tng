@@ -114,7 +114,8 @@ def test_amounts_in_words_follow_the_locales_separator(
     )
     path = f"{ITEMS}/{item.id}"
     page = read(admin_client.get(path, headers=headers).text)
-    assert page.one("option", value=str(package.id)).text == f"Reel of {size}"
+    picker = page.one("select", name="package_id")
+    assert picker.one("option", value=str(package.id)).text == f"Reel of {size}"
     refused = admin_client.post(
         path, data=shown_item_form(item, unit="each"), headers=headers
     )

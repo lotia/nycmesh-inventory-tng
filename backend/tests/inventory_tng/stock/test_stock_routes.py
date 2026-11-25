@@ -288,8 +288,9 @@ def test_stock_sorts_within_each_group_and_filters(
     assert amounts(by="item", place=str(place.store.id)) == ["7", "2"]
     assert amounts(place="x") == ["7", "2", "3"]
     filtered = read(admin_client.get(STOCK, params={"place": str(place.van.id)}).text)
-    chosen = [value for value, _, selected in options(filtered) if selected]
-    assert str(place.van.id) in chosen
+    picker = filtered.one("select", name="place")
+    chosen = [value for value, _, selected in options(picker) if selected]
+    assert chosen == [str(place.van.id)]
     assert ("Clear", STOCK) in links(filtered)
     nothing = text(admin_client.get(STOCK, params={"q": "zzzqqqxxx"}))
     assert "None is in the filter." in nothing

@@ -221,8 +221,8 @@ def test_items_filter_by_category(
     new_item(session, radios, f"Filtered {mark} radio")
     page = read(admin_client.get(ITEMS, params={"category": str(antennas.id)}).text)
     assert items_named(page) == [kept.name]
-    offered = read(page).all("option", value=str(antennas.id))
-    assert any("selected" in choice.attrs for choice in offered)
+    picker = read(page).one("select", name="category")
+    assert "selected" in picker.one("option", value=str(antennas.id)).attrs
     assert ("Clear", ITEMS) in links(page)
     # Kept by a search, a sort and the pages; the search box's suggestions
     # come from it too.
