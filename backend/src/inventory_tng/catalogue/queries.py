@@ -19,6 +19,7 @@ from inventory_tng.models.catalogue import (
     Item,
     ItemPackage,
     ReadingRule,
+    Vendor,
     VendorOffer,
 )
 from inventory_tng.models.places import Location
@@ -98,13 +99,14 @@ ExampleOf = Literal["place", "minimum", "on_order", "offer"]
 
 class UnitChangeExample(NamedTuple):
     """One amount the item records, `amount` in its unit, and `becomes`,
-    what a change into another length would make it; at `place`, by
-    name, if it is stock."""
+    what a change into another length would make it; `name`, the place's
+    if it is stock, the vendor's if it is an offer's units per order (its
+    address, for an offer naming none)."""
 
     of: ExampleOf
     amount: Decimal
     becomes: Decimal
-    place: str | None = None
+    name: str | None = None
 
 
 def unit_change_example(
@@ -114,21 +116,21 @@ def unit_change_example(
     own numbers, for the note after No (Ali, 2026-11-25,
     inventory-tng-aknv): stock moved (`why`), the balance at the first
     place holding any, in the stock pages' order (stock/queries.balances);
-    else a stored amount not nothing: its Reorder at, what is on order,
-    or its first current vendor offer's units per order in its unit.
-    None if it has none."""
+    else, or with none left anywhere, a stored amount not nothing: its
+    Reorder at, what is on order, or its first current vendor offer's
+    units per order in its unit. None if it has none."""
     if why == "moved":
         held = balances(
             session, and_(balance.c.item_id == item.id, balance.c.quantity > 0)
         )
-        if not held:
-            return None
-        _, place, quantity = held[0]
-        return UnitChangeExample(
-            "place", quantity, converted_kept(quantity, item.unit, new), place.name
-        )
-    offered = session.scalar(
-        select(VendorOffer.units_per_order)
+        if held:
+            _, place, quantity = held[0]
+            return UnitChangeExample(
+                "place", quantity, converted_kept(quantity, item.unit, new), place.name
+            )
+    offered = session.execute(
+        select(VendorOffer.units_per_order, func.coalesce(Vendor.name, VendorOffer.url))
+        .outerjoin(Vendor, Vendor.id == VendorOffer.vendor_id)
         .where(
             VendorOffer.item_id == item.id,
             VendorOffer.retired_at.is_(None),
@@ -137,13 +139,16 @@ def unit_change_example(
         )
         .order_by(VendorOffer.id)
         .limit(1)
-    )
-    stored: list[tuple[ExampleOf, Decimal | None]] = [
-        ("minimum", item.minimum),
-        ("on_order", item.on_order),
-        ("offer", offered),
+    ).first()
+    per_order, vendor = offered or (None, None)
+    stored: list[tuple[ExampleOf, Decimal | None, str | None]] = [
+        ("minimum", item.minimum, None),
+        ("on_order", item.on_order, None),
+        ("offer", per_order, vendor),
     ]
-    for of, amount in stored:
+    for of, amount, name in stored:
         if amount:
-            return UnitChangeExample(of, amount, converted_kept(amount, item.unit, new))
+            return UnitChangeExample(
+                of, amount, converted_kept(amount, item.unit, new), name
+            )
     return None

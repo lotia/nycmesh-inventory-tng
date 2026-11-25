@@ -15,7 +15,7 @@ from inventory_tng.catalogue import unit_changes
 from inventory_tng.catalogue.paths import ITEMS, unit_recount
 from inventory_tng.labels import labels
 from inventory_tng.labels.paths import item_labels
-from inventory_tng.models.catalogue import Item, ItemPackage, VendorOffer
+from inventory_tng.models.catalogue import Item, ItemPackage, Vendor, VendorOffer
 
 from helpers.items import unit_answered
 from helpers.markup import problem, read
@@ -45,19 +45,89 @@ def _labelled(session: Session, item: Item, count: int) -> None:
         assert labels.make_for_item(session, item.id, package.id) is not None
 
 
-def _offer(item: Item, units_per_order: Decimal) -> None:
-    """A vendor offer of `units_per_order` in the item's unit."""
+def _offer(item: Item, units_per_order: Decimal, vendor: str | None = "Acme") -> None:
+    """A vendor offer of `units_per_order` in the item's unit, from
+    `vendor`, by name, or naming none."""
     session = object_session(item)
     assert session is not None
+    vendor_id = add(session, Vendor(name=vendor)).id if vendor else None
     add(
         session,
         VendorOffer(
             item_id=item.id,
+            vendor_id=vendor_id,
             url="https://example.org",
             units_per_order=units_per_order,
             unit=item.unit,
         ),
     )
+
+
+def _stored(item: Item, stored: str, amount: str) -> None:
+    """The item's Reorder at, on order or a vendor offer's units per
+    order (`stored`) set to `amount`, and written."""
+    if stored == "offer":
+        _offer(item, Decimal(amount))
+        return
+    setattr(item, stored, Decimal(amount))
+    session = object_session(item)
+    assert session is not None
+    session.flush()
+
+
+# Each stored amount the note gives as its example, from m to ft and from
+# ft to m: the units, what is stored, its amount, the example's words and
+# its bold field name.
+STORED_EXAMPLES = [
+    (
+        "m",
+        "ft",
+        "minimum",
+        "100",
+        "Its Reorder at would change from 100 m to 328.084 ft",
+        "Reorder at",
+    ),
+    (
+        "m",
+        "ft",
+        "on_order",
+        "50",
+        "Its On order would change from 50 m to 164.042 ft",
+        "On order",
+    ),
+    (
+        "m",
+        "ft",
+        "offer",
+        "305",
+        "The Units per order from Acme would change from 305 m to 1000.656 ft",
+        "Units per order",
+    ),
+    (
+        "ft",
+        "m",
+        "minimum",
+        "1000",
+        "Its Reorder at would change from 1000 ft to 304.8 m",
+        "Reorder at",
+    ),
+    (
+        "ft",
+        "m",
+        "on_order",
+        "50",
+        "Its On order would change from 50 ft to 15.24 m",
+        "On order",
+    ),
+    (
+        "ft",
+        "m",
+        "offer",
+        "1000.656",
+        "The Units per order from Acme would change from 1000.656 ft to 305 m",
+        "Units per order",
+    ),
+]
 
 
 def _revoke_links(page: str, count: int) -> list[str]:
@@ -103,8 +173,9 @@ def test_stock_moved_gives_a_place_and_links_to_the_recount(
     page = _declined(admin_client, cable, into)
     assert problem(page, "unit") == (
         f"The unit is still {unit}. Changing it to {into} recalculates every "
-        f"recorded amount from {unit}: the {held} {unit} at {place.store.name} "
-        f"would become {becomes} {into}. If the {held} was really {into}, "
+        f"recorded amount from {unit}. The stock at {place.store.name} would "
+        f"change from {held} {unit} to {becomes} {into}. If the {held} was "
+        f"really {into}, "
         f"recount it in {into}: its records are set to nothing, its unit "
         f"becomes {into}, and you count each place in {into}."
     )
@@ -113,17 +184,54 @@ def test_stock_moved_gives_a_place_and_links_to_the_recount(
     assert note.all("a", href=item_labels(cable.id)) == []
 
 
-def test_stock_moved_none_left_leaves_the_example_out(
-    admin_client: TestClient, session: Session
-) -> None:
-    """All of it installed: no place holds any to give as the example."""
-    place = Place(session)
+def _installed(session: Session, unit: str = "m") -> Item:
+    """A cable in `unit` received and all of it installed: no place holds
+    any."""
+    place = Place(session, cable_unit=unit)
     cable = place.cable
     lines: list[dict[str, object]] = [
-        {"item_id": cable.id, "quantity": "305", "unit": "m"}
+        {"item_id": cable.id, "quantity": "305", "unit": unit}
     ]
     received(session, place, lines)
     write(session, place, kind="install", to_location_id=None, lines=lines)
+    return cable
+
+
+@pytest.mark.parametrize(
+    ("unit", "into", "stored", "amount", "example", "field"), STORED_EXAMPLES
+)
+def test_stock_moved_none_left_gives_a_stored_amount(
+    admin_client: TestClient,
+    session: Session,
+    unit: str,
+    into: str,
+    stored: str,
+    amount: str,
+    example: str,
+    field: str,
+) -> None:
+    """No place holds any to give: a stored amount instead, as the
+    labels-only note gives (Ali, 2026-11-25, inventory-tng-aknv). The
+    link says "they", as the example is no stock to recount."""
+    cable = _installed(session, unit)
+    _stored(cable, stored, amount)
+    page = _declined(admin_client, cable, into)
+    assert problem(page, "unit") == (
+        f"The unit is still {unit}. Changing it to {into} recalculates every "
+        f"recorded amount from {unit}. {example}. If they were really in "
+        f"{into}, recount it in {into}: its records are set to nothing, its "
+        f"unit becomes {into}, and you count each place in {into}."
+    )
+    note = read(page).one("span", id="unit-problem")
+    note.one("strong", field)
+    note.one("a", f"recount it in {into}", href=unit_recount(cable.id, into))
+
+
+def test_stock_moved_none_left_nor_stored_leaves_the_example_out(
+    admin_client: TestClient, session: Session
+) -> None:
+    """All of it installed, and no amount stored: nothing to give."""
+    cable = _installed(session)
     page = _declined(admin_client, cable, "ft")
     assert problem(page, "unit") == (
         "The unit is still m. Changing it to ft recalculates every recorded "
@@ -147,7 +255,8 @@ def test_stock_moved_gives_a_place_holding_some_not_one_short(
     page = _declined(admin_client, cable, "ft")
     assert problem(page, "unit").startswith(
         "The unit is still m. Changing it to ft recalculates every recorded "
-        f"amount from m: the 5 m at {place.van.name} would become 16.404 ft. "
+        f"amount from m. The stock at {place.van.name} would change from 5 m "
+        "to 16.404 ft. "
         "If the 5 was really ft,"
     )
 
@@ -182,32 +291,67 @@ def test_labels_revoked_since_the_unit_was_read_asks_afresh(
 
 
 @pytest.mark.parametrize(
-    ("stored", "example"),
-    [
-        ("minimum", "its Reorder at of 100 would become 328.084 ft"),
-        ("on_order", "the 50 on order would become 164.042 ft"),
-        ("offer", "the vendor offer's 305 would become 1000.656 ft"),
-    ],
+    ("unit", "into", "stored", "amount", "example", "field"), STORED_EXAMPLES
 )
 def test_labels_only_give_a_stored_amount_and_link_to_revoke_the_label(
-    admin_client: TestClient, session: Session, stored: str, example: str
+    admin_client: TestClient,
+    session: Session,
+    unit: str,
+    into: str,
+    stored: str,
+    amount: str,
+    example: str,
+    field: str,
 ) -> None:
-    place = Place(session)
-    cable = place.cable
-    if stored == "offer":
-        _offer(cable, Decimal(305))
-    else:
-        setattr(cable, stored, Decimal(100 if stored == "minimum" else 50))
+    """The field's name bold, as its label (Ali, 2026-11-25,
+    inventory-tng-aknv)."""
+    cable = Place(session, cable_unit=unit).cable
+    _stored(cable, stored, amount)
     _labelled(session, cable, 1)
-    page = _declined(admin_client, cable, "ft")
+    page = _declined(admin_client, cable, into)
     assert problem(page, "unit") == (
-        "The unit is still m. Until its printed label is revoked, changing it "
-        f"recalculates its amounts from m: {example}. If they were really in "
-        "ft, revoke its label, then change its unit to ft; the amounts stay "
-        "as they are."
+        f"The unit is still {unit}. Until its printed label is revoked, "
+        f"changing it recalculates its amounts from {unit}. {example}. If "
+        f"they were really in {into}, revoke its label, then change its unit "
+        f"to {into}; the amounts stay as they are."
     )
     note = read(page).one("span", id="unit-problem")
+    assert [each.text for each in note.all("strong")] == [field]
     note.one("a", "revoke its label", href=item_labels(cable.id))
+
+
+def test_the_example_is_the_first_amount_stored(
+    admin_client: TestClient, session: Session
+) -> None:
+    """Nothing on order is skipped, and the first vendor offer given, not
+    a later one."""
+    cable = Place(session).cable
+    cable.on_order = Decimal(0)
+    _offer(cable, Decimal(305))
+    _offer(cable, Decimal(100), vendor="Later")
+    _labelled(session, cable, 1)
+    page = _declined(admin_client, cable, "ft")
+    assert "The Units per order from Acme would change from 305 m to " in problem(
+        page, "unit"
+    )
+
+
+@pytest.mark.parametrize(
+    ("vendor", "named"),
+    [("<em>Acme</em> & Co", "<em>Acme</em> & Co"), (None, "https://example.org")],
+)
+def test_an_offer_names_its_vendor_as_typed_or_its_address(
+    admin_client: TestClient, session: Session, vendor: str | None, named: str
+) -> None:
+    """A vendor's name is never read as markup: only the field's name is
+    bold. An offer naming no vendor gives its address, as the recount's
+    page does."""
+    cable = Place(session).cable
+    _offer(cable, Decimal(305), vendor=vendor)
+    _labelled(session, cable, 1)
+    page = _declined(admin_client, cable, "ft")
+    assert f"The Units per order from {named} would change" in problem(page, "unit")
+    assert read(page).one("span", id="unit-problem").all("em") == []
 
 
 def test_two_labels_and_no_stored_amount_leave_the_example_out(
@@ -238,8 +382,9 @@ def test_more_labels_say_how_many_from_ft_to_m(
     page = _declined(admin_client, cable, "m")
     assert problem(page, "unit") == (
         "The unit is still ft. Until all 5 of its printed labels are revoked, "
-        "changing it recalculates its amounts from ft: its Reorder at of 1000 "
-        "would become 304.8 m. If they were really in m, revoke its 5 labels, "
+        "changing it recalculates its amounts from ft. Its Reorder at would "
+        "change from 1000 ft to 304.8 m. If they were really in m, revoke its "
+        "5 labels, "
         "then change its unit to m; the amounts stay as they are."
     )
     assert _revoke_links(page, 5) == ["revoke its 5 labels"]
@@ -260,9 +405,9 @@ def test_converted_with_packages_says_their_sizes_are_given_again(
     page = _declined(admin_client, cable, "m")
     assert problem(page, "unit") == (
         "The unit is still ft. Changing it to m recalculates its amounts from "
-        "ft: the vendor offer's 1000.656 would become 305 m. If they were "
-        "really in m, recount it in m: you give its amounts and package sizes "
-        "again in m, and its unit becomes m."
+        "ft. The Units per order from Acme would change from 1000.656 ft to "
+        "305 m. If they were really in m, recount it in m: you give its "
+        "amounts and package sizes again in m, and its unit becomes m."
     )
     note = read(page).one("span", id="unit-problem")
     note.one("a", "recount it in m", href=unit_recount(cable.id, "m"))
@@ -296,23 +441,36 @@ def test_a_retired_item_whose_stock_moved_ends_with_no_link(
     declined = admin_client.post(f"{ITEMS}/{place.cable.id}", data=answered)
     assert problem(declined.text, "unit") == (
         "The unit is still m. Changing it to ft recalculates every recorded "
-        f"amount from m: the 305 m at {place.store.name} would become "
-        "1000.656 ft."
+        f"amount from m. The stock at {place.store.name} would change from "
+        "305 m to 1000.656 ft."
     )
     assert read(declined.text).all("a", href=unit_recount(place.cable.id, "ft")) == []
 
 
+@pytest.mark.parametrize(
+    ("minimum", "said"),
+    [
+        (
+            Decimal(100),
+            (
+                "The unit is still m. Its Reorder at would change from 100 m "
+                "to 328.084 ft."
+            ),
+        ),
+        (None, "The unit is still m."),
+    ],
+)
 def test_a_retired_labelled_item_ends_with_no_link(
-    admin_client: TestClient, session: Session
+    admin_client: TestClient, session: Session, minimum: Decimal | None, said: str
 ) -> None:
-    """Its labels are inactive, so no link offers to revoke them."""
+    """Its labels are inactive, so neither a link to revoke them nor
+    "Until … revoked": the page's top says to bring it back first (Ali,
+    2026-11-25, inventory-tng-aknv)."""
     cable = Place(session).cable
+    cable.minimum = minimum
     _labelled(session, cable, 1)
     answered = unit_answered(cable, "no", unit="ft")
     retire(session, cable)
     declined = admin_client.post(f"{ITEMS}/{cable.id}", data=answered)
-    assert problem(declined.text, "unit") == (
-        "The unit is still m. Until its printed label is revoked, changing it "
-        "recalculates its amounts from m."
-    )
+    assert problem(declined.text, "unit") == said
     assert read(declined.text).all("a", href=item_labels(cable.id)) == []

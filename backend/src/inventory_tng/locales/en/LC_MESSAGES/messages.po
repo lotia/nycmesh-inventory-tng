@@ -1881,8 +1881,9 @@ msgid ""
 "administrator to reset your sign-in."
 msgstr ""
 
-#. follows "…: the 305 m at Shelf A would become 1000.656 ft."; %(amount)s is
-#. that 305, %(new)s the unit asked for. The link goes to the guided recount.
+#. follows "The stock at Shelf A would change from 305 m to 1000.656 ft.";
+#. %(amount)s is that 305, %(new)s the unit asked for. The link goes to the
+#. guided recount.
 #: src/inventory_tng/templates/catalogue/item.html
 #, python-format
 msgid ""
@@ -1892,8 +1893,8 @@ msgid ""
 msgstr ""
 
 #. follows "The unit is still m. Until …, changing it recalculates its amounts
-#. from m."; %(revoke)s is the link to revoke its labels, as "revoke its 2
-#. labels".
+#. from m.", and perhaps one of them converted; %(revoke)s is the link to
+#. revoke its labels, as "revoke its 2 labels".
 #: src/inventory_tng/templates/catalogue/item.html
 #, python-format
 msgid ""
@@ -1902,7 +1903,9 @@ msgid ""
 msgstr ""
 
 #. follows "The unit is still m. Changing it to ft recalculates every recorded
-#. amount from m."; the link goes to the guided recount.
+#. amount from m.", with or without one of its stored amounts converted, as
+#. "Its Reorder at would change from 100 m to 328.084 ft."; the link goes to
+#. the guided recount.
 #: src/inventory_tng/templates/catalogue/item.html
 #, python-format
 msgid ""
@@ -2085,6 +2088,28 @@ msgid ""
 "below the level to reorder at (short ends are not usable), or with fewer "
 "sealed packages there than a package's minimum. Both are set on the "
 "item's page; an item with neither is never listed."
+msgstr ""
+
+#. Translators: completes "…recalculates its amounts from m.";
+#. <strong>On order</strong> is the item's field of that name, kept
+#. bold; %(amount)s %(old)s is how much is on order, %(becomes)s
+#. %(new)s that converted.
+#: src/inventory_tng/catalogue/forms.py
+#, python-format
+msgid ""
+"Its <strong>On order</strong> would change from %(amount)s %(old)s to "
+"%(becomes)s %(new)s"
+msgstr ""
+
+#. Translators: completes "…recalculates its amounts from m.";
+#. <strong>Reorder at</strong> is the item's field of that name, kept
+#. bold; %(amount)s %(old)s is its value, %(becomes)s %(new)s that
+#. converted.
+#: src/inventory_tng/catalogue/forms.py
+#, python-format
+msgid ""
+"Its <strong>Reorder at</strong> would change from %(amount)s %(old)s to "
+"%(becomes)s %(new)s"
 msgstr ""
 
 #: src/inventory_tng/web/forms.py
@@ -4205,6 +4230,18 @@ msgstr ""
 msgid "The 6-digit code it shows"
 msgstr ""
 
+#. Translators: completes "…recalculates its amounts from m.";
+#. <strong>Units per order</strong> is a vendor offer's field of that
+#. name, kept bold; %(name)s is the vendor's name, or the address of
+#. its offer when it names none; %(amount)s %(old)s is its value,
+#. %(becomes)s %(new)s that converted.
+#: src/inventory_tng/catalogue/forms.py
+#, python-format
+msgid ""
+"The <strong>Units per order</strong> from %(name)s would change from "
+"%(amount)s %(old)s to %(becomes)s %(new)s"
+msgstr ""
+
 #: src/inventory_tng/admins/mail_messages.py
 #, python-format
 msgid ""
@@ -4239,19 +4276,6 @@ msgid ""
 " and your other sessions were signed out."
 msgstr ""
 
-#. %(packages)s names one or more of the item's retired packages, such as "Box
-#. and Crate".
-#: src/inventory_tng/templates/catalogue/unit_recounted.html
-#, python-format
-msgid ""
-"The printed label of %(packages)s (retired) was revoked: print a new one "
-"if it is brought back."
-msgid_plural ""
-"The printed labels of %(packages)s (retired) were revoked: print new ones"
-" if they are brought back."
-msgstr[0] ""
-msgstr[1] ""
-
 #. %(packages)s names one or more of the item's packages, such as "Reel and
 #. Spool".
 #: src/inventory_tng/templates/catalogue/unit_recounted.html
@@ -4262,6 +4286,19 @@ msgid ""
 msgid_plural ""
 "The printed labels of %(packages)s were revoked: <a "
 "href=\"%(link)s\">print new ones</a>."
+msgstr[0] ""
+msgstr[1] ""
+
+#. %(packages)s names one or more of the item's retired packages, such as "Box
+#. and Crate".
+#: src/inventory_tng/templates/catalogue/unit_recounted.html
+#, python-format
+msgid ""
+"The printed label of the retired package %(packages)s was revoked: print "
+"a new one if it is brought back."
+msgid_plural ""
+"The printed labels of the retired packages %(packages)s were revoked: "
+"print new ones if they are brought back."
 msgstr[0] ""
 msgstr[1] ""
 
@@ -4302,8 +4339,34 @@ msgstr ""
 msgid "The site's (%(zone)s)"
 msgstr ""
 
+#. Translators: completes "…recalculates every recorded amount from
+#. m."; %(name)s is a place of any kind, such as a store, a shelf, a
+#. bin or a volunteer's home; %(amount)s %(old)s is what the records
+#. hold there, %(becomes)s %(new)s that converted.
+#: src/inventory_tng/catalogue/forms.py
+#, python-format
+msgid ""
+"The stock at %(name)s would change from %(amount)s %(old)s to %(becomes)s"
+" %(new)s"
+msgstr ""
+
 #: src/inventory_tng/admins/accounts.py
 msgid "The two passwords are different."
+msgstr ""
+
+#. Translators: answered No to "Were the recorded amounts really in
+#. %(old)s?" for a retired item with labels printed for it.
+#: src/inventory_tng/catalogue/forms.py
+#, python-format
+msgid "The unit is still %(old)s."
+msgstr ""
+
+#. Translators: as "The unit is still %(old)s.", for an item with
+#. %(example)s, one of its amounts converted, as "Its Reorder at would
+#. change from 100 m to 328.084 ft".
+#: src/inventory_tng/catalogue/forms.py
+#, python-format
+msgid "The unit is still %(old)s. %(example)s."
 msgstr ""
 
 #. Translators: answered No to "Were the recorded amounts really in
@@ -4318,17 +4381,17 @@ msgstr ""
 
 #. Translators: as "The unit is still %(old)s. %(until)s, changing it
 #. recalculates its amounts from %(old)s."; %(example)s says one of
-#. them converted, as "the vendor offer's 305 would become 1000.656 ft".
+#. them converted, as "Its On order would change from 50 m to 164.042 ft".
 #: src/inventory_tng/catalogue/forms.py
 #, python-format
 msgid ""
 "The unit is still %(old)s. %(until)s, changing it recalculates its "
-"amounts from %(old)s: %(example)s."
+"amounts from %(old)s. %(example)s."
 msgstr ""
 
 #. Translators: answered No to "Were the recorded amounts really in
-#. %(old)s?" for an item whose stock has moved, though none is
-#. left anywhere. Never "converting".
+#. %(old)s?" for an item whose stock has moved, though it holds
+#. and stores none. Never "converting".
 #: src/inventory_tng/catalogue/forms.py
 #, python-format
 msgid ""
@@ -4337,16 +4400,14 @@ msgid ""
 msgstr ""
 
 #. Translators: answered No to "Were the recorded amounts really in
-#. %(old)s?" for an item whose stock has moved; %(amount)s
-#. %(old)s is what the records hold at %(place)s, a place of any
-#. kind, such as a store, a shelf, a bin or a volunteer's home;
-#. %(becomes)s %(new)s is that converted. Never "converting".
+#. %(old)s?" for an item whose stock has moved; %(example)s says one
+#. of its amounts converted, as "The stock at Shelf A would change
+#. from 305 m to 1000.656 ft". Never "converting".
 #: src/inventory_tng/catalogue/forms.py
 #, python-format
 msgid ""
 "The unit is still %(old)s. Changing it to %(new)s recalculates every "
-"recorded amount from %(old)s: the %(amount)s %(old)s at %(place)s would "
-"become %(becomes)s %(new)s."
+"recorded amount from %(old)s. %(example)s."
 msgstr ""
 
 #. Translators: answered No to "Were the recorded amounts really in
@@ -4361,13 +4422,13 @@ msgstr ""
 
 #. Translators: answered No to "Were the recorded amounts really in
 #. %(old)s?" for an item whose amounts have been converted before;
-#. %(example)s says one of them converted, as "the vendor offer's
-#. 1000.656 would become 305 m". Never "converting".
+#. %(example)s says one of them converted, as "The Units per order from
+#. Acme would change from 1000.656 ft to 305 m". Never "converting".
 #: src/inventory_tng/catalogue/forms.py
 #, python-format
 msgid ""
 "The unit is still %(old)s. Changing it to %(new)s recalculates its "
-"amounts from %(old)s: %(example)s."
+"amounts from %(old)s. %(example)s."
 msgstr ""
 
 #: src/inventory_tng/catalogue/items_routes.py
@@ -5301,13 +5362,6 @@ msgstr ""
 msgid "item %(id)d (%(name)s)"
 msgstr ""
 
-#. Translators: completes "…recalculates its amounts from m: …";
-#. %(amount)s is its Reorder at, in m, %(becomes)s that in %(new)s.
-#: src/inventory_tng/catalogue/forms.py
-#, python-format
-msgid "its Reorder at of %(amount)s would become %(becomes)s %(new)s"
-msgstr ""
-
 #: src/inventory_tng/templates/devices/device_list.html
 msgid "its number, optional"
 msgstr ""
@@ -5566,14 +5620,6 @@ msgstr ""
 msgid "that minute included, optional"
 msgstr ""
 
-#. Translators: completes "…recalculates its amounts from m: …";
-#. %(amount)s is how much is on order, in m, %(becomes)s that in
-#. %(new)s.
-#: src/inventory_tng/catalogue/forms.py
-#, python-format
-msgid "the %(amount)s on order would become %(becomes)s %(new)s"
-msgstr ""
-
 #: src/inventory_tng/templates/stock/counts.html
 #, python-format
 msgid "the list is under <a href=\"%(link)s\">Site settings</a>"
@@ -5589,14 +5635,6 @@ msgstr ""
 
 #: src/inventory_tng/templates/catalogue/item.html
 msgid "the sheet's NYCM- code"
-msgstr ""
-
-#. Translators: completes "…recalculates its amounts from m: …";
-#. %(amount)s is a vendor offer's units per order, in m, %(becomes)s
-#. that in %(new)s.
-#: src/inventory_tng/catalogue/forms.py
-#, python-format
-msgid "the vendor offer's %(amount)s would become %(becomes)s %(new)s"
 msgstr ""
 
 #: src/inventory_tng/templates/devices/device_list.html

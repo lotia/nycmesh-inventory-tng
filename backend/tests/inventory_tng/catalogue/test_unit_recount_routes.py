@@ -569,7 +569,7 @@ def test_a_converted_item_is_recounted_by_its_amounts_and_package_sizes(
     assert "nothing to count" in words_on(after)
     assert "Add its packages" not in words_on(after)
     assert "The printed label of Reel was revoked: print a new one." in words_on(after)
-    assert "(retired)" not in words_on(after)
+    assert "retired package" not in words_on(after)
     after.one("a", "print a new one", href=f"{ITEMS}/{cable.id}#labels")
 
 
@@ -719,8 +719,8 @@ def test_a_converted_items_retired_package_is_resized_and_stays_retired(
     after = words_on(admin_client.get(done.headers["location"]).text)
     assert "The printed label of Reel was revoked: print a new one." in after
     assert (
-        "The printed label of Box (retired) was revoked: print a new one if "
-        "it is brought back."
+        "The printed label of the retired package Box was revoked: print a new "
+        "one if it is brought back."
     ) in after
     items.restore_package(session, box)
     session.flush()
@@ -738,8 +738,8 @@ def test_a_converted_items_retired_package_is_resized_and_stays_retired(
                 "can be printed once it is brought back;"
             ),
             (
-                "The printed label of Box (retired) was revoked: print a new "
-                "one if it is brought back."
+                "The printed label of the retired package Box was revoked: "
+                "print a new one if it is brought back."
             ),
         ),
         (
@@ -749,8 +749,8 @@ def test_a_converted_items_retired_package_is_resized_and_stays_retired(
                 "ones can be printed once they are brought back;"
             ),
             (
-                "The printed labels of Box and Spool 0 (retired) were revoked: "
-                "print new ones if they are brought back."
+                "The printed labels of the retired packages Box and Spool 0 "
+                "were revoked: print new ones if they are brought back."
             ),
         ),
     ],
@@ -814,8 +814,8 @@ def test_several_packages_labels_revoked_are_said_by_name(
         "The printed labels of Drum and Reel were revoked: print new ones."
     ) in words_on(after)
     assert (
-        "The printed labels of Box and Crate (retired) were revoked: print new "
-        "ones if they are brought back."
+        "The printed labels of the retired packages Box and Crate were "
+        "revoked: print new ones if they are brought back."
     ) in words_on(after)
     after.one("a", "print new ones", href=f"{ITEMS}/{cable.id}#labels")
 

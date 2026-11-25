@@ -846,8 +846,11 @@ def _unit_declined(
     log.info("unit change declined", item_id=item.id, reason=why)
     values = {**form, "unit": item.unit}
     example = queries.unit_change_example(session, item, unit, why)
+    retired = item.retired_at is not None
     problems = {
-        "unit": forms.unit_declined_problem(item.unit, unit, why, example, printed)
+        "unit": forms.unit_declined_problem(
+            item.unit, unit, why, example, printed, retired
+        )
     }
     return _item_page(
         request,

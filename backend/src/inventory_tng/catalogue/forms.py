@@ -10,6 +10,7 @@ from dataclasses import dataclass, field
 from decimal import Decimal
 
 import structlog
+from markupsafe import Markup, escape
 from sqlalchemy.orm import Session
 
 from inventory_tng.catalogue import (
@@ -229,66 +230,87 @@ def unit_declined_problem(
     why: unit_changes.UnitFixed,
     example: UnitChangeExample | None,
     labels_printed: int,
-) -> str:
+    retired: bool,
+) -> Markup:
     """What the item form says beside its unit, in `old`, when the
     administrator answers No to changing it to `new` (Ali, 2026-11-25,
     inventory-tng-y50b, inventory-tng-aknv): that it is still in `old`,
     and what a change would do, with `example`, one of its own amounts,
     if it has one (queries.unit_change_example). Only labelled (`why`),
-    until its `labels_printed` labels are revoked. The way to put right a
-    unit wrong from the start follows, a link in it, unless it is retired
-    (catalogue/item.html)."""
-    values = {"old": old, "new": new}
+    until its `labels_printed` labels are revoked, unless `retired`, as a
+    retired item's labels are inactive. The way to put right a unit wrong
+    from the start follows, a link in it, unless it is retired
+    (catalogue/item.html). Markup, as the example's field name is bold:
+    the values in it escaped."""
+    values: dict[str, object] = {"old": escape(old), "new": escape(new)}
+    if example is not None:
+        values["example"] = _example(example, old, new)
+    if why == "labelled" and retired:
+        return _unit_retired(values)
     if why == "labelled":
-        return _unit_labelled(example, labels_printed, values)
+        return _unit_labelled(labels_printed, values)
     if why == "moved":
         if example is None:
             # Translators: answered No to "Were the recorded amounts really in
-            # %(old)s?" for an item whose stock has moved, though none is
-            # left anywhere. Never "converting".
-            return gettext(
-                "The unit is still %(old)s. Changing it to %(new)s recalculates "
-                "every recorded amount from %(old)s.",
-                **values,
+            # %(old)s?" for an item whose stock has moved, though it holds
+            # and stores none. Never "converting".
+            return Markup(
+                gettext(
+                    "The unit is still %(old)s. Changing it to %(new)s "
+                    "recalculates every recorded amount from %(old)s.",
+                    **values,
+                )
             )
         # Translators: answered No to "Were the recorded amounts really in
-        # %(old)s?" for an item whose stock has moved; %(amount)s
-        # %(old)s is what the records hold at %(place)s, a place of any
-        # kind, such as a store, a shelf, a bin or a volunteer's home;
-        # %(becomes)s %(new)s is that converted. Never "converting".
-        return gettext(
-            "The unit is still %(old)s. Changing it to %(new)s recalculates "
-            "every recorded amount from %(old)s: the %(amount)s %(old)s at "
-            "%(place)s would become %(becomes)s %(new)s.",
-            amount=amount(example.amount),
-            becomes=amount(example.becomes),
-            place=example.place,
-            **values,
+        # %(old)s?" for an item whose stock has moved; %(example)s says one
+        # of its amounts converted, as "The stock at Shelf A would change
+        # from 305 m to 1000.656 ft". Never "converting".
+        return Markup(
+            gettext(
+                "The unit is still %(old)s. Changing it to %(new)s recalculates "
+                "every recorded amount from %(old)s. %(example)s.",
+                **values,
+            )
         )
     if example is None:
         # Translators: answered No to "Were the recorded amounts really in
         # %(old)s?" for an item whose amounts have been converted before.
         # Never "converting".
-        return gettext(
-            "The unit is still %(old)s. Changing it to %(new)s recalculates "
-            "its amounts from %(old)s.",
-            **values,
+        return Markup(
+            gettext(
+                "The unit is still %(old)s. Changing it to %(new)s recalculates "
+                "its amounts from %(old)s.",
+                **values,
+            )
         )
     # Translators: answered No to "Were the recorded amounts really in
     # %(old)s?" for an item whose amounts have been converted before;
-    # %(example)s says one of them converted, as "the vendor offer's
-    # 1000.656 would become 305 m". Never "converting".
-    return gettext(
-        "The unit is still %(old)s. Changing it to %(new)s recalculates its "
-        "amounts from %(old)s: %(example)s.",
-        example=_stored_example(example, new),
-        **values,
+    # %(example)s says one of them converted, as "The Units per order from
+    # Acme would change from 1000.656 ft to 305 m". Never "converting".
+    return Markup(
+        gettext(
+            "The unit is still %(old)s. Changing it to %(new)s recalculates its "
+            "amounts from %(old)s. %(example)s.",
+            **values,
+        )
     )
 
 
-def _unit_labelled(
-    example: UnitChangeExample | None, count: int, values: Mapping[str, str]
-) -> str:
+def _unit_retired(values: Mapping[str, object]) -> Markup:
+    """unit_declined_problem for a retired item its printed labels fix:
+    no change to speak of until it is brought back, which the page's top
+    offers (Ali, 2026-11-25, inventory-tng-aknv)."""
+    if "example" not in values:
+        # Translators: answered No to "Were the recorded amounts really in
+        # %(old)s?" for a retired item with labels printed for it.
+        return Markup(gettext("The unit is still %(old)s.", **values))
+    # Translators: as "The unit is still %(old)s.", for an item with
+    # %(example)s, one of its amounts converted, as "Its Reorder at would
+    # change from 100 m to 328.084 ft".
+    return Markup(gettext("The unit is still %(old)s. %(example)s.", **values))
+
+
+def _unit_labelled(count: int, values: Mapping[str, object]) -> Markup:
     """unit_declined_problem for an item only its `count` printed labels
     fix, its count said as the revoke partial says it
     (catalogue/_revoke_labels.html), opening a sentence."""
@@ -305,55 +327,85 @@ def _unit_labelled(
             "Until all %(num)s of its printed labels are revoked",
             count,
         )
-    if example is None:
+    if "example" not in values:
         # Translators: answered No to "Were the recorded amounts really in
         # %(old)s?" for an item its printed labels fix; %(until)s is as
         # "Until both its printed labels are revoked". Never "converting".
-        return gettext(
-            "The unit is still %(old)s. %(until)s, changing it recalculates "
-            "its amounts from %(old)s.",
-            until=until,
-            **values,
+        return Markup(
+            gettext(
+                "The unit is still %(old)s. %(until)s, changing it recalculates "
+                "its amounts from %(old)s.",
+                until=escape(until),
+                **values,
+            )
         )
     # Translators: as "The unit is still %(old)s. %(until)s, changing it
     # recalculates its amounts from %(old)s."; %(example)s says one of
-    # them converted, as "the vendor offer's 305 would become 1000.656 ft".
-    return gettext(
-        "The unit is still %(old)s. %(until)s, changing it recalculates its "
-        "amounts from %(old)s: %(example)s.",
-        until=until,
-        example=_stored_example(example, values["new"]),
-        **values,
+    # them converted, as "Its On order would change from 50 m to 164.042 ft".
+    return Markup(
+        gettext(
+            "The unit is still %(old)s. %(until)s, changing it recalculates its "
+            "amounts from %(old)s. %(example)s.",
+            until=escape(until),
+            **values,
+        )
     )
 
 
-def _stored_example(example: UnitChangeExample, new: str) -> str:
-    """A stored amount of an item converted into `new`, as the note after
-    No says it."""
+def _example(example: UnitChangeExample, old: str, new: str) -> Markup:
+    """One amount of an item converted from `old` into `new`, as the note
+    after No says it, a sentence but for its full stop (Ali, 2026-11-25,
+    inventory-tng-aknv): a stored amount's field name bold, as its label
+    on the page."""
     values = {
-        "amount": amount(example.amount),
-        "becomes": amount(example.becomes),
-        "new": new,
+        "amount": escape(amount(example.amount)),
+        "becomes": escape(amount(example.becomes)),
+        "old": escape(old),
+        "new": escape(new),
+        "name": escape(example.name or ""),
     }
-    if example.of == "minimum":
-        # Translators: completes "…recalculates its amounts from m: …";
-        # %(amount)s is its Reorder at, in m, %(becomes)s that in %(new)s.
-        return gettext(
-            "its Reorder at of %(amount)s would become %(becomes)s %(new)s", **values
+    if example.of == "place":
+        # Translators: completes "…recalculates every recorded amount from
+        # m."; %(name)s is a place of any kind, such as a store, a shelf, a
+        # bin or a volunteer's home; %(amount)s %(old)s is what the records
+        # hold there, %(becomes)s %(new)s that converted.
+        message = gettext(
+            "The stock at %(name)s would change from %(amount)s %(old)s to "
+            "%(becomes)s %(new)s",
+            **values,
         )
-    if example.of == "on_order":
-        # Translators: completes "…recalculates its amounts from m: …";
-        # %(amount)s is how much is on order, in m, %(becomes)s that in
-        # %(new)s.
-        return gettext(
-            "the %(amount)s on order would become %(becomes)s %(new)s", **values
+    elif example.of == "minimum":
+        # Translators: completes "…recalculates its amounts from m.";
+        # <strong>Reorder at</strong> is the item's field of that name, kept
+        # bold; %(amount)s %(old)s is its value, %(becomes)s %(new)s that
+        # converted.
+        message = gettext(
+            "Its <strong>Reorder at</strong> would change from %(amount)s "
+            "%(old)s to %(becomes)s %(new)s",
+            **values,
         )
-    # Translators: completes "…recalculates its amounts from m: …";
-    # %(amount)s is a vendor offer's units per order, in m, %(becomes)s
-    # that in %(new)s.
-    return gettext(
-        "the vendor offer's %(amount)s would become %(becomes)s %(new)s", **values
-    )
+    elif example.of == "on_order":
+        # Translators: completes "…recalculates its amounts from m.";
+        # <strong>On order</strong> is the item's field of that name, kept
+        # bold; %(amount)s %(old)s is how much is on order, %(becomes)s
+        # %(new)s that converted.
+        message = gettext(
+            "Its <strong>On order</strong> would change from %(amount)s "
+            "%(old)s to %(becomes)s %(new)s",
+            **values,
+        )
+    else:
+        # Translators: completes "…recalculates its amounts from m.";
+        # <strong>Units per order</strong> is a vendor offer's field of that
+        # name, kept bold; %(name)s is the vendor's name, or the address of
+        # its offer when it names none; %(amount)s %(old)s is its value,
+        # %(becomes)s %(new)s that converted.
+        message = gettext(
+            "The <strong>Units per order</strong> from %(name)s would change "
+            "from %(amount)s %(old)s to %(becomes)s %(new)s",
+            **values,
+        )
+    return Markup(message)
 
 
 # A recount's boxes besides Reorder at: what is on order, each current

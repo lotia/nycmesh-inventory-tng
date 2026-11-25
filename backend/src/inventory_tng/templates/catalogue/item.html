@@ -65,14 +65,14 @@ None is left, so nobody can pick it.{% endtrans %}{% endif %}{% endcall %}
     unit wrong from the start, unless retired, as a retired item's labels
     are inactive and it can't be recounted. #}
     {% if unit_declined == "labelled" and not retired %}
-    <span class="problem" id="unit-problem">{{ problems.unit }} {# Translators: follows "The unit is still m. Until …, changing it recalculates its amounts from m."; %(revoke)s is the link to revoke its labels, as "revoke its 2 labels". #}{% trans new=recount_to, revoke=revoke_link(labels_printed, its_labels, opens=false) %}If they were really in {{ new }}, {{ revoke }}, then change its unit to {{ new }}; the amounts stay as they are.{% endtrans %}</span>
+    <span class="problem" id="unit-problem">{{ problems.unit }} {# Translators: follows "The unit is still m. Until …, changing it recalculates its amounts from m.", and perhaps one of them converted; %(revoke)s is the link to revoke its labels, as "revoke its 2 labels". #}{% trans new=recount_to, revoke=revoke_link(labels_printed, its_labels, opens=false) %}If they were really in {{ new }}, {{ revoke }}, then change its unit to {{ new }}; the amounts stay as they are.{% endtrans %}</span>
     {% elif unit_declined == "moved" and not retired %}
     {#- The guided recount (catalogue/unit_recounts.py). #}
-    <span class="problem" id="unit-problem">{{ problems.unit }} {% if unit_example -%}
-    {#- Translators: follows "…: the 305 m at Shelf A would become 1000.656 ft."; %(amount)s is that 305, %(new)s the unit asked for. The link goes to the guided recount. -#}
+    <span class="problem" id="unit-problem">{{ problems.unit }} {% if unit_example and unit_example.of == "place" -%}
+    {#- Translators: follows "The stock at Shelf A would change from 305 m to 1000.656 ft."; %(amount)s is that 305, %(new)s the unit asked for. The link goes to the guided recount. -#}
     {% trans amount=unit_example.amount | amount, new=recount_to, link=recount_in %}If the {{ amount }} was really {{ new }}, <a href="{{ link }}">recount it in {{ new }}</a>: its records are set to nothing, its unit becomes {{ new }}, and you count each place in {{ new }}.{% endtrans %}
     {%- else -%}
-    {#- Translators: follows "The unit is still m. Changing it to ft recalculates every recorded amount from m."; the link goes to the guided recount. -#}
+    {#- Translators: follows "The unit is still m. Changing it to ft recalculates every recorded amount from m.", with or without one of its stored amounts converted, as "Its Reorder at would change from 100 m to 328.084 ft."; the link goes to the guided recount. -#}
     {% trans new=recount_to, link=recount_in %}If they were really in {{ new }}, <a href="{{ link }}">recount it in {{ new }}</a>: its records are set to nothing, its unit becomes {{ new }}, and you count each place in {{ new }}.{% endtrans %}
     {%- endif %}</span>
     {% elif unit_declined == "converted" and not retired %}
