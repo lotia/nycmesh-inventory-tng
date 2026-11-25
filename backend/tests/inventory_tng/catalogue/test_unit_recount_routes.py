@@ -1,9 +1,10 @@
 """The guided recount of an item whose unit was wrong from the start (Ali,
 2026-11-24 and 2026-11-25, inventory-tng-qety): every place brought to
 zero in the old unit, its open packages closed, its packages in the old
-unit retired and renamed, its labels revoked, its unit switched, and
-Reorder at, what is on order and its vendor offers given again in the new
-unit; then a count at each place. Nothing converts."""
+unit retired and renamed, its unit switched, and Reorder at, what is on
+order and its vendor offers given again in the new unit; then a count at
+each place. Nothing converts, and no label is revoked (Ali, 2026-11-25,
+inventory-tng-8ema)."""
 
 import uuid
 from collections.abc import Callable
@@ -108,8 +109,7 @@ def test_the_page_says_beforehand_all_it_will_do(
     ]
     assert "closes its open package;" in said
     assert "Spool becomes Spool (m)" in said
-    (code,) = session.scalars(select(Label.code).where(Label.item_id == cable.id))
-    assert f"revokes its printed label, as it says m: {code}" in said
+    assert "revoke" not in said
     assert "changes its unit to ft" in said
     assert box_values(page.text, "minimum") == ["100"]
     assert box_values(page.text, "on_order") == ["50"]
@@ -127,7 +127,8 @@ def test_recount_brings_each_place_to_zero_and_switches_the_unit(
     admin_client: TestClient, session: Session
 ) -> None:
     """Written off in m as Records were wrong, found where less than none;
-    nothing converted; then a count asked at each place in ft."""
+    nothing converted; its label left current, as it names no unit; then a
+    count asked at each place in ft."""
     spools = _spools(session)
     cable, store, van = spools.cable, spools.store, spools.van
     opened = session.scalars(
@@ -170,12 +171,8 @@ def test_recount_brings_each_place_to_zero_and_switches_the_unit(
     assert opened.closed_at is not None
     assert (spools.spool.name, spools.spool.unit) == ("Spool (m)", "m")
     assert spools.spool.retired_at is not None
-    assert (
-        session.scalars(
-            select(Label).where(Label.item_id == cable.id, Label.revoked_at.is_(None))
-        ).all()
-        == []
-    )
+    (label,) = session.scalars(select(Label).where(Label.item_id == cable.id))
+    assert label.revoked_at is None
     assert cable.unit_recounted_after == written[-1].id
     # A spool in ft takes the old one's name.
     items.add_package(session, cable, "Spool", Decimal(1000), shown_unit="ft")
@@ -187,21 +184,18 @@ def test_recount_brings_each_place_to_zero_and_switches_the_unit(
     )
     page.one("a", f"Count it at {van.name}", href=f"{COUNTS}/{van.id}?item={cable.id}")
     page.one("a", "Add its packages in ft", href=f"{ITEMS}/{cable.id}#add-package")
-    assert "Its printed label was revoked: print a new one in ft." in words_on(page)
+    assert "label" not in words_on(page)
 
 
 def test_a_place_retired_since_is_counted_no_more(
     admin_client: TestClient, session: Session
 ) -> None:
-    """The page after lists only current places; with none, it says so,
-    and asks for no labels when none were revoked."""
+    """The page after lists only current places; with none, it says so."""
     spools = Spools(session)
     retire(session, spools.store)
     path = UNIT_RECOUNTED.format(item_id=spools.cable.id)
-    after = admin_client.get(f"{path}?places={spools.store.id},x&labels=0")
-    said = words_on(after.text)
-    assert "nothing to count" in said
-    assert "label" not in said
+    after = admin_client.get(f"{path}?places={spools.store.id},x")
+    assert "nothing to count" in words_on(after.text)
 
 
 def test_an_item_that_holds_nothing_changes_only_its_amounts(
@@ -308,11 +302,11 @@ def test_a_name_taken_takes_the_next_number(
 def test_refused_if_anything_changed_since_shown(
     admin_client: TestClient, session: Session
 ) -> None:
-    """A label printed since would be revoked unsaid: nothing is done, and
+    """A package added since would be retired unsaid: nothing is done, and
     the page is shown again as it is now, with it. Logged once, by id."""
     spools = Spools(session)
     page = _page(admin_client, spools.cable.id)
-    labels.make_for_item(session, spools.cable.id)
+    items.add_package(session, spools.cable, "Reel", Decimal(100), shown_unit="m")
     with capture_logs() as logs:
         refused = admin_client.post(
             unit_recount(spools.cable.id, "ft"), data=_sent(page)
@@ -327,8 +321,23 @@ def test_refused_if_anything_changed_since_shown(
         }
     ]
     assert str(RULES["changed_since_shown"]) in words_on(refused.text)
-    assert "revokes its printed label" in words_on(refused.text)
+    assert "Reel becomes Reel (m)" in words_on(refused.text)
     assert spools.cable.unit == "m"
+
+
+def test_a_label_printed_since_shown_changes_nothing(
+    admin_client: TestClient, session: Session
+) -> None:
+    """The recount revokes no labels, so one printed after its page was
+    shown is no reason to refuse it, and stays current."""
+    spools = Spools(session)
+    page = _page(admin_client, spools.cable.id)
+    label = labels.make_for_item(session, spools.cable.id)
+    assert label is not None
+    done = admin_client.post(unit_recount(spools.cable.id, "ft"), data=_sent(page))
+    assert done.status_code == 303
+    session.expire_all()
+    assert (spools.cable.unit, label.revoked_at) == ("ft", None)
 
 
 def test_refused_while_a_line_recorded_with_more_than_moved_waits(

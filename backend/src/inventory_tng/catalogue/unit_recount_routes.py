@@ -1,9 +1,8 @@
 """The guided recount of an item whose unit was wrong from the start
 (catalogue/unit_recounts.py): its page, saying beforehand all it will do,
-the labels it revokes among them, and asking Reorder at, what is on order
-and its vendor offers again in the new unit; and the page after, linking
-to a count of it at each place it brought to zero, and saying to print new
-labels (Ali, 2026-11-25, inventory-tng-qety). The answer to No on the item
+and asking Reorder at, what is on order and its vendor offers again in the
+new unit; and the page after, linking to a count of it at each place it
+brought to zero (Ali, 2026-11-25, inventory-tng-qety). The answer to No on the item
 page links here (items_routes)."""
 
 import uuid
@@ -21,7 +20,6 @@ from inventory_tng.core.db_errors import refusal
 from inventory_tng.core.db_sessions import DbSession
 from inventory_tng.core.phrases import Words, gettext
 from inventory_tng.core.sent_forms import form_key
-from inventory_tng.models.base import INTEGER_MAX, whole
 from inventory_tng.models.catalogue import Item
 from inventory_tng.stock.paths import COUNTS
 from inventory_tng.stock.queries import places_with_ids
@@ -149,7 +147,6 @@ def recount(
     return redirect(
         UNIT_RECOUNTED.format(item_id=item_id),
         places=",".join(str(each) for each in done.places),
-        labels=str(done.labels),
     )
 
 
@@ -160,11 +157,9 @@ def recounted(
     session: DbSession,
     item_id: int,
     places: str = "",
-    labels: str = "",
 ) -> Response:
     """The page after a recount: the places it brought to zero, in its
-    address, each linked to its count of the item; and, if it revoked any
-    labels, to print new ones."""
+    address, each linked to its count of the item."""
     found = session.get(Item, item_id)
     if found is None:
         return not_found()
@@ -185,7 +180,6 @@ def recounted(
                 key=lambda each: (each.name.lower(), each.id),
             ),
             "counts_path": COUNTS,
-            "revoked": whole(labels, 0, INTEGER_MAX) or 0,
             "item_path": item_path,
         },
     )

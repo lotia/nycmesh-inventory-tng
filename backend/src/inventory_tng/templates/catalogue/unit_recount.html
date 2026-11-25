@@ -19,13 +19,9 @@ amounts to give again in the new unit (Ali, 2026-11-25). -#}
     <ul>
       {% for each in plan.packages %}<li>{% trans old=each.package.name_shown, new=each.shown %}{{ old }} becomes {{ new }}{% endtrans %}</li>{% endfor %}
     </ul></li>{% endif %}
-  {% if plan.labels %}<li>{% trans count=plan.labels | length, old=item.unit %}revokes its printed label, as it says {{ old }}:{% pluralize %}revokes its {{ count }} printed labels, as they say {{ old }}:{% endtrans %}
-    <ul>
-      {% for named in plan.labels %}<li><span class="key">{{ named.label.code }}</span> {{ named.words }}</li>{% endfor %}
-    </ul></li>{% endif %}
   <li>{% trans new=unit %}changes its unit to {{ new }}, and keeps the amounts below in {{ new }}.{% endtrans %}</li>
 </ol>
-<p>{% trans new=unit %}Then count it at each place in {{ new }}, add its packages in {{ new }}, and print new labels.{% endtrans %}</p>
+<p>{% trans new=unit %}Then count it at each place in {{ new }}, and add its packages in {{ new }}.{% endtrans %}</p>
 {% if plan.waiting %}
 <p class="problem" id="waiting">{{ waiting }}</p>
 {% else %}

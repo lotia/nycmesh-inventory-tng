@@ -20,11 +20,9 @@ then, in order:
 4. Its packages in the old unit retired, retired ones too, each renamed
    with that unit after its name, so one of the same name can be added in
    the new unit (names are unique, retired ones too).
-5. Its labels not revoked revoked, as they say the old unit; listed
-   beforehand, and refused if others were printed since (Ali, 2026-11-25).
-6. Its Reorder at, what is on order and its current vendor offers' units
+5. Its Reorder at, what is on order and its current vendor offers' units
    per order set as the administrator typed them, in the new unit.
-7. Its last ledger transaction marked (Item.unit_recounted_after): what
+6. Its last ledger transaction marked (Item.unit_recounted_after): what
    left a place since a count form was first shown (stock/moved_out.py)
    starts after it, as use summed over a time window must
    (inventory-tng-ueg2).
@@ -33,7 +31,12 @@ An item that holds nothing, as one converted before may (Ali, 2026-11-25,
 inventory-tng-l26i), has nothing to bring to zero or close; the rest is
 done as above, and its packages in the other unit, as a conversion left
 them, stay. Then each place is counted in the new unit; the page after
-links to each count."""
+links to each count.
+
+It revokes no labels: none names the item's unit, as an item's prints its
+name and a package's that package's own size, and those in the old unit
+stop scanning as they are retired (Ali, 2026-11-25, replacing his earlier
+decision that it revokes them)."""
 
 import uuid
 from collections.abc import Iterable, Mapping, Sequence
@@ -51,7 +54,6 @@ from inventory_tng.catalogue.name_keys import name_key
 from inventory_tng.core.db_errors import enforce
 from inventory_tng.core.db_locking import lock_catalogue, locked, relock
 from inventory_tng.core.db_once_committed import once_committed
-from inventory_tng.labels import labels
 from inventory_tng.models.catalogue import (
     Item,
     ItemPackage,
@@ -59,7 +61,6 @@ from inventory_tng.models.catalogue import (
     VendorOffer,
     reading_rules_held,
 )
-from inventory_tng.models.labels import Label
 from inventory_tng.models.names import unit_key
 from inventory_tng.models.places import Location
 from inventory_tng.models.stock import Movement, OpenPackage
@@ -121,15 +122,14 @@ class Renamed(NamedTuple):
 class Planned(NamedTuple):
     """What a recount of the item, as it is now, does: the places it
     brings to zero, the open packages it closes, its packages in its unit
-    and the name each is given as retired, the labels it revokes, the
-    vendor offers it asks for again; whether a line of it recorded with
-    more than was moved waits, which refuses it; and `seen`, all that as
-    one string, which a recount sent from a page showing it compares."""
+    and the name each is given as retired, the vendor offers it asks for
+    again; whether a line of it recorded with more than was moved waits,
+    which refuses it; and `seen`, all that as one string, which a recount
+    sent from a page showing it compares."""
 
     held: list[Held]
     opened: list[OpenPackage]
     packages: list[Renamed]
-    labels: list[labels.Named]
     offers: list[Offer]
     waiting: bool
     seen: str
@@ -192,7 +192,6 @@ def planned(session: Session, item: Item) -> Planned:
     )
     old = [package for package in every if package.unit == item.unit]
     renamed = _renamed(session, old, every, item.unit)
-    printed = labels.current_of(session, Label.item_id == item.id)
     offers = offers_of(session, item.id)
     waiting = unit_changes.checks_waiting(session, item.id)
     last = _last_transaction(session, item.id)
@@ -205,11 +204,10 @@ def planned(session: Session, item: Item) -> Planned:
             _ids(row.id for row in opened),
             # Each with its version: one renamed since is named otherwise.
             ",".join(f"{package.id}.{package.edit_version}" for package in every),
-            _ids(named.label.id for named in printed),
             _ids(each.offer.id for each in offers),
         ]
     )
-    return Planned(held, opened, renamed, printed, offers, waiting, seen)
+    return Planned(held, opened, renamed, offers, waiting, seen)
 
 
 def offers_of(session: Session, item_id: int) -> list[Offer]:
@@ -277,10 +275,9 @@ class Amounts(NamedTuple):
 
 class Recounted(NamedTuple):
     """What a recount did: the places it brought to zero, by id, to count
-    again; and how many labels it revoked, to print again."""
+    again."""
 
     places: list[int]
-    labels: int
 
 
 def recount(
@@ -373,8 +370,6 @@ def _recounted(
     for package in session.scalars(locked(retiring.order_by(ItemPackage.id))):
         package.name = names[package.id]
         package.retired_at = package.retired_at or at
-    # As listed: `seen` holds their ids, under the catalogue lock.
-    revoked = labels.revoke_all(session, Label.item_id == item.id, at)
     offers = select(VendorOffer).where(
         VendorOffer.id.in_([each.offer.id for each in plan.offers])
     )
@@ -396,10 +391,9 @@ def _recounted(
         location_ids=places,
         open_package_ids=[row.id for row in plan.opened],
         item_package_ids=sorted(names),
-        label_ids=revoked,
         vendor_offer_ids=[each.offer.id for each in plan.offers],
     )
-    return Recounted(places, len(revoked))
+    return Recounted(places)
 
 
 def _write_off(

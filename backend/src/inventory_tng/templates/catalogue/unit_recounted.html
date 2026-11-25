@@ -11,5 +11,4 @@ do, in its unit now (Ali, 2026-11-25). -#}
 <p>{% trans item=item.name_shown %}The records held none of {{ item }} at any place: nothing to count.{% endtrans %}</p>
 {% endif %}
 <p><a href="{{ item_path }}#add-package">{% trans unit=item.unit %}Add its packages in {{ unit }}{% endtrans %}</a></p>
-{% if revoked %}<p>{% trans count=revoked, link=item_path ~ "#labels", unit=item.unit %}Its printed label was revoked: <a href="{{ link }}">print a new one</a> in {{ unit }}.{% pluralize %}Its {{ count }} printed labels were revoked: <a href="{{ link }}">print new ones</a> in {{ unit }}.{% endtrans %}</p>{% endif %}
 {% endblock %}

@@ -414,16 +414,6 @@ class Renamed:
     swapped: ItemAlias | None
 
 
-@dataclass(frozen=True)
-class Saved:
-    """What saving an item did besides its fields: what renaming it did,
-    if it was renamed; and how many of its printed labels converting its
-    unit revoked, to print again (unit_changes.convert)."""
-
-    renamed: Renamed | None = None
-    labels_revoked: int = 0
-
-
 def save(
     session: Session,
     item: Item,
@@ -431,24 +421,22 @@ def save(
     *,
     seen: Seen,
     recorded_in: str | None = None,
-) -> Saved:
+) -> Renamed | None:
     """Every one of `fields` set; and, if its name's key changes, its old
     name kept as an alias, in place of the alias it is renamed to if it is
-    one of its own (Ali, 2026-11-15): what it did (Saved). The old name was the
+    one of its own (Ali, 2026-11-15): what that did. The old name was the
     item's, so no other item's name nor any current alias, and so is free
     as an alias. Its unit fixed (unit_changes.unit_fixed), a change between
     lengths converts what is recorded, `fields`' Reorder at too, as typed
     in its unit, once `recorded_in`, the administrator's answer, says what
     was recorded was in its unit as it is held; else
-    unit_changes.UNIT_UNCONFIRMED, to ask (unit_changes.convert); its
-    printed labels revoked then, as they say the old unit."""
+    unit_changes.UNIT_UNCONFIRMED, to ask (unit_changes.convert)."""
     # FOR UPDATE waits for any movement of it being written, and for any
     # label of it being made, which locks the item too (labels.make_for_item).
     relock(session, item, seen=seen)
     enforce("retired_read_only", when=item.retired_at is not None)
-    revoked = 0
     if fields.unit != item.unit and (why := unit_changes.unit_fixed(session, item.id)):
-        minimum, revoked = unit_changes.convert(
+        minimum = unit_changes.convert(
             session, item, fields.unit, fields.minimum, why=why, recorded_in=recorded_in
         )
         fields = replace(fields, minimum=minimum)
@@ -480,7 +468,7 @@ def save(
         setattr(item, column, value)
     once_committed(session, log.info, "item saved", item_id=item.id)
     if not renamed:
-        return Saved(labels_revoked=revoked)
+        return None
     how = "rename" if swapped is None else "swap"
     if swapped is not None:
         _retire_alias(session, swapped, datetime.now(UTC))
@@ -497,7 +485,7 @@ def save(
             item_alias_id=swapped.id,
             by=how,
         )
-    return Saved(Renamed(kept, swapped), revoked)
+    return Renamed(kept, swapped)
 
 
 def _own_alias(session: Session, item_id: int, keys: Keys) -> ItemAlias | None:

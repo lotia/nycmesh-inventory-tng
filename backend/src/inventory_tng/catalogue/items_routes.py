@@ -133,11 +133,7 @@ def _change_or_note[T](
     def asking() -> T:
         done = change()
         # Renamed to its own alias, it was found by that name already.
-        swapped = (
-            isinstance(done, items.Saved)
-            and done.renamed is not None
-            and done.renamed.swapped is not None
-        )
+        swapped = isinstance(done, items.Renamed) and done.swapped is not None
         if asked is not None and not swapped:
             session.flush()
             # An add returns its item; a save is of item_id's.
@@ -253,52 +249,25 @@ def followed_now(count: int) -> str:
     )
 
 
-def labels_revoked(count: int, unit: str) -> str:
-    """After answering Yes to a unit change revoked `count` printed labels
-    of the item, which said `unit`, its old one (Ali, 2026-11-25,
-    inventory-tng-8ema)."""
-    return ngettext(
-        "Its printed label showed %(unit)s and was revoked: print a new one.",
-        "Its %(num)s printed labels showed %(unit)s and were revoked: print new ones.",
-        count,
-        unit=unit,
-    )
-
-
-# The notices of the changes that may make open packages loose, and of
-# those that may revoke an item's labels (_said_after).
+# The notices of the changes that may make open packages loose (_loose_said).
 MAY_MAKE_LOOSE = ("saved", "item_renamed", "package_tracking", "tracking_off")
-MAY_REVOKE = ("saved", "item_renamed")
 
 
-def _said_after(request: Request) -> dict[str, str]:
+def _loose_said(request: Request) -> dict[str, str]:
     """The page's notice and, after it, made_loose for the open packages
-    its address says a change made loose, and labels_revoked for the labels
-    it says the change revoked; nothing to add if none, or if no such
-    change says so."""
+    its address says a change made loose; nothing to add if none, or if
+    no such change says so."""
     said = request.query_params.get("notice", "")
-    query = request.query_params
-    loose = whole(query.get("loose", ""), 1, INTEGER_MAX)
-    revoked = whole(query.get("revoked", ""), 1, INTEGER_MAX)
-    was = query.get("was", "")
-    after = []
-    if said in MAY_MAKE_LOOSE and loose is not None:
-        after.append(made_loose(loose))
-    if said in MAY_REVOKE and revoked is not None and was in UNITS:
-        after.append(labels_revoked(revoked, was))
-    return {"notice": " ".join([str(NOTICES[said]), *after])} if after else {}
+    count = whole(request.query_params.get("loose", ""), 1, INTEGER_MAX)
+    if said not in MAY_MAKE_LOOSE or count is None:
+        return {}
+    return {"notice": f"{NOTICES[said]} {made_loose(count)}"}
 
 
 def _loose_query(count: int) -> dict[str, str]:
     """What a redirect's address says of the open packages a change made
-    loose, for _said_after."""
+    loose, for _loose_said."""
     return {"loose": str(count)} if count else {}
-
-
-def _revoked_query(count: int, unit: str) -> dict[str, str]:
-    """What a redirect's address says of the labels a change revoked, which
-    said `unit`, for _said_after."""
-    return {"revoked": str(count), "was": unit} if count else {}
 
 
 def _listed(
@@ -387,7 +356,7 @@ def _list_page(
             "problems": problems,
             "values": values,
             **_name_field(session, similar),
-            **_said_after(request),
+            **_loose_said(request),
         },
     )
 
@@ -581,7 +550,7 @@ def _item_page(
             ),
             "followed_now": _followed_now(item, packages, opened),
             **_name_field(session, similar),
-            **_said_after(request),
+            **_loose_said(request),
         },
         status_code=409 if held_back else None,
     )
@@ -782,8 +751,7 @@ def save_item(
     fields, problems, typed = forms.item_fields(
         session, form, found, separator=decimal_separator(request)
     )
-    saved = None
-    was = found.unit
+    renamed = None
     answer = form.get(RECORDED)
     if fields is not None and answer == "no":
         return _unit_declined(request, session, signed, found, form, fields.unit)
@@ -794,12 +762,12 @@ def save_item(
         asked = None if same else []
         loose = 0
 
-        def saving() -> items.Saved:
+        def saving() -> items.Renamed | None:
             nonlocal loose
             # The places first: the answers' reading rules lock the items
             # they read again FOR UPDATE, which a save at those places
             # holds after them (open_packages.unfollowing).
-            saved, loose = open_packages.unfollowing(
+            renamed, loose = open_packages.unfollowing(
                 session,
                 signed.admin.id,
                 now(),
@@ -813,9 +781,9 @@ def save_item(
                 ),
                 item_ids=() if fields.track_opened else [item_id],
             )
-            return saved
+            return renamed
 
-        saved, broken = _change_or_note(
+        renamed, broken = _change_or_note(
             session, saving, problems, fields, typed, item_id, asked=asked
         )
         if broken == CLOSE:
@@ -835,9 +803,8 @@ def save_item(
         )
     _decided(session, typed, item_id=item_id)
     session.commit()
-    revoked = saved.labels_revoked if saved else 0
-    said = _loose_query(loose) | _revoked_query(revoked, was)
-    if saved is None or saved.renamed is None:
+    said = _loose_query(loose)
+    if renamed is None:
         return redirect(f"{ITEMS}/{item_id}", notice="saved", **said)
     return redirect(
         f"{ITEMS}/{item_id}", notice="item_renamed", section="aliases", **said

@@ -2047,35 +2047,6 @@ msgid ""
 "brought back. Revoking it stops them scanning for good."
 msgstr ""
 
-#: src/inventory_tng/catalogue/items_routes.py
-#, python-format
-msgid "Its printed label showed %(unit)s and was revoked: print a new one."
-msgid_plural ""
-"Its %(num)s printed labels showed %(unit)s and were revoked: print new "
-"ones."
-msgstr[0] ""
-msgstr[1] ""
-
-#. under "Were the recorded amounts really in m?", of the item's labels printed
-#. and not revoked; %(unit)s is its unit now, which they show.
-#: src/inventory_tng/templates/catalogue/_revoke_labels.html
-#, python-format
-msgid "Its printed label shows %(unit)s: Yes revokes it."
-msgid_plural "Its %(count)s printed labels show %(unit)s: Yes revokes them."
-msgstr[0] ""
-msgstr[1] ""
-
-#: src/inventory_tng/templates/catalogue/unit_recounted.html
-#, python-format
-msgid ""
-"Its printed label was revoked: <a href=\"%(link)s\">print a new one</a> "
-"in %(unit)s."
-msgid_plural ""
-"Its %(count)s printed labels were revoked: <a href=\"%(link)s\">print new"
-" ones</a> in %(unit)s."
-msgstr[0] ""
-msgstr[1] ""
-
 #: src/inventory_tng/web/forms.py
 msgid ""
 "Its size is fixed, as a label has been printed for it: revoke its labels "
@@ -4283,9 +4254,7 @@ msgstr ""
 
 #: src/inventory_tng/templates/catalogue/unit_recount.html
 #, python-format
-msgid ""
-"Then count it at each place in %(new)s, add its packages in %(new)s, and "
-"print new labels."
+msgid "Then count it at each place in %(new)s, and add its packages in %(new)s."
 msgstr ""
 
 #: src/inventory_tng/templates/admins/confirm.html
@@ -5352,13 +5321,6 @@ msgstr ""
 #: src/inventory_tng/templates/devices/device_list.html
 msgid "revoked"
 msgstr ""
-
-#: src/inventory_tng/templates/catalogue/unit_recount.html
-#, python-format
-msgid "revokes its printed label, as it says %(old)s:"
-msgid_plural "revokes its %(count)s printed labels, as they say %(old)s:"
-msgstr[0] ""
-msgstr[1] ""
 
 #: src/inventory_tng/templates/catalogue/item.html
 msgid "set on this package"

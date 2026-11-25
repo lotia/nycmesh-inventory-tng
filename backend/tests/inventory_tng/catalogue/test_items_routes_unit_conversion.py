@@ -525,68 +525,28 @@ def _labelled_reel(session: Session, place: Place) -> tuple[Label, Label, Label]
 
 
 @pytest.mark.parametrize("moved", [False, True])
-def test_yes_revokes_every_label_not_yet_revoked_and_says_to_print_new_ones(
+def test_yes_leaves_every_label_current_and_says_nothing_of_them(
     admin_client: TestClient, session: Session, moved: bool
 ) -> None:
-    """Its labels show m, so Yes revokes them with the change, whether
-    labels alone fix its unit or stock has moved too; the one revoked
-    before keeps its time, and another item's label is left (Ali,
+    """No printed label names the item's unit: its own prints its name,
+    its reel's the reel's size, which converting keeps. So Yes revokes
+    none, and neither the question nor the notice speaks of them (Ali,
     2026-11-25, inventory-tng-8ema)."""
     place = _shelf_a(session) if moved else Place(session)
     own, on_reel, old = _labelled_reel(session, place)
-    other = labels.make_for_item(session, place.item.id)
-    assert other is not None
     asked = admin_client.post(
         f"{ITEMS}/{place.cable.id}", data=shown_item_form(place.cable, unit="ft")
     )
     assert QUESTION in words_on(asked.text)
-    hint = read(asked.text).one("p", id="unit-labels-revoked")
-    assert words_on(hint) == "Its 2 printed labels show m: Yes revokes them."
-    done = admin_client.post(
-        f"{ITEMS}/{place.cable.id}", data=unit_answered(place.cable, unit="ft")
-    )
-    assert done.status_code == 303
-    after = admin_client.get(done.headers["location"])
-    assert (
-        "Saved. Its 2 printed labels showed m and were revoked: print new ones."
-    ) in words_on(after.text)
-    for each in (own, on_reel, old, other):
-        session.refresh(each)
-    assert own.revoked_at is not None
-    assert own.revoked_at == on_reel.revoked_at
-    assert (old.revoked_at, other.revoked_at) == (NOW, None)
-    assert place.cable.unit == "ft"
-
-
-def test_one_label_is_said_once(admin_client: TestClient, session: Session) -> None:
-    place = Place(session)
-    assert labels.make_for_item(session, place.cable.id) is not None
-    asked = admin_client.post(
-        f"{ITEMS}/{place.cable.id}", data=shown_item_form(place.cable, unit="ft")
-    )
-    hint = read(asked.text).one("p", id="unit-labels-revoked")
-    assert words_on(hint) == "Its printed label shows m: Yes revokes it."
-    done = admin_client.post(
-        f"{ITEMS}/{place.cable.id}", data=unit_answered(place.cable, unit="ft")
-    )
-    after = admin_client.get(done.headers["location"])
-    assert (
-        "Saved. Its printed label showed m and was revoked: print a new one."
-    ) in words_on(after.text)
-
-
-def test_no_labels_no_word_of_them(admin_client: TestClient, session: Session) -> None:
-    """Stock moved, nothing printed: neither the question nor the notice
-    speaks of labels."""
-    place = _shelf_a(session)
-    asked = admin_client.post(
-        f"{ITEMS}/{place.cable.id}", data=shown_item_form(place.cable, unit="ft")
-    )
-    assert read(asked.text).all("p", id="unit-labels-revoked") == []
+    assert "label" not in words_on(read(asked.text).one("div", id="unit-question"))
     done = admin_client.post(
         f"{ITEMS}/{place.cable.id}", data=unit_answered(place.cable, unit="ft")
     )
     assert done.headers["location"] == f"{ITEMS}/{place.cable.id}?notice=saved"
+    for each in (own, on_reel, old):
+        session.refresh(each)
+    assert (own.revoked_at, on_reel.revoked_at, old.revoked_at) == (None, None, NOW)
+    assert place.cable.unit == "ft"
 
 
 def test_no_revokes_nothing(admin_client: TestClient, session: Session) -> None:
@@ -598,18 +558,3 @@ def test_no_revokes_nothing(admin_client: TestClient, session: Session) -> None:
         session.refresh(each)
     assert (own.revoked_at, on_reel.revoked_at) == (None, None)
     assert place.cable.unit == "m"
-
-
-def test_a_rename_with_the_change_says_both(
-    admin_client: TestClient, session: Session
-) -> None:
-    """Renamed as well: its aliases' notice, then the labels'."""
-    place = Place(session)
-    assert labels.make_for_item(session, place.cable.id) is not None
-    answered = unit_answered(place.cable, unit="ft", name=f"Heliax {place.cable.id}")
-    done = admin_client.post(f"{ITEMS}/{place.cable.id}", data=answered)
-    after = admin_client.get(done.headers["location"])
-    assert (
-        "remove it below if it shouldn't be. Its printed label showed m and was "
-        "revoked: print a new one."
-    ) in words_on(after.text)

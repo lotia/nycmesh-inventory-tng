@@ -410,12 +410,11 @@ recorded. Rejected: keeping the unit fixed once stock has moved.
   line's unit: each end as the ledger reads that side of the line, by
   how many packages on a sealed side, else exactly (2026-11-25,
   inventory-tng-4fjq, inventory-tng-77eu).
-- Yes also revokes, in the same transaction, every label of the item
-  and its packages not yet revoked, as they show the old unit; the
-  question says how many beforehand, and the notice after says to print
-  new ones. A label made while the question is shown is revoked with
-  them, or, made after, shows the new unit (Ali, 2026-11-25,
-  inventory-tng-8ema). The guided recount revokes them the same way.
+- Yes revokes no labels, as none names the item's unit: an item label
+  prints only its name, and a package label its own size and unit,
+  which converting keeps (Ali, 2026-11-25, inventory-tng-8ema). This
+  replaces his decision earlier that day that Yes revokes them, as that
+  forced reprinting labels still true.
 - No converts nothing and says how to put right a unit wrong from the
   start: the guided recount (next amendment); or, only labelled, revoke
   its labels first.
@@ -454,9 +453,9 @@ corrects it on the same item, keeping its history and links
 other unit, and retiring the item for a new one.
 
 - Offered from the answer No, for an item whose stock has moved, into
-  another length. Its page says beforehand all it will do, the labels
-  it revokes among them, and asks Reorder at, what is on order and its
-  vendor offers' units per order again in the new unit.
+  another length. Its page says beforehand all it will do, and asks
+  Reorder at, what is on order and its vendor offers' units per order
+  again in the new unit.
 - In one transaction, holding the catalogue, every place the item has
   been at, then the item: each place is brought to zero form by form
   in the old unit, by adjustments with the reason Records were wrong,
@@ -464,7 +463,7 @@ other unit, and retiring the item for a new one.
   conversion left (loose, for an open package closed or moved since);
   its open packages close; its packages in the old unit are retired and
   renamed, its unit after their name, so a package of the same name can
-  be added; its labels are revoked; its unit changes; and the amounts
+  be added; its unit changes; and the amounts
   typed are kept. Refused, to be shown again, if anything it would do
   changed since its page was shown, or if it reached another place
   before the item was held.
@@ -475,5 +474,9 @@ other unit, and retiring the item for a new one.
   (`Item.unit_recounted_after`). What left a place since a count form
   was first shown leaves out the lines up to it, and so must use summed
   over a time window, as they are in no unit to add to.
+- It revokes no labels, for the reason Yes revokes none (previous
+  amendment); a retired package's label stops scanning anyway (Ali,
+  2026-11-25, replacing his decision earlier that day that it revokes
+  the item's labels).
 - The page after links to a count of the item at each place, in the new
-  unit, and says to print new labels.
+  unit.
