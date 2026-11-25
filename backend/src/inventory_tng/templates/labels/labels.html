@@ -21,8 +21,11 @@
       {% endfor %}
     </select>
   </label>
+  {#- Current lists no revoked label, so has nothing to hide. #}
+  {% if listing.show != "current" %}
   <label><input type="checkbox" name="revoked" value="no"{% if view.filtered("revoked") == "no" %} checked{% endif %}>
     {% trans %}Hide revoked labels{% endtrans %}</label>
+  {% endif %}
 {% endcall %}
 <p class="hint">{% trans items=items_path, locations=locations_path %}Make labels from an <a href="{{ items }}">item's</a> or a
 <a href="{{ locations }}">location's</a> page. Each has one code, printed as

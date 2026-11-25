@@ -11,6 +11,7 @@ import re
 from collections.abc import Iterator
 from html import unescape
 from typing import TYPE_CHECKING
+from urllib.parse import parse_qs, urlsplit
 
 from bs4 import BeautifulSoup, NavigableString, Tag
 from lxml.html import defs
@@ -148,6 +149,12 @@ def links(page: str | Element) -> list[tuple[str, str]]:
 def addresses(page: str | Element) -> list[str]:
     """Each link's address, in the page's order."""
     return [address for _, address in links(page)]
+
+
+def address(link: str) -> tuple[str, dict[str, list[str]]]:
+    """A link's path and query, its names in any order."""
+    split = urlsplit(link)
+    return split.path, parse_qs(split.query)
 
 
 def row_links(page: str | Element, path: str) -> list[str]:
