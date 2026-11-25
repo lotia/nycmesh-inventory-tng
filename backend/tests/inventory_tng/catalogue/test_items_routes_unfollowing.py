@@ -174,8 +174,7 @@ def test_a_package_or_the_items_ticked_turned_off_say_so_too(
         f"{page}?loose=1&notice=package_tracking&section=packages#packages"
     )
     said = words_on(admin_client.get(done.headers["location"]).text)
-    assert str(made_loose(1)) in said
-    assert ("What was left on 1 open package is now loose units, where it was.") in said
+    assert "What was left on 1 open package is now loose units, where it was." in said
     session.refresh(first)
     assert first.closed_at is not None
 

@@ -119,15 +119,13 @@ class LedgerTransaction(Base):
             name="two_places",
         ),
         CheckConstraint(
-            "CASE kind"
-            " WHEN 'move' THEN num_nulls(from_location_id, to_location_id) = 0"
-            " WHEN 'open' THEN from_location_id IS NOT NULL"
+            f"CASE WHEN {one_of('kind', AT_ONE_PLACE)}"
+            " THEN from_location_id IS NOT NULL"
             " AND from_location_id = to_location_id"
-            " WHEN 'loosen' THEN from_location_id IS NOT NULL"
-            " AND from_location_id = to_location_id"
-            " WHEN 'receipt' THEN from_location_id IS NULL"
+            " WHEN kind = 'move' THEN num_nulls(from_location_id, to_location_id) = 0"
+            " WHEN kind = 'receipt' THEN from_location_id IS NULL"
             " AND to_location_id IS NOT NULL"
-            " WHEN 'install' THEN from_location_id IS NOT NULL"
+            " WHEN kind = 'install' THEN from_location_id IS NOT NULL"
             " AND to_location_id IS NULL"
             " ELSE num_nulls(from_location_id, to_location_id) = 1 END",
             name="sides",

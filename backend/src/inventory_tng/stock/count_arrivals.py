@@ -92,10 +92,10 @@ def as_held(
     for place_id, item_id, open_id, quantity in queries.loosened_at(
         session, aside.keys(), items, gone.since, as_of
     ):
-        # From an open package, as the query asks (queries.loosened_at).
+        # From an open package, as the query asks, each made loose once
+        # (queries.loosened_at).
         assert open_id is not None
-        here = loosened.setdefault(place_id, {})
-        here[(item_id, open_id)] = here.get((item_id, open_id), Decimal(0)) + quantity
+        loosened.setdefault(place_id, {})[(item_id, open_id)] = quantity
     sealed = {
         item_id
         for here in aside.values()
@@ -124,7 +124,7 @@ def as_held_at(
     aside: Aside,
     held: Mapping[tuple[int, Form], Decimal],
     openings: Sequence[Opening],
-    loosened: Mapping[tuple[int, int], Decimal] | None = None,
+    loosened: Mapping[tuple[int, int], Decimal],
 ) -> Arrivals:
     """as_held at one place, from what it read: `held` there at the form's
     moment, `openings` there since, the newest first, and how much each
@@ -132,7 +132,7 @@ def as_held_at(
     open package. What arrived loose or in an open package first, then
     what arrived sealed."""
     left = {line: max(n, Decimal(0)) for line, n in held.items()}
-    unclaimed = dict(loosened or {})
+    unclaimed = dict(loosened)
 
     def held_in(item_id: int, form: Form, arrived: Decimal) -> Held:
         there = min(arrived, left.get((item_id, form), Decimal(0)))
@@ -144,13 +144,16 @@ def as_held_at(
         since, what is left on it, none, and the rest held in the loose
         units the loosening made, as much as it made."""
         first = held_in(item_id, form, arrived)
-        key = (item_id, form.open_package_id or 0)
+        if form.open_package_id is None:
+            return [first]
+        key = (item_id, form.open_package_id)
         made = min(arrived - first.there, unclaimed.get(key, Decimal(0)))
         if not made:
             return [first]
         unclaimed[key] -= made
+        parts = [first._replace(arrived=first.there)] if first.there else []
         loose = held_in(item_id, LOOSE, made)._replace(arrived=arrived - first.there)
-        return [*([first._replace(arrived=first.there)] if first.there else []), loose]
+        return [*parts, loose]
 
     kept: Arrivals = {}
     for (item_id, form), n in sorted(

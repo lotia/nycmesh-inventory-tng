@@ -30,6 +30,7 @@ from inventory_tng.stock import (
     ledger,
     over_recorded,
 )
+from inventory_tng.web.forms import CHANGED
 
 log = structlog.get_logger(__name__)
 meter = metrics.get_meter(__name__)
@@ -365,13 +366,9 @@ def unfollowing[T](
     under way there is counted before the close, and one sent after it
     waits, then is refused, as its open package is closed."""
     lock_catalogue(session)
-    query = select(OpenPackage.location_id).where(
-        OpenPackage.closed_at.is_(None),
-        or_(
-            OpenPackage.item_id.in_(list(item_ids)),
-            OpenPackage.package_id.in_(list(package_ids)),
-        ),
-    )
+    if not item_ids and not package_ids:
+        return change(), 0
+    query = select(OpenPackage.location_id).where(*_open_of(item_ids, package_ids))
     places = set(session.scalars(query.distinct()))
     ledger.lock_places(session, places)
     done = change()
@@ -401,41 +398,34 @@ def close_unfollowed(
     Call it holding `places` (ledger.lock_places) from before the setting
     was changed, as unfollowing does. One at a place not held, as moved
     whole there or opened there meanwhile, is refused as changed
-    (CHANGED_SINCE_SHOWN): its place could only be locked now out of the
+    (web.forms.CHANGED): its place could only be locked now out of the
     ledger's order."""
     followed = func.coalesce(ItemPackage.track_opened, Item.track_opened)
     query = (
-        select(OpenPackage)
+        select(OpenPackage.id)
         .join(ItemPackage, ItemPackage.id == OpenPackage.package_id)
         .join(Item, Item.id == OpenPackage.item_id)
-        .where(
-            OpenPackage.closed_at.is_(None),
-            or_(
-                OpenPackage.item_id.in_(list(item_ids)),
-                OpenPackage.package_id.in_(list(package_ids)),
-            ),
-            followed.is_(False),
-        )
+        .where(*_open_of(item_ids, package_ids), followed.is_(False))
         .order_by(OpenPackage.id)
     )
-    candidates = session.scalars(query).all()
-    if not candidates:
+    ids = list(session.scalars(query))
+    if not ids:
         return 0
     # In the ledger's order, after the places: the items, then the open
     # packages, each by id; then read again as locked.
-    ledger.hold_across(session, open_ids=[row.id for row in candidates])
+    ledger.hold_across(session, open_ids=ids)
     rows = session.scalars(
         locked(
             select(OpenPackage)
             .where(
-                OpenPackage.id.in_([row.id for row in candidates]),
+                OpenPackage.id.in_(ids),
                 OpenPackage.closed_at.is_(None),
             )
             .order_by(OpenPackage.id),
             key_share=True,
         )
     ).all()
-    enforce(CHANGED_SINCE_SHOWN, when=any(r.location_id not in places for r in rows))
+    enforce(CHANGED, when=any(r.location_id not in places for r in rows))
     left = balance.left_on(session, rows)
     for row in rows:
         _loosen(session, row, left[row.id], admin_id)
@@ -443,9 +433,17 @@ def close_unfollowed(
     return len(rows)
 
 
-# What a change refused as made since its page was shown is refused by
-# (db_locking.unchanged).
-CHANGED_SINCE_SHOWN = "changed_since_shown"
+def _open_of(
+    item_ids: Collection[int], package_ids: Collection[int]
+) -> tuple[ColumnElement[bool], ...]:
+    """Filters for the open packages of these items or packages."""
+    return (
+        OpenPackage.closed_at.is_(None),
+        or_(
+            OpenPackage.item_id.in_(list(item_ids)),
+            OpenPackage.package_id.in_(list(package_ids)),
+        ),
+    )
 
 
 def _loosen(session: Session, row: OpenPackage, left: Decimal, admin_id: int) -> None:

@@ -17,6 +17,7 @@ from inventory_tng.models.admins import Admin
 from inventory_tng.models.catalogue import SMALLEST_PACKAGE_FIRST, Item, ItemPackage
 from inventory_tng.models.places import STORE_KINDS, Location
 from inventory_tng.models.stock import (
+    AT_ONE_PLACE,
     AdjustmentReason,
     LedgerTransaction,
     Movement,
@@ -324,8 +325,8 @@ def recent_cuts(
             Movement.to_open_package_id.is_distinct_from(OpenPackage.id),
             # Nor what was left made loose, which leaves it closed: one
             # read as open just before has no such cut to show (Ali,
-            # 2026-11-24, inventory-tng-j89e).
-            LedgerTransaction.kind != "loosen",
+            # 2026-11-24, inventory-tng-j89e). An opening takes from none.
+            LedgerTransaction.kind.not_in(AT_ONE_PLACE),
         )
         .order_by(LedgerTransaction.id.desc())
         .limit(recent)
@@ -381,11 +382,7 @@ def openings_at(
         )
         .join(LedgerTransaction, LedgerTransaction.id == Movement.transaction_id)
         .where(
-            LedgerTransaction.kind == "open",
-            LedgerTransaction.to_location_id.in_(list(place_ids)),
-            LedgerTransaction.id > after,
-            LedgerTransaction.id <= up_to,
-            Movement.item_id.in_(list(item_ids)),
+            *_of_kind_at("open", place_ids, item_ids, after, up_to),
             Movement.from_package_id.is_not(None),
         )
         .order_by(LedgerTransaction.id.desc(), Movement.id.desc())
@@ -412,14 +409,28 @@ def loosened_at(
         )
         .join(LedgerTransaction, LedgerTransaction.id == Movement.transaction_id)
         .where(
-            LedgerTransaction.kind == "loosen",
-            LedgerTransaction.to_location_id.in_(list(place_ids)),
-            LedgerTransaction.id > after,
-            LedgerTransaction.id <= up_to,
-            Movement.item_id.in_(list(item_ids)),
+            *_of_kind_at("loosen", place_ids, item_ids, after, up_to),
             Movement.from_open_package_id.is_not(None),
         )
     ).all()
+
+
+def _of_kind_at(
+    kind: str,
+    place_ids: Collection[int],
+    item_ids: Collection[int],
+    after: int,
+    up_to: int,
+) -> tuple[ColumnElement[bool], ...]:
+    """Filters for the lines of `item_ids` in the ledger transactions of
+    `kind` at the places after `after` up to `up_to`."""
+    return (
+        LedgerTransaction.kind == kind,
+        LedgerTransaction.to_location_id.in_(list(place_ids)),
+        LedgerTransaction.id > after,
+        LedgerTransaction.id <= up_to,
+        Movement.item_id.in_(list(item_ids)),
+    )
 
 
 def last_taken_from(

@@ -1064,7 +1064,7 @@ def upgrade() -> None:
             name=op.f("ck_ledger_transaction_admin_counts"),
         ),
         sa.CheckConstraint(
-            "CASE kind WHEN 'move' THEN num_nulls(from_location_id, to_location_id) = 0 WHEN 'open' THEN from_location_id IS NOT NULL AND from_location_id = to_location_id WHEN 'loosen' THEN from_location_id IS NOT NULL AND from_location_id = to_location_id WHEN 'receipt' THEN from_location_id IS NULL AND to_location_id IS NOT NULL WHEN 'install' THEN from_location_id IS NOT NULL AND to_location_id IS NULL ELSE num_nulls(from_location_id, to_location_id) = 1 END",
+            "CASE WHEN kind IN ('open', 'loosen') THEN from_location_id IS NOT NULL AND from_location_id = to_location_id WHEN kind = 'move' THEN num_nulls(from_location_id, to_location_id) = 0 WHEN kind = 'receipt' THEN from_location_id IS NULL AND to_location_id IS NOT NULL WHEN kind = 'install' THEN from_location_id IS NOT NULL AND to_location_id IS NULL ELSE num_nulls(from_location_id, to_location_id) = 1 END",
             name=op.f("ck_ledger_transaction_sides"),
         ),
         sa.CheckConstraint(

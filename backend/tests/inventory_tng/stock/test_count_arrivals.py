@@ -89,7 +89,7 @@ def test_what_arrived_is_set_aside_as_held_and_never_beyond() -> None:
         Opening(5, 7, newest, Decimal(10)),
         Opening(5, 7, LOOSE, Decimal(10)),
     ]
-    assert as_held_at(aside, held, openings) == {
+    assert as_held_at(aside, held, openings, {}) == {
         (5, LOOSE): [Held(LOOSE, Decimal(3), Decimal(1))],
         (5, first): [Held(first, Decimal(8), Decimal(6))],
         (5, SEALED): [
@@ -97,14 +97,14 @@ def test_what_arrived_is_set_aside_as_held_and_never_beyond() -> None:
             Held(newest, Decimal(10), Decimal(4)),
         ],
     }
-    assert as_held_at({(5, SEALED): Decimal(30)}, held, openings) == {
+    assert as_held_at({(5, SEALED): Decimal(30)}, held, openings, {}) == {
         (5, SEALED): [
             Held(SEALED, Decimal(10), Decimal(10)),
             Held(newest, Decimal(10), Decimal(4)),
             Held(LOOSE, Decimal(10), Decimal(1)),
         ]
     }
-    assert as_held_at({(5, SEALED): Decimal(40)}, held, openings)[(5, SEALED)][
+    assert as_held_at({(5, SEALED): Decimal(40)}, held, openings, {})[(5, SEALED)][
         -1
     ] == Held(SEALED, Decimal(10), Decimal(0))
 

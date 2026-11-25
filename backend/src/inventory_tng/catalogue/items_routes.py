@@ -616,8 +616,8 @@ def track_items(
 ) -> Response:
     """Set "track each opened package" on the items ticked, on the page
     shown, and come back to it as it was: the list's view comes in the
-    form's address. Turned off, the open packages no longer followed are
-    closed, what was left on them loose (open_packages.unfollowing)."""
+    form's address. Turned off, what is left on the open packages no
+    longer followed is made loose (open_packages.unfollowing)."""
     back = listing.link()
     if TRACKING.get(track) is None:
         return not_found()
@@ -638,12 +638,12 @@ def track_items(
     if done is None:
         log.info("package tracking refused", rule=broken, scope="bulk")
         return redirect(back, notice="tracking_changed")
-    changed, closed = done
+    changed, loose = done
     session.commit()
-    # Ticked items set so already may still have had open packages closed.
-    if not changed and not closed:
+    # Ticked items set so already may still have had open packages made loose.
+    if not changed and not loose:
         return redirect(back, notice="tracking_same")
-    return redirect(back, notice=f"tracking_{track}", **_loose_query(closed))
+    return redirect(back, notice=f"tracking_{track}", **_loose_query(loose))
 
 
 @router.get(f"{ITEMS}/{{item_id}}")
@@ -709,13 +709,14 @@ def save_item(
         seen = form_version(form.get("version", ""))
         same = forms.same_name(session, found, form, fields, typed)
         asked = None if same else []
-        closed: list[int] = []
+        loose = 0
 
         def saving() -> items.Renamed | None:
+            nonlocal loose
             # The places first: the answers' reading rules lock the items
             # they read again FOR UPDATE, which a save at those places
             # holds after them (open_packages.unfollowing).
-            renamed, count = open_packages.unfollowing(
+            renamed, loose = open_packages.unfollowing(
                 session,
                 signed.admin.id,
                 now(),
@@ -727,7 +728,6 @@ def save_item(
                 ),
                 item_ids=() if fields.track_opened else [item_id],
             )
-            closed[:] = [count]
             return renamed
 
         renamed, broken = _change_or_note(
@@ -746,7 +746,7 @@ def save_item(
         )
     _decided(session, typed, item_id=item_id)
     session.commit()
-    said = _loose_query(sum(closed))
+    said = _loose_query(loose)
     if renamed is None:
         return redirect(f"{ITEMS}/{item_id}", notice="saved", **said)
     return redirect(
@@ -983,8 +983,8 @@ def track_package(
     track: Annotated[str, Form()] = "",
 ) -> Response:
     """A package's own "track each opened package", or as its item says.
-    No longer followed, its open packages are closed, what was left on
-    them loose (open_packages.unfollowing)."""
+    No longer followed, what is left on its open packages is made loose
+    (open_packages.unfollowing)."""
     package = _package(session, item_id, package_id)
     if package is None or track not in TRACKING:
         return not_found()
