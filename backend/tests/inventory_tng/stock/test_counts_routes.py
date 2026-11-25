@@ -559,8 +559,10 @@ def test_the_counts_filter_shows_its_choices_and_a_way_to_clear_it(
 ) -> None:
     response = listed.client.get(COUNTS, params={"admin": str(listed.bob.id)})
     page = read(response.text)
-    assert (str(listed.bob.id), "bob", True) in options(page)
-    assert (str(listed.shelf.id), "Aa shelf", False) in options(page)
+    admins = options(page.one("select", name="admin"))
+    assert (str(listed.bob.id), "bob", True) in admins
+    places = options(page.one("select", name="place"))
+    assert (str(listed.shelf.id), "Aa shelf", False) in places
     assert ("Clear", COUNTS) in links(page)
 
 

@@ -740,7 +740,8 @@ def test_labels_filter_by_kind_and_item(
     # A kind not offered, or an item not a number, is no filter.
     assert listed(kind="box", item="x") >= mine
     page = read(admin_client.get(LABELS, params={"item": str(cable.id)}).text)
-    assert (str(cable.id), "Cat6 cable", True) in options(page)
+    picker = page.one("select", name="item")
+    assert (str(cable.id), "Cat6 cable", True) in options(picker)
     assert ("Clear", LABELS) in links(page)
     # Printing keeps the filter, to come back to.
     assert "item" in dict(hidden_fields(page))
