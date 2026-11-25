@@ -453,15 +453,18 @@ other unit, and retiring the item for a new one.
   vendor offers' units per order again in the new unit.
 - In one transaction, holding the catalogue, every place the item has
   been at, then the item: each place is brought to zero form by form
-  in the old unit, by adjustments with the reason Records were wrong;
+  in the old unit, by adjustments with the reason Records were wrong,
+  and again in the new unit for any part of a thousandth an earlier
+  conversion left (loose, for an open package closed or moved since);
   its open packages close; its packages in the old unit are retired and
   renamed, its unit after their name, so a package of the same name can
   be added; its labels are revoked; its unit changes; and the amounts
   typed are kept. Refused, to be shown again, if anything it would do
   changed since its page was shown, or if it reached another place
   before the item was held.
-- An item holding nothing, such as one converted before, changes only
-  those amounts and its labels.
+- An item holding nothing, such as one converted before, has nothing to
+  write off or close; the rest is done as above. Its packages in the
+  other unit, as a conversion left them, stay.
 - The item keeps its last ledger transaction then
   (`Item.unit_recounted_after`). What left a place since a count form
   was first shown leaves out the lines up to it, and so must use summed

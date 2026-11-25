@@ -138,7 +138,6 @@ def recount(
         unit_changes.UNIT_CHECKS_WAITING,
     )
     if broken is not None:
-        log.info("unit recount refused", item_id=item_id, rule=broken)
         session.refresh(found)
         if unit not in unit_recounts.units_open(session, found):
             return redirect(f"{ITEMS}/{item_id}")

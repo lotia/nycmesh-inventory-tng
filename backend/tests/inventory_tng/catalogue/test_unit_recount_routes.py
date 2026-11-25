@@ -7,6 +7,7 @@ unit; then a count at each place. Nothing converts."""
 
 import uuid
 from collections.abc import Callable
+from datetime import UTC, datetime
 from decimal import Decimal
 
 import pytest
@@ -14,6 +15,7 @@ from fastapi.testclient import TestClient
 from httpx2 import Response
 from sqlalchemy import select
 from sqlalchemy.orm import Session
+from structlog.testing import capture_logs
 
 from inventory_tng.catalogue import items, unit_recounts
 from inventory_tng.catalogue.paths import ITEMS, UNIT_RECOUNTED, unit_recount
@@ -21,7 +23,8 @@ from inventory_tng.labels import labels
 from inventory_tng.models.catalogue import Item, ItemPackage, VendorOffer
 from inventory_tng.models.labels import Label
 from inventory_tng.models.stock import AdjustmentReason, Movement, OpenPackage
-from inventory_tng.stock.ledger import Entry
+from inventory_tng.stock import open_packages
+from inventory_tng.stock.ledger import Entry, Form
 from inventory_tng.stock.moments import expected
 from inventory_tng.stock.paths import COUNTS
 from inventory_tng.web.forms import RULES
@@ -35,6 +38,7 @@ from helpers.markup import (
     words_on,
 )
 from helpers.rows import add
+from helpers.sign_in import new_admin_id
 from helpers.stock import (
     Place,
     Spools,
@@ -247,6 +251,50 @@ def test_a_part_of_a_thousandth_left_by_a_conversion_is_brought_to_zero(
     assert expected(session, place.store.id) == {}
 
 
+@pytest.mark.parametrize("closed", [True, False])
+def test_a_part_of_a_thousandth_on_an_open_package_gone_is_found_loose(
+    admin_client: TestClient, session: Session, closed: bool
+) -> None:
+    """A spool of 1 ft opened in ft; the cable set to m (as converted);
+    the 0.305 m on it, as read, cut and the spool closed, or moved whole
+    to the van. Its form at the store, 1 ft less 0.305 m, reads nothing
+    in m but -0.001 ft once the cable is in ft again: no line may name it
+    there, so it is found loose, and the store holds nothing."""
+    spools = Spools(session, cable_unit="ft")
+    cable = spools.cable
+    spools.spool.size = Decimal(1)
+    opened = open_packages.make(session, uuid.uuid4(), spools.spool.id, spools.store.id)
+    spools.write(
+        {
+            "kind": "open",
+            "from_location_id": spools.store.id,
+            "to_location_id": spools.store.id,
+        },
+        Entry(cable.id, Decimal(1), spools.sealed, Form(open_package_id=opened.id)),
+    )
+    cable.unit = "m"
+    session.flush()
+    on_it = Form(open_package_id=opened.id)
+    if closed:
+        spools.write(
+            {"kind": "install", "from_location_id": spools.store.id},
+            Entry(cable.id, Decimal("0.305"), on_it),
+        )
+        closer = new_admin_id(session)
+        assert open_packages.close(
+            session, opened.id, closer, datetime.now(UTC), how="direct"
+        )
+    else:
+        spools.move(Entry(cable.id, Decimal("0.305"), on_it, on_it))
+    session.flush()
+    page = _page(admin_client, cable.id)
+    done = admin_client.post(unit_recount(cable.id, "ft"), data=_sent(page))
+    assert done.status_code == 303
+    session.expire_all()
+    assert cable.unit == "ft"
+    assert expected(session, spools.store.id) == {}
+
+
 def test_a_name_taken_takes_the_next_number(
     admin_client: TestClient, session: Session
 ) -> None:
@@ -261,12 +309,23 @@ def test_refused_if_anything_changed_since_shown(
     admin_client: TestClient, session: Session
 ) -> None:
     """A label printed since would be revoked unsaid: nothing is done, and
-    the page is shown again as it is now, with it."""
+    the page is shown again as it is now, with it. Logged once, by id."""
     spools = Spools(session)
     page = _page(admin_client, spools.cable.id)
     labels.make_for_item(session, spools.cable.id)
-    refused = admin_client.post(unit_recount(spools.cable.id, "ft"), data=_sent(page))
+    with capture_logs() as logs:
+        refused = admin_client.post(
+            unit_recount(spools.cable.id, "ft"), data=_sent(page)
+        )
     assert refused.status_code == 409
+    assert [each for each in logs if each["event"] == "unit recount refused"] == [
+        {
+            "event": "unit recount refused",
+            "item_id": spools.cable.id,
+            "reason": "changed",
+            "log_level": "info",
+        }
+    ]
     assert str(RULES["changed_since_shown"]) in words_on(refused.text)
     assert "revokes its printed label" in words_on(refused.text)
     assert spools.cable.unit == "m"

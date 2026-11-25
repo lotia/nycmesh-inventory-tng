@@ -153,7 +153,7 @@ def test_no_converts_nothing_and_says_what_to_do(
     assert declined.status_code == 400
     assert problem(declined.text, "unit") == (
         "Nothing was converted. If they were really in ft, its unit was wrong "
-        "from the start: Recount it in ft"
+        "from the start. Recount it in ft"
     )
     unit_problem = read(declined.text).one("span", id="unit-problem")
     unit_problem.one("a", "Recount it in ft", href=unit_recount(cable.id, "ft"))
@@ -477,6 +477,22 @@ def test_no_for_a_labelled_item_says_to_revoke_its_labels(
     assert again.status_code == 200
     assert "Nothing was converted" not in words_on(again.text)
     assert place.cable.unit == "m"
+
+
+def test_no_for_a_retired_item_whose_stock_moved_offers_no_recount(
+    admin_client: TestClient, session: Session
+) -> None:
+    """Answered No from a page drawn before the item was retired: it may
+    not be recounted, so its note ends where it is, with no link."""
+    place = _shelf_a(session)
+    answered = unit_answered(place.cable, "no", unit="ft")
+    retire(session, place.cable)
+    declined = admin_client.post(f"{ITEMS}/{place.cable.id}", data=answered)
+    assert problem(declined.text, "unit") == (
+        "Nothing was converted. If they were really in ft, its unit was wrong "
+        "from the start."
+    )
+    assert read(declined.text).all("a", href=unit_recount(place.cable.id, "ft")) == []
 
 
 def test_no_for_a_retired_labelled_item_offers_nothing_to_revoke(

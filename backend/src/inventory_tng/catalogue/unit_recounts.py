@@ -14,7 +14,8 @@ then, in order:
 1. Every place holding any of it brought to zero, form by form, in the old
    unit, by adjustments with the reason Records were wrong.
 2. Its unit switched; any part of a thousandth an earlier conversion left
-   on a form (inventory-tng-8s2c) brought to zero in the new one alike.
+   on a form (inventory-tng-8s2c) brought to zero in the new one alike,
+   loose for an open package closed or moved whole since (_held).
 3. Its open packages closed, showing nothing.
 4. Its packages in the old unit retired, retired ones too, each renamed
    with that unit after its name, so one of the same name can be added in
@@ -24,14 +25,15 @@ then, in order:
 6. Its Reorder at, what is on order and its current vendor offers' units
    per order set as the administrator typed them, in the new unit.
 7. Its last ledger transaction marked (Item.unit_recounted_after): what
-   left a place since a count form was first shown (stock/moved_out.py),
-   and use summed over a time window, start after it.
+   left a place since a count form was first shown (stock/moved_out.py)
+   starts after it, as use summed over a time window must
+   (inventory-tng-ueg2).
 
 An item that holds nothing, as one converted before may (Ali, 2026-11-25,
-inventory-tng-l26i), has nothing to bring to zero or close, and its
-packages in the other unit stay: only its amounts in step 6 and its
-labels change. Then each place is counted in the new unit; the page
-after links to each count."""
+inventory-tng-l26i), has nothing to bring to zero or close; the rest is
+done as above, and its packages in the other unit, as a conversion left
+them, stay. Then each place is counted in the new unit; the page after
+links to each count."""
 
 import uuid
 from collections.abc import Iterable, Mapping, Sequence
@@ -41,7 +43,7 @@ from typing import NamedTuple
 
 import structlog
 from opentelemetry import metrics
-from sqlalchemy import func, select
+from sqlalchemy import and_, func, select
 from sqlalchemy.orm import Session
 
 from inventory_tng.catalogue import unit_changes, units
@@ -66,7 +68,7 @@ from inventory_tng.models.places import Location
 from inventory_tng.models.stock import Movement, OpenPackage, OverRecorded
 from inventory_tng.stock import adjustment_reasons, counts, open_packages
 from inventory_tng.stock.balance import by_form
-from inventory_tng.stock.ledger import Form, lock_places
+from inventory_tng.stock.ledger import LOOSE, Form, lock_places
 from inventory_tng.web.forms import CHANGED, RETIRED
 
 log = structlog.get_logger(__name__)
@@ -138,23 +140,39 @@ class Planned(NamedTuple):
 
 def _held(session: Session, item_id: int) -> list[Held]:
     """What the records hold of the item at each place, not nothing, in
-    its unit as it is now, by place name."""
+    its unit as it is now, by place name. What an open package closed, or
+    moved whole elsewhere, holds there, such as a part of a thousandth an
+    earlier conversion left (inventory-tng-8s2c), no line may name: it is
+    held loose, as a count by total finds it."""
+    there = and_(
+        OpenPackage.closed_at.is_(None),
+        OpenPackage.location_id == by_form.c.location_id,
+    )
     rows = session.execute(
         select(
             Location,
             by_form.c.package_id,
             by_form.c.open_package_id,
+            there,
             by_form.c.quantity,
         )
         .join(Location, Location.id == by_form.c.location_id)
+        .outerjoin(OpenPackage, OpenPackage.id == by_form.c.open_package_id)
         .where(by_form.c.item_id == item_id, by_form.c.quantity != 0)
         .order_by(func.lower(Location.name), Location.id)
     )
     held: dict[int, Held] = {}
-    for place, package_id, open_id, quantity in rows:
-        each = held.setdefault(place.id, Held(place, {}))
-        each.forms[Form(package_id, open_id)] = quantity
-    return list(held.values())
+    for place, package_id, open_id, open_there, quantity in rows:
+        form = (
+            LOOSE
+            if open_id is not None and not open_there
+            else Form(package_id, open_id)
+        )
+        forms = held.setdefault(place.id, Held(place, {})).forms
+        forms[form] = forms.get(form, Decimal(0)) + quantity
+        if not forms[form]:
+            del forms[form]
+    return [each for each in held.values() if each.forms]
 
 
 def planned(session: Session, item: Item) -> Planned:
@@ -299,8 +317,7 @@ def recount(
     # A place it reached since was not held first: started over from its
     # page, which the stock moved since shows otherwise anyway (`seen`).
     if not _places_of(session, item.id) <= places:
-        log.info("unit recount refused", item_id=item.id, reason="places_added")
-        enforce(CHANGED)
+        _refused(item.id, "places_added", CHANGED)
     plan = planned(session, item)
     return _recounted(session, item, unit, amounts, plan, seen, key, admin_id, at)
 
@@ -315,6 +332,13 @@ def _places_of(session: Session, item_id: int) -> set[int]:
     return set(session.scalars(been.union(opened)))
 
 
+def _refused(item_id: int, reason: str, rule: str) -> None:
+    """A recount of the item refused by `rule`, logged by `reason`, from a
+    fixed list: "places_added", "retired", "changed" or "checks_waiting"."""
+    log.info("unit recount refused", item_id=item_id, reason=reason)
+    enforce(rule)
+
+
 def _recounted(
     session: Session,
     item: Item,
@@ -327,11 +351,12 @@ def _recounted(
     at: datetime,
 ) -> Recounted:
     """recount's writes, holding the places and the item."""
-    enforce(RETIRED, when=item.retired_at is not None)
-    enforce(CHANGED, when=plan.seen != seen or unit not in units_open(session, item))
+    if item.retired_at is not None:
+        _refused(item.id, "retired", RETIRED)
+    if plan.seen != seen or unit not in units_open(session, item):
+        _refused(item.id, "changed", CHANGED)
     if plan.waiting:
-        log.info("unit recount refused", item_id=item.id, reason="checks_waiting")
-        enforce(unit_changes.UNIT_CHECKS_WAITING)
+        _refused(item.id, "checks_waiting", unit_changes.UNIT_CHECKS_WAITING)
     old = item.unit
     reason = adjustment_reasons.seeded(session, adjustment_reasons.RECORDS_WRONG).id
     for each in plan.held:

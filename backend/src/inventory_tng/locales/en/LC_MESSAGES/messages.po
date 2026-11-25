@@ -2647,12 +2647,13 @@ msgid "Nothing waits."
 msgstr ""
 
 #. Translators: answered No to "Were the recorded amounts really in
-#. %(old)s?"; a link to recount the item in %(new)s follows.
+#. %(old)s?"; a link to recount the item in %(new)s follows, unless it
+#. is retired.
 #: src/inventory_tng/catalogue/forms.py
 #, python-format
 msgid ""
 "Nothing was converted. If they were really in %(new)s, its unit was wrong"
-" from the start:"
+" from the start."
 msgstr ""
 
 #. Translators: answered No to "Were the recorded amounts really in

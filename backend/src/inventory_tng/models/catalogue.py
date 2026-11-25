@@ -156,8 +156,9 @@ class Item(KeyedName, Searchable, Versioned, Base):
     # a guided recount (catalogue/unit_recounts.py): its lines up to it
     # were in a unit wrong from the start, and the recount brought every
     # place to zero after them. What left a place since a moment
-    # (stock/moved_out.py), and use summed over a time window, start after
-    # it. NULL: never recounted, or recounted before anything moved.
+    # (stock/moved_out.py) starts after it, as use summed over a time
+    # window must (inventory-tng-ueg2). NULL: never recounted, or
+    # recounted before anything moved.
     unit_recounted_after: Mapped[int | None] = reference("ledger_transaction.id")
 
     # Everything a volunteer might type to find an item, as one string,

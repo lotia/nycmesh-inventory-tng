@@ -231,10 +231,11 @@ def unit_declined_problem(new: str, why: unit_changes.UnitFixed) -> str:
             new=new,
         )
     # Translators: answered No to "Were the recorded amounts really in
-    # %(old)s?"; a link to recount the item in %(new)s follows.
+    # %(old)s?"; a link to recount the item in %(new)s follows, unless it
+    # is retired.
     return gettext(
         "Nothing was converted. If they were really in %(new)s, its unit was "
-        "wrong from the start:",
+        "wrong from the start.",
         new=new,
     )
 
