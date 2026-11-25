@@ -255,7 +255,7 @@ class ItemPackage(KeyedName, Searchable, Versioned, Base):
     retired_at: Mapped[RetiredAt]
 
     # size and short_below in its item's unit, as kept
-    # (unit_conversion.converted): what the ledger moves, counts and
+    # (unit_conversion.converted_kept): what the ledger moves, counts and
     # compares of it, and the scan page is sent. Read with it.
     @declared_attr
     def size_in_items_unit(cls: type[ItemPackage]) -> Mapped[Decimal]:

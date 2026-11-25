@@ -24,7 +24,7 @@ from inventory_tng.catalogue.amount_rules import whole_enough
 from inventory_tng.catalogue.unit_conversion import (
     at_scale,
     converted,
-    converted_exactly,
+    converted_kept,
     convertible,
 )
 from inventory_tng.core.db_errors import RuleBroken
@@ -702,12 +702,13 @@ def _replay(session: Session, batch: batch_schemas.Batch) -> LedgerTransaction |
             )
         )
         compared = sent_lines if moved_alike else []
+        # Nothing is compared without started, so no packages are needed.
+        lines = [] if started is None else [*compared, *started]
         packages = _packages(
             session,
             {
                 package_id
-                # None needed with no started, as nothing is compared then.
-                for line in ([*compared, *started] if started is not None else [])
+                for line in lines
                 if (package_id := line.leaves.package_id or line.arrives.package_id)
             },
         )
@@ -753,7 +754,7 @@ def _more_written(
                 quantity = (
                     line_amounts.by_packages(quantity, package, unit, into)
                     if package is not None and _size_in(package, unit)
-                    else converted_exactly(quantity, unit, into)
+                    else converted(quantity, unit, into)
                 )
             by[line.item_id, line.leaves, line.arrives] += quantity
         # Each form's sum rounded once, as the ledger reads a sum.
@@ -866,13 +867,13 @@ def _packages(session: Session, package_ids: set[int]) -> dict[int, ItemPackage]
 
 def _size_in(package: ItemPackage | None, unit: str) -> Decimal | None:
     """A package's size in `unit`, a line's, as the ledger took it when the
-    line was written in it (unit_conversion.converted): its item's unit
+    line was written in it (unit_conversion.converted_kept): its item's unit
     may have changed since (inventory-tng-y50b). None for no package, or
     for a unit it is never in, as a batch sent again may say: then it is
     not the batch written."""
     if package is None or not (package.unit == unit or convertible(package.unit, unit)):
         return None
-    return converted(package.size, package.unit, unit)
+    return converted_kept(package.size, package.unit, unit)
 
 
 def _made_by_opening(

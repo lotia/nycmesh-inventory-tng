@@ -11,7 +11,7 @@ from inventory_tng.catalogue.amount_rules import LENGTHS
 from inventory_tng.catalogue.unit_conversion import (
     IN_METRES,
     METRES_PER_FOOT,
-    converted,
+    converted_kept,
     converted_kept_sql,
     convertible,
 )
@@ -43,7 +43,7 @@ def test_every_length_converts_and_nothing_else() -> None:
 def test_python_and_sql_convert_alike(
     session: Session, amount: Decimal, unit: str, into: str, kept: Decimal
 ) -> None:
-    assert converted(amount, unit, into) == kept
+    assert converted_kept(amount, unit, into) == kept
     sql = converted_kept_sql(
         literal(amount, Numeric), literal(unit, Text), literal(into, Text)
     )
@@ -52,4 +52,4 @@ def test_python_and_sql_convert_alike(
 
 def test_each_does_not_convert() -> None:
     with pytest.raises(KeyError):
-        converted(Decimal(1), "each", "m")
+        converted_kept(Decimal(1), "each", "m")

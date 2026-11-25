@@ -17,7 +17,7 @@ from opentelemetry import metrics
 from sqlalchemy import or_, select
 from sqlalchemy.orm import Session
 
-from inventory_tng.catalogue.unit_conversion import converted, convertible
+from inventory_tng.catalogue.unit_conversion import converted_kept, convertible
 from inventory_tng.core.db_errors import enforce
 from inventory_tng.core.db_locking import locked
 from inventory_tng.core.db_once_committed import once_committed
@@ -170,18 +170,24 @@ def _converted(
     held = session.scalars(
         locked(opened.order_by(OpenPackage.id), key_share=True)
     ).all()
-    minimum = None if minimum is None else converted(minimum, old, new)
-    on_order = None if item.on_order is None else converted(item.on_order, old, new)
+    minimum = None if minimum is None else converted_kept(minimum, old, new)
+    on_order = (
+        None if item.on_order is None else converted_kept(item.on_order, old, new)
+    )
     per_order = {
         # Never none at all: so few per order in m is still some.
-        offer.id: max(converted(offer.units_per_order, offer.unit, new), QUANTITY_STEP)
+        offer.id: max(
+            converted_kept(offer.units_per_order, offer.unit, new), QUANTITY_STEP
+        )
         for offer in offered
         if offer.units_per_order is not None
     }
     reported = [row for row in held if row.length_reported is not None]
     lengths = {
         # Set with its unit (its check); narrowed again for the type checker.
-        row.id: converted(row.length_reported, row.length_reported_unit or old, new)
+        row.id: converted_kept(
+            row.length_reported, row.length_reported_unit or old, new
+        )
         for row in reported
         if row.length_reported is not None
     }
@@ -221,9 +227,11 @@ def _kept_in(package: ItemPackage, unit: str) -> bool:
     kept in `unit`, its item's once converted: the size from QUANTITY_STEP
     to QUANTITY_MAX, the length no less than QUANTITY_STEP and below the
     size, as their checks hold them in their own."""
-    size = converted(package.size, package.unit, unit)
+    size = converted_kept(package.size, package.unit, unit)
     if not QUANTITY_STEP <= size <= QUANTITY_MAX:
         return False
     if package.short_below is None:
         return True
-    return QUANTITY_STEP <= converted(package.short_below, package.unit, unit) < size
+    return (
+        QUANTITY_STEP <= converted_kept(package.short_below, package.unit, unit) < size
+    )

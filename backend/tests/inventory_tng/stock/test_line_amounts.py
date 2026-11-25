@@ -13,7 +13,7 @@ import pytest
 from sqlalchemy import exc, func, select, true
 from sqlalchemy.orm import Session
 
-from inventory_tng.catalogue.unit_conversion import at_scale, converted
+from inventory_tng.catalogue.unit_conversion import at_scale, converted_kept
 from inventory_tng.models.catalogue import ItemPackage
 from inventory_tng.models.stock import Movement
 from inventory_tng.stock import counts, line_amounts, moments, open_packages, queries
@@ -359,7 +359,7 @@ def test_by_packages_reads_a_sealed_side_as_the_ledger_does(
             {"kind": "receipt", "to_location_id": spools.store.id},
             Entry(
                 spools.cable.id,
-                2 * converted(package.size, package.unit, written),
+                2 * converted_kept(package.size, package.unit, written),
                 LOOSE,
                 sealed,
             ),

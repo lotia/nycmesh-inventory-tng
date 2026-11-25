@@ -41,19 +41,19 @@ def at_scale_sql(amount: SQLColumnExpression[Any]) -> SQLColumnExpression[Any]:
     return func.round(amount, QUANTITY_SCALE)
 
 
-def converted_exactly(amount: Decimal, unit: str, into: str) -> Decimal:
-    """`amount` in `unit` said in `into`, not rounded, as converted_sql
-    says it: for a sum, rounded once. KeyError for each, which no length
+def converted(amount: Decimal, unit: str, into: str) -> Decimal:
+    """`amount` in `unit` said in `into`, exactly, as converted_sql says
+    it: for a sum, rounded once. KeyError for each, which no length
     converts to."""
     if unit == into:
         return amount
     return amount * IN_METRES[unit] / IN_METRES[into]
 
 
-def converted(amount: Decimal, unit: str, into: str) -> Decimal:
-    """converted_exactly() as it is kept (at_scale), as converted_kept_sql
-    says it."""
-    return at_scale(converted_exactly(amount, unit, into))
+def converted_kept(amount: Decimal, unit: str, into: str) -> Decimal:
+    """converted() as it is kept (at_scale), as converted_kept_sql says
+    it."""
+    return at_scale(converted(amount, unit, into))
 
 
 def _in_metres(unit: SQLColumnExpression[str]) -> SQLColumnExpression[Any]:
@@ -84,5 +84,5 @@ def converted_kept_sql(
     unit: SQLColumnExpression[str],
     into: SQLColumnExpression[str],
 ) -> SQLColumnExpression[Any]:
-    """converted_sql() as it is kept, as converted() rounds it."""
+    """converted_sql() as it is kept, as converted_kept() rounds it."""
     return at_scale_sql(converted_sql(amount, unit, into))

@@ -31,7 +31,7 @@ from sqlalchemy.orm import Session, aliased
 from inventory_tng.catalogue.unit_conversion import (
     IN_METRES,
     at_scale_sql,
-    converted,
+    converted_kept,
     converted_kept_sql,
     converted_sql,
 )
@@ -44,7 +44,7 @@ type Side = Literal["to", "from"]
 _SEALED = {"to": Movement.to_package_id, "from": Movement.from_package_id}
 
 
-def _by_packages(
+def _by_packages_sql(
     sealed: SQLColumnExpression[int | None], quantity: SQLColumnExpression[Any]
 ) -> ColumnElement[Any]:
     """A sealed side's amount, `quantity`, in its item's unit: how many
@@ -66,12 +66,12 @@ def _by_packages(
 def by_packages(
     quantity: Decimal, package: ItemPackage, unit: str, into: str
 ) -> Decimal:
-    """_by_packages() in Python, for a line not written: `quantity` in
+    """_by_packages_sql() in Python, for a line not written: `quantity` in
     `unit` of sealed `package`, said in `into`, another length, by how
     many packages it is, exactly. A batch sent again is so compared with
     the lines written (scan/batch.py, _more_written)."""
-    then = converted(package.size, package.unit, unit)
-    return quantity / then * converted(package.size, package.unit, into)
+    then = converted_kept(package.size, package.unit, unit)
+    return quantity / then * converted_kept(package.size, package.unit, into)
 
 
 def in_items_unit(
@@ -104,7 +104,7 @@ def in_items_unit(
     sealed = _SEALED[side]
     return case(
         (Movement.unit == Item.unit, quantity),
-        (and_(lengths, sealed.is_not(None)), _by_packages(sealed, quantity)),
+        (and_(lengths, sealed.is_not(None)), _by_packages_sql(sealed, quantity)),
         (lengths, converted_sql(quantity, Movement.unit, Item.unit)),
         else_=cast(refused, Numeric),
     )
