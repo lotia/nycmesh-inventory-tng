@@ -420,7 +420,10 @@ recorded. Rejected: keeping the unit fixed once stock has moved.
   recalculate, then links the way to put right a unit wrong from the
   start: the guided recount (next amendment), saying what it does; or,
   only labelled, revoking its labels (Ali, 2026-11-25,
-  inventory-tng-aknv). It never says "converting".
+  inventory-tng-aknv). It never says "converting". The amount is stock
+  at a place if stock has moved and some is held, else a stored one. A
+  retired item's note links nothing; if only labelled, it drops "Until
+  … revoked", as its labels are inactive.
 - Once converted, an item stays fixed (`Item.unit_converted`, set on
   Yes): every later change between m and ft is asked and converts on
   Yes, any number of times, and it never becomes counted each again.

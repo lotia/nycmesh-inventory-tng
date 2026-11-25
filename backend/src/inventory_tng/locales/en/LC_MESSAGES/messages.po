@@ -2090,10 +2090,11 @@ msgid ""
 "item's page; an item with neither is never listed."
 msgstr ""
 
-#. Translators: completes "…recalculates its amounts from m.";
-#. <strong>On order</strong> is the item's field of that name, kept
-#. bold; %(amount)s %(old)s is how much is on order, %(becomes)s
-#. %(new)s that converted.
+#. Translators: follows "…recalculates its amounts from m.",
+#. "…recalculates every recorded amount from m." or "The unit is
+#. still m."; <strong>On order</strong> is the item's field of that
+#. name, kept bold; %(amount)s %(old)s is how much is on order,
+#. %(becomes)s %(new)s that converted.
 #: src/inventory_tng/catalogue/forms.py
 #, python-format
 msgid ""
@@ -2101,10 +2102,11 @@ msgid ""
 "%(becomes)s %(new)s"
 msgstr ""
 
-#. Translators: completes "…recalculates its amounts from m.";
-#. <strong>Reorder at</strong> is the item's field of that name, kept
-#. bold; %(amount)s %(old)s is its value, %(becomes)s %(new)s that
-#. converted.
+#. Translators: follows "…recalculates its amounts from m.",
+#. "…recalculates every recorded amount from m." or "The unit is
+#. still m."; <strong>Reorder at</strong> is the item's field of that
+#. name, kept bold; %(amount)s %(old)s is its value, %(becomes)s
+#. %(new)s that converted.
 #: src/inventory_tng/catalogue/forms.py
 #, python-format
 msgid ""
@@ -4230,11 +4232,12 @@ msgstr ""
 msgid "The 6-digit code it shows"
 msgstr ""
 
-#. Translators: completes "…recalculates its amounts from m.";
-#. <strong>Units per order</strong> is a vendor offer's field of that
-#. name, kept bold; %(name)s is the vendor's name, or the address of
-#. its offer when it names none; %(amount)s %(old)s is its value,
-#. %(becomes)s %(new)s that converted.
+#. Translators: follows "…recalculates its amounts from m.",
+#. "…recalculates every recorded amount from m." or "The unit is
+#. still m."; <strong>Units per order</strong> is a vendor offer's
+#. field of that name, kept bold; %(name)s is the vendor's name, or
+#. the address of its offer when it names none; %(amount)s %(old)s is
+#. its value, %(becomes)s %(new)s that converted.
 #: src/inventory_tng/catalogue/forms.py
 #, python-format
 msgid ""
@@ -4402,7 +4405,9 @@ msgstr ""
 #. Translators: answered No to "Were the recorded amounts really in
 #. %(old)s?" for an item whose stock has moved; %(example)s says one
 #. of its amounts converted, as "The stock at Shelf A would change
-#. from 305 m to 1000.656 ft". Never "converting".
+#. from 305 m to 1000.656 ft", or, with none held anywhere, a stored
+#. one, as "Its Reorder at would change from 100 m to 328.084 ft".
+#. Never "converting".
 #: src/inventory_tng/catalogue/forms.py
 #, python-format
 msgid ""

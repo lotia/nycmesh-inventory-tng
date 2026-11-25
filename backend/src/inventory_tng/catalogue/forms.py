@@ -264,7 +264,9 @@ def unit_declined_problem(
         # Translators: answered No to "Were the recorded amounts really in
         # %(old)s?" for an item whose stock has moved; %(example)s says one
         # of its amounts converted, as "The stock at Shelf A would change
-        # from 305 m to 1000.656 ft". Never "converting".
+        # from 305 m to 1000.656 ft", or, with none held anywhere, a stored
+        # one, as "Its Reorder at would change from 100 m to 328.084 ft".
+        # Never "converting".
         return Markup(
             gettext(
                 "The unit is still %(old)s. Changing it to %(new)s recalculates "
@@ -375,31 +377,34 @@ def _example(example: UnitChangeExample, old: str, new: str) -> Markup:
             **values,
         )
     elif example.of == "minimum":
-        # Translators: completes "…recalculates its amounts from m.";
-        # <strong>Reorder at</strong> is the item's field of that name, kept
-        # bold; %(amount)s %(old)s is its value, %(becomes)s %(new)s that
-        # converted.
+        # Translators: follows "…recalculates its amounts from m.",
+        # "…recalculates every recorded amount from m." or "The unit is
+        # still m."; <strong>Reorder at</strong> is the item's field of that
+        # name, kept bold; %(amount)s %(old)s is its value, %(becomes)s
+        # %(new)s that converted.
         message = gettext(
             "Its <strong>Reorder at</strong> would change from %(amount)s "
             "%(old)s to %(becomes)s %(new)s",
             **values,
         )
     elif example.of == "on_order":
-        # Translators: completes "…recalculates its amounts from m.";
-        # <strong>On order</strong> is the item's field of that name, kept
-        # bold; %(amount)s %(old)s is how much is on order, %(becomes)s
-        # %(new)s that converted.
+        # Translators: follows "…recalculates its amounts from m.",
+        # "…recalculates every recorded amount from m." or "The unit is
+        # still m."; <strong>On order</strong> is the item's field of that
+        # name, kept bold; %(amount)s %(old)s is how much is on order,
+        # %(becomes)s %(new)s that converted.
         message = gettext(
             "Its <strong>On order</strong> would change from %(amount)s "
             "%(old)s to %(becomes)s %(new)s",
             **values,
         )
     else:
-        # Translators: completes "…recalculates its amounts from m.";
-        # <strong>Units per order</strong> is a vendor offer's field of that
-        # name, kept bold; %(name)s is the vendor's name, or the address of
-        # its offer when it names none; %(amount)s %(old)s is its value,
-        # %(becomes)s %(new)s that converted.
+        # Translators: follows "…recalculates its amounts from m.",
+        # "…recalculates every recorded amount from m." or "The unit is
+        # still m."; <strong>Units per order</strong> is a vendor offer's
+        # field of that name, kept bold; %(name)s is the vendor's name, or
+        # the address of its offer when it names none; %(amount)s %(old)s is
+        # its value, %(becomes)s %(new)s that converted.
         message = gettext(
             "The <strong>Units per order</strong> from %(name)s would change "
             "from %(amount)s %(old)s to %(becomes)s %(new)s",
