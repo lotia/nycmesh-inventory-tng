@@ -23,7 +23,13 @@ from inventory_tng.catalogue.amount_rules import becomes_counted_whole, is_whole
 from inventory_tng.catalogue.name_keys import nameless
 from inventory_tng.catalogue.reading_rules import chosen_rule, read_alike_words
 from inventory_tng.core.db_errors import Broken
-from inventory_tng.core.phrases import Separator, Words, gettext, lazy_gettext
+from inventory_tng.core.phrases import (
+    Separator,
+    Words,
+    gettext,
+    lazy_gettext,
+    ngettext,
+)
 from inventory_tng.models.base import INTEGER_MAX, whole
 from inventory_tng.models.catalogue import (
     UNITS,
@@ -216,28 +222,136 @@ PICK_A_CATEGORY = lazy_gettext("Pick a category.")
 PICK_A_UNIT = lazy_gettext("Pick a unit.")
 
 
-def unit_declined_problem(new: str, why: unit_changes.UnitFixed) -> str:
-    """What the item form says beside its unit when the administrator
-    answers No: nothing converts, and how to put right a unit wrong from
-    the start: revoking its labels, or, stock moved or its amounts
-    converted before, the guided recount, which the form links to after
-    these words (unit_recounts)."""
-    if why == "labelled":
+def unit_declined_problem(
+    old: str,
+    new: str,
+    why: unit_changes.UnitFixed,
+    example: unit_changes.Example | None,
+    labels_printed: int,
+) -> str:
+    """What the item form says beside its unit, in `old`, when the
+    administrator answers No to changing it to `new` (Ali, 2026-11-25,
+    inventory-tng-y50b, inventory-tng-aknv): that it is still in `old`,
+    and what a change would do, with `example`, one of its own amounts,
+    if it has one (unit_changes.example). Only labelled (`why`), until
+    its `labels_printed` labels are revoked. The way to put right a unit
+    wrong from the start follows, a link in it, unless it is retired
+    (catalogue/item.html)."""
+    values = {"old": old, "new": new}
+    if example is not None and example.place is not None:
         # Translators: answered No to "Were the recorded amounts really in
-        # %(old)s?"; the item's labels fix its unit; revoking them lets
-        # the unit change without converting.
+        # %(old)s?" for an item whose stock has moved; %(amount)s
+        # %(old)s is what the records hold at %(place)s, a place of any
+        # kind, such as a store, a shelf, a bin or a volunteer's home;
+        # %(becomes)s %(new)s is that converted. Never "converting".
         return gettext(
-            "Nothing was converted. If they were really in %(new)s, revoke "
-            "its labels first, then change its unit.",
-            new=new,
+            "The unit is still %(old)s. Changing it to %(new)s recalculates "
+            "every recorded amount from %(old)s: the %(amount)s %(old)s at "
+            "%(place)s would become %(becomes)s %(new)s.",
+            amount=amount(example.amount),
+            becomes=amount(example.becomes),
+            place=example.place,
+            **values,
+        )
+    if why == "moved":
+        # Translators: answered No to "Were the recorded amounts really in
+        # %(old)s?" for an item whose stock has moved, though none is
+        # left anywhere. Never "converting".
+        return gettext(
+            "The unit is still %(old)s. Changing it to %(new)s recalculates "
+            "every recorded amount from %(old)s.",
+            **values,
+        )
+    if why == "labelled":
+        return _unit_labelled(example, labels_printed, values)
+    if example is None:
+        # Translators: answered No to "Were the recorded amounts really in
+        # %(old)s?" for an item whose amounts have been converted before.
+        # Never "converting".
+        return gettext(
+            "The unit is still %(old)s. Changing it to %(new)s recalculates "
+            "its amounts from %(old)s.",
+            **values,
         )
     # Translators: answered No to "Were the recorded amounts really in
-    # %(old)s?"; a link to recount the item in %(new)s follows, unless it
-    # is retired.
+    # %(old)s?" for an item whose amounts have been converted before;
+    # %(example)s says one of them converted, as "the vendor offer's
+    # 1000.656 would become 305 m". Never "converting".
     return gettext(
-        "Nothing was converted. If they were really in %(new)s, its unit was "
-        "wrong from the start.",
-        new=new,
+        "The unit is still %(old)s. Changing it to %(new)s recalculates its "
+        "amounts from %(old)s: %(example)s.",
+        example=_stored_example(example, new),
+        **values,
+    )
+
+
+def _unit_labelled(
+    example: unit_changes.Example | None, count: int, values: Mapping[str, str]
+) -> str:
+    """unit_declined_problem for an item only its `count` printed labels
+    fix, its count said as the revoke partial says it
+    (catalogue/_revoke_labels.html), opening a sentence."""
+    if count == 2:
+        # Translators: opens "…, changing it recalculates its amounts", said
+        # of an item with two labels printed for it, not revoked.
+        until = gettext("Until both its printed labels are revoked")
+    else:
+        # Translators: opens "…, changing it recalculates its amounts", said
+        # of an item with labels printed for it, not revoked; the plural
+        # is said of more than two, as two have their own words.
+        until = ngettext(
+            "Until its printed label is revoked",
+            "Until all %(num)s of its printed labels are revoked",
+            count,
+        )
+    if example is None:
+        # Translators: answered No to "Were the recorded amounts really in
+        # %(old)s?" for an item its printed labels fix; %(until)s is as
+        # "Until both its printed labels are revoked". Never "converting".
+        return gettext(
+            "The unit is still %(old)s. %(until)s, changing it recalculates "
+            "its amounts from %(old)s.",
+            until=until,
+            **values,
+        )
+    # Translators: as "The unit is still %(old)s. %(until)s, changing it
+    # recalculates its amounts from %(old)s."; %(example)s says one of
+    # them converted, as "the vendor offer's 305 would become 1000.656 ft".
+    return gettext(
+        "The unit is still %(old)s. %(until)s, changing it recalculates its "
+        "amounts from %(old)s: %(example)s.",
+        until=until,
+        example=_stored_example(example, values["new"]),
+        **values,
+    )
+
+
+def _stored_example(example: unit_changes.Example, new: str) -> str:
+    """A stored amount of an item converted into `new`, as the note after
+    No says it."""
+    values = {
+        "amount": amount(example.amount),
+        "becomes": amount(example.becomes),
+        "new": new,
+    }
+    if example.of == "minimum":
+        # Translators: completes "…recalculates its amounts from m: …";
+        # %(amount)s is its Reorder at, in m, %(becomes)s that in %(new)s.
+        return gettext(
+            "its Reorder at of %(amount)s would become %(becomes)s %(new)s", **values
+        )
+    if example.of == "on_order":
+        # Translators: completes "…recalculates its amounts from m: …";
+        # %(amount)s is how much is on order, in m, %(becomes)s that in
+        # %(new)s.
+        return gettext(
+            "the %(amount)s on order would become %(becomes)s %(new)s", **values
+        )
+    # Translators: completes "…recalculates its amounts from m: …";
+    # %(amount)s is a vendor offer's units per order, in m, %(becomes)s
+    # that in %(new)s.
+    return gettext(
+        "the vendor offer's %(amount)s would become %(becomes)s %(new)s", **values
     )
 
 

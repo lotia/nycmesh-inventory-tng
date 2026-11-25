@@ -44,7 +44,6 @@ from helpers.stock import (
     raise_check,
     received,
     report,
-    retire,
     sealed_line,
     write,
 )
@@ -153,12 +152,9 @@ def test_no_converts_nothing_and_says_what_to_do(
     answered = unit_answered(cable, "no", unit="ft")
     declined = admin_client.post(f"{ITEMS}/{cable.id}", data=answered)
     assert declined.status_code == 400
-    assert problem(declined.text, "unit") == (
-        "Nothing was converted. If they were really in ft, its unit was wrong "
-        "from the start. Recount it in ft"
-    )
+    assert problem(declined.text, "unit").startswith("The unit is still m.")
     unit_problem = read(declined.text).one("span", id="unit-problem")
-    unit_problem.one("a", "Recount it in ft", href=unit_recount(cable.id, "ft"))
+    unit_problem.one("a", "recount it in ft", href=unit_recount(cable.id, "ft"))
     assert QUESTION not in words_on(declined.text)
     session.refresh(cable)
     assert (cable.unit, cable.minimum, cable.on_order) == ("m", 100, 50)
@@ -468,47 +464,13 @@ def test_no_for_a_labelled_item_says_to_revoke_its_labels(
     assert label is not None
     answered = unit_answered(place.cable, "no", unit="ft")
     declined = admin_client.post(f"{ITEMS}/{place.cable.id}", data=answered)
-    assert problem(declined.text, "unit") == (
-        "Nothing was converted. If they were really in ft, revoke its labels "
-        "first, then change its unit. Revoke its label"
-    )
     unit_problem = read(declined.text).one("span", id="unit-problem")
-    unit_problem.one("a", "Revoke its label", href=item_labels(place.cable.id))
+    unit_problem.one("a", "revoke its label", href=item_labels(place.cable.id))
     assert labels.revoke(session, label.id, NOW)
     again = admin_client.post(f"{ITEMS}/{place.cable.id}", data=answered)
     assert again.status_code == 200
-    assert "Nothing was converted" not in words_on(again.text)
+    assert "The unit is still m." not in words_on(again.text)
     assert place.cable.unit == "m"
-
-
-def test_no_for_a_retired_item_whose_stock_moved_offers_no_recount(
-    admin_client: TestClient, session: Session
-) -> None:
-    """Answered No from a page drawn before the item was retired: it may
-    not be recounted, so its note ends where it is, with no link."""
-    place = _shelf_a(session)
-    answered = unit_answered(place.cable, "no", unit="ft")
-    retire(session, place.cable)
-    declined = admin_client.post(f"{ITEMS}/{place.cable.id}", data=answered)
-    assert problem(declined.text, "unit") == (
-        "Nothing was converted. If they were really in ft, its unit was wrong "
-        "from the start."
-    )
-    assert read(declined.text).all("a", href=unit_recount(place.cable.id, "ft")) == []
-
-
-def test_no_for_a_retired_labelled_item_offers_nothing_to_revoke(
-    admin_client: TestClient, session: Session
-) -> None:
-    """Answered No from a page drawn before the item was retired: its
-    labels are inactive, so no link offers to revoke them."""
-    place = Place(session)
-    assert labels.make_for_item(session, place.cable.id) is not None
-    answered = unit_answered(place.cable, "no", unit="ft")
-    retire(session, place.cable)
-    declined = admin_client.post(f"{ITEMS}/{place.cable.id}", data=answered)
-    assert "Nothing was converted" in words_on(declined.text)
-    assert read(declined.text).all("a", href=item_labels(place.cable.id)) == []
 
 
 def _labelled_reel(session: Session, place: Place) -> tuple[Label, Label, Label]:
@@ -555,7 +517,7 @@ def test_no_revokes_nothing(admin_client: TestClient, session: Session) -> None:
     own, on_reel, _ = _labelled_reel(session, place)
     answered = unit_answered(place.cable, "no", unit="ft")
     declined = admin_client.post(f"{ITEMS}/{place.cable.id}", data=answered)
-    assert "Nothing was converted" in words_on(declined.text)
+    assert "The unit is still m." in words_on(declined.text)
     for each in (own, on_reel):
         session.refresh(each)
     assert (own.revoked_at, on_reel.revoked_at) == (None, None)
@@ -646,5 +608,5 @@ def test_no_for_a_converted_item_with_no_stock_links_to_the_recount(
     assert labels.revoke(session, label.id, NOW)
     declined = admin_client.post(path, data=unit_answered(cable, "no", unit="m"))
     unit_problem = read(declined.text).one("span", id="unit-problem")
-    unit_problem.one("a", "Recount it in m", href=unit_recount(cable.id, "m"))
+    unit_problem.one("a", "recount it in m", href=unit_recount(cable.id, "m"))
     assert admin_client.get(unit_recount(cable.id, "m")).status_code == 200

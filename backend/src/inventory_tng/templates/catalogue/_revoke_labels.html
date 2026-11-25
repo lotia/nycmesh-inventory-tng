@@ -13,7 +13,12 @@ give the reason first, then the link. -#}
 {%- endmacro %}
 
 {#- The link to the item's labels not revoked, `link`
-(labels.paths.item_labels), to revoke them there. -#}
-{% macro revoke_link(count, link) -%}
+(labels.paths.item_labels), to revoke them there; opening a sentence,
+unless `opens` is false. -#}
+{% macro revoke_link(count, link, opens=true) -%}
+{%- if opens -%}
 {#- Translators: a link to the item's labels, each of which can be revoked there; it opens a sentence, as "Revoke its 2 labels to change it." #}{% trans count=count, link=link %}<a href="{{ link }}">Revoke its label</a>{% pluralize %}<a href="{{ link }}">Revoke its {{ count }} labels</a>{% endtrans %}
+{%- else -%}
+{#- Translators: a link to the item's labels, each of which can be revoked there; within a sentence, as "If they were really in ft, revoke its 2 labels, then change its unit to ft". #}{% trans count=count, link=link %}<a href="{{ link }}">revoke its label</a>{% pluralize %}<a href="{{ link }}">revoke its {{ count }} labels</a>{% endtrans %}
+{%- endif -%}
 {%- endmacro %}

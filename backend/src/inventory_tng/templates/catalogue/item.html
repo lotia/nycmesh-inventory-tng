@@ -35,7 +35,8 @@ None is left, so nobody can pick it.{% endtrans %}{% endif %}{% endcall %}
     <span class="hint">{% trans %}only another length, as stock has moved in it: its recorded amounts are recalculated{% endtrans %}</span>
     {% elif unit_fixed == "converted" %}
     <span class="hint">{% trans %}only another length, as its recorded amounts have been recalculated: they are recalculated again{% endtrans %}</span>
-    {% else %}
+    {% elif unit_declined != "labelled" %}
+    {#- Answered No, the note below links to revoke them: the link once. #}
     <span class="hint">{#- Translators: %(until)s says why, as "until both its printed labels are revoked"; %(revoke)s is the link to revoke them, as "Revoke its 2 labels". #}{% trans until=until_revoked(labels_printed), revoke=revoke_link(labels_printed, its_labels) %}only another length {{ until }}: its recorded amounts are recalculated. {{ revoke }} to change it without recalculating its amounts.{% endtrans %}</span>
     {% endif %}
     <select name="unit">
@@ -59,15 +60,17 @@ None is left, so nobody can pick it.{% endtrans %}{% endif %}{% endcall %}
       {% for unit in units %}<option {% if values.get('unit', item.unit) == unit %}selected{% endif %}>{{ unit }}</option>{% endfor %}
     </select>
     {% endif %}
+    {#- Answered No (Ali, 2026-11-25, inventory-tng-aknv): after what a
+    change would do (forms.unit_declined_problem), the way to put right a
+    unit wrong from the start, unless retired, as a retired item's labels
+    are inactive and it can't be recounted. #}
     {% if unit_declined == "labelled" and not retired %}
-    {#- Answered No, only labels fixing the unit: the way to revoke them;
-    a retired item's are inactive, nothing to revoke. #}
-    <span class="problem" id="unit-problem">{{ problems.unit }} {{ revoke_link(labels_printed, its_labels) }}</span>
-    {% elif unit_declined in ("moved", "converted") and not retired %}
-    {#- Answered No, stock moved or its amounts converted before: the
-    guided recount puts a unit wrong from the start right
-    (catalogue/unit_recounts.py). #}
-    <span class="problem" id="unit-problem">{{ problems.unit }} <a href="{{ recount_in }}">{% trans unit=recount_to %}Recount it in {{ unit }}{% endtrans %}</a></span>
+    <span class="problem" id="unit-problem">{{ problems.unit }} {# Translators: follows "The unit is still m. Until …, changing it recalculates its amounts from m."; %(revoke)s is the link to revoke its labels, as "revoke its 2 labels". #}{% trans new=recount_to, revoke=revoke_link(labels_printed, its_labels, opens=false) %}If they were really in {{ new }}, {{ revoke }}, then change its unit to {{ new }}; the amounts stay as they are.{% endtrans %}</span>
+    {% elif unit_declined == "moved" and not retired %}
+    {#- The guided recount (catalogue/unit_recounts.py). #}
+    <span class="problem" id="unit-problem">{{ problems.unit }} {% if unit_example %}{#- Translators: follows "…: the 305 m at Shelf A would become 1000.656 ft."; %(amount)s is that 305, %(new)s the unit asked for. The link goes to the guided recount. #}{% trans amount=unit_example.amount | amount, new=recount_to, link=recount_in %}If the {{ amount }} was really {{ new }}, <a href="{{ link }}">recount it in {{ new }}</a>: its records are set to nothing, its unit becomes {{ new }}, and you count each place in {{ new }}.{% endtrans %}{% else %}{#- Translators: follows "The unit is still m. Changing it to ft recalculates every recorded amount from m."; the link goes to the guided recount. #}{% trans new=recount_to, link=recount_in %}If they were really in {{ new }}, <a href="{{ link }}">recount it in {{ new }}</a>: its records are set to nothing, its unit becomes {{ new }}, and you count each place in {{ new }}.{% endtrans %}{% endif %}</span>
+    {% elif unit_declined == "converted" and not retired %}
+    <span class="problem" id="unit-problem">{{ problems.unit }} {% if recount_resizes %}{#- Translators: follows "The unit is still ft. Changing it to m recalculates its amounts from ft…", for an item converted before with packages in ft; the link goes to the guided recount. #}{% trans new=recount_to, link=recount_in %}If they were really in {{ new }}, <a href="{{ link }}">recount it in {{ new }}</a>: you give its amounts and package sizes again in {{ new }}, and its unit becomes {{ new }}.{% endtrans %}{% else %}{#- Translators: as "If they were really in m, recount it in m: you give its amounts and package sizes again in m…", for an item with no packages in its unit. #}{% trans new=recount_to, link=recount_in %}If they were really in {{ new }}, <a href="{{ link }}">recount it in {{ new }}</a>: you give its amounts again in {{ new }}, and its unit becomes {{ new }}.{% endtrans %}{% endif %}</span>
     {% else %}
     {% with name = "unit" %}{% include "_field_problem.html" %}{% endwith %}
     {% endif %}

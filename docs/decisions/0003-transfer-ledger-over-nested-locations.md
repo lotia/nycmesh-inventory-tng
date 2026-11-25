@@ -415,9 +415,12 @@ recorded. Rejected: keeping the unit fixed once stock has moved.
   which converting keeps (Ali, 2026-11-25, inventory-tng-8ema). This
   replaces his decision earlier that day that Yes revokes them, as that
   forced reprinting labels still true.
-- No converts nothing and says how to put right a unit wrong from the
-  start: the guided recount (next amendment); or, only labelled, revoke
-  its labels first.
+- No converts nothing. The note beside the unit says it is unchanged
+  and, with one of the item's own amounts, what a change would
+  recalculate, then links the way to put right a unit wrong from the
+  start: the guided recount (next amendment), saying what it does; or,
+  only labelled, revoking its labels (Ali, 2026-11-25,
+  inventory-tng-aknv). It never says "converting".
 - Once converted, an item stays fixed (`Item.unit_converted`, set on
   Yes): every later change between m and ft is asked and converts on
   Yes, any number of times, and it never becomes counted each again.

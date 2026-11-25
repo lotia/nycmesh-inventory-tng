@@ -25,6 +25,7 @@ from inventory_tng.catalogue import (
     queries,
     reading_rules,
     unit_changes,
+    unit_recounts,
     units,
 )
 from inventory_tng.catalogue.amount_rules import becomes_counted_whole, counted_whole
@@ -472,6 +473,7 @@ def _item_page(
     asking_unit: bool = False,
     unit_declined: unit_changes.UnitFixed | None = None,
     unit_declined_to: str | None = None,
+    unit_example: unit_changes.Example | None = None,
 ) -> HTMLResponse:
     """The item's page; its open packages sorted as `asked`, all of them.
     `asking_unit`, the form sent back asks whether what was recorded was
@@ -483,7 +485,8 @@ def _item_page(
     the unit is fixed when its question was answered No, to change it to
     `unit_declined_to`: labels, and the form links to revoke them; or
     stock moved or its amounts converted, and it links to the guided
-    recount (unit_recounts)."""
+    recount (unit_recounts), saying what it does: `unit_example`, the
+    amount the note gives as an example (unit_changes.example), if any."""
     here = f"{ITEMS}/{item.id}"
     packages = queries.packages_of_item(session, item.id)
     view = View.read(here, OPEN_SORTING, asked, anchor=OPEN_PACKAGES)
@@ -533,6 +536,10 @@ def _item_page(
             "its_labels": item_labels(item.id),
             "recount_to": unit_declined_to,
             "recount_in": unit_declined_to and unit_recount(item.id, unit_declined_to),
+            "unit_example": unit_example,
+            # Converted before: the recount asks its packages' sizes again.
+            "recount_resizes": unit_declined == "converted"
+            and bool(unit_recounts.resized_of(session, item)),
             "in_stock": item_total(session, item.id),
             "labels": printed,
             "labels_printed": len(printed),
@@ -829,7 +836,11 @@ def _unit_declined(
         return _item_page(request, session, signed, item, values=form)
     log.info("unit change declined", item_id=item.id, reason=why)
     values = {**form, "unit": item.unit}
-    problems = {"unit": forms.unit_declined_problem(unit, why)}
+    example = unit_changes.example(session, item, unit, why)
+    printed = len(labels.current_of(session, Label.item_id == item.id))
+    problems = {
+        "unit": forms.unit_declined_problem(item.unit, unit, why, example, printed)
+    }
     return _item_page(
         request,
         session,
@@ -839,6 +850,7 @@ def _unit_declined(
         values=values,
         unit_declined=why,
         unit_declined_to=unit,
+        unit_example=example,
     )
 
 
