@@ -378,8 +378,12 @@ msgstr[1] ""
 
 #: src/inventory_tng/catalogue/items_routes.py
 #, python-format
-msgid "%(num)s open package closed; what was left is now loose."
-msgid_plural "%(num)s open packages closed; what was left is now loose."
+msgid ""
+"%(num)s open package is followed now. Turning this off makes what's left "
+"on it loose units."
+msgid_plural ""
+"%(num)s open packages are followed now. Turning this off makes what's "
+"left on them loose units."
 msgstr[0] ""
 msgstr[1] ""
 
@@ -4506,6 +4510,15 @@ msgid ""
 "stays."
 msgstr ""
 
+#: src/inventory_tng/catalogue/items_routes.py
+#, python-format
+msgid "What was left on %(num)s open package is now loose units, where it was."
+msgid_plural ""
+"What was left on %(num)s open packages is now loose units, where each one"
+" was."
+msgstr[0] ""
+msgstr[1] ""
+
 #: src/inventory_tng/templates/catalogue/reading_rules.html
 #: src/inventory_tng/templates/stock/counts.html
 msgid "When"
@@ -4972,12 +4985,6 @@ msgstr ""
 #: src/inventory_tng/templates/stock/_forms.html
 #, python-format
 msgid "loose: %(loose)s %(unit)s"
-msgstr ""
-
-#. Translators: a kind of save, a noun: what was left on an open package
-#. made loose, as its package's opened ones are no longer followed.
-#: src/inventory_tng/stock/length_checks_routes.py
-msgid "loosening"
 msgstr ""
 
 #: src/inventory_tng/templates/labels/labels.html

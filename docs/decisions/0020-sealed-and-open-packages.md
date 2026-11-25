@@ -643,8 +643,21 @@ inventory-tng-j89e):
   does, so a cut saved at the same moment is counted before the close or
   refused after it. One moved whole to another place, or opened at
   another, meanwhile refuses the change as made since the page was shown.
-- **The page says how many closed**, after its own notice: "2 open
-  packages closed; what was left is now loose."
+- **The page says how many were made loose**, after its own notice, in
+  words Ali chose on 2026-11-24: "What was left on 2 open packages is now
+  loose units, where each one was." It lists no amounts or places.
+- **The item page says so before the save.** Under the item's "Track each
+  opened package" box, while open packages follow the item's own setting,
+  it counts only those: "2 open packages are followed now. Turning this
+  off makes what's left on them loose units." Under a package's own
+  setting, the same words count that package's open ones. The items list
+  gives no hint.
+- **No page calls this closing**: "close" is kept for write-offs, used up
+  or lost. The open package's record is marked closed only inside the
+  app. The ledger's kind, loosen, is never shown: the length checks leave
+  it out of an open package's last cuts, as one shown just before it was
+  made loose could otherwise list it.
 
 We rejected leaving both as they were, and only showing "2 open packages
-still followed".
+still followed". For the words, Ali rejected saying nothing before the
+save, and a question to answer before saving.

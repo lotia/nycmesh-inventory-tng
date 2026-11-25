@@ -6,8 +6,9 @@ correct a mistake. A package's size fixed only by labels says so too
 (items.sizes_fixed). A retired item with stock
 left may still be taken, never received (docs/decisions/0003)."""
 
+from collections import Counter
 from collections.abc import Callable, Mapping, Sequence
-from typing import Annotated
+from typing import Annotated, NamedTuple
 
 import structlog
 from fastapi import APIRouter, Depends, Form, Request
@@ -203,36 +204,51 @@ add_notices(
 TRACKING = {"": None, "on": True, "off": False}
 
 
-def closed_loose(closed: int) -> str:
-    """After open packages were closed as their opened ones are no longer
-    followed (open_packages.unfollowing), what is left on them now loose
-    (Ali, 2026-11-23, inventory-tng-j89e)."""
+def made_loose(count: int) -> str:
+    """After turning following off made what was left on `count` open
+    packages loose units (open_packages.unfollowing), said after the page's
+    own notice: never called closing, which is for write-offs, and no
+    amounts or places (Ali, 2026-11-24, inventory-tng-j89e)."""
     return ngettext(
-        "%(num)s open package closed; what was left is now loose.",
-        "%(num)s open packages closed; what was left is now loose.",
-        closed,
+        "What was left on %(num)s open package is now loose units, where it was.",
+        "What was left on %(num)s open packages is now loose units, where each "
+        "one was.",
+        count,
     )
 
 
-# The notices of the changes that may close open packages (_closed_said).
-CLOSING = ("saved", "item_renamed", "package_tracking", "tracking_off")
+def followed_now(count: int) -> str:
+    """The hint under a setting that would make what is left on `count`
+    open packages, followed now, loose units if turned off (Ali,
+    2026-11-24, inventory-tng-j89e)."""
+    return ngettext(
+        "%(num)s open package is followed now. Turning this off makes what's "
+        "left on it loose units.",
+        "%(num)s open packages are followed now. Turning this off makes what's "
+        "left on them loose units.",
+        count,
+    )
 
 
-def _closed_said(request: Request) -> dict[str, str]:
-    """The page's notice and, after it, closed_loose for the open packages
-    its address says a change closed; nothing to add if none, or if no
-    such change says so."""
+# The notices of the changes that may make open packages loose (_loose_said).
+MAY_MAKE_LOOSE = ("saved", "item_renamed", "package_tracking", "tracking_off")
+
+
+def _loose_said(request: Request) -> dict[str, str]:
+    """The page's notice and, after it, made_loose for the open packages
+    its address says a change made loose; nothing to add if none, or if
+    no such change says so."""
     said = request.query_params.get("notice", "")
-    closed = whole(request.query_params.get("closed", ""), 1, INTEGER_MAX)
-    if said not in CLOSING or closed is None:
+    count = whole(request.query_params.get("loose", ""), 1, INTEGER_MAX)
+    if said not in MAY_MAKE_LOOSE or count is None:
         return {}
-    return {"notice": f"{NOTICES[said]} {closed_loose(closed)}"}
+    return {"notice": f"{NOTICES[said]} {made_loose(count)}"}
 
 
-def _closed_query(closed: int) -> dict[str, str]:
-    """What a redirect's address says of the open packages a change closed,
-    for _closed_said."""
-    return {"closed": str(closed)} if closed else {}
+def _loose_query(count: int) -> dict[str, str]:
+    """What a redirect's address says of the open packages a change made
+    loose, for _loose_said."""
+    return {"loose": str(count)} if count else {}
 
 
 def _listed(
@@ -321,7 +337,7 @@ def _list_page(
             "problems": problems,
             "values": values,
             **_name_field(session, similar),
-            **_closed_said(request),
+            **_loose_said(request),
         },
     )
 
@@ -390,6 +406,36 @@ def _short_shown(
     }
 
 
+class FollowedNow(NamedTuple):
+    """The hints of open packages followed now (followed_now): under the
+    item's box, or None, and under each package's own setting, by id."""
+
+    item: str | None
+    packages: dict[int, str]
+
+
+def _followed_now(
+    item: Item, packages: Sequence[ItemPackage], opened: Sequence[open_packages.Shown]
+) -> FollowedNow:
+    """The item's hint counts only the open packages that follow its own
+    setting, their package set "Same as the item"; a package's counts its
+    own open ones while they are followed. None where none would be made
+    loose (Ali, 2026-11-24, inventory-tng-j89e)."""
+    by_package = Counter(each.row.package_id for each in opened)
+    as_item = sum(
+        by_package[package.id] for package in packages if package.track_opened is None
+    )
+    return FollowedNow(
+        followed_now(as_item) if item.track_opened and as_item else None,
+        {
+            package.id: followed_now(by_package[package.id])
+            for package in packages
+            if by_package[package.id]
+            and tracks_opened(item.track_opened, package.track_opened)
+        },
+    )
+
+
 def _item_page(
     request: Request,
     session: Session,
@@ -456,8 +502,9 @@ def _item_page(
             "short_shown": _short_shown(
                 item, packages, short_fraction, problems, values
             ),
+            "followed_now": _followed_now(item, packages, opened),
             **_name_field(session, similar),
-            **_closed_said(request),
+            **_loose_said(request),
         },
         status_code=409 if held_back else None,
     )
@@ -596,7 +643,7 @@ def track_items(
     # Ticked items set so already may still have had open packages closed.
     if not changed and not closed:
         return redirect(back, notice="tracking_same")
-    return redirect(back, notice=f"tracking_{track}", **_closed_query(closed))
+    return redirect(back, notice=f"tracking_{track}", **_loose_query(closed))
 
 
 @router.get(f"{ITEMS}/{{item_id}}")
@@ -699,7 +746,7 @@ def save_item(
         )
     _decided(session, typed, item_id=item_id)
     session.commit()
-    said = _closed_query(sum(closed))
+    said = _loose_query(sum(closed))
     if renamed is None:
         return redirect(f"{ITEMS}/{item_id}", notice="saved", **said)
     return redirect(
@@ -961,7 +1008,7 @@ def track_package(
         f"{ITEMS}/{item_id}",
         notice="package_tracking",
         section="packages",
-        **_closed_query(done[1]),
+        **_loose_query(done[1]),
     )
 
 

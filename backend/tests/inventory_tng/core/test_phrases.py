@@ -1102,8 +1102,9 @@ def test_no_message_has_a_lone_per_cent() -> None:
     assert [form for form in said if lone_per_cents(form)] == []
 
 
-def test_every_kind_of_save_has_words_for_a_cut() -> None:
-    assert length_checks_routes.CUT_KINDS.keys() == set(TRANSACTION_KINDS)
+def test_every_kind_of_save_but_loosen_has_words_for_a_cut() -> None:
+    # queries.recent_cuts leaves loosen out: it has no words to show.
+    assert length_checks_routes.CUT_KINDS.keys() == set(TRANSACTION_KINDS) - {"loosen"}
 
 
 def test_a_unit_name_with_a_prefix_tells_translators_what_it_is() -> None:

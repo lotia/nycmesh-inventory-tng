@@ -158,7 +158,9 @@ RECENT = 5
 
 
 # A cut's transaction kind (models.stock.TRANSACTION_KINDS), in words, where no
-# volunteer made it: the kind of save that took some of an open package.
+# volunteer made it: the kind of save that took some of an open package. Not
+# "loosen", which has no words to show (Ali, 2026-11-24, inventory-tng-j89e):
+# queries.recent_cuts leaves it out.
 CUT_KINDS = {
     # Translators: a kind of save, a noun.
     "move": lazy_gettext("move"),
@@ -174,9 +176,6 @@ CUT_KINDS = {
     "open": lazy_gettext("open"),
     # Translators: a kind of save, a noun.
     "report": lazy_gettext("report"),
-    # Translators: a kind of save, a noun: what was left on an open package
-    # made loose, as its package's opened ones are no longer followed.
-    "loosen": lazy_gettext("loosening"),
 }
 
 

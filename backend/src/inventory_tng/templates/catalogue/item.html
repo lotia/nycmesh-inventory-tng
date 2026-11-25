@@ -65,12 +65,16 @@ None is left, so nobody can pick it.{% endtrans %}{% endif %}{% endcall %}
   other form's page, such as a package refused, shows the item's own. #}
   {% set tracking = values.get('track_opened') == 'on' if 'version' in values else item.track_opened %}
   <label class="flex items-center gap-2 font-normal">
-    <input type="checkbox" name="track_opened" {% if tracking %}checked{% endif %}>
+    <input type="checkbox" name="track_opened" {% if tracking %}checked{% endif %}
+      {%- if followed_now.item and not retired %} aria-describedby="followed-now"{% endif %}>
     {% trans %}Track each opened package{% endtrans %}
   </label>
   <p class="hint">{% trans %}On: a package opened is followed until used up, for
   spools and the like. Off: it becomes loose units, for boxes of small
   things. Each package below can say otherwise.{% endtrans %}</p>
+  {#- Only while open packages follow the item's own setting: turning it
+  off makes what is left on them loose units. #}
+  {% if followed_now.item and not retired %}<p class="hint" id="followed-now">{{ followed_now.item }}</p>{% endif %}
   </fieldset>
   {% if not retired %}<button class="primary">{% trans %}Save{% endtrans %}</button>{% endif %}
 </form>
@@ -141,7 +145,8 @@ None is left, so nobody can pick it.{% endtrans %}{% endif %}{% endcall %}
       <td>{% if not package.retired_at and not retired %}
         <form method="post" action="{{ here }}/packages/{{ package.id }}/tracking" class="actions">
           <label><span class="sr-only">{% trans package=package.name_shown %}When one of {{ package }} is opened{% endtrans %}</span>
-            <select name="track">
+            <select name="track"
+              {%- if package.id in followed_now.packages %} aria-describedby="followed-now-{{ package.id }}"{% endif %}>
               <option value="" {% if not own %}selected{% endif %}>{% trans %}Same as the item{% endtrans %}</option>
               <option value="on" {% if own and package.track_opened %}selected{% endif %}>{% trans %}Track{% endtrans %}</option>
               <option value="off" {% if own and not package.track_opened %}selected{% endif %}>{% trans %}Don't track{% endtrans %}</option>
@@ -149,6 +154,7 @@ None is left, so nobody can pick it.{% endtrans %}{% endif %}{% endcall %}
           </label>
           <button>{% trans package=package.name_shown %}Set<span class="sr-only"> for {{ package }}</span>{% endtrans %}</button>
         </form>
+        {% if package.id in followed_now.packages %}<span class="hint block" id="followed-now-{{ package.id }}">{{ followed_now.packages[package.id] }}</span>{% endif %}
       {% endif %}</td>
       <td>{% if not package.retired_at and not retired %}
         <form method="post" action="{{ here }}/packages/{{ package.id }}/settings" class="actions">

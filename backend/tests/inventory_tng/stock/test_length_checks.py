@@ -4,6 +4,7 @@ check, and an administrator sets it or leaves it."""
 
 import re
 import uuid
+from datetime import UTC, datetime
 from decimal import Decimal
 from functools import partial
 
@@ -736,6 +737,29 @@ def test_recent_cuts_leave_out_a_move_of_it_whole(
     registered_client.post(URL, json=spools.place.batch(lines=[moved]))
     found = length_checks_routes.recent_cuts(session, [made.id])[made.id]
     assert [each.quantity for each in found] == [5]
+
+
+def test_recent_cuts_leave_out_what_was_left_made_loose(
+    registered_client: TestClient, session: Session, spools: Spools
+) -> None:
+    """Following turned off makes the rest loose (open_packages.
+    close_unfollowed): a page that read the package as open just before
+    shows only the cut, never the loosen kind, which has no words."""
+    made = spools.opened()
+    registered_client.post(URL, json=spools.place.batch(lines=[cut(made, "5")]))
+    spools.cable.track_opened = False
+    session.flush()
+    admin_id = new_admin_id(session)
+    at = datetime.now(UTC)
+    places = [spools.store.id]
+    assert (
+        open_packages.close_unfollowed(
+            session, places, admin_id, at, item_ids=[spools.cable.id]
+        )
+        == 1
+    )
+    found = length_checks_routes.recent_cuts(session, [made.id])[made.id]
+    assert [(each.quantity, each.kind) for each in found] == [(5, "move")]
 
 
 def test_the_volunteers_figure_typed_is_set_against_the_report(

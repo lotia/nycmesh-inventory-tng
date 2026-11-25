@@ -304,7 +304,8 @@ def recent_cuts(
     session: Session, open_ids: Collection[int], recent: int
 ) -> Sequence[Row[*tuple[Any, ...]]]:
     """What was last taken from each of `open_ids`' open packages, by
-    package then newest first, `recent` of each, never a move of it whole:
+    package then newest first, `recent` of each, never a move of it whole
+    nor what was left made loose:
     each with the package's id, the transaction's id, when, how much, its
     kind and its volunteer's name, if a volunteer made it."""
     newest = (
@@ -321,6 +322,10 @@ def recent_cuts(
             Movement.from_open_package_id == OpenPackage.id,
             # Not a move of it whole, which names it on both sides.
             Movement.to_open_package_id.is_distinct_from(OpenPackage.id),
+            # Nor what was left made loose, which leaves it closed: one
+            # read as open just before has no such cut to show (Ali,
+            # 2026-11-24, inventory-tng-j89e).
+            LedgerTransaction.kind != "loosen",
         )
         .order_by(LedgerTransaction.id.desc())
         .limit(recent)
