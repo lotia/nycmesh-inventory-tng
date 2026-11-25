@@ -20,6 +20,13 @@ export function isLength(unit: string): boolean {
   return table.lengths.includes(unit);
 }
 
+/** The inputmode of a box for an amount of an item in `unit`: the number
+ * keypad for one counted each, else the keypad with a decimal point, as
+ * the server's web/formatting.keyboard picks. */
+export function keyboard(unit: string): "numeric" | "decimal" {
+  return countedWhole(unit) ? "numeric" : "decimal";
+}
+
 /** An item counted each moves, and is held, in whole units: `amount` in
  * thousandths. */
 export function wholeEnough(unit: string, amount: number): boolean {

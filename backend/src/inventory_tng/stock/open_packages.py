@@ -13,7 +13,7 @@ from typing import Literal, NamedTuple
 
 import structlog
 from opentelemetry import metrics
-from sqlalchemy import ColumnElement, exc, func, or_, select
+from sqlalchemy import ColumnElement, exc, or_, select
 from sqlalchemy.orm import Session
 
 from inventory_tng.core.db_errors import enforce
@@ -403,12 +403,11 @@ def close_unfollowed(
     whole there or opened there meanwhile, is refused as changed
     (web.forms.CHANGED): its place could only be locked now out of the
     ledger's order."""
-    followed = func.coalesce(ItemPackage.track_opened, Item.track_opened)
     query = (
         select(OpenPackage.id)
         .join(ItemPackage, ItemPackage.id == OpenPackage.package_id)
         .join(Item, Item.id == OpenPackage.item_id)
-        .where(*_open_of(item_ids, package_ids), followed.is_(False))
+        .where(*_open_of(item_ids, package_ids), ledger.TRACKS_OPENED.is_(False))
         .order_by(OpenPackage.id)
     )
     ids = list(session.scalars(query))

@@ -21,7 +21,6 @@ from sqlalchemy import (
 )
 from sqlalchemy.orm import Session, aliased
 
-from inventory_tng.catalogue.amount_rules import counted_whole
 from inventory_tng.core.local_time import show_day
 from inventory_tng.core.phrases import gettext, in_query, lazy_gettext
 from inventory_tng.models.admins import Admin
@@ -43,7 +42,7 @@ from inventory_tng.stock.over_recorded import (
     correction_key,
     moved_whole,
 )
-from inventory_tng.web.formatting import amount, times
+from inventory_tng.web.formatting import amount, times, unit_after
 
 # Where stock left, and where it arrived, and the counts that put each
 # right.
@@ -162,8 +161,7 @@ def amount_words(
     one, or so much in its unit."""
     if package is not None and size and quantity % size == 0:
         return times(quantity // size, package)
-    after = "" if counted_whole(unit) else f" {unit}"
-    return f"{amount(quantity)}{after}"
+    return f"{amount(quantity)}{unit_after(unit)}"
 
 
 def from_an_open_package(amount: str) -> str:

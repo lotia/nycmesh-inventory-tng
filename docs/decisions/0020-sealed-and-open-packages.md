@@ -660,6 +660,12 @@ inventory-tng-j89e):
   it out of an open package's last cuts, as one shown just before it was
   made loose could otherwise list it.
 
+We rejected leaving both as they were, and only showing "2 open packages
+still followed". For the words, Ali rejected saying nothing before the
+save, and a question to answer before saving.
+
+## Amendment: an over-recorded check whose open package is made loose (2026-11-24)
+
 - **An opening recorded more than moved, its open package made loose**,
   still waits for its open end (Ali, 2026-11-24, inventory-tng-n7dj). The
   row says "What was on the open spool became loose units at Shelf B on
@@ -688,7 +694,3 @@ inventory-tng-j89e):
   hold, it is refused as changed. Settled, one moved whole reads
   "Corrected", "Adjusted at Van 2". Ali rejected saying only Mark checked
   settles it.
-
-We rejected leaving both as they were, and only showing "2 open packages
-still followed". For the words, Ali rejected saying nothing before the
-save, and a question to answer before saving.

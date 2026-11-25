@@ -2,7 +2,7 @@
 import { msg } from "@lingui/core/macro";
 import { Fragment, type Ref } from "preact";
 import { useId } from "preact/hooks";
-import { countedWhole } from "../amount-rules";
+import { countedWhole, keyboard } from "../amount-rules";
 import { Field } from "../shared/Field";
 import { say, sayAmount } from "../shared/i18n";
 import { wordsOf } from "../shared/outbox-notes";
@@ -183,7 +183,7 @@ export function CartLine({
         {(id) => (
           <input
             id={id}
-            inputMode={countedWhole(item.unit) ? "numeric" : "decimal"}
+            inputMode={keyboard(item.unit)}
             aria-invalid={looseSaid !== undefined || undefined}
             aria-describedby={looseSaid}
             value={line.loose}

@@ -1049,8 +1049,8 @@ On the scan page (`frontend/src/shared/i18n.ts`):
   it and makes `<0>…</0>` with the function given for it:
   `sayParts(REGISTER_IT, {}, [(inside) => <a href="/register">{inside}</a>])`.
 - A quantity people read, in thousandths, is `sayAmount(left)`, written
-  as the page's boxes write it, never grouped, with every thousandth
-  kept, and any other number is `sayNumber(n)`. One a
+  as the page's boxes write it (above), with every thousandth kept, and
+  any other number is `sayNumber(n)`. One a
   box holds is `boxAmount(left)`, read back with `readBox`, both in the
   decimal separator the page's
   `<html data-decimal>` says (`takeSeparatorFrom`), as is a number shown

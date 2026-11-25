@@ -8,7 +8,7 @@
 import type { MessageDescriptor } from "@lingui/core";
 import { msg } from "@lingui/core/macro";
 import { useId } from "preact/hooks";
-import { countedWhole, isLength, isShortEnd } from "../amount-rules";
+import { countedWhole, isLength, isShortEnd, keyboard } from "../amount-rules";
 import { Field } from "../shared/Field";
 import { say, sayAmount } from "../shared/i18n";
 import { boxAmount } from "../shared/quantity";
@@ -180,7 +180,6 @@ export function OpenPackageCard({
   const hintId = useId();
   const unit = item.unit;
   const printed = isLength(unit);
-  const pieces = countedWhole(unit);
   const words = wordsFor(unit);
   // Its package as named, never a word made from the name
   // (inventory-tng-b1z): "the Spool 305 m".
@@ -240,7 +239,7 @@ export function OpenPackageCard({
         {(id) => (
           <input
             id={id}
-            inputMode={pieces ? "numeric" : "decimal"}
+            inputMode={keyboard(unit)}
             aria-invalid={refusedBy !== undefined || undefined}
             aria-describedby={[nowId, afterId, refusedBy]
               .filter(Boolean)
@@ -290,7 +289,7 @@ export function OpenPackageCard({
             <>
               <input
                 id={id}
-                inputMode={printed ? "decimal" : "numeric"}
+                inputMode={keyboard(unit)}
                 aria-describedby={printed ? hintId : undefined}
                 value={taken.now ?? ""}
                 onInput={(event) =>

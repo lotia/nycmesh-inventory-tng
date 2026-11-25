@@ -6,7 +6,7 @@ from decimal import Decimal
 import pytest
 
 from inventory_tng.core.phrases import speaking, writing_numbers
-from inventory_tng.web.formatting import amount, plain_amount
+from inventory_tng.web.formatting import amount, plain_amount, unit_after
 
 from helpers.locales import GERMAN
 
@@ -55,3 +55,7 @@ def test_an_amount_a_form_sends_back_is_plain_in_every_locale() -> None:
         assert plain_amount(Decimal("1234.500")) == "1234.5"
     assert plain_amount(Decimal("1000.000")) == "1000"
     assert plain_amount(None) == amount(None) == ""
+
+
+def test_a_unit_follows_an_amount_unless_counted_each() -> None:
+    assert (unit_after("each"), unit_after("m")) == ("", " m")

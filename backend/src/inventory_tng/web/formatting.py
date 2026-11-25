@@ -41,6 +41,12 @@ PRINTED_LENGTH = lazy_gettext(
 )
 
 
+def unit_after(unit: str) -> str:
+    """What follows an amount of an item in `unit`: " m", or nothing for
+    one counted each (amount_rules.counted_whole)."""
+    return "" if counted_whole(unit) else f" {unit}"
+
+
 def printed_length(unit: str) -> str:
     """How to read the length printed on an open package of an item in
     `unit`, if it is a length (amount_rules.is_length); else nothing."""

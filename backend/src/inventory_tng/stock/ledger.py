@@ -141,6 +141,10 @@ def tracks_opened(item: bool, package: bool | None) -> bool:
     return item if package is None else package
 
 
+# tracks_opened in SQL, over a package joined to its item.
+TRACKS_OPENED = func.coalesce(ItemPackage.track_opened, Item.track_opened)
+
+
 class PackageFacts(NamedTuple):
     """What the ledger's rules read of a package: its item, its size,
     whether opening one makes an open package (tracks_opened), whether it

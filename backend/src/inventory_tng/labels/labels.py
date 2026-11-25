@@ -17,7 +17,6 @@ from opentelemetry import metrics
 from sqlalchemy import ColumnElement, and_, or_, select
 from sqlalchemy.orm import Session
 
-from inventory_tng.catalogue.amount_rules import counted_whole
 from inventory_tng.core.db_locking import get_locked, locked_row
 from inventory_tng.core.db_once_committed import once_committed
 from inventory_tng.core.phrases import PATH_BETWEEN, gettext, lazy_gettext
@@ -25,7 +24,7 @@ from inventory_tng.models.catalogue import Item, ItemPackage
 from inventory_tng.models.labels import Label
 from inventory_tng.models.places import Location
 from inventory_tng.stock.balance import takeable, takeable_package
-from inventory_tng.web.formatting import plain_amount
+from inventory_tng.web.formatting import plain_amount, unit_after
 
 log = structlog.get_logger(__name__)
 meter = metrics.get_meter(__name__)
@@ -139,10 +138,8 @@ def _package_words(item: Item, package: ItemPackage) -> str:
     """A package's label's words, its size in the one style every printed
     label uses, whatever the locale of whoever prints it: a point and no
     grouping, "305 m", "1500.5 m" (Ali, 2026-11-23, inventory-tng-qnwz)."""
-    unit = "" if counted_whole(item.unit) else f" {item.unit}"
-    return package_label(
-        item.name_shown, package.name_shown, f"{plain_amount(package.size)}{unit}"
-    )
+    size = f"{plain_amount(package.size)}{unit_after(item.unit)}"
+    return package_label(item.name_shown, package.name_shown, size)
 
 
 def package_label(item: str, package: str, size: str) -> str:
