@@ -282,4 +282,9 @@ def revoke_label(session: DbSession, listing: Listed, label_id: int) -> Response
     if not labels.revoke(session, label_id, now()):
         return not_found()
     session.commit()
-    return redirect(listing.link(), notice="label_revoked")
+    # A label picked from the search's suggestions is shown no more once
+    # revoked: back to the search it was picked from, not an empty pick.
+    back = (
+        listing.link() if listing.pick is None else listing.link(search=listing.search)
+    )
+    return redirect(back, notice="label_revoked")

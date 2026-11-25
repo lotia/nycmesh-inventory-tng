@@ -577,7 +577,9 @@ def test_a_retired_packages_label_is_revoked_from_its_items_labels(
     revoke = link.attrs["href"]
     asked = words_on(admin_client.get(revoke).text)
     assert "Its printed copies don't scan now" in asked
-    assert admin_client.post(revoke).status_code == 303
+    done = admin_client.post(revoke).headers["location"]
+    path, query = address(item_labels(cable.id))
+    assert address(done) == (path, query | {"notice": ["label_revoked"]})
     assert label.revoked_at is not None
     form = shown_item_form(cable, unit="ft")
     assert admin_client.post(f"{ITEMS}/{cable.id}", data=form).status_code == 303
@@ -646,6 +648,27 @@ def test_an_items_revoked_labels_never_push_its_others_off_the_first_page(
     page = admin_client.get(item_labels(cable.id)).text
     assert codes_listed(page) == [own.code]
     assert "Page 1 of" not in words_on(page)
+
+
+def test_revoking_a_picked_label_goes_back_to_the_search_not_the_pick(
+    admin_client: TestClient, session: Session, cable: Item
+) -> None:
+    """Revoked, a label picked from the suggestions is shown no more, so
+    the list goes back to what it was picked from; kept, to the pick."""
+    label = add(session, Label(item_id=cable.id))
+    view = {"q": "cat6", "pick": str(label.id), "kind": "item"}
+    page = admin_client.get(LABELS, params=view).text
+    (link,) = read(page).all("a", f"Revoke {label.code}")
+    confirm = link.attrs["href"]
+    asked = read(admin_client.get(confirm).text)
+    (keep,) = [to for words, to in links(asked) if words == "Keep it"]
+    picked = {name: [value] for name, value in view.items()}
+    assert address(keep) == (LABELS, picked)
+    done = admin_client.post(confirm).headers["location"]
+    assert address(done) == (
+        LABELS,
+        {"q": ["cat6"], "kind": ["item"], "notice": ["label_revoked"]},
+    )
 
 
 def test_revoking_keeps_the_lists_page_and_drops_what_it_does_not_know(
