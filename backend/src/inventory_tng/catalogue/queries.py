@@ -4,10 +4,14 @@ counts of its tables): plain functions taking a Session, each named for what it
 returns (docs/decisions/0023)."""
 
 from collections.abc import Sequence
+from decimal import Decimal
+from typing import Literal, NamedTuple
 
-from sqlalchemy import ColumnElement, Row, func, select
+from sqlalchemy import ColumnElement, Row, and_, func, select
 from sqlalchemy.orm import Session
 
+from inventory_tng.catalogue.unit_changes import UnitFixed
+from inventory_tng.catalogue.unit_conversion import converted_kept
 from inventory_tng.models.admins import Admin
 from inventory_tng.models.catalogue import (
     SMALLEST_PACKAGE_FIRST,
@@ -15,9 +19,12 @@ from inventory_tng.models.catalogue import (
     Item,
     ItemPackage,
     ReadingRule,
+    VendorOffer,
 )
 from inventory_tng.models.places import Location
 from inventory_tng.models.volunteers import Volunteer
+from inventory_tng.stock.balance import balance
+from inventory_tng.stock.queries import balances
 
 # Each item's category's name, for a select of items to sort by.
 category_name = (
@@ -82,3 +89,61 @@ def current_count(
         )
         or 0
     )
+
+
+# What an example of a change is: the stock at a place, or a stored
+# amount.
+ExampleOf = Literal["place", "minimum", "on_order", "offer"]
+
+
+class UnitChangeExample(NamedTuple):
+    """One amount the item records, `amount` in its unit, and `becomes`,
+    what a change into another length would make it; at `place`, by
+    name, if it is stock."""
+
+    of: ExampleOf
+    amount: Decimal
+    becomes: Decimal
+    place: str | None = None
+
+
+def unit_change_example(
+    session: Session, item: Item, new: str, why: UnitFixed
+) -> UnitChangeExample | None:
+    """What a change of the item into `new` would recalculate, with its
+    own numbers, for the note after No (Ali, 2026-11-25,
+    inventory-tng-aknv): stock moved (`why`), the balance at the first
+    place holding any, in the stock pages' order (stock/queries.balances);
+    else a stored amount not nothing: its Reorder at, what is on order,
+    or its first current vendor offer's units per order in its unit.
+    None if it has none."""
+    if why == "moved":
+        held = balances(
+            session, and_(balance.c.item_id == item.id, balance.c.quantity > 0)
+        )
+        if not held:
+            return None
+        _, place, quantity = held[0]
+        return UnitChangeExample(
+            "place", quantity, converted_kept(quantity, item.unit, new), place.name
+        )
+    offered = session.scalar(
+        select(VendorOffer.units_per_order)
+        .where(
+            VendorOffer.item_id == item.id,
+            VendorOffer.retired_at.is_(None),
+            VendorOffer.unit == item.unit,
+            VendorOffer.units_per_order > 0,
+        )
+        .order_by(VendorOffer.id)
+        .limit(1)
+    )
+    stored: list[tuple[ExampleOf, Decimal | None]] = [
+        ("minimum", item.minimum),
+        ("on_order", item.on_order),
+        ("offer", offered),
+    ]
+    for of, amount in stored:
+        if amount:
+            return UnitChangeExample(of, amount, converted_kept(amount, item.unit, new))
+    return None

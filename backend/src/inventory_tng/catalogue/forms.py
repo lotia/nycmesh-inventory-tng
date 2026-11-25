@@ -21,6 +21,7 @@ from inventory_tng.catalogue import (
 )
 from inventory_tng.catalogue.amount_rules import becomes_counted_whole, is_whole
 from inventory_tng.catalogue.name_keys import nameless
+from inventory_tng.catalogue.queries import UnitChangeExample
 from inventory_tng.catalogue.reading_rules import chosen_rule, read_alike_words
 from inventory_tng.core.db_errors import Broken
 from inventory_tng.core.phrases import (
@@ -226,19 +227,30 @@ def unit_declined_problem(
     old: str,
     new: str,
     why: unit_changes.UnitFixed,
-    example: unit_changes.Example | None,
+    example: UnitChangeExample | None,
     labels_printed: int,
 ) -> str:
     """What the item form says beside its unit, in `old`, when the
     administrator answers No to changing it to `new` (Ali, 2026-11-25,
     inventory-tng-y50b, inventory-tng-aknv): that it is still in `old`,
     and what a change would do, with `example`, one of its own amounts,
-    if it has one (unit_changes.example). Only labelled (`why`), until
-    its `labels_printed` labels are revoked. The way to put right a unit
-    wrong from the start follows, a link in it, unless it is retired
+    if it has one (queries.unit_change_example). Only labelled (`why`),
+    until its `labels_printed` labels are revoked. The way to put right a
+    unit wrong from the start follows, a link in it, unless it is retired
     (catalogue/item.html)."""
     values = {"old": old, "new": new}
-    if example is not None and example.place is not None:
+    if why == "labelled":
+        return _unit_labelled(example, labels_printed, values)
+    if why == "moved":
+        if example is None:
+            # Translators: answered No to "Were the recorded amounts really in
+            # %(old)s?" for an item whose stock has moved, though none is
+            # left anywhere. Never "converting".
+            return gettext(
+                "The unit is still %(old)s. Changing it to %(new)s recalculates "
+                "every recorded amount from %(old)s.",
+                **values,
+            )
         # Translators: answered No to "Were the recorded amounts really in
         # %(old)s?" for an item whose stock has moved; %(amount)s
         # %(old)s is what the records hold at %(place)s, a place of any
@@ -253,17 +265,6 @@ def unit_declined_problem(
             place=example.place,
             **values,
         )
-    if why == "moved":
-        # Translators: answered No to "Were the recorded amounts really in
-        # %(old)s?" for an item whose stock has moved, though none is
-        # left anywhere. Never "converting".
-        return gettext(
-            "The unit is still %(old)s. Changing it to %(new)s recalculates "
-            "every recorded amount from %(old)s.",
-            **values,
-        )
-    if why == "labelled":
-        return _unit_labelled(example, labels_printed, values)
     if example is None:
         # Translators: answered No to "Were the recorded amounts really in
         # %(old)s?" for an item whose amounts have been converted before.
@@ -286,7 +287,7 @@ def unit_declined_problem(
 
 
 def _unit_labelled(
-    example: unit_changes.Example | None, count: int, values: Mapping[str, str]
+    example: UnitChangeExample | None, count: int, values: Mapping[str, str]
 ) -> str:
     """unit_declined_problem for an item only its `count` printed labels
     fix, its count said as the revoke partial says it
@@ -326,7 +327,7 @@ def _unit_labelled(
     )
 
 
-def _stored_example(example: unit_changes.Example, new: str) -> str:
+def _stored_example(example: UnitChangeExample, new: str) -> str:
     """A stored amount of an item converted into `new`, as the note after
     No says it."""
     values = {

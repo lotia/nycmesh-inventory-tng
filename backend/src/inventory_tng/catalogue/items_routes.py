@@ -474,7 +474,7 @@ def _item_page(
     asking_unit: bool = False,
     unit_declined: unit_changes.UnitFixed | None = None,
     unit_declined_to: str | None = None,
-    unit_example: unit_changes.Example | None = None,
+    unit_example: queries.UnitChangeExample | None = None,
 ) -> HTMLResponse:
     """The item's page; its open packages sorted as `asked`, all of them.
     `asking_unit`, the form sent back asks whether what was recorded was
@@ -487,7 +487,8 @@ def _item_page(
     `unit_declined_to`: labels, and the form links to revoke them; or
     stock moved or its amounts converted, and it links to the guided
     recount (unit_recounts), saying what it does: `unit_example`, the
-    amount the note gives as an example (unit_changes.example), if any."""
+    amount the note gives as an example (queries.unit_change_example), if
+    any."""
     here = f"{ITEMS}/{item.id}"
     packages = queries.packages_of_item(session, item.id)
     view = View.read(here, OPEN_SORTING, asked, anchor=OPEN_PACKAGES)
@@ -844,7 +845,7 @@ def _unit_declined(
         return _item_page(request, session, signed, item, values=form)
     log.info("unit change declined", item_id=item.id, reason=why)
     values = {**form, "unit": item.unit}
-    example = unit_changes.example(session, item, unit, why)
+    example = queries.unit_change_example(session, item, unit, why)
     problems = {
         "unit": forms.unit_declined_problem(item.unit, unit, why, example, printed)
     }

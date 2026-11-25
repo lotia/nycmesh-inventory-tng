@@ -45,6 +45,21 @@ def _labelled(session: Session, item: Item, count: int) -> None:
         assert labels.make_for_item(session, item.id, package.id) is not None
 
 
+def _offer(item: Item, units_per_order: Decimal) -> None:
+    """A vendor offer of `units_per_order` in the item's unit."""
+    session = object_session(item)
+    assert session is not None
+    add(
+        session,
+        VendorOffer(
+            item_id=item.id,
+            url="https://example.org",
+            units_per_order=units_per_order,
+            unit=item.unit,
+        ),
+    )
+
+
 def _revoke_links(page: str, count: int) -> list[str]:
     """The words of each link on the page to revoke all `count` of the
     item's labels, in any case: the package hints' links revoke one."""
@@ -180,15 +195,7 @@ def test_labels_only_give_a_stored_amount_and_link_to_revoke_the_label(
     place = Place(session)
     cable = place.cable
     if stored == "offer":
-        add(
-            session,
-            VendorOffer(
-                item_id=cable.id,
-                url="https://example.org",
-                units_per_order=305,
-                unit="m",
-            ),
-        )
+        _offer(cable, Decimal(305))
     else:
         setattr(cable, stored, Decimal(100 if stored == "minimum" else 50))
     _labelled(session, cable, 1)
@@ -247,15 +254,7 @@ def test_converted_with_packages_says_their_sizes_are_given_again(
     inventory-tng-l26i)."""
     place, _, reel = converted_reel(session)
     cable = place.cable
-    add(
-        session,
-        VendorOffer(
-            item_id=cable.id,
-            url="https://example.org",
-            units_per_order=Decimal("1000.656"),
-            unit="ft",
-        ),
-    )
+    _offer(cable, Decimal("1000.656"))
     if reel_retired:
         retire(session, reel)
     page = _declined(admin_client, cable, "m")
