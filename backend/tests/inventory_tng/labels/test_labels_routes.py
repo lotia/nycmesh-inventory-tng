@@ -570,7 +570,7 @@ def test_a_retired_packages_label_is_revoked_from_its_items_labels(
     label = add(session, Label(item_id=cable.id, package_id=reel.id))
     retire(session, reel)
     item_page = read(admin_client.get(f"{ITEMS}/{cable.id}").text)
-    (to_labels,) = item_page.all("a", "Revoke its labels")
+    (to_labels,) = item_page.all("a", "Revoke its label")
     assert to_labels.attrs["href"] == item_labels(cable.id)
     revoke = revoking(admin_client.get(item_labels(cable.id)).text, label)
     asked = words_on(admin_client.get(revoke).text)

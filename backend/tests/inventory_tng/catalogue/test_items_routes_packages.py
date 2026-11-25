@@ -121,8 +121,8 @@ def test_a_packages_labels_fix_its_size_until_revoked(
     box = add(session, ItemPackage(item_id=spools.cable.id, name="Box", size=50))
     page = f"{ITEMS}/{spools.cable.id}"
     wording = (
-        "Holds 50 m: fixed, as a label has been printed for it. "
-        "Revoke its labels to change it."
+        "Holds 50 m: fixed until its printed label is revoked. "
+        "Revoke its label to change it."
     )
     label = labels.make_for_item(session, spools.cable.id, box.id)
     assert label is not None
@@ -133,7 +133,7 @@ def test_a_packages_labels_fix_its_size_until_revoked(
     shown_page = admin_client.get(page).text
     assert wording in words_on(shown_page)
     # The box's alone: the spool has moved, and so has the item's unit.
-    read(shown_page).one("a", "Revoke its labels", href=item_labels(spools.cable.id))
+    read(shown_page).one("a", "Revoke its label", href=item_labels(spools.cable.id))
     _, broken = attempt(
         session, lambda: items.save_package(session, box, "Box", Decimal(25), seen=None)
     )

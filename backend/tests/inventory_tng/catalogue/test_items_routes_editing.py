@@ -399,7 +399,7 @@ def test_the_unit_is_fixed_once_stock_has_moved(
     _moved(session, item)
     page = admin_client.get(f"{ITEMS}/{item.id}").text
     assert "each: fixed, as stock has moved in it" in words_on(page)
-    assert "Revoke its labels" not in words_on(page)
+    assert "Revoke its" not in words_on(page)
     assert ("unit", "each") in hidden_fields(page)
     form = shown_item_form(item, unit="m")
     refused = admin_client.post(f"{ITEMS}/{item.id}", data=form)
@@ -438,13 +438,14 @@ def test_the_unit_is_fixed_once_a_spools_label_is_printed(
     assert label is not None
     page = admin_client.get(f"{ITEMS}/{cable.id}").text
     assert (
-        "only another length, as a label has been printed for it: what is "
-        "recorded is converted. Revoke its labels to change it otherwise."
+        "only another length until its printed label is revoked: its "
+        "recorded amounts are recalculated. Revoke its label to change it "
+        "without recalculating its amounts."
     ) in words_on(page)
     assert unit_options(page) == ["m", "ft"]
     # To the labels list, filtered to this item's, each offered to revoke:
     # beside the unit, and the spool's size, labelled too.
-    revoke = read(page).all("a", "Revoke its labels")
+    revoke = read(page).all("a", "Revoke its label")
     assert [a.attrs["href"] for a in revoke] == [item_labels(cable.id)] * 2
     form = shown_item_form(cable, unit="each")
     refused = admin_client.post(f"{ITEMS}/{cable.id}", data=form)
@@ -507,7 +508,7 @@ def test_a_retired_labelled_items_unit_offers_no_labels_to_revoke(
     assert item.retired_at is not None
     words = words_on(admin_client.get(f"{ITEMS}/{item.id}").text)
     assert "m: fixed, as a label has been printed for it" in words
-    assert "Revoke its labels" not in words
+    assert "Revoke its" not in words
 
 
 def test_retiring_and_bringing_back(

@@ -1,0 +1,19 @@
+{#- What fixes an item's unit, or a package's size, while labels printed for
+it are not revoked, and the link to revoke them, each with how many there
+are, `count` (Ali, 2026-11-25, inventory-tng-62qs): the item page's hints
+give the reason first, then the link. -#}
+
+{#- Why it is fixed: "until both its printed labels are revoked". -#}
+{% macro until_revoked(count) -%}
+{%- if count == 2 -%}
+{#- Translators: completes "m: fixed …", said of an item or a package with two labels printed for it, not revoked. #}{% trans %}until both its printed labels are revoked{% endtrans %}
+{%- else -%}
+{#- Translators: completes "m: fixed …", said of an item or a package with labels printed for it, not revoked; the plural is said of more than two, as two have their own words. #}{% trans count=count %}until its printed label is revoked{% pluralize %}until all {{ count }} of its printed labels are revoked{% endtrans %}
+{%- endif -%}
+{%- endmacro %}
+
+{#- The link to the item's labels not revoked, `link`
+(labels.paths.item_labels), to revoke them there. -#}
+{% macro revoke_link(count, link) -%}
+{#- Translators: a link to the item's labels, each of which can be revoked there; followed by "to change it". #}{% trans count=count, link=link %}<a href="{{ link }}">Revoke its label</a>{% pluralize %}<a href="{{ link }}">Revoke its {{ count }} labels</a>{% endtrans %}
+{%- endmacro %}

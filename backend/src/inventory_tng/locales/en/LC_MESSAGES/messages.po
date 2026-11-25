@@ -590,17 +590,16 @@ msgstr ""
 msgid "%(state)s: %(uses)s of %(most)s used, until %(until)s."
 msgstr ""
 
+#. %(until)s says why, as "until both its printed labels are revoked";
+#. %(revoke)s is the link to revoke them, as "Revoke its 2 labels".
+#: src/inventory_tng/templates/catalogue/item.html
+#, python-format
+msgid "%(unit)s: fixed %(until)s. %(revoke)s to change it."
+msgstr ""
+
 #: src/inventory_tng/templates/catalogue/item.html
 #, python-format
 msgid "%(unit)s: fixed, as a label has been printed for it"
-msgstr ""
-
-#. the link goes to this item's labels, each of which can be revoked there.
-#: src/inventory_tng/templates/catalogue/item.html
-#, python-format
-msgid ""
-"%(unit)s: fixed, as a label has been printed for it. <a "
-"href=\"%(link)s\">Revoke its labels</a> to change it."
 msgstr ""
 
 #: src/inventory_tng/templates/catalogue/item.html
@@ -677,6 +676,15 @@ msgid ""
 "<a href=\"%(link)s\">All registered devices</a>: list them by when they "
 "registered, and revoke many at once."
 msgstr ""
+
+#. a link to the item's labels, each of which can be revoked there; followed by
+#. "to change it".
+#: src/inventory_tng/templates/catalogue/_revoke_labels.html
+#, python-format
+msgid "<a href=\"%(link)s\">Revoke its label</a>"
+msgid_plural "<a href=\"%(link)s\">Revoke its %(count)s labels</a>"
+msgstr[0] ""
+msgstr[1] ""
 
 #: src/inventory_tng/templates/admin_base.html
 #, python-format
@@ -1748,13 +1756,12 @@ msgstr ""
 msgid "Holds"
 msgstr ""
 
-#. a package's size, its "Holds", fixed only by its labels; the link goes to
-#. the item's labels, each of which can be revoked there.
+#. a package's size, its "Holds", fixed only by its labels; %(until)s says why,
+#. as "until both its printed labels are revoked"; %(revoke)s is the link to
+#. the item's labels, to revoke them, as "Revoke its 2 labels".
 #: src/inventory_tng/templates/catalogue/item.html
 #, python-format
-msgid ""
-"Holds %(size)s %(unit)s: fixed, as a label has been printed for it. <a "
-"href=\"%(link)s\">Revoke its labels</a> to change it."
+msgid "Holds %(size)s %(unit)s: fixed %(until)s. %(revoke)s to change it."
 msgstr ""
 
 #: src/inventory_tng/templates/volunteers/volunteers.html
@@ -5102,13 +5109,13 @@ msgstr ""
 msgid "on %(when)s"
 msgstr ""
 
-#. the link goes to this item's labels, each of which can be revoked there.
+#. %(until)s says why, as "until both its printed labels are revoked";
+#. %(revoke)s is the link to revoke them, as "Revoke its 2 labels".
 #: src/inventory_tng/templates/catalogue/item.html
 #, python-format
 msgid ""
-"only another length, as a label has been printed for it: what is recorded"
-" is converted. <a href=\"%(link)s\">Revoke its labels</a> to change it "
-"otherwise."
+"only another length %(until)s: its recorded amounts are recalculated. "
+"%(revoke)s to change it without recalculating its amounts."
 msgstr ""
 
 #: src/inventory_tng/templates/catalogue/item.html
@@ -5270,6 +5277,22 @@ msgstr ""
 #, python-format
 msgid "total across stores, in %(unit)s; blank never reorders"
 msgstr ""
+
+#. completes "m: fixed …", said of an item or a package with two labels printed
+#. for it, not revoked.
+#: src/inventory_tng/templates/catalogue/_revoke_labels.html
+msgid "until both its printed labels are revoked"
+msgstr ""
+
+#. completes "m: fixed …", said of an item or a package with labels printed for
+#. it, not revoked; the plural is said of more than two, as two have their own
+#. words.
+#: src/inventory_tng/templates/catalogue/_revoke_labels.html
+#, python-format
+msgid "until its printed label is revoked"
+msgid_plural "until all %(count)s of its printed labels are revoked"
+msgstr[0] ""
+msgstr[1] ""
 
 #: src/inventory_tng/templates/stock/_forms.html
 #, python-format

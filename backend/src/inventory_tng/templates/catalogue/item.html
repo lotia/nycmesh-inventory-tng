@@ -3,6 +3,7 @@
 {% from "_listing.html" import sort_heading %}
 {% from "_labels.html" import labels_section with context %}
 {% from "_retired_record.html" import retired_record, retire_section with context %}
+{% from "catalogue/_revoke_labels.html" import until_revoked, revoke_link %}
 {% block main %}
 {#- A retired package not brought back for a fraction in its size, which it
 has no box to change: added again instead (Ali, 2026-11-23). #}
@@ -33,7 +34,7 @@ None is left, so nobody can pick it.{% endtrans %}{% endif %}{% endcall %}
     {% if unit_fixed == "moved" %}
     <span class="hint">{% trans %}only another length, as stock has moved in it: what is recorded is converted{% endtrans %}</span>
     {% else %}
-    <span class="hint">{#- Translators: the link goes to this item's labels, each of which can be revoked there. #}{% trans link=its_labels %}only another length, as a label has been printed for it: what is recorded is converted. <a href="{{ link }}">Revoke its labels</a> to change it otherwise.{% endtrans %}</span>
+    <span class="hint">{#- Translators: %(until)s says why, as "until both its printed labels are revoked"; %(revoke)s is the link to revoke them, as "Revoke its 2 labels". #}{% trans until=until_revoked(labels_printed), revoke=revoke_link(labels_printed, its_labels) %}only another length {{ until }}: its recorded amounts are recalculated. {{ revoke }} to change it without recalculating its amounts.{% endtrans %}</span>
     {% endif %}
     <select name="unit">
       {% for unit in units %}<option {% if values.get('unit', item.unit) == unit %}selected{% endif %}>{{ unit }}</option>{% endfor %}
@@ -45,7 +46,8 @@ None is left, so nobody can pick it.{% endtrans %}{% endif %}{% endcall %}
     {#- Read only, and its labels inactive: nothing to revoke. #}
     <span class="hint">{% trans unit=item.unit %}{{ unit }}: fixed, as a label has been printed for it{% endtrans %}</span>
     {% else %}
-    <span class="hint">{#- Translators: the link goes to this item's labels, each of which can be revoked there. #}{% trans unit=item.unit, link=its_labels %}{{ unit }}: fixed, as a label has been printed for it. <a href="{{ link }}">Revoke its labels</a> to change it.{% endtrans %}</span>
+    {#- Counted each, which no other unit converts to: nothing recalculated. #}
+    <span class="hint">{#- Translators: %(until)s says why, as "until both its printed labels are revoked"; %(revoke)s is the link to revoke them, as "Revoke its 2 labels". #}{% trans unit=item.unit, until=until_revoked(labels_printed), revoke=revoke_link(labels_printed, its_labels) %}{{ unit }}: fixed {{ until }}. {{ revoke }} to change it.{% endtrans %}</span>
     {% endif %}
     <input type="hidden" name="unit" value="{{ item.unit }}">
     {% else %}
@@ -53,7 +55,12 @@ None is left, so nobody can pick it.{% endtrans %}{% endif %}{% endcall %}
       {% for unit in units %}<option {% if values.get('unit', item.unit) == unit %}selected{% endif %}>{{ unit }}</option>{% endfor %}
     </select>
     {% endif %}
+    {% if unit_declined == "labelled" %}
+    {#- Answered No, only labels fixing the unit: the way to revoke them. #}
+    <span class="problem" id="unit-problem">{{ problems.unit }} {{ revoke_link(labels_printed, its_labels) }}</span>
+    {% else %}
     {% with name = "unit" %}{% include "_field_problem.html" %}{% endwith %}
+    {% endif %}
   </label>
   {% for name, label, hint in [
     ("manufacturer", _("Manufacturer"), ""),
@@ -157,7 +164,8 @@ None is left, so nobody can pick it.{% endtrans %}{% endif %}{% endcall %}
             {% if sent %}{% with name = "size" %}{% include "_field_problem.html" %}{% endwith %}{% endif %}
           </label>
           {% elif sizes_fixed[package.id] == "labelled" %}
-          <span class="hint block">{#- Translators: a package's size, its "Holds", fixed only by its labels; the link goes to the item's labels, each of which can be revoked there. #}{% trans size=package.size | amount, unit=package.unit, link=its_labels %}Holds {{ size }} {{ unit }}: fixed, as a label has been printed for it. <a href="{{ link }}">Revoke its labels</a> to change it.{% endtrans %}</span>
+          {% set printed = package_labels_printed[package.id] %}
+          <span class="hint block">{#- Translators: a package's size, its "Holds", fixed only by its labels; %(until)s says why, as "until both its printed labels are revoked"; %(revoke)s is the link to the item's labels, to revoke them, as "Revoke its 2 labels". #}{% trans size=package.size | amount, unit=package.unit, until=until_revoked(printed), revoke=revoke_link(printed, its_labels) %}Holds {{ size }} {{ unit }}: fixed {{ until }}. {{ revoke }} to change it.{% endtrans %}</span>
           {% endif %}
           <button>{% if package.id in sizes_fixed %}{% trans package=package.name_shown %}Save<span class="sr-only"> the name of {{ package }}</span>{% endtrans %}
             {%- else %}{% trans package=package.name_shown %}Save<span class="sr-only"> the name and size of {{ package }}</span>{% endtrans %}{% endif %}</button>

@@ -16,6 +16,7 @@ from inventory_tng.catalogue import unit_changes
 from inventory_tng.catalogue.items_routes import RECORDED, RECORDED_IN
 from inventory_tng.catalogue.paths import ITEMS
 from inventory_tng.labels import labels
+from inventory_tng.labels.paths import item_labels
 from inventory_tng.models.catalogue import ItemPackage, VendorOffer
 from inventory_tng.models.stock import Movement
 from inventory_tng.scan.batch import BatchRefused, KeyReused, record
@@ -455,8 +456,10 @@ def test_no_for_a_labelled_item_says_to_revoke_its_labels(
     declined = admin_client.post(f"{ITEMS}/{place.cable.id}", data=answered)
     assert problem(declined.text, "unit") == (
         "Nothing was converted. If they were really in ft, revoke its labels "
-        "first, then change its unit."
+        "first, then change its unit. Revoke its label"
     )
+    unit_problem = read(declined.text).one("span", id="unit-problem")
+    unit_problem.one("a", "Revoke its label", href=item_labels(place.cable.id))
     assert labels.revoke(session, label.id, NOW)
     again = admin_client.post(f"{ITEMS}/{place.cable.id}", data=answered)
     assert again.status_code == 200
