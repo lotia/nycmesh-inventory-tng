@@ -12,7 +12,7 @@ import {
 } from "@lingui/core";
 import { signal } from "@preact/signals";
 import { messages } from "../locales/en.po";
-import { boxSeparator } from "./quantity";
+import { AMOUNT_PLACES, boxSeparator, THOUSANDTHS_PER_UNIT } from "./quantity";
 
 /** Counts each change of locale or catalogue: a component that says
  * anything reads it, through `say`, so it renders again on each. */
@@ -33,7 +33,7 @@ speak("en", messages);
 /** How `sayNumber` writes a number, and Lingui a plural's #: ungrouped,
  * every thousandth kept. */
 const WRITTEN: Intl.NumberFormatOptions = {
-  maximumFractionDigits: 3,
+  maximumFractionDigits: AMOUNT_PLACES,
   useGrouping: false,
 };
 
@@ -70,7 +70,7 @@ export function sayNumber(value: number): string {
 /** `amount`, in thousandths (shared/quantity.ts), as `sayNumber` writes
  * it: 1234500 as "1234.5", or "1234,5" on a comma page. */
 export function sayAmount(amount: number): string {
-  return sayNumber(amount / 1000);
+  return sayNumber(amount / THOUSANDTHS_PER_UNIT);
 }
 
 /** Marks a value's place in a message as it is said: private-use

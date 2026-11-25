@@ -1,4 +1,10 @@
-import { boxAmount, count, readBox, sent } from "../shared/quantity";
+import {
+  boxAmount,
+  count,
+  readBox,
+  sent,
+  THOUSANDTHS_PER_UNIT,
+} from "../shared/quantity";
 
 /**
  * What a place on the count form holds once saved, under "Moved to" it:
@@ -53,7 +59,9 @@ export function followTotals(document: Document): void {
           return;
         }
         // Thousandths times thousandths: back to thousandths.
-        total += Math.round((amount * sent(box.dataset.per ?? "1")) / 1000);
+        total += Math.round(
+          (amount * sent(box.dataset.per ?? "1")) / THOUSANDTHS_PER_UNIT,
+        );
       }
       shown.textContent = boxAmount(total);
       line.hidden = false;
@@ -79,5 +87,5 @@ function adds(box: HTMLInputElement): number | null {
     return readBox(typed);
   }
   const packages = count(typed);
-  return packages === null ? null : packages * 1000;
+  return packages === null ? null : packages * THOUSANDTHS_PER_UNIT;
 }

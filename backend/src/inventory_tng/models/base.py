@@ -2,7 +2,7 @@
 constraints most tables have, and edit versions (Versioned)."""
 
 from datetime import datetime
-from typing import Annotated, Any
+from typing import Annotated, Any, Final
 
 from sqlalchemy import (
     CheckConstraint,
@@ -20,7 +20,11 @@ from sqlalchemy.orm import Mapped, MappedColumn, mapped_column
 # their history.
 from inventory_tng.core import history  # noqa: F401
 
-QUANTITY = Numeric(12, 3)
+# Quantities are numeric(12,3): this many digits in all, and this many of
+# them after the point, so an amount is whole thousandths of its unit.
+QUANTITY_PRECISION: Final = 12
+QUANTITY_SCALE: Final = 3
+QUANTITY = Numeric(QUANTITY_PRECISION, QUANTITY_SCALE)
 # The largest PostgreSQL integer: what an id or other integer column holds.
 INTEGER_MAX = 2**31 - 1
 MONEY = Numeric(10, 2)

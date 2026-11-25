@@ -11,6 +11,7 @@ import {
   type OtherSeparator,
   otherSeparator,
   readBox,
+  THOUSANDTHS_PER_UNIT,
 } from "../shared/quantity";
 import {
   type Cart,
@@ -32,7 +33,7 @@ import { indexOf } from "./search";
  * batch it would refuse is never queued and the cart is kept to fix it. */
 const MAX_ID = 2 ** 31 - 1;
 /** numeric(12,3): under a billion units, in thousandths. */
-const MAX_AMOUNT = 10 ** 12;
+const MAX_AMOUNT = 10 ** 9 * THOUSANDTHS_PER_UNIT;
 /** Lines in a batch (batch_schemas.MAX_LINES): a cart line may be several. */
 const MAX_LINES = 500;
 

@@ -12,7 +12,7 @@ from typing import Annotated, Literal
 from pydantic import BaseModel, Field, ValidationInfo, field_validator, model_validator
 from pydantic_core import PydanticCustomError
 
-from inventory_tng.models.base import INTEGER_MAX
+from inventory_tng.models.base import INTEGER_MAX, QUANTITY_PRECISION, QUANTITY_SCALE
 
 # What a volunteer records. Counts and adjustments are an administrator's
 # (inventory-tng-8i4.14). Whether each kind has a from side and a to side; the
@@ -35,8 +35,14 @@ UNIT_MAX = 32
 Number = Annotated[int, Field(gt=0, le=INTEGER_MAX)]
 # An amount in an item's unit, as the ledger's quantities are kept; one
 # left on something may be none.
-Amount = Annotated[Decimal, Field(gt=0, max_digits=12, decimal_places=3)]
-Remaining = Annotated[Decimal, Field(ge=0, max_digits=12, decimal_places=3)]
+Amount = Annotated[
+    Decimal,
+    Field(gt=0, max_digits=QUANTITY_PRECISION, decimal_places=QUANTITY_SCALE),
+]
+Remaining = Annotated[
+    Decimal,
+    Field(ge=0, max_digits=QUANTITY_PRECISION, decimal_places=QUANTITY_SCALE),
+]
 
 
 class Line(BaseModel):

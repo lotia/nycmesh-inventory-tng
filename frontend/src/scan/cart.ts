@@ -36,6 +36,7 @@ import {
   type OtherSeparator,
   otherSeparator,
   readBox,
+  THOUSANDTHS_PER_UNIT,
   thousandths,
 } from "../shared/quantity";
 import { indexOf } from "./search";
@@ -568,7 +569,9 @@ export function withLineChanged(
 function bumped(line: Line, packageId?: number): Line {
   if (packageId === undefined) {
     const loose = readBox(line.loose);
-    return loose === null ? line : { ...line, loose: boxAmount(loose + 1000) };
+    return loose === null
+      ? line
+      : { ...line, loose: boxAmount(loose + THOUSANDTHS_PER_UNIT) };
   }
   return {
     ...line,

@@ -8,7 +8,7 @@ import re
 import unicodedata
 from decimal import Decimal
 from enum import StrEnum
-from typing import Literal
+from typing import Final, Literal
 
 import structlog
 from opentelemetry import metrics
@@ -17,7 +17,12 @@ from sqlalchemy.orm import Session
 from inventory_tng.catalogue.amount_rules import whole_enough
 from inventory_tng.core.db_base import Base
 from inventory_tng.core.phrases import Separator, Words, gettext, lazy_gettext, number
-from inventory_tng.models.base import INTEGER_MAX, whole
+from inventory_tng.models.base import (
+    INTEGER_MAX,
+    QUANTITY_PRECISION,
+    QUANTITY_SCALE,
+    whole,
+)
 from inventory_tng.models.names import canonical
 
 log = structlog.get_logger(__name__)
@@ -157,8 +162,8 @@ def name_problem(name: str) -> str | None:
 TOO_BIG = lazy_gettext("That number is too big.")
 ABOVE_ZERO = lazy_gettext("Use a number above 0.")
 ZERO_OR_MORE = lazy_gettext("Use 0 or more.")
-QUANTITY_PLACES = 3  # numeric(12,3), as models.base.QUANTITY keeps them.
-QUANTITY_MAX = Decimal("999999999.999")
+# The largest amount models.base.QUANTITY holds: every digit a 9.
+QUANTITY_MAX: Final = Decimal(10**QUANTITY_PRECISION - 1).scaleb(-QUANTITY_SCALE)
 
 
 class Unreadable(StrEnum):
@@ -166,7 +171,7 @@ class Unreadable(StrEnum):
     written with the other decimal separator than the box's; that
     separator followed by three digits after a whole part above 0, as
     thousands are grouped; or more decimal places than the ledger keeps
-    (QUANTITY_PLACES).
+    (QUANTITY_SCALE).
     frontend/src/shared/quantity.ts says the same of the scan page's boxes,
     and both are tested against frontend/src/shared/quantity-cases.json."""
 
@@ -197,7 +202,7 @@ def _split(plain: str, separator: str) -> tuple[bool, str, str] | None:
 def read_decimal(text: str, separator: Separator = ".") -> Decimal | Unreadable:
     """A number typed in a box whose decimal separator is `separator`, "."
     or ",": digits, of any script, with that separator and up to
-    QUANTITY_PLACES decimals after it, and a "-" before them if below
+    QUANTITY_SCALE decimals after it, and a "-" before them if below
     zero. Neither grouping, an exponent, "+" nor "_"; -0 reads as 0. With
     the default it reads a field the page wrote itself (plain_amount)."""
     other = "," if separator == "." else "."
@@ -221,7 +226,7 @@ def read_decimal(text: str, separator: Separator = ".") -> Decimal | Unreadable:
             return Unreadable.THOUSANDS
         return Unreadable.SEPARATOR
     negative, units, fraction = parts
-    if len(fraction) > QUANTITY_PLACES:
+    if len(fraction) > QUANTITY_SCALE:
         return Unreadable.PLACES
     value = Decimal(f"{units or 0}.{fraction}" if fraction else units)
     return -value if negative else value
@@ -288,7 +293,7 @@ def refused_words(refused: Unreadable, separator: Separator) -> str:
     """What a box whose decimal separator is `separator` says of what it
     could not read, refused for `refused`."""
     if refused is Unreadable.PLACES:
-        return at_most_places(QUANTITY_PLACES)
+        return at_most_places(QUANTITY_SCALE)
     if refused is Unreadable.THOUSANDS:
         return str(THOUSANDS)
     if refused is Unreadable.SEPARATOR:

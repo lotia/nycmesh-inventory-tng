@@ -8,7 +8,7 @@
  */
 
 import table from "./amount-rules.json";
-import { thousandths } from "./shared/quantity";
+import { THOUSANDTHS_PER_UNIT, thousandths } from "./shared/quantity";
 
 /** Whether an item in `unit` is counted, in whole units, not measured. */
 export function countedWhole(unit: string): boolean {
@@ -23,7 +23,7 @@ export function isLength(unit: string): boolean {
 /** An item counted each moves, and is held, in whole units: `amount` in
  * thousandths. */
 export function wholeEnough(unit: string, amount: number): boolean {
-  return !countedWhole(unit) || amount % 1000 === 0;
+  return !countedWhole(unit) || amount % THOUSANDTHS_PER_UNIT === 0;
 }
 
 /** Whether an open package with `left` (thousandths) on it is a short

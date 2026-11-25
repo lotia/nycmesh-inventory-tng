@@ -5,7 +5,12 @@
  * uses.
  */
 
-const DECIMAL = /^(\d+)(?:\.(\d{1,3}))?$/;
+/** Decimal places the ledger keeps (the database's numeric(12,3)). */
+export const AMOUNT_PLACES = 3;
+/** Thousandths in one of an item's units: what an amount here counts. */
+export const THOUSANDTHS_PER_UNIT = 10 ** AMOUNT_PLACES;
+
+const DECIMAL = new RegExp(`^(\\d+)(?:\\.(\\d{1,${AMOUNT_PLACES}}))?$`);
 const WHOLE = /^\d+$/;
 
 /** "12.5" as 12500, as the server or the page itself wrote it. Blank is
@@ -17,7 +22,16 @@ export function thousandths(text: string): number | null {
     return null;
   }
   const [, units = "0", fraction = ""] = match;
-  return Number(units) * 1000 + Number(fraction.padEnd(3, "0"));
+  return inThousandths(units, fraction);
+}
+
+/** The whole `units` and the decimal `fraction` after them (at most
+ * AMOUNT_PLACES digits) as one amount in thousandths. */
+function inThousandths(units: string, fraction: string): number {
+  return (
+    Number(units) * THOUSANDTHS_PER_UNIT +
+    Number(fraction.padEnd(AMOUNT_PLACES, "0"))
+  );
 }
 
 /** A decimal the server sent, in thousandths: it is always one, and may
@@ -117,15 +131,16 @@ export function amountTyped(
     }
     // A whole part of 0, or none, is no thousands, so a decimal (Ali,
     // 2026-11-23, inventory-tng-mat2).
-    return /[1-9]/.test(mistaken.units) && mistaken.fraction.length === 3
+    return /[1-9]/.test(mistaken.units) &&
+      mistaken.fraction.length === AMOUNT_PLACES
       ? "thousands"
       : "separator";
   }
   const { negative, units, fraction } = parts;
-  if (fraction.length > 3) {
+  if (fraction.length > AMOUNT_PLACES) {
     return "places";
   }
-  const amount = Number(units) * 1000 + Number(fraction.padEnd(3, "0"));
+  const amount = inThousandths(units, fraction);
   // Plus 0, as -0 is 0.
   return (negative ? -amount : amount) + 0;
 }
@@ -186,9 +201,9 @@ export function decimal(amount: number): string {
   if (amount < 0) {
     return `-${decimal(-amount)}`;
   }
-  const units = Math.trunc(amount / 1000);
-  const fraction = String(amount % 1000)
-    .padStart(3, "0")
+  const units = Math.trunc(amount / THOUSANDTHS_PER_UNIT);
+  const fraction = String(amount % THOUSANDTHS_PER_UNIT)
+    .padStart(AMOUNT_PLACES, "0")
     .replace(/0+$/, "");
   return fraction === "" ? String(units) : `${units}.${fraction}`;
 }
