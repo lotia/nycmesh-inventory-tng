@@ -19,7 +19,7 @@ from starlette.types import Scope
 from inventory_tng.catalogue.amount_rules import counted_whole
 from inventory_tng.core.db_errors import Gone
 from inventory_tng.core.local_time import show, show_day
-from inventory_tng.core.phrases import BRAND, lazy_gettext, number
+from inventory_tng.core.phrases import BRAND, joined, lazy_gettext, number
 from inventory_tng.web.decimal_separator import decimal_separator
 from inventory_tng.web.formatting import (
     amount,
@@ -42,6 +42,8 @@ templates.env.filters["when"] = show
 templates.env.filters["day"] = show_day
 # {{ size | number }}: a number as people read it, ungrouped ("1000").
 templates.env.filters["number"] = number
+# {{ names | joined }}: names as the locale lists them ("A, B and C").
+templates.env.filters["joined"] = joined
 
 # Where a response's Content-Security-Policy nonce is kept, in the
 # request's state (web/security_headers.py).

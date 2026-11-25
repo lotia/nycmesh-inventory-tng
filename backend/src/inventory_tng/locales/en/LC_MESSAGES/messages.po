@@ -2091,17 +2091,6 @@ msgstr ""
 msgid "Its code, <span class=\"key\">%(code)s</span>, names %(names)s."
 msgstr ""
 
-#: src/inventory_tng/templates/catalogue/unit_recounted.html
-#, python-format
-msgid ""
-"Its package's printed label was revoked: <a href=\"%(link)s\">print a new"
-" one</a>."
-msgid_plural ""
-"Its packages' %(count)s printed labels were revoked: <a "
-"href=\"%(link)s\">print new ones</a>."
-msgstr[0] ""
-msgstr[1] ""
-
 #: src/inventory_tng/templates/places/location.html
 #, python-format
 msgid "Its parent's (%(zone)s)"
@@ -2118,17 +2107,6 @@ msgid ""
 "Its printed copies don't scan now, but would if what it names were "
 "brought back. Revoking it stops them scanning for good."
 msgstr ""
-
-#: src/inventory_tng/templates/catalogue/unit_recounted.html
-#, python-format
-msgid ""
-"Its retired package's printed label was revoked: print a new one if it is"
-" brought back."
-msgid_plural ""
-"Its retired packages' %(count)s printed labels were revoked: print new "
-"ones if they are brought back."
-msgstr[0] ""
-msgstr[1] ""
 
 #: src/inventory_tng/web/forms.py
 msgid ""
@@ -4256,6 +4234,32 @@ msgid ""
 " and your other sessions were signed out."
 msgstr ""
 
+#. %(packages)s names one or more of the item's retired packages, such as "Box
+#. and Crate".
+#: src/inventory_tng/templates/catalogue/unit_recounted.html
+#, python-format
+msgid ""
+"The printed label of %(packages)s (retired) was revoked: print a new one "
+"if it is brought back."
+msgid_plural ""
+"The printed labels of %(packages)s (retired) were revoked: print new ones"
+" if they are brought back."
+msgstr[0] ""
+msgstr[1] ""
+
+#. %(packages)s names one or more of the item's packages, such as "Reel and
+#. Spool".
+#: src/inventory_tng/templates/catalogue/unit_recounted.html
+#, python-format
+msgid ""
+"The printed label of %(packages)s was revoked: <a href=\"%(link)s\">print"
+" a new one</a>."
+msgid_plural ""
+"The printed labels of %(packages)s were revoked: <a "
+"href=\"%(link)s\">print new ones</a>."
+msgstr[0] ""
+msgstr[1] ""
+
 #: src/inventory_tng/templates/catalogue/unit_recounted.html
 #, python-format
 msgid "The records held none of %(item)s at any place: nothing to count."
@@ -5494,10 +5498,36 @@ msgstr ""
 
 #: src/inventory_tng/templates/catalogue/unit_recount.html
 #, python-format
-msgid "revokes their printed label, as it shows the size as it was;"
+msgid ""
+"revokes the printed label of its current package, as it shows the size as"
+" it was;"
 msgid_plural ""
-"revokes their %(count)s printed labels, as they show the sizes as they "
-"were;"
+"revokes the %(count)s printed labels of its current packages, as they "
+"show the sizes as they were;"
+msgstr[0] ""
+msgstr[1] ""
+
+#. Said after the labels of its current packages it revokes.
+#: src/inventory_tng/templates/catalogue/unit_recount.html
+#, python-format
+msgid ""
+"revokes the printed label of its retired package too: a new one can be "
+"printed once it is brought back;"
+msgid_plural ""
+"revokes the %(count)s printed labels of its retired packages too: new "
+"ones can be printed once they are brought back;"
+msgstr[0] ""
+msgstr[1] ""
+
+#. Said when only its retired packages have labels to revoke.
+#: src/inventory_tng/templates/catalogue/unit_recount.html
+#, python-format
+msgid ""
+"revokes the printed label of its retired package: a new one can be "
+"printed once it is brought back;"
+msgid_plural ""
+"revokes the %(count)s printed labels of its retired packages: new ones "
+"can be printed once they are brought back;"
 msgstr[0] ""
 msgstr[1] ""
 

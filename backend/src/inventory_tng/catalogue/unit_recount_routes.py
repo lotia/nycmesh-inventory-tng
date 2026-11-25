@@ -3,9 +3,9 @@
 and asking Reorder at, what is on order and its vendor offers again in the
 new unit, and, for one converted before whose stock never moved, its
 packages' sizes, retired ones' too; and the page after, linking to a
-count of it at each place it brought to zero, and to its labels if it
-revoked any of its current packages to print again (Ali, 2026-11-25,
-inventory-tng-qety, inventory-tng-l26i). The
+count of it at each place it brought to zero, and naming the packages
+whose labels it revoked, linking to its labels to print those of current
+ones again (Ali, 2026-11-25, inventory-tng-qety, inventory-tng-l26i). The
 answer to No on the item page links here (items_routes)."""
 
 import uuid
@@ -23,7 +23,6 @@ from inventory_tng.core.db_errors import refusal
 from inventory_tng.core.db_sessions import DbSession
 from inventory_tng.core.phrases import Words, gettext
 from inventory_tng.core.sent_forms import form_key
-from inventory_tng.models.base import INTEGER_MAX, whole
 from inventory_tng.models.catalogue import Item
 from inventory_tng.stock.paths import COUNTS
 from inventory_tng.stock.queries import places_with_ids
@@ -153,12 +152,20 @@ def recount(
         )
     assert done is not None  # Refused, or done.
     session.commit()
-    revoked = {"labels": done.revoked, "retired_labels": done.revoked_retired}
+    revoked = {"labels": _listed(done.revoked)} if done.revoked else {}
     return redirect(
-        UNIT_RECOUNTED.format(item_id=item_id),
-        places=",".join(str(each) for each in done.places),
-        **{name: str(count) for name, count in revoked.items() if count},
+        UNIT_RECOUNTED.format(item_id=item_id), places=_listed(done.places), **revoked
     )
+
+
+def _listed(ids: list[int]) -> str:
+    """Ids as the page after's address lists them (_ids_in)."""
+    return ",".join(str(each) for each in ids)
+
+
+def _ids_in(listed: str) -> set[int]:
+    """The ids the page after's address lists, any other part left out."""
+    return {each for part in listed.split(",") if (each := row_id(part)) is not None}
 
 
 @router.get(UNIT_RECOUNTED)
@@ -169,18 +176,22 @@ def recounted(
     item_id: int,
     places: str = "",
     labels: str = "",
-    retired_labels: str = "",
 ) -> Response:
     """The page after a recount: the places it brought to zero, in its
-    address, each linked to its count of the item; and how many labels it
-    revoked of its current packages, to print again, and of its retired
-    ones, which can't be until they are brought back."""
+    address, each linked to its count of the item; and the packages of
+    the labels it revoked, also in its address, by label id: current
+    ones, to print again, and retired ones, which can't be until they are
+    brought back."""
     found = session.get(Item, item_id)
     if found is None:
         return not_found()
-    ids = {each for part in places.split(",") if (each := row_id(part)) is not None}
     # A retired one, holding nothing now, is counted no more.
-    current = [each for each in places_with_ids(session, ids) if not each.retired_at]
+    current = [
+        each
+        for each in places_with_ids(session, _ids_in(places))
+        if not each.retired_at
+    ]
+    revoked = unit_recounts.revoked_packages(session, item_id, _ids_in(labels))
     item_path = f"{ITEMS}/{item_id}"
     return admin_page(
         request,
@@ -198,7 +209,7 @@ def recounted(
             ),
             "counts_path": COUNTS,
             "item_path": item_path,
-            "revoked": whole(labels, 0, INTEGER_MAX) or 0,
-            "revoked_retired": whole(retired_labels, 0, INTEGER_MAX) or 0,
+            "revoked": [each.name_shown for each in revoked if not each.retired_at],
+            "revoked_retired": [each.name_shown for each in revoked if each.retired_at],
         },
     )

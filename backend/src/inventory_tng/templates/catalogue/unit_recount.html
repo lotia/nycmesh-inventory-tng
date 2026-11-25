@@ -6,21 +6,30 @@ amounts to give again in the new unit (Ali, 2026-11-25). -#}
 {% block main %}
 <p>{% trans item=item.name_shown, old=item.unit, new=unit %}For when what was recorded of {{ item }} was never really in {{ old }}: nothing is converted. In one change, which can't be undone, it:{% endtrans %}</p>
 <ol>
-  <li>{% if plan.held %}{% trans old=item.unit %}writes off, in {{ old }}, all the records hold of it at each place, with the reason Records were wrong:{% endtrans %}
+  {#- Left out for an item converted before, whose stock never moved
+  (Ali, 2026-11-25). #}
+  {% if not plan.converted %}<li>{% if plan.held %}{% trans old=item.unit %}writes off, in {{ old }}, all the records hold of it at each place, with the reason Records were wrong:{% endtrans %}
     {% call table() %}
       <tr><th>{% trans %}Place{% endtrans %}</th><th>{% trans %}Recorded{% endtrans %}</th></tr>
       {% for each in plan.held %}
       <tr><td>{{ each.place.name }}</td><td>{{ each.total | amount }} {{ item.unit }}</td></tr>
       {% endfor %}
     {% endcall %}
-    {%- else %}{% trans %}writes off nothing: the records hold none of it at any place;{% endtrans %}{% endif %}</li>
+    {%- else %}{% trans %}writes off nothing: the records hold none of it at any place;{% endtrans %}{% endif %}</li>{% endif %}
   {% if plan.opened %}<li>{% trans count=plan.opened | length %}closes its open package;{% pluralize %}closes its {{ count }} open packages;{% endtrans %}</li>{% endif %}
   {% if plan.packages %}<li>{% trans old=item.unit %}retires its packages in {{ old }}, renamed so a package of the same name can be added in the new unit:{% endtrans %}
     <ul>
       {% for each in plan.packages %}<li>{% trans old=each.package.name_shown, new=each.shown %}{{ old }} becomes {{ new }}{% endtrans %}</li>{% endfor %}
     </ul></li>{% endif %}
   {% if plan.resized %}<li>{% trans old=item.unit, new=unit %}gives the size of each of its packages in {{ old }} again, below, in {{ new }}, each keeping its name and links;{% endtrans %}
-    {%- if plan.revoking %} {% trans count=plan.revoking | length %}revokes their printed label, as it shows the size as it was;{% pluralize %}revokes their {{ count }} printed labels, as they show the sizes as they were;{% endtrans %}{% endif %}</li>{% endif %}
+    {%- if plan.revoking %}
+    {#- Current packages' labels and retired ones' said apart, each only
+    if there are any (Ali, 2026-11-25). #}
+    <ul>
+      {% if plan.revoking_current %}<li>{% trans count=plan.revoking_current | length %}revokes the printed label of its current package, as it shows the size as it was;{% pluralize %}revokes the {{ count }} printed labels of its current packages, as they show the sizes as they were;{% endtrans %}</li>{% endif %}
+      {% if plan.revoking_retired %}<li>{% if plan.revoking_current %}{#- Translators: Said after the labels of its current packages it revokes. #}{% trans count=plan.revoking_retired | length %}revokes the printed label of its retired package too: a new one can be printed once it is brought back;{% pluralize %}revokes the {{ count }} printed labels of its retired packages too: new ones can be printed once they are brought back;{% endtrans %}
+        {%- else %}{#- Translators: Said when only its retired packages have labels to revoke. #}{% trans count=plan.revoking_retired | length %}revokes the printed label of its retired package: a new one can be printed once it is brought back;{% pluralize %}revokes the {{ count }} printed labels of its retired packages: new ones can be printed once they are brought back;{% endtrans %}{% endif %}</li>{% endif %}
+    </ul>{% endif %}</li>{% endif %}
   <li>{% trans new=unit %}changes its unit to {{ new }}, and keeps the amounts below in {{ new }}.{% endtrans %}</li>
 </ol>
 {% if not plan.converted %}<p>{% trans new=unit %}Then count it at each place in {{ new }}, and add its packages in {{ new }}.{% endtrans %}</p>{% endif %}

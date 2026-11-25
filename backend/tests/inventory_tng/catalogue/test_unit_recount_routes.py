@@ -514,15 +514,18 @@ def test_a_converted_item_is_recounted_by_its_amounts_and_package_sizes(
     ]
     page = _page(admin_client, cable.id, "m")
     said = words_on(page.text)
-    assert "writes off nothing" in said
+    # Its stock never moved: nothing to write off, so not said (Ali,
+    # 2026-11-25).
+    assert "writes off" not in said
     assert "becomes" not in said
     # Nothing to count, and its packages kept (Ali, 2026-11-25).
     assert "Then count it" not in said
     assert (
         "gives the size of each of its packages in ft again, below, in m, each "
-        "keeping its name and links; revokes their printed label, as it shows "
-        "the size as it was;"
+        "keeping its name and links; revokes the printed label of its current "
+        "package, as it shows the size as it was;"
     ) in said
+    assert "retired package" not in said
     fieldset = read(page.text).one("fieldset")
     assert fieldset.one("legend").text == "Reel"
     assert "Holds in m; was 1000 ft" in words_on(fieldset)
@@ -565,9 +568,8 @@ def test_a_converted_item_is_recounted_by_its_amounts_and_package_sizes(
     after = read(admin_client.get(done.headers["location"]).text)
     assert "nothing to count" in words_on(after)
     assert "Add its packages" not in words_on(after)
-    assert "Its package's printed label was revoked: print a new one." in words_on(
-        after
-    )
+    assert "The printed label of Reel was revoked: print a new one." in words_on(after)
+    assert "(retired)" not in words_on(after)
     after.one("a", "print a new one", href=f"{ITEMS}/{cable.id}#labels")
 
 
@@ -688,7 +690,12 @@ def test_a_converted_items_retired_package_is_resized_and_stays_retired(
     assert on_reel is not None
     retired_at = box.retired_at
     page = _page(admin_client, cable.id, "m")
-    assert "revokes their 2 printed labels" in words_on(page.text)
+    said = words_on(page.text)
+    assert (
+        "revokes the printed label of its current package, as it shows the size "
+        "as it was; revokes the printed label of its retired package too: a new "
+        "one can be printed once it is brought back;"
+    ) in said
     asked = read(page.text).all("fieldset")
     assert [words_on(each.one("legend")) for each in asked] == ["Reel", "Box Retired"]
     assert box_values(page.text, f"size_{box.id}") == ["1000"]
@@ -710,9 +717,9 @@ def test_a_converted_items_retired_package_is_resized_and_stays_retired(
         True,
     )
     after = words_on(admin_client.get(done.headers["location"]).text)
-    assert "Its package's printed label was revoked: print a new one." in after
+    assert "The printed label of Reel was revoked: print a new one." in after
     assert (
-        "Its retired package's printed label was revoked: print a new one if "
+        "The printed label of Box (retired) was revoked: print a new one if "
         "it is brought back."
     ) in after
     items.restore_package(session, box)
@@ -722,31 +729,40 @@ def test_a_converted_items_retired_package_is_resized_and_stays_retired(
 
 
 @pytest.mark.parametrize(
-    ("more", "said"),
+    ("more", "before", "said"),
     [
         (
             0,
             (
-                "Its retired package's printed label was revoked: print a new "
+                "revokes the printed label of its retired package: a new one "
+                "can be printed once it is brought back;"
+            ),
+            (
+                "The printed label of Box (retired) was revoked: print a new "
                 "one if it is brought back."
             ),
         ),
         (
             1,
             (
-                "Its retired packages' 2 printed labels were revoked: print "
-                "new ones if they are brought back."
+                "revokes the 2 printed labels of its retired packages: new "
+                "ones can be printed once they are brought back;"
+            ),
+            (
+                "The printed labels of Box and Spool 0 (retired) were revoked: "
+                "print new ones if they are brought back."
             ),
         ),
     ],
 )
 def test_only_a_retired_packages_labels_revoked_are_said_alone(
-    admin_client: TestClient, session: Session, more: int, said: str
+    admin_client: TestClient, session: Session, more: int, before: str, said: str
 ) -> None:
-    """With the current Reel unlabelled, the page after says only that
-    the retired packages' labels were revoked, not as more than others,
-    and asks to print none now. A package has one label at most
-    (labels.make_for_item), so as many labels as packages."""
+    """With the current Reel unlabelled, both pages say only that the
+    retired packages' labels are revoked, without "too" before (Ali,
+    2026-11-25), and the page after asks to print none now. A package has
+    one label at most (labels.make_for_item), so as many labels as
+    packages."""
     cable, reel, box, _ = _retired_box(session)
     sizes = {f"size_{reel.id}": "300", f"size_{box.id}": "304.8"}
     for n in range(more):
@@ -758,13 +774,64 @@ def test_only_a_retired_packages_labels_revoked_are_said_alone(
         sizes[f"size_{spool.id}"] = "152.4"
     session.flush()
     page = _page(admin_client, cable.id, "m")
+    assert before in words_on(page.text)
+    assert "current package" not in words_on(page.text)
     done = admin_client.post(unit_recount(cable.id, "m"), data=_sent(page, **sizes))
     assert done.status_code == 303
     after = words_on(admin_client.get(done.headers["location"]).text)
     assert said in after
-    assert "revoked too" not in after
+    assert "was revoked: print a new one." not in after
     assert "print new ones." not in after
     assert "print a new one." not in after
+
+
+def test_several_packages_labels_revoked_are_said_by_name(
+    admin_client: TestClient, session: Session
+) -> None:
+    """Two current packages labelled and two retired: each pair said with
+    its count before, "too" after the current ones, and named, joined as
+    a list, after (Ali, 2026-11-25)."""
+    cable, reel, box, _ = _retired_box(session)
+    sizes = {f"size_{reel.id}": "300", f"size_{box.id}": "304.8"}
+    assert labels.make_for_item(session, cable.id, reel.id) is not None
+    for name, retired in (("Drum", False), ("Crate", True)):
+        added = items.add_package(session, cable, name, Decimal(500), shown_unit="ft")
+        assert labels.make_for_item(session, cable.id, added.id) is not None
+        if retired:
+            items.retire_package(session, added, datetime.now(UTC))
+        sizes[f"size_{added.id}"] = "152.4"
+    session.flush()
+    page = _page(admin_client, cable.id, "m")
+    assert (
+        "revokes the 2 printed labels of its current packages, as they show the "
+        "sizes as they were; revokes the 2 printed labels of its retired "
+        "packages too: new ones can be printed once they are brought back;"
+    ) in words_on(page.text)
+    done = admin_client.post(unit_recount(cable.id, "m"), data=_sent(page, **sizes))
+    assert done.status_code == 303
+    after = read(admin_client.get(done.headers["location"]).text)
+    assert (
+        "The printed labels of Drum and Reel were revoked: print new ones."
+    ) in words_on(after)
+    assert (
+        "The printed labels of Box and Crate (retired) were revoked: print new "
+        "ones if they are brought back."
+    ) in words_on(after)
+    after.one("a", "print new ones", href=f"{ITEMS}/{cable.id}#labels")
+
+
+def test_the_page_after_names_only_the_items_packages(
+    admin_client: TestClient, session: Session
+) -> None:
+    """A label id in its address of another item's package, or none at
+    all, names nothing."""
+    cable, _, _, on_box = _retired_box(session)
+    path = UNIT_RECOUNTED.format(item_id=cable.id)
+    assert "revoked" in words_on(admin_client.get(f"{path}?labels={on_box.id}").text)
+    other = add(session, Item(name="Other", category_id=cable.category_id))
+    elsewhere = UNIT_RECOUNTED.format(item_id=other.id)
+    after = admin_client.get(f"{elsewhere}?labels={on_box.id},x")
+    assert "revoked" not in words_on(after.text)
 
 
 @pytest.mark.parametrize("bringing_back", [False, True])
