@@ -69,7 +69,8 @@ with an adjustment. Mark checked if you already fixed it.{% endtrans %}</p>
     <td>
       {% if whole %}
       {#- Now where it arrived, it cannot be found again where it left: its
-      count there is confirmed, or corrected by an adjustment. #}
+      count there is confirmed, or corrected by an adjustment. Made loose
+      since, it reads as the others (over_recorded_queries.Shown). #}
       {% set name = "count-" ~ row.id %}
       <form method="post" action="{{ here }}/{{ row.id }}/count{{ view.query_string }}">
         <p>{#- Translators: %(place)s is a place of any kind, such as a store, a shelf, a bin or a volunteer's home. #}{% trans place=each.to_place %}An open package moved to {{ place }}. Confirm or correct count.{% endtrans %}</p>
@@ -87,8 +88,8 @@ with an adjustment. Mark checked if you already fixed it.{% endtrans %}</p>
       other end's next step. Both: nothing left to write, so Close it. #}
       {% set one = each.one_counted %}
       {% set both = each.both_right %}
-      {#- An opening's open package made loose, its open end waiting for a
-      count there (over_recorded_queries.MadeLoose). #}
+      {#- Its open package made loose, an opening's or one moved whole, its
+      open end waiting for a count there (over_recorded_queries.MadeLoose). #}
       {% set loose = each.made_loose %}
       {#- How an end was put right (over_recorded_queries.OneCounted, BothRight):
       "counted", or "closed", an opening's open package written off since. #}

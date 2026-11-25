@@ -538,7 +538,8 @@ def answer(
             )
         # Only another way has words: why_problem refuses them otherwise.
         words = stripped or None
-    ledger.lock_places(session, over_recorded.places_of(session, check_id))
+    held = over_recorded.places_of(session, check_id)
+    ledger.lock_places(session, held)
     admin_id = signed.admin.id
     # The place that refused it (counts.NotCountable), as it was then.
     refused_at: int | None = None
@@ -547,7 +548,7 @@ def answer(
         nonlocal refused_at
         try:
             if do == "correct":
-                return over_recorded.correct(session, check_id, seen, admin_id)
+                return over_recorded.correct(session, check_id, seen, admin_id, held)
             if do == "close":
                 over_recorded.close(session, check_id, seen, admin_id)
                 return "counted"

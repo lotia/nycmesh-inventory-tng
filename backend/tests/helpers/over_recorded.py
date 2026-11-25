@@ -235,5 +235,6 @@ def reason_adjustments(session: Session, reason: str) -> list[Movement]:
 
 def correct_check(session: Session, check: OverRecorded, seen: str, admin: int) -> None:
     """Corrected as the page does: its places, then it."""
-    ledger.lock_places(session, over_recorded.places_of(session, check.id))
-    over_recorded.correct(session, check.id, seen, admin)
+    held = over_recorded.places_of(session, check.id)
+    ledger.lock_places(session, held)
+    over_recorded.correct(session, check.id, seen, admin, held)

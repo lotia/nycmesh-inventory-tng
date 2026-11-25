@@ -92,7 +92,13 @@ def test_a_correction_is_listed_with_when_who_and_where(
 ) -> None:
     place = Place(session)
     check = moved(session, place)
-    over_recorded.correct(session, check.id, seen(check), ada_id(session))
+    over_recorded.correct(
+        session,
+        check.id,
+        seen(check),
+        ada_id(session),
+        over_recorded.places_of(session, check.id),
+    )
     session.flush()
     page = admin_client.get(SETTLED).text
     when = show(settled_at(check), site_zone(session))
@@ -122,7 +128,13 @@ def test_a_place_that_cannot_be_counted_is_not_linked(
     again, and retired, may not be counted."""
     place = Place(session)
     check = raise_check(session, write(session, place), Decimal(3))
-    over_recorded.correct(session, check.id, seen(check), ada_id(session))
+    over_recorded.correct(
+        session,
+        check.id,
+        seen(check),
+        ada_id(session),
+        over_recorded.places_of(session, check.id),
+    )
     retire(session, place.store)
     page = admin_client.get(SETTLED).text
     assert f"{COUNTS}/{place.store.id}" not in page
@@ -223,7 +235,13 @@ def test_corrected_after_one_end_counted_names_the_other(
     count_at(admin_client, place.van.id, {f"counted_{place.item.id}": "1"})
     session.expire_all()
     check = session.scalars(select(OverRecorded)).one()
-    over_recorded.correct(session, check.id, seen(check), ada_id(session))
+    over_recorded.correct(
+        session,
+        check.id,
+        seen(check),
+        ada_id(session),
+        over_recorded.places_of(session, check.id),
+    )
     session.flush()
     ((*_, how, why, _),) = settled_rows(admin_client)
     assert (how, why) == (
@@ -248,7 +266,13 @@ def test_an_opening_is_listed_at_its_place_opened(
     admin_client: TestClient, session: Session
 ) -> None:
     spools, check = opening(session)
-    over_recorded.correct(session, check.id, seen(check), ada_id(session))
+    over_recorded.correct(
+        session,
+        check.id,
+        seen(check),
+        ada_id(session),
+        over_recorded.places_of(session, check.id),
+    )
     session.flush()
     ((_, _, amount, where, how, why, _),) = settled_rows(admin_client)
     assert (where, how, why) == (
@@ -273,7 +297,13 @@ def test_an_openings_open_package_closed_before_correct_names_the_sealed_end(
         session, movement.to_open_package_id, admin, at, how="direct"
     )
     session.flush()
-    over_recorded.correct(session, check.id, seen(check), admin)
+    over_recorded.correct(
+        session,
+        check.id,
+        seen(check),
+        admin,
+        over_recorded.places_of(session, check.id),
+    )
     session.flush()
     ((*_, how, why, _),) = settled_rows(admin_client)
     assert (how, why) == (HOW["corrected"], SEALED_ONLY)
@@ -308,7 +338,13 @@ def test_what_correct_wrote_is_told_by_what_it_wrote_not_when(
     if closed_first:
         assert open_packages.close(session, open_id, admin, at, how="direct")
         session.flush()
-    over_recorded.correct(session, check.id, seen(check), admin)
+    over_recorded.correct(
+        session,
+        check.id,
+        seen(check),
+        admin,
+        over_recorded.places_of(session, check.id),
+    )
     session.flush()
     if not closed_first:
         assert open_packages.close(session, open_id, admin, at, how="direct")
@@ -615,7 +651,13 @@ def test_every_column_sorts_either_way(
     for n, place in enumerate(places):
         check = raise_check(session, write(session, place), Decimal(n + 1))
         if n == 1:
-            over_recorded.correct(session, check.id, seen(check), ada_id(session))
+            over_recorded.correct(
+                session,
+                check.id,
+                seen(check),
+                ada_id(session),
+                over_recorded.places_of(session, check.id),
+            )
         else:
             over_recorded.mark_checked(
                 session, check.id, seen(check), ada_id(session), "both"
@@ -664,7 +706,13 @@ def test_how_sorts_by_its_words_in_the_language_spoken(
     spoken when the list is asked for, not English."""
     places = [Place(session) for _ in range(2)]
     first = raise_check(session, write(session, places[0]))
-    over_recorded.correct(session, first.id, seen(first), ada_id(session))
+    over_recorded.correct(
+        session,
+        first.id,
+        seen(first),
+        ada_id(session),
+        over_recorded.places_of(session, first.id),
+    )
     second = raise_check(session, write(session, places[1]))
     over_recorded.mark_checked(
         session, second.id, seen(second), ada_id(session), "both"

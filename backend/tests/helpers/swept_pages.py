@@ -231,7 +231,8 @@ def over_recorded_settled(world: World) -> None:
     session = world.session
     check = raise_check(session, write(session, world.spools.place))
     seen = over_recorded.seen(check)
-    over_recorded.correct(session, check.id, seen, world.ada_id)
+    held = over_recorded.places_of(session, check.id)
+    over_recorded.correct(session, check.id, seen, world.ada_id, held)
 
 
 def item_parts(world: World) -> None:
