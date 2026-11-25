@@ -24,7 +24,13 @@ from inventory_tng.scan.batch import _more_written
 from inventory_tng.stock import counts, over_recorded
 from inventory_tng.stock.ledger import Entry, Form
 
-from helpers.over_recorded import answered, bagged, checks, recorded_then_changed
+from helpers.over_recorded import (
+    adjustment_units,
+    answered,
+    bagged,
+    checks,
+    recorded_then_changed,
+)
 from helpers.rows import add, tag
 from helpers.sign_in import new_admin_id
 from helpers.stock import URL, Place, Spools, cut, sealed_line
@@ -366,8 +372,4 @@ def test_a_check_and_its_correction_keep_the_unit_its_line_was_recorded_in(
     (check,) = checks(session)
     assert check.unit == "m"
     assert answered(admin_client, session, "correct").status_code == 303
-    written = select(Movement.unit).join(
-        LedgerTransaction, LedgerTransaction.id == Movement.transaction_id
-    )
-    units = session.scalars(written.where(LedgerTransaction.kind == "adjustment"))
-    assert list(units) == ["m", "m"]
+    assert adjustment_units(session) == ["m", "m"]

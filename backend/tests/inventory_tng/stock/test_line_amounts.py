@@ -2,7 +2,6 @@
 refused one in another, so a conversion is never made unawares
 (line_amounts; Ali, 2026-11-24, inventory-tng-2rlr)."""
 
-import uuid
 from collections.abc import Callable
 from datetime import UTC, datetime
 from decimal import Decimal
@@ -12,11 +11,10 @@ from sqlalchemy import exc, true
 from sqlalchemy.orm import Session
 
 from inventory_tng.stock import moments, queries
-from inventory_tng.stock.ledger import Entry, insert_transaction
 from inventory_tng.stock.moved_out import moved_out
 
 from helpers.sign_in import new_admin
-from helpers.stock import Place, Spools
+from helpers.stock import Place, Spools, received, write
 
 # Each reader of the ledger's sums, of the place's store, after its cable
 # came in and some left.
@@ -56,20 +54,12 @@ OPEN_READERS: dict[str, Callable[[Session, Spools, int], object]] = {
 
 def _moved(session: Session, place: Place) -> None:
     """50 m of cable into the store, then 10 m on to the van."""
-    for header, metres in (
-        ({"kind": "receipt", "to_location_id": place.store.id}, 50),
-        (
-            {
-                "kind": "move",
-                "from_location_id": place.store.id,
-                "to_location_id": place.van.id,
-                "volunteer_id": place.volunteer.id,
-            },
-            10,
-        ),
-    ):
-        line = Entry(place.cable.id, Decimal(metres), unit="m")
-        insert_transaction(session, uuid.uuid4(), header, [line])
+    received(session, place, [_cable(place, "50")])
+    write(session, place, lines=[_cable(place, "10")])
+
+
+def _cable(place: Place, metres: str) -> dict[str, object]:
+    return {"item_id": place.cable.id, "quantity": metres, "unit": "m"}
 
 
 def test_lines_in_their_items_unit_are_summed(session: Session, place: Place) -> None:

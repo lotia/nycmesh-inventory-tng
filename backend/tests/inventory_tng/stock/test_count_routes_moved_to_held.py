@@ -62,7 +62,7 @@ class Arrived:
     ) -> None:
         self.client = client
         self.opened: list[OpenPackage] = []
-        self.made = made = Spools(session, tracked=tracked, unit=unit)
+        self.made = made = Spools(session, tracked=tracked, cable_unit=unit)
         made.receive(uuid.uuid4(), spools=2)
         self.cable = made.cable.id
         self.store = made.store

@@ -426,22 +426,14 @@ def _units(session: Session, transaction_id: int) -> list[str]:
 
 
 def test_lines_record_the_unit_they_were_shown_or_counted_in(
-    client: TestClient, session: Session, place: Place
+    session: Session, place: Place
 ) -> None:
     """A batch's line in the unit the scan page showed; a count's, read
     from the records, and an adjustment's, as its form showed it, in the
     cable's."""
-    lines = [{"item_id": place.cable.id, "quantity": "50", "unit": "m"}]
-    sent = client.post(
-        URL,
-        json=place.batch(kind="receipt", lines=lines)
-        | {
-            "from_location_id": None,
-            "to_location_id": place.store.id,
-        },
-    )
-    assert sent.status_code == 201
-    assert _units(session, sent.json()["transaction_id"]) == ["m"]
+    line: dict[str, object] = {"item_id": place.cable.id, "quantity": "50", "unit": "m"}
+    receipt = received(session, place, [line])
+    assert _units(session, receipt.id) == ["m"]
     admin = add(session, Admin(username=f"ada-{tag()}"))
     (counted,) = record_count(
         session,
@@ -449,7 +441,7 @@ def test_lines_record_the_unit_they_were_shown_or_counted_in(
         admin.id,
         place.store.id,
         [(place.cable.id, Decimal(40))],
-        Moment(sent.json()["transaction_id"], 1),
+        Moment(receipt.id, 1),
     ).written
     found = named(session, AdjustmentReason, "Found")
     (adjusted,) = record_adjustment(

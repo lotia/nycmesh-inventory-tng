@@ -6,7 +6,6 @@ import uuid
 from decimal import Decimal
 
 from fastapi.testclient import TestClient
-from sqlalchemy import select
 from sqlalchemy.orm import Session
 from structlog.testing import capture_logs
 
@@ -23,6 +22,7 @@ from inventory_tng.stock.ledger import Form
 from helpers.markup import box_values, read, text, words_on
 from helpers.over_recorded import (
     PAGE,
+    adjustment_units,
     adjustments,
     checks,
     counted,
@@ -70,7 +70,7 @@ def test_its_count_box_shows_the_keypad_its_items_unit_takes(
     recorded in."""
     keyboards = {}
     for unit in ("m", "each"):
-        spools = Spools(session, unit=unit)
+        spools = Spools(session, cable_unit=unit)
         moved_whole(registered_client, spools)
         keyboards[spools.cable.name_shown] = unit
     page = read(admin_client.get(PAGE).text)
@@ -130,11 +130,7 @@ def test_its_count_corrected_adjusts_it_in_the_unit_its_line_was_recorded_in(
     spools = Spools(session)
     moved_whole(registered_client, spools)
     counted(admin_client, session, "180")
-    written = select(Movement.unit).join(
-        LedgerTransaction, LedgerTransaction.id == Movement.transaction_id
-    )
-    units = session.scalars(written.where(LedgerTransaction.kind == "adjustment"))
-    assert list(units) == ["m"]
+    assert adjustment_units(session) == ["m"]
 
 
 def test_its_count_corrected_under_a_key_written_already_says_so(

@@ -235,13 +235,13 @@ def at_retired_van(session: Session) -> Place:
 class Spools:
     """A Place whose cable comes in spools of 305 m, tracked when opened
     (docs/decisions/0020), and two sealed ones received into its store. Or
-    of 305 in `unit`, from the start."""
+    of 305 in `cable_unit`, from the start."""
 
     def __init__(
-        self, session: Session, *, tracked: bool = True, unit: str = "m"
+        self, session: Session, *, tracked: bool = True, cable_unit: str = "m"
     ) -> None:
         self.session = session
-        self.place = Place(session, cable_unit=unit)
+        self.place = Place(session, cable_unit=cable_unit)
         self.cable = self.place.cable
         self.cable.track_opened = tracked
         self.spool = add(

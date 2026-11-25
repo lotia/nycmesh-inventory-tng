@@ -29,17 +29,15 @@ UNITS = "('each', 'm', 'ft')"
 # The tables whose rows name their item, so take its unit; an
 # over_recorded row takes its movement's.
 FILLED_FROM_ITEM = ("movement", "item_package", "vendor_offer")
-# The check on what a volunteer said is on an open package: as it was, and
+# The check on what a volunteer said of an open package: as it was, and
 # with its unit, as models.stock.OpenPackage writes it.
-LENGTH_REPORTED_BY = (
-    (
-        "num_nulls(length_reported_at, length_reported_by_volunteer_id,"
-        " length_reported, length_reported_in_id) IN (0, 4)"
-    ),
-    (
-        "num_nulls(length_reported_at, length_reported_by_volunteer_id,"
-        " length_reported, length_reported_unit, length_reported_in_id) IN (0, 5)"
-    ),
+LENGTH_REPORTED_BY_BEFORE = (
+    "num_nulls(length_reported_at, length_reported_by_volunteer_id,"
+    " length_reported, length_reported_in_id) IN (0, 4)"
+)
+LENGTH_REPORTED_BY_WITH_UNIT = (
+    "num_nulls(length_reported_at, length_reported_by_volunteer_id,"
+    " length_reported, length_reported_unit, length_reported_in_id) IN (0, 5)"
 )
 
 
@@ -70,7 +68,7 @@ def upgrade() -> None:
         " WHERE item.id = open_package.item_id"
         " AND open_package.length_reported IS NOT NULL"
     )
-    _length_reported_by(LENGTH_REPORTED_BY[1])
+    _length_reported_by(LENGTH_REPORTED_BY_WITH_UNIT)
     # Among the only columns the app's login may update in each (the
     # initial migration's UPDATED_ONLY): a package's unit follows its
     # item's while that may change (catalogue/items.save).
@@ -87,7 +85,7 @@ def _length_reported_by(check: str) -> None:
 def downgrade() -> None:
     op.execute(f"REVOKE UPDATE (length_reported_unit) ON open_package FROM {APP_ROLE}")
     op.execute(f"REVOKE UPDATE (unit) ON item_package FROM {APP_ROLE}")
-    _length_reported_by(LENGTH_REPORTED_BY[0])
+    _length_reported_by(LENGTH_REPORTED_BY_BEFORE)
     op.drop_column("open_package", "length_reported_unit")
     for table in ("over_recorded", *FILLED_FROM_ITEM):
         op.drop_column(table, "unit")

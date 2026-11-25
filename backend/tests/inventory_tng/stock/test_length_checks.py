@@ -464,7 +464,7 @@ def test_answers_go_back_to_the_page_they_came_from(
 def test_a_length_of_an_item_counted_each_is_whole(
     admin_client: TestClient, registered_client: TestClient, session: Session
 ) -> None:
-    spools = Spools(session, unit="each")
+    spools = Spools(session, cable_unit="each")
     made = spools.opened()
     registered_client.post(URL, json=report(spools, length(made, "250")))
     form = set_form(session, made, "2.5")
@@ -477,7 +477,7 @@ def test_what_is_in_an_open_box_of_pieces_is_whole(
 ) -> None:
     # Ali, 2026-11-23, inventory-tng-uwi3: the server refuses it, as the
     # scan page does. The spools' item made pieces, counted each.
-    spools = Spools(session, unit="each")
+    spools = Spools(session, cable_unit="each")
     made = spools.opened()
     response = registered_client.post(URL, json=report(spools, length(made, "2.5")))
     assert response.status_code == 422
@@ -547,7 +547,7 @@ def test_the_count_page_hints_at_no_printed_length_of_items_counted_each(
 ) -> None:
     """Counted each, as plugs are: none, of the open packages nor under one
     nobody recorded."""
-    pieces = Spools(session, unit="each")
+    pieces = Spools(session, cable_unit="each")
     pieces.opened()
     page = text(admin_client.get(f"/admin/counts/{pieces.store.id}"))
     assert str(formatting.PRINTED_LENGTH) not in page

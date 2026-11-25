@@ -159,6 +159,16 @@ def adjustments(session: Session) -> list[tuple[object, ...]]:
     ]
 
 
+def adjustment_units(session: Session) -> list[str]:
+    """The unit each adjustment's line was written in."""
+    query = (
+        select(Movement.unit)
+        .join(LedgerTransaction, LedgerTransaction.id == Movement.transaction_id)
+        .where(LedgerTransaction.kind == "adjustment")
+    )
+    return list(session.scalars(query))
+
+
 def from_emptied_store(client: TestClient, session: Session) -> Place:
     """Three radios received into the store and moved to the van, then sent
     again as one: two wait, and the store holds nothing, retired."""
