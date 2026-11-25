@@ -34,8 +34,8 @@ log = structlog.get_logger(__name__)
 
 TEXT_FIELDS = ("manufacturer", "part_number", "old_code", "notes", "ordering_notes")
 # The fields of the add form on the items list (templates/catalogue/
-# items.html), besides how the units in its name are read (READING): an
-# add reads only these, so a new item's others are left as Fields.new
+# items.html), besides what its name field adds as it asks (_add_form):
+# an add reads only these, so a new item's others are left as Fields.new
 # leaves them, whatever is sent (Ali, 2026-11-24, inventory-tng-iibw).
 # The item page's form has every field.
 ADD_FIELDS = frozenset({"name", "category_id", "unit", "manufacturer", "part_number"})
@@ -330,12 +330,18 @@ def short_to_set(package: ItemPackage) -> str:
 
 
 def _add_form(form: Mapping[str, str]) -> dict[str, str]:
-    """Of `form`, only what the add form sends (ADD_FIELDS)."""
-    return {
+    """Of `form`, only what the add form sends: ADD_FIELDS, and what its
+    name field adds as it asks: the answers saying how the units in the
+    name are read (READING), and the name confirmed (DIFFERENT)."""
+    kept = {
         key: value
         for key, value in form.items()
-        if key in ADD_FIELDS or key.startswith(READING)
+        if key in ADD_FIELDS or key == DIFFERENT or key.startswith(READING)
     }
+    # How many, not which: a hand-made form's names are free text.
+    if ignored := len(form) - len(kept):
+        log.debug("add form fields ignored", ignored=ignored)
+    return kept
 
 
 def item_fields(

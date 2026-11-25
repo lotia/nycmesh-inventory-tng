@@ -12,6 +12,7 @@ from sqlalchemy.orm import Session
 
 from inventory_tng.catalogue import items
 from inventory_tng.catalogue.forms import (
+    ADD_FIELDS,
     IS_RETIRED,
     NO_LETTERS,
     PICK_A_CATEGORY,
@@ -64,6 +65,16 @@ def test_adding_an_item(
     assert (item.manufacturer, item.part_number) == ("Ubiquiti", "LBE-5AC")
     assert (history(session, "item", item.id)[0].actor or "").startswith("admin:")
     assert "LiteBeam 5AC" in text(admin_client.get(ITEMS))
+
+
+def test_the_add_form_sends_the_fields_adding_reads(admin_client: TestClient) -> None:
+    """A box added to the add form, or taken off it, changes ADD_FIELDS
+    too: otherwise it would be ignored, or read with nothing to show a
+    problem beside."""
+    page = read(admin_client.get(ITEMS).text)
+    form = page.one("form", method="post", action=ITEMS)
+    sent = {each.attrs["name"] for each in form.all("*") if "name" in each.attrs}
+    assert sent == ADD_FIELDS
 
 
 def test_adding_reads_only_the_add_forms_fields(
