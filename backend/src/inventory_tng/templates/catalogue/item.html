@@ -61,9 +61,9 @@ None is left, so nobody can pick it.{% endtrans %}{% endif %}{% endcall %}
     </select>
     {% endif %}
     {#- Answered No (Ali, 2026-11-25, inventory-tng-aknv): after what a
-    change would do (forms.unit_declined_problem), the way to put right a
-    unit wrong from the start. A retired item's note, unit_declined unset,
-    links nothing. #}
+    change would do (unit_change_forms.unit_declined_problem), the way to
+    put right a unit wrong from the start. A retired item's note,
+    unit_declined unset, links nothing. #}
     {% if unit_declined == "labelled" %}
     <span class="problem" id="unit-problem">{{ problems.unit }} {# Translators: follows "The unit is still m. Until …, changing it recalculates its amounts from m.", and perhaps one of them converted; %(revoke)s is the link to revoke its labels, as "revoke its 2 labels". #}{% trans new=recount_to, revoke=revoke_link(labels_printed, its_labels, opens=false) %}If they were really in {{ new }}, {{ revoke }}, then change its unit to {{ new }}; the amounts stay as they are.{% endtrans %}</span>
     {% elif unit_declined == "moved" %}

@@ -17,7 +17,7 @@ from inventory_tng.stock.ledger import Entry, Form
 from inventory_tng.web.forms import RETIRED
 
 from helpers.sign_in import new_admin_id
-from helpers.stock import Spools, received, retire
+from helpers.stock import Spools, received, recount, retire
 
 
 def test_forms_that_cancel_once_loose_hold_nothing(session: Session) -> None:
@@ -60,15 +60,6 @@ def test_an_item_retired_since_its_page_is_refused(session: Session) -> None:
     seen = unit_recounts.planned(session, spools.cable).seen
     retire(session, spools.cable)
     with capture_logs() as logs, pytest.raises(RuleBroken, match=RETIRED):
-        unit_recounts.recount(
-            session,
-            spools.cable,
-            "ft",
-            unit_recounts.Amounts(None, None, {}, {}),
-            seen=seen,
-            key=uuid.uuid4(),
-            admin_id=new_admin_id(session),
-            at=datetime.now(UTC),
-        )
+        recount(session, spools.cable, seen=seen)
     refused = [each for each in logs if each["event"] == "unit recount refused"]
     assert [each["reason"] for each in refused] == ["retired"]

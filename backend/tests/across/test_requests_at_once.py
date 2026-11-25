@@ -121,6 +121,7 @@ from helpers.stock import (
     held_by_form,
     length,
     raise_check,
+    recount,
     report,
     sealed_line,
 )
@@ -1257,16 +1258,7 @@ def _recounting(
 
     def recounting(session: Session) -> None:
         cable = session.get_one(Item, place.cable.id)
-        unit_recounts.recount(
-            session,
-            cable,
-            unit,
-            unit_recounts.Amounts(None, None, {}, sizes or {}),
-            seen=seen,
-            key=uuid.uuid4(),
-            admin_id=admin_id,
-            at=NOW,
-        )
+        recount(session, cable, unit, seen=seen, sizes=sizes, admin_id=admin_id)
 
     return recounting
 

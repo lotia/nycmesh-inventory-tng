@@ -1,12 +1,7 @@
-"""The guided recount of an item whose unit was wrong from the start (Ali,
-2026-11-24 and 2026-11-25, inventory-tng-qety): every place brought to
-zero in the old unit, its open packages closed, its packages in the old
-unit retired and renamed, its unit switched, and Reorder at, what is on
-order and its vendor offers given again in the new unit; then a count at
-each place. Nothing converts, and no label is revoked (Ali, 2026-11-25,
-inventory-tng-8ema). An item converted before whose stock never moved is
-given its packages' sizes in its old unit again instead, their labels
-revoked (Ali, 2026-11-25, inventory-tng-l26i)."""
+"""The guided recount's pages (catalogue/unit_recount_routes.py), and
+what the recount writes, as decision 0003's guided recount amendment
+says (Ali, 2026-11-24 and 2026-11-25, inventory-tng-qety,
+inventory-tng-8ema, inventory-tng-l26i)."""
 
 import uuid
 from collections.abc import Callable

@@ -4,10 +4,8 @@ does to what is recorded in it. While nothing fixes it, its packages and
 vendor offers follow it, their numbers as typed (follow). Once fixed, it
 changes only between lengths, converting what is recorded once an
 administrator confirms it was in the old unit (convert; Ali, 2026-11-24,
-inventory-tng-y50b), revoking no labels, as none names the item's unit
-(Ali, 2026-11-25, inventory-tng-8ema); never between each and a length.
-Converted once, it stays fixed, so changing back converts again (Ali,
-2026-11-25, inventory-tng-l26i).
+inventory-tng-y50b). Why, and what each change keeps:
+docs/decisions/0003-transfer-ledger-over-nested-locations.md.
 A package form drawn before a change, its amount typed in the unit it
 showed, is refused (require_unit_shown), never kept in the new one.
 
@@ -100,18 +98,12 @@ def require_unit_shown(
 def unit_fixed(session: Session, item: Item) -> UnitFixed | None:
     """Why the item's unit can no longer change freely, if it can't: stock
     has moved in it, for good; what it records has been converted between
-    lengths, for good, as a free change would keep converted numbers
-    (Item.unit_converted; Ali, 2026-11-25, inventory-tng-l26i); or a label
-    not revoked has been printed for it or one of its packages (a
-    package's label names its item too). Its ledger's lines record it, and
-    a free change re-tags its packages' units, which their labels print
-    (Ali, 2026-11-23, inventory-tng-rpud; 2026-11-25, inventory-tng-8ema).
-    It may still change between lengths, converting what is recorded,
-    once an administrator confirms what was recorded was in its unit
-    (convert); never between each and a length. A revoked label scans as
-    no label, so it fixes nothing, and revoking the labels of an item
-    never converted lets a mistaken unit be corrected without converting
-    (Ali, 2026-11-23, inventory-tng-37dj)."""
+    lengths, for good (Item.unit_converted); or a label not revoked has
+    been printed for it or one of its packages. It may still change
+    between lengths, converting (convert). Why each fixes it, and why a
+    revoked label fixes nothing: docs/decisions/0003 (Ali, 2026-11-23 and
+    2026-11-25, inventory-tng-rpud, inventory-tng-37dj, inventory-tng-l26i,
+    inventory-tng-8ema)."""
     if exists_where(session, Movement.item_id == item.id):
         return "moved"
     if item.unit_converted:

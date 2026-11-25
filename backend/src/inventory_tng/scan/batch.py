@@ -706,11 +706,7 @@ def _replay(session: Session, batch: batch_schemas.Batch) -> LedgerTransaction |
         lines = [] if started is None else [*compared, *started]
         packages = _packages(
             session,
-            {
-                package_id
-                for line in lines
-                if (package_id := line.leaves.package_id or line.arrives.package_id)
-            },
+            {package_id for line in lines if (package_id := _package_id(line))},
         )
         raise KeyReused(
             _as_batch(session, transaction, movements),
@@ -719,6 +715,11 @@ def _replay(session: Session, batch: batch_schemas.Batch) -> LedgerTransaction |
     replayed.add(1, {"kind": batch.kind})
     log.info("transaction replayed", transaction_id=transaction.id)
     return transaction
+
+
+def _package_id(line: Entry) -> int | None:
+    """The package a line's sealed side names, if either does."""
+    return line.leaves.package_id or line.arrives.package_id
 
 
 def _more_written(
@@ -746,9 +747,7 @@ def _more_written(
         for line in lines:
             quantity, unit, into = line.quantity, line.unit, units.get(line.item_id)
             if unit is not None and into is not None and convertible(unit, into):
-                package = packages.get(
-                    line.leaves.package_id or line.arrives.package_id or 0
-                )
+                package = packages.get(_package_id(line) or 0)
                 # A package a line sent again names may be another item's,
                 # or too small to be kept in its unit: then not by it.
                 quantity = (
@@ -814,7 +813,7 @@ def _as_batch(
             open_id = line.leaves.open_package_id
             whole = True if line.arrives.open_package_id == open_id else None
         else:
-            package_id = line.leaves.package_id or line.arrives.package_id
+            package_id = _package_id(line)
             open_id = None
             whole = None
         return batch_schemas.RecordedLine(

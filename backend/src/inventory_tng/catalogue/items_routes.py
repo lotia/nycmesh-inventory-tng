@@ -24,8 +24,8 @@ from inventory_tng.catalogue import (
     items,
     queries,
     reading_rules,
+    unit_change_forms,
     unit_changes,
-    unit_recounts,
     units,
 )
 from inventory_tng.catalogue.amount_rules import becomes_counted_whole, counted_whole
@@ -457,6 +457,23 @@ def _followed_now(
     )
 
 
+class FixedBy(NamedTuple):
+    """Why an item's unit is fixed, if it is, and its labels not revoked,
+    its own and its packages', read together."""
+
+    why: unit_changes.UnitFixed | None
+    printed: Sequence[labels.Named]
+
+
+def _fixed_by(session: Session, item: Item) -> FixedBy:
+    """Why the item's unit is fixed, and its labels: labels revoked
+    between the two reads fix nothing, so no hint or note says "0
+    labels"."""
+    why = unit_changes.unit_fixed(session, item)
+    printed = labels.current_of(session, Label.item_id == item.id)
+    return FixedBy(None if why == "labelled" and not printed else why, printed)
+
+
 def _item_page(
     request: Request,
     session: Session,
@@ -475,7 +492,7 @@ def _item_page(
     unit_declined: unit_changes.UnitFixed | None = None,
     unit_declined_to: str | None = None,
     unit_example: queries.UnitChangeExample | None = None,
-    printed: Sequence[labels.Named] | None = None,
+    fixed_by: FixedBy | None = None,
 ) -> HTMLResponse:
     """The item's page; its open packages sorted as `asked`, all of them.
     `asking_unit`, the form sent back asks whether what was recorded was
@@ -490,8 +507,8 @@ def _item_page(
     recount (unit_recounts), saying what it does: `unit_example`, the
     amount the note gives as an example (queries.unit_change_example), if
     any. A retired item's No leaves it unset: its note links nothing.
-    `printed`, the item's labels not revoked as the note counted them,
-    so the page says the same count; read here if not given."""
+    `fixed_by`, why its unit is fixed and its labels as the note read
+    them, so the page says the same; read here if not given."""
     here = f"{ITEMS}/{item.id}"
     packages = queries.packages_of_item(session, item.id)
     view = View.read(here, OPEN_SORTING, asked, anchor=OPEN_PACKAGES)
@@ -500,14 +517,8 @@ def _item_page(
     )
     log.debug("open packages listed", item_id=item.id, found=len(opened), sort=view.by)
     short_fraction = _short_fraction(session, item, problems, values)
-    fixed = unit_changes.unit_fixed(session, item)
-    # Not revoked, its own and its packages': how many each hint says.
-    if printed is None:
-        printed = labels.current_of(session, Label.item_id == item.id)
+    fixed, printed = fixed_by or _fixed_by(session, item)
     by_package = Counter(each.label.package_id for each in printed)
-    # Labels revoked between the reads fix nothing: no hint says "0 labels".
-    if fixed == "labelled" and not printed:
-        fixed = None
     # Only a current one's size can change.
     current = [each.id for each in packages if each.retired_at is None]
     sizes = {
@@ -545,7 +556,7 @@ def _item_page(
             "unit_example": unit_example,
             # Converted before: the recount asks its packages' sizes again.
             "recount_resizes": unit_declined == "converted"
-            and bool(unit_recounts.resized_of(session, item)),
+            and any(each.unit == item.unit for each in packages),
             "in_stock": item_total(session, item.id),
             "labels": printed,
             "labels_printed": len(printed),
@@ -838,25 +849,22 @@ def _unit_declined(
     form shown again in its unit as it is, saying what to do instead; for
     a retired item, which can't be changed until it is brought back, only
     that the unit is unchanged, linking nothing (Ali, 2026-11-25)."""
-    why = unit_changes.unit_fixed(session, item)
     # Read once: a label revoked meanwhile never makes the page's count
     # differ from the note's.
-    printed = labels.current_of(session, Label.item_id == item.id)
-    if (
-        why is None
-        or not convertible(item.unit, unit)
-        or (why == "labelled" and not printed)
-    ):
+    why, printed = fixed_by = _fixed_by(session, item)
+    if why is None or not convertible(item.unit, unit):
         # Answered on a page drawn before the item changed, its labels
         # revoked since, or about a change that is not between lengths:
         # ask afresh.
-        return _item_page(request, session, signed, item, values=form)
+        return _item_page(
+            request, session, signed, item, values=form, fixed_by=fixed_by
+        )
     log.info("unit change declined", item_id=item.id, reason=why)
     values = {**form, "unit": item.unit}
     example = queries.unit_change_example(session, item, unit, why)
     retired = item.retired_at is not None
     problems = {
-        "unit": forms.unit_declined_problem(
+        "unit": unit_change_forms.unit_declined_problem(
             item.unit, unit, why, example, len(printed), retired
         )
     }
@@ -870,7 +878,7 @@ def _unit_declined(
         unit_declined=None if retired else why,
         unit_declined_to=unit,
         unit_example=example,
-        printed=printed,
+        fixed_by=fixed_by,
     )
 
 

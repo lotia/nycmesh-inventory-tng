@@ -12,7 +12,7 @@ from httpx2 import Response
 from sqlalchemy import select
 from sqlalchemy.orm import Session, object_session
 
-from inventory_tng.catalogue import items
+from inventory_tng.catalogue import items, unit_recounts
 from inventory_tng.labels import labels
 from inventory_tng.models.base import INTEGER_MAX
 from inventory_tng.models.catalogue import Category, Item, ItemPackage
@@ -37,7 +37,7 @@ from inventory_tng.web.navigation import retired_holding
 from helpers.concurrency import Committed
 from helpers.markup import Element, hidden_fields, read
 from helpers.rows import add, item_fields, tag
-from helpers.sign_in import admin_named
+from helpers.sign_in import admin_named, new_admin_id
 
 # Where the scan page sends its batches.
 URL = "/api/transactions"
@@ -56,6 +56,31 @@ def to_feet(session: Session, item: Item) -> None:
     converted, as after a confirmed change (catalogue/unit_changes.py)."""
     item.unit = "ft"
     session.flush()
+
+
+def recount(
+    session: Session,
+    item: Item,
+    unit: str = "ft",
+    *,
+    seen: str | None = None,
+    sizes: dict[int, unit_recounts.Sized] | None = None,
+    admin_id: int | None = None,
+) -> unit_recounts.Recounted:
+    """The item recounted into `unit` by a new administrator, unless
+    `admin_id`, its packages given `sizes`, from a page that showed `seen`,
+    or what it shows now, as its route sends it, giving no other amount
+    (catalogue/unit_recounts.py)."""
+    return unit_recounts.recount(
+        session,
+        item,
+        unit,
+        unit_recounts.Amounts(None, None, {}, sizes or {}),
+        seen=unit_recounts.planned(session, item).seen if seen is None else seen,
+        key=uuid.uuid4(),
+        admin_id=new_admin_id(session) if admin_id is None else admin_id,
+        at=datetime.now(UTC),
+    )
 
 
 def unit_of(row: ItemPackage | OpenPackage) -> str:

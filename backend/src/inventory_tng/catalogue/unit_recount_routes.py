@@ -1,12 +1,9 @@
-"""The guided recount of an item whose unit was wrong from the start
-(catalogue/unit_recounts.py): its page, saying beforehand all it will do,
-and asking Reorder at, what is on order and its vendor offers again in the
-new unit, and, for one converted before whose stock never moved, its
-packages' sizes, retired ones' too; and the page after, linking to a
-count of it at each place it brought to zero, and naming the packages
-whose labels it revoked, linking to its labels to print those of current
-ones again (Ali, 2026-11-25, inventory-tng-qety, inventory-tng-l26i). The
-answer to No on the item page links here (items_routes)."""
+"""The guided recount's pages (catalogue/unit_recounts.py): the page
+before, saying all it will do and asking the item's amounts again in the
+new unit, and the page after, linking to what is left to do (Ali,
+2026-11-25, inventory-tng-qety, inventory-tng-l26i; what each says:
+docs/decisions/0003). The answer to No on the item page links here
+(items_routes)."""
 
 import uuid
 from collections.abc import Mapping
@@ -17,7 +14,13 @@ from fastapi.responses import HTMLResponse, Response
 from sqlalchemy.orm import Session
 
 from inventory_tng.admins.guards import AdminSignedIn, SignedIn
-from inventory_tng.catalogue import forms, queries, unit_changes, unit_recounts
+from inventory_tng.catalogue import (
+    forms,
+    queries,
+    unit_change_forms,
+    unit_changes,
+    unit_recounts,
+)
 from inventory_tng.catalogue.paths import ITEMS, UNIT_RECOUNT, UNIT_RECOUNTED
 from inventory_tng.core.db_errors import refusal
 from inventory_tng.core.db_sessions import DbSession
@@ -72,10 +75,10 @@ def _page(
             "unit": unit,
             "plan": plan,
             "key": uuid.uuid4(),
-            "on_order": forms.ON_ORDER,
-            "per_order": forms.PER_ORDER,
-            "size_of": forms.SIZE_OF,
-            "short_below_of": forms.SHORT_BELOW_OF,
+            "on_order": unit_change_forms.ON_ORDER,
+            "per_order": unit_change_forms.PER_ORDER,
+            "size_of": unit_change_forms.SIZE_OF,
+            "short_below_of": unit_change_forms.SHORT_BELOW_OF,
             "holds": forms.HOLDS,
             "waiting": RULES[unit_changes.UNIT_CHECKS_WAITING],
             "values": values,
@@ -120,7 +123,7 @@ def recount(
     # refused as changed.
     offers = [each.offer.id for each in queries.current_offers(session, item_id)]
     packages = unit_recounts.resized_of(session, found)
-    amounts, problems = forms.recount_amounts(
+    amounts, problems = unit_change_forms.recount_amounts(
         form, offers, packages, separator=decimal_separator(request)
     )
     if amounts is None:

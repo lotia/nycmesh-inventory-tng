@@ -1,11 +1,9 @@
 """The guided recount: an item whose unit was wrong from the start,
 corrected on the same item in one transaction, keeping its history,
-labels' records and links (Ali, 2026-11-24, inventory-tng-qety). Converting
-(unit_changes.convert) is right only when what was recorded really was in
-the old unit; here the numbers may already be in the new one, so nothing
-converts. Offered for an item in a length whose unit stock having moved,
-or a conversion before, fixes, into another length, as answering No to a
-conversion points here.
+labels' records and links, nothing converted (Ali, 2026-11-24,
+inventory-tng-qety). Offered for an item in a length whose unit stock
+having moved, or a conversion before, fixes, into another length, as
+answering No to a conversion points here.
 
 In the ledger's lock order (stock/ledger.py): the catalogue lock, then
 every place it has been at, then the item; the places read again, and
@@ -28,25 +26,13 @@ then, in order:
    starts after it, as use summed over a time window must
    (inventory-tng-ueg2).
 
-An item whose stock moved but holds nothing now has nothing to bring to
-zero or close; the rest is done as above, and its packages in the other
-unit, as a conversion left them, stay. Then each place is counted in the
-new unit; the page after links to each count.
-
-An item converted before whose stock never moved (Ali, 2026-11-25,
-inventory-tng-l26i) has nothing to write off, close or count, and no
-package is retired: each package in its old unit, current ones first,
-then retired ones, which stay retired, keeps its name and links, its
-size, and its too-short length if it has one, given again in the new
-unit; those in the other unit stay as they are. A retired one brought
-back later (items.restore_package) has the new size, which its checks
-allow: they refuse only a fraction on an item counted each, and a
-converted item is a length, never counted each again.
-
-It revokes no labels, as none names the item's unit (Ali, 2026-11-25,
-inventory-tng-8ema; why: docs/decisions/0003), but those of the packages
-it gives a new size, retired ones' too, which print the old one
-(inventory-tng-l26i)."""
+An item converted before whose stock never moved (inventory-tng-l26i)
+has nothing to write off, close or count, and retires no package: each
+in its old unit, retired ones too, is given its size again in the new
+unit instead (_resize), and only those packages' labels are revoked.
+Which cases skip which steps, and why:
+docs/decisions/0003-transfer-ledger-over-nested-locations.md, its guided
+recount amendment."""
 
 import uuid
 from collections.abc import Iterable, Mapping, Sequence
@@ -405,15 +391,7 @@ def _recounted(
     at: datetime,
 ) -> Recounted:
     """recount's writes, holding the places and the item."""
-    if item.retired_at is not None:
-        _refused(item.id, "retired", RETIRED)
-    # A package asked again whose size was not sent: never left in the old
-    # unit, nor a server error.
-    unsized = {package.id for package in plan.resized} - amounts.sizes.keys()
-    if plan.seen != seen or unsized or unit not in units_open(session, item):
-        _refused(item.id, "changed", CHANGED)
-    if plan.waiting:
-        _refused(item.id, "checks_waiting", unit_changes.UNIT_CHECKS_WAITING)
+    _refuse_unless_as_seen(session, item, unit, amounts, plan, seen)
     old = item.unit
     reason = adjustment_reasons.seeded(session, adjustment_reasons.RECORDS_WRONG).id
     for each in plan.held:
@@ -435,11 +413,7 @@ def _recounted(
             how="unit_recount",
             reason=adjustment_reasons.RECORDS_WRONG,
         )
-    names = {each.package.id: each.name for each in plan.packages}
-    retiring = select(ItemPackage).where(ItemPackage.id.in_(names))
-    for package in session.scalars(locked(retiring.order_by(ItemPackage.id))):
-        package.name = names[package.id]
-        package.retired_at = package.retired_at or at
+    _retire(session, plan, at)
     _resize(session, plan, amounts.sizes, unit, at)
     offers = select(VendorOffer).where(
         VendorOffer.id.in_([each.offer.id for each in plan.offers])
@@ -461,12 +435,43 @@ def _recounted(
         to_unit=unit,
         location_ids=places,
         open_package_ids=[row.id for row in plan.opened],
-        item_package_ids=sorted(names),
+        item_package_ids=sorted(each.package.id for each in plan.packages),
         resized_package_ids=[package.id for package in plan.resized],
         label_ids=plan.revoking,
         vendor_offer_ids=[each.offer.id for each in plan.offers],
     )
     return Recounted(places, plan.revoking)
+
+
+def _refuse_unless_as_seen(
+    session: Session,
+    item: Item,
+    unit: str,
+    amounts: Amounts,
+    plan: Planned,
+    seen: str,
+) -> None:
+    """Refused (_refused) for a retired item, for anything changed since
+    its page showed `seen`, or while a check of it waits."""
+    if item.retired_at is not None:
+        _refused(item.id, "retired", RETIRED)
+    # A package asked again whose size was not sent: never left in the old
+    # unit, nor a server error.
+    unsized = {package.id for package in plan.resized} - amounts.sizes.keys()
+    if plan.seen != seen or unsized or unit not in units_open(session, item):
+        _refused(item.id, "changed", CHANGED)
+    if plan.waiting:
+        _refused(item.id, "checks_waiting", unit_changes.UNIT_CHECKS_WAITING)
+
+
+def _retire(session: Session, plan: Planned, at: datetime) -> None:
+    """The item's packages in the old unit retired, retired ones too, each
+    renamed as planned (Planned.packages)."""
+    names = {each.package.id: each.name for each in plan.packages}
+    retiring = select(ItemPackage).where(ItemPackage.id.in_(names))
+    for package in session.scalars(locked(retiring.order_by(ItemPackage.id))):
+        package.name = names[package.id]
+        package.retired_at = package.retired_at or at
 
 
 def _resize(

@@ -17,9 +17,10 @@ from inventory_tng.catalogue import unit_changes
 from inventory_tng.catalogue.paths import ITEMS, unit_recount
 from inventory_tng.labels import labels
 from inventory_tng.labels.paths import item_labels
-from inventory_tng.models.catalogue import Item, ItemPackage, Vendor, VendorOffer
+from inventory_tng.models.catalogue import Item, Vendor, VendorOffer
 
 from helpers.items import unit_answered
+from helpers.labels import labelled
 from helpers.markup import problem, read
 from helpers.rows import add
 from helpers.stock import Place, Spools, converted_reel, received, retire, write
@@ -34,17 +35,6 @@ def _declined(client: TestClient, item: Item, unit: str) -> str:
     page = client.post(f"{ITEMS}/{item.id}", data=unit_answered(item, "no", unit=unit))
     assert page.status_code == 400
     return page.text
-
-
-def _labelled(session: Session, item: Item, count: int) -> None:
-    """`count` labels printed: the item's own, then one for each of as
-    many new packages as that leaves, as an item has one current label."""
-    assert labels.make_for_item(session, item.id) is not None
-    for n in range(count - 1):
-        package = add(
-            session, ItemPackage(item_id=item.id, name=f"Spool {n}", size=Decimal(305))
-        )
-        assert labels.make_for_item(session, item.id, package.id) is not None
 
 
 def _offer(
@@ -157,7 +147,7 @@ def test_stock_moved_gives_a_place_and_links_to_the_recount(
     recount revokes none (Ali, 2026-11-25, inventory-tng-8ema)."""
     place = _moved(session, unit, str(Decimal(held) + 5), "5")
     cable = place.cable
-    _labelled(session, cable, 2)
+    labelled(session, cable, 1)
     page = _declined(admin_client, cable, into)
     assert problem(page, "unit") == (
         f"The unit is still {unit}. Changing it to {into} recalculates every "
@@ -192,7 +182,7 @@ def test_a_label_revoked_while_the_note_is_drawn_changes_no_count(
     once can, before the page is drawn: the page links to revoke the
     label the note counted, never "revoke its 0 labels"."""
     cable = Place(session).cable
-    _labelled(session, cable, 1)
+    labelled(session, cable, 0)
     reads = []
     current_of = labels.current_of
 
@@ -332,7 +322,7 @@ def test_labels_only_give_a_stored_amount_and_link_to_revoke_the_label(
     inventory-tng-aknv)."""
     cable = Place(session, cable_unit=unit).cable
     _stored(cable, stored, amount)
-    _labelled(session, cable, 1)
+    labelled(session, cable, 0)
     page = _declined(admin_client, cable, into)
     assert problem(page, "unit") == (
         f"The unit is still {unit}. Until its printed label is revoked, "
@@ -355,7 +345,7 @@ def test_the_example_is_the_first_amount_stored(
     _offer(cable, None, vendor="Unsaid")
     _offer(cable, Decimal(305))
     _offer(cable, Decimal(100), vendor="Later")
-    _labelled(session, cable, 1)
+    labelled(session, cable, 0)
     page = _declined(admin_client, cable, "ft")
     assert "The Units per order from Acme would change from 305 m to " in problem(
         page, "unit"
@@ -374,7 +364,7 @@ def test_an_offer_names_its_vendor_as_typed_or_its_address(
     page does."""
     cable = Place(session).cable
     _offer(cable, Decimal(305), vendor=vendor)
-    _labelled(session, cable, 1)
+    labelled(session, cable, 0)
     page = _declined(admin_client, cable, "ft")
     assert f"The Units per order from {named} would change" in problem(page, "unit")
     assert read(page).one("span", id="unit-problem").all("em") == []
@@ -386,7 +376,7 @@ def test_two_labels_and_no_stored_amount_leave_the_example_out(
     """The revoke link once on the page, not in the unit's hint as well
     (inventory-tng-62qs)."""
     cable = Place(session).cable
-    _labelled(session, cable, 2)
+    labelled(session, cable, 1)
     page = _declined(admin_client, cable, "ft")
     assert problem(page, "unit") == (
         "The unit is still m. Until both its printed labels are revoked, "
@@ -404,7 +394,7 @@ def test_more_labels_say_how_many_from_ft_to_m(
 ) -> None:
     cable = Place(session, cable_unit="ft").cable
     cable.minimum = Decimal(1000)
-    _labelled(session, cable, 5)
+    labelled(session, cable, 4)
     page = _declined(admin_client, cable, "m")
     assert problem(page, "unit") == (
         "The unit is still ft. Until all 5 of its printed labels are revoked, "
@@ -540,29 +530,38 @@ def test_a_retired_converted_item_with_no_example_says_only_the_unit(
 
 
 @pytest.mark.parametrize(
-    ("minimum", "said"),
+    ("unit", "into", "minimum", "example"),
     [
         (
+            "m",
+            "ft",
             Decimal(100),
-            (
-                "The unit is still m. Its Reorder at would change from 100 m "
-                "to 328.084 ft."
-            ),
+            " Its Reorder at would change from 100 m to 328.084 ft.",
         ),
-        (None, "The unit is still m."),
+        ("m", "ft", None, ""),
+        (
+            "ft",
+            "m",
+            Decimal(1000),
+            " Its Reorder at would change from 1000 ft to 304.8 m.",
+        ),
+        ("ft", "m", None, ""),
     ],
 )
 def test_a_retired_labelled_item_ends_with_no_link(
-    admin_client: TestClient, session: Session, minimum: Decimal | None, said: str
+    admin_client: TestClient,
+    session: Session,
+    unit: str,
+    into: str,
+    minimum: Decimal | None,
+    example: str,
 ) -> None:
     """Its labels are inactive, so neither a link to revoke them nor
     "Until … revoked": the page's top says to bring it back first (Ali,
     2026-11-25, inventory-tng-aknv)."""
-    cable = Place(session).cable
+    cable = Place(session, cable_unit=unit).cable
     cable.minimum = minimum
-    _labelled(session, cable, 1)
-    answered = unit_answered(cable, "no", unit="ft")
-    retire(session, cable)
-    declined = admin_client.post(f"{ITEMS}/{cable.id}", data=answered)
-    assert problem(declined.text, "unit") == said
-    assert read(declined.text).all("a", href=item_labels(cable.id)) == []
+    labelled(session, cable, 0)
+    page = _retired_declined(admin_client, cable, into)
+    assert problem(page, "unit") == f"The unit is still {unit}.{example}"
+    assert read(page).all("a", href=item_labels(cable.id)) == []

@@ -2095,7 +2095,7 @@ msgstr ""
 #. still m."; <strong>On order</strong> is the item's field of that
 #. name, kept bold; %(amount)s %(old)s is how much is on order,
 #. %(becomes)s %(new)s that converted.
-#: src/inventory_tng/catalogue/forms.py
+#: src/inventory_tng/catalogue/unit_change_forms.py
 #, python-format
 msgid ""
 "Its <strong>On order</strong> would change from %(amount)s %(old)s to "
@@ -2107,7 +2107,7 @@ msgstr ""
 #. still m."; <strong>Reorder at</strong> is the item's field of that
 #. name, kept bold; %(amount)s %(old)s is its value, %(becomes)s
 #. %(new)s that converted.
-#: src/inventory_tng/catalogue/forms.py
+#: src/inventory_tng/catalogue/unit_change_forms.py
 #, python-format
 msgid ""
 "Its <strong>Reorder at</strong> would change from %(amount)s %(old)s to "
@@ -4238,7 +4238,7 @@ msgstr ""
 #. field of that name, kept bold; %(name)s is the vendor's name, or
 #. the address of its offer when it names none; %(amount)s %(old)s is
 #. its value, %(becomes)s %(new)s that converted.
-#: src/inventory_tng/catalogue/forms.py
+#: src/inventory_tng/catalogue/unit_change_forms.py
 #, python-format
 msgid ""
 "The <strong>Units per order</strong> from %(name)s would change from "
@@ -4347,7 +4347,7 @@ msgstr ""
 #. such as a store, a shelf, a bin or a volunteer's home; %(amount)s
 #. %(old)s is what the records hold there, %(becomes)s %(new)s that
 #. converted.
-#: src/inventory_tng/catalogue/forms.py
+#: src/inventory_tng/catalogue/unit_change_forms.py
 #, python-format
 msgid ""
 "The stock at %(name)s would change from %(amount)s %(old)s to %(becomes)s"
@@ -4361,7 +4361,7 @@ msgstr ""
 #. Translators: answered No to "Were the recorded amounts really in
 #. %(old)s?" for a retired item, which can't be changed until it
 #. is brought back.
-#: src/inventory_tng/catalogue/forms.py
+#: src/inventory_tng/catalogue/unit_change_forms.py
 #, python-format
 msgid "The unit is still %(old)s."
 msgstr ""
@@ -4370,7 +4370,7 @@ msgstr ""
 #. %(example)s, one of its amounts converted, as "Its Reorder at would
 #. change from 100 m to 328.084 ft" or "The stock at Shelf A would
 #. change from 305 m to 1000.656 ft".
-#: src/inventory_tng/catalogue/forms.py
+#: src/inventory_tng/catalogue/unit_change_forms.py
 #, python-format
 msgid "The unit is still %(old)s. %(example)s."
 msgstr ""
@@ -4378,7 +4378,7 @@ msgstr ""
 #. Translators: answered No to "Were the recorded amounts really in
 #. %(old)s?" for an item its printed labels fix; %(until)s is as
 #. "Until both its printed labels are revoked". Never "converting".
-#: src/inventory_tng/catalogue/forms.py
+#: src/inventory_tng/catalogue/unit_change_forms.py
 #, python-format
 msgid ""
 "The unit is still %(old)s. %(until)s, changing it recalculates its "
@@ -4388,7 +4388,7 @@ msgstr ""
 #. Translators: as "The unit is still %(old)s. %(until)s, changing it
 #. recalculates its amounts from %(old)s."; %(example)s says one of
 #. them converted, as "Its On order would change from 50 m to 164.042 ft".
-#: src/inventory_tng/catalogue/forms.py
+#: src/inventory_tng/catalogue/unit_change_forms.py
 #, python-format
 msgid ""
 "The unit is still %(old)s. %(until)s, changing it recalculates its "
@@ -4398,7 +4398,7 @@ msgstr ""
 #. Translators: answered No to "Were the recorded amounts really in
 #. %(old)s?" for an item whose stock has moved, though it holds
 #. and stores none. Never "converting".
-#: src/inventory_tng/catalogue/forms.py
+#: src/inventory_tng/catalogue/unit_change_forms.py
 #, python-format
 msgid ""
 "The unit is still %(old)s. Changing it to %(new)s recalculates every "
@@ -4411,7 +4411,7 @@ msgstr ""
 #. from 305 m to 1000.656 ft", or, with none held anywhere, a stored
 #. one, as "Its Reorder at would change from 100 m to 328.084 ft".
 #. Never "converting".
-#: src/inventory_tng/catalogue/forms.py
+#: src/inventory_tng/catalogue/unit_change_forms.py
 #, python-format
 msgid ""
 "The unit is still %(old)s. Changing it to %(new)s recalculates every "
@@ -4421,7 +4421,7 @@ msgstr ""
 #. Translators: answered No to "Were the recorded amounts really in
 #. %(old)s?" for an item whose amounts have been converted before.
 #. Never "converting".
-#: src/inventory_tng/catalogue/forms.py
+#: src/inventory_tng/catalogue/unit_change_forms.py
 #, python-format
 msgid ""
 "The unit is still %(old)s. Changing it to %(new)s recalculates its "
@@ -4432,7 +4432,7 @@ msgstr ""
 #. %(old)s?" for an item whose amounts have been converted before;
 #. %(example)s says one of them converted, as "The Units per order from
 #. Acme would change from 1000.656 ft to 305 m". Never "converting".
-#: src/inventory_tng/catalogue/forms.py
+#: src/inventory_tng/catalogue/unit_change_forms.py
 #, python-format
 msgid ""
 "The unit is still %(old)s. Changing it to %(new)s recalculates its "
@@ -4713,14 +4713,14 @@ msgstr ""
 
 #. Translators: opens "…, changing it recalculates its amounts", said
 #. of an item with two labels printed for it, not revoked.
-#: src/inventory_tng/catalogue/forms.py
+#: src/inventory_tng/catalogue/unit_change_forms.py
 msgid "Until both its printed labels are revoked"
 msgstr ""
 
 #. Translators: opens "…, changing it recalculates its amounts", said
 #. of an item with labels printed for it, not revoked; the plural
 #. is said of more than two, as two have their own words.
-#: src/inventory_tng/catalogue/forms.py
+#: src/inventory_tng/catalogue/unit_change_forms.py
 #, python-format
 msgid "Until its printed label is revoked"
 msgid_plural "Until all %(num)s of its printed labels are revoked"

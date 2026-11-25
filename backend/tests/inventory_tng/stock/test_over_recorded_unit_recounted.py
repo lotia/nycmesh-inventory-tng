@@ -4,36 +4,17 @@ under its key after the recount says: the recount wrote all of it off,
 in a unit wrong from the start, so no check is raised, which a
 correction would write back."""
 
-import uuid
-from datetime import UTC, datetime
 from decimal import Decimal
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 from structlog.testing import capture_logs
 
-from inventory_tng.catalogue import unit_recounts
 from inventory_tng.models.stock import Movement
 from inventory_tng.stock import over_recorded
 
 from helpers.over_recorded import checks
-from helpers.sign_in import new_admin_id
-from helpers.stock import Place, received
-
-
-def _recounted(session: Session, place: Place) -> None:
-    """The place's cable recounted from m into ft."""
-    cable = place.cable
-    unit_recounts.recount(
-        session,
-        cable,
-        "ft",
-        unit_recounts.Amounts(None, None, {}, {}),
-        seen=unit_recounts.planned(session, cable).seen,
-        key=uuid.uuid4(),
-        admin_id=new_admin_id(session),
-        at=datetime.now(UTC),
-    )
+from helpers.stock import Place, received, recount
 
 
 def _ten(session: Session, place: Place) -> None:
@@ -53,7 +34,7 @@ def test_a_line_before_the_recount_raises_no_check(session: Session) -> None:
     place = Place(session)
     _ten(session, place)
     (before,) = _lines(session)
-    _recounted(session, place)
+    recount(session, place.cable)
     with capture_logs() as logs:
         over_recorded.raise_checks(session, {before: Decimal(4)})
     assert checks(session) == []
@@ -65,7 +46,7 @@ def test_a_line_before_the_recount_raises_no_check(session: Session) -> None:
 def test_a_line_after_the_recount_raises_its_check(session: Session) -> None:
     place = Place(session)
     _ten(session, place)
-    _recounted(session, place)
+    recount(session, place.cable)
     _ten(session, place)
     after = _lines(session)[-1]
     over_recorded.raise_checks(session, {after: Decimal(4)})
