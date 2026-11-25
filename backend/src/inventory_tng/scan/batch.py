@@ -615,8 +615,14 @@ def _lengths_as_kept(
 
 
 def _kept_as_sent(kept: Mapping[str, str]) -> tuple[uuid.UUID, Decimal, str]:
-    """One of those, as sent, compared whatever its decimal places."""
-    return uuid.UUID(kept["open_package_key"]), Decimal(kept["left"]), kept["unit"]
+    """One of those, as sent, compared whatever its decimal places. One an
+    earlier build kept says no unit: read as "", which no batch sends, so a
+    resend of it is refused as the key reused, never a server error."""
+    return (
+        uuid.UUID(kept["open_package_key"]),
+        Decimal(kept["left"]),
+        kept.get("unit", ""),
+    )
 
 
 def _replay(session: Session, batch: batch_schemas.Batch) -> LedgerTransaction | None:

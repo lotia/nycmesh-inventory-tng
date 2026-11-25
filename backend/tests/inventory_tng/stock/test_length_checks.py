@@ -16,6 +16,7 @@ from sqlalchemy.orm import Session
 from inventory_tng.core.local_env import CLONE
 from inventory_tng.models.catalogue import Item, ItemPackage
 from inventory_tng.models.stock import LedgerTransaction, OpenPackage
+from inventory_tng.scan import batch as scan_batch
 from inventory_tng.stock import (
     balance,
     counts,
@@ -112,6 +113,23 @@ def test_a_volunteer_reports_what_is_on_it_and_nothing_moves(
     # Or in another unit (inventory-tng-fs50).
     in_ft = batch | {"lengths": [length(made, "250.5", "ft")]}
     assert registered_client.post(URL, json=in_ft).status_code == 409
+
+
+def test_a_resend_of_a_report_kept_without_its_unit_is_refused(
+    registered_client: TestClient, spools: Spools, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A transaction an earlier build kept says no unit of its reports: a
+    resend under its key is refused as the key reused, as one in another
+    unit is, never a server error (inventory-tng-fs50)."""
+    made = spools.opened()
+    batch = report(spools, length(made, "250.5"))
+    as_kept = {"open_package_key": str(made.key), "left": "250.5"}
+    with monkeypatch.context() as earlier:
+        earlier.setattr(scan_batch, "_lengths_as_kept", lambda _: [as_kept])
+        assert registered_client.post(URL, json=batch).status_code == 201
+    resent = registered_client.post(URL, json=batch)
+    assert resent.status_code == 409
+    assert resent.json()["recorded"]["lengths"] == [as_kept | {"unit": ""}]
 
 
 def test_a_report_rides_with_a_cut(

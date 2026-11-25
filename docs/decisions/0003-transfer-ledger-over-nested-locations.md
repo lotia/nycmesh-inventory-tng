@@ -362,8 +362,8 @@ unit beside it, rather than being read in whatever unit the item has now:
 - An item's own reorder point and amount on order are in its unit, on
   the same row.
 - A batch kept as sent, to answer it sent again, keeps the lengths as
-  the page sent them, with no unit: the open package keeps each with
-  its unit.
+  the page sent them, each with the unit it was shown in
+  (inventory-tng-fs50).
 
 The ledger writes a line only in its item's unit, as it holds the item.
 Every sum of the ledger adds only lines in their item's unit: the

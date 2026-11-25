@@ -913,6 +913,32 @@ def test_counts_saves_shown_in_a_unit_or_size_changed_since(
     }
 
 
+def test_counts_a_length_reported_in_a_unit_changed_since(
+    rolled_back: Recorded, session: Session
+) -> None:
+    """What is on an open spool, said in m once the cable counts in ft, is
+    refused as shown otherwise and counted so (inventory-tng-fs50)."""
+    client, _, reader, _ = rolled_back
+    shown_otherwise = "inventory.saves.shown_otherwise"
+    refused = "inventory.transactions.refused"
+    before = counted(reader, shown_otherwise)
+    refused_before = counted(reader, refused)
+    spools = Spools(session)
+    made = spools.opened()
+    spools.cable.unit = "ft"
+    session.flush()
+    _, token = new_device(session)
+    client.cookies.set(devices.COOKIE, token)
+    batch = report(spools, length(made, "50", "m"))
+    assert client.post("/api/transactions", json=batch).status_code == 422
+    assert added(reader, shown_otherwise, before) == {
+        (("changed", "unit"), ("save", "batch")): 1
+    }
+    assert added(reader, refused, refused_before) == {
+        (("reason", "shown_otherwise"),): 1
+    }
+
+
 def test_counts_numbers_typed_with_the_other_decimal_separator(
     rolled_back: Recorded, session: Session
 ) -> None:
