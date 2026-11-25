@@ -38,7 +38,7 @@ def moved_out(
 ) -> list[MovedOut]:
     """What left each of the places in the ledger transactions after
     `after`, by where it went, item and the form it arrived in, in all,
-    in its unit (line_amounts):
+    in its unit as read where it left (line_amounts):
     an opening or a loosening, which changes only the form of stock at a
     place, is no move. Split at the moment `split`, if given, into what left up to it
     and what left after it (MovedOut.later). In order of place, then
@@ -51,7 +51,7 @@ def moved_out(
     if split is not None:
         by.append(LedgerTransaction.id > split)
     query = (
-        select(*by, at_scale_sql(func.sum(in_items_unit())))
+        select(*by, at_scale_sql(func.sum(in_items_unit("from"))))
         .join(LedgerTransaction, LedgerTransaction.id == Movement.transaction_id)
         .join(Item, Item.id == Movement.item_id)
         .where(

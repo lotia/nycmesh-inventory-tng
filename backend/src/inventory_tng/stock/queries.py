@@ -375,14 +375,15 @@ def openings_at(
     """The sealed packages of `item_ids` opened at the places in the ledger
     transactions after `after` up to `up_to`, the newest first: each
     line's place, item, package, the open package it made (None, opened
-    loose) and amount, in its item's unit (line_amounts)."""
+    loose) and amount made, in its item's unit (line_amounts): the true
+    length of a package opened before a change between m and ft."""
     return session.execute(
         select(
             LedgerTransaction.to_location_id,
             Movement.item_id,
             Movement.from_package_id,
             Movement.to_open_package_id,
-            at_scale_sql(in_items_unit()),
+            at_scale_sql(in_items_unit("to")),
         )
         .join(LedgerTransaction, LedgerTransaction.id == Movement.transaction_id)
         .join(Item, Item.id == Movement.item_id)
@@ -411,7 +412,7 @@ def loosened_at(
             LedgerTransaction.to_location_id,
             Movement.item_id,
             Movement.from_open_package_id,
-            at_scale_sql(in_items_unit()),
+            at_scale_sql(in_items_unit("to")),
         )
         .join(LedgerTransaction, LedgerTransaction.id == Movement.transaction_id)
         .join(Item, Item.id == Movement.item_id)

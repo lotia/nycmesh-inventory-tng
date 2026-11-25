@@ -1,7 +1,8 @@
 """A line recorded with more than was moved, in m, its check raised after
 its item changed to ft (inventory-tng-y50b): a batch sent again under its
 key once the change was saved. Correct and a corrected count write in ft,
-sealed spools by how many, the rest exactly (inventory-tng-4fjq)."""
+each end as the ledger reads that side: sealed spools by how many, the
+rest exactly (inventory-tng-4fjq, inventory-tng-77eu)."""
 
 import uuid
 from decimal import Decimal
@@ -150,12 +151,13 @@ def test_a_count_corrected_is_typed_in_m_and_written_in_ft(
     assert adjustment_units(session) == ["ft"]
 
 
-def test_an_openings_open_end_is_undone_by_packages(session: Session) -> None:
+def test_each_end_of_an_opening_is_undone_as_it_is_read(session: Session) -> None:
     """A spool of 1001 ft, kept as 305.105 m, opened in m, its check
-    raised after the cable changed to ft: the ledger reads the opening by
-    packages, 1001 ft on each side, so Correct undoes 1001 ft at both
-    ends, the open spool's too, not 305.105 m converted exactly
-    (1001.001 ft), which would leave it 0.001 ft short."""
+    raised after the cable changed to ft: the ledger reads the sealed end
+    by packages, 1001 ft, and the open end exactly, 1001.001 ft
+    (1001.00066), so Correct undoes each end so: a whole spool is found
+    sealed, and the open spool shows nothing, not a part of a thousandth
+    over or short (Ali, 2026-11-25, inventory-tng-77eu)."""
     place = Place(session)
     cable = place.cable
     cable.track_opened = True
@@ -181,6 +183,7 @@ def test_an_openings_open_end_is_undone_by_packages(session: Session) -> None:
     assert check.unit == "m"
     correct_check(session, check, over_recorded.seen(check), new_admin_id(session))
     session.flush()
-    assert [row[2] for row in adjustments(session)] == [Decimal(1001)] * 2
+    amounts = [row[2] for row in adjustments(session)]
+    assert amounts == [Decimal(1001), Decimal("1001.001")]
     assert adjustment_units(session) == ["ft", "ft"]
     assert held_by_form(session, store, cable.id) == {(cable.id, sealed): Decimal(1001)}

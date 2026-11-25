@@ -403,26 +403,35 @@ recorded. Rejected: keeping the unit fixed once stock has moved.
   size. A check raised after all, by a batch sent again or while the
   change ran, is corrected in the item's unit now, holding the item as
   the ledger does, and so is an open package's count confirmed in its
-  line's unit: as the ledger reads the line, by how many packages if
-  either side is sealed, else exactly (2026-11-25, inventory-tng-4fjq).
+  line's unit: each end as the ledger reads that side of the line, by
+  how many packages on a sealed side, else exactly (2026-11-25,
+  inventory-tng-4fjq, inventory-tng-77eu).
 - No converts nothing and says how to put right a unit wrong from the
   start, until the guided recount (inventory-tng-qety) does it: count
   its stock in the old unit first, then change its unit; or, only
   labelled, revoke its labels first.
 - Old ledger lines keep their unit; each sum converts them as it reads
   them. A foot is 0.3048 m exactly (`catalogue/unit_conversion.py`, in
-  Python and SQL alike). A line converts exactly and a sum is rounded
-  once, as amounts are kept (`QUANTITY_SCALE`), so 305 m on a shelf
-  reads 1000.656 ft and a sum does not drift by its lines' roundings.
-  A place's total, and what a count compares with, is the sum of its
-  forms, each rounded once: an open package's opening converts by its
-  package and its cuts exactly, so one emptied before the change reads
-  nothing, not a part of a thousandth (2026-11-25, inventory-tng-8s2c).
-  Each and a length never convert: such a line is still refused as it
-  is read.
+  Python and SQL alike). Each side of a line is read apart (Ali,
+  2026-11-25, inventory-tng-77eu): a side in sealed packages converts
+  by its packages (below), and a side loose or in an open package
+  converts exactly. A sum is rounded once, as amounts are kept
+  (`QUANTITY_SCALE`), so 305 m loose on a shelf reads 1000.656 ft and
+  a sum does not drift by its lines' roundings. So every form at every
+  place nets as its lines say: loose units or an open package emptied
+  before the change read nothing, not a part of a thousandth. An
+  opening before the change gives the form it made the package's true
+  length, so it no longer nets to nothing at its place: the item's
+  total gains that part of a thousandth. A place's total, and what a
+  count compares with, is the sum of its forms, each rounded once
+  (2026-11-25, inventory-tng-8s2c). Rejected: accepting the drift for
+  loose stock, and converting an opening exactly on both sides, which
+  moves the part of a thousandth into the sealed form. Each and a
+  length never convert: such a line is still refused as it is read.
 - A package keeps its size and too-short length in its own unit, so a
   "Spool 305 m" label stays true. Wherever stock moves, is counted or is
   sent to the scan page, a package's size is read in its item's unit, as
-  kept: so many 305 m spools are so many times 1000.656 ft. A line of
-  sealed packages recorded before converts by its packages the same
-  way, so spools received in m leave whole in ft, nothing over.
+  kept: so many 305 m spools are so many times 1000.656 ft. A side of
+  a line in sealed packages recorded before converts by its packages
+  the same way, so spools received in m leave whole in ft, nothing
+  over.

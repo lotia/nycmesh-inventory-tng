@@ -87,10 +87,9 @@ def _into_open(session: Session, open_id: int, *where: ColumnElement[bool]) -> D
     """All that went into an open package less all that left it, in the
     ledger transactions `where` picks, in its item's unit (line_amounts)."""
     # A whole move names it on both sides: in and out, nothing changed.
-    amount = in_items_unit()
-    signed = case((Movement.to_open_package_id == open_id, amount), else_=0) - case(
-        (Movement.from_open_package_id == open_id, amount), else_=0
-    )
+    signed = case(
+        (Movement.to_open_package_id == open_id, in_items_unit("to")), else_=0
+    ) - case((Movement.from_open_package_id == open_id, in_items_unit("from")), else_=0)
     total = session.scalar(
         select(func.coalesce(at_scale_sql(func.sum(signed)), 0))
         .select_from(Movement)
@@ -140,8 +139,8 @@ def flows(
     rows = session.execute(
         select(
             Movement.item_id,
-            at_scale_sql(func.sum(in_items_unit()).filter(into)),
-            at_scale_sql(func.sum(in_items_unit()).filter(out)),
+            at_scale_sql(func.sum(in_items_unit("to")).filter(into)),
+            at_scale_sql(func.sum(in_items_unit("from")).filter(out)),
         )
         .join(LedgerTransaction, LedgerTransaction.id == Movement.transaction_id)
         .join(Item, Item.id == Movement.item_id)
@@ -178,25 +177,26 @@ def form_flows(
         return flow
     sides = (
         (
-            True,
+            "to",
             LedgerTransaction.to_location_id,
             Movement.to_package_id,
             Movement.to_open_package_id,
         ),
         (
-            False,
+            "from",
             LedgerTransaction.from_location_id,
             Movement.from_package_id,
             Movement.from_open_package_id,
         ),
     )
-    for into, place, package, opened in sides:
+    for side, place, package, opened in sides:
+        into = side == "to"
         rows = session.execute(
             select(
                 Movement.item_id,
                 package,
                 opened,
-                at_scale_sql(func.sum(in_items_unit())),
+                at_scale_sql(func.sum(in_items_unit(side))),
             )
             .join(LedgerTransaction, LedgerTransaction.id == Movement.transaction_id)
             .join(Item, Item.id == Movement.item_id)
@@ -215,10 +215,11 @@ def _signed_at(
 ) -> tuple[ColumnElement[Any], ...]:
     """Each movement up to the moment `as_of` at the places, once at each
     end there: the place, the item, its form on that side (to_ or from_)
-    and its quantity in its item's unit (line_amounts), more for in, less
-    for out. A subquery's columns, by name: place, item_id, package_id,
-    open_package_id and quantity. An opening, both ends at one place, nets
-    to nothing but by form."""
+    and its quantity in its item's unit as that side reads (line_amounts),
+    more for in, less for out. A subquery's columns, by name: place,
+    item_id, package_id, open_package_id and quantity. An opening, both
+    ends at one place, nets to nothing but by form, or to a part of a
+    thousandth after a change between m and ft (line_amounts)."""
     ids = list(location_ids)
     sides = []
     for side, sign in (("to", 1), ("from", -1)):
@@ -231,7 +232,7 @@ def _signed_at(
                     getattr(Movement, f"{side}_{column}").label(column)
                     for column in ("package_id", "open_package_id")
                 ),
-                (in_items_unit() * literal(sign)).label("quantity"),
+                (in_items_unit(side) * literal(sign)).label("quantity"),
             )
             .join(LedgerTransaction, LedgerTransaction.id == Movement.transaction_id)
             .join(Item, Item.id == Movement.item_id)

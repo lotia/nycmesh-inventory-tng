@@ -1,27 +1,30 @@
 """A ledger line's amount as every sum of the ledger reads it: in its
-item's unit. Each line records the unit it was entered in (Movement.unit;
-Ali, 2026-11-24, inventory-tng-2rlr), which its item's may have changed
-from since, between lengths (inventory-tng-y50b): such a line converts as
-it is read, and keeps its own unit in the ledger. A line in a unit that
-does not convert, each and a length, is refused as it is read, so no sum
-adds amounts in two units unawares.
+item's unit, on one of its sides. Each line records the unit it was
+entered in (Movement.unit; Ali, 2026-11-24, inventory-tng-2rlr), which its
+item's may have changed from since, between lengths (inventory-tng-y50b):
+such a line converts as it is read, and keeps its own unit in the ledger.
+A line in a unit that does not convert, each and a length, is refused as
+it is read, so no sum adds amounts in two units unawares.
 
-A line converts exactly, and a sum is rounded once, as kept
-(unit_conversion.at_scale_sql), so it does not drift by its lines'
-roundings: Shelf A's 305 m reads 1000.656 ft.
-A line of sealed packages converts by its packages instead: so many, each
-its size in its item's unit as kept
+Each side of a line is read apart (Ali, 2026-11-25, inventory-tng-77eu).
+A side in sealed packages converts by its packages: so many, each its
+size in its item's unit as kept
 (models.catalogue.ItemPackage.size_in_items_unit), as the ledger takes
 them since, so packages received before a change leave whole after it.
-So an open package's lines may net a part of a thousandth, which its form
-rounds away: a place's total sums its forms as kept, not its lines
-(balance.balance; inventory-tng-8s2c).
-An amount said of a line, as a correction undoing some of it is written,
-is read by the same expression (said_in_items_unit; inventory-tng-4fjq).
+A side loose or in an open package converts exactly, and a sum is rounded
+once, as kept (unit_conversion.at_scale_sql), so it does not drift by its
+lines' roundings: Shelf A's 305 m loose reads 1000.656 ft. So every form
+at every place nets as its lines say, and an opening before a change
+gives the form it made the package's true length: its two ends differ by
+a part of a thousandth, which the item's total gains. A place's total
+sums its forms as kept (balance.balance; inventory-tng-8s2c).
+An amount said of a line, as a correction undoing some of it on a side
+is written, is read by the same expression (said_in_items_unit;
+inventory-tng-4fjq).
 """
 
 from decimal import Decimal
-from typing import Any
+from typing import Any, Literal
 
 from sqlalchemy import (
     ColumnElement,
@@ -31,7 +34,6 @@ from sqlalchemy import (
     and_,
     case,
     cast,
-    func,
     literal,
     select,
 )
@@ -46,15 +48,20 @@ from inventory_tng.catalogue.unit_conversion import (
 from inventory_tng.models.catalogue import Item, ItemPackage
 from inventory_tng.models.stock import Movement
 
+# A line's side: where it arrives ("to") or where it leaves ("from"), as
+# Movement's to_ and from_ columns name them.
+type Side = Literal["to", "from"]
+_SEALED = {"to": Movement.to_package_id, "from": Movement.from_package_id}
+
 
 def _by_packages(
-    sealed: ColumnElement[Any], quantity: SQLColumnExpression[Any]
+    sealed: SQLColumnExpression[int | None], quantity: SQLColumnExpression[Any]
 ) -> ColumnElement[Any]:
-    """A sealed line's amount, `quantity`, in its item's unit: how many
-    packages it moves, each its size as kept in the line's unit then, times
-    that size as kept in its item's now. Its package is `sealed`, an alias of its
-    own, so a query that joins a package for another reason does not
-    change which."""
+    """A sealed side's amount, `quantity`, in its item's unit: how many
+    packages it moves, each its size as kept in the line's unit then,
+    times that size as kept in its item's now. Its package is `sealed`,
+    an alias of its own, so a query that joins a package for another
+    reason does not change which."""
     package = aliased(ItemPackage)
     then = converted_kept_sql(package.size, package.unit, Movement.unit)
     now = converted_kept_sql(package.size, package.unit, Item.unit)
@@ -67,21 +74,23 @@ def _by_packages(
 
 
 def in_items_unit(
-    quantity: SQLColumnExpression[Any] = Movement.quantity,
+    side: Side, quantity: SQLColumnExpression[Any] = Movement.quantity
 ) -> ColumnElement[Any]:
     """`quantity` of a line, its Movement.quantity unless an amount said
-    of it, read in its item's unit, of the Item the query joins to the
-    line, exactly: a sum or a line read alone is rounded with
-    unit_conversion.at_scale_sql(). A line in a unit that does not convert is an error as it is
-    read, saying the line's id and both units: those words cast to a
-    number, a DataError, as the database may hold no function to raise one
-    (docs/decisions/0016). The words are made from the row's columns, so
-    PostgreSQL cannot work them out as it plans, only for a line that
-    reaches them: one in its item's unit or a length never does. No page
-    answers the error: the ledger writes no line in another unit than its
-    item's (ledger.insert_transaction, movement_unit), and an item's unit
-    changes from each to a length only while it has none, so one means a
-    bug, a 500 whose words name only the line and units."""
+    of it, read on its `side` in its item's unit, of the Item the query
+    joins to the line: by its packages if that side is sealed, else
+    exactly. A sum or a line read alone is rounded with
+    unit_conversion.at_scale_sql(). A line in a unit that does not
+    convert is an error as it is read, saying the line's id and both
+    units: those words cast to a number, a DataError, as the database may
+    hold no function to raise one (docs/decisions/0016). The words are
+    made from the row's columns, so PostgreSQL cannot work them out as it
+    plans, only for a line that reaches them: one in its item's unit or a
+    length never does. No page answers the error: the ledger writes no
+    line in another unit than its item's (ledger.insert_transaction,
+    movement_unit), and an item's unit changes from each to a length only
+    while it has none, so one means a bug, a 500 whose words name only
+    the line and units."""
     refused = (
         literal("ledger line ")
         + cast(Movement.id, Text)
@@ -91,7 +100,7 @@ def in_items_unit(
         + Item.unit
     )
     lengths = and_(Movement.unit.in_(list(IN_METRES)), Item.unit.in_(list(IN_METRES)))
-    sealed = func.coalesce(Movement.from_package_id, Movement.to_package_id)
+    sealed = _SEALED[side]
     return case(
         (Movement.unit == Item.unit, quantity),
         (and_(lengths, sealed.is_not(None)), _by_packages(sealed, quantity)),
@@ -102,14 +111,19 @@ def in_items_unit(
 
 def said_in_items_unit(
     session: Session, movement_id: int, amount: Decimal
-) -> tuple[Decimal, str]:
+) -> tuple[dict[Side, Decimal], str]:
     """`amount` of the line `movement_id`, said in the line's unit, as
-    in_items_unit() reads the line, kept, and its item's unit. Call it
-    holding the item (ledger.hold_across), so its unit cannot change
-    before it is written."""
-    said, unit = session.execute(
-        select(at_scale_sql(in_items_unit(literal(amount, Numeric))), Item.unit)
+    in_items_unit() reads it on each side, kept, by side, and its item's
+    unit. Call it holding the item (ledger.hold_across), so its unit
+    cannot change before it is written."""
+    said = literal(amount, Numeric)
+    into, out, unit = session.execute(
+        select(
+            at_scale_sql(in_items_unit("to", said)),
+            at_scale_sql(in_items_unit("from", said)),
+            Item.unit,
+        )
         .join(Item, Item.id == Movement.item_id)
         .where(Movement.id == movement_id)
     ).one()
-    return said, unit
+    return {"to": into, "from": out}, unit

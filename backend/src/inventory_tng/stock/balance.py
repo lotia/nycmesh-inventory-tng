@@ -30,10 +30,10 @@ from inventory_tng.stock.line_amounts import in_items_unit
 
 def _sides() -> Subquery:
     """Each side of every line, as stock into a place (+) or out of it (-),
-    in the form it is in there, in the item's unit (line_amounts). Each
-    side is a select of its own, joined by UNION ALL, so a filter on a
-    place or an item reaches the indexes on each side, instead of summing
-    the whole ledger first."""
+    in the form it is in there, in the item's unit as that side reads
+    (line_amounts). Each side is a select of its own, joined by UNION ALL,
+    so a filter on a place or an item reaches the indexes on each side,
+    instead of summing the whole ledger first."""
     moved = (
         select(Movement.item_id)
         .join(LedgerTransaction, LedgerTransaction.id == Movement.transaction_id)
@@ -43,13 +43,13 @@ def _sides() -> Subquery:
         LedgerTransaction.to_location_id.label("location_id"),
         Movement.to_package_id.label("package_id"),
         Movement.to_open_package_id.label("open_package_id"),
-        in_items_unit().label("quantity"),
+        in_items_unit("to").label("quantity"),
     ).where(LedgerTransaction.to_location_id.is_not(None))
     out = moved.add_columns(
         LedgerTransaction.from_location_id,
         Movement.from_package_id,
         Movement.from_open_package_id,
-        -in_items_unit(),
+        -in_items_unit("from"),
     ).where(LedgerTransaction.from_location_id.is_not(None))
     return union_all(into, out).subquery("side")
 
@@ -76,9 +76,8 @@ by_form = _by_form()
 # The same, whatever its form: a place whose stock all left keeps its row,
 # at zero. Read as a table: select(balance.c.quantity).where(
 # balance.c.item_id == ...). The sum of its forms as by_form keeps them,
-# not of every line: after a change between m and ft an open package's
-# opening converts by its package, its cuts exactly, so its lines net a
-# part of a thousandth that its form rounds away (inventory-tng-8s2c).
+# not of every line: two forms each holding a part of a thousandth would
+# otherwise make the total differ from its rows (inventory-tng-8s2c).
 balance = (
     select(
         by_form.c.item_id,

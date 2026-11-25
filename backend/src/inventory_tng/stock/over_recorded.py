@@ -409,14 +409,14 @@ def close(session: Session, check_id: int, seen_as: str, admin_id: int) -> None:
 
 def _in_items_unit(
     session: Session, movement: Movement, amount: Decimal
-) -> tuple[Decimal, str]:
+) -> tuple[dict[line_amounts.Side, Decimal], str]:
     """`amount` of a check of `movement`, in the unit its line was recorded
-    in, as the ledger reads the line in its item's unit now, and that unit
-    (line_amounts.said_in_items_unit), to write it in: by packages if
-    either side of the line is sealed, so whole packages stay whole and an
-    opening's open end is undone as much as it was given
-    (inventory-tng-4fjq). The item held first, as the ledger holds it
-    after the check's places, so a change of its unit between lengths
+    in, as the ledger reads the line on each side in its item's unit now,
+    by side, and that unit (line_amounts.said_in_items_unit), to write it
+    in: by packages on a sealed side, so whole packages stay whole, else
+    exactly, so each end is undone as the ledger gave it (inventory-tng-4fjq,
+    inventory-tng-77eu). The item held first, as the ledger holds it after
+    the check's places, so a change of its unit between lengths
     (catalogue/items.py), which holds it FOR UPDATE, has committed or
     waits. A check raised while that change ran, after it looked for
     checks waiting, so converts here too."""
@@ -475,12 +475,12 @@ def correct(
             over_recorded_id=check_id,
             open_package_id=movement.to_open_package_id,
         )
-    sides = (
+    sides: tuple[tuple[int | None, line_amounts.Side, ledger.Form], ...] = (
         (
             None
             if row.left_count_id or (whole and loose_at is not None)
             else transaction.from_location_id,
-            True,
+            "from",
             ledger.Form(movement.from_package_id, movement.from_open_package_id),
         ),
         (
@@ -489,7 +489,7 @@ def correct(
             else transaction.to_location_id
             if loose_at is None
             else loose_at,
-            False,
+            "to",
             # Made loose, what it showed is loose units there now.
             ledger.LOOSE
             if loose_at is not None
@@ -497,18 +497,18 @@ def correct(
         ),
     )
     # The check is in the unit its line was recorded in (raise_checks).
-    amount, unit = _in_items_unit(session, movement, row.quantity)
-    for place, found, form in sides:
+    amounts, unit = _in_items_unit(session, movement, row.quantity)
+    for place, side, form in sides:
         if place is None:
             continue
         counts.record_adjustment(
             session,
-            correction_key(transaction.idempotency_key, row, found=found),
+            correction_key(transaction.idempotency_key, row, found=side == "from"),
             admin_id,
             place,
             movement.item_id,
-            amount,
-            found=found,
+            amounts[side],
+            found=side == "from",
             reason_id=reason.id,
             form=form,
             shown_unit=unit,
@@ -564,14 +564,14 @@ def confirm_count(
     row.settled_how = "corrected"
     # The count was typed in the unit the line was recorded in
     # (forms.confirmed_count).
-    amount, unit = _in_items_unit(session, movement, abs(count - movement.quantity))
+    amounts, unit = _in_items_unit(session, movement, abs(count - movement.quantity))
     counts.record_adjustment(
         session,
         uuid.uuid5(transaction.idempotency_key, f"over recorded {row.id} count"),
         admin_id,
         transaction.to_location_id,
         movement.item_id,
-        amount,
+        amounts["to"],
         found=count > movement.quantity,
         reason_id=adjustment_reasons.seeded(session, REASON).id,
         form=ledger.Form(movement.to_package_id, open_id),
