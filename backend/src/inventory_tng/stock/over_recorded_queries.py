@@ -16,6 +16,7 @@ from sqlalchemy import (
     and_,
     case,
     func,
+    or_,
     select,
 )
 from sqlalchemy.orm import Session, aliased
@@ -541,14 +542,18 @@ SETTLED_ORDER: dict[str, tuple[Any, ...]] = {
                 in_query(SETTLED_HOW["confirmed"]),
             ),
             (
-                # Made loose, Correct corrected it (settled()). One whose
-                # count was corrected before it was made loose sorts here
-                # too, though settled() words it "Count corrected": only
-                # Correct's key, not in SQL, tells the two apart.
+                # Confirm count corrected it, so before it was made loose
+                # if it was, as Confirm count is refused after; Correct,
+                # after (settled()). Told by the clock here: a Correct
+                # begun before the loosening, waiting for its place, sorts
+                # as Count corrected, though settled() reads its key.
                 and_(
                     OverRecorded.settled_how == "corrected",
                     Movement.from_open_package_id == Movement.to_open_package_id,
-                    MADE_LOOSE_IN.is_(None),
+                    or_(
+                        MADE_LOOSE_IN.is_(None),
+                        OpenPackage.closed_at > OverRecorded.settled_at,
+                    ),
                 ),
                 in_query(SETTLED_HOW["count corrected"]),
             ),

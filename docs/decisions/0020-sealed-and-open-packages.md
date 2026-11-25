@@ -631,10 +631,10 @@ inventory-tng-j89e):
   value, and comes back with the box. A box to be set whole for an item
   counted each (above), or one a resize was refused for, at or below
   it, is shown however its package is set.
-- **Turning following off closes the open packages no longer followed**,
-  in the same save, whether set on the item, on a package or for the items
-  ticked. What is left on each becomes loose units at its place, by a
-  ledger transaction of its own kind, a loosening, under the
+- **Turning following off makes the open packages no longer followed
+  loose**, in the same save, whether set on the item, on a package or for
+  the items ticked. What is left on each becomes loose units at its
+  place, by a ledger transaction of its own kind, a loosening, under the
   administrator's name, so the place holds what it held. One left below
   zero takes as much from loose units. The open package is marked closed,
   never deleted, and its history says so. Nothing is written off, so a

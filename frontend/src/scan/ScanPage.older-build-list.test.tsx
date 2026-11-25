@@ -470,8 +470,8 @@ describe("what an older build left", () => {
     await ready();
     fireEvent.click(discardOf("Cat6 cable: 3 m from an open package"));
     // What is left goes back whole, so in the empty cart without a tap,
-    // with row 16's status and nothing left out to say (Ali,
-    // inventory-tng-0su, question 10).
+    // saying "Added back to cart. Review before Record." and nothing
+    // left out to say (Ali, 2026-11-13, inventory-tng-0su).
     await screen.findByText(ADDED_BACK);
     expect(status().textContent).toBe(ADDED_BACK);
     expect(record).toHaveBeenCalledWith({

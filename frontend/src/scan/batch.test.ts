@@ -426,6 +426,18 @@ describe("turning a cart into a batch", () => {
     expect("draft" in batch && batch.draft.lines).toEqual([
       { item_id: 101, quantity: "5", open_package_key: offeredKey, unit: "m" },
     ]);
+    // A receipt shows no open package, so takes from none typed before.
+    const receipt = toBatch(
+      cart({
+        kind: "receipt",
+        lines: lines.map((line) => ({ ...line, loose: "2" })),
+      }),
+      CATALOGUE,
+      [here],
+    );
+    expect("draft" in receipt && receipt.draft.lines).toEqual([
+      { item_id: 101, quantity: "2", unit: "m" },
+    ]);
     // A cut of all it shows says it is used up, unless the volunteer
     // said not.
     const line = { itemId: 101, packages: {}, loose: "" };

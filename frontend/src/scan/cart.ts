@@ -140,6 +140,13 @@ export const SIDES: Record<Kind, Record<Side, boolean>> = {
   open: { from: true, to: false },
 };
 
+/** Whether a cart of `kind` takes from the open packages where it comes
+ * from, as their cards offer: one with a From place, but not an opening,
+ * which opens sealed ones there. */
+export function takesFromOpen(kind: Kind): boolean {
+  return SIDES[kind].from && kind !== "open";
+}
+
 /** What a cart is filled for, in the words the page asks it in. */
 export const KIND_WORDS: Record<Kind, MessageDescriptor> = {
   move: msg`Moving stock`,

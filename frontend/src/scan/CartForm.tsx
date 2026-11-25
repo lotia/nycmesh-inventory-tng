@@ -40,6 +40,7 @@ import {
   reconcile,
   SIDES,
   type Side,
+  takesFromOpen,
   withLine,
   withLineChanged,
 } from "./cart";
@@ -975,7 +976,7 @@ export function CartForm({
                 line={line}
                 item={item}
                 opens={
-                  sides.from && cart.value.kind !== "open"
+                  takesFromOpen(cart.value.kind)
                     ? offeredAt(opens, line.itemId, cart.value.fromId)
                     : []
                 }

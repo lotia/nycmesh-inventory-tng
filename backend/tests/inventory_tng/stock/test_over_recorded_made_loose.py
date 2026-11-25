@@ -10,15 +10,17 @@ from datetime import UTC, datetime
 from decimal import Decimal
 
 import pytest
+from babel.messages.catalog import Catalog
 from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
 
 from inventory_tng.core.db_errors import RuleBroken
 from inventory_tng.core.local_time import show_day, site_zone
+from inventory_tng.core.phrases import compiled, speaking
 from inventory_tng.models.places import Location
 from inventory_tng.models.stock import LedgerTransaction, OpenPackage, OverRecorded
 from inventory_tng.stock import ledger, over_recorded
-from inventory_tng.stock.over_recorded_queries import within
+from inventory_tng.stock.over_recorded_queries import SETTLED_HOW, within
 from inventory_tng.stock.paths import COUNTS
 
 from helpers.markup import links, words_on
@@ -338,3 +340,29 @@ def test_moved_whole_and_written_off_still_asks_for_its_count(
     said = words_on(page_of(admin_client, spools))
     assert f"An open package moved to {spools.van.name}." in said
     assert "became loose units" not in said
+
+
+def test_count_corrected_before_it_was_made_loose_sorts_by_its_words(
+    admin_client: TestClient, registered_client: TestClient, session: Session
+) -> None:
+    """Confirm count corrected one moved whole, then it was made loose: it
+    reads, and sorts by How, as "Count corrected", not "Corrected"."""
+    first = Spools(session)
+    moved_whole(registered_client, first)
+    answered(admin_client, session, "count", count="180", unit=first.cable.unit)
+    made_loose(session, first, open_ones=1)
+    second = Spools(session)
+    moved_whole(registered_client, second)
+    (waits,) = [check for check in checks(session) if check.settled_at is None]
+    over_recorded.mark_checked(
+        session, waits.id, over_recorded.seen(waits), ada_id(session), "arrived"
+    )
+    session.commit()
+    # English sorts Checked first; here Count corrected comes first.
+    catalogue = Catalog()
+    catalogue.add(str(SETTLED_HOW["count corrected"]), "Aaa")
+    catalogue.add(str(SETTLED_HOW["checked"]), "Bbb")
+    with speaking(compiled(catalogue)):
+        said = words_on(admin_client.get(f"{PAGE}/settled?per=all&sort=how").text)
+    assert "Aaa" in said
+    assert said.index("Aaa") < said.index("Bbb")

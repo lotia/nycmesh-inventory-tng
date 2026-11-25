@@ -25,6 +25,7 @@ import {
   resized,
   SIDES,
   separatorWords,
+  takesFromOpen,
   unitChanged,
 } from "./cart";
 import { type Offered, takingOffered, usedUpOf } from "./offered";
@@ -120,9 +121,10 @@ export function toBatch(
   all?: readonly Offered[],
 ): Batch | { problems: Said[]; refused?: OtherSeparator[] } {
   const reconciled = reconcile(filled, catalogue);
-  // Only what the page offers to take from, where it comes from.
+  // Only what the page offers to take from, where it comes from, and
+  // nothing where its kind shows no open package (CartForm).
   const here = new Map(
-    (all ?? [])
+    (takesFromOpen(reconciled.kind) ? (all ?? []) : [])
       .filter((each) => each.location_id === reconciled.fromId)
       .map((each) => [each.key, each]),
   );
