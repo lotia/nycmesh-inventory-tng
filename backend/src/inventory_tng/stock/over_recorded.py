@@ -190,6 +190,8 @@ WRITTEN_OFF_ON = case(
 # OpenPackage.location_id, whatever place that is, and its closed_at says
 # when (Ali, 2026-11-24, inventory-tng-04z7).
 MADE_LOOSE_IN = _LOOSENED_IN.label("made_loose_in")
+# Where a check's open package (OPEN_END) was made loose, else NULL.
+LOOSE_AT = case((_LOOSENED_IN.is_not(None), OpenPackage.location_id))
 
 
 def moved_whole(from_open: int | None, to_open: int | None) -> bool:
@@ -258,14 +260,14 @@ def ends(session: Session, check_id: int) -> tuple[int | None, int | None]:
 
 def places_of(session: Session, check_id: int) -> list[int]:
     """The places a check's transaction moved stock between, and where its
-    open end was made loose (MADE_LOOSE_IN), by id: those to lock first, as
+    open end was made loose (LOOSE_AT), by id: those to lock first, as
     saves take places (ledger.lock_places), and the ones a correction of it
     may be refused at."""
     found = session.execute(
         select(
             LedgerTransaction.from_location_id,
             LedgerTransaction.to_location_id,
-            case((_LOOSENED_IN.is_not(None), OpenPackage.location_id)),
+            LOOSE_AT,
         )
         .join(Movement, Movement.transaction_id == LedgerTransaction.id)
         .join(OverRecorded, OverRecorded.movement_id == Movement.id)
@@ -313,13 +315,15 @@ def correction_key(
 
 
 class _Read(NamedTuple):
-    """A check's movement and transaction, and, for one whose open end
+    """A check's movement and transaction, whether it moved an open
+    package whole (`whole`, moved_whole), and, for one whose open end
     (OPEN_END) no count put right, whether an opening's open package was
     closed since by a write-off (`closed`), and the place its open package
-    was made loose at (`loose_at`, MADE_LOOSE_IN), else None."""
+    was made loose at (`loose_at`, LOOSE_AT), else None."""
 
     movement: Movement
     transaction: LedgerTransaction
+    whole: bool
     closed: bool
     loose_at: int | None
 
@@ -344,25 +348,24 @@ def _read(session: Session, row: OverRecorded) -> _Read:
         and movement.to_open_package_id is not None
         and row.arrived_count_id is None
     ):
-        written_off_on, made_loose_in, at = session.execute(
-            select(WRITTEN_OFF_ON, MADE_LOOSE_IN, OpenPackage.location_id)
+        written_off_on, loose_at = session.execute(
+            select(WRITTEN_OFF_ON, LOOSE_AT)
             .select_from(Movement)
             .join(LedgerTransaction, LedgerTransaction.id == Movement.transaction_id)
             .join(OpenPackage, OPEN_END)
             .where(Movement.id == movement.id)
         ).one()
         closed = written_off_on is not None
-        loose_at = at if made_loose_in is not None else None
-    return _Read(movement, transaction, closed, loose_at)
+    return _Read(movement, transaction, whole, closed, loose_at)
 
 
 def _right(row: OverRecorded, read: _Read) -> bool:
     """Whether every end a check has is put right already (_all_right)."""
-    movement, transaction = read.movement, read.transaction
+    transaction = read.transaction
     return _all_right(
         transaction.from_location_id,
         transaction.to_location_id,
-        moved_whole(movement.from_open_package_id, movement.to_open_package_id),
+        read.whole,
         row.left_count_id,
         row.arrived_count_id,
         read.closed,
@@ -419,7 +422,7 @@ def correct(
     the ledger's order; or as counts.record_adjustment."""
     row = waiting(session, check_id, seen_as)
     read = _read(session, row)
-    movement, transaction, closed, loose_at = read
+    movement, transaction, whole, closed, loose_at = read
     if loose_at is not None and loose_at not in held:
         raise RuleBroken("over_recorded_unchanged")
     if _right(row, read):
@@ -435,7 +438,6 @@ def correct(
             over_recorded_id=check_id,
             open_package_id=movement.to_open_package_id,
         )
-    whole = moved_whole(movement.from_open_package_id, movement.to_open_package_id)
     sides = (
         (
             None
@@ -597,10 +599,7 @@ def _waiting_at[*Columns](
     moved by moment `as_of`, by id, with their open end's open package
     (OPEN_END): what hold_waiting holds and counted() reads. One is at a
     place it moved stock into or out of, or where its open end was made
-    loose (MADE_LOOSE_IN)."""
-    made_loose_there = and_(
-        OpenPackage.location_id.in_(list(places)), _LOOSENED_IN.is_not(None)
-    )
+    loose (LOOSE_AT)."""
     return (
         query.join(Movement, Movement.id == OverRecorded.movement_id)
         .join(LedgerTransaction, LedgerTransaction.id == Movement.transaction_id)
@@ -609,7 +608,7 @@ def _waiting_at[*Columns](
             WAITING,
             Movement.item_id.in_(item_ids),
             LedgerTransaction.id <= as_of,
-            or_(moments.at_places(places), made_loose_there),
+            or_(moments.at_places(places), LOOSE_AT.in_(list(places))),
         )
         .order_by(OverRecorded.id)
     )

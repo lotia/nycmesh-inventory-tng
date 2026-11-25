@@ -22,7 +22,7 @@ from inventory_tng.models.stock import (
     OpenPackage,
     OverRecorded,
 )
-from inventory_tng.stock import counts, ledger, moments, open_packages, over_recorded
+from inventory_tng.stock import counts, moments, open_packages, over_recorded
 from inventory_tng.stock.ledger import Entry, Form
 from inventory_tng.stock.paths import COUNTS
 
@@ -528,10 +528,8 @@ def test_a_close_skips_one_a_count_holds_and_correct_then_closes_it_as_counted(
     (waits,) = checks(first)
     assert waits.settled_at is None
     third = own_committed.session()
-    held = over_recorded.places_of(third, check.id)
-    ledger.lock_places(third, held)
     seen = over_recorded.seen(waits)
-    assert over_recorded.correct(third, check.id, seen, admin, held) == "counted"
+    assert correct_check(third, check, seen, admin) == "counted"
     third.commit()
     (check,) = checks(first)
     assert (check.settled_how, check.settled_by_admin_id) == ("counted", admin)

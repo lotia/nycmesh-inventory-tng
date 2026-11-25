@@ -37,6 +37,7 @@ from inventory_tng.stock.length_checks_routes import KINDS
 from helpers.apps import new_app, on_session
 from helpers.databases import new_database
 from helpers.devices import ADDRESS, new_device
+from helpers.over_recorded import correct_check
 from helpers.rows import add, rolled_back, setting_up, tag
 from helpers.sign_in import new_admin, sealed
 from helpers.stock import (
@@ -230,9 +231,7 @@ def over_recorded_settled(world: World) -> None:
     places, each linked to its count, and who corrected it."""
     session = world.session
     check = raise_check(session, write(session, world.spools.place))
-    seen = over_recorded.seen(check)
-    held = over_recorded.places_of(session, check.id)
-    over_recorded.correct(session, check.id, seen, world.ada_id, held)
+    correct_check(session, check, over_recorded.seen(check), world.ada_id)
 
 
 def item_parts(world: World) -> None:

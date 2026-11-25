@@ -16,7 +16,7 @@ from sqlalchemy.orm import Session
 from inventory_tng.core.db_errors import RuleBroken
 from inventory_tng.core.local_time import show_day, site_zone
 from inventory_tng.models.places import Location
-from inventory_tng.models.stock import LedgerTransaction, OpenPackage
+from inventory_tng.models.stock import LedgerTransaction, OpenPackage, OverRecorded
 from inventory_tng.stock import ledger, over_recorded
 from inventory_tng.stock.over_recorded_queries import within
 from inventory_tng.stock.paths import COUNTS
@@ -72,9 +72,8 @@ def asks_a_count(
     return said in words_on(page) and link in [href for _, href in links(page)]
 
 
-def moved_to_van(session: Session, spools: Spools, check_id: int) -> None:
+def moved_to_van(session: Session, spools: Spools, check: OverRecorded) -> None:
     """The open spool a check's opening arrived in moved whole to the van."""
-    (check,) = (each for each in checks(session) if each.id == check_id)
     on_it = ledger.Form(open_package_id=opened_into(session, check).open_package_id)
     spools.move(ledger.Entry(spools.cable.id, Decimal(305), on_it, on_it))
     session.commit()
@@ -208,7 +207,7 @@ def test_made_loose_after_it_moved_away_asks_a_count_where_it_was_made_loose(
     """Opened at Shelf B, moved whole to Van 2, made loose there: the open
     end asks for a count of Van 2, and only one there puts it right."""
     spools = Spools(session)
-    moved_to_van(session, spools, opening_raised(registered_client, spools).id)
+    moved_to_van(session, spools, opening_raised(registered_client, spools))
     day = made_loose(session, spools)
     assert asks_a_count(page_of(admin_client, spools), spools, day, spools.van)
     count_at(admin_client, spools.store.id, {loose_field(spools): "0"})
@@ -229,7 +228,7 @@ def test_correct_writes_what_was_made_loose_off_where_it_was_made_loose(
     """The sealed spool found again at Shelf B, the loose metres written
     off at Van 2."""
     spools = Spools(session)
-    moved_to_van(session, spools, opening_raised(registered_client, spools).id)
+    moved_to_van(session, spools, opening_raised(registered_client, spools))
     made_loose(session, spools)
     assert (
         "over_recorded_corrected" in correct(admin_client, session).headers["location"]
@@ -253,7 +252,7 @@ def test_correct_refuses_a_place_made_loose_that_it_does_not_hold(
     changed, and nothing is written."""
     spools = Spools(session)
     check = opening_raised(registered_client, spools)
-    moved_to_van(session, spools, check.id)
+    moved_to_van(session, spools, check)
     made_loose(session, spools)
     (check,) = checks(session)
     with pytest.raises(RuleBroken, match="over_recorded_unchanged"):
