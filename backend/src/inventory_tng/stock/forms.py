@@ -176,9 +176,11 @@ def confirmed_count(
     session: Session, movement_id: int, typed: str, shown: str, *, separator: Separator
 ) -> Decimal | str | None:
     """The count typed to confirm an open package moved whole by a ledger
-    line, in the unit the line was recorded in, or what is wrong with it:
-    shown in another, it is asked again (stock/units_shown.py). Compared
-    with its item's again as it is saved (over_recorded.confirm_count)."""
+    line, in the unit the page showed, the line's, or what is wrong with
+    it: its item counted in another unit now, it is asked again
+    (stock/units_shown.py), as nothing converts one to the other. Compared
+    with its item's again under the lock it is saved with
+    (over_recorded.confirm_count)."""
     item_id, unit = queries.item_moved(session, movement_id)
     if shown != unit:
         units_shown.refusing("confirm_count", Now({item_id: unit}, {}))

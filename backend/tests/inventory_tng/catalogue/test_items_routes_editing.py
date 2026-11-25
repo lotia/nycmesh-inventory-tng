@@ -333,6 +333,7 @@ def test_a_package_takes_its_items_unit_and_follows_a_change_to_it(
     reel = add(session, ItemPackage(item_id=item.id, name="Reel", size=Decimal(305)))
     offer = add(session, VendorOffer(item_id=item.id, url="https://example.org"))
     assert (reel.unit, offer.unit) == ("m", "m")
+    drawn = shown(reel)
     saved = admin_client.post(
         f"{ITEMS}/{item.id}", data=shown_item_form(item, unit="ft")
     )
@@ -340,8 +341,18 @@ def test_a_package_takes_its_items_unit_and_follows_a_change_to_it(
     for row in (reel, offer):
         session.refresh(row)
     assert (reel.unit, reel.size, offer.unit) == ("ft", Decimal(305), "ft")
+    followed = history(session, "item_package", reel.id)[-1].new_row
+    assert followed is not None
+    assert followed["unit"] == "ft"
     page = admin_client.get(f"{ITEMS}/{item.id}").text
     assert "305 ft" in words_on(page)
+    # Its size typed in m, on a form drawn before the switch, is refused.
+    stale = admin_client.post(
+        f"{ITEMS}/{item.id}/packages/{reel.id}",
+        data={"package_name": "Reel", "size": "300", "package_version": drawn},
+    )
+    assert "someone else saved this" in text(stale)
+    assert reel.size == Decimal(305)
 
 
 def test_the_unit_is_fixed_once_stock_has_moved(

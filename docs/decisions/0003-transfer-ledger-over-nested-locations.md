@@ -359,13 +359,17 @@ unit beside it, rather than being read in whatever unit the item has now:
   a line was recorded with than moved.
 - An item's own reorder point and amount on order are in its unit, on
   the same row.
+- A batch kept as sent, to answer it sent again, keeps the lengths as
+  the page sent them, with no unit: the open package keeps each with
+  its unit.
 
 The ledger writes a line only in its item's unit, as it holds the item.
 Every sum of the ledger adds only lines in their item's unit: the
 database refuses one in another as it reads it, so no sum mixes units
 unawares, and converting is a change of its own. Pages show each past
 line in its own unit. While an item's unit may still change, its
-packages and vendor offers change with it, their numbers as typed.
+packages and vendor offers change with it, their numbers as typed, each
+a change of its own, so a package's form drawn before is refused.
 
 The units were added by a new migration rather than by rewriting the
 initial one, each filled from its item's, so a database already migrated

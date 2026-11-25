@@ -4,6 +4,7 @@ refused one in another, so a conversion is never made unawares
 
 import uuid
 from collections.abc import Callable
+from datetime import UTC, datetime
 from decimal import Decimal
 
 import pytest
@@ -14,7 +15,8 @@ from inventory_tng.stock import moments, queries
 from inventory_tng.stock.ledger import Entry, insert_transaction
 from inventory_tng.stock.moved_out import moved_out
 
-from helpers.stock import Place
+from helpers.sign_in import new_admin
+from helpers.stock import Place, Spools
 
 # Each reader of the ledger's sums, of the place's store, after its cable
 # came in and some left.
@@ -28,6 +30,27 @@ READERS: dict[str, Callable[[Session, Place], object]] = {
         session, place.store.id, [true()], [place.cable.id]
     ),
     "moved out": lambda session, place: moved_out(session, [place.store.id], 0),
+}
+# Each reader of an open package's lines, of the store, after a spool of
+# its cable was opened there and then made loose.
+OPEN_READERS: dict[str, Callable[[Session, Spools, int], object]] = {
+    "left on it": lambda session, _, open_id: moments.left_at(
+        session, open_id, queries.latest_transaction_id(session)
+    ),
+    "openings": lambda session, spools, _: queries.openings_at(
+        session,
+        [spools.store.id],
+        [spools.cable.id],
+        0,
+        queries.latest_transaction_id(session),
+    ),
+    "made loose": lambda session, spools, _: queries.loosened_at(
+        session,
+        [spools.store.id],
+        [spools.cable.id],
+        0,
+        queries.latest_transaction_id(session),
+    ),
 }
 
 
@@ -64,5 +87,21 @@ def test_a_sum_across_two_units_is_refused(
     _moved(session, place)
     place.cable.unit = "ft"
     session.flush()
-    with pytest.raises(exc.DataError, match="ledger line in m summed in ft"):
+    with pytest.raises(exc.DataError, match=r"ledger line \d+ in m summed in ft"):
         read(session, place)
+
+
+@pytest.mark.parametrize("read", OPEN_READERS.values(), ids=OPEN_READERS.keys())
+def test_an_open_packages_lines_in_two_units_are_refused(
+    session: Session,
+    spools: Spools,
+    read: Callable[[Session, Spools, int], object],
+) -> None:
+    """As above, for the readers of what an open package held."""
+    admin, _ = new_admin(session)
+    open_id = spools.opened().id
+    assert spools.unfollow(admin.id, datetime.now(UTC)) == 1
+    spools.cable.unit = "ft"
+    session.flush()
+    with pytest.raises(exc.DataError, match=r"ledger line \d+ in m summed in ft"):
+        read(session, spools, open_id)

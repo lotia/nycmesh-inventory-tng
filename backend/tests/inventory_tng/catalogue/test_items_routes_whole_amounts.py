@@ -273,12 +273,6 @@ def test_a_fraction_on_a_package_meanwhile_refuses_a_change_to_each(
     [
         ("add_package", "packages", {"package_name": "Drum", "size": "30.5"}, "size"),
         (
-            "save_package",
-            "packages/{id}",
-            {"package_name": "Reel", "size": "30.5"},
-            "size",
-        ),
-        (
             "package_settings",
             "packages/{id}/settings",
             {"short_below": "1.5", "minimum_sealed": ""},
@@ -297,7 +291,9 @@ def test_a_package_fraction_is_refused_once_its_item_is_each_meanwhile(
     field: str,
 ) -> None:
     """Its form checked the amount against the unit before the lock: the
-    unit is read again under it."""
+    unit is read again under it. A package's own form is refused before
+    that, as changed since: the switch moved its unit, and so its version
+    (test_items_routes_editing)."""
     cable, reel = _packaged(session, radios)
 
     def to_each(s: Session) -> None:
@@ -330,7 +326,10 @@ def test_a_switch_to_each_clears_a_too_short_length_no_whole_number_fits(
     session.refresh(reel)
     assert done.headers["location"] == f"{ITEMS}/{cable.id}?notice=saved"
     assert (cable.unit, reel.short_below) == ("each", None)
-    cleared = history(session, "item_package", reel.id)[-1]
+    # Then its unit follows its item's, a change of its own.
+    cleared, followed = history(session, "item_package", reel.id)[-2:]
+    assert followed.new_row is not None
+    assert followed.new_row["unit"] == "each"
     assert cleared.old_row is not None
     assert cleared.new_row is not None
     assert (cleared.old_row["short_below"], cleared.new_row["short_below"]) == (

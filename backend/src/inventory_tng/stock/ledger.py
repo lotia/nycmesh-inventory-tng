@@ -581,7 +581,9 @@ def insert_transaction(
     held = hold(session, header, each_once(lines))
     items = held.items
     for broken in lines_break(kind, items, lines):
-        # An item that does not exist is the foreign key's to refuse.
+        # An item that does not exist is the database's to refuse: the
+        # foreign key, or movement.unit's NOT NULL for a line with no unit
+        # of its own (_unit).
         for rule in broken or ():
             enforce(rule)
     packages, opens, opened = hold_forms(session, header, lines)

@@ -215,9 +215,9 @@ class ItemPackage(KeyedName, Searchable, Versioned, Base):
     size: Mapped[Decimal] = mapped_column(QUANTITY)
     # The unit of size and short_below: its item's when added
     # (_items_unit), and changed with its item's while that may change
-    # (items.save), which its item's history records, so no change of its
-    # own (db_protection).
-    unit: Mapped[Unit] = mapped_column(info={"not_a_change": True})
+    # (items.save). A change of its own, in its history, that moves its
+    # version, so its form drawn in the old unit is refused.
+    unit: Mapped[Unit]
     # NULL: as the item's track_opened says; else this package's own
     # (ledger.tracks_opened).
     track_opened: Mapped[bool | None]
@@ -447,7 +447,7 @@ class VendorOffer(Base):
     vendor_sku: Mapped[str | None] = mapped_column(Text)
     units_per_order: Mapped[Decimal | None] = mapped_column(QUANTITY)
     # The unit of units_per_order, kept as an item package's is.
-    unit: Mapped[Unit] = mapped_column(info={"not_a_change": True})
+    unit: Mapped[Unit]
     retired_at: Mapped[RetiredAt]
 
 

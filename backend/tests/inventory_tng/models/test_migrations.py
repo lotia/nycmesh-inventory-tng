@@ -1,4 +1,5 @@
 import uuid
+from datetime import UTC, datetime
 from decimal import Decimal
 
 from alembic import command
@@ -8,7 +9,13 @@ from sqlalchemy.orm import Session
 
 from inventory_tng.models.catalogue import Category, Item, ItemPackage, VendorOffer
 from inventory_tng.models.places import Location
-from inventory_tng.models.stock import LedgerTransaction, Movement, OverRecorded
+from inventory_tng.models.stock import (
+    LedgerTransaction,
+    Movement,
+    OpenPackage,
+    OverRecorded,
+)
+from inventory_tng.models.volunteers import Volunteer
 
 from helpers.rows import add, setting_up
 
@@ -26,8 +33,8 @@ def test_stored_amounts_take_their_items_unit_as_units_are_added(
     alembic_config: Config,
 ) -> None:
     """Rows from before every stored amount recorded its unit are given
-    their item's, a check its line's, upgrading through 0005
-    (inventory-tng-2rlr)."""
+    their item's, a check its line's, and a length said on an open package
+    its item's, upgrading through 0005 (inventory-tng-2rlr)."""
     connection: Connection = alembic_config.attributes["connection"]
     session = setting_up(Session(bind=connection))
     category = add(session, Category(name="Cables"))
@@ -46,9 +53,24 @@ def test_stored_amounts_take_their_items_unit_as_units_are_added(
         session,
         Movement(transaction_id=receipt.id, item_id=cable.id, quantity=500, unit="ft"),
     )
-    add(session, ItemPackage(item_id=cable.id, name="Box", size=Decimal(1000)))
+    box = add(session, ItemPackage(item_id=cable.id, name="Box", size=Decimal(1000)))
     add(session, VendorOffer(item_id=cable.id, url="https://example.org", unit="ft"))
     add(session, OverRecorded(movement_id=line.id, quantity=5, unit="ft"))
+    volunteer = add(session, Volunteer(name="Ada"))
+    opened = {"item_id": cable.id, "package_id": box.id, "location_id": store.id}
+    unsaid = add(session, OpenPackage(key=uuid.uuid4(), **opened)).id
+    said = add(
+        session,
+        OpenPackage(
+            key=uuid.uuid4(),
+            length_reported_at=datetime.now(UTC),
+            length_reported_by_volunteer_id=volunteer.id,
+            length_reported=Decimal(120),
+            length_reported_unit="ft",
+            length_reported_in_id=receipt.id,
+            **opened,
+        ),
+    ).id
     session.close()
     command.downgrade(alembic_config, "0004")
     command.upgrade(alembic_config, "head")
@@ -57,3 +79,11 @@ def test_stored_amounts_take_their_items_unit_as_units_are_added(
         for table in ("movement", "item_package", "vendor_offer", "over_recorded")
     }
     assert units == {table: ["ft"] for table in units}
+    # Only a length said has a unit, as the check on what was said holds.
+    reported = connection.execute(
+        text("SELECT id, length_reported_unit FROM open_package")
+    )
+    assert {open_id: unit for open_id, unit in reported} == {
+        said: "ft",
+        unsaid: None,
+    }

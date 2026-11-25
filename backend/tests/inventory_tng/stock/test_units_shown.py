@@ -453,3 +453,21 @@ def test_a_confirmed_count_shown_in_another_unit_is_asked_again(
     assert now_counted_in("m") in text(response)
     assert checks(session)[0].settled_at is None
     assert adjustments(session) == []
+
+
+def test_a_confirmed_count_of_a_line_in_another_unit_than_its_items_is_asked_again(
+    admin_client: TestClient, registered_client: TestClient, session: Session
+) -> None:
+    """The page shows the count in its line's unit; with its item counted
+    in another, straight in the database as a moved item's unit is fixed,
+    it says so beside the box, as nothing converts the count
+    (inventory-tng-2rlr)."""
+    spools = Spools(session)
+    moved_whole(registered_client, spools)
+    spools.cable.unit = "ft"
+    session.flush()
+    _, response = counted(admin_client, session, "300", unit="m")
+    assert response.status_code == 400
+    assert now_counted_in("ft") in text(response)
+    assert checks(session)[0].settled_at is None
+    assert adjustments(session) == []

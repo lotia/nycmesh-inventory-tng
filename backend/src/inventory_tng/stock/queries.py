@@ -480,9 +480,11 @@ def open_with_ids(
 
 
 def item_moved(session: Session, movement_id: int) -> tuple[int, str]:
-    """The item a ledger line moved, and the unit it was recorded in."""
+    """The item a ledger line moved, and the item's unit now."""
     item_id, unit = session.execute(
-        select(Movement.item_id, Movement.unit).where(Movement.id == movement_id)
+        select(Item.id, Item.unit)
+        .join(Movement, Movement.item_id == Item.id)
+        .where(Movement.id == movement_id)
     ).one()
     return item_id, unit
 
