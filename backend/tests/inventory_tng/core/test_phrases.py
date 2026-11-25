@@ -931,10 +931,13 @@ def test_a_lists_numbers_are_written_ungrouped_in_any_locale() -> None:
 
 def test_a_language_babel_does_not_know_writes_numbers_as_english() -> None:
     """A pseudo-locale's code, such as en_XA, names no locale Babel knows:
-    its numbers read as English's, so its pages still show."""
+    its numbers read as English's, so its pages still show, in the page's
+    separator."""
     header = 'msgid ""\nmsgstr ""\n"Language: en_XA\\n"\n'
     with speaking(compiled(read_po(StringIO(header)))):
-        assert number(1000) == "1000"
+        assert number(Decimal("1234.5")) == "1234.5"
+        with writing_numbers(","):
+            assert number(Decimal("1234.5")) == "1234,5"
 
 
 def test_names_are_joined_as_the_locale_joins_a_list() -> None:

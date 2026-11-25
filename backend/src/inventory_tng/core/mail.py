@@ -7,10 +7,10 @@ Mail is sent after the reply (Starlette's background tasks), so how long a
 reply takes never shows whether mail went out; the one exception is the
 notice of a recovery code used to confirm a form, sent as soon as that use
 is kept, as the form may yet end in an error whose page sends nothing
-after it (admins/guards._confirm). A failure is logged and
-counted, never shown on a page. Logs carry ids and the kind of mail, never
-addresses or links. Its numbers are written with a point, ungrouped, whatever the page that
-sent it writes (phrases.writing_numbers).
+after it (admins/guards._confirm). A failure is logged and counted, never
+shown on a page. Logs carry ids and the kind of mail, never addresses or
+links. Its numbers are written with a point, ungrouped, whatever the page
+that sent it writes (phrases.writing_numbers).
 """
 
 import smtplib

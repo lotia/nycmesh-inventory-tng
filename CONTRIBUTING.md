@@ -817,13 +817,15 @@ utilities. When you style a page:
   request from the browser's Accept-Language (`web/decimal_separator.py`)
   and writes it in the page's `<html data-decimal>`, which the admin
   scripts and the scan page read. Nothing is stored, and the words stay
-  English. Every number people read is written as a box value is: that
-  separator, never grouped ("1234.5 m", or "1234,5 m"), whether shown
-  back from the boxes, such as the count form's running totals or "Set
-  to 40 m", or in a sentence: the server's `number` and `amount` within
-  the request (`web/numbers_in_words.py`), the scan page's `sayNumber`
-  and `sayAmount`. Mail, logs, operator commands and printed labels keep
-  one style whatever the locale: a point and no grouping.
+  English. Every number or amount the app writes for people is written
+  as a box value is: that separator, never grouped ("1234.5 m", or
+  "1234,5 m"), whether shown back from the boxes, such as the count
+  form's running totals or "Set to 40 m", or in a sentence: the server's
+  `number` and `amount` within the request (`web/numbers_in_words.py`),
+  the scan page's `sayNumber` and `sayAmount`. Mail, logs, operator
+  commands and printed labels keep one style whatever the locale: a point
+  and no grouping. A number in an item's name is shown as decision 0021
+  says.
 - Follow docs/decisions/0019 for links, buttons and lists. A button is
   secondary unless it is its form's main one, `class="primary"`, or the one
   a confirmation page asks for, `class="danger"`. A page's way back is

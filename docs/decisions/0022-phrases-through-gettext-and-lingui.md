@@ -145,9 +145,10 @@ words and its boxes disagreed.
 
 Ali decided on 2026-11-24 (inventory-tng-ua04) that amounts the app
 writes for people (sentences, hints, buttons, alerts, mail) are never
-grouped, on any page, in the page's decimal separator: "1234.5 m" on a
-"." page, "1234,5 m" on a "," page. Every number shown then reads as a
-box takes it. This amends 4mc3's "on a '.' page nothing changes". The
+grouped, on any page. On a page they take its decimal separator:
+"1234.5 m" on a "." page, "1234,5 m" on a "," page. Mail keeps a point.
+Every number shown then reads as a box takes it. This amends 4mc3's
+rule that a "." page's numbers stay as English writes them. The
 server's `phrases.number`, and the scan page's `sayNumber` and plural
 counts, write no grouping; printed labels keep their point.
 

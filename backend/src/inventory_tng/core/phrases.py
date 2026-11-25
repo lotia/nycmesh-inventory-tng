@@ -132,7 +132,7 @@ def number(value: int | Decimal) -> str:
 
 def joined(names: Sequence[str]) -> str:
     """Names joined as the active locale joins a list, such as "A, B and C"
-    in English: in its catalogue's language, as `number` writes."""
+    in English: in its catalogue's language (_number_locale)."""
     return format_list(
         list(names), locale=_number_locale(_active.info().get("language"))
     )

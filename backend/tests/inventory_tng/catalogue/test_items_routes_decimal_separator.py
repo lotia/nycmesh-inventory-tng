@@ -99,9 +99,9 @@ def test_amounts_in_words_follow_the_locales_separator(
     fraction: str,
     highest: str,
 ) -> None:
-    """On a comma page, ungrouped and with a comma, in the page's words
-    and in a refusal the server writes; elsewhere as English writes them
-    (Ali, 2026-11-23, inventory-tng-4mc3)."""
+    """On a comma page with a comma, elsewhere with a point, ungrouped on
+    both, in the page's words and in a refusal the server writes (Ali,
+    2026-11-23, inventory-tng-4mc3; 2026-11-24, inventory-tng-ua04)."""
     item = new_item(session, radios, name="Cat6 cable", unit="m")
     package = add(
         session,

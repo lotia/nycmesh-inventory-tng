@@ -80,8 +80,9 @@ const MARKED = /<(\d+)>([\s\S]*?)<\/\1>/;
  * `phrase` said in the active locale with each value left as a hole, and
  * the values held for those holes. Lingui never reads a value, as it
  * would decode `\uXXXX` in one, so a name is shown exactly as typed.
- * Numbers are filled, so a plural can count them, its # written as
- * `sayNumber` would, and a missing value is left out, as Lingui leaves it.
+ * Numbers are filled, so a plural can count them, its whole # written
+ * as `sayNumber` would, and a missing value is left out, as Lingui
+ * leaves it.
  */
 function holed(
   phrase: MessageDescriptor,
@@ -99,13 +100,14 @@ function holed(
       return [name, `\uE000${held.length - 1}\uE001`];
     }),
   );
-  // A plural's # ungrouped, as sayNumber writes it.
+  // A plural's # ungrouped, as sayNumber writes a whole number.
   const options: MessageOptions = { ...phrase, formats: UNGROUPED };
   return [i18n._(phrase.id, filled, options), held];
 }
 
 /** Lingui's number format for a plural's #: its counts are whole, so no
- * grouping is all that sayNumber's rule asks. */
+ * grouping is all that sayNumber's rule asks; a fraction's decimal sign
+ * would be the locale's, not the page's. */
 const UNGROUPED = { number: { useGrouping: false } };
 
 /** A phrase in the active locale, with the values its placeholders name. */

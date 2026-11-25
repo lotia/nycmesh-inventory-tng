@@ -229,7 +229,7 @@ def _with_a_number(to: str, admin_id: int) -> mail.Message:
     return mail.Message(to, "Subject", number(Decimal("1500.5")), "activity", admin_id)
 
 
-def test_mail_writes_numbers_as_its_words_do_whatever_the_page() -> None:
+def test_mail_writes_numbers_with_a_point_ungrouped_whatever_the_page() -> None:
     """Sent from a comma page, told, told now or later, its numbers keep
     a point (inventory-tng-4mc3), ungrouped (inventory-tng-ua04)."""
     kept = SentMail()
