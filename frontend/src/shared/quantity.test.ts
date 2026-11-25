@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, test } from "vitest";
+import { describe, expect, test } from "vitest";
 import {
   amountTyped,
   boxAmount,
@@ -57,8 +57,6 @@ describe("a box's refusal of the other separator, as the server counts it", () =
 });
 
 describe("the page's decimal separator", () => {
-  afterEach(() => takeSeparatorFrom(document.createElement("html")));
-
   test("is a point until the page says otherwise", () => {
     expect(boxSeparator()).toBe(".");
     expect(readBox("2.5")).toBe(2500);

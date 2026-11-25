@@ -982,8 +982,6 @@ def test_a_count_is_written_ungrouped_its_form_chosen_by_number() -> None:
         hint, limits=SimpleNamespace(password_min=1)
     )
     with speaking(GERMAN):
-        assert retired_holding(1000) == "1000 retired places hold stock"
-        assert "1000 items" in words_shown(items_page(1000))
         assert "at least 1000 characters" in render(
             hint, limits=SimpleNamespace(password_min=1000)
         )

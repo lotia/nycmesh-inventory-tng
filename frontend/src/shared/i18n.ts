@@ -30,6 +30,13 @@ export function speak(name: string, catalogue: typeof messages): void {
 
 speak("en", messages);
 
+/** How `sayNumber` writes a number, and Lingui a plural's #: ungrouped,
+ * every thousandth kept. */
+const WRITTEN: Intl.NumberFormatOptions = {
+  maximumFractionDigits: 3,
+  useGrouping: false,
+};
+
 /** A number writer for each locale, made the first time it is needed. */
 const writers = new Map<string, Intl.NumberFormat>();
 
@@ -50,10 +57,7 @@ export function sayNumber(value: number): string {
   const key = String(locales);
   let writer = writers.get(key);
   if (writer === undefined) {
-    writer = new Intl.NumberFormat(locales, {
-      maximumFractionDigits: 3,
-      useGrouping: false,
-    });
+    writer = new Intl.NumberFormat(locales, WRITTEN);
     writers.set(key, writer);
   }
   const separator = boxSeparator();
@@ -105,10 +109,10 @@ function holed(
   return [i18n._(phrase.id, filled, options), held];
 }
 
-/** Lingui's number format for a plural's #: its counts are whole, so no
- * grouping is all that sayNumber's rule asks; a fraction's decimal sign
- * would be the locale's, not the page's. */
-const UNGROUPED = { number: { useGrouping: false } };
+/** Lingui's number format for a plural's #, sayNumber's own: its counts
+ * are whole, so the page's decimal sign is never needed; a fraction's
+ * would be the locale's. */
+const UNGROUPED = { number: WRITTEN };
 
 /** A phrase in the active locale, with the values its placeholders name. */
 export function say(

@@ -1,7 +1,8 @@
 """Writes the numbers in a request's words, its pages', refusals' and
 notices' alike, with the decimal separator its number boxes take
-(web/decimal_separator.py, phrases.writing_numbers): on a page whose boxes
-take a comma, "1500 m" and "1,5 m" (Ali, 2026-11-23, inventory-tng-4mc3).
+(web/decimal_separator.py, phrases.writing_numbers), never grouped:
+"1500 m" and "1.5 m", or "1,5 m" on a page whose boxes take a comma (Ali,
+2026-11-23, inventory-tng-4mc3; 2026-11-24, inventory-tng-ua04).
 Mail is written as anywhere else (core/mail.py), and so are printed labels
 (labels/labels.py)."""
 

@@ -18,7 +18,6 @@ beforeEach(() => {
 
 afterEach(() => {
   delete document.documentElement.dataset.decimal;
-  takeSeparatorFrom(document.documentElement);
 });
 
 test("a point in a comma page is refused, naming the comma, and reported", async () => {
@@ -58,19 +57,12 @@ test("an amount in words on a comma page takes its comma, ungrouped", async () =
   expect(await screen.findByText("1500 m in all")).not.toBeNull();
   fireEvent.input(loose, { target: { value: "1,5" } });
   expect(await screen.findByText("1,5 m in all")).not.toBeNull();
-});
-
-test("an amount in words is written ungrouped in the page's separator", async () => {
-  // Ali, 2026-11-24 (inventory-tng-ua04): as the page's boxes take it.
-  open();
-  await ready();
-  fillMove();
-  const loose = screen.getByLabelText("Loose m");
   fireEvent.input(loose, { target: { value: "1234,5" } });
   expect(await screen.findByText("1234,5 m in all")).not.toBeNull();
 });
 
 test("on a point page an amount in words is ungrouped too", async () => {
+  // Ali, 2026-11-24 (inventory-tng-ua04): as the page's boxes take it.
   delete document.documentElement.dataset.decimal;
   takeSeparatorFrom(document.documentElement);
   open();
