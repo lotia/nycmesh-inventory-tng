@@ -39,6 +39,7 @@ from helpers.stock import (
     opened_line,
     opening,
     raise_check,
+    received,
     report,
     sealed_line,
     write,
@@ -56,13 +57,8 @@ def _shelf_a(session: Session) -> Place:
     """The bead's example: a cable in m, 305 m of it on Shelf A (the
     place's store), Reorder at 100 m, 50 m on order."""
     place = Place(session)
-    write(
-        session,
-        place,
-        kind="receipt",
-        from_location_id=None,
-        to_location_id=place.store.id,
-        lines=[{"item_id": place.cable.id, "quantity": "305", "unit": "m"}],
+    received(
+        session, place, [{"item_id": place.cable.id, "quantity": "305", "unit": "m"}]
     )
     place.cable.minimum, place.cable.on_order = Decimal(100), Decimal(50)
     session.flush()
@@ -126,13 +122,8 @@ def test_a_reorder_at_typed_with_the_change_is_converted_from_the_old_unit(
 def test_ft_to_m_converts_back(admin_client: TestClient, session: Session) -> None:
     """Either way between lengths: 1000 ft is 304.8 m exactly."""
     place = Place(session, cable_unit="ft")
-    write(
-        session,
-        place,
-        kind="receipt",
-        from_location_id=None,
-        to_location_id=place.store.id,
-        lines=[{"item_id": place.cable.id, "quantity": "1000", "unit": "ft"}],
+    received(
+        session, place, [{"item_id": place.cable.id, "quantity": "1000", "unit": "ft"}]
     )
     admin_client.post(f"{ITEMS}/{place.cable.id}", data=_yes(place.cable, unit="m"))
     assert expected(session, place.store.id) == {place.cable.id: Decimal("304.8")}
@@ -174,13 +165,7 @@ def test_each_and_a_length_never_convert(
     """A radio counted each, with stock, may not become m; a cable with
     stock in m may not become each. Neither form offers it, nor asks."""
     place = _shelf_a(session)
-    write(
-        session,
-        place,
-        kind="receipt",
-        from_location_id=None,
-        to_location_id=place.store.id,
-    )
+    received(session, place)
     for item, unit, rule in (
         (place.item, "m", "item_unit_fixed"),
         (place.cable, "each", "item_unit_fixed"),
@@ -232,13 +217,8 @@ def test_refused_when_an_amount_would_not_keep_in_the_new_unit(
         short_below=Decimal("0.001"),
     )
     add(session, reel)
-    write(
-        session,
-        place,
-        kind="receipt",
-        from_location_id=None,
-        to_location_id=place.store.id,
-        lines=[{"item_id": place.cable.id, "quantity": "10", "unit": "ft"}],
+    received(
+        session, place, [{"item_id": place.cable.id, "quantity": "10", "unit": "ft"}]
     )
     for crumb in (None, Decimal("0.001")):
         if crumb is not None:

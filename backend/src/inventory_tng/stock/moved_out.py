@@ -8,10 +8,11 @@ from typing import NamedTuple
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
+from inventory_tng.catalogue.unit_conversion import at_scale_sql
 from inventory_tng.models.catalogue import Item
 from inventory_tng.models.stock import AT_ONE_PLACE, LedgerTransaction, Movement
 from inventory_tng.stock.ledger import LOOSE, Form
-from inventory_tng.stock.line_amounts import in_items_unit, kept
+from inventory_tng.stock.line_amounts import in_items_unit
 
 
 class MovedOut(NamedTuple):
@@ -50,7 +51,7 @@ def moved_out(
     if split is not None:
         by.append(LedgerTransaction.id > split)
     query = (
-        select(*by, kept(func.sum(in_items_unit())))
+        select(*by, at_scale_sql(func.sum(in_items_unit())))
         .join(LedgerTransaction, LedgerTransaction.id == Movement.transaction_id)
         .join(Item, Item.id == Movement.item_id)
         .where(

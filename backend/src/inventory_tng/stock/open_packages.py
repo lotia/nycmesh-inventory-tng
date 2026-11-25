@@ -268,8 +268,9 @@ def settle_check(
     row = get_locked(session, OpenPackage, open_id, key_share=True)
     if row is None or (row.length_reported_at is None and row.below_zero_at is None):
         return False
-    unit = session.scalar(select(Item.unit).where(Item.id == row.item_id))
-    if unit is None or check_seen(row, unit) != seen:
+    # Held already (hold_across), so no query.
+    item = session.get(Item, row.item_id)
+    if item is None or check_seen(row, item.unit) != seen:
         return False
     _clear_check(row)
     _check_settled(session, how)

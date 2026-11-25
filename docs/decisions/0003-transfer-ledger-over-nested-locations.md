@@ -403,18 +403,17 @@ recorded. Rejected: keeping the unit fixed once stock has moved.
 - No converts nothing and says how to put right a unit wrong from the
   start, until the guided recount (inventory-tng-qety) does it: count
   its stock in the old unit first, then change its unit; or, only
-  labelled, revoke its labels first. The words were chosen by the
-  implementer and are for Ali to confirm.
+  labelled, revoke its labels first.
 - Old ledger lines keep their unit; each sum converts them as it reads
   them. A foot is 0.3048 m exactly (`catalogue/unit_conversion.py`, in
   Python and SQL alike). A line converts exactly and a sum is rounded
-  once to thousandths, so 305 m on a shelf reads 1000.656 ft and a sum
-  does not drift by its lines' roundings. Each and a length never
-  convert: such a line is still refused as it is read.
+  once, as amounts are kept (`QUANTITY_SCALE`), so 305 m on a shelf
+  reads 1000.656 ft and a sum does not drift by its lines' roundings.
+  Each and a length never convert: such a line is still refused as it
+  is read.
 - A package keeps its size and too-short length in its own unit, so a
   "Spool 305 m" label stays true. Wherever stock moves, is counted or is
-  sent to the scan page, a package's size is read in its item's unit, to
-  thousandths: a spool of 305 m is 1000.656 ft, and so many spools are
-  so many times that. A line of sealed packages recorded before converts
-  by its packages the same way, so spools received in m leave whole in
-  ft, nothing over.
+  sent to the scan page, a package's size is read in its item's unit, as
+  kept: so many 305 m spools are so many times 1000.656 ft. A line of
+  sealed packages recorded before converts by its packages the same
+  way, so spools received in m leave whole in ft, nothing over.

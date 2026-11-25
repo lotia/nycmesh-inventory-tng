@@ -28,6 +28,8 @@ QUANTITY_SCALE: Final = 3
 QUANTITY = Numeric(QUANTITY_PRECISION, QUANTITY_SCALE)
 # The largest amount QUANTITY holds: every digit a 9.
 QUANTITY_MAX: Final = Decimal(10**QUANTITY_PRECISION - 1).scaleb(-QUANTITY_SCALE)
+# The smallest amount above none QUANTITY holds: one in its last place.
+QUANTITY_STEP: Final = Decimal(1).scaleb(-QUANTITY_SCALE)
 # The largest PostgreSQL integer: what an id or other integer column holds.
 INTEGER_MAX = 2**31 - 1
 MONEY = Numeric(10, 2)

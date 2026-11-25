@@ -10,6 +10,7 @@ from sqlalchemy import ColumnElement, Row, Select, any_, func, or_, select, true
 from sqlalchemy.dialects.postgresql import distinct_on
 from sqlalchemy.orm import Session
 
+from inventory_tng.catalogue.unit_conversion import at_scale_sql
 from inventory_tng.core.db_lookups import values_by
 from inventory_tng.core.db_sessions import by_name
 from inventory_tng.core.phrases import PATH_BETWEEN
@@ -26,7 +27,7 @@ from inventory_tng.models.stock import (
 from inventory_tng.models.volunteers import Volunteer
 from inventory_tng.stock import package_forms
 from inventory_tng.stock.balance import balance, by_form, countable, countable_item
-from inventory_tng.stock.line_amounts import in_items_unit, kept
+from inventory_tng.stock.line_amounts import in_items_unit
 
 
 def balances(
@@ -381,7 +382,7 @@ def openings_at(
             Movement.item_id,
             Movement.from_package_id,
             Movement.to_open_package_id,
-            kept(in_items_unit()),
+            at_scale_sql(in_items_unit()),
         )
         .join(LedgerTransaction, LedgerTransaction.id == Movement.transaction_id)
         .join(Item, Item.id == Movement.item_id)
@@ -410,7 +411,7 @@ def loosened_at(
             LedgerTransaction.to_location_id,
             Movement.item_id,
             Movement.from_open_package_id,
-            kept(in_items_unit()),
+            at_scale_sql(in_items_unit()),
         )
         .join(LedgerTransaction, LedgerTransaction.id == Movement.transaction_id)
         .join(Item, Item.id == Movement.item_id)

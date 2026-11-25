@@ -57,7 +57,7 @@ from sqlalchemy.orm import Session
 from inventory_tng.catalogue import units
 from inventory_tng.catalogue.amount_rules import counted_whole, is_whole, whole_enough
 from inventory_tng.catalogue.name_keys import SPACES, name_key
-from inventory_tng.catalogue.unit_conversion import SMALLEST, converted, convertible
+from inventory_tng.catalogue.unit_conversion import converted, convertible
 from inventory_tng.core.db_errors import enforce
 from inventory_tng.core.db_locking import (
     Seen,
@@ -68,7 +68,7 @@ from inventory_tng.core.db_locking import (
 )
 from inventory_tng.core.db_once_committed import once_committed
 from inventory_tng.core.db_sessions import exists_where
-from inventory_tng.models.base import QUANTITY_MAX
+from inventory_tng.models.base import QUANTITY_MAX, QUANTITY_STEP
 from inventory_tng.models.catalogue import (
     CURRENT_ALIAS,
     SMALLEST_PACKAGE_FIRST,
@@ -396,7 +396,7 @@ UNIT_UNCONFIRMED = "item_unit_unconfirmed"
 UNIT_CHECKS_WAITING = "item_unit_checks_waiting"
 # Refused: that change, an amount it converts too large to keep in the new
 # unit, or a package's size or too-short length too small or no longer
-# below its size there (QUANTITY_MAX, SMALLEST).
+# below its size there (QUANTITY_MAX, QUANTITY_STEP).
 UNIT_OUT_OF_RANGE = "item_unit_out_of_range"
 # The database's check (models.catalogue.Item) on a fractional Reorder at
 # for an item counted each, which the form refuses first (Ali, 2026-11-23,
@@ -597,13 +597,13 @@ def _converted(session: Session, item: Item, fields: Fields, why: UnitFixed) -> 
     on_order = None if item.on_order is None else converted(item.on_order, old, new)
     per_order = {
         # Never none at all: so few per order in m is still some.
-        offer.id: max(converted(offer.units_per_order, offer.unit, new), SMALLEST)
+        offer.id: max(converted(offer.units_per_order, offer.unit, new), QUANTITY_STEP)
         for offer in offered
         if offer.units_per_order is not None
     }
     reported = [row for row in held if row.length_reported is not None]
     lengths = {
-        # Set with its unit (its check).
+        # Set with its unit (its check); narrowed again for the type checker.
         row.id: converted(row.length_reported, row.length_reported_unit or old, new)
         for row in reported
         if row.length_reported is not None
@@ -624,8 +624,6 @@ def _converted(session: Session, item: Item, fields: Fields, why: UnitFixed) -> 
     for row in reported:
         row.length_reported = lengths[row.id]
         row.length_reported_unit = new
-    offer_ids = [offer.id for offer in offered]
-    open_ids = sorted(lengths)
     once_committed(session, unit_changes_converted.add, 1, {"from": old, "to": new})
     once_committed(
         session,
@@ -635,23 +633,23 @@ def _converted(session: Session, item: Item, fields: Fields, why: UnitFixed) -> 
         reason=why,
         from_unit=old,
         to_unit=new,
-        vendor_offer_ids=offer_ids,
-        open_package_ids=open_ids,
+        vendor_offer_ids=[offer.id for offer in offered],
+        open_package_ids=sorted(lengths),
     )
     return replace(fields, minimum=minimum)
 
 
 def _kept_in(package: ItemPackage, unit: str) -> bool:
     """Whether `package`'s size and too-short length, in its own unit, are
-    kept in `unit`, its item's once converted: the size no less than
-    SMALLEST nor more than QUANTITY_MAX, the length no less than SMALLEST
-    and below the size, as their checks hold them in their own."""
+    kept in `unit`, its item's once converted: the size from QUANTITY_STEP
+    to QUANTITY_MAX, the length no less than QUANTITY_STEP and below the
+    size, as their checks hold them in their own."""
     size = converted(package.size, package.unit, unit)
-    if not SMALLEST <= size <= QUANTITY_MAX:
+    if not QUANTITY_STEP <= size <= QUANTITY_MAX:
         return False
     if package.short_below is None:
         return True
-    return SMALLEST <= converted(package.short_below, package.unit, unit) < size
+    return QUANTITY_STEP <= converted(package.short_below, package.unit, unit) < size
 
 
 def _amounts_follow(session: Session, item_id: int, unit: str) -> None:

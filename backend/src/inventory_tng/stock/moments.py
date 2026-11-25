@@ -23,11 +23,12 @@ from sqlalchemy import (
 )
 from sqlalchemy.orm import Session
 
+from inventory_tng.catalogue.unit_conversion import at_scale_sql
 from inventory_tng.models.catalogue import Item
 from inventory_tng.models.stock import AT_ONE_PLACE, LedgerTransaction, Movement
 from inventory_tng.stock.balance import balance
 from inventory_tng.stock.ledger import Form
-from inventory_tng.stock.line_amounts import in_items_unit, kept
+from inventory_tng.stock.line_amounts import in_items_unit
 
 
 class Moment(NamedTuple):
@@ -91,7 +92,7 @@ def _into_open(session: Session, open_id: int, *where: ColumnElement[bool]) -> D
         (Movement.from_open_package_id == open_id, amount), else_=0
     )
     total = session.scalar(
-        select(func.coalesce(kept(func.sum(signed)), 0))
+        select(func.coalesce(at_scale_sql(func.sum(signed)), 0))
         .select_from(Movement)
         .join(LedgerTransaction, LedgerTransaction.id == Movement.transaction_id)
         .join(Item, Item.id == Movement.item_id)
@@ -147,7 +148,7 @@ def flows(
         select(
             Movement.item_id,
             *(
-                kept(func.sum(in_items_unit()).filter(each, side))
+                at_scale_sql(func.sum(in_items_unit()).filter(each, side))
                 for each in windows
                 for side in (into, out)
             ),
@@ -209,7 +210,10 @@ def form_flows(
                 Movement.item_id,
                 package,
                 opened,
-                *(kept(func.sum(in_items_unit()).filter(each)) for each in windows),
+                *(
+                    at_scale_sql(func.sum(in_items_unit()).filter(each))
+                    for each in windows
+                ),
             )
             .join(LedgerTransaction, LedgerTransaction.id == Movement.transaction_id)
             .join(Item, Item.id == Movement.item_id)
@@ -297,7 +301,7 @@ def _netted_at(
     """_signed_at summed by place, item and `columns`, of `items` only if
     given: each row's place, item, columns and amount, where not zero."""
     place, item_id, *forms, quantity = _signed_at(location_ids, as_of, *columns)
-    total = kept(func.sum(quantity))
+    total = at_scale_sql(func.sum(quantity))
     query = (
         select(place, item_id, *forms, total)
         .group_by(place, item_id, *forms)

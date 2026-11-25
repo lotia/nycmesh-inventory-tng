@@ -204,6 +204,29 @@ PICK_A_CATEGORY = lazy_gettext("Pick a category.")
 PICK_A_UNIT = lazy_gettext("Pick a unit.")
 
 
+def unit_declined_problem(old: str, new: str, why: items.UnitFixed) -> str:
+    """What the item form says beside its unit when the administrator
+    answers No: nothing converts, and how to put right a unit wrong from
+    the start, until the guided recount (inventory-tng-qety) does it."""
+    if why == "labelled":
+        # Translators: answered No to "Were the recorded amounts really in
+        # %(old)s?"; the item's labels say the unit; revoking them lets
+        # the unit change without converting.
+        return gettext(
+            "Nothing was converted. If they were really in %(new)s, revoke "
+            "its labels first, then change its unit.",
+            new=new,
+        )
+    # Translators: answered No to "Were the recorded amounts really in
+    # %(old)s?"; a count in %(old)s first makes the records right in it.
+    return gettext(
+        "Nothing was converted. If they were really in %(new)s, count its "
+        "stock in %(old)s first, then change its unit.",
+        old=old,
+        new=new,
+    )
+
+
 def confirmed(session: Session, form: Mapping[str, str], fields: items.Fields) -> bool:
     """Whether the name was sent before and asked about, then sent again
     unchanged: a different item's, whatever is close."""

@@ -27,7 +27,7 @@ from inventory_tng.core.db_errors import refusal, refusal_naming_index
 from inventory_tng.core.db_once_committed import once_committed
 from inventory_tng.core.db_sessions import DbSession
 from inventory_tng.core.local_time import site_zone
-from inventory_tng.core.phrases import Words, gettext, lazy_gettext, ngettext
+from inventory_tng.core.phrases import Words, lazy_gettext, ngettext
 from inventory_tng.labels import labels
 from inventory_tng.labels.paths import item_labels
 from inventory_tng.models.base import INTEGER_MAX, whole
@@ -98,29 +98,6 @@ REFUSED_FIELDS = {
 # about, so an answer about another is asked again.
 RECORDED = "unit_recorded"
 RECORDED_IN = "unit_asked"
-
-
-def unit_declined(old: str, new: str, why: items.UnitFixed) -> str:
-    """What the item form says beside its unit when the administrator
-    answers No: nothing converts, and how to put right a unit wrong from
-    the start, until the guided recount (inventory-tng-qety) does it."""
-    if why == "labelled":
-        # Translators: answered No to "Were the recorded amounts really in
-        # %(old)s?"; the item's labels say the unit; revoking them lets
-        # the unit change without converting.
-        return gettext(
-            "Nothing was converted. If they were really in %(new)s, revoke "
-            "its labels first, then change its unit.",
-            new=new,
-        )
-    # Translators: answered No to "Were the recorded amounts really in
-    # %(old)s?"; a count in %(old)s first makes the records right in it.
-    return gettext(
-        "Nothing was converted. If they were really in %(new)s, count its "
-        "stock in %(old)s first, then change its unit.",
-        old=old,
-        new=new,
-    )
 
 
 class _AskFirst(Exception):
@@ -820,7 +797,7 @@ def _unit_declined(
         return _item_page(request, session, signed, item, values=form)
     log.info("unit change declined", item_id=item.id, reason=why)
     values = {**form, "unit": item.unit}
-    problems = {"unit": unit_declined(item.unit, unit, why)}
+    problems = {"unit": forms.unit_declined_problem(item.unit, unit, why)}
     return _item_page(request, session, signed, item, problems=problems, values=values)
 
 

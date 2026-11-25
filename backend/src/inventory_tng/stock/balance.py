@@ -20,11 +20,12 @@ from sqlalchemy import (
 )
 from sqlalchemy.orm import Session
 
+from inventory_tng.catalogue.unit_conversion import at_scale_sql
 from inventory_tng.core.db_sessions import by_name, exists_where
 from inventory_tng.models.catalogue import Item, ItemPackage
 from inventory_tng.models.places import Location
 from inventory_tng.models.stock import LedgerTransaction, Movement, OpenPackage
-from inventory_tng.stock.line_amounts import in_items_unit, kept
+from inventory_tng.stock.line_amounts import in_items_unit
 
 
 def _sides() -> Subquery:
@@ -57,7 +58,7 @@ def _summed(name: str, *by: str) -> Subquery:
     side = _sides()
     columns = [side.c[column] for column in ("item_id", "location_id", *by)]
     return (
-        select(*columns, kept(func.sum(side.c.quantity)).label("quantity"))
+        select(*columns, at_scale_sql(func.sum(side.c.quantity)).label("quantity"))
         .group_by(*columns)
         .subquery(name)
     )

@@ -6,8 +6,9 @@ it is read, and keeps its own unit in the ledger. A line in a unit that
 does not convert, each and a length, is refused as it is read, so no sum
 adds amounts in two units unawares.
 
-A line converts exactly, and a sum is rounded once, as kept (kept), so it
-does not drift by its lines' roundings: Shelf A's 305 m reads 1000.656 ft.
+A line converts exactly, and a sum is rounded once, as kept
+(unit_conversion.at_scale_sql), so it does not drift by its lines'
+roundings: Shelf A's 305 m reads 1000.656 ft.
 A line of sealed packages converts by its packages instead: so many, each
 its size in its item's unit as kept
 (models.catalogue.ItemPackage.size_in_items_unit), as the ledger takes
@@ -34,7 +35,6 @@ from inventory_tng.catalogue.unit_conversion import (
     converted_kept_sql,
     converted_sql,
 )
-from inventory_tng.models.base import QUANTITY_SCALE
 from inventory_tng.models.catalogue import Item, ItemPackage
 from inventory_tng.models.stock import Movement
 
@@ -59,7 +59,7 @@ def _by_packages(sealed: ColumnElement[Any]) -> ColumnElement[Any]:
 def in_items_unit() -> ColumnElement[Any]:
     """Movement.quantity, read in its item's unit, of the Item the query
     joins to the line, exactly: a sum or a line read alone is rounded with
-    kept(). A line in a unit that does not convert is an error as it is
+    unit_conversion.at_scale_sql(). A line in a unit that does not convert is an error as it is
     read, saying the line's id and both units: those words cast to a
     number, a DataError, as the database may hold no function to raise one
     (docs/decisions/0016). The words are made from the row's columns, so
@@ -85,10 +85,3 @@ def in_items_unit() -> ColumnElement[Any]:
         (lengths, converted_sql(Movement.quantity, Movement.unit, Item.unit)),
         else_=cast(refused, Numeric),
     )
-
-
-def kept(amount: ColumnElement[Any]) -> ColumnElement[Any]:
-    """A sum of in_items_unit(), or one line of it, as amounts are kept:
-    to QUANTITY_SCALE places (unit_conversion.converted). NULL stays NULL,
-    as a sum of no lines is."""
-    return func.round(amount, QUANTITY_SCALE)

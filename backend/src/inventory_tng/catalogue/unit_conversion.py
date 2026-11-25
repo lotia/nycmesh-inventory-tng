@@ -5,7 +5,8 @@ sides convert alike. Each and a length never convert.
 A conversion is exact until it is kept: an amount is stored, and shown, to
 QUANTITY_SCALE places, rounded half away from zero, as PostgreSQL's
 round() does. A sum converts each line exactly and rounds once
-(stock/line_amounts.py), so no sum drifts by its lines' roundings.
+(stock/line_amounts.py, at_scale_sql), so no sum drifts by its lines'
+roundings.
 """
 
 from decimal import ROUND_HALF_UP, Decimal
@@ -13,15 +14,13 @@ from typing import Any
 
 from sqlalchemy import Numeric, SQLColumnExpression, case, func, literal
 
-from inventory_tng.models.base import QUANTITY_SCALE
+from inventory_tng.models.base import QUANTITY_SCALE, QUANTITY_STEP
 
 # A foot in metres, exactly, by international agreement (1959).
 METRES_PER_FOOT = Decimal("0.3048")
 # Each length unit in metres: every unit of amount_rules.LENGTHS, which a
 # test holds.
 IN_METRES = {"m": Decimal(1), "ft": METRES_PER_FOOT}
-# The smallest amount kept, to QUANTITY_SCALE places.
-SMALLEST = Decimal(1).scaleb(-QUANTITY_SCALE)
 
 
 def convertible(old: str, new: str) -> bool:
@@ -33,7 +32,13 @@ def convertible(old: str, new: str) -> bool:
 def at_scale(amount: Decimal) -> Decimal:
     """`amount` as it is kept: to QUANTITY_SCALE places, half away from
     zero."""
-    return amount.quantize(SMALLEST, rounding=ROUND_HALF_UP)
+    return amount.quantize(QUANTITY_STEP, rounding=ROUND_HALF_UP)
+
+
+def at_scale_sql(amount: SQLColumnExpression[Any]) -> SQLColumnExpression[Any]:
+    """at_scale() in SQL: PostgreSQL's round() is half away from zero too.
+    NULL stays NULL, as a sum of no lines is."""
+    return func.round(amount, QUANTITY_SCALE)
 
 
 def converted(amount: Decimal, unit: str, into: str) -> Decimal:
@@ -74,4 +79,4 @@ def converted_kept_sql(
     into: SQLColumnExpression[str],
 ) -> SQLColumnExpression[Any]:
     """converted_sql() as it is kept, as converted() rounds it."""
-    return func.round(converted_sql(amount, unit, into), QUANTITY_SCALE)
+    return at_scale_sql(converted_sql(amount, unit, into))
