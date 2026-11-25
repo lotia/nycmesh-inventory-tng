@@ -9,10 +9,9 @@ with them. A template says its words in `{% trans %}`. Either way a message
 formats its values as `%(name)s`, always, so a literal per cent is `%%`.
 A context (`pgettext`) only where the same English means two things, from
 the fixed list in CONTRIBUTING.md (Phrases). A number people read is
-written as the locale writes it (`number`, a template's `| number`), a
-plural's count too, and a list of names as it joins them (`joined`); on
-a page whose number boxes take a comma, with that comma and no grouping
-(`writing_numbers`).
+written without grouping, in the decimal separator the page's number
+boxes take (`number`, a template's `| number`, `writing_numbers`), a
+plural's count too; a list of names as the locale joins them (`joined`).
 """
 
 from collections.abc import Callable, Generator, Sequence
@@ -62,8 +61,8 @@ def compiled(catalogue: Catalog) -> Translations:
 # A decimal separator: the one a page's number boxes take
 # (web/decimal_separator.py), which its words' numbers follow.
 Separator = Literal[".", ","]
-# The decimal separator numbers in words are written with now: "." as the
-# words' locale writes, unless `writing_numbers` gives ",".
+# The decimal separator numbers in words are written with now: ".", unless
+# `writing_numbers` gives ",".
 _separator: ContextVar[Separator] = ContextVar("separator", default=".")
 
 ENGLISH = compiled(read(ENGLISH_PO))
@@ -89,11 +88,10 @@ def speaking(translations: Translations) -> Generator[None]:
 
 @contextmanager
 def writing_numbers(separator: Separator) -> Generator[None]:
-    """Write numbers in words with `separator` until the block ends: with
-    ",", as a page whose boxes take one does (Ali, 2026-11-23,
-    inventory-tng-4mc3), "1500" and "1,5", not grouped, so a number in a
-    sentence reads as its box would. One request's or task's own, never
-    another's."""
+    """Write numbers in words with `separator` until the block ends, the
+    one the page's boxes take: with ",", "1500" and "1,5" (Ali, 2026-11-23,
+    inventory-tng-4mc3), so a number in a sentence reads as its box would.
+    One request's or task's own, never another's."""
     token = _separator.set(separator)
     try:
         yield
@@ -114,22 +112,22 @@ def pgettext(context: str, message: str, **values: object) -> str:
 
 def ngettext(singular: str, plural: str, num: int, **values: object) -> str:
     """The form for `num` in the active locale, with `%(num)s` filled with
-    it as the locale writes it."""
+    it as `number` writes it."""
     return _active.ngettext(singular, plural, num) % ({"num": number(num)} | values)
 
 
 def number(value: int | Decimal) -> str:
-    """`value` as the active locale writes it, such as 1,000 in English and
-    1.000 in German: its catalogue's language, English if it names none
-    Babel knows (a pseudo-locale's, such as en_XA). A decimal keeps every
-    digit it has, never rounded. Within `writing_numbers(",")`, ungrouped
-    and with a comma: 1500 and 1,5."""
+    """`value` as people read it, as a number box takes it: never grouped,
+    on every page (Ali, 2026-11-24, inventory-tng-ua04), with the decimal
+    separator `writing_numbers` gives, "." unless it gives ",": 1234.5, or
+    1234,5. Its signs otherwise as the active catalogue's language writes
+    them, English if it names none Babel knows (a pseudo-locale's, such as
+    en_XA). A decimal keeps every digit it has, never rounded."""
     locale = _number_locale(_active.info().get("language"))
-    comma = _separator.get() == ","
     written = format_decimal(
-        value, locale=locale, decimal_quantization=False, group_separator=not comma
+        value, locale=locale, decimal_quantization=False, group_separator=False
     )
-    return written.replace(get_decimal_symbol(locale), ",") if comma else written
+    return written.replace(get_decimal_symbol(locale), _separator.get())
 
 
 def joined(names: Sequence[str]) -> str:

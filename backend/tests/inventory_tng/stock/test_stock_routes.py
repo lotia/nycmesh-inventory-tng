@@ -40,6 +40,24 @@ def test_by_place_and_by_item(admin_client: TestClient, session: Session) -> Non
     assert "5 each in all" in by_item
 
 
+def test_an_items_amount_in_all_is_ungrouped_in_the_pages_separator(
+    admin_client: TestClient, session: Session
+) -> None:
+    """The hint beside an item's name, as a box would take the amount (Ali,
+    2026-11-24, inventory-tng-ua04)."""
+    place = Place(session)
+    received(
+        session,
+        place,
+        [{"item_id": place.cable.id, "quantity": "1234.5", "unit": place.cable.unit}],
+    )
+    for language, written in (("en", "1234.5 m in all"), ("de", "1234,5 m in all")):
+        page = admin_client.get(
+            STOCK, params={"by": "item"}, headers={"Accept-Language": language}
+        )
+        assert written in text(page), language
+
+
 def test_less_than_nothing_asks_for_a_count(
     admin_client: TestClient, session: Session
 ) -> None:

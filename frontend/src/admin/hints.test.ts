@@ -73,6 +73,10 @@ test("a button says what is typed, and 'it' while nothing is", () => {
   field.value = " 40 ";
   field.dispatchEvent(new Event("input"));
   expect(button.textContent).toBe("Set to 40 m");
+  // Ungrouped, as the page's words write it (inventory-tng-ua04).
+  field.value = "1234.5";
+  field.dispatchEvent(new Event("input"));
+  expect(button.textContent).toBe("Set to 1234.5 m");
   for (const typed of ["", "abc", "4 0"]) {
     field.value = typed;
     field.dispatchEvent(new Event("input"));

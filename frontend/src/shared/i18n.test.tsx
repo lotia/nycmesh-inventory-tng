@@ -71,19 +71,20 @@ test("words marked for no part given keep their place, unmarked", () => {
   );
 });
 
-test("a quantity is written as the locale writes a number, every thousandth kept", () => {
-  expect(sayAmount(1_234_500)).toBe("1,234.5");
-  expect(sayAmount(1_234_567)).toBe("1,234.567");
+test("a quantity is written ungrouped, every thousandth kept", () => {
+  // Ali, 2026-11-24 (inventory-tng-ua04): as the page's boxes take it.
+  expect(sayAmount(1_234_500)).toBe("1234.5");
+  expect(sayAmount(1_234_567)).toBe("1234.567");
   expect(sayAmount(1)).toBe("0.001");
   expect(sayAmount(3000)).toBe("3");
-  expect(sayAmount(-1_234_500)).toBe("-1,234.5");
-  expect(sayNumber(1000)).toBe("1,000");
+  expect(sayAmount(-1_234_500)).toBe("-1234.5");
+  expect(sayNumber(1000)).toBe("1000");
   // The most the ledger holds (models/base.py QUANTITY), every digit kept.
-  expect(sayAmount(999_999_999_999)).toBe("999,999,999.999");
+  expect(sayAmount(999_999_999_999)).toBe("999999999.999");
+  // The page's separator, whatever the words' locale.
   speak("de", english);
-  expect(sayAmount(1_234_500)).toBe("1.234,5");
-  expect(sayAmount(1_234_567)).toBe("1.234,567");
-  expect(sayNumber(1000)).toBe("1.000");
+  expect(sayAmount(1_234_500)).toBe("1234.5");
+  expect(sayNumber(1000)).toBe("1000");
 });
 
 test("on a comma page a quantity takes its comma, ungrouped", () => {
@@ -104,8 +105,9 @@ test("on a comma page a quantity takes its comma, ungrouped", () => {
     page.dataset.decimal = ".";
     takeSeparatorFrom(page);
   }
-  expect(sayAmount(1_500_000)).toBe("1,500");
+  expect(sayAmount(1_500_000)).toBe("1500");
+  expect(sayAmount(1500)).toBe("1.5");
   expect(say(BATCHES_WAITING, { count: 1500 })).toBe(
-    "The 1,500 batches waiting on this browser are being sent.",
+    "The 1500 batches waiting on this browser are being sent.",
   );
 });

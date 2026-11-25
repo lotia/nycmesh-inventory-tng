@@ -914,18 +914,19 @@ def test_a_count_is_said_as_a_plural() -> None:
     assert len(left) == 2
 
 
-def test_a_lists_numbers_are_written_as_the_locale_writes_them() -> None:
-    """Its sizes, pages and matches, grouped as German groups digits
-    (inventory-tng-r9ex); its links keep plain digits (web/listing.py)."""
+def test_a_lists_numbers_are_written_ungrouped_in_any_locale() -> None:
+    """Its sizes, pages and matches, as number() writes them
+    (inventory-tng-r9ex), never grouped (Ali, 2026-11-24, inventory-tng-ua04);
+    its links keep plain digits (web/listing.py)."""
     grown = {"sizes": [1000, None], "page": 1000, "pages": 2000}
     view = SimpleNamespace(**vars(VIEW) | grown)
     with speaking(GERMAN):
         shown = words_shown(
             from_macros(LISTING_PARTS, view=view, listing=listing(found=1500))
         )
-    assert "Show 1.000 · All" in shown
-    assert "Page 1.000 of 2.000" in shown
-    assert "1.500 of 3, matching" in shown
+    assert "Show 1000 · All" in shown
+    assert "Page 1000 of 2000" in shown
+    assert "1500 of 3, matching" in shown
 
 
 def test_a_language_babel_does_not_know_writes_numbers_as_english() -> None:
@@ -933,7 +934,7 @@ def test_a_language_babel_does_not_know_writes_numbers_as_english() -> None:
     its numbers read as English's, so its pages still show."""
     header = 'msgid ""\nmsgstr ""\n"Language: en_XA\\n"\n'
     with speaking(compiled(read_po(StringIO(header)))):
-        assert number(1000) == "1,000"
+        assert number(1000) == "1000"
 
 
 def test_names_are_joined_as_the_locale_joins_a_list() -> None:
@@ -961,40 +962,40 @@ def items_page(total: int) -> str:
     )
 
 
-def test_a_count_is_written_as_the_locale_writes_it_its_form_chosen_by_number() -> None:
+def test_a_count_is_written_ungrouped_its_form_chosen_by_number() -> None:
     """A plural's count, in Python and in a template, whether named count
-    or num (inventory-tng-31q3)."""
+    or num (inventory-tng-31q3), as number() writes it in any locale."""
     revoke = {"filter": {}, "keep": "/", "here": "/"}
     many = [SimpleNamespace(id=1, name=NOT_ENGLISH)] * 1000
     hint = "admins/_password_hint.html"
-    assert retired_holding(1000) == "1,000 retired places hold stock"
+    assert retired_holding(1000) == "1000 retired places hold stock"
     assert retired_holding(1) == "1 retired place holds stock"
-    assert "1,000 items" in words_shown(items_page(1000))
+    assert "1000 items" in words_shown(items_page(1000))
     assert "1 item" in words_shown(items_page(1))
-    assert "Revoke 1,000" in signed_in(
+    assert "Revoke 1000" in signed_in(
         "devices/device_revoke.html", devices=many, **revoke
     )
     assert "at least 1 character<" in render(
         hint, limits=SimpleNamespace(password_min=1)
     )
     with speaking(GERMAN):
-        assert retired_holding(1000) == "1.000 retired places hold stock"
-        assert "1.000 items" in words_shown(items_page(1000))
-        assert "at least 1.000 characters" in render(
+        assert retired_holding(1000) == "1000 retired places hold stock"
+        assert "1000 items" in words_shown(items_page(1000))
+        assert "at least 1000 characters" in render(
             hint, limits=SimpleNamespace(password_min=1000)
         )
-        assert mail_messages.days(1000) == "1.000 days"
+        assert mail_messages.days(1000) == "1000 days"
 
 
-def test_a_number_in_a_message_is_written_as_the_locale_writes_it() -> None:
+def test_a_number_in_a_message_is_written_ungrouped() -> None:
     """Not only a plural's count: a view's count and a field's limits too
     (inventory-tng-31q3)."""
-    assert stock_routes.recorded_more_view(1000) == "Recorded more (1,000)"
-    assert over_recorded_routes.waiting_view(1000) == "Waiting (1,000)"
-    assert up_to(1000) == "Up to 1,000 characters."
-    assert whole_minutes(1, 10080) == "A whole number of minutes, from 1 to 10,080."
+    assert stock_routes.recorded_more_view(1000) == "Recorded more (1000)"
+    assert over_recorded_routes.waiting_view(1000) == "Waiting (1000)"
+    assert up_to(1000) == "Up to 1000 characters."
+    assert whole_minutes(1, 10080) == "A whole number of minutes, from 1 to 10080."
     with speaking(GERMAN):
-        assert uses_problem(1000) == "From 1 to 1.000 devices."
+        assert uses_problem(1000) == "From 1 to 1000 devices."
 
 
 def test_numbers_in_words_on_a_comma_page_take_its_comma_ungrouped() -> None:
@@ -1005,10 +1006,11 @@ def test_numbers_in_words_on_a_comma_page_take_its_comma_ungrouped() -> None:
         assert up_to(1500) == "Up to 1500 characters."
         assert number(Decimal("1.5")) == "1,5"
         assert "1000 items" in words_shown(items_page(1000))
-    assert up_to(1500) == "Up to 1,500 characters."
+    assert up_to(1500) == "Up to 1500 characters."
+    assert number(Decimal("1.5")) == "1.5"
 
 
-def test_the_home_and_seeding_pages_write_their_counts_as_the_locale_does() -> None:
+def test_the_home_and_seeding_pages_write_their_counts_ungrouped() -> None:
     """Needs your action's total, each section's count, and the seeding
     page's place in its proposals (inventory-tng-1axu)."""
     kind = SimpleNamespace(title=NOT_ENGLISH, path="/admin/stock/x")
@@ -1034,9 +1036,9 @@ def test_the_home_and_seeding_pages_write_their_counts_as_the_locale_does() -> N
         total=2000,
         here="/here",
     )
-    assert "(1,000)" in home
-    assert ": 2,000" in home
-    assert "1,000 of 2,000." in seeding
+    assert "(1000)" in home
+    assert ": 2000" in home
+    assert "1000 of 2000." in seeding
     assert markup.box_values(seeding, "at") == ["999"]
 
 
@@ -1052,11 +1054,11 @@ def test_only_an_id_fills_a_messages_placeholder_as_plain_digits() -> None:
     assert placeholders <= {"id"}
 
 
-def test_a_badge_counts_as_the_locale_writes_numbers() -> None:
+def test_a_badge_counts_ungrouped() -> None:
     badge = SimpleNamespace(count=1000, words=NOT_ENGLISH)
     sections = [("/admin/stock", NOT_ENGLISH, badge)]
     page = render("_masthead.html", **(SIGNED_IN | {"sections": sections}))
-    assert markup.read(page).all("span", "1,000", aria_hidden="true")
+    assert markup.read(page).all("span", "1000", aria_hidden="true")
 
 
 def test_a_lists_all_is_said_in_the_locale() -> None:

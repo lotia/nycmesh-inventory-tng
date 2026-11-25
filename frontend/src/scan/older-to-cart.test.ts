@@ -473,14 +473,14 @@ describe("line by line", () => {
     );
   });
 
-  test("an older cart's package counts and amounts are written as the locale writes numbers", () => {
+  test("an older cart's package counts and amounts are written ungrouped", () => {
     expect(
       lineWords(
         { itemId: 999, packages: { 5: "1500" }, loose: "1234.5" },
         undefined,
       ),
     ).toBe(
-      "An item no longer in the catalogue: 1,500 × a removed package or item, 1,234.5 loose",
+      "An item no longer in the catalogue: 1500 × a removed package or item, 1234.5 loose",
     );
   });
 

@@ -128,10 +128,30 @@ them open:
   chooses "." or "," for each request from Accept-Language
   (`web/decimal_separator.py`) and tells each page in its
   `<html data-decimal>`; boxes, and numbers shown back from them, use it,
-  and the other is refused (Ali, 2026-11-23, inventory-tng-qnwz). On a
-  page whose separator is ",", numbers in sentences use it too, ungrouped
-  ("1500 m", "1,5 m"), in English words (Ali, 2026-11-23,
-  inventory-tng-4mc3); on a "." page they are as English writes them.
-  Mail and printed labels keep one style, a point; labels never group.
+  and the other is refused (Ali, 2026-11-23, inventory-tng-qnwz).
+  Numbers in sentences use it too, in English words, and are never
+  grouped ("1234.5 m", or "1234,5 m"), as amended below. Mail and printed
+  labels keep one style, a point and no grouping.
 - The scan page's bundle holds the compiled English catalogue; Lingui's
   core adds about 2.5 kB, gzipped.
+
+## Amendment: numbers are never grouped (2026-11-24)
+
+Ali decided on 2026-11-23 (inventory-tng-4mc3) that on a page whose
+separator is "," numbers in sentences take that comma and no grouping,
+while a "." page kept English's grouping ("1,234.5 m"). A "." page's
+boxes refuse "1,234.5" ("Type thousands without a separator"), so its
+words and its boxes disagreed.
+
+Ali decided on 2026-11-24 (inventory-tng-ua04) that amounts the app
+writes for people (sentences, hints, buttons, alerts, mail) are never
+grouped, on any page, in the page's decimal separator: "1234.5 m" on a
+"." page, "1234,5 m" on a "," page. Every number shown then reads as a
+box takes it. This amends 4mc3's "on a '.' page nothing changes". The
+server's `phrases.number`, and the scan page's `sayNumber` and plural
+counts, write no grouping; printed labels keep their point.
+
+Rejected: grouping on both kinds of page ("1,234.5" and "1.234,5").
+Words and boxes would disagree on both, and "1.500" could be misread
+on a comma page. Boxes keep qnwz's strict reading: grouped input is
+refused.

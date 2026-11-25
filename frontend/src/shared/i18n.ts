@@ -30,45 +30,41 @@ export function speak(name: string, catalogue: typeof messages): void {
 
 speak("en", messages);
 
-/** A number writer for each locale and decimal separator, made the first
- * time it is needed. */
+/** A number writer for each locale, made the first time it is needed. */
 const writers = new Map<string, Intl.NumberFormat>();
 
 /**
- * `value` written as the active locale writes a number, grouped and with
- * its decimal sign (1,234.5, or 1.234,5 in German), keeping every
- * thousandth the ledger keeps, as the server's web/formatting.amount
- * does; on a page whose boxes take a comma (shared/quantity's
- * `boxSeparator`), ungrouped and with that comma, 1234,5 (Ali,
- * 2026-11-23, inventory-tng-4mc3). For words only: a box holds
- * shared/quantity's `boxAmount`, which it reads back.
+ * `value` written as the page's boxes take a number: never grouped, on
+ * every page (Ali, 2026-11-24, inventory-tng-ua04), with their decimal
+ * separator (shared/quantity's `boxSeparator`), 1234.5 or 1234,5, and
+ * every thousandth the ledger keeps, as the server's
+ * web/formatting.amount does. Its other signs as the active locale
+ * writes them. For words only: a box holds shared/quantity's
+ * `boxAmount`, which it reads back.
  */
 export function sayNumber(value: number): string {
   // Read so a component rendering this renders again on a change.
   void changes.value;
   // As Lingui writes a plural's #.
   const locales = i18n.locales ?? i18n.locale;
-  const comma = boxSeparator() === ",";
-  const key = `${String(locales)} ${comma}`;
+  const key = String(locales);
   let writer = writers.get(key);
   if (writer === undefined) {
     writer = new Intl.NumberFormat(locales, {
       maximumFractionDigits: 3,
-      useGrouping: !comma,
+      useGrouping: false,
     });
     writers.set(key, writer);
   }
-  if (!comma) {
-    return writer.format(value);
-  }
+  const separator = boxSeparator();
   return writer
     .formatToParts(value)
-    .map((part) => (part.type === "decimal" ? "," : part.value))
+    .map((part) => (part.type === "decimal" ? separator : part.value))
     .join("");
 }
 
 /** `amount`, in thousandths (shared/quantity.ts), as `sayNumber` writes
- * it: 1234500 as "1,234.5", or "1234,5" on a comma page. */
+ * it: 1234500 as "1234.5", or "1234,5" on a comma page. */
 export function sayAmount(amount: number): string {
   return sayNumber(amount / 1000);
 }
@@ -103,16 +99,13 @@ function holed(
       return [name, `\uE000${held.length - 1}\uE001`];
     }),
   );
-  const options: MessageOptions = {
-    ...phrase,
-    // A plural's # ungrouped on a comma page, as sayNumber writes it.
-    ...(boxSeparator() === "," ? { formats: UNGROUPED } : {}),
-  };
+  // A plural's # ungrouped, as sayNumber writes it.
+  const options: MessageOptions = { ...phrase, formats: UNGROUPED };
   return [i18n._(phrase.id, filled, options), held];
 }
 
-/** Lingui's number format for a plural's # on a comma page: its counts
- * are whole, so no grouping is all that sayNumber's rule asks. */
+/** Lingui's number format for a plural's #: its counts are whole, so no
+ * grouping is all that sayNumber's rule asks. */
 const UNGROUPED = { number: { useGrouping: false } };
 
 /** A phrase in the active locale, with the values its placeholders name. */

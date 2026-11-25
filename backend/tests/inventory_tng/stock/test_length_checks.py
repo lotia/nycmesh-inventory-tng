@@ -74,6 +74,24 @@ def test_the_check_page_hints_at_the_printed_length(
     assert read(page).all("input", aria_describedby=f"hint-{made.id}")
 
 
+def test_the_check_page_writes_lengths_ungrouped_in_its_separator(
+    admin_client: TestClient,
+    registered_client: TestClient,
+    spools: Spools,
+) -> None:
+    """In its sentences and its box, on a point page and a comma page (Ali,
+    2026-11-24, inventory-tng-ua04). The Set button's length follows the
+    box in the browser (frontend/src/admin/hints.ts)."""
+    made = spools.opened()
+    registered_client.post(URL, json=report(spools, length(made, "1234.5")))
+    for language, written in (("en", "1234.5"), ("de", "1234,5")):
+        page = admin_client.get(LENGTHS, headers={"Accept-Language": language})
+        assert f"said {written} m is on it" in words_on(page.text), language
+        assert box_values(page.text, "left") == [written]
+        button = read(page.text).one("span", data_follows=f"left-{made.id}")
+        assert button.attrs["data-unit"] == "m"
+
+
 def test_a_volunteer_reports_what_is_on_it_and_nothing_moves(
     registered_client: TestClient, session: Session, spools: Spools
 ) -> None:

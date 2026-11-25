@@ -64,11 +64,12 @@ def counted_box(page: str, item_id: int) -> str | None:
     return box.attrs.get("value")
 
 
-def test_the_count_page_reads_an_amount_grouped_but_its_box_holds_it_plainly(
+def test_the_count_page_writes_an_amount_as_its_box_holds_it(
     admin_client: TestClient, session: Session
 ) -> None:
-    """In English and in German: a box holds what the form reads back
-    (inventory-tng-31q3)."""
+    """Ungrouped in the page's separator on a point page and a comma page
+    (Ali, 2026-11-24, inventory-tng-ua04); whatever the words' locale, the
+    box holds what the form reads back (inventory-tng-31q3)."""
     place = Place(session)
     received(
         session,
@@ -76,11 +77,16 @@ def test_the_count_page_reads_an_amount_grouped_but_its_box_holds_it_plainly(
         [{"item_id": place.cable.id, "quantity": "1234.5", "unit": place.cable.unit}],
     )
     field = f"counted_{place.cable.id}"
-    for catalogue, written in ((ENGLISH, "1,234.5 m"), (GERMAN, "1.234,5 m")):
-        with speaking(catalogue):
-            shown = admin_client.get(f"{COUNTS}/{place.store.id}")
-        assert box_values(shown.text, field) == ["1234.5"]
-        assert written in text(shown)
+    pages = (("en", "1234.5"), ("de", "1234,5"))
+    for catalogue in (ENGLISH, GERMAN):
+        for language, written in pages:
+            with speaking(catalogue):
+                shown = admin_client.get(
+                    f"{COUNTS}/{place.store.id}",
+                    headers={"Accept-Language": language},
+                )
+            assert box_values(shown.text, field) == [written]
+            assert f"{written} m" in text(shown)
     # Metres, perhaps with a decimal point: the keypad with one.
     assert read(shown.text).one("input", name=field, inputmode="decimal")
 

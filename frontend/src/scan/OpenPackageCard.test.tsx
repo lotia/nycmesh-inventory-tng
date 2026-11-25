@@ -1,7 +1,7 @@
 import { fireEvent, render, screen } from "@testing-library/preact";
 import { describe, expect, test, vi } from "vitest";
-import { messages as english } from "../locales/en.po";
-import { say, speak } from "../shared/i18n";
+import { say } from "../shared/i18n";
+import { takeSeparatorFrom } from "../shared/quantity";
 import { cart } from "../testing/cart";
 import { CATALOGUE, cable, openAt, radio } from "../testing/catalogue";
 import { saidAsText } from "../testing/said";
@@ -146,19 +146,21 @@ test("moved whole, what is on it as typed now is said still", () => {
   });
 });
 
-test("what is on it is written as the locale writes numbers, a box takes it plain", () => {
-  // German's separators, read with the English words.
-  speak("de", english);
+test("what is on it is written ungrouped in the page's separator, a box takes it plain", () => {
+  // Ali, 2026-11-24 (inventory-tng-ua04).
+  const page = document.createElement("html");
+  page.dataset.decimal = ",";
+  takeSeparatorFrom(page);
   const onTake = vi.fn();
   card(
     cable,
-    { amount: "0.5", whole: false },
+    { amount: "0,5", whole: false },
     { left: 1_234_567, moving: true, onTake },
   );
-  expect(document.body.textContent).toContain("1.234,567 m");
-  expect(document.body.textContent).toContain("1.234,067 m");
+  expect(document.body.textContent).toContain("1234,567 m");
+  expect(document.body.textContent).toContain("1234,067 m");
   fireEvent.click(screen.getByLabelText(say(ALL_OF_IT)));
-  expect(onTake).toHaveBeenLastCalledWith({ amount: "1234.567", whole: true });
+  expect(onTake).toHaveBeenLastCalledWith({ amount: "1234,567", whole: true });
 });
 
 describe("an open box of 500 connectors, followed", () => {

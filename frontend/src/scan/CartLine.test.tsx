@@ -1,12 +1,11 @@
 import { render, screen } from "@testing-library/preact";
 import { expect, test } from "vitest";
-import { messages as english } from "../locales/en.po";
-import { speak } from "../shared/i18n";
+import { takeSeparatorFrom } from "../shared/quantity";
 import { cable, openAt } from "../testing/catalogue";
 import { CartLine } from "./CartLine";
 import type { Line } from "./cart";
 
-/** A spool of 1,234.567 m, one of them and 1,000 m loose in the cart. */
+/** A spool of 1234.567 m, one of them and 1000 m loose in the cart. */
 function shown() {
   const spool = cable.packages[0] as (typeof cable.packages)[number];
   const item = { ...cable, packages: [{ ...spool, size: "1234.567" }] };
@@ -22,18 +21,20 @@ function shown() {
   );
 }
 
-test("a line's amounts are written as English writes numbers", () => {
+test("a line's amounts are written ungrouped, as its boxes take them", () => {
+  // Ali, 2026-11-24 (inventory-tng-ua04).
   shown();
-  expect(screen.getByText("2,234.567 m in all")).toBeDefined();
-  expect(screen.getByLabelText("Spool (1,234.567 m)")).toBeDefined();
+  expect(screen.getByText("2234.567 m in all")).toBeDefined();
+  expect(screen.getByLabelText("Spool (1234.567 m)")).toBeDefined();
 });
 
-test("a line's amounts are written as the locale writes numbers, its boxes plain", () => {
-  // German's separators, read with the English words.
-  speak("de", english);
+test("on a comma page a line's amounts take its comma, its boxes too", () => {
+  const page = document.createElement("html");
+  page.dataset.decimal = ",";
+  takeSeparatorFrom(page);
   shown();
-  expect(screen.getByText("2.234,567 m in all")).toBeDefined();
-  const spool = screen.getByLabelText("Spool (1.234,567 m)");
+  expect(screen.getByText("2234,567 m in all")).toBeDefined();
+  const spool = screen.getByLabelText("Spool (1234,567 m)");
   expect((spool as HTMLInputElement).value).toBe("1");
   expect((screen.getByLabelText("Loose m") as HTMLInputElement).value).toBe(
     "1000",

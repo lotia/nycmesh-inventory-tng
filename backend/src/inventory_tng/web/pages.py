@@ -40,7 +40,7 @@ cast(dict[str, Any], templates.env.globals)["BRAND"] = BRAND
 # (docs/decisions/0013); {{ moment | day(zone) }}, its day alone ("14 Nov").
 templates.env.filters["when"] = show
 templates.env.filters["day"] = show_day
-# {{ size | number }}: a number as the active locale writes it ("1,000").
+# {{ size | number }}: a number as people read it, ungrouped ("1000").
 templates.env.filters["number"] = number
 
 # Where a response's Content-Security-Policy nonce is kept, in the
@@ -81,7 +81,7 @@ def signed_in_as(request: Request) -> SignedInAs | None:
     return request.scope.get("state", {}).get(_SIGNED_IN_AS)
 
 
-# {{ quantity | amount }}: a quantity as people read it ("1,234.5"); a
+# {{ quantity | amount }}: a quantity as people read it ("1234.5"); a
 # number box takes {{ quantity | box_amount(decimal) }} ("1234.5", or
 # "1234,5"), in the page's decimal separator (page()), and a field the
 # page writes itself, such as a hidden one, {{ quantity | plain_amount }},

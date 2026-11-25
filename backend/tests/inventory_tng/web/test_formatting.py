@@ -14,23 +14,24 @@ from helpers.locales import GERMAN
 @pytest.mark.parametrize(
     ("stored", "read"),
     [
-        ("1234.500", "1,234.5"),
-        ("1000.000", "1,000"),
+        ("1234.500", "1234.5"),
+        ("1000.000", "1000"),
         ("3.000", "3"),
         ("0.001", "0.001"),
-        ("-1234567.125", "-1,234,567.125"),
+        ("-1234567.125", "-1234567.125"),
     ],
 )
-def test_an_amount_keeps_its_digits_grouped_as_the_locale_writes_them(
-    stored: str, read: str
-) -> None:
-    """Every stored digit but trailing zeros, never rounded."""
+def test_an_amount_keeps_its_digits_ungrouped(stored: str, read: str) -> None:
+    """Every stored digit but trailing zeros, never rounded, and never
+    grouped, as a box takes it (Ali, 2026-11-24, inventory-tng-ua04)."""
     assert amount(Decimal(stored)) == read
 
 
-def test_an_amount_takes_the_locales_decimal_sign() -> None:
+def test_an_amount_takes_the_pages_separator_whatever_the_locale() -> None:
     with speaking(GERMAN):
-        assert amount(Decimal("1234.500")) == "1.234,5"
+        assert amount(Decimal("1234.500")) == "1234.5"
+        with writing_numbers(","):
+            assert amount(Decimal("1234.500")) == "1234,5"
 
 
 @pytest.mark.parametrize(
@@ -41,12 +42,12 @@ def test_an_amount_on_a_comma_page_takes_its_comma_ungrouped(
     stored: str, read: str
 ) -> None:
     """In words as its boxes write it (Ali, 2026-11-23, inventory-tng-4mc3);
-    a point page's as English writes it, and a printed label's always so."""
+    a point page's with a point, and a printed label's always so."""
     with writing_numbers(","):
         assert amount(Decimal(stored)) == read
         assert plain_amount(Decimal("1500.5")) == "1500.5"
     with writing_numbers("."):
-        assert amount(Decimal("1500.5")) == "1,500.5"
+        assert amount(Decimal("1500.5")) == "1500.5"
 
 
 def test_an_amount_a_form_sends_back_is_plain_in_every_locale() -> None:

@@ -17,4 +17,4 @@ def test_a_plurals_values_may_take_any_name() -> None:
         "{% trans count=n, plural=p, context=c %}{{ count }} {{ plural }} {{ context }}"
         "{% pluralize %}{{ count }} {{ plural }}s {{ context }}{% endtrans %}"
     ).render(n=1000, p="box", c="here")
-    assert said == "1,000 boxs here"
+    assert said == "1000 boxs here"

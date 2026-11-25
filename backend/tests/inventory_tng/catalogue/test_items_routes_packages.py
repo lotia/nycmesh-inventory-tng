@@ -384,11 +384,11 @@ def test_packages_are_listed_current_first_then_smallest_ties_by_id(
     assert listed == [small, first, second, old]
 
 
-def test_an_items_amounts_read_grouped_but_its_boxes_hold_them_plainly(
+def test_an_items_amounts_read_as_its_boxes_hold_them(
     admin_client: TestClient, session: Session, radios: Category
 ) -> None:
-    """Shown as the locale writes numbers; a box holds what its form reads
-    back (inventory-tng-31q3)."""
+    """Shown ungrouped (inventory-tng-ua04); a box holds what its form
+    reads back (inventory-tng-31q3)."""
     item = add(
         session,
         Item(
@@ -414,4 +414,4 @@ def test_an_items_amounts_read_grouped_but_its_boxes_hold_them_plainly(
     assert minimum == short_below == ["1234.5"]
     # The spool's, then an empty one to add a package.
     assert box_values(page, "size") == ["2000", ""]
-    assert "2,000 m" in text(shown)
+    assert "2000 m" in text(shown)

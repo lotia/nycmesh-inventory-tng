@@ -88,7 +88,7 @@ def test_an_unchanged_box_posts_back_valid_in_a_comma_locale(
 
 @pytest.mark.parametrize(
     ("headers", "size", "fraction", "highest"),
-    [(GERMAN, "1500", "1,5", "1499"), (ENGLISH, "1,500", "1.5", "1,499")],
+    [(GERMAN, "1500", "1,5", "1499"), (ENGLISH, "1500", "1.5", "1499")],
 )
 def test_amounts_in_words_follow_the_locales_separator(
     admin_client: TestClient,

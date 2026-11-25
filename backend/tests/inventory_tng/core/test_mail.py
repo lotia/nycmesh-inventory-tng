@@ -230,8 +230,8 @@ def _with_a_number(to: str, admin_id: int) -> mail.Message:
 
 
 def test_mail_writes_numbers_as_its_words_do_whatever_the_page() -> None:
-    """Sent from a comma page, told, told now or later, its numbers stay
-    as the words' locale writes them (inventory-tng-4mc3)."""
+    """Sent from a comma page, told, told now or later, its numbers keep
+    a point (inventory-tng-4mc3), ungrouped (inventory-tng-ua04)."""
     kept = SentMail()
     tasks = BackgroundTasks()
     notify = mail.Notifier(kept, tasks)
@@ -240,4 +240,4 @@ def test_mail_writes_numbers_as_its_words_do_whatever_the_page() -> None:
         notify.tell_now("a@example.org", 1, _with_a_number)
         notify.later(lambda mailer: mail.deliver(mailer, _with_a_number("b", 2)))
         asyncio.run(tasks())
-    assert [message.body for message in kept] == ["1,500.5"] * 3
+    assert [message.body for message in kept] == ["1500.5"] * 3

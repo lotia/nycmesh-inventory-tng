@@ -32,7 +32,7 @@ def app() -> FastAPI:
 
 @pytest.mark.parametrize("path", ["/async", "/sync"])
 @pytest.mark.parametrize(
-    ("language", "written"), [("de-DE", "1500,5"), ("en-US", "1,500.5")]
+    ("language", "written"), [("de-DE", "1500,5"), ("en-US", "1500.5")]
 )
 def test_a_request_writes_numbers_with_its_separator(
     path: str, language: str, written: str
@@ -40,4 +40,4 @@ def test_a_request_writes_numbers_with_its_separator(
     with TestClient(app()) as client:
         reply = client.get(path, headers={"Accept-Language": language})
     assert reply.text == written
-    assert number(VALUE) == "1,500.5"
+    assert number(VALUE) == "1500.5"

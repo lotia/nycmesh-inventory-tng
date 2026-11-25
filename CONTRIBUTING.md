@@ -817,14 +817,13 @@ utilities. When you style a page:
   request from the browser's Accept-Language (`web/decimal_separator.py`)
   and writes it in the page's `<html data-decimal>`, which the admin
   scripts and the scan page read. Nothing is stored, and the words stay
-  English. A number shown back from the boxes, such as the count form's
-  running totals or "Set to 40 m", is written as a box value is: that
-  separator, no grouping. On a page whose separator is ",", numbers in
-  sentences follow it too, ungrouped ("1500 m", "1,5 m"): the server's
-  `number` and `amount` within the request (`web/numbers_in_words.py`), the scan
-  page's `sayNumber` and `sayAmount`. Mail, logs and operator commands
-  keep English's style, and a printed label writes amounts in one style
-  whatever the locale: a point and no grouping.
+  English. Every number people read is written as a box value is: that
+  separator, never grouped ("1234.5 m", or "1234,5 m"), whether shown
+  back from the boxes, such as the count form's running totals or "Set
+  to 40 m", or in a sentence: the server's `number` and `amount` within
+  the request (`web/numbers_in_words.py`), the scan page's `sayNumber`
+  and `sayAmount`. Mail, logs, operator commands and printed labels keep
+  one style whatever the locale: a point and no grouping.
 - Follow docs/decisions/0019 for links, buttons and lists. A button is
   secondary unless it is its form's main one, `class="primary"`, or the one
   a confirmation page asks for, `class="danger"`. A page's way back is
@@ -1015,9 +1014,9 @@ On the server (`backend/src/inventory_tng/core/phrases.py`, which
   `str()` it only where a str must go, such as a response body, JSON or
   `isinstance` checks. A query takes it as `in_query(phrase)`, said when
   the query runs, so a list sorted by words sorts by those shown.
-- A number people read is written as the locale writes it, digits
-  grouped, or as a comma page's boxes write it (above):
-  `{{ size | number }}` in a template, `number(size)` in Python.
+- A number people read is written as the page's boxes write it, never
+  grouped (above): `{{ size | number }}` in a template, `number(size)` in
+  Python.
   A plural's count is written so already, and its form still chosen by
   the number. A quantity is `{{ left | amount }}`, every stored digit
   kept. A number in a link stays plain digits. A number box takes
@@ -1048,8 +1047,8 @@ On the scan page (`frontend/src/shared/i18n.ts`):
   it and makes `<0>…</0>` with the function given for it:
   `sayParts(REGISTER_IT, {}, [(inside) => <a href="/register">{inside}</a>])`.
 - A quantity people read, in thousandths, is `sayAmount(left)`, written
-  as the locale writes a number with every thousandth kept, or as a comma
-  page's boxes write it, and any other number is `sayNumber(n)`. One a
+  as the page's boxes write it, never grouped, with every thousandth
+  kept, and any other number is `sayNumber(n)`. One a
   box holds is `boxAmount(left)`, read back with `readBox`, both in the
   decimal separator the page's
   `<html data-decimal>` says (`takeSeparatorFrom`), as is a number shown
