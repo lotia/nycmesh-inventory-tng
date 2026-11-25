@@ -2288,6 +2288,10 @@ msgstr ""
 msgid "Next"
 msgstr ""
 
+#: src/inventory_tng/templates/catalogue/item.html
+msgid "No"
+msgstr ""
+
 #: src/inventory_tng/stock/over_recorded_queries.py
 msgid "No adjustment"
 msgstr ""
@@ -2582,6 +2586,25 @@ msgstr ""
 #: src/inventory_tng/templates/stock/over_recorded.html
 #: src/inventory_tng/templates/stock/used_up.html
 msgid "Nothing waits."
+msgstr ""
+
+#. Translators: answered No to "Were the recorded amounts really in
+#. %(old)s?"; a count in %(old)s first makes the records right in it.
+#: src/inventory_tng/catalogue/items_routes.py
+#, python-format
+msgid ""
+"Nothing was converted. If they were really in %(new)s, count its stock in"
+" %(old)s first, then change its unit."
+msgstr ""
+
+#. Translators: answered No to "Were the recorded amounts really in
+#. %(old)s?"; the item's labels say the unit; revoking them lets
+#. the unit change without converting.
+#: src/inventory_tng/catalogue/items_routes.py
+#, python-format
+msgid ""
+"Nothing was converted. If they were really in %(new)s, revoke its labels "
+"first, then change its unit."
 msgstr ""
 
 #: src/inventory_tng/stock/count_routes.py
@@ -3665,6 +3688,12 @@ msgstr ""
 msgid "Set<span class=\"sr-only\"> for %(package)s</span>"
 msgstr ""
 
+#: src/inventory_tng/web/forms.py
+msgid ""
+"Settle its lines in Recorded more than moved first: they are in its unit "
+"now."
+msgstr ""
+
 #: src/inventory_tng/stock/over_recorded_routes.py
 #: src/inventory_tng/templates/stock/over_recorded_settled.html
 msgid "Settled"
@@ -4482,6 +4511,11 @@ msgstr ""
 msgid "Went below zero %(when)s."
 msgstr ""
 
+#: src/inventory_tng/templates/catalogue/item.html
+#, python-format
+msgid "Were the recorded amounts really in %(unit)s?"
+msgstr ""
+
 #: src/inventory_tng/templates/stock/counts.html
 msgid "What"
 msgstr ""
@@ -4617,6 +4651,17 @@ msgstr ""
 
 #: src/inventory_tng/templates/devices/device_list.html
 msgid "With code"
+msgstr ""
+
+#: src/inventory_tng/templates/catalogue/item.html
+msgid "Yes"
+msgstr ""
+
+#: src/inventory_tng/templates/catalogue/item.html
+#, python-format
+msgid ""
+"Yes converts its stock, Reorder at, what is on order and its vendor "
+"offers into %(new)s. Past movements stay in %(old)s."
 msgstr ""
 
 #: src/inventory_tng/templates/admins/admins.html
@@ -5049,6 +5094,21 @@ msgstr ""
 #: src/inventory_tng/templates/labels/labels.html
 #, python-format
 msgid "on %(when)s"
+msgstr ""
+
+#. the link goes to this item's labels, each of which can be revoked there.
+#: src/inventory_tng/templates/catalogue/item.html
+#, python-format
+msgid ""
+"only another length, as a label has been printed for it: what is recorded"
+" is converted. <a href=\"%(link)s\">Revoke its labels</a> to change it "
+"otherwise."
+msgstr ""
+
+#: src/inventory_tng/templates/catalogue/item.html
+msgid ""
+"only another length, as stock has moved in it: what is recorded is "
+"converted"
 msgstr ""
 
 #. Translators: a kind of save, a noun.

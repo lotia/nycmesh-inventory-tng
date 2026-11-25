@@ -1,8 +1,10 @@
 """Items and the packages they come in. An item's unit is fixed once stock
 has moved in it, or while a label of it is printed and not revoked
-(items.unit_fixed): the form shows it, and does not offer to change it;
-fixed only by labels, it links to the item's labels, to revoke them and
-correct a mistake. A package's size fixed only by labels says so too
+(items.unit_fixed): the form offers only another length, for one in a
+length, and asks "Were the recorded amounts really in m?" before it
+converts them (Ali, 2026-11-24, inventory-tng-y50b); fixed only by
+labels, it links to the item's labels, to revoke them and correct a
+mistake. A package's size fixed only by labels says so too
 (items.sizes_fixed). A retired item with stock
 left may still be taken, never received (docs/decisions/0003)."""
 
@@ -25,7 +27,7 @@ from inventory_tng.core.db_errors import refusal, refusal_naming_index
 from inventory_tng.core.db_once_committed import once_committed
 from inventory_tng.core.db_sessions import DbSession
 from inventory_tng.core.local_time import site_zone
-from inventory_tng.core.phrases import Words, lazy_gettext, ngettext
+from inventory_tng.core.phrases import Words, gettext, lazy_gettext, ngettext
 from inventory_tng.labels import labels
 from inventory_tng.labels.paths import item_labels
 from inventory_tng.models.base import INTEGER_MAX, whole
@@ -88,7 +90,36 @@ REFUSED_FIELDS = {
     "item_category_current": "category_id",
     items.MINIMUM_WHOLE: "minimum",
     **dict.fromkeys(items.UNIT_FIXED_RULES.values(), "unit"),
+    items.UNIT_CHECKS_WAITING: "unit",
 }
+# The item form's answer to "Were the recorded amounts really in m?"
+# (items.UNIT_UNCONFIRMED): its button, Yes or No, and the unit it asked
+# about, so an answer about another is asked again.
+RECORDED = "unit_recorded"
+RECORDED_IN = "unit_asked"
+
+
+def unit_declined(old: str, new: str, why: items.UnitFixed) -> str:
+    """What the item form says beside its unit when the administrator
+    answers No: nothing converts, and how to put right a unit wrong from
+    the start, until the guided recount (inventory-tng-qety) does it."""
+    if why == "labelled":
+        # Translators: answered No to "Were the recorded amounts really in
+        # %(old)s?"; the item's labels say the unit; revoking them lets
+        # the unit change without converting.
+        return gettext(
+            "Nothing was converted. If they were really in %(new)s, revoke "
+            "its labels first, then change its unit.",
+            new=new,
+        )
+    # Translators: answered No to "Were the recorded amounts really in
+    # %(old)s?"; a count in %(old)s first makes the records right in it.
+    return gettext(
+        "Nothing was converted. If they were really in %(new)s, count its "
+        "stock in %(old)s first, then change its unit.",
+        old=old,
+        new=new,
+    )
 
 
 class _AskFirst(Exception):
@@ -133,6 +164,7 @@ def _change_or_note[T](
             items.NAME_IS_ALIAS,
             items.READ_ALIKE,
             items.PACKAGES_WHOLE,
+            items.UNIT_UNCONFIRMED,
             *REFUSED_FIELDS,
             *ALERTS,
         )
@@ -450,8 +482,11 @@ def _item_page(
     asked: Asked = UNASKED,
     held_back: ItemPackage | None = None,
     short_to_set: ItemPackage | None = None,
+    asking_unit: bool = False,
 ) -> HTMLResponse:
     """The item's page; its open packages sorted as `asked`, all of them.
+    `asking_unit`, the form sent back asks whether what was recorded was
+    in its unit, Yes and No in place of Save (items.UNIT_UNCONFIRMED).
     With `held_back`, a retired package not brought back for its size's
     fraction: said above the page, with a link to add a new package. With
     `short_to_set`, a package brought back whose Too short to use box is
@@ -464,6 +499,7 @@ def _item_page(
     )
     log.debug("open packages listed", item_id=item.id, found=len(opened), sort=view.by)
     short_fraction = _short_fraction(session, item, problems, values)
+    fixed = items.unit_fixed(session, item.id)
     return admin_page(
         request,
         signed,
@@ -484,8 +520,11 @@ def _item_page(
             "categories": [
                 c for c in queries.categories_by_name(session) if c.retired_at is None
             ],
-            "units": UNITS,
-            "unit_fixed": items.unit_fixed(session, item.id),
+            "units": items.units_open(item.unit, fixed),
+            "unit_fixed": fixed,
+            "asking_unit": asking_unit,
+            "recorded": RECORDED,
+            "recorded_in": RECORDED_IN,
             "its_labels": item_labels(item.id),
             "in_stock": item_total(session, item.id),
             "labels": labels.current_of(session, Label.item_id == item.id),
@@ -705,8 +744,12 @@ def save_item(
         session, form, found, separator=decimal_separator(request)
     )
     renamed = None
+    answer = form.get(RECORDED)
+    if fields is not None and answer == "no":
+        return _unit_declined(request, session, signed, found, form, fields.unit)
     if fields is not None:
         seen = form_version(form.get("version", ""))
+        recorded_in = form.get(RECORDED_IN) if answer == "yes" else None
         same = forms.same_name(session, found, form, fields, typed)
         asked = None if same else []
         loose = 0
@@ -724,7 +767,9 @@ def save_item(
                     session,
                     typed,
                     signed,
-                    lambda: items.save(session, found, fields, seen=seen),
+                    lambda: items.save(
+                        session, found, fields, seen=seen, recorded_in=recorded_in
+                    ),
                 ),
                 item_ids=() if fields.track_opened else [item_id],
             )
@@ -740,6 +785,10 @@ def save_item(
         if broken in ALERTS:
             alert = RULES[broken]
             return _item_page(request, session, signed, found, alert=alert)
+        if broken == items.UNIT_UNCONFIRMED and not problems:
+            return _item_page(
+                request, session, signed, found, values=form, asking_unit=True
+            )
     if problems:
         return _item_page(
             request, session, signed, found, problems=problems, values=form
@@ -752,6 +801,26 @@ def save_item(
     return redirect(
         f"{ITEMS}/{item_id}", notice="item_renamed", section="aliases", **said
     )
+
+
+def _unit_declined(
+    request: Request,
+    session: Session,
+    signed: SignedIn,
+    item: Item,
+    form: Mapping[str, str],
+    unit: str,
+) -> Response:
+    """No to "Were the recorded amounts really in m?": nothing saved, the
+    form shown again in its unit as it is, saying what to do instead."""
+    why = items.unit_fixed(session, item.id)
+    if why is None or unit == item.unit:
+        # Answered on a page drawn before the item changed: ask afresh.
+        return _item_page(request, session, signed, item, values=form)
+    log.info("unit change declined", item_id=item.id, reason=why)
+    values = {**form, "unit": item.unit}
+    problems = {"unit": unit_declined(item.unit, unit, why)}
+    return _item_page(request, session, signed, item, problems=problems, values=values)
 
 
 @router.post(f"{ITEMS}/{{item_id}}/retire")

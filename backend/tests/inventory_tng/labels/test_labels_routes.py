@@ -624,7 +624,7 @@ def test_revoking_an_items_labels_goes_back_to_its_labels_each_time(
     # The filter is said, and kept by printing.
     assert checked(listed, "revoked") == ["no"]
     assert ("revoked", "no") in hidden_fields(listed)
-    form = shown_item_form(cable, unit="ft")
+    form = shown_item_form(cable, unit="each")
     for label, left in ((own, [reels.code]), (reels, [])):
         confirm = revoking(listed, label)
         assert address(confirm) == (f"{LABELS}/{label.id}/revoke", query)
@@ -637,7 +637,7 @@ def test_revoking_an_items_labels_goes_back_to_its_labels_each_time(
         assert codes_listed(listed) == left
         changed = admin_client.post(f"{ITEMS}/{cable.id}", data=form)
         assert changed.status_code == (303 if not left else 400)
-    assert cable.unit == "ft"
+    assert cable.unit == "each"
 
 
 def test_an_items_revoked_labels_never_push_its_others_off_the_first_page(

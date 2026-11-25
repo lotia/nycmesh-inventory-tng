@@ -39,6 +39,7 @@ from helpers.markup import (
     box_values,
     hidden_fields,
     links,
+    options,
     problem,
     read,
     text,
@@ -379,43 +380,54 @@ def test_the_unit_is_fixed_once_stock_has_moved(
     assert negative.status_code == 400
 
 
+def unit_options(page: str) -> list[str]:
+    """The units the item form's Unit offers, in its order."""
+    return [words for _, words, _ in options(read(page).one("select", name="unit"))]
+
+
 def test_the_unit_is_fixed_once_a_spools_label_is_printed(
     admin_client: TestClient, session: Session, radios: Category
 ) -> None:
     """Cat6 cable, Spool 305 m of 305 m, labelled, nothing moved yet: a
-    switch to ft would make the next scan of that label receive 305 ft. So
-    the unit is fixed once any label of the item or its packages is
-    printed, and nothing is converted (Ali, 2026-11-23, inventory-tng-rpud)."""
+    switch to each would make the next scan of that label receive 305 of
+    something else. So the unit is fixed once any label of the item or its
+    packages is printed (Ali, 2026-11-23, inventory-tng-rpud), but for
+    another length, which converts once asked (Ali, 2026-11-24,
+    inventory-tng-y50b): the spool keeps its size in m."""
     cable = new_item(session, radios, "Cat6 cable", unit="m")
     spool = add(session, ItemPackage(item_id=cable.id, name="Spool", size=Decimal(305)))
     page = admin_client.get(f"{ITEMS}/{cable.id}").text
-    assert ("unit", "m") not in hidden_fields(page)
+    assert unit_options(page) == ["m", "each", "ft"]
     label = labels.make_for_item(session, cable.id, spool.id)
     assert label is not None
     page = admin_client.get(f"{ITEMS}/{cable.id}").text
     assert (
-        "m: fixed, as a label has been printed for it. Revoke its labels to change it."
+        "only another length, as a label has been printed for it: what is "
+        "recorded is converted. Revoke its labels to change it otherwise."
     ) in words_on(page)
+    assert unit_options(page) == ["m", "ft"]
     # To the labels list, filtered to this item's, each offered to revoke:
     # beside the unit, and the spool's size, labelled too.
     revoke = read(page).all("a", "Revoke its labels")
     assert [a.attrs["href"] for a in revoke] == [item_labels(cable.id)] * 2
-    assert ("unit", "m") in hidden_fields(page)
-    form = shown_item_form(cable, unit="ft")
+    form = shown_item_form(cable, unit="each")
     refused = admin_client.post(f"{ITEMS}/{cable.id}", data=form)
     assert refused.status_code == 400
     assert str(RULES["item_unit_labelled"]) in text(refused)
+    asked = admin_client.post(f"{ITEMS}/{cable.id}", data=form | {"unit": "ft"})
+    assert asked.status_code == 200
+    assert "Were the recorded amounts really in m?" in words_on(asked.text)
     assert (cable.unit, spool.size) == ("m", 305)
     kept = admin_client.post(f"{ITEMS}/{cable.id}", data=form | {"unit": "m"})
     assert kept.status_code == 303
     # Its labels revoked, a mistaken unit is corrected (Ali, 2026-11-23,
-    # inventory-tng-37dj).
+    # inventory-tng-37dj), unasked, the spool's number as it was.
     assert labels.revoke(session, label.id, NOW)
     page = admin_client.get(f"{ITEMS}/{cable.id}").text
-    assert ("unit", "m") not in hidden_fields(page)
+    assert unit_options(page) == ["m", "each", "ft"]
     form = shown_item_form(cable, unit="ft")
     assert admin_client.post(f"{ITEMS}/{cable.id}", data=form).status_code == 303
-    assert cable.unit == "ft"
+    assert (cable.unit, spool.size, spool.unit) == ("ft", 305, "ft")
 
 
 @pytest.mark.parametrize("package", [False, True])
@@ -423,15 +435,19 @@ def test_a_label_fixes_the_unit_until_revoked_a_movement_for_good(
     session: Session, radios: Category, package: bool
 ) -> None:
     """The item's own label, counting one unit a scan, or one of a
-    package's, each alone, fixes the unit; revoked, it scans as no label,
-    so the unit may change. Once stock has moved it may not, labels
-    revoked or not (Ali, 2026-11-23, inventory-tng-37dj)."""
+    package's, each alone, fixes the unit but for another length, asked
+    first; revoked, it scans as no label, so the unit may change. Once
+    stock has moved it may not, labels revoked or not (Ali, 2026-11-23,
+    inventory-tng-37dj), but for another length, asked first (Ali,
+    2026-11-24, inventory-tng-y50b)."""
     item = new_item(session, radios, "Patch cord", unit="m")
     reel = add(session, ItemPackage(item_id=item.id, name="Reel", size=10))
     label = labels.make_for_item(session, item.id, reel.id if package else None)
     assert label is not None
     assert items.unit_fixed(session, item.id) == "labelled"
     with breaks(session, "item_unit_labelled"):
+        items.save(session, item, item_fields(item, unit="each"), seen=None)
+    with breaks(session, items.UNIT_UNCONFIRMED):
         items.save(session, item, item_fields(item, unit="ft"), seen=None)
     assert labels.revoke(session, label.id, NOW)
     assert items.unit_fixed(session, item.id) is None
@@ -440,6 +456,8 @@ def test_a_label_fixes_the_unit_until_revoked_a_movement_for_good(
     _moved(session, item)
     assert items.unit_fixed(session, item.id) == "moved"
     with breaks(session, "item_unit_fixed"):
+        items.save(session, item, item_fields(item, unit="each"), seen=None)
+    with breaks(session, items.UNIT_UNCONFIRMED):
         items.save(session, item, item_fields(item, unit="m"), seen=None)
 
 

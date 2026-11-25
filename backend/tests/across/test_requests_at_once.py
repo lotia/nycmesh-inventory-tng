@@ -69,6 +69,7 @@ from inventory_tng.scan import catalogue_api
 from inventory_tng.scan.batch import BatchRefused, KeyReused, Recorded, record
 from inventory_tng.scan.batch_schemas import Batch
 from inventory_tng.stock import adjustment_reasons, ledger, open_packages
+from inventory_tng.stock.balance import balance
 from inventory_tng.stock.ledger import Entry, Form, insert_transaction
 from inventory_tng.stock.moments import expected
 from inventory_tng.stock.paths import COUNTS, LENGTHS, USED_UP
@@ -1171,16 +1172,60 @@ def test_a_unit_changed_while_a_label_is_made_waits_then_is_refused(
     place = committed_place(committed)
     reel = ItemPackage(item_id=place.cable.id, name="Reel", size=Decimal(305))
     made(committed, reel)
-    to_ft = doing(
+    to_each = doing(
         Item,
         place.cable.id,
-        lambda s, item: items.save(s, item, item_fields(item, unit="ft"), seen=None),
+        lambda s, item: items.save(s, item, item_fields(item, unit="each"), seen=None),
     )
 
     def labelling(session: Session) -> None:
         assert labels.make_for_item(session, place.cable.id, reel.id) is not None
 
-    assert either_first(committed, labelling, to_ft, swapped=swapped) == refused
+    assert either_first(committed, labelling, to_each, swapped=swapped) == refused
+
+
+@pytest.mark.concurrency
+@pytest.mark.parametrize(
+    ("swapped", "refused"), [(False, None), (True, "movement_unit")]
+)
+def test_a_save_while_a_unit_is_converted_is_converted_or_refused(
+    own_committed: Committed, swapped: bool, refused: str | None
+) -> None:
+    """A receipt of 0.5 m shown in m holds the cable FOR KEY SHARE, and a
+    change to ft that converts holds it FOR UPDATE (Ali, 2026-11-24,
+    inventory-tng-y50b): the change second waits, then reads it and
+    converts it with the rest; the receipt second waits, then is refused
+    as shown in m. Never written in m and read as ft. Each reads the cable
+    as its change leaves it, before at_once rolls the second back."""
+    place = committed_place(own_committed)
+    setup = own_committed.session()
+    receiving(place.cable, place.store, "1")(setup)
+    setup.commit()
+    seen: list[tuple[str, Decimal | None]] = []
+
+    def read(session: Session) -> None:
+        total = session.scalar(
+            select(balance.c.quantity).where(balance.c.item_id == place.cable.id)
+        )
+        seen.append((session.get_one(Item, place.cable.id).unit, total))
+
+    def to_ft(session: Session) -> None:
+        cable = session.get_one(Item, place.cable.id)
+        fields = item_fields(cable, unit="ft")
+        items.save(session, cable, fields, seen=None, recorded_in="m")
+        read(session)
+
+    header = {"kind": "receipt", "to_location_id": place.store.id}
+    shown_in_m = Entry(place.cable.id, Decimal("0.5"), unit="m")
+
+    def receipt(session: Session) -> None:
+        insert_transaction(session, uuid.uuid4(), header, [shown_in_m])
+        read(session)
+
+    assert either_first(own_committed, receipt, to_ft, swapped=swapped) == refused
+    # 1.5 m in ft is 4.921 (4.92125...); 1 m alone, 3.281 ft.
+    converted = ("ft", Decimal("3.281") if swapped else Decimal("4.921"))
+    assert seen == ([converted] if swapped else [("m", Decimal("1.500")), converted])
 
 
 @pytest.mark.concurrency

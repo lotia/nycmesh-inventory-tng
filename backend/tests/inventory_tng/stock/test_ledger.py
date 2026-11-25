@@ -589,7 +589,8 @@ def test_a_transaction_goes_between_two_places(session: Session, place: Place) -
 def test_an_items_unit_is_fixed_once_stock_has_moved(
     session: Session, place: Place
 ) -> None:
-    """In whole units or not: the ledger's quantities are in that unit."""
+    """In whole units or not: the ledger's quantities are in that unit.
+    Another length converts, once asked (catalogue/items.save)."""
     items.save(session, place.cable, item_fields(place.cable, unit="ft"), seen=None)
     write(
         session,
@@ -598,8 +599,8 @@ def test_an_items_unit_is_fixed_once_stock_has_moved(
             {"item_id": place.cable.id, "quantity": "1.5", "unit": place.cable.unit}
         ],
     )
-    for unit in ("each", "m"):
-        with breaks(session, "item_unit_fixed"):
+    for unit, rule in (("each", "item_unit_fixed"), ("m", items.UNIT_UNCONFIRMED)):
+        with breaks(session, rule):
             items.save(
                 session, place.cable, item_fields(place.cable, unit=unit), seen=None
             )

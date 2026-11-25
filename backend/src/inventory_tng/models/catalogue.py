@@ -9,7 +9,9 @@ from sqlalchemy import (
     CheckConstraint,
     DateTime,
     Index,
+    ScalarSelect,
     Select,
+    SQLColumnExpression,
     Text,
     event,
     func,
@@ -21,12 +23,16 @@ from sqlalchemy.orm import (
     Mapped,
     Session,
     SessionTransaction,
+    aliased,
+    column_property,
+    declared_attr,
     mapped_column,
     object_session,
 )
 
 from inventory_tng.catalogue import units
 from inventory_tng.catalogue.amount_rules import COUNTED_WHOLE
+from inventory_tng.catalogue.unit_conversion import converted_kept_sql
 from inventory_tng.core.db_base import Base
 from inventory_tng.core.db_locking import READ_AGAIN_ONCE_LOCKED
 from inventory_tng.core.db_protection import protection
@@ -187,6 +193,23 @@ class Item(KeyedName, Searchable, Versioned, Base):
         self.search_text = " ".join([self.search_text, *names])
 
 
+def _in_items_unit(
+    amount: SQLColumnExpression[Decimal | None],
+    unit: SQLColumnExpression[str],
+    item_id: SQLColumnExpression[int],
+) -> ScalarSelect[Decimal]:
+    """A package's `amount`, in its `unit`, in its item's unit, as kept: of
+    the item `item_id` names, an alias of its own, so a query that joins
+    Item for another reason does not change which."""
+    item = aliased(Item)
+    return (
+        select(converted_kept_sql(amount, unit, item.unit))
+        .where(item.id == item_id)
+        .correlate_except(item)
+        .scalar_subquery()
+    )
+
+
 class ItemPackage(KeyedName, Searchable, Versioned, Base):
     """A size an item comes in: "100-pack" = 100, "reel" = 305 (m)."""
 
@@ -214,10 +237,12 @@ class ItemPackage(KeyedName, Searchable, Versioned, Base):
     # In `unit`.
     size: Mapped[Decimal] = mapped_column(QUANTITY)
     # The unit of size and short_below: its item's when added
-    # (_items_unit), and changed with its item's while that may change
+    # (_items_unit), and changed with its item's while nothing fixes that
     # (items.save). A change of its own, in its history, that moves its
-    # version, so its form drawn in the old unit is refused.
-    unit: Mapped[Unit]
+    # version, so its form drawn in the old unit is refused. Kept as it is
+    # when its item's unit is converted between lengths (Ali, 2026-11-24,
+    # inventory-tng-y50b): "Reel" holds 305 m still once its item is in ft.
+    unit: Mapped[Unit] = mapped_column()
     # NULL: as the item's track_opened says; else this package's own
     # (ledger.tracks_opened).
     track_opened: Mapped[bool | None]
@@ -229,12 +254,24 @@ class ItemPackage(KeyedName, Searchable, Versioned, Base):
     minimum_sealed: Mapped[int | None]
     retired_at: Mapped[RetiredAt]
 
+    # size and short_below in its item's unit, as kept
+    # (unit_conversion.converted): what the ledger moves, counts and
+    # compares of it, and the scan page is sent. Read with it.
+    @declared_attr
+    def size_in_items_unit(cls: type[ItemPackage]) -> Mapped[Decimal]:
+        return column_property(_in_items_unit(cls.size, cls.unit, cls.item_id))
+
+    @declared_attr
+    def short_below_in_items_unit(cls: type[ItemPackage]) -> Mapped[Decimal | None]:
+        return column_property(_in_items_unit(cls.short_below, cls.unit, cls.item_id))
+
 
 # How an item's packages are listed on the item, scan and count pages: the
 # smallest first, ties by id, so two of a size keep one order
 # (inventory-tng-7mby). The stock and reorder pages list sealed packages
-# largest first instead (stock/package_forms.py, largest_first).
-SMALLEST_PACKAGE_FIRST = (ItemPackage.size, ItemPackage.id)
+# largest first instead (stock/package_forms.py, largest_first). In its
+# item's unit, as an item's packages may be in two.
+SMALLEST_PACKAGE_FIRST = (ItemPackage.size_in_items_unit, ItemPackage.id)
 
 
 class ItemAlias(KeyedName, Base):

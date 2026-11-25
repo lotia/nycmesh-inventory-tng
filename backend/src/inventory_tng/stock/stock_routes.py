@@ -259,7 +259,8 @@ def reorder_rows(
     ]
     minimums: dict[int, list[ItemPackage]] = {}
     for package in sorted(
-        kept, key=lambda each: package_forms.largest_first(each.id, each.size)
+        kept,
+        key=lambda each: package_forms.largest_first(each.id, each.size_in_items_unit),
     ):
         minimums.setdefault(package.item_id, []).append(package)
     rows = []

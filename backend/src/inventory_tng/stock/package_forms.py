@@ -71,6 +71,9 @@ def largest_first(package_id: int, size: Decimal) -> tuple[Decimal, int]:
 
 
 class PackageSize(NamedTuple):
+    """A package's name, and its size and too-short length in its item's
+    unit, as its stock is read (ItemPackage.size_in_items_unit)."""
+
     name: str
     size: Decimal
     short_below: Decimal | None
@@ -126,7 +129,11 @@ def forms_of(
     ).all()
     item_ids = {row[0] for row in rows}
     packages = {
-        package.id: PackageSize(package.name_shown, package.size, package.short_below)
+        package.id: PackageSize(
+            package.name_shown,
+            package.size_in_items_unit,
+            package.short_below_in_items_unit,
+        )
         for package in session.scalars(
             select(ItemPackage).where(ItemPackage.item_id.in_(item_ids))
         )

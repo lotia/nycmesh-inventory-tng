@@ -21,6 +21,7 @@ from sqlalchemy import (
 )
 from sqlalchemy.orm import Session, aliased
 
+from inventory_tng.catalogue.unit_conversion import converted_kept_sql
 from inventory_tng.core.local_time import show_day
 from inventory_tng.core.phrases import gettext, in_query, lazy_gettext
 from inventory_tng.models.admins import Admin
@@ -254,10 +255,12 @@ def _checks(*columns: SQLColumnExpression[Any]) -> Select:
             OverRecorded,
             Item.id,
             Item.name_shown,
-            # Its amounts are said in the unit its line was recorded in.
+            # Its amounts are said in the unit its line was recorded in,
+            # its package's size too, which may be in another
+            # (inventory-tng-y50b).
             Movement.unit,
             ItemPackage.name_shown,
-            ItemPackage.size,
+            converted_kept_sql(ItemPackage.size, ItemPackage.unit, Movement.unit),
             Movement.from_open_package_id,
             Movement.to_open_package_id,
             Movement.quantity,

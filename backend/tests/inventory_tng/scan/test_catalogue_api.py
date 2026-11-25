@@ -165,8 +165,9 @@ def test_holds_whats_current(registered_client: TestClient, rows: Rows) -> None:
         "old_code": rows.cable.old_code,
         "retired": False,
         "aliases": [],
-        # Named only, for what an older build left (inventory-tng-0su).
-        "retired_packages": [{"id": rows.reel.id, "name": "Reel", "size": "1"}],
+        # Named only, for what an older build left (inventory-tng-0su), its
+        # size as read in its item's unit, to thousandths.
+        "retired_packages": [{"id": rows.reel.id, "name": "Reel", "size": "1.000"}],
     }
 
     labels = {label["code"]: label for label in reply["labels"]}
@@ -275,7 +276,7 @@ def test_a_retired_item_stays_while_it_has_stock(
         "id": place.cable.id,
         "name": place.cable.name,
         "unit": "m",
-        "packages": [{"id": reel.id, "name": "Reel", "size": "100"}],
+        "packages": [{"id": reel.id, "name": "Reel", "size": "100.000"}],
     }
     # Once it is all taken, it is gone from the page.
     write(

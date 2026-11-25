@@ -95,15 +95,26 @@ def test_reorder_on_usable_stock_and_sealed_minimums() -> None:
         name="Spool",
         name_shown="Spool",
         size=Decimal(305),
+        size_in_items_unit=Decimal(305),
         minimum_sealed=3,
     )
     coil = ItemPackage(
-        id=11, item_id=2, name="Coil", size=Decimal(50), minimum_sealed=1
+        id=11,
+        item_id=2,
+        name="Coil",
+        size=Decimal(50),
+        size_in_items_unit=Decimal(50),
+        minimum_sealed=1,
     )
     usable = {1: Decimal(500), 2: Decimal(50)}
     sealed = {1: {10: Decimal(2)}, 2: {11: Decimal(1)}}
     loose = ItemPackage(
-        id=12, item_id=1, name="Box", size=Decimal(100), minimum_sealed=None
+        id=12,
+        item_id=1,
+        name="Box",
+        size=Decimal(100),
+        size_in_items_unit=Decimal(100),
+        minimum_sealed=None,
     )
     (row,) = stock_routes.reorder_rows(
         [cable, rope], usable, sealed, [spool, coil, loose], {1}
@@ -127,6 +138,7 @@ def test_the_reorder_page_lists_low_sealed_packages_largest_first() -> None:
             item_id=1,
             name_shown=f"P{package_id}",
             size=size,
+            size_in_items_unit=size,
             minimum_sealed=1,
         )
         for package_id, size in sizes.items()

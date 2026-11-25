@@ -1073,7 +1073,7 @@ def test_counts_unit_changes_refused_by_why_the_unit_is_fixed(
     with capture_logs() as logs:
         for item, unit, rule in (
             (moved, "m", "item_unit_fixed"),
-            (labelled, "ft", "item_unit_labelled"),
+            (labelled, "each", "item_unit_labelled"),
         ):
             with breaks(session, rule):
                 items.save(session, item, item_fields(item, unit=unit), seen=None)
@@ -1086,6 +1086,42 @@ def test_counts_unit_changes_refused_by_why_the_unit_is_fixed(
         for line in logs
         if line["event"] == "unit change refused"
     ] == [(moved.id, "moved", "info"), (labelled.id, "labelled", "info")]
+
+
+def test_counts_unit_changes_converted_by_unit(
+    rolled_back: Recorded, session: Session
+) -> None:
+    """A change between lengths, stock moved, is counted once answered Yes,
+    by the unit it was in and the one it is in now, and logged by the
+    item's id; asked, or answered No, it is not."""
+    client, _, reader, _ = rolled_back
+    name = "inventory.unit_changes.converted"
+    before = counted(reader, name)
+    _, key = new_admin(session)
+    sign_in_with(client, key=key)
+    place = Place(session)
+    write(
+        session,
+        place,
+        lines=[{"item_id": place.cable.id, "quantity": "5", "unit": "m"}],
+    )
+    path = f"/admin/items/{place.cable.id}"
+    form = shown_item_form(place.cable, unit="ft")
+    with capture_logs() as logs:
+        assert "really in m?" in client.post(path, data=form).text
+        client.post(path, data=form | {"unit_recorded": "no", "unit_asked": "m"})
+        assert added(reader, name, before) == {}
+        client.post(path, data=form | {"unit_recorded": "yes", "unit_asked": "m"})
+    assert added(reader, name, before) == {(("from", "m"), ("to", "ft")): 1}
+    assert [
+        (line["event"], line["item_id"], line["log_level"])
+        for line in logs
+        if line["event"].startswith("unit change") or "converted" in line["event"]
+    ] == [
+        ("unit change asked", place.cable.id, "info"),
+        ("unit change declined", place.cable.id, "info"),
+        ("item unit converted", place.cable.id, "info"),
+    ]
 
 
 def test_a_write_rolled_back_is_neither_counted_nor_logged(

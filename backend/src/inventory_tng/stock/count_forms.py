@@ -143,12 +143,11 @@ def by_form(
                 problems[field] = NO_SUCH_PACKAGE
             elif count is None:
                 problems[field] = WHOLE_PACKAGES
-            elif count * package.size > QUANTITY_MAX:
+            elif count * package.size_in_items_unit > QUANTITY_MAX:
                 problems[field] = TOO_MANY
             else:
-                lines.append(
-                    (package.item_id, Form(package_id=package.id), count * package.size)
-                )
+                held = count * package.size_in_items_unit
+                lines.append((package.item_id, Form(package_id=package.id), held))
         elif field.startswith(LOOSE_FIELD):
             item = items.get(row_id(field.removeprefix(LOOSE_FIELD)) or 0)
             if item is None:

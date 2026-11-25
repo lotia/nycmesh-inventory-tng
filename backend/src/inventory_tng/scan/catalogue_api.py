@@ -78,7 +78,9 @@ def catalogue(session: Session) -> Catalogue:
         if package.item_id in gone_ids or not offered:
             named.setdefault(package.item_id, []).append(
                 RetiredPackage(
-                    id=package.id, name=package.name_shown, size=package.size
+                    id=package.id,
+                    name=package.name_shown,
+                    size=package.size_in_items_unit,
                 )
             )
             continue
@@ -86,14 +88,15 @@ def catalogue(session: Session) -> Catalogue:
             PackageEntry(
                 id=package.id,
                 name=package.name_shown,
-                size=package.size,
+                size=package.size_in_items_unit,
                 track_opened=tracks_opened(item_tracks, package.track_opened),
                 retired=package.retired_at is not None,
-                short_below=package.short_below,
+                short_below=package.short_below_in_items_unit,
                 sealed=[
                     # A part of one, as a count may leave, is one to open.
                     SealedAt(
-                        location_id=place, count=math.ceil(quantity / package.size)
+                        location_id=place,
+                        count=math.ceil(quantity / package.size_in_items_unit),
                     )
                     for place, quantity in sealed.get(package.id, {}).items()
                 ],

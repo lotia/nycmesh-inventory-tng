@@ -409,6 +409,11 @@ new unit is placed in one of its lists. The scan page reads its copy
 mise run regenerate-amount-rules    # frontend/src/amount-rules.json
 ```
 
+Converting an amount between length units, as a change of an item's unit
+between them does, is `backend/src/inventory_tng/catalogue/unit_conversion.py`,
+in Python and in SQL by the same factor; a test holds that both round
+alike, and that every length unit converts.
+
 A unit newly counted whole also needs a migration that writes out again
 `ck_item_minimum_whole`, the database's check that such an item's Reorder
 at is whole; a test fails until it does.

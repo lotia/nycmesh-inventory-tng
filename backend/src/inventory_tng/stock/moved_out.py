@@ -11,7 +11,7 @@ from sqlalchemy.orm import Session
 from inventory_tng.models.catalogue import Item
 from inventory_tng.models.stock import AT_ONE_PLACE, LedgerTransaction, Movement
 from inventory_tng.stock.ledger import LOOSE, Form
-from inventory_tng.stock.line_amounts import in_items_unit
+from inventory_tng.stock.line_amounts import in_items_unit, kept
 
 
 class MovedOut(NamedTuple):
@@ -50,7 +50,7 @@ def moved_out(
     if split is not None:
         by.append(LedgerTransaction.id > split)
     query = (
-        select(*by, func.sum(in_items_unit()))
+        select(*by, kept(func.sum(in_items_unit())))
         .join(LedgerTransaction, LedgerTransaction.id == Movement.transaction_id)
         .join(Item, Item.id == Movement.item_id)
         .where(

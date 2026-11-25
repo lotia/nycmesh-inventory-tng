@@ -19,7 +19,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from inventory_tng.core.db_errors import RuleBroken
-from inventory_tng.models.catalogue import ItemPackage
+from inventory_tng.models.catalogue import Item, ItemPackage
 from inventory_tng.stock.queries import units_of
 
 log = structlog.get_logger(__name__)
@@ -43,7 +43,7 @@ SHOWN_OTHERWISE = "shown_otherwise"
 
 class Shown(NamedTuple):
     """What a form showed: each item's unit, by item id, and each package's
-    size, by package id."""
+    size in it, by package id."""
 
     units: Mapping[int, str]
     sizes: Mapping[int, Decimal]
@@ -51,7 +51,8 @@ class Shown(NamedTuple):
 
 class Now(NamedTuple):
     """What changed since it was shown, as it is now: each item's unit, by
-    item id; each package's size and its unit, by package id."""
+    item id; each package's size in its item's unit, and that unit, by
+    package id (ItemPackage.size_in_items_unit)."""
 
     units: dict[int, str]
     sizes: dict[int, tuple[Decimal, str]]
@@ -83,9 +84,9 @@ def changed_since(
     sizes: dict[int, tuple[Decimal, str]] = {}
     if package_ids:
         rows = session.execute(
-            select(ItemPackage.id, ItemPackage.size, ItemPackage.unit).where(
-                ItemPackage.id.in_(set(package_ids))
-            )
+            select(ItemPackage.id, ItemPackage.size_in_items_unit, Item.unit)
+            .join(Item, Item.id == ItemPackage.item_id)
+            .where(ItemPackage.id.in_(set(package_ids)))
         )
         sizes = {package_id: (size, unit) for package_id, size, unit in rows}
     return Now(

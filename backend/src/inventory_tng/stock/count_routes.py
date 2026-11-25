@@ -511,7 +511,10 @@ def _count_page(
             "others": others,
             "units": shown_field(units),
             "sizes": shown_field(
-                {package_id: package.size for package_id, package in packages.items()}
+                {
+                    package_id: package.size_in_items_unit
+                    for package_id, package in packages.items()
+                }
             ),
             "key": (values or {}).get("key") or uuid.uuid4(),
             "moment": at,

@@ -42,7 +42,8 @@ deployed, so the migrations may be rewritten (0016).
   scan one); it is picked from a list.
 - **A ledger line says the form stock leaves in and the form it arrives
   in**: a sealed package of a size, an open package, or loose. Quantities
-  stay in the item's unit, each line recording it (0003, amendment
+  stay in the item's unit, each line recording it, and are converted as
+  they are read once the item changes between lengths (0003, amendments
   2026-11-24), so balance is still in minus out, per item, place and
   form. A line of sealed packages is a whole number of them. The scan
   page sends the size it counted them in, and a line of a package resized

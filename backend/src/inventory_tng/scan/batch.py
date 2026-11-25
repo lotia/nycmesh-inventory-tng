@@ -21,6 +21,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from inventory_tng.catalogue.amount_rules import whole_enough
+from inventory_tng.catalogue.unit_conversion import converted
 from inventory_tng.core.db_errors import RuleBroken
 from inventory_tng.core.db_lookups import values_by
 from inventory_tng.core.db_once_committed import once_committed
@@ -231,7 +232,9 @@ def record(
     # scan page asks (Ali, 2026-11-23, inventory-tng-uwi3), and is kept in
     # its item's unit (open_packages.report_length). Read without a lock:
     # an open package exists only once stock moved in its item, which
-    # fixes its unit for good (catalogue/items.unit_fixed).
+    # fixes it as counted each or a length for good
+    # (catalogue/items.unit_fixed); a change between lengths, converting
+    # its reports, waits for the open packages this holds.
     units = values_by(
         session,
         Item.id,
@@ -738,12 +741,7 @@ def _as_batch(
         OpenPackage.key,
         {f.open_package_id for f in forms if f.open_package_id},
     )
-    sizes = values_by(
-        session,
-        ItemPackage.id,
-        ItemPackage.size,
-        {f.package_id for f in forms if f.package_id},
-    )
+    packages = _packages(session, {f.package_id for f in forms if f.package_id})
 
     def line_of(line: Entry) -> batch_schemas.RecordedLine:
         # Read from its movement, so in the unit it was written in.
@@ -765,7 +763,7 @@ def _as_batch(
             item_id=line.item_id,
             quantity=line.quantity,
             package_id=package_id,
-            package_size=sizes.get(package_id) if package_id is not None else None,
+            package_size=_size_in(packages.get(package_id or 0), line.unit),
             open_package_key=keys.get(open_id) if open_id is not None else None,
             whole=whole,
             unit=line.unit,
@@ -803,15 +801,30 @@ def _open_packages_named(
     return {number: found[key] for number, key in keys.items() if key in found}
 
 
+def _packages(session: Session, package_ids: set[int]) -> dict[int, ItemPackage]:
+    """These packages, by id: no query for none."""
+    if not package_ids:
+        return {}
+    query = select(ItemPackage).where(ItemPackage.id.in_(package_ids))
+    return {package.id: package for package in session.scalars(query)}
+
+
+def _size_in(package: ItemPackage | None, unit: str) -> Decimal | None:
+    """A package's size in `unit`, a line's, as the ledger took it when the
+    line was written in it (unit_conversion.converted): its item's unit
+    may have changed since (inventory-tng-y50b). None for no package."""
+    if package is None:
+        return None
+    return converted(package.size, package.unit, unit)
+
+
 def _made_by_opening(
     session: Session, batch: batch_schemas.Batch
 ) -> dict[int, list[int]]:
     """The open packages an opening's lines made, under their keys
     (_opening_keys), by line number."""
-    sizes = values_by(
+    packages = _packages(
         session,
-        ItemPackage.id,
-        ItemPackage.size,
         {
             line.package_id
             for line in batch.lines
@@ -823,7 +836,9 @@ def _made_by_opening(
         if line.open_package_key is not None:
             keys[number] = _opening_keys(batch, number, 1)
         # A package that is not there made none: the key was another batch's.
-        elif (size := sizes.get(line.package_id or 0)) is not None:
+        elif (
+            size := _size_in(packages.get(line.package_id or 0), line.unit)
+        ) is not None:
             keys[number] = _opening_keys(batch, number, _packages_in(line, size))
     found = values_by(
         session,

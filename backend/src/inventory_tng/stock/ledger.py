@@ -150,8 +150,8 @@ TRACKS_OPENED = func.coalesce(ItemPackage.track_opened, Item.track_opened)
 
 
 class PackageFacts(NamedTuple):
-    """What the ledger's rules read of a package: its item, its size,
-    whether opening one makes an open package (tracks_opened), whether it
+    """What the ledger's rules read of a package: its item, its size in
+    its item's unit (ItemPackage.size_in_items_unit), whether opening one makes an open package (tracks_opened), whether it
     is retired, and whether a line takes it sealed with none left
     (_none_sealed)."""
 
@@ -318,6 +318,8 @@ def lock_places(session: Session, location_ids: Iterable[int]) -> None:
 #    transaction's foreign keys take them.
 # 4. Its packages, FOR KEY SHARE, by id: their item, size and whether
 #    tracked opened, which a change to one waits for (catalogue/items.py).
+#    A size is read in its item's unit, held in 2: a change between
+#    lengths (items.save) holds the item FOR UPDATE, so waits for it.
 #    Then the retired ones a line takes sealed, FOR NO KEY UPDATE, by id,
 #    so two saves taking one go one at a time, and the second reads
 #    whether any is left sealed once the first has committed.
@@ -336,6 +338,12 @@ def lock_places(session: Session, location_ids: Iterable[int]) -> None:
 # leaves out those taken (over_recorded.open_package_closed), so waits for
 # none. Its writes take 3 after them: nothing takes an administrator FOR
 # UPDATE, all KEY SHARE waits for.
+#
+# A change of an item's unit between lengths that converts what is
+# recorded (items.save) holds the item FOR UPDATE, as 2 waits for, then
+# its vendor offers FOR UPDATE and its open packages FOR NO KEY UPDATE, by
+# id, as 5: a save holding them is converted after, or refused, never
+# mixed.
 #
 # A change to whether an item's or package's opened ones are followed
 # (open_packages.unfollowing) takes the places of their open packages FOR
@@ -424,7 +432,7 @@ def hold_forms(
         packages = {
             package.id: PackageFacts(
                 package.item_id,
-                package.size,
+                package.size_in_items_unit,
                 tracks_opened(item_tracks, package.track_opened),
                 package.retired_at is not None,
             )

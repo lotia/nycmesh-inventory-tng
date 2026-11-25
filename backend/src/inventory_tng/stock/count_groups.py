@@ -54,7 +54,7 @@ def form_order(
     (models.catalogue.SMALLEST_PACKAGE_FIRST); then open ones, oldest
     first; then loose."""
     if form.package_id is not None:
-        return 0, packages[form.package_id].size, form.package_id
+        return 0, packages[form.package_id].size_in_items_unit, form.package_id
     if form.open_package_id is not None:
         return 1, form.open_package_id
     return (2,)
@@ -76,8 +76,8 @@ def form_row(
         return FormRow(
             f"{SEALED}{item_id}_{package.id}",
             sealed_how_many(package.name_shown),
-            amount / package.size,
-            per=Decimal(package.size),
+            amount / package.size_in_items_unit,
+            per=Decimal(package.size_in_items_unit),
         )
     if form.open_package_id is not None:
         row = opened[form.open_package_id]

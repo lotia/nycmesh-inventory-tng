@@ -57,6 +57,9 @@ RULES = {
     "item_unit_labelled": lazy_gettext(
         "Its unit is fixed, as a label has been printed for it."
     ),
+    "item_unit_checks_waiting": lazy_gettext(
+        "Settle its lines in Recorded more than moved first: they are in its unit now."
+    ),
     "package_size_fixed": lazy_gettext(
         "Its size is fixed, as some has moved or been opened: "
         "add a package of the new size instead."

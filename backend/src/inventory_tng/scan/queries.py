@@ -90,9 +90,14 @@ def open_not_reported(
     session: Session, item_ids: Collection[int]
 ) -> Sequence[Row[OpenPackage, str, Decimal | None]]:
     """The open packages of `item_ids`' items neither closed nor reported
-    used up, oldest first, each with its package's name and short_below."""
+    used up, oldest first, each with its package's name and short_below,
+    in its item's unit."""
     return session.execute(
-        select(OpenPackage, ItemPackage.name_shown, ItemPackage.short_below)
+        select(
+            OpenPackage,
+            ItemPackage.name_shown,
+            ItemPackage.short_below_in_items_unit,
+        )
         .join(ItemPackage, ItemPackage.id == OpenPackage.package_id)
         .where(
             OpenPackage.closed_at.is_(None),

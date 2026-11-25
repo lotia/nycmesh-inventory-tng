@@ -97,7 +97,8 @@ class OpenPackage(Base):
     length_reported_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     length_reported_by_volunteer_id: Mapped[int | None] = reference("volunteer.id")
     length_reported: Mapped[Decimal | None] = mapped_column(QUANTITY)
-    # Its unit: its item's, as the batch that reported it was written.
+    # Its unit: its item's, as the batch that reported it was written, and
+    # converted with it between lengths (catalogue/items._converted).
     length_reported_unit: Mapped[Unit | None]
     # The transaction that reported it: setting it to that counts as of
     # then, so a cut since is not lost.
@@ -224,8 +225,9 @@ class Movement(Base):
     item_id: Mapped[int] = reference("item.id")
     quantity: Mapped[Decimal] = mapped_column(QUANTITY)
     # The unit quantity is in: the one the save was shown, its item's as it
-    # was written (ledger.insert_transaction). Every sum of the ledger adds
-    # only lines in their item's unit (stock/line_amounts.py).
+    # was written (ledger.insert_transaction). Kept when its item's changes
+    # between lengths: every sum of the ledger reads a line in its item's
+    # unit, converting it (stock/line_amounts.py).
     unit: Mapped[Unit]
     from_package_id: Mapped[int | None] = reference("item_package.id")
     from_open_package_id: Mapped[int | None] = reference("open_package.id")

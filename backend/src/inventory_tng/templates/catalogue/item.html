@@ -27,7 +27,18 @@ None is left, so nobody can pick it.{% endtrans %}{% endif %}{% endcall %}
     {% with name = "category_id" %}{% include "_field_problem.html" %}{% endwith %}
   </label>
   <label>{% trans %}Unit{% endtrans %}
-    {% if unit_fixed %}
+    {#- Fixed, an item in a length may still change to another, converting
+    what is recorded once its question is answered Yes (Ali, 2026-11-24). #}
+    {% if unit_fixed and units | length > 1 and not retired %}
+    {% if unit_fixed == "moved" %}
+    <span class="hint">{% trans %}only another length, as stock has moved in it: what is recorded is converted{% endtrans %}</span>
+    {% else %}
+    <span class="hint">{#- Translators: the link goes to this item's labels, each of which can be revoked there. #}{% trans link=its_labels %}only another length, as a label has been printed for it: what is recorded is converted. <a href="{{ link }}">Revoke its labels</a> to change it otherwise.{% endtrans %}</span>
+    {% endif %}
+    <select name="unit">
+      {% for unit in units %}<option {% if values.get('unit', item.unit) == unit %}selected{% endif %}>{{ unit }}</option>{% endfor %}
+    </select>
+    {% elif unit_fixed %}
     {% if unit_fixed == "moved" %}
     <span class="hint">{% trans unit=item.unit %}{{ unit }}: fixed, as stock has moved in it{% endtrans %}</span>
     {% elif retired %}
@@ -76,7 +87,19 @@ None is left, so nobody can pick it.{% endtrans %}{% endif %}{% endcall %}
   off makes what is left on them loose units. #}
   {% if followed_now.item and not retired %}<p class="hint" id="followed-now">{{ followed_now.item }}</p>{% endif %}
   </fieldset>
-  {% if not retired %}<button class="primary">{% trans %}Save{% endtrans %}</button>{% endif %}
+  {% if asking_unit %}
+  {#- Asked once a change between lengths was saved (items.UNIT_UNCONFIRMED):
+  Yes converts what is recorded, No converts nothing (Ali, 2026-11-24). #}
+  <div role="alert" id="unit-question">
+    <p>{% trans unit=item.unit %}Were the recorded amounts really in {{ unit }}?{% endtrans %}</p>
+    <p class="hint">{% trans new=values.get('unit'), old=item.unit %}Yes converts its stock, Reorder at, what is on order and its vendor offers into {{ new }}. Past movements stay in {{ old }}.{% endtrans %}</p>
+    <input type="hidden" name="{{ recorded_in }}" value="{{ item.unit }}">
+    <div class="actions">
+      <button class="primary" name="{{ recorded }}" value="yes">{% trans %}Yes{% endtrans %}</button>
+      <button name="{{ recorded }}" value="no">{% trans %}No{% endtrans %}</button>
+    </div>
+  </div>
+  {% elif not retired %}<button class="primary">{% trans %}Save{% endtrans %}</button>{% endif %}
 </form>
 
 <section id="aliases">

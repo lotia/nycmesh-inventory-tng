@@ -10,7 +10,8 @@ count's moment stays a ledger number), 2026-11-19 and 2026-11-20 (a
 retired package with none left is never taken), 2026-11-21 (a store
 counted with its areas), 2026-11-23 (work saved as it was shown),
 2026-11-24 (a retired item counted to zero), 2026-11-24 (every stored
-amount records its unit)
+amount records its unit), 2026-11-24 (m and ft converted after stock has
+moved)
 
 ## Context
 
@@ -375,3 +376,41 @@ The units were added by a new migration rather than by rewriting the
 initial one, each filled from its item's, so a database already migrated
 keeps its data (coordinator, 2026-11-25). The fill is exact, as an
 item's unit is fixed once stock has moved in it.
+
+## Amendment: m and ft converted after stock has moved (2026-11-24)
+
+Decided by Ali on 2026-11-24 (inventory-tng-y50b, from the investigation
+inventory-tng-hsq1). An item may change between m and ft after stock has
+moved in it, or while a label of it is current, converting what is
+recorded. Rejected: keeping the unit fixed once stock has moved.
+
+- The item form offers only the other length, and asks "Were the
+  recorded amounts really in m?", naming the unit it is in, with Yes and
+  No. A change between each and a length still needs the item never to
+  have moved and no current label, as above.
+- Yes converts, in one transaction holding the item, its vendor offers
+  and its open packages in the ledger's lock order: its stock, its
+  Reorder at (as typed in the old unit), what is on order, its vendor
+  offers' units per order, and what volunteers said is on its open
+  packages. A save under way waits and is converted, or comes after and
+  is refused as shown in the old unit, never written in one and read in
+  the other. Refused while a line of it recorded with more than was
+  moved waits, as that check is undone in the line's unit.
+- No converts nothing and says how to put right a unit wrong from the
+  start, until the guided recount (inventory-tng-qety) does it: count
+  its stock in the old unit first, then change its unit; or, only
+  labelled, revoke its labels first. The words were chosen by the
+  implementer and are for Ali to confirm.
+- Old ledger lines keep their unit; each sum converts them as it reads
+  them. A foot is 0.3048 m exactly (`catalogue/unit_conversion.py`, in
+  Python and SQL alike). A line converts exactly and a sum is rounded
+  once to thousandths, so 305 m on a shelf reads 1000.656 ft and a sum
+  does not drift by its lines' roundings. Each and a length never
+  convert: such a line is still refused as it is read.
+- A package keeps its size and too-short length in its own unit, so a
+  "Spool 305 m" label stays true. Wherever stock moves, is counted or is
+  sent to the scan page, a package's size is read in its item's unit, to
+  thousandths: a spool of 305 m is 1000.656 ft, and so many spools are
+  so many times that. A line of sealed packages recorded before converts
+  by its packages the same way, so spools received in m leave whole in
+  ft, nothing over.
