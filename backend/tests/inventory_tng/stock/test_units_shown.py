@@ -38,6 +38,7 @@ from helpers.stock import (
     count_form_at,
     counts_written,
     retire,
+    to_feet,
 )
 
 
@@ -51,12 +52,6 @@ def box_of_ten(session: Session, place: Place) -> ItemPackage:
 
 def resized_to_twelve(session: Session, box: ItemPackage) -> None:
     box.size = Decimal(12)
-    session.flush()
-
-
-def to_feet(session: Session, place: Place) -> None:
-    """The cable, never moved, switched from m to ft."""
-    place.cable.unit = "ft"
     session.flush()
 
 
@@ -82,7 +77,7 @@ def test_a_batch_line_shown_in_m_saved_after_a_switch_to_ft_is_refused(
         to_location_id=place.store.id,
         lines=[line],
     )
-    to_feet(session, place)
+    to_feet(session, place.cable)
     response = registered_client.post(URL, json=receipt)
     assert response.status_code == 422
     assert problems_of(response) == [(["lines", 0, "unit"], "unit_changed")]
@@ -250,7 +245,7 @@ def test_a_count_of_50_m_saved_after_a_switch_to_ft_is_asked_again(
         "extra_item_id": str(place.cable.id),
         "extra_quantity": "50",
     }
-    to_feet(session, place)
+    to_feet(session, place.cable)
     response = admin_client.post(f"{COUNTS}/{place.store.id}", data=form)
     assert response.status_code == 400
     assert now_counted_in("ft") in text(response)
@@ -280,7 +275,7 @@ def test_a_count_box_not_read_after_a_switch_to_ft_says_so(
         "extra_item_id": str(place.cable.id),
         "extra_quantity": "2,5",
     }
-    to_feet(session, place)
+    to_feet(session, place.cable)
     response = admin_client.post(f"{COUNTS}/{place.store.id}", data=form)
     assert response.status_code == 400
     assert problem(response.text, "extra_quantity") == now_counted_in("ft")
@@ -302,7 +297,7 @@ def test_a_count_refused_by_a_rule_after_a_switch_says_both(
 
     def refused_once(*_: object) -> tuple[object, str]:
         # Another administrator's edit, as the test's own rows are written.
-        to_feet(setting_up(session), place)
+        to_feet(setting_up(session), place.cable)
         del session.info[UNGUARDED_INFO]
         return None, count_routes.ONCE
 
@@ -330,7 +325,7 @@ def test_a_count_saved_then_sent_again_after_a_switch_is_answered_as_saved(
     path = f"{COUNTS}/{place.store.id}"
     saved = admin_client.post(path, data=form, follow_redirects=False)
     assert saved.status_code == 303
-    to_feet(session, place)
+    to_feet(session, place.cable)
     again = admin_client.post(path, data=form, follow_redirects=False)
     assert again.headers["location"] == saved.headers["location"]
 
@@ -380,7 +375,7 @@ def test_an_adjustment_of_50_m_saved_after_a_switch_to_ft_is_asked_again(
         session, place.store, place.cable, amount="50", direction="found"
     )
     assert form["units"] == f"{place.cable.id}:m"
-    to_feet(session, place)
+    to_feet(session, place.cable)
     response = admin_client.post(ADJUSTMENTS, data=form)
     assert response.status_code == 400
     assert now_counted_in("ft") in text(response)
@@ -405,7 +400,7 @@ def test_an_adjustment_shown_in_m_says_so_whatever_else_is_wrong(
     form = adjustment_form(
         session, place.store, place.cable, amount="50", direction="found"
     )
-    to_feet(session, place)
+    to_feet(session, place.cable)
     response = admin_client.post(ADJUSTMENTS, data=form | {"reason_id": ""})
     assert response.status_code == 400
     assert now_counted_in("ft") in text(response)
@@ -429,7 +424,7 @@ def test_an_adjustment_refused_otherwise_says_a_switch_since(
     ) -> tuple[object, str | None]:
         refused = refusal(held, change, *expected)
         # Another administrator's edit, as the test's own rows are written.
-        to_feet(setting_up(session), place)
+        to_feet(setting_up(session), place.cable)
         del session.info[UNGUARDED_INFO]
         return refused
 

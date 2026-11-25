@@ -1,25 +1,14 @@
 """A ledger line's amount as every sum of the ledger reads it: in its
-item's unit, on one of its sides. Each line records the unit it was
-entered in (Movement.unit; Ali, 2026-11-24, inventory-tng-2rlr), which its
-item's may have changed from since, between lengths (inventory-tng-y50b):
-such a line converts as it is read, and keeps its own unit in the ledger.
-A line in a unit that does not convert, each and a length, is refused as
-it is read, so no sum adds amounts in two units unawares.
-
-Each side of a line is read apart (Ali, 2026-11-25, inventory-tng-77eu).
-A side in sealed packages converts by its packages: so many, each its
-size in its item's unit as kept
-(models.catalogue.ItemPackage.size_in_items_unit), as the ledger takes
-them since, so packages received before a change leave whole after it.
-A side loose or in an open package converts exactly, and a sum is rounded
-once, as kept (unit_conversion.at_scale_sql), so it does not drift by its
-lines' roundings: Shelf A's 305 m loose reads 1000.656 ft. So every form
-at every place nets as its lines say, and an opening before a change
-gives the form it made the package's true length: its two ends differ by
-a part of a thousandth, which the item's total gains. A place's total
-sums its forms as kept (balance.balance; inventory-tng-8s2c).
-An amount said of a line, as a correction undoing some of it on a side
-is written, is read by the same expression (said_in_items_unit;
+item's unit, on one of its sides. A line keeps the unit it was entered
+in (Movement.unit); one in another length than its item's now converts
+as it is read, and one in a unit that does not convert, each and a
+length, is refused as it is read. A side in sealed packages converts by
+its packages (models.catalogue.ItemPackage.size_in_items_unit), any
+other side exactly, and a sum is rounded once (unit_conversion.at_scale_sql).
+Why, with examples: docs/decisions/0003, its 2026-11-24 amendments
+(inventory-tng-2rlr, inventory-tng-y50b, inventory-tng-77eu,
+inventory-tng-8s2c). An amount said of a line, as a correction undoing
+some of it, is read by the same expression (said_in_items_unit;
 inventory-tng-4fjq).
 """
 

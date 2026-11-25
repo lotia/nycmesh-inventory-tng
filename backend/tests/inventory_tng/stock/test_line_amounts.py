@@ -22,16 +22,21 @@ from inventory_tng.stock.moved_out import moved_out
 
 from helpers.rows import add
 from helpers.sign_in import new_admin, new_admin_id
-from helpers.stock import Place, Spools, held_by_form, received, write
+from helpers.stock import Place, Spools, held_by_form, received, to_feet, write
 
 # Each reader of the ledger's sums, of the place's store, after its cable
 # came in and some left.
 READERS: dict[str, Callable[[Session, Place], object]] = {
     "balance": lambda session, place: queries.item_total(session, place.cable.id),
     "as of a moment": lambda session, place: moments.expected_at(
-        session, [place.store.id], queries.latest_transaction_id(session)
+        session,
+        [place.store.id],
+        queries.latest_transaction_id(session),
+        [place.cable.id],
     ),
-    "flows": lambda session, place: moments.flows(session, place.store.id, true()),
+    "flows": lambda session, place: moments.flows(
+        session, place.store.id, true(), [place.cable.id]
+    ),
     "by form": lambda session, place: moments.form_flows(
         session, place.store.id, true(), [place.cable.id]
     ),
@@ -113,13 +118,14 @@ def test_lines_in_another_length_are_read_converted(
     confirmed change makes it (catalogue/items.save): 50 / 0.3048 is
     164.04199..., kept to thousandths. The lines keep their unit."""
     _moved(session, place)
-    place.cable.unit = "ft"
-    session.flush()
+    to_feet(session, place.cable)
     assert queries.item_total(session, place.cable.id) == Decimal("164.042")
     assert moments.expected(session, place.store.id) == {
         place.cable.id: Decimal("131.234")
     }
-    (_, flow), *_ = moments.flows(session, place.store.id, true()).items()
+    (_, flow), *_ = moments.flows(
+        session, place.store.id, true(), [place.cable.id]
+    ).items()
     assert flow == (Decimal("164.042"), Decimal("32.808"))
     (out,) = moved_out(session, [place.store.id], 0)
     assert out.quantity == Decimal("32.808")
@@ -136,8 +142,7 @@ def test_a_sum_converts_each_line_exactly_and_rounds_once(
     ft, each rounded first: a sum does not drift by its lines."""
     for _ in range(3):
         received(session, place, [_cable(place, "0.5")])
-    place.cable.unit = "ft"
-    session.flush()
+    to_feet(session, place.cable)
     assert queries.item_total(session, place.cable.id) == Decimal("4.921")
 
 
@@ -149,8 +154,7 @@ def test_sealed_packages_convert_by_package_and_leave_whole(
     (1525 m converted), so the five leaving in ft leave nothing over. The
     spool keeps its size in m."""
     spools.receive(uuid.uuid4(), spools=3)
-    spools.cable.unit = "ft"
-    session.flush()
+    to_feet(session, spools.cable)
     session.refresh(spools.spool)
     assert (spools.spool.size, spools.spool.unit) == (Decimal(305), "m")
     assert spools.spool.size_in_items_unit == Decimal("1000.656")
@@ -175,8 +179,7 @@ def test_an_open_package_opened_before_reads_converted(
     ft, the end its opening made and its cut exactly, as neither of those
     sides is sealed: 1000.65617 less 0.656, kept as 1000.000."""
     open_id = spools.opened().id
-    spools.cable.unit = "ft"
-    session.flush()
+    to_feet(session, spools.cable)
     cut = Entry(spools.cable.id, Decimal("0.656"), Form(open_package_id=open_id), LOOSE)
     spools.move(cut)
     latest = queries.latest_transaction_id(session)
@@ -210,8 +213,7 @@ def test_an_opening_is_matched_by_its_packages(session: Session) -> None:
         {"kind": "open", "from_location_id": store, "to_location_id": store},
         Entry(spools.cable.id, size, sealed, Form(open_package_id=made.id)),
     )
-    spools.cable.unit = "ft"
-    session.flush()
+    to_feet(session, spools.cable)
     latest = queries.latest_transaction_id(session)
     assert moments.left_at(session, made.id, latest) == Decimal("1001.001")
     ((*_, opened),) = queries.openings_at(
@@ -254,8 +256,7 @@ def _metres_to_feet(session: Session, *, tracked: bool) -> tuple[Spools, str]:
     spools = Spools(session, tracked=tracked)
     spools.receive(uuid.uuid4(), spools=4)
     _opened_and_cut(spools, spools.spool, 6)
-    spools.cable.unit = "ft"
-    session.flush()
+    to_feet(session, spools.cable)
     return spools, "6003.937"
 
 
@@ -299,9 +300,9 @@ def test_a_place_holds_the_sum_of_its_forms_after_a_change(
     latest = queries.latest_transaction_id(session)
     assert held_by_form(session, store, cable) == {}
     assert moments.expected(session, store) == {}
-    assert moments.expected_at(session, [store], latest) == {}
+    assert moments.expected_at(session, [store], latest, [cable]) == {}
     assert moments.expected(session, van) == {cable: Decimal(at_van)}
-    assert moments.expected_at(session, [van], latest) == {
+    assert moments.expected_at(session, [van], latest, [cable]) == {
         van: {cable: Decimal(at_van)}
     }
     assert queries.item_total(session, cable) == Decimal(at_van)

@@ -12,13 +12,12 @@ from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
 
 from inventory_tng.catalogue import items
-from inventory_tng.catalogue.items_routes import RECORDED, RECORDED_IN
 from inventory_tng.catalogue.paths import ITEMS
 from inventory_tng.models.catalogue import Item, ItemPackage
 from inventory_tng.stock import open_packages, over_recorded
 from inventory_tng.stock.ledger import LOOSE, Entry, Form, insert_transaction
 
-from helpers.items import shown_item_form
+from helpers.items import unit_answered
 from helpers.over_recorded import (
     adjustment_units,
     adjustments,
@@ -43,9 +42,8 @@ from helpers.stock import (
 
 def _to_ft(admin_client: TestClient, item: Item, **fields: str) -> None:
     """The item changed to ft, answering Yes: its amounts were in m."""
-    form = shown_item_form(item, unit="ft", **fields)
     answered = admin_client.post(
-        f"{ITEMS}/{item.id}", data=form | {RECORDED: "yes", RECORDED_IN: "m"}
+        f"{ITEMS}/{item.id}", data=unit_answered(item, unit="ft", **fields)
     )
     assert answered.status_code == 303
 

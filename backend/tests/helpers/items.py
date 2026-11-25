@@ -5,6 +5,7 @@ from decimal import Decimal
 
 from sqlalchemy.orm import Session
 
+from inventory_tng.catalogue.items_routes import RECORDED, RECORDED_IN
 from inventory_tng.models.catalogue import Category, Item, ItemPackage
 
 from helpers.markup import Element, row_links
@@ -33,6 +34,12 @@ def shown_item_form(item: Item, **fields: str) -> dict[str, str]:
         "unit": item.unit,
         "version": shown(item),
     } | fields
+
+
+def unit_answered(item: Item, answer: str = "yes", **fields: str) -> dict[str, str]:
+    """The item's edit form with `fields` changed, answering `answer` (yes
+    or no) to whether its recorded amounts were really in its unit now."""
+    return shown_item_form(item, **fields) | {RECORDED: answer, RECORDED_IN: item.unit}
 
 
 def same_size_twins(

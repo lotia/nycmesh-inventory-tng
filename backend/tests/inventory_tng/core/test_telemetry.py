@@ -52,7 +52,7 @@ from inventory_tng.web import security_headers
 from helpers.apps import on_session
 from helpers.csp_reports import SHAPES
 from helpers.devices import new_device
-from helpers.items import shown_item_form
+from helpers.items import shown_item_form, unit_answered
 from helpers.mail import NO_MAIL, FailingMail, SentMail
 from helpers.pools import small_database
 from helpers.rows import add, breaks, item_fields, shown, tag
@@ -77,6 +77,7 @@ from helpers.stock import (
     retire,
     sealed_line,
     stocked,
+    to_feet,
     write,
 )
 
@@ -925,8 +926,7 @@ def test_counts_a_length_reported_in_a_unit_changed_since(
     refused_before = counted(reader, refused)
     spools = Spools(session)
     made = spools.opened()
-    spools.cable.unit = "ft"
-    session.flush()
+    to_feet(session, spools.cable)
     _, token = new_device(session)
     client.cookies.set(devices.COOKIE, token)
     batch = report(spools, length(made, "50", "m"))
@@ -1155,9 +1155,9 @@ def test_counts_unit_changes_converted_by_unit(
     form = shown_item_form(place.cable, unit="ft")
     with capture_logs() as logs:
         assert "really in m?" in client.post(path, data=form).text
-        client.post(path, data=form | {"unit_recorded": "no", "unit_asked": "m"})
+        client.post(path, data=unit_answered(place.cable, "no", unit="ft"))
         assert added(reader, name, before) == {}
-        client.post(path, data=form | {"unit_recorded": "yes", "unit_asked": "m"})
+        client.post(path, data=unit_answered(place.cable, unit="ft"))
     assert added(reader, name, before) == {(("from", "m"), ("to", "ft")): 1}
     assert [
         (line["event"], line["item_id"], line["log_level"])

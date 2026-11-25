@@ -427,8 +427,7 @@ recorded. Rejected: keeping the unit fixed once stock has moved.
   count compares with, is the sum of its forms, each rounded once
   (2026-11-25, inventory-tng-8s2c). Rejected: accepting the drift for
   loose stock, and converting an opening exactly on both sides, which
-  moves the part of a thousandth into the sealed form. Each and a
-  length never convert: such a line is still refused as it is read.
+  moves the part of a thousandth into the sealed form.
 - A package keeps its size and too-short length in its own unit, so a
   "Spool 305 m" label stays true. Wherever stock moves, is counted or is
   sent to the scan page, a package's size is read in its item's unit, as

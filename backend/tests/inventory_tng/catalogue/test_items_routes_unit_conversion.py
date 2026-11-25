@@ -16,7 +16,7 @@ from inventory_tng.catalogue import unit_changes
 from inventory_tng.catalogue.items_routes import RECORDED, RECORDED_IN
 from inventory_tng.catalogue.paths import ITEMS
 from inventory_tng.labels import labels
-from inventory_tng.models.catalogue import Item, ItemPackage, VendorOffer
+from inventory_tng.models.catalogue import ItemPackage, VendorOffer
 from inventory_tng.models.stock import Movement
 from inventory_tng.scan.batch import BatchRefused, KeyReused, record
 from inventory_tng.scan.batch_schemas import Batch
@@ -27,7 +27,7 @@ from inventory_tng.stock.moments import expected
 from inventory_tng.stock.paths import LENGTHS
 from inventory_tng.web.forms import RULES
 
-from helpers.items import NOW, shown_item_form
+from helpers.items import NOW, shown_item_form, unit_answered
 from helpers.markup import button, problem, read, words_on
 from helpers.rows import add, shown
 from helpers.stock import (
@@ -46,11 +46,6 @@ from helpers.stock import (
 )
 
 QUESTION = "Were the recorded amounts really in m?"
-
-
-def _yes(item: Item, **fields: str) -> dict[str, str]:
-    """The item's form answered Yes to the question about its unit now."""
-    return shown_item_form(item, **fields) | {RECORDED: "yes", RECORDED_IN: item.unit}
 
 
 def _shelf_a(session: Session) -> Place:
@@ -93,7 +88,7 @@ def test_m_to_ft_asks_then_converts_every_amount(
     assert first.attrs["value"] == "no"
     assert cable.unit == "m"
     done = admin_client.post(
-        f"{ITEMS}/{cable.id}", data=_yes(cable, unit="ft", minimum="100")
+        f"{ITEMS}/{cable.id}", data=unit_answered(cable, unit="ft", minimum="100")
     )
     assert done.status_code == 303
     session.refresh(cable)
@@ -118,7 +113,9 @@ def test_a_reorder_at_typed_with_the_change_is_converted_from_the_old_unit(
 ) -> None:
     """The form says Reorder at is in m, its unit when the form was shown."""
     cable = _shelf_a(session).cable
-    admin_client.post(f"{ITEMS}/{cable.id}", data=_yes(cable, unit="ft", minimum="10"))
+    admin_client.post(
+        f"{ITEMS}/{cable.id}", data=unit_answered(cable, unit="ft", minimum="10")
+    )
     session.refresh(cable)
     assert cable.minimum == Decimal("32.808")
 
@@ -129,7 +126,9 @@ def test_ft_to_m_converts_back(admin_client: TestClient, session: Session) -> No
     received(
         session, place, [{"item_id": place.cable.id, "quantity": "1000", "unit": "ft"}]
     )
-    admin_client.post(f"{ITEMS}/{place.cable.id}", data=_yes(place.cable, unit="m"))
+    admin_client.post(
+        f"{ITEMS}/{place.cable.id}", data=unit_answered(place.cable, unit="m")
+    )
     assert expected(session, place.store.id) == {place.cable.id: Decimal("304.8")}
 
 
@@ -138,7 +137,7 @@ def test_no_converts_nothing_and_says_what_to_do(
 ) -> None:
     place = _shelf_a(session)
     cable = place.cable
-    answered = shown_item_form(cable, unit="ft") | {RECORDED: "no", RECORDED_IN: "m"}
+    answered = unit_answered(cable, "no", unit="ft")
     declined = admin_client.post(f"{ITEMS}/{cable.id}", data=answered)
     assert declined.status_code == 400
     assert problem(declined.text, "unit") == (
@@ -174,7 +173,9 @@ def test_each_and_a_length_never_convert(
         (place.item, "m", "item_unit_fixed"),
         (place.cable, "each", "item_unit_fixed"),
     ):
-        refused = admin_client.post(f"{ITEMS}/{item.id}", data=_yes(item, unit=unit))
+        refused = admin_client.post(
+            f"{ITEMS}/{item.id}", data=unit_answered(item, unit=unit)
+        )
         assert refused.status_code == 400
         assert problem(refused.text, "unit") == str(RULES[rule])
     assert (place.item.unit, place.cable.unit) == ("each", "m")
@@ -192,7 +193,10 @@ def test_refused_while_a_line_recorded_with_more_than_moved_waits(
         lines=[{"item_id": place.cable.id, "quantity": "5", "unit": "m"}],
     )
     raise_check(session, moved)
-    for form in (shown_item_form(place.cable, unit="ft"), _yes(place.cable, unit="ft")):
+    for form in (
+        shown_item_form(place.cable, unit="ft"),
+        unit_answered(place.cable, unit="ft"),
+    ):
         refused = admin_client.post(f"{ITEMS}/{place.cable.id}", data=form)
         assert refused.status_code == 400
         assert QUESTION not in words_on(refused.text)
@@ -209,7 +213,7 @@ def test_refused_when_an_amount_would_not_keep_in_the_new_unit(
     a too-short length of 0.001 ft, or a package of 0.001 ft, is less than
     one holds in m. None converts, and nothing is saved."""
     cable = _shelf_a(session).cable
-    huge = _yes(cable, unit="ft", minimum="400000000")
+    huge = unit_answered(cable, unit="ft", minimum="400000000")
     refused = admin_client.post(f"{ITEMS}/{cable.id}", data=huge)
     assert refused.status_code == 400
     assert problem(refused.text, "unit") == str(RULES[unit_changes.UNIT_OUT_OF_RANGE])
@@ -231,7 +235,7 @@ def test_refused_when_an_amount_would_not_keep_in_the_new_unit(
             reel.short_below = None
             add(session, ItemPackage(item_id=place.cable.id, name="Crumb", size=crumb))
         tiny = admin_client.post(
-            f"{ITEMS}/{place.cable.id}", data=_yes(place.cable, unit="m")
+            f"{ITEMS}/{place.cable.id}", data=unit_answered(place.cable, unit="m")
         )
         assert problem(tiny.text, "unit") == str(RULES[unit_changes.UNIT_OUT_OF_RANGE])
         assert place.cable.unit == "ft"
@@ -253,7 +257,7 @@ def test_a_length_check_shown_before_the_change_is_not_set(
     session.flush()
     seen = open_packages.check_seen(made, "m")
     cable = spools.cable
-    followed = _yes(cable, unit="ft", track_opened="on")
+    followed = unit_answered(cable, unit="ft", track_opened="on")
     assert admin_client.post(f"{ITEMS}/{cable.id}", data=followed).status_code == 303
     before = counts_written(session)
     form = {"left": "300", "seen": seen, "showed": "305", "as_of": "1"}
@@ -281,7 +285,7 @@ def test_packages_keep_their_size_and_move_whole_in_the_new_unit(
     )
     cable = spools.cable
     # Still followed once opened: unticked, its open one would be made loose.
-    followed = _yes(cable, unit="ft", track_opened="on")
+    followed = unit_answered(cable, unit="ft", track_opened="on")
     assert admin_client.post(f"{ITEMS}/{cable.id}", data=followed).status_code == 303
     session.refresh(spools.spool)
     session.refresh(made)
@@ -308,7 +312,7 @@ def test_a_form_shown_before_the_change_is_refused(
     """The item's version moved: an older form, answered Yes, is not saved
     over it."""
     cable = _shelf_a(session).cable
-    before = _yes(cable, unit="ft")
+    before = unit_answered(cable, unit="ft")
     cable.notes = "Changed meanwhile"
     session.flush()
     assert shown(cable) != before["version"]
@@ -327,7 +331,7 @@ def test_a_scan_batch_opens_a_spool_in_the_new_unit_and_one_drawn_before_is_refu
     spools = Spools(session)
     cable = spools.cable
     admin_client.post(
-        f"{ITEMS}/{cable.id}", data=_yes(cable, unit="ft", track_opened="on")
+        f"{ITEMS}/{cable.id}", data=unit_answered(cable, unit="ft", track_opened="on")
     )
     drawn_before = opening(spools, opened_line(spools, unit="m"))
     with pytest.raises(BatchRefused) as refused:
@@ -358,7 +362,7 @@ def test_a_length_reported_on_a_page_drawn_before_the_change_is_refused(
     made = spools.opened()
     cable = spools.cable
     admin_client.post(
-        f"{ITEMS}/{cable.id}", data=_yes(cable, unit="ft", track_opened="on")
+        f"{ITEMS}/{cable.id}", data=unit_answered(cable, unit="ft", track_opened="on")
     )
     drawn_before = report(spools, length(made, "50", "m"))
     with pytest.raises(BatchRefused) as refused:
@@ -382,7 +386,7 @@ def test_a_count_after_the_change_counts_spools_in_the_new_unit(
     spools = Spools(session)
     cable = spools.cable
     admin_client.post(
-        f"{ITEMS}/{cable.id}", data=_yes(cable, unit="ft", track_opened="on")
+        f"{ITEMS}/{cable.id}", data=unit_answered(cable, unit="ft", track_opened="on")
     )
     count_at(
         admin_client, spools.store.id, {f"sealed_{cable.id}_{spools.spool.id}": "1"}
@@ -408,7 +412,7 @@ def test_a_batch_sent_again_is_answered_in_the_unit_it_was_recorded_in(
     record(session, Batch.model_validate(batch), device_id=None)
     cable = spools.cable
     admin_client.post(
-        f"{ITEMS}/{cable.id}", data=_yes(cable, unit="ft", track_opened="on")
+        f"{ITEMS}/{cable.id}", data=unit_answered(cable, unit="ft", track_opened="on")
     )
     less = batch | {"lines": [sealed_line(spools, "305") | {"unit": "m"}]}
     with pytest.raises(KeyReused) as reused:
@@ -447,10 +451,7 @@ def test_no_for_a_labelled_item_says_to_revoke_its_labels(
     place = Place(session)
     label = labels.make_for_item(session, place.cable.id)
     assert label is not None
-    answered = shown_item_form(place.cable, unit="ft") | {
-        RECORDED: "no",
-        RECORDED_IN: "m",
-    }
+    answered = unit_answered(place.cable, "no", unit="ft")
     declined = admin_client.post(f"{ITEMS}/{place.cable.id}", data=answered)
     assert problem(declined.text, "unit") == (
         "Nothing was converted. If they were really in ft, revoke its labels "

@@ -407,7 +407,7 @@ def close(session: Session, check_id: int, seen_as: str, admin_id: int) -> None:
     _closed_right(session, row, admin_id)
 
 
-def _in_items_unit(
+def _said_now(
     session: Session, movement: Movement, amount: Decimal
 ) -> tuple[dict[line_amounts.Side, Decimal], str]:
     """`amount` of a check of `movement`, in the unit its line was recorded
@@ -441,7 +441,7 @@ def correct(
     """Settle one, as corrected: an adjustment on each side its transaction
     has, but one a count put right (counted), undoes what was recorded more
     than moved, in the forms it moved in, in its item's unit now
-    (_in_items_unit), with the reason REASON. Found
+    (_said_now), with the reason REASON. Found
     again where it left, written off where it arrived. An opening's open
     package closed since, however, put its end right (_read), so its end is
     skipped: the sealed end alone is written (Ali, 2026-11-15,
@@ -497,7 +497,7 @@ def correct(
         ),
     )
     # The check is in the unit its line was recorded in (raise_checks).
-    amounts, unit = _in_items_unit(session, movement, row.quantity)
+    amounts, unit = _said_now(session, movement, row.quantity)
     for place, side, form in sides:
         if place is None:
             continue
@@ -534,7 +534,7 @@ def confirm_count(
     administrator says it held when it moved: as it was, as checked,
     writing nothing; else as corrected, with an adjustment at the
     place it arrived, in it, for the difference in its item's unit now
-    (_in_items_unit), with the reason REASON,
+    (_said_now), with the reason REASON,
     under a key of the check's. How it was settled.
     Call it holding its places (places_of), locked first. RuleBroken as
     _settle, if it is not such a move (over_recorded_not_whole), if its
@@ -566,7 +566,7 @@ def confirm_count(
     row.settled_how = "corrected"
     # The count was typed in the unit the line was recorded in
     # (forms.confirmed_count).
-    amounts, unit = _in_items_unit(session, movement, abs(count - movement.quantity))
+    amounts, unit = _said_now(session, movement, abs(count - movement.quantity))
     counts.record_adjustment(
         session,
         uuid.uuid5(transaction.idempotency_key, f"over recorded {row.id} count"),

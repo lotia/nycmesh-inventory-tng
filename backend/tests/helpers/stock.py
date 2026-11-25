@@ -50,6 +50,13 @@ def item_unit(session: Session, item_id: int) -> str:
     return item.unit
 
 
+def to_feet(session: Session, item: Item) -> None:
+    """The item's unit set to ft, and nothing else: its lines read
+    converted, as after a confirmed change (catalogue/unit_changes.py)."""
+    item.unit = "ft"
+    session.flush()
+
+
 def unit_of(row: ItemPackage | OpenPackage) -> str:
     """The unit of the item a package or an open package is of."""
     session = object_session(row)

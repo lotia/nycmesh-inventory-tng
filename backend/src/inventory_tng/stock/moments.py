@@ -124,19 +124,15 @@ def flows(
     session: Session,
     location_id: int,
     window: ColumnElement[bool],
-    items: Collection[int] | None = None,
+    items: Collection[int],
 ) -> dict[int, tuple[Decimal, Decimal]]:
     """What came into a place and what went out of it in `window` (which
-    ledger transactions it takes), by item: each item that moved there in
-    it, of `items` only, if given, in its unit (line_amounts)."""
+    ledger transactions it takes), by item: each of `items` that moved
+    there in it, in its unit (line_amounts)."""
+    if not items:
+        return {}
     into = LedgerTransaction.to_location_id == location_id
     out = LedgerTransaction.from_location_id == location_id
-    # An opening or a loosening changes the form of stock at a place, not
-    # how much is there (but for an opening's part of a thousandth after a
-    # change between m and ft, line_amounts, which is no move either).
-    where = [at_place(location_id), window, LedgerTransaction.kind.not_in(AT_ONE_PLACE)]
-    if items is not None:
-        where.append(Movement.item_id.in_(items))
     rows = session.execute(
         select(
             Movement.item_id,
@@ -145,7 +141,16 @@ def flows(
         )
         .join(LedgerTransaction, LedgerTransaction.id == Movement.transaction_id)
         .join(Item, Item.id == Movement.item_id)
-        .where(*where)
+        .where(
+            at_place(location_id),
+            window,
+            # An opening or a loosening changes the form of stock at a
+            # place, not how much is there (but for an opening's part of
+            # a thousandth after a change between m and ft, line_amounts,
+            # which is no move either).
+            LedgerTransaction.kind.not_in(AT_ONE_PLACE),
+            Movement.item_id.in_(items),
+        )
         .group_by(Movement.item_id)
     )
     # A sum over no movements is NULL: nothing came, or nothing went.
