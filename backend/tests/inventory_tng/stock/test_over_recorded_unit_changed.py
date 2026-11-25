@@ -3,16 +3,19 @@ its item changed to ft (inventory-tng-y50b): a batch sent again under its
 key once the change was saved. Correct and a corrected count write in ft,
 sealed spools by how many, the rest exactly (inventory-tng-4fjq)."""
 
+import uuid
 from decimal import Decimal
 from typing import Any
 
 from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
 
+from inventory_tng.catalogue import items
 from inventory_tng.catalogue.items_routes import RECORDED, RECORDED_IN
 from inventory_tng.catalogue.paths import ITEMS
-from inventory_tng.models.catalogue import Item
-from inventory_tng.stock import over_recorded
+from inventory_tng.models.catalogue import Item, ItemPackage
+from inventory_tng.stock import open_packages, over_recorded
+from inventory_tng.stock.ledger import LOOSE, Entry, Form, insert_transaction
 
 from helpers.items import shown_item_form
 from helpers.over_recorded import (
@@ -20,14 +23,18 @@ from helpers.over_recorded import (
     adjustments,
     checks,
     correct,
+    correct_check,
     counted,
 )
+from helpers.rows import add, item_fields
+from helpers.sign_in import new_admin_id
 from helpers.stock import (
     URL,
     Place,
     Spools,
     cut,
     held_by_form,
+    raise_check,
     received,
     sealed_line,
 )
@@ -141,3 +148,39 @@ def test_a_count_corrected_is_typed_in_m_and_written_in_ft(
         (spools.van.id, None, Decimal("410.105"), made.id, None, over_recorded.REASON)
     ]
     assert adjustment_units(session) == ["ft"]
+
+
+def test_an_openings_open_end_is_undone_by_packages(session: Session) -> None:
+    """A spool of 1001 ft, kept as 305.105 m, opened in m, its check
+    raised after the cable changed to ft: the ledger reads the opening by
+    packages, 1001 ft on each side, so Correct undoes 1001 ft at both
+    ends, the open spool's too, not 305.105 m converted exactly
+    (1001.001 ft), which would leave it 0.001 ft short."""
+    place = Place(session)
+    cable = place.cable
+    cable.track_opened = True
+    spool = add(
+        session, ItemPackage(item_id=cable.id, name="Spool", size=1001, unit="ft")
+    )
+    store = place.store.id
+    sealed = Form(package_id=spool.id)
+    size = Decimal("305.105")
+    receipt = {"kind": "receipt", "to_location_id": store}
+    insert_transaction(
+        session, uuid.uuid4(), receipt, [Entry(cable.id, size, LOOSE, sealed)]
+    )
+    made = open_packages.make(session, uuid.uuid4(), spool.id, store)
+    header = {"kind": "open", "from_location_id": store, "to_location_id": store}
+    line = Entry(cable.id, size, sealed, Form(open_package_id=made.id))
+    opened = insert_transaction(session, uuid.uuid4(), header, [line])
+    items.save(
+        session, cable, item_fields(cable, unit="ft"), seen=None, recorded_in="m"
+    )
+    session.flush()
+    check = raise_check(session, opened, size)
+    assert check.unit == "m"
+    correct_check(session, check, over_recorded.seen(check), new_admin_id(session))
+    session.flush()
+    assert [row[2] for row in adjustments(session)] == [Decimal(1001)] * 2
+    assert adjustment_units(session) == ["ft", "ft"]
+    assert held_by_form(session, store, cable.id) == {(cable.id, sealed): Decimal(1001)}

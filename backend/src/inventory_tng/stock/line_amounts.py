@@ -98,7 +98,8 @@ def said_in_items_unit(
 ) -> tuple[Decimal, str]:
     """`amount` of a line of the item `item_id`, said in the line's `unit`,
     as in_items_unit() reads the line, kept, and the unit it is in then:
-    sealed packages of `package_id` by packages, else exactly. In `unit`
+    by packages of `package_id`, its sealed side's if it has one, else
+    exactly. In `unit`
     still unless it converts into the item's, so a ledger write shown in it
     is refused as it would be. Call it holding the item
     (ledger.hold_across), so its unit cannot change before it is written."""

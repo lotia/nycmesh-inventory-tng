@@ -402,8 +402,9 @@ recorded. Rejected: keeping the unit fixed once stock has moved.
   package's size or too-short length too small or no longer below its
   size. A check raised after all, by a batch sent again or while the
   change ran, is corrected in the item's unit now, holding the item as
-  the ledger does: sealed packages by how many, the rest exactly
-  (2026-11-25, inventory-tng-4fjq).
+  the ledger does, and so is an open package's count confirmed in its
+  line's unit: as the ledger reads the line, by how many packages if
+  either side is sealed, else exactly (2026-11-25, inventory-tng-4fjq).
 - No converts nothing and says how to put right a unit wrong from the
   start, until the guided recount (inventory-tng-qety) does it: count
   its stock in the old unit first, then change its unit; or, only

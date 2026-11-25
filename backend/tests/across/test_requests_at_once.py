@@ -1272,10 +1272,10 @@ def test_a_length_reported_while_a_unit_is_converted_is_converted(
 def test_a_check_raised_while_a_unit_is_converted_is_corrected_in_the_new_unit(
     own_committed: Committed,
 ) -> None:
-    """A change to ft holds the cable FOR UPDATE once it has looked for
-    checks waiting. A check of 3 m raised meanwhile does not hold the
-    cable, so commits, and the change, not seeing it, converts. Correct
-    holds the cable FOR KEY SHARE before it reads its unit
+    """A change to ft holds the cable FOR UPDATE, then looks for checks
+    waiting, taking no lock. A check of 3 m raised after that does not
+    hold the cable, so commits, and the change, not seeing it, converts.
+    Correct holds the cable FOR KEY SHARE before it reads its unit
     (over_recorded._in_items_unit), so waits for the change, then writes
     3 m as 9.843 ft, never refused as shown in m (inventory-tng-4fjq)."""
     setup = own_committed.session()

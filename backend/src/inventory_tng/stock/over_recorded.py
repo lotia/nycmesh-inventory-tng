@@ -408,19 +408,35 @@ def close(session: Session, check_id: int, seen_as: str, admin_id: int) -> None:
 
 
 def _in_items_unit(
-    session: Session, item_id: int, amount: Decimal, unit: str, form: ledger.Form
+    session: Session, movement: Movement, amount: Decimal, unit: str
 ) -> tuple[Decimal, str]:
-    """`amount` of a check, in the unit its line was recorded in, as its
-    item's unit says it now, and that unit (line_amounts.said_in_items_unit),
-    to write it in: a sealed form's by packages, so whole packages stay
-    whole (inventory-tng-4fjq). The item held first, as the ledger holds it
+    """`amount` of a check of `movement`, in the unit its line was recorded
+    in, as its item's unit says it now, and that unit
+    (line_amounts.said_in_items_unit), to write it in. By packages if
+    either side of the line is sealed, as the ledger reads the whole line
+    (line_amounts.in_items_unit), so whole packages stay whole and an
+    opening's open end is undone as much as it was given
+    (inventory-tng-4fjq). The item held first, as the ledger holds it
     after the check's places, so a change of its unit between lengths
     (catalogue/items.py), which holds it FOR UPDATE, has committed or
     waits. A check raised while that change ran, after it looked for
     checks waiting, so converts here too."""
-    ledger.hold_across(session, item_ids=[item_id])
-    sealed = form.package_id if form.open_package_id is None else None
-    return line_amounts.said_in_items_unit(session, item_id, amount, unit, sealed)
+    ledger.hold_across(session, item_ids=[movement.item_id])
+    sealed = movement.from_package_id or movement.to_package_id
+    said, into = line_amounts.said_in_items_unit(
+        session, movement.item_id, amount, unit, sealed
+    )
+    if into != unit:
+        once_committed(
+            session,
+            log.info,
+            "over recorded converted",
+            movement_id=movement.id,
+            item_id=movement.item_id,
+            recorded_in=unit,
+            written_in=into,
+        )
+    return said, into
 
 
 def correct(
@@ -487,9 +503,7 @@ def correct(
     for place, found, form in sides:
         if place is None:
             continue
-        amount, unit = _in_items_unit(
-            session, movement.item_id, row.quantity, row.unit, form
-        )
+        amount, unit = _in_items_unit(session, movement, row.quantity, row.unit)
         counts.record_adjustment(
             session,
             correction_key(transaction.idempotency_key, row, found=found),
@@ -551,11 +565,10 @@ def confirm_count(
         )
         return "checked"
     row.settled_how = "corrected"
-    form = ledger.Form(movement.to_package_id, open_id)
     # The count was typed in the unit the line was recorded in
     # (forms.confirmed_count).
     amount, unit = _in_items_unit(
-        session, movement.item_id, abs(count - movement.quantity), movement.unit, form
+        session, movement, abs(count - movement.quantity), movement.unit
     )
     counts.record_adjustment(
         session,
@@ -566,7 +579,7 @@ def confirm_count(
         amount,
         found=count > movement.quantity,
         reason_id=adjustment_reasons.seeded(session, REASON).id,
-        form=form,
+        form=ledger.Form(movement.to_package_id, open_id),
         shown_unit=unit,
     )
     _measure_settled(session, "corrected")
