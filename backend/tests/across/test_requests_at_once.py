@@ -29,6 +29,7 @@ from httpx2 import Response as Answer
 from sqlalchemy import Engine, delete, select, text, update
 from sqlalchemy.exc import IntegrityError, OperationalError
 from sqlalchemy.orm import InstrumentedAttribute, Session
+from structlog.testing import capture_logs
 
 from inventory_tng.admins import (
     accounts,
@@ -43,6 +44,7 @@ from inventory_tng.catalogue import (
     items,
     reading_rules,
     unit_changes,
+    unit_recounts,
     units,
 )
 from inventory_tng.core.db_base import Base
@@ -1238,6 +1240,83 @@ def test_a_save_while_a_unit_is_converted_is_converted_or_refused(
     # 1.5 m in ft is 4.921 (4.92125...); 1 m alone, 3.281 ft.
     converted = ("ft", Decimal("3.281") if swapped else Decimal("4.921"))
     assert seen == ([converted] if swapped else [("m", Decimal("1.500")), converted])
+
+
+def _recounting(place: Place, seen: str, admin_id: int) -> Write:
+    """A guided recount of the place's cable into ft, from a page that
+    showed `seen`, as its route sends it (catalogue/unit_recounts.py)."""
+
+    def recounting(session: Session) -> None:
+        cable = session.get_one(Item, place.cable.id)
+        unit_recounts.recount(
+            session,
+            cable,
+            "ft",
+            unit_recounts.Amounts(None, None, {}),
+            seen=seen,
+            key=uuid.uuid4(),
+            admin_id=admin_id,
+            at=NOW,
+        )
+
+    return recounting
+
+
+def _shown_for_recount(committed: Committed) -> tuple[Place, str, int]:
+    """A cable, 1 m of it in the store, and what its recount's page shows,
+    and an administrator to recount it, all committed."""
+    place = committed_place(committed)
+    setup = committed.session()
+    receiving(place.cable, place.store, "1")(setup)
+    admin_id = new_admin_id(setup)
+    setup.commit()
+    seen = unit_recounts.planned(setup, setup.get_one(Item, place.cable.id)).seen
+    return place, seen, admin_id
+
+
+@pytest.mark.concurrency
+@pytest.mark.parametrize(
+    ("swapped", "refused"),
+    [(False, "movement_unit"), (True, "changed_since_shown")],
+)
+def test_a_save_while_a_unit_is_recounted_waits_then_is_refused(
+    own_committed: Committed, swapped: bool, refused: str
+) -> None:
+    """A receipt shown in m holds the store, and the recount holds it FOR
+    UPDATE before the cable (Ali, 2026-11-24, inventory-tng-qety): the
+    receipt second waits, then is refused as shown in m; the recount
+    second waits, then is refused as its page showed the store without the
+    receipt. Never written off unseen, nor written in m once in ft."""
+    place, seen, admin_id = _shown_for_recount(own_committed)
+    header = {"kind": "receipt", "to_location_id": place.store.id}
+    shown_in_m = Entry(place.cable.id, Decimal("0.5"), unit="m")
+
+    def receipt(session: Session) -> None:
+        insert_transaction(session, uuid.uuid4(), header, [shown_in_m])
+
+    recounting = _recounting(place, seen, admin_id)
+    assert either_first(own_committed, recounting, receipt, swapped=swapped) == refused
+
+
+@pytest.mark.concurrency
+def test_a_recount_while_a_place_first_receives_the_item_is_refused(
+    own_committed: Committed,
+) -> None:
+    """The van never had the cable, so the recount does not hold it; a
+    receipt there holds the cable, which the recount waits for, then finds
+    the van among its places, not held first: refused before it writes
+    anything, never holding the van after the cable."""
+    place, seen, admin_id = _shown_for_recount(own_committed)
+    with capture_logs() as logs:
+        refused = at_once(
+            own_committed,
+            receiving(place.cable, place.van, "1"),
+            _recounting(place, seen, admin_id),
+        )
+    assert refused == "changed_since_shown"
+    assert [
+        line["reason"] for line in logs if line["event"] == "unit recount refused"
+    ] == ["places_added"]
 
 
 @pytest.mark.concurrency

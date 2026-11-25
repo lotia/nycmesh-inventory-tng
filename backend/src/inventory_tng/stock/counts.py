@@ -398,6 +398,34 @@ def count_open_package(
     return OpenCounted(now, _write_count(session, key, admin_id, place, found, lost))
 
 
+def write_off(
+    session: Session,
+    key: uuid.UUID,
+    admin_id: int,
+    location_id: int,
+    item_id: int,
+    held: Mapping[Form, Decimal],
+    *,
+    reason_id: int,
+) -> list[Written]:
+    """What the records `held` of an item at a place, by form, brought to
+    nothing by adjustments for a reason, in its item's unit: what it held
+    written off under `key`, and less than nothing found under a key made
+    from it, so sending it twice writes each once. Call it holding the
+    place (ledger.lock_place): no other save may write there meanwhile."""
+    zero = [(item_id, form, Decimal(0)) for form in held]
+    found, lost = count_corrections(zero, {(item_id, f): n for f, n in held.items()})
+    written: list[Written] = []
+    for lines, side, sent in (
+        (lost, "from_location_id", key),
+        (found, "to_location_id", uuid.uuid5(key, "found")),
+    ):
+        if lines:
+            header = {"reason_id": reason_id, side: location_id}
+            written += _correct(session, sent, "adjustment", admin_id, header, lines)
+    return written
+
+
 def record_adjustment(
     session: Session,
     key: uuid.UUID,

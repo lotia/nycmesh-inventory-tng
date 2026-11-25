@@ -11,7 +11,7 @@ retired package with none left is never taken), 2026-11-21 (a store
 counted with its areas), 2026-11-23 (work saved as it was shown),
 2026-11-24 (a retired item counted to zero), 2026-11-24 (every stored
 amount records its unit), 2026-11-24 (m and ft converted after stock has
-moved)
+moved), 2026-11-25 (the guided recount of a unit wrong from the start)
 
 ## Context
 
@@ -411,9 +411,8 @@ recorded. Rejected: keeping the unit fixed once stock has moved.
   how many packages on a sealed side, else exactly (2026-11-25,
   inventory-tng-4fjq, inventory-tng-77eu).
 - No converts nothing and says how to put right a unit wrong from the
-  start, until the guided recount (inventory-tng-qety) does it: count
-  its stock in the old unit first, then change its unit; or, only
-  labelled, revoke its labels first.
+  start: the guided recount (next amendment); or, only labelled, revoke
+  its labels first.
 - Old ledger lines keep their unit; each sum converts them as it reads
   them. A foot is 0.3048 m exactly (`catalogue/unit_conversion.py`, in
   Python and SQL alike). Each side of a line is read apart (Ali,
@@ -438,3 +437,34 @@ recorded. Rejected: keeping the unit fixed once stock has moved.
   a line in sealed packages recorded before converts by its packages
   the same way, so spools received in m leave whole in ft, nothing
   over.
+
+## Amendment: the guided recount of a unit wrong from the start (2026-11-25)
+
+Decided by Ali on 2026-11-24 and 2026-11-25 (inventory-tng-qety). When
+what was recorded was never really in the item's unit, converting is
+wrong, as the numbers may already be in the other unit. A guided recount
+corrects it on the same item, keeping its history and links
+(`catalogue/unit_recounts.py`). Rejected: restating the numbers in the
+other unit, and retiring the item for a new one.
+
+- Offered from the answer No, for an item whose stock has moved, into
+  another length. Its page says beforehand all it will do, the labels
+  it revokes among them, and asks Reorder at, what is on order and its
+  vendor offers' units per order again in the new unit.
+- In one transaction, holding the catalogue, every place the item has
+  been at, then the item: each place is brought to zero form by form
+  in the old unit, by adjustments with the reason Records were wrong;
+  its open packages close; its packages in the old unit are retired and
+  renamed, its unit after their name, so a package of the same name can
+  be added; its labels are revoked; its unit changes; and the amounts
+  typed are kept. Refused, to be shown again, if anything it would do
+  changed since its page was shown, or if it reached another place
+  before the item was held.
+- An item holding nothing, such as one converted before, changes only
+  those amounts and its labels.
+- The item keeps its last ledger transaction then
+  (`Item.unit_recounted_after`). What left a place since a count form
+  was first shown leaves out the lines up to it, and so must use summed
+  over a time window, as they are in no unit to add to.
+- The page after links to a count of the item at each place, in the new
+  unit, and says to print new labels.

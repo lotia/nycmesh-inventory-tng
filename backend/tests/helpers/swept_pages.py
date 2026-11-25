@@ -376,6 +376,24 @@ PAGES: dict[str, Page] = {
             "a retired item": lambda w: f"/admin/items/{w.retired_item.id}",
         },
     ),
+    "/admin/items/{item_id}/unit-recount": Page(
+        item_parts,
+        (lambda w: f"/admin/items/{w.spools.cable.id}/unit-recount?unit=ft",),
+        worded={
+            "an item's guided recount": lambda w: (
+                f"/admin/items/{w.spools.cable.id}/unit-recount?unit=ft"
+            ),
+        },
+    ),
+    "/admin/items/{item_id}/unit-recounted": Page(
+        uncounted="the places a recount brought to zero, named in its address",
+        worded={
+            "after a guided recount": lambda w: (
+                f"/admin/items/{w.spools.cable.id}/unit-recounted"
+                f"?places={w.spools.store.id}&labels=2"
+            ),
+        },
+    ),
     "/admin/items/{item_id}/open-packages/{open_id}/close": Page(
         uncounted=A_FORM_OF_ONE_ROW,
         worded={

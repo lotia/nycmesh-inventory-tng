@@ -5,7 +5,7 @@ from collections.abc import Collection
 from decimal import Decimal
 from typing import NamedTuple
 
-from sqlalchemy import func, select
+from sqlalchemy import func, or_, select
 from sqlalchemy.orm import Session
 
 from inventory_tng.catalogue.unit_conversion import at_scale_sql
@@ -38,12 +38,13 @@ def moved_out(
 ) -> list[MovedOut]:
     """What left each of the places in the ledger transactions after
     `after`, by where it went, item and the form it arrived in, in all,
-    in its unit as read where it left (line_amounts):
-    an opening or a loosening, which changes only the form of stock at a
-    place, is no move. Split at the moment `split`, if given, into what left up to it
-    and what left after it (MovedOut.later). In order of place, then
-    where it went, then item, then form, by id, then up to the moment
-    first."""
+    in its unit as read where it left (line_amounts): an opening or a
+    loosening, which changes only the form of stock at a place, is no
+    move; nor is a line of an item up to its guided recount
+    (Item.unit_recounted_after), in a unit wrong from the start. Split at
+    the moment `split`, if given, into what left up to it and what left
+    after it (MovedOut.later). In order of place, then where it went,
+    then item, then form, by id, then up to the moment first."""
     went = LedgerTransaction.from_location_id
     to = LedgerTransaction.to_location_id
     package, opened = Movement.to_package_id, Movement.to_open_package_id
@@ -58,6 +59,10 @@ def moved_out(
             went.in_(list(location_ids)),
             LedgerTransaction.id > after,
             LedgerTransaction.kind.not_in(AT_ONE_PLACE),
+            or_(
+                Item.unit_recounted_after.is_(None),
+                LedgerTransaction.id > Item.unit_recounted_after,
+            ),
         )
         .group_by(*by)
         .order_by(

@@ -14,7 +14,7 @@ from sqlalchemy.orm import Session
 
 from inventory_tng.catalogue import unit_changes
 from inventory_tng.catalogue.items_routes import RECORDED, RECORDED_IN
-from inventory_tng.catalogue.paths import ITEMS
+from inventory_tng.catalogue.paths import ITEMS, unit_recount
 from inventory_tng.labels import labels
 from inventory_tng.labels.paths import item_labels
 from inventory_tng.models.catalogue import ItemPackage, VendorOffer
@@ -152,9 +152,11 @@ def test_no_converts_nothing_and_says_what_to_do(
     declined = admin_client.post(f"{ITEMS}/{cable.id}", data=answered)
     assert declined.status_code == 400
     assert problem(declined.text, "unit") == (
-        "Nothing was converted. If they were really in ft, count its stock in m "
-        "first, then change its unit."
+        "Nothing was converted. If they were really in ft, its unit was wrong "
+        "from the start: Recount it in ft"
     )
+    unit_problem = read(declined.text).one("span", id="unit-problem")
+    unit_problem.one("a", "Recount it in ft", href=unit_recount(cable.id, "ft"))
     assert QUESTION not in words_on(declined.text)
     session.refresh(cable)
     assert (cable.unit, cable.minimum, cable.on_order) == ("m", 100, 50)

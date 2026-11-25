@@ -94,3 +94,20 @@ def test_what_left_is_split_at_a_moment_when_asked(session: Session) -> None:
         MovedOut(store, van, item, Decimal(1)),
         MovedOut(store, van, item, Decimal(4), later=True),
     ]
+
+
+def test_an_items_lines_up_to_its_guided_recount_left_nowhere(
+    session: Session,
+) -> None:
+    """Its unit wrong from the start, they are in no unit to sum with what
+    moved after (catalogue/unit_recounts.py): a count form first shown
+    before the recount says only what left since it (Ali, 2026-11-24,
+    inventory-tng-qety)."""
+    place = stocked(session, "9")
+    store, van, item = place.store.id, place.van.id, place.item
+    before = write(session, place)
+    item.unit_recounted_after = before.id
+    session.flush()
+    assert moved_out(session, [store], 0) == []
+    write(session, place)
+    assert moved_out(session, [store], 0) == [MovedOut(store, van, item.id, Decimal(3))]

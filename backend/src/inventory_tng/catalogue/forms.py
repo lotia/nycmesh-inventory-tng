@@ -12,7 +12,13 @@ from decimal import Decimal
 import structlog
 from sqlalchemy.orm import Session
 
-from inventory_tng.catalogue import items, reading_rules, unit_changes, units
+from inventory_tng.catalogue import (
+    items,
+    reading_rules,
+    unit_changes,
+    unit_recounts,
+    units,
+)
 from inventory_tng.catalogue.amount_rules import becomes_counted_whole, is_whole
 from inventory_tng.catalogue.name_keys import nameless
 from inventory_tng.catalogue.reading_rules import chosen_rule, read_alike_words
@@ -210,10 +216,11 @@ PICK_A_CATEGORY = lazy_gettext("Pick a category.")
 PICK_A_UNIT = lazy_gettext("Pick a unit.")
 
 
-def unit_declined_problem(old: str, new: str, why: unit_changes.UnitFixed) -> str:
+def unit_declined_problem(new: str, why: unit_changes.UnitFixed) -> str:
     """What the item form says beside its unit when the administrator
     answers No: nothing converts, and how to put right a unit wrong from
-    the start, until the guided recount (inventory-tng-qety) does it."""
+    the start: revoking its labels, or, stock moved, the guided recount,
+    which the form links to after these words (unit_recounts)."""
     if why == "labelled":
         # Translators: answered No to "Were the recorded amounts really in
         # %(old)s?"; the item's labels say the unit; revoking them lets
@@ -224,13 +231,40 @@ def unit_declined_problem(old: str, new: str, why: unit_changes.UnitFixed) -> st
             new=new,
         )
     # Translators: answered No to "Were the recorded amounts really in
-    # %(old)s?"; a count in %(old)s first makes the records right in it.
+    # %(old)s?"; a link to recount the item in %(new)s follows.
     return gettext(
-        "Nothing was converted. If they were really in %(new)s, count its "
-        "stock in %(old)s first, then change its unit.",
-        old=old,
+        "Nothing was converted. If they were really in %(new)s, its unit was "
+        "wrong from the start:",
         new=new,
     )
+
+
+# A recount's boxes besides Reorder at: what is on order, and each current
+# vendor offer's units per order, this then its id.
+ON_ORDER, PER_ORDER = "on_order", "per_order_"
+
+
+def recount_amounts(
+    form: Mapping[str, str], offer_ids: Sequence[int], *, separator: Separator
+) -> tuple[unit_recounts.Amounts | None, dict[str, Words]]:
+    """What a guided recount's form sets in the new unit, unless something
+    is wrong, and what is, by field: Reorder at and what is on order zero
+    or more, each offer's units per order above zero, each blank for none;
+    in the decimal `separator` of the page's boxes."""
+    problems: dict[str, Words] = {}
+    read: dict[str, Decimal | None] = {}
+    fields = {"minimum": False, ON_ORDER: False}
+    fields |= {f"{PER_ORDER}{offer_id}": True for offer_id in offer_ids}
+    for name, positive in fields.items():
+        typed = quantity(form.get(name, ""), positive=positive, separator=separator)
+        if isinstance(typed, str):
+            problems[name] = typed
+        else:
+            read[name] = typed
+    if problems:
+        return None, problems
+    per_order = {each: read[f"{PER_ORDER}{each}"] for each in offer_ids}
+    return unit_recounts.Amounts(read["minimum"], read[ON_ORDER], per_order), {}
 
 
 def confirmed(session: Session, form: Mapping[str, str], fields: items.Fields) -> bool:

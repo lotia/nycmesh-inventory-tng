@@ -23,6 +23,7 @@ from inventory_tng.catalogue import (
     categories_routes,
     items_routes,
     reading_rules_routes,
+    unit_recount_routes,
 )
 from inventory_tng.core import database_role, db_errors, health
 from inventory_tng.core.cross_site import CrossSiteRefusal
@@ -149,6 +150,7 @@ def create_app(
         account_routes,
         home_routes,
         items_routes,
+        unit_recount_routes,
         categories_routes,
         locations_routes,
         labels_routes,

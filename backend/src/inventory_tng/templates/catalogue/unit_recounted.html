@@ -1,0 +1,15 @@
+{% extends "admin_base.html" %}
+{#- After a guided recount (catalogue/unit_recounts.py): what is left to
+do, in its unit now (Ali, 2026-11-25). -#}
+{% block main %}
+{% if places %}
+<p>{% trans item=item.name_shown, unit=item.unit %}The records now hold none of {{ item }} at these places. Count it at each, in {{ unit }}:{% endtrans %}</p>
+<ul>
+  {% for place in places %}<li><a href="{{ counts_path }}/{{ place.id }}?item={{ item.id }}">{#- Translators: %(place)s is a place of any kind, such as a store, a shelf, a bin or a volunteer's home. #}{% trans place=place.name %}Count it at {{ place }}{% endtrans %}</a></li>{% endfor %}
+</ul>
+{% else %}
+<p>{% trans item=item.name_shown %}The records held none of {{ item }} at any place: nothing to count.{% endtrans %}</p>
+{% endif %}
+<p><a href="{{ item_path }}#add-package">{% trans unit=item.unit %}Add its packages in {{ unit }}{% endtrans %}</a></p>
+{% if revoked %}<p>{% trans count=revoked, link=item_path ~ "#labels", unit=item.unit %}Its printed label was revoked: <a href="{{ link }}">print a new one</a> in {{ unit }}.{% pluralize %}Its {{ count }} printed labels were revoked: <a href="{{ link }}">print new ones</a> in {{ unit }}.{% endtrans %}</p>{% endif %}
+{% endblock %}

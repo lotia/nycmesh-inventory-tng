@@ -297,7 +297,8 @@ Each catalogue table is written only by its own module, the owner its model
 names (`db_protection.protection`, below), such as `catalogue/items.py` for
 items and their packages; saving an item whose unit changes hands what
 that does to its packages, vendor offers and open packages to
-`catalogue/unit_changes.py`. Admin pages and the seed call those modules'
+`catalogue/unit_changes.py`, and the guided recount of a unit wrong from
+the start is `catalogue/unit_recounts.py`. Admin pages and the seed call those modules'
 functions, one per kind of change, which take the catalogue lock, lock and
 read what the rules need, and refuse a change that breaks one by raising
 `db_errors.RuleBroken` with the rule's name. `db_errors.attempt` returns

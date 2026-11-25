@@ -26,7 +26,7 @@ from structlog.testing import capture_logs
 from inventory_tng.admins import accounts, mail_messages
 from inventory_tng.app import create_app
 from inventory_tng.catalogue import items, unit_changes
-from inventory_tng.catalogue.paths import CATEGORIES
+from inventory_tng.catalogue.paths import CATEGORIES, unit_recount
 from inventory_tng.core import db_sessions, mail
 from inventory_tng.core.db_errors import NoSession, RuleBroken
 from inventory_tng.core.masking import MASK, Masker
@@ -54,6 +54,7 @@ from helpers.csp_reports import SHAPES
 from helpers.devices import new_device
 from helpers.items import shown_item_form, unit_answered
 from helpers.mail import NO_MAIL, FailingMail, SentMail
+from helpers.markup import hidden_fields
 from helpers.pools import small_database
 from helpers.rows import add, breaks, item_fields, shown, tag
 from helpers.sign_in import (
@@ -1168,6 +1169,41 @@ def test_counts_unit_changes_converted_by_unit(
         ("unit change declined", place.cable.id, "info"),
         ("item unit converted", place.cable.id, "info"),
     ]
+
+
+def test_counts_unit_recounts_by_unit(rolled_back: Recorded, session: Session) -> None:
+    """A guided recount is counted once done, by the unit it was in and
+    the one it is in now, and logged by ids alone; refused, it is not."""
+    client, _, reader, _ = rolled_back
+    name = "inventory.unit_recounts"
+    before = counted(reader, name)
+    _, key = new_admin(session)
+    sign_in_with(client, key=key)
+    place = Place(session)
+    cable = place.cable
+    write(session, place, lines=[{"item_id": cable.id, "quantity": "5", "unit": "m"}])
+    path = unit_recount(cable.id, "ft")
+    form = dict(hidden_fields(client.get(path).text))
+    with capture_logs() as logs:
+        assert client.post(path, data=form | {"seen": "stale"}).status_code == 409
+        assert added(reader, name, before) == {}
+        done = client.post(path, data=form, follow_redirects=False)
+        assert done.status_code == 303
+    assert added(reader, name, before) == {(("from", "m"), ("to", "ft")): 1}
+    (line,) = [line for line in logs if line["event"] == "item unit recounted"]
+    assert {**line, "admin_id": 0} == {
+        "event": "item unit recounted",
+        "log_level": "info",
+        "item_id": cable.id,
+        "admin_id": 0,
+        "from_unit": "m",
+        "to_unit": "ft",
+        "location_ids": [place.store.id, place.van.id],
+        "open_package_ids": [],
+        "item_package_ids": [],
+        "label_ids": [],
+        "vendor_offer_ids": [],
+    }
 
 
 def test_counts_package_forms_refused_as_shown_in_a_unit_left_by_form(

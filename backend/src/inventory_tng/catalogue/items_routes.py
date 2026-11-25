@@ -2,9 +2,9 @@
 has moved in it, or while a label of it is printed and not revoked
 (unit_changes.unit_fixed): the form offers only another length, for one in a
 length, and asks "Were the recorded amounts really in m?" before it
-converts them (Ali, 2026-11-24, inventory-tng-y50b); fixed only by
-labels, it links to the item's labels, to revoke them and correct a
-mistake. A package's size fixed only by labels says so too
+converts them (Ali, 2026-11-24, inventory-tng-y50b). Answered No, it
+links to the guided recount (unit_recount_routes), or, fixed only by
+labels, to the item's labels, to revoke them and correct a mistake. A package's size fixed only by labels says so too
 (items.sizes_fixed). A retired item with stock
 left may still be taken, never received (docs/decisions/0003)."""
 
@@ -28,7 +28,7 @@ from inventory_tng.catalogue import (
 )
 from inventory_tng.catalogue.amount_rules import becomes_counted_whole, counted_whole
 from inventory_tng.catalogue.items_listing import SEARCHED
-from inventory_tng.catalogue.paths import CATEGORIES, ITEMS, READINGS
+from inventory_tng.catalogue.paths import CATEGORIES, ITEMS, READINGS, unit_recount
 from inventory_tng.catalogue.reading_rules import NOT_A_UNIT
 from inventory_tng.core.db_errors import refusal, refusal_naming_index
 from inventory_tng.core.db_once_committed import once_committed
@@ -470,6 +470,7 @@ def _item_page(
     short_to_set: ItemPackage | None = None,
     asking_unit: bool = False,
     unit_declined: unit_changes.UnitFixed | None = None,
+    unit_declined_to: str | None = None,
 ) -> HTMLResponse:
     """The item's page; its open packages sorted as `asked`, all of them.
     `asking_unit`, the form sent back asks whether what was recorded was
@@ -478,8 +479,9 @@ def _item_page(
     fraction: said above the page, with a link to add a new package. With
     `short_to_set`, a package brought back whose Too short to use box is
     outlined, the whole numbers it may be beside it. `unit_declined`, why
-    the unit is fixed when its question was answered No: labels, and the
-    form links to revoke them."""
+    the unit is fixed when its question was answered No, to change it to
+    `unit_declined_to`: labels, and the form links to revoke them; or
+    stock moved, and it links to the guided recount (unit_recounts)."""
     here = f"{ITEMS}/{item.id}"
     packages = queries.packages_of_item(session, item.id)
     view = View.read(here, OPEN_SORTING, asked, anchor=OPEN_PACKAGES)
@@ -526,6 +528,8 @@ def _item_page(
             "recorded": RECORDED,
             "recorded_in": RECORDED_IN,
             "its_labels": item_labels(item.id),
+            "recount_to": unit_declined_to,
+            "recount_in": unit_declined_to and unit_recount(item.id, unit_declined_to),
             "in_stock": item_total(session, item.id),
             "labels": printed,
             "labels_printed": len(printed),
@@ -822,7 +826,7 @@ def _unit_declined(
         return _item_page(request, session, signed, item, values=form)
     log.info("unit change declined", item_id=item.id, reason=why)
     values = {**form, "unit": item.unit}
-    problems = {"unit": forms.unit_declined_problem(item.unit, unit, why)}
+    problems = {"unit": forms.unit_declined_problem(unit, why)}
     return _item_page(
         request,
         session,
@@ -831,6 +835,7 @@ def _unit_declined(
         problems=problems,
         values=values,
         unit_declined=why,
+        unit_declined_to=unit,
     )
 
 

@@ -152,6 +152,13 @@ class Item(KeyedName, Searchable, Versioned, Base):
     # (docs/decisions/0020, Amendment).
     track_opened: Mapped[bool] = mapped_column(server_default=text("false"))
     retired_at: Mapped[RetiredAt]
+    # The last ledger transaction of it when its unit was last corrected by
+    # a guided recount (catalogue/unit_recounts.py): its lines up to it
+    # were in a unit wrong from the start, and the recount brought every
+    # place to zero after them. What left a place since a moment
+    # (stock/moved_out.py), and use summed over a time window, start after
+    # it. NULL: never recounted, or recounted before anything moved.
+    unit_recounted_after: Mapped[int | None] = reference("ledger_transaction.id")
 
     # Everything a volunteer might type to find an item, as one string,
     # folded (Searchable), and its name alone so, for close names

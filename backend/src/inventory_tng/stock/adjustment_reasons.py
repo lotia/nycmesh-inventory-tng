@@ -29,9 +29,14 @@ USED_UP = "Used up"
 # The reason a count gives for an open package not there (docs/decisions/0020).
 LOST = "Lost or stolen"
 
+# The reason a guided recount gives for what it writes off, or finds, to
+# bring each place to zero before an item's unit is corrected
+# (catalogue/unit_recounts.py).
+RECORDS_WRONG = "Records were wrong"
+
 
 def seeded(session: Session, name: str) -> AdjustmentReason:
-    """A reason the app gives itself (USED_UP, LOST,
+    """A reason the app gives itself (USED_UP, LOST, RECORDS_WRONG,
     over_recorded.REASON), current. The initial migration makes each, so
     it is found; made again only if an administrator renamed it, and
     brought back if retired."""

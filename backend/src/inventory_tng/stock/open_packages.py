@@ -39,8 +39,8 @@ closed = meter.create_counter(
     "inventory.open_packages.closed",
     unit="{package}",
     description="Open packages an administrator closed, by how: confirming a "
-    "volunteer's report, directly, counting, or no longer following its "
-    "package's opened ones",
+    "volunteer's report, directly, counting, no longer following its "
+    "package's opened ones, or a guided recount of its item's unit",
 )
 cleared = meter.create_counter(
     "inventory.open_packages.cleared",
@@ -280,7 +280,7 @@ def settle_check(
     return True
 
 
-Closing = Literal["confirmed", "direct", "count", "unfollowed"]
+Closing = Literal["confirmed", "direct", "count", "unfollowed", "unit_recount"]
 
 
 def close(
@@ -303,7 +303,8 @@ def close(
     counted (over_recorded.open_package_closed). Its place is locked first,
     then it, then those, as a save's are (stock/ledger.py). RuleBroken as
     counts.record_adjustment refuses. Measured `how` it was closed: by
-    confirming a volunteer's report, directly, or by a count."""
+    confirming a volunteer's report, directly, by a count, or by a guided
+    recount of its item's unit (catalogue/unit_recounts.py)."""
     found = session.get(OpenPackage, open_id)
     if found is None:
         return False

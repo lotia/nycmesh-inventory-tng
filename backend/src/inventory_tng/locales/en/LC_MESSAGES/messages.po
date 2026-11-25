@@ -305,6 +305,11 @@ msgid ""
 "line there. Nothing was saved, and what you typed is kept."
 msgstr ""
 
+#: src/inventory_tng/catalogue/unit_recount_routes.py
+#, python-format
+msgid "%(item)s recounted in %(unit)s"
+msgstr ""
+
 #: src/inventory_tng/templates/stock/count.html
 #, python-format
 msgid "%(item)s · %(amount)s moved"
@@ -397,6 +402,11 @@ msgstr[1] ""
 #: src/inventory_tng/web/formatting.py
 #, python-format
 msgid "%(num)s × %(package)s"
+msgstr ""
+
+#: src/inventory_tng/templates/catalogue/unit_recount.html
+#, python-format
+msgid "%(old)s becomes %(new)s"
 msgstr ""
 
 #: src/inventory_tng/catalogue/forms.py
@@ -847,6 +857,11 @@ msgstr ""
 
 #: src/inventory_tng/templates/catalogue/items.html
 msgid "Add an item"
+msgstr ""
+
+#: src/inventory_tng/templates/catalogue/unit_recounted.html
+#, python-format
+msgid "Add its packages in %(unit)s"
 msgstr ""
 
 #: src/inventory_tng/admins/home_routes.py
@@ -1452,6 +1467,13 @@ msgstr ""
 msgid "Count in the package"
 msgstr ""
 
+#. %(place)s is a place of any kind, such as a store, a shelf, a bin or a
+#. volunteer's home.
+#: src/inventory_tng/templates/catalogue/unit_recounted.html
+#, python-format
+msgid "Count it at %(place)s"
+msgstr ""
+
 #: src/inventory_tng/stock/over_recorded_queries.py
 #: src/inventory_tng/templates/stock/count.html
 msgid "Counted"
@@ -1674,6 +1696,13 @@ msgstr ""
 msgid ""
 "For the items ticked on this page: whether a package of theirs, opened, "
 "is followed until used up. A package that says otherwise keeps its own."
+msgstr ""
+
+#: src/inventory_tng/templates/catalogue/unit_recount.html
+#, python-format
+msgid ""
+"For when what was recorded of %(item)s was never really in %(old)s: "
+"nothing is converted. In one change, which can't be undone, it:"
 msgstr ""
 
 #: src/inventory_tng/admins/reset_routes.py
@@ -2018,6 +2047,17 @@ msgid ""
 "brought back. Revoking it stops them scanning for good."
 msgstr ""
 
+#: src/inventory_tng/templates/catalogue/unit_recounted.html
+#, python-format
+msgid ""
+"Its printed label was revoked: <a href=\"%(link)s\">print a new one</a> "
+"in %(unit)s."
+msgid_plural ""
+"Its %(count)s printed labels were revoked: <a href=\"%(link)s\">print new"
+" ones</a> in %(unit)s."
+msgstr[0] ""
+msgstr[1] ""
+
 #: src/inventory_tng/web/forms.py
 msgid ""
 "Its size is fixed, as a label has been printed for it: revoke its labels "
@@ -2047,6 +2087,11 @@ msgstr ""
 
 #: src/inventory_tng/templates/admins/admin_reset.html
 msgid "Keep it as it is"
+msgstr ""
+
+#: src/inventory_tng/templates/catalogue/unit_recount.html
+#, python-format
+msgid "Keep it in %(old)s"
 msgstr ""
 
 #: src/inventory_tng/templates/stock/open_package_close.html
@@ -2602,12 +2647,12 @@ msgid "Nothing waits."
 msgstr ""
 
 #. Translators: answered No to "Were the recorded amounts really in
-#. %(old)s?"; a count in %(old)s first makes the records right in it.
+#. %(old)s?"; a link to recount the item in %(new)s follows.
 #: src/inventory_tng/catalogue/forms.py
 #, python-format
 msgid ""
-"Nothing was converted. If they were really in %(new)s, count its stock in"
-" %(old)s first, then change its unit."
+"Nothing was converted. If they were really in %(new)s, its unit was wrong"
+" from the start:"
 msgstr ""
 
 #. Translators: answered No to "Were the recorded amounts really in
@@ -2645,6 +2690,10 @@ msgstr ""
 #: src/inventory_tng/admins/mail_messages.py
 #, python-format
 msgid "On %(brand)s: %(words)s."
+msgstr ""
+
+#: src/inventory_tng/templates/catalogue/unit_recount.html
+msgid "On order"
 msgstr ""
 
 #: src/inventory_tng/templates/admins/account.html
@@ -2991,6 +3040,7 @@ msgid ""
 "page. Revoking a code stops every copy of it scanning."
 msgstr ""
 
+#: src/inventory_tng/templates/catalogue/unit_recount.html
 #: src/inventory_tng/templates/stock/counts.html
 #: src/inventory_tng/templates/stock/stock.html
 msgid "Place"
@@ -3161,6 +3211,10 @@ msgstr ""
 msgid "Record it"
 msgstr ""
 
+#: src/inventory_tng/templates/catalogue/unit_recount.html
+msgid "Recorded"
+msgstr ""
+
 #: src/inventory_tng/templates/stock/over_recorded.html
 msgid "Recorded more"
 msgstr ""
@@ -3186,6 +3240,21 @@ msgstr ""
 
 #: src/inventory_tng/templates/stock/count.html
 msgid "Records say"
+msgstr ""
+
+#: src/inventory_tng/catalogue/unit_recount_routes.py
+#, python-format
+msgid "Recount %(item)s in %(unit)s"
+msgstr ""
+
+#: src/inventory_tng/templates/catalogue/unit_recount.html
+#, python-format
+msgid "Recount in %(new)s"
+msgstr ""
+
+#: src/inventory_tng/templates/catalogue/item.html
+#, python-format
+msgid "Recount it in %(unit)s"
 msgstr ""
 
 #: src/inventory_tng/admins/reset_routes.py
@@ -3278,6 +3347,7 @@ msgid "Reorder"
 msgstr ""
 
 #: src/inventory_tng/templates/catalogue/item.html
+#: src/inventory_tng/templates/catalogue/unit_recount.html
 #: src/inventory_tng/templates/stock/reorder.html
 msgid "Reorder at"
 msgstr ""
@@ -4133,6 +4203,18 @@ msgid ""
 " and your other sessions were signed out."
 msgstr ""
 
+#: src/inventory_tng/templates/catalogue/unit_recounted.html
+#, python-format
+msgid "The records held none of %(item)s at any place: nothing to count."
+msgstr ""
+
+#: src/inventory_tng/templates/catalogue/unit_recounted.html
+#, python-format
+msgid ""
+"The records now hold none of %(item)s at these places. Count it at each, "
+"in %(unit)s:"
+msgstr ""
+
 #: src/inventory_tng/templates/stock/count.html
 msgid "The records say nothing is here."
 msgstr ""
@@ -4178,6 +4260,13 @@ msgstr ""
 msgid ""
 "Their sign-in is reset: they are signed out everywhere, and their "
 "password, authenticators and recovery codes no longer work."
+msgstr ""
+
+#: src/inventory_tng/templates/catalogue/unit_recount.html
+#, python-format
+msgid ""
+"Then count it at each place in %(new)s, add its packages in %(new)s, and "
+"print new labels."
 msgstr ""
 
 #: src/inventory_tng/templates/admins/confirm.html
@@ -4406,6 +4495,13 @@ msgstr ""
 #: src/inventory_tng/catalogue/reading_rules_routes.py
 #: src/inventory_tng/templates/catalogue/items.html
 msgid "Unit readings"
+msgstr ""
+
+#. %(vendor)s is a vendor's name, or the address of its offer when it names
+#. none.
+#: src/inventory_tng/templates/catalogue/unit_recount.html
+#, python-format
+msgid "Units per order from %(vendor)s"
 msgstr ""
 
 #: src/inventory_tng/templates/admins/account.html
@@ -4880,6 +4976,18 @@ msgstr ""
 msgid "capacitance"
 msgstr ""
 
+#: src/inventory_tng/templates/catalogue/unit_recount.html
+#, python-format
+msgid "changes its unit to %(new)s, and keeps the amounts below in %(new)s."
+msgstr ""
+
+#: src/inventory_tng/templates/catalogue/unit_recount.html
+#, python-format
+msgid "closes its open package;"
+msgid_plural "closes its %(count)s open packages;"
+msgstr[0] ""
+msgstr[1] ""
+
 #. Translators: a kind of save, a noun.
 #: src/inventory_tng/stock/length_checks_routes.py
 msgid "count"
@@ -5002,6 +5110,16 @@ msgstr ""
 
 #: src/inventory_tng/site_settings/forms.py
 msgid "hours"
+msgstr ""
+
+#: src/inventory_tng/templates/catalogue/unit_recount.html
+#, python-format
+msgid "in %(unit)s; blank: none"
+msgstr ""
+
+#: src/inventory_tng/templates/catalogue/unit_recount.html
+#, python-format
+msgid "in %(unit)s; blank: not said"
 msgstr ""
 
 #: src/inventory_tng/templates/catalogue/item.html
@@ -5205,9 +5323,23 @@ msgstr ""
 msgid "resistance"
 msgstr ""
 
+#: src/inventory_tng/templates/catalogue/unit_recount.html
+#, python-format
+msgid ""
+"retires its packages in %(old)s, renamed so a package of the same name "
+"can be added in the new unit:"
+msgstr ""
+
 #: src/inventory_tng/templates/devices/device_list.html
 msgid "revoked"
 msgstr ""
+
+#: src/inventory_tng/templates/catalogue/unit_recount.html
+#, python-format
+msgid "revokes its printed label, as it says %(old)s:"
+msgid_plural "revokes its %(count)s printed labels, as they say %(old)s:"
+msgstr[0] ""
+msgstr[1] ""
 
 #: src/inventory_tng/templates/catalogue/item.html
 msgid "set on this package"
@@ -5274,6 +5406,7 @@ msgid "too few left: %(left)s %(unit)s"
 msgstr ""
 
 #: src/inventory_tng/templates/catalogue/item.html
+#: src/inventory_tng/templates/catalogue/unit_recount.html
 #, python-format
 msgid "total across stores, in %(unit)s; blank never reorders"
 msgstr ""
@@ -5320,6 +5453,17 @@ msgstr ""
 
 #: src/inventory_tng/templates/places/location.html
 msgid "what its times are shown in; times already recorded keep theirs"
+msgstr ""
+
+#: src/inventory_tng/templates/catalogue/unit_recount.html
+msgid "writes off nothing: the records hold none of it at any place;"
+msgstr ""
+
+#: src/inventory_tng/templates/catalogue/unit_recount.html
+#, python-format
+msgid ""
+"writes off, in %(old)s, all the records hold of it at each place, with "
+"the reason Records were wrong:"
 msgstr ""
 
 #: src/inventory_tng/templates/stock/counts.html

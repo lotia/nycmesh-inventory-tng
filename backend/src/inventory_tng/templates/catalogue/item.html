@@ -59,6 +59,10 @@ None is left, so nobody can pick it.{% endtrans %}{% endif %}{% endcall %}
     {#- Answered No, only labels fixing the unit: the way to revoke them;
     a retired item's are inactive, nothing to revoke. #}
     <span class="problem" id="unit-problem">{{ problems.unit }} {{ revoke_link(labels_printed, its_labels) }}</span>
+    {% elif unit_declined == "moved" and not retired %}
+    {#- Answered No, stock moved: the guided recount puts a unit wrong from
+    the start right (catalogue/unit_recounts.py). #}
+    <span class="problem" id="unit-problem">{{ problems.unit }} <a href="{{ recount_in }}">{% trans unit=recount_to %}Recount it in {{ unit }}{% endtrans %}</a></span>
     {% else %}
     {% with name = "unit" %}{% include "_field_problem.html" %}{% endwith %}
     {% endif %}

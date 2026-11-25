@@ -103,8 +103,8 @@ NAME_KEY = (
     f" '{LOOK_ALIKES}', '{PLAIN}'), {IGNORED}, '', 'g'))"
 )
 # Written out, not imported, so the migration stays as made. seeded finds
-# those the app gives itself by name (adjustment_reasons.USED_UP and LOST,
-# over_recorded.REASON).
+# those the app gives itself by name (adjustment_reasons.USED_UP, LOST and
+# RECORDS_WRONG, over_recorded.REASON).
 REASONS = (
     "Damaged",
     "Lost or stolen",
