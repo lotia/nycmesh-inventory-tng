@@ -491,6 +491,15 @@ def _item_page(
     fixed = unit_changes.unit_fixed(session, item.id)
     # Not revoked, its own and its packages': how many each hint says.
     printed = labels.current_of(session, Label.item_id == item.id)
+    by_package = Counter(each.label.package_id for each in printed)
+    # Only a current one's size can change.
+    sizes = items.sizes_fixed(
+        session, [each.id for each in packages if each.retired_at is None]
+    )
+    # Labels revoked between the reads fix nothing: no hint says "0 labels".
+    if fixed == "labelled" and not printed:
+        fixed = None
+    sizes = {i: why for i, why in sizes.items() if why == "used" or by_package[i]}
     return admin_page(
         request,
         signed,
@@ -503,10 +512,7 @@ def _item_page(
             **retirement(session, item),
             "packages": packages,
             "aliases": items.aliases(session, item.id),
-            # Only a current one's size can change.
-            "sizes_fixed": items.sizes_fixed(
-                session, [each.id for each in packages if each.retired_at is None]
-            ),
+            "sizes_fixed": sizes,
             "undo": undo,
             "categories": [
                 c for c in queries.categories_by_name(session) if c.retired_at is None
@@ -521,9 +527,7 @@ def _item_page(
             "in_stock": item_total(session, item.id),
             "labels": printed,
             "labels_printed": len(printed),
-            "package_labels_printed": Counter(
-                each.label.package_id for each in printed
-            ),
+            "package_labels_printed": by_package,
             "open_packages": opened,
             "open_view": view,
             "zone": site_zone(session),

@@ -61,7 +61,7 @@ RULES = {
         "Settle its lines in Recorded more than moved first: they are in its unit now."
     ),
     "item_unit_out_of_range": lazy_gettext(
-        "Not converted: some of its amounts would be too large in that unit, "
+        "Not changed: some of its amounts would be too large in that unit, "
         "or a package too small."
     ),
     "package_size_fixed": lazy_gettext(

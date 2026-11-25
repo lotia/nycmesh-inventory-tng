@@ -321,11 +321,12 @@ automatically, and allowing the change with a warning.
 Only labels not revoked count (Ali, 2026-11-23, inventory-tng-37dj),
 so a unit or size set wrong and labelled can be corrected: a revoked
 label scans as no label, and work queued from it is refused as above.
-Its page says "m: fixed, as a label has been printed for it. Revoke its
-labels to change it.", linking to all the item's labels on the labels
-page, a retired package's too, each not revoked offered to revoke (Ali,
-2026-11-23, inventory-tng-x30g); a package's size fixed only by its
-labels says so beside it, with the same link. A movement still fixes
+Its page says why first, with how many labels: "each: fixed until both
+its printed labels are revoked. Revoke its 2 labels to change it." (Ali,
+2026-11-25, inventory-tng-62qs). The link goes to all the item's labels
+on the labels page, a retired package's too, each not revoked offered
+to revoke (Ali, 2026-11-23, inventory-tng-x30g); a package's size fixed
+only by its labels says so beside it, with the same link. A movement still fixes
 both for good, and an opening the size. Revoking takes the catalogue
 lock, as a unit or size change does, so neither slips past the other.
 

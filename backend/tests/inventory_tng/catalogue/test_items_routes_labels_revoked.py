@@ -5,6 +5,7 @@ count (Ali, 2026-11-25, inventory-tng-62qs)."""
 
 from decimal import Decimal
 
+import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
 
@@ -94,4 +95,21 @@ def test_several_labels_are_all_counted_until_all_are_revoked(
         assert labels.revoke(session, label.id, NOW)
     page = admin_client.get(f"{ITEMS}/{cable.id}").text
     assert "printed label" not in words_on(page)
+    assert read(page).all("a", href=item_labels(cable.id)) == []
+
+
+def test_labels_revoked_between_the_pages_reads_say_no_count(
+    admin_client: TestClient,
+    session: Session,
+    radios: Category,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Revoked after the unit and sizes were found fixed, before they were
+    counted: the unit and the spool's size are free, with no "0 labels"."""
+    cable = new_item(session, radios, "Cat6 cable", unit="m")
+    _labelled(session, cable, 1)
+    monkeypatch.setattr(labels, "current_of", lambda *_: [])
+    page = admin_client.get(f"{ITEMS}/{cable.id}").text
+    assert "printed label" not in words_on(page)
+    assert "0 labels" not in words_on(page)
     assert read(page).all("a", href=item_labels(cable.id)) == []

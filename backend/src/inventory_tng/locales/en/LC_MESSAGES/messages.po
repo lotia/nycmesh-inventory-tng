@@ -677,8 +677,8 @@ msgid ""
 "registered, and revoke many at once."
 msgstr ""
 
-#. a link to the item's labels, each of which can be revoked there; followed by
-#. "to change it".
+#. a link to the item's labels, each of which can be revoked there; it opens a
+#. sentence, as "Revoke its 2 labels to change it."
 #: src/inventory_tng/templates/catalogue/_revoke_labels.html
 #, python-format
 msgid "<a href=\"%(link)s\">Revoke its label</a>"
@@ -2430,16 +2430,16 @@ msgstr ""
 msgid "Not changed: %(why)s"
 msgstr ""
 
+#: src/inventory_tng/web/forms.py
+msgid ""
+"Not changed: some of its amounts would be too large in that unit, or a "
+"package too small."
+msgstr ""
+
 #: src/inventory_tng/stock/over_recorded_routes.py
 msgid ""
 "Not changed: someone answered or changed it meanwhile. Reload to see it "
 "as it is."
-msgstr ""
-
-#: src/inventory_tng/web/forms.py
-msgid ""
-"Not converted: some of its amounts would be too large in that unit, or a "
-"package too small."
 msgstr ""
 
 #: src/inventory_tng/web/pages.py
@@ -4673,8 +4673,8 @@ msgstr ""
 #: src/inventory_tng/templates/catalogue/item.html
 #, python-format
 msgid ""
-"Yes converts its stock, Reorder at, what is on order and its vendor "
-"offers into %(new)s. Past movements stay in %(old)s."
+"Yes recalculates its stock, Reorder at, what is on order and its vendor "
+"offers in %(new)s. Past movements stay in %(old)s."
 msgstr ""
 
 #: src/inventory_tng/templates/admins/admins.html
@@ -5120,8 +5120,8 @@ msgstr ""
 
 #: src/inventory_tng/templates/catalogue/item.html
 msgid ""
-"only another length, as stock has moved in it: what is recorded is "
-"converted"
+"only another length, as stock has moved in it: its recorded amounts are "
+"recalculated"
 msgstr ""
 
 #. Translators: a kind of save, a noun.

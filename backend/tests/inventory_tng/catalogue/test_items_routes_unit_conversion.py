@@ -42,6 +42,7 @@ from helpers.stock import (
     raise_check,
     received,
     report,
+    retire,
     sealed_line,
     write,
 )
@@ -75,12 +76,21 @@ def test_m_to_ft_asks_then_converts_every_amount(
     )
     # One that says nothing of how many: only its unit follows.
     unsaid = add(session, VendorOffer(item_id=cable.id, url="https://example.net"))
+    shown = words_on(admin_client.get(f"{ITEMS}/{cable.id}").text)
+    assert (
+        "only another length, as stock has moved in it: its recorded amounts "
+        "are recalculated"
+    ) in shown
     asked = admin_client.post(
         f"{ITEMS}/{cable.id}", data=shown_item_form(cable, unit="ft")
     )
     assert asked.status_code == 200
     page = read(asked.text)
     assert QUESTION in words_on(page)
+    assert (
+        "Yes recalculates its stock, Reorder at, what is on order and its "
+        "vendor offers in ft. Past movements stay in m."
+    ) in words_on(page)
     assert button(page, "Yes").attrs["value"] == "yes"
     assert button(page, "No").attrs["value"] == "no"
     # Enter in a field presses the form's first button: No, converting nothing.
@@ -465,3 +475,17 @@ def test_no_for_a_labelled_item_says_to_revoke_its_labels(
     assert again.status_code == 200
     assert "Nothing was converted" not in words_on(again.text)
     assert place.cable.unit == "m"
+
+
+def test_no_for_a_retired_labelled_item_offers_nothing_to_revoke(
+    admin_client: TestClient, session: Session
+) -> None:
+    """Answered No from a page drawn before the item was retired: its
+    labels are inactive, so no link offers to revoke them."""
+    place = Place(session)
+    assert labels.make_for_item(session, place.cable.id) is not None
+    answered = unit_answered(place.cable, "no", unit="ft")
+    retire(session, place.cable)
+    declined = admin_client.post(f"{ITEMS}/{place.cable.id}", data=answered)
+    assert "Nothing was converted" in words_on(declined.text)
+    assert read(declined.text).all("a", href=item_labels(place.cable.id)) == []

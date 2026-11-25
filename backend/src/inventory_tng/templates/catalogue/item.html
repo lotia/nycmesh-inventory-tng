@@ -32,7 +32,7 @@ None is left, so nobody can pick it.{% endtrans %}{% endif %}{% endcall %}
     what is recorded once its question is answered Yes (Ali, 2026-11-24). #}
     {% if unit_fixed and units | length > 1 and not retired %}
     {% if unit_fixed == "moved" %}
-    <span class="hint">{% trans %}only another length, as stock has moved in it: what is recorded is converted{% endtrans %}</span>
+    <span class="hint">{% trans %}only another length, as stock has moved in it: its recorded amounts are recalculated{% endtrans %}</span>
     {% else %}
     <span class="hint">{#- Translators: %(until)s says why, as "until both its printed labels are revoked"; %(revoke)s is the link to revoke them, as "Revoke its 2 labels". #}{% trans until=until_revoked(labels_printed), revoke=revoke_link(labels_printed, its_labels) %}only another length {{ until }}: its recorded amounts are recalculated. {{ revoke }} to change it without recalculating its amounts.{% endtrans %}</span>
     {% endif %}
@@ -55,8 +55,9 @@ None is left, so nobody can pick it.{% endtrans %}{% endif %}{% endcall %}
       {% for unit in units %}<option {% if values.get('unit', item.unit) == unit %}selected{% endif %}>{{ unit }}</option>{% endfor %}
     </select>
     {% endif %}
-    {% if unit_declined == "labelled" %}
-    {#- Answered No, only labels fixing the unit: the way to revoke them. #}
+    {% if unit_declined == "labelled" and not retired %}
+    {#- Answered No, only labels fixing the unit: the way to revoke them;
+    a retired item's are inactive, nothing to revoke. #}
     <span class="problem" id="unit-problem">{{ problems.unit }} {{ revoke_link(labels_printed, its_labels) }}</span>
     {% else %}
     {% with name = "unit" %}{% include "_field_problem.html" %}{% endwith %}
@@ -99,7 +100,7 @@ None is left, so nobody can pick it.{% endtrans %}{% endif %}{% endcall %}
   Yes converts what is recorded, No converts nothing (Ali, 2026-11-24). #}
   <div role="alert" id="unit-question">
     <p>{% trans unit=item.unit %}Were the recorded amounts really in {{ unit }}?{% endtrans %}</p>
-    <p class="hint">{% trans new=values.get('unit'), old=item.unit %}Yes converts its stock, Reorder at, what is on order and its vendor offers into {{ new }}. Past movements stay in {{ old }}.{% endtrans %}</p>
+    <p class="hint">{% trans new=values.get('unit'), old=item.unit %}Yes recalculates its stock, Reorder at, what is on order and its vendor offers in {{ new }}. Past movements stay in {{ old }}.{% endtrans %}</p>
     <input type="hidden" name="{{ recorded_in }}" value="{{ item.unit }}">
     <div class="actions">
       {#- No first, so Enter in a field converts nothing; shown after Yes. #}

@@ -15,5 +15,5 @@ give the reason first, then the link. -#}
 {#- The link to the item's labels not revoked, `link`
 (labels.paths.item_labels), to revoke them there. -#}
 {% macro revoke_link(count, link) -%}
-{#- Translators: a link to the item's labels, each of which can be revoked there; followed by "to change it". #}{% trans count=count, link=link %}<a href="{{ link }}">Revoke its label</a>{% pluralize %}<a href="{{ link }}">Revoke its {{ count }} labels</a>{% endtrans %}
+{#- Translators: a link to the item's labels, each of which can be revoked there; it opens a sentence, as "Revoke its 2 labels to change it." #}{% trans count=count, link=link %}<a href="{{ link }}">Revoke its label</a>{% pluralize %}<a href="{{ link }}">Revoke its {{ count }} labels</a>{% endtrans %}
 {%- endmacro %}
