@@ -35,8 +35,7 @@ links to each count.
 
 It revokes no labels: none names the item's unit, as an item's prints its
 name and a package's that package's own size, and those in the old unit
-stop scanning as they are retired (Ali, 2026-11-25, replacing his earlier
-decision that it revokes them)."""
+stop scanning as they are retired (Ali, 2026-11-25, inventory-tng-8ema)."""
 
 import uuid
 from collections.abc import Iterable, Mapping, Sequence

@@ -2,8 +2,8 @@
 (catalogue/unit_recounts.py): its page, saying beforehand all it will do,
 and asking Reorder at, what is on order and its vendor offers again in the
 new unit; and the page after, linking to a count of it at each place it
-brought to zero (Ali, 2026-11-25, inventory-tng-qety). The answer to No on the item
-page links here (items_routes)."""
+brought to zero (Ali, 2026-11-25, inventory-tng-qety). The answer to No
+on the item page links here (items_routes)."""
 
 import uuid
 from collections.abc import Mapping

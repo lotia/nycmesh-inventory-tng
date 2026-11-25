@@ -223,7 +223,7 @@ def unit_declined_problem(new: str, why: unit_changes.UnitFixed) -> str:
     which the form links to after these words (unit_recounts)."""
     if why == "labelled":
         # Translators: answered No to "Were the recorded amounts really in
-        # %(old)s?"; the item's labels say the unit; revoking them lets
+        # %(old)s?"; the item's labels fix its unit; revoking them lets
         # the unit change without converting.
         return gettext(
             "Nothing was converted. If they were really in %(new)s, revoke "

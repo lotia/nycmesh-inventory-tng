@@ -98,8 +98,9 @@ def unit_fixed(session: Session, item_id: int) -> UnitFixed | None:
     """Why the item's unit can no longer change freely, if it can't: stock
     has moved in it, for good, or a label not revoked has been printed for
     it or one of its packages (a package's label names its item too). Its
-    ledger's lines record it, and its labels say what it was then (Ali,
-    2026-11-23, inventory-tng-rpud). It may still change between lengths,
+    ledger's lines record it, and a free change re-tags its packages'
+    units, which their labels print (Ali, 2026-11-23, inventory-tng-rpud;
+    2026-11-25, inventory-tng-8ema). It may still change between lengths,
     converting what is recorded, once an administrator confirms what was
     recorded was in its unit (convert); never between each and a length.
     A revoked label scans as no label, so it fixes nothing, and revoking
@@ -124,7 +125,7 @@ def units_open(unit: str, why: UnitFixed | None) -> tuple[str, ...]:
 def follow(session: Session, item_id: int, unit: str) -> None:
     """An item's packages and vendor offers, retired ones too, recorded in
     its new unit, their amounts as they were: its unit may change, so no
-    stock has moved in it and no label says it (unit_fixed), and what was
+    stock has moved in it and no label fixes it (unit_fixed), and what was
     typed was meant in the unit chosen (Ali, 2026-11-23,
     inventory-tng-rpud)."""
     for model in (ItemPackage, VendorOffer):

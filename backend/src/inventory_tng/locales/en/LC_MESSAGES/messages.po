@@ -2646,7 +2646,7 @@ msgid ""
 msgstr ""
 
 #. Translators: answered No to "Were the recorded amounts really in
-#. %(old)s?"; the item's labels say the unit; revoking them lets
+#. %(old)s?"; the item's labels fix its unit; revoking them lets
 #. the unit change without converting.
 #: src/inventory_tng/catalogue/forms.py
 #, python-format

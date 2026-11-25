@@ -553,7 +553,8 @@ def test_no_revokes_nothing(admin_client: TestClient, session: Session) -> None:
     place = _shelf_a(session)
     own, on_reel, _ = _labelled_reel(session, place)
     answered = unit_answered(place.cable, "no", unit="ft")
-    admin_client.post(f"{ITEMS}/{place.cable.id}", data=answered)
+    declined = admin_client.post(f"{ITEMS}/{place.cable.id}", data=answered)
+    assert "Nothing was converted" in words_on(declined.text)
     for each in (own, on_reel):
         session.refresh(each)
     assert (own.revoked_at, on_reel.revoked_at) == (None, None)

@@ -463,10 +463,9 @@ other unit, and retiring the item for a new one.
   conversion left (loose, for an open package closed or moved since);
   its open packages close; its packages in the old unit are retired and
   renamed, its unit after their name, so a package of the same name can
-  be added; its unit changes; and the amounts
-  typed are kept. Refused, to be shown again, if anything it would do
-  changed since its page was shown, or if it reached another place
-  before the item was held.
+  be added; its unit changes; and the amounts typed are kept. Refused,
+  to be shown again, if anything it would do changed since its page was
+  shown, or if it reached another place before the item was held.
 - An item holding nothing, such as one converted before, has nothing to
   write off or close; the rest is done as above. Its packages in the
   other unit, as a conversion left them, stay.
