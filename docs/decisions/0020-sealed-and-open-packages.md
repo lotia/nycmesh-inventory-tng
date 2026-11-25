@@ -451,19 +451,19 @@ you" counts every report in one line, which hides what is waiting.
 - **An opening's open package closed** since, however it closed (Confirm
   used up, Close on its item's page, a count, even one whose every line
   was withheld as moved meanwhile, which writes no count; not made loose,
-  below), wrote off what
-  it showed, so Correct skips that end and writes only the sealed end,
-  not refused (Ali, 2026-11-15, inventory-tng-nyl). The row then says
-  "Open spool closed 14 Nov. Sealed spool still to put right." (the day it
-  closed) and offers "Correct sealed spool" and "Count Van", as for one
-  end counted. Correct settles it as `corrected`; the skipped end keeps no
-  count, as the close was none. A count of the sealed spool there puts the
-  other end right, so it closes as `counted`, as does any count of its
-  item there once both ends are right. A Correct seen before the close is
-  not refused, as the sealed end alone is right either way. Correct and a
-  count read the close under the place's lock, which a close takes first,
-  so they go one at a time. Moves are unchanged: a move's open package
-  closed still refuses its Correct and puts no end right.
+  below), wrote off what it showed, so Correct skips that end and writes
+  only the sealed end, not refused (Ali, 2026-11-15, inventory-tng-nyl).
+  The row then says "Open spool closed 14 Nov. Sealed spool still to put
+  right." (the day it closed) and offers "Correct sealed spool" and "Count
+  Van", as for one end counted. Correct settles it as `corrected`; the
+  skipped end keeps no count, as the close was none. A count of the sealed
+  spool there puts the other end right, so it closes as `counted`, as does
+  any count of its item there once both ends are right. A Correct seen
+  before the close is not refused, as the sealed end alone is right either
+  way. Correct and a count read the close under the place's lock, which a
+  close takes first, so they go one at a time. Moves are unchanged: a
+  move's open package closed still refuses its Correct and puts no end
+  right.
 - **Its sealed end counted, then its open package closed**, however
   (Confirm used up, one or ticked, Close on its item's page, a count),
   the close closes the row as `counted`: the sealed end by its count, the

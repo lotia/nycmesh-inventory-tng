@@ -210,6 +210,10 @@ def arrived_field(spools: Spools, into: Form) -> str:
     """The count form's field of the form an opening arrived in."""
     if into.open_package_id is not None:
         return f"opened_{into.open_package_id}"
+    return loose_field(spools)
+
+
+def loose_field(spools: Spools) -> str:
     return f"loose_{spools.cable.id}"
 
 

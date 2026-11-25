@@ -12,6 +12,7 @@ from httpx2 import Response
 from sqlalchemy import select
 from sqlalchemy.orm import Session, object_session
 
+from inventory_tng.catalogue import items
 from inventory_tng.models.base import INTEGER_MAX
 from inventory_tng.models.catalogue import Category, Item, ItemPackage
 from inventory_tng.models.places import Location
@@ -34,7 +35,7 @@ from inventory_tng.web.navigation import retired_holding
 
 from helpers.concurrency import Committed
 from helpers.markup import Element, hidden_fields, read
-from helpers.rows import add, tag
+from helpers.rows import add, item_fields, tag
 from helpers.sign_in import admin_named
 
 # Where the scan page sends its batches.
@@ -303,6 +304,21 @@ class Spools:
             {"kind": "install", "from_location_id": place},
             Entry(self.cable.id, Decimal(metres), self.sealed),
         )
+
+    def unfollow(self, admin_id: int, at: datetime) -> int:
+        """The cable's opened spools no longer followed, as its page saves
+        it, by `admin_id` `at`: how many open packages that closed."""
+        cable = self.cable
+        _, closed = open_packages.unfollowing(
+            self.session,
+            admin_id,
+            at,
+            lambda: items.save(
+                self.session, cable, item_fields(cable, track_opened=False), seen=None
+            ),
+            item_ids=[cable.id],
+        )
+        return closed
 
 
 def netted_retired(session: Session) -> Spools:

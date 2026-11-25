@@ -17,27 +17,11 @@ from inventory_tng.models.stock import LedgerTransaction, Movement, OpenPackage
 from inventory_tng.stock import open_packages
 from inventory_tng.stock.ledger import LOOSE, Entry, Form, insert_transaction
 
-from helpers.rows import add, breaks, history, item_fields, violates
+from helpers.rows import add, breaks, history, violates
 from helpers.sign_in import new_admin
 from helpers.stock import Spools, held_by_form
 
 NOW = datetime(2026, 11, 24, 9, tzinfo=UTC)
-
-
-def turned_off(session: Session, spools: Spools, admin_id: int) -> int:
-    """The cable's opened spools no longer followed, as its page saves it:
-    how many open packages that closed."""
-    cable = spools.cable
-    _, closed = open_packages.unfollowing(
-        session,
-        admin_id,
-        NOW,
-        lambda: items.save(
-            session, cable, item_fields(cable, track_opened=False), seen=None
-        ),
-        item_ids=[cable.id],
-    )
-    return closed
 
 
 def loosenings(session: Session) -> list[LedgerTransaction]:
@@ -65,7 +49,7 @@ def test_open_packages_at_two_places_become_loose_there(
     store_before = sum(held_by_form(session, spools.store.id, cable).values())
     van_before = sum(held_by_form(session, spools.van.id, cable).values())
 
-    assert turned_off(session, spools, admin.id) == 2
+    assert spools.unfollow(admin.id, NOW) == 2
 
     assert held_by_form(session, spools.store.id, cable) == {
         (cable, LOOSE): Decimal(250)
@@ -85,7 +69,7 @@ def test_open_packages_at_two_places_become_loose_there(
     ]
     # Nothing is left open to offer for cuts, and saving again closes none.
     assert open_packages.shown(session, OpenPackage.item_id == cable) == []
-    assert turned_off(session, spools, admin.id) == 0
+    assert spools.unfollow(admin.id, NOW) == 0
 
 
 def test_one_left_below_zero_takes_as_much_from_loose(
@@ -95,7 +79,7 @@ def test_one_left_below_zero_takes_as_much_from_loose(
     cable = spools.cable.id
     row = spools.opened()
     spools.move(Entry(cable, Decimal(310), Form(open_package_id=row.id)))
-    assert turned_off(session, spools, admin.id) == 1
+    assert spools.unfollow(admin.id, NOW) == 1
     # The other spool is still sealed.
     assert held_by_form(session, spools.store.id, cable) == {
         (cable, LOOSE): Decimal(-5),
@@ -127,7 +111,7 @@ def test_only_packages_no_longer_followed_are_closed(
     )
     reel_open = open_packages.make(session, uuid.uuid4(), reel.id, spools.store.id)
     spool_open = spools.opened()
-    assert turned_off(session, spools, admin.id) == 1
+    assert spools.unfollow(admin.id, NOW) == 1
     assert reel_open.closed_at is None
     assert spool_open.closed_at == NOW
 

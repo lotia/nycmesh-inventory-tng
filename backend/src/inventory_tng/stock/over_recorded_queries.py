@@ -36,7 +36,6 @@ from inventory_tng.stock import balance
 from inventory_tng.stock.over_recorded import (
     CHECKED_REASONS,
     MADE_LOOSE_IN,
-    MADE_LOOSE_ON,
     OPENED_INTO,
     WAITING,
     WRITTEN_OFF_ON,
@@ -65,9 +64,9 @@ def within(name: str) -> str:
 class OneCounted(NamedTuple):
     """A check one of whose two ends a count put right: the end counted
     and how ("counted", or "closed" for an opening's open package closed
-    since by a write-off, inventory-tng-nyl) and when, the end still to put right, as a
-    sentence starts with each, and as its Correct button names it; and the
-    place to count, by id and name, and whether it may be counted
+    since by a write-off, inventory-tng-nyl) and when, the end still to put
+    right, as a sentence starts with each, and as its Correct button names
+    it; and the place to count, by id and name, and whether it may be counted
     (balance.countable). A move's ends are its places; an opening's, both
     at one place, its forms: "Sealed spool" where it left, "Open spool" or
     "Loose cat6 cable" where it arrived, the names as within() shows them
@@ -208,6 +207,13 @@ def _loose_end(made_loose_in: int | None, put_right_in: int | None) -> bool:
     )
 
 
+def _waits_loose(made_loose_in: int | None, arrived_on: datetime | None) -> bool:
+    """Whether an opening's open package was made loose there
+    (MADE_LOOSE_IN) and no count has put its open end right yet: its check
+    asks for a count of that place (MadeLoose)."""
+    return made_loose_in is not None and arrived_on is None
+
+
 def _end_names(
     kind: str,
     item: str,
@@ -289,7 +295,7 @@ def shown(session: Session, *where: ColumnElement[bool]) -> list[Shown]:
             LEFT_COUNT.created_at,
             ARRIVED_COUNT.created_at,
             WRITTEN_OFF_ON,
-            MADE_LOOSE_ON,
+            OpenPackage.closed_at,
             MADE_LOOSE_IN,
         )
         .where(WAITING, *where)
@@ -302,9 +308,9 @@ def shown(session: Session, *where: ColumnElement[bool]) -> list[Shown]:
         session,
         {
             to_id if left_on else from_id
-            for *_, from_id, to_id, left_on, arrived_on, closed_on, loose_on, _ in found
+            for *_, from_id, to_id, left_on, arrived_on, closed_on, _, loose_in in found
             if (left_on is None) != (arrived_on is None and closed_on is None)
-            or (loose_on is not None and arrived_on is None)
+            or _waits_loose(loose_in, arrived_on)
         },
     )
     lines = []
@@ -328,7 +334,7 @@ def shown(session: Session, *where: ColumnElement[bool]) -> list[Shown]:
         left_on,
         arrived_on,
         closed_on,
-        loose_on,
+        ended_on,
         loose_in,
     ) in found:
         words = _amount(row.quantity, unit, package, size, from_open, kind)
@@ -339,11 +345,11 @@ def shown(session: Session, *where: ColumnElement[bool]) -> list[Shown]:
         if arrived_on is None and closed_on is not None:
             arrived_on, arrived_how = closed_on, "closed"
         one = both = made_loose = None
-        if loose_on is not None and arrived_on is None:
-            # An opening's: one place, both ends.
+        if _waits_loose(loose_in, arrived_on):
+            # An opening's: one place, both ends; made loose as it closed.
             made_loose = MadeLoose(
                 within(opened(package or "")),
-                loose_on,
+                ended_on,
                 to_id or 0,
                 to_place or "",
                 to_id in countable,

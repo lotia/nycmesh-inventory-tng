@@ -10,10 +10,9 @@ from decimal import Decimal
 from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
 
-from inventory_tng.catalogue import items
 from inventory_tng.core.local_time import show_day, site_zone
 from inventory_tng.models.stock import LedgerTransaction, OpenPackage
-from inventory_tng.stock import ledger, open_packages, over_recorded
+from inventory_tng.stock import ledger, over_recorded
 from inventory_tng.stock.over_recorded_queries import within
 from inventory_tng.stock.paths import COUNTS
 
@@ -23,30 +22,20 @@ from helpers.over_recorded import (
     arrived_field,
     checks,
     correct,
+    loose_field,
     opened_into,
     opening_raised,
     reason_adjustments,
     sealed_field,
 )
-from helpers.rows import item_fields
 from helpers.stock import Spools, ada_id, count_at
 
 
 def made_loose(session: Session, spools: Spools) -> str:
     """The cable's opened spools no longer followed, as its page saves it,
     by admin_client's administrator: the day, as the page shows it."""
-    cable = spools.cable
     at = datetime.now(UTC)
-    _, closed = open_packages.unfollowing(
-        session,
-        ada_id(session),
-        at,
-        lambda: items.save(
-            session, cable, item_fields(cable, track_opened=False), seen=None
-        ),
-        item_ids=[cable.id],
-    )
-    assert closed == 2
+    assert spools.unfollow(ada_id(session), at) == 2
     session.commit()
     return show_day(at, site_zone(session))
 
@@ -86,7 +75,7 @@ def test_made_loose_asks_a_count_which_puts_both_ends_right(
     count_at(
         admin_client,
         spools.store.id,
-        {sealed_field(spools): "1", f"loose_{spools.cable.id}": "305"},
+        {sealed_field(spools): "1", loose_field(spools): "305"},
     )
     (check,) = checks(session)
     assert check.settled_how == "counted"
@@ -103,7 +92,7 @@ def test_made_loose_then_its_loose_units_counted_reads_as_after_any_count(
     spools = Spools(session)
     opening_raised(registered_client, spools)
     day = made_loose(session, spools)
-    count_at(admin_client, spools.store.id, {f"loose_{spools.cable.id}": "305"})
+    count_at(admin_client, spools.store.id, {loose_field(spools): "305"})
     (check,) = checks(session)
     assert check.settled_at is None
     assert check.arrived_count_id is not None
@@ -127,7 +116,7 @@ def test_one_end_counted_before_it_was_made_loose(
     (check,) = checks(session)
     assert check.settled_at is None
     assert asks_a_count(page_of(admin_client, spools), spools, day)
-    count_at(admin_client, spools.store.id, {f"loose_{spools.cable.id}": "305"})
+    count_at(admin_client, spools.store.id, {loose_field(spools): "305"})
     (check,) = checks(session)
     assert check.settled_how == "counted"
 
@@ -206,7 +195,7 @@ def test_made_loose_after_it_moved_away_is_not_loose_here(
     session.commit()
     made_loose(session, spools)
     assert "became loose units" not in words_on(page_of(admin_client, spools))
-    count_at(admin_client, spools.store.id, {f"loose_{spools.cable.id}": "305"})
+    count_at(admin_client, spools.store.id, {loose_field(spools): "305"})
     (row,) = checks(session)
     assert row.arrived_count_id is None
     correct(admin_client, session)

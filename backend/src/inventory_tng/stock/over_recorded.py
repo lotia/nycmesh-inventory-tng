@@ -176,17 +176,14 @@ _LOOSENED_IN = case(
 WRITTEN_OFF_ON = case((_LOOSENED_IN.is_(None), OpenPackage.closed_at)).label(
     "written_off_on"
 )
-# When, and by which transaction, an opening's open package was made loose
-# at the opening's place, else NULL. One moved whole elsewhere first was
-# made loose there, where neither a count of this place nor Correct, which
-# holds only this place, can reach it: like one moved and still open, it
-# is neither put right nor made loose here.
-_LOOSE_HERE = and_(
-    _LOOSENED_IN.is_not(None),
-    OpenPackage.location_id == LedgerTransaction.to_location_id,
-)
-MADE_LOOSE_ON = case((_LOOSE_HERE, OpenPackage.closed_at)).label("made_loose_on")
-MADE_LOOSE_IN = case((_LOOSE_HERE, _LOOSENED_IN)).label("made_loose_in")
+# The transaction that made an opening's open package loose at the
+# opening's place, else NULL; when, its closed_at. One moved whole
+# elsewhere first was made loose there, where neither a count of this place
+# nor Correct, which holds only this place, can reach it: like one moved
+# and still open, it is neither put right nor made loose here.
+MADE_LOOSE_IN = case(
+    (OpenPackage.location_id == LedgerTransaction.to_location_id, _LOOSENED_IN)
+).label("made_loose_in")
 
 
 def moved_whole(from_open: int | None, to_open: int | None) -> bool:
@@ -396,7 +393,7 @@ def correct(session: Session, check_id: int, seen_as: str, admin_id: int) -> Set
     counts.record_adjustment."""
     row = waiting(session, check_id, seen_as)
     read = _read(session, row)
-    movement, transaction, closed = read.movement, read.transaction, read.closed
+    movement, transaction, closed, loose = read
     if _right(row, read):
         _closed_right(session, row, admin_id)
         return "counted"
@@ -421,7 +418,7 @@ def correct(session: Session, check_id: int, seen_as: str, admin_id: int) -> Set
             False,
             # Made loose, what it showed is loose units there now.
             ledger.LOOSE
-            if read.loose
+            if loose
             else ledger.Form(movement.to_package_id, movement.to_open_package_id),
         ),
     )
@@ -600,7 +597,8 @@ def counted(
     did (OPENED_INTO); one made loose there before did not, and a count of
     the item's total or its loose units puts that end right, made by
     `as_of` (MADE_LOOSE_IN; Ali, 2026-11-24, inventory-tng-n7dj). One with
-    every end it has put right closes as counted, by the count's administrator, then. How many closed.
+    every end it has put right closes as counted, by the count's
+    administrator, then. How many closed.
 
     Call it in the count's transaction, holding the place (ledger.lock_place):
     it holds the rows it reads, by id, as Correct and Mark checked take a
